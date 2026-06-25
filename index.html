@@ -1514,8 +1514,7 @@ class Component extends DCLogic {
       const acc=this.state.accounts[t.account||t.from]||{};
       rows.push([t.id,t.dateLabel,t.type,t.merchant,cat.name||t.cat,acc.name||'',t.amount,t.note||'',(t.tags||[]).join('|')]);
     });
-    const csv=rows.map(r=>r.map(v=>'"'+String(v??'').replace(/"/g,'""')+'"').join(',')).join('
-');
+    const csv=rows.map(r=>r.map(v=>'"'+String(v??'').replace(/"/g,'""')+'"').join(',')).join('\\n');
     this.downloadFile('finanzapp-transacciones.csv',csv,'text/csv;charset=utf-8');
     this.flashMsg('CSV exportado');
   }
