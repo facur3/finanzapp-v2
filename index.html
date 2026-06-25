@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:,">
 <script src="./support.js"></script>
 </head>
 <body>
@@ -1199,7 +1200,7 @@ input{font-family:inherit;}
         <div style="font-size:18px;font-weight:800;margin-bottom:6px;">Importar</div>
         <div style="background:var(--card);border-radius:18px;padding:4px 16px;box-shadow:var(--shadow-pill);">
           <div onClick="{{ askImport }}" style="display:flex;align-items:center;gap:12px;padding:14px 0;border-bottom:1px solid var(--hairline);cursor:pointer;"><span style="font-size:20px;">⬆️</span><span style="flex:1;font-size:15px;font-weight:600;">Importar backup</span><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--text-3)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"></polyline></svg></div>
-          <div onClick="{{ askImport }}" style="display:flex;align-items:center;gap:12px;padding:14px 0;cursor:pointer;"><span style="font-size:20px;">📥</span><span style="flex:1;font-size:15px;font-weight:600;">Importar CSV de banco</span><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--text-3)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"></polyline></svg></div>
+          <div onClick="{{ askImportCsv }}" style="display:flex;align-items:center;gap:12px;padding:14px 0;cursor:pointer;"><span style="font-size:20px;">📥</span><span style="flex:1;font-size:15px;font-weight:600;">Importar CSV de banco</span><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--text-3)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"></polyline></svg></div>
         </div>
         <div style="font-size:12px;color:var(--text-3);font-weight:500;text-align:center;margin-top:16px;">Datos locales en este dispositivo</div>
       </div>
@@ -1420,6 +1421,8 @@ class Component extends DCLogic {
     this.CARDGRADS=['linear-gradient(135deg,#3a3a3c,#161618)','linear-gradient(135deg,#7a4b57,#2e1d22)','linear-gradient(135deg,#3f5b7a,#1a2738)','linear-gradient(135deg,#3f6b4c,#1b2e22)','linear-gradient(135deg,#5b4a76,#241d33)'];
     this.CATTYPES=[['gasto','Gasto'],['ingreso','Ingreso'],['transfer','Transferencia'],['inversion','Inversión']];
     this.CARDBRANDS=['Visa','Mastercard','Amex'];
+    this.STORAGE_KEY='finanzapp:v2:state';
+    this.LEGACY_STORAGE_KEY='finanzapp.v2.state';
     this.carouselRef=React.createRef();
     this.SEEDACC={
       banco:{name:'Banco Galicia',type:'Banco',kind:'liquid',liquid:true,emoji:'🏦',iconVar:'--cat-transfer-icon',fillVar:'--cat-transfer-fill',currency:'ARS'},
@@ -1481,21 +1484,51 @@ class Component extends DCLogic {
     this.persistentKeys().forEach(k=>{ snap[k]=state[k]; });
     return snap;
   }
+  coercePersistedState(st){
+    if(!st||typeof st!=='object')throw new Error('invalid-state');
+    const base=this.emptyData();
+    const out=Object.assign({},base,st);
+    const objKeys=['categories','categoryTotals','accounts','archived','balances','accMeta'];
+    objKeys.forEach(k=>{if(!out[k]||typeof out[k]!=='object'||Array.isArray(out[k]))out[k]={};});
+    ['catOrder','txns','order','cards','tagSugg'].forEach(k=>{if(!Array.isArray(out[k]))out[k]=[];});
+    out.categories=Object.assign({},base.categories,out.categories);
+    out.catOrder=out.catOrder.filter(k=>out.categories[k]);
+    Object.keys(out.categories).forEach(k=>{if(out.catOrder.indexOf(k)<0&&k!=='pago')out.catOrder.push(k);});
+    out.order=out.order.filter(k=>out.accounts[k]);
+    Object.keys(out.accounts).forEach(k=>{if(out.order.indexOf(k)<0)out.order.push(k);});
+    out.txns=out.txns.filter(t=>t&&typeof t==='object'&&t.id!=null&&t.type&&isFinite(Number(t.val))&&isFinite(Number(t.amount))).map(t=>Object.assign({dateLabel:'Hoy',tags:[]},t,{tags:Array.isArray(t.tags)?t.tags:[]}));
+    out.cards=out.cards.filter(c=>c&&typeof c==='object').map(c=>Object.assign({id:'card_'+Math.random().toString(36).slice(2),brand:'Visa',bank:'',last4:'0000',saldo:0,limit:1,cierre:'—',vence:'—',grad:this.CARDGRADS[0],compras:[],cuotas:[],pagos:[]},c));
+    out.tagSugg=out.tagSugg.map(t=>String(t).trim().toLowerCase().replace(/^#/,'')).filter(Boolean).filter((t,i,a)=>a.indexOf(t)===i);
+    const maxTxn=out.txns.reduce((m,t)=>Math.max(m,Number(t.id)||0),0);
+    out._next=Math.max(Number(out._next)||1,maxTxn+1,out.order.length+out.cards.length+1);
+    if(['sample','empty'].indexOf(out.dataMode)<0)out.dataMode='empty';
+    if(['light','dark'].indexOf(out.theme)<0)out.theme='light';
+    if(['bars','pills'].indexOf(out.chartStyle)<0)out.chartStyle='bars';
+    out.showOnboarding=!!out.showOnboarding;
+    out.hideAmounts=!!out.hideAmounts;
+    return this.persistentSnapshot(out);
+  }
+  parseBackupPayload(raw){
+    const parsed=typeof raw==='string'?JSON.parse(raw):raw;
+    if(!parsed||parsed.app!=='FinanzApp'||!parsed.state)throw new Error('invalid-backup');
+    if(parsed.schema&&parsed.schema!=='finanzapp.local.v2')throw new Error('invalid-schema');
+    return this.coercePersistedState(parsed.state);
+  }
   loadPersistedState(){
     try{
-      const raw=localStorage.getItem('finanzapp.v2.state');
+      const raw=localStorage.getItem(this.STORAGE_KEY)||localStorage.getItem(this.LEGACY_STORAGE_KEY);
       if(!raw)return;
-      const parsed=JSON.parse(raw);
-      if(!parsed||parsed.app!=='FinanzApp'||!parsed.state)return;
-      this.setState(Object.assign({}, parsed.state, {push:null,sheet:null,subsheet:null,flash:'',confirm:null,detailId:null,editId:null}));
+      const state=this.parseBackupPayload(raw);
+      this.setState(Object.assign({}, state, {push:null,sheet:null,subsheet:null,flash:'',confirm:null,detailId:null,editId:null}));
     }catch(e){
       console.warn('FinanzApp: no se pudo cargar el estado local', e);
+      this.setState({flash:'Datos locales dañados · se inició en modo seguro'});
     }
   }
   persistState(){
     try{
-      const payload={app:'FinanzApp',version:1,savedAt:new Date().toISOString(),state:this.persistentSnapshot(this.state)};
-      localStorage.setItem('finanzapp.v2.state',JSON.stringify(payload));
+      const payload={app:'FinanzApp',schema:'finanzapp.local.v2',version:2,savedAt:new Date().toISOString(),state:this.persistentSnapshot(this.state)};
+      localStorage.setItem(this.STORAGE_KEY,JSON.stringify(payload));
     }catch(e){
       console.warn('FinanzApp: no se pudo guardar el estado local', e);
     }
@@ -1514,12 +1547,12 @@ class Component extends DCLogic {
       const acc=this.state.accounts[t.account||t.from]||{};
       rows.push([t.id,t.dateLabel,t.type,t.merchant,cat.name||t.cat,acc.name||'',t.amount,t.note||'',(t.tags||[]).join('|')]);
     });
-    const csv=rows.map(r=>r.map(v=>'"'+String(v??'').replace(/"/g,'""')+'"').join(',')).join('\\n');
+    const csv='\ufeff'+rows.map(r=>r.map(v=>'"'+String(v??'').replace(/"/g,'""')+'"').join(',')).join('\\n');
     this.downloadFile('finanzapp-transacciones.csv',csv,'text/csv;charset=utf-8');
     this.flashMsg('CSV exportado');
   }
   doBackup(){
-    const payload={app:'FinanzApp',version:1,exportedAt:new Date().toISOString(),state:this.persistentSnapshot(this.state)};
+    const payload={app:'FinanzApp',schema:'finanzapp.local.v2',version:2,exportedAt:new Date().toISOString(),state:this.persistentSnapshot(this.state)};
     this.downloadFile('finanzapp-backup.json',JSON.stringify(payload,null,2),'application/json;charset=utf-8');
     this.flashMsg('Backup descargado');
   }
@@ -1535,10 +1568,7 @@ class Component extends DCLogic {
       const reader=new FileReader();
       reader.onload=()=>{
         try{
-          const parsed=JSON.parse(String(reader.result||''));
-          if(!parsed||parsed.app!=='FinanzApp'||!parsed.state)throw new Error('invalid');
-          const st=parsed.state;
-          if(!st.accounts||!st.balances||!st.categories||!Array.isArray(st.txns))throw new Error('invalid-shape');
+          const st=this.parseBackupPayload(String(reader.result||''));
           this.setState(Object.assign({}, st, {push:null,sheet:null,subsheet:null,flash:'Backup importado',confirm:null,showOnboarding:false}));
         }catch(e){
           this.flashMsg('Backup inválido');
@@ -1547,6 +1577,59 @@ class Component extends DCLogic {
       reader.readAsText(file);
     };
     input.click();
+  }
+  parseCsv(text){
+    const rows=[];let row=[],cell='',q=false;
+    for(let i=0;i<text.length;i++){
+      const ch=text[i],nx=text[i+1];
+      if(q){if(ch==='"'&&nx==='"'){cell+='"';i++;}else if(ch==='"'){q=false;}else cell+=ch;}
+      else if(ch==='"')q=true;
+      else if(ch===','){row.push(cell);cell='';}
+      else if(ch==='\n'){row.push(cell);rows.push(row);row=[];cell='';}
+      else if(ch!=='\r')cell+=ch;
+    }
+    row.push(cell);rows.push(row);
+    return rows.filter(r=>r.some(c=>String(c).trim()!==''));
+  }
+  pickCsvFile(){
+    const input=document.createElement('input');
+    input.type='file';input.accept='.csv,text/csv';
+    input.onchange=()=>{
+      const file=input.files&&input.files[0];
+      if(!file)return;
+      const reader=new FileReader();
+      reader.onload=()=>{
+        try{this.importCsv(String(reader.result||''));}
+        catch(e){console.warn('FinanzApp: CSV inválido',e);this.flashMsg('CSV inválido');}
+      };
+      reader.readAsText(file);
+    };
+    input.click();
+  }
+  importCsv(text){
+    const rows=this.parseCsv(text);
+    if(rows.length<2)throw new Error('empty-csv');
+    const headers=rows[0].map(h=>String(h).replace(/^\ufeff/,'').trim().toLowerCase());
+    const idx=(names)=>names.map(n=>headers.indexOf(n)).find(i=>i>=0);
+    const iDate=idx(['fecha','date']),iType=idx(['tipo','type']),iMerchant=idx(['comercio','merchant','descripcion','descripción','description']),iCat=idx(['categoria','categoría','category']),iAccount=idx(['cuenta','account']),iAmount=idx(['monto','amount']),iNote=idx(['nota','note']),iTags=idx(['tags','etiquetas']);
+    if(iAmount==null||iAmount<0)throw new Error('missing-amount');
+    const fallbackAcc=this.liquidIds()[0]||this.state.order[0];
+    if(!fallbackAcc)throw new Error('missing-account');
+    const byCatName={};Object.keys(this.state.categories).forEach(k=>{byCatName[String(this.state.categories[k].name||'').toLowerCase()]=k;});
+    const txns=rows.slice(1).map((r,n)=>{
+      const rawAmount=String(r[iAmount]||'').trim().replace(/\./g,'').replace(',','.');
+      const amount=Number(rawAmount);if(!isFinite(amount)||amount===0)throw new Error('bad-amount-'+n);
+      const typeRaw=iType>=0?String(r[iType]||'').toLowerCase():'';
+      const type=typeRaw.indexOf('ing')>=0||amount>0?'ingreso':'gasto';
+      const catName=iCat>=0?String(r[iCat]||'').trim():'';
+      const cat=byCatName[catName.toLowerCase()]||(type==='ingreso'?'ingreso':'otros');
+      const accName=iAccount>=0?String(r[iAccount]||'').trim().toLowerCase():'';
+      const acc=Object.keys(this.state.accounts).find(k=>String(this.state.accounts[k].name||'').toLowerCase()===accName)||fallbackAcc;
+      const val=Math.abs(amount);
+      const tags=iTags>=0?String(r[iTags]||'').split('|').map(t=>t.trim().toLowerCase().replace(/^#/,'')).filter(Boolean):[];
+      return {type,merchant:(iMerchant>=0&&r[iMerchant]?String(r[iMerchant]).trim():(this.state.categories[cat]||{}).name)||'Movimiento',cat,amount:type==='ingreso'?val:-val,val,account:acc,dateLabel:(iDate>=0&&r[iDate]?String(r[iDate]).trim():'Hoy'),note:iNote>=0?String(r[iNote]||'').trim():'',tags};
+    });
+    this.setState(s=>{let b={...s.balances},ct={...s.categoryTotals},mi=s.monthIncome,me=s.monthExpense,next=s._next;const withIds=txns.map(t=>{const nt={...t,id:next++};const a=this._apply(nt,b,ct,mi,me);b=a.b;ct=a.ct;mi=a.mi;me=a.me;return nt;});return{txns:[...withIds,...s.txns],balances:b,categoryTotals:ct,monthIncome:mi,monthExpense:me,_next:next,sheet:null,flash:'CSV importado'};});
   }
   emptyData(){
     const cats={};this.DEFAULT_CAT_ORDER.concat(['pago']).forEach(k=>{cats[k]={...this.BASECATS[k]};});
@@ -1605,23 +1688,24 @@ class Component extends DCLogic {
   resetData(){this.clearAll();}
   selectCard(i){this.setState({cardIdx:i});const el=this.carouselRef.current;if(el)el.scrollTo({left:i*310,behavior:'smooth'});}
   onCardScroll(e){const el=e.currentTarget;if(!el)return;const i=Math.max(0,Math.min((this.state.cards||[]).length-1,Math.round(el.scrollLeft/310)));if(i!==this.state.cardIdx)this.setState({cardIdx:i});}
-  openAddPreset(type,from,to){this.setState({sheet:'add',push:null,subsheet:null,addType:type,addAmount:'',addTitle:'',addCat:type==='ingreso'?'ingreso':'comida',addAccount:from,addTo:to,addDate:'Hoy',addTags:[],editId:null});}
+  openAddPreset(type,from,to){const liq=this.liquidIds(),inv=this.investIds();this.setState({sheet:'add',push:null,subsheet:null,addType:type,addAmount:'',addTitle:'',addCat:type==='ingreso'?'ingreso':'comida',addAccount:from||liq[0]||inv[0]||'',addTo:to||inv[0]||liq.find(k=>k!==from)||liq[0]||'',addDate:'Hoy',addTags:[],editId:null});}
   openAddAccount(editId){const s=this.state;if(editId){const a=s.accounts[editId];this.setState({push:'addAccount',newAcc:{name:a.name,type:a.type,kind:a.kind,balance:String(s.balances[editId]||0).replace('.',','),currency:a.currency,liquid:a.liquid,editId}});}else{this.setState({push:'addAccount',newAcc:{name:'',type:'Banco',kind:'liquid',balance:'',currency:'ARS',liquid:true,editId:null}});}}
+  openAddInvestmentAccount(){this.setState({push:'addAccount',newAcc:{name:'',type:'Inversión',kind:'invest',balance:'',currency:this.state.currency,liquid:false,editId:null}});}
   setNewAcc(patch){this.setState(s=>({newAcc:{...s.newAcc,...patch}}));}
   addAccountSave(fromOnb){const n=this.state.newAcc;if(!n.name.trim()){this.flashMsg('Poné un nombre');return;}const tm=this.ACCTYPES.find(t=>t[0]===n.type)||['Banco','liquid','🏦'];const kind=tm[1];const liquid=kind==='liquid'?n.liquid:false;const bal=parseFloat((n.balance||'0').replace(/\./g,'').replace(',','.'))||0;
     this.setState(s=>{const pal=this.PALETTE[s.order.length%this.PALETTE.length];if(n.editId){const acc={...s.accounts[n.editId],name:n.name.trim(),type:n.type,kind,liquid,currency:n.currency,emoji:tm[2]};return{accounts:{...s.accounts,[n.editId]:acc},balances:{...s.balances,[n.editId]:bal},push:fromOnb?null:'accountDetail',acctView:n.editId,flash:'Cuenta actualizada'};}
       const id='acc'+s._next+'_'+(s.order.length);const acc={name:n.name.trim(),type:n.type,kind,liquid,currency:n.currency,emoji:tm[2],iconVar:pal[0],fillVar:pal[1]};return{order:[...s.order,id],accounts:{...s.accounts,[id]:acc},balances:{...s.balances,[id]:bal},_next:s._next+1,push:fromOnb?null:'cuentasTab',flash:'Cuenta creada',newAcc:{name:'',type:'Banco',kind:'liquid',balance:'',currency:'ARS',liquid:true,editId:null}};});
     if(!fromOnb)this.setState({push:null,tab:'cuentas'});}
-  archiveAccount(k){this.setState(s=>({archived:{...s.archived,[k]:true},push:null,tab:'cuentas',flash:'Cuenta archivada'}));}
-  deleteAccount(k){this.setState(s=>{const order=s.order.filter(x=>x!==k);const accounts={...s.accounts};delete accounts[k];const balances={...s.balances};delete balances[k];return{order,accounts,balances,push:null,tab:'cuentas',flash:'Cuenta eliminada'};});}
-  payCardSave(){const S=this.state;const v=parseFloat(S.payAmount.replace(',','.'))||0;if(!v){this.flashMsg('Ingresá un monto');return;}const idx=S.cardView;const card=S.cards[idx];if(!card)return;this.setState(s=>{const cs=s.cards.map((c,i)=>i===idx?{...c,saldo:Math.max(0,c.saldo-v)}:c);const bal={...s.balances,[s.payAccount]:(s.balances[s.payAccount]||0)-v};const t={id:s._next,type:'pago',merchant:'Pago '+card.brand,cat:'pago',amount:-v,val:v,account:s.payAccount,card:card.id,isTransfer:true,dateLabel:'Hoy',note:'Pago de tarjeta',tags:[]};return{cards:cs,balances:bal,txns:[t,...s.txns],_next:s._next+1,push:'cardDetail',payAmount:'',flash:'Pago registrado'};});}
+  archiveAccount(k){if(!this.state.accounts[k]){this.flashMsg('Cuenta no encontrada');return;}this.setState(s=>({archived:{...s.archived,[k]:true},push:null,tab:'cuentas',flash:'Cuenta archivada'}));}
+  deleteAccount(k){if(this.state.txns.some(t=>[t.account,t.from,t.to].indexOf(k)>=0)){this.flashMsg('Archivá la cuenta para conservar movimientos');return;}this.setState(s=>{const order=s.order.filter(x=>x!==k);const accounts={...s.accounts};delete accounts[k];const balances={...s.balances};delete balances[k];return{order,accounts,balances,push:null,tab:'cuentas',flash:'Cuenta eliminada'};});}
+  payCardSave(){const S=this.state;const v=parseFloat(S.payAmount.replace(',','.'))||0;if(!v){this.flashMsg('Ingresá un monto');return;}if(!S.accounts[S.payAccount]){this.flashMsg('Elegí una cuenta');return;}const idx=S.cardView;const card=S.cards[idx];if(!card){this.flashMsg('Elegí una tarjeta');return;}this.setState(s=>{const pago={name:'Pago '+card.brand,monto:v,date:'Hoy'};const cs=s.cards.map((c,i)=>i===idx?{...c,saldo:Math.max(0,c.saldo-v),pagos:[pago,...(c.pagos||[])]}:c);const bal={...s.balances,[s.payAccount]:(s.balances[s.payAccount]||0)-v};const t={id:s._next,type:'pago',merchant:'Pago '+card.brand,cat:'pago',amount:-v,val:v,account:s.payAccount,card:card.id,isTransfer:true,dateLabel:'Hoy',note:'Pago de tarjeta',tags:[]};return{cards:cs,balances:bal,txns:[t,...s.txns],_next:s._next+1,push:'cardDetail',payAmount:'',flash:'Pago registrado'};});}
   payPress(d){this.setState(s=>{let r=s.payAmount;if(d==='back')return{payAmount:r.slice(0,-1)};if(d===','){if(r.indexOf(',')>=0||r==='')return{};return{payAmount:r+','};}if(r.indexOf(',')>=0&&(r.split(',')[1]||'').length>=2)return{};if(r.replace(',','').length>=9)return{};return{payAmount:r+d};});}
   openCardPurchase(idx){this.setState({push:'cardPurchase',sheet:null,subsheet:null,cpSub:null,cpCard:idx||0,cpAmount:'',cpMerchant:'',cpCat:'compras',cpDate:'Hoy',cpInstall:1});}
   cpPress(d){this.setState(s=>{let r=s.cpAmount;if(d==='back')return{cpAmount:r.slice(0,-1)};if(d===','){if(r.indexOf(',')>=0||r==='')return{};return{cpAmount:r+','};}if(r.indexOf(',')>=0&&(r.split(',')[1]||'').length>=2)return{};if(r.replace(',','').length>=9)return{};return{cpAmount:r+d};});}
-  savePurchase(){const S=this.state;const val=parseFloat((S.cpAmount||'').replace(',','.'))||0;if(!val){this.flashMsg('Ingresá un monto');return;}const idx=S.cpCard;const card=S.cards[idx];if(!card){this.flashMsg('Agregá una tarjeta primero');return;}const n=S.cpInstall;const merchant=S.cpMerchant.trim()||(this.state.categories[S.cpCat]?this.state.categories[S.cpCat].name:'Compra');const label=n>1?(merchant+' · cuota 1/'+n):merchant;
-    this.setState(s=>{const cs=s.cards.map((c,i)=>i===idx?{...c,saldo:c.saldo+val,compras:[{name:label,monto:val,date:S.cpDate},...(c.compras||[])]}:c);const ct={...s.categoryTotals,[S.cpCat]:(s.categoryTotals[S.cpCat]||0)+val};const t={id:s._next,type:'gasto',merchant:label,cat:S.cpCat,amount:-val,val,card:card.id,onCard:true,dateLabel:S.cpDate,note:n>1?('Tarjeta '+card.brand+' · '+n+' cuotas'):('Tarjeta '+card.brand),tags:[]};return{cards:cs,categoryTotals:ct,monthExpense:s.monthExpense+val,txns:[t,...s.txns],_next:s._next+1,push:'cardDetail',cardView:idx,flash:'Compra registrada'};});}
-  openAssetTrade(mode,account){const inv=this.investIds();const acc=account||inv[0]||'cedears';this.setState({push:'assetTrade',sheet:null,subsheet:null,atSub:null,atMode:mode||'buy',atAccount:acc,atType:'CEDEAR',atTicker:'',atQty:'',atPrice:'',atFees:'',atSource:this.liquidIds()[0]||'banco'});}
-  saveAssetTrade(){const S=this.state;const qty=parseFloat((S.atQty||'').replace(',','.'))||0;const price=parseFloat((S.atPrice||'').replace(',','.'))||0;const fees=parseFloat((S.atFees||'').replace(',','.'))||0;if(!qty||!price){this.flashMsg('Completá cantidad y precio');return;}const gross=qty*price;const buy=S.atMode==='buy';const total=buy?gross+fees:gross-fees;const inv=S.atAccount,src=S.atSource;const ticker=S.atTicker.trim()||S.atType;
+  savePurchase(){const S=this.state;const val=parseFloat((S.cpAmount||'').replace(',','.'))||0;if(!val){this.flashMsg('Ingresá un monto');return;}const idx=S.cpCard;const card=S.cards[idx];if(!card){this.flashMsg('Agregá una tarjeta primero');return;}if(!S.categories[S.cpCat]){this.flashMsg('Elegí una categoría');return;}const n=S.cpInstall;const merchant=S.cpMerchant.trim()||(this.state.categories[S.cpCat]?this.state.categories[S.cpCat].name:'Compra');const label=n>1?(merchant+' · cuota 1/'+n):merchant;
+    this.setState(s=>{const cuota=n>1?{name:merchant,cur:1,tot:n,monto:val/n}:null;const cs=s.cards.map((c,i)=>i===idx?{...c,saldo:c.saldo+val,compras:[{name:label,monto:val,date:S.cpDate},...(c.compras||[])],cuotas:cuota?[cuota,...(c.cuotas||[])]:c.cuotas}:c);const ct={...s.categoryTotals,[S.cpCat]:(s.categoryTotals[S.cpCat]||0)+val};const t={id:s._next,type:'gasto',merchant:label,cat:S.cpCat,amount:-val,val,card:card.id,onCard:true,dateLabel:S.cpDate,note:n>1?('Tarjeta '+card.brand+' · '+n+' cuotas'):('Tarjeta '+card.brand),tags:[]};return{cards:cs,categoryTotals:ct,monthExpense:s.monthExpense+val,txns:[t,...s.txns],_next:s._next+1,push:'cardDetail',cardView:idx,flash:'Compra registrada'};});}
+  openAssetTrade(mode,account){const inv=this.investIds(),liq=this.liquidIds();const acc=account||inv[0]||'';this.setState({push:'assetTrade',sheet:null,subsheet:null,atSub:null,atMode:mode||'buy',atAccount:acc,atType:'CEDEAR',atTicker:'',atQty:'',atPrice:'',atFees:'',atSource:liq[0]||''});}
+  saveAssetTrade(){const S=this.state;const qty=parseFloat((S.atQty||'').replace(',','.'))||0;const price=parseFloat((S.atPrice||'').replace(',','.'))||0;const fees=parseFloat((S.atFees||'').replace(',','.'))||0;if(!qty||!price){this.flashMsg('Completá cantidad y precio');return;}const gross=qty*price;const buy=S.atMode==='buy';const total=buy?gross+fees:gross-fees;const inv=S.atAccount,src=S.atSource;const ticker=S.atTicker.trim()||S.atType;if(!S.accounts[inv]||!S.accounts[src]){this.flashMsg('Elegí cuentas válidas');return;}if(inv===src){this.flashMsg('Origen y destino deben ser distintos');return;}
     this.setState(s=>{const b={...s.balances};if(buy){b[src]=(b[src]||0)-total;b[inv]=(b[inv]||0)+gross;}else{b[inv]=(b[inv]||0)-gross;b[src]=(b[src]||0)+total;}
       const t={id:s._next,type:'inversion',merchant:(buy?'Compra ':'Venta ')+ticker,cat:'inversion',amount:buy?-total:total,val:total,from:buy?src:inv,to:buy?inv:src,isTransfer:true,dateLabel:'Hoy',note:qty+' × '+this.fmtInt(price)+(fees?(' · comisión '+this.fmtInt(fees)):''),tags:[]};
       return{balances:b,txns:[t,...s.txns],_next:s._next+1,push:'investDetail',investView:inv,flash:buy?'Compra realizada':'Venta realizada'};});}
@@ -1631,7 +1715,7 @@ class Component extends DCLogic {
   press(d){this.setState(s=>{let r=s.addAmount;if(d===','){if(r.indexOf(',')>=0||r==='')return{};return{addAmount:r+','};}if(r.indexOf(',')>=0){const dec=r.split(',')[1]||'';if(dec.length>=2)return{};}if(r.replace(',','').length>=9)return{};return{addAmount:r+d};});}
   backspace(){this.setState(s=>({addAmount:s.addAmount.slice(0,-1)}));}
 
-  openAdd(type){const defCat=type==='ingreso'?'ingreso':'comida';const defAcc=type==='inversion'?'banco':'banco';const defTo=type==='inversion'?'cedears':'efectivo';this.setState({sheet:'add',subsheet:null,addType:type,addAmount:'',addTitle:'',addCat:defCat,addAccount:defAcc,addTo:defTo,addDate:'Hoy',addTags:[],editId:null});}
+  openAdd(type){const liq=this.liquidIds(),inv=this.investIds();const defCat=type==='ingreso'?'ingreso':'comida';const defAcc=liq[0]||inv[0]||'';const defTo=type==='inversion'?(inv[0]||''):(liq.find(k=>k!==defAcc)||inv[0]||defAcc);this.setState({sheet:'add',subsheet:null,addType:type,addAmount:'',addTitle:'',addCat:defCat,addAccount:defAcc,addTo:defTo,addDate:'Hoy',addTags:[],editId:null});}
   groupByDate(list){const order=[];const map={};list.forEach(t=>{if(!map[t.dateLabel]){map[t.dateLabel]=[];order.push(t.dateLabel);}map[t.dateLabel].push(t);});return order.map(day=>{const items=map[day];const total=items.filter(t=>!t.isTransfer).reduce((a,t)=>a+t.amount,0);return {day,items,total};});}
   txView(t){const C=this.state.categories[t.cat]||{name:'',emoji:'💱'};const isInc=t.amount>0&&!t.isTransfer;let amountStr,amtColor;if(t.isTransfer){amountStr='$'+this.fmtNum(t.amount);amtColor='var(--text-2)';}else{amountStr=this.signed(t.amount);amtColor=isInc?'var(--pos)':'var(--text)';}const accId=t.account||t.from;const am=this.state.accounts[accId];const accName=am?am.name:'';if(this.state.hideAmounts)amountStr='••••';const sub=t.note?t.note:(C.name+(accName?' · '+accName:''));return {id:t.id,merchant:t.merchant,emoji:C.emoji,iconVar:C.iconVar||'--cat-otros-icon',sub,amountStr,amtColor,onOpen:()=>this.setState({detailId:t.id,push:'txnDetail'})};}
   setNewCat(patch){this.setState(s=>({newCat:{...s.newCat,...patch}}));}
@@ -1647,14 +1731,14 @@ class Component extends DCLogic {
   saveCard(){const n=this.state.newCard;if(!n.bank.trim()){this.flashMsg('Poné el banco o emisor');return;}const limit=parseFloat((n.limit||'0').replace(/\./g,'').replace(',','.'))||0;const grad=this.CARDGRADS[n.gradIdx]||this.CARDGRADS[0];const last4=(n.last4||'').replace(/\D/g,'').slice(-4)||'0000';this.setState(s=>{const cards=s.cards.slice();if(n.editId!=null&&cards[n.editId]){cards[n.editId]={...cards[n.editId],brand:n.brand,bank:n.bank.trim(),last4,limit,cierre:n.cierre.trim()||cards[n.editId].cierre,vence:n.vence.trim()||cards[n.editId].vence,grad};return{cards,push:null,tab:'tarjetas',cardIdx:n.editId,cardView:n.editId,flash:'Tarjeta actualizada'};}const card={id:'card_'+s._next,brand:n.brand,bank:n.bank.trim(),last4,saldo:0,limit:limit||1,cierre:n.cierre.trim()||'—',vence:n.vence.trim()||'—',grad,compras:[],cuotas:[],pagos:[]};return{cards:[...cards,card],_next:s._next+1,push:null,tab:'tarjetas',cardIdx:cards.length,cardView:cards.length,flash:'Tarjeta creada'};});}
   deleteCard(idx){this.setState(s=>{const cards=s.cards.filter((c,i)=>i!==idx);return{cards,push:null,tab:'tarjetas',cardIdx:0,cardView:0,flash:'Tarjeta eliminada'};});}
 
-  _rev(t,b,ct,mi,me){b={...b};ct={...ct};if(t.type==='gasto'){b[t.account]-=t.amount;ct[t.cat]=Math.max(0,(ct[t.cat]||0)-t.val);me-=t.val;}else if(t.type==='ingreso'){b[t.account]-=t.amount;mi-=t.val;}else{b[t.from]+=t.val;b[t.to]-=t.val;}return{b,ct,mi,me};}
-  _apply(t,b,ct,mi,me){b={...b};ct={...ct};if(t.type==='gasto'){b[t.account]+=t.amount;ct[t.cat]=(ct[t.cat]||0)+t.val;me+=t.val;}else if(t.type==='ingreso'){b[t.account]+=t.amount;mi+=t.val;}else{b[t.from]-=t.val;b[t.to]+=t.val;}return{b,ct,mi,me};}
+  _rev(t,b,ct,mi,me){b={...b};ct={...ct};if(t.type==='gasto'){if(t.account)b[t.account]=(b[t.account]||0)-t.amount;ct[t.cat]=Math.max(0,(ct[t.cat]||0)-t.val);me-=t.val;}else if(t.type==='ingreso'){if(t.account)b[t.account]=(b[t.account]||0)-t.amount;mi-=t.val;}else{if(t.from)b[t.from]=(b[t.from]||0)+t.val;if(t.to)b[t.to]=(b[t.to]||0)-t.val;}return{b,ct,mi,me};}
+  _apply(t,b,ct,mi,me){b={...b};ct={...ct};if(t.type==='gasto'){if(t.account)b[t.account]=(b[t.account]||0)+t.amount;ct[t.cat]=(ct[t.cat]||0)+t.val;me+=t.val;}else if(t.type==='ingreso'){if(t.account)b[t.account]=(b[t.account]||0)+t.amount;mi+=t.val;}else{if(t.from)b[t.from]=(b[t.from]||0)-t.val;if(t.to)b[t.to]=(b[t.to]||0)+t.val;}return{b,ct,mi,me};}
 
-  save(){const S=this.state;if(!S.addAmount)return;const val=parseFloat(S.addAmount.replace(',','.'))||0;if(!val)return;const type=S.addType;const t={type,val,dateLabel:S.addDate,tags:[...S.addTags]};const C=this.CAT[S.addCat]||{};t.merchant=S.addTitle.trim()||(type==='transfer'?'Transferencia':type==='inversion'?'Inversión':C.name||'Movimiento');if(type==='gasto'){t.cat=S.addCat;t.account=S.addAccount;t.amount=-val;t.note=S.addTitle.trim();}else if(type==='ingreso'){t.cat=S.addCat;t.account=S.addAccount;t.amount=val;t.note=S.addTitle.trim();}else if(type==='transfer'){t.cat='transfer';t.from=S.addAccount;t.to=S.addTo;t.amount=-val;t.isTransfer=true;t.note='→ '+(S.accounts[S.addTo]?S.accounts[S.addTo].name:'');}else{t.cat='inversion';t.from=S.addAccount;t.to=S.addTo;t.amount=-val;t.isTransfer=true;t.note='→ '+(S.accounts[S.addTo]?S.accounts[S.addTo].name:'');}
-    this.setState(s=>{let b={...s.balances},ct={...s.categoryTotals},mi=s.monthIncome,me=s.monthExpense,txns=s.txns;if(s.editId){const old=s.txns.find(x=>x.id===s.editId);if(old){const r=this._rev(old,b,ct,mi,me);b=r.b;ct=r.ct;mi=r.mi;me=r.me;txns=txns.filter(x=>x.id!==s.editId);}}const id=s._next;t.id=id;const a=this._apply(t,b,ct,mi,me);return{txns:[t,...txns],balances:a.b,categoryTotals:a.ct,monthIncome:a.mi,monthExpense:a.me,_next:id+1,sheet:null,subsheet:null,editId:null,addAmount:'',addTitle:'',addTags:[]};});}
+  save(){const S=this.state;if(!S.addAmount)return;const val=parseFloat(S.addAmount.replace(',','.'))||0;if(!val)return;const type=S.addType;const t={type,val,dateLabel:S.addDate,tags:[...S.addTags]};const C=S.categories[S.addCat]||{};t.merchant=S.addTitle.trim()||(type==='transfer'?'Transferencia':type==='inversion'?'Inversión':C.name||'Movimiento');if(type==='gasto'||type==='ingreso'){if(!S.accounts[S.addAccount]){this.flashMsg('Elegí una cuenta');return;}if(!S.categories[S.addCat]){this.flashMsg('Elegí una categoría');return;}}else if(!S.accounts[S.addAccount]||!S.accounts[S.addTo]){this.flashMsg('Elegí cuentas válidas');return;}else if(S.addAccount===S.addTo){this.flashMsg('Origen y destino deben ser distintos');return;}if(type==='gasto'){t.cat=S.addCat;t.account=S.addAccount;t.amount=-val;t.note=S.addTitle.trim();}else if(type==='ingreso'){t.cat=S.addCat;t.account=S.addAccount;t.amount=val;t.note=S.addTitle.trim();}else if(type==='transfer'){t.cat='transfer';t.from=S.addAccount;t.to=S.addTo;t.amount=-val;t.isTransfer=true;t.note='→ '+(S.accounts[S.addTo]?S.accounts[S.addTo].name:'');}else{t.cat='inversion';t.from=S.addAccount;t.to=S.addTo;t.amount=-val;t.isTransfer=true;t.note='→ '+(S.accounts[S.addTo]?S.accounts[S.addTo].name:'');}
+    this.setState(s=>{let b={...s.balances},ct={...s.categoryTotals},mi=s.monthIncome,me=s.monthExpense,txns=s.txns;if(s.editId){const old=s.txns.find(x=>x.id===s.editId);if(old){const r=this._rev(old,b,ct,mi,me);b=r.b;ct=r.ct;mi=r.mi;me=r.me;txns=txns.filter(x=>x.id!==s.editId);}}const id=s.editId||s._next;t.id=id;const a=this._apply(t,b,ct,mi,me);return{txns:[t,...txns],balances:a.b,categoryTotals:a.ct,monthIncome:a.mi,monthExpense:a.me,_next:s.editId?s._next:id+1,sheet:null,subsheet:null,editId:null,addAmount:'',addTitle:'',addTags:[],flash:s.editId?'Movimiento actualizado':'Movimiento guardado'};});}
   deleteTxn(){const S=this.state;const t=S.txns.find(x=>x.id===S.detailId);if(!t)return;this.setState(s=>{const r=this._rev(t,s.balances,s.categoryTotals,s.monthIncome,s.monthExpense);return{txns:s.txns.filter(x=>x.id!==t.id),balances:r.b,categoryTotals:r.ct,monthIncome:r.mi,monthExpense:r.me,push:null,detailId:null};});}
   duplicateTxn(){const S=this.state;const t=S.txns.find(x=>x.id===S.detailId);if(!t)return;this.setState(s=>{const id=s._next;const nt={...t,id,dateLabel:'Hoy',tags:[...(t.tags||[])]};const a=this._apply(nt,s.balances,s.categoryTotals,s.monthIncome,s.monthExpense);return{txns:[nt,...s.txns],balances:a.b,categoryTotals:a.ct,monthIncome:a.mi,monthExpense:a.me,_next:id+1,push:null,detailId:null};});}
-  editTxn(){const S=this.state;const t=S.txns.find(x=>x.id===S.detailId);if(!t)return;this.setState({sheet:'add',push:null,subsheet:null,editId:t.id,addType:t.type,addAmount:String(t.val).replace('.',','),addTitle:t.note||t.merchant,addCat:(t.cat==='transfer'||t.cat==='inversion')?'comida':t.cat,addAccount:t.account||t.from||'banco',addTo:t.to||'cedears',addDate:t.dateLabel,addTags:[...(t.tags||[])]});}
+  editTxn(){const S=this.state;const t=S.txns.find(x=>x.id===S.detailId);if(!t)return;const liq=this.liquidIds(),inv=this.investIds();this.setState({sheet:'add',push:null,subsheet:null,editId:t.id,addType:t.type,addAmount:String(t.val).replace('.',','),addTitle:t.note||t.merchant,addCat:(t.cat==='transfer'||t.cat==='inversion'||!S.categories[t.cat])?'comida':t.cat,addAccount:t.account||t.from||liq[0]||'',addTo:t.to||inv[0]||liq[0]||'',addDate:t.dateLabel,addTags:[...(t.tags||[])]});}
 
   renderVals(){
     const S=this.state,CAT=S.categories,ACC=S.accounts,isDark=S.theme==='dark';
@@ -1929,10 +2013,9 @@ class Component extends DCLogic {
       hasConfirm:!!S.confirm,confirmTitle:S.confirm?S.confirm.title:'',confirmMsg:S.confirm?S.confirm.msg:'',confirmLabel:S.confirm?S.confirm.confirmLabel:'Confirmar',
       confirmBtnBg:(S.confirm&&S.confirm.danger)?'var(--accent)':'var(--text)',confirmBtnColor:(S.confirm&&S.confirm.danger)?'#fff':'var(--bg)',
       doConfirm:()=>this.doConfirm(),cancelConfirm:()=>this.setState({confirm:null}),noop:(e)=>{if(e&&e.stopPropagation)e.stopPropagation();},
-      isExport:S.sheet==='export',
+      isExport:S.sheet==='export',askImport:()=>this.askImport(),askImportCsv:()=>this.requestConfirm({title:'Importar CSV',msg:'Seleccioná un CSV con movimientos. Se validará antes de agregarlo a tus datos actuales.',confirmLabel:'Importar CSV',danger:false,onConfirm:()=>this.pickCsvFile()}),
       isSecurity:S.push==='security',
       askReset:()=>this.requestConfirm({title:'Reiniciar datos',msg:'Se borrarán todos los movimientos y volverás a los datos de ejemplo. No se puede deshacer.',confirmLabel:'Reiniciar',danger:true,onConfirm:()=>this.resetData()}),
-      askImport:()=>this.requestConfirm({title:'Importar sobre datos actuales',msg:'Los datos importados se combinarán con los existentes. ¿Continuar?',confirmLabel:'Importar',danger:false,onConfirm:()=>this.flashMsg('Importación completada')}),
       // ---- empty states ----
       homeNoAccounts:S.order.filter(k=>!S.archived[k]).length===0, homeHasAccounts:S.order.filter(k=>!S.archived[k]).length>0,
       homeNoMovs:S.txns.length===0, chartEmpty:chartItems.length===0,
