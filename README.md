@@ -101,6 +101,12 @@ pins the build settings below.
 Every push to `master` triggers an automatic production redeploy. GitHub Actions
 (`.github/workflows/ci.yml`) builds and runs the repo-hygiene check on each push/PR.
 
+### Release & QA docs
+
+- `docs/production-release-checklist.md` — full pre-deploy build/PWA/offline/hygiene
+  checklist plus step-by-step Vercel deploy.
+- `docs/mobile-install-qa.md` — real-device install + offline QA checklist (iPhone/Android).
+
 ## Install as a PWA
 
 ### iPhone / iPad (Safari)

@@ -60,8 +60,29 @@ build, the PWA shell, the vendored runtime, offline behavior, and repo hygiene.
 - [ ] `npm run check:repo` passes
 - [ ] `node_modules/`, `dist/`, `.vite/`, `.env` are NOT tracked
 
-## 9. Deploy (Vercel)
+## 9. Deploy to Vercel (step by step)
 
-- [ ] Build command `npm run build`, output `dist`, install `npm install`/`npm ci`
-- [ ] Production URL loads and matches local
-- [ ] Re-run sections 2–4 against the production URL
+1. Push the latest `master` to GitHub (`facur3/finanzapp-v2`).
+2. Go to <https://vercel.com> → **Add New… → Project**.
+3. **Import** the `facur3/finanzapp-v2` repository.
+4. Set the **Production Branch** to `master` (Project → Settings → Git).
+5. Confirm the build settings (already pinned in `vercel.json`):
+   - **Framework Preset:** Other (static)
+   - **Build Command:** `npm run build`
+   - **Output Directory:** `dist`
+   - **Install Command:** `npm install` (or `npm ci`)
+6. Click **Deploy**.
+7. Open the production URL Vercel returns (e.g. `https://finanzapp-v2.vercel.app`).
+8. On the production URL, verify:
+   - [ ] Manifest loads (DevTools → Application → Manifest)
+   - [ ] Icons + favicon load, no 404
+   - [ ] Service worker registers and is active
+   - [ ] `/vendor/react*.js` load from your own origin (no `unpkg.com`)
+   - [ ] No console errors, no `[dc-runtime] logic class eval FAILED`
+   - [ ] Reload → toggle Network Offline → reload: app shell loads offline
+9. Install on a real device:
+   - [ ] **iPhone (Safari):** Share → Add to Home Screen → opens standalone
+   - [ ] **Android (Chrome):** menu → Install app → opens standalone
+10. Run through `docs/mobile-install-qa.md` on at least one real device.
+
+Every push to `master` triggers an automatic production redeploy.
