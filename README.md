@@ -71,12 +71,41 @@ Fails if `node_modules/`, `dist/`, `.vite/`, or `.env` are tracked by git.
 
 ## Deploy to Vercel
 
-Static deployment, no backend required. `vercel.json` is included.
+Static deployment, no backend required. `vercel.json` is included and already
+pins the build settings below.
 
-- **Framework preset:** Other / Static (the project is not detected as a framework)
-- **Build command:** `npm run build`
-- **Output directory:** `dist`
-- **Install command:** `npm install` (or `npm ci`)
+### One-time setup
+
+1. Push this repo to GitHub (already done on `master`).
+2. Go to <https://vercel.com> → **Add New… → Project**.
+3. **Import** the `finanzapp-v2` GitHub repository.
+4. When prompted for settings (these come from `vercel.json`, but confirm them):
+   - **Framework Preset:** Other (static — the project is not auto-detected as a framework)
+   - **Build Command:** `npm run build`
+   - **Output Directory:** `dist`
+   - **Install Command:** `npm install` (or `npm ci`)
+5. Click **Deploy**.
+
+### After deploy
+
+- Open the production URL Vercel gives you (e.g. `https://finanzapp-v2.vercel.app`).
+- Confirm the app loads and looks identical to local.
+- Open DevTools → **Application → Manifest**: manifest + icons load.
+- DevTools → **Application → Service Workers**: `sw.js` is registered and active.
+- DevTools → **Network**: no favicon 404; `/vendor/react*.js` load from your own
+  origin (not `unpkg.com`).
+- Console: no errors, no `[dc-runtime] logic class eval FAILED`.
+- Reload once, then toggle **Network → Offline** and reload again: the app shell
+  loads offline.
+
+Every push to `master` triggers an automatic production redeploy. GitHub Actions
+(`.github/workflows/ci.yml`) builds and runs the repo-hygiene check on each push/PR.
+
+### Release & QA docs
+
+- `docs/production-release-checklist.md` — full pre-deploy build/PWA/offline/hygiene
+  checklist plus step-by-step Vercel deploy.
+- `docs/mobile-install-qa.md` — real-device install + offline QA checklist (iPhone/Android).
 
 ## Install as a PWA
 
@@ -103,9 +132,18 @@ Click the **Install** icon in the address bar (where supported).
 ## Offline behavior
 
 After the first successful online load, the service worker caches the app shell
-(`index.html`, `support.js`, manifest, icons). On subsequent visits the app shell
-loads offline, and existing `localStorage` data remains available. User data is
-never cached by the service worker.
+(`index.html`, `support.js`, the vendored React runtime under `public/vendor/`,
+manifest, and icons). On subsequent visits the full app boots and renders
+offline, and existing `localStorage` data remains available. User data is never
+cached by the service worker.
+
+### Vendored runtime (no critical external CDN dependency)
+
+The Claude Design runtime (`support.js`) loads React/ReactDOM at boot. These are
+**vendored locally** under `public/vendor/` and served from the app's own origin,
+so the app no longer depends on `unpkg.com` to start. The files are the exact
+React 18.3.1 UMD builds — byte-identical to the CDN copies, verified by the
+runtime's existing Subresource Integrity (SRI) hashes, which were left unchanged.
 
 ## Files that must never be committed
 
@@ -121,9 +159,19 @@ never cached by the service worker.
 
 ## Current limitations
 
-- The PWA is an **app-shell** cache only: web fonts (Google Fonts) are not cached,
-  so offline rendering falls back to system fonts.
+- **Google Fonts (Poppins)** are still loaded cross-origin and are not cached, so
+  offline rendering falls back to system fonts. Vendoring fonts would require
+  touching the design's `<helmet>` font links, which is out of scope under the
+  UI/UX freeze.
+- **Babel standalone** (`@babel/standalone`) is still referenced from `unpkg.com`
+  in `support.js`, but it is **not a critical dependency**: it is only fetched
+  lazily to compile runtime JSX/TSX modules imported via `x-import`, and FinanzApp
+  imports none — so it never loads at runtime and never blocks boot or offline use.
+  It was intentionally **not** vendored to avoid committing ~2.9 MB of code the app
+  never executes. If a future feature adds JSX `x-import` modules, vendor it the
+  same way React was vendored.
 - No custom install banner, update prompt, or offline UI — by design (UI/UX freeze).
   Service-worker updates apply on the next load without a disruptive prompt.
 - iOS has no programmatic install; users add via "Add to Home Screen".
-- The app is still the single-file Claude Design runtime, not a React app.
+- The app intentionally runs from the single-file Claude Design runtime; it is not
+  a React application (even though that runtime uses React internally).
