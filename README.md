@@ -106,6 +106,8 @@ Every push to `master` triggers an automatic production redeploy. GitHub Actions
 - `docs/production-release-checklist.md` — full pre-deploy build/PWA/offline/hygiene
   checklist plus step-by-step Vercel deploy.
 - `docs/mobile-install-qa.md` — real-device install + offline QA checklist (iPhone/Android).
+- `docs/offline-data-guarantees.md` — how data is persisted/loaded, the no-flicker
+  startup guarantee, offline behavior, and the future Dexie migration path.
 
 ## Install as a PWA
 

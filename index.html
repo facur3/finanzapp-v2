@@ -1495,9 +1495,20 @@ class Component extends DCLogic {
       onbStep:0, onbMode:null, onbCard:false, onbInvest:false, flash:'', confirm:null,
       showOnboarding:true,
     }, this.emptyData());
+    // Load persisted local state synchronously so the very first render already
+    // shows the real saved data. This avoids the default/"Patrimonio total: 0"
+    // flicker that happens if saved state is only applied later in componentDidMount.
+    const persisted=this.readPersistedState();
+    if(persisted){
+      Object.assign(this.state, persisted, {push:null,sheet:null,subsheet:null,flash:'',confirm:null,detailId:null,editId:null});
+    }
   }
   componentDidMount(){
-    this.loadPersistedState();
+    // Saved state was already applied synchronously in the constructor. Only the
+    // corrupted-payload notice needs a post-mount setState (cannot toast pre-render).
+    if(this._persistError){
+      this.setState({flash:'Datos locales dañados · se inició en modo seguro'});
+    }
   }
   componentDidUpdate(){
     this.persistState();
@@ -1540,15 +1551,22 @@ class Component extends DCLogic {
     if(parsed.schema&&parsed.schema!=='finanzapp.local.v2')throw new Error('invalid-schema');
     return this.coercePersistedState(parsed.state);
   }
-  loadPersistedState(){
+  readPersistedState(){
+    // Synchronous, crash-safe read of persisted local state. Returns a validated/
+    // migrated persistent snapshot, or null when there is nothing valid to load.
+    let raw=null;
     try{
-      const raw=localStorage.getItem(this.STORAGE_KEY)||localStorage.getItem(this.LEGACY_STORAGE_KEY);
-      if(!raw)return;
-      const state=this.parseBackupPayload(raw);
-      this.setState(Object.assign({}, state, {push:null,sheet:null,subsheet:null,flash:'',confirm:null,detailId:null,editId:null}));
+      raw=localStorage.getItem(this.STORAGE_KEY)||localStorage.getItem(this.LEGACY_STORAGE_KEY);
     }catch(e){
+      return null; // storage unavailable (e.g. disabled) — boot with defaults, no crash
+    }
+    if(!raw)return null;
+    try{
+      return this.parseBackupPayload(raw);
+    }catch(e){
+      this._persistError=true; // corrupted payload — fall back safely, notice after mount
       console.warn('FinanzApp: no se pudo cargar el estado local', e);
-      this.setState({flash:'Datos locales dañados · se inició en modo seguro'});
+      return null;
     }
   }
   persistState(){
