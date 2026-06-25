@@ -43,3 +43,18 @@ browser version. Nothing here should require changing the app interface.
   is expected and does not affect layout.
 - The service worker only caches the app shell + vendored runtime; user data lives in
   `localStorage` and is never cached or cleared by the service worker.
+
+## Production shell (no prototype device chrome)
+
+The production app must **not** render the Claude Design device mockup. The real
+device provides its own status bar — the app does not draw one.
+
+- [ ] No fake iPhone frame / rounded device body / outer gray background
+- [ ] No fake status bar (no "9:50", no drawn signal/battery icons)
+- [ ] App content fills the real screen edge-to-edge
+- [ ] Top content is not hidden behind the real status bar (safe-area-inset-top)
+- [ ] Bottom nav / FAB are tappable above the home indicator (safe-area-inset-bottom)
+- [ ] Dark mode: the top safe area is dark (no white/gray strip)
+- [ ] Light mode: the top safe area is light
+- [ ] Toasts ("Movimiento guardado", "Cuenta creada", …) auto-dismiss after ~2s
+      and never stay stuck after navigation/refresh

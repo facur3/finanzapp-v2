@@ -8,12 +8,13 @@
 
 <!-- PWA -->
 <link rel="manifest" href="/manifest.webmanifest">
-<meta name="theme-color" content="#F0655C">
+<meta name="theme-color" content="#FAF9F6">
 
-<!-- Apple / iOS standalone -->
+<!-- Apple / iOS standalone: translucent status bar so the app background fills
+     the safe area in both themes (no opaque strip in dark mode). -->
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="FinanzApp">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 
@@ -30,6 +31,48 @@
       navigator.serviceWorker.register('/sw.js').catch(function () { /* offline shell is best-effort */ });
     });
   }
+  // Keep the page/status-bar background and theme-color meta in sync with the app
+  // theme so the real device safe areas match (no white strip in dark mode).
+  // This is infrastructure only — it adds no visible UI.
+  (function () {
+    function apply(t) {
+      if (t !== 'dark' && t !== 'light') return; // ignore unrendered placeholder
+      var c = t === 'dark' ? '#0E0E0F' : '#FAF9F6';
+      if (document.documentElement) document.documentElement.style.background = c;
+      if (document.body) document.body.style.background = c;
+      var m = document.querySelector('meta[name=theme-color]');
+      if (m) m.setAttribute('content', c);
+    }
+    var theme = 'light';
+    try {
+      var raw = localStorage.getItem('finanzapp:v2:state') || localStorage.getItem('finanzapp.v2.state');
+      if (raw) { var p = JSON.parse(raw); var t = p && p.state && p.state.theme; if (t === 'dark' || t === 'light') theme = t; }
+    } catch (e) {}
+    apply(theme); // pre-paint, before the app renders
+    // The hidden template may also contain a .fa-frame with an unrendered
+    // placeholder data-theme; select the rendered frame (real dark/light value).
+    function findFrame() {
+      var els = document.querySelectorAll('.fa-frame');
+      for (var i = 0; i < els.length; i++) {
+        var v = els[i].getAttribute('data-theme');
+        if (v === 'dark' || v === 'light') return els[i];
+      }
+      return null;
+    }
+    function watch() {
+      var el = findFrame();
+      if (!el) return false;
+      apply(el.getAttribute('data-theme'));
+      new MutationObserver(function () { apply(el.getAttribute('data-theme')); })
+        .observe(el, { attributes: true, attributeFilter: ['data-theme'] });
+      return true;
+    }
+    document.addEventListener('DOMContentLoaded', function () {
+      if (watch()) return;
+      var iv = setInterval(function () { if (watch()) clearInterval(iv); }, 150);
+      setTimeout(function () { clearInterval(iv); }, 8000);
+    });
+  })();
 </script>
 </head>
 <body>
@@ -39,6 +82,7 @@
 <style>
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
 html,body{height:100%;}
+html,body{overflow:hidden;overscroll-behavior:none;}
 body{font-family:'Poppins',system-ui,sans-serif;}
 input{font-family:inherit;}
 .fa-scroll::-webkit-scrollbar{width:0;height:0;display:none;}
@@ -83,30 +127,14 @@ input{font-family:inherit;}
 </style>
 </helmet>
 
-<div style="min-height:100vh;width:100%;display:flex;align-items:center;justify-content:center;background:radial-gradient(120% 120% at 50% 0%, #d9d7d1 0%, #c9c7c1 100%);padding:24px;">
-  <div class="fa-frame" data-theme="{{ theme }}" style="position:relative;width:390px;height:844px;border-radius:54px;overflow:hidden;background:var(--bg);color:var(--text);box-shadow:0 40px 90px rgba(0,0,0,0.35), 0 0 0 11px #1b1b1d, 0 0 0 13px #2c2c2e;--accent: {{ accentVar }};">
+<div style="min-height:100vh;width:100%;">
+  <div class="fa-frame" data-theme="{{ theme }}" style="position:fixed;inset:0;overflow:hidden;background:var(--bg);color:var(--text);--accent: {{ accentVar }};">
 
-    <!-- STATUS BAR -->
-    <div style="position:absolute;top:0;left:0;right:0;height:50px;z-index:30;display:flex;align-items:center;justify-content:space-between;padding:0 32px 0 34px;pointer-events:none;">
-      <span style="font-size:15px;font-weight:600;letter-spacing:.3px;">9:50</span>
-      <div style="display:flex;align-items:center;gap:7px;">
-        <div style="display:flex;align-items:flex-end;gap:2px;height:11px;">
-          <div style="width:3px;height:5px;border-radius:1px;background:var(--text);"></div>
-          <div style="width:3px;height:7px;border-radius:1px;background:var(--text);"></div>
-          <div style="width:3px;height:9px;border-radius:1px;background:var(--text);"></div>
-          <div style="width:3px;height:11px;border-radius:1px;background:var(--text);"></div>
-        </div>
-        <div style="display:flex;align-items:center;gap:2px;">
-          <div style="position:relative;width:23px;height:12px;border-radius:3.5px;border:1.4px solid var(--text);opacity:.9;padding:1.6px;">
-            <div style="height:100%;width:72%;border-radius:1.5px;background:var(--text);"></div>
-          </div>
-          <div style="width:1.6px;height:5px;border-radius:1px;background:var(--text);opacity:.5;"></div>
-        </div>
-      </div>
-    </div>
+    <!-- Production: real device provides its own status bar. No prototype phone
+         frame, no fake status bar/time/battery. App fills the real viewport. -->
 
     <!-- ============ MAIN SCROLL (tabs) ============ -->
-    <div class="fa-scroll" style="position:absolute;inset:0;overflow-y:auto;padding:58px 22px 104px;">
+    <div class="fa-scroll" style="position:absolute;inset:0;overflow-y:auto;padding:calc(env(safe-area-inset-top) + 14px) 22px calc(104px + env(safe-area-inset-bottom));">
 
       <!-- ============ INICIO ============ -->
       <sc-if value="{{ isInicio }}" hint-placeholder-val="{{ true }}">
@@ -553,21 +581,21 @@ input{font-family:inherit;}
     </div>
 
     <!-- ============ TAB BAR + FAB ============ -->
-    <div style="position:absolute;left:0;right:0;bottom:0;height:86px;padding:9px 20px 26px;background:var(--card);border-top:1px solid var(--hairline);display:flex;align-items:flex-start;justify-content:space-between;z-index:20;">
+    <div style="position:absolute;left:0;right:0;bottom:0;height:calc(86px + env(safe-area-inset-bottom));padding:9px 20px 26px;background:var(--card);border-top:1px solid var(--hairline);display:flex;align-items:flex-start;justify-content:space-between;z-index:20;">
       <div onClick="{{ navInicio }}" style="width:54px;display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer;color: {{ cInicio }};"><svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-7 9 7"></path><path d="M5 10v10h14V10"></path></svg><span style="font-size:10px;font-weight:600;">Inicio</span></div>
       <div onClick="{{ navActividad }}" style="width:54px;display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer;color: {{ cActividad }};"><svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="7" x2="20" y2="7"></line><line x1="8" y1="12" x2="20" y2="12"></line><line x1="8" y1="17" x2="20" y2="17"></line><circle cx="4" cy="7" r="1"></circle><circle cx="4" cy="12" r="1"></circle><circle cx="4" cy="17" r="1"></circle></svg><span style="font-size:10px;font-weight:600;">Actividad</span></div>
       <div style="width:56px;"></div>
       <div onClick="{{ navReportes }}" style="width:54px;display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer;color: {{ cReportes }};"><svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="20" x2="6" y2="13"></line><line x1="12" y1="20" x2="12" y2="6"></line><line x1="18" y1="20" x2="18" y2="10"></line></svg><span style="font-size:10px;font-weight:600;">Reportes</span></div>
       <div onClick="{{ navMas }}" style="width:54px;display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer;color: {{ cMas }};"><svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="1.6"></circle><circle cx="12" cy="12" r="1.6"></circle><circle cx="19" cy="12" r="1.6"></circle></svg><span style="font-size:10px;font-weight:600;">Más</span></div>
     </div>
-    <div onClick="{{ openQuick }}" style="position:absolute;left:50%;transform:translateX(-50%);bottom:46px;z-index:25;width:60px;height:60px;border-radius:50%;background:var(--accent);box-shadow:0 10px 24px rgba(240,101,92,0.45);display:flex;align-items:center;justify-content:center;cursor:pointer;">
+    <div onClick="{{ openQuick }}" style="position:absolute;left:50%;transform:translateX(-50%);bottom:calc(46px + env(safe-area-inset-bottom));z-index:25;width:60px;height:60px;border-radius:50%;background:var(--accent);box-shadow:0 10px 24px rgba(240,101,92,0.45);display:flex;align-items:center;justify-content:center;cursor:pointer;">
       <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
     </div>
 
     <!-- ============ QUICK ADD SHEET ============ -->
     <sc-if value="{{ isQuick }}" hint-placeholder-val="{{ false }}">
       <div onClick="{{ closeSheet }}" style="position:absolute;inset:0;z-index:44;background:rgba(0,0,0,0.4);animation:faFade .2s ease;"></div>
-      <div style="position:absolute;left:0;right:0;bottom:0;z-index:45;background:var(--bg);border-radius:30px 30px 0 0;padding:14px 20px 32px;animation:faSheet .32s cubic-bezier(.22,1,.36,1);">
+      <div style="position:absolute;left:0;right:0;bottom:0;z-index:45;background:var(--bg);border-radius:30px 30px 0 0;padding:14px 20px calc(32px + env(safe-area-inset-bottom));animation:faSheet .32s cubic-bezier(.22,1,.36,1);">
         <div style="width:40px;height:4px;border-radius:2px;background:var(--surface-strong);margin:0 auto 16px;"></div>
         <div style="font-size:18px;font-weight:800;margin-bottom:14px;">Agregar movimiento</div>
         <sc-for list="{{ quickOptions }}" as="o" hint-placeholder-count="4">
@@ -585,7 +613,7 @@ input{font-family:inherit;}
 
     <!-- ============ TRANSACTION DETAIL ============ -->
     <sc-if value="{{ isDetail }}" hint-placeholder-val="{{ false }}">
-      <div class="fa-scroll" data-screen-label="Detalle" style="position:absolute;inset:0;z-index:42;background:var(--bg);animation:faUp .34s cubic-bezier(.22,1,.36,1);overflow-y:auto;padding:58px 22px 40px;">
+      <div class="fa-scroll" data-screen-label="Detalle" style="position:absolute;inset:0;z-index:42;background:var(--bg);animation:faUp .34s cubic-bezier(.22,1,.36,1);overflow-y:auto;padding:calc(env(safe-area-inset-top) + 14px) 22px calc(40px + env(safe-area-inset-bottom));">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;">
           <div onClick="{{ popScreen }}" style="width:40px;height:40px;border-radius:50%;background:var(--surface);display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--text);"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 6 9 12 15 18"></polyline></svg></div>
           <div onClick="{{ editTxn }}" style="font-size:14px;font-weight:600;color:var(--accent);cursor:pointer;">Editar</div>
@@ -617,7 +645,7 @@ input{font-family:inherit;}
 
     <!-- ============ INVESTMENTS ============ -->
     <sc-if value="{{ isInvest }}" hint-placeholder-val="{{ false }}">
-      <div class="fa-scroll" data-screen-label="Inversiones" style="position:absolute;inset:0;z-index:42;background:var(--bg);animation:faUp .34s cubic-bezier(.22,1,.36,1);overflow-y:auto;padding:58px 22px 40px;">
+      <div class="fa-scroll" data-screen-label="Inversiones" style="position:absolute;inset:0;z-index:42;background:var(--bg);animation:faUp .34s cubic-bezier(.22,1,.36,1);overflow-y:auto;padding:calc(env(safe-area-inset-top) + 14px) 22px calc(40px + env(safe-area-inset-bottom));">
         <div style="display:flex;align-items:center;gap:14px;margin-bottom:26px;">
           <div onClick="{{ popScreen }}" style="width:40px;height:40px;border-radius:50%;background:var(--surface);display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--text);"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 6 9 12 15 18"></polyline></svg></div>
           <span style="font-size:17px;font-weight:700;">Inversiones</span>
@@ -656,7 +684,7 @@ input{font-family:inherit;}
 
     <!-- ============ ADD / TRANSFER / INVERSION ============ -->
     <sc-if value="{{ isAdd }}" hint-placeholder-val="{{ false }}">
-      <div data-screen-label="Nuevo movimiento" style="position:absolute;inset:0;z-index:42;background:var(--bg);animation:faUp .34s cubic-bezier(.22,1,.36,1);display:flex;flex-direction:column;padding:54px 22px 24px;">
+      <div data-screen-label="Nuevo movimiento" style="position:absolute;inset:0;z-index:42;background:var(--bg);animation:faUp .34s cubic-bezier(.22,1,.36,1);display:flex;flex-direction:column;padding:calc(env(safe-area-inset-top) + 12px) 22px calc(24px + env(safe-area-inset-bottom));">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
           <div onClick="{{ closeSheet }}" style="width:40px;height:40px;border-radius:50%;background:var(--surface);display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--text-2);"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="5" y1="5" x2="19" y2="19"></line><line x1="19" y1="5" x2="5" y2="19"></line></svg></div>
           <span style="font-size:16px;font-weight:700;">{{ addTitleText }}</span>
@@ -764,7 +792,7 @@ input{font-family:inherit;}
 
     <!-- ============ SETTINGS ============ -->
     <sc-if value="{{ isSettings }}" hint-placeholder-val="{{ false }}">
-      <div class="fa-scroll" data-screen-label="Ajustes" style="position:absolute;inset:0;z-index:42;background:var(--bg);animation:faUp .34s cubic-bezier(.22,1,.36,1);overflow-y:auto;padding:58px 22px 40px;">
+      <div class="fa-scroll" data-screen-label="Ajustes" style="position:absolute;inset:0;z-index:42;background:var(--bg);animation:faUp .34s cubic-bezier(.22,1,.36,1);overflow-y:auto;padding:calc(env(safe-area-inset-top) + 14px) 22px calc(40px + env(safe-area-inset-bottom));">
         <div style="display:flex;align-items:center;gap:14px;margin-bottom:26px;">
           <div onClick="{{ popScreen }}" style="width:40px;height:40px;border-radius:50%;background:var(--surface);display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--text);"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 6 9 12 15 18"></polyline></svg></div>
           <span style="font-size:22px;font-weight:800;letter-spacing:-.5px;">Ajustes</span>
@@ -828,7 +856,7 @@ input{font-family:inherit;}
 
     <!-- ============ ADD ACCOUNT ============ -->
     <sc-if value="{{ isAddAccount }}" hint-placeholder-val="{{ false }}">
-      <div class="fa-scroll" data-screen-label="Nueva cuenta" style="position:absolute;inset:0;z-index:43;background:var(--bg);animation:faUp .34s cubic-bezier(.22,1,.36,1);overflow-y:auto;padding:58px 22px 40px;">
+      <div class="fa-scroll" data-screen-label="Nueva cuenta" style="position:absolute;inset:0;z-index:43;background:var(--bg);animation:faUp .34s cubic-bezier(.22,1,.36,1);overflow-y:auto;padding:calc(env(safe-area-inset-top) + 14px) 22px calc(40px + env(safe-area-inset-bottom));">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;">
           <div onClick="{{ popScreen }}" style="width:40px;height:40px;border-radius:50%;background:var(--surface);display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--text-2);"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="5" y1="5" x2="19" y2="19"></line><line x1="19" y1="5" x2="5" y2="19"></line></svg></div>
           <span style="font-size:16px;font-weight:700;">{{ naTitle }}</span>
@@ -865,7 +893,7 @@ input{font-family:inherit;}
 
     <!-- ============ ACCOUNT DETAIL ============ -->
     <sc-if value="{{ isAcctDetail }}" hint-placeholder-val="{{ false }}">
-      <div class="fa-scroll" data-screen-label="Cuenta" style="position:absolute;inset:0;z-index:42;background:var(--bg);animation:faUp .34s cubic-bezier(.22,1,.36,1);overflow-y:auto;padding:58px 22px 40px;">
+      <div class="fa-scroll" data-screen-label="Cuenta" style="position:absolute;inset:0;z-index:42;background:var(--bg);animation:faUp .34s cubic-bezier(.22,1,.36,1);overflow-y:auto;padding:calc(env(safe-area-inset-top) + 14px) 22px calc(40px + env(safe-area-inset-bottom));">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;">
           <div onClick="{{ popScreen }}" style="width:40px;height:40px;border-radius:50%;background:var(--surface);display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--text);"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 6 9 12 15 18"></polyline></svg></div>
           <div onClick="{{ adEdit }}" style="font-size:14px;font-weight:600;color:var(--accent);cursor:pointer;">Editar</div>
@@ -904,7 +932,7 @@ input{font-family:inherit;}
 
     <!-- ============ CARD DETAIL ============ -->
     <sc-if value="{{ isCardDetail }}" hint-placeholder-val="{{ false }}">
-      <div class="fa-scroll" data-screen-label="Tarjeta" style="position:absolute;inset:0;z-index:42;background:var(--bg);animation:faUp .34s cubic-bezier(.22,1,.36,1);overflow-y:auto;padding:58px 22px 40px;">
+      <div class="fa-scroll" data-screen-label="Tarjeta" style="position:absolute;inset:0;z-index:42;background:var(--bg);animation:faUp .34s cubic-bezier(.22,1,.36,1);overflow-y:auto;padding:calc(env(safe-area-inset-top) + 14px) 22px calc(40px + env(safe-area-inset-bottom));">
         <div style="display:flex;align-items:center;gap:14px;margin-bottom:22px;">
           <div onClick="{{ popScreen }}" style="width:40px;height:40px;border-radius:50%;background:var(--surface);display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--text);"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 6 9 12 15 18"></polyline></svg></div>
           <span style="font-size:17px;font-weight:700;">{{ cdBrand }} ·••• {{ cdLast4 }}</span>
@@ -956,7 +984,7 @@ input{font-family:inherit;}
 
     <!-- ============ PAY CARD ============ -->
     <sc-if value="{{ isPayCard }}" hint-placeholder-val="{{ false }}">
-      <div data-screen-label="Pagar tarjeta" style="position:absolute;inset:0;z-index:43;background:var(--bg);animation:faUp .34s cubic-bezier(.22,1,.36,1);display:flex;flex-direction:column;padding:54px 22px 24px;">
+      <div data-screen-label="Pagar tarjeta" style="position:absolute;inset:0;z-index:43;background:var(--bg);animation:faUp .34s cubic-bezier(.22,1,.36,1);display:flex;flex-direction:column;padding:calc(env(safe-area-inset-top) + 12px) 22px calc(24px + env(safe-area-inset-bottom));">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;">
           <div onClick="{{ popScreen }}" style="width:40px;height:40px;border-radius:50%;background:var(--surface);display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--text-2);"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="5" y1="5" x2="19" y2="19"></line><line x1="19" y1="5" x2="5" y2="19"></line></svg></div>
           <span style="font-size:16px;font-weight:700;">Pagar {{ payCardBrand }}</span>
@@ -997,7 +1025,7 @@ input{font-family:inherit;}
 
     <!-- ============ CARD PURCHASE ============ -->
     <sc-if value="{{ isCardPurchase }}" hint-placeholder-val="{{ false }}">
-      <div data-screen-label="Compra con tarjeta" style="position:absolute;inset:0;z-index:43;background:var(--bg);animation:faUp .34s cubic-bezier(.22,1,.36,1);display:flex;flex-direction:column;padding:54px 22px 24px;">
+      <div data-screen-label="Compra con tarjeta" style="position:absolute;inset:0;z-index:43;background:var(--bg);animation:faUp .34s cubic-bezier(.22,1,.36,1);display:flex;flex-direction:column;padding:calc(env(safe-area-inset-top) + 12px) 22px calc(24px + env(safe-area-inset-bottom));">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
           <div onClick="{{ popScreen }}" style="width:40px;height:40px;border-radius:50%;background:var(--surface);display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--text-2);"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="5" y1="5" x2="19" y2="19"></line><line x1="19" y1="5" x2="5" y2="19"></line></svg></div>
           <span style="font-size:16px;font-weight:700;">Compra con tarjeta</span>
@@ -1050,7 +1078,7 @@ input{font-family:inherit;}
 
     <!-- ============ ASSET TRADE (buy/sell) ============ -->
     <sc-if value="{{ isAssetTrade }}" hint-placeholder-val="{{ false }}">
-      <div class="fa-scroll" data-screen-label="Operar activo" style="position:absolute;inset:0;z-index:43;background:var(--bg);animation:faUp .34s cubic-bezier(.22,1,.36,1);overflow-y:auto;padding:54px 22px 24px;">
+      <div class="fa-scroll" data-screen-label="Operar activo" style="position:absolute;inset:0;z-index:43;background:var(--bg);animation:faUp .34s cubic-bezier(.22,1,.36,1);overflow-y:auto;padding:calc(env(safe-area-inset-top) + 12px) 22px calc(24px + env(safe-area-inset-bottom));">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
           <div onClick="{{ popScreen }}" style="width:40px;height:40px;border-radius:50%;background:var(--surface);display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--text-2);"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="5" y1="5" x2="19" y2="19"></line><line x1="19" y1="5" x2="5" y2="19"></line></svg></div>
           <span style="font-size:16px;font-weight:700;">{{ atTitle }}</span>
@@ -1087,7 +1115,7 @@ input{font-family:inherit;}
 
     <!-- ============ INVESTMENT DETAIL ============ -->
     <sc-if value="{{ isInvestDetail }}" hint-placeholder-val="{{ false }}">
-      <div class="fa-scroll" data-screen-label="Inversión" style="position:absolute;inset:0;z-index:42;background:var(--bg);animation:faUp .34s cubic-bezier(.22,1,.36,1);overflow-y:auto;padding:58px 22px 40px;">
+      <div class="fa-scroll" data-screen-label="Inversión" style="position:absolute;inset:0;z-index:42;background:var(--bg);animation:faUp .34s cubic-bezier(.22,1,.36,1);overflow-y:auto;padding:calc(env(safe-area-inset-top) + 14px) 22px calc(40px + env(safe-area-inset-bottom));">
         <div style="display:flex;align-items:center;gap:14px;margin-bottom:22px;">
           <div onClick="{{ popScreen }}" style="width:40px;height:40px;border-radius:50%;background:var(--surface);display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--text);"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 6 9 12 15 18"></polyline></svg></div>
           <span style="font-size:17px;font-weight:700;">{{ ivName }}</span>
@@ -1132,7 +1160,7 @@ input{font-family:inherit;}
     <!-- ============ ADVANCED FILTERS SHEET ============ -->
     <sc-if value="{{ isFilters }}" hint-placeholder-val="{{ false }}">
       <div onClick="{{ closeSheet }}" style="position:absolute;inset:0;z-index:44;background:rgba(0,0,0,0.4);animation:faFade .2s ease;"></div>
-      <div class="fa-scroll" style="position:absolute;left:0;right:0;bottom:0;z-index:45;background:var(--bg);border-radius:30px 30px 0 0;padding:14px 20px 28px;max-height:82%;overflow-y:auto;animation:faSheet .32s cubic-bezier(.22,1,.36,1);">
+      <div class="fa-scroll" style="position:absolute;left:0;right:0;bottom:0;z-index:45;background:var(--bg);border-radius:30px 30px 0 0;padding:14px 20px calc(28px + env(safe-area-inset-bottom));max-height:82%;overflow-y:auto;animation:faSheet .32s cubic-bezier(.22,1,.36,1);">
         <div style="width:40px;height:4px;border-radius:2px;background:var(--surface-strong);margin:0 auto 16px;"></div>
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;">
           <span style="font-size:18px;font-weight:800;">Filtros</span>
@@ -1152,7 +1180,7 @@ input{font-family:inherit;}
 
     <!-- ============ CATEGORIES ============ -->
     <sc-if value="{{ isCategories }}" hint-placeholder-val="{{ false }}">
-      <div class="fa-scroll" data-screen-label="Categorías" style="position:absolute;inset:0;z-index:42;background:var(--bg);animation:faUp .34s cubic-bezier(.22,1,.36,1);overflow-y:auto;padding:58px 22px 40px;">
+      <div class="fa-scroll" data-screen-label="Categorías" style="position:absolute;inset:0;z-index:42;background:var(--bg);animation:faUp .34s cubic-bezier(.22,1,.36,1);overflow-y:auto;padding:calc(env(safe-area-inset-top) + 14px) 22px calc(40px + env(safe-area-inset-bottom));">
         <div style="display:flex;align-items:center;gap:14px;margin-bottom:24px;">
           <div onClick="{{ popScreen }}" style="width:40px;height:40px;border-radius:50%;background:var(--surface);display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--text);"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 6 9 12 15 18"></polyline></svg></div>
           <span style="font-size:22px;font-weight:800;letter-spacing:-.5px;">Categorías</span>
@@ -1175,7 +1203,7 @@ input{font-family:inherit;}
 
     <!-- ============ TAGS ============ -->
     <sc-if value="{{ isTags }}" hint-placeholder-val="{{ false }}">
-      <div class="fa-scroll" data-screen-label="Etiquetas" style="position:absolute;inset:0;z-index:42;background:var(--bg);animation:faUp .34s cubic-bezier(.22,1,.36,1);overflow-y:auto;padding:58px 22px 40px;">
+      <div class="fa-scroll" data-screen-label="Etiquetas" style="position:absolute;inset:0;z-index:42;background:var(--bg);animation:faUp .34s cubic-bezier(.22,1,.36,1);overflow-y:auto;padding:calc(env(safe-area-inset-top) + 14px) 22px calc(40px + env(safe-area-inset-bottom));">
         <div style="display:flex;align-items:center;gap:14px;margin-bottom:24px;">
           <div onClick="{{ popScreen }}" style="width:40px;height:40px;border-radius:50%;background:var(--surface);display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--text);"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 6 9 12 15 18"></polyline></svg></div>
           <span style="font-size:22px;font-weight:800;letter-spacing:-.5px;">Etiquetas</span>
@@ -1199,7 +1227,7 @@ input{font-family:inherit;}
 
     <!-- ============ SECURITY ============ -->
     <sc-if value="{{ isSecurity }}" hint-placeholder-val="{{ false }}">
-      <div class="fa-scroll" data-screen-label="Seguridad" style="position:absolute;inset:0;z-index:42;background:var(--bg);animation:faUp .34s cubic-bezier(.22,1,.36,1);overflow-y:auto;padding:58px 22px 40px;">
+      <div class="fa-scroll" data-screen-label="Seguridad" style="position:absolute;inset:0;z-index:42;background:var(--bg);animation:faUp .34s cubic-bezier(.22,1,.36,1);overflow-y:auto;padding:calc(env(safe-area-inset-top) + 14px) 22px calc(40px + env(safe-area-inset-bottom));">
         <div style="display:flex;align-items:center;gap:14px;margin-bottom:24px;">
           <div onClick="{{ popScreen }}" style="width:40px;height:40px;border-radius:50%;background:var(--surface);display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--text);"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 6 9 12 15 18"></polyline></svg></div>
           <span style="font-size:22px;font-weight:800;letter-spacing:-.5px;">Seguridad</span>
@@ -1215,7 +1243,7 @@ input{font-family:inherit;}
     <!-- ============ EXPORT / IMPORT SHEET ============ -->
     <sc-if value="{{ isExport }}" hint-placeholder-val="{{ false }}">
       <div onClick="{{ closeSheet }}" style="position:absolute;inset:0;z-index:44;background:rgba(0,0,0,0.4);animation:faFade .2s ease;"></div>
-      <div class="fa-scroll" style="position:absolute;left:0;right:0;bottom:0;z-index:45;background:var(--bg);border-radius:30px 30px 0 0;padding:14px 20px 28px;max-height:82%;overflow-y:auto;animation:faSheet .32s cubic-bezier(.22,1,.36,1);">
+      <div class="fa-scroll" style="position:absolute;left:0;right:0;bottom:0;z-index:45;background:var(--bg);border-radius:30px 30px 0 0;padding:14px 20px calc(28px + env(safe-area-inset-bottom));max-height:82%;overflow-y:auto;animation:faSheet .32s cubic-bezier(.22,1,.36,1);">
         <div style="width:40px;height:4px;border-radius:2px;background:var(--surface-strong);margin:0 auto 16px;"></div>
         <div style="font-size:18px;font-weight:800;margin-bottom:6px;">Exportar</div>
         <div style="background:var(--card);border-radius:18px;padding:4px 16px;box-shadow:var(--shadow-pill);margin-bottom:18px;">
@@ -1234,7 +1262,7 @@ input{font-family:inherit;}
 
     <!-- ============ CATEGORY EDITOR ============ -->
     <sc-if value="{{ isCatEditor }}" hint-placeholder-val="{{ false }}">
-      <div class="fa-scroll" data-screen-label="Editar categoría" style="position:absolute;inset:0;z-index:43;background:var(--bg);animation:faUp .34s cubic-bezier(.22,1,.36,1);overflow-y:auto;padding:58px 22px 40px;">
+      <div class="fa-scroll" data-screen-label="Editar categoría" style="position:absolute;inset:0;z-index:43;background:var(--bg);animation:faUp .34s cubic-bezier(.22,1,.36,1);overflow-y:auto;padding:calc(env(safe-area-inset-top) + 14px) 22px calc(40px + env(safe-area-inset-bottom));">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:22px;">
           <div onClick="{{ popScreen }}" style="width:40px;height:40px;border-radius:50%;background:var(--surface);display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--text-2);"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="5" y1="5" x2="19" y2="19"></line><line x1="19" y1="5" x2="5" y2="19"></line></svg></div>
           <span style="font-size:16px;font-weight:700;">{{ ncTitle }}</span>
@@ -1269,7 +1297,7 @@ input{font-family:inherit;}
 
     <!-- ============ ADD CARD ============ -->
     <sc-if value="{{ isAddCard }}" hint-placeholder-val="{{ false }}">
-      <div class="fa-scroll" data-screen-label="Nueva tarjeta" style="position:absolute;inset:0;z-index:43;background:var(--bg);animation:faUp .34s cubic-bezier(.22,1,.36,1);overflow-y:auto;padding:58px 22px 40px;">
+      <div class="fa-scroll" data-screen-label="Nueva tarjeta" style="position:absolute;inset:0;z-index:43;background:var(--bg);animation:faUp .34s cubic-bezier(.22,1,.36,1);overflow-y:auto;padding:calc(env(safe-area-inset-top) + 14px) 22px calc(40px + env(safe-area-inset-bottom));">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:22px;">
           <div onClick="{{ popScreen }}" style="width:40px;height:40px;border-radius:50%;background:var(--surface);display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--text-2);"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="5" y1="5" x2="19" y2="19"></line><line x1="19" y1="5" x2="5" y2="19"></line></svg></div>
           <span style="font-size:16px;font-weight:700;">{{ ncardTitle }}</span>
@@ -1300,7 +1328,7 @@ input{font-family:inherit;}
     <!-- ============ TAG EDITOR SHEET ============ -->
     <sc-if value="{{ isTagEditor }}" hint-placeholder-val="{{ false }}">
       <div onClick="{{ closeSheet }}" style="position:absolute;inset:0;z-index:44;background:rgba(0,0,0,0.4);animation:faFade .2s ease;"></div>
-      <div style="position:absolute;left:0;right:0;bottom:0;z-index:45;background:var(--bg);border-radius:30px 30px 0 0;padding:14px 20px 32px;animation:faSheet .32s cubic-bezier(.22,1,.36,1);">
+      <div style="position:absolute;left:0;right:0;bottom:0;z-index:45;background:var(--bg);border-radius:30px 30px 0 0;padding:14px 20px calc(32px + env(safe-area-inset-bottom));animation:faSheet .32s cubic-bezier(.22,1,.36,1);">
         <div style="width:40px;height:4px;border-radius:2px;background:var(--surface-strong);margin:0 auto 16px;"></div>
         <div style="font-size:18px;font-weight:800;margin-bottom:14px;">{{ teTitle }}</div>
         <div style="display:flex;align-items:center;gap:8px;background:var(--surface);border-radius:15px;padding:13px 16px;margin-bottom:14px;">
@@ -1335,7 +1363,7 @@ input{font-family:inherit;}
 
     <!-- ============ ONBOARDING STEPPER ============ -->
     <sc-if value="{{ showOnboarding }}" hint-placeholder-val="{{ false }}">
-      <div data-screen-label="Onboarding" style="position:absolute;inset:0;z-index:60;background:var(--bg);display:flex;flex-direction:column;padding:58px 30px 36px;animation:faFade .3s ease;">
+      <div data-screen-label="Onboarding" style="position:absolute;inset:0;z-index:60;background:var(--bg);display:flex;flex-direction:column;padding:calc(env(safe-area-inset-top) + 14px) 30px calc(36px + env(safe-area-inset-bottom));animation:faFade .3s ease;">
         <!-- progress -->
         <div style="display:flex;gap:6px;margin-bottom:36px;">
           <sc-for list="{{ onbDots }}" as="d" hint-placeholder-count="4"><div style="flex:1;height:5px;border-radius:3px;background: {{ d.bg }};transition:background .3s ease;"></div></sc-for>
@@ -1510,8 +1538,18 @@ class Component extends DCLogic {
       this.setState({flash:'Datos locales dañados · se inició en modo seguro'});
     }
   }
-  componentDidUpdate(){
+  componentDidUpdate(prevProps,prevState){
     this.persistState();
+    // Centralised toast lifecycle: any flash (set via flashMsg OR inline setState)
+    // auto-dismisses. A new message resets the timer; only one toast shows at a time.
+    if(this.state.flash && (!prevState || prevState.flash!==this.state.flash)){
+      clearTimeout(this._ft);
+      const cur=this.state.flash;
+      this._ft=setTimeout(()=>{ if(this.state.flash===cur) this.setState({flash:''}); },2200);
+    }
+  }
+  componentWillUnmount(){
+    clearTimeout(this._ft);
   }
   persistentKeys(){
     return ['theme','chartStyle','balanceMode','periodIdx','scopeIdx','currency','hideAmounts','dataMode','categories','catOrder','txns','categoryTotals','monthIncome','monthExpense','order','accounts','archived','balances','accMeta','cards','tagSugg','_next','showOnboarding','onbCard','onbInvest','cardIdx'];
@@ -1726,7 +1764,7 @@ class Component extends DCLogic {
   investIds(s){s=s||this.state;return s.order.filter(k=>s.accounts[k]&&s.accounts[k].kind==='invest'&&!s.archived[k]);}
   debtIds(s){s=s||this.state;return s.order.filter(k=>s.accounts[k]&&s.accounts[k].kind==='debt'&&!s.archived[k]);}
   cardDebt(s){s=s||this.state;return (s.cards||[]).reduce((a,c)=>a+c.saldo,0);}
-  flashMsg(m){this.setState({flash:m});clearTimeout(this._ft);this._ft=setTimeout(()=>this.setState({flash:''}),1700);}
+  flashMsg(m){this.setState({flash:m});/* dismissal handled centrally in componentDidUpdate */}
   requestConfirm(cfg){this.setState({confirm:cfg});}
   doConfirm(){const c=this.state.confirm;this.setState({confirm:null});if(c&&c.onConfirm)c.onConfirm();}
   resetData(){this.clearAll();}

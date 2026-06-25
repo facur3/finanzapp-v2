@@ -52,6 +52,12 @@ build, the PWA shell, the vendored runtime, offline behavior, and repo hygiene.
 - [ ] Screens, layout, spacing, typography, colors, buttons, cards, charts,
       sheets, modals, navigation, icons, labels, and animations are **unchanged**
 - [ ] No new UI elements were added (no install banner / update popup / offline screen)
+- [ ] Production app does **not** render the Claude Design device mockup/chrome
+      (no fake iPhone frame, no fake status bar/time/battery) — the real device
+      provides its own status bar
+- [ ] App fills the real viewport; top/bottom content respects the safe areas
+- [ ] Dark-mode top safe area is dark (no white strip); light-mode top is light
+- [ ] Success/info toasts auto-dismiss (~2s) and never stay stuck
 
 ## 8. Git hygiene
 
