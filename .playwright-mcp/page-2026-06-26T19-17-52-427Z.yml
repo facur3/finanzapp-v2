@@ -1,0 +1,39 @@
+- generic [ref=e5]:
+  - generic [ref=e7]:
+    - generic [ref=e8]:
+      - generic [ref=e9]:
+        - generic [ref=e10]: Finanz
+        - generic [ref=e11]: App
+      - generic [ref=e12]:
+        - img [ref=e14] [cursor=pointer]
+        - img [ref=e17] [cursor=pointer]
+    - generic [ref=e20]:
+      - generic [ref=e21]: 🏦
+      - generic [ref=e22]: Creá tu primera cuenta
+      - generic [ref=e23]: Agregá un banco, efectivo o billetera para empezar a registrar tu dinero.
+      - generic [ref=e24] [cursor=pointer]:
+        - img [ref=e25]
+        - text: Agregar cuenta
+  - generic [ref=e26]:
+    - generic [ref=e33]:
+      - generic [ref=e34]:
+        - generic [ref=e35]: Finanz
+        - generic [ref=e36]: App
+      - generic [ref=e37]: Tus finanzas, claras y livianas.
+      - generic [ref=e38]:
+        - generic [ref=e39]:
+          - generic [ref=e40]: 💸
+          - generic [ref=e41]:
+            - generic [ref=e42]: Registrá en segundos
+            - generic [ref=e43]: Gastos, ingresos y transferencias.
+        - generic [ref=e44]:
+          - generic [ref=e45]: 📊
+          - generic [ref=e46]:
+            - generic [ref=e47]: Disponible vs invertido
+            - generic [ref=e48]: Siempre sabés cuánto podés usar.
+        - generic [ref=e49]:
+          - generic [ref=e50]: ✨
+          - generic [ref=e51]:
+            - generic [ref=e52]: Simple y premium
+            - generic [ref=e53]: Sin planillas ni ruido.
+    - generic [ref=e54] [cursor=pointer]: Empezar

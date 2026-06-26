@@ -127,7 +127,7 @@ input{font-family:inherit;}
 </style>
 </helmet>
 
-<div style="min-height:100vh;width:100%;">
+<div style="min-height:100vh;width:100%;" data-theme="{{ theme }}">
   <div class="fa-frame" data-theme="{{ theme }}" style="position:fixed;inset:0;overflow:hidden;background:var(--bg);color:var(--text);--accent: {{ accentVar }};">
 
     <!-- Production: real device provides its own status bar. No prototype phone
@@ -580,17 +580,6 @@ input{font-family:inherit;}
 
     </div>
 
-    <!-- ============ TAB BAR + FAB ============ -->
-    <div style="position:fixed;left:0;right:0;bottom:0;height:calc(86px + env(safe-area-inset-bottom));padding:9px 20px env(safe-area-inset-bottom);background:var(--card);border-top:1px solid var(--hairline);display:flex;align-items:flex-start;justify-content:space-between;z-index:20;">
-      <div onClick="{{ navInicio }}" style="width:54px;display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer;color: {{ cInicio }};"><svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-7 9 7"></path><path d="M5 10v10h14V10"></path></svg><span style="font-size:10px;font-weight:600;">Inicio</span></div>
-      <div onClick="{{ navActividad }}" style="width:54px;display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer;color: {{ cActividad }};"><svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="7" x2="20" y2="7"></line><line x1="8" y1="12" x2="20" y2="12"></line><line x1="8" y1="17" x2="20" y2="17"></line><circle cx="4" cy="7" r="1"></circle><circle cx="4" cy="12" r="1"></circle><circle cx="4" cy="17" r="1"></circle></svg><span style="font-size:10px;font-weight:600;">Actividad</span></div>
-      <div style="width:56px;"></div>
-      <div onClick="{{ navReportes }}" style="width:54px;display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer;color: {{ cReportes }};"><svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="20" x2="6" y2="13"></line><line x1="12" y1="20" x2="12" y2="6"></line><line x1="18" y1="20" x2="18" y2="10"></line></svg><span style="font-size:10px;font-weight:600;">Reportes</span></div>
-      <div onClick="{{ navMas }}" style="width:54px;display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer;color: {{ cMas }};"><svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="1.6"></circle><circle cx="12" cy="12" r="1.6"></circle><circle cx="19" cy="12" r="1.6"></circle></svg><span style="font-size:10px;font-weight:600;">Más</span></div>
-    </div>
-    <div onClick="{{ openQuick }}" style="position:fixed;left:50%;transform:translateX(-50%);bottom:calc(46px + env(safe-area-inset-bottom));z-index:25;width:60px;height:60px;border-radius:50%;background:var(--accent);box-shadow:0 10px 24px rgba(240,101,92,0.45);display:flex;align-items:center;justify-content:center;cursor:pointer;">
-      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-    </div>
 
     <!-- ============ QUICK ADD SHEET ============ -->
     <sc-if value="{{ isQuick }}" hint-placeholder-val="{{ false }}">
@@ -1450,6 +1439,21 @@ input{font-family:inherit;}
     </sc-if>
 
   </div>
+
+    <sc-if value="{{ showTabBar }}" hint-placeholder-val="{{ true }}">
+    <!-- ============ TAB BAR + FAB ============ -->
+    <div style="position:fixed;left:0;right:0;bottom:0;height:calc(86px + env(safe-area-inset-bottom));padding:9px 20px env(safe-area-inset-bottom);background:var(--card);border-top:1px solid var(--hairline);display:flex;align-items:flex-start;justify-content:space-between;z-index:20;">
+      <div onClick="{{ navInicio }}" style="width:54px;display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer;color: {{ cInicio }};"><svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-7 9 7"></path><path d="M5 10v10h14V10"></path></svg><span style="font-size:10px;font-weight:600;">Inicio</span></div>
+      <div onClick="{{ navActividad }}" style="width:54px;display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer;color: {{ cActividad }};"><svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="7" x2="20" y2="7"></line><line x1="8" y1="12" x2="20" y2="12"></line><line x1="8" y1="17" x2="20" y2="17"></line><circle cx="4" cy="7" r="1"></circle><circle cx="4" cy="12" r="1"></circle><circle cx="4" cy="17" r="1"></circle></svg><span style="font-size:10px;font-weight:600;">Actividad</span></div>
+      <div style="width:56px;"></div>
+      <div onClick="{{ navReportes }}" style="width:54px;display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer;color: {{ cReportes }};"><svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="20" x2="6" y2="13"></line><line x1="12" y1="20" x2="12" y2="6"></line><line x1="18" y1="20" x2="18" y2="10"></line></svg><span style="font-size:10px;font-weight:600;">Reportes</span></div>
+      <div onClick="{{ navMas }}" style="width:54px;display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer;color: {{ cMas }};"><svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="1.6"></circle><circle cx="12" cy="12" r="1.6"></circle><circle cx="19" cy="12" r="1.6"></circle></svg><span style="font-size:10px;font-weight:600;">Más</span></div>
+    </div>
+    <div onClick="{{ openQuick }}" style="position:fixed;left:50%;transform:translateX(-50%);bottom:calc(46px + env(safe-area-inset-bottom));z-index:25;width:60px;height:60px;border-radius:50%;background:var(--accent);box-shadow:0 10px 24px rgba(240,101,92,0.45);display:flex;align-items:center;justify-content:center;cursor:pointer;">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+    </div>
+    </sc-if>
+
 </div>
 </x-dc>
 <script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:440,&quot;height&quot;:900},&quot;accent&quot;:{&quot;editor&quot;:&quot;color&quot;,&quot;default&quot;:&quot;#F0655C&quot;,&quot;options&quot;:[&quot;#F0655C&quot;,&quot;#FF7A66&quot;,&quot;#F25C7A&quot;,&quot;#7C6FF0&quot;,&quot;#2FA56F&quot;],&quot;tsType&quot;:&quot;string&quot;},&quot;defaultTheme&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;default&quot;:&quot;light&quot;,&quot;options&quot;:[&quot;light&quot;,&quot;dark&quot;],&quot;tsType&quot;:&quot;string&quot;},&quot;defaultChart&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;default&quot;:&quot;bars&quot;,&quot;options&quot;:[&quot;bars&quot;,&quot;pills&quot;],&quot;tsType&quot;:&quot;string&quot;}}">
@@ -2152,7 +2156,7 @@ class Component extends DCLogic {
       addCategory:()=>this.openCatEditor(null),
       isTags:S.push==='tags',tagList:S.tagSugg.map(t=>({label:t,onEdit:()=>this.openTagEditor(t)})),
       ...acctD,...invD,...cardD,...onb,
-      showOnboarding:S.showOnboarding,finishOnboarding:()=>this.setState({showOnboarding:false,onbStep:0}),
+      showOnboarding:S.showOnboarding,showTabBar:!S.showOnboarding,finishOnboarding:()=>this.setState({showOnboarding:false,onbStep:0}),
       ...det,
     };
   }
