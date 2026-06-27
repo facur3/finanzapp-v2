@@ -2210,7 +2210,7 @@ class Component extends DCLogic {
       addCategory:()=>this.openCatEditor(null),
       isTags:S.push==='tags',tagList:S.tagSugg.map(t=>({label:t,onEdit:()=>this.openTagEditor(t)})),
       ...acctD,...invD,...cardD,...onb,
-      showOnboarding:S.showOnboarding,showTabBar:!S.showOnboarding,finishOnboarding:()=>this.setState({showOnboarding:false,onbStep:0}),
+      showOnboarding:S.showOnboarding,showTabBar:!S.showOnboarding&&!S.sheet&&!S.confirm,finishOnboarding:()=>this.setState({showOnboarding:false,onbStep:0}),
       ...det,
     };
   }
