@@ -24,6 +24,15 @@
 
 <script src="./support.js"></script>
 <script>
+  // Classify display mode before first paint so safe-area CSS can stay scoped.
+  (function () {
+    var standalone = false;
+    try {
+      standalone = window.navigator.standalone === true ||
+        (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches);
+    } catch (e) {}
+    document.documentElement.classList.add(standalone ? 'fa-standalone' : 'fa-browser');
+  })();
   window.FINANZAPP_VERSION = '1.0.0';
   // Safe service-worker registration: only when supported; never blocks the app.
   if ('serviceWorker' in navigator) {
@@ -73,6 +82,45 @@
       setTimeout(function () { clearInterval(iv); }, 8000);
     });
   })();
+  (function () {
+    try {
+      if (new URLSearchParams(window.location.search).get('debugSafeArea') !== '1') return;
+    } catch (e) { return; }
+    function standaloneMode() {
+      try {
+        return window.navigator.standalone === true ||
+          (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches);
+      } catch (e) { return false; }
+    }
+    function safeAreaProbeHeight() {
+      if (!document.body) return null;
+      var probe = document.createElement('div');
+      probe.style.cssText = 'position:fixed;left:-9999px;bottom:0;height:env(safe-area-inset-bottom, 0px);width:1px;pointer-events:none;visibility:hidden;';
+      document.body.appendChild(probe);
+      var height = window.getComputedStyle(probe).height;
+      probe.remove();
+      return height;
+    }
+    function rectFor(selector) {
+      var el = document.querySelector(selector);
+      if (!el) return null;
+      var r = el.getBoundingClientRect();
+      return { top:r.top, right:r.right, bottom:r.bottom, left:r.left, width:r.width, height:r.height };
+    }
+    function logSafeArea() {
+      console.log('[fa-safe-area]', {
+        innerHeight: window.innerHeight,
+        visualViewportHeight: window.visualViewport ? window.visualViewport.height : null,
+        visualViewportOffsetTop: window.visualViewport ? window.visualViewport.offsetTop : null,
+        mode: standaloneMode() ? 'standalone' : 'browser',
+        safeAreaInsetBottom: safeAreaProbeHeight(),
+        tabBarRect: rectFor('.fa-tabbar'),
+        underlayRect: rectFor('.fa-tabbar-underlay')
+      });
+    }
+    document.addEventListener('DOMContentLoaded', function () { setTimeout(logSafeArea, 0); });
+    if (window.visualViewport) window.visualViewport.addEventListener('resize', logSafeArea);
+  })();
 </script>
 </head>
 <body>
@@ -87,6 +135,8 @@ body{font-family:'Poppins',system-ui,sans-serif;}
 input{font-family:inherit;}
 .fa-scroll::-webkit-scrollbar{width:0;height:0;display:none;}
 .fa-scroll{scrollbar-width:none;}
+.fa-tabbar-underlay{position:fixed;left:0;right:0;bottom:0;height:36px;background:var(--card);z-index:19;pointer-events:none;}
+.fa-standalone .fa-tabbar-underlay{height:calc(env(safe-area-inset-bottom, 0px) + 36px);}
 .fa-frame, .fa-frame *{transition:background-color .35s ease, color .3s ease, border-color .35s ease, box-shadow .35s ease, fill .35s ease;}
 @keyframes faUp{from{transform:translateY(100%);}to{transform:translateY(0);}}
 @keyframes faSheet{from{transform:translateY(110%);}to{transform:translateY(0);}}
@@ -1442,7 +1492,8 @@ input{font-family:inherit;}
 
     <sc-if value="{{ showTabBar }}" hint-placeholder-val="{{ true }}">
     <!-- ============ TAB BAR + FAB ============ -->
-    <div style="--fa-tabbar-base:86px;--fa-tabbar-bleed:28px;position:fixed;left:0;right:0;bottom:calc(-1 * var(--fa-tabbar-bleed));height:calc(var(--fa-tabbar-base) + env(safe-area-inset-bottom, 0px) + var(--fa-tabbar-bleed));padding:9px 20px calc(env(safe-area-inset-bottom, 0px) + var(--fa-tabbar-bleed));background:var(--card);border-top:1px solid var(--hairline);display:flex;align-items:flex-end;justify-content:space-between;z-index:20;">
+    <div class="fa-tabbar-underlay" aria-hidden="true"></div>
+    <div class="fa-tabbar" style="--fa-tabbar-base:86px;--fa-tabbar-bleed:28px;position:fixed;left:0;right:0;bottom:calc(-1 * var(--fa-tabbar-bleed));height:calc(var(--fa-tabbar-base) + env(safe-area-inset-bottom, 0px) + var(--fa-tabbar-bleed));padding:9px 20px calc(env(safe-area-inset-bottom, 0px) + var(--fa-tabbar-bleed));background:var(--card);border-top:1px solid var(--hairline);display:flex;align-items:flex-start;justify-content:space-between;z-index:20;">
       <div onClick="{{ navInicio }}" style="width:54px;display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer;color: {{ cInicio }};"><svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-7 9 7"></path><path d="M5 10v10h14V10"></path></svg><span style="font-size:10px;font-weight:600;">Inicio</span></div>
       <div onClick="{{ navActividad }}" style="width:54px;display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer;color: {{ cActividad }};"><svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="7" x2="20" y2="7"></line><line x1="8" y1="12" x2="20" y2="12"></line><line x1="8" y1="17" x2="20" y2="17"></line><circle cx="4" cy="7" r="1"></circle><circle cx="4" cy="12" r="1"></circle><circle cx="4" cy="17" r="1"></circle></svg><span style="font-size:10px;font-weight:600;">Actividad</span></div>
       <div style="width:56px;"></div>
