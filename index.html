@@ -83,43 +83,46 @@
     });
   })();
   (function () {
-    try {
-      if (new URLSearchParams(window.location.search).get('debugSafeArea') !== '1') return;
-    } catch (e) { return; }
+    // Safe-area diagnostic. Shows a small badge ONLY when the tab bar fails to
+    // reach the bottom (a real gap), or when forced with ?debugSafeArea=1.
+    // Self-hides when the layout is correct, so it adds no UI in the normal case.
     function standaloneMode() {
       try {
         return window.navigator.standalone === true ||
           (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches);
       } catch (e) { return false; }
     }
-    function safeAreaProbeHeight() {
-      if (!document.body) return null;
+    var forced = false;
+    try { forced = new URLSearchParams(window.location.search).get('debugSafeArea') === '1'; } catch (e) {}
+    function insetBottom() {
+      if (!document.body) return '?';
       var probe = document.createElement('div');
-      probe.style.cssText = 'position:fixed;left:-9999px;bottom:0;height:env(safe-area-inset-bottom, 0px);width:1px;pointer-events:none;visibility:hidden;';
+      probe.style.cssText = 'position:fixed;left:-9999px;bottom:0;height:env(safe-area-inset-bottom, 0px);width:1px;visibility:hidden;';
       document.body.appendChild(probe);
-      var height = window.getComputedStyle(probe).height;
-      probe.remove();
-      return height;
+      var h = window.getComputedStyle(probe).height; probe.remove(); return h;
     }
-    function rectFor(selector) {
-      var el = document.querySelector(selector);
-      if (!el) return null;
-      var r = el.getBoundingClientRect();
-      return { top:r.top, right:r.right, bottom:r.bottom, left:r.left, width:r.width, height:r.height };
+    function badge(text) {
+      var id = 'fa-sa-debug', d = document.getElementById(id);
+      if (text == null) { if (d) d.remove(); return; }
+      if (!d) {
+        d = document.createElement('div'); d.id = id;
+        d.style.cssText = 'position:fixed;top:env(safe-area-inset-top,0px);left:0;z-index:2147483647;background:rgba(200,0,0,.9);color:#fff;font:11px/1.3 monospace;padding:4px 6px;white-space:pre;pointer-events:none;border-radius:0 0 6px 0;';
+        (document.body || document.documentElement).appendChild(d);
+      }
+      d.textContent = text;
     }
-    function logSafeArea() {
-      console.log('[fa-safe-area]', {
-        innerHeight: window.innerHeight,
-        visualViewportHeight: window.visualViewport ? window.visualViewport.height : null,
-        visualViewportOffsetTop: window.visualViewport ? window.visualViewport.offsetTop : null,
-        mode: standaloneMode() ? 'standalone' : 'browser',
-        safeAreaInsetBottom: safeAreaProbeHeight(),
-        tabBarRect: rectFor('.fa-tabbar'),
-        underlayRect: rectFor('.fa-tabbar-underlay')
-      });
+    function check() {
+      var e = document.querySelector('.fa-tabbar');
+      var tb = e ? e.getBoundingClientRect() : null;
+      var ih = window.innerHeight;
+      var gap = tb ? Math.round(ih - tb.bottom) : null;
+      var info = 'SA ' + (standaloneMode() ? 'standalone' : 'browser') + ' inset:' + insetBottom() +
+        '\ninnerH:' + ih + ' tabBottom:' + (tb ? Math.round(tb.bottom) : '-') + ' gap:' + gap;
+      console.log('[fa-safe-area]', info);
+      if (forced || (gap != null && gap > 4)) badge(info); else badge(null);
     }
-    document.addEventListener('DOMContentLoaded', function () { setTimeout(logSafeArea, 0); });
-    if (window.visualViewport) window.visualViewport.addEventListener('resize', logSafeArea);
+    document.addEventListener('DOMContentLoaded', function () { setTimeout(check, 300); setTimeout(check, 1200); });
+    if (window.visualViewport) window.visualViewport.addEventListener('resize', function () { setTimeout(check, 50); });
   })();
 </script>
 </head>
@@ -130,7 +133,7 @@
 <style>
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
 html,body{height:100%;}
-html,body{overflow:hidden;overscroll-behavior:none;}
+html,body{overscroll-behavior:none;}
 body{font-family:'Poppins',system-ui,sans-serif;}
 input{font-family:inherit;}
 .fa-scroll::-webkit-scrollbar{width:0;height:0;display:none;}
