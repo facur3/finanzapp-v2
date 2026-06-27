@@ -178,7 +178,7 @@ input{font-family:inherit;}
 </helmet>
 
 <div style="min-height:100vh;width:100%;" data-theme="{{ theme }}">
-  <div class="fa-frame" data-theme="{{ theme }}" style="position:fixed;inset:0;overflow:hidden;background:var(--bg);color:var(--text);--accent: {{ accentVar }};">
+  <div class="fa-frame" data-theme="{{ theme }}" style="position:fixed;inset:0;background:var(--bg);color:var(--text);--accent: {{ accentVar }};">
 
     <!-- Production: real device provides its own status bar. No prototype phone
          frame, no fake status bar/time/battery. App fills the real viewport. -->
@@ -1493,7 +1493,7 @@ input{font-family:inherit;}
     <sc-if value="{{ showTabBar }}" hint-placeholder-val="{{ true }}">
     <!-- ============ TAB BAR + FAB ============ -->
     <div class="fa-tabbar-underlay" aria-hidden="true"></div>
-    <div class="fa-tabbar" style="--fa-tabbar-base:86px;--fa-tabbar-bleed:28px;position:fixed;left:0;right:0;bottom:calc(-1 * (var(--fa-tabbar-bleed) + env(safe-area-inset-bottom, 0px)));height:calc(var(--fa-tabbar-base) + env(safe-area-inset-bottom, 0px) + var(--fa-tabbar-bleed));padding:9px 20px calc(env(safe-area-inset-bottom, 0px) + var(--fa-tabbar-bleed));background:var(--card);border-top:1px solid var(--hairline);display:flex;align-items:flex-start;justify-content:space-between;z-index:20;">
+    <div class="fa-tabbar" style="position:fixed;left:0;right:0;bottom:0;height:calc(86px + env(safe-area-inset-bottom, 0px));padding:9px 20px calc(26px + env(safe-area-inset-bottom, 0px));background:var(--card);border-top:1px solid var(--hairline);display:flex;align-items:flex-start;justify-content:space-between;z-index:20;">
       <div onClick="{{ navInicio }}" style="width:54px;display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer;color: {{ cInicio }};"><svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-7 9 7"></path><path d="M5 10v10h14V10"></path></svg><span style="font-size:10px;font-weight:600;">Inicio</span></div>
       <div onClick="{{ navActividad }}" style="width:54px;display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer;color: {{ cActividad }};"><svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="7" x2="20" y2="7"></line><line x1="8" y1="12" x2="20" y2="12"></line><line x1="8" y1="17" x2="20" y2="17"></line><circle cx="4" cy="7" r="1"></circle><circle cx="4" cy="12" r="1"></circle><circle cx="4" cy="17" r="1"></circle></svg><span style="font-size:10px;font-weight:600;">Actividad</span></div>
       <div style="width:56px;"></div>
