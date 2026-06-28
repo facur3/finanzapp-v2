@@ -993,10 +993,11 @@ input{font-family:inherit;}
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;"><span style="font-size:13px;font-weight:600;color:var(--text-2);">Disponible</span><span style="font-size:14px;font-weight:700;color:var(--pos);">{{ cdAvailStr }}</span></div>
           <div style="height:8px;border-radius:4px;background:var(--surface-strong);overflow:hidden;"><div style="height:100%;width: {{ cdAvailPct }};border-radius:4px;background:var(--pos);"></div></div>
         </div>
-        <div style="display:flex;gap:11px;margin-bottom:26px;">
-          <div onClick="{{ cdPay }}" style="flex:1;height:52px;border-radius:16px;background:var(--accent);display:flex;align-items:center;justify-content:center;gap:7px;cursor:pointer;font-size:15px;font-weight:700;color:#fff;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>Pagar tarjeta</div>
+        <div style="display:flex;gap:11px;margin-bottom:10px;">
+          <div onClick="{{ cdPay }}" style="flex:1;height:52px;border-radius:16px;background:var(--accent);display:flex;align-items:center;justify-content:center;gap:7px;cursor:pointer;font-size:15px;font-weight:700;color:#fff;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>Pagar</div>
           <div onClick="{{ cdAddPurchase }}" style="flex:1;height:52px;border-radius:16px;background:var(--surface);display:flex;align-items:center;justify-content:center;gap:7px;cursor:pointer;font-size:15px;font-weight:600;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>Compra</div>
         </div>
+        <div onClick="{{ cdCloseMonth }}" style="height:44px;border-radius:14px;background:var(--surface);display:flex;align-items:center;justify-content:center;gap:8px;cursor:pointer;font-size:14px;font-weight:600;color:var(--text-2);margin-bottom:22px;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>Cerrar mes · avanzar cuotas</div>
         <div style="font-size:14px;font-weight:700;margin:0 2px 12px;">Compras del resumen</div>
         <div style="background:var(--card);border-radius:18px;padding:4px 16px;box-shadow:var(--shadow-pill);margin-bottom:22px;">
           <sc-for list="{{ cdCompras }}" as="p" hint-placeholder-count="3">
@@ -1009,6 +1010,8 @@ input{font-family:inherit;}
             <sc-for list="{{ cdCuotas }}" as="q" hint-placeholder-count="2">
               <div style="display:flex;align-items:center;gap:13px;padding:13px 0;border-bottom:1px solid {{ q.divider }};"><div style="width:42px;height:42px;border-radius:13px;background:var(--surface);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:var(--text-2);flex:none;">{{ q.frac }}</div><div style="flex:1;"><div style="font-size:14px;font-weight:700;">{{ q.name }}</div><div style="font-size:12px;color:var(--text-2);font-weight:500;">{{ q.tot }} cuotas</div></div><span style="font-size:14px;font-weight:700;">{{ q.montoStr }}</span></div>
             </sc-for>
+            <div style="display:flex;justify-content:space-between;padding:12px 0;border-top:1px solid var(--hairline);"><span style="font-size:13px;font-weight:600;color:var(--text-2);">Este mes</span><span style="font-size:14px;font-weight:700;">{{ cdCuotasMonthStr }}</span></div>
+            <div style="display:flex;justify-content:space-between;padding:12px 0;border-top:1px solid var(--hairline);"><span style="font-size:13px;font-weight:600;color:var(--text-2);">Total restante</span><span style="font-size:14px;font-weight:700;color:var(--accent);">{{ cdCuotasTotalStr }}</span></div>
           </div>
         </sc-if>
         <div style="font-size:14px;font-weight:700;margin:0 2px 12px;">Pagos</div>
@@ -1166,12 +1169,19 @@ input{font-family:inherit;}
           <div style="width:64px;height:64px;border-radius:20px;background:var(--card);display:flex;align-items:center;justify-content:center;font-size:30px;margin-bottom:12px;">{{ ivEmoji }}</div>
           <div style="font-size:12px;color:var(--text-2);font-weight:600;margin-bottom:4px;">Valor actual · {{ ivType }}</div>
           <div style="font-size:34px;font-weight:800;letter-spacing:-1px;">{{ ivBalStr }}</div>
+          <sc-if value="{{ ivHasTotalGL }}" hint-placeholder-val="{{ false }}">
+            <div style="font-size:13px;font-weight:600;color: {{ ivTotalGLColor }};margin-top:6px;">P&amp;L {{ ivTotalGLStr }} &middot; {{ ivTotalGLPctStr }}</div>
+          </sc-if>
         </div>
-        <div style="display:flex;gap:9px;margin-bottom:26px;">
+        <div style="display:flex;gap:9px;margin-bottom:14px;">
           <div onClick="{{ ivBuy }}" style="flex:1;height:48px;border-radius:15px;background:var(--surface);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:13.5px;font-weight:600;">Comprar</div>
           <div onClick="{{ ivSell }}" style="flex:1;height:48px;border-radius:15px;background:var(--surface);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:13.5px;font-weight:600;">Vender</div>
           <div onClick="{{ ivDeposit }}" style="flex:1;height:48px;border-radius:15px;background:var(--surface);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:13.5px;font-weight:600;">Depositar</div>
           <div onClick="{{ ivWithdraw }}" style="flex:1;height:48px;border-radius:15px;background:var(--surface);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:13.5px;font-weight:600;">Retirar</div>
+        </div>
+        <div onClick="{{ ivFetchPrices }}" style="height:44px;border-radius:14px;background:var(--surface);display:flex;align-items:center;justify-content:center;gap:8px;cursor:pointer;margin-bottom:22px;">
+          <span style="font-size:13.5px;font-weight:600;color:var(--text-2);">{{ ivLoadingLabel }}</span>
+          <sc-if value="{{ ivHasLastUpdated }}" hint-placeholder-val="{{ false }}"><span style="font-size:11px;color:var(--text-3);">{{ ivLastUpdatedStr }}</span></sc-if>
         </div>
         <div style="font-size:14px;font-weight:700;margin:0 2px 12px;">Activos</div>
         <sc-if value="{{ ivHasAssets }}" hint-placeholder-val="{{ true }}">
@@ -1183,7 +1193,9 @@ input{font-family:inherit;}
                   <div style="flex:1;"><div style="font-size:15px;font-weight:700;">{{ a.name }}</div><div style="font-size:12px;color:var(--text-2);font-weight:500;">{{ a.qtyStr }}</div></div>
                   <div style="text-align:right;"><div style="font-size:15px;font-weight:700;">{{ a.valueStr }}</div><div style="font-size:12px;font-weight:600;color: {{ a.glColor }};">{{ a.glStr }} · {{ a.glPctStr }}</div></div>
                 </div>
-                <div style="display:flex;justify-content:space-between;border-top:1px solid var(--hairline);padding-top:11px;"><span style="font-size:12px;color:var(--text-2);font-weight:500;">Precio promedio</span><span style="font-size:13px;font-weight:600;">{{ a.avgStr }}</span></div>
+                <div style="display:flex;justify-content:space-between;border-top:1px solid var(--hairline);padding-top:11px;margin-bottom:8px;"><span style="font-size:12px;color:var(--text-2);font-weight:500;">P. promedio</span><span style="font-size:13px;font-weight:600;">{{ a.avgStr }}</span></div>
+                <div style="display:flex;justify-content:space-between;margin-bottom:10px;"><span style="font-size:12px;color:var(--text-2);font-weight:500;">Precio actual</span><span style="font-size:13px;font-weight:600;">{{ a.lastPriceStr }}</span></div>
+                <div onClick="{{ a.onUpdatePrice }}" style="height:36px;border-radius:11px;background:var(--surface);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:13px;font-weight:600;color:var(--text-2);">Actualizar precio</div>
               </div>
             </sc-for>
           </div>
@@ -1194,6 +1206,24 @@ input{font-family:inherit;}
             <div style="font-size:15px;font-weight:700;margin-bottom:4px;">Sin activos todavía</div>
             <div style="font-size:13px;color:var(--text-2);font-weight:500;margin-bottom:16px;">Comprá tu primer activo para empezar.</div>
             <div onClick="{{ ivBuy }}" style="padding:11px 22px;border-radius:14px;background:var(--accent);color:#fff;font-size:14px;font-weight:700;cursor:pointer;">Comprar activo</div>
+          </div>
+        </sc-if>
+        <sc-if value="{{ ivSubOpen }}" hint-placeholder-val="{{ false }}">
+          <div onClick="{{ ivSubClose }}" style="position:fixed;inset:0;z-index:50;background:rgba(0,0,0,0.4);"></div>
+          <div style="position:fixed;left:0;right:0;bottom:0;z-index:51;background:var(--bg);border-radius:30px 30px 0 0;padding:14px 22px calc(28px + env(safe-area-inset-bottom));animation:faSheet .32s cubic-bezier(.22,1,.36,1);">
+            <div style="width:40px;height:4px;border-radius:2px;background:var(--surface-strong);margin:0 auto 16px;"></div>
+            <div style="font-size:17px;font-weight:700;text-align:center;margin-bottom:4px;">Actualizar precio</div>
+            <div style="font-size:13px;color:var(--text-2);text-align:center;font-weight:500;margin-bottom:16px;">{{ ivUpTicker }}</div>
+            <div style="text-align:center;font-size:42px;font-weight:800;letter-spacing:-1.5px;color:var(--accent);margin-bottom:16px;">{{ ivUpPriceStr }}</div>
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:12px;">
+              <sc-for list="{{ ivUpKeypad }}" as="key" hint-placeholder-count="12">
+                <div onClick="{{ key.onPress }}" style="height:54px;border-radius:15px;background:var(--surface);display:flex;align-items:center;justify-content:center;cursor:pointer;">
+                  <sc-if value="{{ key.isBack }}" hint-placeholder-val="{{ false }}"><svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="var(--text)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 5H9L3 12l6 7h12a1 1 0 0 0 1-1V6a1 1 0 0 0-1-1z"></path><line x1="12" y1="9.5" x2="17" y2="14.5"></line><line x1="17" y1="9.5" x2="12" y2="14.5"></line></svg></sc-if>
+                  <sc-if value="{{ key.isNum }}" hint-placeholder-val="{{ true }}"><span style="font-size:24px;font-weight:600;">{{ key.label }}</span></sc-if>
+                </div>
+              </sc-for>
+            </div>
+            <div onClick="{{ ivUpdatePrice }}" style="height:54px;border-radius:17px;background:var(--accent);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:16px;font-weight:700;color:#fff;opacity: {{ ivUpSaveOpacity }};">Actualizar precio</div>
           </div>
         </sc-if>
       </div>
@@ -1334,6 +1364,112 @@ input{font-family:inherit;}
             <div onClick="{{ deleteCatBtn }}" style="flex:1;height:50px;border-radius:16px;background:rgba(240,101,92,0.12);color:var(--accent);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:14px;font-weight:600;">Eliminar</div>
           </div>
         </sc-if>
+      </div>
+    </sc-if>
+
+    <!-- ============ LOANS SCREEN ============ -->
+    <sc-if value="{{ isLoansScreen }}" hint-placeholder-val="{{ false }}">
+      <div class="fa-scroll" data-screen-label="Préstamos" style="position:absolute;inset:0;z-index:42;background:var(--bg);animation:faUp .34s cubic-bezier(.22,1,.36,1);overflow-y:auto;padding:calc(env(safe-area-inset-top) + 14px) 22px calc(40px + env(safe-area-inset-bottom));">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:22px;">
+          <div style="display:flex;align-items:center;gap:14px;">
+            <div onClick="{{ popScreen }}" style="width:40px;height:40px;border-radius:50%;background:var(--surface);display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--text);"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 6 9 12 15 18"></polyline></svg></div>
+            <span style="font-size:22px;font-weight:800;letter-spacing:-.5px;">Préstamos</span>
+          </div>
+          <div onClick="{{ openAddLoan }}" style="width:40px;height:40px;border-radius:50%;background:var(--accent);display:flex;align-items:center;justify-content:center;cursor:pointer;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg></div>
+        </div>
+        <sc-if value="{{ loanEmpty }}" hint-placeholder-val="{{ false }}">
+          <div style="display:flex;flex-direction:column;align-items:center;text-align:center;padding:50px 30px 24px;">
+            <div style="font-size:34px;margin-bottom:10px;">🤝</div>
+            <div style="font-size:16px;font-weight:700;margin-bottom:4px;">Sin préstamos</div>
+            <div style="font-size:13px;color:var(--text-2);font-weight:500;line-height:1.5;margin-bottom:18px;">Registrá lo que prestás o lo que debés.</div>
+            <div onClick="{{ openAddLoan }}" style="padding:12px 24px;border-radius:14px;background:var(--accent);color:#fff;font-size:14px;font-weight:700;cursor:pointer;">Agregar préstamo</div>
+          </div>
+        </sc-if>
+        <sc-if value="{{ loanHasItems }}" hint-placeholder-val="{{ true }}">
+          <div style="background:var(--card);border-radius:20px;padding:4px 16px;box-shadow:var(--shadow-pill);">
+            <sc-for list="{{ loanItems }}" as="l" hint-placeholder-count="2">
+              <div onClick="{{ l.onOpen }}" style="display:flex;align-items:center;gap:12px;padding:14px 0;border-bottom:1px solid var(--hairline);cursor:pointer;">
+                <div style="width:42px;height:42px;border-radius:13px;background:var(--surface);display:flex;align-items:center;justify-content:center;font-size:20px;flex:none;">🤝</div>
+                <div style="flex:1;"><div style="font-size:15px;font-weight:700;">{{ l.person }}</div><div style="font-size:12px;color:var(--text-2);font-weight:500;">{{ l.concept }} · {{ l.date }}</div></div>
+                <div style="text-align:right;"><div style="font-size:15px;font-weight:700;color: {{ l.statusColor }};">{{ l.remainingStr }}</div><div style="font-size:11px;font-weight:600;color: {{ l.statusColor }};">{{ l.statusLabel }}</div></div>
+              </div>
+            </sc-for>
+          </div>
+        </sc-if>
+      </div>
+    </sc-if>
+
+    <!-- ============ ADD LOAN ============ -->
+    <sc-if value="{{ isAddLoan }}" hint-placeholder-val="{{ false }}">
+      <div class="fa-scroll" data-screen-label="Nuevo préstamo" style="position:absolute;inset:0;z-index:43;background:var(--bg);animation:faUp .34s cubic-bezier(.22,1,.36,1);overflow-y:auto;padding:calc(env(safe-area-inset-top) + 14px) 22px calc(40px + env(safe-area-inset-bottom));">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:22px;">
+          <div onClick="{{ addLoanBack }}" style="width:40px;height:40px;border-radius:50%;background:var(--surface);display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--text-2);"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="5" y1="5" x2="19" y2="19"></line><line x1="19" y1="5" x2="5" y2="19"></line></svg></div>
+          <span style="font-size:16px;font-weight:700;">{{ nlTitle }}</span>
+          <div style="width:40px;"></div>
+        </div>
+        <div style="display:flex;background:var(--surface);border-radius:15px;padding:4px;gap:2px;margin-bottom:18px;">
+          <sc-for list="{{ nlDirSeg }}" as="d" hint-placeholder-count="2">
+            <div onClick="{{ d.onPick }}" style="flex:1;height:40px;border-radius:12px;background: {{ d.bg }};box-shadow: {{ d.shadow }};display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:14px;font-weight:600;color: {{ d.color }};">{{ d.label }}</div>
+          </sc-for>
+        </div>
+        <div style="background:var(--card);border-radius:18px;padding:2px 16px;box-shadow:var(--shadow-pill);margin-bottom:16px;">
+          <div style="padding:14px 0;border-bottom:1px solid var(--hairline);"><input value="{{ nlPerson }}" onInput="{{ setNlPerson }}" placeholder="Nombre de la persona" style="width:100%;border:none;background:transparent;font-size:15px;font-weight:600;color:var(--text);outline:none;font-family:inherit;" /></div>
+          <div style="padding:14px 0;border-bottom:1px solid var(--hairline);"><input value="{{ nlConcept }}" onInput="{{ setNlConcept }}" placeholder="Concepto (opcional)" style="width:100%;border:none;background:transparent;font-size:15px;font-weight:600;color:var(--text);outline:none;font-family:inherit;" /></div>
+          <div style="padding:14px 0;"><input value="{{ nlAmount }}" onInput="{{ setNlAmount }}" placeholder="Monto" type="number" inputmode="decimal" style="width:100%;border:none;background:transparent;font-size:15px;font-weight:600;color:var(--text);outline:none;font-family:inherit;" /></div>
+        </div>
+        <div style="display:flex;background:var(--surface);border-radius:13px;padding:3px;gap:2px;margin-bottom:24px;">
+          <sc-for list="{{ nlCurrency }}" as="c" hint-placeholder-count="2">
+            <div onClick="{{ c.onPick }}" style="flex:1;height:38px;border-radius:10px;background: {{ c.bg }};box-shadow: {{ c.shadow }};display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:14px;font-weight:600;color: {{ c.color }};">{{ c.label }}</div>
+          </sc-for>
+        </div>
+        <div onClick="{{ saveLoan }}" style="height:54px;border-radius:17px;background:var(--accent);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:16px;font-weight:700;color:#fff;">{{ nlSaveLabel }}</div>
+      </div>
+    </sc-if>
+
+    <!-- ============ LOAN DETAIL ============ -->
+    <sc-if value="{{ isLoanDetail }}" hint-placeholder-val="{{ false }}">
+      <div class="fa-scroll" data-screen-label="Préstamo" style="position:absolute;inset:0;z-index:44;background:var(--bg);animation:faUp .34s cubic-bezier(.22,1,.36,1);overflow-y:auto;padding:calc(env(safe-area-inset-top) + 14px) 22px calc(40px + env(safe-area-inset-bottom));">
+        <div style="display:flex;align-items:center;gap:14px;margin-bottom:22px;">
+          <div onClick="{{ ldBack }}" style="width:40px;height:40px;border-radius:50%;background:var(--surface);display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--text);"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 6 9 12 15 18"></polyline></svg></div>
+          <span style="font-size:17px;font-weight:700;">{{ ldPerson }}</span>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:center;text-align:center;background:var(--surface);border-radius:28px;padding:26px 20px;margin-bottom:22px;">
+          <div style="width:64px;height:64px;border-radius:20px;background:var(--card);display:flex;align-items:center;justify-content:center;font-size:30px;margin-bottom:12px;">🤝</div>
+          <div style="font-size:11px;color: {{ ldStatusColor }};font-weight:700;letter-spacing:.8px;text-transform:uppercase;margin-bottom:6px;">{{ ldStatusLabel }}</div>
+          <div style="font-size:34px;font-weight:800;letter-spacing:-1px;color: {{ ldStatusColor }};">{{ ldRemainingStr }}</div>
+          <div style="font-size:13px;color:var(--text-2);font-weight:500;margin-top:6px;">de {{ ldOriginalStr }} · {{ ldDate }}</div>
+          <sc-if value="{{ ldHasConcept }}" hint-placeholder-val="{{ false }}">
+            <div style="font-size:13px;color:var(--text-2);font-weight:500;margin-top:4px;">{{ ldConcept }}</div>
+          </sc-if>
+        </div>
+        <sc-if value="{{ ldOpen }}" hint-placeholder-val="{{ true }}">
+          <div style="font-size:14px;font-weight:700;margin:0 2px 12px;">{{ ldPayDir }}</div>
+          <div style="text-align:center;font-size:42px;font-weight:800;letter-spacing:-1.5px;color:var(--accent);margin-bottom:16px;">{{ ldPayAmtStr }}</div>
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:12px;">
+            <sc-for list="{{ ldPayKeypad }}" as="key" hint-placeholder-count="12">
+              <div onClick="{{ key.onPress }}" style="height:54px;border-radius:15px;background:var(--surface);display:flex;align-items:center;justify-content:center;cursor:pointer;">
+                <sc-if value="{{ key.isBack }}" hint-placeholder-val="{{ false }}"><svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="var(--text)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 5H9L3 12l6 7h12a1 1 0 0 0 1-1V6a1 1 0 0 0-1-1z"></path><line x1="12" y1="9.5" x2="17" y2="14.5"></line><line x1="17" y1="9.5" x2="12" y2="14.5"></line></svg></sc-if>
+                <sc-if value="{{ key.isNum }}" hint-placeholder-val="{{ true }}"><span style="font-size:24px;font-weight:600;">{{ key.label }}</span></sc-if>
+              </div>
+            </sc-for>
+          </div>
+          <div onClick="{{ ldAddPayment }}" style="height:54px;border-radius:17px;background:var(--accent);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:16px;font-weight:700;color:#fff;opacity: {{ ldPaySaveOpacity }};margin-bottom:22px;">{{ ldPayDir }}</div>
+        </sc-if>
+        <sc-if value="{{ ldHasPayments }}" hint-placeholder-val="{{ false }}">
+          <div style="font-size:14px;font-weight:700;margin:0 2px 12px;">Historial de pagos</div>
+          <div style="background:var(--card);border-radius:18px;padding:4px 16px;box-shadow:var(--shadow-pill);margin-bottom:22px;">
+            <sc-for list="{{ ldPayments }}" as="p" hint-placeholder-count="2">
+              <div style="display:flex;align-items:center;gap:12px;padding:13px 0;border-bottom:1px solid {{ p.divider }};"><div style="flex:1;"><div style="font-size:14px;font-weight:600;">{{ p.amountStr }}</div><div style="font-size:12px;color:var(--text-2);font-weight:500;">{{ p.date }}</div></div></div>
+            </sc-for>
+          </div>
+        </sc-if>
+        <div style="display:flex;gap:10px;margin-top:8px;">
+          <div onClick="{{ ldEdit }}" style="flex:1;height:50px;border-radius:16px;background:var(--surface);display:flex;align-items:center;justify-content:center;gap:7px;cursor:pointer;font-size:14px;font-weight:600;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"></path><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"></path></svg>Editar</div>
+          <sc-if value="{{ ldOpen }}" hint-placeholder-val="{{ true }}">
+            <div onClick="{{ ldClose }}" style="flex:1;height:50px;border-radius:16px;background:var(--surface);display:flex;align-items:center;justify-content:center;gap:6px;cursor:pointer;font-size:14px;font-weight:700;color:var(--pos);"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>Saldar</div>
+          </sc-if>
+          <div onClick="{{ ldDelete }}" style="flex:1;height:50px;border-radius:16px;background:rgba(240,101,92,0.12);color:var(--accent);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:14px;font-weight:600;">Eliminar</div>
+        </div>
       </div>
     </sc-if>
 
@@ -1531,6 +1667,7 @@ class Component extends DCLogic {
     this.CATCOLORS=[['--cat-comida-icon','--cat-comida-fill'],['--cat-auto-icon','--cat-auto-fill'],['--cat-transfer-icon','--cat-transfer-fill'],['--cat-tarjetas-icon','--cat-tarjetas-fill'],['--cat-ocio-icon','--cat-ocio-fill'],['--cat-compras-icon','--cat-compras-fill'],['--cat-mascotas-icon','--cat-mascotas-fill'],['--cat-otros-icon','--cat-otros-fill']];
     this.CATEMOJIS=['🍔','🛒','🚗','🚌','🏠','💡','🎮','🍿','🛍️','👕','💊','🩺','🐶','✈️','🎓','💼','💰','📈','🎁','☕','🍷','🏷️'];
     this.CARDGRADS=['linear-gradient(135deg,#3a3a3c,#161618)','linear-gradient(135deg,#7a4b57,#2e1d22)','linear-gradient(135deg,#3f5b7a,#1a2738)','linear-gradient(135deg,#3f6b4c,#1b2e22)','linear-gradient(135deg,#5b4a76,#241d33)'];
+    this.CEDEAR_RATIOS={AAPL:10,AMZN:3,GOOGL:8,MSFT:10,META:5,TSLA:8,NVDA:10,JPM:5,SPY:1,QQQ:1,COIN:5,MELI:1,WMT:10,DIS:10,BAC:10,GE:10,PYPL:5,UBER:5,BABA:10};
     this.CATTYPES=[['gasto','Gasto'],['ingreso','Ingreso'],['transfer','Transferencia'],['inversion','Inversión']];
     this.CARDBRANDS=['Visa','Mastercard','Amex'];
     this.STORAGE_KEY='finanzapp:v2:state';
@@ -1543,11 +1680,6 @@ class Component extends DCLogic {
       cedears:{name:'CEDEARs',type:'Acciones',kind:'invest',liquid:false,emoji:'📈',iconVar:'--cat-inversion-icon',fillVar:'--cat-inversion-fill',currency:'USD'},
       btc:{name:'Bitcoin',type:'Cripto',kind:'invest',liquid:false,emoji:'🪙',iconVar:'--cat-comida-icon',fillVar:'--cat-comida-fill',currency:'USD'},
       pf:{name:'Plazo fijo',type:'Renta fija',kind:'invest',liquid:false,emoji:'🔒',iconVar:'--cat-tarjetas-icon',fillVar:'--cat-tarjetas-fill',currency:'ARS'},
-    };
-    this.ASSETS={
-      cedears:[{id:'aapl',name:'Apple',ticker:'AAPL',emoji:'🍎',qty:12,avg:9800,value:130000},{id:'spy',name:'S&P 500',ticker:'SPY',emoji:'📊',qty:2,avg:14000,value:30000}],
-      btc:[{id:'btc',name:'Bitcoin',ticker:'BTC',emoji:'🪙',qty:0.0012,avg:55000000,value:75000}],
-      pf:[{id:'pf1',name:'Plazo fijo 30d',ticker:'',emoji:'🔒',qty:1,avg:39000,value:40000}],
     };
     this.PALETTE=[['--cat-transfer-icon','--cat-transfer-fill'],['--cat-comida-icon','--cat-comida-fill'],['--cat-ocio-icon','--cat-ocio-fill'],['--cat-compras-icon','--cat-compras-fill'],['--cat-mascotas-icon','--cat-mascotas-fill'],['--cat-auto-icon','--cat-auto-fill']];
     this.PERIODS=['Este mes','Esta semana','Este año'];
@@ -1578,6 +1710,7 @@ class Component extends DCLogic {
       payAccount:'banco', payAmount:'',
       cpCard:0, cpAmount:'', cpMerchant:'', cpCat:'compras', cpDate:'Hoy', cpInstall:1, cpSub:null,
       atMode:'buy', atAccount:'cedears', atType:'CEDEAR', atTicker:'', atQty:'', atPrice:'', atFees:'', atSource:'banco', atSub:null,
+      loanView:null, newLoan:{person:'',direction:'me_deben',concept:'',amount:'',currency:'ARS',editId:null}, loanPayAmount:'', ivSub:null, upTicker:'', atNewPrice:'', pricesLoading:false, pricesLastUpdated:null,
       onbStep:0, onbMode:null, onbCard:false, onbInvest:false, flash:'', confirm:null,
       showOnboarding:true,
     }, this.emptyData());
@@ -1610,7 +1743,7 @@ class Component extends DCLogic {
     clearTimeout(this._ft);
   }
   persistentKeys(){
-    return ['theme','chartStyle','balanceMode','periodIdx','scopeIdx','currency','hideAmounts','dataMode','categories','catOrder','txns','categoryTotals','monthIncome','monthExpense','order','accounts','archived','balances','accMeta','cards','tagSugg','_next','showOnboarding','onbCard','onbInvest','cardIdx'];
+    return ['theme','chartStyle','balanceMode','periodIdx','scopeIdx','currency','hideAmounts','dataMode','categories','catOrder','txns','categoryTotals','monthIncome','monthExpense','order','accounts','archived','balances','accMeta','cards','tagSugg','_next','showOnboarding','onbCard','onbInvest','cardIdx','assets','loans'];
   }
   persistentSnapshot(state){
     const snap={};
@@ -1639,6 +1772,9 @@ class Component extends DCLogic {
     if(['bars','pills'].indexOf(out.chartStyle)<0)out.chartStyle='bars';
     out.showOnboarding=!!out.showOnboarding;
     out.hideAmounts=!!out.hideAmounts;
+    if(!out.assets||typeof out.assets!=='object'||Array.isArray(out.assets))out.assets={};
+    if(!Array.isArray(out.loans))out.loans=[];
+    out.loans=out.loans.filter(l=>l&&typeof l==='object'&&l.id!=null&&l.person);
     return this.persistentSnapshot(out);
   }
   parseBackupPayload(raw){
@@ -1776,7 +1912,7 @@ class Component extends DCLogic {
     return {dataMode:'empty',categories:cats,catOrder:this.DEFAULT_CAT_ORDER.slice(),
       txns:[],categoryTotals:{},monthIncome:0,monthExpense:0,
       order:[],accounts:{},archived:{},balances:{},accMeta:{},
-      cards:[],tagSugg:[],_next:1};
+      cards:[],tagSugg:[],_next:1,assets:{},loans:[]};
   }
   sampleData(){
     const cats={};Object.keys(this.BASECATS).forEach(k=>{cats[k]={...this.BASECATS[k]};});
@@ -1803,6 +1939,15 @@ class Component extends DCLogic {
         {id:10,type:'gasto',merchant:'Spotify',cat:'ocio',amount:-2900,val:2900,account:'banco',dateLabel:'12 jun',note:'Suscripción',tags:['suscripción']},
         {id:11,type:'inversion',merchant:'Compra CEDEAR AAPL',cat:'inversion',amount:-30000,val:30000,from:'banco',to:'cedears',isTransfer:true,dateLabel:'10 jun',note:'→ CEDEARs',tags:[]},
         {id:12,type:'gasto',merchant:'Farmacia',cat:'otros',amount:-7400,val:7400,account:'efectivo',dateLabel:'10 jun',note:'',tags:[]},
+      ],
+      assets:{
+        cedears:[{id:'aapl',name:'Apple',ticker:'AAPL',emoji:'🍎',qty:12,avg:9800,lastPrice:11000},{id:'spy',name:'S&P 500',ticker:'SPY',emoji:'📊',qty:2,avg:14000,lastPrice:16000}],
+        btc:[{id:'btc',name:'Bitcoin',ticker:'BTC',emoji:'🪙',qty:0.0012,avg:55000000,lastPrice:75000000}],
+        pf:[{id:'pf1',name:'Plazo fijo 30d',ticker:'',emoji:'🔒',qty:1,avg:39000,lastPrice:40000}],
+      },
+      loans:[
+        {id:'l1',person:'Juan Pérez',direction:'me_deben',concept:'Salida a cenar',originalAmount:15000,remaining:15000,currency:'ARS',date:'10 jun',payments:[]},
+        {id:'l2',person:'María González',direction:'le_debo',concept:'Nafta viaje',originalAmount:8000,remaining:5000,currency:'ARS',date:'15 jun',payments:[{amount:3000,date:'20 jun',note:''}]},
       ],
       _next:13};
   }
@@ -1845,12 +1990,46 @@ class Component extends DCLogic {
   savePurchase(){const S=this.state;const val=parseFloat((S.cpAmount||'').replace(',','.'))||0;if(!val){this.flashMsg('Ingresá un monto');return;}const idx=S.cpCard;const card=S.cards[idx];if(!card){this.flashMsg('Agregá una tarjeta primero');return;}if(!S.categories[S.cpCat]){this.flashMsg('Elegí una categoría');return;}const n=S.cpInstall;const merchant=S.cpMerchant.trim()||(this.state.categories[S.cpCat]?this.state.categories[S.cpCat].name:'Compra');const label=n>1?(merchant+' · cuota 1/'+n):merchant;
     this.setState(s=>{const cuota=n>1?{name:merchant,cur:1,tot:n,monto:val/n}:null;const cs=s.cards.map((c,i)=>i===idx?{...c,saldo:c.saldo+val,compras:[{name:label,monto:val,date:S.cpDate},...(c.compras||[])],cuotas:cuota?[cuota,...(c.cuotas||[])]:c.cuotas}:c);const ct={...s.categoryTotals,[S.cpCat]:(s.categoryTotals[S.cpCat]||0)+val};const t={id:s._next,type:'gasto',merchant:label,cat:S.cpCat,amount:-val,val,card:card.id,onCard:true,dateLabel:S.cpDate,note:n>1?('Tarjeta '+card.brand+' · '+n+' cuotas'):('Tarjeta '+card.brand),tags:[]};return{cards:cs,categoryTotals:ct,monthExpense:s.monthExpense+val,txns:[t,...s.txns],_next:s._next+1,push:'cardDetail',cardView:idx,flash:'Compra registrada'};});}
   openAssetTrade(mode,account){const inv=this.investIds(),liq=this.liquidIds();const acc=account||inv[0]||'';this.setState({push:'assetTrade',sheet:null,subsheet:null,atSub:null,atMode:mode||'buy',atAccount:acc,atType:'CEDEAR',atTicker:'',atQty:'',atPrice:'',atFees:'',atSource:liq[0]||''});}
-  saveAssetTrade(){const S=this.state;const qty=parseFloat((S.atQty||'').replace(',','.'))||0;const price=parseFloat((S.atPrice||'').replace(',','.'))||0;const fees=parseFloat((S.atFees||'').replace(',','.'))||0;if(!qty||!price){this.flashMsg('Completá cantidad y precio');return;}const gross=qty*price;const buy=S.atMode==='buy';const total=buy?gross+fees:gross-fees;const inv=S.atAccount,src=S.atSource;const ticker=S.atTicker.trim()||S.atType;if(!S.accounts[inv]||!S.accounts[src]){this.flashMsg('Elegí cuentas válidas');return;}if(inv===src){this.flashMsg('Origen y destino deben ser distintos');return;}
+  saveAssetTrade(){const S=this.state;const qty=parseFloat((S.atQty||'').replace(',','.'))||0;const price=parseFloat((S.atPrice||'').replace(',','.'))||0;const fees=parseFloat((S.atFees||'').replace(',','.'))||0;if(!qty||!price){this.flashMsg('Completá cantidad y precio');return;}const gross=qty*price;const buy=S.atMode==='buy';const total=buy?gross+fees:gross-fees;const inv=S.atAccount,src=S.atSource;const ticker=(S.atTicker.trim()||S.atType).toUpperCase();if(!S.accounts[inv]||!S.accounts[src]){this.flashMsg('Elegí cuentas válidas');return;}if(inv===src){this.flashMsg('Origen y destino deben ser distintos');return;}
+    const emojiMap={'Bitcoin':'🪙','Cripto':'🔮','CEDEAR':'📈','Renta fija':'🔒'};
     this.setState(s=>{const b={...s.balances};if(buy){b[src]=(b[src]||0)-total;b[inv]=(b[inv]||0)+gross;}else{b[inv]=(b[inv]||0)-gross;b[src]=(b[src]||0)+total;}
+      const na={...s.assets};const aa=[...(na[inv]||[])];const xi=aa.findIndex(a=>a.ticker===ticker);
+      if(buy){if(xi>=0){const ex=aa[xi];const nq=ex.qty+qty;aa[xi]={...ex,qty:nq,avg:(ex.qty*ex.avg+qty*price)/nq,lastPrice:price};}else{aa.push({id:'a'+s._next,ticker,name:ticker,emoji:emojiMap[S.atType]||'📈',qty,avg:price,lastPrice:price});}}
+      else{if(xi>=0){const ex=aa[xi];const nq=ex.qty-qty;if(nq<=0.000001)aa.splice(xi,1);else aa[xi]={...ex,qty:nq,lastPrice:price};}}
+      na[inv]=aa;
       const t={id:s._next,type:'inversion',merchant:(buy?'Compra ':'Venta ')+ticker,cat:'inversion',amount:buy?-total:total,val:total,from:buy?src:inv,to:buy?inv:src,isTransfer:true,dateLabel:'Hoy',note:qty+' × '+this.fmtInt(price)+(fees?(' · comisión '+this.fmtInt(fees)):''),tags:[]};
-      return{balances:b,txns:[t,...s.txns],_next:s._next+1,push:'investDetail',investView:inv,flash:buy?'Compra realizada':'Venta realizada'};});}
+      return{balances:b,assets:na,txns:[t,...s.txns],_next:s._next+1,push:'investDetail',investView:inv,flash:buy?'Compra realizada':'Venta realizada'};});}
   addCustomTag(){const t=this.state.newTagText.trim().toLowerCase().replace(/^#/,'');if(!t)return;this.setState(s=>({tagSugg:s.tagSugg.indexOf(t)>=0?s.tagSugg:[...s.tagSugg,t],addTags:s.addTags.indexOf(t)>=0?s.addTags:[...s.addTags,t],newTagText:'',subsheet:null}));}
   applyCustomDate(){const t=this.state.customDateText.trim();if(!t)return;this.setState({addDate:t,customDateText:'',subsheet:null});}
+  updateAssetPrice(){const S=this.state;const np=parseFloat((S.atNewPrice||'').replace(',','.'))||0;if(!np){this.flashMsg('Ingresá el nuevo precio');return;}const k=S.investView;this.setState(s=>{const na={...s.assets};const aa=[...(na[k]||[])];const xi=aa.findIndex(a=>a.ticker===S.upTicker);if(xi>=0)aa[xi]={...aa[xi],lastPrice:np};na[k]=aa;const nb={...s.balances};nb[k]=aa.reduce((sum,a)=>sum+a.qty*(a.lastPrice||a.avg),0);return{assets:na,balances:nb,ivSub:null,upTicker:'',atNewPrice:'',flash:'Precio actualizado'};});}
+  atNewPricePress(d){this.setState(s=>{let r=s.atNewPrice;if(d==='back')return{atNewPrice:r.slice(0,-1)};if(d===','){if(r.indexOf(',')>=0||r==='')return{};return{atNewPrice:r+','};}if(r.indexOf(',')>=0&&(r.split(',')[1]||'').length>=2)return{};if(r.replace(',','').length>=9)return{};return{atNewPrice:r+d};});}
+  setNewLoan(patch){this.setState(s=>({newLoan:{...s.newLoan,...patch}}));}
+  openAddLoan(editId){const s=this.state;if(editId!=null){const l=(s.loans||[]).find(x=>x.id===editId);if(l){this.setState({push:'addLoan',newLoan:{person:l.person,direction:l.direction,concept:l.concept,amount:String(l.originalAmount),currency:l.currency,editId}});return;}}this.setState({push:'addLoan',newLoan:{person:'',direction:'me_deben',concept:'',amount:'',currency:'ARS',editId:null}});}
+  saveLoan(){const n=this.state.newLoan;if(!n.person.trim()){this.flashMsg('Poné el nombre');return;}const amt=parseFloat((n.amount||'').replace(',','.'))||0;if(!amt){this.flashMsg('Ingresá el monto');return;}this.setState(s=>{const loans=(s.loans||[]).slice();if(n.editId!=null){const idx=loans.findIndex(l=>l.id===n.editId);if(idx>=0){loans[idx]={...loans[idx],person:n.person.trim(),concept:n.concept.trim(),originalAmount:amt,currency:n.currency,direction:n.direction};return{loans,push:'loanDetail',loanView:n.editId,flash:'Préstamo actualizado'};}return{};}const id='l'+s._next;loans.push({id,person:n.person.trim(),direction:n.direction,concept:n.concept.trim(),originalAmount:amt,remaining:amt,currency:n.currency,date:'Hoy',payments:[]});return{loans,_next:s._next+1,push:'loanDetail',loanView:id,flash:'Préstamo guardado'};});}
+  openLoanDetail(id){this.setState({push:'loanDetail',loanView:id,loanPayAmount:''});}
+  loanPayPress(d){this.setState(s=>{let r=s.loanPayAmount;if(d==='back')return{loanPayAmount:r.slice(0,-1)};if(d===','){if(r.indexOf(',')>=0||r==='')return{};return{loanPayAmount:r+','};}if(r.indexOf(',')>=0&&(r.split(',')[1]||'').length>=2)return{};if(r.replace(',','').length>=9)return{};return{loanPayAmount:r+d};});}
+  addLoanPayment(){const S=this.state;const v=parseFloat((S.loanPayAmount||'').replace(',','.'))||0;if(!v){this.flashMsg('Ingresá un monto');return;}this.setState(s=>{const loans=(s.loans||[]).map(l=>{if(l.id!==S.loanView)return l;const rem=Math.max(0,l.remaining-v);return{...l,remaining:rem,payments:[{amount:v,date:'Hoy',note:''},...l.payments]};});return{loans,loanPayAmount:'',flash:'Pago registrado'};});}
+  deleteLoan(id){this.requestConfirm({title:'Eliminar préstamo',msg:'Se eliminará este préstamo. No se puede deshacer.',confirmLabel:'Eliminar',danger:true,onConfirm:()=>this.setState(s=>({loans:(s.loans||[]).filter(l=>l.id!==id),push:'loansScreen',loanView:null,flash:'Préstamo eliminado'}))});}
+  closeLoan(id){this.requestConfirm({title:'Saldar préstamo',msg:'Se marcará como saldado con saldo cero.',confirmLabel:'Saldar',danger:false,onConfirm:()=>this.setState(s=>({loans:(s.loans||[]).map(l=>l.id===id?{...l,remaining:0}:l),flash:'Préstamo saldado'}))});}
+  closeCardMonth(idx){this.requestConfirm({title:'Cerrar mes',msg:'Las cuotas avanzarán un mes. Las completadas se eliminarán automáticamente.',confirmLabel:'Cerrar mes',danger:false,onConfirm:()=>this.setState(s=>{const cards=s.cards.map((c,i)=>{if(i!==idx)return c;const cuotas=(c.cuotas||[]).map(q=>({...q,cur:q.cur+1})).filter(q=>q.cur<=q.tot);return{...c,cuotas};});return{cards,flash:'Mes cerrado · cuotas avanzadas'};})});}
+  async fetchPrices(){if(this.state.pricesLoading)return;this.setState({pricesLoading:true});
+    try{const s=this.state;const na={...s.assets};const nb={...s.balances};
+      const cryptoSet=new Set(),stockSet=new Set();
+      Object.keys(na).forEach(k=>{if(!s.accounts[k])return;(na[k]||[]).forEach(a=>{if(!a.ticker)return;if(a.ticker==='BTC'||a.ticker==='ETH'||a.ticker==='ADA'||a.ticker==='SOL')cryptoSet.add(a.ticker);else stockSet.add(a.ticker);});});
+      const cgMap={BTC:'bitcoin',ETH:'ethereum',ADA:'cardano',SOL:'solana'};
+      const cryptoPrices={};
+      if(cryptoSet.size>0){const ids=[...cryptoSet].map(t=>cgMap[t]).filter(Boolean).join(',');try{const r=await fetch('https://api.coingecko.com/api/v3/simple/price?ids='+ids+'&vs_currencies=ars');const d=await r.json();Object.entries(cgMap).forEach(([t,id])=>{if(d[id]?.ars)cryptoPrices[t]=d[id].ars;});}catch(e){}}
+      let ccl=0;if(stockSet.size>0){try{const r=await fetch('https://dolarapi.com/v1/dolares/contadoconliquidacion');const d=await r.json();ccl=d?.venta||d?.compra||0;}catch(e){}}
+      const stockPrices={};
+      if(stockSet.size>0&&ccl>0){await Promise.all([...stockSet].map(async t=>{try{const r=await fetch('https://query1.finance.yahoo.com/v8/finance/chart/'+t+'?interval=1d&range=1d');const d=await r.json();const p=d?.chart?.result?.[0]?.meta?.regularMarketPrice||0;if(p>0)stockPrices[t]=p;}catch(e){}}));}
+      let anyUpdate=false;
+      Object.keys(na).forEach(k=>{if(!s.accounts[k])return;const aa=[...(na[k]||[])];let changed=false;
+        aa.forEach((a,i)=>{if(!a.ticker)return;let np=0;if(cryptoPrices[a.ticker])np=Math.round(cryptoPrices[a.ticker]);else if(stockPrices[a.ticker]&&ccl>0){const ratio=this.CEDEAR_RATIOS[a.ticker]||10;np=Math.round(stockPrices[a.ticker]*ccl/ratio);}
+          if(np>0&&np!==a.lastPrice){aa[i]={...a,lastPrice:np};changed=true;}});
+        if(changed){na[k]=aa;nb[k]=aa.reduce((sum,a)=>sum+a.qty*(a.lastPrice||a.avg),0);anyUpdate=true;}});
+      const flash=anyUpdate?'Precios actualizados':(cryptoSet.size||stockSet.size)?'Precios sin cambios':'Sin activos';
+      this.setState({assets:na,balances:nb,pricesLoading:false,pricesLastUpdated:Date.now(),flash});}
+    catch(e){this.setState({pricesLoading:false,flash:'Error al actualizar precios'});}}
 
   press(d){this.setState(s=>{let r=s.addAmount;if(d===','){if(r.indexOf(',')>=0||r==='')return{};return{addAmount:r+','};}if(r.indexOf(',')>=0){const dec=r.split(',')[1]||'';if(dec.length>=2)return{};}if(r.replace(',','').length>=9)return{};return{addAmount:r+d};});}
   backspace(){this.setState(s=>({addAmount:s.addAmount.slice(0,-1)}));}
@@ -1982,9 +2161,20 @@ class Component extends DCLogic {
         adNoMovs:movs.length===0,adTransfer:()=>this.openAddPreset('transfer',k,LIQ.find(x=>x!==k)||INV[0]||k),adEdit:()=>this.openAddAccount(k),adArchive:()=>this.requestConfirm({title:'Archivar cuenta',msg:'La cuenta se ocultará de los selectores activos pero se conservará su historial.',confirmLabel:'Archivar',danger:false,onConfirm:()=>this.archiveAccount(k)}),adDelete:()=>this.requestConfirm({title:'Eliminar cuenta',msg:'Se eliminará la cuenta y dejará de contar en tus totales. Esta acción no se puede deshacer.',confirmLabel:'Eliminar',danger:true,onConfirm:()=>this.deleteAccount(k)})};}
     // investment detail (per account)
     let invD={};
-    if(S.investView&&ACC[S.investView]){const k=S.investView,a=ACC[k];const assets=(this.ASSETS[k]||[]).map(as=>{const cost=as.qty*as.avg;const gl=as.value-cost;const glPct=cost>0?(gl/cost*100):0;return{name:as.name,ticker:as.ticker,emoji:as.emoji,qtyStr:(as.qty<1?as.qty.toString():this.fmtInt(as.qty))+(as.ticker?' '+as.ticker:' u'),avgStr:money(as.avg),valueStr:money(as.value),glStr:(gl>=0?'+':'-')+sym+this.fmtInt(Math.abs(gl)),glPctStr:(gl>=0?'+':'')+glPct.toFixed(1).replace('.',',')+'%',glColor:gl>=0?'var(--pos)':'var(--accent)'};});
+    if(S.investView&&ACC[S.investView]){const k=S.investView,a=ACC[k];
+      const rawAssets=(S.assets&&S.assets[k])||[];
+      const assets=rawAssets.map(as=>{const lp=as.lastPrice||as.avg;const value=as.qty*lp;const cost=as.qty*as.avg;const gl=value-cost;const glPct=cost>0?(gl/cost*100):0;return{name:as.name,ticker:as.ticker,emoji:as.emoji,qtyStr:(as.qty<1?as.qty.toFixed(6).replace(/\.?0+$/,''):this.fmtInt(as.qty))+(as.ticker?' '+as.ticker:' u'),avgStr:money(as.avg),lastPriceStr:money(lp),valueStr:money(value),glStr:(gl>=0?'+':'-')+sym+this.fmtInt(Math.abs(gl)),glPctStr:(gl>=0?'+':'')+glPct.toFixed(1).replace('.',',')+'%',glColor:gl>=0?'var(--pos)':'var(--accent)',onUpdatePrice:()=>this.setState({ivSub:'updatePrice',upTicker:as.ticker,atNewPrice:''})};});
+      const ivUpKeypad=order.map(l=>({label:l,isBack:l==='back',isNum:l!=='back',onPress:l==='back'?()=>this.atNewPricePress('back'):()=>this.atNewPricePress(l)}));
+      const totalValue=rawAssets.reduce((sum,as)=>sum+as.qty*(as.lastPrice||as.avg),0);
+      const totalCost=rawAssets.reduce((sum,as)=>sum+as.qty*as.avg,0);
+      const totalGL=totalValue-totalCost;
+      const totalGLPct=totalCost>0?(totalGL/totalCost*100):0;
+      const ivLastUpdatedStr=S.pricesLastUpdated?('\u00b7 '+new Date(S.pricesLastUpdated).toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'})):'';
       invD={ivName:a.name,ivEmoji:a.emoji,ivFillVar:a.fillVar,ivBalStr:money(S.balances[k]),ivType:a.type,ivAssets:assets,ivHasAssets:assets.length>0,ivNoAssets:assets.length===0,
-        ivBuy:()=>this.openAssetTrade('buy',k),ivSell:()=>this.openAssetTrade('sell',k),ivDeposit:()=>this.openAddPreset('transfer',this.liquidIds()[0]||'banco',k),ivWithdraw:()=>this.openAddPreset('transfer',k,this.liquidIds()[0]||'banco')};}
+        ivHasTotalGL:rawAssets.length>0,ivTotalGLStr:(totalGL>=0?'+':'-')+sym+this.fmtInt(Math.abs(totalGL)),ivTotalGLPctStr:(totalGL>=0?'+':'')+totalGLPct.toFixed(1).replace('.',',')+'%',ivTotalGLColor:totalGL>=0?'var(--pos)':'var(--accent)',
+        ivFetchPrices:()=>this.fetchPrices(),ivPricesLoading:S.pricesLoading||false,ivLoadingLabel:S.pricesLoading?'Actualizando…':'Actualizar precios',ivHasLastUpdated:!!S.pricesLastUpdated,ivLastUpdatedStr,
+        ivBuy:()=>this.openAssetTrade('buy',k),ivSell:()=>this.openAssetTrade('sell',k),ivDeposit:()=>this.openAddPreset('transfer',this.liquidIds()[0]||'banco',k),ivWithdraw:()=>this.openAddPreset('transfer',k,this.liquidIds()[0]||'banco'),
+        ivSubOpen:S.ivSub==='updatePrice',ivSubClose:()=>this.setState({ivSub:null}),ivUpTicker:S.upTicker,ivUpPriceStr:this.displayAmount(S.atNewPrice),ivUpKeypad,ivUpdatePrice:()=>this.updateAssetPrice(),ivUpSaveOpacity:S.atNewPrice?'1':'0.5'};}
     // card detail
     let cardD={};
     {const i=S.cardView,c=S.cards[i]||S.cards[0]||{limit:1,brand:'',bank:'',last4:'',grad:this.CARDGRADS[0],cierre:'—',vence:'—',compras:[],cuotas:[],pagos:[]};const saldo=cardSaldo(i);const avail=Math.max(0,c.limit-saldo);
@@ -1992,7 +2182,35 @@ class Component extends DCLogic {
         cdCompras:(c.compras||[]).map((p,j,arr)=>({name:p.name,date:p.date,montoStr:moneyInt(p.monto),divider:j===arr.length-1?'transparent':'var(--hairline)'})),
         cdCuotas:(c.cuotas||[]).map((q2,j,arr)=>({name:q2.name,frac:q2.cur+'/'+q2.tot,tot:q2.tot,montoStr:moneyInt(q2.monto),divider:j===arr.length-1?'transparent':'var(--hairline)'})),cdHasCuotas:(c.cuotas||[]).length>0,cdHasCompras:(c.compras||[]).length>0,
         cdPagos:(c.pagos||[]).map((p,j,arr)=>({name:p.name,date:p.date,montoStr:moneyInt(p.monto),divider:j===arr.length-1?'transparent':'var(--hairline)'})),
-        cdPay:()=>this.setState({push:'payCard',payAmount:'',payAccount:LIQ[0]||'banco'}),cdAddPurchase:()=>this.openCardPurchase(i),cdEdit:()=>this.openAddCard(i),cdDelete:()=>this.requestConfirm({title:'Eliminar tarjeta',msg:'Se eliminará esta tarjeta del prototipo. No se puede deshacer.',confirmLabel:'Eliminar',danger:true,onConfirm:()=>this.deleteCard(i)})};}
+        cdPay:()=>this.setState({push:'payCard',payAmount:'',payAccount:LIQ[0]||'banco'}),cdAddPurchase:()=>this.openCardPurchase(i),cdEdit:()=>this.openAddCard(i),cdDelete:()=>this.requestConfirm({title:'Eliminar tarjeta',msg:'Se eliminará esta tarjeta del prototipo. No se puede deshacer.',confirmLabel:'Eliminar',danger:true,onConfirm:()=>this.deleteCard(i)}),
+        cdCuotasTotalStr:moneyInt((c.cuotas||[]).reduce((a,q)=>a+q.monto*(q.tot-q.cur+1),0)),cdCuotasMonthStr:moneyInt((c.cuotas||[]).reduce((a,q)=>a+q.monto,0)),cdCloseMonth:()=>this.closeCardMonth(i)};}
+    // loans
+    let loanD={};
+    {const loans=(S.loans||[]);
+      const loanItems=loans.map(l=>{const pct=l.originalAmount>0?Math.round((1-l.remaining/l.originalAmount)*100):100;return{id:l.id,person:l.person,concept:l.concept||'',direction:l.direction,remainingStr:moneyInt(l.remaining),originalStr:moneyInt(l.originalAmount),pct:pct+'%',currency:l.currency,date:l.date,closed:l.remaining<=0,statusColor:l.remaining<=0?'var(--text-3)':l.direction==='me_deben'?'var(--pos)':'var(--accent)',statusLabel:l.remaining<=0?'Saldado':l.direction==='me_deben'?'Me deben':'Le debo',onOpen:()=>this.openLoanDetail(l.id)};});
+      const curLoan=loans.find(l=>l.id===S.loanView)||{};
+      const loanPayments=(curLoan.payments||[]).map((p,i,arr)=>({amountStr:moneyInt(p.amount),date:p.date,note:p.note||'',divider:i===arr.length-1?'transparent':'var(--hairline)'}));
+      const loanPayDir=curLoan.direction==='me_deben'?'Registrar cobro':'Registrar pago';
+      const loanPayKeypad=order.map(l=>({label:l,isBack:l==='back',isNum:l!=='back',onPress:l==='back'?()=>this.loanPayPress('back'):()=>this.loanPayPress(l)}));
+      loanD={isLoansScreen:S.push==='loansScreen',isAddLoan:S.push==='addLoan',isLoanDetail:S.push==='loanDetail',
+        loanItems,loanHasItems:loanItems.length>0,loanEmpty:loanItems.length===0,openAddLoan:()=>this.openAddLoan(null),
+        nlPerson:S.newLoan.person,setNlPerson:(e)=>this.setNewLoan({person:e.target.value}),
+        nlConcept:S.newLoan.concept,setNlConcept:(e)=>this.setNewLoan({concept:e.target.value}),
+        nlAmount:S.newLoan.amount,setNlAmount:(e)=>this.setNewLoan({amount:e.target.value}),
+        nlDirSeg:[['me_deben','Me deben'],['le_debo','Le debo']].map(d=>({label:d[1],onPick:()=>this.setNewLoan({direction:d[0]}),bg:S.newLoan.direction===d[0]?'var(--seg-active)':'transparent',shadow:S.newLoan.direction===d[0]?'var(--shadow-pill)':'none',color:S.newLoan.direction===d[0]?'var(--text)':'var(--text-2)'})),
+        nlCurrency:['ARS','USD'].map(c=>({label:c,...seg(S.newLoan.currency,c,()=>this.setNewLoan({currency:c}))})),
+        nlIsEdit:S.newLoan.editId!=null,nlTitle:S.newLoan.editId!=null?'Editar préstamo':'Nuevo préstamo',nlSaveLabel:S.newLoan.editId!=null?'Guardar cambios':'Guardar',
+        saveLoan:()=>this.saveLoan(),
+        ldPerson:curLoan.person||'',ldConcept:curLoan.concept||'',ldHasConcept:!!(curLoan.concept),ldDirection:curLoan.direction||'me_deben',
+        ldRemainingStr:moneyInt(curLoan.remaining||0),ldOriginalStr:moneyInt(curLoan.originalAmount||0),ldDate:curLoan.date||'',
+        ldStatusLabel:curLoan.remaining<=0?'Saldado':curLoan.direction==='me_deben'?'Te deben':'Debés',
+        ldStatusColor:curLoan.remaining<=0?'var(--text-2)':curLoan.direction==='me_deben'?'var(--pos)':'var(--accent)',
+        ldClosed:!(curLoan.remaining>0),ldOpen:curLoan.remaining>0,
+        ldPayments:loanPayments,ldHasPayments:loanPayments.length>0,
+        ldPayKeypad:loanPayKeypad,ldPayAmtStr:this.displayAmount(S.loanPayAmount),ldPayDir:loanPayDir,
+        ldAddPayment:()=>this.addLoanPayment(),ldPaySaveOpacity:S.loanPayAmount?'1':'0.5',
+        ldEdit:()=>this.openAddLoan(S.loanView),ldDelete:()=>this.deleteLoan(S.loanView),ldClose:()=>this.closeLoan(S.loanView),
+        ldBack:()=>this.setState({push:'loansScreen'}),addLoanBack:()=>this.setState({push:S.newLoan.editId!=null?'loanDetail':'loansScreen'})};}
     // pay card
     const payAccName=ACC[S.payAccount]?ACC[S.payAccount].name:'';const payAccEmoji=ACC[S.payAccount]?ACC[S.payAccount].emoji:'';
     const payCardC=S.cards[S.cardView]||S.cards[0]||{brand:''};
@@ -2055,6 +2273,7 @@ class Component extends DCLogic {
       {label:'Cuentas',sub:'Bancos, efectivo y billeteras',emoji:'🏦',fillVar:'--cat-transfer-fill',onPick:()=>this.setState({tab:'cuentas',push:null})},
       {label:'Tarjetas',sub:'Crédito, cuotas y pagos',emoji:'💳',fillVar:'--cat-tarjetas-fill',onPick:()=>this.setState({tab:'tarjetas',push:null})},
       {label:'Inversiones',sub:'CEDEARs, cripto y renta fija',emoji:'📈',fillVar:'--cat-inversion-fill',onPick:()=>this.setState({push:'investments'})},
+      {label:'Préstamos',sub:'Lo que te deben y lo que debés',emoji:'🤝',fillVar:'--cat-otros-fill',onPick:()=>this.setState({push:'loansScreen'})},
       {label:'Categorías',sub:'Gestionar categorías',emoji:'🏷️',fillVar:'--cat-comida-fill',onPick:()=>this.setState({push:'categories'})},
       {label:'Etiquetas',sub:'Tus etiquetas',emoji:'#️⃣',fillVar:'--cat-ocio-fill',onPick:()=>this.setState({push:'tags'})},
       {label:'Exportar / Importar',sub:'CSV y backup',emoji:'📤',fillVar:'--cat-compras-fill',onPick:()=>this.setState({sheet:'export'})},
@@ -2209,7 +2428,7 @@ class Component extends DCLogic {
       catList:S.catOrder.filter(k=>CAT[k]).map(k=>{const c=CAT[k];const tn=(this.CATTYPES.find(t=>t[0]===c.type)||['','Gasto'])[1];return {id:k,name:c.name,emoji:c.emoji,fillVar:c.fillVar,typeLabel:tn,archived:!!c.archived,rowOpacity:c.archived?'0.55':'1',subLabel:(c.archived?'Archivada · ':'')+tn+(c.parent&&CAT[c.parent]?(' · '+CAT[c.parent].name):''),nameColor:c.archived?'var(--text-3)':'var(--text)',onPick:()=>this.openCatEditor(k)};}),
       addCategory:()=>this.openCatEditor(null),
       isTags:S.push==='tags',tagList:S.tagSugg.map(t=>({label:t,onEdit:()=>this.openTagEditor(t)})),
-      ...acctD,...invD,...cardD,...onb,
+      ...acctD,...invD,...cardD,...onb,...loanD,
       showOnboarding:S.showOnboarding,showTabBar:!S.showOnboarding&&!S.sheet&&!S.confirm,finishOnboarding:()=>this.setState({showOnboarding:false,onbStep:0}),
       ...det,
     };
