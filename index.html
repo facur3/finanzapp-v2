@@ -1169,12 +1169,19 @@ input{font-family:inherit;}
           <div style="width:64px;height:64px;border-radius:20px;background:var(--card);display:flex;align-items:center;justify-content:center;font-size:30px;margin-bottom:12px;">{{ ivEmoji }}</div>
           <div style="font-size:12px;color:var(--text-2);font-weight:600;margin-bottom:4px;">Valor actual · {{ ivType }}</div>
           <div style="font-size:34px;font-weight:800;letter-spacing:-1px;">{{ ivBalStr }}</div>
+          <sc-if value="{{ ivHasTotalGL }}" hint-placeholder-val="{{ false }}">
+            <div style="font-size:13px;font-weight:600;color: {{ ivTotalGLColor }};margin-top:6px;">P&amp;L {{ ivTotalGLStr }} &middot; {{ ivTotalGLPctStr }}</div>
+          </sc-if>
         </div>
-        <div style="display:flex;gap:9px;margin-bottom:26px;">
+        <div style="display:flex;gap:9px;margin-bottom:14px;">
           <div onClick="{{ ivBuy }}" style="flex:1;height:48px;border-radius:15px;background:var(--surface);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:13.5px;font-weight:600;">Comprar</div>
           <div onClick="{{ ivSell }}" style="flex:1;height:48px;border-radius:15px;background:var(--surface);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:13.5px;font-weight:600;">Vender</div>
           <div onClick="{{ ivDeposit }}" style="flex:1;height:48px;border-radius:15px;background:var(--surface);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:13.5px;font-weight:600;">Depositar</div>
           <div onClick="{{ ivWithdraw }}" style="flex:1;height:48px;border-radius:15px;background:var(--surface);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:13.5px;font-weight:600;">Retirar</div>
+        </div>
+        <div onClick="{{ ivFetchPrices }}" style="height:44px;border-radius:14px;background:var(--surface);display:flex;align-items:center;justify-content:center;gap:8px;cursor:pointer;margin-bottom:22px;">
+          <span style="font-size:13.5px;font-weight:600;color:var(--text-2);">{{ ivLoadingLabel }}</span>
+          <sc-if value="{{ ivHasLastUpdated }}" hint-placeholder-val="{{ false }}"><span style="font-size:11px;color:var(--text-3);">{{ ivLastUpdatedStr }}</span></sc-if>
         </div>
         <div style="font-size:14px;font-weight:700;margin:0 2px 12px;">Activos</div>
         <sc-if value="{{ ivHasAssets }}" hint-placeholder-val="{{ true }}">
@@ -1660,6 +1667,7 @@ class Component extends DCLogic {
     this.CATCOLORS=[['--cat-comida-icon','--cat-comida-fill'],['--cat-auto-icon','--cat-auto-fill'],['--cat-transfer-icon','--cat-transfer-fill'],['--cat-tarjetas-icon','--cat-tarjetas-fill'],['--cat-ocio-icon','--cat-ocio-fill'],['--cat-compras-icon','--cat-compras-fill'],['--cat-mascotas-icon','--cat-mascotas-fill'],['--cat-otros-icon','--cat-otros-fill']];
     this.CATEMOJIS=['🍔','🛒','🚗','🚌','🏠','💡','🎮','🍿','🛍️','👕','💊','🩺','🐶','✈️','🎓','💼','💰','📈','🎁','☕','🍷','🏷️'];
     this.CARDGRADS=['linear-gradient(135deg,#3a3a3c,#161618)','linear-gradient(135deg,#7a4b57,#2e1d22)','linear-gradient(135deg,#3f5b7a,#1a2738)','linear-gradient(135deg,#3f6b4c,#1b2e22)','linear-gradient(135deg,#5b4a76,#241d33)'];
+    this.CEDEAR_RATIOS={AAPL:10,AMZN:3,GOOGL:8,MSFT:10,META:5,TSLA:8,NVDA:10,JPM:5,SPY:1,QQQ:1,COIN:5,MELI:1,WMT:10,DIS:10,BAC:10,GE:10,PYPL:5,UBER:5,BABA:10};
     this.CATTYPES=[['gasto','Gasto'],['ingreso','Ingreso'],['transfer','Transferencia'],['inversion','Inversión']];
     this.CARDBRANDS=['Visa','Mastercard','Amex'];
     this.STORAGE_KEY='finanzapp:v2:state';
@@ -1702,7 +1710,7 @@ class Component extends DCLogic {
       payAccount:'banco', payAmount:'',
       cpCard:0, cpAmount:'', cpMerchant:'', cpCat:'compras', cpDate:'Hoy', cpInstall:1, cpSub:null,
       atMode:'buy', atAccount:'cedears', atType:'CEDEAR', atTicker:'', atQty:'', atPrice:'', atFees:'', atSource:'banco', atSub:null,
-      loanView:null, newLoan:{person:'',direction:'me_deben',concept:'',amount:'',currency:'ARS',editId:null}, loanPayAmount:'', ivSub:null, upTicker:'', atNewPrice:'',
+      loanView:null, newLoan:{person:'',direction:'me_deben',concept:'',amount:'',currency:'ARS',editId:null}, loanPayAmount:'', ivSub:null, upTicker:'', atNewPrice:'', pricesLoading:false, pricesLastUpdated:null,
       onbStep:0, onbMode:null, onbCard:false, onbInvest:false, flash:'', confirm:null,
       showOnboarding:true,
     }, this.emptyData());
@@ -1993,7 +2001,7 @@ class Component extends DCLogic {
       return{balances:b,assets:na,txns:[t,...s.txns],_next:s._next+1,push:'investDetail',investView:inv,flash:buy?'Compra realizada':'Venta realizada'};});}
   addCustomTag(){const t=this.state.newTagText.trim().toLowerCase().replace(/^#/,'');if(!t)return;this.setState(s=>({tagSugg:s.tagSugg.indexOf(t)>=0?s.tagSugg:[...s.tagSugg,t],addTags:s.addTags.indexOf(t)>=0?s.addTags:[...s.addTags,t],newTagText:'',subsheet:null}));}
   applyCustomDate(){const t=this.state.customDateText.trim();if(!t)return;this.setState({addDate:t,customDateText:'',subsheet:null});}
-  updateAssetPrice(){const S=this.state;const np=parseFloat((S.atNewPrice||'').replace(',','.'))||0;if(!np){this.flashMsg('Ingresá el nuevo precio');return;}const k=S.investView;this.setState(s=>{const na={...s.assets};const aa=[...(na[k]||[])];const xi=aa.findIndex(a=>a.ticker===S.upTicker);if(xi>=0)aa[xi]={...aa[xi],lastPrice:np};na[k]=aa;return{assets:na,ivSub:null,upTicker:'',atNewPrice:'',flash:'Precio actualizado'};});}
+  updateAssetPrice(){const S=this.state;const np=parseFloat((S.atNewPrice||'').replace(',','.'))||0;if(!np){this.flashMsg('Ingresá el nuevo precio');return;}const k=S.investView;this.setState(s=>{const na={...s.assets};const aa=[...(na[k]||[])];const xi=aa.findIndex(a=>a.ticker===S.upTicker);if(xi>=0)aa[xi]={...aa[xi],lastPrice:np};na[k]=aa;const nb={...s.balances};nb[k]=aa.reduce((sum,a)=>sum+a.qty*(a.lastPrice||a.avg),0);return{assets:na,balances:nb,ivSub:null,upTicker:'',atNewPrice:'',flash:'Precio actualizado'};});}
   atNewPricePress(d){this.setState(s=>{let r=s.atNewPrice;if(d==='back')return{atNewPrice:r.slice(0,-1)};if(d===','){if(r.indexOf(',')>=0||r==='')return{};return{atNewPrice:r+','};}if(r.indexOf(',')>=0&&(r.split(',')[1]||'').length>=2)return{};if(r.replace(',','').length>=9)return{};return{atNewPrice:r+d};});}
   setNewLoan(patch){this.setState(s=>({newLoan:{...s.newLoan,...patch}}));}
   openAddLoan(editId){const s=this.state;if(editId!=null){const l=(s.loans||[]).find(x=>x.id===editId);if(l){this.setState({push:'addLoan',newLoan:{person:l.person,direction:l.direction,concept:l.concept,amount:String(l.originalAmount),currency:l.currency,editId}});return;}}this.setState({push:'addLoan',newLoan:{person:'',direction:'me_deben',concept:'',amount:'',currency:'ARS',editId:null}});}
@@ -2004,6 +2012,24 @@ class Component extends DCLogic {
   deleteLoan(id){this.requestConfirm({title:'Eliminar préstamo',msg:'Se eliminará este préstamo. No se puede deshacer.',confirmLabel:'Eliminar',danger:true,onConfirm:()=>this.setState(s=>({loans:(s.loans||[]).filter(l=>l.id!==id),push:'loansScreen',loanView:null,flash:'Préstamo eliminado'}))});}
   closeLoan(id){this.requestConfirm({title:'Saldar préstamo',msg:'Se marcará como saldado con saldo cero.',confirmLabel:'Saldar',danger:false,onConfirm:()=>this.setState(s=>({loans:(s.loans||[]).map(l=>l.id===id?{...l,remaining:0}:l),flash:'Préstamo saldado'}))});}
   closeCardMonth(idx){this.requestConfirm({title:'Cerrar mes',msg:'Las cuotas avanzarán un mes. Las completadas se eliminarán automáticamente.',confirmLabel:'Cerrar mes',danger:false,onConfirm:()=>this.setState(s=>{const cards=s.cards.map((c,i)=>{if(i!==idx)return c;const cuotas=(c.cuotas||[]).map(q=>({...q,cur:q.cur+1})).filter(q=>q.cur<=q.tot);return{...c,cuotas};});return{cards,flash:'Mes cerrado · cuotas avanzadas'};})});}
+  async fetchPrices(){if(this.state.pricesLoading)return;this.setState({pricesLoading:true});
+    try{const s=this.state;const na={...s.assets};const nb={...s.balances};
+      const cryptoSet=new Set(),stockSet=new Set();
+      Object.keys(na).forEach(k=>{if(!s.accounts[k])return;(na[k]||[]).forEach(a=>{if(!a.ticker)return;if(a.ticker==='BTC'||a.ticker==='ETH'||a.ticker==='ADA'||a.ticker==='SOL')cryptoSet.add(a.ticker);else stockSet.add(a.ticker);});});
+      const cgMap={BTC:'bitcoin',ETH:'ethereum',ADA:'cardano',SOL:'solana'};
+      const cryptoPrices={};
+      if(cryptoSet.size>0){const ids=[...cryptoSet].map(t=>cgMap[t]).filter(Boolean).join(',');try{const r=await fetch('https://api.coingecko.com/api/v3/simple/price?ids='+ids+'&vs_currencies=ars');const d=await r.json();Object.entries(cgMap).forEach(([t,id])=>{if(d[id]?.ars)cryptoPrices[t]=d[id].ars;});}catch(e){}}
+      let ccl=0;if(stockSet.size>0){try{const r=await fetch('https://dolarapi.com/v1/dolares/contadoconliquidacion');const d=await r.json();ccl=d?.venta||d?.compra||0;}catch(e){}}
+      const stockPrices={};
+      if(stockSet.size>0&&ccl>0){await Promise.all([...stockSet].map(async t=>{try{const r=await fetch('https://query1.finance.yahoo.com/v8/finance/chart/'+t+'?interval=1d&range=1d');const d=await r.json();const p=d?.chart?.result?.[0]?.meta?.regularMarketPrice||0;if(p>0)stockPrices[t]=p;}catch(e){}}));}
+      let anyUpdate=false;
+      Object.keys(na).forEach(k=>{if(!s.accounts[k])return;const aa=[...(na[k]||[])];let changed=false;
+        aa.forEach((a,i)=>{if(!a.ticker)return;let np=0;if(cryptoPrices[a.ticker])np=Math.round(cryptoPrices[a.ticker]);else if(stockPrices[a.ticker]&&ccl>0){const ratio=this.CEDEAR_RATIOS[a.ticker]||10;np=Math.round(stockPrices[a.ticker]*ccl/ratio);}
+          if(np>0&&np!==a.lastPrice){aa[i]={...a,lastPrice:np};changed=true;}});
+        if(changed){na[k]=aa;nb[k]=aa.reduce((sum,a)=>sum+a.qty*(a.lastPrice||a.avg),0);anyUpdate=true;}});
+      const flash=anyUpdate?'Precios actualizados':(cryptoSet.size||stockSet.size)?'Precios sin cambios':'Sin activos';
+      this.setState({assets:na,balances:nb,pricesLoading:false,pricesLastUpdated:Date.now(),flash});}
+    catch(e){this.setState({pricesLoading:false,flash:'Error al actualizar precios'});}}
 
   press(d){this.setState(s=>{let r=s.addAmount;if(d===','){if(r.indexOf(',')>=0||r==='')return{};return{addAmount:r+','};}if(r.indexOf(',')>=0){const dec=r.split(',')[1]||'';if(dec.length>=2)return{};}if(r.replace(',','').length>=9)return{};return{addAmount:r+d};});}
   backspace(){this.setState(s=>({addAmount:s.addAmount.slice(0,-1)}));}
@@ -2139,7 +2165,14 @@ class Component extends DCLogic {
       const rawAssets=(S.assets&&S.assets[k])||[];
       const assets=rawAssets.map(as=>{const lp=as.lastPrice||as.avg;const value=as.qty*lp;const cost=as.qty*as.avg;const gl=value-cost;const glPct=cost>0?(gl/cost*100):0;return{name:as.name,ticker:as.ticker,emoji:as.emoji,qtyStr:(as.qty<1?as.qty.toFixed(6).replace(/\.?0+$/,''):this.fmtInt(as.qty))+(as.ticker?' '+as.ticker:' u'),avgStr:money(as.avg),lastPriceStr:money(lp),valueStr:money(value),glStr:(gl>=0?'+':'-')+sym+this.fmtInt(Math.abs(gl)),glPctStr:(gl>=0?'+':'')+glPct.toFixed(1).replace('.',',')+'%',glColor:gl>=0?'var(--pos)':'var(--accent)',onUpdatePrice:()=>this.setState({ivSub:'updatePrice',upTicker:as.ticker,atNewPrice:''})};});
       const ivUpKeypad=order.map(l=>({label:l,isBack:l==='back',isNum:l!=='back',onPress:l==='back'?()=>this.atNewPricePress('back'):()=>this.atNewPricePress(l)}));
+      const totalValue=rawAssets.reduce((sum,as)=>sum+as.qty*(as.lastPrice||as.avg),0);
+      const totalCost=rawAssets.reduce((sum,as)=>sum+as.qty*as.avg,0);
+      const totalGL=totalValue-totalCost;
+      const totalGLPct=totalCost>0?(totalGL/totalCost*100):0;
+      const ivLastUpdatedStr=S.pricesLastUpdated?('\u00b7 '+new Date(S.pricesLastUpdated).toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'})):'';
       invD={ivName:a.name,ivEmoji:a.emoji,ivFillVar:a.fillVar,ivBalStr:money(S.balances[k]),ivType:a.type,ivAssets:assets,ivHasAssets:assets.length>0,ivNoAssets:assets.length===0,
+        ivHasTotalGL:rawAssets.length>0,ivTotalGLStr:(totalGL>=0?'+':'-')+sym+this.fmtInt(Math.abs(totalGL)),ivTotalGLPctStr:(totalGL>=0?'+':'')+totalGLPct.toFixed(1).replace('.',',')+'%',ivTotalGLColor:totalGL>=0?'var(--pos)':'var(--accent)',
+        ivFetchPrices:()=>this.fetchPrices(),ivPricesLoading:S.pricesLoading||false,ivLoadingLabel:S.pricesLoading?'Actualizando…':'Actualizar precios',ivHasLastUpdated:!!S.pricesLastUpdated,ivLastUpdatedStr,
         ivBuy:()=>this.openAssetTrade('buy',k),ivSell:()=>this.openAssetTrade('sell',k),ivDeposit:()=>this.openAddPreset('transfer',this.liquidIds()[0]||'banco',k),ivWithdraw:()=>this.openAddPreset('transfer',k,this.liquidIds()[0]||'banco'),
         ivSubOpen:S.ivSub==='updatePrice',ivSubClose:()=>this.setState({ivSub:null}),ivUpTicker:S.upTicker,ivUpPriceStr:this.displayAmount(S.atNewPrice),ivUpKeypad,ivUpdatePrice:()=>this.updateAssetPrice(),ivUpSaveOpacity:S.atNewPrice?'1':'0.5'};}
     // card detail
