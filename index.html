@@ -1723,11 +1723,12 @@ class Component extends DCLogic {
     }
   }
   componentDidMount(){
-    // Saved state was already applied synchronously in the constructor. Only the
-    // corrupted-payload notice needs a post-mount setState (cannot toast pre-render).
     if(this._persistError){
       this.setState({flash:'Datos locales dañados · se inició en modo seguro'});
     }
+    // Auto-fetch prices on mount (after 2s to let app settle) and every 60s.
+    setTimeout(()=>this.fetchPrices(true),2000);
+    this._priceTimer=setInterval(()=>this.fetchPrices(true),60000);
   }
   componentDidUpdate(prevProps,prevState){
     this.persistState();
@@ -1741,6 +1742,7 @@ class Component extends DCLogic {
   }
   componentWillUnmount(){
     clearTimeout(this._ft);
+    clearInterval(this._priceTimer);
   }
   persistentKeys(){
     return ['theme','chartStyle','balanceMode','periodIdx','scopeIdx','currency','hideAmounts','dataMode','categories','catOrder','txns','categoryTotals','monthIncome','monthExpense','order','accounts','archived','balances','accMeta','cards','tagSugg','_next','showOnboarding','onbCard','onbInvest','cardIdx','assets','loans'];
@@ -2012,24 +2014,36 @@ class Component extends DCLogic {
   deleteLoan(id){this.requestConfirm({title:'Eliminar préstamo',msg:'Se eliminará este préstamo. No se puede deshacer.',confirmLabel:'Eliminar',danger:true,onConfirm:()=>this.setState(s=>({loans:(s.loans||[]).filter(l=>l.id!==id),push:'loansScreen',loanView:null,flash:'Préstamo eliminado'}))});}
   closeLoan(id){this.requestConfirm({title:'Saldar préstamo',msg:'Se marcará como saldado con saldo cero.',confirmLabel:'Saldar',danger:false,onConfirm:()=>this.setState(s=>({loans:(s.loans||[]).map(l=>l.id===id?{...l,remaining:0}:l),flash:'Préstamo saldado'}))});}
   closeCardMonth(idx){this.requestConfirm({title:'Cerrar mes',msg:'Las cuotas avanzarán un mes. Las completadas se eliminarán automáticamente.',confirmLabel:'Cerrar mes',danger:false,onConfirm:()=>this.setState(s=>{const cards=s.cards.map((c,i)=>{if(i!==idx)return c;const cuotas=(c.cuotas||[]).map(q=>({...q,cur:q.cur+1})).filter(q=>q.cur<=q.tot);return{...c,cuotas};});return{cards,flash:'Mes cerrado · cuotas avanzadas'};})});}
-  async fetchPrices(){if(this.state.pricesLoading)return;this.setState({pricesLoading:true});
+  async fetchPrices(silent=false){if(this.state.pricesLoading)return;this.setState({pricesLoading:true});
     try{const s=this.state;const na={...s.assets};const nb={...s.balances};
+      const CRYPTO={BTC:'bitcoin',ETH:'ethereum',ADA:'cardano',SOL:'solana',MATIC:'matic-network',DOT:'polkadot'};
       const cryptoSet=new Set(),stockSet=new Set();
-      Object.keys(na).forEach(k=>{if(!s.accounts[k])return;(na[k]||[]).forEach(a=>{if(!a.ticker)return;if(a.ticker==='BTC'||a.ticker==='ETH'||a.ticker==='ADA'||a.ticker==='SOL')cryptoSet.add(a.ticker);else stockSet.add(a.ticker);});});
-      const cgMap={BTC:'bitcoin',ETH:'ethereum',ADA:'cardano',SOL:'solana'};
+      Object.keys(na).forEach(k=>{if(!s.accounts[k])return;(na[k]||[]).forEach(a=>{if(!a.ticker)return;if(CRYPTO[a.ticker])cryptoSet.add(a.ticker);else stockSet.add(a.ticker);});});
+      // 1. Crypto → CoinGecko (ARS direct)
       const cryptoPrices={};
-      if(cryptoSet.size>0){const ids=[...cryptoSet].map(t=>cgMap[t]).filter(Boolean).join(',');try{const r=await fetch('https://api.coingecko.com/api/v3/simple/price?ids='+ids+'&vs_currencies=ars');const d=await r.json();Object.entries(cgMap).forEach(([t,id])=>{if(d[id]?.ars)cryptoPrices[t]=d[id].ars;});}catch(e){}}
-      let ccl=0;if(stockSet.size>0){try{const r=await fetch('https://dolarapi.com/v1/dolares/contadoconliquidacion');const d=await r.json();ccl=d?.venta||d?.compra||0;}catch(e){}}
-      const stockPrices={};
-      if(stockSet.size>0&&ccl>0){await Promise.all([...stockSet].map(async t=>{try{const r=await fetch('https://query1.finance.yahoo.com/v8/finance/chart/'+t+'?interval=1d&range=1d');const d=await r.json();const p=d?.chart?.result?.[0]?.meta?.regularMarketPrice||0;if(p>0)stockPrices[t]=p;}catch(e){}}));}
+      if(cryptoSet.size){const ids=[...cryptoSet].map(t=>CRYPTO[t]).join(',');
+        try{const d=await(await fetch('https://api.coingecko.com/api/v3/simple/price?ids='+ids+'&vs_currencies=ars')).json();Object.entries(CRYPTO).forEach(([t,id])=>{if(d[id]?.ars)cryptoPrices[t]=d[id].ars;});}catch(e){}}
+      // 2. CEDEARs → Yahoo Finance .BA (BYMA peso price, no conversion needed)
+      const stockPrices={},usdFallback={};
+      await Promise.all([...stockSet].map(async t=>{
+        try{const d=await(await fetch('https://query1.finance.yahoo.com/v8/finance/chart/'+t+'.BA?interval=1d&range=1d')).json();const p=d?.chart?.result?.[0]?.meta?.regularMarketPrice||0;if(p>0){stockPrices[t]=p;return;}}catch(e){}
+        // Fallback: USD price, will convert via CCL
+        try{const d=await(await fetch('https://query1.finance.yahoo.com/v8/finance/chart/'+t+'?interval=1d&range=1d')).json();const p=d?.chart?.result?.[0]?.meta?.regularMarketPrice||0;if(p>0)usdFallback[t]=p;}catch(e){}
+      }));
+      // 3. CCL only if we have USD fallbacks to convert
+      let ccl=0;
+      if(Object.keys(usdFallback).length){try{const d=await(await fetch('https://dolarapi.com/v1/dolares/contadoconliquidacion')).json();ccl=d?.venta||d?.compra||0;}catch(e){}}
+      // 4. Apply
       let anyUpdate=false;
       Object.keys(na).forEach(k=>{if(!s.accounts[k])return;const aa=[...(na[k]||[])];let changed=false;
-        aa.forEach((a,i)=>{if(!a.ticker)return;let np=0;if(cryptoPrices[a.ticker])np=Math.round(cryptoPrices[a.ticker]);else if(stockPrices[a.ticker]&&ccl>0){const ratio=this.CEDEAR_RATIOS[a.ticker]||10;np=Math.round(stockPrices[a.ticker]*ccl/ratio);}
+        aa.forEach((a,i)=>{if(!a.ticker)return;let np=0;
+          if(cryptoPrices[a.ticker])np=Math.round(cryptoPrices[a.ticker]);
+          else if(stockPrices[a.ticker])np=Math.round(stockPrices[a.ticker]);
+          else if(usdFallback[a.ticker]&&ccl){np=Math.round(usdFallback[a.ticker]*ccl/(this.CEDEAR_RATIOS[a.ticker]||10));}
           if(np>0&&np!==a.lastPrice){aa[i]={...a,lastPrice:np};changed=true;}});
-        if(changed){na[k]=aa;nb[k]=aa.reduce((sum,a)=>sum+a.qty*(a.lastPrice||a.avg),0);anyUpdate=true;}});
-      const flash=anyUpdate?'Precios actualizados':(cryptoSet.size||stockSet.size)?'Precios sin cambios':'Sin activos';
-      this.setState({assets:na,balances:nb,pricesLoading:false,pricesLastUpdated:Date.now(),flash});}
-    catch(e){this.setState({pricesLoading:false,flash:'Error al actualizar precios'});}}
+        if(changed){na[k]=aa;nb[k]=aa.reduce((s2,a)=>s2+a.qty*(a.lastPrice||a.avg),0);anyUpdate=true;}});
+      this.setState({assets:na,balances:nb,pricesLoading:false,pricesLastUpdated:Date.now(),...(!silent&&anyUpdate?{flash:'Precios actualizados'}:{})});}
+    catch(e){this.setState({pricesLoading:false,...(!silent?{flash:'Error al actualizar precios'}:{})});}}
 
   press(d){this.setState(s=>{let r=s.addAmount;if(d===','){if(r.indexOf(',')>=0||r==='')return{};return{addAmount:r+','};}if(r.indexOf(',')>=0){const dec=r.split(',')[1]||'';if(dec.length>=2)return{};}if(r.replace(',','').length>=9)return{};return{addAmount:r+d};});}
   backspace(){this.setState(s=>({addAmount:s.addAmount.slice(0,-1)}));}
