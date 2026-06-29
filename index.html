@@ -521,17 +521,6 @@ input{font-family:inherit;}
           <div style="display:flex;justify-content:space-between;"><span style="font-size:13px;font-weight:600;color:var(--pos);">Ingresos {{ repIncomeStr }}</span><span style="font-size:13px;font-weight:600;color:var(--accent);">Gastos {{ repExpenseStr }}</span></div>
         </div>
 
-        <div style="display:flex;gap:11px;margin-bottom:22px;">
-          <div style="flex:1;background:var(--surface);border-radius:18px;padding:14px 15px;">
-            <div style="font-size:12px;font-weight:600;color:var(--text-2);margin-bottom:8px;">Patrimonio</div>
-            <div style="display:flex;align-items:flex-end;gap:4px;height:46px;"><sc-for list="{{ repNetWorth }}" as="b" hint-placeholder-count="6"><div style="flex:1;height: {{ b.h }};border-radius:4px;background:var(--cat-inversion-icon);opacity:.85;"></div></sc-for></div>
-          </div>
-          <div style="flex:1;background:var(--surface);border-radius:18px;padding:14px 15px;">
-            <div style="font-size:12px;font-weight:600;color:var(--text-2);margin-bottom:8px;">Disponible</div>
-            <div style="display:flex;align-items:flex-end;gap:4px;height:46px;"><sc-for list="{{ repDispo }}" as="b" hint-placeholder-count="6"><div style="flex:1;height: {{ b.h }};border-radius:4px;background:var(--pos);opacity:.8;"></div></sc-for></div>
-          </div>
-        </div>
-
         <div style="font-size:14px;font-weight:700;margin:0 2px 12px;">Gastos por categoría</div>
         <div style="display:flex;flex-direction:column;gap:11px;margin-bottom:22px;">
           <sc-for list="{{ repCatRows }}" as="c" hint-placeholder-count="4">
@@ -542,25 +531,33 @@ input{font-family:inherit;}
           </sc-for>
         </div>
 
-        <div style="font-size:14px;font-weight:700;margin:0 2px 12px;">Gastos por cuenta</div>
-        <div style="background:var(--card);border-radius:18px;padding:4px 16px;box-shadow:var(--shadow-pill);margin-bottom:22px;">
-          <sc-for list="{{ repByAcct }}" as="a" hint-placeholder-count="3"><div style="display:flex;align-items:center;gap:12px;padding:13px 0;border-bottom:1px solid var(--hairline);"><div style="width:36px;height:36px;border-radius:11px;background:var( {{ a.fillVar }} );display:flex;align-items:center;justify-content:center;font-size:17px;">{{ a.emoji }}</div><span style="flex:1;font-size:14px;font-weight:600;">{{ a.name }}</span><span style="font-size:14px;font-weight:700;">{{ a.amountStr }}</span></div></sc-for>
-        </div>
-
+        <sc-if value="{{ repHasByCard }}" hint-placeholder-val="{{ true }}">
         <div style="font-size:14px;font-weight:700;margin:0 2px 12px;">Gastos por tarjeta</div>
         <div style="background:var(--card);border-radius:18px;padding:4px 16px;box-shadow:var(--shadow-pill);margin-bottom:22px;">
           <sc-for list="{{ repByCard }}" as="c" hint-placeholder-count="2"><div style="display:flex;align-items:center;gap:12px;padding:13px 0;border-bottom:1px solid var(--hairline);"><div style="width:36px;height:36px;border-radius:11px;background:var(--cat-tarjetas-fill);display:flex;align-items:center;justify-content:center;font-size:17px;">💳</div><span style="flex:1;font-size:14px;font-weight:600;">{{ c.name }}</span><span style="font-size:14px;font-weight:700;">{{ c.amountStr }}</span></div></sc-for>
         </div>
+        </sc-if>
 
+        <sc-if value="{{ repHasByAcct }}" hint-placeholder-val="{{ false }}">
+        <div style="font-size:14px;font-weight:700;margin:0 2px 12px;">Gastos por cuenta</div>
+        <div style="background:var(--card);border-radius:18px;padding:4px 16px;box-shadow:var(--shadow-pill);margin-bottom:22px;">
+          <sc-for list="{{ repByAcct }}" as="a" hint-placeholder-count="3"><div style="display:flex;align-items:center;gap:12px;padding:13px 0;border-bottom:1px solid var(--hairline);"><div style="width:36px;height:36px;border-radius:11px;background:var( {{ a.fillVar }} );display:flex;align-items:center;justify-content:center;font-size:17px;">{{ a.emoji }}</div><span style="flex:1;font-size:14px;font-weight:600;">{{ a.name }}</span><span style="font-size:14px;font-weight:700;">{{ a.amountStr }}</span></div></sc-for>
+        </div>
+        </sc-if>
+
+        <sc-if value="{{ futHasCuotas }}" hint-placeholder-val="{{ true }}">
         <div style="background:var(--cat-comida-fill);border-radius:18px;padding:16px 18px;display:flex;align-items:center;gap:13px;margin-bottom:22px;">
           <div style="width:42px;height:42px;border-radius:13px;background:var(--cat-comida-icon);display:flex;align-items:center;justify-content:center;font-size:20px;">📅</div>
-          <div style="flex:1;"><div style="font-size:12px;color:var(--text-2);font-weight:600;">Cuotas futuras (obligaciones)</div><div style="font-size:17px;font-weight:800;">{{ futCuotasStr }}</div></div>
+          <div style="flex:1;"><div style="font-size:12px;color:var(--text-2);font-weight:600;">Cuotas futuras (lo que ya debés)</div><div style="font-size:17px;font-weight:800;">{{ futCuotasStr }}</div></div>
         </div>
+        </sc-if>
 
+        <sc-if value="{{ repHasMerch }}" hint-placeholder-val="{{ true }}">
         <div style="font-size:14px;font-weight:700;margin:0 2px 12px;">Top comercios</div>
         <div style="background:var(--card);border-radius:18px;padding:4px 16px;box-shadow:var(--shadow-pill);">
           <sc-for list="{{ repTopMerch }}" as="m" hint-placeholder-count="5"><div style="display:flex;align-items:center;gap:12px;padding:13px 0;border-bottom:1px solid var(--hairline);"><span style="flex:1;font-size:14px;font-weight:600;">{{ m.name }}</span><span style="font-size:14px;font-weight:700;">{{ m.amountStr }}</span></div></sc-for>
         </div>
+        </sc-if>
         </sc-if>
       </div>
       </sc-if>
@@ -2260,14 +2257,18 @@ class Component extends DCLogic {
     const repByCat=expKeys.map(k=>({k,t:S.categoryTotals[k]||0})).filter(x=>x.t>0).sort((a,b)=>b.t-a.t);
     const repCatMax=Math.max.apply(null,repByCat.map(x=>x.t).concat([1]));
     const repCatRows=repByCat.map(x=>({name:(CAT[x.k]||{}).name,emoji:(CAT[x.k]||{}).emoji,fillVar:cFill(x.k),iconVar:cIcon(x.k),amountStr:money(x.t),pct:Math.round(x.t/repCatMax*100)+'%'}));
-    const acctSpend={};S.txns.forEach(t=>{if(t.amount<0&&!t.isTransfer){const a=t.account;acctSpend[a]=(acctSpend[a]||0)+t.val;}});
+    // Spending by account (cash/bank expenses, i.e. not card purchases).
+    const acctSpend={};S.txns.forEach(t=>{if(t.amount<0&&!t.isTransfer&&!t.onCard){const a=t.account;if(a)acctSpend[a]=(acctSpend[a]||0)+t.val;}});
     const repByAcct=Object.keys(acctSpend).filter(a=>ACC[a]).map(a=>({name:ACC[a].name,emoji:ACC[a].emoji,fillVar:ACC[a].fillVar,amountStr:money(acctSpend[a]),v:acctSpend[a]})).sort((a,b)=>b.v-a.v);
-    const repByCard=S.cards.map((c,i)=>({name:c.brand+' ·••• '+c.last4,amountStr:money(cardSaldo(i))}));
+    const repHasByAcct=repByAcct.length>0;
+    // Spending by card this period (real card purchases, not the running balance).
+    const cardSpend={};S.txns.forEach(t=>{if(t.amount<0&&!t.isTransfer&&t.onCard&&t.card)cardSpend[t.card]=(cardSpend[t.card]||0)+t.val;});
+    const repByCard=S.cards.map(c=>({name:c.brand+' ·••• '+c.last4,v:cardSpend[c.id]||0,amountStr:money(cardSpend[c.id]||0)})).filter(c=>c.v>0).sort((a,b)=>b.v-a.v);
+    const repHasByCard=repByCard.length>0;
     const merchSpend={};S.txns.forEach(t=>{if(t.amount<0&&!t.isTransfer){merchSpend[t.merchant]=(merchSpend[t.merchant]||0)+t.val;}});
     const repTopMerch=Object.keys(merchSpend).map(m=>({name:m,amountStr:money(merchSpend[m]),v:merchSpend[m]})).sort((a,b)=>b.v-a.v).slice(0,5);
+    const repHasMerch=repTopMerch.length>0;
     const futCuotas=S.cards.reduce((a,c)=>a+(c.cuotas||[]).reduce((s,q)=>s+q.monto*(q.tot-q.cur+1),0),0);
-    const repNetWorth=[0.62,0.70,0.66,0.78,0.85,1].map((f,i)=>({h:Math.round(f*100)+'%',last:i===5}));
-    const repDispo=[0.5,0.62,0.58,0.7,0.66,0.82].map((f,i)=>({h:Math.round(f*100)+'%',last:i===5}));
     // ===== MÁS entries =====
     const masItems=[
       {label:'Cuentas',sub:'Bancos, efectivo y billeteras',emoji:'🏦',fillVar:'--cat-transfer-fill',onPick:()=>this.setState({tab:'cuentas',push:null})},
@@ -2366,7 +2367,7 @@ class Component extends DCLogic {
       saveAssetTrade:()=>this.saveAssetTrade(),
       repIncomeStr:money(repIncome),repExpenseStr:money(repExpense),repNetStr:(repNet>=0?'+':'-')+sym+this.fmtInt(Math.abs(repNet)),repNetColor:repNet>=0?'var(--pos)':'var(--accent)',
       repIncPct:repIncPct+'%',repExpPct:(100-repIncPct)+'%',
-      repCatRows,repByAcct,repByCard,repTopMerch,futCuotasStr:money(futCuotas),repNetWorth,repDispo,
+      repCatRows,repByAcct,repHasByAcct,repByCard,repHasByCard,repTopMerch,repHasMerch,futCuotasStr:money(futCuotas),futHasCuotas:futCuotas>0,
       masItems,
       flash:S.flash,hasFlash:!!S.flash,
       hasConfirm:!!S.confirm,confirmTitle:S.confirm?S.confirm.title:'',confirmMsg:S.confirm?S.confirm.msg:'',confirmLabel:S.confirm?S.confirm.confirmLabel:'Confirmar',
