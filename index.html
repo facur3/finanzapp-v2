@@ -659,16 +659,17 @@ input{font-family:inherit;}
         <div style="display:flex;height:14px;border-radius:7px;overflow:hidden;gap:2px;margin-bottom:18px;">
           <sc-for list="{{ portSegments }}" as="s" hint-placeholder-count="3"><div style="width: {{ s.w }};background: {{ s.color }};"></div></sc-for>
         </div>
-        <div style="background:var(--card);border-radius:24px;padding:4px 16px;box-shadow:var(--shadow-pill);margin-bottom:18px;">
+        <div style="font-size:13px;font-weight:600;color:var(--text-2);margin:0 2px 11px;">Instrumentos</div>
+        <div style="display:flex;flex-direction:column;gap:11px;margin-bottom:18px;">
           <sc-for list="{{ portList }}" as="a" hint-placeholder-count="3">
-            <div onClick="{{ a.onOpen }}" style="display:flex;align-items:center;gap:13px;padding:14px 0;border-bottom:1px solid var(--hairline);cursor:pointer;">
-              <div style="width:44px;height:44px;border-radius:14px;background:var(--surface);display:flex;align-items:center;justify-content:center;font-size:21px;flex:none;position:relative;">{{ a.emoji }}<div style="position:absolute;left:-3px;top:-3px;width:11px;height:11px;border-radius:50%;background: {{ a.color }};border:2px solid var(--card);"></div></div>
+            <div onClick="{{ a.onOpen }}" style="display:flex;align-items:center;gap:13px;background:var(--card);border-radius:20px;padding:15px 16px;box-shadow:var(--shadow-pill);cursor:pointer;">
+              <div style="width:46px;height:46px;border-radius:15px;background:var(--surface);display:flex;align-items:center;justify-content:center;font-size:22px;flex:none;position:relative;">{{ a.emoji }}<div style="position:absolute;left:-3px;top:-3px;width:12px;height:12px;border-radius:50%;background: {{ a.color }};border:2px solid var(--card);"></div></div>
               <div style="flex:1;min-width:0;">
-                <div style="font-size:15px;font-weight:700;">{{ a.name }}</div>
+                <div style="font-size:15.5px;font-weight:700;">{{ a.name }}</div>
                 <div style="font-size:12px;color:var(--text-2);font-weight:500;">{{ a.ticker }} · {{ a.pctStr }} del total</div>
               </div>
               <div style="text-align:right;">
-                <div style="font-size:15px;font-weight:700;">{{ a.valueStr }}</div>
+                <div style="font-size:15.5px;font-weight:700;">{{ a.valueStr }}</div>
                 <div style="font-size:12px;font-weight:600;color: {{ a.glColor }};">{{ a.glStr }} · {{ a.glPctStr }}</div>
               </div>
               <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--text-3)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="flex:none;"><polyline points="9 6 15 12 9 18"></polyline></svg>
@@ -704,10 +705,22 @@ input{font-family:inherit;}
           <div onClick="{{ adABuy }}" style="flex:1;height:52px;border-radius:16px;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:15px;font-weight:700;">Comprar más</div>
           <div onClick="{{ adASell }}" style="flex:1;height:52px;border-radius:16px;background:var(--surface);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:15px;font-weight:700;">Vender</div>
         </div>
-        <div style="display:flex;gap:9px;">
+        <div style="display:flex;gap:9px;margin-bottom:22px;">
           <div onClick="{{ adAUpdate }}" style="flex:1;height:46px;border-radius:14px;background:var(--surface);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:13.5px;font-weight:600;color:var(--text-2);">Editar precio</div>
           <div onClick="{{ adARefresh }}" style="flex:1;height:46px;border-radius:14px;background:var(--surface);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:13.5px;font-weight:600;color:var(--text-2);">{{ adARefreshLabel }}</div>
         </div>
+        <sc-if value="{{ adAHasCompras }}" hint-placeholder-val="{{ true }}">
+          <div style="font-size:14px;font-weight:700;margin:0 2px 12px;">Tus operaciones</div>
+          <div style="background:var(--card);border-radius:20px;padding:4px 16px;box-shadow:var(--shadow-pill);">
+            <sc-for list="{{ adACompras }}" as="o" hint-placeholder-count="2">
+              <div style="display:flex;align-items:center;gap:12px;padding:13px 0;border-bottom:1px solid var(--hairline);">
+                <div style="width:38px;height:38px;border-radius:12px;background:var(--surface);display:flex;align-items:center;justify-content:center;flex:none;"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--text-2)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"></line><polyline points="5 12 12 5 19 12"></polyline></svg></div>
+                <div style="flex:1;min-width:0;"><div style="font-size:14px;font-weight:700;">{{ o.kind }} {{ o.qtyStr }}</div><div style="font-size:12px;color:var(--text-2);font-weight:500;">{{ o.date }}</div></div>
+                <span style="font-size:14px;font-weight:700;color: {{ o.color }};">{{ o.amountStr }}</span>
+              </div>
+            </sc-for>
+          </div>
+        </sc-if>
       </div>
     </sc-if>
 
@@ -1936,7 +1949,7 @@ class Component extends DCLogic {
       if(buy){if(xi>=0){const ex=aa[xi];const nq=ex.qty+qty;aa[xi]={...ex,qty:nq,avg:(ex.qty*ex.avg+total)/nq};}else{aa.push({id:'a'+s._next,ticker,name:S.atName||ticker,emoji:S.atEmoji||emojiMap[S.atType]||'📈',qty,avg:unit,lastPrice:unit});}}
       else{if(xi<0){return{flash:'No tenés ese activo'};}const ex=aa[xi];const nq=ex.qty-qty;if(nq<=0.000001)aa.splice(xi,1);else aa[xi]={...ex,qty:nq};}
       na[inv]=aa;const nb={...s.balances};nb[inv]=aa.reduce((sum,a)=>sum+a.qty*(a.lastPrice||a.avg),0);
-      const t={id:s._next,type:'inversion',merchant:(buy?'Compra ':'Venta ')+ticker,cat:'inversion',amount:buy?-total:total,val:total,from:buy?inv:inv,to:inv,isTransfer:true,dateLabel:'Hoy',note:(qty<1?qty:this.fmtInt(qty))+' '+ticker+' · '+this.fmtInt(total),tags:[]};
+      const t={id:s._next,type:'inversion',ticker,aqty:qty,merchant:(buy?'Compra ':'Venta ')+ticker,cat:'inversion',amount:buy?-total:total,val:total,from:buy?inv:inv,to:inv,isTransfer:true,dateLabel:'Hoy',note:(qty<1?qty:this.fmtInt(qty))+' '+ticker+' · '+this.fmtInt(total),tags:[]};
       return{assets:na,balances:nb,txns:[t,...s.txns],_next:s._next+1,push:'investDetail',investView:inv,flash:buy?'Compra registrada':'Venta registrada'};});
     setTimeout(()=>this.fetchPrices(true),300);}
   addCustomTag(){const t=this.state.newTagText.trim().toLowerCase().replace(/^#/,'');if(!t)return;this.setState(s=>({tagSugg:s.tagSugg.indexOf(t)>=0?s.tagSugg:[...s.tagSugg,t],addTags:s.addTags.indexOf(t)>=0?s.addTags:[...s.addTags,t],newTagText:'',subsheet:null}));}
@@ -2060,7 +2073,7 @@ class Component extends DCLogic {
     const expTotal=expKeys.reduce((a,k)=>a+(S.categoryTotals[k]||0),0);
     const chartItems=sorted.filter(x=>x.t>0).map(x=>({key:x.k,name:(CAT[x.k]||{}).name,emoji:(CAT[x.k]||{}).emoji,iconVar:cIcon(x.k),fillVar:cFill(x.k),amount:S.hideAmounts?'••':this.abbr(x.t),h:Math.max(48,Math.round(x.t/maxT*100)),onOpen:()=>this.setState({tab:'actividad',push:null,sheet:null,actCat:x.k,actFilter:'todos',actSearch:''})}));
     // home groups Hoy/Ayer
-    const homeGroups=this.groupByDate(S.txns.slice(0,6)).map(g=>({day:g.day,totalStr:S.hideAmounts?'••••':this.signed(g.total),items:g.items.map(t=>this.txView(t))}));
+    const homeGroups=this.groupByDate(S.txns.filter(t=>t.type==='gasto'||t.type==='ingreso').slice(0,6)).map(g=>({day:g.day,totalStr:S.hideAmounts?'••••':this.signed(g.total),items:g.items.map(t=>this.txView(t))}));
     // activity
     const q=S.actSearch.trim().toLowerCase();
     const filtered=S.txns.filter(t=>{if(S.actCat&&t.cat!==S.actCat)return false;if(S.actFilter==='gastos'&&!(t.amount<0&&!t.isTransfer))return false;if(S.actFilter==='ingresos'&&!(t.amount>0&&!t.isTransfer))return false;if(S.actFilter==='transfer'&&!t.isTransfer)return false;
@@ -2178,7 +2191,9 @@ class Component extends DCLogic {
           adAAvgStr:money(a.avg),adALastStr:money(lp),adAPctStr:pct.toFixed(0)+'% de tu portfolio',
           adABuy:()=>this.tradeAsset('buy',av.account,a),adASell:()=>this.tradeAsset('sell',av.account,a),
           adAUpdate:()=>this.setState({push:'investDetail',investView:av.account,ivSub:'updatePrice',upTicker:a.ticker,atNewPrice:''}),
-          adARefresh:()=>this.fetchPrices(),adARefreshLabel:S.pricesLoading?'Actualizando…':'Actualizar precios',adABack:()=>this.setState({push:'investments',assetView:null})};}}
+          adARefresh:()=>this.fetchPrices(),adARefreshLabel:S.pricesLoading?'Actualizando…':'Actualizar precios',adABack:()=>this.setState({push:'investments',assetView:null})};
+        const lots=(S.txns||[]).filter(t=>t.type==='inversion'&&t.ticker===av.ticker).map(t=>{const buy=(t.amount||0)<=0;const q=t.aqty;return{date:t.dateLabel||'',kind:buy?'Compraste':'Vendiste',qtyStr:q!=null?((q<1?String(q):this.fmtInt(q))+' '+av.ticker):'',amountStr:sym+this.fmtInt(Math.abs(t.amount||t.val||0)),color:buy?'var(--text)':'var(--pos)'};});
+        assetD.adACompras=lots;assetD.adAHasCompras=lots.length>0;}}
     // card detail
     let cardD={};
     {const i=S.cardView,c=S.cards[i]||S.cards[0]||{limit:1,brand:'',bank:'',last4:'',grad:this.CARDGRADS[0],cierre:'—',vence:'—',compras:[],cuotas:[],pagos:[]};const saldo=cardSaldo(i);const avail=Math.max(0,c.limit-saldo);
