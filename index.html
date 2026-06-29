@@ -82,48 +82,6 @@
       setTimeout(function () { clearInterval(iv); }, 8000);
     });
   })();
-  (function () {
-    // Safe-area diagnostic. Shows a small badge ONLY when the tab bar fails to
-    // reach the bottom (a real gap), or when forced with ?debugSafeArea=1.
-    // Self-hides when the layout is correct, so it adds no UI in the normal case.
-    function standaloneMode() {
-      try {
-        return window.navigator.standalone === true ||
-          (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches);
-      } catch (e) { return false; }
-    }
-    var forced = false;
-    try { forced = new URLSearchParams(window.location.search).get('debugSafeArea') === '1'; } catch (e) {}
-    function insetBottom() {
-      if (!document.body) return '?';
-      var probe = document.createElement('div');
-      probe.style.cssText = 'position:fixed;left:-9999px;bottom:0;height:env(safe-area-inset-bottom, 0px);width:1px;visibility:hidden;';
-      document.body.appendChild(probe);
-      var h = window.getComputedStyle(probe).height; probe.remove(); return h;
-    }
-    function badge(text) {
-      var id = 'fa-sa-debug', d = document.getElementById(id);
-      if (text == null) { if (d) d.remove(); return; }
-      if (!d) {
-        d = document.createElement('div'); d.id = id;
-        d.style.cssText = 'position:fixed;top:env(safe-area-inset-top,0px);left:0;z-index:2147483647;background:rgba(200,0,0,.9);color:#fff;font:11px/1.3 monospace;padding:4px 6px;white-space:pre;pointer-events:none;border-radius:0 0 6px 0;';
-        (document.body || document.documentElement).appendChild(d);
-      }
-      d.textContent = text;
-    }
-    function check() {
-      var e = document.querySelector('.fa-tabbar');
-      var tb = e ? e.getBoundingClientRect() : null;
-      var ih = window.innerHeight;
-      var gap = tb ? Math.round(ih - tb.bottom) : null;
-      var info = 'SA ' + (standaloneMode() ? 'standalone' : 'browser') + ' inset:' + insetBottom() +
-        '\ninnerH:' + ih + ' tabBottom:' + (tb ? Math.round(tb.bottom) : '-') + ' gap:' + gap;
-      console.log('[fa-safe-area]', info);
-      if (forced || (gap != null && gap > 4)) badge(info); else badge(null);
-    }
-    document.addEventListener('DOMContentLoaded', function () { setTimeout(check, 300); setTimeout(check, 1200); });
-    if (window.visualViewport) window.visualViewport.addEventListener('resize', function () { setTimeout(check, 50); });
-  })();
 </script>
 </head>
 <body>
@@ -1124,6 +1082,12 @@ input{font-family:inherit;}
         </div>
         <div style="font-size:13px;font-weight:600;color:var(--text-2);margin:0 4px 10px;">Tipo de activo</div>
         <div class="fa-scroll" style="display:flex;gap:8px;overflow-x:auto;margin:0 -22px 18px;padding:0 22px;"><sc-for list="{{ atTypeChips }}" as="c" hint-placeholder-count="4"><div onClick="{{ c.onPick }}" style="flex:none;padding:9px 15px;border-radius:14px;font-size:13px;font-weight:600;cursor:pointer;background: {{ c.bg }};color: {{ c.color }};">{{ c.label }}</div></sc-for></div>
+        <sc-if value="{{ atHasSuggestions }}" hint-placeholder-val="{{ true }}">
+          <div style="font-size:13px;font-weight:600;color:var(--text-2);margin:0 4px 10px;">Elegí el activo</div>
+          <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px;">
+            <sc-for list="{{ atSuggestions }}" as="a" hint-placeholder-count="6"><div onClick="{{ a.onPick }}" style="display:flex;align-items:center;gap:7px;padding:9px 13px;border-radius:14px;cursor:pointer;background: {{ a.bg }};"><span style="font-size:16px;">{{ a.emoji }}</span><span style="font-size:13.5px;font-weight:700;color: {{ a.color }};">{{ a.ticker }}</span><span style="font-size:11.5px;font-weight:500;color: {{ a.nameColor }};">{{ a.name }}</span></div></sc-for>
+          </div>
+        </sc-if>
         <div style="background:var(--card);border-radius:22px;padding:2px 16px;box-shadow:var(--shadow-pill);margin-bottom:16px;">
           <div style="display:flex;align-items:center;gap:10px;padding:14px 0;border-bottom:1px solid var(--hairline);"><span style="font-size:14px;color:var(--text-2);font-weight:500;width:90px;">Activo</span><input value="{{ atTicker }}" onChange="{{ setAtTicker }}" placeholder="{{ atTickerPh }}" style="border:none;outline:none;background:transparent;font-size:15px;font-weight:600;color:var(--text);flex:1;"></div>
           <div style="display:flex;align-items:center;gap:10px;padding:14px 0;border-bottom:1px solid var(--hairline);"><span style="font-size:14px;color:var(--text-2);font-weight:500;width:90px;">Cantidad</span><input value="{{ atQty }}" onChange="{{ setAtQty }}" inputmode="decimal" placeholder="0" style="border:none;outline:none;background:transparent;font-size:15px;font-weight:600;color:var(--text);flex:1;"></div>
@@ -1182,8 +1146,8 @@ input{font-family:inherit;}
                   <div style="flex:1;"><div style="font-size:15px;font-weight:700;">{{ a.name }}</div><div style="font-size:12px;color:var(--text-2);font-weight:500;">{{ a.qtyStr }}</div></div>
                   <div style="text-align:right;"><div style="font-size:15px;font-weight:700;">{{ a.valueStr }}</div><div style="font-size:12px;font-weight:600;color: {{ a.glColor }};">{{ a.glStr }} · {{ a.glPctStr }}</div></div>
                 </div>
-                <div style="display:flex;justify-content:space-between;border-top:1px solid var(--hairline);padding-top:11px;margin-bottom:8px;"><span style="font-size:12px;color:var(--text-2);font-weight:500;">P. promedio</span><span style="font-size:13px;font-weight:600;">{{ a.avgStr }}</span></div>
-                <div style="display:flex;justify-content:space-between;margin-bottom:10px;"><span style="font-size:12px;color:var(--text-2);font-weight:500;">Precio actual</span><span style="font-size:13px;font-weight:600;">{{ a.lastPriceStr }}</span></div>
+                <div style="display:flex;justify-content:space-between;border-top:1px solid var(--hairline);padding-top:11px;margin-bottom:8px;"><span style="font-size:12px;color:var(--text-2);font-weight:500;">Invertido</span><span style="font-size:13px;font-weight:600;">{{ a.costStr }}</span></div>
+                <div style="display:flex;justify-content:space-between;margin-bottom:10px;"><span style="font-size:12px;color:var(--text-2);font-weight:500;">Precio · compra / hoy</span><span style="font-size:13px;font-weight:600;">{{ a.avgStr }} → {{ a.lastPriceStr }}</span></div>
                 <div onClick="{{ a.onUpdatePrice }}" style="height:36px;border-radius:11px;background:var(--surface);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:13px;font-weight:600;color:var(--text-2);">Actualizar precio</div>
               </div>
             </sc-for>
@@ -1639,6 +1603,9 @@ class Component extends DCLogic {
     this.CATEMOJIS=['🍔','🛒','🚗','🚌','🏠','💡','🎮','🍿','🛍️','👕','💊','🩺','🐶','✈️','🎓','💼','💰','📈','🎁','☕','🍷','🏷️'];
     this.CARDGRADS=['linear-gradient(135deg,#3a3a3c,#161618)','linear-gradient(135deg,#7a4b57,#2e1d22)','linear-gradient(135deg,#3f5b7a,#1a2738)','linear-gradient(135deg,#3f6b4c,#1b2e22)','linear-gradient(135deg,#5b4a76,#241d33)'];
     this.CEDEAR_RATIOS={AAPL:10,AMZN:3,GOOGL:8,MSFT:10,META:5,TSLA:8,NVDA:10,JPM:5,SPY:1,QQQ:1,COIN:5,MELI:1,WMT:10,DIS:10,BAC:10,GE:10,PYPL:5,UBER:5,BABA:10};
+    // Curated pick-lists so users choose an asset instead of typing a ticker.
+    this.CEDEARS=[['QQQ','Nasdaq 100','📊'],['SPY','S&P 500','📈'],['AAPL','Apple','🍎'],['AMZN','Amazon','📦'],['MSFT','Microsoft','🪟'],['GOOGL','Google','🔎'],['META','Meta','📘'],['TSLA','Tesla','🚗'],['NVDA','Nvidia','🎮'],['MELI','Mercado Libre','🛒'],['KO','Coca-Cola','🥤'],['DIS','Disney','🏰'],['COIN','Coinbase','🪙'],['BABA','Alibaba','🛍️']];
+    this.CRYPTOS=[['BTC','Bitcoin','🪙'],['ETH','Ethereum','💎'],['SOL','Solana','🌅'],['ADA','Cardano','🔷'],['MATIC','Polygon','🟣'],['DOT','Polkadot','⚫']];
     this.CATTYPES=[['gasto','Gasto'],['ingreso','Ingreso'],['transfer','Transferencia'],['inversion','Inversión']];
     this.CARDBRANDS=['Visa','Mastercard','Amex'];
     this.STORAGE_KEY='finanzapp:v2:state';
@@ -1663,7 +1630,7 @@ class Component extends DCLogic {
       tagEdit:{name:'',orig:null},
       payAccount:'banco', payAmount:'',
       cpCard:0, cpAmount:'', cpMerchant:'', cpCat:'compras', cpDate:'Hoy', cpInstall:1, cpSub:null,
-      atMode:'buy', atAccount:'cedears', atType:'CEDEAR', atTicker:'', atQty:'', atPrice:'', atFees:'', atSource:'banco', atSub:null,
+      atMode:'buy', atAccount:'cedears', atType:'CEDEAR', atTicker:'', atName:'', atEmoji:'', atQty:'', atPrice:'', atFees:'', atSource:'banco', atSub:null,
       loanView:null, newLoan:{person:'',direction:'me_deben',concept:'',amount:'',currency:'ARS',editId:null}, loanPayAmount:'', ivSub:null, upTicker:'', atNewPrice:'', pricesLoading:false, pricesLastUpdated:null,
       onbStep:0, onbCard:false, onbInvest:false, flash:'', confirm:null,
       showOnboarding:true,
@@ -1918,12 +1885,13 @@ class Component extends DCLogic {
   cpPress(d){this.setState(s=>{let r=s.cpAmount;if(d==='back')return{cpAmount:r.slice(0,-1)};if(d===','){if(r.indexOf(',')>=0||r==='')return{};return{cpAmount:r+','};}if(r.indexOf(',')>=0&&(r.split(',')[1]||'').length>=2)return{};if(r.replace(',','').length>=9)return{};return{cpAmount:r+d};});}
   savePurchase(){const S=this.state;const val=parseFloat((S.cpAmount||'').replace(',','.'))||0;if(!val){this.flashMsg('Ingresá un monto');return;}const idx=S.cpCard;const card=S.cards[idx];if(!card){this.flashMsg('Agregá una tarjeta primero');return;}if(!S.categories[S.cpCat]){this.flashMsg('Elegí una categoría');return;}const n=S.cpInstall;const merchant=S.cpMerchant.trim()||(this.state.categories[S.cpCat]?this.state.categories[S.cpCat].name:'Compra');const label=n>1?(merchant+' · cuota 1/'+n):merchant;
     this.setState(s=>{const cuota=n>1?{name:merchant,cur:1,tot:n,monto:val/n}:null;const cs=s.cards.map((c,i)=>i===idx?{...c,saldo:c.saldo+val,compras:[{name:label,monto:val,date:S.cpDate},...(c.compras||[])],cuotas:cuota?[cuota,...(c.cuotas||[])]:c.cuotas}:c);const ct={...s.categoryTotals,[S.cpCat]:(s.categoryTotals[S.cpCat]||0)+val};const t={id:s._next,type:'gasto',merchant:label,cat:S.cpCat,amount:-val,val,card:card.id,onCard:true,dateLabel:S.cpDate,note:n>1?('Tarjeta '+card.brand+' · '+n+' cuotas'):('Tarjeta '+card.brand),tags:[]};return{cards:cs,categoryTotals:ct,monthExpense:s.monthExpense+val,txns:[t,...s.txns],_next:s._next+1,push:'cardDetail',cardView:idx,flash:'Compra registrada'};});}
-  openAssetTrade(mode,account){const inv=this.investIds(),liq=this.liquidIds();const acc=account||inv[0]||'';this.setState({push:'assetTrade',sheet:null,subsheet:null,atSub:null,atMode:mode||'buy',atAccount:acc,atType:'CEDEAR',atTicker:'',atQty:'',atPrice:'',atFees:'',atSource:liq[0]||''});}
+  openAssetTrade(mode,account){const inv=this.investIds(),liq=this.liquidIds();const acc=account||inv[0]||'';this.setState({push:'assetTrade',sheet:null,subsheet:null,atSub:null,atMode:mode||'buy',atAccount:acc,atType:'CEDEAR',atTicker:'',atName:'',atEmoji:'',atQty:'',atPrice:'',atFees:'',atSource:liq[0]||''});}
+  pickAsset(t,n,e){const S=this.state;const held=(S.assets[S.atAccount]||[]).find(a=>a.ticker===t);const patch={atTicker:t,atName:n||t,atEmoji:e||'📈'};if(held&&held.lastPrice)patch.atPrice=String(Math.round(held.lastPrice));this.setState(patch);}
   saveAssetTrade(){const S=this.state;const qty=parseFloat((S.atQty||'').replace(',','.'))||0;const price=parseFloat((S.atPrice||'').replace(',','.'))||0;const fees=parseFloat((S.atFees||'').replace(',','.'))||0;if(!qty||!price){this.flashMsg('Completá cantidad y precio');return;}const gross=qty*price;const buy=S.atMode==='buy';const total=buy?gross+fees:gross-fees;const inv=S.atAccount,src=S.atSource;const ticker=(S.atTicker.trim()||S.atType).toUpperCase();if(!S.accounts[inv]||!S.accounts[src]){this.flashMsg('Elegí cuentas válidas');return;}if(inv===src){this.flashMsg('Origen y destino deben ser distintos');return;}
     const emojiMap={'Bitcoin':'🪙','Cripto':'🔮','CEDEAR':'📈','Renta fija':'🔒'};
     this.setState(s=>{const b={...s.balances};if(buy){b[src]=(b[src]||0)-total;b[inv]=(b[inv]||0)+gross;}else{b[inv]=(b[inv]||0)-gross;b[src]=(b[src]||0)+total;}
       const na={...s.assets};const aa=[...(na[inv]||[])];const xi=aa.findIndex(a=>a.ticker===ticker);
-      if(buy){if(xi>=0){const ex=aa[xi];const nq=ex.qty+qty;aa[xi]={...ex,qty:nq,avg:(ex.qty*ex.avg+qty*price)/nq,lastPrice:price};}else{aa.push({id:'a'+s._next,ticker,name:ticker,emoji:emojiMap[S.atType]||'📈',qty,avg:price,lastPrice:price});}}
+      if(buy){if(xi>=0){const ex=aa[xi];const nq=ex.qty+qty;aa[xi]={...ex,qty:nq,avg:(ex.qty*ex.avg+qty*price)/nq,lastPrice:price};}else{aa.push({id:'a'+s._next,ticker,name:S.atName||ticker,emoji:S.atEmoji||emojiMap[S.atType]||'📈',qty,avg:price,lastPrice:price});}}
       else{if(xi>=0){const ex=aa[xi];const nq=ex.qty-qty;if(nq<=0.000001)aa.splice(xi,1);else aa[xi]={...ex,qty:nq,lastPrice:price};}}
       na[inv]=aa;
       const t={id:s._next,type:'inversion',merchant:(buy?'Compra ':'Venta ')+ticker,cat:'inversion',amount:buy?-total:total,val:total,from:buy?src:inv,to:buy?inv:src,isTransfer:true,dateLabel:'Hoy',note:qty+' × '+this.fmtInt(price)+(fees?(' · comisión '+this.fmtInt(fees)):''),tags:[]};
@@ -2040,7 +2008,7 @@ class Component extends DCLogic {
     const expTotal=expKeys.reduce((a,k)=>a+(S.categoryTotals[k]||0),0);
     const chartItems=sorted.filter(x=>x.t>0).map(x=>({key:x.k,name:(CAT[x.k]||{}).name,emoji:(CAT[x.k]||{}).emoji,iconVar:cIcon(x.k),fillVar:cFill(x.k),amount:S.hideAmounts?'••':this.abbr(x.t),h:Math.max(48,Math.round(x.t/maxT*100)),onOpen:()=>this.setState({tab:'actividad',push:null,sheet:null,actCat:x.k,actFilter:'todos',actSearch:''})}));
     // home groups Hoy/Ayer
-    const homeGroups=this.groupByDate(S.txns.filter(t=>t.dateLabel==='Hoy'||t.dateLabel==='Ayer')).map(g=>({day:g.day,totalStr:S.hideAmounts?'••••':this.signed(g.total),items:g.items.map(t=>this.txView(t))}));
+    const homeGroups=this.groupByDate(S.txns.slice(0,6)).map(g=>({day:g.day,totalStr:S.hideAmounts?'••••':this.signed(g.total),items:g.items.map(t=>this.txView(t))}));
     // activity
     const q=S.actSearch.trim().toLowerCase();
     const filtered=S.txns.filter(t=>{if(S.actCat&&t.cat!==S.actCat)return false;if(S.actFilter==='gastos'&&!(t.amount<0&&!t.isTransfer))return false;if(S.actFilter==='ingresos'&&!(t.amount>0&&!t.isTransfer))return false;if(S.actFilter==='transfer'&&!t.isTransfer)return false;
@@ -2096,7 +2064,7 @@ class Component extends DCLogic {
       {label:'Gasto',sub:'Registrar una salida',icon:'−',iconVar:'--cat-auto-icon',fillVar:'--cat-auto-fill',onPick:()=>this.openAdd('gasto')},
       {label:'Ingreso',sub:'Sumar dinero',icon:'+',iconVar:'--cat-tarjetas-icon',fillVar:'--cat-tarjetas-fill',onPick:()=>this.openAdd('ingreso')},
       {label:'Transferencia',sub:'Mover entre cuentas',icon:'⇄',iconVar:'--cat-transfer-icon',fillVar:'--cat-transfer-fill',onPick:()=>this.openAdd('transfer')},
-      {label:'Movimiento de inversión',sub:'Comprar o vender',icon:'↗',iconVar:'--cat-inversion-icon',fillVar:'--cat-inversion-fill',onPick:()=>this.openAdd('inversion')},
+      {label:'Comprar o vender activo',sub:'CEDEARs, cripto, renta fija',icon:'↗',iconVar:'--cat-inversion-icon',fillVar:'--cat-inversion-fill',onPick:()=>this.openAssetTrade('buy')},
       {label:'Compra con tarjeta',sub:'Gasto con crédito o cuotas',icon:'💳',iconVar:'--cat-tarjetas-icon',fillVar:'--cat-tarjetas-fill',onPick:()=>this.openCardPurchase(S.cardIdx)},
     ];
     // pay keypad
@@ -2122,7 +2090,7 @@ class Component extends DCLogic {
     let invD={};
     if(S.investView&&ACC[S.investView]){const k=S.investView,a=ACC[k];
       const rawAssets=(S.assets&&S.assets[k])||[];
-      const assets=rawAssets.map(as=>{const lp=as.lastPrice||as.avg;const value=as.qty*lp;const cost=as.qty*as.avg;const gl=value-cost;const glPct=cost>0?(gl/cost*100):0;return{name:as.name,ticker:as.ticker,emoji:as.emoji,qtyStr:(as.qty<1?as.qty.toFixed(6).replace(/\.?0+$/,''):this.fmtInt(as.qty))+(as.ticker?' '+as.ticker:' u'),avgStr:money(as.avg),lastPriceStr:money(lp),valueStr:money(value),glStr:(gl>=0?'+':'-')+sym+this.fmtInt(Math.abs(gl)),glPctStr:(gl>=0?'+':'')+glPct.toFixed(1).replace('.',',')+'%',glColor:gl>=0?'var(--pos)':'var(--accent)',onUpdatePrice:()=>this.setState({ivSub:'updatePrice',upTicker:as.ticker,atNewPrice:''})};});
+      const assets=rawAssets.map(as=>{const lp=as.lastPrice||as.avg;const value=as.qty*lp;const cost=as.qty*as.avg;const gl=value-cost;const glPct=cost>0?(gl/cost*100):0;return{name:as.name,ticker:as.ticker,emoji:as.emoji,qtyStr:(as.qty<1?as.qty.toFixed(6).replace(/\.?0+$/,''):this.fmtInt(as.qty))+(as.ticker?' '+as.ticker:' u'),avgStr:money(as.avg),costStr:money(cost),lastPriceStr:money(lp),valueStr:money(value),glStr:(gl>=0?'+':'-')+sym+this.fmtInt(Math.abs(gl)),glPctStr:(gl>=0?'+':'')+glPct.toFixed(1).replace('.',',')+'%',glColor:gl>=0?'var(--pos)':'var(--accent)',onUpdatePrice:()=>this.setState({ivSub:'updatePrice',upTicker:as.ticker,atNewPrice:''})};});
       const ivUpKeypad=order.map(l=>({label:l,isBack:l==='back',isNum:l!=='back',onPress:l==='back'?()=>this.atNewPricePress('back'):()=>this.atNewPricePress(l)}));
       const totalValue=rawAssets.reduce((sum,as)=>sum+as.qty*(as.lastPrice||as.avg),0);
       const totalCost=rawAssets.reduce((sum,as)=>sum+as.qty*as.avg,0);
@@ -2207,7 +2175,15 @@ class Component extends DCLogic {
     const atQtyN=parseFloat((S.atQty||'').replace(',','.'))||0;const atPriceN=parseFloat((S.atPrice||'').replace(',','.'))||0;const atFeesN=parseFloat((S.atFees||'').replace(',','.'))||0;
     const atGross=atQtyN*atPriceN;const atTotalN=S.atMode==='buy'?atGross+atFeesN:atGross-atFeesN;
     const atModeSeg=[['buy','Comprar'],['sell','Vender']].map(m=>({label:m[1],onPick:()=>this.setState({atMode:m[0]}),bg:S.atMode===m[0]?'var(--seg-active)':'transparent',shadow:S.atMode===m[0]?'var(--shadow-pill)':'none',color:S.atMode===m[0]?'var(--text)':'var(--text-2)'}));
-    const atTypeChips=['CEDEAR','Bitcoin','Cripto','Renta fija'].map(t=>({label:t,onPick:()=>this.setState({atType:t}),bg:S.atType===t?'var(--accent)':'var(--surface)',color:S.atType===t?'#fff':'var(--text)'}));
+    const atTypeChips=['CEDEAR','Bitcoin','Cripto','Renta fija'].map(t=>({label:t,onPick:()=>this.setState({atType:t,atTicker:'',atName:'',atEmoji:''}),bg:S.atType===t?'var(--accent)':'var(--surface)',color:S.atType===t?'#fff':'var(--text)'}));
+    // Asset pick-list: when selling, the assets you actually hold; when buying, a
+    // curated list for the chosen type. Tapping fills the ticker (no typing needed).
+    const atPickRaw=S.atMode==='sell'
+      ? (S.assets[S.atAccount]||[]).map(a=>[a.ticker,a.name,a.emoji])
+      : (S.atType==='Bitcoin'||S.atType==='Cripto') ? this.CRYPTOS
+      : S.atType==='CEDEAR' ? this.CEDEARS : [];
+    const atSuggestions=atPickRaw.filter(x=>x&&x[0]).map(x=>({ticker:x[0],name:x[1]||x[0],emoji:x[2]||'📈',onPick:()=>this.pickAsset(x[0],x[1],x[2]),bg:S.atTicker===x[0]?'var(--accent)':'var(--surface)',color:S.atTicker===x[0]?'#fff':'var(--text)',nameColor:S.atTicker===x[0]?'rgba(255,255,255,0.8)':'var(--text-2)'}));
+    const atHasSuggestions=atSuggestions.length>0;
     const atAccC=ACC[S.atAccount]||{};const atSrcC=ACC[S.atSource]||{};
     let atPickerTitle='',atPickerOptions=[];
     if(S.atSub==='acc'){atPickerTitle='Cuenta de inversión';atPickerOptions=INV.map(k=>({label:ACC[k].name,emoji:ACC[k].emoji,fillVar:ACC[k].fillVar,selected:S.atAccount===k,onPick:()=>this.setState({atAccount:k,atSub:null})}));}
@@ -2312,7 +2288,7 @@ class Component extends DCLogic {
       cpIsPicker:S.cpSub==='card'||S.cpSub==='cat',cpPickerTitle,cpPickerOptions,
       savePurchase:()=>this.savePurchase(),cpSaveOpacity:S.cpAmount?'1':'0.5',
       isAssetTrade:S.push==='assetTrade',atModeSeg,atTitle:S.atMode==='buy'?'Comprar activo':'Vender activo',
-      atTypeChips,atAccName:atAccC.name,atSrcLabel:S.atMode==='buy'?'Pagar con':'Acreditar en',atSrcName:atSrcC.name,atSrcEmoji:atSrcC.emoji,atSrcFillVar:atSrcC.fillVar,
+      atTypeChips,atSuggestions,atHasSuggestions,atAccName:atAccC.name,atSrcLabel:S.atMode==='buy'?'Pagar con':'Acreditar en',atSrcName:atSrcC.name,atSrcEmoji:atSrcC.emoji,atSrcFillVar:atSrcC.fillVar,
       pickAtAcc:()=>this.setState({atSub:'acc'}),pickAtSrc:()=>this.setState({atSub:'src'}),
       atTicker:S.atTicker,setAtTicker:(e)=>this.setState({atTicker:e.target.value}),
       atQty:S.atQty,setAtQty:(e)=>this.setState({atQty:e.target.value}),
