@@ -186,7 +186,7 @@ input{font-family:inherit;}
         <!-- hero -->
         <div onClick="{{ navCuentas }}" style="display:flex;align-items:flex-end;margin-bottom:7px;cursor:pointer;">
           <span style="font-size:30px;font-weight:700;color:var(--text-2);margin-bottom:13px;margin-right:3px;">{{ heroSymbol }}</span>
-          <span style="font-size:62px;font-weight:800;letter-spacing:-2.5px;line-height:.9;">{{ heroInt }}</span>
+          <span style="font-size: {{ heroFont }};font-weight:800;letter-spacing:-2.5px;line-height:.9;white-space:nowrap;">{{ heroInt }}</span>
           <span style="font-size:26px;font-weight:700;color:var(--text-2);margin-bottom:11px;">{{ heroDec }}</span>
         </div>
         <div style="font-size:13px;font-weight:500;color:var(--text-3);margin-bottom:20px;">{{ heroSub }}</div>
@@ -2312,7 +2312,7 @@ class Component extends DCLogic {
       dispBg:S.balanceMode==='disponible'?'var(--seg-active)':'transparent',patBg:S.balanceMode==='patrimonio'?'var(--seg-active)':'transparent',
       dispShadow:S.balanceMode==='disponible'?'var(--shadow-pill)':'none',patShadow:S.balanceMode==='patrimonio'?'var(--shadow-pill)':'none',
       dispColor:S.balanceMode==='disponible'?'var(--text)':'var(--text-2)',patColor:S.balanceMode==='patrimonio'?'var(--text)':'var(--text-2)',
-      heroSymbol:S.hideAmounts?'':sym,heroInt:S.hideAmounts?'••••':heroParts[0],heroDec:S.hideAmounts?'':(','+heroParts[1]),
+      heroSymbol:S.hideAmounts?'':sym,heroInt:S.hideAmounts?'••••':heroParts[0],heroDec:S.hideAmounts?'':(','+heroParts[1]),heroFont:(heroParts[0]||'').length<=7?'62px':(heroParts[0]||'').length<=9?'50px':(heroParts[0]||'').length<=11?'40px':'32px',
       heroSub:S.balanceMode==='disponible'?'Disponible para usar ahora':'Neto · cuentas + inversiones − deudas',
       ingresosStr:M('+'+sym+this.fmtInt(S.monthIncome)),gastosStr:M('-'+sym+this.fmtInt(S.monthExpense)),
       periodLabel:this.PERIODS[S.periodIdx],scopeLabel:this.SCOPES[S.scopeIdx],periodScope,
