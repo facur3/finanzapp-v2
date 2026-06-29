@@ -1982,14 +1982,16 @@ class Component extends DCLogic {
         const ids=[...cryptoSet].map(t=>CRYPTO[t]).join(',');
         try{const d=await(await fetch('https://api.coingecko.com/api/v3/simple/price?ids='+ids+'&vs_currencies=usd,ars')).json();
           Object.entries(CRYPTO).forEach(([t,id])=>{const usd=d[id]?.usd;if(usd&&criptoRate>0)cryptoPrices[t]=usd*criptoRate;else if(d[id]?.ars)cryptoPrices[t]=d[id].ars;});}catch(e){}}
-      // 2. CEDEARs/stocks -> data912 live BYMA peso prices (CORS-friendly). Yahoo .BA
-      // is kept as a best-effort fallback (often CORS-blocked from the browser).
+      // 2. CEDEARs/stocks. Base: data912 live BYMA feed (CORS-friendly, intraday but
+      // can lag ~minutes). Upgrade: Yahoo .BA real-time through a CORS proxy, which
+      // overwrites the base when it succeeds. So you always get a price, and a live one
+      // whenever the proxy is reachable.
       const stockPrices={},usdFallback={};let ccl=0;
       if(stockSet.size){
         const map={};
         await Promise.all(['arg_cedears','arg_stocks'].map(async ep=>{try{const arr=await(await fetch('https://data912.com/live/'+ep)).json();if(Array.isArray(arr))arr.forEach(it=>{const sym=String(it.symbol||it.ticker||'').toUpperCase();const px=it.c!=null?it.c:it.px!=null?it.px:it.last!=null?it.last:it.close!=null?it.close:it.p;if(sym&&px>0&&map[sym]==null)map[sym]=px;});}catch(e){}}));
         [...stockSet].forEach(t=>{if(map[t]>0)stockPrices[t]=map[t];});
-        await Promise.all([...stockSet].filter(t=>!stockPrices[t]).map(async t=>{try{const d=await(await fetch('https://query1.finance.yahoo.com/v8/finance/chart/'+t+'.BA?interval=1d&range=1d')).json();const p=d?.chart?.result?.[0]?.meta?.regularMarketPrice||0;if(p>0)stockPrices[t]=p;}catch(e){}}));
+        await Promise.all([...stockSet].map(async t=>{const u='https://query1.finance.yahoo.com/v8/finance/chart/'+t+'.BA?interval=1d&range=1d';try{const d=await(await fetch('https://corsproxy.io/?url='+encodeURIComponent(u))).json();const p=d?.chart?.result?.[0]?.meta?.regularMarketPrice||0;if(p>0){stockPrices[t]=p;return;}}catch(e){}try{const d=await(await fetch(u)).json();const p=d?.chart?.result?.[0]?.meta?.regularMarketPrice||0;if(p>0)stockPrices[t]=p;}catch(e){}}));
       }
       // 3b. FCI (e.g. Cocos Rendimiento) -> ArgentinaDatos valor cuotaparte (VCP).
       const fciPrices={};
@@ -1998,33 +2000,25 @@ class Component extends DCLogic {
         await Promise.all(['rentaMixta','mercadoDinero','rentaFija'].map(async c=>{try{const d=await(await fetch('https://api.argentinadatos.com/v1/finanzas/fci/'+c+'/ultimo')).json();if(Array.isArray(d))d.forEach(f=>funds.push(f));}catch(e){}}));
         fciList.forEach(item=>{let vcp=0;for(const ph of item.phrases){const words=String(ph).toLowerCase().split(/\s+/).filter(Boolean);if(!words.length)continue;const hit=funds.find(f=>{const n=String(f.fondo||'').toLowerCase();return words.every(w=>n.includes(w));});if(hit&&hit.vcp>0){vcp=hit.vcp;break;}}if(vcp>0)fciPrices[item.id]=vcp;});
       }
-      // 4. Apply. For each account, refresh holding prices and recompute its balance.
-      // Tickers (crypto/CEDEAR): value = qty x live price (integer ARS).
-      // FCI: value = baseValue x (liveVCP / baseVCP) — a RELATIVE change that is
-      // scale-independent, so we never need the cuotaparte count or its unit. baseVCP
-      // is calibrated on the first successful fetch; daily yield then accrues on its own.
+      // 4. Apply per account.
+      // FCI account: grow the CURRENT balance by the cuotaparte yield since the last
+      // update (balance x liveVCP/lastVCP) and store lastVCP. This preserves any
+      // spends/deposits made meanwhile and never resets the balance from a stale base.
+      // Tickers (crypto/CEDEAR): value = qty x live price.
       let anyUpdate=false;
-      Object.keys(na).forEach(k=>{if(!s.accounts[k])return;const aa=[...(na[k]||[])];if(!aa.length)return;let changed=false;
-        aa.forEach((a,i)=>{
-          if(a.fci){const live=fciPrices[a.id]||0;let patch=null;
-            // Self-heal baseValue: derive it when missing, OR repair it when a stored
-            // value is wildly off the cost basis (an old build corrupted it ~x1000 by
-            // treating the live VCP as a per-unit price). Cost basis = qty*avg, which
-            // is never overwritten, so it's the safe anchor.
-            let base=Number(a.baseValue)||0;const fromCost=(a.qty>0&&a.avg>0)?a.qty*a.avg:0;
-            if(fromCost>0&&(base<=0||base>fromCost*5||base<fromCost/5)){base=fromCost;patch={...a,baseValue:base};}
-            else if(base<=0){const bv=(a.qty>0&&a.lastPrice>0)?a.qty*a.lastPrice:(Number(s.balances[k])||0);if(bv>0){base=bv;patch={...a,baseValue:bv};}}
-            if(live>0&&!(Number((patch||a).baseVcp)>0)){patch={...(patch||a),baseVcp:live};}
-            if(patch){aa[i]=patch;changed=true;}return;}
-          if(!a.ticker)return;let np=0;
+      Object.keys(na).forEach(k=>{if(!s.accounts[k])return;const aa=[...(na[k]||[])];if(!aa.length)return;
+        const fi=aa.findIndex(a=>a.fci);
+        if(fi>=0){const a=aa[fi];const live=fciPrices[a.id]||0;if(live>0){const lastVcp=Number(a.lastVcp)||0;
+            if(lastVcp>0){const cur=Number(s.balances[k])||0;nb[k]=Math.round(cur*live/lastVcp);}
+            aa[fi]={...a,lastVcp:live};na[k]=aa;anyUpdate=true;}
+          return;}
+        let changed=false;
+        aa.forEach((a,i)=>{if(!a.ticker)return;let np=0;
           if(cryptoPrices[a.ticker])np=Math.round(cryptoPrices[a.ticker]);
           else if(stockPrices[a.ticker])np=Math.round(stockPrices[a.ticker]);
           else if(usdFallback[a.ticker]&&ccl){np=Math.round(usdFallback[a.ticker]*ccl/(this.CEDEAR_RATIOS[a.ticker]||10));}
           if(np>0&&np!==a.lastPrice){aa[i]={...a,lastPrice:np};changed=true;}});
-        const total=aa.reduce((s2,a)=>{
-          if(a.fci){const live=fciPrices[a.id]||0;const bv=Number(a.baseVcp)||0;const base=Number(a.baseValue)||0;return s2+(live>0&&bv>0?base*live/bv:base);}
-          return s2+(a.ticker?a.qty*(a.lastPrice||a.avg):0);
-        },0);
+        const total=aa.reduce((s2,a)=>s2+(a.ticker?a.qty*(a.lastPrice||a.avg):0),0);
         const val=Math.round(total);
         if(changed||val!==Math.round(nb[k]||0)){na[k]=aa;nb[k]=val;anyUpdate=true;}});
       this.setState({assets:na,balances:nb,pricesLoading:false,pricesLastUpdated:Date.now(),...(!silent&&anyUpdate?{flash:'Precios actualizados'}:{})});}
