@@ -1675,26 +1675,26 @@ class Component extends DCLogic {
     this.carouselRef=React.createRef();
     this.mainScrollRef=React.createRef();
     this.SEEDACC={
-      banco:{name:'Banco Galicia',type:'Banco',kind:'liquid',liquid:true,emoji:'🏦',iconVar:'--cat-transfer-icon',fillVar:'--cat-transfer-fill',currency:'ARS'},
+      galicia:{name:'Galicia',type:'Banco',kind:'liquid',liquid:true,emoji:'🏦',iconVar:'--cat-transfer-icon',fillVar:'--cat-transfer-fill',currency:'ARS'},
       efectivo:{name:'Efectivo',type:'Efectivo',kind:'liquid',liquid:true,emoji:'💵',iconVar:'--cat-tarjetas-icon',fillVar:'--cat-tarjetas-fill',currency:'ARS'},
-      mp:{name:'Mercado Pago',type:'Billetera',kind:'liquid',liquid:true,emoji:'📲',iconVar:'--cat-ocio-icon',fillVar:'--cat-ocio-fill',currency:'ARS'},
-      cedears:{name:'CEDEARs',type:'Acciones',kind:'invest',liquid:false,emoji:'📈',iconVar:'--cat-inversion-icon',fillVar:'--cat-inversion-fill',currency:'USD'},
-      btc:{name:'Bitcoin',type:'Cripto',kind:'invest',liquid:false,emoji:'🪙',iconVar:'--cat-comida-icon',fillVar:'--cat-comida-fill',currency:'USD'},
-      pf:{name:'Plazo fijo',type:'Renta fija',kind:'invest',liquid:false,emoji:'🔒',iconVar:'--cat-tarjetas-icon',fillVar:'--cat-tarjetas-fill',currency:'ARS'},
+      cocos:{name:'Cocos',type:'Rendimiento FCI',kind:'liquid',liquid:true,emoji:'💠',iconVar:'--cat-ocio-icon',fillVar:'--cat-ocio-fill',currency:'ARS'},
+      cedears:{name:'CEDEARs',type:'Cocos · Acciones',kind:'invest',liquid:false,emoji:'📈',iconVar:'--cat-inversion-icon',fillVar:'--cat-inversion-fill',currency:'ARS'},
+      btc:{name:'Bitcoin',type:'Binance · Cripto',kind:'invest',liquid:false,emoji:'🪙',iconVar:'--cat-comida-icon',fillVar:'--cat-comida-fill',currency:'ARS'},
     };
+    this.SEED_VERSION='real-2026-06-29';
     this.PALETTE=[['--cat-transfer-icon','--cat-transfer-fill'],['--cat-comida-icon','--cat-comida-fill'],['--cat-ocio-icon','--cat-ocio-fill'],['--cat-compras-icon','--cat-compras-fill'],['--cat-mascotas-icon','--cat-mascotas-fill'],['--cat-auto-icon','--cat-auto-fill']];
     this.PERIODS=['Este mes','Esta semana','Este año'];
     this.SCOPES=['Todas las cuentas','Lista privada','Compartida'];
     this.ACCTYPES=[['Banco','liquid','🏦'],['Efectivo','liquid','💵'],['Billetera','liquid','📲'],['Inversión','invest','📈'],['Tarjeta','debt','💳'],['Deuda','debt','📉']];
     this.SEEDCARDS=[
-      {id:'visa',brand:'Visa',bank:'Galicia',last4:'4821',saldo:159500,limit:500000,cierre:'3 jul',vence:'10 jul',grad:'linear-gradient(135deg,#3a3a3c,#161618)',
-        compras:[{name:'Hawaii Market',monto:8900,date:'Hoy'},{name:'Farmacia',monto:7400,date:'10 jun'},{name:'Notebook · cuota 3/6',monto:25000,date:'2 jun'}],
-        cuotas:[{name:'Notebook',cur:3,tot:6,monto:25000},{name:'Heladera',cur:2,tot:12,monto:18000}],
-        pagos:[{name:'Pago mínimo',monto:120000,date:'10 jun'}]},
-      {id:'master',brand:'Mastercard',bank:'Galicia',last4:'7733',saldo:48200,limit:300000,cierre:'15 jul',vence:'22 jul',grad:'linear-gradient(135deg,#7a4b57,#2e1d22)',
-        compras:[{name:'Zapatillas · cuota 1/3',monto:9000,date:'5 jun'},{name:'Restaurante',monto:12200,date:'8 jun'}],
-        cuotas:[{name:'Zapatillas',cur:1,tot:3,monto:9000}],
-        pagos:[{name:'Pago total',monto:30000,date:'20 jun'}]},
+      {id:'visa',brand:'Visa',bank:'Galicia',last4:'4009',saldo:608335.59,limit:1200000,cierre:'2 jul',vence:'13 jul',grad:'linear-gradient(135deg,#3a3a3c,#161618)',
+        compras:[{name:'MERPAGO*NOSTOPMADERO1',monto:1600,date:'20 jun'},{name:'HOYTS MORENO',monto:9700,date:'13 jun'}],
+        cuotas:[{name:'Campera',cur:1,tot:3,monto:33000},{name:'Samsung S26',cur:3,tot:12,monto:50000}],
+        pagos:[{name:'Pago de tu tarjeta',monto:82762.16,date:'31 may'}]},
+      {id:'master',brand:'Mastercard',bank:'Galicia',last4:'8797',saldo:929166.60,limit:1200000,cierre:'2 jul',vence:'13 jul',grad:'linear-gradient(135deg,#7a4b57,#2e1d22)',
+        compras:[{name:'OCCO HELADOS',monto:12500,date:'20 jun'}],
+        cuotas:[{name:'Samsung S26',cur:3,tot:12,monto:91666.66}],
+        pagos:[{name:'Pago de tu tarjeta',monto:91666.66,date:'31 may'}]},
     ];
     this.state=Object.assign({
       theme:props.defaultTheme||'light', chartStyle:props.defaultChart||'bars',
@@ -1702,15 +1702,15 @@ class Component extends DCLogic {
       balanceMode:'disponible', periodIdx:0, scopeIdx:0, currency:'ARS', hideAmounts:false,
       actFilter:'todos', actSearch:'', actCat:null, actAccount:'todas', actAmount:'todos', actTag:'todos', actRange:'todo',
       cardIdx:0, detailId:null, editId:null, acctView:null, investView:null, cardView:0,
-      addType:'gasto', addAmount:'', addTitle:'', addCat:'comida', addAccount:'banco', addTo:'cedears', addDate:'Hoy', addTags:[],
+      addType:'gasto', addAmount:'', addTitle:'', addCat:'comida', addAccount:'galicia', addTo:'cedears', addDate:'Hoy', addTags:[],
       newTagText:'', customDateText:'',
       newAcc:{name:'',type:'Banco',kind:'liquid',balance:'',currency:'ARS',liquid:true,editId:null},
       newCat:{name:'',emoji:'🍔',type:'gasto',colorIdx:0,parent:'',editId:null},
       newCard:{brand:'Visa',bank:'',last4:'',limit:'',cierre:'',vence:'',gradIdx:0,editId:null},
       tagEdit:{name:'',orig:null},
-      payAccount:'banco', payAmount:'',
+      payAccount:'galicia', payAmount:'',
       cpCard:0, cpAmount:'', cpMerchant:'', cpCat:'compras', cpDate:'Hoy', cpInstall:1, cpSub:null,
-      atMode:'buy', atAccount:'cedears', atType:'CEDEAR', atTicker:'', atQty:'', atPrice:'', atFees:'', atSource:'banco', atSub:null,
+      atMode:'buy', atAccount:'cedears', atType:'CEDEAR', atTicker:'', atQty:'', atPrice:'', atFees:'', atSource:'galicia', atSub:null,
       loanView:null, newLoan:{person:'',direction:'me_deben',concept:'',amount:'',currency:'ARS',editId:null}, loanPayAmount:'', ivSub:null, upTicker:'', atNewPrice:'', pricesLoading:false, pricesLastUpdated:null,
       onbStep:0, onbMode:null, onbCard:false, onbInvest:false, flash:'', confirm:null,
       showOnboarding:true,
@@ -1720,7 +1720,15 @@ class Component extends DCLogic {
     // flicker that happens if saved state is only applied later in componentDidMount.
     const persisted=this.readPersistedState();
     if(persisted){
-      Object.assign(this.state, persisted, {push:null,sheet:null,subsheet:null,flash:'',confirm:null,detailId:null,editId:null});
+      if(persisted.seedVersion!==this.SEED_VERSION){
+        // One-time migration: a payload that predates the current seed is replaced
+        // with the real dataset, so the device picks up the corrected finances once
+        // without a manual reset. Subsequent saves carry the seed version and load
+        // normally (edits persist; this never re-triggers).
+        Object.assign(this.state, this.sampleData(), {showOnboarding:false,push:null,sheet:null,subsheet:null,flash:'',confirm:null,detailId:null,editId:null});
+      } else {
+        Object.assign(this.state, persisted, {push:null,sheet:null,subsheet:null,flash:'',confirm:null,detailId:null,editId:null});
+      }
     }
   }
   componentDidMount(){
@@ -1753,7 +1761,7 @@ class Component extends DCLogic {
     clearInterval(this._priceTimer);
   }
   persistentKeys(){
-    return ['theme','chartStyle','balanceMode','periodIdx','scopeIdx','currency','hideAmounts','dataMode','categories','catOrder','txns','categoryTotals','monthIncome','monthExpense','order','accounts','archived','balances','accMeta','cards','tagSugg','_next','showOnboarding','onbCard','onbInvest','cardIdx','assets','loans'];
+    return ['theme','chartStyle','balanceMode','periodIdx','scopeIdx','currency','hideAmounts','dataMode','categories','catOrder','txns','categoryTotals','monthIncome','monthExpense','order','accounts','archived','balances','accMeta','cards','tagSugg','_next','showOnboarding','onbCard','onbInvest','cardIdx','assets','loans','seedVersion'];
   }
   persistentSnapshot(state){
     const snap={};
@@ -1785,6 +1793,9 @@ class Component extends DCLogic {
     if(!out.assets||typeof out.assets!=='object'||Array.isArray(out.assets))out.assets={};
     if(!Array.isArray(out.loans))out.loans=[];
     out.loans=out.loans.filter(l=>l&&typeof l==='object'&&l.id!=null&&l.person);
+    // Reflect the actually-saved seed version (not the emptyData default), so an
+    // older payload that predates seeding is detected and migrated exactly once.
+    out.seedVersion=st.seedVersion;
     return this.persistentSnapshot(out);
   }
   parseBackupPayload(raw){
@@ -1922,44 +1933,39 @@ class Component extends DCLogic {
     return {dataMode:'empty',categories:cats,catOrder:this.DEFAULT_CAT_ORDER.slice(),
       txns:[],categoryTotals:{},monthIncome:0,monthExpense:0,
       order:[],accounts:{},archived:{},balances:{},accMeta:{},
-      cards:[],tagSugg:[],_next:1,assets:{},loans:[]};
+      cards:[],tagSugg:[],_next:1,assets:{},loans:[],seedVersion:this.SEED_VERSION};
   }
   sampleData(){
     const cats={};Object.keys(this.BASECATS).forEach(k=>{cats[k]={...this.BASECATS[k]};});
-    return {dataMode:'sample',categories:cats,catOrder:this.DEFAULT_CAT_ORDER.slice(),
-      monthIncome:489100,monthExpense:319600,
-      categoryTotals:{comida:159500,auto:127000,tarjetas:15000,compras:8900,ocio:6000,mascotas:0,otros:3200},
-      order:['banco','efectivo','mp','cedears','btc','pf'],
+    return {dataMode:'sample',seedVersion:this.SEED_VERSION,categories:cats,catOrder:this.DEFAULT_CAT_ORDER.slice(),
+      monthIncome:0,monthExpense:56800,
+      categoryTotals:{comida:12500,ocio:9700,otros:1600,compras:33000},
+      order:['galicia','efectivo','cocos','cedears','btc'],
       accounts:JSON.parse(JSON.stringify(this.SEEDACC)),
       archived:{},
       cards:JSON.parse(JSON.stringify(this.SEEDCARDS)),
-      balances:{banco:420088.95,efectivo:85000,mp:190000,cedears:160000,btc:75000,pf:40000},
-      accMeta:{cedears:{chg:'+2,4%',up:true},btc:{chg:'-1,1%',up:false},pf:{chg:'+0,3%',up:true}},
-      tagSugg:['mercado','suscripción','viaje','regalo','trabajo'],
+      balances:{galicia:0,efectivo:11900,cocos:487931.03,cedears:1684510,btc:250176},
+      accMeta:{cocos:{chg:'+2,0%',up:true},cedears:{chg:'-0,3%',up:false},btc:{chg:'-25,6%',up:false}},
+      tagSugg:['samsung','cuotas','cine','cocos'],
       txns:[
-        {id:1,type:'gasto',merchant:'Bet365',cat:'ocio',amount:-6000,val:6000,account:'mp',dateLabel:'Hoy',note:'',tags:['ocio']},
-        {id:2,type:'gasto',merchant:'Occo Helados',cat:'comida',amount:-4500,val:4500,account:'efectivo',dateLabel:'Hoy',note:'Helado con amigos',tags:[]},
-        {id:3,type:'gasto',merchant:'Kiosco',cat:'comida',amount:-1200,val:1200,account:'efectivo',dateLabel:'Hoy',note:'',tags:[]},
-        {id:4,type:'gasto',merchant:'Hawaii Market',cat:'compras',amount:-8900,val:8900,account:'banco',dateLabel:'Hoy',note:'',tags:[]},
-        {id:5,type:'ingreso',merchant:'Transferencia recibida',cat:'ingreso',amount:50000,val:50000,account:'banco',dateLabel:'Hoy',note:'De Juan',tags:[]},
-        {id:6,type:'gasto',merchant:'Supermercado',cat:'comida',amount:-12300,val:12300,account:'banco',dateLabel:'Ayer',note:'Compra semanal',tags:['mercado']},
-        {id:7,type:'gasto',merchant:'Nafta',cat:'auto',amount:-15000,val:15000,account:'banco',dateLabel:'Ayer',note:'',tags:[]},
-        {id:8,type:'gasto',merchant:'Pago Tarjeta Visa',cat:'tarjetas',amount:-9500,val:9500,account:'banco',dateLabel:'Ayer',note:'',tags:[]},
-        {id:9,type:'ingreso',merchant:'Sueldo',cat:'ingreso',amount:489100,val:489100,account:'banco',dateLabel:'12 jun',note:'Sueldo mayo',tags:['trabajo']},
-        {id:10,type:'gasto',merchant:'Spotify',cat:'ocio',amount:-2900,val:2900,account:'banco',dateLabel:'12 jun',note:'Suscripción',tags:['suscripción']},
-        {id:11,type:'inversion',merchant:'Compra CEDEAR AAPL',cat:'inversion',amount:-30000,val:30000,from:'banco',to:'cedears',isTransfer:true,dateLabel:'10 jun',note:'→ CEDEARs',tags:[]},
-        {id:12,type:'gasto',merchant:'Farmacia',cat:'otros',amount:-7400,val:7400,account:'efectivo',dateLabel:'10 jun',note:'',tags:[]},
+        {id:1,type:'gasto',merchant:'OCCO HELADOS',cat:'comida',amount:-12500,val:12500,card:'master',onCard:true,dateLabel:'20 jun',note:'Tarjeta Mastercard',tags:[]},
+        {id:2,type:'gasto',merchant:'MERPAGO*NOSTOPMADERO1',cat:'otros',amount:-1600,val:1600,card:'visa',onCard:true,dateLabel:'20 jun',note:'Tarjeta Visa',tags:[]},
+        {id:3,type:'gasto',merchant:'HOYTS MORENO',cat:'ocio',amount:-9700,val:9700,card:'visa',onCard:true,dateLabel:'13 jun',note:'Tarjeta Visa · cine',tags:['cine']},
+        {id:4,type:'gasto',merchant:'Campera · cuota 1/3',cat:'compras',amount:-33000,val:33000,card:'visa',onCard:true,dateLabel:'6 jun',note:'Tarjeta Visa · 3 cuotas',tags:['cuotas']},
       ],
       assets:{
-        cedears:[{id:'aapl',name:'Apple',ticker:'AAPL',emoji:'🍎',qty:12,avg:9800,lastPrice:11000},{id:'spy',name:'S&P 500',ticker:'SPY',emoji:'📊',qty:2,avg:14000,lastPrice:16000}],
-        btc:[{id:'btc',name:'Bitcoin',ticker:'BTC',emoji:'🪙',qty:0.0012,avg:55000000,lastPrice:75000000}],
-        pf:[{id:'pf1',name:'Plazo fijo 30d',ticker:'',emoji:'🔒',qty:1,avg:39000,lastPrice:40000}],
+        cedears:[
+          {id:'qqq',name:'Nasdaq 100',ticker:'QQQ',emoji:'📊',qty:18,avg:55150,lastPrice:54775},
+          {id:'spy',name:'S&P 500',ticker:'SPY',emoji:'📈',qty:37,avg:18850,lastPrice:18880},
+        ],
+        btc:[
+          {id:'btc',name:'Bitcoin',ticker:'BTC',emoji:'🪙',qty:0.00270093,avg:124376000,lastPrice:92626000},
+        ],
       },
       loans:[
-        {id:'l1',person:'Juan Pérez',direction:'me_deben',concept:'Salida a cenar',originalAmount:15000,remaining:15000,currency:'ARS',date:'10 jun',payments:[]},
-        {id:'l2',person:'María González',direction:'le_debo',concept:'Nafta viaje',originalAmount:8000,remaining:5000,currency:'ARS',date:'15 jun',payments:[{amount:3000,date:'20 jun',note:''}]},
+        {id:'l1',person:'Ro',direction:'me_deben',concept:'Samsung S26 512GB',originalAmount:2962749,remaining:2962749,currency:'ARS',date:'5 may',payments:[]},
       ],
-      _next:13};
+      _next:20};
   }
   loadSample(){this.setState(Object.assign({push:null,sheet:null,subsheet:null,tab:'inicio',showOnboarding:false,cardIdx:0,cardView:0,detailId:null,acctView:null,investView:null,confirm:null,flash:'Datos de ejemplo cargados'},this.sampleData()));}
   clearAll(){this.setState(Object.assign({push:null,sheet:null,subsheet:null,tab:'inicio',showOnboarding:false,cardIdx:0,cardView:0,detailId:null,acctView:null,investView:null,confirm:null,flash:'Datos borrados · empezás de cero'},this.emptyData()));}
