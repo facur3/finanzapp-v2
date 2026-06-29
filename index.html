@@ -654,7 +654,10 @@ input{font-family:inherit;}
         </sc-if>
         <sc-if value="{{ portHasAssets }}" hint-placeholder-val="{{ true }}">
         <div style="font-size:46px;font-weight:800;letter-spacing:-1.5px;margin-bottom:8px;">{{ portValueStr }}</div>
-        <div style="display:inline-flex;align-items:center;gap:5px;background:var(--surface);padding:7px 13px;border-radius:13px;font-size:14px;font-weight:700;color: {{ portGLColor }};margin-bottom:24px;">{{ portResultWord }} {{ portResultAbsStr }} ({{ portGLPctStr }})</div>
+        <div style="display:flex;flex-direction:column;gap:4px;margin-bottom:24px;">
+          <div style="display:inline-flex;align-self:flex-start;align-items:center;gap:5px;background:var(--surface);padding:7px 13px;border-radius:13px;font-size:14px;font-weight:700;color: {{ portGLColor }};">{{ portResultWord }} {{ portResultAbsStr }} ({{ portGLPctStr }})</div>
+          <div style="font-size:11px;color:var(--text-3);font-weight:500;padding-left:2px;">resultado total · lo que pusiste vs hoy</div>
+        </div>
         <div style="font-size:13px;font-weight:600;color:var(--text-2);margin:0 2px 9px;">Distribución</div>
         <div style="display:flex;height:14px;border-radius:7px;overflow:hidden;gap:2px;margin-bottom:18px;">
           <sc-for list="{{ portSegments }}" as="s" hint-placeholder-count="3"><div style="width: {{ s.w }};background: {{ s.color }};"></div></sc-for>
@@ -695,6 +698,7 @@ input{font-family:inherit;}
           <div style="display:flex;flex-direction:column;align-items:center;gap:3px;margin-top:10px;">
             <div style="font-size:12px;color:var(--text-2);font-weight:500;">Invertiste {{ adACostStr }}</div>
             <div style="font-size:14px;font-weight:700;color: {{ adAGLColor }};">{{ adAResultWord }} {{ adAResultAbsStr }} ({{ adAGLPctStr }})</div>
+            <div style="font-size:11px;color:var(--text-3);font-weight:500;">resultado total desde tu compra</div>
           </div>
         </div>
         <div style="background:var(--card);border-radius:20px;padding:6px 16px;box-shadow:var(--shadow-pill);margin-bottom:18px;">
