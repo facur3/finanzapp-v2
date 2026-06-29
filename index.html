@@ -1112,25 +1112,21 @@ input{font-family:inherit;}
         <div style="display:flex;background:var(--surface);border-radius:15px;padding:4px;gap:2px;margin-bottom:18px;">
           <sc-for list="{{ atModeSeg }}" as="o" hint-placeholder-count="2"><div onClick="{{ o.onPick }}" style="flex:1;text-align:center;padding:10px 4px;border-radius:11px;font-size:14px;font-weight:600;cursor:pointer;background: {{ o.bg }};box-shadow: {{ o.shadow }};color: {{ o.color }};">{{ o.label }}</div></sc-for>
         </div>
-        <div style="background:var(--card);border-radius:22px;padding:2px 16px;box-shadow:var(--shadow-pill);margin-bottom:16px;">
-          <div onClick="{{ pickAtAcc }}" style="display:flex;align-items:center;gap:12px;padding:14px 0;border-bottom:1px solid var(--hairline);cursor:pointer;"><span style="font-size:14px;color:var(--text-2);font-weight:500;width:80px;">Cuenta</span><span style="flex:1;font-size:15px;font-weight:600;">{{ atAccName }}</span><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--text-3)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"></polyline></svg></div>
-          <div onClick="{{ pickAtSrc }}" style="display:flex;align-items:center;gap:12px;padding:14px 0;cursor:pointer;"><span style="font-size:14px;color:var(--text-2);font-weight:500;width:80px;">{{ atSrcLabel }}</span><div style="width:32px;height:32px;border-radius:10px;background:var( {{ atSrcFillVar }} );display:flex;align-items:center;justify-content:center;font-size:16px;">{{ atSrcEmoji }}</div><span style="flex:1;font-size:15px;font-weight:600;">{{ atSrcName }}</span><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--text-3)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"></polyline></svg></div>
-        </div>
-        <div style="font-size:13px;font-weight:600;color:var(--text-2);margin:0 4px 10px;">Tipo de activo</div>
-        <div class="fa-scroll" style="display:flex;gap:8px;overflow-x:auto;margin:0 -22px 18px;padding:0 22px;"><sc-for list="{{ atTypeChips }}" as="c" hint-placeholder-count="4"><div onClick="{{ c.onPick }}" style="flex:none;padding:9px 15px;border-radius:14px;font-size:13px;font-weight:600;cursor:pointer;background: {{ c.bg }};color: {{ c.color }};">{{ c.label }}</div></sc-for></div>
+        <div style="font-size:13px;font-weight:600;color:var(--text-2);margin:0 4px 10px;">Tipo</div>
+        <div style="display:flex;gap:8px;margin-bottom:18px;"><sc-for list="{{ atTypeChips }}" as="c" hint-placeholder-count="2"><div onClick="{{ c.onPick }}" style="flex:1;text-align:center;padding:11px 4px;border-radius:14px;font-size:14px;font-weight:600;cursor:pointer;background: {{ c.bg }};color: {{ c.color }};">{{ c.label }}</div></sc-for></div>
         <sc-if value="{{ atHasSuggestions }}" hint-placeholder-val="{{ true }}">
-          <div style="font-size:13px;font-weight:600;color:var(--text-2);margin:0 4px 10px;">Elegí el activo</div>
-          <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px;">
+          <div style="font-size:13px;font-weight:600;color:var(--text-2);margin:0 4px 10px;">Eleg\u00ed el activo</div>
+          <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:18px;">
             <sc-for list="{{ atSuggestions }}" as="a" hint-placeholder-count="6"><div onClick="{{ a.onPick }}" style="display:flex;align-items:center;gap:7px;padding:9px 13px;border-radius:14px;cursor:pointer;background: {{ a.bg }};"><span style="font-size:16px;">{{ a.emoji }}</span><span style="font-size:13.5px;font-weight:700;color: {{ a.color }};">{{ a.ticker }}</span><span style="font-size:11.5px;font-weight:500;color: {{ a.nameColor }};">{{ a.name }}</span></div></sc-for>
           </div>
         </sc-if>
-        <div style="background:var(--card);border-radius:22px;padding:2px 16px;box-shadow:var(--shadow-pill);margin-bottom:16px;">
-          <div style="display:flex;align-items:center;gap:10px;padding:14px 0;border-bottom:1px solid var(--hairline);"><span style="font-size:14px;color:var(--text-2);font-weight:500;width:90px;">Activo</span><input value="{{ atTicker }}" onChange="{{ setAtTicker }}" placeholder="{{ atTickerPh }}" style="border:none;outline:none;background:transparent;font-size:15px;font-weight:600;color:var(--text);flex:1;"></div>
-          <div style="display:flex;align-items:center;gap:10px;padding:14px 0;border-bottom:1px solid var(--hairline);"><span style="font-size:14px;color:var(--text-2);font-weight:500;width:90px;">Cantidad</span><input value="{{ atQty }}" onChange="{{ setAtQty }}" inputmode="decimal" placeholder="0" style="border:none;outline:none;background:transparent;font-size:15px;font-weight:600;color:var(--text);flex:1;"></div>
-          <div style="display:flex;align-items:center;gap:10px;padding:14px 0;border-bottom:1px solid var(--hairline);"><span style="font-size:14px;color:var(--text-2);font-weight:500;width:90px;">Precio u.</span><input value="{{ atPrice }}" onChange="{{ setAtPrice }}" inputmode="decimal" placeholder="0" style="border:none;outline:none;background:transparent;font-size:15px;font-weight:600;color:var(--text);flex:1;"></div>
-          <div style="display:flex;align-items:center;gap:10px;padding:14px 0;"><span style="font-size:14px;color:var(--text-2);font-weight:500;width:90px;">Comisión</span><input value="{{ atFees }}" onChange="{{ setAtFees }}" inputmode="decimal" placeholder="0" style="border:none;outline:none;background:transparent;font-size:15px;font-weight:600;color:var(--text);flex:1;"></div>
+        <div style="background:var(--card);border-radius:22px;padding:2px 16px;box-shadow:var(--shadow-pill);margin-bottom:12px;">
+          <div style="display:flex;align-items:center;gap:10px;padding:15px 0;border-bottom:1px solid var(--hairline);"><span style="font-size:14px;color:var(--text-2);font-weight:500;flex:none;">Cantidad</span><input value="{{ atQtyDisplay }}" onChange="{{ setAtQty }}" inputmode="decimal" placeholder="0" style="border:none;outline:none;background:transparent;font-size:16px;font-weight:700;color:var(--text);flex:1;text-align:right;min-width:0;"></div>
+          <div style="display:flex;align-items:center;gap:10px;padding:15px 0;"><span style="font-size:14px;color:var(--text-2);font-weight:500;flex:none;">{{ atPaidLabel }}</span><div style="flex:1;display:flex;align-items:center;justify-content:flex-end;gap:2px;min-width:0;"><span style="font-size:16px;font-weight:700;color:var(--text-2);">$</span><input value="{{ atTotalDisplay }}" onChange="{{ setAtTotal }}" inputmode="numeric" placeholder="0" style="border:none;outline:none;background:transparent;font-size:16px;font-weight:700;color:var(--text);width:60%;text-align:right;"></div></div>
         </div>
-        <div style="display:flex;align-items:center;justify-content:space-between;background:var(--surface);border-radius:16px;padding:15px 18px;margin-bottom:18px;"><span style="font-size:14px;font-weight:600;color:var(--text-2);">Total</span><span style="font-size:20px;font-weight:800;">{{ atTotalStr }}</span></div>
+        <sc-if value="{{ atHasUnit }}" hint-placeholder-val="{{ false }}">
+          <div style="display:flex;justify-content:space-between;padding:0 6px;margin-bottom:18px;"><span style="font-size:12px;color:var(--text-3);font-weight:500;">Precio por unidad</span><span style="font-size:12px;color:var(--text-2);font-weight:600;">{{ atUnitStr }}</span></div>
+        </sc-if>
         <div onClick="{{ saveAssetTrade }}" style="height:56px;border-radius:18px;background:var(--accent);display:flex;align-items:center;justify-content:center;gap:9px;cursor:pointer;opacity: {{ atSaveOpacity }};"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="5 12 10 17 19 7"></polyline></svg><span style="font-size:17px;font-weight:700;color:#fff;">{{ atSaveLabel }}</span></div>
 
         <sc-if value="{{ atIsPicker }}" hint-placeholder-val="{{ false }}">
@@ -1666,7 +1662,7 @@ class Component extends DCLogic {
       tagEdit:{name:'',orig:null},
       payAccount:'banco', payAmount:'',
       cpCard:0, cpAmount:'', cpMerchant:'', cpCat:'compras', cpDate:'Hoy', cpInstall:1, cpSub:null,
-      atMode:'buy', atAccount:'cedears', atType:'CEDEAR', atTicker:'', atName:'', atEmoji:'', atQty:'', atPrice:'', atFees:'', atSource:'banco', atSub:null,
+      atMode:'buy', atAccount:'cedears', atType:'CEDEAR', atTicker:'', atName:'', atEmoji:'', atQty:'', atTotal:'', atPrice:'', atFees:'', atSource:'banco', atSub:null,
       loanView:null, newLoan:{person:'',direction:'me_deben',concept:'',amount:'',currency:'ARS',editId:null}, loanPayAmount:'', ivSub:null, upTicker:'', atNewPrice:'', pricesLoading:false, pricesLastUpdated:null,
       onbStep:0, onbCard:false, onbInvest:false, flash:'', confirm:null,
       showOnboarding:true,
@@ -1887,6 +1883,12 @@ class Component extends DCLogic {
     return{cards,order,accounts,balances,_next:next,showOnboarding:false,onbStep:0,tab:'inicio',push:null,flash:'¡Listo! Empezá a registrar'};});}
   fmtNum(n){n=Math.abs(n);const p=n.toFixed(2).split('.');return p[0].replace(/\B(?=(\d{3})+(?!\d))/g,'.')+','+p[1];}
   fmtInt(n){n=Math.abs(Math.round(n));return n.toString().replace(/\B(?=(\d{3})+(?!\d))/g,'.');}
+  // Format a raw numeric input string with Argentine thousands dots as the user types.
+  fmtThousands(s){if(s==null)return '';s=String(s);const neg=s[0]==='-';s=s.replace('-','');const p=s.split(',');p[0]=p[0].replace(/\B(?=(\d{3})+(?!\d))/g,'.');return (neg?'-':'')+p.join(',');}
+  cleanNum(s){return String(s||'').replace(/[^0-9,]/g,'').replace(/,(?=.*,)/g,'');}
+  parseNum(s){return parseFloat(String(s||'').replace(/\./g,'').replace(',','.'))||0;}
+  // Pick the investment account that matches an asset type (crypto vs stocks).
+  accountForType(type){const s=this.state;const inv=this.investIds();const crypto=type==='Cripto'||type==='Bitcoin';const m=inv.find(k=>{const a=s.accounts[k]||{};const t=((a.type||'')+' '+(a.name||'')).toLowerCase();const isC=/crip|binance|btc|bitcoin|eth/.test(t);return crypto?isC:!isC;});return m||inv[0]||'';}
   signed(n){return (n<0?'-':'+')+'$'+this.fmtNum(n);}
   abbr(n){n=Math.abs(n);if(n>=1000)return Math.floor(n/1000)+'K';return ''+Math.round(n);}
   displayAmount(raw){if(!raw)return '$0';const parts=raw.split(',');let i=parts[0].replace(/\B(?=(\d{3})+(?!\d))/g,'.');let out='$'+i;if(raw.indexOf(',')>=0)out+=','+(parts[1]||'');return out;}
@@ -1921,18 +1923,22 @@ class Component extends DCLogic {
   cpPress(d){this.setState(s=>{let r=s.cpAmount;if(d==='back')return{cpAmount:r.slice(0,-1)};if(d===','){if(r.indexOf(',')>=0||r==='')return{};return{cpAmount:r+','};}if(r.indexOf(',')>=0&&(r.split(',')[1]||'').length>=2)return{};if(r.replace(',','').length>=9)return{};return{cpAmount:r+d};});}
   savePurchase(){const S=this.state;const val=parseFloat((S.cpAmount||'').replace(',','.'))||0;if(!val){this.flashMsg('Ingresá un monto');return;}const idx=S.cpCard;const card=S.cards[idx];if(!card){this.flashMsg('Agregá una tarjeta primero');return;}if(!S.categories[S.cpCat]){this.flashMsg('Elegí una categoría');return;}const n=S.cpInstall;const merchant=S.cpMerchant.trim()||(this.state.categories[S.cpCat]?this.state.categories[S.cpCat].name:'Compra');const label=n>1?(merchant+' · cuota 1/'+n):merchant;
     this.setState(s=>{const cuota=n>1?{name:merchant,cur:1,tot:n,monto:val/n}:null;const cs=s.cards.map((c,i)=>i===idx?{...c,saldo:c.saldo+val,compras:[{name:label,monto:val,date:S.cpDate},...(c.compras||[])],cuotas:cuota?[cuota,...(c.cuotas||[])]:c.cuotas}:c);const ct={...s.categoryTotals,[S.cpCat]:(s.categoryTotals[S.cpCat]||0)+val};const t={id:s._next,type:'gasto',merchant:label,cat:S.cpCat,amount:-val,val,card:card.id,onCard:true,dateLabel:S.cpDate,note:n>1?('Tarjeta '+card.brand+' · '+n+' cuotas'):('Tarjeta '+card.brand),tags:[]};return{cards:cs,categoryTotals:ct,monthExpense:s.monthExpense+val,txns:[t,...s.txns],_next:s._next+1,push:'cardDetail',cardView:idx,flash:'Compra registrada'};});}
-  openAssetTrade(mode,account){const inv=this.investIds(),liq=this.liquidIds();const acc=account||inv[0]||'';this.setState({push:'assetTrade',sheet:null,subsheet:null,atSub:null,atMode:mode||'buy',atAccount:acc,atType:'CEDEAR',atTicker:'',atName:'',atEmoji:'',atQty:'',atPrice:'',atFees:'',atSource:liq[0]||''});}
-  pickAsset(t,n,e){const S=this.state;const held=(S.assets[S.atAccount]||[]).find(a=>a.ticker===t);const patch={atTicker:t,atName:n||t,atEmoji:e||'📈'};if(held&&held.lastPrice)patch.atPrice=String(Math.round(held.lastPrice));this.setState(patch);}
-  tradeAsset(mode,account,a){const liq=this.liquidIds();const held=(this.state.assets[account]||[]).find(x=>x.ticker===a.ticker);const isC=(this.CRYPTOS||[]).some(x=>x[0]===a.ticker);const atType=a.ticker==='BTC'?'Bitcoin':isC?'Cripto':'CEDEAR';this.setState({push:'assetTrade',sheet:null,subsheet:null,atSub:null,atMode:mode,atAccount:account,atType,atTicker:a.ticker,atName:a.name,atEmoji:a.emoji,atQty:'',atPrice:held&&held.lastPrice?String(Math.round(held.lastPrice)):'',atFees:'',atSource:liq[0]||''});}
-  saveAssetTrade(){const S=this.state;const qty=parseFloat((S.atQty||'').replace(',','.'))||0;const price=parseFloat((S.atPrice||'').replace(',','.'))||0;const fees=parseFloat((S.atFees||'').replace(',','.'))||0;if(!qty||!price){this.flashMsg('Completá cantidad y precio');return;}const gross=qty*price;const buy=S.atMode==='buy';const total=buy?gross+fees:gross-fees;const inv=S.atAccount,src=S.atSource;const ticker=(S.atTicker.trim()||S.atType).toUpperCase();if(!S.accounts[inv]||!S.accounts[src]){this.flashMsg('Elegí cuentas válidas');return;}if(inv===src){this.flashMsg('Origen y destino deben ser distintos');return;}
-    const emojiMap={'Bitcoin':'🪙','Cripto':'🔮','CEDEAR':'📈','Renta fija':'🔒'};
-    this.setState(s=>{const b={...s.balances};if(buy){b[src]=(b[src]||0)-total;b[inv]=(b[inv]||0)+gross;}else{b[inv]=(b[inv]||0)-gross;b[src]=(b[src]||0)+total;}
-      const na={...s.assets};const aa=[...(na[inv]||[])];const xi=aa.findIndex(a=>a.ticker===ticker);
-      if(buy){if(xi>=0){const ex=aa[xi];const nq=ex.qty+qty;aa[xi]={...ex,qty:nq,avg:(ex.qty*ex.avg+qty*price)/nq,lastPrice:price};}else{aa.push({id:'a'+s._next,ticker,name:S.atName||ticker,emoji:S.atEmoji||emojiMap[S.atType]||'📈',qty,avg:price,lastPrice:price});}}
-      else{if(xi>=0){const ex=aa[xi];const nq=ex.qty-qty;if(nq<=0.000001)aa.splice(xi,1);else aa[xi]={...ex,qty:nq,lastPrice:price};}}
-      na[inv]=aa;
-      const t={id:s._next,type:'inversion',merchant:(buy?'Compra ':'Venta ')+ticker,cat:'inversion',amount:buy?-total:total,val:total,from:buy?src:inv,to:buy?inv:src,isTransfer:true,dateLabel:'Hoy',note:qty+' × '+this.fmtInt(price)+(fees?(' · comisión '+this.fmtInt(fees)):''),tags:[]};
-      return{balances:b,assets:na,txns:[t,...s.txns],_next:s._next+1,push:'investDetail',investView:inv,flash:buy?'Compra realizada':'Venta realizada'};});}
+  openAssetTrade(mode,account){const inv=this.investIds();const type='CEDEAR';const acc=account||this.accountForType(type)||inv[0]||'';this.setState({push:'assetTrade',sheet:null,subsheet:null,atSub:null,atMode:mode||'buy',atAccount:acc,atType:type,atTicker:'',atName:'',atEmoji:'',atQty:'',atTotal:''});}
+  pickAsset(t,n,e){this.setState({atTicker:t,atName:n||t,atEmoji:e||'📈'});}
+  setAtType(type){this.setState({atType:type,atAccount:this.accountForType(type),atTicker:'',atName:'',atEmoji:''});}
+  tradeAsset(mode,account,a){const isC=(this.CRYPTOS||[]).some(x=>x[0]===a.ticker);const atType=isC?'Cripto':'CEDEAR';this.setState({push:'assetTrade',sheet:null,subsheet:null,atSub:null,atMode:mode,atAccount:account,atType,atTicker:a.ticker,atName:a.name,atEmoji:a.emoji,atQty:'',atTotal:''});}
+  saveAssetTrade(){const S=this.state;const qty=this.parseNum(S.atQty);const total=this.parseNum(S.atTotal);const buy=S.atMode==='buy';
+    if(!qty){this.flashMsg('Ingresá la cantidad');return;}
+    if(!total){this.flashMsg(buy?'Ingresá cuánto pagaste':'Ingresá cuánto recibiste');return;}
+    const inv=S.atAccount;const ticker=(S.atTicker.trim()||S.atType).toUpperCase();if(!S.accounts[inv]){this.flashMsg('Elegí una cuenta de inversión');return;}
+    const unit=total/qty;const emojiMap={'Bitcoin':'🪙','Cripto':'🔮','CEDEAR':'📈','Renta fija':'🔒'};
+    this.setState(s=>{const na={...s.assets};const aa=[...(na[inv]||[])];const xi=aa.findIndex(a=>a.ticker===ticker);
+      if(buy){if(xi>=0){const ex=aa[xi];const nq=ex.qty+qty;aa[xi]={...ex,qty:nq,avg:(ex.qty*ex.avg+total)/nq};}else{aa.push({id:'a'+s._next,ticker,name:S.atName||ticker,emoji:S.atEmoji||emojiMap[S.atType]||'📈',qty,avg:unit,lastPrice:unit});}}
+      else{if(xi<0){return{flash:'No tenés ese activo'};}const ex=aa[xi];const nq=ex.qty-qty;if(nq<=0.000001)aa.splice(xi,1);else aa[xi]={...ex,qty:nq};}
+      na[inv]=aa;const nb={...s.balances};nb[inv]=aa.reduce((sum,a)=>sum+a.qty*(a.lastPrice||a.avg),0);
+      const t={id:s._next,type:'inversion',merchant:(buy?'Compra ':'Venta ')+ticker,cat:'inversion',amount:buy?-total:total,val:total,from:buy?inv:inv,to:inv,isTransfer:true,dateLabel:'Hoy',note:(qty<1?qty:this.fmtInt(qty))+' '+ticker+' · '+this.fmtInt(total),tags:[]};
+      return{assets:na,balances:nb,txns:[t,...s.txns],_next:s._next+1,push:'investDetail',investView:inv,flash:buy?'Compra registrada':'Venta registrada'};});
+    setTimeout(()=>this.fetchPrices(true),300);}
   addCustomTag(){const t=this.state.newTagText.trim().toLowerCase().replace(/^#/,'');if(!t)return;this.setState(s=>({tagSugg:s.tagSugg.indexOf(t)>=0?s.tagSugg:[...s.tagSugg,t],addTags:s.addTags.indexOf(t)>=0?s.addTags:[...s.addTags,t],newTagText:'',subsheet:null}));}
   applyCustomDate(){const t=this.state.customDateText.trim();if(!t)return;this.setState({addDate:t,customDateText:'',subsheet:null});}
   updateAssetPrice(){const S=this.state;const np=parseFloat((S.atNewPrice||'').replace(',','.'))||0;if(!np){this.flashMsg('Ingresá el nuevo precio');return;}const k=S.investView;this.setState(s=>{const na={...s.assets};const aa=[...(na[k]||[])];const xi=aa.findIndex(a=>a.ticker===S.upTicker);if(xi>=0)aa[xi]={...aa[xi],lastPrice:np};na[k]=aa;const nb={...s.balances};nb[k]=aa.reduce((sum,a)=>sum+a.qty*(a.lastPrice||a.avg),0);return{assets:na,balances:nb,ivSub:null,upTicker:'',atNewPrice:'',flash:'Precio actualizado'};});}
@@ -2242,16 +2248,18 @@ class Component extends DCLogic {
     if(S.cpSub==='card'){cpPickerTitle='Tarjeta';cpPickerOptions=S.cards.map((c,i)=>({label:c.brand+' ·••• '+c.last4,emoji:'💳',fillVar:'--cat-tarjetas-fill',selected:S.cpCard===i,onPick:()=>this.setState({cpCard:i,cpSub:null})}));}
     else if(S.cpSub==='cat'){cpPickerTitle='Categoría';cpPickerOptions=expKeys.map(k=>({label:CAT[k].name,emoji:CAT[k].emoji,fillVar:cFill(k),selected:S.cpCat===k,onPick:()=>this.setState({cpCat:k,cpSub:null})}));}
     // asset trade flow
-    const atQtyN=parseFloat((S.atQty||'').replace(',','.'))||0;const atPriceN=parseFloat((S.atPrice||'').replace(',','.'))||0;const atFeesN=parseFloat((S.atFees||'').replace(',','.'))||0;
-    const atGross=atQtyN*atPriceN;const atTotalN=S.atMode==='buy'?atGross+atFeesN:atGross-atFeesN;
-    const atModeSeg=[['buy','Comprar'],['sell','Vender']].map(m=>({label:m[1],onPick:()=>this.setState({atMode:m[0]}),bg:S.atMode===m[0]?'var(--seg-active)':'transparent',shadow:S.atMode===m[0]?'var(--shadow-pill)':'none',color:S.atMode===m[0]?'var(--text)':'var(--text-2)'}));
-    const atTypeChips=['CEDEAR','Bitcoin','Cripto','Renta fija'].map(t=>({label:t,onPick:()=>this.setState({atType:t,atTicker:'',atName:'',atEmoji:''}),bg:S.atType===t?'var(--accent)':'var(--surface)',color:S.atType===t?'#fff':'var(--text)'}));
+    const atQtyN=this.parseNum(S.atQty);const atTotalN=this.parseNum(S.atTotal);
+    const atUnit=atQtyN>0?atTotalN/atQtyN:0;
+    const atHeld=(S.assets[S.atAccount]||[]).find(a=>a.ticker===S.atTicker);
+    const atMktUnit=atHeld?(atHeld.lastPrice||atHeld.avg):0;
+    const atModeSeg=[['buy','Comprar'],['sell','Vender']].map(m=>({label:m[1],onPick:()=>this.setState({atMode:m[0],atTicker:'',atName:'',atEmoji:'',atQty:'',atTotal:''}),bg:S.atMode===m[0]?'var(--seg-active)':'transparent',shadow:S.atMode===m[0]?'var(--shadow-pill)':'none',color:S.atMode===m[0]?'var(--text)':'var(--text-2)'}));
+    const atTypeChips=['CEDEAR','Cripto'].map(t=>({label:t,onPick:()=>this.setAtType(t),bg:S.atType===t?'var(--accent)':'var(--surface)',color:S.atType===t?'#fff':'var(--text)'}));
     // Asset pick-list: when selling, the assets you actually hold; when buying, a
     // curated list for the chosen type. Tapping fills the ticker (no typing needed).
     const atPickRaw=S.atMode==='sell'
       ? (S.assets[S.atAccount]||[]).map(a=>[a.ticker,a.name,a.emoji])
-      : (S.atType==='Bitcoin'||S.atType==='Cripto') ? this.CRYPTOS
-      : S.atType==='CEDEAR' ? this.CEDEARS : [];
+      : S.atType==='Cripto' ? this.CRYPTOS
+      : this.CEDEARS;
     const atSuggestions=atPickRaw.filter(x=>x&&x[0]).map(x=>({ticker:x[0],name:x[1]||x[0],emoji:x[2]||'📈',onPick:()=>this.pickAsset(x[0],x[1],x[2]),bg:S.atTicker===x[0]?'var(--accent)':'var(--surface)',color:S.atTicker===x[0]?'#fff':'var(--text)',nameColor:S.atTicker===x[0]?'rgba(255,255,255,0.8)':'var(--text-2)'}));
     const atHasSuggestions=atSuggestions.length>0;
     const atAccC=ACC[S.atAccount]||{};const atSrcC=ACC[S.atSource]||{};
@@ -2362,16 +2370,15 @@ class Component extends DCLogic {
       cpOpenKeypad:()=>this.setState({cpSub:'keypad'}),cpIsKeypad:S.cpSub==='keypad',cpCloseSub:()=>this.setState({cpSub:null}),
       cpIsPicker:S.cpSub==='card'||S.cpSub==='cat',cpPickerTitle,cpPickerOptions,
       savePurchase:()=>this.savePurchase(),cpSaveOpacity:S.cpAmount?'1':'0.5',
-      isAssetTrade:S.push==='assetTrade',atModeSeg,atTitle:S.atMode==='buy'?'Comprar activo':'Vender activo',
-      atTypeChips,atSuggestions,atHasSuggestions,atAccName:atAccC.name,atSrcLabel:S.atMode==='buy'?'Pagar con':'Acreditar en',atSrcName:atSrcC.name,atSrcEmoji:atSrcC.emoji,atSrcFillVar:atSrcC.fillVar,
-      pickAtAcc:()=>this.setState({atSub:'acc'}),pickAtSrc:()=>this.setState({atSub:'src'}),
-      atTicker:S.atTicker,setAtTicker:(e)=>this.setState({atTicker:e.target.value}),
-      atQty:S.atQty,setAtQty:(e)=>this.setState({atQty:e.target.value}),
-      atPrice:S.atPrice,setAtPrice:(e)=>this.setState({atPrice:e.target.value}),
-      atFees:S.atFees,setAtFees:(e)=>this.setState({atFees:e.target.value}),
-      atTotalStr:sym+this.fmtInt(atTotalN),atTickerPh:S.atType==='Bitcoin'||S.atType==='Cripto'?'BTC, ETH…':S.atType==='Renta fija'?'Plazo fijo':'AAPL, SPY…',
-      atSaveLabel:S.atMode==='buy'?'Confirmar compra':'Confirmar venta',atSaveOpacity:(atQtyN&&atPriceN)?'1':'0.5',
-      atIsPicker:S.atSub==='acc'||S.atSub==='src',atPickerTitle,atPickerOptions,atCloseSub:()=>this.setState({atSub:null}),
+      isAssetTrade:S.push==='assetTrade',atModeSeg,atTitle:S.atMode==='buy'?'Comprar':'Vender',
+      atTypeChips,atSuggestions,atHasSuggestions,atAccName:atAccC.name,
+      atTicker:S.atTicker,setAtTicker:(e)=>this.setState({atTicker:e.target.value}),atHasAsset:!!S.atTicker,
+      atQtyDisplay:this.fmtThousands(S.atQty),setAtQty:(e)=>this.setState({atQty:this.cleanNum(e.target.value)}),
+      atPaidLabel:S.atMode==='buy'?'Cuánto pagué':'Cuánto recibí',
+      atTotalDisplay:this.fmtThousands(S.atTotal),setAtTotal:(e)=>this.setState({atTotal:this.cleanNum(e.target.value)}),
+      atHasUnit:atUnit>0,atUnitStr:money(atUnit),atHasMkt:atMktUnit>0,atMktStr:money(atMktUnit),
+      atSaveLabel:S.atMode==='buy'?'Registrar compra':'Registrar venta',atSaveOpacity:(atQtyN&&atTotalN&&S.atTicker)?'1':'0.5',
+      atIsPicker:false,atPickerTitle,atPickerOptions,atCloseSub:()=>this.setState({atSub:null}),
       saveAssetTrade:()=>this.saveAssetTrade(),
       repIncomeStr:money(repIncome),repExpenseStr:money(repExpense),repNetStr:(repNet>=0?'+':'-')+sym+this.fmtInt(Math.abs(repNet)),repNetColor:repNet>=0?'var(--pos)':'var(--accent)',
       repIncPct:repIncPct+'%',repExpPct:(100-repIncPct)+'%',repMovCount,
