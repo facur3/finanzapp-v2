@@ -1156,7 +1156,10 @@ input{font-family:inherit;}
           <div style="font-size:12px;color:var(--text-2);font-weight:600;margin-bottom:4px;">Valor actual · {{ ivType }}</div>
           <div style="font-size:34px;font-weight:800;letter-spacing:-1px;">{{ ivBalStr }}</div>
           <sc-if value="{{ ivHasTotalGL }}" hint-placeholder-val="{{ false }}">
-            <div style="font-size:13px;font-weight:600;color: {{ ivTotalGLColor }};margin-top:6px;">P&amp;L {{ ivTotalGLStr }} &middot; {{ ivTotalGLPctStr }}</div>
+            <div style="display:flex;flex-direction:column;align-items:center;gap:3px;margin-top:10px;">
+              <div style="font-size:12px;color:var(--text-2);font-weight:500;">Invertiste {{ ivCostStr }}</div>
+              <div style="font-size:14px;font-weight:700;color: {{ ivTotalGLColor }};">{{ ivResultWord }} {{ ivResultAbsStr }} ({{ ivTotalGLPctStr }})</div>
+            </div>
           </sc-if>
         </div>
         <div style="display:flex;gap:9px;margin-bottom:14px;">
@@ -1700,6 +1703,7 @@ class Component extends DCLogic {
   }
   componentWillUnmount(){
     clearTimeout(this._ft);
+    clearTimeout(this._cardScrollT);
     clearInterval(this._priceTimer);
   }
   persistentKeys(){
@@ -1893,7 +1897,11 @@ class Component extends DCLogic {
   doConfirm(){const c=this.state.confirm;this.setState({confirm:null});if(c&&c.onConfirm)c.onConfirm();}
   resetData(){this.clearAll();}
   selectCard(i){this.setState({cardIdx:i});const el=this.carouselRef.current;if(el)el.scrollTo({left:i*310,behavior:'smooth'});}
-  onCardScroll(e){const el=e.currentTarget;if(!el)return;const i=Math.max(0,Math.min((this.state.cards||[]).length-1,Math.round(el.scrollLeft/310)));if(i!==this.state.cardIdx)this.setState({cardIdx:i});}
+  onCardScroll(e){const el=e.currentTarget;if(!el)return;const left=el.scrollLeft;clearTimeout(this._cardScrollT);
+    // Debounce: only update the active card AFTER scrolling settles, so the native
+    // CSS scroll-snap finishes instead of being interrupted mid-swipe by a re-render
+    // (which left the view stuck between two cards).
+    this._cardScrollT=setTimeout(()=>{const i=Math.max(0,Math.min((this.state.cards||[]).length-1,Math.round(left/310)));if(i!==this.state.cardIdx)this.setState({cardIdx:i});},110);}
   openAddPreset(type,from,to){const liq=this.liquidIds(),inv=this.investIds();this.setState({sheet:'add',push:null,subsheet:null,addType:type,addAmount:'',addTitle:'',addCat:type==='ingreso'?'ingreso':'comida',addAccount:from||liq[0]||inv[0]||'',addTo:to||inv[0]||liq.find(k=>k!==from)||liq[0]||'',addDate:'Hoy',addTags:[],editId:null});}
   openAddAccount(editId){const s=this.state;if(editId){const a=s.accounts[editId];this.setState({push:'addAccount',newAcc:{name:a.name,type:a.type,kind:a.kind,balance:String(s.balances[editId]||0).replace('.',','),currency:a.currency,liquid:a.liquid,editId}});}else{this.setState({push:'addAccount',newAcc:{name:'',type:'Banco',kind:'liquid',balance:'',currency:'ARS',liquid:true,editId:null}});}}
   openAddInvestmentAccount(){this.setState({push:'addAccount',newAcc:{name:'',type:'Inversión',kind:'invest',balance:'',currency:this.state.currency,liquid:false,editId:null}});}
@@ -1953,24 +1961,32 @@ class Component extends DCLogic {
       let ccl=0;
       if(Object.keys(usdFallback).length){try{const d=await(await fetch('https://dolarapi.com/v1/dolares/contadoconliquidacion')).json();ccl=d?.venta||d?.compra||0;}catch(e){}}
       // 3b. FCI (e.g. Cocos Rendimiento) -> ArgentinaDatos valor cuotaparte (VCP).
-      // Auto-accrues daily yield: balance = cuotapartes x VCP, no manual input.
       const fciPrices={};
       if(fciList.length){
         const funds=[];
         await Promise.all(['rentaMixta','mercadoDinero','rentaFija'].map(async c=>{try{const d=await(await fetch('https://api.argentinadatos.com/v1/finanzas/fci/'+c+'/ultimo')).json();if(Array.isArray(d))d.forEach(f=>funds.push(f));}catch(e){}}));
         fciList.forEach(item=>{let vcp=0;for(const ph of item.phrases){const words=String(ph).toLowerCase().split(/\s+/).filter(Boolean);if(!words.length)continue;const hit=funds.find(f=>{const n=String(f.fondo||'').toLowerCase();return words.every(w=>n.includes(w));});if(hit&&hit.vcp>0){vcp=hit.vcp;break;}}if(vcp>0)fciPrices[item.id]=vcp;});
       }
-      // 4. Apply
+      // 4. Apply. For each account, refresh holding prices and recompute its balance.
+      // Tickers (crypto/CEDEAR): value = qty x live price (integer ARS).
+      // FCI: value = baseValue x (liveVCP / baseVCP) — a RELATIVE change that is
+      // scale-independent, so we never need the cuotaparte count or its unit. baseVCP
+      // is calibrated on the first successful fetch; daily yield then accrues on its own.
       let anyUpdate=false;
-      Object.keys(na).forEach(k=>{if(!s.accounts[k])return;const aa=[...(na[k]||[])];let changed=false;
+      Object.keys(na).forEach(k=>{if(!s.accounts[k])return;const aa=[...(na[k]||[])];if(!aa.length)return;let changed=false;
         aa.forEach((a,i)=>{
-          if(a.fci){const v=fciPrices[a.id];if(v>0&&v!==a.lastPrice){aa[i]={...a,lastPrice:v};changed=true;}return;}
+          if(a.fci){const live=fciPrices[a.id]||0;if(live>0&&!(Number(a.baseVcp)>0)){aa[i]={...a,baseVcp:live};changed=true;}return;}
           if(!a.ticker)return;let np=0;
           if(cryptoPrices[a.ticker])np=Math.round(cryptoPrices[a.ticker]);
           else if(stockPrices[a.ticker])np=Math.round(stockPrices[a.ticker]);
           else if(usdFallback[a.ticker]&&ccl){np=Math.round(usdFallback[a.ticker]*ccl/(this.CEDEAR_RATIOS[a.ticker]||10));}
           if(np>0&&np!==a.lastPrice){aa[i]={...a,lastPrice:np};changed=true;}});
-        if(changed){na[k]=aa;nb[k]=aa.reduce((s2,a)=>s2+a.qty*(a.lastPrice||a.avg),0);anyUpdate=true;}});
+        const total=aa.reduce((s2,a)=>{
+          if(a.fci){const live=fciPrices[a.id]||0;const bv=Number(a.baseVcp)||0;const base=Number(a.baseValue)||0;return s2+(live>0&&bv>0?base*live/bv:base);}
+          return s2+(a.ticker?a.qty*(a.lastPrice||a.avg):0);
+        },0);
+        const val=Math.round(total);
+        if(changed||val!==Math.round(nb[k]||0)){na[k]=aa;nb[k]=val;anyUpdate=true;}});
       this.setState({assets:na,balances:nb,pricesLoading:false,pricesLastUpdated:Date.now(),...(!silent&&anyUpdate?{flash:'Precios actualizados'}:{})});}
     catch(e){this.setState({pricesLoading:false,...(!silent?{flash:'Error al actualizar precios'}:{})});}}
 
@@ -2115,6 +2131,7 @@ class Component extends DCLogic {
       const ivLastUpdatedStr=S.pricesLastUpdated?('\u00b7 '+new Date(S.pricesLastUpdated).toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'})):'';
       invD={ivName:a.name,ivEmoji:a.emoji,ivFillVar:a.fillVar,ivBalStr:money(S.balances[k]),ivType:a.type,ivAssets:assets,ivHasAssets:assets.length>0,ivNoAssets:assets.length===0,
         ivHasTotalGL:rawAssets.length>0,ivTotalGLStr:(totalGL>=0?'+':'-')+sym+this.fmtInt(Math.abs(totalGL)),ivTotalGLPctStr:(totalGL>=0?'+':'')+totalGLPct.toFixed(1).replace('.',',')+'%',ivTotalGLColor:totalGL>=0?'var(--pos)':'var(--accent)',
+        ivCostStr:money(totalCost),ivResultWord:totalGL>=0?'Ganás':'Perdés',ivResultAbsStr:sym+this.fmtInt(Math.abs(totalGL)),
         ivFetchPrices:()=>this.fetchPrices(),ivPricesLoading:S.pricesLoading||false,ivLoadingLabel:S.pricesLoading?'Actualizando…':'Actualizar precios',ivHasLastUpdated:!!S.pricesLastUpdated,ivLastUpdatedStr,
         ivBuy:()=>this.openAssetTrade('buy',k),ivSell:()=>this.openAssetTrade('sell',k),ivDeposit:()=>this.openAddPreset('transfer',this.liquidIds()[0]||'banco',k),ivWithdraw:()=>this.openAddPreset('transfer',k,this.liquidIds()[0]||'banco'),
         ivSubOpen:S.ivSub==='updatePrice',ivSubClose:()=>this.setState({ivSub:null}),ivUpTicker:S.upTicker,ivUpPriceStr:this.displayAmount(S.atNewPrice),ivUpKeypad,ivUpdatePrice:()=>this.updateAssetPrice(),ivUpSaveOpacity:S.atNewPrice?'1':'0.5'};}
@@ -2367,7 +2384,7 @@ class Component extends DCLogic {
       addCategory:()=>this.openCatEditor(null),
       isTags:S.push==='tags',tagList:S.tagSugg.map(t=>({label:t,onEdit:()=>this.openTagEditor(t)})),
       ...acctD,...invD,...cardD,...onb,...loanD,
-      showOnboarding:S.showOnboarding,showTabBar:!S.showOnboarding&&!S.sheet&&!S.confirm,finishOnboarding:()=>this.setState({showOnboarding:false,onbStep:0}),
+      showOnboarding:S.showOnboarding,showTabBar:!S.showOnboarding&&!S.sheet&&!S.confirm&&!S.push,finishOnboarding:()=>this.setState({showOnboarding:false,onbStep:0}),
       ...det,
     };
   }
