@@ -1974,20 +1974,23 @@ class Component extends DCLogic {
       const CRYPTO={BTC:'bitcoin',ETH:'ethereum',ADA:'cardano',SOL:'solana',MATIC:'matic-network',DOT:'polkadot'};
       const cryptoSet=new Set(),stockSet=new Set();const fciList=[];
       Object.keys(na).forEach(k=>{if(!s.accounts[k])return;(na[k]||[]).forEach(a=>{if(a.fci){fciList.push({id:a.id,phrases:Array.isArray(a.fondoMatch)?a.fondoMatch:[a.fondoMatch||'']});return;}if(!a.ticker)return;if(CRYPTO[a.ticker])cryptoSet.add(a.ticker);else stockSet.add(a.ticker);});});
-      // 1. Crypto -> CoinGecko (ARS direct)
+      // 1. Crypto -> CoinGecko USD x crypto-dollar (USDT) rate, so the ARS value
+      // matches what the exchange (Binance) shows. Falls back to CoinGecko ARS.
       const cryptoPrices={};
-      if(cryptoSet.size){const ids=[...cryptoSet].map(t=>CRYPTO[t]).join(',');
-        try{const d=await(await fetch('https://api.coingecko.com/api/v3/simple/price?ids='+ids+'&vs_currencies=ars')).json();Object.entries(CRYPTO).forEach(([t,id])=>{if(d[id]?.ars)cryptoPrices[t]=d[id].ars;});}catch(e){}}
-      // 2. CEDEARs -> Yahoo Finance .BA (BYMA peso price, no conversion needed)
-      const stockPrices={},usdFallback={};
-      await Promise.all([...stockSet].map(async t=>{
-        try{const d=await(await fetch('https://query1.finance.yahoo.com/v8/finance/chart/'+t+'.BA?interval=1d&range=1d')).json();const p=d?.chart?.result?.[0]?.meta?.regularMarketPrice||0;if(p>0){stockPrices[t]=p;return;}}catch(e){}
-        // Fallback: USD price, will convert via CCL
-        try{const d=await(await fetch('https://query1.finance.yahoo.com/v8/finance/chart/'+t+'?interval=1d&range=1d')).json();const p=d?.chart?.result?.[0]?.meta?.regularMarketPrice||0;if(p>0)usdFallback[t]=p;}catch(e){}
-      }));
-      // 3. CCL only if we have USD fallbacks to convert
-      let ccl=0;
-      if(Object.keys(usdFallback).length){try{const d=await(await fetch('https://dolarapi.com/v1/dolares/contadoconliquidacion')).json();ccl=d?.venta||d?.compra||0;}catch(e){}}
+      if(cryptoSet.size){
+        let criptoRate=0;try{const d=await(await fetch('https://dolarapi.com/v1/dolares/cripto')).json();criptoRate=d?.venta||d?.compra||0;}catch(e){}
+        const ids=[...cryptoSet].map(t=>CRYPTO[t]).join(',');
+        try{const d=await(await fetch('https://api.coingecko.com/api/v3/simple/price?ids='+ids+'&vs_currencies=usd,ars')).json();
+          Object.entries(CRYPTO).forEach(([t,id])=>{const usd=d[id]?.usd;if(usd&&criptoRate>0)cryptoPrices[t]=usd*criptoRate;else if(d[id]?.ars)cryptoPrices[t]=d[id].ars;});}catch(e){}}
+      // 2. CEDEARs/stocks -> data912 live BYMA peso prices (CORS-friendly). Yahoo .BA
+      // is kept as a best-effort fallback (often CORS-blocked from the browser).
+      const stockPrices={},usdFallback={};let ccl=0;
+      if(stockSet.size){
+        const map={};
+        await Promise.all(['arg_cedears','arg_stocks'].map(async ep=>{try{const arr=await(await fetch('https://data912.com/live/'+ep)).json();if(Array.isArray(arr))arr.forEach(it=>{const sym=String(it.symbol||it.ticker||'').toUpperCase();const px=it.c!=null?it.c:it.px!=null?it.px:it.last!=null?it.last:it.close!=null?it.close:it.p;if(sym&&px>0&&map[sym]==null)map[sym]=px;});}catch(e){}}));
+        [...stockSet].forEach(t=>{if(map[t]>0)stockPrices[t]=map[t];});
+        await Promise.all([...stockSet].filter(t=>!stockPrices[t]).map(async t=>{try{const d=await(await fetch('https://query1.finance.yahoo.com/v8/finance/chart/'+t+'.BA?interval=1d&range=1d')).json();const p=d?.chart?.result?.[0]?.meta?.regularMarketPrice||0;if(p>0)stockPrices[t]=p;}catch(e){}}));
+      }
       // 3b. FCI (e.g. Cocos Rendimiento) -> ArgentinaDatos valor cuotaparte (VCP).
       const fciPrices={};
       if(fciList.length){
