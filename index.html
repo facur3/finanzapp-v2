@@ -2025,13 +2025,13 @@ class Component extends DCLogic {
   async fetchPrices(silent=false){if(this.state.pricesLoading)return;this.setState({pricesLoading:true});
     try{const s=this.state;const na={...s.assets};const nb={...s.balances};
       const CRYPTO={BTC:'bitcoin',ETH:'ethereum',ADA:'cardano',SOL:'solana',MATIC:'matic-network',DOT:'polkadot'};
-      const cryptoSet=new Set(),stockSet=new Set();
-      Object.keys(na).forEach(k=>{if(!s.accounts[k])return;(na[k]||[]).forEach(a=>{if(!a.ticker)return;if(CRYPTO[a.ticker])cryptoSet.add(a.ticker);else stockSet.add(a.ticker);});});
-      // 1. Crypto → CoinGecko (ARS direct)
+      const cryptoSet=new Set(),stockSet=new Set();const fciList=[];
+      Object.keys(na).forEach(k=>{if(!s.accounts[k])return;(na[k]||[]).forEach(a=>{if(a.fci){fciList.push({id:a.id,phrases:Array.isArray(a.fondoMatch)?a.fondoMatch:[a.fondoMatch||'']});return;}if(!a.ticker)return;if(CRYPTO[a.ticker])cryptoSet.add(a.ticker);else stockSet.add(a.ticker);});});
+      // 1. Crypto -> CoinGecko (ARS direct)
       const cryptoPrices={};
       if(cryptoSet.size){const ids=[...cryptoSet].map(t=>CRYPTO[t]).join(',');
         try{const d=await(await fetch('https://api.coingecko.com/api/v3/simple/price?ids='+ids+'&vs_currencies=ars')).json();Object.entries(CRYPTO).forEach(([t,id])=>{if(d[id]?.ars)cryptoPrices[t]=d[id].ars;});}catch(e){}}
-      // 2. CEDEARs → Yahoo Finance .BA (BYMA peso price, no conversion needed)
+      // 2. CEDEARs -> Yahoo Finance .BA (BYMA peso price, no conversion needed)
       const stockPrices={},usdFallback={};
       await Promise.all([...stockSet].map(async t=>{
         try{const d=await(await fetch('https://query1.finance.yahoo.com/v8/finance/chart/'+t+'.BA?interval=1d&range=1d')).json();const p=d?.chart?.result?.[0]?.meta?.regularMarketPrice||0;if(p>0){stockPrices[t]=p;return;}}catch(e){}
@@ -2041,10 +2041,20 @@ class Component extends DCLogic {
       // 3. CCL only if we have USD fallbacks to convert
       let ccl=0;
       if(Object.keys(usdFallback).length){try{const d=await(await fetch('https://dolarapi.com/v1/dolares/contadoconliquidacion')).json();ccl=d?.venta||d?.compra||0;}catch(e){}}
+      // 3b. FCI (e.g. Cocos Rendimiento) -> ArgentinaDatos valor cuotaparte (VCP).
+      // Auto-accrues daily yield: balance = cuotapartes x VCP, no manual input.
+      const fciPrices={};
+      if(fciList.length){
+        const funds=[];
+        await Promise.all(['rentaMixta','mercadoDinero','rentaFija'].map(async c=>{try{const d=await(await fetch('https://api.argentinadatos.com/v1/finanzas/fci/'+c+'/ultimo')).json();if(Array.isArray(d))d.forEach(f=>funds.push(f));}catch(e){}}));
+        fciList.forEach(item=>{let vcp=0;for(const ph of item.phrases){const words=String(ph).toLowerCase().split(/\s+/).filter(Boolean);if(!words.length)continue;const hit=funds.find(f=>{const n=String(f.fondo||'').toLowerCase();return words.every(w=>n.includes(w));});if(hit&&hit.vcp>0){vcp=hit.vcp;break;}}if(vcp>0)fciPrices[item.id]=vcp;});
+      }
       // 4. Apply
       let anyUpdate=false;
       Object.keys(na).forEach(k=>{if(!s.accounts[k])return;const aa=[...(na[k]||[])];let changed=false;
-        aa.forEach((a,i)=>{if(!a.ticker)return;let np=0;
+        aa.forEach((a,i)=>{
+          if(a.fci){const v=fciPrices[a.id];if(v>0&&v!==a.lastPrice){aa[i]={...a,lastPrice:v};changed=true;}return;}
+          if(!a.ticker)return;let np=0;
           if(cryptoPrices[a.ticker])np=Math.round(cryptoPrices[a.ticker]);
           else if(stockPrices[a.ticker])np=Math.round(stockPrices[a.ticker]);
           else if(usdFallback[a.ticker]&&ccl){np=Math.round(usdFallback[a.ticker]*ccl/(this.CEDEAR_RATIOS[a.ticker]||10));}
