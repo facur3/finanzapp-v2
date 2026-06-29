@@ -644,7 +644,7 @@ input{font-family:inherit;}
           <span style="font-size:17px;font-weight:700;">Inversiones</span>
         </div>
         <div style="font-size:13px;font-weight:500;color:var(--text-2);margin-bottom:2px;">Total invertido</div>
-        <sc-if value="{{ investEmpty }}" hint-placeholder-val="{{ false }}">
+        <sc-if value="{{ portNoAssets }}" hint-placeholder-val="{{ false }}">
           <div style="display:flex;flex-direction:column;align-items:center;text-align:center;padding:50px 30px;">
             <div style="width:80px;height:80px;border-radius:24px;background:var(--cat-inversion-fill);display:flex;align-items:center;justify-content:center;font-size:36px;margin-bottom:18px;">📈</div>
             <div style="font-size:19px;font-weight:800;margin-bottom:6px;">Sin inversiones</div>
@@ -652,26 +652,62 @@ input{font-family:inherit;}
             <div onClick="{{ addInvestment }}" style="display:flex;align-items:center;gap:8px;padding:13px 24px;border-radius:16px;background:var(--accent);color:#fff;font-size:15px;font-weight:700;cursor:pointer;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>Agregar inversión</div>
           </div>
         </sc-if>
-        <sc-if value="{{ investHasAny }}" hint-placeholder-val="{{ true }}">
-        <div style="font-size:46px;font-weight:800;letter-spacing:-1.5px;margin-bottom:6px;">{{ invertidoStr }}</div>
-        <div style="display:inline-flex;align-items:center;gap:5px;background:rgba(47,165,111,0.12);color:var(--pos);padding:5px 11px;border-radius:12px;font-size:13px;font-weight:700;margin-bottom:28px;">▲ +1,8% este mes</div>
+        <sc-if value="{{ portHasAssets }}" hint-placeholder-val="{{ true }}">
+        <div style="font-size:46px;font-weight:800;letter-spacing:-1.5px;margin-bottom:8px;">{{ portValueStr }}</div>
+        <div style="display:inline-flex;align-items:center;gap:5px;background:var(--surface);padding:7px 13px;border-radius:13px;font-size:14px;font-weight:700;color: {{ portGLColor }};margin-bottom:24px;">{{ portResultWord }} {{ portResultAbsStr }} ({{ portGLPctStr }})</div>
+        <div style="font-size:13px;font-weight:600;color:var(--text-2);margin:0 2px 9px;">Distribución</div>
+        <div style="display:flex;height:14px;border-radius:7px;overflow:hidden;gap:2px;margin-bottom:18px;">
+          <sc-for list="{{ portSegments }}" as="s" hint-placeholder-count="3"><div style="width: {{ s.w }};background: {{ s.color }};"></div></sc-for>
+        </div>
         <div style="background:var(--card);border-radius:24px;padding:4px 16px;box-shadow:var(--shadow-pill);margin-bottom:18px;">
-          <sc-for list="{{ investAccounts }}" as="a" hint-placeholder-count="3">
-            <div onClick="{{ a.onOpen }}" style="display:flex;align-items:center;gap:14px;padding:15px 0;border-bottom:1px solid {{ a.divider }};cursor:pointer;">
-              <div style="width:48px;height:48px;border-radius:15px;background:var( {{ a.fillVar }} );display:flex;align-items:center;justify-content:center;font-size:22px;flex:none;">{{ a.emoji }}</div>
+          <sc-for list="{{ portList }}" as="a" hint-placeholder-count="3">
+            <div onClick="{{ a.onOpen }}" style="display:flex;align-items:center;gap:13px;padding:14px 0;border-bottom:1px solid var(--hairline);cursor:pointer;">
+              <div style="width:44px;height:44px;border-radius:14px;background:var(--surface);display:flex;align-items:center;justify-content:center;font-size:21px;flex:none;position:relative;">{{ a.emoji }}<div style="position:absolute;left:-3px;top:-3px;width:11px;height:11px;border-radius:50%;background: {{ a.color }};border:2px solid var(--card);"></div></div>
               <div style="flex:1;min-width:0;">
-                <div style="font-size:16px;font-weight:700;">{{ a.name }}</div>
-                <div style="font-size:12px;color:var(--text-2);font-weight:500;">{{ a.type }}</div>
+                <div style="font-size:15px;font-weight:700;">{{ a.name }}</div>
+                <div style="font-size:12px;color:var(--text-2);font-weight:500;">{{ a.ticker }} · {{ a.pctStr }} del total</div>
               </div>
               <div style="text-align:right;">
-                <div style="font-size:15px;font-weight:700;">{{ a.balStr }}</div>
-                <div style="font-size:12px;font-weight:600;color: {{ a.chgColor }};">{{ a.chg }}</div>
+                <div style="font-size:15px;font-weight:700;">{{ a.valueStr }}</div>
+                <div style="font-size:12px;font-weight:600;color: {{ a.glColor }};">{{ a.glStr }} · {{ a.glPctStr }}</div>
               </div>
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--text-3)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="flex:none;"><polyline points="9 6 15 12 9 18"></polyline></svg>
             </div>
           </sc-for>
         </div>
-        <div style="font-size:12px;color:var(--text-3);font-weight:500;line-height:1.5;padding:0 4px;">Tu portafolio se mantiene separado del dinero disponible para gastar.</div>
+        <div style="font-size:12px;color:var(--text-3);font-weight:500;line-height:1.5;padding:0 4px;">Tocá un activo para ver su detalle. Tu portafolio se mantiene separado del dinero disponible.</div>
         </sc-if>
+      </div>
+    </sc-if>
+
+    <!-- ============ ASSET DETAIL (single holding) ============ -->
+    <sc-if value="{{ isAssetDetail }}" hint-placeholder-val="{{ false }}">
+      <div class="fa-scroll" data-screen-label="Activo" style="position:absolute;inset:0;z-index:43;background:var(--bg);animation:faUp .34s cubic-bezier(.22,1,.36,1);overflow-y:auto;padding:calc(env(safe-area-inset-top) + 14px) 22px calc(40px + env(safe-area-inset-bottom));">
+        <div style="display:flex;align-items:center;gap:14px;margin-bottom:22px;">
+          <div onClick="{{ adABack }}" style="width:40px;height:40px;border-radius:50%;background:var(--surface);display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--text);"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 6 9 12 15 18"></polyline></svg></div>
+          <span style="font-size:17px;font-weight:700;">{{ adAName }}</span>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:center;text-align:center;background:var( {{ adAFillVar }} );border-radius:28px;padding:26px 20px;margin-bottom:18px;">
+          <div style="width:64px;height:64px;border-radius:20px;background:var(--card);display:flex;align-items:center;justify-content:center;font-size:30px;margin-bottom:12px;">{{ adAEmoji }}</div>
+          <div style="font-size:12px;color:var(--text-2);font-weight:600;margin-bottom:4px;">{{ adAQtyStr }} · {{ adAAccName }}</div>
+          <div style="font-size:34px;font-weight:800;letter-spacing:-1px;">{{ adAValueStr }}</div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:3px;margin-top:10px;">
+            <div style="font-size:12px;color:var(--text-2);font-weight:500;">Invertiste {{ adACostStr }}</div>
+            <div style="font-size:14px;font-weight:700;color: {{ adAGLColor }};">{{ adAResultWord }} {{ adAResultAbsStr }} ({{ adAGLPctStr }})</div>
+          </div>
+        </div>
+        <div style="background:var(--card);border-radius:20px;padding:6px 16px;box-shadow:var(--shadow-pill);margin-bottom:18px;">
+          <div style="display:flex;justify-content:space-between;padding:11px 0;border-bottom:1px solid var(--hairline);"><span style="font-size:13px;color:var(--text-2);font-weight:500;">Precio · compra → hoy</span><span style="font-size:13px;font-weight:700;">{{ adAAvgStr }} → {{ adALastStr }}</span></div>
+          <div style="display:flex;justify-content:space-between;padding:11px 0;"><span style="font-size:13px;color:var(--text-2);font-weight:500;">Peso en tu portfolio</span><span style="font-size:13px;font-weight:700;">{{ adAPctStr }}</span></div>
+        </div>
+        <div style="display:flex;gap:9px;margin-bottom:11px;">
+          <div onClick="{{ adABuy }}" style="flex:1;height:52px;border-radius:16px;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:15px;font-weight:700;">Comprar más</div>
+          <div onClick="{{ adASell }}" style="flex:1;height:52px;border-radius:16px;background:var(--surface);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:15px;font-weight:700;">Vender</div>
+        </div>
+        <div style="display:flex;gap:9px;">
+          <div onClick="{{ adAUpdate }}" style="flex:1;height:46px;border-radius:14px;background:var(--surface);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:13.5px;font-weight:600;color:var(--text-2);">Editar precio</div>
+          <div onClick="{{ adARefresh }}" style="flex:1;height:46px;border-radius:14px;background:var(--surface);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:13.5px;font-weight:600;color:var(--text-2);">{{ adARefreshLabel }}</div>
+        </div>
       </div>
     </sc-if>
 
@@ -1621,7 +1657,7 @@ class Component extends DCLogic {
       tab:'inicio', push:null, sheet:null, subsheet:null,
       balanceMode:'disponible', periodIdx:0, scopeIdx:0, currency:'ARS', hideAmounts:false,
       actFilter:'todos', actSearch:'', actCat:null, actAccount:'todas', actAmount:'todos', actTag:'todos', actRange:'todo',
-      cardIdx:0, detailId:null, editId:null, acctView:null, investView:null, cardView:0,
+      cardIdx:0, detailId:null, editId:null, acctView:null, investView:null, assetView:null, cardView:0,
       addType:'gasto', addAmount:'', addTitle:'', addCat:'comida', addAccount:'banco', addTo:'cedears', addDate:'Hoy', addTags:[],
       newTagText:'', customDateText:'',
       newAcc:{name:'',type:'Banco',kind:'liquid',balance:'',currency:'ARS',liquid:true,editId:null},
@@ -1887,6 +1923,7 @@ class Component extends DCLogic {
     this.setState(s=>{const cuota=n>1?{name:merchant,cur:1,tot:n,monto:val/n}:null;const cs=s.cards.map((c,i)=>i===idx?{...c,saldo:c.saldo+val,compras:[{name:label,monto:val,date:S.cpDate},...(c.compras||[])],cuotas:cuota?[cuota,...(c.cuotas||[])]:c.cuotas}:c);const ct={...s.categoryTotals,[S.cpCat]:(s.categoryTotals[S.cpCat]||0)+val};const t={id:s._next,type:'gasto',merchant:label,cat:S.cpCat,amount:-val,val,card:card.id,onCard:true,dateLabel:S.cpDate,note:n>1?('Tarjeta '+card.brand+' · '+n+' cuotas'):('Tarjeta '+card.brand),tags:[]};return{cards:cs,categoryTotals:ct,monthExpense:s.monthExpense+val,txns:[t,...s.txns],_next:s._next+1,push:'cardDetail',cardView:idx,flash:'Compra registrada'};});}
   openAssetTrade(mode,account){const inv=this.investIds(),liq=this.liquidIds();const acc=account||inv[0]||'';this.setState({push:'assetTrade',sheet:null,subsheet:null,atSub:null,atMode:mode||'buy',atAccount:acc,atType:'CEDEAR',atTicker:'',atName:'',atEmoji:'',atQty:'',atPrice:'',atFees:'',atSource:liq[0]||''});}
   pickAsset(t,n,e){const S=this.state;const held=(S.assets[S.atAccount]||[]).find(a=>a.ticker===t);const patch={atTicker:t,atName:n||t,atEmoji:e||'📈'};if(held&&held.lastPrice)patch.atPrice=String(Math.round(held.lastPrice));this.setState(patch);}
+  tradeAsset(mode,account,a){const liq=this.liquidIds();const held=(this.state.assets[account]||[]).find(x=>x.ticker===a.ticker);const isC=(this.CRYPTOS||[]).some(x=>x[0]===a.ticker);const atType=a.ticker==='BTC'?'Bitcoin':isC?'Cripto':'CEDEAR';this.setState({push:'assetTrade',sheet:null,subsheet:null,atSub:null,atMode:mode,atAccount:account,atType,atTicker:a.ticker,atName:a.name,atEmoji:a.emoji,atQty:'',atPrice:held&&held.lastPrice?String(Math.round(held.lastPrice)):'',atFees:'',atSource:liq[0]||''});}
   saveAssetTrade(){const S=this.state;const qty=parseFloat((S.atQty||'').replace(',','.'))||0;const price=parseFloat((S.atPrice||'').replace(',','.'))||0;const fees=parseFloat((S.atFees||'').replace(',','.'))||0;if(!qty||!price){this.flashMsg('Completá cantidad y precio');return;}const gross=qty*price;const buy=S.atMode==='buy';const total=buy?gross+fees:gross-fees;const inv=S.atAccount,src=S.atSource;const ticker=(S.atTicker.trim()||S.atType).toUpperCase();if(!S.accounts[inv]||!S.accounts[src]){this.flashMsg('Elegí cuentas válidas');return;}if(inv===src){this.flashMsg('Origen y destino deben ser distintos');return;}
     const emojiMap={'Bitcoin':'🪙','Cripto':'🔮','CEDEAR':'📈','Renta fija':'🔒'};
     this.setState(s=>{const b={...s.balances};if(buy){b[src]=(b[src]||0)-total;b[inv]=(b[inv]||0)+gross;}else{b[inv]=(b[inv]||0)-gross;b[src]=(b[src]||0)+total;}
@@ -2103,6 +2140,30 @@ class Component extends DCLogic {
         ivFetchPrices:()=>this.fetchPrices(),ivPricesLoading:S.pricesLoading||false,ivLoadingLabel:S.pricesLoading?'Actualizando…':'Actualizar precios',ivHasLastUpdated:!!S.pricesLastUpdated,ivLastUpdatedStr,
         ivBuy:()=>this.openAssetTrade('buy',k),ivSell:()=>this.openAssetTrade('sell',k),ivDeposit:()=>this.openAddPreset('transfer',this.liquidIds()[0]||'banco',k),ivWithdraw:()=>this.openAddPreset('transfer',k,this.liquidIds()[0]||'banco'),
         ivSubOpen:S.ivSub==='updatePrice',ivSubClose:()=>this.setState({ivSub:null}),ivUpTicker:S.upTicker,ivUpPriceStr:this.displayAmount(S.atNewPrice),ivUpKeypad,ivUpdatePrice:()=>this.updateAssetPrice(),ivUpSaveOpacity:S.atNewPrice?'1':'0.5'};}
+    // ===== PORTFOLIO (all investment holdings combined) =====
+    const PALCOLORS=['#7C6FF0','#2FA56F','#F0655C','#F2A65C','#5CC8F2','#E15CD4','#9CCB5C','#F2C84C'];
+    let portAssets=[];
+    INV.forEach(k=>{(S.assets[k]||[]).forEach(a=>{const lp=a.lastPrice||a.avg;portAssets.push({account:k,id:a.id,ticker:a.ticker,name:a.name,emoji:a.emoji,qty:a.qty,avg:a.avg,lp,value:a.qty*lp,cost:a.qty*a.avg});});});
+    portAssets.sort((a,b)=>b.value-a.value);
+    const portValue=portAssets.reduce((s2,a)=>s2+a.value,0);
+    const portCost=portAssets.reduce((s2,a)=>s2+a.cost,0);
+    const portGL=portValue-portCost,portGLPct=portCost>0?portGL/portCost*100:0;
+    portAssets.forEach((a,i)=>{a.color=PALCOLORS[i%PALCOLORS.length];a.pct=portValue>0?a.value/portValue*100:0;a.gl=a.value-a.cost;a.glPct=a.cost>0?a.gl/a.cost*100:0;});
+    const portList=portAssets.map(a=>({name:a.name,ticker:a.ticker||'',emoji:a.emoji,color:a.color,pctStr:a.pct.toFixed(0)+'%',barW:Math.max(2,a.pct).toFixed(2)+'%',valueStr:money(a.value),glStr:(a.gl>=0?'+':'-')+sym+this.fmtInt(Math.abs(a.gl)),glPctStr:(a.gl>=0?'+':'')+a.glPct.toFixed(1).replace('.',',')+'%',glColor:a.gl>=0?'var(--pos)':'var(--accent)',onOpen:()=>this.setState({push:'assetDetail',assetView:{account:a.account,ticker:a.ticker}})}));
+    const portfolio={portValueStr:money(portValue),portHasAssets:portAssets.length>0,portCostStr:money(portCost),
+      portResultWord:portGL>=0?'Ganás':'Perdés',portResultAbsStr:sym+this.fmtInt(Math.abs(portGL)),portGLPctStr:(portGL>=0?'+':'')+portGLPct.toFixed(1).replace('.',',')+'%',portGLColor:portGL>=0?'var(--pos)':'var(--accent)',
+      portSegments:portList.map(a=>({color:a.color,w:a.barW})),portList,portNoAssets:portAssets.length===0};
+    // ===== ASSET DETAIL (single holding page) =====
+    let assetD={};
+    if(S.assetView){const av=S.assetView;const a=(S.assets[av.account]||[]).find(x=>x.ticker===av.ticker);
+      if(a){const lp=a.lastPrice||a.avg,value=a.qty*lp,cost=a.qty*a.avg,gl=value-cost,glPct=cost>0?gl/cost*100:0;const pct=portValue>0?value/portValue*100:0;const accM=ACC[av.account]||{};
+        assetD={adAName:a.name,adATicker:a.ticker||'',adAEmoji:a.emoji,adAAccName:accM.name||'',adAFillVar:accM.fillVar||'--cat-inversion-fill',
+          adAValueStr:money(value),adAQtyStr:(a.qty<1?a.qty.toFixed(6).replace(/\.?0+$/,''):this.fmtInt(a.qty))+(a.ticker?' '+a.ticker:' u'),
+          adACostStr:money(cost),adAResultWord:gl>=0?'Ganás':'Perdés',adAResultAbsStr:sym+this.fmtInt(Math.abs(gl)),adAGLPctStr:(gl>=0?'+':'')+glPct.toFixed(1).replace('.',',')+'%',adAGLColor:gl>=0?'var(--pos)':'var(--accent)',
+          adAAvgStr:money(a.avg),adALastStr:money(lp),adAPctStr:pct.toFixed(0)+'% de tu portfolio',
+          adABuy:()=>this.tradeAsset('buy',av.account,a),adASell:()=>this.tradeAsset('sell',av.account,a),
+          adAUpdate:()=>this.setState({push:'investDetail',investView:av.account,ivSub:'updatePrice',upTicker:a.ticker,atNewPrice:''}),
+          adARefresh:()=>this.fetchPrices(),adARefreshLabel:S.pricesLoading?'Actualizando…':'Actualizar precios',adABack:()=>this.setState({push:'investments',assetView:null})};}}
     // card detail
     let cardD={};
     {const i=S.cardView,c=S.cards[i]||S.cards[0]||{limit:1,brand:'',bank:'',last4:'',grad:this.CARDGRADS[0],cierre:'—',vence:'—',compras:[],cuotas:[],pagos:[]};const saldo=cardSaldo(i);const avail=Math.max(0,c.limit-saldo);
@@ -2278,7 +2339,7 @@ class Component extends DCLogic {
       payTotalBg:(S.payAmount&&parseFloat(S.payAmount.replace(',','.'))===Math.round(cardSaldo(S.cardView)))?'var(--accent)':'var(--surface)',
       payTotalColor:(S.payAmount&&parseFloat(S.payAmount.replace(',','.'))===Math.round(cardSaldo(S.cardView)))?'#fff':'var(--text)',
       pickPayAccount:()=>this.setState({subsheet:'pickPay'}),isPickPay:sub==='pickPay',payAccOpts,paySave:()=>this.payCardSave(),paySaveOpacity:S.payAmount?'1':'0.5',
-      isAcctDetail:S.push==='accountDetail',isInvestDetail:S.push==='investDetail',isCardDetail:S.push==='cardDetail',
+      isAcctDetail:S.push==='accountDetail',isInvestDetail:S.push==='investDetail',isCardDetail:S.push==='cardDetail',isAssetDetail:S.push==='assetDetail',
       isCardPurchase:S.push==='cardPurchase',cpAmtStr:this.displayAmount(S.cpAmount),cpCardLabel:cpCardC.brand+' ·••• '+cpCardC.last4,
       cpMerchant:S.cpMerchant,setCpMerchant:(e)=>this.setState({cpMerchant:e.target.value}),
       cpCatName:cpCatC.name,cpCatEmoji:cpCatC.emoji,cpCatFillVar:cFill(S.cpCat),
@@ -2359,7 +2420,7 @@ class Component extends DCLogic {
       catList:S.catOrder.filter(k=>CAT[k]).map(k=>{const c=CAT[k];const tn=(this.CATTYPES.find(t=>t[0]===c.type)||['','Gasto'])[1];return {id:k,name:c.name,emoji:c.emoji,fillVar:c.fillVar,typeLabel:tn,archived:!!c.archived,rowOpacity:c.archived?'0.55':'1',subLabel:(c.archived?'Archivada · ':'')+tn+(c.parent&&CAT[c.parent]?(' · '+CAT[c.parent].name):''),nameColor:c.archived?'var(--text-3)':'var(--text)',onPick:()=>this.openCatEditor(k)};}),
       addCategory:()=>this.openCatEditor(null),
       isTags:S.push==='tags',tagList:S.tagSugg.map(t=>({label:t,onEdit:()=>this.openTagEditor(t)})),
-      ...acctD,...invD,...cardD,...onb,...loanD,
+      ...acctD,...invD,...cardD,...onb,...loanD,...portfolio,...assetD,
       showOnboarding:S.showOnboarding,showTabBar:!S.showOnboarding&&!S.sheet&&!S.confirm&&!S.push,finishOnboarding:()=>this.setState({showOnboarding:false,onbStep:0}),
       ...det,
     };
