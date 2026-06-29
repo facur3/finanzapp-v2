@@ -187,7 +187,7 @@ input{font-family:inherit;}
          frame, no fake status bar/time/battery. App fills the real viewport. -->
 
     <!-- ============ MAIN SCROLL (tabs) ============ -->
-    <div class="fa-scroll" style="position:absolute;inset:0;overflow-y:auto;padding:calc(env(safe-area-inset-top) + 14px) 22px calc(120px + env(safe-area-inset-bottom));">
+    <div ref="{{ mainScrollRef }}" class="fa-scroll" style="position:absolute;inset:0;overflow-y:auto;padding:calc(env(safe-area-inset-top) + 14px) 22px calc(120px + env(safe-area-inset-bottom));">
 
       <!-- ============ INICIO ============ -->
       <sc-if value="{{ isInicio }}" hint-placeholder-val="{{ true }}">
@@ -1673,6 +1673,7 @@ class Component extends DCLogic {
     this.STORAGE_KEY='finanzapp:v2:state';
     this.LEGACY_STORAGE_KEY='finanzapp.v2.state';
     this.carouselRef=React.createRef();
+    this.mainScrollRef=React.createRef();
     this.SEEDACC={
       banco:{name:'Banco Galicia',type:'Banco',kind:'liquid',liquid:true,emoji:'🏦',iconVar:'--cat-transfer-icon',fillVar:'--cat-transfer-fill',currency:'ARS'},
       efectivo:{name:'Efectivo',type:'Efectivo',kind:'liquid',liquid:true,emoji:'💵',iconVar:'--cat-tarjetas-icon',fillVar:'--cat-tarjetas-fill',currency:'ARS'},
@@ -1732,6 +1733,13 @@ class Component extends DCLogic {
   }
   componentDidUpdate(prevProps,prevState){
     this.persistState();
+    // Reset the shared tab scroll container to the top whenever the user opens
+    // a different tab or push-screen, so every new section starts from the top
+    // instead of inheriting the previous section's scroll position.
+    if(prevState && (prevState.tab!==this.state.tab || prevState.push!==this.state.push)){
+      const el=this.mainScrollRef.current;
+      if(el) el.scrollTop=0;
+    }
     // Centralised toast lifecycle: any flash (set via flashMsg OR inline setState)
     // auto-dismisses. A new message resets the timer; only one toast shows at a time.
     if(this.state.flash && (!prevState || prevState.flash!==this.state.flash)){
@@ -2324,7 +2332,7 @@ class Component extends DCLogic {
       isQuick:S.sheet==='quick',quickOptions,
       patrimonioStr:money(patrimonioNeto),patrimonioBrutoStr:money(patrimonioBruto),disponibleStr:money(disponible),invertidoStr:money(invertido),cardDebtStr:money(cardDebt),debtAccStr:money(debtAcc),hasDebt:(cardDebt+debtAcc)>0,
       liquidAccounts,investAccounts,debtAccounts,hasDebtAccounts:debtAccounts.length>0,openAddAccount:()=>this.openAddAccount(null),
-      cards,cardDots,carouselRef:this.carouselRef,onCardScroll:(e)=>this.onCardScroll(e),
+      cards,cardDots,carouselRef:this.carouselRef,mainScrollRef:this.mainScrollRef,onCardScroll:(e)=>this.onCardScroll(e),
       selSaldoStr:money(selSaldo),selVence:selC.vence,selBrand:selC.brand,openCardDetail,
       selCuotas,selHasCuotas:selCuotas.length>0,selNoCuotas:selCuotas.length===0,
       hasCatFilter:!!S.actCat,catFilterName:catF?catF.name:'',catFilterEmoji:catF?catF.emoji:'',catFilterFill:S.actCat?cFill(S.actCat):'--surface',
