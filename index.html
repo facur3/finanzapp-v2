@@ -208,13 +208,6 @@ input{font-family:inherit;}
           </div>
         </div>
 
-        <sc-if value="{{ sampleActive }}" hint-placeholder-val="{{ false }}">
-          <div onClick="{{ openSettings }}" style="display:flex;align-items:center;gap:8px;background:var(--cat-inversion-fill);border-radius:13px;padding:8px 12px;margin-bottom:14px;cursor:pointer;">
-            <span style="font-size:14px;">✨</span>
-            <span style="font-size:12px;font-weight:600;color:var(--text-2);flex:1;">Estás viendo datos de ejemplo</span>
-            <span style="font-size:11px;font-weight:700;color:var(--accent);">Administrar</span>
-          </div>
-        </sc-if>
 
         <sc-if value="{{ homeNoAccounts }}" hint-placeholder-val="{{ false }}">
           <div style="display:flex;flex-direction:column;align-items:center;text-align:center;padding:50px 20px 30px;">
@@ -873,15 +866,8 @@ input{font-family:inherit;}
           <div style="position:relative;width:46px;height:26px;border-radius:13px;background: {{ hideKnobBg }};flex:none;transition:background .25s ease;"><div style="position:absolute;top:2px;left: {{ hideKnobX }};width:22px;height:22px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,0.3);transition:left .22s ease;"></div></div>
         </div>
 
-        <div style="font-size:13px;font-weight:600;color:var(--text-2);margin:0 4px 10px;">Datos de ejemplo</div>
-        <sc-if value="{{ sampleActive }}" hint-placeholder-val="{{ false }}">
-          <div style="display:flex;align-items:center;gap:10px;background:var(--cat-inversion-fill);border-radius:16px;padding:13px 15px;margin-bottom:11px;">
-            <span style="font-size:18px;">✨</span>
-            <span style="flex:1;font-size:13px;font-weight:600;color:var(--text-2);">Estás usando el set de datos de ejemplo.</span>
-          </div>
-        </sc-if>
+        <div style="font-size:13px;font-weight:600;color:var(--text-2);margin:0 4px 10px;">Datos</div>
         <div style="background:var(--card);border-radius:18px;padding:4px 16px;box-shadow:var(--shadow-pill);margin-bottom:11px;">
-          <div onClick="{{ askLoadSample }}" style="display:flex;align-items:center;gap:13px;padding:14px 0;border-bottom:1px solid var(--hairline);cursor:pointer;"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="var(--text-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v4"></path><path d="m16.2 7.8 2.9-2.9"></path><path d="M18 12h4"></path><path d="M5.1 4.9 8 7.8"></path><path d="M2 12h4"></path><circle cx="12" cy="14" r="4"></circle></svg><div style="flex:1;"><div style="font-size:15px;font-weight:600;">Cargar datos de ejemplo</div><div style="font-size:12px;color:var(--text-2);font-weight:500;">Reemplaza todo por el set de muestra</div></div></div>
           <div onClick="{{ askClearAll }}" style="display:flex;align-items:center;gap:13px;padding:14px 0;cursor:pointer;color:var(--accent);"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg><div style="flex:1;"><div style="font-size:15px;font-weight:600;">Borrar todo y empezar de cero</div><div style="font-size:12px;color:var(--text-2);font-weight:500;">Elimina cuentas, movimientos y tarjetas</div></div></div>
         </div>
 
@@ -1559,25 +1545,7 @@ input{font-family:inherit;}
             </div>
           </div>
           <div onClick="{{ onbNext }}" style="height:58px;border-radius:19px;background:var(--accent);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:17px;font-weight:700;color:#fff;">Empezar</div>
-        </sc-if>
-
-        <!-- STEP 1: choose data mode -->
-        <sc-if value="{{ onbMode1 }}" hint-placeholder-val="{{ false }}">
-          <div style="flex:1;display:flex;flex-direction:column;justify-content:center;">
-            <div style="font-size:26px;font-weight:800;letter-spacing:-.5px;margin-bottom:8px;">¿Cómo querés empezar?</div>
-            <div style="font-size:15px;color:var(--text-2);font-weight:500;margin-bottom:28px;">Podés cambiarlo después desde Ajustes.</div>
-            <div onClick="{{ onbUseSample }}" style="display:flex;align-items:center;gap:14px;background:var(--card);border-radius:20px;padding:18px;box-shadow:var(--shadow-pill);margin-bottom:14px;cursor:pointer;border:1.5px solid var(--hairline);">
-              <div style="width:48px;height:48px;border-radius:15px;background:var(--cat-inversion-fill);display:flex;align-items:center;justify-content:center;font-size:23px;flex:none;">✨</div>
-              <div style="flex:1;"><div style="font-size:16px;font-weight:700;">Usar datos de ejemplo</div><div style="font-size:13px;color:var(--text-2);font-weight:500;line-height:1.4;">Explorá la app con cuentas, movimientos y tarjetas de muestra.</div></div>
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--text-3)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"></polyline></svg>
-            </div>
-            <div onClick="{{ onbStartZero }}" style="display:flex;align-items:center;gap:14px;background:var(--card);border-radius:20px;padding:18px;box-shadow:var(--shadow-pill);cursor:pointer;border:1.5px solid var(--hairline);">
-              <div style="width:48px;height:48px;border-radius:15px;background:var(--cat-tarjetas-fill);display:flex;align-items:center;justify-content:center;font-size:23px;flex:none;">🌱</div>
-              <div style="flex:1;"><div style="font-size:16px;font-weight:700;">Empezar desde cero</div><div style="font-size:13px;color:var(--text-2);font-weight:500;line-height:1.4;">Configurás tu moneda y creás tu primera cuenta.</div></div>
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--text-3)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"></polyline></svg>
-            </div>
-          </div>
-          <div onClick="{{ onbBack }}" style="height:58px;border-radius:19px;background:var(--surface);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:16px;font-weight:600;color:var(--text-2);">Volver</div>
+          <div onClick="{{ askImport }}" style="text-align:center;margin-top:16px;cursor:pointer;font-size:14px;font-weight:600;color:var(--text-2);">¿Ya usás FinanzApp? <span style="color:var(--accent);">Importar backup</span></div>
         </sc-if>
 
         <!-- STEP 1: currency -->
@@ -1674,28 +1642,10 @@ class Component extends DCLogic {
     this.LEGACY_STORAGE_KEY='finanzapp.v2.state';
     this.carouselRef=React.createRef();
     this.mainScrollRef=React.createRef();
-    this.SEEDACC={
-      banco:{name:'Banco Galicia',type:'Banco',kind:'liquid',liquid:true,emoji:'🏦',iconVar:'--cat-transfer-icon',fillVar:'--cat-transfer-fill',currency:'ARS'},
-      efectivo:{name:'Efectivo',type:'Efectivo',kind:'liquid',liquid:true,emoji:'💵',iconVar:'--cat-tarjetas-icon',fillVar:'--cat-tarjetas-fill',currency:'ARS'},
-      mp:{name:'Mercado Pago',type:'Billetera',kind:'liquid',liquid:true,emoji:'📲',iconVar:'--cat-ocio-icon',fillVar:'--cat-ocio-fill',currency:'ARS'},
-      cedears:{name:'CEDEARs',type:'Acciones',kind:'invest',liquid:false,emoji:'📈',iconVar:'--cat-inversion-icon',fillVar:'--cat-inversion-fill',currency:'USD'},
-      btc:{name:'Bitcoin',type:'Cripto',kind:'invest',liquid:false,emoji:'🪙',iconVar:'--cat-comida-icon',fillVar:'--cat-comida-fill',currency:'USD'},
-      pf:{name:'Plazo fijo',type:'Renta fija',kind:'invest',liquid:false,emoji:'🔒',iconVar:'--cat-tarjetas-icon',fillVar:'--cat-tarjetas-fill',currency:'ARS'},
-    };
     this.PALETTE=[['--cat-transfer-icon','--cat-transfer-fill'],['--cat-comida-icon','--cat-comida-fill'],['--cat-ocio-icon','--cat-ocio-fill'],['--cat-compras-icon','--cat-compras-fill'],['--cat-mascotas-icon','--cat-mascotas-fill'],['--cat-auto-icon','--cat-auto-fill']];
     this.PERIODS=['Este mes','Esta semana','Este año'];
     this.SCOPES=['Todas las cuentas','Lista privada','Compartida'];
     this.ACCTYPES=[['Banco','liquid','🏦'],['Efectivo','liquid','💵'],['Billetera','liquid','📲'],['Inversión','invest','📈'],['Tarjeta','debt','💳'],['Deuda','debt','📉']];
-    this.SEEDCARDS=[
-      {id:'visa',brand:'Visa',bank:'Galicia',last4:'4821',saldo:159500,limit:500000,cierre:'3 jul',vence:'10 jul',grad:'linear-gradient(135deg,#3a3a3c,#161618)',
-        compras:[{name:'Hawaii Market',monto:8900,date:'Hoy'},{name:'Farmacia',monto:7400,date:'10 jun'},{name:'Notebook · cuota 3/6',monto:25000,date:'2 jun'}],
-        cuotas:[{name:'Notebook',cur:3,tot:6,monto:25000},{name:'Heladera',cur:2,tot:12,monto:18000}],
-        pagos:[{name:'Pago mínimo',monto:120000,date:'10 jun'}]},
-      {id:'master',brand:'Mastercard',bank:'Galicia',last4:'7733',saldo:48200,limit:300000,cierre:'15 jul',vence:'22 jul',grad:'linear-gradient(135deg,#7a4b57,#2e1d22)',
-        compras:[{name:'Zapatillas · cuota 1/3',monto:9000,date:'5 jun'},{name:'Restaurante',monto:12200,date:'8 jun'}],
-        cuotas:[{name:'Zapatillas',cur:1,tot:3,monto:9000}],
-        pagos:[{name:'Pago total',monto:30000,date:'20 jun'}]},
-    ];
     this.state=Object.assign({
       theme:props.defaultTheme||'light', chartStyle:props.defaultChart||'bars',
       tab:'inicio', push:null, sheet:null, subsheet:null,
@@ -1712,7 +1662,7 @@ class Component extends DCLogic {
       cpCard:0, cpAmount:'', cpMerchant:'', cpCat:'compras', cpDate:'Hoy', cpInstall:1, cpSub:null,
       atMode:'buy', atAccount:'cedears', atType:'CEDEAR', atTicker:'', atQty:'', atPrice:'', atFees:'', atSource:'banco', atSub:null,
       loanView:null, newLoan:{person:'',direction:'me_deben',concept:'',amount:'',currency:'ARS',editId:null}, loanPayAmount:'', ivSub:null, upTicker:'', atNewPrice:'', pricesLoading:false, pricesLastUpdated:null,
-      onbStep:0, onbMode:null, onbCard:false, onbInvest:false, flash:'', confirm:null,
+      onbStep:0, onbCard:false, onbInvest:false, flash:'', confirm:null,
       showOnboarding:true,
     }, this.emptyData());
     // Load persisted local state synchronously so the very first render already
@@ -1753,7 +1703,7 @@ class Component extends DCLogic {
     clearInterval(this._priceTimer);
   }
   persistentKeys(){
-    return ['theme','chartStyle','balanceMode','periodIdx','scopeIdx','currency','hideAmounts','dataMode','categories','catOrder','txns','categoryTotals','monthIncome','monthExpense','order','accounts','archived','balances','accMeta','cards','tagSugg','_next','showOnboarding','onbCard','onbInvest','cardIdx','assets','loans'];
+    return ['theme','chartStyle','balanceMode','periodIdx','scopeIdx','currency','hideAmounts','categories','catOrder','txns','categoryTotals','monthIncome','monthExpense','order','accounts','archived','balances','accMeta','cards','tagSugg','_next','showOnboarding','onbCard','onbInvest','cardIdx','assets','loans'];
   }
   persistentSnapshot(state){
     const snap={};
@@ -1777,7 +1727,6 @@ class Component extends DCLogic {
     out.tagSugg=out.tagSugg.map(t=>String(t).trim().toLowerCase().replace(/^#/,'')).filter(Boolean).filter((t,i,a)=>a.indexOf(t)===i);
     const maxTxn=out.txns.reduce((m,t)=>Math.max(m,Number(t.id)||0),0);
     out._next=Math.max(Number(out._next)||1,maxTxn+1,out.order.length+out.cards.length+1);
-    if(['sample','empty'].indexOf(out.dataMode)<0)out.dataMode='empty';
     if(['light','dark'].indexOf(out.theme)<0)out.theme='light';
     if(['bars','pills'].indexOf(out.chartStyle)<0)out.chartStyle='bars';
     out.showOnboarding=!!out.showOnboarding;
@@ -1919,49 +1868,11 @@ class Component extends DCLogic {
   }
   emptyData(){
     const cats={};this.DEFAULT_CAT_ORDER.concat(['pago']).forEach(k=>{cats[k]={...this.BASECATS[k]};});
-    return {dataMode:'empty',categories:cats,catOrder:this.DEFAULT_CAT_ORDER.slice(),
+    return {categories:cats,catOrder:this.DEFAULT_CAT_ORDER.slice(),
       txns:[],categoryTotals:{},monthIncome:0,monthExpense:0,
       order:[],accounts:{},archived:{},balances:{},accMeta:{},
       cards:[],tagSugg:[],_next:1,assets:{},loans:[]};
   }
-  sampleData(){
-    const cats={};Object.keys(this.BASECATS).forEach(k=>{cats[k]={...this.BASECATS[k]};});
-    return {dataMode:'sample',categories:cats,catOrder:this.DEFAULT_CAT_ORDER.slice(),
-      monthIncome:489100,monthExpense:319600,
-      categoryTotals:{comida:159500,auto:127000,tarjetas:15000,compras:8900,ocio:6000,mascotas:0,otros:3200},
-      order:['banco','efectivo','mp','cedears','btc','pf'],
-      accounts:JSON.parse(JSON.stringify(this.SEEDACC)),
-      archived:{},
-      cards:JSON.parse(JSON.stringify(this.SEEDCARDS)),
-      balances:{banco:420088.95,efectivo:85000,mp:190000,cedears:160000,btc:75000,pf:40000},
-      accMeta:{cedears:{chg:'+2,4%',up:true},btc:{chg:'-1,1%',up:false},pf:{chg:'+0,3%',up:true}},
-      tagSugg:['mercado','suscripción','viaje','regalo','trabajo'],
-      txns:[
-        {id:1,type:'gasto',merchant:'Bet365',cat:'ocio',amount:-6000,val:6000,account:'mp',dateLabel:'Hoy',note:'',tags:['ocio']},
-        {id:2,type:'gasto',merchant:'Occo Helados',cat:'comida',amount:-4500,val:4500,account:'efectivo',dateLabel:'Hoy',note:'Helado con amigos',tags:[]},
-        {id:3,type:'gasto',merchant:'Kiosco',cat:'comida',amount:-1200,val:1200,account:'efectivo',dateLabel:'Hoy',note:'',tags:[]},
-        {id:4,type:'gasto',merchant:'Hawaii Market',cat:'compras',amount:-8900,val:8900,account:'banco',dateLabel:'Hoy',note:'',tags:[]},
-        {id:5,type:'ingreso',merchant:'Transferencia recibida',cat:'ingreso',amount:50000,val:50000,account:'banco',dateLabel:'Hoy',note:'De Juan',tags:[]},
-        {id:6,type:'gasto',merchant:'Supermercado',cat:'comida',amount:-12300,val:12300,account:'banco',dateLabel:'Ayer',note:'Compra semanal',tags:['mercado']},
-        {id:7,type:'gasto',merchant:'Nafta',cat:'auto',amount:-15000,val:15000,account:'banco',dateLabel:'Ayer',note:'',tags:[]},
-        {id:8,type:'gasto',merchant:'Pago Tarjeta Visa',cat:'tarjetas',amount:-9500,val:9500,account:'banco',dateLabel:'Ayer',note:'',tags:[]},
-        {id:9,type:'ingreso',merchant:'Sueldo',cat:'ingreso',amount:489100,val:489100,account:'banco',dateLabel:'12 jun',note:'Sueldo mayo',tags:['trabajo']},
-        {id:10,type:'gasto',merchant:'Spotify',cat:'ocio',amount:-2900,val:2900,account:'banco',dateLabel:'12 jun',note:'Suscripción',tags:['suscripción']},
-        {id:11,type:'inversion',merchant:'Compra CEDEAR AAPL',cat:'inversion',amount:-30000,val:30000,from:'banco',to:'cedears',isTransfer:true,dateLabel:'10 jun',note:'→ CEDEARs',tags:[]},
-        {id:12,type:'gasto',merchant:'Farmacia',cat:'otros',amount:-7400,val:7400,account:'efectivo',dateLabel:'10 jun',note:'',tags:[]},
-      ],
-      assets:{
-        cedears:[{id:'aapl',name:'Apple',ticker:'AAPL',emoji:'🍎',qty:12,avg:9800,lastPrice:11000},{id:'spy',name:'S&P 500',ticker:'SPY',emoji:'📊',qty:2,avg:14000,lastPrice:16000}],
-        btc:[{id:'btc',name:'Bitcoin',ticker:'BTC',emoji:'🪙',qty:0.0012,avg:55000000,lastPrice:75000000}],
-        pf:[{id:'pf1',name:'Plazo fijo 30d',ticker:'',emoji:'🔒',qty:1,avg:39000,lastPrice:40000}],
-      },
-      loans:[
-        {id:'l1',person:'Juan Pérez',direction:'me_deben',concept:'Salida a cenar',originalAmount:15000,remaining:15000,currency:'ARS',date:'10 jun',payments:[]},
-        {id:'l2',person:'María González',direction:'le_debo',concept:'Nafta viaje',originalAmount:8000,remaining:5000,currency:'ARS',date:'15 jun',payments:[{amount:3000,date:'20 jun',note:''}]},
-      ],
-      _next:13};
-  }
-  loadSample(){this.setState(Object.assign({push:null,sheet:null,subsheet:null,tab:'inicio',showOnboarding:false,cardIdx:0,cardView:0,detailId:null,acctView:null,investView:null,confirm:null,flash:'Datos de ejemplo cargados'},this.sampleData()));}
   clearAll(){this.setState(Object.assign({push:null,sheet:null,subsheet:null,tab:'inicio',showOnboarding:false,cardIdx:0,cardView:0,detailId:null,acctView:null,investView:null,confirm:null,flash:'Datos borrados · empezás de cero'},this.emptyData()));}
   finishOnboarding(){this.setState(s=>{let cards=s.cards,order=s.order,accounts=s.accounts,balances=s.balances,next=s._next;
     if(s.onbCard){const card={id:'card_'+next,brand:'Visa',bank:'Mi tarjeta',last4:'0000',saldo:0,limit:200000,cierre:'—',vence:'—',grad:this.CARDGRADS[cards.length%this.CARDGRADS.length],compras:[],cuotas:[],pagos:[]};cards=[...cards,card];next++;}
@@ -2253,15 +2164,13 @@ class Component extends DCLogic {
     const fRanges=[['todo','Todo'],['hoy','Hoy'],['recientes','Recientes']].map(o=>({label:o[1],onPick:()=>this.setState({actRange:o[0]}),bg:S.actRange===o[0]?'var(--accent)':'var(--surface)',color:S.actRange===o[0]?'#fff':'var(--text)'}));
     const fTags=[{label:'Todas',k:'todos'}].concat(S.tagSugg.map(t=>({label:'#'+t,k:t}))).map(o=>({label:o.label,onPick:()=>this.setState({actTag:o.k}),bg:S.actTag===o.k?'var(--accent)':'var(--surface)',color:S.actTag===o.k?'#fff':'var(--text)'}));
     // onboarding step flags  (0 welcome · 1 choose mode · 2 currency · 3 account · 4 extras)
-    const onb={onbStep:S.onbStep,onb0:S.onbStep===0,onbMode1:S.onbStep===1,onb1:S.onbStep===2,onb2:S.onbStep===3,onb3:S.onbStep===4,
-      onbDots:[0,1,2,3,4].map(i=>({bg:i<=S.onbStep?'var(--accent)':'var(--surface-strong)'})),
+    const onb={onbStep:S.onbStep,onb0:S.onbStep===0,onb1:S.onbStep===1,onb2:S.onbStep===2,onb3:S.onbStep===3,
+      onbDots:[0,1,2,3].map(i=>({bg:i<=S.onbStep?'var(--accent)':'var(--surface-strong)'})),
       onbCardAdded:!!S.onbCard,onbInvestAdded:!!S.onbInvest,
       onbCardCheckBg:S.onbCard?'var(--pos)':'var(--surface)',onbInvestCheckBg:S.onbInvest?'var(--pos)':'var(--surface)',
       onbCardLabel:S.onbCard?'Tarjeta agregada':'Agregar una tarjeta',onbInvestLabel:S.onbInvest?'Inversi\u00f3n agregada':'Agregar una inversi\u00f3n',
-      onbNext:()=>this.setState(s=>({onbStep:s.onbStep+1})),onbBack:()=>this.setState(s=>({onbStep:Math.max(0,s.onbStep-1)})),
-      onbUseSample:()=>this.loadSample(),
-      onbStartZero:()=>this.setState({onbMode:'zero',onbStep:2,onbCard:false,onbInvest:false,newAcc:{name:'',type:'Banco',kind:'liquid',balance:'',currency:S.currency,liquid:true,editId:null}}),
-      onbCreateAcc:()=>{const n=this.state.newAcc;if(!n.name.trim()){this.flashMsg('Pon\u00e9 un nombre');return;}this.addAccountSave(true);this.setState({onbStep:4});},
+      onbNext:()=>this.setState(s=>{const ns=s.onbStep+1;const patch={onbStep:ns};if(ns===2){patch.onbCard=false;patch.onbInvest=false;patch.newAcc={name:'',type:'Banco',kind:'liquid',balance:'',currency:s.currency,liquid:true,editId:null};}return patch;}),onbBack:()=>this.setState(s=>({onbStep:Math.max(0,s.onbStep-1)})),
+      onbCreateAcc:()=>{const n=this.state.newAcc;if(!n.name.trim()){this.flashMsg('Pon\u00e9 un nombre');return;}this.addAccountSave(true);this.setState({onbStep:3});},
       onbAddCard:()=>this.setState(s=>({onbCard:!s.onbCard})),
       onbAddInvest:()=>this.setState(s=>({onbInvest:!s.onbInvest})),
       onbFinish:()=>this.finishOnboarding()};
@@ -2406,7 +2315,7 @@ class Component extends DCLogic {
       doConfirm:()=>this.doConfirm(),cancelConfirm:()=>this.setState({confirm:null}),noop:(e)=>{if(e&&e.stopPropagation)e.stopPropagation();},
       isExport:S.sheet==='export',askImport:()=>this.askImport(),askImportCsv:()=>this.requestConfirm({title:'Importar CSV',msg:'Seleccioná un CSV con movimientos. Se validará antes de agregarlo a tus datos actuales.',confirmLabel:'Importar CSV',danger:false,onConfirm:()=>this.pickCsvFile()}),
       isSecurity:S.push==='security',
-      askReset:()=>this.requestConfirm({title:'Reiniciar datos',msg:'Se borrarán todos los movimientos y volverás a los datos de ejemplo. No se puede deshacer.',confirmLabel:'Reiniciar',danger:true,onConfirm:()=>this.resetData()}),
+      askReset:()=>this.requestConfirm({title:'Reiniciar datos',msg:'Se borrarán todas tus cuentas, movimientos y tarjetas. Empezás de cero. No se puede deshacer.',confirmLabel:'Reiniciar',danger:true,onConfirm:()=>this.resetData()}),
       // ---- empty states ----
       homeNoAccounts:S.order.filter(k=>!S.archived[k]).length===0, homeHasAccounts:S.order.filter(k=>!S.archived[k]).length>0,
       homeNoMovs:S.txns.length===0, chartEmpty:chartItems.length===0,
@@ -2418,9 +2327,6 @@ class Component extends DCLogic {
       repEmpty:S.txns.length===0, repHasData:S.txns.length>0,
       investEmpty:INV.length===0, investHasAny:INV.length>0, addInvestment:()=>this.openAddAccount(null),
       openAddCard:()=>this.openAddCard(null),
-      // ---- data mode / sample indicator ----
-      dataMode:S.dataMode, sampleActive:S.dataMode==='sample',
-      askLoadSample:()=>this.requestConfirm({title:'Cargar datos de ejemplo',msg:'Se reemplazarán tus datos actuales por el set de ejemplo (cuentas, movimientos, tarjetas e inversiones).',confirmLabel:'Cargar ejemplo',danger:false,onConfirm:()=>this.loadSample()}),
       askClearAll:()=>this.requestConfirm({title:'Borrar todo',msg:'Se eliminarán todas las cuentas, movimientos, tarjetas e inversiones. Empezás de cero. No se puede deshacer.',confirmLabel:'Borrar todo',danger:true,onConfirm:()=>this.clearAll()}),
       // ---- category editor ----
       isCatEditor:S.push==='catEditor', ncIsEdit:!!S.newCat.editId,
