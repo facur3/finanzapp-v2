@@ -268,13 +268,13 @@ input{font-family:inherit;}
               <span style="font-size:12px;font-weight:600;color:var(--text-3);">{{ group.totalStr }}</span>
             </div>
             <sc-for list="{{ group.items }}" as="tx" hint-placeholder-count="3">
-              <div onClick="{{ tx.onOpen }}" style="display:flex;align-items:center;gap:12px;padding:7px 0;cursor:pointer;">
-                <div style="width:40px;height:40px;border-radius:13px;background:var( {{ tx.iconVar }} );display:flex;align-items:center;justify-content:center;font-size:18px;flex:none;">{{ tx.emoji }}</div>
+              <div onClick="{{ tx.onOpen }}" style="display:flex;align-items:center;gap:12px;padding:8px 0;cursor:pointer;">
+                <div style="width:42px;height:42px;border-radius:13px;background:var( {{ tx.iconVar }} );display:flex;align-items:center;justify-content:center;font-size:19px;flex:none;">{{ tx.emoji }}</div>
                 <div style="flex:1;min-width:0;">
-                  <div style="font-size:14px;font-weight:600;line-height:1.25;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">{{ tx.merchant }}</div>
+                  <div style="font-size:15px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ tx.merchant }}</div>
                   <div style="font-size:12px;color:var(--text-2);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ tx.sub }}</div>
                 </div>
-                <span style="font-size:13px;font-weight:700;white-space:nowrap;color: {{ tx.amtColor }};flex:none;">{{ tx.amountStr }}</span>
+                <span style="font-size:13px;font-weight:700;background:var(--surface);padding:7px 12px;border-radius:12px;white-space:nowrap;color: {{ tx.amtColor }};flex:none;">{{ tx.amountStr }}</span>
               </div>
             </sc-for>
           </div>
@@ -340,13 +340,13 @@ input{font-family:inherit;}
               <span style="font-size:12px;font-weight:600;color:var(--text-3);">{{ group.totalStr }}</span>
             </div>
             <sc-for list="{{ group.items }}" as="tx" hint-placeholder-count="3">
-              <div onClick="{{ tx.onOpen }}" style="display:flex;align-items:center;gap:12px;padding:7px 0;cursor:pointer;">
-                <div style="width:40px;height:40px;border-radius:13px;background:var( {{ tx.iconVar }} );display:flex;align-items:center;justify-content:center;font-size:18px;flex:none;">{{ tx.emoji }}</div>
+              <div onClick="{{ tx.onOpen }}" style="display:flex;align-items:center;gap:12px;padding:8px 0;cursor:pointer;">
+                <div style="width:42px;height:42px;border-radius:13px;background:var( {{ tx.iconVar }} );display:flex;align-items:center;justify-content:center;font-size:19px;flex:none;">{{ tx.emoji }}</div>
                 <div style="flex:1;min-width:0;">
-                  <div style="font-size:14px;font-weight:600;line-height:1.25;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">{{ tx.merchant }}</div>
+                  <div style="font-size:15px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ tx.merchant }}</div>
                   <div style="font-size:12px;color:var(--text-2);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ tx.sub }}</div>
                 </div>
-                <span style="font-size:13px;font-weight:700;white-space:nowrap;color: {{ tx.amtColor }};flex:none;">{{ tx.amountStr }}</span>
+                <span style="font-size:13px;font-weight:700;background:var(--surface);padding:7px 12px;border-radius:12px;white-space:nowrap;color: {{ tx.amtColor }};flex:none;">{{ tx.amountStr }}</span>
               </div>
             </sc-for>
           </div>
@@ -515,10 +515,13 @@ input{font-family:inherit;}
           </div>
         </sc-if>
         <sc-if value="{{ repHasData }}" hint-placeholder-val="{{ true }}">
-        <div style="background:var(--card);border-radius:24px;padding:20px;box-shadow:var(--shadow-pill);margin-bottom:14px;">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;"><span style="font-size:13px;font-weight:600;color:var(--text-2);">Resultado neto</span><span style="font-size:18px;font-weight:800;color: {{ repNetColor }};">{{ repNetStr }}</span></div>
-          <div style="display:flex;height:12px;border-radius:6px;overflow:hidden;margin:12px 0 10px;background:var(--surface);"><div style="width: {{ repIncPct }};background:var(--pos);"></div><div style="width: {{ repExpPct }};background:var(--accent);"></div></div>
-          <div style="display:flex;justify-content:space-between;"><span style="font-size:13px;font-weight:600;color:var(--pos);">Ingresos {{ repIncomeStr }}</span><span style="font-size:13px;font-weight:600;color:var(--accent);">Gastos {{ repExpenseStr }}</span></div>
+        <div style="background:var(--card);border-radius:24px;padding:20px;box-shadow:var(--shadow-pill);margin-bottom:18px;">
+          <div style="font-size:13px;font-weight:600;color:var(--text-2);margin-bottom:4px;">Gastos del mes</div>
+          <div style="font-size:32px;font-weight:800;letter-spacing:-1px;margin-bottom:12px;">{{ repExpenseStr }}</div>
+          <div style="display:flex;gap:18px;">
+            <div><div style="font-size:11px;color:var(--text-3);font-weight:500;">Ingresos</div><div style="font-size:14px;font-weight:700;color:var(--pos);">{{ repIncomeStr }}</div></div>
+            <div><div style="font-size:11px;color:var(--text-3);font-weight:500;">Movimientos</div><div style="font-size:14px;font-weight:700;">{{ repMovCount }}</div></div>
+          </div>
         </div>
 
         <div style="font-size:14px;font-weight:700;margin:0 2px 12px;">Gastos por categoría</div>
@@ -1980,7 +1983,7 @@ class Component extends DCLogic {
           if(a.fci){const live=fciPrices[a.id]||0;let patch=null;
             // Self-heal: if baseValue is missing (e.g. an older import), derive it
             // from qty*price or the account's current balance so it never reads 0.
-            if(!(Number(a.baseValue)>0)){const bv=(a.qty>0&&a.lastPrice>0)?a.qty*a.lastPrice:(a.qty>0&&a.avg>0)?a.qty*a.avg:(Number(s.balances[k])||0);if(bv>0){patch={...a,baseValue:bv};}}
+            if(!(Number(a.baseValue)>0)){const bv=(a.qty>0&&a.avg>0)?a.qty*a.avg:(a.qty>0&&a.lastPrice>0)?a.qty*a.lastPrice:(Number(s.balances[k])||0);if(bv>0){patch={...a,baseValue:bv};}}
             if(live>0&&!(Number((patch||a).baseVcp)>0)){patch={...(patch||a),baseVcp:live};}
             if(patch){aa[i]=patch;changed=true;}return;}
           if(!a.ticker)return;let np=0;
@@ -2254,6 +2257,7 @@ class Component extends DCLogic {
     // ===== REPORTS =====
     const repIncome=S.monthIncome, repExpense=S.monthExpense, repNet=repIncome-repExpense;
     const repIncPct=repIncome+repExpense>0?Math.round(repIncome/(repIncome+repExpense)*100):50;
+    const repMovCount=S.txns.filter(t=>t.amount<0&&!t.isTransfer).length;
     const repByCat=expKeys.map(k=>({k,t:S.categoryTotals[k]||0})).filter(x=>x.t>0).sort((a,b)=>b.t-a.t);
     const repCatMax=Math.max.apply(null,repByCat.map(x=>x.t).concat([1]));
     const repCatRows=repByCat.map(x=>({name:(CAT[x.k]||{}).name,emoji:(CAT[x.k]||{}).emoji,fillVar:cFill(x.k),iconVar:cIcon(x.k),amountStr:money(x.t),pct:Math.round(x.t/repCatMax*100)+'%'}));
@@ -2366,7 +2370,7 @@ class Component extends DCLogic {
       atIsPicker:S.atSub==='acc'||S.atSub==='src',atPickerTitle,atPickerOptions,atCloseSub:()=>this.setState({atSub:null}),
       saveAssetTrade:()=>this.saveAssetTrade(),
       repIncomeStr:money(repIncome),repExpenseStr:money(repExpense),repNetStr:(repNet>=0?'+':'-')+sym+this.fmtInt(Math.abs(repNet)),repNetColor:repNet>=0?'var(--pos)':'var(--accent)',
-      repIncPct:repIncPct+'%',repExpPct:(100-repIncPct)+'%',
+      repIncPct:repIncPct+'%',repExpPct:(100-repIncPct)+'%',repMovCount,
       repCatRows,repByAcct,repHasByAcct,repByCard,repHasByCard,repTopMerch,repHasMerch,futCuotasStr:money(futCuotas),futHasCuotas:futCuotas>0,
       masItems,
       flash:S.flash,hasFlash:!!S.flash,
