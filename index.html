@@ -1981,9 +1981,13 @@ class Component extends DCLogic {
       Object.keys(na).forEach(k=>{if(!s.accounts[k])return;const aa=[...(na[k]||[])];if(!aa.length)return;let changed=false;
         aa.forEach((a,i)=>{
           if(a.fci){const live=fciPrices[a.id]||0;let patch=null;
-            // Self-heal: if baseValue is missing (e.g. an older import), derive it
-            // from qty*price or the account's current balance so it never reads 0.
-            if(!(Number(a.baseValue)>0)){const bv=(a.qty>0&&a.avg>0)?a.qty*a.avg:(a.qty>0&&a.lastPrice>0)?a.qty*a.lastPrice:(Number(s.balances[k])||0);if(bv>0){patch={...a,baseValue:bv};}}
+            // Self-heal baseValue: derive it when missing, OR repair it when a stored
+            // value is wildly off the cost basis (an old build corrupted it ~x1000 by
+            // treating the live VCP as a per-unit price). Cost basis = qty*avg, which
+            // is never overwritten, so it's the safe anchor.
+            let base=Number(a.baseValue)||0;const fromCost=(a.qty>0&&a.avg>0)?a.qty*a.avg:0;
+            if(fromCost>0&&(base<=0||base>fromCost*5||base<fromCost/5)){base=fromCost;patch={...a,baseValue:base};}
+            else if(base<=0){const bv=(a.qty>0&&a.lastPrice>0)?a.qty*a.lastPrice:(Number(s.balances[k])||0);if(bv>0){base=bv;patch={...a,baseValue:bv};}}
             if(live>0&&!(Number((patch||a).baseVcp)>0)){patch={...(patch||a),baseVcp:live};}
             if(patch){aa[i]=patch;changed=true;}return;}
           if(!a.ticker)return;let np=0;
