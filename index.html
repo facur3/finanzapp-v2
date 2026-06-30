@@ -1385,6 +1385,70 @@ input{font-family:inherit;}
       </div>
     </sc-if>
 
+    <!-- ============ RECURRING SCREEN ============ -->
+    <sc-if value="{{ isRecScreen }}" hint-placeholder-val="{{ false }}">
+      <div class="fa-scroll" data-screen-label="Recurrentes" style="position:absolute;inset:0;z-index:42;background:var(--bg);animation:faUp .34s cubic-bezier(.22,1,.36,1);overflow-y:auto;padding:calc(env(safe-area-inset-top) + 14px) 22px calc(40px + env(safe-area-inset-bottom));">
+        <div style="display:flex;align-items:center;gap:14px;margin-bottom:22px;">
+          <div onClick="{{ recBack }}" style="width:40px;height:40px;border-radius:50%;background:var(--surface);display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--text);"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 6 9 12 15 18"></polyline></svg></div>
+          <span style="font-size:17px;font-weight:700;flex:1;">Recurrentes</span>
+          <div onClick="{{ openAddRecBtn }}" style="width:38px;height:38px;border-radius:50%;background:var(--accent);display:flex;align-items:center;justify-content:center;cursor:pointer;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg></div>
+        </div>
+        <sc-if value="{{ recEmpty }}" hint-placeholder-val="{{ false }}">
+          <div style="display:flex;flex-direction:column;align-items:center;text-align:center;padding:50px 30px;">
+            <div style="width:80px;height:80px;border-radius:24px;background:var(--cat-ocio-fill);display:flex;align-items:center;justify-content:center;font-size:36px;margin-bottom:18px;">🔁</div>
+            <div style="font-size:19px;font-weight:800;margin-bottom:6px;">Sin recurrentes</div>
+            <div style="font-size:14px;color:var(--text-2);font-weight:500;line-height:1.5;margin-bottom:22px;max-width:280px;">Netflix, sueldo, alquiler… se cargan solos cada mes el día que elijas.</div>
+            <div onClick="{{ openAddRecBtn }}" style="padding:13px 24px;border-radius:16px;background:var(--accent);color:#fff;font-size:15px;font-weight:700;cursor:pointer;">Agregar recurrente</div>
+          </div>
+        </sc-if>
+        <sc-if value="{{ recHasItems }}" hint-placeholder-val="{{ true }}">
+          <div style="display:flex;flex-direction:column;gap:11px;">
+            <sc-for list="{{ recItems }}" as="r" hint-placeholder-count="3">
+              <div style="display:flex;align-items:center;gap:13px;background:var(--card);border-radius:20px;padding:15px 16px;box-shadow:var(--shadow-pill);">
+                <div onClick="{{ r.onOpen }}" style="display:flex;align-items:center;gap:13px;flex:1;min-width:0;cursor:pointer;">
+                  <div style="width:46px;height:46px;border-radius:15px;background:var(--surface);display:flex;align-items:center;justify-content:center;font-size:22px;flex:none;">{{ r.emoji }}</div>
+                  <div style="flex:1;min-width:0;"><div style="font-size:15.5px;font-weight:700;">{{ r.concept }}</div><div style="font-size:12px;color:var(--text-2);font-weight:500;">{{ r.sub }}</div></div>
+                  <div style="text-align:right;"><div style="font-size:15px;font-weight:700;color: {{ r.amtColor }};">{{ r.amountStr }}</div><div style="font-size:11px;color:var(--text-3);font-weight:500;">{{ r.statusStr }}</div></div>
+                </div>
+                <div onClick="{{ r.onToggle }}" style="width:44px;height:26px;border-radius:13px;background: {{ r.knobBg }};position:relative;cursor:pointer;flex:none;transition:background .2s;"><div style="position:absolute;top:2px;left: {{ r.knobX }};width:22px;height:22px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,0.3);transition:left .2s;"></div></div>
+              </div>
+            </sc-for>
+          </div>
+          <div style="font-size:12px;color:var(--text-3);font-weight:500;line-height:1.5;padding:14px 4px 0;">El switch verde = se carga solo cada mes. Pausado = no se carga. Tocá uno para editarlo.</div>
+        </sc-if>
+      </div>
+    </sc-if>
+
+    <!-- ============ ADD RECURRING ============ -->
+    <sc-if value="{{ isAddRec }}" hint-placeholder-val="{{ false }}">
+      <div class="fa-scroll" data-screen-label="Nuevo recurrente" style="position:absolute;inset:0;z-index:43;background:var(--bg);animation:faUp .34s cubic-bezier(.22,1,.36,1);overflow-y:auto;padding:calc(env(safe-area-inset-top) + 14px) 22px calc(40px + env(safe-area-inset-bottom));">
+        <div style="display:flex;align-items:center;gap:14px;margin-bottom:22px;">
+          <div onClick="{{ addRecBack }}" style="width:40px;height:40px;border-radius:50%;background:var(--surface);display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--text);"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 6 9 12 15 18"></polyline></svg></div>
+          <span style="font-size:17px;font-weight:700;">{{ nrTitle }}</span>
+        </div>
+        <div style="display:flex;background:var(--surface);border-radius:15px;padding:4px;gap:2px;margin-bottom:18px;">
+          <sc-for list="{{ nrTypeSeg }}" as="o" hint-placeholder-count="2"><div onClick="{{ o.onPick }}" style="flex:1;text-align:center;padding:11px 4px;border-radius:11px;font-size:14px;font-weight:600;cursor:pointer;background: {{ o.bg }};color: {{ o.color }};">{{ o.label }}</div></sc-for>
+        </div>
+        <div style="background:var(--card);border-radius:22px;padding:2px 16px;box-shadow:var(--shadow-pill);margin-bottom:16px;">
+          <div style="display:flex;align-items:center;gap:10px;padding:15px 0;border-bottom:1px solid var(--hairline);"><span style="font-size:14px;color:var(--text-2);font-weight:500;width:80px;">Nombre</span><input value="{{ nrConcept }}" onChange="{{ setNrConcept }}" placeholder="Netflix, Sueldo…" style="border:none;outline:none;background:transparent;font-size:15px;font-weight:600;color:var(--text);flex:1;"></div>
+          <div style="display:flex;align-items:center;gap:10px;padding:15px 0;border-bottom:1px solid var(--hairline);"><span style="font-size:14px;color:var(--text-2);font-weight:500;width:80px;">Monto</span><span style="font-size:15px;font-weight:700;color:var(--text-2);">$</span><input value="{{ nrAmountDisplay }}" onChange="{{ setNrAmount }}" inputmode="numeric" placeholder="0" style="border:none;outline:none;background:transparent;font-size:15px;font-weight:700;color:var(--text);flex:1;"></div>
+          <div style="display:flex;align-items:center;gap:10px;padding:15px 0;"><span style="font-size:14px;color:var(--text-2);font-weight:500;width:80px;">Día del mes</span><input value="{{ nrDay }}" onChange="{{ setNrDay }}" inputmode="numeric" placeholder="1" style="border:none;outline:none;background:transparent;font-size:15px;font-weight:600;color:var(--text);flex:1;"></div>
+        </div>
+        <sc-if value="{{ nrShowCat }}" hint-placeholder-val="{{ true }}">
+          <div style="font-size:13px;font-weight:600;color:var(--text-2);margin:0 4px 10px;">Categoría</div>
+          <div class="fa-scroll" style="display:flex;gap:8px;overflow-x:auto;margin:0 -22px 18px;padding:0 22px;"><sc-for list="{{ nrCatChips }}" as="c" hint-placeholder-count="5"><div onClick="{{ c.onPick }}" style="flex:none;display:flex;align-items:center;gap:6px;padding:9px 14px;border-radius:14px;font-size:13px;font-weight:600;cursor:pointer;background: {{ c.bg }};color: {{ c.color }};"><span>{{ c.emoji }}</span>{{ c.label }}</div></sc-for></div>
+        </sc-if>
+        <div style="font-size:13px;font-weight:600;color:var(--text-2);margin:0 4px 10px;">¿De dónde sale / a dónde impacta?</div>
+        <div style="display:flex;background:var(--surface);border-radius:15px;padding:4px;gap:2px;margin-bottom:12px;">
+          <sc-for list="{{ nrTargetSeg }}" as="o" hint-placeholder-count="2"><div onClick="{{ o.onPick }}" style="flex:1;text-align:center;padding:10px 4px;border-radius:11px;font-size:13.5px;font-weight:600;cursor:pointer;background: {{ o.bg }};color: {{ o.color }};">{{ o.label }}</div></sc-for>
+        </div>
+        <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:20px;"><sc-for list="{{ nrTargetChips }}" as="t" hint-placeholder-count="3"><div onClick="{{ t.onPick }}" style="display:flex;align-items:center;gap:6px;padding:9px 14px;border-radius:14px;font-size:13px;font-weight:600;cursor:pointer;background: {{ t.bg }};color: {{ t.color }};"><span>{{ t.emoji }}</span>{{ t.label }}</div></sc-for></div>
+        <sc-if value="{{ nrCardOnly }}" hint-placeholder-val="{{ false }}"><div style="font-size:12px;color:var(--text-3);font-weight:500;line-height:1.5;margin:-10px 4px 18px;">Se suma al resumen de esa tarjeta cada mes (y se paga junto con la tarjeta).</div></sc-if>
+        <div onClick="{{ nrSave }}" style="height:56px;border-radius:18px;background:var(--accent);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:17px;font-weight:700;color:#fff;opacity: {{ nrSaveOpacity }};margin-bottom:12px;">Guardar recurrente</div>
+        <sc-if value="{{ nrCanDelete }}" hint-placeholder-val="{{ false }}"><div onClick="{{ nrDelete }}" style="height:50px;border-radius:16px;background:rgba(240,101,92,0.12);color:var(--accent);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:15px;font-weight:600;">Eliminar recurrente</div></sc-if>
+      </div>
+    </sc-if>
+
     <!-- ============ LOANS SCREEN ============ -->
     <sc-if value="{{ isLoansScreen }}" hint-placeholder-val="{{ false }}">
       <div class="fa-scroll" data-screen-label="Préstamos" style="position:absolute;inset:0;z-index:42;background:var(--bg);animation:faUp .34s cubic-bezier(.22,1,.36,1);overflow-y:auto;padding:calc(env(safe-area-inset-top) + 14px) 22px calc(40px + env(safe-area-inset-bottom));">
@@ -1516,6 +1580,16 @@ input{font-family:inherit;}
         <div style="font-size:13px;font-weight:600;color:var(--text-2);margin:0 4px 10px;">Color</div>
         <div style="display:flex;gap:12px;margin-bottom:22px;">
           <sc-for list="{{ ncardGrads }}" as="g" hint-placeholder-count="5"><div onClick="{{ g.onPick }}" style="width:42px;height:42px;border-radius:13px;background: {{ g.grad }};cursor:pointer;box-shadow: {{ g.ring }};"></div></sc-for>
+        </div>
+        <div style="background:var(--card);border-radius:18px;padding:16px;box-shadow:var(--shadow-pill);margin-bottom:22px;">
+          <div style="display:flex;align-items:center;gap:12px;">
+            <div style="flex:1;"><div style="font-size:15px;font-weight:700;">Pago automático</div><div style="font-size:12px;color:var(--text-2);font-weight:500;line-height:1.4;">Paga el resumen del mes solo, el día de vencimiento.</div></div>
+            <div onClick="{{ ncardToggleAutopay }}" style="width:48px;height:28px;border-radius:14px;background: {{ ncardAutopayBg }};position:relative;cursor:pointer;flex:none;transition:background .2s;"><div style="position:absolute;top:2px;left: {{ ncardAutopayX }};width:24px;height:24px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,0.3);transition:left .2s;"></div></div>
+          </div>
+          <sc-if value="{{ ncardAutopayOn }}" hint-placeholder-val="{{ false }}">
+            <div style="font-size:12px;font-weight:600;color:var(--text-2);margin:14px 0 9px;">Pagar desde</div>
+            <div style="display:flex;flex-wrap:wrap;gap:8px;"><sc-for list="{{ ncardAutopayAccounts }}" as="a" hint-placeholder-count="3"><div onClick="{{ a.onPick }}" style="display:flex;align-items:center;gap:6px;padding:9px 13px;border-radius:13px;font-size:13px;font-weight:600;cursor:pointer;background: {{ a.bg }};color: {{ a.color }};"><span>{{ a.emoji }}</span>{{ a.label }}</div></sc-for></div>
+          </sc-if>
         </div>
         <div onClick="{{ saveCard }}" style="height:56px;border-radius:18px;background:var(--accent);display:flex;align-items:center;justify-content:center;gap:9px;cursor:pointer;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="5 12 10 17 19 7"></polyline></svg><span style="font-size:17px;font-weight:700;color:#fff;">{{ ncardSaveLabel }}</span></div>
       </div>
@@ -1691,12 +1765,13 @@ class Component extends DCLogic {
       newTagText:'', customDateText:'',
       newAcc:{name:'',type:'Banco',kind:'liquid',balance:'',currency:'ARS',liquid:true,editId:null},
       newCat:{name:'',emoji:'🍔',type:'gasto',colorIdx:0,parent:'',editId:null},
-      newCard:{brand:'Visa',bank:'',last4:'',limit:'',cierre:'',vence:'',gradIdx:0,editId:null},
+      newCard:{brand:'Visa',bank:'',last4:'',limit:'',cierre:'',vence:'',gradIdx:0,autopay:false,autopayAccount:'',editId:null},
       tagEdit:{name:'',orig:null},
       payAccount:'banco', payAmount:'',
       cpCard:0, cpAmount:'', cpMerchant:'', cpCat:'compras', cpDate:'Hoy', cpInstall:1, cpSub:null,
       atMode:'buy', atAccount:'cedears', atType:'CEDEAR', atTicker:'', atName:'', atEmoji:'', atQty:'', atTotal:'', atPrice:'', atFees:'', atSource:'banco', atSub:null,
       loanView:null, newLoan:{person:'',direction:'me_deben',concept:'',amount:'',currency:'ARS',editId:null}, loanPayAmount:'', ivSub:null, upTicker:'', atNewPrice:'', pricesLoading:false, pricesLastUpdated:null,
+      newRec:{type:'gasto',concept:'',amount:'',cat:'otros',targetKind:'account',targetId:'',day:'1',editId:null},
       onbStep:0, onbCard:false, onbInvest:false, flash:'', confirm:null,
       showOnboarding:true,
     }, this.emptyData());
@@ -1712,6 +1787,8 @@ class Component extends DCLogic {
     if(this._persistError){
       this.setState({flash:'Datos locales dañados · se inició en modo seguro'});
     }
+    // Post any due recurring movements / card auto-payments since last open.
+    this.runAutomations();
     // Auto-fetch prices on mount (after 2s to let app settle) and every 60s.
     setTimeout(()=>this.fetchPrices(true),2000);
     this._priceTimer=setInterval(()=>this.fetchPrices(true),60000);
@@ -1739,7 +1816,7 @@ class Component extends DCLogic {
     clearInterval(this._priceTimer);
   }
   persistentKeys(){
-    return ['theme','chartStyle','balanceMode','periodIdx','scopeIdx','currency','hideAmounts','categories','catOrder','txns','categoryTotals','monthIncome','monthExpense','order','accounts','archived','balances','accMeta','cards','tagSugg','_next','showOnboarding','onbCard','onbInvest','cardIdx','assets','loans'];
+    return ['theme','chartStyle','balanceMode','periodIdx','scopeIdx','currency','hideAmounts','categories','catOrder','txns','categoryTotals','monthIncome','monthExpense','order','accounts','archived','balances','accMeta','cards','tagSugg','_next','showOnboarding','onbCard','onbInvest','cardIdx','assets','loans','recurring'];
   }
   persistentSnapshot(state){
     const snap={};
@@ -1770,6 +1847,8 @@ class Component extends DCLogic {
     if(!out.assets||typeof out.assets!=='object'||Array.isArray(out.assets))out.assets={};
     if(!Array.isArray(out.loans))out.loans=[];
     out.loans=out.loans.filter(l=>l&&typeof l==='object'&&l.id!=null&&l.person);
+    if(!Array.isArray(out.recurring))out.recurring=[];
+    out.recurring=out.recurring.filter(r=>r&&typeof r==='object'&&r.id!=null&&isFinite(Number(r.amount)));
     return this.persistentSnapshot(out);
   }
   parseBackupPayload(raw){
@@ -1907,7 +1986,7 @@ class Component extends DCLogic {
     return {categories:cats,catOrder:this.DEFAULT_CAT_ORDER.slice(),
       txns:[],categoryTotals:{},monthIncome:0,monthExpense:0,
       order:[],accounts:{},archived:{},balances:{},accMeta:{},
-      cards:[],tagSugg:[],_next:1,assets:{},loans:[]};
+      cards:[],tagSugg:[],_next:1,assets:{},loans:[],recurring:[]};
   }
   clearAll(){this.setState(Object.assign({push:null,sheet:null,subsheet:null,tab:'inicio',showOnboarding:false,cardIdx:0,cardView:0,detailId:null,acctView:null,investView:null,confirm:null,flash:'Datos borrados · empezás de cero'},this.emptyData()));}
   finishOnboarding(){this.setState(s=>{let cards=s.cards,order=s.order,accounts=s.accounts,balances=s.balances,next=s._next;
@@ -1950,7 +2029,35 @@ class Component extends DCLogic {
     if(!fromOnb)this.setState({push:null,tab:'cuentas'});}
   archiveAccount(k){if(!this.state.accounts[k]){this.flashMsg('Cuenta no encontrada');return;}this.setState(s=>({archived:{...s.archived,[k]:true},push:null,tab:'cuentas',flash:'Cuenta archivada'}));}
   deleteAccount(k){if(this.state.txns.some(t=>[t.account,t.from,t.to].indexOf(k)>=0)){this.flashMsg('Archivá la cuenta para conservar movimientos');return;}this.setState(s=>{const order=s.order.filter(x=>x!==k);const accounts={...s.accounts};delete accounts[k];const balances={...s.balances};delete balances[k];return{order,accounts,balances,push:null,tab:'cuentas',flash:'Cuenta eliminada'};});}
-  payCardSave(){const S=this.state;const v=parseFloat(S.payAmount.replace(',','.'))||0;if(!v){this.flashMsg('Ingresá un monto');return;}if(!S.accounts[S.payAccount]){this.flashMsg('Elegí una cuenta');return;}const idx=S.cardView;const card=S.cards[idx];if(!card){this.flashMsg('Elegí una tarjeta');return;}this.setState(s=>{const pago={name:'Pago '+card.brand,monto:v,date:'Hoy'};const cs=s.cards.map((c,i)=>i===idx?{...c,saldo:Math.max(0,c.saldo-v),pagos:[pago,...(c.pagos||[])]}:c);const bal={...s.balances,[s.payAccount]:(s.balances[s.payAccount]||0)-v};const t={id:s._next,type:'pago',merchant:'Pago '+card.brand,cat:'pago',amount:-v,val:v,account:s.payAccount,card:card.id,isTransfer:true,dateLabel:'Hoy',note:'Pago de tarjeta',tags:[]};return{cards:cs,balances:bal,txns:[t,...s.txns],_next:s._next+1,push:'cardDetail',payAmount:'',flash:'Pago registrado'};});}
+  payCardSave(){const S=this.state;const v=parseFloat(S.payAmount.replace(',','.'))||0;if(!v){this.flashMsg('Ingresá un monto');return;}if(!S.accounts[S.payAccount]){this.flashMsg('Elegí una cuenta');return;}const idx=S.cardView;const card=S.cards[idx];if(!card){this.flashMsg('Elegí una tarjeta');return;}
+    const resumen=this.cardResumen(card);const cycle=this._cycleKey(new Date());const full=v>=Math.round(resumen)-1&&resumen>0;
+    this.setState(s=>{const pago={name:'Pago '+card.brand,monto:v,date:'Hoy'};
+      const cs=s.cards.map((c,i)=>{if(i!==idx)return c;let nc={...c,saldo:Math.max(0,(c.saldo||0)-v),pagos:[pago,...(c.pagos||[])]};
+        // Paying the full month settles the statement: roll installments forward,
+        // clear paid one-pago purchases and mark the cycle so auto-pay won't repeat.
+        if(full&&c.paidCycle!==cycle)nc=this._closeCycleCard(nc,new Date());return nc;});
+      const bal={...s.balances,[s.payAccount]:(s.balances[s.payAccount]||0)-v};const t={id:s._next,type:'pago',merchant:'Pago '+card.brand,cat:'pago',amount:-v,val:v,account:s.payAccount,card:card.id,isTransfer:true,dateLabel:'Hoy',note:'Pago de tarjeta',tags:[]};return{cards:cs,balances:bal,txns:[t,...s.txns],_next:s._next+1,push:'cardDetail',payAmount:'',flash:full?'Resumen pagado':'Pago registrado'};});}
+  cardResumen(c){return (((c||{}).cuotas)||[]).reduce((a,q)=>a+(q.monto||0),0)+(((c||{}).compras)||[]).reduce((a,p)=>a+(p.monto||0),0);}
+  _cycleKey(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');}
+  _dayOf(s){const m=String(s||'').match(/(\d{1,2})/);return m?Math.min(31,Math.max(1,parseInt(m[1],10))):1;}
+  _monthLabel(d){const M=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];return d.getDate()+' '+M[d.getMonth()];}
+  _nextOccur(day,from){day=Math.min(31,Math.max(1,day||1));let d=new Date(from.getFullYear(),from.getMonth(),day);d.setHours(0,0,0,0);if(d<from)d=new Date(from.getFullYear(),from.getMonth()+1,day);return d;}
+  _closeCycleCard(c,today){const cuotas=(c.cuotas||[]).map(q=>({...q,cur:q.cur+1})).filter(q=>q.cur<=q.tot);return {...c,cuotas,compras:[],paidCycle:this._cycleKey(today)};}
+  // Runs on app open: posts due recurring movements and auto-pays cards whose
+  // due day has passed (idempotent per month via nextDate / paidCycle).
+  runAutomations(){const today=new Date();today.setHours(0,0,0,0);
+    this.setState(s=>{let txns=s.txns,balances={...s.balances},cards=s.cards.map(c=>({...c})),next=s._next,categoryTotals={...s.categoryTotals},monthIncome=s.monthIncome,monthExpense=s.monthExpense,changed=false,posted=0;
+      const recurring=(s.recurring||[]).map(r=>{if(!r.active)return r;let nd=r.nextDate?new Date(r.nextDate):this._nextOccur(r.day,today);const out={...r};let guard=0;
+        while(nd<=today&&guard<60){guard++;const lbl=this._monthLabel(nd);
+          if(r.targetKind==='card'){const ci=cards.findIndex(c=>c.id===r.targetId);if(ci>=0){const c=cards[ci];cards[ci]={...c,saldo:(c.saldo||0)+r.amount,compras:[{name:r.concept||'Recurrente',monto:r.amount,date:lbl},...(c.compras||[])]};categoryTotals={...categoryTotals,[r.cat]:(categoryTotals[r.cat]||0)+r.amount};monthExpense+=r.amount;txns=[{id:next,type:'gasto',merchant:r.concept||'Recurrente',cat:r.cat,amount:-r.amount,val:r.amount,card:r.targetId,onCard:true,dateLabel:lbl,note:'Recurrente · '+c.brand,tags:['recurrente']},...txns];next++;posted++;changed=true;}}
+          else{const acc=r.targetId;if(balances[acc]!=null||s.accounts[acc]){if(r.type==='ingreso'){balances[acc]=(balances[acc]||0)+r.amount;monthIncome+=r.amount;txns=[{id:next,type:'ingreso',merchant:r.concept||'Recurrente',cat:r.cat||'ingreso',amount:r.amount,val:r.amount,account:acc,dateLabel:lbl,note:'Recurrente',tags:['recurrente']},...txns];}else{balances[acc]=(balances[acc]||0)-r.amount;categoryTotals={...categoryTotals,[r.cat]:(categoryTotals[r.cat]||0)+r.amount};monthExpense+=r.amount;txns=[{id:next,type:'gasto',merchant:r.concept||'Recurrente',cat:r.cat,amount:-r.amount,val:r.amount,account:acc,dateLabel:lbl,note:'Recurrente',tags:['recurrente']},...txns];}next++;posted++;changed=true;}}
+          const n2=new Date(nd);n2.setMonth(n2.getMonth()+1);nd=n2;}
+        out.nextDate=nd.toISOString();return out;});
+      const cycle=this._cycleKey(today);
+      cards=cards.map(c=>{if(!c.autopay||!c.autopayAccount||c.paidCycle===cycle)return c;if(today.getDate()<this._dayOf(c.vence))return c;const resumen=this.cardResumen(c);if(resumen<=0)return {...c,paidCycle:cycle};if((balances[c.autopayAccount]||0)<resumen)return c;balances={...balances,[c.autopayAccount]:(balances[c.autopayAccount]||0)-resumen};txns=[{id:next,type:'pago',merchant:'Pago '+c.brand,cat:'pago',amount:-resumen,val:resumen,account:c.autopayAccount,card:c.id,isTransfer:true,dateLabel:this._monthLabel(today),note:'Pago automático',tags:[]},...txns];next++;posted++;changed=true;return this._closeCycleCard({...c,saldo:Math.max(0,(c.saldo||0)-resumen),pagos:[{name:'Pago automático',monto:resumen,date:this._monthLabel(today)},...(c.pagos||[])]},today);});
+      if(!changed)return {recurring};
+      return {recurring,cards,balances,txns,_next:next,categoryTotals,monthIncome,monthExpense,flash:posted?('Se aplicaron '+posted+' movimiento'+(posted>1?'s':'')+' automático'+(posted>1?'s':'')):''};
+    });}
   payPress(d){this.setState(s=>{let r=s.payAmount;if(d==='back')return{payAmount:r.slice(0,-1)};if(d===','){if(r.indexOf(',')>=0||r==='')return{};return{payAmount:r+','};}if(r.indexOf(',')>=0&&(r.split(',')[1]||'').length>=2)return{};if(r.replace(',','').length>=9)return{};return{payAmount:r+d};});}
   openCardPurchase(idx){this.setState({push:'cardPurchase',sheet:null,subsheet:null,cpSub:null,cpCard:idx||0,cpAmount:'',cpMerchant:'',cpCat:'compras',cpDate:'Hoy',cpInstall:1});}
   cpPress(d){this.setState(s=>{let r=s.cpAmount;if(d==='back')return{cpAmount:r.slice(0,-1)};if(d===','){if(r.indexOf(',')>=0||r==='')return{};return{cpAmount:r+','};}if(r.indexOf(',')>=0&&(r.split(',')[1]||'').length>=2)return{};if(r.replace(',','').length>=9)return{};return{cpAmount:r+d};});}
@@ -1984,7 +2091,20 @@ class Component extends DCLogic {
   addLoanPayment(){const S=this.state;const v=parseFloat((S.loanPayAmount||'').replace(',','.'))||0;if(!v){this.flashMsg('Ingresá un monto');return;}this.setState(s=>{const loans=(s.loans||[]).map(l=>{if(l.id!==S.loanView)return l;const rem=Math.max(0,l.remaining-v);return{...l,remaining:rem,payments:[{amount:v,date:'Hoy',note:''},...l.payments]};});return{loans,loanPayAmount:'',flash:'Pago registrado'};});}
   deleteLoan(id){this.requestConfirm({title:'Eliminar préstamo',msg:'Se eliminará este préstamo. No se puede deshacer.',confirmLabel:'Eliminar',danger:true,onConfirm:()=>this.setState(s=>({loans:(s.loans||[]).filter(l=>l.id!==id),push:'loansScreen',loanView:null,flash:'Préstamo eliminado'}))});}
   closeLoan(id){this.requestConfirm({title:'Saldar préstamo',msg:'Se marcará como saldado con saldo cero.',confirmLabel:'Saldar',danger:false,onConfirm:()=>this.setState(s=>({loans:(s.loans||[]).map(l=>l.id===id?{...l,remaining:0}:l),flash:'Préstamo saldado'}))});}
-  closeCardMonth(idx){this.requestConfirm({title:'Cerrar mes',msg:'Las cuotas avanzarán un mes. Las completadas se eliminarán automáticamente.',confirmLabel:'Cerrar mes',danger:false,onConfirm:()=>this.setState(s=>{const cards=s.cards.map((c,i)=>{if(i!==idx)return c;const cuotas=(c.cuotas||[]).map(q=>({...q,cur:q.cur+1})).filter(q=>q.cur<=q.tot);return{...c,cuotas};});return{cards,flash:'Mes cerrado · cuotas avanzadas'};})});}
+  closeCardMonth(idx){this.requestConfirm({title:'Cerrar mes',msg:'Las cuotas avanzarán un mes y se limpiarán las compras del resumen. Las cuotas completadas se eliminan.',confirmLabel:'Cerrar mes',danger:false,onConfirm:()=>this.setState(s=>{const cards=s.cards.map((c,i)=>i===idx?this._closeCycleCard(c,new Date()):c);return{cards,flash:'Mes cerrado · cuotas avanzadas'};})});}
+  setNewRec(patch){this.setState(s=>({newRec:{...s.newRec,...patch}}));}
+  openRecScreen(){this.setState({push:'recScreen'});}
+  openAddRec(editId){const s=this.state;const liq=this.liquidIds();const def={type:'gasto',concept:'',amount:'',cat:'otros',targetKind:'account',targetId:liq[0]||'',day:'1',editId:null};
+    if(editId!=null){const r=(s.recurring||[]).find(x=>x.id===editId);if(r){this.setState({push:'addRec',newRec:{type:r.type,concept:r.concept,amount:String(r.amount),cat:r.cat,targetKind:r.targetKind,targetId:r.targetId,day:String(r.day),editId}});return;}}
+    this.setState({push:'addRec',newRec:def});}
+  saveRec(){const n=this.state.newRec;if(!n.concept.trim()){this.flashMsg('Poné un nombre');return;}const amt=parseFloat((n.amount||'').replace(/\./g,'').replace(',','.'))||0;if(!amt){this.flashMsg('Ingresá el monto');return;}if(!n.targetId){this.flashMsg('Elegí dónde impacta');return;}const day=Math.min(31,Math.max(1,parseInt(n.day,10)||1));
+    this.setState(s=>{const rec=(s.recurring||[]).slice();const base={type:n.type,concept:n.concept.trim(),amount:amt,cat:n.type==='ingreso'?'ingreso':n.cat,targetKind:n.targetKind,targetId:n.targetId,day,active:true};
+      if(n.editId!=null){const i=rec.findIndex(r=>r.id===n.editId);if(i>=0)rec[i]={...rec[i],...base};}
+      else{rec.push({id:'r'+s._next,...base,nextDate:this._nextOccur(day,(()=>{const t=new Date();t.setHours(0,0,0,0);return t;})()).toISOString()});}
+      return{recurring:rec,_next:s._next+1,push:'recScreen',flash:'Recurrente guardado'};});
+    setTimeout(()=>this.runAutomations(),50);}
+  toggleRec(id){this.setState(s=>({recurring:(s.recurring||[]).map(r=>r.id===id?{...r,active:!r.active}:r)}));setTimeout(()=>this.runAutomations(),50);}
+  deleteRec(id){this.setState(s=>({recurring:(s.recurring||[]).filter(r=>r.id!==id),push:'recScreen',flash:'Recurrente eliminado'}));}
   async fetchPrices(silent=false){if(this.state.pricesLoading)return;this.setState({pricesLoading:true});
     try{const s=this.state;const na={...s.assets};const nb={...s.balances};
       const CRYPTO={BTC:'bitcoin',ETH:'ethereum',ADA:'cardano',SOL:'solana',MATIC:'matic-network',DOT:'polkadot'};
@@ -2055,8 +2175,8 @@ class Component extends DCLogic {
   saveTag(){const raw=this.state.tagEdit.name.trim().toLowerCase().replace(/^#/,'');const orig=this.state.tagEdit.orig;if(!raw){this.flashMsg('Poné un nombre');return;}this.setState(s=>{let tags=s.tagSugg.slice();let txns=s.txns,addTags=s.addTags,actTag=s.actTag;if(orig){tags=tags.map(t=>t===orig?raw:t);txns=s.txns.map(t=>({...t,tags:(t.tags||[]).map(x=>x===orig?raw:x)}));addTags=s.addTags.map(x=>x===orig?raw:x);if(actTag===orig)actTag=raw;}else if(tags.indexOf(raw)<0){tags.push(raw);}return{tagSugg:tags,txns,addTags,actTag,sheet:null,flash:orig?'Etiqueta actualizada':'Etiqueta creada'};});}
   deleteTag(tag){this.setState(s=>({tagSugg:s.tagSugg.filter(t=>t!==tag),txns:s.txns.map(t=>({...t,tags:(t.tags||[]).filter(x=>x!==tag)})),addTags:s.addTags.filter(x=>x!==tag),actTag:s.actTag===tag?'todos':s.actTag,flash:'Etiqueta eliminada'}));}
   setNewCard(patch){this.setState(s=>({newCard:{...s.newCard,...patch}}));}
-  openAddCard(editId){const s=this.state;if(editId!=null&&s.cards[editId]){const c=s.cards[editId];const gi=Math.max(0,this.CARDGRADS.indexOf(c.grad));this.setState({push:'addCard',newCard:{brand:c.brand,bank:c.bank,last4:c.last4,limit:String(c.limit||''),cierre:c.cierre||'',vence:c.vence||'',gradIdx:gi,editId}});}else{this.setState({push:'addCard',newCard:{brand:'Visa',bank:'',last4:'',limit:'',cierre:'',vence:'',gradIdx:s.cards.length%this.CARDGRADS.length,editId:null}});}}
-  saveCard(){const n=this.state.newCard;if(!n.bank.trim()){this.flashMsg('Poné el banco o emisor');return;}const limit=parseFloat((n.limit||'0').replace(/\./g,'').replace(',','.'))||0;const grad=this.CARDGRADS[n.gradIdx]||this.CARDGRADS[0];const last4=(n.last4||'').replace(/\D/g,'').slice(-4)||'0000';this.setState(s=>{const cards=s.cards.slice();if(n.editId!=null&&cards[n.editId]){cards[n.editId]={...cards[n.editId],brand:n.brand,bank:n.bank.trim(),last4,limit,cierre:n.cierre.trim()||cards[n.editId].cierre,vence:n.vence.trim()||cards[n.editId].vence,grad};return{cards,push:null,tab:'tarjetas',cardIdx:n.editId,cardView:n.editId,flash:'Tarjeta actualizada'};}const card={id:'card_'+s._next,brand:n.brand,bank:n.bank.trim(),last4,saldo:0,limit:limit||1,cierre:n.cierre.trim()||'—',vence:n.vence.trim()||'—',grad,compras:[],cuotas:[],pagos:[]};return{cards:[...cards,card],_next:s._next+1,push:null,tab:'tarjetas',cardIdx:cards.length,cardView:cards.length,flash:'Tarjeta creada'};});}
+  openAddCard(editId){const s=this.state;if(editId!=null&&s.cards[editId]){const c=s.cards[editId];const gi=Math.max(0,this.CARDGRADS.indexOf(c.grad));this.setState({push:'addCard',newCard:{brand:c.brand,bank:c.bank,last4:c.last4,limit:String(c.limit||''),cierre:c.cierre||'',vence:c.vence||'',gradIdx:gi,autopay:!!c.autopay,autopayAccount:c.autopayAccount||'',editId}});}else{this.setState({push:'addCard',newCard:{brand:'Visa',bank:'',last4:'',limit:'',cierre:'',vence:'',gradIdx:s.cards.length%this.CARDGRADS.length,autopay:false,autopayAccount:'',editId:null}});}}
+  saveCard(){const n=this.state.newCard;if(!n.bank.trim()){this.flashMsg('Poné el banco o emisor');return;}const limit=parseFloat((n.limit||'0').replace(/\./g,'').replace(',','.'))||0;const grad=this.CARDGRADS[n.gradIdx]||this.CARDGRADS[0];const last4=(n.last4||'').replace(/\D/g,'').slice(-4)||'0000';const autopay=!!n.autopay;const autopayAccount=autopay?(n.autopayAccount||this.liquidIds()[0]||''):'';this.setState(s=>{const cards=s.cards.slice();if(n.editId!=null&&cards[n.editId]){cards[n.editId]={...cards[n.editId],brand:n.brand,bank:n.bank.trim(),last4,limit,cierre:n.cierre.trim()||cards[n.editId].cierre,vence:n.vence.trim()||cards[n.editId].vence,grad,autopay,autopayAccount};return{cards,push:null,tab:'tarjetas',cardIdx:n.editId,cardView:n.editId,flash:'Tarjeta actualizada'};}const card={id:'card_'+s._next,brand:n.brand,bank:n.bank.trim(),last4,saldo:0,limit:limit||1,cierre:n.cierre.trim()||'—',vence:n.vence.trim()||'—',grad,autopay,autopayAccount,compras:[],cuotas:[],pagos:[]};return{cards:[...cards,card],_next:s._next+1,push:null,tab:'tarjetas',cardIdx:cards.length,cardView:cards.length,flash:'Tarjeta creada'};});}
   deleteCard(idx){this.setState(s=>{const cards=s.cards.filter((c,i)=>i!==idx);return{cards,push:null,tab:'tarjetas',cardIdx:0,cardView:0,flash:'Tarjeta eliminada'};});}
 
   _rev(t,b,ct,mi,me){b={...b};ct={...ct};if(t.type==='gasto'){if(t.account)b[t.account]=(b[t.account]||0)-t.amount;ct[t.cat]=Math.max(0,(ct[t.cat]||0)-t.val);me-=t.val;}else if(t.type==='ingreso'){if(t.account)b[t.account]=(b[t.account]||0)-t.amount;mi-=t.val;}else{if(t.from)b[t.from]=(b[t.from]||0)+t.val;if(t.to)b[t.to]=(b[t.to]||0)-t.val;}return{b,ct,mi,me};}
@@ -2324,11 +2444,27 @@ class Component extends DCLogic {
     const repHasMerch=repTopMerch.length>0;
     const futCuotas=S.cards.reduce((a,c)=>a+(c.cuotas||[]).reduce((s,q)=>s+q.monto*(q.tot-q.cur+1),0),0);
     // ===== MÁS entries =====
+    // ===== RECURRING =====
+    let recD={};
+    {const nr=S.newRec||{};const recs=(S.recurring||[]);
+      const tName=(r)=>r.targetKind==='card'?((S.cards.find(c=>c.id===r.targetId)||{}).brand||'Tarjeta'):((ACC[r.targetId]||{}).name||'Cuenta');
+      const recItems=recs.map(r=>({id:r.id,concept:r.concept,emoji:r.type==='ingreso'?'💰':(CAT[r.cat]||{}).emoji||'🔁',amountStr:(r.type==='ingreso'?'+':'-')+money(r.amount),amtColor:r.type==='ingreso'?'var(--pos)':'var(--text)',sub:'Día '+r.day+' · '+tName(r),active:!!r.active,knobBg:r.active?'var(--pos)':'var(--surface-strong)',knobX:r.active?'22px':'2px',onToggle:()=>this.toggleRec(r.id),onOpen:()=>this.openAddRec(r.id),statusStr:r.active?'Automático activo':'Pausado'}));
+      const nrIsIncome=nr.type==='ingreso';
+      const targets=nr.targetKind==='card'?S.cards.map(c=>({id:c.id,label:c.brand+' ·••• '+c.last4,emoji:'💳'})):this.liquidIds().map(k=>({id:k,label:(ACC[k]||{}).name,emoji:(ACC[k]||{}).emoji}));
+      recD={isRecScreen:S.push==='recScreen',isAddRec:S.push==='addRec',recItems,recHasItems:recItems.length>0,recEmpty:recItems.length===0,openAddRecBtn:()=>this.openAddRec(null),recBack:()=>this.setState({push:null}),addRecBack:()=>this.setState({push:'recScreen'}),
+        nrTitle:nr.editId!=null?'Editar recurrente':'Nuevo recurrente',nrTypeSeg:[['gasto','Gasto'],['ingreso','Ingreso']].map(o=>({label:o[1],onPick:()=>this.setNewRec({type:o[0]}),bg:nr.type===o[0]?'var(--accent)':'var(--surface)',color:nr.type===o[0]?'#fff':'var(--text)'})),
+        nrConcept:nr.concept,setNrConcept:(e)=>this.setNewRec({concept:e.target.value}),nrAmountDisplay:this.fmtThousands(nr.amount),setNrAmount:(e)=>this.setNewRec({amount:this.cleanNum(e.target.value)}),
+        nrShowCat:!nrIsIncome,nrCatChips:this.DEFAULT_CAT_ORDER.filter(k=>CAT[k]&&CAT[k].type==='gasto'&&!CAT[k].archived).map(k=>({label:CAT[k].name,emoji:CAT[k].emoji,onPick:()=>this.setNewRec({cat:k}),bg:nr.cat===k?'var(--accent)':'var(--surface)',color:nr.cat===k?'#fff':'var(--text)'})),
+        nrTargetSeg:[['account','Cuenta'],['card','Tarjeta']].map(o=>({label:o[1],onPick:()=>this.setNewRec({targetKind:o[0],targetId:''}),bg:nr.targetKind===o[0]?'var(--accent)':'var(--surface)',color:nr.targetKind===o[0]?'#fff':'var(--text)'})),
+        nrTargetChips:targets.map(t=>({label:t.label,emoji:t.emoji,onPick:()=>this.setNewRec({targetId:t.id}),bg:nr.targetId===t.id?'var(--accent)':'var(--surface)',color:nr.targetId===t.id?'#fff':'var(--text)'})),
+        nrDay:nr.day,setNrDay:(e)=>this.setNewRec({day:String(e.target.value).replace(/[^0-9]/g,'').slice(0,2)}),nrCardOnly:nr.targetKind==='card',
+        nrSave:()=>this.saveRec(),nrSaveOpacity:(nr.concept&&nr.amount&&nr.targetId)?'1':'0.5',nrCanDelete:nr.editId!=null,nrDelete:()=>this.deleteRec(nr.editId)};}
     const masItems=[
       {label:'Cuentas',sub:'Bancos, efectivo y billeteras',emoji:'🏦',fillVar:'--cat-transfer-fill',onPick:()=>this.setState({tab:'cuentas',push:null})},
       {label:'Tarjetas',sub:'Crédito, cuotas y pagos',emoji:'💳',fillVar:'--cat-tarjetas-fill',onPick:()=>this.setState({tab:'tarjetas',push:null})},
       {label:'Inversiones',sub:'CEDEARs, cripto y renta fija',emoji:'📈',fillVar:'--cat-inversion-fill',onPick:()=>this.setState({push:'investments'})},
       {label:'Préstamos',sub:'Lo que te deben y lo que debés',emoji:'🤝',fillVar:'--cat-otros-fill',onPick:()=>this.setState({push:'loansScreen'})},
+      {label:'Recurrentes',sub:'Suscripciones, sueldo y pagos fijos',emoji:'🔁',fillVar:'--cat-ocio-fill',onPick:()=>this.openRecScreen()},
       {label:'Categorías',sub:'Gestionar categorías',emoji:'🏷️',fillVar:'--cat-comida-fill',onPick:()=>this.setState({push:'categories'})},
       {label:'Etiquetas',sub:'Tus etiquetas',emoji:'#️⃣',fillVar:'--cat-ocio-fill',onPick:()=>this.setState({push:'tags'})},
       {label:'Exportar / Importar',sub:'CSV y backup',emoji:'📤',fillVar:'--cat-compras-fill',onPick:()=>this.setState({sheet:'export'})},
@@ -2470,6 +2606,8 @@ class Component extends DCLogic {
       ncardLimit:S.newCard.limit,setNcardLimit:(e)=>this.setNewCard({limit:e.target.value}),
       ncardCierre:S.newCard.cierre,setNcardCierre:(e)=>this.setNewCard({cierre:e.target.value}),
       ncardVence:S.newCard.vence,setNcardVence:(e)=>this.setNewCard({vence:e.target.value}),
+      ncardAutopayOn:!!S.newCard.autopay,ncardToggleAutopay:()=>this.setNewCard({autopay:!S.newCard.autopay,autopayAccount:S.newCard.autopayAccount||this.liquidIds()[0]||''}),ncardAutopayBg:S.newCard.autopay?'var(--pos)':'var(--surface-strong)',ncardAutopayX:S.newCard.autopay?'22px':'2px',
+      ncardAutopayAccounts:this.liquidIds().map(k=>({label:(ACC[k]||{}).name,emoji:(ACC[k]||{}).emoji,onPick:()=>this.setNewCard({autopayAccount:k}),bg:S.newCard.autopayAccount===k?'var(--accent)':'var(--surface)',color:S.newCard.autopayAccount===k?'#fff':'var(--text)'})),
       ncardGrads:this.CARDGRADS.map((g,i)=>({grad:g,onPick:()=>this.setNewCard({gradIdx:i}),ring:S.newCard.gradIdx===i?'0 0 0 3px var(--accent)':'0 0 0 1px var(--hairline)'})),
       ncardPreviewGrad:this.CARDGRADS[S.newCard.gradIdx]||this.CARDGRADS[0], ncardPreviewBrand:S.newCard.brand, ncardPreviewBank:S.newCard.bank||'Banco', ncardPreviewLast4:(S.newCard.last4||'').replace(/\D/g,'').slice(-4)||'0000',
       saveCard:()=>this.saveCard(),
@@ -2479,7 +2617,7 @@ class Component extends DCLogic {
       catList:S.catOrder.filter(k=>CAT[k]).map(k=>{const c=CAT[k];const tn=(this.CATTYPES.find(t=>t[0]===c.type)||['','Gasto'])[1];return {id:k,name:c.name,emoji:c.emoji,fillVar:c.fillVar,typeLabel:tn,archived:!!c.archived,rowOpacity:c.archived?'0.55':'1',subLabel:(c.archived?'Archivada · ':'')+tn+(c.parent&&CAT[c.parent]?(' · '+CAT[c.parent].name):''),nameColor:c.archived?'var(--text-3)':'var(--text)',onPick:()=>this.openCatEditor(k)};}),
       addCategory:()=>this.openCatEditor(null),
       isTags:S.push==='tags',tagList:S.tagSugg.map(t=>({label:t,onEdit:()=>this.openTagEditor(t)})),
-      ...acctD,...invD,...cardD,...onb,...loanD,...portfolio,...assetD,
+      ...acctD,...invD,...cardD,...onb,...loanD,...portfolio,...assetD,...recD,
       showOnboarding:S.showOnboarding,showTabBar:!S.showOnboarding&&!S.sheet&&!S.confirm&&!S.push,finishOnboarding:()=>this.setState({showOnboarding:false,onbStep:0}),
       ...det,
     };
