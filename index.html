@@ -166,6 +166,14 @@ input{font-family:inherit;}
           </div>
         </div>
 
+        <sc-if value="{{ showBackupBanner }}" hint-placeholder-val="{{ false }}">
+          <div style="display:flex;align-items:center;gap:11px;background:var(--cat-comida-fill);border-radius:18px;padding:13px 14px;margin-bottom:18px;">
+            <span style="font-size:22px;flex:none;">🛟</span>
+            <div style="flex:1;min-width:0;"><div style="font-size:13.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ backupBannerTitle }}</div><div style="font-size:11.5px;color:var(--text-2);font-weight:500;">Tus datos viven solo en este equipo.</div></div>
+            <div onClick="{{ doBackupNow }}" style="padding:9px 13px;border-radius:12px;background:var(--accent);color:#fff;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;flex:none;">Guardar</div>
+            <div onClick="{{ dismissBackup }}" style="padding:4px 6px;cursor:pointer;color:var(--text-3);font-size:20px;line-height:1;flex:none;">×</div>
+          </div>
+        </sc-if>
 
         <sc-if value="{{ homeNoAccounts }}" hint-placeholder-val="{{ false }}">
           <div style="display:flex;flex-direction:column;align-items:center;text-align:center;padding:50px 20px 30px;">
@@ -527,9 +535,9 @@ input{font-family:inherit;}
 
         <div style="background:var(--card);border-radius:24px;padding:20px;box-shadow:var(--shadow-pill);margin-bottom:18px;display:flex;align-items:center;gap:20px;">
           <div style="width:120px;height:120px;border-radius:50%;background: {{ repDonutGradient }};flex:none;display:flex;align-items:center;justify-content:center;">
-            <div style="width:74px;height:74px;border-radius:50%;background:var(--card);display:flex;flex-direction:column;align-items:center;justify-content:center;">
+            <div style="width:80px;height:80px;border-radius:50%;background:var(--card);display:flex;flex-direction:column;align-items:center;justify-content:center;">
               <span style="font-size:10px;color:var(--text-3);font-weight:600;">Gastos</span>
-              <span style="font-size:14px;font-weight:800;">{{ repExpenseStr }}</span>
+              <span style="font-size:16px;font-weight:800;white-space:nowrap;">{{ repExpenseShort }}</span>
             </div>
           </div>
           <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:8px;">
@@ -1820,7 +1828,7 @@ class Component extends DCLogic {
     clearInterval(this._priceTimer);
   }
   persistentKeys(){
-    return ['theme','chartStyle','balanceMode','periodIdx','scopeIdx','currency','hideAmounts','categories','catOrder','txns','categoryTotals','monthIncome','monthExpense','order','accounts','archived','balances','accMeta','cards','tagSugg','_next','showOnboarding','onbCard','onbInvest','cardIdx','assets','loans','recurring'];
+    return ['theme','chartStyle','balanceMode','periodIdx','scopeIdx','currency','hideAmounts','categories','catOrder','txns','categoryTotals','monthIncome','monthExpense','order','accounts','archived','balances','accMeta','cards','tagSugg','_next','showOnboarding','onbCard','onbInvest','cardIdx','assets','loans','recurring','lastBackupAt','backupDismissedAt'];
   }
   persistentSnapshot(state){
     const snap={};
@@ -1907,8 +1915,9 @@ class Component extends DCLogic {
   }
   doBackup(){
     const payload={app:'FinanzApp',schema:'finanzapp.local.v2',version:2,exportedAt:new Date().toISOString(),state:this.persistentSnapshot(this.state)};
-    this.downloadFile('finanzapp-backup.json',JSON.stringify(payload,null,2),'application/json;charset=utf-8');
-    this.flashMsg('Backup descargado');
+    const stamp=new Date().toISOString().slice(0,10);
+    this.downloadFile('finanzapp-backup-'+stamp+'.json',JSON.stringify(payload,null,2),'application/json;charset=utf-8');
+    this.setState({lastBackupAt:Date.now(),flash:'Backup descargado'});
   }
   askImport(){
     this.requestConfirm({title:'Importar backup',msg:'Seleccioná un backup JSON de FinanzApp. Se reemplazarán los datos locales actuales.',confirmLabel:'Importar',danger:false,onConfirm:()=>this.pickBackupFile()});
@@ -1990,7 +1999,7 @@ class Component extends DCLogic {
     return {categories:cats,catOrder:this.DEFAULT_CAT_ORDER.slice(),
       txns:[],categoryTotals:{},monthIncome:0,monthExpense:0,
       order:[],accounts:{},archived:{},balances:{},accMeta:{},
-      cards:[],tagSugg:[],_next:1,assets:{},loans:[],recurring:[]};
+      cards:[],tagSugg:[],_next:1,assets:{},loans:[],recurring:[],lastBackupAt:null,backupDismissedAt:null};
   }
   clearAll(){this.setState(Object.assign({push:null,sheet:null,subsheet:null,tab:'inicio',showOnboarding:false,cardIdx:0,cardView:0,detailId:null,acctView:null,investView:null,confirm:null,flash:'Datos borrados · empezás de cero'},this.emptyData()));}
   finishOnboarding(){this.setState(s=>{let cards=s.cards,order=s.order,accounts=s.accounts,balances=s.balances,next=s._next;
@@ -2238,6 +2247,13 @@ class Component extends DCLogic {
     const chartItems=sorted.filter(x=>x.t>0).map(x=>({key:x.k,name:(CAT[x.k]||{}).name,emoji:(CAT[x.k]||{}).emoji,iconVar:cIcon(x.k),fillVar:cFill(x.k),amount:S.hideAmounts?'••':this.abbr(x.t),h:Math.max(48,Math.round(x.t/maxT*100)),onOpen:()=>this.setState({tab:'actividad',push:null,sheet:null,actCat:x.k,actFilter:'todos',actSearch:''})}));
     // home groups Hoy/Ayer
     const homeGroups=this.groupByDate(S.txns.filter(t=>t.type==='gasto'||t.type==='ingreso'||t.type==='pago').slice(0,6)).map(g=>({day:g.day,totalStr:S.hideAmounts?'••••':this.signed(g.total),items:g.items.map(t=>this.txView(t))}));
+    // Backup safety: data lives only on this device. Nudge a copy if it's been
+    // a week (or never), unless dismissed in the last few days.
+    const bkHasData=(S.order.length>0||S.txns.length>0);
+    const bkDays=S.lastBackupAt?(Date.now()-S.lastBackupAt)/86400000:Infinity;
+    const bkDismissed=S.backupDismissedAt&&(Date.now()-S.backupDismissedAt)<3*86400000;
+    const showBackupBanner=bkHasData&&bkDays>=7&&!bkDismissed;
+    const backupBannerTitle=S.lastBackupAt?('Hace '+Math.floor(bkDays)+' días que no guardás copia'):'Guardá una copia de tus datos';
     // activity
     const q=S.actSearch.trim().toLowerCase();
     const filtered=S.txns.filter(t=>{if(S.actCat&&t.cat!==S.actCat)return false;if(S.actFilter==='gastos'&&!(t.amount<0&&!t.isTransfer))return false;if(S.actFilter==='ingresos'&&!(t.amount>0&&!t.isTransfer))return false;if(S.actFilter==='transfer'&&!t.isTransfer)return false;
@@ -2525,6 +2541,7 @@ class Component extends DCLogic {
       barsBg:S.chartStyle==='bars'?'var(--seg-active)':'transparent',pillsBg:S.chartStyle==='pills'?'var(--seg-active)':'transparent',
       barsColor:S.chartStyle==='bars'?'var(--text)':'var(--text-3)',pillsColor:S.chartStyle==='pills'?'var(--text)':'var(--text-3)',
       chartItems,homeGroups,actGroups,actFilters,actSearch:S.actSearch,setSearch:(e)=>this.setState({actSearch:e.target.value}),
+      showBackupBanner,backupBannerTitle,doBackupNow:()=>this.doBackup(),dismissBackup:()=>this.setState({backupDismissedAt:Date.now()}),
       actEmpty:filtered.length===0&&S.txns.length>0,
       openGasto:()=>this.openAdd('gasto'),openIngreso:()=>this.openAdd('ingreso'),openTransfer:()=>this.openAdd('transfer'),openInversion:()=>this.openAdd('inversion'),
       openQuick:()=>this.setState({sheet:'quick'}),closeSheet:()=>this.setState({sheet:null}),
@@ -2584,7 +2601,7 @@ class Component extends DCLogic {
       atSaveLabel:S.atMode==='buy'?'Registrar compra':'Registrar venta',atSaveOpacity:(atQtyN&&atTotalN&&S.atTicker)?'1':'0.5',
       atIsPicker:false,atPickerTitle,atPickerOptions,atCloseSub:()=>this.setState({atSub:null}),
       saveAssetTrade:()=>this.saveAssetTrade(),
-      repIncomeStr:money(repIncome),repExpenseStr:money(repExpense),repNetStr:(repNet>=0?'+':'-')+sym+this.fmtInt(Math.abs(repNet)),repNetColor:repNet>=0?'var(--pos)':'var(--accent)',
+      repIncomeStr:money(repIncome),repExpenseStr:money(repExpense),repExpenseShort:(()=>{const n=Math.abs(repExpense);if(n>=1e6)return sym+(n/1e6).toFixed(2).replace(/\.?0+$/,'').replace('.',',')+'M';if(n>=1e3)return sym+(n/1e3).toFixed(1).replace(/\.0$/,'').replace('.',',')+'K';return sym+Math.round(n);})(),repNetStr:(repNet>=0?'+':'-')+sym+this.fmtInt(Math.abs(repNet)),repNetColor:repNet>=0?'var(--pos)':'var(--accent)',
       repIncPct:repIncPct+'%',repExpPct:(100-repIncPct)+'%',repMovCount,
       repCatRows,repDonutGradient,repByAcct,repHasByAcct,repByCard,repHasByCard,repTopMerch,repHasMerch,futCuotasStr:money(futCuotas),futHasCuotas:futCuotas>0,
       masItems,
