@@ -2157,7 +2157,7 @@ class Component extends DCLogic {
       Object.keys(na).forEach(k=>{if(!s.accounts[k])return;const aa=[...(na[k]||[])];if(!aa.length)return;
         const fi=aa.findIndex(a=>a.fci);
         if(fi>=0){const a=aa[fi];const live=fciPrices[a.id]||0;if(live>0){const lastVcp=Number(a.lastVcp)||0;let bal=Number(s.balances[k])||0;
-            if(lastVcp>0){bal=Math.round(bal*live/lastVcp);nb[k]=bal;}
+            if(lastVcp>0){bal=Math.round(bal*live/lastVcp*100)/100;nb[k]=bal;}
             // Daily rendimiento: baseline = the VCP at the first update of the day.
             const dayKey=new Date().toISOString().slice(0,10);let dayVcp=Number(a.dayVcp)||0;let dKey=a.dayKey;
             if(dKey!==dayKey||dayVcp<=0){dayVcp=lastVcp>0?lastVcp:live;dKey=dayKey;}
@@ -2172,8 +2172,8 @@ class Component extends DCLogic {
           else if(usdFallback[a.ticker]&&ccl){np=Math.round(usdFallback[a.ticker]*ccl/(this.CEDEAR_RATIOS[a.ticker]||10));}
           if(np>0&&np!==a.lastPrice){aa[i]={...a,lastPrice:np};changed=true;}});
         const total=aa.reduce((s2,a)=>s2+(a.ticker?a.qty*(a.lastPrice||a.avg):0),0);
-        const val=Math.round(total);
-        if(changed||val!==Math.round(nb[k]||0)){na[k]=aa;nb[k]=val;anyUpdate=true;}});
+        const val=Math.round(total*100)/100;
+        if(changed||Math.abs(val-(nb[k]||0))>0.005){na[k]=aa;nb[k]=val;anyUpdate=true;}});
       this.setState({assets:na,balances:nb,pricesLoading:false,pricesLastUpdated:Date.now(),...(anyUpdate?{accMeta:newAccMeta}:{}),...(!silent&&anyUpdate?{flash:'Precios actualizados'}:{})});}
     catch(e){this.setState({pricesLoading:false,...(!silent?{flash:'Error al actualizar precios'}:{})});}}
 
