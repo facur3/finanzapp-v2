@@ -464,8 +464,9 @@ input{font-family:inherit;}
         <!-- selected card summary -->
         <div style="display:flex;gap:11px;margin-bottom:24px;">
           <div style="flex:1;background:var(--surface);border-radius:18px;padding:14px 16px;">
-            <div style="font-size:12px;color:var(--text-2);font-weight:600;margin-bottom:3px;">Saldo a pagar</div>
-            <div style="font-size:19px;font-weight:800;">{{ selSaldoStr }}</div>
+            <div style="font-size:12px;color:var(--text-2);font-weight:600;margin-bottom:3px;">A pagar este mes</div>
+            <div style="font-size:19px;font-weight:800;">{{ selResumenStr }}</div>
+            <div style="font-size:11px;color:var(--text-3);font-weight:500;margin-top:2px;">Deuda total {{ selDeudaStr }}</div>
           </div>
           <div style="flex:1;background:var(--cat-comida-fill);border-radius:18px;padding:14px 16px;">
             <div style="font-size:12px;color:var(--text-2);font-weight:600;margin-bottom:3px;">Vence</div>
@@ -524,6 +525,19 @@ input{font-family:inherit;}
           </div>
         </div>
 
+        <div style="background:var(--card);border-radius:24px;padding:20px;box-shadow:var(--shadow-pill);margin-bottom:18px;display:flex;align-items:center;gap:20px;">
+          <div style="width:120px;height:120px;border-radius:50%;background: {{ repDonutGradient }};flex:none;display:flex;align-items:center;justify-content:center;">
+            <div style="width:74px;height:74px;border-radius:50%;background:var(--card);display:flex;flex-direction:column;align-items:center;justify-content:center;">
+              <span style="font-size:10px;color:var(--text-3);font-weight:600;">Gastos</span>
+              <span style="font-size:14px;font-weight:800;">{{ repExpenseStr }}</span>
+            </div>
+          </div>
+          <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:8px;">
+            <sc-for list="{{ repCatRows }}" as="c" hint-placeholder-count="4">
+              <div style="display:flex;align-items:center;gap:8px;"><div style="width:10px;height:10px;border-radius:3px;background:var( {{ c.iconVar }} );flex:none;"></div><span style="flex:1;font-size:12.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ c.name }}</span><span style="font-size:12.5px;font-weight:700;color:var(--text-2);">{{ c.pctOf }}</span></div>
+            </sc-for>
+          </div>
+        </div>
         <div style="font-size:14px;font-weight:700;margin:0 2px 12px;">Gastos por categoría</div>
         <div style="display:flex;flex-direction:column;gap:11px;margin-bottom:22px;">
           <sc-for list="{{ repCatRows }}" as="c" hint-placeholder-count="4">
@@ -978,8 +992,9 @@ input{font-family:inherit;}
         </div>
         <div style="border-radius:24px;padding:22px;background: {{ cdGrad }};color:#fff;box-shadow:0 16px 30px rgba(0,0,0,0.22);margin-bottom:18px;">
           <div style="font-size:12px;opacity:.7;font-weight:500;">{{ cdBank }} · {{ cdBrand }}</div>
-          <div style="font-size:11px;opacity:.7;font-weight:500;margin-top:14px;">Saldo a pagar</div>
-          <div style="font-size:30px;font-weight:800;letter-spacing:-1px;margin-bottom:14px;">{{ cdSaldoStr }}</div>
+          <div style="font-size:11px;opacity:.7;font-weight:500;margin-top:14px;">A pagar este mes</div>
+          <div style="font-size:30px;font-weight:800;letter-spacing:-1px;">{{ cdResumenStr }}</div>
+          <div style="font-size:11px;opacity:.7;font-weight:500;margin-bottom:14px;">Deuda total · {{ cdDeudaStr }}</div>
           <div style="display:flex;justify-content:space-between;">
             <div><div style="font-size:11px;opacity:.7;">Cierre</div><div style="font-size:14px;font-weight:700;">{{ cdCierre }}</div></div>
             <div style="text-align:center;"><div style="font-size:11px;opacity:.7;">Vence</div><div style="font-size:14px;font-weight:700;">{{ cdVence }}</div></div>
@@ -1032,11 +1047,12 @@ input{font-family:inherit;}
           <span style="font-size:16px;font-weight:700;">Pagar {{ payCardBrand }}</span>
           <div style="width:40px;"></div>
         </div>
-        <div style="text-align:center;font-size:13px;color:var(--text-2);font-weight:500;margin-bottom:2px;">Saldo a pagar {{ payCardSaldoStr }}</div>
+        <div style="text-align:center;font-size:13px;color:var(--text-2);font-weight:500;margin-bottom:2px;">Resumen del mes {{ payCardSaldoStr }}</div>
         <div style="text-align:center;font-size:46px;font-weight:800;letter-spacing:-1.5px;color:var(--accent);margin-bottom:14px;">{{ payAmtStr }}</div>
-        <div style="display:flex;justify-content:center;gap:9px;margin-bottom:18px;">
-          <div onClick="{{ payTotal }}" style="padding:8px 16px;border-radius:13px;background: {{ payTotalBg }};color: {{ payTotalColor }};font-size:13px;font-weight:700;cursor:pointer;">Pago total</div>
-          <div onClick="{{ payMin }}" style="padding:8px 16px;border-radius:13px;background:var(--surface);color:var(--text);font-size:13px;font-weight:600;cursor:pointer;">Pago mínimo</div>
+        <div style="display:flex;justify-content:center;flex-wrap:wrap;gap:9px;margin-bottom:18px;">
+          <div onClick="{{ payTotal }}" style="padding:8px 16px;border-radius:13px;background: {{ payTotalBg }};color: {{ payTotalColor }};font-size:13px;font-weight:700;cursor:pointer;">Total del mes</div>
+          <div onClick="{{ payMin }}" style="padding:8px 16px;border-radius:13px;background:var(--surface);color:var(--text);font-size:13px;font-weight:600;cursor:pointer;">Mínimo</div>
+          <div onClick="{{ payDeuda }}" style="padding:8px 16px;border-radius:13px;background:var(--surface);color:var(--text);font-size:13px;font-weight:600;cursor:pointer;">Deuda total</div>
         </div>
         <div style="background:var(--card);border-radius:22px;padding:2px 16px;box-shadow:var(--shadow-pill);margin-bottom:18px;">
           <div onClick="{{ pickPayAccount }}" style="display:flex;align-items:center;gap:12px;padding:15px 0;cursor:pointer;"><span style="font-size:14px;color:var(--text-2);font-weight:500;width:74px;">Pagar con</span><div style="width:34px;height:34px;border-radius:11px;background:var(--surface);display:flex;align-items:center;justify-content:center;font-size:17px;">{{ payAccEmoji }}</div><span style="flex:1;font-size:15px;font-weight:600;">{{ payAccName }}</span><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--text-3)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"></polyline></svg></div>
@@ -2095,6 +2111,9 @@ class Component extends DCLogic {
     const debtAccounts=DEBTACC.map((k,i,arr)=>{const v=accView(k);if(i===arr.length-1)v.divider='transparent';return v;});
     // cards
     const cardSaldo=(i)=>S.cards[i]?S.cards[i].saldo:0;
+    // What you actually pay this month (statement): this period's purchases + the
+    // installments due this month. The full c.saldo is the TOTAL debt (future cuotas).
+    const cardResumen=(c)=>(((c||{}).cuotas)||[]).reduce((a,q)=>a+(q.monto||0),0)+(((c||{}).compras)||[]).reduce((a,p)=>a+(p.monto||0),0);
     const cards=S.cards.map((c,i)=>({...c,saldoStr:money(cardSaldo(i)),onSelect:()=>this.selectCard(i),dim:i===S.cardIdx?'1':'0.5',scale:i===S.cardIdx?'scale(1)':'scale(0.95)'}));
     const cardDots=S.cards.map((c,i)=>({w:i===S.cardIdx?'18px':'6px',bg:i===S.cardIdx?'var(--accent)':'var(--surface-strong)'}));
     const selC=S.cards[S.cardIdx]||S.cards[0]||{cuotas:[],brand:'',vence:'—'};const selSaldo=cardSaldo(S.cardIdx);
@@ -2198,7 +2217,7 @@ class Component extends DCLogic {
     // card detail
     let cardD={};
     {const i=S.cardView,c=S.cards[i]||S.cards[0]||{limit:1,brand:'',bank:'',last4:'',grad:this.CARDGRADS[0],cierre:'—',vence:'—',compras:[],cuotas:[],pagos:[]};const saldo=cardSaldo(i);const avail=Math.max(0,c.limit-saldo);
-      cardD={cdBrand:c.brand,cdBank:c.bank,cdLast4:c.last4,cdGrad:c.grad,cdSaldoStr:money(saldo),cdLimitStr:moneyInt(c.limit),cdAvailStr:moneyInt(avail),cdAvailPct:Math.round(avail/c.limit*100)+'%',cdCierre:c.cierre,cdVence:c.vence,
+      cardD={cdBrand:c.brand,cdBank:c.bank,cdLast4:c.last4,cdGrad:c.grad,cdSaldoStr:money(saldo),cdResumenStr:money(cardResumen(c)),cdDeudaStr:money(saldo),cdLimitStr:moneyInt(c.limit),cdAvailStr:moneyInt(avail),cdAvailPct:Math.round(avail/c.limit*100)+'%',cdCierre:c.cierre,cdVence:c.vence,
         cdCompras:(c.compras||[]).map((p,j,arr)=>({name:p.name,date:p.date,montoStr:moneyInt(p.monto),divider:j===arr.length-1?'transparent':'var(--hairline)'})),
         cdCuotas:(c.cuotas||[]).map((q2,j,arr)=>({name:q2.name,frac:q2.cur+'/'+q2.tot,tot:q2.tot,montoStr:moneyInt(q2.monto),divider:j===arr.length-1?'transparent':'var(--hairline)'})),cdHasCuotas:(c.cuotas||[]).length>0,cdHasCompras:(c.compras||[]).length>0,
         cdPagos:(c.pagos||[]).map((p,j,arr)=>({name:p.name,date:p.date,montoStr:moneyInt(p.monto),divider:j===arr.length-1?'transparent':'var(--hairline)'})),
@@ -2288,7 +2307,10 @@ class Component extends DCLogic {
     const repMovCount=S.txns.filter(t=>t.amount<0&&!t.isTransfer).length;
     const repByCat=expKeys.map(k=>({k,t:S.categoryTotals[k]||0})).filter(x=>x.t>0).sort((a,b)=>b.t-a.t);
     const repCatMax=Math.max.apply(null,repByCat.map(x=>x.t).concat([1]));
-    const repCatRows=repByCat.map(x=>({name:(CAT[x.k]||{}).name,emoji:(CAT[x.k]||{}).emoji,fillVar:cFill(x.k),iconVar:cIcon(x.k),amountStr:money(x.t),pct:Math.round(x.t/repCatMax*100)+'%'}));
+    const repCatRows=repByCat.map(x=>({name:(CAT[x.k]||{}).name,emoji:(CAT[x.k]||{}).emoji,fillVar:cFill(x.k),iconVar:cIcon(x.k),amountStr:money(x.t),pct:Math.round(x.t/repCatMax*100)+'%',pctOf:repExpense>0?Math.round(x.t/repExpense*100)+'%':'0%'}));
+    // Donut (conic-gradient) of spending by category for Reports.
+    let repAcc=0;const repDonutSegs=repByCat.map(x=>{const a0=repExpense>0?repAcc/repExpense*100:0;repAcc+=x.t;const a1=repExpense>0?repAcc/repExpense*100:0;return 'var('+cIcon(x.k)+') '+a0.toFixed(2)+'% '+a1.toFixed(2)+'%';});
+    const repDonutGradient=repByCat.length?'conic-gradient('+repDonutSegs.join(',')+')':'var(--surface-strong)';
     // Spending by account (cash/bank expenses, i.e. not card purchases).
     const acctSpend={};S.txns.forEach(t=>{if(t.amount<0&&!t.isTransfer&&!t.onCard){const a=t.account;if(a)acctSpend[a]=(acctSpend[a]||0)+t.val;}});
     const repByAcct=Object.keys(acctSpend).filter(a=>ACC[a]).map(a=>({name:ACC[a].name,emoji:ACC[a].emoji,fillVar:ACC[a].fillVar,amountStr:money(acctSpend[a]),v:acctSpend[a]})).sort((a,b)=>b.v-a.v);
@@ -2344,7 +2366,7 @@ class Component extends DCLogic {
       patrimonioStr:money(patrimonioNeto),patrimonioBrutoStr:money(patrimonioBruto),disponibleStr:money(disponible),invertidoStr:money(invertido),cardDebtStr:money(cardDebt),debtAccStr:money(debtAcc),hasDebt:(cardDebt+debtAcc)>0,
       liquidAccounts,investAccounts,debtAccounts,hasDebtAccounts:debtAccounts.length>0,openAddAccount:()=>this.openAddAccount(null),
       cards,cardDots,carouselRef:this.carouselRef,mainScrollRef:this.mainScrollRef,onCardScroll:(e)=>this.onCardScroll(e),
-      selSaldoStr:money(selSaldo),selVence:selC.vence,selBrand:selC.brand,openCardDetail,
+      selSaldoStr:money(selSaldo),selResumenStr:money(cardResumen(selC)),selDeudaStr:money(selSaldo),selVence:selC.vence,selBrand:selC.brand,openCardDetail,
       selCuotas,selHasCuotas:selCuotas.length>0,selNoCuotas:selCuotas.length===0,
       hasCatFilter:!!S.actCat,catFilterName:catF?catF.name:'',catFilterEmoji:catF?catF.emoji:'',catFilterFill:S.actCat?cFill(S.actCat):'--surface',
       clearCatFilter:()=>this.setState({actCat:null}),
@@ -2372,10 +2394,10 @@ class Component extends DCLogic {
       naSetName:(e)=>this.setNewAcc({name:e.target.value}),naSetBalance:(e)=>this.setNewAcc({balance:e.target.value}),
       naToggleLiquid:()=>this.setNewAcc({liquid:!na.liquid}),naLiquidKnobBg:na.liquid?'var(--pos)':'var(--surface-strong)',naLiquidKnobX:na.liquid?'22px':'2px',
       naSave:()=>this.addAccountSave(false),naTitle:na.editId?'Editar cuenta':'Nueva cuenta',naSaveLabel:na.editId?'Guardar cambios':'Crear cuenta',
-      isPayCard:S.push==='payCard',payKeypad,payAmtStr:this.displayAmount(S.payAmount),payAccName,payAccEmoji,payCardBrand:payCardC.brand,payCardSaldoStr:money(cardSaldo(S.cardView)),
-      payTotal:()=>this.setState({payAmount:String(Math.round(cardSaldo(S.cardView)))}),payMin:()=>this.setState({payAmount:String(Math.round(cardSaldo(S.cardView)*0.1))}),
-      payTotalBg:(S.payAmount&&parseFloat(S.payAmount.replace(',','.'))===Math.round(cardSaldo(S.cardView)))?'var(--accent)':'var(--surface)',
-      payTotalColor:(S.payAmount&&parseFloat(S.payAmount.replace(',','.'))===Math.round(cardSaldo(S.cardView)))?'#fff':'var(--text)',
+      isPayCard:S.push==='payCard',payKeypad,payAmtStr:this.displayAmount(S.payAmount),payAccName,payAccEmoji,payCardBrand:payCardC.brand,payCardSaldoStr:money(cardResumen(payCardC)),
+      payTotal:()=>this.setState({payAmount:String(Math.round(cardResumen(payCardC)))}),payMin:()=>this.setState({payAmount:String(Math.round(cardResumen(payCardC)*0.1))}),payDeuda:()=>this.setState({payAmount:String(Math.round(cardSaldo(S.cardView)))}),
+      payTotalBg:(S.payAmount&&parseFloat(S.payAmount.replace(',','.'))===Math.round(cardResumen(payCardC)))?'var(--accent)':'var(--surface)',
+      payTotalColor:(S.payAmount&&parseFloat(S.payAmount.replace(',','.'))===Math.round(cardResumen(payCardC)))?'#fff':'var(--text)',
       pickPayAccount:()=>this.setState({subsheet:'pickPay'}),isPickPay:sub==='pickPay',payAccOpts,paySave:()=>this.payCardSave(),paySaveOpacity:S.payAmount?'1':'0.5',
       isAcctDetail:S.push==='accountDetail',isInvestDetail:S.push==='investDetail',isCardDetail:S.push==='cardDetail',isAssetDetail:S.push==='assetDetail',
       isCardPurchase:S.push==='cardPurchase',cpAmtStr:this.displayAmount(S.cpAmount),cpCardLabel:cpCardC.brand+' ·••• '+cpCardC.last4,
@@ -2398,7 +2420,7 @@ class Component extends DCLogic {
       saveAssetTrade:()=>this.saveAssetTrade(),
       repIncomeStr:money(repIncome),repExpenseStr:money(repExpense),repNetStr:(repNet>=0?'+':'-')+sym+this.fmtInt(Math.abs(repNet)),repNetColor:repNet>=0?'var(--pos)':'var(--accent)',
       repIncPct:repIncPct+'%',repExpPct:(100-repIncPct)+'%',repMovCount,
-      repCatRows,repByAcct,repHasByAcct,repByCard,repHasByCard,repTopMerch,repHasMerch,futCuotasStr:money(futCuotas),futHasCuotas:futCuotas>0,
+      repCatRows,repDonutGradient,repByAcct,repHasByAcct,repByCard,repHasByCard,repTopMerch,repHasMerch,futCuotasStr:money(futCuotas),futHasCuotas:futCuotas>0,
       masItems,
       flash:S.flash,hasFlash:!!S.flash,
       hasConfirm:!!S.confirm,confirmTitle:S.confirm?S.confirm.title:'',confirmMsg:S.confirm?S.confirm.msg:'',confirmLabel:S.confirm?S.confirm.confirmLabel:'Confirmar',
