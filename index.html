@@ -956,6 +956,9 @@ input{font-family:inherit;}
           <div style="font-size:18px;font-weight:700;margin-bottom:2px;">{{ adName }}</div>
           <div style="font-size:12px;color:var(--text-2);font-weight:600;margin-bottom:10px;">{{ adKindLabel }}</div>
           <div style="font-size:34px;font-weight:800;letter-spacing:-1px;">{{ adBalStr }}</div>
+          <sc-if value="{{ adHasRend }}" hint-placeholder-val="{{ false }}">
+            <div style="font-size:13px;font-weight:700;margin-top:8px;color: {{ adRendColor }};">{{ adRendStr }} hoy · {{ adChgStr }}</div>
+          </sc-if>
         </div>
         <div style="display:flex;gap:11px;margin-bottom:26px;">
           <div onClick="{{ adTransfer }}" style="flex:1;height:50px;border-radius:16px;background:var(--surface);display:flex;align-items:center;justify-content:center;gap:7px;cursor:pointer;font-size:14px;font-weight:600;"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 4 20 8 16 12"></polyline><line x1="20" y1="8" x2="8" y2="8"></line><polyline points="8 12 4 16 8 20"></polyline><line x1="4" y1="16" x2="16" y2="16"></line></svg>Transferir</div>
@@ -1745,6 +1748,7 @@ class Component extends DCLogic {
     // Curated pick-lists so users choose an asset instead of typing a ticker.
     this.CEDEARS=[['QQQ','Nasdaq 100','📊'],['SPY','S&P 500','📈'],['AAPL','Apple','🍎'],['AMZN','Amazon','📦'],['MSFT','Microsoft','🪟'],['GOOGL','Google','🔎'],['META','Meta','📘'],['TSLA','Tesla','🚗'],['NVDA','Nvidia','🎮'],['MELI','Mercado Libre','🛒'],['KO','Coca-Cola','🥤'],['DIS','Disney','🏰'],['COIN','Coinbase','🪙'],['BABA','Alibaba','🛍️']];
     this.CRYPTOS=[['BTC','Bitcoin','🪙'],['ETH','Ethereum','💎'],['SOL','Solana','🌅'],['ADA','Cardano','🔷'],['MATIC','Polygon','🟣'],['DOT','Polkadot','⚫']];
+    this._MONTHS=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
     this.CATTYPES=[['gasto','Gasto'],['ingreso','Ingreso'],['transfer','Transferencia'],['inversion','Inversión']];
     this.CARDBRANDS=['Visa','Mastercard','Amex'];
     this.STORAGE_KEY='finanzapp:v2:state';
@@ -2030,7 +2034,7 @@ class Component extends DCLogic {
   archiveAccount(k){if(!this.state.accounts[k]){this.flashMsg('Cuenta no encontrada');return;}this.setState(s=>({archived:{...s.archived,[k]:true},push:null,tab:'cuentas',flash:'Cuenta archivada'}));}
   deleteAccount(k){if(this.state.txns.some(t=>[t.account,t.from,t.to].indexOf(k)>=0)){this.flashMsg('Archivá la cuenta para conservar movimientos');return;}this.setState(s=>{const order=s.order.filter(x=>x!==k);const accounts={...s.accounts};delete accounts[k];const balances={...s.balances};delete balances[k];return{order,accounts,balances,push:null,tab:'cuentas',flash:'Cuenta eliminada'};});}
   payCardSave(){const S=this.state;const v=parseFloat(S.payAmount.replace(',','.'))||0;if(!v){this.flashMsg('Ingresá un monto');return;}if(!S.accounts[S.payAccount]){this.flashMsg('Elegí una cuenta');return;}const idx=S.cardView;const card=S.cards[idx];if(!card){this.flashMsg('Elegí una tarjeta');return;}
-    const resumen=this.cardResumen(card);const cycle=this._cycleKey(new Date());const full=v>=Math.round(resumen)-1&&resumen>0;
+    const resumen=this.cardResumen(card);const cycle=this._dueCycle(card,new Date());const full=v>=Math.round(resumen)-1&&resumen>0;
     this.setState(s=>{const pago={name:'Pago '+card.brand,monto:v,date:'Hoy'};
       const cs=s.cards.map((c,i)=>{if(i!==idx)return c;let nc={...c,saldo:Math.max(0,(c.saldo||0)-v),pagos:[pago,...(c.pagos||[])]};
         // Paying the full month settles the statement: roll installments forward,
@@ -2040,9 +2044,18 @@ class Component extends DCLogic {
   cardResumen(c){return (((c||{}).cuotas)||[]).reduce((a,q)=>a+(q.monto||0),0)+(((c||{}).compras)||[]).reduce((a,p)=>a+(p.monto||0),0);}
   _cycleKey(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');}
   _dayOf(s){const m=String(s||'').match(/(\d{1,2})/);return m?Math.min(31,Math.max(1,parseInt(m[1],10))):1;}
-  _monthLabel(d){const M=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];return d.getDate()+' '+M[d.getMonth()];}
+  _monthLabel(d){return d.getDate()+' '+this._MONTHS[d.getMonth()];}
+  // Parse a card label like "13 jul" into a real Date near `ref`, picking the
+  // closest occurrence within ±6 months. Critical for auto-pay: read on 30 jun,
+  // "13 jul" must resolve to the coming 13 Jul — NOT be treated as day-13 of the
+  // current month (which made auto-pay fire a month early and double-charge).
+  _parseDate(label,ref){ref=ref||new Date();const m=String(label||'').toLowerCase().match(/(\d{1,2})\s*([a-zé]{3,})?/);if(!m)return null;const day=Math.min(31,Math.max(1,parseInt(m[1],10)));let mon=ref.getMonth();if(m[2]){const i=this._MONTHS.indexOf(m[2].slice(0,3));if(i>=0)mon=i;}let d=new Date(ref.getFullYear(),mon,day);d.setHours(0,0,0,0);const SIX=183*86400000;if(d-ref>SIX)d=new Date(ref.getFullYear()-1,mon,day);else if(ref-d>SIX)d=new Date(ref.getFullYear()+1,mon,day);d.setHours(0,0,0,0);return d;}
+  // Advance a "13 jul" label by one month, keeping the day.
+  _advanceLabel(label){const d=this._parseDate(label,new Date());if(!d)return label;const n=new Date(d.getFullYear(),d.getMonth()+1,d.getDate());return n.getDate()+' '+this._MONTHS[n.getMonth()];}
+  // The settlement cycle a card's statement belongs to, keyed by its due month.
+  _dueCycle(c,ref){return this._cycleKey(this._parseDate((c||{}).vence,ref||new Date())||ref||new Date());}
   _nextOccur(day,from){day=Math.min(31,Math.max(1,day||1));let d=new Date(from.getFullYear(),from.getMonth(),day);d.setHours(0,0,0,0);if(d<from)d=new Date(from.getFullYear(),from.getMonth()+1,day);return d;}
-  _closeCycleCard(c,today){const cuotas=(c.cuotas||[]).map(q=>({...q,cur:q.cur+1})).filter(q=>q.cur<=q.tot);return {...c,cuotas,compras:[],paidCycle:this._cycleKey(today)};}
+  _closeCycleCard(c,today){const cuotas=(c.cuotas||[]).map(q=>({...q,cur:q.cur+1})).filter(q=>q.cur<=q.tot);return {...c,cuotas,compras:[],vence:this._advanceLabel(c.vence),cierre:this._advanceLabel(c.cierre),paidCycle:this._dueCycle(c,today)};}
   // Runs on app open: posts due recurring movements and auto-pays cards whose
   // due day has passed (idempotent per month via nextDate / paidCycle).
   runAutomations(){const today=new Date();today.setHours(0,0,0,0);
@@ -2053,8 +2066,7 @@ class Component extends DCLogic {
           else{const acc=r.targetId;if(balances[acc]!=null||s.accounts[acc]){if(r.type==='ingreso'){balances[acc]=(balances[acc]||0)+r.amount;monthIncome+=r.amount;txns=[{id:next,type:'ingreso',merchant:r.concept||'Recurrente',cat:r.cat||'ingreso',amount:r.amount,val:r.amount,account:acc,dateLabel:lbl,note:'Recurrente',tags:['recurrente']},...txns];}else{balances[acc]=(balances[acc]||0)-r.amount;categoryTotals={...categoryTotals,[r.cat]:(categoryTotals[r.cat]||0)+r.amount};monthExpense+=r.amount;txns=[{id:next,type:'gasto',merchant:r.concept||'Recurrente',cat:r.cat,amount:-r.amount,val:r.amount,account:acc,dateLabel:lbl,note:'Recurrente',tags:['recurrente']},...txns];}next++;posted++;changed=true;}}
           const n2=new Date(nd);n2.setMonth(n2.getMonth()+1);nd=n2;}
         out.nextDate=nd.toISOString();return out;});
-      const cycle=this._cycleKey(today);
-      cards=cards.map(c=>{if(!c.autopay||!c.autopayAccount||c.paidCycle===cycle)return c;if(today.getDate()<this._dayOf(c.vence))return c;const resumen=this.cardResumen(c);if(resumen<=0)return {...c,paidCycle:cycle};if((balances[c.autopayAccount]||0)<resumen)return c;balances={...balances,[c.autopayAccount]:(balances[c.autopayAccount]||0)-resumen};txns=[{id:next,type:'pago',merchant:'Pago '+c.brand,cat:'pago',amount:-resumen,val:resumen,account:c.autopayAccount,card:c.id,isTransfer:true,dateLabel:this._monthLabel(today),note:'Pago automático',tags:[]},...txns];next++;posted++;changed=true;return this._closeCycleCard({...c,saldo:Math.max(0,(c.saldo||0)-resumen),pagos:[{name:'Pago automático',monto:resumen,date:this._monthLabel(today)},...(c.pagos||[])]},today);});
+      cards=cards.map(c=>{if(!c.autopay||!c.autopayAccount)return c;const due=this._parseDate(c.vence,today);const cyc=this._cycleKey(due||today);if(c.paidCycle===cyc)return c;if(!due||today<due)return c;const resumen=this.cardResumen(c);if(resumen<=0)return this._closeCycleCard(c,today);if((balances[c.autopayAccount]||0)<resumen)return c;balances={...balances,[c.autopayAccount]:(balances[c.autopayAccount]||0)-resumen};txns=[{id:next,type:'pago',merchant:'Pago '+c.brand,cat:'pago',amount:-resumen,val:resumen,account:c.autopayAccount,card:c.id,isTransfer:true,dateLabel:this._monthLabel(today),note:'Pago automático',tags:[]},...txns];next++;posted++;changed=true;return this._closeCycleCard({...c,saldo:Math.max(0,(c.saldo||0)-resumen),pagos:[{name:'Pago automático',monto:resumen,date:this._monthLabel(today)},...(c.pagos||[])]},today);});
       if(!changed)return {recurring};
       return {recurring,cards,balances,txns,_next:next,categoryTotals,monthIncome,monthExpense,flash:posted?('Se aplicaron '+posted+' movimiento'+(posted>1?'s':'')+' automático'+(posted>1?'s':'')):''};
     });}
@@ -2141,12 +2153,17 @@ class Component extends DCLogic {
       // update (balance x liveVCP/lastVCP) and store lastVCP. This preserves any
       // spends/deposits made meanwhile and never resets the balance from a stale base.
       // Tickers (crypto/CEDEAR): value = qty x live price.
-      let anyUpdate=false;
+      let anyUpdate=false;let newAccMeta={...s.accMeta};
       Object.keys(na).forEach(k=>{if(!s.accounts[k])return;const aa=[...(na[k]||[])];if(!aa.length)return;
         const fi=aa.findIndex(a=>a.fci);
-        if(fi>=0){const a=aa[fi];const live=fciPrices[a.id]||0;if(live>0){const lastVcp=Number(a.lastVcp)||0;
-            if(lastVcp>0){const cur=Number(s.balances[k])||0;nb[k]=Math.round(cur*live/lastVcp);}
-            aa[fi]={...a,lastVcp:live};na[k]=aa;anyUpdate=true;}
+        if(fi>=0){const a=aa[fi];const live=fciPrices[a.id]||0;if(live>0){const lastVcp=Number(a.lastVcp)||0;let bal=Number(s.balances[k])||0;
+            if(lastVcp>0){bal=Math.round(bal*live/lastVcp);nb[k]=bal;}
+            // Daily rendimiento: baseline = the VCP at the first update of the day.
+            const dayKey=new Date().toISOString().slice(0,10);let dayVcp=Number(a.dayVcp)||0;let dKey=a.dayKey;
+            if(dKey!==dayKey||dayVcp<=0){dayVcp=lastVcp>0?lastVcp:live;dKey=dayKey;}
+            const rPct=dayVcp>0?(live-dayVcp)/dayVcp:0;const rAmt=Math.round(bal*(live-dayVcp)/(live||1));
+            newAccMeta[k]={chg:(rPct>=0?'+':'')+(rPct*100).toFixed(2).replace('.',',')+'%',up:rPct>=0,rend:rAmt};
+            aa[fi]={...a,lastVcp:live,dayVcp,dayKey:dKey};na[k]=aa;anyUpdate=true;}
           return;}
         let changed=false;
         aa.forEach((a,i)=>{if(!a.ticker)return;let np=0;
@@ -2157,7 +2174,7 @@ class Component extends DCLogic {
         const total=aa.reduce((s2,a)=>s2+(a.ticker?a.qty*(a.lastPrice||a.avg):0),0);
         const val=Math.round(total);
         if(changed||val!==Math.round(nb[k]||0)){na[k]=aa;nb[k]=val;anyUpdate=true;}});
-      this.setState({assets:na,balances:nb,pricesLoading:false,pricesLastUpdated:Date.now(),...(!silent&&anyUpdate?{flash:'Precios actualizados'}:{})});}
+      this.setState({assets:na,balances:nb,pricesLoading:false,pricesLastUpdated:Date.now(),...(anyUpdate?{accMeta:newAccMeta}:{}),...(!silent&&anyUpdate?{flash:'Precios actualizados'}:{})});}
     catch(e){this.setState({pricesLoading:false,...(!silent?{flash:'Error al actualizar precios'}:{})});}}
 
   press(d){this.setState(s=>{let r=s.addAmount;if(d===','){if(r.indexOf(',')>=0||r==='')return{};return{addAmount:r+','};}if(r.indexOf(',')>=0){const dec=r.split(',')[1]||'';if(dec.length>=2)return{};}if(r.replace(',','').length>=9)return{};return{addAmount:r+d};});}
@@ -2176,7 +2193,11 @@ class Component extends DCLogic {
   deleteTag(tag){this.setState(s=>({tagSugg:s.tagSugg.filter(t=>t!==tag),txns:s.txns.map(t=>({...t,tags:(t.tags||[]).filter(x=>x!==tag)})),addTags:s.addTags.filter(x=>x!==tag),actTag:s.actTag===tag?'todos':s.actTag,flash:'Etiqueta eliminada'}));}
   setNewCard(patch){this.setState(s=>({newCard:{...s.newCard,...patch}}));}
   openAddCard(editId){const s=this.state;if(editId!=null&&s.cards[editId]){const c=s.cards[editId];const gi=Math.max(0,this.CARDGRADS.indexOf(c.grad));this.setState({push:'addCard',newCard:{brand:c.brand,bank:c.bank,last4:c.last4,limit:String(c.limit||''),cierre:c.cierre||'',vence:c.vence||'',gradIdx:gi,autopay:!!c.autopay,autopayAccount:c.autopayAccount||'',editId}});}else{this.setState({push:'addCard',newCard:{brand:'Visa',bank:'',last4:'',limit:'',cierre:'',vence:'',gradIdx:s.cards.length%this.CARDGRADS.length,autopay:false,autopayAccount:'',editId:null}});}}
-  saveCard(){const n=this.state.newCard;if(!n.bank.trim()){this.flashMsg('Poné el banco o emisor');return;}const limit=parseFloat((n.limit||'0').replace(/\./g,'').replace(',','.'))||0;const grad=this.CARDGRADS[n.gradIdx]||this.CARDGRADS[0];const last4=(n.last4||'').replace(/\D/g,'').slice(-4)||'0000';const autopay=!!n.autopay;const autopayAccount=autopay?(n.autopayAccount||this.liquidIds()[0]||''):'';this.setState(s=>{const cards=s.cards.slice();if(n.editId!=null&&cards[n.editId]){cards[n.editId]={...cards[n.editId],brand:n.brand,bank:n.bank.trim(),last4,limit,cierre:n.cierre.trim()||cards[n.editId].cierre,vence:n.vence.trim()||cards[n.editId].vence,grad,autopay,autopayAccount};return{cards,push:null,tab:'tarjetas',cardIdx:n.editId,cardView:n.editId,flash:'Tarjeta actualizada'};}const card={id:'card_'+s._next,brand:n.brand,bank:n.bank.trim(),last4,saldo:0,limit:limit||1,cierre:n.cierre.trim()||'—',vence:n.vence.trim()||'—',grad,autopay,autopayAccount,compras:[],cuotas:[],pagos:[]};return{cards:[...cards,card],_next:s._next+1,push:null,tab:'tarjetas',cardIdx:cards.length,cardView:cards.length,flash:'Tarjeta creada'};});}
+  saveCard(){const n=this.state.newCard;if(!n.bank.trim()){this.flashMsg('Poné el banco o emisor');return;}const limit=parseFloat((n.limit||'0').replace(/\./g,'').replace(',','.'))||0;const grad=this.CARDGRADS[n.gradIdx]||this.CARDGRADS[0];const last4=(n.last4||'').replace(/\D/g,'').slice(-4)||'0000';const autopay=!!n.autopay;const autopayAccount=autopay?(n.autopayAccount||this.liquidIds()[0]||''):'';this.setState(s=>{const cards=s.cards.slice();if(n.editId!=null&&cards[n.editId]){const prev=cards[n.editId];const venceVal=n.vence.trim()||prev.vence;let paidCycle=prev.paidCycle;
+        // Turning auto-pay ON must never retroactively charge: if this cycle's due
+        // date has already passed, mark it settled so it only starts next cycle.
+        if(autopay&&!prev.autopay){const t0=new Date();t0.setHours(0,0,0,0);const due=this._parseDate(venceVal,t0);if(due&&t0>=due)paidCycle=this._cycleKey(due);}
+        cards[n.editId]={...prev,brand:n.brand,bank:n.bank.trim(),last4,limit,cierre:n.cierre.trim()||prev.cierre,vence:venceVal,grad,autopay,autopayAccount,paidCycle};return{cards,push:null,tab:'tarjetas',cardIdx:n.editId,cardView:n.editId,flash:'Tarjeta actualizada'};}const card={id:'card_'+s._next,brand:n.brand,bank:n.bank.trim(),last4,saldo:0,limit:limit||1,cierre:n.cierre.trim()||'—',vence:n.vence.trim()||'—',grad,autopay,autopayAccount,compras:[],cuotas:[],pagos:[]};return{cards:[...cards,card],_next:s._next+1,push:null,tab:'tarjetas',cardIdx:cards.length,cardView:cards.length,flash:'Tarjeta creada'};});}
   deleteCard(idx){this.setState(s=>{const cards=s.cards.filter((c,i)=>i!==idx);return{cards,push:null,tab:'tarjetas',cardIdx:0,cardView:0,flash:'Tarjeta eliminada'};});}
 
   _rev(t,b,ct,mi,me){b={...b};ct={...ct};if(t.type==='gasto'){if(t.account)b[t.account]=(b[t.account]||0)-t.amount;ct[t.cat]=Math.max(0,(ct[t.cat]||0)-t.val);me-=t.val;}else if(t.type==='ingreso'){if(t.account)b[t.account]=(b[t.account]||0)-t.amount;mi-=t.val;}else{if(t.from)b[t.from]=(b[t.from]||0)+t.val;if(t.to)b[t.to]=(b[t.to]||0)-t.val;}return{b,ct,mi,me};}
@@ -2289,7 +2310,9 @@ class Component extends DCLogic {
     // account detail
     let acctD={};
     if(S.acctView&&ACC[S.acctView]){const k=S.acctView,a=ACC[k];const movs=S.txns.filter(t=>[t.account,t.from,t.to].indexOf(k)>=0).slice(0,8).map(t=>this.txView(t));
+      const am=S.accMeta[k]||{};const isFci=(((S.assets&&S.assets[k])||[]).some(x=>x.fci));
       acctD={adName:a.name,adType:a.type,adEmoji:a.emoji,adFillVar:a.fillVar,adBalStr:money(S.balances[k]),adKindLabel:a.kind==='liquid'?(a.liquid?'Cuenta · cuenta para gastar':'Cuenta'):a.kind==='invest'?'Inversión':'Deuda',adLiquid:!!a.liquid,adMovs:movs,adHasMovs:movs.length>0,
+        adHasRend:isFci&&am.rend!=null,adRendStr:((am.rend||0)>=0?'+':'-')+sym+this.fmtInt(Math.abs(am.rend||0)),adRendColor:(am.rend||0)>=0?'var(--pos)':'var(--accent)',adChgStr:am.chg||'',
         adNoMovs:movs.length===0,adTransfer:()=>this.openAddPreset('transfer',k,LIQ.find(x=>x!==k)||INV[0]||k),adEdit:()=>this.openAddAccount(k),adArchive:()=>this.requestConfirm({title:'Archivar cuenta',msg:'La cuenta se ocultará de los selectores activos pero se conservará su historial.',confirmLabel:'Archivar',danger:false,onConfirm:()=>this.archiveAccount(k)}),adDelete:()=>this.requestConfirm({title:'Eliminar cuenta',msg:'Se eliminará la cuenta y dejará de contar en tus totales. Esta acción no se puede deshacer.',confirmLabel:'Eliminar',danger:true,onConfirm:()=>this.deleteAccount(k)})};}
     // investment detail (per account)
     let invD={};
@@ -2429,7 +2452,8 @@ class Component extends DCLogic {
     const repCatMax=Math.max.apply(null,repByCat.map(x=>x.t).concat([1]));
     const repCatRows=repByCat.map(x=>({name:(CAT[x.k]||{}).name,emoji:(CAT[x.k]||{}).emoji,fillVar:cFill(x.k),iconVar:cIcon(x.k),amountStr:money(x.t),pct:Math.round(x.t/repCatMax*100)+'%',pctOf:repExpense>0?Math.round(x.t/repExpense*100)+'%':'0%'}));
     // Donut (conic-gradient) of spending by category for Reports.
-    let repAcc=0;const repDonutSegs=repByCat.map(x=>{const a0=repExpense>0?repAcc/repExpense*100:0;repAcc+=x.t;const a1=repExpense>0?repAcc/repExpense*100:0;return 'var('+cIcon(x.k)+') '+a0.toFixed(2)+'% '+a1.toFixed(2)+'%';});
+    let repAcc=0;const repDonutN=repByCat.length;const repDonutGap=repDonutN>1?1.4:0;const repDonutSegs=[];
+    repByCat.forEach((x,i)=>{const span=repExpense>0?x.t/repExpense*100:0;const a0=repAcc;const a1=repAcc+span;repAcc=a1;const g=i<repDonutN-1?Math.min(repDonutGap,span*0.4):0;repDonutSegs.push('var('+cIcon(x.k)+') '+a0.toFixed(2)+'% '+(a1-g).toFixed(2)+'%');if(g>0)repDonutSegs.push('var(--card) '+(a1-g).toFixed(2)+'% '+a1.toFixed(2)+'%');});
     const repDonutGradient=repByCat.length?'conic-gradient('+repDonutSegs.join(',')+')':'var(--surface-strong)';
     // Spending by account (cash/bank expenses, i.e. not card purchases).
     const acctSpend={};S.txns.forEach(t=>{if(t.amount<0&&!t.isTransfer&&!t.onCard){const a=t.account;if(a)acctSpend[a]=(acctSpend[a]||0)+t.val;}});
