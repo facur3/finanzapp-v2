@@ -10,13 +10,19 @@ export default async function handler(req, res) {
     const r = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
     const j = await r.json();
     const result = j && j.chart && j.chart.result && j.chart.result[0];
-    const closes = result && result.indicators && result.indicators.quote &&
-      result.indicators.quote[0] && result.indicators.quote[0].close;
+    const rawCloses = (result && result.indicators && result.indicators.quote &&
+      result.indicators.quote[0] && result.indicators.quote[0].close) || [];
+    const rawTimes = (result && result.timestamp) || [];
+    // Keep timestamp+close pairs aligned by dropping the null closes together.
+    const closes = [], times = [];
+    for (let i = 0; i < rawCloses.length; i++) {
+      if (rawCloses[i] != null) { closes.push(rawCloses[i]); times.push(rawTimes[i] || null); }
+    }
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Cache-Control', 's-maxage=300, stale-while-revalidate=600');
-    res.status(200).json({ closes: (closes || []).filter(x => x != null) });
+    res.status(200).json({ closes, times });
   } catch (e) {
     res.setHeader('Access-Control-Allow-Origin', '*');
-    res.status(200).json({ closes: [], error: String(e && e.message || e) });
+    res.status(200).json({ closes: [], times: [], error: String(e && e.message || e) });
   }
 }

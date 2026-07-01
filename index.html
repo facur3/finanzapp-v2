@@ -510,6 +510,34 @@ input{font-family:inherit;}
         <div style="font-size:26px;font-weight:800;letter-spacing:-.5px;margin-bottom:4px;">Reportes</div>
         <div style="font-size:13px;color:var(--text-2);font-weight:500;margin-bottom:22px;">{{ periodScope }}</div>
 
+        <sc-if value="{{ trendHas }}" hint-placeholder-val="{{ false }}">
+          <div style="background:var(--card);border-radius:24px;padding:20px;box-shadow:var(--shadow-pill);margin-bottom:18px;">
+            <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:2px;">
+              <span style="font-size:13px;font-weight:600;color:var(--text-2);">Patrimonio en el tiempo</span>
+              <span style="font-size:12px;font-weight:700;color: {{ trendChangeColor }};">{{ trendChangeStr }}</span>
+            </div>
+            <div style="font-size:28px;font-weight:800;letter-spacing:-.5px;margin-bottom:12px;">{{ trendCurrentStr }}</div>
+            <div style="position:relative;height:80px;">
+              <svg viewBox="0 0 320 80" preserveAspectRatio="none" style="width:100%;height:80px;display:block;">
+                <path d="{{ trendArea }}" fill="{{ trendColor }}" opacity="0.12"></path>
+                <path d="{{ trendPath }}" fill="none" stroke="{{ trendColor }}" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"></path>
+              </svg>
+              <span style="position:absolute;top:0;right:2px;font-size:10.5px;font-weight:600;color:var(--text-3);background:var(--card);padding:0 3px;border-radius:5px;">{{ trendMaxStr }}</span>
+              <span style="position:absolute;bottom:0;right:2px;font-size:10.5px;font-weight:600;color:var(--text-3);background:var(--card);padding:0 3px;border-radius:5px;">{{ trendMinStr }}</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;margin-top:7px;padding:0 2px;">
+              <span style="font-size:10.5px;color:var(--text-3);font-weight:600;">{{ trendStartLabel }}</span>
+              <span style="font-size:10.5px;color:var(--text-3);font-weight:600;">{{ trendEndLabel }}</span>
+            </div>
+          </div>
+        </sc-if>
+        <sc-if value="{{ trendSingle }}" hint-placeholder-val="{{ false }}">
+          <div style="background:var(--card);border-radius:24px;padding:18px 20px;box-shadow:var(--shadow-pill);margin-bottom:18px;display:flex;align-items:center;gap:13px;">
+            <div style="font-size:24px;flex:none;">📈</div>
+            <div style="font-size:13px;color:var(--text-2);font-weight:500;line-height:1.45;">Empezamos a registrar tu patrimonio. Volvé mañana para ver tu tendencia en el tiempo.</div>
+          </div>
+        </sc-if>
+
         <sc-if value="{{ repEmpty }}" hint-placeholder-val="{{ false }}">
           <div style="display:flex;flex-direction:column;align-items:center;text-align:center;padding:70px 30px;">
             <div style="width:80px;height:80px;border-radius:24px;background:var(--surface);display:flex;align-items:center;justify-content:center;font-size:36px;margin-bottom:18px;">📈</div>
@@ -672,8 +700,20 @@ input{font-family:inherit;}
         <div style="font-size:46px;font-weight:800;letter-spacing:-1.5px;margin-bottom:8px;">{{ portValueStr }}</div>
         <div style="margin-bottom:22px;">
           <div style="display:inline-flex;align-items:center;gap:5px;background:var(--surface);padding:7px 13px;border-radius:13px;font-size:14px;font-weight:700;color: {{ portGLColor }};">{{ portResultWord }} {{ portResultAbsStr }} ({{ portGLPctStr }})</div>
+          <sc-if value="{{ portHasUsd }}" hint-placeholder-val="{{ false }}">
+            <div style="font-size:12.5px;color:var(--text-3);font-weight:600;margin-top:9px;">≈ {{ portValueUsdStr }} · dólar cripto {{ portUsdRateStr }}</div>
+          </sc-if>
         </div>
-        <div style="display:flex;align-items:center;justify-content:space-between;margin:24px 2px 12px;">
+        <div style="display:flex;justify-content:center;margin-bottom:6px;">
+          <div style="width:132px;height:132px;border-radius:50%;background: {{ portDonutGradient }};display:flex;align-items:center;justify-content:center;">
+            <div style="width:92px;height:92px;border-radius:50%;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;">
+              <span style="font-size:10px;color:var(--text-3);font-weight:600;">Distribución</span>
+              <span style="font-size:21px;font-weight:800;line-height:1.1;">{{ portCount }}</span>
+              <span style="font-size:10px;color:var(--text-3);font-weight:600;">activos</span>
+            </div>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin:20px 2px 12px;">
           <span style="font-size:13px;font-weight:600;color:var(--text-2);">Instrumentos</span>
           <div style="display:inline-flex;background:var(--surface);border-radius:12px;padding:3px;gap:2px;">
             <div onClick="{{ setPortValor }}" style="padding:6px 12px;border-radius:9px;cursor:pointer;font-size:12px;font-weight:700;background: {{ portValorBg }};color: {{ portValorColor }};">Valor</div>
@@ -696,7 +736,7 @@ input{font-family:inherit;}
             </div>
           </sc-for>
         </div>
-        <div style="font-size:12px;color:var(--text-3);font-weight:500;line-height:1.5;padding:0 4px;">Tocá un activo para ver su detalle. Tu portafolio se mantiene separado del dinero disponible.</div>
+        <div style="font-size:12px;color:var(--text-3);font-weight:500;line-height:1.5;padding:0 4px;">Tu portafolio no cuenta como dinero disponible.</div>
         </sc-if>
       </div>
     </sc-if>
@@ -714,7 +754,12 @@ input{font-family:inherit;}
           <div style="flex:1;min-width:0;"><div style="font-size:16px;font-weight:800;">{{ adATicker }}</div><div style="font-size:12px;color:var(--text-3);font-weight:600;">1 CEDEAR · precio de hoy</div></div>
         </div>
         <div style="font-size:38px;font-weight:800;letter-spacing:-1.5px;margin-bottom:2px;">{{ adALastStr }}</div>
-        <div style="font-size:14px;font-weight:700;color: {{ acChangeColor }};margin-bottom:14px;">{{ acChangeStr }}</div>
+        <sc-if value="{{ acHasChange }}" hint-placeholder-val="{{ true }}">
+          <div style="display:flex;align-items:baseline;gap:6px;margin-bottom:14px;"><span style="font-size:14px;font-weight:700;color: {{ acChangeColor }};">{{ acChangeStr }}</span><span style="font-size:11px;font-weight:600;color:var(--text-3);">· el CEDEAR</span></div>
+        </sc-if>
+        <sc-if value="{{ acNoChange }}" hint-placeholder-val="{{ false }}">
+          <div style="height:14px;margin-bottom:14px;"></div>
+        </sc-if>
 
         <!-- Gráfico de precio -->
         <div style="background:var(--card);border-radius:20px;padding:14px;box-shadow:var(--shadow-pill);margin-bottom:14px;">
@@ -734,6 +779,12 @@ input{font-family:inherit;}
               <div style="height:92px;display:flex;align-items:center;justify-content:center;font-size:13px;color:var(--text-3);font-weight:500;text-align:center;">No pudimos cargar el gráfico ahora</div>
             </sc-if>
           </div>
+          <sc-if value="{{ acHasPath }}" hint-placeholder-val="{{ true }}">
+            <div style="display:flex;justify-content:space-between;margin-top:7px;padding:0 2px;">
+              <span style="font-size:10.5px;color:var(--text-3);font-weight:600;">{{ acStartLabel }}</span>
+              <span style="font-size:10.5px;color:var(--text-3);font-weight:600;">{{ acEndLabel }}</span>
+            </div>
+          </sc-if>
           <div style="display:flex;gap:6px;margin-top:12px;">
             <sc-for list="{{ acRanges }}" as="r" hint-placeholder-count="4"><div onClick="{{ r.onPick }}" style="flex:1;text-align:center;padding:8px 4px;border-radius:11px;font-size:13px;font-weight:700;cursor:pointer;background: {{ r.bg }};color: {{ r.color }};">{{ r.label }}</div></sc-for>
           </div>
@@ -742,7 +793,10 @@ input{font-family:inherit;}
         <!-- Tu tenencia -->
         <div style="background:var(--card);border-radius:20px;padding:16px;box-shadow:var(--shadow-pill);margin-bottom:14px;">
           <div style="font-size:12px;color:var(--text-2);font-weight:600;margin-bottom:4px;">Tu tenencia · {{ adAQtyStr }}</div>
-          <div style="font-size:28px;font-weight:800;letter-spacing:-1px;margin-bottom:12px;">{{ adAValueStr }}</div>
+          <div style="font-size:28px;font-weight:800;letter-spacing:-1px;margin-bottom:2px;">{{ adAValueStr }}</div>
+          <sc-if value="{{ adAHasUsd }}" hint-placeholder-val="{{ false }}">
+            <div style="font-size:12px;color:var(--text-3);font-weight:600;margin-bottom:12px;">{{ adAValueUsdStr }}</div>
+          </sc-if>
           <div style="display:flex;justify-content:space-between;padding:9px 0;border-top:1px solid var(--hairline);"><span style="font-size:13px;color:var(--text-2);font-weight:500;">Invertiste</span><span style="font-size:13px;font-weight:700;">{{ adACostStr }}</span></div>
           <div style="display:flex;justify-content:space-between;padding:9px 0;border-top:1px solid var(--hairline);"><span style="font-size:13px;color:var(--text-2);font-weight:500;">{{ adAResultWord }} (desde tu compra)</span><span style="font-size:13px;font-weight:700;color: {{ adAGLColor }};">{{ adAResultSignStr }} ({{ adAGLPctStr }})</span></div>
         </div>
@@ -1241,8 +1295,10 @@ input{font-family:inherit;}
                   <div style="text-align:right;"><div style="font-size:15px;font-weight:700;">{{ a.valueStr }}</div><div style="font-size:12px;font-weight:600;color: {{ a.glColor }};">{{ a.glStr }} · {{ a.glPctStr }}</div></div>
                 </div>
                 <div style="display:flex;justify-content:space-between;border-top:1px solid var(--hairline);padding-top:11px;margin-bottom:8px;"><span style="font-size:12px;color:var(--text-2);font-weight:500;">Invertido</span><span style="font-size:13px;font-weight:600;">{{ a.costStr }}</span></div>
+                <sc-if value="{{ a.manual }}" hint-placeholder-val="{{ false }}">
                 <div style="display:flex;justify-content:space-between;margin-bottom:10px;"><span style="font-size:12px;color:var(--text-2);font-weight:500;">Precio · compra / hoy</span><span style="font-size:13px;font-weight:600;">{{ a.avgStr }} → {{ a.lastPriceStr }}</span></div>
                 <div onClick="{{ a.onUpdatePrice }}" style="height:36px;border-radius:11px;background:var(--surface);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:13px;font-weight:600;color:var(--text-2);">Actualizar precio</div>
+                </sc-if>
               </div>
             </sc-for>
           </div>
@@ -1628,6 +1684,159 @@ input{font-family:inherit;}
       </div>
     </sc-if>
 
+    <!-- ============ GOALS SCREEN ============ -->
+    <sc-if value="{{ isGoalsScreen }}" hint-placeholder-val="{{ false }}">
+      <div class="fa-scroll" data-screen-label="Metas" style="position:absolute;inset:0;z-index:42;background:var(--bg);animation:faUp .34s cubic-bezier(.22,1,.36,1);overflow-y:auto;padding:calc(env(safe-area-inset-top) + 14px) 22px calc(40px + env(safe-area-inset-bottom));">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:22px;">
+          <div style="display:flex;align-items:center;gap:14px;">
+            <div onClick="{{ popScreen }}" style="width:40px;height:40px;border-radius:50%;background:var(--surface);display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--text);"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 6 9 12 15 18"></polyline></svg></div>
+            <span style="font-size:22px;font-weight:800;letter-spacing:-.5px;">Metas de ahorro</span>
+          </div>
+          <div onClick="{{ openAddGoal }}" style="width:40px;height:40px;border-radius:50%;background:var(--accent);display:flex;align-items:center;justify-content:center;cursor:pointer;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg></div>
+        </div>
+        <sc-if value="{{ goalEmpty }}" hint-placeholder-val="{{ false }}">
+          <div style="display:flex;flex-direction:column;align-items:center;text-align:center;padding:50px 30px 24px;">
+            <div style="font-size:34px;margin-bottom:10px;">🎯</div>
+            <div style="font-size:16px;font-weight:700;margin-bottom:4px;">Sin metas todavía</div>
+            <div style="font-size:13px;color:var(--text-2);font-weight:500;line-height:1.5;margin-bottom:18px;">Poné un objetivo de ahorro y seguí tu progreso.</div>
+            <div onClick="{{ openAddGoal }}" style="padding:12px 24px;border-radius:14px;background:var(--accent);color:#fff;font-size:14px;font-weight:700;cursor:pointer;">Crear meta</div>
+          </div>
+        </sc-if>
+        <sc-if value="{{ goalHasItems }}" hint-placeholder-val="{{ true }}">
+          <div style="display:flex;flex-direction:column;gap:12px;">
+            <sc-for list="{{ goalItems }}" as="g" hint-placeholder-count="2">
+              <div onClick="{{ g.onOpen }}" style="background:var(--card);border-radius:20px;padding:16px;box-shadow:var(--shadow-pill);cursor:pointer;">
+                <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">
+                  <div style="width:44px;height:44px;border-radius:14px;background:var(--surface);display:flex;align-items:center;justify-content:center;font-size:22px;flex:none;">{{ g.emoji }}</div>
+                  <div style="flex:1;min-width:0;"><div style="font-size:15.5px;font-weight:700;">{{ g.name }}</div><div style="font-size:12px;color:var(--text-2);font-weight:500;">{{ g.savedStr }} de {{ g.targetStr }}</div></div>
+                  <span style="font-size:13px;font-weight:700;color: {{ g.pctColor }};">{{ g.statusLabel }}</span>
+                </div>
+                <div style="height:8px;border-radius:5px;background:var(--surface);overflow:hidden;"><div style="height:100%;width: {{ g.barW }};border-radius:5px;background: {{ g.barColor }};"></div></div>
+              </div>
+            </sc-for>
+          </div>
+        </sc-if>
+      </div>
+    </sc-if>
+
+    <!-- ============ ADD GOAL ============ -->
+    <sc-if value="{{ isAddGoal }}" hint-placeholder-val="{{ false }}">
+      <div class="fa-scroll" data-screen-label="Nueva meta" style="position:absolute;inset:0;z-index:43;background:var(--bg);animation:faUp .34s cubic-bezier(.22,1,.36,1);overflow-y:auto;padding:calc(env(safe-area-inset-top) + 14px) 22px calc(40px + env(safe-area-inset-bottom));">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:22px;">
+          <div onClick="{{ addGoalBack }}" style="width:40px;height:40px;border-radius:50%;background:var(--surface);display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--text-2);"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="5" y1="5" x2="19" y2="19"></line><line x1="19" y1="5" x2="5" y2="19"></line></svg></div>
+          <span style="font-size:16px;font-weight:700;">{{ ngTitle }}</span>
+          <div style="width:40px;"></div>
+        </div>
+        <div style="font-size:13px;font-weight:600;color:var(--text-2);margin:0 4px 10px;">Ícono</div>
+        <div style="display:flex;flex-wrap:wrap;gap:9px;margin-bottom:20px;">
+          <sc-for list="{{ ngEmojiChips }}" as="e" hint-placeholder-count="10"><div onClick="{{ e.onPick }}" style="width:46px;height:46px;border-radius:14px;background: {{ e.bg }};display:flex;align-items:center;justify-content:center;font-size:22px;cursor:pointer;">{{ e.emoji }}</div></sc-for>
+        </div>
+        <div style="background:var(--card);border-radius:18px;padding:2px 16px;box-shadow:var(--shadow-pill);margin-bottom:24px;">
+          <div style="padding:14px 0;border-bottom:1px solid var(--hairline);"><input value="{{ ngName }}" onInput="{{ setNgName }}" placeholder="Nombre (ej: Vacaciones)" style="width:100%;border:none;background:transparent;font-size:15px;font-weight:600;color:var(--text);outline:none;font-family:inherit;" /></div>
+          <div style="padding:14px 0;"><input value="{{ ngTarget }}" onInput="{{ setNgTarget }}" placeholder="Objetivo ($)" type="number" inputmode="decimal" style="width:100%;border:none;background:transparent;font-size:15px;font-weight:600;color:var(--text);outline:none;font-family:inherit;" /></div>
+        </div>
+        <div onClick="{{ saveGoal }}" style="height:54px;border-radius:17px;background:var(--accent);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:16px;font-weight:700;color:#fff;">{{ ngSaveLabel }}</div>
+      </div>
+    </sc-if>
+
+    <!-- ============ GOAL DETAIL ============ -->
+    <sc-if value="{{ isGoalDetail }}" hint-placeholder-val="{{ false }}">
+      <div class="fa-scroll" data-screen-label="Meta" style="position:absolute;inset:0;z-index:44;background:var(--bg);animation:faUp .34s cubic-bezier(.22,1,.36,1);overflow-y:auto;padding:calc(env(safe-area-inset-top) + 14px) 22px calc(40px + env(safe-area-inset-bottom));">
+        <div style="display:flex;align-items:center;gap:14px;margin-bottom:22px;">
+          <div onClick="{{ gdBack }}" style="width:40px;height:40px;border-radius:50%;background:var(--surface);display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--text);"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 6 9 12 15 18"></polyline></svg></div>
+          <span style="font-size:17px;font-weight:700;">{{ gdName }}</span>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:center;text-align:center;background:var(--surface);border-radius:28px;padding:26px 20px;margin-bottom:22px;">
+          <div style="width:64px;height:64px;border-radius:20px;background:var(--card);display:flex;align-items:center;justify-content:center;font-size:30px;margin-bottom:12px;">{{ gdEmoji }}</div>
+          <div style="font-size:34px;font-weight:800;letter-spacing:-1px;">{{ gdSavedStr }}</div>
+          <div style="font-size:13px;color:var(--text-2);font-weight:500;margin:4px 0 14px;">de {{ gdTargetStr }} · {{ gdPct }}</div>
+          <div style="width:100%;height:10px;border-radius:6px;background:var(--card);overflow:hidden;margin-bottom:8px;"><div style="height:100%;width: {{ gdBarW }};border-radius:6px;background: {{ gdBarColor }};"></div></div>
+          <div style="font-size:12px;color:var(--text-2);font-weight:600;">{{ gdStatusLabel }} {{ gdRemainingStr }}</div>
+        </div>
+        <div style="font-size:14px;font-weight:700;margin:0 2px 12px;">Registrar ahorro</div>
+        <div style="text-align:center;font-size:42px;font-weight:800;letter-spacing:-1.5px;color:var(--accent);margin-bottom:16px;">{{ gdAmtStr }}</div>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:12px;">
+          <sc-for list="{{ gdKeypad }}" as="key" hint-placeholder-count="12">
+            <div onClick="{{ key.onPress }}" style="height:54px;border-radius:15px;background:var(--surface);display:flex;align-items:center;justify-content:center;cursor:pointer;">
+              <sc-if value="{{ key.isBack }}" hint-placeholder-val="{{ false }}"><svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="var(--text)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 5H9L3 12l6 7h12a1 1 0 0 0 1-1V6a1 1 0 0 0-1-1z"></path><line x1="12" y1="9.5" x2="17" y2="14.5"></line><line x1="17" y1="9.5" x2="12" y2="14.5"></line></svg></sc-if>
+              <sc-if value="{{ key.isNum }}" hint-placeholder-val="{{ true }}"><span style="font-size:24px;font-weight:600;">{{ key.label }}</span></sc-if>
+            </div>
+          </sc-for>
+        </div>
+        <div style="display:flex;gap:10px;margin-bottom:22px;">
+          <div onClick="{{ gdAdd }}" style="flex:1;height:54px;border-radius:17px;background:var(--accent);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:16px;font-weight:700;color:#fff;opacity: {{ gdSaveOpacity }};">Agregar</div>
+          <div onClick="{{ gdTake }}" style="flex:1;height:54px;border-radius:17px;background:var(--surface);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:16px;font-weight:700;color:var(--text);opacity: {{ gdSaveOpacity }};">Sacar</div>
+        </div>
+        <sc-if value="{{ gdHasEntries }}" hint-placeholder-val="{{ false }}">
+          <div style="font-size:14px;font-weight:700;margin:0 2px 12px;">Historial</div>
+          <div style="background:var(--card);border-radius:18px;padding:4px 16px;box-shadow:var(--shadow-pill);margin-bottom:22px;">
+            <sc-for list="{{ gdEntries }}" as="p" hint-placeholder-count="2">
+              <div style="display:flex;align-items:center;gap:12px;padding:13px 0;border-bottom:1px solid {{ p.divider }};"><span style="flex:1;font-size:12px;color:var(--text-2);font-weight:500;">{{ p.date }}</span><span style="font-size:14px;font-weight:700;color: {{ p.color }};">{{ p.amountStr }}</span></div>
+            </sc-for>
+          </div>
+        </sc-if>
+        <div style="display:flex;gap:10px;margin-top:8px;">
+          <div onClick="{{ gdEdit }}" style="flex:1;height:50px;border-radius:16px;background:var(--surface);display:flex;align-items:center;justify-content:center;gap:7px;cursor:pointer;font-size:14px;font-weight:600;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"></path><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"></path></svg>Editar</div>
+          <div onClick="{{ gdDelete }}" style="flex:1;height:50px;border-radius:16px;background:rgba(240,101,92,0.12);color:var(--accent);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:14px;font-weight:600;">Eliminar</div>
+        </div>
+      </div>
+    </sc-if>
+
+    <!-- ============ BUDGETS SCREEN ============ -->
+    <sc-if value="{{ isBudgets }}" hint-placeholder-val="{{ false }}">
+      <div class="fa-scroll" data-screen-label="Presupuestos" style="position:absolute;inset:0;z-index:42;background:var(--bg);animation:faUp .34s cubic-bezier(.22,1,.36,1);overflow-y:auto;padding:calc(env(safe-area-inset-top) + 14px) 22px calc(40px + env(safe-area-inset-bottom));">
+        <div style="display:flex;align-items:center;gap:14px;margin-bottom:22px;">
+          <div onClick="{{ popScreen }}" style="width:40px;height:40px;border-radius:50%;background:var(--surface);display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--text);"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 6 9 12 15 18"></polyline></svg></div>
+          <span style="font-size:22px;font-weight:800;letter-spacing:-.5px;">Presupuestos</span>
+        </div>
+        <sc-if value="{{ budAnyLimit }}" hint-placeholder-val="{{ false }}">
+          <div style="background:var(--card);border-radius:22px;padding:18px 20px;box-shadow:var(--shadow-pill);margin-bottom:20px;">
+            <div style="font-size:13px;font-weight:600;color:var(--text-2);margin-bottom:4px;">Gastado del período</div>
+            <div style="font-size:26px;font-weight:800;letter-spacing:-.5px;margin-bottom:12px;">{{ budTotalSpentStr }} <span style="font-size:14px;color:var(--text-3);font-weight:600;">de {{ budTotalBudStr }}</span></div>
+            <div style="height:9px;border-radius:6px;background:var(--surface);overflow:hidden;"><div style="height:100%;width: {{ budTotalBarW }};border-radius:6px;background: {{ budTotalBarColor }};"></div></div>
+          </div>
+        </sc-if>
+        <div style="font-size:13px;color:var(--text-2);font-weight:500;line-height:1.5;margin:0 2px 14px;">Tocá una categoría para poner o cambiar su límite mensual.</div>
+        <div style="display:flex;flex-direction:column;gap:11px;">
+          <sc-for list="{{ budRows }}" as="c" hint-placeholder-count="5">
+            <div onClick="{{ c.onEdit }}" style="background:var(--card);border-radius:18px;padding:15px 16px;box-shadow:var(--shadow-pill);cursor:pointer;">
+              <div style="display:flex;align-items:center;gap:12px;">
+                <div style="width:38px;height:38px;border-radius:12px;background:var( {{ c.iconVar }} );display:flex;align-items:center;justify-content:center;font-size:18px;flex:none;">{{ c.emoji }}</div>
+                <div style="flex:1;min-width:0;"><div style="font-size:15px;font-weight:700;">{{ c.name }}</div><div style="font-size:12px;color:var(--text-2);font-weight:500;">Gastado {{ c.spentStr }}</div></div>
+                <sc-if value="{{ c.hasLimit }}" hint-placeholder-val="{{ true }}"><span style="font-size:13px;font-weight:700;">{{ c.limitStr }}</span></sc-if>
+                <sc-if value="{{ c.noLimit }}" hint-placeholder-val="{{ false }}"><span style="font-size:12px;font-weight:700;color:var(--accent);">Definir</span></sc-if>
+              </div>
+              <sc-if value="{{ c.hasLimit }}" hint-placeholder-val="{{ true }}">
+                <div style="height:7px;border-radius:5px;background:var(--surface);overflow:hidden;margin:11px 0 6px;"><div style="height:100%;width: {{ c.barW }};border-radius:5px;background: {{ c.barColor }};"></div></div>
+                <div style="font-size:11.5px;font-weight:600;color: {{ c.statusColor }};">{{ c.statusStr }}</div>
+              </sc-if>
+            </div>
+          </sc-for>
+        </div>
+        <sc-if value="{{ budEditOpen }}" hint-placeholder-val="{{ false }}">
+          <div onClick="{{ closeBudgetEdit }}" style="position:fixed;inset:0;z-index:50;background:rgba(0,0,0,0.4);"></div>
+          <div style="position:fixed;left:0;right:0;bottom:0;z-index:51;background:var(--bg);border-radius:30px 30px 0 0;padding:14px 22px calc(28px + env(safe-area-inset-bottom));animation:faSheet .32s cubic-bezier(.22,1,.36,1);">
+            <div style="width:40px;height:4px;border-radius:2px;background:var(--surface-strong);margin:0 auto 16px;"></div>
+            <div style="font-size:17px;font-weight:700;text-align:center;margin-bottom:2px;">{{ budEditEmoji }} {{ budEditName }}</div>
+            <div style="font-size:13px;color:var(--text-2);text-align:center;font-weight:500;margin-bottom:16px;">Límite mensual</div>
+            <div style="text-align:center;font-size:42px;font-weight:800;letter-spacing:-1.5px;color:var(--accent);margin-bottom:16px;">{{ budAmtStr }}</div>
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:12px;">
+              <sc-for list="{{ budKeypad }}" as="key" hint-placeholder-count="12">
+                <div onClick="{{ key.onPress }}" style="height:54px;border-radius:15px;background:var(--surface);display:flex;align-items:center;justify-content:center;cursor:pointer;">
+                  <sc-if value="{{ key.isBack }}" hint-placeholder-val="{{ false }}"><svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="var(--text)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 5H9L3 12l6 7h12a1 1 0 0 0 1-1V6a1 1 0 0 0-1-1z"></path><line x1="12" y1="9.5" x2="17" y2="14.5"></line><line x1="17" y1="9.5" x2="12" y2="14.5"></line></svg></sc-if>
+                  <sc-if value="{{ key.isNum }}" hint-placeholder-val="{{ true }}"><span style="font-size:24px;font-weight:600;">{{ key.label }}</span></sc-if>
+                </div>
+              </sc-for>
+            </div>
+            <div onClick="{{ saveBudget }}" style="height:54px;border-radius:17px;background:var(--accent);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:16px;font-weight:700;color:#fff;opacity: {{ budSaveOpacity }};margin-bottom:10px;">Guardar límite</div>
+            <sc-if value="{{ budEditIsSet }}" hint-placeholder-val="{{ false }}">
+              <div onClick="{{ removeBudget }}" style="height:50px;border-radius:16px;background:rgba(240,101,92,0.12);color:var(--accent);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:15px;font-weight:600;">Quitar límite</div>
+            </sc-if>
+          </div>
+        </sc-if>
+      </div>
+    </sc-if>
+
     <!-- ============ ADD CARD ============ -->
     <sc-if value="{{ isAddCard }}" hint-placeholder-val="{{ false }}">
       <div class="fa-scroll" data-screen-label="Nueva tarjeta" style="position:absolute;inset:0;z-index:43;background:var(--bg);animation:faUp .34s cubic-bezier(.22,1,.36,1);overflow-y:auto;padding:calc(env(safe-area-inset-top) + 14px) 22px calc(40px + env(safe-area-inset-bottom));">
@@ -1850,7 +2059,7 @@ class Component extends DCLogic {
       payAccount:'banco', payAmount:'',
       cpCard:0, cpAmount:'', cpMerchant:'', cpCat:'compras', cpDate:'Hoy', cpInstall:1, cpSub:null,
       atMode:'buy', atAccount:'cedears', atType:'CEDEAR', atTicker:'', atName:'', atEmoji:'', atQty:'', atTotal:'', atPrice:'', atFees:'', atSource:'banco', atSub:null,
-      loanView:null, newLoan:{person:'',direction:'me_deben',concept:'',amount:'',currency:'ARS',editId:null}, loanPayAmount:'', ivSub:null, upTicker:'', atNewPrice:'', pricesLoading:false, pricesLastUpdated:null,
+      loanView:null, newLoan:{person:'',direction:'me_deben',concept:'',amount:'',currency:'ARS',editId:null}, loanPayAmount:'', goalView:null, newGoal:{name:'',emoji:'🎯',target:'',editId:null}, goalAmount:'', budgetCat:null, budgetAmount:'', ivSub:null, upTicker:'', atNewPrice:'', pricesLoading:false, pricesLastUpdated:null,
       newRec:{type:'gasto',concept:'',amount:'',cat:'otros',targetKind:'account',targetId:'',day:'1',editId:null},
       onbStep:0, onbCard:false, onbInvest:false, flash:'', confirm:null,
       showOnboarding:true,
@@ -1870,6 +2079,9 @@ class Component extends DCLogic {
     }
     // Post any due recurring movements / card auto-payments since last open.
     this.runAutomations();
+    // Record today's net-worth snapshot for the trend chart (now + once prices settle).
+    setTimeout(()=>this.recordSnapshot(),300);
+    setTimeout(()=>this.recordSnapshot(),3200);
     // Auto-fetch prices on mount (after 2s to let app settle) and every 60s.
     setTimeout(()=>this.fetchPrices(true),2000);
     this._priceTimer=setInterval(()=>this.fetchPrices(true),60000);
@@ -1903,7 +2115,7 @@ class Component extends DCLogic {
     clearInterval(this._priceTimer);
   }
   persistentKeys(){
-    return ['theme','chartStyle','balanceMode','periodIdx','scopeIdx','currency','hideAmounts','categories','catOrder','txns','categoryTotals','monthIncome','monthExpense','order','accounts','archived','balances','accMeta','cards','tagSugg','_next','showOnboarding','onbCard','onbInvest','cardIdx','assets','loans','recurring','lastBackupAt','backupDismissedAt'];
+    return ['theme','chartStyle','balanceMode','periodIdx','scopeIdx','currency','hideAmounts','categories','catOrder','txns','categoryTotals','budgets','monthIncome','monthExpense','order','accounts','archived','balances','accMeta','cards','tagSugg','_next','showOnboarding','onbCard','onbInvest','cardIdx','assets','loans','recurring','goals','history','usdRate','lastBackupAt','backupDismissedAt'];
   }
   persistentSnapshot(state){
     const snap={};
@@ -1914,7 +2126,7 @@ class Component extends DCLogic {
     if(!st||typeof st!=='object')throw new Error('invalid-state');
     const base=this.emptyData();
     const out=Object.assign({},base,st);
-    const objKeys=['categories','categoryTotals','accounts','archived','balances','accMeta'];
+    const objKeys=['categories','categoryTotals','budgets','accounts','archived','balances','accMeta'];
     objKeys.forEach(k=>{if(!out[k]||typeof out[k]!=='object'||Array.isArray(out[k]))out[k]={};});
     ['catOrder','txns','order','cards','tagSugg'].forEach(k=>{if(!Array.isArray(out[k]))out[k]=[];});
     out.categories=Object.assign({},base.categories,out.categories);
@@ -1936,6 +2148,11 @@ class Component extends DCLogic {
     out.loans=out.loans.filter(l=>l&&typeof l==='object'&&l.id!=null&&l.person);
     if(!Array.isArray(out.recurring))out.recurring=[];
     out.recurring=out.recurring.filter(r=>r&&typeof r==='object'&&r.id!=null&&isFinite(Number(r.amount)));
+    if(!Array.isArray(out.goals))out.goals=[];
+    out.goals=out.goals.filter(g=>g&&typeof g==='object'&&g.id!=null&&g.name).map(g=>Object.assign({emoji:'🎯',saved:0,target:0,date:'Hoy',entries:[]},g,{saved:Number(g.saved)||0,target:Number(g.target)||0,entries:Array.isArray(g.entries)?g.entries:[]}));
+    if(!Array.isArray(out.history))out.history=[];
+    out.history=out.history.filter(h=>h&&typeof h==='object'&&h.d&&isFinite(Number(h.pat))).map(h=>({d:String(h.d),pat:Number(h.pat)||0,disp:Number(h.disp)||0,inv:Number(h.inv)||0})).slice(-365);
+    out.usdRate=Number(out.usdRate)||0;
     return this.persistentSnapshot(out);
   }
   parseBackupPayload(raw){
@@ -2152,9 +2369,9 @@ class Component extends DCLogic {
   emptyData(){
     const cats={};this.DEFAULT_CAT_ORDER.concat(['pago']).forEach(k=>{cats[k]={...this.BASECATS[k]};});
     return {categories:cats,catOrder:this.DEFAULT_CAT_ORDER.slice(),
-      txns:[],categoryTotals:{},monthIncome:0,monthExpense:0,
+      txns:[],categoryTotals:{},budgets:{},monthIncome:0,monthExpense:0,
       order:[],accounts:{},archived:{},balances:{},accMeta:{},
-      cards:[],tagSugg:[],_next:1,assets:{},loans:[],recurring:[],lastBackupAt:null,backupDismissedAt:null};
+      cards:[],tagSugg:[],_next:1,assets:{},loans:[],recurring:[],goals:[],history:[],usdRate:0,lastBackupAt:null,backupDismissedAt:null};
   }
   clearAll(){this.setState(Object.assign({push:null,sheet:null,subsheet:null,tab:'inicio',showOnboarding:false,cardIdx:0,cardView:0,detailId:null,acctView:null,investView:null,confirm:null,flash:'Datos borrados · empezás de cero'},this.emptyData()));}
   finishOnboarding(){this.setState(s=>{let cards=s.cards,order=s.order,accounts=s.accounts,balances=s.balances,next=s._next;
@@ -2177,6 +2394,12 @@ class Component extends DCLogic {
   investIds(s){s=s||this.state;return s.order.filter(k=>s.accounts[k]&&s.accounts[k].kind==='invest'&&!s.archived[k]);}
   debtIds(s){s=s||this.state;return s.order.filter(k=>s.accounts[k]&&s.accounts[k].kind==='debt'&&!s.archived[k]);}
   cardDebt(s){s=s||this.state;return (s.cards||[]).reduce((a,c)=>a+c.saldo,0);}
+  _todayKey(){const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+  computeNetWorth(){const disp=this.sumIds(this.liquidIds()),inv=this.sumIds(this.investIds()),debt=this.cardDebt()+this.sumIds(this.debtIds());return{disp:Math.round(disp),inv:Math.round(inv),pat:Math.round(disp+inv-debt)};}
+  // Build an SVG line+area path from a value series (shared by charts).
+  sparkPath(vals,W,H,PAD){const n=vals.length;if(n<2)return null;const min=Math.min.apply(null,vals),max=Math.max.apply(null,vals),span=(max-min)||1;const xa=i=>(i/(n-1))*W,ya=v=>PAD+(1-(v-min)/span)*(H-2*PAD);let d='M '+xa(0).toFixed(1)+' '+ya(vals[0]).toFixed(1);for(let i=1;i<n;i++)d+=' L '+xa(i).toFixed(1)+' '+ya(vals[i]).toFixed(1);return{path:d,area:d+' L '+W+' '+H+' L 0 '+H+' Z',min,max};}
+  // Upsert today's net-worth snapshot (one per day), capped to a year of history.
+  recordSnapshot(){const nw=this.computeNetWorth(),key=this._todayKey();this.setState(s=>{const hist=(s.history||[]).slice(),last=hist[hist.length-1],entry={d:key,pat:nw.pat,disp:nw.disp,inv:nw.inv};if(last&&last.d===key){if(last.pat===entry.pat&&last.disp===entry.disp&&last.inv===entry.inv)return null;hist[hist.length-1]=entry;}else{hist.push(entry);}while(hist.length>365)hist.shift();return{history:hist};});}
   flashMsg(m){this.setState({flash:m});/* dismissal handled centrally in componentDidUpdate */}
   requestConfirm(cfg){this.setState({confirm:cfg});}
   doConfirm(){const c=this.state.confirm;this.setState({confirm:null});if(c&&c.onConfirm)c.onConfirm();}
@@ -2254,7 +2477,9 @@ class Component extends DCLogic {
     const url='/api/chart?ticker='+encodeURIComponent(ticker+'.BA')+'&range='+rr[0]+'&interval='+rr[1];
     fetch(url).then(r=>r.json()).then(j=>{
       if((this.state.assetChart||{}).range!==range)return; // a newer range was requested
-      const pts=((j&&j.closes)||[]).filter(x=>x!=null&&isFinite(x));
+      // Keep close+timestamp pairs aligned when dropping gaps.
+      const rawC=(j&&j.closes)||[],rawT=(j&&j.times)||[];const pts=[],tms=[];
+      for(let i=0;i<rawC.length;i++){if(rawC[i]!=null&&isFinite(rawC[i])){pts.push(rawC[i]);tms.push(rawT[i]||null);}}
       if(pts.length<2){this.setState(s=>({assetChart:{...s.assetChart,loading:false,ok:false,range}}));return;}
       const n=pts.length,min=Math.min.apply(null,pts),max=Math.max.apply(null,pts),span=(max-min)||1;
       const W=320,H=92,PAD=10;const xa=i=>(i/(n-1))*W;const ya=v=>PAD+(1-(v-min)/span)*(H-2*PAD);
@@ -2262,7 +2487,10 @@ class Component extends DCLogic {
       const area=d+' L '+W+' '+H+' L 0 '+H+' Z';
       const up=pts[n-1]>=pts[0];const chg=pts[0]>0?(pts[n-1]-pts[0])/pts[0]*100:0;
       const lbl={'1D':'hoy','1S':'en la semana','1M':'en el mes','Máx':'histórico'}[range]||'';
-      this.setState({assetChart:{loading:false,ok:true,range,path:d,area,up,changeStr:(chg>=0?'+':'')+chg.toFixed(1).replace('.',',')+'% '+lbl,maxStr:'$'+this.fmtInt(max),minStr:'$'+this.fmtInt(min)}});
+      // X-axis date/time labels for the ends of the series.
+      const MES=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+      const fmtT=ts=>{if(!ts)return'';const dt=new Date(ts*1000);return range==='1D'?(String(dt.getHours()).padStart(2,'0')+':'+String(dt.getMinutes()).padStart(2,'0')):(dt.getDate()+' '+MES[dt.getMonth()]+(range==='Máx'?" '"+String(dt.getFullYear()).slice(-2):''));};
+      this.setState({assetChart:{loading:false,ok:true,range,path:d,area,up,changeStr:(chg>=0?'+':'')+chg.toFixed(1).replace('.',',')+'% '+lbl,maxStr:'$'+this.fmtInt(max),minStr:'$'+this.fmtInt(min),startLabel:fmtT(tms[0]),endLabel:fmtT(tms[n-1])}});
     }).catch(()=>{if((this.state.assetChart||{}).range===range)this.setState(s=>({assetChart:{...s.assetChart,loading:false,ok:false}}));});
   }
   setAtType(type){this.setState({atType:type,atAccount:this.accountForType(type),atTicker:'',atName:'',atEmoji:''});}
@@ -2291,6 +2519,20 @@ class Component extends DCLogic {
   addLoanPayment(){const S=this.state;const v=parseFloat((S.loanPayAmount||'').replace(',','.'))||0;if(!v){this.flashMsg('Ingresá un monto');return;}this.setState(s=>{const loans=(s.loans||[]).map(l=>{if(l.id!==S.loanView)return l;const rem=Math.max(0,l.remaining-v);return{...l,remaining:rem,payments:[{amount:v,date:'Hoy',note:''},...l.payments]};});return{loans,loanPayAmount:'',flash:'Pago registrado'};});}
   deleteLoan(id){this.requestConfirm({title:'Eliminar préstamo',msg:'Se eliminará este préstamo. No se puede deshacer.',confirmLabel:'Eliminar',danger:true,onConfirm:()=>this.setState(s=>({loans:(s.loans||[]).filter(l=>l.id!==id),push:'loansScreen',loanView:null,flash:'Préstamo eliminado'}))});}
   closeLoan(id){this.requestConfirm({title:'Saldar préstamo',msg:'Se marcará como saldado con saldo cero.',confirmLabel:'Saldar',danger:false,onConfirm:()=>this.setState(s=>({loans:(s.loans||[]).map(l=>l.id===id?{...l,remaining:0}:l),flash:'Préstamo saldado'}))});}
+  // ===== Savings goals (aspirational tracker; does not move real balances) =====
+  setNewGoal(patch){this.setState(s=>({newGoal:{...s.newGoal,...patch}}));}
+  openAddGoal(editId){const s=this.state;if(editId!=null){const g=(s.goals||[]).find(x=>x.id===editId);if(g){this.setState({push:'addGoal',newGoal:{name:g.name,emoji:g.emoji||'🎯',target:String(g.target),editId}});return;}}this.setState({push:'addGoal',newGoal:{name:'',emoji:'🎯',target:'',editId:null}});}
+  saveGoal(){const n=this.state.newGoal;if(!n.name.trim()){this.flashMsg('Poné un nombre');return;}const target=parseFloat((n.target||'').replace(/\./g,'').replace(',','.'))||0;if(!target){this.flashMsg('Ingresá el objetivo');return;}this.setState(s=>{const goals=(s.goals||[]).slice();if(n.editId!=null){const idx=goals.findIndex(g=>g.id===n.editId);if(idx>=0){goals[idx]={...goals[idx],name:n.name.trim(),emoji:n.emoji||'🎯',target};return{goals,push:'goalDetail',goalView:n.editId,flash:'Meta actualizada'};}return{};}const id='g'+s._next;goals.push({id,name:n.name.trim(),emoji:n.emoji||'🎯',target,saved:0,date:'Hoy',entries:[]});return{goals,_next:s._next+1,push:'goalDetail',goalView:id,flash:'Meta creada'};});}
+  openGoalDetail(id){this.setState({push:'goalDetail',goalView:id,goalAmount:''});}
+  goalAmountPress(d){this.setState(s=>{let r=s.goalAmount;if(d==='back')return{goalAmount:r.slice(0,-1)};if(d===','){if(r.indexOf(',')>=0||r==='')return{};return{goalAmount:r+','};}if(r.indexOf(',')>=0&&(r.split(',')[1]||'').length>=2)return{};if(r.replace(',','').length>=9)return{};return{goalAmount:r+d};});}
+  addGoalMoney(dir){const S=this.state;const v=parseFloat((S.goalAmount||'').replace(',','.'))||0;if(!v){this.flashMsg('Ingresá un monto');return;}this.setState(s=>{const goals=(s.goals||[]).map(g=>{if(g.id!==S.goalView)return g;const nv=dir==='take'?Math.max(0,(g.saved||0)-v):(g.saved||0)+v;return{...g,saved:nv,entries:[{amount:dir==='take'?-v:v,date:'Hoy'},...(g.entries||[])]};});return{goals,goalAmount:'',flash:dir==='take'?'Retiro registrado':'Ahorro registrado'};});}
+  deleteGoal(id){this.requestConfirm({title:'Eliminar meta',msg:'Se eliminará esta meta. No se puede deshacer.',confirmLabel:'Eliminar',danger:true,onConfirm:()=>this.setState(s=>({goals:(s.goals||[]).filter(g=>g.id!==id),push:'goalsScreen',goalView:null,flash:'Meta eliminada'}))});}
+  // ===== Budgets (monthly limit per category) =====
+  openBudgetEdit(cat){const cur=(this.state.budgets||{})[cat];this.setState({budgetCat:cat,budgetAmount:cur?String(cur):''});}
+  closeBudgetEdit(){this.setState({budgetCat:null,budgetAmount:''});}
+  budgetAmountPress(d){this.setState(s=>{let r=s.budgetAmount;if(d==='back')return{budgetAmount:r.slice(0,-1)};if(d===','){if(r.indexOf(',')>=0||r==='')return{};return{budgetAmount:r+','};}if(r.indexOf(',')>=0&&(r.split(',')[1]||'').length>=2)return{};if(r.replace(',','').length>=9)return{};return{budgetAmount:r+d};});}
+  saveBudget(){const S=this.state;const cat=S.budgetCat;if(!cat)return;const v=parseFloat((S.budgetAmount||'').replace(',','.'))||0;this.setState(s=>{const budgets={...(s.budgets||{})};if(v>0)budgets[cat]=v;else delete budgets[cat];return{budgets,budgetCat:null,budgetAmount:'',flash:v>0?'Presupuesto guardado':'Presupuesto quitado'};});}
+  removeBudget(){const S=this.state;const cat=S.budgetCat;if(!cat)return;this.setState(s=>{const budgets={...(s.budgets||{})};delete budgets[cat];return{budgets,budgetCat:null,budgetAmount:'',flash:'Presupuesto quitado'};});}
   closeCardMonth(idx){this.requestConfirm({title:'Cerrar mes',msg:'Las cuotas avanzarán un mes y se limpiarán las compras del resumen. Las cuotas completadas se eliminan.',confirmLabel:'Cerrar mes',danger:false,onConfirm:()=>this.setState(s=>{const cards=s.cards.map((c,i)=>i===idx?this._closeCycleCard(c,new Date()):c);return{cards,flash:'Mes cerrado · cuotas avanzadas'};})});}
   setNewRec(patch){this.setState(s=>({newRec:{...s.newRec,...patch}}));}
   openRecScreen(){this.setState({push:'recScreen'});}
@@ -2310,11 +2552,12 @@ class Component extends DCLogic {
       const CRYPTO={BTC:'bitcoin',ETH:'ethereum',ADA:'cardano',SOL:'solana',MATIC:'matic-network',DOT:'polkadot'};
       const cryptoSet=new Set(),stockSet=new Set();const fciList=[];
       Object.keys(na).forEach(k=>{if(!s.accounts[k])return;(na[k]||[]).forEach(a=>{if(a.fci){fciList.push({id:a.id,phrases:Array.isArray(a.fondoMatch)?a.fondoMatch:[a.fondoMatch||'']});return;}if(!a.ticker)return;if(CRYPTO[a.ticker])cryptoSet.add(a.ticker);else stockSet.add(a.ticker);});});
+      // 0. Dólar cripto (para mostrar inversiones en USD y convertir cripto).
+      let criptoRate=this.state.usdRate||0;try{const d=await(await fetch('https://dolarapi.com/v1/dolares/cripto')).json();const r=d?.venta||d?.compra||0;if(r>0)criptoRate=r;}catch(e){}
       // 1. Crypto -> CoinGecko USD x crypto-dollar (USDT) rate, so the ARS value
       // matches what the exchange (Binance) shows. Falls back to CoinGecko ARS.
       const cryptoPrices={};
       if(cryptoSet.size){
-        let criptoRate=0;try{const d=await(await fetch('https://dolarapi.com/v1/dolares/cripto')).json();criptoRate=d?.venta||d?.compra||0;}catch(e){}
         const ids=[...cryptoSet].map(t=>CRYPTO[t]).join(',');
         try{const d=await(await fetch('https://api.coingecko.com/api/v3/simple/price?ids='+ids+'&vs_currencies=usd,ars')).json();
           Object.entries(CRYPTO).forEach(([t,id])=>{const usd=d[id]?.usd;if(usd&&criptoRate>0)cryptoPrices[t]=usd*criptoRate;else if(d[id]?.ars)cryptoPrices[t]=d[id].ars;});}catch(e){}}
@@ -2366,7 +2609,7 @@ class Component extends DCLogic {
         const total=aa.reduce((s2,a)=>s2+(a.ticker?a.qty*(a.lastPrice||a.avg):0),0);
         const val=Math.round(total*100)/100;
         if(changed||Math.abs(val-(nb[k]||0))>0.005){na[k]=aa;nb[k]=val;anyUpdate=true;}});
-      this.setState({assets:na,balances:nb,pricesLoading:false,pricesLastUpdated:Date.now(),...(anyUpdate?{accMeta:newAccMeta}:{}),...(!silent&&anyUpdate?{flash:'Precios actualizados'}:{})});}
+      this.setState({assets:na,balances:nb,pricesLoading:false,pricesLastUpdated:Date.now(),...(criptoRate>0?{usdRate:criptoRate}:{}),...(anyUpdate?{accMeta:newAccMeta}:{}),...(!silent&&anyUpdate?{flash:'Precios actualizados'}:{})});}
     catch(e){this.setState({pricesLoading:false,...(!silent?{flash:'Error al actualizar precios'}:{})});}}
 
   press(d){this.setState(s=>{let r=s.addAmount;if(d===','){if(r.indexOf(',')>=0||r==='')return{};return{addAmount:r+','};}if(r.indexOf(',')>=0){const dec=r.split(',')[1]||'';if(dec.length>=2)return{};}if(r.replace(',','').length>=9)return{};return{addAmount:r+d};});}
@@ -2524,7 +2767,7 @@ class Component extends DCLogic {
     let invD={};
     if(S.investView&&ACC[S.investView]){const k=S.investView,a=ACC[k];
       const rawAssets=(S.assets&&S.assets[k])||[];
-      const assets=rawAssets.map(as=>{const lp=as.lastPrice||as.avg;const value=as.qty*lp;const cost=as.qty*as.avg;const gl=value-cost;const glPct=cost>0?(gl/cost*100):0;return{name:as.name,ticker:as.ticker,emoji:as.emoji,qtyStr:(as.qty<1?as.qty.toFixed(6).replace(/\.?0+$/,''):this.fmtInt(as.qty))+(as.ticker?' '+as.ticker:' u'),avgStr:money(as.avg),costStr:money(cost),lastPriceStr:money(lp),valueStr:money(value),glStr:(gl>=0?'+':'-')+sym+this.fmtInt(Math.abs(gl)),glPctStr:(gl>=0?'+':'')+glPct.toFixed(1).replace('.',',')+'%',glColor:gl>=0?'var(--pos)':'var(--accent)',onUpdatePrice:()=>this.setState({ivSub:'updatePrice',upTicker:as.ticker,atNewPrice:''})};});
+      const assets=rawAssets.map(as=>{const lp=as.lastPrice||as.avg;const value=as.qty*lp;const cost=as.qty*as.avg;const gl=value-cost;const glPct=cost>0?(gl/cost*100):0;return{name:as.name,ticker:as.ticker,emoji:as.emoji,qtyStr:(as.qty<1?as.qty.toFixed(6).replace(/\.?0+$/,''):this.fmtInt(as.qty))+(as.ticker?' '+as.ticker:' u'),avgStr:money(as.avg),costStr:money(cost),lastPriceStr:money(lp),valueStr:money(value),glStr:(gl>=0?'+':'-')+sym+this.fmtInt(Math.abs(gl)),glPctStr:(gl>=0?'+':'')+glPct.toFixed(1).replace('.',',')+'%',glColor:gl>=0?'var(--pos)':'var(--accent)',manual:(!as.ticker&&!as.fci),onUpdatePrice:()=>this.setState({ivSub:'updatePrice',upTicker:as.ticker,atNewPrice:''})};});
       const ivUpKeypad=order.map(l=>({label:l,isBack:l==='back',isNum:l!=='back',onPress:l==='back'?()=>this.atNewPricePress('back'):()=>this.atNewPricePress(l)}));
       const totalValue=rawAssets.reduce((sum,as)=>sum+as.qty*(as.lastPrice||as.avg),0);
       const totalCost=rawAssets.reduce((sum,as)=>sum+as.qty*as.avg,0);
@@ -2548,13 +2791,19 @@ class Component extends DCLogic {
     portAssets.forEach((a,i)=>{a.color=PALCOLORS[i%PALCOLORS.length];a.pct=portValue>0?a.value/portValue*100:0;a.gl=a.value-a.cost;a.glPct=a.cost>0?a.gl/a.cost*100:0;});
     const portRend=S.portMode==='rendimiento';
     const portList=portAssets.map(a=>{const glStr=(a.gl>=0?'+':'-')+sym+this.fmtInt(Math.abs(a.gl)),glPctStr=(a.gl>=0?'+':'')+a.glPct.toFixed(1).replace('.',',')+'%',glColor=a.gl>=0?'var(--pos)':'var(--accent)';
-      return {name:a.name,ticker:a.ticker||'',emoji:a.emoji,color:a.color,pctStr:a.pct.toFixed(0)+'%',barW:Math.max(2,a.pct).toFixed(2)+'%',
+      return {name:a.name,ticker:a.ticker||'',emoji:a.emoji,color:a.color,pctStr:a.pct.toFixed(0)+'%',
         primaryStr:portRend?glStr:money(a.value),primaryColor:portRend?glColor:'var(--text)',
         secondaryStr:portRend?glPctStr:(glStr+' · '+glPctStr),secondaryColor:glColor,
         onOpen:()=>this.openAssetDetail(a.account,a.ticker)};});
+    // Allocation donut (conic-gradient), same pattern as the Reports donut.
+    let portAcc=0;const portDonutN=portAssets.length;const portDonutGap=portDonutN>1?1.4:0;const portDonutSegs=[];
+    portAssets.forEach((a,i)=>{const span=portValue>0?a.value/portValue*100:0;const a0=portAcc;const a1=portAcc+span;portAcc=a1;const g=i<portDonutN-1?Math.min(portDonutGap,span*0.4):0;portDonutSegs.push(a.color+' '+a0.toFixed(2)+'% '+(a1-g).toFixed(2)+'%');if(g>0)portDonutSegs.push('var(--bg) '+(a1-g).toFixed(2)+'% '+a1.toFixed(2)+'%');});
+    const portDonutGradient=portAssets.length?'conic-gradient('+portDonutSegs.join(',')+')':'var(--surface-strong)';
+    const usdRate=S.usdRate||0;const portValueUsd=usdRate>0?portValue/usdRate:0;
     const portfolio={portValueStr:money(portValue),portHasAssets:portAssets.length>0,portCostStr:money(portCost),
       portResultWord:portGL>=0?'Ganás':'Perdés',portResultAbsStr:sym+this.fmtInt(Math.abs(portGL)),portGLPctStr:(portGL>=0?'+':'')+portGLPct.toFixed(1).replace('.',',')+'%',portGLColor:portGL>=0?'var(--pos)':'var(--accent)',
-      portSegments:portList.map(a=>({color:a.color,w:a.barW})),portList,portNoAssets:portAssets.length===0,
+      portHasUsd:usdRate>0&&!S.hideAmounts,portValueUsdStr:'US$ '+this.fmtInt(portValueUsd),portUsdRateStr:'$'+this.fmtInt(usdRate),
+      portDonutGradient,portCount:portAssets.length,portList,portNoAssets:portAssets.length===0,
       setPortValor:()=>this.setState({portMode:'valor'}),setPortRend:()=>this.setState({portMode:'rendimiento'}),
       portValorBg:portRend?'transparent':'var(--card)',portValorColor:portRend?'var(--text-3)':'var(--text)',portRendBg:portRend?'var(--card)':'transparent',portRendColor:portRend?'var(--text)':'var(--text-3)'};
     // ===== ASSET DETAIL (single holding page) =====
@@ -2562,13 +2811,13 @@ class Component extends DCLogic {
     if(S.assetView){const av=S.assetView;const a=(S.assets[av.account]||[]).find(x=>x.ticker===av.ticker);
       if(a){const lp=a.lastPrice||a.avg,value=a.qty*lp,cost=a.qty*a.avg,gl=value-cost,glPct=cost>0?gl/cost*100:0;const pct=portValue>0?value/portValue*100:0;const accM=ACC[av.account]||{};
         assetD={adAName:a.name,adATicker:a.ticker||'',adAEmoji:a.emoji,adAAccName:accM.name||'',adAFillVar:accM.fillVar||'--cat-inversion-fill',
-          adAValueStr:money(value),adAQtyStr:(a.qty<1?a.qty.toFixed(6).replace(/\.?0+$/,''):this.fmtInt(a.qty))+(a.ticker?' '+a.ticker:' u'),
+          adAValueStr:money(value),adAHasUsd:(S.usdRate>0&&!S.hideAmounts),adAValueUsdStr:'≈ US$ '+this.fmtInt(value/(S.usdRate||1)),adAQtyStr:(a.qty<1?a.qty.toFixed(6).replace(/\.?0+$/,''):this.fmtInt(a.qty))+(a.ticker?' '+a.ticker:' u'),
           adACostStr:money(cost),adAResultWord:gl>=0?'Ganás':'Perdés',adAResultAbsStr:sym+this.fmtInt(Math.abs(gl)),adAGLPctStr:(gl>=0?'+':'')+glPct.toFixed(1).replace('.',',')+'%',adAGLColor:gl>=0?'var(--pos)':'var(--accent)',
           adAAvgStr:money(a.avg),adALastStr:money(lp),adAPctStr:pct.toFixed(0)+'% de tu portfolio',
           adAResultSignStr:(gl>=0?'+':'-')+sym+this.fmtInt(Math.abs(gl)),
           acHasPath:!!S.assetChart.path,acDim:S.assetChart.loading?'0.45':'1',acLoadingNoPath:S.assetChart.loading&&!S.assetChart.path,acFail:!S.assetChart.ok&&!S.assetChart.loading&&!S.assetChart.path,
-          acPath:S.assetChart.path||'',acArea:S.assetChart.area||'',acColor:'#2E9BEA',acMaxStr:S.assetChart.maxStr||'',acMinStr:S.assetChart.minStr||'',
-          acChangeStr:S.assetChart.changeStr||'',acChangeColor:S.assetChart.up?'var(--pos)':'var(--accent)',
+          acPath:S.assetChart.path||'',acArea:S.assetChart.area||'',acColor:'#2E9BEA',acMaxStr:S.assetChart.maxStr||'',acMinStr:S.assetChart.minStr||'',acStartLabel:S.assetChart.startLabel||'',acEndLabel:S.assetChart.endLabel||'',
+          acChangeStr:S.assetChart.changeStr||'',acChangeColor:S.assetChart.up?'var(--pos)':'var(--accent)',acHasChange:!!S.assetChart.changeStr,acNoChange:!S.assetChart.changeStr,
           acRanges:['1D','1S','1M','Máx'].map(r=>({label:r,onPick:()=>this.setAssetChartRange(r),bg:(S.assetChartRange===r)?'var(--text)':'var(--surface)',color:(S.assetChartRange===r)?'var(--bg)':'var(--text-2)'})),
           adABuy:()=>this.tradeAsset('buy',av.account,a),adASell:()=>this.tradeAsset('sell',av.account,a),
           adAUpdate:()=>this.setState({push:'investDetail',investView:av.account,ivSub:'updatePrice',upTicker:a.ticker,atNewPrice:''}),
@@ -2611,6 +2860,46 @@ class Component extends DCLogic {
         ldAddPayment:()=>this.addLoanPayment(),ldPaySaveOpacity:S.loanPayAmount?'1':'0.5',
         ldEdit:()=>this.openAddLoan(S.loanView),ldDelete:()=>this.deleteLoan(S.loanView),ldClose:()=>this.closeLoan(S.loanView),
         ldBack:()=>this.setState({push:'loansScreen'}),addLoanBack:()=>this.setState({push:S.newLoan.editId!=null?'loanDetail':'loansScreen'})};}
+    // goals (savings)
+    let goalD={};
+    {const goals=(S.goals||[]);const GOALEMOJIS=['🎯','🏖️','🚗','🏠','✈️','🎓','💻','📱','💍','🎁'];
+      const goalItems=goals.map(g=>{const pct=g.target>0?Math.min(100,Math.round(g.saved/g.target*100)):0;const done=g.target>0&&g.saved>=g.target;return{id:g.id,name:g.name,emoji:g.emoji||'🎯',savedStr:moneyInt(g.saved),targetStr:moneyInt(g.target),pct:pct+'%',barW:pct+'%',done,barColor:done?'var(--pos)':'var(--accent)',pctColor:done?'var(--pos)':'var(--text-2)',statusLabel:done?'¡Completada!':pct+'%',onOpen:()=>this.openGoalDetail(g.id)};});
+      const curGoal=goals.find(g=>g.id===S.goalView)||{};
+      const gTarget=curGoal.target||0,gSaved=curGoal.saved||0,gPct=gTarget>0?Math.min(100,Math.round(gSaved/gTarget*100)):0,gDone=gTarget>0&&gSaved>=gTarget;
+      const goalEntries=(curGoal.entries||[]).map((e,i,arr)=>({amountStr:(e.amount>=0?'+':'-')+moneyInt(Math.abs(e.amount)),date:e.date,color:e.amount>=0?'var(--pos)':'var(--accent)',divider:i===arr.length-1?'transparent':'var(--hairline)'}));
+      const goalKeypad=order.map(l=>({label:l,isBack:l==='back',isNum:l!=='back',onPress:l==='back'?()=>this.goalAmountPress('back'):()=>this.goalAmountPress(l)}));
+      const ng=S.newGoal;
+      goalD={isGoalsScreen:S.push==='goalsScreen',isAddGoal:S.push==='addGoal',isGoalDetail:S.push==='goalDetail',
+        goalItems,goalHasItems:goalItems.length>0,goalEmpty:goalItems.length===0,openAddGoal:()=>this.openAddGoal(null),
+        ngName:ng.name,setNgName:(e)=>this.setNewGoal({name:e.target.value}),
+        ngTarget:ng.target,setNgTarget:(e)=>this.setNewGoal({target:e.target.value}),
+        ngEmojiChips:GOALEMOJIS.map(em=>({emoji:em,onPick:()=>this.setNewGoal({emoji:em}),bg:ng.emoji===em?'var(--accent)':'var(--surface)'})),
+        ngTitle:ng.editId!=null?'Editar meta':'Nueva meta',ngSaveLabel:ng.editId!=null?'Guardar cambios':'Crear meta',saveGoal:()=>this.saveGoal(),
+        addGoalBack:()=>this.setState({push:ng.editId!=null?'goalDetail':'goalsScreen'}),
+        gdName:curGoal.name||'',gdEmoji:curGoal.emoji||'🎯',gdSavedStr:moneyInt(gSaved),gdTargetStr:moneyInt(gTarget),
+        gdPct:gPct+'%',gdBarW:gPct+'%',gdDone:gDone,gdBarColor:gDone?'var(--pos)':'var(--accent)',
+        gdRemainingStr:moneyInt(Math.max(0,gTarget-gSaved)),gdStatusLabel:gDone?'¡Meta cumplida!':'Te falta',
+        gdAmtStr:this.displayAmount(S.goalAmount),gdKeypad:goalKeypad,gdSaveOpacity:S.goalAmount?'1':'0.5',
+        gdAdd:()=>this.addGoalMoney('add'),gdTake:()=>this.addGoalMoney('take'),
+        gdEntries:goalEntries,gdHasEntries:goalEntries.length>0,
+        gdEdit:()=>this.openAddGoal(S.goalView),gdDelete:()=>this.deleteGoal(S.goalView),
+        gdBack:()=>this.setState({push:'goalsScreen'})};}
+    // budgets (monthly limit per category)
+    let budgetD={};
+    {const B=S.budgets||{};
+      const budRows=expKeys.map(k=>{const spent=S.categoryTotals[k]||0;const lim=B[k]||0;const has=lim>0;const pct=has?Math.min(100,Math.round(spent/lim*100)):0;const over=has&&spent>lim;const rem=Math.max(0,lim-spent);
+        return{cat:k,name:(CAT[k]||{}).name,emoji:(CAT[k]||{}).emoji,iconVar:cIcon(k),spentStr:moneyInt(spent),limitStr:has?moneyInt(lim):'',hasLimit:has,noLimit:!has,barW:pct+'%',barColor:over?'var(--accent)':(pct>=80?'#E8A13C':'var(--pos)'),statusStr:over?('Te pasaste '+moneyInt(spent-lim)):('Te queda '+moneyInt(rem)),statusColor:over?'var(--accent)':'var(--text-2)',onEdit:()=>this.openBudgetEdit(k)};});
+      const withLimit=budRows.filter(r=>r.hasLimit);
+      const totalBud=withLimit.reduce((a,r)=>a+((B[r.cat])||0),0);
+      const totalSpent=withLimit.reduce((a,r)=>a+(S.categoryTotals[r.cat]||0),0);
+      const totalPct=totalBud>0?Math.min(100,Math.round(totalSpent/totalBud*100)):0;
+      const editCat=S.budgetCat;const editCatObj=editCat?(CAT[editCat]||{}):{};
+      const budKeypad=order.map(l=>({label:l,isBack:l==='back',isNum:l!=='back',onPress:l==='back'?()=>this.budgetAmountPress('back'):()=>this.budgetAmountPress(l)}));
+      budgetD={isBudgets:S.push==='budgetsScreen',budRows,budAnyLimit:withLimit.length>0,
+        budTotalBudStr:moneyInt(totalBud),budTotalSpentStr:moneyInt(totalSpent),budTotalBarW:totalPct+'%',budTotalBarColor:totalSpent>totalBud?'var(--accent)':'var(--pos)',
+        budEditOpen:!!editCat,budEditName:editCatObj.name||'',budEditEmoji:editCatObj.emoji||'',budEditIsSet:editCat?(B[editCat]>0):false,
+        budAmtStr:this.displayAmount(S.budgetAmount),budKeypad,budSaveOpacity:S.budgetAmount?'1':'0.5',
+        saveBudget:()=>this.saveBudget(),removeBudget:()=>this.removeBudget(),closeBudgetEdit:()=>this.closeBudgetEdit()};}
     // pay card
     const payAccName=ACC[S.payAccount]?ACC[S.payAccount].name:'';const payAccEmoji=ACC[S.payAccount]?ACC[S.payAccount].emoji:'';
     const payCardC=S.cards[S.cardView]||S.cards[0]||{brand:''};
@@ -2673,6 +2962,11 @@ class Component extends DCLogic {
     let repAcc=0;const repDonutN=repByCat.length;const repDonutGap=repDonutN>1?1.4:0;const repDonutSegs=[];
     repByCat.forEach((x,i)=>{const span=repExpense>0?x.t/repExpense*100:0;const a0=repAcc;const a1=repAcc+span;repAcc=a1;const g=i<repDonutN-1?Math.min(repDonutGap,span*0.4):0;repDonutSegs.push('var('+cIcon(x.k)+') '+a0.toFixed(2)+'% '+(a1-g).toFixed(2)+'%');if(g>0)repDonutSegs.push('var(--card) '+(a1-g).toFixed(2)+'% '+a1.toFixed(2)+'%');});
     const repDonutGradient=repByCat.length?'conic-gradient('+repDonutSegs.join(',')+')':'var(--surface-strong)';
+    // Net-worth trend (patrimonio over time) from daily snapshots.
+    const hist=(S.history||[]);let trend={trendHas:false,trendSingle:hist.length===1};
+    if(hist.length>=2){const vals=hist.map(h=>h.pat);const sp=this.sparkPath(vals,320,80,8);const first=vals[0],last=vals[vals.length-1];const up=last>=first;const chg=first!==0?(last-first)/Math.abs(first)*100:0;
+      const MES=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];const fmtD=(k)=>{const p=String(k).split('-');return p.length===3?(parseInt(p[2],10)+' '+MES[parseInt(p[1],10)-1]):k;};
+      trend={trendHas:true,trendSingle:false,trendPath:sp.path,trendArea:sp.area,trendColor:up?'var(--pos)':'var(--accent)',trendMaxStr:money(sp.max),trendMinStr:money(sp.min),trendStartLabel:fmtD(hist[0].d),trendEndLabel:fmtD(hist[hist.length-1].d),trendChangeStr:(chg>=0?'+':'')+chg.toFixed(1).replace('.',',')+'%',trendChangeColor:up?'var(--pos)':'var(--accent)',trendCurrentStr:money(last)};}
     // Spending by account (cash/bank expenses, i.e. not card purchases).
     const acctSpend={};S.txns.forEach(t=>{if(t.amount<0&&!t.isTransfer&&!t.onCard){const a=t.account;if(a)acctSpend[a]=(acctSpend[a]||0)+t.val;}});
     const repByAcct=Object.keys(acctSpend).filter(a=>ACC[a]).map(a=>({name:ACC[a].name,emoji:ACC[a].emoji,fillVar:ACC[a].fillVar,amountStr:money(acctSpend[a]),v:acctSpend[a]})).sort((a,b)=>b.v-a.v);
@@ -2707,6 +3001,8 @@ class Component extends DCLogic {
       {label:'Cuentas',sub:'Bancos, efectivo y billeteras',emoji:'🏦',fillVar:'--cat-transfer-fill',onPick:()=>this.setState({tab:'cuentas',push:null})},
       {label:'Tarjetas',sub:'Crédito, cuotas y pagos',emoji:'💳',fillVar:'--cat-tarjetas-fill',onPick:()=>this.setState({tab:'tarjetas',push:null})},
       {label:'Inversiones',sub:'CEDEARs, cripto y renta fija',emoji:'📈',fillVar:'--cat-inversion-fill',onPick:()=>this.setState({push:'investments'})},
+      {label:'Presupuestos',sub:'Límite mensual por categoría',emoji:'📊',fillVar:'--cat-compras-fill',onPick:()=>this.setState({push:'budgetsScreen'})},
+      {label:'Metas de ahorro',sub:'Objetivos y tu progreso',emoji:'🎯',fillVar:'--cat-inversion-fill',onPick:()=>this.setState({push:'goalsScreen'})},
       {label:'Préstamos',sub:'Lo que te deben y lo que debés',emoji:'🤝',fillVar:'--cat-otros-fill',onPick:()=>this.setState({push:'loansScreen'})},
       {label:'Recurrentes',sub:'Suscripciones, sueldo y pagos fijos',emoji:'🔁',fillVar:'--cat-ocio-fill',onPick:()=>this.openRecScreen()},
       {label:'Categorías',sub:'Gestionar categorías',emoji:'🏷️',fillVar:'--cat-comida-fill',onPick:()=>this.setState({push:'categories'})},
@@ -2801,7 +3097,7 @@ class Component extends DCLogic {
       saveAssetTrade:()=>this.saveAssetTrade(),
       repIncomeStr:money(repIncome),repExpenseStr:money(repExpense),repExpenseShort:(()=>{const n=Math.abs(repExpense);if(n>=1e6)return sym+(n/1e6).toFixed(2).replace(/\.?0+$/,'').replace('.',',')+'M';if(n>=1e3)return sym+(n/1e3).toFixed(1).replace(/\.0$/,'').replace('.',',')+'K';return sym+Math.round(n);})(),repNetStr:(repNet>=0?'+':'-')+sym+this.fmtInt(Math.abs(repNet)),repNetColor:repNet>=0?'var(--pos)':'var(--accent)',
       repIncPct:repIncPct+'%',repExpPct:(100-repIncPct)+'%',repMovCount,
-      repCatRows,repDonutGradient,repByAcct,repHasByAcct,repByCard,repHasByCard,repTopMerch,repHasMerch,futCuotasStr:money(futCuotas),futHasCuotas:futCuotas>0,
+      repCatRows,repDonutGradient,repByAcct,repHasByAcct,repByCard,repHasByCard,repTopMerch,repHasMerch,...trend,futCuotasStr:money(futCuotas),futHasCuotas:futCuotas>0,
       masItems,
       isCloudScreen:S.push==='cloudScreen',cloudOff:S.cloud.status==='off',cloudSignedIn:S.cloud.status==='signed-in',cloudSignedOut:S.cloud.status==='signed-out',
       cloudEmail:S.cloud.email,cloudPassword:S.cloud.password,cloudSyncing:S.cloud.syncing,cloudSyncOpacity:S.cloud.syncing?'0.5':'1',cloudUserEmail:S.cloud.user?S.cloud.user.email:'',
@@ -2866,7 +3162,7 @@ class Component extends DCLogic {
       catList:S.catOrder.filter(k=>CAT[k]).map(k=>{const c=CAT[k];const tn=(this.CATTYPES.find(t=>t[0]===c.type)||['','Gasto'])[1];return {id:k,name:c.name,emoji:c.emoji,fillVar:c.fillVar,typeLabel:tn,archived:!!c.archived,rowOpacity:c.archived?'0.55':'1',subLabel:(c.archived?'Archivada · ':'')+tn+(c.parent&&CAT[c.parent]?(' · '+CAT[c.parent].name):''),nameColor:c.archived?'var(--text-3)':'var(--text)',onPick:()=>this.openCatEditor(k)};}),
       addCategory:()=>this.openCatEditor(null),
       isTags:S.push==='tags',tagList:S.tagSugg.map(t=>({label:t,onEdit:()=>this.openTagEditor(t)})),
-      ...acctD,...invD,...cardD,...onb,...loanD,...portfolio,...assetD,...recD,
+      ...acctD,...invD,...cardD,...onb,...loanD,...goalD,...budgetD,...portfolio,...assetD,...recD,
       showOnboarding:S.showOnboarding,showTabBar:!S.showOnboarding&&!S.sheet&&!S.confirm&&!S.push,finishOnboarding:()=>this.setState({showOnboarding:false,onbStep:0}),
       ...det,
     };
