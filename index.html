@@ -375,7 +375,9 @@ input{font-family:inherit;}
           <div style="font-size:32px;font-weight:800;letter-spacing:-1px;margin-bottom:14px;">{{ patrimonioStr }}</div>
           <div style="display:flex;align-items:center;justify-content:space-between;padding:7px 0;"><span style="font-size:13px;color:var(--text-2);font-weight:500;">Disponible</span><span style="font-size:13px;font-weight:700;color:var(--pos);">{{ disponibleStr }}</span></div>
           <div style="display:flex;align-items:center;justify-content:space-between;padding:7px 0;"><span style="font-size:13px;color:var(--text-2);font-weight:500;">Inversiones</span><span style="font-size:13px;font-weight:700;">{{ invertidoStr }}</span></div>
-          <div style="display:flex;align-items:center;justify-content:space-between;padding:7px 0;border-top:1px solid var(--hairline);margin-top:3px;"><span style="font-size:13px;color:var(--text-2);font-weight:500;">Deuda de tarjetas</span><span style="font-size:13px;font-weight:700;color:var(--accent);">− {{ cardDebtStr }}</span></div>
+          <sc-if value="{{ hasCardDebt }}" hint-placeholder-val="{{ false }}">
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:7px 0;border-top:1px solid var(--hairline);margin-top:3px;"><span style="font-size:13px;color:var(--text-2);font-weight:500;">Deuda de tarjetas</span><span style="font-size:13px;font-weight:700;color:var(--accent);">− {{ cardDebtStr }}</span></div>
+          </sc-if>
         </div>
 
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
@@ -3036,7 +3038,7 @@ class Component extends DCLogic {
       openGasto:()=>this.openAdd('gasto'),openIngreso:()=>this.openAdd('ingreso'),openTransfer:()=>this.openAdd('transfer'),openInversion:()=>this.openAdd('inversion'),
       openQuick:()=>this.setState({sheet:'quick'}),closeSheet:()=>this.setState({sheet:null}),
       isQuick:S.sheet==='quick',quickOptions,
-      patrimonioStr:money(patrimonioNeto),patrimonioBrutoStr:money(patrimonioBruto),disponibleStr:money(disponible),invertidoStr:money(invertido),cardDebtStr:money(cardDebt),debtAccStr:money(debtAcc),hasDebt:(cardDebt+debtAcc)>0,
+      patrimonioStr:money(patrimonioNeto),patrimonioBrutoStr:money(patrimonioBruto),disponibleStr:money(disponible),invertidoStr:money(invertido),cardDebtStr:money(cardDebt),debtAccStr:money(debtAcc),hasDebt:(cardDebt+debtAcc)>0,hasCardDebt:cardDebt>0,
       liquidAccounts,investAccounts,debtAccounts,hasDebtAccounts:debtAccounts.length>0,openAddAccount:()=>this.openAddAccount(null),
       cards,cardDots,carouselRef:this.carouselRef,mainScrollRef:this.mainScrollRef,onCardScroll:(e)=>this.onCardScroll(e),
       selSaldoStr:money(selSaldo),selResumenStr:money(cardResumen(selC)),selDeudaStr:money(selSaldo),selVence:selC.vence,selBrand:selC.brand,openCardDetail,
