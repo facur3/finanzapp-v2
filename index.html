@@ -556,7 +556,7 @@ input{font-family:inherit;}
         </sc-if>
         <sc-if value="{{ repHasData }}" hint-placeholder-val="{{ true }}">
         <div style="background:var(--card);border-radius:24px;padding:20px;box-shadow:var(--shadow-pill);margin-bottom:18px;">
-          <div style="font-size:13px;font-weight:600;color:var(--text-2);margin-bottom:4px;">Gastos del mes</div>
+          <div style="font-size:13px;font-weight:600;color:var(--text-2);margin-bottom:4px;">{{ repExpenseLabel }}</div>
           <div style="font-size:32px;font-weight:800;letter-spacing:-1px;margin-bottom:12px;">{{ repExpenseStr }}</div>
           <div style="display:flex;gap:18px;">
             <div><div style="font-size:11px;color:var(--text-3);font-weight:500;">Ingresos</div><div style="font-size:14px;font-weight:700;color:var(--pos);">{{ repIncomeStr }}</div></div>
@@ -3043,6 +3043,7 @@ class Component extends DCLogic {
       heroSub:S.balanceMode==='disponible'?'Disponible para usar ahora':'Neto · cuentas + inversiones − deudas',
       ingresosStr:M('+'+sym+this.fmtInt(S.monthIncome)),gastosStr:M('-'+sym+this.fmtInt(S.monthExpense)),
       periodLabel:this.PERIODS[S.periodIdx],scopeLabel:this.SCOPES[S.scopeIdx],periodScope,
+      repExpenseLabel:['Gastos del mes','Gastos de la semana','Gastos del año'][S.periodIdx]||'Gastos del período',
       openSettings:()=>this.setState({push:'settings'}),
       isBars:S.chartStyle==='bars',isPills:S.chartStyle==='pills',setBars:()=>this.setState({chartStyle:'bars'}),setPills:()=>this.setState({chartStyle:'pills'}),
       barsBg:S.chartStyle==='bars'?'var(--seg-active)':'transparent',pillsBg:S.chartStyle==='pills'?'var(--seg-active)':'transparent',
