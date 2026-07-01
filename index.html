@@ -1964,6 +1964,8 @@ class Component extends DCLogic {
       this.setState(s=>({cloud:{...s.cloud,status:'signed-out'}}));
       this._sb.auth.getSession().then(({data})=>{const u=data&&data.session&&data.session.user;if(u)this._cloudOnAuth(u);}).catch(()=>{});
       this._sb.auth.onAuthStateChange((event,session)=>{const u=session&&session.user;if(u)this._cloudOnAuth(u);else this.setState(s=>({cloud:{...s.cloud,status:'signed-out',user:null,lastSync:null}}));});
+      // When connectivity returns, flush any changes made while offline.
+      window.addEventListener('online',()=>{if(this.state.cloud&&this.state.cloud.status==='signed-in')this.cloudPushDebounced();});
     }catch(e){console.warn('cloud init failed',e);}
   }
   _cloudOnAuth(u){
