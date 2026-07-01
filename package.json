@@ -5,17 +5,25 @@
   "type": "module",
   "scripts": {
     "build:domain": "node scripts/build-domain.mjs",
-    "predev": "node scripts/build-domain.mjs",
+    "build:capacitor-bridge": "node scripts/build-capacitor-bridge.mjs",
+    "predev": "npm run build:domain && npm run build:capacitor-bridge",
     "dev": "vite --host 0.0.0.0",
-    "prebuild": "node scripts/build-domain.mjs",
+    "prebuild": "npm run build:domain && npm run build:capacitor-bridge",
     "build": "vite build",
     "preview": "vite preview --host 0.0.0.0",
     "check:repo": "node scripts/check-repo.mjs",
     "test": "vitest run"
   },
   "devDependencies": {
-    "vite": "^6.0.0",
+    "@capacitor/cli": "^7.6.7",
+    "@capacitor/ios": "^7.6.7",
+    "esbuild": "^0.28.1",
     "typescript": "^5.6.0",
+    "vite": "^6.0.0",
     "vitest": "^2.1.0"
+  },
+  "dependencies": {
+    "@capacitor/app": "^7.1.2",
+    "@capacitor/core": "^7.6.7"
   }
 }
