@@ -670,15 +670,19 @@ input{font-family:inherit;}
         </sc-if>
         <sc-if value="{{ portHasAssets }}" hint-placeholder-val="{{ true }}">
         <div style="font-size:46px;font-weight:800;letter-spacing:-1.5px;margin-bottom:8px;">{{ portValueStr }}</div>
-        <div style="display:flex;flex-direction:column;gap:4px;margin-bottom:24px;">
-          <div style="display:inline-flex;align-self:flex-start;align-items:center;gap:5px;background:var(--surface);padding:7px 13px;border-radius:13px;font-size:14px;font-weight:700;color: {{ portGLColor }};">{{ portResultWord }} {{ portResultAbsStr }} ({{ portGLPctStr }})</div>
-          <div style="font-size:11px;color:var(--text-3);font-weight:500;padding-left:2px;">resultado total · lo que pusiste vs hoy</div>
+        <div style="margin-bottom:22px;">
+          <div style="display:inline-flex;align-items:center;gap:5px;background:var(--surface);padding:7px 13px;border-radius:13px;font-size:14px;font-weight:700;color: {{ portGLColor }};">{{ portResultWord }} {{ portResultAbsStr }} ({{ portGLPctStr }})</div>
         </div>
-        <div style="font-size:13px;font-weight:600;color:var(--text-2);margin:0 2px 9px;">Distribución</div>
-        <div style="display:flex;height:14px;border-radius:7px;overflow:hidden;gap:2px;margin-bottom:18px;">
+        <div style="display:flex;height:14px;border-radius:7px;overflow:hidden;gap:2px;margin-bottom:20px;">
           <sc-for list="{{ portSegments }}" as="s" hint-placeholder-count="3"><div style="width: {{ s.w }};background: {{ s.color }};"></div></sc-for>
         </div>
-        <div style="font-size:13px;font-weight:600;color:var(--text-2);margin:0 2px 11px;">Instrumentos</div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin:0 2px 12px;">
+          <span style="font-size:13px;font-weight:600;color:var(--text-2);">Instrumentos</span>
+          <div style="display:inline-flex;background:var(--surface);border-radius:12px;padding:3px;gap:2px;">
+            <div onClick="{{ setPortValor }}" style="padding:6px 12px;border-radius:9px;cursor:pointer;font-size:12px;font-weight:700;background: {{ portValorBg }};color: {{ portValorColor }};">Valor</div>
+            <div onClick="{{ setPortRend }}" style="padding:6px 12px;border-radius:9px;cursor:pointer;font-size:12px;font-weight:700;background: {{ portRendBg }};color: {{ portRendColor }};">Rendimiento</div>
+          </div>
+        </div>
         <div style="display:flex;flex-direction:column;gap:11px;margin-bottom:18px;">
           <sc-for list="{{ portList }}" as="a" hint-placeholder-count="3">
             <div onClick="{{ a.onOpen }}" style="display:flex;align-items:center;gap:13px;background:var(--card);border-radius:20px;padding:15px 16px;box-shadow:var(--shadow-pill);cursor:pointer;">
@@ -688,8 +692,8 @@ input{font-family:inherit;}
                 <div style="font-size:12px;color:var(--text-2);font-weight:500;">{{ a.ticker }} · {{ a.pctStr }} del total</div>
               </div>
               <div style="text-align:right;">
-                <div style="font-size:15.5px;font-weight:700;">{{ a.valueStr }}</div>
-                <div style="font-size:12px;font-weight:600;color: {{ a.glColor }};">{{ a.glStr }} · {{ a.glPctStr }}</div>
+                <div style="font-size:15.5px;font-weight:700;color: {{ a.primaryColor }};">{{ a.primaryStr }}</div>
+                <div style="font-size:12px;font-weight:600;color: {{ a.secondaryColor }};">{{ a.secondaryStr }}</div>
               </div>
               <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--text-3)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="flex:none;"><polyline points="9 6 15 12 9 18"></polyline></svg>
             </div>
@@ -740,16 +744,10 @@ input{font-family:inherit;}
           <div style="font-size:28px;font-weight:800;letter-spacing:-1px;margin-bottom:12px;">{{ adAValueStr }}</div>
           <div style="display:flex;justify-content:space-between;padding:9px 0;border-top:1px solid var(--hairline);"><span style="font-size:13px;color:var(--text-2);font-weight:500;">Invertiste</span><span style="font-size:13px;font-weight:700;">{{ adACostStr }}</span></div>
           <div style="display:flex;justify-content:space-between;padding:9px 0;border-top:1px solid var(--hairline);"><span style="font-size:13px;color:var(--text-2);font-weight:500;">{{ adAResultWord }} (desde tu compra)</span><span style="font-size:13px;font-weight:700;color: {{ adAGLColor }};">{{ adAResultSignStr }} ({{ adAGLPctStr }})</span></div>
-          <div style="display:flex;justify-content:space-between;padding:9px 0;border-top:1px solid var(--hairline);"><span style="font-size:13px;color:var(--text-2);font-weight:500;">Precio · compra → hoy</span><span style="font-size:13px;font-weight:700;">{{ adAAvgStr }} → {{ adALastStr }}</span></div>
-          <div style="display:flex;justify-content:space-between;padding:9px 0;border-top:1px solid var(--hairline);"><span style="font-size:13px;color:var(--text-2);font-weight:500;">Peso en tu portfolio</span><span style="font-size:13px;font-weight:700;">{{ adAPctStr }}</span></div>
-        </div>
-        <div style="display:flex;gap:9px;margin-bottom:11px;">
-          <div onClick="{{ adABuy }}" style="flex:1;height:52px;border-radius:16px;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:15px;font-weight:700;">Comprar más</div>
-          <div onClick="{{ adASell }}" style="flex:1;height:52px;border-radius:16px;background:var(--surface);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:15px;font-weight:700;">Vender</div>
         </div>
         <div style="display:flex;gap:9px;margin-bottom:22px;">
-          <div onClick="{{ adAUpdate }}" style="flex:1;height:46px;border-radius:14px;background:var(--surface);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:13.5px;font-weight:600;color:var(--text-2);">Editar precio</div>
-          <div onClick="{{ adARefresh }}" style="flex:1;height:46px;border-radius:14px;background:var(--surface);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:13.5px;font-weight:600;color:var(--text-2);">{{ adARefreshLabel }}</div>
+          <div onClick="{{ adABuy }}" style="flex:1;height:52px;border-radius:16px;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:15px;font-weight:700;">Comprar más</div>
+          <div onClick="{{ adASell }}" style="flex:1;height:52px;border-radius:16px;background:var(--surface);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:15px;font-weight:700;">Vender</div>
         </div>
         <sc-if value="{{ adAHasCompras }}" hint-placeholder-val="{{ true }}">
           <div style="font-size:14px;font-weight:700;margin:0 2px 12px;">Tus operaciones</div>
@@ -1841,7 +1839,7 @@ class Component extends DCLogic {
       balanceMode:'disponible', periodIdx:0, scopeIdx:0, currency:'ARS', hideAmounts:false,
       actFilter:'todos', actSearch:'', actCat:null, actAccount:'todas', actAmount:'todos', actTag:'todos', actRange:'todo',
       cardIdx:0, detailId:null, editId:null, acctView:null, investView:null, assetView:null, cardView:0,
-      assetChartRange:'1M', assetChart:{loading:false,ok:false,range:'1M'},
+      assetChartRange:'1M', assetChart:{loading:false,ok:false,range:'1M'}, portMode:'valor',
       addType:'gasto', addAmount:'', addTitle:'', addCat:'comida', addAccount:'banco', addTo:'cedears', addDate:'Hoy', addTags:[],
       newTagText:'', customDateText:'',
       newAcc:{name:'',type:'Banco',kind:'liquid',balance:'',currency:'ARS',liquid:true,editId:null},
@@ -2546,10 +2544,17 @@ class Component extends DCLogic {
     const portCost=portAssets.reduce((s2,a)=>s2+a.cost,0);
     const portGL=portValue-portCost,portGLPct=portCost>0?portGL/portCost*100:0;
     portAssets.forEach((a,i)=>{a.color=PALCOLORS[i%PALCOLORS.length];a.pct=portValue>0?a.value/portValue*100:0;a.gl=a.value-a.cost;a.glPct=a.cost>0?a.gl/a.cost*100:0;});
-    const portList=portAssets.map(a=>({name:a.name,ticker:a.ticker||'',emoji:a.emoji,color:a.color,pctStr:a.pct.toFixed(0)+'%',barW:Math.max(2,a.pct).toFixed(2)+'%',valueStr:money(a.value),glStr:(a.gl>=0?'+':'-')+sym+this.fmtInt(Math.abs(a.gl)),glPctStr:(a.gl>=0?'+':'')+a.glPct.toFixed(1).replace('.',',')+'%',glColor:a.gl>=0?'var(--pos)':'var(--accent)',onOpen:()=>this.openAssetDetail(a.account,a.ticker)}));
+    const portRend=S.portMode==='rendimiento';
+    const portList=portAssets.map(a=>{const glStr=(a.gl>=0?'+':'-')+sym+this.fmtInt(Math.abs(a.gl)),glPctStr=(a.gl>=0?'+':'')+a.glPct.toFixed(1).replace('.',',')+'%',glColor=a.gl>=0?'var(--pos)':'var(--accent)';
+      return {name:a.name,ticker:a.ticker||'',emoji:a.emoji,color:a.color,pctStr:a.pct.toFixed(0)+'%',barW:Math.max(2,a.pct).toFixed(2)+'%',
+        primaryStr:portRend?glStr:money(a.value),primaryColor:portRend?glColor:'var(--text)',
+        secondaryStr:portRend?glPctStr:(glStr+' · '+glPctStr),secondaryColor:glColor,
+        onOpen:()=>this.openAssetDetail(a.account,a.ticker)};});
     const portfolio={portValueStr:money(portValue),portHasAssets:portAssets.length>0,portCostStr:money(portCost),
       portResultWord:portGL>=0?'Ganás':'Perdés',portResultAbsStr:sym+this.fmtInt(Math.abs(portGL)),portGLPctStr:(portGL>=0?'+':'')+portGLPct.toFixed(1).replace('.',',')+'%',portGLColor:portGL>=0?'var(--pos)':'var(--accent)',
-      portSegments:portList.map(a=>({color:a.color,w:a.barW})),portList,portNoAssets:portAssets.length===0};
+      portSegments:portList.map(a=>({color:a.color,w:a.barW})),portList,portNoAssets:portAssets.length===0,
+      setPortValor:()=>this.setState({portMode:'valor'}),setPortRend:()=>this.setState({portMode:'rendimiento'}),
+      portValorBg:portRend?'transparent':'var(--card)',portValorColor:portRend?'var(--text-3)':'var(--text)',portRendBg:portRend?'var(--card)':'transparent',portRendColor:portRend?'var(--text)':'var(--text-3)'};
     // ===== ASSET DETAIL (single holding page) =====
     let assetD={};
     if(S.assetView){const av=S.assetView;const a=(S.assets[av.account]||[]).find(x=>x.ticker===av.ticker);
