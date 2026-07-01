@@ -836,6 +836,9 @@ input{font-family:inherit;}
           <span style="font-size:16px;font-weight:700;">{{ addTitleText }}</span>
           <div style="width:40px;"></div>
         </div>
+        <sc-if value="{{ scCapture }}">
+          <div style="display:flex;align-items:center;justify-content:center;gap:6px;background:var(--cat-tarjetas-fill);color:var(--text);font-size:12px;font-weight:700;padding:8px 12px;border-radius:12px;margin-bottom:14px;"> Apple Pay Shortcut capture</div>
+        </sc-if>
         <!-- type segmented -->
         <div class="fa-scroll" style="display:flex;gap:7px;overflow-x:auto;margin:0 -22px 18px;padding:0 22px;">
           <sc-for list="{{ typeTabs }}" as="t" hint-placeholder-count="4">
@@ -2072,6 +2075,7 @@ class Component extends DCLogic {
       newRec:{type:'gasto',concept:'',amount:'',cat:'otros',targetKind:'account',targetId:'',day:'1',editId:null},
       onbStep:0, onbCard:false, onbInvest:false, flash:'', confirm:null,
       showOnboarding:true,
+      shortcutCapture:false, // spike: true when the add-expense sheet was opened by an iOS Shortcut
       cloud:{status:'off',email:'',password:'',user:null,syncing:false,lastSync:null},
     }, this.emptyData());
     // Load persisted local state synchronously so the very first render already
@@ -2095,6 +2099,29 @@ class Component extends DCLogic {
     setTimeout(()=>this.fetchPrices(true),2000);
     this._priceTimer=setInterval(()=>this.fetchPrices(true),60000);
     this.initCloud();
+    this.checkShortcutCapture();
+  }
+  // ===== SPIKE: Apple Pay / iOS Shortcuts capture =====
+  // An iOS Shortcut (Wallet "Transaction" trigger) opens FinanzApp with
+  //   ?quickAdd=expense&source=shortcut
+  // Apple does NOT expose the payment amount/merchant to the Shortcut, so this is
+  // only a fast MANUAL capture: we open a pre-filled "add expense" sheet.
+  checkShortcutCapture(){
+    try{
+      const p=new URLSearchParams(window.location.search);
+      if(p.get('quickAdd')==='expense'){
+        this.openShortcutCapture();
+        // Clean the URL so a manual refresh doesn't re-open the capture sheet.
+        window.history.replaceState({},'',window.location.pathname+window.location.hash);
+      }
+    }catch(e){}
+  }
+  openShortcutCapture(){
+    const liq=this.liquidIds(),inv=this.investIds();
+    const defAcc=liq[0]||inv[0]||'';
+    const defTo=liq.find(k=>k!==defAcc)||inv[0]||defAcc;
+    // Mirrors openAdd('gasto'): amount empty, merchant empty, date today.
+    this.setState({sheet:'add',subsheet:null,addType:'gasto',addAmount:'',addTitle:'',addCat:'comida',addAccount:defAcc,addTo:defTo,addDate:'Hoy',addTags:[],editId:null,shortcutCapture:true});
   }
   componentDidUpdate(prevProps,prevState){
     this.persistState();
@@ -2622,7 +2649,7 @@ class Component extends DCLogic {
   press(d){this.setState(s=>{let r=s.addAmount;if(d===','){if(r.indexOf(',')>=0||r==='')return{};return{addAmount:r+','};}if(r.indexOf(',')>=0){const dec=r.split(',')[1]||'';if(dec.length>=2)return{};}if(r.replace(',','').length>=9)return{};return{addAmount:r+d};});}
   backspace(){this.setState(s=>({addAmount:s.addAmount.slice(0,-1)}));}
 
-  openAdd(type){const liq=this.liquidIds(),inv=this.investIds();const defCat=type==='ingreso'?'ingreso':'comida';const defAcc=liq[0]||inv[0]||'';const defTo=type==='inversion'?(inv[0]||''):(liq.find(k=>k!==defAcc)||inv[0]||defAcc);this.setState({sheet:'add',subsheet:null,addType:type,addAmount:'',addTitle:'',addCat:defCat,addAccount:defAcc,addTo:defTo,addDate:'Hoy',addTags:[],editId:null});}
+  openAdd(type){const liq=this.liquidIds(),inv=this.investIds();const defCat=type==='ingreso'?'ingreso':'comida';const defAcc=liq[0]||inv[0]||'';const defTo=type==='inversion'?(inv[0]||''):(liq.find(k=>k!==defAcc)||inv[0]||defAcc);this.setState({sheet:'add',subsheet:null,addType:type,addAmount:'',addTitle:'',addCat:defCat,addAccount:defAcc,addTo:defTo,addDate:'Hoy',addTags:[],editId:null,shortcutCapture:false});}
   groupByDate(list){const order=[];const map={};list.forEach(t=>{if(!map[t.dateLabel]){map[t.dateLabel]=[];order.push(t.dateLabel);}map[t.dateLabel].push(t);});return order.map(day=>{const items=map[day];const total=items.filter(t=>!t.isTransfer).reduce((a,t)=>a+t.amount,0);return {day,items,total};});}
   txView(t){const C=this.state.categories[t.cat]||{name:'',emoji:'💱'};const isPago=t.type==='pago';const isInc=t.amount>0&&!t.isTransfer;let amountStr,amtColor;
     // Card payments are transfers (net worth unchanged) but the user moved cash
@@ -3063,7 +3090,7 @@ class Component extends DCLogic {
       clearCatFilter:()=>this.setState({actCat:null}),
       openInvestments:()=>this.setState({push:'investments'}),isInvest:S.push==='investments',popScreen:()=>this.setState({push:null,detailId:null}),
       isDetail:S.push==='txnDetail',editTxn:()=>this.editTxn(),deleteTxn:()=>this.requestConfirm({title:'Eliminar movimiento',msg:'Se eliminará este movimiento y se revertirá su impacto en los saldos. No se puede deshacer.',confirmLabel:'Eliminar',danger:true,onConfirm:()=>this.deleteTxn()}),duplicateTxn:()=>this.duplicateTxn(),
-      isAdd:S.sheet==='add',addTitleText:typeNames[S.addType],
+      isAdd:S.sheet==='add',addTitleText:typeNames[S.addType],scCapture:S.sheet==='add'&&S.shortcutCapture,
       addAmtDisplay:this.displayAmount(S.addAmount),addAmtColor:amtColorByType,addAmtSign:amtSign,
       typeTabs,showCategory:S.addType==='gasto'||S.addType==='ingreso',showFromTo:S.addType==='transfer'||S.addType==='inversion',
       accName:accA.name,accEmoji:accA.emoji,accFillVar:accA.fillVar,toName:accB.name,toEmoji:accB.emoji,toFillVar:accB.fillVar,
