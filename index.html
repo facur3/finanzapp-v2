@@ -1421,24 +1421,15 @@ input{font-family:inherit;}
         </sc-if>
 
         <sc-if value="{{ cloudSignedOut }}" hint-placeholder-val="{{ false }}">
-          <sc-if value="{{ cloudSent }}" hint-placeholder-val="{{ false }}">
-            <div style="background:var(--card);border-radius:20px;padding:20px;box-shadow:var(--shadow-pill);text-align:center;margin-bottom:14px;">
-              <div style="font-size:32px;margin-bottom:8px;">📬</div>
-              <div style="font-size:16px;font-weight:800;margin-bottom:4px;">Revisá tu email</div>
-              <div style="font-size:13px;color:var(--text-2);font-weight:500;line-height:1.5;margin-bottom:16px;">Te enviamos un código a <b>{{ cloudEmail }}</b>. Ingresalo acá:</div>
-              <input value="{{ cloudCode }}" onChange="{{ setCloudCode }}" inputmode="numeric" placeholder="000000" style="width:100%;box-sizing:border-box;border:1px solid var(--hairline);border-radius:14px;padding:14px;outline:none;background:var(--surface);font-size:24px;font-weight:800;letter-spacing:8px;text-align:center;color:var(--text);">
-            </div>
-            <div onClick="{{ cloudVerifyCode }}" style="height:56px;border-radius:18px;background:var(--accent);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:16px;font-weight:700;color:#fff;opacity: {{ cloudSyncOpacity }};margin-bottom:12px;">Entrar</div>
-            <div onClick="{{ cloudEditEmail }}" style="text-align:center;cursor:pointer;font-size:13px;font-weight:600;color:var(--text-2);">Cambiar email o reenviar</div>
-          </sc-if>
-          <sc-if value="{{ cloudSignedOut }}" hint-placeholder-val="{{ true }}">
-            <div style="background:var(--card);border-radius:20px;padding:18px;box-shadow:var(--shadow-pill);margin-bottom:14px;">
-              <div style="font-size:13px;font-weight:600;color:var(--text-2);margin-bottom:8px;">Tu email</div>
-              <input value="{{ cloudEmail }}" onChange="{{ setCloudEmail }}" inputmode="email" placeholder="vos@email.com" style="width:100%;box-sizing:border-box;border:1px solid var(--hairline);border-radius:14px;padding:14px;outline:none;background:var(--surface);font-size:15px;font-weight:600;color:var(--text);">
-            </div>
-            <div onClick="{{ cloudSendCode }}" style="height:56px;border-radius:18px;background:var(--accent);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:16px;font-weight:700;color:#fff;opacity: {{ cloudSyncOpacity }};">Enviarme el código</div>
-            <div style="font-size:12px;color:var(--text-3);font-weight:500;line-height:1.5;text-align:center;margin-top:14px;">Sin contraseñas. Te llega un código de 6 dígitos al email y entrás. Funciona igual en el navegador o con la app instalada. Si ya usabas la app sin cuenta, tus datos actuales se suben automáticamente.</div>
-          </sc-if>
+          <div style="background:var(--card);border-radius:20px;padding:18px;box-shadow:var(--shadow-pill);margin-bottom:14px;">
+            <div style="font-size:13px;font-weight:600;color:var(--text-2);margin-bottom:8px;">Email</div>
+            <input value="{{ cloudEmail }}" onChange="{{ setCloudEmail }}" inputmode="email" placeholder="vos@email.com" style="width:100%;box-sizing:border-box;border:1px solid var(--hairline);border-radius:14px;padding:14px;outline:none;background:var(--surface);font-size:15px;font-weight:600;color:var(--text);margin-bottom:14px;">
+            <div style="font-size:13px;font-weight:600;color:var(--text-2);margin-bottom:8px;">Contraseña</div>
+            <input value="{{ cloudPassword }}" onChange="{{ setCloudPassword }}" type="password" placeholder="Mínimo 6 caracteres" style="width:100%;box-sizing:border-box;border:1px solid var(--hairline);border-radius:14px;padding:14px;outline:none;background:var(--surface);font-size:15px;font-weight:600;color:var(--text);">
+          </div>
+          <div onClick="{{ cloudSignIn }}" style="height:56px;border-radius:18px;background:var(--accent);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:16px;font-weight:700;color:#fff;opacity: {{ cloudSyncOpacity }};margin-bottom:10px;">Entrar</div>
+          <div onClick="{{ cloudSignUp }}" style="height:52px;border-radius:16px;background:var(--surface);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:15px;font-weight:700;color:var(--text);opacity: {{ cloudSyncOpacity }};">Crear cuenta nueva</div>
+          <div style="font-size:12px;color:var(--text-3);font-weight:500;line-height:1.5;text-align:center;margin-top:14px;">Si es tu primera vez, tocá <b>Crear cuenta nueva</b>. Si ya usabas la app sin cuenta, al crearla tus datos actuales se suben automáticamente.</div>
         </sc-if>
 
         <sc-if value="{{ cloudSignedIn }}" hint-placeholder-val="{{ false }}">
@@ -1846,7 +1837,7 @@ class Component extends DCLogic {
       newRec:{type:'gasto',concept:'',amount:'',cat:'otros',targetKind:'account',targetId:'',day:'1',editId:null},
       onbStep:0, onbCard:false, onbInvest:false, flash:'', confirm:null,
       showOnboarding:true,
-      cloud:{status:'off',email:'',code:'',user:null,syncing:false,lastSync:null,sent:false},
+      cloud:{status:'off',email:'',password:'',user:null,syncing:false,lastSync:null},
     }, this.emptyData());
     // Load persisted local state synchronously so the very first render already
     // shows the real saved data. This avoids the default/"Patrimonio total: 0"
@@ -2009,30 +2000,31 @@ class Component extends DCLogic {
     }catch(e){console.warn('push failed',e);this.setState(s=>({cloud:{...s.cloud,syncing:false}}));}
   }
   cloudPushDebounced(){if(this._pushTimer)clearTimeout(this._pushTimer);this._pushTimer=setTimeout(()=>this.cloudPushNow(),2500);}
-  cloudSendCode(){
-    const email=(this.state.cloud.email||'').trim();
+  cloudSignUp(){
+    const email=(this.state.cloud.email||'').trim();const password=this.state.cloud.password||'';
     if(!email||email.indexOf('@')<0){this.flashMsg('Poné un email válido');return;}
+    if(password.length<6){this.flashMsg('La contraseña necesita 6+ caracteres');return;}
     if(!this._sb){this.flashMsg('La nube no está configurada');return;}
     this.setState(s=>({cloud:{...s.cloud,syncing:true}}));
-    this._sb.auth.signInWithOtp({email,options:{shouldCreateUser:true}}).then(({error})=>{
-      if(error){this.flashMsg(error.message||'No se pudo enviar el código');this.setState(s=>({cloud:{...s.cloud,syncing:false}}));}
-      else this.setState(s=>({cloud:{...s.cloud,syncing:false,sent:true,code:''},flash:'Te enviamos un código'}));
-    }).catch(()=>{this.flashMsg('No se pudo enviar el código');this.setState(s=>({cloud:{...s.cloud,syncing:false}}));});
+    this._sb.auth.signUp({email,password}).then(({data,error})=>{
+      if(error){this.flashMsg(error.message||'No se pudo crear la cuenta');this.setState(s=>({cloud:{...s.cloud,syncing:false}}));}
+      else if(data&&data.session){this.setState(s=>({cloud:{...s.cloud,syncing:false,password:''}}));/* onAuthStateChange signs in + syncs */}
+      else{this.setState(s=>({cloud:{...s.cloud,syncing:false,password:''},flash:'Revisá tu email para confirmar la cuenta'}));}
+    }).catch(()=>{this.flashMsg('No se pudo crear la cuenta');this.setState(s=>({cloud:{...s.cloud,syncing:false}}));});
   }
-  cloudVerifyCode(){
-    const email=(this.state.cloud.email||'').trim();
-    const token=(this.state.cloud.code||'').replace(/\D/g,'');
-    if(token.length<6){this.flashMsg('Poné el código de 6 dígitos');return;}
-    if(!this._sb)return;
+  cloudSignIn(){
+    const email=(this.state.cloud.email||'').trim();const password=this.state.cloud.password||'';
+    if(!email||email.indexOf('@')<0){this.flashMsg('Poné un email válido');return;}
+    if(!password){this.flashMsg('Poné tu contraseña');return;}
+    if(!this._sb){this.flashMsg('La nube no está configurada');return;}
     this.setState(s=>({cloud:{...s.cloud,syncing:true}}));
-    this._sb.auth.verifyOtp({email,token,type:'email'}).then(({error})=>{
-      if(error){this.flashMsg('Código incorrecto o vencido');this.setState(s=>({cloud:{...s.cloud,syncing:false}}));}
-      else this.setState(s=>({cloud:{...s.cloud,syncing:false,sent:false,code:''}}));// onAuthStateChange handles sign-in + sync
-    }).catch(()=>{this.flashMsg('No se pudo verificar');this.setState(s=>({cloud:{...s.cloud,syncing:false}}));});
+    this._sb.auth.signInWithPassword({email,password}).then(({error})=>{
+      if(error){this.flashMsg('Email o contraseña incorrectos');this.setState(s=>({cloud:{...s.cloud,syncing:false}}));}
+      else this.setState(s=>({cloud:{...s.cloud,syncing:false,password:''}}));// onAuthStateChange signs in + syncs
+    }).catch(()=>{this.flashMsg('No se pudo entrar');this.setState(s=>({cloud:{...s.cloud,syncing:false}}));});
   }
-  setCloudCode(e){const v=(e&&e.target?e.target.value:'').replace(/\D/g,'').slice(0,6);this.setState(s=>({cloud:{...s.cloud,code:v}}));}
-  cloudEditEmail(){this.setState(s=>({cloud:{...s.cloud,sent:false,code:''}}));}
-  cloudSignOut(){if(this._sb)this._sb.auth.signOut().catch(()=>{});this.setState(s=>({cloud:{...s.cloud,status:'signed-out',user:null,lastSync:null,sent:false},push:null,flash:'Sesión cerrada'}));}
+  setCloudPassword(e){const v=e&&e.target?e.target.value:'';this.setState(s=>({cloud:{...s.cloud,password:v}}));}
+  cloudSignOut(){if(this._sb)this._sb.auth.signOut().catch(()=>{});this.setState(s=>({cloud:{...s.cloud,status:'signed-out',user:null,lastSync:null,password:''},push:null,flash:'Sesión cerrada'}));}
   setCloudEmail(e){const v=e&&e.target?e.target.value:'';this.setState(s=>({cloud:{...s.cloud,email:v}}));}
   downloadFile(name, content, type){
     const blob=new Blob([content],{type:type||'application/octet-stream'});
@@ -2753,9 +2745,9 @@ class Component extends DCLogic {
       repCatRows,repDonutGradient,repByAcct,repHasByAcct,repByCard,repHasByCard,repTopMerch,repHasMerch,futCuotasStr:money(futCuotas),futHasCuotas:futCuotas>0,
       masItems,
       isCloudScreen:S.push==='cloudScreen',cloudOff:S.cloud.status==='off',cloudSignedIn:S.cloud.status==='signed-in',cloudSignedOut:S.cloud.status==='signed-out',
-      cloudEmail:S.cloud.email,cloudCode:S.cloud.code,cloudSent:S.cloud.sent,cloudSyncing:S.cloud.syncing,cloudSyncOpacity:S.cloud.syncing?'0.5':'1',cloudUserEmail:S.cloud.user?S.cloud.user.email:'',
+      cloudEmail:S.cloud.email,cloudPassword:S.cloud.password,cloudSyncing:S.cloud.syncing,cloudSyncOpacity:S.cloud.syncing?'0.5':'1',cloudUserEmail:S.cloud.user?S.cloud.user.email:'',
       cloudLastSyncStr:S.cloud.lastSync?('Última sincronización: '+new Date(S.cloud.lastSync).toLocaleString('es-AR',{hour:'2-digit',minute:'2-digit',day:'2-digit',month:'short'})):'Sin sincronizar todavía',
-      setCloudEmail:(e)=>this.setCloudEmail(e),setCloudCode:(e)=>this.setCloudCode(e),cloudSendCode:()=>this.cloudSendCode(),cloudVerifyCode:()=>this.cloudVerifyCode(),cloudEditEmail:()=>this.cloudEditEmail(),cloudSignOut:()=>this.cloudSignOut(),cloudSyncNow:()=>this.cloudPushNow(),cloudBack:()=>this.setState({push:null}),
+      setCloudEmail:(e)=>this.setCloudEmail(e),setCloudPassword:(e)=>this.setCloudPassword(e),cloudSignUp:()=>this.cloudSignUp(),cloudSignIn:()=>this.cloudSignIn(),cloudSignOut:()=>this.cloudSignOut(),cloudSyncNow:()=>this.cloudPushNow(),cloudBack:()=>this.setState({push:null}),
       flash:S.flash,hasFlash:!!S.flash,
       hasConfirm:!!S.confirm,confirmTitle:S.confirm?S.confirm.title:'',confirmMsg:S.confirm?S.confirm.msg:'',confirmLabel:S.confirm?S.confirm.confirmLabel:'Confirmar',cancelLabel:(S.confirm&&S.confirm.cancelLabel)?S.confirm.cancelLabel:'Cancelar',
       confirmBtnBg:(S.confirm&&S.confirm.danger)?'var(--accent)':'var(--text)',confirmBtnColor:(S.confirm&&S.confirm.danger)?'#fff':'var(--bg)',
