@@ -22,6 +22,13 @@
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
 <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png">
 
+<!-- Pure financial domain (money math, transaction apply/reverse, dates…).
+     Classic + synchronous ON PURPOSE: the component boots inside
+     loadReactUmd().then(init) and can render before a deferred module runs.
+     Loading here (before support.js) guarantees window.FinanzDomain exists at
+     first render. Generated from src/domain/ (the tested source of truth) by
+     `npm run build:domain`; regenerated automatically on predev/prebuild. -->
+<script src="./domain.iife.js"></script>
 <script src="./support.js"></script>
 <script src="./vendor/supabase.js"></script>
 <script>
@@ -2380,24 +2387,24 @@ class Component extends DCLogic {
     if(s.onbCard){const card={id:'card_'+next,brand:'Visa',bank:'Mi tarjeta',last4:'0000',saldo:0,limit:200000,cierre:'—',vence:'—',grad:this.CARDGRADS[cards.length%this.CARDGRADS.length],compras:[],cuotas:[],pagos:[]};cards=[...cards,card];next++;}
     if(s.onbInvest){const id='acc_inv_'+next;accounts={...accounts,[id]:{name:'Inversiones',type:'Inversión',kind:'invest',liquid:false,currency:s.currency,emoji:'📈',iconVar:'--cat-inversion-icon',fillVar:'--cat-inversion-fill'}};order=[...order,id];balances={...balances,[id]:0};next++;}
     return{cards,order,accounts,balances,_next:next,showOnboarding:false,onbStep:0,tab:'inicio',push:null,flash:'¡Listo! Empezá a registrar'};});}
-  fmtNum(n){n=Math.abs(n);const p=n.toFixed(2).split('.');return p[0].replace(/\B(?=(\d{3})+(?!\d))/g,'.')+','+p[1];}
-  fmtInt(n){n=Math.abs(Math.round(n));return n.toString().replace(/\B(?=(\d{3})+(?!\d))/g,'.');}
+  fmtNum(n){return window.FinanzDomain.fmtNum(n);}
+  fmtInt(n){return window.FinanzDomain.fmtInt(n);}
   // Format a raw numeric input string with Argentine thousands dots as the user types.
   fmtThousands(s){if(s==null)return '';s=String(s);const neg=s[0]==='-';s=s.replace('-','');const p=s.split(',');p[0]=p[0].replace(/\B(?=(\d{3})+(?!\d))/g,'.');return (neg?'-':'')+p.join(',');}
   cleanNum(s){return String(s||'').replace(/[^0-9,]/g,'').replace(/,(?=.*,)/g,'');}
   parseNum(s){return parseFloat(String(s||'').replace(/\./g,'').replace(',','.'))||0;}
   // Pick the investment account that matches an asset type (crypto vs stocks).
   accountForType(type){const s=this.state;const inv=this.investIds();const crypto=type==='Cripto'||type==='Bitcoin';const m=inv.find(k=>{const a=s.accounts[k]||{};const t=((a.type||'')+' '+(a.name||'')).toLowerCase();const isC=/crip|binance|btc|bitcoin|eth/.test(t);return crypto?isC:!isC;});return m||inv[0]||'';}
-  signed(n){return (n<0?'-':'+')+'$'+this.fmtNum(n);}
-  abbr(n){n=Math.abs(n);if(n>=1000)return Math.floor(n/1000)+'K';return ''+Math.round(n);}
-  displayAmount(raw){if(!raw)return '$0';const parts=raw.split(',');let i=parts[0].replace(/\B(?=(\d{3})+(?!\d))/g,'.');let out='$'+i;if(raw.indexOf(',')>=0)out+=','+(parts[1]||'');return out;}
-  sumIds(ids){const b=this.state.balances;return ids.reduce((a,k)=>a+(b[k]||0),0);}
-  liquidIds(s){s=s||this.state;return s.order.filter(k=>s.accounts[k]&&s.accounts[k].liquid&&!s.archived[k]);}
-  investIds(s){s=s||this.state;return s.order.filter(k=>s.accounts[k]&&s.accounts[k].kind==='invest'&&!s.archived[k]);}
-  debtIds(s){s=s||this.state;return s.order.filter(k=>s.accounts[k]&&s.accounts[k].kind==='debt'&&!s.archived[k]);}
-  cardDebt(s){s=s||this.state;return (s.cards||[]).reduce((a,c)=>a+c.saldo,0);}
-  _todayKey(){const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
-  computeNetWorth(){const disp=this.sumIds(this.liquidIds()),inv=this.sumIds(this.investIds()),debt=this.cardDebt()+this.sumIds(this.debtIds());return{disp:Math.round(disp),inv:Math.round(inv),pat:Math.round(disp+inv-debt)};}
+  signed(n){return window.FinanzDomain.signed(n);}
+  abbr(n){return window.FinanzDomain.abbr(n);}
+  displayAmount(raw){return window.FinanzDomain.displayAmount(raw);}
+  sumIds(ids){return window.FinanzDomain.sumIds(this.state.balances,ids);}
+  liquidIds(s){return window.FinanzDomain.liquidIds(s||this.state);}
+  investIds(s){return window.FinanzDomain.investIds(s||this.state);}
+  debtIds(s){return window.FinanzDomain.debtIds(s||this.state);}
+  cardDebt(s){return window.FinanzDomain.cardDebt(s||this.state);}
+  _todayKey(){return window.FinanzDomain.todayKey();}
+  computeNetWorth(){return window.FinanzDomain.netWorth(this.state);}
   // Build an SVG line+area path from a value series (shared by charts).
   sparkPath(vals,W,H,PAD){const n=vals.length;if(n<2)return null;const min=Math.min.apply(null,vals),max=Math.max.apply(null,vals),span=(max-min)||1;const xa=i=>(i/(n-1))*W,ya=v=>PAD+(1-(v-min)/span)*(H-2*PAD);let d='M '+xa(0).toFixed(1)+' '+ya(vals[0]).toFixed(1);for(let i=1;i<n;i++)d+=' L '+xa(i).toFixed(1)+' '+ya(vals[i]).toFixed(1);return{path:d,area:d+' L '+W+' '+H+' L 0 '+H+' Z',min,max};}
   // Upsert today's net-worth snapshot (one per day), capped to a year of history.
@@ -2437,7 +2444,7 @@ class Component extends DCLogic {
   // closest occurrence within ±6 months. Critical for auto-pay: read on 30 jun,
   // "13 jul" must resolve to the coming 13 Jul — NOT be treated as day-13 of the
   // current month (which made auto-pay fire a month early and double-charge).
-  _parseDate(label,ref){ref=ref||new Date();const m=String(label||'').toLowerCase().match(/(\d{1,2})\s*([a-zé]{3,})?/);if(!m)return null;const day=Math.min(31,Math.max(1,parseInt(m[1],10)));let mon=ref.getMonth();if(m[2]){const i=this._MONTHS.indexOf(m[2].slice(0,3));if(i>=0)mon=i;}let d=new Date(ref.getFullYear(),mon,day);d.setHours(0,0,0,0);const SIX=183*86400000;if(d-ref>SIX)d=new Date(ref.getFullYear()-1,mon,day);else if(ref-d>SIX)d=new Date(ref.getFullYear()+1,mon,day);d.setHours(0,0,0,0);return d;}
+  _parseDate(label,ref){return window.FinanzDomain.parseDate(label,ref);}
   // Advance a "13 jul" label by one month, keeping the day.
   _advanceLabel(label){const d=this._parseDate(label,new Date());if(!d)return label;const n=new Date(d.getFullYear(),d.getMonth()+1,d.getDate());return n.getDate()+' '+this._MONTHS[n.getMonth()];}
   // The settlement cycle a card's statement belongs to, keyed by its due month.
@@ -2641,8 +2648,8 @@ class Component extends DCLogic {
         cards[n.editId]={...prev,brand:n.brand,bank:n.bank.trim(),last4,limit,cierre:n.cierre.trim()||prev.cierre,vence:venceVal,grad,autopay,autopayAccount,paidCycle};return{cards,push:null,tab:'tarjetas',cardIdx:n.editId,cardView:n.editId,flash:'Tarjeta actualizada'};}const card={id:'card_'+s._next,brand:n.brand,bank:n.bank.trim(),last4,saldo:0,limit:limit||1,cierre:n.cierre.trim()||'—',vence:n.vence.trim()||'—',grad,autopay,autopayAccount,compras:[],cuotas:[],pagos:[]};return{cards:[...cards,card],_next:s._next+1,push:null,tab:'tarjetas',cardIdx:cards.length,cardView:cards.length,flash:'Tarjeta creada'};});}
   deleteCard(idx){this.setState(s=>{const cards=s.cards.filter((c,i)=>i!==idx);return{cards,push:null,tab:'tarjetas',cardIdx:0,cardView:0,flash:'Tarjeta eliminada'};});}
 
-  _rev(t,b,ct,mi,me){b={...b};ct={...ct};if(t.type==='gasto'){if(t.account)b[t.account]=(b[t.account]||0)-t.amount;ct[t.cat]=Math.max(0,(ct[t.cat]||0)-t.val);me-=t.val;}else if(t.type==='ingreso'){if(t.account)b[t.account]=(b[t.account]||0)-t.amount;mi-=t.val;}else{if(t.from)b[t.from]=(b[t.from]||0)+t.val;if(t.to)b[t.to]=(b[t.to]||0)-t.val;}return{b,ct,mi,me};}
-  _apply(t,b,ct,mi,me){b={...b};ct={...ct};if(t.type==='gasto'){if(t.account)b[t.account]=(b[t.account]||0)+t.amount;ct[t.cat]=(ct[t.cat]||0)+t.val;me+=t.val;}else if(t.type==='ingreso'){if(t.account)b[t.account]=(b[t.account]||0)+t.amount;mi+=t.val;}else{if(t.from)b[t.from]=(b[t.from]||0)-t.val;if(t.to)b[t.to]=(b[t.to]||0)+t.val;}return{b,ct,mi,me};}
+  _rev(t,b,ct,mi,me){return window.FinanzDomain.reverseTxn(t,b,ct,mi,me);}
+  _apply(t,b,ct,mi,me){return window.FinanzDomain.applyTxn(t,b,ct,mi,me);}
 
   save(){const S=this.state;if(!S.addAmount)return;const val=parseFloat(S.addAmount.replace(',','.'))||0;if(!val)return;const type=S.addType;const t={type,val,dateLabel:S.addDate,tags:[...S.addTags]};const C=S.categories[S.addCat]||{};t.merchant=S.addTitle.trim()||(type==='transfer'?'Transferencia':type==='inversion'?'Inversión':C.name||'Movimiento');if(type==='gasto'||type==='ingreso'){if(!S.accounts[S.addAccount]){this.flashMsg('Elegí una cuenta');return;}if(!S.categories[S.addCat]){this.flashMsg('Elegí una categoría');return;}}else if(!S.accounts[S.addAccount]||!S.accounts[S.addTo]){this.flashMsg('Elegí cuentas válidas');return;}else if(S.addAccount===S.addTo){this.flashMsg('Origen y destino deben ser distintos');return;}if(type==='gasto'){t.cat=S.addCat;t.account=S.addAccount;t.amount=-val;t.note=S.addTitle.trim();}else if(type==='ingreso'){t.cat=S.addCat;t.account=S.addAccount;t.amount=val;t.note=S.addTitle.trim();}else if(type==='transfer'){t.cat='transfer';t.from=S.addAccount;t.to=S.addTo;t.amount=-val;t.isTransfer=true;t.note='→ '+(S.accounts[S.addTo]?S.accounts[S.addTo].name:'');}else{t.cat='inversion';t.from=S.addAccount;t.to=S.addTo;t.amount=-val;t.isTransfer=true;t.note='→ '+(S.accounts[S.addTo]?S.accounts[S.addTo].name:'');}
     this.setState(s=>{let b={...s.balances},ct={...s.categoryTotals},mi=s.monthIncome,me=s.monthExpense,txns=s.txns;if(s.editId){const old=s.txns.find(x=>x.id===s.editId);if(old){const r=this._rev(old,b,ct,mi,me);b=r.b;ct=r.ct;mi=r.mi;me=r.me;txns=txns.filter(x=>x.id!==s.editId);}}const id=s.editId||s._next;t.id=id;const a=this._apply(t,b,ct,mi,me);return{txns:[t,...txns],balances:a.b,categoryTotals:a.ct,monthIncome:a.mi,monthExpense:a.me,_next:s.editId?s._next:id+1,sheet:null,subsheet:null,editId:null,addAmount:'',addTitle:'',addTags:[],flash:s.editId?'Movimiento actualizado':'Movimiento guardado'};});}

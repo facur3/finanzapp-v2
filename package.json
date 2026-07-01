@@ -4,13 +4,18 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "build:domain": "node scripts/build-domain.mjs",
+    "predev": "node scripts/build-domain.mjs",
     "dev": "vite --host 0.0.0.0",
+    "prebuild": "node scripts/build-domain.mjs",
     "build": "vite build",
     "preview": "vite preview --host 0.0.0.0",
-    "check:repo": "node scripts/check-repo.mjs"
+    "check:repo": "node scripts/check-repo.mjs",
+    "test": "vitest run"
   },
   "devDependencies": {
     "vite": "^6.0.0",
-    "typescript": "^5.6.0"
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.0"
   }
 }
