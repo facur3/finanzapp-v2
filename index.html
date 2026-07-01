@@ -968,6 +968,9 @@ input{font-family:inherit;}
           <sc-if value="{{ adHasRend }}" hint-placeholder-val="{{ false }}">
             <div style="font-size:13px;font-weight:700;margin-top:8px;color: {{ adRendColor }};">{{ adRendStr }} hoy · {{ adChgStr }}</div>
           </sc-if>
+          <sc-if value="{{ adHasUnits }}" hint-placeholder-val="{{ false }}">
+            <div style="font-size:11.5px;font-weight:600;margin-top:4px;color:var(--text-3);">{{ adUnitsStr }}</div>
+          </sc-if>
         </div>
         <div style="display:flex;gap:11px;margin-bottom:26px;">
           <div onClick="{{ adTransfer }}" style="flex:1;height:50px;border-radius:16px;background:var(--surface);display:flex;align-items:center;justify-content:center;gap:7px;cursor:pointer;font-size:14px;font-weight:600;"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 4 20 8 16 12"></polyline><line x1="20" y1="8" x2="8" y2="8"></line><polyline points="8 12 4 16 8 20"></polyline><line x1="4" y1="16" x2="16" y2="16"></line></svg>Transferir</div>
@@ -2295,21 +2298,25 @@ class Component extends DCLogic {
         fciList.forEach(item=>{let vcp=0;for(const ph of item.phrases){const words=String(ph).toLowerCase().split(/\s+/).filter(Boolean);if(!words.length)continue;const hit=funds.find(f=>{const n=String(f.fondo||'').toLowerCase();return words.every(w=>n.includes(w));});if(hit&&hit.vcp>0){vcp=hit.vcp;break;}}if(vcp>0)fciPrices[item.id]=vcp;});
       }
       // 4. Apply per account.
-      // FCI account: grow the CURRENT balance by the cuotaparte yield since the last
-      // update (balance x liveVCP/lastVCP) and store lastVCP. This preserves any
-      // spends/deposits made meanwhile and never resets the balance from a stale base.
+      // FCI account: hold a fixed number of cuotapartes (units), exactly like Cocos.
+      // Balance = units x liveVCP (recomputed fresh each time, no compounding drift).
+      // If the balance changed for another reason (spend/deposit/manual edit), we
+      // reconvert units from the new balance at the last known VCP so it's preserved.
       // Tickers (crypto/CEDEAR): value = qty x live price.
       let anyUpdate=false;let newAccMeta={...s.accMeta};
       Object.keys(na).forEach(k=>{if(!s.accounts[k])return;const aa=[...(na[k]||[])];if(!aa.length)return;
         const fi=aa.findIndex(a=>a.fci);
-        if(fi>=0){const a=aa[fi];const live=fciPrices[a.id]||0;if(live>0){const lastVcp=Number(a.lastVcp)||0;let bal=Number(s.balances[k])||0;
-            if(lastVcp>0){bal=Math.round(bal*live/lastVcp*100)/100;nb[k]=bal;}
+        if(fi>=0){const a=aa[fi];const live=fciPrices[a.id]||0;if(live>0){const lastVcp=Number(a.lastVcp)||0;const cur=Number(s.balances[k])||0;
+            let units=Number(a.units)||0;
+            if(units>0&&lastVcp>0){const expected=units*lastVcp;if(Math.abs(cur-expected)>0.5)units=cur/lastVcp;}
+            else{units=live>0?cur/live:0;}
+            const bal=Math.round(units*live*100)/100;nb[k]=bal;
             // Daily rendimiento: baseline = the VCP at the first update of the day.
             const dayKey=new Date().toISOString().slice(0,10);let dayVcp=Number(a.dayVcp)||0;let dKey=a.dayKey;
             if(dKey!==dayKey||dayVcp<=0){dayVcp=lastVcp>0?lastVcp:live;dKey=dayKey;}
             const rPct=dayVcp>0?(live-dayVcp)/dayVcp:0;const rAmt=Math.round(bal*(live-dayVcp)/(live||1));
             newAccMeta[k]={chg:(rPct>=0?'+':'')+(rPct*100).toFixed(2).replace('.',',')+'%',up:rPct>=0,rend:rAmt};
-            aa[fi]={...a,lastVcp:live,dayVcp,dayKey:dKey};na[k]=aa;anyUpdate=true;}
+            aa[fi]={...a,units,lastVcp:live,dayVcp,dayKey:dKey};na[k]=aa;anyUpdate=true;}
           return;}
         let changed=false;
         aa.forEach((a,i)=>{if(!a.ticker)return;let np=0;
@@ -2469,9 +2476,10 @@ class Component extends DCLogic {
     // account detail
     let acctD={};
     if(S.acctView&&ACC[S.acctView]){const k=S.acctView,a=ACC[k];const movs=S.txns.filter(t=>[t.account,t.from,t.to].indexOf(k)>=0).slice(0,8).map(t=>this.txView(t));
-      const am=S.accMeta[k]||{};const isFci=(((S.assets&&S.assets[k])||[]).some(x=>x.fci));
+      const am=S.accMeta[k]||{};const fciAsset=((S.assets&&S.assets[k])||[]).find(x=>x.fci);const isFci=!!fciAsset;
       acctD={adName:a.name,adType:a.type,adEmoji:a.emoji,adFillVar:a.fillVar,adBalStr:money(S.balances[k]),adKindLabel:a.kind==='liquid'?(a.liquid?'Cuenta · cuenta para gastar':'Cuenta'):a.kind==='invest'?'Inversión':'Deuda',adLiquid:!!a.liquid,adMovs:movs,adHasMovs:movs.length>0,
         adHasRend:isFci&&am.rend!=null,adRendStr:((am.rend||0)>=0?'+':'-')+sym+this.fmtInt(Math.abs(am.rend||0)),adRendColor:(am.rend||0)>=0?'var(--pos)':'var(--accent)',adChgStr:am.chg||'',
+        adHasUnits:!!(fciAsset&&fciAsset.units>0),adUnitsStr:(fciAsset&&fciAsset.units>0)?(fciAsset.units.toFixed(2)+' cuotapartes'):'',
         adNoMovs:movs.length===0,adTransfer:()=>this.openAddPreset('transfer',k,LIQ.find(x=>x!==k)||INV[0]||k),adEdit:()=>this.openAddAccount(k),adArchive:()=>this.requestConfirm({title:'Archivar cuenta',msg:'La cuenta se ocultará de los selectores activos pero se conservará su historial.',confirmLabel:'Archivar',danger:false,onConfirm:()=>this.archiveAccount(k)}),adDelete:()=>this.requestConfirm({title:'Eliminar cuenta',msg:'Se eliminará la cuenta y dejará de contar en tus totales. Esta acción no se puede deshacer.',confirmLabel:'Eliminar',danger:true,onConfirm:()=>this.deleteAccount(k)})};}
     // investment detail (per account)
     let invD={};
