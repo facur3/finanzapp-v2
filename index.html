@@ -2413,7 +2413,6 @@ class Component extends DCLogic {
     this._cardScrollT=setTimeout(()=>{const i=Math.max(0,Math.min((this.state.cards||[]).length-1,Math.round(left/310)));if(i!==this.state.cardIdx)this.setState({cardIdx:i});},110);}
   openAddPreset(type,from,to){const liq=this.liquidIds(),inv=this.investIds();this.setState({sheet:'add',push:null,subsheet:null,addType:type,addAmount:'',addTitle:'',addCat:type==='ingreso'?'ingreso':'comida',addAccount:from||liq[0]||inv[0]||'',addTo:to||inv[0]||liq.find(k=>k!==from)||liq[0]||'',addDate:'Hoy',addTags:[],editId:null});}
   openAddAccount(editId){const s=this.state;if(editId){const a=s.accounts[editId];this.setState({push:'addAccount',newAcc:{name:a.name,type:a.type,kind:a.kind,balance:String(s.balances[editId]||0).replace('.',','),currency:a.currency,liquid:a.liquid,editId}});}else{this.setState({push:'addAccount',newAcc:{name:'',type:'Banco',kind:'liquid',balance:'',currency:'ARS',liquid:true,editId:null}});}}
-  openAddInvestmentAccount(){this.setState({push:'addAccount',newAcc:{name:'',type:'Inversión',kind:'invest',balance:'',currency:this.state.currency,liquid:false,editId:null}});}
   setNewAcc(patch){this.setState(s=>({newAcc:{...s.newAcc,...patch}}));}
   addAccountSave(fromOnb){const n=this.state.newAcc;if(!n.name.trim()){this.flashMsg('Poné un nombre');return;}const tm=this.ACCTYPES.find(t=>t[0]===n.type)||['Banco','liquid','🏦'];const kind=tm[1];const liquid=kind==='liquid'?n.liquid:false;const bal=parseFloat((n.balance||'0').replace(/\./g,'').replace(',','.'))||0;
     this.setState(s=>{const pal=this.PALETTE[s.order.length%this.PALETTE.length];if(n.editId){const acc={...s.accounts[n.editId],name:n.name.trim(),type:n.type,kind,liquid,currency:n.currency,emoji:tm[2]};return{accounts:{...s.accounts,[n.editId]:acc},balances:{...s.balances,[n.editId]:bal},push:fromOnb?null:'accountDetail',acctView:n.editId,flash:'Cuenta actualizada'};}
@@ -2431,7 +2430,6 @@ class Component extends DCLogic {
       const bal={...s.balances,[s.payAccount]:(s.balances[s.payAccount]||0)-v};const t={id:s._next,type:'pago',merchant:'Pago '+card.brand,cat:'pago',amount:-v,val:v,account:s.payAccount,card:card.id,isTransfer:true,dateLabel:'Hoy',note:'Pago de tarjeta',tags:[]};return{cards:cs,balances:bal,txns:[t,...s.txns],_next:s._next+1,push:'cardDetail',payAmount:'',flash:full?'Resumen pagado':'Pago registrado'};});}
   cardResumen(c){return (((c||{}).cuotas)||[]).reduce((a,q)=>a+(q.monto||0),0)+(((c||{}).compras)||[]).reduce((a,p)=>a+(p.monto||0),0);}
   _cycleKey(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');}
-  _dayOf(s){const m=String(s||'').match(/(\d{1,2})/);return m?Math.min(31,Math.max(1,parseInt(m[1],10))):1;}
   _monthLabel(d){return d.getDate()+' '+this._MONTHS[d.getMonth()];}
   // Parse a card label like "13 jul" into a real Date near `ref`, picking the
   // closest occurrence within ±6 months. Critical for auto-pay: read on 30 jun,
@@ -2669,7 +2667,6 @@ class Component extends DCLogic {
     const expKeys=S.catOrder.filter(k=>CAT[k]&&CAT[k].type==='gasto'&&!CAT[k].archived);
     const sorted=expKeys.map(k=>({k,t:S.categoryTotals[k]||0})).sort((a,b)=>b.t-a.t).slice(0,4);
     const maxT=Math.max.apply(null,sorted.map(x=>x.t).concat([1]));
-    const expTotal=expKeys.reduce((a,k)=>a+(S.categoryTotals[k]||0),0);
     const chartItems=sorted.filter(x=>x.t>0).map(x=>({key:x.k,name:(CAT[x.k]||{}).name,emoji:(CAT[x.k]||{}).emoji,iconVar:cIcon(x.k),fillVar:cFill(x.k),amount:S.hideAmounts?'••':this.abbr(x.t),h:Math.max(48,Math.round(x.t/maxT*100)),onOpen:()=>this.setState({tab:'actividad',push:null,sheet:null,actCat:x.k,actFilter:'todos',actSearch:''})}));
     // home groups Hoy/Ayer
     const homeGroups=this.groupByDate(S.txns.filter(t=>t.type==='gasto'||t.type==='ingreso'||t.type==='pago').slice(0,6)).map(g=>({day:g.day,totalStr:S.hideAmounts?'••••':this.signed(g.total),items:g.items.map(t=>this.txView(t))}));
@@ -2800,7 +2797,7 @@ class Component extends DCLogic {
     portAssets.forEach((a,i)=>{const span=portValue>0?a.value/portValue*100:0;const a0=portAcc;const a1=portAcc+span;portAcc=a1;const g=i<portDonutN-1?Math.min(portDonutGap,span*0.4):0;portDonutSegs.push(a.color+' '+a0.toFixed(2)+'% '+(a1-g).toFixed(2)+'%');if(g>0)portDonutSegs.push('var(--bg) '+(a1-g).toFixed(2)+'% '+a1.toFixed(2)+'%');});
     const portDonutGradient=portAssets.length?'conic-gradient('+portDonutSegs.join(',')+')':'var(--surface-strong)';
     const usdRate=S.usdRate||0;const portValueUsd=usdRate>0?portValue/usdRate:0;
-    const portfolio={portValueStr:money(portValue),portHasAssets:portAssets.length>0,portCostStr:money(portCost),
+    const portfolio={portValueStr:money(portValue),portHasAssets:portAssets.length>0,
       portResultWord:portGL>=0?'Ganás':'Perdés',portResultAbsStr:sym+this.fmtInt(Math.abs(portGL)),portGLPctStr:(portGL>=0?'+':'')+portGLPct.toFixed(1).replace('.',',')+'%',portGLColor:portGL>=0?'var(--pos)':'var(--accent)',
       portHasUsd:usdRate>0&&!S.hideAmounts,portValueUsdStr:'US$ '+this.fmtInt(portValueUsd),portUsdRateStr:'$'+this.fmtInt(usdRate),
       portDonutGradient,portCount:portAssets.length,portList,portNoAssets:portAssets.length===0,
@@ -2809,19 +2806,18 @@ class Component extends DCLogic {
     // ===== ASSET DETAIL (single holding page) =====
     let assetD={};
     if(S.assetView){const av=S.assetView;const a=(S.assets[av.account]||[]).find(x=>x.ticker===av.ticker);
-      if(a){const lp=a.lastPrice||a.avg,value=a.qty*lp,cost=a.qty*a.avg,gl=value-cost,glPct=cost>0?gl/cost*100:0;const pct=portValue>0?value/portValue*100:0;const accM=ACC[av.account]||{};
-        assetD={adAName:a.name,adATicker:a.ticker||'',adAEmoji:a.emoji,adAAccName:accM.name||'',adAFillVar:accM.fillVar||'--cat-inversion-fill',
+      if(a){const lp=a.lastPrice||a.avg,value=a.qty*lp,cost=a.qty*a.avg,gl=value-cost,glPct=cost>0?gl/cost*100:0;const accM=ACC[av.account]||{};
+        assetD={adAName:a.name,adATicker:a.ticker||'',adAEmoji:a.emoji,adAFillVar:accM.fillVar||'--cat-inversion-fill',
           adAValueStr:money(value),adAHasUsd:(S.usdRate>0&&!S.hideAmounts),adAValueUsdStr:'≈ US$ '+this.fmtInt(value/(S.usdRate||1)),adAQtyStr:(a.qty<1?a.qty.toFixed(6).replace(/\.?0+$/,''):this.fmtInt(a.qty))+(a.ticker?' '+a.ticker:' u'),
-          adACostStr:money(cost),adAResultWord:gl>=0?'Ganás':'Perdés',adAResultAbsStr:sym+this.fmtInt(Math.abs(gl)),adAGLPctStr:(gl>=0?'+':'')+glPct.toFixed(1).replace('.',',')+'%',adAGLColor:gl>=0?'var(--pos)':'var(--accent)',
-          adAAvgStr:money(a.avg),adALastStr:money(lp),adAPctStr:pct.toFixed(0)+'% de tu portfolio',
+          adACostStr:money(cost),adAResultWord:gl>=0?'Ganás':'Perdés',adAGLPctStr:(gl>=0?'+':'')+glPct.toFixed(1).replace('.',',')+'%',adAGLColor:gl>=0?'var(--pos)':'var(--accent)',
+          adAAvgStr:money(a.avg),adALastStr:money(lp),
           adAResultSignStr:(gl>=0?'+':'-')+sym+this.fmtInt(Math.abs(gl)),
           acHasPath:!!S.assetChart.path,acDim:S.assetChart.loading?'0.45':'1',acLoadingNoPath:S.assetChart.loading&&!S.assetChart.path,acFail:!S.assetChart.ok&&!S.assetChart.loading&&!S.assetChart.path,
           acPath:S.assetChart.path||'',acArea:S.assetChart.area||'',acColor:'#2E9BEA',acMaxStr:S.assetChart.maxStr||'',acMinStr:S.assetChart.minStr||'',acStartLabel:S.assetChart.startLabel||'',acEndLabel:S.assetChart.endLabel||'',
           acChangeStr:S.assetChart.changeStr||'',acChangeColor:S.assetChart.up?'var(--pos)':'var(--accent)',acHasChange:!!S.assetChart.changeStr,acNoChange:!S.assetChart.changeStr,
           acRanges:['1D','1S','1M','Máx'].map(r=>({label:r,onPick:()=>this.setAssetChartRange(r),bg:(S.assetChartRange===r)?'var(--text)':'var(--surface)',color:(S.assetChartRange===r)?'var(--bg)':'var(--text-2)'})),
           adABuy:()=>this.tradeAsset('buy',av.account,a),adASell:()=>this.tradeAsset('sell',av.account,a),
-          adAUpdate:()=>this.setState({push:'investDetail',investView:av.account,ivSub:'updatePrice',upTicker:a.ticker,atNewPrice:''}),
-          adARefresh:()=>this.fetchPrices(),adARefreshLabel:S.pricesLoading?'Actualizando…':'Actualizar precios',adABack:()=>this.setState({push:'investments',assetView:null})};
+          adABack:()=>this.setState({push:'investments',assetView:null})};
         const lots=(S.txns||[]).filter(t=>t.type==='inversion'&&t.ticker===av.ticker).map(t=>{const buy=(t.amount||0)<=0;const q=t.aqty;return{date:t.dateLabel||'',kind:buy?'Compraste':'Vendiste',qtyStr:q!=null?((q<1?String(q):this.fmtInt(q))+' '+av.ticker):'',amountStr:sym+this.fmtInt(Math.abs(t.amount||t.val||0)),color:buy?'var(--text)':'var(--pos)'};});
         assetD.adACompras=lots;assetD.adAHasCompras=lots.length>0;}}
     // card detail
@@ -2947,7 +2943,7 @@ class Component extends DCLogic {
       : this.CEDEARS;
     const atSuggestions=atPickRaw.filter(x=>x&&x[0]).map(x=>({ticker:x[0],name:x[1]||x[0],emoji:x[2]||'📈',onPick:()=>this.pickAsset(x[0],x[1],x[2]),bg:S.atTicker===x[0]?'var(--accent)':'var(--surface)',color:S.atTicker===x[0]?'#fff':'var(--text)',nameColor:S.atTicker===x[0]?'rgba(255,255,255,0.8)':'var(--text-2)'}));
     const atHasSuggestions=atSuggestions.length>0;
-    const atAccC=ACC[S.atAccount]||{};const atSrcC=ACC[S.atSource]||{};
+    const atAccC=ACC[S.atAccount]||{};
     let atPickerTitle='',atPickerOptions=[];
     if(S.atSub==='acc'){atPickerTitle='Cuenta de inversión';atPickerOptions=INV.map(k=>({label:ACC[k].name,emoji:ACC[k].emoji,fillVar:ACC[k].fillVar,selected:S.atAccount===k,onPick:()=>this.setState({atAccount:k,atSub:null})}));}
     else if(S.atSub==='src'){atPickerTitle=S.atMode==='buy'?'Pagar con':'Acreditar en';atPickerOptions=LIQ.map(k=>({label:ACC[k].name,emoji:ACC[k].emoji,fillVar:ACC[k].fillVar,selected:S.atSource===k,onPick:()=>this.setState({atSource:k,atSub:null})}));}

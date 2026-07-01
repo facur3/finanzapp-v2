@@ -36,7 +36,12 @@ React runtime is vendored locally, so startup never depends on `unpkg.com`.
 `localStorage` is scoped to the **origin** and to the **specific browser/profile**.
 Data saved in Safari is not visible in Chrome, and data on one device is not on
 another. Installing via "Add to Home Screen" keeps the same origin, so the
-installed app shares storage with that browser. There is no cloud sync.
+installed app shares storage with that browser.
+
+**Optional cloud sync** (Supabase, see `SUPABASE_SETUP.md`) can bridge devices when
+signed in: the persistent snapshot is mirrored to a single JSONB row per user with
+last-write-wins by timestamp. `localStorage` remains the local source of truth and
+the app stays fully functional offline; the cloud is a mirror, not a dependency.
 
 ## No-flicker startup guarantee
 
@@ -70,7 +75,9 @@ skeleton, or visual masking was added, and the UI is unchanged.
 ## Limitations
 
 - **First load must be online** (inherent to web PWAs).
-- **Storage is per-origin, per-browser, per-device** — no cross-device sync.
+- **Storage is per-origin, per-browser, per-device.** Cross-device continuity is
+  available only through the optional Supabase cloud sync; without it, storage stays
+  local to each browser/device.
 - A corrupted payload currently falls back to defaults; the next successful save
   overwrites the corrupted value. There is **no automatic quarantine/backup** of a
   corrupted payload today (the app has no existing pattern for it). See the

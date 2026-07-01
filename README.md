@@ -12,10 +12,18 @@ from the **Claude Design runtime** export as the exact, approved UI/UX baseline.
 - `design-reference/FinanzApp.dc.html` and `design-reference/support.js` are kept
   as untouched reference files.
 
-This version intentionally **does not** convert the app to React. It runs from the
-Claude Design runtime. There is **no React, no Dexie, no Supabase, no Capacitor,
-and no backend.** Future refactors must be parity-safe: one screen/flow at a time,
-with the Claude Design behavior preserved exactly after every commit.
+This version intentionally **does not** convert the app to React — it runs from the
+Claude Design runtime (which uses React internally). `localStorage` is the source of
+truth. On top of that baseline the app now also has:
+
+- **Optional cloud sync** via Supabase (email + password auth, one JSONB row per user,
+  last-write-wins). Off until configured — see `SUPABASE_SETUP.md`. Without it the app
+  is 100% local, exactly as before.
+- **One serverless function** (`api/chart.js` on Vercel) that proxies Yahoo Finance
+  price history for the investment charts. No other backend.
+
+Future refactors must be parity-safe: one screen/flow at a time, with the Claude
+Design behavior preserved exactly after every commit.
 
 ## Functionality included
 
@@ -25,6 +33,12 @@ with the Claude Design behavior preserved exactly after every commit.
 - Category chart tap filters Activity automatically.
 - Functional quick-add flows, movement detail, card purchase, card payment,
   investment trade, account/category/tag/card forms, security/reset, settings and filters.
+- **Investments**: CEDEARs, crypto and FCI with live prices (CoinGecko, data912,
+  Yahoo, ArgentinaDatos), portfolio donut, per-asset price charts, and USD (dólar
+  cripto) valuation.
+- **Budgets** (monthly limit per category), **savings goals**, and a **net-worth
+  trend** chart from daily snapshots.
+- **Optional cloud sync** (Supabase) so data can follow you across devices.
 - CSV export, JSON backup export, JSON backup import.
 - **Installable PWA shell** (manifest + service worker) with offline app-shell support.
 
@@ -71,8 +85,9 @@ Fails if `node_modules/`, `dist/`, `.vite/`, or `.env` are tracked by git.
 
 ## Deploy to Vercel
 
-Static deployment, no backend required. `vercel.json` is included and already
-pins the build settings below.
+Mostly static, plus one serverless function (`api/chart.js`, auto-detected by
+Vercel) that proxies price history. `vercel.json` is included and already pins the
+build settings below.
 
 ### One-time setup
 
