@@ -2,7 +2,7 @@
    Infrastructure only: no UI, no push, no user-data caching. */
 'use strict';
 
-var CACHE = 'finanzapp-shell-v42';
+var CACHE = 'finanzapp-shell-v43';
 
 // App shell assets to precache. Kept intentionally small.
 var SHELL = [
