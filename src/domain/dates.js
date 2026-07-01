@@ -30,3 +30,25 @@ export function parseDate(label, ref) {
   d.setHours(0, 0, 0, 0);
   return d;
 }
+
+// Resolve a display label ("Hoy"/"Ayer"/"Anteayer"/"13 jul") to an ISO key
+// "YYYY-MM-DD". This is how the app backfills real dates from the legacy
+// label-only transactions and stamps new ones. Falls back to today when unknown.
+export function isoFromLabel(label, ref = new Date()) {
+  const base = new Date(ref);
+  base.setHours(0, 0, 0, 0);
+  const s = String(label || '').trim().toLowerCase();
+  if (s === '' || s === 'hoy') return todayKey(base);
+  if (s === 'ayer') {
+    const d = new Date(base);
+    d.setDate(d.getDate() - 1);
+    return todayKey(d);
+  }
+  if (s === 'anteayer') {
+    const d = new Date(base);
+    d.setDate(d.getDate() - 2);
+    return todayKey(d);
+  }
+  const p = parseDate(label, base);
+  return p ? todayKey(p) : todayKey(base);
+}

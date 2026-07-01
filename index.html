@@ -2143,7 +2143,7 @@ class Component extends DCLogic {
     Object.keys(out.categories).forEach(k=>{if(out.catOrder.indexOf(k)<0&&k!=='pago')out.catOrder.push(k);});
     out.order=out.order.filter(k=>out.accounts[k]);
     Object.keys(out.accounts).forEach(k=>{if(out.order.indexOf(k)<0)out.order.push(k);});
-    out.txns=out.txns.filter(t=>t&&typeof t==='object'&&t.id!=null&&t.type&&isFinite(Number(t.val))&&isFinite(Number(t.amount))).map(t=>Object.assign({dateLabel:'Hoy',tags:[]},t,{tags:Array.isArray(t.tags)?t.tags:[]}));
+    out.txns=out.txns.filter(t=>t&&typeof t==='object'&&t.id!=null&&t.type&&isFinite(Number(t.val))&&isFinite(Number(t.amount))).map(t=>{const nt=Object.assign({dateLabel:'Hoy',tags:[]},t,{tags:Array.isArray(t.tags)?t.tags:[]});if(!nt.dateISO)nt.dateISO=window.FinanzDomain.isoFromLabel(nt.dateLabel);return nt;});
     out.cards=out.cards.filter(c=>c&&typeof c==='object').map(c=>Object.assign({id:'card_'+Math.random().toString(36).slice(2),brand:'Visa',bank:'',last4:'0000',saldo:0,limit:1,cierre:'—',vence:'—',grad:this.CARDGRADS[0],compras:[],cuotas:[],pagos:[]},c));
     out.tagSugg=out.tagSugg.map(t=>String(t).trim().toLowerCase().replace(/^#/,'')).filter(Boolean).filter((t,i,a)=>a.indexOf(t)===i);
     const maxTxn=out.txns.reduce((m,t)=>Math.max(m,Number(t.id)||0),0);
@@ -2651,7 +2651,7 @@ class Component extends DCLogic {
   _rev(t,b,ct,mi,me){return window.FinanzDomain.reverseTxn(t,b,ct,mi,me);}
   _apply(t,b,ct,mi,me){return window.FinanzDomain.applyTxn(t,b,ct,mi,me);}
 
-  save(){const S=this.state;if(!S.addAmount)return;const val=parseFloat(S.addAmount.replace(',','.'))||0;if(!val)return;const type=S.addType;const t={type,val,dateLabel:S.addDate,tags:[...S.addTags]};const C=S.categories[S.addCat]||{};t.merchant=S.addTitle.trim()||(type==='transfer'?'Transferencia':type==='inversion'?'Inversión':C.name||'Movimiento');if(type==='gasto'||type==='ingreso'){if(!S.accounts[S.addAccount]){this.flashMsg('Elegí una cuenta');return;}if(!S.categories[S.addCat]){this.flashMsg('Elegí una categoría');return;}}else if(!S.accounts[S.addAccount]||!S.accounts[S.addTo]){this.flashMsg('Elegí cuentas válidas');return;}else if(S.addAccount===S.addTo){this.flashMsg('Origen y destino deben ser distintos');return;}if(type==='gasto'){t.cat=S.addCat;t.account=S.addAccount;t.amount=-val;t.note=S.addTitle.trim();}else if(type==='ingreso'){t.cat=S.addCat;t.account=S.addAccount;t.amount=val;t.note=S.addTitle.trim();}else if(type==='transfer'){t.cat='transfer';t.from=S.addAccount;t.to=S.addTo;t.amount=-val;t.isTransfer=true;t.note='→ '+(S.accounts[S.addTo]?S.accounts[S.addTo].name:'');}else{t.cat='inversion';t.from=S.addAccount;t.to=S.addTo;t.amount=-val;t.isTransfer=true;t.note='→ '+(S.accounts[S.addTo]?S.accounts[S.addTo].name:'');}
+  save(){const S=this.state;if(!S.addAmount)return;const val=parseFloat(S.addAmount.replace(',','.'))||0;if(!val)return;const type=S.addType;const t={type,val,dateLabel:S.addDate,dateISO:window.FinanzDomain.isoFromLabel(S.addDate),tags:[...S.addTags]};const C=S.categories[S.addCat]||{};t.merchant=S.addTitle.trim()||(type==='transfer'?'Transferencia':type==='inversion'?'Inversión':C.name||'Movimiento');if(type==='gasto'||type==='ingreso'){if(!S.accounts[S.addAccount]){this.flashMsg('Elegí una cuenta');return;}if(!S.categories[S.addCat]){this.flashMsg('Elegí una categoría');return;}}else if(!S.accounts[S.addAccount]||!S.accounts[S.addTo]){this.flashMsg('Elegí cuentas válidas');return;}else if(S.addAccount===S.addTo){this.flashMsg('Origen y destino deben ser distintos');return;}if(type==='gasto'){t.cat=S.addCat;t.account=S.addAccount;t.amount=-val;t.note=S.addTitle.trim();}else if(type==='ingreso'){t.cat=S.addCat;t.account=S.addAccount;t.amount=val;t.note=S.addTitle.trim();}else if(type==='transfer'){t.cat='transfer';t.from=S.addAccount;t.to=S.addTo;t.amount=-val;t.isTransfer=true;t.note='→ '+(S.accounts[S.addTo]?S.accounts[S.addTo].name:'');}else{t.cat='inversion';t.from=S.addAccount;t.to=S.addTo;t.amount=-val;t.isTransfer=true;t.note='→ '+(S.accounts[S.addTo]?S.accounts[S.addTo].name:'');}
     this.setState(s=>{let b={...s.balances},ct={...s.categoryTotals},mi=s.monthIncome,me=s.monthExpense,txns=s.txns;if(s.editId){const old=s.txns.find(x=>x.id===s.editId);if(old){const r=this._rev(old,b,ct,mi,me);b=r.b;ct=r.ct;mi=r.mi;me=r.me;txns=txns.filter(x=>x.id!==s.editId);}}const id=s.editId||s._next;t.id=id;const a=this._apply(t,b,ct,mi,me);return{txns:[t,...txns],balances:a.b,categoryTotals:a.ct,monthIncome:a.mi,monthExpense:a.me,_next:s.editId?s._next:id+1,sheet:null,subsheet:null,editId:null,addAmount:'',addTitle:'',addTags:[],flash:s.editId?'Movimiento actualizado':'Movimiento guardado'};});}
   deleteTxn(){const S=this.state;const t=S.txns.find(x=>x.id===S.detailId);if(!t)return;this.setState(s=>{const r=this._rev(t,s.balances,s.categoryTotals,s.monthIncome,s.monthExpense);return{txns:s.txns.filter(x=>x.id!==t.id),balances:r.b,categoryTotals:r.ct,monthIncome:r.mi,monthExpense:r.me,push:null,detailId:null};});}
   duplicateTxn(){const S=this.state;const t=S.txns.find(x=>x.id===S.detailId);if(!t)return;this.setState(s=>{const id=s._next;const nt={...t,id,dateLabel:'Hoy',tags:[...(t.tags||[])]};const a=this._apply(nt,s.balances,s.categoryTotals,s.monthIncome,s.monthExpense);return{txns:[nt,...s.txns],balances:a.b,categoryTotals:a.ct,monthIncome:a.mi,monthExpense:a.me,_next:id+1,push:null,detailId:null};});}
@@ -2674,6 +2674,14 @@ class Component extends DCLogic {
     const heroParts=this.fmtNum(heroVal).split(',');
     // chart
     const expKeys=S.catOrder.filter(k=>CAT[k]&&CAT[k].type==='gasto'&&!CAT[k].archived);
+    // Period-scoped totals computed from transactions by REAL date (Fase 2).
+    // Reports honor the "Este mes/semana/año" selector; Budgets are always the
+    // current month (monthly by definition). Home chart keeps its own accumulator.
+    const FD=window.FinanzDomain;
+    const budgetMonthCat=FD.categoryTotals(FD.periodTxns(S.txns,0));
+    const periodTx=FD.periodTxns(S.txns,S.periodIdx);
+    const periodCat=FD.categoryTotals(periodTx);
+    const periodIE=FD.incomeExpense(periodTx);
     const sorted=expKeys.map(k=>({k,t:S.categoryTotals[k]||0})).sort((a,b)=>b.t-a.t).slice(0,4);
     const maxT=Math.max.apply(null,sorted.map(x=>x.t).concat([1]));
     const chartItems=sorted.filter(x=>x.t>0).map(x=>({key:x.k,name:(CAT[x.k]||{}).name,emoji:(CAT[x.k]||{}).emoji,iconVar:cIcon(x.k),fillVar:cFill(x.k),amount:S.hideAmounts?'••':this.abbr(x.t),h:Math.max(48,Math.round(x.t/maxT*100)),onOpen:()=>this.setState({tab:'actividad',push:null,sheet:null,actCat:x.k,actFilter:'todos',actSearch:''})}));
@@ -2892,11 +2900,11 @@ class Component extends DCLogic {
     // budgets (monthly limit per category)
     let budgetD={};
     {const B=S.budgets||{};
-      const budRows=expKeys.map(k=>{const spent=S.categoryTotals[k]||0;const lim=B[k]||0;const has=lim>0;const pct=has?Math.min(100,Math.round(spent/lim*100)):0;const over=has&&spent>lim;const rem=Math.max(0,lim-spent);
+      const budRows=expKeys.map(k=>{const spent=budgetMonthCat[k]||0;const lim=B[k]||0;const has=lim>0;const pct=has?Math.min(100,Math.round(spent/lim*100)):0;const over=has&&spent>lim;const rem=Math.max(0,lim-spent);
         return{cat:k,name:(CAT[k]||{}).name,emoji:(CAT[k]||{}).emoji,iconVar:cIcon(k),spentStr:moneyInt(spent),limitStr:has?moneyInt(lim):'',hasLimit:has,noLimit:!has,barW:pct+'%',barColor:over?'var(--accent)':(pct>=80?'#E8A13C':'var(--pos)'),statusStr:over?('Te pasaste '+moneyInt(spent-lim)):('Te queda '+moneyInt(rem)),statusColor:over?'var(--accent)':'var(--text-2)',onEdit:()=>this.openBudgetEdit(k)};});
       const withLimit=budRows.filter(r=>r.hasLimit);
       const totalBud=withLimit.reduce((a,r)=>a+((B[r.cat])||0),0);
-      const totalSpent=withLimit.reduce((a,r)=>a+(S.categoryTotals[r.cat]||0),0);
+      const totalSpent=withLimit.reduce((a,r)=>a+(budgetMonthCat[r.cat]||0),0);
       const totalPct=totalBud>0?Math.min(100,Math.round(totalSpent/totalBud*100)):0;
       const editCat=S.budgetCat;const editCatObj=editCat?(CAT[editCat]||{}):{};
       const budKeypad=order.map(l=>({label:l,isBack:l==='back',isNum:l!=='back',onPress:l==='back'?()=>this.budgetAmountPress('back'):()=>this.budgetAmountPress(l)}));
@@ -2957,10 +2965,10 @@ class Component extends DCLogic {
     if(S.atSub==='acc'){atPickerTitle='Cuenta de inversión';atPickerOptions=INV.map(k=>({label:ACC[k].name,emoji:ACC[k].emoji,fillVar:ACC[k].fillVar,selected:S.atAccount===k,onPick:()=>this.setState({atAccount:k,atSub:null})}));}
     else if(S.atSub==='src'){atPickerTitle=S.atMode==='buy'?'Pagar con':'Acreditar en';atPickerOptions=LIQ.map(k=>({label:ACC[k].name,emoji:ACC[k].emoji,fillVar:ACC[k].fillVar,selected:S.atSource===k,onPick:()=>this.setState({atSource:k,atSub:null})}));}
     // ===== REPORTS =====
-    const repIncome=S.monthIncome, repExpense=S.monthExpense, repNet=repIncome-repExpense;
+    const repIncome=periodIE.income, repExpense=periodIE.expense, repNet=repIncome-repExpense;
     const repIncPct=repIncome+repExpense>0?Math.round(repIncome/(repIncome+repExpense)*100):50;
-    const repMovCount=S.txns.filter(t=>t.amount<0&&!t.isTransfer).length;
-    const repByCat=expKeys.map(k=>({k,t:S.categoryTotals[k]||0})).filter(x=>x.t>0).sort((a,b)=>b.t-a.t);
+    const repMovCount=periodTx.filter(t=>t.amount<0&&!t.isTransfer).length;
+    const repByCat=expKeys.map(k=>({k,t:periodCat[k]||0})).filter(x=>x.t>0).sort((a,b)=>b.t-a.t);
     const repCatMax=Math.max.apply(null,repByCat.map(x=>x.t).concat([1]));
     const repCatRows=repByCat.map(x=>({name:(CAT[x.k]||{}).name,emoji:(CAT[x.k]||{}).emoji,fillVar:cFill(x.k),iconVar:cIcon(x.k),amountStr:money(x.t),pct:Math.round(x.t/repCatMax*100)+'%',pctOf:repExpense>0?Math.round(x.t/repExpense*100)+'%':'0%'}));
     // Donut (conic-gradient) of spending by category for Reports.
@@ -2973,14 +2981,14 @@ class Component extends DCLogic {
       const MES=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];const fmtD=(k)=>{const p=String(k).split('-');return p.length===3?(parseInt(p[2],10)+' '+MES[parseInt(p[1],10)-1]):k;};
       trend={trendHas:true,trendSingle:false,trendPath:sp.path,trendArea:sp.area,trendColor:up?'var(--pos)':'var(--accent)',trendMaxStr:money(sp.max),trendMinStr:money(sp.min),trendStartLabel:fmtD(hist[0].d),trendEndLabel:fmtD(hist[hist.length-1].d),trendChangeStr:(chg>=0?'+':'')+chg.toFixed(1).replace('.',',')+'%',trendChangeColor:up?'var(--pos)':'var(--accent)',trendCurrentStr:money(last)};}
     // Spending by account (cash/bank expenses, i.e. not card purchases).
-    const acctSpend={};S.txns.forEach(t=>{if(t.amount<0&&!t.isTransfer&&!t.onCard){const a=t.account;if(a)acctSpend[a]=(acctSpend[a]||0)+t.val;}});
+    const acctSpend={};periodTx.forEach(t=>{if(t.amount<0&&!t.isTransfer&&!t.onCard){const a=t.account;if(a)acctSpend[a]=(acctSpend[a]||0)+t.val;}});
     const repByAcct=Object.keys(acctSpend).filter(a=>ACC[a]).map(a=>({name:ACC[a].name,emoji:ACC[a].emoji,fillVar:ACC[a].fillVar,amountStr:money(acctSpend[a]),v:acctSpend[a]})).sort((a,b)=>b.v-a.v);
     const repHasByAcct=repByAcct.length>0;
     // Spending by card this period (real card purchases, not the running balance).
-    const cardSpend={};S.txns.forEach(t=>{if(t.amount<0&&!t.isTransfer&&t.onCard&&t.card)cardSpend[t.card]=(cardSpend[t.card]||0)+t.val;});
+    const cardSpend={};periodTx.forEach(t=>{if(t.amount<0&&!t.isTransfer&&t.onCard&&t.card)cardSpend[t.card]=(cardSpend[t.card]||0)+t.val;});
     const repByCard=S.cards.map(c=>({name:c.brand+' ·••• '+c.last4,v:cardSpend[c.id]||0,amountStr:money(cardSpend[c.id]||0)})).filter(c=>c.v>0).sort((a,b)=>b.v-a.v);
     const repHasByCard=repByCard.length>0;
-    const merchSpend={};S.txns.forEach(t=>{if(t.amount<0&&!t.isTransfer){merchSpend[t.merchant]=(merchSpend[t.merchant]||0)+t.val;}});
+    const merchSpend={};periodTx.forEach(t=>{if(t.amount<0&&!t.isTransfer){merchSpend[t.merchant]=(merchSpend[t.merchant]||0)+t.val;}});
     const repTopMerch=Object.keys(merchSpend).map(m=>({name:m,amountStr:money(merchSpend[m]),v:merchSpend[m]})).sort((a,b)=>b.v-a.v).slice(0,5);
     const repHasMerch=repTopMerch.length>0;
     const futCuotas=S.cards.reduce((a,c)=>a+(c.cuotas||[]).reduce((s,q)=>s+q.monto*(q.tot-q.cur+1),0),0);

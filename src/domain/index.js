@@ -8,10 +8,11 @@ import * as money from './money.js';
 import * as transactions from './transactions.js';
 import * as balances from './balances.js';
 import * as dates from './dates.js';
+import * as reports from './reports.js';
 
-const FinanzDomain = { ...money, ...transactions, ...balances, ...dates };
+const FinanzDomain = { ...money, ...transactions, ...balances, ...dates, ...reports };
 
 if (typeof window !== 'undefined') window.FinanzDomain = FinanzDomain;
 
-export { money, transactions, balances, dates };
+export { money, transactions, balances, dates, reports };
 export default FinanzDomain;

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { todayKey, parseDate } from './dates.js';
+import { todayKey, parseDate, isoFromLabel } from './dates.js';
 
 describe('dates.todayKey', () => {
   it('formats a local YYYY-MM-DD (month is 1-based)', () => {
@@ -30,5 +30,21 @@ describe('dates.parseDate', () => {
     expect(d.getFullYear()).toBe(2025);
     expect(d.getMonth()).toBe(11);
     expect(d.getDate()).toBe(30);
+  });
+});
+
+describe('dates.isoFromLabel', () => {
+  const ref = new Date(2026, 6, 15); // 15 jul 2026
+  it('maps relative labels to ISO keys', () => {
+    expect(isoFromLabel('Hoy', ref)).toBe('2026-07-15');
+    expect(isoFromLabel('Ayer', ref)).toBe('2026-07-14');
+    expect(isoFromLabel('Anteayer', ref)).toBe('2026-07-13');
+    expect(isoFromLabel('', ref)).toBe('2026-07-15');
+  });
+  it('parses explicit "day month" labels', () => {
+    expect(isoFromLabel('3 jul', ref)).toBe('2026-07-03');
+  });
+  it('falls back to today for unrecognizable labels', () => {
+    expect(isoFromLabel('cualquier cosa', ref)).toBe('2026-07-15');
   });
 });
