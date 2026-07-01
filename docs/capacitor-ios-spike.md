@@ -149,26 +149,74 @@ Before a production iOS branch is merged from macOS, run CocoaPods and review
 whether `ios/App/Podfile.lock` should be generated and tracked to pin native
 dependency resolution.
 
-## Real iPhone Verification Checklist
+## Mac/Xcode Real-Device Verification
 
-1. On macOS, run `npm install`.
-2. Run `npm run build`.
-3. Run `npx cap sync ios`.
-4. Open `ios/App/App.xcworkspace` in Xcode.
-5. Set signing team / bundle settings as needed.
-6. Build and install on a real iPhone.
-7. Open the app manually and confirm the existing FinanzApp UI loads.
-8. In Shortcuts, create **Open URL** with:
+Use these exact steps on a Mac with Xcode installed:
 
-```text
-finanzapp://quick-add-expense?amount=12.50&merchant=Starbucks&category=comida&tags=cafe,apple-pay&note=Apple%20Pay&source=shortcut
+```bash
+git checkout capacitor-ios-spike
+npm ci
+npm run build
+npx cap sync ios
+npx cap open ios
 ```
 
-9. Run the Shortcut manually.
-10. Confirm the Add Expense sheet opens with amount, merchant, category, tags, and badge.
-11. Refresh/reopen the app and confirm it does not repeatedly reopen stale capture.
-12. Test a manual **Nuevo gasto** and confirm the shortcut badge is hidden.
-13. Type `Uber` manually and confirm category/tag suggestions apply.
+In Xcode:
+
+1. Select a real iPhone as the run destination.
+2. Configure signing team if Xcode asks for it.
+3. Confirm or adjust the bundle id if needed: `com.facur3.finanzapp`.
+4. Run the app on the device.
+5. Open the installed native app manually and confirm the existing FinanzApp UI loads.
+
+Do not use simulator-only results as final proof. The target behavior depends on
+iOS Shortcuts opening the installed app through the custom URL scheme on real
+hardware.
+
+## iPhone Shortcut Test
+
+Create a manual Shortcut on the same iPhone:
+
+1. Open **Shortcuts**.
+2. Create a new Shortcut.
+3. Add action **URL**.
+4. Set the URL to:
+
+```text
+finanzapp://quick-add-expense?source=shortcut&amount=12.50&merchant=Starbucks&category=comida&tags=cafe,apple-pay&note=Apple%20Pay
+```
+
+5. Add action **Open URLs**.
+6. Run the Shortcut manually.
+
+Expected result:
+
+- Native FinanzApp opens, not Safari.
+- Add Expense opens automatically.
+- The Apple Pay Shortcut capture badge appears.
+- Amount is prefilled: `12.50`.
+- Merchant/concept is prefilled: `Starbucks`.
+- Category is selected if valid: `comida`.
+- Tags are applied if valid: `cafe`, `apple-pay`.
+
+After the main Shortcut test:
+
+1. Close and reopen FinanzApp manually and confirm it does not repeatedly reopen stale capture.
+2. Open **Nuevo gasto** manually and confirm the shortcut badge is hidden.
+3. Type `Uber` manually and confirm category/tag suggestions apply.
+
+## Troubleshooting
+
+- If Safari opens, the `finanzapp://` URL scheme is not registered or the native app is not installed correctly. Check the installed build and `ios/App/App/Info.plist` URL Types.
+- If nothing opens, check `ios/App/App/Info.plist` -> `CFBundleURLTypes` -> `CFBundleURLSchemes` includes `finanzapp`.
+- If the app opens but the Add Expense sheet does not, check the Capacitor bridge in `src/capacitor/deepLinks.js`, specifically `appUrlOpen` and `getLaunchUrl` handling.
+- If the native build fails, check CocoaPods installation, Xcode version, signing team, provisioning profile, and bundle id configuration.
+
+## Decision Criteria
+
+- Merge this spike only after the real iPhone Shortcut test passes.
+- If the real iPhone test passes, the next feature should be Local Notifications.
+- If the real iPhone test fails, fix the deep link path before adding anything else.
 
 Do not mark the iOS spike as device-verified until this checklist is completed
 on real iPhone hardware.
