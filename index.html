@@ -1812,6 +1812,8 @@ class Component extends DCLogic {
     // Supabase cloud sync (optional). Fill url + anonKey to enable accounts.
     // Empty = app stays 100% local. The anon key is public/safe to ship (RLS protects rows).
     this.SUPA={url:'https://mtijtrdltfyfvnvcdxbx.supabase.co',anonKey:'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im10aWp0cmRsdGZ5ZnZudmNkeGJ4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI4NTUwNDEsImV4cCI6MjA5ODQzMTA0MX0.Q8iyn9c5DNThMCojTuQy38I4ffkLnefghru4OBO5Ohk'};
+    // Local "last data change" timestamp — drives last-write-wins cloud sync.
+    this._localMod=Number((typeof localStorage!=='undefined'&&localStorage.getItem('finanzapp:mod'))||0)||0;
     this.carouselRef=React.createRef();
     this.mainScrollRef=React.createRef();
     this.PALETTE=[['--cat-transfer-icon','--cat-transfer-fill'],['--cat-comida-icon','--cat-comida-fill'],['--cat-ocio-icon','--cat-ocio-fill'],['--cat-compras-icon','--cat-compras-fill'],['--cat-mascotas-icon','--cat-mascotas-fill'],['--cat-auto-icon','--cat-auto-fill']];
@@ -1860,8 +1862,11 @@ class Component extends DCLogic {
   }
   componentDidUpdate(prevProps,prevState){
     this.persistState();
-    // Mirror data changes to the cloud (debounced) when signed in.
-    if(this.state.cloud&&this.state.cloud.status==='signed-in'&&prevState&&this._dataChanged(prevState,this.state))this.cloudPushDebounced();
+    // Track local data changes for last-write-wins sync + mirror to cloud (debounced).
+    if(prevState&&this._dataChanged(prevState,this.state)&&!this._applyingRemote){
+      this._localMod=Date.now();try{localStorage.setItem('finanzapp:mod',String(this._localMod));}catch(e){}
+      if(this.state.cloud&&this.state.cloud.status==='signed-in')this.cloudPushDebounced();
+    }
     // Reset the shared tab scroll container to the top whenever the user opens
     // a different tab or push-screen, so every new section starts from the top
     // instead of inheriting the previous section's scroll position.
@@ -1971,31 +1976,33 @@ class Component extends DCLogic {
     if(!this._sb)return;
     this.setState(s=>({cloud:{...s.cloud,syncing:true}}));
     try{
-      const {data}=await this._sb.from('user_data').select('data').eq('user_id',u.id).maybeSingle();
+      const {data}=await this._sb.from('user_data').select('data,updated_at').eq('user_id',u.id).maybeSingle();
       const remote=data&&data.data;
       const remoteHas=remote&&typeof remote==='object'&&(((remote.order||[]).length)||((remote.txns||[]).length));
-      const localHas=this.state.order.length>0||this.state.txns.length>0;
-      if(remoteHas&&localHas){
-        this.requestConfirm({title:'Datos en tu cuenta',msg:'Encontramos datos guardados en la nube. ¿Traés los de la nube (reemplaza este equipo) o subís los de este equipo?',confirmLabel:'Usar la nube',cancelLabel:'Subir este equipo',danger:false,
-          onConfirm:()=>{this._cloudApplyRemote(remote);this.setState(s=>({cloud:{...s.cloud,lastSync:Date.now()}}));},
-          onCancel:()=>{this.cloudPushNow();}});
-      } else if(remoteHas){
-        this._cloudApplyRemote(remote);this.setState(s=>({cloud:{...s.cloud,lastSync:Date.now()}}));
+      const remoteMod=(data&&data.updated_at)?Date.parse(data.updated_at):0;
+      const localMod=this._localMod||0;
+      // Last-write-wins by timestamp: no prompts. Newer side wins.
+      if(remoteHas&&remoteMod>localMod+2000){
+        this._cloudApplyRemote(remote,false);this._localMod=remoteMod;try{localStorage.setItem('finanzapp:mod',String(remoteMod));}catch(e){}
+        this.setState(s=>({cloud:{...s.cloud,lastSync:Date.now()}}));
       } else {
         await this.cloudPushNow();
       }
-    }catch(e){console.warn('sync failed',e);this.flashMsg('No se pudo sincronizar');}
+    }catch(e){console.warn('sync failed',e);}
     this.setState(s=>({cloud:{...s.cloud,syncing:false}}));
   }
-  _cloudApplyRemote(remote){
-    try{const st=this.coercePersistedState(remote);this.setState(Object.assign({},st,{push:null,sheet:null,subsheet:null,confirm:null,showOnboarding:false,flash:'Sincronizado desde la nube'}));}
-    catch(e){console.warn('apply remote failed',e);}
+  _cloudApplyRemote(remote,silent){
+    try{const st=this.coercePersistedState(remote);this._applyingRemote=true;
+      this.setState(Object.assign({},st,{push:null,sheet:null,subsheet:null,confirm:null,showOnboarding:false},silent?{}:{flash:'Datos sincronizados'}));
+      setTimeout(()=>{this._applyingRemote=false;},200);}
+    catch(e){console.warn('apply remote failed',e);this._applyingRemote=false;}
   }
   async cloudPushNow(){
     if(!this._sb||!this.state.cloud.user)return;
     try{this.setState(s=>({cloud:{...s.cloud,syncing:true}}));
       const {error}=await this._sb.from('user_data').upsert({user_id:this.state.cloud.user.id,data:this.persistentSnapshot(this.state),updated_at:new Date().toISOString()});
       if(error)throw error;
+      this._localMod=Date.now();try{localStorage.setItem('finanzapp:mod',String(this._localMod));}catch(e){}
       this.setState(s=>({cloud:{...s.cloud,syncing:false,lastSync:Date.now()}}));
     }catch(e){console.warn('push failed',e);this.setState(s=>({cloud:{...s.cloud,syncing:false}}));}
   }
