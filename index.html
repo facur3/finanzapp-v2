@@ -673,10 +673,7 @@ input{font-family:inherit;}
         <div style="margin-bottom:22px;">
           <div style="display:inline-flex;align-items:center;gap:5px;background:var(--surface);padding:7px 13px;border-radius:13px;font-size:14px;font-weight:700;color: {{ portGLColor }};">{{ portResultWord }} {{ portResultAbsStr }} ({{ portGLPctStr }})</div>
         </div>
-        <div style="display:flex;height:14px;border-radius:7px;overflow:hidden;gap:2px;margin-bottom:20px;">
-          <sc-for list="{{ portSegments }}" as="s" hint-placeholder-count="3"><div style="width: {{ s.w }};background: {{ s.color }};"></div></sc-for>
-        </div>
-        <div style="display:flex;align-items:center;justify-content:space-between;margin:0 2px 12px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin:24px 2px 12px;">
           <span style="font-size:13px;font-weight:600;color:var(--text-2);">Instrumentos</span>
           <div style="display:inline-flex;background:var(--surface);border-radius:12px;padding:3px;gap:2px;">
             <div onClick="{{ setPortValor }}" style="padding:6px 12px;border-radius:9px;cursor:pointer;font-size:12px;font-weight:700;background: {{ portValorBg }};color: {{ portValorColor }};">Valor</div>
@@ -714,25 +711,29 @@ input{font-family:inherit;}
         <!-- Precio del CEDEAR en grande (estilo Cocos) -->
         <div style="display:flex;align-items:center;gap:12px;margin-bottom:6px;">
           <div style="width:44px;height:44px;border-radius:14px;background:var( {{ adAFillVar }} );display:flex;align-items:center;justify-content:center;font-size:22px;flex:none;">{{ adAEmoji }}</div>
-          <div style="flex:1;min-width:0;"><div style="font-size:15px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ adAName }}</div><div style="font-size:12px;color:var(--text-3);font-weight:600;">{{ adATicker }} · 1 CEDEAR</div></div>
+          <div style="flex:1;min-width:0;"><div style="font-size:16px;font-weight:800;">{{ adATicker }}</div><div style="font-size:12px;color:var(--text-3);font-weight:600;">1 CEDEAR · precio de hoy</div></div>
         </div>
         <div style="font-size:38px;font-weight:800;letter-spacing:-1.5px;margin-bottom:2px;">{{ adALastStr }}</div>
-        <div style="font-size:14px;font-weight:700;color: {{ acColor }};margin-bottom:14px;">{{ acChangeStr }}</div>
+        <div style="font-size:14px;font-weight:700;color: {{ acChangeColor }};margin-bottom:14px;">{{ acChangeStr }}</div>
 
         <!-- Gráfico de precio -->
         <div style="background:var(--card);border-radius:20px;padding:14px;box-shadow:var(--shadow-pill);margin-bottom:14px;">
-          <sc-if value="{{ acOk }}" hint-placeholder-val="{{ true }}">
-            <svg viewBox="0 0 320 92" preserveAspectRatio="none" style="width:100%;height:92px;display:block;">
-              <path d="{{ acArea }}" fill="{{ acColor }}" opacity="0.10"></path>
-              <path d="{{ acPath }}" fill="none" stroke="{{ acColor }}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"></path>
-            </svg>
-          </sc-if>
-          <sc-if value="{{ acLoading }}" hint-placeholder-val="{{ false }}">
-            <div style="height:92px;display:flex;align-items:center;justify-content:center;font-size:13px;color:var(--text-3);font-weight:600;">Cargando gráfico…</div>
-          </sc-if>
-          <sc-if value="{{ acFail }}" hint-placeholder-val="{{ false }}">
-            <div style="height:92px;display:flex;align-items:center;justify-content:center;font-size:13px;color:var(--text-3);font-weight:500;text-align:center;">No pudimos cargar el gráfico ahora</div>
-          </sc-if>
+          <div style="position:relative;height:92px;">
+            <sc-if value="{{ acHasPath }}" hint-placeholder-val="{{ true }}">
+              <svg viewBox="0 0 320 92" preserveAspectRatio="none" style="width:100%;height:92px;display:block;opacity: {{ acDim }};transition:opacity .2s;">
+                <path d="{{ acArea }}" fill="{{ acColor }}" opacity="0.12"></path>
+                <path d="{{ acPath }}" fill="none" stroke="{{ acColor }}" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"></path>
+              </svg>
+              <span style="position:absolute;top:0;right:2px;font-size:10.5px;font-weight:600;color:var(--text-3);background:var(--card);padding:0 3px;border-radius:5px;">{{ acMaxStr }}</span>
+              <span style="position:absolute;bottom:0;right:2px;font-size:10.5px;font-weight:600;color:var(--text-3);background:var(--card);padding:0 3px;border-radius:5px;">{{ acMinStr }}</span>
+            </sc-if>
+            <sc-if value="{{ acLoadingNoPath }}" hint-placeholder-val="{{ false }}">
+              <div style="height:92px;display:flex;align-items:center;justify-content:center;font-size:13px;color:var(--text-3);font-weight:600;">Cargando gráfico…</div>
+            </sc-if>
+            <sc-if value="{{ acFail }}" hint-placeholder-val="{{ false }}">
+              <div style="height:92px;display:flex;align-items:center;justify-content:center;font-size:13px;color:var(--text-3);font-weight:500;text-align:center;">No pudimos cargar el gráfico ahora</div>
+            </sc-if>
+          </div>
           <div style="display:flex;gap:6px;margin-top:12px;">
             <sc-for list="{{ acRanges }}" as="r" hint-placeholder-count="4"><div onClick="{{ r.onPick }}" style="flex:1;text-align:center;padding:8px 4px;border-radius:11px;font-size:13px;font-weight:700;cursor:pointer;background: {{ r.bg }};color: {{ r.color }};">{{ r.label }}</div></sc-for>
           </div>
@@ -2248,20 +2249,21 @@ class Component extends DCLogic {
     if(!ticker){this.setState({assetChart:{loading:false,ok:false,range}});return;}
     const map={'1D':['1d','15m'],'1S':['5d','60m'],'1M':['1mo','1d'],'Máx':['max','1wk']};
     const rr=map[range]||map['1M'];
-    this.setState({assetChart:{loading:true,ok:false,range}});
+    // Keep the previous chart visible while loading the new range (no layout jump).
+    this.setState(s=>({assetChart:{...s.assetChart,loading:true,range}}));
     const url='/api/chart?ticker='+encodeURIComponent(ticker+'.BA')+'&range='+rr[0]+'&interval='+rr[1];
     fetch(url).then(r=>r.json()).then(j=>{
       if((this.state.assetChart||{}).range!==range)return; // a newer range was requested
       const pts=((j&&j.closes)||[]).filter(x=>x!=null&&isFinite(x));
-      if(pts.length<2){this.setState({assetChart:{loading:false,ok:false,range}});return;}
+      if(pts.length<2){this.setState(s=>({assetChart:{...s.assetChart,loading:false,ok:false,range}}));return;}
       const n=pts.length,min=Math.min.apply(null,pts),max=Math.max.apply(null,pts),span=(max-min)||1;
       const W=320,H=92,PAD=10;const xa=i=>(i/(n-1))*W;const ya=v=>PAD+(1-(v-min)/span)*(H-2*PAD);
       let d='M '+xa(0).toFixed(1)+' '+ya(pts[0]).toFixed(1);for(let i=1;i<n;i++)d+=' L '+xa(i).toFixed(1)+' '+ya(pts[i]).toFixed(1);
       const area=d+' L '+W+' '+H+' L 0 '+H+' Z';
       const up=pts[n-1]>=pts[0];const chg=pts[0]>0?(pts[n-1]-pts[0])/pts[0]*100:0;
       const lbl={'1D':'hoy','1S':'en la semana','1M':'en el mes','Máx':'histórico'}[range]||'';
-      this.setState({assetChart:{loading:false,ok:true,range,path:d,area,up,color:up?'var(--pos)':'var(--accent)',changeStr:(chg>=0?'+':'')+chg.toFixed(1).replace('.',',')+'% '+lbl}});
-    }).catch(()=>{if((this.state.assetChart||{}).range===range)this.setState({assetChart:{loading:false,ok:false,range}});});
+      this.setState({assetChart:{loading:false,ok:true,range,path:d,area,up,changeStr:(chg>=0?'+':'')+chg.toFixed(1).replace('.',',')+'% '+lbl,maxStr:'$'+this.fmtInt(max),minStr:'$'+this.fmtInt(min)}});
+    }).catch(()=>{if((this.state.assetChart||{}).range===range)this.setState(s=>({assetChart:{...s.assetChart,loading:false,ok:false}}));});
   }
   setAtType(type){this.setState({atType:type,atAccount:this.accountForType(type),atTicker:'',atName:'',atEmoji:''});}
   tradeAsset(mode,account,a){const isC=(this.CRYPTOS||[]).some(x=>x[0]===a.ticker);const atType=isC?'Cripto':'CEDEAR';this.setState({push:'assetTrade',sheet:null,subsheet:null,atSub:null,atMode:mode,atAccount:account,atType,atTicker:a.ticker,atName:a.name,atEmoji:a.emoji,atQty:'',atTotal:''});}
@@ -2564,7 +2566,9 @@ class Component extends DCLogic {
           adACostStr:money(cost),adAResultWord:gl>=0?'Ganás':'Perdés',adAResultAbsStr:sym+this.fmtInt(Math.abs(gl)),adAGLPctStr:(gl>=0?'+':'')+glPct.toFixed(1).replace('.',',')+'%',adAGLColor:gl>=0?'var(--pos)':'var(--accent)',
           adAAvgStr:money(a.avg),adALastStr:money(lp),adAPctStr:pct.toFixed(0)+'% de tu portfolio',
           adAResultSignStr:(gl>=0?'+':'-')+sym+this.fmtInt(Math.abs(gl)),
-          acLoading:S.assetChart.loading,acOk:S.assetChart.ok&&!S.assetChart.loading,acFail:!S.assetChart.ok&&!S.assetChart.loading,acPath:S.assetChart.path||'',acArea:S.assetChart.area||'',acColor:S.assetChart.color||'var(--text-2)',acChangeStr:S.assetChart.changeStr||'',
+          acHasPath:!!S.assetChart.path,acDim:S.assetChart.loading?'0.45':'1',acLoadingNoPath:S.assetChart.loading&&!S.assetChart.path,acFail:!S.assetChart.ok&&!S.assetChart.loading&&!S.assetChart.path,
+          acPath:S.assetChart.path||'',acArea:S.assetChart.area||'',acColor:'#2E9BEA',acMaxStr:S.assetChart.maxStr||'',acMinStr:S.assetChart.minStr||'',
+          acChangeStr:S.assetChart.changeStr||'',acChangeColor:S.assetChart.up?'var(--pos)':'var(--accent)',
           acRanges:['1D','1S','1M','Máx'].map(r=>({label:r,onPick:()=>this.setAssetChartRange(r),bg:(S.assetChartRange===r)?'var(--text)':'var(--surface)',color:(S.assetChartRange===r)?'var(--bg)':'var(--text-2)'})),
           adABuy:()=>this.tradeAsset('buy',av.account,a),adASell:()=>this.tradeAsset('sell',av.account,a),
           adAUpdate:()=>this.setState({push:'investDetail',investView:av.account,ivSub:'updatePrice',upTicker:a.ticker,atNewPrice:''}),
