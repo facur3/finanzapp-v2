@@ -35,3 +35,30 @@ export function parseShortcutCaptureParams(search, { categories = {}, accounts =
     tags,
   };
 }
+
+export function shortcutCaptureSearchFromUrl(url) {
+  let parsed;
+  try {
+    parsed = new URL(String(url || ''));
+  } catch (e) {
+    return '';
+  }
+
+  if (parsed.protocol === 'finanzapp:') {
+    const route = (parsed.hostname || parsed.pathname || '').replace(/^\/+/, '').toLowerCase();
+    if (route !== 'quick-add-expense') return '';
+    const source = parsed.searchParams.get('source') || 'shortcut';
+    const out = new URLSearchParams({ quickAdd: 'expense', source });
+    ['amount', 'merchant', 'category', 'account', 'tags', 'note'].forEach((key) => {
+      const value = parsed.searchParams.get(key);
+      if (value != null && value !== '') out.set(key, value);
+    });
+    return '?' + out.toString();
+  }
+
+  if ((parsed.protocol === 'http:' || parsed.protocol === 'https:') && parsed.searchParams.get('quickAdd') === 'expense') {
+    return parsed.search;
+  }
+
+  return '';
+}
