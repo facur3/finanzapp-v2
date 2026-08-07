@@ -847,7 +847,7 @@
             <div style="display:flex;justify-content:space-between;padding:9px 0;border-top:1px solid var(--hairline);"><span style="font-size:13px;color:var(--text-2);font-weight:500;">Invertiste</span><span style="font-size:13px;font-weight:700;">{{ adACostStr }}</span></div>
             <div style="display:flex;justify-content:space-between;padding:9px 0;border-top:1px solid var(--hairline);"><span style="font-size:13px;color:var(--text-2);font-weight:500;">{{ adAResultWord }} (desde tu compra)</span><span style="font-size:13px;font-weight:700;color: {{ adAGLColor }};">{{ adAResultSignStr }} ({{ adAGLPctStr }})</span></div>
           </sc-if>
-          <sc-if value="{{ adACostPending }}" hint-placeholder-val="{{ false }}"><div style="padding:11px 0 1px;border-top:1px solid var(--hairline);font-size:12.5px;color:var(--text-2);font-weight:600;line-height:1.45;">Falta el costo de compra. El valor actual es válido, pero el rendimiento queda oculto para no mostrar un resultado falso.</div></sc-if>
+          <sc-if value="{{ adACostPending }}" hint-placeholder-val="{{ false }}"><div style="padding:11px 0 1px;border-top:1px solid var(--hairline);font-size:12.5px;color:var(--text-2);font-weight:600;line-height:1.45;">El valor actual y los rendimientos oficiales del fondo son válidos. Falta tu costo de compra inicial, por eso FinanzApp oculta únicamente tu ganancia o pérdida personal.</div></sc-if>
         </div>
         <div style="display:flex;gap:9px;margin-bottom:22px;">
           <div onClick="{{ adABuy }}" style="flex:1;height:52px;border-radius:16px;background:var(--accent);color:var(--on-accent);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:15px;font-weight:700;">Comprar más</div>
@@ -2106,6 +2106,7 @@ class Component extends DCLogic {
     this._localMod=Number((typeof localStorage!=='undefined'&&localStorage.getItem('finanzapp:mod'))||0)||0;
     this.carouselRef=React.createRef();
     this.mainScrollRef=React.createRef();
+    this._pushScroll={};
     this.PALETTE=[['--cat-transfer-icon','--cat-transfer-fill'],['--cat-comida-icon','--cat-comida-fill'],['--cat-ocio-icon','--cat-ocio-fill'],['--cat-compras-icon','--cat-compras-fill'],['--cat-mascotas-icon','--cat-mascotas-fill'],['--cat-auto-icon','--cat-auto-fill']];
     this.PERIODS=['Este mes','Esta semana','Este año'];
     this.SCOPES=['Todas las cuentas','Lista privada','Compartida'];
@@ -2200,12 +2201,29 @@ class Component extends DCLogic {
     this.setState(s=>({sheet:'add',subsheet:null,addType:'gasto',addAmount:(capture&&capture.amount)||'',addTitle:title,addNote:'',addCat,addAccount:defAcc,addTo:defTo,addDate:'Hoy',addDateISO:window.FinanzDomain.todayKey(),addTags,tagSugg:window.FinanzDomain.uniqueTags([...(s.tagSugg||[]),...addTags]),addCatTouched:!!(capture&&capture.category),addSuggestedKey:suggested&&suggested.key,addSuggestedTags:(suggested&&suggested.suggestedTags)||[],editId:null,shortcutCapture:!!(capture&&capture.shortcut)}));
   }
   // ===== Conversational capture (voice or text) =====
+  rememberPushScroll(key=this.state.push){
+    if(!key||typeof document==='undefined')return;
+    const screens=document.querySelectorAll('.fa-frame > .fa-screen');
+    const el=screens.length?screens[screens.length-1]:null;
+    if(el)this._pushScroll[key]=el.scrollTop||0;
+  }
+  restorePushScroll(key){
+    if(!key||typeof document==='undefined')return;
+    const top=Number(this._pushScroll[key]);
+    if(!Number.isFinite(top))return;
+    requestAnimationFrame(()=>requestAnimationFrame(()=>{
+      const screens=document.querySelectorAll('.fa-frame > .fa-screen');
+      const el=screens.length?screens[screens.length-1]:null;
+      if(el)el.scrollTop=top;
+    }));
+  }
   popScreen(target=null,patch={}){
     if(this.state.navState==='leaving')return;
+    this.rememberPushScroll();
     clearTimeout(this._navTimer);
     this.setState({navState:'leaving'});
     this._navTimer=setTimeout(()=>{
-      this.setState({...patch,push:target,detailId:target?this.state.detailId:null,navState:'back-settle'});
+      this.setState({...patch,push:target,detailId:target?this.state.detailId:null,navState:'back-settle'},()=>this.restorePushScroll(target));
     },180);
   }
   navigateTab(tab,patch={}){
@@ -2222,12 +2240,29 @@ class Component extends DCLogic {
       this._tabTimer=setTimeout(()=>this.setState({tabMotion:'idle'}),300);
     },125);
   }
-  assistantContext(){return{accounts:this.state.accounts,categories:this.state.categories,cards:this.state.cards,recurring:this.state.recurring,transactions:this.state.txns,archived:this.state.archived};}
+  fciSpendSources(s=this.state){
+    return window.FinanzDomain.spendableFciSources(s,s.usdRate).filter(source=>source.valueARS>0.005);
+  }
+  spendSourceMeta(id,s=this.state){
+    const account=s.accounts[id];
+    if(account)return{id,name:account.name,type:account.type,emoji:account.emoji,fillVar:account.fillVar,currency:account.currency||'ARS',accountId:id,fci:false};
+    const source=window.FinanzDomain.findFciSpendSource(s,id,s.usdRate);
+    if(!source)return null;
+    return{id:source.id,name:source.name,type:'FCI · '+(source.ticker||'Fondo común'),emoji:source.emoji||'◉',fillVar:'--cat-inversion-fill',currency:'ARS',accountId:source.accountId,fci:true,valueARS:source.valueARS};
+  }
+  assistantContext(){
+    const accounts={...this.state.accounts};
+    this.fciSpendSources().forEach(source=>{accounts[source.id]={name:source.name,type:'FCI '+(source.ticker||''),currency:'ARS',kind:'spendable-investment',fci:true,sourceAccountId:source.accountId};});
+    return{accounts,categories:this.state.categories,cards:this.state.cards,recurring:this.state.recurring,transactions:this.state.txns,archived:this.state.archived};
+  }
   hydrateAssistantDraft(value){const S=this.state,ctx=this.assistantContext();let d=window.FinanzDomain.normalizeAssistantDraft(window.FinanzDomain.resolveAssistantReferences(value,ctx),ctx);
     const liquid=this.liquidIds();if(!d.accountId&&liquid.length===1)d.accountId=liquid[0];
     if(!d.cardId&&S.cards.length===1)d.cardId=S.cards[0].id;
     if(d.intent==='recurring'&&d.recurringId){const r=(S.recurring||[]).find(x=>x.id===d.recurringId);if(r){d={...d,transactionType:r.type||d.transactionType,amount:d.amount||Number(r.amount)||null,merchant:d.merchant||r.concept||'Recurrente',categoryId:d.categoryId||r.cat||'',accountId:d.accountId||(r.targetKind==='account'?r.targetId:''),cardId:d.cardId||(r.targetKind==='card'?r.targetId:''),tags:window.FinanzDomain.uniqueTags([...(d.tags||[]),'recurrente','asistente'])};}}
     if(d.intent==='transaction'&&d.transactionType==='ingreso'&&!d.categoryId&&S.categories.ingreso)d.categoryId='ingreso';
+    const virtualFci=window.FinanzDomain.parseFciSpendSourceId(d.accountId);
+    const canSpendFci=(d.intent==='transaction'||d.intent==='recurring')&&d.transactionType==='gasto';
+    if(virtualFci&&!canSpendFci)d.accountId='';
     return window.FinanzDomain.normalizeAssistantDraft(d,ctx);
   }
   assistantMissing(d){if(!d||d.intent==='none')return['una orden que pueda registrar'];const missing=[];
@@ -2265,25 +2300,50 @@ class Component extends DCLogic {
     if(d.intent==='card_payment'){const idx=this.state.cards.findIndex(c=>c.id===d.cardId),card=this.state.cards[idx];const amount=d.amount||this.cardResumen(card);const payDate=new Date(d.dateISO+'T12:00:00');const full=amount>=Math.round(this.cardResumen(card))-1&&this.cardResumen(card)>0;const cycle=this._dueCycle(card,payDate);const accountCurrency=(this.state.accounts[d.accountId]||{}).currency||'ARS';if(accountCurrency==='USD'&&!this.state.usdRate){this.setState({assistantError:'Necesito una cotización actualizada para pagar una tarjeta en pesos desde una cuenta en dólares.'});this.fetchPrices(true);return;}const accountDebit=window.FinanzDomain.convertCurrency(amount,'ARS',accountCurrency,this.state.usdRate);
       this.setState(s=>{const cards=s.cards.map((c,i)=>{if(i!==idx)return c;let next={...c,saldo:Math.max(0,(c.saldo||0)-amount),pagos:[{name:'Pago '+c.brand,monto:amount,date:dateLabel,dateISO:d.dateISO},...(c.pagos||[])]};if(full&&c.paidCycle!==cycle)next=this._closeCycleCard(next,payDate);return next;});const txn={id:s._next,type:'pago',merchant:'Pago '+card.brand,cat:'pago',amount:-amount,val:amount,currency:'ARS',account:d.accountId,accountAmount:accountDebit,card:card.id,isTransfer:true,dateLabel,dateISO:d.dateISO,note:'Pago de tarjeta · Asistente',tags:['asistente']};return{cards,balances:{...s.balances,[d.accountId]:(s.balances[d.accountId]||0)-accountDebit},txns:[txn,...s.txns],_next:s._next+1,sheet:null,assistantDraft:null,assistantText:'',flash:full?'Resumen pagado':'Pago registrado'};});return;}
     if(d.intent==='recurring'&&d.cardId){const idx=this.state.cards.findIndex(c=>c.id===d.cardId),card=this.state.cards[idx];this.setState(s=>{const cards=s.cards.map((c,i)=>i===idx?{...c,saldo:(c.saldo||0)+d.amount,compras:[{name:d.merchant||'Recurrente',monto:d.amount,date:dateLabel,dateISO:d.dateISO},...(c.compras||[])]}:c);const txn={id:s._next,type:'gasto',merchant:d.merchant||'Recurrente',cat:d.categoryId,amount:-d.amount,val:d.amount,currency:'ARS',card:d.cardId,onCard:true,dateLabel,dateISO:d.dateISO,note:'Recurrente · '+card.brand,tags:d.tags};return{cards,categoryTotals:{...s.categoryTotals,[d.categoryId]:(s.categoryTotals[d.categoryId]||0)+d.amount},monthExpense:s.monthExpense+d.amount,txns:[txn,...s.txns],_next:s._next+1,sheet:null,assistantDraft:null,assistantText:'',flash:'Recurrente registrado'};});return;}
-    const type=d.transactionType,amount=d.amount;const category=this.state.categories[d.categoryId]||{};const genericMerchant=!d.merchant||/^(gasto|ingreso|movimiento)$/i.test(d.merchant);const txn={id:this.state._next,type,merchant:genericMerchant?(category.name||(type==='ingreso'?'Ingreso':'Gasto')):d.merchant,cat:d.categoryId,amount:type==='ingreso'?amount:-amount,val:amount,currency:(this.state.accounts[d.accountId]||{}).currency||d.currency||'ARS',account:d.accountId,dateLabel,dateISO:d.dateISO,note:d.note||(d.intent==='recurring'?'Recurrente':'Cargado por voz o texto'),tags:d.tags};
-    this.setState(s=>{const applied=this._apply(txn,s.balances,s.categoryTotals,s.monthIncome,s.monthExpense);return{balances:applied.b,categoryTotals:applied.ct,monthIncome:applied.mi,monthExpense:applied.me,txns:[txn,...s.txns],tagSugg:window.FinanzDomain.uniqueTags([...(s.tagSugg||[]),...(d.tags||[])]),_next:s._next+1,sheet:null,assistantDraft:null,assistantText:'',assistantError:'',flash:d.intent==='recurring'?'Recurrente registrado':'Movimiento guardado'};});}
+    const type=d.transactionType,amount=d.amount;
+    const category=this.state.categories[d.categoryId]||{};
+    const genericMerchant=!d.merchant||/^(gasto|ingreso|movimiento)$/i.test(d.merchant);
+    const source=type==='gasto'?window.FinanzDomain.findFciSpendSource(this.state,d.accountId,this.state.usdRate):null;
+    const txn={
+      id:this.state._next,type,
+      merchant:genericMerchant?(category.name||(type==='ingreso'?'Ingreso':'Gasto')):d.merchant,
+      cat:d.categoryId,amount:type==='ingreso'?amount:-amount,val:amount,
+      currency:source?'ARS':((this.state.accounts[d.accountId]||{}).currency||d.currency||'ARS'),
+      account:source?source.accountId:d.accountId,dateLabel,dateISO:d.dateISO,
+      note:d.note||(d.intent==='recurring'?'Recurrente':'Cargado por voz o texto'),tags:d.tags
+    };
+    this.setState(s=>{
+      let assets=s.assets;
+      let finalTxn={...txn};
+      if(source){
+        const redeemed=window.FinanzDomain.redeemFciUnits(assets,d.accountId,amount,s.usdRate);
+        if(!redeemed.ok){
+          const msg=redeemed.error==='insufficient'?'El FCI no tiene suficiente disponible para ese gasto.':redeemed.error==='missing-price'?'No tengo un valor de cuotaparte válido para calcular el rescate.':'No pude usar ese FCI como medio de pago.';
+          return{assistantError:msg};
+        }
+        assets=redeemed.assets;
+        finalTxn={...finalTxn,fciRedemption:redeemed.redemption,fundingLabel:'FCI · '+redeemed.redemption.name,account:redeemed.redemption.accountId};
+      }
+      const applied=this._apply(finalTxn,s.balances,s.categoryTotals,s.monthIncome,s.monthExpense);
+      return{assets,balances:applied.b,categoryTotals:applied.ct,monthIncome:applied.mi,monthExpense:applied.me,txns:[finalTxn,...s.txns],tagSugg:window.FinanzDomain.uniqueTags([...(s.tagSugg||[]),...(d.tags||[])]),_next:s._next+1,sheet:null,assistantDraft:null,assistantText:'',assistantError:'',flash:d.intent==='recurring'?'Recurrente registrado':'Movimiento guardado'};
+    });
+  }
   componentDidUpdate(prevProps,prevState){
     this.persistState();
-    // A back action only animates the screen that leaves. Keep the revealed
-    // screen still, then re-enable its normal forward animation on the next
-    // actual navigation. This avoids the doubled/jumping close animation.
-    if(prevState&&prevState.navState==='back-settle'&&this.state.navState==='back-settle'&&(prevState.push!==this.state.push||prevState.sheet!==this.state.sheet||prevState.tab!==this.state.tab)){
-      this.setState({navState:'idle'});
+    // The outgoing screen owns the back animation. As soon as the target screen
+    // is revealed, settle to idle without replaying a forward animation.
+    if(prevState&&prevState.navState==='leaving'&&this.state.navState==='back-settle'){
+      clearTimeout(this._navSettleTimer);
+      this._navSettleTimer=setTimeout(()=>{if(this.state.navState==='back-settle')this.setState({navState:'idle'});},34);
     }
     // Track local data changes for last-write-wins sync + mirror to cloud (debounced).
     if(prevState&&this._dataChanged(prevState,this.state)&&!this._applyingRemote){
       this._localMod=Date.now();try{localStorage.setItem('finanzapp:mod',String(this._localMod));}catch(e){}
       if(this.state.cloud&&this.state.cloud.status==='signed-in')this.cloudPushDebounced();
     }
-    // Reset the shared tab scroll container to the top whenever the user opens
-    // a different tab or push-screen, so every new section starts from the top
-    // instead of inheriting the previous section's scroll position.
-    if(prevState && (prevState.tab!==this.state.tab || prevState.push!==this.state.push)){
+    // Push screens are overlays. Resetting the tab underneath them caused the
+    // visible jump-to-top when the user came back from an investment detail.
+    if(prevState && prevState.tab!==this.state.tab){
       const el=this.mainScrollRef.current;
       if(el) el.scrollTop=0;
     }
@@ -2301,6 +2361,7 @@ class Component extends DCLogic {
     clearTimeout(this._ft);
     clearTimeout(this._cardScrollT);
     clearTimeout(this._navTimer);
+    clearTimeout(this._navSettleTimer);
     clearTimeout(this._tabTimer);
     clearTimeout(this._automationTimer);
     clearInterval(this._priceTimer);
@@ -2608,7 +2669,7 @@ class Component extends DCLogic {
   cardDebt(s){return window.FinanzDomain.cardDebt(s||this.state);}
   _todayKey(){return window.FinanzDomain.todayKey();}
   toggleHeroCurrency(){if(this.state.heroCurrency==='ARS'&&!this.state.usdRate){this.flashMsg('Actualizando dólar cripto…');this.fetchPrices(true);return;}this.setState(s=>({heroCurrency:s.heroCurrency==='USD'?'ARS':'USD'}));}
-  computeNetWorth(){const s=this.state,FD=window.FinanzDomain;const disp=FD.sumAccountsARS(this.liquidIds(s),s.balances,s.accounts,s.usdRate,s.assets),inv=FD.sumAccountsARS(this.investIds(s),s.balances,s.accounts,s.usdRate,s.assets),debt=FD.sumAccountsARS(this.debtIds(s),s.balances,s.accounts,s.usdRate,s.assets)+this.cardDebt(s);return{disp,inv,debt,pat:disp+inv-debt};}
+  computeNetWorth(){const s=this.state,FD=window.FinanzDomain;const liquid=FD.sumAccountsARS(this.liquidIds(s),s.balances,s.accounts,s.usdRate,s.assets),fci=FD.spendableFciValueARS(s,s.usdRate),disp=liquid+fci,inv=FD.sumAccountsARS(this.investIds(s),s.balances,s.accounts,s.usdRate,s.assets),debt=FD.sumAccountsARS(this.debtIds(s),s.balances,s.accounts,s.usdRate,s.assets)+this.cardDebt(s);return{disp,inv,debt,pat:liquid+inv-debt};}
   // Build an SVG line+area path from a value series (shared by charts).
   sparkPath(vals,W,H,PAD){const n=vals.length;if(n<2)return null;const min=Math.min.apply(null,vals),max=Math.max.apply(null,vals),span=(max-min)||1;const xa=i=>(i/(n-1))*W,ya=v=>PAD+(1-(v-min)/span)*(H-2*PAD);let d='M '+xa(0).toFixed(1)+' '+ya(vals[0]).toFixed(1);for(let i=1;i<n;i++)d+=' L '+xa(i).toFixed(1)+' '+ya(vals[i]).toFixed(1);return{path:d,area:d+' L '+W+' '+H+' L 0 '+H+' Z',min,max};}
   // Upsert today's net-worth snapshot (one per day), capped to a year of history.
@@ -2687,7 +2748,7 @@ class Component extends DCLogic {
     };});
   }
   pickAsset(t,n,e){this.setState({atTicker:t,atName:n||t,atEmoji:e||'📈'});}
-  openAssetDetail(account,ticker){const r=this.state.assetChartRange||'1M';const asset=(this.state.assets[account]||[]).find(a=>a.ticker===ticker);this.setState({push:'assetDetail',assetView:{account,ticker},assetChart:{loading:true,ok:false,range:r}});setTimeout(()=>this.fetchAssetChart(asset,r),60);}
+  openAssetDetail(account,ticker){this.rememberPushScroll('investments');const r=this.state.assetChartRange||'1M';const asset=(this.state.assets[account]||[]).find(a=>a.ticker===ticker);this.setState({push:'assetDetail',assetView:{account,ticker},assetChart:{loading:true,ok:false,range:r}});setTimeout(()=>this.fetchAssetChart(asset,r),60);}
   setAssetChartRange(range){this.setState({assetChartRange:range});const av=this.state.assetView;if(av){const asset=(this.state.assets[av.account]||[]).find(a=>a.ticker===av.ticker);this.fetchAssetChart(asset,range);}}
   // Historical charts use the provider appropriate to the holding: Yahoo for
   // BYMA instruments, CoinGecko for crypto, and CAFCI data for FCI VCP history.
@@ -2830,7 +2891,7 @@ class Component extends DCLogic {
     const txnCurrency=window.FinanzDomain.transactionCurrency(t,this.state.accounts),txnSymbol=txnCurrency==='USD'?'US$':'$';
     if(t.isTransfer&&!isPago){amountStr=txnSymbol+this.fmtNum(t.amount);amtColor='var(--text-2)';}else{amountStr=(t.amount>=0?'+':'-')+txnSymbol+this.fmtNum(Math.abs(t.amount));amtColor=isInc?'var(--pos)':'var(--text)';}
     const accId=t.account||t.from;const am=this.state.accounts[accId];const accName=am?am.name:'';if(this.state.hideAmounts)amountStr='••••';
-    const context=[isPago?'Pago de tarjeta':C.name,accName].filter(Boolean).join(' · ');const note=t.note&&!/^(Registrado con el asistente|Cargado por voz o texto)$/i.test(t.note)?t.note:'';const sub=[context,note].filter(Boolean).join(' · ');
+    const context=[isPago?'Pago de tarjeta':C.name,t.fundingLabel||accName].filter(Boolean).join(' · ');const note=t.note&&!/^(Registrado con el asistente|Cargado por voz o texto)$/i.test(t.note)?t.note:'';const sub=[context,note].filter(Boolean).join(' · ');
     return {id:t.id,merchant:t.merchant,emoji:isPago?'💳':C.emoji,iconVar:isPago?'--cat-tarjetas-icon':(C.iconVar||'--cat-otros-icon'),sub,amountStr,amtColor,onOpen:()=>this.setState({detailId:t.id,push:'txnDetail'})};}
   setNewCat(patch){this.setState(s=>({newCat:{...s.newCat,...patch}}));}
   openCatEditor(editId){const s=this.state;if(editId&&s.categories[editId]){const c=s.categories[editId];const ci=Math.max(0,this.CATCOLORS.findIndex(p=>p[0]===c.iconVar));this.setState({push:'catEditor',newCat:{name:c.name,emoji:c.emoji,type:c.type,colorIdx:ci,parent:c.parent||'',editId}});}else{this.setState({push:'catEditor',newCat:{name:'',emoji:this.CATEMOJIS[0],type:'gasto',colorIdx:0,parent:'',editId:null}});}}
@@ -2852,12 +2913,78 @@ class Component extends DCLogic {
   _rev(t,b,ct,mi,me){return window.FinanzDomain.reverseTxn(t,b,ct,mi,me);}
   _apply(t,b,ct,mi,me){return window.FinanzDomain.applyTxn(t,b,ct,mi,me);}
 
-  save(){const S=this.state;if(!S.addAmount)return;const val=parseFloat(S.addAmount.replace(',','.'))||0;if(!val)return;const type=S.addType;const dateISO=S.addDateISO||window.FinanzDomain.isoFromLabel(S.addDate);const t={type,val,dateLabel:window.FinanzDomain.labelFromISO(dateISO),dateISO,tags:[...S.addTags]};const C=S.categories[S.addCat]||{};t.merchant=S.addTitle.trim()||(type==='transfer'?'Transferencia':type==='inversion'?'Inversión':C.name||'Movimiento');if(type==='gasto'||type==='ingreso'){if(!S.accounts[S.addAccount]){this.flashMsg('Elegí una cuenta');return;}if(!S.categories[S.addCat]){this.flashMsg('Elegí una categoría');return;}}else if(!S.accounts[S.addAccount]||!S.accounts[S.addTo]){this.flashMsg('Elegí cuentas válidas');return;}else if(S.addAccount===S.addTo){this.flashMsg('Origen y destino deben ser distintos');return;}t.currency=(S.accounts[S.addAccount]||{}).currency||'ARS';if(type==='gasto'){t.cat=S.addCat;t.account=S.addAccount;t.amount=-val;t.note=S.addNote.trim();}else if(type==='ingreso'){t.cat=S.addCat;t.account=S.addAccount;t.amount=val;t.note=S.addNote.trim();}else{const toCurrency=(S.accounts[S.addTo]||{}).currency||'ARS';if(t.currency!==toCurrency&&!S.usdRate){this.flashMsg('Actualizá la cotización antes de convertir monedas');this.fetchPrices(true);return;}t.cat=type==='transfer'?'transfer':'inversion';t.from=S.addAccount;t.to=S.addTo;t.amount=-val;t.isTransfer=true;t.toCurrency=toCurrency;t.toVal=window.FinanzDomain.convertCurrency(val,t.currency,toCurrency,S.usdRate);t.note='→ '+(S.accounts[S.addTo]?S.accounts[S.addTo].name:'')+(S.addNote.trim()?(' · '+S.addNote.trim()):'')+(t.currency!==toCurrency?(' · '+(toCurrency==='USD'?'US$':'$')+this.fmtNum(t.toVal)):'');}
-    this.setState(s=>{let b={...s.balances},ct={...s.categoryTotals},mi=s.monthIncome,me=s.monthExpense,txns=s.txns;if(s.editId){const old=s.txns.find(x=>x.id===s.editId);if(old){const r=this._rev(old,b,ct,mi,me);b=r.b;ct=r.ct;mi=r.mi;me=r.me;txns=txns.filter(x=>x.id!==s.editId);}}const id=s.editId||s._next;t.id=id;const a=this._apply(t,b,ct,mi,me);return{txns:[t,...txns],balances:a.b,categoryTotals:a.ct,monthIncome:a.mi,monthExpense:a.me,_next:s.editId?s._next:id+1,sheet:null,subsheet:null,editId:null,addAmount:'',addTitle:'',addNote:'',addTags:[],addCatTouched:false,addSuggestedKey:null,addSuggestedTags:[],shortcutCapture:false,flash:s.editId?'Movimiento actualizado':'Movimiento guardado'};});}
-  deleteTxn(){const S=this.state;const t=S.txns.find(x=>x.id===S.detailId);if(!t)return;this.setState(s=>{const r=this._rev(t,s.balances,s.categoryTotals,s.monthIncome,s.monthExpense);return{txns:s.txns.filter(x=>x.id!==t.id),balances:r.b,categoryTotals:r.ct,monthIncome:r.mi,monthExpense:r.me,push:null,detailId:null};});}
-  duplicateTxn(){const S=this.state;const t=S.txns.find(x=>x.id===S.detailId);if(!t)return;this.setState(s=>{const id=s._next;const nt={...t,id,dateLabel:'Hoy',dateISO:this._todayKey(),tags:[...(t.tags||[])]};const a=this._apply(nt,s.balances,s.categoryTotals,s.monthIncome,s.monthExpense);return{txns:[nt,...s.txns],balances:a.b,categoryTotals:a.ct,monthIncome:a.mi,monthExpense:a.me,_next:id+1,push:null,detailId:null};});}
-  editTxn(){const S=this.state;const t=S.txns.find(x=>x.id===S.detailId);if(!t)return;const liq=this.liquidIds(),inv=this.investIds();const iso=t.dateISO||window.FinanzDomain.isoFromLabel(t.dateLabel);this.setState({sheet:'add',push:null,subsheet:null,editId:t.id,addType:t.type,addAmount:String(t.val).replace('.',','),addTitle:t.merchant||'',addNote:t.note||'',addCat:(t.cat==='transfer'||t.cat==='inversion'||!S.categories[t.cat])?'comida':t.cat,addAccount:t.account||t.from||liq[0]||'',addTo:t.to||inv[0]||liq[0]||'',addDate:window.FinanzDomain.labelFromISO(iso),addDateISO:iso,addTags:[...(t.tags||[])],addCatTouched:true,addSuggestedKey:null,addSuggestedTags:[],shortcutCapture:false});}
-
+  save(){
+    const S=this.state;
+    if(!S.addAmount)return;
+    const val=parseFloat(S.addAmount.replace(',','.'))||0;
+    if(!val)return;
+    const type=S.addType,FD=window.FinanzDomain;
+    const fciSource=type==='gasto'?FD.findFciSpendSource(S,S.addAccount,S.usdRate):null;
+    const dateISO=S.addDateISO||FD.isoFromLabel(S.addDate);
+    const t={type,val,dateLabel:FD.labelFromISO(dateISO),dateISO,tags:[...S.addTags]};
+    const C=S.categories[S.addCat]||{};
+    t.merchant=S.addTitle.trim()||(type==='transfer'?'Transferencia':type==='inversion'?'Inversión':C.name||'Movimiento');
+    if(type==='gasto'||type==='ingreso'){
+      if(!S.accounts[S.addAccount]&&!fciSource){this.flashMsg(type==='gasto'?'Elegí con qué pagar':'Elegí una cuenta');return;}
+      if(!S.categories[S.addCat]){this.flashMsg('Elegí una categoría');return;}
+    }else if(!S.accounts[S.addAccount]||!S.accounts[S.addTo]){this.flashMsg('Elegí cuentas válidas');return;}
+    else if(S.addAccount===S.addTo){this.flashMsg('Origen y destino deben ser distintos');return;}
+    t.currency=fciSource?'ARS':((S.accounts[S.addAccount]||{}).currency||'ARS');
+    if(type==='gasto'){
+      t.cat=S.addCat;t.account=fciSource?fciSource.accountId:S.addAccount;t.amount=-val;t.note=S.addNote.trim();
+      if(fciSource)t.fciSourceId=S.addAccount;
+    }else if(type==='ingreso'){
+      t.cat=S.addCat;t.account=S.addAccount;t.amount=val;t.note=S.addNote.trim();
+    }else{
+      const toCurrency=(S.accounts[S.addTo]||{}).currency||'ARS';
+      if(t.currency!==toCurrency&&!S.usdRate){this.flashMsg('Actualizá la cotización antes de convertir monedas');this.fetchPrices(true);return;}
+      t.cat=type==='transfer'?'transfer':'inversion';t.from=S.addAccount;t.to=S.addTo;t.amount=-val;t.isTransfer=true;t.toCurrency=toCurrency;t.toVal=FD.convertCurrency(val,t.currency,toCurrency,S.usdRate);
+      t.note='→ '+(S.accounts[S.addTo]?S.accounts[S.addTo].name:'')+(S.addNote.trim()?(' · '+S.addNote.trim()):'')+(t.currency!==toCurrency?(' · '+(toCurrency==='USD'?'US$':'$')+this.fmtNum(t.toVal)):'');
+    }
+    this.setState(s=>{
+      let b={...s.balances},ct={...s.categoryTotals},mi=s.monthIncome,me=s.monthExpense,txns=s.txns,assets=s.assets;
+      if(s.editId){
+        const old=s.txns.find(x=>x.id===s.editId);
+        if(old){
+          if(old.fciRedemption)assets=FD.restoreFciUnits(assets,old.fciRedemption);
+          const r=this._rev(old,b,ct,mi,me);b=r.b;ct=r.ct;mi=r.mi;me=r.me;txns=txns.filter(x=>x.id!==s.editId);
+        }
+      }
+      if(t.fciSourceId){
+        const redeemed=FD.redeemFciUnits(assets,t.fciSourceId,val,s.usdRate);
+        if(!redeemed.ok){
+          const msg=redeemed.error==='insufficient'?'El FCI no tiene suficiente disponible para ese gasto.':redeemed.error==='missing-price'?'Actualizá el valor de la cuotaparte antes de pagar con el FCI.':'No pude usar ese FCI como medio de pago.';
+          return{flash:msg};
+        }
+        assets=redeemed.assets;t.fciRedemption=redeemed.redemption;t.account=redeemed.redemption.accountId;t.fundingLabel='FCI · '+redeemed.redemption.name;
+      }
+      const id=s.editId||s._next;t.id=id;
+      const a=this._apply(t,b,ct,mi,me);
+      return{txns:[t,...txns],assets,balances:a.b,categoryTotals:a.ct,monthIncome:a.mi,monthExpense:a.me,_next:s.editId?s._next:id+1,sheet:null,subsheet:null,editId:null,addAmount:'',addTitle:'',addNote:'',addTags:[],addCatTouched:false,addSuggestedKey:null,addSuggestedTags:[],shortcutCapture:false,flash:s.editId?'Movimiento actualizado':'Movimiento guardado'};
+    });
+  }
+  deleteTxn(){
+    const S=this.state,t=S.txns.find(x=>x.id===S.detailId);if(!t)return;
+    this.setState(s=>{const assets=t.fciRedemption?window.FinanzDomain.restoreFciUnits(s.assets,t.fciRedemption):s.assets;const r=this._rev(t,s.balances,s.categoryTotals,s.monthIncome,s.monthExpense);return{txns:s.txns.filter(x=>x.id!==t.id),assets,balances:r.b,categoryTotals:r.ct,monthIncome:r.mi,monthExpense:r.me,push:null,detailId:null};});
+  }
+  duplicateTxn(){
+    const S=this.state,t=S.txns.find(x=>x.id===S.detailId);if(!t)return;
+    this.setState(s=>{
+      const id=s._next;let assets=s.assets;let nt={...t,id,dateLabel:'Hoy',dateISO:this._todayKey(),tags:[...(t.tags||[])]};
+      if(t.fciRedemption){
+        const redeemed=window.FinanzDomain.redeemFciUnits(assets,t.fciRedemption.sourceId,t.val,s.usdRate);
+        if(!redeemed.ok)return{flash:'El FCI no tiene suficiente disponible para duplicar este gasto.'};
+        assets=redeemed.assets;nt={...nt,fciRedemption:redeemed.redemption,account:redeemed.redemption.accountId,fundingLabel:'FCI · '+redeemed.redemption.name};
+      }
+      const a=this._apply(nt,s.balances,s.categoryTotals,s.monthIncome,s.monthExpense);
+      return{txns:[nt,...s.txns],assets,balances:a.b,categoryTotals:a.ct,monthIncome:a.mi,monthExpense:a.me,_next:id+1,push:null,detailId:null};
+    });
+  }
+  editTxn(){
+    const S=this.state,t=S.txns.find(x=>x.id===S.detailId);if(!t)return;
+    const liq=this.liquidIds(),inv=this.investIds();const iso=t.dateISO||window.FinanzDomain.isoFromLabel(t.dateLabel);
+    this.setState({sheet:'add',push:null,subsheet:null,editId:t.id,addType:t.type,addAmount:String(t.val).replace('.',','),addTitle:t.merchant||'',addNote:t.note||'',addCat:(t.cat==='transfer'||t.cat==='inversion'||!S.categories[t.cat])?'comida':t.cat,addAccount:(t.fciRedemption&&t.fciRedemption.sourceId)||t.account||t.from||liq[0]||'',addTo:t.to||inv[0]||liq[0]||'',addDate:window.FinanzDomain.labelFromISO(iso),addDateISO:iso,addTags:[...(t.tags||[])],addCatTouched:true,addSuggestedKey:null,addSuggestedTags:[],shortcutCapture:false});
+  }
   renderVals(){
     const S=this.state,CAT=S.categories,ACC=S.accounts,isDark=S.theme==='dark';
     const cFill=(k)=>(CAT[k]&&CAT[k].fillVar)||'--cat-otros-fill';const cIcon=(k)=>(CAT[k]&&CAT[k].iconVar)||'--cat-otros-icon';
@@ -2875,11 +3002,13 @@ class Component extends DCLogic {
     const quoteMeta=(asset)=>{const state=FD.quoteFreshness(asset);const labels={current:'Actual',aggregated:'Agregado',delayed:'Demorado',stale:'Dato vencido',manual:'Manual',unknown:'Fecha desconocida',missing:'Sin fuente'};let when='';const raw=asset.quoteAsOf||asset.quoteFetchedAt;if(raw){const parsed=/^\d{4}-\d{2}-\d{2}$/.test(raw)?new Date(raw+'T12:00:00'):new Date(raw);if(!isNaN(parsed))when=' · '+parsed.toLocaleString('es-AR',{day:'numeric',month:'short',hour:raw.length>10?'2-digit':undefined,minute:raw.length>10?'2-digit':undefined});}return(asset.quoteSource||'Sin fuente')+' · '+(labels[state]||labels[asset.quoteQuality]||'Verificar')+when;};
     const signedARS=(n)=>M((n>=0?'+':'-')+sym+this.fmtNum(Math.abs(displayARS(n))));
     const LIQ=this.liquidIds(S),INV=this.investIds(S),DEBTACC=this.debtIds(S);
+    const FCI_SPEND=FD.spendableFciSources(S,S.usdRate).filter(source=>source.valueARS>0.005);
     const unknownBalanceCount=LIQ.filter(id=>ACC[id]&&ACC[id].balanceKnown===false).length;
     const sumARS=(ids)=>FD.sumAccountsARS(ids,S.balances,ACC,S.usdRate,S.assets);
-    const disponible=sumARS(LIQ), invertido=sumARS(INV);
+    const liquidDisponible=sumARS(LIQ),fciDisponible=FCI_SPEND.reduce((sum,source)=>sum+source.valueARS,0);
+    const disponible=liquidDisponible+fciDisponible, invertido=sumARS(INV);
     const cardDebt=this.cardDebt(S), debtAcc=sumARS(DEBTACC);
-    const patrimonioBruto=disponible+invertido;
+    const patrimonioBruto=liquidDisponible+invertido;
     const patrimonioNeto=patrimonioBruto-cardDebt-debtAcc;
     const baseHeroVal=S.balanceMode==='disponible'?disponible:patrimonioNeto;
     const heroIsUsd=S.heroCurrency==='USD';
@@ -2906,7 +3035,7 @@ class Component extends DCLogic {
     const maxT=Math.max.apply(null,sorted.map(x=>x.t).concat([1]));
     const chartItems=sorted.filter(x=>x.t>0).map(x=>({key:x.k,name:(CAT[x.k]||{}).name,emoji:(CAT[x.k]||{}).emoji,iconVar:cIcon(x.k),fillVar:cFill(x.k),amount:S.hideAmounts?'••':this.abbr(displayARS(x.t)),h:Math.max(48,Math.round(x.t/maxT*100)),onOpen:()=>this.navigateTab('actividad',{actCat:x.k,actFilter:'todos',actSearch:''})}));
     // Home and Activity are always driven by real chronology, never array order.
-    const homeGroups=this.groupByDate(homeTx.filter(t=>t.type==='gasto'||t.type==='ingreso'||t.type==='pago').slice(0,6)).map(g=>({day:g.day,totalStr:signedARS(g.total),items:g.items.map(t=>this.txView(t))}));
+    const homeGroups=this.groupByDate(homeTx.slice(0,6)).map(g=>({day:g.day,totalStr:signedARS(g.total),items:g.items.map(t=>this.txView(t))}));
     // Backup safety: data lives only on this device. Nudge a copy if it's been
     // a week (or never), unless dismissed in the last few days.
     const bkHasData=(S.order.length>0||S.txns.length>0);
@@ -2947,7 +3076,7 @@ class Component extends DCLogic {
     // can propose a draft, but it cannot manufacture accounts, cards or categories.
     const assistantDraft=S.assistantDraft?this.hydrateAssistantDraft(S.assistantDraft):null;
     const assistantMissing=assistantDraft?this.assistantMissing(assistantDraft):[];
-    const assistantAccount=assistantDraft&&ACC[assistantDraft.accountId];
+    const assistantAccount=assistantDraft&&this.spendSourceMeta(assistantDraft.accountId,S);
     const assistantCard=assistantDraft&&S.cards.find(c=>c.id===assistantDraft.cardId);
     const assistantCategory=assistantDraft&&CAT[assistantDraft.categoryId];
     const assistantAmount=assistantDraft?(assistantDraft.amount||(assistantDraft.intent==='card_payment'?cardResumen(assistantCard):0)):0;
@@ -2978,7 +3107,7 @@ class Component extends DCLogic {
     const typeTabs=[mkType('gasto','Gasto'),mkType('ingreso','Ingreso'),mkType('transfer','Transferencia')];
     const amtColorByType=S.addType==='gasto'?'var(--danger)':S.addType==='ingreso'?'var(--pos)':'var(--text)';
     const amtSign=S.addType==='gasto'?'-':S.addType==='ingreso'?'+':'';
-    const accA=ACC[S.addAccount]||{},accB=ACC[S.addTo]||{},catA=CAT[S.addCat]||{};
+    const accA=this.spendSourceMeta(S.addAccount,S)||{},accB=ACC[S.addTo]||{},catA=CAT[S.addCat]||{};
     const presetDates=['Hoy','Ayer','Anteayer'];
     const mkDate=(label)=>({label,custom:false,onPick:()=>this.setState({addDate:label,addDateISO:FD.isoFromLabel(label)}),bg:S.addDate===label?'var(--accent)':'var(--surface)',color:S.addDate===label?'var(--on-accent)':'var(--text)'});
     const customActive=presetDates.indexOf(S.addDate)<0;
@@ -2990,8 +3119,8 @@ class Component extends DCLogic {
     const keypad=order.map(l=>({label:l,isBack:l==='back',isNum:l!=='back',onPress:l==='back'?()=>this.backspace():()=>this.press(l)}));
     // picker
     let pickerTitle='',pickerOptions=[];const sub=S.subsheet;
-    const accOpt=(k,onPick,selKey)=>({label:ACC[k].name,emoji:ACC[k].emoji,fillVar:ACC[k].fillVar,selected:selKey===k,onPick});
-    if(sub==='pickAccount'){pickerTitle=S.addType==='transfer'||S.addType==='inversion'?'Cuenta de origen':'Cuenta';const ids=(S.addType==='inversion')?LIQ:(S.addType==='transfer'?LIQ.concat(INV):LIQ);pickerOptions=ids.map(k=>accOpt(k,()=>this.setState({addAccount:k,subsheet:null}),S.addAccount));}
+    const accOpt=(k,onPick,selKey)=>{const meta=this.spendSourceMeta(k,S)||{};return{label:meta.name||'Fuente',emoji:meta.emoji||'◉',fillVar:meta.fillVar||'--cat-inversion-fill',selected:selKey===k,onPick};};
+    if(sub==='pickAccount'){pickerTitle=S.addType==='gasto'?'Pagar con':(S.addType==='transfer'||S.addType==='inversion'?'Cuenta de origen':'Cuenta');const spendIds=LIQ.concat(FCI_SPEND.map(source=>source.id));const ids=(S.addType==='inversion')?LIQ:(S.addType==='transfer'?LIQ.concat(INV):(S.addType==='gasto'?spendIds:LIQ));pickerOptions=ids.map(k=>accOpt(k,()=>this.setState({addAccount:k,subsheet:null}),S.addAccount));}
     else if(sub==='pickTo'){pickerTitle='Cuenta de destino';const ids=(S.addType==='inversion')?INV:LIQ.concat(INV);pickerOptions=ids.map(k=>accOpt(k,()=>this.setState({addTo:k,subsheet:null}),S.addTo));}
     else if(sub==='pickCat'){pickerTitle='Categoría';const ids=S.addType==='ingreso'?S.catOrder.filter(k=>CAT[k]&&CAT[k].type==='ingreso'&&!CAT[k].archived):expKeys;pickerOptions=ids.map(k=>({label:CAT[k].name,emoji:CAT[k].emoji,fillVar:cFill(k),selected:S.addCat===k,onPick:()=>this.setState({addCat:k,subsheet:null,addCatTouched:true})}));}
     // quick
@@ -3054,11 +3183,11 @@ class Component extends DCLogic {
     const portGL=knownPortValue-portCost,portGLPct=portCost>0?portGL/portCost*100:0;
     portAssets.forEach((a,i)=>{a.color=PALCOLORS[i%PALCOLORS.length];a.pct=portValue>0?a.value/portValue*100:0;a.gl=a.costUnknown?null:a.performanceValue-a.cost;a.glPct=!a.costUnknown&&a.cost>0?a.gl/a.cost*100:0;});
     const portRend=S.portMode==='rendimiento';
-    const portList=portAssets.map(a=>{const unknown=a.costUnknown;const glStr=unknown?'Costo pendiente':((a.gl>=0?'+':'-')+sym+this.fmtInt(Math.abs(displayARS(a.gl)))),glPctStr=unknown?'Sin rendimiento':((a.gl>=0?'+':'')+a.glPct.toFixed(1).replace('.',',')+'%'),glColor=unknown?'var(--text-3)':a.gl>=0?'var(--pos)':'var(--danger)';
+    const portList=portAssets.map(a=>{const unknown=a.costUnknown;const glStr=unknown?'Costo de compra no cargado':((a.gl>=0?'+':'-')+sym+this.fmtInt(Math.abs(displayARS(a.gl)))),glPctStr=unknown?'Rendimiento personal oculto':((a.gl>=0?'+':'')+a.glPct.toFixed(1).replace('.',',')+'%'),glColor=unknown?'var(--text-3)':a.gl>=0?'var(--pos)':'var(--danger)';
       return {name:a.name,ticker:a.ticker||'',emoji:a.emoji,color:a.color,pctStr:a.pct.toFixed(0)+'%',
         kind:a.kind,
         primaryStr:portRend?glStr:money(a.value),primaryColor:portRend?glColor:'var(--text)',
-        secondaryStr:portRend?glPctStr:(unknown?'Costo pendiente':(glStr+' · '+glPctStr)),secondaryColor:glColor,
+        secondaryStr:portRend?glPctStr:(unknown?'Valor actual válido · falta costo de compra':(glStr+' · '+glPctStr)),secondaryColor:glColor,
         onOpen:()=>this.openAssetDetail(a.account,a.ticker)};});
     const portGroupMeta={cedears:{label:'CEDEARs y ETFs',icon:'◎'},crypto:{label:'Cripto',icon:'◇'},bonds:{label:'Bonos y ON',icon:'◫'},fci:{label:'Fondos comunes',icon:'◌'}};
     const portSections=['cedears','crypto','bonds','fci'].map(kind=>{const assets=portList.filter(a=>a.kind===kind);const total=portAssets.filter(a=>a.kind===kind).reduce((sum,a)=>sum+a.value,0);return{...portGroupMeta[kind],kind,count:assets.length,summary:assets.length+' '+(assets.length===1?'instrumento':'instrumentos')+' · '+money(total),assets};}).filter(section=>section.count>0);
@@ -3299,7 +3428,7 @@ class Component extends DCLogic {
       dispShadow:S.balanceMode==='disponible'?'var(--shadow-pill)':'none',patShadow:S.balanceMode==='patrimonio'?'var(--shadow-pill)':'none',
       dispColor:S.balanceMode==='disponible'?'var(--text)':'var(--text-2)',patColor:S.balanceMode==='patrimonio'?'var(--text)':'var(--text-2)',
       heroSymbol:S.hideAmounts?'':heroSym,heroInt:S.hideAmounts?'••••':heroParts[0],heroDec:S.hideAmounts?'':(','+heroParts[1]),heroFont:(heroParts[0]||'').length<=7?'62px':(heroParts[0]||'').length<=9?'50px':(heroParts[0]||'').length<=11?'40px':'32px',
-      heroSub:(unknownBalanceCount?('Total parcial · '+unknownBalanceCount+' saldo pendiente'):S.balanceMode==='disponible'?'Disponible para usar ahora':'Neto · cuentas + inversiones − deudas')+(heroIsUsd?' · dólar cripto':'')+' · Tocá para ver en '+(heroIsUsd?'pesos':'dólares'),
+      heroSub:(unknownBalanceCount?('Total parcial · '+unknownBalanceCount+' saldo pendiente'):S.balanceMode==='disponible'?('Disponible para usar ahora'+(fciDisponible>0?' · incluye FCI rescatable':'')):'Neto · cuentas + inversiones − deudas')+(heroIsUsd?' · dólar cripto':'')+' · Tocá para ver en '+(heroIsUsd?'pesos':'dólares'),
       toggleHeroCurrency:()=>this.toggleHeroCurrency(),heroAnimName:heroIsUsd?'faMoneyUp':'faMoneyDown',heroToggleHint:heroIsUsd?'Ver en pesos':'Ver en dólares',
       ingresosStr:M('+'+sym+this.fmtInt(displayARS(homeIE.income))),gastosStr:M('-'+sym+this.fmtInt(displayARS(homeIE.expense))),
       periodLabel:this.PERIODS[S.periodIdx],scopeLabel:this.SCOPES[S.scopeIdx],periodScope,

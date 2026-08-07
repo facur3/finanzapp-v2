@@ -5,9 +5,14 @@ import {
   assetPerformanceValueARS,
   assetValueARS,
   fciPeriodChange,
+  findFciSpendSource,
   investmentValuation,
   matchFundRecord,
   quoteFreshness,
+  redeemFciUnits,
+  restoreFciUnits,
+  spendableFciSources,
+  spendableFciValueARS,
 } from './investments.js';
 
 describe('investment valuation', () => {
@@ -48,6 +53,41 @@ describe('FCI market data', () => {
       amount: 18.862 * (11503.24 - 11496.91),
       percent: (11503.24 - 11496.91) / 11496.91,
     });
+  });
+});
+
+describe('FCI spendable liquidity', () => {
+  const state = {
+    order: ['portfolio'],
+    accounts: { portfolio: { name: 'Cocos', kind: 'invest' } },
+    archived: {},
+    assets: {
+      portfolio: [{ id: 'fund-1', ticker: 'COCORMA', name: 'Cocos Rendimiento FCI', emoji: '◉', fci: true, qty: 10, units: 10, lastPrice: 1000, quoteCurrency: 'ARS' }],
+    },
+    usdRate: 1500,
+  };
+
+  it('exposes an FCI as spendable money without reclassifying the investment account', () => {
+    const [source] = spendableFciSources(state);
+    expect(source).toMatchObject({ accountId: 'portfolio', ticker: 'COCORMA', valueARS: 10000 });
+    expect(state.accounts.portfolio.kind).toBe('invest');
+    expect(spendableFciValueARS(state)).toBe(10000);
+    expect(findFciSpendSource(state, source.id)).toMatchObject({ qty: 10, unitARS: 1000 });
+  });
+
+  it('redeems the exact cuotapartes needed for an expense and can restore them', () => {
+    const [source] = spendableFciSources(state);
+    const redeemed = redeemFciUnits(state.assets, source.id, 2500, state.usdRate);
+    expect(redeemed.ok).toBe(true);
+    expect(redeemed.redemption.qty).toBeCloseTo(2.5, 8);
+    expect(redeemed.assets.portfolio[0]).toMatchObject({ qty: 7.5, units: 7.5 });
+    const restored = restoreFciUnits(redeemed.assets, redeemed.redemption);
+    expect(restored.portfolio[0]).toMatchObject({ qty: 10, units: 10 });
+  });
+
+  it('refuses an expense larger than the fund value', () => {
+    const [source] = spendableFciSources(state);
+    expect(redeemFciUnits(state.assets, source.id, 10001, state.usdRate)).toMatchObject({ ok: false, error: 'insufficient' });
   });
 });
 
