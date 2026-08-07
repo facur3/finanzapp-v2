@@ -41,6 +41,19 @@ describe('parseAssistantCommand', () => {
     const draft = parseAssistantCommand('Pagué el resumen completo de la Visa desde Galicia', context, NOW);
     expect(draft).toMatchObject({ intent: 'card_payment', amount: null, cardId: 'visa-galicia', accountId: 'galicia' });
   });
+  it('prepares a monthly budget for an existing category', () => {
+    const draft = parseAssistantCommand('Creá un presupuesto de 80 mil para comida', context, NOW);
+    expect(draft).toMatchObject({ intent: 'create_budget', amount: 80000, categoryId: 'comida' });
+  });
+  it('prepares a recurring rule without posting it immediately', () => {
+    const draft = parseAssistantCommand('Creá un gasto recurrente gimnasio por 25 mil el día 5 desde Galicia en comida', context, NOW);
+    expect(draft).toMatchObject({ intent: 'create_recurring', transactionType: 'gasto', amount: 25000, scheduleDay: 5, accountId: 'galicia', categoryId: 'comida' });
+    expect(draft.merchant.toLowerCase()).toContain('gimnasio');
+  });
+  it('prepares new categories and tags', () => {
+    expect(parseAssistantCommand('Creá una categoría Viajes', context, NOW)).toMatchObject({ intent: 'create_category', merchant: 'Viajes' });
+    expect(parseAssistantCommand('Agregá una etiqueta trabajo', context, NOW)).toMatchObject({ intent: 'create_tag', merchant: 'trabajo' });
+  });
   it('does not pretend to understand an unrelated request', () => {
     expect(parseAssistantCommand('¿Cómo viene mi mes?', context, NOW).intent).toBe('none');
   });

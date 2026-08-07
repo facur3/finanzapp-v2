@@ -1,0 +1,80 @@
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;overscroll-behavior:none}
+body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','Segoe UI',sans-serif;letter-spacing:-.01em;background:#f4f7fb}
+input,button,textarea{font:inherit}
+.fa-scroll::-webkit-scrollbar{width:0;height:0;display:none}
+.fa-scroll{scrollbar-width:none;overflow-x:hidden}
+
+/* App shell: phone-first, while remaining calm and usable on tablets/desktop. */
+.fa-frame{width:min(100%,520px);left:50%!important;right:auto!important;transform:translateX(-50%);overflow:hidden;box-shadow:0 0 0 1px var(--hairline),0 24px 80px rgba(9,25,47,.12)}
+.fa-frame,.fa-frame *{transition:background-color .3s ease,color .25s ease,border-color .3s ease,box-shadow .3s ease,fill .3s ease}
+.fa-frame [style*="cursor:pointer"]{touch-action:manipulation;transition:transform .22s cubic-bezier(.22,1,.36,1),opacity .18s ease,background-color .26s ease,color .26s ease,box-shadow .26s ease}
+.fa-frame [style*="cursor:pointer"]:active{transform:scale(.975)}
+.fa-main-scroll{padding-left:clamp(16px,5vw,24px)!important;padding-right:clamp(16px,5vw,24px)!important;padding-bottom:calc(112px + env(safe-area-inset-bottom,0px))!important}
+.fa-screen{will-change:transform,opacity}
+.fa-frame[data-nav-state="leaving"] .fa-screen{animation:faPushOut .18s cubic-bezier(.4,0,1,1) both!important;pointer-events:none}
+.fa-frame[data-nav-state="back-enter"] .fa-screen{animation:faBackIn .28s cubic-bezier(.22,1,.36,1) both!important}
+
+/* Floating iOS-like tab bar. Blue is reserved for selection and action. */
+.fa-tabbar-underlay{display:none!important}
+.fa-tabbar{left:12px!important;right:12px!important;bottom:calc(9px + env(safe-area-inset-bottom,0px))!important;height:72px!important;padding:9px 14px!important;background:color-mix(in srgb,var(--card) 86%,transparent)!important;border:1px solid var(--hairline)!important;border-radius:27px!important;align-items:center!important;box-shadow:0 16px 46px rgba(9,25,47,.17),0 2px 8px rgba(9,25,47,.08)!important;backdrop-filter:blur(22px) saturate(1.35);-webkit-backdrop-filter:blur(22px) saturate(1.35)}
+.fa-fab{bottom:calc(15px + env(safe-area-inset-bottom,0px))!important;background:var(--accent)!important;color:var(--on-accent)!important;box-shadow:0 9px 24px var(--accent-shadow)!important}
+.fa-frame .fa-fab:active{transform:translateX(-50%) scale(.965)!important}
+.fa-fab svg{stroke:currentColor!important}
+.fa-hero-balance{transform-origin:left center;user-select:none}
+
+/* Assistant feedback and investment information architecture. */
+.fa-assistant-orb{position:relative;isolation:isolate}
+.fa-assistant-orb:before{content:"";position:absolute;inset:-7px;border-radius:inherit;background:var(--accent);opacity:.13;z-index:-1;animation:faBreathe 2.8s ease-in-out infinite}
+.fa-listening:before{opacity:.28;animation:faPulse 1.05s ease-out infinite}
+.fa-live-copy{min-height:18px;color:var(--accent);font-size:11px;font-weight:700;letter-spacing:.01em}
+.fa-invest-tools{display:flex;gap:8px;overflow-x:auto;margin:0 -2px 22px;padding:0 2px 3px}
+.fa-invest-tool{flex:none;display:flex;align-items:center;gap:8px;padding:10px 13px;border-radius:15px;background:var(--surface);color:var(--text);font-size:12px;font-weight:720;cursor:pointer;border:1px solid var(--hairline)}
+.fa-portfolio-sections{display:flex;flex-direction:column;gap:18px;margin-bottom:18px}
+.fa-portfolio-section{display:flex;flex-direction:column;gap:8px}
+.fa-portfolio-header{display:flex;align-items:end;justify-content:space-between;padding:0 3px 2px}
+.fa-portfolio-header strong{font-size:15px;letter-spacing:-.02em}
+.fa-portfolio-header span{font-size:11px;color:var(--text-3);font-weight:650}
+.fa-asset-row{display:flex;align-items:center;gap:12px;background:var(--card);border:1px solid var(--hairline);border-radius:18px;padding:14px;box-shadow:var(--shadow-pill);cursor:pointer}
+.fa-asset-row+.fa-asset-row{margin-top:1px}
+.fa-native-date{color-scheme:light}
+[data-theme="dark"] .fa-native-date{color-scheme:dark}
+
+@keyframes faUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
+@keyframes faPushIn{from{transform:translateX(28px);opacity:.2}to{transform:translateX(0);opacity:1}}
+@keyframes faPushOut{from{transform:translateX(0);opacity:1}to{transform:translateX(34px);opacity:0}}
+@keyframes faBackIn{from{transform:translateX(-14px);opacity:.55}to{transform:translateX(0);opacity:1}}
+@keyframes faSheet{from{transform:translateY(110%)}to{transform:translateY(0)}}
+@keyframes faFade{from{opacity:0}to{opacity:1}}
+@keyframes faPop{0%{transform:scale(.88);opacity:0}100%{transform:scale(1);opacity:1}}
+@keyframes faMoneyUp{0%{opacity:.12;transform:translateY(14px);filter:blur(4px)}100%{opacity:1;transform:translateY(0);filter:blur(0)}}
+@keyframes faMoneyDown{0%{opacity:.12;transform:translateY(-14px);filter:blur(4px)}100%{opacity:1;transform:translateY(0);filter:blur(0)}}
+@keyframes faBreathe{0%,100%{transform:scale(.94)}50%{transform:scale(1.08)}}
+@keyframes faPulse{0%{transform:scale(.86);opacity:.34}100%{transform:scale(1.38);opacity:0}}
+
+:root{
+  --bg:#F4F7FB;--surface:#EAF0F7;--surface-strong:#DDE6F1;--seg-active:#FFFFFF;--card:#FFFFFF;
+  --text:#0B1220;--text-2:#5F6B7A;--text-3:#98A3B3;--hairline:rgba(16,38,66,.08);
+  --shadow-soft:0 16px 38px rgba(20,50,86,.10);--shadow-pill:0 3px 12px rgba(20,50,86,.07);
+  --accent:#1769E0;--accent-soft:#E8F1FF;--accent-shadow:rgba(23,105,224,.30);--on-accent:#FFFFFF;--pos:#16865F;--danger:#D64550;
+  --cat-comida-icon:#EFB859;--cat-comida-fill:#FFF3D9;--cat-auto-icon:#D77B75;--cat-auto-fill:#FBE8E6;
+  --cat-transfer-icon:#6D99DA;--cat-transfer-fill:#E7F0FE;--cat-tarjetas-icon:#67A87B;--cat-tarjetas-fill:#E5F4E9;
+  --cat-ocio-icon:#9577C8;--cat-ocio-fill:#F0E9FB;--cat-compras-icon:#CF7790;--cat-compras-fill:#FAE8EE;
+  --cat-mascotas-icon:#B88A57;--cat-mascotas-fill:#F7EDDF;--cat-otros-icon:#7F8997;--cat-otros-fill:#EDF0F4;
+  --cat-ingreso-icon:#58A476;--cat-ingreso-fill:#E5F4E9;--cat-inversion-icon:#557FDB;--cat-inversion-fill:#E7EEFD;
+}
+[data-theme="dark"]{
+  --bg:#080B10;--surface:#1B222D;--surface-strong:#252E3B;--seg-active:#293443;--card:#131820;
+  --text:#F4F7FB;--text-2:#A4AFBD;--text-3:#697586;--hairline:rgba(255,255,255,.08);
+  --shadow-soft:0 18px 46px rgba(0,0,0,.46);--shadow-pill:0 3px 14px rgba(0,0,0,.32);
+  --accent:#64A8FF;--accent-soft:#162B46;--accent-shadow:rgba(70,150,255,.28);--on-accent:#071524;--pos:#44C995;--danger:#FF808A;
+  --cat-comida-icon:#B78A3E;--cat-comida-fill:rgba(239,184,89,.14);--cat-auto-icon:#A95D59;--cat-auto-fill:rgba(215,123,117,.14);
+  --cat-transfer-icon:#597DB4;--cat-transfer-fill:rgba(109,153,218,.15);--cat-tarjetas-icon:#4F805D;--cat-tarjetas-fill:rgba(103,168,123,.14);
+  --cat-ocio-icon:#705A98;--cat-ocio-fill:rgba(149,119,200,.15);--cat-compras-icon:#96596B;--cat-compras-fill:rgba(207,119,144,.14);
+  --cat-mascotas-icon:#81613E;--cat-mascotas-fill:rgba(184,138,87,.14);--cat-otros-icon:#59616C;--cat-otros-fill:rgba(127,137,151,.12);
+  --cat-ingreso-icon:#4E805E;--cat-ingreso-fill:rgba(88,164,118,.14);--cat-inversion-icon:#4869AA;--cat-inversion-fill:rgba(85,127,219,.15);
+}
+
+@media (max-width:359px){.fa-main-scroll{padding-left:14px!important;padding-right:14px!important}.fa-tabbar{left:7px!important;right:7px!important;padding-left:8px!important;padding-right:8px!important}.fa-tabbar [style*="font-size:10px"]{font-size:9px!important}}
+@media (min-width:521px){body{background:#e9eef5}[data-theme="dark"] body{background:#05070a}}
+@media (prefers-reduced-motion:reduce){.fa-frame,.fa-frame *{animation-duration:.001ms!important;animation-iteration-count:1!important;scroll-behavior:auto!important;transition-duration:.001ms!important}}

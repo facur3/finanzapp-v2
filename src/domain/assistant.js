@@ -101,6 +101,32 @@ function merchantFromText(text, type, excluded = []) {
   return clean.charAt(0).toUpperCase() + clean.slice(1);
 }
 
+function namedValue(text, kind) {
+  const patterns = kind === 'category'
+    ? [/categor[ií]a\s+(?:llamada\s+)?([^,.]+)$/i]
+    : [/etiqueta\s+(?:llamada\s+)?([^,.]+)$/i, /(?:^|\s)tag\s+(?:llamado\s+)?([^,.]+)$/i];
+  for (const pattern of patterns) {
+    const match = String(text || '').match(pattern);
+    if (match && match[1]) return match[1].trim().slice(0, 40);
+  }
+  return '';
+}
+
+function recurringName(text, excluded = []) {
+  let value = String(text || '')
+    .replace(/(?:\$|ARS|USD|US\$)?\s*\d[\d.\s]*(?:,\d{1,2})?\s*(?:millones?|mill[oó]n|mil)?/gi, ' ')
+    .replace(/\b(?:cre[aá]|crear|creame|agreg[aá]|guardar|configur[aá]|program[aá]|un|una|gasto|ingreso|recurrente|todos los meses|mensual|por|de|el d[ií]a|d[ií]a|desde|con|en)\b/gi, ' ');
+  for (const phrase of excluded.filter(Boolean)) {
+    const variants = [String(phrase), ...String(phrase).split(/\s+/).filter(token => token.length > 2)];
+    for (const variant of variants) {
+      const escaped = variant.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      value = value.replace(new RegExp(escaped, 'gi'), ' ');
+    }
+  }
+  value = value.replace(/\s+/g, ' ').trim().slice(0, 80);
+  return value ? value.charAt(0).toUpperCase() + value.slice(1) : '';
+}
+
 function baseDraft(intent, now) {
   return {
     intent,
@@ -112,6 +138,7 @@ function baseDraft(intent, now) {
     accountId: '',
     cardId: '',
     recurringId: '',
+    scheduleDay: null,
     dateISO: todayKey(new Date(now || Date.now())),
     tags: ['asistente'],
     explanation: '',
@@ -135,6 +162,54 @@ export function parseAssistantCommand(text, context = {}, now = new Date()) {
   const wantsFullCard = /\b(total|complet[ao]|todo|resumen)\b/.test(normalized);
   const cardWords = /\b(tarjeta|visa|mastercard|master|amex|resumen)\b/.test(normalized);
   const paymentWords = /\b(pague|pagar|abone|abonar|pago)\b/.test(normalized);
+  const createWords = /\b(crea|crear|creame|agrega|guardar|configura|programa|define|fija|pone)\b/.test(normalized);
+
+  if (createWords && /\b(categoria)\b/.test(normalized)) {
+    const draft = baseDraft('create_category', now);
+    draft.merchant = namedValue(text, 'category');
+    draft.transactionType = /\b(ingreso|ingresos)\b/.test(normalized) ? 'ingreso' : 'gasto';
+    draft.explanation = 'Preparé una categoría nueva. Revisá el nombre antes de crearla.';
+    draft.confidence = draft.merchant ? 0.96 : 0.48;
+    return draft;
+  }
+
+  if (createWords && /\b(etiqueta|tag)\b/.test(normalized)) {
+    const draft = baseDraft('create_tag', now);
+    const tag = namedValue(text, /\betiqueta\b/.test(normalized) ? 'tag' : 'tag');
+    draft.tags = tag ? ['asistente', tag] : ['asistente'];
+    draft.merchant = tag;
+    draft.explanation = 'Preparé una etiqueta nueva para usar en tus movimientos.';
+    draft.confidence = tag ? 0.96 : 0.48;
+    return draft;
+  }
+
+  if (createWords && /\b(presupuesto|budget|limite mensual)\b/.test(normalized)) {
+    const draft = baseDraft('create_budget', now);
+    draft.amount = amount;
+    draft.categoryId = category ? category.id : '';
+    draft.categoryRef = category ? category.name : '';
+    draft.merchant = category ? category.name : 'Presupuesto';
+    draft.explanation = 'Preparé un límite mensual para esa categoría.';
+    draft.confidence = amount && category ? 0.96 : 0.58;
+    return draft;
+  }
+
+  if (createWords && /\brecurrente\b/.test(normalized)) {
+    const draft = baseDraft('create_recurring', now);
+    const isIncome = /\b(ingreso|sueldo|salario|honorarios)\b/.test(normalized);
+    const dayMatch = normalized.match(/\bdia\s*(\d{1,2})\b/);
+    draft.transactionType = isIncome ? 'ingreso' : 'gasto';
+    draft.amount = amount;
+    draft.accountId = account ? account.id : (accounts.length === 1 ? accounts[0].id : '');
+    draft.cardId = card ? card.id : '';
+    draft.categoryId = category ? category.id : (isIncome ? 'ingreso' : '');
+    draft.scheduleDay = dayMatch ? Math.min(31, Math.max(1, Number(dayMatch[1]))) : 1;
+    draft.merchant = recurringName(text, [category && category.name, account && account.name, card && card.brand]);
+    draft.tags = ['asistente', 'recurrente'];
+    draft.explanation = 'Preparé una regla mensual. No se crea hasta que confirmes.';
+    draft.confidence = amount && draft.merchant && (draft.accountId || draft.cardId) ? 0.9 : 0.56;
+    return draft;
+  }
 
   if (cardWords && paymentWords) {
     const draft = baseDraft('card_payment', now);
@@ -188,7 +263,7 @@ export function parseAssistantCommand(text, context = {}, now = new Date()) {
 }
 
 export function normalizeAssistantDraft(value, context = {}, now = new Date()) {
-  const allowedIntents = ['transaction', 'recurring', 'card_payment', 'none'];
+  const allowedIntents = ['transaction', 'recurring', 'card_payment', 'create_recurring', 'create_budget', 'create_category', 'create_tag', 'none'];
   const draft = { ...baseDraft('none', now), ...(value || {}) };
   if (!allowedIntents.includes(draft.intent)) draft.intent = 'none';
   if (!['gasto', 'ingreso', 'none'].includes(draft.transactionType)) draft.transactionType = 'none';
@@ -202,6 +277,8 @@ export function normalizeAssistantDraft(value, context = {}, now = new Date()) {
   draft.categoryId = categoryIds.has(String(draft.categoryId)) ? String(draft.categoryId) : '';
   draft.cardId = cardIds.has(String(draft.cardId)) ? String(draft.cardId) : '';
   draft.recurringId = recurringIds.has(String(draft.recurringId)) ? String(draft.recurringId) : '';
+  const scheduleDay = Number(draft.scheduleDay);
+  draft.scheduleDay = Number.isFinite(scheduleDay) ? Math.min(31, Math.max(1, Math.round(scheduleDay))) : null;
   ['accountRef', 'categoryRef', 'cardRef', 'recurringRef'].forEach(key => { draft[key] = String(draft[key] || '').trim().slice(0, 80); });
   draft.currency = draft.currency === 'USD' ? 'USD' : 'ARS';
   draft.dateISO = isoFromLabel(draft.dateISO, now);

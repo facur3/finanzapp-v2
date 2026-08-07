@@ -2,7 +2,7 @@
    Infrastructure only: no UI, no push, no user-data caching. */
 'use strict';
 
-var CACHE = 'finanzapp-shell-v55';
+var CACHE = 'finanzapp-shell-v56';
 
 // App shell assets to precache. Kept intentionally small.
 var SHELL = [
@@ -11,6 +11,7 @@ var SHELL = [
   '/support.js',
   '/domain.iife.js',
   '/capacitor-deep-links.iife.js',
+  '/finanzapp.css',
   '/vendor/react.production.min.js',
   '/vendor/react-dom.production.min.js',
   '/vendor/supabase.js',

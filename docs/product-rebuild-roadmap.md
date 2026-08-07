@@ -7,9 +7,14 @@ goal is a trustworthy finance app, not a collection of decorative screens.
 
 The Buro reference is strongest where it uses whitespace, one dominant number,
 clear bottom navigation, restrained charts and progressive buy/sell flows. Those
-principles informed FinanzApp's revised hierarchy and motion. Its generic blue
-market palette, investment-only framing and low-information empty areas were not
-copied; FinanzApp keeps its warmer identity and broader personal-finance scope.
+principles informed FinanzApp's revised hierarchy and motion. The product now
+uses a calm blue action/selection color with separate semantic green and red,
+while keeping its broader personal-finance scope and avoiding a visual copy.
+
+The supplied Cocos screens reinforce a second rule: market discovery, portfolio
+value and instrument detail are separate jobs. FinanzApp therefore groups
+holdings by CEDEAR/ETF, crypto, bond/ON and FCI, gives every asset a dedicated
+detail page, and uses a floating bottom bar without copying Cocos branding.
 
 ## Delivered in the assistant/experience foundation
 
@@ -22,6 +27,9 @@ copied; FinanzApp keeps its warmer identity and broader personal-finance scope.
 - normalized mixed-currency totals, reports and cross-currency transfers;
 - bonds alongside CEDEARs, crypto and FCI in the portfolio and price adapters;
 - clearer chart labels, native system typography and reduced-motion support.
+- modular app-shell sources, floating bottom navigation, horizontal push/back
+  motion, responsive spacing and separate portfolio sections for CEDEARs/ETFs,
+  crypto, bonds/ONs and FCI.
 
 ## Next: ledger and reconciliation
 
@@ -39,11 +47,12 @@ copied; FinanzApp keeps its warmer identity and broader personal-finance scope.
 
 ## Next: maintainable interface architecture
 
-Keep Vite, TypeScript, the tested domain modules and Capacitor. Migrate the
-single-file runtime incrementally to React components rather than rewriting the
-whole product in a new native framework:
+Keep Vite, TypeScript, the tested domain modules and Capacitor. The generated
+single runtime document is now assembled from separate shell, template,
+controller and CSS sources. Continue migrating incrementally to React components
+rather than rewriting the whole product in a new native framework:
 
-1. extract design tokens, primitives and navigation;
+1. extract screen-level templates and reusable design primitives;
 2. extract onboarding and the dashboard;
 3. extract movement, card and recurring flows;
 4. extract portfolio and reports;

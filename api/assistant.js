@@ -2,7 +2,7 @@ const schema = {
   type: 'object',
   additionalProperties: false,
   properties: {
-    intent: { type: 'string', enum: ['transaction', 'recurring', 'card_payment', 'none'] },
+    intent: { type: 'string', enum: ['transaction', 'recurring', 'card_payment', 'create_recurring', 'create_budget', 'create_category', 'create_tag', 'none'] },
     transactionType: { type: 'string', enum: ['gasto', 'ingreso', 'none'] },
     amount: { anyOf: [{ type: 'number' }, { type: 'null' }] },
     currency: { type: 'string', enum: ['ARS', 'USD'] },
@@ -11,13 +11,46 @@ const schema = {
     accountRef: { type: 'string' },
     cardRef: { type: 'string' },
     recurringRef: { type: 'string' },
+    scheduleDay: { anyOf: [{ type: 'number' }, { type: 'null' }] },
     dateISO: { type: 'string' },
     tags: { type: 'array', items: { type: 'string' } },
     explanation: { type: 'string' },
     confidence: { type: 'number' },
   },
-  required: ['intent', 'transactionType', 'amount', 'currency', 'merchant', 'categoryRef', 'accountRef', 'cardRef', 'recurringRef', 'dateISO', 'tags', 'explanation', 'confidence'],
+  required: ['intent', 'transactionType', 'amount', 'currency', 'merchant', 'categoryRef', 'accountRef', 'cardRef', 'recurringRef', 'scheduleDay', 'dateISO', 'tags', 'explanation', 'confidence'],
 };
+
+const rateBuckets = globalThis.__finanzappAssistantRateBuckets || new Map();
+globalThis.__finanzappAssistantRateBuckets = rateBuckets;
+
+function allowRequest(req) {
+  const raw = String(req.headers['x-forwarded-for'] || req.socket?.remoteAddress || 'anonymous');
+  const key = raw.split(',')[0].trim();
+  const now = Date.now();
+  const max = Math.max(3, Number(process.env.ASSISTANT_RATE_LIMIT_PER_MINUTE) || 30);
+  const current = rateBuckets.get(key);
+  if (!current || now - current.startedAt >= 60000) {
+    rateBuckets.set(key, { startedAt: now, count: 1 });
+    return true;
+  }
+  if (current.count >= max) return false;
+  current.count += 1;
+  return true;
+}
+
+function usageSummary(payload, model) {
+  const usage = payload && payload.usage || {};
+  const inputTokens = Number(usage.input_tokens) || 0;
+  const outputTokens = Number(usage.output_tokens) || 0;
+  const luna = model === 'gpt-5.6-luna';
+  return {
+    model,
+    inputTokens,
+    outputTokens,
+    totalTokens: Number(usage.total_tokens) || inputTokens + outputTokens,
+    estimatedCostUsd: luna ? (inputTokens * 0.20 + outputTokens * 1.20) / 1000000 : null,
+  };
+}
 
 function outputText(payload) {
   for (const item of (payload && payload.output) || []) {
@@ -39,6 +72,10 @@ export default async function handler(req, res) {
     res.status(503).json({ error: 'ai_not_configured' });
     return;
   }
+  if (!allowRequest(req)) {
+    res.status(429).json({ error: 'rate_limit_exceeded' });
+    return;
+  }
   const text = String(req.body && req.body.text || '').trim().slice(0, 800);
   const today = String(req.body && req.body.today || '').slice(0, 10);
   if (!text) {
@@ -53,11 +90,14 @@ export default async function handler(req, res) {
     'Si falta un dato, devolvé string vacío o amount null.',
     'Si parece un recurrente sin monto, elegí intent recurring y usá recurringRef con las palabras del usuario.',
     'Para pago total o completo de tarjeta usá card_payment con amount null.',
+    'Podés preparar create_recurring, create_budget, create_category o create_tag; nunca los ejecutes.',
+    'En create_recurring, scheduleDay es el día mensual (1 a 31).',
     'No ejecutes nada: el cliente siempre mostrará una confirmación.',
     'Fecha local: ' + today,
   ].join('\n');
 
   try {
+    const model = process.env.OPENAI_MODEL || 'gpt-5.6-luna';
     const response = await fetch('https://api.openai.com/v1/responses', {
       method: 'POST',
       signal: AbortSignal.timeout(15000),
@@ -66,14 +106,15 @@ export default async function handler(req, res) {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: process.env.OPENAI_MODEL || 'gpt-5.6-luna',
+        model,
         store: false,
         input: [
           { role: 'system', content: instructions },
           { role: 'user', content: text },
         ],
         text: { format: { type: 'json_schema', name: 'finanzapp_command', strict: true, schema } },
-        max_output_tokens: 700,
+        reasoning: { effort: 'none' },
+        max_output_tokens: 500,
       }),
     });
     const payload = await response.json();
@@ -87,7 +128,7 @@ export default async function handler(req, res) {
       return;
     }
     const draft = JSON.parse(raw);
-    res.status(200).json({ draft: { ...draft, source: 'openai' } });
+    res.status(200).json({ draft: { ...draft, source: 'openai' }, usage: usageSummary(payload, model) });
   } catch (error) {
     res.status(502).json({ error: 'assistant_unavailable' });
   }

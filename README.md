@@ -3,11 +3,17 @@
 FinanzApp is a personal finance app for Argentina: accounts, movements, cards,
 budgets, recurring movements, categories, tags and investments with local
 persistence. Its UI currently runs on the **Claude Design runtime** while the
-financial rules live in tested domain modules.
+financial rules live in tested domain modules and the editable app shell is
+split by responsibility.
 
 ## Architecture (read before changing anything)
 
-- `index.html` is the running app, based directly on `design-reference/FinanzApp.dc.html`.
+- `index.html` is generated. Do not edit it directly.
+- `src/app/index.shell.html` owns the document/PWA boot shell.
+- `src/app/template.html` owns the screen markup, `src/app/component.js` the UI
+  controller/state adapter, and `src/app/finanzapp.css` the visual/motion system.
+- `scripts/build-app-shell.mjs` assembles those files before dev/build.
+- `public/finanzapp.css` is its generated, service-worker-cacheable CSS copy.
 - `support.js` is the Design Components runtime. `public/support.js` is the copy
   used by the production build/preview (Vite copies `public/` into `dist/`).
 - `design-reference/FinanzApp.dc.html` and `design-reference/support.js` are kept
@@ -37,8 +43,9 @@ original export.
 - Functional quick-add flows, movement detail, card purchase, card payment,
   investment trade, account/category/tag/card forms, security/reset, settings and filters.
 - **Voice/text assistant** in Argentine Spanish for expenses, income, stored
-  recurring movements (for example “Cobré el sueldo”) and card payments. It
-  always shows a validated draft before writing anything.
+  recurring movements (for example “Cobré el sueldo”), card payments, new
+  recurrent rules, budgets, categories and tags. Dictation updates the text as
+  partial results arrive and every action shows a validated draft before writing.
 - **Real dates** stored as ISO values, native calendar selection, and dynamic
   “Hoy/Ayer/5 ago” labels that do not become stale after midnight.
 - **Investments**: CEDEARs, crypto, Argentine bonds and FCI with live prices (CoinGecko, data912,
@@ -71,10 +78,13 @@ Open: http://localhost:5173
 
 ### Optional OpenAI assistant
 
-The deterministic on-device parser works without a key. For ambiguous phrases,
-configure your deployment environment and set `OPENAI_API_KEY` as a
-server-side secret. Never use a `VITE_` prefix: that would expose the key to the
-browser. See `docs/assistant-and-market-data.md` for the data boundary and setup.
+The deterministic on-device parser works without a key and costs nothing. For
+ambiguous phrases, configure your deployment environment and set
+`OPENAI_API_KEY` as a server-side secret. The default remote model is
+`gpt-5.6-luna`; the UI reports the actual token count and estimated per-command
+cost returned by the server. Never use a `VITE_` prefix: that would expose the
+key to the browser. See `docs/assistant-and-market-data.md` for pricing, limits,
+the data boundary and setup.
 
 ## Build
 
@@ -214,5 +224,6 @@ runtime's existing Subresource Integrity (SRI) hashes, which were left unchanged
 - There is no custom install banner, update prompt or offline status UI yet.
   Service-worker updates apply on the next load.
 - iOS has no programmatic install; users add via "Add to Home Screen".
-- The app intentionally runs from the single-file Claude Design runtime; it is not
-  a React application (even though that runtime uses React internally).
+- The generated runtime document is still consumed by Claude Design and is not
+  a conventional React application, but its editable shell, styles, controller
+  and tested domain logic are now separate source files.
