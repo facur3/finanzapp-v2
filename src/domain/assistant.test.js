@@ -1,0 +1,61 @@
+import { describe, expect, it } from 'vitest';
+import { normalizeAssistantDraft, parseAssistantCommand, parseSpokenAmount, resolveAssistantReferences } from './assistant.js';
+
+const NOW = new Date(2026, 7, 7, 12);
+const context = {
+  accounts: {
+    galicia: { name: 'Banco Galicia', type: 'Banco' },
+    cash: { name: 'Efectivo', type: 'Efectivo' },
+  },
+  categories: {
+    comida: { name: 'Comida', type: 'gasto' },
+    ingreso: { name: 'Ingreso', type: 'ingreso' },
+  },
+  recurring: [
+    { id: 'salary', type: 'ingreso', concept: 'Sueldo Qnity', amount: 1150000, cat: 'ingreso', targetKind: 'account', targetId: 'galicia' },
+  ],
+  cards: [{ id: 'visa-galicia', brand: 'Visa', bank: 'Galicia', last4: '4242' }],
+  archived: {},
+};
+
+describe('parseSpokenAmount', () => {
+  it.each([
+    ['$1.150.000', 1150000],
+    ['1,5 millones', 1500000],
+    ['25 mil', 25000],
+    ['12.500,50', 12500.5],
+  ])('parses %s', (input, expected) => expect(parseSpokenAmount(input)).toBe(expected));
+});
+
+describe('parseAssistantCommand', () => {
+  it('reuses a saved salary recurring when the user says they got paid', () => {
+    const draft = parseAssistantCommand('Cobré el sueldo', context, NOW);
+    expect(draft).toMatchObject({ intent: 'recurring', recurringId: 'salary', amount: 1150000, accountId: 'galicia', transactionType: 'ingreso' });
+  });
+  it('prepares an expense with amount, account and date', () => {
+    const draft = parseAssistantCommand('Gasté 25 mil en comida con Galicia ayer', context, NOW);
+    expect(draft).toMatchObject({ intent: 'transaction', transactionType: 'gasto', amount: 25000, accountId: 'galicia', categoryId: 'comida', dateISO: '2026-08-06' });
+    expect(draft.merchant).toBe('Gasto');
+  });
+  it('prepares a full card payment without inventing an amount', () => {
+    const draft = parseAssistantCommand('Pagué el resumen completo de la Visa desde Galicia', context, NOW);
+    expect(draft).toMatchObject({ intent: 'card_payment', amount: null, cardId: 'visa-galicia', accountId: 'galicia' });
+  });
+  it('does not pretend to understand an unrelated request', () => {
+    expect(parseAssistantCommand('¿Cómo viene mi mes?', context, NOW).intent).toBe('none');
+  });
+});
+
+describe('normalizeAssistantDraft', () => {
+  it('drops model-provided ids that do not exist in local state', () => {
+    const draft = normalizeAssistantDraft({ intent: 'transaction', transactionType: 'gasto', amount: 10, accountId: 'invented', categoryId: 'invented', dateISO: '2026-08-01' }, context, NOW);
+    expect(draft.accountId).toBe('');
+    expect(draft.categoryId).toBe('');
+    expect(draft.tags).toContain('asistente');
+  });
+
+  it('resolves model text references only against local entities', () => {
+    const resolved = resolveAssistantReferences({ accountRef: 'Galicia', categoryRef: 'comida', cardRef: 'Visa' }, context);
+    expect(resolved).toMatchObject({ accountId: 'galicia', categoryId: 'comida', cardId: 'visa-galicia' });
+  });
+});

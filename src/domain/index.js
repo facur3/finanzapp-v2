@@ -11,10 +11,12 @@ import * as dates from './dates.js';
 import * as reports from './reports.js';
 import * as merchantRules from './merchantRules.js';
 import * as shortcutCapture from './shortcutCapture.js';
+import * as assistant from './assistant.js';
+import * as currency from './currency.js';
 
-const FinanzDomain = { ...money, ...transactions, ...balances, ...dates, ...reports, ...merchantRules, ...shortcutCapture };
+const FinanzDomain = { ...money, ...transactions, ...balances, ...dates, ...reports, ...merchantRules, ...shortcutCapture, ...assistant, ...currency };
 
 if (typeof window !== 'undefined') window.FinanzDomain = FinanzDomain;
 
-export { money, transactions, balances, dates, reports, merchantRules, shortcutCapture };
+export { money, transactions, balances, dates, reports, merchantRules, shortcutCapture, assistant, currency };
 export default FinanzDomain;

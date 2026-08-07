@@ -1,8 +1,9 @@
 # FinanzApp
 
-FinanzApp is a personal finance app (accounts, movements, cards, categories,
-tags, investments and settings) with local persistence. It is currently built
-from the **Claude Design runtime** export as the exact, approved UI/UX baseline.
+FinanzApp is a personal finance app for Argentina: accounts, movements, cards,
+budgets, recurring movements, categories, tags and investments with local
+persistence. Its UI currently runs on the **Claude Design runtime** while the
+financial rules live in tested domain modules.
 
 ## Architecture (read before changing anything)
 
@@ -19,11 +20,13 @@ truth. On top of that baseline the app now also has:
 - **Optional cloud sync** via Supabase (email + password auth, one JSONB row per user,
   last-write-wins). Off until configured — see `SUPABASE_SETUP.md`. Without it the app
   is 100% local, exactly as before.
-- **One serverless function** (`api/chart.js` on Vercel) that proxies Yahoo Finance
-  price history for the investment charts. No other backend.
+- **Two serverless functions**: `api/chart.js` proxies Yahoo Finance price history;
+  `api/assistant.js` optionally interprets ambiguous natural-language commands with
+  OpenAI Structured Outputs. The API key stays on the server.
 
-Future refactors must be parity-safe: one screen/flow at a time, with the Claude
-Design behavior preserved exactly after every commit.
+Future refactors should preserve financial behavior and data migrations one flow
+at a time; the interface can continue evolving without tying the product to the
+original export.
 
 ## Functionality included
 
@@ -33,9 +36,17 @@ Design behavior preserved exactly after every commit.
 - Category chart tap filters Activity automatically.
 - Functional quick-add flows, movement detail, card purchase, card payment,
   investment trade, account/category/tag/card forms, security/reset, settings and filters.
-- **Investments**: CEDEARs, crypto and FCI with live prices (CoinGecko, data912,
+- **Voice/text assistant** in Argentine Spanish for expenses, income, stored
+  recurring movements (for example “Cobré el sueldo”) and card payments. It
+  always shows a validated draft before writing anything.
+- **Real dates** stored as ISO values, native calendar selection, and dynamic
+  “Hoy/Ayer/5 ago” labels that do not become stale after midnight.
+- **Investments**: CEDEARs, crypto, Argentine bonds and FCI with live prices (CoinGecko, data912,
   Yahoo, ArgentinaDatos), portfolio donut, per-asset price charts, and USD (dólar
   cripto) valuation.
+- Animated ARS/USD conversion by tapping the large dashboard amount.
+- Mixed ARS/USD account totals and reports are normalized with the current quote;
+  each account and movement still shows its native currency.
 - **Budgets** (monthly limit per category), **savings goals**, and a **net-worth
   trend** chart from daily snapshots.
 - **Optional cloud sync** (Supabase) so data can follow you across devices.
@@ -57,6 +68,13 @@ npm run dev
 ```
 
 Open: http://localhost:5173
+
+### Optional OpenAI assistant
+
+The deterministic on-device parser works without a key. For ambiguous phrases,
+configure your deployment environment and set `OPENAI_API_KEY` as a
+server-side secret. Never use a `VITE_` prefix: that would expose the key to the
+browser. See `docs/assistant-and-market-data.md` for the data boundary and setup.
 
 ## Build
 
@@ -85,9 +103,8 @@ Fails if `node_modules/`, `dist/`, `.vite/`, or `.env` are tracked by git.
 
 ## Deploy to Vercel
 
-Mostly static, plus one serverless function (`api/chart.js`, auto-detected by
-Vercel) that proxies price history. `vercel.json` is included and already pins the
-build settings below.
+Mostly static, plus `api/chart.js` and `api/assistant.js` (auto-detected by Vercel).
+`vercel.json` is included and already pins the build settings below.
 
 ### One-time setup
 
@@ -100,6 +117,8 @@ build settings below.
    - **Output Directory:** `dist`
    - **Install Command:** `npm install` (or `npm ci`)
 5. Click **Deploy**.
+6. Optional: add `OPENAI_API_KEY` (and, only if needed, `OPENAI_MODEL`) under
+   **Project Settings → Environment Variables**, then redeploy.
 
 ### After deploy
 
@@ -167,7 +186,7 @@ runtime's existing Subresource Integrity (SRI) hashes, which were left unchanged
 - `node_modules/`
 - `dist/`
 - `.vite/`
-- `.env`, `.env.*` (except `.env.example`)
+- `.env`, `.env.*`
 - logs (`*.log`)
 - OS junk (`.DS_Store`, `Thumbs.db`, …)
 - local screenshots / temporary QA artifacts
@@ -176,10 +195,15 @@ runtime's existing Subresource Integrity (SRI) hashes, which were left unchanged
 
 ## Current limitations
 
-- **Google Fonts (Poppins)** are still loaded cross-origin and are not cached, so
-  offline rendering falls back to system fonts. Vendoring fonts would require
-  touching the design's `<helmet>` font links, which is out of scope under the
-  UI/UX freeze.
+- Market data is best-effort and comes from public providers; it is suitable for
+  personal tracking, not order execution or accounting statements. Manual price
+  overrides and backup/CSV flows remain available.
+- Cocos does not expose a documented public OAuth/account API in this integration,
+  so FinanzApp does **not** request Cocos credentials or claim to sync holdings.
+  Broker reconciliation should be added through an official API or a documented
+  export format when one is available.
+- Browser voice recognition depends on browser support. The Capacitor iOS shell
+  uses a native speech-recognition plugin and declares the required permissions.
 - **Babel standalone** (`@babel/standalone`) is still referenced from `unpkg.com`
   in `support.js`, but it is **not a critical dependency**: it is only fetched
   lazily to compile runtime JSX/TSX modules imported via `x-import`, and FinanzApp
@@ -187,8 +211,8 @@ runtime's existing Subresource Integrity (SRI) hashes, which were left unchanged
   It was intentionally **not** vendored to avoid committing ~2.9 MB of code the app
   never executes. If a future feature adds JSX `x-import` modules, vendor it the
   same way React was vendored.
-- No custom install banner, update prompt, or offline UI — by design (UI/UX freeze).
-  Service-worker updates apply on the next load without a disruptive prompt.
+- There is no custom install banner, update prompt or offline status UI yet.
+  Service-worker updates apply on the next load.
 - iOS has no programmatic install; users add via "Add to Home Screen".
 - The app intentionally runs from the single-file Claude Design runtime; it is not
   a React application (even though that runtime uses React internally).

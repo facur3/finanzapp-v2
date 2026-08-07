@@ -3,7 +3,7 @@
 // Extracted verbatim from index.html `_apply` / `_rev`. Pure & immutable in b/ct
 // (returns fresh copies); mi/me are plain numbers. Behaviour MUST stay identical.
 //
-// Transaction shape (relevant fields): { type, account, from, to, cat, amount, val }
+// Transaction shape (relevant fields): { type, account, from, to, cat, amount, val, toVal }
 //  - type 'gasto'   : expense  (amount negative, val = |amount|)
 //  - type 'ingreso' : income
 //  - anything else  : transfer/investment (moves from -> to, no cat/mi/me impact)
@@ -20,7 +20,7 @@ export function reverseTxn(t, b, ct, mi, me) {
     mi -= t.val;
   } else {
     if (t.from) b[t.from] = (b[t.from] || 0) + t.val;
-    if (t.to) b[t.to] = (b[t.to] || 0) - t.val;
+    if (t.to) b[t.to] = (b[t.to] || 0) - (t.toVal == null ? t.val : t.toVal);
   }
   return { b, ct, mi, me };
 }
@@ -37,7 +37,7 @@ export function applyTxn(t, b, ct, mi, me) {
     mi += t.val;
   } else {
     if (t.from) b[t.from] = (b[t.from] || 0) - t.val;
-    if (t.to) b[t.to] = (b[t.to] || 0) + t.val;
+    if (t.to) b[t.to] = (b[t.to] || 0) + (t.toVal == null ? t.val : t.toVal);
   }
   return { b, ct, mi, me };
 }

@@ -38,6 +38,16 @@ export function isoFromLabel(label, ref = new Date()) {
   const base = new Date(ref);
   base.setHours(0, 0, 0, 0);
   const s = String(label || '').trim().toLowerCase();
+  // Native date inputs and imported CSVs use an ISO date. The legacy parser
+  // treated the leading year as a day number ("2024-06-05" became day 31),
+  // which is why custom dates could later appear as "Hoy".
+  const iso = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (iso) {
+    const y = Number(iso[1]), m = Number(iso[2]), d = Number(iso[3]);
+    const parsed = new Date(y, m - 1, d);
+    if (parsed.getFullYear() === y && parsed.getMonth() === m - 1 && parsed.getDate() === d) return s;
+    return todayKey(base);
+  }
   if (s === '' || s === 'hoy') return todayKey(base);
   if (s === 'ayer') {
     const d = new Date(base);
@@ -51,4 +61,23 @@ export function isoFromLabel(label, ref = new Date()) {
   }
   const p = parseDate(label, base);
   return p ? todayKey(p) : todayKey(base);
+}
+
+// Turn the stored ISO date into a label that is useful *today*. We intentionally
+// do not persist "Hoy"/"Ayer": those words go stale after midnight, while the
+// ISO date remains correct forever.
+export function labelFromISO(iso, ref = new Date()) {
+  const m = String(iso || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return String(iso || '');
+  const date = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  if (Number.isNaN(date.getTime())) return String(iso || '');
+  date.setHours(0, 0, 0, 0);
+  const base = new Date(ref);
+  base.setHours(0, 0, 0, 0);
+  const days = Math.round((base - date) / 86400000);
+  if (days === 0) return 'Hoy';
+  if (days === 1) return 'Ayer';
+  if (days === 2) return 'Anteayer';
+  const label = date.getDate() + ' ' + MONTHS[date.getMonth()];
+  return date.getFullYear() === base.getFullYear() ? label : label + ' ' + date.getFullYear();
 }

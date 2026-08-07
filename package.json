@@ -23,6 +23,7 @@
     "vitest": "^2.1.0"
   },
   "dependencies": {
+    "@capacitor-community/speech-recognition": "^7.0.1",
     "@capacitor/app": "^7.1.2",
     "@capacitor/core": "^7.6.7"
   }

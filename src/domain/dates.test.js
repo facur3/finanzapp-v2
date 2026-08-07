@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { todayKey, parseDate, isoFromLabel } from './dates.js';
+import { todayKey, parseDate, isoFromLabel, labelFromISO } from './dates.js';
 
 describe('dates.todayKey', () => {
   it('formats a local YYYY-MM-DD (month is 1-based)', () => {
@@ -46,5 +46,24 @@ describe('dates.isoFromLabel', () => {
   });
   it('falls back to today for unrecognizable labels', () => {
     expect(isoFromLabel('cualquier cosa', ref)).toBe('2026-07-15');
+  });
+  it('preserves a valid ISO date from a native calendar input', () => {
+    expect(isoFromLabel('2024-06-05', ref)).toBe('2024-06-05');
+  });
+  it('rejects an impossible ISO date', () => {
+    expect(isoFromLabel('2026-02-31', ref)).toBe('2026-07-15');
+  });
+});
+
+describe('dates.labelFromISO', () => {
+  const ref = new Date(2026, 6, 1); // 1 jul 2026
+  it('uses relative labels only when they are actually relative to today', () => {
+    expect(labelFromISO('2026-07-01', ref)).toBe('Hoy');
+    expect(labelFromISO('2026-06-30', ref)).toBe('Ayer');
+    expect(labelFromISO('2026-06-29', ref)).toBe('Anteayer');
+  });
+  it('shows the real calendar date for older movements', () => {
+    expect(labelFromISO('2026-06-05', ref)).toBe('5 jun');
+    expect(labelFromISO('2025-12-30', ref)).toBe('30 dic 2025');
   });
 });
