@@ -34,8 +34,9 @@ At the current published price, `gpt-5.6-luna` costs US$0.20 per million input
 tokens and US$1.20 per million output tokens. The endpoint reads the actual
 `usage` returned by OpenAI and sends the token count plus an estimate to the UI.
 For example, 500 input + 120 output tokens is about US$0.000244. Actual totals
-depend on phrase/output size; set an OpenAI project budget and usage alert as the
-hard operational control.
+depend on phrase/output size. Configure project spend limits/alerts and verify
+that enforcement is enabled: a notification-only budget is a soft threshold and
+does not stop requests by itself.
 
 The OpenAI model page does not list a supported free API tier for this model.
 FinanzApp therefore never requires it: clear commands use the local parser with
