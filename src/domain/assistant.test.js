@@ -39,6 +39,10 @@ describe('parseAssistantCommand', () => {
     expect(draft).toMatchObject({ intent: 'transaction', transactionType: 'gasto', amount: 25000, accountId: 'galicia', categoryId: 'comida', dateISO: '2026-08-06' });
     expect(draft.merchant).toBe('Gasto');
   });
+  it('treats hoy as the actual local calendar date supplied to the parser', () => {
+    const draft = parseAssistantCommand('Gasté 1500 en comida con Galicia hoy', context, NOW);
+    expect(draft).toMatchObject({ amount: 1500, accountId: 'galicia', categoryId: 'comida', dateISO: '2026-08-07' });
+  });
   it('understands a weekday as a real date instead of treating it as the merchant', () => {
     const draft = parseAssistantCommand('Gasté 25 mil en comida el lunes anterior', context, NOW);
     expect(draft).toMatchObject({ intent: 'transaction', amount: 25000, categoryId: 'comida', dateISO: '2026-08-03', merchant: 'Gasto' });
@@ -90,5 +94,11 @@ describe('normalizeAssistantDraft', () => {
   it('resolves model text references only against local entities', () => {
     const resolved = resolveAssistantReferences({ accountRef: 'Galicia', categoryRef: 'comida', cardRef: 'Visa' }, context);
     expect(resolved).toMatchObject({ accountId: 'galicia', categoryId: 'comida', cardId: 'visa-galicia' });
+  });
+
+  it('can resolve an FCI virtual funding source supplied by the app context', () => {
+    const withFund = { ...context, accounts: { ...context.accounts, 'fci-spend:portfolio:fund-1': { name: 'Cocos Rendimiento FCI', type: 'FCI COCORMA' } } };
+    const resolved = resolveAssistantReferences({ accountRef: 'Cocos Rendimiento' }, withFund);
+    expect(resolved.accountId).toBe('fci-spend:portfolio:fund-1');
   });
 });
