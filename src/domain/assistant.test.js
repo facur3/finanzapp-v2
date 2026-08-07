@@ -9,6 +9,8 @@ const context = {
   },
   categories: {
     comida: { name: 'Comida', type: 'gasto' },
+    auto: { name: 'Auto', type: 'gasto' },
+    compras: { name: 'Compras', type: 'gasto' },
     ingreso: { name: 'Ingreso', type: 'ingreso' },
   },
   recurring: [
@@ -36,6 +38,24 @@ describe('parseAssistantCommand', () => {
     const draft = parseAssistantCommand('Gasté 25 mil en comida con Galicia ayer', context, NOW);
     expect(draft).toMatchObject({ intent: 'transaction', transactionType: 'gasto', amount: 25000, accountId: 'galicia', categoryId: 'comida', dateISO: '2026-08-06' });
     expect(draft.merchant).toBe('Gasto');
+  });
+  it('understands a weekday as a real date instead of treating it as the merchant', () => {
+    const draft = parseAssistantCommand('Gasté 25 mil en comida el lunes anterior', context, NOW);
+    expect(draft).toMatchObject({ intent: 'transaction', amount: 25000, categoryId: 'comida', dateISO: '2026-08-03', merchant: 'Gasto' });
+  });
+  it('infers food, merchant and item detail from natural speech', () => {
+    const draft = parseAssistantCommand('Compré 2 hamburguesas por 2000, en Kiddo', context, NOW);
+    expect(draft).toMatchObject({ intent: 'transaction', amount: 2000, categoryId: 'comida', merchant: 'Kiddo', dateISO: '2026-08-07' });
+    expect(draft.note.toLowerCase()).toContain('2 hamburguesas');
+  });
+  it('learns a merchant category locally from previous movements', () => {
+    const learned = { ...context, transactions: [{ id: 9, merchant: 'Kiddo', cat: 'comida' }] };
+    const draft = parseAssistantCommand('Gasté 3500 en Kiddo', learned, NOW);
+    expect(draft).toMatchObject({ amount: 3500, categoryId: 'comida', merchant: 'Kiddo' });
+  });
+  it('understands named calendar dates and common transport vocabulary', () => {
+    const draft = parseAssistantCommand('Pagué 5 mil de Uber el 5 de agosto', context, NOW);
+    expect(draft).toMatchObject({ intent: 'transaction', amount: 5000, categoryId: 'auto', dateISO: '2026-08-05' });
   });
   it('prepares a full card payment without inventing an amount', () => {
     const draft = parseAssistantCommand('Pagué el resumen completo de la Visa desde Galicia', context, NOW);

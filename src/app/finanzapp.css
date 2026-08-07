@@ -13,8 +13,7 @@ input,button,textarea{font:inherit}
 .fa-main-scroll{padding-left:clamp(16px,5vw,24px)!important;padding-right:clamp(16px,5vw,24px)!important;padding-bottom:calc(102px + env(safe-area-inset-bottom,0px))!important}
 .fa-screen{will-change:transform,opacity}
 .fa-frame[data-nav-state="leaving"] .fa-screen{animation:faPushOut .18s cubic-bezier(.4,0,1,1) both!important;pointer-events:none}
-.fa-frame[data-nav-state="back-enter"] .fa-screen{animation:faBackIn .28s cubic-bezier(.22,1,.36,1) both!important}
-.fa-frame[data-nav-state="back-enter"] .fa-main-scroll>[data-screen-label]{animation:faBackIn .28s cubic-bezier(.22,1,.36,1) both!important}
+.fa-frame[data-nav-state="back-settle"] .fa-screen{animation:none!important}
 .fa-frame[data-tab-motion="leaving"][data-tab-direction="next"] .fa-main-scroll>[data-screen-label]{animation:faTabLeaveNext .125s cubic-bezier(.4,0,1,1) both;pointer-events:none}
 .fa-frame[data-tab-motion="leaving"][data-tab-direction="prev"] .fa-main-scroll>[data-screen-label]{animation:faTabLeavePrev .125s cubic-bezier(.4,0,1,1) both;pointer-events:none}
 .fa-frame[data-tab-motion="entering"][data-tab-direction="next"] .fa-main-scroll>[data-screen-label]{animation:faTabEnterNext .3s cubic-bezier(.22,1,.36,1) both}
@@ -63,7 +62,6 @@ input,button,textarea{font:inherit}
 @keyframes faUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
 @keyframes faPushIn{from{transform:translateX(28px);opacity:.2}to{transform:translateX(0);opacity:1}}
 @keyframes faPushOut{from{transform:translateX(0);opacity:1}to{transform:translateX(34px);opacity:0}}
-@keyframes faBackIn{from{transform:translateX(-14px);opacity:.55}to{transform:translateX(0);opacity:1}}
 @keyframes faSheet{from{transform:translateY(110%)}to{transform:translateY(0)}}
 @keyframes faFade{from{opacity:0}to{opacity:1}}
 @keyframes faPop{0%{transform:scale(.88);opacity:0}100%{transform:scale(1);opacity:1}}

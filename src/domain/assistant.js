@@ -52,6 +52,45 @@ function matchEntity(list, text, fields = ['name']) {
   return scored[0] ? scored[0].item : null;
 }
 
+const WEEKDAYS = { domingo: 0, lunes: 1, martes: 2, miercoles: 3, jueves: 4, viernes: 5, sabado: 6 };
+const MONTH_INDEX = { enero: 0, febrero: 1, marzo: 2, abril: 3, mayo: 4, junio: 5, julio: 6, agosto: 7, septiembre: 8, setiembre: 8, octubre: 9, noviembre: 10, diciembre: 11 };
+const CATEGORY_HINTS = [
+  { aliases: ['comida', 'alimentacion', 'alimentos'], terms: ['hamburguesa', 'pizza', 'empanada', 'restaurante', 'restaurant', 'cafeteria', 'cafe', 'comida', 'almuerzo', 'cena', 'desayuno', 'delivery', 'rappi', 'pedidos ya', 'pedidosya', 'supermercado', 'verduleria', 'kiosco'] },
+  { aliases: ['auto', 'transporte', 'movilidad'], terms: ['uber', 'cabify', 'taxi', 'sube', 'colectivo', 'subte', 'tren', 'nafta', 'combustible', 'ypf', 'shell', 'peaje', 'estacionamiento'] },
+  { aliases: ['compras', 'shopping'], terms: ['amazon', 'mercado libre', 'mercadolibre', 'ropa', 'zapatilla', 'calzado', 'electrodomestico'] },
+  { aliases: ['ocio', 'entretenimiento'], terms: ['cine', 'netflix', 'spotify', 'juego', 'gaming', 'teatro', 'recital', 'salida'] },
+  { aliases: ['mascotas', 'mascota'], terms: ['veterinaria', 'veterinario', 'perro', 'gato', 'mascota'] },
+  { aliases: ['tarjetas', 'tarjeta'], terms: ['visa', 'mastercard', 'amex', 'resumen de tarjeta'] },
+  { aliases: ['inversiones', 'inversion'], terms: ['cedear', 'bono', 'cripto', 'fci', 'caucion', 'accion'] },
+];
+
+function hasTerm(text, term) {
+  const escaped = fold(term).replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s+');
+  const plural = fold(term).includes(' ') ? '' : '(?:s|es)?';
+  return new RegExp('(^|\\s)' + escaped + plural + '(?=$|\\s|[.,;])').test(fold(text));
+}
+
+function categoryFromText(categories, text) {
+  const direct = matchEntity(categories, text, ['name']);
+  if (direct) return direct;
+  const available = entries(categories).filter(category => category.type === 'gasto' && !category.archived);
+  for (const hint of CATEGORY_HINTS) {
+    if (!hint.terms.some(term => hasTerm(text, term))) continue;
+    const category = available.find(item => hint.aliases.some(alias => {
+      const value = fold(item.id + ' ' + (item.name || ''));
+      return value === alias || value.split(' ').includes(alias) || value.includes(alias);
+    }));
+    if (category) return category;
+  }
+  return null;
+}
+
+function categoryFromHistory(categories, transactions, merchant) {
+  if (!merchant) return null;
+  const match = entries(transactions).find(transaction => fold(transaction.merchant) === fold(merchant) && transaction.cat);
+  return match ? entries(categories).find(category => String(category.id) === String(match.cat) && !category.archived) || null : null;
+}
+
 export function resolveAssistantReferences(value, context = {}) {
   const draft = { ...(value || {}) };
   const account = !draft.accountId && draft.accountRef ? matchEntity(context.accounts, draft.accountRef, ['name', 'type']) : null;
@@ -67,24 +106,107 @@ export function resolveAssistantReferences(value, context = {}) {
 
 function spokenDate(text, now) {
   const value = fold(text);
+  const ref = new Date(now || Date.now());
+  ref.setHours(0, 0, 0, 0);
   const iso = value.match(/\b(\d{4}-\d{2}-\d{2})\b/);
   if (iso) return isoFromLabel(iso[1], now);
   const slash = value.match(/\b(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?\b/);
   if (slash) {
-    const ref = new Date(now || Date.now());
     let year = slash[3] ? Number(slash[3]) : ref.getFullYear();
     if (year < 100) year += 2000;
     return isoFromLabel(year + '-' + String(slash[2]).padStart(2, '0') + '-' + String(slash[1]).padStart(2, '0'), ref);
   }
+  const named = value.match(/\b(?:el\s+)?(\d{1,2})\s+de\s+(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|setiembre|octubre|noviembre|diciembre)(?:\s+de\s+(\d{4}))?\b/);
+  if (named) {
+    const day = Number(named[1]), month = MONTH_INDEX[named[2]];
+    let year = named[3] ? Number(named[3]) : ref.getFullYear();
+    let date = new Date(year, month, day);
+    if (!named[3]) {
+      const distance = date - ref;
+      if (distance > 183 * 86400000) date = new Date(year - 1, month, day);
+      else if (distance < -183 * 86400000) date = new Date(year + 1, month, day);
+    }
+    if (date.getMonth() === month && date.getDate() === day) return todayKey(date);
+  }
   if (value.includes('anteayer')) return isoFromLabel('Anteayer', now);
   if (value.includes('ayer')) return isoFromLabel('Ayer', now);
-  return todayKey(new Date(now || Date.now()));
+  const ago = value.match(/\bhace\s+(\d{1,3})\s+dias?\b/);
+  if (ago) {
+    const date = new Date(ref);
+    date.setDate(date.getDate() - Number(ago[1]));
+    return todayKey(date);
+  }
+  const weekday = value.match(/\b(?:el\s+)?(domingo|lunes|martes|miercoles|jueves|viernes|sabado)(?:\s+(anterior|pasad[oa]|ultim[oa])|\s+de\s+la\s+semana\s+pasada)?\b/);
+  if (weekday) {
+    let days = (ref.getDay() - WEEKDAYS[weekday[1]] + 7) % 7;
+    if (days === 0 && weekday[2]) days = 7;
+    const date = new Date(ref);
+    date.setDate(date.getDate() - days);
+    return todayKey(date);
+  }
+  if (/\b(?:la\s+)?semana\s+pasada\b/.test(value)) {
+    const date = new Date(ref);
+    date.setDate(date.getDate() - 7);
+    return todayKey(date);
+  }
+  return todayKey(ref);
+}
+
+function stripSpokenDates(value) {
+  return String(value || '')
+    .replace(/\b\d{4}-\d{2}-\d{2}\b/giu, ' ')
+    .replace(/\b\d{1,2}\/\d{1,2}(?:\/\d{2,4})?\b/giu, ' ')
+    .replace(/\b(?:el\s+)?\d{1,2}\s+de\s+(?:enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|setiembre|octubre|noviembre|diciembre)(?:\s+de\s+\d{4})?\b/giu, ' ')
+    .replace(/\b(?:hoy|anteayer|ayer|hace\s+\d{1,3}\s+d[ií]as?|(?:la\s+)?semana\s+pasada)\b/giu, ' ')
+    .replace(/\b(?:el\s+)?(?:domingo|lunes|martes|mi[eé]rcoles|jueves|viernes|s[aá]bado)(?:(?:\s+(?:anterior|pasad[oa]|[uú]ltim[oa]))|(?:\s+de\s+la\s+semana\s+pasada))?\b/giu, ' ');
+}
+
+function titleValue(value) {
+  const clean = String(value || '').replace(/^[\s,;.-]+|[\s,;.-]+$/g, '').replace(/\s+/g, ' ').slice(0, 80);
+  return clean ? clean.charAt(0).toUpperCase() + clean.slice(1) : '';
+}
+
+function placeFromText(text, excluded = []) {
+  const value = stripSpokenDates(text);
+  const match = value.match(/[,;]\s*(?:en|de)\s+([^,;]+?)\s*$/iu) || value.match(/\s+en\s+([^,;]+?)\s*$/iu);
+  if (!match) return '';
+  const place = titleValue(match[1]);
+  const normalized = fold(place);
+  if (!place || excluded.filter(Boolean).some(item => {
+    const candidate = fold(item);
+    return candidate && (candidate === normalized || normalized.includes(candidate));
+  })) return '';
+  return place;
+}
+
+function noteFromText(text, amount, place, excluded = []) {
+  let clean = stripSpokenDates(text);
+  if (place) {
+    const escapedPlace = place.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    clean = clean.replace(new RegExp('[,;]?\\s+(?:en|de)\\s+' + escapedPlace + '\\s*$', 'iu'), ' ');
+  }
+  clean = clean
+    .replace(/\bpor\s+(?:\$|ARS|USD|US\$)?\s*\d[\d.\s]*(?:,\d{1,2})?\b/giu, ' ')
+    .replace(/(?:\$|ARS|USD|US\$)\s*\d[\d.\s]*(?:,\d{1,2})?/giu, ' ')
+    .replace(/\b\d+(?:[.,]\d+)?\s*(?:millones?|mill[oó]n|mil)\b/giu, ' ')
+    .replace(/(^|[^\p{L}\p{N}])(?:gast[eé]|pagu[eé]|compr[eé]|abon[eé]|cobr[eé]|recib[ií]|deposit[eé]|ingres[oó]|me pagaron|un gasto|un ingreso|con|desde)(?=$|[^\p{L}\p{N}])/giu, ' ');
+  if (amount) {
+    const amountText = String(amount).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    clean = clean.replace(new RegExp('(^|[^\\d])' + amountText + '(?=$|[^\\d])', 'g'), ' ');
+  }
+  for (const phrase of excluded.filter(Boolean)) {
+    const escaped = String(phrase).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    clean = clean.replace(new RegExp('(^|[^\\p{L}\\p{N}])' + escaped + '(?=$|[^\\p{L}\\p{N}])', 'giu'), ' ');
+  }
+  clean = clean
+    .replace(/(^|[^\p{L}\p{N}])(?:en|de|a|por)(?=$|[^\p{L}\p{N}])/giu, ' ')
+    .replace(/\s+/g, ' ');
+  return titleValue(clean).slice(0, 120);
 }
 
 function merchantFromText(text, type, excluded = []) {
-  let clean = String(text || '')
+  let clean = stripSpokenDates(text)
     .replace(/(?:\$|ARS|USD|US\$)?\s*\d[\d.\s]*(?:,\d{1,2})?\s*(?:millones?|mill[oó]n|mil)?/gi, ' ')
-    .replace(/(^|[^\p{L}\p{N}])(hoy|ayer|anteayer|el \d{1,2}\/\d{1,2}(?:\/\d{2,4})?)(?=$|[^\p{L}\p{N}])/giu, ' ')
     .replace(/(^|[^\p{L}\p{N}])(gast[eé]|pagu[eé]|compr[eé]|abon[eé]|cobr[eé]|recib[ií]|deposit[eé]|ingres[oó]|me pagaron|un gasto|un ingreso|de|desde|con|en|a|por)(?=$|[^\p{L}\p{N}])/giu, ' ');
   for (const phrase of excluded.filter(Boolean)) {
     const variants = [String(phrase), ...String(phrase).split(/\s+/).filter(token => token.length > 2)];
@@ -134,6 +256,7 @@ function baseDraft(intent, now) {
     amount: null,
     currency: 'ARS',
     merchant: '',
+    note: '',
     categoryId: '',
     accountId: '',
     cardId: '',
@@ -155,7 +278,7 @@ export function parseAssistantCommand(text, context = {}, now = new Date()) {
   const recurring = entries(context.recurring);
   const cards = entries(context.cards);
   const account = matchEntity(accounts, normalized, ['name', 'type']);
-  const category = matchEntity(categories, normalized, ['name']);
+  let category = categoryFromText(categories, normalized);
   const card = matchEntity(cards, normalized, ['brand', 'bank', 'last4']);
   const amount = parseSpokenAmount(normalized);
   const dateISO = spokenDate(normalized, now);
@@ -248,11 +371,17 @@ export function parseAssistantCommand(text, context = {}, now = new Date()) {
   if (incomeWords || expenseWords) {
     const type = incomeWords && !expenseWords ? 'ingreso' : 'gasto';
     const draft = baseDraft('transaction', now);
+    let excluded = [category && category.name, account && account.name, card && card.brand, 'tarjeta'];
+    const place = placeFromText(text, excluded);
+    if (!category && place) category = categoryFromHistory(categories, context.transactions || context.txns, place);
+    excluded = [category && category.name, account && account.name, card && card.brand, 'tarjeta'];
     draft.transactionType = type;
     draft.amount = amount;
     draft.accountId = account ? account.id : (accounts.length === 1 ? accounts[0].id : '');
     draft.categoryId = category ? category.id : (type === 'ingreso' ? 'ingreso' : '');
-    draft.merchant = merchantFromText(text, type, [category && category.name, account && account.name, card && card.brand, 'tarjeta']);
+    draft.merchant = place || merchantFromText(text, type, excluded);
+    draft.note = noteFromText(text, amount, place, excluded);
+    if (fold(draft.note) === fold(draft.merchant)) draft.note = '';
     draft.dateISO = dateISO;
     draft.explanation = 'Entendí un ' + (type === 'ingreso' ? 'ingreso' : 'gasto') + '. Revisá los datos antes de guardarlo.';
     draft.confidence = amount ? (draft.accountId ? 0.88 : 0.72) : 0.45;
@@ -283,6 +412,7 @@ export function normalizeAssistantDraft(value, context = {}, now = new Date()) {
   draft.currency = draft.currency === 'USD' ? 'USD' : 'ARS';
   draft.dateISO = isoFromLabel(draft.dateISO, now);
   draft.merchant = String(draft.merchant || '').trim().slice(0, 80);
+  draft.note = String(draft.note || '').trim().slice(0, 120);
   draft.tags = [...new Set((Array.isArray(draft.tags) ? draft.tags : []).map(tag => fold(tag).replace(/\s/g, '-')).filter(Boolean))].slice(0, 8);
   if (!draft.tags.includes('asistente')) draft.tags.unshift('asistente');
   draft.explanation = String(draft.explanation || '').trim().slice(0, 240);
