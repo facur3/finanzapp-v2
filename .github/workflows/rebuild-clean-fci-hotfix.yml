@@ -3,6 +3,8 @@ name: Rebuild clean FCI hotfix
 on:
   push:
     branches: [fix/fci-spendable-navigation]
+  pull_request:
+    branches: [master]
 
 permissions:
   contents: write
