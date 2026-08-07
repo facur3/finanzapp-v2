@@ -631,7 +631,8 @@
         <sc-if value="{{ portHasAssets }}" hint-placeholder-val="{{ true }}">
         <div style="font-size:46px;font-weight:800;letter-spacing:-1.5px;margin-bottom:8px;">{{ portValueStr }}</div>
         <div style="margin-bottom:22px;">
-          <div style="display:inline-flex;align-items:center;gap:5px;background:var(--surface);padding:7px 13px;border-radius:13px;font-size:14px;font-weight:700;color: {{ portGLColor }};">{{ portResultWord }} {{ portResultAbsStr }} ({{ portGLPctStr }})</div>
+          <sc-if value="{{ portHasKnownCost }}" hint-placeholder-val="{{ true }}"><div style="display:inline-flex;align-items:center;gap:5px;background:var(--surface);padding:7px 13px;border-radius:13px;font-size:14px;font-weight:700;color: {{ portGLColor }};">{{ portResultWord }} {{ portResultAbsStr }} ({{ portGLPctStr }})</div></sc-if>
+          <sc-if value="{{ portHasUnknownCost }}" hint-placeholder-val="{{ false }}"><div style="font-size:12.5px;color:var(--text-3);font-weight:600;margin-top:9px;">{{ portUnknownCostStr }} · no se inventa rendimiento</div></sc-if>
           <sc-if value="{{ portHasUsd }}" hint-placeholder-val="{{ false }}">
             <div style="font-size:12.5px;color:var(--text-3);font-weight:600;margin-top:9px;">≈ {{ portValueUsdStr }} · dólar cripto {{ portUsdRateStr }}</div>
           </sc-if>
@@ -740,8 +741,11 @@
           <sc-if value="{{ adAHasUsd }}" hint-placeholder-val="{{ false }}">
             <div style="font-size:12px;color:var(--text-3);font-weight:600;margin-bottom:12px;">{{ adAValueUsdStr }}</div>
           </sc-if>
-          <div style="display:flex;justify-content:space-between;padding:9px 0;border-top:1px solid var(--hairline);"><span style="font-size:13px;color:var(--text-2);font-weight:500;">Invertiste</span><span style="font-size:13px;font-weight:700;">{{ adACostStr }}</span></div>
-          <div style="display:flex;justify-content:space-between;padding:9px 0;border-top:1px solid var(--hairline);"><span style="font-size:13px;color:var(--text-2);font-weight:500;">{{ adAResultWord }} (desde tu compra)</span><span style="font-size:13px;font-weight:700;color: {{ adAGLColor }};">{{ adAResultSignStr }} ({{ adAGLPctStr }})</span></div>
+          <sc-if value="{{ adAHasCost }}" hint-placeholder-val="{{ true }}">
+            <div style="display:flex;justify-content:space-between;padding:9px 0;border-top:1px solid var(--hairline);"><span style="font-size:13px;color:var(--text-2);font-weight:500;">Invertiste</span><span style="font-size:13px;font-weight:700;">{{ adACostStr }}</span></div>
+            <div style="display:flex;justify-content:space-between;padding:9px 0;border-top:1px solid var(--hairline);"><span style="font-size:13px;color:var(--text-2);font-weight:500;">{{ adAResultWord }} (desde tu compra)</span><span style="font-size:13px;font-weight:700;color: {{ adAGLColor }};">{{ adAResultSignStr }} ({{ adAGLPctStr }})</span></div>
+          </sc-if>
+          <sc-if value="{{ adACostPending }}" hint-placeholder-val="{{ false }}"><div style="padding:11px 0 1px;border-top:1px solid var(--hairline);font-size:12.5px;color:var(--text-2);font-weight:600;line-height:1.45;">Falta el costo de compra. El valor actual es válido, pero el rendimiento queda oculto para no mostrar un resultado falso.</div></sc-if>
         </div>
         <div style="display:flex;gap:9px;margin-bottom:22px;">
           <div onClick="{{ adABuy }}" style="flex:1;height:52px;border-radius:16px;background:var(--accent);color:var(--on-accent);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:15px;font-weight:700;">Comprar más</div>
@@ -1045,7 +1049,7 @@
           <div onClick="{{ cdPay }}" style="flex:1;height:52px;border-radius:16px;background:var(--accent);display:flex;align-items:center;justify-content:center;gap:7px;cursor:pointer;font-size:15px;font-weight:700;color:var(--on-accent);"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>Pagar</div>
           <div onClick="{{ cdAddPurchase }}" style="flex:1;height:52px;border-radius:16px;background:var(--surface);display:flex;align-items:center;justify-content:center;gap:7px;cursor:pointer;font-size:15px;font-weight:600;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>Compra</div>
         </div>
-        <div onClick="{{ cdCloseMonth }}" style="height:44px;border-radius:14px;background:var(--surface);display:flex;align-items:center;justify-content:center;gap:8px;cursor:pointer;font-size:14px;font-weight:600;color:var(--text-2);margin-bottom:22px;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>Cerrar mes · avanzar cuotas</div>
+        <sc-if value="{{ cdHasPreviousCycle }}" hint-placeholder-val="{{ false }}"><div style="font-size:11.5px;color:var(--text-3);font-weight:600;margin:2px 2px 22px;">{{ cdPreviousCycleStr }}</div></sc-if>
         <div style="font-size:14px;font-weight:700;margin:0 2px 12px;">Compras del resumen</div>
         <div style="background:var(--card);border-radius:18px;padding:4px 16px;box-shadow:var(--shadow-pill);margin-bottom:22px;">
           <sc-for list="{{ cdCompras }}" as="p" hint-placeholder-count="3">
@@ -1230,6 +1234,7 @@
               <div style="font-size:14px;font-weight:700;color: {{ ivTotalGLColor }};">{{ ivResultWord }} {{ ivResultAbsStr }} ({{ ivTotalGLPctStr }})</div>
             </div>
           </sc-if>
+          <sc-if value="{{ ivHasUnknownCost }}" hint-placeholder-val="{{ false }}"><div style="font-size:11.5px;color:var(--text-2);font-weight:600;margin-top:8px;">{{ ivUnknownCostStr }} · rendimiento parcial</div></sc-if>
         </div>
         <div style="display:flex;gap:9px;margin-bottom:14px;">
           <div onClick="{{ ivBuy }}" style="flex:1;height:48px;border-radius:15px;background:var(--surface);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:13.5px;font-weight:600;">Comprar</div>
@@ -1385,7 +1390,7 @@
         </div>
         <div style="font-size:18px;font-weight:800;margin-bottom:6px;">Importar</div>
         <div style="background:var(--card);border-radius:18px;padding:4px 16px;box-shadow:var(--shadow-pill);">
-          <div onClick="{{ askImport }}" style="display:flex;align-items:center;gap:12px;padding:14px 0;border-bottom:1px solid var(--hairline);cursor:pointer;"><span style="font-size:20px;">⬆️</span><span style="flex:1;font-size:15px;font-weight:600;">Importar backup</span><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--text-3)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"></polyline></svg></div>
+          <div onClick="{{ askImport }}" style="display:flex;align-items:center;gap:12px;padding:14px 0;border-bottom:1px solid var(--hairline);cursor:pointer;"><span style="font-size:20px;">⬆️</span><span style="flex:1;font-size:15px;font-weight:600;">Backup o configuración JSON</span><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--text-3)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"></polyline></svg></div>
           <div onClick="{{ askImportCsv }}" style="display:flex;align-items:center;gap:12px;padding:14px 0;cursor:pointer;"><span style="font-size:20px;">📥</span><span style="flex:1;font-size:15px;font-weight:600;">Importar CSV de banco</span><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--text-3)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"></polyline></svg></div>
         </div>
         <div style="font-size:12px;color:var(--text-3);font-weight:500;text-align:center;margin-top:16px;">Datos locales en este dispositivo</div>
@@ -1890,7 +1895,7 @@
             </div>
           </div>
           <div onClick="{{ onbNext }}" style="height:58px;border-radius:19px;background:var(--accent);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:17px;font-weight:700;color:var(--on-accent);">Empezar</div>
-          <div onClick="{{ askImport }}" style="text-align:center;margin-top:16px;cursor:pointer;font-size:14px;font-weight:600;color:var(--text-2);">¿Ya usás FinanzApp? <span style="color:var(--accent);">Importar backup</span></div>
+          <div onClick="{{ askImport }}" style="text-align:center;margin-top:16px;cursor:pointer;font-size:14px;font-weight:600;color:var(--text-2);">¿Ya usás FinanzApp? <span style="color:var(--accent);">Importar datos</span></div>
         </sc-if>
 
         <!-- STEP 1: currency -->

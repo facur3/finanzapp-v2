@@ -730,7 +730,8 @@
         <sc-if value="{{ portHasAssets }}" hint-placeholder-val="{{ true }}">
         <div style="font-size:46px;font-weight:800;letter-spacing:-1.5px;margin-bottom:8px;">{{ portValueStr }}</div>
         <div style="margin-bottom:22px;">
-          <div style="display:inline-flex;align-items:center;gap:5px;background:var(--surface);padding:7px 13px;border-radius:13px;font-size:14px;font-weight:700;color: {{ portGLColor }};">{{ portResultWord }} {{ portResultAbsStr }} ({{ portGLPctStr }})</div>
+          <sc-if value="{{ portHasKnownCost }}" hint-placeholder-val="{{ true }}"><div style="display:inline-flex;align-items:center;gap:5px;background:var(--surface);padding:7px 13px;border-radius:13px;font-size:14px;font-weight:700;color: {{ portGLColor }};">{{ portResultWord }} {{ portResultAbsStr }} ({{ portGLPctStr }})</div></sc-if>
+          <sc-if value="{{ portHasUnknownCost }}" hint-placeholder-val="{{ false }}"><div style="font-size:12.5px;color:var(--text-3);font-weight:600;margin-top:9px;">{{ portUnknownCostStr }} · no se inventa rendimiento</div></sc-if>
           <sc-if value="{{ portHasUsd }}" hint-placeholder-val="{{ false }}">
             <div style="font-size:12.5px;color:var(--text-3);font-weight:600;margin-top:9px;">≈ {{ portValueUsdStr }} · dólar cripto {{ portUsdRateStr }}</div>
           </sc-if>
@@ -839,8 +840,11 @@
           <sc-if value="{{ adAHasUsd }}" hint-placeholder-val="{{ false }}">
             <div style="font-size:12px;color:var(--text-3);font-weight:600;margin-bottom:12px;">{{ adAValueUsdStr }}</div>
           </sc-if>
-          <div style="display:flex;justify-content:space-between;padding:9px 0;border-top:1px solid var(--hairline);"><span style="font-size:13px;color:var(--text-2);font-weight:500;">Invertiste</span><span style="font-size:13px;font-weight:700;">{{ adACostStr }}</span></div>
-          <div style="display:flex;justify-content:space-between;padding:9px 0;border-top:1px solid var(--hairline);"><span style="font-size:13px;color:var(--text-2);font-weight:500;">{{ adAResultWord }} (desde tu compra)</span><span style="font-size:13px;font-weight:700;color: {{ adAGLColor }};">{{ adAResultSignStr }} ({{ adAGLPctStr }})</span></div>
+          <sc-if value="{{ adAHasCost }}" hint-placeholder-val="{{ true }}">
+            <div style="display:flex;justify-content:space-between;padding:9px 0;border-top:1px solid var(--hairline);"><span style="font-size:13px;color:var(--text-2);font-weight:500;">Invertiste</span><span style="font-size:13px;font-weight:700;">{{ adACostStr }}</span></div>
+            <div style="display:flex;justify-content:space-between;padding:9px 0;border-top:1px solid var(--hairline);"><span style="font-size:13px;color:var(--text-2);font-weight:500;">{{ adAResultWord }} (desde tu compra)</span><span style="font-size:13px;font-weight:700;color: {{ adAGLColor }};">{{ adAResultSignStr }} ({{ adAGLPctStr }})</span></div>
+          </sc-if>
+          <sc-if value="{{ adACostPending }}" hint-placeholder-val="{{ false }}"><div style="padding:11px 0 1px;border-top:1px solid var(--hairline);font-size:12.5px;color:var(--text-2);font-weight:600;line-height:1.45;">Falta el costo de compra. El valor actual es válido, pero el rendimiento queda oculto para no mostrar un resultado falso.</div></sc-if>
         </div>
         <div style="display:flex;gap:9px;margin-bottom:22px;">
           <div onClick="{{ adABuy }}" style="flex:1;height:52px;border-radius:16px;background:var(--accent);color:var(--on-accent);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:15px;font-weight:700;">Comprar más</div>
@@ -1144,7 +1148,7 @@
           <div onClick="{{ cdPay }}" style="flex:1;height:52px;border-radius:16px;background:var(--accent);display:flex;align-items:center;justify-content:center;gap:7px;cursor:pointer;font-size:15px;font-weight:700;color:var(--on-accent);"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>Pagar</div>
           <div onClick="{{ cdAddPurchase }}" style="flex:1;height:52px;border-radius:16px;background:var(--surface);display:flex;align-items:center;justify-content:center;gap:7px;cursor:pointer;font-size:15px;font-weight:600;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>Compra</div>
         </div>
-        <div onClick="{{ cdCloseMonth }}" style="height:44px;border-radius:14px;background:var(--surface);display:flex;align-items:center;justify-content:center;gap:8px;cursor:pointer;font-size:14px;font-weight:600;color:var(--text-2);margin-bottom:22px;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>Cerrar mes · avanzar cuotas</div>
+        <sc-if value="{{ cdHasPreviousCycle }}" hint-placeholder-val="{{ false }}"><div style="font-size:11.5px;color:var(--text-3);font-weight:600;margin:2px 2px 22px;">{{ cdPreviousCycleStr }}</div></sc-if>
         <div style="font-size:14px;font-weight:700;margin:0 2px 12px;">Compras del resumen</div>
         <div style="background:var(--card);border-radius:18px;padding:4px 16px;box-shadow:var(--shadow-pill);margin-bottom:22px;">
           <sc-for list="{{ cdCompras }}" as="p" hint-placeholder-count="3">
@@ -1329,6 +1333,7 @@
               <div style="font-size:14px;font-weight:700;color: {{ ivTotalGLColor }};">{{ ivResultWord }} {{ ivResultAbsStr }} ({{ ivTotalGLPctStr }})</div>
             </div>
           </sc-if>
+          <sc-if value="{{ ivHasUnknownCost }}" hint-placeholder-val="{{ false }}"><div style="font-size:11.5px;color:var(--text-2);font-weight:600;margin-top:8px;">{{ ivUnknownCostStr }} · rendimiento parcial</div></sc-if>
         </div>
         <div style="display:flex;gap:9px;margin-bottom:14px;">
           <div onClick="{{ ivBuy }}" style="flex:1;height:48px;border-radius:15px;background:var(--surface);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:13.5px;font-weight:600;">Comprar</div>
@@ -1484,7 +1489,7 @@
         </div>
         <div style="font-size:18px;font-weight:800;margin-bottom:6px;">Importar</div>
         <div style="background:var(--card);border-radius:18px;padding:4px 16px;box-shadow:var(--shadow-pill);">
-          <div onClick="{{ askImport }}" style="display:flex;align-items:center;gap:12px;padding:14px 0;border-bottom:1px solid var(--hairline);cursor:pointer;"><span style="font-size:20px;">⬆️</span><span style="flex:1;font-size:15px;font-weight:600;">Importar backup</span><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--text-3)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"></polyline></svg></div>
+          <div onClick="{{ askImport }}" style="display:flex;align-items:center;gap:12px;padding:14px 0;border-bottom:1px solid var(--hairline);cursor:pointer;"><span style="font-size:20px;">⬆️</span><span style="flex:1;font-size:15px;font-weight:600;">Backup o configuración JSON</span><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--text-3)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"></polyline></svg></div>
           <div onClick="{{ askImportCsv }}" style="display:flex;align-items:center;gap:12px;padding:14px 0;cursor:pointer;"><span style="font-size:20px;">📥</span><span style="flex:1;font-size:15px;font-weight:600;">Importar CSV de banco</span><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--text-3)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"></polyline></svg></div>
         </div>
         <div style="font-size:12px;color:var(--text-3);font-weight:500;text-align:center;margin-top:16px;">Datos locales en este dispositivo</div>
@@ -1989,7 +1994,7 @@
             </div>
           </div>
           <div onClick="{{ onbNext }}" style="height:58px;border-radius:19px;background:var(--accent);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:17px;font-weight:700;color:var(--on-accent);">Empezar</div>
-          <div onClick="{{ askImport }}" style="text-align:center;margin-top:16px;cursor:pointer;font-size:14px;font-weight:600;color:var(--text-2);">¿Ya usás FinanzApp? <span style="color:var(--accent);">Importar backup</span></div>
+          <div onClick="{{ askImport }}" style="text-align:center;margin-top:16px;cursor:pointer;font-size:14px;font-weight:600;color:var(--text-2);">¿Ya usás FinanzApp? <span style="color:var(--accent);">Importar datos</span></div>
         </sc-if>
 
         <!-- STEP 1: currency -->
@@ -2082,9 +2087,9 @@ class Component extends DCLogic {
     this.CARDGRADS=['linear-gradient(135deg,#3a3a3c,#161618)','linear-gradient(135deg,#7a4b57,#2e1d22)','linear-gradient(135deg,#3f5b7a,#1a2738)','linear-gradient(135deg,#3f6b4c,#1b2e22)','linear-gradient(135deg,#5b4a76,#241d33)'];
     this.CEDEAR_RATIOS={AAPL:10,AMZN:3,GOOGL:8,MSFT:10,META:5,TSLA:8,NVDA:10,JPM:5,SPY:1,QQQ:1,COIN:5,MELI:1,WMT:10,DIS:10,BAC:10,GE:10,PYPL:5,UBER:5,BABA:10};
     // Curated pick-lists so users choose an asset instead of typing a ticker.
-    this.CEDEARS=[['QQQ','Nasdaq 100','📊'],['SPY','S&P 500','📈'],['AAPL','Apple','🍎'],['AMZN','Amazon','📦'],['MSFT','Microsoft','🪟'],['GOOGL','Google','🔎'],['META','Meta','📘'],['TSLA','Tesla','🚗'],['NVDA','Nvidia','🎮'],['MELI','Mercado Libre','🛒'],['KO','Coca-Cola','🥤'],['DIS','Disney','🏰'],['COIN','Coinbase','🪙'],['BABA','Alibaba','🛍️']];
+    this.CEDEARS=[['QQQ','Nasdaq 100','📊'],['SPY','S&P 500','📈'],['ACWI','iShares MSCI ACWI ETF','🌐'],['SMH','VanEck Semiconductor ETF','💾'],['AAPL','Apple','🍎'],['AMZN','Amazon','📦'],['MSFT','Microsoft','🪟'],['GOOGL','Google','🔎'],['META','Meta','📘'],['TSLA','Tesla','🚗'],['NVDA','Nvidia','🎮'],['MELI','Mercado Libre','🛒'],['KO','Coca-Cola','🥤'],['DIS','Disney','🏰'],['COIN','Coinbase','🪙'],['BABA','Alibaba','🛍️']];
     this.CRYPTOS=[['BTC','Bitcoin','🪙'],['ETH','Ethereum','💎'],['SOL','Solana','🌅'],['ADA','Cardano','🔷'],['MATIC','Polygon','🟣'],['DOT','Polkadot','⚫']];
-    this.BONOS=[['AL30','Bono soberano AL30','🏛️'],['GD30','Global 2030','🏛️'],['AL35','Bono soberano AL35','🏛️'],['GD35','Global 2035','🏛️'],['GD38','Global 2038','🏛️'],['AE38','Bono soberano AE38','🏛️'],['TZX27','Bono CER 2027','🛡️'],['TZX28','Bono CER 2028','🛡️']];
+    this.BONOS=[['AO27','Bono Argentina 2027','🇦🇷'],['AL30','Bono soberano AL30','🏛️'],['GD30','Global 2030','🏛️'],['AL35','Bono soberano AL35','🏛️'],['GD35','Global 2035','🏛️'],['GD38','Global 2038','🏛️'],['AE38','Bono soberano AE38','🏛️'],['TZX27','Bono CER 2027','🛡️'],['TZX28','Bono CER 2028','🛡️']];
     this._MONTHS=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
     this.CATTYPES=[['gasto','Gasto'],['ingreso','Ingreso'],['transfer','Transferencia'],['inversion','Inversión']];
     this.CARDBRANDS=['Visa','Mastercard','Amex'];
@@ -2139,6 +2144,12 @@ class Component extends DCLogic {
     }
     // Post any due recurring movements / card auto-payments since last open.
     this.runAutomations();
+    // A PWA can stay open across midnight. Re-check on focus/visibility and at
+    // the next local midnight so "automático" does not secretly mean "on reopen".
+    this._automationWake=()=>{if(document.visibilityState!=='hidden')this.runAutomations();};
+    window.addEventListener('focus',this._automationWake);
+    document.addEventListener('visibilitychange',this._automationWake);
+    this.scheduleAutomationCheck();
     // Record today's net-worth snapshot for the trend chart (now + once prices settle).
     setTimeout(()=>this.recordSnapshot(),300);
     setTimeout(()=>this.recordSnapshot(),3200);
@@ -2280,10 +2291,12 @@ class Component extends DCLogic {
   }
   componentWillUnmount(){
     if(this._shortcutCaptureListener)window.removeEventListener('finanzapp:shortcutCapture',this._shortcutCaptureListener);
+    if(this._automationWake){window.removeEventListener('focus',this._automationWake);document.removeEventListener('visibilitychange',this._automationWake);}
     clearTimeout(this._ft);
     clearTimeout(this._cardScrollT);
     clearTimeout(this._navTimer);
     clearTimeout(this._tabTimer);
+    clearTimeout(this._automationTimer);
     clearInterval(this._priceTimer);
     if(this._speechRecognition)try{this._speechRecognition.abort();}catch(e){}
     if(this._nativeSpeechActive&&window.FinanzNativeSpeech)window.FinanzNativeSpeech.stop().catch(()=>{});
@@ -2467,7 +2480,20 @@ class Component extends DCLogic {
     this.setState({lastBackupAt:Date.now(),flash:'Backup descargado'});
   }
   askImport(){
-    this.requestConfirm({title:'Importar backup',msg:'Seleccioná un backup JSON de FinanzApp. Se reemplazarán los datos locales actuales.',confirmLabel:'Importar',danger:false,onConfirm:()=>this.pickBackupFile()});
+    this.requestConfirm({title:'Importar datos',msg:'Podés elegir un backup completo o un archivo de configuración. El backup reemplaza tus datos; la configuración sólo agrega o actualiza cuentas, tarjetas e inversiones y conserva tus movimientos.',confirmLabel:'Elegir archivo',danger:false,onConfirm:()=>this.pickBackupFile()});
+  }
+  applySetupImport(imported){const setup=imported.setup;
+    this.setState(s=>{const accounts={...s.accounts},balances={...s.balances},assets={...s.assets},order=[...s.order];let cards=[...(s.cards||[])],recurring=[...(s.recurring||[])],txns=[...(s.txns||[])],next=s._next;
+      const accountIds=new Map();
+      setup.accounts.forEach((account,index)=>{let id=account.id;const same=accounts[id]&&accounts[id].kind===account.kind;if(accounts[id]&&!same){const byName=Object.keys(accounts).find(key=>accounts[key].kind===account.kind&&String(accounts[key].name).toLowerCase()===account.name.toLowerCase());id=byName||account.id+'_importado';let suffix=2;while(accounts[id]&&id!==byName){id=account.id+'_importado_'+suffix;suffix++;}}
+        const pal=this.PALETTE[(order.length+index)%this.PALETTE.length];accounts[id]={...(accounts[id]||{}),name:account.name,type:account.type,kind:account.kind,currency:account.currency,liquid:account.liquid,emoji:account.emoji,iconVar:(accounts[id]||{}).iconVar||pal[0],fillVar:(accounts[id]||{}).fillVar||pal[1]};balances[id]=account.balance;if(order.indexOf(id)<0)order.push(id);if(!assets[id])assets[id]=[];accountIds.set(account.id,id);});
+      setup.assets.forEach(asset=>{const accountId=accountIds.get(asset.accountId)||asset.accountId;if(!accounts[accountId])throw new Error('missing-import-account');const current=[...(assets[accountId]||[])];const i=current.findIndex(item=>item.ticker===asset.ticker||item.id===asset.id);const normalized={...asset,accountId:undefined,fondoMatch:asset.fondoMatch.length?asset.fondoMatch:undefined};delete normalized.accountId;if(i>=0)current[i]={...current[i],...normalized};else current.push(normalized);assets[accountId]=current;});
+      Object.keys(assets).forEach(id=>{if(accounts[id]&&accounts[id].kind==='invest')balances[id]=(assets[id]||[]).reduce((sum,asset)=>sum+Number(asset.qty||0)*Number(asset.lastPrice||asset.avg||0),0);});
+      const cardIds=new Map();setup.cards.forEach((card,index)=>{const i=cards.findIndex(existing=>existing.id===card.id||(card.last4&&existing.last4===card.last4));const existing=i>=0?cards[i]:null;const normalized={...card,id:existing?existing.id:card.id,grad:card.grad||(existing&&existing.grad)||this.CARDGRADS[index%this.CARDGRADS.length]};if(i>=0)cards[i]={...existing,...normalized};else cards.push(normalized);cardIds.set(card.id,normalized.id);});
+      const existingLots=new Set(txns.map(t=>t.importKey).filter(Boolean));setup.investmentLots.forEach(lot=>{if(existingLots.has(lot.importKey))return;const accountId=accountIds.get(lot.accountId)||lot.accountId;txns.push({id:next,type:'inversion',ticker:lot.ticker,aqty:lot.qty,merchant:'Compra '+lot.ticker,cat:'inversion',amount:-lot.total,val:lot.total,currency:'ARS',from:accountId,to:accountId,isTransfer:true,dateLabel:window.FinanzDomain.labelFromISO(lot.dateISO),dateISO:lot.dateISO,note:lot.note||((lot.qty<1?lot.qty:this.fmtInt(lot.qty))+' '+lot.ticker+' · importado'),tags:['importado'],importKey:lot.importKey});existingLots.add(lot.importKey);next++;});
+      setup.recurring.forEach(item=>{const targetId=item.targetKind==='card'?(cardIds.get(item.targetId)||item.targetId):(accountIds.get(item.targetId)||item.targetId);const normalized={...item,targetId,nextDate:item.nextDate||this._nextOccur(item.day,(()=>{const d=new Date();d.setHours(0,0,0,0);return d;})()).toISOString()};const i=recurring.findIndex(r=>r.id===item.id||(r.concept===item.concept&&r.targetKind===item.targetKind&&r.targetId===targetId));if(i>=0)recurring[i]={...recurring[i],...normalized,id:recurring[i].id};else recurring.push(normalized);});
+      return{accounts,balances,assets,order,cards,recurring,txns,_next:next,push:null,sheet:null,subsheet:null,confirm:null,showOnboarding:false,flash:'Configuración importada sin borrar tus movimientos'};
+    },()=>{this.runAutomations();setTimeout(()=>this.fetchPrices(true),250);});
   }
   pickBackupFile(){
     const input=document.createElement('input');
@@ -2478,10 +2504,12 @@ class Component extends DCLogic {
       const reader=new FileReader();
       reader.onload=()=>{
         try{
-          const st=this.parseBackupPayload(String(reader.result||''));
+          const raw=String(reader.result||'');const parsed=JSON.parse(raw);
+          if(parsed&&parsed.schema==='finanzapp.setup.v1'){this.applySetupImport(window.FinanzDomain.parseSetupImport(parsed));return;}
+          const st=this.parseBackupPayload(parsed);
           this.setState(Object.assign({}, st, {push:null,sheet:null,subsheet:null,flash:'Backup importado',confirm:null,showOnboarding:false}));
         }catch(e){
-          this.flashMsg('Backup inválido');
+          this.flashMsg('El archivo no es compatible o tiene datos incompletos');
         }
       };
       reader.readAsText(file);
@@ -2608,7 +2636,7 @@ class Component extends DCLogic {
         // clear paid one-pago purchases and mark the cycle so auto-pay won't repeat.
         if(full&&c.paidCycle!==cycle)nc=this._closeCycleCard(nc,new Date());return nc;});
       const bal={...s.balances,[s.payAccount]:(s.balances[s.payAccount]||0)-accountDebit};const t={id:s._next,type:'pago',merchant:'Pago '+card.brand,cat:'pago',amount:-v,val:v,currency:'ARS',account:s.payAccount,accountAmount:accountDebit,card:card.id,isTransfer:true,dateLabel:'Hoy',dateISO:this._todayKey(),note:'Pago de tarjeta',tags:[]};return{cards:cs,balances:bal,txns:[t,...s.txns],_next:s._next+1,push:'cardDetail',payAmount:'',flash:full?'Resumen pagado':'Pago registrado'};});}
-  cardResumen(c){return (((c||{}).cuotas)||[]).reduce((a,q)=>a+(q.monto||0),0)+(((c||{}).compras)||[]).reduce((a,p)=>a+(p.monto||0),0);}
+  cardResumen(c){return window.FinanzDomain.cardStatementTotal(c);}
   _cycleKey(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');}
   _monthLabel(d){return d.getDate()+' '+this._MONTHS[d.getMonth()];}
   // Parse a card label like "13 jul" into a real Date near `ref`, picking the
@@ -2622,11 +2650,12 @@ class Component extends DCLogic {
   _dueCycle(c,ref){return this._cycleKey(this._parseDate((c||{}).vence,ref||new Date())||ref||new Date());}
   _nextOccur(day,from){day=Math.min(31,Math.max(1,day||1));let d=new Date(from.getFullYear(),from.getMonth(),day);d.setHours(0,0,0,0);if(d<from)d=new Date(from.getFullYear(),from.getMonth()+1,day);return d;}
   _closeCycleCard(c,today){const cuotas=(c.cuotas||[]).map(q=>({...q,cur:q.cur+1})).filter(q=>q.cur<=q.tot);return {...c,cuotas,compras:[],vence:this._advanceLabel(c.vence),cierre:this._advanceLabel(c.cierre),paidCycle:this._dueCycle(c,today)};}
-  // Runs on app open: posts due recurring movements and auto-pays cards whose
-  // due day has passed (idempotent per month via nextDate / paidCycle).
+  scheduleAutomationCheck(){clearTimeout(this._automationTimer);const now=new Date();const next=new Date(now.getFullYear(),now.getMonth(),now.getDate()+1,0,0,2,0);this._automationTimer=setTimeout(()=>{this.runAutomations();this.scheduleAutomationCheck();},Math.max(1000,next-now));}
+  // Runs on app open, wake and local midnight: posts due recurring movements and
+  // auto-pays cards whose due day passed (idempotent via nextDate / paidCycle).
   runAutomations(){const today=new Date();today.setHours(0,0,0,0);
     this.setState(s=>{let txns=s.txns,balances={...s.balances},cards=s.cards.map(c=>({...c})),next=s._next,categoryTotals={...s.categoryTotals},monthIncome=s.monthIncome,monthExpense=s.monthExpense,changed=false,posted=0;
-      const recurring=(s.recurring||[]).map(r=>{if(!r.active)return r;let nd=r.nextDate?new Date(r.nextDate):this._nextOccur(r.day,today);const out={...r};let guard=0;
+      const recurring=(s.recurring||[]).map(r=>{if(!r.active)return r;let nd=r.nextDate?new Date(r.nextDate):this._nextOccur(r.day,today);if(Number.isNaN(nd.getTime()))nd=this._nextOccur(r.day,today);nd.setHours(0,0,0,0);const out={...r};let guard=0;
         while(nd<=today&&guard<60){guard++;const lbl=this._monthLabel(nd),iso=window.FinanzDomain.todayKey(nd);
           if(r.targetKind==='card'){const ci=cards.findIndex(c=>c.id===r.targetId);if(ci>=0){const c=cards[ci];cards[ci]={...c,saldo:(c.saldo||0)+r.amount,compras:[{name:r.concept||'Recurrente',monto:r.amount,date:lbl,dateISO:iso},...(c.compras||[])]};categoryTotals={...categoryTotals,[r.cat]:(categoryTotals[r.cat]||0)+r.amount};monthExpense+=r.amount;txns=[{id:next,type:'gasto',merchant:r.concept||'Recurrente',cat:r.cat,amount:-r.amount,val:r.amount,currency:'ARS',card:r.targetId,onCard:true,dateLabel:lbl,dateISO:iso,note:'Recurrente · '+c.brand,tags:['recurrente']},...txns];next++;posted++;changed=true;}}
           else{const acc=r.targetId;if(balances[acc]!=null||s.accounts[acc]){const currency=(s.accounts[acc]||{}).currency||'ARS';if(r.type==='ingreso'){balances[acc]=(balances[acc]||0)+r.amount;monthIncome+=r.amount;txns=[{id:next,type:'ingreso',merchant:r.concept||'Recurrente',cat:r.cat||'ingreso',amount:r.amount,val:r.amount,currency,account:acc,dateLabel:lbl,dateISO:iso,note:'Recurrente',tags:['recurrente']},...txns];}else{balances[acc]=(balances[acc]||0)-r.amount;categoryTotals={...categoryTotals,[r.cat]:(categoryTotals[r.cat]||0)+r.amount};monthExpense+=r.amount;txns=[{id:next,type:'gasto',merchant:r.concept||'Recurrente',cat:r.cat,amount:-r.amount,val:r.amount,currency,account:acc,dateLabel:lbl,dateISO:iso,note:'Recurrente',tags:['recurrente']},...txns];}next++;posted++;changed=true;}}
@@ -2639,8 +2668,8 @@ class Component extends DCLogic {
   payPress(d){this.setState(s=>{let r=s.payAmount;if(d==='back')return{payAmount:r.slice(0,-1)};if(d===','){if(r.indexOf(',')>=0||r==='')return{};return{payAmount:r+','};}if(r.indexOf(',')>=0&&(r.split(',')[1]||'').length>=2)return{};if(r.replace(',','').length>=9)return{};return{payAmount:r+d};});}
   openCardPurchase(idx){this.setState({push:'cardPurchase',sheet:null,subsheet:null,cpSub:null,cpCard:idx||0,cpAmount:'',cpMerchant:'',cpCat:'compras',cpDate:'Hoy',cpDateISO:this._todayKey(),cpInstall:1});}
   cpPress(d){this.setState(s=>{let r=s.cpAmount;if(d==='back')return{cpAmount:r.slice(0,-1)};if(d===','){if(r.indexOf(',')>=0||r==='')return{};return{cpAmount:r+','};}if(r.indexOf(',')>=0&&(r.split(',')[1]||'').length>=2)return{};if(r.replace(',','').length>=9)return{};return{cpAmount:r+d};});}
-  savePurchase(){const S=this.state;const val=parseFloat((S.cpAmount||'').replace(',','.'))||0;if(!val){this.flashMsg('Ingresá un monto');return;}const idx=S.cpCard;const card=S.cards[idx];if(!card){this.flashMsg('Agregá una tarjeta primero');return;}if(!S.categories[S.cpCat]){this.flashMsg('Elegí una categoría');return;}const n=S.cpInstall;const merchant=S.cpMerchant.trim()||(this.state.categories[S.cpCat]?this.state.categories[S.cpCat].name:'Compra');const label=n>1?(merchant+' · cuota 1/'+n):merchant;const dateISO=window.FinanzDomain.isoFromLabel(S.cpDateISO||S.cpDate);
-    this.setState(s=>{const cuota=n>1?{name:merchant,cur:1,tot:n,monto:val/n}:null;const cs=s.cards.map((c,i)=>i===idx?{...c,saldo:c.saldo+val,compras:[{name:label,monto:val,date:window.FinanzDomain.labelFromISO(dateISO),dateISO},...(c.compras||[])],cuotas:cuota?[cuota,...(c.cuotas||[])]:c.cuotas}:c);const ct={...s.categoryTotals,[S.cpCat]:(s.categoryTotals[S.cpCat]||0)+val};const t={id:s._next,type:'gasto',merchant:label,cat:S.cpCat,amount:-val,val,currency:'ARS',card:card.id,onCard:true,dateLabel:window.FinanzDomain.labelFromISO(dateISO),dateISO,note:n>1?('Tarjeta '+card.brand+' · '+n+' cuotas'):('Tarjeta '+card.brand),tags:[]};return{cards:cs,categoryTotals:ct,monthExpense:s.monthExpense+val,txns:[t,...s.txns],_next:s._next+1,push:'cardDetail',cardView:idx,flash:'Compra registrada'};});}
+  savePurchase(){const S=this.state;const val=parseFloat((S.cpAmount||'').replace(',','.'))||0;if(!val){this.flashMsg('Ingresá un monto');return;}const idx=S.cpCard;const card=S.cards[idx];if(!card){this.flashMsg('Agregá una tarjeta primero');return;}if(!S.categories[S.cpCat]){this.flashMsg('Elegí una categoría');return;}const n=S.cpInstall;const merchant=S.cpMerchant.trim()||(this.state.categories[S.cpCat]?this.state.categories[S.cpCat].name:'Compra');const label=n>1?(merchant+' · cuota 1/'+n):merchant;const dateISO=window.FinanzDomain.isoFromLabel(S.cpDateISO||S.cpDate);const dateLabel=window.FinanzDomain.labelFromISO(dateISO);
+    this.setState(s=>{const cs=s.cards.map((c,i)=>i===idx?window.FinanzDomain.addCardPurchase(c,{amount:val,installments:n,merchant,date:dateLabel,dateISO}):c);const ct={...s.categoryTotals,[S.cpCat]:(s.categoryTotals[S.cpCat]||0)+val};const t={id:s._next,type:'gasto',merchant:label,cat:S.cpCat,amount:-val,val,currency:'ARS',card:card.id,onCard:true,dateLabel,dateISO,note:n>1?('Tarjeta '+card.brand+' · '+n+' cuotas'):('Tarjeta '+card.brand),tags:[]};return{cards:cs,categoryTotals:ct,monthExpense:s.monthExpense+val,txns:[t,...s.txns],_next:s._next+1,push:'cardDetail',cardView:idx,flash:n>1?'Compra en cuotas registrada':'Compra registrada'};});}
   openAssetTrade(mode,account,type='CEDEAR'){
     const inv=this.investIds();const existing=account||this.accountForType(type)||inv[0]||'';
     if(existing){this.setState({push:'assetTrade',sheet:null,subsheet:null,atSub:null,atMode:mode||'buy',atAccount:existing,atType:type,atTicker:'',atName:'',atEmoji:'',atSearch:'',atQty:'',atTotal:'',atDateISO:this._todayKey()});return;}
@@ -2720,7 +2749,6 @@ class Component extends DCLogic {
   budgetAmountPress(d){this.setState(s=>{let r=s.budgetAmount;if(d==='back')return{budgetAmount:r.slice(0,-1)};if(d===','){if(r.indexOf(',')>=0||r==='')return{};return{budgetAmount:r+','};}if(r.indexOf(',')>=0&&(r.split(',')[1]||'').length>=2)return{};if(r.replace(',','').length>=9)return{};return{budgetAmount:r+d};});}
   saveBudget(){const S=this.state;const cat=S.budgetCat;if(!cat)return;const v=parseFloat((S.budgetAmount||'').replace(',','.'))||0;this.setState(s=>{const budgets={...(s.budgets||{})};if(v>0)budgets[cat]=v;else delete budgets[cat];return{budgets,budgetCat:null,budgetAmount:'',flash:v>0?'Presupuesto guardado':'Presupuesto quitado'};});}
   removeBudget(){const S=this.state;const cat=S.budgetCat;if(!cat)return;this.setState(s=>{const budgets={...(s.budgets||{})};delete budgets[cat];return{budgets,budgetCat:null,budgetAmount:'',flash:'Presupuesto quitado'};});}
-  closeCardMonth(idx){this.requestConfirm({title:'Cerrar mes',msg:'Las cuotas avanzarán un mes y se limpiarán las compras del resumen. Las cuotas completadas se eliminan.',confirmLabel:'Cerrar mes',danger:false,onConfirm:()=>this.setState(s=>{const cards=s.cards.map((c,i)=>i===idx?this._closeCycleCard(c,new Date()):c);return{cards,flash:'Mes cerrado · cuotas avanzadas'};})});}
   setNewRec(patch){this.setState(s=>({newRec:{...s.newRec,...patch}}));}
   openRecScreen(){this.setState({push:'recScreen'});}
   openAddRec(editId){const s=this.state;const liq=this.liquidIds();const def={type:'gasto',concept:'',amount:'',cat:'otros',targetKind:'account',targetId:liq[0]||'',day:'1',editId:null};
@@ -2728,11 +2756,11 @@ class Component extends DCLogic {
     this.setState({push:'addRec',newRec:def});}
   saveRec(){const n=this.state.newRec;if(!n.concept.trim()){this.flashMsg('Poné un nombre');return;}const amt=parseFloat((n.amount||'').replace(/\./g,'').replace(',','.'))||0;if(!amt){this.flashMsg('Ingresá el monto');return;}if(!n.targetId){this.flashMsg('Elegí dónde impacta');return;}const day=Math.min(31,Math.max(1,parseInt(n.day,10)||1));
     this.setState(s=>{const rec=(s.recurring||[]).slice();const base={type:n.type,concept:n.concept.trim(),amount:amt,cat:n.type==='ingreso'?'ingreso':n.cat,targetKind:n.targetKind,targetId:n.targetId,day,active:true};
-      if(n.editId!=null){const i=rec.findIndex(r=>r.id===n.editId);if(i>=0)rec[i]={...rec[i],...base};}
-      else{rec.push({id:'r'+s._next,...base,nextDate:this._nextOccur(day,(()=>{const t=new Date();t.setHours(0,0,0,0);return t;})()).toISOString()});}
-      return{recurring:rec,_next:s._next+1,push:'recScreen',flash:'Recurrente guardado'};});
+      const today=(()=>{const t=new Date();t.setHours(0,0,0,0);return t;})();const nextDate=this._nextOccur(day,today).toISOString();
+      if(n.editId!=null){const i=rec.findIndex(r=>r.id===n.editId);if(i>=0)rec[i]={...rec[i],...base,nextDate};return{recurring:rec,push:'recScreen',flash:'Recurrente actualizado'};}
+      rec.push({id:'r'+s._next,...base,nextDate});return{recurring:rec,_next:s._next+1,push:'recScreen',flash:'Recurrente guardado'};});
     setTimeout(()=>this.runAutomations(),50);}
-  toggleRec(id){this.setState(s=>({recurring:(s.recurring||[]).map(r=>r.id===id?{...r,active:!r.active}:r)}));setTimeout(()=>this.runAutomations(),50);}
+  toggleRec(id){this.setState(s=>({recurring:(s.recurring||[]).map(r=>{if(r.id!==id)return r;const active=!r.active;if(!active)return{...r,active:false};const today=new Date();today.setHours(0,0,0,0);return{...r,active:true,nextDate:this._nextOccur(r.day,today).toISOString()};})}));setTimeout(()=>this.runAutomations(),50);}
   deleteRec(id){this.setState(s=>({recurring:(s.recurring||[]).filter(r=>r.id!==id),push:'recScreen',flash:'Recurrente eliminado'}));}
   async fetchPrices(silent=false){if(this.state.pricesLoading)return;this.setState({pricesLoading:true});
     try{const s=this.state;const na={...s.assets};const nb={...s.balances};
@@ -2766,34 +2794,25 @@ class Component extends DCLogic {
         await Promise.all(['rentaMixta','mercadoDinero','rentaFija'].map(async c=>{try{const d=await(await fetch('https://api.argentinadatos.com/v1/finanzas/fci/'+c+'/ultimo')).json();if(Array.isArray(d))d.forEach(f=>funds.push(f));}catch(e){}}));
         fciList.forEach(item=>{let vcp=0;for(const ph of item.phrases){const words=String(ph).toLowerCase().split(/\s+/).filter(Boolean);if(!words.length)continue;const hit=funds.find(f=>{const n=String(f.fondo||'').toLowerCase();return words.every(w=>n.includes(w));});if(hit&&hit.vcp>0){vcp=hit.vcp;break;}}if(vcp>0)fciPrices[item.id]=vcp;});
       }
-      // 4. Apply per account.
-      // FCI account: hold a fixed number of cuotapartes (units), exactly like Cocos.
-      // Balance = units x liveVCP (recomputed fresh each time, no compounding drift).
-      // If the balance changed for another reason (spend/deposit/manual edit), we
-      // reconvert units from the new balance at the last known VCP so it's preserved.
-      // Tickers (crypto/CEDEAR): value = qty x live price.
+      // 4. Apply every asset in every account. An investment account may mix an
+      // FCI with CEDEARs/bonds; finding a fund must never short-circuit the rest.
       let anyUpdate=false;let newAccMeta={...s.accMeta};
       Object.keys(na).forEach(k=>{if(!s.accounts[k])return;const aa=[...(na[k]||[])];if(!aa.length)return;
-        const fi=aa.findIndex(a=>a.fci);
-        if(fi>=0){const a=aa[fi];const live=fciPrices[a.id]||0;if(live>0){const lastVcp=Number(a.lastVcp)||0;const cur=Number(s.balances[k])||0;
-            let units=Number(a.units)||0;
-            if(units>0&&lastVcp>0){const expected=units*lastVcp;if(Math.abs(cur-expected)>0.5)units=cur/lastVcp;}
-            else{units=live>0?cur/live:0;}
-            const bal=Math.round(units*live*100)/100;nb[k]=bal;
-            // Daily rendimiento: baseline = the VCP at the first update of the day.
-            const dayKey=new Date().toISOString().slice(0,10);let dayVcp=Number(a.dayVcp)||0;let dKey=a.dayKey;
-            if(dKey!==dayKey||dayVcp<=0){dayVcp=lastVcp>0?lastVcp:live;dKey=dayKey;}
-            const rPct=dayVcp>0?(live-dayVcp)/dayVcp:0;const rAmt=Math.round(bal*(live-dayVcp)/(live||1));
-            newAccMeta[k]={chg:(rPct>=0?'+':'')+(rPct*100).toFixed(2).replace('.',',')+'%',up:rPct>=0,rend:rAmt};
-            aa[fi]={...a,units,lastVcp:live,dayVcp,dayKey:dKey};na[k]=aa;anyUpdate=true;}
-          return;}
         let changed=false;
-        aa.forEach((a,i)=>{if(!a.ticker)return;let np=0;
+        aa.forEach((a,i)=>{if(a.fci){const live=fciPrices[a.id]||0;if(live<=0)return;const lastVcp=Number(a.lastVcp)||0;const previousValue=Number(a.qty||0)*Number(a.lastPrice||a.avg||0);let units=Number(a.units)||0;
+            if(!units&&a.unitsEstimated)units=previousValue/live;
+            else if(!units&&Number(a.qty)>0)units=Number(a.qty);
+            else if(!units&&aa.length===1)units=(Number(s.balances[k])||0)/live;
+            if(aa.length===1&&units>0&&lastVcp>0&&!a.unitsEstimated){const expected=units*lastVcp,cur=Number(s.balances[k])||0;if(Math.abs(cur-expected)>0.5)units=cur/lastVcp;}
+            const dayKey=new Date().toISOString().slice(0,10);let dayVcp=Number(a.dayVcp)||0;let dKey=a.dayKey;if(dKey!==dayKey||dayVcp<=0){dayVcp=lastVcp>0?lastVcp:live;dKey=dayKey;}
+            const fundValue=units*live,rPct=dayVcp>0?(live-dayVcp)/dayVcp:0,rAmt=Math.round(fundValue*(live-dayVcp)/(live||1));newAccMeta[k]={chg:(rPct>=0?'+':'')+(rPct*100).toFixed(2).replace('.',',')+'%',up:rPct>=0,rend:rAmt};
+            aa[i]={...a,qty:units,units,lastPrice:live,lastVcp:live,dayVcp,dayKey:dKey};changed=true;return;}
+          if(!a.ticker)return;let np=0;
           if(cryptoPrices[a.ticker])np=Math.round(cryptoPrices[a.ticker]);
           else if(stockPrices[a.ticker])np=Math.round(stockPrices[a.ticker]);
           else if(usdFallback[a.ticker]&&ccl){np=Math.round(usdFallback[a.ticker]*ccl/(this.CEDEAR_RATIOS[a.ticker]||10));}
           if(np>0&&np!==a.lastPrice){aa[i]={...a,lastPrice:np};changed=true;}});
-        const total=aa.reduce((s2,a)=>s2+(a.ticker?a.qty*(a.lastPrice||a.avg):0),0);
+        const total=aa.reduce((s2,a)=>s2+Number(a.qty||0)*Number(a.lastPrice||a.avg||0),0);
         const val=Math.round(total*100)/100;
         if(changed||Math.abs(val-(nb[k]||0))>0.005){na[k]=aa;nb[k]=val;anyUpdate=true;}});
       this.setState({assets:na,balances:nb,pricesLoading:false,pricesLastUpdated:Date.now(),...(criptoRate>0?{usdRate:criptoRate}:{}),...(anyUpdate?{accMeta:newAccMeta}:{}),...(!silent&&anyUpdate?{flash:'Precios actualizados'}:{})});}
@@ -3006,15 +3025,16 @@ class Component extends DCLogic {
     let invD={};
     if(S.investView&&ACC[S.investView]){const k=S.investView,a=ACC[k];
       const rawAssets=(S.assets&&S.assets[k])||[];
-      const assets=rawAssets.map(as=>{const lp=as.lastPrice||as.avg;const value=as.qty*lp;const cost=as.qty*as.avg;const gl=value-cost;const glPct=cost>0?(gl/cost*100):0;return{name:as.name,ticker:as.ticker,emoji:as.emoji,qtyStr:(as.qty<1?as.qty.toFixed(6).replace(/\.?0+$/,''):this.fmtInt(as.qty))+(as.ticker?' '+as.ticker:' u'),avgStr:money(as.avg),costStr:money(cost),lastPriceStr:money(lp),valueStr:money(value),glStr:(gl>=0?'+':'-')+sym+this.fmtInt(Math.abs(displayARS(gl))),glPctStr:(gl>=0?'+':'')+glPct.toFixed(1).replace('.',',')+'%',glColor:gl>=0?'var(--pos)':'var(--danger)',manual:(!as.ticker&&!as.fci),onUpdatePrice:()=>this.setState({ivSub:'updatePrice',upTicker:as.ticker,atNewPrice:''})};});
+      const assets=rawAssets.map(as=>{const lp=as.lastPrice||as.avg;const value=as.qty*lp;const cost=as.qty*as.avg;const gl=value-cost;const glPct=cost>0?(gl/cost*100):0;const unknown=!!as.costUnknown;return{name:as.name,ticker:as.ticker,emoji:as.emoji,qtyStr:(as.qty<1?as.qty.toFixed(6).replace(/\.?0+$/,''):this.fmtInt(as.qty))+(as.ticker?' '+as.ticker:' u'),avgStr:unknown?'Pendiente':money(as.avg),costStr:unknown?'Costo pendiente':money(cost),lastPriceStr:money(lp),valueStr:money(value),glStr:unknown?'Sin calcular':((gl>=0?'+':'-')+sym+this.fmtInt(Math.abs(displayARS(gl)))),glPctStr:unknown?'Cargá el costo':((gl>=0?'+':'')+glPct.toFixed(1).replace('.',',')+'%'),glColor:unknown?'var(--text-3)':gl>=0?'var(--pos)':'var(--danger)',manual:(!as.ticker&&!as.fci),onUpdatePrice:()=>this.setState({ivSub:'updatePrice',upTicker:as.ticker,atNewPrice:''})};});
       const ivUpKeypad=order.map(l=>({label:l,isBack:l==='back',isNum:l!=='back',onPress:l==='back'?()=>this.atNewPricePress('back'):()=>this.atNewPricePress(l)}));
       const totalValue=rawAssets.reduce((sum,as)=>sum+as.qty*(as.lastPrice||as.avg),0);
-      const totalCost=rawAssets.reduce((sum,as)=>sum+as.qty*as.avg,0);
-      const totalGL=totalValue-totalCost;
+      const knownAssets=rawAssets.filter(as=>!as.costUnknown);const knownValue=knownAssets.reduce((sum,as)=>sum+as.qty*(as.lastPrice||as.avg),0);
+      const totalCost=knownAssets.reduce((sum,as)=>sum+as.qty*as.avg,0);
+      const totalGL=knownValue-totalCost;
       const totalGLPct=totalCost>0?(totalGL/totalCost*100):0;
       const ivLastUpdatedStr=S.pricesLastUpdated?('\u00b7 '+new Date(S.pricesLastUpdated).toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'})):'';
       invD={ivName:a.name,ivEmoji:a.emoji,ivFillVar:a.fillVar,ivBalStr:money(S.balances[k]),ivType:a.type,ivAssets:assets,ivHasAssets:assets.length>0,ivNoAssets:assets.length===0,
-        ivHasTotalGL:rawAssets.length>0,ivTotalGLStr:(totalGL>=0?'+':'-')+sym+this.fmtInt(Math.abs(displayARS(totalGL))),ivTotalGLPctStr:(totalGL>=0?'+':'')+totalGLPct.toFixed(1).replace('.',',')+'%',ivTotalGLColor:totalGL>=0?'var(--pos)':'var(--danger)',
+        ivHasTotalGL:knownAssets.length>0,ivHasUnknownCost:knownAssets.length<rawAssets.length,ivUnknownCostStr:(rawAssets.length-knownAssets.length)+' '+((rawAssets.length-knownAssets.length)===1?'activo sin costo':'activos sin costo'),ivTotalGLStr:(totalGL>=0?'+':'-')+sym+this.fmtInt(Math.abs(displayARS(totalGL))),ivTotalGLPctStr:(totalGL>=0?'+':'')+totalGLPct.toFixed(1).replace('.',',')+'%',ivTotalGLColor:totalGL>=0?'var(--pos)':'var(--danger)',
         ivCostStr:money(totalCost),ivResultWord:totalGL>=0?'Ganás':'Perdés',ivResultAbsStr:sym+this.fmtInt(Math.abs(displayARS(totalGL))),
         ivFetchPrices:()=>this.fetchPrices(),ivPricesLoading:S.pricesLoading||false,ivLoadingLabel:S.pricesLoading?'Actualizando…':'Actualizar precios',ivHasLastUpdated:!!S.pricesLastUpdated,ivLastUpdatedStr,
         ivBuy:()=>this.openAssetTrade('buy',k),ivSell:()=>this.openAssetTrade('sell',k),ivDeposit:()=>this.openAddPreset('transfer',this.liquidIds()[0]||'banco',k),ivWithdraw:()=>this.openAddPreset('transfer',k,this.liquidIds()[0]||'banco'),
@@ -3022,18 +3042,19 @@ class Component extends DCLogic {
     // ===== PORTFOLIO (all investment holdings combined) =====
     const PALCOLORS=['#0B63CE','#16815D','#6867D9','#1B8CAD','#B7791F','#9A5CC4','#3478A8','#708090'];
     let portAssets=[];
-    INV.forEach(k=>{(S.assets[k]||[]).forEach(a=>{const lp=a.lastPrice||a.avg;const isCrypto=this.CRYPTOS.some(x=>x[0]===a.ticker);const isBond=this.BONOS.some(x=>x[0]===a.ticker);const kind=a.fci?'fci':isCrypto?'crypto':isBond?'bonds':'cedears';portAssets.push({account:k,id:a.id,ticker:a.ticker,name:a.name,emoji:a.emoji,qty:a.qty,avg:a.avg,lp,value:a.qty*lp,cost:a.qty*a.avg,kind});});});
+    INV.forEach(k=>{(S.assets[k]||[]).forEach(a=>{const lp=a.lastPrice||a.avg;const isCrypto=this.CRYPTOS.some(x=>x[0]===a.ticker);const isBond=this.BONOS.some(x=>x[0]===a.ticker);const kind=a.fci?'fci':isCrypto?'crypto':isBond?'bonds':'cedears';portAssets.push({account:k,id:a.id,ticker:a.ticker,name:a.name,emoji:a.emoji,qty:a.qty,avg:a.avg,lp,value:a.qty*lp,cost:a.qty*a.avg,costUnknown:!!a.costUnknown,kind});});});
     portAssets.sort((a,b)=>b.value-a.value);
     const portValue=portAssets.reduce((s2,a)=>s2+a.value,0);
-    const portCost=portAssets.reduce((s2,a)=>s2+a.cost,0);
-    const portGL=portValue-portCost,portGLPct=portCost>0?portGL/portCost*100:0;
-    portAssets.forEach((a,i)=>{a.color=PALCOLORS[i%PALCOLORS.length];a.pct=portValue>0?a.value/portValue*100:0;a.gl=a.value-a.cost;a.glPct=a.cost>0?a.gl/a.cost*100:0;});
+    const knownPortAssets=portAssets.filter(a=>!a.costUnknown);const knownPortValue=knownPortAssets.reduce((s2,a)=>s2+a.value,0);
+    const portCost=knownPortAssets.reduce((s2,a)=>s2+a.cost,0);
+    const portGL=knownPortValue-portCost,portGLPct=portCost>0?portGL/portCost*100:0;
+    portAssets.forEach((a,i)=>{a.color=PALCOLORS[i%PALCOLORS.length];a.pct=portValue>0?a.value/portValue*100:0;a.gl=a.costUnknown?null:a.value-a.cost;a.glPct=!a.costUnknown&&a.cost>0?a.gl/a.cost*100:0;});
     const portRend=S.portMode==='rendimiento';
-    const portList=portAssets.map(a=>{const glStr=(a.gl>=0?'+':'-')+sym+this.fmtInt(Math.abs(displayARS(a.gl))),glPctStr=(a.gl>=0?'+':'')+a.glPct.toFixed(1).replace('.',',')+'%',glColor=a.gl>=0?'var(--pos)':'var(--danger)';
+    const portList=portAssets.map(a=>{const unknown=a.costUnknown;const glStr=unknown?'Costo pendiente':((a.gl>=0?'+':'-')+sym+this.fmtInt(Math.abs(displayARS(a.gl)))),glPctStr=unknown?'Sin rendimiento':((a.gl>=0?'+':'')+a.glPct.toFixed(1).replace('.',',')+'%'),glColor=unknown?'var(--text-3)':a.gl>=0?'var(--pos)':'var(--danger)';
       return {name:a.name,ticker:a.ticker||'',emoji:a.emoji,color:a.color,pctStr:a.pct.toFixed(0)+'%',
         kind:a.kind,
         primaryStr:portRend?glStr:money(a.value),primaryColor:portRend?glColor:'var(--text)',
-        secondaryStr:portRend?glPctStr:(glStr+' · '+glPctStr),secondaryColor:glColor,
+        secondaryStr:portRend?glPctStr:(unknown?'Costo pendiente':(glStr+' · '+glPctStr)),secondaryColor:glColor,
         onOpen:()=>this.openAssetDetail(a.account,a.ticker)};});
     const portGroupMeta={cedears:{label:'CEDEARs y ETFs',icon:'◎'},crypto:{label:'Cripto',icon:'◇'},bonds:{label:'Bonos y ON',icon:'◫'},fci:{label:'Fondos comunes',icon:'◌'}};
     const portSections=['cedears','crypto','bonds','fci'].map(kind=>{const assets=portList.filter(a=>a.kind===kind);const total=portAssets.filter(a=>a.kind===kind).reduce((sum,a)=>sum+a.value,0);return{...portGroupMeta[kind],kind,count:assets.length,summary:assets.length+' '+(assets.length===1?'instrumento':'instrumentos')+' · '+money(total),assets};}).filter(section=>section.count>0);
@@ -3047,7 +3068,8 @@ class Component extends DCLogic {
     portAssets.forEach((a,i)=>{const span=portValue>0?a.value/portValue*100:0;const a0=portAcc;const a1=portAcc+span;portAcc=a1;const g=i<portDonutN-1?Math.min(portDonutGap,span*0.4):0;portDonutSegs.push(a.color+' '+a0.toFixed(2)+'% '+(a1-g).toFixed(2)+'%');if(g>0)portDonutSegs.push('var(--bg) '+(a1-g).toFixed(2)+'% '+a1.toFixed(2)+'%');});
     const portDonutGradient=portAssets.length?'conic-gradient('+portDonutSegs.join(',')+')':'var(--surface-strong)';
     const usdRate=S.usdRate||0;const portValueUsd=usdRate>0?portValue/usdRate:0;
-    const portfolio={portValueStr:money(portValue),portHasAssets:portAssets.length>0,
+    const unknownPortCount=portAssets.length-knownPortAssets.length;const portfolio={portValueStr:money(portValue),portHasAssets:portAssets.length>0,
+      portHasKnownCost:knownPortAssets.length>0,portHasUnknownCost:unknownPortCount>0,portUnknownCostStr:unknownPortCount+' '+(unknownPortCount===1?'activo necesita costo de compra':'activos necesitan costo de compra'),
       portResultWord:portGL>=0?'Ganás':'Perdés',portResultAbsStr:sym+this.fmtInt(Math.abs(displayARS(portGL))),portGLPctStr:(portGL>=0?'+':'')+portGLPct.toFixed(1).replace('.',',')+'%',portGLColor:portGL>=0?'var(--pos)':'var(--danger)',
       portHasUsd:usdRate>0&&!S.hideAmounts,portValueUsdStr:'US$ '+this.fmtInt(portValueUsd),portUsdRateStr:'$'+this.fmtInt(usdRate),
       portDonutGradient,portCount:portAssets.length,portList,portSections,portTools,portNoAssets:portAssets.length===0,
@@ -3056,11 +3078,11 @@ class Component extends DCLogic {
     // ===== ASSET DETAIL (single holding page) =====
     let assetD={};
     if(S.assetView){const av=S.assetView;const a=(S.assets[av.account]||[]).find(x=>x.ticker===av.ticker);
-      if(a){const lp=a.lastPrice||a.avg,value=a.qty*lp,cost=a.qty*a.avg,gl=value-cost,glPct=cost>0?gl/cost*100:0;const accM=ACC[av.account]||{};const isCrypto=this.CRYPTOS.some(x=>x[0]===a.ticker),isBond=this.BONOS.some(x=>x[0]===a.ticker);const unitKind=isCrypto?'unidad':isBond?'bono':'CEDEAR';
+      if(a){const lp=a.lastPrice||a.avg,value=a.qty*lp,cost=a.qty*a.avg,gl=value-cost,glPct=cost>0?gl/cost*100:0;const accM=ACC[av.account]||{};const isCrypto=this.CRYPTOS.some(x=>x[0]===a.ticker),isBond=this.BONOS.some(x=>x[0]===a.ticker);const unitKind=a.fci?'fondo':isCrypto?'unidad':isBond?'bono':'CEDEAR';
         assetD={adAName:a.name,adATicker:a.ticker||'',adAEmoji:a.emoji,adAFillVar:accM.fillVar||'--cat-inversion-fill',
           adAUnitLabel:'1 '+unitKind,acChangeSuffix:'· '+unitKind,
           adAValueStr:money(value),adAHasUsd:(S.usdRate>0&&!S.hideAmounts),adAValueUsdStr:'≈ US$ '+this.fmtInt(value/(S.usdRate||1)),adAQtyStr:(a.qty<1?a.qty.toFixed(6).replace(/\.?0+$/,''):this.fmtInt(a.qty))+(a.ticker?' '+a.ticker:' u'),
-          adACostStr:money(cost),adAResultWord:gl>=0?'Ganás':'Perdés',adAGLPctStr:(gl>=0?'+':'')+glPct.toFixed(1).replace('.',',')+'%',adAGLColor:gl>=0?'var(--pos)':'var(--danger)',
+          adAHasCost:!a.costUnknown,adACostPending:!!a.costUnknown,adACostStr:money(cost),adAResultWord:gl>=0?'Ganás':'Perdés',adAGLPctStr:(gl>=0?'+':'')+glPct.toFixed(1).replace('.',',')+'%',adAGLColor:gl>=0?'var(--pos)':'var(--danger)',
           adAAvgStr:money(a.avg),adALastStr:money(lp),
           adAResultSignStr:(gl>=0?'+':'-')+sym+this.fmtInt(Math.abs(displayARS(gl))),
           acHasPath:!!S.assetChart.path,acDim:S.assetChart.loading?'0.45':'1',acLoadingNoPath:S.assetChart.loading&&!S.assetChart.path,acFail:!S.assetChart.ok&&!S.assetChart.loading&&!S.assetChart.path,
@@ -3074,12 +3096,12 @@ class Component extends DCLogic {
     // card detail
     let cardD={};
     {const i=S.cardView,c=S.cards[i]||S.cards[0]||{limit:1,brand:'',bank:'',last4:'',grad:this.CARDGRADS[0],cierre:'—',vence:'—',compras:[],cuotas:[],pagos:[]};const saldo=cardSaldo(i);const avail=Math.max(0,c.limit-saldo);
-      cardD={cdBrand:c.brand,cdBank:c.bank,cdLast4:c.last4,cdGrad:c.grad,cdSaldoStr:money(saldo),cdResumenStr:money(cardResumen(c)),cdDeudaStr:money(saldo),cdLimitStr:moneyInt(c.limit),cdAvailStr:moneyInt(avail),cdAvailPct:Math.round(avail/c.limit*100)+'%',cdCierre:c.cierre,cdVence:c.vence,
+      cardD={cdBrand:c.brand,cdBank:c.bank,cdLast4:c.last4,cdGrad:c.grad,cdSaldoStr:money(saldo),cdResumenStr:money(cardResumen(c)),cdDeudaStr:money(saldo),cdLimitStr:moneyInt(c.limit),cdAvailStr:moneyInt(avail),cdAvailPct:Math.round(avail/c.limit*100)+'%',cdCierre:c.cierre,cdVence:c.vence,cdHasPreviousCycle:!!(c.previousClose&&c.previousDue),cdPreviousCycleStr:c.previousClose&&c.previousDue?('Ciclo anterior · cerró '+c.previousClose+' · venció '+c.previousDue):'',
         cdCompras:(c.compras||[]).map((p,j,arr)=>({name:p.name,date:FD.timelineLabelFromISO(p.dateISO||FD.isoFromLabel(p.date)),montoStr:moneyInt(p.monto),divider:j===arr.length-1?'transparent':'var(--hairline)'})),
         cdCuotas:(c.cuotas||[]).map((q2,j,arr)=>({name:q2.name,frac:q2.cur+'/'+q2.tot,tot:q2.tot,montoStr:moneyInt(q2.monto),divider:j===arr.length-1?'transparent':'var(--hairline)'})),cdHasCuotas:(c.cuotas||[]).length>0,cdHasCompras:(c.compras||[]).length>0,
         cdPagos:(c.pagos||[]).map((p,j,arr)=>({name:p.name,date:FD.timelineLabelFromISO(p.dateISO||FD.isoFromLabel(p.date)),montoStr:moneyInt(p.monto),divider:j===arr.length-1?'transparent':'var(--hairline)'})),
         cdPay:()=>this.setState({push:'payCard',payAmount:'',payAccount:LIQ[0]||'banco'}),cdAddPurchase:()=>this.openCardPurchase(i),cdEdit:()=>this.openAddCard(i),cdDelete:()=>this.requestConfirm({title:'Eliminar tarjeta',msg:'Se eliminará esta tarjeta del prototipo. No se puede deshacer.',confirmLabel:'Eliminar',danger:true,onConfirm:()=>this.deleteCard(i)}),
-        cdCuotasTotalStr:moneyInt((c.cuotas||[]).reduce((a,q)=>a+q.monto*(q.tot-q.cur+1),0)),cdCuotasMonthStr:moneyInt((c.cuotas||[]).reduce((a,q)=>a+q.monto,0)),cdCloseMonth:()=>this.closeCardMonth(i)};}
+        cdCuotasTotalStr:moneyInt(window.FinanzDomain.cardInstallmentsRemaining(c)),cdCuotasMonthStr:moneyInt((c.cuotas||[]).reduce((a,q)=>a+q.monto,0))};}
     // loans
     let loanD={};
     {const loans=(S.loans||[]);
@@ -3227,7 +3249,7 @@ class Component extends DCLogic {
     let recD={};
     {const nr=S.newRec||{};const recs=(S.recurring||[]);
       const tName=(r)=>r.targetKind==='card'?((S.cards.find(c=>c.id===r.targetId)||{}).brand||'Tarjeta'):((ACC[r.targetId]||{}).name||'Cuenta');
-      const recItems=recs.map(r=>{const recCurrency=r.targetKind==='card'?'ARS':((ACC[r.targetId]||{}).currency||'ARS');return{id:r.id,concept:r.concept,emoji:r.type==='ingreso'?'💰':(CAT[r.cat]||{}).emoji||'🔁',amountStr:(r.type==='ingreso'?'+':'-')+nativeMoney(r.amount,recCurrency),amtColor:r.type==='ingreso'?'var(--pos)':'var(--text)',sub:'Día '+r.day+' · '+tName(r),active:!!r.active,knobBg:r.active?'var(--pos)':'var(--surface-strong)',knobX:r.active?'22px':'2px',onToggle:()=>this.toggleRec(r.id),onOpen:()=>this.openAddRec(r.id),statusStr:r.active?'Automático activo':'Pausado'};});
+      const recItems=recs.map(r=>{const recCurrency=r.targetKind==='card'?'ARS':((ACC[r.targetId]||{}).currency||'ARS');const nextISO=r.nextDate&&!Number.isNaN(new Date(r.nextDate).getTime())?window.FinanzDomain.todayKey(new Date(r.nextDate)):'';return{id:r.id,concept:r.concept,emoji:r.type==='ingreso'?'💰':(CAT[r.cat]||{}).emoji||'🔁',amountStr:(r.type==='ingreso'?'+':'-')+nativeMoney(r.amount,recCurrency),amtColor:r.type==='ingreso'?'var(--pos)':'var(--text)',sub:(r.active&&nextISO?'Próximo '+window.FinanzDomain.labelFromISO(nextISO):'Día '+r.day)+' · '+tName(r),active:!!r.active,knobBg:r.active?'var(--pos)':'var(--surface-strong)',knobX:r.active?'22px':'2px',onToggle:()=>this.toggleRec(r.id),onOpen:()=>this.openAddRec(r.id),statusStr:r.active?'Automático':'Pausado'};});
       const nrIsIncome=nr.type==='ingreso';
       const targets=nr.targetKind==='card'?S.cards.map(c=>({id:c.id,label:c.brand+' ·••• '+c.last4,emoji:'💳'})):this.liquidIds().map(k=>({id:k,label:(ACC[k]||{}).name,emoji:(ACC[k]||{}).emoji}));
       recD={isRecScreen:S.push==='recScreen',isAddRec:S.push==='addRec',recItems,recHasItems:recItems.length>0,recEmpty:recItems.length===0,openAddRecBtn:()=>this.openAddRec(null),recBack:()=>this.popScreen(),addRecBack:()=>this.popScreen('recScreen'),

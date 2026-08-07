@@ -96,4 +96,10 @@ describe('dates.sortTransactionsNewestFirst', () => {
       { id: 8, dateISO: '2026-08-07' },
     ]).map(item => item.id)).toEqual([8, 4]);
   });
+
+  it('keeps a movement from today above one from yesterday even when yesterday was created later', () => {
+    const createdFirst = { id: 10, dateISO: '2026-08-07', merchant: 'Hoy' };
+    const createdLater = { id: 11, dateISO: '2026-08-06', merchant: 'Ayer' };
+    expect(sortTransactionsNewestFirst([createdLater, createdFirst]).map(item => item.merchant)).toEqual(['Hoy', 'Ayer']);
+  });
 });
