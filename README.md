@@ -198,4 +198,29 @@ runtime's existing Subresource Integrity (SRI) hashes, which were left unchanged
 - OS junk (`.DS_Store`, `Thumbs.db`, …)
 - local screenshots / temporary QA artifacts
 
-`npm run check:repo` an
+`npm run check:repo` and CI (`.github/workflows/ci.yml`) enforce this.
+
+## Current limitations
+
+- Market data is best-effort and comes from public providers; it is suitable for
+  personal tracking, not order execution or accounting statements. Manual price
+  overrides and backup/CSV flows remain available.
+- Cocos does not expose a documented public OAuth/account API in this integration,
+  so FinanzApp does **not** request Cocos credentials or claim to sync holdings.
+  Broker reconciliation should be added through an official API or a documented
+  export format when one is available.
+- Browser voice recognition depends on browser support. The Capacitor iOS shell
+  uses a native speech-recognition plugin and declares the required permissions.
+- **Babel standalone** (`@babel/standalone`) is still referenced from `unpkg.com`
+  in `support.js`, but it is **not a critical dependency**: it is only fetched
+  lazily to compile runtime JSX/TSX modules imported via `x-import`, and FinanzApp
+  imports none — so it never loads at runtime and never blocks boot or offline use.
+  It was intentionally **not** vendored to avoid committing ~2.9 MB of code the app
+  never executes. If a future feature adds JSX `x-import` modules, vendor it the
+  same way React was vendored.
+- There is no custom install banner, update prompt or offline status UI yet.
+  Service-worker updates apply on the next load.
+- iOS has no programmatic install; users add via "Add to Home Screen".
+- The generated runtime document is still consumed by Claude Design and is not
+  a conventional React application, but its editable shell, styles, controller
+  and tested domain logic are now separate source files.
