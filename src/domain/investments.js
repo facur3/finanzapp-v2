@@ -137,3 +137,139 @@ export function applyAssetQuote(asset, quote) {
     quoteLastErrorAt: null,
   };
 }
+
+const FCI_SPEND_PREFIX = 'fci-spend:';
+
+export function fciSpendSourceId(accountId, asset) {
+  const assetKey = String((asset && (asset.id || asset.ticker)) || '').trim();
+  if (!accountId || !assetKey) return '';
+  return FCI_SPEND_PREFIX + encodeURIComponent(String(accountId)) + ':' + encodeURIComponent(assetKey);
+}
+
+export function parseFciSpendSourceId(value) {
+  const raw = String(value || '');
+  if (!raw.startsWith(FCI_SPEND_PREFIX)) return null;
+  const body = raw.slice(FCI_SPEND_PREFIX.length);
+  const splitAt = body.indexOf(':');
+  if (splitAt <= 0 || splitAt >= body.length - 1) return null;
+  try {
+    return {
+      accountId: decodeURIComponent(body.slice(0, splitAt)),
+      assetKey: decodeURIComponent(body.slice(splitAt + 1)),
+    };
+  } catch (_) {
+    return null;
+  }
+}
+
+export function spendableFciSources(state, usdRate = state && state.usdRate) {
+  const accounts = (state && state.accounts) || {};
+  const assets = (state && state.assets) || {};
+  const archived = (state && state.archived) || {};
+  const order = Array.isArray(state && state.order) ? state.order : Object.keys(accounts);
+  const sources = [];
+  for (const accountId of order) {
+    const account = accounts[accountId];
+    if (!account || account.kind !== 'invest' || archived[accountId]) continue;
+    for (const asset of (assets[accountId] || [])) {
+      if (!asset || !asset.fci) continue;
+      const unitARS = assetUnitValueARS(asset, usdRate);
+      const qty = finite(asset.qty != null ? asset.qty : asset.units);
+      const valueARS = Math.max(0, qty * unitARS);
+      sources.push({
+        id: fciSpendSourceId(accountId, asset),
+        accountId,
+        assetId: asset.id || '',
+        ticker: asset.ticker || '',
+        name: asset.name || asset.ticker || 'FCI',
+        emoji: asset.emoji || '◉',
+        qty,
+        unitARS,
+        valueARS,
+      });
+    }
+  }
+  return sources;
+}
+
+export function findFciSpendSource(state, sourceId, usdRate = state && state.usdRate) {
+  const parsed = parseFciSpendSourceId(sourceId);
+  if (!parsed) return null;
+  const assets = (state && state.assets && state.assets[parsed.accountId]) || [];
+  const asset = assets.find(item => String(item && (item.id || item.ticker)) === parsed.assetKey && item && item.fci);
+  if (!asset) return null;
+  const qty = finite(asset.qty != null ? asset.qty : asset.units);
+  const unitARS = assetUnitValueARS(asset, usdRate);
+  return {
+    id: String(sourceId),
+    accountId: parsed.accountId,
+    assetId: asset.id || '',
+    ticker: asset.ticker || '',
+    name: asset.name || asset.ticker || 'FCI',
+    emoji: asset.emoji || '◉',
+    qty,
+    unitARS,
+    valueARS: Math.max(0, qty * unitARS),
+    asset,
+  };
+}
+
+export function spendableFciValueARS(state, usdRate = state && state.usdRate) {
+  return spendableFciSources(state, usdRate).reduce((sum, source) => sum + source.valueARS, 0);
+}
+
+// Redeeming an FCI to fund an expense changes the holding quantity but does not
+// turn the fund into a bank account. Balances are intentionally left to the
+// transaction layer: the expense already subtracts the same ARS amount from the
+// investment container, while this helper keeps cuotapartes in sync.
+export function redeemFciUnits(assetsByAccount, sourceId, amountARS, usdRate) {
+  const parsed = parseFciSpendSourceId(sourceId);
+  const amount = finite(amountARS);
+  if (!parsed || amount <= 0) return { ok: false, error: 'invalid-source' };
+  const current = Array.isArray(assetsByAccount && assetsByAccount[parsed.accountId]) ? assetsByAccount[parsed.accountId] : [];
+  const index = current.findIndex(item => String(item && (item.id || item.ticker)) === parsed.assetKey && item && item.fci);
+  if (index < 0) return { ok: false, error: 'missing-fund' };
+  const asset = current[index];
+  const unitARS = assetUnitValueARS(asset, usdRate);
+  const currentQty = finite(asset.qty != null ? asset.qty : asset.units);
+  const availableARS = currentQty * unitARS;
+  if (!(unitARS > 0)) return { ok: false, error: 'missing-price' };
+  if (amount > availableARS + 0.01) return { ok: false, error: 'insufficient', availableARS };
+  const qty = Math.min(currentQty, amount / unitARS);
+  const nextQty = Math.max(0, currentQty - qty);
+  const nextAsset = { ...asset, qty: nextQty, units: nextQty };
+  const accountAssets = current.slice();
+  accountAssets[index] = nextAsset;
+  return {
+    ok: true,
+    assets: { ...(assetsByAccount || {}), [parsed.accountId]: accountAssets },
+    redemption: {
+      sourceId: String(sourceId),
+      accountId: parsed.accountId,
+      assetId: asset.id || '',
+      ticker: asset.ticker || '',
+      name: asset.name || asset.ticker || 'FCI',
+      qty,
+      amountARS: amount,
+      assetSnapshot: { ...asset },
+    },
+  };
+}
+
+export function restoreFciUnits(assetsByAccount, redemption) {
+  if (!redemption || !redemption.accountId || !(finite(redemption.qty) > 0)) return assetsByAccount || {};
+  const accountId = String(redemption.accountId);
+  const current = Array.isArray(assetsByAccount && assetsByAccount[accountId]) ? assetsByAccount[accountId] : [];
+  const key = String(redemption.assetId || redemption.ticker || '');
+  let index = current.findIndex(item => String(item && (item.id || item.ticker)) === key);
+  const accountAssets = current.slice();
+  if (index < 0 && redemption.assetSnapshot) {
+    accountAssets.push({ ...redemption.assetSnapshot, qty: finite(redemption.qty), units: finite(redemption.qty) });
+  } else if (index >= 0) {
+    const asset = accountAssets[index];
+    const currentQty = finite(asset.qty != null ? asset.qty : asset.units);
+    const nextQty = currentQty + finite(redemption.qty);
+    accountAssets[index] = { ...asset, qty: nextQty, units: nextQty };
+  }
+  return { ...(assetsByAccount || {}), [accountId]: accountAssets };
+}
