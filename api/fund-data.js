@@ -41,6 +41,31 @@ export function parseCafciFundPage(html) {
   return { price, asOf, history };
 }
 
+export function calculateFundReturns(history) {
+  const rows = (Array.isArray(history) ? history : [])
+    .map(row => ({ date: String(row.date || ''), price: Number(row.price) }))
+    .filter(row => /^\d{4}-\d{2}-\d{2}$/.test(row.date) && row.price > 0)
+    .sort((a, b) => a.date.localeCompare(b.date));
+  if (rows.length < 2) return {};
+  const current = rows[rows.length - 1];
+  const currentDate = new Date(current.date + 'T12:00:00Z');
+  const fromTarget = target => {
+    const reference = rows.filter(row => new Date(row.date + 'T12:00:00Z') <= target).at(-1);
+    if (!reference || reference.date === current.date) return null;
+    return { percent: current.price / reference.price - 1, from: reference.date, to: current.date };
+  };
+  const daysBefore = days => {
+    const target = new Date(currentDate);
+    target.setUTCDate(target.getUTCDate() - days);
+    return fromTarget(target);
+  };
+  return {
+    sevenDays: daysBefore(7),
+    thirtyDays: daysBefore(30),
+    yearToDate: fromTarget(new Date(Date.UTC(currentDate.getUTCFullYear(), 0, 1, 12))),
+  };
+}
+
 export async function getOfficialFundData(slug, fetchImpl = fetch) {
   const fund = FUNDS[String(slug || '')];
   if (!fund) throw new Error('unsupported fund');
@@ -51,6 +76,7 @@ export async function getOfficialFundData(slug, fetchImpl = fetch) {
   if (!(parsed.price > 0) || !parsed.asOf) throw new Error('CAFCI data not found');
   return {
     ...parsed,
+    returns: calculateFundReturns(parsed.history),
     name: fund.name,
     currency: 'ARS',
     source: 'CAFCI oficial',

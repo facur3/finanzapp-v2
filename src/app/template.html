@@ -742,6 +742,7 @@
           <sc-if value="{{ adAHasUsd }}" hint-placeholder-val="{{ false }}">
             <div style="font-size:12px;color:var(--text-3);font-weight:600;margin-bottom:12px;">{{ adAValueUsdStr }}</div>
           </sc-if>
+          <sc-if value="{{ adAHasReturns }}" hint-placeholder-val="{{ false }}"><div style="padding:10px 0;border-top:1px solid var(--hairline);"><div style="font-size:13px;font-weight:750;color:var(--pos);">{{ adAReturnsStr }}</div><div style="font-size:10.5px;color:var(--text-3);font-weight:520;margin-top:2px;">{{ adAReturnsSourceStr }}</div></div></sc-if>
           <sc-if value="{{ adAHasRate }}" hint-placeholder-val="{{ false }}"><div style="padding:10px 0;border-top:1px solid var(--hairline);"><div style="font-size:14px;font-weight:750;color:var(--pos);">{{ adARateStr }}</div><div style="font-size:10.5px;color:var(--text-3);font-weight:520;margin-top:2px;">{{ adARateSourceStr }}</div></div></sc-if>
           <sc-if value="{{ adAHasCost }}" hint-placeholder-val="{{ true }}">
             <div style="display:flex;justify-content:space-between;padding:9px 0;border-top:1px solid var(--hairline);"><span style="font-size:13px;color:var(--text-2);font-weight:500;">Invertiste</span><span style="font-size:13px;font-weight:700;">{{ adACostStr }}</span></div>
