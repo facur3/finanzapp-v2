@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>FinanzApp</title>
+<meta name="description" content="Personal finance app">
+
+<!-- PWA -->
+<link rel="manifest" href="/manifest.webmanifest">
+<meta name="theme-color" content="#F4F7FB">
+
+<!-- Apple / iOS standalone: translucent status bar so the app background fills
+     the safe area in both themes (no opaque strip in dark mode). -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="FinanzApp">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+
+<!-- Favicon -->
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
+<link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png">
+
+<!-- Pure financial domain (money math, transaction apply/reverse, dates…).
+     Classic + synchronous ON PURPOSE: the component boots inside
+     loadReactUmd().then(init) and can render before a deferred module runs.
+     Loading here (before support.js) guarantees window.FinanzDomain exists at
+     first render. Generated from src/domain/ (the tested source of truth) by
+     `npm run build:domain`; regenerated automatically on predev/prebuild. -->
+<script src="./domain.iife.js"></script>
+<script src="./capacitor-deep-links.iife.js"></script>
+<script src="./support.js"></script>
+<script src="./vendor/supabase.js"></script>
+<script>
+  // Classify display mode before first paint so safe-area CSS can stay scoped.
+  (function () {
+    var standalone = false;
+    try {
+      standalone = window.navigator.standalone === true ||
+        (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches);
+    } catch (e) {}
+    document.documentElement.classList.add(standalone ? 'fa-standalone' : 'fa-browser');
+  })();
+  window.FINANZAPP_VERSION = '1.2.0';
+  // Safe service-worker registration: only when supported; never blocks the app.
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', function () {
+      navigator.serviceWorker.register('/sw.js').catch(function () { /* offline shell is best-effort */ });
+    });
+  }
+  // Keep the page/status-bar background and theme-color meta in sync with the app
+  // theme so the real device safe areas match (no white strip in dark mode).
+  // This is infrastructure only — it adds no visible UI.
+  (function () {
+    function apply(t) {
+      if (t !== 'dark' && t !== 'light') return; // ignore unrendered placeholder
+      var c = t === 'dark' ? '#080B10' : '#F4F7FB';
+      if (document.documentElement) document.documentElement.style.background = c;
+      if (document.body) document.body.style.background = c;
+      var m = document.querySelector('meta[name=theme-color]');
+      if (m) m.setAttribute('content', c);
+    }
+    var theme = 'light';
+    try {
+      var raw = localStorage.getItem('finanzapp:v2:state') || localStorage.getItem('finanzapp.v2.state');
+      if (raw) { var p = JSON.parse(raw); var t = p && p.state && p.state.theme; if (t === 'dark' || t === 'light') theme = t; }
+    } catch (e) {}
+    apply(theme); // pre-paint, before the app renders
+    // The hidden template may also contain a .fa-frame with an unrendered
+    // placeholder data-theme; select the rendered frame (real dark/light value).
+    function findFrame() {
+      var els = document.querySelectorAll('.fa-frame');
+      for (var i = 0; i < els.length; i++) {
+        var v = els[i].getAttribute('data-theme');
+        if (v === 'dark' || v === 'light') return els[i];
+      }
+      return null;
+    }
+    function watch() {
+      var el = findFrame();
+      if (!el) return false;
+      apply(el.getAttribute('data-theme'));
+      new MutationObserver(function () { apply(el.getAttribute('data-theme')); })
+        .observe(el, { attributes: true, attributeFilter: ['data-theme'] });
+      return true;
+    }
+    document.addEventListener('DOMContentLoaded', function () {
+      if (watch()) return;
+      var iv = setInterval(function () { if (watch()) clearInterval(iv); }, 150);
+      setTimeout(function () { clearInterval(iv); }, 8000);
+    });
+  })();
+</script>
+<link rel="stylesheet" href="/finanzapp.css">
+</head>
+<body>
+<x-dc>
+<!-- FINANZAPP_TEMPLATE -->
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:440,&quot;height&quot;:900},&quot;accent&quot;:{&quot;editor&quot;:&quot;color&quot;,&quot;default&quot;:&quot;#1769E0&quot;,&quot;options&quot;:[&quot;#1769E0&quot;,&quot;#0067C5&quot;,&quot;#5257D8&quot;,&quot;#16865F&quot;],&quot;tsType&quot;:&quot;string&quot;},&quot;defaultTheme&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;default&quot;:&quot;light&quot;,&quot;options&quot;:[&quot;light&quot;,&quot;dark&quot;],&quot;tsType&quot;:&quot;string&quot;},&quot;defaultChart&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;default&quot;:&quot;bars&quot;,&quot;options&quot;:[&quot;bars&quot;,&quot;pills&quot;],&quot;tsType&quot;:&quot;string&quot;}}">
+/* FINANZAPP_COMPONENT */
+</script>
+</body>
+</html>

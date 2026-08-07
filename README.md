@@ -1,12 +1,19 @@
 # FinanzApp
 
-FinanzApp is a personal finance app (accounts, movements, cards, categories,
-tags, investments and settings) with local persistence. It is currently built
-from the **Claude Design runtime** export as the exact, approved UI/UX baseline.
+FinanzApp is a personal finance app for Argentina: accounts, movements, cards,
+budgets, recurring movements, categories, tags and investments with local
+persistence. Its UI currently runs on the **Claude Design runtime** while the
+financial rules live in tested domain modules and the editable app shell is
+split by responsibility.
 
 ## Architecture (read before changing anything)
 
-- `index.html` is the running app, based directly on `design-reference/FinanzApp.dc.html`.
+- `index.html` is generated. Do not edit it directly.
+- `src/app/index.shell.html` owns the document/PWA boot shell.
+- `src/app/template.html` owns the screen markup, `src/app/component.js` the UI
+  controller/state adapter, and `src/app/finanzapp.css` the visual/motion system.
+- `scripts/build-app-shell.mjs` assembles those files before dev/build.
+- `public/finanzapp.css` is its generated, service-worker-cacheable CSS copy.
 - `support.js` is the Design Components runtime. `public/support.js` is the copy
   used by the production build/preview (Vite copies `public/` into `dist/`).
 - `design-reference/FinanzApp.dc.html` and `design-reference/support.js` are kept
@@ -19,11 +26,12 @@ truth. On top of that baseline the app now also has:
 - **Optional cloud sync** via Supabase (email + password auth, one JSONB row per user,
   last-write-wins). Off until configured — see `SUPABASE_SETUP.md`. Without it the app
   is 100% local, exactly as before.
-- **One serverless function** (`api/chart.js` on Vercel) that proxies Yahoo Finance
-  price history for the investment charts. No other backend.
+- **One serverless function**: `api/chart.js` proxies Yahoo Finance price history.
+  The assistant is entirely local, needs no API key and cannot create token charges.
 
-Future refactors must be parity-safe: one screen/flow at a time, with the Claude
-Design behavior preserved exactly after every commit.
+Future refactors should preserve financial behavior and data migrations one flow
+at a time; the interface can continue evolving without tying the product to the
+original export.
 
 ## Functionality included
 
@@ -33,9 +41,19 @@ Design behavior preserved exactly after every commit.
 - Category chart tap filters Activity automatically.
 - Functional quick-add flows, movement detail, card purchase, card payment,
   investment trade, account/category/tag/card forms, security/reset, settings and filters.
-- **Investments**: CEDEARs, crypto and FCI with live prices (CoinGecko, data912,
+- **Free local voice/text assistant** in Argentine Spanish for expenses, income, stored
+  recurring movements (for example “Cobré el sueldo”), card payments, new
+  recurrent rules, budgets, categories and tags. Dictation updates the text as
+  partial results arrive and every action shows a validated draft before writing.
+  It runs without an API key, paid tokens or a remote AI request.
+- **Real dates** stored as ISO values, native calendar selection, and dynamic
+  “Hoy/Ayer/5 ago” labels that do not become stale after midnight.
+- **Investments**: CEDEARs, crypto, Argentine bonds and FCI with live prices (CoinGecko, data912,
   Yahoo, ArgentinaDatos), portfolio donut, per-asset price charts, and USD (dólar
   cripto) valuation.
+- Animated ARS/USD conversion by tapping the large dashboard amount.
+- Mixed ARS/USD account totals and reports are normalized with the current quote;
+  each account and movement still shows its native currency.
 - **Budgets** (monthly limit per category), **savings goals**, and a **net-worth
   trend** chart from daily snapshots.
 - **Optional cloud sync** (Supabase) so data can follow you across devices.
@@ -57,6 +75,14 @@ npm run dev
 ```
 
 Open: http://localhost:5173
+
+### Local assistant (zero cost)
+
+The assistant uses the tested on-device intent engine in `src/domain/assistant.js`.
+It does not require an account or API key and it never spends tokens. Clear and
+incomplete commands both stay on the device; incomplete drafts explain exactly
+which field is missing before the user can confirm them. See
+`docs/assistant-and-market-data.md` for the capability and privacy boundary.
 
 ## Build
 
@@ -85,9 +111,8 @@ Fails if `node_modules/`, `dist/`, `.vite/`, or `.env` are tracked by git.
 
 ## Deploy to Vercel
 
-Mostly static, plus one serverless function (`api/chart.js`, auto-detected by
-Vercel) that proxies price history. `vercel.json` is included and already pins the
-build settings below.
+Mostly static, plus `api/chart.js` (auto-detected by Vercel).
+`vercel.json` is included and already pins the build settings below.
 
 ### One-time setup
 
@@ -100,6 +125,7 @@ build settings below.
    - **Output Directory:** `dist`
    - **Install Command:** `npm install` (or `npm ci`)
 5. Click **Deploy**.
+6. No AI key or paid service is required for the assistant.
 
 ### After deploy
 
@@ -167,7 +193,7 @@ runtime's existing Subresource Integrity (SRI) hashes, which were left unchanged
 - `node_modules/`
 - `dist/`
 - `.vite/`
-- `.env`, `.env.*` (except `.env.example`)
+- `.env`, `.env.*`
 - logs (`*.log`)
 - OS junk (`.DS_Store`, `Thumbs.db`, …)
 - local screenshots / temporary QA artifacts
@@ -176,10 +202,15 @@ runtime's existing Subresource Integrity (SRI) hashes, which were left unchanged
 
 ## Current limitations
 
-- **Google Fonts (Poppins)** are still loaded cross-origin and are not cached, so
-  offline rendering falls back to system fonts. Vendoring fonts would require
-  touching the design's `<helmet>` font links, which is out of scope under the
-  UI/UX freeze.
+- Market data is best-effort and comes from public providers; it is suitable for
+  personal tracking, not order execution or accounting statements. Manual price
+  overrides and backup/CSV flows remain available.
+- Cocos does not expose a documented public OAuth/account API in this integration,
+  so FinanzApp does **not** request Cocos credentials or claim to sync holdings.
+  Broker reconciliation should be added through an official API or a documented
+  export format when one is available.
+- Browser voice recognition depends on browser support. The Capacitor iOS shell
+  uses a native speech-recognition plugin and declares the required permissions.
 - **Babel standalone** (`@babel/standalone`) is still referenced from `unpkg.com`
   in `support.js`, but it is **not a critical dependency**: it is only fetched
   lazily to compile runtime JSX/TSX modules imported via `x-import`, and FinanzApp
@@ -187,8 +218,9 @@ runtime's existing Subresource Integrity (SRI) hashes, which were left unchanged
   It was intentionally **not** vendored to avoid committing ~2.9 MB of code the app
   never executes. If a future feature adds JSX `x-import` modules, vendor it the
   same way React was vendored.
-- No custom install banner, update prompt, or offline UI — by design (UI/UX freeze).
-  Service-worker updates apply on the next load without a disruptive prompt.
+- There is no custom install banner, update prompt or offline status UI yet.
+  Service-worker updates apply on the next load.
 - iOS has no programmatic install; users add via "Add to Home Screen".
-- The app intentionally runs from the single-file Claude Design runtime; it is not
-  a React application (even though that runtime uses React internally).
+- The generated runtime document is still consumed by Claude Design and is not
+  a conventional React application, but its editable shell, styles, controller
+  and tested domain logic are now separate source files.

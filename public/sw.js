@@ -2,13 +2,16 @@
    Infrastructure only: no UI, no push, no user-data caching. */
 'use strict';
 
-var CACHE = 'finanzapp-shell-v53';
+var CACHE = 'finanzapp-shell-v60';
 
 // App shell assets to precache. Kept intentionally small.
 var SHELL = [
   '/',
   '/index.html',
   '/support.js',
+  '/domain.iife.js',
+  '/capacitor-deep-links.iife.js',
+  '/finanzapp.css',
   '/vendor/react.production.min.js',
   '/vendor/react-dom.production.min.js',
   '/vendor/supabase.js',
@@ -45,7 +48,7 @@ self.addEventListener('fetch', function (event) {
   if (req.method !== 'GET') return;
 
   var url = new URL(req.url);
-  if (url.origin !== self.location.origin) return; // never touch cross-origin (fonts, etc.)
+  if (url.origin !== self.location.origin) return; // never touch cross-origin provider requests
 
   // Navigations: network-first so updates are picked up, fall back to cached shell offline.
   if (req.mode === 'navigate') {

@@ -33,6 +33,10 @@
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>FinanzApp usa el micrófono solo cuando elegís dictar un movimiento.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>FinanzApp convierte tu dictado en texto para preparar el movimiento que vas a confirmar.</string>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIMainStoryboardFile</key>

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { todayKey, parseDate, isoFromLabel } from './dates.js';
+import { todayKey, parseDate, isoFromLabel, labelFromISO, timelineLabelFromISO, fullDateLabel, sortTransactionsNewestFirst } from './dates.js';
 
 describe('dates.todayKey', () => {
   it('formats a local YYYY-MM-DD (month is 1-based)', () => {
@@ -46,5 +46,60 @@ describe('dates.isoFromLabel', () => {
   });
   it('falls back to today for unrecognizable labels', () => {
     expect(isoFromLabel('cualquier cosa', ref)).toBe('2026-07-15');
+  });
+  it('preserves a valid ISO date from a native calendar input', () => {
+    expect(isoFromLabel('2024-06-05', ref)).toBe('2024-06-05');
+  });
+  it('rejects an impossible ISO date', () => {
+    expect(isoFromLabel('2026-02-31', ref)).toBe('2026-07-15');
+  });
+});
+
+describe('dates.labelFromISO', () => {
+  const ref = new Date(2026, 6, 1); // 1 jul 2026
+  it('uses relative labels only when they are actually relative to today', () => {
+    expect(labelFromISO('2026-07-01', ref)).toBe('Hoy');
+    expect(labelFromISO('2026-06-30', ref)).toBe('Ayer');
+    expect(labelFromISO('2026-06-29', ref)).toBe('Anteayer');
+  });
+  it('shows the real calendar date for older movements', () => {
+    expect(labelFromISO('2026-06-05', ref)).toBe('5 jun');
+    expect(labelFromISO('2025-12-30', ref)).toBe('30 dic 2025');
+  });
+});
+
+describe('dates timeline presentation', () => {
+  const ref = new Date(2026, 7, 7, 12);
+
+  it('shows relative context together with the real calendar date', () => {
+    expect(timelineLabelFromISO('2026-08-07', ref)).toBe('Hoy · 7 ago');
+    expect(timelineLabelFromISO('2026-08-06', ref)).toBe('Ayer · 6 ago');
+    expect(timelineLabelFromISO('2026-08-02', ref)).toBe('2 ago');
+  });
+
+  it('formats an unambiguous full date for movement detail', () => {
+    expect(fullDateLabel('2026-08-07')).toBe('7 de agosto de 2026');
+  });
+});
+
+describe('dates.sortTransactionsNewestFirst', () => {
+  it('uses the actual date instead of persisted array order', () => {
+    const old = { id: 9, dateISO: '2026-07-01' };
+    const newest = { id: 2, dateISO: '2026-08-07' };
+    const middle = { id: 7, dateISO: '2026-08-06' };
+    expect(sortTransactionsNewestFirst([old, newest, middle])).toEqual([newest, middle, old]);
+  });
+
+  it('uses the newest id first when two movements share a date', () => {
+    expect(sortTransactionsNewestFirst([
+      { id: 4, dateISO: '2026-08-07' },
+      { id: 8, dateISO: '2026-08-07' },
+    ]).map(item => item.id)).toEqual([8, 4]);
+  });
+
+  it('keeps a movement from today above one from yesterday even when yesterday was created later', () => {
+    const createdFirst = { id: 10, dateISO: '2026-08-07', merchant: 'Hoy' };
+    const createdLater = { id: 11, dateISO: '2026-08-06', merchant: 'Ayer' };
+    expect(sortTransactionsNewestFirst([createdLater, createdFirst]).map(item => item.merchant)).toEqual(['Hoy', 'Ayer']);
   });
 });

@@ -1,0 +1,104 @@
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;overscroll-behavior:none}
+body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','Segoe UI',sans-serif;letter-spacing:-.01em;background:#f4f7fb}
+input,button,textarea{font:inherit}
+.fa-scroll::-webkit-scrollbar{width:0;height:0;display:none}
+.fa-scroll{scrollbar-width:none;overflow-x:hidden}
+
+/* App shell: phone-first, while remaining calm and usable on tablets/desktop. */
+.fa-frame{width:min(100%,520px);left:50%!important;right:auto!important;transform:translateX(-50%);overflow:hidden;box-shadow:0 0 0 1px var(--hairline),0 24px 80px rgba(9,25,47,.12)}
+.fa-frame,.fa-frame *{transition:background-color .28s ease,color .22s ease,border-color .28s ease,box-shadow .28s ease,fill .28s ease}
+.fa-frame [style*="cursor:pointer"]{touch-action:manipulation;transition:transform .22s cubic-bezier(.22,1,.36,1),opacity .18s ease,background-color .26s ease,color .26s ease,box-shadow .26s ease}
+.fa-frame [style*="cursor:pointer"]:active{transform:scale(.975)}
+.fa-main-scroll{padding-left:clamp(16px,5vw,24px)!important;padding-right:clamp(16px,5vw,24px)!important;padding-bottom:calc(102px + env(safe-area-inset-bottom,0px))!important}
+.fa-screen{will-change:transform,opacity}
+.fa-frame[data-nav-state="leaving"] .fa-screen{animation:faPushOut .18s cubic-bezier(.4,0,1,1) both!important;pointer-events:none}
+.fa-frame[data-nav-state="back-settle"] .fa-screen{animation:none!important}
+.fa-frame[data-tab-motion="leaving"][data-tab-direction="next"] .fa-main-scroll>[data-screen-label]{animation:faTabLeaveNext .125s cubic-bezier(.4,0,1,1) both;pointer-events:none}
+.fa-frame[data-tab-motion="leaving"][data-tab-direction="prev"] .fa-main-scroll>[data-screen-label]{animation:faTabLeavePrev .125s cubic-bezier(.4,0,1,1) both;pointer-events:none}
+.fa-frame[data-tab-motion="entering"][data-tab-direction="next"] .fa-main-scroll>[data-screen-label]{animation:faTabEnterNext .3s cubic-bezier(.22,1,.36,1) both}
+.fa-frame[data-tab-motion="entering"][data-tab-direction="prev"] .fa-main-scroll>[data-screen-label]{animation:faTabEnterPrev .3s cubic-bezier(.22,1,.36,1) both}
+
+/* Floating iOS-like tab bar. Blue is reserved for selection and action. */
+.fa-tabbar-underlay{display:none!important}
+.fa-tabbar{left:clamp(18px,6vw,34px)!important;right:clamp(18px,6vw,34px)!important;bottom:calc(10px + env(safe-area-inset-bottom,0px))!important;height:64px!important;padding:7px 12px!important;background:color-mix(in srgb,var(--card) 90%,transparent)!important;border:1px solid var(--hairline)!important;border-radius:23px!important;align-items:center!important;box-shadow:0 12px 32px rgba(9,25,47,.13),0 2px 6px rgba(9,25,47,.06)!important;backdrop-filter:blur(20px) saturate(1.25);-webkit-backdrop-filter:blur(20px) saturate(1.25)}
+.fa-tabbar>div{width:48px!important}
+.fa-tabbar>div:nth-child(3){width:52px!important}
+.fa-fab{bottom:calc(17px + env(safe-area-inset-bottom,0px))!important;width:50px!important;height:50px!important;background:var(--accent)!important;color:var(--on-accent)!important;box-shadow:0 7px 18px var(--accent-shadow)!important}
+.fa-fab svg{width:24px;height:24px}
+.fa-frame .fa-fab:active{transform:translateX(-50%) scale(.965)!important}
+.fa-fab svg{stroke:currentColor!important}
+.fa-hero-balance{transform-origin:left center;user-select:none;max-width:100%;overflow:hidden;padding:3px 0}
+.fa-home-flows>div+div{position:relative}
+.fa-home-flows>div+div:before{content:"";position:absolute;left:-9px;top:4px;bottom:4px;width:1px;background:var(--hairline)}
+.fa-assistant-entry{border:1px solid transparent;box-shadow:none}
+.fa-assistant-entry:hover{border-color:var(--hairline);background:var(--surface-strong)!important}
+.fa-assistant-entry-icon{box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 12%,transparent)}
+.fa-txn-amount{font-variant-numeric:tabular-nums;letter-spacing:-.015em}
+.fa-filter-tabs>div{transition:color .2s ease,border-color .28s ease!important}
+.fa-category-fill{transform-origin:bottom;animation:faBarRise .52s cubic-bezier(.22,1,.36,1) both}
+.fa-category-column:nth-child(2) .fa-category-fill{animation-delay:.04s}.fa-category-column:nth-child(3) .fa-category-fill{animation-delay:.08s}.fa-category-column:nth-child(4) .fa-category-fill{animation-delay:.12s}
+.fa-report-summary{border:1px solid var(--hairline)}
+.fa-report-bar{transform-origin:left;animation:faBarReveal .5s cubic-bezier(.22,1,.36,1) both}
+.fa-report-periods>div{transition:color .2s ease,border-color .25s ease!important}
+
+/* Assistant feedback and investment information architecture. */
+.fa-assistant-orb{position:relative;isolation:isolate}
+.fa-assistant-orb:before{content:"";position:absolute;inset:-7px;border-radius:inherit;background:var(--accent);opacity:.13;z-index:-1;animation:faBreathe 2.8s ease-in-out infinite}
+.fa-listening:before{opacity:.28;animation:faPulse 1.05s ease-out infinite}
+.fa-live-copy{min-height:18px;color:var(--accent);font-size:11px;font-weight:700;letter-spacing:.01em}
+.fa-invest-tools{display:flex;gap:8px;overflow-x:auto;margin:0 -2px 22px;padding:0 2px 3px}
+.fa-invest-tool{flex:none;display:flex;align-items:center;gap:8px;padding:10px 13px;border-radius:15px;background:var(--surface);color:var(--text);font-size:12px;font-weight:720;cursor:pointer;border:1px solid var(--hairline)}
+.fa-portfolio-sections{display:flex;flex-direction:column;gap:18px;margin-bottom:18px}
+.fa-portfolio-section{display:flex;flex-direction:column;gap:8px}
+.fa-portfolio-header{display:flex;align-items:end;justify-content:space-between;padding:0 3px 2px}
+.fa-portfolio-header strong{font-size:15px;letter-spacing:-.02em}
+.fa-portfolio-header span{font-size:11px;color:var(--text-3);font-weight:650}
+.fa-asset-row{display:flex;align-items:center;gap:12px;background:var(--card);border:1px solid var(--hairline);border-radius:18px;padding:14px;box-shadow:var(--shadow-pill);cursor:pointer}
+.fa-asset-row+.fa-asset-row{margin-top:1px}
+.fa-native-date{color-scheme:light}
+[data-theme="dark"] .fa-native-date{color-scheme:dark}
+
+@keyframes faUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
+@keyframes faPushIn{from{transform:translateX(28px);opacity:.2}to{transform:translateX(0);opacity:1}}
+@keyframes faPushOut{from{transform:translateX(0);opacity:1}to{transform:translateX(34px);opacity:0}}
+@keyframes faSheet{from{transform:translateY(110%)}to{transform:translateY(0)}}
+@keyframes faFade{from{opacity:0}to{opacity:1}}
+@keyframes faPop{0%{transform:scale(.88);opacity:0}100%{transform:scale(1);opacity:1}}
+@keyframes faMoneyUp{0%{opacity:.12;transform:translateY(14px);filter:blur(4px)}100%{opacity:1;transform:translateY(0);filter:blur(0)}}
+@keyframes faMoneyDown{0%{opacity:.12;transform:translateY(-14px);filter:blur(4px)}100%{opacity:1;transform:translateY(0);filter:blur(0)}}
+@keyframes faBreathe{0%,100%{transform:scale(.94)}50%{transform:scale(1.08)}}
+@keyframes faPulse{0%{transform:scale(.86);opacity:.34}100%{transform:scale(1.38);opacity:0}}
+@keyframes faTabLeaveNext{to{transform:translateX(-18px);opacity:0}}
+@keyframes faTabLeavePrev{to{transform:translateX(18px);opacity:0}}
+@keyframes faTabEnterNext{from{transform:translateX(22px);opacity:0}to{transform:translateX(0);opacity:1}}
+@keyframes faTabEnterPrev{from{transform:translateX(-22px);opacity:0}to{transform:translateX(0);opacity:1}}
+@keyframes faBarRise{from{transform:scaleY(.08);opacity:.4}to{transform:scaleY(1);opacity:1}}
+@keyframes faBarReveal{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+
+:root{
+  --bg:#F6F7F9;--surface:#ECEFF3;--surface-strong:#DFE4EA;--seg-active:#FFFFFF;--card:#FFFFFF;
+  --text:#101318;--text-2:#626B77;--text-3:#98A1AD;--hairline:rgba(16,28,45,.08);
+  --shadow-soft:0 16px 38px rgba(20,34,54,.09);--shadow-pill:0 3px 12px rgba(20,34,54,.06);
+  --accent:#0B63CE;--accent-soft:#E7F1FF;--accent-shadow:rgba(11,99,206,.27);--on-accent:#FFFFFF;--pos:#16815D;--danger:#D14A55;
+  --cat-comida-icon:#EFB859;--cat-comida-fill:#FFF3D9;--cat-auto-icon:#D77B75;--cat-auto-fill:#FBE8E6;
+  --cat-transfer-icon:#6D99DA;--cat-transfer-fill:#E7F0FE;--cat-tarjetas-icon:#67A87B;--cat-tarjetas-fill:#E5F4E9;
+  --cat-ocio-icon:#9577C8;--cat-ocio-fill:#F0E9FB;--cat-compras-icon:#CF7790;--cat-compras-fill:#FAE8EE;
+  --cat-mascotas-icon:#B88A57;--cat-mascotas-fill:#F7EDDF;--cat-otros-icon:#7F8997;--cat-otros-fill:#EDF0F4;
+  --cat-ingreso-icon:#58A476;--cat-ingreso-fill:#E5F4E9;--cat-inversion-icon:#557FDB;--cat-inversion-fill:#E7EEFD;
+}
+[data-theme="dark"]{
+  --bg:#090A0C;--surface:#1A1D22;--surface-strong:#252931;--seg-active:#292E36;--card:#121417;
+  --text:#F5F7FA;--text-2:#A5ADB8;--text-3:#68727F;--hairline:rgba(255,255,255,.08);
+  --shadow-soft:0 18px 46px rgba(0,0,0,.46);--shadow-pill:0 3px 14px rgba(0,0,0,.32);
+  --accent:#66ABFF;--accent-soft:#152942;--accent-shadow:rgba(74,153,255,.24);--on-accent:#07131F;--pos:#47C895;--danger:#FF818B;
+  --cat-comida-icon:#B78A3E;--cat-comida-fill:rgba(239,184,89,.14);--cat-auto-icon:#A95D59;--cat-auto-fill:rgba(215,123,117,.14);
+  --cat-transfer-icon:#597DB4;--cat-transfer-fill:rgba(109,153,218,.15);--cat-tarjetas-icon:#4F805D;--cat-tarjetas-fill:rgba(103,168,123,.14);
+  --cat-ocio-icon:#705A98;--cat-ocio-fill:rgba(149,119,200,.15);--cat-compras-icon:#96596B;--cat-compras-fill:rgba(207,119,144,.14);
+  --cat-mascotas-icon:#81613E;--cat-mascotas-fill:rgba(184,138,87,.14);--cat-otros-icon:#59616C;--cat-otros-fill:rgba(127,137,151,.12);
+  --cat-ingreso-icon:#4E805E;--cat-ingreso-fill:rgba(88,164,118,.14);--cat-inversion-icon:#4869AA;--cat-inversion-fill:rgba(85,127,219,.15);
+}
+
+@media (max-width:359px){.fa-main-scroll{padding-left:14px!important;padding-right:14px!important}.fa-tabbar{left:10px!important;right:10px!important;padding-left:8px!important;padding-right:8px!important}.fa-tabbar [style*="font-size:10px"]{font-size:9px!important}.fa-home-flows{gap:14px!important}}
+@media (min-width:521px){body{background:#eceef1}[data-theme="dark"] body{background:#050607}}
+@media (prefers-reduced-motion:reduce){.fa-frame,.fa-frame *{animation-duration:.001ms!important;animation-iteration-count:1!important;scroll-behavior:auto!important;transition-duration:.001ms!important}}

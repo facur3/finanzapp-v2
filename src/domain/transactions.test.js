@@ -31,6 +31,14 @@ describe('transactions.applyTxn', () => {
     expect(r.me).toBe(0);
   });
 
+  it('supports a converted destination amount for cross-currency transfers', () => {
+    const t = { type: 'transfer', from: 'usd', to: 'ars', val: 100, toVal: 130000 };
+    const r = applyTxn(t, { usd: 500, ars: 20000 }, {}, 0, 0);
+    expect(r.b).toEqual({ usd: 400, ars: 150000 });
+    const reversed = reverseTxn(t, r.b, r.ct, r.mi, r.me);
+    expect(reversed.b).toEqual({ usd: 500, ars: 20000 });
+  });
+
   it('does not mutate the input balances/category objects', () => {
     const b = { a: 1000 };
     const ct = {};
