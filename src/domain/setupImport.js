@@ -24,6 +24,7 @@ function normalizeAccount(account) {
     liquid: kind === 'liquid' ? account?.liquid !== false : false,
     emoji: text(account?.emoji || (kind === 'invest' ? '📈' : '🏦'), 'account-emoji'),
     balance: positive(account?.balance ?? 0, 'account-balance', true),
+    balanceKnown: account?.balanceKnown !== false,
   };
 }
 function normalizeCard(card) {
@@ -74,6 +75,8 @@ function normalizeCard(card) {
 
 function normalizeAsset(asset) {
   const costUnknown = !!asset?.costUnknown;
+  const quoteCurrency = ['ARS', 'USD'].includes(String(asset?.quoteCurrency || '').toUpperCase()) ? String(asset.quoteCurrency).toUpperCase() : 'ARS';
+  const costCurrency = ['ARS', 'USD'].includes(String(asset?.costCurrency || '').toUpperCase()) ? String(asset.costCurrency).toUpperCase() : quoteCurrency;
   return {
     accountId: text(asset?.accountId, 'asset-account'),
     id: text(asset?.id, 'asset-id'),
@@ -83,10 +86,27 @@ function normalizeAsset(asset) {
     qty: positive(asset?.qty, 'asset-quantity'),
     avg: costUnknown ? positive(asset?.avg ?? asset?.lastPrice, 'asset-average') : positive(asset?.avg, 'asset-average'),
     lastPrice: positive(asset?.lastPrice ?? asset?.avg, 'asset-last-price'),
+    quoteTicker: text(asset?.quoteTicker || asset?.ticker, 'asset-quote-ticker'),
+    arsQuoteTicker: text(asset?.arsQuoteTicker, 'asset-ars-quote-ticker', true),
+    lastPriceARS: positive(asset?.lastPriceARS ?? 0, 'asset-last-price-ars', true),
+    quoteCurrency,
+    costCurrency,
+    unitDivisor: positive(asset?.unitDivisor ?? 1, 'asset-unit-divisor'),
+    priceProvider: text(asset?.priceProvider, 'asset-price-provider', true),
+    quoteSource: text(asset?.quoteSource, 'asset-quote-source', true),
+    quoteQuality: text(asset?.quoteQuality, 'asset-quote-quality', true),
+    quoteAsOf: text(asset?.quoteAsOf, 'asset-quote-as-of', true),
+    quoteFetchedAt: text(asset?.quoteFetchedAt, 'asset-quote-fetched-at', true),
     fci: !!asset?.fci,
     fondoMatch: list(asset?.fondoMatch).map(value => text(value, 'fund-match')).filter(Boolean),
+    fundSlug: text(asset?.fundSlug, 'fund-slug', true),
+    officialRateSlug: text(asset?.officialRateSlug, 'official-rate-slug', true),
+    estimatedAnnualRate: positive(asset?.estimatedAnnualRate ?? 0, 'asset-estimated-rate', true),
+    estimatedAnnualRateAsOf: text(asset?.estimatedAnnualRateAsOf, 'asset-estimated-rate-as-of', true),
+    estimatedAnnualRateSource: text(asset?.estimatedAnnualRateSource, 'asset-estimated-rate-source', true),
     costUnknown,
     unitsEstimated: !!asset?.unitsEstimated,
+    quantitySource: text(asset?.quantitySource, 'asset-quantity-source', true),
   };
 }
 
@@ -98,6 +118,8 @@ function normalizeLot(lot) {
     name: text(lot?.name || lot?.ticker, 'lot-name'),
     qty: positive(lot?.qty, 'lot-quantity'),
     total: positive(lot?.total, 'lot-total'),
+    currency: ['ARS', 'USD'].includes(String(lot?.currency || '').toUpperCase()) ? String(lot.currency).toUpperCase() : 'ARS',
+    unitDivisor: positive(lot?.unitDivisor ?? 1, 'lot-unit-divisor'),
     dateISO: text(lot?.dateISO, 'lot-date'),
     note: text(lot?.note, 'lot-note', true),
   };

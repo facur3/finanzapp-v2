@@ -695,9 +695,10 @@
         <!-- Precio unitario del activo -->
         <div style="display:flex;align-items:center;gap:12px;margin-bottom:6px;">
           <div style="width:44px;height:44px;border-radius:14px;background:var( {{ adAFillVar }} );display:flex;align-items:center;justify-content:center;font-size:22px;flex:none;">{{ adAEmoji }}</div>
-          <div style="flex:1;min-width:0;"><div style="font-size:16px;font-weight:800;">{{ adATicker }}</div><div style="font-size:12px;color:var(--text-3);font-weight:600;">{{ adAUnitLabel }} · precio de hoy</div></div>
+          <div style="flex:1;min-width:0;"><div style="font-size:16px;font-weight:800;">{{ adATicker }}</div><div style="font-size:12px;color:var(--text-3);font-weight:600;">{{ adAUnitLabel }} · última cotización disponible</div></div>
         </div>
         <div style="font-size:38px;font-weight:800;letter-spacing:-1.5px;margin-bottom:2px;">{{ adALastStr }}</div>
+        <div style="font-size:11px;line-height:1.35;color:var(--text-3);font-weight:520;margin-bottom:10px;">{{ adAQuoteStr }}</div>
         <sc-if value="{{ acHasChange }}" hint-placeholder-val="{{ true }}">
           <div style="display:flex;align-items:baseline;gap:6px;margin-bottom:14px;"><span style="font-size:14px;font-weight:700;color: {{ acChangeColor }};">{{ acChangeStr }}</span><span style="font-size:11px;font-weight:600;color:var(--text-3);">{{ acChangeSuffix }}</span></div>
         </sc-if>
@@ -741,6 +742,7 @@
           <sc-if value="{{ adAHasUsd }}" hint-placeholder-val="{{ false }}">
             <div style="font-size:12px;color:var(--text-3);font-weight:600;margin-bottom:12px;">{{ adAValueUsdStr }}</div>
           </sc-if>
+          <sc-if value="{{ adAHasRate }}" hint-placeholder-val="{{ false }}"><div style="padding:10px 0;border-top:1px solid var(--hairline);"><div style="font-size:14px;font-weight:750;color:var(--pos);">{{ adARateStr }}</div><div style="font-size:10.5px;color:var(--text-3);font-weight:520;margin-top:2px;">{{ adARateSourceStr }}</div></div></sc-if>
           <sc-if value="{{ adAHasCost }}" hint-placeholder-val="{{ true }}">
             <div style="display:flex;justify-content:space-between;padding:9px 0;border-top:1px solid var(--hairline);"><span style="font-size:13px;color:var(--text-2);font-weight:500;">Invertiste</span><span style="font-size:13px;font-weight:700;">{{ adACostStr }}</span></div>
             <div style="display:flex;justify-content:space-between;padding:9px 0;border-top:1px solid var(--hairline);"><span style="font-size:13px;color:var(--text-2);font-weight:500;">{{ adAResultWord }} (desde tu compra)</span><span style="font-size:13px;font-weight:700;color: {{ adAGLColor }};">{{ adAResultSignStr }} ({{ adAGLPctStr }})</span></div>
@@ -1196,8 +1198,8 @@
           </div>
         </sc-if>
         <div style="background:var(--card);border-radius:22px;padding:2px 16px;box-shadow:var(--shadow-pill);margin-bottom:12px;">
-          <div style="display:flex;align-items:center;gap:10px;padding:15px 0;border-bottom:1px solid var(--hairline);"><span style="font-size:14px;color:var(--text-2);font-weight:500;flex:none;">Cantidad</span><input value="{{ atQtyDisplay }}" onChange="{{ setAtQty }}" inputmode="decimal" placeholder="0" style="border:none;outline:none;background:transparent;font-size:16px;font-weight:700;color:var(--text);flex:1;text-align:right;min-width:0;"></div>
-          <div style="display:flex;align-items:center;gap:10px;padding:15px 0;"><span style="font-size:14px;color:var(--text-2);font-weight:500;flex:none;">{{ atPaidLabel }}</span><div style="flex:1;display:flex;align-items:center;justify-content:flex-end;gap:2px;min-width:0;"><span style="font-size:16px;font-weight:700;color:var(--text-2);">$</span><input value="{{ atTotalDisplay }}" onChange="{{ setAtTotal }}" inputmode="numeric" placeholder="0" style="border:none;outline:none;background:transparent;font-size:16px;font-weight:700;color:var(--text);width:60%;text-align:right;"></div></div>
+          <div style="display:flex;align-items:center;gap:10px;padding:15px 0;border-bottom:1px solid var(--hairline);"><span style="font-size:14px;color:var(--text-2);font-weight:500;flex:none;">{{ atQtyLabel }}</span><sc-if value="{{ atManualQty }}" hint-placeholder-val="{{ true }}"><input value="{{ atQtyDisplay }}" onChange="{{ setAtQty }}" inputmode="decimal" placeholder="0" style="border:none;outline:none;background:transparent;font-size:16px;font-weight:700;color:var(--text);flex:1;text-align:right;min-width:0;"></sc-if><sc-if value="{{ atAutoQty }}" hint-placeholder-val="{{ false }}"><span style="flex:1;text-align:right;font-size:15px;font-weight:700;color:var(--text);">{{ atQtyDisplay }}</span></sc-if></div>
+          <div style="display:flex;align-items:center;gap:10px;padding:15px 0;"><span style="font-size:14px;color:var(--text-2);font-weight:500;flex:none;">{{ atPaidLabel }}</span><div style="flex:1;display:flex;align-items:center;justify-content:flex-end;gap:2px;min-width:0;"><span style="font-size:16px;font-weight:700;color:var(--text-2);">{{ atTotalPrefix }}</span><input value="{{ atTotalDisplay }}" onChange="{{ setAtTotal }}" inputmode="numeric" placeholder="0" style="border:none;outline:none;background:transparent;font-size:16px;font-weight:700;color:var(--text);width:60%;text-align:right;"></div></div>
         </div>
         <sc-if value="{{ atHasUnit }}" hint-placeholder-val="{{ false }}">
           <div style="display:flex;justify-content:space-between;padding:0 6px;margin-bottom:18px;"><span style="font-size:12px;color:var(--text-3);font-weight:500;">Precio por unidad</span><span style="font-size:12px;color:var(--text-2);font-weight:600;">{{ atUnitStr }}</span></div>
@@ -1257,6 +1259,7 @@
                   <div style="text-align:right;"><div style="font-size:15px;font-weight:700;">{{ a.valueStr }}</div><div style="font-size:12px;font-weight:600;color: {{ a.glColor }};">{{ a.glStr }} · {{ a.glPctStr }}</div></div>
                 </div>
                 <div style="display:flex;justify-content:space-between;border-top:1px solid var(--hairline);padding-top:11px;margin-bottom:8px;"><span style="font-size:12px;color:var(--text-2);font-weight:500;">Invertido</span><span style="font-size:13px;font-weight:600;">{{ a.costStr }}</span></div>
+                <div style="font-size:11px;line-height:1.35;color:var(--text-3);font-weight:520;margin-bottom:9px;">{{ a.quoteStr }}</div>
                 <sc-if value="{{ a.manual }}" hint-placeholder-val="{{ false }}">
                 <div style="display:flex;justify-content:space-between;margin-bottom:10px;"><span style="font-size:12px;color:var(--text-2);font-weight:500;">Precio · compra / hoy</span><span style="font-size:13px;font-weight:600;">{{ a.avgStr }} → {{ a.lastPriceStr }}</span></div>
                 <div onClick="{{ a.onUpdatePrice }}" style="height:36px;border-radius:11px;background:var(--surface);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:13px;font-weight:600;color:var(--text-2);">Actualizar precio</div>

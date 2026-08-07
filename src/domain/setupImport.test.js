@@ -17,6 +17,7 @@ describe('setup import schema', () => {
     const result = parseSetupImport(valid);
     expect(result.setup.cards[0]).toMatchObject({ last4: '0000', compras: [], cuotas: [], pagos: [] });
     expect(result.setup.assets[0]).toMatchObject({ ticker: 'TEST', qty: 1, costUnknown: false });
+    expect(result.setup.assets[0]).toMatchObject({ quoteTicker: 'TEST', quoteCurrency: 'ARS', costCurrency: 'ARS', unitDivisor: 1 });
   });
 
   it('rejects an unsupported schema before it can touch app state', () => {
@@ -27,5 +28,23 @@ describe('setup import schema', () => {
     const payload = structuredClone(valid);
     payload.setup.assets[0] = { ...payload.setup.assets[0], avg: undefined, costUnknown: true };
     expect(parseSetupImport(payload).setup.assets[0]).toMatchObject({ costUnknown: true, avg: 1 });
+  });
+
+  it('preserves USD bond quote semantics and provenance', () => {
+    const payload = structuredClone(valid);
+    payload.setup.assets[0] = {
+      ...payload.setup.assets[0],
+      ticker: 'AO27D',
+      quoteTicker: 'AO27D',
+      quoteCurrency: 'USD',
+      costCurrency: 'USD',
+      unitDivisor: 100,
+      arsQuoteTicker: 'AO27',
+      lastPriceARS: 156160,
+      quoteSource: 'Broker statement',
+    };
+    payload.setup.investmentLots[0] = { ...payload.setup.investmentLots[0], ticker: 'AO27D', currency: 'USD', unitDivisor: 100 };
+    expect(parseSetupImport(payload).setup.assets[0]).toMatchObject({ quoteCurrency: 'USD', costCurrency: 'USD', unitDivisor: 100, arsQuoteTicker: 'AO27', lastPriceARS: 156160 });
+    expect(parseSetupImport(payload).setup.investmentLots[0]).toMatchObject({ currency: 'USD', unitDivisor: 100 });
   });
 });

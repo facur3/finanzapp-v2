@@ -45,18 +45,37 @@ the Xcode project.
 
 ## Market data boundary
 
-FinanzApp currently updates:
+FinanzApp currently updates each imported holding from its configured quantity
+and quote convention:
 
-- crypto through CoinGecko and the Argentine crypto-dollar rate;
-- CEDEARs and Argentine bonds through public BYMA-oriented feeds, with Yahoo
-  Finance fallback for supported symbols;
-- FCI unit values through ArgentinaDatos phrase matching;
-- historical asset charts through the server-side chart proxy.
+- crypto through Binance public market data, with CoinGecko as a keyless
+  fallback, and the Argentine crypto-dollar rate for ARS totals;
+- CEDEARs and Argentine bonds through Data912's delayed, educational
+  BYMA-oriented feed. Bonds can declare a quote divisor (normally 100 nominal)
+  and separate ARS/USD species;
+- Cocos Rendimiento Clase A from its official CAFCI regulatory page. The free
+  ArgentinaDatos/CAFCI dataset is the fallback and is also used for compatible
+  FCI history;
+- the Cocos annual percentage separately from the VCP. It is labelled as an
+  estimated TNA and is never used as if it were the actual daily return;
+- historical charts through a provider-aware server adapter.
 
-Providers can be delayed, unavailable or change format. A visible last-updated
-time and manual price correction remain part of the product contract.
+Every saved quote carries source, observation time, fetch time and quality. A
+provider can be delayed, unavailable or change format, so the UI exposes that
+state. A failed or older response never replaces a newer broker capture with
+zero or stale data; the last known value remains visible with its real status.
+
+An account total is only complete when every holding can be converted to ARS.
+Unknown bank balances are shown as pending and make the dashboard total partial
+instead of silently treating them as zero.
 
 There is no direct Cocos account connection. Do not ask users for Cocos passwords
 or scrape a signed-in session. A future adapter must use either an official
 OAuth/API contract or a stable, documented Cocos export and must reconcile
 positions before mutating the portfolio.
+
+The app can update the market value of a known quantity. It cannot discover a
+new Cocos subscription, rescue or broker-side trade without an official account
+API; those quantity-changing events must be registered or imported. For an FCI,
+the quantity of units stays fixed while the VCP changes and changes only when
+units are subscribed or redeemed.
