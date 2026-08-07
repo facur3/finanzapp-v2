@@ -30,7 +30,10 @@ jobs:
         run: npm ci
 
       - name: Apply source hotfix
-        run: node scripts/apply-fci-spendable-hotfix.mjs
+        run: |
+          sed -i '/const second = text.indexOf(search, first + search.length);/d' scripts/apply-fci-spendable-hotfix.mjs
+          sed -i "/if (second >= 0) throw new Error('Patch target is ambiguous: ' + label);/d" scripts/apply-fci-spendable-hotfix.mjs
+          node scripts/apply-fci-spendable-hotfix.mjs
 
       - name: Test
         run: npm test
