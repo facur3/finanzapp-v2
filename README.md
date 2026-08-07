@@ -26,9 +26,8 @@ truth. On top of that baseline the app now also has:
 - **Optional cloud sync** via Supabase (email + password auth, one JSONB row per user,
   last-write-wins). Off until configured — see `SUPABASE_SETUP.md`. Without it the app
   is 100% local, exactly as before.
-- **Two serverless functions**: `api/chart.js` proxies Yahoo Finance price history;
-  `api/assistant.js` optionally interprets ambiguous natural-language commands with
-  OpenAI Structured Outputs. The API key stays on the server.
+- **One serverless function**: `api/chart.js` proxies Yahoo Finance price history.
+  The assistant is entirely local, needs no API key and cannot create token charges.
 
 Future refactors should preserve financial behavior and data migrations one flow
 at a time; the interface can continue evolving without tying the product to the
@@ -42,10 +41,11 @@ original export.
 - Category chart tap filters Activity automatically.
 - Functional quick-add flows, movement detail, card purchase, card payment,
   investment trade, account/category/tag/card forms, security/reset, settings and filters.
-- **Voice/text assistant** in Argentine Spanish for expenses, income, stored
+- **Free local voice/text assistant** in Argentine Spanish for expenses, income, stored
   recurring movements (for example “Cobré el sueldo”), card payments, new
   recurrent rules, budgets, categories and tags. Dictation updates the text as
   partial results arrive and every action shows a validated draft before writing.
+  It runs without an API key, paid tokens or a remote AI request.
 - **Real dates** stored as ISO values, native calendar selection, and dynamic
   “Hoy/Ayer/5 ago” labels that do not become stale after midnight.
 - **Investments**: CEDEARs, crypto, Argentine bonds and FCI with live prices (CoinGecko, data912,
@@ -76,15 +76,13 @@ npm run dev
 
 Open: http://localhost:5173
 
-### Optional OpenAI assistant
+### Local assistant (zero cost)
 
-The deterministic on-device parser works without a key and costs nothing. For
-ambiguous phrases, configure your deployment environment and set
-`OPENAI_API_KEY` as a server-side secret. The default remote model is
-`gpt-5.6-luna`; the UI reports the actual token count and estimated per-command
-cost returned by the server. Never use a `VITE_` prefix: that would expose the
-key to the browser. See `docs/assistant-and-market-data.md` for pricing, limits,
-the data boundary and setup.
+The assistant uses the tested on-device intent engine in `src/domain/assistant.js`.
+It does not require an account or API key and it never spends tokens. Clear and
+incomplete commands both stay on the device; incomplete drafts explain exactly
+which field is missing before the user can confirm them. See
+`docs/assistant-and-market-data.md` for the capability and privacy boundary.
 
 ## Build
 
@@ -113,7 +111,7 @@ Fails if `node_modules/`, `dist/`, `.vite/`, or `.env` are tracked by git.
 
 ## Deploy to Vercel
 
-Mostly static, plus `api/chart.js` and `api/assistant.js` (auto-detected by Vercel).
+Mostly static, plus `api/chart.js` (auto-detected by Vercel).
 `vercel.json` is included and already pins the build settings below.
 
 ### One-time setup
@@ -127,8 +125,7 @@ Mostly static, plus `api/chart.js` and `api/assistant.js` (auto-detected by Verc
    - **Output Directory:** `dist`
    - **Install Command:** `npm install` (or `npm ci`)
 5. Click **Deploy**.
-6. Optional: add `OPENAI_API_KEY` (and, only if needed, `OPENAI_MODEL`) under
-   **Project Settings → Environment Variables**, then redeploy.
+6. No AI key or paid service is required for the assistant.
 
 ### After deploy
 
@@ -201,29 +198,4 @@ runtime's existing Subresource Integrity (SRI) hashes, which were left unchanged
 - OS junk (`.DS_Store`, `Thumbs.db`, …)
 - local screenshots / temporary QA artifacts
 
-`npm run check:repo` and CI (`.github/workflows/ci.yml`) enforce this.
-
-## Current limitations
-
-- Market data is best-effort and comes from public providers; it is suitable for
-  personal tracking, not order execution or accounting statements. Manual price
-  overrides and backup/CSV flows remain available.
-- Cocos does not expose a documented public OAuth/account API in this integration,
-  so FinanzApp does **not** request Cocos credentials or claim to sync holdings.
-  Broker reconciliation should be added through an official API or a documented
-  export format when one is available.
-- Browser voice recognition depends on browser support. The Capacitor iOS shell
-  uses a native speech-recognition plugin and declares the required permissions.
-- **Babel standalone** (`@babel/standalone`) is still referenced from `unpkg.com`
-  in `support.js`, but it is **not a critical dependency**: it is only fetched
-  lazily to compile runtime JSX/TSX modules imported via `x-import`, and FinanzApp
-  imports none — so it never loads at runtime and never blocks boot or offline use.
-  It was intentionally **not** vendored to avoid committing ~2.9 MB of code the app
-  never executes. If a future feature adds JSX `x-import` modules, vendor it the
-  same way React was vendored.
-- There is no custom install banner, update prompt or offline status UI yet.
-  Service-worker updates apply on the next load.
-- iOS has no programmatic install; users add via "Add to Home Screen".
-- The generated runtime document is still consumed by Claude Design and is not
-  a conventional React application, but its editable shell, styles, controller
-  and tested domain logic are now separate source files.
+`npm run check:repo` an

@@ -14,47 +14,28 @@ Every draft is checked against the local account, category, card and recurring
 IDs. The assistant cannot invent an ID and it never writes a movement until the
 user taps **Confirmar y guardar**.
 
-Straightforward commands are parsed on the device. Ambiguous commands may call
-`POST /api/assistant`, which uses OpenAI Structured Outputs. The model receives
-only the phrase and current date. Account, category, card and recurring names or
-IDs and stored catalogs never leave the device; a name is sent only if the user
-included it in the phrase itself. Textual references from the response are
-matched locally. Transaction history, balances and authentication data are not
-sent to the model, and the OpenAI key never reaches the browser. Responses are
-requested with storage disabled. A small server-side rate limit defaults to 30
-requests per minute per client; `ASSISTANT_RATE_LIMIT_PER_MINUTE` can lower it.
+All commands are parsed on the device. The deployment has no remote assistant
+route or paid model. Account, category, card, recurring, transaction and balance
+data stay in the local app. Incomplete commands still produce a safe preview
+when possible and clearly list the missing fields.
 
 ## Model, tokens and cost
 
-The optional fallback defaults to `gpt-5.6-luna` because this task is short,
-structured extraction rather than financial advice or long-form reasoning. It
-supports Structured Outputs and is priced for high-volume, cost-sensitive work.
+The active assistant is a deterministic local intent engine, not a generative
+large language model. It uses no tokens and has no per-command or monthly cost.
+This is deliberate: for writing money movements, predictable extraction and a
+confirmation step are safer than downloading a large model or relying on a free
+quota that can change.
 
-At the current published price, `gpt-5.6-luna` costs US$0.20 per million input
-tokens and US$1.20 per million output tokens. The endpoint reads the actual
-`usage` returned by OpenAI and sends the token count plus an estimate to the UI.
-For example, 500 input + 120 output tokens is about US$0.000244. Actual totals
-depend on phrase/output size. Configure project spend limits/alerts and verify
-that enforcement is enabled: a notification-only budget is a soft threshold and
-does not stop requests by itself.
+An in-browser generative model remains a future optional enhancement. WebLLM or
+Transformers.js can run open models locally, but they require a substantial first
+download and compatible device memory/graphics support. They should only be
+offered behind an explicit download screen and must never replace the reliable
+local parser for the core transaction actions.
 
-The OpenAI model page does not list a supported free API tier for this model.
-FinanzApp therefore never requires it: clear commands use the local parser with
-zero API tokens, and the app remains functional when no key is configured.
-
-## Server configuration
-
-Set these values in the server/deployment environment:
-
-```text
-OPENAI_API_KEY=...
-OPENAI_MODEL=gpt-5.6-luna
-ASSISTANT_RATE_LIMIT_PER_MINUTE=30
-```
-
-`OPENAI_MODEL` is optional; the value above is the default. Configure both as
-server-side deployment variables, never prefix the key with `VITE_`, and never
-commit it to the repository.
+There is no remote assistant endpoint in the deployment and no AI API key to
+configure. The normal product therefore has no path that can create token
+charges.
 
 On the web, dictation uses interim browser Web Speech results so the textarea is
 updated while the person is still talking. In the

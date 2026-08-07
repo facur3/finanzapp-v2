@@ -3,6 +3,7 @@
 // and parsing human labels like "13 jul" into a Date near a reference date.
 
 export const MONTHS = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+export const FULL_MONTHS = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
 
 // Local-date ISO key "YYYY-MM-DD" (NOT UTC — matches the app's original behaviour).
 export function todayKey(d = new Date()) {
@@ -80,4 +81,37 @@ export function labelFromISO(iso, ref = new Date()) {
   if (days === 2) return 'Anteayer';
   const label = date.getDate() + ' ' + MONTHS[date.getMonth()];
   return date.getFullYear() === base.getFullYear() ? label : label + ' ' + date.getFullYear();
+}
+
+// Timeline headers keep the useful relative cue but always expose the real date.
+// "Hoy · 7 ago" is harder to misread than a floating "Hoy" and still scans fast.
+export function timelineLabelFromISO(iso, ref = new Date()) {
+  const relative = labelFromISO(iso, ref);
+  const m = String(iso || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return relative;
+  const short = Number(m[3]) + ' ' + MONTHS[Number(m[2]) - 1];
+  if (relative === 'Hoy' || relative === 'Ayer' || relative === 'Anteayer') return relative + ' · ' + short;
+  return relative;
+}
+
+export function fullDateLabel(iso) {
+  const m = String(iso || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return String(iso || '');
+  const year = Number(m[1]), month = Number(m[2]), day = Number(m[3]);
+  const date = new Date(year, month - 1, day);
+  if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) return String(iso || '');
+  return day + ' de ' + FULL_MONTHS[month - 1] + ' de ' + year;
+}
+
+// Persistence order is not a chronology guarantee: imports, edits and legacy
+// migrations may append older rows. Always derive list order from the real ISO date.
+export function sortTransactionsNewestFirst(transactions, ref = new Date()) {
+  return (Array.isArray(transactions) ? transactions : []).map((transaction, index) => ({ transaction, index })).sort((a, b) => {
+    const aISO = a.transaction.dateISO || isoFromLabel(a.transaction.dateLabel, ref);
+    const bISO = b.transaction.dateISO || isoFromLabel(b.transaction.dateLabel, ref);
+    if (aISO !== bISO) return aISO < bISO ? 1 : -1;
+    const aId = Number(a.transaction.id), bId = Number(b.transaction.id);
+    if (Number.isFinite(aId) && Number.isFinite(bId) && aId !== bId) return bId - aId;
+    return a.index - b.index;
+  }).map(item => item.transaction);
 }
