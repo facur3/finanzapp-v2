@@ -56,8 +56,9 @@ and quote convention:
 - Cocos Rendimiento Clase A from its official CAFCI regulatory page. The free
   ArgentinaDatos/CAFCI dataset is the fallback and is also used for compatible
   FCI history;
-- the Cocos annual percentage separately from the VCP. It is labelled as an
-  estimated TNA and is never used as if it were the actual daily return;
+- actual 7-day, 30-day and year-to-date FCI returns calculated from official
+  CAFCI VCP observations. A broker TNA capture can be shown as a dated reference,
+  but it is never treated as the actual return or silently refreshed by scraping;
 - historical charts through a provider-aware server adapter.
 
 Every saved quote carries source, observation time, fetch time and quality. A

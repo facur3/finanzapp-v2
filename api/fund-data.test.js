@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import handler, { getOfficialFundData, parseCafciFundPage } from './fund-data.js';
+import handler, { calculateFundReturns, getOfficialFundData, parseCafciFundPage } from './fund-data.js';
 
 const PAGE = `
   <a href="/v2/fondos/876/ficha-regulatoria.pdf?clase=2516&amp;fecha=2026-07-31">PDF</a>
@@ -31,6 +31,20 @@ describe('official CAFCI fund data', () => {
     await expect(getOfficialFundData('otro-fondo', vi.fn())).rejects.toThrow('unsupported fund');
   });
 
+  it('calculates actual period returns from the official VCP series', () => {
+    const returns = calculateFundReturns([
+      { date: '2025-12-30', price: 100 },
+      { date: '2026-07-01', price: 110 },
+      { date: '2026-07-24', price: 120 },
+      { date: '2026-07-31', price: 123 },
+    ]);
+    expect(returns.sevenDays).toMatchObject({ from: '2026-07-24', to: '2026-07-31' });
+    expect(returns.sevenDays.percent).toBeCloseTo(0.025, 12);
+    expect(returns.thirtyDays).toEqual({ percent: 123 / 110 - 1, from: '2026-07-01', to: '2026-07-31' });
+    expect(returns.yearToDate).toMatchObject({ from: '2025-12-30', to: '2026-07-31' });
+    expect(returns.yearToDate.percent).toBeCloseTo(0.23, 12);
+  });
+
   it('returns normalized official data from the server route', async () => {
     const oldFetch = global.fetch;
     global.fetch = vi.fn().mockResolvedValue({ ok: true, text: async () => PAGE });
@@ -40,5 +54,6 @@ describe('official CAFCI fund data', () => {
     expect(res.statusCode).toBe(200);
     expect(res.body.price).toBe(11465.424);
     expect(res.body.source).toBe('CAFCI oficial');
+    expect(res.body.returns.sevenDays).toBeTruthy();
   });
 });
