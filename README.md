@@ -38,7 +38,7 @@ original export.
 - Local state for accounts, movements, cards, categories, tags, investments and settings.
 - Verified local persistence with `localStorage`: integrity checksum, atomic
   write, automatic previous-good snapshot, corruption quarantine and v2 migration.
-- Empty-first onboarding and optional sample data from the design.
+- Empty-first onboarding: the app never inserts sample balances or movements into user data.
 - Category chart tap filters Activity automatically.
 - Functional quick-add flows, movement detail, card purchase, card payment,
   investment trade, account/category/tag/card forms, security/reset, settings and filters.
