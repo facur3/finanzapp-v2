@@ -2,7 +2,7 @@
    Infrastructure only: no UI, no push, no user-data caching. */
 'use strict';
 
-var CACHE = 'finanzapp-shell-v61';
+var CACHE = 'finanzapp-shell-v62';
 
 // App shell assets to precache. Kept intentionally small.
 var SHELL = [
@@ -50,6 +50,16 @@ self.addEventListener('fetch', function (event) {
   var url = new URL(req.url);
   if (url.origin !== self.location.origin) return; // never touch cross-origin provider requests
 
+  // API responses contain market data and must never be served stale from the
+  // app-shell cache. When offline, report the failure so the UI keeps its last
+  // explicitly persisted quote and can label it as such.
+  if (url.pathname.indexOf('/api/') === 0) {
+    event.respondWith(fetch(new Request(req, { cache: 'no-store' })).catch(function () {
+      return new Response(JSON.stringify({ error: 'offline' }), { status: 503, headers: { 'Content-Type': 'application/json' } });
+    }));
+    return;
+  }
+
   // Navigations: network-first so updates are picked up, fall back to cached shell offline.
   if (req.mode === 'navigate') {
     event.respondWith(
@@ -64,17 +74,16 @@ self.addEventListener('fetch', function (event) {
     return;
   }
 
-  // Same-origin static assets: stale-while-revalidate (offline-capable + self-updating).
+  // Same-origin static assets: network-first prevents a fresh HTML document from
+  // running against an older JS/CSS bundle. The verified shell remains available
+  // as an offline fallback.
   event.respondWith(
-    caches.match(req).then(function (cached) {
-      var network = fetch(req).then(function (res) {
+    fetch(req).then(function (res) {
         if (res && res.status === 200 && res.type === 'basic') {
           var copy = res.clone();
           caches.open(CACHE).then(function (c) { c.put(req, copy); });
         }
         return res;
-      }).catch(function () { return cached; });
-      return cached || network;
-    })
+      }).catch(function () { return caches.match(req); })
   );
 });

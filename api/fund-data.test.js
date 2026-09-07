@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import handler, { calculateFundReturns, getOfficialFundData, parseCafciFundPage } from './fund-data.js';
 
 const PAGE = `
-  <a href="/v2/fondos/876/ficha-regulatoria.pdf?clase=2516&amp;fecha=2026-07-31">PDF</a>
+  <a href="/v2/fondos/876/ficha-regulatoria.pdf?clase=2517&amp;fecha=2026-07-31">PDF</a>
   <td>Valor Cuotaparte</td><td class="value">11.465,424</td>
   <canvas data-vcp-chart-data-value="[{&quot;fecha&quot;:&quot;2026-07-24&quot;,&quot;valor&quot;:&quot;11423.10&quot;},{&quot;fecha&quot;:&quot;2026-07-31&quot;,&quot;valor&quot;:&quot;11465.424&quot;}]"></canvas>
 `;
@@ -40,9 +40,12 @@ describe('official CAFCI fund data', () => {
     ]);
     expect(returns.sevenDays).toMatchObject({ from: '2026-07-24', to: '2026-07-31' });
     expect(returns.sevenDays.percent).toBeCloseTo(0.025, 12);
-    expect(returns.thirtyDays).toEqual({ percent: 123 / 110 - 1, from: '2026-07-01', to: '2026-07-31' });
+    expect(returns.sevenDays.unitChange).toBe(3);
+    expect(returns.thirtyDays).toEqual({ percent: 123 / 110 - 1, unitChange: 13, from: '2026-07-01', to: '2026-07-31' });
     expect(returns.yearToDate).toMatchObject({ from: '2025-12-30', to: '2026-07-31' });
     expect(returns.yearToDate.percent).toBeCloseTo(0.23, 12);
+    expect(returns.lastPeriod).toMatchObject({ from: '2026-07-24', to: '2026-07-31', days: 7, unitChange: 3 });
+    expect(returns.lastPeriod.annualizedSimple).toBeCloseTo(0.025 * 365 / 7, 12);
   });
 
   it('returns normalized official data from the server route', async () => {
@@ -52,8 +55,12 @@ describe('official CAFCI fund data', () => {
     await handler({ query: { fund: 'cocos-rendimiento-clase-a' } }, res);
     global.fetch = oldFetch;
     expect(res.statusCode).toBe(200);
-    expect(res.body.price).toBe(11465.424);
+    expect(res.body.price).toBe(11.465424);
+    expect(res.body.history[0].price).toBe(11.4231);
+    expect(res.body.officialUrl).toContain('clase=2517');
     expect(res.body.source).toBe('CAFCI oficial');
     expect(res.body.returns.sevenDays).toBeTruthy();
+    expect(res.body.returns.sevenDays.unitChange).toBeCloseTo(0.042324, 12);
+    expect(res.body.returns.lastPeriod.days).toBe(7);
   });
 });

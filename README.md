@@ -36,21 +36,29 @@ original export.
 ## Functionality included
 
 - Local state for accounts, movements, cards, categories, tags, investments and settings.
-- Local persistence with `localStorage`, so data survives refresh/reopen.
+- Verified local persistence with `localStorage`: integrity checksum, atomic
+  write, automatic previous-good snapshot, corruption quarantine and v2 migration.
 - Empty-first onboarding and optional sample data from the design.
 - Category chart tap filters Activity automatically.
 - Functional quick-add flows, movement detail, card purchase, card payment,
   investment trade, account/category/tag/card forms, security/reset, settings and filters.
-- **Free local voice/text assistant** in Argentine Spanish for expenses, income, stored
-  recurring movements (for example “Cobré el sueldo”), card payments, new
-  recurrent rules, budgets, categories and tags. Dictation updates the text as
-  partial results arrive and every action shows a validated draft before writing.
+- **Free local voice/text assistant** in Argentine Spanish for expenses, income,
+  transfers, card purchases/payments, stored recurring movements (for example
+  “Cobré el sueldo”), new recurrent rules, budgets, categories and tags. It
+  separates amount/currency, merchant, category, detail, account and card; supports
+  local forms such as `mil`, `lucas` and `palos`; rejects questions/negations; and
+  offers safe inline choices when a phrase is genuinely ambiguous. Dictation updates
+  the text as partial results arrive and every action shows a validated draft that can
+  be edited (type, amount, source/merchant, category, account and date) before saving.
   It runs without an API key, paid tokens or a remote AI request.
+- iOS-style directional transitions and left-edge swipe back through the app's real
+  navigation history, including the previous tab or nested detail screen.
 - **Real dates** stored as ISO values, native calendar selection, and dynamic
   “Hoy/Ayer/5 ago” labels that do not become stale after midnight.
-- **Investments**: CEDEARs, crypto, Argentine bonds and FCI with live prices (CoinGecko, data912,
-  Yahoo, ArgentinaDatos), portfolio donut, per-asset price charts, and USD (dólar
-  cripto) valuation.
+- **Investments**: CEDEARs, crypto, Argentine bonds/ON and FCI with live prices
+  (Binance/CoinGecko, Data912, Yahoo and CAFCI), portfolio donut, per-asset price
+  charts, USD valuation, cash-aware buys/sells and a reconciliation mode that fixes
+  a broker holding without inventing income, expenses or cash movements.
 - Animated ARS/USD conversion by tapping the large dashboard amount.
 - Mixed ARS/USD account totals and reports are normalized with the current quote;
   each account and movement still shows its native currency.
@@ -107,7 +115,7 @@ behave fully in `build` + `preview`, not necessarily in `dev`).
 npm run check:repo
 ```
 
-Fails if `node_modules/`, `dist/`, `.vite/`, or `.env` are tracked by git.
+Fails if `node_modules/`, `dist/`, `.vite/`, `.playwright-mcp/`, or `.env` are tracked by git.
 
 ## Deploy to Vercel
 
@@ -140,7 +148,8 @@ Mostly static, plus `api/chart.js` (auto-detected by Vercel).
   loads offline.
 
 Every push to `master` triggers an automatic production redeploy. GitHub Actions
-(`.github/workflows/ci.yml`) builds and runs the repo-hygiene check on each push/PR.
+(`.github/workflows/ci.yml`) runs unit tests, builds and checks repository hygiene
+on each push/PR.
 
 ### Release & QA docs
 
@@ -197,6 +206,7 @@ runtime's existing Subresource Integrity (SRI) hashes, which were left unchanged
 - logs (`*.log`)
 - OS junk (`.DS_Store`, `Thumbs.db`, …)
 - local screenshots / temporary QA artifacts
+- `.playwright-mcp/`
 
 `npm run check:repo` and CI (`.github/workflows/ci.yml`) enforce this.
 

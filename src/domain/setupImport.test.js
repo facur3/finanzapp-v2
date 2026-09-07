@@ -15,9 +15,9 @@ const valid = {
 describe('setup import schema', () => {
   it('normalizes a safe incremental setup', () => {
     const result = parseSetupImport(valid);
-    expect(result.setup.cards[0]).toMatchObject({ last4: '0000', compras: [], cuotas: [], pagos: [] });
+    expect(result.setup.cards[0]).toMatchObject({ last4: '0000', statementAdjustment: 0, pendingAdjustment: 0, compras: [], cuotas: [], pendientes: [], pagos: [] });
     expect(result.setup.assets[0]).toMatchObject({ ticker: 'TEST', qty: 1, costUnknown: false });
-    expect(result.setup.assets[0]).toMatchObject({ quoteTicker: 'TEST', quoteCurrency: 'ARS', costCurrency: 'ARS', unitDivisor: 1 });
+    expect(result.setup.assets[0]).toMatchObject({ quoteTicker: 'TEST', quoteCurrency: 'ARS', costCurrency: 'ARS', unitDivisor: 1, vcpScale: 1 });
   });
 
   it('rejects an unsupported schema before it can touch app state', () => {
@@ -28,6 +28,12 @@ describe('setup import schema', () => {
     const payload = structuredClone(valid);
     payload.setup.assets[0] = { ...payload.setup.assets[0], avg: undefined, costUnknown: true };
     expect(parseSetupImport(payload).setup.assets[0]).toMatchObject({ costUnknown: true, avg: 1 });
+  });
+
+  it('uses the current price when an unknown historical cost was exported as zero', () => {
+    const payload = structuredClone(valid);
+    payload.setup.assets[0] = { ...payload.setup.assets[0], avg: 0, lastPrice: 1000, costUnknown: true };
+    expect(parseSetupImport(payload).setup.assets[0]).toMatchObject({ costUnknown: true, avg: 1000, lastPrice: 1000 });
   });
 
   it('preserves USD bond quote semantics and provenance', () => {
@@ -46,5 +52,29 @@ describe('setup import schema', () => {
     payload.setup.investmentLots[0] = { ...payload.setup.investmentLots[0], ticker: 'AO27D', currency: 'USD', unitDivisor: 100 };
     expect(parseSetupImport(payload).setup.assets[0]).toMatchObject({ quoteCurrency: 'USD', costCurrency: 'USD', unitDivisor: 100, arsQuoteTicker: 'AO27', lastPriceARS: 156160 });
     expect(parseSetupImport(payload).setup.investmentLots[0]).toMatchObject({ currency: 'USD', unitDivisor: 100 });
+  });
+
+  it('preserves the VCP scale used to normalize fund feeds', () => {
+    const payload = structuredClone(valid);
+    payload.setup.assets[0] = {
+      ...payload.setup.assets[0],
+      ticker: 'COCORMA',
+      fci: true,
+      fundSlug: 'cocos-rendimiento-clase-a',
+      vcpScale: 1000,
+    };
+    expect(parseSetupImport(payload).setup.assets[0]).toMatchObject({ ticker: 'COCORMA', fci: true, vcpScale: 1000 });
+  });
+
+  it('never imports a recurring income as a credit-card purchase', () => {
+    const payload = structuredClone(valid);
+    payload.setup.recurring = [{ id: 'salary', type: 'ingreso', concept: 'Sueldo', amount: 1000, targetKind: 'card', targetId: 'demo-card', day: 1 }];
+    expect(parseSetupImport(payload).setup.recurring[0]).toMatchObject({ type: 'ingreso', targetKind: 'account' });
+  });
+
+  it('accepts a card whose credit limit is not known yet', () => {
+    const payload = structuredClone(valid);
+    payload.setup.cards[0].limit = 0;
+    expect(parseSetupImport(payload).setup.cards[0].limit).toBe(0);
   });
 });

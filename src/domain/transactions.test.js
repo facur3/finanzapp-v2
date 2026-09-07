@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { applyTxn, reverseTxn } from './transactions.js';
+import { applyTxn, classifyImportedTransactionType, reverseTxn } from './transactions.js';
 
 // Characterization tests locking the v53 apply/reverse behaviour, plus the core
 // financial invariant: reverse(apply(x)) === x.
@@ -39,6 +39,14 @@ describe('transactions.applyTxn', () => {
     expect(reversed.b).toEqual({ usd: 500, ars: 20000 });
   });
 
+  it('applies and reverses a card payment in the funding account currency', () => {
+    const t = { type: 'pago', account: 'usd', val: 15000, accountAmount: 10 };
+    const applied = applyTxn(t, { usd: 100 }, {}, 0, 0);
+    expect(applied.b.usd).toBe(90);
+    const reversed = reverseTxn(t, applied.b, applied.ct, applied.mi, applied.me);
+    expect(reversed.b.usd).toBe(100);
+  });
+
   it('does not mutate the input balances/category objects', () => {
     const b = { a: 1000 };
     const ct = {};
@@ -64,5 +72,23 @@ describe('transactions round-trip', () => {
       expect(r.mi).toBe(mi0);
       expect(r.me).toBe(me0);
     }
+  });
+});
+
+describe('transactions.classifyImportedTransactionType', () => {
+  it('respects an explicit CSV type even when the amount has the opposite sign', () => {
+    expect(classifyImportedTransactionType('gasto', 1000)).toBe('gasto');
+    expect(classifyImportedTransactionType('ingreso', -1000)).toBe('ingreso');
+  });
+
+  it('uses the sign only when a simple type was not supplied', () => {
+    expect(classifyImportedTransactionType('', 1000)).toBe('ingreso');
+    expect(classifyImportedTransactionType('', -1000)).toBe('gasto');
+  });
+
+  it('rejects linked rows that a flat CSV cannot reconstruct safely', () => {
+    expect(classifyImportedTransactionType('transfer', -1000)).toBeNull();
+    expect(classifyImportedTransactionType('pago', -1000)).toBeNull();
+    expect(classifyImportedTransactionType('inversión', -1000)).toBeNull();
   });
 });

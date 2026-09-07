@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { todayKey, parseDate, isoFromLabel, labelFromISO, timelineLabelFromISO, fullDateLabel, sortTransactionsNewestFirst } from './dates.js';
+import { todayKey, monthlyDate, nextMonthlyOccurrence, parseDate, isoFromLabel, labelFromISO, timelineLabelFromISO, fullDateLabel, sortTransactionsNewestFirst } from './dates.js';
 
 describe('dates.todayKey', () => {
   it('formats a local YYYY-MM-DD (month is 1-based)', () => {
@@ -30,6 +30,24 @@ describe('dates.parseDate', () => {
     expect(d.getFullYear()).toBe(2025);
     expect(d.getMonth()).toBe(11);
     expect(d.getDate()).toBe(30);
+  });
+
+  it('clamps impossible monthly days instead of spilling into the next month', () => {
+    const d = parseDate('31 feb', new Date(2026, 1, 1));
+    expect(todayKey(d)).toBe('2026-02-28');
+  });
+});
+
+describe('monthly occurrences', () => {
+  it('uses the last day in short months and returns to the preferred day later', () => {
+    expect(todayKey(monthlyDate(2026, 1, 31))).toBe('2026-02-28');
+    expect(todayKey(monthlyDate(2026, 2, 31))).toBe('2026-03-31');
+    expect(todayKey(monthlyDate(2028, 1, 31))).toBe('2028-02-29');
+  });
+
+  it('includes today or selects next month when the occurrence passed', () => {
+    expect(todayKey(nextMonthlyOccurrence(15, new Date(2026, 6, 15)))).toBe('2026-07-15');
+    expect(todayKey(nextMonthlyOccurrence(15, new Date(2026, 6, 16)))).toBe('2026-08-15');
   });
 });
 

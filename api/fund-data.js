@@ -1,10 +1,19 @@
 const FUNDS = {
   'cocos-rendimiento-clase-a': {
     fundId: '876',
-    classId: '2516',
+    classId: '2517',
     name: 'Cocos Rendimiento - Clase A',
+    // CAFCI publishes this class as the value of 1,000 quota parts. Brokers
+    // expose COCORMA quantity in individual quota parts, so normalize the feed
+    // before it reaches portfolio valuation.
+    unitScale: 1000,
   },
 };
+
+export function fundUnitScale(slug) {
+  const fund = FUNDS[String(slug || '')];
+  return fund && Number(fund.unitScale) > 0 ? Number(fund.unitScale) : 0;
+}
 
 const decodeEntities = value => String(value || '')
   .replace(/&quot;/g, '"')
@@ -52,14 +61,30 @@ export function calculateFundReturns(history) {
   const fromTarget = target => {
     const reference = rows.filter(row => new Date(row.date + 'T12:00:00Z') <= target).at(-1);
     if (!reference || reference.date === current.date) return null;
-    return { percent: current.price / reference.price - 1, from: reference.date, to: current.date };
+    return {
+      percent: current.price / reference.price - 1,
+      unitChange: current.price - reference.price,
+      from: reference.date,
+      to: current.date,
+    };
   };
   const daysBefore = days => {
     const target = new Date(currentDate);
     target.setUTCDate(target.getUTCDate() - days);
     return fromTarget(target);
   };
+  const previous = rows[rows.length - 2];
+  const elapsedDays = Math.max(1, Math.round((Date.parse(current.date + 'T12:00:00Z') - Date.parse(previous.date + 'T12:00:00Z')) / 86400000));
+  const lastPercent = current.price / previous.price - 1;
   return {
+    lastPeriod: {
+      percent: lastPercent,
+      unitChange: current.price - previous.price,
+      annualizedSimple: lastPercent * 365 / elapsedDays,
+      days: elapsedDays,
+      from: previous.date,
+      to: current.date,
+    },
     sevenDays: daysBefore(7),
     thirtyDays: daysBefore(30),
     yearToDate: fromTarget(new Date(Date.UTC(currentDate.getUTCFullYear(), 0, 1, 12))),
@@ -74,9 +99,15 @@ export async function getOfficialFundData(slug, fetchImpl = fetch) {
   if (!response.ok) throw new Error('CAFCI ' + response.status);
   const parsed = parseCafciFundPage(await response.text());
   if (!(parsed.price > 0) || !parsed.asOf) throw new Error('CAFCI data not found');
+  const scale = fundUnitScale(slug) || 1;
+  const history = parsed.history.map(row => ({ ...row, price: row.price / scale }));
   return {
     ...parsed,
-    returns: calculateFundReturns(parsed.history),
+    price: parsed.price / scale,
+    history,
+    // Calculate after normalization so both the percentage and the absolute
+    // change refer to one individual quota part, just like the holding does.
+    returns: calculateFundReturns(history),
     name: fund.name,
     currency: 'ARS',
     source: 'CAFCI oficial',

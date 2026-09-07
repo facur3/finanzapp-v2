@@ -4,6 +4,12 @@ const positive = (value, field, allowZero = false) => {
   return number;
 };
 
+const finite = (value, field) => {
+  const number = Number(value);
+  if (!Number.isFinite(number)) throw new Error('invalid-' + field);
+  return number;
+};
+
 const text = (value, field, optional = false) => {
   const normalized = String(value ?? '').trim();
   if (!normalized && !optional) throw new Error('invalid-' + field);
@@ -52,15 +58,27 @@ function normalizeCard(card) {
     date: text(item?.date, 'payment-date', true),
     dateISO: text(item?.dateISO, 'payment-date-iso', true),
   }));
+  const pending = list(card?.pendientes).map(item => ({
+    name: text(item?.name, 'pending-purchase-name'),
+    monto: positive(item?.monto, 'pending-purchase-amount'),
+    installments: Math.max(1, Math.round(positive(item?.installments ?? 1, 'pending-purchase-installments'))),
+    date: text(item?.date, 'pending-purchase-date', true),
+    dateISO: text(item?.dateISO, 'pending-purchase-date-iso', true),
+  }));
   return {
     id: text(card?.id, 'card-id'),
     brand: text(card?.brand, 'card-brand'),
     bank: text(card?.bank, 'card-bank'),
     last4: text(card?.last4, 'card-last4'),
     saldo: positive(card?.saldo ?? 0, 'card-balance', true),
-    limit: positive(card?.limit, 'card-limit'),
+    statementPaid: positive(card?.statementPaid ?? 0, 'card-statement-paid', true),
+    statementAdjustment: finite(card?.statementAdjustment ?? 0, 'card-statement-adjustment'),
+    pendingAdjustment: finite(card?.pendingAdjustment ?? 0, 'card-pending-adjustment'),
+    limit: positive(card?.limit ?? 0, 'card-limit', true),
     cierre: text(card?.cierre, 'card-close'),
     vence: text(card?.vence, 'card-due'),
+    cierreDay: card?.cierreDay == null ? null : Math.min(31, Math.max(1, Math.round(positive(card.cierreDay, 'card-close-day')))),
+    venceDay: card?.venceDay == null ? null : Math.min(31, Math.max(1, Math.round(positive(card.venceDay, 'card-due-day')))),
     previousClose: text(card?.previousClose, 'card-previous-close', true),
     previousDue: text(card?.previousDue, 'card-previous-due', true),
     paidCycle: text(card?.paidCycle, 'card-paid-cycle', true),
@@ -69,6 +87,7 @@ function normalizeCard(card) {
     autopayAccount: text(card?.autopayAccount, 'card-autopay-account', true),
     compras: purchases,
     cuotas: installments,
+    pendientes: pending,
     pagos: payments,
   };
 }
@@ -77,6 +96,8 @@ function normalizeAsset(asset) {
   const costUnknown = !!asset?.costUnknown;
   const quoteCurrency = ['ARS', 'USD'].includes(String(asset?.quoteCurrency || '').toUpperCase()) ? String(asset.quoteCurrency).toUpperCase() : 'ARS';
   const costCurrency = ['ARS', 'USD'].includes(String(asset?.costCurrency || '').toUpperCase()) ? String(asset.costCurrency).toUpperCase() : quoteCurrency;
+  const lastPrice = positive(asset?.lastPrice ?? asset?.avg, 'asset-last-price');
+  const average = costUnknown && !(Number(asset?.avg) > 0) ? lastPrice : positive(asset?.avg, 'asset-average');
   return {
     accountId: text(asset?.accountId, 'asset-account'),
     id: text(asset?.id, 'asset-id'),
@@ -84,8 +105,8 @@ function normalizeAsset(asset) {
     name: text(asset?.name, 'asset-name'),
     emoji: text(asset?.emoji || '📈', 'asset-emoji'),
     qty: positive(asset?.qty, 'asset-quantity'),
-    avg: costUnknown ? positive(asset?.avg ?? asset?.lastPrice, 'asset-average') : positive(asset?.avg, 'asset-average'),
-    lastPrice: positive(asset?.lastPrice ?? asset?.avg, 'asset-last-price'),
+    avg: average,
+    lastPrice,
     quoteTicker: text(asset?.quoteTicker || asset?.ticker, 'asset-quote-ticker'),
     arsQuoteTicker: text(asset?.arsQuoteTicker, 'asset-ars-quote-ticker', true),
     lastPriceARS: positive(asset?.lastPriceARS ?? 0, 'asset-last-price-ars', true),
@@ -101,6 +122,7 @@ function normalizeAsset(asset) {
     fondoMatch: list(asset?.fondoMatch).map(value => text(value, 'fund-match')).filter(Boolean),
     fundSlug: text(asset?.fundSlug, 'fund-slug', true),
     officialRateSlug: text(asset?.officialRateSlug, 'official-rate-slug', true),
+    vcpScale: positive(asset?.vcpScale ?? 1, 'asset-vcp-scale'),
     estimatedAnnualRate: positive(asset?.estimatedAnnualRate ?? 0, 'asset-estimated-rate', true),
     estimatedAnnualRateAsOf: text(asset?.estimatedAnnualRateAsOf, 'asset-estimated-rate-as-of', true),
     estimatedAnnualRateSource: text(asset?.estimatedAnnualRateSource, 'asset-estimated-rate-source', true),
@@ -127,7 +149,9 @@ function normalizeLot(lot) {
 
 function normalizeRecurring(item) {
   const type = item?.type === 'ingreso' ? 'ingreso' : 'gasto';
-  const targetKind = item?.targetKind === 'card' ? 'card' : 'account';
+  // An income cannot be credited to a credit card. Preserve the record but
+  // normalize it to an account target so the app never posts it as a purchase.
+  const targetKind = type === 'ingreso' ? 'account' : (item?.targetKind === 'card' ? 'card' : 'account');
   return {
     id: text(item?.id, 'recurring-id'),
     type,

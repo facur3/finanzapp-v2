@@ -29,6 +29,7 @@ Desktop.ini
 
 # Local QA / temporary artifacts
 screenshots/
+.playwright-mcp/
 *.local
 .cache/
 tmp/

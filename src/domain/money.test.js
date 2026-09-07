@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { fmtNum, fmtInt, abbr, signed } from './money.js';
+import { fmtNum, fmtInt, abbr, parseMoneyInput, signed } from './money.js';
 
 // Characterization tests: lock the exact strings the v53 app produces.
 describe('money.fmtNum', () => {
@@ -35,5 +35,18 @@ describe('money.signed', () => {
     expect(signed(-1000)).toBe('-$1.000,00');
     expect(signed(1000)).toBe('+$1.000,00');
     expect(signed(0)).toBe('+$0,00');
+  });
+});
+
+describe('money.parseMoneyInput', () => {
+  it.each([
+    ['-12500.5', -12500.5],
+    ['-12.500,50', -12500.5],
+    ['-12,500.50', -12500.5],
+    ['$ 12.500', 12500],
+    ['US$ 1,20', 1.2],
+    ['1.234.567', 1234567],
+  ])('parses %s without changing its magnitude', (input, expected) => {
+    expect(parseMoneyInput(input)).toBe(expected);
   });
 });

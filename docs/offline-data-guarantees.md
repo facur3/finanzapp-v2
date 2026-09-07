@@ -24,7 +24,9 @@ React runtime is vendored locally, so startup never depends on `unpkg.com`.
 - App state is stored in `localStorage` under **`finanzapp:v2:state`**
   (legacy key `finanzapp.v2.state` is still read as a fallback).
 - The payload is a versioned envelope:
-  `{ app:"FinanzApp", schema:"finanzapp.local.v2", version:2, savedAt, state:{…} }`.
+  `{ app:"FinanzApp", schema:"finanzapp.local.v3", version:3, savedAt, revision, checksum, state:{…} }`.
+- Each write is verified before and after promotion from a temporary key. The last
+  valid primary snapshot is retained at `finanzapp:v2:state:backup`.
 - Only a fixed set of **persistent keys** is stored (accounts, balances, txns,
   categories, cards, totals, theme, privacy mode, etc.) — transient UI state
   (open sheets/modals, current tab, drafts) is never persisted.
@@ -39,9 +41,16 @@ another. Installing via "Add to Home Screen" keeps the same origin, so the
 installed app shares storage with that browser.
 
 **Optional cloud sync** (Supabase, see `SUPABASE_SETUP.md`) can bridge devices when
-signed in: the persistent snapshot is mirrored to a single JSONB row per user with
-last-write-wins by timestamp. `localStorage` remains the local source of truth and
-the app stays fully functional offline; the cloud is a mirror, not a dependency.
+signed in. `localStorage` remains the immediate source of truth and the app stays
+fully functional offline; the cloud is a mirror, not a dependency. Failed uploads
+remain marked as pending across reloads and retry when connectivity returns. If the
+cloud and the device both changed since their last successful sync, neither snapshot
+is overwritten automatically: the account screen asks which complete copy to keep.
+
+The JSON backup is the lossless restore format for the complete state. CSV remains
+useful for analysis and for importing simple income/expense rows; linked card
+payments, transfers and investment operations require JSON because a flat row does
+not contain enough state to rebuild both sides safely.
 
 ## No-flicker startup guarantee
 
@@ -66,11 +75,17 @@ skeleton, or visual masking was added, and the UI is unchanged.
 
 ## Corrupted / unavailable storage
 
-- If the saved payload is unparseable, the app **does not crash or blank-screen**:
-  it boots with safe defaults and shows the existing toast
-  "Datos locales dañados · se inició en modo seguro".
-- If `localStorage` is entirely unavailable (e.g. disabled), startup falls back to
-  defaults without throwing.
+- The v3 checksum detects truncated or modified snapshots before they are trusted.
+- Startup tries the valid primary snapshot first, then a verified interrupted-write
+  snapshot, the previous-good backup and finally the legacy v2 key.
+- If the primary payload is damaged, it is preserved at
+  `finanzapp:v2:state:corrupt` for diagnosis rather than silently overwritten.
+- When recovery succeeds, the app opens with the recovered real data, explains that
+  a backup was restored and promotes it back to the verified v3 format.
+- If every candidate is invalid, the app **does not crash or blank-screen**: it boots
+  with safe defaults and shows the damaged-data notice.
+- If `localStorage` is entirely unavailable (for example, disabled), startup falls
+  back to defaults without throwing.
 
 ## Limitations
 
@@ -78,14 +93,12 @@ skeleton, or visual masking was added, and the UI is unchanged.
 - **Storage is per-origin, per-browser, per-device.** Cross-device continuity is
   available only through the optional Supabase cloud sync; without it, storage stays
   local to each browser/device.
-- A corrupted payload currently falls back to defaults; the next successful save
-  overwrites the corrupted value. There is **no automatic quarantine/backup** of a
-  corrupted payload today (the app has no existing pattern for it). See the
-  migration path below if stronger durability is desired.
+- The checksum detects corruption but is not encryption or authentication. Device
+  access and browser-profile security still protect local data.
 - Fonts (Google Fonts / Poppins) are loaded cross-origin and not cached, so
   offline rendering falls back to system fonts (layout is unaffected).
 
-## Future durability path (not implemented — documented only)
+## Optional future durability path
 
 If richer storage is needed later, migrate persistence to **IndexedDB via Dexie**
 as a separate phase:
@@ -94,6 +107,7 @@ as a separate phase:
 2. Move the persistent snapshot into a Dexie table, preserving the same
    `coercePersistedState` validation and the synchronous-bootstrap guarantee
    (hydrate the first render from an in-memory cache seeded before mount).
-3. Optionally add a quarantine table for corrupted payloads before overwrite.
+3. Preserve the existing checksum, previous-good backup and corruption quarantine
+   semantics in the IndexedDB records.
 
 This is intentionally **out of scope** for the current local-first architecture.

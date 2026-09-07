@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>FinanzApp</title>
-<meta name="description" content="Personal finance app">
+<meta name="description" content="Finanzas personales privadas, simples y disponibles sin conexión">
 
 <!-- PWA -->
 <link rel="manifest" href="/manifest.webmanifest">
@@ -42,7 +42,7 @@
     } catch (e) {}
     document.documentElement.classList.add(standalone ? 'fa-standalone' : 'fa-browser');
   })();
-  window.FINANZAPP_VERSION = '1.2.0';
+  window.FINANZAPP_VERSION = '1.3.0';
   // Safe service-worker registration: only when supported; never blocks the app.
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', function () {

@@ -10,6 +10,26 @@ export function todayKey(d = new Date()) {
   return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
 }
 
+const normalizedDay = value => Math.min(31, Math.max(1, Math.trunc(Number(value)) || 1));
+
+// A monthly day such as 31 means "the last available day" in shorter months,
+// then returns to day 31 in the next long month. Native Date overflow would
+// otherwise skip February entirely or permanently drift to day 28.
+export function monthlyDate(year, month, preferredDay) {
+  const lastDay = new Date(year, month + 1, 0).getDate();
+  const date = new Date(year, month, Math.min(normalizedDay(preferredDay), lastDay));
+  date.setHours(0, 0, 0, 0);
+  return date;
+}
+
+export function nextMonthlyOccurrence(preferredDay, from = new Date()) {
+  const base = new Date(from);
+  base.setHours(0, 0, 0, 0);
+  let date = monthlyDate(base.getFullYear(), base.getMonth(), preferredDay);
+  if (date < base) date = monthlyDate(base.getFullYear(), base.getMonth() + 1, preferredDay);
+  return date;
+}
+
 // Parse a loose label ("13 jul", "3", "30 dic") into a normalized Date near `ref`.
 // Picks the nearest occurrence within ~6 months (so a December date seen in January
 // resolves to the previous year). Returns null when there's no day number.
@@ -23,12 +43,10 @@ export function parseDate(label, ref) {
     const i = MONTHS.indexOf(m[2].slice(0, 3));
     if (i >= 0) mon = i;
   }
-  let d = new Date(ref.getFullYear(), mon, day);
-  d.setHours(0, 0, 0, 0);
+  let d = monthlyDate(ref.getFullYear(), mon, day);
   const SIX = 183 * 86400000;
-  if (d - ref > SIX) d = new Date(ref.getFullYear() - 1, mon, day);
-  else if (ref - d > SIX) d = new Date(ref.getFullYear() + 1, mon, day);
-  d.setHours(0, 0, 0, 0);
+  if (d - ref > SIX) d = monthlyDate(ref.getFullYear() - 1, mon, day);
+  else if (ref - d > SIX) d = monthlyDate(ref.getFullYear() + 1, mon, day);
   return d;
 }
 

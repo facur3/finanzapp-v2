@@ -1,15 +1,15 @@
 {
   "name": "FinanzApp",
   "short_name": "FinanzApp",
-  "description": "Personal finance app",
+  "description": "Finanzas personales privadas, simples y disponibles sin conexión",
   "lang": "es",
   "dir": "ltr",
   "display": "standalone",
   "orientation": "portrait",
   "start_url": "/",
   "scope": "/",
-  "background_color": "#FAF9F6",
-  "theme_color": "#F0655C",
+  "background_color": "#F4F7FB",
+  "theme_color": "#0B63CE",
   "icons": [
     {
       "src": "/icon-192.png",

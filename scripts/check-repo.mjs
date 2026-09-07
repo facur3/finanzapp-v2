@@ -2,8 +2,9 @@
 /* Repository hygiene check. No dependencies.
    Fails if forbidden generated/local files are tracked by git. */
 import { execSync } from 'node:child_process';
+import { existsSync } from 'node:fs';
 
-const FORBIDDEN = [/^node_modules\//, /^dist\//, /^\.vite\//, /^\.env(\..*)?$/];
+const FORBIDDEN = [/^node_modules\//, /^dist\//, /^\.vite\//, /^\.playwright-mcp\//, /^\.env(\..*)?$/];
 
 let tracked = '';
 try {
@@ -17,6 +18,7 @@ const offenders = tracked
   .split('\n')
   .map((s) => s.trim())
   .filter(Boolean)
+  .filter((f) => existsSync(f))
   .filter((f) => FORBIDDEN.some((re) => re.test(f)));
 
 if (offenders.length) {

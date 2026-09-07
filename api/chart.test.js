@@ -18,14 +18,36 @@ describe('chart provider adapter', () => {
     vi.stubGlobal('fetch', vi.fn(async () => ({
       ok: true,
       text: async () => `
-        <a href="ficha-regulatoria.pdf?clase=2516&amp;fecha=2026-08-07">PDF</a>
+        <a href="ficha-regulatoria.pdf?clase=2517&amp;fecha=2026-08-07">PDF</a>
         <td>Valor Cuotaparte</td><td>11.503,24</td>
         <canvas data-vcp-chart-data-value="[{&quot;fecha&quot;:&quot;2026-08-06&quot;,&quot;valor&quot;:&quot;11496.91&quot;},{&quot;fecha&quot;:&quot;2026-08-07&quot;,&quot;valor&quot;:&quot;11503.24&quot;}]"></canvas>
       `,
     })));
     const res = response();
     await handler({ query: { provider: 'fci', fund: 'cocos-rendimiento-clase-a', range: 'max' } }, res);
-    expect(res.result.body).toMatchObject({ closes: [11496.91, 11503.24], currency: 'ARS', source: 'CAFCI oficial' });
+    expect(res.result.body).toMatchObject({ closes: [11.49691, 11.50324], currency: 'ARS', source: 'CAFCI oficial' });
+  });
+
+  it('keeps the same individual-quota scale when the official FCI page needs its fallback', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce({ ok: false, status: 503 })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ historico: [
+        { fecha: '2026-08-06', valorCuotaparte: 11496.91 },
+        { fecha: '2026-08-07', valorCuotaparte: 11503.24 },
+      ] }) });
+    vi.stubGlobal('fetch', fetchMock);
+    const res = response();
+    await handler({ query: { provider: 'fci', fund: 'cocos-rendimiento-clase-a', range: 'max' } }, res);
+    expect(res.result.body).toMatchObject({ closes: [11.49691, 11.50324], currency: 'ARS', source: 'CAFCI vía ArgentinaDatos' });
+  });
+
+  it('does not forward arbitrary fund slugs to a fallback provider', async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    const res = response();
+    await handler({ query: { provider: 'fci', fund: 'otro-fondo', range: 'max' } }, res);
+    expect(res.result.body).toMatchObject({ closes: [], error: 'unsupported fund' });
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it('normalizes CoinGecko millisecond timestamps to seconds', async () => {

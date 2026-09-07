@@ -37,3 +37,34 @@ export function displayAmount(raw) {
   if (raw.indexOf(',') >= 0) out += ',' + (parts[1] || '');
   return out;
 }
+
+// Accept both the app's Argentine display format and machine/US decimal output.
+// This is used by CSV import, including files exported by FinanzApp itself where
+// JavaScript serializes decimals with a dot (for example, "-12500.5").
+export function parseMoneyInput(value) {
+  const original = String(value ?? '').trim();
+  if (!original) return NaN;
+  const negative = /^\s*-/.test(original) || /^\s*\(.*\)\s*$/.test(original);
+  const clean = original.replace(/[^0-9.,]/g, '');
+  if (!/\d/.test(clean)) return NaN;
+
+  const dot = clean.lastIndexOf('.');
+  const comma = clean.lastIndexOf(',');
+  let normalized = clean;
+  if (dot >= 0 && comma >= 0) {
+    const decimal = dot > comma ? '.' : ',';
+    const thousands = decimal === '.' ? ',' : '.';
+    normalized = clean.split(thousands).join('').replace(decimal, '.');
+  } else {
+    const separator = dot >= 0 ? '.' : comma >= 0 ? ',' : '';
+    if (separator) {
+      const groups = clean.split(separator);
+      const thousandsOnly = groups.length > 2
+        ? groups.slice(1).every(group => group.length === 3)
+        : groups[1].length === 3;
+      normalized = thousandsOnly ? groups.join('') : groups.slice(0, -1).join('') + '.' + groups[groups.length - 1];
+    }
+  }
+  const number = Number(normalized);
+  return Number.isFinite(number) ? (negative ? -Math.abs(number) : number) : NaN;
+}

@@ -1,12 +1,12 @@
 # FinanzApp — Production Release Checklist
 
-Run before every production deploy. The UI/UX is frozen: it must look and behave
-identically to the approved Claude Design baseline. This checklist validates the
-build, the PWA shell, the vendored runtime, offline behavior, and repo hygiene.
+Run before every production deploy. This checklist validates the current product
+behavior, build, PWA shell, vendored runtime, offline guarantees and repo hygiene.
 
 ## 1. Build & local preview
 
 - [ ] `npm install`
+- [ ] `npm test` passes
 - [ ] `npm run build` passes with no errors
 - [ ] `npm run check:repo` → "OK: no forbidden generated files are tracked"
 - [ ] `npm run preview` serves `dist/` and the app loads
@@ -40,6 +40,10 @@ build, the PWA shell, the vendored runtime, offline behavior, and repo hygiene.
 - [ ] CSV export works
 - [ ] JSON backup export works
 - [ ] JSON backup import works
+- [ ] Assistant separates type, amount, source/merchant, category and account
+- [ ] Assistant draft opens in Edit and saves the reviewed values only
+- [ ] Investment reconciliation changes holdings without creating cash movements
+- [ ] Left-edge swipe returns to the actual previous tab/detail screen
 
 ## 6. Install
 
@@ -50,8 +54,7 @@ build, the PWA shell, the vendored runtime, offline behavior, and repo hygiene.
 ## 7. Visual confirmation
 
 - [ ] Screens, layout, spacing, typography, colors, buttons, cards, charts,
-      sheets, modals, navigation, icons, labels, and animations are **unchanged**
-- [ ] No new UI elements were added (no install banner / update popup / offline screen)
+      sheets, modals, navigation, icons, labels, and animations are internally consistent
 - [ ] Production app does **not** render the Claude Design device mockup/chrome
       (no fake iPhone frame, no fake status bar/time/battery) — the real device
       provides its own status bar
@@ -64,7 +67,7 @@ build, the PWA shell, the vendored runtime, offline behavior, and repo hygiene.
 - [ ] `git status --short` is clean (no generated files)
 - [ ] `git diff --stat` shows only intended changes
 - [ ] `npm run check:repo` passes
-- [ ] `node_modules/`, `dist/`, `.vite/`, `.env` are NOT tracked
+- [ ] `node_modules/`, `dist/`, `.vite/`, `.playwright-mcp/`, `.env` are NOT tracked
 
 ## 9. Deploy to Vercel (step by step)
 

@@ -1,4 +1,4 @@
-import { getOfficialFundData } from './fund-data.js';
+import { fundUnitScale, getOfficialFundData } from './fund-data.js';
 
 // Server-side historical chart adapter. The browser requests one normalized
 // shape while the server chooses the correct public source for each asset.
@@ -30,6 +30,8 @@ export default async function handler(req, res) {
     if (provider === 'fci') {
       const fund = safe(query.fund, /^[a-z0-9-]+$/);
       if (!fund) return send(res, { closes: [], times: [], currency: 'ARS', error: 'missing fund' });
+      const unitScale = fundUnitScale(fund);
+      if (!unitScale) return send(res, { closes: [], times: [], currency: 'ARS', error: 'unsupported fund' });
       let points = [];
       let source = 'CAFCI oficial';
       try {
@@ -40,7 +42,7 @@ export default async function handler(req, res) {
         if (!response.ok) throw new Error('FCI provider ' + response.status);
         const data = await response.json();
         points = (Array.isArray(data && data.historico) ? data.historico : [])
-          .map(row => ({ time: Date.parse(row.fecha), close: Number(row.valorCuotaparte) }));
+          .map(row => ({ time: Date.parse(row.fecha), close: Number(row.valorCuotaparte) / unitScale }));
         source = 'CAFCI vía ArgentinaDatos';
       }
       const cutoff = cutoffFor(range);
