@@ -273,3 +273,50 @@ export function restoreFciUnits(assetsByAccount, redemption) {
   }
   return { ...(assetsByAccount || {}), [accountId]: accountAssets };
 }
+
+// Pays an ARS liability from either a normal account or a spendable FCI. The
+// caller receives one reversible mutation and transaction metadata, so manual
+// payments, assistant actions and due-date automations cannot drift apart.
+export function fundCardPayment(state, sourceId, amountARS, usdRate = state && state.usdRate) {
+  const amount = finite(amountARS);
+  const accounts = (state && state.accounts) || {};
+  const balances = (state && state.balances) || {};
+  const assets = (state && state.assets) || {};
+  const archived = (state && state.archived) || {};
+  if (!(amount > 0) || !sourceId) return { ok: false, error: 'invalid-source' };
+
+  const fci = findFciSpendSource(state, sourceId, usdRate);
+  if (fci) {
+    if (archived[fci.accountId]) return { ok: false, error: 'archived' };
+    const redeemed = redeemFciUnits(assets, sourceId, amount, usdRate);
+    if (!redeemed.ok) return redeemed;
+    const valuation = investmentValuation(redeemed.assets[fci.accountId], usdRate);
+    const nextBalance = valuation.complete ? valuation.valueARS : (finite(balances[fci.accountId]) - amount);
+    return {
+      ok: true,
+      assets: redeemed.assets,
+      balances: { ...balances, [fci.accountId]: nextBalance },
+      transaction: {
+        account: fci.accountId,
+        accountAmount: amount,
+        fciRedemption: redeemed.redemption,
+        fundingLabel: 'FCI · ' + redeemed.redemption.name,
+      },
+    };
+  }
+
+  const account = accounts[sourceId];
+  if (!account || archived[sourceId]) return { ok: false, error: 'missing-account' };
+  const currency = normalizeCurrency(account.currency);
+  if (currency === 'USD' && !(finite(usdRate) > 0)) return { ok: false, error: 'missing-rate' };
+  const accountDebit = convertCurrency(amount, 'ARS', currency, usdRate);
+  if (account.balanceKnown !== false && finite(balances[sourceId]) + 0.005 < accountDebit) {
+    return { ok: false, error: 'insufficient', available: finite(balances[sourceId]) };
+  }
+  return {
+    ok: true,
+    assets,
+    balances: { ...balances, [sourceId]: finite(balances[sourceId]) - accountDebit },
+    transaction: { account: sourceId, accountAmount: accountDebit },
+  };
+}

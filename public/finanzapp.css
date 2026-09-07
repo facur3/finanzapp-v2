@@ -123,6 +123,17 @@ button{appearance:none;-webkit-appearance:none;border:0;padding:0;background:tra
 .fa-portfolio-header span{font-size:11px;color:var(--text-3);font-weight:650}
 .fa-asset-row{display:flex;align-items:center;gap:12px;background:var(--card);border:1px solid var(--hairline);border-radius:18px;padding:14px;box-shadow:var(--shadow-pill);cursor:pointer}
 .fa-asset-row+.fa-asset-row{margin-top:1px}
+.fa-asset-row>div:nth-child(2){min-width:0;overflow:hidden}
+.fa-asset-row>div:nth-child(2)>div:last-child{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fa-asset-row>div:nth-child(3){min-width:0!important;max-width:43%;overflow:hidden}
+.fa-asset-row>div:nth-child(3)>div{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fa-card-summary-grid>div{min-width:0;overflow:hidden}
+.fa-card-summary-grid>div>div:nth-child(2){font-size:clamp(15px,4.1vw,19px)!important;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-variant-numeric:tabular-nums}
+.fa-card-summary-grid>div>div:nth-child(3){white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+@media(max-width:430px){
+  .fa-card-summary-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+  .fa-card-summary-grid>div:last-child:nth-child(3){grid-column:1/-1}
+}
 .fa-native-date{color-scheme:light}
 [data-theme="dark"] .fa-native-date{color-scheme:dark}
 

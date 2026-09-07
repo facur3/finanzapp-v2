@@ -6,6 +6,7 @@ import {
   assetValueARS,
   fciPeriodChange,
   findFciSpendSource,
+  fundCardPayment,
   investmentValuation,
   matchFundRecord,
   quoteFreshness,
@@ -88,6 +89,30 @@ describe('FCI spendable liquidity', () => {
   it('refuses an expense larger than the fund value', () => {
     const [source] = spendableFciSources(state);
     expect(redeemFciUnits(state.assets, source.id, 10001, state.usdRate)).toMatchObject({ ok: false, error: 'insufficient' });
+  });
+
+  it('funds a card payment by redeeming FCI units exactly once and is reversible', () => {
+    const [source] = spendableFciSources(state);
+    const funded = fundCardPayment({ ...state, balances: { portfolio: 10000 } }, source.id, 2500);
+    expect(funded).toMatchObject({
+      ok: true,
+      balances: { portfolio: 7500 },
+      transaction: { account: 'portfolio', accountAmount: 2500, fundingLabel: 'FCI · Cocos Rendimiento FCI' },
+    });
+    expect(funded.assets.portfolio[0]).toMatchObject({ qty: 7.5, units: 7.5 });
+    expect(restoreFciUnits(funded.assets, funded.transaction.fciRedemption).portfolio[0].qty).toBeCloseTo(10, 8);
+  });
+
+  it('funds a card payment from a regular account in its own currency', () => {
+    const funded = fundCardPayment({
+      accounts: { usd: { currency: 'USD' } }, balances: { usd: 100 }, assets: {}, archived: {}, usdRate: 1500,
+    }, 'usd', 15000);
+    expect(funded).toMatchObject({ ok: true, balances: { usd: 90 }, transaction: { account: 'usd', accountAmount: 10 } });
+  });
+
+  it('refuses to overdraw the FCI when paying a card', () => {
+    const [source] = spendableFciSources(state);
+    expect(fundCardPayment({ ...state, balances: { portfolio: 10000 } }, source.id, 10001)).toMatchObject({ ok: false, error: 'insufficient' });
   });
 });
 

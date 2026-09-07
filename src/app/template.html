@@ -344,7 +344,7 @@
           </div>
         </div>
         <div onClick="{{ openCardDetail }}" style="display:flex;align-items:center;justify-content:space-between;background:var(--surface);border-radius:16px;padding:14px 16px;margin-bottom:24px;cursor:pointer;">
-          <span style="font-size:14px;font-weight:600;">Ver resumen de {{ selBrand }}</span>
+          <span style="font-size:14px;font-weight:600;">Ver resumen y configurar {{ selBrand }}</span>
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--text-3)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"></polyline></svg>
         </div>
         <div style="font-size:15px;font-weight:700;margin:0 2px 12px;">Cuotas activas · {{ selBrand }}</div>
@@ -708,7 +708,7 @@
           <div onClick="{{ popScreen }}" style="width:40px;height:40px;border-radius:50%;background:var(--surface);display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--text);"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 6 9 12 15 18"></polyline></svg></div>
           <span style="font-size:17px;font-weight:700;">Inversiones</span>
         </div>
-        <div style="font-size:13px;font-weight:500;color:var(--text-2);margin-bottom:2px;">Total invertido</div>
+        <div style="font-size:13px;font-weight:500;color:var(--text-2);margin-bottom:2px;">Valor actual</div>
         <sc-if value="{{ portNoAssets }}" hint-placeholder-val="{{ false }}">
           <div style="display:flex;flex-direction:column;align-items:center;text-align:center;padding:50px 30px;">
             <div style="width:80px;height:80px;border-radius:24px;background:var(--cat-inversion-fill);display:flex;align-items:center;justify-content:center;font-size:36px;margin-bottom:18px;">📈</div>
@@ -851,7 +851,7 @@
             <div style="display:flex;justify-content:space-between;padding:9px 0;border-top:1px solid var(--hairline);"><span style="font-size:13px;color:var(--text-2);font-weight:500;">Invertiste</span><span style="font-size:13px;font-weight:700;">{{ adACostStr }}</span></div>
             <div style="display:flex;justify-content:space-between;padding:9px 0;border-top:1px solid var(--hairline);"><span style="font-size:13px;color:var(--text-2);font-weight:500;">{{ adAResultWord }} (desde tu compra)</span><span style="font-size:13px;font-weight:700;color: {{ adAGLColor }};">{{ adAResultSignStr }} ({{ adAGLPctStr }})</span></div>
           </sc-if>
-          <sc-if value="{{ adACostPending }}" hint-placeholder-val="{{ false }}"><div style="padding:11px 0 1px;border-top:1px solid var(--hairline);font-size:12.5px;color:var(--text-2);font-weight:600;line-height:1.45;">El valor actual y los rendimientos oficiales del fondo son válidos. Falta tu costo de compra inicial, por eso FinanzApp oculta únicamente tu ganancia o pérdida personal.</div></sc-if>
+          <sc-if value="{{ adACostPending }}" hint-placeholder-val="{{ false }}"><div style="padding:11px 0 1px;border-top:1px solid var(--hairline);"><div style="font-size:12.5px;color:var(--text-2);font-weight:600;line-height:1.45;">El valor actual es válido. Cargá cuánto pagaste en total para calcular tu rendimiento personal.</div><div onClick="{{ adAOpenCost }}" style="display:inline-flex;margin-top:10px;padding:8px 11px;border-radius:11px;background:var(--accent-soft);color:var(--accent);font-size:12px;font-weight:750;cursor:pointer;">Cargar costo total</div></div></sc-if>
         </div>
         <div style="display:flex;gap:9px;margin-bottom:22px;">
           <div onClick="{{ adABuy }}" style="flex:1;height:52px;border-radius:16px;background:var(--accent);color:var(--on-accent);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:15px;font-weight:700;">Comprar más</div>
@@ -868,6 +868,16 @@
                 <span style="font-size:14px;font-weight:700;color: {{ o.color }};">{{ o.amountStr }}</span>
               </div>
             </sc-for>
+          </div>
+        </sc-if>
+        <sc-if value="{{ adACostOpen }}" hint-placeholder-val="{{ false }}">
+          <div onClick="{{ adACloseCost }}" style="position:fixed;inset:0;z-index:50;background:rgba(0,0,0,.38);animation:faFade .2s ease;"></div>
+          <div style="position:fixed;left:0;right:0;bottom:0;z-index:51;background:var(--bg);border-radius:28px 28px 0 0;padding:15px 22px calc(28px + env(safe-area-inset-bottom));animation:faSheet .3s cubic-bezier(.22,1,.36,1);">
+            <div style="width:40px;height:4px;border-radius:2px;background:var(--surface-strong);margin:0 auto 16px;"></div>
+            <div style="font-size:18px;font-weight:800;margin-bottom:5px;">Costo total de {{ adATicker }}</div>
+            <div style="font-size:12px;color:var(--text-2);font-weight:550;line-height:1.45;margin-bottom:14px;">Sumá todo lo que pagaste por la cantidad que hoy tenés. Esto calcula rendimiento; no descuenta dinero.</div>
+            <div style="display:flex;align-items:center;gap:8px;background:var(--card);border:1px solid var(--hairline);border-radius:17px;padding:14px 16px;margin-bottom:13px;"><span style="font-size:16px;font-weight:750;color:var(--text-2);">{{ adACostPrefix }}</span><input value="{{ adACostAmount }}" onChange="{{ setAdACostAmount }}" inputmode="decimal" placeholder="0,00" style="flex:1;min-width:0;border:0;outline:0;background:transparent;color:var(--text);font-size:22px;font-weight:780;"></div>
+            <div onClick="{{ adASaveCost }}" style="height:52px;border-radius:16px;background:var(--accent);color:var(--on-accent);display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:750;cursor:pointer;">Guardar costo</div>
           </div>
         </sc-if>
       </div>
@@ -1211,6 +1221,7 @@
         <div style="background:var(--card);border-radius:22px;padding:2px 16px;box-shadow:var(--shadow-pill);margin-bottom:18px;">
           <div onClick="{{ pickPayAccount }}" style="display:flex;align-items:center;gap:12px;padding:15px 0;cursor:pointer;"><span style="font-size:14px;color:var(--text-2);font-weight:500;width:74px;">Pagar con</span><div style="width:34px;height:34px;border-radius:11px;background:var(--surface);display:flex;align-items:center;justify-content:center;font-size:17px;">{{ payAccEmoji }}</div><span style="flex:1;font-size:15px;font-weight:600;">{{ payAccName }}</span><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--text-3)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"></polyline></svg></div>
         </div>
+        <div style="font-size:11.5px;color:var(--text-3);font-weight:550;line-height:1.4;margin:-8px 4px 14px;">Si pagás el resumen completo antes del vencimiento, el débito automático reconoce el pago y no vuelve a descontarlo.</div>
         <div style="flex:1;"></div>
         <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:12px;">
           <sc-for list="{{ payKeypad }}" as="key" hint-placeholder-count="12">
@@ -1976,6 +1987,7 @@
           <sc-if value="{{ ncardAutopayOn }}" hint-placeholder-val="{{ false }}">
             <div style="font-size:12px;font-weight:600;color:var(--text-2);margin:14px 0 9px;">Pagar desde</div>
             <div style="display:flex;flex-wrap:wrap;gap:8px;"><sc-for list="{{ ncardAutopayAccounts }}" as="a" hint-placeholder-count="3"><div onClick="{{ a.onPick }}" style="display:flex;align-items:center;gap:6px;padding:9px 13px;border-radius:13px;font-size:13px;font-weight:600;cursor:pointer;background: {{ a.bg }};color: {{ a.color }};"><span>{{ a.emoji }}</span>{{ a.label }}</div></sc-for></div>
+            <div style="font-size:11px;color:var(--text-3);font-weight:540;line-height:1.4;margin-top:10px;">También podés elegir Cocos Rendimiento FCI. FinanzApp rescata sólo las cuotapartes necesarias y registra un único pago.</div>
           </sc-if>
         </div>
         <div onClick="{{ saveCard }}" style="height:56px;border-radius:18px;background:var(--accent);display:flex;align-items:center;justify-content:center;gap:9px;cursor:pointer;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="5 12 10 17 19 7"></polyline></svg><span style="font-size:17px;font-weight:700;color:var(--on-accent);">{{ ncardSaveLabel }}</span></div>
