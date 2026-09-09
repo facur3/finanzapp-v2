@@ -14,15 +14,20 @@ button{appearance:none;-webkit-appearance:none;border:0;padding:0;background:tra
 .fa-frame [style*="cursor:pointer"]:active{transform:scale(.975)}
 .fa-main-scroll{padding-left:clamp(16px,5vw,24px)!important;padding-right:clamp(16px,5vw,24px)!important;padding-bottom:calc(102px + env(safe-area-inset-bottom,0px))!important}
 .fa-screen{will-change:transform,opacity;backface-visibility:hidden;-webkit-backface-visibility:hidden}
-.fa-frame[data-nav-state="entering"]>.fa-screen{animation:faPushIn .34s cubic-bezier(.22,1,.36,1) both!important;pointer-events:none}
-.fa-frame[data-nav-state="leaving"] .fa-screen{animation:faPushOut .18s cubic-bezier(.4,0,1,1) both!important;pointer-events:none}
+.fa-frame[data-nav-state="entering"]>.fa-screen:not(.fa-stack-underlay){animation:faPushIn .34s cubic-bezier(.22,1,.36,1) both!important;pointer-events:none}
+.fa-frame[data-nav-state="leaving"] .fa-screen:not(.fa-stack-underlay){animation:faPushOut .18s cubic-bezier(.4,0,1,1) both!important;pointer-events:none}
+.fa-frame[data-nav-state="entering"]>.fa-add-screen{animation:faModalIn .36s cubic-bezier(.22,1,.36,1) both!important}
+.fa-frame[data-nav-state="leaving"]>.fa-add-screen{animation:faModalOut .2s cubic-bezier(.4,0,1,1) both!important}
+.fa-frame[data-nav-state="leaving"]>.fa-sheet-backdrop{animation:faFadeOut .18s ease both!important;pointer-events:none}.fa-frame[data-nav-state="leaving"]>.fa-bottom-sheet{animation:faSheetOut .2s cubic-bezier(.4,0,1,1) both!important;pointer-events:none}
+.fa-stack-underlay{pointer-events:none!important;animation:none!important}
+.fa-frame[data-sub-motion="leaving"] .fa-add-sub-backdrop{animation:faFadeOut .18s ease both!important;pointer-events:none}.fa-frame[data-sub-motion="leaving"] .fa-add-sub-sheet{animation:faSheetOut .19s cubic-bezier(.4,0,1,1) both!important;pointer-events:none}
 .fa-frame[data-nav-state="back-settle"] .fa-screen{animation:none!important}
 .fa-frame[data-tab-motion="leaving"][data-tab-direction="next"] .fa-main-scroll>[data-screen-label]{animation:faTabLeaveNext .125s cubic-bezier(.4,0,1,1) both;pointer-events:none}
 .fa-frame[data-tab-motion="leaving"][data-tab-direction="prev"] .fa-main-scroll>[data-screen-label]{animation:faTabLeavePrev .125s cubic-bezier(.4,0,1,1) both;pointer-events:none}
 .fa-frame[data-tab-motion="entering"][data-tab-direction="next"] .fa-main-scroll>[data-screen-label]{animation:faTabEnterNext .3s cubic-bezier(.22,1,.36,1) both}
 .fa-frame[data-tab-motion="entering"][data-tab-direction="prev"] .fa-main-scroll>[data-screen-label]{animation:faTabEnterPrev .3s cubic-bezier(.22,1,.36,1) both}
-.fa-frame[data-swipe-state="tracking"][data-swipe-layer="overlay"]>.fa-screen{animation:none!important;transform:translate3d(var(--swipe-x),0,0)!important;transition:none!important;box-shadow:-14px 0 34px rgba(9,25,47,.12)}
-.fa-frame[data-swipe-state="cancelling"][data-swipe-layer="overlay"]>.fa-screen,.fa-frame[data-swipe-state="completing"][data-swipe-layer="overlay"]>.fa-screen{animation:none!important;transform:translate3d(var(--swipe-x),0,0)!important;transition:transform .18s cubic-bezier(.22,1,.36,1)!important}
+.fa-frame[data-swipe-state="tracking"][data-swipe-layer="overlay"]>.fa-screen:not(.fa-stack-underlay){animation:none!important;transform:translate3d(var(--swipe-x),0,0)!important;transition:none!important;box-shadow:-14px 0 34px rgba(9,25,47,.12)}
+.fa-frame[data-swipe-state="cancelling"][data-swipe-layer="overlay"]>.fa-screen:not(.fa-stack-underlay),.fa-frame[data-swipe-state="completing"][data-swipe-layer="overlay"]>.fa-screen:not(.fa-stack-underlay){animation:none!important;transform:translate3d(var(--swipe-x),0,0)!important;transition:transform .18s cubic-bezier(.22,1,.36,1)!important}
 .fa-frame[data-swipe-state="tracking"][data-swipe-layer="tab"] .fa-main-scroll>[data-screen-label]{animation:none!important;transform:translate3d(var(--swipe-x),0,0)!important;transition:none!important}
 .fa-frame[data-swipe-state="cancelling"][data-swipe-layer="tab"] .fa-main-scroll>[data-screen-label],.fa-frame[data-swipe-state="completing"][data-swipe-layer="tab"] .fa-main-scroll>[data-screen-label]{animation:none!important;transform:translate3d(var(--swipe-x),0,0)!important;transition:transform .18s cubic-bezier(.22,1,.36,1)!important}
 
@@ -146,7 +151,7 @@ button{appearance:none;-webkit-appearance:none;border:0;padding:0;background:tra
   .fa-card-summary-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important}
   .fa-card-summary-grid>div:last-child:nth-child(3){grid-column:1/-1}
 }
-.fa-native-date{color-scheme:light}
+.fa-native-date{display:block;width:100%;max-width:100%;min-width:0;min-inline-size:0;overflow:hidden;color-scheme:light;-webkit-appearance:none;appearance:none}
 [data-theme="dark"] .fa-native-date{color-scheme:dark}
 
 @keyframes faUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
@@ -154,6 +159,10 @@ button{appearance:none;-webkit-appearance:none;border:0;padding:0;background:tra
 @keyframes faPushOut{from{transform:translate3d(0,0,0);opacity:1}to{transform:translate3d(46px,0,0);opacity:0}}
 @keyframes faSheet{from{transform:translateY(110%)}to{transform:translateY(0)}}
 @keyframes faFade{from{opacity:0}to{opacity:1}}
+@keyframes faFadeOut{from{opacity:1}to{opacity:0}}
+@keyframes faSheetOut{from{transform:translateY(0)}to{transform:translateY(108%)}}
+@keyframes faModalIn{from{transform:translateY(34px) scale(.992);opacity:.25}to{transform:translateY(0) scale(1);opacity:1}}
+@keyframes faModalOut{from{transform:translateY(0) scale(1);opacity:1}to{transform:translateY(38px) scale(.992);opacity:0}}
 @keyframes faPop{0%{transform:scale(.88);opacity:0}100%{transform:scale(1);opacity:1}}
 @keyframes faMoneyUp{0%{opacity:.12;transform:translateY(14px);filter:blur(4px)}100%{opacity:1;transform:translateY(0);filter:blur(0)}}
 @keyframes faMoneyDown{0%{opacity:.12;transform:translateY(-14px);filter:blur(4px)}100%{opacity:1;transform:translateY(0);filter:blur(0)}}

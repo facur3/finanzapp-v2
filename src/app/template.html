@@ -1,5 +1,5 @@
 <div style="min-height:100vh;width:100%;" data-theme="{{ theme }}">
-  <div class="fa-frame" data-theme="{{ theme }}" data-nav-state="{{ navState }}" data-tab-motion="{{ tabMotion }}" data-tab-direction="{{ tabDirection }}" data-swipe-state="{{ swipeState }}" data-swipe-layer="{{ swipeLayer }}" onTouchStart="{{ beginBackSwipe }}" onTouchMove="{{ moveBackSwipe }}" onTouchEnd="{{ endBackSwipe }}" onTouchCancel="{{ endBackSwipe }}" style="position:fixed;inset:0;background:var(--bg);color:var(--text);--accent: {{ accentVar }};--swipe-x: {{ swipeOffset }}px;">
+  <div class="fa-frame" data-theme="{{ theme }}" data-nav-state="{{ navState }}" data-sub-motion="{{ subMotion }}" data-tab-motion="{{ tabMotion }}" data-tab-direction="{{ tabDirection }}" data-swipe-state="{{ swipeState }}" data-swipe-layer="{{ swipeLayer }}" onTouchStart="{{ beginBackSwipe }}" onTouchMove="{{ moveBackSwipe }}" onTouchEnd="{{ endBackSwipe }}" onTouchCancel="{{ endBackSwipe }}" style="position:fixed;inset:0;background:var(--bg);color:var(--text);--accent: {{ accentVar }};--swipe-x: {{ swipeOffset }}px;">
 
     <!-- Production: real device provides its own status bar. No prototype phone
          frame, no fake status bar/time/battery. App fills the real viewport. -->
@@ -520,8 +520,8 @@
 
     <!-- ============ QUICK ADD SHEET ============ -->
     <sc-if value="{{ isQuick }}" hint-placeholder-val="{{ false }}">
-      <div onClick="{{ closeSheet }}" style="position:absolute;inset:0;z-index:44;background:rgba(0,0,0,0.4);animation:faFade .2s ease;"></div>
-      <div style="position:absolute;left:0;right:0;bottom:0;z-index:45;background:var(--bg);border-radius:30px 30px 0 0;padding:14px 20px calc(32px + env(safe-area-inset-bottom));animation:faSheet .32s cubic-bezier(.22,1,.36,1);">
+      <div class="fa-sheet-backdrop" onClick="{{ closeSheet }}" style="position:absolute;inset:0;z-index:44;background:rgba(0,0,0,0.4);animation:faFade .2s ease;"></div>
+      <div class="fa-bottom-sheet" style="position:absolute;left:0;right:0;bottom:0;z-index:45;background:var(--bg);border-radius:30px 30px 0 0;padding:14px 20px calc(32px + env(safe-area-inset-bottom));animation:faSheet .32s cubic-bezier(.22,1,.36,1);">
         <div style="width:40px;height:4px;border-radius:2px;background:var(--surface-strong);margin:0 auto 16px;"></div>
         <div style="font-size:18px;font-weight:800;margin-bottom:14px;">Agregar movimiento</div>
         <div class="fa-assistant-entry" onClick="{{ openAssistant }}" style="display:flex;align-items:center;gap:13px;background:var(--surface);color:var(--text);border-radius:18px;padding:12px 13px;margin-bottom:9px;cursor:pointer;">
@@ -703,7 +703,7 @@
 
     <!-- ============ INVESTMENTS ============ -->
     <sc-if value="{{ isInvest }}" hint-placeholder-val="{{ false }}">
-      <div class="fa-scroll fa-screen" data-screen-label="Inversiones" style="position:absolute;inset:0;z-index:42;background:var(--bg);animation:faPushIn .34s cubic-bezier(.22,1,.36,1);overflow-y:auto;padding:calc(env(safe-area-inset-top) + 14px) 22px calc(40px + env(safe-area-inset-bottom));">
+      <div class="fa-scroll fa-screen {{ investStackClass }}" data-screen-label="Inversiones" style="position:absolute;inset:0;z-index:42;background:var(--bg);animation:faPushIn .34s cubic-bezier(.22,1,.36,1);overflow-y:auto;padding:calc(env(safe-area-inset-top) + 14px) 22px calc(40px + env(safe-area-inset-bottom));">
         <div style="display:flex;align-items:center;gap:14px;margin-bottom:26px;">
           <div onClick="{{ popScreen }}" style="width:40px;height:40px;border-radius:50%;background:var(--surface);display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--text);"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 6 9 12 15 18"></polyline></svg></div>
           <span style="font-size:17px;font-weight:700;">Inversiones</span>
@@ -886,7 +886,7 @@
 
     <!-- ============ ADD / TRANSFER / INVERSION ============ -->
     <sc-if value="{{ isAdd }}" hint-placeholder-val="{{ false }}">
-      <div class="fa-screen" data-screen-label="Nuevo movimiento" style="position:absolute;inset:0;z-index:42;background:var(--bg);animation:faPushIn .34s cubic-bezier(.22,1,.36,1);display:flex;flex-direction:column;padding:calc(env(safe-area-inset-top) + 12px) 22px calc(24px + env(safe-area-inset-bottom));">
+      <div class="fa-screen fa-add-screen" data-screen-label="Nuevo movimiento" style="position:absolute;inset:0;z-index:42;background:var(--bg);animation:faModalIn .36s cubic-bezier(.22,1,.36,1);display:flex;flex-direction:column;padding:calc(env(safe-area-inset-top) + 12px) 22px calc(24px + env(safe-area-inset-bottom));">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
           <div onClick="{{ closeSheet }}" style="width:40px;height:40px;border-radius:50%;background:var(--surface);display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--text-2);"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="5" y1="5" x2="19" y2="19"></line><line x1="19" y1="5" x2="5" y2="19"></line></svg></div>
           <span style="font-size:16px;font-weight:700;">{{ addTitleText }}</span>
@@ -937,8 +937,8 @@
 
         <!-- KEYPAD SUBSHEET -->
         <sc-if value="{{ isKeypad }}" hint-placeholder-val="{{ false }}">
-          <div onClick="{{ closeSub }}" style="position:absolute;inset:0;z-index:50;background:rgba(0,0,0,0.35);animation:faFade .2s ease;"></div>
-          <div style="position:absolute;left:0;right:0;bottom:0;z-index:51;background:var(--bg);border-radius:28px 28px 0 0;padding:16px 20px 30px;animation:faSheet .3s cubic-bezier(.22,1,.36,1);box-shadow:0 -12px 40px rgba(0,0,0,0.18);">
+          <div class="fa-add-sub-backdrop" onClick="{{ closeSub }}" style="position:absolute;inset:0;z-index:50;background:rgba(0,0,0,0.35);animation:faFade .2s ease;"></div>
+          <div class="fa-add-sub-sheet" style="position:absolute;left:0;right:0;bottom:0;z-index:51;background:var(--bg);border-radius:28px 28px 0 0;padding:16px 20px 30px;animation:faSheet .3s cubic-bezier(.22,1,.36,1);box-shadow:0 -12px 40px rgba(0,0,0,0.18);">
             <div style="width:40px;height:4px;border-radius:2px;background:var(--surface-strong);margin:0 auto 14px;"></div>
             <div style="text-align:center;font-size:46px;font-weight:800;letter-spacing:-1.5px;color: {{ addAmtColor }};margin-bottom:18px;">{{ addAmtSign }}{{ addAmtDisplay }}</div>
             <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:12px;">
@@ -955,8 +955,8 @@
 
         <!-- PICKER SUBSHEET -->
         <sc-if value="{{ isPicker }}" hint-placeholder-val="{{ false }}">
-          <div onClick="{{ closeSub }}" style="position:absolute;inset:0;z-index:50;background:rgba(0,0,0,0.35);animation:faFade .2s ease;"></div>
-          <div style="position:absolute;left:0;right:0;bottom:0;z-index:51;background:var(--bg);border-radius:28px 28px 0 0;padding:16px 20px 30px;max-height:70%;overflow-y:auto;animation:faSheet .3s cubic-bezier(.22,1,.36,1);">
+          <div class="fa-add-sub-backdrop" onClick="{{ closeSub }}" style="position:absolute;inset:0;z-index:50;background:rgba(0,0,0,0.35);animation:faFade .2s ease;"></div>
+          <div class="fa-add-sub-sheet" style="position:absolute;left:0;right:0;bottom:0;z-index:51;background:var(--bg);border-radius:28px 28px 0 0;padding:16px 20px 30px;max-height:70%;overflow-y:auto;animation:faSheet .3s cubic-bezier(.22,1,.36,1);">
             <div style="width:40px;height:4px;border-radius:2px;background:var(--surface-strong);margin:0 auto 14px;"></div>
             <div style="font-size:17px;font-weight:800;margin-bottom:12px;">{{ pickerTitle }}</div>
             <sc-for list="{{ pickerOptions }}" as="o" hint-placeholder-count="4">
@@ -971,8 +971,8 @@
 
         <!-- CUSTOM DATE SUBSHEET -->
         <sc-if value="{{ isCustomDate }}" hint-placeholder-val="{{ false }}">
-          <div onClick="{{ closeSub }}" style="position:absolute;inset:0;z-index:50;background:rgba(0,0,0,0.35);animation:faFade .2s ease;"></div>
-          <div style="position:absolute;left:0;right:0;bottom:0;z-index:51;background:var(--bg);border-radius:28px 28px 0 0;padding:16px 20px 30px;animation:faSheet .3s cubic-bezier(.22,1,.36,1);">
+          <div class="fa-add-sub-backdrop" onClick="{{ closeSub }}" style="position:absolute;inset:0;z-index:50;background:rgba(0,0,0,0.35);animation:faFade .2s ease;"></div>
+          <div class="fa-add-sub-sheet" style="position:absolute;left:0;right:0;bottom:0;z-index:51;background:var(--bg);border-radius:28px 28px 0 0;padding:16px 20px 30px;animation:faSheet .3s cubic-bezier(.22,1,.36,1);">
             <div style="width:40px;height:4px;border-radius:2px;background:var(--surface-strong);margin:0 auto 14px;"></div>
             <div style="font-size:17px;font-weight:800;margin-bottom:14px;">Fecha personalizada</div>
             <input class="fa-native-date" type="date" value="{{ customDateText }}" onChange="{{ setCustomDate }}" max="{{ customDateMax }}" style="width:100%;border:none;outline:none;background:var(--surface);border-radius:15px;padding:15px 16px;font-size:15px;font-weight:650;color:var(--text);margin-bottom:8px;">
@@ -983,8 +983,8 @@
 
         <!-- NEW TAG SUBSHEET -->
         <sc-if value="{{ isNewTag }}" hint-placeholder-val="{{ false }}">
-          <div onClick="{{ closeSub }}" style="position:absolute;inset:0;z-index:50;background:rgba(0,0,0,0.35);animation:faFade .2s ease;"></div>
-          <div style="position:absolute;left:0;right:0;bottom:0;z-index:51;background:var(--bg);border-radius:28px 28px 0 0;padding:16px 20px 30px;animation:faSheet .3s cubic-bezier(.22,1,.36,1);">
+          <div class="fa-add-sub-backdrop" onClick="{{ closeSub }}" style="position:absolute;inset:0;z-index:50;background:rgba(0,0,0,0.35);animation:faFade .2s ease;"></div>
+          <div class="fa-add-sub-sheet" style="position:absolute;left:0;right:0;bottom:0;z-index:51;background:var(--bg);border-radius:28px 28px 0 0;padding:16px 20px 30px;animation:faSheet .3s cubic-bezier(.22,1,.36,1);">
             <div style="width:40px;height:4px;border-radius:2px;background:var(--surface-strong);margin:0 auto 14px;"></div>
             <div style="font-size:17px;font-weight:800;margin-bottom:14px;">Nueva etiqueta</div>
             <div style="display:flex;align-items:center;gap:8px;background:var(--surface);border-radius:15px;padding:13px 16px;margin-bottom:14px;">
