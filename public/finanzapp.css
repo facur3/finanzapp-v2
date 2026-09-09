@@ -13,7 +13,8 @@ button{appearance:none;-webkit-appearance:none;border:0;padding:0;background:tra
 .fa-frame [style*="cursor:pointer"]{touch-action:manipulation;transition:transform .22s cubic-bezier(.22,1,.36,1),opacity .18s ease,background-color .26s ease,color .26s ease,box-shadow .26s ease}
 .fa-frame [style*="cursor:pointer"]:active{transform:scale(.975)}
 .fa-main-scroll{padding-left:clamp(16px,5vw,24px)!important;padding-right:clamp(16px,5vw,24px)!important;padding-bottom:calc(102px + env(safe-area-inset-bottom,0px))!important}
-.fa-screen{will-change:transform,opacity;backface-visibility:hidden;-webkit-backface-visibility:hidden}
+.fa-screen{will-change:transform,opacity;backface-visibility:hidden;-webkit-backface-visibility:hidden;box-shadow:-64px 0 0 var(--bg)}
+.fa-add-screen{box-shadow:0 -48px 0 var(--bg),-64px 0 0 var(--bg)}
 .fa-frame[data-nav-state="entering"]>.fa-screen:not(.fa-stack-underlay){animation:faPushIn .34s cubic-bezier(.22,1,.36,1) both!important;box-shadow:-64px 0 0 var(--bg);pointer-events:none}
 .fa-frame[data-nav-state="leaving"] .fa-screen:not(.fa-stack-underlay){animation:faPushOut .18s cubic-bezier(.4,0,1,1) both!important;box-shadow:-64px 0 0 var(--bg);pointer-events:none}
 .fa-frame[data-nav-state="entering"]>.fa-add-screen{animation:faModalIn .36s cubic-bezier(.22,1,.36,1) both!important;box-shadow:0 -48px 0 var(--bg),-64px 0 0 var(--bg)}
@@ -168,10 +169,10 @@ button{appearance:none;-webkit-appearance:none;border:0;padding:0;background:tra
 @keyframes faMoneyDown{0%{opacity:.12;transform:translateY(-14px);filter:blur(4px)}100%{opacity:1;transform:translateY(0);filter:blur(0)}}
 @keyframes faBreathe{0%,100%{transform:scale(.94)}50%{transform:scale(1.08)}}
 @keyframes faPulse{0%{transform:scale(.86);opacity:.34}100%{transform:scale(1.38);opacity:0}}
-@keyframes faTabLeaveNext{to{transform:translateX(-18px);opacity:0}}
-@keyframes faTabLeavePrev{to{transform:translateX(18px);opacity:0}}
-@keyframes faTabEnterNext{from{transform:translateX(22px);opacity:0}to{transform:translateX(0);opacity:1}}
-@keyframes faTabEnterPrev{from{transform:translateX(-22px);opacity:0}to{transform:translateX(0);opacity:1}}
+@keyframes faTabLeaveNext{to{transform:translateX(-12px);opacity:.94}}
+@keyframes faTabLeavePrev{to{transform:translateX(12px);opacity:.94}}
+@keyframes faTabEnterNext{from{transform:translateX(14px);opacity:.94}to{transform:translateX(0);opacity:1}}
+@keyframes faTabEnterPrev{from{transform:translateX(-14px);opacity:.94}to{transform:translateX(0);opacity:1}}
 @keyframes faBarRise{from{transform:scaleY(.08);opacity:.4}to{transform:scaleY(1);opacity:1}}
 @keyframes faAssistantRise{from{opacity:0;transform:translateY(14px) scale(.985)}to{opacity:1;transform:translateY(0) scale(1)}}
 @keyframes faMessageIn{from{opacity:0;transform:translateY(9px) scale(.985)}to{opacity:1;transform:translateY(0) scale(1)}}
