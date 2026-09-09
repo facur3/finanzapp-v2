@@ -14,10 +14,10 @@ button{appearance:none;-webkit-appearance:none;border:0;padding:0;background:tra
 .fa-frame [style*="cursor:pointer"]:active{transform:scale(.975)}
 .fa-main-scroll{padding-left:clamp(16px,5vw,24px)!important;padding-right:clamp(16px,5vw,24px)!important;padding-bottom:calc(102px + env(safe-area-inset-bottom,0px))!important}
 .fa-screen{will-change:transform,opacity;backface-visibility:hidden;-webkit-backface-visibility:hidden}
-.fa-frame[data-nav-state="entering"]>.fa-screen:not(.fa-stack-underlay){animation:faPushIn .34s cubic-bezier(.22,1,.36,1) both!important;pointer-events:none}
-.fa-frame[data-nav-state="leaving"] .fa-screen:not(.fa-stack-underlay){animation:faPushOut .18s cubic-bezier(.4,0,1,1) both!important;pointer-events:none}
-.fa-frame[data-nav-state="entering"]>.fa-add-screen{animation:faModalIn .36s cubic-bezier(.22,1,.36,1) both!important}
-.fa-frame[data-nav-state="leaving"]>.fa-add-screen{animation:faModalOut .2s cubic-bezier(.4,0,1,1) both!important}
+.fa-frame[data-nav-state="entering"]>.fa-screen:not(.fa-stack-underlay){animation:faPushIn .34s cubic-bezier(.22,1,.36,1) both!important;box-shadow:-64px 0 0 var(--bg);pointer-events:none}
+.fa-frame[data-nav-state="leaving"] .fa-screen:not(.fa-stack-underlay){animation:faPushOut .18s cubic-bezier(.4,0,1,1) both!important;box-shadow:-64px 0 0 var(--bg);pointer-events:none}
+.fa-frame[data-nav-state="entering"]>.fa-add-screen{animation:faModalIn .36s cubic-bezier(.22,1,.36,1) both!important;box-shadow:0 -48px 0 var(--bg),-64px 0 0 var(--bg)}
+.fa-frame[data-nav-state="leaving"]>.fa-add-screen{animation:faModalOut .2s cubic-bezier(.4,0,1,1) both!important;box-shadow:0 -48px 0 var(--bg),-64px 0 0 var(--bg)}
 .fa-frame[data-nav-state="leaving"]>.fa-sheet-backdrop{animation:faFadeOut .18s ease both!important;pointer-events:none}.fa-frame[data-nav-state="leaving"]>.fa-bottom-sheet{animation:faSheetOut .2s cubic-bezier(.4,0,1,1) both!important;pointer-events:none}
 .fa-stack-underlay{pointer-events:none!important;animation:none!important}
 .fa-frame[data-sub-motion="leaving"] .fa-add-sub-backdrop{animation:faFadeOut .18s ease both!important;pointer-events:none}.fa-frame[data-sub-motion="leaving"] .fa-add-sub-sheet{animation:faSheetOut .19s cubic-bezier(.4,0,1,1) both!important;pointer-events:none}
@@ -155,14 +155,14 @@ button{appearance:none;-webkit-appearance:none;border:0;padding:0;background:tra
 [data-theme="dark"] .fa-native-date{color-scheme:dark}
 
 @keyframes faUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
-@keyframes faPushIn{from{transform:translate3d(44px,0,0) scale(.992);opacity:.28}to{transform:translate3d(0,0,0) scale(1);opacity:1}}
-@keyframes faPushOut{from{transform:translate3d(0,0,0);opacity:1}to{transform:translate3d(46px,0,0);opacity:0}}
+@keyframes faPushIn{from{transform:translate3d(32px,0,0)}to{transform:translate3d(0,0,0)}}
+@keyframes faPushOut{from{transform:translate3d(0,0,0)}to{transform:translate3d(32px,0,0)}}
 @keyframes faSheet{from{transform:translateY(110%)}to{transform:translateY(0)}}
 @keyframes faFade{from{opacity:0}to{opacity:1}}
 @keyframes faFadeOut{from{opacity:1}to{opacity:0}}
 @keyframes faSheetOut{from{transform:translateY(0)}to{transform:translateY(108%)}}
-@keyframes faModalIn{from{transform:translateY(34px) scale(.992);opacity:.25}to{transform:translateY(0) scale(1);opacity:1}}
-@keyframes faModalOut{from{transform:translateY(0) scale(1);opacity:1}to{transform:translateY(38px) scale(.992);opacity:0}}
+@keyframes faModalIn{from{transform:translateY(24px)}to{transform:translateY(0)}}
+@keyframes faModalOut{from{transform:translateY(0)}to{transform:translateY(28px)}}
 @keyframes faPop{0%{transform:scale(.88);opacity:0}100%{transform:scale(1);opacity:1}}
 @keyframes faMoneyUp{0%{opacity:.12;transform:translateY(14px);filter:blur(4px)}100%{opacity:1;transform:translateY(0);filter:blur(0)}}
 @keyframes faMoneyDown{0%{opacity:.12;transform:translateY(-14px);filter:blur(4px)}100%{opacity:1;transform:translateY(0);filter:blur(0)}}
