@@ -1,5 +1,24 @@
 # FinanzApp
 
+## Native mobile migration — start here
+
+The new iOS-first app is being built with **Expo + React Native + TypeScript** in
+`apps/mobile`. The current web/Capacitor app below remains operational; this is
+an isolated pilot, not a completed migration or an App Store release.
+
+- [Mobile setup and commands](apps/mobile/README.md)
+- [Paso a paso para probarlo en tu iPhone](docs/empezar-en-iphone.md)
+- [Living roadmap, status and next actions](docs/mobile-roadmap.md)
+- [Why Expo, when Swift makes sense, and the no-Mac workflow](docs/decisions/001-native-mobile.md)
+- [Real iPhone acceptance checklist](docs/mobile-device-checklist.md)
+- [Contributor/agent continuity instructions](AGENTS.md)
+
+No new GitHub repository is necessary. Keep these documents updated after each
+iteration. Existing data is not automatically shared between the web app and the
+new native app: importing it safely is an explicit migration milestone.
+
+## Current web/Capacitor product
+
 FinanzApp is a personal finance app for Argentina: accounts, movements, cards,
 budgets, recurring movements, categories, tags and investments with local
 persistence. Its UI currently runs on the **Claude Design runtime** while the

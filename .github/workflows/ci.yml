@@ -30,3 +30,37 @@ jobs:
 
       - name: Repository hygiene (no generated files tracked)
         run: npm run check:repo
+
+  mobile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: apps/mobile
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: apps/mobile/package-lock.json
+
+      - name: Install isolated mobile dependencies
+        run: npm ci
+
+      - name: Expo dependency compatibility
+        run: npm run check
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: SQLite persistence and transaction tests
+        run: npm run test:storage
+
+      - name: Export iOS JavaScript and assets (not a signed native build)
+        run: npm run export:ios

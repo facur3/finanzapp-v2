@@ -1,5 +1,10 @@
 # Apple Pay / iOS Shortcuts capture
 
+> This describes the existing web capture, not the new native implementation.
+> Follow [the mobile roadmap](mobile-roadmap.md) for the future App Intent and
+> real-device Wallet field validation. Do not interpret the old PWA recipe as
+> unrestricted Apple Pay history access or as a guarantee of automatic fields.
+
 **Status:** merged PWA flow. This keeps FinanzApp as a web app and does not add
 React migration, Capacitor, Swift, or native iOS code.
 
