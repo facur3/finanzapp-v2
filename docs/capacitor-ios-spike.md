@@ -1,5 +1,9 @@
 # Capacitor iOS Wrapper Spike
 
+> Historical wrapper notes. The current native migration plan is
+> [Expo/React Native with optional Swift modules](decisions/001-native-mobile.md).
+> Keep the existing wrapper functional while the isolated pilot is validated.
+
 **Status:** spike branch only. Do not merge until web checks are green, generated
 files are reviewed, and real iPhone testing is planned on macOS/Xcode.
 

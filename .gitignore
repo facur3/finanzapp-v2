@@ -33,3 +33,17 @@ screenshots/
 *.local
 .cache/
 tmp/
+
+# Expo development state and generated native projects (legacy root ios stays tracked)
+.expo/
+apps/mobile/ios/
+apps/mobile/android/
+*.ipa
+*.apk
+*.aab
+*.p12
+*.p8
+*.mobileprovision
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal

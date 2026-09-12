@@ -1,5 +1,10 @@
 # Product rebuild roadmap
 
+> Mobile architecture update (2026-09-11): use [the living mobile roadmap](mobile-roadmap.md)
+> and [decision 001](decisions/001-native-mobile.md). The earlier recommendation to
+> retain Capacitor below is historical, superseded for the new mobile UI. The
+> financial accuracy and reconciliation work in this document remains relevant.
+
 This document turns the broad redesign into verifiable product increments. The
 goal is a trustworthy finance app, not a collection of decorative screens.
 

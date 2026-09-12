@@ -4,7 +4,12 @@
 import { execSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 
-const FORBIDDEN = [/^node_modules\//, /^dist\//, /^\.vite\//, /^\.playwright-mcp\//, /^\.env(\..*)?$/];
+const FORBIDDEN = [
+  /(^|\/)(node_modules|dist|\.vite|\.expo|\.playwright-mcp)\//,
+  /(^|\/)\.env(?:\.(?!example$).*)?$/,
+  /^apps\/mobile\/(ios|android)\//,
+  /\.(ipa|apk|aab|p12|p8|mobileprovision|sqlite(?:-shm|-wal)?)$/,
+];
 
 let tracked = '';
 try {
