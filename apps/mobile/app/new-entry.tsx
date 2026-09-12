@@ -1,27 +1,25 @@
 import { useRef, useState } from 'react';
-import { Keyboard, Platform, View } from 'react-native';
+import { Keyboard } from 'react-native';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
-import DateTimePicker from '@react-native-community/datetimepicker';
 import { randomUUID } from 'expo-crypto';
 import * as Haptics from 'expo-haptics';
 import { parseMinorUnits, todayKey, type EntryKind } from '@finanzapp/domain';
 import { useLedger } from '../src/storage/LedgerProvider';
-import { ActionButton, AppText, Choices, EmptyState, ErrorMessage, Field, IconButton, PressFeedback, Screen } from '../src/ui/components';
-import { usePalette } from '../src/ui/theme';
+import { ActionButton, AmountField, Choices, EmptyState, ErrorMessage, Field, IconButton, Screen, Surface } from '../src/ui/components';
+import { AccountField, DateField } from '../src/ui/form-controls';
+import { initialAccountId } from '../src/ui/presentation';
 
 export default function NewEntryScreen() {
   const { snapshot, addEntry } = useLedger();
-  const params = useLocalSearchParams<{ accountId?: string; kind?: string }>();
-  const p = usePalette();
+  const params = useLocalSearchParams<{ accountId?: string; kind?: string; currency?: string }>();
   const accounts = snapshot?.accounts ?? [];
   const [operation] = useState(() => ({ id: randomUUID(), createdAt: new Date().toISOString() }));
   const [kind, setKind] = useState<EntryKind>(params.kind === 'income' ? 'income' : 'expense');
-  const [accountId, setAccountId] = useState(() => accounts.find(account => account.id === params.accountId)?.id ?? accounts[0]?.id ?? '');
+  const [accountId, setAccountId] = useState(() => initialAccountId(accounts, params.accountId, params.currency));
   const [amount, setAmount] = useState('');
   const [merchant, setMerchant] = useState('');
   const [category, setCategory] = useState('');
   const [date, setDate] = useState(() => new Date());
-  const [showDate, setShowDate] = useState(false);
   const [busy, setBusy] = useState(false);
   const saving = useRef(false);
   const [error, setError] = useState<string | null>(null);
@@ -56,34 +54,15 @@ export default function NewEntryScreen() {
       action={<ActionButton label="Agregar cuenta" onPress={() => router.replace('/new-account')} />} /> : <>
       <Choices value={kind} onChange={setKind} disabled={busy}
         options={[{ value: 'expense', label: 'Gasto' }, { value: 'income', label: 'Ingreso' }]} />
-      <Field label={`Monto en ${account?.currency ?? 'ARS'}`} value={amount} onChangeText={setAmount}
-        keyboardType="decimal-pad" inputMode="decimal" maxLength={24} editable={!busy}
-        style={{ fontSize: 34, fontWeight: '600', fontVariant: ['tabular-nums'] }} />
-      <View style={{ gap: 8 }}><AppText secondary>Cuenta</AppText>
-        <Choices value={accountId} options={accounts.map(item => ({ value: item.id, label: `${item.name} · ${item.currency}` }))}
-          onChange={setAccountId} disabled={busy} />
-      </View>
+      <AmountField currency={account?.currency ?? 'ARS'} value={amount} onChangeText={value => { setAmount(value); setError(null); }} editable={!busy} />
       <Field label={kind === 'expense' ? 'Comercio o concepto' : 'Origen o concepto'} value={merchant}
         onChangeText={setMerchant} maxLength={120} autoCapitalize="sentences" editable={!busy} />
       <Field label="Categoría" value={category} onChangeText={setCategory}
         maxLength={60} autoCapitalize="sentences" editable={!busy} />
-      <View style={{ gap: 8 }}><AppText secondary>Fecha</AppText>
-        <PressFeedback accessibilityRole="button" accessibilityLabel="Elegir fecha" disabled={busy}
-          accessibilityState={{ expanded: showDate, disabled: busy }}
-          onPress={() => { Keyboard.dismiss(); setShowDate(value => !value); }}
-          style={{ backgroundColor: p.surface, borderRadius: 16, padding: 16 }}>
-          <AppText>{date.toLocaleDateString('es-AR', { day: 'numeric', month: 'long', year: 'numeric' })}</AppText>
-        </PressFeedback>
-        {showDate && <View style={{ width: '100%', overflow: 'hidden' }}>
-          <DateTimePicker value={date} mode="date" display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-            themeVariant={p.isDark ? 'dark' : 'light'} minimumDate={new Date(1900, 0, 1)} maximumDate={new Date()}
-            style={{ width: '100%' }} onChange={(event, next) => {
-              if (Platform.OS !== 'ios') setShowDate(false);
-              if (event.type === 'set' && next) setDate(next);
-            }} />
-          {Platform.OS === 'ios' && <ActionButton label="Listo" onPress={() => setShowDate(false)} secondary />}
-        </View>}
-      </View>
+      <Surface grouped>
+        <AccountField accounts={accounts} value={accountId} onChange={setAccountId} disabled={busy} />
+        <DateField value={date} onChange={setDate} disabled={busy} />
+      </Surface>
       <ErrorMessage message={error} />
       <ActionButton label={kind === 'expense' ? 'Guardar gasto' : 'Guardar ingreso'} onPress={save} busy={busy}
         disabled={!amount.trim() || !merchant.trim() || !category.trim() || !account} />

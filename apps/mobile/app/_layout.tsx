@@ -11,7 +11,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { LedgerProvider, useLedger } from '../src/storage/LedgerProvider';
 import { ActionButton, AppText, ErrorMessage } from '../src/ui/components';
-import { usePalette, useReduceMotion } from '../src/ui/theme';
+import { UIProvider, usePalette, useReduceMotion } from '../src/ui/theme';
 
 void SplashScreen.preventAutoHideAsync().catch(() => {});
 
@@ -20,7 +20,7 @@ export const unstable_settings = { initialRouteName: '(tabs)' };
 export default function RootLayout() {
   const p = usePalette();
   return <GestureHandlerRootView style={{ flex: 1, backgroundColor: p.background }}>
-    <SafeAreaProvider><LedgerProvider><Navigation /></LedgerProvider></SafeAreaProvider>
+    <SafeAreaProvider><UIProvider><LedgerProvider><Navigation /></LedgerProvider></UIProvider></SafeAreaProvider>
   </GestureHandlerRootView>;
 }
 
@@ -63,6 +63,7 @@ function Navigation() {
       headerBackButtonDisplayMode: 'minimal', gestureEnabled: true }}>
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       <Stack.Screen name="account/[id]" options={{ title: 'Cuenta' }} />
+      <Stack.Screen name="accounts" options={{ title: 'Cuentas' }} />
       <Stack.Screen name="entry/[id]" options={{ title: 'Movimiento' }} />
       <Stack.Screen name="new-account" options={{ title: 'Nueva cuenta', presentation: 'modal' }} />
       <Stack.Screen name="new-entry" options={{ title: 'Nuevo movimiento', presentation: 'modal' }} />

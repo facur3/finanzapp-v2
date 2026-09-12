@@ -35,19 +35,22 @@ This is **not yet a replacement for the current app**. Do not uninstall it or
 re-enter the full portfolio into the pilot. The first use/persistence pilot has
 passed; the optimized standalone build and full device checklist remain gates.
 
-## Next deliverable after the accepted pilot
+## Current visual iteration and next deliverable
 
-Continue with Expo + React Native. Start with an original, calm visual system and
-refine Home, the amount sheet and movement detail; the concrete direction and
-acceptance criteria are in [the mobile design brief](mobile-design.md).
-Keep the native navigation that the user liked. In the same next milestone,
-implement posted-entry edit/undo, then a versioned import preview with exact
+Continue with Expo + React Native. The first original, calm visual system is
+implemented: available balance and quick actions on Home, date-grouped/searchable
+movements, a complete account list, compact account/date selectors and clearer
+amount/detail screens. Native navigation remains the only owner of transitions.
+See [the mobile design brief](mobile-design.md) and its pending device acceptance.
+Next implement posted-entry edit/undo, then a versioned import preview with exact
 totals and recovery. Do not make the user manually rebuild the portfolio.
 
-The next owner action is to keep a private backup from the current app and, if
-available, record iPhone model/iOS version for the pilot evidence. An Apple
-membership is not required for this UI/ledger work in Expo Go. Link EAS and enroll
-when ready for the independent signed build; see [costs and next steps](empezar-en-iphone.md#6-después-del-piloto-aprobado).
+The owner reported **iPhone 14 Pro, iOS 26.6.1**. Next action: update the existing
+checkout to `master` and try the new interface, retaining a private backup and
+the current app. No Apple membership is needed for this UI/ledger work in Expo Go.
+After UI review and basic ledger correction/recovery, link EAS Free and enroll
+for the independent signed build before deeper Apple integration; do not wait
+until the full migration is done. See [costs and next steps](empezar-en-iphone.md#6-después-del-piloto-aprobado).
 Supabase remains in the architecture; mobile sync is still to be implemented.
 
 ## Next phases, in order
@@ -151,6 +154,35 @@ no scraping promises, no claims that a local record actually paid a bank/card.
 - Aim for smooth frame pacing on real hardware; measure before claiming 60/120 fps.
 
 ## Handoff log (append actual evidence)
+
+### 2026-09-12 — First native visual-system iteration
+
+- Added original system typography, quiet grouped surfaces, semantic colors and
+  compact rows. No real user data or seeded sample balances enter the app/repo.
+- Home distinguishes available cash by currency from future full net worth.
+  Expense/income preselection follows the selected currency or explicit account.
+- Activity searches concept/category/account without accent/case sensitivity,
+  filters type and uses stable, virtualized date groups. Account detail reuses it.
+  Today/yesterday labels refresh at midnight and when returning to the app.
+- Account selection no longer renders one button per account inside the form.
+  Date selection keeps a separate draft until Listo; Cancelar/swipe discards it.
+  iOS amount input includes a keyboard-dismiss action; large-text row layout adapts.
+- One accessibility subscription controls restrained press/selection motion;
+  stack/sheet transitions remain native. No screenshot overlays or back redirects.
+- Checked on Linux: mobile TypeScript, 20 storage/toolchain/presentation tests,
+  Metro iOS JavaScript/assets export, 221 domain/web tests and Vite build.
+  Expo compatibility checked locally in offline mode; the regular online check
+  and clean-install/build jobs remain required in the PR before merging.
+- Browser component preview could not be opened by this environment's browser.
+  No screenshot/layout approval, UIKit/date-keyboard behavior, canceled gesture
+  result, signed build or frame-rate evidence is inferred from compilation.
+  The first pilot's approval does not approve this new UI; device checklist pending.
+- Recorded the reported iPhone 14 Pro/iOS 26.6.1. Updated the Spanish guide to
+  switch old pilot checkouts to `master`, retain SQLite, and explain Expo Go vs
+  EAS Build vs an independent preview. Stay free for this step; no build or charge.
+- No schema, dependencies, signing configuration, Supabase data or legacy
+  production code changed. Next: device feedback, posted-entry edit/undo,
+  versioned restore/import preview, then the next migration milestones.
 
 ### 2026-09-12 — Expo Go pilot accepted; next milestone defined
 

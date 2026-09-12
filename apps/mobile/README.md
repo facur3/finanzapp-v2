@@ -10,13 +10,15 @@ For a plain-language Spanish walkthrough, start with
 **2026-09-12:** the user accepted the first Expo Go pilot on iPhone, reporting
 fluid native navigation and records preserved after closing/reopening. Remaining
 gesture/accessibility checks and an optimized signed build are still pending.
-The next iteration is [the original visual system](../../docs/mobile-design.md),
-posted-entry edit/undo and a previewed legacy import.
+The reported device is an **iPhone 14 Pro running iOS 26.6.1**; its tested commit
+is unknown. The first [original visual-system iteration](../../docs/mobile-design.md)
+is now implemented, but its device acceptance is pending. Next: posted-entry
+edit/undo and a previewed legacy import.
 
 ## First start on Linux or Windows
 
 Install Node.js LTS (22.22 or newer; development/CI uses Node 24), Git and VS Code.
-From the repository root, after checking out the migration branch:
+From the repository root on the updated `master` branch:
 
 ```bash
 cd apps/mobile
@@ -46,6 +48,23 @@ with native navigation and SQLite. It starts empty. Opening balances are explici
 and are not income. ARS and USD are shown separately without fabricated rates.
 The draft can be changed before Save; editing/deleting posted entries and transfers
 are part of the next ledger milestone, not implemented controls in this pilot.
+
+The current visual iteration includes:
+
+- Home: available balance by currency, expense/income actions, recent records and
+  a short account list. The full account list groups by currency. Selecting USD
+  on Home preselects an existing USD account when opening the draft.
+- Movements: virtualized date groups, accent-insensitive concept/category/account
+  search and expense/income filters. Search does not mutate the stored entries.
+- Forms: emphasized amount, iOS keyboard Done, compact account chooser and a native
+  date sheet with separate draft/confirm/cancel. Save still waits for durable storage.
+- System appearance, accessible labels and restrained press/selection feedback.
+  A single shared accessibility subscription controls reduced motion; native
+  navigation alone owns screen transitions. Date labels refresh after midnight/resume.
+
+No database migration, Supabase connection, seeded records or native paid service
+was introduced by this UI change. Follow the new-iteration section of the
+[device checklist](../../docs/mobile-device-checklist.md) before accepting its layout.
 
 Only enter a small amount of data while checking the experience. Do not re-enter
 the entire portfolio or uninstall the existing app. Legacy import, complete card/
@@ -123,6 +142,8 @@ with the same storage repository. It checks persistence, rejected writes, atomic
 migrations and repeated operation IDs. It also tests the actual query-string and
 Xcode-generator integrations affected by the temporary dependency fixes in
 [`compat/`](compat/README.md). It does not replace native-device testing.
+It also covers the actual presentation helpers: filtering/search, stable ordering,
+date grouping, available currencies and account preselection (20 tests total).
 
 For dependency changes, also run `npm ls --all` and `npm audit`. Keep the scoped patched
 decoder/UUID compatibility intact; do not run `npm audit fix --force`, which can

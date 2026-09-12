@@ -35,14 +35,15 @@ export default function SettingsScreen() {
   }
 
   return <Screen>
-    <Surface><SectionTitle>Tus datos</SectionTitle>
-      <AppText>Los movimientos se guardan en este dispositivo y podés registrarlos sin conexión.</AppText>
-      <AppText secondary>Este piloto todavía no sincroniza con tu cuenta de FinanzApp. Si borrás la app, podés perder sus datos locales.</AppText>
+    <Surface><SectionTitle>En este dispositivo</SectionTitle>
+      <AppText>Tu dinero, guardado localmente.</AppText>
+      <AppText secondary style={{ fontSize: 15 }}>Podés registrar movimientos sin conexión. La sincronización todavía no está activada.</AppText>
     </Surface>
     <Surface><SectionTitle>Copia de seguridad</SectionTitle>
-      <AppText secondary>Exportá tus cuentas y movimientos a un archivo. Contiene datos personales: elegí dónde guardarlo. La restauración y la importación de la app anterior llegan en la siguiente etapa.</AppText>
+      <AppText secondary style={{ fontSize: 15 }}>Guardá tus cuentas y movimientos en un lugar privado antes de borrar la app o cambiar de teléfono.</AppText>
+      <AppText secondary style={{ fontSize: 13 }}>La restauración y la importación de la app anterior todavía están pendientes.</AppText>
       <ErrorMessage message={error} />
-      <ActionButton label="Compartir copia" onPress={exportBackup} busy={busy} disabled={!snapshot} secondary />
+      <ActionButton label="Compartir copia" icon="share-outline" onPress={exportBackup} busy={busy} disabled={!snapshot} secondary />
     </Surface>
     <AppText secondary style={{ textAlign: 'center', fontSize: 13 }}>FinanzApp · Piloto nativo 0.1.0</AppText>
   </Screen>;

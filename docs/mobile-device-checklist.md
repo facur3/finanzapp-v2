@@ -5,8 +5,10 @@ The user reported completing the Spanish guide, creating records, keeping them
 after closing/reopening Expo Go, and fluid navigation that felt native on iPhone.
 This is reported device evidence, not a signed-build or complete release result.
 
-Device model, iOS version and exact tested commit were not supplied. The available
-published pilot was `a5673bc`; do not infer that it was the installed revision.
+Device subsequently reported on 2026-09-12: **iPhone 14 Pro, iOS 26.6.1**.
+The exact tested commit was not supplied. The available published first pilot
+was `a5673bc`; do not infer that it was the installed revision. The first visual
+iteration below postdates that acceptance and has not been device-approved.
 The specific checks below stay pending unless separately reported.
 
 Record: date, device model, iOS version, build profile/number, commit, tester and
@@ -36,6 +38,9 @@ result. Do not commit screenshots containing actual balances, accounts or names.
 
 ## Later Apple gates
 
+Before starting this section, repeat the new visual iteration checks below.
+Face ID on iOS is not supported inside Expo Go; use our signed development build.
+
 - [ ] Face ID allow/deny/cancel, passcode recovery, re-enrollment and app-switcher privacy.
 - [ ] Reminder allow/deny/change time/disable; phone locked and app closed; Focus behavior.
 - [ ] Apple sign-in first/repeat/cancel, hidden email, sign-out and account deletion.
@@ -53,3 +58,19 @@ result. Do not commit screenshots containing actual balances, accounts or names.
 - [ ] Review frame drops, cold start, scroll and memory with a sizeable private test dataset.
 - [ ] Subscription purchase/restore/expiry/refund and user-data export/deletion pass.
 - [ ] Privacy/security review and App Store declarations match what the build actually does.
+
+## First visual iteration — device results pending
+
+- [ ] Updating from the old pilot branch to `master` preserves existing SQLite data.
+- [ ] Home shows available cash, not complete net worth; currencies remain separate.
+- [ ] Choosing USD on Home opens Gasto/Ingreso with an existing USD account selected.
+- [ ] Amount keyboard's Listo dismisses it without saving or losing entered text.
+- [ ] Account chooser handles long names/many accounts and selects exactly one.
+- [ ] Date wheel Cancelar/swipe dismissal preserves the original date; Listo commits it.
+- [ ] Date, chooser toolbar, amount and Save fit at large text sizes and narrow widths.
+- [ ] Search ignores case/accents; all query terms match concept/category/account.
+- [ ] Expense/income filters and search remain after detail → back; rows are not duplicated.
+- [ ] Today/yesterday labels update when the app resumes after midnight.
+- [ ] Open/close/cancel small swipes in entries, accounts and sheets without another-tab flash.
+- [ ] Light/dark, VoiceOver, Reduce Motion and private backup sharing checked again.
+- [ ] Save and close/reopen still preserve the exact balances and one record per operation.
