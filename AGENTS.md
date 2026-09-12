@@ -3,7 +3,8 @@
 1. Read `README.md`, `docs/mobile-roadmap.md` and
    `docs/decisions/001-native-mobile.md` before changing architecture or mobile code.
 2. For mobile changes also read `apps/mobile/README.md` and
-   `docs/mobile-device-checklist.md`. Keep their status and next action current.
+   `docs/mobile-device-checklist.md`; for UI changes read `docs/mobile-design.md`.
+   Keep their status and next action current.
 3. The current web/Capacitor app remains the production product. The Expo app in
    `apps/mobile` is an isolated pilot, not a complete migration. Never replace
    production, change its bundle identifier or run a database migration remotely

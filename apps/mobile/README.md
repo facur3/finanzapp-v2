@@ -7,6 +7,12 @@ features and [decision 001](../../docs/decisions/001-native-mobile.md) for why.
 For a plain-language Spanish walkthrough, start with
 [Probarlo en tu iPhone](../../docs/empezar-en-iphone.md).
 
+**2026-09-12:** the user accepted the first Expo Go pilot on iPhone, reporting
+fluid native navigation and records preserved after closing/reopening. Remaining
+gesture/accessibility checks and an optimized signed build are still pending.
+The next iteration is [the original visual system](../../docs/mobile-design.md),
+posted-entry edit/undo and a previewed legacy import.
+
 ## First start on Linux or Windows
 
 Install Node.js LTS (22.22 or newer; development/CI uses Node 24), Git and VS Code.
@@ -22,6 +28,12 @@ Install **Expo Go** from the App Store. Put the computer and iPhone on the same
 network, scan the terminal QR with the iPhone camera and open Expo Go. Allow local
 network access if iOS asks. If LAN access is unavailable, `npm start -- --tunnel`
 uses an optional network tunnel and may ask to install Expo's tunnel dependency.
+
+If Expo Go asks you to sign in on both ends, use the same free **Expo account**
+in Expo Go and `npx expo login`. This is separate from an Apple ID or GitHub login.
+Create it at [expo.dev/signup](https://expo.dev/signup) if needed, or reset its
+password through Expo. Do not paste passwords into issues or chat. Opening the
+project chooser's Expo Go option is the intended first-pilot route.
 
 This first preview requires a running development server. It is not a signed
 standalone app, and it cannot validate every future native Apple feature.
@@ -108,7 +120,13 @@ npm run export:ios
 
 `test:storage` uses a real temporary SQLite database through Node's SQLite driver,
 with the same storage repository. It checks persistence, rejected writes, atomic
-migrations and repeated operation IDs. It does not replace native-device testing.
+migrations and repeated operation IDs. It also tests the actual query-string and
+Xcode-generator integrations affected by the temporary dependency fixes in
+[`compat/`](compat/README.md). It does not replace native-device testing.
+
+For dependency changes, also run `npm ls --all` and `npm audit`. Keep the scoped patched
+decoder/UUID compatibility intact; do not run `npm audit fix --force`, which can
+replace Expo packages with incompatible major versions.
 
 `export:ios` bundles JavaScript/assets for iOS with Metro. It is **not** an Xcode
 compile, signed `.ipa`, simulator run or evidence of gesture/Face ID behavior.

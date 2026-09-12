@@ -1,6 +1,6 @@
 # FinanzApp mobile: living roadmap
 
-Updated: 2026-09-11. Read with [decision 001](decisions/001-native-mobile.md).
+Updated: 2026-09-12. Read with [decision 001](decisions/001-native-mobile.md).
 This document supersedes the mobile architecture direction of
 `product-rebuild-roadmap.md`; that file still records useful financial work.
 
@@ -26,21 +26,40 @@ a bundle export or an API key/configuration being present.
 - [x] Expo Router native navigation, account and amount sheets, local SQLite pilot.
 - [x] Typed shared entry and integer-cent ledger validation/tests.
 - [x] Linux typecheck, JS iOS bundle export, storage tests and web regression checks.
+- [x] User accepted the first Expo Go pilot on iPhone: entries persisted after
+  close/reopen and navigation felt native and fluid (reported 2026-09-12).
 - [ ] User links their Expo project; no project ID or signing secret invented.
-- [ ] Cloud-signed build and physical iPhone acceptance.
+- [ ] Cloud-signed preview and remaining physical iPhone acceptance checks.
 
 This is **not yet a replacement for the current app**. Do not uninstall it or
-re-enter the full portfolio into the pilot. The first milestone is a small,
-device-tested vertical slice before committing to the complete migration.
+re-enter the full portfolio into the pilot. The first use/persistence pilot has
+passed; the optimized standalone build and full device checklist remain gates.
+
+## Next deliverable after the accepted pilot
+
+Continue with Expo + React Native. Start with an original, calm visual system and
+refine Home, the amount sheet and movement detail; the concrete direction and
+acceptance criteria are in [the mobile design brief](mobile-design.md).
+Keep the native navigation that the user liked. In the same next milestone,
+implement posted-entry edit/undo, then a versioned import preview with exact
+totals and recovery. Do not make the user manually rebuild the portfolio.
+
+The next owner action is to keep a private backup from the current app and, if
+available, record iPhone model/iOS version for the pilot evidence. An Apple
+membership is not required for this UI/ledger work in Expo Go. Link EAS and enroll
+when ready for the independent signed build; see [costs and next steps](empezar-en-iphone.md#6-después-del-piloto-aprobado).
+Supabase remains in the architecture; mobile sync is still to be implemented.
 
 ## Next phases, in order
 
 ### M1 — Native foundation and device gate
 
-- [x] Home, accounts, expense/income, activity and detail use native stack/sheets (implemented; device acceptance pending).
+- [x] Home, accounts, expense/income, activity and detail use native stack/sheets
+  (implemented; basic iPhone experience accepted, specific gesture/layout checks pending).
 - [ ] Small canceled swipes leave exactly the same screen visible; no redirect.
 - [ ] Keyboard, safe areas, dynamic text and reduced motion work on an iPhone.
-- [x] SQLite writes, same-operation retry and no silent empty reset (10 real-SQLite integration tests; native-device gate pending).
+- [x] SQLite writes, same-operation retry and no silent empty reset (10 real-SQLite
+  integration tests; basic close/reopen persistence also reported on iPhone).
 - [x] Export pilot data with a distinct format (implemented; native sharing gate pending).
 - [ ] Pass [physical device checklist](mobile-device-checklist.md).
 
@@ -133,6 +152,20 @@ no scraping promises, no claims that a local record actually paid a bank/card.
 
 ## Handoff log (append actual evidence)
 
+### 2026-09-12 — Expo Go pilot accepted; next milestone defined
+
+- User reports following the guide successfully on their iPhone, registering an
+  expense/movement and finding it unchanged after closing and reopening Expo Go.
+- User describes the navigation/animations as fluid and native; accepts continuing
+  with the chosen architecture and asks for an original minimal iOS visual design.
+- Device model, iOS version and tested revision were not provided. No independent
+  build, canceled-gesture matrix, accessibility matrix or performance measurement
+  is inferred from this report. See the updated device checklist.
+- Next scope: design system and first three screens, edit/undo and safe import.
+  Cards, investments, reports/assistant, Apple integrations and sync follow their
+  existing phases. No Expo/Apple subscription, cloud build or database change was
+  initiated. The owner already has a working Expo Go development setup.
+
 ### 2026-09-11 — Foundation started
 
 - GitHub access confirmed for existing public `facur3/finanzapp-v2`.
@@ -169,3 +202,21 @@ no scraping promises, no claims that a local record actually paid a bank/card.
   Supabase. No new user data was seeded and no paid/cloud service was started.
 - Next: follow [the Spanish iPhone guide](empezar-en-iphone.md), record the device
   gate, then implement previewed legacy import and reversible ledger edits.
+
+### 2026-09-12 — Follow-up dependency fixes checked
+
+- Aligned TypeScript to Expo SDK 57's expected `~6.0.3` and explicitly included
+  Node/React types. The previous published CI failure was the older TS version.
+- Replaced the two vulnerable indirect packages with patched upstream versions.
+  The decoder needs a small CommonJS adapter to preserve the router caller's API;
+  the scoped UUID override preserves the Xcode generator's CommonJS API. Details
+  and removal criteria are in `apps/mobile/compat/README.md`.
+- Clean `npm ci` succeeded; the installed dependency tree is valid and the mobile
+  `npm audit` snapshot reports zero vulnerabilities. This is not a full security audit.
+- Passed: TypeScript, 13 SQLite/toolchain tests, Metro iOS JS/assets export,
+  221 domain/web tests, Vite production build and repository hygiene.
+- Expo compatibility passed locally in offline mode. The online endpoint timed
+  out through the workspace proxy; the normal online check remains enabled in
+  GitHub Actions and must pass there before merging the foundation PR.
+- No UI or database schema changed in this follow-up. The design brief is a plan
+  for the next iteration; the user's Expo Go result predates these dependency fixes.

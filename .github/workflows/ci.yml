@@ -53,13 +53,16 @@ jobs:
       - name: Install isolated mobile dependencies
         run: npm ci
 
+      - name: Dependency tree integrity
+        run: npm ls --all
+
       - name: Expo dependency compatibility
         run: npm run check
 
       - name: Typecheck
         run: npm run typecheck
 
-      - name: SQLite persistence and transaction tests
+      - name: SQLite persistence and dependency compatibility tests
         run: npm run test:storage
 
       - name: Export iOS JavaScript and assets (not a signed native build)

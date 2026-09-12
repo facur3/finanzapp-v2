@@ -9,6 +9,7 @@ an isolated pilot, not a completed migration or an App Store release.
 - [Mobile setup and commands](apps/mobile/README.md)
 - [Paso a paso para probarlo en tu iPhone](docs/empezar-en-iphone.md)
 - [Living roadmap, status and next actions](docs/mobile-roadmap.md)
+- [Original iOS design direction and next screens](docs/mobile-design.md)
 - [Why Expo, when Swift makes sense, and the no-Mac workflow](docs/decisions/001-native-mobile.md)
 - [Real iPhone acceptance checklist](docs/mobile-device-checklist.md)
 - [Contributor/agent continuity instructions](AGENTS.md)

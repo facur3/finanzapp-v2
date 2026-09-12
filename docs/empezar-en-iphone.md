@@ -1,6 +1,10 @@
 # Probar FinanzApp en tu iPhone, desde Linux o Windows
 
-Actualizado: 11 de septiembre de 2026.
+Actualizado: 12 de septiembre de 2026.
+
+**El primer piloto ya fue aprobado en Expo Go:** el usuario confirmó que los
+movimientos persistieron al cerrar/reabrir y que la navegación se sentía nativa
+y fluida. Si ya hiciste esa prueba, seguí en [Después del piloto aprobado](#6-después-del-piloto-aprobado).
 
 Ya hay una primera versión móvil para probar: cuentas, gastos, ingresos,
 actividad y guardado local. Es un **piloto**: todavía faltan inversiones,
@@ -18,6 +22,9 @@ en [este documento](decisions/001-native-mobile.md).
   y [Git](https://git-scm.com/downloads). Node ejecuta las herramientas; Git
   descarga y actualiza el código. VS Code sirve para editarlo.
 - En el iPhone: instalá **Expo Go** desde la App Store.
+- Usá tu cuenta gratuita de [Expo](https://expo.dev/signup) en Expo Go y en la
+  terminal con `npx expo login` si pide iniciar sesión. Son las credenciales de
+  Expo; Apple y GitHub son cuentas distintas. Si ya funciona, no repitas el alta.
 - Conectá ambos a la misma red Wi-Fi.
 
 Todavía no necesitás pagar Apple Developer ni comprar un servicio de IA.
@@ -73,7 +80,7 @@ de funcionamiento independiente se hace con la versión instalada del paso 4.
 
 Después de revisar el piloto:
 
-1. Creá tu cuenta en [Expo](https://expo.dev/signup).
+1. Usá la misma cuenta de Expo con la que ya probaste el piloto.
 2. Para firmar e instalar nuestra propia app de esta manera, necesitás tu
    inscripción en el [Apple Developer Program](https://developer.apple.com/programs/enroll/).
    El alta y el pago los hacés vos con tu identidad. No me pases contraseñas.
@@ -105,5 +112,53 @@ todavía una versión firmada; tampoco se envió nada a la App Store.
   contratar un modelo pago. Sus propuestas se podrán revisar antes de guardar.
 
 El orden y el estado de cada etapa están en [el plan actualizado](mobile-roadmap.md).
-El próximo paso concreto es abrir este piloto en tu iPhone y completar la primera
-prueba, antes de trasladar tus datos y reconstruir todas las secciones.
+Si todavía no lo probaste, completá primero la prueba de arriba.
+
+## 6. Después del piloto aprobado
+
+Seguimos con Expo + React Native. La siguiente entrega es una interfaz propia,
+mínima y coherente en Inicio, gasto/ingreso y detalle, conservando la navegación
+que ya te gustó. Está definida en [la propuesta visual](mobile-design.md).
+Después completamos editar/deshacer y el importador con vista previa para traer
+tus datos sin volver a escribir todo. El piloto todavía no es el registro principal.
+
+**Ahora, de tu lado:** conservá una copia JSON privada de la app actual usando su
+opción de exportar backup. No la subas al repositorio ni hace falta compartirla
+para diseñar la app. No borres Supabase ni vuelvas a cargar el patrimonio en el
+piloto. Modelo de iPhone y versión de iOS ayudan a registrar la prueba; no bloquean
+el desarrollo.
+
+Para actualizar esta misma copia del código, detené Metro con `Ctrl+C` y ejecutá:
+
+```bash
+cd ~/Projects/apps/finanzapp-ios
+git pull --ff-only
+cd apps/mobile
+npm ci
+npm start
+```
+
+Esto actualiza la rama que ya tenés; no hace falta volver a clonar. Si tenés
+cambios locales y Git no permite actualizar, conservá el mensaje para revisarlo,
+sin borrar archivos ni forzar un reset. Actualizar el código no borra SQLite;
+desinstalar Expo Go o borrar sus datos sí puede eliminar los registros del piloto.
+
+**Cuándo pagar (precios consultados el 12 de septiembre de 2026):**
+
+| Etapa | Qué necesitás |
+| --- | --- |
+| Mejorar la interfaz y probar los movimientos con Expo Go | Sin pago nuevo. Tu instalación actual alcanza. |
+| Compilar nuestra app con EAS | Expo ofrece un plan Free con hasta 15 builds iOS por mes y cola de baja prioridad. Revisar la cuota de tu cuenta antes de iniciar una compilación. |
+| Instalar la versión propia por este flujo desde Linux y usar TestFlight/App Store | Apple Developer Program: USD 99 por año; el importe final puede variar por región. El alta y pago se hacen con tu cuenta Apple. |
+
+Fuentes oficiales: [precios de Expo](https://expo.dev/pricing) y
+[alta de Apple Developer](https://developer.apple.com/programs/enroll/).
+No hace falta contratar Expo de pago ahora. Recomendamos iniciar el alta de Apple
+cuando estemos listos para la primera versión propia; no esperar a terminar toda
+la app para probar ese flujo, Face ID y las funciones nativas específicas.
+
+La siguiente prueba después de esa alta será instalar `development`, luego
+`preview` y abrirla con la computadora apagada. La versión `preview` trae su
+código incluido y permite comprobar persistencia, arranque y fluidez sin Metro.
+Esa comprobación y las pruebas específicas de accesibilidad/gestos aún están
+pendientes, aunque el primer piloto de uso ya haya pasado.
