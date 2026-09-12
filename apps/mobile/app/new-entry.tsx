@@ -6,7 +6,7 @@ import * as Haptics from 'expo-haptics';
 import { parseMinorUnits, todayKey, type EntryKind } from '@finanzapp/domain';
 import { useLedger } from '../src/storage/LedgerProvider';
 import { ActionButton, AmountField, Choices, EmptyState, ErrorMessage, Field, IconButton, Screen, Surface } from '../src/ui/components';
-import { AccountField, DateField } from '../src/ui/form-controls';
+import { AccountField, CategoryField, DateField } from '../src/ui/form-controls';
 import { initialAccountId } from '../src/ui/presentation';
 
 export default function NewEntryScreen() {
@@ -57,9 +57,8 @@ export default function NewEntryScreen() {
       <AmountField currency={account?.currency ?? 'ARS'} value={amount} onChangeText={value => { setAmount(value); setError(null); }} editable={!busy} />
       <Field label={kind === 'expense' ? 'Comercio o concepto' : 'Origen o concepto'} value={merchant}
         onChangeText={setMerchant} maxLength={120} autoCapitalize="sentences" editable={!busy} />
-      <Field label="Categoría" value={category} onChangeText={setCategory}
-        maxLength={60} autoCapitalize="sentences" editable={!busy} />
       <Surface grouped>
+        <CategoryField entries={snapshot?.entries ?? []} kind={kind} value={category} onChange={setCategory} disabled={busy} />
         <AccountField accounts={accounts} value={accountId} onChange={setAccountId} disabled={busy} />
         <DateField value={date} onChange={setDate} disabled={busy} />
       </Surface>

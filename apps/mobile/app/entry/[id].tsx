@@ -1,8 +1,7 @@
 import { View } from 'react-native';
-import Ionicons from '@expo/vector-icons/Ionicons';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useLedger } from '../../src/storage/LedgerProvider';
-import { AppText, DetailRow, EmptyState, Money, Screen, Surface } from '../../src/ui/components';
+import { AppText, CategoryBadge, DetailRow, EmptyState, Money, Screen, Surface } from '../../src/ui/components';
 import { usePalette } from '../../src/ui/theme';
 
 export default function EntryScreen() {
@@ -19,9 +18,7 @@ export default function EntryScreen() {
   return <Screen>
     <Stack.Screen options={{ title: income ? 'Ingreso' : 'Gasto' }} />
     <View style={{ gap: 16, alignItems: 'center', paddingVertical: 24 }}>
-      <View style={{ width: 60, height: 60, borderRadius: 22, justifyContent: 'center', alignItems: 'center', backgroundColor: income ? p.positiveSoft : p.inset }}>
-        <Ionicons name={income ? 'arrow-down-outline' : 'arrow-up-outline'} size={27} color={income ? p.positive : p.secondary} accessible={false} />
-      </View>
+      <CategoryBadge category={entry.category} large />
       <View style={{ width: '100%', alignItems: 'center' }}><Money minor={income ? entry.amountMinor : -entry.amountMinor}
         currency={account.currency} large signed color={income ? p.positive : p.text} /></View>
       <AppText style={{ fontSize: 23, lineHeight: 30, fontWeight: '600', textAlign: 'center' }}>{entry.merchant}</AppText>

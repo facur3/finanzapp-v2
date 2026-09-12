@@ -7,9 +7,13 @@ This is reported device evidence, not a signed-build or complete release result.
 
 Device subsequently reported on 2026-09-12: **iPhone 14 Pro, iOS 26.6.1**.
 The exact tested commit was not supplied. The available published first pilot
-was `a5673bc`; do not infer that it was the installed revision. The first visual
-iteration below postdates that acceptance and has not been device-approved.
-The specific checks below stay pending unless separately reported.
+was `a5673bc`; do not infer that it was the installed revision.
+
+Follow-up report after the first visual iteration: the user says the requested
+basic checks work, **but Settings or Movements stays black intermittently, about
+one in ten tab switches**. The visual style is explicitly not approved yet.
+The new Interfaz 02 mitigation/design has not been re-tested on the phone.
+Specific accessibility, background/airplane and release checks stay pending.
 
 Record: date, device model, iOS version, build profile/number, commit, tester and
 result. Do not commit screenshots containing actual balances, accounts or names.
@@ -59,14 +63,14 @@ Face ID on iOS is not supported inside Expo Go; use our signed development build
 - [ ] Subscription purchase/restore/expiry/refund and user-data export/deletion pass.
 - [ ] Privacy/security review and App Store declarations match what the build actually does.
 
-## First visual iteration — device results pending
+## First visual iteration — basic flow reported working; tab regression open
 
-- [ ] Updating from the old pilot branch to `master` preserves existing SQLite data.
+- [x] Updating preserves existing records (user reports the requested basic checks passed).
 - [ ] Home shows available cash, not complete net worth; currencies remain separate.
 - [ ] Choosing USD on Home opens Gasto/Ingreso with an existing USD account selected.
-- [ ] Amount keyboard's Listo dismisses it without saving or losing entered text.
+- [x] Amount keyboard's Listo dismisses it (user report of the requested basic checks).
 - [ ] Account chooser handles long names/many accounts and selects exactly one.
-- [ ] Date wheel Cancelar/swipe dismissal preserves the original date; Listo commits it.
+- [x] Date Cancelar/Listo works in the requested basic check (user report; swipe matrix still pending).
 - [ ] Date, chooser toolbar, amount and Save fit at large text sizes and narrow widths.
 - [ ] Search ignores case/accents; all query terms match concept/category/account.
 - [ ] Expense/income filters and search remain after detail → back; rows are not duplicated.
@@ -74,3 +78,24 @@ Face ID on iOS is not supported inside Expo Go; use our signed development build
 - [ ] Open/close/cancel small swipes in entries, accounts and sheets without another-tab flash.
 - [ ] Light/dark, VoiceOver, Reduce Motion and private backup sharing checked again.
 - [ ] Save and close/reopen still preserve the exact balances and one record per operation.
+
+## Interfaz 02 — black-tab mitigation and categories (re-test pending)
+
+- [ ] Footer in Ajustes shows **Interfaz 02**, confirming the updated JavaScript.
+- [ ] Perform 30–40 switches across Inicio → Ajustes → Movimientos in both directions.
+- [ ] Repeat some switches quickly, before a previous press response finishes.
+- [ ] Background/foreground the app, then repeat; Settings backup control always appears.
+- [ ] Switch away/back with an activity filter/search active; query and records survive.
+- [ ] Open a detail/form, cancel an edge/modal swipe, then switch tabs again.
+- [ ] VoiceOver cannot focus hidden tabs; Reduce Motion and dark/light stay readable.
+- [ ] Category chooser opens, searches and closes/cancels without changing the draft.
+- [ ] Pick an existing/custom category and change income/expense without losing it.
+- [ ] Existing labels and balances remain unchanged; emoji is presentation only.
+- [ ] Tu mes matches recorded income/expenses in the selected currency through today.
+- [ ] Opening balances and other currencies are excluded; no phantom income or FX.
+- [ ] Large text/long amounts fit the balance card, month summary and category sheet.
+
+If black content remains, record whether the header/tab bar is visible, if
+switching tabs recovers it, whether it followed keyboard/background activity,
+the theme and any red Metro error. Share only redacted error text, not balances
+or private records. Do not reset SQLite, uninstall Expo Go or change Expo versions.

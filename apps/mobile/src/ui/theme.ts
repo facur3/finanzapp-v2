@@ -7,12 +7,14 @@ const light = {
   text: '#141A24', secondary: '#606B7A', line: '#E1E5EC',
   accent: '#2467DC', onAccent: '#FFFFFF', positive: '#13794D', negative: '#BD3548',
   accentSoft: '#E9F0FD', positiveSoft: '#E8F5EE', negativeSoft: '#FCECEF',
+  hero: '#17385B', heroText: '#F5F9FF', heroSecondary: '#C4D9F2',
 };
 const dark: typeof light = {
   background: '#080B10', surface: '#151A22', inset: '#202733',
   text: '#F4F6FA', secondary: '#A6B0C0', line: '#2B3544',
   accent: '#7AB3FF', onAccent: '#09203B', positive: '#73D6A7', negative: '#FF909E',
   accentSoft: '#1A2B44', positiveSoft: '#173329', negativeSoft: '#38212B',
+  hero: '#162D45', heroText: '#F5F9FF', heroSecondary: '#C4D9F2',
 };
 
 export function usePalette() {

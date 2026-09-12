@@ -117,10 +117,13 @@ Si todavía no lo probaste, completá primero la prueba de arriba.
 ## 6. Después del piloto aprobado
 
 Seguimos con Expo + React Native y **por ahora seguimos probando gratis en Expo Go**.
-Ya está implementada la primera iteración de [la interfaz propia](mobile-design.md):
+Ya está implementada la segunda iteración de [la interfaz propia](mobile-design.md):
 Inicio más simple, acceso directo a Gasto/Ingreso, movimientos agrupados por fecha
 con búsqueda, cuentas en su propia lista y formularios más claros. Conserva la
-navegación nativa que ya te gustó. Falta tu prueba de esta nueva interfaz.
+navegación nativa que ya te gustó. También suma categorías con símbolos y selector,
+un saldo con más identidad visual y el resumen Tu mes. La pantalla negra al
+cambiar pestañas tiene una mitigación específica: ver [Interfaz 02](#7-interfaz-02-pantalla-negra-y-categorías).
+Falta tu prueba de esta nueva interfaz; el estilo no se considera aprobado aún.
 
 Inicio dice **Disponible en tus cuentas**, no patrimonio: el piloto todavía no
 incluye inversiones ni deudas. Pesos y dólares se muestran por separado, sin
@@ -143,7 +146,7 @@ git switch master
 git pull --ff-only
 cd apps/mobile
 npm ci
-npm start
+npm start -- --clear
 ```
 
 Esto cambia desde la antigua rama del piloto a `master`, donde se integran las
@@ -151,11 +154,12 @@ entregas verificadas; no hace falta volver a clonar. Si tenés
 cambios locales y Git no permite actualizar, conservá el mensaje para revisarlo,
 sin borrar archivos ni forzar un reset. Actualizar el código no borra SQLite;
 desinstalar Expo Go o borrar sus datos sí puede eliminar los registros del piloto.
+`--clear` limpia solamente el caché del compilador en la computadora, no tus datos.
 
 **Prueba breve de esta entrega:**
 
 1. Confirmá que aparecen las mismas cuentas, saldos y movimientos que ya tenías.
-2. Desde Inicio, abrí Gasto e Ingreso. Si tenés una cuenta USD, seleccioná Dólares
+2. Desde Inicio, abrí Gasto e Ingreso. Si tenés una cuenta USD, seleccioná USD
    antes de abrir: el formulario debe abrir con una cuenta en esa moneda.
 3. Escribí un monto; usá **Listo** para cerrar su teclado. Abrí Cuenta y Fecha.
    Cambiá la fecha y tocá **Cancelar**: debe conservar la original. Repetí usando
@@ -202,3 +206,33 @@ La siguiente prueba después de esa alta será instalar `development`, luego
 código incluido y permite comprobar persistencia, arranque y fluidez sin Metro.
 Esa comprobación y las pruebas específicas de accesibilidad/gestos aún están
 pendientes, aunque el primer piloto de uso ya haya pasado.
+
+## 7. Interfaz 02: pantalla negra y categorías
+
+La combinación anterior fundía el contenido de las pestañas y apartaba sus vistas
+inactivas. Se eliminó esa combinación como causa plausible del fallo reportado:
+las tres pestañas quedan preparadas y el cambio es directo. No se recargan tus
+datos al tocar cada sección; se conservan búsquedas y filtros. Abrir detalles,
+volver, los formularios y las respuestas de los botones conservan sus animaciones.
+Esto está implementado, pero **todavía falta confirmar en el iPhone que el negro
+intermitente desapareció**. No se borró ni migró SQLite.
+
+Después de actualizar con los comandos de arriba y abrir el QR nuevo:
+
+1. En Ajustes, el pie debe decir **Interfaz 02**.
+2. Cambiá 30–40 veces entre Inicio, Movimientos y Ajustes. Probá ambos sentidos
+   y algunas pulsaciones rápidas. La copia de seguridad y los movimientos deben
+   aparecer siempre, sin necesidad de recargar.
+3. Dejá una búsqueda/filtro en Movimientos, salí y volvé: debe conservarse.
+   Repetí después de salir de Expo Go y volver, y después de cerrar un formulario.
+4. En un borrador, tocá Categoría: elegí una, buscá una ya usada o escribí una
+   propia y tocá Usar. Cancelar el selector no debe cambiar el borrador. No hace
+   falta guardar un movimiento nuevo para revisar esto.
+5. Revisá el saldo, los símbolos de categoría y Tu mes en claro/oscuro y texto
+   grande. Tu mes muestra registros de esa moneda, no el saldo inicial ni todo
+   el patrimonio.
+
+Si reaparece el negro, contame si siguen visibles la barra de abajo y el título,
+si cambiar de pestaña lo recupera y si pasó después de usar el teclado o volver
+a Expo Go. Si Metro muestra un error rojo, compartí su texto sin datos privados.
+No hace falta desinstalar, borrar tus movimientos, cambiar Expo ni pagar EAS.

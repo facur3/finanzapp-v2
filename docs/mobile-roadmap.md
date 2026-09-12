@@ -42,6 +42,12 @@ implemented: available balance and quick actions on Home, date-grouped/searchabl
 movements, a complete account list, compact account/date selectors and clearer
 amount/detail screens. Native navigation remains the only owner of transitions.
 See [the mobile design brief](mobile-design.md) and its pending device acceptance.
+The subsequent user test reports basic flow working but **intermittent black
+content when switching to Settings/Movements** and a visual style that is still
+too bare. Interfaz 02 removes the JS tab fade/detach/freeze/lazy combination,
+keeps root content mounted and adds category recognition/selection, a stronger
+balance hierarchy and exact monthly recorded flow. The device re-test is open;
+do not mark the black-screen issue fixed on-device or the design approved yet.
 Next implement posted-entry edit/undo, then a versioned import preview with exact
 totals and recovery. Do not make the user manually rebuild the portfolio.
 
@@ -94,6 +100,8 @@ Supabase remains in the architecture; mobile sync is still to be implemented.
 
 ### M4 — Reports, dashboard and assistant
 
+- [x] Basic monthly recorded income/expenses by currency through today, excluding
+  opening balances (Interfaz 02, 9 pure-domain cases; visual acceptance pending).
 - [ ] Clear cash available vs net worth, liabilities and invested value.
 - [ ] Readable charts with labeled units/periods, real history and reduced motion.
 - [ ] Compare matching portions of months, categories and merchants; no invented causes.
@@ -154,6 +162,45 @@ no scraping promises, no claims that a local record actually paid a bank/card.
 - Aim for smooth frame pacing on real hardware; measure before claiming 60/120 fps.
 
 ## Handoff log (append actual evidence)
+
+### 2026-09-12 — Interfaz 02: intermittent black tabs and visual feedback
+
+- User reports completing the requested basic checks successfully, but a tab
+  sometimes stays black (Settings/Movements, roughly one in ten switches).
+  The visual design is explicitly not approved; the user asks for a more useful,
+  distinctive, calm iOS experience and future merchant logos/category recognition.
+- Inspected installed Expo Router 57's vendored BottomTabView, forFade and
+  react-native-screens fallback. Fade animates scene opacity to/from zero and
+  coordinates native inactive activity/detachment. This is a **plausible mechanism,
+  not a reproduced physical-iPhone root cause**. No evidence of a lost SQLite record.
+- Removed content fade for the three tabs; set detachInactiveScreens=false,
+  lazy=false and freezeOnBlur=false. Native detail/modal stack is unchanged.
+  No timed redirects, snapshots, focus reloads, forced remounts or global screen
+  disabling. The tradeoff is keeping three lightweight roots mounted; lists stay
+  virtualized. Source and configuration regression guards live under mobile UI/tests.
+- Added a deep-blue available-balance surface, compact ARS/USD selection, category
+  badges, searchable/reusable/custom category choice, and Tu mes. Existing strings
+  are preserved; arbitrary category text has a safe symbol fallback (including
+  object-prototype names). This is not AI classification or a seeded user dataset.
+- Shared monthly summary uses recorded entry dates through today, integer cents
+  and separate currencies; opening balances are excluded. Unsafe total magnitude
+  returns an unavailable state instead of rounding or blanking the Home screen.
+- Checked: 230 domain/web tests and 29 mobile tests (including two tab-layout
+  configuration guards), TypeScript, Metro iOS JS/assets export and Vite build.
+  These guards are not native navigation/performance tests. CI must pass online
+  Expo compatibility, clean installs, builds and hygiene before merge.
+- Interfaz 02 is visible in Settings. Spanish guide and device checklist specify
+  cache-only restart, 30–40 tab switches, search retention, keyboard/background
+  cases and non-mutating category draft tests. No local data reset or reinstall.
+- No visual preview or native runtime reproduced the intermittent issue here.
+  Physical iPhone re-test and visual feedback remain open. Next: resolve any
+  remaining native issue, then posted-entry edit/undo and safe restore/import.
+- Merchant logos are future verified assets with category/initial fallback;
+  do not generate fake marks or send private entry text to lookup providers.
+  Reports/charts remain planned around real periods/categories, not decoration.
+- No new dependency, DB/schema mutation, cloud write, EAS build, charge or legacy
+  production behavior change. Official reference for the affected tab options:
+  [React Navigation bottom tabs](https://reactnavigation.org/docs/bottom-tab-navigator/).
 
 ### 2026-09-12 — First native visual-system iteration
 

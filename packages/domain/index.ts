@@ -3,3 +3,4 @@
 export { fmtNum, parseMoneyInput } from '../../src/domain/money.js';
 export { todayKey, labelFromISO } from '../../src/domain/dates.js';
 export * from './ledger.ts';
+export * from './month-summary.ts';

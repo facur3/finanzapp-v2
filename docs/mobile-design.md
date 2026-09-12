@@ -1,7 +1,12 @@
 # FinanzApp: dirección visual móvil
 
-Actualizado: 12 de septiembre de 2026. Primera iteración implementada en
-`apps/mobile`; validación visual/gestual en el iPhone todavía pendiente.
+Actualizado: 12 de septiembre de 2026. Interfaz 02 implementada en `apps/mobile`;
+su validación visual/gestual en el iPhone todavía está pendiente.
+
+El usuario probó el recorrido de la primera iteración y reportó que funcionaba,
+pero una pestaña queda negra aproximadamente una de cada diez veces. Además,
+**no aprueba todavía el estilo**: lo siente demasiado básico. No confundir la
+aceptación del flujo con una aprobación visual o de estabilidad.
 
 El piloto confirmó que al usuario le gusta la navegación nativa. Conservamos
 esa base y construimos una identidad propia: simple, cálida y fácil de leer.
@@ -17,11 +22,18 @@ Inicio, Movimientos y Ajustes, sin botones decorativos de secciones no implement
 
 | Pantalla | Jerarquía y comportamiento |
 | --- | --- |
-| Inicio | Disponible por moneda, accesos a Gasto/Ingreso, cuatro movimientos recientes y hasta tres cuentas. Ver todas abre la lista de cuentas. Patrimonio e inversiones llegan cuando esté implementada su contabilidad. |
+| Inicio | Disponible en una superficie azul profunda con selector ARS/USD compacto; Gasto/Ingreso, tres movimientos recientes, Tu mes y hasta tres cuentas. Patrimonio e inversiones llegan cuando esté implementada su contabilidad. |
 | Gasto / ingreso | Monto destacado y moneda visible, con Listo en el teclado iOS. Cuenta en una fila que abre su selector. Fecha en una hoja nativa con Cancelar/Listo; no modifica la fecha hasta confirmar. Validación visible y borrador conservado ante errores de guardado. |
 | Movimientos | Lista virtualizada agrupada por fecha, búsqueda por concepto/categoría/cuenta y filtros Todos/Gastos/Ingresos. Importe firmado y moneda; no sumar ARS y USD ni inventar días vacíos. |
 | Cuentas | Lista completa por moneda y detalle con disponible, saldo inicial separado de ingresos y movimientos de esa cuenta. |
 | Detalle | Importe, concepto y fecha primero; cuenta y categoría después. Editar y deshacer se muestran cuando tengan persistencia y reversión implementadas. |
+
+Interfaz 02 añade un selector de categorías con búsqueda, categorías ya usadas y
+opción de escribir una propia. Un emoji pequeño ayuda a reconocer cada categoría,
+sin repetirlo en el texto ni modificar registros anteriores. Las categorías que
+no reconocemos usan un símbolo neutro; no se infiere el comercio de un emoji.
+Tu mes resume únicamente gastos/ingresos registrados, desde el inicio del mes
+hasta hoy y en la moneda seleccionada. No cuenta el saldo inicial como ingreso.
 
 ## Sistema visual
 
@@ -42,6 +54,10 @@ Inicio, Movimientos y Ajustes, sin botones decorativos de secciones no implement
 
 - La pila y las hojas nativas controlan entrar, volver, arrastrar y cancelar.
   No añadir una segunda animación de pantalla encima de la navegación del sistema.
+- Las tres pestañas del piloto cambian sin fundido de contenido y permanecen
+  montadas, sin congelamiento/desconexión de vistas inactivas. Es una mitigación
+  del bloqueo negro reportado, pendiente de repetir en iPhone. No fuerza un reload,
+  no borra filtros y no desactiva la navegación nativa de detalles/formularios.
 - Respuesta breve al presionar y confirmar. Conservar los hápticos de guardado;
   no vibrar en cada fila ni reiniciar animaciones en cada render.
   Presión breve de escala y selección con fundido, desactivadas con Reducir movimiento.
@@ -66,6 +82,21 @@ Después: completar tarjetas/inversiones y su conciliación; reportes y asistent
 basados en movimientos reales; sincronización opcional y funciones de Apple.
 El orden y las pruebas contables están en [el roadmap](mobile-roadmap.md).
 
+## Referencias y próximos detalles visuales
+
+- [MonAi](https://get-monai.app/): referencia de captura simple y reconocimiento
+  rápido de categorías. Se conserva una composición, textos y recursos propios.
+- Gráficos: primero barras por categoría y evolución por período con escala,
+  moneda y valores legibles; no una colección de donuts decorativos. Animar el
+  cambio de datos sin volver a dibujar todo al regresar de otra pantalla.
+- Logos de comercios (por ejemplo, PedidosYa): futura identificación explícita
+  contra un catálogo verificado, con recursos cuyo uso esté autorizado y una
+  alternativa de categoría/iniciales cuando falten. No generar logos falsos,
+  inventar asociaciones ni enviar conceptos o movimientos privados a un buscador
+  o proveedor de logos. Evaluar caché/offline y privacidad antes de implementarlo.
+- No añadir aún accesos de tarjetas, inversiones o IA sin funciones completas.
+  La app final sigue en construcción; el piloto no es su diseño definitivo.
+
 ## Aceptación de diseño
 
 - [ ] Recorrido completo Inicio → gasto/ingreso → guardar → detalle → volver.
@@ -76,3 +107,5 @@ El orden y las pruebas contables están en [el roadmap](mobile-roadmap.md).
 - [ ] Tema claro/oscuro, VoiceOver y Reducir movimiento revisados en el iPhone.
 - [ ] El usuario revisa estas tres pantallas antes de extender el lenguaje visual.
 - [ ] Repetir la prueba en una versión `preview` optimizada e independiente de Metro.
+- [ ] Cambiar 30–40 veces entre Inicio, Movimientos y Ajustes sin una pestaña vacía.
+- [ ] Revisar Interfaz 02, sus categorías, contraste, montos largos y Tu mes en iPhone.
