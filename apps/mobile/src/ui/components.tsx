@@ -6,6 +6,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { accountBalanceMinor, formatMinorUnits, labelFromISO, type Currency, type Entry, type Account } from '@finanzapp/domain';
 import { router } from 'expo-router';
 import { useCurrentDay, usePalette, useReduceMotion } from './theme';
+import { categorySymbol } from './categories';
 
 type IconName = keyof typeof Ionicons.glyphMap;
 
@@ -146,13 +147,13 @@ export function ErrorMessage({ message }: { message: string | null }) {
   </View> : null;
 }
 
-export function Money({ minor, currency, large = false, color, signed = false }: {
-  minor: number; currency: Currency; large?: boolean; color?: string; signed?: boolean;
+export function Money({ minor, currency, large = false, color, signed = false, size }: {
+  minor: number; currency: Currency; large?: boolean; color?: string; signed?: boolean; size?: number;
 }) {
   const p = usePalette();
   const sign = minor < 0 ? '−' : signed && minor > 0 ? '+' : '';
   return <Text accessibilityLabel={(minor < 0 ? 'Menos ' : '') + formatMinorUnits(Math.abs(minor)) + (currency === 'USD' ? ' dólares' : ' pesos')}
-    style={{ color: color ?? p.text, fontSize: large ? 42 : 17, fontWeight: large ? '700' : '600',
+    style={{ color: color ?? p.text, fontSize: size ?? (large ? 42 : 17), fontWeight: large ? '700' : '600',
       letterSpacing: large ? -1.4 : -0.2, fontVariant: ['tabular-nums'], flexShrink: 1, maxWidth: '100%' }}>
     {sign}{currency === 'USD' ? 'US$ ' : '$ '}{formatMinorUnits(Math.abs(minor))}
   </Text>;
@@ -176,6 +177,15 @@ export function DetailRow({ label, value, icon, onPress, last = false, disabled 
     disabled={disabled} accessibilityState={{ disabled }} onPress={onPress} style={style}>{content}</PressFeedback> : <View style={style}>{content}</View>;
 }
 
+export function CategoryBadge({ category, large = false }: { category: string; large?: boolean }) {
+  const p = usePalette();
+  return <View accessible={false} accessibilityElementsHidden importantForAccessibility="no-hide-descendants"
+    style={{ width: large ? 60 : 42, height: large ? 60 : 42, borderRadius: large ? 21 : 15,
+      alignItems: 'center', justifyContent: 'center', backgroundColor: p.inset }}>
+    <Text allowFontScaling={false} style={{ fontSize: large ? 29 : 23 }}>{categorySymbol(category)}</Text>
+  </View>;
+}
+
 export function EntryRow({ entry, account, last = false, showDate = true }: { entry: Entry; account: Account; last?: boolean; showDate?: boolean }) {
   const p = usePalette();
   const { fontScale } = useWindowDimensions();
@@ -186,9 +196,7 @@ export function EntryRow({ entry, account, last = false, showDate = true }: { en
     accessibilityLabel={[entry.merchant, income ? 'ingreso' : 'gasto', formatMinorUnits(entry.amountMinor) + ' ' + account.currency, entry.category, account.name, dateLabel].join(', ')}
     onPress={() => router.push({ pathname: '/entry/[id]', params: { id: entry.id } })}
     style={[styles.entry, { borderBottomColor: p.line, borderBottomWidth: last ? 0 : StyleSheet.hairlineWidth }]}>
-    <View style={[styles.rowIcon, { backgroundColor: income ? p.positiveSoft : p.inset }]}>
-      <Ionicons name={income ? 'arrow-down-outline' : 'arrow-up-outline'} size={19} color={income ? p.positive : p.secondary} accessible={false} />
-    </View>
+    <CategoryBadge category={entry.category} />
     <View style={{ flex: 1, minWidth: 0, gap: 4 }}>
       <View style={{ flexDirection: fontScale > 1.3 ? 'column' : 'row', gap: 6, alignItems: fontScale > 1.3 ? 'flex-start' : 'baseline' }}>
         <AppText numberOfLines={fontScale > 1.3 ? undefined : 1} style={{ flex: fontScale > 1.3 ? undefined : 1, fontWeight: '600' }}>{entry.merchant}</AppText>

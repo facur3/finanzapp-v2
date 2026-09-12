@@ -35,8 +35,8 @@ export default function SettingsScreen() {
   }
 
   return <Screen>
-    <Surface><SectionTitle>En este dispositivo</SectionTitle>
-      <AppText>Tu dinero, guardado localmente.</AppText>
+    <Surface><SectionTitle>Datos y privacidad</SectionTitle>
+      <AppText>Tus registros quedan en este dispositivo.</AppText>
       <AppText secondary style={{ fontSize: 15 }}>Podés registrar movimientos sin conexión. La sincronización todavía no está activada.</AppText>
     </Surface>
     <Surface><SectionTitle>Copia de seguridad</SectionTitle>
@@ -45,6 +45,6 @@ export default function SettingsScreen() {
       <ErrorMessage message={error} />
       <ActionButton label="Compartir copia" icon="share-outline" onPress={exportBackup} busy={busy} disabled={!snapshot} secondary />
     </Surface>
-    <AppText secondary style={{ textAlign: 'center', fontSize: 13 }}>FinanzApp · Piloto nativo 0.1.0</AppText>
+    <AppText secondary style={{ textAlign: 'center', fontSize: 13 }}>FinanzApp · Piloto nativo 0.1.0 · Interfaz 02</AppText>
   </Screen>;
 }

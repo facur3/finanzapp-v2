@@ -1,11 +1,12 @@
-import { useState, type ReactNode } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { FlatList, Keyboard, Modal, Platform, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import type { Account } from '@finanzapp/domain';
-import { AppText, DetailRow, PressFeedback } from './components';
+import type { Account, Entry, EntryKind } from '@finanzapp/domain';
+import { AppText, CategoryBadge, DetailRow, Field, PressFeedback } from './components';
 import { usePalette, useReduceMotion } from './theme';
+import { categoryChoices, categoryKey, customCategory } from './categories';
 
 // Native presentation only. No navigation redirects, captured backgrounds or
 // custom screen-level enter/exit animation layered over UIKit.
@@ -68,5 +69,42 @@ export function DateField({ value, onChange, disabled = false }: { value: Date; 
       onDone={() => { onChange(draft); setVisible(false); }}>
       <View style={{ width: '100%', overflow: 'hidden', paddingTop: 20 }}>{picker}</View>
     </SelectionSheet> : visible && picker}
+  </>;
+}
+
+export function CategoryField({ entries, kind, value, onChange, disabled = false }: {
+  entries: Entry[]; kind: EntryKind; value: string; onChange: (category: string) => void; disabled?: boolean;
+}) {
+  const p = usePalette();
+  const [visible, setVisible] = useState(false);
+  const [query, setQuery] = useState('');
+  const choices = useMemo(() => categoryChoices(entries, kind, query, value), [entries, kind, query, value]);
+  const custom = customCategory(query, choices);
+  const choose = (category: string) => { Keyboard.dismiss(); onChange(category); setVisible(false); };
+  return <>
+    <DetailRow label="Categoría" value={value || 'Elegir categoría'} icon="pricetag-outline" disabled={disabled}
+      onPress={() => { Keyboard.dismiss(); setQuery(''); setVisible(true); }} />
+    <SelectionSheet visible={visible} title="Categorías" onClose={() => setVisible(false)}>
+      <FlatList data={choices} keyExtractor={categoryKey} keyboardShouldPersistTaps="handled"
+        automaticallyAdjustKeyboardInsets keyboardDismissMode="interactive"
+        contentContainerStyle={{ padding: 20, paddingTop: 0, paddingBottom: 40 }}
+        ListHeaderComponent={<View style={{ gap: 12, paddingBottom: 16 }}>
+          <Field label="Buscar o crear categoría" value={query} onChangeText={setQuery}
+            placeholder="Nombre de la categoría" maxLength={60} autoCapitalize="sentences"
+            clearButtonMode="while-editing" autoCorrect={false} />
+          {custom && <PressFeedback accessibilityRole="button" accessibilityLabel={'Usar categoría ' + custom}
+            onPress={() => choose(custom)} style={{ flexDirection: 'row', gap: 12, padding: 14, borderRadius: 16, backgroundColor: p.accentSoft }}>
+            <Ionicons name="add-circle-outline" color={p.accent} size={24} accessible={false} />
+            <AppText style={{ color: p.accent, fontWeight: '600', flex: 1 }}>Usar «{custom}»</AppText>
+          </PressFeedback>}
+        </View>}
+        renderItem={({ item }) => <PressFeedback accessibilityRole="button" accessibilityLabel={item}
+          accessibilityState={{ selected: categoryKey(value) === categoryKey(item) }} onPress={() => choose(item)}
+          style={{ flexDirection: 'row', alignItems: 'center', gap: 14, padding: 12, marginBottom: 6, backgroundColor: p.surface, borderRadius: 18 }}>
+          <CategoryBadge category={item} />
+          <AppText style={{ flex: 1, fontWeight: '500' }}>{item}</AppText>
+          {categoryKey(value) === categoryKey(item) && <Ionicons name="checkmark-circle" color={p.accent} size={23} accessible={false} />}
+        </PressFeedback>} />
+    </SelectionSheet>
   </>;
 }

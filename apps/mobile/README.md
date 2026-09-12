@@ -12,8 +12,10 @@ fluid native navigation and records preserved after closing/reopening. Remaining
 gesture/accessibility checks and an optimized signed build are still pending.
 The reported device is an **iPhone 14 Pro running iOS 26.6.1**; its tested commit
 is unknown. The first [original visual-system iteration](../../docs/mobile-design.md)
-is now implemented, but its device acceptance is pending. Next: posted-entry
-edit/undo and a previewed legacy import.
+is implemented. The user reported the requested basic flow working, but Settings
+or Movements intermittently stayed black on tab changes and the visual style
+is not yet approved. **Interfaz 02** addresses this risk and refines the design;
+its focused physical re-test is pending. Next: posted-entry edit/undo and safe import.
 
 ## First start on Linux or Windows
 
@@ -61,6 +63,14 @@ The current visual iteration includes:
 - System appearance, accessible labels and restrained press/selection feedback.
   A single shared accessibility subscription controls reduced motion; native
   navigation alone owns screen transitions. Date labels refresh after midnight/resume.
+- Interfaz 02: stable mounted tab roots with no content fade, lazy mounting or
+  freezing. Detail/modal stack animations remain native. Keeping three roots
+  mounted uses more memory; activity remains virtualized. Do not globally disable
+  react-native-screens or add focus-triggered reloads to hide the symptom.
+- A distinctive balance surface, category symbols and a searchable chooser that
+  reuses existing category strings or accepts a custom one. No auto-reclassification.
+- Tu mes: exact recorded income/expenses by currency, through today. No opening
+  balance counted as income; unsafe aggregate totals get an unavailable state.
 
 No database migration, Supabase connection, seeded records or native paid service
 was introduced by this UI change. Follow the new-iteration section of the
@@ -143,7 +153,14 @@ migrations and repeated operation IDs. It also tests the actual query-string and
 Xcode-generator integrations affected by the temporary dependency fixes in
 [`compat/`](compat/README.md). It does not replace native-device testing.
 It also covers the actual presentation helpers: filtering/search, stable ordering,
-date grouping, available currencies and account preselection (20 tests total).
+date grouping, available currencies, account preselection and category handling.
+The 29 mobile tests include a configuration regression guard over the real tab
+layout. This guard is **not** a native tab-switch test; use the physical checklist.
+The root suite also tests the shared monthly summary.
+
+For the intermittent black-tab report, update to `master`, restart with
+`npm start -- --clear` (bundler cache only, not SQLite), reopen from the new QR,
+and follow the **Interfaz 02** section of the device checklist. Do not uninstall.
 
 For dependency changes, also run `npm ls --all` and `npm audit`. Keep the scoped patched
 decoder/UUID compatibility intact; do not run `npm audit fix --force`, which can
