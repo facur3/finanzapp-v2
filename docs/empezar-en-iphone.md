@@ -37,7 +37,7 @@ Abrí una terminal en una carpeta donde quieras guardar el proyecto. Esta copia
 usa otra carpeta para conservar la que ya tengas:
 
 ```bash
-git clone --branch feat/expo-native-foundation https://github.com/facur3/finanzapp-v2.git finanzapp-ios
+git clone --branch master https://github.com/facur3/finanzapp-v2.git finanzapp-ios
 cd finanzapp-ios/apps/mobile
 npm ci
 npm start
@@ -116,32 +116,70 @@ Si todavía no lo probaste, completá primero la prueba de arriba.
 
 ## 6. Después del piloto aprobado
 
-Seguimos con Expo + React Native. La siguiente entrega es una interfaz propia,
-mínima y coherente en Inicio, gasto/ingreso y detalle, conservando la navegación
-que ya te gustó. Está definida en [la propuesta visual](mobile-design.md).
+Seguimos con Expo + React Native y **por ahora seguimos probando gratis en Expo Go**.
+Ya está implementada la primera iteración de [la interfaz propia](mobile-design.md):
+Inicio más simple, acceso directo a Gasto/Ingreso, movimientos agrupados por fecha
+con búsqueda, cuentas en su propia lista y formularios más claros. Conserva la
+navegación nativa que ya te gustó. Falta tu prueba de esta nueva interfaz.
+
+Inicio dice **Disponible en tus cuentas**, no patrimonio: el piloto todavía no
+incluye inversiones ni deudas. Pesos y dólares se muestran por separado, sin
+inventar una cotización. No hay datos precargados ni cambios en tu base local.
 Después completamos editar/deshacer y el importador con vista previa para traer
 tus datos sin volver a escribir todo. El piloto todavía no es el registro principal.
 
 **Ahora, de tu lado:** conservá una copia JSON privada de la app actual usando su
 opción de exportar backup. No la subas al repositorio ni hace falta compartirla
 para diseñar la app. No borres Supabase ni vuelvas a cargar el patrimonio en el
-piloto. Modelo de iPhone y versión de iOS ayudan a registrar la prueba; no bloquean
-el desarrollo.
+piloto. Ya registramos tu **iPhone 14 Pro con iOS 26.6.1**, según tu mensaje.
+No hace falta volver a dar ese dato mientras no cambie.
 
 Para actualizar esta misma copia del código, detené Metro con `Ctrl+C` y ejecutá:
 
 ```bash
 cd ~/Projects/apps/finanzapp-ios
+git fetch origin
+git switch master
 git pull --ff-only
 cd apps/mobile
 npm ci
 npm start
 ```
 
-Esto actualiza la rama que ya tenés; no hace falta volver a clonar. Si tenés
+Esto cambia desde la antigua rama del piloto a `master`, donde se integran las
+entregas verificadas; no hace falta volver a clonar. Si tenés
 cambios locales y Git no permite actualizar, conservá el mensaje para revisarlo,
 sin borrar archivos ni forzar un reset. Actualizar el código no borra SQLite;
 desinstalar Expo Go o borrar sus datos sí puede eliminar los registros del piloto.
+
+**Prueba breve de esta entrega:**
+
+1. Confirmá que aparecen las mismas cuentas, saldos y movimientos que ya tenías.
+2. Desde Inicio, abrí Gasto e Ingreso. Si tenés una cuenta USD, seleccioná Dólares
+   antes de abrir: el formulario debe abrir con una cuenta en esa moneda.
+3. Escribí un monto; usá **Listo** para cerrar su teclado. Abrí Cuenta y Fecha.
+   Cambiá la fecha y tocá **Cancelar**: debe conservar la original. Repetí usando
+   **Listo**: debe tomar la nueva. Esto modifica el borrador, no guarda un gasto.
+4. En Movimientos, buscá por concepto, categoría o cuenta; probá los filtros,
+   entrá a un detalle y volvé. La búsqueda y los filtros deben conservarse.
+5. Probá un gesto de volver cancelado, modo oscuro y texto grande. Cerrá/reabrí
+   Expo Go y confirmá los datos de nuevo. Para comprobar un guardado, usá un
+   movimiento que quieras conservar: editar/deshacer lo guardado aún está pendiente.
+
+### Expo Go y EAS: para qué sirve cada uno
+
+| Herramienta | Qué hace | Dónde probás |
+| --- | --- | --- |
+| Expo Go | Es la app de Expo que ya instalaste. Carga nuestro código con las funciones nativas que trae incluidas. | En tu iPhone, normalmente conectado a Metro en tu computadora. |
+| EAS Build | Es un servicio que compila y firma **nuestra propia app** en servidores de Expo. Para iOS usa una Mac en la nube; vos podés seguir en Linux o Windows. | La app resultante se instala en el mismo iPhone. No es un simulador para tu PC. |
+| Build `preview` | Es nuestra app con el código incluido, optimizada y con identidad propia. La prepara EAS Build. | En tu iPhone, sin Expo Go y sin depender de la computadora. |
+
+Expo Go no permite verificar absolutamente todo. Por ejemplo, **Face ID en iOS
+requiere una versión propia de desarrollo**; también debemos probar allí nuestra
+configuración nativa, permisos e integraciones. Un build `development` sigue usando
+Metro para editar en vivo; `preview` es el que usaremos para la prueba independiente.
+Fuentes: [Expo Go y development builds](https://docs.expo.dev/develop/development-builds/introduction/),
+[Face ID en Expo](https://docs.expo.dev/versions/latest/sdk/local-authentication/).
 
 **Cuándo pagar (precios consultados el 12 de septiembre de 2026):**
 
@@ -153,9 +191,11 @@ desinstalar Expo Go o borrar sus datos sí puede eliminar los registros del pilo
 
 Fuentes oficiales: [precios de Expo](https://expo.dev/pricing) y
 [alta de Apple Developer](https://developer.apple.com/programs/enroll/).
-No hace falta contratar Expo de pago ahora. Recomendamos iniciar el alta de Apple
-cuando estemos listos para la primera versión propia; no esperar a terminar toda
-la app para probar ese flujo, Face ID y las funciones nativas específicas.
+No hace falta contratar Expo de pago ni pagar Apple ahora. Primero revisamos esta
+interfaz y completamos la corrección/recuperación básica de los movimientos.
+Después vinculamos EAS con el plan gratuito y hacemos el alta de Apple para la
+primera versión propia, antes de implementar a fondo Face ID y las integraciones.
+No esperamos a terminar toda la migración para probar ese flujo de instalación.
 
 La siguiente prueba después de esa alta será instalar `development`, luego
 `preview` y abrirla con la computadora apagada. La versión `preview` trae su

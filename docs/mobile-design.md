@@ -1,7 +1,7 @@
 # FinanzApp: dirección visual móvil
 
-Actualizado: 12 de septiembre de 2026. Propuesta para la siguiente iteración;
-todavía no es un rediseño implementado ni validado en el iPhone.
+Actualizado: 12 de septiembre de 2026. Primera iteración implementada en
+`apps/mobile`; validación visual/gestual en el iPhone todavía pendiente.
 
 El piloto confirmó que al usuario le gusta la navegación nativa. Conservamos
 esa base y construimos una identidad propia: simple, cálida y fácil de leer.
@@ -10,15 +10,17 @@ pantallas, textos, recursos gráficos y composición de FinanzApp serán propios
 
 ## Primera entrega de diseño
 
-Trabajar primero en Inicio, registro de gasto/ingreso y detalle del movimiento.
+Se aplicó primero a Inicio, registro de gasto/ingreso, cuentas y movimientos.
 Son el recorrido diario y permiten revisar el estilo antes de extenderlo a
-tarjetas, inversiones, reportes y asistente. Mantener las tres pestañas del piloto
-mientras las nuevas secciones no tengan una función completa.
+tarjetas, inversiones, reportes y asistente. Se mantienen tres pestañas funcionales:
+Inicio, Movimientos y Ajustes, sin botones decorativos de secciones no implementadas.
 
 | Pantalla | Jerarquía y comportamiento |
 | --- | --- |
-| Inicio | Saldo disponible por moneda, acción de registrar y últimos movimientos. Cuentas en una lista breve; el detalle se abre al tocar. Patrimonio e inversiones se incorporan cuando esté implementada su contabilidad. |
-| Gasto / ingreso | Monto destacado, moneda visible y una cuenta seleccionada explícitamente. Concepto, categoría y fecha en filas legibles. Guardar accesible con teclado y mensaje concreto junto al dato inválido. |
+| Inicio | Disponible por moneda, accesos a Gasto/Ingreso, cuatro movimientos recientes y hasta tres cuentas. Ver todas abre la lista de cuentas. Patrimonio e inversiones llegan cuando esté implementada su contabilidad. |
+| Gasto / ingreso | Monto destacado y moneda visible, con Listo en el teclado iOS. Cuenta en una fila que abre su selector. Fecha en una hoja nativa con Cancelar/Listo; no modifica la fecha hasta confirmar. Validación visible y borrador conservado ante errores de guardado. |
+| Movimientos | Lista virtualizada agrupada por fecha, búsqueda por concepto/categoría/cuenta y filtros Todos/Gastos/Ingresos. Importe firmado y moneda; no sumar ARS y USD ni inventar días vacíos. |
+| Cuentas | Lista completa por moneda y detalle con disponible, saldo inicial separado de ingresos y movimientos de esa cuenta. |
 | Detalle | Importe, concepto y fecha primero; cuenta y categoría después. Editar y deshacer se muestran cuando tengan persistencia y reversión implementadas. |
 
 ## Sistema visual
@@ -42,6 +44,8 @@ mientras las nuevas secciones no tengan una función completa.
   No añadir una segunda animación de pantalla encima de la navegación del sistema.
 - Respuesta breve al presionar y confirmar. Conservar los hápticos de guardado;
   no vibrar en cada fila ni reiniciar animaciones en cada render.
+  Presión breve de escala y selección con fundido, desactivadas con Reducir movimiento.
+  Una sola suscripción de accesibilidad para toda la interfaz.
 - Fondo opaco coherente entre destino, pestaña, hoja y carga. Un gesto cancelado
   conserva pantalla, foco y borrador sin mostrar otra sección por un instante.
 - Respetar Reducir movimiento y VoiceOver. Cada control tiene nombre y estado;
@@ -67,6 +71,8 @@ El orden y las pruebas contables están en [el roadmap](mobile-roadmap.md).
 - [ ] Recorrido completo Inicio → gasto/ingreso → guardar → detalle → volver.
 - [ ] Apertura, cierre y cancelación de gestos sin destellos ni cambios de pestaña.
 - [ ] Fecha, teclado, montos largos y texto grande sin controles fuera de pantalla.
+- [ ] La moneda de Inicio preselecciona una cuenta compatible en Gasto/Ingreso.
+- [ ] Búsqueda y filtros se conservan al volver de un detalle; sin duplicar filas.
 - [ ] Tema claro/oscuro, VoiceOver y Reducir movimiento revisados en el iPhone.
 - [ ] El usuario revisa estas tres pantallas antes de extender el lenguaje visual.
 - [ ] Repetir la prueba en una versión `preview` optimizada e independiente de Metro.

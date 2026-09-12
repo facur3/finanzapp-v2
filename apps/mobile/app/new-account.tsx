@@ -5,7 +5,7 @@ import { randomUUID } from 'expo-crypto';
 import * as Haptics from 'expo-haptics';
 import { parseMinorUnits, type Currency } from '@finanzapp/domain';
 import { useLedger } from '../src/storage/LedgerProvider';
-import { ActionButton, AppText, Choices, ErrorMessage, Field, IconButton, Screen } from '../src/ui/components';
+import { ActionButton, AmountField, AppText, Choices, ErrorMessage, Field, IconButton, Screen } from '../src/ui/components';
 
 export default function NewAccountScreen() {
   const { addAccount } = useLedger();
@@ -40,13 +40,12 @@ export default function NewAccountScreen() {
     <Stack.Screen options={{ gestureEnabled: !busy,
       headerLeft: () => <IconButton name="close" label="Cerrar" onPress={close} disabled={busy} /> }} />
     <Field label="Nombre de la cuenta" value={name} onChangeText={setName} maxLength={80}
-      autoCapitalize="words" returnKeyType="next" editable={!busy} />
-    <AppText secondary>Moneda</AppText>
+      autoCapitalize="words" editable={!busy} />
     <Choices value={currency} onChange={setCurrency} disabled={busy}
       options={[{ value: 'ARS', label: 'Pesos · ARS' }, { value: 'USD', label: 'Dólares · USD' }]} />
-    <Field label="Saldo inicial" value={opening} onChangeText={setOpening} maxLength={24}
-      keyboardType="numbers-and-punctuation" editable={!busy} />
-    <AppText secondary>Es el saldo desde el que vas a empezar a registrar movimientos. No cuenta como ingreso. Escribí 0 si la cuenta está vacía.</AppText>
+    <AmountField label="Saldo inicial" currency={currency} value={opening} onChangeText={value => { setOpening(value); setError(null); }}
+      keyboardType="numbers-and-punctuation" inputMode={undefined} editable={!busy} />
+    <AppText secondary style={{ fontSize: 14 }}>El saldo que tenés al empezar. No cuenta como ingreso. Escribí 0 si la cuenta está vacía.</AppText>
     <ErrorMessage message={error} />
     <ActionButton label="Guardar cuenta" onPress={save} busy={busy} disabled={!name.trim() || !opening.trim()} />
   </Screen>;
