@@ -70,7 +70,7 @@ export default function BackupImportScreen() {
   }
 
   const plan = review?.preview;
-  const additions = (plan?.accounts.length ?? 0) + (plan?.records.length ?? 0);
+  const additions = (plan?.accounts.length ?? 0) + (plan?.records.length ?? 0) + (plan?.transfers.length ?? 0);
   return <Screen>
     <Stack.Screen options={{ gestureEnabled: !busy, headerBackVisible: !busy }} />
     {done ? <EmptyState title="Copia incorporada" detail="Tus cuentas y movimientos ya están guardados en este dispositivo. No se duplicaron registros existentes." icon="checkmark-circle-outline"
@@ -86,7 +86,8 @@ export default function BackupImportScreen() {
         <Surface grouped>
           <DetailRow label="Cuentas nuevas" value={String(plan.accounts.length)} />
           <DetailRow label="Movimientos nuevos" value={String(plan.records.filter(record => !record.voided).length)} />
-          <DetailRow label="Deshechos a conservar" value={String(plan.records.filter(record => record.voided).length)} />
+          <DetailRow label="Transferencias nuevas" value={String(plan.transfers.filter(record => !record.voided).length)} />
+          <DetailRow label="Deshechos a conservar" value={String(plan.records.filter(record => record.voided).length + plan.transfers.filter(record => record.voided).length)} />
           <DetailRow label="Movimientos ya presentes" value={String(plan.identical)} last />
         </Surface>
         {plan.conflicts > 0 ? <ErrorMessage message={`Hay ${plan.conflicts} registros con cambios diferentes. No se importará nada. Esta copia no puede reemplazar correcciones locales ni reactivar movimientos deshechos.`} /> : <>
@@ -108,7 +109,7 @@ export default function BackupImportScreen() {
         {!!plan && !plan.conflicts && additions > 0 && <ActionButton label="Confirmar importación" onPress={confirm} busy={busy} />}
         <ActionButton label="Elegir otra copia" onPress={choose} disabled={busy} secondary />
       </>}
-      <AppText secondary style={{ fontSize: 13 }}>Copias nativas v1/v2 · JSON de hasta 5 MB. La importación de la app web, tarjetas e inversiones llegará en otra etapa.</AppText>
+      <AppText secondary style={{ fontSize: 13 }}>Copias nativas v1/v2/v3 · JSON de hasta 5 MB. La importación de la app web, tarjetas e inversiones llegará en otra etapa.</AppText>
     </>}
   </Screen>;
 }

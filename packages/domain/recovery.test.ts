@@ -10,7 +10,7 @@ const time = '2026-09-13T12:00:00Z';
 const empty = { accounts: [], records: [] };
 
 describe('native edit and recovery domain', () => {
-  it('roundtrips v1 and v2 without changing a source record', () => {
+  it('roundtrips v1 and current backup without changing a source record', () => {
     expect(parsePilotBackup(JSON.stringify(createPilotBackup(snapshotFromArchive(archive)))).archive).toEqual(archive);
     const restored = parsePilotBackup('\uFEFF' + JSON.stringify(createRecoveryBackup(archive)));
     expect(restored.archive).toEqual(archive);

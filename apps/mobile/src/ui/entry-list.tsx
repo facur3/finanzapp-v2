@@ -1,18 +1,17 @@
 import { useMemo, type ReactNode } from 'react';
 import { SectionList, View } from 'react-native';
-import { labelFromISO, type Account, type Entry } from '@finanzapp/domain';
-import { AppText, EntryRow } from './components';
-import { groupEntries, type EntrySection } from './presentation';
+import { labelFromISO, type Account, type Entry, type Transfer } from '@finanzapp/domain';
+import { AppText, MovementRow } from './components';
+import { groupActivity, mergeActivity, type ActivityItem } from './presentation';
 import { useCurrentDay, usePalette } from './theme';
 
-export function EntryList({ entries, accounts, header, empty }: {
-  entries: Entry[]; accounts: Account[]; header?: ReactNode; empty?: ReactNode;
+export function EntryList({ entries, transfers, accounts, accountId, header, empty }: {
+  entries: Entry[]; transfers?: Transfer[]; accounts: Account[]; accountId?: string; header?: ReactNode; empty?: ReactNode;
 }) {
   const p = usePalette();
   const day = useCurrentDay();
-  const sections = useMemo(() => groupEntries(entries), [entries]);
-  const byId = useMemo(() => new Map(accounts.map(account => [account.id, account])), [accounts]);
-  return <SectionList<Entry, EntrySection> sections={sections} keyExtractor={entry => entry.id}
+  const sections = useMemo(() => groupActivity(mergeActivity(entries, transfers)), [entries, transfers]);
+  return <SectionList<ActivityItem, { dateISO: string; data: ActivityItem[] }> sections={sections} keyExtractor={item => item.key}
     style={{ flex: 1, backgroundColor: p.background }}
     contentContainerStyle={{ padding: 20, paddingBottom: 40, flexGrow: 1 }}
     contentInsetAdjustmentBehavior="automatic" automaticallyAdjustKeyboardInsets
@@ -28,6 +27,6 @@ export function EntryList({ entries, accounts, header, empty }: {
     renderItem={({ item, index, section }) => <View style={{ backgroundColor: p.surface, overflow: 'hidden',
       borderTopLeftRadius: index === 0 ? 20 : 0, borderTopRightRadius: index === 0 ? 20 : 0,
       borderBottomLeftRadius: index === section.data.length - 1 ? 20 : 0, borderBottomRightRadius: index === section.data.length - 1 ? 20 : 0 }}>
-      <EntryRow entry={item} account={byId.get(item.accountId)!} showDate={false} last={index === section.data.length - 1} />
+      <MovementRow item={item} accounts={accounts} accountId={accountId} showDate={false} last={index === section.data.length - 1} />
     </View>} />;
 }

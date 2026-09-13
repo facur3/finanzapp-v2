@@ -84,7 +84,7 @@ Face ID on iOS is not supported inside Expo Go; use our signed development build
 
 ## Interfaz 02 — black-tab mitigation and categories (re-test pending)
 
-- [ ] Footer in Ajustes shows **Interfaz 04**, including the Interfaz 02 mitigation.
+- [ ] Footer in Ajustes shows **Interfaz 05**, including the Interfaz 02 mitigation.
 - [ ] Perform 30–40 switches across Inicio → Ajustes → Movimientos in both directions.
 - [ ] Repeat some switches quickly, before a previous press response finishes.
 - [ ] Background/foreground the app, then repeat; Settings backup control always appears.
@@ -108,7 +108,7 @@ or private records. Do not reset SQLite, uninstall Expo Go or change Expo versio
 Use the small ledger already in the pilot; do not seed transactions to fill a chart.
 The walkthrough is read-only and does not require another expense or income.
 
-- [ ] Ajustes footer identifies **Interfaz 04** (contains Interfaz 03). Existing balances/entries are unchanged.
+- [ ] Ajustes footer identifies **Interfaz 05** (contains Interfaz 03). Existing balances/entries are unchanged.
 - [ ] Inicio → Ver cuentas opens the full list; back returns to Inicio.
 - [ ] Tu mes shows at most three categories with amount/share of **all** expenses.
 - [ ] More than three categories are explicitly identified as a partial preview.
@@ -146,10 +146,10 @@ test install, not by uninstalling the user's only copy. Do not downgrade schema 
 - [ ] After close/reopen, Ajustes → Movimientos deshechos still offers recovery.
 - [ ] Recuperar applies its original effect exactly once; repeat taps cannot double it.
 - [ ] Updated bars reflect only real saved values, with no focus/scroll replay.
-- [ ] Ajustes → Compartir copia saves native v2 JSON through Files; cancel does not claim success.
+- [ ] Ajustes → Compartir copia saves native v3 JSON through Files; cancel does not claim success.
 - [ ] Importar copia opens the iOS Files picker; cancel leaves the ledger unchanged.
 - [ ] The same exported file previews as already present; no duplicate import action.
-- [ ] Native v1/v2 backup on an isolated empty install restores active and undone records/totals.
+- [ ] Native v1/v2/v3 backup on an isolated empty install restores active and undone records/totals.
 - [ ] Preview shows counts and before/after ARS/USD; Cancel/back never imports.
 - [ ] Conflict/unsupported web/new schema/corrupt/oversized file shows an explanation without partial import.
 - [ ] Local correction/undo is never overwritten/reactivated by an older backup.
@@ -159,5 +159,31 @@ test install, not by uninstalling the user's only copy. Do not downgrade schema 
 
 Automated cases use synthetic fixtures in disposable SQLite files; none are
 inserted into the real app. Native file selection, sharing, gestures and appearance
-still need physical evidence. The v2 snapshot does not export the full local edit
+still need physical evidence. The v3 snapshot does not export the full local edit
 audit history; cloud/legacy migration and encryption remain separate gates.
+
+## Interfaz 05 — accounts and internal transfers (pending)
+
+The owner defers a combined visual review. No device result is claimed for this
+delivery. Do not populate their app with test fixtures or delete the only install.
+
+- [ ] Save a private backup before updating; the footer reads Interfaz 05 afterward.
+- [ ] Existing v1/v2 pilot data upgrades in place with unchanged balances, entries and undone entries.
+- [ ] Account → pencil opens name and **current available balance**, not just opening balance.
+- [ ] Cancel/unchanged save writes nothing. Rename preserves every balance and entry.
+- [ ] A deliberate correction clearly confirms old/new balance; only opening balance changes, not spending/income reports.
+- [ ] Account currency is immutable; new-account from a USD transfer defaults to USD.
+- [ ] Transferir is contextual to account detail, not another Home action/tab.
+- [ ] Same-currency destination picker excludes source; changing source clears an incompatible target.
+- [ ] Form previews both resulting balances; edit removes the old transfer effect first.
+- [ ] One real transfer changes both account balances once and preserves currency total.
+- [ ] Activity Todos/search/recent show the transfer once; expense/income filters/reports exclude it.
+- [ ] Each account detail lists the transfer with its own direction/sign.
+- [ ] Edit/undo/restore survives close/reopen; a repeat tap does not duplicate effects.
+- [ ] Transfer detail changes to undone/recovered in place, without redirect/back-tab flash.
+- [ ] Native v3 copy review lists new transfers and includes undone transfers in recovery.
+- [ ] Light/dark, large text, VoiceOver, keyboard/date, Reduce Motion and canceled swipe are correct in every new route.
+
+Automated handler tests are not a measurement of native fluidity. Bank execution,
+foreign exchange, fees, legacy import, cloud sync and full audit export are not
+included in this slice. Device logs/screenshots must exclude personal finances.

@@ -16,6 +16,8 @@ const archive: domain.LedgerArchive = { accounts: [account, { ...account, id: 'u
 
 function harness(file: string, props: any = {}, options: { data?: domain.LedgerArchive; params?: any;
   add?: (value: domain.Entry) => Promise<void>; update?: (value: domain.EntryChange) => Promise<void>;
+  addTransfer?: (value: domain.Transfer) => Promise<void>; updateTransfer?: (value: domain.TransferChange) => Promise<void>;
+  updateAccount?: (value: domain.AccountChange) => Promise<void>; addAccount?: (value: domain.Account) => Promise<void>;
   restore?: (value: domain.LedgerArchive, baseline: string) => Promise<void>; picker?: () => Promise<any> } = {}) {
   const source = readFileSync(new URL('../' + file, import.meta.url), 'utf8');
   const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText;
@@ -23,11 +25,16 @@ function harness(file: string, props: any = {}, options: { data?: domain.LedgerA
   const refs: any[] = [];
   let cursor = 0, refCursor = 0, uuid = 0, backs = 0;
   const pushed: any[] = [], alerts: any[] = [], updates: domain.EntryChange[] = [], additions: domain.Entry[] = [], restores: any[] = [];
+  const transfers: domain.Transfer[] = [], transferChanges: domain.TransferChange[] = [], accountChanges: domain.AccountChange[] = [], newAccounts: domain.Account[] = [];
   let data = options.data ?? archive;
   const jsx = (type: Node['type'], props: Node['props']) => ({ type, props });
   const ledger = { useLedger: () => ({ archive: data, snapshot: domain.snapshotFromArchive(data),
     addEntry: async (value: domain.Entry) => { additions.push(value); await options.add?.(value); },
     updateEntry: async (value: domain.EntryChange) => { updates.push(value); await options.update?.(value); },
+    addTransfer: async (value: domain.Transfer) => { transfers.push(value); await options.addTransfer?.(value); },
+    updateTransfer: async (value: domain.TransferChange) => { transferChanges.push(value); await options.updateTransfer?.(value); },
+    updateAccount: async (value: domain.AccountChange) => { accountChanges.push(value); await options.updateAccount?.(value); },
+    addAccount: async (value: domain.Account) => { newAccounts.push(value); await options.addAccount?.(value); },
     restoreBackup: async (value: domain.LedgerArchive, baseline: string) => { restores.push({ value, baseline }); await options.restore?.(value, baseline); },
   }) };
   const components = Object.fromEntries(['Screen', 'EmptyState', 'ActionButton', 'AppText', 'AmountField', 'Choices', 'ErrorMessage', 'Field', 'IconButton', 'Surface',
@@ -44,6 +51,7 @@ function harness(file: string, props: any = {}, options: { data?: domain.LedgerA
     'expo-haptics': { NotificationFeedbackType: { Success: 'Success' }, notificationAsync: async () => {} },
     'expo-file-system': { File: { pickFileAsync: options.picker ?? (async () => ({ canceled: true })) } },
     '@finanzapp/domain': domain,
+    '@expo/vector-icons/Ionicons': 'Ionicons',
     '../storage/LedgerProvider': ledger, '../src/storage/LedgerProvider': ledger, '../../src/storage/LedgerProvider': ledger,
     './components': components, '../src/ui/components': components, '../../src/ui/components': components,
     './form-controls': { AccountField: 'AccountField', CategoryField: 'CategoryField', DateField: 'DateField' },
@@ -56,11 +64,11 @@ function harness(file: string, props: any = {}, options: { data?: domain.LedgerA
     return modules[name];
   } });
   return {
-    render: () => { cursor = 0; refCursor = 0; let node = (module.exports.default ?? module.exports.EntryForm)(props);
+    render: () => { cursor = 0; refCursor = 0; let node = (module.exports.default ?? module.exports.EntryForm ?? module.exports.TransferForm)(props);
       while (typeof node.type === 'function') node = node.type(node.props);
       return node; },
     setData: (next: domain.LedgerArchive) => { data = next; },
-    pushed, alerts, updates, additions, restores, backs: () => backs,
+    pushed, alerts, updates, additions, restores, transfers, transferChanges, accountChanges, newAccounts, backs: () => backs,
   };
 }
 function nodes(value: any): Node[] {
@@ -215,4 +223,134 @@ test('identical or conflicting backups cannot show an enabled import action', as
     assert.equal(nodes(view.render()).some(node => node.props.label === 'Confirmar importación'), false);
     assert.equal(view.restores.length, 0);
   }
+});
+
+const destination: domain.Account = { ...account, id: 'b', name: 'Destino', openingMinor: 0 };
+const transfer: domain.Transfer = { id: 'transfer', fromAccountId: 'a', toAccountId: 'b', amountMinor: 1000, note: '', dateISO: entry.dateISO, createdAt };
+const transferData: domain.LedgerArchive = { ...archive, accounts: [...archive.accounts, destination] };
+function fillTransfer(view: ReturnType<typeof harness>) {
+  find(view.render(), 'AmountField').props.onChangeText('10');
+  find(view.render(), 'AccountField', 'Hacia').props.onChange('b');
+}
+test('transfer form previews exact two-account balances and only offers same-currency destinations', async () => {
+  const view = harness('src/ui/transfer-form.tsx', { accountId: 'a' }, { data: transferData });
+  assert.deepEqual(find(view.render(), 'AccountField', 'Hacia').props.accounts.map((a: domain.Account) => a.id), ['b']);
+  fillTransfer(view);
+  const root = view.render();
+  assert.equal(find(root, 'DetailRow', 'Prueba ARS después').props.value, 'ARS 866,55');
+  assert.equal(find(root, 'DetailRow', 'Destino después').props.value, 'ARS 10,00');
+  await find(root, 'ActionButton', 'Registrar transferencia').props.onPress();
+  assert.equal(view.transfers.length, 1);
+  assert.equal(view.transfers[0].amountMinor, 1000);
+  assert.equal(view.transfers[0].fromAccountId, 'a');
+  assert.equal(view.transfers[0].toAccountId, 'b');
+  assert.equal(view.additions.length, 0);
+  assert.equal(view.backs(), 1);
+});
+test('changing transfer source clears an incompatible target; validation keeps invalid drafts editable', async () => {
+  const view = harness('src/ui/transfer-form.tsx', { accountId: 'a' }, { data: transferData });
+  fillTransfer(view);
+  find(view.render(), 'AccountField', 'Desde').props.onChange('u');
+  assert.equal(find(view.render(), 'AccountField', 'Hacia').props.value, '');
+  assert.equal(find(view.render(), 'AmountField').props.currency, 'USD');
+  assert.equal(find(view.render(), 'EmptyState').props.title, 'Falta otra cuenta en esta moneda');
+  find(view.render(), 'AccountField', 'Desde').props.onChange('a');
+  find(view.render(), 'AccountField', 'Hacia').props.onChange('b');
+  find(view.render(), 'AmountField').props.onChangeText('12abc');
+  await find(view.render(), 'ActionButton', 'Registrar transferencia').props.onPress();
+  assert.ok(find(view.render(), 'ErrorMessage').props.message);
+  assert.equal(find(view.render(), 'AmountField').props.editable, true);
+  assert.equal(view.transfers.length, 0);
+});
+test('a transfer submission freezes across failed refresh and ignores duplicate taps while saving', async () => {
+  let finish!: () => void, attempts = 0;
+  const view = harness('src/ui/transfer-form.tsx', { accountId: 'a' }, { data: transferData, addTransfer: async () => {
+    if (++attempts === 1) { await new Promise<void>(resolve => { finish = resolve; }); throw new Error('Refresh failed'); }
+  } });
+  fillTransfer(view);
+  const root = view.render();
+  const saving = find(root, 'ActionButton').props.onPress();
+  await find(root, 'ActionButton').props.onPress();
+  find(view.render(), 'Stack.Screen').props.options.headerLeft().props.onPress();
+  assert.equal(view.transfers.length, 1);
+  assert.equal(view.backs(), 0);
+  finish(); await saving;
+  assert.equal(find(view.render(), 'AmountField').props.editable, false);
+  view.setData({ ...transferData, transfers: [domain.initialTransferRecord(view.transfers[0])] });
+  await find(view.render(), 'ActionButton', 'Reintentar guardado').props.onPress();
+  assert.deepEqual(view.transfers[0], view.transfers[1]);
+  assert.equal(view.backs(), 1);
+});
+test('editing a transfer removes its previous effect in preview and retains its identity', async () => {
+  const original = domain.initialTransferRecord(transfer);
+  const view = harness('src/ui/transfer-form.tsx', { original }, { data: { ...transferData, transfers: [original] } });
+  assert.equal(find(view.render(), 'AmountField').props.value, '10,00');
+  find(view.render(), 'AmountField').props.onChangeText('20');
+  assert.equal(find(view.render(), 'DetailRow', 'Prueba ARS después').props.value, 'ARS 856,55');
+  await find(view.render(), 'ActionButton', 'Guardar cambios').props.onPress();
+  assert.equal(view.transferChanges.length, 1);
+  assert.equal(view.transferChanges[0].after.transfer.id, transfer.id);
+  assert.equal(view.transferChanges[0].after.revision, 1);
+  assert.equal(view.transfers.length, 0);
+});
+test('transfer undo requires confirmation, affects both sides, and updates detail without redirecting', async () => {
+  const original = domain.initialTransferRecord(transfer);
+  const view = harness('app/transfer/[id].tsx', {}, { data: { ...transferData, transfers: [original] }, params: { id: transfer.id } });
+  find(view.render(), 'ActionButton', 'Deshacer transferencia').props.onPress();
+  assert.match(view.alerts[0].message, /Destino/);
+  assert.match(view.alerts[0].message, /Prueba ARS/);
+  view.alerts[0].buttons[0].onPress();
+  assert.equal(view.transferChanges.length, 0);
+  find(view.render(), 'ActionButton', 'Deshacer transferencia').props.onPress();
+  view.alerts[1].buttons[1].onPress(); await flush();
+  view.setData({ ...transferData, transfers: [view.transferChanges[0].after] });
+  assert.equal(find(view.render(), 'ActionButton', 'Recuperar transferencia').props.disabled, undefined);
+  assert.equal(view.backs(), 0);
+  assert.equal(view.pushed.length, 0);
+});
+test('account correction prefills actual available balance and waits for explicit confirmation', async () => {
+  const data = { ...transferData, transfers: [domain.initialTransferRecord(transfer)] };
+  const view = harness('app/edit-account/[id].tsx', {}, { data, params: { id: 'a' } });
+  assert.equal(find(view.render(), 'AmountField').props.value, '866,55');
+  find(view.render(), 'AmountField').props.onChangeText('500');
+  find(view.render(), 'ActionButton').props.onPress();
+  assert.equal(view.accountChanges.length, 0);
+  view.alerts[0].buttons[0].onPress();
+  assert.equal(view.accountChanges.length, 0);
+  find(view.render(), 'ActionButton').props.onPress();
+  view.alerts[1].buttons[1].onPress(); await flush();
+  assert.equal(view.accountChanges.length, 1);
+  assert.equal(view.accountChanges[0].after.openingMinor, 63345);
+  assert.equal(view.accountChanges[0].expectedBalanceMinor, 86655);
+  assert.equal(view.backs(), 1);
+});
+test('account rename does not change its balance; unchanged save and close never write', async () => {
+  const view = harness('app/edit-account/[id].tsx', {}, { data: transferData, params: { id: 'a' } });
+  find(view.render(), 'ActionButton').props.onPress();
+  assert.equal(view.accountChanges.length, 0);
+  find(view.render(), 'Field').props.onChangeText('Renombrada');
+  find(view.render(), 'ActionButton').props.onPress(); await flush();
+  assert.equal(view.alerts.length, 0);
+  assert.equal(view.accountChanges[0].expectedBalanceMinor, null);
+  assert.equal(view.accountChanges[0].after.openingMinor, account.openingMinor);
+});
+test('new account retry is frozen and honors requested USD currency', async () => {
+  let attempts = 0;
+  const view = harness('app/new-account.tsx', {}, { params: { currency: 'USD' }, addAccount: async () => { if (++attempts === 1) throw new Error('Refresh failed'); } });
+  assert.equal(find(view.render(), 'Choices').props.value, 'USD');
+  find(view.render(), 'Field').props.onChangeText('Nueva');
+  find(view.render(), 'AmountField').props.onChangeText('100');
+  await find(view.render(), 'ActionButton').props.onPress();
+  assert.equal(find(view.render(), 'Field').props.editable, false);
+  await find(view.render(), 'ActionButton', 'Reintentar guardado').props.onPress();
+  assert.deepEqual(view.newAccounts[0], view.newAccounts[1]);
+  assert.equal(view.backs(), 1);
+});
+test('a backup containing only a new transfer still offers import with correct counts', async () => {
+  const json = JSON.stringify(domain.createRecoveryBackup({ ...transferData, transfers: [domain.initialTransferRecord(transfer)] }));
+  const view = harness('app/backup-import.tsx', {}, { data: transferData,
+    picker: async () => ({ canceled: false, result: { size: json.length, name: 'test.json', text: async () => json } }) });
+  await find(view.render(), 'ActionButton', 'Elegir copia').props.onPress();
+  assert.equal(find(view.render(), 'DetailRow', 'Transferencias nuevas').props.value, '1');
+  assert.ok(find(view.render(), 'ActionButton', 'Confirmar importación'));
 });

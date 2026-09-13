@@ -1,6 +1,6 @@
 # FinanzApp: dirección visual móvil
 
-Actualizado: 13 de septiembre de 2026. Interfaz 04 implementada en `apps/mobile`;
+Actualizado: 13 de septiembre de 2026. Interfaz 05 implementada en `apps/mobile`;
 su validación visual/gestual en el iPhone todavía está pendiente.
 
 El usuario probó el recorrido de la primera iteración y reportó que funcionaba,
@@ -30,6 +30,8 @@ Inicio, Movimientos y Ajustes, sin botones decorativos de secciones no implement
 | Reporte mensual | Acceso desde Tu mes, no una cuarta pestaña. Mes y moneda, gasto total, ingresos y barras por categoría ordenadas por importe. Mes actual hasta hoy; meses anteriores completos. |
 | Categoría del reporte | Total y movimientos exactos de esa categoría, moneda y período. Abrir un movimiento y volver conserva el contexto de la pila nativa. |
 | Recuperación | Dos filas en Ajustes: Importar copia y Movimientos deshechos. Vista previa con cambios y saldos por moneda; conflicto explicado sin botones de sobreescritura. |
+| Editar cuenta | Lápiz en el detalle. Nombre y saldo disponible; moneda fija. Confirmación explícita al corregir saldo, sin inventar un movimiento. |
+| Transferencia | Dentro de la cuenta, no otro botón en Inicio. Monto, Desde/Hacia, fecha y nota opcional. Vista del saldo resultante en ambas cuentas antes de registrar. |
 
 Interfaz 02 añade un selector de categorías con búsqueda, categorías ya usadas y
 opción de escribir una propia. Un emoji pequeño ayuda a reconocer cada categoría,
@@ -46,6 +48,12 @@ porcentaje y nombre permanecen legibles sin depender de colores ni de tocar el
 gráfico. Un único azul evita una leyenda arcoíris. Las listas largas se virtualizan.
 Se agrupan variantes de mayúsculas/acentos/espacios sin renombrar datos guardados;
 categorías distintas no se unen por compartir un emoji o parte del nombre.
+
+Interfaz 05 conserva esa composición. Las transferencias tienen un icono de flechas
+neutro, no un emoji de gasto ni verde de ingreso. En actividad aparecen una sola
+vez; dentro de una cuenta muestran el signo correspondiente. No entran en barras
+de gastos. Las nuevas hojas reutilizan controles, tamaños accesibles y respuesta
+al presionar; no se agrega otra animación sobre la navegación nativa.
 
 ## Sistema visual
 
@@ -94,7 +102,8 @@ categorías distintas no se unen por compartir un emoji o parte del nombre.
 
 ## Datos y alcance de la próxima iteración
 
-Editar/deshacer/recuperar y el importador de copias **nativas** v1/v2 ya están
+Editar/deshacer/recuperar, corregir cuentas, transferencias de igual moneda y el
+importador de copias **nativas** v1/v2/v3 ya están
 implementados con pruebas de lógica/SQLite; falta la prueba física. La importación
 solo agrega registros faltantes y bloquea cualquier conflicto, sin restaurar una
 versión antigua encima de una corrección. Los movimientos deshechos no cuentan.

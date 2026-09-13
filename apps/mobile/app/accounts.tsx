@@ -24,7 +24,7 @@ export default function AccountsScreen() {
       renderItem={({ item, index, section }) => <View style={{ backgroundColor: p.surface, overflow: 'hidden',
         borderTopLeftRadius: index === 0 ? 20 : 0, borderTopRightRadius: index === 0 ? 20 : 0,
         borderBottomLeftRadius: index === section.data.length - 1 ? 20 : 0, borderBottomRightRadius: index === section.data.length - 1 ? 20 : 0 }}>
-        <AccountRow account={item} entries={snapshot.entries} last={index === section.data.length - 1} />
+        <AccountRow account={item} entries={snapshot.entries} transfers={snapshot.transfers} last={index === section.data.length - 1} />
       </View>} />
   </>;
 }

@@ -28,16 +28,16 @@ function SelectionSheet({ visible, title, onClose, onDone, children }: {
   </Modal>;
 }
 
-export function AccountField({ accounts, value, onChange, disabled = false }: {
-  accounts: Account[]; value: string; onChange: (id: string) => void; disabled?: boolean;
+export function AccountField({ accounts, value, onChange, disabled = false, label = 'Cuenta' }: {
+  accounts: Account[]; value: string; onChange: (id: string) => void; disabled?: boolean; label?: string;
 }) {
   const p = usePalette();
   const [visible, setVisible] = useState(false);
   const selected = accounts.find(account => account.id === value);
   return <>
-    <DetailRow label="Cuenta" value={selected ? selected.name + ' · ' + selected.currency : 'Elegir cuenta'} icon="wallet-outline"
+    <DetailRow label={label} value={selected ? selected.name + ' · ' + selected.currency : 'Elegir cuenta'} icon="wallet-outline"
       disabled={disabled} onPress={() => { Keyboard.dismiss(); setVisible(true); }} />
-    <SelectionSheet visible={visible} title="Elegir cuenta" onClose={() => setVisible(false)}>
+    <SelectionSheet visible={visible} title={label === 'Cuenta' ? 'Elegir cuenta' : label} onClose={() => setVisible(false)}>
       <FlatList data={accounts} keyExtractor={account => account.id} contentContainerStyle={{ padding: 20, paddingTop: 0 }}
         renderItem={({ item }) => <PressFeedback accessibilityRole="button" accessibilityState={{ selected: value === item.id }}
           accessibilityLabel={item.name + ', ' + item.currency} onPress={() => { onChange(item.id); setVisible(false); }}

@@ -4,8 +4,8 @@ import { router } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { totalsByCurrency, type Currency } from '@finanzapp/domain';
 import { useLedger } from '../../src/storage/LedgerProvider';
-import { ActionButton, AppText, EmptyState, EntryActions, EntryRow, Money, PressFeedback, Screen, SectionTitle, Surface } from '../../src/ui/components';
-import { availableCurrencies, selectEntries } from '../../src/ui/presentation';
+import { ActionButton, AppText, EmptyState, EntryActions, MovementRow, Money, PressFeedback, Screen, SectionTitle, Surface } from '../../src/ui/components';
+import { availableCurrencies, mergeActivity } from '../../src/ui/presentation';
 import { MonthCard } from '../../src/ui/month-card';
 import { usePalette } from '../../src/ui/theme';
 
@@ -14,7 +14,7 @@ export default function HomeScreen() {
   const p = usePalette();
   const { fontScale } = useWindowDimensions();
   const [selectedCurrency, setCurrency] = useState<Currency>('ARS');
-  const recent = useMemo(() => snapshot ? selectEntries(snapshot.entries, snapshot.accounts).slice(0, 3) : [], [snapshot]);
+  const recent = useMemo(() => snapshot ? mergeActivity(snapshot.entries, snapshot.transfers).slice(0, 3) : [], [snapshot]);
   if (!snapshot) return null;
   const currencies = availableCurrencies(snapshot.accounts);
   const currency = currencies.includes(selectedCurrency) ? selectedCurrency : currencies[0];
@@ -49,8 +49,8 @@ export default function HomeScreen() {
       <MonthCard snapshot={snapshot} currency={currency} />
       <View>
         <SectionTitle action="Ver todos" onAction={() => router.navigate('/activity')}>Movimientos recientes</SectionTitle>
-        {recent.length ? <Surface grouped>{recent.map((entry, index) => <EntryRow key={entry.id} entry={entry}
-          account={snapshot.accounts.find(account => account.id === entry.accountId)!} last={index === recent.length - 1} />)}</Surface>
+        {recent.length ? <Surface grouped>{recent.map((item, index) => <MovementRow key={item.key} item={item}
+          accounts={snapshot.accounts} last={index === recent.length - 1} />)}</Surface>
           : <Surface><AppText secondary>Todavía no hay movimientos. Registrá un gasto o un ingreso para verlo acá.</AppText></Surface>}
       </View>
     </>}
