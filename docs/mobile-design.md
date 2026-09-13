@@ -1,6 +1,6 @@
 # FinanzApp: dirección visual móvil
 
-Actualizado: 12 de septiembre de 2026. Interfaz 02 implementada en `apps/mobile`;
+Actualizado: 13 de septiembre de 2026. Interfaz 03 implementada en `apps/mobile`;
 su validación visual/gestual en el iPhone todavía está pendiente.
 
 El usuario probó el recorrido de la primera iteración y reportó que funcionaba,
@@ -22,11 +22,13 @@ Inicio, Movimientos y Ajustes, sin botones decorativos de secciones no implement
 
 | Pantalla | Jerarquía y comportamiento |
 | --- | --- |
-| Inicio | Disponible en una superficie azul profunda con selector ARS/USD compacto; Gasto/Ingreso, tres movimientos recientes, Tu mes y hasta tres cuentas. Patrimonio e inversiones llegan cuando esté implementada su contabilidad. |
+| Inicio | Disponible en una superficie azul profunda con selector ARS/USD y Ver cuentas; Gasto/Ingreso, Tu mes con tres categorías y tres movimientos recientes. Se elimina la lista repetida de cuentas. Patrimonio e inversiones llegan cuando esté implementada su contabilidad. |
 | Gasto / ingreso | Monto destacado y moneda visible, con Listo en el teclado iOS. Cuenta en una fila que abre su selector. Fecha en una hoja nativa con Cancelar/Listo; no modifica la fecha hasta confirmar. Validación visible y borrador conservado ante errores de guardado. |
 | Movimientos | Lista virtualizada agrupada por fecha, búsqueda por concepto/categoría/cuenta y filtros Todos/Gastos/Ingresos. Importe firmado y moneda; no sumar ARS y USD ni inventar días vacíos. |
 | Cuentas | Lista completa por moneda y detalle con disponible, saldo inicial separado de ingresos y movimientos de esa cuenta. |
 | Detalle | Importe, concepto y fecha primero; cuenta y categoría después. Editar y deshacer se muestran cuando tengan persistencia y reversión implementadas. |
+| Reporte mensual | Acceso desde Tu mes, no una cuarta pestaña. Mes y moneda, gasto total, ingresos y barras por categoría ordenadas por importe. Mes actual hasta hoy; meses anteriores completos. |
+| Categoría del reporte | Total y movimientos exactos de esa categoría, moneda y período. Abrir un movimiento y volver conserva el contexto de la pila nativa. |
 
 Interfaz 02 añade un selector de categorías con búsqueda, categorías ya usadas y
 opción de escribir una propia. Un emoji pequeño ayuda a reconocer cada categoría,
@@ -34,6 +36,15 @@ sin repetirlo en el texto ni modificar registros anteriores. Las categorías que
 no reconocemos usan un símbolo neutro; no se infiere el comercio de un emoji.
 Tu mes resume únicamente gastos/ingresos registrados, desde el inicio del mes
 hasta hoy y en la moneda seleccionada. No cuenta el saldo inicial como ingreso.
+
+Interfaz 03 convierte Inicio en un dashboard breve. Las tres barras principales
+son accesos a sus movimientos; Ver reporte muestra todas las categorías. Si hay
+más de tres, se avisa que la vista inicial es parcial. La escala es siempre la
+proporción del gasto total, no del gasto de la categoría más grande. Importe,
+porcentaje y nombre permanecen legibles sin depender de colores ni de tocar el
+gráfico. Un único azul evita una leyenda arcoíris. Las listas largas se virtualizan.
+Se agrupan variantes de mayúsculas/acentos/espacios sin renombrar datos guardados;
+categorías distintas no se unen por compartir un emoji o parte del nombre.
 
 ## Sistema visual
 
@@ -66,9 +77,10 @@ hasta hoy y en la moneda seleccionada. No cuenta el saldo inicial como ingreso.
   conserva pantalla, foco y borrador sin mostrar otra sección por un instante.
 - Respetar Reducir movimiento y VoiceOver. Cada control tiene nombre y estado;
   el teclado y la fecha quedan dentro del área segura.
-- Más adelante, gráficos con unidades, período, leyenda y valor accesible al tocar.
-  Transiciones breves entre datos reales, escala comprensible y sin reiniciar el
-  trazado al volver de un detalle. No dibujar historia que no existe.
+- Barras de categoría: transición de 260 ms solo cuando cambia la proporción,
+  sin empezar desde cero ni reiniciarse al volver de un detalle. Reducir movimiento
+  aplica el valor sin transición. El número no se anima desde un importe inventado.
+  No añadir animaciones de entrada/salida de pantalla encima de la pila nativa.
 
 ## Datos y alcance de la próxima iteración
 
@@ -78,17 +90,17 @@ con una vista previa. Mostrar qué entidades se admiten, totales por moneda y
 cualquier dato no compatible. Nunca descartar tarjetas/inversiones silenciosamente
 si el importador inicial aún no las soporta.
 
-Después: completar tarjetas/inversiones y su conciliación; reportes y asistente
-basados en movimientos reales; sincronización opcional y funciones de Apple.
+Después: completar tarjetas/inversiones y su conciliación; ampliar los reportes
+mensuales ya implementados y sumar el asistente; sincronización y funciones de Apple.
 El orden y las pruebas contables están en [el roadmap](mobile-roadmap.md).
 
 ## Referencias y próximos detalles visuales
 
 - [MonAi](https://get-monai.app/): referencia de captura simple y reconocimiento
   rápido de categorías. Se conserva una composición, textos y recursos propios.
-- Gráficos: primero barras por categoría y evolución por período con escala,
-  moneda y valores legibles; no una colección de donuts decorativos. Animar el
-  cambio de datos sin volver a dibujar todo al regresar de otra pantalla.
+- Gráficos: las barras por categoría ya están implementadas. La evolución temporal
+  y la comparación de períodos equivalentes quedan para después: requieren historia
+  real y contexto, no tendencias, ahorro ni causas inventadas a partir de pocos datos.
 - Logos de comercios (por ejemplo, PedidosYa): futura identificación explícita
   contra un catálogo verificado, con recursos cuyo uso esté autorizado y una
   alternativa de categoría/iniciales cuando falten. No generar logos falsos,
@@ -109,3 +121,6 @@ El orden y las pruebas contables están en [el roadmap](mobile-roadmap.md).
 - [ ] Repetir la prueba en una versión `preview` optimizada e independiente de Metro.
 - [ ] Cambiar 30–40 veces entre Inicio, Movimientos y Ajustes sin una pestaña vacía.
 - [ ] Revisar Interfaz 02, sus categorías, contraste, montos largos y Tu mes en iPhone.
+- [ ] Revisar Interfaz 03: Inicio → reporte → categoría → movimiento → volver.
+- [ ] Mes/moneda conservados, tres categorías vs lista completa, estados vacíos y texto grande.
+- [ ] Barras con Reducir movimiento, cambio rápido de mes y regreso sin reiniciar el gráfico.

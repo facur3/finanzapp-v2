@@ -15,7 +15,9 @@ is unknown. The first [original visual-system iteration](../../docs/mobile-desig
 is implemented. The user reported the requested basic flow working, but Settings
 or Movements intermittently stayed black on tab changes and the visual style
 is not yet approved. **Interfaz 02** addresses this risk and refines the design;
-its focused physical re-test is pending. Next: posted-entry edit/undo and safe import.
+its focused physical re-test is pending. **Interfaz 03 (2026-09-13)** builds on it
+with a compact dashboard and read-only monthly category reports. Physical/visual
+acceptance remains open. Next ledger work: posted-entry edit/undo and safe import.
 
 ## First start on Linux or Windows
 
@@ -53,8 +55,9 @@ are part of the next ledger milestone, not implemented controls in this pilot.
 
 The current visual iteration includes:
 
-- Home: available balance by currency, expense/income actions, recent records and
-  a short account list. The full account list groups by currency. Selecting USD
+- Home: available balance by currency, expense/income actions, Tu mes and recent
+  records. Ver cuentas in the balance surface opens the full account list,
+  grouped by currency, without repeating that list on Home. Selecting USD
   on Home preselects an existing USD account when opening the draft.
 - Movements: virtualized date groups, accent-insensitive concept/category/account
   search and expense/income filters. Search does not mutate the stored entries.
@@ -71,6 +74,15 @@ The current visual iteration includes:
   reuses existing category strings or accepts a custom one. No auto-reclassification.
 - Tu mes: exact recorded income/expenses by currency, through today. No opening
   balance counted as income; unsafe aggregate totals get an unavailable state.
+- Interfaz 03: top three expense categories on Home; Ver reporte opens all of
+  them, month/currency controls and each category's actual entries. Reports live
+  in the native stack, not an extra tab. Historical months include all their days;
+  future dates never inflate the through-today chart. Category identity ignores
+  case/accents/extra spaces without editing the stored strings.
+- Accessible single-color bars, explicit amounts and percentage of total spend.
+  Changes animate for 260 ms, never replay on focus or animate a fabricated balance.
+  Reduce Motion removes the transition. Lists remain virtualized and empty periods
+  have no fake categories, trends or sample data.
 
 No database migration, Supabase connection, seeded records or native paid service
 was introduced by this UI change. Follow the new-iteration section of the
@@ -154,13 +166,15 @@ Xcode-generator integrations affected by the temporary dependency fixes in
 [`compat/`](compat/README.md). It does not replace native-device testing.
 It also covers the actual presentation helpers: filtering/search, stable ordering,
 date grouping, available currencies, account preselection and category handling.
-The 29 mobile tests include a configuration regression guard over the real tab
-layout. This guard is **not** a native tab-switch test; use the physical checklist.
-The root suite also tests the shared monthly summary.
+The 41 mobile tests include guards over the real tab layout, report route handlers
+and bar-animation configuration. These are **not** native rendering/gesture tests;
+use the physical checklist. The root suite also tests the shared monthly summary
+and spending report, including exact category-to-entry reconciliation.
 
 For the intermittent black-tab report, update to `master`, restart with
 `npm start -- --clear` (bundler cache only, not SQLite), reopen from the new QR,
-and follow the **Interfaz 02** section of the device checklist. Do not uninstall.
+and repeat the **Interfaz 02** tab checks, then the **Interfaz 03** report checks.
+The current footer says Interfaz 03. Do not uninstall or add fake test movements.
 
 For dependency changes, also run `npm ls --all` and `npm audit`. Keep the scoped patched
 decoder/UUID compatibility intact; do not run `npm audit fix --force`, which can

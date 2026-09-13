@@ -13,6 +13,8 @@ Follow-up report after the first visual iteration: the user says the requested
 basic checks work, **but Settings or Movements stays black intermittently, about
 one in ten tab switches**. The visual style is explicitly not approved yet.
 The new Interfaz 02 mitigation/design has not been re-tested on the phone.
+Interfaz 03 adds Home/category reports and retains that mitigation unchanged.
+No physical result for Interfaz 03 has been recorded yet.
 Specific accessibility, background/airplane and release checks stay pending.
 
 Record: date, device model, iOS version, build profile/number, commit, tester and
@@ -81,7 +83,7 @@ Face ID on iOS is not supported inside Expo Go; use our signed development build
 
 ## Interfaz 02 — black-tab mitigation and categories (re-test pending)
 
-- [ ] Footer in Ajustes shows **Interfaz 02**, confirming the updated JavaScript.
+- [ ] Footer in Ajustes shows **Interfaz 03** (or later), including the Interfaz 02 mitigation.
 - [ ] Perform 30–40 switches across Inicio → Ajustes → Movimientos in both directions.
 - [ ] Repeat some switches quickly, before a previous press response finishes.
 - [ ] Background/foreground the app, then repeat; Settings backup control always appears.
@@ -99,3 +101,27 @@ If black content remains, record whether the header/tab bar is visible, if
 switching tabs recovers it, whether it followed keyboard/background activity,
 the theme and any red Metro error. Share only redacted error text, not balances
 or private records. Do not reset SQLite, uninstall Expo Go or change Expo versions.
+
+## Interfaz 03 — dashboard and monthly category reports (pending)
+
+Use the small ledger already in the pilot; do not seed transactions to fill a chart.
+The walkthrough is read-only and does not require another expense or income.
+
+- [ ] Ajustes footer identifies **Interfaz 03**. Existing balances/entries are unchanged.
+- [ ] Inicio → Ver cuentas opens the full list; back returns to Inicio.
+- [ ] Tu mes shows at most three categories with amount/share of **all** expenses.
+- [ ] More than three categories are explicitly identified as a partial preview.
+- [ ] Ver reporte opens a native detail, with the same currency as Home.
+- [ ] Month arrows stop at current month/earliest recorded month for that currency.
+- [ ] Historical months include all days; current month includes only dates through today.
+- [ ] Each category opens only matching expenses for that month and currency.
+- [ ] Adding the displayed category movements equals that category's displayed total.
+- [ ] Category → movement → back → report preserves month/currency and scroll position.
+- [ ] Direct Home → category → movement → back → Home also returns to its actual origin.
+- [ ] Tiny/canceled swipes never expose a different section or restart the chart.
+- [ ] Changing month/currency updates proportions briefly, without animating monetary numbers.
+- [ ] Reduce Motion applies the bar value immediately; screen readers announce label/amount/share.
+- [ ] Empty or income-only months show no category bars, invented percentages or trend claims.
+- [ ] Clear/dark, narrow screen and large text: category/amount/month labels remain readable.
+- [ ] Report-only use preserves the private backup contents and all account balances.
+- [ ] Repeat the 30–40 tab-switch check above; its physical verification remains open.
