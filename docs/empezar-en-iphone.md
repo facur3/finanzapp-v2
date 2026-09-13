@@ -68,7 +68,7 @@ bibliotecas al azar.
 
 No vuelvas a cargar todo tu patrimonio. El piloto todavía no importa ni
 sincroniza tus datos de la app web. Sí puede restaurar sus propias copias nativas
-v1/v2 desde Ajustes → Importar copia, con revisión previa. Eso todavía no convierte
+v1/v2/v3 desde Ajustes → Importar copia, con revisión previa. Eso todavía no convierte
 al piloto en el reemplazo de la app actual.
 
 La prueba completa está en [la lista para iPhone](mobile-device-checklist.md).
@@ -126,13 +126,15 @@ cambiar pestañas tiene una mitigación específica: ver [Interfaz 02](#7-interf
 Interfaz 03 suma gastos por categoría y un reporte mensual, sin agregar una pestaña
 ni duplicar la lista de cuentas: [cómo probarlo](#8-interfaz-03-inicio-y-reporte-mensual).
 Interfaz 04 agrega editar, deshacer/recuperar y copias del piloto: [cómo probarlo](#9-interfaz-04-corregir-y-recuperar).
+Interfaz 05 suma corregir cuentas y transferir entre cuentas de igual moneda:
+[cómo probarlo cuando quieras](#10-interfaz-05-cuentas-y-transferencias).
 Falta tu prueba de esta nueva interfaz; el estilo no se considera aprobado aún.
 
 Inicio dice **Disponible en tus cuentas**, no patrimonio: el piloto todavía no
 incluye inversiones ni deudas. Pesos y dólares se muestran por separado, sin
-inventar una cotización. No hay datos precargados. Interfaz 04 actualiza la estructura
+inventar una cotización. No hay datos precargados. Interfaz 05 actualiza la estructura
 de la base local conservando tus registros; no toca Supabase ni la app anterior.
-Después completamos cuentas/transferencias y el importador de la app web para traer
+Después completamos el importador de la app web y las operaciones entre monedas para traer
 tus datos sin volver a escribir todo. El piloto todavía no es el registro principal.
 
 **Ahora, de tu lado:** conservá una copia JSON privada de la app actual usando su
@@ -225,7 +227,7 @@ intermitente desapareció**. No se borró ni migró SQLite.
 
 Después de actualizar con los comandos de arriba y abrir el QR nuevo:
 
-1. En Ajustes, el pie actual debe decir **Interfaz 04**; conserva esta corrección.
+1. En Ajustes, el pie actual debe decir **Interfaz 05**; conserva esta corrección.
 2. Cambiá 30–40 veces entre Inicio, Movimientos y Ajustes. Probá ambos sentidos
    y algunas pulsaciones rápidas. La copia de seguridad y los movimientos deben
    aparecer siempre, sin necesidad de recargar.
@@ -246,7 +248,7 @@ No hace falta desinstalar, borrar tus movimientos, cambiar Expo ni pagar EAS.
 ## 8. Interfaz 03: Inicio y reporte mensual
 
 Seguimos gratis en Expo Go. Actualizá con los mismos comandos del paso 6 y abrí
-el nuevo QR. Ajustes debe decir **Interfaz 04**, que incluye estos reportes. No hace falta cargar datos nuevos:
+el nuevo QR. Ajustes debe decir **Interfaz 05**, que incluye estos reportes. No hace falta cargar datos nuevos:
 usá los movimientos que ya guardaste en el piloto.
 
 1. **Inicio:** el saldo sigue siendo el disponible de tus cuentas, no todo tu
@@ -282,7 +284,7 @@ La prueba de pestañas del paso 7 sigue abierta: esta entrega no cambia esa miti
 
 Se sigue probando con Expo Go, sin ningún pago ni alta nueva. Guardá primero una
 copia privada del piloto, actualizá con los comandos del paso 6 y comprobá el pie
-**Interfaz 04** en Ajustes. La actualización conserva las cuentas/movimientos y
+**Interfaz 05** en Ajustes (incluye lo de Interfaz 04). La actualización conserva las cuentas/movimientos y
 agrega el control de cambios a la misma base. **No vuelvas a código anterior ni
 desinstales Expo Go** después: una versión vieja no entiende esta estructura.
 
@@ -311,11 +313,11 @@ desinstales Expo Go** después: una versión vieja no entiende esta estructura.
 
 ### Importar una copia
 
-1. **Ajustes → Compartir copia** genera el archivo nativo v2. Guardalo en Archivos,
+1. **Ajustes → Compartir copia** genera el archivo nativo v3. Guardalo en Archivos,
    en una ubicación privada. Contiene datos financieros en texto, **sin cifrado**.
    Cancelar el menú no significa que se haya guardado afuera de la app.
 2. **Ajustes → Importar copia → Elegir copia** abre el selector de archivos del
-   sistema. Seleccioná una copia nativa del piloto, v1 o v2.
+   sistema. Seleccioná una copia nativa del piloto, v1, v2 o v3.
 3. Revisá cuentas nuevas, movimientos, deshechos, registros ya presentes y saldo
    antes/después por moneda. No se importa nada hasta **Confirmar importación**
    y confirmar el aviso. Cancelar o volver no cambia los registros.
@@ -338,3 +340,70 @@ separado; **no borres tu única instalación para probarla**. Estas pantallas y 
 pruebas contables ya están implementadas, pero la fluidez, los gestos, Archivos y
 el diseño siguen pendientes de revisión en tu iPhone. Mantenemos los botones con
 respuesta breve y la navegación nativa, sin efectos de pantalla superpuestos.
+
+## 10. Interfaz 05: cuentas y transferencias
+
+Podés revisar esta entrega junto con las anteriores, cuando tengas tiempo.
+No hay que pagar, contratar nada ni crear otro proyecto para probar estos cambios
+en el piloto que ya usás. Antes de actualizar, guardá una copia privada desde
+**Ajustes → Compartir copia**. No desinstales Expo Go ni borres sus datos.
+
+En la carpeta del repositorio que ya tenés:
+
+```bash
+git switch master
+git pull --ff-only
+cd apps/mobile
+npm ci
+npm start -- --clear
+```
+
+Si la terminal ya está en `apps/mobile`, hacé `cd ../..` primero. Si Git avisa que
+tenés cambios locales, frená y avisá; no uses comandos para descartarlos. Escaneá
+el nuevo QR. En Ajustes, el pie debe decir **Interfaz 05**. Limpiar la caché de
+Metro con `--clear` no borra SQLite. La base local pasa automáticamente a versión
+3 sin perder los registros; **no vuelvas a una versión vieja del código** después.
+
+### Dónde está cada acción
+
+| Quiero… | Dónde y qué hace |
+| --- | --- |
+| Cambiar el nombre de una cuenta | Inicio → Ver cuentas → cuenta → lápiz. Editá el nombre; no cambia su saldo. |
+| Corregir un saldo mal cargado | En ese mismo formulario, poné el **saldo disponible real de esa cuenta**, no el total de tu patrimonio. Confirmá el valor anterior y el nuevo. Se ajusta el saldo inicial; no se inventa un gasto/ingreso ni se reescribe el historial. |
+| Registrar dinero que moví entre mis cuentas | Dentro de la cuenta → Transferir. Elegí Desde, Hacia, monto y fecha; revisá los dos saldos resultantes. Ambas cuentas deben ser de la misma moneda. |
+| Corregir o deshacer esa transferencia | Movimientos → transferencia → Editar o Deshacer. Cambia ambas cuentas una sola vez. Ajustes → Movimientos deshechos permite recuperarla. |
+
+**No corrijas nada por actualizar.** Si tus saldos ya coinciden, dejalos como están.
+Usá la corrección de saldo solo para un error de carga. Un gasto, un cobro o una
+transferencia real se registra como tal. Las nuevas acciones no ejecutan pagos ni
+transferencias bancarias; solo actualizan tus registros en FinanzApp.
+
+Para una transferencia, las cuentas de destino se limitan a la misma moneda.
+Si falta otra, el formulario ofrece agregarla. Cambiar pesos por dólares necesita
+dos importes y una cotización real: todavía no está implementado. Una comisión
+real se registra como gasto separado, no se inventa dentro de la transferencia.
+Un saldo negativo se advierte, pero se permite registrar una operación real.
+
+### Revisión breve, cuando puedas
+
+1. Primero comprobá que los saldos y movimientos anteriores siguen iguales.
+2. Abrí una cuenta y su lápiz, revisá el formulario y cerralo sin guardar.
+3. Si tenés una transferencia real para registrar, cargala y verificá: el origen
+   baja, el destino sube y el disponible total de esa moneda **no cambia**. Aparece
+   una vez en Movimientos → Todos y no infla los gastos/ingresos del reporte.
+4. Abrí su edición, cambiá el borrador y cancelá: no debe cambiar nada. Solo
+   guardá o deshacé operaciones que realmente quieras corregir.
+5. Cerrá y reabrí la app. Guardá otra copia privada; importar esa misma copia debe
+   indicarte que ya está incorporada, sin duplicados. No borres tu instalación
+   para probar una restauración desde cero.
+6. Probá volver, un swipe pequeño cancelado, letra grande, modo oscuro y Reducir
+   movimiento. Si falla, anotá pantalla/gesto y grabá un video sin datos sensibles.
+
+El respaldo nuevo es v3 e incluye cuentas corregidas y transferencias activas o
+deshechas. Sigue aceptando copias nativas v1/v2 y bloqueando conflictos. No exporta
+todo el historial de cambios local. La copia de la app web, tarjetas e inversiones
+sigue pendiente de un importador específico: no hace falta recargar tu patrimonio.
+
+Siguiente bloque: diseñar la importación segura de datos anteriores, con revisión
+de qué entidades admite y comparación de totales antes de guardar. Las funciones
+de Apple, la sincronización y la versión independiente firmada siguen en el roadmap.

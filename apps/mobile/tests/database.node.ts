@@ -4,8 +4,9 @@ import { DatabaseSync } from 'node:sqlite';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { accountBalanceMinor, archiveKey, createRecoveryBackup, initialRecord, makeEntryChange, parsePilotBackup, snapshotFromArchive, totalsByCurrency, type Account, type Entry } from '@finanzapp/domain';
-import { changeEntry, createAccount, createEntry, importArchive, initializeDatabase, readArchive, readSnapshot, type LedgerDatabase } from '../src/storage/database.ts';
+import { accountBalanceMinor, archiveKey, createRecoveryBackup, initialRecord, makeEntryChange, parsePilotBackup, snapshotFromArchive, totalsByCurrency, type Account, type Entry,
+  makeAccountChange, initialTransferRecord, makeTransferChange, type Transfer } from '@finanzapp/domain';
+import { changeEntry, createAccount, createEntry, importArchive, initializeDatabase, readArchive, readSnapshot, changeAccount, createTransfer, changeTransfer, type LedgerDatabase } from '../src/storage/database.ts';
 import { runExclusiveTransaction, type TransactionConnection } from '../src/storage/transaction.ts';
 
 // Synthetic records in disposable databases only. Nothing seeds a user's app.
@@ -55,7 +56,7 @@ test('new install is empty; initialization can repeat without deleting data', as
   const { db } = setup();
   await initializeDatabase(db);
   assert.deepEqual(await readSnapshot(db), { accounts: [], entries: [] });
-  assert.equal((await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))?.user_version, 2);
+  assert.equal((await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))?.user_version, 3);
   await createAccount(db, account);
   await initializeDatabase(db);
   assert.deepEqual((await readSnapshot(db)).accounts, [account]);
@@ -118,7 +119,7 @@ test('a failed transaction rolls back all earlier statements', async () => {
   const { db } = setup();
   await initializeDatabase(db);
   await assert.rejects(db.withExclusiveTransactionAsync(async tx => {
-    await tx.runAsync('INSERT INTO accounts VALUES (?, ?, ?, ?, ?)', account.id, account.name, account.currency, account.openingMinor, account.createdAt);
+    await tx.runAsync('INSERT INTO accounts (id, name, currency, openingMinor, createdAt) VALUES (?, ?, ?, ?, ?)', account.id, account.name, account.currency, account.openingMinor, account.createdAt);
     throw new Error('Simulated interrupted operation');
   }), /interrupted/);
   assert.deepEqual(await readSnapshot(db), { accounts: [], entries: [] });
@@ -141,9 +142,9 @@ test('newer database schema is refused intact instead of reset or downgraded', a
   const { db } = setup();
   await initializeDatabase(db);
   await createAccount(db, account);
-  await db.execAsync('PRAGMA user_version = 3');
+  await db.execAsync('PRAGMA user_version = 4');
   await assert.rejects(initializeDatabase(db), /versión más nueva/);
-  assert.equal((await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))?.user_version, 3);
+  assert.equal((await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))?.user_version, 4);
   assert.deepEqual((await readSnapshot(db)).accounts, [account]);
 });
 
@@ -253,7 +254,7 @@ test('undoing an income or restoring an expense checks safe balance range before
   assert.equal((await readSnapshot(db)).entries.length, 2);
 });
 
-test('v2 backup restores edited and undone entries into a new database and re-import never doubles balances', async () => {
+test('current backup restores edited and undone entries into a new database and re-import never doubles balances', async () => {
   const { db } = await funded();
   await changeEntry(db, makeEntryChange('undo', initialRecord(expense), 'void', changedAt));
   await createEntry(db, { ...expense, id: 'active' });
@@ -322,4 +323,155 @@ test('migration from actual v1 records preserves cents; interruption rolls back 
   await initializeDatabase(db);
   assert.deepEqual(await readSnapshot(db), { accounts: [account], entries: [expense] });
   assert.deepEqual((await readArchive(db)).records, [initialRecord(expense)]);
+});
+
+const secondAccount: Account = { ...account, id: 'destination', name: 'Destino', openingMinor: 0 };
+const transfer: Transfer = { id: 'transfer', fromAccountId: account.id, toAccountId: secondAccount.id, amountMinor: 1000,
+  note: 'Prueba', dateISO: expense.dateISO, createdAt: account.createdAt };
+async function transferReady() {
+  const result = await funded();
+  await createAccount(result.db, secondAccount);
+  return result;
+}
+test('a transfer persists both legs once after retry and restart without adding an income or expense', async () => {
+  const { db, path } = await transferReady();
+  await createTransfer(db, transfer);
+  await createTransfer(db, transfer);
+  await db.closeAsync();
+  const reopened = databaseAt(path);
+  await initializeDatabase(reopened);
+  const saved = await readSnapshot(reopened);
+  assert.equal(saved.entries.length, 1);
+  assert.equal(saved.transfers!.length, 1);
+  assert.equal(accountBalanceMinor(account, saved.entries, saved.transfers), 86655);
+  assert.equal(accountBalanceMinor(secondAccount, saved.entries, saved.transfers), 1000);
+  assert.deepEqual(totalsByCurrency(saved), { ARS: 87655 });
+  await assert.rejects(createTransfer(reopened, { ...transfer, amountMinor: 2000 }), /ya existe/);
+});
+test('invalid transfer currency, missing destination and overflow leave both accounts unchanged', async () => {
+  const { db } = await transferReady();
+  await createAccount(db, { ...secondAccount, id: 'usd', currency: 'USD' });
+  const before = await readArchive(db);
+  for (const patch of [{ toAccountId: 'missing' }, { toAccountId: account.id }, { toAccountId: 'usd' }, { amountMinor: -1 }, { amountMinor: Number.MAX_SAFE_INTEGER + 1 }]) {
+    await assert.rejects(createTransfer(db, { ...transfer, ...patch }));
+    assert.deepEqual(await readArchive(db), before);
+  }
+});
+test('editing, undoing and restoring a transfer is atomic and stale/late retries do not repeat either leg', async () => {
+  const { db } = await transferReady();
+  await createTransfer(db, transfer);
+  const edit = makeTransferChange('edit-transfer', initialTransferRecord(transfer), 'edit', changedAt, { ...transfer, amountMinor: 2000 });
+  await changeTransfer(db, edit);
+  await changeTransfer(db, edit);
+  await assert.rejects(changeTransfer(db, { ...edit, id: 'stale-transfer' }), /cambió/);
+  const undo = makeTransferChange('undo-transfer', edit.after, 'void', changedAt);
+  await changeTransfer(db, undo);
+  assert.deepEqual((await readSnapshot(db)).transfers, []);
+  await assert.rejects(createTransfer(db, transfer), /ya existe/);
+  const restore = makeTransferChange('restore-transfer', undo.after, 'restore', changedAt);
+  await changeTransfer(db, restore);
+  await changeTransfer(db, undo);
+  await changeTransfer(db, edit);
+  assert.deepEqual((await readArchive(db)).transfers, [restore.after]);
+  assert.equal((await db.getAllAsync('SELECT id FROM transfer_changes')).length, 3);
+});
+test('transfer audit failure rolls back its changed balance; exact retry succeeds', async () => {
+  const { db } = await transferReady();
+  await createTransfer(db, transfer);
+  const undo = makeTransferChange('undo-transfer', initialTransferRecord(transfer), 'void', changedAt);
+  const failing: LedgerDatabase = { ...db, withExclusiveTransactionAsync: work => db.withExclusiveTransactionAsync(tx => work({ ...tx,
+    runAsync: async (sql, ...params) => { if (sql.includes('INSERT INTO transfer_changes')) throw new Error('Disk full'); return tx.runAsync(sql, ...params); },
+  })) };
+  const before = await readArchive(db);
+  await assert.rejects(changeTransfer(failing, undo), /Disk full/);
+  assert.deepEqual(await readArchive(db), before);
+  await changeTransfer(db, undo);
+  assert.deepEqual((await readSnapshot(db)).transfers, []);
+});
+test('correcting balance preserves entries/transfers and survives restart with one receipt', async () => {
+  const { db, path } = await transferReady();
+  await createTransfer(db, transfer);
+  const snapshot = await readSnapshot(db);
+  const change = makeAccountChange('correction', account, snapshot, 'Nombre corregido', 50000, changedAt);
+  await changeAccount(db, change);
+  await changeAccount(db, change);
+  await db.closeAsync();
+  const reopened = databaseAt(path);
+  await initializeDatabase(reopened);
+  const saved = await readSnapshot(reopened);
+  assert.equal(accountBalanceMinor(saved.accounts.find(a => a.id === account.id)!, saved.entries, saved.transfers), 50000);
+  assert.deepEqual(saved.entries, snapshot.entries);
+  assert.deepEqual(saved.transfers, snapshot.transfers);
+  assert.deepEqual(saved.accounts.find(a => a.id === account.id), change.after);
+  assert.equal((await reopened.getAllAsync('SELECT id FROM account_changes')).length, 1);
+});
+test('a stale balance correction is rejected after a new transfer; a name-only edit preserves the new balance', async () => {
+  const { db } = await transferReady();
+  const snapshot = await readSnapshot(db);
+  const correction = makeAccountChange('balance', account, snapshot, account.name, 100, changedAt);
+  const rename = makeAccountChange('name', account, snapshot, 'Renombrada', accountBalanceMinor(account, snapshot.entries), changedAt);
+  await createTransfer(db, transfer);
+  await assert.rejects(changeAccount(db, correction), /saldo cambió/);
+  await changeAccount(db, rename);
+  const saved = await readSnapshot(db);
+  assert.equal(accountBalanceMinor(saved.accounts.find(a => a.id === account.id)!, saved.entries, saved.transfers), 86655);
+  const next = makeAccountChange('name-again', rename.after, saved, 'Otra', 86655, changedAt);
+  await changeAccount(db, next);
+  await changeAccount(db, rename); // Late receipt, not a name rollback.
+  assert.equal((await readSnapshot(db)).accounts.find(a => a.id === account.id)!.name, 'Otra');
+  await assert.rejects(changeAccount(db, { ...rename, id: 'stale-name' }), /cambió/);
+});
+test('account audit failure rolls back its correction and can retry; altered receipt IDs cannot overwrite', async () => {
+  const { db } = await funded();
+  const change = makeAccountChange('balance', account, await readSnapshot(db), account.name, 1000, changedAt);
+  const failing: LedgerDatabase = { ...db, withExclusiveTransactionAsync: work => db.withExclusiveTransactionAsync(tx => work({ ...tx,
+    runAsync: async (sql, ...params) => { if (sql.includes('INSERT INTO account_changes')) throw new Error('Disk full'); return tx.runAsync(sql, ...params); },
+  })) };
+  await assert.rejects(changeAccount(failing, change), /Disk full/);
+  assert.deepEqual((await readSnapshot(db)).accounts, [account]);
+  await changeAccount(db, change);
+  await assert.rejects(changeAccount(db, { ...change, after: { ...change.after, name: 'Alterada' } }), /ya existe/);
+  assert.deepEqual((await readSnapshot(db)).accounts, [change.after]);
+});
+test('v3 import is atomic across accounts, entries and transfers, and preserves tombstones and corrections', async () => {
+  const { db } = await transferReady();
+  await createTransfer(db, transfer);
+  await changeTransfer(db, makeTransferChange('undo', initialTransferRecord(transfer), 'void', changedAt));
+  await changeAccount(db, makeAccountChange('correct', account, await readSnapshot(db), 'Corregida', 1000, changedAt));
+  const incoming = parsePilotBackup(JSON.stringify(createRecoveryBackup(await readArchive(db)))).archive;
+  const other = setup().db;
+  await initializeDatabase(other);
+  const baseline = archiveKey(await readArchive(other));
+  const failing: LedgerDatabase = { ...other, withExclusiveTransactionAsync: work => other.withExclusiveTransactionAsync(tx => work({ ...tx,
+    runAsync: async (sql, ...params) => { if (sql.includes('INSERT INTO transfers')) throw new Error('Interrupted transfer import'); return tx.runAsync(sql, ...params); },
+  })) };
+  await assert.rejects(importArchive(failing, incoming, baseline), /Interrupted/);
+  assert.equal(archiveKey(await readArchive(other)), baseline);
+  await importArchive(other, incoming, baseline);
+  await importArchive(other, incoming, baseline);
+  assert.equal(archiveKey(await readArchive(other)), archiveKey(incoming));
+  assert.deepEqual((await readSnapshot(other)).transfers, []);
+});
+test('actual v2 database upgrades atomically and preserves entry revisions and audit history', async () => {
+  const { db } = setup();
+  await db.execAsync(`CREATE TABLE accounts (id TEXT PRIMARY KEY, name TEXT, currency TEXT, openingMinor INTEGER, createdAt TEXT) STRICT;
+    CREATE TABLE entries (id TEXT PRIMARY KEY, accountId TEXT REFERENCES accounts(id), kind TEXT, amountMinor INTEGER,
+      merchant TEXT, category TEXT, dateISO TEXT, createdAt TEXT, revision INTEGER, voided INTEGER, updatedAt TEXT) STRICT;
+    CREATE TABLE entry_changes (id TEXT PRIMARY KEY, entryId TEXT REFERENCES entries(id), action TEXT, beforeJSON TEXT, afterJSON TEXT) STRICT;
+    PRAGMA user_version = 2;`);
+  await db.runAsync('INSERT INTO accounts VALUES (?, ?, ?, ?, ?)', account.id, account.name, account.currency, account.openingMinor, account.createdAt);
+  const undo = makeEntryChange('undo', initialRecord(expense), 'void', changedAt);
+  await db.runAsync('INSERT INTO entries VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', expense.id, account.id, expense.kind, expense.amountMinor,
+    expense.merchant, expense.category, expense.dateISO, expense.createdAt, 1, 1, changedAt);
+  await db.runAsync('INSERT INTO entry_changes VALUES (?, ?, ?, ?, ?)', undo.id, expense.id, 'void', JSON.stringify(undo.before), JSON.stringify(undo.after));
+  const failing: LedgerDatabase = { ...db, withExclusiveTransactionAsync: work => db.withExclusiveTransactionAsync(tx => work({ ...tx,
+    execAsync: async sql => { await tx.execAsync(sql); if (sql.includes('ALTER TABLE accounts')) throw new Error('Interrupted v3'); },
+  })) };
+  await assert.rejects(initializeDatabase(failing), /Interrupted v3/);
+  assert.equal((await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))?.user_version, 2);
+  assert.deepEqual(await db.getFirstAsync('SELECT * FROM accounts'), account);
+  await initializeDatabase(db);
+  assert.deepEqual((await readArchive(db)).records, [undo.after]);
+  await changeEntry(db, undo); // Existing v2 receipt still recognizes a retry.
+  assert.equal((await db.getAllAsync('SELECT id FROM entry_changes')).length, 1);
 });

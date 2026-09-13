@@ -1,4 +1,4 @@
-import type { Account, Currency, Entry, EntryKind } from '@finanzapp/domain';
+import type { Account, Currency, Entry, EntryKind, Transfer } from '@finanzapp/domain';
 
 export type EntryFilter = 'all' | EntryKind;
 export type EntrySection = { dateISO: string; data: Entry[] };
@@ -38,4 +38,27 @@ export function initialAccountId(accounts: Account[], accountId?: string, curren
 
 export function availableCurrencies(accounts: Account[]): Currency[] {
   return (['ARS', 'USD'] as Currency[]).filter(currency => accounts.some(account => account.currency === currency));
+}
+
+export type ActivityItem = { type: 'entry'; key: string; value: Entry } | { type: 'transfer'; key: string; value: Transfer };
+export function selectTransfers(transfers: Transfer[], accounts: Account[], query = '', accountId?: string): Transfer[] {
+  const names = new Map(accounts.map(a => [a.id, a.name]));
+  const terms = searchable(query).trim().split(/\s+/).filter(Boolean);
+  return transfers.filter(t => (!accountId || t.fromAccountId === accountId || t.toAccountId === accountId)
+    && terms.every(term => searchable(['transferencia', t.note, names.get(t.fromAccountId), names.get(t.toAccountId)].join(' ')).includes(term)));
+}
+export function mergeActivity(entries: Entry[], transfers: Transfer[] = []): ActivityItem[] {
+  const items: ActivityItem[] = [...entries.map(value => ({ type: 'entry' as const, key: 'entry-' + value.id, value })),
+    ...transfers.map(value => ({ type: 'transfer' as const, key: 'transfer-' + value.id, value }))];
+  return items.sort((a, b) => a.value.dateISO !== b.value.dateISO ? (a.value.dateISO < b.value.dateISO ? 1 : -1)
+    : Date.parse(b.value.createdAt) - Date.parse(a.value.createdAt) || b.key.localeCompare(a.key));
+}
+export function groupActivity(items: ActivityItem[]): { dateISO: string; data: ActivityItem[] }[] {
+  const sections: { dateISO: string; data: ActivityItem[] }[] = [];
+  for (const item of items) {
+    const last = sections[sections.length - 1];
+    if (last?.dateISO === item.value.dateISO) last.data.push(item);
+    else sections.push({ dateISO: item.value.dateISO, data: [item] });
+  }
+  return sections;
 }

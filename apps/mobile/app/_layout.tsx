@@ -72,6 +72,10 @@ function Navigation() {
       <Stack.Screen name="new-account" options={{ title: 'Nueva cuenta', presentation: 'modal' }} />
       <Stack.Screen name="new-entry" options={{ title: 'Nuevo movimiento', presentation: 'modal' }} />
       <Stack.Screen name="edit-entry/[id]" options={{ title: 'Editar movimiento', presentation: 'modal' }} />
+      <Stack.Screen name="edit-account/[id]" options={{ title: 'Editar cuenta', presentation: 'modal' }} />
+      <Stack.Screen name="new-transfer" options={{ title: 'Entre mis cuentas', presentation: 'modal' }} />
+      <Stack.Screen name="edit-transfer/[id]" options={{ title: 'Editar transferencia', presentation: 'modal' }} />
+      <Stack.Screen name="transfer/[id]" options={{ title: 'Transferencia' }} />
     </Stack>
   </View></ThemeProvider>;
 }

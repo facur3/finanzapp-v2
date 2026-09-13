@@ -3,7 +3,8 @@ import { ActivityIndicator, InputAccessoryView, Keyboard, Platform, Pressable, S
   useWindowDimensions, type PressableProps, type StyleProp, type TextInputProps, type TextProps, type ViewStyle } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { accountBalanceMinor, formatMinorUnits, labelFromISO, type Currency, type Entry, type Account } from '@finanzapp/domain';
+import { accountBalanceMinor, formatMinorUnits, labelFromISO, type Currency, type Entry, type Account, type Transfer } from '@finanzapp/domain';
+import type { ActivityItem } from './presentation';
 import { router } from 'expo-router';
 import { useCurrentDay, usePalette, useReduceMotion } from './theme';
 import { categorySymbol } from './categories';
@@ -210,10 +211,10 @@ export function EntryRow({ entry, account, last = false, showDate = true }: { en
   </PressFeedback>;
 }
 
-export function AccountRow({ account, entries, last = false }: { account: Account; entries: Entry[]; last?: boolean }) {
+export function AccountRow({ account, entries, transfers, last = false }: { account: Account; entries: Entry[]; transfers?: Transfer[]; last?: boolean }) {
   const p = usePalette();
   const { fontScale } = useWindowDimensions();
-  const balance = accountBalanceMinor(account, entries);
+  const balance = accountBalanceMinor(account, entries, transfers);
   return <PressFeedback accessibilityRole="button" accessibilityLabel={'Ver cuenta ' + account.name + ', saldo ' + formatMinorUnits(balance) + ' ' + account.currency}
     onPress={() => router.push({ pathname: '/account/[id]', params: { id: account.id } })}
     style={[styles.entry, { borderBottomColor: p.line, borderBottomWidth: last ? 0 : StyleSheet.hairlineWidth }]}>
@@ -223,6 +224,35 @@ export function AccountRow({ account, entries, last = false }: { account: Accoun
       <Money minor={balance} currency={account.currency} />
     </View>
     <Ionicons name="chevron-forward" size={16} color={p.secondary} accessible={false} />
+  </PressFeedback>;
+}
+
+export function MovementRow({ item, accounts, accountId, last, showDate = true }: {
+  item: ActivityItem; accounts: Account[]; accountId?: string; last?: boolean; showDate?: boolean;
+}) {
+  return item.type === 'entry' ? <EntryRow entry={item.value} account={accounts.find(a => a.id === item.value.accountId)!} last={last} showDate={showDate} />
+    : <TransferRow transfer={item.value} accounts={accounts} accountId={accountId} last={last} showDate={showDate} />;
+}
+export function TransferRow({ transfer: t, accounts, accountId, last = false, showDate = true }: {
+  transfer: Transfer; accounts: Account[]; accountId?: string; last?: boolean; showDate?: boolean;
+}) {
+  const p = usePalette();
+  const { fontScale } = useWindowDimensions();
+  const day = useCurrentDay();
+  const from = accounts.find(a => a.id === t.fromAccountId)!, to = accounts.find(a => a.id === t.toAccountId)!;
+  const date = labelFromISO(t.dateISO, new Date(day + 'T12:00:00'));
+  return <PressFeedback accessibilityRole="button"
+    accessibilityLabel={`Transferencia de ${from.name} a ${to.name}, ${formatMinorUnits(t.amountMinor)} ${from.currency}, ${date}${t.note ? ', ' + t.note : ''}`}
+    onPress={() => router.push({ pathname: '/transfer/[id]', params: { id: t.id } })}
+    style={[styles.entry, { borderBottomColor: p.line, borderBottomWidth: last ? 0 : StyleSheet.hairlineWidth }]}>
+    <View style={[styles.rowIcon, { backgroundColor: p.accentSoft }]}><Ionicons name="swap-horizontal-outline" size={21} color={p.accent} accessible={false} /></View>
+    <View style={{ flex: 1, minWidth: 0, gap: 4 }}>
+      <View style={{ flexDirection: fontScale > 1.3 ? 'column' : 'row', gap: 6, alignItems: fontScale > 1.3 ? 'flex-start' : 'baseline' }}>
+        <AppText style={{ flex: fontScale > 1.3 ? undefined : 1, fontWeight: '600' }}>Transferencia</AppText>
+        <View style={{ maxWidth: fontScale > 1.3 ? '100%' : '55%' }}><Money minor={accountId === from.id ? -t.amountMinor : t.amountMinor} currency={from.currency} signed={!!accountId} /></View>
+      </View>
+      <AppText secondary numberOfLines={fontScale > 1.3 ? undefined : 2} style={{ fontSize: 13, lineHeight: 19 }}>{from.name} → {to.name}{showDate ? ' · ' + date : ''}</AppText>
+    </View>
   </PressFeedback>;
 }
 

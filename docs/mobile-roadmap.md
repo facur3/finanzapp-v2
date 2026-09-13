@@ -60,9 +60,13 @@ Visual acceptance is still open. **Interfaz 04** now implements posted-entry
 editing/undo/recovery and additive native v1/v2 backup import with exact review.
 It preserves the visual/tab system while adding contextual actions in detail and
 Settings. The owner has not yet reviewed the new design or supplied device results.
-Native SQLite upgrades locally to v2; the web product and Supabase remain intact.
-Legacy backup import, account editing/transfers and full native accounting remain
-open. See the [Interfaz 04 walkthrough](empezar-en-iphone.md#9-interfaz-04-corregir-y-recuperar).
+**Interfaz 05** now adds account-name/current-balance corrections and same-currency
+transfers, including edit/undo/recovery and v3 native backups. SQLite upgrades to
+schema 3, preserving existing data. The web product and Supabase remain intact.
+The owner explicitly defers reviewing the recent iterations together; do not
+invent device approval or make it a blocker to bounded implementation work.
+Legacy backup import, currency exchange and full native accounting remain open.
+See the [Interfaz 05 walkthrough](empezar-en-iphone.md#10-interfaz-05-cuentas-y-transferencias).
 
 The owner reported **iPhone 14 Pro, iOS 26.6.1**. Next action: update the existing
 checkout to `master` and try the new interface, retaining a private backup and
@@ -80,7 +84,7 @@ Supabase remains in the architecture; mobile sync is still to be implemented.
   (implemented; basic iPhone experience accepted, specific gesture/layout checks pending).
 - [ ] Small canceled swipes leave exactly the same screen visible; no redirect.
 - [ ] Keyboard, safe areas, dynamic text and reduced motion work on an iPhone.
-- [x] SQLite writes, same-operation retry and no silent empty reset (20 real-SQLite
+- [x] SQLite writes, same-operation retry and no silent empty reset (real-SQLite
   integration tests; basic close/reopen persistence also reported on iPhone).
 - [x] Export pilot data with a distinct format (implemented; native sharing gate pending).
 - [ ] Pass [physical device checklist](mobile-device-checklist.md).
@@ -91,11 +95,15 @@ Supabase remains in the architecture; mobile sync is still to be implemented.
   mutation receipts (implemented/tested; multi-device outbox still pending).
 - [x] Edit/undo/recover posted native entries with atomic local before/after audit.
   Changing accounts is restricted to the same currency. Physical acceptance pending.
-- [ ] Account editing and complete transfer/currency operation audit.
+- [x] Account name/current-balance correction with confirmation, optimistic revision
+  and stale-balance checks; no fabricated expense/income.
+- [x] Same-currency transfers stored once with both balance effects; edit/undo/restore,
+  local audit, activity/detail and backup support. Physical acceptance pending.
+- [ ] Cross-currency operations and complete currency/fee audit.
 - [ ] Versioned legacy backup importer with dry run and exact before/after totals.
 - [ ] Accounts/currencies, cash and liabilities kept separate; no fake FX rate.
 - [ ] Transfer recorded once, including different-currency legs and rate/fees.
-- [x] Native v1/v2 additive backup review/restore, strict corrupt/unsupported input
+- [x] Native v1/v2/v3 additive backup review/restore, strict corrupt/unsupported input
   rejection, stale-preview/conflict checks and atomic interrupted migration/import
   recovery (tested in disposable SQLite; native picker/restore device gate pending).
 - [ ] Legacy backup fidelity, full audit-history export, replacement recovery,
@@ -184,6 +192,40 @@ no scraping promises, no claims that a local record actually paid a bank/card.
 - Aim for smooth frame pacing on real hardware; measure before claiming 60/120 fps.
 
 ## Handoff log (append actual evidence)
+
+### 2026-09-13 — Interfaz 05: account corrections and internal transfers
+
+- Owner asks to continue bounded implementation and will review recent design
+  together later. No new device acceptance, paid plan, EAS build or production
+  replacement was authorized/started in this delivery.
+- Account pencil edits name/current available balance. Explicit correction
+  adjusts opening balance with a revision and local audit receipt, not a fake
+  expense/income. Currency is immutable. Stale balance corrections reject if a
+  posting changed the balance while the form was open. Name-only edits preserve it.
+- Same-currency transfers use a single row representing both legs, integer cents,
+  safe-range validation and one durable transaction. Edit/undo/recover plus audit
+  receipts prevent duplicate effects or late retries reverting later changes.
+- Contextual Transferir on account detail; native sheets, shared selectors/date/
+  amount controls, both resulting balances and negative-balance warning. No added
+  Home action or tab; neutral transfer row instead of fake spending/income color.
+- Transfers appear once in mixed activity/recent results and on both accounts;
+  reports remain expense/income-only. Undone transfers remain recoverable.
+- New-account submission is also frozen across a failed post-commit refresh.
+- SQLite 1/2 → 3 migration preserves filename, records, revisions and old receipts.
+  Native v3 backup includes corrected accounts and transfer records/tombstones;
+  imports v1/v2/v3, validates all data, blocks conflicts, adds atomically. No full
+  local audit export, legacy import, actual bank execution or silent FX operation.
+- Checked locally: **306 domain/web + 80 mobile tests = 386**, TypeScript,
+  Metro iOS JS/Hermes/assets export (1688 modules), root Vite build and repository
+  hygiene. Node SQLite tests include real v1/v2 migration interruption/restart,
+  transfer/account audit failures, frozen retries, stale drafts and atomic import.
+  Route-handler tests cover real handlers with native hosts replaced by descriptors;
+  not UIKit rendering, animation frame pacing or gesture evidence.
+- Local online Expo dependency check hit proxy timeout; no dependencies changed.
+  CI online compatibility and both build/mobile jobs must pass before merge.
+- Next: versioned legacy import plan/dry run with explicit supported entities;
+  no wholesale re-entry of personal data. Combined iPhone review remains pending.
+  [Walkthrough](empezar-en-iphone.md#10-interfaz-05-cuentas-y-transferencias).
 
 ### 2026-09-13 — Interfaz 04: contextual correction and native recovery
 

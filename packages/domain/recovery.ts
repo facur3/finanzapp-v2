@@ -1,4 +1,5 @@
 import { totalsByCurrency, validateAccount, validateEntry, type Account, type Entry, type LedgerSnapshot } from './ledger.ts';
+import { TRANSFER_KEYS, sameTransferRecord, validateTransferRecord, type TransferRecord } from './transfers.ts';
 
 /** The current version of every entry, including reversible tombstones.
  * Reports consume snapshotFromArchive, never the tombstones themselves. */
@@ -8,7 +9,7 @@ export interface EntryRecord {
   voided: boolean;
   updatedAt: string;
 }
-export interface LedgerArchive { accounts: Account[]; records: EntryRecord[]; }
+export interface LedgerArchive { accounts: Account[]; records: EntryRecord[]; transfers?: TransferRecord[]; }
 export interface EntryChange {
   id: string;
   action: 'edit' | 'void' | 'restore';
@@ -29,10 +30,12 @@ function object(value: unknown, keys: readonly string[]): Record<string, unknown
 function timestamp(value: unknown): asserts value is string {
   if (typeof value !== 'string' || !Number.isFinite(Date.parse(value))) throw new Error('Fecha de modificación inválida.');
 }
-function accountValue(value: unknown): Account {
-  const item = object(value, ACCOUNT_KEYS) as unknown as Account;
+function accountValue(value: unknown, allowRevision = true): Account {
+  const keys = allowRevision && value && typeof value === 'object' && Object.hasOwn(value, 'revision')
+    ? [...ACCOUNT_KEYS, 'revision', 'updatedAt'] as const : ACCOUNT_KEYS;
+  const item = object(value, keys) as unknown as Account;
   validateAccount(item);
-  return Object.fromEntries(ACCOUNT_KEYS.map(key => [key, item[key]])) as unknown as Account;
+  return Object.fromEntries((item.revision === 0 ? ACCOUNT_KEYS : keys).map(key => [key, item[key]])) as unknown as Account;
 }
 function entryValue(value: unknown, accounts: Account[]): Entry {
   const item = object(value, ENTRY_KEYS) as unknown as Entry;
@@ -53,7 +56,8 @@ export function validateRecord(record: EntryRecord, accounts: Account[]): void {
   }
 }
 export function snapshotFromArchive(archive: LedgerArchive): LedgerSnapshot {
-  return { accounts: archive.accounts, entries: archive.records.filter(record => !record.voided).map(record => record.entry) };
+  return { accounts: archive.accounts, entries: archive.records.filter(record => !record.voided).map(record => record.entry),
+    ...(archive.transfers?.length ? { transfers: archive.transfers.filter(record => !record.voided).map(record => record.transfer) } : {}) };
 }
 export function validateArchive(archive: LedgerArchive): void {
   const accounts = new Set<string>();
@@ -68,19 +72,38 @@ export function validateArchive(archive: LedgerArchive): void {
     if (entries.has(record.entry.id)) throw new Error('La copia repite un movimiento. No se importó nada.');
     entries.add(record.entry.id);
   }
+  const transfers = new Set<string>();
+  for (const record of archive.transfers ?? []) {
+    validateTransferRecord(record, archive.accounts);
+    if (transfers.has(record.transfer.id)) throw new Error('La copia repite una transferencia.');
+    transfers.add(record.transfer.id);
+  }
   totalsByCurrency(snapshotFromArchive(archive));
 }
-export function sameAccount(a: Account, b: Account): boolean { return ACCOUNT_KEYS.every(key => a[key] === b[key]); }
+export function sameAccount(a: Account, b: Account): boolean {
+  return ACCOUNT_KEYS.every(key => a[key] === b[key]) && (a.revision ?? 0) === (b.revision ?? 0)
+    && (a.updatedAt ?? a.createdAt) === (b.updatedAt ?? b.createdAt);
+}
 export function sameEntry(a: Entry, b: Entry): boolean { return ENTRY_KEYS.every(key => a[key] === b[key]); }
 export function sameRecord(a: EntryRecord, b: EntryRecord): boolean {
   return sameEntry(a.entry, b.entry) && a.revision === b.revision && a.voided === b.voided && a.updatedAt === b.updatedAt;
 }
 function canonicalArchive(archive: LedgerArchive): LedgerArchive {
   return {
-    accounts: archive.accounts.map(accountValue).sort((a, b) => a.id.localeCompare(b.id)),
+    accounts: archive.accounts.map(a => accountValue(a)).sort((a, b) => a.id.localeCompare(b.id)),
     records: archive.records.map(record => ({ entry: entryValue(record.entry, archive.accounts), revision: record.revision,
       voided: record.voided, updatedAt: record.updatedAt })).sort((a, b) => a.entry.id.localeCompare(b.entry.id)),
+    ...(archive.transfers?.length ? { transfers: archive.transfers.map(r => transferValue(r, archive.accounts))
+      .sort((a, b) => a.transfer.id.localeCompare(b.transfer.id)) } : {}),
   };
+}
+function transferValue(value: unknown, accounts: Account[]): TransferRecord {
+  const row = object(value, ['transfer', 'revision', 'voided', 'updatedAt']);
+  const transfer = object(row.transfer, TRANSFER_KEYS);
+  const result = { transfer: Object.fromEntries(TRANSFER_KEYS.map(k => [k, transfer[k]])), revision: row.revision,
+    voided: row.voided, updatedAt: row.updatedAt } as unknown as TransferRecord;
+  validateTransferRecord(result, accounts);
+  return result;
 }
 /** Local optimistic concurrency token, not a cryptographic authenticity check. */
 export function archiveKey(archive: LedgerArchive): string { return JSON.stringify(canonicalArchive(archive)); }
@@ -106,8 +129,9 @@ export function validateEntryChange(change: EntryChange, accounts: Account[]): v
 
 export function createRecoveryBackup(archive: LedgerArchive, now = new Date()) {
   validateArchive(archive);
-  return { app: 'FinanzApp', schema: 'finanzapp.native-pilot.v2', exportedAt: now.toISOString(),
-    moneyUnit: 'integer-minor-units', ...canonicalArchive(archive) };
+  const canonical = canonicalArchive(archive);
+  return { app: 'FinanzApp', schema: 'finanzapp.native-pilot.v3', exportedAt: now.toISOString(),
+    moneyUnit: 'integer-minor-units', ...canonical, transfers: canonical.transfers ?? [] };
 }
 export interface ParsedBackup { archive: LedgerArchive; exportedAt: string; }
 export function parsePilotBackup(raw: string): ParsedBackup {
@@ -117,23 +141,26 @@ export function parsePilotBackup(raw: string): ParsedBackup {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('El archivo no es una copia de FinanzApp.');
   const header = value as Record<string, unknown>;
   const v1 = header.schema === 'finanzapp.native-pilot.v1';
-  if (!v1 && header.schema !== 'finanzapp.native-pilot.v2') {
-    throw new Error('Solo se pueden restaurar copias del piloto nativo v1 o v2. La app web/anterior y otras versiones todavía no son compatibles; conservá el archivo.');
+  const v3 = header.schema === 'finanzapp.native-pilot.v3';
+  if (!v1 && !v3 && header.schema !== 'finanzapp.native-pilot.v2') {
+    throw new Error('Solo se pueden restaurar copias del piloto nativo v1, v2 o v3. La app web/anterior y otras versiones todavía no son compatibles; conservá el archivo.');
   }
-  object(value, ['app', 'schema', 'exportedAt', 'moneyUnit', 'accounts', v1 ? 'entries' : 'records']);
+  object(value, ['app', 'schema', 'exportedAt', 'moneyUnit', 'accounts', v1 ? 'entries' : 'records', ...(v3 ? ['transfers'] : [])]);
   if (header.app !== 'FinanzApp' || header.moneyUnit !== 'integer-minor-units') throw new Error('Formato o unidad monetaria no compatibles.');
   timestamp(header.exportedAt);
   const rows = v1 ? header.entries : header.records;
   if (!Array.isArray(header.accounts) || !Array.isArray(rows) || header.accounts.length > 1000 || rows.length > 25000) {
     throw new Error('La copia no tiene una lista válida de cuentas y movimientos (máximo 1.000 cuentas y 25.000 movimientos).');
   }
-  const accounts = header.accounts.map(accountValue);
+  if (v3 && (!Array.isArray(header.transfers) || header.transfers.length + rows.length > 25000)) throw new Error('La copia supera el límite de movimientos o contiene transferencias inválidas.');
+  const accounts = header.accounts.map(a => accountValue(a, v3));
   const records = rows.map((value): EntryRecord => {
     if (v1) return initialRecord(entryValue(value, accounts));
     const record = object(value, ['entry', 'revision', 'voided', 'updatedAt']);
     return { entry: entryValue(record.entry, accounts), revision: record.revision as number, voided: record.voided as boolean, updatedAt: record.updatedAt as string };
   });
-  const archive = { accounts, records };
+  const transfers = v3 ? (header.transfers as unknown[]).map(t => transferValue(t, accounts)) : [];
+  const archive = { accounts, records, ...(transfers.length ? { transfers } : {}) };
   validateArchive(archive);
   return { archive, exportedAt: header.exportedAt };
 }
@@ -142,6 +169,7 @@ export interface ImportPreview {
   baseline: string;
   accounts: Account[];
   records: EntryRecord[];
+  transfers: TransferRecord[];
   identical: number;
   conflicts: number;
   before: ReturnType<typeof totalsByCurrency>;
@@ -153,6 +181,8 @@ export function previewBackupImport(current: LedgerArchive, incoming: LedgerArch
   validateArchive(incoming);
   const accountMap = new Map(current.accounts.map(account => [account.id, account]));
   const recordMap = new Map(current.records.map(record => [record.entry.id, record]));
+  const transferMap = new Map((current.transfers ?? []).map(r => [r.transfer.id, r]));
+  const transfers: TransferRecord[] = [];
   const accounts: Account[] = [], records: EntryRecord[] = [];
   let conflicts = 0, identical = 0;
   for (const account of incoming.accounts) {
@@ -166,8 +196,14 @@ export function previewBackupImport(current: LedgerArchive, incoming: LedgerArch
     else if (sameRecord(existing, record)) identical++;
     else conflicts++;
   }
-  const combined = { accounts: [...current.accounts, ...accounts], records: [...current.records, ...records] };
+  for (const record of incoming.transfers ?? []) {
+    const existing = transferMap.get(record.transfer.id);
+    if (!existing) transfers.push(record);
+    else if (sameTransferRecord(existing, record)) identical++;
+    else conflicts++;
+  }
+  const combined = { accounts: [...current.accounts, ...accounts], records: [...current.records, ...records], transfers: [...current.transfers ?? [], ...transfers] };
   if (!conflicts) validateArchive(combined);
-  return { baseline: archiveKey(current), accounts, records, identical, conflicts,
+  return { baseline: archiveKey(current), accounts, records, transfers, identical, conflicts,
     before: totalsByCurrency(snapshotFromArchive(current)), after: conflicts ? null : totalsByCurrency(snapshotFromArchive(combined)) };
 }

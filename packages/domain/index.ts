@@ -6,3 +6,5 @@ export * from './ledger.ts';
 export * from './month-summary.ts';
 export * from './spending-report.ts';
 export * from './recovery.ts';
+export * from './transfers.ts';
+export * from './account-changes.ts';

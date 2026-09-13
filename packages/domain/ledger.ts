@@ -9,6 +9,8 @@ export interface Account {
   currency: Currency;
   openingMinor: number;
   createdAt: string;
+  revision?: number;
+  updatedAt?: string;
 }
 
 export interface Entry {
@@ -25,6 +27,18 @@ export interface Entry {
 export interface LedgerSnapshot {
   accounts: Account[];
   entries: Entry[];
+  transfers?: Transfer[];
+}
+
+/** A single internal transfer owns both legs; it is never spending or income. */
+export interface Transfer {
+  id: string;
+  fromAccountId: string;
+  toAccountId: string;
+  amountMinor: number;
+  note: string;
+  dateISO: string;
+  createdAt: string;
 }
 
 export function formatMinorUnits(minor: number): string {
@@ -81,6 +95,10 @@ export function validateAccount(account: Account): void {
   if (!['ARS', 'USD'].includes(account.currency)) throw new Error('Elegí ARS o USD.');
   if (!Number.isSafeInteger(account.openingMinor)) throw new Error('Saldo inicial inválido.');
   if (!validTimestamp(account.createdAt)) throw new Error('Fecha de creación inválida.');
+  if (account.revision !== undefined || account.updatedAt !== undefined) {
+    if (!Number.isSafeInteger(account.revision) || account.revision! < 0 || !validTimestamp(account.updatedAt!)
+      || (account.revision === 0 && account.updatedAt !== account.createdAt)) throw new Error('Versión de cuenta inválida.');
+  }
 }
 
 export function validateEntry(entry: Entry, accounts: Account[]): void {
@@ -99,11 +117,25 @@ export function validateEntry(entry: Entry, accounts: Account[]): void {
   if (!validDateISO(entry.dateISO) || !validTimestamp(entry.createdAt)) throw new Error('Elegí una fecha válida.');
 }
 
-export function accountBalanceMinor(account: Account, entries: Entry[]): number {
+export function validateTransfer(transfer: Transfer, accounts: Account[]): void {
+  if (![transfer.id, transfer.fromAccountId, transfer.toAccountId].every(validId)) throw new Error('Identificador inválido.');
+  const from = accounts.find(a => a.id === transfer.fromAccountId), to = accounts.find(a => a.id === transfer.toAccountId);
+  if (!from || !to || from.id === to.id) throw new Error('Elegí dos cuentas distintas.');
+  if (from.currency !== to.currency) throw new Error('Las dos cuentas deben tener la misma moneda.');
+  if (!Number.isSafeInteger(transfer.amountMinor) || transfer.amountMinor <= 0) throw new Error('Ingresá un monto mayor que cero y con hasta dos decimales.');
+  if (typeof transfer.note !== 'string' || transfer.note.length > 120) throw new Error('Usá una nota de hasta 120 caracteres.');
+  if (!validDateISO(transfer.dateISO) || !validTimestamp(transfer.createdAt)) throw new Error('Elegí una fecha válida.');
+}
+
+export function accountBalanceMinor(account: Account, entries: Entry[], transfers: Transfer[] = []): number {
   // Exact accumulation is order independent, including near the safe boundary.
   // Otherwise insertion order can validate a balance that date-sorted reads reject.
-  const total = entries.filter(entry => entry.accountId === account.id).reduce((sum, entry) =>
+  let total = entries.filter(entry => entry.accountId === account.id).reduce((sum, entry) =>
     sum + BigInt(entry.kind === 'expense' ? -entry.amountMinor : entry.amountMinor), BigInt(account.openingMinor));
+  for (const transfer of transfers) {
+    if (transfer.fromAccountId === account.id) total -= BigInt(transfer.amountMinor);
+    if (transfer.toAccountId === account.id) total += BigInt(transfer.amountMinor);
+  }
   if (total > BigInt(Number.MAX_SAFE_INTEGER) || total < -BigInt(Number.MAX_SAFE_INTEGER)) throw new Error('El saldo supera el rango seguro.');
   return Number(total);
 }
@@ -112,7 +144,7 @@ export function accountBalanceMinor(account: Account, entries: Entry[]): number 
 export function totalsByCurrency(snapshot: LedgerSnapshot): Partial<Record<Currency, number>> {
   const sums: Partial<Record<Currency, bigint>> = {};
   for (const account of snapshot.accounts) {
-    sums[account.currency] = (sums[account.currency] ?? 0n) + BigInt(accountBalanceMinor(account, snapshot.entries));
+    sums[account.currency] = (sums[account.currency] ?? 0n) + BigInt(accountBalanceMinor(account, snapshot.entries, snapshot.transfers));
   }
   const result: Partial<Record<Currency, number>> = {};
   for (const currency of ['ARS', 'USD'] as const) {
@@ -125,6 +157,9 @@ export function totalsByCurrency(snapshot: LedgerSnapshot): Partial<Record<Curre
 }
 
 export function createPilotBackup(snapshot: LedgerSnapshot, now: Date = new Date()) {
+  if (snapshot.transfers?.length || snapshot.accounts.some(a => a.revision !== undefined || a.updatedAt !== undefined)) {
+    throw new Error('Usá la copia actual para conservar transferencias y correcciones de cuentas.');
+  }
   snapshot.accounts.forEach(validateAccount);
   snapshot.entries.forEach(entry => validateEntry(entry, snapshot.accounts));
   return {

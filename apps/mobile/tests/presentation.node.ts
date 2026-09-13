@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import type { Account, Entry } from '@finanzapp/domain';
-import { availableCurrencies, groupEntries, initialAccountId, selectEntries } from '../src/ui/presentation.ts';
+import type { Account, Entry, Transfer } from '@finanzapp/domain';
+import { availableCurrencies, groupEntries, initialAccountId, selectEntries, selectTransfers, mergeActivity, groupActivity } from '../src/ui/presentation.ts';
 
 // Synthetic fixtures only; never loaded by the app or stored in a user database.
 const accounts: Account[] = [
@@ -10,6 +10,22 @@ const accounts: Account[] = [
 ];
 const base: Entry = { id: 'a', accountId: 'ars', kind: 'expense', amountMinor: 123456, merchant: 'Café de prueba', category: 'Comida', dateISO: '2026-09-11', createdAt: '2026-09-11T12:00:00Z' };
 const entries: Entry[] = [base, { ...base, id: 'b', accountId: 'usd', kind: 'income', merchant: 'Cobro de prueba', category: 'Trabajo', dateISO: '2026-09-12' }, { ...base, id: 'c', createdAt: '2026-09-11T13:00:00Z' }];
+
+test('transfers match both account sides and all search terms without modifying data', () => {
+  const extra = { ...accounts[0], id: 'dest', name: 'Destino' };
+  const transfer: Transfer = { id: 'a', fromAccountId: 'ars', toAccountId: 'dest', amountMinor: 1, note: 'Ahorro', dateISO: base.dateISO, createdAt: base.createdAt };
+  const all = [...accounts, extra];
+  for (const id of ['ars', 'dest']) assert.deepEqual(selectTransfers([transfer], all, '', id), [transfer]);
+  assert.deepEqual(selectTransfers([transfer], all, 'TRANSFERÉNCIA destino ahorro'), [transfer]);
+  assert.deepEqual(selectTransfers([transfer], all, '', 'usd'), []);
+  assert.deepEqual(selectTransfers([transfer], all, 'no coincide'), []);
+  const mixed = mergeActivity(entries, [transfer]);
+  assert.equal(mixed.length, 4);
+  assert.equal(new Set(mixed.map(item => item.key)).size, 4); // Identical entry/transfer IDs are namespaced.
+  assert.equal(mixed[0].value.dateISO, '2026-09-12');
+  assert.deepEqual(groupActivity(mixed).flatMap(s => s.data), mixed);
+  assert.equal(entries[0], base);
+});
 
 test('activity is newest first without changing the stored entries', () => {
   const before = JSON.stringify(entries);

@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { AppState } from 'react-native';
-import { snapshotFromArchive, type Account, type Entry, type EntryChange, type LedgerArchive, type LedgerSnapshot } from '@finanzapp/domain';
-import { changeEntry, createAccount, createEntry, importArchive, initializeDatabase, readArchive, type LedgerDatabase } from './database';
+import { snapshotFromArchive, type Account, type Entry, type EntryChange, type LedgerArchive, type LedgerSnapshot, type AccountChange, type Transfer, type TransferChange } from '@finanzapp/domain';
+import { changeEntry, createAccount, createEntry, importArchive, initializeDatabase, readArchive, changeAccount, createTransfer, changeTransfer, type LedgerDatabase } from './database';
 import { openLedgerDatabase } from './nativeDatabase';
 
 type LedgerContextValue = {
@@ -12,6 +12,9 @@ type LedgerContextValue = {
   addAccount: (account: Account) => Promise<void>;
   addEntry: (entry: Entry) => Promise<void>;
   updateEntry: (change: EntryChange) => Promise<void>;
+  updateAccount: (change: AccountChange) => Promise<void>;
+  addTransfer: (transfer: Transfer) => Promise<void>;
+  updateTransfer: (change: TransferChange) => Promise<void>;
   restoreBackup: (incoming: LedgerArchive, baseline: string) => Promise<void>;
 };
 const LedgerContext = createContext<LedgerContextValue | null>(null);
@@ -83,6 +86,9 @@ export function LedgerProvider({ children }: { children: ReactNode }) {
     addAccount: account => mutate(db => createAccount(db, account)),
     addEntry: entry => mutate(db => createEntry(db, entry)),
     updateEntry: change => mutate(db => changeEntry(db, change)),
+    updateAccount: change => mutate(db => changeAccount(db, change)),
+    addTransfer: transfer => mutate(db => createTransfer(db, transfer)),
+    updateTransfer: change => mutate(db => changeTransfer(db, change)),
     restoreBackup: (incoming, baseline) => mutate(db => importArchive(db, incoming, baseline)),
   }}>{children}</LedgerContext.Provider>;
 }
