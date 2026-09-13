@@ -1,13 +1,13 @@
 # Probar FinanzApp en tu iPhone, desde Linux o Windows
 
-Actualizado: 12 de septiembre de 2026.
+Actualizado: 13 de septiembre de 2026.
 
 **El primer piloto ya fue aprobado en Expo Go:** el usuario confirmó que los
 movimientos persistieron al cerrar/reabrir y que la navegación se sentía nativa
 y fluida. Si ya hiciste esa prueba, seguí en [Después del piloto aprobado](#6-después-del-piloto-aprobado).
 
 Ya hay una primera versión móvil para probar: cuentas, gastos, ingresos,
-actividad y guardado local. Es un **piloto**: todavía faltan inversiones,
+actividad, reporte mensual por categoría y guardado local. Es un **piloto**: todavía faltan inversiones,
 tarjetas, IA, sincronización y las integraciones de Apple. Tu app actual sigue
 siendo la que usás para llevar todas tus finanzas.
 
@@ -117,12 +117,14 @@ Si todavía no lo probaste, completá primero la prueba de arriba.
 ## 6. Después del piloto aprobado
 
 Seguimos con Expo + React Native y **por ahora seguimos probando gratis en Expo Go**.
-Ya está implementada la segunda iteración de [la interfaz propia](mobile-design.md):
+Ya está implementada la tercera iteración de [la interfaz propia](mobile-design.md):
 Inicio más simple, acceso directo a Gasto/Ingreso, movimientos agrupados por fecha
 con búsqueda, cuentas en su propia lista y formularios más claros. Conserva la
 navegación nativa que ya te gustó. También suma categorías con símbolos y selector,
 un saldo con más identidad visual y el resumen Tu mes. La pantalla negra al
 cambiar pestañas tiene una mitigación específica: ver [Interfaz 02](#7-interfaz-02-pantalla-negra-y-categorías).
+Interfaz 03 suma gastos por categoría y un reporte mensual, sin agregar una pestaña
+ni duplicar la lista de cuentas: [cómo probarlo](#8-interfaz-03-inicio-y-reporte-mensual).
 Falta tu prueba de esta nueva interfaz; el estilo no se considera aprobado aún.
 
 Inicio dice **Disponible en tus cuentas**, no patrimonio: el piloto todavía no
@@ -219,7 +221,7 @@ intermitente desapareció**. No se borró ni migró SQLite.
 
 Después de actualizar con los comandos de arriba y abrir el QR nuevo:
 
-1. En Ajustes, el pie debe decir **Interfaz 02**.
+1. En Ajustes, el pie actual debe decir **Interfaz 03**; conserva esta corrección.
 2. Cambiá 30–40 veces entre Inicio, Movimientos y Ajustes. Probá ambos sentidos
    y algunas pulsaciones rápidas. La copia de seguridad y los movimientos deben
    aparecer siempre, sin necesidad de recargar.
@@ -236,3 +238,38 @@ Si reaparece el negro, contame si siguen visibles la barra de abajo y el título
 si cambiar de pestaña lo recupera y si pasó después de usar el teclado o volver
 a Expo Go. Si Metro muestra un error rojo, compartí su texto sin datos privados.
 No hace falta desinstalar, borrar tus movimientos, cambiar Expo ni pagar EAS.
+
+## 8. Interfaz 03: Inicio y reporte mensual
+
+Seguimos gratis en Expo Go. Actualizá con los mismos comandos del paso 6 y abrí
+el nuevo QR. Ajustes debe decir **Interfaz 03**. No hace falta cargar datos nuevos:
+usá los movimientos que ya guardaste en el piloto.
+
+1. **Inicio:** el saldo sigue siendo el disponible de tus cuentas, no todo tu
+   patrimonio. **Ver cuentas** abre la lista completa. Debajo de Gasto/Ingreso,
+   **Tu mes** resume ingresos/gastos y muestra las tres categorías principales.
+   Más abajo están tus movimientos recientes.
+2. **Ver reporte:** abre todas las categorías. Si tenés cuentas en pesos y dólares,
+   podés elegir la moneda; nunca se suman entre sí. Las flechas recorren los meses
+   desde el primer movimiento de esa moneda hasta el mes actual. **Este mes**
+   vuelve al actual si estabas viendo uno anterior.
+3. **Tocá una categoría:** abre solo sus gastos en esa moneda y mes. El total de
+   esa lista debe coincidir con el importe de la categoría. Variantes como Café
+   y CAFÉ se agrupan, pero no se modifica el texto de tus registros.
+4. **Abrí un movimiento y volvé:** primero debe aparecer su categoría y luego
+   el reporte, conservando mes y moneda. Si entraste a la categoría directamente
+   desde Inicio, volvés a Inicio. Probá también un gesto atrás pequeño y cancelado.
+5. **Revisá las barras:** el porcentaje es sobre todo el gasto registrado, no
+   sobre la categoría más grande. Se anima el cambio de proporción, no el importe;
+   no se reinicia al volver de un detalle. Probá Reducir movimiento, texto grande
+   y modo oscuro/claro. Si no hay gastos, se explica sin dibujar datos de ejemplo.
+
+El mes actual llega **hasta hoy**; un mes anterior incluye **todo ese mes**. Se usa
+la fecha del movimiento, no el día en que lo escribiste. Los saldos iniciales y
+los ingresos no se convierten en gastos. Ver un reporte no modifica ningún dato.
+
+Todavía no hay comparaciones automáticas, predicciones, presupuestos, reportes de
+tarjetas/inversiones ni explicación de causas. Primero consolidamos datos reales y
+la corrección/recuperación de movimientos. La aceptación visual y las animaciones
+siguen pendientes de tu iPhone; las pruebas del código no reemplazan esa revisión.
+La prueba de pestañas del paso 7 sigue abierta: esta entrega no cambia esa mitigación.

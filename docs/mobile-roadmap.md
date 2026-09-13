@@ -1,6 +1,6 @@
 # FinanzApp mobile: living roadmap
 
-Updated: 2026-09-12. Read with [decision 001](decisions/001-native-mobile.md).
+Updated: 2026-09-13. Read with [decision 001](decisions/001-native-mobile.md).
 This document supersedes the mobile architecture direction of
 `product-rebuild-roadmap.md`; that file still records useful financial work.
 
@@ -50,6 +50,13 @@ balance hierarchy and exact monthly recorded flow. The device re-test is open;
 do not mark the black-screen issue fixed on-device or the design approved yet.
 Next implement posted-entry edit/undo, then a versioned import preview with exact
 totals and recovery. Do not make the user manually rebuild the portfolio.
+
+At the owner's request, **Interfaz 03** now adds a read-only dashboard/report slice
+before those ledger milestones: Home's available balance links to accounts, Tu mes
+shows the top three spending categories, and a native-stack monthly report opens
+all categories and their exact movements. No extra tab or production migration.
+The tab mitigation remains unchanged; no new physical result has been reported.
+Visual acceptance, reversible entries and recovery/import are still open gates.
 
 The owner reported **iPhone 14 Pro, iOS 26.6.1**. Next action: update the existing
 checkout to `master` and try the new interface, retaining a private backup and
@@ -103,7 +110,9 @@ Supabase remains in the architecture; mobile sync is still to be implemented.
 - [x] Basic monthly recorded income/expenses by currency through today, excluding
   opening balances (Interfaz 02, 9 pure-domain cases; visual acceptance pending).
 - [ ] Clear cash available vs net worth, liabilities and invested value.
-- [ ] Readable charts with labeled units/periods, real history and reduced motion.
+- [x] Category bars with amount, share of total, period/currency and movement
+  drill-down; reduced-motion-aware transitions (Interfaz 03, device acceptance open).
+- [ ] Real-history time series with understandable scale and accessible interaction.
 - [ ] Compare matching portions of months, categories and merchants; no invented causes.
 - [ ] Free local Spanish parser; gift/income/loan distinction and amount/merchant split.
 - [ ] Answer money questions from actual ledger data, including yesterday and month deltas.
@@ -162,6 +171,44 @@ no scraping promises, no claims that a local record actually paid a bank/card.
 - Aim for smooth frame pacing on real hardware; measure before claiming 60/120 fps.
 
 ## Handoff log (append actual evidence)
+
+### 2026-09-13 — Interfaz 03: a focused dashboard and monthly spending report
+
+- Owner asked to continue the original minimal iOS identity with a useful Home,
+  categories and reports. This read-only slice does not replace the remaining
+  edit/undo, backup restore or legacy import milestones.
+- Home retains available cash/ARS-USD, expense/income and three recent movements.
+  Account access is integrated into the balance surface instead of duplicating
+  an account list. Tu mes adds the three largest categories with explicit partial
+  coverage when more exist; all categories are available through Ver reporte.
+- New native-stack report and category detail use the existing push/back owner.
+  Month/currency remain in the report state and are passed to category detail;
+  entry detail returns to its originating category. No redirects, focus reloads,
+  fourth tab or new screen fade; the previous black-tab mitigation is preserved.
+- Shared domain helper uses integer cents, complete historical calendar months,
+  current month through today, and separate ARS/USD. Opening balances/income never
+  become spending categories. Unsafe totals withhold the whole chart, not part of it.
+  Case/accent/space variants group without rewriting records; exact normalized
+  category equality is shared by the bars and their movement filter.
+- One-color bars represent share of **total** spending, not share of the largest
+  category. Amounts/percentages stay explicit; sub-0.1% values are not labeled zero.
+  Transitions only occur when proportions change (260 ms; zero with Reduce Motion),
+  without zero-to-total number animation or focus replay. List rows support large
+  text, narrow widths, accessible names and virtualized long lists.
+- Checked: **249 domain/web tests + 41 mobile tests = 290**, TypeScript,
+  Metro iOS JavaScript/assets export and legacy Vite build. Mobile tests include
+  report selections, actual route handlers/data scope, chart configuration and
+  the existing SQLite/tab safeguards; these are not native rendering/gesture tests.
+  Local Expo compatibility passed in offline mode only; online CI remains required
+  before merging, together with clean installs, builds and repository hygiene.
+- Browser component preview was attempted but returned ERR_BLOCKED_BY_CLIENT for
+  the local preview. No alternate browser/network route was used. No screenshot,
+  layout approval, physical gesture result, signed iOS build or frame-rate claim.
+  Interfaz 03 in Settings identifies the delivery; the Spanish guide includes a
+  non-mutating report walkthrough plus the still-open tab-switch stress test.
+- No dependency, schema or storage change; no bank/merchant lookup, user-data
+  publication, Supabase write, EAS build, paid service or legacy product change.
+  Next: iPhone visual/back-navigation feedback, posted-entry edit/undo and recovery.
 
 ### 2026-09-12 — Interfaz 02: intermittent black tabs and visual feedback
 

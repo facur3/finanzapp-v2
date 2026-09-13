@@ -1,10 +1,10 @@
-import type { Entry, EntryKind } from '@finanzapp/domain';
+import { categoryKey, type Entry, type EntryKind } from '@finanzapp/domain';
+export { categoryKey } from '@finanzapp/domain';
 
 // Interface choices, not seeded transactions or an automatic reclassification.
 // Keep the user's category string in the ledger, including custom categories.
 const expenseLabels = ['Comida', 'Supermercado', 'Transporte', 'Hogar', 'Servicios', 'Salud', 'Ropa', 'Ocio', 'Educación', 'Viajes', 'Mascotas', 'Otros'];
 const incomeLabels = ['Sueldo', 'Trabajo', 'Regalos', 'Reembolsos', 'Préstamos', 'Otros'];
-export const categoryKey = (label: string) => label.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('es-AR').replace(/\s+/g, ' ').trim();
 
 const symbols = new Map<string, string>(Object.entries({
   comida: '🍽️', comidas: '🍽️', alimentacion: '🍽️', restaurante: '🍽️', restaurantes: '🍽️', delivery: '🍽️',

@@ -65,6 +65,8 @@ function Navigation() {
       <Stack.Screen name="account/[id]" options={{ title: 'Cuenta' }} />
       <Stack.Screen name="accounts" options={{ title: 'Cuentas' }} />
       <Stack.Screen name="entry/[id]" options={{ title: 'Movimiento' }} />
+      <Stack.Screen name="reports" options={{ title: 'Reporte mensual' }} />
+      <Stack.Screen name="report-category" options={{ title: 'Categoría' }} />
       <Stack.Screen name="new-account" options={{ title: 'Nueva cuenta', presentation: 'modal' }} />
       <Stack.Screen name="new-entry" options={{ title: 'Nuevo movimiento', presentation: 'modal' }} />
     </Stack>

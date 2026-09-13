@@ -45,6 +45,6 @@ export default function SettingsScreen() {
       <ErrorMessage message={error} />
       <ActionButton label="Compartir copia" icon="share-outline" onPress={exportBackup} busy={busy} disabled={!snapshot} secondary />
     </Surface>
-    <AppText secondary style={{ textAlign: 'center', fontSize: 13 }}>FinanzApp · Piloto nativo 0.1.0 · Interfaz 02</AppText>
+    <AppText secondary style={{ textAlign: 'center', fontSize: 13 }}>FinanzApp · Piloto nativo 0.1.0 · Interfaz 03</AppText>
   </Screen>;
 }

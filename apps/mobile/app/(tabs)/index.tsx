@@ -1,9 +1,10 @@
 import { useMemo, useState } from 'react';
 import { View, useWindowDimensions } from 'react-native';
 import { router } from 'expo-router';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { totalsByCurrency, type Currency } from '@finanzapp/domain';
 import { useLedger } from '../../src/storage/LedgerProvider';
-import { AccountRow, ActionButton, AppText, EmptyState, EntryActions, EntryRow, Money, PressFeedback, Screen, SectionTitle, Surface } from '../../src/ui/components';
+import { ActionButton, AppText, EmptyState, EntryActions, EntryRow, Money, PressFeedback, Screen, SectionTitle, Surface } from '../../src/ui/components';
 import { availableCurrencies, selectEntries } from '../../src/ui/presentation';
 import { MonthCard } from '../../src/ui/month-card';
 import { usePalette } from '../../src/ui/theme';
@@ -35,22 +36,22 @@ export default function HomeScreen() {
           </View>}
         </View>
         <Money minor={totals[currency]!} currency={currency} large color={p.heroText} />
-        <AppText style={{ color: p.heroSecondary, fontSize: 14 }}>
-          {accounts.length === 1 ? accounts[0].name : accounts.length + ' cuentas'} · {currency}
-        </AppText>
+        <PressFeedback accessibilityRole="button" accessibilityLabel="Ver todas mis cuentas" onPress={() => router.push('/accounts')}
+          style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+          <AppText style={{ color: p.heroSecondary, fontSize: 14, flex: 1 }}>
+            {accounts.length === 1 ? '1 cuenta' : accounts.length + ' cuentas'} · {currency}
+          </AppText>
+          <AppText style={{ color: p.heroText, fontSize: 14, fontWeight: '500', flexShrink: 1 }}>Ver cuentas</AppText>
+          <Ionicons name="chevron-forward" size={17} color={p.heroSecondary} accessible={false} />
+        </PressFeedback>
       </Surface>
       <EntryActions currency={currency} />
+      <MonthCard snapshot={snapshot} currency={currency} />
       <View>
         <SectionTitle action="Ver todos" onAction={() => router.navigate('/activity')}>Movimientos recientes</SectionTitle>
         {recent.length ? <Surface grouped>{recent.map((entry, index) => <EntryRow key={entry.id} entry={entry}
           account={snapshot.accounts.find(account => account.id === entry.accountId)!} last={index === recent.length - 1} />)}</Surface>
           : <Surface><AppText secondary>Todavía no hay movimientos. Registrá un gasto o un ingreso para verlo acá.</AppText></Surface>}
-      </View>
-      <MonthCard snapshot={snapshot} currency={currency} />
-      <View>
-        <SectionTitle action="Ver todas" onAction={() => router.push('/accounts')}>Tus cuentas</SectionTitle>
-        <Surface grouped>{accounts.slice(0, 3).map((account, index) => <AccountRow key={account.id} account={account}
-          entries={snapshot.entries} last={index === Math.min(accounts.length, 3) - 1} />)}</Surface>
       </View>
     </>}
   </Screen>;
