@@ -48,15 +48,21 @@ too bare. Interfaz 02 removes the JS tab fade/detach/freeze/lazy combination,
 keeps root content mounted and adds category recognition/selection, a stronger
 balance hierarchy and exact monthly recorded flow. The device re-test is open;
 do not mark the black-screen issue fixed on-device or the design approved yet.
-Next implement posted-entry edit/undo, then a versioned import preview with exact
-totals and recovery. Do not make the user manually rebuild the portfolio.
+The next ledger slice is implemented below (Interfaz 04); do not make the user
+manually rebuild the portfolio while full legacy import is still pending.
 
 At the owner's request, **Interfaz 03** now adds a read-only dashboard/report slice
 before those ledger milestones: Home's available balance links to accounts, Tu mes
 shows the top three spending categories, and a native-stack monthly report opens
 all categories and their exact movements. No extra tab or production migration.
 The tab mitigation remains unchanged; no new physical result has been reported.
-Visual acceptance, reversible entries and recovery/import are still open gates.
+Visual acceptance is still open. **Interfaz 04** now implements posted-entry
+editing/undo/recovery and additive native v1/v2 backup import with exact review.
+It preserves the visual/tab system while adding contextual actions in detail and
+Settings. The owner has not yet reviewed the new design or supplied device results.
+Native SQLite upgrades locally to v2; the web product and Supabase remain intact.
+Legacy backup import, account editing/transfers and full native accounting remain
+open. See the [Interfaz 04 walkthrough](empezar-en-iphone.md#9-interfaz-04-corregir-y-recuperar).
 
 The owner reported **iPhone 14 Pro, iOS 26.6.1**. Next action: update the existing
 checkout to `master` and try the new interface, retaining a private backup and
@@ -74,19 +80,26 @@ Supabase remains in the architecture; mobile sync is still to be implemented.
   (implemented; basic iPhone experience accepted, specific gesture/layout checks pending).
 - [ ] Small canceled swipes leave exactly the same screen visible; no redirect.
 - [ ] Keyboard, safe areas, dynamic text and reduced motion work on an iPhone.
-- [x] SQLite writes, same-operation retry and no silent empty reset (10 real-SQLite
+- [x] SQLite writes, same-operation retry and no silent empty reset (20 real-SQLite
   integration tests; basic close/reopen persistence also reported on iPhone).
 - [x] Export pilot data with a distinct format (implemented; native sharing gate pending).
 - [ ] Pass [physical device checklist](mobile-device-checklist.md).
 
 ### M2 — Safe data migration and complete ledger
 
-- [ ] Immutable operation IDs; reversible/deduplicated posting model.
-- [ ] Edit/undo posted entries and account changes, preserving the operation audit trail.
+- [x] Native expense/income IDs, revisions, reversible tombstones and deduplicated
+  mutation receipts (implemented/tested; multi-device outbox still pending).
+- [x] Edit/undo/recover posted native entries with atomic local before/after audit.
+  Changing accounts is restricted to the same currency. Physical acceptance pending.
+- [ ] Account editing and complete transfer/currency operation audit.
 - [ ] Versioned legacy backup importer with dry run and exact before/after totals.
 - [ ] Accounts/currencies, cash and liabilities kept separate; no fake FX rate.
 - [ ] Transfer recorded once, including different-currency legs and rate/fees.
-- [ ] Backup restore, corrupt input handling, interrupted migrations, recovery.
+- [x] Native v1/v2 additive backup review/restore, strict corrupt/unsupported input
+  rejection, stale-preview/conflict checks and atomic interrupted migration/import
+  recovery (tested in disposable SQLite; native picker/restore device gate pending).
+- [ ] Legacy backup fidelity, full audit-history export, replacement recovery,
+  encryption/key management and large-backup streaming beyond pilot limits.
 - [ ] Native data-at-rest protection/key recovery decision and privacy review.
 - [ ] Cross-check against the existing rules/tests; do not reuse unsafe rounding.
 
@@ -171,6 +184,51 @@ no scraping promises, no claims that a local record actually paid a bank/card.
 - Aim for smooth frame pacing on real hardware; measure before claiming 60/120 fps.
 
 ## Handoff log (append actual evidence)
+
+### 2026-09-13 — Interfaz 04: contextual correction and native recovery
+
+- Owner asks to continue while they review the design later. Their descriptions
+  of categories/Home are not physical or visual acceptance. Keep the existing
+  original palette, press/selection feedback, chart-value transitions and native
+  stack/sheets. WhatsApp-like shared elements/MonAi scroll ideas are recorded as
+  possibilities, not implemented via experimental navigation overlays.
+- One reusable form now creates or edits native expenses/income. All fields
+  prefill, identity/createdAt stay immutable, no-change saves do nothing, and a
+  same-currency account correction recalculates both affected balances once.
+  Exact submitted commands are held across retry/refresh failures; stale drafts
+  cannot overwrite a newer version. Success/haptics follow durable storage/read.
+- Deshacer is a tombstone, not a refund/extra income; Recuperar restores its
+  original effect. Both require native confirmation with amount/account impact.
+  Detail changes status in place, with no redirect; Settings lists recoverable
+  undone entries. Active Home, activity and reports exclude tombstones.
+- Local SQLite v1 → v2 migration keeps the same pilot filename and rows; adds
+  version/state fields and an atomic local before/after edit audit. Tested restart,
+  failed audit writes, interrupted ALTER/import batches, receipt retries and
+  stale commands. A downgrade is refused intact; no remote schema is changed.
+- V2 native snapshot export includes current revisions/tombstones, not full audit
+  history. Native v1/v2 import previews counts and exact available totals by currency,
+  skips equal IDs/data and blocks the entire batch on any conflict. It only adds
+  missing rows; no reset/replacement/name-based account merging or implicit sync.
+  Unsupported legacy/web/future/mixed formats, dangling/duplicate IDs, invalid
+  cents/dates and unsafe totals are refused. Limit: 5 MB / 1,000 accounts / 25,000
+  movements. No file is uploaded; source file is read-only; exports are not encrypted.
+- Regression testing found an order-dependent extreme-balance failure: insertion
+  validation could pass but a date-sorted reload overflowed an intermediate Number
+  sum. Native balances now accumulate exactly with BigInt and check the final safe
+  range, returning integer cents; no BigInt goes to SQLite/JSON or the legacy web.
+- Checked: **282 domain/web + 61 mobile tests = 343**, mobile TypeScript, Metro iOS
+  JavaScript/Hermes/assets export (1,681 modules), legacy Vite build and repository
+  hygiene. Handler/host-descriptor tests include prefilling, cancel, busy/double-tap,
+  retry, file review and native-confirmation wiring; they are not rendered iOS tests.
+  The local online Expo compatibility request timed out at the environment proxy;
+  its bundled offline check and the normal online CI check are recorded separately.
+  Both CI jobs must pass before merging.
+- No physical iPhone, native Files/sharing, canceled gesture, visual approval,
+  signed build or frame-rate evidence for this iteration. No new dependencies,
+  EAS build, charge, bank operation, personal-data publication or Supabase write.
+  Next: owner checks Interfaz 04/03 and the existing black-tab stress test; then
+  account corrections/transfers and versioned legacy import. Do not use the pilot
+  as the principal ledger or re-enter the entire portfolio yet.
 
 ### 2026-09-13 — Interfaz 03: a focused dashboard and monthly spending report
 

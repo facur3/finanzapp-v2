@@ -1,6 +1,6 @@
 # FinanzApp: dirección visual móvil
 
-Actualizado: 13 de septiembre de 2026. Interfaz 03 implementada en `apps/mobile`;
+Actualizado: 13 de septiembre de 2026. Interfaz 04 implementada en `apps/mobile`;
 su validación visual/gestual en el iPhone todavía está pendiente.
 
 El usuario probó el recorrido de la primera iteración y reportó que funcionaba,
@@ -26,9 +26,10 @@ Inicio, Movimientos y Ajustes, sin botones decorativos de secciones no implement
 | Gasto / ingreso | Monto destacado y moneda visible, con Listo en el teclado iOS. Cuenta en una fila que abre su selector. Fecha en una hoja nativa con Cancelar/Listo; no modifica la fecha hasta confirmar. Validación visible y borrador conservado ante errores de guardado. |
 | Movimientos | Lista virtualizada agrupada por fecha, búsqueda por concepto/categoría/cuenta y filtros Todos/Gastos/Ingresos. Importe firmado y moneda; no sumar ARS y USD ni inventar días vacíos. |
 | Cuentas | Lista completa por moneda y detalle con disponible, saldo inicial separado de ingresos y movimientos de esa cuenta. |
-| Detalle | Importe, concepto y fecha primero; cuenta y categoría después. Editar y deshacer se muestran cuando tengan persistencia y reversión implementadas. |
+| Detalle | Importe, concepto y fecha primero; cuenta y categoría después. Editar abre la misma hoja que el registro; Deshacer confirma su efecto. Si está deshecho, solo ofrece Recuperar. |
 | Reporte mensual | Acceso desde Tu mes, no una cuarta pestaña. Mes y moneda, gasto total, ingresos y barras por categoría ordenadas por importe. Mes actual hasta hoy; meses anteriores completos. |
 | Categoría del reporte | Total y movimientos exactos de esa categoría, moneda y período. Abrir un movimiento y volver conserva el contexto de la pila nativa. |
+| Recuperación | Dos filas en Ajustes: Importar copia y Movimientos deshechos. Vista previa con cambios y saldos por moneda; conflicto explicado sin botones de sobreescritura. |
 
 Interfaz 02 añade un selector de categorías con búsqueda, categorías ya usadas y
 opción de escribir una propia. Un emoji pequeño ayuda a reconocer cada categoría,
@@ -81,14 +82,25 @@ categorías distintas no se unen por compartir un emoji o parte del nombre.
   sin empezar desde cero ni reiniciarse al volver de un detalle. Reducir movimiento
   aplica el valor sin transición. El número no se anima desde un importe inventado.
   No añadir animaciones de entrada/salida de pantalla encima de la pila nativa.
+- Interfaz 04 reutiliza el formulario, botones, selectors y hojas existentes:
+  sin una segunda animación ni botones extra en Inicio. Editar vuelve al detalle
+  real; deshacer/recuperar cambia su estado en el mismo lugar, sin redirigir.
+  Háptico solo tras confirmar el guardado; saldos y reportes toman datos persistidos.
+- El usuario propone continuidad entre elementos al abrir/cerrar (referencia
+  WhatsApp) y barras vinculadas al scroll (referencia MonAi), como ideas, no como
+  requisitos literales. Evaluarlas tras el re-test de pestañas: no esconder contenido
+  hasta animarlo, no atar el valor financiero al scroll y no interceptar el gesto
+  nativo de volver. Aún no se implementan transiciones compartidas experimentales.
 
 ## Datos y alcance de la próxima iteración
 
-Antes de usar la app nueva como registro principal: editar/deshacer movimientos
-sin duplicar débitos, restaurar la copia del piloto e importar el respaldo anterior
-con una vista previa. Mostrar qué entidades se admiten, totales por moneda y
-cualquier dato no compatible. Nunca descartar tarjetas/inversiones silenciosamente
-si el importador inicial aún no las soporta.
+Editar/deshacer/recuperar y el importador de copias **nativas** v1/v2 ya están
+implementados con pruebas de lógica/SQLite; falta la prueba física. La importación
+solo agrega registros faltantes y bloquea cualquier conflicto, sin restaurar una
+versión antigua encima de una corrección. Los movimientos deshechos no cuentan.
+Antes de usar la app nueva como registro principal todavía hay que importar el
+respaldo de la app anterior, mostrando entidades admitidas y totales por moneda.
+Por ahora se rechaza esa copia completa: nunca se descartan tarjetas/inversiones.
 
 Después: completar tarjetas/inversiones y su conciliación; ampliar los reportes
 mensuales ya implementados y sumar el asistente; sincronización y funciones de Apple.
@@ -124,3 +136,5 @@ El orden y las pruebas contables están en [el roadmap](mobile-roadmap.md).
 - [ ] Revisar Interfaz 03: Inicio → reporte → categoría → movimiento → volver.
 - [ ] Mes/moneda conservados, tres categorías vs lista completa, estados vacíos y texto grande.
 - [ ] Barras con Reducir movimiento, cambio rápido de mes y regreso sin reiniciar el gráfico.
+- [ ] Interfaz 04: editar/cancelar/volver conserva contexto; deshacer/recuperar actualiza sin un destello de pestaña.
+- [ ] Importar copia: selector Archivos, revisión, cancelación, texto grande y errores claros en iPhone.

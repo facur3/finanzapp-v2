@@ -65,10 +65,13 @@ function Navigation() {
       <Stack.Screen name="account/[id]" options={{ title: 'Cuenta' }} />
       <Stack.Screen name="accounts" options={{ title: 'Cuentas' }} />
       <Stack.Screen name="entry/[id]" options={{ title: 'Movimiento' }} />
+      <Stack.Screen name="undone-entries" options={{ title: 'Movimientos deshechos' }} />
+      <Stack.Screen name="backup-import" options={{ title: 'Importar copia' }} />
       <Stack.Screen name="reports" options={{ title: 'Reporte mensual' }} />
       <Stack.Screen name="report-category" options={{ title: 'Categoría' }} />
       <Stack.Screen name="new-account" options={{ title: 'Nueva cuenta', presentation: 'modal' }} />
       <Stack.Screen name="new-entry" options={{ title: 'Nuevo movimiento', presentation: 'modal' }} />
+      <Stack.Screen name="edit-entry/[id]" options={{ title: 'Editar movimiento', presentation: 'modal' }} />
     </Stack>
   </View></ThemeProvider>;
 }
