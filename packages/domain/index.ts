@@ -5,3 +5,4 @@ export { todayKey, labelFromISO } from '../../src/domain/dates.js';
 export * from './ledger.ts';
 export * from './month-summary.ts';
 export * from './spending-report.ts';
+export * from './recovery.ts';

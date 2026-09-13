@@ -7,7 +7,7 @@ movimientos persistieron al cerrar/reabrir y que la navegación se sentía nativ
 y fluida. Si ya hiciste esa prueba, seguí en [Después del piloto aprobado](#6-después-del-piloto-aprobado).
 
 Ya hay una primera versión móvil para probar: cuentas, gastos, ingresos,
-actividad, reporte mensual por categoría y guardado local. Es un **piloto**: todavía faltan inversiones,
+actividad, reporte mensual por categoría, edición/recuperación y guardado local. Es un **piloto**: todavía faltan inversiones,
 tarjetas, IA, sincronización y las integraciones de Apple. Tu app actual sigue
 siendo la que usás para llevar todas tus finanzas.
 
@@ -58,8 +58,8 @@ bibliotecas al azar.
 1. Agregá una cuenta y escribí su saldo inicial explícitamente. El piloto empieza
    vacío y no trae tus datos de Cocos, Binance, bancos ni la app anterior.
 2. Registrá un gasto o ingreso que quieras usar para esta prueba. Revisá monto,
-   cuenta, categoría y fecha antes de guardar. No está habilitada todavía la
-   edición de un movimiento ya guardado.
+   cuenta, categoría y fecha antes de guardar. Desde su detalle también podés
+   editarlo o deshacerlo, y recuperar lo deshecho después.
 3. Abrí su detalle y volvé. Probá también un gesto hacia atrás muy pequeño,
    cancelándolo sin terminar de mover el dedo.
 4. Cerrá y volvé a abrir. Confirmá que el movimiento y el saldo sigan ahí.
@@ -67,8 +67,8 @@ bibliotecas al azar.
 6. En Ajustes → Compartir copia, guardá el archivo en una ubicación privada.
 
 No vuelvas a cargar todo tu patrimonio. El piloto todavía no importa ni
-sincroniza tus datos anteriores y no restaura backups desde su interfaz.
-La exportación preserva los registros para la siguiente etapa, pero no convierte
+sincroniza tus datos de la app web. Sí puede restaurar sus propias copias nativas
+v1/v2 desde Ajustes → Importar copia, con revisión previa. Eso todavía no convierte
 al piloto en el reemplazo de la app actual.
 
 La prueba completa está en [la lista para iPhone](mobile-device-checklist.md).
@@ -117,7 +117,7 @@ Si todavía no lo probaste, completá primero la prueba de arriba.
 ## 6. Después del piloto aprobado
 
 Seguimos con Expo + React Native y **por ahora seguimos probando gratis en Expo Go**.
-Ya está implementada la tercera iteración de [la interfaz propia](mobile-design.md):
+Ya está implementada la cuarta iteración de [la interfaz propia](mobile-design.md):
 Inicio más simple, acceso directo a Gasto/Ingreso, movimientos agrupados por fecha
 con búsqueda, cuentas en su propia lista y formularios más claros. Conserva la
 navegación nativa que ya te gustó. También suma categorías con símbolos y selector,
@@ -125,12 +125,14 @@ un saldo con más identidad visual y el resumen Tu mes. La pantalla negra al
 cambiar pestañas tiene una mitigación específica: ver [Interfaz 02](#7-interfaz-02-pantalla-negra-y-categorías).
 Interfaz 03 suma gastos por categoría y un reporte mensual, sin agregar una pestaña
 ni duplicar la lista de cuentas: [cómo probarlo](#8-interfaz-03-inicio-y-reporte-mensual).
+Interfaz 04 agrega editar, deshacer/recuperar y copias del piloto: [cómo probarlo](#9-interfaz-04-corregir-y-recuperar).
 Falta tu prueba de esta nueva interfaz; el estilo no se considera aprobado aún.
 
 Inicio dice **Disponible en tus cuentas**, no patrimonio: el piloto todavía no
 incluye inversiones ni deudas. Pesos y dólares se muestran por separado, sin
-inventar una cotización. No hay datos precargados ni cambios en tu base local.
-Después completamos editar/deshacer y el importador con vista previa para traer
+inventar una cotización. No hay datos precargados. Interfaz 04 actualiza la estructura
+de la base local conservando tus registros; no toca Supabase ni la app anterior.
+Después completamos cuentas/transferencias y el importador de la app web para traer
 tus datos sin volver a escribir todo. El piloto todavía no es el registro principal.
 
 **Ahora, de tu lado:** conservá una copia JSON privada de la app actual usando su
@@ -139,7 +141,9 @@ para diseñar la app. No borres Supabase ni vuelvas a cargar el patrimonio en el
 piloto. Ya registramos tu **iPhone 14 Pro con iOS 26.6.1**, según tu mensaje.
 No hace falta volver a dar ese dato mientras no cambie.
 
-Para actualizar esta misma copia del código, detené Metro con `Ctrl+C` y ejecutá:
+Antes de actualizar, guardá también una copia privada **del piloto** desde Ajustes
+→ Compartir copia. Conservá el archivo y la instalación. Luego detené Metro con
+`Ctrl+C` y actualizá esta misma copia del código:
 
 ```bash
 cd ~/Projects/apps/finanzapp-ios
@@ -170,7 +174,7 @@ desinstalar Expo Go o borrar sus datos sí puede eliminar los registros del pilo
    entrá a un detalle y volvé. La búsqueda y los filtros deben conservarse.
 5. Probá un gesto de volver cancelado, modo oscuro y texto grande. Cerrá/reabrí
    Expo Go y confirmá los datos de nuevo. Para comprobar un guardado, usá un
-   movimiento que quieras conservar: editar/deshacer lo guardado aún está pendiente.
+   movimiento que quieras conservar o corregir; Interfaz 04 ya permite editarlo/deshacerlo.
 
 ### Expo Go y EAS: para qué sirve cada uno
 
@@ -221,7 +225,7 @@ intermitente desapareció**. No se borró ni migró SQLite.
 
 Después de actualizar con los comandos de arriba y abrir el QR nuevo:
 
-1. En Ajustes, el pie actual debe decir **Interfaz 03**; conserva esta corrección.
+1. En Ajustes, el pie actual debe decir **Interfaz 04**; conserva esta corrección.
 2. Cambiá 30–40 veces entre Inicio, Movimientos y Ajustes. Probá ambos sentidos
    y algunas pulsaciones rápidas. La copia de seguridad y los movimientos deben
    aparecer siempre, sin necesidad de recargar.
@@ -242,7 +246,7 @@ No hace falta desinstalar, borrar tus movimientos, cambiar Expo ni pagar EAS.
 ## 8. Interfaz 03: Inicio y reporte mensual
 
 Seguimos gratis en Expo Go. Actualizá con los mismos comandos del paso 6 y abrí
-el nuevo QR. Ajustes debe decir **Interfaz 03**. No hace falta cargar datos nuevos:
+el nuevo QR. Ajustes debe decir **Interfaz 04**, que incluye estos reportes. No hace falta cargar datos nuevos:
 usá los movimientos que ya guardaste en el piloto.
 
 1. **Inicio:** el saldo sigue siendo el disponible de tus cuentas, no todo tu
@@ -273,3 +277,64 @@ tarjetas/inversiones ni explicación de causas. Primero consolidamos datos reale
 la corrección/recuperación de movimientos. La aceptación visual y las animaciones
 siguen pendientes de tu iPhone; las pruebas del código no reemplazan esa revisión.
 La prueba de pestañas del paso 7 sigue abierta: esta entrega no cambia esa mitigación.
+
+## 9. Interfaz 04: corregir y recuperar
+
+Se sigue probando con Expo Go, sin ningún pago ni alta nueva. Guardá primero una
+copia privada del piloto, actualizá con los comandos del paso 6 y comprobá el pie
+**Interfaz 04** en Ajustes. La actualización conserva las cuentas/movimientos y
+agrega el control de cambios a la misma base. **No vuelvas a código anterior ni
+desinstales Expo Go** después: una versión vieja no entiende esta estructura.
+
+### Editar un movimiento
+
+1. Abrí un movimiento desde Inicio, Movimientos o un reporte → **Editar movimiento**.
+2. El monto, tipo, concepto, categoría, cuenta y fecha ya vienen cargados. Corregí
+   lo que corresponda → **Guardar cambios**. Editar no crea un segundo movimiento.
+3. La cuenta se puede cambiar por otra de la **misma moneda**. No se convierte un
+   gasto de pesos a dólares cambiando solamente su cuenta.
+4. Volvé al reporte/Inicio: saldo y categoría deben reflejar la corrección una vez.
+   Para revisar solo el diseño, abrí el formulario y cerralo sin guardar.
+
+### Deshacer y recuperar
+
+- En el detalle → **Deshacer movimiento**. La confirmación explica cuánto vuelve
+  o se descuenta de la cuenta. Cancelar no cambia nada.
+- El movimiento deja de contar, pero no se borra definitivamente ni crea un
+  ingreso ficticio. En el mismo detalle aparece **Recuperar movimiento**.
+- También queda en **Ajustes → Movimientos deshechos** después de cerrar/reabrir.
+  Recuperarlo vuelve a aplicar su efecto original exactamente una vez.
+- Si aparece un error al guardar, usá **Reintentar** con el mismo envío. La app
+  conserva los datos enviados y bloquea cambiarlos durante ese reintento. Si
+  querés corregirlos, cerrá y verificá primero el movimiento actual: no lo cargues
+  otra vez como uno nuevo. El aviso de verificación permite actualizar la vista.
+
+### Importar una copia
+
+1. **Ajustes → Compartir copia** genera el archivo nativo v2. Guardalo en Archivos,
+   en una ubicación privada. Contiene datos financieros en texto, **sin cifrado**.
+   Cancelar el menú no significa que se haya guardado afuera de la app.
+2. **Ajustes → Importar copia → Elegir copia** abre el selector de archivos del
+   sistema. Seleccioná una copia nativa del piloto, v1 o v2.
+3. Revisá cuentas nuevas, movimientos, deshechos, registros ya presentes y saldo
+   antes/después por moneda. No se importa nada hasta **Confirmar importación**
+   y confirmar el aviso. Cancelar o volver no cambia los registros.
+4. Si seleccionás la misma copia que acabás de exportar, debe indicar que ya está
+   incorporada, sin duplicar nada. Esta es una prueba segura con tus datos actuales.
+5. Si una copia antigua contradice una corrección o un movimiento deshecho, se
+   bloquea toda la importación. Conservá ambas versiones; no se sobrescribe ninguna.
+
+El importador **agrega lo que falta por identificador**; no reemplaza toda la base,
+no une cuentas solo por tener el mismo nombre y no funciona como sincronización.
+Admite JSON hasta 5 MB, 1.000 cuentas y 25.000 movimientos. La copia conserva el
+estado actual y los deshechos, pero no todas las revisiones históricas del registro
+de cambios local. Las copias de la **app web/anterior**, tarjetas e inversiones aún
+no se importan: si elegís una, debe explicarlo sin guardar parcialmente sus datos.
+El selector reutiliza [FileSystem de Expo](https://docs.expo.dev/versions/latest/sdk/filesystem/),
+ya incluido en el proyecto; no se añadió otra biblioteca.
+
+La prueba completa de recuperar en una instalación vacía se hará en un entorno
+separado; **no borres tu única instalación para probarla**. Estas pantallas y las
+pruebas contables ya están implementadas, pero la fluidez, los gestos, Archivos y
+el diseño siguen pendientes de revisión en tu iPhone. Mantenemos los botones con
+respuesta breve y la navegación nativa, sin efectos de pantalla superpuestos.

@@ -14,7 +14,8 @@ basic checks work, **but Settings or Movements stays black intermittently, about
 one in ten tab switches**. The visual style is explicitly not approved yet.
 The new Interfaz 02 mitigation/design has not been re-tested on the phone.
 Interfaz 03 adds Home/category reports and retains that mitigation unchanged.
-No physical result for Interfaz 03 has been recorded yet.
+Interfaz 04 adds correction/recovery without changing the tab mitigation.
+No physical result for Interfaz 03 or 04 has been recorded yet.
 Specific accessibility, background/airplane and release checks stay pending.
 
 Record: date, device model, iOS version, build profile/number, commit, tester and
@@ -83,7 +84,7 @@ Face ID on iOS is not supported inside Expo Go; use our signed development build
 
 ## Interfaz 02 — black-tab mitigation and categories (re-test pending)
 
-- [ ] Footer in Ajustes shows **Interfaz 03** (or later), including the Interfaz 02 mitigation.
+- [ ] Footer in Ajustes shows **Interfaz 04**, including the Interfaz 02 mitigation.
 - [ ] Perform 30–40 switches across Inicio → Ajustes → Movimientos in both directions.
 - [ ] Repeat some switches quickly, before a previous press response finishes.
 - [ ] Background/foreground the app, then repeat; Settings backup control always appears.
@@ -107,7 +108,7 @@ or private records. Do not reset SQLite, uninstall Expo Go or change Expo versio
 Use the small ledger already in the pilot; do not seed transactions to fill a chart.
 The walkthrough is read-only and does not require another expense or income.
 
-- [ ] Ajustes footer identifies **Interfaz 03**. Existing balances/entries are unchanged.
+- [ ] Ajustes footer identifies **Interfaz 04** (contains Interfaz 03). Existing balances/entries are unchanged.
 - [ ] Inicio → Ver cuentas opens the full list; back returns to Inicio.
 - [ ] Tu mes shows at most three categories with amount/share of **all** expenses.
 - [ ] More than three categories are explicitly identified as a partial preview.
@@ -125,3 +126,38 @@ The walkthrough is read-only and does not require another expense or income.
 - [ ] Clear/dark, narrow screen and large text: category/amount/month labels remain readable.
 - [ ] Report-only use preserves the private backup contents and all account balances.
 - [ ] Repeat the 30–40 tab-switch check above; its physical verification remains open.
+
+## Interfaz 04 — corrections and native backup recovery (pending)
+
+Keep a private pilot backup before updating. Use existing pilot records, not fake
+transactions; full restore into an empty install belongs on a separate isolated
+test install, not by uninstalling the user's only copy. Do not downgrade schema 2.
+
+- [ ] Update preserves all previous accounts/entries/cents after schema 1 → 2.
+- [ ] Detail → Editar prefills amount/kind/concept/category/account/local date.
+- [ ] Cancel/no-change Save does not change any balance or create a second entry.
+- [ ] A real correction updates the original entry, its account, Home and report exactly once.
+- [ ] Changing account restores the old balance and adjusts only the new same-currency account.
+- [ ] Currency cannot silently change while editing; ARS and USD remain separate.
+- [ ] Double Save and retries after a failure do not repeat a posting; failed draft stays visible.
+- [ ] Deshacer confirms the specific amount/account effect; Cancelar changes nothing.
+- [ ] Undone entry disappears from active reports/balances without creating income/refund.
+- [ ] Detail stays visible with Recuperar, without jumping through Inicio/another tab.
+- [ ] After close/reopen, Ajustes → Movimientos deshechos still offers recovery.
+- [ ] Recuperar applies its original effect exactly once; repeat taps cannot double it.
+- [ ] Updated bars reflect only real saved values, with no focus/scroll replay.
+- [ ] Ajustes → Compartir copia saves native v2 JSON through Files; cancel does not claim success.
+- [ ] Importar copia opens the iOS Files picker; cancel leaves the ledger unchanged.
+- [ ] The same exported file previews as already present; no duplicate import action.
+- [ ] Native v1/v2 backup on an isolated empty install restores active and undone records/totals.
+- [ ] Preview shows counts and before/after ARS/USD; Cancel/back never imports.
+- [ ] Conflict/unsupported web/new schema/corrupt/oversized file shows an explanation without partial import.
+- [ ] Local correction/undo is never overwritten/reactivated by an older backup.
+- [ ] Closing/reopening after import preserves the imported result; repeat import adds nothing.
+- [ ] Light/dark, large text, VoiceOver and Reduce Motion for edit/recovery/import screens.
+- [ ] Return from edit/import or cancel a small swipe without the intermittent black-tab regression.
+
+Automated cases use synthetic fixtures in disposable SQLite files; none are
+inserted into the real app. Native file selection, sharing, gestures and appearance
+still need physical evidence. The v2 snapshot does not export the full local edit
+audit history; cloud/legacy migration and encryption remain separate gates.

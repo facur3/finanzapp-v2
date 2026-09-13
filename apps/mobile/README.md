@@ -17,7 +17,9 @@ or Movements intermittently stayed black on tab changes and the visual style
 is not yet approved. **Interfaz 02** addresses this risk and refines the design;
 its focused physical re-test is pending. **Interfaz 03 (2026-09-13)** builds on it
 with a compact dashboard and read-only monthly category reports. Physical/visual
-acceptance remains open. Next ledger work: posted-entry edit/undo and safe import.
+acceptance remains open. **Interfaz 04** adds posted-entry edit/undo/recovery and
+native-backup review/import. Neither this delivery nor Interfaz 03 has new physical
+acceptance evidence. Next: device checks, account corrections/transfers and legacy import.
 
 ## First start on Linux or Windows
 
@@ -50,8 +52,11 @@ Use the Expo SDK version in the lockfile; do not mix arbitrary React Native vers
 The first functional slice is accounts, expense/income, activity and detail,
 with native navigation and SQLite. It starts empty. Opening balances are explicit
 and are not income. ARS and USD are shown separately without fabricated rates.
-The draft can be changed before Save; editing/deleting posted entries and transfers
-are part of the next ledger milestone, not implemented controls in this pilot.
+Drafts and posted entries can be edited. Open a movement → Editar movimiento;
+change amount, kind, concept, category, date or account **within the same currency**.
+Deshacer removes its effect without a fake refund/income. Its recoverable record
+remains in Ajustes → Movimientos deshechos, including after closing/reopening.
+Account editing, transfers and cross-currency conversion remain separate milestones.
 
 The current visual iteration includes:
 
@@ -84,8 +89,11 @@ The current visual iteration includes:
   Reduce Motion removes the transition. Lists remain virtualized and empty periods
   have no fake categories, trends or sample data.
 
-No database migration, Supabase connection, seeded records or native paid service
-was introduced by this UI change. Follow the new-iteration section of the
+Interfaz 04 migrates the existing pilot SQLite file from schema 1 to 2, atomically,
+preserving its filename/rows and adding revisions, tombstones and a local edit audit.
+Do not revert to older app code after upgrading. A newer DB version is refused
+intact; no error deletes the file. No Supabase connection, seeded records, dependency
+change or paid service was introduced. Follow the new-iteration section of the
 [device checklist](../../docs/mobile-device-checklist.md) before accepting its layout.
 
 Only enter a small amount of data while checking the experience. Do not re-enter
@@ -93,10 +101,24 @@ the entire portfolio or uninstall the existing app. Legacy import, complete card
 investment accounting, Supabase sync, Face ID, reminders and Apple Pay capture
 are separate roadmap milestones; no disabled decorative buttons imply otherwise.
 
-The pilot can export its own JSON backup through the system sharing sheet. It is
-**not** the legacy web backup format; restore/import is still a later milestone.
-Export/share is an explicit user action, never an automatic upload. SQLite is
-local storage, not a backup or a claim of application-level encryption.
+The pilot exports its own v2 JSON backup through the system sharing sheet and
+imports native v1/v2 backups through Ajustes → Importar copia. Review shows new
+accounts, active/undone entries, identical entries and exact before/after available
+totals for ARS/USD separately. Confirmation adds only missing IDs in one transaction.
+Identical IDs/data are skipped; any conflict blocks the whole import, including
+old copies that would resurrect a tombstone. No silent overwrite or account merging
+by name. Local changes after preview require another review. Reimport/retry is safe.
+
+Native JSON is **not** the legacy web backup format: unsupported schema/entities,
+invalid cents/dates/references, duplicate IDs, unsafe totals, extra fields and files
+over 5 MB are rejected before import. Limits: 1,000 accounts/25,000 entry records.
+Export validates its own restore format/size. V2 includes current versions and
+tombstones, **not** the full local `entry_changes` audit history, settings, attachments,
+cards or investments. A backup is a snapshot, not a cross-device synchronization.
+There is no replace/reset import mode; preserve both copies if conflicts are reported.
+File selection/sharing is explicit, not an automatic upload. The selected source
+file is never edited/deleted. Export is plain JSON, not encrypted or authenticated;
+store privately. SQLite is local storage, not a substitute for a private backup.
 
 ## Signed iPhone builds without a Mac
 
@@ -166,15 +188,22 @@ Xcode-generator integrations affected by the temporary dependency fixes in
 [`compat/`](compat/README.md). It does not replace native-device testing.
 It also covers the actual presentation helpers: filtering/search, stable ordering,
 date grouping, available currencies, account preselection and category handling.
-The 41 mobile tests include guards over the real tab layout, report route handlers
+The 61 mobile tests include guards over the real tab layout, report/recovery handlers
 and bar-animation configuration. These are **not** native rendering/gesture tests;
 use the physical checklist. The root suite also tests the shared monthly summary
 and spending report, including exact category-to-entry reconciliation.
 
 For the intermittent black-tab report, update to `master`, restart with
 `npm start -- --clear` (bundler cache only, not SQLite), reopen from the new QR,
-and repeat the **Interfaz 02** tab checks, then the **Interfaz 03** report checks.
-The current footer says Interfaz 03. Do not uninstall or add fake test movements.
+and repeat the **Interfaz 02** tab checks, **Interfaz 03** report checks and
+**Interfaz 04** correction/recovery checks. The current footer says Interfaz 04.
+Before updating, save a private pilot copy; do not uninstall or add fake movements.
+
+If a storage/refresh error occurs, the form retains the exact submitted command
+for retry and locks its inputs, rather than reusing its ID for different data.
+A post-commit refresh error also exposes a global verification warning. Retry the
+same command or verify the current records before entering anything again. Local
+audit receipts prevent a late retry from repeating/reversing a later change.
 
 For dependency changes, also run `npm ls --all` and `npm audit`. Keep the scoped patched
 decoder/UUID compatibility intact; do not run `npm audit fix --force`, which can

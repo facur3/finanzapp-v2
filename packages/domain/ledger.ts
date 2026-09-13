@@ -100,20 +100,26 @@ export function validateEntry(entry: Entry, accounts: Account[]): void {
 }
 
 export function accountBalanceMinor(account: Account, entries: Entry[]): number {
-  return entries.filter(entry => entry.accountId === account.id).reduce((total, entry) => {
-    const next = total + (entry.kind === 'expense' ? -entry.amountMinor : entry.amountMinor);
-    if (!Number.isSafeInteger(next)) throw new Error('El saldo supera el rango seguro.');
-    return next;
-  }, account.openingMinor);
+  // Exact accumulation is order independent, including near the safe boundary.
+  // Otherwise insertion order can validate a balance that date-sorted reads reject.
+  const total = entries.filter(entry => entry.accountId === account.id).reduce((sum, entry) =>
+    sum + BigInt(entry.kind === 'expense' ? -entry.amountMinor : entry.amountMinor), BigInt(account.openingMinor));
+  if (total > BigInt(Number.MAX_SAFE_INTEGER) || total < -BigInt(Number.MAX_SAFE_INTEGER)) throw new Error('El saldo supera el rango seguro.');
+  return Number(total);
 }
 
 // Never sum currencies without a real exchange rate.
 export function totalsByCurrency(snapshot: LedgerSnapshot): Partial<Record<Currency, number>> {
-  const result: Partial<Record<Currency, number>> = {};
+  const sums: Partial<Record<Currency, bigint>> = {};
   for (const account of snapshot.accounts) {
-    const next = (result[account.currency] ?? 0) + accountBalanceMinor(account, snapshot.entries);
-    if (!Number.isSafeInteger(next)) throw new Error('El total supera el rango seguro.');
-    result[account.currency] = next;
+    sums[account.currency] = (sums[account.currency] ?? 0n) + BigInt(accountBalanceMinor(account, snapshot.entries));
+  }
+  const result: Partial<Record<Currency, number>> = {};
+  for (const currency of ['ARS', 'USD'] as const) {
+    const total = sums[currency];
+    if (total === undefined) continue;
+    if (total > BigInt(Number.MAX_SAFE_INTEGER) || total < -BigInt(Number.MAX_SAFE_INTEGER)) throw new Error('El total supera el rango seguro.');
+    result[currency] = Number(total);
   }
   return result;
 }

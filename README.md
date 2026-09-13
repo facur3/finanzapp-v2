@@ -18,6 +18,12 @@ No new GitHub repository is necessary. Keep these documents updated after each
 iteration. Existing data is not automatically shared between the web app and the
 new native app: importing it safely is an explicit migration milestone.
 
+**Interfaz 04 (2026-09-13):** the native pilot can edit posted expenses/income,
+undo/recover them, and preview/import its own v1/v2 backups without overwriting
+local corrections. It upgrades its existing local SQLite file in place; do not
+downgrade or uninstall. Legacy web import, cloud sync and physical acceptance of
+this iteration are still pending. See [the iPhone walkthrough](docs/empezar-en-iphone.md#9-interfaz-04-corregir-y-recuperar).
+
 ## Current web/Capacitor product
 
 FinanzApp is a personal finance app for Argentina: accounts, movements, cards,
