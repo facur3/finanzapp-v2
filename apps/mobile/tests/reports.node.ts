@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { reportSelection, shiftReportMonth, spendingShare } from '../src/ui/report-presentation.ts';
+import { reportSelection, shiftReportMonth, spendingShare, reportPeriodLabel, reportCutoff, changePercent } from '../src/ui/report-presentation.ts';
 import type { LedgerSnapshot } from '@finanzapp/domain';
 
 const createdAt = '2026-09-12T12:00:00Z';
@@ -44,4 +44,14 @@ test('invalid totals never produce NaN/Infinity widths or a fabricated percentag
   for (const [part, total] of [[1, 0], [2, 1], [-1, 1], [1, Infinity], [NaN, 10], [1.5, 10]]) {
     assert.deepEqual(spendingShare(part, total), { fraction: 0, label: '—' });
   }
+});
+
+test('partial comparison periods are not mislabeled as full months', () => {
+  assert.equal(reportPeriodLabel({ currency: 'ARS', startISO: '2026-08-01', endISO: '2026-08-12' }, '2026-09-12'), 'Del 1 al 12 · ARS');
+  assert.equal(reportPeriodLabel({ currency: 'ARS', startISO: '2026-08-01', endISO: '2026-08-31' }, '2026-09-12'), 'Mes completo · ARS');
+  assert.equal(reportCutoff('2026-08', '2026-08-12', '2026-09-12'), '2026-08-12');
+  assert.equal(reportCutoff('2026-08', '2026-09-12', '2026-09-12'), null);
+  assert.equal(changePercent(1, Number.MAX_SAFE_INTEGER), '<0,1 %');
+  assert.equal(changePercent(100, 0), '—');
+  assert.equal(changePercent(-50, 100), '50 %');
 });

@@ -21,8 +21,15 @@ acceptance remains open. **Interfaz 04** adds posted-entry edit/undo/recovery an
 native-backup review/import. Neither this delivery nor Interfaz 03 has new physical
 acceptance evidence. **Interfaz 05** adds account corrections and same-currency
 transfers with editing/undo/recovery. The owner is deferring a combined review;
-there is no new physical acceptance. Next: legacy import and full accounting,
-with device checks still an explicit gate.
+there is no new physical acceptance. **Interfaz 06** adds daily expense drill-down
+and monthly/category comparisons. Next: useful ledger features and full accounting;
+legacy import is optional backlog, with device checks still an explicit gate.
+
+Inicio → Ver reporte offers Categorías / Día a día and Comparar gastos. Current
+months compare equal initial day counts (both capped if the previous month is
+shorter); historical months compare full months. Exact date ranges stay visible.
+Category totals open only their dated expenses. Missing records are not savings.
+Native backup/recovery stays available, but no JSON import is required to start.
 
 ## First start on Linux or Windows
 
@@ -212,7 +219,7 @@ and spending report, including exact category-to-entry reconciliation.
 For the intermittent black-tab report, update to `master`, restart with
 `npm start -- --clear` (bundler cache only, not SQLite), reopen from the new QR,
 and repeat the **Interfaz 02** tab checks, **Interfaz 03** report checks and
-**Interfaz 04/05** correction/recovery and transfer checks. The current footer says Interfaz 05.
+**Interfaz 04/05** correction/recovery and transfer checks, plus **Interfaz 06** daily/comparison reports. The current footer says Interfaz 06.
 Before updating, save a private pilot copy; do not uninstall or add fake movements.
 
 If a storage/refresh error occurs, the form retains the exact submitted command

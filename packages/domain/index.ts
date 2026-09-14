@@ -8,3 +8,4 @@ export * from './spending-report.ts';
 export * from './recovery.ts';
 export * from './transfers.ts';
 export * from './account-changes.ts';
+export * from './report-insights.ts';

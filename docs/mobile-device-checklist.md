@@ -1,5 +1,18 @@
 # Physical iPhone acceptance checklist
 
+## Interfaz 06 — reports (physical review pending)
+
+- [ ] Footer reads Interfaz 06; existing records/balances are unchanged.
+- [ ] Inicio → Ver reporte → Día a día → day → expense → back preserves context.
+- [ ] Only the selected currency/date expenses appear; no transfers/future days.
+- [ ] Comparar gastos shows exact ranges; category totals open only those dates.
+- [ ] Missing history shows insufficient information, not invented savings.
+- [ ] Canceled swipes, fast tab changes, background/resume do not flash.
+- [ ] Light/dark, VoiceOver, long amounts, large text and Reduce Motion work.
+
+No JSON import/new data is required to inspect existing reports. Leap-year fixtures
+belong only in automated tests; do not change the phone clock or seed fake records.
+
 Status: **first Expo Go pilot accepted by the user on 2026-09-12**.
 The user reported completing the Spanish guide, creating records, keeping them
 after closing/reopening Expo Go, and fluid navigation that felt native on iPhone.

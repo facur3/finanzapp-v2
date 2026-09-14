@@ -1,6 +1,6 @@
 # FinanzApp: dirección visual móvil
 
-Actualizado: 13 de septiembre de 2026. Interfaz 05 implementada en `apps/mobile`;
+Actualizado: 14 de septiembre de 2026. Interfaz 06 implementada en `apps/mobile`;
 su validación visual/gestual en el iPhone todavía está pendiente.
 
 El usuario probó el recorrido de la primera iteración y reportó que funcionaba,
@@ -107,9 +107,9 @@ importador de copias **nativas** v1/v2/v3 ya están
 implementados con pruebas de lógica/SQLite; falta la prueba física. La importación
 solo agrega registros faltantes y bloquea cualquier conflicto, sin restaurar una
 versión antigua encima de una corrección. Los movimientos deshechos no cuentan.
-Antes de usar la app nueva como registro principal todavía hay que importar el
-respaldo de la app anterior, mostrando entidades admitidas y totales por moneda.
-Por ahora se rechaza esa copia completa: nunca se descartan tarjetas/inversiones.
+Importar la app anterior es opcional y no bloquea empezar de cero o cargar unos
+pocos movimientos reales. El usuario prioriza funcionalidades/diseño. Se conserva
+la recuperación nativa; la copia web completa sigue rechazada, sin descartes silenciosos.
 
 Después: completar tarjetas/inversiones y su conciliación; ampliar los reportes
 mensuales ya implementados y sumar el asistente; sincronización y funciones de Apple.
@@ -119,9 +119,11 @@ El orden y las pruebas contables están en [el roadmap](mobile-roadmap.md).
 
 - [MonAi](https://get-monai.app/): referencia de captura simple y reconocimiento
   rápido de categorías. Se conserva una composición, textos y recursos propios.
-- Gráficos: las barras por categoría ya están implementadas. La evolución temporal
-  y la comparación de períodos equivalentes quedan para después: requieren historia
-  real y contexto, no tendencias, ahorro ni causas inventadas a partir de pocos datos.
+- Interfaz 06: Categorías / Día a día dentro del reporte. La lista diaria prioriza
+  fecha, importe y acceso al movimiento sin gráfico redundante. Comparar gastos
+  muestra rangos explícitos y cambios por categoría; cada período abre sus registros.
+  Falta de historia no es ahorro. Se reutilizan la presión breve y la pila nativa,
+  sin ocultar datos al hacer scroll ni transiciones experimentales. Revisión física pendiente.
 - Logos de comercios (por ejemplo, PedidosYa): futura identificación explícita
   contra un catálogo verificado, con recursos cuyo uso esté autorizado y una
   alternativa de categoría/iniciales cuando falten. No generar logos falsos,

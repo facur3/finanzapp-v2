@@ -1,6 +1,23 @@
 # Probar FinanzApp en tu iPhone, desde Linux o Windows
 
-Actualizado: 13 de septiembre de 2026.
+Actualizado: 14 de septiembre de 2026.
+
+## Interfaz 06 — reportes que se entienden
+
+Actualizá tu checkout habitual a `master` con `git pull --ff-only`, entrá en
+`apps/mobile` y ejecutá `npm start`. Si aún estás en otra rama, seguí primero los
+pasos de actualización de esta guía; no borres cambios locales ni reinstales Expo Go.
+En Ajustes debe decir **Interfaz 06**. Conservá una copia privada antes de actualizar.
+
+1. Inicio → Tu mes → Ver reporte: alterná **Categorías / Día a día**.
+2. Tocá un día para ver sus gastos. Abrí un movimiento y volvé: debe conservar el contexto.
+3. **Comparar gastos** muestra los rangos y la diferencia por categoría.
+4. Tocá el importe de un período para ver exactamente sus movimientos.
+
+No necesitás importar JSON, pagar ni volver a cargar el portfolio. Si todavía no
+hay gastos en ambos períodos, se avisa sin inventar ahorro. La revisión visual,
+texto grande y gestos en tu iPhone queda pendiente. Los respaldos nativos siguen
+disponibles por seguridad, no como requisito para empezar.
 
 **El primer piloto ya fue aprobado en Expo Go:** el usuario confirmó que los
 movimientos persistieron al cerrar/reabrir y que la navegación se sentía nativa
