@@ -69,6 +69,8 @@ function Navigation() {
       <Stack.Screen name="backup-import" options={{ title: 'Importar copia' }} />
       <Stack.Screen name="reports" options={{ title: 'Reporte mensual' }} />
       <Stack.Screen name="report-category" options={{ title: 'Categoría' }} />
+      <Stack.Screen name="report-day" options={{ title: 'Gastos del día' }} />
+      <Stack.Screen name="report-comparison" options={{ title: 'Comparar gastos' }} />
       <Stack.Screen name="new-account" options={{ title: 'Nueva cuenta', presentation: 'modal' }} />
       <Stack.Screen name="new-entry" options={{ title: 'Nuevo movimiento', presentation: 'modal' }} />
       <Stack.Screen name="edit-entry/[id]" options={{ title: 'Editar movimiento', presentation: 'modal' }} />

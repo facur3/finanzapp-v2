@@ -6,20 +6,22 @@ import { useLedger } from '../src/storage/LedgerProvider';
 import { AppText, CategoryBadge, EmptyState, Money, Screen, SectionTitle } from '../src/ui/components';
 import { EntryList } from '../src/ui/entry-list';
 import { selectEntries } from '../src/ui/presentation';
-import { reportMonthLabel, reportPeriodLabel, reportSelection } from '../src/ui/report-presentation';
+import { reportMonthLabel, reportPeriodLabel, reportSelection, reportCutoff } from '../src/ui/report-presentation';
 import { useCurrentDay } from '../src/ui/theme';
 
 export default function ReportCategoryScreen() {
-  const params = useLocalSearchParams<{ currency?: string | string[]; month?: string | string[]; category?: string | string[] }>();
+  const params = useLocalSearchParams<{ currency?: string | string[]; month?: string | string[]; category?: string | string[]; through?: string | string[] }>();
   const { snapshot } = useLedger();
   const day = useCurrentDay();
   const key = typeof params.category === 'string' ? params.category : '';
   const selection = useMemo(() => snapshot ? reportSelection(snapshot, params.currency, params.month, day) : null,
     [snapshot, params.currency, params.month, day]);
-  const report = useMemo(() => snapshot && selection ? spendingReport(snapshot, selection.currency, selection.monthISO, day) : null,
-    [snapshot, selection, day]);
+  const cutoff = selection ? reportCutoff(selection.monthISO, params.through, day) : null;
+  const report = useMemo(() => snapshot && selection && cutoff ? spendingReport(snapshot, selection.currency, selection.monthISO, cutoff) : null,
+    [snapshot, selection, cutoff]);
   const entries = useMemo(() => snapshot && report && key
     ? selectEntries(expensesInPeriod(snapshot, report, key), snapshot.accounts) : [], [snapshot, report, key]);
+  if (cutoff === null) return <Screen><EmptyState title="Período no válido" detail="Volvé al reporte para elegir las fechas." /></Screen>;
   if (!snapshot || !report || !selection) return null;
   if (!entries.length) return <Screen>
     <AppText secondary>{reportMonthLabel(selection.monthISO)} · {reportPeriodLabel(report, day)}</AppText>

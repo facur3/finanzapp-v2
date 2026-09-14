@@ -1,6 +1,6 @@
 # FinanzApp mobile: living roadmap
 
-Updated: 2026-09-13. Read with [decision 001](decisions/001-native-mobile.md).
+Updated: 2026-09-14. Read with [decision 001](decisions/001-native-mobile.md).
 This document supersedes the mobile architecture direction of
 `product-rebuild-roadmap.md`; that file still records useful financial work.
 
@@ -78,6 +78,13 @@ Supabase remains in the architecture; mobile sync is still to be implemented.
 
 ## Next phases, in order
 
+Priority override from the owner (2026-09-14): starting empty/manual entry is
+acceptable. Legacy import is optional backlog, not the next blocking deliverable.
+Preserve native recovery; prioritize useful features, reports and calm native UI.
+Interfaz 06 implements daily expense drill-down and previous-month/category
+comparison. Next product slice: card statement/payment accounting. Device review
+remains pending; do not infer approval from automated tests.
+
 ### M1 — Native foundation and device gate
 
 - [x] Home, accounts, expense/income, activity and detail use native stack/sheets
@@ -134,7 +141,9 @@ Supabase remains in the architecture; mobile sync is still to be implemented.
 - [x] Category bars with amount, share of total, period/currency and movement
   drill-down; reduced-motion-aware transitions (Interfaz 03, device acceptance open).
 - [ ] Real-history time series with understandable scale and accessible interaction.
-- [ ] Compare matching portions of months, categories and merchants; no invented causes.
+- [x] Compare matching portions of months and category deltas with scoped drill-down
+  (Interfaz 06; missing-history guard; physical review pending).
+- [ ] Merchant comparison and longer real-history time series.
 - [ ] Free local Spanish parser; gift/income/loan distinction and amount/merchant split.
 - [ ] Answer money questions from actual ledger data, including yesterday and month deltas.
 - [ ] Review/edit amount, account, category, date and action before saving.
@@ -192,6 +201,22 @@ no scraping promises, no claims that a local record actually paid a bank/card.
 - Aim for smooth frame pacing on real hardware; measure before claiming 60/120 fps.
 
 ## Handoff log (append actual evidence)
+
+### 2026-09-14 — Interfaz 06: daily reports and fair comparisons
+
+- Daily amounts open actual expenses. Comparison ranks category differences;
+  links retain exact date cutoffs and currency. No extra Home card/tab.
+- Equal elapsed days in current months; short February caps both periods with
+  explanation. Full historical months disclose unequal lengths. Missing history
+  never becomes invented savings. Integer cents and safe aggregate range guards.
+- No database writes/schema changes, dependencies, paid services or production
+  replacement. Native stack/press feedback and black-tab mitigation preserved.
+- Checked locally: **317 domain/web + 85 mobile tests = 402**, TypeScript,
+  iOS Metro JS/Hermes/assets export (1691 modules), root Vite build and repository
+  hygiene. Online Expo compatibility hit an HTTP proxy timeout; local offline
+  compatibility passed with Expo's reduced-reliability warning. Online CI must
+  pass before merge. Real iPhone layout/gestures remain pending.
+- Legacy import optional per owner; native backup/recovery retained.
 
 ### 2026-09-13 — Interfaz 05: account corrections and internal transfers
 

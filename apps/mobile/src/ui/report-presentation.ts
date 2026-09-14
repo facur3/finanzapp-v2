@@ -24,7 +24,28 @@ export function reportMonthLabel(monthISO: string): string {
 }
 
 export function reportPeriodLabel(period: ReportPeriod, day: string): string {
-  return (period.endISO === day ? 'Hasta hoy' : 'Mes completo') + ' · ' + period.currency;
+  const [year, month] = period.endISO.split('-').map(Number);
+  const lastDay = new Date(year, month, 0, 12).getDate();
+  const label = period.endISO === day ? 'Hasta hoy' : Number(period.endISO.slice(-2)) === lastDay
+    ? 'Mes completo' : `Del 1 al ${Number(period.endISO.slice(-2))}`;
+  return label + ' · ' + period.currency;
+}
+
+/** Optional comparison cutoff must stay within the requested month and today. */
+export function reportCutoff(monthISO: string, through: unknown, today: string): string | null {
+  if (through === undefined) return today;
+  return typeof through === 'string' && validDateISO(through) && through.slice(0, 7) === monthISO && through <= today ? through : null;
+}
+
+export function changePercent(delta: number, previous: number): string {
+  if (!Number.isSafeInteger(delta) || !Number.isSafeInteger(previous) || previous <= 0) return '—';
+  const fraction = Math.abs(delta) / previous;
+  if (fraction > 0 && fraction < 0.001) return '<0,1 %';
+  return (fraction * 100).toLocaleString('es-AR', { maximumFractionDigits: 1 }) + ' %';
+}
+
+export function dateRangeLabel(period: ReportPeriod): string {
+  return `1–${Number(period.endISO.slice(-2))} de ${reportMonthLabel(period.startISO.slice(0, 7))}`;
 }
 
 export function spendingShare(amountMinor: number, totalMinor: number): { fraction: number; label: string } {

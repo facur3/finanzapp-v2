@@ -16,7 +16,13 @@ an isolated pilot, not a completed migration or an App Store release.
 
 No new GitHub repository is necessary. Keep these documents updated after each
 iteration. Existing data is not automatically shared between the web app and the
-new native app: importing it safely is an explicit migration milestone.
+new native app. Starting empty or entering a few real records manually is supported;
+legacy import is optional backlog, not a prerequisite for product development.
+
+**Interfaz 06 (2026-09-14):** daily expense drill-down and previous-month/category
+comparison inside Reports, with explicit date ranges and missing-history guards.
+No new dependencies, database schema or paid services. Physical review pending.
+See the Interfaz 06 section of the iPhone walkthrough above.
 
 **Interfaz 05 (2026-09-13):** the native pilot adds contextual account-name/balance
 correction and same-currency internal transfers, including edit/undo/recovery.

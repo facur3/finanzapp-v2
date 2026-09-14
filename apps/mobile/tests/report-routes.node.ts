@@ -119,3 +119,41 @@ test('an unknown/malformed category cannot show every expense by accident', () =
     assert.equal(find(detail, 'EmptyState').props.title, 'No hay gastos de esta categoría');
   }
 });
+
+test('daily view opens only expenses in the selected date and currency', () => {
+  const view = routeHarness('reports.tsx', { currency: 'ARS', month: '2026-08' });
+  nodes(view.render()).find(n => n.type === 'Choices' && n.props.value === 'categories')!.props.onChange('days');
+  const list = view.render();
+  assert.equal(list.props.data.length, 2);
+  const row = list.props.renderItem({ item: list.props.data[1], index: 1 });
+  find(row, 'DetailRow').props.onPress();
+  const detail = routeHarness('report-day.tsx', view.pushed[0].params).render();
+  assert.deepEqual(detail.props.entries.map((e: domain.Entry) => e.id).sort(), ['b', 'c']);
+  assert.equal(find(detail, 'Money').props.minor, 505);
+});
+test('day and comparison cutoff reject malformed or future scope', () => {
+  for (const date of [['2026-08-10'], '2026-02-30', '2026-09-13', undefined]) {
+    assert.equal(find(routeHarness('report-day.tsx', { currency: 'ARS', date }).render(), 'EmptyState').props.title, 'Día no válido');
+  }
+  for (const through of [['2026-08-12'], '2026-09-12', 'bad']) {
+    assert.equal(find(routeHarness('report-category.tsx', { currency: 'ARS', month: '2026-08', category: 'salud', through }).render(), 'EmptyState').props.title, 'Período no válido');
+  }
+});
+test('comparison category drilldown preserves the cutoff, not the whole previous month', () => {
+  const data = { ...snapshot, entries: [...snapshot.entries, { ...snapshot.entries[0], id: 'now', dateISO: '2026-09-10', amountMinor: 400 }] };
+  const view = routeHarness('report-comparison.tsx', { currency: 'ARS', month: '2026-09' }, data);
+  const list = view.render();
+  const category = list.props.data.find((item: domain.CategoryChange) => item.key === 'salud');
+  const row = list.props.renderItem({ item: category });
+  find(row, 'DetailRow', 'Anterior').props.onPress();
+  assert.equal(view.pushed[0].params.through, '2026-08-12');
+  const detail = routeHarness('report-category.tsx', view.pushed[0].params, data).render();
+  assert.deepEqual(detail.props.entries.map((e: domain.Entry) => e.id), ['b']);
+  assert.equal(find(detail, 'Money').props.minor, 202);
+});
+test('comparison never presents an invented change when history is absent', () => {
+  const list = routeHarness('report-comparison.tsx', { currency: 'ARS', month: '2026-09' }).render();
+  assert.equal(list.props.data.length, 0);
+  assert.equal(nodes(list).some(n => n.type === 'Money'), false);
+  assert.equal(find(list, 'EmptyState').props.title, 'Todavía no hay suficiente información');
+});

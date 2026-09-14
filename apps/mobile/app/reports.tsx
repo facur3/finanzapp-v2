@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { FlatList, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
-import { formatMinorUnits, spendingReport, type CategorySpending, type Currency } from '@finanzapp/domain';
+import { dailySpending, formatMinorUnits, spendingReport, type CategorySpending, type DailySpending, type Currency } from '@finanzapp/domain';
 import { useLedger } from '../src/storage/LedgerProvider';
 import { AppText, Choices, DetailRow, EmptyState, IconButton, Money, PressFeedback, SectionTitle, Surface } from '../src/ui/components';
 import { reportMonthLabel, reportPeriodLabel, reportSelection, shiftReportMonth } from '../src/ui/report-presentation';
@@ -15,16 +15,19 @@ export default function ReportsScreen() {
   const day = useCurrentDay();
   const [currencyOverride, setCurrency] = useState<Currency>();
   const [monthOverride, setMonth] = useState<string>();
+  const [view, setView] = useState<'categories' | 'days'>('categories');
   const selection = useMemo(() => snapshot ? reportSelection(snapshot, currencyOverride ?? params.currency, monthOverride ?? params.month, day) : null,
     [snapshot, currencyOverride, params.currency, monthOverride, params.month, day]);
   const report = useMemo(() => snapshot && selection ? spendingReport(snapshot, selection.currency, selection.monthISO, day) : null,
     [snapshot, selection, day]);
   if (!snapshot || !report || !selection) return null;
+  const rows: (CategorySpending | DailySpending)[] = view === 'categories' ? report.categories
+    : report.status === 'ready' ? dailySpending(snapshot, report) : [];
   const { currency, currencies, monthISO, earliestMonth, currentMonth } = selection;
   const canPrevious = monthISO > earliestMonth;
   const canNext = monthISO < currentMonth;
 
-  return <FlatList<CategorySpending> data={report.categories} keyExtractor={category => category.key}
+  return <FlatList<CategorySpending | DailySpending> data={rows} keyExtractor={item => 'key' in item ? item.key : item.dateISO}
     style={{ flex: 1, backgroundColor: p.background }}
     contentContainerStyle={{ padding: 20, paddingBottom: 40, flexGrow: 1 }}
     contentInsetAdjustmentBehavior="automatic" removeClippedSubviews={false}
@@ -53,20 +56,27 @@ export default function ReportsScreen() {
           <AppText secondary style={{ fontSize: 15 }}>Gastos registrados</AppText>
           <Money minor={report.expenseMinor} currency={currency} large />
         </View>
-        <Surface grouped><DetailRow label="Ingresos registrados" value={currency + ' ' + formatMinorUnits(report.incomeMinor)} last /></Surface>
+        <Surface grouped><DetailRow label="Ingresos registrados" value={currency + ' ' + formatMinorUnits(report.incomeMinor)} />
+          <DetailRow label="Comparar gastos" value="Mes anterior" last
+            onPress={() => router.push({ pathname: '/report-comparison', params: { currency, month: monthISO } })} />
+        </Surface>
+        <Choices value={view} onChange={setView} options={[{ value: 'categories', label: 'Categorías' }, { value: 'days', label: 'Día a día' }]} />
         {report.categories.length > 0 && <View>
-          <SectionTitle>Por categoría</SectionTitle>
-          <AppText secondary style={{ fontSize: 13 }}>Cada barra muestra su proporción del gasto total.</AppText>
+          <SectionTitle>{view === 'categories' ? 'Por categoría' : 'Gastos por día'}</SectionTitle>
+          <AppText secondary style={{ fontSize: 13 }}>{view === 'categories' ? 'Cada barra muestra su proporción del gasto total.' : 'Solo días con gastos registrados. Tocá uno para ver los movimientos.'}</AppText>
         </View>}
       </> : <EmptyState title="El total supera el rango disponible" icon="calculator-outline"
         detail="Tus movimientos siguen guardados. No mostramos un total ni un gráfico redondeado que pueda ser incorrecto." />}
     </View>}
     renderItem={({ item, index }) => <View style={{ backgroundColor: p.surface, overflow: 'hidden',
       borderTopLeftRadius: index === 0 ? 22 : 0, borderTopRightRadius: index === 0 ? 22 : 0,
-      borderBottomLeftRadius: index === report.categories.length - 1 ? 22 : 0, borderBottomRightRadius: index === report.categories.length - 1 ? 22 : 0 }}>
-      <CategorySpendingRow category={item} totalMinor={report.status === 'ready' ? report.expenseMinor : 0}
+      borderBottomLeftRadius: index === rows.length - 1 ? 22 : 0, borderBottomRightRadius: index === rows.length - 1 ? 22 : 0 }}>
+      {'key' in item ? <CategorySpendingRow category={item} totalMinor={report.status === 'ready' ? report.expenseMinor : 0}
         currency={currency} last={index === report.categories.length - 1}
         onPress={() => router.push({ pathname: '/report-category', params: { currency, month: monthISO, category: item.key } })} />
+        : <DetailRow label={new Date(item.dateISO + 'T12:00:00').toLocaleDateString('es-AR', { weekday: 'short', day: 'numeric', month: 'short' }) + ' · ' + item.count + (item.count === 1 ? ' gasto' : ' gastos')}
+          value={currency + ' ' + formatMinorUnits(item.amountMinor)} last={index === rows.length - 1}
+          onPress={() => router.push({ pathname: '/report-day', params: { currency, date: item.dateISO } })} />}
     </View>}
     ListEmptyComponent={report.status === 'ready' ? <EmptyState title="Sin gastos en este período" icon="bar-chart-outline"
       detail="Los gastos registrados en esta moneda aparecerán acá, agrupados por categoría. Podés recorrer los meses con movimientos usando las flechas." /> : null}
