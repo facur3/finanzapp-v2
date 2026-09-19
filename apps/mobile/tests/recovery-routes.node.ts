@@ -354,3 +354,12 @@ test('a backup containing only a new transfer still offers import with correct c
   assert.equal(find(view.render(), 'DetailRow', 'Transferencias nuevas').props.value, '1');
   assert.ok(find(view.render(), 'ActionButton', 'Confirmar importación'));
 });
+
+test('starting without a bank balance creates a zero tracking baseline, not an income', async () => {
+  const view = harness('app/new-account.tsx');
+  find(view.render(), 'Field').props.onChangeText('Mi registro');
+  assert.equal(find(view.render(), 'ActionButton').props.disabled, false);
+  await find(view.render(), 'ActionButton').props.onPress();
+  assert.equal(view.newAccounts[0].openingMinor, 0);
+  assert.equal(view.additions.length, 0);
+});

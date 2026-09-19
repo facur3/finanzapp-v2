@@ -3,18 +3,16 @@ import { AccessibilityInfo, AppState, useColorScheme } from 'react-native';
 import { todayKey } from '@finanzapp/domain';
 
 const light = {
-  background: '#F5F6F8', surface: '#FFFFFF', inset: '#ECEFF4',
-  text: '#141A24', secondary: '#606B7A', line: '#E1E5EC',
-  accent: '#2467DC', onAccent: '#FFFFFF', positive: '#13794D', negative: '#BD3548',
-  accentSoft: '#E9F0FD', positiveSoft: '#E8F5EE', negativeSoft: '#FCECEF',
-  hero: '#17385B', heroText: '#F5F9FF', heroSecondary: '#C4D9F2',
+  background: '#F8F7FA', surface: '#FFFFFF', inset: '#EFEDF5',
+  text: '#1C1B25', secondary: '#696575', line: '#E4E1EB',
+  accent: '#4B3BDB', onAccent: '#FFFFFF', positive: '#13794D', negative: '#BD3548',
+  accentSoft: '#EFECFF', positiveSoft: '#E8F5EE', negativeSoft: '#FCECEF',
 };
 const dark: typeof light = {
-  background: '#080B10', surface: '#151A22', inset: '#202733',
+  background: '#101014', surface: '#1B1B23', inset: '#282731',
   text: '#F4F6FA', secondary: '#A6B0C0', line: '#2B3544',
-  accent: '#7AB3FF', onAccent: '#09203B', positive: '#73D6A7', negative: '#FF909E',
-  accentSoft: '#1A2B44', positiveSoft: '#173329', negativeSoft: '#38212B',
-  hero: '#162D45', heroText: '#F5F9FF', heroSecondary: '#C4D9F2',
+  accent: '#B4AAFF', onAccent: '#20184E', positive: '#73D6A7', negative: '#FF909E',
+  accentSoft: '#2C2547', positiveSoft: '#173329', negativeSoft: '#38212B',
 };
 
 export function usePalette() {

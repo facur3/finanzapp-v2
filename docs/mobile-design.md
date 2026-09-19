@@ -1,151 +1,81 @@
 # FinanzApp: dirección visual móvil
 
-Actualizado: 14 de septiembre de 2026. Interfaz 06 implementada en `apps/mobile`;
-su validación visual/gestual en el iPhone todavía está pendiente.
+Interfaz 07 · 19 de septiembre de 2026. Implementado en código; revisión visual y
+gestual en iPhone pendiente. [Alcance del producto](decisions/002-spending-first.md).
 
-El usuario probó el recorrido de la primera iteración y reportó que funcionaba,
-pero una pestaña queda negra aproximadamente una de cada diez veces. Además,
-**no aprueba todavía el estilo**: lo siente demasiado básico. No confundir la
-aceptación del flujo con una aprobación visual o de estabilidad.
+## Referencias y criterio propio
 
-El piloto confirmó que al usuario le gusta la navegación nativa. Conservamos
-esa base y construimos una identidad propia: simple, cálida y fácil de leer.
-Mon AI es una referencia de la calma y sencillez que busca el usuario; las
-pantallas, textos, recursos gráficos y composición de FinanzApp serán propios.
+Se revisaron los tres ZIP suministrados. Buro aporta el espacio, la jerarquía de
+importes, las superficies suaves y un acento contenido. No copiamos su marca,
+activos, APY, promociones ni navegación de trading. Zenfinance aporta lectura de
+actividad y separación de acciones; Smart Expense Tracker aporta compromisos
+próximos, pero descartamos la densidad de chips, mensajes de estado y colores.
+No se incorporan imágenes personales, cifras, logos ni HTML de estas referencias.
 
-## Primera entrega de diseño
+La identidad elegida combina blanco cálido (#F8F7FA), tinta (#1C1B25), índigo
+(#4B3BDB), superficies blancas y lavanda muy tenue. En oscuro, fondo #101014 y
+acento #B4AAFF. Rojo/verde significan gasto/ingreso o estado, no decoración.
+Tipografía del sistema, números claros, esquinas consistentes y respiración.
 
-Se aplicó primero a Inicio, registro de gasto/ingreso, cuentas y movimientos.
-Son el recorrido diario y permiten revisar el estilo antes de extenderlo a
-tarjetas, inversiones, reportes y asistente. Se mantienen tres pestañas funcionales:
-Inicio, Movimientos y Ajustes, sin botones decorativos de secciones no implementadas.
+## Inicio actual
 
-| Pantalla | Jerarquía y comportamiento |
-| --- | --- |
-| Inicio | Disponible en una superficie azul profunda con selector ARS/USD y Ver cuentas; Gasto/Ingreso, Tu mes con tres categorías y tres movimientos recientes. Se elimina la lista repetida de cuentas. Patrimonio e inversiones llegan cuando esté implementada su contabilidad. |
-| Gasto / ingreso | Monto destacado y moneda visible, con Listo en el teclado iOS. Cuenta en una fila que abre su selector. Fecha en una hoja nativa con Cancelar/Listo; no modifica la fecha hasta confirmar. Validación visible y borrador conservado ante errores de guardado. |
-| Movimientos | Lista virtualizada agrupada por fecha, búsqueda por concepto/categoría/cuenta y filtros Todos/Gastos/Ingresos. Importe firmado y moneda; no sumar ARS y USD ni inventar días vacíos. |
-| Cuentas | Lista completa por moneda y detalle con disponible, saldo inicial separado de ingresos y movimientos de esa cuenta. |
-| Detalle | Importe, concepto y fecha primero; cuenta y categoría después. Editar abre la misma hoja que el registro; Deshacer confirma su efecto. Si está deshecho, solo ofrece Recuperar. |
-| Reporte mensual | Acceso desde Tu mes, no una cuarta pestaña. Mes y moneda, gasto total, ingresos y barras por categoría ordenadas por importe. Mes actual hasta hoy; meses anteriores completos. |
-| Categoría del reporte | Total y movimientos exactos de esa categoría, moneda y período. Abrir un movimiento y volver conserva el contexto de la pila nativa. |
-| Recuperación | Dos filas en Ajustes: Importar copia y Movimientos deshechos. Vista previa con cambios y saldos por moneda; conflicto explicado sin botones de sobreescritura. |
-| Editar cuenta | Lápiz en el detalle. Nombre y saldo disponible; moneda fija. Confirmación explícita al corregir saldo, sin inventar un movimiento. |
-| Transferencia | Dentro de la cuenta, no otro botón en Inicio. Monto, Desde/Hacia, fecha y nota opcional. Vista del saldo resultante en ambas cuentas antes de registrar. |
+1. Fechas y moneda, discretas y explícitas.
+2. **Gastado este mes/esta semana**, importe protagonista y cantidad de registros.
+3. Selector Semana/Mes; barras de gastos por día o grupos de hasta siete días.
+4. Acciones Gasto/Ingreso. Ingresos del período como dato secundario si existen.
+5. En qué gastaste: hasta tres categorías, barras proporcionales al total y detalle.
+6. Últimos movimientos del período/moneda. El acceso Ver todos abre la actividad completa.
 
-Interfaz 02 añade un selector de categorías con búsqueda, categorías ya usadas y
-opción de escribir una propia. Un emoji pequeño ayuda a reconocer cada categoría,
-sin repetirlo en el texto ni modificar registros anteriores. Las categorías que
-no reconocemos usan un símbolo neutro; no se infiere el comercio de un emoji.
-Tu mes resume únicamente gastos/ingresos registrados, desde el inicio del mes
-hasta hoy y en la moneda seleccionada. No cuenta el saldo inicial como ingreso.
+Cuentas se abre con el icono del encabezado o desde Ajustes. No compite con el
+gasto principal, no se llama patrimonio y no requiere conectar un banco. El saldo
+inicial puede quedar vacío: base de registro cero, claramente explicada, nunca
+una afirmación de que la cuenta bancaria esté vacía. El onboarding aún necesita
+un nombre para agrupar movimientos; eliminar ese paso requiere un cambio posterior.
 
-Interfaz 03 convierte Inicio en un dashboard breve. Las tres barras principales
-son accesos a sus movimientos; Ver reporte muestra todas las categorías. Si hay
-más de tres, se avisa que la vista inicial es parcial. La escala es siempre la
-proporción del gasto total, no del gasto de la categoría más grande. Importe,
-porcentaje y nombre permanecen legibles sin depender de colores ni de tocar el
-gráfico. Un único azul evita una leyenda arcoíris. Las listas largas se virtualizan.
-Se agrupan variantes de mayúsculas/acentos/espacios sin renombrar datos guardados;
-categorías distintas no se unen por compartir un emoji o parte del nombre.
+No se agrega una tarjeta de IA, presupuesto, deuda o vencimiento sin una función
+operativa detrás. Próximos pagos se sumará solo con recurrentes/deudas almacenados.
+No repetir el importe del mes en otra tarjeta. Sin listas de inversiones nativas.
 
-Interfaz 05 conserva esa composición. Las transferencias tienen un icono de flechas
-neutro, no un emoji de gasto ni verde de ingreso. En actividad aparecen una sola
-vez; dentro de una cuenta muestran el signo correspondiente. No entran en barras
-de gastos. Las nuevas hojas reutilizan controles, tamaños accesibles y respuesta
-al presionar; no se agrega otra animación sobre la navegación nativa.
+## Gráficos
 
-## Sistema visual
+Estas barras usan vistas nativas y **Reanimated**, ya instalado. Recharts usa la
+interfaz web/SVG del navegador y no es la elección para este cliente React Native.
+No agregamos una dependencia de gráficos complejos a cinco/siete barras ni una
+WebView. Si luego hace falta una serie interactiva más compleja, evaluar una
+librería nativa compatible con la versión de Expo y medirla antes de adoptarla.
 
-- Tipografía del sistema iOS, jerarquía corta y soporte de tamaños de accesibilidad.
-  Los montos grandes pueden ocupar más de una línea sin tapar otros controles.
-- Fondo claro suave y oscuro profundo; superficies agrupadas con separadores
-  discretos. Un acento azul propio para acciones y selección.
-- Verde/rojo reservados para significado financiero y acompañados por signo o
-  texto. Desconocido, pendiente y cero tienen presentaciones distintas.
-- Espaciado consistente y objetivos táctiles de al menos 44 puntos. Evitar
-  recuadros dentro de recuadros y repetir el mismo saldo en varios bloques.
-- Iconos simples y coherentes. Una acción principal visible; ajustes secundarios
-  en detalle o menú contextual, sin ocultar información necesaria para decidir.
-- Estado vacío con una acción útil. Mostrar únicamente información registrada;
-  las capturas y los datos personales no pertenecen al repositorio público.
+- Barras de categoría: porcentaje de todo el gasto del período, no solo las tres visibles.
+- Serie temporal: escala cero → máximo mostrado, etiquetas de fechas y valores
+  exactos al abrir. Bloques sin registros no acreditan gasto real cero.
+- No curvas suavizadas que inventen valores entre transacciones, rendimiento,
+  porcentajes de crecimiento sin datos ni gráficos de ejemplo.
+- La semana comienza lunes y puede cruzar un mes/año; se conserva ese rango al abrir
+  categorías. El reporte mensual se etiqueta como tal, incluso desde la semana.
+- Tocar una barra abre sus movimientos; monto/moneda/fecha también disponibles a VoiceOver.
+- Animación breve de datos, sin empezar desde cero, sin reiniciarse al volver.
+  Reduce Motion aplica el valor directamente. Scroll no modifica valores financieros.
 
-## Movimiento e interacción
+## Navegación, accesibilidad y pantallas
 
-- La pila y las hojas nativas controlan entrar, volver, arrastrar y cancelar.
-  No añadir una segunda animación de pantalla encima de la navegación del sistema.
-- Las tres pestañas del piloto cambian sin fundido de contenido y permanecen
-  montadas, sin congelamiento/desconexión de vistas inactivas. Es una mitigación
-  del bloqueo negro reportado, pendiente de repetir en iPhone. No fuerza un reload,
-  no borra filtros y no desactiva la navegación nativa de detalles/formularios.
-- Respuesta breve al presionar y confirmar. Conservar los hápticos de guardado;
-  no vibrar en cada fila ni reiniciar animaciones en cada render.
-  Presión breve de escala y selección con fundido, desactivadas con Reducir movimiento.
-  Una sola suscripción de accesibilidad para toda la interfaz.
-- Fondo opaco coherente entre destino, pestaña, hoja y carga. Un gesto cancelado
-  conserva pantalla, foco y borrador sin mostrar otra sección por un instante.
-- Respetar Reducir movimiento y VoiceOver. Cada control tiene nombre y estado;
-  el teclado y la fecha quedan dentro del área segura.
-- Barras de categoría: transición de 260 ms solo cuando cambia la proporción,
-  sin empezar desde cero ni reiniciarse al volver de un detalle. Reducir movimiento
-  aplica el valor sin transición. El número no se anima desde un importe inventado.
-  No añadir animaciones de entrada/salida de pantalla encima de la pila nativa.
-- Interfaz 04 reutiliza el formulario, botones, selectors y hojas existentes:
-  sin una segunda animación ni botones extra en Inicio. Editar vuelve al detalle
-  real; deshacer/recuperar cambia su estado en el mismo lugar, sin redirigir.
-  Háptico solo tras confirmar el guardado; saldos y reportes toman datos persistidos.
-- El usuario propone continuidad entre elementos al abrir/cerrar (referencia
-  WhatsApp) y barras vinculadas al scroll (referencia MonAi), como ideas, no como
-  requisitos literales. Evaluarlas tras el re-test de pestañas: no esconder contenido
-  hasta animarlo, no atar el valor financiero al scroll y no interceptar el gesto
-  nativo de volver. Aún no se implementan transiciones compartidas experimentales.
+La pila y las hojas nativas son la única transición de pantalla. Las tres pestañas
+siguen montadas sin fade/detach/freeze; no se afirma que el bloqueo negro esté
+resuelto en iPhone sin repetir la prueba. Los nuevos componentes usan presión
+breve y selección existentes, sin una capa animada sobre el gesto de volver.
 
-## Datos y alcance de la próxima iteración
+Se conservan importe/fecha en hojas nativas, recuperación de errores y acciones
+Editar/Deshacer/Recuperar. Objetivos de 44 puntos, texto escalable, tema claro/oscuro,
+contraste, fondo opaco y listas virtualizadas. La serie horizontal conserva objetivos
+táctiles en pantallas estrechas. Revisar el contenido completo con texto grande.
 
-Editar/deshacer/recuperar, corregir cuentas, transferencias de igual moneda y el
-importador de copias **nativas** v1/v2/v3 ya están
-implementados con pruebas de lógica/SQLite; falta la prueba física. La importación
-solo agrega registros faltantes y bloquea cualquier conflicto, sin restaurar una
-versión antigua encima de una corrección. Los movimientos deshechos no cuentan.
-Importar la app anterior es opcional y no bloquea empezar de cero o cargar unos
-pocos movimientos reales. El usuario prioriza funcionalidades/diseño. Se conserva
-la recuperación nativa; la copia web completa sigue rechazada, sin descartes silenciosos.
+## Revisión pendiente
 
-Después: completar tarjetas/inversiones y su conciliación; ampliar los reportes
-mensuales ya implementados y sumar el asistente; sincronización y funciones de Apple.
-El orden y las pruebas contables están en [el roadmap](mobile-roadmap.md).
+- Inicio → semana → categoría → movimiento → volver conserva fechas/moneda.
+- Selector, teclado, fecha, modal y gesto cancelado sin destello ni pestaña vacía.
+- Claro/oscuro, texto grande, montos largos y VoiceOver en iPhone 14 Pro.
+- Barras: etiqueta/importe y escala comprensibles, sin depender solo del color.
+- 30–40 cambios entre pestañas, fondo/primer plano y regreso desde formularios.
+- Versión optimizada independiente de Metro antes de afirmar fluidez de producción.
 
-## Referencias y próximos detalles visuales
-
-- [MonAi](https://get-monai.app/): referencia de captura simple y reconocimiento
-  rápido de categorías. Se conserva una composición, textos y recursos propios.
-- Interfaz 06: Categorías / Día a día dentro del reporte. La lista diaria prioriza
-  fecha, importe y acceso al movimiento sin gráfico redundante. Comparar gastos
-  muestra rangos explícitos y cambios por categoría; cada período abre sus registros.
-  Falta de historia no es ahorro. Se reutilizan la presión breve y la pila nativa,
-  sin ocultar datos al hacer scroll ni transiciones experimentales. Revisión física pendiente.
-- Logos de comercios (por ejemplo, PedidosYa): futura identificación explícita
-  contra un catálogo verificado, con recursos cuyo uso esté autorizado y una
-  alternativa de categoría/iniciales cuando falten. No generar logos falsos,
-  inventar asociaciones ni enviar conceptos o movimientos privados a un buscador
-  o proveedor de logos. Evaluar caché/offline y privacidad antes de implementarlo.
-- No añadir aún accesos de tarjetas, inversiones o IA sin funciones completas.
-  La app final sigue en construcción; el piloto no es su diseño definitivo.
-
-## Aceptación de diseño
-
-- [ ] Recorrido completo Inicio → gasto/ingreso → guardar → detalle → volver.
-- [ ] Apertura, cierre y cancelación de gestos sin destellos ni cambios de pestaña.
-- [ ] Fecha, teclado, montos largos y texto grande sin controles fuera de pantalla.
-- [ ] La moneda de Inicio preselecciona una cuenta compatible en Gasto/Ingreso.
-- [ ] Búsqueda y filtros se conservan al volver de un detalle; sin duplicar filas.
-- [ ] Tema claro/oscuro, VoiceOver y Reducir movimiento revisados en el iPhone.
-- [ ] El usuario revisa estas tres pantallas antes de extender el lenguaje visual.
-- [ ] Repetir la prueba en una versión `preview` optimizada e independiente de Metro.
-- [ ] Cambiar 30–40 veces entre Inicio, Movimientos y Ajustes sin una pestaña vacía.
-- [ ] Revisar Interfaz 02, sus categorías, contraste, montos largos y Tu mes en iPhone.
-- [ ] Revisar Interfaz 03: Inicio → reporte → categoría → movimiento → volver.
-- [ ] Mes/moneda conservados, tres categorías vs lista completa, estados vacíos y texto grande.
-- [ ] Barras con Reducir movimiento, cambio rápido de mes y regreso sin reiniciar el gráfico.
-- [ ] Interfaz 04: editar/cancelar/volver conserva contexto; deshacer/recuperar actualiza sin un destello de pestaña.
-- [ ] Importar copia: selector Archivos, revisión, cancelación, texto grande y errores claros en iPhone.
+La vista de componentes web de esta entrega no pudo abrirse en el navegador del
+entorno (dirección local bloqueada). Typecheck, export y tests no prueban layout ni
+frame rate nativo. No hay aceptación visual nueva. Ver [guía de prueba](empezar-en-iphone.md).

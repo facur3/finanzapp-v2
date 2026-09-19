@@ -24,9 +24,9 @@ function ShareBar({ fraction }: { fraction: number }) {
   </View>;
 }
 
-export function CategorySpendingRow({ category, totalMinor, currency, onPress, last = false, compact = false }: {
+export function CategorySpendingRow({ category, totalMinor, currency, onPress, last = false, compact = false, periodName = 'mes' }: {
   category: CategorySpending; totalMinor: number; currency: Currency;
-  onPress: () => void; last?: boolean; compact?: boolean;
+  onPress: () => void; last?: boolean; compact?: boolean; periodName?: string;
 }) {
   const p = usePalette();
   const { fontScale, width } = useWindowDimensions();
@@ -34,8 +34,8 @@ export function CategorySpendingRow({ category, totalMinor, currency, onPress, l
   const count = category.count === 1 ? '1 gasto' : category.count + ' gastos';
   const stacked = fontScale > 1.3 || width < 360;
   return <PressFeedback accessibilityRole="button"
-    accessibilityLabel={`${category.category}, ${formatMinorUnits(category.amountMinor)} ${currency}, ${label} del gasto del mes, ${count}`}
-    accessibilityHint="Abre los movimientos de esta categoría en el mes seleccionado"
+    accessibilityLabel={`${category.category}, ${formatMinorUnits(category.amountMinor)} ${currency}, ${label} del gasto del ${periodName}, ${count}`}
+    accessibilityHint={"Abre los movimientos de esta categoría en el " + periodName + " seleccionado"}
     onPress={onPress} style={{ paddingHorizontal: 16, paddingVertical: 16, flexDirection: 'row', gap: 12, alignItems: 'center',
       borderBottomWidth: last ? 0 : StyleSheet.hairlineWidth, borderBottomColor: p.line }}>
     <CategoryBadge category={category.category} />

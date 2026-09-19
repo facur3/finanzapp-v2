@@ -1,5 +1,20 @@
 # FinanzApp
 
+## Dirección del producto — 19 de septiembre de 2026
+
+La app nativa se enfoca en **gastos y compromisos cotidianos**, con cuentas simples
+opcionales. Inicio muestra gasto de la semana/mes. Tarjetas, deudas, recurrentes
+y presupuestos siguen en el plan; inversiones y patrimonio salen del alcance nativo.
+
+- [Decisión, alternativas y alcance](docs/decisions/002-spending-first.md)
+- [Base de IA en nube y Atajos: qué funciona y qué falta](docs/mobile-integrations.md)
+
+**Interfaz 07:** nuevo Inicio con períodos, barras y detalle; saldo inicial opcional,
+paleta índigo y superficies tranquilas. Base de API autenticada, bandeja de capturas
+y límites de IA, apagada hasta configuración. No hay chat/Apple Pay activo todavía.
+Datos locales existentes preservados; sin cambios de esquema móvil ni datos de ejemplo.
+La web anterior mantiene sus funciones actuales. Detalle de pruebas en el roadmap.
+
 ## Native mobile migration — start here
 
 The new iOS-first app is being built with **Expo + React Native + TypeScript** in
@@ -60,8 +75,9 @@ truth. On top of that baseline the app now also has:
 - **Optional cloud sync** via Supabase (email + password auth, one JSONB row per user,
   last-write-wins). Off until configured — see `SUPABASE_SETUP.md`. Without it the app
   is 100% local, exactly as before.
-- **One serverless function**: `api/chart.js` proxies Yahoo Finance price history.
-  The assistant is entirely local, needs no API key and cannot create token charges.
+- **Web data services**: `api/chart.js` proxies market history and `api/fund-data.js`
+  serves fund data. This legacy web assistant remains local and needs no model key.
+  The new native cloud endpoints are separate and disabled until explicitly configured.
 
 Future refactors should preserve financial behavior and data migrations one flow
 at a time; the interface can continue evolving without tying the product to the

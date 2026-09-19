@@ -15,7 +15,7 @@ export default function TabsLayout() {
     tabBarActiveTintColor: p.accent, tabBarInactiveTintColor: p.secondary,
     tabBarStyle: { backgroundColor: p.surface, borderTopColor: p.line },
     sceneStyle: { backgroundColor: p.background } }}>
-    <Tabs.Screen name="index" options={{ title: 'Inicio', tabBarIcon: ({ color, size, focused }) => <Ionicons name={focused ? 'home' : 'home-outline'} size={size} color={color} /> }} />
+    <Tabs.Screen name="index" options={{ title: 'Inicio', headerRight: () => <IconButton name="wallet-outline" label="Ver mis cuentas" onPress={() => router.push('/accounts')} />, tabBarIcon: ({ color, size, focused }) => <Ionicons name={focused ? 'home' : 'home-outline'} size={size} color={color} /> }} />
     <Tabs.Screen name="activity" options={{ title: 'Movimientos',
       headerRight: () => <IconButton name="add" label="Registrar movimiento" onPress={() => router.push('/new-entry')} />,
       tabBarIcon: ({ color, size, focused }) => <Ionicons name={focused ? 'receipt' : 'receipt-outline'} size={size} color={color} /> }} />

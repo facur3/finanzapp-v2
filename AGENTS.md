@@ -1,7 +1,9 @@
 # FinanzApp: read before working
 
 1. Read `README.md`, `docs/mobile-roadmap.md` and
-   `docs/decisions/001-native-mobile.md` before changing architecture or mobile code.
+   `docs/decisions/001-native-mobile.md` and `docs/decisions/002-spending-first.md`
+   before changing architecture or mobile code. Native scope is spending/commitments
+   with optional simple accounts; do not migrate the portfolio/market-data hub.
 2. For mobile changes also read `apps/mobile/README.md` and
    `docs/mobile-device-checklist.md`; for UI changes read `docs/mobile-design.md`.
    Keep their status and next action current.
@@ -31,7 +33,9 @@
     Never claim App Store approval or a fixed frame rate before verification.
 11. Apple Pay capture records an expense; it does not execute bank payments or
     read arbitrary Wallet history. Default external/AI input to a reviewed draft.
-    Bank integrations require official access and user consent. No paid AI by default.
+    Bank integrations require official access and user consent. The owner now selects
+    cloud AI for native; keep it opt-in, server-keyed and bounded. No live paid
+    calls until the owner configures their account; local manual entry stays offline.
 12. Before handing off: run the relevant checks listed in the mobile README and
     the existing web tests/build/hygiene check. Record outcomes and blockers in
     `docs/mobile-roadmap.md`. No EAS cloud builds, subscriptions or store submissions

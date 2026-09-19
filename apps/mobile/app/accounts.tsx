@@ -16,7 +16,8 @@ export default function AccountsScreen() {
     <SectionList<Account, typeof sections[number]> sections={sections} keyExtractor={account => account.id}
       style={{ flex: 1, backgroundColor: p.background }} contentContainerStyle={{ padding: 20, paddingBottom: 40, flexGrow: 1 }}
       contentInsetAdjustmentBehavior="automatic" stickySectionHeadersEnabled={false} removeClippedSubviews={false}
-      ListEmptyComponent={<EmptyState title="Empezá por una cuenta" detail="Agregá el lugar donde guardás tu dinero y su saldo actual."
+      ListHeaderComponent={<AppText secondary style={{ fontSize: 14, paddingBottom: 12 }}>Saldos calculados con lo que registraste. No se sincronizan con tu banco.</AppText>}
+      ListEmptyComponent={<EmptyState title="Empezá por una cuenta" detail="Elegí una cuenta para agrupar movimientos. Cargar el saldo inicial es opcional."
         action={<ActionButton label="Agregar cuenta" onPress={() => router.push('/new-account')} />} />}
       renderSectionHeader={({ section }) => <AppText secondary accessibilityRole="header" style={{ fontSize: 14, fontWeight: '500', paddingBottom: 12, paddingTop: 12 }}>
         {section.currency === 'ARS' ? 'Pesos argentinos' : 'Dólares estadounidenses'}

@@ -1,206 +1,133 @@
 # FinanzApp mobile: living roadmap
 
-Updated: 2026-09-14. Read with [decision 001](decisions/001-native-mobile.md).
-This document supersedes the mobile architecture direction of
-`product-rebuild-roadmap.md`; that file still records useful financial work.
+Updated: 2026-09-19. Read [decision 001](decisions/001-native-mobile.md) and
+[decision 002](decisions/002-spending-first.md). Decision 002 supersedes earlier
+full-finance migration phases and the local-only AI preference. Handoff entries
+below are historical evidence, not current product priorities.
 
 ## Destination
 
-A real App Store app with a calm, minimal iOS experience: native navigation,
-interruptible gestures, readable animated charts, accessible amounts/dates,
-reliable financial rules, private local-first data and optional Supabase sync.
-No seeded user data, paid AI dependency, fabricated returns or bank-password scraping.
+An iOS spending/commitment app: fast capture, understandable spending, upcoming
+payments and optional manually tracked accounts. No native investment portfolio,
+market quotes or claim to know complete net worth. Cloud AI is opt-in, bounded and
+server-keyed; manual recording and local data work without connectivity. Recurring
+expenses, debts, budgets and cards remain in scope. Native navigation, accessible
+amounts, real data and recoverable durable writes remain requirements.
 
-## Status vocabulary
+## Status and current delivery — Interfaz 07
 
-**Implemented** means code exists. **Checked** names the actual test performed.
-**Device-verified** requires a recorded physical iPhone result. **Released** means
-distributed, not just committed. Do not mark a feature complete from a screenshot,
-a bundle export or an API key/configuration being present.
+Implemented is code, checked names a test, device-verified needs a physical result,
+and released means distributed. Neither a bundle nor a screenshot is App Store QA.
 
-## Current iteration: isolated native foundation
+- [x] Spending-first Home: week/month, separate currencies, recorded expense total.
+- [x] Exact chart buckets, category and date drill-downs; scoped recent entries.
+- [x] Original warm-white/ink/indigo visual direction inspired by supplied references.
+- [x] Accounts stay accessible from the header/Settings; initial balance optional.
+- [x] Remove obsolete MonthCard, duplicated monthly flow block and balance-hero colors.
+- [x] Cloud contracts, mobile client/evidence builder, disabled API routes and
+  Responses provider adapter. No AI key in app, paid request or cloud data migration.
+- [x] Staging SQL inbox with owner isolation, unique events and durable daily quotas.
+- [ ] Activate/test the integrations with real staging auth, consent and owned keys.
+- [ ] Physical visual/gesture review on iPhone. The user accepted only the initial
+  Expo Go pilot; later interface iterations have not received device approval.
 
-- [x] Architecture decision including the SwiftUI alternative and no-Mac limits.
-- [x] Same repo, separate mobile install and app identity; current product preserved.
-- [x] `AGENTS.md` links the living plan for future contributors/agents.
-- [x] Expo Router native navigation, account and amount sheets, local SQLite pilot.
-- [x] Typed shared entry and integer-cent ledger validation/tests.
-- [x] Linux typecheck, JS iOS bundle export, storage tests and web regression checks.
-- [x] User accepted the first Expo Go pilot on iPhone: entries persisted after
-  close/reopen and navigation felt native and fluid (reported 2026-09-12).
-- [ ] User links their Expo project; no project ID or signing secret invented.
-- [ ] Cloud-signed preview and remaining physical iPhone acceptance checks.
+Local verification: **331 root/domain/API + 92 mobile tests = 423**; TypeScript,
+iOS JS/Hermes/assets export, root Vite build and repository hygiene pass. Local
+online Expo dependency verification timed out through the proxy; online CI remains
+a merge gate. PostgreSQL schema tests run in a new isolated CI job, not the user's
+Supabase. Browser layout preview was blocked at localhost (ERR_BLOCKED_BY_CLIENT),
+so no rendered layout, native frame pacing or gesture acceptance is claimed.
+CI run [35470917523](https://github.com/facur3/finanzapp-v2/actions/runs/35470917523)
+passed the web and PostgreSQL jobs but blocked mobile on four newly recommended
+SDK 57 patches. Updated Expo to ~57.0.24, Constants to ~57.0.19, Router to ~57.0.22
+and Sharing to ~57.0.21; no SDK-major jump, workaround or disabled check. The next
+CI run must pass all three jobs before merge. Final result is linked from PR #22.
+After those patches, 423 tests, typecheck, dependency-tree integrity and iOS export
+pass again locally; the mobile npm audit reports zero known vulnerabilities.
 
-This is **not yet a replacement for the current app**. Do not uninstall it or
-re-enter the full portfolio into the pilot. The first use/persistence pilot has
-passed; the optimized standalone build and full device checklist remain gates.
+Existing SQLite stays at schema 3. No private data, test fixture, ZIP artwork or
+financial screenshot is added to user data or published as a product asset.
+The unmerged card-statements experiment is not part of this delivery. The old
+web/Capacitor product and data remain available; its used features are not dead code.
 
-## Current visual iteration and next deliverable
+## Next deliverables, in order
 
-Continue with Expo + React Native. The first original, calm visual system is
-implemented: available balance and quick actions on Home, date-grouped/searchable
-movements, a complete account list, compact account/date selectors and clearer
-amount/detail screens. Native navigation remains the only owner of transitions.
-See [the mobile design brief](mobile-design.md) and its pending device acceptance.
-The subsequent user test reports basic flow working but **intermittent black
-content when switching to Settings/Movements** and a visual style that is still
-too bare. Interfaz 02 removes the JS tab fade/detach/freeze/lazy combination,
-keeps root content mounted and adds category recognition/selection, a stronger
-balance hierarchy and exact monthly recorded flow. The device re-test is open;
-do not mark the black-screen issue fixed on-device or the design approved yet.
-The next ledger slice is implemented below (Interfaz 04); do not make the user
-manually rebuild the portfolio while full legacy import is still pending.
+### 1. Complete the daily tracking loop
 
-At the owner's request, **Interfaz 03** now adds a read-only dashboard/report slice
-before those ledger milestones: Home's available balance links to accounts, Tu mes
-shows the top three spending categories, and a native-stack monthly report opens
-all categories and their exact movements. No extra tab or production migration.
-The tab mitigation remains unchanged; no new physical result has been reported.
-Visual acceptance is still open. **Interfaz 04** now implements posted-entry
-editing/undo/recovery and additive native v1/v2 backup import with exact review.
-It preserves the visual/tab system while adding contextual actions in detail and
-Settings. The owner has not yet reviewed the new design or supplied device results.
-**Interfaz 05** now adds account-name/current-balance corrections and same-currency
-transfers, including edit/undo/recovery and v3 native backups. SQLite upgrades to
-schema 3, preserving existing data. The web product and Supabase remain intact.
-The owner explicitly defers reviewing the recent iterations together; do not
-invent device approval or make it a blocker to bounded implementation work.
-Legacy backup import, currency exchange and full native accounting remain open.
-See the [Interfaz 05 walkthrough](empezar-en-iphone.md#10-interfaz-05-cuentas-y-transferencias).
+- [ ] Review Interfaz 07 on device: small canceled swipes, large text, both themes,
+  tiny amounts/long names, Monday/month boundaries and 30–40 tab changes.
+- [ ] First-entry onboarding without requiring a named account; preserve current
+  recorded-account semantics rather than inventing a bank balance.
+- [ ] Budgets by month/category, explicit remaining budget and exceeded state.
+- [ ] Recurring expenses/income and subscriptions: next occurrence, pause/edit,
+  reminders and per-occurrence identity. Scheduled is not paid; retries cannot duplicate.
+- [ ] A small upcoming-payments block only after there is actual stored data.
 
-The owner reported **iPhone 14 Pro, iOS 26.6.1**. Next action: update the existing
-checkout to `master` and try the new interface, retaining a private backup and
-the current app. No Apple membership is needed for this UI/ledger work in Expo Go.
-After UI review and basic ledger correction/recovery, link EAS Free and enroll
-for the independent signed build before deeper Apple integration; do not wait
-until the full migration is done. See [costs and next steps](empezar-en-iphone.md#6-después-del-piloto-aprobado).
-Supabase remains in the architecture; mobile sync is still to be implemented.
+### 2. Activate smart capture and explanations
 
-## Next phases, in order
+Use [integration contracts](mobile-integrations.md) as the implementation boundary.
 
-Priority override from the owner (2026-09-14): starting empty/manual entry is
-acceptable. Legacy import is optional backlog, not the next blocking deliverable.
-Preserve native recovery; prioritize useful features, reports and calm native UI.
-Interfaz 06 implements daily expense drill-down and previous-month/category
-comparison. Next product slice: card statement/payment accounting. Device review
-remains pending; do not infer approval from automated tests.
+- [ ] Staging Supabase setup, mobile sign-in and cloud-data consent; no login needed
+  for the local core. The existing web snapshot is not a mobile sync engine.
+- [ ] Text assistant UI, then audio/transcription with explicit mic permission,
+  limits and deletion. Review/edit/undo with no phantom success or discarded draft.
+- [ ] Evaluate Spanish phrases, ambiguous categories, currencies, loans/refunds,
+  questions and failure handling with owned test data and measured provider usage.
+- [ ] Safe auto-registration opt-in only for complete supported operations and
+  owned account/card mappings. Ambiguous messages stay drafts.
+- [ ] Scoped/revocable Shortcut pairing token; current base endpoint uses session
+  JWT and is not a turnkey background Shortcut integration.
+- [ ] Durable inbox → SQLite receipt → acknowledgement, repeated delivery after
+  edits/deletions and cross-device conflict tests before autonomous ingestion.
+- [ ] Actual iPhone Apple Pay transaction trigger, available fields, missing amount,
+  duplicate triggers, offline catch-up and cancellation verified without bank execution.
+- [ ] Explain only deterministic facts, disclose partial records, and link supporting
+  movements. Savings plans need goals/timeframe and explicit assumptions.
 
-### M1 — Native foundation and device gate
+### 3. Commitments and cards
 
-- [x] Home, accounts, expense/income, activity and detail use native stack/sheets
-  (implemented; basic iPhone experience accepted, specific gesture/layout checks pending).
-- [ ] Small canceled swipes leave exactly the same screen visible; no redirect.
-- [ ] Keyboard, safe areas, dynamic text and reduced motion work on an iPhone.
-- [x] SQLite writes, same-operation retry and no silent empty reset (real-SQLite
-  integration tests; basic close/reopen persistence also reported on iPhone).
-- [x] Export pilot data with a distinct format (implemented; native sharing gate pending).
-- [ ] Pass [physical device checklist](mobile-device-checklist.md).
+- [ ] Debo / me deben, due dates, partial payments and recoverable history.
+- [ ] Loan principal is separate from income/consumption; interest/fees have categories.
+- [ ] Debit/credit payment method, purchase, installments and due date.
+- [ ] Purchase counted once; installment/payment reduces obligation without a second
+  expense. Early payment removes that amount from later scheduled payments.
+- [ ] Cash outflow, recorded expense and future commitment have distinct labels.
+- [ ] No native FCI redemption, broker portfolio or simulated bank/card payment.
 
-### M2 — Safe data migration and complete ledger
+### 4. Independent build, Apple and optional sync
 
-- [x] Native expense/income IDs, revisions, reversible tombstones and deduplicated
-  mutation receipts (implemented/tested; multi-device outbox still pending).
-- [x] Edit/undo/recover posted native entries with atomic local before/after audit.
-  Changing accounts is restricted to the same currency. Physical acceptance pending.
-- [x] Account name/current-balance correction with confirmation, optimistic revision
-  and stale-balance checks; no fabricated expense/income.
-- [x] Same-currency transfers stored once with both balance effects; edit/undo/restore,
-  local audit, activity/detail and backup support. Physical acceptance pending.
-- [ ] Cross-currency operations and complete currency/fee audit.
-- [ ] Versioned legacy backup importer with dry run and exact before/after totals.
-- [ ] Accounts/currencies, cash and liabilities kept separate; no fake FX rate.
-- [ ] Transfer recorded once, including different-currency legs and rate/fees.
-- [x] Native v1/v2/v3 additive backup review/restore, strict corrupt/unsupported input
-  rejection, stale-preview/conflict checks and atomic interrupted migration/import
-  recovery (tested in disposable SQLite; native picker/restore device gate pending).
-- [ ] Legacy backup fidelity, full audit-history export, replacement recovery,
-  encryption/key management and large-backup streaming beyond pilot limits.
-- [ ] Native data-at-rest protection/key recovery decision and privacy review.
-- [ ] Cross-check against the existing rules/tests; do not reuse unsafe rounding.
+- [ ] Link owner's EAS project and enroll Apple when ready for a signed preview;
+  the Expo Go design/ledger step does not need a paid build.
+- [ ] Local reminders with opt-in time/timezone/deduplication; no amounts by default.
+- [ ] Face ID/passcode fallback, background privacy and native data protection.
+- [ ] App Intents/widgets/Apple sign-in after signed-device evidence.
+- [ ] Optional normalized Supabase sync: outbox, revisions, tombstones, RLS, conflict
+  handling and user/session isolation. Reuse durable local operation IDs.
+- [ ] Data export/deletion/recovery and provider privacy/retention before cloud release.
+- [ ] TestFlight performance/accessibility, subscription economics, StoreKit/restore,
+  policy/support/privacy metadata and App Store submission after the release gate.
 
-### M3 — Cards, recurrent entries and investment accounting
+Legacy import stays optional backlog. Do not require JSON or full portfolio re-entry.
+Keep native backup/recovery, integer cents, no fake FX, no silent reset and original
+unrelated work. Never merge all branches indiscriminately or enable costs by accident.
 
-- [ ] Credit purchase increases card debt, not an immediate cash debit.
-- [ ] Closing dates, due dates, partial payments and installments.
-- [ ] Early payment and repeated processing cannot debit twice.
-- [ ] FCI-funded card payment posts a redemption/payment once, not a second expense.
-- [ ] Investment purchase consumes the selected cash account; sale returns proceeds.
-- [ ] Reconciliation changes quantities/valuation without invented cash transactions.
-- [ ] FCI changes follow verified unit prices; estimated TNA is not a guaranteed yield.
-- [ ] Quotes include source/time/currency/units, including bond/ON per-100 convention.
-- [ ] Unknown acquisition cost stays unknown; missing prices retain last known data.
-- [ ] Scheduled accounting is distinguished from actual bank execution. iOS background
-  tasks do not guarantee code runs at an exact due time with the app closed; use
-  idempotent catch-up on launch and evaluate an authorized server scheduler later.
+## Motion and design rules
 
-### M4 — Reports, dashboard and assistant
+One main number, real chart values, calm hierarchy and contextual actions. Native
+stack/sheets own transitions. Preserve the mounted-tab mitigation; do not reintroduce
+focus fades, detach/freeze combinations or redirect-based back handling. Brief press,
+selection and data-change animations respect Reduce Motion; text and financial
+values are never hidden until an animation finishes. 44-point targets, VoiceOver,
+safe areas, system text and separate currencies apply to every new screen.
 
-- [x] Basic monthly recorded income/expenses by currency through today, excluding
-  opening balances (Interfaz 02, 9 pure-domain cases; visual acceptance pending).
-- [ ] Clear cash available vs net worth, liabilities and invested value.
-- [x] Category bars with amount, share of total, period/currency and movement
-  drill-down; reduced-motion-aware transitions (Interfaz 03, device acceptance open).
-- [ ] Real-history time series with understandable scale and accessible interaction.
-- [x] Compare matching portions of months and category deltas with scoped drill-down
-  (Interfaz 06; missing-history guard; physical review pending).
-- [ ] Merchant comparison and longer real-history time series.
-- [ ] Free local Spanish parser; gift/income/loan distinction and amount/merchant split.
-- [ ] Answer money questions from actual ledger data, including yesterday and month deltas.
-- [ ] Review/edit amount, account, category, date and action before saving.
-- [ ] Honest fallback when the local assistant cannot understand; never promise all questions.
+## Handoff log (historical evidence)
 
-### M5 — Apple integration
+### 2026-09-19 — Interfaz 07: spending-first direction
 
-- [ ] Local daily reminder: opt-in time, disable/edit, timezone changes, no duplicates.
-- [ ] Notification action opens the proper entry screen; no sensitive amount by default.
-- [ ] Haptics: restrained save/confirm/error feedback, not vibration on every scroll.
-- [ ] Face ID plus device-passcode recovery; hide app-switcher snapshot when locked.
-- [ ] Sign in with Apple and secure session handling.
-- [ ] Siri/App Intents and Action Button quick capture.
-- [ ] Wallet/Apple Pay Transaction Shortcut pilot on actual Argentine card/iPhone.
-- [ ] Validate provided fields, account mapping, duplicate events, refunds and undo.
-- [ ] Widgets with opt-in balance visibility; accessible system appearance.
-- [ ] Future FinanceKit only if supported territory/products + entitlement allow it.
+Product pivot and dashboard implemented; see status above and decision 002. Manual
+local entry remains operational; cloud/Shortcuts base is explicitly disabled until
+configured and tested. No remote SQL, API charges or signed build performed.
 
-### M6 — Supabase and safe multi-device use
-
-- [ ] Keep existing cloud data intact; apply versioned schema migration in staging first.
-- [ ] Row-based data with RLS, ownership checks and cross-user isolation tests.
-- [ ] Local outbox, deletion records, retry/idempotency and conflict policy.
-- [ ] Same-account multi-device tests, offline edits, sign-out/user-change isolation.
-- [ ] Account deletion/export, backup restoration and explicit cloud opt-in.
-- [ ] Public API keys only in client; server credentials and provider secrets stay server-side.
-
-### M7 — Monetization and release
-
-- [ ] Apple Developer enrollment; verify seller identity and supported iOS version.
-- [ ] Separate development/test/store environments and signing credentials.
-- [ ] StoreKit subscription, restore purchases, cancellations/expiry/refunds tested.
-- [ ] Optional RevenueCat evaluated separately; no paid service enabled automatically.
-- [ ] TestFlight beta and performance/accessibility/offline migration acceptance.
-- [ ] App icon, App Store screenshots, support/privacy URLs and privacy declarations.
-- [ ] Review financial-app scope (tracker, not bank/broker), export compliance and policies.
-- [ ] Production switch only after import fidelity and recovery have passed.
-- [ ] App Store review and monitoring. Eligibility is not a guarantee of approval.
-
-### Later — Banks and brokers
-
-Galicia/Cocos/other connections require documented APIs/exports, consent and
-provider access. Verify availability separately. No account passwords in the app,
-no scraping promises, no claims that a local record actually paid a bank/card.
-
-## Motion and visual acceptance rules
-
-- One main number/action per screen; details on demand rather than crowded cards.
-- Opaque native screen backgrounds, stable route ownership, real back stack.
-- Modal open/close and canceled gestures must be continuous, with no base-tab flash.
-- Restrained press/selection/confirmation motion; no looping decoration.
-- Never animate a number from an invented balance. Preserve chart scale and meaning.
-- Minimum 44-point targets, system text scaling, VoiceOver labels and sufficient contrast.
-- Disable non-essential motion with Reduce Motion; no forced fixed-width date inputs.
-- Aim for smooth frame pacing on real hardware; measure before claiming 60/120 fps.
-
-## Handoff log (append actual evidence)
 
 ### 2026-09-14 — Interfaz 06: daily reports and fair comparisons
 

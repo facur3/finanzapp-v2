@@ -424,3 +424,34 @@ sigue pendiente de un importador específico: no hace falta recargar tu patrimon
 Siguiente bloque: diseñar la importación segura de datos anteriores, con revisión
 de qué entidades admite y comparación de totales antes de guardar. Las funciones
 de Apple, la sincronización y la versión independiente firmada siguen en el roadmap.
+
+
+## 12. Interfaz 07: gastos primero
+
+Ya no hace falta llevar todo el patrimonio. Inicio muestra lo gastado en la
+semana o el mes; las cuentas y sus registros anteriores se conservan.
+
+Con Metro detenido, desde la carpeta de tu clon:
+
+```bash
+git switch master
+git pull --ff-only
+cd apps/mobile
+npm ci
+npm start -- --clear
+```
+
+Si Git avisa cambios locales, no uses reset/clean: conservá esos cambios primero.
+Abrí el nuevo QR en Expo Go. No reinstales ni borres datos. En Ajustes debe decir
+**Interfaz 07**. Podés revisar con los movimientos que ya tenés:
+
+1. Compará el número principal con tus gastos del mes. El saldo inicial e ingresos no lo inflan.
+2. Cambiá Esta semana / Este mes y ARS / USD, si tenés ambas monedas.
+3. Tocá una barra y una categoría. Volvé: deben conservar la selección, sin destellos.
+4. Abrí Cuentas con el icono arriba o desde Ajustes. Los registros deben seguir ahí.
+5. Revisá claro/oscuro, texto grande y Reducir movimiento. Cerrá y volvé a abrir.
+
+Todavía no tenés que pagar nada para probar este diseño. La IA en nube y la captura
+Apple Pay tienen código base, pero no están activadas ni hay chat/grabación en la
+app. Primero integraremos consentimiento, login y bandeja local; después configuraremos
+las cuentas del servidor y el Atajo con vos. Nunca pegues claves o contraseñas en el chat.

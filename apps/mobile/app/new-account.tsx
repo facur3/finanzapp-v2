@@ -27,7 +27,7 @@ export default function NewAccountScreen() {
     setError(null);
     Keyboard.dismiss();
     try {
-      const submission = pending ?? { ...operation, name: name.trim(), currency, openingMinor: parseMinorUnits(opening) };
+      const submission = pending ?? { ...operation, name: name.trim(), currency, openingMinor: parseMinorUnits(opening.trim() || '0') };
       validateAccount(submission);
       setPending(submission);
       await addAccount(submission);
@@ -48,11 +48,11 @@ export default function NewAccountScreen() {
       autoCapitalize="words" editable={!busy && !pending} />
     <Choices value={currency} onChange={setCurrency} disabled={busy || !!pending}
       options={[{ value: 'ARS', label: 'Pesos · ARS' }, { value: 'USD', label: 'Dólares · USD' }]} />
-    <AmountField label="Saldo inicial" currency={currency} value={opening} onChangeText={value => { setOpening(value); setError(null); }}
+    <AmountField label="Saldo inicial (opcional)" currency={currency} value={opening} onChangeText={value => { setOpening(value); setError(null); }}
       keyboardType="numbers-and-punctuation" inputMode={undefined} editable={!busy && !pending} />
-    <AppText secondary style={{ fontSize: 14 }}>El saldo que tenés al empezar. No cuenta como ingreso. Escribí 0 si la cuenta está vacía.</AppText>
+    <AppText secondary style={{ fontSize: 14 }}>Podés dejarlo vacío para registrar desde cero. El saldo registrado será el resultado de tus movimientos; no representa tu saldo bancario. Si cargás un saldo inicial, no cuenta como ingreso.</AppText>
     <ErrorMessage message={error} />
     {pending && error && <AppText secondary style={{ fontSize: 13 }}>Reintentá el mismo envío para evitar duplicados. Para cambiarlo, cerrá y revisá primero tus cuentas.</AppText>}
-    <ActionButton label={pending && error ? 'Reintentar guardado' : 'Guardar cuenta'} onPress={save} busy={busy} disabled={!name.trim() || !opening.trim()} />
+    <ActionButton label={pending && error ? 'Reintentar guardado' : 'Guardar cuenta'} onPress={save} busy={busy} disabled={!name.trim()} />
   </Screen>;
 }
