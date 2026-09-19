@@ -87,7 +87,7 @@ Account → Transferir records one internal transfer between distinct accounts i
 the **same currency**. A single stored record affects both balances atomically.
 The form previews both resulting balances (including removal of the prior effect
 when editing). Negative balances are allowed for truthful tracking but warned.
-It **does not send money to a bank**. Transfers appear once in Todos/recent activity,
+It **does not send money to a bank**. Transfers appear once in full activity,
 on both account details and in recovery; they never appear as income/spending in
 reports. Cross-currency operations, fees and bank execution remain separate work.
 

@@ -37,7 +37,13 @@ online Expo dependency verification timed out through the proxy; online CI remai
 a merge gate. PostgreSQL schema tests run in a new isolated CI job, not the user's
 Supabase. Browser layout preview was blocked at localhost (ERR_BLOCKED_BY_CLIENT),
 so no rendered layout, native frame pacing or gesture acceptance is claimed.
-CI outcome and merge are recorded below when available.
+CI run [35470917523](https://github.com/facur3/finanzapp-v2/actions/runs/35470917523)
+passed the web and PostgreSQL jobs but blocked mobile on four newly recommended
+SDK 57 patches. Updated Expo to ~57.0.24, Constants to ~57.0.19, Router to ~57.0.22
+and Sharing to ~57.0.21; no SDK-major jump, workaround or disabled check. The next
+CI run must pass all three jobs before merge. Final result is linked from PR #22.
+After those patches, 423 tests, typecheck, dependency-tree integrity and iOS export
+pass again locally; the mobile npm audit reports zero known vulnerabilities.
 
 Existing SQLite stays at schema 3. No private data, test fixture, ZIP artwork or
 financial screenshot is added to user data or published as a product asset.
