@@ -56,7 +56,7 @@ function AccountEditor({ account, snapshot }: { account: Account; snapshot: Ledg
     <Stack.Screen options={{ title: 'Editar cuenta', gestureEnabled: !busy,
       headerLeft: () => <IconButton name="close" label="Cerrar" onPress={close} disabled={busy} /> }} />
     <Field label="Nombre de la cuenta" value={name} onChangeText={setName} maxLength={80} editable={!locked} />
-    <AmountField label="Saldo disponible" currency={account.currency} value={balance} onChangeText={setBalance}
+    <AmountField label="Saldo registrado" currency={account.currency} value={balance} onChangeText={setBalance}
       keyboardType="numbers-and-punctuation" inputMode={undefined} editable={!locked} />
     <Surface grouped><DetailRow label="Moneda" value={account.currency} last /></Surface>
     <AppText secondary style={{ fontSize: 14 }}>Usá esta corrección solo si el saldo está mal cargado. Si recibiste, gastaste o moviste dinero, registrá el movimiento correspondiente.</AppText>

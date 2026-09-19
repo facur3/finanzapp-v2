@@ -9,3 +9,4 @@ export * from './recovery.ts';
 export * from './transfers.ts';
 export * from './account-changes.ts';
 export * from './report-insights.ts';
+export * from './spending-overview.ts';

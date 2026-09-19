@@ -39,6 +39,7 @@ export default function SettingsScreen() {
   }
 
   return <Screen>
+    <Surface grouped><DetailRow label="Cuentas" value="Saldos y movimientos" icon="wallet-outline" last onPress={() => router.push('/accounts')} /></Surface>
     <Surface><SectionTitle>Datos y privacidad</SectionTitle>
       <AppText>Tus registros quedan en este dispositivo.</AppText>
       <AppText secondary style={{ fontSize: 15 }}>Podés registrar movimientos sin conexión. La sincronización todavía no está activada.</AppText>
@@ -55,6 +56,6 @@ export default function SettingsScreen() {
       <DetailRow label="Movimientos deshechos" value={String((archive?.records.filter(record => record.voided).length ?? 0) + (archive?.transfers?.filter(record => record.voided).length ?? 0))}
         icon="arrow-undo-outline" last disabled={busy} onPress={() => router.push('/undone-entries')} />
     </Surface>
-    <AppText secondary style={{ textAlign: 'center', fontSize: 13 }}>FinanzApp · Piloto nativo 0.1.0 · Interfaz 06</AppText>
+    <AppText secondary style={{ textAlign: 'center', fontSize: 13 }}>FinanzApp · Piloto nativo 0.1.0 · Interfaz 07</AppText>
   </Screen>;
 }

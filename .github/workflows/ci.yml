@@ -67,3 +67,25 @@ jobs:
 
       - name: Export iOS JavaScript and assets (not a signed native build)
         run: npm run export:ios
+
+  mobile_api:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: fixture-only
+          POSTGRES_DB: mobile_api_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Isolated PostgreSQL inbox ownership, deduplication and quota tests
+        env:
+          PGPASSWORD: fixture-only
+        run: psql -h localhost -U postgres -d mobile_api_test -f server/mobile/schema.test.sql

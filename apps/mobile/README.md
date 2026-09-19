@@ -22,14 +22,25 @@ native-backup review/import. Neither this delivery nor Interfaz 03 has new physi
 acceptance evidence. **Interfaz 05** adds account corrections and same-currency
 transfers with editing/undo/recovery. The owner is deferring a combined review;
 there is no new physical acceptance. **Interfaz 06** adds daily expense drill-down
-and monthly/category comparisons. Next: useful ledger features and full accounting;
-legacy import is optional backlog, with device checks still an explicit gate.
+and monthly/category comparisons. Interfaz 07 supersedes the balance-first Home;
+the spending-first decision is authoritative, with device checks still an explicit gate.
 
-Inicio → Ver reporte offers Categorías / Día a día and Comparar gastos. Current
+Inicio → Reporte mensual offers Categorías / Día a día and Comparar gastos. Current
 months compare equal initial day counts (both capped if the previous month is
 shorter); historical months compare full months. Exact date ranges stay visible.
 Category totals open only their dated expenses. Missing records are not savings.
 Native backup/recovery stays available, but no JSON import is required to start.
+
+## Product scope (Interfaz 07)
+
+[Decision 002](../../docs/decisions/002-spending-first.md) selects spending and
+commitments with optional accounts. No native portfolio or market data. The old
+MonthCard and balance hero are removed; new period/category drill-downs reuse the
+native stack. No SQLite migration or loss of existing records.
+Cloud AI replaces the earlier local-parser plan. [Integration contracts/setup](../../docs/mobile-integrations.md)
+describe the disabled-by-default API, bounded provider adapter, pending inbox,
+and remaining auth/consent/Shortcut/audio UI. No paid calls or remote SQL were run.
+No buttons suggest unfinished integrations are already available.
 
 ## First start on Linux or Windows
 
@@ -66,7 +77,7 @@ Drafts and posted entries can be edited. Open a movement → Editar movimiento;
 change amount, kind, concept, category, date or account **within the same currency**.
 Deshacer removes its effect without a fake refund/income. Its recoverable record
 remains in Ajustes → Movimientos deshechos, including after closing/reopening.
-Open an account → pencil to rename it or correct its **current available balance**.
+Open an account → pencil to rename it or correct its **recorded balance**.
 A correction changes opening balance with a local revision/audit receipt, not
 an expense/income. Confirmation shows the previous and new balance. Concurrent
 balance changes reject a stale correction; a rename alone preserves new movements.
@@ -82,10 +93,10 @@ reports. Cross-currency operations, fees and bank execution remain separate work
 
 The current visual iteration includes:
 
-- Home: available balance by currency, expense/income actions, Tu mes and recent
-  records. Ver cuentas in the balance surface opens the full account list,
-  grouped by currency, without repeating that list on Home. Selecting USD
-  on Home preselects an existing USD account when opening the draft.
+- Home: recorded spending by week/month and currency, exact interactive bars, top
+  categories and scoped recent entries. Accounts are reached from the header or
+  Settings. Opening balance is optional (zero tracking baseline, not bank sync).
+  Selecting USD preselects a compatible account in the entry draft.
 - Movements: virtualized date groups, accent-insensitive concept/category/account
   search and expense/income filters. Search does not mutate the stored entries.
 - Forms: emphasized amount, iOS keyboard Done, compact account chooser and a native
@@ -97,11 +108,11 @@ The current visual iteration includes:
   freezing. Detail/modal stack animations remain native. Keeping three roots
   mounted uses more memory; activity remains virtualized. Do not globally disable
   react-native-screens or add focus-triggered reloads to hide the symptom.
-- A distinctive balance surface, category symbols and a searchable chooser that
+- Category symbols and a searchable chooser that
   reuses existing category strings or accepts a custom one. No auto-reclassification.
-- Tu mes: exact recorded income/expenses by currency, through today. No opening
-  balance counted as income; unsafe aggregate totals get an unavailable state.
-- Interfaz 03: top three expense categories on Home; Ver reporte opens all of
+- Exact recorded income/expenses by currency, through today. No opening balance
+  counted as income; unsafe aggregate totals get an unavailable state.
+- Interfaz 03: top three expense categories on Home; Reporte mensual opens all of
   them, month/currency controls and each category's actual entries. Reports live
   in the native stack, not an extra tab. Historical months include all their days;
   future dates never inflate the through-today chart. Category identity ignores
@@ -120,8 +131,7 @@ change or paid service was introduced. Follow the new-iteration section of the
 [device checklist](../../docs/mobile-device-checklist.md) before accepting its layout.
 
 Only enter a small amount of data while checking the experience. Do not re-enter
-the entire portfolio or uninstall the existing app. Legacy import, complete card/
-investment accounting, Supabase sync, Face ID, reminders and Apple Pay capture
+the entire portfolio or uninstall the existing app. Legacy import, card/commitment accounting, Supabase sync, Face ID, reminders and Apple Pay capture
 are separate roadmap milestones; no disabled decorative buttons imply otherwise.
 
 The pilot exports its own v3 JSON backup through the system sharing sheet and
@@ -219,7 +229,7 @@ and spending report, including exact category-to-entry reconciliation.
 For the intermittent black-tab report, update to `master`, restart with
 `npm start -- --clear` (bundler cache only, not SQLite), reopen from the new QR,
 and repeat the **Interfaz 02** tab checks, **Interfaz 03** report checks and
-**Interfaz 04/05** correction/recovery and transfer checks, plus **Interfaz 06** daily/comparison reports. The current footer says Interfaz 06.
+**Interfaz 04/05** correction/recovery and transfer checks, plus **Interfaz 06** daily/comparison reports. The current footer says Interfaz 07.
 Before updating, save a private pilot copy; do not uninstall or add fake movements.
 
 If a storage/refresh error occurs, the form retains the exact submitted command

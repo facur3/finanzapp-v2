@@ -1,5 +1,23 @@
 # Physical iPhone acceptance checklist
 
+## Interfaz 07 — current product direction (pending)
+
+- [ ] Footer identifies Interfaz 07. Existing records persist after reopen.
+- [ ] Home main amount equals recorded expenses, not account balance or net worth.
+- [ ] Week/month and currency update total, categories and recent records together.
+- [ ] Bar/category detail contains exactly its date range/currency; back retains context.
+- [ ] Accounts open from the header/Settings; no balance re-entry is required.
+- [ ] Blank opening balance saves a zero tracking baseline, explained as such.
+- [ ] Income-only/empty periods show no invented chart or savings claim.
+- [ ] Both themes, large text, long amounts, VoiceOver and Reduce Motion work.
+- [ ] Repeat canceled gestures and 30–40 tab changes without blank content.
+
+Cloud AI/Shortcuts are not enabled or available through the UI yet. Do not enter
+keys, configure a payment automation or expect captures to affect balances.
+The older sections below are historical checks; Home balance/Tu mes references
+were replaced by the current spending-first screen.
+
+
 ## Interfaz 06 — reports (physical review pending)
 
 - [ ] Footer reads Interfaz 06; existing records/balances are unchanged.

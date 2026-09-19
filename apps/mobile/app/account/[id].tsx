@@ -19,7 +19,7 @@ export default function AccountScreen() {
     <Stack.Screen options={{ title: account.name, headerRight: () => <IconButton name="create-outline" label="Editar cuenta"
       onPress={() => router.push({ pathname: '/edit-account/[id]', params: { id } })} /> }} />
     <EntryList entries={entries} transfers={transfers} accountId={id} accounts={snapshot.accounts} header={<View style={{ gap: 24 }}>
-      <View style={{ gap: 12, paddingVertical: 12 }}><AppText secondary>Saldo disponible · {account.currency}</AppText>
+      <View style={{ gap: 12, paddingVertical: 12 }}><AppText secondary>Saldo registrado · {account.currency}</AppText>
         <Money minor={accountBalanceMinor(account, entries, transfers)} currency={account.currency} large /></View>
       <EntryActions accountId={id} />
       <View><Surface grouped>
