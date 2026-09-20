@@ -4,6 +4,7 @@ import {
   type Account, type Entry, type EntryChange, type EntryRecord, type LedgerArchive, type LedgerSnapshot,
   accountBalanceMinor, validateAccountChange, type AccountChange, initialTransferRecord, sameTransferRecord,
   sameTransfer, validateTransfer, validateTransferChange, type Transfer, type TransferChange, type TransferRecord,
+  materializeRecurringRule, sameRecurringRule, validateRecurringRule, type RecurringRule,
 } from '@finanzapp/domain';
 
 type SqlValue = string | number | null;
@@ -18,7 +19,7 @@ export interface LedgerDatabase extends SqlExecutor {
 }
 
 export const DATABASE_NAME = 'finanzapp-native-pilot-v1.sqlite';
-export const DATABASE_VERSION = 3;
+export const DATABASE_VERSION = 4;
 
 const SCHEMA = `
   CREATE TABLE accounts (
@@ -85,6 +86,27 @@ const MIGRATE_V3 = `
   PRAGMA user_version = 3;
 `;
 
+const MIGRATE_V4 = `
+  CREATE TABLE recurring_rules (
+    id TEXT PRIMARY KEY NOT NULL,
+    accountId TEXT NOT NULL REFERENCES accounts(id) ON DELETE RESTRICT,
+    kind TEXT NOT NULL CHECK(kind IN ('expense', 'income')),
+    amountMinor INTEGER NOT NULL CHECK(amountMinor > 0 AND amountMinor <= 9007199254740991),
+    merchant TEXT NOT NULL CHECK(length(trim(merchant)) BETWEEN 1 AND 120),
+    category TEXT NOT NULL CHECK(length(trim(category)) BETWEEN 1 AND 60),
+    frequency TEXT NOT NULL CHECK(frequency IN ('weekly', 'monthly', 'yearly')),
+    anchorDateISO TEXT NOT NULL,
+    nextDateISO TEXT NOT NULL,
+    active INTEGER NOT NULL CHECK(active IN (0, 1)),
+    createdAt TEXT NOT NULL,
+    revision INTEGER NOT NULL DEFAULT 0 CHECK(revision >= 0 AND revision <= 9007199254740991),
+    updatedAt TEXT NOT NULL
+  ) STRICT;
+  CREATE INDEX recurring_next ON recurring_rules(active, nextDateISO);
+  CREATE INDEX recurring_account ON recurring_rules(accountId);
+  PRAGMA user_version = 4;
+`;
+
 export async function initializeDatabase(db: LedgerDatabase): Promise<void> {
   // Set before opening a transaction; foreign_keys is connection-local.
   await db.execAsync('PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000;');
@@ -97,6 +119,7 @@ export async function initializeDatabase(db: LedgerDatabase): Promise<void> {
     if (version === 0) await tx.execAsync(SCHEMA);
     if (version < 2) await tx.execAsync(MIGRATE_V2);
     if (version < 3) await tx.execAsync(MIGRATE_V3);
+    if (version < 4) await tx.execAsync(MIGRATE_V4);
   });
   await readSnapshot(db); // Validate before showing a balance, not after a render.
 }
@@ -124,7 +147,20 @@ export async function readArchive(db: SqlExecutor): Promise<LedgerArchive> {
     if (voided !== 0 && voided !== 1) throw new Error('Estado de transferencia inválido.');
     return { transfer, revision, voided: voided === 1, updatedAt };
   });
-  const archive = { accounts, records, ...(transfers.length ? { transfers } : {}) };
+  const recurringRows = await db.getAllAsync<Omit<RecurringRule, 'active'> & { active: number }>(
+    'SELECT * FROM recurring_rules ORDER BY active DESC, nextDateISO, createdAt, id');
+  const recurring = recurringRows.map(({ active, ...row }) => {
+    if (active !== 0 && active !== 1) throw new Error('Estado de recurrente inválido.');
+    const rule = { ...row, active: active === 1 };
+    validateRecurringRule(rule, accounts);
+    return rule;
+  });
+  const archive = {
+    accounts,
+    records,
+    ...(transfers.length ? { transfers } : {}),
+    ...(recurring.length ? { recurring } : {}),
+  };
   validateArchive(archive); // Including tombstones and safe integer totals.
   return archive;
 }
@@ -207,7 +243,7 @@ export async function importArchive(db: LedgerDatabase, incoming: LedgerArchive,
     const current = await readArchive(tx);
     const plan = previewBackupImport(current, incoming);
     if (plan.conflicts) throw new Error('La copia contradice cambios locales. No se importó nada. Conservá ambas versiones.');
-    if (!plan.accounts.length && !plan.records.length && !plan.transfers.length) return; // Re-import or retry after commit: already present.
+    if (!plan.accounts.length && !plan.records.length && !plan.transfers.length && !plan.recurring.length) return;
     if (plan.baseline !== baseline) throw new Error('Tus datos cambiaron. Volvé a revisar la copia antes de importar.');
     for (const account of plan.accounts) {
       await tx.runAsync('INSERT INTO accounts (id, name, currency, openingMinor, createdAt, revision, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?)',
@@ -215,6 +251,7 @@ export async function importArchive(db: LedgerDatabase, incoming: LedgerArchive,
     }
     for (const record of plan.records) await insertRecord(tx, record);
     for (const record of plan.transfers) await insertTransferRecord(tx, record);
+    for (const rule of plan.recurring) await insertRecurringRule(tx, rule);
     // No existing rows are updated or deleted. Any failure rolls back the batch.
   });
 }
@@ -288,4 +325,82 @@ export async function changeTransfer(db: LedgerDatabase, change: TransferChange)
     await tx.runAsync('INSERT INTO transfer_changes (id, transferId, action, beforeJSON, afterJSON) VALUES (?, ?, ?, ?, ?)',
       change.id, t.id, change.action, JSON.stringify(change.before), JSON.stringify(change.after));
   });
+}
+
+async function insertRecurringRule(tx: SqlExecutor, rule: RecurringRule): Promise<void> {
+  await tx.runAsync(`INSERT INTO recurring_rules (id, accountId, kind, amountMinor, merchant, category, frequency,
+    anchorDateISO, nextDateISO, active, createdAt, revision, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  rule.id, rule.accountId, rule.kind, rule.amountMinor, rule.merchant, rule.category, rule.frequency,
+  rule.anchorDateISO, rule.nextDateISO, rule.active ? 1 : 0, rule.createdAt, rule.revision, rule.updatedAt);
+}
+
+export async function saveRecurringRule(db: LedgerDatabase, input: RecurringRule): Promise<void> {
+  const rule = { ...input, merchant: input.merchant.trim(), category: input.category.trim() };
+  await db.withExclusiveTransactionAsync(async tx => {
+    const archive = await readArchive(tx);
+    validateRecurringRule(rule, archive.accounts);
+    const existing = archive.recurring?.find(item => item.id === rule.id);
+    if (!existing) {
+      if (rule.revision !== 0 || rule.updatedAt !== rule.createdAt) throw new Error('Un recurrente nuevo no puede tener cambios previos.');
+      validateArchive({ ...archive, recurring: [...archive.recurring ?? [], rule] });
+      await insertRecurringRule(tx, rule);
+      return;
+    }
+    if (sameRecurringRule(existing, rule)) return;
+    if (rule.createdAt !== existing.createdAt || rule.revision !== existing.revision + 1) {
+      throw new Error('El recurrente cambió desde que lo abriste. Volvé a revisarlo.');
+    }
+    const beforeAccount = archive.accounts.find(account => account.id === existing.accountId);
+    const afterAccount = archive.accounts.find(account => account.id === rule.accountId);
+    if (!beforeAccount || !afterAccount || beforeAccount.currency !== afterAccount.currency) {
+      throw new Error('Elegí una cuenta de la misma moneda. Cambiar la moneda requiere crear otro recurrente.');
+    }
+    validateArchive({ ...archive, recurring: archive.recurring!.map(item => item.id === rule.id ? rule : item) });
+    await tx.runAsync(`UPDATE recurring_rules SET accountId = ?, kind = ?, amountMinor = ?, merchant = ?, category = ?,
+      frequency = ?, anchorDateISO = ?, nextDateISO = ?, active = ?, revision = ?, updatedAt = ? WHERE id = ?`,
+    rule.accountId, rule.kind, rule.amountMinor, rule.merchant, rule.category, rule.frequency, rule.anchorDateISO,
+    rule.nextDateISO, rule.active ? 1 : 0, rule.revision, rule.updatedAt, rule.id);
+  });
+}
+
+/** Materialize every due occurrence once. Entry IDs are deterministic and the
+ * rule advance is committed atomically with those postings. */
+export async function processRecurring(db: LedgerDatabase, throughDateISO: string, nowISO = new Date().toISOString()): Promise<number> {
+  let created = 0;
+  await db.withExclusiveTransactionAsync(async tx => {
+    const archive = await readArchive(tx);
+    if (!archive.recurring?.length) return;
+    const records = [...archive.records];
+    const recurring = [...archive.recurring];
+    const inserts: EntryRecord[] = [];
+    const updates: RecurringRule[] = [];
+
+    for (let index = 0; index < recurring.length; index++) {
+      const current = recurring[index];
+      const materialized = materializeRecurringRule(current, archive.accounts, throughDateISO, nowISO);
+      if (!materialized.entries.length) continue;
+      for (const entry of materialized.entries) {
+        const existing = records.find(record => record.entry.id === entry.id);
+        if (existing) {
+          if (!sameEntry(existing.entry, entry)) throw new Error('Un vencimiento recurrente coincide con otro movimiento distinto.');
+          continue; // A restored/voided deterministic occurrence is never duplicated.
+        }
+        const record = initialRecord(entry);
+        records.push(record);
+        inserts.push(record);
+      }
+      recurring[index] = materialized.rule;
+      updates.push(materialized.rule);
+    }
+
+    if (!updates.length) return;
+    validateArchive({ ...archive, records, recurring });
+    for (const record of inserts) await insertRecord(tx, record);
+    for (const rule of updates) {
+      await tx.runAsync('UPDATE recurring_rules SET nextDateISO = ?, revision = ?, updatedAt = ? WHERE id = ?',
+        rule.nextDateISO, rule.revision, rule.updatedAt, rule.id);
+    }
+    created = inserts.length;
+  });
+  return created;
 }
