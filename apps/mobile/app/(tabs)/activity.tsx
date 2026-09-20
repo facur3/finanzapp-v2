@@ -11,17 +11,17 @@ export default function ActivityScreen() {
   const [filter, setFilter] = useState<EntryFilter>('all');
   const [query, setQuery] = useState('');
   const entries = useMemo(() => snapshot ? selectEntries(snapshot.entries, snapshot.accounts, filter, query) : [], [snapshot, filter, query]);
-  const transfers = useMemo(() => snapshot && filter === 'all' ? selectTransfers(snapshot.transfers ?? [], snapshot.accounts, query) : [], [snapshot, filter, query]);
+  const transfers = useMemo(() => snapshot && (filter === 'all' || filter === 'transfer') ? selectTransfers(snapshot.transfers ?? [], snapshot.accounts, query) : [], [snapshot, filter, query]);
   if (!snapshot) return null;
   const count = entries.length + transfers.length;
   const hasRecords = snapshot.entries.length + (snapshot.transfers?.length ?? 0) > 0;
   return <EntryList entries={entries} transfers={transfers} accounts={snapshot.accounts}
-    header={hasRecords ? <View style={{ gap: 16, paddingTop: 4, paddingBottom: 8 }}>
-      <Field label="Buscar movimientos" placeholder="Concepto, categoría o cuenta" value={query} onChangeText={setQuery}
+    header={hasRecords ? <View style={{ gap: 12, paddingTop: 4, paddingBottom: 4 }}>
+      <Field label="Buscar" placeholder="Comercio, categoría o cuenta" value={query} onChangeText={setQuery}
         autoCapitalize="none" autoCorrect={false} clearButtonMode="while-editing" returnKeyType="search" />
       <Choices value={filter} onChange={setFilter}
-        options={[{ value: 'all', label: 'Todos' }, { value: 'expense', label: 'Gastos' }, { value: 'income', label: 'Ingresos' }]} />
-      <AppText secondary style={{ fontSize: 13 }}>{count === 1 ? '1 movimiento' : count + ' movimientos'}</AppText>
+        options={[{ value: 'all', label: 'Todos' }, { value: 'expense', label: 'Gastos' }, { value: 'income', label: 'Ingresos' }, { value: 'transfer', label: 'Transf.' }]} />
+      <AppText tertiary variant="caption" style={{ paddingHorizontal: 4 }}>{count === 1 ? '1 movimiento' : count + ' movimientos'}</AppText>
     </View> : undefined}
     empty={hasRecords ? <EmptyState title="Sin coincidencias" icon="search-outline"
       detail="Probá con otro concepto, categoría o cuenta."

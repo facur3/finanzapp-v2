@@ -15,10 +15,32 @@ server-keyed; manual recording and local data work without connectivity. Recurri
 expenses, debts, budgets and cards remain in scope. Native navigation, accessible
 amounts, real data and recoverable durable writes remain requirements.
 
-## Status and current delivery — Interfaz 10
+## Status and current delivery — Interfaz 11
 
 Implemented is code, checked names a test, device-verified needs a physical result,
 and released means distributed. Neither a bundle nor a screenshot is App Store QA.
+
+- [x] Compact Home: metric and currency controls in one row, an eyebrow + hero amount
+  with the record count (and income when it exists), a week/month control under the
+  hero, Gasto/Ingreso, one budget line (only when budgets exist), the top three
+  categories with share, up to three upcoming commitments (with "Programar" when there
+  are none) and the last four entries. The timeline bars left Home; analysis is in
+  Reportes, linked from the categories block.
+- [x] Movimientos: Todos / Gastos / Ingresos / Transf. filter, section labels Hoy · 20
+  sep, Ayer, weekday within a week, then the date, and a per-day net of entries when
+  the day has one currency (transfers excluded, never mixed currencies).
+- [x] Transaction detail: tile, signed amount, merchant, full date and a status line;
+  category, account or card (linking to the card), budget context only when an active
+  budget matches that month/currency/category, currency; edit and undo. Transfer
+  detail names card payments, debt payments and collections and links to the
+  obligation. No fabricated bank data.
+- [ ] Physical iPhone review of the Home density, section labels and detail layout.
+
+Interfaz 11 verification adds presentation tests for the transfer filter, section
+labels and day nets, Home handler tests (no timeline, Reportes link, Programar,
+Disponible excluding a card) and a detail test for budget context.
+
+### Previous delivery — Interfaz 10
 
 - [x] Five tabs with one meaning each: Inicio, Movimientos, Reportes, Tarjetas, Ajustes.
   Reports and cards are no longer links buried in Home or Settings; Recurrentes is
@@ -108,13 +130,8 @@ are not dead code.
 Interfaz 10 sequences the product/visual work as focused pull requests, each gated
 by CI and merged into master before the next starts:
 
-1. **Home redesign.** Gastos as the default hero, compact period/currency controls,
-   one budget module, top categories in a compact format, upcoming commitments,
-   recent entries and an obvious path to Reportes. Remove the large timeline bars
-   from Home; keep them in Reportes.
-2. **Movimientos and transaction detail.** Wallet-style grouping (Hoy, Ayer, this
-   week, dates), filters including transfers, and a premium detail: large amount,
-   merchant, date, account or card, category, edit and undo. No fabricated metadata.
+1. ~~Home redesign~~ — delivered in Interfaz 11.
+2. ~~Movimientos and transaction detail~~ — delivered in Interfaz 11.
 3. **Entry forms.** Large amount, obvious expense/income/transfer state, prominent
    account-or-card and category selectors, merchant, date; optional fields disclosed
    progressively. No decorative Split/Receipt/Tags until their data exists.
@@ -196,6 +213,15 @@ values are never hidden until an animation finishes. 44-point targets, VoiceOver
 safe areas, system text and separate currencies apply to every new screen.
 
 ## Handoff log (historical evidence)
+
+### 2026-09-20 — Interfaz 11: compact Home, Movimientos and transaction detail
+
+- Home lost the timeline bars and the empty budget card; it keeps one hero, compact
+  controls, budget line, top categories, upcoming commitments and recent entries.
+- Movimientos filters transfers, labels sections by relative day/weekday and shows a
+  single-currency day net. Detail screens follow the Wallet hierarchy with only stored facts.
+- Checked locally: 355 domain/web + 123 mobile tests, TypeScript, Vite build, hygiene,
+  offline Expo compatibility and Metro iOS export. No device evidence.
 
 ### 2026-09-20 — Interfaz 10: five tabs, cards/debts accounting and neutral visual system
 

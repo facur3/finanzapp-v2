@@ -1,6 +1,41 @@
-import type { Account, Currency, Entry, EntryKind, Transfer } from '@finanzapp/domain';
+import { labelFromISO, type Account, type Currency, type Entry, type EntryKind, type Transfer } from '@finanzapp/domain';
 
-export type EntryFilter = 'all' | EntryKind;
+export type EntryFilter = 'all' | EntryKind | 'transfer';
+const WEEKDAYS = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
+// Same abbreviations as the ledger's date labels, independent of the device ICU data.
+const MONTHS = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+
+/** Section label for an activity date: Hoy · 20 sep, Ayer · 19 sep, a weekday
+ * within the last week, then the plain date (with the year when it differs). */
+export function activityDateLabel(dateISO: string, todayISO: string): string {
+  const relative = labelFromISO(dateISO, new Date(todayISO + 'T12:00:00'));
+  const [year, month, day] = dateISO.split('-').map(Number);
+  const date = new Date(year, month - 1, day, 12);
+  if (Number.isNaN(date.getTime())) return relative;
+  const short = day + ' ' + MONTHS[month - 1];
+  const days = Math.round((Date.parse(todayISO + 'T12:00:00Z') - Date.parse(dateISO + 'T12:00:00Z')) / 86400000);
+  if (days === 0) return 'Hoy · ' + short;
+  if (days === 1) return 'Ayer · ' + short;
+  if (days > 1 && days < 7) return WEEKDAYS[date.getDay()] + ' · ' + short;
+  return relative;
+}
+
+/** Net recorded flow of one day's entries in one currency (income minus
+ * expenses, transfers excluded). Null when the day mixes currencies. */
+export function dayNetMinor(entries: Entry[], accounts: Account[]): { currency: Currency; minor: number } | null {
+  const currencies = new Map(accounts.map(account => [account.id, account.currency]));
+  let currency: Currency | null = null;
+  let total = 0n;
+  for (const entry of entries) {
+    const own = currencies.get(entry.accountId);
+    if (!own) return null;
+    if (currency && own !== currency) return null;
+    currency = own;
+    total += BigInt(entry.kind === 'income' ? entry.amountMinor : -entry.amountMinor);
+  }
+  if (!currency || total > BigInt(Number.MAX_SAFE_INTEGER) || total < -BigInt(Number.MAX_SAFE_INTEGER)) return null;
+  return { currency, minor: Number(total) };
+}
 export type EntrySection = { dateISO: string; data: Entry[] };
 const searchable = (text: string) => text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('es-AR');
 
@@ -8,6 +43,7 @@ const searchable = (text: string) => text.normalize('NFD').replace(/[\u0300-\u03
 export function selectEntries(entries: Entry[], accounts: Account[], filter: EntryFilter = 'all', query = '', accountId?: string) {
   const names = new Map(accounts.map(account => [account.id, account.name]));
   const terms = searchable(query).trim().split(/\s+/).filter(Boolean);
+  if (filter === 'transfer') return [];
   return entries.filter(entry => {
     if ((filter !== 'all' && entry.kind !== filter) || (accountId && entry.accountId !== accountId)) return false;
     const text = searchable([entry.merchant, entry.category, names.get(entry.accountId) ?? ''].join(' '));

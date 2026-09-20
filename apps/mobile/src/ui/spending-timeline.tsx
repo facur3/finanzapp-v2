@@ -6,7 +6,9 @@ import { formatMinorUnits, type Currency, type ReportPeriod, type SpendingBucket
 import { AppText, PressFeedback } from './components';
 import { usePalette, useReduceMotion } from './theme';
 
-const dateLabel = (day: string) => new Date(day + 'T12:00:00').toLocaleDateString('es-AR', { day: 'numeric', month: 'short' });
+const MONTHS = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+// Manual abbreviations keep "sep" stable across ICU versions (newer data says "sept").
+const dateLabel = (day: string) => Number(day.slice(8, 10)) + ' ' + MONTHS[Number(day.slice(5, 7)) - 1];
 export const periodLabel = (p: ReportPeriod) => p.startISO === p.endISO ? dateLabel(p.startISO) : dateLabel(p.startISO) + ' – ' + dateLabel(p.endISO);
 
 function Bar({ fraction }: { fraction: number }) {

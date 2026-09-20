@@ -39,7 +39,7 @@ function harness(file: string, props: any = {}, options: { data?: domain.LedgerA
     restoreBackup: async (value: domain.LedgerArchive, baseline: string) => { restores.push({ value, baseline }); await options.restore?.(value, baseline); },
   }) };
   const components = Object.fromEntries(['Screen', 'EmptyState', 'ActionButton', 'AppText', 'AmountField', 'Choices', 'ErrorMessage', 'Field', 'IconButton', 'Surface',
-    'CategoryBadge', 'DetailRow', 'Money', 'SectionTitle'].map(name => [name, name]));
+    'CategoryBadge', 'DetailRow', 'Money', 'SectionTitle', 'GlyphTile'].map(name => [name, name]));
   const modules: Record<string, unknown> = {
     react: { useState: (initial: any) => { const i = cursor++; if (!(i in state)) state[i] = typeof initial === 'function' ? initial() : initial;
       return [state[i], (next: any) => { state[i] = typeof next === 'function' ? next(state[i]) : next; }]; },
@@ -58,7 +58,8 @@ function harness(file: string, props: any = {}, options: { data?: domain.LedgerA
     './form-controls': { AccountField: 'AccountField', CategoryField: 'CategoryField', DateField: 'DateField' },
     './presentation': presentation,
     './liability-presentation': liabilityPresentation,
-    '../../src/ui/theme': { usePalette: () => ({ text: '#000', positive: '#070', income: '#070', expense: '#700', tint: '#00F' }) },
+    '../../src/ui/theme': { space: { xs: 4, s: 8, m: 12, l: 16, xl: 20, xxl: 24, xxxl: 32 },
+      usePalette: () => ({ text: '#000', positive: '#070', income: '#070', expense: '#700', tint: '#00F', warning: '#a60', secondary: '#666', tertiary: '#999' }) },
     './theme': { space: { xs: 4, s: 8, m: 12, l: 16, xl: 20, xxl: 24, xxxl: 32 } },
   };
   const module = { exports: {} as Record<string, (props: any) => Node> };
@@ -423,4 +424,18 @@ test('a card purchase detail links to the card, not to a generic account screen'
   assert.equal(row.props.value, 'Visa');
   row.props.onPress();
   assert.equal(JSON.stringify(view.pushed[0]), JSON.stringify({ pathname: '/card/[id]', params: { id: 'card' } }));
+});
+
+test('entry detail shows budget context only for a matching active budget, and links to that month', () => {
+  const budget: domain.MonthlyBudget = { id: 'b', category: 'salud', currency: 'ARS', monthISO: '2026-01', amountMinor: 20000, active: true, createdAt, revision: 0, updatedAt: createdAt };
+  const view = harness('app/entry/[id].tsx', {}, { data: { ...archive, budgets: [budget] }, params: { id: entry.id } });
+  const row = find(view.render(), 'DetailRow', 'Presupuesto');
+  assert.equal(row.props.value, '62 % usado · quedan 76,55');
+  assert.equal(row.props.tone, 'neutral');
+  row.props.onPress();
+  assert.equal(JSON.stringify(view.pushed[0]), JSON.stringify({ pathname: '/budgets', params: { currency: 'ARS', month: '2026-01' } }));
+  const other = harness('app/entry/[id].tsx', {}, { data: { ...archive, budgets: [{ ...budget, monthISO: '2026-02' }] }, params: { id: entry.id } });
+  assert.equal(nodes(other.render()).some(node => node.type === 'DetailRow' && node.props.label === 'Presupuesto'), false);
+  const exceeded = harness('app/entry/[id].tsx', {}, { data: { ...archive, budgets: [{ ...budget, amountMinor: 10000 }] }, params: { id: entry.id } });
+  assert.equal(find(exceeded.render(), 'DetailRow', 'Presupuesto').props.tone, 'expense');
 });

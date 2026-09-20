@@ -29,8 +29,11 @@ Gastos / Disponible Home hero and a non-networked Assistant preview. **Interfaz 
 (2026-09-20)** restructures navigation into five tabs (Inicio, Movimientos, Reportes,
 Tarjetas, Ajustes), adds credit cards, personal debts and receivables with correct
 accounting, and replaces the purple accent with a neutral, semantic visual system.
-The spending-first decision remains authoritative, with device checks still an
-explicit gate.
+**Interfaz 11 (2026-09-20)** makes Home compact (one hero, compact controls, budget
+line, top categories, upcoming, recent), adds a transfer filter, relative section
+labels and day nets to Movimientos, and gives transaction detail the Wallet
+hierarchy with budget context. The spending-first decision remains authoritative,
+with device checks still an explicit gate.
 
 Inicio → Reporte mensual offers Categorías / Día a día and Comparar gastos. Current
 months compare equal initial day counts (both capped if the previous month is
@@ -38,7 +41,7 @@ shorter); historical months compare full months. Exact date ranges stay visible.
 Category totals open only their dated expenses. Missing records are not savings.
 Native backup/recovery stays available, but no JSON import is required to start.
 
-## Product scope (Interfaz 10)
+## Product scope (Interfaz 11)
 
 [Decision 002](../../docs/decisions/002-spending-first.md) selects spending and
 commitments with optional accounts. No native portfolio or market data. The old
@@ -271,7 +274,8 @@ For the intermittent black-tab report, update to `master`, restart with
 `npm start -- --clear` (bundler cache only, not SQLite), reopen from the new QR,
 and repeat the **Interfaz 02** tab checks, **Interfaz 03** report checks and
 **Interfaz 04/05** correction/recovery and transfer checks, plus **Interfaz 06** daily/comparison reports and **Interfaz 08** recurring/upcoming
-checks, plus **Interfaz 10** cards/debts and five-tab checks. The current footer says Interfaz 10.
+checks, plus **Interfaz 10** cards/debts and five-tab checks and **Interfaz 11** Home,
+Movimientos and detail checks. The current footer says Interfaz 11.
 Before updating, save a private pilot copy; do not uninstall or add fake movements.
 
 If a storage/refresh error occurs, the form retains the exact submitted command
