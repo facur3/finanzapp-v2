@@ -1,5 +1,6 @@
 import { totalsByCurrency, validateAccount, validateEntry, type Account, type Entry, type LedgerSnapshot } from './ledger.ts';
 import { TRANSFER_KEYS, sameTransferRecord, validateTransferRecord, type TransferRecord } from './transfers.ts';
+import { sameRecurringRule, validateRecurringRule, type RecurringRule } from './recurring.ts';
 
 /** The current version of every entry, including reversible tombstones.
  * Reports consume snapshotFromArchive, never the tombstones themselves. */
@@ -9,7 +10,12 @@ export interface EntryRecord {
   voided: boolean;
   updatedAt: string;
 }
-export interface LedgerArchive { accounts: Account[]; records: EntryRecord[]; transfers?: TransferRecord[]; }
+export interface LedgerArchive {
+  accounts: Account[];
+  records: EntryRecord[];
+  transfers?: TransferRecord[];
+  recurring?: RecurringRule[];
+}
 export interface EntryChange {
   id: string;
   action: 'edit' | 'void' | 'restore';
@@ -19,6 +25,8 @@ export interface EntryChange {
 export const BACKUP_MAX_BYTES = 5 * 1024 * 1024;
 const ACCOUNT_KEYS = ['id', 'name', 'currency', 'openingMinor', 'createdAt'] as const;
 const ENTRY_KEYS = ['id', 'accountId', 'kind', 'amountMinor', 'merchant', 'category', 'dateISO', 'createdAt'] as const;
+const RECURRING_KEYS = ['id', 'accountId', 'kind', 'amountMinor', 'merchant', 'category', 'frequency',
+  'anchorDateISO', 'nextDateISO', 'active', 'createdAt', 'revision', 'updatedAt'] as const;
 
 function object(value: unknown, keys: readonly string[]): Record<string, unknown> {
   if (!value || typeof value !== 'object' || Array.isArray(value)
@@ -41,6 +49,12 @@ function entryValue(value: unknown, accounts: Account[]): Entry {
   const item = object(value, ENTRY_KEYS) as unknown as Entry;
   validateEntry(item, accounts);
   return Object.fromEntries(ENTRY_KEYS.map(key => [key, item[key]])) as unknown as Entry;
+}
+function recurringValue(value: unknown, accounts: Account[]): RecurringRule {
+  const row = object(value, RECURRING_KEYS);
+  const rule = Object.fromEntries(RECURRING_KEYS.map(key => [key, row[key]])) as unknown as RecurringRule;
+  validateRecurringRule(rule, accounts);
+  return rule;
 }
 export function initialRecord(entry: Entry): EntryRecord {
   return { entry, revision: 0, voided: false, updatedAt: entry.createdAt };
@@ -78,6 +92,12 @@ export function validateArchive(archive: LedgerArchive): void {
     if (transfers.has(record.transfer.id)) throw new Error('La copia repite una transferencia.');
     transfers.add(record.transfer.id);
   }
+  const recurring = new Set<string>();
+  for (const rule of archive.recurring ?? []) {
+    validateRecurringRule(rule, archive.accounts);
+    if (recurring.has(rule.id)) throw new Error('La copia repite un recurrente.');
+    recurring.add(rule.id);
+  }
   totalsByCurrency(snapshotFromArchive(archive));
 }
 export function sameAccount(a: Account, b: Account): boolean {
@@ -95,6 +115,8 @@ function canonicalArchive(archive: LedgerArchive): LedgerArchive {
       voided: record.voided, updatedAt: record.updatedAt })).sort((a, b) => a.entry.id.localeCompare(b.entry.id)),
     ...(archive.transfers?.length ? { transfers: archive.transfers.map(r => transferValue(r, archive.accounts))
       .sort((a, b) => a.transfer.id.localeCompare(b.transfer.id)) } : {}),
+    ...(archive.recurring?.length ? { recurring: archive.recurring.map(rule => recurringValue(rule, archive.accounts))
+      .sort((a, b) => a.id.localeCompare(b.id)) } : {}),
   };
 }
 function transferValue(value: unknown, accounts: Account[]): TransferRecord {
@@ -130,8 +152,8 @@ export function validateEntryChange(change: EntryChange, accounts: Account[]): v
 export function createRecoveryBackup(archive: LedgerArchive, now = new Date()) {
   validateArchive(archive);
   const canonical = canonicalArchive(archive);
-  return { app: 'FinanzApp', schema: 'finanzapp.native-pilot.v3', exportedAt: now.toISOString(),
-    moneyUnit: 'integer-minor-units', ...canonical, transfers: canonical.transfers ?? [] };
+  return { app: 'FinanzApp', schema: 'finanzapp.native-pilot.v4', exportedAt: now.toISOString(),
+    moneyUnit: 'integer-minor-units', ...canonical, transfers: canonical.transfers ?? [], recurring: canonical.recurring ?? [] };
 }
 export interface ParsedBackup { archive: LedgerArchive; exportedAt: string; }
 export function parsePilotBackup(raw: string): ParsedBackup {
@@ -141,26 +163,35 @@ export function parsePilotBackup(raw: string): ParsedBackup {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('El archivo no es una copia de FinanzApp.');
   const header = value as Record<string, unknown>;
   const v1 = header.schema === 'finanzapp.native-pilot.v1';
+  const v2 = header.schema === 'finanzapp.native-pilot.v2';
   const v3 = header.schema === 'finanzapp.native-pilot.v3';
-  if (!v1 && !v3 && header.schema !== 'finanzapp.native-pilot.v2') {
-    throw new Error('Solo se pueden restaurar copias del piloto nativo v1, v2 o v3. La app web/anterior y otras versiones todavía no son compatibles; conservá el archivo.');
+  const v4 = header.schema === 'finanzapp.native-pilot.v4';
+  if (!v1 && !v2 && !v3 && !v4) {
+    throw new Error('Solo se pueden restaurar copias del piloto nativo v1, v2, v3 o v4. La app web/anterior y otras versiones todavía no son compatibles; conservá el archivo.');
   }
-  object(value, ['app', 'schema', 'exportedAt', 'moneyUnit', 'accounts', v1 ? 'entries' : 'records', ...(v3 ? ['transfers'] : [])]);
+  object(value, ['app', 'schema', 'exportedAt', 'moneyUnit', 'accounts', v1 ? 'entries' : 'records',
+    ...(v3 || v4 ? ['transfers'] : []), ...(v4 ? ['recurring'] : [])]);
   if (header.app !== 'FinanzApp' || header.moneyUnit !== 'integer-minor-units') throw new Error('Formato o unidad monetaria no compatibles.');
   timestamp(header.exportedAt);
   const rows = v1 ? header.entries : header.records;
   if (!Array.isArray(header.accounts) || !Array.isArray(rows) || header.accounts.length > 1000 || rows.length > 25000) {
     throw new Error('La copia no tiene una lista válida de cuentas y movimientos (máximo 1.000 cuentas y 25.000 movimientos).');
   }
-  if (v3 && (!Array.isArray(header.transfers) || header.transfers.length + rows.length > 25000)) throw new Error('La copia supera el límite de movimientos o contiene transferencias inválidas.');
-  const accounts = header.accounts.map(a => accountValue(a, v3));
+  if ((v3 || v4) && (!Array.isArray(header.transfers) || header.transfers.length + rows.length > 25000)) {
+    throw new Error('La copia supera el límite de movimientos o contiene transferencias inválidas.');
+  }
+  if (v4 && (!Array.isArray(header.recurring) || header.recurring.length > 5000)) {
+    throw new Error('La copia contiene demasiados recurrentes o un formato inválido.');
+  }
+  const accounts = header.accounts.map(a => accountValue(a, v3 || v4));
   const records = rows.map((value): EntryRecord => {
     if (v1) return initialRecord(entryValue(value, accounts));
     const record = object(value, ['entry', 'revision', 'voided', 'updatedAt']);
     return { entry: entryValue(record.entry, accounts), revision: record.revision as number, voided: record.voided as boolean, updatedAt: record.updatedAt as string };
   });
-  const transfers = v3 ? (header.transfers as unknown[]).map(t => transferValue(t, accounts)) : [];
-  const archive = { accounts, records, ...(transfers.length ? { transfers } : {}) };
+  const transfers = v3 || v4 ? (header.transfers as unknown[]).map(t => transferValue(t, accounts)) : [];
+  const recurring = v4 ? (header.recurring as unknown[]).map(rule => recurringValue(rule, accounts)) : [];
+  const archive = { accounts, records, ...(transfers.length ? { transfers } : {}), ...(recurring.length ? { recurring } : {}) };
   validateArchive(archive);
   return { archive, exportedAt: header.exportedAt };
 }
@@ -170,6 +201,7 @@ export interface ImportPreview {
   accounts: Account[];
   records: EntryRecord[];
   transfers: TransferRecord[];
+  recurring: RecurringRule[];
   identical: number;
   conflicts: number;
   before: ReturnType<typeof totalsByCurrency>;
@@ -182,7 +214,9 @@ export function previewBackupImport(current: LedgerArchive, incoming: LedgerArch
   const accountMap = new Map(current.accounts.map(account => [account.id, account]));
   const recordMap = new Map(current.records.map(record => [record.entry.id, record]));
   const transferMap = new Map((current.transfers ?? []).map(r => [r.transfer.id, r]));
+  const recurringMap = new Map((current.recurring ?? []).map(rule => [rule.id, rule]));
   const transfers: TransferRecord[] = [];
+  const recurring: RecurringRule[] = [];
   const accounts: Account[] = [], records: EntryRecord[] = [];
   let conflicts = 0, identical = 0;
   for (const account of incoming.accounts) {
@@ -202,8 +236,15 @@ export function previewBackupImport(current: LedgerArchive, incoming: LedgerArch
     else if (sameTransferRecord(existing, record)) identical++;
     else conflicts++;
   }
-  const combined = { accounts: [...current.accounts, ...accounts], records: [...current.records, ...records], transfers: [...current.transfers ?? [], ...transfers] };
+  for (const rule of incoming.recurring ?? []) {
+    const existing = recurringMap.get(rule.id);
+    if (!existing) recurring.push(rule);
+    else if (sameRecurringRule(existing, rule)) identical++;
+    else conflicts++;
+  }
+  const combined = { accounts: [...current.accounts, ...accounts], records: [...current.records, ...records],
+    transfers: [...current.transfers ?? [], ...transfers], recurring: [...current.recurring ?? [], ...recurring] };
   if (!conflicts) validateArchive(combined);
-  return { baseline: archiveKey(current), accounts, records, transfers, identical, conflicts,
+  return { baseline: archiveKey(current), accounts, records, transfers, recurring, identical, conflicts,
     before: totalsByCurrency(snapshotFromArchive(current)), after: conflicts ? null : totalsByCurrency(snapshotFromArchive(combined)) };
 }
