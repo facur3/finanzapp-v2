@@ -501,3 +501,14 @@ Actualizá como en el paso anterior (copia privada, `git pull --ff-only`, `npm c
    el día de la semana y luego la fecha, con el neto del día a la derecha.
 3. Abrí un gasto: importe, comercio, fecha, categoría y cuenta o tarjeta. Si tenés un
    presupuesto para esa categoría en ese mes, aparece cuánto usaste.
+
+## 15. Interfaz 12: formularios más claros
+
+Actualizá como en los pasos anteriores. En Ajustes debe decir **Interfaz 12**.
+
+1. Tocá Gasto en Inicio: arriba el tipo, el importe grande y después dos tarjetas
+   grandes, Categoría y Pagado con. Elegí una tarjeta de crédito y mirá cómo cambia
+   la línea de deuda; elegí una cuenta y mirá el saldo registrado.
+2. Si tenés un presupuesto para esa categoría este mes, la tarjeta Categoría muestra
+   cuánto llevás gastado de ese límite.
+3. Tocá Transferencia: abre el formulario de transferencia con la misma cuenta.

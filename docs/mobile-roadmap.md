@@ -15,10 +15,28 @@ server-keyed; manual recording and local data work without connectivity. Recurri
 expenses, debts, budgets and cards remain in scope. Native navigation, accessible
 amounts, real data and recoverable durable writes remain requirements.
 
-## Status and current delivery — Interfaz 11
+## Status and current delivery — Interfaz 12
 
 Implemented is code, checked names a test, device-verified needs a physical result,
 and released means distributed. Neither a bundle nor a screenshot is App Store QA.
+
+- [x] Entry form hierarchy: Gasto / Ingreso / Transferencia switch (Transferencia hands
+  off to the transfer form and back), a large amount tinted green for income, then two
+  full-width selector cards that cannot be overlooked: Categoría (with the live budget
+  line for that month when one exists) and Pagado con / Ingresa en (with the recorded
+  balance or card debt, and the kind of each option in the sheet), then merchant and
+  date. The save button echoes the amount. A card purchase says it counts once.
+- [x] Transfer form: the same kind switch in plain mode; source and destination are
+  selector cards with the resulting balance; a locked card or debt shows as a fixed
+  card with its debt or pending amount. Recurring form uses the same selector cards.
+- [x] No decorative Split, Receipt or Tags controls: they appear only when their data exists.
+- [ ] Physical iPhone review of the form with the keyboard open, large text and VoiceOver.
+
+Interfaz 12 verification adds form handler tests for the prominent selectors (labels,
+live balance and card debt, budget line, amount echo, hand-off to transfers, debt
+accounts never offered).
+
+### Previous delivery — Interfaz 11
 
 - [x] Compact Home: metric and currency controls in one row, an eyebrow + hero amount
   with the record count (and income when it exists), a week/month control under the
@@ -132,9 +150,7 @@ by CI and merged into master before the next starts:
 
 1. ~~Home redesign~~ — delivered in Interfaz 11.
 2. ~~Movimientos and transaction detail~~ — delivered in Interfaz 11.
-3. **Entry forms.** Large amount, obvious expense/income/transfer state, prominent
-   account-or-card and category selectors, merchant, date; optional fields disclosed
-   progressively. No decorative Split/Receipt/Tags until their data exists.
+3. ~~Entry forms~~ — delivered in Interfaz 12.
 4. **Reportes.** Category donut with legend, historical trend, previous-period
    comparison, top merchants, budget status and honest insights; period, category
    and account filters. Net cash flow, never "savings", until savings has a definition.
@@ -213,6 +229,14 @@ values are never hidden until an animation finishes. 44-point targets, VoiceOver
 safe areas, system text and separate currencies apply to every new screen.
 
 ## Handoff log (historical evidence)
+
+### 2026-09-20 — Interfaz 12: entry, transfer and recurring form hierarchy
+
+- Forms lead with kind and amount, then Categoría and Pagado con / Ingresa en as
+  full-width cards with live context (balance, card debt, month budget). Transfers
+  and recurring rules share the pattern; obligations stay locked in payment mode.
+- Checked locally: 355 domain/web + 124 mobile tests, TypeScript, Vite build, hygiene,
+  offline Expo compatibility and Metro iOS export. No device evidence.
 
 ### 2026-09-20 — Interfaz 11: compact Home, Movimientos and transaction detail
 

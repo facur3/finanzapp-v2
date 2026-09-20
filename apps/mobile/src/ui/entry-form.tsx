@@ -1,18 +1,23 @@
-import { useRef, useState } from 'react';
-import { Keyboard } from 'react-native';
+import { useMemo, useRef, useState } from 'react';
+import { Keyboard, View } from 'react-native';
 import { router, Stack } from 'expo-router';
 import { randomUUID } from 'expo-crypto';
 import * as Haptics from 'expo-haptics';
-import { formatMinorUnits, makeEntryChange, parseMinorUnits, sameEntry, todayKey, validateEntry, validateEntryChange,
-  type Entry, type EntryChange, type EntryKind, type EntryRecord } from '@finanzapp/domain';
+import { accountBalanceMinor, categoryKey, formatMinorUnits, makeEntryChange, parseMinorUnits, sameEntry, summarizeMonthlyBudgets, todayKey,
+  validateEntry, validateEntryChange, type Entry, type EntryChange, type EntryKind, type EntryRecord } from '@finanzapp/domain';
 import { useLedger } from '../storage/LedgerProvider';
 import { ActionButton, AmountField, AppText, Choices, EmptyState, ErrorMessage, Field, IconButton, Screen, Surface } from './components';
 import { AccountField, CategoryField, DateField } from './form-controls';
 import { accountKindLabel, postingAccounts } from './liability-presentation';
 import { initialAccountId } from './presentation';
+import { space } from './theme';
 
-/** One form for creating and correcting a posting. A submitted command stays
- * frozen across retries, including a failed refresh after SQLite committed. */
+type FormKind = EntryKind | 'transfer';
+
+/** One form for creating and correcting a posting. The amount, the kind, the
+ * category and the account or card are the four things a user must see; a
+ * submitted command stays frozen across retries, including a failed refresh
+ * after SQLite committed. */
 export function EntryForm({ original, accountId: requestedAccount, currency, kind: requestedKind }: {
   original?: EntryRecord; accountId?: string; currency?: string; kind?: string;
 }) {
@@ -36,6 +41,37 @@ export function EntryForm({ original, accountId: requestedAccount, currency, kin
   const eligibleAccounts = before ? accounts.filter(item => item.currency === originalCurrency) : accounts;
   const locked = busy || pending !== null;
   const close = () => { if (!saving.current) { if (router.canGoBack()) router.back(); else router.replace('/'); } };
+  const cards = archive?.cards ?? [], debts = archive?.debts ?? [];
+  const kindOf = (id: string) => { const found = accounts.find(item => item.id === id); return found ? accountKindLabel(found, cards, debts) : 'Cuenta'; };
+  const isCard = !!account && cards.some(card => card.accountId === account.id);
+
+  // Live context for the two prominent selectors: recorded balance or card debt, and the category budget for that month.
+  const accountDetail = useMemo(() => {
+    if (!account || !snapshot) return undefined;
+    const balance = accountBalanceMinor(account, snapshot.entries, snapshot.transfers);
+    const money = (minor: number) => (account.currency === 'USD' ? 'US$ ' : '$ ') + formatMinorUnits(Math.abs(minor));
+    if (isCard) return balance < 0 ? `Tarjeta de crédito · deuda ${money(balance)}` : `Tarjeta de crédito · ${balance > 0 ? 'a favor ' + money(balance) : 'sin deuda'}`;
+    return `Saldo registrado ${balance < 0 ? '−' : ''}${money(balance)}`;
+  }, [account, snapshot, isCard]);
+  const budget = useMemo(() => {
+    if (!account || !snapshot || kind !== 'expense' || !category.trim()) return null;
+    try {
+      const row = summarizeMonthlyBudgets(snapshot, archive?.budgets ?? [], account.currency, todayKey(date).slice(0, 7)).rows
+        .find(item => categoryKey(item.budget.category) === categoryKey(category));
+      if (!row) return null;
+      const money = (minor: number) => (account.currency === 'USD' ? 'US$ ' : '$ ') + formatMinorUnits(minor);
+      return { text: row.exceeded ? `Presupuesto excedido por ${money(-row.remainingMinor)}` : `${money(row.spentMinor)} de ${money(row.budget.amountMinor)} este mes`,
+        tone: row.exceeded ? 'expense' as const : row.ratio >= 0.85 ? 'warning' as const : 'neutral' as const };
+    } catch { return null; }
+  }, [account, snapshot, archive?.budgets, kind, category, date]);
+  let parsed: number | null = null;
+  try { parsed = parseMinorUnits(amount); } catch { parsed = null; }
+  const amountEcho = parsed && parsed > 0 && account ? ` · ${account.currency === 'USD' ? 'US$ ' : '$ '}${formatMinorUnits(parsed)}` : '';
+
+  function changeKind(next: FormKind) {
+    if (next === 'transfer') { router.replace({ pathname: '/new-transfer', params: account ? { accountId: account.id } : {} }); return; }
+    setKind(next);
+  }
 
   async function save() {
     if (saving.current) return;
@@ -70,27 +106,36 @@ export function EntryForm({ original, accountId: requestedAccount, currency, kin
     }
   }
 
-  return <Screen>
-    <Stack.Screen options={{ title: before ? 'Editar movimiento' : kind === 'expense' ? 'Registrar gasto' : 'Registrar ingreso', gestureEnabled: !busy,
+  const title = before ? 'Editar movimiento' : kind === 'expense' ? (isCard ? 'Compra con tarjeta' : 'Registrar gasto') : 'Registrar ingreso';
+  return <Screen gap={space.l}>
+    <Stack.Screen options={{ title, gestureEnabled: !busy,
       headerLeft: () => <IconButton name="close" label="Cerrar" onPress={close} disabled={busy} /> }} />
     {!accounts.length ? <EmptyState title="Primero, una cuenta" detail="Cada movimiento necesita una cuenta para actualizar su saldo."
       action={<ActionButton label="Agregar cuenta" onPress={() => router.replace('/new-account')} />} /> : <>
-      <Choices value={kind} onChange={setKind} disabled={locked}
-        options={[{ value: 'expense', label: 'Gasto' }, { value: 'income', label: 'Ingreso' }]} />
-      <AmountField currency={account?.currency ?? 'ARS'} value={amount} onChangeText={value => { setAmount(value); setError(null); }} editable={!locked} />
-      <Field label={kind === 'expense' ? 'Comercio o concepto' : 'Origen o concepto'} value={merchant}
+      <Choices<FormKind> value={kind} onChange={changeKind} disabled={locked}
+        options={before ? [{ value: 'expense', label: 'Gasto' }, { value: 'income', label: 'Ingreso' }]
+          : [{ value: 'expense', label: 'Gasto' }, { value: 'income', label: 'Ingreso' }, { value: 'transfer', label: 'Transferencia' }]} />
+      <AmountField currency={account?.currency ?? 'ARS'} value={amount} onChangeText={value => { setAmount(value); setError(null); }} editable={!locked}
+        tone={kind === 'income' ? 'income' : 'neutral'} label={kind === 'expense' ? 'Gasto' : 'Ingreso'} />
+      <View style={{ gap: space.m }}>
+        <CategoryField entries={snapshot?.entries ?? []} kind={kind} value={category} onChange={setCategory} disabled={locked}
+          prominent detail={budget?.text} detailTone={budget?.tone} />
+        <AccountField label={kind === 'expense' ? 'Pagado con' : 'Ingresa en'} accounts={eligibleAccounts} value={accountId} onChange={setAccountId} disabled={locked}
+          prominent kindOf={kindOf} detail={accountDetail}
+          describe={item => { const balance = snapshot ? accountBalanceMinor(item, snapshot.entries, snapshot.transfers) : 0;
+            return (cards.some(card => card.accountId === item.id) ? 'deuda ' : 'saldo ') + formatMinorUnits(Math.abs(balance)); }} />
+      </View>
+      <Field label={kind === 'expense' ? 'Comercio o concepto' : 'Origen o concepto'} value={merchant} placeholder={kind === 'expense' ? 'Ej. Carrefour' : 'Ej. Sueldo'}
         onChangeText={setMerchant} maxLength={120} autoCapitalize="sentences" editable={!locked} />
-      <Surface grouped>
-        <CategoryField entries={snapshot?.entries ?? []} kind={kind} value={category} onChange={setCategory} disabled={locked} />
-        <AccountField label="Cuenta o tarjeta" accounts={eligibleAccounts} value={accountId} onChange={setAccountId} disabled={locked}
-          kindOf={id => { const found = accounts.find(item => item.id === id); return found ? accountKindLabel(found, archive?.cards, archive?.debts) : 'Cuenta'; }} />
-        <DateField value={date} onChange={setDate} disabled={locked} />
-      </Surface>
-      {before && <AppText secondary style={{ fontSize: 13, textAlign: 'center' }}>Corregís el movimiento original. No se registra otro gasto o ingreso.</AppText>}
+      <Surface grouped><DateField value={date} onChange={setDate} disabled={locked} /></Surface>
+      {isCard && kind === 'expense' && !before && <AppText secondary variant="footnote" style={{ textAlign: 'center' }}>
+        Cuenta como gasto una sola vez y suma a la deuda de la tarjeta. El pago del resumen se registra desde Tarjetas.
+      </AppText>}
+      {before && <AppText secondary variant="footnote" style={{ textAlign: 'center' }}>Corregís el movimiento original. No se registra otro gasto o ingreso.</AppText>}
       <ErrorMessage message={error} />
-      {pending && !busy && error && <AppText secondary style={{ fontSize: 13 }}>Conservamos el envío para reintentar sin duplicarlo. Para cambiar los datos, cerrá y revisá primero Movimientos.</AppText>}
-      <ActionButton label={pending && error ? 'Reintentar guardado' : before ? 'Guardar cambios' : kind === 'expense' ? 'Guardar gasto' : 'Guardar ingreso'} onPress={save} busy={busy}
-        disabled={!amount.trim() || !merchant.trim() || !category.trim() || !account} />
+      {pending && !busy && error && <AppText secondary variant="footnote">Conservamos el envío para reintentar sin duplicarlo. Para cambiar los datos, cerrá y revisá primero Movimientos.</AppText>}
+      <ActionButton label={pending && error ? 'Reintentar guardado' : before ? 'Guardar cambios' : (kind === 'expense' ? 'Guardar gasto' : 'Guardar ingreso') + amountEcho}
+        onPress={save} busy={busy} disabled={!amount.trim() || !merchant.trim() || !category.trim() || !account} />
     </>}
   </Screen>;
 }

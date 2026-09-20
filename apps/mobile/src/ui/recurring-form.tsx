@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { Keyboard } from 'react-native';
+import { Keyboard, View } from 'react-native';
 import { router, Stack } from 'expo-router';
 import { randomUUID } from 'expo-crypto';
 import * as Haptics from 'expo-haptics';
@@ -10,6 +10,7 @@ import { ActionButton, AmountField, AppText, Choices, EmptyState, ErrorMessage, 
 import { AccountField, CategoryField, DateField } from './form-controls';
 import { accountKindLabel, postingAccounts } from './liability-presentation';
 import { initialAccountId } from './presentation';
+import { space } from './theme';
 
 export function RecurringForm({ original, accountId: requestedAccount }: { original?: RecurringRule; accountId?: string }) {
   const { snapshot, archive, saveRecurring } = useLedger();
@@ -94,7 +95,7 @@ export function RecurringForm({ original, accountId: requestedAccount }: { origi
     }
   }
 
-  return <Screen>
+  return <Screen gap={space.l}>
     <Stack.Screen options={{ title: before ? 'Editar recurrente' : 'Nuevo recurrente', gestureEnabled: !busy,
       headerLeft: () => <IconButton name="close" label="Cerrar" onPress={close} disabled={busy} /> }} />
     {!accounts.length ? <EmptyState title="Primero, una cuenta"
@@ -102,17 +103,17 @@ export function RecurringForm({ original, accountId: requestedAccount }: { origi
       action={<ActionButton label="Agregar cuenta" onPress={() => router.replace('/new-account')} />} /> : <>
       <Choices value={kind} onChange={setKind} disabled={locked}
         options={[{ value: 'expense', label: 'Gasto' }, { value: 'income', label: 'Ingreso' }]} />
-      <AmountField currency={account?.currency ?? 'ARS'} value={amount}
-        onChangeText={value => { setAmount(value); setError(null); }} editable={!locked} />
-      <Field label={kind === 'expense' ? 'Comercio o concepto' : 'Origen o concepto'} value={merchant}
-        onChangeText={setMerchant} maxLength={120} autoCapitalize="sentences" editable={!locked} />
-      <Surface grouped>
-        <CategoryField entries={snapshot?.entries ?? []} kind={kind} value={category} onChange={setCategory} disabled={locked} />
-        <AccountField label="Cuenta o tarjeta" accounts={eligibleAccounts} value={accountId} onChange={setAccountId} disabled={locked}
+      <AmountField currency={account?.currency ?? 'ARS'} value={amount} label={kind === 'expense' ? 'Gasto recurrente' : 'Ingreso recurrente'}
+        onChangeText={value => { setAmount(value); setError(null); }} editable={!locked} tone={kind === 'income' ? 'income' : 'neutral'} />
+      <View style={{ gap: space.m }}>
+        <CategoryField entries={snapshot?.entries ?? []} kind={kind} value={category} onChange={setCategory} disabled={locked} prominent />
+        <AccountField label={kind === 'expense' ? 'Pagado con' : 'Ingresa en'} accounts={eligibleAccounts} value={accountId} onChange={setAccountId} disabled={locked} prominent
           kindOf={id => { const found = accounts.find(item => item.id === id); return found ? accountKindLabel(found, archive?.cards, archive?.debts) : 'Cuenta'; }} />
-        <DateField value={date} onChange={setDate} disabled={locked} allowFuture label="Próxima fecha" />
-      </Surface>
+      </View>
+      <Field label={kind === 'expense' ? 'Comercio o concepto' : 'Origen o concepto'} value={merchant} placeholder={kind === 'expense' ? 'Ej. Alquiler' : 'Ej. Sueldo'}
+        onChangeText={setMerchant} maxLength={120} autoCapitalize="sentences" editable={!locked} />
       <ViewFrequency value={frequency} onChange={setFrequency} disabled={locked} />
+      <Surface grouped><DateField value={date} onChange={setDate} disabled={locked} allowFuture label="Próxima fecha" /></Surface>
       <AppText secondary style={{ fontSize: 13, textAlign: 'center' }}>
         Si la próxima fecha es hoy, FinanzApp registra ese movimiento al guardar. Luego avanza la fecha automáticamente sin duplicarlo.
       </AppText>
