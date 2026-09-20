@@ -74,6 +74,10 @@ function Navigation() {
       <Stack.Screen name="report-comparison" options={{ title: 'Comparar gastos' }} />
       <Stack.Screen name="recurring" options={{ title: 'Recurrentes' }} />
       <Stack.Screen name="budgets" options={{ title: 'Presupuestos' }} />
+      <Stack.Screen name="cards" options={{ title: 'Tarjetas' }} />
+      <Stack.Screen name="card/[id]" options={{ title: 'Tarjeta' }} />
+      <Stack.Screen name="debts" options={{ title: 'Deudas' }} />
+      <Stack.Screen name="debt/[id]" options={{ title: 'Deuda' }} />
       <Stack.Screen name="assistant-preview" options={{ title: 'Asistente', presentation: 'modal' }} />
       <Stack.Screen name="new-account" options={{ title: 'Nueva cuenta', presentation: 'modal' }} />
       <Stack.Screen name="new-entry" options={{ title: 'Nuevo movimiento', presentation: 'modal' }} />
@@ -84,6 +88,10 @@ function Navigation() {
       <Stack.Screen name="edit-recurring/[id]" options={{ title: 'Editar recurrente', presentation: 'modal' }} />
       <Stack.Screen name="new-budget" options={{ title: 'Nuevo presupuesto', presentation: 'modal' }} />
       <Stack.Screen name="edit-budget/[id]" options={{ title: 'Editar presupuesto', presentation: 'modal' }} />
+      <Stack.Screen name="new-card" options={{ title: 'Nueva tarjeta', presentation: 'modal' }} />
+      <Stack.Screen name="edit-card/[id]" options={{ title: 'Editar tarjeta', presentation: 'modal' }} />
+      <Stack.Screen name="new-debt" options={{ title: 'Nueva deuda', presentation: 'modal' }} />
+      <Stack.Screen name="edit-debt/[id]" options={{ title: 'Editar deuda', presentation: 'modal' }} />
       <Stack.Screen name="edit-transfer/[id]" options={{ title: 'Editar transferencia', presentation: 'modal' }} />
       <Stack.Screen name="transfer/[id]" options={{ title: 'Transferencia' }} />
     </Stack>
