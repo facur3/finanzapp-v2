@@ -1,6 +1,6 @@
 # FinanzApp mobile: living roadmap
 
-Updated: 2026-09-19. Read [decision 001](decisions/001-native-mobile.md) and
+Updated: 2026-09-20. Read [decision 001](decisions/001-native-mobile.md) and
 [decision 002](decisions/002-spending-first.md). Decision 002 supersedes earlier
 full-finance migration phases and the local-only AI preference. Handoff entries
 below are historical evidence, not current product priorities.
@@ -14,7 +14,7 @@ server-keyed; manual recording and local data work without connectivity. Recurri
 expenses, debts, budgets and cards remain in scope. Native navigation, accessible
 amounts, real data and recoverable durable writes remain requirements.
 
-## Status and current delivery — Interfaz 07
+## Status and current delivery — Interfaz 08
 
 Implemented is code, checked names a test, device-verified needs a physical result,
 and released means distributed. Neither a bundle nor a screenshot is App Store QA.
@@ -23,6 +23,13 @@ and released means distributed. Neither a bundle nor a screenshot is App Store Q
 - [x] Exact chart buckets, category and date drill-downs; scoped recent entries.
 - [x] Original warm-white/ink/indigo visual direction inspired by supplied references.
 - [x] Accounts stay accessible from the header/Settings; initial balance optional.
+- [x] Native recurring expense/income rules: weekly/monthly/yearly, edit/pause/reactivate,
+  stable end-of-month anchors and deterministic per-occurrence identity.
+- [x] Due occurrences are materialized atomically on open/resume; retries/restarts cannot
+  duplicate the posting. Paused dates are not silently backfilled on reactivation.
+- [x] Real upcoming commitments appear on Home only when stored active expense rules exist.
+  The dedicated screen adds a 30-day ARS/USD-separated forecast with Reduce Motion support.
+- [x] Native v4 backup/import includes recurring rules while retaining v1/v2/v3 restore support.
 - [x] Remove obsolete MonthCard, duplicated monthly flow block and balance-hero colors.
 - [x] Cloud contracts, mobile client/evidence builder, disabled API routes and
   Responses provider adapter. No AI key in app, paid request or cloud data migration.
@@ -31,21 +38,16 @@ and released means distributed. Neither a bundle nor a screenshot is App Store Q
 - [ ] Physical visual/gesture review on iPhone. The user accepted only the initial
   Expo Go pilot; later interface iterations have not received device approval.
 
-Local verification: **331 root/domain/API + 92 mobile tests = 423**; TypeScript,
-iOS JS/Hermes/assets export, root Vite build and repository hygiene pass. Local
-online Expo dependency verification timed out through the proxy; online CI remains
-a merge gate. PostgreSQL schema tests run in a new isolated CI job, not the user's
-Supabase. Browser layout preview was blocked at localhost (ERR_BLOCKED_BY_CLIENT),
-so no rendered layout, native frame pacing or gesture acceptance is claimed.
-CI run [35470917523](https://github.com/facur3/finanzapp-v2/actions/runs/35470917523)
-passed the web and PostgreSQL jobs but blocked mobile on four newly recommended
-SDK 57 patches. Updated Expo to ~57.0.24, Constants to ~57.0.19, Router to ~57.0.22
-and Sharing to ~57.0.21; no SDK-major jump, workaround or disabled check. The next
-CI run must pass all three jobs before merge. Final result is linked from PR #22.
-After those patches, 423 tests, typecheck, dependency-tree integrity and iOS export
-pass again locally; the mobile npm audit reports zero known vulnerabilities.
+Interfaz 08 verification is enforced by the same CI gates: root/domain tests and
+build, repository hygiene, isolated PostgreSQL tests, mobile dependency integrity,
+Expo compatibility, TypeScript, real temporary-SQLite tests and iOS JS/Hermes/assets
+export. The feature adds calendar edge-case, migration, rollback, restart, retry,
+pause and v4-backup coverage. Physical iPhone layout/gesture/frame pacing remains a
+separate acceptance gate; automated handlers are not UIKit evidence.
 
-Existing SQLite stays at schema 3. No private data, test fixture, ZIP artwork or
+SQLite is now schema 4 with an additive recurring_rules table and indexes. Existing
+schema 1/2/3 data migrates in place; no reset, bank connection or remote migration
+is part of this delivery. No private data, test fixture, ZIP artwork or
 financial screenshot is added to user data or published as a product asset.
 The unmerged card-statements experiment is not part of this delivery. The old
 web/Capacitor product and data remain available; its used features are not dead code.
@@ -59,9 +61,10 @@ web/Capacitor product and data remain available; its used features are not dead 
 - [ ] First-entry onboarding without requiring a named account; preserve current
   recorded-account semantics rather than inventing a bank balance.
 - [ ] Budgets by month/category, explicit remaining budget and exceeded state.
-- [ ] Recurring expenses/income and subscriptions: next occurrence, pause/edit,
-  reminders and per-occurrence identity. Scheduled is not paid; retries cannot duplicate.
-- [ ] A small upcoming-payments block only after there is actual stored data.
+- [x] Recurring expenses/income and subscriptions: next occurrence, pause/edit and
+  per-occurrence identity. Scheduled is not paid; retries cannot duplicate.
+- [x] A small upcoming-payments block only when there is actual stored recurring data.
+- [ ] Local reminder opt-in/timezone/deduplication; keep notification content private by default.
 
 ### 2. Activate smart capture and explanations
 
@@ -121,6 +124,18 @@ values are never hidden until an animation finishes. 44-point targets, VoiceOver
 safe areas, system text and separate currencies apply to every new screen.
 
 ## Handoff log (historical evidence)
+
+### 2026-09-20 — Interfaz 08: recurring commitments
+
+- Weekly/monthly/yearly local recurring rules with amount, concept, category, account,
+  next date, active state and stable calendar anchor.
+- Due occurrences use deterministic IDs and are inserted in the same SQLite transaction
+  that advances the schedule. App open/resume catches pending active dates safely.
+- Dedicated Recurrentes screen supports create/edit/pause/reactivate plus separate
+  30-day ARS/USD projections; Home shows only real upcoming expense commitments.
+- Schema 4 and native backup v4 preserve the rules; v1/v2/v3 imports remain supported.
+- No reminder permission, Apple Pay, Face ID, signed build, cloud cost or bank execution
+  is enabled. Those stay behind the later signed-device/EAS gates.
 
 ### 2026-09-19 — Interfaz 07: spending-first direction
 

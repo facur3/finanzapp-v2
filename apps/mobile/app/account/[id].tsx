@@ -9,10 +9,11 @@ import { selectEntries, selectTransfers } from '../../src/ui/presentation';
 
 export default function AccountScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { snapshot } = useLedger();
+  const { snapshot, archive } = useLedger();
   const entries = useMemo(() => snapshot ? selectEntries(snapshot.entries, snapshot.accounts, 'all', '', id) : [], [snapshot, id]);
   const transfers = useMemo(() => snapshot ? selectTransfers(snapshot.transfers ?? [], snapshot.accounts, '', id) : [], [snapshot, id]);
   const account = snapshot?.accounts.find(item => item.id === id);
+  const recurringCount = archive?.recurring?.filter(rule => rule.accountId === id && rule.active).length ?? 0;
   if (!account || !snapshot) return <Screen><EmptyState title="No encontramos esta cuenta"
     detail="Volvé a tus cuentas para elegir una guardada en este dispositivo." /></Screen>;
   return <>
@@ -24,6 +25,8 @@ export default function AccountScreen() {
       <EntryActions accountId={id} />
       <View><Surface grouped>
         <DetailRow label="Transferir" value="Entre mis cuentas" icon="swap-horizontal-outline" onPress={() => router.push({ pathname: '/new-transfer', params: { accountId: id } })} />
+        <DetailRow label="Recurrentes" value={recurringCount ? recurringCount + ' activos' : 'Configurar'} icon="repeat-outline"
+          onPress={() => router.push({ pathname: '/recurring', params: { accountId: id } })} />
         <DetailRow label="Saldo inicial" value={account.currency + ' ' + formatMinorUnits(account.openingMinor)} last /></Surface>
         <AppText secondary style={{ fontSize: 13, paddingTop: 8 }}>Tu punto de partida. No se cuenta como ingreso.</AppText></View>
       <SectionTitle>Movimientos</SectionTitle>

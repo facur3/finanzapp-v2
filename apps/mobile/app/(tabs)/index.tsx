@@ -1,16 +1,16 @@
 import { useMemo, useState } from 'react';
 import { View } from 'react-native';
 import { router } from 'expo-router';
-import { spendingOverview, spendingWindow, type Currency, type SpendingWindow } from '@finanzapp/domain';
+import { labelFromISO, spendingOverview, spendingWindow, type Account, type Currency, type RecurringRule, type SpendingWindow } from '@finanzapp/domain';
 import { useLedger } from '../../src/storage/LedgerProvider';
-import { ActionButton, AppText, Choices, EmptyState, EntryActions, EntryRow, Money, Screen, SectionTitle, Surface } from '../../src/ui/components';
+import { ActionButton, AppText, CategoryBadge, Choices, EmptyState, EntryActions, EntryRow, Money, PressFeedback, Screen, SectionTitle, Surface } from '../../src/ui/components';
 import { availableCurrencies, selectEntries } from '../../src/ui/presentation';
 import { CategorySpendingRow } from '../../src/ui/spending-chart';
 import { SpendingTimeline, periodLabel } from '../../src/ui/spending-timeline';
-import { useCurrentDay } from '../../src/ui/theme';
+import { useCurrentDay, usePalette } from '../../src/ui/theme';
 
 export default function HomeScreen() {
-  const { snapshot } = useLedger();
+  const { snapshot, archive } = useLedger();
   const day = useCurrentDay();
   const [selectedCurrency, setCurrency] = useState<Currency>('ARS');
   const [window, setWindow] = useState<SpendingWindow>('month');
@@ -21,6 +21,11 @@ export default function HomeScreen() {
   const recent = useMemo(() => snapshot ? selectEntries(snapshot.entries.filter(entry =>
     snapshot.accounts.some(a => a.id === entry.accountId && a.currency === currency)
       && entry.dateISO >= period.startISO && entry.dateISO <= period.endISO), snapshot.accounts).slice(0, 3) : [], [snapshot, currency, period]);
+  const upcoming = useMemo(() => (archive?.recurring ?? [])
+    .filter(rule => rule.active && rule.kind === 'expense' && rule.nextDateISO >= day
+      && snapshot?.accounts.some(account => account.id === rule.accountId && account.currency === currency))
+    .sort((a, b) => a.nextDateISO.localeCompare(b.nextDateISO) || a.merchant.localeCompare(b.merchant))
+    .slice(0, 3), [archive?.recurring, snapshot?.accounts, currency, day]);
   if (!snapshot || !summary) return null;
   const openReport = () => router.push({ pathname: '/reports', params: { currency } });
   return <Screen>
@@ -48,6 +53,12 @@ export default function HomeScreen() {
         <AppText secondary style={{ fontSize: 14 }}>Ingresos del período</AppText>
         <Money minor={summary.incomeMinor} currency={currency} size={16} />
       </View>}
+      {!!upcoming.length && <View>
+        <SectionTitle action="Ver todos" onAction={() => router.push('/recurring')}>Próximos compromisos</SectionTitle>
+        <AppText secondary style={{ fontSize: 13, marginBottom: 12 }}>Pagos recurrentes programados · {currency}</AppText>
+        <Surface grouped>{upcoming.map((rule, index) => <UpcomingRecurringRow key={rule.id} rule={rule}
+          account={snapshot.accounts.find(account => account.id === rule.accountId)!} day={day} last={index === upcoming.length - 1} />)}</Surface>
+      </View>}
       <View>
         <SectionTitle action="Reporte mensual" onAction={openReport}>En qué gastaste</SectionTitle>
         <Surface grouped>
@@ -70,4 +81,26 @@ export default function HomeScreen() {
       </View>
     </>}
   </Screen>;
+}
+
+
+function UpcomingRecurringRow({ rule, account, day, last }: {
+  rule: RecurringRule; account: Account; day: string; last: boolean;
+}) {
+  const p = usePalette();
+  const date = labelFromISO(rule.nextDateISO, new Date(day + 'T12:00:00'));
+  return <PressFeedback accessibilityRole="button"
+    accessibilityLabel={`${rule.merchant}, próximo pago ${date}, ${account.currency}`}
+    onPress={() => router.push({ pathname: '/edit-recurring/[id]', params: { id: rule.id } })}
+    style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 16,
+      borderBottomWidth: last ? 0 : 0.5, borderBottomColor: p.line }}>
+    <CategoryBadge category={rule.category} />
+    <View style={{ flex: 1, minWidth: 0, gap: 4 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 8 }}>
+        <AppText numberOfLines={1} style={{ flex: 1, fontWeight: '600' }}>{rule.merchant}</AppText>
+        <Money minor={rule.amountMinor} currency={account.currency} />
+      </View>
+      <AppText secondary numberOfLines={1} style={{ fontSize: 13 }}>{date} · {rule.category}</AppText>
+    </View>
+  </PressFeedback>;
 }

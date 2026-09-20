@@ -218,3 +218,29 @@ delivery. Do not populate their app with test fixtures or delete the only instal
 Automated handler tests are not a measurement of native fluidity. Bank execution,
 foreign exchange, fees, legacy import, cloud sync and full audit export are not
 included in this slice. Device logs/screenshots must exclude personal finances.
+
+
+## Interfaz 08 — recurring commitments and upcoming payments (pending device review)
+
+Automated storage/calendar checks are not visual acceptance. Use a private pilot
+backup first and only small test amounts; do not uninstall the only copy of the app.
+
+- [ ] Ajustes footer reads Interfaz 08 and Recurrentes opens without adding a fourth tab.
+- [ ] Create one monthly expense recurrente with a future date; close/reopen and confirm no movement posts early.
+- [ ] Create one recurrente due today; it appears once in Movimientos and its next date advances once.
+- [ ] Close/reopen several times after that due date; the balance and movement count do not change again.
+- [ ] A day-31 monthly rule shows the short-month date correctly and returns to day 31 when the calendar permits.
+- [ ] Pause a rule, pass/change its date in test data, reopen, and verify no paused occurrence is posted.
+- [ ] Reactivate it; dates elapsed while paused are skipped rather than silently charged.
+- [ ] Account detail → Recurrentes filters to that account and creating from there preselects it.
+- [ ] Inicio shows Próximos compromisos only when a real active expense rule exists in the selected currency.
+- [ ] ARS and USD upcoming/30-day projections are never added together.
+- [ ] Recurrentes bars animate smoothly; Reduce Motion removes the transition and values remain visible.
+- [ ] Long concept/category/account names, large text and VoiceOver keep the amount/date understandable.
+- [ ] Light/dark mode, small canceled back swipe and 30–40 tab/detail transitions do not reproduce the black-screen issue.
+- [ ] Exported native v4 backup reviews recurring rules on import; re-importing the same copy adds nothing.
+- [ ] Updating from schema 3 preserves existing accounts, movements, transfers, corrections and balances.
+
+Local reminders, Face ID, Apple Pay, signed-device Apple integrations and bank
+execution are not part of Interfaz 08. Test those only after their explicit EAS/
+development-build gate is implemented.
