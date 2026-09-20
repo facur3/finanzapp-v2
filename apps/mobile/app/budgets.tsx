@@ -3,7 +3,7 @@ import { View } from 'react-native';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
-import { currentMonthISO, shiftMonthISO, summarizeMonthlyBudgets, type BudgetProgress, type Currency } from '@finanzapp/domain';
+import { currentMonthISO, formatMinorUnits, shiftMonthISO, summarizeMonthlyBudgets, type BudgetProgress, type Currency } from '@finanzapp/domain';
 import { useLedger } from '../src/storage/LedgerProvider';
 import { ActionButton, AppText, CategoryBadge, Choices, EmptyState, IconButton, Money, PressFeedback, Screen, SectionTitle, Surface } from '../src/ui/components';
 import { availableCurrencies } from '../src/ui/presentation';
@@ -100,7 +100,7 @@ function BudgetRow({ row, last }: { row: BudgetProgress; last: boolean }) {
   useEffect(() => {
     progress.value = withTiming(Math.min(1, row.ratio), { duration: reduced ? 0 : 420 });
   }, [row.ratio, reduced, progress]);
-  const bar = useAnimatedStyle(() => ({ width: `${Math.max(2, progress.value * 100)}%` as `${number}%` }));
+  const bar = useAnimatedStyle(() => ({ width: `${progress.value === 0 ? 0 : Math.max(2, progress.value * 100)}%` as `${number}%` }));
   return <PressFeedback accessibilityRole="button"
     accessibilityLabel={`Presupuesto ${row.budget.category}, gastado ${row.spentMinor}, límite ${row.budget.amountMinor}`}
     onPress={() => router.push({ pathname: '/edit-budget/[id]', params: { id: row.budget.id } })}
@@ -115,7 +115,7 @@ function BudgetRow({ row, last }: { row: BudgetProgress; last: boolean }) {
       </View>
       <View style={{ alignItems: 'flex-end', gap: 3 }}>
         <Money minor={row.spentMinor} currency={row.budget.currency} size={16} color={row.exceeded ? p.negative : p.text} />
-        <AppText secondary style={{ fontSize: 12 }}>de {row.budget.currency === 'USD' ? 'US$ ' : '$ '}{formatForRow(row.budget.amountMinor)}</AppText>
+        <AppText secondary style={{ fontSize: 12 }}>de {row.budget.currency === 'USD' ? 'US$ ' : '$ '}{formatMinorUnits(row.budget.amountMinor)}</AppText>
       </View>
     </View>
     <View style={{ height: 7, borderRadius: 999, backgroundColor: p.inset, overflow: 'hidden' }}>
@@ -131,20 +131,15 @@ function BudgetTotalBar({ spent, total }: { spent: number; total: number }) {
   useEffect(() => {
     progress.value = withTiming(total > 0 ? Math.min(1, spent / total) : 0, { duration: reduced ? 0 : 520 });
   }, [spent, total, reduced, progress]);
-  const bar = useAnimatedStyle(() => ({ width: `${Math.max(2, progress.value * 100)}%` as `${number}%` }));
+  const bar = useAnimatedStyle(() => ({ width: `${progress.value === 0 ? 0 : Math.max(2, progress.value * 100)}%` as `${number}%` }));
   return <View style={{ height: 8, borderRadius: 999, overflow: 'hidden', backgroundColor: p.inset }}>
     <Animated.View style={[{ height: 8, borderRadius: 999, backgroundColor: spent > total ? p.negative : p.accent }, bar]} />
   </View>;
 }
 
-function formatForRow(minor: number) {
-  const whole = Math.floor(Math.abs(minor) / 100).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
-  return whole + ',' + String(Math.abs(minor) % 100).padStart(2, '0');
-}
-
 function MoneyInline({ minor, currency }: { minor: number; currency: Currency }) {
   const p = usePalette();
   return <AppText style={{ fontSize: 13, color: p.text, fontWeight: '600' }}>
-    {currency === 'USD' ? 'US$ ' : '$ '}{formatForRow(minor)}
+    {currency === 'USD' ? 'US$ ' : '$ '}{formatMinorUnits(minor)}
   </AppText>;
 }
