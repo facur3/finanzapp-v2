@@ -5,8 +5,9 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { accountBalanceMinor, archiveKey, createRecoveryBackup, initialRecord, makeEntryChange, parsePilotBackup, snapshotFromArchive, totalsByCurrency, type Account, type Entry,
-  makeAccountChange, initialTransferRecord, makeTransferChange, type Transfer } from '@finanzapp/domain';
-import { changeEntry, createAccount, createEntry, importArchive, initializeDatabase, readArchive, readSnapshot, changeAccount, createTransfer, changeTransfer, type LedgerDatabase } from '../src/storage/database.ts';
+  makeAccountChange, initialTransferRecord, makeTransferChange, type Transfer, type RecurringRule } from '@finanzapp/domain';
+import { changeEntry, createAccount, createEntry, importArchive, initializeDatabase, readArchive, readSnapshot, changeAccount,
+  createTransfer, changeTransfer, saveRecurringRule, processRecurring, type LedgerDatabase } from '../src/storage/database.ts';
 import { runExclusiveTransaction, type TransactionConnection } from '../src/storage/transaction.ts';
 
 // Synthetic records in disposable databases only. Nothing seeds a user's app.
@@ -56,7 +57,7 @@ test('new install is empty; initialization can repeat without deleting data', as
   const { db } = setup();
   await initializeDatabase(db);
   assert.deepEqual(await readSnapshot(db), { accounts: [], entries: [] });
-  assert.equal((await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))?.user_version, 3);
+  assert.equal((await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))?.user_version, 4);
   await createAccount(db, account);
   await initializeDatabase(db);
   assert.deepEqual((await readSnapshot(db)).accounts, [account]);
@@ -142,9 +143,9 @@ test('newer database schema is refused intact instead of reset or downgraded', a
   const { db } = setup();
   await initializeDatabase(db);
   await createAccount(db, account);
-  await db.execAsync('PRAGMA user_version = 4');
+  await db.execAsync('PRAGMA user_version = 5');
   await assert.rejects(initializeDatabase(db), /versión más nueva/);
-  assert.equal((await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))?.user_version, 4);
+  assert.equal((await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))?.user_version, 5);
   assert.deepEqual((await readSnapshot(db)).accounts, [account]);
 });
 
@@ -474,4 +475,103 @@ test('actual v2 database upgrades atomically and preserves entry revisions and a
   assert.deepEqual((await readArchive(db)).records, [undo.after]);
   await changeEntry(db, undo); // Existing v2 receipt still recognizes a retry.
   assert.equal((await db.getAllAsync('SELECT id FROM entry_changes')).length, 1);
+});
+
+
+const recurring: RecurringRule = {
+  id: 'recurring-rent',
+  accountId: account.id,
+  kind: 'expense',
+  amountMinor: 5000,
+  merchant: 'Alquiler',
+  category: 'Vivienda',
+  frequency: 'monthly',
+  anchorDateISO: '2026-01-31',
+  nextDateISO: '2026-01-31',
+  active: true,
+  createdAt: '2026-01-01T12:00:00.000Z',
+  revision: 0,
+  updatedAt: '2026-01-01T12:00:00.000Z',
+};
+
+test('v3 database upgrades to recurring schema without changing existing balances', async () => {
+  const { db } = await transferReady();
+  await createTransfer(db, transfer);
+  const before = await readSnapshot(db);
+  await db.execAsync('PRAGMA user_version = 3; DROP TABLE IF EXISTS recurring_rules;');
+  await initializeDatabase(db);
+  assert.equal((await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))?.user_version, 4);
+  assert.deepEqual(await readSnapshot(db), before);
+  assert.deepEqual((await readArchive(db)).recurring ?? [], []);
+});
+
+test('recurring catch-up posts each due date once and retry/restart never double debits', async () => {
+  const { db, path } = setup();
+  await initializeDatabase(db);
+  await createAccount(db, account);
+  await saveRecurringRule(db, recurring);
+  assert.equal(await processRecurring(db, '2026-03-31', '2026-04-01T00:00:00.000Z'), 3);
+  assert.equal(await processRecurring(db, '2026-03-31', '2026-04-01T00:00:01.000Z'), 0);
+  let archive = await readArchive(db);
+  assert.deepEqual(archive.records.map(record => record.entry.dateISO).sort(), ['2026-01-31', '2026-02-28', '2026-03-31']);
+  assert.equal(archive.recurring![0].nextDateISO, '2026-04-30');
+  assert.equal(accountBalanceMinor(account, snapshotFromArchive(archive).entries), 85000);
+
+  await db.closeAsync();
+  const reopened = databaseAt(path);
+  await initializeDatabase(reopened);
+  assert.equal(await processRecurring(reopened, '2026-03-31'), 0);
+  archive = await readArchive(reopened);
+  assert.equal(archive.records.length, 3);
+  assert.equal(accountBalanceMinor(account, snapshotFromArchive(archive).entries), 85000);
+});
+
+test('recurring posting and schedule advance roll back together on disk failure', async () => {
+  const { db } = setup();
+  await initializeDatabase(db);
+  await createAccount(db, account);
+  await saveRecurringRule(db, recurring);
+  const before = await readArchive(db);
+  const failing: LedgerDatabase = { ...db, withExclusiveTransactionAsync: work => db.withExclusiveTransactionAsync(tx => work({ ...tx,
+    runAsync: async (sql, ...params) => {
+      if (sql.startsWith('UPDATE recurring_rules')) throw new Error('Disk full after posting');
+      return tx.runAsync(sql, ...params);
+    },
+  })) };
+  await assert.rejects(processRecurring(failing, '2026-01-31'), /Disk full/);
+  assert.equal(archiveKey(await readArchive(db)), archiveKey(before));
+  assert.equal(await processRecurring(db, '2026-01-31'), 1);
+});
+
+test('pausing preserves history and reactivation can safely skip paused dates before catch-up', async () => {
+  const { db } = setup();
+  await initializeDatabase(db);
+  await createAccount(db, account);
+  await saveRecurringRule(db, recurring);
+  await processRecurring(db, '2026-01-31');
+  const saved = (await readArchive(db)).recurring![0];
+  const paused = { ...saved, active: false, revision: saved.revision + 1, updatedAt: '2026-02-01T00:00:00.000Z' };
+  await saveRecurringRule(db, paused);
+  assert.equal(await processRecurring(db, '2026-03-31'), 0);
+  assert.equal((await readSnapshot(db)).entries.length, 1);
+});
+
+test('v4 backup roundtrip and additive import preserve recurring rules without duplicate generated entries', async () => {
+  const { db } = setup();
+  await initializeDatabase(db);
+  await createAccount(db, account);
+  await saveRecurringRule(db, recurring);
+  await processRecurring(db, '2026-01-31');
+  const original = await readArchive(db);
+  const incoming = parsePilotBackup(JSON.stringify(createRecoveryBackup(original))).archive;
+  assert.deepEqual(incoming.recurring, original.recurring);
+
+  const other = setup().db;
+  await initializeDatabase(other);
+  const baseline = archiveKey(await readArchive(other));
+  await importArchive(other, incoming, baseline);
+  await importArchive(other, incoming, baseline);
+  assert.equal(archiveKey(await readArchive(other)), archiveKey(incoming));
+  assert.equal(await processRecurring(other, '2026-01-31'), 0);
+  assert.equal((await readSnapshot(other)).entries.length, 1);
 });
