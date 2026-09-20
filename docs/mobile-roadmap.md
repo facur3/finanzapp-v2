@@ -14,7 +14,7 @@ server-keyed; manual recording and local data work without connectivity. Recurri
 expenses, debts, budgets and cards remain in scope. Native navigation, accessible
 amounts, real data and recoverable durable writes remain requirements.
 
-## Status and current delivery — Interfaz 08
+## Status and current delivery — Interfaz 09
 
 Implemented is code, checked names a test, device-verified needs a physical result,
 and released means distributed. Neither a bundle nor a screenshot is App Store QA.
@@ -23,13 +23,19 @@ and released means distributed. Neither a bundle nor a screenshot is App Store Q
 - [x] Exact chart buckets, category and date drill-downs; scoped recent entries.
 - [x] Original warm-white/ink/indigo visual direction inspired by supplied references.
 - [x] Accounts stay accessible from the header/Settings; initial balance optional.
+- [x] Home explicitly toggles Gastos / Disponible: spending is period consumption;
+  available is only the recorded balance of accounts in the selected currency.
+- [x] Monthly category budgets with remaining/exceeded state, future months, ARS/USD
+  separation, reversible archival and exact expense-only consumption.
+- [x] A visible Assistant preview is reachable from the Home toolbar without pretending
+  cloud AI is active or placing an action button in the three-section tab bar.
 - [x] Native recurring expense/income rules: weekly/monthly/yearly, edit/pause/reactivate,
   stable end-of-month anchors and deterministic per-occurrence identity.
 - [x] Due occurrences are materialized atomically on open/resume; retries/restarts cannot
   duplicate the posting. Paused dates are not silently backfilled on reactivation.
 - [x] Real upcoming commitments appear on Home only when stored active expense rules exist.
   The dedicated screen adds a 30-day ARS/USD-separated forecast with Reduce Motion support.
-- [x] Native v4 backup/import includes recurring rules while retaining v1/v2/v3 restore support.
+- [x] Native v5 backup/import includes recurring rules and monthly budgets while retaining v1-v4 restore support.
 - [x] Remove obsolete MonthCard, duplicated monthly flow block and balance-hero colors.
 - [x] Cloud contracts, mobile client/evidence builder, disabled API routes and
   Responses provider adapter. No AI key in app, paid request or cloud data migration.
@@ -38,15 +44,15 @@ and released means distributed. Neither a bundle nor a screenshot is App Store Q
 - [ ] Physical visual/gesture review on iPhone. The user accepted only the initial
   Expo Go pilot; later interface iterations have not received device approval.
 
-Interfaz 08 verification is enforced by the same CI gates: root/domain tests and
+Interfaz 09 verification is enforced by the same CI gates: root/domain tests and
 build, repository hygiene, isolated PostgreSQL tests, mobile dependency integrity,
 Expo compatibility, TypeScript, real temporary-SQLite tests and iOS JS/Hermes/assets
 export. The feature adds calendar edge-case, migration, rollback, restart, retry,
-pause and v4-backup coverage. Physical iPhone layout/gesture/frame pacing remains a
+pause, budget migration/retry and v5-backup coverage. Physical iPhone layout/gesture/frame pacing remains a
 separate acceptance gate; automated handlers are not UIKit evidence.
 
-SQLite is now schema 4 with an additive recurring_rules table and indexes. Existing
-schema 1/2/3 data migrates in place; no reset, bank connection or remote migration
+SQLite is now schema 5. Schema 4 recurring_rules remain intact and schema 5 adds
+monthly_budgets with an additive index. Existing schema 1/2/3/4 data migrates in place; no reset, bank connection or remote migration
 is part of this delivery. No private data, test fixture, ZIP artwork or
 financial screenshot is added to user data or published as a product asset.
 The unmerged card-statements experiment is not part of this delivery. The old
@@ -60,7 +66,7 @@ web/Capacitor product and data remain available; its used features are not dead 
   tiny amounts/long names, Monday/month boundaries and 30–40 tab changes.
 - [ ] First-entry onboarding without requiring a named account; preserve current
   recorded-account semantics rather than inventing a bank balance.
-- [ ] Budgets by month/category, explicit remaining budget and exceeded state.
+- [x] Budgets by month/category, explicit remaining budget and exceeded state.
 - [x] Recurring expenses/income and subscriptions: next occurrence, pause/edit and
   per-occurrence identity. Scheduled is not paid; retries cannot duplicate.
 - [x] A small upcoming-payments block only when there is actual stored recurring data.
@@ -124,6 +130,20 @@ values are never hidden until an animation finishes. 44-point targets, VoiceOver
 safe areas, system text and separate currencies apply to every new screen.
 
 ## Handoff log (historical evidence)
+
+### 2026-09-20 — Interfaz 09: budgets, Home metric and assistant entry point
+
+- Home has one large financial hero with a native-style Gastos / Disponible segment.
+  Disponible is explicitly a recorded-account total, never bank sync or net worth.
+- Monthly category budgets are durable local records with exact cents, month/currency
+  identity, edit/archive, exceeded state and animated progress respecting Reduce Motion.
+- Budget operations do not alter account balances; income and internal transfers do
+  not consume spending limits. Backup schema v5 preserves active/archived budgets.
+- Sparkles in the Home toolbar opens an honest Assistant preview. No provider request,
+  financial-data upload, token/key, paid call or fake AI response is enabled.
+- SQLite 4 → 5 migration is additive. CI uses Node 24-generation checkout/setup-node.
+- Cards/debts remain the next accounting slice so card purchase and card payment are
+  modeled once rather than double-counting consumption.
 
 ### 2026-09-20 — Interfaz 08: recurring commitments
 
