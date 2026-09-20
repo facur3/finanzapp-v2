@@ -22,8 +22,10 @@ native-backup review/import. Neither this delivery nor Interfaz 03 has new physi
 acceptance evidence. **Interfaz 05** adds account corrections and same-currency
 transfers with editing/undo/recovery. The owner is deferring a combined review;
 there is no new physical acceptance. **Interfaz 06** adds daily expense drill-down
-and monthly/category comparisons. Interfaz 07 supersedes the balance-first Home;
-the spending-first decision is authoritative, with device checks still an explicit gate.
+and monthly/category comparisons. Interfaz 07 supersedes the balance-first Home. **Interfaz 08 (2026-09-20)** adds
+native recurring commitments, automatic due-date materialization and a real upcoming
+payments block. The spending-first decision remains authoritative, with device checks
+still an explicit gate.
 
 Inicio → Reporte mensual offers Categorías / Día a día and Comparar gastos. Current
 months compare equal initial day counts (both capped if the previous month is
@@ -31,7 +33,7 @@ shorter); historical months compare full months. Exact date ranges stay visible.
 Category totals open only their dated expenses. Missing records are not savings.
 Native backup/recovery stays available, but no JSON import is required to start.
 
-## Product scope (Interfaz 07)
+## Product scope (Interfaz 08)
 
 [Decision 002](../../docs/decisions/002-spending-first.md) selects spending and
 commitments with optional accounts. No native portfolio or market data. The old
@@ -91,6 +93,16 @@ It **does not send money to a bank**. Transfers appear once in full activity,
 on both account details and in recovery; they never appear as income/spending in
 reports. Cross-currency operations, fees and bank execution remain separate work.
 
+Ajustes → Recurrentes creates weekly, monthly or yearly expense/income rules tied
+to a real account. Each rule stores its next date and a stable calendar anchor,
+so a January 31 schedule can use February 28 and return to March 31 instead of
+drifting permanently. Opening/resuming the app posts due active occurrences into
+the normal ledger and advances the rule in the same SQLite transaction. Each
+occurrence has a deterministic ID, so retry/restart cannot silently double-charge.
+Pausing keeps prior history and reactivation skips dates that elapsed while paused.
+Home shows up to three real upcoming expense commitments for the selected currency;
+the Recurrentes screen also shows a 30-day forecast without mixing ARS and USD.
+
 The current visual iteration includes:
 
 - Home: recorded spending by week/month and currency, exact interactive bars, top
@@ -122,21 +134,21 @@ The current visual iteration includes:
   Reduce Motion removes the transition. Lists remain virtualized and empty periods
   have no fake categories, trends or sample data.
 
-Interfaz 05 migrates the existing pilot SQLite file from schema 1/2 to 3, atomically,
-preserving its filename/rows and entry audit. It adds versioned account corrections
-and transfers with revisions, tombstones and atomic local audit receipts.
+Interfaz 05 migrated the existing pilot SQLite file from schema 1/2 to 3, atomically,
+preserving its filename/rows and entry audit. Interfaz 08 adds the schema 3 → 4
+recurring_rules migration without replacing existing balances, entries or transfers.
 Do not revert to older app code after upgrading. A newer DB version is refused
-intact; no error deletes the file. No Supabase connection, seeded records, dependency
-change or paid service was introduced. Follow the new-iteration section of the
+intact; no error deletes the file. No Supabase connection, seeded records, new
+runtime dependency or paid service was introduced. Follow the new-iteration section of the
 [device checklist](../../docs/mobile-device-checklist.md) before accepting its layout.
 
 Only enter a small amount of data while checking the experience. Do not re-enter
-the entire portfolio or uninstall the existing app. Legacy import, card/commitment accounting, Supabase sync, Face ID, reminders and Apple Pay capture
+the entire portfolio or uninstall the existing app. Legacy import, debt/card accounting, Supabase sync, Face ID, reminders and Apple Pay capture
 are separate roadmap milestones; no disabled decorative buttons imply otherwise.
 
-The pilot exports its own v3 JSON backup through the system sharing sheet and
-imports native v1/v2/v3 backups through Ajustes → Importar copia. Review shows new
-accounts, active/undone entries and transfers, identical records and exact before/after available
+The pilot exports its own v4 JSON backup through the system sharing sheet and
+imports native v1/v2/v3/v4 backups through Ajustes → Importar copia. Review shows new
+accounts, active/undone entries, transfers and recurring rules, identical records and exact before/after available
 totals for ARS/USD separately. Confirmation adds only missing IDs in one transaction.
 Identical IDs/data are skipped; any conflict blocks the whole import, including
 old copies that would resurrect a tombstone. No silent overwrite or account merging
@@ -144,9 +156,10 @@ by name. Local changes after preview require another review. Reimport/retry is s
 
 Native JSON is **not** the legacy web backup format: unsupported schema/entities,
 invalid cents/dates/references, duplicate IDs, unsafe totals, extra fields and files
-over 5 MB are rejected before import. Limits: 1,000 accounts/25,000 combined entry/transfer records.
-Export validates its own restore format/size. V3 includes current versions and
-tombstones, **not** full local account/entry/transfer audit history, settings, attachments,
+over 5 MB are rejected before import. Limits: 1,000 accounts, 25,000 combined
+entry/transfer records and 5,000 recurring rules.
+Export validates its own restore format/size. V4 includes current versions,
+tombstones and recurring schedules, **not** full local account/entry/transfer audit history, settings, attachments,
 cards or investments. A backup is a snapshot, not a cross-device synchronization.
 There is no replace/reset import mode; preserve both copies if conflicts are reported.
 File selection/sharing is explicit, not an automatic upload. The selected source
@@ -229,7 +242,8 @@ and spending report, including exact category-to-entry reconciliation.
 For the intermittent black-tab report, update to `master`, restart with
 `npm start -- --clear` (bundler cache only, not SQLite), reopen from the new QR,
 and repeat the **Interfaz 02** tab checks, **Interfaz 03** report checks and
-**Interfaz 04/05** correction/recovery and transfer checks, plus **Interfaz 06** daily/comparison reports. The current footer says Interfaz 07.
+**Interfaz 04/05** correction/recovery and transfer checks, plus **Interfaz 06** daily/comparison reports and **Interfaz 08** recurring/upcoming
+checks. The current footer says Interfaz 08.
 Before updating, save a private pilot copy; do not uninstall or add fake movements.
 
 If a storage/refresh error occurs, the form retains the exact submitted command
