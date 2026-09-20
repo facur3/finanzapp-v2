@@ -2,6 +2,8 @@ import { totalsByCurrency, validateAccount, validateEntry, type Account, type En
 import { TRANSFER_KEYS, sameTransferRecord, validateTransferRecord, type TransferRecord } from './transfers.ts';
 import { sameRecurringRule, validateRecurringRule, type RecurringRule } from './recurring.ts';
 import { sameMonthlyBudget, validateBudgetCollection, validateMonthlyBudget, type MonthlyBudget } from './budgets.ts';
+import { sameCreditCardProfile, samePersonalDebtProfile, validateCreditCardProfile, validateLiabilityProfiles,
+  validatePersonalDebtProfile, type CreditCardProfile, type PersonalDebtProfile } from './liabilities.ts';
 
 /** The current version of every entry, including reversible tombstones.
  * Reports consume snapshotFromArchive, never the tombstones themselves. */
@@ -17,6 +19,8 @@ export interface LedgerArchive {
   transfers?: TransferRecord[];
   recurring?: RecurringRule[];
   budgets?: MonthlyBudget[];
+  cards?: CreditCardProfile[];
+  debts?: PersonalDebtProfile[];
 }
 export interface EntryChange {
   id: string;
@@ -31,6 +35,10 @@ const RECURRING_KEYS = ['id', 'accountId', 'kind', 'amountMinor', 'merchant', 'c
   'anchorDateISO', 'nextDateISO', 'active', 'createdAt', 'revision', 'updatedAt'] as const;
 const BUDGET_KEYS = ['id', 'category', 'currency', 'monthISO', 'amountMinor', 'active',
   'createdAt', 'revision', 'updatedAt'] as const;
+const CARD_KEYS = ['id', 'accountId', 'issuer', 'last4', 'creditLimitMinor', 'closingDay', 'dueDay',
+  'active', 'createdAt', 'revision', 'updatedAt'] as const;
+const DEBT_KEYS = ['id', 'accountId', 'direction', 'counterparty', 'dueDateISO', 'note',
+  'active', 'createdAt', 'revision', 'updatedAt'] as const;
 
 function object(value: unknown, keys: readonly string[]): Record<string, unknown> {
   if (!value || typeof value !== 'object' || Array.isArray(value)
@@ -65,6 +73,18 @@ function budgetValue(value: unknown): MonthlyBudget {
   const budget = Object.fromEntries(BUDGET_KEYS.map(key => [key, row[key]])) as unknown as MonthlyBudget;
   validateMonthlyBudget(budget);
   return budget;
+}
+function cardValue(value: unknown, accounts: Account[]): CreditCardProfile {
+  const row = object(value, CARD_KEYS);
+  const card = Object.fromEntries(CARD_KEYS.map(key => [key, row[key]])) as unknown as CreditCardProfile;
+  validateCreditCardProfile(card, accounts);
+  return card;
+}
+function debtValue(value: unknown, accounts: Account[]): PersonalDebtProfile {
+  const row = object(value, DEBT_KEYS);
+  const debt = Object.fromEntries(DEBT_KEYS.map(key => [key, row[key]])) as unknown as PersonalDebtProfile;
+  validatePersonalDebtProfile(debt, accounts);
+  return debt;
 }
 export function initialRecord(entry: Entry): EntryRecord {
   return { entry, revision: 0, voided: false, updatedAt: entry.createdAt };
@@ -109,6 +129,7 @@ export function validateArchive(archive: LedgerArchive): void {
     recurring.add(rule.id);
   }
   validateBudgetCollection(archive.budgets ?? []);
+  validateLiabilityProfiles(archive.cards ?? [], archive.debts ?? [], archive.accounts);
   totalsByCurrency(snapshotFromArchive(archive));
 }
 export function sameAccount(a: Account, b: Account): boolean {
@@ -129,6 +150,10 @@ function canonicalArchive(archive: LedgerArchive): LedgerArchive {
     ...(archive.recurring?.length ? { recurring: archive.recurring.map(rule => recurringValue(rule, archive.accounts))
       .sort((a, b) => a.id.localeCompare(b.id)) } : {}),
     ...(archive.budgets?.length ? { budgets: archive.budgets.map(budgetValue)
+      .sort((a, b) => a.id.localeCompare(b.id)) } : {}),
+    ...(archive.cards?.length ? { cards: archive.cards.map(card => cardValue(card, archive.accounts))
+      .sort((a, b) => a.id.localeCompare(b.id)) } : {}),
+    ...(archive.debts?.length ? { debts: archive.debts.map(debt => debtValue(debt, archive.accounts))
       .sort((a, b) => a.id.localeCompare(b.id)) } : {}),
   };
 }
@@ -165,9 +190,10 @@ export function validateEntryChange(change: EntryChange, accounts: Account[]): v
 export function createRecoveryBackup(archive: LedgerArchive, now = new Date()) {
   validateArchive(archive);
   const canonical = canonicalArchive(archive);
-  return { app: 'FinanzApp', schema: 'finanzapp.native-pilot.v5', exportedAt: now.toISOString(),
+  return { app: 'FinanzApp', schema: 'finanzapp.native-pilot.v6', exportedAt: now.toISOString(),
     moneyUnit: 'integer-minor-units', ...canonical, transfers: canonical.transfers ?? [],
-    recurring: canonical.recurring ?? [], budgets: canonical.budgets ?? [] };
+    recurring: canonical.recurring ?? [], budgets: canonical.budgets ?? [],
+    cards: canonical.cards ?? [], debts: canonical.debts ?? [] };
 }
 export interface ParsedBackup { archive: LedgerArchive; exportedAt: string; }
 export function parsePilotBackup(raw: string): ParsedBackup {
@@ -181,37 +207,46 @@ export function parsePilotBackup(raw: string): ParsedBackup {
   const v3 = header.schema === 'finanzapp.native-pilot.v3';
   const v4 = header.schema === 'finanzapp.native-pilot.v4';
   const v5 = header.schema === 'finanzapp.native-pilot.v5';
-  if (!v1 && !v2 && !v3 && !v4 && !v5) {
-    throw new Error('Solo se pueden restaurar copias del piloto nativo v1, v2, v3, v4 o v5. La app web/anterior y otras versiones todavía no son compatibles; conservá el archivo.');
+  const v6 = header.schema === 'finanzapp.native-pilot.v6';
+  if (!v1 && !v2 && !v3 && !v4 && !v5 && !v6) {
+    throw new Error('Solo se pueden restaurar copias del piloto nativo v1 a v6. La app web/anterior y otras versiones todavía no son compatibles; conservá el archivo.');
   }
   object(value, ['app', 'schema', 'exportedAt', 'moneyUnit', 'accounts', v1 ? 'entries' : 'records',
-    ...(v3 || v4 || v5 ? ['transfers'] : []), ...(v4 || v5 ? ['recurring'] : []), ...(v5 ? ['budgets'] : [])]);
+    ...(v3 || v4 || v5 || v6 ? ['transfers'] : []), ...(v4 || v5 || v6 ? ['recurring'] : []),
+    ...(v5 || v6 ? ['budgets'] : []), ...(v6 ? ['cards', 'debts'] : [])]);
   if (header.app !== 'FinanzApp' || header.moneyUnit !== 'integer-minor-units') throw new Error('Formato o unidad monetaria no compatibles.');
   timestamp(header.exportedAt);
   const rows = v1 ? header.entries : header.records;
   if (!Array.isArray(header.accounts) || !Array.isArray(rows) || header.accounts.length > 1000 || rows.length > 25000) {
     throw new Error('La copia no tiene una lista válida de cuentas y movimientos (máximo 1.000 cuentas y 25.000 movimientos).');
   }
-  if ((v3 || v4 || v5) && (!Array.isArray(header.transfers) || header.transfers.length + rows.length > 25000)) {
+  if ((v3 || v4 || v5 || v6) && (!Array.isArray(header.transfers) || header.transfers.length + rows.length > 25000)) {
     throw new Error('La copia supera el límite de movimientos o contiene transferencias inválidas.');
   }
-  if ((v4 || v5) && (!Array.isArray(header.recurring) || header.recurring.length > 5000)) {
+  if ((v4 || v5 || v6) && (!Array.isArray(header.recurring) || header.recurring.length > 5000)) {
     throw new Error('La copia contiene demasiados recurrentes o un formato inválido.');
   }
-  if (v5 && (!Array.isArray(header.budgets) || header.budgets.length > 5000)) {
+  if ((v5 || v6) && (!Array.isArray(header.budgets) || header.budgets.length > 5000)) {
     throw new Error('La copia contiene demasiados presupuestos o un formato inválido.');
   }
-  const accounts = header.accounts.map(a => accountValue(a, v3 || v4 || v5));
+  if (v6 && (!Array.isArray(header.cards) || !Array.isArray(header.debts)
+    || header.cards.length + header.debts.length > 5000)) {
+    throw new Error('La copia contiene demasiadas tarjetas/deudas o un formato inválido.');
+  }
+  const accounts = header.accounts.map(a => accountValue(a, v3 || v4 || v5 || v6));
   const records = rows.map((value): EntryRecord => {
     if (v1) return initialRecord(entryValue(value, accounts));
     const record = object(value, ['entry', 'revision', 'voided', 'updatedAt']);
     return { entry: entryValue(record.entry, accounts), revision: record.revision as number, voided: record.voided as boolean, updatedAt: record.updatedAt as string };
   });
-  const transfers = v3 || v4 || v5 ? (header.transfers as unknown[]).map(t => transferValue(t, accounts)) : [];
-  const recurring = v4 || v5 ? (header.recurring as unknown[]).map(rule => recurringValue(rule, accounts)) : [];
-  const budgets = v5 ? (header.budgets as unknown[]).map(budgetValue) : [];
+  const transfers = v3 || v4 || v5 || v6 ? (header.transfers as unknown[]).map(t => transferValue(t, accounts)) : [];
+  const recurring = v4 || v5 || v6 ? (header.recurring as unknown[]).map(rule => recurringValue(rule, accounts)) : [];
+  const budgets = v5 || v6 ? (header.budgets as unknown[]).map(budgetValue) : [];
+  const cards = v6 ? (header.cards as unknown[]).map(card => cardValue(card, accounts)) : [];
+  const debts = v6 ? (header.debts as unknown[]).map(debt => debtValue(debt, accounts)) : [];
   const archive = { accounts, records, ...(transfers.length ? { transfers } : {}),
-    ...(recurring.length ? { recurring } : {}), ...(budgets.length ? { budgets } : {}) };
+    ...(recurring.length ? { recurring } : {}), ...(budgets.length ? { budgets } : {}),
+    ...(cards.length ? { cards } : {}), ...(debts.length ? { debts } : {}) };
   validateArchive(archive);
   return { archive, exportedAt: header.exportedAt };
 }
@@ -223,6 +258,8 @@ export interface ImportPreview {
   transfers: TransferRecord[];
   recurring: RecurringRule[];
   budgets: MonthlyBudget[];
+  cards: CreditCardProfile[];
+  debts: PersonalDebtProfile[];
   identical: number;
   conflicts: number;
   before: ReturnType<typeof totalsByCurrency>;
@@ -237,9 +274,13 @@ export function previewBackupImport(current: LedgerArchive, incoming: LedgerArch
   const transferMap = new Map((current.transfers ?? []).map(r => [r.transfer.id, r]));
   const recurringMap = new Map((current.recurring ?? []).map(rule => [rule.id, rule]));
   const budgetMap = new Map((current.budgets ?? []).map(budget => [budget.id, budget]));
+  const cardMap = new Map((current.cards ?? []).map(card => [card.id, card]));
+  const debtMap = new Map((current.debts ?? []).map(debt => [debt.id, debt]));
   const transfers: TransferRecord[] = [];
   const recurring: RecurringRule[] = [];
   const budgets: MonthlyBudget[] = [];
+  const cards: CreditCardProfile[] = [];
+  const debts: PersonalDebtProfile[] = [];
   const accounts: Account[] = [], records: EntryRecord[] = [];
   let conflicts = 0, identical = 0;
   for (const account of incoming.accounts) {
@@ -271,10 +312,23 @@ export function previewBackupImport(current: LedgerArchive, incoming: LedgerArch
     else if (sameMonthlyBudget(existing, budget)) identical++;
     else conflicts++;
   }
+  for (const card of incoming.cards ?? []) {
+    const existing = cardMap.get(card.id);
+    if (!existing) cards.push(card);
+    else if (sameCreditCardProfile(existing, card)) identical++;
+    else conflicts++;
+  }
+  for (const debt of incoming.debts ?? []) {
+    const existing = debtMap.get(debt.id);
+    if (!existing) debts.push(debt);
+    else if (samePersonalDebtProfile(existing, debt)) identical++;
+    else conflicts++;
+  }
   const combined = { accounts: [...current.accounts, ...accounts], records: [...current.records, ...records],
     transfers: [...current.transfers ?? [], ...transfers], recurring: [...current.recurring ?? [], ...recurring],
-    budgets: [...current.budgets ?? [], ...budgets] };
+    budgets: [...current.budgets ?? [], ...budgets], cards: [...current.cards ?? [], ...cards],
+    debts: [...current.debts ?? [], ...debts] };
   if (!conflicts) validateArchive(combined);
-  return { baseline: archiveKey(current), accounts, records, transfers, recurring, budgets, identical, conflicts,
+  return { baseline: archiveKey(current), accounts, records, transfers, recurring, budgets, cards, debts, identical, conflicts,
     before: totalsByCurrency(snapshotFromArchive(current)), after: conflicts ? null : totalsByCurrency(snapshotFromArchive(combined)) };
 }
