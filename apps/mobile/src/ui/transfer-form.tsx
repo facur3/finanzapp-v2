@@ -11,8 +11,9 @@ import { AccountField, DateField } from './form-controls';
 import { initialAccountId } from './presentation';
 
 export function TransferForm({ original, accountId, fromAccountId: requestedFrom, toAccountId: requestedTo,
-  title = 'Entre mis cuentas', defaultNote = '' }: {
-  original?: TransferRecord; accountId?: string; fromAccountId?: string; toAccountId?: string; title?: string; defaultNote?: string;
+  title = 'Entre mis cuentas', defaultNote = '', maxAmountMinor }: {
+  original?: TransferRecord; accountId?: string; fromAccountId?: string; toAccountId?: string; title?: string;
+  defaultNote?: string; maxAmountMinor?: string;
 }) {
   const { snapshot, archive, addTransfer, updateTransfer } = useLedger();
   const accounts = snapshot?.accounts ?? [];
@@ -44,8 +45,14 @@ export function TransferForm({ original, accountId, fromAccountId: requestedFrom
   const targets = visibleForTransfer.filter(a => a.id !== fromId && a.currency === from?.currency);
   const locked = busy || pending !== null;
   const close = () => { if (!saving.current) { if (router.canGoBack()) router.back(); else router.replace('/'); } };
+  const contextualMax = maxAmountMinor && /^\d+$/.test(maxAmountMinor) ? Number(maxAmountMinor) : null;
   function draft(): Transfer {
     return { ...(before?.transfer ?? operation), fromAccountId: fromId, toAccountId: toId, amountMinor: parseMinorUnits(amount), note: note.trim(), dateISO: todayKey(date) };
+  }
+  function validateContext(transfer: Transfer) {
+    if (contextualMax !== null && Number.isSafeInteger(contextualMax) && contextualMax >= 0 && transfer.amountMinor > contextualMax) {
+      throw new Error('El monto supera el saldo pendiente de esta obligación.');
+    }
   }
   // Show the full effect of an edit (remove the old transfer, then apply the new one).
   function proposed(transfer: Transfer) {
@@ -55,6 +62,7 @@ export function TransferForm({ original, accountId, fromAccountId: requestedFrom
   try {
     const transfer = draft();
     validateTransfer(transfer, accounts);
+    validateContext(transfer);
     const next = proposed(transfer);
     totalsByCurrency(next);
     preview = { from: accountBalanceMinor(from!, next.entries, next.transfers), to: accountBalanceMinor(to!, next.entries, next.transfers) };
@@ -67,6 +75,7 @@ export function TransferForm({ original, accountId, fromAccountId: requestedFrom
       if (!submission) {
         const transfer = draft();
         validateTransfer(transfer, accounts);
+        validateContext(transfer);
         if (transfer.dateISO > todayKey()) throw new Error('Elegí hoy o una fecha anterior.');
         totalsByCurrency(proposed(transfer));
         if (before && sameTransfer(before.transfer, transfer)) { saving.current = false; close(); return; }
