@@ -24,10 +24,16 @@ export default function HomeScreen() {
   const currency = currencies.includes(selectedCurrency) ? selectedCurrency : currencies[0] ?? 'ARS';
   const period = useMemo(() => spendingWindow(currency, window, day), [currency, window, day]);
   const summary = useMemo(() => snapshot ? spendingOverview(snapshot, period) : null, [snapshot, period]);
-  const available = useMemo(() => snapshot ? totalsByCurrency(snapshot)[currency] ?? 0 : 0, [snapshot, currency]);
-  const monthBudget = useMemo(() => snapshot
-    ? summarizeMonthlyBudgets(snapshot, archive?.budgets ?? [], currency, currentMonthISO(day)) : null,
-  [snapshot, archive?.budgets, currency, day]);
+  const available = useMemo(() => {
+    if (!snapshot) return { status: 'ready' as const, minor: 0 };
+    try { return { status: 'ready' as const, minor: totalsByCurrency(snapshot)[currency] ?? 0 }; }
+    catch { return { status: 'out-of-range' as const }; }
+  }, [snapshot, currency]);
+  const monthBudget = useMemo(() => {
+    if (!snapshot) return null;
+    try { return summarizeMonthlyBudgets(snapshot, archive?.budgets ?? [], currency, currentMonthISO(day)); }
+    catch { return null; }
+  }, [snapshot, archive?.budgets, currency, day]);
   const recent = useMemo(() => snapshot ? selectEntries(snapshot.entries.filter(entry =>
     snapshot.accounts.some(a => a.id === entry.accountId && a.currency === currency)
       && entry.dateISO >= period.startISO && entry.dateISO <= period.endISO), snapshot.accounts).slice(0, 3) : [], [snapshot, currency, period]);
@@ -37,7 +43,7 @@ export default function HomeScreen() {
     .sort((a, b) => a.nextDateISO.localeCompare(b.nextDateISO) || a.merchant.localeCompare(b.merchant))
     .slice(0, 3), [archive?.recurring, snapshot?.accounts, currency, day]);
 
-  if (!snapshot || !summary || !monthBudget) return null;
+  if (!snapshot || !summary) return null;
   const accountCount = snapshot.accounts.filter(account => account.currency === currency).length;
   const openReport = () => router.push({ pathname: '/reports', params: { currency } });
 
@@ -64,7 +70,9 @@ export default function HomeScreen() {
             <AppText secondary style={{ fontSize: 14 }}>{summary.expenseCount} {summary.expenseCount === 1 ? 'gasto registrado' : 'gastos registrados'} · {currency}</AppText>
           </> : <AppText secondary>El total supera el rango que podemos mostrar con precisión. Tus movimientos siguen guardados.</AppText>
             : <>
-              <Money minor={available} currency={currency} large size={50} color={available < 0 ? p.negative : p.text} />
+              {available.status === 'ready' ? <Money minor={available.minor} currency={currency} large size={50}
+                color={available.minor < 0 ? p.negative : p.text} />
+                : <AppText secondary>El saldo total supera el rango que podemos mostrar con precisión. Tus cuentas siguen guardadas.</AppText>}
               <AppText secondary style={{ fontSize: 14 }}>
                 {accountCount} {accountCount === 1 ? 'cuenta registrada' : 'cuentas registradas'} · no es sincronización bancaria
               </AppText>
@@ -79,7 +87,10 @@ export default function HomeScreen() {
 
       <EntryActions currency={currency} />
 
-      {!!monthBudget.rows.length ? <View>
+      {monthBudget === null ? <Surface>
+        <AppText style={{ fontWeight: '600' }}>Presupuesto no disponible</AppText>
+        <AppText secondary style={{ fontSize: 14 }}>Los importes del mes superan el rango que podemos mostrar con precisión. Tus movimientos siguen guardados.</AppText>
+      </Surface> : !!monthBudget.rows.length ? <View>
         <SectionTitle action="Ver" onAction={() => router.push({ pathname: '/budgets', params: { currency } })}>Presupuesto del mes</SectionTitle>
         <BudgetHomeCard currency={currency} spent={monthBudget.spentBudgetedMinor} total={monthBudget.budgetedMinor}
           remaining={monthBudget.remainingMinor} />
