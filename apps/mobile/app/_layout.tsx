@@ -44,20 +44,20 @@ function Navigation() {
         <AppText style={{ fontSize: 25, fontWeight: '700' }}>No pudimos abrir FinanzApp</AppText>
         <ErrorMessage message={error ?? 'No se pudieron cargar los recursos. Cerrá y abrí la app. Tus datos siguen guardados.'} />
         {!fontError && <ActionButton label="Volver a intentar" onPress={retry} />}
-      </> : <ActivityIndicator accessibilityLabel="Abriendo tus datos" color={p.accent} />}
+      </> : <ActivityIndicator accessibilityLabel="Abriendo tus datos" color={p.secondary} />}
     </View>
   </SafeAreaView>;
 
   const theme = { ...(p.isDark ? DarkTheme : DefaultTheme), colors: {
     ...(p.isDark ? DarkTheme : DefaultTheme).colors,
-    primary: p.accent, background: p.background, card: p.background, text: p.text, border: p.line,
+    primary: p.tint, background: p.background, card: p.background, text: p.text, border: p.line,
   } };
   return <ThemeProvider value={theme}><View style={{ flex: 1, backgroundColor: p.background }}>
     <StatusBar style={p.isDark ? 'light' : 'dark'} />
     {error && <SafeAreaView edges={['top']} style={{ padding: 16, backgroundColor: p.surface }}>
       <ErrorMessage message={error} /><ActionButton label="Verificar de nuevo" onPress={retry} secondary />
     </SafeAreaView>}
-    <Stack screenOptions={{ headerStyle: { backgroundColor: p.background }, headerTintColor: p.accent,
+    <Stack screenOptions={{ headerStyle: { backgroundColor: p.background }, headerTintColor: p.text,
       headerTitleStyle: { color: p.text }, headerShadowVisible: false,
       contentStyle: { backgroundColor: p.background }, animation: reduced ? 'none' : 'default',
       headerBackButtonDisplayMode: 'minimal', gestureEnabled: true }}>
@@ -68,12 +68,14 @@ function Navigation() {
       <Stack.Screen name="undone-entries" options={{ title: 'Movimientos deshechos' }} />
       <Stack.Screen name="backup-import" options={{ title: 'Importar copia' }} />
       <Stack.Screen name="spending-detail" options={{ title: 'Gastos del período' }} />
-      <Stack.Screen name="reports" options={{ title: 'Reporte mensual' }} />
       <Stack.Screen name="report-category" options={{ title: 'Categoría' }} />
       <Stack.Screen name="report-day" options={{ title: 'Gastos del día' }} />
       <Stack.Screen name="report-comparison" options={{ title: 'Comparar gastos' }} />
       <Stack.Screen name="recurring" options={{ title: 'Recurrentes' }} />
       <Stack.Screen name="budgets" options={{ title: 'Presupuestos' }} />
+      <Stack.Screen name="card/[id]" options={{ title: 'Tarjeta' }} />
+      <Stack.Screen name="debts" options={{ title: 'Deudas' }} />
+      <Stack.Screen name="debt/[id]" options={{ title: 'Deuda' }} />
       <Stack.Screen name="assistant-preview" options={{ title: 'Asistente', presentation: 'modal' }} />
       <Stack.Screen name="new-account" options={{ title: 'Nueva cuenta', presentation: 'modal' }} />
       <Stack.Screen name="new-entry" options={{ title: 'Nuevo movimiento', presentation: 'modal' }} />
@@ -84,6 +86,10 @@ function Navigation() {
       <Stack.Screen name="edit-recurring/[id]" options={{ title: 'Editar recurrente', presentation: 'modal' }} />
       <Stack.Screen name="new-budget" options={{ title: 'Nuevo presupuesto', presentation: 'modal' }} />
       <Stack.Screen name="edit-budget/[id]" options={{ title: 'Editar presupuesto', presentation: 'modal' }} />
+      <Stack.Screen name="new-card" options={{ title: 'Nueva tarjeta', presentation: 'modal' }} />
+      <Stack.Screen name="edit-card/[id]" options={{ title: 'Editar tarjeta', presentation: 'modal' }} />
+      <Stack.Screen name="new-debt" options={{ title: 'Nueva deuda', presentation: 'modal' }} />
+      <Stack.Screen name="edit-debt/[id]" options={{ title: 'Editar deuda', presentation: 'modal' }} />
       <Stack.Screen name="edit-transfer/[id]" options={{ title: 'Editar transferencia', presentation: 'modal' }} />
       <Stack.Screen name="transfer/[id]" options={{ title: 'Transferencia' }} />
     </Stack>

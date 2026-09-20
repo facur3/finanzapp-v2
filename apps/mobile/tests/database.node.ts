@@ -5,9 +5,11 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { accountBalanceMinor, archiveKey, createRecoveryBackup, initialRecord, makeEntryChange, parsePilotBackup, snapshotFromArchive, totalsByCurrency, type Account, type Entry,
-  makeAccountChange, initialTransferRecord, makeTransferChange, type Transfer, type RecurringRule, type MonthlyBudget } from '@finanzapp/domain';
+  makeAccountChange, initialTransferRecord, makeTransferChange, type Transfer, type RecurringRule, type MonthlyBudget,
+  cardDebtMinor, debtOutstandingMinor, liquidTotalsByCurrency, spendingOverview, type CreditCardProfile, type PersonalDebtProfile } from '@finanzapp/domain';
 import { changeEntry, createAccount, createEntry, importArchive, initializeDatabase, readArchive, readSnapshot, changeAccount,
-  createTransfer, changeTransfer, saveRecurringRule, processRecurring, saveMonthlyBudget, type LedgerDatabase } from '../src/storage/database.ts';
+  createTransfer, changeTransfer, saveRecurringRule, processRecurring, saveMonthlyBudget,
+  createCreditCard, saveCreditCard, createPersonalDebt, savePersonalDebt, type LedgerDatabase } from '../src/storage/database.ts';
 import { runExclusiveTransaction, type TransactionConnection } from '../src/storage/transaction.ts';
 
 // Synthetic records in disposable databases only. Nothing seeds a user's app.
@@ -57,7 +59,7 @@ test('new install is empty; initialization can repeat without deleting data', as
   const { db } = setup();
   await initializeDatabase(db);
   assert.deepEqual(await readSnapshot(db), { accounts: [], entries: [] });
-  assert.equal((await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))?.user_version, 5);
+  assert.equal((await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))?.user_version, 6);
   await createAccount(db, account);
   await initializeDatabase(db);
   assert.deepEqual((await readSnapshot(db)).accounts, [account]);
@@ -143,9 +145,9 @@ test('newer database schema is refused intact instead of reset or downgraded', a
   const { db } = setup();
   await initializeDatabase(db);
   await createAccount(db, account);
-  await db.execAsync('PRAGMA user_version = 6');
+  await db.execAsync('PRAGMA user_version = 7');
   await assert.rejects(initializeDatabase(db), /versión más nueva/);
-  assert.equal((await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))?.user_version, 6);
+  assert.equal((await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))?.user_version, 7);
   assert.deepEqual((await readSnapshot(db)).accounts, [account]);
 });
 
@@ -498,9 +500,9 @@ test('v3 database upgrades through recurring and budget schemas without changing
   const { db } = await transferReady();
   await createTransfer(db, transfer);
   const before = await readSnapshot(db);
-  await db.execAsync('PRAGMA user_version = 3; DROP TABLE IF EXISTS recurring_rules; DROP TABLE IF EXISTS monthly_budgets;');
+  await db.execAsync('PRAGMA user_version = 3; DROP TABLE IF EXISTS recurring_rules; DROP TABLE IF EXISTS monthly_budgets; DROP TABLE IF EXISTS credit_cards; DROP TABLE IF EXISTS personal_debts;');
   await initializeDatabase(db);
-  assert.equal((await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))?.user_version, 5);
+  assert.equal((await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))?.user_version, 6);
   assert.deepEqual(await readSnapshot(db), before);
   assert.deepEqual((await readArchive(db)).recurring ?? [], []);
   assert.deepEqual((await readArchive(db)).budgets ?? [], []);
@@ -596,10 +598,10 @@ test('schema 4 upgrades to budget schema 5 without changing recurring rules or b
   await createAccount(db, account);
   await saveRecurringRule(db, recurring);
   const before = await readArchive(db);
-  await db.execAsync('DROP TABLE monthly_budgets; PRAGMA user_version = 4;');
+  await db.execAsync('DROP TABLE monthly_budgets; DROP TABLE credit_cards; DROP TABLE personal_debts; PRAGMA user_version = 4;');
   await initializeDatabase(db);
   const after = await readArchive(db);
-  assert.equal((await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))?.user_version, 5);
+  assert.equal((await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))?.user_version, 6);
   assert.deepEqual(after.accounts, before.accounts);
   assert.deepEqual(after.records, before.records);
   assert.deepEqual(after.recurring, before.recurring);
@@ -654,7 +656,7 @@ test('v5 backup/import preserves active and archived budgets without duplicating
   await saveMonthlyBudget(db, archived);
   const original = await readArchive(db);
   const backup = createRecoveryBackup(original);
-  assert.equal(backup.schema, 'finanzapp.native-pilot.v5');
+  assert.equal(backup.schema, 'finanzapp.native-pilot.v6');
   const incoming = parsePilotBackup(JSON.stringify(backup)).archive;
   assert.deepEqual(incoming.budgets, [archived]);
 
@@ -664,4 +666,172 @@ test('v5 backup/import preserves active and archived budgets without duplicating
   await importArchive(other, incoming, baseline);
   await importArchive(other, incoming, baseline);
   assert.equal(archiveKey(await readArchive(other)), archiveKey(incoming));
+});
+
+
+const cardAccount: Account = { id: 'card-account', name: 'Visa Gold', currency: 'ARS', openingMinor: -20000, createdAt: account.createdAt };
+const card: CreditCardProfile = { id: 'card-fixture', accountId: cardAccount.id, issuer: 'Banco', last4: '4009', creditLimitMinor: 500000,
+  closingDay: 28, dueDay: 5, active: true, createdAt: account.createdAt, revision: 0, updatedAt: account.createdAt };
+const purchase: Entry = { ...expense, id: 'card-purchase', accountId: cardAccount.id, amountMinor: 23100, merchant: 'Starbucks', category: 'Café' };
+const cardPayment: Transfer = { id: 'card-payment', fromAccountId: account.id, toAccountId: cardAccount.id, amountMinor: 30000,
+  note: 'Pago Visa Gold', dateISO: '2026-09-15', createdAt: account.createdAt };
+const debtAccount: Account = { id: 'debt-account', name: 'Debo · Juan', currency: 'ARS', openingMinor: -30000, createdAt: account.createdAt };
+const debt: PersonalDebtProfile = { id: 'debt-fixture', accountId: debtAccount.id, direction: 'owed_by_me', counterparty: 'Juan',
+  dueDateISO: '2026-10-01', note: '', active: true, createdAt: account.createdAt, revision: 0, updatedAt: account.createdAt };
+
+test('schema 5 upgrades to card/debt schema 6 preserving budgets, recurring rules and balances', async () => {
+  const { db } = await funded();
+  await saveRecurringRule(db, recurring);
+  await saveMonthlyBudget(db, monthlyBudget);
+  const before = await readArchive(db);
+  await db.execAsync('DROP TABLE credit_cards; DROP TABLE personal_debts; PRAGMA user_version = 5;');
+  const failing: LedgerDatabase = { ...db, withExclusiveTransactionAsync: work => db.withExclusiveTransactionAsync(tx => work({ ...tx,
+    execAsync: async sql => { await tx.execAsync(sql); if (sql.includes('personal_debts')) throw new Error('Interrupted v6'); },
+  })) };
+  await assert.rejects(initializeDatabase(failing), /Interrupted v6/);
+  assert.equal((await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))?.user_version, 5);
+  await initializeDatabase(db);
+  const after = await readArchive(db);
+  assert.equal((await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))?.user_version, 6);
+  assert.equal(archiveKey(after), archiveKey(before));
+  assert.deepEqual(after.cards ?? [], []);
+  assert.deepEqual(after.debts ?? [], []);
+});
+
+test('card purchase is one expense; paying the card moves cash into the card without a second expense', async () => {
+  const { db, path } = await funded();
+  await createCreditCard(db, cardAccount, card);
+  await createCreditCard(db, cardAccount, card); // Retry after a failed refresh.
+  await assert.rejects(createCreditCard(db, cardAccount, { ...card, last4: '0000' }), /ya existe/);
+  await createEntry(db, purchase);
+  let snapshot = await readSnapshot(db);
+  assert.equal(cardDebtMinor(card, snapshot), 20000 + 23100);
+  assert.equal(accountBalanceMinor(account, snapshot.entries, snapshot.transfers), 100000 - 12345);
+  await createTransfer(db, cardPayment);
+  await createTransfer(db, cardPayment);
+  await db.closeAsync();
+  const reopened = databaseAt(path);
+  await initializeDatabase(reopened);
+  snapshot = await readSnapshot(reopened);
+  const archive = await readArchive(reopened);
+  assert.equal((await reopened.getAllAsync('SELECT id FROM credit_cards')).length, 1);
+  assert.equal(cardDebtMinor(card, snapshot), 20000 + 23100 - 30000);
+  assert.equal(accountBalanceMinor(account, snapshot.entries, snapshot.transfers), 100000 - 12345 - 30000);
+  const overview = spendingOverview(snapshot, { currency: 'ARS', startISO: '2026-09-01', endISO: '2026-09-30' });
+  assert.equal(overview.status === 'ready' && overview.expenseMinor, 12345 + 23100);
+  assert.equal(overview.status === 'ready' && overview.expenseCount, 2);
+  assert.deepEqual(liquidTotalsByCurrency(snapshot, archive.cards, archive.debts), { ARS: 100000 - 12345 - 30000 });
+  assert.deepEqual(totalsByCurrency(snapshot), { ARS: 100000 - 12345 - 20000 - 23100 });
+});
+
+test('a card cannot start with credit in the holder favour, or reuse an account that already has another obligation', async () => {
+  const { db } = await funded();
+  await assert.rejects(createCreditCard(db, { ...cardAccount, openingMinor: 1 }, card), /crédito a favor/);
+  await assert.rejects(createCreditCard(db, cardAccount, { ...card, accountId: 'other' }), /no coincide/);
+  await createCreditCard(db, cardAccount, card);
+  await assert.rejects(createPersonalDebt(db, { ...debtAccount, id: cardAccount.id }, { ...debt, accountId: cardAccount.id }), /ya existe/);
+  await assert.rejects(createCreditCard(db, { ...cardAccount, id: 'second-card-account' }, { ...card, id: 'second-card', accountId: cardAccount.id }), /no coincide/);
+  assert.equal((await readArchive(db)).cards!.length, 1);
+});
+
+test('editing and archiving a card is retry-safe, keeps its account and never changes balances', async () => {
+  const { db } = await funded();
+  await createCreditCard(db, cardAccount, card);
+  await createEntry(db, purchase);
+  const balanceBefore = cardDebtMinor(card, await readSnapshot(db));
+  const edited: CreditCardProfile = { ...card, creditLimitMinor: 800000, dueDay: 10, revision: 1, updatedAt: changedAt };
+  await saveCreditCard(db, edited);
+  await saveCreditCard(db, edited);
+  await assert.rejects(saveCreditCard(db, { ...edited, accountId: account.id }), /no puede representar dos|cambió/);
+  await assert.rejects(saveCreditCard(db, { ...card, dueDay: 12, revision: 5, updatedAt: changedAt }), /cambió/);
+  await assert.rejects(saveCreditCard(db, { ...edited, id: 'missing' }), /No encontramos/);
+  const archived: CreditCardProfile = { ...edited, active: false, revision: 2, updatedAt: '2026-09-14T12:00:00.000Z' };
+  await saveCreditCard(db, archived);
+  const archive = await readArchive(db);
+  assert.deepEqual(archive.cards, [archived]);
+  assert.equal(cardDebtMinor(card, snapshotFromArchive(archive)), balanceBefore);
+  assert.equal(archive.records.length, 2);
+});
+
+test('personal debt: partial payments reduce it through transfers; direct expenses or income on it are refused', async () => {
+  const { db, path } = await funded();
+  await createPersonalDebt(db, debtAccount, debt);
+  await createPersonalDebt(db, debtAccount, debt);
+  await assert.rejects(createPersonalDebt(db, { ...debtAccount, openingMinor: 5 }, debt), /no coincide con su dirección/);
+  await assert.rejects(createEntry(db, { ...expense, id: 'debt-expense', accountId: debtAccount.id }), /pagos o cobros/);
+  await assert.rejects(createEntry(db, { ...expense, id: 'debt-income', kind: 'income', accountId: debtAccount.id }), /pagos o cobros/);
+  await assert.rejects(changeEntry(db, makeEntryChange('move', initialRecord(expense), 'edit', changedAt, { ...expense, accountId: debtAccount.id })), /pagos o cobros/);
+  await assert.rejects(saveRecurringRule(db, { ...recurring, accountId: debtAccount.id }), /pagos o cobros/);
+  const payment: Transfer = { id: 'debt-payment', fromAccountId: account.id, toAccountId: debtAccount.id, amountMinor: 10000, note: 'Pago a Juan', dateISO: '2026-09-15', createdAt: account.createdAt };
+  await createTransfer(db, payment);
+  await createTransfer(db, payment);
+  await db.closeAsync();
+  const reopened = databaseAt(path);
+  await initializeDatabase(reopened);
+  const snapshot = await readSnapshot(reopened);
+  assert.equal(debtOutstandingMinor(debt, snapshot), 20000);
+  assert.equal(accountBalanceMinor(account, snapshot.entries, snapshot.transfers), 100000 - 12345 - 10000);
+  assert.equal(snapshot.entries.length, 1); // The payment is not an expense.
+  const settled: PersonalDebtProfile = { ...debt, active: false, revision: 1, updatedAt: changedAt };
+  await savePersonalDebt(reopened, settled);
+  await savePersonalDebt(reopened, settled);
+  await assert.rejects(savePersonalDebt(reopened, { ...settled, direction: 'owed_to_me', revision: 2 }), /cambió/);
+  assert.deepEqual((await readArchive(reopened)).debts, [settled]);
+});
+
+test('receivable: "they owe me" starts positive and collections move money into cash', async () => {
+  const { db } = await funded();
+  const receivableAccount: Account = { id: 'receivable-account', name: 'Me deben · Ana', currency: 'ARS', openingMinor: 15000, createdAt: account.createdAt };
+  const receivable: PersonalDebtProfile = { ...debt, id: 'receivable', accountId: receivableAccount.id, direction: 'owed_to_me', counterparty: 'Ana', dueDateISO: null };
+  await assert.rejects(createPersonalDebt(db, { ...receivableAccount, openingMinor: -1 }, receivable), /no coincide con su dirección/);
+  await createPersonalDebt(db, receivableAccount, receivable);
+  await createTransfer(db, { id: 'collection', fromAccountId: receivableAccount.id, toAccountId: account.id, amountMinor: 5000, note: 'Cobro de Ana', dateISO: '2026-09-16', createdAt: account.createdAt });
+  const snapshot = await readSnapshot(db);
+  assert.equal(debtOutstandingMinor(receivable, snapshot), 10000);
+  assert.equal(accountBalanceMinor(account, snapshot.entries, snapshot.transfers), 100000 - 12345 + 5000);
+  const archive = await readArchive(db);
+  assert.deepEqual(liquidTotalsByCurrency(snapshot, archive.cards, archive.debts), { ARS: 100000 - 12345 + 5000 });
+});
+
+test('card creation rolls back its account when the profile insert fails, and retry adds both once', async () => {
+  const { db } = await funded();
+  const failing: LedgerDatabase = { ...db, withExclusiveTransactionAsync: work => db.withExclusiveTransactionAsync(tx => work({ ...tx,
+    runAsync: async (sql, ...params) => { if (sql.includes('INSERT INTO credit_cards')) throw new Error('Disk full'); return tx.runAsync(sql, ...params); },
+  })) };
+  await assert.rejects(createCreditCard(failing, cardAccount, card), /Disk full/);
+  assert.equal((await readSnapshot(db)).accounts.length, 1);
+  await createCreditCard(db, cardAccount, card);
+  const archive = await readArchive(db);
+  assert.equal(archive.accounts.length, 2);
+  assert.deepEqual(archive.cards, [card]);
+});
+
+test('v6 backup roundtrips cards and debts; additive import never duplicates their accounts or balances', async () => {
+  const { db } = await funded();
+  await createCreditCard(db, cardAccount, card);
+  await createEntry(db, purchase);
+  await createTransfer(db, cardPayment);
+  await createPersonalDebt(db, debtAccount, debt);
+  const original = await readArchive(db);
+  const backup = createRecoveryBackup(original);
+  assert.equal(backup.schema, 'finanzapp.native-pilot.v6');
+  const incoming = parsePilotBackup(JSON.stringify(backup)).archive;
+  assert.deepEqual(incoming.cards, original.cards);
+  assert.deepEqual(incoming.debts, original.debts);
+
+  const other = setup().db;
+  await initializeDatabase(other);
+  const baseline = archiveKey(await readArchive(other));
+  const failing: LedgerDatabase = { ...other, withExclusiveTransactionAsync: work => other.withExclusiveTransactionAsync(tx => work({ ...tx,
+    runAsync: async (sql, ...params) => { if (sql.includes('INSERT INTO personal_debts')) throw new Error('Interrupted debt import'); return tx.runAsync(sql, ...params); },
+  })) };
+  await assert.rejects(importArchive(failing, incoming, baseline), /Interrupted/);
+  assert.equal(archiveKey(await readArchive(other)), baseline);
+  await importArchive(other, incoming, baseline);
+  await importArchive(other, incoming, baseline);
+  const restored = await readArchive(other);
+  assert.equal(archiveKey(restored), archiveKey(original));
+  assert.equal(cardDebtMinor(card, snapshotFromArchive(restored)), 20000 + 23100 - 30000);
+  assert.equal(debtOutstandingMinor(debt, snapshotFromArchive(restored)), 30000);
+  assert.deepEqual(liquidTotalsByCurrency(snapshotFromArchive(restored), restored.cards, restored.debts), { ARS: 100000 - 12345 - 30000 });
 });

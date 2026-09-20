@@ -1,23 +1,38 @@
 import { categoryKey, type Entry, type EntryKind } from '@finanzapp/domain';
+import type Ionicons from '@expo/vector-icons/Ionicons';
 export { categoryKey } from '@finanzapp/domain';
+
+export type IconName = keyof typeof Ionicons.glyphMap;
 
 // Interface choices, not seeded transactions or an automatic reclassification.
 // Keep the user's category string in the ledger, including custom categories.
 const expenseLabels = ['Comida', 'Supermercado', 'Transporte', 'Hogar', 'Servicios', 'Salud', 'Ropa', 'Ocio', 'Educación', 'Viajes', 'Mascotas', 'Otros'];
 const incomeLabels = ['Sueldo', 'Trabajo', 'Regalos', 'Reembolsos', 'Préstamos', 'Otros'];
 
-const symbols = new Map<string, string>(Object.entries({
-  comida: '🍽️', comidas: '🍽️', alimentacion: '🍽️', restaurante: '🍽️', restaurantes: '🍽️', delivery: '🍽️',
-  cafe: '☕', cafeteria: '☕', supermercado: '🛒', supermercados: '🛒', compras: '🛍️',
-  transporte: '🚗', combustible: '⛽', hogar: '🏠', alquiler: '🏠', vivienda: '🏠',
-  servicios: '💡', salud: '💊', farmacia: '💊', ropa: '👕', indumentaria: '👕',
-  ocio: '🎟️', entretenimiento: '🎟️', educacion: '📚', viajes: '✈️', mascotas: '🐾',
-  deporte: '🏃', gimnasio: '🏃', sueldo: '💼', salario: '💼', trabajo: '💻',
-  regalos: '🎁', regalo: '🎁', reembolsos: '↩️', reembolso: '↩️', prestamos: '🤝', prestamo: '🤝',
+// Monochrome glyphs, not emoji: the tile stays calm and consistent with the
+// rest of the interface, and colour is reserved for meaning.
+const glyphs = new Map<string, IconName>(Object.entries({
+  comida: 'restaurant-outline', comidas: 'restaurant-outline', alimentacion: 'restaurant-outline', restaurante: 'restaurant-outline',
+  restaurantes: 'restaurant-outline', delivery: 'bicycle-outline', 'fast food': 'fast-food-outline', pizza: 'pizza-outline',
+  cafe: 'cafe-outline', cafeteria: 'cafe-outline', bebidas: 'wine-outline', bar: 'beer-outline',
+  supermercado: 'cart-outline', supermercados: 'cart-outline', super: 'cart-outline', almacen: 'basket-outline', compras: 'bag-outline', shopping: 'bag-outline',
+  transporte: 'bus-outline', combustible: 'car-outline', nafta: 'car-outline', auto: 'car-outline', taxi: 'car-outline', uber: 'car-outline',
+  hogar: 'home-outline', alquiler: 'home-outline', vivienda: 'home-outline', expensas: 'business-outline', muebles: 'bed-outline',
+  servicios: 'flash-outline', luz: 'flash-outline', gas: 'flame-outline', agua: 'water-outline', internet: 'wifi-outline', celular: 'phone-portrait-outline', telefono: 'phone-portrait-outline',
+  salud: 'medkit-outline', farmacia: 'medkit-outline', medico: 'medkit-outline', ropa: 'shirt-outline', indumentaria: 'shirt-outline', belleza: 'cut-outline',
+  ocio: 'ticket-outline', entretenimiento: 'ticket-outline', cine: 'film-outline', musica: 'musical-notes-outline', juegos: 'game-controller-outline',
+  suscripciones: 'repeat-outline', suscripcion: 'repeat-outline', streaming: 'tv-outline', tecnologia: 'laptop-outline',
+  educacion: 'school-outline', libros: 'book-outline', cursos: 'school-outline', viajes: 'airplane-outline', vacaciones: 'airplane-outline', hotel: 'bed-outline',
+  mascotas: 'paw-outline', deporte: 'barbell-outline', deportes: 'barbell-outline', gimnasio: 'barbell-outline',
+  impuestos: 'document-text-outline', seguros: 'shield-checkmark-outline', bancos: 'business-outline', comisiones: 'business-outline',
+  regalos: 'gift-outline', regalo: 'gift-outline', hijos: 'people-outline', familia: 'people-outline',
+  sueldo: 'briefcase-outline', salario: 'briefcase-outline', trabajo: 'laptop-outline', freelance: 'laptop-outline', honorarios: 'briefcase-outline',
+  reembolsos: 'return-down-back-outline', reembolso: 'return-down-back-outline', prestamos: 'people-outline', prestamo: 'people-outline',
+  inversiones: 'trending-up-outline', intereses: 'trending-up-outline', ventas: 'pricetags-outline', otros: 'ellipsis-horizontal',
 }));
 
-export function categorySymbol(label: string): string {
-  return symbols.get(categoryKey(label)) ?? '🧾';
+export function categoryIcon(label: string): IconName {
+  return glyphs.get(categoryKey(label)) ?? 'pricetag-outline';
 }
 
 export function categoryChoices(entries: Entry[], kind: EntryKind, query = '', selected = ''): string[] {

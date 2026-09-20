@@ -1,18 +1,18 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import type { Entry } from '@finanzapp/domain';
-import { categoryChoices, categoryKey, categorySymbol, customCategory } from '../src/ui/categories.ts';
+import { categoryChoices, categoryIcon, categoryKey, customCategory } from '../src/ui/categories.ts';
 
 const entry: Entry = { id: 'entry', accountId: 'account', kind: 'expense', amountMinor: 100, merchant: 'Concepto de prueba', category: 'Categoría propia', dateISO: '2026-09-12', createdAt: '2026-09-12T12:00:00Z' };
 
-test('category symbols tolerate case and accents without rewriting labels', () => {
-  assert.equal(categorySymbol('  EDUCACIÓN  '), '📚');
-  assert.equal(categorySymbol('Café'), '☕');
-  assert.equal(categorySymbol('Categoría propia'), '🧾');
+test('category glyphs tolerate case and accents without rewriting labels', () => {
+  assert.equal(categoryIcon('  EDUCACIÓN  '), 'school-outline');
+  assert.equal(categoryIcon('Café'), 'cafe-outline');
+  assert.equal(categoryIcon('Categoría propia'), 'pricetag-outline');
   assert.equal(entry.category, 'Categoría propia');
 });
 test('arbitrary user category strings never resolve to object prototypes', () => {
-  for (const label of ['__proto__', 'constructor', 'toString', '<script>', '']) assert.equal(categorySymbol(label), '🧾');
+  for (const label of ['__proto__', 'constructor', 'toString', '<script>', '']) assert.equal(categoryIcon(label), 'pricetag-outline');
 });
 test('picker offers useful choices without creating ledger records', () => {
   const records: Entry[] = [];

@@ -2,11 +2,11 @@ import { useMemo, useState } from 'react';
 import { FlatList, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { dailySpending, formatMinorUnits, spendingReport, type CategorySpending, type DailySpending, type Currency } from '@finanzapp/domain';
-import { useLedger } from '../src/storage/LedgerProvider';
-import { AppText, Choices, DetailRow, EmptyState, IconButton, Money, PressFeedback, SectionTitle, Surface } from '../src/ui/components';
-import { reportMonthLabel, reportPeriodLabel, reportSelection, shiftReportMonth } from '../src/ui/report-presentation';
-import { CategorySpendingRow } from '../src/ui/spending-chart';
-import { useCurrentDay, usePalette } from '../src/ui/theme';
+import { useLedger } from '../../src/storage/LedgerProvider';
+import { AppText, Choices, DetailRow, EmptyState, IconButton, Money, PressFeedback, SectionTitle, Surface } from '../../src/ui/components';
+import { reportMonthLabel, reportPeriodLabel, reportSelection, shiftReportMonth } from '../../src/ui/report-presentation';
+import { CategorySpendingRow } from '../../src/ui/spending-chart';
+import { useCurrentDay, usePalette } from '../../src/ui/theme';
 
 export default function ReportsScreen() {
   const params = useLocalSearchParams<{ currency?: string | string[]; month?: string | string[] }>();
@@ -47,7 +47,7 @@ export default function ReportsScreen() {
           <AppText secondary style={{ fontSize: 13 }}>{reportPeriodLabel(report, day)}</AppText>
           {canNext && <PressFeedback accessibilityRole="button" onPress={() => setMonth(currentMonth)}
             accessibilityLabel="Volver al mes actual">
-            <AppText style={{ fontSize: 13, fontWeight: '600', color: p.accent }}>Este mes</AppText>
+            <AppText style={{ fontSize: 13, fontWeight: '600', color: p.tint }}>Este mes</AppText>
           </PressFeedback>}
         </View>
       </View>

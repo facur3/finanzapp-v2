@@ -2,12 +2,24 @@ import { describe, expect, it } from 'vitest';
 import { accountBalanceMinor, createPilotBackup, totalsByCurrency, type Account, type Entry } from './ledger';
 import { archiveKey, BACKUP_MAX_BYTES, createRecoveryBackup, initialRecord, makeEntryChange, parsePilotBackup, previewBackupImport,
   sameRecord, snapshotFromArchive, validateArchive, validateEntryChange, type LedgerArchive } from './recovery';
+import { initialTransferRecord } from './transfers';
+import type { CreditCardProfile, PersonalDebtProfile } from './liabilities';
 
 const account: Account = { id: 'a', name: 'Prueba', currency: 'ARS', openingMinor: 100000, createdAt: '2026-09-11T12:00:00Z' };
 const entry: Entry = { id: 'e', accountId: 'a', kind: 'expense', amountMinor: 101, merchant: 'Prueba', category: 'Prueba', dateISO: '2026-09-11', createdAt: account.createdAt };
 const archive: LedgerArchive = { accounts: [account], records: [initialRecord(entry)] };
 const time = '2026-09-13T12:00:00Z';
 const empty = { accounts: [], records: [] };
+const cardAccount: Account = { id: 'card-acc', name: 'Visa', currency: 'ARS', openingMinor: -5000, createdAt: account.createdAt };
+const debtAccount: Account = { id: 'debt-acc', name: 'Debo \u00B7 Juan', currency: 'ARS', openingMinor: -7000, createdAt: account.createdAt };
+const card: CreditCardProfile = { id: 'card', accountId: cardAccount.id, issuer: 'Banco', last4: '1234', creditLimitMinor: 100000,
+  closingDay: 28, dueDay: 5, active: true, createdAt: account.createdAt, revision: 0, updatedAt: account.createdAt };
+const debt: PersonalDebtProfile = { id: 'debt', accountId: debtAccount.id, direction: 'owed_by_me', counterparty: 'Juan', dueDateISO: null,
+  note: '', active: true, createdAt: account.createdAt, revision: 0, updatedAt: account.createdAt };
+const liabilities: LedgerArchive = { accounts: [account, cardAccount, debtAccount],
+  records: [initialRecord(entry), initialRecord({ ...entry, id: 'purchase', accountId: cardAccount.id, amountMinor: 2000 })],
+  transfers: [initialTransferRecord({ id: 't', fromAccountId: account.id, toAccountId: cardAccount.id, amountMinor: 1000, note: 'Pago', dateISO: entry.dateISO, createdAt: account.createdAt })],
+  cards: [card], debts: [debt] };
 
 describe('native edit and recovery domain', () => {
   it('roundtrips v1 and current backup without changing a source record', () => {
@@ -15,6 +27,24 @@ describe('native edit and recovery domain', () => {
     const restored = parsePilotBackup('\uFEFF' + JSON.stringify(createRecoveryBackup(archive)));
     expect(restored.archive).toEqual(archive);
     expect(archive.records[0].revision).toBe(0);
+  });
+  it('v6 backups carry cards and debts; a v5 file without them still restores', () => {
+    const backup = createRecoveryBackup(liabilities);
+    expect(backup.schema).toBe('finanzapp.native-pilot.v6');
+    expect(parsePilotBackup(JSON.stringify(backup)).archive).toEqual(liabilities);
+    const v5 = { ...createRecoveryBackup(archive), schema: 'finanzapp.native-pilot.v5' } as Record<string, unknown>;
+    delete v5.cards; delete v5.debts;
+    expect(parsePilotBackup(JSON.stringify(v5)).archive).toEqual(archive);
+    expect(() => parsePilotBackup(JSON.stringify({ ...v5, cards: [] }))).toThrow();
+  });
+  it('previews import totals as liquid money and detects card/debt conflicts', () => {
+    const plan = previewBackupImport(empty, liabilities);
+    expect(plan.cards).toEqual([card]);
+    expect(plan.debts).toEqual([debt]);
+    expect(plan.after).toEqual({ ARS: 100000 - 101 - 1000 });
+    expect(previewBackupImport(liabilities, { ...liabilities, cards: [{ ...card, creditLimitMinor: 1, revision: 1, updatedAt: time }] }).conflicts).toBe(1);
+    expect(previewBackupImport(liabilities, liabilities)).toMatchObject({ identical: 5, conflicts: 0, cards: [], debts: [] });
+    expect(() => validateArchive({ ...liabilities, debts: [{ ...debt, accountId: cardAccount.id }] })).toThrow(/dos obligaciones/);
   });
   it('preserves revisions and tombstones in a backup, but excludes undone entries from every balance/report', () => {
     const undo = makeEntryChange('undo', archive.records[0], 'void', time);

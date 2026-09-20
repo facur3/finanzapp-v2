@@ -25,8 +25,12 @@ there is no new physical acceptance. **Interfaz 06** adds daily expense drill-do
 and monthly/category comparisons. Interfaz 07 supersedes the balance-first Home. **Interfaz 08 (2026-09-20)** adds
 native recurring commitments, automatic due-date materialization and a real upcoming
 payments block. **Interfaz 09 (2026-09-20)** adds monthly category budgets, a clear
-Gastos / Disponible Home hero and a non-networked Assistant preview. The spending-first
-decision remains authoritative, with device checks still an explicit gate.
+Gastos / Disponible Home hero and a non-networked Assistant preview. **Interfaz 10
+(2026-09-20)** restructures navigation into five tabs (Inicio, Movimientos, Reportes,
+Tarjetas, Ajustes), adds credit cards, personal debts and receivables with correct
+accounting, and replaces the purple accent with a neutral, semantic visual system.
+The spending-first decision remains authoritative, with device checks still an
+explicit gate.
 
 Inicio → Reporte mensual offers Categorías / Día a día and Comparar gastos. Current
 months compare equal initial day counts (both capped if the previous month is
@@ -34,7 +38,7 @@ shorter); historical months compare full months. Exact date ranges stay visible.
 Category totals open only their dated expenses. Missing records are not savings.
 Native backup/recovery stays available, but no JSON import is required to start.
 
-## Product scope (Interfaz 09)
+## Product scope (Interfaz 10)
 
 [Decision 002](../../docs/decisions/002-spending-first.md) selects spending and
 commitments with optional accounts. No native portfolio or market data. The old
@@ -105,6 +109,17 @@ Pausing keeps prior history and reactivation skips dates that elapsed while paus
 Home shows up to three real upcoming expense commitments for the selected currency;
 the Recurrentes screen also shows a 30-day forecast without mixing ARS and USD.
 
+Tarjetas holds credit cards, debts and receivables. A card is a hidden internal
+account: registering a purchase posts **one expense** to the card (it counts in
+Movimientos, Reportes and Presupuestos and raises the card's recorded debt).
+**Pagar tarjeta** records a transfer from a cash account into the card: cash goes
+down, debt goes down, and no second expense is created. Closing and due dates are
+calculated from the days you enter; there is no bank statement, pending state or
+card control. A debt ("Debo") or receivable ("Me deben") is also a hidden account
+whose opening balance is the principal; each payment or collection is a transfer
+capped at the outstanding amount. Expenses, income and recurring rules can never be
+posted to a debt account. Home's Disponible excludes cards, debts and receivables.
+
 Ajustes → Presupuestos stores category limits for one month and one currency. Only
 recorded expenses consume them; income and internal transfers do not. Budgets can be
 edited or archived without changing historical movements or account balances. Home
@@ -145,21 +160,23 @@ The current visual iteration includes:
 
 Interfaz 05 migrated the existing pilot SQLite file from schema 1/2 to 3, atomically,
 preserving its filename/rows and entry audit. Interfaz 08 added schema 4 recurring_rules;
-Interfaz 09 adds schema 5 monthly_budgets without replacing existing balances, entries,
-transfers or recurring schedules.
+Interfaz 09 added schema 5 monthly_budgets; Interfaz 10 adds schema 6 credit_cards and
+personal_debts. Neither replaces existing balances, entries, transfers or schedules.
 Do not revert to older app code after upgrading. A newer DB version is refused
 intact; no error deletes the file. No Supabase connection, seeded records, new
 runtime dependency or paid service was introduced. Follow the new-iteration section of the
 [device checklist](../../docs/mobile-device-checklist.md) before accepting its layout.
 
 Only enter a small amount of data while checking the experience. Do not re-enter
-the entire portfolio or uninstall the existing app. Legacy import, debt/card accounting, Supabase sync, Face ID, reminders and Apple Pay capture
-are separate roadmap milestones; no disabled decorative buttons imply otherwise.
+the entire portfolio or uninstall the existing app. Legacy import, card installments,
+Supabase sync, Face ID, reminders and Apple Pay capture are separate roadmap
+milestones; no disabled decorative buttons imply otherwise.
 
-The pilot exports its own v5 JSON backup through the system sharing sheet and
-imports native v1/v2/v3/v4/v5 backups through Ajustes → Importar copia. Review shows new
-accounts, active/undone entries, transfers, recurring rules and budgets, identical records and exact before/after available
-totals for ARS/USD separately. Confirmation adds only missing IDs in one transaction.
+The pilot exports its own v6 JSON backup through the system sharing sheet and
+imports native v1 to v6 backups through Ajustes → Importar copia. Review shows new
+accounts, cards, debts, active/undone entries, transfers, recurring rules and budgets,
+identical records and exact before/after liquid totals for ARS/USD separately (cards
+and debts are excluded from those totals). Confirmation adds only missing IDs in one transaction.
 Identical IDs/data are skipped; any conflict blocks the whole import, including
 old copies that would resurrect a tombstone. No silent overwrite or account merging
 by name. Local changes after preview require another review. Reimport/retry is safe.
@@ -168,9 +185,9 @@ Native JSON is **not** the legacy web backup format: unsupported schema/entities
 invalid cents/dates/references, duplicate IDs, unsafe totals, extra fields and files
 over 5 MB are rejected before import. Limits: 1,000 accounts, 25,000 combined
 entry/transfer records, 5,000 recurring rules and 5,000 budgets.
-Export validates its own restore format/size. V5 includes current versions,
-tombstones, recurring schedules and monthly budgets, **not** full local account/entry/transfer audit history, settings, attachments,
-cards or investments. A backup is a snapshot, not a cross-device synchronization.
+Export validates its own restore format/size. V6 includes current versions,
+tombstones, recurring schedules, monthly budgets and card/debt profiles, **not** full
+local account/entry/transfer audit history, settings, attachments or investments. A backup is a snapshot, not a cross-device synchronization.
 There is no replace/reset import mode; preserve both copies if conflicts are reported.
 File selection/sharing is explicit, not an automatic upload. The selected source
 file is never edited/deleted. Export is plain JSON, not encrypted or authenticated;
@@ -244,8 +261,9 @@ Xcode-generator integrations affected by the temporary dependency fixes in
 [`compat/`](compat/README.md). It does not replace native-device testing.
 It also covers the actual presentation helpers: filtering/search, stable ordering,
 date grouping, available currencies, account preselection and category handling.
-The mobile tests include guards over the real tab layout, report/recovery/transfer handlers
-and bar-animation configuration. These are **not** native rendering/gesture tests;
+The mobile tests include guards over the real five-tab layout, report/recovery/transfer
+handlers, the Cards tab, card/debt detail, the locked card-payment form and
+bar-animation configuration. These are **not** native rendering/gesture tests;
 use the physical checklist. The root suite also tests the shared monthly summary
 and spending report, including exact category-to-entry reconciliation.
 
@@ -253,7 +271,7 @@ For the intermittent black-tab report, update to `master`, restart with
 `npm start -- --clear` (bundler cache only, not SQLite), reopen from the new QR,
 and repeat the **Interfaz 02** tab checks, **Interfaz 03** report checks and
 **Interfaz 04/05** correction/recovery and transfer checks, plus **Interfaz 06** daily/comparison reports and **Interfaz 08** recurring/upcoming
-checks. The current footer says Interfaz 09.
+checks, plus **Interfaz 10** cards/debts and five-tab checks. The current footer says Interfaz 10.
 Before updating, save a private pilot copy; do not uninstall or add fake movements.
 
 If a storage/refresh error occurs, the form retains the exact submitted command

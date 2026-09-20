@@ -1,7 +1,8 @@
 # FinanzApp mobile: living roadmap
 
-Updated: 2026-09-20. Read [decision 001](decisions/001-native-mobile.md) and
-[decision 002](decisions/002-spending-first.md). Decision 002 supersedes earlier
+Updated: 2026-09-20. Read [decision 001](decisions/001-native-mobile.md),
+[decision 002](decisions/002-spending-first.md) and
+[decision 003](decisions/003-five-tabs-and-cards.md). Decision 002 supersedes earlier
 full-finance migration phases and the local-only AI preference. Handoff entries
 below are historical evidence, not current product priorities.
 
@@ -14,10 +15,56 @@ server-keyed; manual recording and local data work without connectivity. Recurri
 expenses, debts, budgets and cards remain in scope. Native navigation, accessible
 amounts, real data and recoverable durable writes remain requirements.
 
-## Status and current delivery — Interfaz 09
+## Status and current delivery — Interfaz 10
 
 Implemented is code, checked names a test, device-verified needs a physical result,
 and released means distributed. Neither a bundle nor a screenshot is App Store QA.
+
+- [x] Five tabs with one meaning each: Inicio, Movimientos, Reportes, Tarjetas, Ajustes.
+  Reports and cards are no longer links buried in Home or Settings; Recurrentes is
+  reachable from Home's Próximos compromisos even when empty, and from Settings.
+- [x] Credit cards and personal debts as hidden internal accounts (SQLite schema 6):
+  a card purchase is one expense that raises the card debt; a card payment is a
+  transfer that lowers cash and debt; debts/receivables settle through transfers.
+  Expenses, income and recurring rules on a debt account are refused in storage.
+- [x] Home Disponible excludes cards, debts and receivables; backup v6 carries card and
+  debt profiles; v1–v5 files still import. Import preview totals are liquid money.
+- [x] Wallet-inspired Cards tab: snapping carousel, recorded debt, available limit,
+  closing/due dates from user-entered days, statement purchases/payments, recent
+  activity, debts/receivables; card and debt detail; contextual card payment and
+  debt settlement forms capped at the outstanding amount.
+- [x] Neutral ink-first visual system with semantic expense/income/transfer/warning
+  colours, glyph tiles instead of emoji, native segmented controls and an ink tab bar.
+  Purple is retired. See [visual direction](mobile-design.md).
+- [ ] Physical iPhone review of the carousel, palette contrast and large text.
+- [ ] Home, Activity, transaction detail, entry forms, Reports, Budgets and Recurring
+  redesigns on the new system (next phases below).
+
+Interfaz 10 verification uses the same CI gates. It adds domain tests for card and
+debt accounting, calendar cycles and v6 recovery; real temporary-SQLite tests for the
+5 → 6 migration (including interruption), retry-safe card/debt creation, purchase and
+payment double-count guards, debt posting refusal and v6 import; and route-handler
+tests for the Cards tab, card/debt detail, the locked payment transfer and the entry
+form account scope. Physical iPhone layout/gesture/frame pacing remains a separate gate.
+
+SQLite is now schema 6. Schema 5 monthly_budgets remain intact and schema 6 adds
+credit_cards and personal_debts with unique internal-account references. Existing
+schema 1–5 data migrates in place; no reset, bank connection or remote migration is
+part of this delivery.
+
+### Audit of the previous WIP branch (feat/mobile-cards-liabilities)
+
+The branch modelled cards and debts correctly (hidden accounts, purchase once,
+payment as transfer) but was not finished: no domain, SQLite or route tests; the
+recovery test still expected v5 so its own suite would have failed; cards and debts
+were registered as routes but unreachable from any screen; a debt account could be
+posted to from the expense form, recurring form and entry edit; backup preview
+totals still counted card debt as available money; and the hidden accounts leaked
+through the generic account detail. Interfaz 10 reused its domain/storage shape
+(so any device that ran the branch keeps schema 6 compatibility) and rebuilt the
+surfaces, guards and tests around it rather than merging it as-is.
+
+### Previous delivery — Interfaz 09
 
 - [x] Spending-first Home: week/month, separate currencies, recorded expense total.
 - [x] Exact chart buckets, category and date drill-downs; scoped recent entries.
@@ -51,14 +98,33 @@ export. The feature adds calendar edge-case, migration, rollback, restart, retry
 pause, budget migration/retry and v5-backup coverage. Physical iPhone layout/gesture/frame pacing remains a
 separate acceptance gate; automated handlers are not UIKit evidence.
 
-SQLite is now schema 5. Schema 4 recurring_rules remain intact and schema 5 adds
-monthly_budgets with an additive index. Existing schema 1/2/3/4 data migrates in place; no reset, bank connection or remote migration
-is part of this delivery. No private data, test fixture, ZIP artwork or
-financial screenshot is added to user data or published as a product asset.
-The unmerged card-statements experiment is not part of this delivery. The old
-web/Capacitor product and data remain available; its used features are not dead code.
+Interfaz 09 shipped schema 5 (monthly_budgets). No private data, test fixture, ZIP
+artwork or financial screenshot is added to user data or published as a product
+asset. The old web/Capacitor product and data remain available; its used features
+are not dead code.
 
 ## Next deliverables, in order
+
+Interfaz 10 sequences the product/visual work as focused pull requests, each gated
+by CI and merged into master before the next starts:
+
+1. **Home redesign.** Gastos as the default hero, compact period/currency controls,
+   one budget module, top categories in a compact format, upcoming commitments,
+   recent entries and an obvious path to Reportes. Remove the large timeline bars
+   from Home; keep them in Reportes.
+2. **Movimientos and transaction detail.** Wallet-style grouping (Hoy, Ayer, this
+   week, dates), filters including transfers, and a premium detail: large amount,
+   merchant, date, account or card, category, edit and undo. No fabricated metadata.
+3. **Entry forms.** Large amount, obvious expense/income/transfer state, prominent
+   account-or-card and category selectors, merchant, date; optional fields disclosed
+   progressively. No decorative Split/Receipt/Tags until their data exists.
+4. **Reportes.** Category donut with legend, historical trend, previous-period
+   comparison, top merchants, budget status and honest insights; period, category
+   and account filters. Net cash flow, never "savings", until savings has a definition.
+5. **Presupuestos, Recurrentes and Cuentas polish**, then installments and statement
+   periods for cards with proper calendar semantics.
+6. **EAS development build and Apple integrations** (Face ID, notifications, Apple
+   Pay capture, App Intents) only after the core product is stable on device.
 
 ### 1. Complete the daily tracking loop
 
@@ -130,6 +196,16 @@ values are never hidden until an animation finishes. 44-point targets, VoiceOver
 safe areas, system text and separate currencies apply to every new screen.
 
 ## Handoff log (historical evidence)
+
+### 2026-09-20 — Interfaz 10: five tabs, cards/debts accounting and neutral visual system
+
+- Tabs: Inicio, Movimientos, Reportes, Tarjetas, Ajustes; mounted-tab mitigation kept.
+- Cards and debts are hidden internal accounts with profiles. Purchase = one expense,
+  payment = transfer; debt settlement = transfer; storage refuses postings on debts.
+- Home Disponible is liquid money only. Backup v6; v1–v5 import unchanged.
+- Palette: ink-first neutrals, semantic coral/green/blue/amber, glyph tiles, ink tab bar.
+- Checked locally: 355 domain/web + 119 mobile tests, TypeScript, Vite build, hygiene,
+  Expo compatibility and Metro iOS export (recorded in the PR). No device evidence.
 
 ### 2026-09-20 — Interfaz 09: budgets, Home metric and assistant entry point
 

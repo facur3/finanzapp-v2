@@ -2,8 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { View } from 'react-native';
 import { router } from 'expo-router';
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
-import { currentMonthISO, formatMinorUnits, labelFromISO, spendingOverview, spendingWindow, summarizeMonthlyBudgets, totalsByCurrency,
-  type Account, type Currency, type RecurringRule, type SpendingWindow } from '@finanzapp/domain';
+import { currentMonthISO, formatMinorUnits, hiddenLiabilityAccountIds, labelFromISO, liquidTotalsByCurrency, spendingOverview, spendingWindow,
+  summarizeMonthlyBudgets, type Account, type Currency, type RecurringRule, type SpendingWindow } from '@finanzapp/domain';
 import { useLedger } from '../../src/storage/LedgerProvider';
 import { ActionButton, AppText, CategoryBadge, Choices, EmptyState, EntryActions, EntryRow, Money, PressFeedback, Screen, SectionTitle, Surface } from '../../src/ui/components';
 import { availableCurrencies, selectEntries } from '../../src/ui/presentation';
@@ -24,11 +24,12 @@ export default function HomeScreen() {
   const currency = currencies.includes(selectedCurrency) ? selectedCurrency : currencies[0] ?? 'ARS';
   const period = useMemo(() => spendingWindow(currency, window, day), [currency, window, day]);
   const summary = useMemo(() => snapshot ? spendingOverview(snapshot, period) : null, [snapshot, period]);
+  // Disponible is recorded liquid money: cards, debts and receivables are never netted into it.
   const available = useMemo(() => {
     if (!snapshot) return { status: 'ready' as const, minor: 0 };
-    try { return { status: 'ready' as const, minor: totalsByCurrency(snapshot)[currency] ?? 0 }; }
+    try { return { status: 'ready' as const, minor: liquidTotalsByCurrency(snapshot, archive?.cards, archive?.debts)[currency] ?? 0 }; }
     catch { return { status: 'out-of-range' as const }; }
-  }, [snapshot, currency]);
+  }, [snapshot, archive?.cards, archive?.debts, currency]);
   const monthBudget = useMemo(() => {
     if (!snapshot) return null;
     try { return summarizeMonthlyBudgets(snapshot, archive?.budgets ?? [], currency, currentMonthISO(day)); }
@@ -44,8 +45,9 @@ export default function HomeScreen() {
     .slice(0, 3), [archive?.recurring, snapshot?.accounts, currency, day]);
 
   if (!snapshot || !summary) return null;
-  const accountCount = snapshot.accounts.filter(account => account.currency === currency).length;
-  const openReport = () => router.push({ pathname: '/reports', params: { currency } });
+  const hidden = hiddenLiabilityAccountIds(archive?.cards, archive?.debts);
+  const accountCount = snapshot.accounts.filter(account => account.currency === currency && !hidden.has(account.id)).length;
+  const openReport = () => router.navigate({ pathname: '/reports', params: { currency } });
 
   return <Screen>
     {!snapshot.accounts.length ? <EmptyState title="Entendé tus gastos."
@@ -103,7 +105,7 @@ export default function HomeScreen() {
           <PressFeedback accessibilityRole="button" accessibilityLabel="Configurar presupuesto"
             onPress={() => router.push({ pathname: '/budgets', params: { currency } })}
             style={{ paddingHorizontal: 8 }}>
-            <AppText style={{ color: p.accent, fontWeight: '600' }}>Configurar</AppText>
+            <AppText style={{ color: p.tint, fontWeight: '600' }}>Configurar</AppText>
           </PressFeedback>
         </View>
       </Surface>}
@@ -113,12 +115,14 @@ export default function HomeScreen() {
         <Money minor={summary.incomeMinor} currency={currency} size={16} />
       </View>}
 
-      {!!upcoming.length && <View>
-        <SectionTitle action="Ver todos" onAction={() => router.push('/recurring')}>Próximos compromisos</SectionTitle>
-        <AppText secondary style={{ fontSize: 13, marginBottom: 12 }}>Pagos recurrentes programados · {currency}</AppText>
-        <Surface grouped>{upcoming.map((rule, index) => <UpcomingRecurringRow key={rule.id} rule={rule}
-          account={snapshot.accounts.find(account => account.id === rule.accountId)!} day={day} last={index === upcoming.length - 1} />)}</Surface>
-      </View>}
+      <View>
+        <SectionTitle action={upcoming.length ? 'Ver todos' : 'Programar'} onAction={() => router.push(upcoming.length ? '/recurring' : '/new-recurring')}>Próximos compromisos</SectionTitle>
+        {upcoming.length ? <>
+          <AppText secondary style={{ fontSize: 13, marginBottom: 12 }}>Pagos recurrentes programados · {currency}</AppText>
+          <Surface grouped>{upcoming.map((rule, index) => <UpcomingRecurringRow key={rule.id} rule={rule}
+            account={snapshot.accounts.find(account => account.id === rule.accountId)!} day={day} last={index === upcoming.length - 1} />)}</Surface>
+        </> : <AppText secondary style={{ fontSize: 14 }}>Alquiler, suscripciones o un sueldo: programalos una vez y FinanzApp los registra al vencer.</AppText>}
+      </View>
 
       <View>
         <SectionTitle action="Reporte mensual" onAction={openReport}>En qué gastaste</SectionTitle>

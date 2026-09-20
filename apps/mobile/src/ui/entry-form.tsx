@@ -8,6 +8,7 @@ import { formatMinorUnits, makeEntryChange, parseMinorUnits, sameEntry, todayKey
 import { useLedger } from '../storage/LedgerProvider';
 import { ActionButton, AmountField, AppText, Choices, EmptyState, ErrorMessage, Field, IconButton, Screen, Surface } from './components';
 import { AccountField, CategoryField, DateField } from './form-controls';
+import { accountKindLabel, postingAccounts } from './liability-presentation';
 import { initialAccountId } from './presentation';
 
 /** One form for creating and correcting a posting. A submitted command stays
@@ -15,8 +16,9 @@ import { initialAccountId } from './presentation';
 export function EntryForm({ original, accountId: requestedAccount, currency, kind: requestedKind }: {
   original?: EntryRecord; accountId?: string; currency?: string; kind?: string;
 }) {
-  const { snapshot, addEntry, updateEntry } = useLedger();
-  const accounts = snapshot?.accounts ?? [];
+  const { snapshot, archive, addEntry, updateEntry } = useLedger();
+  // Cash accounts and cards can carry an expense or income; a personal debt only changes through payments.
+  const accounts = postingAccounts(snapshot?.accounts ?? [], archive?.debts);
   const [before] = useState(original);
   const [operation] = useState(() => ({ id: randomUUID(), createdAt: new Date().toISOString() }));
   const [kind, setKind] = useState<EntryKind>(before?.entry.kind ?? (requestedKind === 'income' ? 'income' : 'expense'));
@@ -80,7 +82,8 @@ export function EntryForm({ original, accountId: requestedAccount, currency, kin
         onChangeText={setMerchant} maxLength={120} autoCapitalize="sentences" editable={!locked} />
       <Surface grouped>
         <CategoryField entries={snapshot?.entries ?? []} kind={kind} value={category} onChange={setCategory} disabled={locked} />
-        <AccountField accounts={eligibleAccounts} value={accountId} onChange={setAccountId} disabled={locked} />
+        <AccountField label="Cuenta o tarjeta" accounts={eligibleAccounts} value={accountId} onChange={setAccountId} disabled={locked}
+          kindOf={id => { const found = accounts.find(item => item.id === id); return found ? accountKindLabel(found, archive?.cards, archive?.debts) : 'Cuenta'; }} />
         <DateField value={date} onChange={setDate} disabled={locked} />
       </Surface>
       {before && <AppText secondary style={{ fontSize: 13, textAlign: 'center' }}>Corregís el movimiento original. No se registra otro gasto o ingreso.</AppText>}

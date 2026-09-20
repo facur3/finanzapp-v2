@@ -123,7 +123,7 @@ function RecurringRow({ rule, accounts, last, busy, onToggle }: {
     <View style={{ paddingHorizontal: 12 }}>
       <Switch value={rule.active} disabled={busy} onValueChange={onToggle}
         accessibilityLabel={(rule.active ? 'Pausar ' : 'Activar ') + rule.merchant}
-        trackColor={{ false: p.inset, true: p.accentSoft }} thumbColor={rule.active ? p.accent : p.secondary} />
+        trackColor={{ false: p.line, true: p.income }} />
     </View>
   </View>;
 }

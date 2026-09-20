@@ -5,6 +5,7 @@ import { runInNewContext } from 'node:vm';
 import ts from 'typescript';
 import * as domain from '@finanzapp/domain';
 import * as presentation from '../src/ui/presentation.ts';
+import * as liabilityPresentation from '../src/ui/liability-presentation.ts';
 
 // Actual screen/form handlers with native hosts replaced by descriptors.
 // This does not render UIKit, the Files picker, animation frames or gestures.
@@ -56,7 +57,9 @@ function harness(file: string, props: any = {}, options: { data?: domain.LedgerA
     './components': components, '../src/ui/components': components, '../../src/ui/components': components,
     './form-controls': { AccountField: 'AccountField', CategoryField: 'CategoryField', DateField: 'DateField' },
     './presentation': presentation,
-    '../../src/ui/theme': { usePalette: () => ({ text: '#000', positive: '#070' }) },
+    './liability-presentation': liabilityPresentation,
+    '../../src/ui/theme': { usePalette: () => ({ text: '#000', positive: '#070', income: '#070', expense: '#700', tint: '#00F' }) },
+    './theme': { space: { xs: 4, s: 8, m: 12, l: 16, xl: 20, xxl: 24, xxxl: 32 } },
   };
   const module = { exports: {} as Record<string, (props: any) => Node> };
   runInNewContext(code, { module, exports: module.exports, Date, require: (name: string) => {
@@ -362,4 +365,62 @@ test('starting without a bank balance creates a zero tracking baseline, not an i
   await find(view.render(), 'ActionButton').props.onPress();
   assert.equal(view.newAccounts[0].openingMinor, 0);
   assert.equal(view.additions.length, 0);
+});
+
+const cardAccount: domain.Account = { ...account, id: 'card-acc', name: 'Visa', openingMinor: -5000 };
+const debtAccount: domain.Account = { ...account, id: 'debt-acc', name: 'Debo · Juan', openingMinor: -7000 };
+const card: domain.CreditCardProfile = { id: 'card', accountId: cardAccount.id, issuer: 'Banco', last4: '1234', creditLimitMinor: null,
+  closingDay: 28, dueDay: 5, active: true, createdAt, revision: 0, updatedAt: createdAt };
+const debt: domain.PersonalDebtProfile = { id: 'debt', accountId: debtAccount.id, direction: 'owed_by_me', counterparty: 'Juan', dueDateISO: null,
+  note: '', active: true, createdAt, revision: 0, updatedAt: createdAt };
+const liabilityData: domain.LedgerArchive = { ...archive, accounts: [...archive.accounts, cardAccount, debtAccount], cards: [card], debts: [debt] };
+
+test('card payment locks the card as destination, caps at the recorded debt and never becomes an expense', async () => {
+  const view = harness('src/ui/transfer-form.tsx', { toAccountId: 'card-acc', title: 'Pagar tarjeta', defaultNote: 'Pago Visa', maxAmountMinor: '5000' }, { data: liabilityData });
+  let root = view.render();
+  assert.equal(nodes(root).some(node => node.type === 'AccountField' && node.props.label === 'Hacia'), false);
+  assert.equal(find(root, 'DetailRow', 'Tarjeta').props.value, 'Visa');
+  assert.equal(find(root, 'AccountField', 'Desde').props.value, 'a');
+  assert.deepEqual(find(root, 'AccountField', 'Desde').props.accounts.map((item: domain.Account) => item.id), ['a']);
+  assert.equal(find(root, 'Field').props.value, 'Pago Visa');
+  find(root, 'AmountField').props.onChangeText('60');
+  root = view.render();
+  await find(root, 'ActionButton', 'Registrar pago').props.onPress();
+  assert.match(find(view.render(), 'ErrorMessage').props.message, /supera la deuda/);
+  assert.equal(view.transfers.length, 0);
+  find(view.render(), 'AmountField').props.onChangeText('50');
+  root = view.render();
+  assert.equal(find(root, 'DetailRow', 'Visa después').props.value, 'ARS A favor 0,00');
+  await find(root, 'ActionButton', 'Registrar pago').props.onPress();
+  assert.equal(view.transfers.length, 1);
+  assert.deepEqual([view.transfers[0].fromAccountId, view.transfers[0].toAccountId, view.transfers[0].amountMinor, view.transfers[0].note], ['a', 'card-acc', 5000, 'Pago Visa']);
+  assert.equal(view.additions.length, 0);
+});
+
+test('a plain transfer between accounts never lists cards or debts, while editing one keeps its original accounts', async () => {
+  const view = harness('src/ui/transfer-form.tsx', { accountId: 'a' }, { data: liabilityData });
+  assert.deepEqual(find(view.render(), 'AccountField', 'Desde').props.accounts.map((item: domain.Account) => item.id), ['a', 'u']);
+  assert.deepEqual(find(view.render(), 'AccountField', 'Hacia').props.accounts.map((item: domain.Account) => item.id), []);
+  const original = domain.initialTransferRecord({ id: 'pay', fromAccountId: 'a', toAccountId: 'card-acc', amountMinor: 100, note: 'Pago', dateISO: entry.dateISO, createdAt });
+  const editing = harness('src/ui/transfer-form.tsx', { original }, { data: { ...liabilityData, transfers: [original] } });
+  assert.deepEqual(find(editing.render(), 'AccountField', 'Hacia').props.accounts.map((item: domain.Account) => item.id), ['card-acc']);
+});
+
+test('expense form offers cash accounts and cards but never a personal debt account', () => {
+  const view = harness('src/ui/entry-form.tsx', { accountId: 'debt-acc' }, { data: liabilityData });
+  const field = find(view.render(), 'AccountField');
+  assert.equal(field.props.label, 'Cuenta o tarjeta');
+  assert.deepEqual(field.props.accounts.map((item: domain.Account) => item.id), ['a', 'u', 'card-acc']);
+  assert.equal(field.props.value, 'a');
+  assert.equal(field.props.kindOf('card-acc'), 'Tarjeta de crédito');
+  assert.equal(field.props.kindOf('a'), 'Cuenta');
+});
+
+test('a card purchase detail links to the card, not to a generic account screen', () => {
+  const cardPurchase = { ...entry, id: 'cp', accountId: 'card-acc' };
+  const view = harness('app/entry/[id].tsx', {}, { data: { ...liabilityData, records: [domain.initialRecord(cardPurchase)] }, params: { id: 'cp' } });
+  const row = find(view.render(), 'DetailRow', 'Tarjeta');
+  assert.equal(row.props.value, 'Visa');
+  row.props.onPress();
+  assert.equal(JSON.stringify(view.pushed[0]), JSON.stringify({ pathname: '/card/[id]', params: { id: 'card' } }));
 });

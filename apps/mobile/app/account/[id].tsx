@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { View } from 'react-native';
-import { router, Stack, useLocalSearchParams } from 'expo-router';
+import { Redirect, router, Stack, useLocalSearchParams } from 'expo-router';
 import { accountBalanceMinor, formatMinorUnits } from '@finanzapp/domain';
 import { useLedger } from '../../src/storage/LedgerProvider';
 import { AppText, DetailRow, EmptyState, EntryActions, IconButton, Money, Screen, SectionTitle, Surface } from '../../src/ui/components';
@@ -14,6 +14,10 @@ export default function AccountScreen() {
   const transfers = useMemo(() => snapshot ? selectTransfers(snapshot.transfers ?? [], snapshot.accounts, '', id) : [], [snapshot, id]);
   const account = snapshot?.accounts.find(item => item.id === id);
   const recurringCount = archive?.recurring?.filter(rule => rule.accountId === id && rule.active).length ?? 0;
+  const card = archive?.cards?.find(item => item.accountId === id);
+  const debt = archive?.debts?.find(item => item.accountId === id);
+  if (card) return <Redirect href={{ pathname: '/card/[id]', params: { id: card.id } }} />;
+  if (debt) return <Redirect href={{ pathname: '/debt/[id]', params: { id: debt.id } }} />;
   if (!account || !snapshot) return <Screen><EmptyState title="No encontramos esta cuenta"
     detail="Volvé a tus cuentas para elegir una guardada en este dispositivo." /></Screen>;
   return <>

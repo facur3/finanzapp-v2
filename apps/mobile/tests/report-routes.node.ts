@@ -6,6 +6,7 @@ import ts from 'typescript';
 import * as domain from '@finanzapp/domain';
 import * as presentation from '../src/ui/presentation.ts';
 import * as reportPresentation from '../src/ui/report-presentation.ts';
+import * as liabilityPresentation from '../src/ui/liability-presentation.ts';
 
 // Exercise the actual routes' data/handlers with host components replaced by
 // descriptors. This is NOT a rendered iOS screen or gesture/animation test.
@@ -45,8 +46,11 @@ function routeHarness(file: string, params: Record<string, unknown>, data = snap
     '../src/ui/presentation': presentation,
     '../src/ui/report-presentation': reportPresentation,
     '../src/ui/spending-chart': { CategorySpendingRow: 'CategorySpendingRow' },
-    '../src/ui/theme': { useCurrentDay: () => '2026-09-12', usePalette: () => ({ background: '#F5F6F8', surface: '#FFFFFF', accent: '#2467DC' }) },
+    '../src/ui/liability-presentation': liabilityPresentation,
+    '../src/ui/theme': { useCurrentDay: () => '2026-09-12', usePalette: () => ({ background: '#F5F6F8', surface: '#FFFFFF', accent: '#0A0A0C', tint: '#2563EB' }) },
   };
+  // Tab routes live one level deeper than stack routes.
+  for (const name of Object.keys(modules)) if (name.startsWith('../src/')) modules['../' + name] = modules[name];
   const module = { exports: {} as { default?: () => Node } };
   runInNewContext(code, { module, exports: module.exports, require: (name: string) => {
     if (!Object.hasOwn(modules, name)) throw new Error('Unexpected report dependency: ' + name);
@@ -69,7 +73,7 @@ function find(root: Node, type: string, label?: string) {
 }
 
 test('report row pushes a scoped category detail; underlying period and currency stay selected', () => {
-  const view = routeHarness('reports.tsx', { currency: 'ARS', month: '2026-08' });
+  const view = routeHarness('(tabs)/reports.tsx', { currency: 'ARS', month: '2026-08' });
   const list = view.render();
   const category = list.props.data.find((item: domain.CategorySpending) => item.key === 'salud');
   const row = list.props.renderItem({ item: category, index: 0 });
@@ -84,14 +88,14 @@ test('report row pushes a scoped category detail; underlying period and currency
   assert.equal(find(view.render(), 'Money').props.minor, 606);
 });
 test('return-to-current-month works even when opened with a historical route parameter', () => {
-  const view = routeHarness('reports.tsx', { month: '2026-08', currency: 'ARS' });
+  const view = routeHarness('(tabs)/reports.tsx', { month: '2026-08', currency: 'ARS' });
   find(view.render(), 'PressFeedback', 'Volver al mes actual').props.onPress();
   const current = view.render();
   assert.equal(find(current, 'IconButton', 'Mes siguiente').props.disabled, true);
   assert.equal(find(current, 'Money').props.minor, 0);
 });
 test('month and currency controls update report data and enforce the available bounds', () => {
-  const view = routeHarness('reports.tsx', {});
+  const view = routeHarness('(tabs)/reports.tsx', {});
   find(view.render(), 'IconButton', 'Mes anterior').props.onPress();
   let report = view.render();
   assert.equal(find(report, 'Money').props.minor, 606);
@@ -104,11 +108,11 @@ test('month and currency controls update report data and enforce the available b
   assert.equal(find(view.render(), 'IconButton', 'Mes siguiente').props.disabled, true);
 });
 test('empty and overflow reports do not render a fake or partial category list', () => {
-  const empty = routeHarness('reports.tsx', {}).render();
+  const empty = routeHarness('(tabs)/reports.tsx', {}).render();
   assert.equal(empty.props.data.length, 0);
   assert.equal(find(empty, 'EmptyState').props.title, 'Sin gastos en este período');
   const huge = { ...snapshot, entries: snapshot.entries.slice(0, 2).map(e => ({ ...e, amountMinor: Number.MAX_SAFE_INTEGER })) };
-  const overflow = routeHarness('reports.tsx', { month: '2026-08' }, huge).render();
+  const overflow = routeHarness('(tabs)/reports.tsx', { month: '2026-08' }, huge).render();
   assert.equal(overflow.props.data.length, 0);
   assert.equal(nodes(overflow).some(n => n.type === 'Money'), false);
 });
@@ -121,7 +125,7 @@ test('an unknown/malformed category cannot show every expense by accident', () =
 });
 
 test('daily view opens only expenses in the selected date and currency', () => {
-  const view = routeHarness('reports.tsx', { currency: 'ARS', month: '2026-08' });
+  const view = routeHarness('(tabs)/reports.tsx', { currency: 'ARS', month: '2026-08' });
   nodes(view.render()).find(n => n.type === 'Choices' && n.props.value === 'categories')!.props.onChange('days');
   const list = view.render();
   assert.equal(list.props.data.length, 2);

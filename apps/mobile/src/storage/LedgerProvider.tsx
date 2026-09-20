@@ -1,9 +1,11 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { AppState } from 'react-native';
 import { snapshotFromArchive, todayKey, type Account, type Entry, type EntryChange, type LedgerArchive, type LedgerSnapshot,
-  type AccountChange, type Transfer, type TransferChange, type RecurringRule, type MonthlyBudget } from '@finanzapp/domain';
+  type AccountChange, type Transfer, type TransferChange, type RecurringRule, type MonthlyBudget,
+  type CreditCardProfile, type PersonalDebtProfile } from '@finanzapp/domain';
 import { changeEntry, createAccount, createEntry, importArchive, initializeDatabase, readArchive, changeAccount,
-  createTransfer, changeTransfer, saveRecurringRule, processRecurring, saveMonthlyBudget, type LedgerDatabase } from './database';
+  createTransfer, changeTransfer, saveRecurringRule, processRecurring, saveMonthlyBudget,
+  createCreditCard, saveCreditCard, createPersonalDebt, savePersonalDebt, type LedgerDatabase } from './database';
 import { openLedgerDatabase } from './nativeDatabase';
 
 type LedgerContextValue = {
@@ -19,6 +21,10 @@ type LedgerContextValue = {
   updateTransfer: (change: TransferChange) => Promise<void>;
   saveRecurring: (rule: RecurringRule) => Promise<void>;
   saveBudget: (budget: MonthlyBudget) => Promise<void>;
+  addCard: (account: Account, card: CreditCardProfile) => Promise<void>;
+  saveCard: (card: CreditCardProfile) => Promise<void>;
+  addDebt: (account: Account, debt: PersonalDebtProfile) => Promise<void>;
+  saveDebt: (debt: PersonalDebtProfile) => Promise<void>;
   restoreBackup: (incoming: LedgerArchive, baseline: string) => Promise<void>;
 };
 const LedgerContext = createContext<LedgerContextValue | null>(null);
@@ -100,6 +106,10 @@ export function LedgerProvider({ children }: { children: ReactNode }) {
       await processRecurring(db, todayKey());
     }),
     saveBudget: budget => mutate(db => saveMonthlyBudget(db, budget)),
+    addCard: (account, card) => mutate(db => createCreditCard(db, account, card)),
+    saveCard: card => mutate(db => saveCreditCard(db, card)),
+    addDebt: (account, debt) => mutate(db => createPersonalDebt(db, account, debt)),
+    saveDebt: debt => mutate(db => savePersonalDebt(db, debt)),
     restoreBackup: (incoming, baseline) => mutate(async db => {
       await importArchive(db, incoming, baseline);
       await processRecurring(db, todayKey());
