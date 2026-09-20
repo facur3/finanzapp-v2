@@ -1,7 +1,9 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { AppState } from 'react-native';
-import { snapshotFromArchive, type Account, type Entry, type EntryChange, type LedgerArchive, type LedgerSnapshot, type AccountChange, type Transfer, type TransferChange } from '@finanzapp/domain';
-import { changeEntry, createAccount, createEntry, importArchive, initializeDatabase, readArchive, changeAccount, createTransfer, changeTransfer, type LedgerDatabase } from './database';
+import { snapshotFromArchive, todayKey, type Account, type Entry, type EntryChange, type LedgerArchive, type LedgerSnapshot,
+  type AccountChange, type Transfer, type TransferChange, type RecurringRule } from '@finanzapp/domain';
+import { changeEntry, createAccount, createEntry, importArchive, initializeDatabase, readArchive, changeAccount,
+  createTransfer, changeTransfer, saveRecurringRule, processRecurring, type LedgerDatabase } from './database';
 import { openLedgerDatabase } from './nativeDatabase';
 
 type LedgerContextValue = {
@@ -15,6 +17,7 @@ type LedgerContextValue = {
   updateAccount: (change: AccountChange) => Promise<void>;
   addTransfer: (transfer: Transfer) => Promise<void>;
   updateTransfer: (change: TransferChange) => Promise<void>;
+  saveRecurring: (rule: RecurringRule) => Promise<void>;
   restoreBackup: (incoming: LedgerArchive, baseline: string) => Promise<void>;
 };
 const LedgerContext = createContext<LedgerContextValue | null>(null);
@@ -44,6 +47,7 @@ export function LedgerProvider({ children }: { children: ReactNode }) {
       const db = database.current ?? await openLedgerDatabase();
       database.current = db;
       await initializeDatabase(db);
+      await processRecurring(db, todayKey());
       const next = await readArchive(db);
       if (!cancelled) setArchive(next);
     }).catch(() => {
@@ -56,10 +60,11 @@ export function LedgerProvider({ children }: { children: ReactNode }) {
     const subscription = AppState.addEventListener('change', state => {
       if (state !== 'active' || !database.current || !snapshot) return;
       void enqueue(async () => {
+        await processRecurring(database.current!, todayKey());
         const next = await readArchive(database.current!);
         if (mounted.current) { setArchive(next); setError(null); }
       }).catch(() => {
-        if (mounted.current) setError('No pudimos verificar tus datos locales. No se modificó nada.');
+        if (mounted.current) setError('No pudimos verificar tus datos locales ni los vencimientos recurrentes. No se modificó nada fuera de una transacción completa.');
       });
     });
     return () => subscription.remove();
@@ -89,7 +94,14 @@ export function LedgerProvider({ children }: { children: ReactNode }) {
     updateAccount: change => mutate(db => changeAccount(db, change)),
     addTransfer: transfer => mutate(db => createTransfer(db, transfer)),
     updateTransfer: change => mutate(db => changeTransfer(db, change)),
-    restoreBackup: (incoming, baseline) => mutate(db => importArchive(db, incoming, baseline)),
+    saveRecurring: rule => mutate(async db => {
+      await saveRecurringRule(db, rule);
+      await processRecurring(db, todayKey());
+    }),
+    restoreBackup: (incoming, baseline) => mutate(async db => {
+      await importArchive(db, incoming, baseline);
+      await processRecurring(db, todayKey());
+    }),
   }}>{children}</LedgerContext.Provider>;
 }
 
