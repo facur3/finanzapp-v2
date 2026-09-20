@@ -6,6 +6,8 @@ import {
   sameTransfer, validateTransfer, validateTransferChange, type Transfer, type TransferChange, type TransferRecord,
   materializeRecurringRule, sameRecurringRule, validateRecurringRule, type RecurringRule,
   sameMonthlyBudget, validateMonthlyBudget, type MonthlyBudget,
+  sameCreditCardProfile, samePersonalDebtProfile, validateCreditCardProfile, validatePersonalDebtProfile,
+  type CreditCardProfile, type PersonalDebtProfile,
 } from '@finanzapp/domain';
 
 type SqlValue = string | number | null;
@@ -20,7 +22,7 @@ export interface LedgerDatabase extends SqlExecutor {
 }
 
 export const DATABASE_NAME = 'finanzapp-native-pilot-v1.sqlite';
-export const DATABASE_VERSION = 5;
+export const DATABASE_VERSION = 6;
 
 const SCHEMA = `
   CREATE TABLE accounts (
@@ -124,6 +126,37 @@ const MIGRATE_V5 = `
   PRAGMA user_version = 5;
 `;
 
+const MIGRATE_V6 = `
+  CREATE TABLE credit_cards (
+    id TEXT PRIMARY KEY NOT NULL,
+    accountId TEXT NOT NULL UNIQUE REFERENCES accounts(id) ON DELETE RESTRICT,
+    issuer TEXT NOT NULL CHECK(length(issuer) <= 80),
+    last4 TEXT NOT NULL CHECK(last4 = '' OR (length(last4) = 4 AND last4 NOT GLOB '*[^0-9]*')),
+    creditLimitMinor INTEGER CHECK(creditLimitMinor IS NULL OR (creditLimitMinor > 0 AND creditLimitMinor <= 9007199254740991)),
+    closingDay INTEGER NOT NULL CHECK(closingDay BETWEEN 1 AND 31),
+    dueDay INTEGER NOT NULL CHECK(dueDay BETWEEN 1 AND 31),
+    active INTEGER NOT NULL CHECK(active IN (0, 1)),
+    createdAt TEXT NOT NULL,
+    revision INTEGER NOT NULL DEFAULT 0 CHECK(revision >= 0 AND revision <= 9007199254740991),
+    updatedAt TEXT NOT NULL
+  ) STRICT;
+  CREATE INDEX cards_active ON credit_cards(active, createdAt);
+  CREATE TABLE personal_debts (
+    id TEXT PRIMARY KEY NOT NULL,
+    accountId TEXT NOT NULL UNIQUE REFERENCES accounts(id) ON DELETE RESTRICT,
+    direction TEXT NOT NULL CHECK(direction IN ('owed_by_me', 'owed_to_me')),
+    counterparty TEXT NOT NULL CHECK(length(trim(counterparty)) BETWEEN 1 AND 80),
+    dueDateISO TEXT,
+    note TEXT NOT NULL CHECK(length(note) <= 120),
+    active INTEGER NOT NULL CHECK(active IN (0, 1)),
+    createdAt TEXT NOT NULL,
+    revision INTEGER NOT NULL DEFAULT 0 CHECK(revision >= 0 AND revision <= 9007199254740991),
+    updatedAt TEXT NOT NULL
+  ) STRICT;
+  CREATE INDEX debts_active_due ON personal_debts(active, dueDateISO);
+  PRAGMA user_version = 6;
+`;
+
 export async function initializeDatabase(db: LedgerDatabase): Promise<void> {
   // Set before opening a transaction; foreign_keys is connection-local.
   await db.execAsync('PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000;');
@@ -138,6 +171,7 @@ export async function initializeDatabase(db: LedgerDatabase): Promise<void> {
     if (version < 3) await tx.execAsync(MIGRATE_V3);
     if (version < 4) await tx.execAsync(MIGRATE_V4);
     if (version < 5) await tx.execAsync(MIGRATE_V5);
+    if (version < 6) await tx.execAsync(MIGRATE_V6);
   });
   await readSnapshot(db); // Validate before showing a balance, not after a render.
 }
@@ -181,12 +215,30 @@ export async function readArchive(db: SqlExecutor): Promise<LedgerArchive> {
     validateMonthlyBudget(budget);
     return budget;
   });
+  const cardRows = await db.getAllAsync<Omit<CreditCardProfile, 'active'> & { active: number }>(
+    'SELECT * FROM credit_cards ORDER BY active DESC, createdAt, id');
+  const cards = cardRows.map(({ active, ...row }) => {
+    if (active !== 0 && active !== 1) throw new Error('Estado de tarjeta inválido.');
+    const card = { ...row, active: active === 1 };
+    validateCreditCardProfile(card, accounts);
+    return card;
+  });
+  const debtRows = await db.getAllAsync<Omit<PersonalDebtProfile, 'active'> & { active: number }>(
+    'SELECT * FROM personal_debts ORDER BY active DESC, dueDateISO, createdAt, id');
+  const debts = debtRows.map(({ active, ...row }) => {
+    if (active !== 0 && active !== 1) throw new Error('Estado de deuda inválido.');
+    const debt = { ...row, active: active === 1 };
+    validatePersonalDebtProfile(debt, accounts);
+    return debt;
+  });
   const archive = {
     accounts,
     records,
     ...(transfers.length ? { transfers } : {}),
     ...(recurring.length ? { recurring } : {}),
     ...(budgets.length ? { budgets } : {}),
+    ...(cards.length ? { cards } : {}),
+    ...(debts.length ? { debts } : {}),
   };
   validateArchive(archive); // Including tombstones and safe integer totals.
   return archive;
@@ -270,7 +322,8 @@ export async function importArchive(db: LedgerDatabase, incoming: LedgerArchive,
     const current = await readArchive(tx);
     const plan = previewBackupImport(current, incoming);
     if (plan.conflicts) throw new Error('La copia contradice cambios locales. No se importó nada. Conservá ambas versiones.');
-    if (!plan.accounts.length && !plan.records.length && !plan.transfers.length && !plan.recurring.length && !plan.budgets.length) return;
+    if (!plan.accounts.length && !plan.records.length && !plan.transfers.length && !plan.recurring.length
+      && !plan.budgets.length && !plan.cards.length && !plan.debts.length) return;
     if (plan.baseline !== baseline) throw new Error('Tus datos cambiaron. Volvé a revisar la copia antes de importar.');
     for (const account of plan.accounts) {
       await tx.runAsync('INSERT INTO accounts (id, name, currency, openingMinor, createdAt, revision, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?)',
@@ -280,6 +333,8 @@ export async function importArchive(db: LedgerDatabase, incoming: LedgerArchive,
     for (const record of plan.transfers) await insertTransferRecord(tx, record);
     for (const rule of plan.recurring) await insertRecurringRule(tx, rule);
     for (const budget of plan.budgets) await insertMonthlyBudget(tx, budget);
+    for (const card of plan.cards) await insertCreditCard(tx, card);
+    for (const debt of plan.debts) await insertPersonalDebt(tx, debt);
     // No existing rows are updated or deleted. Any failure rolls back the batch.
   });
 }
@@ -466,5 +521,115 @@ export async function saveMonthlyBudget(db: LedgerDatabase, input: MonthlyBudget
     await tx.runAsync(`UPDATE monthly_budgets SET category = ?, monthISO = ?, amountMinor = ?, active = ?,
       revision = ?, updatedAt = ? WHERE id = ?`, budget.category, budget.monthISO, budget.amountMinor,
     budget.active ? 1 : 0, budget.revision, budget.updatedAt, budget.id);
+  });
+}
+
+
+async function insertCreditCard(tx: SqlExecutor, card: CreditCardProfile): Promise<void> {
+  await tx.runAsync(`INSERT INTO credit_cards (id, accountId, issuer, last4, creditLimitMinor, closingDay, dueDay,
+    active, createdAt, revision, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  card.id, card.accountId, card.issuer, card.last4, card.creditLimitMinor, card.closingDay, card.dueDay,
+  card.active ? 1 : 0, card.createdAt, card.revision, card.updatedAt);
+}
+async function insertPersonalDebt(tx: SqlExecutor, debt: PersonalDebtProfile): Promise<void> {
+  await tx.runAsync(`INSERT INTO personal_debts (id, accountId, direction, counterparty, dueDateISO, note,
+    active, createdAt, revision, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  debt.id, debt.accountId, debt.direction, debt.counterparty, debt.dueDateISO, debt.note,
+  debt.active ? 1 : 0, debt.createdAt, debt.revision, debt.updatedAt);
+}
+async function insertInternalAccount(tx: SqlExecutor, account: Account): Promise<void> {
+  await tx.runAsync(
+    'INSERT INTO accounts (id, name, currency, openingMinor, createdAt, revision, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?)',
+    account.id, account.name, account.currency, account.openingMinor, account.createdAt,
+    account.revision ?? 0, account.updatedAt ?? account.createdAt,
+  );
+}
+
+export async function createCreditCard(db: LedgerDatabase, accountInput: Account, cardInput: CreditCardProfile): Promise<void> {
+  const account = { ...accountInput, name: accountInput.name.trim() };
+  const card = { ...cardInput, issuer: cardInput.issuer.trim(), last4: cardInput.last4.trim() };
+  validateAccount(account);
+  if ((account.revision ?? 0) !== 0 || account.openingMinor > 0) {
+    throw new Error('La tarjeta nueva debe comenzar sin crédito a favor y sin correcciones previas.');
+  }
+  if (card.accountId !== account.id) throw new Error('La tarjeta no coincide con su cuenta interna.');
+  await db.withExclusiveTransactionAsync(async tx => {
+    const archive = await readArchive(tx);
+    validateCreditCardProfile(card, [...archive.accounts, account]);
+    const existingAccount = archive.accounts.find(item => item.id === account.id);
+    const existingCard = archive.cards?.find(item => item.id === card.id);
+    if (existingAccount || existingCard) {
+      if (existingAccount && existingCard && sameAccount(existingAccount, account) && sameCreditCardProfile(existingCard, card)) return;
+      throw new Error('Esta tarjeta ya existe con otros datos.');
+    }
+    const next = { ...archive, accounts: [...archive.accounts, account], cards: [...archive.cards ?? [], card] };
+    validateArchive(next);
+    await insertInternalAccount(tx, account);
+    await insertCreditCard(tx, card);
+  });
+}
+
+export async function saveCreditCard(db: LedgerDatabase, input: CreditCardProfile): Promise<void> {
+  const card = { ...input, issuer: input.issuer.trim(), last4: input.last4.trim() };
+  await db.withExclusiveTransactionAsync(async tx => {
+    const archive = await readArchive(tx);
+    validateCreditCardProfile(card, archive.accounts);
+    const existing = archive.cards?.find(item => item.id === card.id);
+    if (!existing) throw new Error('No encontramos esta tarjeta.');
+    if (sameCreditCardProfile(existing, card)) return;
+    if (card.accountId !== existing.accountId || card.createdAt !== existing.createdAt || card.revision !== existing.revision + 1) {
+      throw new Error('La tarjeta cambió desde que la abriste. Volvé a revisarla.');
+    }
+    const cards = archive.cards!.map(item => item.id === card.id ? card : item);
+    validateArchive({ ...archive, cards });
+    await tx.runAsync(`UPDATE credit_cards SET issuer = ?, last4 = ?, creditLimitMinor = ?, closingDay = ?, dueDay = ?,
+      active = ?, revision = ?, updatedAt = ? WHERE id = ?`, card.issuer, card.last4, card.creditLimitMinor,
+    card.closingDay, card.dueDay, card.active ? 1 : 0, card.revision, card.updatedAt, card.id);
+  });
+}
+
+export async function createPersonalDebt(db: LedgerDatabase, accountInput: Account, debtInput: PersonalDebtProfile): Promise<void> {
+  const account = { ...accountInput, name: accountInput.name.trim() };
+  const debt = { ...debtInput, counterparty: debtInput.counterparty.trim(), note: debtInput.note.trim() };
+  validateAccount(account);
+  if ((account.revision ?? 0) !== 0
+    || (debt.direction === 'owed_by_me' && account.openingMinor > 0)
+    || (debt.direction === 'owed_to_me' && account.openingMinor < 0)) {
+    throw new Error('El saldo inicial de la deuda no coincide con su dirección.');
+  }
+  if (debt.accountId !== account.id) throw new Error('La deuda no coincide con su cuenta interna.');
+  await db.withExclusiveTransactionAsync(async tx => {
+    const archive = await readArchive(tx);
+    validatePersonalDebtProfile(debt, [...archive.accounts, account]);
+    const existingAccount = archive.accounts.find(item => item.id === account.id);
+    const existingDebt = archive.debts?.find(item => item.id === debt.id);
+    if (existingAccount || existingDebt) {
+      if (existingAccount && existingDebt && sameAccount(existingAccount, account) && samePersonalDebtProfile(existingDebt, debt)) return;
+      throw new Error('Esta deuda ya existe con otros datos.');
+    }
+    const next = { ...archive, accounts: [...archive.accounts, account], debts: [...archive.debts ?? [], debt] };
+    validateArchive(next);
+    await insertInternalAccount(tx, account);
+    await insertPersonalDebt(tx, debt);
+  });
+}
+
+export async function savePersonalDebt(db: LedgerDatabase, input: PersonalDebtProfile): Promise<void> {
+  const debt = { ...input, counterparty: input.counterparty.trim(), note: input.note.trim() };
+  await db.withExclusiveTransactionAsync(async tx => {
+    const archive = await readArchive(tx);
+    validatePersonalDebtProfile(debt, archive.accounts);
+    const existing = archive.debts?.find(item => item.id === debt.id);
+    if (!existing) throw new Error('No encontramos esta deuda.');
+    if (samePersonalDebtProfile(existing, debt)) return;
+    if (debt.accountId !== existing.accountId || debt.direction !== existing.direction
+      || debt.createdAt !== existing.createdAt || debt.revision !== existing.revision + 1) {
+      throw new Error('La deuda cambió desde que la abriste. Volvé a revisarla.');
+    }
+    const debts = archive.debts!.map(item => item.id === debt.id ? debt : item);
+    validateArchive({ ...archive, debts });
+    await tx.runAsync(`UPDATE personal_debts SET counterparty = ?, dueDateISO = ?, note = ?, active = ?,
+      revision = ?, updatedAt = ? WHERE id = ?`, debt.counterparty, debt.dueDateISO, debt.note,
+    debt.active ? 1 : 0, debt.revision, debt.updatedAt, debt.id);
   });
 }
