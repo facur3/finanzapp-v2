@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import type { Account, Entry, Transfer } from '@finanzapp/domain';
-import { availableCurrencies, groupEntries, initialAccountId, selectEntries, selectTransfers, mergeActivity, groupActivity } from '../src/ui/presentation.ts';
+import { availableCurrencies, groupEntries, initialAccountId, selectEntries, selectTransfers, mergeActivity, groupActivity, activityDateLabel, dayNetMinor } from '../src/ui/presentation.ts';
 
 // Synthetic fixtures only; never loaded by the app or stored in a user database.
 const accounts: Account[] = [
@@ -64,4 +64,19 @@ test('currency choices include only currencies with an account, even when balanc
 test('equal dates and instants have deterministic order, including timezone offsets', () => {
   const tied = [{ ...base, id: 'x', createdAt: '2026-09-11T09:00:00-03:00' }, { ...base, id: 'y', createdAt: '2026-09-11T12:00:00Z' }];
   assert.deepEqual(selectEntries(tied, accounts).map(entry => entry.id), ['y', 'x']);
+});
+
+test('the transfer filter lists no entries; section labels stay truthful across today, weekdays and years', () => {
+  assert.deepEqual(selectEntries(entries, accounts, 'transfer'), []);
+  assert.equal(activityDateLabel('2026-09-20', '2026-09-20'), 'Hoy · 20 sep');
+  assert.equal(activityDateLabel('2026-09-19', '2026-09-20'), 'Ayer · 19 sep');
+  assert.equal(activityDateLabel('2026-09-17', '2026-09-20'), 'jueves · 17 sep');
+  assert.equal(activityDateLabel('2026-09-13', '2026-09-20'), '13 sep');
+  assert.equal(activityDateLabel('2025-12-31', '2026-09-20'), '31 dic 2025');
+});
+test('a day net total only exists for entries of one currency and never counts transfers', () => {
+  assert.deepEqual(dayNetMinor([base, { ...base, id: 'i', kind: 'income', amountMinor: 200000 }], accounts), { currency: 'ARS', minor: 200000 - 123456 });
+  assert.equal(dayNetMinor(entries, accounts), null);
+  assert.equal(dayNetMinor([], accounts), null);
+  assert.equal(dayNetMinor([{ ...base, accountId: 'missing' }], accounts), null);
 });

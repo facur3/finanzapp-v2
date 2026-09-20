@@ -23,14 +23,14 @@ const snapshot: domain.LedgerSnapshot = { accounts: [
   { id: 'u', accountId: 'u', kind: 'expense', amountMinor: 999, merchant: 'Prueba', category: 'Salud', dateISO: '2026-08-10', createdAt },
 ] };
 
-function routeHarness(file: string, params: Record<string, unknown>, data = snapshot) {
+function routeHarness(file: string, params: Record<string, unknown>, data = snapshot, extra: Partial<domain.LedgerArchive> = {}) {
   const source = readFileSync(new URL('../app/' + file, import.meta.url), 'utf8');
   const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText;
   const jsx = (type: string, props: Record<string, unknown>) => ({ type, props });
   const state: unknown[] = [];
   const pushed: any[] = [];
   let cursor = 0;
-  const componentNames = ['AppText', 'Choices', 'DetailRow', 'EmptyState', 'IconButton', 'Money', 'PressFeedback', 'SectionTitle', 'Surface', 'CategoryBadge', 'Screen', 'EntryActions', 'EntryRow', 'ActionButton'];
+  const componentNames = ['AppText', 'Choices', 'DetailRow', 'EmptyState', 'IconButton', 'Money', 'PressFeedback', 'SectionTitle', 'Surface', 'CategoryBadge', 'Screen', 'EntryActions', 'EntryRow', 'ActionButton', 'GlyphTile', 'Stat'];
   const modules: Record<string, unknown> = {
     react: { useEffect: (fn: () => unknown) => { fn(); }, useMemo: (fn: () => unknown) => fn(), useState: (initial?: unknown) => {
       const index = cursor++;
@@ -44,15 +44,16 @@ function routeHarness(file: string, params: Record<string, unknown>, data = snap
       useAnimatedStyle: (fn: () => unknown) => fn() },
     'expo-router': { useLocalSearchParams: () => params, router: { push: (to: unknown) => pushed.push(to), navigate: (to: unknown) => pushed.push(to) } },
     '@finanzapp/domain': domain,
-    '../src/storage/LedgerProvider': { useLedger: () => ({ snapshot: data }) },
+    '../src/storage/LedgerProvider': { useLedger: () => ({ snapshot: data, archive: { accounts: data.accounts, records: [], ...extra } }) },
     '../src/ui/components': Object.fromEntries(componentNames.map(name => [name, name])),
     '../src/ui/entry-list': { EntryList: 'EntryList' },
     '../src/ui/presentation': presentation,
     '../src/ui/report-presentation': reportPresentation,
     '../src/ui/spending-chart': { CategorySpendingRow: 'CategorySpendingRow' },
-    '../src/ui/theme': { useCurrentDay: () => '2026-09-12', useReduceMotion: () => false,
-      usePalette: () => ({ background: '#F5F6F8', surface: '#FFFFFF', accent: '#2467DC',
-        negative: '#C73535', text: '#111111', secondary: '#666666', inset: '#EEEEEE', line: '#DDDDDD' }) },
+    '../src/ui/home-modules': { BudgetHomeCard: 'BudgetHomeCard', CategoryHomeRow: 'CategoryHomeRow', UpcomingRecurringRow: 'UpcomingRecurringRow' },
+    '../src/ui/theme': { useCurrentDay: () => '2026-09-12', useReduceMotion: () => false, space: { xs: 4, s: 8, m: 12, l: 16, xl: 20, xxl: 24, xxxl: 32 },
+      usePalette: () => ({ background: '#F5F6F8', surface: '#FFFFFF', accent: '#0A0A0C', tint: '#2563EB', expense: '#C42F39',
+        negative: '#C73535', text: '#111111', secondary: '#666666', tertiary: '#999999', inset: '#EEEEEE', line: '#DDDDDD' }) },
   };
   modules['../src/ui/spending-timeline'] = { SpendingTimeline: 'SpendingTimeline', periodLabel: (p: any) => p.startISO + '–' + p.endISO };
   for (const name of Object.keys(modules)) if (name.startsWith('../src/')) modules['../' + name] = modules[name];
@@ -72,7 +73,7 @@ function nodes(value: any): Node[] {
     ...nodes(value.props.ListEmptyComponent), ...nodes(value.props.ListFooterComponent), ...nodes(value.props.header)];
 }
 function find(root: Node, type: string, label?: string) {
-  const node = nodes(root).find(item => item.type === type && (!label || item.props.label === label || item.props.accessibilityLabel === label));
+  const node = nodes(root).find(item => item.type === type && (!label || item.props.label === label || item.props.accessibilityLabel === label || item.props.action === label));
   assert.ok(node, 'Missing ' + type + ' ' + (label ?? ''));
   return node;
 }
@@ -93,24 +94,41 @@ test('Home scopes spending, recent entries, categories and actions to week and c
   nodes(view.render()).find(n => n.type === 'Choices' && n.props.value === 'ARS')!.props.onChange('USD');
   assert.equal(find(view.render(), 'Money').props.minor, 1000);
   assert.equal(find(view.render(), 'EntryActions').props.currency, 'USD');
-  assert.equal(find(view.render(), 'CategorySpendingRow').props.totalMinor, 1000);
+  assert.equal(find(view.render(), 'CategoryHomeRow').props.totalMinor, 1000);
 });
 test('weekly category opens matching dates, and returning keeps the selected period', () => {
   const view = routeHarness('(tabs)/index.tsx', {}, homeData);
   nodes(view.render()).find(n => n.type === 'Choices' && n.props.value === 'month')!.props.onChange('week');
-  find(view.render(), 'CategorySpendingRow').props.onPress();
+  find(view.render(), 'CategoryHomeRow').props.onPress();
   assert.equal(view.pushed[0].pathname, '/spending-detail');
   const detail = routeHarness('spending-detail.tsx', view.pushed[0].params, homeData).render();
   assert.deepEqual(detail.props.entries.map((e: domain.Entry) => e.id), ['now']);
   assert.equal(find(detail, 'Money').props.minor, 200);
   assert.equal(find(view.render(), 'Money').props.minor, 200);
 });
-test('empty and overflow Home never invent a chart or partial total', () => {
+test('empty and overflow Home never invent a chart, budget or partial total', () => {
   const empty = routeHarness('(tabs)/index.tsx', {}).render();
   assert.equal(find(empty, 'Money').props.minor, 0);
-  assert.equal(nodes(empty).some(n => n.type === 'SpendingTimeline'), false);
+  assert.equal(nodes(empty).some(n => n.type === 'SpendingTimeline' || n.type === 'CategoryHomeRow' || n.type === 'BudgetHomeCard'), false);
   const huge = { ...homeData, entries: homeData.entries.filter(e => e.id === 'early' || e.id === 'now').map(e => ({ ...e, amountMinor: Number.MAX_SAFE_INTEGER })) };
   assert.equal(nodes(routeHarness('(tabs)/index.tsx', {}, huge).render()).some(n => n.type === 'Money'), false);
+});
+test('Home keeps analysis in Reportes: no timeline bars, a Reportes link on categories and a way to program recurrentes', () => {
+  const view = routeHarness('(tabs)/index.tsx', {}, homeData);
+  const root = view.render();
+  assert.equal(nodes(root).some(n => n.type === 'SpendingTimeline'), false);
+  find(root, 'SectionTitle', 'Reportes');
+  nodes(root).find(n => n.type === 'SectionTitle' && n.props.action === 'Reportes')!.props.onAction();
+  assert.equal(view.pushed.at(-1).pathname, '/reports');
+  nodes(root).find(n => n.type === 'SectionTitle' && n.props.action === 'Programar')!.props.onAction();
+  assert.equal(view.pushed.at(-1), '/new-recurring');
+  // Disponible excludes a card account's negative balance.
+  const withCard = { ...homeData, accounts: [...homeData.accounts, { id: 'card-acc', name: 'Visa', currency: 'ARS' as const, openingMinor: -5000, createdAt }] };
+  const cardView = routeHarness('(tabs)/index.tsx', {}, withCard, { cards: [{ id: 'card', accountId: 'card-acc', issuer: '', last4: '', creditLimitMinor: null,
+    closingDay: 1, dueDay: 10, active: true, createdAt, revision: 0, updatedAt: createdAt }] });
+  nodes(cardView.render()).find(n => n.type === 'Choices' && n.props.value === 'spending')!.props.onChange('available');
+  // Account "a": opening 10000, expenses 101 + 202 + 303 + 100 + 200, income 500. The card's −5000 is excluded.
+  assert.equal(find(cardView.render(), 'Money').props.minor, 10000 - 101 - 202 - 303 - 100 - 200 + 500);
 });
 test('expense detail rejects malformed scope and a category miss never opens all entries', () => {
   const valid = { currency: 'ARS', startISO: '2026-09-01', endISO: '2026-09-12' };

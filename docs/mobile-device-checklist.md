@@ -1,5 +1,20 @@
 # Physical iPhone acceptance checklist
 
+## Interfaz 11 — compact Home, Movimientos and transaction detail (pending device review)
+
+- [ ] Ajustes footer reads Interfaz 11; existing data is unchanged (no schema change in this delivery).
+- [ ] Inicio fits its first screen with the hero, Gasto/Ingreso and the budget line; there are no timeline bars on Inicio.
+- [ ] Gastos / Disponible and ARS / USD sit in one row; Esta semana / Este mes appears only under Gastos.
+- [ ] The hero amount stays readable at large text; the eyebrow shows the period dates.
+- [ ] En qué gastaste shows at most three categories with amount and share; Reportes opens the Reportes tab with the same currency.
+- [ ] Próximos compromisos shows Programar when empty and up to three rules with "Hoy / Mañana / En N días".
+- [ ] Movimientos → Transf. lists only transfers, card payments and debt settlements; Gastos/Ingresos exclude them.
+- [ ] Section labels read Hoy · 20 sep, Ayer · 19 sep, a weekday within the last week, then the date; older years include the year.
+- [ ] A day with ARS and USD entries shows no net total; a single-currency day shows +/− net of entries only.
+- [ ] A transaction detail shows amount, merchant, full date, status, category, account or card (opens the card) and, only with a matching budget, a Presupuesto row that opens that month.
+- [ ] Transfer detail titles card payments, debt payments and collections and links both sides.
+- [ ] Light/dark, large text, VoiceOver and Reduce Motion remain readable on Inicio, Movimientos and detail.
+
 ## Interfaz 10 — five tabs, cards/debts and the neutral visual system (pending device review)
 
 Save a private backup first and use small test amounts. Do not uninstall the only copy.

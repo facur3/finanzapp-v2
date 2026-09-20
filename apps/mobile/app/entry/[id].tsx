@@ -3,10 +3,10 @@ import { Alert, View } from 'react-native';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { randomUUID } from 'expo-crypto';
 import * as Haptics from 'expo-haptics';
-import { formatMinorUnits, makeEntryChange, type EntryChange, type EntryRecord, type Account } from '@finanzapp/domain';
+import { categoryKey, formatMinorUnits, makeEntryChange, summarizeMonthlyBudgets, type EntryChange, type EntryRecord, type Account } from '@finanzapp/domain';
 import { useLedger } from '../../src/storage/LedgerProvider';
 import { ActionButton, AppText, CategoryBadge, DetailRow, EmptyState, ErrorMessage, Money, Screen, Surface } from '../../src/ui/components';
-import { usePalette } from '../../src/ui/theme';
+import { space, usePalette } from '../../src/ui/theme';
 
 export default function EntryScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -18,8 +18,10 @@ export default function EntryScreen() {
   return <EntryDetail key={id} record={record} account={account} />;
 }
 
+/** Wallet-like detail: the amount and merchant first, then only facts FinanzApp
+ * actually stores. No bank reference, merchant location or authorization state. */
 function EntryDetail({ record, account }: { record: EntryRecord; account: Account }) {
-  const { updateEntry, archive } = useLedger();
+  const { updateEntry, archive, snapshot } = useLedger();
   const p = usePalette();
   const { entry } = record;
   const card = archive?.cards?.find(item => item.accountId === account.id);
@@ -58,30 +60,49 @@ function EntryDetail({ record, account }: { record: EntryRecord; account: Accoun
   }
   const income = entry.kind === 'income';
   const [year, month, day] = entry.dateISO.split('-').map(Number);
-  const date = new Date(year, month - 1, day, 12).toLocaleDateString('es-AR', { day: 'numeric', month: 'long', year: 'numeric' });
-  return <Screen>
-    <Stack.Screen options={{ title: record.voided ? 'Movimiento deshecho' : income ? 'Ingreso' : 'Gasto', gestureEnabled: !busy, headerBackVisible: !busy }} />
-    <View style={{ gap: 16, alignItems: 'center', paddingVertical: 24 }}>
+  const date = new Date(year, month - 1, day, 12).toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+  // Budget context only when a matching active budget exists for this month, currency and category.
+  let budget: { ratio: number; remainingMinor: number; exceeded: boolean } | null = null;
+  if (!income && !record.voided && snapshot) {
+    try {
+      const row = summarizeMonthlyBudgets(snapshot, archive?.budgets ?? [], account.currency, entry.dateISO.slice(0, 7)).rows
+        .find(item => categoryKey(item.budget.category) === categoryKey(entry.category));
+      if (row) budget = { ratio: row.ratio, remainingMinor: row.remainingMinor, exceeded: row.exceeded };
+    } catch { budget = null; }
+  }
+  const status = record.voided ? 'Deshecho · no cuenta en saldos ni reportes' : record.revision > 0 ? 'Registrado · corregido' : 'Registrado';
+
+  return <Screen gap={space.xl}>
+    <Stack.Screen options={{ title: record.voided ? 'Movimiento deshecho' : income ? 'Ingreso' : card ? 'Compra con tarjeta' : 'Gasto', gestureEnabled: !busy, headerBackVisible: !busy }} />
+    <View style={{ gap: 14, alignItems: 'center', paddingVertical: 12 }}>
       <CategoryBadge category={entry.category} large tone={income ? 'income' : 'neutral'} />
-      <View style={{ width: '100%', alignItems: 'center' }}><Money minor={income ? entry.amountMinor : -entry.amountMinor}
-        currency={account.currency} large signed tone={income ? 'income' : 'expense'} /></View>
-      <AppText style={{ fontSize: 23, lineHeight: 30, fontWeight: '600', textAlign: 'center' }}>{entry.merchant}</AppText>
-      <AppText secondary style={{ fontSize: 14, textAlign: 'center' }}>{date}</AppText>
+      <View style={{ alignItems: 'center', gap: 4, width: '100%' }}>
+        <Money minor={income ? entry.amountMinor : -entry.amountMinor} currency={account.currency} large signed
+          tone={income ? 'income' : 'expense'} color={record.voided ? p.tertiary : undefined} />
+        <AppText variant="title3" style={{ textAlign: 'center' }}>{entry.merchant}</AppText>
+        <AppText secondary variant="subhead" style={{ textAlign: 'center', textTransform: 'capitalize' }}>{date}</AppText>
+      </View>
+      <AppText accessibilityLiveRegion="polite" variant="caption" style={{ color: record.voided ? p.warning : p.secondary, fontWeight: '500', textAlign: 'center' }}>{status}</AppText>
     </View>
     <Surface grouped>
+      <DetailRow label="Categoría" value={entry.category} icon="pricetag-outline" />
       <DetailRow label={card ? 'Tarjeta' : 'Cuenta'} value={account.name} icon={card ? 'card-outline' : 'wallet-outline'}
         disabled={busy}
         onPress={() => router.push(card ? { pathname: '/card/[id]', params: { id: card.id } } : { pathname: '/account/[id]', params: { id: account.id } })} />
-      <DetailRow label="Categoría" value={entry.category} icon="pricetag-outline" />
+      {budget && <DetailRow label="Presupuesto" icon="speedometer-outline" tone={budget.exceeded ? 'expense' : budget.ratio >= 0.85 ? 'warning' : 'neutral'}
+        value={budget.exceeded ? `Excedido por ${formatMinorUnits(-budget.remainingMinor)}` : `${Math.round(budget.ratio * 100)} % usado · quedan ${formatMinorUnits(budget.remainingMinor)}`}
+        onPress={() => router.push({ pathname: '/budgets', params: { currency: account.currency, month: entry.dateISO.slice(0, 7) } })} />}
       <DetailRow label="Moneda" value={account.currency === 'ARS' ? 'Pesos argentinos' : 'Dólares estadounidenses'} last />
     </Surface>
-    <AppText secondary accessibilityLiveRegion="polite" style={{ textAlign: 'center', fontSize: 13 }}>
-      {record.voided ? 'No cuenta en tus saldos ni reportes.' : record.revision > 0 ? 'Movimiento actualizado' : 'Movimiento registrado'}
-    </AppText>
+    {card && !income && <AppText secondary variant="footnote" style={{ textAlign: 'center' }}>
+      Contó como gasto una sola vez y aumentó la deuda de la tarjeta. Pagar la tarjeta no lo vuelve a sumar.
+    </AppText>}
     <ErrorMessage message={error} />
-    {!record.voided && <ActionButton label="Editar movimiento" icon="create-outline" disabled={busy || !!pending}
-      onPress={() => router.push({ pathname: '/edit-entry/[id]', params: { id: entry.id } })} />}
-    <ActionButton label={pending ? 'Reintentar cambio' : record.voided ? 'Recuperar movimiento' : 'Deshacer movimiento'}
-      icon={record.voided ? 'arrow-redo-outline' : 'arrow-undo-outline'} onPress={confirm} busy={busy} secondary={!record.voided} />
+    <View style={{ gap: 10 }}>
+      {!record.voided && <ActionButton label="Editar movimiento" icon="create-outline" disabled={busy || !!pending}
+        onPress={() => router.push({ pathname: '/edit-entry/[id]', params: { id: entry.id } })} />}
+      <ActionButton label={pending ? 'Reintentar cambio' : record.voided ? 'Recuperar movimiento' : 'Deshacer movimiento'}
+        icon={record.voided ? 'arrow-redo-outline' : 'arrow-undo-outline'} onPress={confirm} busy={busy} secondary={!record.voided} />
+    </View>
   </Screen>;
 }

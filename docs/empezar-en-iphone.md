@@ -488,3 +488,16 @@ y tus cuentas, movimientos, presupuestos y recurrentes deben seguir iguales.
 
 La app no se conecta al banco: cierres y vencimientos se calculan con los días que
 cargaste y la deuda es la que registrás vos. Las cuotas llegarán en otra etapa.
+
+## 14. Interfaz 11: Inicio más simple, Movimientos y detalle
+
+Actualizá como en el paso anterior (copia privada, `git pull --ff-only`, `npm ci`,
+`npm start -- --clear`). En Ajustes debe decir **Interfaz 11**.
+
+1. Inicio ahora entra en una pantalla: número principal, Gasto / Ingreso, presupuesto,
+   categorías principales, próximos compromisos y últimos movimientos. Las barras
+   del período están en Reportes.
+2. En Movimientos probá el filtro **Transf.** y mirá las secciones: "Hoy", "Ayer",
+   el día de la semana y luego la fecha, con el neto del día a la derecha.
+3. Abrí un gasto: importe, comercio, fecha, categoría y cuenta o tarjeta. Si tenés un
+   presupuesto para esa categoría en ese mes, aparece cuánto usaste.

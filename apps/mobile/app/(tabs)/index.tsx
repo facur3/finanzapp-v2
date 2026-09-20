@@ -1,18 +1,19 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { View } from 'react-native';
 import { router } from 'expo-router';
-import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
-import { currentMonthISO, formatMinorUnits, hiddenLiabilityAccountIds, labelFromISO, liquidTotalsByCurrency, spendingOverview, spendingWindow,
-  summarizeMonthlyBudgets, type Account, type Currency, type RecurringRule, type SpendingWindow } from '@finanzapp/domain';
+import { currentMonthISO, formatMinorUnits, hiddenLiabilityAccountIds, liquidTotalsByCurrency, spendingOverview, spendingWindow,
+  summarizeMonthlyBudgets, type Currency, type SpendingWindow } from '@finanzapp/domain';
 import { useLedger } from '../../src/storage/LedgerProvider';
-import { ActionButton, AppText, CategoryBadge, Choices, EmptyState, EntryActions, EntryRow, Money, PressFeedback, Screen, SectionTitle, Surface } from '../../src/ui/components';
+import { ActionButton, AppText, Choices, EmptyState, EntryActions, EntryRow, Money, Screen, SectionTitle, Surface } from '../../src/ui/components';
+import { BudgetHomeCard, CategoryHomeRow, UpcomingRecurringRow } from '../../src/ui/home-modules';
 import { availableCurrencies, selectEntries } from '../../src/ui/presentation';
-import { CategorySpendingRow } from '../../src/ui/spending-chart';
-import { SpendingTimeline, periodLabel } from '../../src/ui/spending-timeline';
-import { useCurrentDay, usePalette, useReduceMotion } from '../../src/ui/theme';
+import { periodLabel } from '../../src/ui/spending-timeline';
+import { space, useCurrentDay, usePalette } from '../../src/ui/theme';
 
 type HomeMetric = 'spending' | 'available';
 
+/** Home answers one question at a time: how much did I spend this period, or
+ * how much recorded money do I have. Analysis lives in Reportes; cards in Tarjetas. */
 export default function HomeScreen() {
   const { snapshot, archive } = useLedger();
   const day = useCurrentDay();
@@ -37,7 +38,7 @@ export default function HomeScreen() {
   }, [snapshot, archive?.budgets, currency, day]);
   const recent = useMemo(() => snapshot ? selectEntries(snapshot.entries.filter(entry =>
     snapshot.accounts.some(a => a.id === entry.accountId && a.currency === currency)
-      && entry.dateISO >= period.startISO && entry.dateISO <= period.endISO), snapshot.accounts).slice(0, 3) : [], [snapshot, currency, period]);
+      && entry.dateISO >= period.startISO && entry.dateISO <= period.endISO), snapshot.accounts).slice(0, 4) : [], [snapshot, currency, period]);
   const upcoming = useMemo(() => (archive?.recurring ?? [])
     .filter(rule => rule.active && rule.kind === 'expense' && rule.nextDateISO >= day
       && snapshot?.accounts.some(account => account.id === rule.accountId && account.currency === currency))
@@ -48,156 +49,82 @@ export default function HomeScreen() {
   const hidden = hiddenLiabilityAccountIds(archive?.cards, archive?.debts);
   const accountCount = snapshot.accounts.filter(account => account.currency === currency && !hidden.has(account.id)).length;
   const openReport = () => router.navigate({ pathname: '/reports', params: { currency } });
+  const spending = metric === 'spending';
+  const topCategories = summary.categories.slice(0, 3);
 
-  return <Screen>
+  return <Screen gap={space.xxl}>
     {!snapshot.accounts.length ? <EmptyState title="Entendé tus gastos."
       detail="Elegí una cuenta para agrupar tus movimientos. Podés empezar sin cargar tu saldo bancario."
       icon="receipt-outline" action={<ActionButton label="Empezar" icon="add-outline" onPress={() => router.push('/new-account')} />} /> : <>
-      <View style={{ gap: 18, paddingTop: 8 }}>
-        <Choices value={metric} onChange={setMetric}
-          options={[{ value: 'spending', label: 'Gastos' }, { value: 'available', label: 'Disponible' }]} />
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-          <AppText secondary style={{ fontSize: 14 }}>
-            {metric === 'spending' ? periodLabel(period) : 'Saldo registrado'}
-          </AppText>
+      <View style={{ gap: space.xl }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+          <View style={{ flex: 1, maxWidth: 232 }}>
+            <Choices value={metric} onChange={setMetric}
+              options={[{ value: 'spending', label: 'Gastos' }, { value: 'available', label: 'Disponible' }]} />
+          </View>
           {currencies.length > 1 && <Choices value={currency} onChange={setCurrency}
             options={currencies.map(value => ({ value, label: value }))} />}
         </View>
-        <View style={{ gap: 9 }}>
-          <AppText style={{ fontSize: 19, fontWeight: '500' }}>
-            {metric === 'spending' ? (window === 'month' ? 'Gastado este mes' : 'Gastado esta semana') : 'Disponible en tus cuentas'}
-          </AppText>
-          {metric === 'spending' ? summary.status === 'ready' ? <>
-            <Money minor={summary.expenseMinor} currency={currency} large size={50} />
-            <AppText secondary style={{ fontSize: 14 }}>{summary.expenseCount} {summary.expenseCount === 1 ? 'gasto registrado' : 'gastos registrados'} · {currency}</AppText>
-          </> : <AppText secondary>El total supera el rango que podemos mostrar con precisión. Tus movimientos siguen guardados.</AppText>
-            : <>
-              {available.status === 'ready' ? <Money minor={available.minor} currency={currency} large size={50}
-                color={available.minor < 0 ? p.negative : p.text} />
-                : <AppText secondary>El saldo total supera el rango que podemos mostrar con precisión. Tus cuentas siguen guardadas.</AppText>}
-              <AppText secondary style={{ fontSize: 14 }}>
-                {accountCount} {accountCount === 1 ? 'cuenta registrada' : 'cuentas registradas'} · no es sincronización bancaria
-              </AppText>
-            </>}
-        </View>
+
         <View style={{ gap: 8 }}>
-          <AppText secondary style={{ fontSize: 13 }}>Período de análisis</AppText>
-          <Choices value={window} onChange={setWindow} options={[{ value: 'week', label: 'Esta semana' }, { value: 'month', label: 'Este mes' }]} />
+          <AppText secondary variant="eyebrow">
+            {spending ? `Gastado · ${periodLabel(period)}` : 'Disponible · saldo registrado'}
+          </AppText>
+          {spending ? summary.status === 'ready'
+            ? <Money minor={summary.expenseMinor} currency={currency} large />
+            : <AppText secondary variant="subhead">El total supera el rango que podemos mostrar con precisión. Tus movimientos siguen guardados.</AppText>
+            : available.status === 'ready'
+              ? <Money minor={available.minor} currency={currency} large color={available.minor < 0 ? p.expense : undefined} />
+              : <AppText secondary variant="subhead">El saldo total supera el rango que podemos mostrar con precisión. Tus cuentas siguen guardadas.</AppText>}
+          <AppText secondary variant="subhead">
+            {spending
+              ? summary.status === 'ready'
+                ? `${summary.expenseCount} ${summary.expenseCount === 1 ? 'gasto registrado' : 'gastos registrados'}${summary.incomeMinor > 0 ? ` · ingresos ${currency === 'USD' ? 'US$ ' : '$ '}${formatMinorUnits(summary.incomeMinor)}` : ''}`
+                : currency
+              : `${accountCount} ${accountCount === 1 ? 'cuenta' : 'cuentas'} · no es saldo bancario ni patrimonio`}
+          </AppText>
         </View>
-        {summary.status === 'ready' && summary.expenseCount > 0 && <SpendingTimeline buckets={summary.buckets} currency={currency} />}
+
+        {spending && <View style={{ maxWidth: 232 }}>
+          <Choices value={window} onChange={setWindow} options={[{ value: 'week', label: 'Esta semana' }, { value: 'month', label: 'Este mes' }]} />
+        </View>}
       </View>
 
       <EntryActions currency={currency} />
 
-      {monthBudget === null ? <Surface>
-        <AppText style={{ fontWeight: '600' }}>Presupuesto no disponible</AppText>
-        <AppText secondary style={{ fontSize: 14 }}>Los importes del mes superan el rango que podemos mostrar con precisión. Tus movimientos siguen guardados.</AppText>
-      </Surface> : !!monthBudget.rows.length ? <View>
+      {monthBudget !== null && monthBudget.rows.length > 0 && <View>
         <SectionTitle action="Ver" onAction={() => router.push({ pathname: '/budgets', params: { currency } })}>Presupuesto del mes</SectionTitle>
-        <BudgetHomeCard currency={currency} spent={monthBudget.spentBudgetedMinor} total={monthBudget.budgetedMinor}
-          remaining={monthBudget.remainingMinor} />
-      </View> : <Surface style={{ gap: 10 }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-          <View style={{ flex: 1, gap: 3 }}>
-            <AppText style={{ fontWeight: '600' }}>Presupuesto del mes</AppText>
-            <AppText secondary style={{ fontSize: 14 }}>Poné límites por categoría y seguí cuánto te queda.</AppText>
-          </View>
-          <PressFeedback accessibilityRole="button" accessibilityLabel="Configurar presupuesto"
-            onPress={() => router.push({ pathname: '/budgets', params: { currency } })}
-            style={{ paddingHorizontal: 8 }}>
-            <AppText style={{ color: p.tint, fontWeight: '600' }}>Configurar</AppText>
-          </PressFeedback>
-        </View>
-      </Surface>}
-
-      {summary.status === 'ready' && summary.incomeMinor > 0 && <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'baseline', gap: 8 }}>
-        <AppText secondary style={{ fontSize: 14 }}>Ingresos del período</AppText>
-        <Money minor={summary.incomeMinor} currency={currency} size={16} />
+        <BudgetHomeCard summary={monthBudget} />
       </View>}
 
       <View>
-        <SectionTitle action={upcoming.length ? 'Ver todos' : 'Programar'} onAction={() => router.push(upcoming.length ? '/recurring' : '/new-recurring')}>Próximos compromisos</SectionTitle>
-        {upcoming.length ? <>
-          <AppText secondary style={{ fontSize: 13, marginBottom: 12 }}>Pagos recurrentes programados · {currency}</AppText>
-          <Surface grouped>{upcoming.map((rule, index) => <UpcomingRecurringRow key={rule.id} rule={rule}
-            account={snapshot.accounts.find(account => account.id === rule.accountId)!} day={day} last={index === upcoming.length - 1} />)}</Surface>
-        </> : <AppText secondary style={{ fontSize: 14 }}>Alquiler, suscripciones o un sueldo: programalos una vez y FinanzApp los registra al vencer.</AppText>}
+        <SectionTitle action="Reportes" onAction={openReport}>En qué gastaste</SectionTitle>
+        {topCategories.length ? <Surface grouped>
+          {topCategories.map((category, index) => <CategoryHomeRow key={category.key} category={category}
+            totalMinor={summary.status === 'ready' ? summary.expenseMinor : 0} currency={currency}
+            last={index === topCategories.length - 1}
+            onPress={() => router.push({ pathname: '/spending-detail', params: { ...period, category: category.key } })} />)}
+        </Surface> : <AppText secondary variant="subhead">
+          {summary.status === 'ready' ? 'Tus categorías aparecerán cuando registres un gasto en este período.' : 'El desglose está disponible en tus movimientos.'}
+        </AppText>}
+        {summary.categories.length > 3 && <AppText tertiary variant="caption" style={{ paddingTop: 8, paddingHorizontal: 4 }}>
+          Las 3 principales de {summary.categories.length} categorías · el resto está en Reportes.
+        </AppText>}
       </View>
 
       <View>
-        <SectionTitle action="Reporte mensual" onAction={openReport}>En qué gastaste</SectionTitle>
-        <Surface grouped>
-          {summary.categories.slice(0, 3).map((category, index) => <CategorySpendingRow key={category.key} category={category}
-            totalMinor={summary.status === 'ready' ? summary.expenseMinor : 0} currency={currency} compact periodName="período"
-            last={index === Math.min(summary.categories.length, 3) - 1}
-            onPress={() => router.push({ pathname: '/spending-detail', params: { ...period, category: category.key } })} />)}
-          {!summary.categories.length && <AppText secondary style={{ padding: 20, fontSize: 15 }}>
-            {summary.status === 'ready' ? 'Tus categorías aparecerán cuando registres un gasto en este período.' : 'El desglose está disponible en tus movimientos.'}
-          </AppText>}
-          {summary.categories.length > 3 && <AppText secondary style={{ padding: 16, fontSize: 13 }}>Las 3 principales de {summary.categories.length} categorías.</AppText>}
-        </Surface>
+        <SectionTitle action={upcoming.length ? 'Ver todos' : 'Programar'} onAction={() => router.push(upcoming.length ? '/recurring' : '/new-recurring')}>Próximos compromisos</SectionTitle>
+        {upcoming.length ? <Surface grouped>{upcoming.map((rule, index) => <UpcomingRecurringRow key={rule.id} rule={rule}
+          account={snapshot.accounts.find(account => account.id === rule.accountId)!} day={day} last={index === upcoming.length - 1} />)}</Surface>
+          : <AppText secondary variant="subhead">Alquiler, suscripciones o un sueldo: programalos una vez y FinanzApp los registra al vencer.</AppText>}
       </View>
 
       <View>
         <SectionTitle action="Ver todos" onAction={() => router.navigate('/activity')}>Últimos movimientos</SectionTitle>
-        <AppText secondary style={{ fontSize: 13, marginBottom: 12 }}>Del período seleccionado · {currency}</AppText>
         {recent.length ? <Surface grouped>{recent.map((entry, index) => <EntryRow key={entry.id} entry={entry}
           account={snapshot.accounts.find(a => a.id === entry.accountId)!} last={index === recent.length - 1} />)}</Surface>
-          : <AppText secondary>Todavía no hay movimientos registrados en este período.</AppText>}
+          : <AppText secondary variant="subhead">Todavía no hay movimientos registrados en este período.</AppText>}
       </View>
     </>}
   </Screen>;
 }
-
-function BudgetHomeCard({ currency, spent, total, remaining }: {
-  currency: Currency; spent: number; total: number; remaining: number;
-}) {
-  const p = usePalette();
-  const reduced = useReduceMotion();
-  const progress = useSharedValue(0);
-  useEffect(() => {
-    progress.value = withTiming(total > 0 ? Math.min(1, spent / total) : 0, { duration: reduced ? 0 : 480 });
-  }, [spent, total, reduced, progress]);
-  const bar = useAnimatedStyle(() => ({ width: `${progress.value === 0 ? 0 : Math.max(2, progress.value * 100)}%` as `${number}%` }));
-  return <PressFeedback accessibilityRole="button" accessibilityLabel="Abrir presupuestos"
-    onPress={() => router.push({ pathname: '/budgets', params: { currency } })}>
-    <Surface>
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'baseline', gap: 8 }}>
-        <View style={{ flex: 1, minWidth: 160, gap: 3 }}>
-          <AppText secondary style={{ fontSize: 13 }}>Disponible</AppText>
-          <Money minor={remaining} currency={currency} size={28} color={remaining < 0 ? p.negative : p.text} />
-        </View>
-        <View style={{ alignItems: 'flex-end', gap: 3 }}>
-          <AppText secondary style={{ fontSize: 12 }}>Gastado</AppText>
-          <Money minor={spent} currency={currency} size={15} />
-        </View>
-      </View>
-      <View style={{ height: 7, borderRadius: 999, overflow: 'hidden', backgroundColor: p.inset }}>
-        <Animated.View style={[{ height: 7, borderRadius: 999, backgroundColor: spent > total ? p.negative : p.accent }, bar]} />
-      </View>
-      <AppText secondary style={{ fontSize: 12 }}>Límite total · {currency === 'USD' ? 'US$ ' : '$ '}{formatMinorUnits(total)}</AppText>
-    </Surface>
-  </PressFeedback>;
-}
-
-function UpcomingRecurringRow({ rule, account, day, last }: {
-  rule: RecurringRule; account: Account; day: string; last: boolean;
-}) {
-  const p = usePalette();
-  const date = labelFromISO(rule.nextDateISO, new Date(day + 'T12:00:00'));
-  return <PressFeedback accessibilityRole="button"
-    accessibilityLabel={`${rule.merchant}, próximo pago ${date}, ${account.currency}`}
-    onPress={() => router.push({ pathname: '/edit-recurring/[id]', params: { id: rule.id } })}
-    style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 16,
-      borderBottomWidth: last ? 0 : 0.5, borderBottomColor: p.line }}>
-    <CategoryBadge category={rule.category} />
-    <View style={{ flex: 1, minWidth: 0, gap: 4 }}>
-      <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 8 }}>
-        <AppText numberOfLines={1} style={{ flex: 1, fontWeight: '600' }}>{rule.merchant}</AppText>
-        <Money minor={rule.amountMinor} currency={account.currency} />
-      </View>
-      <AppText secondary numberOfLines={1} style={{ fontSize: 13 }}>{date} · {rule.category}</AppText>
-    </View>
-  </PressFeedback>;
-}
-

@@ -1,8 +1,8 @@
 import { useMemo, type ReactNode } from 'react';
 import { SectionList, View } from 'react-native';
-import { labelFromISO, type Account, type Entry, type Transfer } from '@finanzapp/domain';
+import { formatMinorUnits, type Account, type Entry, type Transfer } from '@finanzapp/domain';
 import { AppText, MovementRow, type RowContext } from './components';
-import { groupActivity, mergeActivity, type ActivityItem } from './presentation';
+import { activityDateLabel, dayNetMinor, groupActivity, mergeActivity, type ActivityItem } from './presentation';
 import { useCurrentDay, usePalette } from './theme';
 
 export function EntryList({ entries, transfers, accounts, accountId, header, empty, context }: {
@@ -20,10 +20,18 @@ export function EntryList({ entries, transfers, accounts, accountId, header, emp
     initialNumToRender={12} maxToRenderPerBatch={12} windowSize={7}
     ListHeaderComponent={header ? <View>{header}</View> : null}
     ListEmptyComponent={empty ? <View style={{ paddingTop: 16 }}>{empty}</View> : null}
-    renderSectionHeader={({ section }) => <AppText accessibilityRole="header" secondary variant="footnote"
-      style={{ fontWeight: '600', paddingTop: 20, paddingBottom: 8, paddingHorizontal: 4 }}>
-      {labelFromISO(section.dateISO, new Date(day + 'T12:00:00'))}
-    </AppText>}
+    renderSectionHeader={({ section }) => {
+      const net = context ? null : dayNetMinor(section.data.filter(item => item.type === 'entry').map(item => item.value as Entry), accounts);
+      return <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', gap: 12, paddingTop: 20, paddingBottom: 8, paddingHorizontal: 4 }}>
+        <AppText accessibilityRole="header" secondary variant="footnote" style={{ fontWeight: '600', flexShrink: 1 }}>
+          {activityDateLabel(section.dateISO, day)}
+        </AppText>
+        {net && net.minor !== 0 && <AppText secondary variant="footnote" style={{ fontVariant: ['tabular-nums'] }}
+          accessibilityLabel={`Neto del día ${net.minor < 0 ? 'menos ' : ''}${formatMinorUnits(Math.abs(net.minor))} ${net.currency}`}>
+          {net.minor < 0 ? '−' : '+'}{net.currency === 'USD' ? 'US$ ' : '$ '}{formatMinorUnits(Math.abs(net.minor))}
+        </AppText>}
+      </View>;
+    }}
     renderItem={({ item, index, section }) => <View style={{ backgroundColor: p.surface, overflow: 'hidden',
       borderTopLeftRadius: index === 0 ? 16 : 0, borderTopRightRadius: index === 0 ? 16 : 0,
       borderBottomLeftRadius: index === section.data.length - 1 ? 16 : 0, borderBottomRightRadius: index === section.data.length - 1 ? 16 : 0 }}>
