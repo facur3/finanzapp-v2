@@ -15,10 +15,29 @@ server-keyed; manual recording and local data work without connectivity. Recurri
 expenses, debts, budgets and cards remain in scope. Native navigation, accessible
 amounts, real data and recoverable durable writes remain requirements.
 
-## Status and current delivery — Interfaz 13
+## Status and current delivery — Interfaz 14
 
 Implemented is code, checked names a test, device-verified needs a physical result,
 and released means distributed. Neither a bundle nor a screenshot is App Store QA.
+
+- [x] Presupuestos: one hero (what is left or how far over), a total bar, spent and
+  limit, a status line counting exceeded and near-limit categories, and dense rows
+  with percentage, status text, spent of limit and one thin bar each. Month navigation
+  says whether the month is current, closed or future.
+- [x] Recurrentes: a 30-day projection per currency as three compact statistics
+  (payments, due count, income), rows with frequency, next date, account, signed
+  amount and "Hoy / Mañana / En N días", and the native switch to pause.
+- [x] Cuentas: liquid accounts grouped by currency with each currency's recorded
+  total in the section header; cards and debts stay in Tarjetas. Account detail shows
+  the recorded balance, this month's recorded expenses and income, Gasto / Ingreso /
+  Transferir, recurring rules and the opening balance, then its movements.
+- [ ] Physical iPhone review of the budget rows, the switch and account actions.
+
+Interfaz 14 verification adds handler tests for budgets (remaining, exceeded and
+near-limit rows), recurring projection and pause, account totals per currency, account
+detail statistics and the redirect of obligation accounts.
+
+### Previous delivery — Interfaz 13
 
 - [x] Reportes answers "¿a dónde fue mi plata?" for one month and currency: recorded
   total with daily average and the change against the same elapsed days of the previous
@@ -170,8 +189,8 @@ by CI and merged into master before the next starts:
 2. ~~Movimientos and transaction detail~~ — delivered in Interfaz 11.
 3. ~~Entry forms~~ — delivered in Interfaz 12.
 4. ~~Reportes~~ — delivered in Interfaz 13. Account and custom period filters remain backlog.
-5. **Presupuestos, Recurrentes and Cuentas polish**, then installments and statement
-   periods for cards with proper calendar semantics.
+5. ~~Presupuestos, Recurrentes and Cuentas polish~~ — delivered in Interfaz 14.
+   Installments and statement periods for cards, with proper calendar semantics, remain.
 6. **EAS development build and Apple integrations** (Face ID, notifications, Apple
    Pay capture, App Intents) only after the core product is stable on device.
 
@@ -245,6 +264,13 @@ values are never hidden until an animation finishes. 44-point targets, VoiceOver
 safe areas, system text and separate currencies apply to every new screen.
 
 ## Handoff log (historical evidence)
+
+### 2026-09-20 — Interfaz 14: Presupuestos, Recurrentes and Cuentas polish
+
+- Dense budget rows with percentage and one thin bar; 30-day recurring statistics;
+  per-currency liquid totals in Cuentas; account detail with month in/out and actions.
+- Checked locally: 359 domain/web + 129 mobile tests, TypeScript, Vite build, hygiene,
+  offline Expo compatibility and Metro iOS export. No device evidence.
 
 ### 2026-09-20 — Interfaz 13: Reportes analytics
 
