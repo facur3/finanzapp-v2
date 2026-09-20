@@ -498,7 +498,7 @@ test('v3 database upgrades through recurring and budget schemas without changing
   const { db } = await transferReady();
   await createTransfer(db, transfer);
   const before = await readSnapshot(db);
-  await db.execAsync('PRAGMA user_version = 3; DROP TABLE IF EXISTS recurring_rules;');
+  await db.execAsync('PRAGMA user_version = 3; DROP TABLE IF EXISTS recurring_rules; DROP TABLE IF EXISTS monthly_budgets;');
   await initializeDatabase(db);
   assert.equal((await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))?.user_version, 5);
   assert.deepEqual(await readSnapshot(db), before);
