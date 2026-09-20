@@ -15,7 +15,7 @@ import { initialAccountId } from './presentation';
 export function EntryForm({ original, accountId: requestedAccount, currency, kind: requestedKind }: {
   original?: EntryRecord; accountId?: string; currency?: string; kind?: string;
 }) {
-  const { snapshot, addEntry, updateEntry } = useLedger();
+  const { snapshot, archive, addEntry, updateEntry } = useLedger();
   const accounts = snapshot?.accounts ?? [];
   const [before] = useState(original);
   const [operation] = useState(() => ({ id: randomUUID(), createdAt: new Date().toISOString() }));
@@ -31,7 +31,9 @@ export function EntryForm({ original, accountId: requestedAccount, currency, kin
   const [error, setError] = useState<string | null>(null);
   const account = accounts.find(item => item.id === accountId);
   const originalCurrency = accounts.find(item => item.id === before?.entry.accountId)?.currency;
-  const eligibleAccounts = before ? accounts.filter(item => item.currency === originalCurrency) : accounts;
+  const debtAccounts = new Set((archive?.debts ?? []).map(debt => debt.accountId));
+  const spendAccounts = accounts.filter(item => !debtAccounts.has(item.id) || item.id === before?.entry.accountId);
+  const eligibleAccounts = before ? spendAccounts.filter(item => item.currency === originalCurrency) : spendAccounts;
   const locked = busy || pending !== null;
   const close = () => { if (!saving.current) { if (router.canGoBack()) router.back(); else router.replace('/'); } };
 
@@ -80,7 +82,7 @@ export function EntryForm({ original, accountId: requestedAccount, currency, kin
         onChangeText={setMerchant} maxLength={120} autoCapitalize="sentences" editable={!locked} />
       <Surface grouped>
         <CategoryField entries={snapshot?.entries ?? []} kind={kind} value={category} onChange={setCategory} disabled={locked} />
-        <AccountField accounts={eligibleAccounts} value={accountId} onChange={setAccountId} disabled={locked} />
+        <AccountField label="Cuenta o tarjeta" accounts={eligibleAccounts} value={accountId} onChange={setAccountId} disabled={locked} />
         <DateField value={date} onChange={setDate} disabled={locked} />
       </Surface>
       {before && <AppText secondary style={{ fontSize: 13, textAlign: 'center' }}>Corregís el movimiento original. No se registra otro gasto o ingreso.</AppText>}
