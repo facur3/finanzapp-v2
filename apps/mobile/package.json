@@ -11,14 +11,20 @@
     "export:ios": "expo export --platform ios",
     "check": "expo install --check"
   },
-  "engines": { "node": ">=22.22.0" },
+  "engines": {
+    "node": ">=22.22.0"
+  },
   "overrides": {
-    "query-string": { "decode-uri-component": "$decode-uri-component" },
-    "xcode": { "uuid": "11.1.1" }
+    "query-string": {
+      "decode-uri-component": "$decode-uri-component"
+    },
+    "xcode": {
+      "uuid": "11.1.1"
+    }
   },
   "dependencies": {
-    "@finanzapp/domain": "file:../../packages/domain",
     "@expo/vector-icons": "^15.0.2",
+    "@finanzapp/domain": "file:../../packages/domain",
     "@react-native-community/datetimepicker": "9.1.0",
     "decode-uri-component": "file:./compat/decode-uri-component",
     "expo": "~57.0.24",
@@ -42,6 +48,7 @@
     "react-native-reanimated": "4.5.1",
     "react-native-safe-area-context": "~5.7.0",
     "react-native-screens": "~4.26.0",
+    "react-native-svg": "15.15.4",
     "react-native-worklets": "0.10.1",
     "safe-decode-uri-component": "npm:decode-uri-component@0.5.0"
   },

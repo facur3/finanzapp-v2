@@ -1,6 +1,6 @@
 # FinanzApp: dirección visual móvil
 
-Interfaz 12 · 20 de septiembre de 2026. Implementado en código; revisión visual y
+Interfaz 13 · 20 de septiembre de 2026. Implementado en código; revisión visual y
 gestual en iPhone pendiente. [Alcance del producto](decisions/002-spending-first.md) ·
 [Navegación y tarjetas](decisions/003-five-tabs-and-cards.md).
 
@@ -40,6 +40,12 @@ nombre, emisor, moneda, últimos cuatro dígitos y un tono estable por tarjeta.
 
 ## Pantallas de esta entrega
 
+- **Reportes.** Título del mes con flechas, total registrado, promedio por día y
+  variación contra los mismos días del mes anterior; barras de seis meses en una
+  sola escala (el mes en curso, delineado); dona por categoría con rampa de tinta
+  (cinco pasos, el resto como Otras) y leyenda con importe y participación; Día a
+  día; presupuestos con porcentaje; comercios principales; hechos (no consejos);
+  ingresos, flujo neto y comparación. Sin "ahorro": no tenemos su definición.
 - **Formularios.** Selector Gasto / Ingreso / Transferencia, importe grande (verde
   para ingresos, azul para transferencias) y dos tarjetas de selección a ancho
   completo que no se pueden pasar por alto: Categoría (con la línea de presupuesto
@@ -71,6 +77,16 @@ nombre, emisor, moneda, últimos cuatro dígitos y un tono estable por tarjeta.
 - **Formularios.** Pagar tarjeta y saldar deudas fijan la obligación y solo eligen
   la cuenta de dinero en la misma moneda. El selector de cuenta nombra el tipo
   (Cuenta, Tarjeta de crédito) y nunca ofrece una deuda para un gasto.
+
+## Gráficos
+
+Las barras y las barras de progreso usan vistas nativas y **Reanimated**. La dona
+usa **react-native-svg** en la versión incluida por Expo SDK 57 (funciona en Expo
+Go); no se agrega una librería de gráficos completa ni una WebView. Una sola
+tonalidad de tinta en cinco pasos ordena las porciones por tamaño; los nombres van
+en la leyenda, nunca solo en el color. Los gráficos aparecen con un fundido breve y,
+con Reduce Motion, directamente; los valores nunca se ocultan hasta terminar una
+animación.
 
 ## Motion y accesibilidad
 

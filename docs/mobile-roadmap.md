@@ -15,10 +15,28 @@ server-keyed; manual recording and local data work without connectivity. Recurri
 expenses, debts, budgets and cards remain in scope. Native navigation, accessible
 amounts, real data and recoverable durable writes remain requirements.
 
-## Status and current delivery — Interfaz 12
+## Status and current delivery — Interfaz 13
 
 Implemented is code, checked names a test, device-verified needs a physical result,
 and released means distributed. Neither a bundle nor a screenshot is App Store QA.
+
+- [x] Reportes answers "¿a dónde fue mi plata?" for one month and currency: recorded
+  total with daily average and the change against the same elapsed days of the previous
+  month; a six-month bar trend (past months complete, current month through today,
+  tapping a bar selects it); a category donut in an ink lightness ramp with a legend
+  list (top five named, the rest grouped as Otras) and day-by-day view; budget status
+  rows; top merchants by normalized identity; factual insights (over/near budget,
+  largest expense, category that grew); recorded income, net cash flow (never called
+  savings) and the previous-month comparison. Nothing is estimated or converted.
+- [x] `react-native-svg` 15.15.4 (the Expo SDK 57 bundled version, Expo Go compatible)
+  draws the donut; bars and progress use plain views.
+- [ ] Physical iPhone review of the donut, bars and legend at large text and in dark mode.
+
+Interfaz 13 verification adds domain tests for the monthly trend, top merchants,
+daily average and insights, and report handler tests for the trend selection, donut
+data and empty months.
+
+### Previous delivery — Interfaz 12
 
 - [x] Entry form hierarchy: Gasto / Ingreso / Transferencia switch (Transferencia hands
   off to the transfer form and back), a large amount tinted green for income, then two
@@ -151,9 +169,7 @@ by CI and merged into master before the next starts:
 1. ~~Home redesign~~ — delivered in Interfaz 11.
 2. ~~Movimientos and transaction detail~~ — delivered in Interfaz 11.
 3. ~~Entry forms~~ — delivered in Interfaz 12.
-4. **Reportes.** Category donut with legend, historical trend, previous-period
-   comparison, top merchants, budget status and honest insights; period, category
-   and account filters. Net cash flow, never "savings", until savings has a definition.
+4. ~~Reportes~~ — delivered in Interfaz 13. Account and custom period filters remain backlog.
 5. **Presupuestos, Recurrentes and Cuentas polish**, then installments and statement
    periods for cards with proper calendar semantics.
 6. **EAS development build and Apple integrations** (Face ID, notifications, Apple
@@ -229,6 +245,14 @@ values are never hidden until an animation finishes. 44-point targets, VoiceOver
 safe areas, system text and separate currencies apply to every new screen.
 
 ## Handoff log (historical evidence)
+
+### 2026-09-20 — Interfaz 13: Reportes analytics
+
+- Trend, donut, legend, day-by-day, budgets, top merchants and insights on one tab;
+  every figure is recorded spending in the selected currency.
+- One new dependency: react-native-svg at the SDK 57 bundled version.
+- Checked locally: 359 domain/web + 125 mobile tests, TypeScript, Vite build, hygiene,
+  npm ls, offline Expo compatibility and Metro iOS export. No device evidence.
 
 ### 2026-09-20 — Interfaz 12: entry, transfer and recurring form hierarchy
 

@@ -512,3 +512,14 @@ Actualizá como en los pasos anteriores. En Ajustes debe decir **Interfaz 12**.
 2. Si tenés un presupuesto para esa categoría este mes, la tarjeta Categoría muestra
    cuánto llevás gastado de ese límite.
 3. Tocá Transferencia: abre el formulario de transferencia con la misma cuenta.
+
+## 16. Interfaz 13: Reportes
+
+Actualizá como antes. En Ajustes debe decir **Interfaz 13**.
+
+1. Abrí la pestaña Reportes: total del mes, promedio por día, variación contra el
+   mes anterior, barras de los últimos seis meses y la dona por categoría.
+2. Tocá una barra de un mes anterior: todo el reporte cambia a ese mes. Tocá una
+   categoría de la leyenda para ver sus movimientos.
+3. Más abajo: presupuestos con porcentaje, dónde más gastaste y hechos de tus
+   registros. Flujo neto es ingresos menos gastos registrados, no ahorro.
