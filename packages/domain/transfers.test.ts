@@ -67,15 +67,16 @@ describe('internal transfers and account corrections', () => {
     for (const after of [{ ...change.after, currency: 'USD' as const }, { ...change.after, id: 'other' },
       { ...change.after, openingMinor: 0 }, { ...change.after, revision: 0 }]) expect(() => validateAccountChange({ ...change, after })).toThrow();
   });
-  it('v3 backup preserves corrected accounts, transfer revisions and tombstones', () => {
+  it('v4 backup preserves corrected accounts, transfer revisions and tombstones', () => {
     const change = makeAccountChange('edit', a, snapshotFromArchive(archive), 'Nueva', 5000, time);
     const saved = { ...archive, accounts: [change.after, b, usd], transfers: [makeTransferChange('undo', initialTransferRecord(t), 'void', time).after] };
     const backup = createRecoveryBackup(saved);
-    expect(backup.schema).toBe('finanzapp.native-pilot.v3');
+    expect(backup.schema).toBe('finanzapp.native-pilot.v4');
     expect(parsePilotBackup(JSON.stringify(backup)).archive).toEqual(saved);
     expect(() => createPilotBackup(snapshotFromArchive(saved))).toThrow();
     const v2 = { ...createRecoveryBackup({ accounts: [a, b], records: [] }), schema: 'finanzapp.native-pilot.v2' };
     delete (v2 as any).transfers;
+    delete (v2 as any).recurring;
     expect(parsePilotBackup(JSON.stringify(v2)).archive).toEqual({ accounts: [a, b], records: [] });
   });
   it('preview includes transfers, refuses stale account metadata and prevents resurrection', () => {
@@ -90,7 +91,7 @@ describe('internal transfers and account corrections', () => {
   });
   it.each([(copy: any) => { copy.transfers.push(copy.transfers[0]); }, (copy: any) => { copy.transfers[0].revision = -1; },
     (copy: any) => { copy.transfers[0].transfer.amountMinor = '123'; }, (copy: any) => { copy.accounts[0].revision = 1; },
-    (copy: any) => { delete copy.transfers; }, (copy: any) => { copy.transfers[0].transfer.fee = 1; }])('rejects corrupt v3 backups %#', corrupt => {
+    (copy: any) => { delete copy.transfers; }, (copy: any) => { copy.transfers[0].transfer.fee = 1; }])('rejects corrupt current backups %#', corrupt => {
     const copy = createRecoveryBackup(archive); corrupt(copy);
     expect(() => parsePilotBackup(JSON.stringify(copy))).toThrow();
   });
