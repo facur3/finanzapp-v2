@@ -7,7 +7,7 @@ import * as Haptics from 'expo-haptics';
 import { advanceRecurringDate, labelFromISO, recurringOccurrencesThrough, todayKey,
   type Currency, type RecurringFrequency, type RecurringRule } from '@finanzapp/domain';
 import { useLedger } from '../src/storage/LedgerProvider';
-import { ActionButton, AppText, CategoryBadge, EmptyState, IconButton, Money, PressFeedback, Screen, SectionTitle, Surface } from '../src/ui/components';
+import { ActionButton, AppText, CategoryBadge, EmptyState, ErrorMessage, IconButton, Money, PressFeedback, Screen, SectionTitle, Surface } from '../src/ui/components';
 import { usePalette, useReduceMotion } from '../src/ui/theme';
 
 const FREQUENCY: Record<RecurringFrequency, string> = { weekly: 'Semanal', monthly: 'Mensual', yearly: 'Anual' };
@@ -17,6 +17,7 @@ export default function RecurringScreen() {
   const { archive, snapshot, saveRecurring } = useLedger();
   const p = usePalette();
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [toggleError, setToggleError] = useState<string | null>(null);
   const accounts = snapshot?.accounts ?? [];
   const allRules = archive?.recurring ?? [];
   const rules = useMemo(() => allRules
@@ -31,6 +32,7 @@ export default function RecurringScreen() {
   async function toggle(rule: RecurringRule) {
     if (busyId) return;
     setBusyId(rule.id);
+    setToggleError(null);
     try {
       const now = new Date().toISOString();
       let nextDateISO = rule.nextDateISO;
@@ -41,6 +43,8 @@ export default function RecurringScreen() {
       const next = { ...rule, active: !rule.active, nextDateISO, revision: rule.revision + 1, updatedAt: now };
       await saveRecurring(next);
       void Haptics.selectionAsync().catch(() => {});
+    } catch (cause) {
+      setToggleError(cause instanceof Error ? cause.message : 'No pudimos cambiar el estado del recurrente. Probá nuevamente.');
     } finally {
       setBusyId(null);
     }
@@ -62,6 +66,7 @@ export default function RecurringScreen() {
       </AppText>
     </View>
 
+    <ErrorMessage message={toggleError} />
     {!rules.length ? <EmptyState title="Nada recurrente todavía"
       detail={account ? 'Creá un pago o ingreso recurrente para esta cuenta.' : 'Suscripciones, alquiler, sueldo o cualquier movimiento que se repita.'}
       icon="repeat-outline"
