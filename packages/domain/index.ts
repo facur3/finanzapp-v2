@@ -11,3 +11,4 @@ export * from './account-changes.ts';
 export * from './report-insights.ts';
 export * from './spending-overview.ts';
 export * from './recurring.ts';
+export * from './budgets.ts';
