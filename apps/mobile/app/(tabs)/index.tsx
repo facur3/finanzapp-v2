@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { View } from 'react-native';
 import { router } from 'expo-router';
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
-import { currentMonthISO, labelFromISO, spendingOverview, spendingWindow, summarizeMonthlyBudgets, totalsByCurrency,
+import { currentMonthISO, formatMinorUnits, labelFromISO, spendingOverview, spendingWindow, summarizeMonthlyBudgets, totalsByCurrency,
   type Account, type Currency, type RecurringRule, type SpendingWindow } from '@finanzapp/domain';
 import { useLedger } from '../../src/storage/LedgerProvider';
 import { ActionButton, AppText, CategoryBadge, Choices, EmptyState, EntryActions, EntryRow, Money, PressFeedback, Screen, SectionTitle, Surface } from '../../src/ui/components';
@@ -143,7 +143,7 @@ function BudgetHomeCard({ currency, spent, total, remaining }: {
   useEffect(() => {
     progress.value = withTiming(total > 0 ? Math.min(1, spent / total) : 0, { duration: reduced ? 0 : 480 });
   }, [spent, total, reduced, progress]);
-  const bar = useAnimatedStyle(() => ({ width: `${Math.max(2, progress.value * 100)}%` as `${number}%` }));
+  const bar = useAnimatedStyle(() => ({ width: `${progress.value === 0 ? 0 : Math.max(2, progress.value * 100)}%` as `${number}%` }));
   return <PressFeedback accessibilityRole="button" accessibilityLabel="Abrir presupuestos"
     onPress={() => router.push({ pathname: '/budgets', params: { currency } })}>
     <Surface>
@@ -160,7 +160,7 @@ function BudgetHomeCard({ currency, spent, total, remaining }: {
       <View style={{ height: 7, borderRadius: 999, overflow: 'hidden', backgroundColor: p.inset }}>
         <Animated.View style={[{ height: 7, borderRadius: 999, backgroundColor: spent > total ? p.negative : p.accent }, bar]} />
       </View>
-      <AppText secondary style={{ fontSize: 12 }}>Límite total · {currency === 'USD' ? 'US$ ' : '$ '}{formatMinor(total)}</AppText>
+      <AppText secondary style={{ fontSize: 12 }}>Límite total · {currency === 'USD' ? 'US$ ' : '$ '}{formatMinorUnits(total)}</AppText>
     </Surface>
   </PressFeedback>;
 }
@@ -186,8 +186,3 @@ function UpcomingRecurringRow({ rule, account, day, last }: {
   </PressFeedback>;
 }
 
-function formatMinor(minor: number) {
-  const absolute = Math.abs(minor);
-  const whole = Math.floor(absolute / 100).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
-  return whole + ',' + String(absolute % 100).padStart(2, '0');
-}
