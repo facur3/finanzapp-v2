@@ -19,9 +19,10 @@ export default function EntryScreen() {
 }
 
 function EntryDetail({ record, account }: { record: EntryRecord; account: Account }) {
-  const { updateEntry } = useLedger();
+  const { updateEntry, archive } = useLedger();
   const p = usePalette();
   const { entry } = record;
+  const card = archive?.cards?.find(item => item.accountId === account.id);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState<EntryChange | null>(null);
@@ -61,16 +62,16 @@ function EntryDetail({ record, account }: { record: EntryRecord; account: Accoun
   return <Screen>
     <Stack.Screen options={{ title: record.voided ? 'Movimiento deshecho' : income ? 'Ingreso' : 'Gasto', gestureEnabled: !busy, headerBackVisible: !busy }} />
     <View style={{ gap: 16, alignItems: 'center', paddingVertical: 24 }}>
-      <CategoryBadge category={entry.category} large />
+      <CategoryBadge category={entry.category} large tone={income ? 'income' : 'neutral'} />
       <View style={{ width: '100%', alignItems: 'center' }}><Money minor={income ? entry.amountMinor : -entry.amountMinor}
-        currency={account.currency} large signed color={income ? p.positive : p.text} /></View>
+        currency={account.currency} large signed tone={income ? 'income' : 'expense'} /></View>
       <AppText style={{ fontSize: 23, lineHeight: 30, fontWeight: '600', textAlign: 'center' }}>{entry.merchant}</AppText>
       <AppText secondary style={{ fontSize: 14, textAlign: 'center' }}>{date}</AppText>
     </View>
     <Surface grouped>
-      <DetailRow label="Cuenta" value={account.name} icon="wallet-outline"
+      <DetailRow label={card ? 'Tarjeta' : 'Cuenta'} value={account.name} icon={card ? 'card-outline' : 'wallet-outline'}
         disabled={busy}
-        onPress={() => router.push({ pathname: '/account/[id]', params: { id: account.id } })} />
+        onPress={() => router.push(card ? { pathname: '/card/[id]', params: { id: card.id } } : { pathname: '/account/[id]', params: { id: account.id } })} />
       <DetailRow label="Categoría" value={entry.category} icon="pricetag-outline" />
       <DetailRow label="Moneda" value={account.currency === 'ARS' ? 'Pesos argentinos' : 'Dólares estadounidenses'} last />
     </Surface>

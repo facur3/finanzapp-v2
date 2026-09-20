@@ -71,10 +71,11 @@ export default function BackupImportScreen() {
 
   const plan = review?.preview;
   const additions = (plan?.accounts.length ?? 0) + (plan?.records.length ?? 0) + (plan?.transfers.length ?? 0)
-    + (plan?.recurring.length ?? 0) + (plan?.budgets.length ?? 0);
+    + (plan?.recurring.length ?? 0) + (plan?.budgets.length ?? 0) + (plan?.cards.length ?? 0) + (plan?.debts.length ?? 0);
+  const hiddenIncoming = new Set([...plan?.cards ?? [], ...plan?.debts ?? []].map(item => item.accountId));
   return <Screen>
     <Stack.Screen options={{ gestureEnabled: !busy, headerBackVisible: !busy }} />
-    {done ? <EmptyState title="Copia incorporada" detail="Tus cuentas, movimientos, presupuestos y recurrentes ya están guardados en este dispositivo. No se duplicaron registros existentes." icon="checkmark-circle-outline"
+    {done ? <EmptyState title="Copia incorporada" detail="Tus cuentas, tarjetas, deudas, movimientos, presupuestos y recurrentes ya están guardados en este dispositivo. No se duplicaron registros existentes." icon="checkmark-circle-outline"
       action={<ActionButton label="Elegir otra copia" onPress={choose} busy={busy} secondary />} /> : <>
       {!review && <EmptyState title="Recuperá tus registros" icon="folder-open-outline"
         detail="Elegí una copia del piloto nativo. Podrás revisar los cambios antes de guardarlos. No se envía el archivo a ningún servidor."
@@ -85,7 +86,9 @@ export default function BackupImportScreen() {
           <AppText secondary style={{ fontSize: 13 }}>{new Date(review.backup.exportedAt).toLocaleString('es-AR')}</AppText>
         </View>
         <Surface grouped>
-          <DetailRow label="Cuentas nuevas" value={String(plan.accounts.length)} />
+          <DetailRow label="Cuentas nuevas" value={String(plan.accounts.filter(account => !hiddenIncoming.has(account.id)).length)} />
+          <DetailRow label="Tarjetas nuevas" value={String(plan.cards.length)} />
+          <DetailRow label="Deudas nuevas" value={String(plan.debts.length)} />
           <DetailRow label="Movimientos nuevos" value={String(plan.records.filter(record => !record.voided).length)} />
           <DetailRow label="Transferencias nuevas" value={String(plan.transfers.filter(record => !record.voided).length)} />
           <DetailRow label="Recurrentes nuevos" value={String(plan.recurring.length)} />
@@ -94,7 +97,7 @@ export default function BackupImportScreen() {
           <DetailRow label="Registros ya presentes" value={String(plan.identical)} last />
         </Surface>
         {plan.conflicts > 0 ? <ErrorMessage message={`Hay ${plan.conflicts} registros con cambios diferentes. No se importará nada. Esta copia no puede reemplazar correcciones locales ni reactivar movimientos deshechos.`} /> : <>
-          <Surface><SectionTitle>Disponible después</SectionTitle>
+          <Surface><SectionTitle caption="Solo cuentas de dinero. Tarjetas y deudas no se suman.">Disponible después</SectionTitle>
             {(['ARS', 'USD'] as const).filter(currency => plan.after?.[currency] !== undefined).map(currency => <View key={currency} style={{ gap: 6 }}>
               <AppText secondary style={{ fontSize: 13 }}>{currency}</AppText>
               <Money minor={plan.after![currency]!} currency={currency} size={28} />
@@ -112,7 +115,7 @@ export default function BackupImportScreen() {
         {!!plan && !plan.conflicts && additions > 0 && <ActionButton label="Confirmar importación" onPress={confirm} busy={busy} />}
         <ActionButton label="Elegir otra copia" onPress={choose} disabled={busy} secondary />
       </>}
-      <AppText secondary style={{ fontSize: 13 }}>Copias nativas v1/v2/v3/v4/v5 · JSON de hasta 5 MB. La importación de la app web, tarjetas e inversiones llegará en otra etapa.</AppText>
+      <AppText secondary style={{ fontSize: 13 }}>Copias nativas v1 a v6 · JSON de hasta 5 MB. La importación de la app web e inversiones llegará en otra etapa.</AppText>
     </>}
   </Screen>;
 }

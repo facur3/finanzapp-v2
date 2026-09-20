@@ -1,16 +1,19 @@
 import { SectionList, View } from 'react-native';
 import { router, Stack } from 'expo-router';
-import { type Account } from '@finanzapp/domain';
+import { hiddenLiabilityAccountIds, type Account } from '@finanzapp/domain';
 import { useLedger } from '../src/storage/LedgerProvider';
 import { AccountRow, ActionButton, AppText, EmptyState, IconButton } from '../src/ui/components';
 import { availableCurrencies } from '../src/ui/presentation';
 import { usePalette } from '../src/ui/theme';
 
 export default function AccountsScreen() {
-  const { snapshot } = useLedger();
+  const { snapshot, archive } = useLedger();
   const p = usePalette();
   if (!snapshot) return null;
-  const sections = availableCurrencies(snapshot.accounts).map(currency => ({ currency, data: snapshot.accounts.filter(account => account.currency === currency) }));
+  // Cards and debts live in Tarjetas; this list is liquid money only.
+  const hidden = hiddenLiabilityAccountIds(archive?.cards, archive?.debts);
+  const visible = snapshot.accounts.filter(account => !hidden.has(account.id));
+  const sections = availableCurrencies(visible).map(currency => ({ currency, data: visible.filter(account => account.currency === currency) }));
   return <>
     <Stack.Screen options={{ headerRight: () => <IconButton name="add" label="Agregar cuenta" onPress={() => router.push('/new-account')} /> }} />
     <SectionList<Account, typeof sections[number]> sections={sections} keyExtractor={account => account.id}

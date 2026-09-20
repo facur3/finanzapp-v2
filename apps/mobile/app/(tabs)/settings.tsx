@@ -39,11 +39,15 @@ export default function SettingsScreen() {
   }
 
   const activeRecurring = archive?.recurring?.filter(rule => rule.active).length ?? 0;
+  const activeCards = archive?.cards?.filter(card => card.active).length ?? 0;
+  const activeDebts = archive?.debts?.filter(debt => debt.active).length ?? 0;
   const currentBudgets = archive?.budgets?.filter(budget => budget.active && budget.monthISO === currentMonthISO(todayKey())).length ?? 0;
 
   return <Screen>
     <Surface grouped>
       <DetailRow label="Cuentas" value="Saldos y movimientos" icon="wallet-outline" onPress={() => router.push('/accounts')} />
+      <DetailRow label="Tarjetas" value={activeCards ? activeCards + (activeCards === 1 ? ' activa' : ' activas') : 'Compras y pagos'} icon="card-outline" onPress={() => router.navigate('/cards')} />
+      <DetailRow label="Deudas y cobros" value={activeDebts ? activeDebts + (activeDebts === 1 ? ' pendiente' : ' pendientes') : 'Debo · me deben'} icon="people-outline" onPress={() => router.push('/debts')} />
       <DetailRow label="Presupuestos" value={currentBudgets ? currentBudgets + ' este mes' : 'Plan mensual'} icon="speedometer-outline"
         onPress={() => router.push('/budgets')} />
       <DetailRow label="Recurrentes" value={activeRecurring ? activeRecurring + ' activos' : 'Pagos e ingresos'} icon="repeat-outline"
@@ -55,7 +59,7 @@ export default function SettingsScreen() {
       <AppText secondary style={{ fontSize: 15 }}>Podés registrar movimientos sin conexión. La sincronización todavía no está activada.</AppText>
     </Surface>
     <Surface><SectionTitle>Copia de seguridad</SectionTitle>
-      <AppText secondary style={{ fontSize: 15 }}>Guardá tus cuentas, movimientos, presupuestos y recurrentes en un lugar privado antes de borrar la app o cambiar de teléfono.</AppText>
+      <AppText secondary style={{ fontSize: 15 }}>Guardá tus cuentas, tarjetas, deudas, movimientos, presupuestos y recurrentes en un lugar privado antes de borrar la app o cambiar de teléfono.</AppText>
       <AppText secondary style={{ fontSize: 13 }}>Incluye el estado actual y los movimientos deshechos. El archivo no está cifrado: guardalo en un lugar privado.</AppText>
       <ErrorMessage message={error} />
       <ActionButton label="Compartir copia" icon="share-outline" onPress={exportBackup} busy={busy} disabled={!archive} secondary />
@@ -66,6 +70,6 @@ export default function SettingsScreen() {
       <DetailRow label="Movimientos deshechos" value={String((archive?.records.filter(record => record.voided).length ?? 0) + (archive?.transfers?.filter(record => record.voided).length ?? 0))}
         icon="arrow-undo-outline" last disabled={busy} onPress={() => router.push('/undone-entries')} />
     </Surface>
-    <AppText secondary style={{ textAlign: 'center', fontSize: 13 }}>FinanzApp · Piloto nativo 0.1.0 · Interfaz 09</AppText>
+    <AppText secondary style={{ textAlign: 'center', fontSize: 13 }}>FinanzApp · Piloto nativo 0.1.0 · Interfaz 10</AppText>
   </Screen>;
 }

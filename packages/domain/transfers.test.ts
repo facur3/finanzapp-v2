@@ -67,17 +67,19 @@ describe('internal transfers and account corrections', () => {
     for (const after of [{ ...change.after, currency: 'USD' as const }, { ...change.after, id: 'other' },
       { ...change.after, openingMinor: 0 }, { ...change.after, revision: 0 }]) expect(() => validateAccountChange({ ...change, after })).toThrow();
   });
-  it('v5 backup preserves corrected accounts, transfer revisions and tombstones', () => {
+  it('current backup preserves corrected accounts, transfer revisions and tombstones', () => {
     const change = makeAccountChange('edit', a, snapshotFromArchive(archive), 'Nueva', 5000, time);
     const saved = { ...archive, accounts: [change.after, b, usd], transfers: [makeTransferChange('undo', initialTransferRecord(t), 'void', time).after] };
     const backup = createRecoveryBackup(saved);
-    expect(backup.schema).toBe('finanzapp.native-pilot.v5');
+    expect(backup.schema).toBe('finanzapp.native-pilot.v6');
     expect(parsePilotBackup(JSON.stringify(backup)).archive).toEqual(saved);
     expect(() => createPilotBackup(snapshotFromArchive(saved))).toThrow();
     const v2 = { ...createRecoveryBackup({ accounts: [a, b], records: [] }), schema: 'finanzapp.native-pilot.v2' };
     delete (v2 as any).transfers;
     delete (v2 as any).recurring;
     delete (v2 as any).budgets;
+    delete (v2 as any).cards;
+    delete (v2 as any).debts;
     expect(parsePilotBackup(JSON.stringify(v2)).archive).toEqual({ accounts: [a, b], records: [] });
   });
   it('preview includes transfers, refuses stale account metadata and prevents resurrection', () => {

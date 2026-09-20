@@ -455,3 +455,36 @@ Todavía no tenés que pagar nada para probar este diseño. La IA en nube y la c
 Apple Pay tienen código base, pero no están activadas ni hay chat/grabación en la
 app. Primero integraremos consentimiento, login y bandeja local; después configuraremos
 las cuentas del servidor y el Atajo con vos. Nunca pegues claves o contraseñas en el chat.
+
+## 13. Interfaz 10: cinco pestañas, tarjetas y nuevo diseño
+
+Guardá una copia privada desde Ajustes antes de actualizar. Luego, con Metro
+detenido:
+
+```bash
+git switch master
+git pull --ff-only
+cd apps/mobile
+npm ci
+npm start -- --clear
+```
+
+Abrí el nuevo QR en Expo Go sin reinstalar. En Ajustes debe decir **Interfaz 10**
+y tus cuentas, movimientos, presupuestos y recurrentes deben seguir iguales.
+
+1. Ahora hay cinco pestañas: Inicio, Movimientos, Reportes, Tarjetas y Ajustes.
+   Cambiá entre ellas varias veces; no debería quedar ninguna en negro.
+2. En Tarjetas, tocá **+** y cargá una tarjeta con nombre, moneda, la deuda que ya
+   tenés (opcional), el límite y los días de cierre y vencimiento del resumen.
+3. Registrá una compra desde la tarjeta con un importe chico. Aparece una sola vez
+   en Movimientos y en Reportes, y sube la deuda de la tarjeta. El Disponible de
+   Inicio no cambia.
+4. Tocá **Pagar tarjeta**, elegí la cuenta desde la que pagás y registrá el pago.
+   Baja el saldo de esa cuenta y la deuda de la tarjeta; no aparece ningún gasto
+   nuevo. Si intentás pagar más que la deuda registrada, la app lo rechaza.
+5. En Deudas y cobros registrá algo que debés o que te deben, y un pago o cobro
+   parcial. El pendiente baja y tampoco aparece como gasto o ingreso.
+6. Revisá claro/oscuro, texto grande y Reducir movimiento en Tarjetas.
+
+La app no se conecta al banco: cierres y vencimientos se calculan con los días que
+cargaste y la deuda es la que registrás vos. Las cuotas llegarán en otra etapa.

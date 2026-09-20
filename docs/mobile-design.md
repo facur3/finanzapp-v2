@@ -1,81 +1,69 @@
 # FinanzApp: dirección visual móvil
 
-Interfaz 07 · 19 de septiembre de 2026. Implementado en código; revisión visual y
-gestual en iPhone pendiente. [Alcance del producto](decisions/002-spending-first.md).
+Interfaz 10 · 20 de septiembre de 2026. Implementado en código; revisión visual y
+gestual en iPhone pendiente. [Alcance del producto](decisions/002-spending-first.md) ·
+[Navegación y tarjetas](decisions/003-five-tabs-and-cards.md).
 
 ## Referencias y criterio propio
 
-Se revisaron los tres ZIP suministrados. Buro aporta el espacio, la jerarquía de
-importes, las superficies suaves y un acento contenido. No copiamos su marca,
-activos, APY, promociones ni navegación de trading. Zenfinance aporta lectura de
-actividad y separación de acciones; Smart Expense Tracker aporta compromisos
-próximos, pero descartamos la densidad de chips, mensajes de estado y colores.
-No se incorporan imágenes personales, cifras, logos ni HTML de estas referencias.
+Apple Wallet aporta la jerarquía de una tarjeta y de una fila de transacción:
+comercio, contexto en una línea, importe alineado a la derecha, tarjetas apiladas
+con nombre, emisor y últimos dígitos. Las referencias tipo MonAI, Cocos y las
+láminas "FinanzApp — visual direction" aportan base neutra, un número principal
+grande, controles compactos y color solo con significado. No copiamos marcas,
+mapas de comercios, estados bancarios ni acciones que la app no ejecuta.
 
-La identidad elegida combina blanco cálido (#F8F7FA), tinta (#1C1B25), índigo
-(#4B3BDB), superficies blancas y lavanda muy tenue. En oscuro, fondo #101014 y
-acento #B4AAFF. Rojo/verde significan gasto/ingreso o estado, no decoración.
-Tipografía del sistema, números claros, esquinas consistentes y respiración.
+## Sistema
 
-## Inicio actual
+**Color.** Tinta sobre fondo. Claro: fondo #F2F2F6, superficie #FFFFFF, tinta
+#0A0A0C, secundario #6E7078, relleno #EEEEF3. Oscuro: fondo #000000, superficie
+#1C1C1E, elevado #242426, tinta #F5F5F7, secundario #A0A0A8. Cuatro colores
+semánticos: gasto coral (#C42F39 / #F0555C), ingreso verde (#15804F / #3DBE86),
+transferencia e interacción azul (#2563EB / #5B9BFF), alerta ámbar (#B45309 /
+#E8A030), cada uno con un tinte suave para tiles y chips. Todos los textos
+semánticos superan 4,5:1 sobre su fondo. Los botones principales son tinta; los
+enlaces, azul. Los importes de gasto van en tinta con signo menos; solo el ingreso
+se pinta de verde. Nunca color sin signo o etiqueta.
 
-1. Fechas y moneda, discretas y explícitas.
-2. **Gastado este mes/esta semana**, importe protagonista y cantidad de registros.
-3. Selector Semana/Mes; barras de gastos por día o grupos de hasta siete días.
-4. Acciones Gasto/Ingreso. Ingresos del período como dato secundario si existen.
-5. En qué gastaste: hasta tres categorías, barras proporcionales al total y detalle.
-6. Últimos movimientos del período/moneda. El acceso Ver todos abre la actividad completa.
+**Tipografía.** Fuente del sistema. Héroe 44/700 tabular con tracking negativo,
+título grande 34, título 22, encabezado 17/600, cuerpo 17, subtítulo 15, nota 13,
+etiqueta 12. Números siempre tabulares.
 
-Cuentas se abre con el icono del encabezado o desde Ajustes. No compite con el
-gasto principal, no se llama patrimonio y no requiere conectar un banco. El saldo
-inicial puede quedar vacío: base de registro cero, claramente explicada, nunca
-una afirmación de que la cuenta bancaria esté vacía. El onboarding aún necesita
-un nombre para agrupar movimientos; eliminar ese paso requiere un cambio posterior.
+**Espacio y forma.** Margen de pantalla 20, tarjeta 16, escala 4–32. Radios: chip
+14, tile 12, grupo 16, tarjeta 20, hoja 24, tarjeta de crédito 18. Elevación clara
+con sombra suave; en oscuro, escalones de superficie sin sombra.
 
-No se agrega una tarjeta de IA, presupuesto, deuda o vencimiento sin una función
-operativa detrás. Próximos pagos se sumará solo con recurrentes/deudas almacenados.
-No repetir el importe del mes en otra tarjeta. Sin listas de inversiones nativas.
+**Componentes.** Fila de movimiento (tile de glifo · comercio · categoría · cuenta ·
+fecha · importe), control segmentado nativo, botones de 52 pt, tiles de glifo
+monocromo (los emoji se retiran), estadísticas compactas, tarjeta de crédito con
+nombre, emisor, moneda, últimos cuatro dígitos y un tono estable por tarjeta.
 
-## Gráficos
+## Pantallas de esta entrega
 
-Estas barras usan vistas nativas y **Reanimated**, ya instalado. Recharts usa la
-interfaz web/SVG del navegador y no es la elección para este cliente React Native.
-No agregamos una dependencia de gráficos complejos a cinco/siete barras ni una
-WebView. Si luego hace falta una serie interactiva más compleja, evaluar una
-librería nativa compatible con la versión de Expo y medirla antes de adoptarla.
+- **Tarjetas.** Carrusel horizontal con ajuste al soltar, deuda registrada como
+  número principal, disponible del límite, cierre y vencimiento, barra de uso
+  (ámbar desde 85 %, coral sobre el límite), acciones Registrar compra / Pagar
+  tarjeta, compras y pagos del resumen abierto, recientes y deudas.
+- **Detalle de tarjeta.** Tarjeta grande, deuda, límite, disponible, cierre,
+  vencimiento, resumen abierto y todos sus movimientos. Pagos se leen como
+  "Pago de tarjeta · desde Cuenta", sin signo ambiguo.
+- **Deudas y cobros.** Totales por moneda, Debo / Me deben, detalle con estado,
+  vencimiento y registro de pagos o cobros limitados al saldo pendiente.
+- **Formularios.** Pagar tarjeta y saldar deudas fijan la obligación y solo eligen
+  la cuenta de dinero en la misma moneda. El selector de cuenta nombra el tipo
+  (Cuenta, Tarjeta de crédito) y nunca ofrece una deuda para un gasto.
 
-- Barras de categoría: porcentaje de todo el gasto del período, no solo las tres visibles.
-- Serie temporal: escala cero → máximo mostrado, etiquetas de fechas y valores
-  exactos al abrir. Bloques sin registros no acreditan gasto real cero.
-- No curvas suavizadas que inventen valores entre transacciones, rendimiento,
-  porcentajes de crecimiento sin datos ni gráficos de ejemplo.
-- La semana comienza lunes y puede cruzar un mes/año; se conserva ese rango al abrir
-  categorías. El reporte mensual se etiqueta como tal, incluso desde la semana.
-- Tocar una barra abre sus movimientos; monto/moneda/fecha también disponibles a VoiceOver.
-- Animación breve de datos, sin empezar desde cero, sin reiniciarse al volver.
-  Reduce Motion aplica el valor directamente. Scroll no modifica valores financieros.
+## Motion y accesibilidad
 
-## Navegación, accesibilidad y pantallas
+Presión breve, selección y cambios de datos animados en 160–360 ms; Reduce Motion
+aplica los valores sin transición. La pila y las hojas nativas siguen siendo la
+única transición de pantalla; las cinco pestañas permanecen montadas sin
+fade/detach/freeze. Objetivos de 44 pt, texto escalable con filas apiladas en
+tamaños grandes, etiquetas de VoiceOver con importe, moneda y estado.
 
-La pila y las hojas nativas son la única transición de pantalla. Las tres pestañas
-siguen montadas sin fade/detach/freeze; no se afirma que el bloqueo negro esté
-resuelto en iPhone sin repetir la prueba. Los nuevos componentes usan presión
-breve y selección existentes, sin una capa animada sobre el gesto de volver.
+## Pendiente de revisión en iPhone
 
-Se conservan importe/fecha en hojas nativas, recuperación de errores y acciones
-Editar/Deshacer/Recuperar. Objetivos de 44 puntos, texto escalable, tema claro/oscuro,
-contraste, fondo opaco y listas virtualizadas. La serie horizontal conserva objetivos
-táctiles en pantallas estrechas. Revisar el contenido completo con texto grande.
-
-## Revisión pendiente
-
-- Inicio → semana → categoría → movimiento → volver conserva fechas/moneda.
-- Selector, teclado, fecha, modal y gesto cancelado sin destello ni pestaña vacía.
-- Claro/oscuro, texto grande, montos largos y VoiceOver en iPhone 14 Pro.
-- Barras: etiqueta/importe y escala comprensibles, sin depender solo del color.
-- 30–40 cambios entre pestañas, fondo/primer plano y regreso desde formularios.
-- Versión optimizada independiente de Metro antes de afirmar fluidez de producción.
-
-La vista de componentes web de esta entrega no pudo abrirse en el navegador del
-entorno (dirección local bloqueada). Typecheck, export y tests no prueban layout ni
-frame rate nativo. No hay aceptación visual nueva. Ver [guía de prueba](empezar-en-iphone.md).
+- Carrusel: ajuste, indicador de página y cambio de panel al soltar.
+- Contraste de tarjetas de crédito y del tinte azul en claro/oscuro.
+- Filas con nombres largos, texto grande y VoiceOver en Tarjetas y Deudas.
+- Inicio y Reportes con la nueva paleta antes de su rediseño (fases siguientes).

@@ -1,5 +1,24 @@
 # Physical iPhone acceptance checklist
 
+## Interfaz 10 — five tabs, cards/debts and the neutral visual system (pending device review)
+
+Save a private backup first and use small test amounts. Do not uninstall the only copy.
+
+- [ ] Ajustes footer reads Interfaz 10; accounts, movements, recurrentes and budgets are unchanged after the schema 5 → 6 upgrade.
+- [ ] Five tabs (Inicio, Movimientos, Reportes, Tarjetas, Ajustes) switch 30–40 times without a black frame; Reportes opens from Inicio → Reporte mensual on the tab.
+- [ ] Inicio → Próximos compromisos → Programar opens the recurring form even with no rules; Ajustes → Recurrentes still works.
+- [ ] The purple accent is gone: ink tab bar and buttons, blue links, coral/green only on semantic amounts and tiles, amber only for warnings.
+- [ ] Tarjetas → + creates a card with name, currency, optional current debt, limit and closing/due days; it appears as a card face in the carousel.
+- [ ] With two cards, the carousel snaps one card at a time and the panel below changes to the selected card.
+- [ ] Registrar compra posts one expense on the card: Movimientos, Reportes and Presupuestos count it once; the card debt rises by the same amount; Disponible does not change.
+- [ ] Pagar tarjeta only offers cash accounts in the card's currency, caps at the recorded debt, lowers the cash balance and the card debt, and adds no expense or income.
+- [ ] Card detail lists purchases and payments with "Pago de tarjeta · desde …" and links each purchase to its normal detail.
+- [ ] A card purchase detail's Tarjeta row opens the card, not a generic account screen; Cuentas never lists card or debt accounts.
+- [ ] Deudas → + creates "Debo" and "Me deben"; Registrar pago/cobro is capped at the pending amount and never appears as a gasto/ingreso.
+- [ ] The expense form's Cuenta o tarjeta selector names cards as Tarjeta de crédito and never offers a debt.
+- [ ] Exported v6 backup lists cards and debts on review; reimport adds nothing twice; an Interfaz 09 (v5) file still imports.
+- [ ] Light/dark, large text (rows stack), VoiceOver labels for cards, amounts and status, and Reduce Motion (no carousel/bar animation) remain readable.
+
 ## Interfaz 09 — Home, budgets and Assistant preview (pending device review)
 
 Use the existing pilot data and save a private backup first. Do not create fake

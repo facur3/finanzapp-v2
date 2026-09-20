@@ -8,11 +8,12 @@ import { formatMinorUnits, parseMinorUnits, sameRecurringRule, todayKey, validat
 import { useLedger } from '../storage/LedgerProvider';
 import { ActionButton, AmountField, AppText, Choices, EmptyState, ErrorMessage, Field, IconButton, Screen, Surface } from './components';
 import { AccountField, CategoryField, DateField } from './form-controls';
+import { accountKindLabel, postingAccounts } from './liability-presentation';
 import { initialAccountId } from './presentation';
 
 export function RecurringForm({ original, accountId: requestedAccount }: { original?: RecurringRule; accountId?: string }) {
-  const { snapshot, saveRecurring } = useLedger();
-  const accounts = snapshot?.accounts ?? [];
+  const { snapshot, archive, saveRecurring } = useLedger();
+  const accounts = postingAccounts(snapshot?.accounts ?? [], archive?.debts);
   const [before] = useState(original);
   const [operation] = useState(() => ({ id: randomUUID(), createdAt: new Date().toISOString() }));
   const [kind, setKind] = useState<EntryKind>(before?.kind ?? 'expense');
@@ -107,7 +108,8 @@ export function RecurringForm({ original, accountId: requestedAccount }: { origi
         onChangeText={setMerchant} maxLength={120} autoCapitalize="sentences" editable={!locked} />
       <Surface grouped>
         <CategoryField entries={snapshot?.entries ?? []} kind={kind} value={category} onChange={setCategory} disabled={locked} />
-        <AccountField accounts={eligibleAccounts} value={accountId} onChange={setAccountId} disabled={locked} />
+        <AccountField label="Cuenta o tarjeta" accounts={eligibleAccounts} value={accountId} onChange={setAccountId} disabled={locked}
+          kindOf={id => { const found = accounts.find(item => item.id === id); return found ? accountKindLabel(found, archive?.cards, archive?.debts) : 'Cuenta'; }} />
         <DateField value={date} onChange={setDate} disabled={locked} allowFuture label="Próxima fecha" />
       </Surface>
       <ViewFrequency value={frequency} onChange={setFrequency} disabled={locked} />

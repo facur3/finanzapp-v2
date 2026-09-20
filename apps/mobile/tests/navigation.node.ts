@@ -21,7 +21,7 @@ function renderLayout(background: string) {
     '@expo/vector-icons/Ionicons': () => null,
     '../../src/ui/components': { IconButton: () => null },
     '../../src/ui/navigation': { tabHostOptions, tabScreenOptions },
-    '../../src/ui/theme': { usePalette: () => ({ background, text: '#FFFFFF', accent: '#7AB3FF', secondary: '#A6B0C0', surface: '#151A22', line: '#2B3544' }) },
+    '../../src/ui/theme': { usePalette: () => ({ background, text: '#FFFFFF', tertiary: '#7C7C84', secondary: '#A6B0C0', surface: '#151A22', line: '#2B3544' }) },
   };
   runInNewContext(code, { module, exports: module.exports, require: (name: string) => {
     if (!Object.hasOwn(modules, name)) throw new Error('Unexpected layout dependency: ' + name);
@@ -35,7 +35,7 @@ for (const [theme, background] of [['light', '#F5F6F8'], ['dark', '#080B10']]) {
     const { props } = renderLayout(background);
     assert.equal(props.detachInactiveScreens, false);
     const screens = props.children;
-    assert.equal(screens.map((screen: any) => screen.props.name).join(','), 'index,activity,settings');
+    assert.equal(screens.map((screen: any) => screen.props.name).join(','), 'index,activity,reports,cards,settings');
     for (const screen of screens) {
       const options = { ...props.screenOptions, ...screen.props.options };
       assert.equal(options.animation, 'none');
