@@ -70,6 +70,6 @@ export default function SettingsScreen() {
       <DetailRow label="Movimientos deshechos" value={String((archive?.records.filter(record => record.voided).length ?? 0) + (archive?.transfers?.filter(record => record.voided).length ?? 0))}
         icon="arrow-undo-outline" last disabled={busy} onPress={() => router.push('/undone-entries')} />
     </Surface>
-    <AppText secondary style={{ textAlign: 'center', fontSize: 13 }}>FinanzApp · Piloto nativo 0.1.0 · Interfaz 11</AppText>
+    <AppText secondary style={{ textAlign: 'center', fontSize: 13 }}>FinanzApp · Piloto nativo 0.1.0 · Interfaz 12</AppText>
   </Screen>;
 }

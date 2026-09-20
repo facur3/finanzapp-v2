@@ -1,5 +1,18 @@
 # Physical iPhone acceptance checklist
 
+## Interfaz 12 — entry, transfer and recurring form hierarchy (pending device review)
+
+- [ ] Ajustes footer reads Interfaz 12; no data changes after updating.
+- [ ] Registrar gasto shows Gasto / Ingreso / Transferencia, the large amount, then Categoría and Pagado con as full-width cards before the merchant field.
+- [ ] Choosing a card in Pagado con shows "Tarjeta de crédito · deuda …"; choosing a cash account shows "Saldo registrado …"; the sheet names each option's kind and balance.
+- [ ] With a budget for the chosen category this month, the Categoría card shows "… de … este mes" and turns amber near the limit or coral when exceeded; without a budget it shows nothing.
+- [ ] Ingreso tints the amount green and relabels the account card to Ingresa en.
+- [ ] The Save button echoes the typed amount; invalid text shows an error and keeps the draft.
+- [ ] Tapping Transferencia opens the transfer form with the same account preselected; its Gasto / Ingreso options return to the entry form.
+- [ ] Pagar tarjeta and Registrar pago/cobro keep the obligation as a fixed card with its debt or pending amount; only same-currency cash accounts are offered.
+- [ ] Nuevo recurrente uses the same Categoría and Pagado con cards, then frequency and next date.
+- [ ] Keyboard open, large text, VoiceOver ("Categoría: Elegir categoría") and Reduce Motion remain usable.
+
 ## Interfaz 11 — compact Home, Movimientos and transaction detail (pending device review)
 
 - [ ] Ajustes footer reads Interfaz 11; existing data is unchanged (no schema change in this delivery).

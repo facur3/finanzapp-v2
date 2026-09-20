@@ -55,7 +55,7 @@ function harness(file: string, props: any = {}, options: { data?: domain.LedgerA
     '@expo/vector-icons/Ionicons': 'Ionicons',
     '../storage/LedgerProvider': ledger, '../src/storage/LedgerProvider': ledger, '../../src/storage/LedgerProvider': ledger,
     './components': components, '../src/ui/components': components, '../../src/ui/components': components,
-    './form-controls': { AccountField: 'AccountField', CategoryField: 'CategoryField', DateField: 'DateField' },
+    './form-controls': { AccountField: 'AccountField', CategoryField: 'CategoryField', DateField: 'DateField', SelectorCard: 'SelectorCard' },
     './presentation': presentation,
     './liability-presentation': liabilityPresentation,
     '../../src/ui/theme': { space: { xs: 4, s: 8, m: 12, l: 16, xl: 20, xxl: 24, xxxl: 32 },
@@ -380,7 +380,8 @@ test('card payment locks the card as destination, caps at the recorded debt and 
   const view = harness('src/ui/transfer-form.tsx', { toAccountId: 'card-acc', title: 'Pagar tarjeta', defaultNote: 'Pago Visa', maxAmountMinor: '5000' }, { data: liabilityData });
   let root = view.render();
   assert.equal(nodes(root).some(node => node.type === 'AccountField' && node.props.label === 'Hacia'), false);
-  assert.equal(find(root, 'DetailRow', 'Tarjeta').props.value, 'Visa');
+  assert.equal(find(root, 'SelectorCard', 'Tarjeta').props.value, 'Visa');
+  assert.equal(find(root, 'SelectorCard', 'Tarjeta').props.detail, 'ARS Deuda 50,00');
   assert.equal(find(root, 'AccountField', 'Desde').props.value, 'a');
   assert.deepEqual(find(root, 'AccountField', 'Desde').props.accounts.map((item: domain.Account) => item.id), ['a']);
   assert.equal(find(root, 'Field').props.value, 'Pago Visa');
@@ -410,11 +411,32 @@ test('a plain transfer between accounts never lists cards or debts, while editin
 test('expense form offers cash accounts and cards but never a personal debt account', () => {
   const view = harness('src/ui/entry-form.tsx', { accountId: 'debt-acc' }, { data: liabilityData });
   const field = find(view.render(), 'AccountField');
-  assert.equal(field.props.label, 'Cuenta o tarjeta');
+  assert.equal(field.props.label, 'Pagado con');
+  assert.equal(field.props.prominent, true);
   assert.deepEqual(field.props.accounts.map((item: domain.Account) => item.id), ['a', 'u', 'card-acc']);
   assert.equal(field.props.value, 'a');
   assert.equal(field.props.kindOf('card-acc'), 'Tarjeta de crédito');
   assert.equal(field.props.kindOf('a'), 'Cuenta');
+  assert.equal(field.props.detail, 'Saldo registrado $ 876,55');
+  assert.equal(field.props.describe({ ...cardAccount }), 'deuda 50,00');
+  find(view.render(), 'AccountField').props.onChange('card-acc');
+  assert.equal(find(view.render(), 'AccountField').props.detail, 'Tarjeta de crédito · deuda $ 50,00');
+  assert.equal(find(view.render(), 'Stack.Screen').props.options.title, 'Compra con tarjeta');
+});
+
+test('the entry form shows the category budget live, echoes the amount on Save and hands off to the transfer form', () => {
+  const budget: domain.MonthlyBudget = { id: 'b', category: 'Salud', currency: 'ARS', monthISO: domain.todayKey().slice(0, 7), amountMinor: 50000, active: true, createdAt, revision: 0, updatedAt: createdAt };
+  const view = harness('src/ui/entry-form.tsx', { kind: 'expense' }, { data: { ...liabilityData, budgets: [budget] } });
+  assert.equal(find(view.render(), 'CategoryField').props.detail, undefined);
+  find(view.render(), 'CategoryField').props.onChange('salud');
+  assert.equal(find(view.render(), 'CategoryField').props.detail, '$ 0,00 de $ 500,00 este mes');
+  find(view.render(), 'AmountField').props.onChangeText('1234,5');
+  assert.equal(find(view.render(), 'ActionButton').props.label, 'Guardar gasto · $ 1.234,50');
+  const choices = find(view.render(), 'Choices');
+  assert.equal(choices.props.options.map((option: { value: string }) => option.value).join(','), 'expense,income,transfer');
+  choices.props.onChange('transfer');
+  assert.equal(JSON.stringify(view.pushed[0]), JSON.stringify({ pathname: '/new-transfer', params: { accountId: 'a' } }));
+  assert.equal(view.additions.length, 0);
 });
 
 test('a card purchase detail links to the card, not to a generic account screen', () => {

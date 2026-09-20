@@ -1,6 +1,6 @@
 # FinanzApp: dirección visual móvil
 
-Interfaz 11 · 20 de septiembre de 2026. Implementado en código; revisión visual y
+Interfaz 12 · 20 de septiembre de 2026. Implementado en código; revisión visual y
 gestual en iPhone pendiente. [Alcance del producto](decisions/002-spending-first.md) ·
 [Navegación y tarjetas](decisions/003-five-tabs-and-cards.md).
 
@@ -40,6 +40,13 @@ nombre, emisor, moneda, últimos cuatro dígitos y un tono estable por tarjeta.
 
 ## Pantallas de esta entrega
 
+- **Formularios.** Selector Gasto / Ingreso / Transferencia, importe grande (verde
+  para ingresos, azul para transferencias) y dos tarjetas de selección a ancho
+  completo que no se pueden pasar por alto: Categoría (con la línea de presupuesto
+  del mes si existe) y Pagado con / Ingresa en (con saldo registrado o deuda de
+  tarjeta, y el tipo de cada opción en la hoja). Comercio y fecha después. El botón
+  Guardar repite el importe. Sin controles decorativos de dividir, comprobante o
+  etiquetas mientras no existan sus datos.
 - **Inicio.** Una fila con Gastos / Disponible y la moneda; etiqueta de período,
   número principal y cantidad de registros; Esta semana / Este mes; Gasto / Ingreso;
   una línea de presupuesto solo si hay presupuestos; las tres categorías principales

@@ -1,14 +1,15 @@
 import { useRef, useState } from 'react';
-import { Keyboard } from 'react-native';
+import { Keyboard, View } from 'react-native';
 import { router, Stack } from 'expo-router';
 import { randomUUID } from 'expo-crypto';
 import * as Haptics from 'expo-haptics';
 import { accountBalanceMinor, accountKind, formatMinorUnits, hiddenLiabilityAccountIds, makeTransferChange, parseMinorUnits, sameTransfer, todayKey,
   totalsByCurrency, validateTransfer, validateTransferChange, type Transfer, type TransferChange, type TransferRecord } from '@finanzapp/domain';
 import { useLedger } from '../storage/LedgerProvider';
-import { ActionButton, AmountField, AppText, DetailRow, EmptyState, ErrorMessage, Field, IconButton, Screen, Surface } from './components';
-import { AccountField, DateField } from './form-controls';
+import { ActionButton, AmountField, AppText, Choices, DetailRow, EmptyState, ErrorMessage, Field, IconButton, Screen, Surface } from './components';
+import { AccountField, DateField, SelectorCard } from './form-controls';
 import { initialAccountId } from './presentation';
+import { space } from './theme';
 
 /** One form for three movements that are never spending or income: a transfer
  * between cash accounts, a card payment (cash → card) and a debt payment or
@@ -111,30 +112,42 @@ export function TransferForm({ original, accountId, fromAccountId: requestedFrom
   const noCashCounterpart = !!obligation && !cash.some(a => a.currency === obligation.currency);
   const submitLabel = pending && error ? 'Reintentar guardado' : before ? 'Guardar cambios'
     : obligationKind === 'card' ? 'Registrar pago' : obligationKind === 'debt' ? (lockedTo ? 'Registrar pago' : 'Registrar cobro') : 'Registrar transferencia';
+  const balanceDetail = (id: string | undefined) => {
+    const item = accounts.find(a => a.id === id);
+    if (!item || !snapshot) return undefined;
+    return `${item.currency} ${balanceLabel(item.id, accountBalanceMinor(item, snapshot.entries, snapshot.transfers))}`;
+  };
+  const plain = !before && !obligation;
 
-  return <Screen>
+  return <Screen gap={space.l}>
     <Stack.Screen options={{ title: before ? 'Editar transferencia' : title, gestureEnabled: !busy,
       headerLeft: () => <IconButton name="close" label="Cerrar" onPress={close} disabled={busy} /> }} />
     {!sources.length || noCashCounterpart ? <EmptyState title="Primero, una cuenta" detail={obligation
       ? `Necesitás una cuenta en ${obligation.currency} desde donde ${lockedTo ? 'sale' : 'entra'} el dinero.`
       : 'Agregá las cuentas entre las que movés tu dinero.'}
       action={<ActionButton label="Agregar cuenta" onPress={() => router.replace({ pathname: '/new-account', params: obligation ? { currency: obligation.currency } : {} })} />} /> : <>
-      <AmountField label={obligationKind === 'card' ? 'Pago' : obligationKind === 'debt' ? (lockedTo ? 'Pago' : 'Cobro') : 'Monto'}
+      {plain && <Choices<'expense' | 'income' | 'transfer'> value="transfer" disabled={locked}
+        onChange={next => { if (next !== 'transfer') router.replace({ pathname: '/new-entry', params: { kind: next, ...(from ? { accountId: from.id } : {}) } }); }}
+        options={[{ value: 'expense', label: 'Gasto' }, { value: 'income', label: 'Ingreso' }, { value: 'transfer', label: 'Transferencia' }]} />}
+      <AmountField label={obligationKind === 'card' ? 'Pago' : obligationKind === 'debt' ? (lockedTo ? 'Pago' : 'Cobro') : 'Transferencia'}
         currency={(obligation ?? from)?.currency ?? 'ARS'} value={amount} onChangeText={value => { setAmount(value); setError(null); }} editable={!locked} tone="transfer" />
       {contextualMax !== null && obligation && <AppText secondary variant="footnote" style={{ textAlign: 'center', marginTop: -8 }}>
         {obligationKind === 'card' ? 'Deuda registrada' : 'Pendiente'}: {obligation.currency} {formatMinorUnits(contextualMax)}
       </AppText>}
-      <Surface grouped>
-        {lockedFrom ? <DetailRow label={kindLabel(lockedFrom.id)} value={lockedFrom.name} icon={obligationKind === 'card' ? 'card-outline' : 'people-outline'} />
-          : <AccountField label="Desde" accounts={cashSources} value={fromId} disabled={locked} kindOf={kindLabel} onChange={id => {
+      <View style={{ gap: space.m }}>
+        {lockedFrom ? <SelectorCard label={kindLabel(lockedFrom.id)} value={lockedFrom.name} placeholder="" detail={balanceDetail(lockedFrom.id)}
+          icon={obligationKind === 'card' ? 'card-outline' : 'people-outline'} tone="transfer" disabled onPress={() => {}} />
+          : <AccountField label="Desde" accounts={cashSources} value={fromId} disabled={locked} kindOf={kindLabel} prominent detail={balanceDetail(fromId)} onChange={id => {
             setFromId(id);
             const source = accounts.find(a => a.id === id);
             if (!lockedTo && (toId === id || to?.currency !== source?.currency)) setToId('');
           }} />}
-        {lockedTo ? <DetailRow label={kindLabel(lockedTo.id)} value={lockedTo.name} icon={obligationKind === 'card' ? 'card-outline' : 'people-outline'} />
-          : <AccountField label="Hacia" accounts={lockedFrom ? targets.filter(a => a.id !== lockedFrom.id) : targets} value={toId} onChange={setToId} kindOf={kindLabel} disabled={locked || !targets.length} />}
-        <DateField value={date} onChange={setDate} disabled={locked} />
-      </Surface>
+        {lockedTo ? <SelectorCard label={kindLabel(lockedTo.id)} value={lockedTo.name} placeholder="" detail={balanceDetail(lockedTo.id)}
+          icon={obligationKind === 'card' ? 'card-outline' : 'people-outline'} tone="transfer" disabled onPress={() => {}} />
+          : <AccountField label="Hacia" accounts={lockedFrom ? targets.filter(a => a.id !== lockedFrom.id) : targets} value={toId} onChange={setToId} kindOf={kindLabel}
+            prominent detail={balanceDetail(toId)} disabled={locked || !targets.length} />}
+      </View>
+      <Surface grouped><DateField value={date} onChange={setDate} disabled={locked} /></Surface>
       {!obligation && !targets.length && <EmptyState title="Falta otra cuenta en esta moneda" detail="Las transferencias de esta etapa son entre cuentas en pesos o entre cuentas en dólares, sin conversión."
         action={<ActionButton label="Agregar cuenta" secondary disabled={locked} onPress={() => router.push({ pathname: '/new-account', params: { currency: from?.currency ?? 'ARS' } })} />} />}
       <Field label="Nota (opcional)" value={note} onChangeText={setNote} maxLength={120} editable={!locked} />
