@@ -2,7 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { View } from 'react-native';
 import { router } from 'expo-router';
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
-import { currentMonthISO, formatMinorUnits, labelFromISO, spendingOverview, spendingWindow, summarizeMonthlyBudgets, totalsByCurrency,
+import { currentMonthISO, formatMinorUnits, hiddenLiabilityAccountIds, labelFromISO, liquidTotalsByCurrency,
+  spendingOverview, spendingWindow, summarizeMonthlyBudgets,
   type Account, type Currency, type RecurringRule, type SpendingWindow } from '@finanzapp/domain';
 import { useLedger } from '../../src/storage/LedgerProvider';
 import { ActionButton, AppText, CategoryBadge, Choices, EmptyState, EntryActions, EntryRow, Money, PressFeedback, Screen, SectionTitle, Surface } from '../../src/ui/components';
@@ -26,9 +27,9 @@ export default function HomeScreen() {
   const summary = useMemo(() => snapshot ? spendingOverview(snapshot, period) : null, [snapshot, period]);
   const available = useMemo(() => {
     if (!snapshot) return { status: 'ready' as const, minor: 0 };
-    try { return { status: 'ready' as const, minor: totalsByCurrency(snapshot)[currency] ?? 0 }; }
+    try { return { status: 'ready' as const, minor: liquidTotalsByCurrency(snapshot, archive?.cards ?? [], archive?.debts ?? [])[currency] ?? 0 }; }
     catch { return { status: 'out-of-range' as const }; }
-  }, [snapshot, currency]);
+  }, [snapshot, archive?.cards, archive?.debts, currency]);
   const monthBudget = useMemo(() => {
     if (!snapshot) return null;
     try { return summarizeMonthlyBudgets(snapshot, archive?.budgets ?? [], currency, currentMonthISO(day)); }
@@ -44,7 +45,8 @@ export default function HomeScreen() {
     .slice(0, 3), [archive?.recurring, snapshot?.accounts, currency, day]);
 
   if (!snapshot || !summary) return null;
-  const accountCount = snapshot.accounts.filter(account => account.currency === currency).length;
+  const hiddenAccounts = hiddenLiabilityAccountIds(archive?.cards ?? [], archive?.debts ?? []);
+  const accountCount = snapshot.accounts.filter(account => account.currency === currency && !hiddenAccounts.has(account.id)).length;
   const openReport = () => router.push({ pathname: '/reports', params: { currency } });
 
   return <Screen>
