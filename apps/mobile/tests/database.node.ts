@@ -5,9 +5,9 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { accountBalanceMinor, archiveKey, createRecoveryBackup, initialRecord, makeEntryChange, parsePilotBackup, snapshotFromArchive, totalsByCurrency, type Account, type Entry,
-  makeAccountChange, initialTransferRecord, makeTransferChange, type Transfer, type RecurringRule } from '@finanzapp/domain';
+  makeAccountChange, initialTransferRecord, makeTransferChange, type Transfer, type RecurringRule, type MonthlyBudget } from '@finanzapp/domain';
 import { changeEntry, createAccount, createEntry, importArchive, initializeDatabase, readArchive, readSnapshot, changeAccount,
-  createTransfer, changeTransfer, saveRecurringRule, processRecurring, type LedgerDatabase } from '../src/storage/database.ts';
+  createTransfer, changeTransfer, saveRecurringRule, processRecurring, saveMonthlyBudget, type LedgerDatabase } from '../src/storage/database.ts';
 import { runExclusiveTransaction, type TransactionConnection } from '../src/storage/transaction.ts';
 
 // Synthetic records in disposable databases only. Nothing seeds a user's app.
@@ -57,7 +57,7 @@ test('new install is empty; initialization can repeat without deleting data', as
   const { db } = setup();
   await initializeDatabase(db);
   assert.deepEqual(await readSnapshot(db), { accounts: [], entries: [] });
-  assert.equal((await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))?.user_version, 4);
+  assert.equal((await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))?.user_version, 5);
   await createAccount(db, account);
   await initializeDatabase(db);
   assert.deepEqual((await readSnapshot(db)).accounts, [account]);
@@ -143,9 +143,9 @@ test('newer database schema is refused intact instead of reset or downgraded', a
   const { db } = setup();
   await initializeDatabase(db);
   await createAccount(db, account);
-  await db.execAsync('PRAGMA user_version = 5');
+  await db.execAsync('PRAGMA user_version = 6');
   await assert.rejects(initializeDatabase(db), /versión más nueva/);
-  assert.equal((await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))?.user_version, 5);
+  assert.equal((await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))?.user_version, 6);
   assert.deepEqual((await readSnapshot(db)).accounts, [account]);
 });
 
@@ -494,15 +494,16 @@ const recurring: RecurringRule = {
   updatedAt: '2026-01-01T12:00:00.000Z',
 };
 
-test('v3 database upgrades to recurring schema without changing existing balances', async () => {
+test('v3 database upgrades through recurring and budget schemas without changing existing balances', async () => {
   const { db } = await transferReady();
   await createTransfer(db, transfer);
   const before = await readSnapshot(db);
   await db.execAsync('PRAGMA user_version = 3; DROP TABLE IF EXISTS recurring_rules;');
   await initializeDatabase(db);
-  assert.equal((await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))?.user_version, 4);
+  assert.equal((await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))?.user_version, 5);
   assert.deepEqual(await readSnapshot(db), before);
   assert.deepEqual((await readArchive(db)).recurring ?? [], []);
+  assert.deepEqual((await readArchive(db)).budgets ?? [], []);
 });
 
 test('recurring catch-up posts each due date once and retry/restart never double debits', async () => {
@@ -556,7 +557,7 @@ test('pausing preserves history and reactivation can safely skip paused dates be
   assert.equal((await readSnapshot(db)).entries.length, 1);
 });
 
-test('v4 backup roundtrip and additive import preserve recurring rules without duplicate generated entries', async () => {
+test('current backup roundtrip and additive import preserve recurring rules without duplicate generated entries', async () => {
   const { db } = setup();
   await initializeDatabase(db);
   await createAccount(db, account);
@@ -574,4 +575,93 @@ test('v4 backup roundtrip and additive import preserve recurring rules without d
   assert.equal(archiveKey(await readArchive(other)), archiveKey(incoming));
   assert.equal(await processRecurring(other, '2026-01-31'), 0);
   assert.equal((await readSnapshot(other)).entries.length, 1);
+});
+
+
+const monthlyBudget: MonthlyBudget = {
+  id: 'budget-fixture',
+  category: 'Fixture',
+  currency: 'ARS',
+  monthISO: '2026-09',
+  amountMinor: 20000,
+  active: true,
+  createdAt: '2026-09-01T12:00:00.000Z',
+  revision: 0,
+  updatedAt: '2026-09-01T12:00:00.000Z',
+};
+
+test('schema 4 upgrades to budget schema 5 without changing recurring rules or balances', async () => {
+  const { db } = setup();
+  await initializeDatabase(db);
+  await createAccount(db, account);
+  await saveRecurringRule(db, recurring);
+  const before = await readArchive(db);
+  await db.execAsync('DROP TABLE monthly_budgets; PRAGMA user_version = 4;');
+  await initializeDatabase(db);
+  const after = await readArchive(db);
+  assert.equal((await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))?.user_version, 5);
+  assert.deepEqual(after.accounts, before.accounts);
+  assert.deepEqual(after.records, before.records);
+  assert.deepEqual(after.recurring, before.recurring);
+  assert.deepEqual(after.budgets ?? [], []);
+});
+
+test('monthly budget create/edit/archive is retry-safe and never changes account balances', async () => {
+  const { db, path } = await funded();
+  const beforeBalance = accountBalanceMinor(account, (await readSnapshot(db)).entries);
+  await saveMonthlyBudget(db, monthlyBudget);
+  await saveMonthlyBudget(db, monthlyBudget);
+  let archive = await readArchive(db);
+  assert.deepEqual(archive.budgets, [monthlyBudget]);
+  assert.equal(accountBalanceMinor(account, (await readSnapshot(db)).entries), beforeBalance);
+
+  const edited: MonthlyBudget = { ...monthlyBudget, amountMinor: 25000, revision: 1, updatedAt: changedAt };
+  await saveMonthlyBudget(db, edited);
+  await saveMonthlyBudget(db, edited);
+  archive = await readArchive(db);
+  assert.deepEqual(archive.budgets, [edited]);
+
+  await db.closeAsync();
+  const reopened = databaseAt(path);
+  await initializeDatabase(reopened);
+  assert.deepEqual((await readArchive(reopened)).budgets, [edited]);
+
+  const archived: MonthlyBudget = { ...edited, active: false, revision: 2, updatedAt: '2026-09-14T12:00:00.000Z' };
+  await saveMonthlyBudget(reopened, archived);
+  await saveMonthlyBudget(reopened, archived);
+  assert.deepEqual((await readArchive(reopened)).budgets, [archived]);
+  assert.equal(accountBalanceMinor(account, (await readSnapshot(reopened)).entries), beforeBalance);
+});
+
+test('duplicate active budget identity, stale revision and cross-currency edit are rejected intact', async () => {
+  const { db } = setup();
+  await initializeDatabase(db);
+  await createAccount(db, account);
+  await saveMonthlyBudget(db, monthlyBudget);
+  const before = await readArchive(db);
+  await assert.rejects(saveMonthlyBudget(db, { ...monthlyBudget, id: 'duplicate-budget', category: ' fÍxture ' }), /Ya existe/);
+  await assert.rejects(saveMonthlyBudget(db, { ...monthlyBudget, amountMinor: 30000, revision: 0 }), /cambió/);
+  await assert.rejects(saveMonthlyBudget(db, { ...monthlyBudget, currency: 'USD', revision: 1, updatedAt: changedAt }), /cambiar la moneda/);
+  assert.equal(archiveKey(await readArchive(db)), archiveKey(before));
+});
+
+test('v5 backup/import preserves active and archived budgets without duplicating them', async () => {
+  const { db } = setup();
+  await initializeDatabase(db);
+  await createAccount(db, account);
+  await saveMonthlyBudget(db, monthlyBudget);
+  const archived: MonthlyBudget = { ...monthlyBudget, active: false, revision: 1, updatedAt: changedAt };
+  await saveMonthlyBudget(db, archived);
+  const original = await readArchive(db);
+  const backup = createRecoveryBackup(original);
+  assert.equal(backup.schema, 'finanzapp.native-pilot.v5');
+  const incoming = parsePilotBackup(JSON.stringify(backup)).archive;
+  assert.deepEqual(incoming.budgets, [archived]);
+
+  const other = setup().db;
+  await initializeDatabase(other);
+  const baseline = archiveKey(await readArchive(other));
+  await importArchive(other, incoming, baseline);
+  await importArchive(other, incoming, baseline);
+  assert.equal(archiveKey(await readArchive(other)), archiveKey(incoming));
 });
