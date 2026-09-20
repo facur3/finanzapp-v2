@@ -523,3 +523,14 @@ Actualizá como antes. En Ajustes debe decir **Interfaz 13**.
    categoría de la leyenda para ver sus movimientos.
 3. Más abajo: presupuestos con porcentaje, dónde más gastaste y hechos de tus
    registros. Flujo neto es ingresos menos gastos registrados, no ahorro.
+
+## 17. Interfaz 14: presupuestos, recurrentes y cuentas
+
+Actualizá como antes. En Ajustes debe decir **Interfaz 14**.
+
+1. Ajustes → Presupuestos: arriba cuánto te queda del mes; abajo cada categoría con
+   su porcentaje y una barra fina. Una excedida se ve en coral; cerca del límite, en ámbar.
+2. Ajustes → Recurrentes: pagos, vencimientos e ingresos de los próximos 30 días por
+   moneda, y cada regla con "Hoy", "Mañana" o "En N días". Pausá una con el switch.
+3. Cuentas (icono en Inicio): cada moneda con su total registrado. Abrí una cuenta:
+   saldo, gastos e ingresos del mes y los botones Gasto, Ingreso y Transferir.

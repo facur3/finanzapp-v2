@@ -1,6 +1,6 @@
 # FinanzApp: dirección visual móvil
 
-Interfaz 13 · 20 de septiembre de 2026. Implementado en código; revisión visual y
+Interfaz 14 · 20 de septiembre de 2026. Implementado en código; revisión visual y
 gestual en iPhone pendiente. [Alcance del producto](decisions/002-spending-first.md) ·
 [Navegación y tarjetas](decisions/003-five-tabs-and-cards.md).
 
@@ -40,6 +40,15 @@ nombre, emisor, moneda, últimos cuatro dígitos y un tono estable por tarjeta.
 
 ## Pantallas de esta entrega
 
+- **Presupuestos.** Un número principal (lo que queda o cuánto se excedió), barra
+  total, gastado y límite, una línea de estado y filas densas con porcentaje, estado
+  y una barra fina por categoría. Nada de barras enormes repetidas.
+- **Recurrentes.** Tres estadísticas compactas para los próximos 30 días por moneda,
+  filas con frecuencia, próxima fecha, cuenta, importe con signo y "Hoy / Mañana /
+  En N días", y el switch nativo para pausar.
+- **Cuentas.** Solo cuentas de dinero, agrupadas por moneda con el total de cada una;
+  el detalle muestra saldo, gastos e ingresos del mes, Gasto / Ingreso / Transferir y
+  sus movimientos. Tarjetas y deudas viven en su pestaña.
 - **Reportes.** Título del mes con flechas, total registrado, promedio por día y
   variación contra los mismos días del mes anterior; barras de seis meses en una
   sola escala (el mes en curso, delineado); dona por categoría con rampa de tinta

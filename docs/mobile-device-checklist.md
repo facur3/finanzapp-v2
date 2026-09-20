@@ -1,5 +1,16 @@
 # Physical iPhone acceptance checklist
 
+## Interfaz 14 — Presupuestos, Recurrentes and Cuentas polish (pending device review)
+
+- [ ] Ajustes footer reads Interfaz 14; no data changes after updating.
+- [ ] Presupuestos shows what is left (or how far over) as the hero, spent and limit, a status line, and one row per category with percentage, status and a thin bar; a category over its limit reads coral, near the limit amber.
+- [ ] Month arrows label the month as en curso, cerrado or futuro; Este mes returns to today.
+- [ ] Recurrentes shows Pagos / Vencimientos / Ingresos for the next 30 days per currency; rows show frequency, next date, account, signed amount and Hoy / Mañana / En N días.
+- [ ] Pausing with the switch keeps the rule and its history; reactivating skips elapsed dates and never posts them.
+- [ ] Cuentas lists only cash accounts, grouped by currency, each with its recorded total; the footer says cards and debts live in Tarjetas.
+- [ ] An account shows its recorded balance, this month's expenses and income, Gasto / Ingreso / Transferir and Recurrentes; opening a card account from anywhere lands on the card.
+- [ ] Light/dark, large text, VoiceOver and Reduce Motion remain readable on these screens.
+
 ## Interfaz 13 — Reportes analytics (pending device review)
 
 - [ ] Ajustes footer reads Interfaz 13; no data changes after updating.
