@@ -29,7 +29,7 @@ function routeHarness(file: string, params: Record<string, unknown>, data = snap
   const state: unknown[] = [];
   const pushed: any[] = [];
   let cursor = 0;
-  const componentNames = ['AppText', 'Choices', 'DetailRow', 'EmptyState', 'IconButton', 'Money', 'PressFeedback', 'SectionTitle', 'Surface', 'CategoryBadge', 'Screen'];
+  const componentNames = ['AppText', 'Choices', 'DetailRow', 'EmptyState', 'IconButton', 'Money', 'PressFeedback', 'SectionTitle', 'Surface', 'CategoryBadge', 'Screen', 'GlyphTile'];
   const modules: Record<string, unknown> = {
     react: { useMemo: (fn: () => unknown) => fn(), useState: (initial?: unknown) => {
       const index = cursor++;
@@ -38,16 +38,20 @@ function routeHarness(file: string, params: Record<string, unknown>, data = snap
     } },
     'react/jsx-runtime': { jsx, jsxs: jsx, Fragment: 'Fragment' },
     'react-native': { View: 'View', FlatList: 'FlatList' },
+    '@expo/vector-icons/Ionicons': 'Ionicons',
     'expo-router': { useLocalSearchParams: () => params, router: { push: (to: unknown) => pushed.push(to) } },
     '@finanzapp/domain': domain,
-    '../src/storage/LedgerProvider': { useLedger: () => ({ snapshot: data }) },
+    '../src/storage/LedgerProvider': { useLedger: () => ({ snapshot: data, archive: { accounts: data.accounts, records: [] } }) },
+    '../src/ui/charts': { DonutChart: 'DonutChart', MonthBars: 'MonthBars', OTHERS_KEY: '__others__',
+      donutSlices: (items: { key: string; label: string; value: number }[]) => items.slice(0, 5).map((item, index) => ({ ...item, color: 'c' + index })) },
     '../src/ui/components': Object.fromEntries(componentNames.map(name => [name, name])),
     '../src/ui/entry-list': { EntryList: 'EntryList' },
     '../src/ui/presentation': presentation,
     '../src/ui/report-presentation': reportPresentation,
-    '../src/ui/spending-chart': { CategorySpendingRow: 'CategorySpendingRow' },
+    '../src/ui/spending-chart': { CategorySpendingRow: 'CategorySpendingRow', CategoryLegendRow: 'CategoryLegendRow' },
     '../src/ui/liability-presentation': liabilityPresentation,
-    '../src/ui/theme': { useCurrentDay: () => '2026-09-12', usePalette: () => ({ background: '#F5F6F8', surface: '#FFFFFF', accent: '#0A0A0C', tint: '#2563EB' }) },
+    '../src/ui/theme': { useCurrentDay: () => '2026-09-12', space: { xs: 4, s: 8, m: 12, l: 16, xl: 20, xxl: 24, xxxl: 32 },
+      usePalette: () => ({ background: '#F5F6F8', surface: '#FFFFFF', accent: '#0A0A0C', tint: '#2563EB', text: '#000', secondary: '#666', tertiary: '#999', line: '#ddd', inset: '#eee', expense: '#c00', warning: '#a60', isDark: false }) },
   };
   // Tab routes live one level deeper than stack routes.
   for (const name of Object.keys(modules)) if (name.startsWith('../src/')) modules['../' + name] = modules[name];
@@ -77,7 +81,8 @@ test('report row pushes a scoped category detail; underlying period and currency
   const list = view.render();
   const category = list.props.data.find((item: domain.CategorySpending) => item.key === 'salud');
   const row = list.props.renderItem({ item: category, index: 0 });
-  find(row, 'CategorySpendingRow').props.onPress();
+  assert.equal(find(row, 'CategoryLegendRow').props.color, 'c0');
+  find(row, 'CategoryLegendRow').props.onPress();
   assert.equal(view.pushed[0].pathname, '/report-category');
   assert.equal(JSON.stringify(view.pushed[0].params), JSON.stringify({ currency: 'ARS', month: '2026-08', category: 'salud' }));
   const detail = routeHarness('report-category.tsx', view.pushed[0].params).render();
@@ -160,4 +165,24 @@ test('comparison never presents an invented change when history is absent', () =
   assert.equal(list.props.data.length, 0);
   assert.equal(nodes(list).some(n => n.type === 'Money'), false);
   assert.equal(find(list, 'EmptyState').props.title, 'Todavía no hay suficiente información');
+});
+
+test('reports show a six-month trend that selects months, a donut for categories and factual footers', () => {
+  const data = { ...snapshot, entries: [...snapshot.entries, { ...snapshot.entries[0], id: 'now', dateISO: '2026-09-10', amountMinor: 400 }] };
+  const view = routeHarness('(tabs)/reports.tsx', { currency: 'ARS' }, data);
+  let root = view.render();
+  const bars = find(root, 'MonthBars');
+  assert.deepEqual(bars.props.points.map((point: { monthISO: string; amountMinor: number }) => [point.monthISO, point.amountMinor]).slice(-2), [['2026-08', 606], ['2026-09', 400]]);
+  assert.equal(bars.props.selected, '2026-09');
+  assert.equal(find(root, 'DonutChart').props.total, 400);
+  assert.equal(find(root, 'DonutChart').props.slices[0].key, 'salud');
+  bars.props.onSelect('2026-08');
+  root = view.render();
+  assert.equal(find(root, 'Money').props.minor, 606);
+  assert.equal(find(root, 'MonthBars').props.selected, '2026-08');
+  assert.equal(nodes(root).some(node => node.type === 'DetailRow' && node.props.label === 'Flujo neto'), true);
+  // History keeps the trend visible for an empty current month; no history at all shows neither chart.
+  assert.equal(nodes(routeHarness('(tabs)/reports.tsx', {}).render()).some(node => node.type === 'DonutChart'), false);
+  const empty = routeHarness('(tabs)/reports.tsx', {}, { ...snapshot, entries: [] }).render();
+  assert.equal(nodes(empty).some(node => node.type === 'DonutChart' || node.type === 'MonthBars'), false);
 });

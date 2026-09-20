@@ -1,5 +1,17 @@
 # Physical iPhone acceptance checklist
 
+## Interfaz 13 — Reportes analytics (pending device review)
+
+- [ ] Ajustes footer reads Interfaz 13; no data changes after updating.
+- [ ] Reportes shows the month title, the recorded total, "por día" and the change versus the same days of the previous month (or nothing when history is missing).
+- [ ] The six-month bars use one scale; tapping a past month selects it and updates total, donut and lists; the current month bar is outlined.
+- [ ] The donut has at most five named slices plus Otras, a 2 pt gap between slices and the total in the middle; slices match the legend order and swatches.
+- [ ] Legend rows open the category's movements for that month; Día a día rows open that day.
+- [ ] Presupuestos rows show spent of limit and a percentage (amber near the limit, coral when exceeded); Administrar opens Presupuestos for that month.
+- [ ] Dónde más gastaste ranks merchants by amount with count and category; Para tener en cuenta lists only facts (over/near budget, largest expense, category that grew).
+- [ ] Flujo neto equals recorded income minus recorded expenses; transfers and card payments are excluded.
+- [ ] Dark mode, large text, VoiceOver (donut and bars announce values) and Reduce Motion (no fade/bar animation) remain readable.
+
 ## Interfaz 12 — entry, transfer and recurring form hierarchy (pending device review)
 
 - [ ] Ajustes footer reads Interfaz 12; no data changes after updating.

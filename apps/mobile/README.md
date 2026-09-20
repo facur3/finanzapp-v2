@@ -35,16 +35,21 @@ labels and day nets to Movimientos, and gives transaction detail the Wallet
 hierarchy with budget context. **Interfaz 12 (2026-09-20)** gives the entry, transfer
 and recurring forms a clear hierarchy: kind, large amount, then Categoría and Pagado
 con / Ingresa en as full-width selector cards with the live balance, card debt or month
-budget. The spending-first decision remains authoritative, with device checks still an
-explicit gate.
+budget. **Interfaz 13 (2026-09-20)** turns Reportes into the analysis surface: trend,
+category donut with legend, day by day, budgets, top merchants, factual insights and
+net cash flow. The spending-first decision remains authoritative, with device checks
+still an explicit gate.
 
-Inicio → Reporte mensual offers Categorías / Día a día and Comparar gastos. Current
-months compare equal initial day counts (both capped if the previous month is
+The Reportes tab shows, for one month and currency, the recorded total with its daily
+average and change against the same elapsed days of the previous month, a six-month
+trend, a category donut with a legend (Categorías) or a Día a día list, budget status,
+top merchants, factual insights, recorded income and net cash flow, plus Comparar.
+Current months compare equal initial day counts (both capped if the previous month is
 shorter); historical months compare full months. Exact date ranges stay visible.
 Category totals open only their dated expenses. Missing records are not savings.
 Native backup/recovery stays available, but no JSON import is required to start.
 
-## Product scope (Interfaz 12)
+## Product scope (Interfaz 13)
 
 [Decision 002](../../docs/decisions/002-spending-first.md) selects spending and
 commitments with optional accounts. No native portfolio or market data. The old
@@ -280,7 +285,7 @@ For the intermittent black-tab report, update to `master`, restart with
 and repeat the **Interfaz 02** tab checks, **Interfaz 03** report checks and
 **Interfaz 04/05** correction/recovery and transfer checks, plus **Interfaz 06** daily/comparison reports and **Interfaz 08** recurring/upcoming
 checks, plus **Interfaz 10** cards/debts and five-tab checks and **Interfaz 11** Home,
-Movimientos and detail checks and **Interfaz 12** form checks. The current footer says Interfaz 12.
+Movimientos and detail checks, **Interfaz 12** form checks and **Interfaz 13** Reportes checks. The current footer says Interfaz 13.
 Before updating, save a private pilot copy; do not uninstall or add fake movements.
 
 If a storage/refresh error occurs, the form retains the exact submitted command
@@ -289,7 +294,8 @@ A post-commit refresh error also exposes a global verification warning. Retry th
 same command or verify the current records before entering anything again. Local
 audit receipts prevent a late retry from repeating/reversing a later change.
 
-For dependency changes, also run `npm ls --all` and `npm audit`. Keep the scoped patched
+`react-native-svg` is pinned to the Expo SDK 57 bundled version (15.15.4) and draws
+only the category donut; it works in Expo Go. For dependency changes, also run `npm ls --all` and `npm audit`. Keep the scoped patched
 decoder/UUID compatibility intact; do not run `npm audit fix --force`, which can
 replace Expo packages with incompatible major versions.
 
