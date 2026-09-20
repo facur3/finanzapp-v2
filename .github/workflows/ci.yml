@@ -11,12 +11,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
-      - name: Setup Node 20
-        uses: actions/setup-node@v4
+      - name: Setup Node 24
+        uses: actions/setup-node@v5
         with:
-          node-version: 20
+          node-version: 24
           cache: npm
 
       - name: Install dependencies
@@ -41,10 +41,10 @@ jobs:
         working-directory: apps/mobile
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup Node 24
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: 24
           cache: npm
@@ -84,7 +84,7 @@ jobs:
         options: >-
           --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Isolated PostgreSQL inbox ownership, deduplication and quota tests
         env:
           PGPASSWORD: fixture-only

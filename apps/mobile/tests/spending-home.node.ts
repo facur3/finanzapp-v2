@@ -32,13 +32,16 @@ function routeHarness(file: string, params: Record<string, unknown>, data = snap
   let cursor = 0;
   const componentNames = ['AppText', 'Choices', 'DetailRow', 'EmptyState', 'IconButton', 'Money', 'PressFeedback', 'SectionTitle', 'Surface', 'CategoryBadge', 'Screen', 'EntryActions', 'EntryRow', 'ActionButton'];
   const modules: Record<string, unknown> = {
-    react: { useMemo: (fn: () => unknown) => fn(), useState: (initial?: unknown) => {
+    react: { useEffect: (fn: () => unknown) => { fn(); }, useMemo: (fn: () => unknown) => fn(), useState: (initial?: unknown) => {
       const index = cursor++;
       if (!(index in state)) state[index] = initial;
-      return [state[index], (value: unknown) => { state[index] = value; }];
+      return [state[index], (value: unknown) => { state[index] = typeof value === 'function' ? (value as (current: unknown) => unknown)(state[index]) : value; }];
     } },
     'react/jsx-runtime': { jsx, jsxs: jsx, Fragment: 'Fragment' },
     'react-native': { View: 'View', FlatList: 'FlatList' },
+    'react-native-reanimated': { __esModule: true, default: { View: 'Animated.View' },
+      useSharedValue: (value: number) => ({ value }), withTiming: (value: number) => value,
+      useAnimatedStyle: (fn: () => unknown) => fn() },
     'expo-router': { useLocalSearchParams: () => params, router: { push: (to: unknown) => pushed.push(to), navigate: (to: unknown) => pushed.push(to) } },
     '@finanzapp/domain': domain,
     '../src/storage/LedgerProvider': { useLedger: () => ({ snapshot: data }) },
@@ -47,7 +50,9 @@ function routeHarness(file: string, params: Record<string, unknown>, data = snap
     '../src/ui/presentation': presentation,
     '../src/ui/report-presentation': reportPresentation,
     '../src/ui/spending-chart': { CategorySpendingRow: 'CategorySpendingRow' },
-    '../src/ui/theme': { useCurrentDay: () => '2026-09-12', usePalette: () => ({ background: '#F5F6F8', surface: '#FFFFFF', accent: '#2467DC' }) },
+    '../src/ui/theme': { useCurrentDay: () => '2026-09-12', useReduceMotion: () => false,
+      usePalette: () => ({ background: '#F5F6F8', surface: '#FFFFFF', accent: '#2467DC',
+        negative: '#C73535', text: '#111111', secondary: '#666666', inset: '#EEEEEE', line: '#DDDDDD' }) },
   };
   modules['../src/ui/spending-timeline'] = { SpendingTimeline: 'SpendingTimeline', periodLabel: (p: any) => p.startISO + '–' + p.endISO };
   for (const name of Object.keys(modules)) if (name.startsWith('../src/')) modules['../' + name] = modules[name];
