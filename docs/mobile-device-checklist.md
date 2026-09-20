@@ -1,5 +1,31 @@
 # Physical iPhone acceptance checklist
 
+## Interfaz 09 — Home, budgets and Assistant preview (pending device review)
+
+Use the existing pilot data and save a private backup first. Do not create fake
+transactions just to fill charts and do not uninstall the only copy of the app.
+
+- [ ] Ajustes footer reads Interfaz 09 and existing accounts/movements/recurrentes remain unchanged.
+- [ ] Inicio → Gastos keeps the large expense total for the selected week/month and currency.
+- [ ] Inicio → Disponible switches the hero without moving tabs and equals the sum of recorded accounts in that currency.
+- [ ] Disponible is clearly labeled as recorded data, not bank sync or net worth.
+- [ ] Switching Gastos / Disponible, ARS/USD and week/month feels immediate with no black frame.
+- [ ] Sparkles in the Inicio header opens Assistant as a native modal/route, not a fourth tab.
+- [ ] Assistant explicitly says Próximamente and does not request login, consent, microphone or network access.
+- [ ] Presupuestos → create one category limit; Home and Presupuestos show the same remaining amount.
+- [ ] Income and an internal transfer do not consume the budget; a matching expense does.
+- [ ] A category expense over the limit shows Excedido without changing the account balance.
+- [ ] A zero-spend budget has a visually empty progress bar; Reduce Motion applies values without animation.
+- [ ] Editing a budget changes only the limit. Removing it hides the plan but preserves every movement.
+- [ ] Month arrows cross December/January correctly and allow preparing a future month.
+- [ ] ARS and USD budgets never combine.
+- [ ] Exported native v5 backup lists budgets on review; reimport adds nothing twice.
+- [ ] Updating from schema 4 preserves recurrentes, movements, transfers, balances and their exact cents.
+- [ ] Light/dark, large text, VoiceOver and canceled edge/modal swipes remain readable/stable.
+
+Cards/debts, real cloud AI, reminders, Face ID and Apple Pay are not part of
+Interfaz 09 and should not be inferred from preview controls.
+
 ## Interfaz 07 — current product direction (pending)
 
 - [ ] Footer identifies Interfaz 07. Existing records persist after reopen.
