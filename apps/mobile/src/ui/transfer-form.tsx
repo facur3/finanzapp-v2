@@ -3,22 +3,34 @@ import { Keyboard } from 'react-native';
 import { router, Stack } from 'expo-router';
 import { randomUUID } from 'expo-crypto';
 import * as Haptics from 'expo-haptics';
-import { accountBalanceMinor, formatMinorUnits, makeTransferChange, parseMinorUnits, sameTransfer, todayKey,
+import { accountBalanceMinor, formatMinorUnits, hiddenLiabilityAccountIds, makeTransferChange, parseMinorUnits, sameTransfer, todayKey,
   totalsByCurrency, validateTransfer, validateTransferChange, type Transfer, type TransferChange, type TransferRecord } from '@finanzapp/domain';
 import { useLedger } from '../storage/LedgerProvider';
 import { ActionButton, AmountField, AppText, DetailRow, EmptyState, ErrorMessage, Field, IconButton, Screen, Surface } from './components';
 import { AccountField, DateField } from './form-controls';
 import { initialAccountId } from './presentation';
 
-export function TransferForm({ original, accountId }: { original?: TransferRecord; accountId?: string }) {
-  const { snapshot, addTransfer, updateTransfer } = useLedger();
+export function TransferForm({ original, accountId, fromAccountId: requestedFrom, toAccountId: requestedTo,
+  title = 'Entre mis cuentas', defaultNote = '' }: {
+  original?: TransferRecord; accountId?: string; fromAccountId?: string; toAccountId?: string; title?: string; defaultNote?: string;
+}) {
+  const { snapshot, archive, addTransfer, updateTransfer } = useLedger();
   const accounts = snapshot?.accounts ?? [];
   const [before] = useState(original);
   const [operation] = useState(() => ({ id: randomUUID(), createdAt: new Date().toISOString() }));
-  const [fromId, setFromId] = useState(() => before?.transfer.fromAccountId ?? initialAccountId(accounts, accountId));
-  const [toId, setToId] = useState(before?.transfer.toAccountId ?? '');
+  const hidden = hiddenLiabilityAccountIds(archive?.cards ?? [], archive?.debts ?? []);
+  const requestedTarget = accounts.find(a => a.id === requestedTo);
+  const requestedSource = accounts.find(a => a.id === requestedFrom);
+  const [fromId, setFromId] = useState(() => before?.transfer.fromAccountId
+    ?? requestedSource?.id
+    ?? (requestedTarget ? accounts.find(a => !hidden.has(a.id) && a.id !== requestedTarget.id && a.currency === requestedTarget.currency)?.id : undefined)
+    ?? initialAccountId(accounts.filter(a => !hidden.has(a.id)), accountId));
+  const [toId, setToId] = useState(() => before?.transfer.toAccountId
+    ?? requestedTarget?.id
+    ?? (requestedSource ? accounts.find(a => !hidden.has(a.id) && a.id !== requestedSource.id && a.currency === requestedSource.currency)?.id : '')
+    ?? '');
   const [amount, setAmount] = useState(before ? formatMinorUnits(before.transfer.amountMinor) : '');
-  const [note, setNote] = useState(before?.transfer.note ?? '');
+  const [note, setNote] = useState(before?.transfer.note ?? defaultNote);
   const [date, setDate] = useState(() => before ? new Date(before.transfer.dateISO + 'T12:00:00') : new Date());
   const [busy, setBusy] = useState(false);
   const [pending, setPending] = useState<{ transfer: Transfer; change?: TransferChange } | null>(null);
@@ -26,8 +38,10 @@ export function TransferForm({ original, accountId }: { original?: TransferRecor
   const saving = useRef(false);
   const from = accounts.find(a => a.id === fromId), to = accounts.find(a => a.id === toId);
   const originalCurrency = accounts.find(a => a.id === before?.transfer.fromAccountId)?.currency;
-  const sources = before ? accounts.filter(a => a.currency === originalCurrency) : accounts;
-  const targets = accounts.filter(a => a.id !== fromId && a.currency === from?.currency);
+  const allowedHidden = new Set([before?.transfer.fromAccountId, before?.transfer.toAccountId, requestedFrom, requestedTo].filter(Boolean));
+  const visibleForTransfer = accounts.filter(a => !hidden.has(a.id) || allowedHidden.has(a.id));
+  const sources = before ? visibleForTransfer.filter(a => a.currency === originalCurrency) : visibleForTransfer;
+  const targets = visibleForTransfer.filter(a => a.id !== fromId && a.currency === from?.currency);
   const locked = busy || pending !== null;
   const close = () => { if (!saving.current) { if (router.canGoBack()) router.back(); else router.replace('/'); } };
   function draft(): Transfer {
@@ -67,7 +81,7 @@ export function TransferForm({ original, accountId }: { original?: TransferRecor
     finally { saving.current = false; setBusy(false); }
   }
   return <Screen>
-    <Stack.Screen options={{ title: before ? 'Editar transferencia' : 'Entre mis cuentas', gestureEnabled: !busy,
+    <Stack.Screen options={{ title: before ? 'Editar transferencia' : title, gestureEnabled: !busy,
       headerLeft: () => <IconButton name="close" label="Cerrar" onPress={close} disabled={busy} /> }} />
     {!sources.length ? <EmptyState title="Primero, una cuenta" detail="Agregá las cuentas entre las que movés tu dinero."
       action={<ActionButton label="Agregar cuenta" onPress={() => router.replace('/new-account')} />} /> : <>
@@ -89,7 +103,7 @@ export function TransferForm({ original, accountId }: { original?: TransferRecor
         <DetailRow label={to.name + ' después'} value={`${to.currency} ${formatMinorUnits(preview.to)}`} last />
       </Surface>}
       {preview && (preview.from < 0 || preview.to < 0) && <AppText secondary style={{ fontSize: 14 }}>Una cuenta quedará con saldo negativo. Revisá el importe y tus movimientos; podés registrar la transferencia si refleja lo que realmente ocurrió.</AppText>}
-      <AppText secondary style={{ fontSize: 13 }}>Solo registra un movimiento entre tus cuentas. No envía dinero al banco ni cuenta como gasto o ingreso.</AppText>
+      <AppText secondary style={{ fontSize: 13 }}>Este movimiento mueve saldo entre registros. No envía dinero al banco ni cuenta como gasto o ingreso.</AppText>
       <ErrorMessage message={error} />
       {pending && error && <AppText secondary style={{ fontSize: 13 }}>El envío quedó fijo para reintentar sin duplicarlo. Antes de cambiarlo, cerrá y revisá Movimientos.</AppText>}
       <ActionButton label={pending && error ? 'Reintentar guardado' : before ? 'Guardar cambios' : 'Registrar transferencia'} busy={busy}
