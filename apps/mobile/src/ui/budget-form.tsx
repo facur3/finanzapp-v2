@@ -25,9 +25,10 @@ export function BudgetForm({ original, monthISO, currency: requestedCurrency }: 
   const [category, setCategory] = useState(before?.category ?? '');
   const [busy, setBusy] = useState(false);
   const [pending, setPending] = useState<MonthlyBudget | null>(null);
+  const [archivePending, setArchivePending] = useState<MonthlyBudget | null>(null);
   const [error, setError] = useState<string | null>(null);
   const saving = useRef(false);
-  const locked = busy || pending !== null;
+  const locked = busy || pending !== null || archivePending !== null;
   const close = () => { if (!saving.current) { if (router.canGoBack()) router.back(); else router.replace('/budgets'); } };
 
   async function save() {
@@ -77,29 +78,37 @@ export function BudgetForm({ original, monthISO, currency: requestedCurrency }: 
     }
   }
 
+  async function commitArchive(submission: MonthlyBudget) {
+    if (saving.current) return;
+    saving.current = true;
+    setBusy(true);
+    setError(null);
+    try {
+      setArchivePending(submission);
+      await saveBudget(submission);
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      saving.current = false;
+      close();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'No pudimos eliminar el presupuesto. Reintentá el mismo cambio.');
+    } finally {
+      saving.current = false;
+      setBusy(false);
+    }
+  }
+
   async function archive() {
     if (!before || busy || saving.current) return;
+    if (archivePending) {
+      await commitArchive(archivePending);
+      return;
+    }
+    const submission: MonthlyBudget = {
+      ...before, active: false, revision: before.revision + 1, updatedAt: new Date().toISOString(),
+    };
     Alert.alert('¿Eliminar este presupuesto?', 'Se deja de usar para este mes. Tus gastos y movimientos no se modifican.', [
       { text: 'Cancelar', style: 'cancel' },
-      { text: 'Eliminar', style: 'destructive', onPress: () => {
-        void (async () => {
-          saving.current = true;
-          setBusy(true);
-          setError(null);
-          try {
-            const next: MonthlyBudget = { ...before, active: false, revision: before.revision + 1, updatedAt: new Date().toISOString() };
-            await saveBudget(next);
-            void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-            saving.current = false;
-            close();
-          } catch (cause) {
-            setError(cause instanceof Error ? cause.message : 'No pudimos eliminar el presupuesto.');
-          } finally {
-            saving.current = false;
-            setBusy(false);
-          }
-        })();
-      } },
+      { text: 'Eliminar', style: 'destructive', onPress: () => { void commitArchive(submission); } },
     ]);
   }
 
@@ -128,6 +137,7 @@ export function BudgetForm({ original, monthISO, currency: requestedCurrency }: 
     </AppText>}
     <ActionButton label={pending && error ? 'Reintentar guardado' : before ? 'Guardar cambios' : 'Crear presupuesto'}
       onPress={save} busy={busy} disabled={!amount.trim() || !category.trim()} />
-    {before && <ActionButton label="Eliminar presupuesto" onPress={archive} secondary disabled={busy} />}
+    {before && <ActionButton label={archivePending && error ? 'Reintentar eliminación' : 'Eliminar presupuesto'}
+      onPress={archive} secondary disabled={busy || pending !== null} />}
   </Screen>;
 }
