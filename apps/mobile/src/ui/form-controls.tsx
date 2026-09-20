@@ -49,13 +49,16 @@ export function AccountField({ accounts, value, onChange, disabled = false, labe
   </>;
 }
 
-export function DateField({ value, onChange, disabled = false }: { value: Date; onChange: (date: Date) => void; disabled?: boolean }) {
+export function DateField({ value, onChange, disabled = false, allowFuture = false, label = 'Fecha' }: {
+  value: Date; onChange: (date: Date) => void; disabled?: boolean; allowFuture?: boolean; label?: string;
+}) {
   const p = usePalette();
   const [visible, setVisible] = useState(false);
   const [draft, setDraft] = useState(value);
   const open = () => { Keyboard.dismiss(); setDraft(new Date(value)); setVisible(true); };
   const picker = <DateTimePicker value={draft} mode="date" display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-    themeVariant={p.isDark ? 'dark' : 'light'} minimumDate={new Date(1900, 0, 1)} maximumDate={new Date()}
+    themeVariant={p.isDark ? 'dark' : 'light'} minimumDate={new Date(1900, 0, 1)}
+    maximumDate={allowFuture ? new Date(2100, 11, 31) : new Date()}
     style={{ width: '100%' }} onChange={(event, next) => {
       if (Platform.OS !== 'ios') {
         setVisible(false);
@@ -63,9 +66,9 @@ export function DateField({ value, onChange, disabled = false }: { value: Date; 
       } else if (event.type === 'set' && next) setDraft(next);
     }} />;
   return <>
-    <DetailRow label="Fecha" icon="calendar-outline" last disabled={disabled} onPress={open}
+    <DetailRow label={label} icon="calendar-outline" last disabled={disabled} onPress={open}
       value={value.toLocaleDateString('es-AR', { day: 'numeric', month: 'short', year: 'numeric' })} />
-    {Platform.OS === 'ios' ? <SelectionSheet visible={visible} title="Elegir fecha" onClose={() => setVisible(false)}
+    {Platform.OS === 'ios' ? <SelectionSheet visible={visible} title={label === 'Fecha' ? 'Elegir fecha' : label} onClose={() => setVisible(false)}
       onDone={() => { onChange(draft); setVisible(false); }}>
       <View style={{ width: '100%', overflow: 'hidden', paddingTop: 20 }}>{picker}</View>
     </SelectionSheet> : visible && picker}
