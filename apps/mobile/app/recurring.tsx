@@ -168,7 +168,7 @@ function ForecastLine({ label, amount, max, currency, color }: {
   useEffect(() => {
     progress.value = withTiming(amount / max, { duration: reduced ? 0 : 520 });
   }, [amount, max, reduced, progress]);
-  const style = useAnimatedStyle(() => ({ width: Math.max(2, progress.value * 100) + '%' }));
+  const style = useAnimatedStyle(() => ({ width: `${Math.max(2, progress.value * 100)}%` as `${number}%` }));
   return <View style={{ gap: 6 }}>
     <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 8 }}>
       <AppText secondary style={{ fontSize: 13, flex: 1 }}>{label}</AppText>
