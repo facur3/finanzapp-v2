@@ -15,10 +15,75 @@ server-keyed; manual recording and local data work without connectivity. Recurri
 expenses, debts, budgets and cards remain in scope. Native navigation, accessible
 amounts, real data and recoverable durable writes remain requirements.
 
-## Status and current delivery — Interfaz 17
+## Status and current delivery — Producto 18
 
 Implemented is code, checked names a test, device-verified needs a physical result,
 and released means distributed. Neither a bundle nor a screenshot is App Store QA.
+
+Producto 18 — Navigation & Smart Actions is a product-architecture phase on top of the
+stable Interfaz 17 visuals: no redesign, a clearer map of the app and faster financial
+actions. Everything below is implemented and checked in Node; nothing is device-verified.
+
+- [x] The fifth tab is **Más**, not Ajustes (`app/(tabs)/_layout.tsx`, glyph
+  `ellipsis-horizontal-circle`). The primary bar stays at five: Inicio, Movimientos,
+  Reportes, Tarjetas, Más. Presupuestos, Recurrentes, Cuentas and Deudas are not tabs.
+  The route file keeps its historical name `settings.tsx`.
+- [x] Más is a grouped native hub (`app/(tabs)/settings.tsx`): **Finanzas** — Cuentas,
+  Presupuestos, Recurrentes, Deudas y cobros, Categorías; **App y datos** — Asistente
+  ("Vista previa"), Copia de seguridad, Movimientos deshechos, with a footer line about
+  local storage and the still-disabled sync. Tarjetas is no longer a Más row (it is a
+  tab). Export/import moved to their own screen (`app/backup.tsx`, "Compartir e
+  importar"), with the export code unchanged. Product judgment: no Preferencias row
+  yet, because nothing would sit behind it; no disabled decorative rows.
+- [x] Tarjetas contains only credit cards: the carousel, recorded debt, available
+  credit, closing and due dates, Registrar compra / Pagar tarjeta and statement
+  activity. The "Deudas y cobros" section was removed from the tab; the debts screen,
+  debt detail, forms, data and accounting are untouched and reached from Más.
+- [x] Transfer **Usar todo** (`src/ui/transfer-form.tsx`): under the amount, a footnote
+  shows the source's recorded balance ("Saldo registrado: ARS 190.162,00") with a
+  quiet text action that fills the field with the complete positive balance in the
+  field's canonical display model ("190.162"; cents only when present). It is
+  computed from the current records, respects ARS/USD, recalculates when Desde changes,
+  offers nothing for a zero or negative balance, and never submits: the person still
+  reviews, can edit downward and confirms. While editing an existing transfer the
+  figure excludes that transfer's own effect. Idempotency and retry semantics are
+  the existing ones (same operation ID; inputs lock after a failed save).
+- [x] Card payment **Pagar total**: fills the recorded card debt, bounded by both the
+  live debt and the caller's cap, so the shortcut can never propose a payment above
+  the registered debt; a card in credit offers nothing. Editing upward past the debt
+  is still refused on save. The payment stays one transfer (no second expense).
+- [x] Personal debts **Saldar total** (I owe) and **Cobrar total** (they owe me): fill
+  the current pending amount; one transfer per save, never an expense or income.
+- [x] Home header no longer shows the sparkles Assistant shortcut. The Assistant stays
+  reachable from Más as "Vista previa"; nothing claims a model is active. Home keeps
+  contextual blocks only (budget when meaningful, upcoming commitments when real);
+  no permanent navigation buttons were added.
+- [x] Categories: the defaults are unchanged. Test-looking categories such as "sjsjn"
+  and "JD" are not presets — the picker only knows preset labels plus the strings
+  recorded on entries, so they come from historical entries on the device, and they
+  keep working (offered first as recorded, never renamed). A read-only **Más →
+  Categorías** screen lists the defaults and the recorded custom categories with their
+  usage, so the origin is visible on the phone. No categories table, migration or
+  backup bump in this PR; management/archive stays the next dedicated phase (below).
+- [x] Visual system preserved: existing tokens and components; the only new piece is
+  `AmountShortcut` (footnote + primary-coloured text action), used by the transfer form.
+- [ ] Physical iPhone review: the Más tab and its two groups, Tarjetas without debts,
+  Usar todo / Pagar total / Saldar total / Cobrar total on the device keyboard (the
+  filled value, the caret at the end, editing after the fill), the Categorías list and
+  the new backup screen; VoiceOver labels of the shortcut; both themes, large text,
+  Reduce Motion, Expo Go.
+
+Producto 18 verification adds `tests/smart-amounts.node.ts` (Usar todo in ARS and USD,
+source-account change, zero/negative balance, Pagar total with live-debt and cap bounds,
+Saldar total, Cobrar total, editing exclusion, retry lock and one operation ID, no
+expense/income ever created), `tests/more-routes.node.ts` (Más groups, rows, pushes and
+counts; backup screen; read-only categories screen), extends `tests/navigation.node.ts`
+(Más title/icon, single Home header action, no sparkles), `tests/liabilities-routes.node.ts`
+(Tarjetas renders no personal debts even with one recorded), `tests/categories.node.ts`
+(historical custom categories intact next to intact defaults) and
+`tests/money-input.node.ts` (`amountFromMinor`, integer round trip, no float).
+
+### Previous delivery — Interfaz 17
 
 Interfaz 17 gives the pilot a visual identity and a monetary experience of its own.
 Interfaz 15 solved motion and Interfaz 16 solved hierarchy, but the dark UI was still
@@ -162,7 +227,7 @@ facts row, stacked buttons, statement caption) and adds unit tests for the quick
 actions, the hero fit (representative values, Dynamic Type, floor, the Money
 component) and the form selector tints.
 
-### Custom categories: model and plan (Interfaz 18, not in this PR)
+### Custom categories: model and plan (next dedicated phase, not in Producto 18)
 
 Today a category is the trimmed string stored on each entry, recurring rule and
 budget (1–60 characters, CHECK-constrained in SQLite); `categoryKey` normalises
@@ -176,9 +241,10 @@ Safest model: a `categories` table (`key` = normalised string, `label`, `icon`,
 display label of a key; the recorded strings and their audit history never change.
 Deleting archives the key (hidden from the picker, still shown on history). This
 needs one additive migration (v7) and a backup format bump (v7) with the same
-recovery tests as budgets; no rewrite of entries. UI: Ajustes → Categorías (icon,
-colour, name, + Nueva categoría) and an edit sheet. It expands scope and storage,
-so it is its own phase after the Interfaz 17 device review.
+recovery tests as budgets; no rewrite of entries. UI: Más → Categorías (today a
+read-only list of defaults and recorded categories with usage; then icon, colour,
+name, + Nueva categoría and an edit sheet). It expands scope and storage, so it is
+its own phase after the Producto 18 device review.
 
 ### Previous delivery — Interfaz 15
 
@@ -494,6 +560,26 @@ targets, VoiceOver, safe areas, system text and separate currencies apply to eve
 new screen.
 
 ## Handoff log (historical evidence)
+
+### 2026-09-21 — Producto 18: navigation and smart actions
+
+- The fifth tab became Más, a grouped hub (Finanzas / App y datos) with the backup
+  export/import on its own screen and a read-only Categorías list; Tarjetas lost the
+  personal-debts section (data and screens untouched, reached from Más); the Home
+  sparkles shortcut was removed while the Assistant is a preview. The transfer form
+  gained one contextual shortcut: Usar todo (positive source balance), Pagar total
+  (recorded card debt, capped), Saldar total and Cobrar total (pending obligation),
+  all fill-only through the amount field's canonical display model.
+- Checked locally: TypeScript, 186 mobile tests (18 new), root domain/web tests (359),
+  Vite build, hygiene, Expo compatibility and Metro iOS export. No device evidence.
+- Edge cases recorded: a zero or negative source balance offers no "all" (figure still
+  shown); a card in credit offers no Pagar total; a stale, larger `maxAmountMinor`
+  cannot raise the fill above the live debt; while editing a transfer the "all"
+  excludes that transfer's own effect; the shortcut is disabled while a failed save is
+  locked for retry. Usar todo can still leave the source at exactly zero and, after a
+  manual edit upward, negative (warned, allowed, as before). Cross-currency stays
+  refused. The categories "sjsjn" / "JD" cannot be verified from Linux (the SQLite file
+  lives on the iPhone), but the code has no other source for them than recorded entries.
 
 ### 2026-09-21 — Interfaz 17: visual identity and monetary experience
 

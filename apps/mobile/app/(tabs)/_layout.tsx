@@ -6,8 +6,10 @@ import { selectionHaptic } from '../../src/ui/motion';
 import { tabHostOptions, tabScreenOptions } from '../../src/ui/navigation';
 
 // Five sections, each with one meaning: Inicio (what matters now), Movimientos
-// (everything recorded), Reportes (where the money went), Tarjetas (cards and
-// debts) and Ajustes. Reports and cards are tabs, not links buried in Home.
+// (everything recorded), Reportes (where the money went), Tarjetas (credit cards
+// only) and Más, the secondary hub for everything else (accounts, budgets,
+// recurring, personal debts, categories, the Assistant preview, data). Reports
+// and cards are tabs, not links buried in Home; nothing else becomes a tab.
 export default function TabsLayout() {
   const p = usePalette();
   // These lightweight roots stay mounted. Their visibility must not depend on
@@ -23,10 +25,9 @@ export default function TabsLayout() {
     tabBarStyle: { backgroundColor: p.surface, borderTopColor: p.line },
     tabBarLabelStyle: { fontSize: 10, fontWeight: '500' },
     sceneStyle: { backgroundColor: p.background } }}>
-    <Tabs.Screen name="index" options={{ title: 'Inicio', headerRight: () => <>
-      <IconButton name="sparkles-outline" label="Abrir asistente" onPress={() => router.push('/assistant-preview')} />
-      <IconButton name="wallet-outline" label="Ver mis cuentas" onPress={() => router.push('/accounts')} />
-    </>, tabBarIcon: ({ color, size, focused }) => <Ionicons name={focused ? 'home' : 'home-outline'} size={size} color={color} /> }} />
+    {/* The Assistant is still a preview: it lives under Más, not in the Home header. */}
+    <Tabs.Screen name="index" options={{ title: 'Inicio',
+      headerRight: () => <IconButton name="wallet-outline" label="Ver mis cuentas" onPress={() => router.push('/accounts')} />, tabBarIcon: ({ color, size, focused }) => <Ionicons name={focused ? 'home' : 'home-outline'} size={size} color={color} /> }} />
     <Tabs.Screen name="activity" options={{ title: 'Movimientos',
       headerRight: () => <IconButton name="add" label="Registrar movimiento" onPress={() => router.push('/new-entry')} />,
       tabBarIcon: ({ color, size, focused }) => <Ionicons name={focused ? 'receipt' : 'receipt-outline'} size={size} color={color} /> }} />
@@ -35,6 +36,6 @@ export default function TabsLayout() {
     <Tabs.Screen name="cards" options={{ title: 'Tarjetas',
       headerRight: () => <IconButton name="add" label="Agregar tarjeta" onPress={() => router.push('/new-card')} />,
       tabBarIcon: ({ color, size, focused }) => <Ionicons name={focused ? 'card' : 'card-outline'} size={size} color={color} /> }} />
-    <Tabs.Screen name="settings" options={{ title: 'Ajustes', tabBarIcon: ({ color, size, focused }) => <Ionicons name={focused ? 'options' : 'options-outline'} size={size} color={color} /> }} />
+    <Tabs.Screen name="settings" options={{ title: 'Más', tabBarIcon: ({ color, size, focused }) => <Ionicons name={focused ? 'ellipsis-horizontal-circle' : 'ellipsis-horizontal-circle-outline'} size={size} color={color} /> }} />
   </Tabs>;
 }

@@ -92,6 +92,7 @@ test('cards tab shows an honest empty state and a debts invitation without any c
   assert.equal(nodes(root).some(node => node.type === 'CardCarousel'), false);
   find(root, 'EmptyState').props.action.props.onPress();
   assert.equal(nodes(root).some(node => node.type === 'DebtRow'), false);
+  assert.equal(nodes(root).some(node => node.type === 'SectionTitle' && node.props.children === 'Deudas y cobros'), false, 'personal debts live under Más');
 });
 
 test('cards tab summarizes the selected card from recorded purchases and payments, never a synced balance', () => {
@@ -117,7 +118,11 @@ test('cards tab summarizes the selected card from recorded purchases and payment
   const recent = nodes(root).filter(node => node.type === 'MovementRow');
   assert.equal(recent.length, 2);
   assert.ok(recent.every(node => node.props.context === 'card' && node.props.accountId === 'card-acc'));
-  assert.deepEqual(nodes(root).filter(node => node.type === 'DebtRow').map(node => node.props.debt.id), ['debt']);
+  // Personal debts are a different obligation: the tab never lists them or links to them, even with an active debt recorded.
+  assert.deepEqual(nodes(root).filter(node => node.type === 'DebtRow'), []);
+  assert.equal(nodes(root).some(node => node.type === 'SectionTitle' && node.props.children === 'Deudas y cobros'), false);
+  assert.equal(JSON.stringify(view.pushed).includes('/debts'), false);
+  assert.equal(nodes(root).filter(node => node.type === 'SectionTitle').map(node => node.props.children).join(','), 'Recientes');
 });
 
 test('switching the carousel selection changes the panel, and a card without limit hides availability', () => {

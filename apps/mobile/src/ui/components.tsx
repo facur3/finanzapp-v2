@@ -226,6 +226,21 @@ export function AmountField({ label = 'Monto', currency, tone, value = '', onCha
   </View>;
 }
 
+/** A quiet contextual action under an amount ("Usar todo", "Pagar total"):
+ * a footnote with the recorded figure and a text button that only fills the
+ * field. Saving stays with the primary button, so the person still reviews. */
+export function AmountShortcut({ label, caption, onPress, disabled = false }: { label?: string; caption: string; onPress?: () => void; disabled?: boolean }) {
+  const p = usePalette();
+  return <View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center', flexWrap: 'wrap', gap: 4, marginTop: -8 }}>
+    <AppText secondary variant="footnote">{caption}{label && onPress ? ' ·' : ''}</AppText>
+    {label && onPress && <PressFeedback feedback="opacity" accessibilityRole="button" accessibilityLabel={label + ', ' + caption}
+      onPress={onPress} disabled={disabled} accessibilityState={{ disabled }} hitSlop={8}
+      style={{ paddingVertical: 6, paddingHorizontal: 4, opacity: disabled ? 0.5 : 1 }}>
+      <AppText variant="footnote" style={{ color: p.primary, fontWeight: '600' }}>{label}</AppText>
+    </PressFeedback>}
+  </View>;
+}
+
 function Choice({ label, selected, disabled, onPress }: { label: string; selected: boolean; disabled?: boolean; onPress: () => void }) {
   const p = usePalette();
   const reduced = useReduceMotion();

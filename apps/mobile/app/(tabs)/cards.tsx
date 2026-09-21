@@ -4,22 +4,23 @@ import { router } from 'expo-router';
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { cardStatementActivity, formatMinorUnits, labelFromISO, liabilityActivity } from '@finanzapp/domain';
 import { useLedger } from '../../src/storage/LedgerProvider';
-import { ActionButton, AppText, EmptyState, GlyphTile, Money, MovementRow, Screen, SectionTitle, Stat, Surface, toneColors } from '../../src/ui/components';
+import { ActionButton, AppText, EmptyState, Money, MovementRow, Screen, SectionTitle, Stat, Surface, toneColors } from '../../src/ui/components';
 import { CardCarousel, CardFace } from '../../src/ui/card-visual';
-import { DebtRow } from '../../src/ui/liability-rows';
 import { activeCards, daysUntil, statementCaption, usageTone, type CardSummary } from '../../src/ui/liability-presentation';
-import { Reflow, ValueTransition, timing } from '../../src/ui/motion';
+import { ValueTransition, timing } from '../../src/ui/motion';
 import { mergeActivity } from '../../src/ui/presentation';
 import { space, useCurrentDay, usePalette, useReduceMotion } from '../../src/ui/theme';
 
+/** Tarjetas is only credit cards: the card, its recorded debt, available
+ * credit, closing and due dates, purchases, payments and statement activity.
+ * Personal debts and receivables are a different obligation and live under
+ * Más → Deudas y cobros. */
 export default function CardsScreen() {
   const { archive, snapshot } = useLedger();
   const day = useCurrentDay();
-  const p = usePalette();
   const cards = useMemo(() => snapshot ? activeCards(archive?.cards, snapshot, day) : [], [archive?.cards, snapshot, day]);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const selected = cards[Math.min(selectedIndex, Math.max(0, cards.length - 1))];
-  const debts = useMemo(() => (archive?.debts ?? []).filter(debt => debt.active), [archive?.debts]);
   if (!snapshot || !archive) return null;
 
   return <Screen gap={space.xxl}>
@@ -35,19 +36,6 @@ export default function CardsScreen() {
         </View>
         {selected && <CardPanel summary={selected} day={day} />}
       </>}
-
-    <Reflow>
-      <SectionTitle action={debts.length ? 'Ver todas' : 'Agregar'} onAction={() => router.push(debts.length ? '/debts' : '/new-debt')}>Deudas y cobros</SectionTitle>
-      {debts.length ? <Surface grouped>
-        {debts.slice(0, 3).map((debt, index) => <DebtRow key={debt.id} debt={debt} last={index === Math.min(debts.length, 3) - 1} />)}
-      </Surface> : <Surface style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-        <GlyphTile icon="people-outline" />
-        <View style={{ flex: 1, gap: 2 }}>
-          <AppText style={{ fontWeight: '500' }}>Lo que debés y lo que te deben</AppText>
-          <AppText secondary variant="footnote">Pagos y cobros parciales reducen el saldo. No se cuentan como gasto ni ingreso.</AppText>
-        </View>
-      </Surface>}
-    </Reflow>
   </Screen>;
 }
 

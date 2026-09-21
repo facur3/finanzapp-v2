@@ -51,3 +51,27 @@ export function customCategory(query: string, choices: string[]): string | null 
   if (!value || value.length > 60 || choices.some(label => categoryKey(label) === categoryKey(value))) return null;
   return value;
 }
+
+export interface CategoryCatalogRow { label: string; preset: boolean; count: number }
+
+/** Read-only catalogue for Más → Categorías: the presets in their order, then
+ * every category recorded on the given entries that is not a preset, most used
+ * first. A recorded spelling wins over the preset's, as in the picker. Strings
+ * are read as stored; nothing is renamed, merged, archived or deleted here.
+ * Editing and archiving categories is its own later phase. */
+export function categoryCatalog(entries: Entry[], kind: EntryKind): CategoryCatalogRow[] {
+  const recorded = new Map<string, { label: string; count: number }>();
+  for (const entry of entries) {
+    if (entry.kind !== kind) continue;
+    const key = categoryKey(entry.category);
+    if (!key) continue;
+    const row = recorded.get(key);
+    if (row) row.count++; else recorded.set(key, { label: entry.category.trim(), count: 1 });
+  }
+  const presets = kind === 'income' ? incomeLabels : expenseLabels;
+  const presetKeys = new Set(presets.map(categoryKey));
+  const rows = presets.map(label => ({ label: recorded.get(categoryKey(label))?.label ?? label, preset: true, count: recorded.get(categoryKey(label))?.count ?? 0 }));
+  const custom = [...recorded.entries()].filter(([key]) => !presetKeys.has(key)).map(([, row]) => ({ ...row, preset: false }))
+    .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label, 'es'));
+  return [...rows, ...custom];
+}
