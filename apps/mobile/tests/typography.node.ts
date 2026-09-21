@@ -6,7 +6,7 @@ import ts from 'typescript';
 import * as geometry from '../src/ui/geometry.ts';
 import * as moneyInput from '../src/ui/money-input.ts';
 
-const { amountWidthEm, fitFontSize } = geometry;
+const { AMOUNT_FIELD, amountFieldLayout, amountWidthEm, fitFontSize } = geometry;
 
 // Responsive financial typography: a hero amount is one line, dominant, and
 // shrinks only as much as its width requires. Regression for the iPhone
@@ -31,6 +31,41 @@ test('Dynamic Type is part of the fit: the rendered width uses the capped system
   assert.equal(fitFontSize('US$ 999.999.999,99', PHONE, 44, 22, 1.4), 24.5);
   assert.ok(amountWidthEm('US$ 1,00') > amountWidthEm('$ 1,00'));
   assert.ok(amountWidthEm('−$ 1,00') > amountWidthEm('$ 1,00'), 'the sign takes width too');
+});
+
+// The amount field's box: room for the last digit, the caret and a grouping
+// dot that has just appeared, at every representative display string.
+// Regression for the iPhone report where the caret overlapped the "0" of
+// "3.000" in a field sized by the native input around its own text.
+const DISPLAYS = ['3', '30', '300', '3.000', '30.000', '300.000', '3.000.000', '3.000.000,50', '9.999.999.999.999,99'];
+test('the amount field box always leaves padding and caret room beyond the text, and shrinks only when the row is full', () => {
+  for (const symbol of ['$', 'US$']) {
+    let previous = 0;
+    for (const text of DISPLAYS) {
+      const { fontSize, width } = amountFieldLayout(text, PHONE, symbol, 6);
+      const textWidth = amountWidthEm(text) * fontSize;
+      assert.ok(width! - textWidth >= AMOUNT_FIELD.padding * 2 + AMOUNT_FIELD.caret - 1, `${symbol} ${text}: ${width} for ${textWidth.toFixed(1)} of text at ${fontSize}`);
+      assert.ok(width! + amountWidthEm(symbol) * geometry.amountSymbolSize(fontSize) + 6 <= PHONE + 1, `${symbol} ${text} fits the row with its symbol`);
+      assert.ok(fontSize >= AMOUNT_FIELD.min && fontSize <= AMOUNT_FIELD.base);
+      const atBase = amountWidthEm(text) * AMOUNT_FIELD.base + AMOUNT_FIELD.padding * 2 + AMOUNT_FIELD.caret + amountWidthEm(symbol) * geometry.amountSymbolSize(AMOUNT_FIELD.base) + 6;
+      assert.ok(fontSize < AMOUNT_FIELD.base ? atBase > PHONE : atBase <= PHONE + 1, `${text} shrinks exactly when it would not fit the row at the base size`);
+      assert.ok(width! >= previous || fontSize < AMOUNT_FIELD.base, `${text}: the box never narrows as digits and dots arrive`);
+      previous = fontSize === AMOUNT_FIELD.base ? width! : 0;
+    }
+  }
+  // Typing 3 → 3.000: a grouping dot appears and the box grows with it in the same step.
+  const before = amountFieldLayout('3000', PHONE, '$', 6).width!, after = amountFieldLayout('3.000', PHONE, '$', 6).width!;
+  assert.ok(after > before, 'the dot widens the box');
+  assert.equal(amountFieldLayout('3.000', PHONE, '$', 6).fontSize, 46, 'a short amount keeps the base size');
+  assert.equal(amountFieldLayout('3.000.000,50', PHONE, '$', 6).fontSize, 46, 'a full price still fits at the base size on the reported iPhone');
+  assert.ok(amountFieldLayout('9.999.999.999.999,99', PHONE, '$', 6).fontSize < 46, 'the longest safe amount shrinks to fit');
+  assert.equal(amountFieldLayout('', PHONE, '$', 6).width, amountFieldLayout('0', PHONE, '$', 6).width, 'an empty field is sized for its placeholder');
+  assert.equal(amountFieldLayout('3', PHONE, '$', 6).width, AMOUNT_FIELD.minWidth, 'a lone digit gets the minimum box');
+  assert.deepEqual(amountFieldLayout('3.000', 0, '$', 6), { fontSize: 46, width: undefined, symbolSize: 32 }, 'before layout: base size, no width');
+  // Dynamic Type: the capped scale is part of the fit and of the box.
+  const large = amountFieldLayout('3.000.000,50', PHONE, '$', 6, 1.4);
+  assert.ok(large.fontSize < 46 && large.width! <= PHONE);
+  assert.ok(amountFieldLayout('3.000', PHONE, '$', 6, 1.4).width! > amountFieldLayout('3.000', PHONE, '$', 6).width!);
 });
 
 // The Money component itself: heroes measure their container and size from it;

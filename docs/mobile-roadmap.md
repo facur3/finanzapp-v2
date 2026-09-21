@@ -48,6 +48,14 @@ black, white and grey with the category hues as the only colour.
   colour: four rows, a 20 % fill clipped by the surface edge and separators.)
 - [x] Home quick actions are neutral circles with only the glyph in its semantic
   colour, so Home no longer reads as three coloured buttons.
+- [x] Amount field box: the third iPhone review showed the caret overlapping the
+  last digit of "3.000". The native input had sized itself around its text with
+  negative tracking, which on iOS draws the last glyph past the measured width.
+  The box is now computed from the row width (`amountFieldLayout`): estimated
+  tabular text width plus 8 pt padding each side and 4 pt for the caret, the size
+  shrinking only when the amount would not fit beside its symbol; no tracking.
+  Checked at every representative string, with Dynamic Type, and for insertion and
+  backspace at every caret position.
 - [x] Category detail title clipping fixed: "Comida" lost its ascenders because the
   heading set a 26 pt size on the body variant's 22 pt line box. Headings now use the
   named title variants and `AppText` grows the line box when a style changes only the
@@ -490,6 +498,10 @@ new screen.
   became neutral circles with semantic glyphs; the clipped category title (a large
   size on the body line box) was fixed in `AppText` and every large heading moved
   to the named title variants. 162 mobile tests.
+- Third review: the amount field's caret overlapped the last digit of "3.000".
+  Root cause: the native input sized itself around its text with negative tracking.
+  The box is now pure geometry from the row width with padding and caret room,
+  tested per display string and caret position. 164 mobile tests.
 
 ### 2026-09-20 — Interfaz 16: native visual cohesion and information hierarchy
 

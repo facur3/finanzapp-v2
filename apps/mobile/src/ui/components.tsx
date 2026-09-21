@@ -10,7 +10,7 @@ import { radius, space, type, useCurrentDay, usePalette, useReduceMotion, type P
 import { categoryIcon, type IconName } from './categories';
 import { tintOf } from './category-color';
 import { useCategoryColor } from './category-hues';
-import { SEGMENT_GAP, SEGMENT_PADDING, fitFontSize, segmentLayout } from './geometry';
+import { AMOUNT_FIELD, SEGMENT_GAP, SEGMENT_PADDING, amountFieldLayout, fitFontSize, segmentLayout } from './geometry';
 import { duration, easeOut, selectionHaptic, timing } from './motion';
 import { editAmountInput, settleAmountInput, splitAmount } from './money-input';
 
@@ -149,14 +149,22 @@ export function Field({ label, ...props }: TextInputProps & { label: string }) {
  * the text changes, so a grouping dot appearing to its left does not move it.
  * When the formatter refuses an edit (a third decimal, a fourteenth digit) the
  * native text is reset explicitly, because an unchanged prop would leave the
- * refused characters on screen. */
+ * refused characters on screen.
+ *
+ * The box is sized in JavaScript from the row's measured width
+ * (amountFieldLayout), not by the native input around its own text: room is
+ * kept for the caret and the last digit on both sides, and the size only
+ * shrinks when the amount would not fit the row. No negative tracking on the
+ * input: on iOS it draws the last glyph past the measured width, where the
+ * caret then overlaps it. */
 export function AmountField({ label = 'Monto', currency, tone, value = '', onChangeText, ...props }: TextInputProps & { label?: string; currency: Currency; tone?: Tone }) {
   const p = usePalette();
   const accessoryId = useId();
   const input = useRef<TextInput>(null);
-  const length = value.length;
-  const long = length > 11;
-  const amountSize = length > 17 ? 24 : long ? 32 : 46;
+  const { fontScale } = useWindowDimensions();
+  const [rowWidth, setRowWidth] = useState(0);
+  const symbol = currency === 'USD' ? 'US$' : '$';
+  const { fontSize, width, symbolSize } = amountFieldLayout(value, rowWidth, symbol, AMOUNT_GAP, Math.min(fontScale, HERO_MAX_SCALE));
   const color = tone && tone !== 'neutral' ? toneColors(p, tone).color : p.text;
   const change = (raw: string) => {
     const next = editAmountInput(value, raw);
@@ -166,14 +174,15 @@ export function AmountField({ label = 'Monto', currency, tone, value = '', onCha
   const settle = () => { const next = settleAmountInput(value); if (next !== value) onChangeText?.(next); };
   return <View style={{ gap: 10, alignItems: 'center', paddingVertical: 8 }}>
     <AppText secondary variant="footnote" style={{ fontWeight: '500' }}>{label} · {currency}</AppText>
-    <View style={{ width: '100%', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-      <AppText accessible={false} style={{ fontSize: long ? 26 : 32, lineHeight: long ? 34 : 40, color: p.secondary, fontWeight: '500' }}>{currency === 'USD' ? 'US$' : '$'}</AppText>
+    <View style={{ width: '100%', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: AMOUNT_GAP }}
+      onLayout={event => setRowWidth(event.nativeEvent.layout.width)}>
+      <AppText accessible={false} maxFontSizeMultiplier={HERO_MAX_SCALE} style={{ fontSize: symbolSize, lineHeight: Math.round(symbolSize * 1.25), color: p.secondary, fontWeight: '500' }}>{symbol}</AppText>
       <TextInput ref={input} keyboardType="decimal-pad" inputMode="decimal" maxLength={24} placeholder="0" {...props} value={value} onChangeText={change}
         onBlur={event => { settle(); props.onBlur?.(event); }} onSubmitEditing={event => { settle(); props.onSubmitEditing?.(event); }}
         accessibilityLabel={label + ' en ' + (currency === 'ARS' ? 'pesos argentinos' : 'dólares')}
         inputAccessoryViewID={Platform.OS === 'ios' ? accessoryId : undefined}
-        selectionColor={p.primary} placeholderTextColor={p.tertiary}
-        style={[styles.amountInput, { color, fontSize: amountSize }, props.style]} />
+        selectionColor={p.primary} placeholderTextColor={p.tertiary} maxFontSizeMultiplier={HERO_MAX_SCALE}
+        style={[styles.amountInput, { color, fontSize, width }, props.style]} />
     </View>
     {Platform.OS === 'ios' && <InputAccessoryView nativeID={accessoryId} backgroundColor={p.surface}>
       <View style={{ alignItems: 'flex-end', paddingHorizontal: 20 }}>
@@ -254,6 +263,7 @@ export function ErrorMessage({ message }: { message: string | null }) {
 }
 
 const HERO_MAX_SCALE = 1.4, ROW_MAX_SCALE = 1.8;
+const AMOUNT_GAP = 6;
 
 /** Amounts are ink by default. Income is green with a plus; an explicit negative
  * value shows a minus. Colour never replaces the sign or the label. An amount is
@@ -434,7 +444,8 @@ const styles = StyleSheet.create({
   buttonCompact: { minHeight: 44, paddingVertical: 10, paddingHorizontal: 14 },
   buttonText: { fontSize: 17, fontWeight: '600', textAlign: 'center', flexShrink: 1 },
   input: { borderRadius: radius.button, paddingHorizontal: 16, paddingVertical: 14, fontSize: 17, minHeight: 52 },
-  amountInput: { minHeight: 60, minWidth: 72, maxWidth: '85%', flexShrink: 1, fontWeight: '700', letterSpacing: -1.2, fontVariant: ['tabular-nums'], paddingVertical: 6, textAlign: 'center' },
+  amountInput: { minHeight: 60, minWidth: AMOUNT_FIELD.minWidth, maxWidth: '100%', flexShrink: 1, fontWeight: '700', letterSpacing: 0, fontVariant: ['tabular-nums'],
+    paddingVertical: 6, paddingHorizontal: AMOUNT_FIELD.padding, textAlign: 'center' },
   choices: { flexDirection: 'row', borderRadius: 10, padding: SEGMENT_PADDING, gap: SEGMENT_GAP },
   thumb: { position: 'absolute', top: SEGMENT_PADDING, bottom: SEGMENT_PADDING, left: 0, borderRadius: 8 },
   choice: { flex: 1, minWidth: 72, minHeight: 32, paddingHorizontal: 8, paddingVertical: 6, alignItems: 'center', justifyContent: 'center' },

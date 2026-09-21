@@ -54,6 +54,24 @@ test('deleting works through grouping dots: backspace over a dot removes the dig
   assert.equal(editAmountInput('1.234.567', '1.234.567'), '1.234.567', 'no edit is a no-op');
 });
 
+test('insertion and backspace at every caret position: end, before a dot, after a dot, in the middle', () => {
+  // The raw text is what iOS reports after the keystroke; the caret position is where the change sits.
+  const base = '3.000.000';
+  assert.equal(editAmountInput(base, '3.000.0005'), '30.000.005', 'insert at the end');
+  assert.equal(editAmountInput(base, '3.000.00'), '300.000', 'backspace at the end');
+  assert.equal(editAmountInput(base, '35.000.000'), '35.000.000', 'insert before the first dot');
+  assert.equal(editAmountInput(base, '3.0005.000'), '30.005.000', 'insert before the second dot');
+  assert.equal(editAmountInput(base, '3.5000.000'), '35.000.000', 'insert after the first dot');
+  assert.equal(editAmountInput(base, '3.000.5000'), '30.005.000', 'insert after the second dot');
+  assert.equal(editAmountInput(base, '3.050.000'), '3.050.000', 'insert in the middle of a group');
+  assert.equal(editAmountInput(base, '.000.000'), '0', 'backspace on the first digit leaves the zeros, which collapse');
+  assert.equal(editAmountInput(base, '3000.000'), '0', 'backspace on the first dot removes the digit before it (the 3), and the zeros collapse');
+  assert.equal(editAmountInput(base, '3.000000'), '300.000', 'backspace on the second dot removes the digit before it');
+  assert.equal(editAmountInput(base, '3.00.000'), '300.000', 'backspace in the middle of a group');
+  assert.equal(editAmountInput('3.000,50', '3.0000,50'), '30.000,50', 'insert before the comma');
+  assert.equal(editAmountInput('3.000,50', '3.000,5'), '3.000,5', 'backspace at the end of the decimals');
+});
+
 test('replacing a selection and inserting in the middle keep the digits the user meant', () => {
   assert.equal(editAmountInput('1.234.567', '1.967'), '1.967', 'a selection across a dot replaced by one digit');
   assert.equal(editAmountInput('1.234.567', '19.234.567'), '19.234.567', 'insert before the first group');

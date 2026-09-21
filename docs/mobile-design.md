@@ -67,6 +67,12 @@ presentación: cada cambio se interpreta como una edición del texto anterior
 (`src/ui/money-input.ts`), la cadena mostrada sigue pasando por `parseMinorUnits`
 y el módulo no crea ningún número flotante. El cursor queda en manos de iOS, que
 conserva su distancia al final del texto cuando aparece un punto a la izquierda.
+La caja del campo se calcula en JavaScript a partir del ancho medido de la fila
+(`amountFieldLayout` en `src/ui/geometry.ts`): ancho estimado del texto en cifras
+tabulares más 8 pt de margen a cada lado y 4 pt para el cursor, y el tamaño (46 pt)
+baja solo cuando el importe no cabe en la fila junto al símbolo, nunca por cantidad
+de caracteres. El campo no lleva tracking negativo: en iOS dibuja el último glifo
+más allá del ancho medido y el cursor lo pisa (el "3.000" recortado del iPhone).
 
 **Títulos de pantalla.** Los encabezados grandes usan las variantes con nombre
 (título 1 28/34, título 2 22/28), nunca un `fontSize` suelto sobre la caja de
