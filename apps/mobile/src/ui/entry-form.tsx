@@ -6,6 +6,7 @@ import * as Haptics from 'expo-haptics';
 import { accountBalanceMinor, categoryKey, formatMinorUnits, makeEntryChange, parseMinorUnits, sameEntry, summarizeMonthlyBudgets, todayKey,
   validateEntry, validateEntryChange, type Entry, type EntryChange, type EntryKind, type EntryRecord } from '@finanzapp/domain';
 import { useLedger } from '../storage/LedgerProvider';
+import { budgetTone } from './budget-presentation';
 import { ActionButton, AmountField, AppText, Choices, EmptyState, ErrorMessage, Field, IconButton, Screen, Surface } from './components';
 import { AccountField, CategoryField, DateField } from './form-controls';
 import { accountKindLabel, postingAccounts } from './liability-presentation';
@@ -66,7 +67,7 @@ export function EntryForm({ original, accountId: requestedAccount, currency, kin
       if (!row) return null;
       const money = (minor: number) => (account.currency === 'USD' ? 'US$ ' : '$ ') + formatMinorUnits(minor);
       return { text: row.exceeded ? `Presupuesto excedido por ${money(-row.remainingMinor)}` : `${money(row.spentMinor)} de ${money(row.budget.amountMinor)} este mes`,
-        tone: row.exceeded ? 'expense' as const : row.ratio >= 0.85 ? 'warning' as const : 'neutral' as const };
+        tone: budgetTone(row) };
     } catch { return null; }
   }, [account, snapshot, archive?.budgets, kind, category, date]);
   let parsed: number | null = null;

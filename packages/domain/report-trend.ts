@@ -1,6 +1,6 @@
 import { validDateISO, type Currency, type LedgerSnapshot } from './ledger.ts';
 import { categoryKey, expensesInPeriod, reportPeriod, type ReportPeriod } from './spending-report.ts';
-import { shiftMonthISO, summarizeMonthlyBudgets, type MonthlyBudget } from './budgets.ts';
+import { budgetState, shiftMonthISO, summarizeMonthlyBudgets, type MonthlyBudget } from './budgets.ts';
 import { spendingComparison } from './report-insights.ts';
 
 function safeSum(values: number[]): number {
@@ -81,11 +81,21 @@ export function spendingInsights(snapshot: LedgerSnapshot, budgets: MonthlyBudge
   const period = reportPeriod(currency, monthISO, asOfISO);
   let summary: ReturnType<typeof summarizeMonthlyBudgets> | null = null;
   try { summary = summarizeMonthlyBudgets(snapshot, budgets, currency, monthISO); } catch { summary = null; }
+  // The month's ceiling first, then category sublimits. Same thresholds as every screen.
+  const total = summary?.total;
+  if (total && budgetState(total) === 'exceeded') {
+    insights.push({ id: 'over:' + total.budget.id, tone: 'expense',
+      title: 'Superaste tu presupuesto general', detail: `${format(-total.remainingMinor)} por encima de ${format(total.budget.amountMinor)}` });
+  } else if (total && budgetState(total) === 'warning') {
+    insights.push({ id: 'near:' + total.budget.id, tone: 'warning',
+      title: 'Estás cerca de tu presupuesto general', detail: `Quedan ${format(total.remainingMinor)} de ${format(total.budget.amountMinor)}` });
+  }
   for (const row of summary?.rows ?? []) {
-    if (row.exceeded) {
+    const state = budgetState(row);
+    if (state === 'exceeded') {
       insights.push({ id: 'over:' + row.budget.id, category: row.budget.category, tone: 'expense',
         title: `${row.budget.category} superó su presupuesto`, detail: `${format(-row.remainingMinor)} por encima de ${format(row.budget.amountMinor)}` });
-    } else if (row.ratio >= 0.85) {
+    } else if (state === 'warning') {
       insights.push({ id: 'near:' + row.budget.id, category: row.budget.category, tone: 'warning',
         title: `${row.budget.category} está cerca del límite`, detail: `Quedan ${format(row.remainingMinor)} de ${format(row.budget.amountMinor)}` });
     }

@@ -43,8 +43,8 @@ describe('report trend, merchants and insights', () => {
   });
   it('states facts only: over/near budget, the largest expense and the category that grew', () => {
     const budgets: MonthlyBudget[] = [
-      { id: 'b1', category: 'Supermercado', currency: 'ARS', monthISO: '2026-09', amountMinor: 12000, active: true, createdAt, revision: 0, updatedAt: createdAt },
-      { id: 'b2', category: 'Café', currency: 'ARS', monthISO: '2026-09', amountMinor: 25000, active: true, createdAt, revision: 0, updatedAt: createdAt },
+      { id: 'b1', scope: 'category', category: 'Supermercado', currency: 'ARS', monthISO: '2026-09', amountMinor: 12000, active: true, createdAt, revision: 0, updatedAt: createdAt },
+      { id: 'b2', scope: 'category', category: 'Café', currency: 'ARS', monthISO: '2026-09', amountMinor: 25000, active: true, createdAt, revision: 0, updatedAt: createdAt },
     ];
     const insights = spendingInsights(snapshot, budgets, 'ARS', '2026-09', '2026-09-12', format);
     expect(insights.map(item => item.id)).toEqual(['over:b1', 'near:b2', 'largest:3', 'growth:cafe']);
@@ -53,5 +53,14 @@ describe('report trend, merchants and insights', () => {
     expect(insights[2].title).toBe('Tu mayor gasto fue Starbucks');
     expect(insights[3].detail).toBe('Frente a los mismos días del mes anterior');
     expect(spendingInsights({ accounts: snapshot.accounts, entries: [] }, [], 'ARS', '2026-09', '2026-09-12', format)).toEqual([]);
+    // A total budget speaks first and without a category; September ARS spending is 42.100 over the whole month.
+    const total: MonthlyBudget = { id: 't', scope: 'total', currency: 'ARS', monthISO: '2026-09', amountMinor: 40000, active: true, createdAt, revision: 0, updatedAt: createdAt };
+    const withTotal = spendingInsights(snapshot, [total, ...budgets], 'ARS', '2026-09', '2026-09-12', format);
+    expect(withTotal.map(item => item.id)).toEqual(['over:t', 'over:b1', 'near:b2', 'largest:3'], 'four facts at most; the total comes first');
+    expect(withTotal[0]).toMatchObject({ tone: 'expense', title: 'Superaste tu presupuesto general', detail: '$ 21.00 por encima de $ 400.00' });
+    expect(withTotal[0].category).toBeUndefined();
+    const near = spendingInsights(snapshot, [{ ...total, amountMinor: 45000 }], 'ARS', '2026-09', '2026-09-12', format);
+    expect(near[0]).toMatchObject({ id: 'near:t', tone: 'warning', title: 'Estás cerca de tu presupuesto general', detail: 'Quedan $ 29.00 de $ 450.00' });
+    expect(spendingInsights(snapshot, [{ ...total, amountMinor: 100000 }], 'ARS', '2026-09', '2026-09-12', format).some(item => item.id.endsWith(':t'))).toBe(false);
   });
 });

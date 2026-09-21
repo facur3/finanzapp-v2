@@ -1,9 +1,20 @@
 import { categoryKey } from './spending-report.ts';
 import { validDateISO, type Currency, type LedgerSnapshot } from './ledger.ts';
 
-export interface MonthlyBudget {
+/** A budget is a planning limit for one month and one currency. It never
+ * changes what a movement is: expenses stay expenses, transfers stay
+ * transfers, and a limit only says how much of the recorded spending was
+ * planned for.
+ *
+ * Two scopes. A **total** budget is the ceiling for every recorded expense of
+ * the month in that currency. A **category** budget is a sublimit inside it
+ * for one normalised category. Sublimits never add up to a total: "Total
+ * 500.000, Comida 150.000, Ocio 50.000" plans 500.000, not 700.000. A total
+ * budget is not a category, so it carries no category string at all. */
+export type BudgetScope = 'total' | 'category';
+
+interface MonthlyBudgetBase {
   id: string;
-  category: string;
   currency: Currency;
   monthISO: string;
   amountMinor: number;
@@ -12,9 +23,22 @@ export interface MonthlyBudget {
   revision: number;
   updatedAt: string;
 }
+export interface TotalMonthlyBudget extends MonthlyBudgetBase { scope: 'total'; category?: undefined }
+export interface CategoryMonthlyBudget extends MonthlyBudgetBase { scope: 'category'; category: string }
+export type MonthlyBudget = TotalMonthlyBudget | CategoryMonthlyBudget;
 
-export interface BudgetProgress {
-  budget: MonthlyBudget;
+/** Where a limit stands: calm below the warning share, warning from that share
+ * up to and including the limit, exceeded once spending passes it. One place
+ * for the thresholds so every screen agrees. */
+export const BUDGET_WARNING_RATIO = 0.85;
+export type BudgetState = 'calm' | 'warning' | 'exceeded';
+export function budgetState(progress: Pick<BudgetProgress, 'ratio' | 'exceeded'>): BudgetState {
+  if (progress.exceeded) return 'exceeded';
+  return progress.ratio >= BUDGET_WARNING_RATIO ? 'warning' : 'calm';
+}
+
+export interface BudgetProgress<B extends MonthlyBudget = MonthlyBudget> {
+  budget: B;
   spentMinor: number;
   remainingMinor: number;
   ratio: number;
@@ -24,15 +48,20 @@ export interface BudgetProgress {
 export interface MonthlyBudgetSummary {
   currency: Currency;
   monthISO: string;
+  /** The month's ceiling, measured against every recorded expense of the month, or null when none is active. */
+  total: BudgetProgress<TotalMonthlyBudget> | null;
+  /** Category sublimits, worst first. The sum of their limits is never the month's budget. */
+  rows: BudgetProgress<CategoryMonthlyBudget>[];
+  /** Sum of the category sublimits (not a total budget) and what those categories spent. */
   budgetedMinor: number;
   spentBudgetedMinor: number;
   remainingMinor: number;
+  /** Every recorded expense of the month in this currency, budgeted or not. */
   totalSpentMinor: number;
   unbudgetedSpentMinor: number;
-  rows: BudgetProgress[];
 }
 
-const BUDGET_KEYS = ['id', 'category', 'currency', 'monthISO', 'amountMinor', 'active',
+const BUDGET_KEYS = ['id', 'scope', 'category', 'currency', 'monthISO', 'amountMinor', 'active',
   'createdAt', 'revision', 'updatedAt'] as const;
 
 function validId(value: string): boolean {
@@ -55,14 +84,20 @@ export function shiftMonthISO(monthISO: string, amount: number): string {
   const date = new Date(Date.UTC(year, month - 1 + amount, 1));
   return date.toISOString().slice(0, 7);
 }
-export function budgetIdentityKey(budget: Pick<MonthlyBudget, 'currency' | 'monthISO' | 'category'>): string {
-  return [budget.currency, budget.monthISO, categoryKey(budget.category)].join('|');
+/** One active total per currency and month; one active sublimit per
+ * normalised category, currency and month. */
+export function budgetIdentityKey(budget: Pick<MonthlyBudget, 'currency' | 'monthISO' | 'scope' | 'category'>): string {
+  return [budget.currency, budget.monthISO, budget.scope === 'total' ? 'total' : 'category:' + categoryKey(budget.category ?? '')].join('|');
 }
 
 export function validateMonthlyBudget(budget: MonthlyBudget): void {
   if (!validId(budget.id)) throw new Error('Identificador de presupuesto inválido.');
-  if (typeof budget.category !== 'string' || !budget.category.trim() || budget.category.length > 60) {
+  if (budget.scope !== 'total' && budget.scope !== 'category') throw new Error('Elegí un presupuesto general o por categoría.');
+  if (budget.scope === 'category' && (typeof budget.category !== 'string' || !budget.category.trim() || budget.category.length > 60)) {
     throw new Error('Elegí una categoría de hasta 60 caracteres.');
+  }
+  if (budget.scope === 'total' && budget.category !== undefined) {
+    throw new Error('Un presupuesto general no lleva categoría.');
   }
   if (!['ARS', 'USD'].includes(budget.currency)) throw new Error('Elegí ARS o USD.');
   if (!validMonthISO(budget.monthISO)) throw new Error('Elegí un mes válido.');
@@ -87,13 +122,24 @@ export function validateBudgetCollection(budgets: MonthlyBudget[]): void {
     ids.add(budget.id);
     if (!budget.active) continue;
     const key = budgetIdentityKey(budget);
-    if (activeKeys.has(key)) throw new Error('Ya existe un presupuesto activo para esa categoría, moneda y mes.');
+    if (activeKeys.has(key)) {
+      throw new Error(budget.scope === 'total' ? 'Ya existe un presupuesto general activo para esa moneda y mes.'
+        : 'Ya existe un presupuesto activo para esa categoría, moneda y mes.');
+    }
     activeKeys.add(key);
   }
 }
 
 export function sameMonthlyBudget(a: MonthlyBudget, b: MonthlyBudget): boolean {
   return BUDGET_KEYS.every(key => a[key] === b[key]);
+}
+
+/** A legacy record (schema 5/6 rows and v5/v6 backups, which had no scope)
+ * is always a category budget; scoped records pass through unchanged. */
+export function scopedMonthlyBudget(value: MonthlyBudgetBase & { scope?: BudgetScope; category?: string | null }): MonthlyBudget {
+  const { scope, category, ...base } = value;
+  if (scope === 'total') return { ...base, scope: 'total' };
+  return { ...base, scope: 'category', category: category ?? '' };
 }
 
 function safeNumber(value: bigint): number {
@@ -118,21 +164,28 @@ export function summarizeMonthlyBudgets(snapshot: LedgerSnapshot, budgets: Month
     spentByCategory.set(key, (spentByCategory.get(key) ?? 0n) + amount);
   }
 
-  let budgeted = 0n, spentBudgeted = 0n;
-  const rows = active.map(budget => {
-    const spent = spentByCategory.get(categoryKey(budget.category)) ?? 0n;
+  const progress = <B extends MonthlyBudget>(budget: B, spent: bigint): BudgetProgress<B> => {
     const limit = BigInt(budget.amountMinor);
-    budgeted += limit;
-    spentBudgeted += spent;
     const spentMinor = safeNumber(spent);
-    const remainingMinor = safeNumber(limit - spent);
     return {
       budget,
       spentMinor,
-      remainingMinor,
+      remainingMinor: safeNumber(limit - spent),
       ratio: budget.amountMinor > 0 ? Math.max(0, spentMinor / budget.amountMinor) : 0,
       exceeded: spent > limit,
     };
+  };
+  // The total is measured against every expense of the month; the collection
+  // validator above guarantees at most one active total per currency and month.
+  const totalBudget = active.find((budget): budget is TotalMonthlyBudget => budget.scope === 'total') ?? null;
+  const total = totalBudget ? progress(totalBudget, totalSpent) : null;
+
+  let budgeted = 0n, spentBudgeted = 0n;
+  const rows = active.filter((budget): budget is CategoryMonthlyBudget => budget.scope === 'category').map(budget => {
+    const spent = spentByCategory.get(categoryKey(budget.category)) ?? 0n;
+    budgeted += BigInt(budget.amountMinor);
+    spentBudgeted += spent;
+    return progress(budget, spent);
   }).sort((a, b) => Number(b.exceeded) - Number(a.exceeded)
     || b.ratio - a.ratio || categoryKey(a.budget.category).localeCompare(categoryKey(b.budget.category), 'es-AR'));
 
@@ -142,6 +195,7 @@ export function summarizeMonthlyBudgets(snapshot: LedgerSnapshot, budgets: Month
   return {
     currency,
     monthISO,
+    total,
     budgetedMinor,
     spentBudgetedMinor,
     remainingMinor: safeNumber(budgeted - spentBudgeted),

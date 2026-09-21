@@ -1,5 +1,20 @@
 # Physical iPhone acceptance checklist
 
+## Producto 19 — general monthly budget and category sublimits (pending device review)
+
+- [ ] Before updating, share a private copy. After updating, Más footer reads Producto 19 and every existing budget is still there in Presupuestos with the same category, month, currency and amount (they are now "Por categoría" sublimits); nothing else changed.
+- [ ] Más → Presupuestos → + : the form asks Tipo [General | Por categoría] first, then ARS / USD and the amount; General shows no category picker and explains it is the ceiling of all recorded expenses; Por categoría shows the picker and says it is a sublimit that does not add to the general budget; the amount field behaves exactly as in Interfaz 17.
+- [ ] Create a general budget for this month: the screen leads with "Presupuesto general" (Disponible, bar, Gastado / Límite, "N % utilizado", Editar); the sublimits sit under "Por categoría" with their count; there is no summed total anywhere.
+- [ ] Creating a second general budget for the same month and currency is refused with a clear message and nothing is saved; a general budget for the other currency or another month is allowed; ARS spending never counts against a USD budget.
+- [ ] The general budget counts every recorded expense of the month (cash and card purchases once) and ignores income, transfers between accounts, Pagar tarjeta and debt payments/collections; undoing a movement lowers it.
+- [ ] States: below 85 % neutral; from 85 % to exactly the limit amber ("cerca del límite" / "límite alcanzado"); past the limit coral with "excedido" and the amount over. Same colours on Home, Presupuestos, Reportes and the movement detail.
+- [ ] Without a general budget: a compact "Agregar presupuesto general" secondary button, no giant empty card, sublimits still listed; with no budgets at all, the empty state with Crear presupuesto.
+- [ ] Home "Presupuesto del mes": with a general budget it shows what is left, "de $X · N %" and how many sublimits are over; without one it shows the tightest sublimit and the count; tapping opens Presupuestos.
+- [ ] Editing a general budget changes only the amount (no Tipo / currency controls); Eliminar asks first and archives it; a new general budget can then be created for that month.
+- [ ] Reportes → Presupuestos lists "Presupuesto general" first; "Para tener en cuenta" shows "Superaste / Estás cerca de tu presupuesto general" when true.
+- [ ] Más → Copia de seguridad: Compartir copia produces a v7 file; importing it into a fresh install (review, then confirm) restores the general and category budgets; an older v6 copy still imports and its budgets appear as category sublimits.
+- [ ] VoiceOver reads the general panel as one sentence (spent of limit, percent, disponible / excedido); large text and Reduce Motion; both themes; Expo Go.
+
 ## Producto 18 — navigation and smart actions (pending device review)
 
 - [ ] Más footer reads Producto 18; no data changes after updating; the tab bar reads Inicio · Movimientos · Reportes · Tarjetas · Más with the ellipsis-circle glyph; no sixth tab.

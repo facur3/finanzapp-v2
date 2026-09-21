@@ -5,6 +5,7 @@ import { randomUUID } from 'expo-crypto';
 import * as Haptics from 'expo-haptics';
 import { categoryKey, formatMinorUnits, makeEntryChange, summarizeMonthlyBudgets, type EntryChange, type EntryRecord, type Account } from '@finanzapp/domain';
 import { useLedger } from '../../src/storage/LedgerProvider';
+import { budgetTone } from '../../src/ui/budget-presentation';
 import { ActionButton, AppText, CategoryBadge, DetailRow, EmptyState, ErrorMessage, Money, Screen, Surface } from '../../src/ui/components';
 import { space, usePalette } from '../../src/ui/theme';
 
@@ -89,7 +90,7 @@ function EntryDetail({ record, account }: { record: EntryRecord; account: Accoun
       <DetailRow label={card ? 'Tarjeta' : 'Cuenta'} value={account.name} icon={card ? 'card-outline' : 'wallet-outline'}
         disabled={busy}
         onPress={() => router.push(card ? { pathname: '/card/[id]', params: { id: card.id } } : { pathname: '/account/[id]', params: { id: account.id } })} />
-      {budget && <DetailRow label="Presupuesto" icon="speedometer-outline" tone={budget.exceeded ? 'expense' : budget.ratio >= 0.85 ? 'warning' : 'neutral'}
+      {budget && <DetailRow label="Presupuesto" icon="speedometer-outline" tone={budgetTone(budget)}
         value={budget.exceeded ? `Excedido por ${formatMinorUnits(-budget.remainingMinor)}` : `${Math.round(budget.ratio * 100)} % usado · quedan ${formatMinorUnits(budget.remainingMinor)}`}
         onPress={() => router.push({ pathname: '/budgets', params: { currency: account.currency, month: entry.dateISO.slice(0, 7) } })} />}
       <DetailRow label="Moneda" value={account.currency === 'ARS' ? 'Pesos argentinos' : 'Dólares estadounidenses'} last />

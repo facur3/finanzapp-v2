@@ -59,7 +59,7 @@ test('new install is empty; initialization can repeat without deleting data', as
   const { db } = setup();
   await initializeDatabase(db);
   assert.deepEqual(await readSnapshot(db), { accounts: [], entries: [] });
-  assert.equal((await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))?.user_version, 6);
+  assert.equal((await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))?.user_version, 7);
   await createAccount(db, account);
   await initializeDatabase(db);
   assert.deepEqual((await readSnapshot(db)).accounts, [account]);
@@ -145,9 +145,9 @@ test('newer database schema is refused intact instead of reset or downgraded', a
   const { db } = setup();
   await initializeDatabase(db);
   await createAccount(db, account);
-  await db.execAsync('PRAGMA user_version = 7');
+  await db.execAsync('PRAGMA user_version = 8');
   await assert.rejects(initializeDatabase(db), /versión más nueva/);
-  assert.equal((await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))?.user_version, 7);
+  assert.equal((await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))?.user_version, 8);
   assert.deepEqual((await readSnapshot(db)).accounts, [account]);
 });
 
@@ -502,7 +502,7 @@ test('v3 database upgrades through recurring and budget schemas without changing
   const before = await readSnapshot(db);
   await db.execAsync('PRAGMA user_version = 3; DROP TABLE IF EXISTS recurring_rules; DROP TABLE IF EXISTS monthly_budgets; DROP TABLE IF EXISTS credit_cards; DROP TABLE IF EXISTS personal_debts;');
   await initializeDatabase(db);
-  assert.equal((await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))?.user_version, 6);
+  assert.equal((await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))?.user_version, 7);
   assert.deepEqual(await readSnapshot(db), before);
   assert.deepEqual((await readArchive(db)).recurring ?? [], []);
   assert.deepEqual((await readArchive(db)).budgets ?? [], []);
@@ -582,6 +582,7 @@ test('current backup roundtrip and additive import preserve recurring rules with
 
 const monthlyBudget: MonthlyBudget = {
   id: 'budget-fixture',
+  scope: 'category',
   category: 'Fixture',
   currency: 'ARS',
   monthISO: '2026-09',
@@ -601,7 +602,7 @@ test('schema 4 upgrades to budget schema 5 without changing recurring rules or b
   await db.execAsync('DROP TABLE monthly_budgets; DROP TABLE credit_cards; DROP TABLE personal_debts; PRAGMA user_version = 4;');
   await initializeDatabase(db);
   const after = await readArchive(db);
-  assert.equal((await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))?.user_version, 6);
+  assert.equal((await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))?.user_version, 7);
   assert.deepEqual(after.accounts, before.accounts);
   assert.deepEqual(after.records, before.records);
   assert.deepEqual(after.recurring, before.recurring);
@@ -656,7 +657,7 @@ test('v5 backup/import preserves active and archived budgets without duplicating
   await saveMonthlyBudget(db, archived);
   const original = await readArchive(db);
   const backup = createRecoveryBackup(original);
-  assert.equal(backup.schema, 'finanzapp.native-pilot.v6');
+  assert.equal(backup.schema, 'finanzapp.native-pilot.v7');
   const incoming = parsePilotBackup(JSON.stringify(backup)).archive;
   assert.deepEqual(incoming.budgets, [archived]);
 
@@ -668,6 +669,112 @@ test('v5 backup/import preserves active and archived budgets without duplicating
   assert.equal(archiveKey(await readArchive(other)), archiveKey(incoming));
 });
 
+
+const totalBudget: MonthlyBudget = { id: 'total-fixture', scope: 'total', currency: 'ARS', monthISO: '2026-09', amountMinor: 500000, active: true,
+  createdAt: '2026-09-01T12:00:00.000Z', revision: 0, updatedAt: '2026-09-01T12:00:00.000Z' };
+const V6_BUDGETS_TABLE = `
+  CREATE TABLE monthly_budgets (
+    id TEXT PRIMARY KEY NOT NULL,
+    category TEXT NOT NULL CHECK(length(trim(category)) BETWEEN 1 AND 60),
+    currency TEXT NOT NULL CHECK(currency IN ('ARS', 'USD')),
+    monthISO TEXT NOT NULL,
+    amountMinor INTEGER NOT NULL CHECK(amountMinor > 0 AND amountMinor <= 9007199254740991),
+    active INTEGER NOT NULL CHECK(active IN (0, 1)),
+    createdAt TEXT NOT NULL,
+    revision INTEGER NOT NULL DEFAULT 0 CHECK(revision >= 0 AND revision <= 9007199254740991),
+    updatedAt TEXT NOT NULL
+  ) STRICT;
+  CREATE INDEX budgets_period ON monthly_budgets(currency, monthISO, active);`;
+
+test('schema 6 upgrades to scoped budget schema 7: every old budget survives exactly as a category budget', async () => {
+  const { db, path } = await funded();
+  await saveRecurringRule(db, recurring);
+  const before = await readArchive(db);
+  // Rebuild the v6 table by hand and insert rows the old way (no scope column), including an archived one and an odd spelling.
+  await db.execAsync('DROP TABLE monthly_budgets;' + V6_BUDGETS_TABLE + " PRAGMA user_version = 6;");
+  const legacy = [
+    { ...monthlyBudget },
+    { ...monthlyBudget, id: 'archived-fixture', category: ' fÍxture ', active: false, revision: 3, updatedAt: changedAt },
+    { ...monthlyBudget, id: 'usd-fixture', category: 'Viajes', currency: 'USD' as const, amountMinor: 123456 },
+  ];
+  for (const row of legacy) {
+    await db.runAsync('INSERT INTO monthly_budgets (id, category, currency, monthISO, amountMinor, active, createdAt, revision, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      row.id, row.category!, row.currency, row.monthISO, row.amountMinor, row.active ? 1 : 0, row.createdAt, row.revision, row.updatedAt);
+  }
+  // An interrupted migration leaves the v6 table, its rows and the version untouched.
+  const failing: LedgerDatabase = { ...db, withExclusiveTransactionAsync: work => db.withExclusiveTransactionAsync(tx => work({ ...tx,
+    execAsync: async sql => { await tx.execAsync(sql); if (sql.includes('monthly_budgets_v7')) throw new Error('Interrupted v7'); },
+  })) };
+  await assert.rejects(initializeDatabase(failing), /Interrupted v7/);
+  assert.equal((await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))?.user_version, 6);
+  assert.equal((await db.getFirstAsync<{ n: number }>('SELECT count(*) AS n FROM monthly_budgets'))?.n, 3);
+  await initializeDatabase(db);
+  await initializeDatabase(db); // idempotent: a v7 file is not rebuilt again
+  assert.equal((await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))?.user_version, 7);
+  const after = await readArchive(db);
+  assert.deepEqual(after.accounts, before.accounts);
+  assert.deepEqual(after.records, before.records);
+  assert.deepEqual(after.recurring, before.recurring);
+  const byId = Object.fromEntries((after.budgets ?? []).map(budget => [budget.id, budget]));
+  for (const row of legacy) assert.deepEqual(byId[row.id], { ...row, scope: 'category' }, row.id + ' keeps id, category, month, currency, amount, state, revision and timestamps');
+  assert.equal(Object.keys(byId).length, 3);
+  // The rebuilt table enforces the scope rule: a total row cannot carry a category and a sublimit cannot lack one.
+  await assert.rejects(db.runAsync("INSERT INTO monthly_budgets (id, scope, category, currency, monthISO, amountMinor, active, createdAt, revision, updatedAt) VALUES ('bad', 'total', 'General', 'ARS', '2026-09', 1, 1, '2026-09-01T12:00:00.000Z', 0, '2026-09-01T12:00:00.000Z')"));
+  await assert.rejects(db.runAsync("INSERT INTO monthly_budgets (id, scope, category, currency, monthISO, amountMinor, active, createdAt, revision, updatedAt) VALUES ('bad', 'category', NULL, 'ARS', '2026-09', 1, 1, '2026-09-01T12:00:00.000Z', 0, '2026-09-01T12:00:00.000Z')"));
+  await db.closeAsync();
+  const reopened = databaseAt(path);
+  await initializeDatabase(reopened);
+  assert.equal(archiveKey(await readArchive(reopened)), archiveKey(after));
+});
+
+test('a total budget persists without a category, beside sublimits, once per currency and month, and never changes balances', async () => {
+  const { db, path } = await funded();
+  const beforeBalance = accountBalanceMinor(account, (await readSnapshot(db)).entries);
+  await saveMonthlyBudget(db, totalBudget);
+  await saveMonthlyBudget(db, totalBudget); // retry-safe
+  await saveMonthlyBudget(db, monthlyBudget);
+  let archive = await readArchive(db);
+  assert.deepEqual(archive.budgets, [totalBudget, monthlyBudget], 'the total sorts before its month\'s sublimits');
+  assert.equal(Object.hasOwn(archive.budgets![0], 'category'), false, 'no fake category on a total');
+  assert.equal((await db.getFirstAsync<{ category: string | null; scope: string }>('SELECT category, scope FROM monthly_budgets WHERE id = ?', totalBudget.id))?.category, null);
+  assert.equal(accountBalanceMinor(account, (await readSnapshot(db)).entries), beforeBalance);
+  const before = archiveKey(archive);
+  // A second active total for the same currency and month is refused; other months and currencies are fine.
+  await assert.rejects(saveMonthlyBudget(db, { ...totalBudget, id: 'second-total' }), /general activo/);
+  await assert.rejects(saveMonthlyBudget(db, { ...totalBudget, id: 'fake-category', category: 'General' } as unknown as MonthlyBudget), /no lleva categoría/);
+  await assert.rejects(saveMonthlyBudget(db, { ...totalBudget, id: 'zero', amountMinor: 0 }), /mayor que cero/);
+  await assert.rejects(saveMonthlyBudget(db, { ...totalBudget, id: 'negative', amountMinor: -1 }), /mayor que cero/);
+  // Editing keeps identity: the kind cannot flip, a stale revision is refused, an amount edit is retry-safe.
+  await assert.rejects(saveMonthlyBudget(db, { ...monthlyBudget, scope: 'total', category: undefined, revision: 1, updatedAt: changedAt } as MonthlyBudget), /general y por categoría/);
+  await assert.rejects(saveMonthlyBudget(db, { ...totalBudget, amountMinor: 1, revision: 0 }), /cambió/);
+  assert.equal(archiveKey(await readArchive(db)), before, 'nothing changed on rejection');
+  await saveMonthlyBudget(db, { ...totalBudget, id: 'october', monthISO: '2026-10' });
+  await saveMonthlyBudget(db, { ...totalBudget, id: 'usd', currency: 'USD', amountMinor: 30000 });
+  const edited: MonthlyBudget = { ...totalBudget, amountMinor: 600000, revision: 1, updatedAt: changedAt };
+  await saveMonthlyBudget(db, edited);
+  await saveMonthlyBudget(db, edited);
+  // Archiving the total lets a new one take its place; history keeps the archived row.
+  const archived: MonthlyBudget = { ...edited, active: false, revision: 2, updatedAt: '2026-09-14T12:00:00.000Z' };
+  await saveMonthlyBudget(db, archived);
+  await saveMonthlyBudget(db, { ...totalBudget, id: 'replacement', amountMinor: 450000 });
+  await db.closeAsync();
+  const reopened = databaseAt(path);
+  await initializeDatabase(reopened);
+  archive = await readArchive(reopened);
+  assert.deepEqual(archive.budgets!.map(budget => [budget.id, budget.scope, budget.active, budget.amountMinor]),
+    [['october', 'total', true, 500000], ['replacement', 'total', true, 450000], ['total-fixture', 'total', false, 600000], ['budget-fixture', 'category', true, 20000], ['usd', 'total', true, 30000]]);
+  // v7 backups round-trip totals; a v6 file with the same category budget still imports, as a category budget.
+  const backup = createRecoveryBackup(archive);
+  assert.equal(backup.schema, 'finanzapp.native-pilot.v7');
+  assert.equal(archiveKey(parsePilotBackup(JSON.stringify(backup)).archive), archiveKey(archive));
+  const { scope: _scope, ...legacyRow } = monthlyBudget;
+  const v6 = { ...createRecoveryBackup({ accounts: archive.accounts, records: archive.records }), schema: 'finanzapp.native-pilot.v6', budgets: [legacyRow] };
+  const other = setup().db;
+  await initializeDatabase(other);
+  const incoming = parsePilotBackup(JSON.stringify(v6)).archive;
+  await importArchive(other, incoming, archiveKey(await readArchive(other)));
+  assert.deepEqual((await readArchive(other)).budgets, [monthlyBudget]);
+});
 
 const cardAccount: Account = { id: 'card-account', name: 'Visa Gold', currency: 'ARS', openingMinor: -20000, createdAt: account.createdAt };
 const card: CreditCardProfile = { id: 'card-fixture', accountId: cardAccount.id, issuer: 'Banco', last4: '4009', creditLimitMinor: 500000,
@@ -692,7 +799,7 @@ test('schema 5 upgrades to card/debt schema 6 preserving budgets, recurring rule
   assert.equal((await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))?.user_version, 5);
   await initializeDatabase(db);
   const after = await readArchive(db);
-  assert.equal((await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))?.user_version, 6);
+  assert.equal((await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))?.user_version, 7);
   assert.equal(archiveKey(after), archiveKey(before));
   assert.deepEqual(after.cards ?? [], []);
   assert.deepEqual(after.debts ?? [], []);
@@ -814,7 +921,7 @@ test('v6 backup roundtrips cards and debts; additive import never duplicates the
   await createPersonalDebt(db, debtAccount, debt);
   const original = await readArchive(db);
   const backup = createRecoveryBackup(original);
-  assert.equal(backup.schema, 'finanzapp.native-pilot.v6');
+  assert.equal(backup.schema, 'finanzapp.native-pilot.v7');
   const incoming = parsePilotBackup(JSON.stringify(backup)).archive;
   assert.deepEqual(incoming.cards, original.cards);
   assert.deepEqual(incoming.debts, original.debts);

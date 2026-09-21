@@ -267,8 +267,29 @@ importe, moneda y estado.
 - Inicio no suma botones: el acceso al Asistente desaparece de la cabecera mientras
   sea una vista previa; los bloques contextuales existentes se mantienen.
 
+## Producto 19 — presupuesto general y sublímites (sin rediseño)
+
+- **Formulario.** Primero el tipo, con el segmentado existente: General o Por
+  categoría. General no muestra selector de categoría; Por categoría lo conserva.
+  Mismo AmountField de Interfaz 17.
+- **Presupuestos.** Jerarquía: el presupuesto general es el resumen principal
+  (Disponible o Excedido, barra, Gastado / Límite, "N % utilizado" en su color de
+  estado) y los límites por categoría son filas densas debajo. Sin general, un botón
+  secundario compacto "Agregar presupuesto general", nunca una tarjeta vacía enorme.
+  Nunca se suman los sublímites.
+- **Estados.** Un solo criterio en el dominio: calmo por debajo del 85 %, aviso
+  (ámbar) desde el 85 % hasta el límite inclusive, excedido (coral) al superarlo.
+  Los mismos tres tonos semánticos de siempre.
+- **Inicio.** La tarjeta responde cuánto del mes usé: lo que queda del general,
+  "de $X · N %" y cuántos sublímites se excedieron; sin general, el sublímite más
+  ajustado y la cantidad de sublímites.
+
 ## Pendiente de revisión en iPhone
 
+- Tipo del formulario y ambas variantes; panel general y filas en calmo / aviso /
+  excedido; botón compacto; tarjeta de Inicio con y sin general; migración del
+  archivo real (presupuestos idénticos) y copia v7; VoiceOver, texto grande,
+  Reduce Motion, ambos temas.
 - Más y sus grupos, Tarjetas sin deudas, los atajos de importe con el teclado del
   iPhone (valor, cursor al final, edición posterior), Categorías y Copia de seguridad;
   VoiceOver del atajo; ambos temas, texto grande y Reduce Motion.

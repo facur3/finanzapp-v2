@@ -9,6 +9,12 @@ y presupuestos siguen en el plan; inversiones y patrimonio salen del alcance nat
 - [Decisión, alternativas y alcance](docs/decisions/002-spending-first.md)
 - [Base de IA en nube y Atajos: qué funciona y qué falta](docs/mobile-integrations.md)
 
+**Producto 19 (2026-09-21):** presupuestos completos en la app nativa: un
+**presupuesto general** mensual (techo de todos los gastos registrados del mes en una
+moneda) junto a **límites por categoría** que son sublímites y no se suman; modelo
+con `scope`, esquema SQLite 7 (los presupuestos existentes se conservan exactos como
+sublímites por categoría) y copia v7 (las v5/v6 siguen importándose). Sin rediseño.
+
 **Producto 18 (2026-09-21):** la quinta pestaña nativa es **Más**, hub agrupado de
 Cuentas, Presupuestos, Recurrentes, Deudas y cobros, Categorías, Asistente y datos;
 Tarjetas queda solo para tarjetas de crédito; las transferencias, pagos de tarjeta y

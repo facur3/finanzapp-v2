@@ -51,7 +51,7 @@ describe('credit card accounting', () => {
   });
 
   it('card purchases consume the category budget; the payment transfer does not', () => {
-    const budget: MonthlyBudget = { id: 'b', category: 'Café', currency: 'ARS', monthISO: '2026-09', amountMinor: 50000, active: true, createdAt, revision: 0, updatedAt: createdAt };
+    const budget: MonthlyBudget = { id: 'b', scope: 'category', category: 'Café', currency: 'ARS', monthISO: '2026-09', amountMinor: 50000, active: true, createdAt, revision: 0, updatedAt: createdAt };
     const summary = summarizeMonthlyBudgets(snapshot, [budget], 'ARS', '2026-09');
     expect(summary.rows[0].spentMinor).toBe(23100);
     expect(summary.totalSpentMinor).toBe(28100);

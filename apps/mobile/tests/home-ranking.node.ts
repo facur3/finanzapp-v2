@@ -4,6 +4,7 @@ import { test } from 'node:test';
 import { runInNewContext } from 'node:vm';
 import ts from 'typescript';
 import * as presentation from '../src/ui/report-presentation.ts';
+import * as budgetPresentation from '../src/ui/budget-presentation.ts';
 import { washOf } from '../src/ui/category-color.ts';
 
 // A source/behaviour guard over the Home category module: honest proportions,
@@ -36,6 +37,7 @@ function harness() {
     './category-hues': { useCategoryColor: (label: string) => '#' + label.length.toString().padStart(6, 'A') },
     './motion': { easeOut: 'ease-out', timing: (kind: string, reduced: boolean) => ({ duration: reduced ? 0 : 260 }) },
     './report-presentation': presentation,
+    './budget-presentation': budgetPresentation,
     './theme': { useReduceMotion: () => env.reduced, usePalette: () => ({ line: '#ddd', isDark: true }) },
   };
   const module = { exports: {} as Record<string, any> };
@@ -48,7 +50,14 @@ function harness() {
     const group = module.exports.CategoryRanking(props);
     return { group, rows: group.props.children.map((row: any) => { const node = row.type(row.props); return node; }) };
   };
-  return { env, render };
+  const renderBudget = (summary: any) => { env.cursor.shared = 0; env.cursor.ref = 0; return module.exports.BudgetHomeCard({ summary }); };
+  return { env, render, renderBudget };
+}
+function flatten(value: any): any[] {
+  if (!value || typeof value !== 'object') return [];
+  if (Array.isArray(value)) return value.flatMap(flatten);
+  if (!value.props) return [];
+  return [value, ...flatten(value.props.children)];
 }
 
 const category = (key: string, amountMinor: number) => ({ key, category: key, amountMinor, count: 1 });
@@ -113,4 +122,38 @@ test('Home shows at most three ranked categories', () => {
   const { render } = harness();
   const categories = Array.from({ length: 6 }, (_, index) => category('c' + index, 100));
   assert.equal(render({ categories, totalMinor: 600, currency: 'ARS', onPressCategory: () => {} }).rows.length, 3);
+});
+
+const budgetAt = '2026-09-01T12:00:00.000Z';
+const totalBudget = { id: 't', scope: 'total', currency: 'ARS', monthISO: '2026-09', amountMinor: 50000000, active: true, createdAt: budgetAt, revision: 0, updatedAt: budgetAt };
+const progress = (budget: any, spentMinor: number) => ({ budget, spentMinor, remainingMinor: budget.amountMinor - spentMinor, ratio: spentMinor / budget.amountMinor, exceeded: spentMinor > budget.amountMinor });
+const foodRow = progress({ ...totalBudget, id: 'f', scope: 'category', category: 'Comida', amountMinor: 15000000 }, 12000000);
+const funRow = progress({ ...totalBudget, id: 'o', scope: 'category', category: 'Ocio', amountMinor: 5000000 }, 5500000);
+
+test('the Home budget card leads with the general budget and its share used, and counts sublimits without adding them', () => {
+  const { renderBudget } = harness();
+  const summary = { currency: 'ARS', monthISO: '2026-09', total: progress(totalBudget, 32000000), rows: [funRow, foodRow],
+    budgetedMinor: 20000000, spentBudgetedMinor: 17500000, remainingMinor: 2500000, totalSpentMinor: 32000000, unbudgetedSpentMinor: 14500000 };
+  const card = renderBudget(summary);
+  assert.equal(card.props.accessibilityLabel, 'Presupuesto general: quedan 18000000 ARS de 50000000, 64 por ciento usado. 1 categoría excedida');
+  const money = flatten(card).find(node => node.type === 'Money');
+  assert.equal(money.props.minor, 18000000, 'what is left of the ceiling, never the sum of sublimits');
+  const texts = flatten(card).filter(node => node.type === 'AppText').map(node => Array.isArray(node.props.children) ? node.props.children.join('') : String(node.props.children));
+  assert.ok(texts.includes('Presupuesto general · te queda'));
+  assert.ok(texts.includes('de $ 50000000 · 64 %'));
+  assert.ok(texts.includes('1 categoría excedida'));
+  const exceeded = renderBudget({ ...summary, total: progress(totalBudget, 60000000), rows: [] });
+  assert.match(exceeded.props.accessibilityLabel, /^Presupuesto general: excedido en 10000000 ARS de 50000000, 120 por ciento usado\.$/);
+});
+
+test('without a general budget the Home card falls back to the tightest sublimit and says how many there are', () => {
+  const { renderBudget } = harness();
+  const card = renderBudget({ currency: 'ARS', monthISO: '2026-09', total: null, rows: [funRow, foodRow],
+    budgetedMinor: 20000000, spentBudgetedMinor: 17500000, remainingMinor: 2500000, totalSpentMinor: 32000000, unbudgetedSpentMinor: 14500000 });
+  assert.equal(card.props.accessibilityLabel, 'Ocio: excedido en 500000 ARS de 5000000, 110 por ciento usado. 2 categorías · 1 excedida');
+  assert.equal(flatten(card).find(node => node.type === 'Money').props.minor, 500000);
+  assert.equal(flatten(card).some(node => node.type === 'Money' && node.props.minor === 2500000), false, 'no summed remaining');
+  const single = renderBudget({ currency: 'ARS', monthISO: '2026-09', total: null, rows: [foodRow], budgetedMinor: 15000000, spentBudgetedMinor: 12000000, remainingMinor: 3000000, totalSpentMinor: 12000000, unbudgetedSpentMinor: 0 });
+  assert.equal(single.props.accessibilityLabel, 'Comida: quedan 3000000 ARS de 15000000, 80 por ciento usado. Límite por categoría');
+  assert.equal(renderBudget({ currency: 'ARS', monthISO: '2026-09', total: null, rows: [], budgetedMinor: 0, spentBudgetedMinor: 0, remainingMinor: 0, totalSpentMinor: 0, unbudgetedSpentMinor: 0 }), null);
 });

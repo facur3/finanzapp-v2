@@ -58,6 +58,13 @@ deshechos); Tarjetas holds only credit cards; the Home sparkles shortcut is gone
 while the Assistant is a preview; and the transfer form offers fill-only amount
 shortcuts — Usar todo, Pagar total, Saldar total, Cobrar total — computed from the
 recorded balance or obligation, never submitting on their own.
+**Producto 19 (2026-09-21)** completes budgets: a **general** monthly budget (the
+ceiling for every recorded expense of the month in one currency) beside **category**
+sublimits that never add up to it; a scoped model (`scope: 'total' | 'category'`,
+no fake "General" category), SQLite schema 7 (the budgets table is rebuilt and every
+old budget survives exactly as a category budget), backup format v7 (v5/v6 files
+still import), a hierarchical Presupuestos screen, a Home card that answers "how much
+of my month have I used" and one shared set of states (calm / warning / exceeded).
 
 The Reportes tab shows, for one month and currency, the recorded total with its daily
 average and change against the same elapsed days of the previous month, a six-month
@@ -154,11 +161,20 @@ whose opening balance is the principal; each payment or collection is a transfer
 capped at the outstanding amount. Expenses, income and recurring rules can never be
 posted to a debt account. Home's Disponible excludes cards, debts and receivables.
 
-Más → Presupuestos stores category limits for one month and one currency. Only
-recorded expenses consume them; income and internal transfers do not. Budgets can be
-edited or archived without changing historical movements or account balances. Home
-shows the current-month budget only when meaningful and distinguishes its remaining
-limit from the separately calculated account balance.
+Más → Presupuestos stores planning limits for one month and one currency, in two
+kinds. A **general** budget is the ceiling for every recorded expense of that month
+and currency: cash and card purchases count once, exactly as in Reportes; income,
+internal transfers, card payments and debt settlements never count; voided entries
+are gone. A **category** budget is a sublimit for one normalised category inside it.
+Sublimits are never summed: "General 500.000, Comida 150.000, Ocio 50.000" plans
+500.000. At most one active general budget per currency and month, and one active
+sublimit per category, currency and month; editing never flips the kind or the
+currency. Budgets can be edited or archived without changing historical movements or
+account balances. States are shared everywhere: calm below 85 %, warning from 85 %
+up to and including the limit, exceeded past it. Home leads with the general budget
+when one exists (what is left, the share used, how many sublimits are over) and
+otherwise with the tightest sublimit, never with a sum of sublimits. ARS and USD stay
+separate; a USD budget only sees USD expenses.
 
 The current visual iteration includes:
 
@@ -197,7 +213,11 @@ The current visual iteration includes:
 Interfaz 05 migrated the existing pilot SQLite file from schema 1/2 to 3, atomically,
 preserving its filename/rows and entry audit. Interfaz 08 added schema 4 recurring_rules;
 Interfaz 09 added schema 5 monthly_budgets; Interfaz 10 adds schema 6 credit_cards and
-personal_debts. Neither replaces existing balances, entries, transfers or schedules.
+personal_debts; Producto 19 adds schema 7, which rebuilds monthly_budgets with a
+`scope` column and a nullable `category` (every existing row is copied as a category
+budget with its id, amount, month, currency, state, revision and timestamps unchanged,
+in one exclusive transaction; an interruption leaves the schema 6 table intact). None of
+them replaces existing balances, entries, transfers or schedules.
 Do not revert to older app code after upgrading. A newer DB version is refused
 intact; no error deletes the file. No Supabase connection, seeded records, new
 runtime dependency or paid service was introduced. Follow the new-iteration section of the
@@ -208,8 +228,10 @@ the entire portfolio or uninstall the existing app. Legacy import, card installm
 Supabase sync, Face ID, reminders and Apple Pay capture are separate roadmap
 milestones; no disabled decorative buttons imply otherwise.
 
-The pilot exports its own v6 JSON backup through the system sharing sheet and
-imports native v1 to v6 backups through Más → Copia de seguridad → Importar copia. Review shows new
+The pilot exports its own v7 JSON backup through the system sharing sheet and
+imports native v1 to v7 backups through Más → Copia de seguridad → Importar copia. A v7
+budget carries its `scope`; a general budget has no `category` key. Budgets in v5/v6
+files have no scope and are read as category budgets, exactly as written. Review shows new
 accounts, cards, debts, active/undone entries, transfers, recurring rules and budgets,
 identical records and exact before/after liquid totals for ARS/USD separately (cards
 and debts are excluded from those totals). Confirmation adds only missing IDs in one transaction.
@@ -221,7 +243,7 @@ Native JSON is **not** the legacy web backup format: unsupported schema/entities
 invalid cents/dates/references, duplicate IDs, unsafe totals, extra fields and files
 over 5 MB are rejected before import. Limits: 1,000 accounts, 25,000 combined
 entry/transfer records, 5,000 recurring rules and 5,000 budgets.
-Export validates its own restore format/size. V6 includes current versions,
+Export validates its own restore format/size. V7 includes current versions,
 tombstones, recurring schedules, monthly budgets and card/debt profiles, **not** full
 local account/entry/transfer audit history, settings, attachments or investments. A backup is a snapshot, not a cross-device synchronization.
 There is no replace/reset import mode; preserve both copies if conflicts are reported.
@@ -301,7 +323,8 @@ The mobile tests include guards over the real five-tab layout (Más, no Home spa
 report/recovery/transfer handlers, the Cards tab (no personal debts), card/debt detail,
 the locked card-payment form, the fill-only amount shortcuts (Usar todo, Pagar total,
 Saldar total, Cobrar total), the Más hub, backup and read-only categories screens,
-historical custom categories and bar-animation configuration. These are **not** native rendering/gesture tests;
+historical custom categories, the scoped budget form, the hierarchical Presupuestos
+screen, the Home budget card, the schema 7 migration and bar-animation configuration. These are **not** native rendering/gesture tests;
 use the physical checklist. The root suite also tests the shared monthly summary
 and spending report, including exact category-to-entry reconciliation.
 
@@ -310,7 +333,7 @@ For the intermittent black-tab report, update to `master`, restart with
 and repeat the **Interfaz 02** tab checks, **Interfaz 03** report checks and
 **Interfaz 04/05** correction/recovery and transfer checks, plus **Interfaz 06** daily/comparison reports and **Interfaz 08** recurring/upcoming
 checks, plus **Interfaz 10** cards/debts and five-tab checks and **Interfaz 11** Home,
-Movimientos and detail checks, **Interfaz 12** form checks, **Interfaz 13** Reportes checks, **Interfaz 14** budgets/recurring/accounts checks, **Interfaz 15** motion checks, **Interfaz 16** cohesion checks, **Interfaz 17** identity and money-input checks and **Producto 18** Más / Tarjetas / amount-shortcut checks. The current footer (Más) says Producto 18.
+Movimientos and detail checks, **Interfaz 12** form checks, **Interfaz 13** Reportes checks, **Interfaz 14** budgets/recurring/accounts checks, **Interfaz 15** motion checks, **Interfaz 16** cohesion checks, **Interfaz 17** identity and money-input checks **Producto 18** Más / Tarjetas / amount-shortcut checks and **Producto 19** budget checks. The current footer (Más) says Producto 19.
 Before updating, save a private pilot copy; do not uninstall or add fake movements.
 
 If a storage/refresh error occurs, the form retains the exact submitted command

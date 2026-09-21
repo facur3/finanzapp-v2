@@ -5,7 +5,7 @@ import {
   accountBalanceMinor, validateAccountChange, type AccountChange, initialTransferRecord, sameTransferRecord,
   sameTransfer, validateTransfer, validateTransferChange, type Transfer, type TransferChange, type TransferRecord,
   materializeRecurringRule, sameRecurringRule, validateRecurringRule, type RecurringRule,
-  sameMonthlyBudget, validateMonthlyBudget, type MonthlyBudget,
+  sameMonthlyBudget, scopedMonthlyBudget, validateMonthlyBudget, type MonthlyBudget,
   assertPostingAccount, sameCreditCardProfile, samePersonalDebtProfile, validateCreditCardProfile, validatePersonalDebtProfile,
   type CreditCardProfile, type PersonalDebtProfile,
 } from '@finanzapp/domain';
@@ -22,7 +22,7 @@ export interface LedgerDatabase extends SqlExecutor {
 }
 
 export const DATABASE_NAME = 'finanzapp-native-pilot-v1.sqlite';
-export const DATABASE_VERSION = 6;
+export const DATABASE_VERSION = 7;
 
 const SCHEMA = `
   CREATE TABLE accounts (
@@ -160,6 +160,36 @@ const MIGRATE_V6 = `
   PRAGMA user_version = 6;
 `;
 
+// Producto 19: a budget has a scope. A total budget is the month's ceiling
+// and carries no category; a category budget is a sublimit. SQLite cannot
+// relax the old NOT NULL/CHECK on `category`, so the table is rebuilt in the
+// same exclusive transaction: every existing row is copied as a category
+// budget with its id, category, month, currency, amount, state, timestamps and
+// revision unchanged, then the old table is dropped and the new one renamed.
+// Guarded by user_version, so it runs once and never on a v7 file.
+const MIGRATE_V7 = `
+  CREATE TABLE monthly_budgets_v7 (
+    id TEXT PRIMARY KEY NOT NULL,
+    scope TEXT NOT NULL CHECK(scope IN ('total', 'category')),
+    category TEXT CHECK(
+      (scope = 'category' AND category IS NOT NULL AND length(trim(category)) BETWEEN 1 AND 60)
+      OR (scope = 'total' AND category IS NULL)),
+    currency TEXT NOT NULL CHECK(currency IN ('ARS', 'USD')),
+    monthISO TEXT NOT NULL,
+    amountMinor INTEGER NOT NULL CHECK(amountMinor > 0 AND amountMinor <= 9007199254740991),
+    active INTEGER NOT NULL CHECK(active IN (0, 1)),
+    createdAt TEXT NOT NULL,
+    revision INTEGER NOT NULL DEFAULT 0 CHECK(revision >= 0 AND revision <= 9007199254740991),
+    updatedAt TEXT NOT NULL
+  ) STRICT;
+  INSERT INTO monthly_budgets_v7 (id, scope, category, currency, monthISO, amountMinor, active, createdAt, revision, updatedAt)
+    SELECT id, 'category', category, currency, monthISO, amountMinor, active, createdAt, revision, updatedAt FROM monthly_budgets;
+  DROP TABLE monthly_budgets;
+  ALTER TABLE monthly_budgets_v7 RENAME TO monthly_budgets;
+  CREATE INDEX budgets_period ON monthly_budgets(currency, monthISO, active);
+  PRAGMA user_version = 7;
+`;
+
 export async function initializeDatabase(db: LedgerDatabase): Promise<void> {
   // Set before opening a transaction; foreign_keys is connection-local.
   await db.execAsync('PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000;');
@@ -175,6 +205,7 @@ export async function initializeDatabase(db: LedgerDatabase): Promise<void> {
     if (version < 4) await tx.execAsync(MIGRATE_V4);
     if (version < 5) await tx.execAsync(MIGRATE_V5);
     if (version < 6) await tx.execAsync(MIGRATE_V6);
+    if (version < 7) await tx.execAsync(MIGRATE_V7);
   });
   await readSnapshot(db); // Validate before showing a balance, not after a render.
 }
@@ -210,11 +241,14 @@ export async function readArchive(db: SqlExecutor): Promise<LedgerArchive> {
     validateRecurringRule(rule, accounts);
     return rule;
   });
-  const budgetRows = await db.getAllAsync<Omit<MonthlyBudget, 'active'> & { active: number }>(
-    'SELECT * FROM monthly_budgets ORDER BY monthISO DESC, currency, category, createdAt, id');
+  type BudgetRow = { id: string; scope: 'total' | 'category'; category: string | null; currency: MonthlyBudget['currency']; monthISO: string;
+    amountMinor: number; active: number; createdAt: string; revision: number; updatedAt: string };
+  // The total (category NULL) sorts before the sublimits of its month.
+  const budgetRows = await db.getAllAsync<BudgetRow>(
+    'SELECT * FROM monthly_budgets ORDER BY monthISO DESC, currency, category IS NOT NULL, category, createdAt, id');
   const budgets = budgetRows.map(({ active, ...row }) => {
     if (active !== 0 && active !== 1) throw new Error('Estado de presupuesto inválido.');
-    const budget = { ...row, active: active === 1 };
+    const budget = scopedMonthlyBudget({ ...row, active: active === 1 });
     validateMonthlyBudget(budget);
     return budget;
   });
@@ -496,13 +530,13 @@ export async function processRecurring(db: LedgerDatabase, throughDateISO: strin
 
 
 async function insertMonthlyBudget(tx: SqlExecutor, budget: MonthlyBudget): Promise<void> {
-  await tx.runAsync(`INSERT INTO monthly_budgets (id, category, currency, monthISO, amountMinor, active, createdAt, revision, updatedAt)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`, budget.id, budget.category, budget.currency, budget.monthISO,
+  await tx.runAsync(`INSERT INTO monthly_budgets (id, scope, category, currency, monthISO, amountMinor, active, createdAt, revision, updatedAt)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, budget.id, budget.scope, budget.scope === 'category' ? budget.category : null, budget.currency, budget.monthISO,
   budget.amountMinor, budget.active ? 1 : 0, budget.createdAt, budget.revision, budget.updatedAt);
 }
 
 export async function saveMonthlyBudget(db: LedgerDatabase, input: MonthlyBudget): Promise<void> {
-  const budget = { ...input, category: input.category.trim() };
+  const budget: MonthlyBudget = input.scope === 'category' ? { ...input, category: input.category.trim() } : input;
   await db.withExclusiveTransactionAsync(async tx => {
     const archive = await readArchive(tx);
     validateMonthlyBudget(budget);
@@ -522,10 +556,13 @@ export async function saveMonthlyBudget(db: LedgerDatabase, input: MonthlyBudget
     if (budget.currency !== existing.currency) {
       throw new Error('Para cambiar la moneda, creá otro presupuesto.');
     }
+    if (budget.scope !== existing.scope) {
+      throw new Error('Para cambiar entre presupuesto general y por categoría, creá otro presupuesto.');
+    }
     const budgets = (archive.budgets ?? []).map(item => item.id === budget.id ? budget : item);
     validateArchive({ ...archive, budgets });
     await tx.runAsync(`UPDATE monthly_budgets SET category = ?, monthISO = ?, amountMinor = ?, active = ?,
-      revision = ?, updatedAt = ? WHERE id = ?`, budget.category, budget.monthISO, budget.amountMinor,
+      revision = ?, updatedAt = ? WHERE id = ?`, budget.scope === 'category' ? budget.category : null, budget.monthISO, budget.amountMinor,
     budget.active ? 1 : 0, budget.revision, budget.updatedAt, budget.id);
   });
 }

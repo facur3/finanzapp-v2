@@ -4,6 +4,7 @@ import { archiveKey, BACKUP_MAX_BYTES, createRecoveryBackup, initialRecord, make
   sameRecord, snapshotFromArchive, validateArchive, validateEntryChange, type LedgerArchive } from './recovery';
 import { initialTransferRecord } from './transfers';
 import type { CreditCardProfile, PersonalDebtProfile } from './liabilities';
+import type { MonthlyBudget } from './budgets';
 
 const account: Account = { id: 'a', name: 'Prueba', currency: 'ARS', openingMinor: 100000, createdAt: '2026-09-11T12:00:00Z' };
 const entry: Entry = { id: 'e', accountId: 'a', kind: 'expense', amountMinor: 101, merchant: 'Prueba', category: 'Prueba', dateISO: '2026-09-11', createdAt: account.createdAt };
@@ -28,10 +29,25 @@ describe('native edit and recovery domain', () => {
     expect(restored.archive).toEqual(archive);
     expect(archive.records[0].revision).toBe(0);
   });
-  it('v6 backups carry cards and debts; a v5 file without them still restores', () => {
+  it('v7 backups carry scoped budgets; v6 and v5 files still restore, and their budgets become category budgets', () => {
     const backup = createRecoveryBackup(liabilities);
-    expect(backup.schema).toBe('finanzapp.native-pilot.v6');
+    expect(backup.schema).toBe('finanzapp.native-pilot.v7');
     expect(parsePilotBackup(JSON.stringify(backup)).archive).toEqual(liabilities);
+    const total: MonthlyBudget = { id: 'total', scope: 'total', currency: 'ARS', monthISO: '2026-09', amountMinor: 500000, active: true, createdAt: account.createdAt, revision: 0, updatedAt: account.createdAt };
+    const food: MonthlyBudget = { id: 'food', scope: 'category', category: 'Comida', currency: 'ARS', monthISO: '2026-09', amountMinor: 150000, active: true, createdAt: account.createdAt, revision: 0, updatedAt: account.createdAt };
+    const budgeted: LedgerArchive = { ...archive, budgets: [food, total] }; // canonical order is by id
+    const v7 = createRecoveryBackup(budgeted);
+    expect(Object.fromEntries(v7.budgets.map(budget => [budget.id, Object.keys(budget).includes('category')]))).toEqual({ total: false, food: true });
+    expect(parsePilotBackup(JSON.stringify(v7)).archive).toEqual(budgeted);
+    // A v6 file has budgets without scope: they are category budgets, read exactly as written.
+    const { scope: _scope, ...legacyFood } = food;
+    const v6 = { ...createRecoveryBackup(archive), schema: 'finanzapp.native-pilot.v6', budgets: [legacyFood] };
+    expect(parsePilotBackup(JSON.stringify(v6)).archive.budgets).toEqual([food]);
+    // A v6 file cannot smuggle scoped or total budgets, and a total never carries a category.
+    expect(() => parsePilotBackup(JSON.stringify({ ...v6, budgets: [food] }))).toThrow();
+    expect(() => parsePilotBackup(JSON.stringify({ ...v6, budgets: [{ ...legacyFood, scope: 'total' }] }))).toThrow();
+    expect(() => parsePilotBackup(JSON.stringify({ ...v7, budgets: [{ ...total, category: 'General' }] }))).toThrow();
+    expect(() => parsePilotBackup(JSON.stringify({ ...v7, budgets: [total, { ...total, id: 'again' }] }))).toThrow(/general activo/);
     const v5 = { ...createRecoveryBackup(archive), schema: 'finanzapp.native-pilot.v5' } as Record<string, unknown>;
     delete v5.cards; delete v5.debts;
     expect(parsePilotBackup(JSON.stringify(v5)).archive).toEqual(archive);

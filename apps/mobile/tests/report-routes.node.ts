@@ -6,6 +6,7 @@ import ts from 'typescript';
 import * as domain from '@finanzapp/domain';
 import * as presentation from '../src/ui/presentation.ts';
 import * as reportPresentation from '../src/ui/report-presentation.ts';
+import * as budgetPresentation from '../src/ui/budget-presentation.ts';
 import * as categoryColor from '../src/ui/category-color.ts';
 import * as liabilityPresentation from '../src/ui/liability-presentation.ts';
 
@@ -48,6 +49,7 @@ function routeHarness(file: string, params: Record<string, unknown>, data = snap
     '../src/ui/components': Object.fromEntries(componentNames.map(name => [name, name])),
     '../src/ui/entry-list': { EntryList: 'EntryList' },
     '../src/ui/presentation': presentation,
+    '../src/ui/budget-presentation': budgetPresentation, '../../src/ui/budget-presentation': budgetPresentation,
     '../src/ui/report-presentation': reportPresentation,
     '../src/ui/spending-chart': { CategorySpendingRow: 'CategorySpendingRow', CategoryLegendRow: 'CategoryLegendRow' },
     '../src/ui/liability-presentation': liabilityPresentation,
