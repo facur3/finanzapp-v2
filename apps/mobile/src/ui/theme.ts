@@ -2,27 +2,9 @@ import { createContext, createElement, useContext, useEffect, useState, type Rea
 import { AccessibilityInfo, AppState, useColorScheme, type TextStyle } from 'react-native';
 import { todayKey } from '@finanzapp/domain';
 
-/** Ink-first neutrals plus four semantic colors. Colour carries meaning
- * (expense, income, transfer, warning); everything else is ink on ground. */
-const light = {
-  background: '#F2F2F6', surface: '#FFFFFF', inset: '#EEEEF3', elevated: '#FFFFFF',
-  text: '#0A0A0C', secondary: '#6E7078', tertiary: '#8E9098', line: '#E6E6EC',
-  // Primary actions and the active tab are ink; links and interactive text are the blue tint.
-  accent: '#0A0A0C', onAccent: '#FFFFFF', accentSoft: '#EEEEF3', tint: '#2563EB',
-  expense: '#C42F39', income: '#15804F', transfer: '#2563EB', warning: '#B45309',
-  expenseSoft: '#FBE9EA', incomeSoft: '#E6F5EE', transferSoft: '#E8EFFD', warningSoft: '#FCF1E0',
-  shadow: 'rgba(10, 10, 12, 0.08)',
-};
-const dark: typeof light = {
-  background: '#000000', surface: '#1C1C1E', inset: '#2C2C2E', elevated: '#242426',
-  text: '#F5F5F7', secondary: '#A0A0A8', tertiary: '#7C7C84', line: '#2C2C30',
-  accent: '#F5F5F7', onAccent: '#0A0A0C', accentSoft: '#2C2C2E', tint: '#5B9BFF',
-  expense: '#F0555C', income: '#3DBE86', transfer: '#5B9BFF', warning: '#E8A030',
-  expenseSoft: '#3A1E20', incomeSoft: '#173126', transferSoft: '#172A45', warningSoft: '#3A2C14',
-  shadow: 'rgba(0, 0, 0, 0)',
-};
+import { darkPalette, lightPalette, type PaletteColors } from './palette';
 
-export type Palette = typeof light & {
+export type Palette = PaletteColors & {
   isDark: boolean;
   /** Aliases kept for existing call sites: income/expense semantics. */
   positive: string; negative: string; positiveSoft: string; negativeSoft: string;
@@ -30,7 +12,7 @@ export type Palette = typeof light & {
 
 export function usePalette(): Palette {
   const isDark = useColorScheme() === 'dark';
-  const base = isDark ? dark : light;
+  const base = isDark ? darkPalette : lightPalette;
   return { ...base, isDark, positive: base.income, negative: base.expense, positiveSoft: base.incomeSoft, negativeSoft: base.expenseSoft };
 }
 

@@ -55,7 +55,7 @@ export default function BudgetsScreen() {
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
             <AppText secondary variant="caption">{isCurrent ? 'Mes en curso' : monthISO > currentMonthISO(day) ? 'Mes futuro · podés prepararlo' : 'Mes cerrado'}</AppText>
             {!isCurrent && <PressFeedback feedback="opacity" accessibilityRole="button" accessibilityLabel="Volver al mes actual" onPress={() => setMonthISO(currentMonthISO(day))} style={{ minHeight: 28 }}>
-              <AppText variant="caption" style={{ fontWeight: '600', color: p.tint }}>Este mes</AppText>
+              <AppText variant="caption" style={{ fontWeight: '600', color: p.primary }}>Este mes</AppText>
             </PressFeedback>}
           </View>
         </View>

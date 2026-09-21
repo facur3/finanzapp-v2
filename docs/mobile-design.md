@@ -1,6 +1,6 @@
 # FinanzApp: dirección visual móvil
 
-Interfaz 16 · 20 de septiembre de 2026. Implementado en código; revisión visual y
+Interfaz 17 · 21 de septiembre de 2026. Implementado en código; revisión visual y
 gestual en iPhone pendiente. [Alcance del producto](decisions/002-spending-first.md) ·
 [Navegación y tarjetas](decisions/003-five-tabs-and-cards.md).
 
@@ -17,13 +17,27 @@ mapas de comercios, estados bancarios ni acciones que la app no ejecuta.
 
 **Color.** Tinta sobre fondo. Claro: fondo #F2F2F6, superficie #FFFFFF, tinta
 #0A0A0C, secundario #6E7078, relleno #EEEEF3. Oscuro: fondo #000000, superficie
-#1C1C1E, elevado #242426, tinta #F5F5F7, secundario #A0A0A8. Cuatro colores
-semánticos: gasto coral (#C42F39 / #F0555C), ingreso verde (#15804F / #3DBE86),
-transferencia e interacción azul (#2563EB / #5B9BFF), alerta ámbar (#B45309 /
-#E8A030), cada uno con un tinte suave para tiles y chips. Todos los textos
-semánticos superan 4,5:1 sobre su fondo. Los botones principales son tinta; los
-enlaces, azul. Los importes de gasto van en tinta con signo menos; solo el ingreso
-se pinta de verde. Nunca color sin signo o etiqueta.
+#1C1C1E, elevado #242426, tinta #F5F5F7, secundario #A0A0A8. Los tokens viven en
+`src/ui/palette.ts`, sin React Native, para poder medir su contraste en Node.
+
+**Primario FinanzApp.** Un azul cobalto para la interacción y la selección, y para
+nada más: claro #2557D6 (6,2:1 sobre blanco); oscuro #5B87FF para texto, íconos y
+selección (4,7:1 sobre el pulgar del segmentado, 6,4:1 sobre negro) y #3565EA como
+relleno del botón principal bajo texto blanco (5:1). Tinte suave #E5ECFB / #122048.
+Lo usan la pestaña activa, la etiqueta elegida de cada control segmentado (Gastos /
+Disponible, Todos / Gastos / Ingresos / Transf., Categorías / Día a día, ARS / USD),
+los enlaces y acciones de sección, el único botón relleno de cada pantalla, el
+selector de cuenta y las marcas de elección en las hojas, la barra del mes elegido y
+"Este mes". El texto normal nunca es azul; los botones secundarios siguen en tinta
+sobre relleno. No es violeta ni verde neón: es un azul financiero, sobrio.
+
+**Semántica aparte.** Cuatro colores con significado, intactos: gasto coral (#C42F39 /
+#F0555C), ingreso verde (#15804F / #3DBE86), transferencia azul celeste (#0B6BB3 /
+#4DB0FF, distinto del cobalto para que el significado y la interacción no compartan
+muestra), alerta ámbar (#B45309 / #E8A030), cada uno con un tinte suave para tiles y
+chips. Todos los textos semánticos superan 4,5:1 sobre la superficie. Los importes de
+gasto van en tinta con signo menos; solo el ingreso se pinta de verde. Nunca color sin
+signo o etiqueta. `tests/theme.node.ts` verifica estos contrastes en ambos temas.
 
 **Color de categoría.** Ocho tonos apagados de una misma familia (terracota, azul
 acero, oliva, rosa, verde azulado, ocre, índigo, pizarra), con variante clara y
@@ -34,6 +48,53 @@ un tinte suave del mismo tono (alfa 14 % en claro, 20 % en oscuro), en filas,
 leyenda, presupuestos y detalle; no hay puntos de color sueltos. Ingreso y alerta
 siguen mandando sobre el tono cuando ese significado importa. "Otras" en la dona
 queda en gris neutro.
+
+**Importe héroe en tres niveles.** Un importe grande es un solo texto con tres
+niveles del mismo color: el símbolo ("$ ", "US$ ", con su signo) en secundario, las
+unidades en primer plano y los centavos (",00") en terciario; mismo tamaño, misma
+línea base, una sola etiqueta de VoiceOver. Un héroe coloreado (ingreso, saldo
+negativo) conserva su tono y solo baja el alfa. Las filas siguen siendo una cadena
+plana. Se aplica en Inicio, Reportes, detalle de movimiento, tarjeta, deuda,
+presupuestos y cuenta.
+
+**Campo de importe.** Agrupa los dígitos mientras se escribe: 2 · 20 · 200 · 2.000 ·
+20.000 · 200.000 · 2.000.000; la coma inicia hasta dos decimales (2.000,5 · 2.000,50);
+un punto tecleado en un teclado en-US es separador decimal; "2,000.50" o
+"2.000.000,50" pegados se normalizan; borrar sobre un punto de agrupación borra el
+dígito anterior; una selección se reemplaza; como máximo trece cifras enteras (el
+rango seguro); al salir del campo "2.000,5" se completa a "2.000,50". Es solo
+presentación: la cadena mostrada sigue pasando por `parseMinorUnits` y el módulo
+no crea ningún número flotante.
+
+El modelo (`src/ui/money-input.ts`) es un estado canónico, nunca la cadena mostrada:
+signo · cifras enteras · coma decimal opcional · decimales · cursor lógico (un
+índice dentro de "-1234,5", que la agrupación no puede mover). De ese estado se
+derivan el texto y el índice del cursor en pantalla. Cada evento nativo trae el
+texto nuevo y el cursor nativo; se leen al estado a partir de las cifras y la coma
+(un punto es agrupación salvo que sea entrada explícita: un punto más de los que
+había en pantalla, o un pegado cuyos separadores lo indiquen), y el texto y la
+selección se devuelven al campo en una sola actualización controlada. Por eso una
+tecla que llega cuando el campo nativo todavía muestra el texto sin formatear lee
+las mismas cifras, y un punto que FinanzApp insertó nunca se convierte en decimal.
+No se confía en que iOS conserve el cursor: la selección se sigue con
+`onSelectionChange` (ignorando los eventos que describen un texto distinto del
+mostrado) y se controla con `selection`.
+
+La caja del campo es estable: el campo ocupa toda la fila con márgenes fijos
+(`amountFieldLayout` en `src/ui/geometry.ts`: a la izquierda el símbolo y su
+separación, a la derecha el cursor), centra el texto de forma nativa y el símbolo
+se coloca junto al borde izquierdo del texto por aritmética (se desliza medio
+avance por cifra, como ese borde). Al escribir no cambia el tamaño de la caja ni
+se recentra nada; solo baja el tamaño de letra (desde 46 pt) cuando el importe no
+cabe entre los márgenes, nunca por cantidad de caracteres. El campo no lleva
+tracking negativo: en iOS dibuja el último glifo más allá del ancho medido y el
+cursor lo pisa (el "3.000" recortado del iPhone).
+
+**Títulos de pantalla.** Los encabezados grandes usan las variantes con nombre
+(título 1 28/34, título 2 22/28), nunca un `fontSize` suelto sobre la caja de
+línea del cuerpo: en iOS un glifo más alto que su línea se recorta por arriba
+(el "Comida" cortado en el detalle de categoría). `AppText` además ajusta la
+caja de línea cuando un estilo cambia solo el tamaño.
 
 **Tipografía.** Fuente del sistema. Héroe 44/700 tabular con tracking negativo,
 título grande 34, título 22, encabezado 17/600, cuerpo 17, subtítulo 15, nota 13,
@@ -70,6 +131,11 @@ nombre, emisor, moneda, últimos cuatro dígitos y un tono estable por tarjeta.
   (cinco con nombre, el resto como Otras en gris) y leyenda con importe y participación; Día a
   día; presupuestos con porcentaje; comercios principales; hechos (no consejos);
   ingresos, flujo neto y comparación. Sin "ahorro": no tenemos su definición.
+  Interfaz 17: la barra y la etiqueta del mes elegido van en el primario, las demás
+  en grafito; "Dónde más gastaste" conserva el número de puesto y muestra el tile de
+  la categoría de cada comercio (sin colores de podio); "Para tener en cuenta" tiñe
+  cada tarjeta al 8 % con el tono de su categoría o su color semántico y un hecho de
+  categoría lleva su tile.
 - **Formularios.** Un solo modal de movimiento con el selector Gasto / Ingreso /
   Transferencia arriba (cambiar de modo es estado, no navegación), importe grande (verde
   para ingresos, azul para transferencias) y dos tarjetas de selección a ancho
@@ -77,16 +143,23 @@ nombre, emisor, moneda, últimos cuatro dígitos y un tono estable por tarjeta.
   del mes si existe) y Pagado con / Ingresa en (con saldo registrado o deuda de
   tarjeta, y el tipo de cada opción en la hoja). Comercio y fecha después. El botón
   Guardar repite el importe. Sin controles decorativos de dividir, comprobante o
-  etiquetas mientras no existan sus datos.
+  etiquetas mientras no existan sus datos. Jerarquía de color: categoría en su
+  tono, cuenta en el primario, fecha neutra, botón de guardar en el primario.
 - **Inicio.** El mes en curso, nada más. Una fila con Gastos / Disponible y la
   moneda; el nombre del mes (o "Saldo registrado" con el botón de información) y el
   número principal, sin cantidad de registros ni rango de fechas ni selector de
   período. Tres acciones redondas: Gasto, Ingreso, Transferir. Una línea de
-  presupuesto solo si hay presupuestos. "En qué gastaste": las tres categorías
-  principales como filas (tile en su tono, nombre, importe y una línea fina de
-  3 pt con su participación); "Ver N" abre Reportes. Compromisos próximos solo
-  cuando existen; los últimos cuatro movimientos. Los períodos y el análisis viven
-  en Reportes.
+  presupuesto solo si hay presupuestos. Las tres acciones redondas son círculos
+  neutros (escalón de superficie en oscuro, blanco con sombra suave en claro) con
+  solo el glifo en su color semántico: el color vive en el trazo, no en un tile
+  relleno. "En qué gastaste": un bloque agrupado con hasta tres categorías; detrás
+  del contenido de cada fila, un lavado redondeado de su propio tono (11 % en
+  oscuro, 8 % en claro), con margen respecto de los bordes de la fila, corre desde
+  la izquierda exactamente en su proporción del mes (sin mínimo inventado: 0,1 %
+  es un filo y la fila sigue siendo tocable). Sin separadores que corten el
+  lavado. Tile, nombre e importe; sin porcentajes ni barra debajo. "Reportes"
+  abre la pestaña. Compromisos próximos solo cuando existen; los últimos cuatro
+  movimientos. Los períodos y el análisis viven en Reportes.
 - **Movimientos.** Buscador, filtro Todos / Gastos / Ingresos / Transf., secciones
   "Hoy · 20 sep", "Ayer", día de la semana en los últimos siete días y luego la fecha,
   con el neto del día cuando hay una sola moneda.
@@ -156,6 +229,12 @@ siguen montadas, así un revelado al montar no se vería).
   funde como un bloque.
 - **Bloques.** Una sección que aparece o desaparece se funde y los vecinos se
   deslizan en lugar de saltar; con Reduce Motion, solo el fundido.
+- **Lavados de categoría (Inicio).** Con los primeros datos, cada lavado crece
+  desde cero hasta su proporción real en 300 ms ease-out, con 50 ms de escalonado
+  entre filas; un cambio de datos interpola desde la proporción anterior en 260 ms.
+  Es una vista absoluta sin hijos detrás del contenido: no cuesta layout ni bloquea
+  el toque. Con Reduce Motion no hay movimiento de ancho, solo un fundido de 200 ms.
+  Nunca responde al scroll.
 - **Formularios.** Gasto / Ingreso / Transferencia es un solo control sobre un
   solo modal: cambiar es estado, no navegación, y el formulario de abajo se funde.
 - **Carrusel de tarjetas.** La posición vive en el hilo de UI; las tarjetas vecinas
@@ -173,6 +252,10 @@ texto escalable con filas apiladas en tamaños grandes, etiquetas de VoiceOver c
 importe, moneda y estado.
 
 ## Pendiente de revisión en iPhone
+
+- Primario cobalto en ambos temas (pestaña, segmentados, CTA, selectores); rellenos
+  tintados de Inicio y su revelado; campo de importe (tecleo, borrado sobre un punto,
+  pegado, cursor) en ARS y USD; niveles del héroe; Dynamic Type y Reduce Motion.
 
 - Pulgar del segmentado, fundido del héroe, barrido de la dona y profundidad del
   carrusel a 60/120 Hz, en ambos temas y con Reduce Motion activado y desactivado.

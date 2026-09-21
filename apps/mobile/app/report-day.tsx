@@ -20,7 +20,7 @@ export default function ReportDayScreen() {
   let total: number | null = null;
   try { total = dailySpending(snapshot, period)[0]?.amountMinor ?? 0; } catch { /* Keep the records accessible when their sum exceeds the safe range. */ }
   return <EntryList entries={entries} accounts={snapshot.accounts} header={<View style={{ gap: 16 }}>
-    <AppText accessibilityRole="header" style={{ fontSize: 24, fontWeight: '700' }}>{new Date(date + 'T12:00:00').toLocaleDateString('es-AR', { day: 'numeric', month: 'long', year: 'numeric' })}</AppText>
+    <AppText accessibilityRole="header" variant="title2">{new Date(date + 'T12:00:00').toLocaleDateString('es-AR', { day: 'numeric', month: 'long', year: 'numeric' })}</AppText>
     {total !== null ? <Money minor={total} currency={currency} large /> : <AppText>No podemos mostrar el total con precisión.</AppText>}
     <AppText secondary>{entries.length} gastos registrados · {currency}</AppText>
     {!entries.length && <EmptyState title="Sin gastos registrados" detail="No hay gastos para este día y moneda." />}

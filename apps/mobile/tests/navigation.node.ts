@@ -22,7 +22,7 @@ function renderLayout(background: string) {
     '../../src/ui/components': { IconButton: () => null },
     '../../src/ui/navigation': { tabHostOptions, tabScreenOptions },
     '../../src/ui/motion': { selectionHaptic: () => {} },
-    '../../src/ui/theme': { usePalette: () => ({ background, text: '#FFFFFF', tertiary: '#7C7C84', secondary: '#A6B0C0', surface: '#151A22', line: '#2B3544' }) },
+    '../../src/ui/theme': { usePalette: () => ({ background, primary: '#5B87FF', text: '#FFFFFF', tertiary: '#7C7C84', secondary: '#A6B0C0', surface: '#151A22', line: '#2B3544' }) },
   };
   runInNewContext(code, { module, exports: module.exports, require: (name: string) => {
     if (!Object.hasOwn(modules, name)) throw new Error('Unexpected layout dependency: ' + name);

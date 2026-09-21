@@ -15,10 +15,109 @@ server-keyed; manual recording and local data work without connectivity. Recurri
 expenses, debts, budgets and cards remain in scope. Native navigation, accessible
 amounts, real data and recoverable durable writes remain requirements.
 
-## Status and current delivery — Interfaz 16
+## Status and current delivery — Interfaz 17
 
 Implemented is code, checked names a test, device-verified needs a physical result,
 and released means distributed. Neither a bundle nor a screenshot is App Store QA.
+
+Interfaz 17 gives the pilot a visual identity and a monetary experience of its own.
+Interfaz 15 solved motion and Interfaz 16 solved hierarchy, but the dark UI was still
+black, white and grey with the category hues as the only colour.
+
+- [x] One brand primary, a cobalt blue (`src/ui/palette.ts`: light #2557D6; dark
+  #5B87FF for text and selection, #3565EA under white button text), used only for
+  interaction and selection: the selected tab, the selected label of every segmented
+  control (Gastos / Disponible, Todos / Gastos / Ingresos / Transf., Categorías / Día
+  a día, ARS / USD), links and section actions, the one filled call to action per
+  screen, the account selector and picker checkmarks, the selected six-month bar and
+  "Este mes". Normal text stays neutral. Every use is checked at 4.5:1 or better in
+  `tests/theme.node.ts` for both themes.
+- [x] Semantic colours stay separate: expense coral, income green, warning amber and
+  the eight category hues are unchanged; transfer moved from the old link blue to a
+  distinct azure (#0B6BB3 / #4DB0FF) so meaning and interaction never share a swatch.
+  Secondary actions stay ink on the inset fill, so a screen has at most one blue button.
+- [x] Home "En qué gastaste": one grouped surface with up to three ranked rows. Behind
+  each row's content a rounded wash of its own hue (11 % dark, 8 % light), inset
+  from the row's edges, runs from the left for exactly its share of the month (no
+  invented minimum: 0,1 % is a hairline and the row stays fully tappable). No
+  separators cut through it. Glyph tile, name, amount; no percentages, no line under
+  the row. Washes grow from zero on first data (300 ms ease-out, 50 ms stagger) and
+  interpolate on later data; Reduce Motion keeps a 200 ms fade only. The wash is an
+  absolute, childless view on the UI thread; nothing is driven by scroll. (The
+  owner's second iPhone review found the first version a heavy, square block of
+  colour: four rows, a 20 % fill clipped by the surface edge and separators.)
+- [x] Home quick actions are neutral circles with only the glyph in its semantic
+  colour, so Home no longer reads as three coloured buttons.
+- [x] Amount field box: the third iPhone review showed the caret overlapping the
+  last digit of "3.000" (the native input sized itself around its text with
+  negative tracking). The fourth review, recorded, showed the number jumping
+  sideways per digit (the per-text box width re-centred the symbol + input group)
+  and malformed values such as "300,00" when zeroes were typed quickly. The box is
+  now stable: the input spans the row with fixed paddings and centres its text
+  natively; the symbol is placed beside the text by arithmetic; only the font size
+  changes, and only when the amount would not fit. No tracking.
+- [x] Amount editing is a canonical state (sign, whole digits, decimal comma,
+  fraction, logical caret), not a diff of display strings. The old common-prefix/
+  common-suffix edit read the native text against the last rendered value; when a
+  keystroke arrived before the controlled update had landed, the native text still
+  held the previous unformatted digits, the diff attributed one of FinanzApp's own
+  grouping dots to the user, and that dot became a decimal comma. Now digits and
+  the comma in the native text are the truth, a dot is grouping unless it is
+  explicit input (one more dot than the screen had, or a paste with its own
+  separators), and the display text and display caret are rendered from the state
+  and pushed as controlled `value` and `selection` from the change event's own
+  caret; selection events that describe a text other than the shown one are
+  ignored. Tested by a simulated native field: sequential typing 3 … 3.000.000,50
+  with canonical value, display, logical and display caret at every step, repeated
+  zeroes on a lagging native view, backspace at the end and around dots, insertion
+  in the middle, selection replacement, comma and typed period, Argentine and US
+  pastes, limits, negatives.
+- [x] Category detail title clipping fixed: "Comida" lost its ascenders because the
+  heading set a 26 pt size on the body variant's 22 pt line box. Headings now use the
+  named title variants and `AppText` grows the line box when a style changes only the
+  size. "Gastos del período" shares the report category header (tile, name, period).
+- [x] Monetary input formats as the user types: "2000000" reads "2.000.000",
+  "2000,5" reads "2.000,5", a typed period on an en-US keypad is a decimal separator,
+  pasted "2,000.50" or "2.000.000,50" normalise, backspace over a grouping dot
+  removes the digit before it, a selection can be replaced, two decimals at most,
+  thirteen whole digits at most (the safe range), leading zeros vanish, blur
+  completes "2.000,5" to "2.000,50". Presentation only: each change is read as an
+  canonical edit state (`src/ui/money-input.ts`), the display string still goes
+  through the domain's `parseMinorUnits` and the module contains no float. The
+  caret is tracked explicitly as a logical position among the digits.
+- [x] Hero amounts are one amount in three quiet levels: the currency symbol steps
+  back to secondary and the cents to tertiary (same size, same baseline, one
+  VoiceOver label); a coloured hero keeps its hue and lowers the alpha. Row amounts
+  stay one plain string. The measured fit from Interfaz 16 is untouched.
+- [x] Reportes colour refinement, not redesign: the selected month bar and label are
+  the primary, the other bars graphite; "Dónde más gastaste" keeps its numbered rank
+  and shows each merchant's category tile (no podium colours); "Para tener en cuenta"
+  cards take 8 % of their category hue or semantic colour, a category fact shows its
+  tile. Category and account selectors keep the Interfaz 16 hierarchy; the date row
+  stays neutral.
+- [ ] Physical iPhone review: the cobalt primary in both themes (tab, segmented
+  labels, CTA, selectors), the tinted Home fills and their reveal, the formatted
+  amount field (typing, backspace over a dot, paste, caret) in ARS and USD, hero
+  colour levels, Dynamic Type at the largest size, Reduce Motion and Expo Go.
+
+Interfaz 17 verification adds `tests/money-input.node.ts` (typing, comma and period
+decimals, deletion, selection replacement, paste normalisation, limits, round trip
+through `parseMinorUnits`, no floating point), `tests/theme.node.ts` (contrast of the
+primary on every surface it is used on, of white on the filled button, semantic
+separation from the primary) and `tests/home-ranking.node.ts` (honest proportions at
+99,8 / 0,1 / 0,1 %, no percentage copy, staggered reveal, interpolation, Reduce
+Motion, four-row limit), and updates the hero typography and selector tests.
+
+### Future: card due-date reminders (not in this PR)
+
+FinanzApp should eventually remind the user around a credit-card due date. It must
+never claim "Todavía no pagaste tu tarjeta": the app is not bank-synchronised and
+does not know whether a payment happened. Preferred language: "Visa Galicia vence
+mañana", "Deuda registrada: $125.400", "Revisá si ya la pagaste." Tapping the
+notification should deep-link to that card's detail / Pagar tarjeta flow. This
+belongs to the notifications/native phase after the EAS development build.
+
+### Previous delivery — Interfaz 16
 
 Interfaz 16 is a subtraction pass after the owner's iPhone review of Interfaz 15: the
 product direction was accepted, but the screens felt noisy and monochromatic.
@@ -63,7 +162,7 @@ facts row, stacked buttons, statement caption) and adds unit tests for the quick
 actions, the hero fit (representative values, Dynamic Type, floor, the Money
 component) and the form selector tints.
 
-### Custom categories: model and plan (Interfaz 17, not in this PR)
+### Custom categories: model and plan (Interfaz 18, not in this PR)
 
 Today a category is the trimmed string stored on each entry, recurring rule and
 budget (1–60 characters, CHECK-constrained in SQLite); `categoryKey` normalises
@@ -79,7 +178,7 @@ Deleting archives the key (hidden from the picker, still shown on history). This
 needs one additive migration (v7) and a backup format bump (v7) with the same
 recovery tests as budgets; no rewrite of entries. UI: Ajustes → Categorías (icon,
 colour, name, + Nueva categoría) and an edit sheet. It expands scope and storage,
-so it is its own phase after the Interfaz 16 device review.
+so it is its own phase after the Interfaz 17 device review.
 
 ### Previous delivery — Interfaz 15
 
@@ -309,10 +408,12 @@ by CI and merged into master before the next starts:
    Installments and statement periods for cards, with proper calendar semantics, remain.
 6. ~~Motion system, Home composition and category colour~~ — delivered in Interfaz 15.
 7. ~~Native visual cohesion and information hierarchy~~ — delivered in Interfaz 16.
-8. **Custom categories** (Interfaz 17): categories table decorating stored strings,
+8. ~~Visual identity and monetary experience~~ — delivered in Interfaz 17.
+9. **Custom categories** (Interfaz 18): categories table decorating stored strings,
    rename as display label, archive instead of delete, migration v7, backup v7.
-9. **EAS development build and Apple integrations** (Face ID, notifications, Apple
-   Pay capture, App Intents) only after the core product is stable on device.
+10. **EAS development build and Apple integrations** (Face ID, notifications with
+    the card due-date reminder, Apple Pay capture, App Intents) only after the core
+    product is stable on device.
 
 ### 1. Complete the daily tracking loop
 
@@ -384,10 +485,46 @@ driven by data or touch, never by a screen gaining focus: use `src/ui/motion.tsx
 ad-hoc timings. Brief press, selection and data-change animations respect Reduce
 Motion; text and financial values are never hidden until an animation finishes. One
 haptic per user action, always paired with a visual. Category hues come from
-`src/ui/category-color.ts` and never replace a name. 44-point targets, VoiceOver,
-safe areas, system text and separate currencies apply to every new screen.
+`src/ui/category-color.ts` and never replace a name. Colour tokens live in
+`src/ui/palette.ts`: the cobalt primary marks interaction and selection only, the
+semantic colours carry meaning, normal text stays neutral, and any new use of the
+primary must keep 4.5:1 (see `tests/theme.node.ts`). Money input goes through
+`src/ui/money-input.ts` and the domain parser; never format with floats. 44-point
+targets, VoiceOver, safe areas, system text and separate currencies apply to every
+new screen.
 
 ## Handoff log (historical evidence)
+
+### 2026-09-21 — Interfaz 17: visual identity and monetary experience
+
+- A cobalt brand primary for interaction and selection (tab, segmented labels,
+  links, one filled CTA per screen, account selector, selected month bar), transfer
+  moved to a distinct azure, category hues untouched. Home "En qué gastaste" became
+  one grouped distribution with tinted fills behind the rows (honest shares,
+  staggered reveal, Reduce Motion fade). The amount field formats Argentine grouping
+  while typing through an edit-aware pure module; values still parse to integer
+  minor units. Hero amounts got three colour levels in one string. Reportes merchants
+  show their category tile and insight cards take an 8 % tint.
+- Checked locally: root domain/web tests, TypeScript, Vite build, hygiene, 161 mobile
+  tests (money input, theme contrast, Home ranking, hero typography, selector tints),
+  Expo compatibility and Metro iOS export. No device evidence: caret behaviour of the
+  formatted field, the tinted fills and the cobalt in both themes need the iPhone.
+- Pre-merge polish after a second iPhone review: the Home category fills became
+  faint, inset, rounded washes on three rows without separators; the quick actions
+  became neutral circles with semantic glyphs; the clipped category title (a large
+  size on the body line box) was fixed in `AppText` and every large heading moved
+  to the named title variants. 162 mobile tests.
+- Third review: the amount field's caret overlapped the last digit of "3.000".
+  Root cause: the native input sized itself around its text with negative tracking.
+  The box is now pure geometry from the row width with padding and caret room,
+  tested per display string and caret position. 164 mobile tests.
+- Fourth review, recorded on the iPhone: the number jumped sideways as digits and
+  dots arrived, and fast zeroes produced "300,00"-style values. The per-text box
+  width was replaced by a stable row-wide box with fixed paddings and an
+  arithmetically placed symbol; the display-string diff was replaced by a canonical
+  edit state with an explicit, logically mapped caret driven by the change event's
+  own selection. A simulated native field, including a lagging one, covers the
+  device sequence. 168 mobile tests.
 
 ### 2026-09-20 — Interfaz 16: native visual cohesion and information hierarchy
 

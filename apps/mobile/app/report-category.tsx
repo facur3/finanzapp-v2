@@ -33,13 +33,13 @@ export default function ReportCategoryScreen() {
   return <EntryList entries={entries} accounts={snapshot.accounts} header={<View style={{ gap: 22 }}>
     <View style={{ gap: 12, paddingTop: 8 }}>
       <CategoryBadge category={label} large />
-      <AppText accessibilityRole="header" style={{ fontSize: 28, lineHeight: 35, fontWeight: '700', letterSpacing: -0.5 }}>{label}</AppText>
-      <AppText secondary style={{ fontSize: 14 }}>{reportMonthLabel(selection.monthISO)} · {reportPeriodLabel(report, day)}</AppText>
+      <AppText accessibilityRole="header" variant="title1">{label}</AppText>
+      <AppText secondary variant="subhead">{reportMonthLabel(selection.monthISO)} · {reportPeriodLabel(report, day)}</AppText>
     </View>
     <View style={{ gap: 10 }}>
       {category ? <Money minor={category.amountMinor} currency={selection.currency} large />
         : <AppText secondary>No podemos mostrar este total con precisión. Los movimientos están disponibles abajo.</AppText>}
-      <AppText secondary style={{ fontSize: 14 }}>{entries.length === 1 ? '1 gasto registrado' : entries.length + ' gastos registrados'}</AppText>
+      <AppText secondary variant="subhead">{entries.length === 1 ? '1 gasto registrado' : entries.length + ' gastos registrados'}</AppText>
     </View>
     <SectionTitle>Movimientos</SectionTitle>
   </View>} />;

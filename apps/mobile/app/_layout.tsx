@@ -42,7 +42,7 @@ function Navigation() {
   if (fontError || !snapshot || !fontsLoaded) return <SafeAreaView style={{ flex: 1, backgroundColor: p.background }}>
     <View style={{ flex: 1, padding: 28, justifyContent: 'center', gap: 20 }}>
       {error || fontError ? <>
-        <AppText style={{ fontSize: 25, fontWeight: '700' }}>No pudimos abrir FinanzApp</AppText>
+        <AppText variant="title1">No pudimos abrir FinanzApp</AppText>
         <ErrorMessage message={error ?? 'No se pudieron cargar los recursos. Cerrá y abrí la app. Tus datos siguen guardados.'} />
         {!fontError && <ActionButton label="Volver a intentar" onPress={retry} />}
       </> : <ActivityIndicator accessibilityLabel="Abriendo tus datos" color={p.secondary} />}
@@ -51,7 +51,7 @@ function Navigation() {
 
   const theme = { ...(p.isDark ? DarkTheme : DefaultTheme), colors: {
     ...(p.isDark ? DarkTheme : DefaultTheme).colors,
-    primary: p.tint, background: p.background, card: p.background, text: p.text, border: p.line,
+    primary: p.primary, background: p.background, card: p.background, text: p.text, border: p.line,
   } };
   return <ThemeProvider value={theme}><View style={{ flex: 1, backgroundColor: p.background }}>
     <StatusBar style={p.isDark ? 'light' : 'dark'} />

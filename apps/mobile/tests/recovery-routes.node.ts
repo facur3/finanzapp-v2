@@ -59,7 +59,7 @@ function harness(file: string, props: any = {}, options: { data?: domain.LedgerA
     './presentation': presentation,
     './liability-presentation': liabilityPresentation,
     '../../src/ui/theme': { space: { xs: 4, s: 8, m: 12, l: 16, xl: 20, xxl: 24, xxxl: 32 },
-      usePalette: () => ({ text: '#000', positive: '#070', income: '#070', expense: '#700', tint: '#00F', warning: '#a60', secondary: '#666', tertiary: '#999' }) },
+      usePalette: () => ({ text: '#000', positive: '#070', income: '#070', expense: '#700', primary: '#2557D6', warning: '#a60', secondary: '#666', tertiary: '#999' }) },
     './theme': { space: { xs: 4, s: 8, m: 12, l: 16, xl: 20, xxl: 24, xxxl: 32 }, usePalette: () => ({ background: '#fff' }) },
     './entry-form': { EntryForm: 'EntryForm' }, './transfer-form': { TransferForm: 'TransferForm' },
     './motion': { ValueTransition: 'ValueTransition' },

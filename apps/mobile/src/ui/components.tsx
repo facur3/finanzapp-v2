@@ -10,8 +10,9 @@ import { radius, space, type, useCurrentDay, usePalette, useReduceMotion, type P
 import { categoryIcon, type IconName } from './categories';
 import { tintOf } from './category-color';
 import { useCategoryColor } from './category-hues';
-import { SEGMENT_GAP, SEGMENT_PADDING, fitFontSize, segmentLayout } from './geometry';
+import { SEGMENT_GAP, SEGMENT_PADDING, amountFieldLayout, fitFontSize, segmentLayout } from './geometry';
 import { duration, easeOut, selectionHaptic, timing } from './motion';
+import { EMPTY_AMOUNT, amountFromCanonical, readAmountChange, renderAmount, settleAmount, splitAmount } from './money-input';
 
 export type { IconName } from './categories';
 /** Colour carries meaning. Neutral is ink on fill; the rest are the four semantic tints. */
@@ -27,11 +28,17 @@ export function toneColors(p: Palette, tone: Tone): { color: string; soft: strin
   }
 }
 
+/** Text in one of the named styles. A larger `fontSize` in `style` without
+ * its own `lineHeight` gets a line box that fits it, instead of inheriting the
+ * variant's smaller one; on iOS a glyph taller than its line box is clipped
+ * at the top ("Comida" lost its ascenders on the category detail). */
 export function AppText({ children, style, secondary = false, tertiary = false, variant = 'body', ...props }: TextProps & {
   secondary?: boolean; tertiary?: boolean; variant?: keyof typeof type;
 }) {
   const p = usePalette();
-  return <Text {...props} style={[type[variant], { color: tertiary ? p.tertiary : secondary ? p.secondary : p.text }, style]}>{children}</Text>;
+  const flat = StyleSheet.flatten(style);
+  const fits = flat?.fontSize && !flat.lineHeight ? { lineHeight: Math.round(flat.fontSize * 1.25) } : null;
+  return <Text {...props} style={[type[variant], { color: tertiary ? p.tertiary : secondary ? p.secondary : p.text }, style, fits]}>{children}</Text>;
 }
 
 export function Screen({ children, gap = space.xl }: { children: ReactNode; gap?: number }) {
@@ -62,7 +69,7 @@ export function SectionTitle({ children, action, onAction, caption }: { children
       {caption && <AppText secondary variant="footnote">{caption}</AppText>}
     </View>
     {action && onAction && <PressFeedback feedback="opacity" accessibilityRole="button" accessibilityLabel={action} onPress={onAction} style={{ paddingLeft: 12, minHeight: 36 }}>
-      <AppText variant="subhead" style={{ color: p.tint, fontWeight: '500' }}>{action}</AppText>
+      <AppText variant="subhead" style={{ color: p.primary, fontWeight: '500' }}>{action}</AppText>
     </PressFeedback>}
   </View>;
 }
@@ -74,8 +81,10 @@ export function SectionTitle({ children, action, onAction, caption }: { children
  * shrink; `opacity` (0.4) for bare text and icon buttons, like a bar button. */
 export type PressTreatment = 'scale' | 'highlight' | 'opacity';
 
-export function PressFeedback({ children, style, containerStyle, feedback = 'scale', ...props }: PressableProps & {
+export function PressFeedback({ children, style, containerStyle, feedback = 'scale', backdrop, ...props }: PressableProps & {
   children: ReactNode; style?: StyleProp<ViewStyle>; containerStyle?: StyleProp<ViewStyle>; feedback?: PressTreatment;
+  /** Drawn under the highlight and the content: a proportional fill behind a row. */
+  backdrop?: ReactNode;
 }) {
   const p = usePalette();
   const reduced = useReduceMotion();
@@ -90,19 +99,23 @@ export function PressFeedback({ children, style, containerStyle, feedback = 'sca
     style={[{ minHeight: 44, justifyContent: 'center' }, style]} pressRetentionOffset={12}
     onPressIn={event => { pressed.value = active ? withTiming(1, { duration: duration.press, easing: easeOut }) : 0; props.onPressIn?.(event); }}
     onPressOut={event => { pressed.value = withTiming(0, { duration: active ? duration.release : 0, easing: easeOut }); props.onPressOut?.(event); }}>
+    {backdrop}
     {feedback === 'highlight' && <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: p.isDark ? 'rgba(255,255,255,0.07)' : 'rgba(10,10,12,0.05)' }, highlightStyle]} />}
     {children}
   </Pressable></Animated.View>;
 }
 
+/** The one filled call to action on a screen is the brand primary with white
+ * text. Secondary actions stay ink on the inset fill, so a screen has at most
+ * one blue button; a semantic tone (a transfer, an income) still wins. */
 export function ActionButton({ label, onPress, disabled = false, busy = false, secondary = false, tone, icon, containerStyle, compact = false }: {
   label: string; onPress: () => void; disabled?: boolean; busy?: boolean; secondary?: boolean; tone?: Exclude<Tone, 'neutral'>;
   icon?: IconName; containerStyle?: StyleProp<ViewStyle>; compact?: boolean;
 }) {
   const p = usePalette();
   const semantic = tone ? toneColors(p, tone) : null;
-  const background = semantic ? (secondary ? semantic.soft : semantic.color) : secondary ? p.accentSoft : p.accent;
-  const color = semantic ? (secondary ? semantic.color : '#FFFFFF') : secondary ? p.text : p.onAccent;
+  const background = semantic ? (secondary ? semantic.soft : semantic.color) : secondary ? p.inset : p.primaryFill;
+  const color = semantic ? (secondary ? semantic.color : '#FFFFFF') : secondary ? p.text : p.onPrimary;
   return <PressFeedback accessibilityRole="button" accessibilityLabel={label} containerStyle={containerStyle}
     accessibilityState={{ disabled: disabled || busy, busy }} disabled={disabled || busy}
     onPress={onPress} style={[styles.button, compact && styles.buttonCompact, { backgroundColor: background, opacity: disabled || busy ? 0.5 : 1 }]}>
@@ -124,31 +137,89 @@ export function Field({ label, ...props }: TextInputProps & { label: string }) {
   const p = usePalette();
   return <View style={{ gap: 8 }}><AppText secondary variant="footnote" style={{ fontWeight: '500' }}>{label}</AppText>
     <TextInput returnKeyType="done" onSubmitEditing={Keyboard.dismiss} {...props} accessibilityLabel={label} placeholderTextColor={p.tertiary}
-      selectionColor={p.tint} style={[styles.input, { color: p.text, backgroundColor: p.surface }, props.style]} />
+      selectionColor={p.primary} style={[styles.input, { color: p.text, backgroundColor: p.surface }, props.style]} />
   </View>;
 }
 
-export function AmountField({ label = 'Monto', currency, tone, ...props }: TextInputProps & { label?: string; currency: Currency; tone?: Tone }) {
+type Caret = { start: number; end: number };
+
+/** The amount, formatted as the user types: "2000000" reads "2.000.000" and
+ * "2000,5" reads "2.000,5". The value the form holds is that display string;
+ * it still goes through parseMinorUnits, so the stored amount is the same
+ * integer whether the user typed a comma or a period.
+ *
+ * Editing is a canonical state (money-input.ts), not the display string. Each
+ * native change event carries the new text and the native caret; both are
+ * read into the state (digits and comma are the truth, a dot is grouping
+ * unless it is explicit input), and the display text and display caret are
+ * rendered from it and pushed back as the controlled `value` and `selection`
+ * in one update. The caret is therefore a logical position among the digits,
+ * which a grouping dot cannot move, and a change that arrives while the
+ * native text still shows the previous, unformatted keystroke reads the same
+ * digits. Selection events are mirrored into the state so a tap moves the
+ * caret; one that describes a text other than the one shown (the raw text of
+ * a keystroke being formatted) is ignored. A refused edit re-renders the same
+ * value and caret, and React Native restores both natively.
+ *
+ * The box is stable while typing: the input spans the row with fixed
+ * paddings (amountFieldLayout) and centres its text natively, and the symbol
+ * is placed beside the text by arithmetic. Only the font size changes, and
+ * only when the amount would not fit. No negative tracking: on iOS it draws
+ * the last glyph past the measured width, under the caret. */
+export function AmountField({ label = 'Monto', currency, tone, value = '', onChangeText, ...props }: TextInputProps & { label?: string; currency: Currency; tone?: Tone }) {
   const p = usePalette();
   const accessoryId = useId();
-  const length = props.value?.length ?? 0;
-  const long = length > 11;
-  const amountSize = length > 17 ? 24 : long ? 32 : 46;
+  const { fontScale } = useWindowDimensions();
+  const [rowWidth, setRowWidth] = useState(0);
+  const [selection, setSelection] = useState<Caret>();
+  // What the field shows and where its caret is, kept in a ref so a second keystroke in the same frame reads the latest render.
+  const shown = useRef({ text: value, caret: value.length });
+  const emitted = useRef(value);
+  useEffect(() => {
+    if (value === emitted.current) return;
+    // The form changed the value itself (a prefill or a reset): adopt it and let the caret settle at the end.
+    emitted.current = value;
+    shown.current = { text: value, caret: value.length };
+    setSelection(undefined);
+  }, [value]);
+  const symbol = currency === 'USD' ? 'US$' : '$';
+  const { fontSize, symbolSize, paddingLeft, paddingRight, symbolX } = amountFieldLayout(value, rowWidth, symbol, AMOUNT_GAP, Math.min(fontScale, HERO_MAX_SCALE));
   const color = tone && tone !== 'neutral' ? toneColors(p, tone).color : p.text;
+  const show = (rendered: { text: string; caret: number }) => {
+    shown.current = rendered;
+    setSelection({ start: rendered.caret, end: rendered.caret });
+    if (rendered.text !== emitted.current) { emitted.current = rendered.text; onChangeText?.(rendered.text); }
+  };
+  const change = (event: { nativeEvent: { text: string; selection?: Caret } }) => {
+    const { text, selection: native } = event.nativeEvent;
+    show(renderAmount(readAmountChange(shown.current, text, native ? native.end : null)));
+  };
+  const select = (event: { nativeEvent: { selection: Caret; text?: string } }) => {
+    const { selection: native, text } = event.nativeEvent;
+    if (text !== undefined && text !== shown.current.text) return;
+    shown.current = { ...shown.current, caret: native.end };
+    setSelection(native);
+  };
+  const settle = () => show(renderAmount(settleAmount(amountFromCanonical(shown.current.text.replace(/\./g, '')) ?? EMPTY_AMOUNT)));
   return <View style={{ gap: 10, alignItems: 'center', paddingVertical: 8 }}>
     <AppText secondary variant="footnote" style={{ fontWeight: '500' }}>{label} · {currency}</AppText>
-    <View style={{ width: '100%', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-      <AppText accessible={false} style={{ fontSize: long ? 26 : 32, lineHeight: long ? 34 : 40, color: p.secondary, fontWeight: '500' }}>{currency === 'USD' ? 'US$' : '$'}</AppText>
-      <TextInput keyboardType="decimal-pad" inputMode="decimal" maxLength={24} placeholder="0" {...props}
+    <View style={{ width: '100%', justifyContent: 'center' }} onLayout={event => setRowWidth(event.nativeEvent.layout.width)}>
+      <TextInput keyboardType="decimal-pad" inputMode="decimal" maxLength={24} placeholder="0" {...props} value={value} onChange={change}
+        selection={selection} onSelectionChange={select}
+        onBlur={event => { settle(); props.onBlur?.(event); }} onSubmitEditing={event => { settle(); props.onSubmitEditing?.(event); }}
         accessibilityLabel={label + ' en ' + (currency === 'ARS' ? 'pesos argentinos' : 'dólares')}
         inputAccessoryViewID={Platform.OS === 'ios' ? accessoryId : undefined}
-        selectionColor={p.tint} placeholderTextColor={p.tertiary}
-        style={[styles.amountInput, { color, fontSize: amountSize }, props.style]} />
+        selectionColor={p.primary} placeholderTextColor={p.tertiary} maxFontSizeMultiplier={HERO_MAX_SCALE}
+        style={[styles.amountInput, { color, fontSize, paddingLeft, paddingRight }, props.style]} />
+      <View pointerEvents="none" style={[StyleSheet.absoluteFill, { justifyContent: 'center', alignItems: 'flex-start', opacity: symbolX === null ? 0 : 1 }]}>
+        <AppText accessible={false} maxFontSizeMultiplier={HERO_MAX_SCALE}
+          style={{ fontSize: symbolSize, lineHeight: Math.round(symbolSize * 1.25), color: p.secondary, fontWeight: '500', transform: [{ translateX: symbolX ?? 0 }] }}>{symbol}</AppText>
+      </View>
     </View>
     {Platform.OS === 'ios' && <InputAccessoryView nativeID={accessoryId} backgroundColor={p.surface}>
       <View style={{ alignItems: 'flex-end', paddingHorizontal: 20 }}>
         <PressFeedback feedback="opacity" accessibilityRole="button" accessibilityLabel="Cerrar teclado del monto" onPress={Keyboard.dismiss} style={{ paddingHorizontal: 12 }}>
-          <AppText style={{ color: p.tint, fontWeight: '600' }}>Listo</AppText>
+          <AppText style={{ color: p.primary, fontWeight: '600' }}>Listo</AppText>
         </PressFeedback>
       </View>
     </InputAccessoryView>}
@@ -160,14 +231,16 @@ function Choice({ label, selected, disabled, onPress }: { label: string; selecte
   const reduced = useReduceMotion();
   return <Pressable accessibilityRole="button" accessibilityState={{ selected, disabled }} disabled={disabled}
     onPress={onPress} style={styles.choice} hitSlop={4}>
-    <Animated.Text numberOfLines={1} style={{ fontSize: 13, lineHeight: 18, textAlign: 'center', fontWeight: '600', color: selected ? p.text : p.secondary,
+    <Animated.Text numberOfLines={1} style={{ fontSize: 13, lineHeight: 18, textAlign: 'center', fontWeight: '600', color: selected ? p.primary : p.secondary,
       transitionProperty: 'color', transitionDuration: reduced ? 0 : duration.state }}>{label}</Animated.Text>
   </Pressable>;
 }
 
 /** Native-style segmented control: one thumb slides to the chosen segment
  * (interruptible, 200 ms ease-out, none under Reduce Motion) and the change
- * ticks with a selection haptic. Tapping the current value does nothing. */
+ * ticks with a selection haptic. The chosen label is the brand primary on a
+ * neutral thumb: selection reads as selection without a filled blue block.
+ * Tapping the current value does nothing. */
 export function Choices<T extends string>({ value, options, onChange, disabled }: {
   value: T; options: { value: T; label: string }[]; onChange: (value: T) => void; disabled?: boolean;
 }) {
@@ -222,6 +295,7 @@ export function ErrorMessage({ message }: { message: string | null }) {
 }
 
 const HERO_MAX_SCALE = 1.4, ROW_MAX_SCALE = 1.8;
+const AMOUNT_GAP = 6;
 
 /** Amounts are ink by default. Income is green with a plus; an explicit negative
  * value shows a minus. Colour never replaces the sign or the label. An amount is
@@ -246,11 +320,21 @@ export function Money({ minor, currency, large = false, color, signed = false, s
   const text = sign + (currency === 'USD' ? 'US$ ' : '$ ') + formatMinorUnits(Math.abs(minor));
   const fontSize = hero ? fitFontSize(text, width, base, Math.round(base / 2), Math.min(fontScale, HERO_MAX_SCALE)) : base;
   const label = (minor < 0 ? 'Menos ' : '') + formatMinorUnits(Math.abs(minor)) + (currency === 'USD' ? ' dólares' : ' pesos');
+  const ink = color ?? semantic;
+  // A hero is one amount in three weights of the same colour: the symbol and
+  // the cents step back so the whole units carry the number. Same size, same
+  // baseline, one accessibility label; nested spans keep it one line.
+  const parts = hero ? splitAmount(text) : null;
+  const quiet = ink === p.text ? { symbol: p.secondary, cents: p.tertiary } : { symbol: ink + 'B3', cents: ink + '8C' };
   const body = <Text accessibilityLabel={label} numberOfLines={1} adjustsFontSizeToFit={!hero} minimumFontScale={0.75}
     maxFontSizeMultiplier={hero ? HERO_MAX_SCALE : ROW_MAX_SCALE}
-    style={{ color: color ?? semantic, fontSize, lineHeight: hero ? Math.round(fontSize * 1.18) : undefined, fontWeight: weight ?? (large ? '700' : '600'),
+    style={{ color: ink, fontSize, lineHeight: hero ? Math.round(fontSize * 1.18) : undefined, fontWeight: weight ?? (large ? '700' : '600'),
       letterSpacing: hero ? -fontSize * 0.03 : -0.2, fontVariant: ['tabular-nums'], flexShrink: 1, maxWidth: '100%', textAlign: align }}>
-    {text}
+    {parts ? <>
+      <Text style={{ color: quiet.symbol, fontWeight: '600' }}>{parts.prefix}</Text>
+      {parts.whole}
+      <Text style={{ color: quiet.cents, fontWeight: '600' }}>{parts.decimals}</Text>
+    </> : text}
   </Text>;
   // The wrapper spans its container so the measured width is the space available, never the text's own width.
   return hero ? <View style={{ alignSelf: 'stretch' }} onLayout={event => setWidth(event.nativeEvent.layout.width)}>{body}</View> : body;
@@ -392,7 +476,7 @@ const styles = StyleSheet.create({
   buttonCompact: { minHeight: 44, paddingVertical: 10, paddingHorizontal: 14 },
   buttonText: { fontSize: 17, fontWeight: '600', textAlign: 'center', flexShrink: 1 },
   input: { borderRadius: radius.button, paddingHorizontal: 16, paddingVertical: 14, fontSize: 17, minHeight: 52 },
-  amountInput: { minHeight: 60, minWidth: 72, maxWidth: '85%', flexShrink: 1, fontWeight: '700', letterSpacing: -1.2, fontVariant: ['tabular-nums'], paddingVertical: 6, textAlign: 'center' },
+  amountInput: { minHeight: 60, width: '100%', fontWeight: '700', letterSpacing: 0, fontVariant: ['tabular-nums'], paddingVertical: 6, textAlign: 'center' },
   choices: { flexDirection: 'row', borderRadius: 10, padding: SEGMENT_PADDING, gap: SEGMENT_GAP },
   thumb: { position: 'absolute', top: SEGMENT_PADDING, bottom: SEGMENT_PADDING, left: 0, borderRadius: 8 },
   choice: { flex: 1, minWidth: 72, minHeight: 32, paddingHorizontal: 8, paddingVertical: 6, alignItems: 'center', justifyContent: 'center' },

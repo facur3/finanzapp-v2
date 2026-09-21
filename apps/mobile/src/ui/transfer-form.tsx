@@ -9,7 +9,7 @@ import { useLedger } from '../storage/LedgerProvider';
 import { ActionButton, AmountField, AppText, DetailRow, EmptyState, ErrorMessage, Field, IconButton, Screen, Surface } from './components';
 import { AccountField, DateField, SelectorCard } from './form-controls';
 import { initialAccountId } from './presentation';
-import { space } from './theme';
+import { space, usePalette } from './theme';
 
 /** One form for three movements that are never spending or income: a transfer
  * between cash accounts, a card payment (cash → card) and a debt payment or
@@ -23,6 +23,7 @@ export function TransferForm({ original, accountId, fromAccountId: requestedFrom
   onAccountChange?: (accountId: string) => void;
 }) {
   const { snapshot, archive, addTransfer, updateTransfer } = useLedger();
+  const p = usePalette();
   const accounts = snapshot?.accounts ?? [];
   const cards = archive?.cards ?? [], debts = archive?.debts ?? [];
   const hidden = hiddenLiabilityAccountIds(cards, debts);
@@ -134,7 +135,7 @@ export function TransferForm({ original, accountId, fromAccountId: requestedFrom
       </AppText>}
       <View style={{ gap: space.m }}>
         {lockedFrom ? <SelectorCard label={kindLabel(lockedFrom.id)} value={lockedFrom.name} placeholder="" detail={balanceDetail(lockedFrom.id)}
-          icon={obligationKind === 'card' ? 'card-outline' : 'people-outline'} tone="transfer" disabled onPress={() => {}} />
+          icon={obligationKind === 'card' ? 'card-outline' : 'people-outline'} color={p.primary} disabled onPress={() => {}} />
           : <AccountField label="Desde" accounts={cashSources} value={fromId} disabled={locked} kindOf={kindLabel} prominent detail={balanceDetail(fromId)} onChange={id => {
             setFromId(id);
             onAccountChange?.(id);
@@ -142,7 +143,7 @@ export function TransferForm({ original, accountId, fromAccountId: requestedFrom
             if (!lockedTo && (toId === id || to?.currency !== source?.currency)) setToId('');
           }} />}
         {lockedTo ? <SelectorCard label={kindLabel(lockedTo.id)} value={lockedTo.name} placeholder="" detail={balanceDetail(lockedTo.id)}
-          icon={obligationKind === 'card' ? 'card-outline' : 'people-outline'} tone="transfer" disabled onPress={() => {}} />
+          icon={obligationKind === 'card' ? 'card-outline' : 'people-outline'} color={p.primary} disabled onPress={() => {}} />
           : <AccountField label="Hacia" accounts={lockedFrom ? targets.filter(a => a.id !== lockedFrom.id) : targets} value={toId} onChange={setToId} kindOf={kindLabel}
             prominent detail={balanceDetail(toId)} disabled={locked || !targets.length} />}
       </View>
