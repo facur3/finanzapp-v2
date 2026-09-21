@@ -67,7 +67,9 @@ function Navigation() {
       <Stack.Screen name="accounts" options={{ title: 'Cuentas' }} />
       <Stack.Screen name="entry/[id]" options={{ title: 'Movimiento' }} />
       <Stack.Screen name="undone-entries" options={{ title: 'Movimientos deshechos' }} />
+      <Stack.Screen name="backup" options={{ title: 'Copia de seguridad' }} />
       <Stack.Screen name="backup-import" options={{ title: 'Importar copia' }} />
+      <Stack.Screen name="categories" options={{ title: 'Categorías' }} />
       <Stack.Screen name="spending-detail" options={{ title: 'Gastos del período' }} />
       <Stack.Screen name="report-category" options={{ title: 'Categoría' }} />
       <Stack.Screen name="report-day" options={{ title: 'Gastos del día' }} />

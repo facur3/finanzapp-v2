@@ -11,15 +11,16 @@ import { tabHostOptions, tabScreenOptions } from '../src/ui/navigation.ts';
 const source = readFileSync(new URL('../app/(tabs)/_layout.tsx', import.meta.url), 'utf8');
 const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText;
 
+const pushed: unknown[] = [];
 function renderLayout(background: string) {
   const jsx = (type: unknown, props: Record<string, unknown>) => ({ type, props });
   const Tabs = Object.assign(() => null, { Screen: 'TabScreen' });
   const module = { exports: {} as { default?: () => any } };
   const modules: Record<string, unknown> = {
     'react/jsx-runtime': { jsx, jsxs: jsx },
-    'expo-router': { Tabs, router: { push: () => {} } },
-    '@expo/vector-icons/Ionicons': () => null,
-    '../../src/ui/components': { IconButton: () => null },
+    'expo-router': { Tabs, router: { push: (to: unknown) => pushed.push(to) } },
+    '@expo/vector-icons/Ionicons': 'Ionicons',
+    '../../src/ui/components': { IconButton: 'IconButton' },
     '../../src/ui/navigation': { tabHostOptions, tabScreenOptions },
     '../../src/ui/motion': { selectionHaptic: () => {} },
     '../../src/ui/theme': { usePalette: () => ({ background, primary: '#5B87FF', text: '#FFFFFF', tertiary: '#7C7C84', secondary: '#A6B0C0', surface: '#151A22', line: '#2B3544' }) },
@@ -49,3 +50,20 @@ for (const [theme, background] of [['light', '#F5F6F8'], ['dark', '#080B10']]) {
     }
   });
 }
+
+test('the fifth tab is Más, and the Assistant preview no longer has a Home header shortcut', () => {
+  const { props } = renderLayout('#F5F6F8');
+  const screens = props.children;
+  const byName = Object.fromEntries(screens.map((screen: any) => [screen.props.name, screen.props.options]));
+  assert.equal(screens.map((screen: any) => screen.props.options.title).join(','), 'Inicio,Movimientos,Reportes,Tarjetas,Más');
+  assert.equal(byName.settings.tabBarIcon({ color: '#000', size: 24, focused: true }).props.name, 'ellipsis-horizontal-circle');
+  assert.equal(byName.settings.tabBarIcon({ color: '#000', size: 24, focused: false }).props.name, 'ellipsis-horizontal-circle-outline');
+  // Home keeps one header action (accounts); the sparkles button is gone until the Assistant is a real capability.
+  const home = byName.index.headerRight();
+  assert.equal(home.type, 'IconButton');
+  assert.equal(home.props.name, 'wallet-outline');
+  home.props.onPress();
+  assert.deepEqual(pushed.at(-1), '/accounts');
+  assert.equal(JSON.stringify(screens).includes('sparkles'), false);
+  assert.equal(JSON.stringify(screens).includes('assistant-preview'), false);
+});
