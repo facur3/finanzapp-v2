@@ -67,3 +67,9 @@ export function accountKindLabel(account: Account, cards: CreditCardProfile[] = 
 export function currencyName(currency: Currency): string {
   return currency === 'USD' ? 'Dólares estadounidenses' : 'Pesos argentinos';
 }
+
+/** One line of statement facts under the activity title, instead of two cards. */
+export function statementCaption(statement: { startISO: string; purchaseCount: number; paymentCount: number }, relative: (iso: string) => string): string {
+  return [`Resumen abierto desde ${relative(statement.startISO)}`, statement.purchaseCount === 1 ? '1 compra' : statement.purchaseCount + ' compras',
+    statement.paymentCount === 1 ? '1 pago' : statement.paymentCount + ' pagos'].join(' · ');
+}

@@ -41,9 +41,12 @@ net cash flow. **Interfaz 14 (2026-09-20)** polishes Presupuestos (dense rows wi
 percentage), Recurrentes (30-day statistics, relative dates) and Cuentas (per-currency
 totals, account detail with month in/out and actions). **Interfaz 15 (2026-09-20)**
 adds the motion system (sliding segmented thumb, value crossfades, reflow, haptics),
-the Home composition bar with stable category hues, the clockwise donut sweep and a
-UI-thread card carousel. The spending-first decision remains authoritative, with
-device checks still an explicit gate.
+stable category hues, the clockwise donut sweep and a UI-thread card carousel; the
+owner reviewed it on the iPhone and accepted the direction. **Interfaz 16
+(2026-09-20)** is the subtraction pass that followed: category hue inside the tile,
+a month-only Home with round actions and ranked categories, one-line responsive
+amounts, a quieter card hierarchy and the disclaimer copy removed. The spending-first
+decision remains authoritative, with device checks still an explicit gate.
 
 The Reportes tab shows, for one month and currency, the recorded total with its daily
 average and change against the same elapsed days of the previous month, a six-month
@@ -54,7 +57,7 @@ shorter); historical months compare full months. Exact date ranges stay visible.
 Category totals open only their dated expenses. Missing records are not savings.
 Native backup/recovery stays available, but no JSON import is required to start.
 
-## Product scope (Interfaz 15)
+## Product scope (Interfaz 16)
 
 [Decision 002](../../docs/decisions/002-spending-first.md) selects spending and
 commitments with optional accounts. No native portfolio or market data. The old
@@ -290,7 +293,7 @@ For the intermittent black-tab report, update to `master`, restart with
 and repeat the **Interfaz 02** tab checks, **Interfaz 03** report checks and
 **Interfaz 04/05** correction/recovery and transfer checks, plus **Interfaz 06** daily/comparison reports and **Interfaz 08** recurring/upcoming
 checks, plus **Interfaz 10** cards/debts and five-tab checks and **Interfaz 11** Home,
-Movimientos and detail checks, **Interfaz 12** form checks, **Interfaz 13** Reportes checks, **Interfaz 14** budgets/recurring/accounts checks and **Interfaz 15** motion checks. The current footer says Interfaz 15.
+Movimientos and detail checks, **Interfaz 12** form checks, **Interfaz 13** Reportes checks, **Interfaz 14** budgets/recurring/accounts checks, **Interfaz 15** motion checks and **Interfaz 16** cohesion checks. The current footer says Interfaz 16.
 Before updating, save a private pilot copy; do not uninstall or add fake movements.
 
 If a storage/refresh error occurs, the form retains the exact submitted command

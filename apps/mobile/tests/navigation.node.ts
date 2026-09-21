@@ -21,6 +21,7 @@ function renderLayout(background: string) {
     '@expo/vector-icons/Ionicons': () => null,
     '../../src/ui/components': { IconButton: () => null },
     '../../src/ui/navigation': { tabHostOptions, tabScreenOptions },
+    '../../src/ui/motion': { selectionHaptic: () => {} },
     '../../src/ui/theme': { usePalette: () => ({ background, text: '#FFFFFF', tertiary: '#7C7C84', secondary: '#A6B0C0', surface: '#151A22', line: '#2B3544' }) },
   };
   runInNewContext(code, { module, exports: module.exports, require: (name: string) => {

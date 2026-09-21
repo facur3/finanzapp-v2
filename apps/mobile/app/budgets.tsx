@@ -91,9 +91,6 @@ export default function BudgetsScreen() {
       icon="speedometer-outline"
       action={<ActionButton label="Crear presupuesto" icon="add-outline" onPress={() => router.push({ pathname: '/new-budget', params: { currency, month: monthISO } })} />} />}
 
-    <AppText tertiary variant="footnote" style={{ textAlign: 'center' }}>
-      Cada presupuesto pertenece a un mes y una moneda. Las compras con tarjeta cuentan; los pagos de tarjeta y las transferencias no.
-    </AppText>
   </Screen>;
 }
 

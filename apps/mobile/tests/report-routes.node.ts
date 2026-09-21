@@ -52,6 +52,7 @@ function routeHarness(file: string, params: Record<string, unknown>, data = snap
     '../src/ui/spending-chart': { CategorySpendingRow: 'CategorySpendingRow', CategoryLegendRow: 'CategoryLegendRow' },
     '../src/ui/liability-presentation': liabilityPresentation,
     '../src/ui/category-color': categoryColor,
+    '../src/ui/quick-actions': { QuickActions: 'QuickActions' },
     '../src/ui/motion': { ValueTransition: 'ValueTransition', Reflow: 'Reflow', selectionHaptic: () => {}, impactHaptic: () => {}, timing: (kind: string, reduced: boolean) => ({ duration: reduced ? 0 : 260 }) },
     '../src/ui/theme': { useCurrentDay: () => '2026-09-12', space: { xs: 4, s: 8, m: 12, l: 16, xl: 20, xxl: 24, xxxl: 32 },
       usePalette: () => ({ background: '#F5F6F8', surface: '#FFFFFF', accent: '#0A0A0C', tint: '#2563EB', text: '#000', secondary: '#666', tertiary: '#999', line: '#ddd', inset: '#eee', expense: '#c00', warning: '#a60', isDark: false }) },
@@ -84,7 +85,7 @@ test('report row pushes a scoped category detail; underlying period and currency
   const list = view.render();
   const category = list.props.data.find((item: domain.CategorySpending) => item.key === 'salud');
   const row = list.props.renderItem({ item: category, index: 0 });
-  assert.equal(find(row, 'CategoryLegendRow').props.color, 'c0');
+  assert.equal(find(row, 'CategoryLegendRow').props.category.key, 'salud', 'the legend row carries its category; the tile owns the hue');
   find(row, 'CategoryLegendRow').props.onPress();
   assert.equal(view.pushed[0].pathname, '/report-category');
   assert.equal(JSON.stringify(view.pushed[0].params), JSON.stringify({ currency: 'ARS', month: '2026-08', category: 'salud' }));

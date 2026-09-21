@@ -15,10 +15,73 @@ server-keyed; manual recording and local data work without connectivity. Recurri
 expenses, debts, budgets and cards remain in scope. Native navigation, accessible
 amounts, real data and recoverable durable writes remain requirements.
 
-## Status and current delivery — Interfaz 15
+## Status and current delivery — Interfaz 16
 
 Implemented is code, checked names a test, device-verified needs a physical result,
 and released means distributed. Neither a bundle nor a screenshot is App Store QA.
+
+Interfaz 16 is a subtraction pass after the owner's iPhone review of Interfaz 15: the
+product direction was accepted, but the screens felt noisy and monochromatic.
+
+- [x] Category identity is one object: the glyph tile takes the category hue (glyph
+  in the hue, background a soft tint of it) in every row, legend, budget and detail.
+  The detached colour dot is gone. Income and warning tones still override the hue.
+- [x] Home is the current month: Gastos / Disponible, the currency control, one
+  number and its month name (or "Saldo registrado" with the info button). No count,
+  no date range, no week/month control; periods belong to Reportes. Three Wallet-style
+  round actions (Gasto coral, Ingreso green, Transferir blue) replace the two filled
+  buttons, so a transfer is one tap away. "En qué gastaste" is the top three
+  categories as ranked rows with one 3 pt hue line each; "Ver N" opens Reportes.
+- [x] Responsive financial typography: every amount is one line. A hero measures its
+  container and takes the largest size (down to half its base) at which the whole
+  string fits, computed from tabular glyph widths; on the reported iPhone
+  "$ 999.999.999,99" renders at 40 pt and "US$ 999.999.999,99" at 34.5 pt. The native
+  shrink-to-fit is no longer used on heroes: on iOS it also fits the measured height
+  and collapsed long amounts to a few points (the defect the owner saw). Rows keep
+  the native fit with a 3/4 floor. Dynamic Type is capped at 1.4× on heroes. The
+  amount field steps 46 → 32 → 24 pt.
+- [x] Forms keep the category identity: the chosen expense category shows its glyph
+  on its hue in Registrar gasto, Editar movimiento, recurring and budget selectors and
+  in the picker sheets; a chosen account takes the blue interaction accent; the date
+  stays quiet. Home's category action reads "Reportes".
+- [x] Tarjetas: identity (card) → state (debt) → three facts (Disponible with its limit
+  as a caption, Cierre, Vencimiento) → primary Registrar compra → secondary Pagar
+  tarjeta (same width, blue tint) → activity, whose caption carries the statement
+  facts. The detail table (límite, emisor, moneda) and the two statement cards are gone.
+- [x] Quieter screens: the bank/sync disclaimers, rule-restating footers and section
+  captions were removed from Cuentas, the account detail, Presupuestos, Recurrentes,
+  Deudas, Tarjetas and the movement detail. The account detail uses the same round
+  actions as Home.
+- [x] Tab bar: one selection tick when the section changes; no slide, no fade.
+- [ ] Physical iPhone review: tinted tiles in both themes, hero amounts at 999.999.999,99,
+  long merchant and category names, Dynamic Type at the largest size, the round
+  actions, the card hierarchy and the tab tick.
+
+Interfaz 16 verification updates the Home handler tests (month only, no count or range
+copy, quick actions, ranking), the account and card detail tests (round actions,
+facts row, stacked buttons, statement caption) and adds unit tests for the quick
+actions, the hero fit (representative values, Dynamic Type, floor, the Money
+component) and the form selector tints.
+
+### Custom categories: model and plan (Interfaz 17, not in this PR)
+
+Today a category is the trimmed string stored on each entry, recurring rule and
+budget (1–60 characters, CHECK-constrained in SQLite); `categoryKey` normalises
+accents, case and spaces for grouping; icons come from a keyword map and hues from a
+stable hash. Arbitrary names already work: the picker offers recorded spellings first
+and any typed text becomes a category on save. There is no categories table, so
+nothing to rename or delete, and history references the string, not an id.
+
+Safest model: a `categories` table (`key` = normalised string, `label`, `icon`,
+`hue`, `archived`) that decorates the strings already stored. Renaming changes the
+display label of a key; the recorded strings and their audit history never change.
+Deleting archives the key (hidden from the picker, still shown on history). This
+needs one additive migration (v7) and a backup format bump (v7) with the same
+recovery tests as budgets; no rewrite of entries. UI: Ajustes → Categorías (icon,
+colour, name, + Nueva categoría) and an edit sheet. It expands scope and storage,
+so it is its own phase after the Interfaz 16 device review.
+
+### Previous delivery — Interfaz 15
 
 - [x] Motion system (`src/ui/motion.tsx`): one ease-out curve, named durations
   (press 100, release 160, state 200, data 260, enter 200, exit 100, reveal 480 ms),
@@ -245,9 +308,10 @@ by CI and merged into master before the next starts:
 5. ~~Presupuestos, Recurrentes and Cuentas polish~~ — delivered in Interfaz 14.
    Installments and statement periods for cards, with proper calendar semantics, remain.
 6. ~~Motion system, Home composition and category colour~~ — delivered in Interfaz 15.
-   Remaining polish candidates: transaction detail hero transition, form amount tone
-   crossfade, an animated total in Presupuestos, account and custom period filters in Reportes.
-7. **EAS development build and Apple integrations** (Face ID, notifications, Apple
+7. ~~Native visual cohesion and information hierarchy~~ — delivered in Interfaz 16.
+8. **Custom categories** (Interfaz 17): categories table decorating stored strings,
+   rename as display label, archive instead of delete, migration v7, backup v7.
+9. **EAS development build and Apple integrations** (Face ID, notifications, Apple
    Pay capture, App Intents) only after the core product is stable on device.
 
 ### 1. Complete the daily tracking loop
@@ -324,6 +388,19 @@ haptic per user action, always paired with a visual. Category hues come from
 safe areas, system text and separate currencies apply to every new screen.
 
 ## Handoff log (historical evidence)
+
+### 2026-09-20 — Interfaz 16: native visual cohesion and information hierarchy
+
+- Category hue inside the tile, month-only Home with round actions and ranked
+  categories, one-line responsive amounts everywhere, a card hierarchy of identity →
+  state → facts → primary → secondary → activity, disclaimer and footer copy removed,
+  a tab-change tick. Custom categories investigated and planned as Interfaz 17.
+- Pre-merge defect pass after a second iPhone review: the hero amount collapsed on
+  long values (native shrink-to-fit fitting the measured height); replaced by a
+  measured, deterministic fit. Category hue carried into the form selectors and
+  picker sheets; account selector on the blue accent; Home link renamed Reportes.
+- Checked locally: 359 domain/web + 140 mobile tests, TypeScript, Vite build, hygiene,
+  Expo compatibility and Metro iOS export. No device evidence.
 
 ### 2026-09-20 — Interfaz 15: motion system, Home composition and category colour
 

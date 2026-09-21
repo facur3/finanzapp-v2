@@ -58,6 +58,7 @@ function harness(file: string, params: Record<string, unknown> = {}, data: domai
     '../src/storage/LedgerProvider': ledger, '../../src/storage/LedgerProvider': ledger,
     '../src/ui/components': Object.fromEntries(names.map(name => [name, name])), '../../src/ui/components': Object.fromEntries(names.map(name => [name, name])),
     '../src/ui/entry-list': { EntryList: 'EntryList' }, '../../src/ui/entry-list': { EntryList: 'EntryList' },
+    '../src/ui/quick-actions': { QuickActions: 'QuickActions' }, '../../src/ui/quick-actions': { QuickActions: 'QuickActions' },
     '../src/ui/motion': { ValueTransition: 'ValueTransition', Reflow: 'Reflow', selectionHaptic: () => {}, impactHaptic: () => {}, duration: { press: 100, release: 160, state: 200, data: 260, enter: 200, exit: 100, reveal: 480 }, timing: (kind: string, reduced: boolean) => ({ duration: reduced ? 0 : 260 }) }, '../../src/ui/motion': { ValueTransition: 'ValueTransition', Reflow: 'Reflow', selectionHaptic: () => {}, impactHaptic: () => {}, duration: { press: 100, release: 160, state: 200, data: 260, enter: 200, exit: 100, reveal: 480 }, timing: (kind: string, reduced: boolean) => ({ duration: reduced ? 0 : 260 }) },
     '../src/ui/presentation': presentation, '../../src/ui/presentation': presentation,
     '../src/ui/theme': theme, '../../src/ui/theme': theme,
@@ -131,8 +132,10 @@ test('account detail shows this month in and out, three actions and redirects ob
   assert.deepEqual(stats.map(node => node.props.label), ['Gastos este mes', 'Ingresos este mes']);
   assert.equal(nodes(stats[0]).find(node => node.type === 'Money')!.props.minor, -12000);
   assert.equal(nodes(stats[1]).find(node => node.type === 'Money')!.props.minor, 50000);
-  find(root, 'ActionButton', 'Transferir').props.onPress();
-  assert.equal(JSON.stringify(view.pushed[0]), JSON.stringify({ pathname: '/new-transfer', params: { accountId: 'cash' } }));
+  const actions = find(root, 'QuickActions');
+  assert.equal(actions.props.accountId, 'cash');
+  assert.equal(actions.props.currency, 'ARS');
+  assert.equal(nodes(root).some(node => node.type === 'AppText' && /sincronizaci/.test(String(node.props.children))), false, 'no bank disclaimer copy');
   const redirect = harness('account/[id].tsx', { id: 'card-acc' }).render();
   assert.equal(redirect.type, 'Redirect');
   assert.equal(JSON.stringify(redirect.props.href), JSON.stringify({ pathname: '/card/[id]', params: { id: 'card' } }));

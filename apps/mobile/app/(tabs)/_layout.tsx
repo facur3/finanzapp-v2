@@ -2,6 +2,7 @@ import { router, Tabs } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { usePalette } from '../../src/ui/theme';
 import { IconButton } from '../../src/ui/components';
+import { selectionHaptic } from '../../src/ui/motion';
 import { tabHostOptions, tabScreenOptions } from '../../src/ui/navigation';
 
 // Five sections, each with one meaning: Inicio (what matters now), Movimientos
@@ -12,7 +13,9 @@ export default function TabsLayout() {
   // These lightweight roots stay mounted. Their visibility must not depend on
   // an interrupted opacity animation or a native detach/reattach.
   // Stack pushes and modal gestures still use the native navigator above us.
-  return <Tabs {...tabHostOptions} screenOptions={{ ...tabScreenOptions,
+  // Sections switch instantly (no slide, no fade: the mounted-tab mitigation); a selection tick confirms the change without delaying it.
+  return <Tabs {...tabHostOptions} screenListeners={({ navigation }) => ({ tabPress: () => { if (!navigation.isFocused()) selectionHaptic(); } })}
+    screenOptions={{ ...tabScreenOptions,
     headerStyle: { backgroundColor: p.background },
     headerTitleStyle: { color: p.text, fontWeight: '600' }, headerShadowVisible: false,
     tabBarActiveTintColor: p.text, tabBarInactiveTintColor: p.tertiary,

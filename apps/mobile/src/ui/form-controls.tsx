@@ -5,6 +5,7 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import type { Account, Entry, EntryKind } from '@finanzapp/domain';
 import { AppText, CategoryBadge, DetailRow, Field, GlyphTile, PressFeedback, surfaceShadow, type IconName, type Tone } from './components';
+import { useCategoryColor } from './category-hues';
 import { selectionHaptic } from './motion';
 import { radius, usePalette, useReduceMotion } from './theme';
 import { categoryChoices, categoryIcon, categoryKey, customCategory } from './categories';
@@ -12,8 +13,8 @@ import { categoryChoices, categoryIcon, categoryKey, customCategory } from './ca
 /** Full-width selector used for the two choices a user must never overlook in
  * a form: which category and which account or card. A 44 pt tile, the label,
  * the current value and a live detail line (balance, budget) sit on one card. */
-export function SelectorCard({ label, value, placeholder, detail, icon, tone = 'neutral', disabled = false, onPress, detailTone }: {
-  label: string; value?: string; placeholder: string; detail?: string; icon: IconName; tone?: Tone; disabled?: boolean; onPress: () => void;
+export function SelectorCard({ label, value, placeholder, detail, icon, tone = 'neutral', color, disabled = false, onPress, detailTone }: {
+  label: string; value?: string; placeholder: string; detail?: string; icon: IconName; tone?: Tone; color?: string; disabled?: boolean; onPress: () => void;
   detailTone?: 'neutral' | 'warning' | 'expense';
 }) {
   const p = usePalette();
@@ -21,7 +22,7 @@ export function SelectorCard({ label, value, placeholder, detail, icon, tone = '
   return <PressFeedback accessibilityRole="button" accessibilityLabel={`${label}: ${value ?? placeholder}${detail ? ', ' + detail : ''}`}
     accessibilityState={{ disabled }} disabled={disabled} onPress={onPress}
     style={[{ flexDirection: 'row', alignItems: 'center', gap: 14, padding: 14, borderRadius: radius.group, backgroundColor: p.surface, minHeight: 72, opacity: disabled ? 0.6 : 1 }, surfaceShadow(p)]}>
-    <GlyphTile icon={icon} tone={tone} size={44} />
+    <GlyphTile icon={icon} tone={tone} color={color} size={44} />
     <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
       <AppText secondary variant="caption" style={{ fontWeight: '500' }}>{label}</AppText>
       <AppText numberOfLines={1} style={{ fontWeight: '600', color: value ? p.text : p.tint }}>{value ?? placeholder}</AppText>
@@ -69,7 +70,7 @@ export function AccountField({ accounts, value, onChange, disabled = false, labe
   return <>
     {prominent ? <SelectorCard label={label} value={selected ? selected.name : undefined} placeholder="Elegir cuenta"
       detail={detail ?? (selected ? kind(selected.id) + ' · ' + selected.currency : undefined)} detailTone={detailTone}
-      icon={selected ? icon(selected.id) : 'wallet-outline'} disabled={disabled} onPress={open} />
+      icon={selected ? icon(selected.id) : 'wallet-outline'} tone={selected ? 'transfer' : 'neutral'} disabled={disabled} onPress={open} />
       : <DetailRow label={label} value={selected ? selected.name + ' · ' + selected.currency : 'Elegir cuenta'} icon={selected ? icon(selected.id) : 'wallet-outline'}
         disabled={disabled} onPress={open} />}
     <SelectionSheet visible={visible} title={label === 'Cuenta' ? 'Elegir cuenta' : label} onClose={() => setVisible(false)}>
@@ -112,11 +113,14 @@ export function DateField({ value, onChange, disabled = false, allowFuture = fal
   </>;
 }
 
+/** The chosen category looks like itself here too: its glyph on its hue, as in
+ * every row and detail. Income categories keep the income tone. */
 export function CategoryField({ entries, kind, value, onChange, disabled = false, prominent = false, detail, detailTone }: {
   entries: Entry[]; kind: EntryKind; value: string; onChange: (category: string) => void; disabled?: boolean;
   prominent?: boolean; detail?: string; detailTone?: 'neutral' | 'warning' | 'expense';
 }) {
   const p = usePalette();
+  const hue = useCategoryColor(value);
   const [visible, setVisible] = useState(false);
   const [query, setQuery] = useState('');
   const choices = useMemo(() => categoryChoices(entries, kind, query, value), [entries, kind, query, value]);
@@ -125,7 +129,8 @@ export function CategoryField({ entries, kind, value, onChange, disabled = false
   const open = () => { Keyboard.dismiss(); setQuery(''); setVisible(true); };
   return <>
     {prominent ? <SelectorCard label="Categoría" value={value || undefined} placeholder="Elegir categoría" detail={detail} detailTone={detailTone}
-      icon={value ? categoryIcon(value) : 'pricetag-outline'} tone={kind === 'income' && value ? 'income' : 'neutral'} disabled={disabled} onPress={open} />
+      icon={value ? categoryIcon(value) : 'pricetag-outline'} tone={kind === 'income' && value ? 'income' : 'neutral'}
+      color={value && kind === 'expense' ? hue : undefined} disabled={disabled} onPress={open} />
       : <DetailRow label="Categoría" value={value || 'Elegir categoría'} icon="pricetag-outline" disabled={disabled} onPress={open} />}
     <SelectionSheet visible={visible} title="Categorías" onClose={() => setVisible(false)}>
       <FlatList data={choices} keyExtractor={categoryKey} keyboardShouldPersistTaps="handled"

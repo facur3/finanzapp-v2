@@ -1,6 +1,6 @@
 # FinanzApp: dirección visual móvil
 
-Interfaz 15 · 20 de septiembre de 2026. Implementado en código; revisión visual y
+Interfaz 16 · 20 de septiembre de 2026. Implementado en código; revisión visual y
 gestual en iPhone pendiente. [Alcance del producto](decisions/002-spending-first.md) ·
 [Navegación y tarjetas](decisions/003-five-tabs-and-cards.md).
 
@@ -29,21 +29,28 @@ se pinta de verde. Nunca color sin signo o etiqueta.
 acero, oliva, rosa, verde azulado, ocre, índigo, pizarra), con variante clara y
 oscura. Cada categoría recibe un tono estable por hash de su clave, resolviendo
 colisiones en orden de primer uso, así una categoría nueva nunca cambia el color
-de una existente. Se usa en la barra de composición de Inicio, la dona y los
-puntos de la leyenda, siempre junto al nombre. "Otras" no es una categoría: queda
-en gris neutro. Los tiles de glifo en las listas siguen monocromos.
+de una existente. La categoría es un solo objeto: su glifo en el tono y el tile en
+un tinte suave del mismo tono (alfa 14 % en claro, 20 % en oscuro), en filas,
+leyenda, presupuestos y detalle; no hay puntos de color sueltos. Ingreso y alerta
+siguen mandando sobre el tono cuando ese significado importa. "Otras" en la dona
+queda en gris neutro.
 
 **Tipografía.** Fuente del sistema. Héroe 44/700 tabular con tracking negativo,
 título grande 34, título 22, encabezado 17/600, cuerpo 17, subtítulo 15, nota 13,
-etiqueta 12. Números siempre tabulares.
+etiqueta 12. Números siempre tabulares. **Importes responsivos:** un importe es
+siempre una sola línea; uno corto queda grande y uno largo se reduce hasta la
+mitad (héroe) o tres cuartos (fila) para caber, nunca se corta ni se parte. Dynamic
+Type aplica con un tope de 1,4× en héroes. El campo de importe baja de 46 a 32 y 24 pt
+según la cantidad de cifras.
 
 **Espacio y forma.** Margen de pantalla 20, tarjeta 16, escala 4–32. Radios: chip
 14, tile 12, grupo 16, tarjeta 20, hoja 24, tarjeta de crédito 18. Elevación clara
 con sombra suave; en oscuro, escalones de superficie sin sombra.
 
-**Componentes.** Fila de movimiento (tile de glifo · comercio · categoría · cuenta ·
-fecha · importe), control segmentado nativo, botones de 52 pt, tiles de glifo
-monocromo (los emoji se retiran), estadísticas compactas, tarjeta de crédito con
+**Componentes.** Fila de movimiento (tile de categoría · comercio · categoría ·
+cuenta · fecha · importe), control segmentado nativo, botones de 52 pt, acciones
+rápidas redondas (tile suave semántico de 56 pt con glifo y leyenda: Gasto coral,
+Ingreso verde, Transferir azul), estadísticas compactas, tarjeta de crédito con
 nombre, emisor, moneda, últimos cuatro dígitos y un tono estable por tarjeta.
 
 ## Pantallas de esta entrega
@@ -71,14 +78,15 @@ nombre, emisor, moneda, últimos cuatro dígitos y un tono estable por tarjeta.
   tarjeta, y el tipo de cada opción en la hoja). Comercio y fecha después. El botón
   Guardar repite el importe. Sin controles decorativos de dividir, comprobante o
   etiquetas mientras no existan sus datos.
-- **Inicio.** Una fila con Gastos / Disponible y la moneda; etiqueta de período,
-  número principal y cantidad de registros; Esta semana / Este mes (solo en Gastos);
-  Gasto / Ingreso; una línea de presupuesto solo si hay presupuestos; "En qué
-  gastaste" como una barra apilada en tonos de categoría más las tres principales
-  (nombre, importe, participación) y una fila neutra "Otras N categorías" que abre
-  Reportes; compromisos próximos solo cuando existen; los últimos cuatro movimientos.
-  Disponible no lleva aclaraciones en pantalla: un botón de información abre su
-  definición. Sin barras de análisis: eso vive en Reportes.
+- **Inicio.** El mes en curso, nada más. Una fila con Gastos / Disponible y la
+  moneda; el nombre del mes (o "Saldo registrado" con el botón de información) y el
+  número principal, sin cantidad de registros ni rango de fechas ni selector de
+  período. Tres acciones redondas: Gasto, Ingreso, Transferir. Una línea de
+  presupuesto solo si hay presupuestos. "En qué gastaste": las tres categorías
+  principales como filas (tile en su tono, nombre, importe y una línea fina de
+  3 pt con su participación); "Ver N" abre Reportes. Compromisos próximos solo
+  cuando existen; los últimos cuatro movimientos. Los períodos y el análisis viven
+  en Reportes.
 - **Movimientos.** Buscador, filtro Todos / Gastos / Ingresos / Transf., secciones
   "Hoy · 20 sep", "Ayer", día de la semana en los últimos siete días y luego la fecha,
   con el neto del día cuando hay una sola moneda.
@@ -86,18 +94,27 @@ nombre, emisor, moneda, últimos cuatro dígitos y un tono estable por tarjeta.
   estado; categoría, cuenta o tarjeta, contexto de presupuesto solo si existe uno
   activo para ese mes, moneda; editar y deshacer. Nada inventado: sin referencias
   bancarias, mapas ni estados de autorización.
-- **Tarjetas.** Carrusel horizontal con ajuste al soltar, deuda registrada como
-  número principal, disponible del límite, cierre y vencimiento, barra de uso
-  (ámbar desde 85 %, coral sobre el límite), acciones Registrar compra / Pagar
-  tarjeta, compras y pagos del resumen abierto, recientes y deudas.
-- **Detalle de tarjeta.** Tarjeta grande, deuda, límite, disponible, cierre,
-  vencimiento, resumen abierto y todos sus movimientos. Pagos se leen como
-  "Pago de tarjeta · desde Cuenta", sin signo ambiguo.
+- **Tarjetas.** Identidad → estado → hechos → acción principal → acción
+  secundaria → actividad. Carrusel horizontal con ajuste al soltar, deuda
+  registrada como número principal, una fila de tres hechos (Disponible, Cierre,
+  Vencimiento) con barra de uso (ámbar desde 85 %, coral sobre el límite),
+  Registrar compra a ancho completo sobre Pagar tarjeta (mismo tamaño, tinte
+  azul), y Recientes con los hechos del resumen abierto en su leyenda. Deudas debajo.
+- **Detalle de tarjeta.** Tarjeta grande, deuda, tres hechos (Disponible con el
+  límite como leyenda, Cierre, Vencimiento), las dos acciones apiladas y todos sus
+  movimientos con el resumen abierto en la leyenda. Emisor y moneda ya están en la
+  tarjeta; no hay tabla de detalle. Pagos se leen como "Pago de tarjeta · desde
+  Cuenta", sin signo ambiguo.
 - **Deudas y cobros.** Totales por moneda, Debo / Me deben, detalle con estado,
   vencimiento y registro de pagos o cobros limitados al saldo pendiente.
 - **Formularios.** Pagar tarjeta y saldar deudas fijan la obligación y solo eligen
   la cuenta de dinero en la misma moneda. El selector de cuenta nombra el tipo
   (Cuenta, Tarjeta de crédito) y nunca ofrece una deuda para un gasto.
+
+**Menos texto.** Las pantallas no repiten reglas que la app ya cumple: sin
+"no es saldo bancario", sin pies que expliquen que ARS y USD no se suman, sin
+leyendas que reiteren que un pago no es un gasto. La definición de Disponible
+vive detrás del botón de información.
 
 ## Gráficos
 
@@ -145,9 +162,10 @@ siguen montadas, así un revelado al montar no se vería).
   retroceden (0,94 / 0,7). Al asentarse en otra tarjeta suena un háptico; el panel
   queda montado y solo sus valores se funden, así lo de abajo no salta. Reduce
   Motion deja todas las tarjetas planas.
-- **Hápticos.** Uno por acción del usuario (selección en segmentos, flechas de mes,
-  categoría o cuenta elegida, tarjeta asentada; éxito al guardar) y siempre con una
-  señal visual.
+- **Hápticos.** Uno por acción del usuario (selección en segmentos, cambio de
+  pestaña, flechas de mes, categoría o cuenta elegida, tarjeta asentada; éxito al
+  guardar) y siempre con una señal visual. Las pestañas cambian al instante, sin
+  deslizamiento ni fundido.
 
 La pila y las hojas nativas siguen siendo la única transición de pantalla; las
 cinco pestañas permanecen montadas sin fade/detach/freeze. Objetivos de 44 pt,

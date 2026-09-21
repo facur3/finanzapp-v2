@@ -64,7 +64,7 @@ export default function RecurringScreen() {
       action={<ActionButton label="Crear recurrente" icon="add-outline" onPress={() => router.push({ pathname: '/new-recurring', params: newParams })} />} />
       : <>
         {!!forecast.length && <View>
-          <SectionTitle caption="Proyección de reglas activas · no mezcla ARS y USD">Próximos 30 días</SectionTitle>
+          <SectionTitle>Próximos 30 días</SectionTitle>
           <View style={{ gap: 10 }}>
             {forecast.map(item => <Surface key={item.currency} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', gap: 12 }}>
               <Stat label={`Pagos · ${item.currency}`}><Money minor={item.expense} currency={item.currency} size={20} weight="700" /></Stat>
@@ -86,9 +86,6 @@ export default function RecurringScreen() {
             last={index === paused.length - 1} busy={busyId === rule.id} onToggle={() => toggle(rule)} />)}</Surface>
         </View>}
       </>}
-    <AppText tertiary variant="footnote" style={{ textAlign: 'center' }}>
-      Si la app estuvo cerrada, los vencimientos pendientes se registran al abrirla. Cada fecha tiene un identificador único: nunca se duplican.
-    </AppText>
   </Screen>;
 }
 

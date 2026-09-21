@@ -7,7 +7,7 @@ import { useLedger } from '../../src/storage/LedgerProvider';
 import { ActionButton, AppText, EmptyState, GlyphTile, Money, MovementRow, Screen, SectionTitle, Stat, Surface, toneColors } from '../../src/ui/components';
 import { CardCarousel, CardFace } from '../../src/ui/card-visual';
 import { DebtRow } from '../../src/ui/liability-rows';
-import { activeCards, daysUntil, usageTone, type CardSummary } from '../../src/ui/liability-presentation';
+import { activeCards, daysUntil, statementCaption, usageTone, type CardSummary } from '../../src/ui/liability-presentation';
 import { Reflow, ValueTransition, timing } from '../../src/ui/motion';
 import { mergeActivity } from '../../src/ui/presentation';
 import { space, useCurrentDay, usePalette, useReduceMotion } from '../../src/ui/theme';
@@ -48,9 +48,6 @@ export default function CardsScreen() {
         </View>
       </Surface>}
     </Reflow>
-    <AppText tertiary variant="footnote" style={{ textAlign: 'center', color: p.tertiary }}>
-      Cierres y vencimientos se calculan con los días que cargaste. No hay conexión bancaria.
-    </AppText>
   </Screen>;
 }
 
@@ -92,28 +89,17 @@ function CardPanel({ summary, day }: { summary: CardSummary; day: string }) {
         label={`${Math.round(Math.min(usage, 9.99) * 100)} % del límite de ${account.currency === 'USD' ? 'US$ ' : '$ '}${formatMinorUnits(card.creditLimitMinor)}`} />}
     </Surface></ValueTransition>
 
-    <View style={{ flexDirection: 'row', gap: 10 }}>
-      <ActionButton label="Registrar compra" icon="cart-outline" containerStyle={{ flex: 1 }}
+    {/* Primary above secondary, same width and height: hierarchy by fill, not by geometry. */}
+    <View style={{ gap: 10 }}>
+      <ActionButton label="Registrar compra" icon="cart-outline"
         onPress={() => router.push({ pathname: '/new-entry', params: { accountId: account.id, kind: 'expense' } })} />
-      <ActionButton label="Pagar tarjeta" icon="arrow-forward-outline" secondary containerStyle={{ flex: 1 }} disabled={debtMinor === 0}
+      <ActionButton label="Pagar tarjeta" icon="arrow-forward-outline" secondary tone="transfer" disabled={debtMinor === 0}
         onPress={() => router.push({ pathname: '/new-transfer', params: { toAccountId: account.id, title: 'Pagar tarjeta', note: 'Pago ' + account.name, maxAmountMinor: String(debtMinor) } })} />
     </View>
 
-    {statement && <ValueTransition id={card.id} variant="fade" style={{ flexDirection: 'row', gap: 10 }}>
-      <Surface style={{ flex: 1, gap: 4 }}>
-        <AppText secondary variant="caption" style={{ fontWeight: '500' }}>Compras del resumen</AppText>
-        <Money minor={statement.purchasesMinor} currency={account.currency} size={17} />
-        <AppText tertiary variant="caption">{statement.purchaseCount === 1 ? '1 compra' : statement.purchaseCount + ' compras'} · desde {relative(statement.startISO)}</AppText>
-      </Surface>
-      <Surface style={{ flex: 1, gap: 4 }}>
-        <AppText secondary variant="caption" style={{ fontWeight: '500' }}>Pagos del resumen</AppText>
-        <Money minor={statement.paymentsMinor} currency={account.currency} size={17} tone="transfer" color={statement.paymentsMinor ? undefined : p.text} />
-        <AppText tertiary variant="caption">{statement.paymentCount === 1 ? '1 pago' : statement.paymentCount + ' pagos'}</AppText>
-      </Surface>
-    </ValueTransition>}
-
     <ValueTransition id={card.id} variant="fade">
-      <SectionTitle action="Ver todo" onAction={() => router.push({ pathname: '/card/[id]', params: { id: card.id } })}>Recientes</SectionTitle>
+      <SectionTitle action="Ver todo" onAction={() => router.push({ pathname: '/card/[id]', params: { id: card.id } })}
+        caption={statement ? statementCaption(statement, relative) : undefined}>Recientes</SectionTitle>
       {recent.length ? <Surface grouped>
         {recent.map((item, index) => <MovementRow key={item.key} item={item} accounts={snapshot.accounts} accountId={account.id} context="card" last={index === recent.length - 1} />)}
       </Surface> : <AppText secondary variant="subhead">Todavía no registraste compras ni pagos en esta tarjeta.</AppText>}

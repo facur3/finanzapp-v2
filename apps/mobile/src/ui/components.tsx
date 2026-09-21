@@ -8,7 +8,9 @@ import type { ActivityItem } from './presentation';
 import { router } from 'expo-router';
 import { radius, space, type, useCurrentDay, usePalette, useReduceMotion, type Palette } from './theme';
 import { categoryIcon, type IconName } from './categories';
-import { SEGMENT_GAP, SEGMENT_PADDING, segmentLayout } from './geometry';
+import { tintOf } from './category-color';
+import { useCategoryColor } from './category-hues';
+import { SEGMENT_GAP, SEGMENT_PADDING, fitFontSize, segmentLayout } from './geometry';
 import { duration, easeOut, selectionHaptic, timing } from './motion';
 
 export type { IconName } from './categories';
@@ -129,7 +131,9 @@ export function Field({ label, ...props }: TextInputProps & { label: string }) {
 export function AmountField({ label = 'Monto', currency, tone, ...props }: TextInputProps & { label?: string; currency: Currency; tone?: Tone }) {
   const p = usePalette();
   const accessoryId = useId();
-  const long = (props.value?.length ?? 0) > 11;
+  const length = props.value?.length ?? 0;
+  const long = length > 11;
+  const amountSize = length > 17 ? 24 : long ? 32 : 46;
   const color = tone && tone !== 'neutral' ? toneColors(p, tone).color : p.text;
   return <View style={{ gap: 10, alignItems: 'center', paddingVertical: 8 }}>
     <AppText secondary variant="footnote" style={{ fontWeight: '500' }}>{label} · {currency}</AppText>
@@ -139,7 +143,7 @@ export function AmountField({ label = 'Monto', currency, tone, ...props }: TextI
         accessibilityLabel={label + ' en ' + (currency === 'ARS' ? 'pesos argentinos' : 'dólares')}
         inputAccessoryViewID={Platform.OS === 'ios' ? accessoryId : undefined}
         selectionColor={p.tint} placeholderTextColor={p.tertiary}
-        style={[styles.amountInput, { color, fontSize: long ? 32 : 46 }, props.style]} />
+        style={[styles.amountInput, { color, fontSize: amountSize }, props.style]} />
     </View>
     {Platform.OS === 'ios' && <InputAccessoryView nativeID={accessoryId} backgroundColor={p.surface}>
       <View style={{ alignItems: 'flex-end', paddingHorizontal: 20 }}>
@@ -188,9 +192,12 @@ export function Choices<T extends string>({ value, options, onChange, disabled }
   </View>;
 }
 
-export function GlyphTile({ icon, tone = 'neutral', large = false, size }: { icon: IconName; tone?: Tone; large?: boolean; size?: number }) {
+/** A glyph on a soft tile. `color` gives the tile an identity (a category
+ * hue); otherwise the tone decides. The tile is one object: hue in the glyph
+ * and in its background, never a separate swatch beside it. */
+export function GlyphTile({ icon, tone = 'neutral', large = false, size, color }: { icon: IconName; tone?: Tone; large?: boolean; size?: number; color?: string }) {
   const p = usePalette();
-  const colors = toneColors(p, tone);
+  const colors = color ? { color, soft: tintOf(color, p) } : toneColors(p, tone);
   const side = size ?? (large ? 56 : 40);
   return <View accessible={false} accessibilityElementsHidden importantForAccessibility="no-hide-descendants"
     style={{ width: side, height: side, borderRadius: large ? 16 : radius.tile, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.soft }}>
@@ -214,20 +221,39 @@ export function ErrorMessage({ message }: { message: string | null }) {
   </View> : null;
 }
 
+const HERO_MAX_SCALE = 1.4, ROW_MAX_SCALE = 1.8;
+
 /** Amounts are ink by default. Income is green with a plus; an explicit negative
- * value shows a minus. Colour never replaces the sign or the label. */
-export function Money({ minor, currency, large = false, color, signed = false, size, tone = 'neutral', weight }: {
+ * value shows a minus. Colour never replaces the sign or the label. An amount is
+ * always one line. A hero (28 pt and up) measures the width it was given and
+ * takes the largest size, down to half of its base, at which the whole string
+ * fits; a short value stays at full size and a long one shrinks only as much as
+ * it must. This replaces the native shrink-to-fit, which on iOS also fits the
+ * measured height and collapsed long amounts to a few points. Row amounts keep
+ * the native fit with a 3/4 floor and no fixed line height. Dynamic Type still
+ * applies, capped so a hero cannot outgrow the screen. */
+export function Money({ minor, currency, large = false, color, signed = false, size, tone = 'neutral', weight, align = 'left' }: {
   minor: number; currency: Currency; large?: boolean; color?: string; signed?: boolean; size?: number; tone?: Tone; weight?: '500' | '600' | '700';
+  align?: 'left' | 'center';
 }) {
   const p = usePalette();
+  const { fontScale } = useWindowDimensions();
+  const [width, setWidth] = useState(0);
   const sign = minor < 0 ? '−' : signed && minor > 0 ? '+' : '';
   const semantic = tone === 'income' ? p.income : tone === 'expense' ? p.text : tone === 'transfer' ? p.transfer : tone === 'warning' ? p.warning : p.text;
-  const fontSize = size ?? (large ? 44 : 17);
-  return <Text accessibilityLabel={(minor < 0 ? 'Menos ' : '') + formatMinorUnits(Math.abs(minor)) + (currency === 'USD' ? ' dólares' : ' pesos')}
-    style={{ color: color ?? semantic, fontSize, lineHeight: Math.round(fontSize * 1.18), fontWeight: weight ?? (large ? '700' : '600'),
-      letterSpacing: fontSize >= 28 ? -fontSize * 0.03 : -0.2, fontVariant: ['tabular-nums'], flexShrink: 1, maxWidth: '100%' }}>
-    {sign}{currency === 'USD' ? 'US$ ' : '$ '}{formatMinorUnits(Math.abs(minor))}
+  const base = size ?? (large ? 44 : 17);
+  const hero = base >= 28;
+  const text = sign + (currency === 'USD' ? 'US$ ' : '$ ') + formatMinorUnits(Math.abs(minor));
+  const fontSize = hero ? fitFontSize(text, width, base, Math.round(base / 2), Math.min(fontScale, HERO_MAX_SCALE)) : base;
+  const label = (minor < 0 ? 'Menos ' : '') + formatMinorUnits(Math.abs(minor)) + (currency === 'USD' ? ' dólares' : ' pesos');
+  const body = <Text accessibilityLabel={label} numberOfLines={1} adjustsFontSizeToFit={!hero} minimumFontScale={0.75}
+    maxFontSizeMultiplier={hero ? HERO_MAX_SCALE : ROW_MAX_SCALE}
+    style={{ color: color ?? semantic, fontSize, lineHeight: hero ? Math.round(fontSize * 1.18) : undefined, fontWeight: weight ?? (large ? '700' : '600'),
+      letterSpacing: hero ? -fontSize * 0.03 : -0.2, fontVariant: ['tabular-nums'], flexShrink: 1, maxWidth: '100%', textAlign: align }}>
+    {text}
   </Text>;
+  // The wrapper spans its container so the measured width is the space available, never the text's own width.
+  return hero ? <View style={{ alignSelf: 'stretch' }} onLayout={event => setWidth(event.nativeEvent.layout.width)}>{body}</View> : body;
 }
 
 export function DetailRow({ label, value, icon, onPress, last = false, disabled = false, tone = 'neutral' }: {
@@ -257,8 +283,11 @@ export function Stat({ label, children, align = 'left' }: { label: string; child
   </View>;
 }
 
+/** The category as one designed object: its glyph on its own hue. Income and
+ * warning tones override the hue because that meaning matters more. */
 export function CategoryBadge({ category, large = false, tone = 'neutral' }: { category: string; large?: boolean; tone?: Tone }) {
-  return <GlyphTile icon={categoryIcon(category)} large={large} tone={tone} />;
+  const color = useCategoryColor(category);
+  return <GlyphTile icon={categoryIcon(category)} large={large} tone={tone} color={tone === 'neutral' ? color : undefined} />;
 }
 
 /** One transaction line: merchant, then category · account · date; amount on the right. */
@@ -353,17 +382,6 @@ export function TransferRow({ transfer: t, accounts, accountId, last = false, sh
       </View>
     </View>
   </PressFeedback>;
-}
-
-export function EntryActions({ accountId, currency }: { accountId?: string; currency?: Currency }) {
-  const { fontScale } = useWindowDimensions();
-  const params = { ...(accountId ? { accountId } : {}), ...(currency ? { currency } : {}) };
-  return <View style={{ flexDirection: fontScale > 1.3 ? 'column' : 'row', gap: 10 }}>
-    <ActionButton label="Gasto" icon="remove-outline" containerStyle={{ flex: 1 }}
-      onPress={() => router.push({ pathname: '/new-entry', params: { kind: 'expense', ...params } })} />
-    <ActionButton label="Ingreso" icon="add-outline" secondary containerStyle={{ flex: 1 }}
-      onPress={() => router.push({ pathname: '/new-entry', params: { kind: 'income', ...params } })} />
-  </View>;
 }
 
 const styles = StyleSheet.create({

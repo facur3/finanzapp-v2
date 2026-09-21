@@ -22,7 +22,6 @@ export default function AccountsScreen() {
     <SectionList<Account, typeof sections[number]> sections={sections} keyExtractor={account => account.id}
       style={{ flex: 1, backgroundColor: p.background }} contentContainerStyle={{ padding: space.xl, paddingBottom: 48, flexGrow: 1 }}
       contentInsetAdjustmentBehavior="automatic" stickySectionHeadersEnabled={false} removeClippedSubviews={false}
-      ListHeaderComponent={<AppText secondary variant="subhead" style={{ paddingBottom: 4 }}>Saldos calculados con lo que registraste. No se sincronizan con tu banco.</AppText>}
       ListEmptyComponent={<EmptyState title="Empezá por una cuenta" detail="Elegí una cuenta para agrupar movimientos. Cargar el saldo inicial es opcional."
         action={<ActionButton label="Agregar cuenta" onPress={() => router.push('/new-account')} />} />}
       renderSectionHeader={({ section }) => <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', gap: 12, paddingTop: 20, paddingBottom: 8, paddingHorizontal: 4 }}>
@@ -37,8 +36,6 @@ export default function AccountsScreen() {
         borderBottomLeftRadius: index === section.data.length - 1 ? 16 : 0, borderBottomRightRadius: index === section.data.length - 1 ? 16 : 0 }}>
         <AccountRow account={item} entries={snapshot.entries} transfers={snapshot.transfers} last={index === section.data.length - 1} />
       </View>}
-      ListFooterComponent={<AppText tertiary variant="footnote" style={{ paddingTop: 20, textAlign: 'center' }}>
-        Tarjetas y deudas están en la pestaña Tarjetas y no se suman acá.
-      </AppText>} />
+      />
   </>;
 }

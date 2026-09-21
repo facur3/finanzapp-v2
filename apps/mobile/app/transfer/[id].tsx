@@ -63,7 +63,7 @@ function TransferDetail({ record, accounts }: { record: TransferRecord; accounts
     <View style={{ alignItems: 'center', gap: 14, paddingVertical: 12 }}>
       <GlyphTile icon={toKind === 'card' ? 'card-outline' : toKind === 'debt' || fromKind === 'debt' ? 'people-outline' : 'swap-horizontal-outline'} tone="transfer" large />
       <View style={{ alignItems: 'center', gap: 4, width: '100%' }}>
-        <Money minor={t.amountMinor} currency={from.currency} large tone="transfer" color={record.voided ? p.tertiary : undefined} />
+        <Money minor={t.amountMinor} currency={from.currency} large align="center" tone="transfer" color={record.voided ? p.tertiary : undefined} />
         <AppText variant="title3" style={{ textAlign: 'center' }}>{t.note || kindTitle}</AppText>
         <AppText secondary variant="subhead" style={{ textAlign: 'center', textTransform: 'capitalize' }}>{date}</AppText>
       </View>
