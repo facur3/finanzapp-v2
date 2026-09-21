@@ -99,7 +99,7 @@ export default function HomeScreen() {
       </Reflow>}
 
       <Reflow>
-        <SectionTitle action={summary.categories.length > 3 ? `Ver ${summary.categories.length}` : 'Reportes'} onAction={openReport}>En qué gastaste</SectionTitle>
+        <SectionTitle action="Reportes" onAction={openReport}>En qué gastaste</SectionTitle>
         <ValueTransition id={currency} variant="fade">
           {summary.categories.length && summary.status === 'ready' ? <CategoryRanking categories={summary.categories} totalMinor={summary.expenseMinor} currency={currency}
             onPressCategory={category => router.push({ pathname: '/spending-detail', params: { ...period, category: category.key } })} />

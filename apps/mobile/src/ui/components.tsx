@@ -10,7 +10,7 @@ import { radius, space, type, useCurrentDay, usePalette, useReduceMotion, type P
 import { categoryIcon, type IconName } from './categories';
 import { tintOf } from './category-color';
 import { useCategoryColor } from './category-hues';
-import { SEGMENT_GAP, SEGMENT_PADDING, segmentLayout } from './geometry';
+import { SEGMENT_GAP, SEGMENT_PADDING, fitFontSize, segmentLayout } from './geometry';
 import { duration, easeOut, selectionHaptic, timing } from './motion';
 
 export type { IconName } from './categories';
@@ -221,26 +221,39 @@ export function ErrorMessage({ message }: { message: string | null }) {
   </View> : null;
 }
 
+const HERO_MAX_SCALE = 1.4, ROW_MAX_SCALE = 1.8;
+
 /** Amounts are ink by default. Income is green with a plus; an explicit negative
  * value shows a minus. Colour never replaces the sign or the label. An amount is
- * always one line: a short value stays large and a long one scales down to fit
- * its container (to half size for a hero, three quarters in a row) instead of
- * wrapping or clipping. Dynamic Type still applies, capped so a hero cannot
- * outgrow the screen. */
-export function Money({ minor, currency, large = false, color, signed = false, size, tone = 'neutral', weight }: {
+ * always one line. A hero (28 pt and up) measures the width it was given and
+ * takes the largest size, down to half of its base, at which the whole string
+ * fits; a short value stays at full size and a long one shrinks only as much as
+ * it must. This replaces the native shrink-to-fit, which on iOS also fits the
+ * measured height and collapsed long amounts to a few points. Row amounts keep
+ * the native fit with a 3/4 floor and no fixed line height. Dynamic Type still
+ * applies, capped so a hero cannot outgrow the screen. */
+export function Money({ minor, currency, large = false, color, signed = false, size, tone = 'neutral', weight, align = 'left' }: {
   minor: number; currency: Currency; large?: boolean; color?: string; signed?: boolean; size?: number; tone?: Tone; weight?: '500' | '600' | '700';
+  align?: 'left' | 'center';
 }) {
   const p = usePalette();
+  const { fontScale } = useWindowDimensions();
+  const [width, setWidth] = useState(0);
   const sign = minor < 0 ? '−' : signed && minor > 0 ? '+' : '';
   const semantic = tone === 'income' ? p.income : tone === 'expense' ? p.text : tone === 'transfer' ? p.transfer : tone === 'warning' ? p.warning : p.text;
-  const fontSize = size ?? (large ? 44 : 17);
-  const hero = fontSize >= 28;
-  return <Text accessibilityLabel={(minor < 0 ? 'Menos ' : '') + formatMinorUnits(Math.abs(minor)) + (currency === 'USD' ? ' dólares' : ' pesos')}
-    numberOfLines={1} adjustsFontSizeToFit minimumFontScale={hero ? 0.5 : 0.75} maxFontSizeMultiplier={hero ? 1.4 : 1.8}
-    style={{ color: color ?? semantic, fontSize, lineHeight: Math.round(fontSize * 1.18), fontWeight: weight ?? (large ? '700' : '600'),
-      letterSpacing: hero ? -fontSize * 0.03 : -0.2, fontVariant: ['tabular-nums'], flexShrink: 1, maxWidth: '100%' }}>
-    {sign}{currency === 'USD' ? 'US$ ' : '$ '}{formatMinorUnits(Math.abs(minor))}
+  const base = size ?? (large ? 44 : 17);
+  const hero = base >= 28;
+  const text = sign + (currency === 'USD' ? 'US$ ' : '$ ') + formatMinorUnits(Math.abs(minor));
+  const fontSize = hero ? fitFontSize(text, width, base, Math.round(base / 2), Math.min(fontScale, HERO_MAX_SCALE)) : base;
+  const label = (minor < 0 ? 'Menos ' : '') + formatMinorUnits(Math.abs(minor)) + (currency === 'USD' ? ' dólares' : ' pesos');
+  const body = <Text accessibilityLabel={label} numberOfLines={1} adjustsFontSizeToFit={!hero} minimumFontScale={0.75}
+    maxFontSizeMultiplier={hero ? HERO_MAX_SCALE : ROW_MAX_SCALE}
+    style={{ color: color ?? semantic, fontSize, lineHeight: hero ? Math.round(fontSize * 1.18) : undefined, fontWeight: weight ?? (large ? '700' : '600'),
+      letterSpacing: hero ? -fontSize * 0.03 : -0.2, fontVariant: ['tabular-nums'], flexShrink: 1, maxWidth: '100%', textAlign: align }}>
+    {text}
   </Text>;
+  // The wrapper spans its container so the measured width is the space available, never the text's own width.
+  return hero ? <View style={{ alignSelf: 'stretch' }} onLayout={event => setWidth(event.nativeEvent.layout.width)}>{body}</View> : body;
 }
 
 export function DetailRow({ label, value, icon, onPress, last = false, disabled = false, tone = 'neutral' }: {

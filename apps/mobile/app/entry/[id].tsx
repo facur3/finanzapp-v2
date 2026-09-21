@@ -77,7 +77,7 @@ function EntryDetail({ record, account }: { record: EntryRecord; account: Accoun
     <View style={{ gap: 14, alignItems: 'center', paddingVertical: 12 }}>
       <CategoryBadge category={entry.category} large tone={income ? 'income' : 'neutral'} />
       <View style={{ alignItems: 'center', gap: 4, width: '100%' }}>
-        <Money minor={income ? entry.amountMinor : -entry.amountMinor} currency={account.currency} large signed
+        <Money minor={income ? entry.amountMinor : -entry.amountMinor} currency={account.currency} large signed align="center"
           tone={income ? 'income' : 'expense'} color={record.voided ? p.tertiary : undefined} />
         <AppText variant="title3" style={{ textAlign: 'center' }}>{entry.merchant}</AppText>
         <AppText secondary variant="subhead" style={{ textAlign: 'center', textTransform: 'capitalize' }}>{date}</AppText>

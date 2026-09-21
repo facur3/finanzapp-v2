@@ -32,9 +32,18 @@ product direction was accepted, but the screens felt noisy and monochromatic.
   round actions (Gasto coral, Ingreso green, Transferir blue) replace the two filled
   buttons, so a transfer is one tap away. "En qué gastaste" is the top three
   categories as ranked rows with one 3 pt hue line each; "Ver N" opens Reportes.
-- [x] Responsive financial typography: every amount is one line and scales down to
-  fit (to half size for a hero, three quarters in a row) instead of wrapping or
-  clipping; Dynamic Type is capped on heroes. The amount field steps 46 → 32 → 24 pt.
+- [x] Responsive financial typography: every amount is one line. A hero measures its
+  container and takes the largest size (down to half its base) at which the whole
+  string fits, computed from tabular glyph widths; on the reported iPhone
+  "$ 999.999.999,99" renders at 40 pt and "US$ 999.999.999,99" at 34.5 pt. The native
+  shrink-to-fit is no longer used on heroes: on iOS it also fits the measured height
+  and collapsed long amounts to a few points (the defect the owner saw). Rows keep
+  the native fit with a 3/4 floor. Dynamic Type is capped at 1.4× on heroes. The
+  amount field steps 46 → 32 → 24 pt.
+- [x] Forms keep the category identity: the chosen expense category shows its glyph
+  on its hue in Registrar gasto, Editar movimiento, recurring and budget selectors and
+  in the picker sheets; a chosen account takes the blue interaction accent; the date
+  stays quiet. Home's category action reads "Reportes".
 - [x] Tarjetas: identity (card) → state (debt) → three facts (Disponible with its limit
   as a caption, Cierre, Vencimiento) → primary Registrar compra → secondary Pagar
   tarjeta (same width, blue tint) → activity, whose caption carries the statement
@@ -50,7 +59,9 @@ product direction was accepted, but the screens felt noisy and monochromatic.
 
 Interfaz 16 verification updates the Home handler tests (month only, no count or range
 copy, quick actions, ranking), the account and card detail tests (round actions,
-facts row, stacked buttons, statement caption) and adds a quick-actions unit test.
+facts row, stacked buttons, statement caption) and adds unit tests for the quick
+actions, the hero fit (representative values, Dynamic Type, floor, the Money
+component) and the form selector tints.
 
 ### Custom categories: model and plan (Interfaz 17, not in this PR)
 
@@ -384,7 +395,11 @@ safe areas, system text and separate currencies apply to every new screen.
   categories, one-line responsive amounts everywhere, a card hierarchy of identity →
   state → facts → primary → secondary → activity, disclaimer and footer copy removed,
   a tab-change tick. Custom categories investigated and planned as Interfaz 17.
-- Checked locally: 359 domain/web + 136 mobile tests, TypeScript, Vite build, hygiene,
+- Pre-merge defect pass after a second iPhone review: the hero amount collapsed on
+  long values (native shrink-to-fit fitting the measured height); replaced by a
+  measured, deterministic fit. Category hue carried into the form selectors and
+  picker sheets; account selector on the blue accent; Home link renamed Reportes.
+- Checked locally: 359 domain/web + 140 mobile tests, TypeScript, Vite build, hygiene,
   Expo compatibility and Metro iOS export. No device evidence.
 
 ### 2026-09-20 — Interfaz 15: motion system, Home composition and category colour

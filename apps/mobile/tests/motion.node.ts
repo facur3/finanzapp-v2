@@ -143,3 +143,46 @@ test('quick actions open the three movement modes with the account and currency 
   const tiles = actions.map((action: any) => action.props.children[0].props.style.backgroundColor);
   assert.equal(JSON.stringify(tiles), JSON.stringify(['expense-soft', 'income-soft', 'transfer-soft']));
 });
+
+test('form selectors keep the category hue and give the account the interaction accent', () => {
+  const source = readFileSync(new URL('../src/ui/form-controls.tsx', import.meta.url), 'utf8');
+  const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText;
+  const jsx = (type: any, props: any) => ({ type, props });
+  const state: unknown[] = [];
+  let cursor = 0;
+  const modules: Record<string, any> = {
+    react: { useMemo: (fn: () => unknown) => fn(), useState: (initial: unknown) => { const index = cursor++; if (!(index in state)) state[index] = initial;
+      return [state[index], (value: unknown) => { state[index] = value; }]; } },
+    'react/jsx-runtime': { jsx, jsxs: jsx, Fragment: 'Fragment' },
+    'react-native': { FlatList: 'FlatList', Keyboard: { dismiss() {} }, Modal: 'Modal', Platform: { OS: 'ios' }, View: 'View' },
+    'react-native-safe-area-context': { SafeAreaView: 'SafeAreaView' },
+    '@react-native-community/datetimepicker': 'DateTimePicker',
+    '@expo/vector-icons/Ionicons': 'Ionicons',
+    './components': { AppText: 'AppText', CategoryBadge: 'CategoryBadge', DetailRow: 'DetailRow', Field: 'Field', GlyphTile: 'GlyphTile', PressFeedback: 'PressFeedback', surfaceShadow: () => ({}) },
+    './category-hues': { useCategoryColor: (label: string) => label ? '#B0507A' : '#000' },
+    './motion': { selectionHaptic: () => {} },
+    './theme': { radius: { group: 16 }, usePalette: () => ({ surface: '#fff', text: '#000', tint: '#03c', secondary: '#666', tertiary: '#999', background: '#fff', transferSoft: '#eef', isDark: false }), useReduceMotion: () => true },
+    './categories': { categoryChoices: () => [], categoryIcon: () => 'paw-outline', categoryKey: (label: string) => label.toLowerCase(), customCategory: () => null },
+  };
+  const module = { exports: {} as Record<string, (props: any) => any> };
+  runInNewContext(code, { module, exports: module.exports, require: (name: string) => {
+    if (!Object.hasOwn(modules, name)) throw new Error('Unexpected form-controls dependency: ' + name);
+    return modules[name];
+  } });
+  const render = (component: string, props: any) => { cursor = 0; state.length = 0; let node = module.exports[component](props); while (typeof node.type === 'function') node = node.type(node.props); return node; };
+  const selector = (node: any) => { let card = node.props.children[0]; while (typeof card.type === 'function') card = card.type(card.props); return card; };
+  const tileOf = (card: any) => card.props.children[0];
+  const chosen = selector(render('CategoryField', { entries: [], kind: 'expense', value: 'Mascotas', onChange: () => {}, prominent: true }));
+  assert.equal(tileOf(chosen).props.color, '#B0507A', 'the chosen expense category shows its own hue');
+  assert.equal(tileOf(chosen).props.icon, 'paw-outline');
+  const empty = selector(render('CategoryField', { entries: [], kind: 'expense', value: '', onChange: () => {}, prominent: true }));
+  assert.equal(tileOf(empty).props.color, undefined, 'no hue before a category is chosen');
+  const income = selector(render('CategoryField', { entries: [], kind: 'income', value: 'Sueldo', onChange: () => {}, prominent: true }));
+  assert.equal(tileOf(income).props.color, undefined);
+  assert.equal(tileOf(income).props.tone, 'income', 'income keeps its meaning over the hue');
+  const accounts = [{ id: 'a', name: 'Banco', currency: 'ARS', openingMinor: 0, createdAt: '' }];
+  const account = selector(render('AccountField', { accounts, value: 'a', onChange: () => {}, prominent: true }));
+  assert.equal(tileOf(account).props.tone, 'transfer', 'a chosen account takes the interaction accent');
+  const none = selector(render('AccountField', { accounts, value: '', onChange: () => {}, prominent: true }));
+  assert.equal(tileOf(none).props.tone, 'neutral');
+});

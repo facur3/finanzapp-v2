@@ -6,7 +6,7 @@ import * as Haptics from 'expo-haptics';
 import { formatMinorUnits, parseMinorUnits, sameMonthlyBudget, validateMonthlyBudget,
   type Currency, type MonthlyBudget } from '@finanzapp/domain';
 import { useLedger } from '../storage/LedgerProvider';
-import { ActionButton, AmountField, AppText, Choices, ErrorMessage, IconButton, Screen, Surface } from './components';
+import { ActionButton, AmountField, AppText, Choices, ErrorMessage, IconButton, Screen } from './components';
 import { CategoryField } from './form-controls';
 
 function monthLabel(monthISO: string) {
@@ -123,14 +123,10 @@ export function BudgetForm({ original, monthISO, currency: requestedCurrency }: 
       options={[{ value: 'ARS', label: 'Pesos · ARS' }, { value: 'USD', label: 'Dólares · USD' }]} />}
     <AmountField label="Presupuesto" currency={currency} value={amount}
       onChangeText={value => { setAmount(value); setError(null); }} editable={!locked} />
-    <Surface grouped>
-      <CategoryField entries={snapshot?.entries ?? []} kind="expense" value={category} onChange={setCategory} disabled={locked} />
-      <View style={{ paddingHorizontal: 16, paddingVertical: 14 }}>
-        <AppText secondary style={{ fontSize: 13 }}>
-          Se compara con los gastos registrados en esta categoría durante ese mes. Transferencias e ingresos no consumen presupuesto.
-        </AppText>
-      </View>
-    </Surface>
+    <CategoryField entries={snapshot?.entries ?? []} kind="expense" value={category} onChange={setCategory} disabled={locked} prominent />
+    <AppText secondary variant="footnote" style={{ textAlign: 'center' }}>
+      Se compara con los gastos registrados en esta categoría durante ese mes.
+    </AppText>
     <ErrorMessage message={error} />
     {pending && error && <AppText secondary style={{ fontSize: 13, textAlign: 'center' }}>
       El envío quedó congelado para que Reintentar no cree otro presupuesto.

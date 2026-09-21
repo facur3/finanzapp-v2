@@ -38,7 +38,7 @@ export default function DebtDetailScreen() {
         <View style={{ gap: 12, alignItems: 'center', paddingTop: 8 }}>
           <GlyphTile icon={owed ? 'arrow-up-outline' : 'arrow-down-outline'} tone={owed ? 'warning' : 'income'} large />
           <AppText secondary variant="footnote" style={{ fontWeight: '500' }}>{owed ? 'Debo a' : 'Me debe'} {debt.counterparty} · {account.currency}</AppText>
-          <Money minor={outstanding} currency={account.currency} large size={40} />
+          <Money minor={outstanding} currency={account.currency} large size={40} align="center" />
           <AppText variant="subhead" style={{ color: overdue ? p.expense : p.secondary, fontWeight: overdue ? '600' : '400' }}>{status}</AppText>
         </View>
         <ActionButton label={owed ? 'Registrar pago' : 'Registrar cobro'} icon={owed ? 'arrow-forward-outline' : 'arrow-down-outline'}
