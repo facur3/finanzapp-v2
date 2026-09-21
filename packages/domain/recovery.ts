@@ -1,7 +1,7 @@
 import { totalsByCurrency, validateAccount, validateEntry, type Account, type Entry, type LedgerSnapshot } from './ledger.ts';
 import { TRANSFER_KEYS, sameTransferRecord, validateTransferRecord, type TransferRecord } from './transfers.ts';
 import { sameRecurringRule, validateRecurringRule, type RecurringRule } from './recurring.ts';
-import { sameMonthlyBudget, validateBudgetCollection, validateMonthlyBudget, type MonthlyBudget } from './budgets.ts';
+import { sameMonthlyBudget, scopedMonthlyBudget, validateBudgetCollection, validateMonthlyBudget, type MonthlyBudget } from './budgets.ts';
 import { liquidTotalsByCurrency, sameCreditCardProfile, samePersonalDebtProfile, validateCreditCardProfile, validateLiabilityProfiles,
   validatePersonalDebtProfile, type CreditCardProfile, type PersonalDebtProfile } from './liabilities.ts';
 
@@ -33,7 +33,11 @@ const ACCOUNT_KEYS = ['id', 'name', 'currency', 'openingMinor', 'createdAt'] as 
 const ENTRY_KEYS = ['id', 'accountId', 'kind', 'amountMinor', 'merchant', 'category', 'dateISO', 'createdAt'] as const;
 const RECURRING_KEYS = ['id', 'accountId', 'kind', 'amountMinor', 'merchant', 'category', 'frequency',
   'anchorDateISO', 'nextDateISO', 'active', 'createdAt', 'revision', 'updatedAt'] as const;
-const BUDGET_KEYS = ['id', 'category', 'currency', 'monthISO', 'amountMinor', 'active',
+// v5/v6 budgets had no scope: every one of them is a category budget. v7 adds
+// `scope`; a total budget carries no `category` key at all.
+const LEGACY_BUDGET_KEYS = ['id', 'category', 'currency', 'monthISO', 'amountMinor', 'active',
+  'createdAt', 'revision', 'updatedAt'] as const;
+const BUDGET_BASE_KEYS = ['id', 'scope', 'currency', 'monthISO', 'amountMinor', 'active',
   'createdAt', 'revision', 'updatedAt'] as const;
 const CARD_KEYS = ['id', 'accountId', 'issuer', 'last4', 'creditLimitMinor', 'closingDay', 'dueDay',
   'active', 'createdAt', 'revision', 'updatedAt'] as const;
@@ -68,9 +72,17 @@ function recurringValue(value: unknown, accounts: Account[]): RecurringRule {
   validateRecurringRule(rule, accounts);
   return rule;
 }
-function budgetValue(value: unknown): MonthlyBudget {
-  const row = object(value, BUDGET_KEYS);
-  const budget = Object.fromEntries(BUDGET_KEYS.map(key => [key, row[key]])) as unknown as MonthlyBudget;
+function budgetValue(value: unknown, legacy = false): MonthlyBudget {
+  const scoped = !legacy && !!value && typeof value === 'object' && Object.hasOwn(value, 'scope');
+  if (legacy || !scoped) {
+    const row = object(value, LEGACY_BUDGET_KEYS);
+    const budget = scopedMonthlyBudget(Object.fromEntries(LEGACY_BUDGET_KEYS.map(key => [key, row[key]])) as unknown as Parameters<typeof scopedMonthlyBudget>[0]);
+    validateMonthlyBudget(budget);
+    return budget;
+  }
+  const keys = (value as { scope?: unknown }).scope === 'total' ? BUDGET_BASE_KEYS : [...BUDGET_BASE_KEYS, 'category'] as const;
+  const row = object(value, keys);
+  const budget = Object.fromEntries(keys.map(key => [key, row[key]])) as unknown as MonthlyBudget;
   validateMonthlyBudget(budget);
   return budget;
 }
@@ -149,7 +161,7 @@ function canonicalArchive(archive: LedgerArchive): LedgerArchive {
       .sort((a, b) => a.transfer.id.localeCompare(b.transfer.id)) } : {}),
     ...(archive.recurring?.length ? { recurring: archive.recurring.map(rule => recurringValue(rule, archive.accounts))
       .sort((a, b) => a.id.localeCompare(b.id)) } : {}),
-    ...(archive.budgets?.length ? { budgets: archive.budgets.map(budgetValue)
+    ...(archive.budgets?.length ? { budgets: archive.budgets.map(budget => budgetValue(budget))
       .sort((a, b) => a.id.localeCompare(b.id)) } : {}),
     ...(archive.cards?.length ? { cards: archive.cards.map(card => cardValue(card, archive.accounts))
       .sort((a, b) => a.id.localeCompare(b.id)) } : {}),
@@ -190,7 +202,7 @@ export function validateEntryChange(change: EntryChange, accounts: Account[]): v
 export function createRecoveryBackup(archive: LedgerArchive, now = new Date()) {
   validateArchive(archive);
   const canonical = canonicalArchive(archive);
-  return { app: 'FinanzApp', schema: 'finanzapp.native-pilot.v6', exportedAt: now.toISOString(),
+  return { app: 'FinanzApp', schema: 'finanzapp.native-pilot.v7', exportedAt: now.toISOString(),
     moneyUnit: 'integer-minor-units', ...canonical, transfers: canonical.transfers ?? [],
     recurring: canonical.recurring ?? [], budgets: canonical.budgets ?? [],
     cards: canonical.cards ?? [], debts: canonical.debts ?? [] };
@@ -208,13 +220,14 @@ export function parsePilotBackup(raw: string): ParsedBackup {
   const v4 = header.schema === 'finanzapp.native-pilot.v4';
   const v5 = header.schema === 'finanzapp.native-pilot.v5';
   const v6 = header.schema === 'finanzapp.native-pilot.v6';
-  if (!v1 && !v2 && !v3 && !v4 && !v5 && !v6) {
-    throw new Error('Solo se pueden restaurar copias del piloto nativo v1 a v6. La app web/anterior y otras versiones todavía no son compatibles; conservá el archivo.');
+  const v7 = header.schema === 'finanzapp.native-pilot.v7';
+  if (!v1 && !v2 && !v3 && !v4 && !v5 && !v6 && !v7) {
+    throw new Error('Solo se pueden restaurar copias del piloto nativo v1 a v7. La app web/anterior y otras versiones todavía no son compatibles; conservá el archivo.');
   }
-  const hasTransfers = v3 || v4 || v5 || v6, hasRecurring = v4 || v5 || v6, hasBudgets = v5 || v6;
+  const hasTransfers = v3 || v4 || v5 || v6 || v7, hasRecurring = v4 || v5 || v6 || v7, hasBudgets = v5 || v6 || v7, hasLiabilities = v6 || v7;
   object(value, ['app', 'schema', 'exportedAt', 'moneyUnit', 'accounts', v1 ? 'entries' : 'records',
     ...(hasTransfers ? ['transfers'] : []), ...(hasRecurring ? ['recurring'] : []),
-    ...(hasBudgets ? ['budgets'] : []), ...(v6 ? ['cards', 'debts'] : [])]);
+    ...(hasBudgets ? ['budgets'] : []), ...(hasLiabilities ? ['cards', 'debts'] : [])]);
   if (header.app !== 'FinanzApp' || header.moneyUnit !== 'integer-minor-units') throw new Error('Formato o unidad monetaria no compatibles.');
   timestamp(header.exportedAt);
   const rows = v1 ? header.entries : header.records;
@@ -230,7 +243,7 @@ export function parsePilotBackup(raw: string): ParsedBackup {
   if (hasBudgets && (!Array.isArray(header.budgets) || header.budgets.length > 5000)) {
     throw new Error('La copia contiene demasiados presupuestos o un formato inválido.');
   }
-  if (v6 && (!Array.isArray(header.cards) || !Array.isArray(header.debts) || header.cards.length + header.debts.length > 1000)) {
+  if (hasLiabilities && (!Array.isArray(header.cards) || !Array.isArray(header.debts) || header.cards.length + header.debts.length > 1000)) {
     throw new Error('La copia contiene demasiadas tarjetas/deudas o un formato inválido.');
   }
   const accounts = header.accounts.map(a => accountValue(a, hasTransfers));
@@ -241,9 +254,10 @@ export function parsePilotBackup(raw: string): ParsedBackup {
   });
   const transfers = hasTransfers ? (header.transfers as unknown[]).map(t => transferValue(t, accounts)) : [];
   const recurring = hasRecurring ? (header.recurring as unknown[]).map(rule => recurringValue(rule, accounts)) : [];
-  const budgets = hasBudgets ? (header.budgets as unknown[]).map(budgetValue) : [];
-  const cards = v6 ? (header.cards as unknown[]).map(card => cardValue(card, accounts)) : [];
-  const debts = v6 ? (header.debts as unknown[]).map(debt => debtValue(debt, accounts)) : [];
+  // Only a v7 file may carry scoped budgets; v5/v6 budgets are read as category budgets.
+  const budgets = hasBudgets ? (header.budgets as unknown[]).map(budget => budgetValue(budget, !v7)) : [];
+  const cards = hasLiabilities ? (header.cards as unknown[]).map(card => cardValue(card, accounts)) : [];
+  const debts = hasLiabilities ? (header.debts as unknown[]).map(debt => debtValue(debt, accounts)) : [];
   const archive = { accounts, records, ...(transfers.length ? { transfers } : {}),
     ...(recurring.length ? { recurring } : {}), ...(budgets.length ? { budgets } : {}),
     ...(cards.length ? { cards } : {}), ...(debts.length ? { debts } : {}) };

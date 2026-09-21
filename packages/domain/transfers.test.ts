@@ -71,7 +71,7 @@ describe('internal transfers and account corrections', () => {
     const change = makeAccountChange('edit', a, snapshotFromArchive(archive), 'Nueva', 5000, time);
     const saved = { ...archive, accounts: [change.after, b, usd], transfers: [makeTransferChange('undo', initialTransferRecord(t), 'void', time).after] };
     const backup = createRecoveryBackup(saved);
-    expect(backup.schema).toBe('finanzapp.native-pilot.v6');
+    expect(backup.schema).toBe('finanzapp.native-pilot.v7');
     expect(parsePilotBackup(JSON.stringify(backup)).archive).toEqual(saved);
     expect(() => createPilotBackup(snapshotFromArchive(saved))).toThrow();
     const v2 = { ...createRecoveryBackup({ accounts: [a, b], records: [] }), schema: 'finanzapp.native-pilot.v2' };
