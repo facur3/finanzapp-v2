@@ -6,7 +6,7 @@ import { useReduceMotion } from './theme';
 
 /** One motion language for the whole app: fast, ease-out, interruptible and
  * driven by data or touch, never by a screen gaining focus. Reduce Motion keeps
- * opacity changes that explain a state and drops movement and reveals. */
+ * the opacity changes that explain a state and drops movement and reveals. */
 export const easeOut = Easing.bezier(0.23, 1, 0.32, 1);
 export const easeInOut = Easing.bezier(0.77, 0, 0.175, 1);
 
@@ -19,7 +19,11 @@ export const duration = {
   state: 200,
   /** A value or proportion changing after new data. */
   data: 260,
-  /** A chart appearing for new data. */
+  /** A new value arriving in place of an old one. */
+  enter: 200,
+  /** The old value leaving; shorter than the entrance so the two barely overlap. */
+  exit: 100,
+  /** A chart drawn for the first time. */
   reveal: 480,
 } as const;
 
@@ -40,34 +44,34 @@ export function impactHaptic() {
   void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
 }
 
-const enter = FadeInUp.duration(220).easing(easeOut).withInitialValues({ opacity: 0, transform: [{ translateY: 6 }] });
-const exit = FadeOut.duration(120);
-const enterFade = FadeIn.duration(200).easing(easeOut);
+const rise = FadeInUp.duration(duration.enter).easing(easeOut).withInitialValues({ opacity: 0, transform: [{ translateY: 6 }] });
+const fadeIn = FadeIn.duration(duration.enter).easing(easeOut);
+const fadeOut = FadeOut.duration(duration.exit).easing(easeOut);
 const reflow = LinearTransition.duration(220).easing(easeOut);
 
-/** Crossfades its content whenever `id` changes: the old value fades out while
- * the new one rises 6 pt into place. Nothing animates on first mount (the tab
- * roots stay mounted, so a mount reveal would play unseen) and nothing moves
- * under Reduce Motion, where the new value simply replaces the old one. */
+/** Crossfades its content whenever `id` changes: the old value fades out in
+ * 100 ms while the new one fades in over 200 ms, rising 6 pt in the `rise`
+ * variant. Nothing animates on first mount (the tab roots stay mounted, so a
+ * mount reveal would play unseen). Reduce Motion keeps the crossfade and drops
+ * the rise, so the state change is still explained without movement. */
 export function ValueTransition({ id, children, style, variant = 'rise' }: {
   id: string; children: ReactNode; style?: StyleProp<ViewStyle>; variant?: 'rise' | 'fade';
 }) {
   const reduced = useReduceMotion();
   const mounted = useRef(false);
   useEffect(() => { mounted.current = true; }, []);
-  const animate = mounted.current && !reduced;
-  return <Animated.View key={id} style={style} entering={animate ? (variant === 'rise' ? enter : enterFade) : undefined}
-    exiting={animate ? exit : undefined}>{children}</Animated.View>;
+  const animate = mounted.current;
+  return <Animated.View key={id} style={style} entering={animate ? (variant === 'rise' && !reduced ? rise : fadeIn) : undefined}
+    exiting={animate ? fadeOut : undefined}>{children}</Animated.View>;
 }
 
-/** A block whose size or position follows data (a control that appears, a row
- * that arrives). Siblings slide instead of jumping; with `fade`, the block
- * itself fades in when it appears and out when it goes. Use it on tab roots,
- * where data changes are the only reason a block appears; a pushed screen
- * already has the native transition. */
+/** A block whose presence follows data (a budget line, a commitments list).
+ * Siblings slide instead of jumping when it appears or leaves; with `fade`, the
+ * block itself fades in and out. Reduce Motion keeps the fade and drops the
+ * slide. Use it on tab roots, where data changes are the only reason a block
+ * appears; a pushed screen already has the native transition. */
 export function Reflow({ children, style, fade = false }: { children: ReactNode; style?: StyleProp<ViewStyle>; fade?: boolean }) {
   const reduced = useReduceMotion();
-  const animate = fade && !reduced;
   return <Animated.View style={style} layout={reduced ? undefined : reflow}
-    entering={animate ? enterFade : undefined} exiting={animate ? exit : undefined}>{children}</Animated.View>;
+    entering={fade ? fadeIn : undefined} exiting={fade ? fadeOut : undefined}>{children}</Animated.View>;
 }

@@ -4,6 +4,7 @@ import Animated, { cancelAnimation, useAnimatedStyle, useSharedValue, withTiming
 import { router } from 'expo-router';
 import { formatMinorUnits, type Currency, type ReportPeriod, type SpendingBucket } from '@finanzapp/domain';
 import { AppText, PressFeedback } from './components';
+import { timing } from './motion';
 import { usePalette, useReduceMotion } from './theme';
 
 const MONTHS = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
@@ -15,7 +16,7 @@ function Bar({ fraction }: { fraction: number }) {
   const p = usePalette(), reduced = useReduceMotion();
   const value = useSharedValue(fraction);
   useEffect(() => {
-    value.value = withTiming(fraction, { duration: reduced ? 0 : 240 });
+    value.value = withTiming(fraction, timing('data', reduced));
     return () => cancelAnimation(value);
   }, [fraction, reduced, value]);
   const style = useAnimatedStyle(() => ({ height: `${value.value * 100}%` as `${number}%` }));
@@ -30,7 +31,7 @@ export function SpendingTimeline({ buckets, currency }: { buckets: SpendingBucke
   return <View style={{ gap: 8 }}>
     <AppText secondary style={{ fontSize: 12 }}>Gasto registrado · máximo {currency} {formatMinorUnits(max)}</AppText>
     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ flexGrow: 1, gap: 4 }}>
-      {buckets.map(bucket => <PressFeedback key={bucket.startISO} accessibilityRole="button"
+      {buckets.map(bucket => <PressFeedback key={bucket.startISO} feedback="opacity" accessibilityRole="button"
         accessibilityLabel={`${periodLabel(bucket)}, ${formatMinorUnits(bucket.amountMinor)} ${currency}, ${bucket.count} gastos registrados`}
         accessibilityHint="Abre los gastos de estas fechas" containerStyle={{ flex: 1, minWidth: 44 }}
         onPress={() => router.push({ pathname: '/spending-detail', params: { currency, startISO: bucket.startISO, endISO: bucket.endISO } })}

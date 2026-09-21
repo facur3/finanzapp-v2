@@ -20,40 +20,56 @@ amounts, real data and recoverable durable writes remain requirements.
 Implemented is code, checked names a test, device-verified needs a physical result,
 and released means distributed. Neither a bundle nor a screenshot is App Store QA.
 
-- [x] Motion system (`src/ui/motion.tsx`): one ease-out curve, five named durations
-  (press 100, release 160, state 200, data 260, reveal 480 ms), selection/impact
-  haptic helpers, `ValueTransition` (a value crossfades and rises 6 pt when its data
-  changes; nothing plays on mount because tab roots stay mounted) and `Reflow`
-  (siblings slide when a block appears or leaves). Reduce Motion drops movement and
-  reveals and keeps instant values.
-- [x] Segmented control: one thumb slides between segments (interruptible), labels
-  transition colour, a selection haptic ticks on change and re-tapping the current
-  value does nothing. Press feedback is 0.97 in 100 ms with a retention offset.
-- [x] Home: the hero crossfades on Gastos / Disponible, period and currency changes;
-  the period control fades and the sections below reflow. "En qué gastaste" is one
-  stacked composition bar in category hues plus the top three categories (name,
-  amount, share) and a neutral "Otras N categorías" row that opens Reportes. The
-  commitments block only exists with upcoming stored rules. The Disponible definition
-  moved from on-screen copy to an information button (native alert).
+- [x] Motion system (`src/ui/motion.tsx`): one ease-out curve, named durations
+  (press 100, release 160, state 200, data 260, enter 200, exit 100, reveal 480 ms),
+  selection/impact haptic helpers, `ValueTransition` (the old value fades out in
+  100 ms while the new one fades in over 200 ms, rising 6 pt; nothing plays on mount
+  because tab roots stay mounted) and `Reflow` (siblings slide when a block appears
+  or leaves). Reduce Motion keeps the opacity crossfades, drops the rise, the slides,
+  the carousel depth and the chart reveal, and switches the native stack and sheets
+  to fade.
+- [x] Press treatments: `scale` (0.97 in 100 ms) for buttons, cards and chips;
+  `highlight` (a translucent tint, like a table cell) for full-width rows, which never
+  shrink; `opacity` (0.4) for bare text and icon buttons. Segmented control: one thumb
+  slides between segments (interruptible), labels transition colour, a selection
+  haptic ticks on change and re-tapping the current value does nothing.
+- [x] Movement modal (`src/ui/movement-form.tsx`): Gasto / Ingreso / Transferencia is
+  one control above one modal; switching is state, not navigation, so the thumb
+  finishes, the haptic is truthful and the form below crossfades. The chosen account
+  carries over. Card payments and debt settlements keep their own locked form.
+- [x] Home: one tap moves at most three things. The hero crossfades on Gastos /
+  Disponible, period and currency changes; the period row keeps its place under
+  Disponible and only dims, so nothing below reflows; the recent list fades as one
+  block. "En qué gastaste" is one stacked composition bar in category hues (drawn
+  with transforms on the UI thread) plus the top three categories (name, amount,
+  share) and a neutral "Otras N categorías" row that opens Reportes; the bar morphs
+  when the same categories get new amounts and the block crossfades when the set of
+  categories changes. The commitments block only exists with upcoming stored rules.
+  The Disponible definition moved from on-screen copy to an information button.
 - [x] Category colour: eight muted hues assigned per category key by hash with
   collision avoidance in order of first use, stable across Home, the donut and the
   legend; "Otras" stays neutral. Colour sits next to the name, never alone.
-- [x] Reportes: the donut sweeps in clockwise for new data while the previous chart
-  fades out (static path is the finished arc, so a failed animated prop still shows
-  the complete chart); the total crossfades on month/currency change; month arrows,
-  Este mes and trend bars tick a selection haptic; bar and label colours transition;
-  budget insights sit on their tone tint.
+- [x] Reportes: the first donut sweeps in clockwise (static path is the finished arc,
+  so a failed animated prop still shows the complete chart); a month or currency
+  change is one crossfade with the slices already final, and the month title, its
+  caption and the total crossfade together; month arrows, Este mes and trend bars
+  tick a selection haptic; bar and label colours transition; budget insights sit on
+  their tone tint.
 - [x] Tarjetas: the carousel reads scroll position on the UI thread (no React render
   per frame); neighbouring cards step back to 0.94 scale / 0.7 opacity; the page dots
-  transition; settling on another card ticks a haptic and the panel crossfades instead
-  of remounting abruptly. Category and account pickers tick a haptic on a new choice.
+  transition; settling on another card ticks a haptic. The panel stays mounted and
+  only its values crossfade, so the debts section below never jumps. Category and
+  account pickers tick a haptic on a new choice. Presupuestos, drill-down and
+  timeline bars use the shared data timing instead of their own durations.
 - [ ] Physical iPhone review of the thumb slide, hero crossfade, donut sweep and
   carousel depth at 60/120 Hz, in both themes, with Reduce Motion on and off.
 
 Interfaz 15 verification adds tests for the segmented thumb geometry, the carousel
-index, the category palette (stability, distinctness, spelling, dark variant) and the
-donut sweep (finished static path, clock-hand order, Reduce Motion), and updates the
-Home handler tests (composition, hidden commitments, no disclaimer copy, hue map).
+index, the category palette (stability, distinctness, spelling, dark variant), the
+donut sweep (finished static path, clock-hand order, first-time only, Reduce Motion),
+the movement modal (mode switch as state, account carry-over, no navigation) and the
+hosted entry form, and updates the Home handler tests (composition, hidden
+commitments, no disclaimer copy, hue map, period row kept under Disponible).
 
 ### Previous delivery — Interfaz 14
 
@@ -315,7 +331,13 @@ safe areas, system text and separate currencies apply to every new screen.
   reflow), a sliding segmented thumb, Home hero transitions and composition bar,
   category hues shared by Home and Reportes, a clockwise donut sweep, a UI-thread card
   carousel with depth and a crossfading card panel. No new dependency.
-- Checked locally: 359 domain/web + 133 mobile tests, TypeScript, Vite build, hygiene,
+- A second pass after a motion review: Transferencia became a mode of one movement
+  modal, Home fires at most three motions per tap, Reduce Motion keeps fades, exits
+  ease out in 100 ms, the composition bar draws with transforms and crossfades on a
+  category-set change, the donut sweeps once and crossfades afterwards, Reportes
+  title and total move together, the card panel stays mounted, rows highlight
+  instead of shrinking, and hard-coded durations use the shared vocabulary.
+- Checked locally: 359 domain/web + 135 mobile tests, TypeScript, Vite build, hygiene,
   Expo compatibility and Metro iOS export. No device evidence: motion feel, haptic
   timing and the animated SVG path in Expo Go still need the iPhone.
 

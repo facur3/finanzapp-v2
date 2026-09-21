@@ -53,7 +53,7 @@ function routeHarness(file: string, params: Record<string, unknown>, data = snap
     '../src/ui/spending-chart': { CategorySpendingRow: 'CategorySpendingRow' },
     '../src/ui/home-modules': { BudgetHomeCard: 'BudgetHomeCard', CategoryComposition: 'CategoryComposition', MetricHelp: 'MetricHelp', UpcomingRecurringRow: 'UpcomingRecurringRow' },
     '../src/ui/category-color': categoryColor,
-    '../src/ui/motion': { ValueTransition: 'ValueTransition', Reflow: 'Reflow', selectionHaptic: () => {}, impactHaptic: () => {}, timing: (kind: string, reduced: boolean) => ({ duration: reduced ? 0 : 260 }) },
+    '../src/ui/motion': { ValueTransition: 'ValueTransition', Reflow: 'Reflow', selectionHaptic: () => {}, impactHaptic: () => {}, duration: { press: 100, release: 160, state: 200, data: 260, enter: 200, exit: 100, reveal: 480 }, timing: (kind: string, reduced: boolean) => ({ duration: reduced ? 0 : 260 }) },
     '../src/ui/theme': { useCurrentDay: () => '2026-09-12', useReduceMotion: () => false, space: { xs: 4, s: 8, m: 12, l: 16, xl: 20, xxl: 24, xxxl: 32 },
       usePalette: () => ({ background: '#F5F6F8', surface: '#FFFFFF', accent: '#0A0A0C', tint: '#2563EB', expense: '#C42F39',
         negative: '#C73535', text: '#111111', secondary: '#666666', tertiary: '#999999', inset: '#EEEEEE', line: '#DDDDDD' }) },
@@ -147,6 +147,12 @@ test('Home keeps analysis in Reportes: no timeline bars, a Reportes link on cate
   nodes(cardView.render()).find(n => n.type === 'Choices' && n.props.value === 'spending')!.props.onChange('available');
   // Account "a": opening 10000, expenses 101 + 202 + 303 + 100 + 200, income 500. The card's −5000 is excluded.
   assert.equal(find(cardView.render(), 'Money').props.minor, 10000 - 101 - 202 - 303 - 100 - 200 + 500);
+  // The period control keeps its place (dimmed, not removed) so nothing below reflows on the switch.
+  const periodRow = nodes(cardView.render()).find(n => n.type === 'Animated.View' && n.props.pointerEvents === 'none');
+  assert.ok(periodRow, 'period row stays mounted under Disponible');
+  assert.equal(periodRow!.props.style.opacity, 0);
+  assert.equal(nodes(cardView.render()).some(n => n.type === 'Choices' && n.props.value === 'month'), true);
+  assert.equal(nodes(cardView.render()).some(n => n.type === 'AppText' && /saldo bancario|patrimonio/.test(String(n.props.children))), false);
 });
 test('expense detail rejects malformed scope and a category miss never opens all entries', () => {
   const valid = { currency: 'ARS', startISO: '2026-09-01', endISO: '2026-09-12' };

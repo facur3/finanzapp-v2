@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { StyleSheet, View } from 'react-native';
 import Animated, { useAnimatedProps, useAnimatedStyle, useSharedValue, withTiming, type SharedValue } from 'react-native-reanimated';
 import Svg, { Circle, Path } from 'react-native-svg';
@@ -53,13 +53,18 @@ function Slice({ cx, radius, start, end, color, thickness, progress }: {
 }
 
 /** Category donut with a 2 px gap between slices and the total in the middle.
- * New data sweeps in clockwise (480 ms) while the previous chart fades out;
- * Reduce Motion shows the finished chart at once. */
+ * The first chart sweeps in clockwise (480 ms); after that a month or currency
+ * change is one crossfade with the slices already final, so the change reads
+ * as one state replacing another rather than a redraw. Reduce Motion shows the
+ * finished chart at once. */
 export function DonutChart({ slices, total, currency, size = 176, thickness = 22, caption }: {
   slices: (DonutSlice & { color: string })[]; total: number; currency: Currency; size?: number; thickness?: number; caption: string;
 }) {
   const p = usePalette();
   const signature = slices.map(slice => slice.key + ':' + slice.value).join('|');
+  const revealed = useRef(false);
+  const reveal = !revealed.current;
+  useEffect(() => { revealed.current = true; }, []);
   const arcs = useMemo(() => {
     const sum = slices.reduce((acc, slice) => acc + slice.value, 0);
     if (sum <= 0) return [];
@@ -76,7 +81,7 @@ export function DonutChart({ slices, total, currency, size = 176, thickness = 22
   const label = slices.map(slice => `${slice.label} ${Math.round(slice.value / Math.max(1, total) * 100)} %`).join(', ');
   return <ValueTransition id={signature} variant="fade" style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
     <View accessible accessibilityRole="image" accessibilityLabel={`${caption}: ${label}`} style={{ width: size, height: size }}>
-      <Sweep key={signature} arcs={arcs} size={size} thickness={thickness} ring={p.inset} />
+      <Sweep arcs={arcs} size={size} thickness={thickness} ring={p.inset} reveal={reveal} />
     </View>
     <View pointerEvents="none" style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center', gap: 2, paddingHorizontal: thickness + 8 }]}>
       <AppText secondary variant="caption" style={{ fontWeight: '500' }}>{caption}</AppText>
@@ -85,10 +90,12 @@ export function DonutChart({ slices, total, currency, size = 176, thickness = 22
   </ValueTransition>;
 }
 
-function Sweep({ arcs, size, thickness, ring }: { arcs: { key: string; start: number; end: number; color: string; radius: number }[]; size: number; thickness: number; ring: string }) {
+function Sweep({ arcs, size, thickness, ring, reveal }: {
+  arcs: { key: string; start: number; end: number; color: string; radius: number }[]; size: number; thickness: number; ring: string; reveal: boolean;
+}) {
   const reduced = useReduceMotion();
-  const progress = useSharedValue(reduced ? 1 : 0);
-  useEffect(() => { progress.value = reduced ? 1 : withTiming(1, timing('reveal', false)); }, [reduced, progress]);
+  const progress = useSharedValue(reduced || !reveal ? 1 : 0);
+  useEffect(() => { progress.value = reduced || !reveal ? 1 : withTiming(1, timing('reveal', false)); }, [reduced, reveal, progress]);
   return <Svg width={size} height={size}>
     <Circle cx={size / 2} cy={size / 2} r={(size - thickness) / 2} stroke={ring} strokeWidth={thickness} fill="none" />
     {arcs.map(arc => arc.end > arc.start ? <Slice key={arc.key} cx={size / 2} radius={arc.radius} start={arc.start} end={arc.end} color={arc.color} thickness={thickness} progress={progress} /> : null)}
@@ -132,7 +139,7 @@ function Bar({ point, fraction, selected, onPress, currency, height }: {
   const value = useSharedValue(fraction);
   useEffect(() => { value.value = withTiming(fraction, timing('data', reduced)); }, [fraction, reduced, value]);
   const style = useAnimatedStyle(() => ({ height: Math.max(point.amountMinor > 0 ? 3 : 0, value.value * (height - 4)) }));
-  return <PressFeedback accessibilityRole="button" accessibilityState={{ selected }}
+  return <PressFeedback feedback="opacity" accessibilityRole="button" accessibilityState={{ selected }}
     accessibilityLabel={`${MONTHS[Number(point.monthISO.slice(5, 7)) - 1]} ${point.monthISO.slice(0, 4)}, ${(point.amountMinor / 100).toLocaleString('es-AR', { minimumFractionDigits: 2 })} ${currency}${point.partial ? ', mes en curso' : ''}`}
     onPress={onPress} containerStyle={{ flex: 1 }} style={{ height, justifyContent: 'flex-end', minHeight: undefined }}>
     <Animated.View style={[{ borderRadius: 6, backgroundColor: selected ? p.text : p.inset, borderWidth: point.partial ? StyleSheet.hairlineWidth * 2 : 0, borderColor: p.secondary,

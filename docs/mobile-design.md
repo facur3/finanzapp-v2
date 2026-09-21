@@ -63,7 +63,8 @@ nombre, emisor, moneda, últimos cuatro dígitos y un tono estable por tarjeta.
   (cinco con nombre, el resto como Otras en gris) y leyenda con importe y participación; Día a
   día; presupuestos con porcentaje; comercios principales; hechos (no consejos);
   ingresos, flujo neto y comparación. Sin "ahorro": no tenemos su definición.
-- **Formularios.** Selector Gasto / Ingreso / Transferencia, importe grande (verde
+- **Formularios.** Un solo modal de movimiento con el selector Gasto / Ingreso /
+  Transferencia arriba (cambiar de modo es estado, no navegación), importe grande (verde
   para ingresos, azul para transferencias) y dos tarjetas de selección a ancho
   completo que no se pueden pasar por alto: Categoría (con la línea de presupuesto
   del mes si existe) y Pagado con / Ingresa en (con saldo registrado o deuda de
@@ -105,10 +106,11 @@ usa **react-native-svg** en la versión incluida por Expo SDK 57 (funciona en Ex
 Go); no se agrega una librería de gráficos completa ni una WebView. Las porciones
 usan el tono de su categoría (hasta cinco con nombre, el resto como Otras en gris);
 los nombres van en la leyenda, nunca solo en el color. Con datos nuevos la dona se
-dibuja en sentido horario desde las doce (480 ms) mientras la anterior se desvanece;
-el trazo estático es el arco terminado, así el gráfico está completo aunque la
-propiedad animada no se aplique. Con Reduce Motion aparece terminada. Los valores
-nunca se ocultan hasta terminar una animación.
+dibuja en sentido horario desde las doce (480 ms) solo la primera vez; un cambio de
+mes o moneda es un único fundido con las porciones ya finales, junto con el título
+del mes y el total. El trazo estático es el arco terminado, así el gráfico está
+completo aunque la propiedad animada no se aplique. Con Reduce Motion aparece
+terminada. Los valores nunca se ocultan hasta terminar una animación.
 
 ## Motion y accesibilidad
 
@@ -118,20 +120,31 @@ datos 260, revelado 480. Nada supera 300 ms salvo el revelado de un gráfico. La
 motion responde a datos o al dedo, nunca a que una pantalla gane foco (las raíces
 siguen montadas, así un revelado al montar no se vería).
 
-- **Presión.** Escala 0,97 al apoyar el dedo, vuelta al soltar; el control responde
-  antes de que termine el toque.
+- **Presión.** El control responde al apoyar el dedo, antes de que termine el
+  toque. Botones, tarjetas y chips escalan a 0,97; las filas a ancho completo se
+  tiñen como una celda de tabla y nunca se achican; los botones de texto o ícono
+  se atenúan al 40 %.
 - **Control segmentado.** Un solo pulgar se desliza al segmento elegido
   (interrumpible), las etiquetas cambian de color en transición y un háptico de
   selección marca el cambio. Tocar el valor actual no hace nada.
 - **Valores.** Cuando cambian los datos de un número principal (métrica, período,
-  moneda, mes), el valor anterior se desvanece y el nuevo sube 6 pt; con Reduce
-  Motion se reemplaza al instante. Barras y proporciones interpolan entre datos
-  reales, nunca desde cero.
-- **Bloques.** Un control o sección que aparece o desaparece se funde y los
-  vecinos se deslizan en lugar de saltar.
+  moneda, mes), el valor anterior se desvanece en 100 ms y el nuevo aparece en
+  200 ms subiendo 6 pt; con Reduce Motion queda el fundido sin el desplazamiento.
+  Barras y proporciones interpolan entre datos reales, nunca desde cero; si cambia
+  el conjunto de categorías, el bloque se funde en lugar de transformar una
+  categoría en otra.
+- **Una acción, pocas cosas.** Un toque mueve como máximo el pulgar del
+  segmentado, el número principal y una visualización. En Inicio la fila de
+  período conserva su lugar bajo Disponible y solo se atenúa; la lista reciente se
+  funde como un bloque.
+- **Bloques.** Una sección que aparece o desaparece se funde y los vecinos se
+  deslizan en lugar de saltar; con Reduce Motion, solo el fundido.
+- **Formularios.** Gasto / Ingreso / Transferencia es un solo control sobre un
+  solo modal: cambiar es estado, no navegación, y el formulario de abajo se funde.
 - **Carrusel de tarjetas.** La posición vive en el hilo de UI; las tarjetas vecinas
-  retroceden (0,94 / 0,7). Al asentarse en otra tarjeta suena un háptico y el panel
-  se funde. Reduce Motion deja todas las tarjetas planas.
+  retroceden (0,94 / 0,7). Al asentarse en otra tarjeta suena un háptico; el panel
+  queda montado y solo sus valores se funden, así lo de abajo no salta. Reduce
+  Motion deja todas las tarjetas planas.
 - **Hápticos.** Uno por acción del usuario (selección en segmentos, flechas de mes,
   categoría o cuenta elegida, tarjeta asentada; éxito al guardar) y siempre con una
   señal visual.

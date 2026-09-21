@@ -75,15 +75,15 @@ export default function ReportsScreen() {
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
           <IconButton name="chevron-back" label="Mes anterior" disabled={!canPrevious}
             onPress={() => { if (canPrevious) goToMonth(shiftReportMonth(monthISO, -1)); }} />
-          <View style={{ flex: 1, alignItems: 'center', gap: 2 }}>
+          <ValueTransition id={monthISO + '|' + currency} variant="fade" style={{ flex: 1, alignItems: 'center', gap: 2 }}>
             <AppText accessibilityRole="header" variant="title3" style={{ textTransform: 'capitalize', textAlign: 'center' }}>{reportMonthLabel(monthISO)}</AppText>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
               <AppText secondary variant="caption">{reportPeriodLabel(report, day)}</AppText>
-              {canNext && <PressFeedback accessibilityRole="button" onPress={() => goToMonth(currentMonth)} accessibilityLabel="Volver al mes actual" style={{ minHeight: 28 }}>
+              {canNext && <PressFeedback feedback="opacity" accessibilityRole="button" onPress={() => goToMonth(currentMonth)} accessibilityLabel="Volver al mes actual" style={{ minHeight: 28 }}>
                 <AppText variant="caption" style={{ fontWeight: '600', color: p.tint }}>Este mes</AppText>
               </PressFeedback>}
             </View>
-          </View>
+          </ValueTransition>
           <IconButton name="chevron-forward" label="Mes siguiente" disabled={!canNext}
             onPress={() => { if (canNext) goToMonth(shiftReportMonth(monthISO, 1)); }} />
         </View>
@@ -187,7 +187,7 @@ function BudgetStatusRow({ category, spent, limit, ratio, exceeded, money, last,
   const p = usePalette();
   const color = exceeded ? p.expense : ratio >= 0.85 ? p.warning : p.text;
   const percent = Math.round(ratio * 100);
-  return <PressFeedback accessibilityRole="button" accessibilityLabel={`${category}: ${money(spent)} de ${money(limit)}, ${percent} por ciento${exceeded ? ', excedido' : ''}`}
+  return <PressFeedback feedback="highlight" accessibilityRole="button" accessibilityLabel={`${category}: ${money(spent)} de ${money(limit)}, ${percent} por ciento${exceeded ? ', excedido' : ''}`}
     onPress={onPress} style={{ paddingHorizontal: 16, paddingVertical: 12, gap: 8, borderBottomWidth: last ? 0 : 0.5, borderBottomColor: p.line }}>
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
       <AppText numberOfLines={1} style={{ flex: 1, fontWeight: '500' }}>{category}</AppText>

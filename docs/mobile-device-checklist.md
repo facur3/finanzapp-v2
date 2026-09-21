@@ -4,13 +4,15 @@
 
 - [ ] Ajustes footer reads Interfaz 15; no data changes after updating.
 - [ ] Segmented controls (Gastos / Disponible, Esta semana / Este mes, currency, Reportes views, Movimientos filters, form kind) slide one thumb to the chosen segment with a light selection tick; tapping the current value does nothing; a fast double switch reverses mid-slide without a jump.
-- [ ] Home: switching metric, period or currency crossfades the hero (old fades, new rises slightly); the period control fades in/out and the sections below slide rather than jump; the composition bar re-proportions smoothly.
+- [ ] Nuevo movimiento: Gasto / Ingreso / Transferencia is one control above the form; choosing Transferencia finishes the thumb slide, ticks once and crossfades the form below with no screen swap; the chosen account carries over; Pagar tarjeta still opens its own locked form.
+- [ ] Home: switching metric, period or currency crossfades the hero (old fades in 100 ms, new rises in 200 ms) and at most one other block; under Disponible the period row dims in place and nothing below moves; the composition bar re-proportions smoothly for the same categories and crossfades when the categories change.
+- [ ] Full-width rows (Movimientos, Home lists, detail rows, pickers) tint on press and do not shrink; buttons and cards scale; icon and text buttons dim.
 - [ ] Home shows the stacked composition bar and top three categories with a coloured dot; "Otras N categorías" opens Reportes; the Disponible ⓘ button opens the definition and no disclaimer copy appears on screen.
 - [ ] Without recurring rules, no "Próximos compromisos" block exists on Home; with a rule it appears with "Ver todos".
-- [ ] Reportes: changing month (arrows, Este mes, a trend bar) crossfades the total and sweeps the donut clockwise from twelve while the previous one fades; the donut is complete after the sweep and slice colours match the legend dots and Home's bar.
-- [ ] Tarjetas: neighbouring cards step back while swiping; settling on another card ticks once and the panel crossfades; page dots transition.
+- [ ] Reportes: the first donut sweeps clockwise from twelve; changing month (arrows, Este mes, a trend bar) crossfades the title, caption, total and donut together with no redraw; slice colours match the legend dots and Home's bar.
+- [ ] Tarjetas: neighbouring cards step back while swiping; settling on another card ticks once, the panel's values crossfade and the Deudas section below does not jump; page dots transition.
 - [ ] Choosing a category or account in a form ticks once; choosing the same one again does not.
-- [ ] Reduce Motion on: no thumb slide, no hero rise, donut appears finished, cards stay flat, values still update instantly; haptics still fire.
+- [ ] Reduce Motion on: no thumb slide, no hero rise, no section slides, donut appears finished, cards stay flat, screens and sheets fade instead of sliding; values still crossfade (opacity only); haptics still fire.
 - [ ] Both themes at 60 and 120 Hz: no dropped frames while scrolling Home with the composition bar visible; large text keeps rows readable.
 
 ## Interfaz 14 — Presupuestos, Recurrentes and Cuentas polish (pending device review)

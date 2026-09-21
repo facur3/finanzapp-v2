@@ -1,16 +1,17 @@
 import { useMemo, useState } from 'react';
 import { View } from 'react-native';
 import { router } from 'expo-router';
+import Animated from 'react-native-reanimated';
 import { currentMonthISO, formatMinorUnits, hiddenLiabilityAccountIds, liquidTotalsByCurrency, spendingOverview, spendingWindow,
   summarizeMonthlyBudgets, type Currency, type SpendingWindow } from '@finanzapp/domain';
 import { useLedger } from '../../src/storage/LedgerProvider';
 import { ActionButton, AppText, Choices, EmptyState, EntryActions, EntryRow, Money, Screen, SectionTitle, Surface } from '../../src/ui/components';
 import { assignCategoryHues } from '../../src/ui/category-color';
 import { BudgetHomeCard, CategoryComposition, MetricHelp, UpcomingRecurringRow } from '../../src/ui/home-modules';
-import { Reflow, ValueTransition } from '../../src/ui/motion';
+import { Reflow, ValueTransition, duration } from '../../src/ui/motion';
 import { availableCurrencies, selectEntries } from '../../src/ui/presentation';
 import { periodLabel } from '../../src/ui/spending-timeline';
-import { space, useCurrentDay, usePalette } from '../../src/ui/theme';
+import { space, useCurrentDay, usePalette, useReduceMotion } from '../../src/ui/theme';
 
 type HomeMetric = 'spending' | 'available';
 
@@ -23,6 +24,7 @@ export default function HomeScreen() {
   const { snapshot, archive } = useLedger();
   const day = useCurrentDay();
   const p = usePalette();
+  const reduced = useReduceMotion();
   const [selectedCurrency, setCurrency] = useState<Currency>('ARS');
   const [window, setWindow] = useState<SpendingWindow>('month');
   const [metric, setMetric] = useState<HomeMetric>('spending');
@@ -56,13 +58,15 @@ export default function HomeScreen() {
   const accountCount = snapshot.accounts.filter(account => account.currency === currency && !hidden.has(account.id)).length;
   const openReport = () => router.navigate({ pathname: '/reports', params: { currency } });
   const spending = metric === 'spending';
-  const heroId = `${metric}|${currency}|${spending ? period.startISO + period.endISO : ''}`;
+  // Keyed by the choice, not the dates: a day boundary must not animate the hero on its own.
+  const heroId = `${metric}|${currency}|${spending ? window : ''}`;
+  const listId = `${currency}|${window}`;
 
   return <Screen gap={space.xxl}>
     {!snapshot.accounts.length ? <EmptyState title="Entendé tus gastos."
       detail="Elegí una cuenta para agrupar tus movimientos. Podés empezar sin cargar tu saldo bancario."
       icon="receipt-outline" action={<ActionButton label="Empezar" icon="add-outline" onPress={() => router.push('/new-account')} />} /> : <>
-      <Reflow style={{ gap: space.xl }}>
+      <View style={{ gap: space.xl }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
           <View style={{ flex: 1, maxWidth: 232 }}>
             <Choices value={metric} onChange={setMetric}
@@ -92,12 +96,14 @@ export default function HomeScreen() {
           </AppText>
         </ValueTransition>
 
-        {spending && <Reflow fade style={{ maxWidth: 232 }}>
+        {/* The period row keeps its place under Disponible so nothing below reflows; it only dims out. */}
+        <Animated.View pointerEvents={spending ? 'auto' : 'none'} accessibilityElementsHidden={!spending} importantForAccessibility={spending ? 'auto' : 'no-hide-descendants'}
+          style={{ maxWidth: 232, opacity: spending ? 1 : 0, transitionProperty: 'opacity', transitionDuration: reduced ? 0 : duration.state }}>
           <Choices value={window} onChange={setWindow} options={[{ value: 'week', label: 'Esta semana' }, { value: 'month', label: 'Este mes' }]} />
-        </Reflow>}
-      </Reflow>
+        </Animated.View>
+      </View>
 
-      <Reflow><EntryActions currency={currency} /></Reflow>
+      <EntryActions currency={currency} />
 
       {monthBudget !== null && monthBudget.rows.length > 0 && <Reflow fade>
         <SectionTitle action="Ver" onAction={() => router.push({ pathname: '/budgets', params: { currency } })}>Presupuesto del mes</SectionTitle>
@@ -122,9 +128,11 @@ export default function HomeScreen() {
 
       <Reflow>
         <SectionTitle action="Ver todos" onAction={() => router.navigate('/activity')}>Últimos movimientos</SectionTitle>
-        {recent.length ? <Surface grouped>{recent.map((entry, index) => <Reflow key={entry.id} fade><EntryRow entry={entry}
-          account={snapshot.accounts.find(a => a.id === entry.accountId)!} last={index === recent.length - 1} /></Reflow>)}</Surface>
-          : <AppText secondary variant="subhead">Todavía no hay movimientos registrados en este período.</AppText>}
+        <ValueTransition id={listId} variant="fade">
+          {recent.length ? <Surface grouped>{recent.map((entry, index) => <EntryRow key={entry.id} entry={entry}
+            account={snapshot.accounts.find(a => a.id === entry.accountId)!} last={index === recent.length - 1} />)}</Surface>
+            : <AppText secondary variant="subhead">Todavía no hay movimientos registrados en este período.</AppText>}
+        </ValueTransition>
       </Reflow>
     </>}
   </Screen>;

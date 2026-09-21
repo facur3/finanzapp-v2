@@ -53,7 +53,7 @@ test('category hues are stable, distinct while they can be, and independent of s
   assert.equal(hueColor(CATEGORY_HUES + 1, p), hueColor(1, p));
 });
 
-test('donut sweeps in from twelve o\'clock, finishes at the recorded shares and skips motion when reduced', () => {
+test('donut sweeps in from twelve o\'clock only the first time, then crossfades, and skips motion when reduced', () => {
   const source = readFileSync(new URL('../src/ui/charts.tsx', import.meta.url), 'utf8');
   const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText;
   const jsx = (type: any, props: any) => ({ type, props });
@@ -61,7 +61,7 @@ test('donut sweeps in from twelve o\'clock, finishes at the recorded shares and 
   const shared: { value: number }[] = [];
   const timings: number[] = [];
   const modules: Record<string, any> = {
-    react: { useEffect: (fn: () => any) => { fn(); }, useMemo: (fn: () => any) => fn() },
+    react: { useEffect: (fn: () => any) => { fn(); }, useMemo: (fn: () => any) => fn(), useRef: (value: any) => ({ current: value }) },
     'react/jsx-runtime': { jsx, jsxs: jsx },
     'react-native': { View: 'View', StyleSheet: { absoluteFill: {}, hairlineWidth: 0.5 } },
     'react-native-reanimated': { __esModule: true, default: { View: 'AnimatedView', Text: 'AnimatedText', createAnimatedComponent: (c: any) => 'Animated(' + c + ')' },
@@ -80,7 +80,8 @@ test('donut sweeps in from twelve o\'clock, finishes at the recorded shares and 
     return modules[name];
   } });
   const slices = [{ key: 'a', label: 'A', value: 300, color: '#1' }, { key: 'b', label: 'B', value: 100, color: '#2' }];
-  const render = () => {
+  const render = (revealed = false) => {
+    modules.react.useRef = () => ({ current: revealed });
     const chart = module.exports.DonutChart!({ slices, total: 400, currency: 'ARS', caption: 'Total' });
     const sweep = chart.props.children[0].props.children;
     const svg = sweep.type(sweep.props);
@@ -102,6 +103,9 @@ test('donut sweeps in from twelve o\'clock, finishes at the recorded shares and 
   assert.equal(halfway[1], '', 'the second slice waits for the hand');
   progress.value = 1;
   assert.deepEqual(paths.map((path: any) => path.props.animatedProps().d), finished);
+  const again = render(true);
+  assert.equal(shared.at(-1)!.value, 1, 'a later month change crossfades with the slices already final');
+  assert.equal(again.chart.type, 'ValueTransition');
   reduced = true;
   const still = render();
   assert.equal(shared.at(-1)!.value, 1, 'reduced motion shows the finished chart at once');

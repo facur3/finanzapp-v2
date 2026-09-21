@@ -18,7 +18,7 @@ export function DebtRow({ debt, last }: { debt: PersonalDebtProfile; last: boole
   const overdue = !!debt.dueDateISO && debt.dueDateISO < day && outstanding > 0;
   const due = debt.dueDateISO ? labelFromISO(debt.dueDateISO, new Date(day + 'T12:00:00')) : null;
   const status = outstanding === 0 ? 'Saldada' : overdue ? 'Vencida · ' + due : due ? 'Vence ' + due : 'Sin fecha';
-  return <PressFeedback accessibilityRole="button"
+  return <PressFeedback feedback="highlight" accessibilityRole="button"
     accessibilityLabel={`${owed ? 'Debo a' : 'Me debe'} ${debt.counterparty}, ${formatMinorUnits(outstanding)} ${account.currency}, ${status}`}
     onPress={() => router.push({ pathname: '/debt/[id]', params: { id: debt.id } })}
     style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, paddingHorizontal: 16, minHeight: 64,

@@ -60,7 +60,9 @@ function harness(file: string, props: any = {}, options: { data?: domain.LedgerA
     './liability-presentation': liabilityPresentation,
     '../../src/ui/theme': { space: { xs: 4, s: 8, m: 12, l: 16, xl: 20, xxl: 24, xxxl: 32 },
       usePalette: () => ({ text: '#000', positive: '#070', income: '#070', expense: '#700', tint: '#00F', warning: '#a60', secondary: '#666', tertiary: '#999' }) },
-    './theme': { space: { xs: 4, s: 8, m: 12, l: 16, xl: 20, xxl: 24, xxxl: 32 } },
+    './theme': { space: { xs: 4, s: 8, m: 12, l: 16, xl: 20, xxl: 24, xxxl: 32 }, usePalette: () => ({ background: '#fff' }) },
+    './entry-form': { EntryForm: 'EntryForm' }, './transfer-form': { TransferForm: 'TransferForm' },
+    './motion': { ValueTransition: 'ValueTransition' },
   };
   const module = { exports: {} as Record<string, (props: any) => Node> };
   runInNewContext(code, { module, exports: module.exports, Date, require: (name: string) => {
@@ -68,7 +70,7 @@ function harness(file: string, props: any = {}, options: { data?: domain.LedgerA
     return modules[name];
   } });
   return {
-    render: () => { cursor = 0; refCursor = 0; let node = (module.exports.default ?? module.exports.EntryForm ?? module.exports.TransferForm)(props);
+    render: () => { cursor = 0; refCursor = 0; let node = (module.exports.default ?? module.exports.EntryForm ?? module.exports.TransferForm ?? module.exports.MovementForm)(props);
       while (typeof node.type === 'function') node = node.type(node.props);
       return node; },
     setData: (next: domain.LedgerArchive) => { data = next; },
@@ -424,7 +426,37 @@ test('expense form offers cash accounts and cards but never a personal debt acco
   assert.equal(find(view.render(), 'Stack.Screen').props.options.title, 'Compra con tarjeta');
 });
 
-test('the entry form shows the category budget live, echoes the amount on Save and hands off to the transfer form', () => {
+test('the movement modal switches Gasto / Ingreso / Transferencia as state, never as navigation', () => {
+  const view = harness('src/ui/movement-form.tsx', { kind: 'expense', accountId: 'a' }, { data: liabilityData });
+  let root = view.render();
+  const choices = find(root, 'Choices');
+  assert.equal(choices.props.options.map((option: { value: string }) => option.value).join(','), 'expense,income,transfer');
+  assert.equal(choices.props.value, 'expense');
+  assert.equal(find(root, 'EntryForm').props.kind, 'expense');
+  assert.equal(find(root, 'EntryForm').props.accountId, 'a');
+  find(root, 'EntryForm').props.onAccountChange('b');
+  choices.props.onChange('transfer');
+  root = view.render();
+  assert.equal(find(root, 'Choices').props.value, 'transfer');
+  assert.equal(find(root, 'TransferForm').props.accountId, 'b', 'the chosen account carries over into the transfer');
+  assert.equal(find(root, 'ValueTransition').props.id, 'transfer');
+  assert.equal(nodes(root).some(node => node.type === 'EntryForm'), false);
+  find(root, 'Choices').props.onChange('income');
+  root = view.render();
+  assert.equal(find(root, 'EntryForm').props.kind, 'income');
+  assert.equal(find(root, 'ValueTransition').props.id, 'entry');
+  assert.equal(view.pushed.length, 0, 'switching modes never navigates');
+});
+
+test('a hosted entry form renders no switch of its own and follows the host kind', () => {
+  const view = harness('src/ui/entry-form.tsx', { kind: 'income', accountId: 'a', onKindChange: () => {} }, { data: liabilityData });
+  const root = view.render();
+  assert.equal(nodes(root).some(node => node.type === 'Choices'), false);
+  assert.equal(find(root, 'AmountField').props.label, 'Ingreso');
+  assert.equal(find(root, 'AccountField').props.label, 'Ingresa en');
+});
+
+test('the entry form shows the category budget live and echoes the amount on Save', () => {
   const budget: domain.MonthlyBudget = { id: 'b', category: 'Salud', currency: 'ARS', monthISO: domain.todayKey().slice(0, 7), amountMinor: 50000, active: true, createdAt, revision: 0, updatedAt: createdAt };
   const view = harness('src/ui/entry-form.tsx', { kind: 'expense' }, { data: { ...liabilityData, budgets: [budget] } });
   assert.equal(find(view.render(), 'CategoryField').props.detail, undefined);
@@ -432,10 +464,10 @@ test('the entry form shows the category budget live, echoes the amount on Save a
   assert.equal(find(view.render(), 'CategoryField').props.detail, '$ 0,00 de $ 500,00 este mes');
   find(view.render(), 'AmountField').props.onChangeText('1234,5');
   assert.equal(find(view.render(), 'ActionButton').props.label, 'Guardar gasto · $ 1.234,50');
+  // On its own (edit mode and tests) the form keeps a Gasto / Ingreso switch; Transferencia is the host's job.
   const choices = find(view.render(), 'Choices');
-  assert.equal(choices.props.options.map((option: { value: string }) => option.value).join(','), 'expense,income,transfer');
-  choices.props.onChange('transfer');
-  assert.equal(JSON.stringify(view.pushed[0]), JSON.stringify({ pathname: '/new-transfer', params: { accountId: 'a' } }));
+  assert.equal(choices.props.options.map((option: { value: string }) => option.value).join(','), 'expense,income');
+  assert.equal(view.pushed.length, 0);
   assert.equal(view.additions.length, 0);
 });
 

@@ -59,7 +59,7 @@ function Navigation() {
     </SafeAreaView>}
     <Stack screenOptions={{ headerStyle: { backgroundColor: p.background }, headerTintColor: p.text,
       headerTitleStyle: { color: p.text }, headerShadowVisible: false,
-      contentStyle: { backgroundColor: p.background }, animation: reduced ? 'none' : 'default',
+      contentStyle: { backgroundColor: p.background }, animation: reduced ? 'fade' : 'default',
       headerBackButtonDisplayMode: 'minimal', gestureEnabled: true }}>
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       <Stack.Screen name="account/[id]" options={{ title: 'Cuenta' }} />
