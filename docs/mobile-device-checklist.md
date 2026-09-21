@@ -1,5 +1,18 @@
 # Physical iPhone acceptance checklist
 
+## Interfaz 16 — native visual cohesion and information hierarchy (pending device review)
+
+- [ ] Ajustes footer reads Interfaz 16; no data changes after updating.
+- [ ] Every category tile (Movimientos, Home, Reportes legend, Presupuestos, Recurrentes, detail) shows its glyph in the category hue on a soft tint of the same hue; no separate colour dot anywhere; income rows stay green; both themes remain readable.
+- [ ] Home: Gastos / Disponible, the currency control, the month name and one number; no count, no date range, no week/month control. Disponible shows "Saldo registrado" with ⓘ and the account count only.
+- [ ] Home round actions: Gasto (coral), Ingreso (green), Transferir (blue) each open the right mode of the movement modal; they scale on press and read well at large text.
+- [ ] "En qué gastaste": up to three ranked rows with a thin hue line; "Ver N" opens Reportes; the block crossfades on currency change.
+- [ ] Hero amounts at 999.999.999,99 in ARS and USD stay on one line on Home, Reportes, movement detail, card, debt, budgets and account detail; row amounts never wrap; the amount field shrinks as digits are typed.
+- [ ] Long merchant, category and account names truncate or wrap inside their surfaces at default and largest Dynamic Type.
+- [ ] Tarjetas and card detail: card → debt → three facts (Disponible with the limit caption, Cierre, Vencimiento) → Registrar compra → Pagar tarjeta (same width, blue tint) → activity with the statement caption; no detail table below.
+- [ ] Cuentas, account detail, Presupuestos, Recurrentes, Deudas and the movement detail show no bank or rule-restating copy; the account detail uses the round actions.
+- [ ] Changing tab ticks once and switches instantly; re-tapping the current tab does not tick.
+
 ## Interfaz 15 — motion system, Home composition and category colour (pending device review)
 
 - [ ] Ajustes footer reads Interfaz 15; no data changes after updating.

@@ -10,6 +10,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { LedgerProvider, useLedger } from '../src/storage/LedgerProvider';
+import { CategoryHuesProvider } from '../src/ui/category-hues';
 import { ActionButton, AppText, ErrorMessage } from '../src/ui/components';
 import { UIProvider, usePalette, useReduceMotion } from '../src/ui/theme';
 
@@ -20,7 +21,7 @@ export const unstable_settings = { initialRouteName: '(tabs)' };
 export default function RootLayout() {
   const p = usePalette();
   return <GestureHandlerRootView style={{ flex: 1, backgroundColor: p.background }}>
-    <SafeAreaProvider><UIProvider><LedgerProvider><Navigation /></LedgerProvider></UIProvider></SafeAreaProvider>
+    <SafeAreaProvider><UIProvider><LedgerProvider><CategoryHuesProvider><Navigation /></CategoryHuesProvider></LedgerProvider></UIProvider></SafeAreaProvider>
   </GestureHandlerRootView>;
 }
 

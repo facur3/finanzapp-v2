@@ -59,6 +59,7 @@ function harness(file: string, params: Record<string, unknown> = {}, data: domai
     '../src/ui/presentation': presentation, '../../src/ui/presentation': presentation,
     '../src/ui/theme': theme, '../../src/ui/theme': theme,
     '../src/ui/liability-rows': { DebtRow: 'DebtRow' }, '../../src/ui/liability-rows': { DebtRow: 'DebtRow' },
+    '../src/ui/quick-actions': { QuickActions: 'QuickActions' }, '../../src/ui/quick-actions': { QuickActions: 'QuickActions' },
     '../src/ui/motion': { ValueTransition: 'ValueTransition', Reflow: 'Reflow', selectionHaptic: () => {}, impactHaptic: () => {}, timing: (kind: string, reduced: boolean) => ({ duration: reduced ? 0 : 260 }) }, '../../src/ui/motion': { ValueTransition: 'ValueTransition', Reflow: 'Reflow', selectionHaptic: () => {}, impactHaptic: () => {}, timing: (kind: string, reduced: boolean) => ({ duration: reduced ? 0 : 260 }) },
   };
   const module = { exports: {} as { default?: () => Node } };
@@ -106,8 +107,9 @@ test('cards tab summarizes the selected card from recorded purchases and payment
   assert.equal(find(root, 'Money').props.minor, 13100);
   const purchases = nodes(root).filter(node => node.type === 'Money').map(node => node.props.minor);
   assert.ok(purchases.includes(500000 - 13100), 'available limit is limit minus recorded debt');
-  assert.ok(purchases.includes(23100), 'statement purchases');
-  assert.ok(purchases.includes(30000), 'statement payments');
+  const caption = nodes(root).find(node => node.type === 'SectionTitle' && node.props.action === 'Ver todo')!.props.caption;
+  assert.match(caption, /^Resumen abierto desde .* · 1 compra · 1 pago$/, 'statement facts live in one caption line');
+  assert.equal(nodes(root).filter(node => node.type === 'Surface').length >= 1, true);
   find(root, 'ActionButton', 'Registrar compra').props.onPress();
   assert.equal(JSON.stringify(view.pushed.at(-1)), JSON.stringify({ pathname: '/new-entry', params: { accountId: 'card-acc', kind: 'expense' } }));
   find(root, 'ActionButton', 'Pagar tarjeta').props.onPress();
@@ -138,10 +140,17 @@ test('card detail lists only that card account with card context and links purch
   assert.deepEqual(list.props.entries.map((entry: domain.Entry) => entry.id), ['purchase']);
   assert.deepEqual(list.props.transfers.map((transfer: domain.Transfer) => transfer.id), ['payment']);
   assert.equal(find(root, 'Money').props.minor, 13100);
-  assert.equal(find(root, 'DetailRow', 'Límite').props.value, '$ 5.000,00');
-  assert.equal(find(root, 'DetailRow', 'Disponible del límite').props.value, '$ 4.869,00');
-  assert.equal(find(root, 'DetailRow', 'Próximo cierre').props.value, '28 sep');
-  assert.equal(find(root, 'DetailRow', 'Próximo vencimiento').props.value, '5 oct');
+  // Identity on the card face, one debt, three facts, primary above secondary, then activity. No detail table.
+  assert.equal(nodes(root).some(node => node.type === 'DetailRow'), false);
+  const stats = nodes(root).filter(node => node.type === 'Stat').map(node => node.props.label);
+  assert.deepEqual(stats, ['Disponible', 'Cierre', 'Vencimiento']);
+  assert.ok(nodes(root).filter(node => node.type === 'Money').map(node => node.props.minor).includes(500000 - 13100), 'available limit');
+  assert.ok(nodes(root).some(node => node.type === 'AppText' && node.props.children?.[1] === '$ 5.000,00'), 'the limit is a caption under Disponible');
+  const buttons = nodes(root).filter(node => node.type === 'ActionButton').map(node => node.props);
+  assert.deepEqual(buttons.map(button => button.label), ['Registrar compra', 'Pagar tarjeta']);
+  assert.equal(buttons[1].secondary, true);
+  assert.ok(buttons.every(button => button.containerStyle === undefined), 'both actions span the full width');
+  assert.match(find(root, 'SectionTitle').props.caption, /^Resumen abierto desde .* · 1 compra · 1 pago$/);
   assert.equal(find(harness('card/[id].tsx', { id: 'missing' }).render(), 'EmptyState').props.title, 'No encontramos esta tarjeta');
 });
 

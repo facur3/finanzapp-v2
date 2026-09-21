@@ -52,8 +52,5 @@ export default function DebtsScreen() {
         <Surface grouped>{owedToMe.map((debt, index) => <DebtRow key={debt.id} debt={debt} last={index === owedToMe.length - 1} />)}</Surface>
       </View>}
     </>}
-    <AppText tertiary variant="footnote" style={{ textAlign: 'center' }}>
-      Los totales no mezclan ARS y USD ni se suman al saldo disponible de tus cuentas.
-    </AppText>
   </Screen>;
 }

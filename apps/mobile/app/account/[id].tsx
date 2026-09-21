@@ -3,7 +3,8 @@ import { View } from 'react-native';
 import { Redirect, router, Stack, useLocalSearchParams } from 'expo-router';
 import { accountBalanceMinor, currentMonthISO, formatMinorUnits } from '@finanzapp/domain';
 import { useLedger } from '../../src/storage/LedgerProvider';
-import { ActionButton, AppText, DetailRow, EmptyState, IconButton, Money, Screen, SectionTitle, Stat, Surface } from '../../src/ui/components';
+import { AppText, DetailRow, EmptyState, IconButton, Money, Screen, SectionTitle, Stat, Surface } from '../../src/ui/components';
+import { QuickActions } from '../../src/ui/quick-actions';
 import { EntryList } from '../../src/ui/entry-list';
 import { selectEntries, selectTransfers } from '../../src/ui/presentation';
 import { space, useCurrentDay, usePalette } from '../../src/ui/theme';
@@ -41,28 +42,20 @@ export default function AccountScreen() {
       onPress={() => router.push({ pathname: '/edit-account/[id]', params: { id } })} /> }} />
     <EntryList entries={entries} transfers={transfers} accountId={id} accounts={snapshot.accounts} header={<View style={{ gap: space.xl, paddingBottom: 4 }}>
       <View style={{ gap: 8, paddingTop: 8 }}>
-        <AppText secondary variant="eyebrow">Saldo registrado · {account.currency}</AppText>
+        <AppText secondary variant="subhead" style={{ fontWeight: '500' }}>Saldo registrado</AppText>
         <Money minor={balance} currency={account.currency} large color={balance < 0 ? p.expense : undefined} />
-        <AppText secondary variant="subhead">Resultado de lo que registraste. No es sincronización bancaria.</AppText>
       </View>
       {month && <Surface style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 12 }}>
         <Stat label="Gastos este mes"><Money minor={-month.expense} currency={account.currency} size={17} tone="expense" signed={month.expense > 0} /></Stat>
         <Stat label="Ingresos este mes" align="right"><Money minor={month.income} currency={account.currency} size={17} tone={month.income ? 'income' : 'neutral'} signed={month.income > 0} /></Stat>
       </Surface>}
-      <View style={{ flexDirection: 'row', gap: 10 }}>
-        <ActionButton label="Gasto" icon="remove-outline" compact containerStyle={{ flex: 1 }}
-          onPress={() => router.push({ pathname: '/new-entry', params: { kind: 'expense', accountId: id } })} />
-        <ActionButton label="Ingreso" icon="add-outline" compact secondary containerStyle={{ flex: 1 }}
-          onPress={() => router.push({ pathname: '/new-entry', params: { kind: 'income', accountId: id } })} />
-        <ActionButton label="Transferir" icon="swap-horizontal-outline" compact secondary containerStyle={{ flex: 1 }}
-          onPress={() => router.push({ pathname: '/new-transfer', params: { accountId: id } })} />
-      </View>
+      <QuickActions accountId={id} currency={account.currency} />
       <Surface grouped>
         <DetailRow label="Recurrentes" value={recurringCount ? recurringCount + (recurringCount === 1 ? ' activo' : ' activos') : 'Programar'} icon="repeat-outline"
           onPress={() => router.push({ pathname: '/recurring', params: { accountId: id } })} />
         <DetailRow label="Saldo inicial" value={account.currency + ' ' + formatMinorUnits(account.openingMinor)} icon="flag-outline" last />
       </Surface>
-      <SectionTitle caption="Solo movimientos de esta cuenta">Movimientos</SectionTitle>
+      <SectionTitle>Movimientos</SectionTitle>
     </View>} empty={<AppText secondary variant="subhead">Todavía no hay movimientos en esta cuenta.</AppText>} />
   </>;
 }

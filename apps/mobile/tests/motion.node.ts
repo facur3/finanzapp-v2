@@ -111,3 +111,35 @@ test('donut sweeps in from twelve o\'clock only the first time, then crossfades,
   assert.equal(shared.at(-1)!.value, 1, 'reduced motion shows the finished chart at once');
   assert.deepEqual(still.paths.map((path: any) => path.props.animatedProps().d), still.paths.map((path: any) => path.props.d));
 });
+
+test('quick actions open the three movement modes with the account and currency carried over', () => {
+  const source = readFileSync(new URL('../src/ui/quick-actions.tsx', import.meta.url), 'utf8');
+  const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText;
+  const jsx = (type: any, props: any) => ({ type, props });
+  const pushed: any[] = [];
+  const modules: Record<string, any> = {
+    'react/jsx-runtime': { jsx, jsxs: jsx },
+    'react-native': { View: 'View' },
+    'expo-router': { router: { push: (to: unknown) => pushed.push(to) } },
+    '@expo/vector-icons/Ionicons': 'Ionicons',
+    './components': { AppText: 'AppText', PressFeedback: 'PressFeedback', toneColors: (_p: unknown, tone: string) => ({ color: tone, soft: tone + '-soft' }) },
+    './theme': { space: { xxxl: 32 }, usePalette: () => ({ secondary: '#666' }) },
+  };
+  const module = { exports: {} as { QuickActions?: (props: any) => any } };
+  runInNewContext(code, { module, exports: module.exports, require: (name: string) => {
+    if (!Object.hasOwn(modules, name)) throw new Error('Unexpected quick-actions dependency: ' + name);
+    return modules[name];
+  } });
+  const row = module.exports.QuickActions!({ currency: 'USD', accountId: 'a' });
+  const actions = row.props.children.map((child: any) => child.type(child.props));
+  assert.equal(JSON.stringify(actions.map((action: any) => action.props.accessibilityLabel)), JSON.stringify(['Registrar gasto', 'Registrar ingreso', 'Transferir entre cuentas']));
+  actions.forEach((action: any) => action.props.onPress());
+  assert.equal(JSON.stringify(pushed), JSON.stringify([
+    { pathname: '/new-entry', params: { kind: 'expense', accountId: 'a', currency: 'USD' } },
+    { pathname: '/new-entry', params: { kind: 'income', accountId: 'a', currency: 'USD' } },
+    { pathname: '/new-transfer', params: { accountId: 'a' } },
+  ]));
+  // Each tile carries its semantic tone in the glyph and its soft background: expense coral, income green, transfer blue.
+  const tiles = actions.map((action: any) => action.props.children[0].props.style.backgroundColor);
+  assert.equal(JSON.stringify(tiles), JSON.stringify(['expense-soft', 'income-soft', 'transfer-soft']));
+});

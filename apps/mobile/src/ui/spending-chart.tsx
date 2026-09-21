@@ -52,8 +52,8 @@ export function CategorySpendingRow({ category, totalMinor, currency, onPress, l
   </PressFeedback>;
 }
 
-/** Legend row for the donut: colour swatch, category, count, amount and share. */
-export function CategoryLegendRow({ category, totalMinor, currency, color, onPress, last = false }: {
+/** Legend row for the donut: the category tile carries the slice's hue; `color` is kept for callers that pass it. */
+export function CategoryLegendRow({ category, totalMinor, currency, color: _color, onPress, last = false }: {
   category: CategorySpending; totalMinor: number; currency: Currency; color: string; onPress: () => void; last?: boolean;
 }) {
   const p = usePalette();
@@ -66,7 +66,6 @@ export function CategoryLegendRow({ category, totalMinor, currency, color, onPre
     accessibilityHint="Abre los movimientos de esta categoría en el mes seleccionado"
     onPress={onPress} style={{ paddingHorizontal: 16, paddingVertical: 12, minHeight: 60, flexDirection: 'row', gap: 12, alignItems: 'center',
       borderBottomWidth: last ? 0 : StyleSheet.hairlineWidth, borderBottomColor: p.line }}>
-    <View accessible={false} style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: color }} />
     <CategoryBadge category={category.category} />
     <View style={{ flex: 1, minWidth: 0, gap: 8, flexDirection: stacked ? 'column' : 'row', alignItems: stacked ? 'flex-start' : 'center' }}>
       <View style={{ flex: stacked ? undefined : 1, minWidth: 0, gap: 3 }}>

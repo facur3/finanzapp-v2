@@ -94,9 +94,6 @@ function EntryDetail({ record, account }: { record: EntryRecord; account: Accoun
         onPress={() => router.push({ pathname: '/budgets', params: { currency: account.currency, month: entry.dateISO.slice(0, 7) } })} />}
       <DetailRow label="Moneda" value={account.currency === 'ARS' ? 'Pesos argentinos' : 'Dólares estadounidenses'} last />
     </Surface>
-    {card && !income && <AppText secondary variant="footnote" style={{ textAlign: 'center' }}>
-      Contó como gasto una sola vez y aumentó la deuda de la tarjeta. Pagar la tarjeta no lo vuelve a sumar.
-    </AppText>}
     <ErrorMessage message={error} />
     <View style={{ gap: 10 }}>
       {!record.voided && <ActionButton label="Editar movimiento" icon="create-outline" disabled={busy || !!pending}

@@ -55,10 +55,17 @@ export function hueColor(hue: number, p: Pick<Palette, 'isDark'>): string {
   return p.isDark ? entry.dark : entry.light;
 }
 
-/** Colour for a category key; unknown keys (a category with no recorded
- * expense yet) fall back to their hash so the answer is still stable. */
-export function categoryColor(key: string, hues: Map<string, number>, p: Pick<Palette, 'isDark'>): string {
+/** Colour for a category label or key; unknown keys (a category with no
+ * recorded expense yet) fall back to their hash so the answer is still stable. */
+export function categoryColor(label: string, hues: Map<string, number>, p: Pick<Palette, 'isDark'>): string {
+  const key = categoryKey(label);
   return hueColor(hues.get(key) ?? hash(key) % HUES.length, p);
+}
+
+/** A soft surface in the hue: the tile background behind a glyph. Hex alpha
+ * keeps it one colour object rather than a second palette entry per hue. */
+export function tintOf(color: string, p: Pick<Palette, 'isDark'>): string {
+  return color + (p.isDark ? '33' : '24');
 }
 
 /** The grouped tail ("Otras") is not a category: it stays neutral. */
