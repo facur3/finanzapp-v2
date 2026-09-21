@@ -58,7 +58,6 @@ export default function ReportsScreen() {
   const canNext = monthISO < currentMonth;
   const slices = donutSlices(report.categories.map(category => ({ key: category.key, label: category.category, value: category.amountMinor })), p, hues);
   const goToMonth = (month: string | undefined) => { selectionHaptic(); setMonth(month); };
-  const colorFor = (key: string) => slices.find(slice => slice.key === key)?.color ?? slices.find(slice => slice.key === OTHERS_KEY)?.color ?? p.tertiary;
   const average = ready ? dailyAverageMinor(report.expenseMinor, report) : 0;
   const delta = comparison && comparison.status === 'ready' && comparison.previous?.status === 'ready' && comparison.deltaMinor !== null
     ? { minor: comparison.deltaMinor, percent: changePercent(comparison.deltaMinor, comparison.previous.expenseMinor), mode: comparison.mode } : null;
@@ -123,7 +122,7 @@ export default function ReportsScreen() {
     renderItem={({ item, index }) => <View style={{ backgroundColor: p.surface, overflow: 'hidden',
       borderTopLeftRadius: index === 0 ? 16 : 0, borderTopRightRadius: index === 0 ? 16 : 0,
       borderBottomLeftRadius: index === rows.length - 1 ? 16 : 0, borderBottomRightRadius: index === rows.length - 1 ? 16 : 0 }}>
-      {'key' in item ? <CategoryLegendRow category={item} totalMinor={ready ? report.expenseMinor : 0} color={colorFor(item.key)}
+      {'key' in item ? <CategoryLegendRow category={item} totalMinor={ready ? report.expenseMinor : 0}
         currency={currency} last={index === report.categories.length - 1}
         onPress={() => router.push({ pathname: '/report-category', params: { currency, month: monthISO, category: item.key } })} />
         : <DetailRow label={activityDateLabel(item.dateISO, day) + ' · ' + item.count + (item.count === 1 ? ' gasto' : ' gastos')}

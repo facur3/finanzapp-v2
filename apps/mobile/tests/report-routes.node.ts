@@ -85,7 +85,7 @@ test('report row pushes a scoped category detail; underlying period and currency
   const list = view.render();
   const category = list.props.data.find((item: domain.CategorySpending) => item.key === 'salud');
   const row = list.props.renderItem({ item: category, index: 0 });
-  assert.equal(find(row, 'CategoryLegendRow').props.color, 'c0');
+  assert.equal(find(row, 'CategoryLegendRow').props.category.key, 'salud', 'the legend row carries its category; the tile owns the hue');
   find(row, 'CategoryLegendRow').props.onPress();
   assert.equal(view.pushed[0].pathname, '/report-category');
   assert.equal(JSON.stringify(view.pushed[0].params), JSON.stringify({ currency: 'ARS', month: '2026-08', category: 'salud' }));

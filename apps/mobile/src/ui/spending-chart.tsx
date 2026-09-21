@@ -52,9 +52,9 @@ export function CategorySpendingRow({ category, totalMinor, currency, onPress, l
   </PressFeedback>;
 }
 
-/** Legend row for the donut: the category tile carries the slice's hue; `color` is kept for callers that pass it. */
-export function CategoryLegendRow({ category, totalMinor, currency, color: _color, onPress, last = false }: {
-  category: CategorySpending; totalMinor: number; currency: Currency; color: string; onPress: () => void; last?: boolean;
+/** Legend row for the donut: the category tile carries the slice's hue, so the row needs no swatch. */
+export function CategoryLegendRow({ category, totalMinor, currency, onPress, last = false }: {
+  category: CategorySpending; totalMinor: number; currency: Currency; onPress: () => void; last?: boolean;
 }) {
   const p = usePalette();
   const { fontScale } = useWindowDimensions();
