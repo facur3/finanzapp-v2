@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { formatMinorUnits, parseMinorUnits } from '@finanzapp/domain';
-import { EMPTY_AMOUNT, amountFromCanonical, canonicalAmount, displayAmount, displayCaret, logicalCaret, readAmountChange, renderAmount,
+import { EMPTY_AMOUNT, amountFromCanonical, amountFromMinor, canonicalAmount, displayAmount, displayCaret, logicalCaret, readAmountChange, renderAmount,
   settleAmount, splitAmount, type AmountEdit } from '../src/ui/money-input.ts';
 
 // The amount field keeps a canonical edit state (sign, whole digits, decimal
@@ -343,4 +343,18 @@ test('hero amounts split into symbol, whole units and decimals for a colour hier
   assert.deepEqual(splitAmount('$ 12'), { prefix: '$ ', whole: '12', decimals: '' });
   const { prefix, whole, decimals } = splitAmount('−US$ 999.999.999,99');
   assert.equal(prefix + whole + decimals, '−US$ 999.999.999,99', 'the parts concatenate to the original string');
+});
+
+test('a shortcut fills the field as the person would have typed the amount, from integer minor units', () => {
+  assert.equal(amountFromMinor(19016200), '190.162');
+  assert.equal(amountFromMinor(19016250), '190.162,50');
+  assert.equal(amountFromMinor(5), '0,05');
+  assert.equal(amountFromMinor(100), '1');
+  assert.equal(amountFromMinor(999999999999999), '9.999.999.999.999,99');
+  for (const minor of [19016200, 19016250, 5, 100, 1310, 999999999999999]) assert.equal(parseMinorUnits(amountFromMinor(minor)), minor, 'round trip ' + minor);
+  // Never a negative, zero or fabricated "all".
+  assert.equal(amountFromMinor(0), '');
+  assert.equal(amountFromMinor(-19016200), '');
+  assert.equal(amountFromMinor(Number.MAX_SAFE_INTEGER + 2), '');
+  assert.equal(amountFromMinor(12.5), '');
 });

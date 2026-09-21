@@ -251,8 +251,27 @@ cinco pestañas permanecen montadas sin fade/detach/freeze. Objetivos de 44 pt,
 texto escalable con filas apiladas en tamaños grandes, etiquetas de VoiceOver con
 importe, moneda y estado.
 
+## Producto 18 — navegación y acciones rápidas (sin rediseño)
+
+- **Más.** La quinta pestaña deja de llamarse Ajustes: es el hub secundario, dos
+  listas agrupadas nativas (Finanzas / App y datos) con una nota al pie sobre datos
+  locales. Tarjetas no aparece ahí porque ya es pestaña. La copia de seguridad tiene
+  su pantalla; Categorías es una lista de solo lectura por ahora.
+- **Tarjetas** solo muestra tarjetas de crédito. Deudas y cobros vive en Más.
+- **Atajo de importe.** Bajo el campo de importe de una transferencia, una nota al pie
+  con la cifra registrada ("Saldo registrado: ARS 190.162,00", "Deuda registrada",
+  "Pendiente") y una acción de texto en el primario cobalto: Usar todo, Pagar total,
+  Saldar total o Cobrar total. Solo rellena el campo con el modelo canónico de
+  visualización; guardar sigue siendo el botón principal. Sin cifra positiva no hay
+  acción, solo la nota.
+- Inicio no suma botones: el acceso al Asistente desaparece de la cabecera mientras
+  sea una vista previa; los bloques contextuales existentes se mantienen.
+
 ## Pendiente de revisión en iPhone
 
+- Más y sus grupos, Tarjetas sin deudas, los atajos de importe con el teclado del
+  iPhone (valor, cursor al final, edición posterior), Categorías y Copia de seguridad;
+  VoiceOver del atajo; ambos temas, texto grande y Reduce Motion.
 - Primario cobalto en ambos temas (pestaña, segmentados, CTA, selectores); rellenos
   tintados de Inicio y su revelado; campo de importe (tecleo, borrado sobre un punto,
   pegado, cursor) en ARS y USD; niveles del héroe; Dynamic Type y Reduce Motion.

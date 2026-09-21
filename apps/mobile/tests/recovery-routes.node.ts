@@ -6,6 +6,7 @@ import ts from 'typescript';
 import * as domain from '@finanzapp/domain';
 import * as presentation from '../src/ui/presentation.ts';
 import * as liabilityPresentation from '../src/ui/liability-presentation.ts';
+import * as moneyInput from '../src/ui/money-input.ts';
 
 // Actual screen/form handlers with native hosts replaced by descriptors.
 // This does not render UIKit, the Files picker, animation frames or gestures.
@@ -38,7 +39,7 @@ function harness(file: string, props: any = {}, options: { data?: domain.LedgerA
     addAccount: async (value: domain.Account) => { newAccounts.push(value); await options.addAccount?.(value); },
     restoreBackup: async (value: domain.LedgerArchive, baseline: string) => { restores.push({ value, baseline }); await options.restore?.(value, baseline); },
   }) };
-  const components = Object.fromEntries(['Screen', 'EmptyState', 'ActionButton', 'AppText', 'AmountField', 'Choices', 'ErrorMessage', 'Field', 'IconButton', 'Surface',
+  const components = Object.fromEntries(['Screen', 'EmptyState', 'ActionButton', 'AppText', 'AmountField', 'AmountShortcut', 'Choices', 'ErrorMessage', 'Field', 'IconButton', 'Surface',
     'CategoryBadge', 'DetailRow', 'Money', 'SectionTitle', 'GlyphTile'].map(name => [name, name]));
   const modules: Record<string, unknown> = {
     react: { useState: (initial: any) => { const i = cursor++; if (!(i in state)) state[i] = typeof initial === 'function' ? initial() : initial;
@@ -57,6 +58,7 @@ function harness(file: string, props: any = {}, options: { data?: domain.LedgerA
     './components': components, '../src/ui/components': components, '../../src/ui/components': components,
     './form-controls': { AccountField: 'AccountField', CategoryField: 'CategoryField', DateField: 'DateField', SelectorCard: 'SelectorCard' },
     './presentation': presentation,
+    './money-input': moneyInput,
     './liability-presentation': liabilityPresentation,
     '../../src/ui/theme': { space: { xs: 4, s: 8, m: 12, l: 16, xl: 20, xxl: 24, xxxl: 32 },
       usePalette: () => ({ text: '#000', positive: '#070', income: '#070', expense: '#700', primary: '#2557D6', warning: '#a60', secondary: '#666', tertiary: '#999' }) },

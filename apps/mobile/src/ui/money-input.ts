@@ -220,3 +220,16 @@ export function splitAmount(text: string): { prefix: string; whole: string; deci
   if (!match) return { prefix: '', whole: text, decimals: '' };
   return { prefix: match[1], whole: match[2], decimals: match[3] ?? '' };
 }
+
+/** Integer minor units as the field would display them after the user typed
+ * the amount: "19016200" → "190.162", "19016250" → "190.162,50", "5" → "0,05".
+ * Whole amounts stay whole (no ",00"), so a shortcut fills the field the way
+ * a person would have typed it. Negative or unsafe values give an empty field:
+ * a shortcut never proposes a negative or fabricated amount. */
+export function amountFromMinor(minor: number): string {
+  if (!Number.isSafeInteger(minor) || minor <= 0) return '';
+  // Digits only: the last two are the cents, the rest the whole units.
+  const digits = String(minor).padStart(3, '0');
+  const whole = digits.slice(0, -2), cents = digits.slice(-2);
+  return displayAmount(whole + (cents === '00' ? '' : ',' + cents));
+}

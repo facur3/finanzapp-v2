@@ -51,6 +51,13 @@ decision remains authoritative, with device checks still an explicit gate.
 interaction and selection, transfer on a distinct azure, Home categories as one
 tinted-fill distribution, Argentine digit grouping while typing an amount (display
 only; storage stays integer minor units) and hero amounts in three colour levels.
+**Producto 18 (2026-09-21)** is product architecture, not a redesign: the fifth tab
+is **Más**, a grouped hub (Finanzas: Cuentas, Presupuestos, Recurrentes, Deudas y
+cobros, Categorías; App y datos: Asistente preview, Copia de seguridad, Movimientos
+deshechos); Tarjetas holds only credit cards; the Home sparkles shortcut is gone
+while the Assistant is a preview; and the transfer form offers fill-only amount
+shortcuts — Usar todo, Pagar total, Saldar total, Cobrar total — computed from the
+recorded balance or obligation, never submitting on their own.
 
 The Reportes tab shows, for one month and currency, the recorded total with its daily
 average and change against the same elapsed days of the previous month, a six-month
@@ -61,7 +68,7 @@ shorter); historical months compare full months. Exact date ranges stay visible.
 Category totals open only their dated expenses. Missing records are not savings.
 Native backup/recovery stays available, but no JSON import is required to start.
 
-## Product scope (Interfaz 17)
+## Product scope (Producto 18)
 
 [Decision 002](../../docs/decisions/002-spending-first.md) selects spending and
 commitments with optional accounts. No native portfolio or market data. The old
@@ -70,8 +77,9 @@ native stack. No SQLite migration or loss of existing records.
 Cloud AI replaces the earlier local-parser plan. [Integration contracts/setup](../../docs/mobile-integrations.md)
 describe the disabled-by-default API, bounded provider adapter, pending inbox,
 and remaining auth/consent/Shortcut/audio UI. No paid calls or remote SQL were run.
-The sparkles control opens an explicit preview of the future Assistant; it never
-claims a model is active and sends no financial data.
+Más → Asistente opens an explicit preview of the future Assistant; it never
+claims a model is active and sends no financial data. The Home header no longer
+advertises it.
 
 ## First start on Linux or Windows
 
@@ -107,7 +115,7 @@ and are not income. ARS and USD are shown separately without fabricated rates.
 Drafts and posted entries can be edited. Open a movement → Editar movimiento;
 change amount, kind, concept, category, date or account **within the same currency**.
 Deshacer removes its effect without a fake refund/income. Its recoverable record
-remains in Ajustes → Movimientos deshechos, including after closing/reopening.
+remains in Más → Movimientos deshechos, including after closing/reopening.
 Open an account → pencil to rename it or correct its **recorded balance**.
 A correction changes opening balance with a local revision/audit receipt, not
 an expense/income. Confirmation shows the previous and new balance. Concurrent
@@ -122,7 +130,7 @@ It **does not send money to a bank**. Transfers appear once in full activity,
 on both account details and in recovery; they never appear as income/spending in
 reports. Cross-currency operations, fees and bank execution remain separate work.
 
-Ajustes → Recurrentes creates weekly, monthly or yearly expense/income rules tied
+Más → Recurrentes creates weekly, monthly or yearly expense/income rules tied
 to a real account. Each rule stores its next date and a stable calendar anchor,
 so a January 31 schedule can use February 28 and return to March 31 instead of
 drifting permanently. Opening/resuming the app posts due active occurrences into
@@ -132,18 +140,21 @@ Pausing keeps prior history and reactivation skips dates that elapsed while paus
 Home shows up to three real upcoming expense commitments for the selected currency;
 the Recurrentes screen also shows a 30-day forecast without mixing ARS and USD.
 
-Tarjetas holds credit cards, debts and receivables. A card is a hidden internal
-account: registering a purchase posts **one expense** to the card (it counts in
+Tarjetas holds credit cards only; personal debts and receivables live under
+Más → Deudas y cobros. A card is a hidden internal account: registering a purchase posts **one expense** to the card (it counts in
 Movimientos, Reportes and Presupuestos and raises the card's recorded debt).
 **Pagar tarjeta** records a transfer from a cash account into the card: cash goes
-down, debt goes down, and no second expense is created. Closing and due dates are
+down, debt goes down, and no second expense is created. Its form offers **Pagar
+total**, which only fills the amount with the recorded debt (never more); a plain
+transfer offers **Usar todo** (the source's positive recorded balance) and a debt
+offers **Saldar total** / **Cobrar total**. Saving stays explicit in every case. Closing and due dates are
 calculated from the days you enter; there is no bank statement, pending state or
 card control. A debt ("Debo") or receivable ("Me deben") is also a hidden account
 whose opening balance is the principal; each payment or collection is a transfer
 capped at the outstanding amount. Expenses, income and recurring rules can never be
 posted to a debt account. Home's Disponible excludes cards, debts and receivables.
 
-Ajustes → Presupuestos stores category limits for one month and one currency. Only
+Más → Presupuestos stores category limits for one month and one currency. Only
 recorded expenses consume them; income and internal transfers do not. Budgets can be
 edited or archived without changing historical movements or account balances. Home
 shows the current-month budget only when meaningful and distinguishes its remaining
@@ -198,7 +209,7 @@ Supabase sync, Face ID, reminders and Apple Pay capture are separate roadmap
 milestones; no disabled decorative buttons imply otherwise.
 
 The pilot exports its own v6 JSON backup through the system sharing sheet and
-imports native v1 to v6 backups through Ajustes → Importar copia. Review shows new
+imports native v1 to v6 backups through Más → Copia de seguridad → Importar copia. Review shows new
 accounts, cards, debts, active/undone entries, transfers, recurring rules and budgets,
 identical records and exact before/after liquid totals for ARS/USD separately (cards
 and debts are excluded from those totals). Confirmation adds only missing IDs in one transaction.
@@ -286,9 +297,11 @@ Xcode-generator integrations affected by the temporary dependency fixes in
 [`compat/`](compat/README.md). It does not replace native-device testing.
 It also covers the actual presentation helpers: filtering/search, stable ordering,
 date grouping, available currencies, account preselection and category handling.
-The mobile tests include guards over the real five-tab layout, report/recovery/transfer
-handlers, the Cards tab, card/debt detail, the locked card-payment form and
-bar-animation configuration. These are **not** native rendering/gesture tests;
+The mobile tests include guards over the real five-tab layout (Más, no Home sparkles),
+report/recovery/transfer handlers, the Cards tab (no personal debts), card/debt detail,
+the locked card-payment form, the fill-only amount shortcuts (Usar todo, Pagar total,
+Saldar total, Cobrar total), the Más hub, backup and read-only categories screens,
+historical custom categories and bar-animation configuration. These are **not** native rendering/gesture tests;
 use the physical checklist. The root suite also tests the shared monthly summary
 and spending report, including exact category-to-entry reconciliation.
 
@@ -297,7 +310,7 @@ For the intermittent black-tab report, update to `master`, restart with
 and repeat the **Interfaz 02** tab checks, **Interfaz 03** report checks and
 **Interfaz 04/05** correction/recovery and transfer checks, plus **Interfaz 06** daily/comparison reports and **Interfaz 08** recurring/upcoming
 checks, plus **Interfaz 10** cards/debts and five-tab checks and **Interfaz 11** Home,
-Movimientos and detail checks, **Interfaz 12** form checks, **Interfaz 13** Reportes checks, **Interfaz 14** budgets/recurring/accounts checks, **Interfaz 15** motion checks, **Interfaz 16** cohesion checks and **Interfaz 17** identity and money-input checks. The current footer says Interfaz 17.
+Movimientos and detail checks, **Interfaz 12** form checks, **Interfaz 13** Reportes checks, **Interfaz 14** budgets/recurring/accounts checks, **Interfaz 15** motion checks, **Interfaz 16** cohesion checks, **Interfaz 17** identity and money-input checks and **Producto 18** Más / Tarjetas / amount-shortcut checks. The current footer (Más) says Producto 18.
 Before updating, save a private pilot copy; do not uninstall or add fake movements.
 
 If a storage/refresh error occurs, the form retains the exact submitted command

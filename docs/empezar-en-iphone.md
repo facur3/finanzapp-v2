@@ -1,6 +1,13 @@
 # Probar FinanzApp en tu iPhone, desde Linux o Windows
 
-Actualizado: 14 de septiembre de 2026.
+Actualizado: 21 de septiembre de 2026.
+
+> **Producto 18:** la quinta pestaña ahora se llama **Más** (antes Ajustes). Donde esta
+> guía diga "Ajustes → …", buscá lo mismo en Más: Cuentas, Presupuestos, Recurrentes,
+> Deudas y cobros y Categorías bajo *Finanzas*; Asistente, **Copia de seguridad**
+> (Compartir copia e Importar copia) y Movimientos deshechos bajo *App y datos*.
+> Las deudas y cobros ya no aparecen en Tarjetas. El pie de Más debe decir
+> **Producto 18**.
 
 ## Interfaz 06 — reportes que se entienden
 

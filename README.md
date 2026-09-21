@@ -9,6 +9,12 @@ y presupuestos siguen en el plan; inversiones y patrimonio salen del alcance nat
 - [Decisión, alternativas y alcance](docs/decisions/002-spending-first.md)
 - [Base de IA en nube y Atajos: qué funciona y qué falta](docs/mobile-integrations.md)
 
+**Producto 18 (2026-09-21):** la quinta pestaña nativa es **Más**, hub agrupado de
+Cuentas, Presupuestos, Recurrentes, Deudas y cobros, Categorías, Asistente y datos;
+Tarjetas queda solo para tarjetas de crédito; las transferencias, pagos de tarjeta y
+saldos de deudas ofrecen Usar todo / Pagar total / Saldar total / Cobrar total, que
+solo rellenan el importe. Sin rediseño visual ni cambios de esquema.
+
 **Interfaz 07:** nuevo Inicio con períodos, barras y detalle; saldo inicial opcional,
 paleta índigo y superficies tranquilas. Base de API autenticada, bandeja de capturas
 y límites de IA, apagada hasta configuración. No hay chat/Apple Pay activo todavía.

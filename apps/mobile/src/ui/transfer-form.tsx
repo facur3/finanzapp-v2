@@ -4,9 +4,10 @@ import { router, Stack } from 'expo-router';
 import { randomUUID } from 'expo-crypto';
 import * as Haptics from 'expo-haptics';
 import { accountBalanceMinor, accountKind, formatMinorUnits, hiddenLiabilityAccountIds, makeTransferChange, parseMinorUnits, sameTransfer, todayKey,
-  totalsByCurrency, validateTransfer, validateTransferChange, type Transfer, type TransferChange, type TransferRecord } from '@finanzapp/domain';
+  totalsByCurrency, validateTransfer, validateTransferChange, type Account, type Transfer, type TransferChange, type TransferRecord } from '@finanzapp/domain';
 import { useLedger } from '../storage/LedgerProvider';
-import { ActionButton, AmountField, AppText, DetailRow, EmptyState, ErrorMessage, Field, IconButton, Screen, Surface } from './components';
+import { ActionButton, AmountField, AmountShortcut, AppText, DetailRow, EmptyState, ErrorMessage, Field, IconButton, Screen, Surface } from './components';
+import { amountFromMinor } from './money-input';
 import { AccountField, DateField, SelectorCard } from './form-controls';
 import { initialAccountId } from './presentation';
 import { space, usePalette } from './theme';
@@ -115,6 +116,27 @@ export function TransferForm({ original, accountId, fromAccountId: requestedFrom
   const noCashCounterpart = !!obligation && !cash.some(a => a.currency === obligation.currency);
   const submitLabel = pending && error ? 'Reintentar guardado' : before ? 'Guardar cambios'
     : obligationKind === 'card' ? 'Registrar pago' : obligationKind === 'debt' ? (lockedTo ? 'Registrar pago' : 'Registrar cobro') : 'Registrar transferencia';
+  // The whole recorded figure a shortcut may fill: the source's positive balance
+  // for a transfer, the outstanding obligation for a payment or collection. It is
+  // read from the current records (minus the transfer being edited), never from a
+  // stale parameter; the caller's cap still bounds it. A negative or zero figure
+  // offers no action. The shortcut only fills the field; saving stays explicit.
+  const shortcut = (() => {
+    if (!snapshot) return null;
+    const recorded = (item: Account) => accountBalanceMinor(item, snapshot.entries, (snapshot.transfers ?? []).filter(t => t.id !== before?.transfer.id));
+    try {
+      const context = lockedTo ? { account: lockedTo, minor: -recorded(lockedTo), label: obligationKind === 'card' ? 'Pagar total' : 'Saldar total' }
+        : lockedFrom ? { account: lockedFrom, minor: recorded(lockedFrom), label: 'Cobrar total' }
+          : from ? { account: from, minor: recorded(from), label: 'Usar todo' } : null;
+      if (!context) return null;
+      let fill = Math.max(0, context.minor);
+      if (contextualMax !== null && Number.isSafeInteger(contextualMax)) fill = Math.min(fill, contextualMax);
+      // A card in credit has nothing to pay; an obligation is pending or settled, never negative; cash is shown as recorded.
+      const figure = obligationKind === 'card' ? (context.minor < 0 ? ['A favor', -context.minor] as const : ['Deuda registrada', context.minor] as const)
+        : obligationKind === 'debt' ? ['Pendiente', Math.max(0, context.minor)] as const : ['Saldo registrado', context.minor] as const;
+      return { ...context, fill, text: `${figure[0]}: ${context.account.currency} ${formatMinorUnits(figure[1])}` };
+    } catch { return null; }
+  })();
   const balanceDetail = (id: string | undefined) => {
     const item = accounts.find(a => a.id === id);
     if (!item || !snapshot) return undefined;
@@ -130,9 +152,8 @@ export function TransferForm({ original, accountId, fromAccountId: requestedFrom
       action={<ActionButton label="Agregar cuenta" onPress={() => router.replace({ pathname: '/new-account', params: obligation ? { currency: obligation.currency } : {} })} />} /> : <>
       <AmountField label={obligationKind === 'card' ? 'Pago' : obligationKind === 'debt' ? (lockedTo ? 'Pago' : 'Cobro') : 'Transferencia'}
         currency={(obligation ?? from)?.currency ?? 'ARS'} value={amount} onChangeText={value => { setAmount(value); setError(null); }} editable={!locked} tone="transfer" />
-      {contextualMax !== null && obligation && <AppText secondary variant="footnote" style={{ textAlign: 'center', marginTop: -8 }}>
-        {obligationKind === 'card' ? 'Deuda registrada' : 'Pendiente'}: {obligation.currency} {formatMinorUnits(contextualMax)}
-      </AppText>}
+      {shortcut && <AmountShortcut caption={shortcut.text} label={shortcut.fill > 0 ? shortcut.label : undefined} disabled={locked}
+        onPress={shortcut.fill > 0 ? () => { setAmount(amountFromMinor(shortcut.fill)); setError(null); } : undefined} />}
       <View style={{ gap: space.m }}>
         {lockedFrom ? <SelectorCard label={kindLabel(lockedFrom.id)} value={lockedFrom.name} placeholder="" detail={balanceDetail(lockedFrom.id)}
           icon={obligationKind === 'card' ? 'card-outline' : 'people-outline'} color={p.primary} disabled onPress={() => {}} />
