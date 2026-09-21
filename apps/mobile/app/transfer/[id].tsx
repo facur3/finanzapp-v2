@@ -5,7 +5,7 @@ import { randomUUID } from 'expo-crypto';
 import * as Haptics from 'expo-haptics';
 import { accountKind, formatMinorUnits, makeTransferChange, type Account, type TransferRecord, type TransferChange } from '@finanzapp/domain';
 import { useLedger } from '../../src/storage/LedgerProvider';
-import { ActionButton, AppText, DetailRow, EmptyState, ErrorMessage, GlyphTile, Money, Screen, Surface } from '../../src/ui/components';
+import { AccountBadge, ActionButton, AppText, DetailRow, EmptyState, ErrorMessage, GlyphTile, Money, Screen, Surface } from '../../src/ui/components';
 import { space, usePalette } from '../../src/ui/theme';
 
 export default function TransferScreen() {
@@ -70,8 +70,8 @@ function TransferDetail({ record, accounts }: { record: TransferRecord; accounts
       <AppText accessibilityLiveRegion="polite" variant="caption" style={{ color: record.voided ? p.warning : p.secondary, fontWeight: '500', textAlign: 'center' }}>{status}</AppText>
     </View>
     <Surface grouped>
-      <DetailRow label="Desde" value={from.name} icon="arrow-up-outline" disabled={busy} onPress={() => router.push(linkFor(from))} />
-      <DetailRow label="Hacia" value={to.name} icon="arrow-down-outline" disabled={busy} onPress={() => router.push(linkFor(to))} last={!t.note} />
+      <DetailRow label="Desde" value={from.name} icon="arrow-up-outline" leading={fromKind === 'cash' ? <AccountBadge accountId={from.id} size={28} /> : undefined} disabled={busy} onPress={() => router.push(linkFor(from))} />
+      <DetailRow label="Hacia" value={to.name} icon="arrow-down-outline" leading={toKind === 'cash' ? <AccountBadge accountId={to.id} size={28} /> : undefined} disabled={busy} onPress={() => router.push(linkFor(to))} last={!t.note} />
       {!!t.note && <DetailRow label="Nota" value={t.note} last />}
     </Surface>
     <ErrorMessage message={error} />

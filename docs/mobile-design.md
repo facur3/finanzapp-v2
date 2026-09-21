@@ -284,7 +284,41 @@ importe, moneda y estado.
   "de $X · N %" y cuántos sublímites se excedieron; sin general, el sublímite más
   ajustado y la cantidad de sublímites.
 
+## Producto 20 — identidad de cuentas y categorías (sin rediseño)
+
+- **Un solo cimiento.** Íconos curados (Ionicons, nunca emoji) y una paleta fija de
+  once colores contenidos — cobalto, celeste, verde azulado, verde, oliva, ocre,
+  terracota, rosa, índigo, pizarra, grafito — con nombre accesible en español y par
+  claro/oscuro medido en Node (`tests/appearance.node.ts`). El coral de gasto no está:
+  es significado, no identidad. Doce íconos de cuenta (billetera, efectivo, banco,
+  billetera virtual, tarjeta prepaga, ahorro, inversión, negocio, caja fuerte, exterior,
+  hogar, compartida) y treinta y siete de categoría.
+- **El selector.** Vista previa (tile grande con el nombre), "Icono" como grilla de
+  tiles redondos de 44 pt y "Color" como fila de puntos. El elegido se rellena con su
+  color y lleva un anillo; el punto elegido, anillo y tilde. Un háptico de selección por
+  cambio, solo transiciones de color (200 ms; 0 con Reduce Motion), radio buttons con
+  nombre real para VoiceOver ("Banco", "Celeste"), nunca "círculo azul".
+- **Dónde vive el color.** Solo en el tile: glifo en su color sobre su tinte suave, como
+  la categoría desde Interfaz 16. Filas, importes, pantallas y texto siguen neutros. Una
+  cuenta sin elección se ve billetera sobre cobalto; tarjetas y deudas conservan su glifo.
+- **Superficies.** Cuentas, detalle de cuenta (tile junto a "Saldo registrado"), el
+  selector de cuenta y su hoja en todos los formularios, las filas Cuenta / Desde / Hacia
+  de los detalles. Categorías: el nombre visible sigue a su definición en filas, detalle,
+  selector, Inicio, Reportes (leyenda, dona, comercios), Presupuestos, Recurrentes y
+  desgloses; la cadena guardada no cambia.
+- **Categorías.** Lista con Gastos, Ingresos y Archivadas; "+" abre Nueva categoría;
+  tocar una fila edita nombre, ícono y color o la archiva con confirmación. Sin borrado.
+- **Más.** Solo el grupo Finanzas lleva tiles tintados (cobalto, verde azulado, índigo,
+  ocre, pizarra) sobre la superficie neutra; App y datos sigue neutro.
+
 ## Pendiente de revisión en iPhone
+
+- Producto 20: el selector con el teclado abierto y cerrado, tamaño de toque y háptico
+  por cambio, tiles de cuenta y categoría en ambos temas y con texto grande, Cuentas y
+  los selectores con cuentas vestidas y sin vestir, renombrar una categoría y comprobar
+  que Reportes muestra un solo grupo, archivar y ver la fila en Archivadas y el
+  movimiento intacto, actualización del archivo real a esquema 8 sin cambios de saldo,
+  copia v8 compartida e importada, VoiceOver leyendo los nombres de color e ícono.
 
 - Tipo del formulario y ambas variantes; panel general y filas en calmo / aviso /
   excedido; botón compacto; tarjeta de Inicio con y sin general; migración del

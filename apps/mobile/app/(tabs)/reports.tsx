@@ -7,8 +7,7 @@ import { dailyAverageMinor, dailySpending, formatMinorUnits, monthlySpendingTren
 import { useLedger } from '../../src/storage/LedgerProvider';
 import { budgetTone, percentUsed } from '../../src/ui/budget-presentation';
 import { AppText, CategoryBadge, Choices, DetailRow, EmptyState, GlyphTile, IconButton, Money, PressFeedback, SectionTitle, Surface } from '../../src/ui/components';
-import { assignCategoryHues } from '../../src/ui/category-color';
-import { useCategoryColor } from '../../src/ui/category-hues';
+import { useCategoryColor, useCategoryLookOf } from '../../src/ui/category-hues';
 import { DonutChart, MonthBars, OTHERS_KEY, donutSlices } from '../../src/ui/charts';
 import { ValueTransition, selectionHaptic } from '../../src/ui/motion';
 import { activityDateLabel } from '../../src/ui/presentation';
@@ -33,7 +32,7 @@ export default function ReportsScreen() {
   const report = useMemo(() => snapshot && selection ? spendingReport(snapshot, selection.currency, selection.monthISO, day) : null,
     [snapshot, selection, day]);
   const money = (minor: number) => (selection?.currency === 'USD' ? 'US$ ' : '$ ') + formatMinorUnits(minor);
-  const hues = useMemo(() => assignCategoryHues(snapshot?.entries ?? []), [snapshot?.entries]);
+  const lookOf = useCategoryLookOf('expense');
   const trend = useMemo(() => {
     if (!snapshot || !selection) return [];
     try { return monthlySpendingTrend(snapshot, selection.currency, selection.monthISO, day, 6); } catch { return []; }
@@ -58,7 +57,7 @@ export default function ReportsScreen() {
   const { currency, currencies, monthISO, earliestMonth, currentMonth } = selection;
   const canPrevious = monthISO > earliestMonth;
   const canNext = monthISO < currentMonth;
-  const slices = donutSlices(report.categories.map(category => ({ key: category.key, label: category.category, value: category.amountMinor })), p, hues);
+  const slices = donutSlices(report.categories.map(category => ({ key: category.key, label: lookOf(category.category).label, value: category.amountMinor })), p, key => lookOf(key).hex);
   const goToMonth = (month: string | undefined) => { selectionHaptic(); setMonth(month); };
   const average = ready ? dailyAverageMinor(report.expenseMinor, report) : 0;
   const delta = comparison && comparison.status === 'ready' && comparison.previous?.status === 'ready' && comparison.deltaMinor !== null
@@ -156,7 +155,7 @@ export default function ReportsScreen() {
             <CategoryBadge category={merchant.category} />
             <View style={{ flex: 1, minWidth: 0, gap: 3 }}>
               <AppText numberOfLines={1} style={{ fontWeight: '500' }}>{merchant.merchant}</AppText>
-              <AppText secondary variant="footnote" numberOfLines={1}>{merchant.count === 1 ? '1 compra' : merchant.count + ' compras'} · {merchant.category}</AppText>
+              <AppText secondary variant="footnote" numberOfLines={1}>{merchant.count === 1 ? '1 compra' : merchant.count + ' compras'} · {lookOf(merchant.category).label}</AppText>
             </View>
             <Money minor={merchant.amountMinor} currency={currency} />
           </View>)}

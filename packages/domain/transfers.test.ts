@@ -71,7 +71,7 @@ describe('internal transfers and account corrections', () => {
     const change = makeAccountChange('edit', a, snapshotFromArchive(archive), 'Nueva', 5000, time);
     const saved = { ...archive, accounts: [change.after, b, usd], transfers: [makeTransferChange('undo', initialTransferRecord(t), 'void', time).after] };
     const backup = createRecoveryBackup(saved);
-    expect(backup.schema).toBe('finanzapp.native-pilot.v7');
+    expect(backup.schema).toBe('finanzapp.native-pilot.v8');
     expect(parsePilotBackup(JSON.stringify(backup)).archive).toEqual(saved);
     expect(() => createPilotBackup(snapshotFromArchive(saved))).toThrow();
     const v2 = { ...createRecoveryBackup({ accounts: [a, b], records: [] }), schema: 'finanzapp.native-pilot.v2' };
@@ -80,6 +80,8 @@ describe('internal transfers and account corrections', () => {
     delete (v2 as any).budgets;
     delete (v2 as any).cards;
     delete (v2 as any).debts;
+    delete (v2 as any).appearances;
+    delete (v2 as any).categories;
     expect(parsePilotBackup(JSON.stringify(v2)).archive).toEqual({ accounts: [a, b], records: [] });
   });
   it('preview includes transfers, refuses stale account metadata and prevents resurrection', () => {

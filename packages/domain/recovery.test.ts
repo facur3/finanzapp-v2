@@ -5,6 +5,8 @@ import { archiveKey, BACKUP_MAX_BYTES, createRecoveryBackup, initialRecord, make
 import { initialTransferRecord } from './transfers';
 import type { CreditCardProfile, PersonalDebtProfile } from './liabilities';
 import type { MonthlyBudget } from './budgets';
+import { makeAccountAppearance } from './appearance';
+import { editedCategoryDefinition, newCategoryDefinition, resolveCategory } from './categories';
 
 const account: Account = { id: 'a', name: 'Prueba', currency: 'ARS', openingMinor: 100000, createdAt: '2026-09-11T12:00:00Z' };
 const entry: Entry = { id: 'e', accountId: 'a', kind: 'expense', amountMinor: 101, merchant: 'Prueba', category: 'Prueba', dateISO: '2026-09-11', createdAt: account.createdAt };
@@ -31,7 +33,7 @@ describe('native edit and recovery domain', () => {
   });
   it('v7 backups carry scoped budgets; v6 and v5 files still restore, and their budgets become category budgets', () => {
     const backup = createRecoveryBackup(liabilities);
-    expect(backup.schema).toBe('finanzapp.native-pilot.v7');
+    expect(backup.schema).toBe('finanzapp.native-pilot.v8');
     expect(parsePilotBackup(JSON.stringify(backup)).archive).toEqual(liabilities);
     const total: MonthlyBudget = { id: 'total', scope: 'total', currency: 'ARS', monthISO: '2026-09', amountMinor: 500000, active: true, createdAt: account.createdAt, revision: 0, updatedAt: account.createdAt };
     const food: MonthlyBudget = { id: 'food', scope: 'category', category: 'Comida', currency: 'ARS', monthISO: '2026-09', amountMinor: 150000, active: true, createdAt: account.createdAt, revision: 0, updatedAt: account.createdAt };
@@ -41,14 +43,15 @@ describe('native edit and recovery domain', () => {
     expect(parsePilotBackup(JSON.stringify(v7)).archive).toEqual(budgeted);
     // A v6 file has budgets without scope: they are category budgets, read exactly as written.
     const { scope: _scope, ...legacyFood } = food;
-    const v6 = { ...createRecoveryBackup(archive), schema: 'finanzapp.native-pilot.v6', budgets: [legacyFood] };
+    const { appearances: _a6, categories: _c6, ...v7Shape } = createRecoveryBackup(archive);
+    const v6 = { ...v7Shape, schema: 'finanzapp.native-pilot.v6', budgets: [legacyFood] };
     expect(parsePilotBackup(JSON.stringify(v6)).archive.budgets).toEqual([food]);
     // A v6 file cannot smuggle scoped or total budgets, and a total never carries a category.
     expect(() => parsePilotBackup(JSON.stringify({ ...v6, budgets: [food] }))).toThrow();
     expect(() => parsePilotBackup(JSON.stringify({ ...v6, budgets: [{ ...legacyFood, scope: 'total' }] }))).toThrow();
     expect(() => parsePilotBackup(JSON.stringify({ ...v7, budgets: [{ ...total, category: 'General' }] }))).toThrow();
     expect(() => parsePilotBackup(JSON.stringify({ ...v7, budgets: [total, { ...total, id: 'again' }] }))).toThrow(/general activo/);
-    const v5 = { ...createRecoveryBackup(archive), schema: 'finanzapp.native-pilot.v5' } as Record<string, unknown>;
+    const v5 = { ...v7Shape, schema: 'finanzapp.native-pilot.v5' } as Record<string, unknown>;
     delete v5.cards; delete v5.debts;
     expect(parsePilotBackup(JSON.stringify(v5)).archive).toEqual(archive);
     expect(() => parsePilotBackup(JSON.stringify({ ...v5, cards: [] }))).toThrow();
@@ -152,5 +155,53 @@ describe('native edit and recovery domain', () => {
       { ...good.after, revision: 0 }, { ...good.after, voided: true },
     ]) expect(() => validateEntryChange({ ...good, after }, [account])).toThrow();
     expect(sameRecord(good.before, good.after)).toBe(false);
+  });
+
+  it('v8 backups round-trip account looks and category definitions; v7 files restore without them', () => {
+    const look = makeAccountAppearance(account.id, 'bank', 'azure', time);
+    const kiosco = newCategoryDefinition('expense', 'Kiosco', 'cafe', 'ochre', time);
+    const renamed = editedCategoryDefinition(resolveCategory('expense', 'Comida'), { label: 'Alimentaci\u00f3n' }, time);
+    const dressed: LedgerArchive = { ...archive, appearances: [look], categories: [renamed, kiosco] };
+    const v8 = createRecoveryBackup(dressed);
+    expect(v8.schema).toBe('finanzapp.native-pilot.v8');
+    expect(v8.appearances).toEqual([look]);
+    expect(v8.categories.map(item => item.key)).toEqual(['comida', 'kiosco']);
+    expect(parsePilotBackup(JSON.stringify(v8)).archive).toEqual(dressed);
+    // Every financial array is byte-identical to the v7 export of the same ledger.
+    const { appearances: _a, categories: _c, schema: _s, exportedAt: _e, ...rest } = v8;
+    const { appearances: _a2, categories: _c2, schema: _s2, exportedAt: _e2, ...plain } = createRecoveryBackup(archive);
+    expect(rest).toEqual(plain);
+    // A v7 file has neither array: it restores exactly as before, and cannot carry them.
+    const v7 = { ...rest, exportedAt: v8.exportedAt, schema: 'finanzapp.native-pilot.v7' };
+    expect(parsePilotBackup(JSON.stringify(v7)).archive).toEqual(archive);
+    expect(() => parsePilotBackup(JSON.stringify({ ...v7, appearances: [look] }))).toThrow();
+    // A v8 file must carry both arrays, and every row is validated.
+    expect(() => parsePilotBackup(JSON.stringify({ ...v8, categories: undefined }))).toThrow();
+    expect(() => parsePilotBackup(JSON.stringify({ ...v8, appearances: [{ ...look, icon: 'rocket' }] }))).toThrow(/\u00edcono/);
+    expect(() => parsePilotBackup(JSON.stringify({ ...v8, appearances: [{ ...look, color: '#FF00FF' }] }))).toThrow(/color/);
+    expect(() => parsePilotBackup(JSON.stringify({ ...v8, appearances: [{ ...look, accountId: 'ghost' }] }))).toThrow(/cuenta existente/);
+    expect(() => parsePilotBackup(JSON.stringify({ ...v8, appearances: [look, { ...look, color: 'rose' }] }))).toThrow(/repite/);
+    expect(() => parsePilotBackup(JSON.stringify({ ...v8, appearances: [{ ...look, openingMinor: 5 }] }))).toThrow(/campos/);
+    expect(() => parsePilotBackup(JSON.stringify({ ...v8, categories: [{ ...kiosco, key: 'otra' }] }))).toThrow(/identidad/);
+    expect(() => parsePilotBackup(JSON.stringify({ ...v8, categories: [kiosco, { ...kiosco, label: 'Bar' }] }))).toThrow(/repite/);
+  });
+  it('imports identity rows additively by what they decorate and reports conflicts', () => {
+    const look = makeAccountAppearance(account.id, 'bank', 'azure', time);
+    const kiosco = newCategoryDefinition('expense', 'Kiosco', 'cafe', 'ochre', time);
+    const incoming: LedgerArchive = { ...archive, appearances: [look], categories: [kiosco] };
+    const plan = previewBackupImport(archive, incoming);
+    expect(plan.appearances).toEqual([look]);
+    expect(plan.categories).toEqual([kiosco]);
+    expect(plan.conflicts).toBe(0);
+    expect(plan.after).toEqual(plan.before);
+    const same = previewBackupImport(incoming, incoming);
+    expect(same.appearances).toEqual([]);
+    expect(same.categories).toEqual([]);
+    expect(same.identical).toBe(3);
+    // A different look for the same account, or a different definition for the same identity, is a conflict, never an overwrite.
+    expect(previewBackupImport(incoming, { ...archive, appearances: [{ ...look, color: 'rose' }] }).conflicts).toBe(1);
+    expect(previewBackupImport(incoming, { ...archive, categories: [{ ...kiosco, label: 'Bar' }] }).conflicts).toBe(1);
+    // A look for an account the copy does not carry is invalid on its own.
+    expect(() => previewBackupImport(archive, { accounts: [], records: [], appearances: [look] })).toThrow(/cuenta existente/);
   });
 });

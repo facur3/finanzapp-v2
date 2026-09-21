@@ -7,12 +7,14 @@ import { AppText, CategoryBadge, EmptyState, Money, Screen, SectionTitle } from 
 import { EntryList } from '../src/ui/entry-list';
 import { selectEntries } from '../src/ui/presentation';
 import { reportMonthLabel, reportPeriodLabel, reportSelection, reportCutoff } from '../src/ui/report-presentation';
+import { useCategoryLookOf } from '../src/ui/category-hues';
 import { useCurrentDay } from '../src/ui/theme';
 
 export default function ReportCategoryScreen() {
   const params = useLocalSearchParams<{ currency?: string | string[]; month?: string | string[]; category?: string | string[]; through?: string | string[] }>();
   const { snapshot } = useLedger();
   const day = useCurrentDay();
+  const lookOf = useCategoryLookOf('expense');
   const key = typeof params.category === 'string' ? params.category : '';
   const selection = useMemo(() => snapshot ? reportSelection(snapshot, params.currency, params.month, day) : null,
     [snapshot, params.currency, params.month, day]);
@@ -33,7 +35,7 @@ export default function ReportCategoryScreen() {
   return <EntryList entries={entries} accounts={snapshot.accounts} header={<View style={{ gap: 22 }}>
     <View style={{ gap: 12, paddingTop: 8 }}>
       <CategoryBadge category={label} large />
-      <AppText accessibilityRole="header" variant="title1">{label}</AppText>
+      <AppText accessibilityRole="header" variant="title1">{lookOf(label).label}</AppText>
       <AppText secondary variant="subhead">{reportMonthLabel(selection.monthISO)} · {reportPeriodLabel(report, day)}</AppText>
     </View>
     <View style={{ gap: 10 }}>

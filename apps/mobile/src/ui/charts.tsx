@@ -15,8 +15,9 @@ export type DonutSlice = { key: string; label: string; value: number };
 /** Groups the tail of a ranked list into "Otras" so the donut keeps at most
  * five readable slices. Each named slice takes its category hue; the tail is
  * neutral because it is not one category. */
-export function donutSlices(items: DonutSlice[], p: Palette, hues: Map<string, number>, max = 5): (DonutSlice & { color: string; count?: number })[] {
-  const head = items.slice(0, items.length > max ? max - 1 : max).map(item => ({ ...item, color: categoryColor(item.key, hues, p) }));
+export function donutSlices(items: DonutSlice[], p: Palette, hues: Map<string, number> | ((key: string) => string), max = 5): (DonutSlice & { color: string; count?: number })[] {
+  const colorOf = typeof hues === 'function' ? hues : (key: string) => categoryColor(key, hues, p);
+  const head = items.slice(0, items.length > max ? max - 1 : max).map(item => ({ ...item, color: colorOf(item.key) }));
   const tail = items.slice(head.length);
   if (!tail.length) return head;
   return [...head, { key: OTHERS_KEY, label: 'Otras', value: tail.reduce((sum, item) => sum + item.value, 0), color: othersColor(p), count: tail.length }];

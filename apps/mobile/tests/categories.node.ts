@@ -1,39 +1,79 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import type { Entry } from '@finanzapp/domain';
-import { categoryCatalog, categoryChoices, categoryIcon, categoryKey, customCategory } from '../src/ui/categories.ts';
+import { editedCategoryDefinition, newCategoryDefinition, resolveCategory, type CategoryDefinition, type Entry } from '@finanzapp/domain';
+import { categoryChoices, categoryIcon, categoryKey, categorySearchText, customCategory, identityGlyph } from '../src/ui/categories.ts';
+import { resolveCategoryLook } from '../src/ui/appearance.ts';
+import { assignCategoryHues, hueColor } from '../src/ui/category-color.ts';
 
 const entry: Entry = { id: 'entry', accountId: 'account', kind: 'expense', amountMinor: 100, merchant: 'Concepto de prueba', category: 'Categoría propia', dateISO: '2026-09-12', createdAt: '2026-09-12T12:00:00Z' };
+const now = '2026-09-21T12:00:00Z';
+const light = { isDark: false }, dark = { isDark: true };
 
-test('category glyphs tolerate case and accents without rewriting labels', () => {
+test('category glyphs come from the curated icon for presets and from the synonym map for historical strings, never rewriting labels', () => {
   assert.equal(categoryIcon('  EDUCACIÓN  '), 'school-outline');
-  assert.equal(categoryIcon('Café'), 'cafe-outline');
+  assert.equal(categoryIcon('Café'), 'cafe-outline', 'a historical synonym still gets a glyph');
+  assert.equal(categoryIcon('nafta'), 'car-outline');
   assert.equal(categoryIcon('Categoría propia'), 'pricetag-outline');
+  assert.equal(categoryIcon('Comida'), 'restaurant-outline');
+  assert.equal(categoryIcon('Regalos', 'income'), 'gift-outline');
   assert.equal(entry.category, 'Categoría propia');
 });
-test('arbitrary user category strings never resolve to object prototypes', () => {
+test('arbitrary user category strings never resolve to object prototypes or break', () => {
   for (const label of ['__proto__', 'constructor', 'toString', '<script>', '']) assert.equal(categoryIcon(label), 'pricetag-outline');
+  assert.equal(identityGlyph({ icon: 'not-an-icon' as never, key: 'x' }), 'ellipsis-horizontal', 'an unknown curated id falls back to the default glyph');
 });
-test('picker offers useful choices without creating ledger records', () => {
+test('a definition changes the glyph, the colour and the display name of a stored string', () => {
+  const renamed = editedCategoryDefinition(resolveCategory('expense', 'Comida'), { label: 'Alimentación', icon: 'cafe', color: 'green' }, now);
+  const identity = { definitions: [renamed], hues: new Map<string, number>() };
+  const look = resolveCategoryLook('expense', 'COMIDA', identity, light);
+  assert.equal(look.label, 'Alimentación');
+  assert.equal(look.glyph, 'cafe-outline');
+  assert.equal(look.hex, '#15804F');
+  assert.equal(resolveCategoryLook('expense', 'comida', identity, dark).hex, '#3DBE86');
+  assert.equal(look.storedLabel, 'Comida', 'new movements keep recording the original spelling');
+});
+test('a historical string keeps its stored label and a deterministic hue, and an unknown colour id falls back instead of breaking', () => {
+  const entries = [entry, { ...entry, id: 'b', category: 'sjsjn', dateISO: '2026-09-13' }];
+  const hues = assignCategoryHues(entries);
+  const identity = { definitions: [], hues };
+  const look = resolveCategoryLook('expense', 'sjsjn', identity, light);
+  assert.equal(look.label, 'sjsjn');
+  assert.equal(look.glyph, 'pricetag-outline');
+  assert.equal(look.hex, hueColor(hues.get('sjsjn')!, light));
+  assert.equal(resolveCategoryLook('expense', 'sjsjn', identity, light).hex, look.hex, 'stable across calls');
+  const broken: CategoryDefinition = { ...newCategoryDefinition('expense', 'Rota', 'other', 'graphite', now), color: 'neon' as never };
+  assert.equal(resolveCategoryLook('expense', 'Rota', { definitions: [broken], hues }, light).hex, '#2557D6', 'default colour, not a crash');
+});
+test('picker offers identities without creating ledger records; presets first on an empty ledger', () => {
   const records: Entry[] = [];
-  assert.ok(categoryChoices(records, 'expense').includes('Comida'));
-  assert.ok(categoryChoices(records, 'income').includes('Sueldo'));
-  assert.ok(!categoryChoices(records, 'expense').includes('Sueldo'));
+  assert.ok(categoryChoices(records, 'expense').some(item => item.label === 'Comida'));
+  assert.ok(categoryChoices(records, 'income').some(item => item.label === 'Sueldo'));
+  assert.ok(!categoryChoices(records, 'expense').some(item => item.label === 'Sueldo'));
   assert.deepEqual(records, []);
 });
-test('existing spelling wins over a preset and duplicate variants', () => {
+test('the preset display name wins over an odd recorded spelling; the recorded key still groups', () => {
   const options = categoryChoices([{ ...entry, category: 'EDUCACION' }, { ...entry, id: 'b', category: 'Educación' }], 'expense');
-  assert.deepEqual(options.filter(label => categoryKey(label) === 'educacion'), ['EDUCACION']);
+  const educacion = options.filter(item => item.key === 'educacion');
+  assert.equal(educacion.length, 1);
+  assert.equal(educacion[0].label, 'Educación');
+  assert.equal(educacion[0].storedLabel, 'Educación');
 });
-test('custom/current category remains selectable after changing entry kind', () => {
-  assert.equal(categoryChoices([entry], 'income', '', 'Categoría propia')[0], 'Categoría propia');
+test('custom/current category remains selectable after changing entry kind, and an archived one stays valid while editing', () => {
+  assert.equal(categoryChoices([entry], 'income', '', 'Categoría propia')[0].label, 'Categoría propia');
+  const archived = editedCategoryDefinition(resolveCategory('expense', 'Categoría propia'), { archived: true }, now);
+  assert.ok(!categoryChoices([entry], 'expense', '', '', [archived]).some(item => item.key === 'categoria propia'));
+  assert.equal(categoryChoices([entry], 'expense', '', 'Categoría propia', [archived])[0].archived, true);
 });
 test('search handles accents and all query words; creating requires a distinct valid name', () => {
-  assert.deepEqual(categoryChoices([entry], 'expense', 'PROPIA categoria'), ['Categoría propia']);
-  assert.equal(customCategory(' EDUCACION ', ['Educación']), null);
+  assert.deepEqual(categoryChoices([entry], 'expense', 'PROPIA categoria').map(item => item.label), ['Categoría propia']);
+  const choices = categoryChoices([], 'expense', 'educacion');
+  assert.equal(customCategory(' EDUCACION ', choices), null);
   assert.equal(customCategory(' ', []), null);
   assert.equal(customCategory('x'.repeat(61), []), null);
   assert.equal(customCategory(' Mi categoría ', []), 'Mi categoría');
+  assert.equal(categorySearchText('expense', 'Comida'), 'Comida');
+  const renamed = editedCategoryDefinition(resolveCategory('expense', 'Comida'), { label: 'Alimentación' }, now);
+  assert.equal(categorySearchText('expense', 'Comida', [renamed]), 'Alimentación Comida', 'searching either name finds the movement');
 });
 test('picker never changes stored dates/categories/order when ranking', () => {
   const records = [entry, { ...entry, id: 'b', category: 'Anterior', dateISO: '2026-08-01' }];
@@ -51,29 +91,23 @@ const history: Entry[] = [
   { ...entry, id: 'h4', category: 'Comida', dateISO: '2026-09-18' },
   { ...entry, id: 'h5', kind: 'income', category: 'Sueldo', dateISO: '2026-09-01' },
 ];
-const expensePresets = ['Comida', 'Supermercado', 'Transporte', 'Hogar', 'Servicios', 'Salud', 'Ropa', 'Ocio', 'Educación', 'Viajes', 'Mascotas', 'Otros'];
-const incomePresets = ['Sueldo', 'Trabajo', 'Regalos', 'Reembolsos', 'Préstamos', 'Otros'];
+const expensePresets = ['Comida', 'Supermercado', 'Restaurantes', 'Transporte', 'Combustible', 'Hogar', 'Alquiler', 'Servicios', 'Suscripciones', 'Salud',
+  'Farmacia', 'Educación', 'Ropa', 'Tecnología', 'Ocio', 'Viajes', 'Mascotas', 'Regalos', 'Impuestos', 'Seguros', 'Otros'];
+const incomePresets = ['Sueldo', 'Trabajo', 'Ventas', 'Inversiones', 'Regalos', 'Reembolsos', 'Préstamos', 'Otros'];
 
 test('test-looking categories are not presets: an empty ledger offers exactly the defaults', () => {
-  assert.deepEqual(categoryChoices([], 'expense'), expensePresets);
-  assert.deepEqual(categoryChoices([], 'income'), incomePresets);
-  assert.deepEqual(categoryCatalog([], 'expense').map(row => [row.label, row.preset, row.count]), expensePresets.map(label => [label, true, 0]));
+  assert.deepEqual(categoryChoices([], 'expense').map(item => item.label), expensePresets);
+  assert.deepEqual(categoryChoices([], 'income').map(item => item.label), incomePresets);
+  assert.ok(categoryChoices([], 'expense').every(item => item.source === 'preset' && item.icon && item.color));
 });
 test('historical custom categories stay selectable and unrenamed next to the intact defaults', () => {
   const before = JSON.stringify(history);
   const choices = categoryChoices(history, 'expense');
-  assert.deepEqual(choices.slice(0, 3), ['Comida', 'JD', 'sjsjn'], 'recorded spellings first, most recent first');
-  for (const label of expensePresets) assert.ok(choices.includes(label), label + ' preset intact');
+  assert.deepEqual(choices.slice(0, 3).map(item => item.label), ['Comida', 'JD', 'sjsjn'], 'recorded first, most recent first');
+  assert.deepEqual(choices.slice(1, 3).map(item => item.source), ['historical', 'historical']);
+  for (const label of expensePresets) assert.ok(choices.some(item => item.label === label), label + ' preset intact');
   assert.equal(choices.length, expensePresets.length + 2);
-  assert.deepEqual(categoryChoices(history, 'income'), incomePresets, 'expense-only history never leaks into income');
+  assert.deepEqual(categoryChoices(history, 'income').map(item => item.label), incomePresets, 'expense-only history never leaks into income');
   assert.equal(JSON.stringify(history), before, 'nothing in the ledger was renamed or deleted');
-});
-test('the read-only catalogue lists presets in order, then recorded custom categories by use, without touching entries', () => {
-  const before = JSON.stringify(history);
-  const rows = categoryCatalog(history, 'expense');
-  assert.deepEqual(rows.slice(0, 12).map(row => row.label), expensePresets);
-  assert.deepEqual(rows.slice(12).map(row => [row.label, row.preset, row.count]), [['JD', false, 2], ['sjsjn', false, 1]]);
-  assert.deepEqual(rows.find(row => row.label === 'Comida'), { label: 'Comida', preset: true, count: 1 });
-  assert.deepEqual(categoryCatalog(history, 'income').filter(row => row.count), [{ label: 'Sueldo', preset: true, count: 1 }]);
-  assert.equal(JSON.stringify(history), before);
+  assert.equal(categoryKey('  JD '), 'jd');
 });

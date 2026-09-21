@@ -115,7 +115,7 @@ export default function BackupImportScreen() {
         {!!plan && !plan.conflicts && additions > 0 && <ActionButton label="Confirmar importación" onPress={confirm} busy={busy} />}
         <ActionButton label="Elegir otra copia" onPress={choose} disabled={busy} secondary />
       </>}
-      <AppText secondary style={{ fontSize: 13 }}>Copias nativas v1 a v7 · JSON de hasta 5 MB. La importación de la app web e inversiones llegará en otra etapa.</AppText>
+      <AppText secondary style={{ fontSize: 13 }}>Copias nativas v1 a v8 · JSON de hasta 5 MB. La importación de la app web e inversiones llegará en otra etapa.</AppText>
     </>}
   </Screen>;
 }

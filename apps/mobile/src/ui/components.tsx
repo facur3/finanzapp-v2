@@ -3,13 +3,13 @@ import { ActivityIndicator, InputAccessoryView, Keyboard, Platform, Pressable, S
   useWindowDimensions, type PressableProps, type StyleProp, type TextInputProps, type TextProps, type ViewStyle } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { accountBalanceMinor, formatMinorUnits, labelFromISO, type Currency, type Entry, type Account, type Transfer } from '@finanzapp/domain';
+import { accountBalanceMinor, formatMinorUnits, labelFromISO, type Currency, type Entry, type EntryKind, type Account, type Transfer } from '@finanzapp/domain';
 import type { ActivityItem } from './presentation';
 import { router } from 'expo-router';
 import { radius, space, type, useCurrentDay, usePalette, useReduceMotion, type Palette } from './theme';
-import { categoryIcon, type IconName } from './categories';
+import type { IconName } from './categories';
 import { tintOf } from './category-color';
-import { useCategoryColor } from './category-hues';
+import { useAccountLook, useCategoryLook } from './category-hues';
 import { SEGMENT_GAP, SEGMENT_PADDING, amountFieldLayout, fitFontSize, segmentLayout } from './geometry';
 import { duration, easeOut, selectionHaptic, timing } from './motion';
 import { EMPTY_AMOUNT, amountFromCanonical, readAmountChange, renderAmount, settleAmount, splitAmount } from './money-input';
@@ -355,14 +355,16 @@ export function Money({ minor, currency, large = false, color, signed = false, s
   return hero ? <View style={{ alignSelf: 'stretch' }} onLayout={event => setWidth(event.nativeEvent.layout.width)}>{body}</View> : body;
 }
 
-export function DetailRow({ label, value, icon, onPress, last = false, disabled = false, tone = 'neutral' }: {
+export function DetailRow({ label, value, icon, leading, onPress, last = false, disabled = false, tone = 'neutral' }: {
   label: string; value: string; icon?: IconName; onPress?: () => void; last?: boolean; disabled?: boolean; tone?: Tone;
+  /** An identity tile (an account's look, a Más row) in place of the bare glyph. */
+  leading?: ReactNode;
 }) {
   const p = usePalette();
   const { fontScale } = useWindowDimensions();
   const stacked = fontScale > 1.3;
   const content = <>
-    {icon && <Ionicons name={icon} size={20} color={tone === 'neutral' ? p.secondary : toneColors(p, tone).color} accessible={false} />}
+    {leading ?? (icon && <Ionicons name={icon} size={20} color={tone === 'neutral' ? p.secondary : toneColors(p, tone).color} accessible={false} />)}
     <View style={{ flex: 1, minWidth: 0, gap: 3, flexDirection: stacked ? 'column' : 'row', alignItems: stacked ? 'flex-start' : 'center' }}>
       <AppText secondary variant="subhead" style={{ flexShrink: 1 }}>{label}</AppText>
       <AppText style={{ flex: stacked ? undefined : 1, textAlign: stacked ? 'left' : 'right', flexShrink: 1 }}>{value}</AppText>
@@ -382,11 +384,23 @@ export function Stat({ label, children, align = 'left' }: { label: string; child
   </View>;
 }
 
-/** The category as one designed object: its glyph on its own hue. Income and
- * warning tones override the hue because that meaning matters more. */
-export function CategoryBadge({ category, large = false, tone = 'neutral' }: { category: string; large?: boolean; tone?: Tone }) {
-  const color = useCategoryColor(category);
-  return <GlyphTile icon={categoryIcon(category)} large={large} tone={tone} color={tone === 'neutral' ? color : undefined} />;
+/** The category as one designed object: its glyph on its own colour, resolved
+ * from the stored string through the identity (definition, preset or
+ * historical fallback). Income and warning tones override the colour because
+ * that meaning matters more. */
+export function CategoryBadge({ category, kind = 'expense', large = false, tone = 'neutral', size }: {
+  category: string; kind?: EntryKind; large?: boolean; tone?: Tone; size?: number;
+}) {
+  const look = useCategoryLook(category, kind);
+  return <GlyphTile icon={look.glyph} large={large} size={size} tone={tone} color={tone === 'neutral' ? look.hex : undefined} />;
+}
+
+/** A liquid account as one designed object: its chosen glyph on its chosen
+ * colour, the same wherever the account appears. Cards and debts keep their
+ * own glyphs and tones. */
+export function AccountBadge({ accountId, large = false, size }: { accountId: string; large?: boolean; size?: number }) {
+  const look = useAccountLook(accountId);
+  return <GlyphTile icon={look.glyph} large={large} size={size} color={look.hex} />;
 }
 
 /** One transaction line: merchant, then category · account · date; amount on the right. */
@@ -399,12 +413,13 @@ export function EntryRow({ entry, account, last = false, showDate = true, showAc
   const dateLabel = labelFromISO(entry.dateISO, new Date(day + 'T12:00:00'));
   const income = entry.kind === 'income';
   const stacked = fontScale > 1.3;
-  const detail = [entry.category, showAccount ? account.name : null, showDate ? dateLabel : null].filter(Boolean).join(' · ');
+  const category = useCategoryLook(entry.category, entry.kind).label;
+  const detail = [category, showAccount ? account.name : null, showDate ? dateLabel : null].filter(Boolean).join(' · ');
   return <PressFeedback feedback="highlight" accessibilityRole="button"
-    accessibilityLabel={[entry.merchant, income ? 'ingreso' : 'gasto', formatMinorUnits(entry.amountMinor) + ' ' + account.currency, entry.category, account.name, dateLabel].join(', ')}
+    accessibilityLabel={[entry.merchant, income ? 'ingreso' : 'gasto', formatMinorUnits(entry.amountMinor) + ' ' + account.currency, category, account.name, dateLabel].join(', ')}
     onPress={() => router.push({ pathname: '/entry/[id]', params: { id: entry.id } })}
     style={[styles.row, { borderBottomColor: p.line, borderBottomWidth: last ? 0 : StyleSheet.hairlineWidth }]}>
-    <CategoryBadge category={entry.category} tone={income ? 'income' : 'neutral'} />
+    <CategoryBadge category={entry.category} kind={entry.kind} tone={income ? 'income' : 'neutral'} />
     <View style={{ flex: 1, minWidth: 0, gap: 8, flexDirection: stacked ? 'column' : 'row', alignItems: stacked ? 'flex-start' : 'center' }}>
       <View style={{ flex: stacked ? undefined : 1, minWidth: 0, gap: 3 }}>
         <AppText numberOfLines={stacked ? undefined : 1} style={{ fontWeight: '500' }}>{entry.merchant}</AppText>
@@ -427,7 +442,7 @@ export function AccountRow({ account, entries, transfers, last = false, kindLabe
   return <PressFeedback feedback="highlight" accessibilityRole="button" accessibilityLabel={'Ver cuenta ' + account.name + ', saldo ' + formatMinorUnits(balance) + ' ' + account.currency}
     onPress={() => router.push({ pathname: '/account/[id]', params: { id: account.id } })}
     style={[styles.row, { borderBottomColor: p.line, borderBottomWidth: last ? 0 : StyleSheet.hairlineWidth }]}>
-    <GlyphTile icon="wallet-outline" />
+    <AccountBadge accountId={account.id} />
     <View style={{ flex: 1, minWidth: 0, gap: 8, flexDirection: stacked ? 'column' : 'row', alignItems: stacked ? 'flex-start' : 'center' }}>
       <View style={{ flex: stacked ? undefined : 1, minWidth: 0, gap: 3 }}>
         <AppText numberOfLines={stacked ? undefined : 1} style={{ fontWeight: '500' }}>{account.name}</AppText>

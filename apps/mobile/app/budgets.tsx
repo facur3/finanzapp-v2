@@ -6,6 +6,7 @@ import { currentMonthISO, formatMinorUnits, shiftMonthISO, summarizeMonthlyBudge
   type TotalMonthlyBudget } from '@finanzapp/domain';
 import { useLedger } from '../src/storage/LedgerProvider';
 import { budgetTone, percentUsed } from '../src/ui/budget-presentation';
+import { useCategoryLabel } from '../src/ui/category-hues';
 import { ActionButton, AppText, CategoryBadge, Choices, EmptyState, IconButton, Money, PressFeedback, Screen, SectionTitle, Stat, Surface } from '../src/ui/components';
 import { availableCurrencies } from '../src/ui/presentation';
 import { timing } from '../src/ui/motion';
@@ -133,14 +134,15 @@ function BudgetRow({ row, money, last }: { row: BudgetProgress<CategoryMonthlyBu
   const tone = state === 'expense' ? p.expense : state === 'warning' ? p.warning : p.text;
   const percent = percentUsed(row);
   const status = row.exceeded ? `Excedido por ${money(-row.remainingMinor)}` : row.remainingMinor === 0 ? 'Límite alcanzado' : `Quedan ${money(row.remainingMinor)}`;
+  const name = useCategoryLabel(row.budget.category);
   return <PressFeedback feedback="highlight" accessibilityRole="button"
-    accessibilityLabel={`Presupuesto ${row.budget.category}: ${money(row.spentMinor)} de ${money(row.budget.amountMinor)}, ${percent} por ciento. ${status}`}
+    accessibilityLabel={`Presupuesto ${name}: ${money(row.spentMinor)} de ${money(row.budget.amountMinor)}, ${percent} por ciento. ${status}`}
     onPress={() => router.push({ pathname: '/edit-budget/[id]', params: { id: row.budget.id } })}
     style={{ paddingHorizontal: 16, paddingVertical: 12, gap: 10, borderBottomWidth: last ? 0 : StyleSheet.hairlineWidth, borderBottomColor: p.line }}>
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
       <CategoryBadge category={row.budget.category} tone={state} />
       <View style={{ flex: 1, minWidth: 0, gap: 3 }}>
-        <AppText numberOfLines={1} style={{ fontWeight: '500' }}>{row.budget.category}</AppText>
+        <AppText numberOfLines={1} style={{ fontWeight: '500' }}>{name}</AppText>
         <AppText variant="footnote" style={{ color: state === 'neutral' ? p.secondary : tone }}>{status}</AppText>
       </View>
       <View style={{ alignItems: 'flex-end', gap: 3 }}>

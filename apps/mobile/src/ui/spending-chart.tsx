@@ -4,7 +4,7 @@ import Animated, { cancelAnimation, useAnimatedStyle, useSharedValue, withTiming
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { formatMinorUnits, type CategorySpending, type Currency } from '@finanzapp/domain';
 import { AppText, CategoryBadge, Money, PressFeedback } from './components';
-import { useCategoryColor } from './category-hues';
+import { useCategoryLook } from './category-hues';
 import { spendingShare } from './report-presentation';
 import { timing } from './motion';
 import { usePalette, useReduceMotion } from './theme';
@@ -31,20 +31,20 @@ export function CategorySpendingRow({ category, totalMinor, currency, onPress, l
   onPress: () => void; last?: boolean; compact?: boolean; periodName?: string;
 }) {
   const p = usePalette();
-  const color = useCategoryColor(category.category);
+  const { hex: color, label: name } = useCategoryLook(category.category);
   const { fontScale, width } = useWindowDimensions();
   const { fraction, label } = spendingShare(category.amountMinor, totalMinor);
   const count = category.count === 1 ? '1 gasto' : category.count + ' gastos';
   const stacked = fontScale > 1.3 || width < 360;
   return <PressFeedback feedback="highlight" accessibilityRole="button"
-    accessibilityLabel={`${category.category}, ${formatMinorUnits(category.amountMinor)} ${currency}, ${label} del gasto del ${periodName}, ${count}`}
+    accessibilityLabel={`${name}, ${formatMinorUnits(category.amountMinor)} ${currency}, ${label} del gasto del ${periodName}, ${count}`}
     accessibilityHint={"Abre los movimientos de esta categoría en el " + periodName + " seleccionado"}
     onPress={onPress} style={{ paddingHorizontal: 16, paddingVertical: 16, flexDirection: 'row', gap: 12, alignItems: 'center',
       borderBottomWidth: last ? 0 : StyleSheet.hairlineWidth, borderBottomColor: p.line }}>
     <CategoryBadge category={category.category} />
     <View style={{ flex: 1, minWidth: 0, gap: 9 }}>
       <View style={{ flexDirection: stacked ? 'column' : 'row', gap: 6, alignItems: stacked ? 'flex-start' : 'baseline' }}>
-        <AppText numberOfLines={stacked ? undefined : 2} style={{ flex: stacked ? undefined : 1, fontWeight: '600', fontSize: 15, lineHeight: 21 }}>{category.category}</AppText>
+        <AppText numberOfLines={stacked ? undefined : 2} style={{ flex: stacked ? undefined : 1, fontWeight: '600', fontSize: 15, lineHeight: 21 }}>{name}</AppText>
         <View style={{ maxWidth: stacked ? '100%' : '55%' }}><Money minor={category.amountMinor} currency={currency} size={15} /></View>
       </View>
       <ShareBar fraction={fraction} color={color} />
@@ -60,18 +60,19 @@ export function CategoryLegendRow({ category, totalMinor, currency, onPress, las
 }) {
   const p = usePalette();
   const { fontScale } = useWindowDimensions();
+  const name = useCategoryLook(category.category).label;
   const { label } = spendingShare(category.amountMinor, totalMinor);
   const count = category.count === 1 ? '1 gasto' : category.count + ' gastos';
   const stacked = fontScale > 1.3;
   return <PressFeedback feedback="highlight" accessibilityRole="button"
-    accessibilityLabel={`${category.category}, ${formatMinorUnits(category.amountMinor)} ${currency}, ${label} del gasto del mes, ${count}`}
+    accessibilityLabel={`${name}, ${formatMinorUnits(category.amountMinor)} ${currency}, ${label} del gasto del mes, ${count}`}
     accessibilityHint="Abre los movimientos de esta categoría en el mes seleccionado"
     onPress={onPress} style={{ paddingHorizontal: 16, paddingVertical: 12, minHeight: 60, flexDirection: 'row', gap: 12, alignItems: 'center',
       borderBottomWidth: last ? 0 : StyleSheet.hairlineWidth, borderBottomColor: p.line }}>
     <CategoryBadge category={category.category} />
     <View style={{ flex: 1, minWidth: 0, gap: 8, flexDirection: stacked ? 'column' : 'row', alignItems: stacked ? 'flex-start' : 'center' }}>
       <View style={{ flex: stacked ? undefined : 1, minWidth: 0, gap: 3 }}>
-        <AppText numberOfLines={stacked ? undefined : 1} style={{ fontWeight: '500' }}>{category.category}</AppText>
+        <AppText numberOfLines={stacked ? undefined : 1} style={{ fontWeight: '500' }}>{name}</AppText>
         <AppText secondary variant="footnote">{count}</AppText>
       </View>
       <View style={{ alignItems: stacked ? 'flex-start' : 'flex-end', gap: 3 }}>

@@ -6,7 +6,8 @@ import * as Haptics from 'expo-haptics';
 import { categoryKey, formatMinorUnits, makeEntryChange, summarizeMonthlyBudgets, type EntryChange, type EntryRecord, type Account } from '@finanzapp/domain';
 import { useLedger } from '../../src/storage/LedgerProvider';
 import { budgetTone } from '../../src/ui/budget-presentation';
-import { ActionButton, AppText, CategoryBadge, DetailRow, EmptyState, ErrorMessage, Money, Screen, Surface } from '../../src/ui/components';
+import { AccountBadge, ActionButton, AppText, CategoryBadge, DetailRow, EmptyState, ErrorMessage, Money, Screen, Surface } from '../../src/ui/components';
+import { useCategoryLabel } from '../../src/ui/category-hues';
 import { space, usePalette } from '../../src/ui/theme';
 
 export default function EntryScreen() {
@@ -26,6 +27,7 @@ function EntryDetail({ record, account }: { record: EntryRecord; account: Accoun
   const p = usePalette();
   const { entry } = record;
   const card = archive?.cards?.find(item => item.accountId === account.id);
+  const categoryLabel = useCategoryLabel(entry.category, entry.kind);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState<EntryChange | null>(null);
@@ -76,7 +78,7 @@ function EntryDetail({ record, account }: { record: EntryRecord; account: Accoun
   return <Screen gap={space.xl}>
     <Stack.Screen options={{ title: record.voided ? 'Movimiento deshecho' : income ? 'Ingreso' : card ? 'Compra con tarjeta' : 'Gasto', gestureEnabled: !busy, headerBackVisible: !busy }} />
     <View style={{ gap: 14, alignItems: 'center', paddingVertical: 12 }}>
-      <CategoryBadge category={entry.category} large tone={income ? 'income' : 'neutral'} />
+      <CategoryBadge category={entry.category} kind={entry.kind} large tone={income ? 'income' : 'neutral'} />
       <View style={{ alignItems: 'center', gap: 4, width: '100%' }}>
         <Money minor={income ? entry.amountMinor : -entry.amountMinor} currency={account.currency} large signed align="center"
           tone={income ? 'income' : 'expense'} color={record.voided ? p.tertiary : undefined} />
@@ -86,8 +88,9 @@ function EntryDetail({ record, account }: { record: EntryRecord; account: Accoun
       <AppText accessibilityLiveRegion="polite" variant="caption" style={{ color: record.voided ? p.warning : p.secondary, fontWeight: '500', textAlign: 'center' }}>{status}</AppText>
     </View>
     <Surface grouped>
-      <DetailRow label="Categoría" value={entry.category} icon="pricetag-outline" />
+      <DetailRow label="Categoría" value={categoryLabel} icon="pricetag-outline" />
       <DetailRow label={card ? 'Tarjeta' : 'Cuenta'} value={account.name} icon={card ? 'card-outline' : 'wallet-outline'}
+        leading={card ? undefined : <AccountBadge accountId={account.id} size={28} />}
         disabled={busy}
         onPress={() => router.push(card ? { pathname: '/card/[id]', params: { id: card.id } } : { pathname: '/account/[id]', params: { id: account.id } })} />
       {budget && <DetailRow label="Presupuesto" icon="speedometer-outline" tone={budgetTone(budget)}

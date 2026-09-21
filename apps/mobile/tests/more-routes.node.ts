@@ -5,6 +5,7 @@ import { runInNewContext } from 'node:vm';
 import ts from 'typescript';
 import * as domain from '@finanzapp/domain';
 import * as categories from '../src/ui/categories.ts';
+import * as appearance from '../src/ui/appearance.ts';
 
 // Producto 18: the Más hub, the backup screen and the read-only categories
 // screen with native hosts replaced by descriptors. Not a rendered iOS screen.
@@ -33,9 +34,9 @@ function harness(file: string, data: domain.LedgerArchive = archive) {
   const pushed: any[] = [];
   let cursor = 0;
   const ledger = { useLedger: () => ({ archive: data, snapshot: domain.snapshotFromArchive(data) }) };
-  const names = ['ActionButton', 'AppText', 'CategoryBadge', 'DetailRow', 'ErrorMessage', 'Screen', 'SectionTitle', 'Surface'];
+  const names = ['ActionButton', 'AppText', 'CategoryBadge', 'DetailRow', 'ErrorMessage', 'GlyphTile', 'IconButton', 'PressFeedback', 'Screen', 'SectionTitle', 'Surface'];
   const components = Object.fromEntries(names.map(name => [name, name]));
-  const theme = { usePalette: () => ({ text: '#000', secondary: '#666', line: '#ddd' }) };
+  const theme = { usePalette: () => ({ text: '#000', secondary: '#666', line: '#ddd', isDark: false }) };
   const modules: Record<string, unknown> = {
     react: { useMemo: (fn: () => unknown) => fn(), useRef: (initial: unknown) => ({ current: initial }), useState: (initial: unknown) => {
       const index = cursor++;
@@ -44,13 +45,15 @@ function harness(file: string, data: domain.LedgerArchive = archive) {
     } },
     'react/jsx-runtime': { jsx, jsxs: jsx, Fragment: 'Fragment' },
     'react-native': { View: 'View' },
-    'expo-router': { router: { push: (to: unknown) => pushed.push(to), navigate: (to: unknown) => pushed.push(to) } },
+    'expo-router': { Stack: { Screen: 'Stack.Screen' }, router: { push: (to: unknown) => pushed.push(to), navigate: (to: unknown) => pushed.push(to) } },
     'expo-file-system': { File: class {}, Paths: { cache: '/cache' } },
     'expo-sharing': { isAvailableAsync: async () => false, shareAsync: async () => {} },
     '@finanzapp/domain': domain,
     '../src/storage/LedgerProvider': ledger, '../../src/storage/LedgerProvider': ledger,
     '../src/ui/components': components, '../../src/ui/components': components,
     '../src/ui/categories': categories,
+    '../src/ui/appearance': appearance, '../../src/ui/appearance': appearance,
+    '../src/ui/category-hues': { useCategoryColor: () => '#3E6FB0', useCategoryLabel: (s: string) => s, useCategoryDefinitions: () => [], useCategoryLook: (s: string) => ({ label: s, storedLabel: s, key: String(s).toLowerCase(), hex: '#3E6FB0', glyph: 'pricetag-outline' }), useCategoryLookOf: () => (s: string) => ({ label: s, storedLabel: s, key: String(s).toLowerCase(), hex: '#3E6FB0', glyph: 'pricetag-outline' }), useAccountLook: () => ({ icon: 'wallet', color: 'cobalt', glyph: 'wallet-outline', hex: '#2557D6' }), useAccountLookOf: () => () => ({ icon: 'wallet', color: 'cobalt', glyph: 'wallet-outline', hex: '#2557D6' }) }, '../../src/ui/category-hues': { useCategoryColor: () => '#3E6FB0', useCategoryLabel: (s: string) => s, useCategoryDefinitions: () => [], useCategoryLook: (s: string) => ({ label: s, storedLabel: s, key: String(s).toLowerCase(), hex: '#3E6FB0', glyph: 'pricetag-outline' }), useCategoryLookOf: () => (s: string) => ({ label: s, storedLabel: s, key: String(s).toLowerCase(), hex: '#3E6FB0', glyph: 'pricetag-outline' }), useAccountLook: () => ({ icon: 'wallet', color: 'cobalt', glyph: 'wallet-outline', hex: '#2557D6' }), useAccountLookOf: () => () => ({ icon: 'wallet', color: 'cobalt', glyph: 'wallet-outline', hex: '#2557D6' }) },
     '../src/ui/theme': theme, '../../src/ui/theme': theme,
   };
   const module = { exports: {} as { default?: () => Node } };
@@ -88,7 +91,12 @@ test('Más groups permanent navigation into Finanzas and App y datos, with live 
   assert.deepEqual(rows(root).filter(row => row.props.last).map(row => row.props.label), ['Categorías', 'Movimientos deshechos']);
   assert.equal(nodes(root).some(node => node.type === 'ActionButton'), false);
   const texts = nodes(root).filter(node => node.type === 'AppText').map(node => String(node.props.children)).join(' ');
-  assert.match(texts, /Producto 19/);
+  assert.match(texts, /Producto 20/);
+  assert.equal(value('Categorías'), 'Gastos e ingresos');
+  // Finanzas rows carry a soft identity tile from the shared palette; App y datos rows stay neutral glyphs.
+  const leading = rows(root).map(row => row.props.leading?.type ?? null);
+  assert.deepEqual(leading, ['GlyphTile', 'GlyphTile', 'GlyphTile', 'GlyphTile', 'GlyphTile', null, null, null]);
+  assert.equal(new Set(rows(root).slice(0, 5).map(row => row.props.leading.props.color)).size, 5, 'five distinct restrained colours, no row painted');
   assert.match(texts, /sincronización todavía no está activada/);
 });
 
@@ -114,18 +122,37 @@ test('the backup screen keeps export and import together and links the review fl
   assert.equal(nodes(disabled.render()).find(node => node.type === 'ActionButton')!.props.disabled, false, 'an empty ledger can still be backed up');
 });
 
-test('the categories screen lists defaults and recorded custom categories read-only, never editing the ledger', () => {
+test('the categories screen lists presets, custom and historical categories with usage, opens the editor, and never edits the ledger', () => {
   const before = JSON.stringify(archive);
-  const root = harness('categories.tsx').render();
-  assert.deepEqual(nodes(root).filter(node => node.type === 'SectionTitle').map(node => node.props.children), ['Gastos', 'Ingresos']);
+  const view = harness('categories.tsx');
+  const root = view.render();
+  assert.deepEqual(nodes(root).filter(node => node.type === 'SectionTitle').map(node => node.props.children), ['Gastos', 'Ingresos'], 'no Archivadas group without archived categories');
   const badges = nodes(root).filter(node => node.type === 'CategoryBadge').map(node => node.props.category);
-  assert.deepEqual(badges.slice(0, 12), ['Comida', 'Supermercado', 'Transporte', 'Hogar', 'Servicios', 'Salud', 'Ropa', 'Ocio', 'Educación', 'Viajes', 'Mascotas', 'Otros']);
-  assert.deepEqual(badges.slice(12, 14), ['JD', 'sjsjn'], 'historical custom categories stay, most used first');
-  assert.deepEqual(badges.slice(14), ['Sueldo', 'Trabajo', 'Regalos', 'Reembolsos', 'Préstamos', 'Otros']);
-  const labels = nodes(root).filter(node => node.type === 'View' && node.props.accessibilityLabel).map(node => node.props.accessibilityLabel);
-  assert.ok(labels.includes('JD, 1 movimiento · Propia'));
-  assert.ok(labels.includes('Supermercado, 1 movimiento'));
+  assert.deepEqual(badges.slice(0, 21), ['Comida', 'Supermercado', 'Restaurantes', 'Transporte', 'Combustible', 'Hogar', 'Alquiler', 'Servicios', 'Suscripciones', 'Salud',
+    'Farmacia', 'Educación', 'Ropa', 'Tecnología', 'Ocio', 'Viajes', 'Mascotas', 'Regalos', 'Impuestos', 'Seguros', 'Otros']);
+  assert.deepEqual(badges.slice(21, 23), ['JD', 'sjsjn'], 'historical custom categories stay, most used first, spelled as recorded');
+  assert.deepEqual(badges.slice(23), ['Sueldo', 'Trabajo', 'Ventas', 'Inversiones', 'Regalos', 'Reembolsos', 'Préstamos', 'Otros']);
+  const pressables = nodes(root).filter(node => node.type === 'PressFeedback');
+  const labels = pressables.map(node => node.props.accessibilityLabel);
+  assert.ok(labels.includes('JD, 1 movimiento · Histórica'));
+  assert.ok(labels.includes('Supermercado, 1 movimiento · Predeterminada'));
   assert.ok(labels.includes('Comida, Predeterminada'));
-  assert.equal(nodes(root).some(node => node.type === 'ActionButton' || node.type === 'DetailRow'), false, 'nothing to tap: no rename, merge or delete yet');
+  pressables.find(node => node.props.accessibilityLabel.startsWith('JD,'))!.props.onPress();
+  assert.equal(JSON.stringify(view.pushed), JSON.stringify([{ pathname: '/edit-category', params: { kind: 'expense', key: 'jd' } }]));
+  const header = nodes(root).find(node => node.type === 'Stack.Screen')!.props.options.headerRight();
+  assert.equal(header.props.label, 'Nueva categoría');
+  header.props.onPress();
+  assert.equal(view.pushed[1], '/new-category');
   assert.equal(JSON.stringify(archive), before);
+});
+
+test('an archived definition moves its category to a quiet Archivadas group and a renamed preset shows its display name', () => {
+  const renamed = domain.editedCategoryDefinition(domain.resolveCategory('expense', 'Comida'), { label: 'Alimentación', icon: 'cafe', color: 'green' }, createdAt);
+  const archived = domain.editedCategoryDefinition(domain.resolveCategory('expense', 'sjsjn'), { archived: true }, createdAt);
+  const root = harness('categories.tsx', { ...archive, categories: [renamed, archived] }).render();
+  assert.deepEqual(nodes(root).filter(node => node.type === 'SectionTitle').map(node => node.props.children), ['Gastos', 'Ingresos', 'Archivadas']);
+  const labels = nodes(root).filter(node => node.type === 'PressFeedback').map(node => node.props.accessibilityLabel);
+  assert.ok(labels.includes('Alimentación, Predeterminada · editada'), labels.join(' | '));
+  assert.ok(labels.includes('sjsjn, 1 movimiento · Propia, archivada'), 'an adopted historical string is now the user\'s own definition');
+  assert.equal(labels.filter(label => label.startsWith('sjsjn')).length, 1, 'archived once, in its own group');
 });

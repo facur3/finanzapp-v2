@@ -4,11 +4,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import type { Account, Entry, EntryKind } from '@finanzapp/domain';
-import { AppText, CategoryBadge, DetailRow, Field, GlyphTile, PressFeedback, surfaceShadow, type IconName, type Tone } from './components';
-import { useCategoryColor } from './category-hues';
+import { AccountBadge, AppText, CategoryBadge, DetailRow, Field, GlyphTile, PressFeedback, surfaceShadow, type IconName, type Tone } from './components';
+import { useAccountLookOf, useCategoryDefinitions, useCategoryLook } from './category-hues';
 import { selectionHaptic } from './motion';
 import { radius, usePalette, useReduceMotion } from './theme';
-import { categoryChoices, categoryIcon, categoryKey, customCategory } from './categories';
+import { categoryChoices, categoryKey, customCategory } from './categories';
 
 /** Full-width selector used for the two choices a user must never overlook in
  * a form: which category and which account or card. A 44 pt tile, the label,
@@ -62,23 +62,28 @@ export function AccountField({ accounts, value, onChange, disabled = false, labe
   describe?: (account: Account) => string;
 }) {
   const p = usePalette();
+  const lookOf = useAccountLookOf();
   const [visible, setVisible] = useState(false);
   const selected = accounts.find(account => account.id === value);
   const kind = (id: string) => kindOf?.(id) ?? 'Cuenta';
-  const icon = (id: string) => kind(id).startsWith('Tarjeta') ? 'card-outline' : kind(id) === 'Deuda' ? 'people-outline' : 'wallet-outline';
+  const isCash = (id: string) => !kind(id).startsWith('Tarjeta') && kind(id) !== 'Deuda';
+  // A cash account shows its own look; a card or a debt keeps its kind glyph in the brand primary.
+  const icon = (id: string) => isCash(id) ? lookOf(id).glyph : kind(id).startsWith('Tarjeta') ? 'card-outline' : 'people-outline';
+  const color = (id: string) => isCash(id) ? lookOf(id).hex : p.primary;
   const open = () => { Keyboard.dismiss(); setVisible(true); };
   return <>
     {prominent ? <SelectorCard label={label} value={selected ? selected.name : undefined} placeholder="Elegir cuenta"
       detail={detail ?? (selected ? kind(selected.id) + ' · ' + selected.currency : undefined)} detailTone={detailTone}
-      icon={selected ? icon(selected.id) : 'wallet-outline'} color={selected ? p.primary : undefined} disabled={disabled} onPress={open} />
+      icon={selected ? icon(selected.id) : 'wallet-outline'} color={selected ? color(selected.id) : undefined} disabled={disabled} onPress={open} />
       : <DetailRow label={label} value={selected ? selected.name + ' · ' + selected.currency : 'Elegir cuenta'} icon={selected ? icon(selected.id) : 'wallet-outline'}
+        leading={selected && isCash(selected.id) ? <AccountBadge accountId={selected.id} size={28} /> : undefined}
         disabled={disabled} onPress={open} />}
     <SelectionSheet visible={visible} title={label === 'Cuenta' ? 'Elegir cuenta' : label} onClose={() => setVisible(false)}>
       <FlatList data={accounts} keyExtractor={account => account.id} contentContainerStyle={{ padding: 20, paddingTop: 0 }}
         renderItem={({ item }) => <PressFeedback feedback="highlight" accessibilityRole="button" accessibilityState={{ selected: value === item.id }}
           accessibilityLabel={item.name + ', ' + kind(item.id) + ', ' + item.currency} onPress={() => { if (item.id !== value) selectionHaptic(); onChange(item.id); setVisible(false); }}
           style={{ flexDirection: 'row', alignItems: 'center', padding: 14, gap: 14, backgroundColor: p.surface, borderRadius: 16, marginBottom: 8, overflow: 'hidden' }}>
-          <GlyphTile icon={icon(item.id)} />
+          {isCash(item.id) ? <AccountBadge accountId={item.id} /> : <GlyphTile icon={icon(item.id)} />}
           <View style={{ flex: 1, gap: 3 }}><AppText style={{ fontWeight: '600' }}>{item.name}</AppText>
             <AppText secondary style={{ fontSize: 14 }}>{kind(item.id)} · {item.currency}{describe ? ' · ' + describe(item) : ''}</AppText></View>
           {item.id === value && <Ionicons name="checkmark-circle" color={p.primary} size={24} accessible={false} />}
@@ -120,20 +125,22 @@ export function CategoryField({ entries, kind, value, onChange, disabled = false
   prominent?: boolean; detail?: string; detailTone?: 'neutral' | 'warning' | 'expense';
 }) {
   const p = usePalette();
-  const hue = useCategoryColor(value);
+  const definitions = useCategoryDefinitions();
+  const look = useCategoryLook(value, kind);
   const [visible, setVisible] = useState(false);
   const [query, setQuery] = useState('');
-  const choices = useMemo(() => categoryChoices(entries, kind, query, value), [entries, kind, query, value]);
-  const custom = customCategory(query, choices);
+  // Choices are identities: the display name is shown, the stored spelling is what the movement records.
+  const choices = useMemo(() => categoryChoices(entries, kind, query, value, definitions), [entries, kind, query, value, definitions]);
+  const custom = customCategory(query, choices, kind, definitions);
   const choose = (category: string) => { Keyboard.dismiss(); if (categoryKey(category) !== categoryKey(value)) selectionHaptic(); onChange(category); setVisible(false); };
   const open = () => { Keyboard.dismiss(); setQuery(''); setVisible(true); };
   return <>
-    {prominent ? <SelectorCard label="Categoría" value={value || undefined} placeholder="Elegir categoría" detail={detail} detailTone={detailTone}
-      icon={value ? categoryIcon(value) : 'pricetag-outline'} tone={kind === 'income' && value ? 'income' : 'neutral'}
-      color={value && kind === 'expense' ? hue : undefined} disabled={disabled} onPress={open} />
-      : <DetailRow label="Categoría" value={value || 'Elegir categoría'} icon="pricetag-outline" disabled={disabled} onPress={open} />}
+    {prominent ? <SelectorCard label="Categoría" value={value ? look.label : undefined} placeholder="Elegir categoría" detail={detail} detailTone={detailTone}
+      icon={value ? look.glyph : 'pricetag-outline'} tone={kind === 'income' && value ? 'income' : 'neutral'}
+      color={value && kind === 'expense' ? look.hex : undefined} disabled={disabled} onPress={open} />
+      : <DetailRow label="Categoría" value={value ? look.label : 'Elegir categoría'} icon="pricetag-outline" disabled={disabled} onPress={open} />}
     <SelectionSheet visible={visible} title="Categorías" onClose={() => setVisible(false)}>
-      <FlatList data={choices} keyExtractor={categoryKey} keyboardShouldPersistTaps="handled"
+      <FlatList data={choices} keyExtractor={item => item.key} keyboardShouldPersistTaps="handled"
         automaticallyAdjustKeyboardInsets keyboardDismissMode="interactive"
         contentContainerStyle={{ padding: 20, paddingTop: 0, paddingBottom: 40 }}
         ListHeaderComponent={<View style={{ gap: 12, paddingBottom: 16 }}>
@@ -146,12 +153,16 @@ export function CategoryField({ entries, kind, value, onChange, disabled = false
             <AppText style={{ color: p.primary, fontWeight: '600', flex: 1 }}>Usar «{custom}»</AppText>
           </PressFeedback>}
         </View>}
-        renderItem={({ item }) => <PressFeedback feedback="highlight" accessibilityRole="button" accessibilityLabel={item}
-          accessibilityState={{ selected: categoryKey(value) === categoryKey(item) }} onPress={() => choose(item)}
+        renderItem={({ item }) => <PressFeedback feedback="highlight" accessibilityRole="button"
+          accessibilityLabel={item.label + (item.archived ? ', archivada' : '')}
+          accessibilityState={{ selected: categoryKey(value) === item.key }} onPress={() => choose(item.storedLabel)}
           style={{ flexDirection: 'row', alignItems: 'center', gap: 14, padding: 12, marginBottom: 6, backgroundColor: p.surface, borderRadius: 18, overflow: 'hidden' }}>
-          <CategoryBadge category={item} />
-          <AppText style={{ flex: 1, fontWeight: '500' }}>{item}</AppText>
-          {categoryKey(value) === categoryKey(item) && <Ionicons name="checkmark-circle" color={p.primary} size={23} accessible={false} />}
+          <CategoryBadge category={item.storedLabel} kind={kind} />
+          <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+            <AppText numberOfLines={1} style={{ fontWeight: '500' }}>{item.label}</AppText>
+            {item.archived && <AppText secondary variant="caption">Archivada · sigue válida en este movimiento</AppText>}
+          </View>
+          {categoryKey(value) === item.key && <Ionicons name="checkmark-circle" color={p.primary} size={23} accessible={false} />}
         </PressFeedback>} />
     </SelectionSheet>
   </>;
