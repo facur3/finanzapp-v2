@@ -1,5 +1,19 @@
 # Physical iPhone acceptance checklist
 
+## Producto 22 — AI reachability and native material (pending device review)
+
+- [ ] Before updating, share a private copy. After updating, Más footer reads Producto 22; no account, card, movement, budget or rule changed.
+- [ ] The tab bar reads Inicio, Movimientos, Asistente, Reportes, Más; the centre sparkles icon fills when active; 30–40 tab changes through Asistente do not reproduce the black-tab issue.
+- [ ] Hold the phone in one hand, right thumb then left thumb: the Asistente tab is reached without shifting the grip; compare with the leftmost Home action.
+- [ ] Inicio → Asistente lands on the tab (the tab highlights; no back button, no stacked copy); typing there, switching to Inicio and back keeps the conversation; closing the app clears it.
+- [ ] Más → Finanzas shows Cuentas, Tarjetas, Presupuestos, Recurrentes, Deudas y cobros, Categorías with six distinct restrained tiles; Tarjetas opens the same cards screen with "+" in its header, the carousel, Registrar compra and Pagar tarjeta work as before; saving a new card returns to Tarjetas.
+- [ ] Glass: on iOS 26 the four Home circles and the composer pill show native Liquid Glass (scroll content under the row: the circles refract it); the Assistant circle carries a cobalt wash and no ring; glyph colours are coral, green and azure; the send button is solid cobalt; both themes.
+- [ ] Press a glass circle: the 0.97 scale, the glass stays visible during the press (no blink to a plain circle).
+- [ ] Settings → Accessibility → Display & Text Size → Reduce Transparency ON: without restarting, the circles and the composer switch to the opaque material (white with hairline in light, surface step in dark, cobalt wash and ring on the Assistant); OFF: glass returns.
+- [ ] Composer in the Asistente tab: with the keyboard down the pill sits just above the tab bar with no empty strip; tap the field: the pill rises to the keyboard's top edge exactly; interactive dismiss follows the drag; large text still caps the field at about five lines.
+- [ ] VoiceOver: the tab reads "Asistente"; Home actions read "Abrir el Asistente", "Registrar gasto", "Registrar ingreso", "Transferir entre cuentas"; the composer reads "Mensaje para el Asistente", "Dictar", "Enviar".
+- [ ] Narrow width (SE / 13 mini if available) and the largest Dynamic Type: four columns still fit, captions wrap to two lines, no overlap between circles.
+
 ## Producto 21 — Assistant experience (pending device review)
 
 - [ ] Before updating, share a private copy. After updating, Más footer reads Producto 21; no account, movement, budget or rule changed.

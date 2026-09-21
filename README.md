@@ -21,6 +21,14 @@ Tarjetas queda solo para tarjetas de crédito; las transferencias, pagos de tarj
 saldos de deudas ofrecen Usar todo / Pagar total / Saldar total / Cobrar total, que
 solo rellenan el importe. Sin rediseño visual ni cambios de esquema.
 
+**Producto 22 (2026-09-21):** el Asistente pasa a ser la pestaña central (Inicio,
+Movimientos, **Asistente**, Reportes, Más), alcanzable con cualquier pulgar desde
+cualquier pantalla; Tarjetas sale de la barra y es la segunda fila de Más → Finanzas,
+con su misma pantalla y su "+". Las cuatro acciones de Inicio y el compositor del
+Asistente se dibujan con Liquid Glass nativo (`expo-glass-effect`) solo en iOS 26 con
+la API disponible y sin Reducir transparencia; en cualquier otro caso conservan el
+material opaco de Producto 21. Sin cambios financieros ni activación de nube.
+
 **Interfaz 07:** nuevo Inicio con períodos, barras y detalle; saldo inicial opcional,
 paleta índigo y superficies tranquilas. Base de API autenticada, bandeja de capturas
 y límites de IA, apagada hasta configuración. No hay chat/Apple Pay activo todavía.

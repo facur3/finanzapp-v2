@@ -45,9 +45,10 @@ test('every palette colour keeps glyph contrast on its soft tint and on the surf
     }
   }
 });
-test('the Más Finanzas tiles use palette colours and stay restrained: five rows, no expense coral, no more than one row per colour', () => {
+test('the Más Finanzas tiles use palette colours and stay restrained: six rows, no expense coral, no more than one row per colour', () => {
   const colors = Object.values(FINANCE_ROW_LOOKS).map(look => look.color);
-  assert.equal(colors.length, 5);
+  assert.equal(colors.length, 6);
+  assert.equal(FINANCE_ROW_LOOKS.cards.glyph, 'card-outline', 'Tarjetas is a Finanzas row since the centre tab became the Assistant');
   assert.equal(new Set(colors).size, colors.length);
   for (const color of colors) assert.ok(APPEARANCE_COLORS.some(item => item.id === color), color);
 });

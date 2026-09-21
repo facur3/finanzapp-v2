@@ -100,8 +100,9 @@ export function resolveAccountLook(accountId: string, appearances: AccountAppear
 
 /** Más → Finanzas: a soft, meaningful identity per row, from the same palette
  * accounts and categories use, so the hub reads as one system. */
-export const FINANCE_ROW_LOOKS: Record<'accounts' | 'budgets' | 'recurring' | 'debts' | 'categories', { glyph: IconName; color: AppearanceColorId }> = {
+export const FINANCE_ROW_LOOKS: Record<'accounts' | 'cards' | 'budgets' | 'recurring' | 'debts' | 'categories', { glyph: IconName; color: AppearanceColorId }> = {
   accounts: { glyph: 'wallet-outline', color: 'cobalt' },
+  cards: { glyph: 'card-outline', color: 'graphite' },
   budgets: { glyph: 'speedometer-outline', color: 'teal' },
   recurring: { glyph: 'repeat-outline', color: 'indigo' },
   debts: { glyph: 'people-outline', color: 'ochre' },

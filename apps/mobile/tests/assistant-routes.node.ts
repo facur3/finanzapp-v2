@@ -41,7 +41,7 @@ function scriptedClient(mode: AssistantClient['mode'] = 'remote') {
 function harness({ client, accounts = [visa, cash, usd], data = entries, params = {}, reduced = false, addEntry }: {
   client: AssistantClient; accounts?: domain.Account[]; data?: domain.Entry[]; params?: Record<string, string>; reduced?: boolean; addEntry?: (entry: domain.Entry) => Promise<void>;
 }) {
-  const source = readFileSync(new URL('../app/assistant.tsx', import.meta.url), 'utf8');
+  const source = readFileSync(new URL('../app/(tabs)/assistant.tsx', import.meta.url), 'utf8');
   const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText;
   const jsx = (type: unknown, props: Record<string, unknown>) => ({ type, props });
   const state: unknown[] = [];
@@ -62,7 +62,7 @@ function harness({ client, accounts = [visa, cash, usd], data = entries, params 
     },
     'react/jsx-runtime': { jsx, jsxs: jsx, Fragment: 'Fragment' },
     'react-native': { View: 'View', FlatList: 'FlatList' },
-    'expo-router': { Stack: { Screen: 'Stack.Screen' }, useLocalSearchParams: () => params, router: { push: (to: unknown) => pushed.push(to) } },
+    'expo-router': { Tabs: { Screen: 'Tabs.Screen' }, useLocalSearchParams: () => params, router: { push: (to: unknown) => pushed.push(to) } },
     'expo-crypto': { randomUUID: () => 'uuid-' + (written.length + 1) },
     '@finanzapp/domain': domain,
     '../src/assistant/runtime': { assistantForBuild: () => client },
@@ -78,6 +78,8 @@ function harness({ client, accounts = [visa, cash, usd], data = entries, params 
     '../src/ui/theme': { space: { xs: 4, s: 8, m: 12, l: 16, xl: 20, xxl: 24, xxxl: 32 }, useCurrentDay: () => '2026-09-21', useReduceMotion: () => reduced,
       usePalette: () => ({ background: '#F2F2F6', warning: '#B45309', warningSoft: '#FCF1E0', isDark: false }) },
   };
+  // The screen is a tab root now, one level deeper than the stack routes.
+  for (const name of Object.keys(modules)) if (name.startsWith('../src/')) modules['../' + name] = modules[name];
   const module = { exports: {} as { default?: () => Node } };
   runInNewContext(code, { module, exports: module.exports, Error, AbortController, Promise, Map, Date, require: (name: string) => {
     if (!Object.hasOwn(modules, name)) throw new Error('Unexpected assistant dependency: ' + name);
@@ -91,7 +93,7 @@ function harness({ client, accounts = [visa, cash, usd], data = entries, params 
     list.props.ref.current = { scrollToEnd: (options: unknown) => scrolled.push(options) };
     const items: Node[] = list.props.data.map((item: unknown) => list.props.renderItem({ item }));
     const composer = nodes(root).find(node => node.type === 'AssistantComposer')!;
-    const screen = nodes(root).find(node => node.type === 'Stack.Screen')!;
+    const screen = nodes(root).find(node => node.type === 'Tabs.Screen')!;
     return { root, list, items, composer, screen, empty: list.props.ListEmptyComponent as Node, messages: list.props.data as conversation.Message[] };
   };
   return { render, pushed, written, scrolled, haptics, effects };
@@ -433,11 +435,17 @@ test('New chat aborts any request and returns to the empty conversation; leaving
   assert.equal(pushed.length, 0);
 });
 
-test('the Assistant is reached from Home as the first quick action and from Más; the old preview screen is gone', () => {
+test('the Assistant is the centre tab and the Home quick action lands on it; the old preview and the stack route are gone', () => {
   const layout = readFileSync(new URL('../app/_layout.tsx', import.meta.url), 'utf8');
-  assert.match(layout, /name="assistant"/);
+  assert.equal(layout.includes('name="assistant"'), false, 'no duplicate stack screen: one conversation, one route');
+  assert.match(layout, /name="cards"/);
   assert.equal(layout.includes('assistant-preview'), false);
-  const tabs = readFileSync(new URL('../app/(tabs)/index.tsx', import.meta.url), 'utf8');
-  assert.match(tabs, /<QuickActions currency=\{currency\} assistant \/>/);
+  const tabs = readFileSync(new URL('../app/(tabs)/_layout.tsx', import.meta.url), 'utf8');
+  assert.match(tabs, /name="assistant"/);
+  const home = readFileSync(new URL('../app/(tabs)/index.tsx', import.meta.url), 'utf8');
+  assert.match(home, /<QuickActions currency=\{currency\} assistant \/>/);
+  const actions = readFileSync(new URL('../src/ui/quick-actions.tsx', import.meta.url), 'utf8');
+  assert.match(actions, /router\.navigate\(\{ pathname: '\/assistant'/, 'navigate, not push: switching to the tab, never stacking a copy');
   assert.throws(() => readFileSync(new URL('../app/assistant-preview.tsx', import.meta.url)));
+  assert.throws(() => readFileSync(new URL('../app/assistant.tsx', import.meta.url)));
 });

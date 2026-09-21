@@ -35,17 +35,23 @@ export const radius = { chip: 14, tile: 12, group: 16, card: 20, sheet: 24, cred
 export const space = { xs: 4, s: 8, m: 12, l: 16, xl: 20, xxl: 24, xxxl: 32 };
 
 const ReduceMotionContext = createContext(true);
+// Defaults to true: until iOS answers, a control is drawn on its opaque material, never on a missing effect.
+const ReduceTransparencyContext = createContext(true);
 const DayContext = createContext(todayKey());
 
-// One native accessibility subscription, not one request/listener per row.
+// One native accessibility subscription per setting, not one request/listener per row.
 export function UIProvider({ children }: { children: ReactNode }) {
   const [reduced, setReduced] = useState(true);
+  const [reducedTransparency, setReducedTransparency] = useState(true);
   const [day, setDay] = useState(todayKey);
   useEffect(() => {
     let mounted = true;
     void AccessibilityInfo.isReduceMotionEnabled().then(value => { if (mounted) setReduced(value); }).catch(() => {});
     const subscription = AccessibilityInfo.addEventListener('reduceMotionChanged', setReduced);
-    return () => { mounted = false; subscription.remove(); };
+    // iOS only: Android and web have no such setting, so the promise rejects or resolves false and the opaque material stays.
+    void AccessibilityInfo.isReduceTransparencyEnabled().then(value => { if (mounted) setReducedTransparency(value); }).catch(() => {});
+    const transparency = AccessibilityInfo.addEventListener('reduceTransparencyChanged', setReducedTransparency);
+    return () => { mounted = false; subscription.remove(); transparency.remove(); };
   }, []);
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout>;
@@ -61,8 +67,11 @@ export function UIProvider({ children }: { children: ReactNode }) {
     return () => { clearTimeout(timer); subscription.remove(); };
   }, []);
   return createElement(ReduceMotionContext.Provider, { value: reduced },
-    createElement(DayContext.Provider, { value: day }, children));
+    createElement(ReduceTransparencyContext.Provider, { value: reducedTransparency },
+      createElement(DayContext.Provider, { value: day }, children)));
 }
 
 export const useReduceMotion = () => useContext(ReduceMotionContext);
+/** The iOS "Reduce Transparency" setting: when on, no glass material is drawn anywhere. */
+export const useReduceTransparency = () => useContext(ReduceTransparencyContext);
 export const useCurrentDay = () => useContext(DayContext);

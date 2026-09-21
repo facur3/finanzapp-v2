@@ -101,6 +101,20 @@ form prefilled. Voice is a visible affordance only (the microphone explains that
 transcription needs the development build). Scripted fixtures exist for tests and,
 under `EXPO_PUBLIC_ASSISTANT_FIXTURES=1` in a development bundle only, for seeing the
 states on the iPhone behind a visible "Vista de prueba" banner that never saves.
+**Producto 22 (2026-09-21)** is reachability and material, not features: the Assistant
+becomes the **centre tab** (Inicio, Movimientos, Asistente, Reportes, Más), so either
+thumb reaches it from any screen; the Home quick action stays as a discoverability
+shortcut and lands on the same tab (`router.navigate`, never a stacked copy). Tarjetas
+leaves the bar and is the second Finanzas row under Más, pushed as its own screen with
+its "+" in the header; nothing about cards changed. The four Home actions and the
+Assistant composer become **control surfaces** (`src/ui/material.tsx`): on iOS 26 with
+`isLiquidGlassAvailable()`, `isGlassEffectAPIAvailable()` and Reduce Transparency off
+they are native Liquid Glass (`expo-glass-effect`, the SDK 57 version already bundled
+in Expo Go; regular glass, a cobalt wash on the Assistant, no ring); on older iOS,
+Android, web, a beta without the API, or with Reduce Transparency they keep the opaque
+material of Producto 21 unchanged. Glass is never drawn on rows, chips, lists, cards
+or the tab bar. The composer measures what sits below it (the tab bar) so it rests on
+the bar with the keyboard down and rises exactly to the keyboard when it opens.
 
 The Reportes tab shows, for one month and currency, the recorded total with its daily
 average and change against the same elapsed days of the previous month, a six-month
@@ -184,7 +198,7 @@ Pausing keeps prior history and reactivation skips dates that elapsed while paus
 Home shows up to three real upcoming expense commitments for the selected currency;
 the Recurrentes screen also shows a 30-day forecast without mixing ARS and USD.
 
-Tarjetas holds credit cards only; personal debts and receivables live under
+Más → Tarjetas holds credit cards only; personal debts and receivables live under
 Más → Deudas y cobros. A card is a hidden internal account: registering a purchase posts **one expense** to the card (it counts in
 Movimientos, Reportes and Presupuestos and raises the card's recorded debt).
 **Pagar tarjeta** records a transfer from a cash account into the card: cash goes
@@ -382,7 +396,12 @@ Entry, retry with the same id, Editar hand-off, clarification chips, Reintentar,
 fixture banner that never writes, autoscroll gating, Reduce Motion, New chat) and
 `assistant-ui.node.ts` (composer labels and states, keyboard-tracking structure, draft
 card rows and gaps, chips, thinking pulse under Reduce Motion, evidence rendering), plus
-the four-column quick actions guard in `motion.node.ts`. These are **not** native rendering/gesture tests;
+the four-column quick actions guard in `motion.node.ts`. Producto 22 adds
+`material.node.ts` (the glass/opaque decision matrix, the composer padding formula,
+`useMaterial` never throwing, `ControlSurface` in both materials, and a guard that only
+the two control surfaces import the material) and updates the navigation, Más, Cards,
+composer and quick-action guards for the centre tab, the pushed Tarjetas screen and the
+glass branch. These are **not** native rendering/gesture tests;
 use the physical checklist. The root suite also tests the shared monthly summary
 and spending report, including exact category-to-entry reconciliation.
 
@@ -391,7 +410,7 @@ For the intermittent black-tab report, update to `master`, restart with
 and repeat the **Interfaz 02** tab checks, **Interfaz 03** report checks and
 **Interfaz 04/05** correction/recovery and transfer checks, plus **Interfaz 06** daily/comparison reports and **Interfaz 08** recurring/upcoming
 checks, plus **Interfaz 10** cards/debts and five-tab checks and **Interfaz 11** Home,
-Movimientos and detail checks, **Interfaz 12** form checks, **Interfaz 13** Reportes checks, **Interfaz 14** budgets/recurring/accounts checks, **Interfaz 15** motion checks, **Interfaz 16** cohesion checks, **Interfaz 17** identity and money-input checks **Producto 18** Más / Tarjetas / amount-shortcut checks, **Producto 19** budget checks, **Producto 20** account/category identity checks and **Producto 21** Assistant checks. The current footer (Más) says Producto 21.
+Movimientos and detail checks, **Interfaz 12** form checks, **Interfaz 13** Reportes checks, **Interfaz 14** budgets/recurring/accounts checks, **Interfaz 15** motion checks, **Interfaz 16** cohesion checks, **Interfaz 17** identity and money-input checks **Producto 18** Más / Tarjetas / amount-shortcut checks, **Producto 19** budget checks, **Producto 20** account/category identity checks **Producto 21** Assistant checks and **Producto 22** reachability/material checks. The current footer (Más) says Producto 22.
 Before updating, save a private pilot copy; do not uninstall or add fake movements.
 
 If a storage/refresh error occurs, the form retains the exact submitted command
