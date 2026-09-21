@@ -65,6 +65,22 @@ no fake "General" category), SQLite schema 7 (the budgets table is rebuilt and e
 old budget survives exactly as a category budget), backup format v7 (v5/v6 files
 still import), a hierarchical Presupuestos screen, a Home card that answers "how much
 of my month have I used" and one shared set of states (calm / warning / exceeded).
+**Producto 20 (2026-09-21)** adds user-controlled identity, not a redesign: liquid
+accounts choose a name, icon and colour (Cuentas, account detail, every account
+selector, Pagado con / Ingresa en, Desde / Hacia, recurring forms and the detail rows
+all show the same tile); categories can be created, renamed, re-iconed, recoloured and
+archived from Más → Categorías without touching a single movement. Identity is
+presentation metadata in two additive tables (SQLite schema 8): a look per account
+beside the account row, and a definition per `(kind, normalised key)` that decorates
+the free category string entries already carry. Renaming changes only the display
+name: the string new movements record (`storedLabel`) is fixed at creation, so history,
+budgets, recurring rules and reports keep grouping under one key. Presets are code, not
+rows (nothing is seeded); historical strings such as test categories keep their spelling
+and get a deterministic fallback glyph and hue until the user dresses or archives them.
+Backup format is v8 (v1–v7 files still import; their accounts show the default look).
+One shared icon-and-colour picker (curated Ionicons glyphs, eleven restrained colours
+with accessible Spanish names) serves both; Más → Finanzas rows carry soft tinted tiles.
+The Assistant remains a preview under Más.
 
 The Reportes tab shows, for one month and currency, the recorded total with its daily
 average and change against the same elapsed days of the previous month, a six-month
@@ -216,7 +232,10 @@ Interfaz 09 added schema 5 monthly_budgets; Interfaz 10 adds schema 6 credit_car
 personal_debts; Producto 19 adds schema 7, which rebuilds monthly_budgets with a
 `scope` column and a nullable `category` (every existing row is copied as a category
 budget with its id, amount, month, currency, state, revision and timestamps unchanged,
-in one exclusive transaction; an interruption leaves the schema 6 table intact). None of
+in one exclusive transaction; an interruption leaves the schema 6 table intact).
+Producto 20 adds schema 8: two additive tables, `account_appearances` (one look per
+account, foreign key to accounts) and `category_definitions` (primary key kind + key),
+with no seeded rows; an account without a row shows wallet on cobalt. None of
 them replaces existing balances, entries, transfers or schedules.
 Do not revert to older app code after upgrading. A newer DB version is refused
 intact; no error deletes the file. No Supabase connection, seeded records, new
@@ -228,8 +247,12 @@ the entire portfolio or uninstall the existing app. Legacy import, card installm
 Supabase sync, Face ID, reminders and Apple Pay capture are separate roadmap
 milestones; no disabled decorative buttons imply otherwise.
 
-The pilot exports its own v7 JSON backup through the system sharing sheet and
-imports native v1 to v7 backups through Más → Copia de seguridad → Importar copia. A v7
+The pilot exports its own v8 JSON backup through the system sharing sheet and
+imports native v1 to v8 backups through Más → Copia de seguridad → Importar copia. A v8
+file adds `appearances` and `categories`; v1–v7 files have neither, and import as before
+(accounts then show the default look, categories resolve to presets or history). A look
+or a definition for the same account/identity that differs from the local one is a
+conflict, never an overwrite. A v7
 budget carries its `scope`; a general budget has no `category` key. Budgets in v5/v6
 files have no scope and are read as category budgets, exactly as written. Review shows new
 accounts, cards, debts, active/undone entries, transfers, recurring rules and budgets,
@@ -322,9 +345,13 @@ date grouping, available currencies, account preselection and category handling.
 The mobile tests include guards over the real five-tab layout (Más, no Home sparkles),
 report/recovery/transfer handlers, the Cards tab (no personal debts), card/debt detail,
 the locked card-payment form, the fill-only amount shortcuts (Usar todo, Pagar total,
-Saldar total, Cobrar total), the Más hub, backup and read-only categories screens,
-historical custom categories, the scoped budget form, the hierarchical Presupuestos
-screen, the Home budget card, the schema 7 migration and bar-animation configuration. These are **not** native rendering/gesture tests;
+Saldar total, Cobrar total), the Más hub (tinted Finanzas tiles), backup and the
+categories management screen, historical custom categories, the scoped budget form, the
+hierarchical Presupuestos screen, the Home budget card, the schema 7 and 8 migrations,
+account looks (create/edit/retry, selectors), the category form (create/rename/archive),
+the shared icon-and-colour picker (VoiceOver names, haptics, Reduce Motion), every
+curated glyph against the bundled Ionicons font, palette contrast, and bar-animation
+configuration. These are **not** native rendering/gesture tests;
 use the physical checklist. The root suite also tests the shared monthly summary
 and spending report, including exact category-to-entry reconciliation.
 
@@ -333,7 +360,7 @@ For the intermittent black-tab report, update to `master`, restart with
 and repeat the **Interfaz 02** tab checks, **Interfaz 03** report checks and
 **Interfaz 04/05** correction/recovery and transfer checks, plus **Interfaz 06** daily/comparison reports and **Interfaz 08** recurring/upcoming
 checks, plus **Interfaz 10** cards/debts and five-tab checks and **Interfaz 11** Home,
-Movimientos and detail checks, **Interfaz 12** form checks, **Interfaz 13** Reportes checks, **Interfaz 14** budgets/recurring/accounts checks, **Interfaz 15** motion checks, **Interfaz 16** cohesion checks, **Interfaz 17** identity and money-input checks **Producto 18** Más / Tarjetas / amount-shortcut checks and **Producto 19** budget checks. The current footer (Más) says Producto 19.
+Movimientos and detail checks, **Interfaz 12** form checks, **Interfaz 13** Reportes checks, **Interfaz 14** budgets/recurring/accounts checks, **Interfaz 15** motion checks, **Interfaz 16** cohesion checks, **Interfaz 17** identity and money-input checks **Producto 18** Más / Tarjetas / amount-shortcut checks, **Producto 19** budget checks and **Producto 20** account/category identity checks. The current footer (Más) says Producto 20.
 Before updating, save a private pilot copy; do not uninstall or add fake movements.
 
 If a storage/refresh error occurs, the form retains the exact submitted command

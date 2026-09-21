@@ -70,6 +70,8 @@ function Navigation() {
       <Stack.Screen name="backup" options={{ title: 'Copia de seguridad' }} />
       <Stack.Screen name="backup-import" options={{ title: 'Importar copia' }} />
       <Stack.Screen name="categories" options={{ title: 'Categorías' }} />
+      <Stack.Screen name="new-category" options={{ title: 'Nueva categoría', presentation: 'modal' }} />
+      <Stack.Screen name="edit-category" options={{ title: 'Editar categoría', presentation: 'modal' }} />
       <Stack.Screen name="spending-detail" options={{ title: 'Gastos del período' }} />
       <Stack.Screen name="report-category" options={{ title: 'Categoría' }} />
       <Stack.Screen name="report-day" options={{ title: 'Gastos del día' }} />

@@ -1,5 +1,19 @@
 # Physical iPhone acceptance checklist
 
+## Producto 20 — account identity and custom categories (pending device review)
+
+- [ ] Before updating, share a private copy. After updating, Más footer reads Producto 20; every account keeps its name, currency and balance and shows the wallet-on-cobalt tile; every movement, budget and recurring rule is unchanged; the existing test categories still appear on their movements.
+- [ ] Más → Finanzas: Cuentas, Presupuestos, Recurrentes, Deudas y cobros and Categorías each show a soft tinted tile; rows and text stay neutral; App y datos rows are unchanged; both themes.
+- [ ] Nueva cuenta: Nombre, then the picker (preview, Icono grid, Color dots), Moneda, Saldo inicial; choosing a tile or a dot ticks once and shows the selection at once; the preview follows the name; with Reduce Motion nothing animates; VoiceOver reads "Banco", "Celeste" and "Vista previa: Banco en Celeste".
+- [ ] Save "Cocos · billetera · cobalto", "Efectivo · efectivo · verde", "Banco Galicia · banco · celeste": Cuentas shows each tile; account detail, Registrar gasto → Pagado con, its sheet, Transferir → Desde / Hacia, Nuevo recurrente and the movement/transfer detail rows all show the same tile per account; cards keep the card glyph.
+- [ ] Editar cuenta: change only the colour and save: the balance, the name and Movimientos deshechos are untouched and no correction is recorded; change name + icon: one save; change the balance: the confirmation still appears; currency cannot be changed.
+- [ ] Más → Categorías → +: create "Kiosco" (gasto, café, ocre); it is offered immediately in Registrar gasto; saving a movement with it shows the tile everywhere.
+- [ ] Edit "Comida" to "Alimentación" with a new colour: old movements read "Alimentación", a new movement recorded with it, Reportes shows one group with both, the budget and recurring rule for Comida still match; the categories list says "Predeterminada · editada".
+- [ ] Archive a test category (e.g. "sjsjn"): it disappears from the picker for new movements, its movements still show it, it sits under Archivadas, editing one of those movements still shows it as the current value; Desarchivar brings it back.
+- [ ] Creating a category named like an existing one ("comida") is refused with a message; nothing is saved.
+- [ ] Copia de seguridad: share a v8 file; import it into a fresh install: accounts arrive with their looks and categories with their looks; importing an older v7 copy still works and its accounts show the default look.
+- [ ] Large text, VoiceOver on the categories list and picker, both themes, Expo Go; long account and category names truncate inside their rows.
+
 ## Producto 19 — general monthly budget and category sublimits (pending device review)
 
 - [ ] Before updating, share a private copy. After updating, Más footer reads Producto 19 and every existing budget is still there in Presupuestos with the same category, month, currency and amount (they are now "Por categoría" sublimits); nothing else changed.

@@ -2,10 +2,11 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { AppState } from 'react-native';
 import { snapshotFromArchive, todayKey, type Account, type Entry, type EntryChange, type LedgerArchive, type LedgerSnapshot,
   type AccountChange, type Transfer, type TransferChange, type RecurringRule, type MonthlyBudget,
-  type CreditCardProfile, type PersonalDebtProfile } from '@finanzapp/domain';
+  type CreditCardProfile, type PersonalDebtProfile, type AccountAppearance, type CategoryDefinition } from '@finanzapp/domain';
 import { changeEntry, createAccount, createEntry, importArchive, initializeDatabase, readArchive, changeAccount,
   createTransfer, changeTransfer, saveRecurringRule, processRecurring, saveMonthlyBudget,
-  createCreditCard, saveCreditCard, createPersonalDebt, savePersonalDebt, type LedgerDatabase } from './database';
+  createCreditCard, saveCreditCard, createPersonalDebt, savePersonalDebt, saveAccountAppearance, saveCategoryDefinition,
+  type LedgerDatabase } from './database';
 import { openLedgerDatabase } from './nativeDatabase';
 
 type LedgerContextValue = {
@@ -13,10 +14,12 @@ type LedgerContextValue = {
   archive: LedgerArchive | null;
   error: string | null;
   retry: () => void;
-  addAccount: (account: Account) => Promise<void>;
+  addAccount: (account: Account, appearance?: AccountAppearance) => Promise<void>;
   addEntry: (entry: Entry) => Promise<void>;
   updateEntry: (change: EntryChange) => Promise<void>;
-  updateAccount: (change: AccountChange) => Promise<void>;
+  updateAccount: (change: AccountChange, appearance?: AccountAppearance) => Promise<void>;
+  saveAppearance: (appearance: AccountAppearance) => Promise<void>;
+  saveCategory: (definition: CategoryDefinition) => Promise<void>;
   addTransfer: (transfer: Transfer) => Promise<void>;
   updateTransfer: (change: TransferChange) => Promise<void>;
   saveRecurring: (rule: RecurringRule) => Promise<void>;
@@ -95,10 +98,12 @@ export function LedgerProvider({ children }: { children: ReactNode }) {
   return <LedgerContext.Provider value={{
     snapshot, archive, error,
     retry: () => setAttempt(value => value + 1),
-    addAccount: account => mutate(db => createAccount(db, account)),
+    addAccount: (account, appearance) => mutate(db => createAccount(db, account, appearance)),
     addEntry: entry => mutate(db => createEntry(db, entry)),
     updateEntry: change => mutate(db => changeEntry(db, change)),
-    updateAccount: change => mutate(db => changeAccount(db, change)),
+    updateAccount: (change, appearance) => mutate(db => changeAccount(db, change, appearance)),
+    saveAppearance: appearance => mutate(db => saveAccountAppearance(db, appearance)),
+    saveCategory: definition => mutate(db => saveCategoryDefinition(db, definition)),
     addTransfer: transfer => mutate(db => createTransfer(db, transfer)),
     updateTransfer: change => mutate(db => changeTransfer(db, change)),
     saveRecurring: rule => mutate(async db => {

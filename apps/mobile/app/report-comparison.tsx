@@ -3,12 +3,14 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { formatMinorUnits, spendingComparison, type CategoryChange, type ReportPeriod } from '@finanzapp/domain';
 import { useLedger } from '../src/storage/LedgerProvider';
 import { AppText, DetailRow, EmptyState, Money, SectionTitle, Surface } from '../src/ui/components';
+import { useCategoryLookOf } from '../src/ui/category-hues';
 import { changePercent, dateRangeLabel, reportSelection } from '../src/ui/report-presentation';
 import { useCurrentDay, usePalette } from '../src/ui/theme';
 
 export default function ReportComparisonScreen() {
   const params = useLocalSearchParams<{ currency?: string; month?: string }>();
   const { snapshot } = useLedger();
+  const lookOf = useCategoryLookOf('expense');
   const today = useCurrentDay(), p = usePalette();
   if (!snapshot) return null;
   const selection = reportSelection(snapshot, params.currency, params.month, today);
@@ -39,7 +41,7 @@ export default function ReportComparisonScreen() {
     </View>}
     renderItem={({ item }) => <Surface grouped>
       <View style={{ padding: 16, gap: 6 }}>
-        <AppText style={{ fontWeight: '600', fontSize: 17 }}>{item.category}</AppText>
+        <AppText style={{ fontWeight: '600', fontSize: 17 }}>{lookOf(item.category).label}</AppText>
         <AppText secondary>{item.deltaMinor === 0 ? 'Sin cambio' : amount(Math.abs(item.deltaMinor)) + (item.deltaMinor > 0 ? ' más' : ' menos')}</AppText>
       </View>
       <DetailRow label="Este período" value={amount(item.currentMinor)} onPress={item.currentCount ? () => openCategory(current, item.key) : undefined} />

@@ -8,6 +8,8 @@ import {
   sameMonthlyBudget, scopedMonthlyBudget, validateMonthlyBudget, type MonthlyBudget,
   assertPostingAccount, sameCreditCardProfile, samePersonalDebtProfile, validateCreditCardProfile, validatePersonalDebtProfile,
   type CreditCardProfile, type PersonalDebtProfile,
+  sameAccountAppearance, validateAccountAppearance, type AccountAppearance,
+  sameCategoryDefinition, validateCategoryDefinition, type CategoryDefinition,
 } from '@finanzapp/domain';
 
 type SqlValue = string | number | null;
@@ -22,7 +24,7 @@ export interface LedgerDatabase extends SqlExecutor {
 }
 
 export const DATABASE_NAME = 'finanzapp-native-pilot-v1.sqlite';
-export const DATABASE_VERSION = 7;
+export const DATABASE_VERSION = 8;
 
 const SCHEMA = `
   CREATE TABLE accounts (
@@ -190,6 +192,38 @@ const MIGRATE_V7 = `
   PRAGMA user_version = 7;
 `;
 
+// Producto 20: presentation identity in two additive tables. An account's look
+// is a profile beside the account (like a card or a debt), never a column on
+// the financial row; a category definition decorates the normalised key that
+// entries, budgets, recurring rules and reports already group by. Neither
+// table is seeded: an account without a row shows the default look and a
+// category without a row is a preset or a historical string. Guarded by
+// user_version, so an interruption leaves the schema 7 file untouched.
+const MIGRATE_V8 = `
+  CREATE TABLE account_appearances (
+    accountId TEXT PRIMARY KEY NOT NULL REFERENCES accounts(id) ON DELETE RESTRICT,
+    icon TEXT NOT NULL CHECK(length(icon) BETWEEN 1 AND 40),
+    color TEXT NOT NULL CHECK(length(color) BETWEEN 1 AND 40),
+    createdAt TEXT NOT NULL,
+    revision INTEGER NOT NULL DEFAULT 0 CHECK(revision >= 0 AND revision <= 9007199254740991),
+    updatedAt TEXT NOT NULL
+  ) STRICT;
+  CREATE TABLE category_definitions (
+    kind TEXT NOT NULL CHECK(kind IN ('expense', 'income')),
+    key TEXT NOT NULL CHECK(length(key) BETWEEN 1 AND 60),
+    storedLabel TEXT NOT NULL CHECK(length(trim(storedLabel)) BETWEEN 1 AND 60),
+    label TEXT NOT NULL CHECK(length(trim(label)) BETWEEN 1 AND 60),
+    icon TEXT NOT NULL CHECK(length(icon) BETWEEN 1 AND 40),
+    color TEXT NOT NULL CHECK(length(color) BETWEEN 1 AND 40),
+    archived INTEGER NOT NULL CHECK(archived IN (0, 1)),
+    createdAt TEXT NOT NULL,
+    revision INTEGER NOT NULL DEFAULT 0 CHECK(revision >= 0 AND revision <= 9007199254740991),
+    updatedAt TEXT NOT NULL,
+    PRIMARY KEY (kind, key)
+  ) STRICT;
+  PRAGMA user_version = 8;
+`;
+
 export async function initializeDatabase(db: LedgerDatabase): Promise<void> {
   // Set before opening a transaction; foreign_keys is connection-local.
   await db.execAsync('PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000;');
@@ -206,6 +240,7 @@ export async function initializeDatabase(db: LedgerDatabase): Promise<void> {
     if (version < 5) await tx.execAsync(MIGRATE_V5);
     if (version < 6) await tx.execAsync(MIGRATE_V6);
     if (version < 7) await tx.execAsync(MIGRATE_V7);
+    if (version < 8) await tx.execAsync(MIGRATE_V8);
   });
   await readSnapshot(db); // Validate before showing a balance, not after a render.
 }
@@ -268,6 +303,16 @@ export async function readArchive(db: SqlExecutor): Promise<LedgerArchive> {
     validatePersonalDebtProfile(debt, accounts);
     return debt;
   });
+  const appearanceRows = await db.getAllAsync<AccountAppearance>('SELECT * FROM account_appearances ORDER BY accountId');
+  const appearances = appearanceRows.map(row => { validateAccountAppearance(row, accounts); return row; });
+  const categoryRows = await db.getAllAsync<Omit<CategoryDefinition, 'archived'> & { archived: number }>(
+    'SELECT * FROM category_definitions ORDER BY kind, key');
+  const categories = categoryRows.map(({ archived, ...row }) => {
+    if (archived !== 0 && archived !== 1) throw new Error('Estado de categoría inválido.');
+    const definition = { ...row, archived: archived === 1 };
+    validateCategoryDefinition(definition);
+    return definition;
+  });
   const archive = {
     accounts,
     records,
@@ -276,20 +321,33 @@ export async function readArchive(db: SqlExecutor): Promise<LedgerArchive> {
     ...(budgets.length ? { budgets } : {}),
     ...(cards.length ? { cards } : {}),
     ...(debts.length ? { debts } : {}),
+    ...(appearances.length ? { appearances } : {}),
+    ...(categories.length ? { categories } : {}),
   };
   validateArchive(archive); // Including tombstones and safe integer totals.
   return archive;
 }
 
-export async function createAccount(db: LedgerDatabase, input: Account): Promise<void> {
+/** A new account and, optionally, its chosen look in the same commit. The look
+ * is presentation only; retrying with the same account and look is safe. */
+export async function createAccount(db: LedgerDatabase, input: Account, appearance?: AccountAppearance): Promise<void> {
   const account = { ...input, name: input.name.trim() };
   validateAccount(account);
   if ((account.revision ?? 0) !== 0) throw new Error('Una cuenta nueva no puede tener correcciones previas.');
+  if (appearance) {
+    validateAccountAppearance(appearance, [account]);
+    if (appearance.revision !== 0) throw new Error('La apariencia de una cuenta nueva no puede tener cambios previos.');
+  }
   await db.withExclusiveTransactionAsync(async tx => {
     const existing = await tx.getFirstAsync<Account>('SELECT * FROM accounts WHERE id = ?', account.id);
     if (existing) {
       if (!sameAccount(existing, account)) {
         throw new Error('Esta operación ya existe con otros datos. Volvé a abrir el formulario.');
+      }
+      if (appearance) {
+        const look = await tx.getFirstAsync<AccountAppearance>('SELECT * FROM account_appearances WHERE accountId = ?', account.id);
+        if (!look) await insertAppearance(tx, appearance);
+        else if (!sameAccountAppearance(look, appearance)) throw new Error('Esta operación ya existe con otros datos. Volvé a abrir el formulario.');
       }
       return; // Retrying a committed operation is safe.
     }
@@ -299,6 +357,68 @@ export async function createAccount(db: LedgerDatabase, input: Account): Promise
       'INSERT INTO accounts (id, name, currency, openingMinor, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?)',
       account.id, account.name, account.currency, account.openingMinor, account.createdAt, account.createdAt,
     );
+    if (appearance) await insertAppearance(tx, appearance);
+  });
+}
+
+async function insertAppearance(tx: SqlExecutor, look: AccountAppearance): Promise<void> {
+  await tx.runAsync('INSERT INTO account_appearances (accountId, icon, color, createdAt, revision, updatedAt) VALUES (?, ?, ?, ?, ?, ?)',
+    look.accountId, look.icon, look.color, look.createdAt, look.revision, look.updatedAt);
+}
+
+/** Upsert one account's look inside an open transaction: a first row, an
+ * identical retry, or the next revision. Never touches `accounts`. */
+async function writeAppearance(tx: SqlExecutor, look: AccountAppearance, accounts: Account[]): Promise<void> {
+  validateAccountAppearance(look, accounts);
+  const existing = await tx.getFirstAsync<AccountAppearance>('SELECT * FROM account_appearances WHERE accountId = ?', look.accountId);
+  if (!existing) {
+    if (look.revision !== 0) throw new Error('La apariencia cambió desde que la abriste. Volvé a revisarla.');
+    await insertAppearance(tx, look);
+    return;
+  }
+  if (sameAccountAppearance(existing, look)) return; // Committed already; a refresh failed.
+  if (look.createdAt !== existing.createdAt || look.revision !== existing.revision + 1) {
+    throw new Error('La apariencia cambió desde que la abriste. Volvé a revisarla.');
+  }
+  await tx.runAsync('UPDATE account_appearances SET icon = ?, color = ?, revision = ?, updatedAt = ? WHERE accountId = ?',
+    look.icon, look.color, look.revision, look.updatedAt, look.accountId);
+}
+
+/** Change only how an account looks. Balance, currency, name, entries,
+ * transfers and the account's own revision/audit are not involved. */
+export async function saveAccountAppearance(db: LedgerDatabase, look: AccountAppearance): Promise<void> {
+  await db.withExclusiveTransactionAsync(async tx => {
+    const archive = await readArchive(tx);
+    await writeAppearance(tx, look, archive.accounts);
+  });
+}
+
+/** Create, edit or archive a category definition. The identity `(kind, key)`
+ * is fixed; the stored spelling never changes; the whole collection is
+ * validated so a display name cannot read as another category. Entries,
+ * budgets and recurring rules are never rewritten. */
+export async function saveCategoryDefinition(db: LedgerDatabase, input: CategoryDefinition): Promise<void> {
+  const definition = { ...input, label: input.label.trim() };
+  await db.withExclusiveTransactionAsync(async tx => {
+    const archive = await readArchive(tx);
+    validateCategoryDefinition(definition);
+    const existing = archive.categories?.find(item => item.kind === definition.kind && item.key === definition.key);
+    if (!existing) {
+      if (definition.revision !== 0 || definition.updatedAt !== definition.createdAt) throw new Error('Una categoría nueva no puede tener cambios previos.');
+      validateArchive({ ...archive, categories: [...archive.categories ?? [], definition] });
+      await tx.runAsync(`INSERT INTO category_definitions (kind, key, storedLabel, label, icon, color, archived, createdAt, revision, updatedAt)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, definition.kind, definition.key, definition.storedLabel, definition.label, definition.icon,
+      definition.color, definition.archived ? 1 : 0, definition.createdAt, definition.revision, definition.updatedAt);
+      return;
+    }
+    if (sameCategoryDefinition(existing, definition)) return;
+    if (definition.storedLabel !== existing.storedLabel || definition.createdAt !== existing.createdAt || definition.revision !== existing.revision + 1) {
+      throw new Error('La categoría cambió desde que la abriste. Volvé a revisarla.');
+    }
+    validateArchive({ ...archive, categories: archive.categories!.map(item => item === existing ? definition : item) });
+    await tx.runAsync(`UPDATE category_definitions SET label = ?, icon = ?, color = ?, archived = ?, revision = ?, updatedAt = ?
+      WHERE kind = ? AND key = ?`, definition.label, definition.icon, definition.color, definition.archived ? 1 : 0,
+    definition.revision, definition.updatedAt, definition.kind, definition.key);
   });
 }
 
@@ -362,7 +482,7 @@ export async function importArchive(db: LedgerDatabase, incoming: LedgerArchive,
     const plan = previewBackupImport(current, incoming);
     if (plan.conflicts) throw new Error('La copia contradice cambios locales. No se importó nada. Conservá ambas versiones.');
     if (!plan.accounts.length && !plan.records.length && !plan.transfers.length && !plan.recurring.length
-      && !plan.budgets.length && !plan.cards.length && !plan.debts.length) return;
+      && !plan.budgets.length && !plan.cards.length && !plan.debts.length && !plan.appearances.length && !plan.categories.length) return;
     if (plan.baseline !== baseline) throw new Error('Tus datos cambiaron. Volvé a revisar la copia antes de importar.');
     for (const account of plan.accounts) {
       await tx.runAsync('INSERT INTO accounts (id, name, currency, openingMinor, createdAt, revision, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?)',
@@ -374,12 +494,21 @@ export async function importArchive(db: LedgerDatabase, incoming: LedgerArchive,
     for (const budget of plan.budgets) await insertMonthlyBudget(tx, budget);
     for (const card of plan.cards) await insertCreditCard(tx, card);
     for (const debt of plan.debts) await insertPersonalDebt(tx, debt);
+    for (const look of plan.appearances) await insertAppearance(tx, look);
+    for (const definition of plan.categories) {
+      await tx.runAsync(`INSERT INTO category_definitions (kind, key, storedLabel, label, icon, color, archived, createdAt, revision, updatedAt)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, definition.kind, definition.key, definition.storedLabel, definition.label, definition.icon,
+      definition.color, definition.archived ? 1 : 0, definition.createdAt, definition.revision, definition.updatedAt);
+    }
     // No existing rows are updated or deleted. Any failure rolls back the batch.
   });
 }
 
-export async function changeAccount(db: LedgerDatabase, change: AccountChange): Promise<void> {
+/** A name/balance correction with its audit receipt and, optionally, a new
+ * look, in one commit. The look never enters the account's before/after JSON. */
+export async function changeAccount(db: LedgerDatabase, change: AccountChange, appearance?: AccountAppearance): Promise<void> {
   validateAccountChange(change);
+  if (appearance && appearance.accountId !== change.before.id) throw new Error('La apariencia no corresponde a esta cuenta.');
   await db.withExclusiveTransactionAsync(async tx => {
     const archive = await readArchive(tx);
     const receipt = await tx.getFirstAsync<{ beforeJSON: string; afterJSON: string; expectedBalanceMinor: number | null }>(
@@ -387,6 +516,7 @@ export async function changeAccount(db: LedgerDatabase, change: AccountChange): 
     if (receipt) {
       if (!sameAccount(JSON.parse(receipt.beforeJSON), change.before) || !sameAccount(JSON.parse(receipt.afterJSON), change.after)
         || receipt.expectedBalanceMinor !== change.expectedBalanceMinor) throw new Error('Esta operación ya existe con otros datos.');
+      if (appearance) await writeAppearance(tx, appearance, archive.accounts); // Identical after a failed refresh; otherwise the look was not saved yet.
       return;
     }
     const current = archive.accounts.find(a => a.id === change.before.id);
@@ -400,6 +530,7 @@ export async function changeAccount(db: LedgerDatabase, change: AccountChange): 
       change.after.name, change.after.openingMinor, change.after.revision!, change.after.updatedAt!, current.id);
     await tx.runAsync('INSERT INTO account_changes (id, accountId, beforeJSON, afterJSON, expectedBalanceMinor) VALUES (?, ?, ?, ?, ?)',
       change.id, current.id, JSON.stringify(change.before), JSON.stringify(change.after), change.expectedBalanceMinor);
+    if (appearance) await writeAppearance(tx, appearance, archive.accounts);
   });
 }
 

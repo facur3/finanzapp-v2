@@ -14,3 +14,5 @@ export * from './recurring.ts';
 export * from './budgets.ts';
 export * from './liabilities.ts';
 export * from './report-trend.ts';
+export * from './appearance.ts';
+export * from './categories.ts';

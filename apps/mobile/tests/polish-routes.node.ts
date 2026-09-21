@@ -40,7 +40,7 @@ function harness(file: string, params: Record<string, unknown> = {}, data: domai
   let cursor = 0;
   const ledger = { useLedger: () => ({ archive: data, snapshot: domain.snapshotFromArchive(data), saveRecurring: async (next: domain.RecurringRule) => { saved.push(next); } }) };
   const names = ['ActionButton', 'AppText', 'CategoryBadge', 'Choices', 'DetailRow', 'EmptyState', 'ErrorMessage', 'IconButton', 'Money', 'PressFeedback',
-    'Screen', 'SectionTitle', 'Stat', 'Surface', 'AccountRow'];
+    'Screen', 'SectionTitle', 'Stat', 'Surface', 'AccountRow', 'AccountBadge'];
   const theme = { space: { xs: 4, s: 8, m: 12, l: 16, xl: 20, xxl: 24, xxxl: 32 }, useCurrentDay: () => '2026-09-20', useReduceMotion: () => true,
     usePalette: () => ({ text: '#000', secondary: '#666', tertiary: '#999', line: '#ddd', inset: '#eee', expense: '#c00', income: '#080', warning: '#a60', primary: '#2557D6', background: '#fff', surface: '#fff' }) };
   const modules: Record<string, unknown> = {
@@ -64,6 +64,7 @@ function harness(file: string, params: Record<string, unknown> = {}, data: domai
     '../src/ui/presentation': presentation, '../../src/ui/presentation': presentation,
     '../src/ui/budget-presentation': budgetPresentation, '../../src/ui/budget-presentation': budgetPresentation,
     '../src/ui/theme': theme, '../../src/ui/theme': theme,
+    '../src/ui/category-hues': { useCategoryColor: () => '#3E6FB0', useCategoryLabel: (s: string) => s, useCategoryDefinitions: () => [], useCategoryLook: (s: string) => ({ label: s, storedLabel: s, key: String(s).toLowerCase(), hex: '#3E6FB0', glyph: 'pricetag-outline' }), useCategoryLookOf: () => (s: string) => ({ label: s, storedLabel: s, key: String(s).toLowerCase(), hex: '#3E6FB0', glyph: 'pricetag-outline' }), useAccountLook: () => ({ icon: 'wallet', color: 'cobalt', glyph: 'wallet-outline', hex: '#2557D6' }), useAccountLookOf: () => () => ({ icon: 'wallet', color: 'cobalt', glyph: 'wallet-outline', hex: '#2557D6' }) }, '../../src/ui/category-hues': { useCategoryColor: () => '#3E6FB0', useCategoryLabel: (s: string) => s, useCategoryDefinitions: () => [], useCategoryLook: (s: string) => ({ label: s, storedLabel: s, key: String(s).toLowerCase(), hex: '#3E6FB0', glyph: 'pricetag-outline' }), useCategoryLookOf: () => (s: string) => ({ label: s, storedLabel: s, key: String(s).toLowerCase(), hex: '#3E6FB0', glyph: 'pricetag-outline' }), useAccountLook: () => ({ icon: 'wallet', color: 'cobalt', glyph: 'wallet-outline', hex: '#2557D6' }), useAccountLookOf: () => () => ({ icon: 'wallet', color: 'cobalt', glyph: 'wallet-outline', hex: '#2557D6' }) },
   };
   const module = { exports: {} as { default?: () => Node } };
   runInNewContext(code, { module, exports: module.exports, require: (name: string) => {

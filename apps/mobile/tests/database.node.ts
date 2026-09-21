@@ -6,10 +6,12 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { accountBalanceMinor, archiveKey, createRecoveryBackup, initialRecord, makeEntryChange, parsePilotBackup, snapshotFromArchive, totalsByCurrency, type Account, type Entry,
   makeAccountChange, initialTransferRecord, makeTransferChange, type Transfer, type RecurringRule, type MonthlyBudget,
-  cardDebtMinor, debtOutstandingMinor, liquidTotalsByCurrency, spendingOverview, type CreditCardProfile, type PersonalDebtProfile } from '@finanzapp/domain';
+  cardDebtMinor, debtOutstandingMinor, liquidTotalsByCurrency, spendingOverview, type CreditCardProfile, type PersonalDebtProfile,
+  makeAccountAppearance, accountLook, newCategoryDefinition, editedCategoryDefinition, resolveCategory, categoryOptions, spendingReport,
+  summarizeMonthlyBudgets, type AccountAppearance } from '@finanzapp/domain';
 import { changeEntry, createAccount, createEntry, importArchive, initializeDatabase, readArchive, readSnapshot, changeAccount,
   createTransfer, changeTransfer, saveRecurringRule, processRecurring, saveMonthlyBudget,
-  createCreditCard, saveCreditCard, createPersonalDebt, savePersonalDebt, type LedgerDatabase } from '../src/storage/database.ts';
+  createCreditCard, saveCreditCard, createPersonalDebt, savePersonalDebt, saveAccountAppearance, saveCategoryDefinition, type LedgerDatabase } from '../src/storage/database.ts';
 import { runExclusiveTransaction, type TransactionConnection } from '../src/storage/transaction.ts';
 
 // Synthetic records in disposable databases only. Nothing seeds a user's app.
@@ -59,7 +61,7 @@ test('new install is empty; initialization can repeat without deleting data', as
   const { db } = setup();
   await initializeDatabase(db);
   assert.deepEqual(await readSnapshot(db), { accounts: [], entries: [] });
-  assert.equal((await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))?.user_version, 7);
+  assert.equal((await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))?.user_version, 8);
   await createAccount(db, account);
   await initializeDatabase(db);
   assert.deepEqual((await readSnapshot(db)).accounts, [account]);
@@ -145,9 +147,9 @@ test('newer database schema is refused intact instead of reset or downgraded', a
   const { db } = setup();
   await initializeDatabase(db);
   await createAccount(db, account);
-  await db.execAsync('PRAGMA user_version = 8');
+  await db.execAsync('PRAGMA user_version = 9');
   await assert.rejects(initializeDatabase(db), /versión más nueva/);
-  assert.equal((await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))?.user_version, 8);
+  assert.equal((await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))?.user_version, 9);
   assert.deepEqual((await readSnapshot(db)).accounts, [account]);
 });
 
@@ -500,9 +502,9 @@ test('v3 database upgrades through recurring and budget schemas without changing
   const { db } = await transferReady();
   await createTransfer(db, transfer);
   const before = await readSnapshot(db);
-  await db.execAsync('PRAGMA user_version = 3; DROP TABLE IF EXISTS recurring_rules; DROP TABLE IF EXISTS monthly_budgets; DROP TABLE IF EXISTS credit_cards; DROP TABLE IF EXISTS personal_debts;');
+  await db.execAsync('PRAGMA user_version = 3; DROP TABLE IF EXISTS account_appearances; DROP TABLE IF EXISTS category_definitions; DROP TABLE IF EXISTS recurring_rules; DROP TABLE IF EXISTS monthly_budgets; DROP TABLE IF EXISTS credit_cards; DROP TABLE IF EXISTS personal_debts;');
   await initializeDatabase(db);
-  assert.equal((await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))?.user_version, 7);
+  assert.equal((await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))?.user_version, 8);
   assert.deepEqual(await readSnapshot(db), before);
   assert.deepEqual((await readArchive(db)).recurring ?? [], []);
   assert.deepEqual((await readArchive(db)).budgets ?? [], []);
@@ -599,10 +601,10 @@ test('schema 4 upgrades to budget schema 5 without changing recurring rules or b
   await createAccount(db, account);
   await saveRecurringRule(db, recurring);
   const before = await readArchive(db);
-  await db.execAsync('DROP TABLE monthly_budgets; DROP TABLE credit_cards; DROP TABLE personal_debts; PRAGMA user_version = 4;');
+  await db.execAsync('DROP TABLE IF EXISTS account_appearances; DROP TABLE IF EXISTS category_definitions; DROP TABLE monthly_budgets; DROP TABLE credit_cards; DROP TABLE personal_debts; PRAGMA user_version = 4;');
   await initializeDatabase(db);
   const after = await readArchive(db);
-  assert.equal((await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))?.user_version, 7);
+  assert.equal((await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))?.user_version, 8);
   assert.deepEqual(after.accounts, before.accounts);
   assert.deepEqual(after.records, before.records);
   assert.deepEqual(after.recurring, before.recurring);
@@ -657,7 +659,7 @@ test('v5 backup/import preserves active and archived budgets without duplicating
   await saveMonthlyBudget(db, archived);
   const original = await readArchive(db);
   const backup = createRecoveryBackup(original);
-  assert.equal(backup.schema, 'finanzapp.native-pilot.v7');
+  assert.equal(backup.schema, 'finanzapp.native-pilot.v8');
   const incoming = parsePilotBackup(JSON.stringify(backup)).archive;
   assert.deepEqual(incoming.budgets, [archived]);
 
@@ -691,7 +693,7 @@ test('schema 6 upgrades to scoped budget schema 7: every old budget survives exa
   await saveRecurringRule(db, recurring);
   const before = await readArchive(db);
   // Rebuild the v6 table by hand and insert rows the old way (no scope column), including an archived one and an odd spelling.
-  await db.execAsync('DROP TABLE monthly_budgets;' + V6_BUDGETS_TABLE + " PRAGMA user_version = 6;");
+  await db.execAsync('DROP TABLE IF EXISTS account_appearances; DROP TABLE IF EXISTS category_definitions; DROP TABLE monthly_budgets;' + V6_BUDGETS_TABLE + " PRAGMA user_version = 6;");
   const legacy = [
     { ...monthlyBudget },
     { ...monthlyBudget, id: 'archived-fixture', category: ' fÍxture ', active: false, revision: 3, updatedAt: changedAt },
@@ -710,7 +712,7 @@ test('schema 6 upgrades to scoped budget schema 7: every old budget survives exa
   assert.equal((await db.getFirstAsync<{ n: number }>('SELECT count(*) AS n FROM monthly_budgets'))?.n, 3);
   await initializeDatabase(db);
   await initializeDatabase(db); // idempotent: a v7 file is not rebuilt again
-  assert.equal((await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))?.user_version, 7);
+  assert.equal((await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))?.user_version, 8);
   const after = await readArchive(db);
   assert.deepEqual(after.accounts, before.accounts);
   assert.deepEqual(after.records, before.records);
@@ -765,10 +767,11 @@ test('a total budget persists without a category, beside sublimits, once per cur
     [['october', 'total', true, 500000], ['replacement', 'total', true, 450000], ['total-fixture', 'total', false, 600000], ['budget-fixture', 'category', true, 20000], ['usd', 'total', true, 30000]]);
   // v7 backups round-trip totals; a v6 file with the same category budget still imports, as a category budget.
   const backup = createRecoveryBackup(archive);
-  assert.equal(backup.schema, 'finanzapp.native-pilot.v7');
+  assert.equal(backup.schema, 'finanzapp.native-pilot.v8');
   assert.equal(archiveKey(parsePilotBackup(JSON.stringify(backup)).archive), archiveKey(archive));
   const { scope: _scope, ...legacyRow } = monthlyBudget;
-  const v6 = { ...createRecoveryBackup({ accounts: archive.accounts, records: archive.records }), schema: 'finanzapp.native-pilot.v6', budgets: [legacyRow] };
+  const { appearances: _a6, categories: _c6, ...v7Shape } = createRecoveryBackup({ accounts: archive.accounts, records: archive.records });
+  const v6 = { ...v7Shape, schema: 'finanzapp.native-pilot.v6', budgets: [legacyRow] };
   const other = setup().db;
   await initializeDatabase(other);
   const incoming = parsePilotBackup(JSON.stringify(v6)).archive;
@@ -791,7 +794,7 @@ test('schema 5 upgrades to card/debt schema 6 preserving budgets, recurring rule
   await saveRecurringRule(db, recurring);
   await saveMonthlyBudget(db, monthlyBudget);
   const before = await readArchive(db);
-  await db.execAsync('DROP TABLE credit_cards; DROP TABLE personal_debts; PRAGMA user_version = 5;');
+  await db.execAsync('DROP TABLE IF EXISTS account_appearances; DROP TABLE IF EXISTS category_definitions; DROP TABLE credit_cards; DROP TABLE personal_debts; PRAGMA user_version = 5;');
   const failing: LedgerDatabase = { ...db, withExclusiveTransactionAsync: work => db.withExclusiveTransactionAsync(tx => work({ ...tx,
     execAsync: async sql => { await tx.execAsync(sql); if (sql.includes('personal_debts')) throw new Error('Interrupted v6'); },
   })) };
@@ -799,7 +802,7 @@ test('schema 5 upgrades to card/debt schema 6 preserving budgets, recurring rule
   assert.equal((await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))?.user_version, 5);
   await initializeDatabase(db);
   const after = await readArchive(db);
-  assert.equal((await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))?.user_version, 7);
+  assert.equal((await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))?.user_version, 8);
   assert.equal(archiveKey(after), archiveKey(before));
   assert.deepEqual(after.cards ?? [], []);
   assert.deepEqual(after.debts ?? [], []);
@@ -921,7 +924,7 @@ test('v6 backup roundtrips cards and debts; additive import never duplicates the
   await createPersonalDebt(db, debtAccount, debt);
   const original = await readArchive(db);
   const backup = createRecoveryBackup(original);
-  assert.equal(backup.schema, 'finanzapp.native-pilot.v7');
+  assert.equal(backup.schema, 'finanzapp.native-pilot.v8');
   const incoming = parsePilotBackup(JSON.stringify(backup)).archive;
   assert.deepEqual(incoming.cards, original.cards);
   assert.deepEqual(incoming.debts, original.debts);
@@ -941,4 +944,192 @@ test('v6 backup roundtrips cards and debts; additive import never duplicates the
   assert.equal(cardDebtMinor(card, snapshotFromArchive(restored)), 20000 + 23100 - 30000);
   assert.equal(debtOutstandingMinor(debt, snapshotFromArchive(restored)), 30000);
   assert.deepEqual(liquidTotalsByCurrency(snapshotFromArchive(restored), restored.cards, restored.debts), { ARS: 100000 - 12345 - 30000 });
+});
+
+// Producto 20: presentation identity. Every test below checks that balances,
+// entries, transfers, budgets and rules are byte-identical before and after.
+const financialKey = (archive: Awaited<ReturnType<typeof readArchive>>) => archiveKey({ accounts: archive.accounts, records: archive.records,
+  transfers: archive.transfers, recurring: archive.recurring, budgets: archive.budgets, cards: archive.cards, debts: archive.debts });
+
+test('schema 7 upgrades to identity schema 8 additively: existing accounts keep the default look, nothing is seeded, interruption is safe', async () => {
+  const { db, path } = await funded();
+  await saveRecurringRule(db, recurring);
+  await saveMonthlyBudget(db, monthlyBudget);
+  const before = await readArchive(db);
+  await db.execAsync('DROP TABLE account_appearances; DROP TABLE category_definitions; PRAGMA user_version = 7;');
+  const failing: LedgerDatabase = { ...db, withExclusiveTransactionAsync: work => db.withExclusiveTransactionAsync(tx => work({ ...tx,
+    execAsync: async sql => { await tx.execAsync(sql); if (sql.includes('category_definitions')) throw new Error('Interrupted v8'); },
+  })) };
+  await assert.rejects(initializeDatabase(failing), /Interrupted v8/);
+  assert.equal((await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))?.user_version, 7);
+  assert.equal((await db.getAllAsync("SELECT name FROM sqlite_master WHERE name IN ('account_appearances', 'category_definitions')")).length, 0);
+  await initializeDatabase(db);
+  await initializeDatabase(db); // idempotent
+  assert.equal((await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))?.user_version, 8);
+  const after = await readArchive(db);
+  assert.equal(archiveKey(after), archiveKey(before), 'no financial row changed and no appearance/category row was seeded');
+  assert.equal(after.appearances, undefined);
+  assert.equal(after.categories, undefined);
+  assert.deepEqual(accountLook(account.id, after.appearances), { icon: 'wallet', color: 'cobalt' });
+  await db.closeAsync();
+  const reopened = databaseAt(path);
+  await initializeDatabase(reopened);
+  assert.equal(archiveKey(await readArchive(reopened)), archiveKey(before));
+});
+
+test('an account look is created with the account, persists across restart, and retries without duplicating either', async () => {
+  const { db, path } = setup();
+  await initializeDatabase(db);
+  const look = makeAccountAppearance(account.id, 'bank', 'azure', account.createdAt);
+  await createAccount(db, account, look);
+  await createAccount(db, account, look); // same command again
+  const saved = await readArchive(db);
+  assert.deepEqual(saved.accounts, [account]);
+  assert.deepEqual(saved.appearances, [look]);
+  await assert.rejects(createAccount(db, account, { ...look, color: 'rose' }), /ya existe/);
+  await assert.rejects(createAccount(db, { ...account, id: 'plain' }, { ...look, accountId: 'plain', icon: 'rocket' as never }), /ícono/);
+  await assert.rejects(createAccount(db, { ...account, id: 'plain' }, { ...look, accountId: 'plain', color: '#FF0000' as never }), /color/);
+  assert.equal((await readArchive(db)).accounts.length, 1, 'an invalid look never creates the account either');
+  await createAccount(db, { ...account, id: 'plain' }); // a look is optional
+  await db.closeAsync();
+  const reopened = databaseAt(path);
+  await initializeDatabase(reopened);
+  const archive = await readArchive(reopened);
+  assert.deepEqual(archive.appearances, [look]);
+  assert.deepEqual(accountLook('plain', archive.appearances), { icon: 'wallet', color: 'cobalt' });
+});
+
+test('editing a look changes no financial field, no account revision and no audit; a stale look is refused', async () => {
+  const { db } = await funded();
+  await createTransfer(db, { ...transfer, toAccountId: account.id, fromAccountId: 'x' }).catch(() => {});
+  const before = await readArchive(db);
+  const first = makeAccountAppearance(account.id, 'cash', 'green', changedAt);
+  await saveAccountAppearance(db, first);
+  await saveAccountAppearance(db, first);
+  const next = makeAccountAppearance(account.id, 'savings', 'teal', '2026-09-14T12:00:00.000Z', first);
+  await saveAccountAppearance(db, next);
+  await saveAccountAppearance(db, next);
+  await assert.rejects(saveAccountAppearance(db, next.revision === 1 ? { ...first, icon: 'safe' } : next), /cambió/);
+  await assert.rejects(saveAccountAppearance(db, { ...next, accountId: 'ghost' }), /cuenta existente/);
+  const after = await readArchive(db);
+  assert.equal(financialKey(after), financialKey(before));
+  assert.deepEqual(after.accounts, before.accounts, 'the account row keeps revision 0 and its name/opening balance');
+  assert.equal((await db.getAllAsync('SELECT id FROM account_changes')).length, 0, 'a look is not an account correction');
+  assert.deepEqual(after.appearances, [next]);
+  assert.equal(accountBalanceMinor(after.accounts[0], snapshotFromArchive(after).entries), 100000 - 12345);
+  // Renaming and re-dressing in one commit: the correction receipt never includes the look.
+  const change = makeAccountChange('rename', after.accounts[0], snapshotFromArchive(after), 'Cuenta renombrada', 100000 - 12345, changedAt);
+  const look = makeAccountAppearance(account.id, 'bank', 'cobalt', changedAt, next);
+  await changeAccount(db, change, look);
+  await changeAccount(db, change, look);
+  const renamed = await readArchive(db);
+  assert.equal(renamed.accounts[0].name, 'Cuenta renombrada');
+  assert.deepEqual(renamed.appearances, [look]);
+  const receipt = await db.getFirstAsync<{ afterJSON: string }>('SELECT afterJSON FROM account_changes WHERE id = ?', 'rename');
+  assert.equal(JSON.parse(receipt!.afterJSON).icon, undefined);
+  assert.equal(accountBalanceMinor(renamed.accounts[0], snapshotFromArchive(renamed).entries), 100000 - 12345);
+});
+
+test('a look for a hidden card or debt account is rejected by the forms, and an orphan look row cannot exist', async () => {
+  const { db } = await funded();
+  await assert.rejects(db.withExclusiveTransactionAsync(tx => tx.runAsync(
+    "INSERT INTO account_appearances (accountId, icon, color, createdAt, revision, updatedAt) VALUES ('ghost', 'wallet', 'cobalt', '2026-09-01T12:00:00.000Z', 0, '2026-09-01T12:00:00.000Z')")
+    .then(() => {})), /FOREIGN KEY/);
+  assert.equal((await readArchive(db)).appearances, undefined);
+});
+
+test('categories: create, rename as display identity, change icon/colour and archive without rewriting any entry, budget or rule', async () => {
+  const { db, path } = await funded();
+  await createEntry(db, { ...expense, id: 'food-1', category: 'Comida', amountMinor: 700 });
+  await createEntry(db, { ...expense, id: 'food-2', category: 'COMIDA', amountMinor: 300 });
+  await createEntry(db, { ...expense, id: 'legacy', category: 'sjsjn', amountMinor: 100 });
+  await saveRecurringRule(db, { ...recurring, category: 'Comida' });
+  await saveMonthlyBudget(db, { ...monthlyBudget, category: 'Comida' });
+  const before = await readArchive(db);
+  const kiosco = newCategoryDefinition('expense', ' Kiosco ', 'cafe', 'ochre', changedAt);
+  await saveCategoryDefinition(db, kiosco);
+  await saveCategoryDefinition(db, kiosco);
+  await assert.rejects(saveCategoryDefinition(db, { ...kiosco, color: 'rose' }), /cambió/, 'a second first-revision write with other data is stale');
+  await assert.rejects(saveCategoryDefinition(db, newCategoryDefinition('expense', 'Bar', 'emoji' as never, 'ochre', changedAt)), /ícono/);
+  await assert.rejects(saveCategoryDefinition(db, newCategoryDefinition('expense', 'Bar', 'cafe', 'neon' as never, changedAt)), /color/);
+  await assert.rejects(saveCategoryDefinition(db, { ...newCategoryDefinition('expense', 'Bar', 'cafe', 'ochre', changedAt), label: 'Supermercado' }), /otra categoría/);
+  // Rename the preset "Comida": the definition adopts the key and keeps recording "Comida".
+  const renamed = editedCategoryDefinition(resolveCategory('expense', 'Comida', (await readArchive(db)).categories), { label: 'Alimentación', color: 'green' }, changedAt);
+  await saveCategoryDefinition(db, renamed);
+  await saveCategoryDefinition(db, renamed);
+  const again = editedCategoryDefinition(resolveCategory('expense', 'Comida', (await readArchive(db)).categories), { icon: 'restaurant' }, '2026-09-14T12:00:00.000Z');
+  await saveCategoryDefinition(db, again);
+  await assert.rejects(saveCategoryDefinition(db, { ...again, storedLabel: 'Alimentación', key: 'alimentacion' }), /cambió|identidad|previos/, 'the stored spelling never changes: a different key is another (new) identity');
+  await assert.rejects(saveCategoryDefinition(db, { ...again, label: 'Kiosco', revision: again.revision + 1 }), /otra categoría/);
+  // Archive the historical "sjsjn".
+  const archived = editedCategoryDefinition(resolveCategory('expense', 'sjsjn'), { archived: true }, changedAt);
+  await saveCategoryDefinition(db, archived);
+  const after = await readArchive(db);
+  assert.equal(financialKey(after), financialKey(before), 'entries, budgets and rules are byte-identical');
+  assert.deepEqual(after.records.map(record => record.entry.category), before.records.map(record => record.entry.category));
+  assert.deepEqual(after.categories!.map(item => [item.key, item.label, item.icon, item.color, item.archived, item.revision]),
+    [['comida', 'Alimentación', 'restaurant', 'green', false, 1], ['kiosco', 'Kiosco', 'cafe', 'ochre', false, 0], ['sjsjn', 'sjsjn', 'other', 'graphite', true, 0]]);
+  // Reports keep one group for Comida/COMIDA and the display name follows the definition; budgets and rules resolve to it too.
+  const snapshot = snapshotFromArchive(after);
+  const report = spendingReport(snapshot, 'ARS', '2026-09', '2026-09-30');
+  const food = report.categories.find(item => item.key === 'comida')!;
+  assert.equal(food.amountMinor, 1000);
+  assert.equal(resolveCategory('expense', food.category, after.categories).label, 'Alimentación');
+  assert.equal(summarizeMonthlyBudgets(snapshot, after.budgets!, 'ARS', '2026-09').rows.find(row => row.budget.category === 'Comida')?.spentMinor, 1000);
+  assert.equal(resolveCategory('expense', after.recurring![0].category, after.categories).label, 'Alimentación');
+  // The picker offers the renamed identity (recording "Comida"), the custom one, and hides the archived string unless it is the current value.
+  const options = categoryOptions('expense', after.categories, snapshot.entries);
+  assert.deepEqual(options.find(item => item.key === 'comida')!.storedLabel, 'Comida');
+  assert.ok(options.some(item => item.label === 'Kiosco'));
+  assert.ok(!options.some(item => item.key === 'sjsjn'));
+  assert.equal(categoryOptions('expense', after.categories, snapshot.entries, '', 'sjsjn')[0].label, 'sjsjn');
+  assert.equal(resolveCategory('expense', 'sjsjn', after.categories).archived, true, 'historical movements still resolve');
+  await db.closeAsync();
+  const reopened = databaseAt(path);
+  await initializeDatabase(reopened);
+  assert.equal(archiveKey(await readArchive(reopened)), archiveKey(after));
+});
+
+test('v8 backup round-trips looks and categories; v7 files import without them; identity rows import additively and conflicts block', async () => {
+  const { db } = await funded();
+  const look = makeAccountAppearance(account.id, 'bank', 'azure', changedAt);
+  await saveAccountAppearance(db, look);
+  await saveCategoryDefinition(db, newCategoryDefinition('expense', 'Kiosco', 'cafe', 'ochre', changedAt));
+  const original = await readArchive(db);
+  const backup = createRecoveryBackup(original);
+  assert.equal(backup.schema, 'finanzapp.native-pilot.v8');
+  assert.deepEqual(backup.appearances, [look]);
+  assert.equal(backup.categories.length, 1);
+  const incoming = parsePilotBackup(JSON.stringify(backup)).archive;
+  assert.equal(archiveKey(incoming), archiveKey(original));
+
+  const other = setup().db;
+  await initializeDatabase(other);
+  const baseline = archiveKey(await readArchive(other));
+  const failing: LedgerDatabase = { ...other, withExclusiveTransactionAsync: work => other.withExclusiveTransactionAsync(tx => work({ ...tx,
+    runAsync: async (sql, ...params) => { if (sql.includes('INSERT INTO category_definitions')) throw new Error('Interrupted identity import'); return tx.runAsync(sql, ...params); },
+  })) };
+  await assert.rejects(importArchive(failing, incoming, baseline), /Interrupted/);
+  assert.equal(archiveKey(await readArchive(other)), baseline);
+  await importArchive(other, incoming, baseline);
+  await importArchive(other, incoming, baseline);
+  const restored = await readArchive(other);
+  assert.equal(archiveKey(restored), archiveKey(original));
+  assert.deepEqual(totalsByCurrency(snapshotFromArchive(restored)), totalsByCurrency(snapshotFromArchive(original)));
+  // A different look for the same account in a copy is a conflict: the local choice is never overwritten.
+  await assert.rejects(importArchive(other, { ...incoming, appearances: [{ ...look, color: 'rose' }] }, archiveKey(restored)), /contradice/);
+  assert.deepEqual((await readArchive(other)).appearances, [look]);
+  // A v7 file (no identity arrays) still imports; the account then shows the default look.
+  const { appearances: _a, categories: _c, ...rest } = backup;
+  const v7 = parsePilotBackup(JSON.stringify({ ...rest, schema: 'finanzapp.native-pilot.v7' })).archive;
+  assert.equal(v7.appearances, undefined);
+  const third = setup().db;
+  await initializeDatabase(third);
+  await importArchive(third, v7, archiveKey(await readArchive(third)));
+  const plain = await readArchive(third);
+  assert.deepEqual(plain.accounts, original.accounts);
+  assert.deepEqual(accountLook(account.id, plain.appearances), { icon: 'wallet', color: 'cobalt' });
+  // Invalid identity rows are refused before anything is written.
+  assert.throws(() => parsePilotBackup(JSON.stringify({ ...backup, appearances: [{ ...look, icon: 'rocket' }] })), /ícono/);
+  assert.throws(() => parsePilotBackup(JSON.stringify({ ...backup, categories: [{ ...backup.categories[0], color: 'neon' }] })), /color/);
 });

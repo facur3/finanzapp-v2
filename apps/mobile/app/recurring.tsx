@@ -102,7 +102,7 @@ function RecurringRow({ rule, accounts, day, last, busy, onToggle }: {
     <PressFeedback feedback="highlight" accessibilityRole="button" accessibilityLabel={`Editar recurrente ${rule.merchant}, ${FREQUENCY[rule.frequency].toLowerCase()}, ${formatMinorUnits(rule.amountMinor)} ${account?.currency ?? ''}, próximo ${date}`}
       onPress={() => router.push({ pathname: '/edit-recurring/[id]', params: { id: rule.id } })}
       containerStyle={{ flex: 1 }} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, paddingLeft: 16, minHeight: 64 }}>
-      <CategoryBadge category={rule.category} tone={income ? 'income' : 'neutral'} />
+      <CategoryBadge category={rule.category} kind={rule.kind} tone={income ? 'income' : 'neutral'} />
       <View style={{ flex: 1, minWidth: 0, gap: 3 }}>
         <AppText numberOfLines={1} style={{ fontWeight: '500' }}>{rule.merchant}</AppText>
         <AppText secondary variant="footnote" numberOfLines={1}>{FREQUENCY[rule.frequency]} · {date}{account ? ' · ' + account.name : ''}</AppText>

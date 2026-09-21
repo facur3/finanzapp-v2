@@ -1,6 +1,6 @@
 # FinanzApp mobile: living roadmap
 
-Updated: 2026-09-20. Read [decision 001](decisions/001-native-mobile.md),
+Updated: 2026-09-21. Read [decision 001](decisions/001-native-mobile.md),
 [decision 002](decisions/002-spending-first.md) and
 [decision 003](decisions/003-five-tabs-and-cards.md). Decision 002 supersedes earlier
 full-finance migration phases and the local-only AI preference. Handoff entries
@@ -15,10 +15,87 @@ server-keyed; manual recording and local data work without connectivity. Recurri
 expenses, debts, budgets and cards remain in scope. Native navigation, accessible
 amounts, real data and recoverable durable writes remain requirements.
 
-## Status and current delivery — Producto 19
+## Status and current delivery — Producto 20
 
 Implemented is code, checked names a test, device-verified needs a physical result,
 and released means distributed. Neither a bundle nor a screenshot is App Store QA.
+
+Producto 20 — Personalization gives financial objects a user-controlled visual
+identity: custom categories and account identity, on one shared foundation. It is
+not a redesign: the cobalt primary, the semantic colours, typography and motion stay.
+
+- [x] **Category identity model** (`packages/domain/categories.ts`). `Entry.category`
+  stays a free string and every consumer (reports, budgets, recurring rules, backups)
+  keeps grouping by `categoryKey(string)`. Identity is `(kind, key)`. **Presets** live
+  in code with label, icon and colour (nothing seeded). A **definition** row decorates
+  one identity: `label` (display), `icon`, `color`, `archived`, and `storedLabel`, the
+  exact string new movements record, fixed at creation so its key never changes.
+  Renaming "Comida" to "Alimentación" keeps recording "Comida": old and new movements
+  resolve to one identity and Reportes never splits one category in two. A string with
+  no definition and no preset is **historical**: rendered as stored with a deterministic
+  synonym glyph and one of the eight muted hues. `resolveCategory`, `categoryOptions`
+  (picker: current value first even if archived, then recorded most recent first, then
+  the catalogue, archived excluded), `categoryCatalog` (management list with usage) and
+  `validateCategoryDefinitions` (unique identity; within a kind no display name can read
+  as another definition or preset).
+- [x] **Account appearance** (`packages/domain/appearance.ts`): `AccountAppearance` is
+  a profile beside the account (`accountId`, `icon`, `color`, version), like a card or a
+  debt profile. The `accounts` row, its audit and its backup shape are untouched; an
+  account without a row shows wallet on cobalt (`accountLook`), so existing accounts
+  migrate by reading, with nothing written. Curated ids: twelve account icons, 37
+  category icons, eleven colours with accessible Spanish names and light/dark hex
+  pairs (no expense coral). Invalid ids are refused on write/import and fall back on read.
+- [x] **SQLite schema 8** (`MIGRATE_V8`): `account_appearances` (PK accountId, FK to
+  accounts) and `category_definitions` (PK kind + key), additive, no rows, one exclusive
+  transaction; an interruption leaves the schema 7 file untouched; idempotent.
+  `createAccount(db, account, look?)` and `changeAccount(db, change, look?)` write the
+  look in the same commit; `saveAccountAppearance` changes only the look (no account
+  revision, no receipt); `saveCategoryDefinition` upserts one identity with stale-revision
+  and stored-spelling checks and validates the whole collection.
+- [x] **Backup v8** (`finanzapp.native-pilot.v8`): adds `appearances` and `categories`;
+  every financial array is byte-identical to v7. v1–v7 files import as before; a v7 file
+  cannot carry the new arrays; import is additive by account / identity, and a differing
+  look or definition is a conflict, never an overwrite.
+- [x] **Shared picker** (`src/ui/appearance-picker.tsx`): preview tile with the name,
+  Icono as a grid of 44 pt round tiles, Color as a row of dots; the chosen tile fills with
+  the chosen colour and gets a ring, the chosen dot a ring and a check; one selection
+  haptic per change; colour-only transitions (0 ms under Reduce Motion); radio semantics
+  with real names ("Banco", "Celeste"). Account and category forms share it.
+- [x] **Account surfaces**: `AccountBadge` in Cuentas rows, account detail, both
+  `AccountField` presentations and their sheets (Pagado con / Ingresa en, Desde / Hacia,
+  recurring), movement detail (Cuenta row) and transfer detail (Desde / Hacia). Cards and
+  debts keep their own glyphs. Colour lives in the tile only; rows, amounts and screens
+  stay neutral. Nueva cuenta asks Nombre, Icono, Color, Moneda, Saldo inicial; Editar
+  cuenta changes name, icon and colour (one commit with the correction when both change),
+  currency stays immutable.
+- [x] **Categories**: Más → Categorías lists Gastos / Ingresos (presets, custom and
+  historical with usage) and an Archivadas group; "+" opens Nueva categoría (kind, name,
+  icon, colour, available at once); tapping a row opens Editar categoría (name, icon,
+  colour, Archivar / Desarchivar with confirmation). Every row shows the display name
+  through the identity: rows, detail, picker, Home ranking, Reportes legend/donut/
+  merchants, Presupuestos, recurring, drill-downs. No hard delete: archive-first.
+- [x] **Default catalogue**: expense Comida, Supermercado, Restaurantes, Transporte,
+  Combustible, Hogar, Alquiler, Servicios, Suscripciones, Salud, Farmacia, Educación,
+  Ropa, Tecnología, Ocio, Viajes, Mascotas, Regalos, Impuestos, Seguros, Otros; income
+  Sueldo, Trabajo, Ventas, Inversiones, Regalos, Reembolsos, Préstamos, Otros. A recorded
+  odd spelling ("EDUCACION") now displays the preset label; the stored string is kept.
+- [x] **Más**: Finanzas rows carry a soft tinted tile each (cobalt, teal, indigo, ochre,
+  slate); App y datos stays neutral. Categorías shows the count of personalised ones.
+- [x] **Assistant**: unchanged, still a preview under Más. Future direction is recorded
+  under Next deliverables.
+- [ ] Physical iPhone review: see the device checklist (picker touch/haptics, tiles in
+  both themes, schema 8 upgrade on the real file, v8 backup, VoiceOver names).
+
+Producto 20 verification adds domain tests (`appearance.test.ts`, `categories.test.ts`,
+`recovery.test.ts` v8 round trip / v7 import / smuggling / conflicts), storage tests
+(`database.node.ts`: schema 7 → 8 with interruption and idempotence, look create/edit/
+retry with byte-identical financial data and no audit, category create/rename/archive
+without rewriting entries/budgets/rules, v8 backup and v7 import, invalid ids refused),
+and UI tests (`appearance.node.ts`: every glyph exists in the bundled Ionicons font,
+palette contrast on surface and tint, fallbacks; `categories.node.ts`; `more-routes`;
+`personalization-routes.node.ts`: account forms, category form, selectors, picker).
+
+### Previous delivery — Producto 19
 
 Producto 19 — Budgets 2 makes budgets a complete, financially coherent feature. A
 budget is a planning limit; it never changes what a movement is. No visual redesign.
@@ -556,9 +633,16 @@ by CI and merged into master before the next starts:
 6. ~~Motion system, Home composition and category colour~~ — delivered in Interfaz 15.
 7. ~~Native visual cohesion and information hierarchy~~ — delivered in Interfaz 16.
 8. ~~Visual identity and monetary experience~~ — delivered in Interfaz 17.
-9. **Custom categories** (Interfaz 18): categories table decorating stored strings,
-   rename as display label, archive instead of delete, migration v7, backup v7.
-10. **EAS development build and Apple integrations** (Face ID, notifications with
+9. ~~Custom categories and account identity~~ — delivered in Producto 20 (definitions
+   decorating stored strings, display rename, archive-first, schema 8, backup v8).
+10. **Assistant (future, not in Producto 20)**: a text composer, a voice affordance,
+    a streaming conversation, suggested questions, structured draft cards for actions
+    such as recording an expense, explicit confirmation before any financial write,
+    and links to the supporting FinanzApp records. When it becomes functional it may
+    regain a prominent Home/header entry point; until then it stays under Más as
+    Vista previa. No Supabase, auth or cloud sync is wired in the app yet; the local
+    SQLite ledger remains the source of truth and the cloud foundation is its own phase.
+11. **EAS development build and Apple integrations** (Face ID, notifications with
     the card due-date reminder, Apple Pay capture, App Intents) only after the core
     product is stable on device.
 
@@ -641,6 +725,20 @@ targets, VoiceOver, safe areas, system text and separate currencies apply to eve
 new screen.
 
 ## Handoff log (historical evidence)
+
+### 2026-09-21 — Producto 20: custom categories and account identity
+
+- Category identity model (presets in code, definitions per kind + normalised key,
+  display rename with a fixed stored spelling, archive-first), account looks as a
+  profile beside the account, SQLite schema 8 (two additive tables, nothing seeded),
+  backup v8 with v1–v7 compatibility, one shared icon/colour picker, account identity
+  across Cuentas, detail, selectors and detail rows, category management (create, edit,
+  archive), tinted Más → Finanzas tiles. Assistant untouched (preview under Más).
+- **Checked on Linux:** 397 root tests (vitest), 229 mobile tests (Node SQLite, route
+  and source harnesses), TypeScript, Expo dependency check, `npm ls --all`, Metro iOS
+  export, Vite build, repo hygiene. **Not device-verified:** picker gestures/haptics,
+  tiles in both themes and Dynamic Type, schema 8 upgrade on the real pilot file, v8
+  share/import on iOS, VoiceOver reading of the picker.
 
 ### 2026-09-21 — Producto 19: monthly total budget and category sublimits
 

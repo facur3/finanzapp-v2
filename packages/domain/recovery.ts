@@ -4,6 +4,8 @@ import { sameRecurringRule, validateRecurringRule, type RecurringRule } from './
 import { sameMonthlyBudget, scopedMonthlyBudget, validateBudgetCollection, validateMonthlyBudget, type MonthlyBudget } from './budgets.ts';
 import { liquidTotalsByCurrency, sameCreditCardProfile, samePersonalDebtProfile, validateCreditCardProfile, validateLiabilityProfiles,
   validatePersonalDebtProfile, type CreditCardProfile, type PersonalDebtProfile } from './liabilities.ts';
+import { APPEARANCE_KEYS, sameAccountAppearance, validateAccountAppearance, validateAccountAppearances, type AccountAppearance } from './appearance.ts';
+import { CATEGORY_DEFINITION_KEYS, sameCategoryDefinition, validateCategoryDefinition, validateCategoryDefinitions, type CategoryDefinition } from './categories.ts';
 
 /** The current version of every entry, including reversible tombstones.
  * Reports consume snapshotFromArchive, never the tombstones themselves. */
@@ -21,6 +23,9 @@ export interface LedgerArchive {
   budgets?: MonthlyBudget[];
   cards?: CreditCardProfile[];
   debts?: PersonalDebtProfile[];
+  /** Producto 20: presentation metadata. Neither changes a balance. */
+  appearances?: AccountAppearance[];
+  categories?: CategoryDefinition[];
 }
 export interface EntryChange {
   id: string;
@@ -98,6 +103,19 @@ function debtValue(value: unknown, accounts: Account[]): PersonalDebtProfile {
   validatePersonalDebtProfile(debt, accounts);
   return debt;
 }
+function appearanceValue(value: unknown, accounts: Account[]): AccountAppearance {
+  const row = object(value, APPEARANCE_KEYS);
+  const appearance = Object.fromEntries(APPEARANCE_KEYS.map(key => [key, row[key]])) as unknown as AccountAppearance;
+  validateAccountAppearance(appearance, accounts);
+  return appearance;
+}
+function categoryValue(value: unknown): CategoryDefinition {
+  const row = object(value, CATEGORY_DEFINITION_KEYS);
+  const definition = Object.fromEntries(CATEGORY_DEFINITION_KEYS.map(key => [key, row[key]])) as unknown as CategoryDefinition;
+  validateCategoryDefinition(definition);
+  return definition;
+}
+const categoryIdentity = (definition: CategoryDefinition) => definition.kind + '|' + definition.key;
 export function initialRecord(entry: Entry): EntryRecord {
   return { entry, revision: 0, voided: false, updatedAt: entry.createdAt };
 }
@@ -142,6 +160,8 @@ export function validateArchive(archive: LedgerArchive): void {
   }
   validateBudgetCollection(archive.budgets ?? []);
   validateLiabilityProfiles(archive.cards ?? [], archive.debts ?? [], archive.accounts);
+  validateAccountAppearances(archive.appearances ?? [], archive.accounts);
+  validateCategoryDefinitions(archive.categories ?? []);
   totalsByCurrency(snapshotFromArchive(archive));
 }
 export function sameAccount(a: Account, b: Account): boolean {
@@ -167,6 +187,10 @@ function canonicalArchive(archive: LedgerArchive): LedgerArchive {
       .sort((a, b) => a.id.localeCompare(b.id)) } : {}),
     ...(archive.debts?.length ? { debts: archive.debts.map(debt => debtValue(debt, archive.accounts))
       .sort((a, b) => a.id.localeCompare(b.id)) } : {}),
+    ...(archive.appearances?.length ? { appearances: archive.appearances.map(item => appearanceValue(item, archive.accounts))
+      .sort((a, b) => a.accountId.localeCompare(b.accountId)) } : {}),
+    ...(archive.categories?.length ? { categories: archive.categories.map(item => categoryValue(item))
+      .sort((a, b) => categoryIdentity(a).localeCompare(categoryIdentity(b))) } : {}),
   };
 }
 function transferValue(value: unknown, accounts: Account[]): TransferRecord {
@@ -202,10 +226,11 @@ export function validateEntryChange(change: EntryChange, accounts: Account[]): v
 export function createRecoveryBackup(archive: LedgerArchive, now = new Date()) {
   validateArchive(archive);
   const canonical = canonicalArchive(archive);
-  return { app: 'FinanzApp', schema: 'finanzapp.native-pilot.v7', exportedAt: now.toISOString(),
+  return { app: 'FinanzApp', schema: 'finanzapp.native-pilot.v8', exportedAt: now.toISOString(),
     moneyUnit: 'integer-minor-units', ...canonical, transfers: canonical.transfers ?? [],
     recurring: canonical.recurring ?? [], budgets: canonical.budgets ?? [],
-    cards: canonical.cards ?? [], debts: canonical.debts ?? [] };
+    cards: canonical.cards ?? [], debts: canonical.debts ?? [],
+    appearances: canonical.appearances ?? [], categories: canonical.categories ?? [] };
 }
 export interface ParsedBackup { archive: LedgerArchive; exportedAt: string; }
 export function parsePilotBackup(raw: string): ParsedBackup {
@@ -221,13 +246,16 @@ export function parsePilotBackup(raw: string): ParsedBackup {
   const v5 = header.schema === 'finanzapp.native-pilot.v5';
   const v6 = header.schema === 'finanzapp.native-pilot.v6';
   const v7 = header.schema === 'finanzapp.native-pilot.v7';
-  if (!v1 && !v2 && !v3 && !v4 && !v5 && !v6 && !v7) {
-    throw new Error('Solo se pueden restaurar copias del piloto nativo v1 a v7. La app web/anterior y otras versiones todavía no son compatibles; conservá el archivo.');
+  const v8 = header.schema === 'finanzapp.native-pilot.v8';
+  if (!v1 && !v2 && !v3 && !v4 && !v5 && !v6 && !v7 && !v8) {
+    throw new Error('Solo se pueden restaurar copias del piloto nativo v1 a v8. La app web/anterior y otras versiones todavía no son compatibles; conservá el archivo.');
   }
-  const hasTransfers = v3 || v4 || v5 || v6 || v7, hasRecurring = v4 || v5 || v6 || v7, hasBudgets = v5 || v6 || v7, hasLiabilities = v6 || v7;
+  const hasTransfers = v3 || v4 || v5 || v6 || v7 || v8, hasRecurring = v4 || v5 || v6 || v7 || v8, hasBudgets = v5 || v6 || v7 || v8;
+  const hasLiabilities = v6 || v7 || v8, hasScopedBudgets = v7 || v8, hasIdentity = v8;
   object(value, ['app', 'schema', 'exportedAt', 'moneyUnit', 'accounts', v1 ? 'entries' : 'records',
     ...(hasTransfers ? ['transfers'] : []), ...(hasRecurring ? ['recurring'] : []),
-    ...(hasBudgets ? ['budgets'] : []), ...(hasLiabilities ? ['cards', 'debts'] : [])]);
+    ...(hasBudgets ? ['budgets'] : []), ...(hasLiabilities ? ['cards', 'debts'] : []),
+    ...(hasIdentity ? ['appearances', 'categories'] : [])]);
   if (header.app !== 'FinanzApp' || header.moneyUnit !== 'integer-minor-units') throw new Error('Formato o unidad monetaria no compatibles.');
   timestamp(header.exportedAt);
   const rows = v1 ? header.entries : header.records;
@@ -246,6 +274,10 @@ export function parsePilotBackup(raw: string): ParsedBackup {
   if (hasLiabilities && (!Array.isArray(header.cards) || !Array.isArray(header.debts) || header.cards.length + header.debts.length > 1000)) {
     throw new Error('La copia contiene demasiadas tarjetas/deudas o un formato inválido.');
   }
+  if (hasIdentity && (!Array.isArray(header.appearances) || !Array.isArray(header.categories)
+    || header.appearances.length > 1000 || header.categories.length > 2000)) {
+    throw new Error('La copia contiene demasiadas apariencias/categorías o un formato inválido.');
+  }
   const accounts = header.accounts.map(a => accountValue(a, hasTransfers));
   const records = rows.map((value): EntryRecord => {
     if (v1) return initialRecord(entryValue(value, accounts));
@@ -254,13 +286,17 @@ export function parsePilotBackup(raw: string): ParsedBackup {
   });
   const transfers = hasTransfers ? (header.transfers as unknown[]).map(t => transferValue(t, accounts)) : [];
   const recurring = hasRecurring ? (header.recurring as unknown[]).map(rule => recurringValue(rule, accounts)) : [];
-  // Only a v7 file may carry scoped budgets; v5/v6 budgets are read as category budgets.
-  const budgets = hasBudgets ? (header.budgets as unknown[]).map(budget => budgetValue(budget, !v7)) : [];
+  // Only a v7+ file may carry scoped budgets; v5/v6 budgets are read as category budgets.
+  const budgets = hasBudgets ? (header.budgets as unknown[]).map(budget => budgetValue(budget, !hasScopedBudgets)) : [];
   const cards = hasLiabilities ? (header.cards as unknown[]).map(card => cardValue(card, accounts)) : [];
   const debts = hasLiabilities ? (header.debts as unknown[]).map(debt => debtValue(debt, accounts)) : [];
+  // v1–v7 files carry no identity: their accounts show the default look and their categories resolve to presets or history.
+  const appearances = hasIdentity ? (header.appearances as unknown[]).map(item => appearanceValue(item, accounts)) : [];
+  const categories = hasIdentity ? (header.categories as unknown[]).map(item => categoryValue(item)) : [];
   const archive = { accounts, records, ...(transfers.length ? { transfers } : {}),
     ...(recurring.length ? { recurring } : {}), ...(budgets.length ? { budgets } : {}),
-    ...(cards.length ? { cards } : {}), ...(debts.length ? { debts } : {}) };
+    ...(cards.length ? { cards } : {}), ...(debts.length ? { debts } : {}),
+    ...(appearances.length ? { appearances } : {}), ...(categories.length ? { categories } : {}) };
   validateArchive(archive);
   return { archive, exportedAt: header.exportedAt };
 }
@@ -274,6 +310,8 @@ export interface ImportPreview {
   budgets: MonthlyBudget[];
   cards: CreditCardProfile[];
   debts: PersonalDebtProfile[];
+  appearances: AccountAppearance[];
+  categories: CategoryDefinition[];
   identical: number;
   conflicts: number;
   /** Recorded liquid money by currency (cards and personal debts excluded). */
@@ -291,11 +329,15 @@ export function previewBackupImport(current: LedgerArchive, incoming: LedgerArch
   const budgetMap = new Map((current.budgets ?? []).map(budget => [budget.id, budget]));
   const cardMap = new Map((current.cards ?? []).map(card => [card.id, card]));
   const debtMap = new Map((current.debts ?? []).map(debt => [debt.id, debt]));
+  const appearanceMap = new Map((current.appearances ?? []).map(item => [item.accountId, item]));
+  const categoryMap = new Map((current.categories ?? []).map(item => [categoryIdentity(item), item]));
   const transfers: TransferRecord[] = [];
   const recurring: RecurringRule[] = [];
   const budgets: MonthlyBudget[] = [];
   const cards: CreditCardProfile[] = [];
   const debts: PersonalDebtProfile[] = [];
+  const appearances: AccountAppearance[] = [];
+  const categories: CategoryDefinition[] = [];
   const accounts: Account[] = [], records: EntryRecord[] = [];
   let conflicts = 0, identical = 0;
   for (const account of incoming.accounts) {
@@ -339,12 +381,27 @@ export function previewBackupImport(current: LedgerArchive, incoming: LedgerArch
     else if (samePersonalDebtProfile(existing, debt)) identical++;
     else conflicts++;
   }
+  // Appearance and category rows are keyed by what they decorate, so two devices
+  // that dressed the same account or category are compared, never duplicated.
+  for (const appearance of incoming.appearances ?? []) {
+    const existing = appearanceMap.get(appearance.accountId);
+    if (!existing) appearances.push(appearance);
+    else if (sameAccountAppearance(existing, appearance)) identical++;
+    else conflicts++;
+  }
+  for (const definition of incoming.categories ?? []) {
+    const existing = categoryMap.get(categoryIdentity(definition));
+    if (!existing) categories.push(definition);
+    else if (sameCategoryDefinition(existing, definition)) identical++;
+    else conflicts++;
+  }
   const combined = { accounts: [...current.accounts, ...accounts], records: [...current.records, ...records],
     transfers: [...current.transfers ?? [], ...transfers], recurring: [...current.recurring ?? [], ...recurring],
     budgets: [...current.budgets ?? [], ...budgets], cards: [...current.cards ?? [], ...cards],
-    debts: [...current.debts ?? [], ...debts] };
+    debts: [...current.debts ?? [], ...debts], appearances: [...current.appearances ?? [], ...appearances],
+    categories: [...current.categories ?? [], ...categories] };
   if (!conflicts) validateArchive(combined);
-  return { baseline: archiveKey(current), accounts, records, transfers, recurring, budgets, cards, debts, identical, conflicts,
+  return { baseline: archiveKey(current), accounts, records, transfers, recurring, budgets, cards, debts, appearances, categories, identical, conflicts,
     before: liquidTotalsByCurrency(snapshotFromArchive(current), current.cards, current.debts),
     after: conflicts ? null : liquidTotalsByCurrency(snapshotFromArchive(combined), combined.cards, combined.debts) };
 }

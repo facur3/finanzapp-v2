@@ -6,11 +6,13 @@ import { AppText, CategoryBadge, EmptyState, Money, Screen, SectionTitle } from 
 import { EntryList } from '../src/ui/entry-list';
 import { selectEntries } from '../src/ui/presentation';
 import { periodLabel } from '../src/ui/spending-timeline';
+import { useCategoryLookOf } from '../src/ui/category-hues';
 import { useCurrentDay } from '../src/ui/theme';
 
 export default function SpendingDetailScreen() {
   const { snapshot } = useLedger();
   const today = useCurrentDay();
+  const lookOf = useCategoryLookOf('expense');
   const { currency, startISO, endISO, category } = useLocalSearchParams<{ currency?: string; startISO?: string; endISO?: string; category?: string }>();
   if (!snapshot) return null;
   if ((currency !== 'ARS' && currency !== 'USD') || typeof startISO !== 'string' || typeof endISO !== 'string'
@@ -27,7 +29,7 @@ export default function SpendingDetailScreen() {
   return <EntryList entries={entries} accounts={snapshot.accounts} header={<View style={{ gap: 22 }}>
     <View style={{ gap: 12, paddingTop: 8 }}>
       {group && <CategoryBadge category={group.category} large />}
-      <AppText accessibilityRole="header" variant="title1">{group?.category ?? 'Gastos registrados'}</AppText>
+      <AppText accessibilityRole="header" variant="title1">{group ? lookOf(group.category).label : 'Gastos registrados'}</AppText>
       <AppText secondary variant="subhead">{periodLabel(period)} · {currency}</AppText>
     </View>
     <View style={{ gap: 10 }}>

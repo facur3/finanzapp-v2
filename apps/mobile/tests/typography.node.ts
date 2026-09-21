@@ -109,7 +109,7 @@ test('Money sizes a hero from its measured width and leaves rows to the native f
     'expo-router': { router: {} },
     './theme': { radius: {}, space: {}, type: { body: { fontSize: 17, lineHeight: 22 } }, useCurrentDay: () => '2026-09-20', useReduceMotion: () => true, usePalette: () => ({ text: '#000', secondary: '#666', tertiary: '#999', income: '#008800', transfer: '#03c', warning: '#a60' }) },
     './categories': { categoryIcon: () => 'pricetag-outline' },
-    './category-color': { tintOf: (c: string) => c }, './category-hues': { useCategoryColor: () => '#111' },
+    './category-color': { tintOf: (c: string) => c }, './category-hues': { useCategoryColor: () => '#111', useCategoryLook: (label: string) => ({ label, hex: '#111', glyph: 'pricetag-outline' }), useAccountLook: () => ({ glyph: 'wallet-outline', hex: '#2557D6' }) },
     './geometry': geometry, './money-input': moneyInput, './motion': { duration: {}, easeOut: {}, selectionHaptic: () => {}, timing: () => ({}) },
   };
   const module = { exports: {} as { Money?: (props: any) => any; AppText?: (props: any) => any } };

@@ -34,7 +34,7 @@ function harness() {
     '@finanzapp/domain': { formatMinorUnits: (minor: number) => String(minor), labelFromISO: () => '' },
     './components': { AppText: 'AppText', CategoryBadge: 'CategoryBadge', Money: 'Money', PressFeedback: 'PressFeedback', Surface: 'Surface' },
     './category-color': { washOf },
-    './category-hues': { useCategoryColor: (label: string) => '#' + label.length.toString().padStart(6, 'A') },
+    './category-hues': { useCategoryColor: (label: string) => '#' + label.length.toString().padStart(6, 'A'), useCategoryLook: (label: string) => ({ label, hex: '#' + label.length.toString().padStart(6, 'A'), glyph: 'pricetag-outline' }) },
     './motion': { easeOut: 'ease-out', timing: (kind: string, reduced: boolean) => ({ duration: reduced ? 0 : 260 }) },
     './report-presentation': presentation,
     './budget-presentation': budgetPresentation,

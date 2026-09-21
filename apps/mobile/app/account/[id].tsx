@@ -3,7 +3,7 @@ import { View } from 'react-native';
 import { Redirect, router, Stack, useLocalSearchParams } from 'expo-router';
 import { accountBalanceMinor, currentMonthISO, formatMinorUnits } from '@finanzapp/domain';
 import { useLedger } from '../../src/storage/LedgerProvider';
-import { AppText, DetailRow, EmptyState, IconButton, Money, Screen, SectionTitle, Stat, Surface } from '../../src/ui/components';
+import { AccountBadge, AppText, DetailRow, EmptyState, IconButton, Money, Screen, SectionTitle, Stat, Surface } from '../../src/ui/components';
 import { QuickActions } from '../../src/ui/quick-actions';
 import { EntryList } from '../../src/ui/entry-list';
 import { selectEntries, selectTransfers } from '../../src/ui/presentation';
@@ -42,7 +42,10 @@ export default function AccountScreen() {
       onPress={() => router.push({ pathname: '/edit-account/[id]', params: { id } })} /> }} />
     <EntryList entries={entries} transfers={transfers} accountId={id} accounts={snapshot.accounts} header={<View style={{ gap: space.xl, paddingBottom: 4 }}>
       <View style={{ gap: 8, paddingTop: 8 }}>
-        <AppText secondary variant="subhead" style={{ fontWeight: '500' }}>Saldo registrado</AppText>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+          <AccountBadge accountId={id} size={32} />
+          <AppText secondary variant="subhead" style={{ fontWeight: '500' }}>Saldo registrado</AppText>
+        </View>
         <Money minor={balance} currency={account.currency} large color={balance < 0 ? p.expense : undefined} />
       </View>
       {month && <Surface style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 12 }}>
