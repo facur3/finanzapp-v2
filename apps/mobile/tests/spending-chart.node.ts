@@ -29,8 +29,9 @@ test('bars retain real proportions, animate data changes only, and honor reduced
     '@expo/vector-icons/Ionicons': 'Icon', '@finanzapp/domain': domain,
     './components': { AppText: 'AppText', CategoryBadge: 'CategoryBadge', Money: 'Money', PressFeedback: 'PressFeedback' },
     './report-presentation': presentation,
+    './category-hues': { useCategoryColor: () => '#3E6FB0' },
     './motion': { timing: (kind: string, isReduced: boolean) => ({ duration: isReduced ? 0 : 260 }) },
-    './theme': { useReduceMotion: () => reduced, usePalette: () => ({ accent: '#2467DC', inset: '#ECEFF4' }) },
+    './theme': { useReduceMotion: () => reduced, usePalette: () => ({ text: '#000', inset: '#ECEFF4' }) },
   };
   const module = { exports: {} as { CategorySpendingRow?: (props: any) => any } };
   runInNewContext(code, { module, exports: module.exports, require: (name: string) => {

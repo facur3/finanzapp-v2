@@ -161,7 +161,7 @@ test('form selectors keep the category hue and give the account the interaction 
     './components': { AppText: 'AppText', CategoryBadge: 'CategoryBadge', DetailRow: 'DetailRow', Field: 'Field', GlyphTile: 'GlyphTile', PressFeedback: 'PressFeedback', surfaceShadow: () => ({}) },
     './category-hues': { useCategoryColor: (label: string) => label ? '#B0507A' : '#000' },
     './motion': { selectionHaptic: () => {} },
-    './theme': { radius: { group: 16 }, usePalette: () => ({ surface: '#fff', text: '#000', tint: '#03c', secondary: '#666', tertiary: '#999', background: '#fff', transferSoft: '#eef', isDark: false }), useReduceMotion: () => true },
+    './theme': { radius: { group: 16 }, usePalette: () => ({ surface: '#fff', text: '#000', primary: '#2557D6', primarySoft: '#E5ECFB', secondary: '#666', tertiary: '#999', background: '#fff', isDark: false }), useReduceMotion: () => true },
     './categories': { categoryChoices: () => [], categoryIcon: () => 'paw-outline', categoryKey: (label: string) => label.toLowerCase(), customCategory: () => null },
   };
   const module = { exports: {} as Record<string, (props: any) => any> };
@@ -182,7 +182,9 @@ test('form selectors keep the category hue and give the account the interaction 
   assert.equal(tileOf(income).props.tone, 'income', 'income keeps its meaning over the hue');
   const accounts = [{ id: 'a', name: 'Banco', currency: 'ARS', openingMinor: 0, createdAt: '' }];
   const account = selector(render('AccountField', { accounts, value: 'a', onChange: () => {}, prominent: true }));
-  assert.equal(tileOf(account).props.tone, 'transfer', 'a chosen account takes the interaction accent');
+  assert.equal(tileOf(account).props.color, '#2557D6', 'a chosen account takes the brand primary, not the transfer semantic');
+  assert.equal(tileOf(account).props.tone, 'neutral');
   const none = selector(render('AccountField', { accounts, value: '', onChange: () => {}, prominent: true }));
+  assert.equal(tileOf(none).props.color, undefined);
   assert.equal(tileOf(none).props.tone, 'neutral');
 });

@@ -1,5 +1,17 @@
 # Physical iPhone acceptance checklist
 
+## Interfaz 17 — visual identity and monetary experience (pending device review)
+
+- [ ] Ajustes footer reads Interfaz 17; no data changes after updating.
+- [ ] The selected tab, the selected label of every segmented control, section links, "Este mes", the account selector and the picker checkmarks are the same cobalt blue in both themes; unselected tabs, other bars, dates and normal text stay neutral. Nothing reads as purple or neon.
+- [ ] One filled blue button per screen (Guardar gasto, Guardar cambios, Crear, Registrar compra, Empezar); secondary actions stay grey; Pagar tarjeta and Transferir keep the azure transfer tint, distinguishable from the cobalt.
+- [ ] Home "En qué gastaste": one grouped block of up to four rows; each row's tinted fill matches its share (a 99,8 / 0,1 / 0,1 % month shows one nearly full row and two hairlines that are still tappable); text stays readable over the fill in both themes; on first data the fills grow in with a slight stagger, on a currency change the block crossfades; with Reduce Motion the fills appear without growing; scrolling never moves them.
+- [ ] Amount field: typing 2, 20, 200, 2000, 20000, 200000, 2000000 reads 2 · 20 · 200 · 2.000 · 20.000 · 200.000 · 2.000.000; "2000,5" and "2000,50" read 2.000,5 and 2.000,50; on an en-US keypad the period acts as the decimal comma; backspace over a grouping dot removes the digit before it; deleting a digit in the middle keeps the caret where it was; pasting "2.000.000,50" and "2,000,000.50" both give 2.000.000,50; a third decimal is ignored; the field never jumps; the saved movement shows exactly the typed amount in ARS and USD.
+- [ ] Hero amounts on Home, Reportes, movement detail, card, debt, budgets and account detail: symbol slightly quieter, whole units dominant, cents quieter, one baseline, one line at the largest Dynamic Type; VoiceOver reads the whole amount once; row amounts unchanged.
+- [ ] Reportes: the selected six-month bar and its label are blue, the others graphite; "Dónde más gastaste" shows rank number plus the merchant's category tile; "Para tener en cuenta" cards show a faint tint with fully readable text; Categorías / Día a día highlights in blue.
+- [ ] Forms: category tile in its hue, account selector blue, date row neutral, the amount label and Listo bar in blue; the form stays calm.
+- [ ] Both themes, Expo Go, large text and Reduce Motion for all of the above.
+
 ## Interfaz 16 — native visual cohesion and information hierarchy (pending device review)
 
 - [ ] Ajustes footer reads Interfaz 16; no data changes after updating.

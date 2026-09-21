@@ -51,7 +51,7 @@ function Navigation() {
 
   const theme = { ...(p.isDark ? DarkTheme : DefaultTheme), colors: {
     ...(p.isDark ? DarkTheme : DefaultTheme).colors,
-    primary: p.tint, background: p.background, card: p.background, text: p.text, border: p.line,
+    primary: p.primary, background: p.background, card: p.background, text: p.text, border: p.line,
   } };
   return <ThemeProvider value={theme}><View style={{ flex: 1, backgroundColor: p.background }}>
     <StatusBar style={p.isDark ? 'light' : 'dark'} />

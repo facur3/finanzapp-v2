@@ -9,8 +9,8 @@ export default function AssistantPreviewScreen() {
   return <Screen>
     <Stack.Screen options={{ title: 'Asistente' }} />
     <View style={{ alignItems: 'center', gap: 14, paddingTop: 16 }}>
-      <View style={{ width: 72, height: 72, borderRadius: 24, alignItems: 'center', justifyContent: 'center', backgroundColor: p.accentSoft }}>
-        <Ionicons name="sparkles" size={32} color={p.accent} accessible={false} />
+      <View style={{ width: 72, height: 72, borderRadius: 24, alignItems: 'center', justifyContent: 'center', backgroundColor: p.primarySoft }}>
+        <Ionicons name="sparkles" size={32} color={p.primary} accessible={false} />
       </View>
       <View style={{ alignItems: 'center', gap: 6 }}>
         <AppText accessibilityRole="header" style={{ fontSize: 30, lineHeight: 36, fontWeight: '700', letterSpacing: -0.8 }}>
@@ -50,7 +50,7 @@ function PreviewPrompt({ icon, title, detail }: { icon: keyof typeof Ionicons.gl
   const p = usePalette();
   return <View style={{ flexDirection: 'row', gap: 12, alignItems: 'flex-start' }}>
     <View style={{ width: 38, height: 38, borderRadius: 13, alignItems: 'center', justifyContent: 'center', backgroundColor: p.inset }}>
-      <Ionicons name={icon} size={20} color={p.accent} accessible={false} />
+      <Ionicons name={icon} size={20} color={p.primary} accessible={false} />
     </View>
     <View style={{ flex: 1, gap: 3 }}>
       <AppText style={{ fontWeight: '600' }}>{title}</AppText>

@@ -41,7 +41,7 @@ function harness(file: string, params: Record<string, unknown> = {}, data: domai
   const names = ['ActionButton', 'AppText', 'CategoryBadge', 'Choices', 'DetailRow', 'EmptyState', 'ErrorMessage', 'IconButton', 'Money', 'PressFeedback',
     'Screen', 'SectionTitle', 'Stat', 'Surface', 'AccountRow'];
   const theme = { space: { xs: 4, s: 8, m: 12, l: 16, xl: 20, xxl: 24, xxxl: 32 }, useCurrentDay: () => '2026-09-20', useReduceMotion: () => true,
-    usePalette: () => ({ text: '#000', secondary: '#666', tertiary: '#999', line: '#ddd', inset: '#eee', expense: '#c00', income: '#080', warning: '#a60', tint: '#03c', background: '#fff', surface: '#fff' }) };
+    usePalette: () => ({ text: '#000', secondary: '#666', tertiary: '#999', line: '#ddd', inset: '#eee', expense: '#c00', income: '#080', warning: '#a60', primary: '#2557D6', background: '#fff', surface: '#fff' }) };
   const modules: Record<string, unknown> = {
     react: { useEffect: (fn: () => unknown) => { fn(); }, useMemo: (fn: () => unknown) => fn(), useState: (initial: unknown) => {
       const index = cursor++;

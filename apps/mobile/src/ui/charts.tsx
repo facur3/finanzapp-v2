@@ -104,9 +104,9 @@ function Sweep({ arcs, size, thickness, ring, reveal }: {
 
 const MONTHS = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
 
-/** Six monthly bars on a common zero-to-max scale. The selected month is ink,
- * the rest are tertiary; a partial (current) month is outlined. Tapping a bar
- * selects that month. Bars animate between data sets, never from zero. */
+/** Six monthly bars on a common zero-to-max scale. The selected month is the
+ * brand primary, the rest are graphite; a partial (current) month is outlined.
+ * Tapping a bar selects that month. Bars animate between data sets, never from zero. */
 export function MonthBars({ points, selected, onSelect, currency, height = 120 }: {
   points: { monthISO: string; amountMinor: number; partial: boolean }[]; selected: string; onSelect: (monthISO: string) => void; currency: Currency; height?: number;
 }) {
@@ -121,7 +121,7 @@ export function MonthBars({ points, selected, onSelect, currency, height = 120 }
     </View>
     <View style={{ flexDirection: 'row', gap: 6 }}>
       {points.map(point => <Animated.Text key={point.monthISO} style={{ flex: 1, fontSize: 12, lineHeight: 16, textAlign: 'center', fontWeight: point.monthISO === selected ? '600' : '400',
-        color: point.monthISO === selected ? p.text : p.secondary, transitionProperty: 'color', transitionDuration: reduced ? 0 : duration.state }}>
+        color: point.monthISO === selected ? p.primary : p.secondary, transitionProperty: 'color', transitionDuration: reduced ? 0 : duration.state }}>
         {MONTHS[Number(point.monthISO.slice(5, 7)) - 1]}
       </Animated.Text>)}
     </View>
@@ -142,7 +142,7 @@ function Bar({ point, fraction, selected, onPress, currency, height }: {
   return <PressFeedback feedback="opacity" accessibilityRole="button" accessibilityState={{ selected }}
     accessibilityLabel={`${MONTHS[Number(point.monthISO.slice(5, 7)) - 1]} ${point.monthISO.slice(0, 4)}, ${(point.amountMinor / 100).toLocaleString('es-AR', { minimumFractionDigits: 2 })} ${currency}${point.partial ? ', mes en curso' : ''}`}
     onPress={onPress} containerStyle={{ flex: 1 }} style={{ height, justifyContent: 'flex-end', minHeight: undefined }}>
-    <Animated.View style={[{ borderRadius: 6, backgroundColor: selected ? p.text : p.inset, borderWidth: point.partial ? StyleSheet.hairlineWidth * 2 : 0, borderColor: p.secondary,
+    <Animated.View style={[{ borderRadius: 6, backgroundColor: selected ? p.primary : p.inset, borderWidth: point.partial ? StyleSheet.hairlineWidth * 2 : 0, borderColor: p.secondary,
       transitionProperty: 'backgroundColor', transitionDuration: reduced ? 0 : duration.state }, style]} />
   </PressFeedback>;
 }

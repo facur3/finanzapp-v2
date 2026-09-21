@@ -4,11 +4,12 @@ import Animated, { cancelAnimation, useAnimatedStyle, useSharedValue, withTiming
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { formatMinorUnits, type CategorySpending, type Currency } from '@finanzapp/domain';
 import { AppText, CategoryBadge, Money, PressFeedback } from './components';
+import { useCategoryColor } from './category-hues';
 import { spendingShare } from './report-presentation';
 import { timing } from './motion';
 import { usePalette, useReduceMotion } from './theme';
 
-function ShareBar({ fraction }: { fraction: number }) {
+function ShareBar({ fraction, color }: { fraction: number; color: string }) {
   const p = usePalette();
   const reduced = useReduceMotion();
   // Start at the real proportion. Animate changes between data, never a fake
@@ -21,7 +22,7 @@ function ShareBar({ fraction }: { fraction: number }) {
   const style = useAnimatedStyle(() => ({ width: `${progress.value * 100}%` as `${number}%` }));
   return <View accessible={false} accessibilityElementsHidden importantForAccessibility="no-hide-descendants"
     style={{ height: 6, borderRadius: 3, backgroundColor: p.inset, overflow: 'hidden' }}>
-    <Animated.View style={[{ height: 6, borderRadius: 3, backgroundColor: p.accent }, style]} />
+    <Animated.View style={[{ height: 6, borderRadius: 3, backgroundColor: color }, style]} />
   </View>;
 }
 
@@ -30,6 +31,7 @@ export function CategorySpendingRow({ category, totalMinor, currency, onPress, l
   onPress: () => void; last?: boolean; compact?: boolean; periodName?: string;
 }) {
   const p = usePalette();
+  const color = useCategoryColor(category.category);
   const { fontScale, width } = useWindowDimensions();
   const { fraction, label } = spendingShare(category.amountMinor, totalMinor);
   const count = category.count === 1 ? '1 gasto' : category.count + ' gastos';
@@ -45,7 +47,7 @@ export function CategorySpendingRow({ category, totalMinor, currency, onPress, l
         <AppText numberOfLines={stacked ? undefined : 2} style={{ flex: stacked ? undefined : 1, fontWeight: '600', fontSize: 15, lineHeight: 21 }}>{category.category}</AppText>
         <View style={{ maxWidth: stacked ? '100%' : '55%' }}><Money minor={category.amountMinor} currency={currency} size={15} /></View>
       </View>
-      <ShareBar fraction={fraction} />
+      <ShareBar fraction={fraction} color={color} />
       <AppText secondary style={{ fontSize: 13, lineHeight: 18 }}>{label}{compact ? '' : ' · ' + count}</AppText>
     </View>
     {!compact && <Ionicons name="chevron-forward" size={15} color={p.secondary} accessible={false} />}

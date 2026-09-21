@@ -12,6 +12,7 @@ import { tintOf } from './category-color';
 import { useCategoryColor } from './category-hues';
 import { SEGMENT_GAP, SEGMENT_PADDING, fitFontSize, segmentLayout } from './geometry';
 import { duration, easeOut, selectionHaptic, timing } from './motion';
+import { editAmountInput, settleAmountInput, splitAmount } from './money-input';
 
 export type { IconName } from './categories';
 /** Colour carries meaning. Neutral is ink on fill; the rest are the four semantic tints. */
@@ -62,7 +63,7 @@ export function SectionTitle({ children, action, onAction, caption }: { children
       {caption && <AppText secondary variant="footnote">{caption}</AppText>}
     </View>
     {action && onAction && <PressFeedback feedback="opacity" accessibilityRole="button" accessibilityLabel={action} onPress={onAction} style={{ paddingLeft: 12, minHeight: 36 }}>
-      <AppText variant="subhead" style={{ color: p.tint, fontWeight: '500' }}>{action}</AppText>
+      <AppText variant="subhead" style={{ color: p.primary, fontWeight: '500' }}>{action}</AppText>
     </PressFeedback>}
   </View>;
 }
@@ -74,8 +75,10 @@ export function SectionTitle({ children, action, onAction, caption }: { children
  * shrink; `opacity` (0.4) for bare text and icon buttons, like a bar button. */
 export type PressTreatment = 'scale' | 'highlight' | 'opacity';
 
-export function PressFeedback({ children, style, containerStyle, feedback = 'scale', ...props }: PressableProps & {
+export function PressFeedback({ children, style, containerStyle, feedback = 'scale', backdrop, ...props }: PressableProps & {
   children: ReactNode; style?: StyleProp<ViewStyle>; containerStyle?: StyleProp<ViewStyle>; feedback?: PressTreatment;
+  /** Drawn under the highlight and the content: a proportional fill behind a row. */
+  backdrop?: ReactNode;
 }) {
   const p = usePalette();
   const reduced = useReduceMotion();
@@ -90,19 +93,23 @@ export function PressFeedback({ children, style, containerStyle, feedback = 'sca
     style={[{ minHeight: 44, justifyContent: 'center' }, style]} pressRetentionOffset={12}
     onPressIn={event => { pressed.value = active ? withTiming(1, { duration: duration.press, easing: easeOut }) : 0; props.onPressIn?.(event); }}
     onPressOut={event => { pressed.value = withTiming(0, { duration: active ? duration.release : 0, easing: easeOut }); props.onPressOut?.(event); }}>
+    {backdrop}
     {feedback === 'highlight' && <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: p.isDark ? 'rgba(255,255,255,0.07)' : 'rgba(10,10,12,0.05)' }, highlightStyle]} />}
     {children}
   </Pressable></Animated.View>;
 }
 
+/** The one filled call to action on a screen is the brand primary with white
+ * text. Secondary actions stay ink on the inset fill, so a screen has at most
+ * one blue button; a semantic tone (a transfer, an income) still wins. */
 export function ActionButton({ label, onPress, disabled = false, busy = false, secondary = false, tone, icon, containerStyle, compact = false }: {
   label: string; onPress: () => void; disabled?: boolean; busy?: boolean; secondary?: boolean; tone?: Exclude<Tone, 'neutral'>;
   icon?: IconName; containerStyle?: StyleProp<ViewStyle>; compact?: boolean;
 }) {
   const p = usePalette();
   const semantic = tone ? toneColors(p, tone) : null;
-  const background = semantic ? (secondary ? semantic.soft : semantic.color) : secondary ? p.accentSoft : p.accent;
-  const color = semantic ? (secondary ? semantic.color : '#FFFFFF') : secondary ? p.text : p.onAccent;
+  const background = semantic ? (secondary ? semantic.soft : semantic.color) : secondary ? p.inset : p.primaryFill;
+  const color = semantic ? (secondary ? semantic.color : '#FFFFFF') : secondary ? p.text : p.onPrimary;
   return <PressFeedback accessibilityRole="button" accessibilityLabel={label} containerStyle={containerStyle}
     accessibilityState={{ disabled: disabled || busy, busy }} disabled={disabled || busy}
     onPress={onPress} style={[styles.button, compact && styles.buttonCompact, { backgroundColor: background, opacity: disabled || busy ? 0.5 : 1 }]}>
@@ -124,31 +131,48 @@ export function Field({ label, ...props }: TextInputProps & { label: string }) {
   const p = usePalette();
   return <View style={{ gap: 8 }}><AppText secondary variant="footnote" style={{ fontWeight: '500' }}>{label}</AppText>
     <TextInput returnKeyType="done" onSubmitEditing={Keyboard.dismiss} {...props} accessibilityLabel={label} placeholderTextColor={p.tertiary}
-      selectionColor={p.tint} style={[styles.input, { color: p.text, backgroundColor: p.surface }, props.style]} />
+      selectionColor={p.primary} style={[styles.input, { color: p.text, backgroundColor: p.surface }, props.style]} />
   </View>;
 }
 
-export function AmountField({ label = 'Monto', currency, tone, ...props }: TextInputProps & { label?: string; currency: Currency; tone?: Tone }) {
+/** The amount, formatted as the user types: "2000000" reads "2.000.000" and
+ * "2000,5" reads "2.000,5" (see money-input.ts). The value the form holds is
+ * that display string; it still goes through parseMinorUnits, so the stored
+ * amount is the same integer whether the user typed a comma or a period. The
+ * caret is left to iOS, which keeps it at the same distance from the end when
+ * the text changes, so a grouping dot appearing to its left does not move it.
+ * When the formatter refuses an edit (a third decimal, a fourteenth digit) the
+ * native text is reset explicitly, because an unchanged prop would leave the
+ * refused characters on screen. */
+export function AmountField({ label = 'Monto', currency, tone, value = '', onChangeText, ...props }: TextInputProps & { label?: string; currency: Currency; tone?: Tone }) {
   const p = usePalette();
   const accessoryId = useId();
-  const length = props.value?.length ?? 0;
+  const input = useRef<TextInput>(null);
+  const length = value.length;
   const long = length > 11;
   const amountSize = length > 17 ? 24 : long ? 32 : 46;
   const color = tone && tone !== 'neutral' ? toneColors(p, tone).color : p.text;
+  const change = (raw: string) => {
+    const next = editAmountInput(value, raw);
+    if (next === value) { if (raw !== value) input.current?.setNativeProps({ text: value }); return; }
+    onChangeText?.(next);
+  };
+  const settle = () => { const next = settleAmountInput(value); if (next !== value) onChangeText?.(next); };
   return <View style={{ gap: 10, alignItems: 'center', paddingVertical: 8 }}>
     <AppText secondary variant="footnote" style={{ fontWeight: '500' }}>{label} · {currency}</AppText>
     <View style={{ width: '100%', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
       <AppText accessible={false} style={{ fontSize: long ? 26 : 32, lineHeight: long ? 34 : 40, color: p.secondary, fontWeight: '500' }}>{currency === 'USD' ? 'US$' : '$'}</AppText>
-      <TextInput keyboardType="decimal-pad" inputMode="decimal" maxLength={24} placeholder="0" {...props}
+      <TextInput ref={input} keyboardType="decimal-pad" inputMode="decimal" maxLength={24} placeholder="0" {...props} value={value} onChangeText={change}
+        onBlur={event => { settle(); props.onBlur?.(event); }} onSubmitEditing={event => { settle(); props.onSubmitEditing?.(event); }}
         accessibilityLabel={label + ' en ' + (currency === 'ARS' ? 'pesos argentinos' : 'dólares')}
         inputAccessoryViewID={Platform.OS === 'ios' ? accessoryId : undefined}
-        selectionColor={p.tint} placeholderTextColor={p.tertiary}
+        selectionColor={p.primary} placeholderTextColor={p.tertiary}
         style={[styles.amountInput, { color, fontSize: amountSize }, props.style]} />
     </View>
     {Platform.OS === 'ios' && <InputAccessoryView nativeID={accessoryId} backgroundColor={p.surface}>
       <View style={{ alignItems: 'flex-end', paddingHorizontal: 20 }}>
         <PressFeedback feedback="opacity" accessibilityRole="button" accessibilityLabel="Cerrar teclado del monto" onPress={Keyboard.dismiss} style={{ paddingHorizontal: 12 }}>
-          <AppText style={{ color: p.tint, fontWeight: '600' }}>Listo</AppText>
+          <AppText style={{ color: p.primary, fontWeight: '600' }}>Listo</AppText>
         </PressFeedback>
       </View>
     </InputAccessoryView>}
@@ -160,14 +184,16 @@ function Choice({ label, selected, disabled, onPress }: { label: string; selecte
   const reduced = useReduceMotion();
   return <Pressable accessibilityRole="button" accessibilityState={{ selected, disabled }} disabled={disabled}
     onPress={onPress} style={styles.choice} hitSlop={4}>
-    <Animated.Text numberOfLines={1} style={{ fontSize: 13, lineHeight: 18, textAlign: 'center', fontWeight: '600', color: selected ? p.text : p.secondary,
+    <Animated.Text numberOfLines={1} style={{ fontSize: 13, lineHeight: 18, textAlign: 'center', fontWeight: '600', color: selected ? p.primary : p.secondary,
       transitionProperty: 'color', transitionDuration: reduced ? 0 : duration.state }}>{label}</Animated.Text>
   </Pressable>;
 }
 
 /** Native-style segmented control: one thumb slides to the chosen segment
  * (interruptible, 200 ms ease-out, none under Reduce Motion) and the change
- * ticks with a selection haptic. Tapping the current value does nothing. */
+ * ticks with a selection haptic. The chosen label is the brand primary on a
+ * neutral thumb: selection reads as selection without a filled blue block.
+ * Tapping the current value does nothing. */
 export function Choices<T extends string>({ value, options, onChange, disabled }: {
   value: T; options: { value: T; label: string }[]; onChange: (value: T) => void; disabled?: boolean;
 }) {
@@ -246,11 +272,21 @@ export function Money({ minor, currency, large = false, color, signed = false, s
   const text = sign + (currency === 'USD' ? 'US$ ' : '$ ') + formatMinorUnits(Math.abs(minor));
   const fontSize = hero ? fitFontSize(text, width, base, Math.round(base / 2), Math.min(fontScale, HERO_MAX_SCALE)) : base;
   const label = (minor < 0 ? 'Menos ' : '') + formatMinorUnits(Math.abs(minor)) + (currency === 'USD' ? ' dólares' : ' pesos');
+  const ink = color ?? semantic;
+  // A hero is one amount in three weights of the same colour: the symbol and
+  // the cents step back so the whole units carry the number. Same size, same
+  // baseline, one accessibility label; nested spans keep it one line.
+  const parts = hero ? splitAmount(text) : null;
+  const quiet = ink === p.text ? { symbol: p.secondary, cents: p.tertiary } : { symbol: ink + 'B3', cents: ink + '8C' };
   const body = <Text accessibilityLabel={label} numberOfLines={1} adjustsFontSizeToFit={!hero} minimumFontScale={0.75}
     maxFontSizeMultiplier={hero ? HERO_MAX_SCALE : ROW_MAX_SCALE}
-    style={{ color: color ?? semantic, fontSize, lineHeight: hero ? Math.round(fontSize * 1.18) : undefined, fontWeight: weight ?? (large ? '700' : '600'),
+    style={{ color: ink, fontSize, lineHeight: hero ? Math.round(fontSize * 1.18) : undefined, fontWeight: weight ?? (large ? '700' : '600'),
       letterSpacing: hero ? -fontSize * 0.03 : -0.2, fontVariant: ['tabular-nums'], flexShrink: 1, maxWidth: '100%', textAlign: align }}>
-    {text}
+    {parts ? <>
+      <Text style={{ color: quiet.symbol, fontWeight: '600' }}>{parts.prefix}</Text>
+      {parts.whole}
+      <Text style={{ color: quiet.cents, fontWeight: '600' }}>{parts.decimals}</Text>
+    </> : text}
   </Text>;
   // The wrapper spans its container so the measured width is the space available, never the text's own width.
   return hero ? <View style={{ alignSelf: 'stretch' }} onLayout={event => setWidth(event.nativeEvent.layout.width)}>{body}</View> : body;

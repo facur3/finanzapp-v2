@@ -18,7 +18,8 @@ export default function TabsLayout() {
     screenOptions={{ ...tabScreenOptions,
     headerStyle: { backgroundColor: p.background },
     headerTitleStyle: { color: p.text, fontWeight: '600' }, headerShadowVisible: false,
-    tabBarActiveTintColor: p.text, tabBarInactiveTintColor: p.tertiary,
+    // The selected tab is the brand primary; the rest stay neutral. Switching is still instant.
+    tabBarActiveTintColor: p.primary, tabBarInactiveTintColor: p.tertiary,
     tabBarStyle: { backgroundColor: p.surface, borderTopColor: p.line },
     tabBarLabelStyle: { fontSize: 10, fontWeight: '500' },
     sceneStyle: { backgroundColor: p.background } }}>

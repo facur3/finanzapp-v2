@@ -25,7 +25,7 @@ export function SelectorCard({ label, value, placeholder, detail, icon, tone = '
     <GlyphTile icon={icon} tone={tone} color={color} size={44} />
     <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
       <AppText secondary variant="caption" style={{ fontWeight: '500' }}>{label}</AppText>
-      <AppText numberOfLines={1} style={{ fontWeight: '600', color: value ? p.text : p.tint }}>{value ?? placeholder}</AppText>
+      <AppText numberOfLines={1} style={{ fontWeight: '600', color: value ? p.text : p.primary }}>{value ?? placeholder}</AppText>
       {!!detail && <AppText numberOfLines={1} variant="footnote" style={{ color: detailColor }}>{detail}</AppText>}
     </View>
     <Ionicons name="chevron-forward" size={18} color={p.tertiary} accessible={false} />
@@ -43,9 +43,9 @@ function SelectionSheet({ visible, title, onClose, onDone, children }: {
     allowSwipeDismissal onRequestClose={onClose}>
     <SafeAreaView edges={['top', 'bottom']} style={{ flex: 1, backgroundColor: p.background }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 16 }}>
-        <PressFeedback feedback="opacity" accessibilityRole="button" onPress={onClose}><AppText style={{ color: p.tint, fontSize: 16 }}>Cancelar</AppText></PressFeedback>
+        <PressFeedback feedback="opacity" accessibilityRole="button" onPress={onClose}><AppText style={{ color: p.primary, fontSize: 16 }}>Cancelar</AppText></PressFeedback>
         <AppText accessibilityRole="header" style={{ flex: 1, textAlign: 'center', fontWeight: '600' }}>{title}</AppText>
-        {onDone && <PressFeedback feedback="opacity" accessibilityRole="button" onPress={onDone}><AppText style={{ color: p.tint, fontSize: 16, fontWeight: '600' }}>Listo</AppText></PressFeedback>}
+        {onDone && <PressFeedback feedback="opacity" accessibilityRole="button" onPress={onDone}><AppText style={{ color: p.primary, fontSize: 16, fontWeight: '600' }}>Listo</AppText></PressFeedback>}
       </View>
       {children}
     </SafeAreaView>
@@ -70,7 +70,7 @@ export function AccountField({ accounts, value, onChange, disabled = false, labe
   return <>
     {prominent ? <SelectorCard label={label} value={selected ? selected.name : undefined} placeholder="Elegir cuenta"
       detail={detail ?? (selected ? kind(selected.id) + ' · ' + selected.currency : undefined)} detailTone={detailTone}
-      icon={selected ? icon(selected.id) : 'wallet-outline'} tone={selected ? 'transfer' : 'neutral'} disabled={disabled} onPress={open} />
+      icon={selected ? icon(selected.id) : 'wallet-outline'} color={selected ? p.primary : undefined} disabled={disabled} onPress={open} />
       : <DetailRow label={label} value={selected ? selected.name + ' · ' + selected.currency : 'Elegir cuenta'} icon={selected ? icon(selected.id) : 'wallet-outline'}
         disabled={disabled} onPress={open} />}
     <SelectionSheet visible={visible} title={label === 'Cuenta' ? 'Elegir cuenta' : label} onClose={() => setVisible(false)}>
@@ -81,7 +81,7 @@ export function AccountField({ accounts, value, onChange, disabled = false, labe
           <GlyphTile icon={icon(item.id)} />
           <View style={{ flex: 1, gap: 3 }}><AppText style={{ fontWeight: '600' }}>{item.name}</AppText>
             <AppText secondary style={{ fontSize: 14 }}>{kind(item.id)} · {item.currency}{describe ? ' · ' + describe(item) : ''}</AppText></View>
-          {item.id === value && <Ionicons name="checkmark-circle" color={p.tint} size={24} accessible={false} />}
+          {item.id === value && <Ionicons name="checkmark-circle" color={p.primary} size={24} accessible={false} />}
         </PressFeedback>} />
     </SelectionSheet>
   </>;
@@ -141,9 +141,9 @@ export function CategoryField({ entries, kind, value, onChange, disabled = false
             placeholder="Nombre de la categoría" maxLength={60} autoCapitalize="sentences"
             clearButtonMode="while-editing" autoCorrect={false} />
           {custom && <PressFeedback feedback="highlight" accessibilityRole="button" accessibilityLabel={'Usar categoría ' + custom}
-            onPress={() => choose(custom)} style={{ flexDirection: 'row', gap: 12, padding: 14, borderRadius: 16, backgroundColor: p.transferSoft, overflow: 'hidden' }}>
-            <Ionicons name="add-circle-outline" color={p.tint} size={24} accessible={false} />
-            <AppText style={{ color: p.tint, fontWeight: '600', flex: 1 }}>Usar «{custom}»</AppText>
+            onPress={() => choose(custom)} style={{ flexDirection: 'row', gap: 12, padding: 14, borderRadius: 16, backgroundColor: p.primarySoft, overflow: 'hidden' }}>
+            <Ionicons name="add-circle-outline" color={p.primary} size={24} accessible={false} />
+            <AppText style={{ color: p.primary, fontWeight: '600', flex: 1 }}>Usar «{custom}»</AppText>
           </PressFeedback>}
         </View>}
         renderItem={({ item }) => <PressFeedback feedback="highlight" accessibilityRole="button" accessibilityLabel={item}
@@ -151,7 +151,7 @@ export function CategoryField({ entries, kind, value, onChange, disabled = false
           style={{ flexDirection: 'row', alignItems: 'center', gap: 14, padding: 12, marginBottom: 6, backgroundColor: p.surface, borderRadius: 18, overflow: 'hidden' }}>
           <CategoryBadge category={item} />
           <AppText style={{ flex: 1, fontWeight: '500' }}>{item}</AppText>
-          {categoryKey(value) === categoryKey(item) && <Ionicons name="checkmark-circle" color={p.tint} size={23} accessible={false} />}
+          {categoryKey(value) === categoryKey(item) && <Ionicons name="checkmark-circle" color={p.primary} size={23} accessible={false} />}
         </PressFeedback>} />
     </SelectionSheet>
   </>;

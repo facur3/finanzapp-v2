@@ -1,12 +1,13 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { FlatList, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { dailyAverageMinor, dailySpending, formatMinorUnits, monthlySpendingTrend, spendingComparison, spendingInsights, spendingReport,
-  summarizeMonthlyBudgets, topMerchants, type CategorySpending, type Currency, type DailySpending } from '@finanzapp/domain';
+  summarizeMonthlyBudgets, topMerchants, type CategorySpending, type Currency, type DailySpending, type SpendingInsight } from '@finanzapp/domain';
 import { useLedger } from '../../src/storage/LedgerProvider';
-import { AppText, Choices, DetailRow, EmptyState, GlyphTile, IconButton, Money, PressFeedback, SectionTitle, Surface } from '../../src/ui/components';
+import { AppText, CategoryBadge, Choices, DetailRow, EmptyState, GlyphTile, IconButton, Money, PressFeedback, SectionTitle, Surface } from '../../src/ui/components';
 import { assignCategoryHues } from '../../src/ui/category-color';
+import { useCategoryColor } from '../../src/ui/category-hues';
 import { DonutChart, MonthBars, OTHERS_KEY, donutSlices } from '../../src/ui/charts';
 import { ValueTransition, selectionHaptic } from '../../src/ui/motion';
 import { activityDateLabel } from '../../src/ui/presentation';
@@ -79,7 +80,7 @@ export default function ReportsScreen() {
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
               <AppText secondary variant="caption">{reportPeriodLabel(report, day)}</AppText>
               {canNext && <PressFeedback feedback="opacity" accessibilityRole="button" onPress={() => goToMonth(currentMonth)} accessibilityLabel="Volver al mes actual" style={{ minHeight: 28 }}>
-                <AppText variant="caption" style={{ fontWeight: '600', color: p.tint }}>Este mes</AppText>
+                <AppText variant="caption" style={{ fontWeight: '600', color: p.primary }}>Este mes</AppText>
               </PressFeedback>}
             </View>
           </ValueTransition>
@@ -143,9 +144,11 @@ export default function ReportsScreen() {
       {ready && merchants.length > 0 && <View>
         <SectionTitle caption="Por importe registrado en el período">Dónde más gastaste</SectionTitle>
         <Surface grouped>
-          {merchants.map((merchant, index) => <View key={merchant.key} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 12, minHeight: 60,
+          {/* Rank stays a number; the tile carries the merchant's category, the one identity it really has. No decorative podium colours. */}
+          {merchants.map((merchant, index) => <View key={merchant.key} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 12, minHeight: 64,
             borderBottomWidth: index === merchants.length - 1 ? 0 : 0.5, borderBottomColor: p.line }}>
-            <AppText secondary variant="footnote" style={{ width: 18, textAlign: 'center', fontVariant: ['tabular-nums'] }}>{index + 1}</AppText>
+            <AppText tertiary variant="footnote" style={{ width: 16, textAlign: 'center', fontVariant: ['tabular-nums'], fontWeight: '600' }}>{index + 1}</AppText>
+            <CategoryBadge category={merchant.category} />
             <View style={{ flex: 1, minWidth: 0, gap: 3 }}>
               <AppText numberOfLines={1} style={{ fontWeight: '500' }}>{merchant.merchant}</AppText>
               <AppText secondary variant="footnote" numberOfLines={1}>{merchant.count === 1 ? '1 compra' : merchant.count + ' compras'} · {merchant.category}</AppText>
@@ -157,15 +160,16 @@ export default function ReportsScreen() {
       {ready && insights.length > 0 && <View>
         <SectionTitle caption="Hechos de tus registros, no consejos">Para tener en cuenta</SectionTitle>
         <View style={{ gap: 10 }}>
-          {insights.map(insight => <Surface key={insight.id} style={[{ flexDirection: 'row', alignItems: 'center', gap: 12 },
-            insight.tone === 'expense' ? { backgroundColor: p.expenseSoft } : insight.tone === 'warning' ? { backgroundColor: p.warningSoft } : null]}>
-            <GlyphTile icon={insight.tone === 'expense' ? 'alert-circle-outline' : insight.tone === 'warning' ? 'speedometer-outline' : insight.id.startsWith('largest') ? 'receipt-outline' : 'trending-up-outline'}
-              tone={insight.tone} />
+          {/* A fact about a category looks like that category; a warning or excess keeps its semantic tone. The surface takes only a whisper (8 %) of the colour so the text stays fully readable. */}
+          {insights.map(insight => <InsightSurface key={insight.id} tone={insight.tone} category={insight.category}>
+            {insight.category && insight.tone === 'neutral' ? <CategoryBadge category={insight.category} />
+              : <GlyphTile icon={insight.tone === 'expense' ? 'alert-circle-outline' : insight.tone === 'warning' ? 'speedometer-outline' : insight.id.startsWith('largest') ? 'receipt-outline' : 'trending-up-outline'}
+                tone={insight.tone} />}
             <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
               <AppText style={{ fontWeight: '500' }}>{insight.title}</AppText>
               <AppText secondary variant="footnote">{insight.detail}</AppText>
             </View>
-          </Surface>)}
+          </InsightSurface>)}
         </View>
       </View>}
       {ready && <Surface grouped>
@@ -178,6 +182,16 @@ export default function ReportsScreen() {
         Solo movimientos registrados en {currency}. Los saldos iniciales, las transferencias y los pagos de tarjeta no cuentan como ingresos ni gastos. Un mes sin registros no significa que no hayas gastado.
       </AppText>
     </View>} />;
+}
+
+/** The insight card's surface: a category fact takes the category hue, an
+ * expense or warning fact its semantic colour, both at 8 % so the ink keeps
+ * its contrast; a plain fact stays on the neutral surface. */
+function InsightSurface({ tone, category, children }: { tone: SpendingInsight['tone']; category?: string; children: ReactNode }) {
+  const p = usePalette();
+  const hue = useCategoryColor(category ?? '');
+  const color = tone === 'expense' ? p.expense : tone === 'warning' ? p.warning : tone === 'income' ? p.income : category ? hue : null;
+  return <Surface style={[{ flexDirection: 'row', alignItems: 'center', gap: 12 }, color ? { backgroundColor: color + '14' } : null]}>{children}</Surface>;
 }
 
 function BudgetStatusRow({ category, spent, limit, ratio, exceeded, money, last, onPress }: {

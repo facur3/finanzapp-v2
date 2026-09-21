@@ -4,6 +4,7 @@ import { test } from 'node:test';
 import { runInNewContext } from 'node:vm';
 import ts from 'typescript';
 import * as geometry from '../src/ui/geometry.ts';
+import * as moneyInput from '../src/ui/money-input.ts';
 
 const { amountWidthEm, fitFontSize } = geometry;
 
@@ -53,10 +54,10 @@ test('Money sizes a hero from its measured width and leaves rows to the native f
     '@expo/vector-icons/Ionicons': 'Ionicons',
     '@finanzapp/domain': { formatMinorUnits: (minor: number) => (minor / 100).toLocaleString('es-AR', { minimumFractionDigits: 2 }), accountBalanceMinor: () => 0, labelFromISO: () => '' },
     'expo-router': { router: {} },
-    './theme': { radius: {}, space: {}, type: {}, useCurrentDay: () => '2026-09-20', useReduceMotion: () => true, usePalette: () => ({ text: '#000', income: '#080', transfer: '#03c', warning: '#a60' }) },
+    './theme': { radius: {}, space: {}, type: {}, useCurrentDay: () => '2026-09-20', useReduceMotion: () => true, usePalette: () => ({ text: '#000', secondary: '#666', tertiary: '#999', income: '#008800', transfer: '#03c', warning: '#a60' }) },
     './categories': { categoryIcon: () => 'pricetag-outline' },
     './category-color': { tintOf: (c: string) => c }, './category-hues': { useCategoryColor: () => '#111' },
-    './geometry': geometry, './motion': { duration: {}, easeOut: {}, selectionHaptic: () => {}, timing: () => ({}) },
+    './geometry': geometry, './money-input': moneyInput, './motion': { duration: {}, easeOut: {}, selectionHaptic: () => {}, timing: () => ({}) },
   };
   const module = { exports: {} as { Money?: (props: any) => any } };
   runInNewContext(code, { module, exports: module.exports, require: (name: string) => {
@@ -74,12 +75,25 @@ test('Money sizes a hero from its measured width and leaves rows to the native f
   hero.props.onLayout({ nativeEvent: { layout: { width: PHONE } } });
   hero = render({ minor: 99999999999, currency: 'ARS', large: true });
   text = hero.props.children;
-  assert.equal(text.props.children, '$ 999.999.999,99');
+  // One amount, three quiet levels: the symbol and the cents are nested spans in the same size and baseline.
+  const [symbol, whole, cents] = text.props.children.props.children;
+  assert.equal(symbol.props.children + whole + cents.props.children, '$ 999.999.999,99', 'the parts are the whole string');
+  assert.equal(symbol.type, 'Text'); assert.equal(cents.type, 'Text');
+  assert.equal(symbol.props.style.color, '#666', 'the symbol steps back to secondary');
+  assert.equal(cents.props.style.color, '#999', 'the cents step back to tertiary');
+  assert.equal(symbol.props.style.fontSize, undefined, 'no size change: the fit and the baseline stay one');
+  assert.equal(text.props.accessibilityLabel, '999.999.999,99 pesos', 'VoiceOver reads one amount');
   assert.equal(text.props.style.fontSize, 40, 'sized from the measured width');
   assert.equal(text.props.style.lineHeight, Math.round(40 * 1.18));
   assert.equal(text.props.maxFontSizeMultiplier, 1.4);
+  const income = render({ minor: 1234, currency: 'USD', large: true, signed: true, tone: 'income' }).props.children;
+  const [greenSymbol, greenWhole, greenCents] = income.props.children.props.children;
+  assert.equal(greenSymbol.props.children + greenWhole + greenCents.props.children, '+US$ 12,34');
+  assert.equal(greenSymbol.props.style.color, '#008800B3', 'a coloured hero keeps its hue and only lowers the alpha');
+  assert.equal(income.props.style.color, '#008800');
   const row = render({ minor: 1234, currency: 'USD' });
   assert.equal(row.type, 'Text', 'a row amount is a plain text');
+  assert.equal(row.props.children, 'US$ 12,34', 'row amounts stay one plain string');
   assert.equal(row.props.adjustsFontSizeToFit, true);
   assert.equal(row.props.minimumFontScale, 0.75);
   assert.equal(row.props.style.lineHeight, undefined, 'no fixed line height for the native fit');

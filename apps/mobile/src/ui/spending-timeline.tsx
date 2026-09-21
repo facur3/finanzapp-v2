@@ -21,7 +21,7 @@ function Bar({ fraction }: { fraction: number }) {
   }, [fraction, reduced, value]);
   const style = useAnimatedStyle(() => ({ height: `${value.value * 100}%` as `${number}%` }));
   return <View accessible={false} style={{ height: 90, width: '100%', justifyContent: 'flex-end', borderBottomWidth: 1, borderBottomColor: p.line }}>
-    <Animated.View style={[{ backgroundColor: p.accent, borderTopLeftRadius: 7, borderTopRightRadius: 7, marginHorizontal: 8 }, style]} />
+    <Animated.View style={[{ backgroundColor: p.text, borderTopLeftRadius: 7, borderTopRightRadius: 7, marginHorizontal: 8 }, style]} />
   </View>;
 }
 
