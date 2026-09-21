@@ -6,6 +6,7 @@ import { currentMonthISO, formatMinorUnits, shiftMonthISO, summarizeMonthlyBudge
 import { useLedger } from '../src/storage/LedgerProvider';
 import { ActionButton, AppText, CategoryBadge, Choices, EmptyState, IconButton, Money, PressFeedback, Screen, SectionTitle, Stat, Surface } from '../src/ui/components';
 import { availableCurrencies } from '../src/ui/presentation';
+import { timing } from '../src/ui/motion';
 import { space, useCurrentDay, usePalette, useReduceMotion } from '../src/ui/theme';
 
 function monthLabel(monthISO: string) {
@@ -53,7 +54,7 @@ export default function BudgetsScreen() {
           <AppText accessibilityRole="header" variant="title3" style={{ textTransform: 'capitalize', textAlign: 'center' }}>{monthLabel(monthISO)}</AppText>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
             <AppText secondary variant="caption">{isCurrent ? 'Mes en curso' : monthISO > currentMonthISO(day) ? 'Mes futuro · podés prepararlo' : 'Mes cerrado'}</AppText>
-            {!isCurrent && <PressFeedback accessibilityRole="button" accessibilityLabel="Volver al mes actual" onPress={() => setMonthISO(currentMonthISO(day))} style={{ minHeight: 28 }}>
+            {!isCurrent && <PressFeedback feedback="opacity" accessibilityRole="button" accessibilityLabel="Volver al mes actual" onPress={() => setMonthISO(currentMonthISO(day))} style={{ minHeight: 28 }}>
               <AppText variant="caption" style={{ fontWeight: '600', color: p.tint }}>Este mes</AppText>
             </PressFeedback>}
           </View>
@@ -101,12 +102,12 @@ function BudgetRow({ row, money, last }: { row: BudgetProgress; money: (minor: n
   const reduced = useReduceMotion();
   const ratio = Math.min(1, row.ratio);
   const progress = useSharedValue(ratio);
-  useEffect(() => { progress.value = withTiming(ratio, { duration: reduced ? 0 : 360 }); }, [ratio, reduced, progress]);
+  useEffect(() => { progress.value = withTiming(ratio, timing('data', reduced)); }, [ratio, reduced, progress]);
   const bar = useAnimatedStyle(() => ({ width: `${progress.value === 0 ? 0 : Math.max(1.5, progress.value * 100)}%` as `${number}%` }));
   const tone = row.exceeded ? p.expense : row.ratio >= 0.85 ? p.warning : p.text;
   const percent = Math.round(row.ratio * 100);
   const status = row.exceeded ? `Excedido por ${money(-row.remainingMinor)}` : row.remainingMinor === 0 ? 'Límite alcanzado' : `Quedan ${money(row.remainingMinor)}`;
-  return <PressFeedback accessibilityRole="button"
+  return <PressFeedback feedback="highlight" accessibilityRole="button"
     accessibilityLabel={`Presupuesto ${row.budget.category}: ${money(row.spentMinor)} de ${money(row.budget.amountMinor)}, ${percent} por ciento. ${status}`}
     onPress={() => router.push({ pathname: '/edit-budget/[id]', params: { id: row.budget.id } })}
     style={{ paddingHorizontal: 16, paddingVertical: 12, gap: 10, borderBottomWidth: last ? 0 : StyleSheet.hairlineWidth, borderBottomColor: p.line }}>
@@ -132,7 +133,7 @@ function TotalBar({ spent, total }: { spent: number; total: number }) {
   const reduced = useReduceMotion();
   const ratio = total > 0 ? Math.min(1, spent / total) : 0;
   const progress = useSharedValue(ratio);
-  useEffect(() => { progress.value = withTiming(ratio, { duration: reduced ? 0 : 420 }); }, [ratio, reduced, progress]);
+  useEffect(() => { progress.value = withTiming(ratio, timing('data', reduced)); }, [ratio, reduced, progress]);
   const bar = useAnimatedStyle(() => ({ width: `${progress.value === 0 ? 0 : Math.max(1.5, progress.value * 100)}%` as `${number}%` }));
   return <View accessible={false} style={{ height: 6, borderRadius: 3, overflow: 'hidden', backgroundColor: p.inset }}>
     <Animated.View style={[{ height: 6, borderRadius: 3, backgroundColor: spent > total ? p.expense : ratio >= 0.85 ? p.warning : p.text }, bar]} />

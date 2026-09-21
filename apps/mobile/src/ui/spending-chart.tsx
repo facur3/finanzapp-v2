@@ -5,6 +5,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { formatMinorUnits, type CategorySpending, type Currency } from '@finanzapp/domain';
 import { AppText, CategoryBadge, Money, PressFeedback } from './components';
 import { spendingShare } from './report-presentation';
+import { timing } from './motion';
 import { usePalette, useReduceMotion } from './theme';
 
 function ShareBar({ fraction }: { fraction: number }) {
@@ -14,7 +15,7 @@ function ShareBar({ fraction }: { fraction: number }) {
   // zero balance or a focus-triggered replay when returning from a detail.
   const progress = useSharedValue(fraction);
   useEffect(() => {
-    progress.value = withTiming(fraction, { duration: reduced ? 0 : 260 });
+    progress.value = withTiming(fraction, timing('data', reduced));
     return () => cancelAnimation(progress);
   }, [fraction, reduced, progress]);
   const style = useAnimatedStyle(() => ({ width: `${progress.value * 100}%` as `${number}%` }));
@@ -33,7 +34,7 @@ export function CategorySpendingRow({ category, totalMinor, currency, onPress, l
   const { fraction, label } = spendingShare(category.amountMinor, totalMinor);
   const count = category.count === 1 ? '1 gasto' : category.count + ' gastos';
   const stacked = fontScale > 1.3 || width < 360;
-  return <PressFeedback accessibilityRole="button"
+  return <PressFeedback feedback="highlight" accessibilityRole="button"
     accessibilityLabel={`${category.category}, ${formatMinorUnits(category.amountMinor)} ${currency}, ${label} del gasto del ${periodName}, ${count}`}
     accessibilityHint={"Abre los movimientos de esta categoría en el " + periodName + " seleccionado"}
     onPress={onPress} style={{ paddingHorizontal: 16, paddingVertical: 16, flexDirection: 'row', gap: 12, alignItems: 'center',
@@ -60,7 +61,7 @@ export function CategoryLegendRow({ category, totalMinor, currency, color, onPre
   const { label } = spendingShare(category.amountMinor, totalMinor);
   const count = category.count === 1 ? '1 gasto' : category.count + ' gastos';
   const stacked = fontScale > 1.3;
-  return <PressFeedback accessibilityRole="button"
+  return <PressFeedback feedback="highlight" accessibilityRole="button"
     accessibilityLabel={`${category.category}, ${formatMinorUnits(category.amountMinor)} ${currency}, ${label} del gasto del mes, ${count}`}
     accessibilityHint="Abre los movimientos de esta categoría en el mes seleccionado"
     onPress={onPress} style={{ paddingHorizontal: 16, paddingVertical: 12, minHeight: 60, flexDirection: 'row', gap: 12, alignItems: 'center',

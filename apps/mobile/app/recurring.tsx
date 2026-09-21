@@ -102,7 +102,7 @@ function RecurringRow({ rule, accounts, day, last, busy, onToggle }: {
   const when = !rule.active ? 'Pausado' : days <= 0 ? 'Hoy' : days === 1 ? 'Mañana' : `En ${days} días`;
   const income = rule.kind === 'income';
   return <View style={{ flexDirection: 'row', alignItems: 'center', borderBottomColor: p.line, borderBottomWidth: last ? 0 : StyleSheet.hairlineWidth, opacity: rule.active ? 1 : 0.6 }}>
-    <PressFeedback accessibilityRole="button" accessibilityLabel={`Editar recurrente ${rule.merchant}, ${FREQUENCY[rule.frequency].toLowerCase()}, ${formatMinorUnits(rule.amountMinor)} ${account?.currency ?? ''}, próximo ${date}`}
+    <PressFeedback feedback="highlight" accessibilityRole="button" accessibilityLabel={`Editar recurrente ${rule.merchant}, ${FREQUENCY[rule.frequency].toLowerCase()}, ${formatMinorUnits(rule.amountMinor)} ${account?.currency ?? ''}, próximo ${date}`}
       onPress={() => router.push({ pathname: '/edit-recurring/[id]', params: { id: rule.id } })}
       containerStyle={{ flex: 1 }} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, paddingLeft: 16, minHeight: 64 }}>
       <CategoryBadge category={rule.category} tone={income ? 'income' : 'neutral'} />

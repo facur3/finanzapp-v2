@@ -18,15 +18,20 @@ type FormKind = EntryKind | 'transfer';
  * category and the account or card are the four things a user must see; a
  * submitted command stays frozen across retries, including a failed refresh
  * after SQLite committed. */
-export function EntryForm({ original, accountId: requestedAccount, currency, kind: requestedKind }: {
+export function EntryForm({ original, accountId: requestedAccount, currency, kind: requestedKind, onKindChange, onAccountChange }: {
   original?: EntryRecord; accountId?: string; currency?: string; kind?: string;
+  /** When a host owns the Gasto / Ingreso / Transferencia switch it passes `kind` and this callback; the form then renders no switch of its own. */
+  onKindChange?: (kind: FormKind) => void;
+  /** Lets the host carry the chosen account over when the mode changes. */
+  onAccountChange?: (accountId: string) => void;
 }) {
   const { snapshot, archive, addEntry, updateEntry } = useLedger();
   // Cash accounts and cards can carry an expense or income; a personal debt only changes through payments.
   const accounts = postingAccounts(snapshot?.accounts ?? [], archive?.debts);
   const [before] = useState(original);
   const [operation] = useState(() => ({ id: randomUUID(), createdAt: new Date().toISOString() }));
-  const [kind, setKind] = useState<EntryKind>(before?.entry.kind ?? (requestedKind === 'income' ? 'income' : 'expense'));
+  const [ownKind, setKind] = useState<EntryKind>(before?.entry.kind ?? (requestedKind === 'income' ? 'income' : 'expense'));
+  const kind: EntryKind = onKindChange ? (requestedKind === 'income' ? 'income' : 'expense') : ownKind;
   const [accountId, setAccountId] = useState(() => before?.entry.accountId ?? initialAccountId(accounts, requestedAccount, currency));
   const [amount, setAmount] = useState(before ? formatMinorUnits(before.entry.amountMinor) : '');
   const [merchant, setMerchant] = useState(before?.entry.merchant ?? '');
@@ -68,11 +73,6 @@ export function EntryForm({ original, accountId: requestedAccount, currency, kin
   try { parsed = parseMinorUnits(amount); } catch { parsed = null; }
   const amountEcho = parsed && parsed > 0 && account ? ` · ${account.currency === 'USD' ? 'US$ ' : '$ '}${formatMinorUnits(parsed)}` : '';
 
-  function changeKind(next: FormKind) {
-    if (next === 'transfer') { router.replace({ pathname: '/new-transfer', params: account ? { accountId: account.id } : {} }); return; }
-    setKind(next);
-  }
-
   async function save() {
     if (saving.current) return;
     saving.current = true;
@@ -112,15 +112,14 @@ export function EntryForm({ original, accountId: requestedAccount, currency, kin
       headerLeft: () => <IconButton name="close" label="Cerrar" onPress={close} disabled={busy} /> }} />
     {!accounts.length ? <EmptyState title="Primero, una cuenta" detail="Cada movimiento necesita una cuenta para actualizar su saldo."
       action={<ActionButton label="Agregar cuenta" onPress={() => router.replace('/new-account')} />} /> : <>
-      <Choices<FormKind> value={kind} onChange={changeKind} disabled={locked}
-        options={before ? [{ value: 'expense', label: 'Gasto' }, { value: 'income', label: 'Ingreso' }]
-          : [{ value: 'expense', label: 'Gasto' }, { value: 'income', label: 'Ingreso' }, { value: 'transfer', label: 'Transferencia' }]} />
+      {!onKindChange && <Choices<EntryKind> value={kind} onChange={setKind} disabled={locked}
+        options={[{ value: 'expense', label: 'Gasto' }, { value: 'income', label: 'Ingreso' }]} />}
       <AmountField currency={account?.currency ?? 'ARS'} value={amount} onChangeText={value => { setAmount(value); setError(null); }} editable={!locked}
         tone={kind === 'income' ? 'income' : 'neutral'} label={kind === 'expense' ? 'Gasto' : 'Ingreso'} />
       <View style={{ gap: space.m }}>
         <CategoryField entries={snapshot?.entries ?? []} kind={kind} value={category} onChange={setCategory} disabled={locked}
           prominent detail={budget?.text} detailTone={budget?.tone} />
-        <AccountField label={kind === 'expense' ? 'Pagado con' : 'Ingresa en'} accounts={eligibleAccounts} value={accountId} onChange={setAccountId} disabled={locked}
+        <AccountField label={kind === 'expense' ? 'Pagado con' : 'Ingresa en'} accounts={eligibleAccounts} value={accountId} onChange={id => { setAccountId(id); onAccountChange?.(id); }} disabled={locked}
           prominent kindOf={kindOf} detail={accountDetail}
           describe={item => { const balance = snapshot ? accountBalanceMinor(item, snapshot.entries, snapshot.transfers) : 0;
             return (cards.some(card => card.accountId === item.id) ? 'deuda ' : 'saldo ') + formatMinorUnits(Math.abs(balance)); }} />

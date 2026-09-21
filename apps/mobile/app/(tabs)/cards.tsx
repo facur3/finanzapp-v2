@@ -8,6 +8,7 @@ import { ActionButton, AppText, EmptyState, GlyphTile, Money, MovementRow, Scree
 import { CardCarousel, CardFace } from '../../src/ui/card-visual';
 import { DebtRow } from '../../src/ui/liability-rows';
 import { activeCards, daysUntil, usageTone, type CardSummary } from '../../src/ui/liability-presentation';
+import { Reflow, ValueTransition, timing } from '../../src/ui/motion';
 import { mergeActivity } from '../../src/ui/presentation';
 import { space, useCurrentDay, usePalette, useReduceMotion } from '../../src/ui/theme';
 
@@ -32,10 +33,10 @@ export default function CardsScreen() {
               currency={item.account.currency} width={width} accessibilityHint="Abre el detalle de la tarjeta"
               onPress={() => router.push({ pathname: '/card/[id]', params: { id: item.card.id } })} />} />
         </View>
-        {selected && <CardPanel key={selected.card.id} summary={selected} day={day} />}
+        {selected && <CardPanel summary={selected} day={day} />}
       </>}
 
-    <View>
+    <Reflow>
       <SectionTitle action={debts.length ? 'Ver todas' : 'Agregar'} onAction={() => router.push(debts.length ? '/debts' : '/new-debt')}>Deudas y cobros</SectionTitle>
       {debts.length ? <Surface grouped>
         {debts.slice(0, 3).map((debt, index) => <DebtRow key={debt.id} debt={debt} last={index === Math.min(debts.length, 3) - 1} />)}
@@ -46,7 +47,7 @@ export default function CardsScreen() {
           <AppText secondary variant="footnote">Pagos y cobros parciales reducen el saldo. No se cuentan como gasto ni ingreso.</AppText>
         </View>
       </Surface>}
-    </View>
+    </Reflow>
     <AppText tertiary variant="footnote" style={{ textAlign: 'center', color: p.tertiary }}>
       Cierres y vencimientos se calculan con los días que cargaste. No hay conexión bancaria.
     </AppText>
@@ -67,14 +68,16 @@ function CardPanel({ summary, day }: { summary: CardSummary; day: string }) {
   const tone = usageTone(usage);
   const dueIn = daysUntil(dueISO, day);
   const relative = (iso: string) => labelFromISO(iso, new Date(day + 'T12:00:00'));
+  // The panel structure stays mounted across cards; only its values crossfade,
+  // so the sections below never jump to a different height mid-transition.
   return <View style={{ gap: space.xl }}>
-    <View style={{ gap: 6 }}>
+    <ValueTransition id={card.id} style={{ gap: 6 }}>
       <AppText secondary variant="footnote" style={{ fontWeight: '500' }}>Deuda registrada · {account.currency}</AppText>
       <Money minor={debtMinor} currency={account.currency} large size={40} />
       {debtMinor === 0 && <AppText secondary variant="footnote">Sin deuda registrada en esta tarjeta.</AppText>}
-    </View>
+    </ValueTransition>
 
-    <Surface style={{ gap: 14 }}>
+    <ValueTransition id={card.id} variant="fade"><Surface style={{ gap: 14 }}>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 12 }}>
         <Stat label="Disponible">
           {availableMinor !== null ? <Money minor={availableMinor} currency={account.currency} size={17} color={availableMinor < 0 ? p.expense : undefined} />
@@ -87,7 +90,7 @@ function CardPanel({ summary, day }: { summary: CardSummary; day: string }) {
       </View>
       {usage !== null && card.creditLimitMinor !== null && <UsageBar usage={usage} tone={tone}
         label={`${Math.round(Math.min(usage, 9.99) * 100)} % del límite de ${account.currency === 'USD' ? 'US$ ' : '$ '}${formatMinorUnits(card.creditLimitMinor)}`} />}
-    </Surface>
+    </Surface></ValueTransition>
 
     <View style={{ flexDirection: 'row', gap: 10 }}>
       <ActionButton label="Registrar compra" icon="cart-outline" containerStyle={{ flex: 1 }}
@@ -96,7 +99,7 @@ function CardPanel({ summary, day }: { summary: CardSummary; day: string }) {
         onPress={() => router.push({ pathname: '/new-transfer', params: { toAccountId: account.id, title: 'Pagar tarjeta', note: 'Pago ' + account.name, maxAmountMinor: String(debtMinor) } })} />
     </View>
 
-    {statement && <View style={{ flexDirection: 'row', gap: 10 }}>
+    {statement && <ValueTransition id={card.id} variant="fade" style={{ flexDirection: 'row', gap: 10 }}>
       <Surface style={{ flex: 1, gap: 4 }}>
         <AppText secondary variant="caption" style={{ fontWeight: '500' }}>Compras del resumen</AppText>
         <Money minor={statement.purchasesMinor} currency={account.currency} size={17} />
@@ -107,14 +110,14 @@ function CardPanel({ summary, day }: { summary: CardSummary; day: string }) {
         <Money minor={statement.paymentsMinor} currency={account.currency} size={17} tone="transfer" color={statement.paymentsMinor ? undefined : p.text} />
         <AppText tertiary variant="caption">{statement.paymentCount === 1 ? '1 pago' : statement.paymentCount + ' pagos'}</AppText>
       </Surface>
-    </View>}
+    </ValueTransition>}
 
-    <View>
+    <ValueTransition id={card.id} variant="fade">
       <SectionTitle action="Ver todo" onAction={() => router.push({ pathname: '/card/[id]', params: { id: card.id } })}>Recientes</SectionTitle>
       {recent.length ? <Surface grouped>
         {recent.map((item, index) => <MovementRow key={item.key} item={item} accounts={snapshot.accounts} accountId={account.id} context="card" last={index === recent.length - 1} />)}
       </Surface> : <AppText secondary variant="subhead">Todavía no registraste compras ni pagos en esta tarjeta.</AppText>}
-    </View>
+    </ValueTransition>
   </View>;
 }
 
@@ -122,7 +125,7 @@ function UsageBar({ usage, tone, label }: { usage: number; tone: 'neutral' | 'wa
   const p = usePalette();
   const reduced = useReduceMotion();
   const progress = useSharedValue(Math.min(1, usage));
-  useEffect(() => { progress.value = withTiming(Math.min(1, usage), { duration: reduced ? 0 : 360 }); }, [usage, reduced, progress]);
+  useEffect(() => { progress.value = withTiming(Math.min(1, usage), timing('data', reduced)); }, [usage, reduced, progress]);
   const bar = useAnimatedStyle(() => ({ width: `${progress.value === 0 ? 0 : Math.max(1.5, progress.value * 100)}%` as `${number}%` }));
   const fill = tone === 'neutral' ? p.text : toneColors(p, tone).color;
   return <View style={{ gap: 6 }}>

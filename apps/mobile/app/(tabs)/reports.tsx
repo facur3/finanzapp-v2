@@ -6,7 +6,9 @@ import { dailyAverageMinor, dailySpending, formatMinorUnits, monthlySpendingTren
   summarizeMonthlyBudgets, topMerchants, type CategorySpending, type Currency, type DailySpending } from '@finanzapp/domain';
 import { useLedger } from '../../src/storage/LedgerProvider';
 import { AppText, Choices, DetailRow, EmptyState, GlyphTile, IconButton, Money, PressFeedback, SectionTitle, Surface } from '../../src/ui/components';
+import { assignCategoryHues } from '../../src/ui/category-color';
 import { DonutChart, MonthBars, OTHERS_KEY, donutSlices } from '../../src/ui/charts';
+import { ValueTransition, selectionHaptic } from '../../src/ui/motion';
 import { activityDateLabel } from '../../src/ui/presentation';
 import { changePercent, reportMonthLabel, reportPeriodLabel, reportSelection, shiftReportMonth } from '../../src/ui/report-presentation';
 import { CategoryLegendRow } from '../../src/ui/spending-chart';
@@ -29,6 +31,7 @@ export default function ReportsScreen() {
   const report = useMemo(() => snapshot && selection ? spendingReport(snapshot, selection.currency, selection.monthISO, day) : null,
     [snapshot, selection, day]);
   const money = (minor: number) => (selection?.currency === 'USD' ? 'US$ ' : '$ ') + formatMinorUnits(minor);
+  const hues = useMemo(() => assignCategoryHues(snapshot?.entries ?? []), [snapshot?.entries]);
   const trend = useMemo(() => {
     if (!snapshot || !selection) return [];
     try { return monthlySpendingTrend(snapshot, selection.currency, selection.monthISO, day, 6); } catch { return []; }
@@ -53,7 +56,8 @@ export default function ReportsScreen() {
   const { currency, currencies, monthISO, earliestMonth, currentMonth } = selection;
   const canPrevious = monthISO > earliestMonth;
   const canNext = monthISO < currentMonth;
-  const slices = donutSlices(report.categories.map(category => ({ key: category.key, label: category.category, value: category.amountMinor })), p);
+  const slices = donutSlices(report.categories.map(category => ({ key: category.key, label: category.category, value: category.amountMinor })), p, hues);
+  const goToMonth = (month: string | undefined) => { selectionHaptic(); setMonth(month); };
   const colorFor = (key: string) => slices.find(slice => slice.key === key)?.color ?? slices.find(slice => slice.key === OTHERS_KEY)?.color ?? p.tertiary;
   const average = ready ? dailyAverageMinor(report.expenseMinor, report) : 0;
   const delta = comparison && comparison.status === 'ready' && comparison.previous?.status === 'ready' && comparison.deltaMinor !== null
@@ -70,23 +74,23 @@ export default function ReportsScreen() {
           options={currencies.map(value => ({ value, label: value === 'ARS' ? 'Pesos · ARS' : 'Dólares · USD' }))} />}
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
           <IconButton name="chevron-back" label="Mes anterior" disabled={!canPrevious}
-            onPress={() => { if (canPrevious) setMonth(shiftReportMonth(monthISO, -1)); }} />
-          <View style={{ flex: 1, alignItems: 'center', gap: 2 }}>
+            onPress={() => { if (canPrevious) goToMonth(shiftReportMonth(monthISO, -1)); }} />
+          <ValueTransition id={monthISO + '|' + currency} variant="fade" style={{ flex: 1, alignItems: 'center', gap: 2 }}>
             <AppText accessibilityRole="header" variant="title3" style={{ textTransform: 'capitalize', textAlign: 'center' }}>{reportMonthLabel(monthISO)}</AppText>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
               <AppText secondary variant="caption">{reportPeriodLabel(report, day)}</AppText>
-              {canNext && <PressFeedback accessibilityRole="button" onPress={() => setMonth(currentMonth)} accessibilityLabel="Volver al mes actual" style={{ minHeight: 28 }}>
+              {canNext && <PressFeedback feedback="opacity" accessibilityRole="button" onPress={() => goToMonth(currentMonth)} accessibilityLabel="Volver al mes actual" style={{ minHeight: 28 }}>
                 <AppText variant="caption" style={{ fontWeight: '600', color: p.tint }}>Este mes</AppText>
               </PressFeedback>}
             </View>
-          </View>
+          </ValueTransition>
           <IconButton name="chevron-forward" label="Mes siguiente" disabled={!canNext}
-            onPress={() => { if (canNext) setMonth(shiftReportMonth(monthISO, 1)); }} />
+            onPress={() => { if (canNext) goToMonth(shiftReportMonth(monthISO, 1)); }} />
         </View>
       </View>
 
       {ready ? <>
-        <View style={{ gap: 8 }}>
+        <ValueTransition id={monthISO + '|' + currency} style={{ gap: 8 }}>
           <AppText secondary variant="eyebrow">Gastado · {currency}</AppText>
           <Money minor={report.expenseMinor} currency={currency} large />
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6 }}>
@@ -99,11 +103,11 @@ export default function ReportsScreen() {
               </View>
             </>}
           </View>
-        </View>
+        </ValueTransition>
 
         {trend.length > 0 && trend.some(point => point.amountMinor > 0) && <Surface style={{ gap: 12 }}>
           <AppText secondary variant="caption" style={{ fontWeight: '500' }}>Últimos seis meses</AppText>
-          <MonthBars points={trend} selected={monthISO} onSelect={month => setMonth(month === currentMonth ? undefined : month)} currency={currency} />
+          <MonthBars points={trend} selected={monthISO} onSelect={month => { if (month !== monthISO) goToMonth(month === currentMonth ? undefined : month); }} currency={currency} />
         </Surface>}
 
         <Choices value={view} onChange={setView} options={[{ value: 'categories', label: 'Categorías' }, { value: 'days', label: 'Día a día' }]} />
@@ -154,7 +158,8 @@ export default function ReportsScreen() {
       {ready && insights.length > 0 && <View>
         <SectionTitle caption="Hechos de tus registros, no consejos">Para tener en cuenta</SectionTitle>
         <View style={{ gap: 10 }}>
-          {insights.map(insight => <Surface key={insight.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+          {insights.map(insight => <Surface key={insight.id} style={[{ flexDirection: 'row', alignItems: 'center', gap: 12 },
+            insight.tone === 'expense' ? { backgroundColor: p.expenseSoft } : insight.tone === 'warning' ? { backgroundColor: p.warningSoft } : null]}>
             <GlyphTile icon={insight.tone === 'expense' ? 'alert-circle-outline' : insight.tone === 'warning' ? 'speedometer-outline' : insight.id.startsWith('largest') ? 'receipt-outline' : 'trending-up-outline'}
               tone={insight.tone} />
             <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
@@ -182,7 +187,7 @@ function BudgetStatusRow({ category, spent, limit, ratio, exceeded, money, last,
   const p = usePalette();
   const color = exceeded ? p.expense : ratio >= 0.85 ? p.warning : p.text;
   const percent = Math.round(ratio * 100);
-  return <PressFeedback accessibilityRole="button" accessibilityLabel={`${category}: ${money(spent)} de ${money(limit)}, ${percent} por ciento${exceeded ? ', excedido' : ''}`}
+  return <PressFeedback feedback="highlight" accessibilityRole="button" accessibilityLabel={`${category}: ${money(spent)} de ${money(limit)}, ${percent} por ciento${exceeded ? ', excedido' : ''}`}
     onPress={onPress} style={{ paddingHorizontal: 16, paddingVertical: 12, gap: 8, borderBottomWidth: last ? 0 : 0.5, borderBottomColor: p.line }}>
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
       <AppText numberOfLines={1} style={{ flex: 1, fontWeight: '500' }}>{category}</AppText>

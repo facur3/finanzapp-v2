@@ -6,6 +6,7 @@ import ts from 'typescript';
 import * as domain from '@finanzapp/domain';
 import * as presentation from '../src/ui/presentation.ts';
 import * as reportPresentation from '../src/ui/report-presentation.ts';
+import * as categoryColor from '../src/ui/category-color.ts';
 import { monthlyEvidence } from '../src/integrations/evidence.ts';
 import { integrationClient } from '../src/integrations/client.ts';
 
@@ -50,7 +51,9 @@ function routeHarness(file: string, params: Record<string, unknown>, data = snap
     '../src/ui/presentation': presentation,
     '../src/ui/report-presentation': reportPresentation,
     '../src/ui/spending-chart': { CategorySpendingRow: 'CategorySpendingRow' },
-    '../src/ui/home-modules': { BudgetHomeCard: 'BudgetHomeCard', CategoryHomeRow: 'CategoryHomeRow', UpcomingRecurringRow: 'UpcomingRecurringRow' },
+    '../src/ui/home-modules': { BudgetHomeCard: 'BudgetHomeCard', CategoryComposition: 'CategoryComposition', MetricHelp: 'MetricHelp', UpcomingRecurringRow: 'UpcomingRecurringRow' },
+    '../src/ui/category-color': categoryColor,
+    '../src/ui/motion': { ValueTransition: 'ValueTransition', Reflow: 'Reflow', selectionHaptic: () => {}, impactHaptic: () => {}, duration: { press: 100, release: 160, state: 200, data: 260, enter: 200, exit: 100, reveal: 480 }, timing: (kind: string, reduced: boolean) => ({ duration: reduced ? 0 : 260 }) },
     '../src/ui/theme': { useCurrentDay: () => '2026-09-12', useReduceMotion: () => false, space: { xs: 4, s: 8, m: 12, l: 16, xl: 20, xxl: 24, xxxl: 32 },
       usePalette: () => ({ background: '#F5F6F8', surface: '#FFFFFF', accent: '#0A0A0C', tint: '#2563EB', expense: '#C42F39',
         negative: '#C73535', text: '#111111', secondary: '#666666', tertiary: '#999999', inset: '#EEEEEE', line: '#DDDDDD' }) },
@@ -94,12 +97,16 @@ test('Home scopes spending, recent entries, categories and actions to week and c
   nodes(view.render()).find(n => n.type === 'Choices' && n.props.value === 'ARS')!.props.onChange('USD');
   assert.equal(find(view.render(), 'Money').props.minor, 1000);
   assert.equal(find(view.render(), 'EntryActions').props.currency, 'USD');
-  assert.equal(find(view.render(), 'CategoryHomeRow').props.totalMinor, 1000);
+  const composition = find(view.render(), 'CategoryComposition');
+  assert.equal(composition.props.totalMinor, 1000);
+  assert.deepEqual(composition.props.categories.map((c: domain.CategorySpending) => c.key), ['salud']);
+  assert.equal(composition.props.hues.get('salud'), categoryColor.assignCategoryHues(homeData.entries).get('salud'));
 });
 test('weekly category opens matching dates, and returning keeps the selected period', () => {
   const view = routeHarness('(tabs)/index.tsx', {}, homeData);
   nodes(view.render()).find(n => n.type === 'Choices' && n.props.value === 'month')!.props.onChange('week');
-  find(view.render(), 'CategoryHomeRow').props.onPress();
+  const composition = find(view.render(), 'CategoryComposition');
+  composition.props.onPressCategory(composition.props.categories[0]);
   assert.equal(view.pushed[0].pathname, '/spending-detail');
   const detail = routeHarness('spending-detail.tsx', view.pushed[0].params, homeData).render();
   assert.deepEqual(detail.props.entries.map((e: domain.Entry) => e.id), ['now']);
@@ -109,19 +116,30 @@ test('weekly category opens matching dates, and returning keeps the selected per
 test('empty and overflow Home never invent a chart, budget or partial total', () => {
   const empty = routeHarness('(tabs)/index.tsx', {}).render();
   assert.equal(find(empty, 'Money').props.minor, 0);
-  assert.equal(nodes(empty).some(n => n.type === 'SpendingTimeline' || n.type === 'CategoryHomeRow' || n.type === 'BudgetHomeCard'), false);
+  assert.equal(nodes(empty).some(n => n.type === 'SpendingTimeline' || n.type === 'CategoryComposition' || n.type === 'BudgetHomeCard' || n.type === 'UpcomingRecurringRow'), false);
+  assert.equal(nodes(empty).some(n => n.type === 'SectionTitle' && n.props.children === 'Próximos compromisos'), false, 'no empty commitments block');
   const huge = { ...homeData, entries: homeData.entries.filter(e => e.id === 'early' || e.id === 'now').map(e => ({ ...e, amountMinor: Number.MAX_SAFE_INTEGER })) };
   assert.equal(nodes(routeHarness('(tabs)/index.tsx', {}, huge).render()).some(n => n.type === 'Money'), false);
 });
-test('Home keeps analysis in Reportes: no timeline bars, a Reportes link on categories and a way to program recurrentes', () => {
+test('Home keeps analysis in Reportes: no timeline bars, a Reportes link on categories and commitments only with stored rules', () => {
   const view = routeHarness('(tabs)/index.tsx', {}, homeData);
   const root = view.render();
   assert.equal(nodes(root).some(n => n.type === 'SpendingTimeline'), false);
   find(root, 'SectionTitle', 'Reportes');
   nodes(root).find(n => n.type === 'SectionTitle' && n.props.action === 'Reportes')!.props.onAction();
   assert.equal(view.pushed.at(-1).pathname, '/reports');
-  nodes(root).find(n => n.type === 'SectionTitle' && n.props.action === 'Programar')!.props.onAction();
-  assert.equal(view.pushed.at(-1), '/new-recurring');
+  find(root, 'CategoryComposition').props.onPressOthers();
+  assert.equal(view.pushed.at(-1).pathname, '/reports');
+  assert.equal(nodes(root).some(n => n.type === 'UpcomingRecurringRow' || (n.type === 'SectionTitle' && n.props.action === 'Programar')), false, 'no commitments block without rules');
+  // No disclaimer copy on screen: the definition lives behind contextual help.
+  const texts = nodes(root).filter(n => n.type === 'AppText').map(n => String(n.props.children));
+  assert.equal(texts.some(text => /saldo bancario|patrimonio/.test(text)), false);
+  const rule = { id: 'r', kind: 'expense' as const, accountId: 'a', amountMinor: 700, merchant: 'Alquiler', category: 'Hogar', frequency: 'monthly' as const,
+    nextDateISO: '2026-09-20', active: true, createdAt, revision: 0, updatedAt: createdAt };
+  const withRule = routeHarness('(tabs)/index.tsx', {}, homeData, { recurring: [rule] as domain.RecurringRule[] });
+  assert.equal(find(withRule.render(), 'UpcomingRecurringRow').props.rule.id, 'r');
+  nodes(withRule.render()).find(n => n.type === 'SectionTitle' && n.props.action === 'Ver todos' && n.props.children === 'Próximos compromisos')!.props.onAction();
+  assert.equal(withRule.pushed.at(-1), '/recurring');
   // Disponible excludes a card account's negative balance.
   const withCard = { ...homeData, accounts: [...homeData.accounts, { id: 'card-acc', name: 'Visa', currency: 'ARS' as const, openingMinor: -5000, createdAt }] };
   const cardView = routeHarness('(tabs)/index.tsx', {}, withCard, { cards: [{ id: 'card', accountId: 'card-acc', issuer: '', last4: '', creditLimitMinor: null,
@@ -129,6 +147,12 @@ test('Home keeps analysis in Reportes: no timeline bars, a Reportes link on cate
   nodes(cardView.render()).find(n => n.type === 'Choices' && n.props.value === 'spending')!.props.onChange('available');
   // Account "a": opening 10000, expenses 101 + 202 + 303 + 100 + 200, income 500. The card's −5000 is excluded.
   assert.equal(find(cardView.render(), 'Money').props.minor, 10000 - 101 - 202 - 303 - 100 - 200 + 500);
+  // The period control keeps its place (dimmed, not removed) so nothing below reflows on the switch.
+  const periodRow = nodes(cardView.render()).find(n => n.type === 'Animated.View' && n.props.pointerEvents === 'none');
+  assert.ok(periodRow, 'period row stays mounted under Disponible');
+  assert.equal(periodRow!.props.style.opacity, 0);
+  assert.equal(nodes(cardView.render()).some(n => n.type === 'Choices' && n.props.value === 'month'), true);
+  assert.equal(nodes(cardView.render()).some(n => n.type === 'AppText' && /saldo bancario|patrimonio/.test(String(n.props.children))), false);
 });
 test('expense detail rejects malformed scope and a category miss never opens all entries', () => {
   const valid = { currency: 'ARS', startISO: '2026-09-01', endISO: '2026-09-12' };

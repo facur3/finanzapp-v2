@@ -6,7 +6,7 @@ import * as Haptics from 'expo-haptics';
 import { accountBalanceMinor, accountKind, formatMinorUnits, hiddenLiabilityAccountIds, makeTransferChange, parseMinorUnits, sameTransfer, todayKey,
   totalsByCurrency, validateTransfer, validateTransferChange, type Transfer, type TransferChange, type TransferRecord } from '@finanzapp/domain';
 import { useLedger } from '../storage/LedgerProvider';
-import { ActionButton, AmountField, AppText, Choices, DetailRow, EmptyState, ErrorMessage, Field, IconButton, Screen, Surface } from './components';
+import { ActionButton, AmountField, AppText, DetailRow, EmptyState, ErrorMessage, Field, IconButton, Screen, Surface } from './components';
 import { AccountField, DateField, SelectorCard } from './form-controls';
 import { initialAccountId } from './presentation';
 import { space } from './theme';
@@ -16,9 +16,11 @@ import { space } from './theme';
  * collection (cash → debt, receivable → cash). The obligation side is fixed by
  * the caller; only the cash side is chosen here. */
 export function TransferForm({ original, accountId, fromAccountId: requestedFrom, toAccountId: requestedTo,
-  title = 'Entre mis cuentas', defaultNote = '', maxAmountMinor }: {
+  title = 'Entre mis cuentas', defaultNote = '', maxAmountMinor, onAccountChange }: {
   original?: TransferRecord; accountId?: string; fromAccountId?: string; toAccountId?: string; title?: string;
   defaultNote?: string; maxAmountMinor?: string;
+  /** Lets the host carry the source account over when the mode changes. */
+  onAccountChange?: (accountId: string) => void;
 }) {
   const { snapshot, archive, addTransfer, updateTransfer } = useLedger();
   const accounts = snapshot?.accounts ?? [];
@@ -117,7 +119,6 @@ export function TransferForm({ original, accountId, fromAccountId: requestedFrom
     if (!item || !snapshot) return undefined;
     return `${item.currency} ${balanceLabel(item.id, accountBalanceMinor(item, snapshot.entries, snapshot.transfers))}`;
   };
-  const plain = !before && !obligation;
 
   return <Screen gap={space.l}>
     <Stack.Screen options={{ title: before ? 'Editar transferencia' : title, gestureEnabled: !busy,
@@ -126,9 +127,6 @@ export function TransferForm({ original, accountId, fromAccountId: requestedFrom
       ? `Necesitás una cuenta en ${obligation.currency} desde donde ${lockedTo ? 'sale' : 'entra'} el dinero.`
       : 'Agregá las cuentas entre las que movés tu dinero.'}
       action={<ActionButton label="Agregar cuenta" onPress={() => router.replace({ pathname: '/new-account', params: obligation ? { currency: obligation.currency } : {} })} />} /> : <>
-      {plain && <Choices<'expense' | 'income' | 'transfer'> value="transfer" disabled={locked}
-        onChange={next => { if (next !== 'transfer') router.replace({ pathname: '/new-entry', params: { kind: next, ...(from ? { accountId: from.id } : {}) } }); }}
-        options={[{ value: 'expense', label: 'Gasto' }, { value: 'income', label: 'Ingreso' }, { value: 'transfer', label: 'Transferencia' }]} />}
       <AmountField label={obligationKind === 'card' ? 'Pago' : obligationKind === 'debt' ? (lockedTo ? 'Pago' : 'Cobro') : 'Transferencia'}
         currency={(obligation ?? from)?.currency ?? 'ARS'} value={amount} onChangeText={value => { setAmount(value); setError(null); }} editable={!locked} tone="transfer" />
       {contextualMax !== null && obligation && <AppText secondary variant="footnote" style={{ textAlign: 'center', marginTop: -8 }}>
@@ -139,6 +137,7 @@ export function TransferForm({ original, accountId, fromAccountId: requestedFrom
           icon={obligationKind === 'card' ? 'card-outline' : 'people-outline'} tone="transfer" disabled onPress={() => {}} />
           : <AccountField label="Desde" accounts={cashSources} value={fromId} disabled={locked} kindOf={kindLabel} prominent detail={balanceDetail(fromId)} onChange={id => {
             setFromId(id);
+            onAccountChange?.(id);
             const source = accounts.find(a => a.id === id);
             if (!lockedTo && (toId === id || to?.currency !== source?.currency)) setToId('');
           }} />}

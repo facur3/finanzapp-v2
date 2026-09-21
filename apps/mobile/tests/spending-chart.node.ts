@@ -29,6 +29,7 @@ test('bars retain real proportions, animate data changes only, and honor reduced
     '@expo/vector-icons/Ionicons': 'Icon', '@finanzapp/domain': domain,
     './components': { AppText: 'AppText', CategoryBadge: 'CategoryBadge', Money: 'Money', PressFeedback: 'PressFeedback' },
     './report-presentation': presentation,
+    './motion': { timing: (kind: string, isReduced: boolean) => ({ duration: isReduced ? 0 : 260 }) },
     './theme': { useReduceMotion: () => reduced, usePalette: () => ({ accent: '#2467DC', inset: '#ECEFF4' }) },
   };
   const module = { exports: {} as { CategorySpendingRow?: (props: any) => any } };

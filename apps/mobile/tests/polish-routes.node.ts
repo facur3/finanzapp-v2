@@ -58,6 +58,7 @@ function harness(file: string, params: Record<string, unknown> = {}, data: domai
     '../src/storage/LedgerProvider': ledger, '../../src/storage/LedgerProvider': ledger,
     '../src/ui/components': Object.fromEntries(names.map(name => [name, name])), '../../src/ui/components': Object.fromEntries(names.map(name => [name, name])),
     '../src/ui/entry-list': { EntryList: 'EntryList' }, '../../src/ui/entry-list': { EntryList: 'EntryList' },
+    '../src/ui/motion': { ValueTransition: 'ValueTransition', Reflow: 'Reflow', selectionHaptic: () => {}, impactHaptic: () => {}, duration: { press: 100, release: 160, state: 200, data: 260, enter: 200, exit: 100, reveal: 480 }, timing: (kind: string, reduced: boolean) => ({ duration: reduced ? 0 : 260 }) }, '../../src/ui/motion': { ValueTransition: 'ValueTransition', Reflow: 'Reflow', selectionHaptic: () => {}, impactHaptic: () => {}, duration: { press: 100, release: 160, state: 200, data: 260, enter: 200, exit: 100, reveal: 480 }, timing: (kind: string, reduced: boolean) => ({ duration: reduced ? 0 : 260 }) },
     '../src/ui/presentation': presentation, '../../src/ui/presentation': presentation,
     '../src/ui/theme': theme, '../../src/ui/theme': theme,
   };

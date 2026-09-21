@@ -1,4 +1,4 @@
-import { useEffect, useId, type ReactNode } from 'react';
+import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { ActivityIndicator, InputAccessoryView, Keyboard, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View,
   useWindowDimensions, type PressableProps, type StyleProp, type TextInputProps, type TextProps, type ViewStyle } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
@@ -8,6 +8,8 @@ import type { ActivityItem } from './presentation';
 import { router } from 'expo-router';
 import { radius, space, type, useCurrentDay, usePalette, useReduceMotion, type Palette } from './theme';
 import { categoryIcon, type IconName } from './categories';
+import { SEGMENT_GAP, SEGMENT_PADDING, segmentLayout } from './geometry';
+import { duration, easeOut, selectionHaptic, timing } from './motion';
 
 export type { IconName } from './categories';
 /** Colour carries meaning. Neutral is ink on fill; the rest are the four semantic tints. */
@@ -57,23 +59,36 @@ export function SectionTitle({ children, action, onAction, caption }: { children
       <AppText accessibilityRole="header" variant="headline">{children}</AppText>
       {caption && <AppText secondary variant="footnote">{caption}</AppText>}
     </View>
-    {action && onAction && <PressFeedback accessibilityRole="button" accessibilityLabel={action} onPress={onAction} style={{ paddingLeft: 12, minHeight: 36 }}>
+    {action && onAction && <PressFeedback feedback="opacity" accessibilityRole="button" accessibilityLabel={action} onPress={onAction} style={{ paddingLeft: 12, minHeight: 36 }}>
       <AppText variant="subhead" style={{ color: p.tint, fontWeight: '500' }}>{action}</AppText>
     </PressFeedback>}
   </View>;
 }
 
-export function PressFeedback({ children, style, containerStyle, ...props }: PressableProps & {
-  children: ReactNode; style?: StyleProp<ViewStyle>; containerStyle?: StyleProp<ViewStyle>;
+/** Feedback on press-in, commit on press-out, in 100 ms so the interface
+ * answers the finger before the tap completes. Three native treatments:
+ * `scale` (0.97) for buttons, cards and chips; `highlight` (a translucent
+ * tint over the row, like a table cell) for full-width rows, which must not
+ * shrink; `opacity` (0.4) for bare text and icon buttons, like a bar button. */
+export type PressTreatment = 'scale' | 'highlight' | 'opacity';
+
+export function PressFeedback({ children, style, containerStyle, feedback = 'scale', ...props }: PressableProps & {
+  children: ReactNode; style?: StyleProp<ViewStyle>; containerStyle?: StyleProp<ViewStyle>; feedback?: PressTreatment;
 }) {
+  const p = usePalette();
   const reduced = useReduceMotion();
-  const scale = useSharedValue(1);
-  useEffect(() => { if (reduced || props.disabled) scale.value = 1; }, [reduced, props.disabled, scale]);
-  const animatedStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
+  const pressed = useSharedValue(0);
+  useEffect(() => { if (props.disabled) pressed.value = 0; }, [props.disabled, pressed]);
+  const animatedStyle = useAnimatedStyle(() => feedback === 'scale' ? { transform: [{ scale: 1 - 0.03 * pressed.value }] }
+    : feedback === 'opacity' ? { opacity: 1 - 0.6 * pressed.value } : {});
+  const highlightStyle = useAnimatedStyle(() => ({ opacity: pressed.value }));
+  // Reduce Motion drops the scale but keeps the tint and dim: a colour change is not movement.
+  const active = feedback !== 'scale' || !reduced;
   return <Animated.View style={[containerStyle, animatedStyle]}><Pressable {...props}
-    style={[{ minHeight: 44, justifyContent: 'center' }, style]}
-    onPressIn={event => { scale.value = reduced ? 1 : withTiming(0.98, { duration: 90 }); props.onPressIn?.(event); }}
-    onPressOut={event => { scale.value = withTiming(1, { duration: reduced ? 0 : 160 }); props.onPressOut?.(event); }}>
+    style={[{ minHeight: 44, justifyContent: 'center' }, style]} pressRetentionOffset={12}
+    onPressIn={event => { pressed.value = active ? withTiming(1, { duration: duration.press, easing: easeOut }) : 0; props.onPressIn?.(event); }}
+    onPressOut={event => { pressed.value = withTiming(0, { duration: active ? duration.release : 0, easing: easeOut }); props.onPressOut?.(event); }}>
+    {feedback === 'highlight' && <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: p.isDark ? 'rgba(255,255,255,0.07)' : 'rgba(10,10,12,0.05)' }, highlightStyle]} />}
     {children}
   </Pressable></Animated.View>;
 }
@@ -98,7 +113,7 @@ export function ActionButton({ label, onPress, disabled = false, busy = false, s
 
 export function IconButton({ name, label, onPress, disabled = false, color }: { name: IconName; label: string; onPress: () => void; disabled?: boolean; color?: string }) {
   const p = usePalette();
-  return <PressFeedback accessibilityRole="button" accessibilityLabel={label} onPress={onPress}
+  return <PressFeedback feedback="opacity" accessibilityRole="button" accessibilityLabel={label} onPress={onPress}
     disabled={disabled} accessibilityState={{ disabled }}
     style={{ width: 44, alignItems: 'center', opacity: disabled ? 0.35 : 1 }}><Ionicons name={name} size={24} color={color ?? p.text} /></PressFeedback>;
 }
@@ -128,7 +143,7 @@ export function AmountField({ label = 'Monto', currency, tone, ...props }: TextI
     </View>
     {Platform.OS === 'ios' && <InputAccessoryView nativeID={accessoryId} backgroundColor={p.surface}>
       <View style={{ alignItems: 'flex-end', paddingHorizontal: 20 }}>
-        <PressFeedback accessibilityRole="button" accessibilityLabel="Cerrar teclado del monto" onPress={Keyboard.dismiss} style={{ paddingHorizontal: 12 }}>
+        <PressFeedback feedback="opacity" accessibilityRole="button" accessibilityLabel="Cerrar teclado del monto" onPress={Keyboard.dismiss} style={{ paddingHorizontal: 12 }}>
           <AppText style={{ color: p.tint, fontWeight: '600' }}>Listo</AppText>
         </PressFeedback>
       </View>
@@ -139,26 +154,37 @@ export function AmountField({ label = 'Monto', currency, tone, ...props }: TextI
 function Choice({ label, selected, disabled, onPress }: { label: string; selected: boolean; disabled?: boolean; onPress: () => void }) {
   const p = usePalette();
   const reduced = useReduceMotion();
-  const opacity = useSharedValue(selected ? 1 : 0);
-  useEffect(() => { opacity.value = withTiming(selected ? 1 : 0, { duration: reduced ? 0 : 160 }); }, [selected, reduced, opacity]);
-  const selectionStyle = useAnimatedStyle(() => ({ opacity: opacity.value }));
-  return <PressFeedback containerStyle={{ flex: 1, minWidth: 72 }}
-    accessibilityRole="button" accessibilityState={{ selected, disabled }} disabled={disabled}
-    onPress={onPress} style={styles.choice}>
-    <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, { borderRadius: 8, backgroundColor: p.isDark ? p.elevated : p.surface },
-      p.isDark ? {} : { shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 3, shadowOffset: { width: 0, height: 1 } }, selectionStyle]} />
-    <AppText numberOfLines={1} style={{ fontSize: 13, lineHeight: 18, textAlign: 'center', fontWeight: '600', color: selected ? p.text : p.secondary }}>{label}</AppText>
-  </PressFeedback>;
+  return <Pressable accessibilityRole="button" accessibilityState={{ selected, disabled }} disabled={disabled}
+    onPress={onPress} style={styles.choice} hitSlop={4}>
+    <Animated.Text numberOfLines={1} style={{ fontSize: 13, lineHeight: 18, textAlign: 'center', fontWeight: '600', color: selected ? p.text : p.secondary,
+      transitionProperty: 'color', transitionDuration: reduced ? 0 : duration.state }}>{label}</Animated.Text>
+  </Pressable>;
 }
 
-/** Native-style segmented control. */
+/** Native-style segmented control: one thumb slides to the chosen segment
+ * (interruptible, 200 ms ease-out, none under Reduce Motion) and the change
+ * ticks with a selection haptic. Tapping the current value does nothing. */
 export function Choices<T extends string>({ value, options, onChange, disabled }: {
   value: T; options: { value: T; label: string }[]; onChange: (value: T) => void; disabled?: boolean;
 }) {
   const p = usePalette();
-  return <View style={[styles.choices, { backgroundColor: p.inset }]}>
+  const reduced = useReduceMotion();
+  const [trackWidth, setTrackWidth] = useState(0);
+  const index = Math.max(0, options.findIndex(option => option.value === value));
+  const { width, offset } = segmentLayout(trackWidth, options.length, index);
+  const x = useSharedValue(offset);
+  const measured = useRef(false);
+  useEffect(() => {
+    // The first measurement places the thumb; later changes slide it.
+    if (!measured.current || reduced) { x.value = offset; measured.current = trackWidth > 0; return; }
+    x.value = withTiming(offset, timing('state', reduced));
+  }, [offset, reduced, trackWidth, x]);
+  const thumbStyle = useAnimatedStyle(() => ({ transform: [{ translateX: x.value }] }));
+  return <View style={[styles.choices, { backgroundColor: p.inset }]} onLayout={event => setTrackWidth(event.nativeEvent.layout.width)}>
+    {width > 0 && <Animated.View pointerEvents="none" style={[styles.thumb, { width, backgroundColor: p.isDark ? p.elevated : p.surface },
+      p.isDark ? {} : { shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 3, shadowOffset: { width: 0, height: 1 } }, thumbStyle]} />}
     {options.map(option => <Choice key={option.value} label={option.label} selected={value === option.value}
-      disabled={disabled} onPress={() => onChange(option.value)} />)}
+      disabled={disabled} onPress={() => { if (option.value !== value) { selectionHaptic(); onChange(option.value); } }} />)}
   </View>;
 }
 
@@ -219,7 +245,7 @@ export function DetailRow({ label, value, icon, onPress, last = false, disabled 
     {onPress && <Ionicons name="chevron-forward" size={16} color={p.tertiary} accessible={false} />}
   </>;
   const style: StyleProp<ViewStyle> = [styles.detailRow, { borderBottomColor: p.line, borderBottomWidth: last ? 0 : StyleSheet.hairlineWidth }];
-  return onPress ? <PressFeedback accessibilityRole="button" accessibilityLabel={label + ': ' + value}
+  return onPress ? <PressFeedback feedback="highlight" accessibilityRole="button" accessibilityLabel={label + ': ' + value}
     disabled={disabled} accessibilityState={{ disabled }} onPress={onPress} style={style}>{content}</PressFeedback> : <View style={style}>{content}</View>;
 }
 
@@ -246,7 +272,7 @@ export function EntryRow({ entry, account, last = false, showDate = true, showAc
   const income = entry.kind === 'income';
   const stacked = fontScale > 1.3;
   const detail = [entry.category, showAccount ? account.name : null, showDate ? dateLabel : null].filter(Boolean).join(' · ');
-  return <PressFeedback accessibilityRole="button"
+  return <PressFeedback feedback="highlight" accessibilityRole="button"
     accessibilityLabel={[entry.merchant, income ? 'ingreso' : 'gasto', formatMinorUnits(entry.amountMinor) + ' ' + account.currency, entry.category, account.name, dateLabel].join(', ')}
     onPress={() => router.push({ pathname: '/entry/[id]', params: { id: entry.id } })}
     style={[styles.row, { borderBottomColor: p.line, borderBottomWidth: last ? 0 : StyleSheet.hairlineWidth }]}>
@@ -270,7 +296,7 @@ export function AccountRow({ account, entries, transfers, last = false, kindLabe
   const { fontScale } = useWindowDimensions();
   const balance = accountBalanceMinor(account, entries, transfers);
   const stacked = fontScale > 1.3;
-  return <PressFeedback accessibilityRole="button" accessibilityLabel={'Ver cuenta ' + account.name + ', saldo ' + formatMinorUnits(balance) + ' ' + account.currency}
+  return <PressFeedback feedback="highlight" accessibilityRole="button" accessibilityLabel={'Ver cuenta ' + account.name + ', saldo ' + formatMinorUnits(balance) + ' ' + account.currency}
     onPress={() => router.push({ pathname: '/account/[id]', params: { id: account.id } })}
     style={[styles.row, { borderBottomColor: p.line, borderBottomWidth: last ? 0 : StyleSheet.hairlineWidth }]}>
     <GlyphTile icon="wallet-outline" />
@@ -311,7 +337,7 @@ export function TransferRow({ transfer: t, accounts, accountId, last = false, sh
   const detail = context ? [t.note && t.note !== title ? t.note : null, incoming ? 'desde ' + from.name : 'hacia ' + to.name, showDate ? date : null].filter(Boolean).join(' · ')
     : `${from.name} → ${to.name}${showDate ? ' · ' + date : ''}`;
   const signed = !!accountId && !context;
-  return <PressFeedback accessibilityRole="button"
+  return <PressFeedback feedback="highlight" accessibilityRole="button"
     accessibilityLabel={`${title}, de ${from.name} a ${to.name}, ${formatMinorUnits(t.amountMinor)} ${from.currency}, ${date}${t.note ? ', ' + t.note : ''}`}
     onPress={() => router.push({ pathname: '/transfer/[id]', params: { id: t.id } })}
     style={[styles.row, { borderBottomColor: p.line, borderBottomWidth: last ? 0 : StyleSheet.hairlineWidth }]}>
@@ -349,8 +375,9 @@ const styles = StyleSheet.create({
   buttonText: { fontSize: 17, fontWeight: '600', textAlign: 'center', flexShrink: 1 },
   input: { borderRadius: radius.button, paddingHorizontal: 16, paddingVertical: 14, fontSize: 17, minHeight: 52 },
   amountInput: { minHeight: 60, minWidth: 72, maxWidth: '85%', flexShrink: 1, fontWeight: '700', letterSpacing: -1.2, fontVariant: ['tabular-nums'], paddingVertical: 6, textAlign: 'center' },
-  choices: { flexDirection: 'row', borderRadius: 10, padding: 2, gap: 2 },
-  choice: { minHeight: 32, paddingHorizontal: 8, paddingVertical: 6, alignItems: 'center', justifyContent: 'center' },
+  choices: { flexDirection: 'row', borderRadius: 10, padding: SEGMENT_PADDING, gap: SEGMENT_GAP },
+  thumb: { position: 'absolute', top: SEGMENT_PADDING, bottom: SEGMENT_PADDING, left: 0, borderRadius: 8 },
+  choice: { flex: 1, minWidth: 72, minHeight: 32, paddingHorizontal: 8, paddingVertical: 6, alignItems: 'center', justifyContent: 'center' },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, paddingHorizontal: 16, minHeight: 64 },
   detailRow: { minHeight: 54, flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 14 },
 });
