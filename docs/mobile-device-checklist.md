@@ -1,5 +1,22 @@
 # Physical iPhone acceptance checklist
 
+## Producto 21 — Assistant experience (pending device review)
+
+- [ ] Before updating, share a private copy. After updating, Más footer reads Producto 21; no account, movement, budget or rule changed.
+- [ ] Inicio shows four round actions in one row — Asistente, Gasto, Ingreso, Transferir — with equal columns on the iPhone 14 Pro; check a narrow width if available (SE / 13 mini) and Dynamic Type at the largest accessibility sizes: captions may wrap to two lines, nothing overflows, VoiceOver reads "Abrir el Asistente", "Registrar gasto", "Registrar ingreso", "Transferir entre cuentas".
+- [ ] The material: white circles with a hairline edge and a soft shadow in light; a surface step with a faint light edge in dark; the Asistente circle on a cobalt wash with a thin cobalt ring and the sparkles glyph. Press: the 0.97 scale on touch (no scale with Reduce Motion), no flash.
+- [ ] Asistente pushes the conversation screen (native back swipe works). Empty state: "¿En qué te ayudo?" and four suggestions; the composer sits above the home indicator; no "Nuevo chat" button yet.
+- [ ] Tap the field: the keyboard rises and the composer follows it exactly (no gap, no jump); drag the list down to dismiss the keyboard interactively and the composer follows the drag; rotate large text on: the field grows to about five lines then scrolls inside.
+- [ ] Send is grey and inactive while the field is empty or only spaces; typing fills it cobalt; the microphone shows the development-build note instead of recording.
+- [ ] Send a message in this build: one light haptic, the text returns to the field untouched, one note "El Asistente todavía no está conectado…" appears in the thread and the caption under the composer is not repeated; nothing is sent (Airplane mode changes nothing).
+- [ ] Optional test view: start Metro with `EXPO_PUBLIC_ASSISTANT_FIXTURES=1 npm start`. The amber "Vista de prueba" banner is visible. "¿Por qué gasté más este mes?" streams word by word with "Pensando…" first; Stop during streaming keeps the partial text and says "Respuesta interrumpida."; the answer shows four evidence rows and "Ver movimientos" opens Movimientos.
+- [ ] Test view: "Gasté 18.500 en Carrefour con la Visa" (with an ARS account whose name contains "Visa") shows the draft card with amount, Comercio, Categoría tile, Pagado con tile and "Hoy"; Confirmar shows the test-view note and writes nothing (Movimientos unchanged); Editar opens Registrar gasto prefilled with 18.500,00, Carrefour, Supermercado and the account; Descartar collapses the card.
+- [ ] Test view: "Gasté 18 mil en el súper" with two or more ARS accounts asks "¿Con qué lo pagaste?" with the accounts as chips; picking one ticks once, repeats the choice as your message and shows the draft; with exactly one ARS account the draft appears directly.
+- [ ] Test view: "error", "sin conexión" and "límite" show one calm note each; "Reintentar" appears only for the ones that were sent.
+- [ ] Scroll up while a long answer streams: the list does not pull you back down; at the end it follows. Reduce Motion on: messages fade in without rising, the thinking dot does not pulse, scrolling is not animated.
+- [ ] VoiceOver: reads "Vos: …" for your messages, "Asistente: …" for answers, the draft rows as "Comercio: Carrefour" etc., the chips by name, "Enviar", "Dictar", "Detener respuesta", "Nuevo chat".
+- [ ] Nuevo chat clears the thread and returns to the suggestions; leaving the screen and returning starts empty (no history in this build).
+
 ## Producto 20 — account identity and custom categories (pending device review)
 
 - [ ] Before updating, share a private copy. After updating, Más footer reads Producto 20; every account keeps its name, currency and balance and shows the wallet-on-cobalt tile; every movement, budget and recurring rule is unchanged; the existing test categories still appear on their movements.

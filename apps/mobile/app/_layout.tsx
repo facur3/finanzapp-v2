@@ -81,7 +81,7 @@ function Navigation() {
       <Stack.Screen name="card/[id]" options={{ title: 'Tarjeta' }} />
       <Stack.Screen name="debts" options={{ title: 'Deudas' }} />
       <Stack.Screen name="debt/[id]" options={{ title: 'Deuda' }} />
-      <Stack.Screen name="assistant-preview" options={{ title: 'Asistente', presentation: 'modal' }} />
+      <Stack.Screen name="assistant" options={{ title: 'Asistente' }} />
       <Stack.Screen name="new-account" options={{ title: 'Nueva cuenta', presentation: 'modal' }} />
       <Stack.Screen name="new-entry" options={{ title: 'Nuevo movimiento', presentation: 'modal' }} />
       <Stack.Screen name="edit-entry/[id]" options={{ title: 'Editar movimiento', presentation: 'modal' }} />

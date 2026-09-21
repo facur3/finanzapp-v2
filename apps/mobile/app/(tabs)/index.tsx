@@ -91,7 +91,7 @@ export default function HomeScreen() {
         </ValueTransition>
       </View>
 
-      <QuickActions currency={currency} />
+      <QuickActions currency={currency} assistant />
 
       {monthBudget !== null && (monthBudget.total !== null || monthBudget.rows.length > 0) && <Reflow fade>
         <SectionTitle action="Ver" onAction={() => router.push({ pathname: '/budgets', params: { currency } })}>Presupuesto del mes</SectionTitle>

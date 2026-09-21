@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { View } from 'react-native';
 import { Choices } from './components';
-import { EntryForm } from './entry-form';
+import { EntryForm, type EntryPrefill } from './entry-form';
 import { ValueTransition } from './motion';
 import { space, usePalette } from './theme';
 import { TransferForm } from './transfer-form';
@@ -13,8 +13,8 @@ export type MovementKind = 'expense' | 'income' | 'transfer';
  * state: the thumb slides, the haptic ticks and the form below crossfades. No
  * navigation is involved, so nothing interrupts the control mid-motion. The
  * account chosen so far carries over between modes; other draft fields do not. */
-export function MovementForm({ kind: initialKind = 'expense', accountId, currency }: {
-  kind?: string; accountId?: string; currency?: string;
+export function MovementForm({ kind: initialKind = 'expense', accountId, currency, prefill }: {
+  kind?: string; accountId?: string; currency?: string; prefill?: EntryPrefill;
 }) {
   const p = usePalette();
   const [kind, setKind] = useState<MovementKind>(initialKind === 'income' ? 'income' : initialKind === 'transfer' ? 'transfer' : 'expense');
@@ -27,7 +27,7 @@ export function MovementForm({ kind: initialKind = 'expense', accountId, currenc
     <ValueTransition id={kind === 'transfer' ? 'transfer' : 'entry'} variant="fade" style={{ flex: 1 }}>
       {kind === 'transfer'
         ? <TransferForm accountId={carried} onAccountChange={setCarried} />
-        : <EntryForm kind={kind} onKindChange={setKind} accountId={carried} currency={currency} onAccountChange={setCarried} />}
+        : <EntryForm kind={kind} onKindChange={setKind} accountId={carried} currency={currency} onAccountChange={setCarried} prefill={prefill} />}
     </ValueTransition>
   </View>;
 }

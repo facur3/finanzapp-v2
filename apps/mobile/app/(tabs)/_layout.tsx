@@ -25,7 +25,7 @@ export default function TabsLayout() {
     tabBarStyle: { backgroundColor: p.surface, borderTopColor: p.line },
     tabBarLabelStyle: { fontSize: 10, fontWeight: '500' },
     sceneStyle: { backgroundColor: p.background } }}>
-    {/* The Assistant is still a preview: it lives under Más, not in the Home header. */}
+    {/* The Assistant is the first Home quick action, not a header button; Más keeps its permanent row. */}
     <Tabs.Screen name="index" options={{ title: 'Inicio',
       headerRight: () => <IconButton name="wallet-outline" label="Ver mis cuentas" onPress={() => router.push('/accounts')} />, tabBarIcon: ({ color, size, focused }) => <Ionicons name={focused ? 'home' : 'home-outline'} size={size} color={color} /> }} />
     <Tabs.Screen name="activity" options={{ title: 'Movimientos',

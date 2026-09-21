@@ -37,7 +37,7 @@ export default function MoreScreen() {
     <View style={{ gap: 10 }}>
       <SectionTitle>App y datos</SectionTitle>
       <Surface grouped>
-        <DetailRow label="Asistente" value="Vista previa" icon="sparkles-outline" onPress={() => router.push('/assistant-preview')} />
+        <DetailRow label="Asistente" value="Preguntá o registrá" icon="sparkles-outline" onPress={() => router.push('/assistant')} />
         <DetailRow label="Copia de seguridad" value="Compartir e importar" icon="save-outline" onPress={() => router.push('/backup')} />
         <DetailRow label="Movimientos deshechos" value={undone ? plural(undone, 'recuperable', 'recuperables') : 'Ninguno'} icon="arrow-undo-outline" last onPress={() => router.push('/undone-entries')} />
       </Surface>
@@ -45,6 +45,6 @@ export default function MoreScreen() {
         Tus registros quedan en este dispositivo y podés registrar sin conexión. La sincronización todavía no está activada.
       </AppText>
     </View>
-    <AppText secondary style={{ textAlign: 'center', fontSize: 13 }}>FinanzApp · Piloto nativo 0.1.0 · Producto 20</AppText>
+    <AppText secondary style={{ textAlign: 'center', fontSize: 13 }}>FinanzApp · Piloto nativo 0.1.0 · Producto 21</AppText>
   </Screen>;
 }

@@ -311,7 +311,55 @@ importe, moneda y estado.
 - **Más.** Solo el grupo Finanzas lleva tiles tintados (cobalto, verde azulado, índigo,
   ocre, pizarra) sobre la superficie neutra; App y datos sigue neutro.
 
+## Producto 21 — el Asistente como capacidad principal
+
+- **Inicio.** Cuatro acciones de igual ancho: Asistente, Gasto, Ingreso, Transferir. Las
+  columnas flexionan (nada de separaciones fijas que desbordan un iPhone angosto) y la
+  leyenda puede partirse en dos líneas con texto grande; la etiqueta de VoiceOver no se
+  abrevia. El círculo es un material opaco con sensación nativa, no vidrio web: en claro,
+  blanco con borde hairline y la sombra suave de las tarjetas; en oscuro, un escalón de
+  superficie con un filo de luz arriba. El Asistente es el mismo objeto en el tinte de
+  marca: lavado cobalto, anillo cobalto fino de 1 pt y el glifo sparkles en cobalto. Sin
+  blur, sin gradientes, sin dependencia decorativa; el material real (Liquid Glass) queda
+  para la fase de development build.
+- **Conversación silenciosa.** Mensaje propio: píldora compacta gris (`inset`) a la
+  derecha, sin color de marca. Respuesta: texto corrido a la izquierda, sin contenedor.
+  "Pensando…" con un punto cobalto que late (quieto con Reduce Motion) antes de la primera
+  palabra; un cursor cobalto mientras llega texto; "Respuesta interrumpida." si se detuvo.
+  Nunca burbujas grandes, nunca violeta, nunca bordes brillantes.
+- **Estado vacío.** Un tile sparkles de 44 pt, "¿En qué te ayudo?" y cuatro sugerencias
+  como chips; desaparecen al empezar la conversación.
+- **Compositor.** Una píldora de superficie con borde hairline: campo multilínea (hasta
+  unas cinco líneas, luego desplaza dentro), micrófono en secundario y un botón redondo
+  de enviar relleno de cobalto (gris e inactivo sin texto; se convierte en Detener
+  mientras responde). Sigue el teclado en el hilo de UI y respeta el indicador de inicio.
+  El micrófono existe y explica su límite: el dictado necesita el development build.
+- **Tarjeta de borrador.** Una Surface: eyebrow "Borrador · Gasto", importe grande en
+  coral (verde para ingreso), filas Comercio / Categoría (tile) / Pagado con (tile de
+  cuenta) / Fecha ("Hoy · 21 sep"), Confirmar (primario) y Editar (secundario) a igual
+  ancho, Descartar como texto. Un dato faltante se marca en ámbar y desactiva Confirmar.
+  Confirmada: "Guardado · Gasto" con tilde verde y "Ver movimiento". Descartada o
+  editada: una sola línea gris. Aparece con el ascenso de 6 pt (solo fundido con Reduce
+  Motion).
+- **Aclaración.** La pregunta como texto del Asistente y las opciones como chips
+  (cuentas de esa moneda, Gasto / Ingreso, categorías más usadas); un háptico de selección
+  y la elección se repite como mensaje propio.
+- **Evidencia.** Filas discretas entre hairlines (etiqueta secundaria, importe con Money,
+  con signo cuando es diferencia) y enlaces de texto en cobalto con chevron: Ver
+  movimientos, Ver categoría, Ver presupuesto. Nunca un tablero.
+- **No conectado.** Una leyenda terciaria bajo el compositor antes del primer envío; al
+  enviar, el texto vuelve intacto al campo y una nota con ícono lo explica. Sin respuesta
+  inventada, sin envío remoto.
+
 ## Pendiente de revisión en iPhone
+
+- Producto 21: las cuatro acciones en iPhone SE / 13 mini y con texto grande (leyendas a
+  dos líneas, ningún desborde), el material en ambos temas, el anillo cobalto del
+  Asistente; el compositor con el teclado abierto, cerrado y descartado con el gesto,
+  con texto grande, en ambos temas; VoiceOver a lo largo de una conversación (mensaje,
+  respuesta, chips, tarjeta, botones); "Pensando…" y las apariciones con Reduce Motion
+  activado y desactivado; el borrador y los chips con la vista de prueba
+  (`EXPO_PUBLIC_ASSISTANT_FIXTURES=1`, solo desarrollo); Nuevo chat.
 
 - Producto 20: el selector con el teclado abierto y cerrado, tamaño de toque y háptico
   por cambio, tiles de cuenta y categoría en ambos temas y con texto grande, Cuentas y

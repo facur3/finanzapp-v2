@@ -112,38 +112,64 @@ test('donut sweeps in from twelve o\'clock only the first time, then crossfades,
   assert.deepEqual(still.paths.map((path: any) => path.props.animatedProps().d), still.paths.map((path: any) => path.props.d));
 });
 
-test('quick actions open the three movement modes with the account and currency carried over', () => {
+test('quick actions are four equal columns on Home, Assistant first, and three on account detail', () => {
   const source = readFileSync(new URL('../src/ui/quick-actions.tsx', import.meta.url), 'utf8');
   const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText;
   const jsx = (type: any, props: any) => ({ type, props });
   const pushed: any[] = [];
+  const dark = { secondary: '#666', inset: '#2C2C2E', surface: '#1C1C1E', primary: '#5B87FF', primarySoft: '#122048', isDark: true };
+  let palette: any = dark;
   const modules: Record<string, any> = {
     'react/jsx-runtime': { jsx, jsxs: jsx },
-    'react-native': { View: 'View' },
+    'react-native': { View: 'View', StyleSheet: { hairlineWidth: 0.5 } },
     'expo-router': { router: { push: (to: unknown) => pushed.push(to) } },
     '@expo/vector-icons/Ionicons': 'Ionicons',
-    './components': { AppText: 'AppText', PressFeedback: 'PressFeedback', surfaceShadow: () => ({}), toneColors: (_p: unknown, tone: string) => ({ color: tone, soft: tone + '-soft' }) },
-    './theme': { space: { xxxl: 32 }, usePalette: () => ({ secondary: '#666', inset: '#2C2C2E', surface: '#1C1C1E', isDark: true }) },
+    './components': { AppText: 'AppText', PressFeedback: 'PressFeedback', toneColors: (_p: unknown, tone: string) => ({ color: tone, soft: tone + '-soft' }) },
+    './theme': { space: { xs: 4, s: 8, xxxl: 32 }, usePalette: () => palette },
   };
-  const module = { exports: {} as { QuickActions?: (props: any) => any } };
+  const module = { exports: {} as { QuickActions?: (props: any) => any; quickActionMaterial?: (p: any, assistant: boolean) => any; QUICK_ACTION_SIZE?: number } };
   runInNewContext(code, { module, exports: module.exports, require: (name: string) => {
     if (!Object.hasOwn(modules, name)) throw new Error('Unexpected quick-actions dependency: ' + name);
     return modules[name];
   } });
-  const row = module.exports.QuickActions!({ currency: 'USD', accountId: 'a' });
-  const actions = row.props.children.map((child: any) => child.type(child.props));
-  assert.equal(JSON.stringify(actions.map((action: any) => action.props.accessibilityLabel)), JSON.stringify(['Registrar gasto', 'Registrar ingreso', 'Transferir entre cuentas']));
-  actions.forEach((action: any) => action.props.onPress());
+  const render = (props: any) => module.exports.QuickActions!(props).props.children.map((child: any) => child.type(child.props));
+  // Home: four actions, the Assistant first, carrying the currency into the conversation.
+  const home = render({ currency: 'USD', assistant: true });
+  assert.equal(JSON.stringify(home.map((action: any) => action.props.accessibilityLabel)), JSON.stringify(['Abrir el Asistente', 'Registrar gasto', 'Registrar ingreso', 'Transferir entre cuentas']));
+  assert.equal(JSON.stringify(home.map((action: any) => action.props.children[1].props.children)), JSON.stringify(['Asistente', 'Gasto', 'Ingreso', 'Transferir']));
+  home.forEach((action: any) => action.props.onPress());
+  assert.equal(JSON.stringify(pushed[0]), JSON.stringify({ pathname: '/assistant', params: { currency: 'USD' } }));
+  // Geometry: equal flexible columns (no fixed gaps that overflow a narrow iPhone) and a caption allowed to wrap under large text with the full VoiceOver label kept.
+  for (const action of home) {
+    assert.equal(action.props.containerStyle.flex, 1);
+    assert.equal(action.props.containerStyle.minWidth, 0);
+    assert.equal(action.props.children[1].props.numberOfLines, 2);
+  }
+  assert.equal(module.exports.QUICK_ACTION_SIZE, 54);
+  // Restraint: neutral material with the semantic colour only in the glyph; the Assistant is the same object in the brand tint with a thin cobalt ring.
+  const circle = (action: any) => Object.assign({}, ...action.props.children[0].props.style);
+  assert.equal(JSON.stringify(home.slice(1).map((action: any) => circle(action).backgroundColor)), JSON.stringify(['#2C2C2E', '#2C2C2E', '#2C2C2E']));
+  assert.equal(JSON.stringify(home.map((action: any) => action.props.children[0].props.children.props.color)), JSON.stringify(['#5B87FF', 'expense', 'income', 'transfer']));
+  assert.equal(circle(home[0]).backgroundColor, '#122048');
+  assert.equal(circle(home[0]).borderWidth, 1);
+  assert.ok(String(circle(home[0]).borderColor).startsWith('#5B87FF'));
+  assert.equal(circle(home[1]).borderWidth, 0.5, 'a hairline edge, not a glow');
+  assert.equal(circle(home[1]).shadowOpacity, undefined, 'dark mode draws no shadow');
+  palette = { ...dark, isDark: false, surface: '#FFFFFF', primary: '#2557D6', primarySoft: '#E5ECFB' };
+  const light = render({ currency: 'ARS', assistant: true });
+  assert.equal(circle(light[1]).backgroundColor, '#FFFFFF');
+  assert.ok(circle(light[1]).shadowOpacity <= 0.08, 'a soft card shadow in light');
+  assert.ok(circle(light[0]).shadowOpacity <= 0.2, 'the Assistant halo stays restrained');
+  // Account detail keeps the three movements with the account carried over.
+  pushed.length = 0;
+  const detail = render({ currency: 'USD', accountId: 'a' });
+  assert.equal(JSON.stringify(detail.map((action: any) => action.props.accessibilityLabel)), JSON.stringify(['Registrar gasto', 'Registrar ingreso', 'Transferir entre cuentas']));
+  detail.forEach((action: any) => action.props.onPress());
   assert.equal(JSON.stringify(pushed), JSON.stringify([
     { pathname: '/new-entry', params: { kind: 'expense', accountId: 'a', currency: 'USD' } },
     { pathname: '/new-entry', params: { kind: 'income', accountId: 'a', currency: 'USD' } },
     { pathname: '/new-transfer', params: { accountId: 'a' } },
   ]));
-  // Restraint: the circle is neutral; only the glyph carries the semantic colour (expense coral, income green, transfer azure).
-  const circles = actions.map((action: any) => action.props.children[0].props.style[0].backgroundColor);
-  assert.equal(JSON.stringify(circles), JSON.stringify(['#2C2C2E', '#2C2C2E', '#2C2C2E']));
-  const glyphs = actions.map((action: any) => action.props.children[0].props.children.props.color);
-  assert.equal(JSON.stringify(glyphs), JSON.stringify(['expense', 'income', 'transfer']));
 });
 
 test('form selectors keep the category hue and give the account the interaction accent', () => {
