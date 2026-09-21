@@ -93,7 +93,7 @@ export default function HomeScreen() {
 
       <QuickActions currency={currency} />
 
-      {monthBudget !== null && monthBudget.rows.length > 0 && <Reflow fade>
+      {monthBudget !== null && (monthBudget.total !== null || monthBudget.rows.length > 0) && <Reflow fade>
         <SectionTitle action="Ver" onAction={() => router.push({ pathname: '/budgets', params: { currency } })}>Presupuesto del mes</SectionTitle>
         <BudgetHomeCard summary={monthBudget} />
       </Reflow>}

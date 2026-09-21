@@ -5,6 +5,7 @@ import { runInNewContext } from 'node:vm';
 import ts from 'typescript';
 import * as domain from '@finanzapp/domain';
 import * as presentation from '../src/ui/presentation.ts';
+import * as budgetPresentation from '../src/ui/budget-presentation.ts';
 
 // Budgets, Recurrentes, Cuentas and account detail handlers with native hosts
 // replaced by descriptors. Not a rendered iOS screen or gesture test.
@@ -22,8 +23,8 @@ const entries: domain.Entry[] = [
   { id: 'e4', accountId: cash.id, kind: 'expense', amountMinor: 700, merchant: 'Viejo', category: 'Café', dateISO: '2026-08-30', createdAt },
 ];
 const budgets: domain.MonthlyBudget[] = [
-  { id: 'b-cafe', category: 'Café', currency: 'ARS', monthISO: '2026-09', amountMinor: 2500, active: true, createdAt, revision: 0, updatedAt: createdAt },
-  { id: 'b-super', category: 'Supermercado', currency: 'ARS', monthISO: '2026-09', amountMinor: 10000, active: true, createdAt, revision: 0, updatedAt: createdAt },
+  { id: 'b-cafe', scope: 'category', category: 'Café', currency: 'ARS', monthISO: '2026-09', amountMinor: 2500, active: true, createdAt, revision: 0, updatedAt: createdAt },
+  { id: 'b-super', scope: 'category', category: 'Supermercado', currency: 'ARS', monthISO: '2026-09', amountMinor: 10000, active: true, createdAt, revision: 0, updatedAt: createdAt },
 ];
 const rule: domain.RecurringRule = { id: 'rent', accountId: cash.id, kind: 'expense', amountMinor: 40000, merchant: 'Alquiler', category: 'Hogar', frequency: 'monthly',
   anchorDateISO: '2026-10-01', nextDateISO: '2026-10-01', active: true, createdAt, revision: 0, updatedAt: createdAt };
@@ -61,6 +62,7 @@ function harness(file: string, params: Record<string, unknown> = {}, data: domai
     '../src/ui/quick-actions': { QuickActions: 'QuickActions' }, '../../src/ui/quick-actions': { QuickActions: 'QuickActions' },
     '../src/ui/motion': { ValueTransition: 'ValueTransition', Reflow: 'Reflow', selectionHaptic: () => {}, impactHaptic: () => {}, duration: { press: 100, release: 160, state: 200, data: 260, enter: 200, exit: 100, reveal: 480 }, timing: (kind: string, reduced: boolean) => ({ duration: reduced ? 0 : 260 }) }, '../../src/ui/motion': { ValueTransition: 'ValueTransition', Reflow: 'Reflow', selectionHaptic: () => {}, impactHaptic: () => {}, duration: { press: 100, release: 160, state: 200, data: 260, enter: 200, exit: 100, reveal: 480 }, timing: (kind: string, reduced: boolean) => ({ duration: reduced ? 0 : 260 }) },
     '../src/ui/presentation': presentation, '../../src/ui/presentation': presentation,
+    '../src/ui/budget-presentation': budgetPresentation, '../../src/ui/budget-presentation': budgetPresentation,
     '../src/ui/theme': theme, '../../src/ui/theme': theme,
   };
   const module = { exports: {} as { default?: () => Node } };
@@ -84,19 +86,70 @@ function find(root: Node, type: string, label?: string): Node {
   return node;
 }
 
-test('budgets show what is left, mark exceeded and near-limit categories, and never count cards or transfers twice', () => {
+const total: domain.MonthlyBudget = { id: 'b-total', scope: 'total', currency: 'ARS', monthISO: '2026-09', amountMinor: 20000, active: true, createdAt, revision: 0, updatedAt: createdAt };
+const texts = (root: Node) => nodes(root).filter(node => node.type === 'AppText').map(node => Array.isArray(node.props.children) ? node.props.children.join('') : String(node.props.children));
+
+test('budgets without a general budget list the sublimits, offer a compact general action and never sum sublimits into a total', () => {
   const view = harness('budgets.tsx', { currency: 'ARS' });
   const root = view.render();
-  // Café: 3000 of 2500 (exceeded). Supermercado: 9000 of 10000 (90 %, near). Remaining total: 12500 − 12000 = 500.
-  assert.equal(find(root, 'Money').props.minor, 500);
+  // Café: 3000 of 2500 (exceeded). Supermercado: 9000 of 10000 (90 %, near). No invented 12.500 monthly total.
+  assert.equal(nodes(root).some(node => node.type === 'Money' && node.props.large), false, 'no summed hero');
+  assert.equal(nodes(root).some(node => node.type === 'Money' && node.props.minor === 500), false, 'sublimits are never added up');
+  const add = find(root, 'ActionButton', 'Agregar presupuesto general');
+  assert.equal(add.props.compact, true);
+  add.props.onPress();
+  assert.equal(JSON.stringify(view.pushed.at(-1)), JSON.stringify({ pathname: '/new-budget', params: { currency: 'ARS', month: '2026-09', scope: 'total' } }));
   const rows = nodes(root).filter(node => typeof node.type === 'function' && node.props.row);
   assert.deepEqual(rows.map(node => [node.props.row.budget.category, node.props.row.exceeded, Math.round(node.props.row.ratio * 100)]), [['Café', true, 120], ['Supermercado', false, 90]]);
   const labels = nodes(root).filter(node => node.type === 'PressFeedback').map(node => node.props.accessibilityLabel).filter(Boolean);
   assert.ok(labels.some(label => /Café: \$ 30,00 de \$ 25,00, 120 por ciento\. Excedido por \$ 5,00/.test(label)));
   assert.ok(labels.some(label => /Supermercado.*90 por ciento\. Quedan \$ 10,00/.test(label)));
-  assert.ok(nodes(root).some(node => node.type === 'AppText' && String(node.props.children?.join?.('') ?? node.props.children).includes('1 excedida')));
+  const section = find(root, 'SectionTitle', 'Agregar');
+  assert.equal(section.props.children, 'Por categoría');
+  assert.match(section.props.caption, /2 categorías · 1 excedida · 1 cerca del límite/);
+  section.props.onAction();
+  assert.equal(JSON.stringify(view.pushed.at(-1)), JSON.stringify({ pathname: '/new-budget', params: { currency: 'ARS', month: '2026-09', scope: 'category' } }));
+  assert.equal(texts(root).some(text => text.includes('Además gastaste')), false, 'every September expense has a sublimit here, so no unbudgeted line');
+  const partial = harness('budgets.tsx', { currency: 'ARS' }, { ...archive, budgets: [budgets[0]] }).render();
+  assert.ok(texts(partial).some(text => text.includes('Además gastaste $ 90,00 en categorías sin límite propio')), 'unbudgeted spending stays visible');
   find(root, 'IconButton', 'Mes siguiente').props.onPress();
   assert.equal(find(view.render(), 'EmptyState').props.title, 'Dale un límite a tu mes');
+});
+
+test('a general budget is the primary summary over all recorded expenses, with sublimits under it', () => {
+  const view = harness('budgets.tsx', { currency: 'ARS' }, { ...archive, budgets: [...budgets, total] });
+  const root = view.render();
+  // September ARS expenses: 3.000 + 9.000 = 12.000 of 20.000 (60 %); income and the card are not spending.
+  const panel = nodes(root).find(node => typeof node.type === 'function' && node.props.total)!;
+  assert.equal(panel.props.total.spentMinor, 12000);
+  assert.equal(panel.props.total.remainingMinor, 8000);
+  const hero = nodes(root).find(node => node.type === 'Money' && node.props.large)!;
+  assert.equal(hero.props.minor, 8000, 'disponible of the general budget');
+  const stats = nodes(root).filter(node => node.type === 'Stat').map(node => node.props.label);
+  assert.deepEqual(stats, ['Gastado', 'Límite']);
+  assert.ok(texts(root).some(text => text.startsWith('60 % utilizado')));
+  const general = find(root, 'SectionTitle', 'Editar');
+  assert.equal(general.props.children, 'Presupuesto general');
+  general.props.onAction();
+  assert.equal(JSON.stringify(view.pushed.at(-1)), JSON.stringify({ pathname: '/edit-budget/[id]', params: { id: 'b-total' } }));
+  assert.equal(nodes(root).some(node => node.type === 'ActionButton' && node.props.label === 'Agregar presupuesto general'), false);
+  assert.equal(nodes(root).filter(node => typeof node.type === 'function' && node.props.row).length, 2, 'sublimits still listed');
+  const label = nodes(root).find(node => node.type === 'View' && typeof node.props.accessibilityLabel === 'string' && node.props.accessibilityLabel.startsWith('Presupuesto general'))!;
+  assert.equal(label.props.accessibilityLabel, 'Presupuesto general: $ 120,00 de $ 200,00, 60 por ciento usado. Disponible $ 80,00');
+});
+
+test('an exceeded general budget and a general budget alone are both honest', () => {
+  const exceeded = harness('budgets.tsx', { currency: 'ARS' }, { ...archive, budgets: [{ ...total, amountMinor: 10000 }] }).render();
+  assert.equal(nodes(exceeded).find(node => node.type === 'Money' && node.props.large)!.props.minor, 2000, 'excedido por 20,00');
+  assert.ok(texts(exceeded).some(text => text === '120 % utilizado · excedido'));
+  assert.ok(texts(exceeded).some(text => text.includes('Sin límites por categoría este mes')));
+  assert.equal(nodes(exceeded).filter(node => typeof node.type === 'function' && node.props.row).length, 0);
+  const exact = harness('budgets.tsx', { currency: 'ARS' }, { ...archive, budgets: [{ ...total, amountMinor: 12000 }] }).render();
+  assert.ok(texts(exact).some(text => text === '100 % utilizado · límite alcanzado'));
+  const usd = harness('budgets.tsx', { currency: 'USD' }, { ...archive, budgets: [total, { ...total, id: 'usd-total', currency: 'USD', amountMinor: 50000 }] }).render();
+  const usdPanel = nodes(usd).find(node => typeof node.type === 'function' && node.props.total)!;
+  assert.equal(usdPanel.props.total.budget.id, 'usd-total');
+  assert.equal(usdPanel.props.total.spentMinor, 0, 'ARS spending never counts against the USD budget');
 });
 
 test('recurrentes projects the next 30 days per currency and pausing advances nothing silently', async () => {

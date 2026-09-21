@@ -5,6 +5,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import Animated, { useAnimatedStyle, useSharedValue, withDelay, withTiming } from 'react-native-reanimated';
 import { formatMinorUnits, labelFromISO, type Account, type CategorySpending, type Currency, type MonthlyBudgetSummary, type RecurringRule } from '@finanzapp/domain';
 import { AppText, CategoryBadge, Money, PressFeedback, Surface } from './components';
+import { budgetHomeHeadline, budgetTone, categoriesStatus, percentUsed } from './budget-presentation';
 import { washOf } from './category-color';
 import { useCategoryColor } from './category-hues';
 import { easeOut, timing } from './motion';
@@ -85,36 +86,45 @@ function RankedRow({ category, totalMinor, currency, index, last, onPress }: {
   </PressFeedback>;
 }
 
-/** One line of budget truth for the current month: what is left, of how much,
- * and whether any category is over. Tapping opens Presupuestos. */
+/** One line of budget truth for the current month. With a total budget it
+ * answers "how much of my month have I used": what is left of the ceiling,
+ * the share used, and whether any sublimit is over. Without one, the tightest
+ * category sublimit stands in, with the count of sublimits beside it. Sublimits
+ * are never added up into a monthly total. Tapping opens Presupuestos. */
 export function BudgetHomeCard({ summary }: { summary: MonthlyBudgetSummary }) {
   const p = usePalette();
   const reduced = useReduceMotion();
-  const { currency, budgetedMinor: total, spentBudgetedMinor: spent, remainingMinor: remaining } = summary;
-  const exceeded = summary.rows.filter(row => row.exceeded).length;
-  const ratio = total > 0 ? Math.min(1, spent / total) : 0;
-  const progress = useSharedValue(ratio);
-  useEffect(() => { progress.value = withTiming(ratio, timing('data', reduced)); }, [ratio, reduced, progress]);
+  const headline = budgetHomeHeadline(summary);
+  const { currency } = summary;
+  const progressValue = headline ? Math.min(1, headline.progress.ratio) : 0;
+  const progress = useSharedValue(progressValue);
+  useEffect(() => { progress.value = withTiming(progressValue, timing('data', reduced)); }, [progressValue, reduced, progress]);
   const bar = useAnimatedStyle(() => ({ width: `${progress.value === 0 ? 0 : Math.max(1.5, progress.value * 100)}%` as `${number}%` }));
-  const tone = remaining < 0 ? p.expense : ratio >= 0.85 ? p.warning : p.text;
-  const status = exceeded ? `${exceeded} ${exceeded === 1 ? 'categoría excedida' : 'categorías excedidas'}`
-    : `${summary.rows.length} ${summary.rows.length === 1 ? 'categoría en orden' : 'categorías en orden'}`;
+  if (!headline) return null;
+  const { remainingMinor: remaining, budget } = headline.progress;
+  const tone = budgetTone(headline.progress);
+  const color = tone === 'expense' ? p.expense : tone === 'warning' ? p.warning : p.text;
+  const title = headline.kind === 'total' ? 'Presupuesto general' : budget.category;
+  const percent = percentUsed(headline.progress);
+  const status = headline.kind === 'total' ? categoriesStatus(headline.categories, headline.exceededCategories)
+    : headline.categories > 1 ? `${headline.categories} categorías${headline.exceededCategories ? ` · ${headline.exceededCategories} ${headline.exceededCategories === 1 ? 'excedida' : 'excedidas'}` : ''}` : 'Límite por categoría';
+  const symbol = currency === 'USD' ? 'US$ ' : '$ ';
   return <PressFeedback accessibilityRole="button"
-    accessibilityLabel={`Presupuesto del mes: ${remaining < 0 ? 'excedido en ' : 'quedan '}${formatMinorUnits(Math.abs(remaining))} ${currency} de ${formatMinorUnits(total)}. ${status}`}
+    accessibilityLabel={`${title}: ${remaining < 0 ? 'excedido en ' : 'quedan '}${formatMinorUnits(Math.abs(remaining))} ${currency} de ${formatMinorUnits(budget.amountMinor)}, ${percent} por ciento usado.${status ? ' ' + status : ''}`}
     onPress={() => router.push({ pathname: '/budgets', params: { currency } })}>
     <Surface style={{ gap: 12 }}>
       <View style={{ flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', gap: 12 }}>
         <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
-          <AppText secondary variant="caption" style={{ fontWeight: '500' }}>{remaining < 0 ? 'Excedido' : 'Te queda'}</AppText>
-          <Money minor={Math.abs(remaining)} currency={currency} size={24} weight="700" color={tone} />
+          <AppText secondary variant="caption" numberOfLines={1} style={{ fontWeight: '500' }}>{title} · {remaining < 0 ? 'excedido' : 'te queda'}</AppText>
+          <Money minor={Math.abs(remaining)} currency={currency} size={24} weight="700" color={color} />
         </View>
         <View style={{ alignItems: 'flex-end', gap: 2 }}>
-          <AppText secondary variant="caption">de {currency === 'USD' ? 'US$ ' : '$ '}{formatMinorUnits(total)}</AppText>
-          <AppText variant="footnote" style={{ color: exceeded ? p.expense : p.secondary, fontWeight: exceeded ? '600' : '400' }}>{status}</AppText>
+          <AppText secondary variant="caption">de {symbol}{formatMinorUnits(budget.amountMinor)} · {percent} %</AppText>
+          {!!status && <AppText variant="footnote" style={{ color: headline.exceededCategories ? p.expense : p.secondary, fontWeight: headline.exceededCategories ? '600' : '400' }}>{status}</AppText>}
         </View>
       </View>
       <View accessible={false} style={{ height: 6, borderRadius: 3, overflow: 'hidden', backgroundColor: p.inset }}>
-        <Animated.View style={[{ height: 6, borderRadius: 3, backgroundColor: tone === p.text ? p.text : tone }, bar]} />
+        <Animated.View style={[{ height: 6, borderRadius: 3, backgroundColor: color }, bar]} />
       </View>
     </Surface>
   </PressFeedback>;

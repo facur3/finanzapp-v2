@@ -186,3 +186,20 @@ test('cloud client requires HTTPS/session and returns an inbox receipt, never a 
   }
   assert.equal(calls, 1);
 });
+
+test('Home shows the budget module for a general budget alone, for sublimits alone, and never for archived budgets', () => {
+  const createdAt = '2026-09-01T12:00:00.000Z';
+  const total: domain.MonthlyBudget = { id: 'total', scope: 'total', currency: 'ARS', monthISO: '2026-09', amountMinor: 100000, active: true, createdAt, revision: 0, updatedAt: createdAt };
+  const sublimit: domain.MonthlyBudget = { id: 'salud', scope: 'category', category: 'Salud', currency: 'ARS', monthISO: '2026-09', amountMinor: 1000, active: true, createdAt, revision: 0, updatedAt: createdAt };
+  const withTotal = routeHarness('(tabs)/index.tsx', {}, homeData, { budgets: [total] }).render();
+  const card = nodes(withTotal).find(n => n.type === 'BudgetHomeCard')!;
+  assert.ok(card, 'a general budget alone is enough for the module');
+  assert.equal(card.props.summary.total.budget.id, 'total');
+  assert.equal(card.props.summary.total.spentMinor, 300, 'all September ARS expenses');
+  assert.deepEqual(card.props.summary.rows, []);
+  const withSublimit = routeHarness('(tabs)/index.tsx', {}, homeData, { budgets: [sublimit] }).render();
+  assert.equal(nodes(withSublimit).find(n => n.type === 'BudgetHomeCard')!.props.summary.total, null);
+  const archived = routeHarness('(tabs)/index.tsx', {}, homeData, { budgets: [{ ...total, active: false, revision: 1, updatedAt: '2026-09-02T12:00:00.000Z' }] }).render();
+  assert.equal(nodes(archived).some(n => n.type === 'BudgetHomeCard'), false);
+  assert.equal(nodes(archived).some(n => n.type === 'SectionTitle' && n.props.children === 'Presupuesto del mes'), false);
+});

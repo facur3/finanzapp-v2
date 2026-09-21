@@ -5,6 +5,7 @@ import { runInNewContext } from 'node:vm';
 import ts from 'typescript';
 import * as domain from '@finanzapp/domain';
 import * as presentation from '../src/ui/presentation.ts';
+import * as budgetPresentation from '../src/ui/budget-presentation.ts';
 import * as liabilityPresentation from '../src/ui/liability-presentation.ts';
 import * as moneyInput from '../src/ui/money-input.ts';
 
@@ -58,6 +59,7 @@ function harness(file: string, props: any = {}, options: { data?: domain.LedgerA
     './components': components, '../src/ui/components': components, '../../src/ui/components': components,
     './form-controls': { AccountField: 'AccountField', CategoryField: 'CategoryField', DateField: 'DateField', SelectorCard: 'SelectorCard' },
     './presentation': presentation,
+    './budget-presentation': budgetPresentation, '../../src/ui/budget-presentation': budgetPresentation,
     './money-input': moneyInput,
     './liability-presentation': liabilityPresentation,
     '../../src/ui/theme': { space: { xs: 4, s: 8, m: 12, l: 16, xl: 20, xxl: 24, xxxl: 32 },
@@ -459,7 +461,7 @@ test('a hosted entry form renders no switch of its own and follows the host kind
 });
 
 test('the entry form shows the category budget live and echoes the amount on Save', () => {
-  const budget: domain.MonthlyBudget = { id: 'b', category: 'Salud', currency: 'ARS', monthISO: domain.todayKey().slice(0, 7), amountMinor: 50000, active: true, createdAt, revision: 0, updatedAt: createdAt };
+  const budget: domain.MonthlyBudget = { id: 'b', scope: 'category', category: 'Salud', currency: 'ARS', monthISO: domain.todayKey().slice(0, 7), amountMinor: 50000, active: true, createdAt, revision: 0, updatedAt: createdAt };
   const view = harness('src/ui/entry-form.tsx', { kind: 'expense' }, { data: { ...liabilityData, budgets: [budget] } });
   assert.equal(find(view.render(), 'CategoryField').props.detail, undefined);
   find(view.render(), 'CategoryField').props.onChange('salud');
@@ -483,7 +485,7 @@ test('a card purchase detail links to the card, not to a generic account screen'
 });
 
 test('entry detail shows budget context only for a matching active budget, and links to that month', () => {
-  const budget: domain.MonthlyBudget = { id: 'b', category: 'salud', currency: 'ARS', monthISO: '2026-01', amountMinor: 20000, active: true, createdAt, revision: 0, updatedAt: createdAt };
+  const budget: domain.MonthlyBudget = { id: 'b', scope: 'category', category: 'salud', currency: 'ARS', monthISO: '2026-01', amountMinor: 20000, active: true, createdAt, revision: 0, updatedAt: createdAt };
   const view = harness('app/entry/[id].tsx', {}, { data: { ...archive, budgets: [budget] }, params: { id: entry.id } });
   const row = find(view.render(), 'DetailRow', 'Presupuesto');
   assert.equal(row.props.value, '62 % usado · quedan 76,55');

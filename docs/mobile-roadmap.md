@@ -15,10 +15,91 @@ server-keyed; manual recording and local data work without connectivity. Recurri
 expenses, debts, budgets and cards remain in scope. Native navigation, accessible
 amounts, real data and recoverable durable writes remain requirements.
 
-## Status and current delivery — Producto 18
+## Status and current delivery — Producto 19
 
 Implemented is code, checked names a test, device-verified needs a physical result,
 and released means distributed. Neither a bundle nor a screenshot is App Store QA.
+
+Producto 19 — Budgets 2 makes budgets a complete, financially coherent feature. A
+budget is a planning limit; it never changes what a movement is. No visual redesign.
+
+- [x] **Domain model** (`packages/domain/budgets.ts`): `MonthlyBudget` is a
+  discriminated union on `scope`. A `total` budget has no `category` key at all; a
+  `category` budget requires one (1–60 characters). `validateMonthlyBudget` rejects a
+  total that carries any category, a sublimit without one, a zero or negative limit
+  and an unknown scope. `budgetIdentityKey` is `currency|month|total` or
+  `currency|month|category:<normalised>`, so the collection validator allows at most
+  one active total per currency and month and keeps the existing one-active-sublimit-
+  per-normalised-category rule; an archived predecessor never blocks a new one.
+  `scopedMonthlyBudget` reads a legacy record (no scope) as a category budget.
+- [x] **Total budget calculation**: `summarizeMonthlyBudgets` now returns `total`
+  (progress of the active total against `totalSpentMinor`, every recorded expense of
+  the month in that currency, exactly what Reportes counts: cash and card purchases
+  once; never income, internal transfers, card payments, debt settlements or voided
+  entries; other months and the other currency excluded) beside `rows` (category
+  sublimits, worst first). `budgetedMinor` remains the sum of sublimits for their own
+  line; it is never presented as the month's budget.
+- [x] **States** live in the domain: `BUDGET_WARNING_RATIO = 0.85` and
+  `budgetState(progress)` → calm below 85 %, warning from 85 % up to and including
+  100 %, exceeded past the limit. The UI maps them to the existing neutral / warning /
+  expense tones (`src/ui/budget-presentation.ts`); Reportes insights use the same rule
+  and add "Superaste / Estás cerca de tu presupuesto general" first.
+- [x] **SQLite schema 7** (`MIGRATE_V7`): `monthly_budgets` is rebuilt with
+  `scope TEXT NOT NULL CHECK(scope IN ('total','category'))` and a nullable `category`
+  with a CHECK tying it to the scope; every existing row is copied as
+  `scope = 'category'` with id, category, currency, month, amount, active, createdAt,
+  revision and updatedAt unchanged, then the old table is dropped and the new one
+  renamed, all inside the existing exclusive migration transaction. Guarded by
+  `user_version`, so it runs once and never on a v7 file; an interruption leaves the
+  schema 6 table, its rows and the version untouched. A total is stored with
+  `category NULL`; edits cannot change the scope or the currency.
+- [x] **Backup v7**: `createRecoveryBackup` writes `finanzapp.native-pilot.v7`; a total
+  budget serialises without a `category` key. `parsePilotBackup` accepts v1–v7: budgets
+  in v5/v6 files have no scope and are read as category budgets, a v6 file cannot smuggle
+  a scoped or total budget, and a v7 total with a category is refused.
+- [x] **Form** (`src/ui/budget-form.tsx`): Tipo [General | Por categoría] first, then
+  currency and the Interfaz 17 AmountField; General hides the category picker and
+  explains the ceiling, Por categoría keeps the picker and says it is a sublimit that
+  does not add to the general budget. Editing never shows the kind or currency
+  controls. Same retry-safe submission and archive confirmation as before.
+- [x] **Presupuestos screen** (`app/budgets.tsx`): with a general budget, a primary
+  panel (Disponible or Excedido, bar, Gastado / Límite, "64 % utilizado" in its state
+  colour, Editar) over a "Por categoría" list with its count caption; without one, a
+  compact secondary "Agregar presupuesto general" action and the sublimits on their
+  own. The old hero that summed sublimit limits is gone. Unbudgeted spending stays a
+  footnote under the sublimits.
+- [x] **Home** (`BudgetHomeCard`): with a general budget it leads with what is left of
+  the ceiling, "de $X · 64 %" and how many sublimits are over; without one it shows
+  the tightest sublimit (exceeded first) and the count of sublimits. Nothing sums
+  sublimits. Home shows the module for a general budget alone, sublimits alone, and
+  never for archived budgets.
+- [x] Reportes lists "Presupuesto general" first in the Presupuestos block, then the
+  sublimits. Entry form and movement detail keep the category context with the shared
+  states. Currencies stay separate throughout: a USD budget sees only USD expenses.
+- [x] Categories untouched: free strings and presets as before; "sjsjn"-style
+  historical categories remain historical data. Custom-category CRUD is the next
+  dedicated phase.
+- [ ] Physical iPhone review: the Tipo control and the form in both kinds, the general
+  panel and sublimit rows in calm / warning / exceeded, the compact "Agregar
+  presupuesto general", the Home card with and without a general budget, Reportes
+  insights, the schema 7 upgrade on the real pilot file (existing budgets identical
+  afterwards) and a v7 backup export/import; VoiceOver, large text, Reduce Motion, both
+  themes, Expo Go.
+
+Producto 19 verification adds domain tests (`budgets.test.ts`: total over cash and
+card purchases once, card payment / debt payment / income / voided / other-month /
+other-currency exclusions, coexistence without summing, exceeded / exact 100 % /
+approaching states, uniqueness, fake-category and non-positive rejection, legacy
+records; `recovery.test.ts`: v7 round trip, v6 legacy budgets, smuggling refused;
+`report-trend.test.ts`: total insights first), storage tests (`database.node.ts`:
+schema 6 → 7 with hand-built v6 rows preserved exactly, interrupted migration,
+idempotent rerun, CHECK enforcement, total persistence beside sublimits, duplicate
+total, scope flip and currency flip refused, archive-and-replace, v7 backup and v6
+import), and UI tests (`budgets-routes.node.ts` form, `polish-routes.node.ts` screen
+hierarchy, `home-ranking.node.ts` Home card, `spending-home.node.ts` Home module
+conditions, `budget-presentation.node.ts` states and headline).
+
+### Previous delivery — Producto 18
 
 Producto 18 — Navigation & Smart Actions is a product-architecture phase on top of the
 stable Interfaz 17 visuals: no redesign, a clearer map of the app and faster financial
@@ -560,6 +641,21 @@ targets, VoiceOver, safe areas, system text and separate currencies apply to eve
 new screen.
 
 ## Handoff log (historical evidence)
+
+### 2026-09-21 — Producto 19: monthly total budget and category sublimits
+
+- Scoped budget model (total | category) with no fake category, one active total per
+  currency and month, SQLite schema 7 (table rebuild that preserves every existing
+  budget as a category budget), backup v7 with v5/v6 compatibility, shared budget
+  states, a scoped form, a hierarchical Presupuestos screen, a total-first Home card
+  and total insights in Reportes. Sublimits are never summed into a monthly figure.
+- Checked locally: TypeScript, 199 mobile tests (13 new), root domain/web tests
+  (368, 12 new), Vite build, hygiene, Expo compatibility and Metro iOS export. No
+  device evidence; the real pilot file has not been migrated yet.
+- Edge cases recorded: exactly 100 % is "límite alcanzado" (warning, not exceeded); a
+  general budget alone shows an explicit "sin límites por categoría" line; an archived
+  total lets a replacement be created and keeps the archived row in history; a stale
+  revision, a scope flip or a currency flip on edit are refused without changes.
 
 ### 2026-09-21 — Producto 18: navigation and smart actions
 

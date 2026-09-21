@@ -88,7 +88,7 @@ test('Más groups permanent navigation into Finanzas and App y datos, with live 
   assert.deepEqual(rows(root).filter(row => row.props.last).map(row => row.props.label), ['Categorías', 'Movimientos deshechos']);
   assert.equal(nodes(root).some(node => node.type === 'ActionButton'), false);
   const texts = nodes(root).filter(node => node.type === 'AppText').map(node => String(node.props.children)).join(' ');
-  assert.match(texts, /Producto 18/);
+  assert.match(texts, /Producto 19/);
   assert.match(texts, /sincronización todavía no está activada/);
 });
 

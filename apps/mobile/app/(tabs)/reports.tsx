@@ -5,6 +5,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { dailyAverageMinor, dailySpending, formatMinorUnits, monthlySpendingTrend, spendingComparison, spendingInsights, spendingReport,
   summarizeMonthlyBudgets, topMerchants, type CategorySpending, type Currency, type DailySpending, type SpendingInsight } from '@finanzapp/domain';
 import { useLedger } from '../../src/storage/LedgerProvider';
+import { budgetTone, percentUsed } from '../../src/ui/budget-presentation';
 import { AppText, CategoryBadge, Choices, DetailRow, EmptyState, GlyphTile, IconButton, Money, PressFeedback, SectionTitle, Surface } from '../../src/ui/components';
 import { assignCategoryHues } from '../../src/ui/category-color';
 import { useCategoryColor } from '../../src/ui/category-hues';
@@ -133,11 +134,15 @@ export default function ReportsScreen() {
     ListEmptyComponent={ready ? <EmptyState title="Sin gastos en este período" icon="pie-chart-outline"
       detail="Los gastos registrados en esta moneda aparecerán acá, agrupados por categoría. Podés recorrer los meses con movimientos usando las flechas." /> : null}
     ListFooterComponent={<View style={{ gap: space.xxl, paddingTop: space.xxl }}>
-      {ready && budgets && budgets.rows.length > 0 && <View>
+      {ready && budgets && (budgets.total || budgets.rows.length > 0) && <View>
         <SectionTitle action="Administrar" onAction={() => router.push({ pathname: '/budgets', params: { currency, month: monthISO } })}>Presupuestos</SectionTitle>
         <Surface grouped>
+          {/* The month's ceiling first (all recorded expenses), then the category sublimits. */}
+          {budgets.total && <BudgetStatusRow category="Presupuesto general" spent={budgets.total.spentMinor} limit={budgets.total.budget.amountMinor}
+            progress={budgets.total} money={money} last={budgets.rows.length === 0}
+            onPress={() => router.push({ pathname: '/edit-budget/[id]', params: { id: budgets.total!.budget.id } })} />}
           {budgets.rows.map((row, index) => <BudgetStatusRow key={row.budget.id} category={row.budget.category} spent={row.spentMinor} limit={row.budget.amountMinor}
-            ratio={row.ratio} exceeded={row.exceeded} money={money} last={index === budgets.rows.length - 1}
+            progress={row} money={money} last={index === budgets.rows.length - 1}
             onPress={() => router.push({ pathname: '/edit-budget/[id]', params: { id: row.budget.id } })} />)}
         </Surface>
       </View>}
@@ -194,12 +199,14 @@ function InsightSurface({ tone, category, children }: { tone: SpendingInsight['t
   return <Surface style={[{ flexDirection: 'row', alignItems: 'center', gap: 12 }, color ? { backgroundColor: color + '14' } : null]}>{children}</Surface>;
 }
 
-function BudgetStatusRow({ category, spent, limit, ratio, exceeded, money, last, onPress }: {
-  category: string; spent: number; limit: number; ratio: number; exceeded: boolean; money: (minor: number) => string; last: boolean; onPress: () => void;
+function BudgetStatusRow({ category, spent, limit, progress, money, last, onPress }: {
+  category: string; spent: number; limit: number; progress: { ratio: number; exceeded: boolean }; money: (minor: number) => string; last: boolean; onPress: () => void;
 }) {
   const p = usePalette();
-  const color = exceeded ? p.expense : ratio >= 0.85 ? p.warning : p.text;
-  const percent = Math.round(ratio * 100);
+  const { ratio, exceeded } = progress;
+  const tone = budgetTone(progress);
+  const color = tone === 'expense' ? p.expense : tone === 'warning' ? p.warning : p.text;
+  const percent = percentUsed(progress);
   return <PressFeedback feedback="highlight" accessibilityRole="button" accessibilityLabel={`${category}: ${money(spent)} de ${money(limit)}, ${percent} por ciento${exceeded ? ', excedido' : ''}`}
     onPress={onPress} style={{ paddingHorizontal: 16, paddingVertical: 12, gap: 8, borderBottomWidth: last ? 0 : 0.5, borderBottomColor: p.line }}>
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
