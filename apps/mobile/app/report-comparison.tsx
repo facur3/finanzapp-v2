@@ -25,7 +25,7 @@ export default function ReportComparisonScreen() {
       {comparison.capped && <AppText secondary>Esta comparación llega hasta el día {Number(current.endISO.slice(-2))} en ambos meses porque el anterior fue más corto. El reporte mensual conserva todos los días.</AppText>}
       {comparison.status === 'out-of-range' ? <EmptyState title="El total supera el rango disponible" detail="Tus movimientos siguen guardados. No mostramos una comparación imprecisa." /> : <>
         {comparison.status === 'ready' && deltaMinor !== null && previous?.status === 'ready' && <View style={{ gap: 10 }}>
-          <AppText accessibilityRole="header" style={{ fontSize: 24, fontWeight: '700' }}>{deltaMinor === 0 ? 'El mismo gasto registrado' : changePercent(deltaMinor, previous.expenseMinor) + (deltaMinor > 0 ? ' más registrado' : ' menos registrado')}</AppText>
+          <AppText accessibilityRole="header" variant="title2">{deltaMinor === 0 ? 'El mismo gasto registrado' : changePercent(deltaMinor, previous.expenseMinor) + (deltaMinor > 0 ? ' más registrado' : ' menos registrado')}</AppText>
           <Money minor={deltaMinor} currency={selection.currency} large />
           <AppText secondary>Diferencia respecto del período anterior</AppText>
         </View>}

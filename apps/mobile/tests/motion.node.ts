@@ -122,8 +122,8 @@ test('quick actions open the three movement modes with the account and currency 
     'react-native': { View: 'View' },
     'expo-router': { router: { push: (to: unknown) => pushed.push(to) } },
     '@expo/vector-icons/Ionicons': 'Ionicons',
-    './components': { AppText: 'AppText', PressFeedback: 'PressFeedback', toneColors: (_p: unknown, tone: string) => ({ color: tone, soft: tone + '-soft' }) },
-    './theme': { space: { xxxl: 32 }, usePalette: () => ({ secondary: '#666' }) },
+    './components': { AppText: 'AppText', PressFeedback: 'PressFeedback', surfaceShadow: () => ({}), toneColors: (_p: unknown, tone: string) => ({ color: tone, soft: tone + '-soft' }) },
+    './theme': { space: { xxxl: 32 }, usePalette: () => ({ secondary: '#666', inset: '#2C2C2E', surface: '#1C1C1E', isDark: true }) },
   };
   const module = { exports: {} as { QuickActions?: (props: any) => any } };
   runInNewContext(code, { module, exports: module.exports, require: (name: string) => {
@@ -139,9 +139,11 @@ test('quick actions open the three movement modes with the account and currency 
     { pathname: '/new-entry', params: { kind: 'income', accountId: 'a', currency: 'USD' } },
     { pathname: '/new-transfer', params: { accountId: 'a' } },
   ]));
-  // Each tile carries its semantic tone in the glyph and its soft background: expense coral, income green, transfer blue.
-  const tiles = actions.map((action: any) => action.props.children[0].props.style.backgroundColor);
-  assert.equal(JSON.stringify(tiles), JSON.stringify(['expense-soft', 'income-soft', 'transfer-soft']));
+  // Restraint: the circle is neutral; only the glyph carries the semantic colour (expense coral, income green, transfer azure).
+  const circles = actions.map((action: any) => action.props.children[0].props.style[0].backgroundColor);
+  assert.equal(JSON.stringify(circles), JSON.stringify(['#2C2C2E', '#2C2C2E', '#2C2C2E']));
+  const glyphs = actions.map((action: any) => action.props.children[0].props.children.props.color);
+  assert.equal(JSON.stringify(glyphs), JSON.stringify(['expense', 'income', 'transfer']));
 });
 
 test('form selectors keep the category hue and give the account the interaction accent', () => {

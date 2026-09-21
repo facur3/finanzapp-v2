@@ -5,7 +5,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import Animated, { useAnimatedStyle, useSharedValue, withDelay, withTiming } from 'react-native-reanimated';
 import { formatMinorUnits, labelFromISO, type Account, type CategorySpending, type Currency, type MonthlyBudgetSummary, type RecurringRule } from '@finanzapp/domain';
 import { AppText, CategoryBadge, Money, PressFeedback, Surface } from './components';
-import { tintOf } from './category-color';
+import { washOf } from './category-color';
 import { useCategoryColor } from './category-hues';
 import { easeOut, timing } from './motion';
 import { spendingShare } from './report-presentation';
@@ -28,13 +28,16 @@ export function MetricHelp({ title, detail }: { title: string; detail: string })
  * are honest: a 0,1 % category gets a hairline, never an invented minimum. */
 export const RANKING_REVEAL = { duration: 300, stagger: 50, fade: 200 } as const;
 
-/** The biggest categories this month as one distribution: a grouped surface
- * whose rows are each filled, from the left, in a tint of their own hue for
- * exactly their share of the month. The category is one object (glyph on its
- * hue), the amount sits right; no percentages, no bar under the row. Reportes
- * has the full picture. Fills are absolute, childless and behind the content,
- * so the animation costs no layout and never blocks a tap. */
-export function CategoryRanking({ categories, totalMinor, currency, limit = 4, onPressCategory }: {
+/** The biggest categories this month as one quiet distribution. Each row sits
+ * on the grouped surface; behind its content a rounded wash of its own hue,
+ * inset from the row's edges, runs from the left for exactly its share of the
+ * month. The wash is faint (a tenth of the hue) so three rows read as three
+ * rows, not a block of colour, and the largest category is a soft highlight
+ * rather than a filled bar. The category is one object (glyph on its hue), the
+ * amount sits right; no percentages, no bar under the row. Reportes has the
+ * full picture. Washes are absolute, childless and behind the content, so
+ * the animation costs no layout and never blocks a tap. */
+export function CategoryRanking({ categories, totalMinor, currency, limit = 3, onPressCategory }: {
   categories: CategorySpending[]; totalMinor: number; currency: Currency; limit?: number; onPressCategory: (category: CategorySpending) => void;
 }) {
   const head = categories.slice(0, limit);
@@ -70,8 +73,10 @@ function RankedRow({ category, totalMinor, currency, index, last, onPress }: {
   const stacked = fontScale > 1.3;
   return <PressFeedback feedback="highlight" accessibilityRole="button" accessibilityHint="Abre los movimientos de esta categoría este mes"
     accessibilityLabel={`${category.category}, ${formatMinorUnits(category.amountMinor)} ${currency}, ${label} del gasto del mes`}
-    onPress={onPress} style={[styles.row, { borderBottomColor: p.line, borderBottomWidth: last ? 0 : StyleSheet.hairlineWidth }]}
-    backdrop={<Animated.View pointerEvents="none" accessible={false} style={[styles.fill, { backgroundColor: tintOf(color, p) }, fill]} />}>
+    onPress={onPress} style={[styles.row, last && styles.rowLast]}
+    backdrop={<View pointerEvents="none" accessible={false} style={styles.fillTrack}>
+      <Animated.View style={[styles.fill, { backgroundColor: washOf(color, p) }, fill]} />
+    </View>}>
     <CategoryBadge category={category.category} />
     <View style={{ flex: 1, minWidth: 0, flexDirection: stacked ? 'column' : 'row', gap: stacked ? 2 : 12, alignItems: stacked ? 'flex-start' : 'center' }}>
       <AppText numberOfLines={1} style={{ flex: stacked ? undefined : 1, minWidth: 0, fontWeight: '500' }}>{category.category}</AppText>
@@ -139,7 +144,9 @@ export function UpcomingRecurringRow({ rule, account, day, last }: {
 }
 
 const styles = StyleSheet.create({
-  row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, paddingHorizontal: 16, minHeight: 64 },
-  // The fill's right edge is softened; its left and outer corners are clipped by the grouped surface.
-  fill: { position: 'absolute', left: 0, top: 0, bottom: 0, borderTopRightRadius: 6, borderBottomRightRadius: 6 },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10, paddingHorizontal: 16, minHeight: 64 },
+  rowLast: { paddingBottom: 12 },
+  // The wash lives in a track inset from the row, so it is a rounded shape of its own, never cut by the surface's edges or a separator.
+  fillTrack: { position: 'absolute', left: 6, right: 6, top: 5, bottom: 5 },
+  fill: { position: 'absolute', left: 0, top: 0, bottom: 0, borderRadius: 12 },
 });

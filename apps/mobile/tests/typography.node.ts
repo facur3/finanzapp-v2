@@ -47,19 +47,19 @@ test('Money sizes a hero from its measured width and leaves rows to the native f
         return [state[index], (value: unknown) => { state[index] = value; }]; } },
     'react/jsx-runtime': { jsx, jsxs: jsx, Fragment: 'Fragment' },
     'react-native': { ActivityIndicator: 'ActivityIndicator', InputAccessoryView: 'InputAccessoryView', Keyboard: {}, Platform: { OS: 'ios' }, Pressable: 'Pressable',
-      ScrollView: 'ScrollView', StyleSheet: { create: (styles: unknown) => styles, absoluteFill: {}, hairlineWidth: 0.5 }, Text: 'Text', TextInput: 'TextInput', View: 'View',
+      ScrollView: 'ScrollView', StyleSheet: { create: (styles: unknown) => styles, absoluteFill: {}, hairlineWidth: 0.5, flatten: (style: any) => Object.assign({}, ...[style].flat(Infinity).filter(Boolean)) }, Text: 'Text', TextInput: 'TextInput', View: 'View',
       useWindowDimensions: () => ({ width: 393, fontScale: 1 }) },
     'react-native-reanimated': { __esModule: true, default: { View: 'Animated.View', Text: 'Animated.Text' }, useSharedValue: (value: number) => ({ value }),
       withTiming: (value: number) => value, useAnimatedStyle: (fn: () => unknown) => fn() },
     '@expo/vector-icons/Ionicons': 'Ionicons',
     '@finanzapp/domain': { formatMinorUnits: (minor: number) => (minor / 100).toLocaleString('es-AR', { minimumFractionDigits: 2 }), accountBalanceMinor: () => 0, labelFromISO: () => '' },
     'expo-router': { router: {} },
-    './theme': { radius: {}, space: {}, type: {}, useCurrentDay: () => '2026-09-20', useReduceMotion: () => true, usePalette: () => ({ text: '#000', secondary: '#666', tertiary: '#999', income: '#008800', transfer: '#03c', warning: '#a60' }) },
+    './theme': { radius: {}, space: {}, type: { body: { fontSize: 17, lineHeight: 22 } }, useCurrentDay: () => '2026-09-20', useReduceMotion: () => true, usePalette: () => ({ text: '#000', secondary: '#666', tertiary: '#999', income: '#008800', transfer: '#03c', warning: '#a60' }) },
     './categories': { categoryIcon: () => 'pricetag-outline' },
     './category-color': { tintOf: (c: string) => c }, './category-hues': { useCategoryColor: () => '#111' },
     './geometry': geometry, './money-input': moneyInput, './motion': { duration: {}, easeOut: {}, selectionHaptic: () => {}, timing: () => ({}) },
   };
-  const module = { exports: {} as { Money?: (props: any) => any } };
+  const module = { exports: {} as { Money?: (props: any) => any; AppText?: (props: any) => any } };
   runInNewContext(code, { module, exports: module.exports, require: (name: string) => {
     if (!Object.hasOwn(modules, name)) throw new Error('Unexpected components dependency: ' + name);
     return modules[name];
@@ -91,6 +91,15 @@ test('Money sizes a hero from its measured width and leaves rows to the native f
   assert.equal(greenSymbol.props.children + greenWhole + greenCents.props.children, '+US$ 12,34');
   assert.equal(greenSymbol.props.style.color, '#008800B3', 'a coloured hero keeps its hue and only lowers the alpha');
   assert.equal(income.props.style.color, '#008800');
+  // Regression for the clipped category title: a larger fontSize on the body variant must not keep the 22 pt line box.
+  const flatten = (style: any) => Object.assign({}, ...[style].flat(Infinity).filter(Boolean));
+  const heading = flatten(module.exports.AppText!({ children: 'Comida', style: { fontSize: 26, fontWeight: '700' } }).props.style);
+  assert.equal(heading.fontSize, 26);
+  assert.ok(heading.lineHeight >= 26 * 1.2, 'the line box grows with the font');
+  const explicit = flatten(module.exports.AppText!({ children: 'x', style: { fontSize: 26, lineHeight: 40 } }).props.style);
+  assert.equal(explicit.lineHeight, 40, 'an explicit line height is respected');
+  const body = flatten(module.exports.AppText!({ children: 'x' }).props.style);
+  assert.equal(body.lineHeight, 22, 'the variant line box stays when nothing overrides the size');
   const row = render({ minor: 1234, currency: 'USD' });
   assert.equal(row.type, 'Text', 'a row amount is a plain text');
   assert.equal(row.props.children, 'US$ 12,34', 'row amounts stay one plain string');

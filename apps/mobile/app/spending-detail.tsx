@@ -2,7 +2,7 @@ import { View } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { expensesInPeriod, spendingOverview, validDateISO, type ReportPeriod } from '@finanzapp/domain';
 import { useLedger } from '../src/storage/LedgerProvider';
-import { AppText, EmptyState, Money, Screen } from '../src/ui/components';
+import { AppText, CategoryBadge, EmptyState, Money, Screen, SectionTitle } from '../src/ui/components';
 import { EntryList } from '../src/ui/entry-list';
 import { selectEntries } from '../src/ui/presentation';
 import { periodLabel } from '../src/ui/spending-timeline';
@@ -23,11 +23,17 @@ export default function SpendingDetailScreen() {
   const entries = selectEntries(expensesInPeriod(snapshot, period, category), snapshot.accounts);
   const group = category ? report.categories.find(c => c.key === category) : undefined;
   const total = report.status === 'ready' ? category ? group?.amountMinor ?? 0 : report.expenseMinor : null;
-  return <EntryList entries={entries} accounts={snapshot.accounts} header={<View style={{ gap: 14 }}>
-    <AppText accessibilityRole="header" style={{ fontSize: 26, fontWeight: '700' }}>{group?.category ?? 'Gastos registrados'}</AppText>
-    <AppText secondary>{periodLabel(period)} · {currency}</AppText>
-    {total !== null ? <Money minor={total} currency={currency} large /> : <AppText secondary>No podemos mostrar este total con precisión.</AppText>}
-    <AppText secondary>{entries.length} gastos registrados</AppText>
-    {!entries.length && <AppText secondary>No hay gastos registrados para estas fechas y moneda.</AppText>}
+  // Same header as the report's category screen: the category as its tile, the name, the period, the total.
+  return <EntryList entries={entries} accounts={snapshot.accounts} header={<View style={{ gap: 22 }}>
+    <View style={{ gap: 12, paddingTop: 8 }}>
+      {group && <CategoryBadge category={group.category} large />}
+      <AppText accessibilityRole="header" variant="title1">{group?.category ?? 'Gastos registrados'}</AppText>
+      <AppText secondary variant="subhead">{periodLabel(period)} · {currency}</AppText>
+    </View>
+    <View style={{ gap: 10 }}>
+      {total !== null ? <Money minor={total} currency={currency} large /> : <AppText secondary>No podemos mostrar este total con precisión.</AppText>}
+      <AppText secondary variant="subhead">{entries.length === 1 ? '1 gasto registrado' : entries.length + ' gastos registrados'}</AppText>
+    </View>
+    {entries.length ? <SectionTitle>Movimientos</SectionTitle> : <AppText secondary>No hay gastos registrados para estas fechas y moneda.</AppText>}
   </View>} />;
 }

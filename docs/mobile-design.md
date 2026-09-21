@@ -68,6 +68,12 @@ presentación: cada cambio se interpreta como una edición del texto anterior
 y el módulo no crea ningún número flotante. El cursor queda en manos de iOS, que
 conserva su distancia al final del texto cuando aparece un punto a la izquierda.
 
+**Títulos de pantalla.** Los encabezados grandes usan las variantes con nombre
+(título 1 28/34, título 2 22/28), nunca un `fontSize` suelto sobre la caja de
+línea del cuerpo: en iOS un glifo más alto que su línea se recorta por arriba
+(el "Comida" cortado en el detalle de categoría). `AppText` además ajusta la
+caja de línea cuando un estilo cambia solo el tamaño.
+
 **Tipografía.** Fuente del sistema. Héroe 44/700 tabular con tracking negativo,
 título grande 34, título 22, encabezado 17/600, cuerpo 17, subtítulo 15, nota 13,
 etiqueta 12. Números siempre tabulares. **Importes responsivos:** un importe es
@@ -121,12 +127,16 @@ nombre, emisor, moneda, últimos cuatro dígitos y un tono estable por tarjeta.
   moneda; el nombre del mes (o "Saldo registrado" con el botón de información) y el
   número principal, sin cantidad de registros ni rango de fechas ni selector de
   período. Tres acciones redondas: Gasto, Ingreso, Transferir. Una línea de
-  presupuesto solo si hay presupuestos. "En qué gastaste": un solo bloque agrupado
-  con hasta cuatro categorías; cada fila se rellena desde la izquierda, detrás del
-  contenido, con el tinte suave de su propio tono exactamente en su proporción del
-  mes (sin mínimo inventado: 0,1 % es un filo y la fila sigue siendo tocable).
-  Tile, nombre e importe; sin porcentajes ni barra debajo. "Reportes" abre la
-  pestaña. Compromisos próximos solo cuando existen; los últimos cuatro
+  presupuesto solo si hay presupuestos. Las tres acciones redondas son círculos
+  neutros (escalón de superficie en oscuro, blanco con sombra suave en claro) con
+  solo el glifo en su color semántico: el color vive en el trazo, no en un tile
+  relleno. "En qué gastaste": un bloque agrupado con hasta tres categorías; detrás
+  del contenido de cada fila, un lavado redondeado de su propio tono (11 % en
+  oscuro, 8 % en claro), con margen respecto de los bordes de la fila, corre desde
+  la izquierda exactamente en su proporción del mes (sin mínimo inventado: 0,1 %
+  es un filo y la fila sigue siendo tocable). Sin separadores que corten el
+  lavado. Tile, nombre e importe; sin porcentajes ni barra debajo. "Reportes"
+  abre la pestaña. Compromisos próximos solo cuando existen; los últimos cuatro
   movimientos. Los períodos y el análisis viven en Reportes.
 - **Movimientos.** Buscador, filtro Todos / Gastos / Ingresos / Transf., secciones
   "Hoy · 20 sep", "Ayer", día de la semana en los últimos siete días y luego la fecha,
@@ -197,7 +207,7 @@ siguen montadas, así un revelado al montar no se vería).
   funde como un bloque.
 - **Bloques.** Una sección que aparece o desaparece se funde y los vecinos se
   deslizan en lugar de saltar; con Reduce Motion, solo el fundido.
-- **Rellenos de categoría (Inicio).** Con los primeros datos, cada relleno crece
+- **Lavados de categoría (Inicio).** Con los primeros datos, cada lavado crece
   desde cero hasta su proporción real en 300 ms ease-out, con 50 ms de escalonado
   entre filas; un cambio de datos interpola desde la proporción anterior en 260 ms.
   Es una vista absoluta sin hijos detrás del contenido: no cuesta layout ni bloquea

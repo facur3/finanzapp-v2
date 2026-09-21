@@ -28,11 +28,17 @@ export function toneColors(p: Palette, tone: Tone): { color: string; soft: strin
   }
 }
 
+/** Text in one of the named styles. A larger `fontSize` in `style` without
+ * its own `lineHeight` gets a line box that fits it, instead of inheriting the
+ * variant's smaller one; on iOS a glyph taller than its line box is clipped
+ * at the top ("Comida" lost its ascenders on the category detail). */
 export function AppText({ children, style, secondary = false, tertiary = false, variant = 'body', ...props }: TextProps & {
   secondary?: boolean; tertiary?: boolean; variant?: keyof typeof type;
 }) {
   const p = usePalette();
-  return <Text {...props} style={[type[variant], { color: tertiary ? p.tertiary : secondary ? p.secondary : p.text }, style]}>{children}</Text>;
+  const flat = StyleSheet.flatten(style);
+  const fits = flat?.fontSize && !flat.lineHeight ? { lineHeight: Math.round(flat.fontSize * 1.25) } : null;
+  return <Text {...props} style={[type[variant], { color: tertiary ? p.tertiary : secondary ? p.secondary : p.text }, style, fits]}>{children}</Text>;
 }
 
 export function Screen({ children, gap = space.xl }: { children: ReactNode; gap?: number }) {

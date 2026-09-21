@@ -36,13 +36,22 @@ black, white and grey with the category hues as the only colour.
   the eight category hues are unchanged; transfer moved from the old link blue to a
   distinct azure (#0B6BB3 / #4DB0FF) so meaning and interaction never share a swatch.
   Secondary actions stay ink on the inset fill, so a screen has at most one blue button.
-- [x] Home "En qué gastaste": one grouped surface with up to four ranked rows. Each row
-  is filled from the left, behind its content, in the soft tint of its own hue for
-  exactly its share of the month (no invented minimum: 0,1 % is a hairline and the
-  row stays fully tappable). Glyph tile, name, amount; no percentages, no line under
-  the row. Fills grow from zero on first data (300 ms ease-out, 50 ms stagger) and
-  interpolate on later data; Reduce Motion keeps a 200 ms fade only. The fill is an
-  absolute, childless view on the UI thread; nothing is driven by scroll.
+- [x] Home "En qué gastaste": one grouped surface with up to three ranked rows. Behind
+  each row's content a rounded wash of its own hue (11 % dark, 8 % light), inset
+  from the row's edges, runs from the left for exactly its share of the month (no
+  invented minimum: 0,1 % is a hairline and the row stays fully tappable). No
+  separators cut through it. Glyph tile, name, amount; no percentages, no line under
+  the row. Washes grow from zero on first data (300 ms ease-out, 50 ms stagger) and
+  interpolate on later data; Reduce Motion keeps a 200 ms fade only. The wash is an
+  absolute, childless view on the UI thread; nothing is driven by scroll. (The
+  owner's second iPhone review found the first version a heavy, square block of
+  colour: four rows, a 20 % fill clipped by the surface edge and separators.)
+- [x] Home quick actions are neutral circles with only the glyph in its semantic
+  colour, so Home no longer reads as three coloured buttons.
+- [x] Category detail title clipping fixed: "Comida" lost its ascenders because the
+  heading set a 26 pt size on the body variant's 22 pt line box. Headings now use the
+  named title variants and `AppText` grows the line box when a style changes only the
+  size. "Gastos del período" shares the report category header (tile, name, period).
 - [x] Monetary input formats as the user types: "2000000" reads "2.000.000",
   "2000,5" reads "2.000,5", a typed period on an en-US keypad is a decimal separator,
   pasted "2,000.50" or "2.000.000,50" normalise, backspace over a grouping dot
@@ -476,6 +485,11 @@ new screen.
   tests (money input, theme contrast, Home ranking, hero typography, selector tints),
   Expo compatibility and Metro iOS export. No device evidence: caret behaviour of the
   formatted field, the tinted fills and the cobalt in both themes need the iPhone.
+- Pre-merge polish after a second iPhone review: the Home category fills became
+  faint, inset, rounded washes on three rows without separators; the quick actions
+  became neutral circles with semantic glyphs; the clipped category title (a large
+  size on the body line box) was fixed in `AppText` and every large heading moved
+  to the named title variants. 162 mobile tests.
 
 ### 2026-09-20 — Interfaz 16: native visual cohesion and information hierarchy
 

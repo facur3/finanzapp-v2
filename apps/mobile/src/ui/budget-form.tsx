@@ -117,7 +117,7 @@ export function BudgetForm({ original, monthISO, currency: requestedCurrency }: 
       headerLeft: () => <IconButton name="close" label="Cerrar" onPress={close} disabled={busy} /> }} />
     <View style={{ gap: 4, alignItems: 'center', paddingTop: 8 }}>
       <AppText secondary style={{ fontSize: 14, textTransform: 'capitalize' }}>{monthLabel(before?.monthISO ?? monthISO)}</AppText>
-      <AppText style={{ fontSize: 25, fontWeight: '700', letterSpacing: -0.5 }}>Límite mensual</AppText>
+      <AppText variant="title2">Límite mensual</AppText>
     </View>
     {!before && <Choices value={currency} onChange={setCurrency} disabled={locked}
       options={[{ value: 'ARS', label: 'Pesos · ARS' }, { value: 'USD', label: 'Dólares · USD' }]} />}

@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import { runInNewContext } from 'node:vm';
 import ts from 'typescript';
 import * as presentation from '../src/ui/report-presentation.ts';
-import { tintOf } from '../src/ui/category-color.ts';
+import { washOf } from '../src/ui/category-color.ts';
 
 // A source/behaviour guard over the Home category module: honest proportions,
 // a reveal that runs once, interpolation on data changes and Reduce Motion.
@@ -32,7 +32,7 @@ function harness() {
       withDelay: (delay: number, animation: { value: number; duration: number }) => ({ ...animation, delay }) },
     '@finanzapp/domain': { formatMinorUnits: (minor: number) => String(minor), labelFromISO: () => '' },
     './components': { AppText: 'AppText', CategoryBadge: 'CategoryBadge', Money: 'Money', PressFeedback: 'PressFeedback', Surface: 'Surface' },
-    './category-color': { tintOf },
+    './category-color': { washOf },
     './category-hues': { useCategoryColor: (label: string) => '#' + label.length.toString().padStart(6, 'A') },
     './motion': { easeOut: 'ease-out', timing: (kind: string, reduced: boolean) => ({ duration: reduced ? 0 : 260 }) },
     './report-presentation': presentation,
@@ -63,18 +63,25 @@ test('rows fill in proportion to real spending, with no invented minimum and no 
   assert.deepEqual(progress.map(item => item.initial), [0, 0, 0], 'the first frame starts empty and animates up');
   assert.deepEqual(progress.map(item => (item.value as any).value), [0.998, 0.001, 0.001], 'the animation targets are the honest shares');
   // The style maps the share straight to a width: 0,1 % is a hairline, never a padded minimum.
+  const fillOf = (row: any) => row.props.backdrop.props.children;
   progress[1].value = 0.001;
-  assert.equal(rows[1].props.backdrop.props.style[2]().width, '0.1%');
+  assert.equal(fillOf(rows[1]).props.style[2]().width, '0.1%');
   progress[0].value = 0.998;
-  assert.equal(rows[0].props.backdrop.props.style[2]().width, '99.8%');
+  assert.equal(fillOf(rows[0]).props.style[2]().width, '99.8%');
   for (const row of rows) {
     assert.equal(row.props.accessibilityRole, 'button', 'a tiny share is still a full tappable row');
-    assert.equal(row.props.backdrop.props.pointerEvents, 'none', 'the fill never intercepts the tap');
-    assert.equal(row.props.backdrop.props.style[0].position, 'absolute', 'the fill is out of flow: no layout cost');
+    assert.equal(row.props.backdrop.props.pointerEvents, 'none', 'the wash never intercepts the tap');
+    const track = row.props.backdrop.props.style;
+    assert.equal(track.position, 'absolute', 'the wash is out of flow: no layout cost');
+    assert.ok(track.left > 0 && track.right > 0 && track.top > 0 && track.bottom > 0, 'the wash is inset from the row, a rounded shape of its own');
+    assert.ok(fillOf(row).props.style[0].borderRadius >= 10, 'rounded, never cut square by the surface edge');
     assert.equal(row.props.children[0].type, 'CategoryBadge', 'the category is the glyph on its hue, no emoji');
+    assert.equal(row.props.style[0].borderBottomWidth, undefined, 'no separator cuts through the wash');
   }
   assert.match(rows[1].props.accessibilityLabel, /ocio, 100 ARS, 0,1 % del gasto del mes/);
-  assert.equal(rows[0].props.backdrop.props.style[1].backgroundColor, tintOf('#AAAAA6', { isDark: true }), 'the fill is the soft tint of the category hue');
+  assert.equal(fillOf(rows[0]).props.style[1].backgroundColor, washOf('#AAAAA6', { isDark: true }), 'the wash is a faint tenth of the category hue');
+  assert.equal(washOf('#AAAAA6', { isDark: true }), '#AAAAA61C');
+  assert.equal(washOf('#AAAAA6', { isDark: false }), '#AAAAA614');
   const texts = JSON.stringify(rows);
   assert.equal(/%/.test(texts.replace(/accessibilityLabel[^,]*,[^,]*,[^"]*"/g, '')), false, 'no visible percentage labels');
 });
@@ -102,8 +109,8 @@ test('Reduce Motion skips the width motion: the fill starts at its final share a
   assert.deepEqual(opacity.value, { value: 1, duration: 200, delay: 0 }, 'a short opacity change explains the appearance');
 });
 
-test('Home shows at most four ranked categories', () => {
+test('Home shows at most three ranked categories', () => {
   const { render } = harness();
   const categories = Array.from({ length: 6 }, (_, index) => category('c' + index, 100));
-  assert.equal(render({ categories, totalMinor: 600, currency: 'ARS', onPressCategory: () => {} }).rows.length, 4);
+  assert.equal(render({ categories, totalMinor: 600, currency: 'ARS', onPressCategory: () => {} }).rows.length, 3);
 });
