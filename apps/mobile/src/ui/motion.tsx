@@ -39,9 +39,14 @@ export function selectionHaptic() {
   void Haptics.selectionAsync().catch(() => {});
 }
 
-/** Something snapped home: a card settling in the carousel. */
+/** Something snapped home: a card settling in the carousel; a message leaving the composer. */
 export function impactHaptic() {
   void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+}
+
+/** A durable write was accepted: a saved movement, a confirmed draft. */
+export function successHaptic() {
+  void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
 }
 
 const rise = FadeInUp.duration(duration.enter).easing(easeOut).withInitialValues({ opacity: 0, transform: [{ translateY: 6 }] });
@@ -74,4 +79,12 @@ export function Reflow({ children, style, fade = false }: { children: ReactNode;
   const reduced = useReduceMotion();
   return <Animated.View style={style} layout={reduced ? undefined : reflow}
     entering={fade ? fadeIn : undefined} exiting={fade ? fadeOut : undefined}>{children}</Animated.View>;
+}
+
+/** A block that arrives after the screen is already up (a new message, a draft
+ * card): it rises 6 pt in 200 ms, or only fades under Reduce Motion. Unlike
+ * ValueTransition it animates on mount, because arriving is the event. */
+export function Appear({ children, style }: { children: ReactNode; style?: StyleProp<ViewStyle> }) {
+  const reduced = useReduceMotion();
+  return <Animated.View style={style} entering={reduced ? fadeIn : rise} exiting={fadeOut}>{children}</Animated.View>;
 }

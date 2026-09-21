@@ -7,8 +7,17 @@ No se hicieron llamadas pagas ni se modificó una base de datos remota.
 
 Manual → validadores → SQLite → confirmación sigue funcionando sin conexión.
 Texto/transcripción → servidor autenticado → IA → resultado estructurado →
-validadores → borrador revisable. La UI de chat, grabación/transcripción, consentimiento,
-login móvil y guardado automático son la próxima integración, todavía pendientes.
+validadores → borrador revisable. **Producto 21 (2026-09-21)** entrega la UI de chat
+con esa frontera: `apps/mobile/src/assistant/client.ts` envuelve `integrationClient`
+(mismo origen HTTPS, misma sesión bearer, mismos contratos) en un cliente por eventos
+(`delta`, `result`, `error`) listo para streaming; `runtime.ts` elige el cliente de cada
+build y hoy devuelve **desconectado** porque no existe proveedor de sesión: ninguna
+solicitud sale del dispositivo. La respuesta `draft` se resuelve en el teléfono
+(`resolveDraft`: cuenta por nombre o única elegible, si no pregunta; tipo, importe y
+categoría faltantes también preguntan) y solo Confirmar escribe, validado por el dominio.
+Las filas y enlaces de una respuesta salen únicamente de los `factIds` citados sobre la
+evidencia local, nunca del texto. Grabación/transcripción, consentimiento, login móvil
+y guardado automático siguen pendientes.
 
 Atajo → POST autenticado → bandeja durable `needs_review`. Esta entrega **no**
 incorpora esa bandeja al libro local. No mostrar "gasto guardado" por recibir un

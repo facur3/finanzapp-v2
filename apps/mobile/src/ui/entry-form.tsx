@@ -15,12 +15,15 @@ import { space } from './theme';
 
 type FormKind = EntryKind | 'transfer';
 
+/** Seed values for a new posting (an Assistant draft handed to the form). Display strings; the amount is the same canonical text the field renders. */
+export type EntryPrefill = { amount?: string; merchant?: string; category?: string; dateISO?: string };
+
 /** One form for creating and correcting a posting. The amount, the kind, the
  * category and the account or card are the four things a user must see; a
  * submitted command stays frozen across retries, including a failed refresh
  * after SQLite committed. */
-export function EntryForm({ original, accountId: requestedAccount, currency, kind: requestedKind, onKindChange, onAccountChange }: {
-  original?: EntryRecord; accountId?: string; currency?: string; kind?: string;
+export function EntryForm({ original, accountId: requestedAccount, currency, kind: requestedKind, onKindChange, onAccountChange, prefill }: {
+  original?: EntryRecord; accountId?: string; currency?: string; kind?: string; prefill?: EntryPrefill;
   /** When a host owns the Gasto / Ingreso / Transferencia switch it passes `kind` and this callback; the form then renders no switch of its own. */
   onKindChange?: (kind: FormKind) => void;
   /** Lets the host carry the chosen account over when the mode changes. */
@@ -34,10 +37,10 @@ export function EntryForm({ original, accountId: requestedAccount, currency, kin
   const [ownKind, setKind] = useState<EntryKind>(before?.entry.kind ?? (requestedKind === 'income' ? 'income' : 'expense'));
   const kind: EntryKind = onKindChange ? (requestedKind === 'income' ? 'income' : 'expense') : ownKind;
   const [accountId, setAccountId] = useState(() => before?.entry.accountId ?? initialAccountId(accounts, requestedAccount, currency));
-  const [amount, setAmount] = useState(before ? formatMinorUnits(before.entry.amountMinor) : '');
-  const [merchant, setMerchant] = useState(before?.entry.merchant ?? '');
-  const [category, setCategory] = useState(before?.entry.category ?? '');
-  const [date, setDate] = useState(() => before ? new Date(before.entry.dateISO + 'T12:00:00') : new Date());
+  const [amount, setAmount] = useState(before ? formatMinorUnits(before.entry.amountMinor) : prefill?.amount ?? '');
+  const [merchant, setMerchant] = useState(before?.entry.merchant ?? prefill?.merchant ?? '');
+  const [category, setCategory] = useState(before?.entry.category ?? prefill?.category ?? '');
+  const [date, setDate] = useState(() => before ? new Date(before.entry.dateISO + 'T12:00:00') : prefill?.dateISO ? new Date(prefill.dateISO + 'T12:00:00') : new Date());
   const [busy, setBusy] = useState(false);
   const [pending, setPending] = useState<{ entry: Entry; change?: EntryChange } | null>(null);
   const saving = useRef(false);

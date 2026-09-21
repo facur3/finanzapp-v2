@@ -83,15 +83,15 @@ test('Más groups permanent navigation into Finanzas and App y datos, with live 
   assert.equal(value('Recurrentes'), '1 activo');
   assert.equal(value('Deudas y cobros'), '1 pendiente');
   assert.equal(value('Presupuestos'), 'Plan mensual');
-  assert.equal(value('Asistente'), 'Vista previa', 'the Assistant never claims to be active');
+  assert.equal(value('Asistente'), 'Preguntá o registrá', 'the Assistant row describes the capability, not a model status');
   assert.equal(value('Movimientos deshechos'), '1 recuperable');
   for (const row of rows(root)) row.props.onPress();
-  assert.deepEqual(view.pushed, ['/accounts', '/budgets', '/recurring', '/debts', '/categories', '/assistant-preview', '/backup', '/undone-entries']);
+  assert.deepEqual(view.pushed, ['/accounts', '/budgets', '/recurring', '/debts', '/categories', '/assistant', '/backup', '/undone-entries']);
   // Each group closes its last row; no export button or sharing lives on the hub any more.
   assert.deepEqual(rows(root).filter(row => row.props.last).map(row => row.props.label), ['Categorías', 'Movimientos deshechos']);
   assert.equal(nodes(root).some(node => node.type === 'ActionButton'), false);
   const texts = nodes(root).filter(node => node.type === 'AppText').map(node => String(node.props.children)).join(' ');
-  assert.match(texts, /Producto 20/);
+  assert.match(texts, /Producto 21/);
   assert.equal(value('Categorías'), 'Gastos e ingresos');
   // Finanzas rows carry a soft identity tile from the shared palette; App y datos rows stay neutral glyphs.
   const leading = rows(root).map(row => row.props.leading?.type ?? null);

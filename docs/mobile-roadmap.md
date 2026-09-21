@@ -15,10 +15,73 @@ server-keyed; manual recording and local data work without connectivity. Recurri
 expenses, debts, budgets and cards remain in scope. Native navigation, accessible
 amounts, real data and recoverable durable writes remain requirements.
 
-## Status and current delivery — Producto 20
+## Status and current delivery — Producto 21
 
 Implemented is code, checked names a test, device-verified needs a physical result,
 and released means distributed. Neither a bundle nor a screenshot is App Store QA.
+
+Producto 21 — Assistant Experience makes the Assistant a first-class capability of the
+product before the cloud model is connected: the real conversational interface, its
+state model and its client boundary, with the disconnected state represented honestly.
+No paid call, no Supabase project, no auth, no speech recognition, no autonomous write.
+
+- [x] **Home affordance.** Four equal-width quick actions, Asistente first (sparkles on
+  a cobalt wash with a thin cobalt ring), then Gasto / Ingreso / Transferir on a neutral
+  opaque material (hairline edge; soft card shadow in light, a faint light edge in dark).
+  Columns flex, captions may wrap to two lines under large text, VoiceOver labels stay
+  full ("Abrir el Asistente"). Account detail keeps the three movements. No blur
+  dependency: real Liquid Glass material is a development-build enhancement.
+- [x] **Conversation model** (`apps/mobile/src/assistant/conversation.ts`): one
+  ephemeral conversation (messages in local order: user / assistant / system, an
+  assistant message carries optional structured content: answer, draft or
+  clarification), a composer draft and a phase (idle / thinking / streaming). Pure
+  reducer: send, delta, answer, fail, stop, choose, draft confirmed / cancelled / edited,
+  note, reset. No persistence, no history product: chat history is a later capability.
+- [x] **Draft principle.** A parsed sentence becomes a draft card (kind, amount, comercio,
+  categoría with its tile, pagado con with the account tile, fecha) that the user
+  confirms explicitly. `resolveDraft` never guesses a financially meaningful field: no
+  kind → "¿Fue un gasto o un ingreso?"; no amount → asks for it; a payment method that
+  matches one account by name is used, one eligible account is implied, otherwise
+  "¿Con qué lo pagaste?" with the accounts of that currency as chips; no category →
+  the user's most-used categories as chips. Confirmar is the only ledger write: the
+  screen builds one Entry, the domain validates it, the repository saves it, a failed
+  save keeps the draft and a retry reuses the same id. Editar opens the entry form
+  prefilled and marks the card as edited; Descartar collapses it. Nothing is written by
+  rendering, by a stale tap on a confirmed card, or in the fixture view.
+- [x] **Evidence.** Answer rows and links come only from the cited `factIds` of the
+  local `monthlyEvidence` (signed differences when both months cite the same label,
+  absolute amounts otherwise; at most five rows); links open Movimientos, the category's
+  dated expenses or Presupuestos. An id that is not local evidence renders nothing.
+- [x] **Client boundary** (`src/assistant/client.ts`): event-based (`delta`, `result`,
+  `error`) so a future token stream and today's single JSON reply render through the
+  same code; `remoteAssistant` wraps the existing `integrationClient` (HTTPS origin,
+  bearer session, strict contracts, 35 s timeout) and maps failures to reasons;
+  `disconnectedAssistant` yields one `unavailable` without a request. `runtime.ts`
+  chooses: this build is disconnected (no session provider exists yet); scripted
+  fixtures only in a development bundle with `EXPO_PUBLIC_ASSISTANT_FIXTURES=1`.
+- [x] **Screen** (`app/assistant.tsx`): quiet empty state ("¿En qué te ayudo?", four
+  suggestions that disappear once a conversation starts), a FlatList that autoscrolls
+  only when the reader is near the end, a composer that rides the keyboard on the UI
+  thread (`useAnimatedKeyboard`), send disabled when empty and Stop while answering, a
+  visible microphone that explains the development-build boundary, one calm caption
+  when disconnected, New chat in the header. Haptics: light impact on send, success on
+  a confirmed write, selection on a chip; none on open.
+- [x] **Motion and accessibility.** New messages and cards rise 6 pt / fade only under
+  Reduce Motion (`Appear`); the thinking dot pulses or stands still; every state is
+  written ("Pensando…", "Respuesta interrumpida", "Borrador descartado"), never only
+  coloured; VoiceOver labels on the field, microphone, send/stop, chips, links, draft
+  rows and buttons; Dynamic Type caps the composer at about five lines.
+- [x] **Checked on Linux:** 264 mobile tests (35 new across three files), TypeScript,
+  Expo dependency check, Metro iOS export, 397 root tests, Vite build, repo hygiene.
+- [ ] **Not device-verified:** keyboard tracking and interactive dismissal, the
+  material of the four actions in both themes, the composer under large text, VoiceOver
+  order through a conversation, the Reduce Motion behaviour of the pulse and reveals,
+  the draft card and chips on the iPhone.
+- [ ] **Next (Cloud/EAS phase):** mobile sign-in + consent, server origin configured,
+  session provider wired into `assistantForEnvironment`, real token streaming from the
+  endpoint, speech-to-text in the development build, chat history if wanted.
+
+### Previous delivery — Producto 20
 
 Producto 20 — Personalization gives financial objects a user-controlled visual
 identity: custom categories and account identity, on one shared foundation. It is
@@ -635,13 +698,12 @@ by CI and merged into master before the next starts:
 8. ~~Visual identity and monetary experience~~ — delivered in Interfaz 17.
 9. ~~Custom categories and account identity~~ — delivered in Producto 20 (definitions
    decorating stored strings, display rename, archive-first, schema 8, backup v8).
-10. **Assistant (future, not in Producto 20)**: a text composer, a voice affordance,
-    a streaming conversation, suggested questions, structured draft cards for actions
-    such as recording an expense, explicit confirmation before any financial write,
-    and links to the supporting FinanzApp records. When it becomes functional it may
-    regain a prominent Home/header entry point; until then it stays under Más as
-    Vista previa. No Supabase, auth or cloud sync is wired in the app yet; the local
-    SQLite ledger remains the source of truth and the cloud foundation is its own phase.
+10. ~~Assistant experience~~ — delivered in Producto 21 (four Home actions with
+    Asistente first, the conversational screen, composer with a visible voice
+    affordance, streaming-ready state model, suggestions, draft cards with explicit
+    confirmation, clarification chips, evidence rows and links, disconnected state).
+    No Supabase, auth or cloud sync is wired in the app yet; the local SQLite ledger
+    remains the source of truth and activation is the next phase.
 11. **EAS development build and Apple integrations** (Face ID, notifications with
     the card due-date reminder, Apple Pay capture, App Intents) only after the core
     product is stable on device.
@@ -664,8 +726,9 @@ Use [integration contracts](mobile-integrations.md) as the implementation bounda
 
 - [ ] Staging Supabase setup, mobile sign-in and cloud-data consent; no login needed
   for the local core. The existing web snapshot is not a mobile sync engine.
-- [ ] Text assistant UI, then audio/transcription with explicit mic permission,
-  limits and deletion. Review/edit/undo with no phantom success or discarded draft.
+- [x] Text assistant UI (Producto 21: conversation, drafts, clarifications, evidence,
+  disconnected state). [ ] Audio/transcription with explicit mic permission, limits and
+  deletion (development build). Review/edit/undo with no phantom success or discarded draft.
 - [ ] Evaluate Spanish phrases, ambiguous categories, currencies, loans/refunds,
   questions and failure handling with owned test data and measured provider usage.
 - [ ] Safe auto-registration opt-in only for complete supported operations and
@@ -725,6 +788,22 @@ targets, VoiceOver, safe areas, system text and separate currencies apply to eve
 new screen.
 
 ## Handoff log (historical evidence)
+
+### 2026-09-21 — Producto 21: Assistant experience
+
+- Four equal-width Home quick actions with Asistente first on a restrained opaque
+  material (no blur dependency), the real Assistant screen replacing the brochure
+  preview (suggestions, composer with mic/send/stop riding the keyboard, streaming and
+  thinking states, draft cards with Confirmar / Editar / Descartar, clarification chips,
+  evidence rows and links, calm disconnected / offline / limit / failed notes, New chat),
+  a pure conversation reducer, an event-based client boundary wrapping the existing
+  integration client, a disconnected runtime, scripted fixtures gated to development
+  bundles, entry-form prefill for Editar, `successHaptic` and `Appear` in the motion
+  module. Backend, contracts and evidence builder reused, not changed; nothing activated.
+- **Checked on Linux:** 264 mobile tests (Node SQLite, route and source harnesses),
+  TypeScript, Expo dependency check, Metro iOS export, 397 root tests, Vite build, repo
+  hygiene. **Not device-verified:** keyboard tracking, material in both themes, VoiceOver
+  order, Reduce Motion, Dynamic Type in the composer and on the four captions.
 
 ### 2026-09-21 — Producto 20: custom categories and account identity
 

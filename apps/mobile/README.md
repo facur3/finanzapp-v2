@@ -80,7 +80,27 @@ and get a deterministic fallback glyph and hue until the user dresses or archive
 Backup format is v8 (v1–v7 files still import; their accounts show the default look).
 One shared icon-and-colour picker (curated Ionicons glyphs, eleven restrained colours
 with accessible Spanish names) serves both; Más → Finanzas rows carry soft tinted tiles.
-The Assistant remains a preview under Más.
+**Producto 21 (2026-09-21)** is the Assistant experience: the production-intent
+conversational interface, built before the cloud model is connected and honest about
+it. Home's quick actions become four equal columns — **Asistente**, Gasto, Ingreso,
+Transferir — on a restrained opaque material (hairline edge, soft shadow in light, a
+light edge in dark; the Assistant on a cobalt wash with a thin cobalt ring). The
+brochure preview is gone: `/assistant` is a real conversation (quiet empty state with
+four suggestions, a composer with microphone and send/stop, user pills, plain
+Assistant text, streaming and "Pensando…" states, structured **draft cards** with
+Confirmar / Editar / Descartar, **clarification chips** when the account, kind or
+category is unknown, **answers with evidence rows and links** to Movimientos /
+categoría / Presupuestos, and calm inline notes for not connected / offline / limit /
+failed). The conversation model is pure (`src/assistant/conversation.ts`), the client
+boundary is event-based and streaming-ready (`src/assistant/client.ts`, wrapping the
+existing `integrationClient` and POST `/api/mobile/assistant`), and this build's runtime
+is **disconnected**: nothing leaves the device, a sent message returns to the composer
+under one note. The only ledger write is an explicit Confirmar on a draft, validated by
+the domain and saved through the same repository as the form; Editar opens the entry
+form prefilled. Voice is a visible affordance only (the microphone explains that
+transcription needs the development build). Scripted fixtures exist for tests and,
+under `EXPO_PUBLIC_ASSISTANT_FIXTURES=1` in a development bundle only, for seeing the
+states on the iPhone behind a visible "Vista de prueba" banner that never saves.
 
 The Reportes tab shows, for one month and currency, the recorded total with its daily
 average and change against the same elapsed days of the previous month, a six-month
@@ -100,9 +120,10 @@ native stack. No SQLite migration or loss of existing records.
 Cloud AI replaces the earlier local-parser plan. [Integration contracts/setup](../../docs/mobile-integrations.md)
 describe the disabled-by-default API, bounded provider adapter, pending inbox,
 and remaining auth/consent/Shortcut/audio UI. No paid calls or remote SQL were run.
-Más → Asistente opens an explicit preview of the future Assistant; it never
-claims a model is active and sends no financial data. The Home header no longer
-advertises it.
+Inicio → Asistente (first quick action) and Más → Asistente open the real Assistant
+conversation. In this build it is disconnected: it never claims a model is active and
+sends no financial data; the interface, the draft/clarification/evidence states and the
+client boundary are ready for the activation phase (session, consent, server origin).
 
 ## First start on Linux or Windows
 
@@ -351,7 +372,17 @@ hierarchical Presupuestos screen, the Home budget card, the schema 7 and 8 migra
 account looks (create/edit/retry, selectors), the category form (create/rename/archive),
 the shared icon-and-colour picker (VoiceOver names, haptics, Reduce Motion), every
 curated glyph against the bundled Ionicons font, palette contrast, and bar-animation
-configuration. These are **not** native rendering/gesture tests;
+configuration. Producto 21 adds `assistant.node.ts` (conversation reducer, intent
+classification, draft resolution and clarification, evidence rows/links, the
+disconnected/remote/fixture clients and the runtime's fixture gate),
+`assistant-routes.node.ts` (the screen: empty state, suggestions, composer state,
+disconnected note that preserves the text, streaming and Stop, answers with links, a
+draft that writes nothing until Confirmar and then exactly once with a domain-validated
+Entry, retry with the same id, Editar hand-off, clarification chips, Reintentar, the
+fixture banner that never writes, autoscroll gating, Reduce Motion, New chat) and
+`assistant-ui.node.ts` (composer labels and states, keyboard-tracking structure, draft
+card rows and gaps, chips, thinking pulse under Reduce Motion, evidence rendering), plus
+the four-column quick actions guard in `motion.node.ts`. These are **not** native rendering/gesture tests;
 use the physical checklist. The root suite also tests the shared monthly summary
 and spending report, including exact category-to-entry reconciliation.
 
@@ -360,7 +391,7 @@ For the intermittent black-tab report, update to `master`, restart with
 and repeat the **Interfaz 02** tab checks, **Interfaz 03** report checks and
 **Interfaz 04/05** correction/recovery and transfer checks, plus **Interfaz 06** daily/comparison reports and **Interfaz 08** recurring/upcoming
 checks, plus **Interfaz 10** cards/debts and five-tab checks and **Interfaz 11** Home,
-Movimientos and detail checks, **Interfaz 12** form checks, **Interfaz 13** Reportes checks, **Interfaz 14** budgets/recurring/accounts checks, **Interfaz 15** motion checks, **Interfaz 16** cohesion checks, **Interfaz 17** identity and money-input checks **Producto 18** Más / Tarjetas / amount-shortcut checks, **Producto 19** budget checks and **Producto 20** account/category identity checks. The current footer (Más) says Producto 20.
+Movimientos and detail checks, **Interfaz 12** form checks, **Interfaz 13** Reportes checks, **Interfaz 14** budgets/recurring/accounts checks, **Interfaz 15** motion checks, **Interfaz 16** cohesion checks, **Interfaz 17** identity and money-input checks **Producto 18** Más / Tarjetas / amount-shortcut checks, **Producto 19** budget checks, **Producto 20** account/category identity checks and **Producto 21** Assistant checks. The current footer (Más) says Producto 21.
 Before updating, save a private pilot copy; do not uninstall or add fake movements.
 
 If a storage/refresh error occurs, the form retains the exact submitted command
@@ -393,6 +424,9 @@ npm run check:repo
 
 - `app/`: Expo Router routes, tabs, detail screens and native modal forms.
 - `src/ui/`: shared theme, accessible controls and restrained motion.
+- `src/assistant/`: the Assistant conversation model, client boundary, runtime selection
+  and test fixtures (no React, no network in the model).
+- `src/integrations/`: the HTTPS integration client and the on-device evidence builder.
 - `src/storage/`: SQLite repository and React data provider.
 - `../../packages/domain`: pure typed financial helpers, with legacy helpers reused.
 - `app.config.ts`: isolated app identities, plugins and optional real Expo project ID.
