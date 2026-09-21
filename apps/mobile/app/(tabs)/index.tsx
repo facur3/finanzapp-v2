@@ -5,12 +5,17 @@ import { currentMonthISO, formatMinorUnits, hiddenLiabilityAccountIds, liquidTot
   summarizeMonthlyBudgets, type Currency, type SpendingWindow } from '@finanzapp/domain';
 import { useLedger } from '../../src/storage/LedgerProvider';
 import { ActionButton, AppText, Choices, EmptyState, EntryActions, EntryRow, Money, Screen, SectionTitle, Surface } from '../../src/ui/components';
-import { BudgetHomeCard, CategoryHomeRow, UpcomingRecurringRow } from '../../src/ui/home-modules';
+import { assignCategoryHues } from '../../src/ui/category-color';
+import { BudgetHomeCard, CategoryComposition, MetricHelp, UpcomingRecurringRow } from '../../src/ui/home-modules';
+import { Reflow, ValueTransition } from '../../src/ui/motion';
 import { availableCurrencies, selectEntries } from '../../src/ui/presentation';
 import { periodLabel } from '../../src/ui/spending-timeline';
 import { space, useCurrentDay, usePalette } from '../../src/ui/theme';
 
 type HomeMetric = 'spending' | 'available';
+
+const AVAILABLE_HELP = 'Es el dinero registrado en tus cuentas de esta moneda: saldo inicial más ingresos, menos gastos y transferencias. '
+  + 'No incluye tarjetas ni deudas, y no es un saldo bancario ni tu patrimonio.';
 
 /** Home answers one question at a time: how much did I spend this period, or
  * how much recorded money do I have. Analysis lives in Reportes; cards in Tarjetas. */
@@ -25,6 +30,7 @@ export default function HomeScreen() {
   const currency = currencies.includes(selectedCurrency) ? selectedCurrency : currencies[0] ?? 'ARS';
   const period = useMemo(() => spendingWindow(currency, window, day), [currency, window, day]);
   const summary = useMemo(() => snapshot ? spendingOverview(snapshot, period) : null, [snapshot, period]);
+  const hues = useMemo(() => assignCategoryHues(snapshot?.entries ?? []), [snapshot?.entries]);
   // Disponible is recorded liquid money: cards, debts and receivables are never netted into it.
   const available = useMemo(() => {
     if (!snapshot) return { status: 'ready' as const, minor: 0 };
@@ -50,13 +56,13 @@ export default function HomeScreen() {
   const accountCount = snapshot.accounts.filter(account => account.currency === currency && !hidden.has(account.id)).length;
   const openReport = () => router.navigate({ pathname: '/reports', params: { currency } });
   const spending = metric === 'spending';
-  const topCategories = summary.categories.slice(0, 3);
+  const heroId = `${metric}|${currency}|${spending ? period.startISO + period.endISO : ''}`;
 
   return <Screen gap={space.xxl}>
     {!snapshot.accounts.length ? <EmptyState title="Entendé tus gastos."
       detail="Elegí una cuenta para agrupar tus movimientos. Podés empezar sin cargar tu saldo bancario."
       icon="receipt-outline" action={<ActionButton label="Empezar" icon="add-outline" onPress={() => router.push('/new-account')} />} /> : <>
-      <View style={{ gap: space.xl }}>
+      <Reflow style={{ gap: space.xl }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
           <View style={{ flex: 1, maxWidth: 232 }}>
             <Choices value={metric} onChange={setMetric}
@@ -66,10 +72,11 @@ export default function HomeScreen() {
             options={currencies.map(value => ({ value, label: value }))} />}
         </View>
 
-        <View style={{ gap: 8 }}>
-          <AppText secondary variant="eyebrow">
-            {spending ? `Gastado · ${periodLabel(period)}` : 'Disponible · saldo registrado'}
-          </AppText>
+        <ValueTransition id={heroId} style={{ gap: 8 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
+            <AppText secondary variant="eyebrow">{spending ? `Gastado · ${periodLabel(period)}` : 'Disponible · saldo registrado'}</AppText>
+            {!spending && <MetricHelp title="Disponible" detail={AVAILABLE_HELP} />}
+          </View>
           {spending ? summary.status === 'ready'
             ? <Money minor={summary.expenseMinor} currency={currency} large />
             : <AppText secondary variant="subhead">El total supera el rango que podemos mostrar con precisión. Tus movimientos siguen guardados.</AppText>
@@ -81,50 +88,44 @@ export default function HomeScreen() {
               ? summary.status === 'ready'
                 ? `${summary.expenseCount} ${summary.expenseCount === 1 ? 'gasto registrado' : 'gastos registrados'}${summary.incomeMinor > 0 ? ` · ingresos ${currency === 'USD' ? 'US$ ' : '$ '}${formatMinorUnits(summary.incomeMinor)}` : ''}`
                 : currency
-              : `${accountCount} ${accountCount === 1 ? 'cuenta' : 'cuentas'} · no es saldo bancario ni patrimonio`}
+              : `${accountCount} ${accountCount === 1 ? 'cuenta de dinero' : 'cuentas de dinero'}`}
           </AppText>
-        </View>
+        </ValueTransition>
 
-        {spending && <View style={{ maxWidth: 232 }}>
+        {spending && <Reflow fade style={{ maxWidth: 232 }}>
           <Choices value={window} onChange={setWindow} options={[{ value: 'week', label: 'Esta semana' }, { value: 'month', label: 'Este mes' }]} />
-        </View>}
-      </View>
+        </Reflow>}
+      </Reflow>
 
-      <EntryActions currency={currency} />
+      <Reflow><EntryActions currency={currency} /></Reflow>
 
-      {monthBudget !== null && monthBudget.rows.length > 0 && <View>
+      {monthBudget !== null && monthBudget.rows.length > 0 && <Reflow fade>
         <SectionTitle action="Ver" onAction={() => router.push({ pathname: '/budgets', params: { currency } })}>Presupuesto del mes</SectionTitle>
         <BudgetHomeCard summary={monthBudget} />
-      </View>}
+      </Reflow>}
 
-      <View>
+      <Reflow>
         <SectionTitle action="Reportes" onAction={openReport}>En qué gastaste</SectionTitle>
-        {topCategories.length ? <Surface grouped>
-          {topCategories.map((category, index) => <CategoryHomeRow key={category.key} category={category}
-            totalMinor={summary.status === 'ready' ? summary.expenseMinor : 0} currency={currency}
-            last={index === topCategories.length - 1}
-            onPress={() => router.push({ pathname: '/spending-detail', params: { ...period, category: category.key } })} />)}
-        </Surface> : <AppText secondary variant="subhead">
-          {summary.status === 'ready' ? 'Tus categorías aparecerán cuando registres un gasto en este período.' : 'El desglose está disponible en tus movimientos.'}
-        </AppText>}
-        {summary.categories.length > 3 && <AppText tertiary variant="caption" style={{ paddingTop: 8, paddingHorizontal: 4 }}>
-          Las 3 principales de {summary.categories.length} categorías · el resto está en Reportes.
-        </AppText>}
-      </View>
+        {summary.categories.length && summary.status === 'ready' ? <CategoryComposition categories={summary.categories} totalMinor={summary.expenseMinor}
+          currency={currency} hues={hues} onPressOthers={openReport}
+          onPressCategory={category => router.push({ pathname: '/spending-detail', params: { ...period, category: category.key } })} />
+          : <AppText secondary variant="subhead">
+            {summary.status === 'ready' ? 'Tus categorías aparecerán cuando registres un gasto en este período.' : 'El desglose está disponible en tus movimientos.'}
+          </AppText>}
+      </Reflow>
 
-      <View>
-        <SectionTitle action={upcoming.length ? 'Ver todos' : 'Programar'} onAction={() => router.push(upcoming.length ? '/recurring' : '/new-recurring')}>Próximos compromisos</SectionTitle>
-        {upcoming.length ? <Surface grouped>{upcoming.map((rule, index) => <UpcomingRecurringRow key={rule.id} rule={rule}
+      {upcoming.length > 0 && <Reflow fade>
+        <SectionTitle action="Ver todos" onAction={() => router.push('/recurring')}>Próximos compromisos</SectionTitle>
+        <Surface grouped>{upcoming.map((rule, index) => <UpcomingRecurringRow key={rule.id} rule={rule}
           account={snapshot.accounts.find(account => account.id === rule.accountId)!} day={day} last={index === upcoming.length - 1} />)}</Surface>
-          : <AppText secondary variant="subhead">Alquiler, suscripciones o un sueldo: programalos una vez y FinanzApp los registra al vencer.</AppText>}
-      </View>
+      </Reflow>}
 
-      <View>
+      <Reflow>
         <SectionTitle action="Ver todos" onAction={() => router.navigate('/activity')}>Últimos movimientos</SectionTitle>
-        {recent.length ? <Surface grouped>{recent.map((entry, index) => <EntryRow key={entry.id} entry={entry}
-          account={snapshot.accounts.find(a => a.id === entry.accountId)!} last={index === recent.length - 1} />)}</Surface>
+        {recent.length ? <Surface grouped>{recent.map((entry, index) => <Reflow key={entry.id} fade><EntryRow entry={entry}
+          account={snapshot.accounts.find(a => a.id === entry.accountId)!} last={index === recent.length - 1} /></Reflow>)}</Surface>
           : <AppText secondary variant="subhead">Todavía no hay movimientos registrados en este período.</AppText>}
-      </View>
+      </Reflow>
     </>}
   </Screen>;
 }

@@ -59,6 +59,7 @@ function harness(file: string, params: Record<string, unknown> = {}, data: domai
     '../src/ui/presentation': presentation, '../../src/ui/presentation': presentation,
     '../src/ui/theme': theme, '../../src/ui/theme': theme,
     '../src/ui/liability-rows': { DebtRow: 'DebtRow' }, '../../src/ui/liability-rows': { DebtRow: 'DebtRow' },
+    '../src/ui/motion': { ValueTransition: 'ValueTransition', Reflow: 'Reflow', selectionHaptic: () => {}, impactHaptic: () => {}, timing: (kind: string, reduced: boolean) => ({ duration: reduced ? 0 : 260 }) }, '../../src/ui/motion': { ValueTransition: 'ValueTransition', Reflow: 'Reflow', selectionHaptic: () => {}, impactHaptic: () => {}, timing: (kind: string, reduced: boolean) => ({ duration: reduced ? 0 : 260 }) },
   };
   const module = { exports: {} as { default?: () => Node } };
   runInNewContext(code, { module, exports: module.exports, require: (name: string) => {

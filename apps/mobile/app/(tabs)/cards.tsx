@@ -8,6 +8,7 @@ import { ActionButton, AppText, EmptyState, GlyphTile, Money, MovementRow, Scree
 import { CardCarousel, CardFace } from '../../src/ui/card-visual';
 import { DebtRow } from '../../src/ui/liability-rows';
 import { activeCards, daysUntil, usageTone, type CardSummary } from '../../src/ui/liability-presentation';
+import { ValueTransition, timing } from '../../src/ui/motion';
 import { mergeActivity } from '../../src/ui/presentation';
 import { space, useCurrentDay, usePalette, useReduceMotion } from '../../src/ui/theme';
 
@@ -32,7 +33,7 @@ export default function CardsScreen() {
               currency={item.account.currency} width={width} accessibilityHint="Abre el detalle de la tarjeta"
               onPress={() => router.push({ pathname: '/card/[id]', params: { id: item.card.id } })} />} />
         </View>
-        {selected && <CardPanel key={selected.card.id} summary={selected} day={day} />}
+        {selected && <ValueTransition id={selected.card.id} variant="fade"><CardPanel key={selected.card.id} summary={selected} day={day} /></ValueTransition>}
       </>}
 
     <View>
@@ -122,7 +123,7 @@ function UsageBar({ usage, tone, label }: { usage: number; tone: 'neutral' | 'wa
   const p = usePalette();
   const reduced = useReduceMotion();
   const progress = useSharedValue(Math.min(1, usage));
-  useEffect(() => { progress.value = withTiming(Math.min(1, usage), { duration: reduced ? 0 : 360 }); }, [usage, reduced, progress]);
+  useEffect(() => { progress.value = withTiming(Math.min(1, usage), timing('data', reduced)); }, [usage, reduced, progress]);
   const bar = useAnimatedStyle(() => ({ width: `${progress.value === 0 ? 0 : Math.max(1.5, progress.value * 100)}%` as `${number}%` }));
   const fill = tone === 'neutral' ? p.text : toneColors(p, tone).color;
   return <View style={{ gap: 6 }}>

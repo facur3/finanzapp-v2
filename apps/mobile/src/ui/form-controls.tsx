@@ -5,6 +5,7 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import type { Account, Entry, EntryKind } from '@finanzapp/domain';
 import { AppText, CategoryBadge, DetailRow, Field, GlyphTile, PressFeedback, surfaceShadow, type IconName, type Tone } from './components';
+import { selectionHaptic } from './motion';
 import { radius, usePalette, useReduceMotion } from './theme';
 import { categoryChoices, categoryIcon, categoryKey, customCategory } from './categories';
 
@@ -74,7 +75,7 @@ export function AccountField({ accounts, value, onChange, disabled = false, labe
     <SelectionSheet visible={visible} title={label === 'Cuenta' ? 'Elegir cuenta' : label} onClose={() => setVisible(false)}>
       <FlatList data={accounts} keyExtractor={account => account.id} contentContainerStyle={{ padding: 20, paddingTop: 0 }}
         renderItem={({ item }) => <PressFeedback accessibilityRole="button" accessibilityState={{ selected: value === item.id }}
-          accessibilityLabel={item.name + ', ' + kind(item.id) + ', ' + item.currency} onPress={() => { onChange(item.id); setVisible(false); }}
+          accessibilityLabel={item.name + ', ' + kind(item.id) + ', ' + item.currency} onPress={() => { if (item.id !== value) selectionHaptic(); onChange(item.id); setVisible(false); }}
           style={{ flexDirection: 'row', alignItems: 'center', padding: 14, gap: 14, backgroundColor: p.surface, borderRadius: 16, marginBottom: 8 }}>
           <GlyphTile icon={icon(item.id)} />
           <View style={{ flex: 1, gap: 3 }}><AppText style={{ fontWeight: '600' }}>{item.name}</AppText>
@@ -120,7 +121,7 @@ export function CategoryField({ entries, kind, value, onChange, disabled = false
   const [query, setQuery] = useState('');
   const choices = useMemo(() => categoryChoices(entries, kind, query, value), [entries, kind, query, value]);
   const custom = customCategory(query, choices);
-  const choose = (category: string) => { Keyboard.dismiss(); onChange(category); setVisible(false); };
+  const choose = (category: string) => { Keyboard.dismiss(); if (categoryKey(category) !== categoryKey(value)) selectionHaptic(); onChange(category); setVisible(false); };
   const open = () => { Keyboard.dismiss(); setQuery(''); setVisible(true); };
   return <>
     {prominent ? <SelectorCard label="Categoría" value={value || undefined} placeholder="Elegir categoría" detail={detail} detailTone={detailTone}

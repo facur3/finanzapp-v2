@@ -1,49 +1,66 @@
 import { useEffect, useMemo } from 'react';
 import { StyleSheet, View } from 'react-native';
-import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
+import Animated, { useAnimatedProps, useAnimatedStyle, useSharedValue, withTiming, type SharedValue } from 'react-native-reanimated';
 import Svg, { Circle, Path } from 'react-native-svg';
 import { AppText, Money, PressFeedback } from './components';
+import { categoryColor, othersColor } from './category-color';
+import { ValueTransition, duration, timing } from './motion';
 import { usePalette, useReduceMotion, type Palette } from './theme';
 import type { Currency } from '@finanzapp/domain';
 
-/** Share is rank, not identity: one ink hue in five lightness steps, largest
- * first. Names live in the legend rows, so colour is never the only cue. */
-export function inkRamp(p: Palette): string[] {
-  return p.isDark ? ['#F5F5F7', '#C4C4CB', '#93939B', '#66666E', '#43434A'] : ['#0A0A0C', '#3C3C42', '#6E7078', '#A0A2AA', '#CBCBD2'];
-}
 export const OTHERS_KEY = '__others__';
 
 export type DonutSlice = { key: string; label: string; value: number };
 
 /** Groups the tail of a ranked list into "Otras" so the donut keeps at most
- * five readable slices. Returns the same shape with a colour per slice. */
-export function donutSlices(items: DonutSlice[], p: Palette, max = 5): (DonutSlice & { color: string; count?: number })[] {
-  const ramp = inkRamp(p);
-  const head = items.slice(0, items.length > max ? max - 1 : max).map((item, index) => ({ ...item, color: ramp[index] }));
+ * five readable slices. Each named slice takes its category hue; the tail is
+ * neutral because it is not one category. */
+export function donutSlices(items: DonutSlice[], p: Palette, hues: Map<string, number>, max = 5): (DonutSlice & { color: string; count?: number })[] {
+  const head = items.slice(0, items.length > max ? max - 1 : max).map(item => ({ ...item, color: categoryColor(item.key, hues, p) }));
   const tail = items.slice(head.length);
   if (!tail.length) return head;
-  return [...head, { key: OTHERS_KEY, label: 'Otras', value: tail.reduce((sum, item) => sum + item.value, 0), color: ramp[max - 1], count: tail.length }];
+  return [...head, { key: OTHERS_KEY, label: 'Otras', value: tail.reduce((sum, item) => sum + item.value, 0), color: othersColor(p), count: tail.length }];
 }
 
 function arcPath(cx: number, cy: number, radius: number, startAngle: number, endAngle: number): string {
+  'worklet';
+  if (endAngle <= startAngle) return '';
+  // A single full slice needs two arcs; SVG cannot draw a 360° arc in one command.
+  if (endAngle - startAngle >= Math.PI * 2 - 1e-6) {
+    const half = startAngle + Math.PI;
+    return arcPath(cx, cy, radius, startAngle, half) + ' ' + arcPath(cx, cy, radius, half, startAngle + Math.PI * 2 - 1e-4);
+  }
   const start = { x: cx + radius * Math.cos(startAngle), y: cy + radius * Math.sin(startAngle) };
   const end = { x: cx + radius * Math.cos(endAngle), y: cy + radius * Math.sin(endAngle) };
   const large = endAngle - startAngle > Math.PI ? 1 : 0;
   return `M ${start.x} ${start.y} A ${radius} ${radius} 0 ${large} 1 ${end.x} ${end.y}`;
 }
 
+const AnimatedPath = Animated.createAnimatedComponent(Path);
+
+/** One slice drawn up to the sweep clock: as `progress` goes 0 → 1 the clock
+ * hand travels once around from twelve, and each slice appears in turn. The
+ * static `d` is the finished arc, so the chart is complete even if the
+ * animated prop never applies. */
+function Slice({ cx, radius, start, end, color, thickness, progress }: {
+  cx: number; radius: number; start: number; end: number; color: string; thickness: number; progress: SharedValue<number>;
+}) {
+  const animatedProps = useAnimatedProps(() => {
+    const hand = -Math.PI / 2 + progress.value * Math.PI * 2;
+    return { d: arcPath(cx, cx, radius, start, Math.min(end, hand)) };
+  });
+  return <AnimatedPath d={arcPath(cx, cx, radius, start, end)} animatedProps={animatedProps} stroke={color} strokeWidth={thickness} fill="none" strokeLinecap="butt" />;
+}
+
 /** Category donut with a 2 px gap between slices and the total in the middle.
- * The chart fades in on data changes; Reduce Motion shows it immediately. */
+ * New data sweeps in clockwise (480 ms) while the previous chart fades out;
+ * Reduce Motion shows the finished chart at once. */
 export function DonutChart({ slices, total, currency, size = 176, thickness = 22, caption }: {
   slices: (DonutSlice & { color: string })[]; total: number; currency: Currency; size?: number; thickness?: number; caption: string;
 }) {
   const p = usePalette();
-  const reduced = useReduceMotion();
   const signature = slices.map(slice => slice.key + ':' + slice.value).join('|');
-  const opacity = useSharedValue(reduced ? 1 : 0);
-  useEffect(() => { opacity.value = 0; opacity.value = withTiming(1, { duration: reduced ? 0 : 320 }); }, [signature, reduced, opacity]);
-  const fade = useAnimatedStyle(() => ({ opacity: opacity.value }));
-  const paths = useMemo(() => {
+  const arcs = useMemo(() => {
     const sum = slices.reduce((acc, slice) => acc + slice.value, 0);
     if (sum <= 0) return [];
     const radius = (size - thickness) / 2;
@@ -53,25 +70,29 @@ export function DonutChart({ slices, total, currency, size = 176, thickness = 22
       const sweep = (slice.value / sum) * Math.PI * 2;
       const start = angle + gap / 2, end = angle + sweep - gap / 2;
       angle += sweep;
-      if (end <= start) return { key: slice.key, d: '', color: slice.color };
-      // A single full slice needs two arcs; SVG cannot draw a 360° arc in one command.
-      const d = sweep >= Math.PI * 2 - 1e-6
-        ? arcPath(size / 2, size / 2, radius, start, start + Math.PI) + ' ' + arcPath(size / 2, size / 2, radius, start + Math.PI, start + Math.PI * 2 - 1e-4)
-        : arcPath(size / 2, size / 2, radius, start, end);
-      return { key: slice.key, d, color: slice.color };
+      return { key: slice.key, start, end, color: slice.color, radius };
     });
   }, [slices, size, thickness]);
   const label = slices.map(slice => `${slice.label} ${Math.round(slice.value / Math.max(1, total) * 100)} %`).join(', ');
-  return <Animated.View accessible accessibilityRole="image" accessibilityLabel={`${caption}: ${label}`} style={[{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }, fade]}>
-    <Svg width={size} height={size}>
-      <Circle cx={size / 2} cy={size / 2} r={(size - thickness) / 2} stroke={p.inset} strokeWidth={thickness} fill="none" />
-      {paths.map(path => path.d ? <Path key={path.key} d={path.d} stroke={path.color} strokeWidth={thickness} fill="none" strokeLinecap="butt" /> : null)}
-    </Svg>
+  return <ValueTransition id={signature} variant="fade" style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
+    <View accessible accessibilityRole="image" accessibilityLabel={`${caption}: ${label}`} style={{ width: size, height: size }}>
+      <Sweep key={signature} arcs={arcs} size={size} thickness={thickness} ring={p.inset} />
+    </View>
     <View pointerEvents="none" style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center', gap: 2, paddingHorizontal: thickness + 8 }]}>
       <AppText secondary variant="caption" style={{ fontWeight: '500' }}>{caption}</AppText>
       <Money minor={total} currency={currency} size={size >= 176 ? 20 : 17} weight="700" />
     </View>
-  </Animated.View>;
+  </ValueTransition>;
+}
+
+function Sweep({ arcs, size, thickness, ring }: { arcs: { key: string; start: number; end: number; color: string; radius: number }[]; size: number; thickness: number; ring: string }) {
+  const reduced = useReduceMotion();
+  const progress = useSharedValue(reduced ? 1 : 0);
+  useEffect(() => { progress.value = reduced ? 1 : withTiming(1, timing('reveal', false)); }, [reduced, progress]);
+  return <Svg width={size} height={size}>
+    <Circle cx={size / 2} cy={size / 2} r={(size - thickness) / 2} stroke={ring} strokeWidth={thickness} fill="none" />
+    {arcs.map(arc => arc.end > arc.start ? <Slice key={arc.key} cx={size / 2} radius={arc.radius} start={arc.start} end={arc.end} color={arc.color} thickness={thickness} progress={progress} /> : null)}
+  </Svg>;
 }
 
 const MONTHS = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
@@ -83,6 +104,7 @@ export function MonthBars({ points, selected, onSelect, currency, height = 120 }
   points: { monthISO: string; amountMinor: number; partial: boolean }[]; selected: string; onSelect: (monthISO: string) => void; currency: Currency; height?: number;
 }) {
   const p = usePalette();
+  const reduced = useReduceMotion();
   const max = Math.max(...points.map(point => point.amountMinor), 1);
   const current = points.find(point => point.monthISO === selected);
   return <View style={{ gap: 8 }}>
@@ -91,9 +113,10 @@ export function MonthBars({ points, selected, onSelect, currency, height = 120 }
         onPress={() => onSelect(point.monthISO)} currency={currency} height={height} />)}
     </View>
     <View style={{ flexDirection: 'row', gap: 6 }}>
-      {points.map(point => <AppText key={point.monthISO} variant="caption" style={{ flex: 1, textAlign: 'center', fontWeight: point.monthISO === selected ? '600' : '400', color: point.monthISO === selected ? p.text : p.secondary }}>
+      {points.map(point => <Animated.Text key={point.monthISO} style={{ flex: 1, fontSize: 12, lineHeight: 16, textAlign: 'center', fontWeight: point.monthISO === selected ? '600' : '400',
+        color: point.monthISO === selected ? p.text : p.secondary, transitionProperty: 'color', transitionDuration: reduced ? 0 : duration.state }}>
         {MONTHS[Number(point.monthISO.slice(5, 7)) - 1]}
-      </AppText>)}
+      </Animated.Text>)}
     </View>
     {current && <AppText secondary variant="caption" style={{ textAlign: 'center' }}>
       {current.partial ? 'Mes en curso hasta hoy' : 'Mes completo'} · escala de 0 a {currency === 'USD' ? 'US$ ' : '$ '}{(max / 100).toLocaleString('es-AR', { maximumFractionDigits: 0 })}
@@ -107,11 +130,12 @@ function Bar({ point, fraction, selected, onPress, currency, height }: {
   const p = usePalette();
   const reduced = useReduceMotion();
   const value = useSharedValue(fraction);
-  useEffect(() => { value.value = withTiming(fraction, { duration: reduced ? 0 : 280 }); }, [fraction, reduced, value]);
+  useEffect(() => { value.value = withTiming(fraction, timing('data', reduced)); }, [fraction, reduced, value]);
   const style = useAnimatedStyle(() => ({ height: Math.max(point.amountMinor > 0 ? 3 : 0, value.value * (height - 4)) }));
   return <PressFeedback accessibilityRole="button" accessibilityState={{ selected }}
     accessibilityLabel={`${MONTHS[Number(point.monthISO.slice(5, 7)) - 1]} ${point.monthISO.slice(0, 4)}, ${(point.amountMinor / 100).toLocaleString('es-AR', { minimumFractionDigits: 2 })} ${currency}${point.partial ? ', mes en curso' : ''}`}
     onPress={onPress} containerStyle={{ flex: 1 }} style={{ height, justifyContent: 'flex-end', minHeight: undefined }}>
-    <Animated.View style={[{ borderRadius: 6, backgroundColor: selected ? p.text : p.inset, borderWidth: point.partial ? StyleSheet.hairlineWidth * 2 : 0, borderColor: p.secondary }, style]} />
+    <Animated.View style={[{ borderRadius: 6, backgroundColor: selected ? p.text : p.inset, borderWidth: point.partial ? StyleSheet.hairlineWidth * 2 : 0, borderColor: p.secondary,
+      transitionProperty: 'backgroundColor', transitionDuration: reduced ? 0 : duration.state }, style]} />
   </PressFeedback>;
 }

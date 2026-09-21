@@ -1,5 +1,18 @@
 # Physical iPhone acceptance checklist
 
+## Interfaz 15 — motion system, Home composition and category colour (pending device review)
+
+- [ ] Ajustes footer reads Interfaz 15; no data changes after updating.
+- [ ] Segmented controls (Gastos / Disponible, Esta semana / Este mes, currency, Reportes views, Movimientos filters, form kind) slide one thumb to the chosen segment with a light selection tick; tapping the current value does nothing; a fast double switch reverses mid-slide without a jump.
+- [ ] Home: switching metric, period or currency crossfades the hero (old fades, new rises slightly); the period control fades in/out and the sections below slide rather than jump; the composition bar re-proportions smoothly.
+- [ ] Home shows the stacked composition bar and top three categories with a coloured dot; "Otras N categorías" opens Reportes; the Disponible ⓘ button opens the definition and no disclaimer copy appears on screen.
+- [ ] Without recurring rules, no "Próximos compromisos" block exists on Home; with a rule it appears with "Ver todos".
+- [ ] Reportes: changing month (arrows, Este mes, a trend bar) crossfades the total and sweeps the donut clockwise from twelve while the previous one fades; the donut is complete after the sweep and slice colours match the legend dots and Home's bar.
+- [ ] Tarjetas: neighbouring cards step back while swiping; settling on another card ticks once and the panel crossfades; page dots transition.
+- [ ] Choosing a category or account in a form ticks once; choosing the same one again does not.
+- [ ] Reduce Motion on: no thumb slide, no hero rise, donut appears finished, cards stay flat, values still update instantly; haptics still fire.
+- [ ] Both themes at 60 and 120 Hz: no dropped frames while scrolling Home with the composition bar visible; large text keeps rows readable.
+
 ## Interfaz 14 — Presupuestos, Recurrentes and Cuentas polish (pending device review)
 
 - [ ] Ajustes footer reads Interfaz 14; no data changes after updating.

@@ -1,9 +1,12 @@
 import type { ReactNode } from 'react';
-import { FlatList, StyleSheet, Text, View, useWindowDimensions, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native';
+import { StyleSheet, Text, View, useWindowDimensions, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native';
+import Animated, { Extrapolation, interpolate, useAnimatedScrollHandler, useAnimatedStyle, useSharedValue, type SharedValue } from 'react-native-reanimated';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import type { Currency } from '@finanzapp/domain';
 import { PressFeedback } from './components';
-import { radius, space, usePalette } from './theme';
+import { carouselIndex } from './geometry';
+import { duration, selectionHaptic } from './motion';
+import { radius, space, usePalette, useReduceMotion } from './theme';
 
 /** Card faces use a small curated set of deep, calm tones chosen per card by a
  * stable hash of its id, so a card keeps its colour across sessions and devices. */
@@ -49,31 +52,49 @@ export function CardFace({ id, name, issuer, last4, currency, width, onPress, ac
   return onPress ? <PressFeedback accessible={false} onPress={onPress} style={{ minHeight: undefined }}>{body}</PressFeedback> : body;
 }
 
-/** Horizontal, snapping card stack. The selected index follows the scroll
- * position; the card content below the carousel reacts to it. */
+/** Horizontal, snapping card stack. Scroll position lives on the UI thread:
+ * neighbouring cards step back (0.94 scale, 0.7 opacity) as the finger moves,
+ * with no React render per frame. The selected index settles once the scroll
+ * ends and ticks a selection haptic; Reduce Motion keeps every card flat. */
 export function CardCarousel<T extends { id: string }>({ items, render, onSelect, selectedIndex }: {
   items: T[]; render: (item: T, width: number) => ReactNode; onSelect: (index: number) => void; selectedIndex: number;
 }) {
   const p = usePalette();
+  const reduced = useReduceMotion();
   const { width: windowWidth } = useWindowDimensions();
   const width = Math.min(windowWidth - space.xl * 2, 420);
   const gap = space.m;
+  const step = width + gap;
+  const scrollX = useSharedValue(0);
+  const onScroll = useAnimatedScrollHandler({ onScroll: event => { scrollX.value = event.contentOffset.x; } });
   const settle = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const index = Math.round(event.nativeEvent.contentOffset.x / (width + gap));
-    const next = Math.max(0, Math.min(items.length - 1, index));
-    if (next !== selectedIndex) onSelect(next);
+    const next = carouselIndex(event.nativeEvent.contentOffset.x, step, items.length);
+    if (next !== selectedIndex) { selectionHaptic(); onSelect(next); }
   };
   return <View style={{ gap: space.m }}>
-    <FlatList data={items} keyExtractor={item => item.id} horizontal showsHorizontalScrollIndicator={false}
-      snapToInterval={width + gap} snapToAlignment="start" decelerationRate="fast" disableIntervalMomentum
+    <Animated.FlatList data={items} keyExtractor={item => item.id} horizontal showsHorizontalScrollIndicator={false}
+      snapToInterval={step} snapToAlignment="start" decelerationRate="fast" disableIntervalMomentum
       contentContainerStyle={{ paddingHorizontal: space.xl, gap }}
-      onMomentumScrollEnd={settle} onScrollEndDrag={settle} scrollEventThrottle={32} onScroll={settle}
-      getItemLayout={(_, index) => ({ length: width + gap, offset: (width + gap) * index, index })}
-      renderItem={({ item }) => <View style={{ width }}>{render(item, width)}</View>} />
+      onScroll={onScroll} scrollEventThrottle={16} onMomentumScrollEnd={settle} onScrollEndDrag={settle}
+      getItemLayout={(_, index) => ({ length: step, offset: step * index, index })}
+      renderItem={({ item, index }) => <CarouselItem index={index} step={step} width={width} scrollX={scrollX} flat={reduced}>{render(item, width)}</CarouselItem>} />
     {items.length > 1 && <View accessible accessibilityLabel={`Tarjeta ${selectedIndex + 1} de ${items.length}`} style={styles.dots}>
-      {items.map((item, index) => <View key={item.id} style={[styles.dot, { backgroundColor: index === selectedIndex ? p.text : p.line }]} />)}
+      {items.map((item, index) => <Animated.View key={item.id} style={[styles.dot, { backgroundColor: index === selectedIndex ? p.text : p.line,
+        transitionProperty: 'backgroundColor', transitionDuration: reduced ? 0 : duration.state }]} />)}
     </View>}
   </View>;
+}
+
+function CarouselItem({ index, step, width, scrollX, flat, children }: {
+  index: number; step: number; width: number; scrollX: SharedValue<number>; flat: boolean; children: ReactNode;
+}) {
+  const style = useAnimatedStyle(() => {
+    if (flat) return { opacity: 1, transform: [{ scale: 1 }] };
+    const input = [(index - 1) * step, index * step, (index + 1) * step];
+    return { opacity: interpolate(scrollX.value, input, [0.7, 1, 0.7], Extrapolation.CLAMP),
+      transform: [{ scale: interpolate(scrollX.value, input, [0.94, 1, 0.94], Extrapolation.CLAMP) }] };
+  });
+  return <Animated.View style={[{ width }, style]}>{children}</Animated.View>;
 }
 
 const styles = StyleSheet.create({
