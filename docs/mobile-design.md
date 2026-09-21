@@ -63,16 +63,32 @@ un punto tecleado en un teclado en-US es separador decimal; "2,000.50" o
 "2.000.000,50" pegados se normalizan; borrar sobre un punto de agrupación borra el
 dígito anterior; una selección se reemplaza; como máximo trece cifras enteras (el
 rango seguro); al salir del campo "2.000,5" se completa a "2.000,50". Es solo
-presentación: cada cambio se interpreta como una edición del texto anterior
-(`src/ui/money-input.ts`), la cadena mostrada sigue pasando por `parseMinorUnits`
-y el módulo no crea ningún número flotante. El cursor queda en manos de iOS, que
-conserva su distancia al final del texto cuando aparece un punto a la izquierda.
-La caja del campo se calcula en JavaScript a partir del ancho medido de la fila
-(`amountFieldLayout` en `src/ui/geometry.ts`): ancho estimado del texto en cifras
-tabulares más 8 pt de margen a cada lado y 4 pt para el cursor, y el tamaño (46 pt)
-baja solo cuando el importe no cabe en la fila junto al símbolo, nunca por cantidad
-de caracteres. El campo no lleva tracking negativo: en iOS dibuja el último glifo
-más allá del ancho medido y el cursor lo pisa (el "3.000" recortado del iPhone).
+presentación: la cadena mostrada sigue pasando por `parseMinorUnits` y el módulo
+no crea ningún número flotante.
+
+El modelo (`src/ui/money-input.ts`) es un estado canónico, nunca la cadena mostrada:
+signo · cifras enteras · coma decimal opcional · decimales · cursor lógico (un
+índice dentro de "-1234,5", que la agrupación no puede mover). De ese estado se
+derivan el texto y el índice del cursor en pantalla. Cada evento nativo trae el
+texto nuevo y el cursor nativo; se leen al estado a partir de las cifras y la coma
+(un punto es agrupación salvo que sea entrada explícita: un punto más de los que
+había en pantalla, o un pegado cuyos separadores lo indiquen), y el texto y la
+selección se devuelven al campo en una sola actualización controlada. Por eso una
+tecla que llega cuando el campo nativo todavía muestra el texto sin formatear lee
+las mismas cifras, y un punto que FinanzApp insertó nunca se convierte en decimal.
+No se confía en que iOS conserve el cursor: la selección se sigue con
+`onSelectionChange` (ignorando los eventos que describen un texto distinto del
+mostrado) y se controla con `selection`.
+
+La caja del campo es estable: el campo ocupa toda la fila con márgenes fijos
+(`amountFieldLayout` en `src/ui/geometry.ts`: a la izquierda el símbolo y su
+separación, a la derecha el cursor), centra el texto de forma nativa y el símbolo
+se coloca junto al borde izquierdo del texto por aritmética (se desliza medio
+avance por cifra, como ese borde). Al escribir no cambia el tamaño de la caja ni
+se recentra nada; solo baja el tamaño de letra (desde 46 pt) cuando el importe no
+cabe entre los márgenes, nunca por cantidad de caracteres. El campo no lleva
+tracking negativo: en iOS dibuja el último glifo más allá del ancho medido y el
+cursor lo pisa (el "3.000" recortado del iPhone).
 
 **Títulos de pantalla.** Los encabezados grandes usan las variantes con nombre
 (título 1 28/34, título 2 22/28), nunca un `fontSize` suelto sobre la caja de

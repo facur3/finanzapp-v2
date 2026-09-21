@@ -49,13 +49,29 @@ black, white and grey with the category hues as the only colour.
 - [x] Home quick actions are neutral circles with only the glyph in its semantic
   colour, so Home no longer reads as three coloured buttons.
 - [x] Amount field box: the third iPhone review showed the caret overlapping the
-  last digit of "3.000". The native input had sized itself around its text with
-  negative tracking, which on iOS draws the last glyph past the measured width.
-  The box is now computed from the row width (`amountFieldLayout`): estimated
-  tabular text width plus 8 pt padding each side and 4 pt for the caret, the size
-  shrinking only when the amount would not fit beside its symbol; no tracking.
-  Checked at every representative string, with Dynamic Type, and for insertion and
-  backspace at every caret position.
+  last digit of "3.000" (the native input sized itself around its text with
+  negative tracking). The fourth review, recorded, showed the number jumping
+  sideways per digit (the per-text box width re-centred the symbol + input group)
+  and malformed values such as "300,00" when zeroes were typed quickly. The box is
+  now stable: the input spans the row with fixed paddings and centres its text
+  natively; the symbol is placed beside the text by arithmetic; only the font size
+  changes, and only when the amount would not fit. No tracking.
+- [x] Amount editing is a canonical state (sign, whole digits, decimal comma,
+  fraction, logical caret), not a diff of display strings. The old common-prefix/
+  common-suffix edit read the native text against the last rendered value; when a
+  keystroke arrived before the controlled update had landed, the native text still
+  held the previous unformatted digits, the diff attributed one of FinanzApp's own
+  grouping dots to the user, and that dot became a decimal comma. Now digits and
+  the comma in the native text are the truth, a dot is grouping unless it is
+  explicit input (one more dot than the screen had, or a paste with its own
+  separators), and the display text and display caret are rendered from the state
+  and pushed as controlled `value` and `selection` from the change event's own
+  caret; selection events that describe a text other than the shown one are
+  ignored. Tested by a simulated native field: sequential typing 3 … 3.000.000,50
+  with canonical value, display, logical and display caret at every step, repeated
+  zeroes on a lagging native view, backspace at the end and around dots, insertion
+  in the middle, selection replacement, comma and typed period, Argentine and US
+  pastes, limits, negatives.
 - [x] Category detail title clipping fixed: "Comida" lost its ascenders because the
   heading set a 26 pt size on the body variant's 22 pt line box. Headings now use the
   named title variants and `AppText` grows the line box when a style changes only the
@@ -66,9 +82,9 @@ black, white and grey with the category hues as the only colour.
   removes the digit before it, a selection can be replaced, two decimals at most,
   thirteen whole digits at most (the safe range), leading zeros vanish, blur
   completes "2.000,5" to "2.000,50". Presentation only: each change is read as an
-  edit of the previous display (`src/ui/money-input.ts`), the display string still
-  goes through the domain's `parseMinorUnits` and the module contains no float.
-  The caret is left to iOS, which keeps its distance from the end of the text.
+  canonical edit state (`src/ui/money-input.ts`), the display string still goes
+  through the domain's `parseMinorUnits` and the module contains no float. The
+  caret is tracked explicitly as a logical position among the digits.
 - [x] Hero amounts are one amount in three quiet levels: the currency symbol steps
   back to secondary and the cents to tertiary (same size, same baseline, one
   VoiceOver label); a coloured hero keeps its hue and lowers the alpha. Row amounts
@@ -502,6 +518,13 @@ new screen.
   Root cause: the native input sized itself around its text with negative tracking.
   The box is now pure geometry from the row width with padding and caret room,
   tested per display string and caret position. 164 mobile tests.
+- Fourth review, recorded on the iPhone: the number jumped sideways as digits and
+  dots arrived, and fast zeroes produced "300,00"-style values. The per-text box
+  width was replaced by a stable row-wide box with fixed paddings and an
+  arithmetically placed symbol; the display-string diff was replaced by a canonical
+  edit state with an explicit, logically mapped caret driven by the change event's
+  own selection. A simulated native field, including a lagging one, covers the
+  device sequence. 168 mobile tests.
 
 ### 2026-09-20 — Interfaz 16: native visual cohesion and information hierarchy
 

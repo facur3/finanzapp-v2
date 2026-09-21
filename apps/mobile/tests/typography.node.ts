@@ -38,34 +38,52 @@ test('Dynamic Type is part of the fit: the rendered width uses the capped system
 // Regression for the iPhone report where the caret overlapped the "0" of
 // "3.000" in a field sized by the native input around its own text.
 const DISPLAYS = ['3', '30', '300', '3.000', '30.000', '300.000', '3.000.000', '3.000.000,50', '9.999.999.999.999,99'];
-test('the amount field box always leaves padding and caret room beyond the text, and shrinks only when the row is full', () => {
+test('the amount field keeps one stable box while typing: only the symbol slides, and the size drops only when the row is full', () => {
   for (const symbol of ['$', 'US$']) {
-    let previous = 0;
-    for (const text of DISPLAYS) {
-      const { fontSize, width } = amountFieldLayout(text, PHONE, symbol, 6);
-      const textWidth = amountWidthEm(text) * fontSize;
-      assert.ok(width! - textWidth >= AMOUNT_FIELD.padding * 2 + AMOUNT_FIELD.caret - 1, `${symbol} ${text}: ${width} for ${textWidth.toFixed(1)} of text at ${fontSize}`);
-      assert.ok(width! + amountWidthEm(symbol) * geometry.amountSymbolSize(fontSize) + 6 <= PHONE + 1, `${symbol} ${text} fits the row with its symbol`);
-      assert.ok(fontSize >= AMOUNT_FIELD.min && fontSize <= AMOUNT_FIELD.base);
-      const atBase = amountWidthEm(text) * AMOUNT_FIELD.base + AMOUNT_FIELD.padding * 2 + AMOUNT_FIELD.caret + amountWidthEm(symbol) * geometry.amountSymbolSize(AMOUNT_FIELD.base) + 6;
-      assert.ok(fontSize < AMOUNT_FIELD.base ? atBase > PHONE : atBase <= PHONE + 1, `${text} shrinks exactly when it would not fit the row at the base size`);
-      assert.ok(width! >= previous || fontSize < AMOUNT_FIELD.base, `${text}: the box never narrows as digits and dots arrive`);
-      previous = fontSize === AMOUNT_FIELD.base ? width! : 0;
+    const typing = DISPLAYS.slice(0, 8); // 3 … 3.000.000,50
+    const boxes = typing.map(text => amountFieldLayout(text, PHONE, symbol, 6));
+    // Every step that fits at the base size shares one box (size, paddings, symbol size): nothing to re-lay out while typing.
+    const shrinkAt = boxes.findIndex(box => box.fontSize < AMOUNT_FIELD.base);
+    const stable = shrinkAt < 0 ? boxes : boxes.slice(0, shrinkAt);
+    assert.ok(stable.length >= 7, `${symbol}: 3 … 3.000.000 all fit at the base size on the reported iPhone`);
+    assert.ok(stable.every(box => box.fontSize === AMOUNT_FIELD.base && box.paddingLeft === boxes[0].paddingLeft && box.paddingRight === boxes[0].paddingRight && box.symbolSize === boxes[0].symbolSize),
+      `${symbol}: the box is identical for every step at the base size`);
+    for (const [index, box] of boxes.entries()) {
+      const atBase = amountWidthEm(typing[index]) * AMOUNT_FIELD.base + boxes[0].paddingLeft + boxes[0].paddingRight;
+      assert.ok(box.fontSize < AMOUNT_FIELD.base ? atBase > PHONE : atBase <= PHONE, `${symbol} ${typing[index]}: the size drops exactly when the text would not fit at the base size`);
+    }
+    // The symbol hugs the text's left edge: it slides left by half an advance per digit (or dot), never right, never a jump.
+    for (let index = 1; index < stable.length; index++) {
+      const moved = boxes[index - 1].symbolX! - boxes[index].symbolX!;
+      const added = (amountWidthEm(typing[index]) - amountWidthEm(typing[index - 1])) / geometry.SAFETY * AMOUNT_FIELD.base;
+      assert.ok(moved >= 0 && moved <= added / 2 + 1.5, `${symbol} ${typing[index]}: the symbol moved ${moved} pt for ${added.toFixed(1)} pt of new text`);
+    }
+    for (const [index, text] of typing.entries()) {
+      const box = boxes[index];
+      assert.ok(box.symbolX! >= 0, `${text}: the symbol stays inside the row`);
+      const textWidth = amountWidthEm(text) / geometry.SAFETY * box.fontSize;
+      const textLeft = box.paddingLeft + (PHONE - box.paddingLeft - box.paddingRight - textWidth) / 2;
+      assert.ok(Math.abs(textLeft - 6 - amountWidthEm(symbol) * box.symbolSize - box.symbolX!) <= 1.5, `${text}: the symbol sits one gap left of the centred text`);
+      assert.ok(box.paddingLeft >= amountWidthEm(symbol) * box.symbolSize + 6, 'the left padding reserves the symbol and the gap');
+      assert.ok(box.paddingRight >= AMOUNT_FIELD.caret, 'the right padding reserves the caret');
+      assert.ok(PHONE - box.paddingLeft - box.paddingRight >= amountWidthEm(text) * box.fontSize, `${text} fits between the paddings`);
+      // The pair (symbol + number) is centred in the row, give or take the caret room.
+      const pairLeft = box.symbolX!, pairRight = textLeft + textWidth;
+      assert.ok(Math.abs(pairLeft - (PHONE - pairRight)) <= AMOUNT_FIELD.caret + 2, `${text}: the symbol and number read as one centred group`);
     }
   }
-  // Typing 3 → 3.000: a grouping dot appears and the box grows with it in the same step.
-  const before = amountFieldLayout('3000', PHONE, '$', 6).width!, after = amountFieldLayout('3.000', PHONE, '$', 6).width!;
-  assert.ok(after > before, 'the dot widens the box');
-  assert.equal(amountFieldLayout('3.000', PHONE, '$', 6).fontSize, 46, 'a short amount keeps the base size');
-  assert.equal(amountFieldLayout('3.000.000,50', PHONE, '$', 6).fontSize, 46, 'a full price still fits at the base size on the reported iPhone');
-  assert.ok(amountFieldLayout('9.999.999.999.999,99', PHONE, '$', 6).fontSize < 46, 'the longest safe amount shrinks to fit');
-  assert.equal(amountFieldLayout('', PHONE, '$', 6).width, amountFieldLayout('0', PHONE, '$', 6).width, 'an empty field is sized for its placeholder');
-  assert.equal(amountFieldLayout('3', PHONE, '$', 6).width, AMOUNT_FIELD.minWidth, 'a lone digit gets the minimum box');
-  assert.deepEqual(amountFieldLayout('3.000', 0, '$', 6), { fontSize: 46, width: undefined, symbolSize: 32 }, 'before layout: base size, no width');
-  // Dynamic Type: the capped scale is part of the fit and of the box.
+  const longest = amountFieldLayout('9.999.999.999.999,99', PHONE, '$', 6);
+  assert.ok(longest.fontSize < AMOUNT_FIELD.base && longest.fontSize >= AMOUNT_FIELD.min, 'the longest safe amount shrinks to fit');
+  assert.ok(PHONE - longest.paddingLeft - longest.paddingRight >= amountWidthEm('9.999.999.999.999,99') * longest.fontSize);
+  assert.ok(longest.symbolX! >= 0 && longest.symbolX! <= 16, 'and its symbol sits by the row edge (the fit keeps a 4 % safety margin and rounds down), never outside');
+  assert.equal(amountFieldLayout('3.000.000,50', PHONE, '$', 6).fontSize, 46, 'a full price still fits at the base size');
+  assert.deepEqual(amountFieldLayout('', PHONE, '$', 6), amountFieldLayout('0', PHONE, '$', 6), 'an empty field is laid out for its placeholder');
+  assert.equal(amountFieldLayout('3.000', 0, '$', 6).symbolX, null, 'before layout the symbol is not placed');
+  assert.equal(amountFieldLayout('3.000', 0, '$', 6).fontSize, 46);
+  // Dynamic Type: the capped scale is part of the fit, the insets and the symbol position.
   const large = amountFieldLayout('3.000.000,50', PHONE, '$', 6, 1.4);
-  assert.ok(large.fontSize < 46 && large.width! <= PHONE);
-  assert.ok(amountFieldLayout('3.000', PHONE, '$', 6, 1.4).width! > amountFieldLayout('3.000', PHONE, '$', 6).width!);
+  assert.ok(large.fontSize < 46 && large.paddingLeft > amountFieldLayout('3.000.000,50', PHONE, '$', 6).paddingLeft);
+  assert.ok(amountFieldLayout('3.000', PHONE, '$', 6, 1.4).symbolX! < amountFieldLayout('3.000', PHONE, '$', 6).symbolX!);
 });
 
 // The Money component itself: heroes measure their container and size from it;
