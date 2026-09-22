@@ -88,6 +88,14 @@ native Liquid Glass where iOS provides it. No financial semantics, no cloud.
   accessibility API missing or throwing, adapter-only lazy require), TypeScript,
   expo-doctor, Expo dependency check, `npm ls --all`, `npm audit` (0), Metro iOS export,
   397 root tests, Vite build, repo hygiene.
+- [x] **EAS link (2026-09-21, third push).** The owner created the EAS project
+  `@facur3/finanzapp-mobile` (`b1cd9780-7e6a-4de3-9248-d446d0c77520`); `eas init` could
+  not write the dynamic config, so `app.config.ts` now carries that ID and
+  `owner: 'facur3'` as defaults, with `EXPO_PUBLIC_EAS_PROJECT_ID` still overriding
+  (validated as a UUID). Bundle identifiers unchanged. Verified: `npx expo config
+  --type public` shows the ID for both variants and the override, `npx eas-cli@latest
+  project:info` resolves the project; `tests/app-config.node.ts` guards it. No
+  credentials, devices or builds were touched.
 - [ ] **Not device-verified:** that Expo Go now starts and stays open (mode A with the
   kill switch, then mode B), the Más footer reading "Material opaco (Expo Go)", the
   composer resting on the tab bar and rising with the keyboard, the centre tab with
@@ -833,8 +841,9 @@ Use [integration contracts](mobile-integrations.md) as the implementation bounda
 
 ### 4. Independent build, Apple and optional sync
 
-- [ ] Link owner's EAS project and enroll Apple when ready for a signed preview;
-  the Expo Go design/ledger step does not need a paid build.
+- [x] Link owner's EAS project (`@facur3/finanzapp-mobile`, Producto 22). [ ] Enroll
+  Apple when ready for a signed preview; the Expo Go design/ledger step does not need
+  a paid build.
 - [ ] Local reminders with opt-in time/timezone/deduplication; no amounts by default.
 - [ ] Face ID/passcode fallback, background privacy and native data protection.
 - [ ] App Intents/widgets/Apple sign-in after signed-device evidence.

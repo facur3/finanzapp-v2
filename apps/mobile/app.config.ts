@@ -7,14 +7,20 @@ if (variant !== 'development' && variant !== 'preview') {
   throw new Error('Solo development o preview están habilitados en el piloto.');
 }
 const isDevelopment = variant === 'development';
-const projectId = process.env.EXPO_PUBLIC_EAS_PROJECT_ID;
-if (projectId && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(projectId)) {
+// The EAS project @facur3/finanzapp-mobile, created by the owner on 2026-09-21. A project
+// ID is public configuration (it names a project, it grants nothing), so it lives here;
+// EXPO_PUBLIC_EAS_PROJECT_ID still overrides it for a fork or a second project.
+const EAS_PROJECT_ID = 'b1cd9780-7e6a-4de3-9248-d446d0c77520';
+const EAS_OWNER = 'facur3';
+const projectId = process.env.EXPO_PUBLIC_EAS_PROJECT_ID?.trim() || EAS_PROJECT_ID;
+if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(projectId)) {
   throw new Error('EXPO_PUBLIC_EAS_PROJECT_ID debe ser el UUID real del proyecto Expo.');
 }
 
 const config: ExpoConfig = {
   name: isDevelopment ? 'FinanzApp Dev' : 'FinanzApp Preview',
   slug: 'finanzapp-mobile',
+  owner: EAS_OWNER,
   version: '0.1.0',
   orientation: 'portrait',
   userInterfaceStyle: 'automatic',
@@ -29,7 +35,7 @@ const config: ExpoConfig = {
   },
   plugins: ['expo-router', 'expo-sqlite', '@react-native-community/datetimepicker', 'expo-system-ui',
     ['expo-splash-screen', { backgroundColor: '#F5F6F8', dark: { backgroundColor: '#080B10' } }]],
-  extra: { pilot: true, ...(projectId ? { eas: { projectId } } : {}) },
+  extra: { pilot: true, eas: { projectId } },
 };
 
 export default config;

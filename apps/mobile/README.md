@@ -332,12 +332,14 @@ store privately. SQLite is local storage, not a substitute for a private backup.
 
 1. Create a free Expo account and enroll in the Apple Developer Program when ready
    for a signed iPhone build. Apple enrollment requires the owner's identity/payment.
-2. In this directory run `npx eas-cli@latest login`, then
-   `npx eas-cli@latest init` to create/link **your** Expo project. If EAS asks for
-   the project ID in the dynamic config, copy the actual UUID shown into a local
-   `.env.local` file as `EXPO_PUBLIC_EAS_PROJECT_ID=<your-project-uuid>`.
-   Set the same public value in the Expo project's `development` and `preview`
-   environments. It identifies a project; it is not a credential. Never invent it.
+2. The pilot is linked to the owner's EAS project **@facur3/finanzapp-mobile**
+   (`b1cd9780-7e6a-4de3-9248-d446d0c77520`, created 2026-09-21): `app.config.ts`
+   carries that ID and `owner: 'facur3'` as its defaults, so no terminal export is
+   needed. A project ID identifies a project and grants nothing; it is not a
+   credential. Log in with `npx eas-cli@latest login` and confirm the link with
+   `npx eas-cli@latest project:info`. A fork or a second project sets
+   `EXPO_PUBLIC_EAS_PROJECT_ID=<its-uuid>` (a local `.env.local` works) to override the
+   default; an invalid value is refused at config time. Never invent an ID.
 3. Register the phone with `npx eas-cli@latest device:create`. Open its registration
    URL on the iPhone, complete registration and enable iOS Developer Mode.
 4. Run `npx eas-cli@latest build --platform ios --profile development`.
