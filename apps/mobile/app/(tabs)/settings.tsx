@@ -3,7 +3,7 @@ import { router } from 'expo-router';
 import { currentMonthISO, todayKey } from '@finanzapp/domain';
 import { useLedger } from '../../src/storage/LedgerProvider';
 import { FINANCE_ROW_LOOKS, appearanceHex } from '../../src/ui/appearance';
-import { AppText, DetailRow, GlyphTile, Screen, SectionTitle, Surface } from '../../src/ui/components';
+import { AppText, GlyphTile, NavigationRow, Screen, SectionTitle, Surface } from '../../src/ui/components';
 import { useMaterialDecision } from '../../src/ui/material';
 import { MATERIAL_LABELS } from '../../src/ui/material-policy';
 import { usePalette } from '../../src/ui/theme';
@@ -27,30 +27,30 @@ export default function MoreScreen() {
   const activeCards = archive?.cards?.filter(card => card.active).length ?? 0;
   const undone = (archive?.records.filter(record => record.voided).length ?? 0) + (archive?.transfers?.filter(record => record.voided).length ?? 0);
   const plural = (count: number, one: string, many: string) => count + ' ' + (count === 1 ? one : many);
-  const tile = (key: keyof typeof FINANCE_ROW_LOOKS) => <GlyphTile icon={FINANCE_ROW_LOOKS[key].glyph} color={appearanceHex(FINANCE_ROW_LOOKS[key].color, p)} size={30} />;
+  const tile = (key: keyof typeof FINANCE_ROW_LOOKS) => <GlyphTile icon={FINANCE_ROW_LOOKS[key].glyph} color={appearanceHex(FINANCE_ROW_LOOKS[key].color, p)} size={34} />;
 
   return <Screen>
     <View>
       <SectionTitle>Finanzas</SectionTitle>
       <Surface grouped>
-        <DetailRow label="Cuentas" value="Saldos y movimientos" icon="wallet-outline" leading={tile('accounts')} onPress={() => router.push('/accounts')} />
-        <DetailRow label="Tarjetas" value={activeCards ? plural(activeCards, 'tarjeta de crédito', 'tarjetas de crédito') : 'Compras y resúmenes'} icon="card-outline" leading={tile('cards')} onPress={() => router.push('/cards')} />
-        <DetailRow label="Presupuestos" value={currentBudgets ? currentBudgets + ' este mes' : 'Plan mensual'} icon="speedometer-outline" leading={tile('budgets')} onPress={() => router.push('/budgets')} />
-        <DetailRow label="Recurrentes" value={activeRecurring ? plural(activeRecurring, 'activo', 'activos') : 'Pagos e ingresos'} icon="repeat-outline" leading={tile('recurring')} onPress={() => router.push('/recurring')} />
-        <DetailRow label="Deudas y cobros" value={activeDebts ? plural(activeDebts, 'pendiente', 'pendientes') : 'Debo · me deben'} icon="people-outline" leading={tile('debts')} onPress={() => router.push('/debts')} />
-        <DetailRow label="Categorías" value={customCategories ? plural(customCategories, 'personalizada', 'personalizadas') : 'Gastos e ingresos'} icon="pricetags-outline" leading={tile('categories')} last onPress={() => router.push('/categories')} />
+        <NavigationRow title="Cuentas" subtitle="Saldos y movimientos" leading={tile('accounts')} onPress={() => router.push('/accounts')} />
+        <NavigationRow title="Tarjetas" subtitle={activeCards ? plural(activeCards, 'tarjeta de crédito', 'tarjetas de crédito') : 'Compras y resúmenes'} leading={tile('cards')} onPress={() => router.push('/cards')} />
+        <NavigationRow title="Presupuestos" subtitle={currentBudgets ? currentBudgets + ' este mes' : 'Plan mensual'} leading={tile('budgets')} onPress={() => router.push('/budgets')} />
+        <NavigationRow title="Recurrentes" subtitle={activeRecurring ? plural(activeRecurring, 'activo', 'activos') : 'Pagos e ingresos'} leading={tile('recurring')} onPress={() => router.push('/recurring')} />
+        <NavigationRow title="Deudas y cobros" subtitle={activeDebts ? plural(activeDebts, 'pendiente', 'pendientes') : 'Debo · me deben'} leading={tile('debts')} onPress={() => router.push('/debts')} />
+        <NavigationRow title="Categorías" subtitle={customCategories ? plural(customCategories, 'personalizada', 'personalizadas') : 'Gastos e ingresos'} leading={tile('categories')} last onPress={() => router.push('/categories')} />
       </Surface>
     </View>
     <View style={{ gap: 10 }}>
       <SectionTitle>App y datos</SectionTitle>
       <Surface grouped>
-        <DetailRow label="Copia de seguridad" value="Compartir e importar" icon="save-outline" onPress={() => router.push('/backup')} />
-        <DetailRow label="Movimientos deshechos" value={undone ? plural(undone, 'recuperable', 'recuperables') : 'Ninguno'} icon="arrow-undo-outline" last onPress={() => router.push('/undone-entries')} />
+        <NavigationRow title="Copia de seguridad" subtitle="Compartir e importar" icon="save-outline" onPress={() => router.push('/backup')} />
+        <NavigationRow title="Movimientos deshechos" subtitle={undone ? plural(undone, 'recuperable', 'recuperables') : 'Ninguno'} icon="arrow-undo-outline" last onPress={() => router.push('/undone-entries')} />
       </Surface>
       <AppText secondary variant="footnote" style={{ paddingHorizontal: 4 }}>
         Tus registros quedan en este dispositivo y podés registrar sin conexión. La sincronización todavía no está activada.
       </AppText>
     </View>
-    <AppText secondary style={{ textAlign: 'center', fontSize: 13 }}>FinanzApp · Piloto nativo 0.1.0 · Producto 22 · {MATERIAL_LABELS[material.reason]}</AppText>
+    <AppText secondary style={{ textAlign: 'center', fontSize: 13 }}>FinanzApp · Piloto nativo 0.1.0 · Producto 22.1 · {MATERIAL_LABELS[material.reason]}</AppText>
   </Screen>;
 }

@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
-import { ActivityIndicator, InputAccessoryView, Keyboard, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View,
+import { ActivityIndicator, Alert, InputAccessoryView, Keyboard, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View,
   useWindowDimensions, type PressableProps, type StyleProp, type TextInputProps, type TextProps, type ViewStyle } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -293,13 +293,33 @@ export function GlyphTile({ icon, tone = 'neutral', large = false, size, color }
   </View>;
 }
 
+/** An empty or missing state as one calm card: a 44 pt glyph, a headline and
+ * one line of guidance, never a full-screen illustration. */
 export function EmptyState({ title, detail, action, icon = 'wallet-outline' }: { title: string; detail: string; action?: ReactNode; icon?: IconName }) {
-  return <Surface style={{ gap: 16, paddingVertical: 28 }}>
-    <GlyphTile icon={icon} large />
-    <AppText accessibilityRole="header" variant="title2">{title}</AppText>
+  return <Surface style={{ gap: 12, paddingVertical: 22 }}>
+    <GlyphTile icon={icon} size={44} />
+    <AppText accessibilityRole="header" variant="title3">{title}</AppText>
     <AppText secondary variant="subhead">{detail}</AppText>
-    {action}
+    {action && <View style={{ marginTop: 4 }}>{action}</View>}
   </Surface>;
+}
+
+/** Contextual help behind an information glyph: the full explanation lives in
+ * a native alert, so a form keeps one short line next to the field. */
+export function InfoButton({ title, detail, label }: { title: string; detail: string; label?: string }) {
+  const p = usePalette();
+  return <PressFeedback feedback="opacity" accessibilityRole="button" accessibilityLabel={label ?? 'Más información sobre ' + title.toLowerCase()} hitSlop={8}
+    onPress={() => Alert.alert(title, detail)} style={{ minHeight: 28, minWidth: 28, alignItems: 'center', justifyContent: 'center' }}>
+    <Ionicons name="information-circle-outline" size={18} color={p.tertiary} accessible={false} />
+  </PressFeedback>;
+}
+
+/** A short note under a field with its help glyph: "Opcional. No cuenta como ingreso." and the full story one tap away. */
+export function FieldNote({ children, help }: { children: string; help?: { title: string; detail: string } }) {
+  return <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2, marginTop: -space.s }}>
+    <AppText secondary variant="footnote" style={{ flexShrink: 1 }}>{children}</AppText>
+    {help && <InfoButton title={help.title} detail={help.detail} />}
+  </View>;
 }
 
 export function ErrorMessage({ message }: { message: string | null }) {
@@ -374,6 +394,27 @@ export function DetailRow({ label, value, icon, leading, onPress, last = false, 
   const style: StyleProp<ViewStyle> = [styles.detailRow, { borderBottomColor: p.line, borderBottomWidth: last ? 0 : StyleSheet.hairlineWidth }];
   return onPress ? <PressFeedback feedback="highlight" accessibilityRole="button" accessibilityLabel={label + ': ' + value}
     disabled={disabled} accessibilityState={{ disabled }} onPress={onPress} style={style}>{content}</PressFeedback> : <View style={style}>{content}</View>;
+}
+
+/** A row that leads somewhere: a tinted identity tile or a neutral glyph, the
+ * title as the primary line, the description underneath it in the secondary
+ * colour, and a chevron. Title and subtitle never compete for one line, so a
+ * long title ("Deudas y cobros") and a long description ("Debo · me deben")
+ * both fit at any text size; each may wrap to two lines before truncating. */
+export function NavigationRow({ title, subtitle, icon, leading, onPress, last = false, disabled = false }: {
+  title: string; subtitle?: string; icon?: IconName; leading?: ReactNode; onPress: () => void; last?: boolean; disabled?: boolean;
+}) {
+  const p = usePalette();
+  return <PressFeedback feedback="highlight" accessibilityRole="button" accessibilityLabel={subtitle ? title + ', ' + subtitle : title}
+    disabled={disabled} accessibilityState={{ disabled }} onPress={onPress}
+    style={[styles.navigationRow, { borderBottomColor: p.line, borderBottomWidth: last ? 0 : StyleSheet.hairlineWidth, opacity: disabled ? 0.6 : 1 }]}>
+    {leading ?? (icon && <View style={styles.navigationGlyph}><Ionicons name={icon} size={22} color={p.secondary} accessible={false} /></View>)}
+    <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+      <AppText numberOfLines={2} style={{ fontWeight: '600' }}>{title}</AppText>
+      {!!subtitle && <AppText secondary variant="footnote" numberOfLines={2}>{subtitle}</AppText>}
+    </View>
+    <Ionicons name="chevron-forward" size={16} color={p.tertiary} accessible={false} />
+  </PressFeedback>;
 }
 
 /** Compact statistic: eyebrow label over a value. */
@@ -512,4 +553,6 @@ const styles = StyleSheet.create({
   choice: { flex: 1, minWidth: 72, minHeight: 32, paddingHorizontal: 8, paddingVertical: 6, alignItems: 'center', justifyContent: 'center' },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, paddingHorizontal: 16, minHeight: 64 },
   detailRow: { minHeight: 54, flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 14 },
+  navigationRow: { minHeight: 60, flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 16, paddingVertical: 11 },
+  navigationGlyph: { width: 30, alignItems: 'center' },
 });

@@ -4,7 +4,7 @@ import * as Sharing from 'expo-sharing';
 import { router } from 'expo-router';
 import { BACKUP_MAX_BYTES, createRecoveryBackup, parsePilotBackup } from '@finanzapp/domain';
 import { useLedger } from '../src/storage/LedgerProvider';
-import { ActionButton, AppText, DetailRow, ErrorMessage, Screen, SectionTitle, Surface } from '../src/ui/components';
+import { ActionButton, AppText, ErrorMessage, NavigationRow, Screen, SectionTitle, Surface } from '../src/ui/components';
 
 /** Export and import of the native pilot backup, moved out of the Más hub so
  * that screen stays a list. The export logic is unchanged: a snapshot this app
@@ -49,7 +49,7 @@ export default function BackupScreen() {
       <ActionButton label="Compartir copia" icon="share-outline" onPress={exportBackup} busy={busy} disabled={!archive} secondary />
     </Surface>
     <Surface grouped>
-      <DetailRow label="Importar copia" value="Revisar archivo" icon="download-outline" last disabled={busy}
+      <NavigationRow title="Importar copia" subtitle="Revisar el archivo antes de agregar" icon="download-outline" last disabled={busy}
         onPress={() => router.push('/backup-import')} />
     </Surface>
     <AppText secondary variant="footnote">Una copia es una foto de tus datos, no una sincronización entre dispositivos. Importar solo agrega lo que falta y nunca reemplaza registros existentes.</AppText>

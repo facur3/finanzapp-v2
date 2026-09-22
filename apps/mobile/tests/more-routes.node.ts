@@ -35,7 +35,7 @@ function harness(file: string, data: domain.LedgerArchive = archive) {
   const pushed: any[] = [];
   let cursor = 0;
   const ledger = { useLedger: () => ({ archive: data, snapshot: domain.snapshotFromArchive(data) }) };
-  const names = ['ActionButton', 'AppText', 'CategoryBadge', 'DetailRow', 'ErrorMessage', 'GlyphTile', 'IconButton', 'PressFeedback', 'Screen', 'SectionTitle', 'Surface'];
+  const names = ['ActionButton', 'AppText', 'CategoryBadge', 'DetailRow', 'ErrorMessage', 'GlyphTile', 'IconButton', 'NavigationRow', 'PressFeedback', 'Screen', 'SectionTitle', 'Surface'];
   const components = Object.fromEntries(names.map(name => [name, name]));
   const theme = { usePalette: () => ({ text: '#000', secondary: '#666', line: '#ddd', isDark: false }) };
   const modules: Record<string, unknown> = {
@@ -73,16 +73,17 @@ function nodes(value: any): Node[] {
   const own = typeof value.type === 'function' ? nodes(value.type(value.props)) : [];
   return [value, ...own, ...nodes(value.props.children)];
 }
-const rows = (root: Node) => nodes(root).filter(node => node.type === 'DetailRow');
+// Más and backup rows lead somewhere: title over subtitle, never a label/value pair competing for one line.
+const rows = (root: Node) => nodes(root).filter(node => node.type === 'NavigationRow');
 
 test('Más groups permanent navigation into Finanzas and App y datos, with live counts', () => {
   const view = harness('(tabs)/settings.tsx');
   const root = view.render();
   assert.deepEqual(nodes(root).filter(node => node.type === 'SectionTitle').map(node => node.props.children), ['Finanzas', 'App y datos']);
-  const labels = rows(root).map(row => row.props.label);
+  const labels = rows(root).map(row => row.props.title);
   assert.deepEqual(labels, ['Cuentas', 'Tarjetas', 'Presupuestos', 'Recurrentes', 'Deudas y cobros', 'Categorías', 'Copia de seguridad', 'Movimientos deshechos']);
   assert.equal(labels.includes('Asistente'), false, 'the Assistant is the centre tab, not a Más row');
-  const value = (label: string) => rows(root).find(row => row.props.label === label)!.props.value;
+  const value = (label: string) => rows(root).find(row => row.props.title === label)!.props.subtitle;
   assert.equal(value('Tarjetas'), 'Compras y resúmenes', 'no cards recorded: an honest placeholder');
   assert.equal(value('Recurrentes'), '1 activo');
   assert.equal(value('Deudas y cobros'), '1 pendiente');
@@ -91,16 +92,18 @@ test('Más groups permanent navigation into Finanzas and App y datos, with live 
   for (const row of rows(root)) row.props.onPress();
   assert.deepEqual(view.pushed, ['/accounts', '/cards', '/budgets', '/recurring', '/debts', '/categories', '/backup', '/undone-entries']);
   // Each group closes its last row; no export button or sharing lives on the hub any more.
-  assert.deepEqual(rows(root).filter(row => row.props.last).map(row => row.props.label), ['Categorías', 'Movimientos deshechos']);
+  assert.deepEqual(rows(root).filter(row => row.props.last).map(row => row.props.title), ['Categorías', 'Movimientos deshechos']);
   assert.equal(nodes(root).some(node => node.type === 'ActionButton'), false);
   const texts = nodes(root).filter(node => node.type === 'AppText').map(node => String(node.props.children)).join(' ');
-  assert.match(texts, /Producto 22/);
+  assert.match(texts, /Producto 22\.1/);
   assert.match(texts, /Material opaco \(Expo Go\)/, 'the footer says which control material this session draws, so a tester can confirm the mode');
   assert.equal(value('Categorías'), 'Gastos e ingresos');
   // Finanzas rows carry a soft identity tile from the shared palette; App y datos rows stay neutral glyphs.
   const leading = rows(root).map(row => row.props.leading?.type ?? null);
   assert.deepEqual(leading, ['GlyphTile', 'GlyphTile', 'GlyphTile', 'GlyphTile', 'GlyphTile', 'GlyphTile', null, null]);
   assert.equal(new Set(rows(root).slice(0, 6).map(row => row.props.leading.props.color)).size, 6, 'six distinct restrained colours, no row painted');
+  assert.deepEqual(rows(root).slice(6).map(row => row.props.icon), ['save-outline', 'arrow-undo-outline'], 'App y datos keeps neutral glyphs');
+  assert.equal(rows(root).some(row => 'value' in row.props || 'label' in row.props), false, 'no leftover label/value props');
   assert.match(texts, /sincronización todavía no está activada/);
 });
 
@@ -108,8 +111,8 @@ test('Más → Tarjetas counts active credit cards and opens the pushed Tarjetas
   const card: domain.CreditCardProfile = { id: 'card', accountId: cash.id, issuer: 'Visa', last4: '4009', creditLimitMinor: null, closingDay: 28, dueDay: 5, active: true, createdAt, revision: 0, updatedAt: createdAt };
   const view = harness('(tabs)/settings.tsx', { ...archive, cards: [card, { ...card, id: 'old', active: false }] });
   const root = view.render();
-  const row = rows(root).find(item => item.props.label === 'Tarjetas')!;
-  assert.equal(row.props.value, '1 tarjeta de crédito');
+  const row = rows(root).find(item => item.props.title === 'Tarjetas')!;
+  assert.equal(row.props.subtitle, '1 tarjeta de crédito');
   assert.equal(row.props.leading.props.icon, 'card-outline');
   row.props.onPress();
   assert.deepEqual(view.pushed, ['/cards']);
@@ -117,7 +120,7 @@ test('Más → Tarjetas counts active credit cards and opens the pushed Tarjetas
 
 test('Más empty ledger shows honest placeholders instead of zero counts', () => {
   const root = harness('(tabs)/settings.tsx', { accounts: [], records: [] }).render();
-  const value = (label: string) => rows(root).find(row => row.props.label === label)!.props.value;
+  const value = (label: string) => rows(root).find(row => row.props.title === label)!.props.subtitle;
   assert.equal(value('Recurrentes'), 'Pagos e ingresos');
   assert.equal(value('Deudas y cobros'), 'Debo · me deben');
   assert.equal(value('Movimientos deshechos'), 'Ninguno');
@@ -130,7 +133,8 @@ test('the backup screen keeps export and import together and links the review fl
   assert.equal(button.props.label, 'Compartir copia');
   assert.equal(button.props.disabled, false);
   assert.equal(button.props.secondary, true);
-  const importRow = rows(root).find(row => row.props.label === 'Importar copia')!;
+  const importRow = rows(root).find(row => row.props.title === 'Importar copia')!;
+  assert.equal(importRow.props.subtitle, 'Revisar el archivo antes de agregar');
   importRow.props.onPress();
   assert.deepEqual(view.pushed, ['/backup-import']);
   const disabled = harness('backup.tsx', { accounts: [], records: [] });

@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { runInNewContext } from 'node:vm';
 import ts from 'typescript';
+import * as currencies from '../src/ui/currencies.ts';
 import * as domain from '@finanzapp/domain';
 import * as presentation from '../src/ui/presentation.ts';
 import * as budgetPresentation from '../src/ui/budget-presentation.ts';
@@ -41,7 +42,7 @@ function harness(file: string, props: any = {}, options: { data?: domain.LedgerA
     addAccount: async (value: domain.Account) => { newAccounts.push(value); await options.addAccount?.(value); },
     restoreBackup: async (value: domain.LedgerArchive, baseline: string) => { restores.push({ value, baseline }); await options.restore?.(value, baseline); },
   }) };
-  const components = Object.fromEntries(['Screen', 'EmptyState', 'ActionButton', 'AppText', 'AmountField', 'AmountShortcut', 'Choices', 'ErrorMessage', 'Field', 'IconButton', 'Surface',
+  const components = Object.fromEntries(['Screen', 'EmptyState', 'ActionButton', 'AppText', 'AmountField', 'AmountShortcut', 'Choices', 'ErrorMessage', 'Field', 'FieldNote', 'IconButton', 'Surface',
     'CategoryBadge', 'DetailRow', 'Money', 'SectionTitle', 'GlyphTile', 'AccountBadge'].map(name => [name, name]));
   const modules: Record<string, unknown> = {
     react: { useState: (initial: any) => { const i = cursor++; if (!(i in state)) state[i] = typeof initial === 'function' ? initial() : initial;
@@ -58,7 +59,9 @@ function harness(file: string, props: any = {}, options: { data?: domain.LedgerA
     '@expo/vector-icons/Ionicons': 'Ionicons',
     '../storage/LedgerProvider': ledger, '../src/storage/LedgerProvider': ledger, '../../src/storage/LedgerProvider': ledger,
     './components': components, '../src/ui/components': components, '../../src/ui/components': components,
-    './form-controls': { AccountField: 'AccountField', CategoryField: 'CategoryField', DateField: 'DateField', SelectorCard: 'SelectorCard' },
+    './form-controls': { AccountField: 'AccountField', CategoryField: 'CategoryField', CurrencyField: 'CurrencyField', DateField: 'DateField', SelectorCard: 'SelectorCard' },
+    '../src/ui/form-controls': { CurrencyField: 'CurrencyField' },
+    '../src/ui/currencies': currencies, '../../src/ui/currencies': currencies,
     './presentation': presentation,
     './budget-presentation': budgetPresentation, '../../src/ui/budget-presentation': budgetPresentation,
     './money-input': moneyInput,
@@ -351,7 +354,7 @@ test('account rename does not change its balance; unchanged save and close never
 test('new account retry is frozen and honors requested USD currency', async () => {
   let attempts = 0;
   const view = harness('app/new-account.tsx', {}, { params: { currency: 'USD' }, addAccount: async () => { if (++attempts === 1) throw new Error('Refresh failed'); } });
-  assert.equal(find(view.render(), 'Choices').props.value, 'USD');
+  assert.equal(find(view.render(), 'CurrencyField').props.value, 'USD', 'the requested currency is preselected in the currency row');
   find(view.render(), 'Field').props.onChangeText('Nueva');
   find(view.render(), 'AmountField').props.onChangeText('100');
   await find(view.render(), 'ActionButton').props.onPress();

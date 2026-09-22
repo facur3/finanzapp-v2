@@ -351,6 +351,21 @@ importe, moneda y estado.
   enviar, el texto vuelve intacto al campo y una nota con ícono lo explica. Sin respuesta
   inventada, sin envío remoto.
 
+## Producto 22.1 — claridad y formularios (sin rediseño)
+
+- **Fila de navegación.** Tile tintado (Finanzas) o glifo neutro en una columna fija de
+  30 pt (App y datos), título en peso 600 como línea principal, descripción debajo en
+  footnote secundario, chevron; cada texto puede partirse en dos líneas antes de
+  truncar y el par se lee como una sola etiqueta de VoiceOver. Nunca más título y
+  descripción compitiendo en la misma línea. `DetailRow` sigue para pares dato/valor.
+- **Notas de campo.** Una línea corta bajo el campo ("Opcional. No cuenta como
+  ingreso.") y un glifo de información que abre la explicación completa en una alerta
+  nativa: se divulga, no se recorta.
+- **Moneda.** Una fila agrupada "Moneda · Pesos argentinos · ARS" con chevron y una hoja
+  con las dos monedas del libro, tilde en la actual y una nota de por qué son dos. Es la
+  semilla de la pantalla de monedas con búsqueda de la próxima fase.
+- **Estados vacíos.** Una tarjeta serena: glifo de 44 pt, título title3, una línea.
+
 ## Producto 22 — alcance con el pulgar y material nativo
 
 - **Pestañas.** Inicio, Movimientos, **Asistente**, Reportes, Más. El centro inferior

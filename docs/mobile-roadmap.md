@@ -15,7 +15,50 @@ server-keyed; manual recording and local data work without connectivity. Recurri
 expenses, debts, budgets and cards remain in scope. Native navigation, accessible
 amounts, real data and recoverable durable writes remain requirements.
 
-## Status and current delivery — Producto 22
+## Status and current delivery — Producto 22.1
+
+Implemented is code, checked names a test, device-verified needs a physical result,
+and released means distributed. Neither a bundle nor a screenshot is App Store QA.
+
+Producto 22.1 — UI Clarity & Form Polish is a focused refinement after the development
+build started working: rows that read as title over subtitle, shorter forms with
+progressive disclosure, a native currency row. No redesign, no financial change.
+
+- [x] **Problems found.** Más rows rendered title and description as a label/value pair
+  on one line, so "Deudas y cobros" and "Debo · me deben" competed and could clip at
+  large text; the Reportes row "Comparar con el mes anterior / Por categoría" wrapped
+  its right-hand text into short lines; the backup import row had the same shape; Nueva
+  cuenta carried a three-sentence paragraph under Saldo inicial and a permanent
+  ARS/USD segmented control; Editar cuenta carried two paragraphs; empty states used a
+  56 pt glyph and a title2 headline inside a tall card.
+- [x] **NavigationRow** (`src/ui/components.tsx`): leading tinted tile or neutral glyph
+  in a fixed 30 pt column, title (weight 600) over a footnote subtitle, each up to two
+  lines, a chevron, 60 pt minimum height, `title, subtitle` as one VoiceOver label.
+  Used by Más → Finanzas (34 pt tiles) and App y datos (neutral glyphs), Reportes →
+  Comparar ("Diferencias por categoría") and Copia de seguridad → Importar copia.
+  `DetailRow` stays for label/value facts (detail screens, selectors, previews).
+- [x] **FieldNote / InfoButton**: one short line under a field and an information
+  glyph that opens the full explanation in a native alert. Nueva cuenta: "Opcional. No
+  cuenta como ingreso." with the complete saldo inicial text behind it; Editar cuenta:
+  "Solo para corregir un saldo mal cargado." and "La moneda de una cuenta no se cambia."
+  with their full explanations. Nothing financial was removed, only moved one tap away.
+- [x] **CurrencyField** (`src/ui/form-controls.tsx`, `src/ui/currencies.ts`): a grouped
+  row "Moneda · Pesos argentinos · ARS" with a chevron opening a page sheet that lists
+  ARS and USD (name, code, symbol, checkmark, one selection haptic) and says why the
+  list is short. Only the two currencies the ledger holds; `searchCurrencies` and the
+  option shape are the seed of the searchable currency screen of the next phase. The
+  currency stays visible and changeable before the account exists; an existing
+  account still cannot change it.
+- [x] **EmptyState**: one calm card (44 pt glyph, title3 headline, one subhead line,
+  22 pt vertical padding) across every screen that uses it.
+- [x] **Checked on Linux:** 283 mobile tests (5 new in `ui-rows.node.ts`; Más, backup,
+  account-form and selector guards updated), TypeScript, Expo dependency check, Metro
+  iOS export, 397 root tests, Vite build, repo hygiene.
+- [ ] **Not device-verified:** Más and Reportes rows at the largest Dynamic Type sizes
+  and on a narrow width, the currency sheet, the information alerts with VoiceOver,
+  Nueva cuenta scrolling with the keyboard on a small iPhone, both themes.
+
+### Previous delivery — Producto 22
 
 Implemented is code, checked names a test, device-verified needs a physical result,
 and released means distributed. Neither a bundle nor a screenshot is App Store QA.
@@ -805,7 +848,9 @@ by CI and merged into master before the next starts:
 11. ~~AI reachability and native material~~ — delivered in Producto 22 (Assistant
     centre tab, Tarjetas under Más, Liquid Glass on the two control surfaces with the
     opaque fallback). Producto 23 is the real cloud/text Assistant activation.
-12. **EAS development build and Apple integrations** (Face ID, notifications with
+12. ~~UI clarity and form polish~~ — delivered in Producto 22.1 (NavigationRow,
+    FieldNote, CurrencyField, calmer empty states).
+13. **EAS development build and Apple integrations** (Face ID, notifications with
     the card due-date reminder, Apple Pay capture, App Intents) only after the core
     product is stable on device.
 
@@ -890,6 +935,17 @@ targets, VoiceOver, safe areas, system text and separate currencies apply to eve
 new screen.
 
 ## Handoff log (historical evidence)
+
+### 2026-09-22 — Producto 22.1: UI clarity and form polish
+
+- One navigation row (title over subtitle, tile or glyph, chevron) for Más, Reportes →
+  Comparar and the backup import row; short field notes with an information glyph in
+  the account forms; a native currency row with an ARS/USD sheet ready for the future
+  currency screen; calmer empty states. No domain, schema, backup, cloud or native change.
+- **Checked on Linux:** 283 mobile tests, TypeScript, Expo dependency check, Metro iOS
+  export, 397 root tests, Vite build, repo hygiene. **Not device-verified:** Dynamic
+  Type and narrow-width wrapping of the rows, the currency sheet, VoiceOver on the
+  information glyphs, small-iPhone scrolling in Nueva cuenta.
 
 ### 2026-09-21 — Producto 22: AI reachability and native material
 

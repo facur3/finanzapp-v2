@@ -101,6 +101,18 @@ form prefilled. Voice is a visible affordance only (the microphone explains that
 transcription needs the development build). Scripted fixtures exist for tests and,
 under `EXPO_PUBLIC_ASSISTANT_FIXTURES=1` in a development bundle only, for seeing the
 states on the iPhone behind a visible "Vista de prueba" banner that never saves.
+**Producto 22.1 (2026-09-22)** is clarity and form polish, not a redesign: Más → Finanzas
+and App y datos rows, the Reportes "Comparar con el mes anterior" row and the backup
+import row use one `NavigationRow` (tinted tile or neutral glyph, the title as the primary
+line, the description under it, a chevron), so "Deudas y cobros / Debo · me deben" no
+longer compete on one line and nothing clips; Nueva cuenta keeps one short line under
+Saldo inicial ("Opcional. No cuenta como ingreso.") with the full explanation behind an
+information glyph (`FieldNote` / `InfoButton`), and its currency is a native row
+(`CurrencyField`: name and code, a page sheet listing the two ledger currencies with a
+checkmark, ready to become the searchable currency screen; `src/ui/currencies.ts` holds
+the list and the search helper); Editar cuenta uses the same short notes; empty states
+are one calm card (44 pt glyph, title3). No domain, schema, backup, cloud or native change.
+
 **Producto 22 (2026-09-21)** is reachability and material, not features: the Assistant
 becomes the **centre tab** (Inicio, Movimientos, Asistente, Reportes, Más), so either
 thumb reaches it from any screen; the Home quick action stays as a discoverability
@@ -424,7 +436,9 @@ the two control surfaces import the material, that only the adapter names
 `expo-glass-effect` and only through a lazy `require`), the startup-safety cases (Expo Go,
 the kill switch, an unregistered view, a module that fails to load or throws, a missing
 or throwing Reduce Transparency API: opaque every time, the module never evaluated on an
-unsafe path), `worklets.node.ts` (every animated file compiled with `babel-preset-expo`
+unsafe path), `ui-rows.node.ts` (NavigationRow hierarchy and labels, FieldNote and its information
+alert, the calmer EmptyState, the currency row and sheet, the ARS/USD list and search
+helper), `worklets.node.ts` (every animated file compiled with `babel-preset-expo`
 as Metro does for iOS; a function captured by a UI-runtime callback must be a worklet,
 which is what `composerBottomPadding` was missing on the first device run) and updates
 the navigation, Más, Cards, composer and quick-action guards for the centre tab, the
@@ -437,7 +451,7 @@ For the intermittent black-tab report, update to `master`, restart with
 and repeat the **Interfaz 02** tab checks, **Interfaz 03** report checks and
 **Interfaz 04/05** correction/recovery and transfer checks, plus **Interfaz 06** daily/comparison reports and **Interfaz 08** recurring/upcoming
 checks, plus **Interfaz 10** cards/debts and five-tab checks and **Interfaz 11** Home,
-Movimientos and detail checks, **Interfaz 12** form checks, **Interfaz 13** Reportes checks, **Interfaz 14** budgets/recurring/accounts checks, **Interfaz 15** motion checks, **Interfaz 16** cohesion checks, **Interfaz 17** identity and money-input checks **Producto 18** Más / Tarjetas / amount-shortcut checks, **Producto 19** budget checks, **Producto 20** account/category identity checks **Producto 21** Assistant checks and **Producto 22** reachability/material checks. The current footer (Más) says Producto 22.
+Movimientos and detail checks, **Interfaz 12** form checks, **Interfaz 13** Reportes checks, **Interfaz 14** budgets/recurring/accounts checks, **Interfaz 15** motion checks, **Interfaz 16** cohesion checks, **Interfaz 17** identity and money-input checks **Producto 18** Más / Tarjetas / amount-shortcut checks, **Producto 19** budget checks, **Producto 20** account/category identity checks **Producto 21** Assistant checks, **Producto 22** reachability/material checks and **Producto 22.1** clarity checks. The current footer (Más) says Producto 22.1.
 Before updating, save a private pilot copy; do not uninstall or add fake movements.
 
 If a storage/refresh error occurs, the form retains the exact submitted command

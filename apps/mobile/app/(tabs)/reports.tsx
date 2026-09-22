@@ -6,7 +6,7 @@ import { dailyAverageMinor, dailySpending, formatMinorUnits, monthlySpendingTren
   summarizeMonthlyBudgets, topMerchants, type CategorySpending, type Currency, type DailySpending, type SpendingInsight } from '@finanzapp/domain';
 import { useLedger } from '../../src/storage/LedgerProvider';
 import { budgetTone, percentUsed } from '../../src/ui/budget-presentation';
-import { AppText, CategoryBadge, Choices, DetailRow, EmptyState, GlyphTile, IconButton, Money, PressFeedback, SectionTitle, Surface } from '../../src/ui/components';
+import { AppText, CategoryBadge, Choices, DetailRow, EmptyState, GlyphTile, IconButton, Money, NavigationRow, PressFeedback, SectionTitle, Surface } from '../../src/ui/components';
 import { useCategoryColor, useCategoryLookOf } from '../../src/ui/category-hues';
 import { DonutChart, MonthBars, OTHERS_KEY, donutSlices } from '../../src/ui/charts';
 import { ValueTransition, selectionHaptic } from '../../src/ui/motion';
@@ -179,7 +179,7 @@ export default function ReportsScreen() {
       {ready && <Surface grouped>
         <DetailRow label="Ingresos registrados" value={money(report.incomeMinor)} icon="add-circle-outline" />
         <DetailRow label="Flujo neto" value={(report.incomeMinor - report.expenseMinor < 0 ? '−' : '') + money(Math.abs(report.incomeMinor - report.expenseMinor))} icon="swap-vertical-outline" />
-        <DetailRow label="Comparar con el mes anterior" value="Por categoría" icon="git-compare-outline" last
+        <NavigationRow title="Comparar con el mes anterior" subtitle="Diferencias por categoría" icon="git-compare-outline" last
           onPress={() => router.push({ pathname: '/report-comparison', params: { currency, month: monthISO } })} />
       </Surface>}
       <AppText tertiary variant="footnote" style={{ paddingHorizontal: 4 }}>

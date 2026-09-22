@@ -7,10 +7,16 @@ import { makeAccountAppearance, parseMinorUnits, validateAccount, validateAccoun
 import { useLedger } from '../src/storage/LedgerProvider';
 import { ACCOUNT_ICON_CHOICES, COLOR_CHOICES, DEFAULT_LOOK } from '../src/ui/appearance';
 import { IconColorPicker } from '../src/ui/appearance-picker';
-import { ActionButton, AmountField, AppText, Choices, ErrorMessage, Field, IconButton, Screen } from '../src/ui/components';
+import { ActionButton, AmountField, AppText, ErrorMessage, Field, FieldNote, IconButton, Screen } from '../src/ui/components';
+import { CurrencyField } from '../src/ui/form-controls';
+
+const OPENING_HELP = 'Podés dejarlo vacío para registrar desde cero. El saldo registrado será el resultado de tus movimientos; '
+  + 'no representa tu saldo bancario. Si cargás un saldo inicial, es el punto de partida y no cuenta como ingreso.';
 
 /** Nombre, icono, color, moneda, saldo inicial. The look is saved in the same
- * commit as the account; it is presentation only and never a financial field. */
+ * commit as the account; it is presentation only and never a financial field.
+ * The currency is a native row with a sheet (ARS or USD, the two the ledger
+ * holds), visible and changeable until the account exists. */
 export default function NewAccountScreen() {
   const params = useLocalSearchParams<{ currency?: string }>();
   const { addAccount } = useLedger();
@@ -61,11 +67,10 @@ export default function NewAccountScreen() {
       autoCapitalize="words" editable={!locked} placeholder="Ej. Banco, Efectivo, Cocos" />
     <IconColorPicker icons={ACCOUNT_ICON_CHOICES} colors={COLOR_CHOICES} icon={icon} color={color}
       onIconChange={setIcon} onColorChange={setColor} disabled={locked} previewLabel={name} />
-    <Choices value={currency} onChange={setCurrency} disabled={locked}
-      options={[{ value: 'ARS', label: 'Pesos · ARS' }, { value: 'USD', label: 'Dólares · USD' }]} />
-    <AmountField label="Saldo inicial (opcional)" currency={currency} value={opening} onChangeText={value => { setOpening(value); setError(null); }}
+    <CurrencyField value={currency} onChange={setCurrency} disabled={locked} />
+    <AmountField label="Saldo inicial" currency={currency} value={opening} onChangeText={value => { setOpening(value); setError(null); }}
       keyboardType="numbers-and-punctuation" inputMode={undefined} editable={!locked} />
-    <AppText secondary style={{ fontSize: 14 }}>Podés dejarlo vacío para registrar desde cero. El saldo registrado será el resultado de tus movimientos; no representa tu saldo bancario. Si cargás un saldo inicial, no cuenta como ingreso.</AppText>
+    <FieldNote help={{ title: 'Saldo inicial', detail: OPENING_HELP }}>Opcional. No cuenta como ingreso.</FieldNote>
     <ErrorMessage message={error} />
     {pending && error && <AppText secondary style={{ fontSize: 13 }}>Reintentá el mismo envío para evitar duplicados. Para cambiarlo, cerrá y revisá primero tus cuentas.</AppText>}
     <ActionButton label={pending && error ? 'Reintentar guardado' : 'Guardar cuenta'} onPress={save} busy={busy} disabled={!name.trim()} />

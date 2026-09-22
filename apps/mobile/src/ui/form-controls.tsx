@@ -3,8 +3,9 @@ import { FlatList, Keyboard, Modal, Platform, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import type { Account, Entry, EntryKind } from '@finanzapp/domain';
-import { AccountBadge, AppText, CategoryBadge, DetailRow, Field, GlyphTile, PressFeedback, surfaceShadow, type IconName, type Tone } from './components';
+import type { Account, Currency, Entry, EntryKind } from '@finanzapp/domain';
+import { AccountBadge, AppText, CategoryBadge, DetailRow, Field, GlyphTile, PressFeedback, Surface, surfaceShadow, type IconName, type Tone } from './components';
+import { currencyOption, searchCurrencies } from './currencies';
 import { useAccountLookOf, useCategoryDefinitions, useCategoryLook } from './category-hues';
 import { selectionHaptic } from './motion';
 import { radius, usePalette, useReduceMotion } from './theme';
@@ -87,6 +88,38 @@ export function AccountField({ accounts, value, onChange, disabled = false, labe
           <View style={{ flex: 1, gap: 3 }}><AppText style={{ fontWeight: '600' }}>{item.name}</AppText>
             <AppText secondary style={{ fontSize: 14 }}>{kind(item.id)} · {item.currency}{describe ? ' · ' + describe(item) : ''}</AppText></View>
           {item.id === value && <Ionicons name="checkmark-circle" color={p.primary} size={24} accessible={false} />}
+        </PressFeedback>} />
+    </SelectionSheet>
+  </>;
+}
+
+/** The account's currency as one native row: name and code, a chevron, and a
+ * sheet that lists the currencies the ledger can hold (ARS and USD today),
+ * with a checkmark on the current one. The sheet is the seed of the
+ * searchable currency screen the next phase adds: the list, the search helper
+ * and the row shape already exist in `currencies.ts`. Only for a new account;
+ * an existing account never changes currency. */
+export function CurrencyField({ value, onChange, disabled = false }: { value: Currency; onChange: (currency: Currency) => void; disabled?: boolean }) {
+  const p = usePalette();
+  const [visible, setVisible] = useState(false);
+  const selected = currencyOption(value);
+  const open = () => { Keyboard.dismiss(); setVisible(true); };
+  return <>
+    <Surface grouped>
+      <DetailRow label="Moneda" value={selected.name + ' · ' + selected.code} icon="cash-outline" last disabled={disabled} onPress={open} />
+    </Surface>
+    <SelectionSheet visible={visible} title="Elegir moneda" onClose={() => setVisible(false)}>
+      <FlatList data={searchCurrencies('')} keyExtractor={option => option.code} contentContainerStyle={{ padding: 20, paddingTop: 0 }}
+        ListFooterComponent={<AppText secondary variant="footnote" style={{ paddingHorizontal: 4, paddingTop: 4 }}>
+          Por ahora las cuentas se registran en pesos o en dólares, sin convertir entre sí. Otras monedas llegan con su cotización.
+        </AppText>}
+        renderItem={({ item }) => <PressFeedback feedback="highlight" accessibilityRole="button" accessibilityState={{ selected: value === item.code }}
+          accessibilityLabel={item.name + ', ' + item.code} onPress={() => { if (item.code !== value) selectionHaptic(); onChange(item.code); setVisible(false); }}
+          style={{ flexDirection: 'row', alignItems: 'center', padding: 14, gap: 14, backgroundColor: p.surface, borderRadius: 16, marginBottom: 8, overflow: 'hidden' }}>
+          <GlyphTile icon="cash-outline" />
+          <View style={{ flex: 1, gap: 3 }}><AppText style={{ fontWeight: '600' }}>{item.name}</AppText>
+            <AppText secondary style={{ fontSize: 14 }}>{item.code} · {item.symbol}</AppText></View>
+          {item.code === value && <Ionicons name="checkmark-circle" color={p.primary} size={24} accessible={false} />}
         </PressFeedback>} />
     </SelectionSheet>
   </>;
