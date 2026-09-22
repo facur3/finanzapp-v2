@@ -1,20 +1,21 @@
 import { useEffect, useMemo, useState } from 'react';
 import { View } from 'react-native';
-import { router } from 'expo-router';
+import { router, Stack } from 'expo-router';
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { cardStatementActivity, formatMinorUnits, labelFromISO, liabilityActivity } from '@finanzapp/domain';
-import { useLedger } from '../../src/storage/LedgerProvider';
-import { ActionButton, AppText, EmptyState, Money, MovementRow, Screen, SectionTitle, Stat, Surface, toneColors } from '../../src/ui/components';
-import { CardCarousel, CardFace } from '../../src/ui/card-visual';
-import { activeCards, daysUntil, statementCaption, usageTone, type CardSummary } from '../../src/ui/liability-presentation';
-import { ValueTransition, timing } from '../../src/ui/motion';
-import { mergeActivity } from '../../src/ui/presentation';
-import { space, useCurrentDay, usePalette, useReduceMotion } from '../../src/ui/theme';
+import { useLedger } from '../src/storage/LedgerProvider';
+import { ActionButton, AppText, EmptyState, IconButton, Money, MovementRow, Screen, SectionTitle, Stat, Surface, toneColors } from '../src/ui/components';
+import { CardCarousel, CardFace } from '../src/ui/card-visual';
+import { activeCards, daysUntil, statementCaption, usageTone, type CardSummary } from '../src/ui/liability-presentation';
+import { ValueTransition, timing } from '../src/ui/motion';
+import { mergeActivity } from '../src/ui/presentation';
+import { space, useCurrentDay, usePalette, useReduceMotion } from '../src/ui/theme';
 
 /** Tarjetas is only credit cards: the card, its recorded debt, available
  * credit, closing and due dates, purchases, payments and statement activity.
- * Personal debts and receivables are a different obligation and live under
- * Más → Deudas y cobros. */
+ * Reached from Más → Finanzas → Tarjetas (the centre tab went to the
+ * Assistant); the "+" stays in its header. Personal debts and receivables
+ * are a different obligation and live under Más → Deudas y cobros. */
 export default function CardsScreen() {
   const { archive, snapshot } = useLedger();
   const day = useCurrentDay();
@@ -24,6 +25,7 @@ export default function CardsScreen() {
   if (!snapshot || !archive) return null;
 
   return <Screen gap={space.xxl}>
+    <Stack.Screen options={{ title: 'Tarjetas', headerRight: () => <IconButton name="add" label="Agregar tarjeta" onPress={() => router.push('/new-card')} /> }} />
     {!cards.length ? <EmptyState title="Tus tarjetas, como en la billetera" icon="card-outline"
       detail="Registrá cada compra una sola vez como gasto. Cuando pagás el resumen, el dinero sale de tu cuenta y baja la deuda de la tarjeta, sin volver a contar el consumo."
       action={<ActionButton label="Agregar tarjeta" icon="add-outline" onPress={() => router.push('/new-card')} />} />

@@ -15,10 +15,108 @@ server-keyed; manual recording and local data work without connectivity. Recurri
 expenses, debts, budgets and cards remain in scope. Native navigation, accessible
 amounts, real data and recoverable durable writes remain requirements.
 
-## Status and current delivery — Producto 21
+## Status and current delivery — Producto 22
 
 Implemented is code, checked names a test, device-verified needs a physical result,
 and released means distributed. Neither a bundle nor a screenshot is App Store QA.
+
+Producto 22 — AI Reachability & Native Material is a small product/UI phase: the
+Assistant gets the most reachable persistent slot, and the two control surfaces gain
+native Liquid Glass where iOS provides it. No financial semantics, no cloud.
+
+- [x] **Centre tab.** Tabs are Inicio, Movimientos, **Asistente**, Reportes, Más. The
+  Assistant screen is the tab root `(tabs)/assistant.tsx` (stays mounted, so the
+  ephemeral conversation survives a tab switch; nothing is persisted; New chat is set by
+  the screen through `Tabs.Screen` once a conversation exists). The Home quick action
+  remains and uses `router.navigate`, so it switches to the tab instead of stacking a
+  second conversation. Reachability: the bottom-centre slot is equidistant for the right
+  and the left thumb and inside the comfortable zone on both small and large iPhones,
+  whereas the Home row sits in the upper third, its leftmost action farthest for a right
+  thumb and its rightmost for a left thumb; Dynamic Type does not move the tab.
+- [x] **Tarjetas under Más.** `app/cards.tsx` is a pushed screen with its "+" in its
+  own header; Más → Finanzas reads Cuentas, Tarjetas (graphite tile, live count of
+  active cards), Presupuestos, Recurrentes, Deudas y cobros, Categorías. Card
+  accounting, forms, detail and `router.replace('/cards')` after saving are unchanged.
+  The Más → Asistente row is gone (it is a tab).
+- [x] **Startup regression and fix (2026-09-21, second push).** The owner's first
+  device run closed Expo Go right after the bundle loaded. Not reproduced on Linux (no
+  device); cause narrowed by reading the installed native code: a JavaScript guard
+  cannot prevent a native abort, and Producto 22 mounted five native `GlassView`s at
+  startup (Home circles and the always-mounted composer). Expo modules' JS side only
+  warns when a view config is missing, then the Fabric initializer calls `fatalError`
+  ("Cannot create a view 'GlassView' from module 'ExpoGlassEffect'") when the running
+  binary cannot create the view; a prop conversion failure is swallowed (`try?`), so the
+  tint is not it. Most likely cause: the Expo Go binary's embedded glass module or its
+  glass path differing from the 57.0.3 module in the lockfile. Fix: an adapter boundary
+  (`src/ui/material.tsx`) that never imports `expo-glass-effect` statically (its JS binds
+  the native view at evaluation time) and loads it lazily, once, only when `loadReason`
+  allows: not Expo Go (`expo-constants` `expoGoConfig` / `appOwnership`), not switched
+  off (`EXPO_PUBLIC_DISABLE_GLASS=1`), iOS, and `ExpoGlassEffect.GlassView` registered in
+  the running binary (`globalThis.expo.getViewConfig`, which answers null). **Expo Go
+  therefore always gets the opaque material and never evaluates the module.** The
+  Reduce Transparency query and listener are feature-detected (`subscribeReduceTransparency`)
+  and default to opaque. Más's footer names the active material and why.
+- [x] **Material policy** (`src/ui/material-policy.ts`, pure): `loadReason` (disabled,
+  expo-go, platform, not-registered) then `drawReason` (`isLiquidGlassAvailable()`, the
+  runtime API `isGlassEffectAPIAvailable()` that some iOS 26 betas lack, Reduce
+  Transparency live in `UIProvider`, defaulting to on until iOS answers). Glass is a
+  development-build (expo-dev-client) capability, where the embedded module is the one
+  in the lockfile. `expo-glass-effect@~57.0.3` is declared explicitly (already installed
+  through expo-router); expo-doctor 21/21, `expo install --check`, `npm ls`, audit clean.
+- [x] **Where glass is drawn.** Only two control surfaces, through `ControlSurface`:
+  the four Home actions (regular glass, a cobalt wash on the Assistant, glyph colours
+  unchanged, no ring on glass) and the Assistant composer bar (untinted regular glass;
+  the field, the glyphs and the solid cobalt send button are the glass view's content).
+  Press feedback stays the 0.97 scale: opacity is never animated on a glass view
+  because the effect stops drawing at 0. `isInteractive` is off to avoid a second
+  native bounce over ours.
+- [x] **Where glass is deliberately not drawn.** Transaction, category and detail rows,
+  grouped lists, Reportes cards, the segmented controls and filter pills (Todos / Gastos
+  / Ingresos / Transf., Gastos / Disponible, Categorías / Día a día, ARS / USD; selected
+  state stays the cobalt primary), the draft/evidence cards, the tab bar and headers
+  (the JS tab bar keeps its opaque surface; a system UITabBar with native material is
+  the native-tabs work of the development-build phase, not a custom glass overlay over
+  react-navigation's bar).
+- [x] **Composer geometry.** `composerBottomPadding(keyboard, inset, occupied)`: the
+  bar measures what sits below the screen in window coordinates (the tab bar) and
+  subtracts it, so it rests on the tab bar with the keyboard down and rises exactly to
+  the keyboard when it opens; in a stack it clears the home indicator as before.
+- [x] **Touch targets.** Each Home action is a flexing column (about 80 × 84 pt on a
+  390 pt width, circle plus caption) with an 8 pt gap; no overlapping hit areas.
+- [x] **Checked on Linux:** 275 mobile tests (9 in `material.node.ts`: load and draw
+  matrices, kill switch, Expo Go, unregistered view, failing or throwing module,
+  accessibility API missing or throwing, adapter-only lazy require), TypeScript,
+  expo-doctor, Expo dependency check, `npm ls --all`, `npm audit` (0), Metro iOS export,
+  397 root tests, Vite build, repo hygiene.
+- [x] **Worklet boundary (2026-09-22, fourth push).** The owner's retest surfaced the
+  concrete startup error: "[Worklets] Tried to synchronously call a Remote Function.
+  Called composerBottomPadding on the UI Runtime", from `useAnimatedStyle` in the
+  composer. `composerBottomPadding` was an ordinary imported function, so the animated
+  style held a remote reference. Fix: the `'worklet'` directive as the first statement
+  of its body (`material-policy.ts`); keyboard geometry unchanged. Audit of every
+  `useAnimatedStyle` / `useAnimatedProps` / scroll handler in `src/ui` and `app`: the
+  only other imported helper on the UI runtime, `arcPath` in charts, already carried
+  the directive. Guard: `tests/worklets.node.ts` compiles every animated file with
+  `babel-preset-expo` as Metro does for iOS (Worklets plugin 0.10.1 included), reads
+  the emitted worklets and closures back, and fails when a captured function is not a
+  worklet; removing the directive makes it fail. That proves the plugin output, not the
+  iOS runtime: the iPhone retest has the final word.
+- [x] **EAS link (2026-09-21, third push).** The owner created the EAS project
+  `@facur3/finanzapp-mobile` (`b1cd9780-7e6a-4de3-9248-d446d0c77520`); `eas init` could
+  not write the dynamic config, so `app.config.ts` now carries that ID and
+  `owner: 'facur3'` as defaults, with `EXPO_PUBLIC_EAS_PROJECT_ID` still overriding
+  (validated as a UUID). Bundle identifiers unchanged. Verified: `npx expo config
+  --type public` shows the ID for both variants and the override, `npx eas-cli@latest
+  project:info` resolves the project; `tests/app-config.node.ts` guards it. No
+  credentials, devices or builds were touched.
+- [ ] **Not device-verified:** that Expo Go now starts and stays open without the
+  Worklets error (mode A with the kill switch, then mode B), the Más footer reading
+  "Material opaco (Expo Go)", the
+  composer resting on the tab bar and rising with the keyboard, the centre tab with
+  VoiceOver and large text, Tarjetas from Más with its header "+". Glass itself (look,
+  Reduce Transparency flip) waits for the development build (Producto 23).
+
+### Previous delivery — Producto 21
 
 Producto 21 — Assistant Experience makes the Assistant a first-class capability of the
 product before the cloud model is connected: the real conversational interface, its
@@ -704,7 +802,10 @@ by CI and merged into master before the next starts:
     confirmation, clarification chips, evidence rows and links, disconnected state).
     No Supabase, auth or cloud sync is wired in the app yet; the local SQLite ledger
     remains the source of truth and activation is the next phase.
-11. **EAS development build and Apple integrations** (Face ID, notifications with
+11. ~~AI reachability and native material~~ — delivered in Producto 22 (Assistant
+    centre tab, Tarjetas under Más, Liquid Glass on the two control surfaces with the
+    opaque fallback). Producto 23 is the real cloud/text Assistant activation.
+12. **EAS development build and Apple integrations** (Face ID, notifications with
     the card due-date reminder, Apple Pay capture, App Intents) only after the core
     product is stable on device.
 
@@ -754,8 +855,9 @@ Use [integration contracts](mobile-integrations.md) as the implementation bounda
 
 ### 4. Independent build, Apple and optional sync
 
-- [ ] Link owner's EAS project and enroll Apple when ready for a signed preview;
-  the Expo Go design/ledger step does not need a paid build.
+- [x] Link owner's EAS project (`@facur3/finanzapp-mobile`, Producto 22). [ ] Enroll
+  Apple when ready for a signed preview; the Expo Go design/ledger step does not need
+  a paid build.
 - [ ] Local reminders with opt-in time/timezone/deduplication; no amounts by default.
 - [ ] Face ID/passcode fallback, background privacy and native data protection.
 - [ ] App Intents/widgets/Apple sign-in after signed-device evidence.
@@ -788,6 +890,23 @@ targets, VoiceOver, safe areas, system text and separate currencies apply to eve
 new screen.
 
 ## Handoff log (historical evidence)
+
+### 2026-09-21 — Producto 22: AI reachability and native material
+
+- Assistant as the centre tab (tab root, Home action navigates to it), Tarjetas moved
+  from the bar to Más → Finanzas as a pushed screen with its header action, a pure
+  material policy plus `ControlSurface`, native Liquid Glass through `expo-glass-effect`
+  (already bundled in Expo Go SDK 57) on the four Home actions and the composer only,
+  opaque Producto 21 material everywhere else and whenever any condition fails, Reduce
+  Transparency subscription, tab-bar-aware composer padding. No financial change.
+- **Device regression (owner, 2026-09-21):** Expo Go loaded the project, then closed.
+  Fix pushed to the same PR: lazy adapter boundary, Expo Go forced opaque, kill switch,
+  registry pre-flight, feature-detected accessibility API (see the status section).
+- **Checked on Linux:** 275 mobile tests, TypeScript, expo-doctor, Expo dependency
+  check, dependency tree and audit, Metro iOS export, 397 root tests, Vite build, repo
+  hygiene. **Not device-verified:** Expo Go startup after the fix (modes A and B),
+  composer over the tab bar and keyboard, centre tab with VoiceOver and large text;
+  glass look and Reduce Transparency flip wait for the development build.
 
 ### 2026-09-21 — Producto 21: Assistant experience
 

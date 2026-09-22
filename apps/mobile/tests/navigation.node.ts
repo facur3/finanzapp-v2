@@ -37,7 +37,7 @@ for (const [theme, background] of [['light', '#F5F6F8'], ['dark', '#080B10']]) {
     const { props } = renderLayout(background);
     assert.equal(props.detachInactiveScreens, false);
     const screens = props.children;
-    assert.equal(screens.map((screen: any) => screen.props.name).join(','), 'index,activity,reports,cards,settings');
+    assert.equal(screens.map((screen: any) => screen.props.name).join(','), 'index,activity,assistant,reports,settings');
     for (const screen of screens) {
       const options = { ...props.screenOptions, ...screen.props.options };
       assert.equal(options.animation, 'none');
@@ -51,11 +51,18 @@ for (const [theme, background] of [['light', '#F5F6F8'], ['dark', '#080B10']]) {
   });
 }
 
-test('the fifth tab is Más, and the Assistant preview no longer has a Home header shortcut', () => {
+test('the Assistant is the centre tab, Tarjetas left the bar for Más, and Home keeps one header action', () => {
   const { props } = renderLayout('#F5F6F8');
   const screens = props.children;
   const byName = Object.fromEntries(screens.map((screen: any) => [screen.props.name, screen.props.options]));
-  assert.equal(screens.map((screen: any) => screen.props.options.title).join(','), 'Inicio,Movimientos,Reportes,Tarjetas,Más');
+  assert.equal(screens.map((screen: any) => screen.props.options.title).join(','), 'Inicio,Movimientos,Asistente,Reportes,Más');
+  assert.equal(screens[2].props.name, 'assistant', 'the third of five slots: reachable by either thumb');
+  assert.equal(byName.assistant.tabBarIcon({ color: '#000', size: 24, focused: true }).props.name, 'sparkles');
+  assert.equal(byName.assistant.tabBarIcon({ color: '#000', size: 24, focused: false }).props.name, 'sparkles-outline');
+  assert.equal(byName.assistant.headerRight, undefined, 'New chat is set by the screen itself, only once a conversation exists');
+  assert.equal(byName.cards, undefined, 'Tarjetas is no longer a tab');
+  assert.equal(JSON.stringify(screens).includes('Agregar tarjeta'), false, 'the card header action moved with the screen');
+  assert.equal(JSON.stringify(screens).includes('tabBarBackground'), false, 'the JS tab bar keeps its opaque surface; no forced custom glass over the bar');
   assert.equal(byName.settings.tabBarIcon({ color: '#000', size: 24, focused: true }).props.name, 'ellipsis-horizontal-circle');
   assert.equal(byName.settings.tabBarIcon({ color: '#000', size: 24, focused: false }).props.name, 'ellipsis-horizontal-circle-outline');
   // Home keeps one header action (accounts); the sparkles button is gone until the Assistant is a real capability.
@@ -64,6 +71,5 @@ test('the fifth tab is Más, and the Assistant preview no longer has a Home head
   assert.equal(home.props.name, 'wallet-outline');
   home.props.onPress();
   assert.deepEqual(pushed.at(-1), '/accounts');
-  assert.equal(JSON.stringify(screens).includes('sparkles'), false);
   assert.equal(JSON.stringify(screens).includes('assistant-preview'), false);
 });

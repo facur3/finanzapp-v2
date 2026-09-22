@@ -1,5 +1,21 @@
 # Physical iPhone acceptance checklist
 
+## Producto 22 — AI reachability and native material (pending device review)
+
+- [ ] Before updating, share a private copy. After updating, Más footer reads Producto 22; no account, card, movement, budget or rule changed.
+- [ ] The tab bar reads Inicio, Movimientos, Asistente, Reportes, Más; the centre sparkles icon fills when active; 30–40 tab changes through Asistente do not reproduce the black-tab issue.
+- [ ] Hold the phone in one hand, right thumb then left thumb: the Asistente tab is reached without shifting the grip; compare with the leftmost Home action.
+- [ ] Inicio → Asistente lands on the tab (the tab highlights; no back button, no stacked copy); typing there, switching to Inicio and back keeps the conversation; closing the app clears it.
+- [ ] Más → Finanzas shows Cuentas, Tarjetas, Presupuestos, Recurrentes, Deudas y cobros, Categorías with six distinct restrained tiles; Tarjetas opens the same cards screen with "+" in its header, the carousel, Registrar compra and Pagar tarjeta work as before; saving a new card returns to Tarjetas.
+- [ ] **Worklets retest (2026-09-22):** no native change, so no rebuild: stop Metro, run `npm start -- --clear` (bundler cache only), reload the project in Expo Go. No red screen and no "[Worklets] Tried to synchronously call a Remote Function" at startup; the Asistente tab opens, tapping the field raises the keyboard and the composer follows it exactly; dismissing it interactively follows the drag; the composer rests on the tab bar afterwards.
+- [ ] **Startup, mode A (diagnostic):** from `apps/mobile` run `EXPO_PUBLIC_DISABLE_GLASS=1 npm start -- --clear`, scan the new QR. Expo Go loads and stays open; Inicio shows the four opaque circles (white with hairline in light, surface step in dark, cobalt wash and ring on the Assistant); Más footer reads "Material opaco (desactivado)".
+- [ ] **Startup, mode B (automatic):** stop Metro, run `npm start -- --clear`, scan again. Expo Go loads and stays open with the same opaque circles and composer; Más footer reads "Material opaco (Expo Go)". Both modes: switch tabs 30–40 times through Asistente, open Más → Tarjetas, come back.
+- [ ] If Expo Go still closes in either mode: note which mode, keep the Metro terminal output, and on the Mac/PC capture the crash log from the iPhone (Settings → Privacy & Security → Analytics & Improvements → Analytics Data, the newest `Exponent-…ips` file) or with `xcrun devicectl device info crashes` / Console.app filtered on "Exponent"; the first lines after "Application Specific Information" name the fatalError. Share only the crash text, never financial data.
+- [ ] Glass itself (native Liquid Glass on the circles and the composer, the cobalt wash without ring, the 0.97 press with the glass visible, the Reduce Transparency switch flipping to opaque without a restart) is verified on the development build, not in Expo Go: there the footer must read "Liquid Glass".
+- [ ] Composer in the Asistente tab: with the keyboard down the pill sits just above the tab bar with no empty strip; tap the field: the pill rises to the keyboard's top edge exactly; interactive dismiss follows the drag; large text still caps the field at about five lines.
+- [ ] VoiceOver: the tab reads "Asistente"; Home actions read "Abrir el Asistente", "Registrar gasto", "Registrar ingreso", "Transferir entre cuentas"; the composer reads "Mensaje para el Asistente", "Dictar", "Enviar".
+- [ ] Narrow width (SE / 13 mini if available) and the largest Dynamic Type: four columns still fit, captions wrap to two lines, no overlap between circles.
+
 ## Producto 21 — Assistant experience (pending device review)
 
 - [ ] Before updating, share a private copy. After updating, Más footer reads Producto 21; no account, movement, budget or rule changed.

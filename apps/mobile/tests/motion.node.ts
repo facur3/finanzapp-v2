@@ -112,17 +112,19 @@ test('donut sweeps in from twelve o\'clock only the first time, then crossfades,
   assert.deepEqual(still.paths.map((path: any) => path.props.animatedProps().d), still.paths.map((path: any) => path.props.d));
 });
 
-test('quick actions are four equal columns on Home, Assistant first, and three on account detail', () => {
+test('quick actions are four equal columns on Home, Assistant first, and three on account detail; glass or opaque by material', () => {
   const source = readFileSync(new URL('../src/ui/quick-actions.tsx', import.meta.url), 'utf8');
   const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText;
   const jsx = (type: any, props: any) => ({ type, props });
   const pushed: any[] = [];
   const dark = { secondary: '#666', inset: '#2C2C2E', surface: '#1C1C1E', primary: '#5B87FF', primarySoft: '#122048', isDark: true };
   let palette: any = dark;
+  let material: 'opaque' | 'glass' = 'opaque';
   const modules: Record<string, any> = {
     'react/jsx-runtime': { jsx, jsxs: jsx },
     'react-native': { View: 'View', StyleSheet: { hairlineWidth: 0.5 } },
-    'expo-router': { router: { push: (to: unknown) => pushed.push(to) } },
+    './material': { ControlSurface: 'ControlSurface', useMaterial: () => material },
+    'expo-router': { router: { push: (to: unknown) => pushed.push(to), navigate: (to: unknown) => pushed.push({ navigate: to }) } },
     '@expo/vector-icons/Ionicons': 'Ionicons',
     './components': { AppText: 'AppText', PressFeedback: 'PressFeedback', toneColors: (_p: unknown, tone: string) => ({ color: tone, soft: tone + '-soft' }) },
     './theme': { space: { xs: 4, s: 8, xxxl: 32 }, usePalette: () => palette },
@@ -138,7 +140,7 @@ test('quick actions are four equal columns on Home, Assistant first, and three o
   assert.equal(JSON.stringify(home.map((action: any) => action.props.accessibilityLabel)), JSON.stringify(['Abrir el Asistente', 'Registrar gasto', 'Registrar ingreso', 'Transferir entre cuentas']));
   assert.equal(JSON.stringify(home.map((action: any) => action.props.children[1].props.children)), JSON.stringify(['Asistente', 'Gasto', 'Ingreso', 'Transferir']));
   home.forEach((action: any) => action.props.onPress());
-  assert.equal(JSON.stringify(pushed[0]), JSON.stringify({ pathname: '/assistant', params: { currency: 'USD' } }));
+  assert.equal(JSON.stringify(pushed[0]), JSON.stringify({ navigate: { pathname: '/assistant', params: { currency: 'USD' } } }), 'the Assistant is a tab: navigate to it, never push a copy');
   // Geometry: equal flexible columns (no fixed gaps that overflow a narrow iPhone) and a caption allowed to wrap under large text with the full VoiceOver label kept.
   for (const action of home) {
     assert.equal(action.props.containerStyle.flex, 1);
@@ -147,9 +149,16 @@ test('quick actions are four equal columns on Home, Assistant first, and three o
   }
   assert.equal(module.exports.QUICK_ACTION_SIZE, 54);
   // Restraint: neutral material with the semantic colour only in the glyph; the Assistant is the same object in the brand tint with a thin cobalt ring.
-  const circle = (action: any) => Object.assign({}, ...action.props.children[0].props.style);
+  const surface = (action: any) => action.props.children[0];
+  const circle = (action: any) => ({ ...surface(action).props.style, ...surface(action).props.opaque });
+  for (const action of home) {
+    assert.equal(surface(action).type, 'ControlSurface');
+    assert.equal(surface(action).props.material, 'opaque');
+    assert.equal(circle(action).width, 54);
+    assert.equal(circle(action).borderRadius, 27);
+  }
   assert.equal(JSON.stringify(home.slice(1).map((action: any) => circle(action).backgroundColor)), JSON.stringify(['#2C2C2E', '#2C2C2E', '#2C2C2E']));
-  assert.equal(JSON.stringify(home.map((action: any) => action.props.children[0].props.children.props.color)), JSON.stringify(['#5B87FF', 'expense', 'income', 'transfer']));
+  assert.equal(JSON.stringify(home.map((action: any) => surface(action).props.children.props.color)), JSON.stringify(['#5B87FF', 'expense', 'income', 'transfer']));
   assert.equal(circle(home[0]).backgroundColor, '#122048');
   assert.equal(circle(home[0]).borderWidth, 1);
   assert.ok(String(circle(home[0]).borderColor).startsWith('#5B87FF'));
@@ -160,6 +169,14 @@ test('quick actions are four equal columns on Home, Assistant first, and three o
   assert.equal(circle(light[1]).backgroundColor, '#FFFFFF');
   assert.ok(circle(light[1]).shadowOpacity <= 0.08, 'a soft card shadow in light');
   assert.ok(circle(light[0]).shadowOpacity <= 0.2, 'the Assistant halo stays restrained');
+  // Native glass on iOS 26: same geometry, the opaque style handed over untouched as the fallback, a cobalt wash only on the Assistant.
+  material = 'glass';
+  const glass = render({ currency: 'ARS', assistant: true });
+  assert.equal(JSON.stringify(glass.map((action: any) => surface(action).props.material)), JSON.stringify(['glass', 'glass', 'glass', 'glass']));
+  assert.equal(JSON.stringify(glass.map((action: any) => surface(action).props.tint ?? null)), JSON.stringify(['#2557D640', null, null, null]));
+  assert.equal(surface(glass[0]).props.opaque.borderWidth, 1, 'the opaque fallback is still the ringed version');
+  assert.equal(JSON.stringify(glass.map((action: any) => surface(action).props.children.props.color)), JSON.stringify(['#2557D6', 'expense', 'income', 'transfer']), 'glyph colours are the same on glass');
+  material = 'opaque';
   // Account detail keeps the three movements with the account carried over.
   pushed.length = 0;
   const detail = render({ currency: 'USD', accountId: 'a' });

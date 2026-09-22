@@ -6,6 +6,7 @@ import ts from 'typescript';
 import * as domain from '@finanzapp/domain';
 import * as categories from '../src/ui/categories.ts';
 import * as appearance from '../src/ui/appearance.ts';
+import * as materialPolicy from '../src/ui/material-policy.ts';
 
 // Producto 18: the Más hub, the backup screen and the read-only categories
 // screen with native hosts replaced by descriptors. Not a rendered iOS screen.
@@ -55,6 +56,8 @@ function harness(file: string, data: domain.LedgerArchive = archive) {
     '../src/ui/appearance': appearance, '../../src/ui/appearance': appearance,
     '../src/ui/category-hues': { useCategoryColor: () => '#3E6FB0', useCategoryLabel: (s: string) => s, useCategoryDefinitions: () => [], useCategoryLook: (s: string) => ({ label: s, storedLabel: s, key: String(s).toLowerCase(), hex: '#3E6FB0', glyph: 'pricetag-outline' }), useCategoryLookOf: () => (s: string) => ({ label: s, storedLabel: s, key: String(s).toLowerCase(), hex: '#3E6FB0', glyph: 'pricetag-outline' }), useAccountLook: () => ({ icon: 'wallet', color: 'cobalt', glyph: 'wallet-outline', hex: '#2557D6' }), useAccountLookOf: () => () => ({ icon: 'wallet', color: 'cobalt', glyph: 'wallet-outline', hex: '#2557D6' }) }, '../../src/ui/category-hues': { useCategoryColor: () => '#3E6FB0', useCategoryLabel: (s: string) => s, useCategoryDefinitions: () => [], useCategoryLook: (s: string) => ({ label: s, storedLabel: s, key: String(s).toLowerCase(), hex: '#3E6FB0', glyph: 'pricetag-outline' }), useCategoryLookOf: () => (s: string) => ({ label: s, storedLabel: s, key: String(s).toLowerCase(), hex: '#3E6FB0', glyph: 'pricetag-outline' }), useAccountLook: () => ({ icon: 'wallet', color: 'cobalt', glyph: 'wallet-outline', hex: '#2557D6' }), useAccountLookOf: () => () => ({ icon: 'wallet', color: 'cobalt', glyph: 'wallet-outline', hex: '#2557D6' }) },
     '../src/ui/theme': theme, '../../src/ui/theme': theme,
+    '../src/ui/material': { useMaterialDecision: () => ({ material: 'opaque', reason: 'expo-go' }) }, '../../src/ui/material': { useMaterialDecision: () => ({ material: 'opaque', reason: 'expo-go' }) },
+    '../src/ui/material-policy': materialPolicy, '../../src/ui/material-policy': materialPolicy,
   };
   const module = { exports: {} as { default?: () => Node } };
   runInNewContext(code, { module, exports: module.exports, Date, require: (name: string) => {
@@ -77,27 +80,39 @@ test('Más groups permanent navigation into Finanzas and App y datos, with live 
   const root = view.render();
   assert.deepEqual(nodes(root).filter(node => node.type === 'SectionTitle').map(node => node.props.children), ['Finanzas', 'App y datos']);
   const labels = rows(root).map(row => row.props.label);
-  assert.deepEqual(labels, ['Cuentas', 'Presupuestos', 'Recurrentes', 'Deudas y cobros', 'Categorías', 'Asistente', 'Copia de seguridad', 'Movimientos deshechos']);
-  assert.equal(labels.includes('Tarjetas'), false, 'Tarjetas is a primary tab, not a Más row');
+  assert.deepEqual(labels, ['Cuentas', 'Tarjetas', 'Presupuestos', 'Recurrentes', 'Deudas y cobros', 'Categorías', 'Copia de seguridad', 'Movimientos deshechos']);
+  assert.equal(labels.includes('Asistente'), false, 'the Assistant is the centre tab, not a Más row');
   const value = (label: string) => rows(root).find(row => row.props.label === label)!.props.value;
+  assert.equal(value('Tarjetas'), 'Compras y resúmenes', 'no cards recorded: an honest placeholder');
   assert.equal(value('Recurrentes'), '1 activo');
   assert.equal(value('Deudas y cobros'), '1 pendiente');
   assert.equal(value('Presupuestos'), 'Plan mensual');
-  assert.equal(value('Asistente'), 'Preguntá o registrá', 'the Assistant row describes the capability, not a model status');
   assert.equal(value('Movimientos deshechos'), '1 recuperable');
   for (const row of rows(root)) row.props.onPress();
-  assert.deepEqual(view.pushed, ['/accounts', '/budgets', '/recurring', '/debts', '/categories', '/assistant', '/backup', '/undone-entries']);
+  assert.deepEqual(view.pushed, ['/accounts', '/cards', '/budgets', '/recurring', '/debts', '/categories', '/backup', '/undone-entries']);
   // Each group closes its last row; no export button or sharing lives on the hub any more.
   assert.deepEqual(rows(root).filter(row => row.props.last).map(row => row.props.label), ['Categorías', 'Movimientos deshechos']);
   assert.equal(nodes(root).some(node => node.type === 'ActionButton'), false);
   const texts = nodes(root).filter(node => node.type === 'AppText').map(node => String(node.props.children)).join(' ');
-  assert.match(texts, /Producto 21/);
+  assert.match(texts, /Producto 22/);
+  assert.match(texts, /Material opaco \(Expo Go\)/, 'the footer says which control material this session draws, so a tester can confirm the mode');
   assert.equal(value('Categorías'), 'Gastos e ingresos');
   // Finanzas rows carry a soft identity tile from the shared palette; App y datos rows stay neutral glyphs.
   const leading = rows(root).map(row => row.props.leading?.type ?? null);
-  assert.deepEqual(leading, ['GlyphTile', 'GlyphTile', 'GlyphTile', 'GlyphTile', 'GlyphTile', null, null, null]);
-  assert.equal(new Set(rows(root).slice(0, 5).map(row => row.props.leading.props.color)).size, 5, 'five distinct restrained colours, no row painted');
+  assert.deepEqual(leading, ['GlyphTile', 'GlyphTile', 'GlyphTile', 'GlyphTile', 'GlyphTile', 'GlyphTile', null, null]);
+  assert.equal(new Set(rows(root).slice(0, 6).map(row => row.props.leading.props.color)).size, 6, 'six distinct restrained colours, no row painted');
   assert.match(texts, /sincronización todavía no está activada/);
+});
+
+test('Más → Tarjetas counts active credit cards and opens the pushed Tarjetas screen', () => {
+  const card: domain.CreditCardProfile = { id: 'card', accountId: cash.id, issuer: 'Visa', last4: '4009', creditLimitMinor: null, closingDay: 28, dueDay: 5, active: true, createdAt, revision: 0, updatedAt: createdAt };
+  const view = harness('(tabs)/settings.tsx', { ...archive, cards: [card, { ...card, id: 'old', active: false }] });
+  const root = view.render();
+  const row = rows(root).find(item => item.props.label === 'Tarjetas')!;
+  assert.equal(row.props.value, '1 tarjeta de crédito');
+  assert.equal(row.props.leading.props.icon, 'card-outline');
+  row.props.onPress();
+  assert.deepEqual(view.pushed, ['/cards']);
 });
 
 test('Más empty ledger shows honest placeholders instead of zero counts', () => {

@@ -4,6 +4,7 @@ import { test } from 'node:test';
 import { runInNewContext } from 'node:vm';
 import ts from 'typescript';
 import * as conversation from '../src/assistant/conversation.ts';
+import * as materialPolicy from '../src/ui/material-policy.ts';
 import * as presentation from '../src/ui/presentation.ts';
 
 // Producto 21: the composer and the message components at source level, with
@@ -11,7 +12,7 @@ import * as presentation from '../src/ui/presentation.ts';
 // checks structure, labels and state logic; rendering, VoiceOver order,
 // keyboard tracking and the pulse need the iPhone.
 type Node = { type: any; props: Record<string, any> };
-function load(file: string, { reduced = false, fontScale = 1, dark = false, bottomInset = 34 } = {}) {
+function load(file: string, { reduced = false, fontScale = 1, dark = false, bottomInset = 34, material = 'opaque' as 'opaque' | 'glass' } = {}) {
   const source = readFileSync(new URL('../src/ui/' + file, import.meta.url), 'utf8');
   const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText;
   const jsx = (type: any, props: any) => ({ type, props });
@@ -24,9 +25,12 @@ function load(file: string, { reduced = false, fontScale = 1, dark = false, bott
     : { isDark: false, background: '#F2F2F6', surface: '#FFFFFF', inset: '#EEEEF3', text: '#0A0A0C', secondary: '#6E7078', tertiary: '#8E9098', line: '#E6E6EC', primary: '#2557D6', primaryFill: '#2557D6', onPrimary: '#FFF', primarySoft: '#E5ECFB', income: '#15804F', warning: '#B45309' };
   const modules: Record<string, any> = {
     react: { useState: (initial: unknown) => { const index = cursor++; if (!(index in state)) state[index] = initial; return [state[index], (value: unknown) => { state[index] = typeof value === 'function' ? (value as (c: unknown) => unknown)(state[index]) : value; }]; },
+      useRef: (initial: unknown) => { const index = cursor++; if (!(index in state)) state[index] = { current: initial }; return state[index]; },
       useEffect: (fn: () => unknown) => { fn(); } },
     'react/jsx-runtime': { jsx, jsxs: jsx, Fragment: 'Fragment' },
     'react-native': { View: 'View', TextInput: 'TextInput', StyleSheet: { hairlineWidth: 0.5, create: (styles: unknown) => styles }, Platform: { OS: 'ios' }, useWindowDimensions: () => ({ fontScale, width: 390, height: 844 }) },
+    './material': { ControlSurface: 'ControlSurface', useMaterial: () => material },
+    './material-policy': materialPolicy,
     'react-native-reanimated': { __esModule: true, default: { View: 'Animated.View' }, Easing: { inOut: (f: unknown) => f, quad: 'quad' },
       useAnimatedKeyboard: () => ({ height: { value: 0 }, state: { value: 0 } }),
       useAnimatedStyle: (fn: () => unknown) => fn, useSharedValue: (value: number) => { const item = { value }; shared.push(item); return item; },
@@ -98,16 +102,42 @@ test('the composer labels its field, microphone and send; send is disabled when 
   assert.equal(flat(nodes(large.render('AssistantComposer', props)).find(node => node.type === 'TextInput')!.props.style).maxHeight, Math.round(22 * 1.6 * 5));
 });
 
-test('the composer keeps the safe area when the keyboard is down and follows the keyboard frame when it is up', () => {
+test('the composer clears the safe area or the keyboard, minus what already sits below it (a tab bar), and rides the keyboard on the UI thread', () => {
   const ui = load('assistant-composer.tsx', { bottomInset: 34 });
   const root = ui.render('AssistantComposer', { value: '', onChange: () => {}, onSend: () => {}, onStop: () => {}, busy: false });
   const space = nodes(root).find(node => node.type === 'Animated.View')!;
   const animated = space.props.style[1] as () => { paddingBottom: number };
-  assert.equal(animated().paddingBottom, 34 + 8, 'home indicator clear, plus the bar\'s own breathing room');
+  assert.equal(animated().paddingBottom, 34 + 8, 'in a stack: home indicator clear, plus the bar\'s own breathing room');
+  // As a tab root, the measured tab bar below the screen is subtracted: nothing to add while the keyboard is down.
+  space.props.ref.current = { measureInWindow: (done: (x: number, y: number, w: number, h: number) => void) => done(0, 100, 390, 844 - 100 - 83) };
+  space.props.onLayout();
+  const again = nodes(ui.render('AssistantComposer', { value: '', onChange: () => {}, onSend: () => {}, onStop: () => {}, busy: false })).find(node => node.type === 'Animated.View')!;
+  assert.equal((again.props.style[1] as () => { paddingBottom: number })().paddingBottom, 8);
+  assert.equal(materialPolicy.composerBottomPadding(336, 34, 83), 253, 'keyboard up over a tab bar: the bar rises to the keyboard\'s top edge');
+  assert.equal(materialPolicy.composerBottomPadding(336, 34, 0), 336, 'keyboard up in a stack');
+  assert.equal(materialPolicy.composerBottomPadding(0, 0, 0), 0);
   const source = readFileSync(new URL('../src/ui/assistant-composer.tsx', import.meta.url), 'utf8');
   assert.match(source, /useAnimatedKeyboard\(\)/, 'keyboard tracking on the UI thread, no manual offset guessing');
-  assert.match(source, /Math\.max\(keyboard\.height\.value, bottomInset\)/);
   assert.equal(source.includes('KeyboardAvoidingView'), false);
+});
+
+test('the composer bar is a control surface: native glass when the material allows it, the opaque pill otherwise; the send button stays solid', () => {
+  const props = { value: 'hola', onChange: () => {}, onSend: () => {}, onStop: () => {}, busy: false };
+  const opaque = nodes(load('assistant-composer.tsx').render('AssistantComposer', props)).find(node => node.type === 'ControlSurface')!;
+  assert.equal(opaque.props.material, 'opaque');
+  assert.equal(opaque.props.opaque.backgroundColor, '#FFFFFF');
+  assert.equal(opaque.props.opaque.borderWidth, 0.5, 'hairline edge on the opaque pill');
+  assert.ok(opaque.props.opaque.shadowOpacity <= 0.08);
+  assert.equal(flat(opaque.props.style).borderRadius, 24);
+  const dark = nodes(load('assistant-composer.tsx', { dark: true }).render('AssistantComposer', props)).find(node => node.type === 'ControlSurface')!;
+  assert.equal(dark.props.opaque.backgroundColor, '#1C1C1E');
+  assert.equal(dark.props.opaque.shadowOpacity, undefined, 'no shadow in dark');
+  const glass = nodes(load('assistant-composer.tsx', { material: 'glass' }).render('AssistantComposer', props)).find(node => node.type === 'ControlSurface')!;
+  assert.equal(glass.props.material, 'glass');
+  assert.equal(glass.props.tint, undefined, 'the composer is untinted glass: the text keeps its own contrast');
+  assert.ok(nodes(glass).some(node => node.type === 'TextInput'), 'the field is content of the glass view');
+  const send = byLabel(glass, 'Enviar')!;
+  assert.equal(flat(nodes(send).find(node => node.type === 'View')!.props.style).backgroundColor, '#2557D6', 'the send button is solid on glass too');
 });
 
 test('a draft card lists kind, amount, merchant, category, account and date, confirms only when complete, and collapses when cancelled or edited', () => {

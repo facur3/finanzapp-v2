@@ -351,7 +351,42 @@ importe, moneda y estado.
   enviar, el texto vuelve intacto al campo y una nota con ícono lo explica. Sin respuesta
   inventada, sin envío remoto.
 
+## Producto 22 — alcance con el pulgar y material nativo
+
+- **Pestañas.** Inicio, Movimientos, **Asistente**, Reportes, Más. El centro inferior
+  es el punto equidistante para el pulgar derecho y el izquierdo y queda dentro de la
+  zona cómoda en un iPhone chico y en uno grande; la fila de acciones de Inicio vive en
+  el tercio superior, con su primer botón lejos del pulgar derecho y el último lejos del
+  izquierdo. El ícono es sparkles (relleno al estar activo), en la misma familia que los
+  demás; nada lo agranda ni lo colorea distinto. Tarjetas pasa a Más → Finanzas, segunda
+  fila, tile grafito con el mismo sistema contenido; Más no se vuelve un arcoíris.
+- **Inicio conserva Asistente** como primera acción rápida mientras la capacidad es
+  nueva; ambas entradas llevan a la misma conversación (la pestaña, sin apilar copias).
+- **Material.** Dos superficies de control, y solo dos: los cuatro círculos de Inicio y
+  la píldora del compositor. En iOS 26, con la API presente y sin Reducir transparencia,
+  se dibujan con Liquid Glass nativo en estilo regular (cuerpo suficiente detrás de un
+  glifo o de un campo de texto); el Asistente lleva un lavado cobalto al 25 % y ningún
+  anillo, porque el material ya trae el borde. Eso ocurre solo en un development build:
+  Expo Go siempre usa el material opaco y no carga el módulo de vidrio (una decoración
+  jamás puede cerrar la app). En cualquier otro caso se mantiene el material opaco de
+  Producto 21 tal cual: no es un estado roto, es el diseño para esos dispositivos. El pie
+  de Más dice qué material se dibuja y por qué. Los glifos conservan sus colores semánticos; el botón de enviar sigue
+  siendo cobalto sólido sobre el vidrio. La respuesta al toque sigue siendo la escala
+  0,97; nunca opacidad, que apaga el vidrio.
+- **Sin vidrio.** Filas de movimientos y categorías, listas agrupadas, tarjetas de
+  Reportes, segmentados y píldoras de filtro (el seleccionado sigue en cobalto), la
+  tarjeta de borrador y la evidencia del Asistente, cabeceras y barra de pestañas (la
+  barra JS sigue opaca; una UITabBar del sistema con material nativo es trabajo de la
+  fase de development build, no una capa de vidrio forzada encima).
+
 ## Pendiente de revisión en iPhone
+
+- Producto 22: si Expo Go en el iPhone 14 Pro (iOS 26.6.1) informa Liquid Glass
+  disponible y cómo se ven los cuatro círculos y el compositor sobre ambos fondos;
+  activar Reducir transparencia en Accesibilidad y ver el cambio al material opaco sin
+  reiniciar; el compositor apoyado sobre la barra de pestañas con el teclado cerrado y
+  subiendo exacto al abrirlo; la pestaña central con VoiceOver y texto grande; Más →
+  Tarjetas con su "+" en la cabecera y volver con el gesto.
 
 - Producto 21: las cuatro acciones en iPhone SE / 13 mini y con texto grande (leyendas a
   dos líneas, ningún desborde), el material en ambos temas, el anillo cobalto del

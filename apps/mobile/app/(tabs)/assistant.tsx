@@ -1,22 +1,25 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { FlatList, View, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native';
-import { router, Stack, useLocalSearchParams } from 'expo-router';
+import { router, Tabs, useLocalSearchParams } from 'expo-router';
 import { randomUUID } from 'expo-crypto';
 import { formatMinorUnits, validateEntry, type Currency, type Entry } from '@finanzapp/domain';
-import { assistantForBuild } from '../src/assistant/runtime';
+import { assistantForBuild } from '../../src/assistant/runtime';
 import { REASON_TEXT, SUGGESTIONS, classifyIntent, completeDraft, contentFromResult, conversationReducer, emptyConversation, entryFromDraft,
-  shouldAutoscroll, type ClarificationOption, type DraftContent, type EvidenceLink, type Message } from '../src/assistant/conversation';
-import { monthlyEvidence } from '../src/integrations/evidence';
-import { useLedger } from '../src/storage/LedgerProvider';
-import { AssistantComposer } from '../src/ui/assistant-composer';
-import { AnswerEvidence, AssistantText, ClarificationChoices, DraftCard, Suggestions, SystemNote, UserMessage } from '../src/ui/assistant-messages';
-import { AppText, IconButton } from '../src/ui/components';
-import { postingAccounts } from '../src/ui/liability-presentation';
-import { Appear, impactHaptic, successHaptic } from '../src/ui/motion';
-import { availableCurrencies } from '../src/ui/presentation';
-import { space, useCurrentDay, usePalette, useReduceMotion } from '../src/ui/theme';
+  shouldAutoscroll, type ClarificationOption, type DraftContent, type EvidenceLink, type Message } from '../../src/assistant/conversation';
+import { monthlyEvidence } from '../../src/integrations/evidence';
+import { useLedger } from '../../src/storage/LedgerProvider';
+import { AssistantComposer } from '../../src/ui/assistant-composer';
+import { AnswerEvidence, AssistantText, ClarificationChoices, DraftCard, Suggestions, SystemNote, UserMessage } from '../../src/ui/assistant-messages';
+import { AppText, IconButton } from '../../src/ui/components';
+import { postingAccounts } from '../../src/ui/liability-presentation';
+import { Appear, impactHaptic, successHaptic } from '../../src/ui/motion';
+import { availableCurrencies } from '../../src/ui/presentation';
+import { space, useCurrentDay, usePalette, useReduceMotion } from '../../src/ui/theme';
 
-/** The Assistant: one ephemeral conversation over the local ledger.
+/** The Assistant: one ephemeral conversation over the local ledger, as the
+ * centre tab (reachable by either thumb from anywhere; the Home quick action
+ * lands here too). The tab root stays mounted, so the conversation survives
+ * a tab change while the app is open and nothing is persisted.
  *
  * The screen owns no financial rules. It sends text to the client boundary
  * (`assistantForBuild`, disconnected in this build), reduces the events into
@@ -129,7 +132,7 @@ export default function AssistantScreen() {
     ? <AppText tertiary variant="caption" style={{ textAlign: 'center' }}>No conectado en esta versión. Lo que escribas queda en tu iPhone.</AppText> : null;
 
   return <View style={{ flex: 1, backgroundColor: p.background }}>
-    <Stack.Screen options={{ title: 'Asistente',
+    <Tabs.Screen options={{ title: 'Asistente',
       headerRight: state.messages.length ? () => <IconButton name="create-outline" label="Nuevo chat" onPress={() => { stop(); dispatch({ type: 'reset' }); }} /> : undefined }} />
     {client.mode === 'fixture' && <View accessible accessibilityRole="text" style={{ backgroundColor: p.warningSoft, paddingHorizontal: space.xl, paddingVertical: space.s }}>
       <AppText variant="footnote" style={{ color: p.warning, fontWeight: '600', textAlign: 'center' }}>Vista de prueba: respuestas de ejemplo, nada se guarda.</AppText>

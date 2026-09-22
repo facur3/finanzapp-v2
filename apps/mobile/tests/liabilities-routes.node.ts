@@ -86,8 +86,8 @@ function find(root: Node, type: string, label?: string): Node {
   return node;
 }
 
-test('cards tab shows an honest empty state and a debts invitation without any card', () => {
-  const root = harness('(tabs)/cards.tsx', {}, empty).render();
+test('Tarjetas shows an honest empty state and a debts invitation without any card', () => {
+  const root = harness('cards.tsx', {}, empty).render();
   assert.equal(find(root, 'EmptyState').props.title, 'Tus tarjetas, como en la billetera');
   assert.equal(nodes(root).some(node => node.type === 'CardCarousel'), false);
   find(root, 'EmptyState').props.action.props.onPress();
@@ -95,9 +95,17 @@ test('cards tab shows an honest empty state and a debts invitation without any c
   assert.equal(nodes(root).some(node => node.type === 'SectionTitle' && node.props.children === 'Deudas y cobros'), false, 'personal debts live under Más');
 });
 
-test('cards tab summarizes the selected card from recorded purchases and payments, never a synced balance', () => {
-  const view = harness('(tabs)/cards.tsx');
+test('Tarjetas summarizes the selected card from recorded purchases and payments, never a synced balance', () => {
+  const view = harness('cards.tsx');
   const root = view.render();
+  // The screen is pushed from Más now; its "+" lives in its own header.
+  const header = nodes(root).find(node => node.type === 'Stack.Screen')!.props.options;
+  assert.equal(header.title, 'Tarjetas');
+  const add = header.headerRight();
+  assert.equal(add.type, 'IconButton');
+  assert.equal(add.props.label, 'Agregar tarjeta');
+  add.props.onPress();
+  assert.equal(view.pushed.at(-1), '/new-card');
   const carousel = find(root, 'CardCarousel');
   assert.deepEqual(carousel.props.items.map((item: { id: string }) => item.id), ['card', 'usd-card']);
   const face = find(root, 'CardFace');
@@ -126,7 +134,7 @@ test('cards tab summarizes the selected card from recorded purchases and payment
 });
 
 test('switching the carousel selection changes the panel, and a card without limit hides availability', () => {
-  const view = harness('(tabs)/cards.tsx');
+  const view = harness('cards.tsx');
   find(view.render(), 'CardCarousel').props.onSelect(1);
   const root = view.render();
   assert.equal(find(root, 'CardCarousel').props.selectedIndex, 1);
