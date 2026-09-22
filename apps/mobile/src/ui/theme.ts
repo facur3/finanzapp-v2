@@ -2,6 +2,7 @@ import { createContext, createElement, useContext, useEffect, useState, type Rea
 import { AccessibilityInfo, AppState, useColorScheme, type TextStyle } from 'react-native';
 import { todayKey } from '@finanzapp/domain';
 
+import { subscribeReduceTransparency } from './material-policy';
 import { darkPalette, lightPalette, type PaletteColors } from './palette';
 
 export type Palette = PaletteColors & {
@@ -48,10 +49,9 @@ export function UIProvider({ children }: { children: ReactNode }) {
     let mounted = true;
     void AccessibilityInfo.isReduceMotionEnabled().then(value => { if (mounted) setReduced(value); }).catch(() => {});
     const subscription = AccessibilityInfo.addEventListener('reduceMotionChanged', setReduced);
-    // iOS only: Android and web have no such setting, so the promise rejects or resolves false and the opaque material stays.
-    void AccessibilityInfo.isReduceTransparencyEnabled().then(value => { if (mounted) setReducedTransparency(value); }).catch(() => {});
-    const transparency = AccessibilityInfo.addEventListener('reduceTransparencyChanged', setReducedTransparency);
-    return () => { mounted = false; subscription.remove(); transparency.remove(); };
+    // iOS only, and feature-detected: an older or mismatched runtime without the API, or one that throws, keeps the opaque material.
+    const transparency = subscribeReduceTransparency(AccessibilityInfo as Parameters<typeof subscribeReduceTransparency>[0], setReducedTransparency);
+    return () => { mounted = false; subscription.remove(); transparency(); };
   }, []);
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout>;

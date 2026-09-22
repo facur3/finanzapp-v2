@@ -25,9 +25,11 @@ solo rellenan el importe. Sin rediseño visual ni cambios de esquema.
 Movimientos, **Asistente**, Reportes, Más), alcanzable con cualquier pulgar desde
 cualquier pantalla; Tarjetas sale de la barra y es la segunda fila de Más → Finanzas,
 con su misma pantalla y su "+". Las cuatro acciones de Inicio y el compositor del
-Asistente se dibujan con Liquid Glass nativo (`expo-glass-effect`) solo en iOS 26 con
-la API disponible y sin Reducir transparencia; en cualquier otro caso conservan el
-material opaco de Producto 21. Sin cambios financieros ni activación de nube.
+Asistente se dibujan con Liquid Glass nativo (`expo-glass-effect`) solo en un
+development build en iOS 26 con la API disponible y sin Reducir transparencia; en Expo Go,
+y en cualquier otro caso, conservan el material opaco de Producto 21 y el módulo de vidrio
+ni siquiera se evalúa (`EXPO_PUBLIC_DISABLE_GLASS=1` lo fuerza en cualquier entorno). Sin
+cambios financieros ni activación de nube.
 
 **Interfaz 07:** nuevo Inicio con períodos, barras y detalle; saldo inicial opcional,
 paleta índigo y superficies tranquilas. Base de API autenticada, bandeja de capturas

@@ -38,13 +38,31 @@ native Liquid Glass where iOS provides it. No financial semantics, no cloud.
   active cards), Presupuestos, Recurrentes, Deudas y cobros, Categorías. Card
   accounting, forms, detail and `router.replace('/cards')` after saving are unchanged.
   The Más → Asistente row is gone (it is a tab).
-- [x] **Material policy** (`src/ui/material-policy.ts`, pure): glass only when
-  platform is iOS, `isLiquidGlassAvailable()` (iOS 26+, Liquid Glass SDK), the runtime
-  API is present (`isGlassEffectAPIAvailable()`, some iOS 26 betas lack it) and Reduce
-  Transparency is off (live `AccessibilityInfo` subscription in `UIProvider`, defaulting
-  to on until iOS answers). `expo-glass-effect@~57.0.3` is declared explicitly; it was
-  already installed through expo-router and is in Expo Go's SDK 57 native modules, so
-  no new native code and no Expo Go breakage. A throwing native module means opaque.
+- [x] **Startup regression and fix (2026-09-21, second push).** The owner's first
+  device run closed Expo Go right after the bundle loaded. Not reproduced on Linux (no
+  device); cause narrowed by reading the installed native code: a JavaScript guard
+  cannot prevent a native abort, and Producto 22 mounted five native `GlassView`s at
+  startup (Home circles and the always-mounted composer). Expo modules' JS side only
+  warns when a view config is missing, then the Fabric initializer calls `fatalError`
+  ("Cannot create a view 'GlassView' from module 'ExpoGlassEffect'") when the running
+  binary cannot create the view; a prop conversion failure is swallowed (`try?`), so the
+  tint is not it. Most likely cause: the Expo Go binary's embedded glass module or its
+  glass path differing from the 57.0.3 module in the lockfile. Fix: an adapter boundary
+  (`src/ui/material.tsx`) that never imports `expo-glass-effect` statically (its JS binds
+  the native view at evaluation time) and loads it lazily, once, only when `loadReason`
+  allows: not Expo Go (`expo-constants` `expoGoConfig` / `appOwnership`), not switched
+  off (`EXPO_PUBLIC_DISABLE_GLASS=1`), iOS, and `ExpoGlassEffect.GlassView` registered in
+  the running binary (`globalThis.expo.getViewConfig`, which answers null). **Expo Go
+  therefore always gets the opaque material and never evaluates the module.** The
+  Reduce Transparency query and listener are feature-detected (`subscribeReduceTransparency`)
+  and default to opaque. Más's footer names the active material and why.
+- [x] **Material policy** (`src/ui/material-policy.ts`, pure): `loadReason` (disabled,
+  expo-go, platform, not-registered) then `drawReason` (`isLiquidGlassAvailable()`, the
+  runtime API `isGlassEffectAPIAvailable()` that some iOS 26 betas lack, Reduce
+  Transparency live in `UIProvider`, defaulting to on until iOS answers). Glass is a
+  development-build (expo-dev-client) capability, where the embedded module is the one
+  in the lockfile. `expo-glass-effect@~57.0.3` is declared explicitly (already installed
+  through expo-router); expo-doctor 21/21, `expo install --check`, `npm ls`, audit clean.
 - [x] **Where glass is drawn.** Only two control surfaces, through `ControlSurface`:
   the four Home actions (regular glass, a cobalt wash on the Assistant, glyph colours
   unchanged, no ring on glass) and the Assistant composer bar (untinted regular glass;
@@ -65,14 +83,16 @@ native Liquid Glass where iOS provides it. No financial semantics, no cloud.
   the keyboard when it opens; in a stack it clears the home indicator as before.
 - [x] **Touch targets.** Each Home action is a flexing column (about 80 × 84 pt on a
   390 pt width, circle plus caption) with an 8 pt gap; no overlapping hit areas.
-- [x] **Checked on Linux:** 271 mobile tests (7 new in `material.node.ts`, guards
-  updated), TypeScript, Expo dependency check, `npm ls --all`, `npm audit` (0), Metro
-  iOS export, 397 root tests, Vite build, repo hygiene.
-- [ ] **Not device-verified:** whether Expo Go on the iPhone 14 Pro / iOS 26.6.1
-  reports Liquid Glass available and how the glass reads over both backgrounds, the
-  Reduce Transparency fallback flip at runtime, the composer resting on the tab bar and
-  rising with the keyboard, the centre tab with VoiceOver and large text, Tarjetas from
-  Más with its header "+".
+- [x] **Checked on Linux:** 275 mobile tests (9 in `material.node.ts`: load and draw
+  matrices, kill switch, Expo Go, unregistered view, failing or throwing module,
+  accessibility API missing or throwing, adapter-only lazy require), TypeScript,
+  expo-doctor, Expo dependency check, `npm ls --all`, `npm audit` (0), Metro iOS export,
+  397 root tests, Vite build, repo hygiene.
+- [ ] **Not device-verified:** that Expo Go now starts and stays open (mode A with the
+  kill switch, then mode B), the Más footer reading "Material opaco (Expo Go)", the
+  composer resting on the tab bar and rising with the keyboard, the centre tab with
+  VoiceOver and large text, Tarjetas from Más with its header "+". Glass itself (look,
+  Reduce Transparency flip) waits for the development build (Producto 23).
 
 ### Previous delivery — Producto 21
 
@@ -856,10 +876,14 @@ new screen.
   (already bundled in Expo Go SDK 57) on the four Home actions and the composer only,
   opaque Producto 21 material everywhere else and whenever any condition fails, Reduce
   Transparency subscription, tab-bar-aware composer padding. No financial change.
-- **Checked on Linux:** 271 mobile tests, TypeScript, Expo dependency check, dependency
-  tree and audit, Metro iOS export, 397 root tests, Vite build, repo hygiene.
-  **Not device-verified:** glass availability and look, Reduce Transparency flip,
-  composer over the tab bar and keyboard, centre tab with VoiceOver and large text.
+- **Device regression (owner, 2026-09-21):** Expo Go loaded the project, then closed.
+  Fix pushed to the same PR: lazy adapter boundary, Expo Go forced opaque, kill switch,
+  registry pre-flight, feature-detected accessibility API (see the status section).
+- **Checked on Linux:** 275 mobile tests, TypeScript, expo-doctor, Expo dependency
+  check, dependency tree and audit, Metro iOS export, 397 root tests, Vite build, repo
+  hygiene. **Not device-verified:** Expo Go startup after the fix (modes A and B),
+  composer over the tab bar and keyboard, centre tab with VoiceOver and large text;
+  glass look and Reduce Transparency flip wait for the development build.
 
 ### 2026-09-21 — Producto 21: Assistant experience
 

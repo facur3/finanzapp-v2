@@ -4,6 +4,8 @@ import { currentMonthISO, todayKey } from '@finanzapp/domain';
 import { useLedger } from '../../src/storage/LedgerProvider';
 import { FINANCE_ROW_LOOKS, appearanceHex } from '../../src/ui/appearance';
 import { AppText, DetailRow, GlyphTile, Screen, SectionTitle, Surface } from '../../src/ui/components';
+import { useMaterialDecision } from '../../src/ui/material';
+import { MATERIAL_LABELS } from '../../src/ui/material-policy';
 import { usePalette } from '../../src/ui/theme';
 
 /** Más is the secondary navigation hub: everything that is not one of the four
@@ -16,6 +18,8 @@ import { usePalette } from '../../src/ui/theme';
 export default function MoreScreen() {
   const { archive } = useLedger();
   const p = usePalette();
+  // Which control material this session draws and why: lets a tester confirm the opaque or glass mode without guessing.
+  const material = useMaterialDecision();
   const activeRecurring = archive?.recurring?.filter(rule => rule.active).length ?? 0;
   const activeDebts = archive?.debts?.filter(debt => debt.active).length ?? 0;
   const currentBudgets = archive?.budgets?.filter(budget => budget.active && budget.monthISO === currentMonthISO(todayKey())).length ?? 0;
@@ -47,6 +51,6 @@ export default function MoreScreen() {
         Tus registros quedan en este dispositivo y podés registrar sin conexión. La sincronización todavía no está activada.
       </AppText>
     </View>
-    <AppText secondary style={{ textAlign: 'center', fontSize: 13 }}>FinanzApp · Piloto nativo 0.1.0 · Producto 22</AppText>
+    <AppText secondary style={{ textAlign: 'center', fontSize: 13 }}>FinanzApp · Piloto nativo 0.1.0 · Producto 22 · {MATERIAL_LABELS[material.reason]}</AppText>
   </Screen>;
 }

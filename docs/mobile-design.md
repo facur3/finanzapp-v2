@@ -366,9 +366,11 @@ importe, moneda y estado.
   la píldora del compositor. En iOS 26, con la API presente y sin Reducir transparencia,
   se dibujan con Liquid Glass nativo en estilo regular (cuerpo suficiente detrás de un
   glifo o de un campo de texto); el Asistente lleva un lavado cobalto al 25 % y ningún
-  anillo, porque el material ya trae el borde. En cualquier otro caso se mantiene el
-  material opaco de Producto 21 tal cual: no es un estado roto, es el diseño para esos
-  dispositivos. Los glifos conservan sus colores semánticos; el botón de enviar sigue
+  anillo, porque el material ya trae el borde. Eso ocurre solo en un development build:
+  Expo Go siempre usa el material opaco y no carga el módulo de vidrio (una decoración
+  jamás puede cerrar la app). En cualquier otro caso se mantiene el material opaco de
+  Producto 21 tal cual: no es un estado roto, es el diseño para esos dispositivos. El pie
+  de Más dice qué material se dibuja y por qué. Los glifos conservan sus colores semánticos; el botón de enviar sigue
   siendo cobalto sólido sobre el vidrio. La respuesta al toque sigue siendo la escala
   0,97; nunca opacidad, que apaga el vidrio.
 - **Sin vidrio.** Filas de movimientos y categorías, listas agrupadas, tarjetas de

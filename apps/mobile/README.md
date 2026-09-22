@@ -107,14 +107,33 @@ thumb reaches it from any screen; the Home quick action stays as a discoverabili
 shortcut and lands on the same tab (`router.navigate`, never a stacked copy). Tarjetas
 leaves the bar and is the second Finanzas row under Más, pushed as its own screen with
 its "+" in the header; nothing about cards changed. The four Home actions and the
-Assistant composer become **control surfaces** (`src/ui/material.tsx`): on iOS 26 with
-`isLiquidGlassAvailable()`, `isGlassEffectAPIAvailable()` and Reduce Transparency off
-they are native Liquid Glass (`expo-glass-effect`, the SDK 57 version already bundled
-in Expo Go; regular glass, a cobalt wash on the Assistant, no ring); on older iOS,
-Android, web, a beta without the API, or with Reduce Transparency they keep the opaque
-material of Producto 21 unchanged. Glass is never drawn on rows, chips, lists, cards
-or the tab bar. The composer measures what sits below it (the tab bar) so it rests on
-the bar with the keyboard down and rises exactly to the keyboard when it opens.
+Assistant composer become **control surfaces** (`src/ui/material.tsx`, the only door to
+`expo-glass-effect`). **Expo Go always draws the opaque material of Producto 21 and never
+evaluates the glass module**: the first device run of Producto 22 closed Expo Go right
+after loading, and mounting a native view the running binary cannot create ends in a
+native `fatalError` inside Expo's Fabric initializer that no JavaScript try/catch can
+reach. So the module is required lazily, once, and only when four conditions hold: not
+Expo Go (`expo-constants`), not switched off (`EXPO_PUBLIC_DISABLE_GLASS=1`, a UI flag,
+not a secret), iOS, and the running binary has registered `ExpoGlassEffect.GlassView`
+(read from the module registry, which answers null instead of throwing). Only then does
+it ask `isLiquidGlassAvailable()` and `isGlassEffectAPIAvailable()`, and Reduce
+Transparency (feature-detected, live) still wins. Native Liquid Glass is therefore a
+**development build** capability (regular glass, a cobalt wash on the Assistant, no
+ring); Expo Go, older iOS, Android, web, a beta without the API, a missing module or
+Reduce Transparency keep the opaque material unchanged. Glass is never drawn on rows,
+chips, lists, cards or the tab bar. Más's footer names the active material and why
+("Material opaco (Expo Go)", "Liquid Glass"). The composer measures what sits below it
+(the tab bar) so it rests on the bar with the keyboard down and rises exactly to the
+keyboard when it opens.
+
+Two ways to run the pilot while checking the material:
+
+```bash
+# A. Diagnostic: opaque material forced everywhere, glass module never loaded.
+EXPO_PUBLIC_DISABLE_GLASS=1 npm start -- --clear
+# B. Normal automatic mode (Expo Go: opaque; a development build on iOS 26: glass).
+npm start -- --clear
+```
 
 The Reportes tab shows, for one month and currency, the recorded total with its daily
 average and change against the same elapsed days of the previous month, a six-month
@@ -399,9 +418,12 @@ card rows and gaps, chips, thinking pulse under Reduce Motion, evidence renderin
 the four-column quick actions guard in `motion.node.ts`. Producto 22 adds
 `material.node.ts` (the glass/opaque decision matrix, the composer padding formula,
 `useMaterial` never throwing, `ControlSurface` in both materials, and a guard that only
-the two control surfaces import the material) and updates the navigation, Más, Cards,
-composer and quick-action guards for the centre tab, the pushed Tarjetas screen and the
-glass branch. These are **not** native rendering/gesture tests;
+the two control surfaces import the material, that only the adapter names
+`expo-glass-effect` and only through a lazy `require`), the startup-safety cases (Expo Go,
+the kill switch, an unregistered view, a module that fails to load or throws, a missing
+or throwing Reduce Transparency API: opaque every time, the module never evaluated on an
+unsafe path) and updates the navigation, Más, Cards, composer and quick-action guards
+for the centre tab, the pushed Tarjetas screen and the glass branch. These are **not** native rendering/gesture tests;
 use the physical checklist. The root suite also tests the shared monthly summary
 and spending report, including exact category-to-entry reconciliation.
 
