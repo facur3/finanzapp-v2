@@ -5,6 +5,7 @@ import { runInNewContext } from 'node:vm';
 import ts from 'typescript';
 import * as domain from '@finanzapp/domain';
 import * as appearance from '../src/ui/appearance.ts';
+import * as currencies from '../src/ui/currencies.ts';
 import * as categories from '../src/ui/categories.ts';
 
 // Producto 20: the account forms, the category form and the selectors, with
@@ -41,7 +42,7 @@ function harness(file: string, props: any = {}, options: { data?: domain.LedgerA
   const hues = { useCategoryDefinitions: () => identity.definitions, useCategoryLook: (s: string, kind = 'expense') => appearance.resolveCategoryLook(kind as domain.EntryKind, s, identity, p),
     useCategoryLabel: (s: string, kind = 'expense') => appearance.resolveCategoryLook(kind as domain.EntryKind, s, identity, p).label,
     useAccountLook: (id: string) => appearance.resolveAccountLook(id, identity.appearances, p), useAccountLookOf: () => (id: string) => appearance.resolveAccountLook(id, identity.appearances, p) };
-  const components = Object.fromEntries(['Screen', 'ActionButton', 'AmountField', 'AppText', 'Choices', 'DetailRow', 'EmptyState', 'ErrorMessage', 'Field', 'IconButton', 'Surface',
+  const components = Object.fromEntries(['Screen', 'ActionButton', 'AmountField', 'AppText', 'Choices', 'DetailRow', 'EmptyState', 'ErrorMessage', 'Field', 'FieldNote', 'IconButton', 'InfoButton', 'NavigationRow', 'Surface',
     'CategoryBadge', 'AccountBadge', 'GlyphTile', 'PressFeedback', 'SectionTitle'].map(name => [name, name]));
   (components as any).surfaceShadow = () => ({});
   const modules: Record<string, unknown> = {
@@ -65,6 +66,8 @@ function harness(file: string, props: any = {}, options: { data?: domain.LedgerA
     './appearance-picker': { IconColorPicker: 'IconColorPicker' }, '../src/ui/appearance-picker': { IconColorPicker: 'IconColorPicker' }, '../../src/ui/appearance-picker': { IconColorPicker: 'IconColorPicker' },
     './category-hues': hues, '../src/ui/category-hues': hues, '../../src/ui/category-hues': hues,
     './categories': categories, '../src/ui/category-form': { CategoryForm: 'CategoryForm' },
+    './currencies': currencies, '../src/ui/currencies': currencies, '../../src/ui/currencies': currencies,
+    '../src/ui/form-controls': { CurrencyField: 'CurrencyField' }, '../../src/ui/form-controls': { CurrencyField: 'CurrencyField' },
     './motion': { selectionHaptic: () => {} },
     './theme': { space: { xs: 4, s: 8, m: 12, l: 16, xl: 20, xxl: 24, xxxl: 32 }, radius: { group: 16 }, usePalette: () => p, useReduceMotion: () => true },
   };

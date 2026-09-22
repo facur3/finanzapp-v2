@@ -1,5 +1,14 @@
 # Physical iPhone acceptance checklist
 
+## Producto 22.1 — UI clarity and form polish (pending device review)
+
+- [ ] Más footer reads Producto 22.1. Más → Finanzas: each row shows the tile, the title in bold and the description under it; "Deudas y cobros / Debo · me deben" and "Tarjetas / Compras y resúmenes" never share a line or clip; App y datos rows show neutral glyphs; at the largest Dynamic Type sizes titles and descriptions wrap to two lines and the chevron stays visible; both themes.
+- [ ] Reportes (with a ready month): "Comparar con el mes anterior" shows "Diferencias por categoría" underneath, no short wrapped lines on the right; it opens the comparison.
+- [ ] Más → Copia de seguridad: "Importar copia / Revisar el archivo antes de agregar" as one row; it opens the review flow.
+- [ ] Nueva cuenta: Nombre, the picker, then a "Moneda" row reading "Pesos argentinos · ARS" (or USD when opened from a USD context); tapping it opens a sheet with the two currencies and a checkmark; choosing Dólares ticks once and the row and the amount symbol update before saving; under Saldo inicial one line "Opcional. No cuenta como ingreso." with an ⓘ that opens the full explanation; VoiceOver reads "Más información sobre saldo inicial"; on a small iPhone the form scrolls with the keyboard open and Guardar stays reachable.
+- [ ] Editar cuenta: the short notes under Saldo registrado and Moneda, each with an ⓘ; the currency row still cannot be changed.
+- [ ] Empty states (Recurrentes, Tarjetas, Deudas without data): one calm card with a 44 pt glyph, not a tall block.
+
 ## Producto 22 — AI reachability and native material (pending device review)
 
 - [ ] Before updating, share a private copy. After updating, Más footer reads Producto 22; no account, card, movement, budget or rule changed.

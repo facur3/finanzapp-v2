@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { runInNewContext } from 'node:vm';
 import ts from 'typescript';
+import * as currencies from '../src/ui/currencies.ts';
 import { carouselIndex, segmentLayout } from '../src/ui/geometry.ts';
 import { assignCategoryHues, categoryColor, hueColor, othersColor, CATEGORY_HUES } from '../src/ui/category-color.ts';
 import type { Entry } from '@finanzapp/domain';
@@ -203,7 +204,8 @@ test('form selectors keep the category hue and give the account the interaction 
     'react-native-safe-area-context': { SafeAreaView: 'SafeAreaView' },
     '@react-native-community/datetimepicker': 'DateTimePicker',
     '@expo/vector-icons/Ionicons': 'Ionicons',
-    './components': { AccountBadge: 'AccountBadge', AppText: 'AppText', CategoryBadge: 'CategoryBadge', DetailRow: 'DetailRow', Field: 'Field', GlyphTile: 'GlyphTile', PressFeedback: 'PressFeedback', surfaceShadow: () => ({}) },
+    './components': { AccountBadge: 'AccountBadge', AppText: 'AppText', CategoryBadge: 'CategoryBadge', DetailRow: 'DetailRow', Field: 'Field', GlyphTile: 'GlyphTile', PressFeedback: 'PressFeedback', Surface: 'Surface', surfaceShadow: () => ({}) },
+    './currencies': currencies,
     './category-hues': { useCategoryColor: (label: string) => label ? '#B0507A' : '#000', useCategoryDefinitions: () => [], useCategoryLook: (label: string) => ({ label, hex: label ? '#B0507A' : '#000', glyph: 'paw-outline' }), useAccountLookOf: () => () => ({ glyph: 'wallet-outline', hex: '#2557D6' }) },
     './motion': { selectionHaptic: () => {} },
     './theme': { radius: { group: 16 }, usePalette: () => ({ surface: '#fff', text: '#000', primary: '#2557D6', primarySoft: '#E5ECFB', secondary: '#666', tertiary: '#999', background: '#fff', isDark: false }), useReduceMotion: () => true },
