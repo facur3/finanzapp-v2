@@ -424,8 +424,11 @@ the two control surfaces import the material, that only the adapter names
 `expo-glass-effect` and only through a lazy `require`), the startup-safety cases (Expo Go,
 the kill switch, an unregistered view, a module that fails to load or throws, a missing
 or throwing Reduce Transparency API: opaque every time, the module never evaluated on an
-unsafe path) and updates the navigation, Más, Cards, composer and quick-action guards
-for the centre tab, the pushed Tarjetas screen and the glass branch. These are **not** native rendering/gesture tests;
+unsafe path), `worklets.node.ts` (every animated file compiled with `babel-preset-expo`
+as Metro does for iOS; a function captured by a UI-runtime callback must be a worklet,
+which is what `composerBottomPadding` was missing on the first device run) and updates
+the navigation, Más, Cards, composer and quick-action guards for the centre tab, the
+pushed Tarjetas screen and the glass branch. These are **not** native rendering/gesture tests;
 use the physical checklist. The root suite also tests the shared monthly summary
 and spending report, including exact category-to-entry reconciliation.
 

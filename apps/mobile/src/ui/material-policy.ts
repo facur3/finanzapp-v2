@@ -109,5 +109,9 @@ export function subscribeReduceTransparency(api: ReduceTransparencyAPI | undefin
  * The composer clears the keyboard or the safe area, whichever is taller,
  * minus what is already occupied, never less than zero. */
 export function composerBottomPadding(keyboardHeight: number, bottomInset: number, occupied: number): number {
+  'worklet';
+  // The directive above ships this function to the UI runtime, where
+  // useAnimatedStyle calls it; without it the animated style would hold a
+  // remote reference and throw "Tried to synchronously call a Remote Function".
   return Math.max(Math.max(keyboardHeight, bottomInset) - occupied, 0);
 }

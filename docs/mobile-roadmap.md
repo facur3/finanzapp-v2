@@ -88,6 +88,19 @@ native Liquid Glass where iOS provides it. No financial semantics, no cloud.
   accessibility API missing or throwing, adapter-only lazy require), TypeScript,
   expo-doctor, Expo dependency check, `npm ls --all`, `npm audit` (0), Metro iOS export,
   397 root tests, Vite build, repo hygiene.
+- [x] **Worklet boundary (2026-09-22, fourth push).** The owner's retest surfaced the
+  concrete startup error: "[Worklets] Tried to synchronously call a Remote Function.
+  Called composerBottomPadding on the UI Runtime", from `useAnimatedStyle` in the
+  composer. `composerBottomPadding` was an ordinary imported function, so the animated
+  style held a remote reference. Fix: the `'worklet'` directive as the first statement
+  of its body (`material-policy.ts`); keyboard geometry unchanged. Audit of every
+  `useAnimatedStyle` / `useAnimatedProps` / scroll handler in `src/ui` and `app`: the
+  only other imported helper on the UI runtime, `arcPath` in charts, already carried
+  the directive. Guard: `tests/worklets.node.ts` compiles every animated file with
+  `babel-preset-expo` as Metro does for iOS (Worklets plugin 0.10.1 included), reads
+  the emitted worklets and closures back, and fails when a captured function is not a
+  worklet; removing the directive makes it fail. That proves the plugin output, not the
+  iOS runtime: the iPhone retest has the final word.
 - [x] **EAS link (2026-09-21, third push).** The owner created the EAS project
   `@facur3/finanzapp-mobile` (`b1cd9780-7e6a-4de3-9248-d446d0c77520`); `eas init` could
   not write the dynamic config, so `app.config.ts` now carries that ID and
@@ -96,8 +109,9 @@ native Liquid Glass where iOS provides it. No financial semantics, no cloud.
   --type public` shows the ID for both variants and the override, `npx eas-cli@latest
   project:info` resolves the project; `tests/app-config.node.ts` guards it. No
   credentials, devices or builds were touched.
-- [ ] **Not device-verified:** that Expo Go now starts and stays open (mode A with the
-  kill switch, then mode B), the Más footer reading "Material opaco (Expo Go)", the
+- [ ] **Not device-verified:** that Expo Go now starts and stays open without the
+  Worklets error (mode A with the kill switch, then mode B), the Más footer reading
+  "Material opaco (Expo Go)", the
   composer resting on the tab bar and rising with the keyboard, the centre tab with
   VoiceOver and large text, Tarjetas from Más with its header "+". Glass itself (look,
   Reduce Transparency flip) waits for the development build (Producto 23).
