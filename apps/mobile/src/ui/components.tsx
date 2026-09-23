@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
+import { Children, useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { ActivityIndicator, Alert, InputAccessoryView, Keyboard, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View,
   useWindowDimensions, type PressableProps, type StyleProp, type TextInputProps, type TextProps, type ViewStyle } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
@@ -10,9 +10,10 @@ import { radius, space, type, useCurrentDay, usePalette, useReduceMotion, type P
 import type { IconName } from './categories';
 import { tintOf } from './category-color';
 import { useAccountLook, useCategoryLook } from './category-hues';
-import { SEGMENT_GAP, SEGMENT_PADDING, amountFieldLayout, fitFontSize, segmentLayout } from './geometry';
+import { AMOUNT_FIELD, SEGMENT_GAP, SEGMENT_PADDING, amountFieldLayout, fitFontSize, segmentLayout } from './geometry';
 import { duration, easeOut, selectionHaptic, timing } from './motion';
 import { EMPTY_AMOUNT, amountFromCanonical, readAmountChange, renderAmount, settleAmount, splitAmount } from './money-input';
+import { useI18n } from '../i18n/provider';
 
 export type { IconName } from './categories';
 /** Colour carries meaning. Neutral is ink on fill; the rest are the four semantic tints. */
@@ -26,6 +27,17 @@ export function toneColors(p: Palette, tone: Tone): { color: string; soft: strin
     case 'warning': return { color: p.warning, soft: p.warningSoft };
     default: return { color: p.text, soft: p.inset };
   }
+}
+
+/** Whether a row should stack its label and value (or name and amount) as
+ * two lines instead of sharing one: at large Dynamic Type sizes a name and a
+ * money value no longer fit side by side, and truncating either would hide
+ * data. One threshold for every row, so the interface changes shape at one
+ * text size rather than row by row. */
+export const STACK_AT_SCALE = 1.2;
+export function useStacked(): boolean {
+  const { fontScale } = useWindowDimensions();
+  return fontScale > STACK_AT_SCALE;
 }
 
 /** Text in one of the named styles. A larger `fontSize` in `style` without
@@ -161,13 +173,19 @@ type Caret = { start: number; end: number };
  * a keystroke being formatted) is ignored. A refused edit re-renders the same
  * value and caret, and React Native restores both natively.
  *
- * The box is stable while typing: the input spans the row with fixed
- * paddings (amountFieldLayout) and centres its text natively, and the symbol
- * is placed beside the text by arithmetic. Only the font size changes, and
- * only when the amount would not fit. No negative tracking: on iOS it draws
- * the last glyph past the measured width, under the caret. */
-export function AmountField({ label = 'Monto', currency, tone, value = '', onChangeText, ...props }: TextInputProps & { label?: string; currency: Currency; tone?: Tone }) {
+ * Geometry: the symbol is anchored at the left edge of the row and the
+ * digits grow to the right from a fixed origin, in tabular figures, like a
+ * ledger column. Nothing that is already on screen moves when a digit or a
+ * grouping dot appears ("999" → "1.000", "999.999" → "1.000.000"): no
+ * centring, no estimated symbol position, no layout animation per
+ * keystroke. Only the font size steps down, and only when the whole amount
+ * would no longer fit beside the symbol (amountFieldLayout). The row reads
+ * left-aligned like the hero amounts of Inicio and the detail screens. No
+ * negative tracking: on iOS it draws the last glyph past the measured width,
+ * under the caret. */
+export function AmountField({ label, currency, tone, value = '', onChangeText, ...props }: TextInputProps & { label?: string; currency: Currency; tone?: Tone }) {
   const p = usePalette();
+  const { t } = useI18n();
   const accessoryId = useId();
   const { fontScale } = useWindowDimensions();
   const [rowWidth, setRowWidth] = useState(0);
@@ -182,8 +200,9 @@ export function AmountField({ label = 'Monto', currency, tone, value = '', onCha
     shown.current = { text: value, caret: value.length };
     setSelection(undefined);
   }, [value]);
+  const title = label ?? t('amount.label');
   const symbol = currency === 'USD' ? 'US$' : '$';
-  const { fontSize, symbolSize, paddingLeft, paddingRight, symbolX } = amountFieldLayout(value, rowWidth, symbol, AMOUNT_GAP, Math.min(fontScale, HERO_MAX_SCALE));
+  const { fontSize, symbolSize } = amountFieldLayout(value, rowWidth, symbol, AMOUNT_GAP, Math.min(fontScale, HERO_MAX_SCALE));
   const color = tone && tone !== 'neutral' ? toneColors(p, tone).color : p.text;
   const show = (rendered: { text: string; caret: number }) => {
     shown.current = rendered;
@@ -201,25 +220,23 @@ export function AmountField({ label = 'Monto', currency, tone, value = '', onCha
     setSelection(native);
   };
   const settle = () => show(renderAmount(settleAmount(amountFromCanonical(shown.current.text.replace(/\./g, '')) ?? EMPTY_AMOUNT)));
-  return <View style={{ gap: 10, alignItems: 'center', paddingVertical: 8 }}>
-    <AppText secondary variant="footnote" style={{ fontWeight: '500' }}>{label} · {currency}</AppText>
-    <View style={{ width: '100%', justifyContent: 'center' }} onLayout={event => setRowWidth(event.nativeEvent.layout.width)}>
+  return <View style={{ gap: 6, paddingVertical: 8 }}>
+    <AppText secondary variant="footnote" style={{ fontWeight: '500' }}>{title} · {currency}</AppText>
+    <View style={styles.amountRow} onLayout={event => setRowWidth(event.nativeEvent.layout.width)}>
+      <AppText accessible={false} maxFontSizeMultiplier={HERO_MAX_SCALE}
+        style={{ fontSize: symbolSize, lineHeight: Math.round(symbolSize * 1.25), color: p.secondary, fontWeight: '500' }}>{symbol}</AppText>
       <TextInput keyboardType="decimal-pad" inputMode="decimal" maxLength={24} placeholder="0" {...props} value={value} onChange={change}
         selection={selection} onSelectionChange={select}
         onBlur={event => { settle(); props.onBlur?.(event); }} onSubmitEditing={event => { settle(); props.onSubmitEditing?.(event); }}
-        accessibilityLabel={label + ' en ' + (currency === 'ARS' ? 'pesos argentinos' : 'dólares')}
+        accessibilityLabel={t('amount.accessibility', { label: title, currency: t(currency === 'ARS' ? 'amount.inPesos' : 'amount.inDollars') })}
         inputAccessoryViewID={Platform.OS === 'ios' ? accessoryId : undefined}
         selectionColor={p.primary} placeholderTextColor={p.tertiary} maxFontSizeMultiplier={HERO_MAX_SCALE}
-        style={[styles.amountInput, { color, fontSize, paddingLeft, paddingRight }, props.style]} />
-      <View pointerEvents="none" style={[StyleSheet.absoluteFill, { justifyContent: 'center', alignItems: 'flex-start', opacity: symbolX === null ? 0 : 1 }]}>
-        <AppText accessible={false} maxFontSizeMultiplier={HERO_MAX_SCALE}
-          style={{ fontSize: symbolSize, lineHeight: Math.round(symbolSize * 1.25), color: p.secondary, fontWeight: '500', transform: [{ translateX: symbolX ?? 0 }] }}>{symbol}</AppText>
-      </View>
+        style={[styles.amountInput, { color, fontSize, paddingRight: AMOUNT_FIELD.caret }, props.style]} />
     </View>
     {Platform.OS === 'ios' && <InputAccessoryView nativeID={accessoryId} backgroundColor={p.surface}>
       <View style={{ alignItems: 'flex-end', paddingHorizontal: 20 }}>
-        <PressFeedback feedback="opacity" accessibilityRole="button" accessibilityLabel="Cerrar teclado del monto" onPress={Keyboard.dismiss} style={{ paddingHorizontal: 12 }}>
-          <AppText style={{ color: p.primary, fontWeight: '600' }}>Listo</AppText>
+        <PressFeedback feedback="opacity" accessibilityRole="button" accessibilityLabel={t('common.closeAmountKeyboard')} onPress={Keyboard.dismiss} style={{ paddingHorizontal: 12 }}>
+          <AppText style={{ color: p.primary, fontWeight: '600' }}>{t('common.done')}</AppText>
         </PressFeedback>
       </View>
     </InputAccessoryView>}
@@ -231,7 +248,7 @@ export function AmountField({ label = 'Monto', currency, tone, value = '', onCha
  * field. Saving stays with the primary button, so the person still reviews. */
 export function AmountShortcut({ label, caption, onPress, disabled = false }: { label?: string; caption: string; onPress?: () => void; disabled?: boolean }) {
   const p = usePalette();
-  return <View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center', flexWrap: 'wrap', gap: 4, marginTop: -8 }}>
+  return <View style={{ flexDirection: 'row', justifyContent: 'flex-start', alignItems: 'center', flexWrap: 'wrap', gap: 4, marginTop: -8 }}>
     <AppText secondary variant="footnote">{caption}{label && onPress ? ' ·' : ''}</AppText>
     {label && onPress && <PressFeedback feedback="opacity" accessibilityRole="button" accessibilityLabel={label + ', ' + caption}
       onPress={onPress} disabled={disabled} accessibilityState={{ disabled }} hitSlop={8}
@@ -246,8 +263,9 @@ function Choice({ label, selected, disabled, onPress }: { label: string; selecte
   const reduced = useReduceMotion();
   return <Pressable accessibilityRole="button" accessibilityState={{ selected, disabled }} disabled={disabled}
     onPress={onPress} style={styles.choice} hitSlop={4}>
-    <Animated.Text numberOfLines={1} style={{ fontSize: 13, lineHeight: 18, textAlign: 'center', fontWeight: '600', color: selected ? p.primary : p.secondary,
-      transitionProperty: 'color', transitionDuration: reduced ? 0 : duration.state }}>{label}</Animated.Text>
+    <Animated.Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8} maxFontSizeMultiplier={1.3}
+      style={{ fontSize: 13, lineHeight: 18, textAlign: 'center', fontWeight: '600', color: selected ? p.primary : p.secondary,
+        transitionProperty: 'color', transitionDuration: reduced ? 0 : duration.state }}>{label}</Animated.Text>
   </Pressable>;
 }
 
@@ -308,7 +326,8 @@ export function EmptyState({ title, detail, action, icon = 'wallet-outline' }: {
  * a native alert, so a form keeps one short line next to the field. */
 export function InfoButton({ title, detail, label }: { title: string; detail: string; label?: string }) {
   const p = usePalette();
-  return <PressFeedback feedback="opacity" accessibilityRole="button" accessibilityLabel={label ?? 'Más información sobre ' + title.toLowerCase()} hitSlop={8}
+  const { t } = useI18n();
+  return <PressFeedback feedback="opacity" accessibilityRole="button" accessibilityLabel={label ?? t('common.moreInfoAbout', { title: title.toLowerCase() })} hitSlop={8}
     onPress={() => Alert.alert(title, detail)} style={{ minHeight: 28, minWidth: 28, alignItems: 'center', justifyContent: 'center' }}>
     <Ionicons name="information-circle-outline" size={18} color={p.tertiary} accessible={false} />
   </PressFeedback>;
@@ -331,6 +350,8 @@ export function ErrorMessage({ message }: { message: string | null }) {
 
 const HERO_MAX_SCALE = 1.4, ROW_MAX_SCALE = 1.8;
 const AMOUNT_GAP = 6;
+/** The widest share of a row an amount may take beside a name before the row stacks: a full ARS price fits whole, the name still has half the row. */
+const AMOUNT_COLUMN = '56%';
 
 /** Amounts are ink by default. Income is green with a plus; an explicit negative
  * value shows a minus. Colour never replaces the sign or the label. An amount is
@@ -347,6 +368,7 @@ export function Money({ minor, currency, large = false, color, signed = false, s
 }) {
   const p = usePalette();
   const { fontScale } = useWindowDimensions();
+  const { spokenMoney } = useI18n();
   const [width, setWidth] = useState(0);
   const sign = minor < 0 ? '−' : signed && minor > 0 ? '+' : '';
   const semantic = tone === 'income' ? p.income : tone === 'expense' ? p.text : tone === 'transfer' ? p.transfer : tone === 'warning' ? p.warning : p.text;
@@ -354,7 +376,7 @@ export function Money({ minor, currency, large = false, color, signed = false, s
   const hero = base >= 28;
   const text = sign + (currency === 'USD' ? 'US$ ' : '$ ') + formatMinorUnits(Math.abs(minor));
   const fontSize = hero ? fitFontSize(text, width, base, Math.round(base / 2), Math.min(fontScale, HERO_MAX_SCALE)) : base;
-  const label = (minor < 0 ? 'Menos ' : '') + formatMinorUnits(Math.abs(minor)) + (currency === 'USD' ? ' dólares' : ' pesos');
+  const label = spokenMoney(minor, currency);
   const ink = color ?? semantic;
   // A hero is one amount in three weights of the same colour: the symbol and
   // the cents step back so the whole units carry the number. Same size, same
@@ -375,14 +397,21 @@ export function Money({ minor, currency, large = false, color, signed = false, s
   return hero ? <View style={{ alignSelf: 'stretch' }} onLayout={event => setWidth(event.nativeEvent.layout.width)}>{body}</View> : body;
 }
 
-export function DetailRow({ label, value, icon, leading, onPress, last = false, disabled = false, tone = 'neutral' }: {
+/** Label and value longer than this, together, no longer share one line on a
+ * phone: the value moves under the label rather than wrapping right-aligned
+ * into short fragments (the currency code or the amount alone on a line). */
+export const DETAIL_INLINE_LIMIT = 30;
+
+export function DetailRow({ label, value, icon, leading, onPress, last = false, disabled = false, tone = 'neutral', layout = 'auto' }: {
   label: string; value: string; icon?: IconName; onPress?: () => void; last?: boolean; disabled?: boolean; tone?: Tone;
   /** An identity tile (an account's look, a Más row) in place of the bare glyph. */
   leading?: ReactNode;
+  /** `auto` stacks at large text or when the pair is long; `stacked` always; `inline` only at large text. */
+  layout?: 'auto' | 'stacked' | 'inline';
 }) {
   const p = usePalette();
-  const { fontScale } = useWindowDimensions();
-  const stacked = fontScale > 1.3;
+  const large = useStacked();
+  const stacked = layout === 'stacked' || large || (layout === 'auto' && label.length + value.length > DETAIL_INLINE_LIMIT);
   const content = <>
     {leading ?? (icon && <Ionicons name={icon} size={20} color={tone === 'neutral' ? p.secondary : toneColors(p, tone).color} accessible={false} />)}
     <View style={{ flex: 1, minWidth: 0, gap: 3, flexDirection: stacked ? 'column' : 'row', alignItems: stacked ? 'flex-start' : 'center' }}>
@@ -417,11 +446,53 @@ export function NavigationRow({ title, subtitle, icon, leading, onPress, last = 
   </PressFeedback>;
 }
 
-/** Compact statistic: eyebrow label over a value. */
+/** A row that holds a chosen value and, when pressed, opens its chooser: a
+ * glyph or identity tile, the field label as a caption, the value as the
+ * primary line and an optional detail line (a currency code and symbol, an
+ * account's kind), then a chevron. Everything is stacked vertically, so a
+ * long value ("Dólares estadounidenses", a long account name) wraps under
+ * the label and its code keeps its own line instead of being pushed to a
+ * lone right-aligned fragment. Without `onPress` it is a read-only fact in
+ * the same shape (the currency of an existing account). */
+export function SelectionRow({ label, value, detail, icon, leading, onPress, last = false, disabled = false, placeholder = false }: {
+  label: string; value: string; detail?: string; icon?: IconName; leading?: ReactNode; onPress?: () => void; last?: boolean; disabled?: boolean;
+  /** The value is a prompt ("Elegir cuenta"), drawn in the primary colour. */
+  placeholder?: boolean;
+}) {
+  const p = usePalette();
+  const content = <>
+    {leading ?? (icon && <View style={styles.navigationGlyph}><Ionicons name={icon} size={22} color={p.secondary} accessible={false} /></View>)}
+    <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+      <AppText secondary variant="footnote" style={{ fontWeight: '500' }}>{label}</AppText>
+      <AppText numberOfLines={3} style={{ fontWeight: '600', color: placeholder ? p.primary : p.text }}>{value}</AppText>
+      {!!detail && <AppText secondary variant="footnote" numberOfLines={2}>{detail}</AppText>}
+    </View>
+    {onPress && <Ionicons name="chevron-forward" size={16} color={p.tertiary} accessible={false} />}
+  </>;
+  const style: StyleProp<ViewStyle> = [styles.selectionRow, { borderBottomColor: p.line, borderBottomWidth: last ? 0 : StyleSheet.hairlineWidth, opacity: disabled ? 0.6 : 1 }];
+  const accessibilityLabel = label + ': ' + value + (detail ? ', ' + detail : '');
+  return onPress ? <PressFeedback feedback="highlight" accessibilityRole="button" accessibilityLabel={accessibilityLabel}
+    disabled={disabled} accessibilityState={{ disabled }} onPress={onPress} style={style}>{content}</PressFeedback>
+    : <View accessible accessibilityLabel={accessibilityLabel} style={style}>{content}</View>;
+}
+
+/** Compact statistic: eyebrow label over a value. It may shrink and wrap, so
+ * two or three in a row never push past the card's edge. */
 export function Stat({ label, children, align = 'left' }: { label: string; children: ReactNode; align?: 'left' | 'right' }) {
-  return <View style={{ gap: 3, alignItems: align === 'right' ? 'flex-end' : 'flex-start', minWidth: 0 }}>
+  return <View style={{ gap: 3, alignItems: align === 'right' ? 'flex-end' : 'flex-start', minWidth: 0, flexShrink: 1 }}>
     <AppText secondary variant="caption" style={{ fontWeight: '500' }}>{label}</AppText>
     {children}
+  </View>;
+}
+
+/** Two or three statistics side by side at normal text sizes, one under the
+ * other at large sizes: an amount and a date each keep their whole text. Every
+ * child gets an equal share of the row and may shrink; an absent child leaves
+ * no empty column. */
+export function StatRow({ children }: { children: ReactNode }) {
+  const stacked = useStacked();
+  return <View style={{ flexDirection: stacked ? 'column' : 'row', gap: stacked ? space.m : space.l }}>
+    {Children.map(children, child => child ? <View style={{ flex: stacked ? undefined : 1, minWidth: 0 }}>{child}</View> : null)}
   </View>;
 }
 
@@ -449,11 +520,10 @@ export function EntryRow({ entry, account, last = false, showDate = true, showAc
   entry: Entry; account: Account; last?: boolean; showDate?: boolean; showAccount?: boolean;
 }) {
   const p = usePalette();
-  const { fontScale } = useWindowDimensions();
   const day = useCurrentDay();
   const dateLabel = labelFromISO(entry.dateISO, new Date(day + 'T12:00:00'));
   const income = entry.kind === 'income';
-  const stacked = fontScale > 1.3;
+  const stacked = useStacked();
   const category = useCategoryLook(entry.category, entry.kind).label;
   const detail = [category, showAccount ? account.name : null, showDate ? dateLabel : null].filter(Boolean).join(' · ');
   return <PressFeedback feedback="highlight" accessibilityRole="button"
@@ -466,7 +536,7 @@ export function EntryRow({ entry, account, last = false, showDate = true, showAc
         <AppText numberOfLines={stacked ? undefined : 1} style={{ fontWeight: '500' }}>{entry.merchant}</AppText>
         <AppText secondary variant="footnote" numberOfLines={stacked ? undefined : 1}>{detail}</AppText>
       </View>
-      <View style={{ maxWidth: stacked ? '100%' : '48%', alignItems: 'flex-end' }}>
+      <View style={{ maxWidth: stacked ? '100%' : AMOUNT_COLUMN, alignItems: 'flex-end' }}>
         <Money minor={income ? entry.amountMinor : -entry.amountMinor} currency={account.currency} signed tone={income ? 'income' : 'expense'} />
       </View>
     </View>
@@ -477,9 +547,8 @@ export function AccountRow({ account, entries, transfers, last = false, kindLabe
   account: Account; entries: Entry[]; transfers?: Transfer[]; last?: boolean; kindLabel?: string;
 }) {
   const p = usePalette();
-  const { fontScale } = useWindowDimensions();
   const balance = accountBalanceMinor(account, entries, transfers);
-  const stacked = fontScale > 1.3;
+  const stacked = useStacked();
   return <PressFeedback feedback="highlight" accessibilityRole="button" accessibilityLabel={'Ver cuenta ' + account.name + ', saldo ' + formatMinorUnits(balance) + ' ' + account.currency}
     onPress={() => router.push({ pathname: '/account/[id]', params: { id: account.id } })}
     style={[styles.row, { borderBottomColor: p.line, borderBottomWidth: last ? 0 : StyleSheet.hairlineWidth }]}>
@@ -510,11 +579,10 @@ export function TransferRow({ transfer: t, accounts, accountId, last = false, sh
   transfer: Transfer; accounts: Account[]; accountId?: string; last?: boolean; showDate?: boolean; context?: RowContext;
 }) {
   const p = usePalette();
-  const { fontScale } = useWindowDimensions();
   const day = useCurrentDay();
   const from = accounts.find(a => a.id === t.fromAccountId)!, to = accounts.find(a => a.id === t.toAccountId)!;
   const date = labelFromISO(t.dateISO, new Date(day + 'T12:00:00'));
-  const stacked = fontScale > 1.3;
+  const stacked = useStacked();
   const outgoing = accountId === from.id;
   const incoming = accountId === to.id;
   const title = context === 'card' ? (incoming ? 'Pago de tarjeta' : 'Transferencia') : context === 'debt' ? (incoming ? 'Pago' : 'Cobro') : t.note || 'Transferencia';
@@ -531,7 +599,7 @@ export function TransferRow({ transfer: t, accounts, accountId, last = false, sh
         <AppText numberOfLines={stacked ? undefined : 1} style={{ fontWeight: '500' }}>{title}</AppText>
         <AppText secondary variant="footnote" numberOfLines={stacked ? undefined : 1}>{detail}</AppText>
       </View>
-      <View style={{ maxWidth: stacked ? '100%' : '48%', alignItems: 'flex-end' }}>
+      <View style={{ maxWidth: stacked ? '100%' : AMOUNT_COLUMN, alignItems: 'flex-end' }}>
         <Money minor={signed && outgoing ? -t.amountMinor : t.amountMinor} currency={from.currency} signed={signed} tone="transfer"
           color={accountId ? undefined : p.text} />
       </View>
@@ -547,7 +615,8 @@ const styles = StyleSheet.create({
   buttonCompact: { minHeight: 44, paddingVertical: 10, paddingHorizontal: 14 },
   buttonText: { fontSize: 17, fontWeight: '600', textAlign: 'center', flexShrink: 1 },
   input: { borderRadius: radius.button, paddingHorizontal: 16, paddingVertical: 14, fontSize: 17, minHeight: 52 },
-  amountInput: { minHeight: 60, width: '100%', fontWeight: '700', letterSpacing: 0, fontVariant: ['tabular-nums'], paddingVertical: 6, textAlign: 'center' },
+  amountRow: { flexDirection: 'row', alignItems: 'center', gap: AMOUNT_GAP, width: '100%' },
+  amountInput: { flex: 1, minWidth: 0, minHeight: 60, fontWeight: '700', letterSpacing: 0, fontVariant: ['tabular-nums'], paddingVertical: 6, paddingLeft: 0, textAlign: 'left' },
   choices: { flexDirection: 'row', borderRadius: 10, padding: SEGMENT_PADDING, gap: SEGMENT_GAP },
   thumb: { position: 'absolute', top: SEGMENT_PADDING, bottom: SEGMENT_PADDING, left: 0, borderRadius: 8 },
   choice: { flex: 1, minWidth: 72, minHeight: 32, paddingHorizontal: 8, paddingVertical: 6, alignItems: 'center', justifyContent: 'center' },
@@ -555,4 +624,5 @@ const styles = StyleSheet.create({
   detailRow: { minHeight: 54, flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 14 },
   navigationRow: { minHeight: 60, flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 16, paddingVertical: 11 },
   navigationGlyph: { width: 30, alignItems: 'center' },
+  selectionRow: { minHeight: 64, flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 16, paddingVertical: 10 },
 });

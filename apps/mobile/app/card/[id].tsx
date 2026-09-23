@@ -3,7 +3,7 @@ import { View, useWindowDimensions } from 'react-native';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { cardCreditMinor, cardStatementActivity, formatMinorUnits, labelFromISO, liabilityActivity } from '@finanzapp/domain';
 import { useLedger } from '../../src/storage/LedgerProvider';
-import { ActionButton, AppText, EmptyState, IconButton, Money, Screen, SectionTitle, Stat, Surface } from '../../src/ui/components';
+import { ActionButton, AppText, EmptyState, IconButton, Money, Screen, SectionTitle, Stat, Surface, StatRow } from '../../src/ui/components';
 import { CardFace } from '../../src/ui/card-visual';
 import { EntryList } from '../../src/ui/entry-list';
 import { statementCaption, summarizeCard, usageTone } from '../../src/ui/liability-presentation';
@@ -44,17 +44,17 @@ export default function CardDetailScreen() {
         </View>
 
         <Surface style={{ gap: 14 }}>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 12 }}>
+          <StatRow>
             <Stat label="Disponible">
               {availableMinor !== null ? <Money minor={availableMinor} currency={account.currency} size={17} color={tone === 'neutral' ? undefined : tone === 'warning' ? p.warning : p.expense} />
                 : <AppText secondary variant="subhead">Sin límite</AppText>}
               {card.creditLimitMinor !== null && <AppText tertiary variant="caption">de {money(card.creditLimitMinor)}</AppText>}
             </Stat>
-            <Stat label="Cierre" align="right"><AppText style={{ fontWeight: '600' }}>{relative(closingISO)}</AppText></Stat>
-            <Stat label="Vencimiento" align="right">
+            <Stat label="Cierre"><AppText style={{ fontWeight: '600' }}>{relative(closingISO)}</AppText></Stat>
+            <Stat label="Vencimiento">
               <AppText style={{ fontWeight: '600', color: tone !== 'neutral' && debtMinor > 0 ? p.warning : p.text }}>{relative(dueISO)}</AppText>
             </Stat>
-          </View>
+          </StatRow>
         </Surface>
 
         <View style={{ gap: 10 }}>

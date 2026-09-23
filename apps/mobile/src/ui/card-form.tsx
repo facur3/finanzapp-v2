@@ -6,7 +6,7 @@ import * as Haptics from 'expo-haptics';
 import { formatMinorUnits, parseMinorUnits, sameCreditCardProfile, validateAccount, validateCreditCardProfile,
   type Account, type CreditCardProfile, type Currency } from '@finanzapp/domain';
 import { useLedger } from '../storage/LedgerProvider';
-import { ActionButton, AmountField, AppText, Choices, DetailRow, ErrorMessage, Field, IconButton, Screen, Surface } from './components';
+import { ActionButton, AmountField, AppText, Choices, DetailRow, ErrorMessage, Field, IconButton, Screen, Surface, useStacked } from './components';
 import { space } from './theme';
 
 type PendingCreate = { account: Account; card: CreditCardProfile };
@@ -14,6 +14,7 @@ type PendingCreate = { account: Account; card: CreditCardProfile };
 /** Creates a card with its hidden internal account in one durable commit, or
  * edits the card profile. A submitted command stays frozen across retries. */
 export function CardForm({ original }: { original?: CreditCardProfile }) {
+  const stacked = useStacked();
   const { snapshot, addCard, saveCard } = useLedger();
   const account = snapshot?.accounts.find(item => item.id === original?.accountId);
   const [before] = useState(original);
@@ -139,10 +140,10 @@ export function CardForm({ original }: { original?: CreditCardProfile }) {
     <AmountField label="Límite de crédito (opcional)" currency={currency} value={limit}
       onChangeText={value => { setLimit(value); setError(null); }} editable={!locked} />
 
-    <View style={{ flexDirection: 'row', gap: 12 }}>
-      <View style={{ flex: 1 }}><Field label="Día de cierre" value={closingDay} onChangeText={value => setClosingDay(value.replace(/\D/g, '').slice(0, 2))}
+    <View style={{ flexDirection: stacked ? 'column' : 'row', gap: 12 }}>
+      <View style={{ flex: stacked ? undefined : 1 }}><Field label="Día de cierre" value={closingDay} onChangeText={value => setClosingDay(value.replace(/\D/g, '').slice(0, 2))}
         placeholder="1–31" keyboardType="number-pad" maxLength={2} editable={!locked} /></View>
-      <View style={{ flex: 1 }}><Field label="Día de vencimiento" value={dueDay} onChangeText={value => setDueDay(value.replace(/\D/g, '').slice(0, 2))}
+      <View style={{ flex: stacked ? undefined : 1 }}><Field label="Día de vencimiento" value={dueDay} onChangeText={value => setDueDay(value.replace(/\D/g, '').slice(0, 2))}
         placeholder="1–31" keyboardType="number-pad" maxLength={2} editable={!locked} /></View>
     </View>
     <AppText secondary variant="footnote" style={{ marginTop: -space.s }}>

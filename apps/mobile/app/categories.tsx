@@ -50,7 +50,7 @@ function CatalogSection({ title, caption, kind, rows }: { title: string; caption
           borderBottomColor: p.line, borderBottomWidth: index === rows.length - 1 ? 0 : 0.5, opacity: row.identity.archived ? 0.6 : 1 }}>
         <CategoryBadge category={row.identity.storedLabel} kind={kind ?? row.identity.kind} />
         <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
-          <AppText numberOfLines={1} style={{ fontWeight: '500' }}>{row.identity.label}</AppText>
+          <AppText numberOfLines={2} style={{ fontWeight: '500' }}>{row.identity.label}</AppText>
           <AppText secondary variant="footnote">{usage(row)}{kind ? '' : row.identity.kind === 'income' ? ' · Ingreso' : ' · Gasto'}</AppText>
         </View>
       </PressFeedback>)}

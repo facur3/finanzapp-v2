@@ -10,6 +10,9 @@ import * as budgetPresentation from '../src/ui/budget-presentation.ts';
 import * as liabilityPresentation from '../src/ui/liability-presentation.ts';
 import * as moneyInput from '../src/ui/money-input.ts';
 import * as appearance from '../src/ui/appearance.ts';
+import * as i18nFormat from '../src/i18n/format.ts';
+import { bindLocale } from '../src/i18n/bind.ts';
+const i18nProvider = { useI18n: () => bindLocale('es-AR') };
 
 // Actual screen/form handlers with native hosts replaced by descriptors.
 // This does not render UIKit, the Files picker, animation frames or gestures.
@@ -45,6 +48,7 @@ function harness(file: string, props: any = {}, options: { data?: domain.LedgerA
   const components = Object.fromEntries(['Screen', 'EmptyState', 'ActionButton', 'AppText', 'AmountField', 'AmountShortcut', 'Choices', 'ErrorMessage', 'Field', 'FieldNote', 'IconButton', 'Surface',
     'CategoryBadge', 'DetailRow', 'Money', 'SectionTitle', 'GlyphTile', 'AccountBadge'].map(name => [name, name]));
   const modules: Record<string, unknown> = {
+    '../i18n/format': i18nFormat, '../src/i18n/format': i18nFormat, '../../src/i18n/format': i18nFormat, '../i18n/provider': i18nProvider, '../src/i18n/provider': i18nProvider, '../../src/i18n/provider': i18nProvider,
     react: { useState: (initial: any) => { const i = cursor++; if (!(i in state)) state[i] = typeof initial === 'function' ? initial() : initial;
       return [state[i], (next: any) => { state[i] = typeof next === 'function' ? next(state[i]) : next; }]; },
     useRef: (initial: any) => { const i = refCursor++; return refs[i] ??= { current: initial }; }, useMemo: (fn: () => any) => fn() },
@@ -60,7 +64,7 @@ function harness(file: string, props: any = {}, options: { data?: domain.LedgerA
     '../storage/LedgerProvider': ledger, '../src/storage/LedgerProvider': ledger, '../../src/storage/LedgerProvider': ledger,
     './components': components, '../src/ui/components': components, '../../src/ui/components': components,
     './form-controls': { AccountField: 'AccountField', CategoryField: 'CategoryField', CurrencyField: 'CurrencyField', DateField: 'DateField', SelectorCard: 'SelectorCard' },
-    '../src/ui/form-controls': { CurrencyField: 'CurrencyField' },
+    '../src/ui/form-controls': { CurrencyField: 'CurrencyField' }, '../../src/ui/form-controls': { CurrencyField: 'CurrencyField' },
     '../src/ui/currencies': currencies, '../../src/ui/currencies': currencies,
     './presentation': presentation,
     './budget-presentation': budgetPresentation, '../../src/ui/budget-presentation': budgetPresentation,
@@ -254,8 +258,8 @@ test('transfer form previews exact two-account balances and only offers same-cur
   assert.deepEqual(find(view.render(), 'AccountField', 'Hacia').props.accounts.map((a: domain.Account) => a.id), ['b']);
   fillTransfer(view);
   const root = view.render();
-  assert.equal(find(root, 'DetailRow', 'Prueba ARS después').props.value, 'ARS 866,55');
-  assert.equal(find(root, 'DetailRow', 'Destino después').props.value, 'ARS 10,00');
+  assert.equal(find(root, 'DetailRow', 'Prueba ARS después').props.value, 'ARS\u00A0866,55');
+  assert.equal(find(root, 'DetailRow', 'Destino después').props.value, 'ARS\u00A010,00');
   await find(root, 'ActionButton', 'Registrar transferencia').props.onPress();
   assert.equal(view.transfers.length, 1);
   assert.equal(view.transfers[0].amountMinor, 1000);
@@ -303,7 +307,7 @@ test('editing a transfer removes its previous effect in preview and retains its 
   const view = harness('src/ui/transfer-form.tsx', { original }, { data: { ...transferData, transfers: [original] } });
   assert.equal(find(view.render(), 'AmountField').props.value, '10,00');
   find(view.render(), 'AmountField').props.onChangeText('20');
-  assert.equal(find(view.render(), 'DetailRow', 'Prueba ARS después').props.value, 'ARS 856,55');
+  assert.equal(find(view.render(), 'DetailRow', 'Prueba ARS después').props.value, 'ARS\u00A0856,55');
   await find(view.render(), 'ActionButton', 'Guardar cambios').props.onPress();
   assert.equal(view.transferChanges.length, 1);
   assert.equal(view.transferChanges[0].after.transfer.id, transfer.id);
@@ -405,7 +409,7 @@ test('card payment locks the card as destination, caps at the recorded debt and 
   assert.equal(view.transfers.length, 0);
   find(view.render(), 'AmountField').props.onChangeText('50');
   root = view.render();
-  assert.equal(find(root, 'DetailRow', 'Visa después').props.value, 'ARS A favor 0,00');
+  assert.equal(find(root, 'DetailRow', 'Visa después').props.value, 'ARS\u00A0A favor 0,00');
   await find(root, 'ActionButton', 'Registrar pago').props.onPress();
   assert.equal(view.transfers.length, 1);
   assert.deepEqual([view.transfers[0].fromAccountId, view.transfers[0].toAccountId, view.transfers[0].amountMinor, view.transfers[0].note], ['a', 'card-acc', 5000, 'Pago Visa']);
@@ -474,7 +478,7 @@ test('the entry form shows the category budget live and echoes the amount on Sav
   find(view.render(), 'CategoryField').props.onChange('salud');
   assert.equal(find(view.render(), 'CategoryField').props.detail, '$ 0,00 de $ 500,00 este mes');
   find(view.render(), 'AmountField').props.onChangeText('1234,5');
-  assert.equal(find(view.render(), 'ActionButton').props.label, 'Guardar gasto · $ 1.234,50');
+  assert.equal(find(view.render(), 'ActionButton').props.label, 'Guardar gasto\u00A0·\u00A0$\u00A01.234,50');
   // On its own (edit mode and tests) the form keeps a Gasto / Ingreso switch; Transferencia is the host's job.
   const choices = find(view.render(), 'Choices');
   assert.equal(choices.props.options.map((option: { value: string }) => option.value).join(','), 'expense,income');

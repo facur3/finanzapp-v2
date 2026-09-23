@@ -7,6 +7,9 @@ import * as domain from '@finanzapp/domain';
 import * as categories from '../src/ui/categories.ts';
 import * as appearance from '../src/ui/appearance.ts';
 import * as materialPolicy from '../src/ui/material-policy.ts';
+import * as i18nFormat from '../src/i18n/format.ts';
+import { bindLocale } from '../src/i18n/bind.ts';
+const i18nProvider = { useI18n: () => bindLocale('es-AR') };
 
 // Producto 18: the Más hub, the backup screen and the read-only categories
 // screen with native hosts replaced by descriptors. Not a rendered iOS screen.
@@ -39,6 +42,7 @@ function harness(file: string, data: domain.LedgerArchive = archive) {
   const components = Object.fromEntries(names.map(name => [name, name]));
   const theme = { usePalette: () => ({ text: '#000', secondary: '#666', line: '#ddd', isDark: false }) };
   const modules: Record<string, unknown> = {
+    '../i18n/format': i18nFormat, '../src/i18n/format': i18nFormat, '../../src/i18n/format': i18nFormat, '../i18n/provider': i18nProvider, '../src/i18n/provider': i18nProvider, '../../src/i18n/provider': i18nProvider,
     react: { useMemo: (fn: () => unknown) => fn(), useRef: (initial: unknown) => ({ current: initial }), useState: (initial: unknown) => {
       const index = cursor++;
       if (!(index in state)) state[index] = typeof initial === 'function' ? (initial as () => unknown)() : initial;
@@ -95,7 +99,7 @@ test('Más groups permanent navigation into Finanzas and App y datos, with live 
   assert.deepEqual(rows(root).filter(row => row.props.last).map(row => row.props.title), ['Categorías', 'Movimientos deshechos']);
   assert.equal(nodes(root).some(node => node.type === 'ActionButton'), false);
   const texts = nodes(root).filter(node => node.type === 'AppText').map(node => String(node.props.children)).join(' ');
-  assert.match(texts, /Producto 22\.1/);
+  assert.match(texts, /Producto 23\.0/);
   assert.match(texts, /Material opaco \(Expo Go\)/, 'the footer says which control material this session draws, so a tester can confirm the mode');
   assert.equal(value('Categorías'), 'Gastos e ingresos');
   // Finanzas rows carry a soft identity tile from the shared palette; App y datos rows stay neutral glyphs.

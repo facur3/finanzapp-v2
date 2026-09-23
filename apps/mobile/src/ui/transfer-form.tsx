@@ -173,8 +173,8 @@ export function TransferForm({ original, accountId, fromAccountId: requestedFrom
         action={<ActionButton label="Agregar cuenta" secondary disabled={locked} onPress={() => router.push({ pathname: '/new-account', params: { currency: from?.currency ?? 'ARS' } })} />} />}
       <Field label="Nota (opcional)" value={note} onChangeText={setNote} maxLength={120} editable={!locked} />
       {preview && from && to && <Surface grouped>
-        <DetailRow label={from.name + ' después'} value={`${from.currency} ${balanceLabel(from.id, preview.from)}`} />
-        <DetailRow label={to.name + ' después'} value={`${to.currency} ${balanceLabel(to.id, preview.to)}`} last />
+        <DetailRow label={from.name + ' después'} value={from.currency + '\u00A0' + balanceLabel(from.id, preview.from)} />
+        <DetailRow label={to.name + ' después'} value={to.currency + '\u00A0' + balanceLabel(to.id, preview.to)} last />
       </Surface>}
       {preview && from && to && ((preview.from < 0 && !hidden.has(from.id)) || (preview.to < 0 && !hidden.has(to.id))) && <AppText secondary variant="subhead">
         Una cuenta quedará con saldo negativo. Revisá el importe y tus movimientos; podés registrarlo si refleja lo que realmente ocurrió.

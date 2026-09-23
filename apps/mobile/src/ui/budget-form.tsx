@@ -8,11 +8,9 @@ import { formatMinorUnits, parseMinorUnits, sameMonthlyBudget, validateMonthlyBu
 import { useLedger } from '../storage/LedgerProvider';
 import { ActionButton, AmountField, AppText, Choices, ErrorMessage, IconButton, Screen } from './components';
 import { CategoryField } from './form-controls';
+import { formatMonth } from '../i18n/format';
 
-function monthLabel(monthISO: string) {
-  const [year, month] = monthISO.split('-').map(Number);
-  return new Date(year, month - 1, 1, 12).toLocaleDateString('es-AR', { month: 'long', year: 'numeric' });
-}
+const monthLabel = (monthISO: string) => formatMonth(monthISO);
 
 /** One limit for one month and currency. The first question is what kind of
  * limit: General is the ceiling for all of the month's recorded expenses and

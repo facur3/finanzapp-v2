@@ -4,7 +4,8 @@ import { router, Stack } from 'expo-router';
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { cardStatementActivity, formatMinorUnits, labelFromISO, liabilityActivity } from '@finanzapp/domain';
 import { useLedger } from '../src/storage/LedgerProvider';
-import { ActionButton, AppText, EmptyState, IconButton, Money, MovementRow, Screen, SectionTitle, Stat, Surface, toneColors } from '../src/ui/components';
+import { ActionButton, AppText, EmptyState, IconButton, Money, MovementRow, Screen, SectionTitle, Stat, Surface, toneColors, StatRow } from '../src/ui/components';
+import { moneyText, withCurrencyCode } from '../src/i18n/format';
 import { CardCarousel, CardFace } from '../src/ui/card-visual';
 import { activeCards, daysUntil, statementCaption, usageTone, type CardSummary } from '../src/ui/liability-presentation';
 import { ValueTransition, timing } from '../src/ui/motion';
@@ -59,24 +60,24 @@ function CardPanel({ summary, day }: { summary: CardSummary; day: string }) {
   // so the sections below never jump to a different height mid-transition.
   return <View style={{ gap: space.xl }}>
     <ValueTransition id={card.id} style={{ gap: 6 }}>
-      <AppText secondary variant="footnote" style={{ fontWeight: '500' }}>Deuda registrada · {account.currency}</AppText>
+      <AppText secondary variant="footnote" style={{ fontWeight: '500' }}>{withCurrencyCode('Deuda registrada', account.currency)}</AppText>
       <Money minor={debtMinor} currency={account.currency} large size={40} />
       {debtMinor === 0 && <AppText secondary variant="footnote">Sin deuda registrada en esta tarjeta.</AppText>}
     </ValueTransition>
 
     <ValueTransition id={card.id} variant="fade"><Surface style={{ gap: 14 }}>
-      <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 12 }}>
+      <StatRow>
         <Stat label="Disponible">
           {availableMinor !== null ? <Money minor={availableMinor} currency={account.currency} size={17} color={availableMinor < 0 ? p.expense : undefined} />
             : <AppText secondary variant="subhead">Sin límite cargado</AppText>}
         </Stat>
-        <Stat label="Cierre" align="right"><AppText style={{ fontWeight: '600' }}>{relative(closingISO)}</AppText></Stat>
-        <Stat label="Vencimiento" align="right">
+        <Stat label="Cierre"><AppText style={{ fontWeight: '600' }}>{relative(closingISO)}</AppText></Stat>
+        <Stat label="Vencimiento">
           <AppText style={{ fontWeight: '600', color: dueIn <= 3 && debtMinor > 0 ? p.warning : p.text }}>{relative(dueISO)}</AppText>
         </Stat>
-      </View>
+      </StatRow>
       {usage !== null && card.creditLimitMinor !== null && <UsageBar usage={usage} tone={tone}
-        label={`${Math.round(Math.min(usage, 9.99) * 100)} % del límite de ${account.currency === 'USD' ? 'US$ ' : '$ '}${formatMinorUnits(card.creditLimitMinor)}`} />}
+        label={`${Math.round(Math.min(usage, 9.99) * 100)} % del límite de ${moneyText(card.creditLimitMinor, account.currency)}`} />}
     </Surface></ValueTransition>
 
     {/* Primary above secondary, same width and height: hierarchy by fill, not by geometry. */}

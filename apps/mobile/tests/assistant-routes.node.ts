@@ -11,6 +11,9 @@ import * as presentation from '../src/ui/presentation.ts';
 import type { AssistantClient, AssistantEvent } from '../src/assistant/client.ts';
 import { disconnectedAssistant } from '../src/assistant/client.ts';
 import { FIXTURE_ANSWER, FIXTURE_DRAFT, FIXTURE_DRAFT_NO_ACCOUNT, FIXTURE_FACTS, fixtureAssistant } from '../src/assistant/fixtures.ts';
+import * as i18nFormat from '../src/i18n/format.ts';
+import { bindLocale } from '../src/i18n/bind.ts';
+const i18nProvider = { useI18n: () => bindLocale('es-AR') };
 
 // Producto 21: the Assistant screen's handlers, with React, native hosts and the
 // UI modules replaced by descriptors and a scripted client. Not a rendered
@@ -54,6 +57,7 @@ function harness({ client, accounts = [visa, cash, usd], data = entries, params 
   const slot = (initial: () => unknown) => { const index = cursor++; if (!(index in state)) state[index] = initial(); return index; };
   const snapshot: domain.LedgerSnapshot = { accounts, entries: data, transfers: [] };
   const modules: Record<string, unknown> = {
+    '../i18n/format': i18nFormat, '../src/i18n/format': i18nFormat, '../../src/i18n/format': i18nFormat, '../i18n/provider': i18nProvider, '../src/i18n/provider': i18nProvider, '../../src/i18n/provider': i18nProvider,
     react: {
       useState: (initial: unknown) => { const index = slot(() => typeof initial === 'function' ? (initial as () => unknown)() : initial); return [state[index], (value: unknown) => { state[index] = typeof value === 'function' ? (value as (c: unknown) => unknown)(state[index]) : value; }]; },
       useReducer: (reducer: (s: unknown, a: unknown) => unknown, initial: unknown) => { const index = slot(() => initial); return [state[index], (action: unknown) => { state[index] = reducer(state[index], action); }]; },

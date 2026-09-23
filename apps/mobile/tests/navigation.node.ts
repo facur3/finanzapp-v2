@@ -4,6 +4,9 @@ import { test } from 'node:test';
 import { runInNewContext } from 'node:vm';
 import ts from 'typescript';
 import { tabHostOptions, tabScreenOptions } from '../src/ui/navigation.ts';
+import * as i18nFormat from '../src/i18n/format.ts';
+import { bindLocale } from '../src/i18n/bind.ts';
+const i18nProvider = { useI18n: () => bindLocale('es-AR') };
 
 // A configuration regression guard over the actual layout module, NOT an iOS
 // render/gesture test. It catches overrides that accidentally bring back the
@@ -17,6 +20,7 @@ function renderLayout(background: string) {
   const Tabs = Object.assign(() => null, { Screen: 'TabScreen' });
   const module = { exports: {} as { default?: () => any } };
   const modules: Record<string, unknown> = {
+    '../i18n/format': i18nFormat, '../src/i18n/format': i18nFormat, '../../src/i18n/format': i18nFormat, '../i18n/provider': i18nProvider, '../src/i18n/provider': i18nProvider, '../../src/i18n/provider': i18nProvider,
     'react/jsx-runtime': { jsx, jsxs: jsx },
     'expo-router': { Tabs, router: { push: (to: unknown) => pushed.push(to) } },
     '@expo/vector-icons/Ionicons': 'Ionicons',

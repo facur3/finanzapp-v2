@@ -9,6 +9,17 @@ y presupuestos siguen en el plan; inversiones y patrimonio salen del alcance nat
 - [Decisión, alternativas y alcance](docs/decisions/002-spending-first.md)
 - [Base de IA en nube y Atajos: qué funciona y qué falta](docs/mobile-integrations.md)
 
+**Producto 23.0 (2026-09-22):** pulido de interacción y base de localización: el selector
+de moneda es una fila vertical (etiqueta, nombre completo, código y símbolo, ícono y
+chevron) y "Dólares estadounidenses · USD" ya no parte el código a otra línea; el campo de
+importe ancla el símbolo a la izquierda y los dígitos crecen desde un origen fijo en
+cifras tabulares (nada se mueve en 999 → 1.000 ni en 999.999 → 1.000.000; solo baja el
+tamaño cuando el importe no entra); filas, estadísticas y segmentados compartidos se
+apilan con texto grande en vez de recortar; `apps/mobile/src/i18n` resuelve el idioma
+del dispositivo, formatea fechas y porcentajes desde tablas y tiene catálogos es-AR y
+en-US, con el inglés todavía no habilitado (Producto 23.1 completa la traducción;
+Producto 24 es el motor multimoneda). Sin cambios financieros ni de esquema.
+
 **Producto 19 (2026-09-21):** presupuestos completos en la app nativa: un
 **presupuesto general** mensual (techo de todos los gastos registrados del mes en una
 moneda) junto a **límites por categoría** que son sublímites y no se suman; modelo

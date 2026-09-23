@@ -1,8 +1,9 @@
 import { FlatList, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
-import { formatMinorUnits, spendingComparison, type CategoryChange, type ReportPeriod } from '@finanzapp/domain';
+import { spendingComparison, type CategoryChange, type ReportPeriod } from '@finanzapp/domain';
 import { useLedger } from '../src/storage/LedgerProvider';
 import { AppText, DetailRow, EmptyState, Money, SectionTitle, Surface } from '../src/ui/components';
+import { codedAmount } from '../src/i18n/format';
 import { useCategoryLookOf } from '../src/ui/category-hues';
 import { changePercent, dateRangeLabel, reportSelection } from '../src/ui/report-presentation';
 import { useCurrentDay, usePalette } from '../src/ui/theme';
@@ -16,7 +17,7 @@ export default function ReportComparisonScreen() {
   const selection = reportSelection(snapshot, params.currency, params.month, today);
   const comparison = spendingComparison(snapshot, selection.currency, selection.monthISO, today);
   const { current, previous, deltaMinor } = comparison;
-  const amount = (minor: number) => selection.currency + ' ' + formatMinorUnits(minor);
+  const amount = (minor: number) => codedAmount(minor, selection.currency);
   const openCategory = (period: ReportPeriod, key: string) => router.push({ pathname: '/report-category',
     params: { currency: selection.currency, month: period.startISO.slice(0, 7), category: key, through: period.endISO } });
   return <FlatList<CategoryChange> data={comparison.categories} keyExtractor={item => item.key}

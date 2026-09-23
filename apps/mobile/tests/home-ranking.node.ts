@@ -6,6 +6,9 @@ import ts from 'typescript';
 import * as presentation from '../src/ui/report-presentation.ts';
 import * as budgetPresentation from '../src/ui/budget-presentation.ts';
 import { washOf } from '../src/ui/category-color.ts';
+import * as i18nFormat from '../src/i18n/format.ts';
+import { bindLocale } from '../src/i18n/bind.ts';
+const i18nProvider = { useI18n: () => bindLocale('es-AR') };
 
 // A source/behaviour guard over the Home category module: honest proportions,
 // a reveal that runs once, interpolation on data changes and Reduce Motion.
@@ -19,6 +22,7 @@ function harness() {
   // Hooks persist by call order across renders, like React's, so a re-render keeps its refs and shared values.
   const env = { reduced: false, shared: [] as (Shared & { initial: unknown })[], refs: [] as { current: unknown }[], cursor: { shared: 0, ref: 0 } };
   const modules: Record<string, any> = {
+    '../i18n/format': i18nFormat, '../src/i18n/format': i18nFormat, '../../src/i18n/format': i18nFormat, '../i18n/provider': i18nProvider, '../src/i18n/provider': i18nProvider, '../../src/i18n/provider': i18nProvider,
     react: { useEffect: (fn: () => any) => { fn(); }, useRef: (value: unknown) => {
       const index = env.cursor.ref++;
       return env.refs[index] ??= { current: value }; } },
@@ -32,7 +36,7 @@ function harness() {
       withTiming: (value: number, options: { duration: number }) => ({ value, duration: options.duration, delay: 0 }),
       withDelay: (delay: number, animation: { value: number; duration: number }) => ({ ...animation, delay }) },
     '@finanzapp/domain': { formatMinorUnits: (minor: number) => String(minor), labelFromISO: () => '' },
-    './components': { AppText: 'AppText', CategoryBadge: 'CategoryBadge', Money: 'Money', PressFeedback: 'PressFeedback', Surface: 'Surface' },
+    './components': { AppText: 'AppText', CategoryBadge: 'CategoryBadge', Money: 'Money', PressFeedback: 'PressFeedback', Surface: 'Surface', useStacked: () => false },
     './category-color': { washOf },
     './category-hues': { useCategoryColor: (label: string) => '#' + label.length.toString().padStart(6, 'A'), useCategoryLook: (label: string) => ({ label, hex: '#' + label.length.toString().padStart(6, 'A'), glyph: 'pricetag-outline' }) },
     './motion': { easeOut: 'ease-out', timing: (kind: string, reduced: boolean) => ({ duration: reduced ? 0 : 260 }) },
@@ -87,7 +91,7 @@ test('rows fill in proportion to real spending, with no invented minimum and no 
     assert.equal(row.props.children[0].type, 'CategoryBadge', 'the category is the glyph on its hue, no emoji');
     assert.equal(row.props.style[0].borderBottomWidth, undefined, 'no separator cuts through the wash');
   }
-  assert.match(rows[1].props.accessibilityLabel, /ocio, 100 ARS, 0,1 % del gasto del mes/);
+  assert.match(rows[1].props.accessibilityLabel, /ocio, 100 ARS, 0,1\u00A0% del gasto del mes/);
   assert.equal(fillOf(rows[0]).props.style[1].backgroundColor, washOf('#AAAAA6', { isDark: true }), 'the wash is a faint tenth of the category hue');
   assert.equal(washOf('#AAAAA6', { isDark: true }), '#AAAAA61C');
   assert.equal(washOf('#AAAAA6', { isDark: false }), '#AAAAA614');

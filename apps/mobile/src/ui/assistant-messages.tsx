@@ -110,7 +110,7 @@ export function AnswerEvidence({ content, currency, onOpen }: { content: AnswerC
   return <View style={[styles.assistantRow, { gap: space.s }]}>
     {content.rows.length > 0 && <View style={[styles.evidence, { borderColor: p.line }]}>
       {content.rows.map(row => <View key={row.id} accessible accessibilityLabel={row.label} style={styles.evidenceRow}>
-        <AppText secondary variant="subhead" numberOfLines={1} style={{ flex: 1 }}>{row.label}</AppText>
+        <AppText secondary variant="subhead" numberOfLines={2} style={{ flex: 1, minWidth: 0 }}>{row.label}</AppText>
         <Money minor={row.amountMinor} currency={currency} signed={row.signed} size={15} weight="600" />
       </View>)}
     </View>}
@@ -180,10 +180,10 @@ export function DraftCard({ content, accounts, onConfirm, onEdit, onCancel, onOp
 function DraftRow({ label, value, leading, missing = false, last = false }: { label: string; value: string; leading?: ReactNode; missing?: boolean; last?: boolean }) {
   const p = usePalette();
   return <View accessible accessibilityLabel={label + ': ' + value} style={[styles.draftRow, { borderBottomColor: p.line, borderBottomWidth: last ? 0 : StyleSheet.hairlineWidth }]}>
-    <AppText secondary variant="subhead" style={{ width: 96 }}>{label}</AppText>
-    <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8, justifyContent: 'flex-end' }}>
+    <AppText secondary variant="subhead" style={{ minWidth: 96, flexShrink: 1 }}>{label}</AppText>
+    <View style={{ flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 8, justifyContent: 'flex-end' }}>
       {leading}
-      <AppText numberOfLines={1} style={{ flexShrink: 1, fontWeight: '500', color: missing ? p.warning : p.text }}>{value}</AppText>
+      <AppText numberOfLines={2} style={{ flexShrink: 1, textAlign: 'right', fontWeight: '500', color: missing ? p.warning : p.text }}>{value}</AppText>
     </View>
   </View>;
 }

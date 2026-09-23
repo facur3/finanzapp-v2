@@ -6,6 +6,9 @@ import ts from 'typescript';
 import * as domain from '@finanzapp/domain';
 import * as presentation from '../src/ui/presentation.ts';
 import * as budgetPresentation from '../src/ui/budget-presentation.ts';
+import * as i18nFormat from '../src/i18n/format.ts';
+import { bindLocale } from '../src/i18n/bind.ts';
+const i18nProvider = { useI18n: () => bindLocale('es-AR') };
 
 // Budgets, Recurrentes, Cuentas and account detail handlers with native hosts
 // replaced by descriptors. Not a rendered iOS screen or gesture test.
@@ -44,6 +47,7 @@ function harness(file: string, params: Record<string, unknown> = {}, data: domai
   const theme = { space: { xs: 4, s: 8, m: 12, l: 16, xl: 20, xxl: 24, xxxl: 32 }, useCurrentDay: () => '2026-09-20', useReduceMotion: () => true,
     usePalette: () => ({ text: '#000', secondary: '#666', tertiary: '#999', line: '#ddd', inset: '#eee', expense: '#c00', income: '#080', warning: '#a60', primary: '#2557D6', background: '#fff', surface: '#fff' }) };
   const modules: Record<string, unknown> = {
+    '../i18n/format': i18nFormat, '../src/i18n/format': i18nFormat, '../../src/i18n/format': i18nFormat, '../i18n/provider': i18nProvider, '../src/i18n/provider': i18nProvider, '../../src/i18n/provider': i18nProvider,
     react: { useEffect: (fn: () => unknown) => { fn(); }, useMemo: (fn: () => unknown) => fn(), useState: (initial: unknown) => {
       const index = cursor++;
       if (!(index in state)) state[index] = typeof initial === 'function' ? (initial as () => unknown)() : initial;
@@ -57,7 +61,7 @@ function harness(file: string, params: Record<string, unknown> = {}, data: domai
     'expo-router': { Stack: { Screen: 'Stack.Screen' }, Redirect: 'Redirect', useLocalSearchParams: () => params, router: { push: (to: unknown) => pushed.push(to) } },
     '@finanzapp/domain': domain,
     '../src/storage/LedgerProvider': ledger, '../../src/storage/LedgerProvider': ledger,
-    '../src/ui/components': Object.fromEntries(names.map(name => [name, name])), '../../src/ui/components': Object.fromEntries(names.map(name => [name, name])),
+    '../src/ui/components': { ...Object.fromEntries(names.map(name => [name, name])), useStacked: () => false }, '../../src/ui/components': { ...Object.fromEntries(names.map(name => [name, name])), useStacked: () => false },
     '../src/ui/entry-list': { EntryList: 'EntryList' }, '../../src/ui/entry-list': { EntryList: 'EntryList' },
     '../src/ui/quick-actions': { QuickActions: 'QuickActions' }, '../../src/ui/quick-actions': { QuickActions: 'QuickActions' },
     '../src/ui/motion': { ValueTransition: 'ValueTransition', Reflow: 'Reflow', selectionHaptic: () => {}, impactHaptic: () => {}, duration: { press: 100, release: 160, state: 200, data: 260, enter: 200, exit: 100, reveal: 480 }, timing: (kind: string, reduced: boolean) => ({ duration: reduced ? 0 : 260 }) }, '../../src/ui/motion': { ValueTransition: 'ValueTransition', Reflow: 'Reflow', selectionHaptic: () => {}, impactHaptic: () => {}, duration: { press: 100, release: 160, state: 200, data: 260, enter: 200, exit: 100, reveal: 480 }, timing: (kind: string, reduced: boolean) => ({ duration: reduced ? 0 : 260 }) },
@@ -157,7 +161,7 @@ test('recurrentes projects the next 30 days per currency and pausing advances no
   const view = harness('recurring.tsx');
   const root = view.render();
   const stats = nodes(root).filter(node => node.type === 'Stat').map(node => node.props.label);
-  assert.deepEqual(stats.slice(0, 3), ['Pagos · ARS', 'Vencimientos', 'Ingresos']);
+  assert.deepEqual(stats.slice(0, 3), ['Pagos\u00A0·\u00A0ARS', 'Vencimientos', 'Ingresos']);
   assert.equal(find(root, 'Money').props.minor, 40000);
   const row = nodes(root).find(node => typeof node.type === 'function' && node.props.rule)!;
   assert.equal(row.props.rule.id, 'rent');

@@ -3,6 +3,7 @@ import { StyleSheet, View } from 'react-native';
 import Animated, { useAnimatedProps, useAnimatedStyle, useSharedValue, withTiming, type SharedValue } from 'react-native-reanimated';
 import Svg, { Circle, Path } from 'react-native-svg';
 import { AppText, Money, PressFeedback } from './components';
+import { currencySymbol, formatCount, spokenMoney } from '../i18n/format';
 import { categoryColor, othersColor } from './category-color';
 import { ValueTransition, duration, timing } from './motion';
 import { usePalette, useReduceMotion, type Palette } from './theme';
@@ -127,7 +128,7 @@ export function MonthBars({ points, selected, onSelect, currency, height = 120 }
       </Animated.Text>)}
     </View>
     {current && <AppText secondary variant="caption" style={{ textAlign: 'center' }}>
-      {current.partial ? 'Mes en curso hasta hoy' : 'Mes completo'} · escala de 0 a {currency === 'USD' ? 'US$ ' : '$ '}{(max / 100).toLocaleString('es-AR', { maximumFractionDigits: 0 })}
+      {current.partial ? 'Mes en curso hasta hoy' : 'Mes completo'} · escala de 0 a {currencySymbol(currency)}{'\u00A0'}{formatCount(Math.round(max / 100))}
     </AppText>}
   </View>;
 }
@@ -141,7 +142,7 @@ function Bar({ point, fraction, selected, onPress, currency, height }: {
   useEffect(() => { value.value = withTiming(fraction, timing('data', reduced)); }, [fraction, reduced, value]);
   const style = useAnimatedStyle(() => ({ height: Math.max(point.amountMinor > 0 ? 3 : 0, value.value * (height - 4)) }));
   return <PressFeedback feedback="opacity" accessibilityRole="button" accessibilityState={{ selected }}
-    accessibilityLabel={`${MONTHS[Number(point.monthISO.slice(5, 7)) - 1]} ${point.monthISO.slice(0, 4)}, ${(point.amountMinor / 100).toLocaleString('es-AR', { minimumFractionDigits: 2 })} ${currency}${point.partial ? ', mes en curso' : ''}`}
+    accessibilityLabel={`${MONTHS[Number(point.monthISO.slice(5, 7)) - 1]} ${point.monthISO.slice(0, 4)}, ${spokenMoney(point.amountMinor, currency)}${point.partial ? ', mes en curso' : ''}`}
     onPress={onPress} containerStyle={{ flex: 1 }} style={{ height, justifyContent: 'flex-end', minHeight: undefined }}>
     <Animated.View style={[{ borderRadius: 6, backgroundColor: selected ? p.primary : p.inset, borderWidth: point.partial ? StyleSheet.hairlineWidth * 2 : 0, borderColor: p.secondary,
       transitionProperty: 'backgroundColor', transitionDuration: reduced ? 0 : duration.state }, style]} />

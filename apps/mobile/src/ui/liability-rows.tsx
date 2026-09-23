@@ -25,9 +25,9 @@ export function DebtRow({ debt, last }: { debt: PersonalDebtProfile; last: boole
       borderBottomWidth: last ? 0 : 0.5, borderBottomColor: p.line }}>
     <GlyphTile icon={owed ? 'arrow-up-outline' : 'arrow-down-outline'} tone={owed ? 'warning' : 'income'} />
     <View style={{ flex: 1, minWidth: 0, gap: 3 }}>
-      <AppText numberOfLines={1} style={{ fontWeight: '500' }}>{debt.counterparty}</AppText>
+      <AppText numberOfLines={2} style={{ fontWeight: '500' }}>{debt.counterparty}</AppText>
       <AppText secondary variant="footnote" style={overdue ? { color: p.expense } : undefined}>{owed ? 'Debo' : 'Me deben'} · {status}</AppText>
     </View>
-    <Money minor={outstanding} currency={account.currency} />
+    <View style={{ maxWidth: '50%', alignItems: 'flex-end' }}><Money minor={outstanding} currency={account.currency} /></View>
   </PressFeedback>;
 }

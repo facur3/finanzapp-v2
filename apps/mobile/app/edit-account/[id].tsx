@@ -8,8 +8,8 @@ import { accountBalanceMinor, accountLook, formatMinorUnits, makeAccountAppearan
 import { useLedger } from '../../src/storage/LedgerProvider';
 import { ACCOUNT_ICON_CHOICES, COLOR_CHOICES } from '../../src/ui/appearance';
 import { IconColorPicker } from '../../src/ui/appearance-picker';
-import { ActionButton, AmountField, AppText, DetailRow, EmptyState, ErrorMessage, Field, FieldNote, IconButton, Screen, Surface } from '../../src/ui/components';
-import { currencyOption } from '../../src/ui/currencies';
+import { ActionButton, AmountField, AppText, EmptyState, ErrorMessage, Field, FieldNote, IconButton, Screen } from '../../src/ui/components';
+import { CurrencyField } from '../../src/ui/form-controls';
 
 const BALANCE_HELP = 'El ícono y el color solo cambian cómo se ve la cuenta. Usá la corrección de saldo únicamente si está mal cargado: '
   + 'queda un recibo de corrección, no un ingreso ni un gasto. Si recibiste, gastaste o moviste dinero, registrá el movimiento correspondiente.';
@@ -86,7 +86,7 @@ function AccountEditor({ account, snapshot, current }: { account: Account; snaps
     <AmountField label="Saldo registrado" currency={account.currency} value={balance} onChangeText={setBalance}
       keyboardType="numbers-and-punctuation" inputMode={undefined} editable={!locked} />
     <FieldNote help={{ title: 'Saldo registrado', detail: BALANCE_HELP }}>Solo para corregir un saldo mal cargado.</FieldNote>
-    <Surface grouped><DetailRow label="Moneda" value={currencyOption(account.currency).name + ' · ' + account.currency} last /></Surface>
+    <CurrencyField value={account.currency} />
     <FieldNote help={{ title: 'Moneda', detail: CURRENCY_HELP }}>La moneda de una cuenta no se cambia.</FieldNote>
     <ErrorMessage message={error} />
     {pending && error && <AppText secondary style={{ fontSize: 13 }}>Reintentá este mismo cambio. Para editarlo, cerrá y verificá primero el saldo guardado.</AppText>}

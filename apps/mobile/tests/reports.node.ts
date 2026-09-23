@@ -35,9 +35,9 @@ test('month navigation crosses year boundaries without adding a fixed number of 
   assert.equal(shiftReportMonth('2024-03', -1), '2024-02');
 });
 test('the bar scale is share of total, not share of the largest category', () => {
-  assert.deepEqual(spendingShare(300, 1000), { fraction: 0.3, label: '30 %' });
-  assert.deepEqual(spendingShare(1000, 1000), { fraction: 1, label: '100 %' });
-  assert.equal(spendingShare(1, Number.MAX_SAFE_INTEGER).label, '<0,1 %');
+  assert.deepEqual(spendingShare(300, 1000), { fraction: 0.3, label: '30\u00A0%' });
+  assert.deepEqual(spendingShare(1000, 1000), { fraction: 1, label: '100\u00A0%' });
+  assert.equal(spendingShare(1, Number.MAX_SAFE_INTEGER).label, '<0,1\u00A0%');
   assert.ok(spendingShare(1, Number.MAX_SAFE_INTEGER).fraction > 0);
 });
 test('invalid totals never produce NaN/Infinity widths or a fabricated percentage', () => {
@@ -51,7 +51,7 @@ test('partial comparison periods are not mislabeled as full months', () => {
   assert.equal(reportPeriodLabel({ currency: 'ARS', startISO: '2026-08-01', endISO: '2026-08-31' }, '2026-09-12'), 'Mes completo · ARS');
   assert.equal(reportCutoff('2026-08', '2026-08-12', '2026-09-12'), '2026-08-12');
   assert.equal(reportCutoff('2026-08', '2026-09-12', '2026-09-12'), null);
-  assert.equal(changePercent(1, Number.MAX_SAFE_INTEGER), '<0,1 %');
+  assert.equal(changePercent(1, Number.MAX_SAFE_INTEGER), '<0,1\u00A0%');
   assert.equal(changePercent(100, 0), '—');
-  assert.equal(changePercent(-50, 100), '50 %');
+  assert.equal(changePercent(-50, 100), '50\u00A0%');
 });

@@ -5,7 +5,8 @@ import * as Haptics from 'expo-haptics';
 import { advanceRecurringDate, formatMinorUnits, labelFromISO, recurringOccurrencesThrough, todayKey,
   type Currency, type RecurringFrequency, type RecurringRule } from '@finanzapp/domain';
 import { useLedger } from '../src/storage/LedgerProvider';
-import { ActionButton, AppText, CategoryBadge, EmptyState, ErrorMessage, IconButton, Money, PressFeedback, Screen, SectionTitle, Stat, Surface } from '../src/ui/components';
+import { ActionButton, AppText, CategoryBadge, EmptyState, ErrorMessage, IconButton, Money, PressFeedback, Screen, SectionTitle, Stat, StatRow, Surface } from '../src/ui/components';
+import { withCurrencyCode } from '../src/i18n/format';
 import { space, useCurrentDay, usePalette } from '../src/ui/theme';
 
 const FREQUENCY: Record<RecurringFrequency, string> = { weekly: 'Semanal', monthly: 'Mensual', yearly: 'Anual' };
@@ -66,11 +67,11 @@ export default function RecurringScreen() {
         {!!forecast.length && <View>
           <SectionTitle>Próximos 30 días</SectionTitle>
           <View style={{ gap: 10 }}>
-            {forecast.map(item => <Surface key={item.currency} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', gap: 12 }}>
-              <Stat label={`Pagos · ${item.currency}`}><Money minor={item.expense} currency={item.currency} size={20} weight="700" /></Stat>
-              <Stat label="Vencimientos" align="right"><AppText style={{ fontWeight: '600' }}>{item.count}</AppText></Stat>
-              <Stat label="Ingresos" align="right"><Money minor={item.income} currency={item.currency} size={17} tone={item.income ? 'income' : 'neutral'} signed={item.income > 0} /></Stat>
-            </Surface>)}
+            {forecast.map(item => <Surface key={item.currency}><StatRow>
+              <Stat label={withCurrencyCode('Pagos', item.currency)}><Money minor={item.expense} currency={item.currency} size={20} weight="700" /></Stat>
+              <Stat label="Vencimientos"><AppText style={{ fontWeight: '600' }}>{item.count}</AppText></Stat>
+              <Stat label="Ingresos"><Money minor={item.income} currency={item.currency} size={17} tone={item.income ? 'income' : 'neutral'} signed={item.income > 0} /></Stat>
+            </StatRow></Surface>)}
           </View>
         </View>}
 
@@ -104,10 +105,10 @@ function RecurringRow({ rule, accounts, day, last, busy, onToggle }: {
       containerStyle={{ flex: 1 }} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, paddingLeft: 16, minHeight: 64 }}>
       <CategoryBadge category={rule.category} kind={rule.kind} tone={income ? 'income' : 'neutral'} />
       <View style={{ flex: 1, minWidth: 0, gap: 3 }}>
-        <AppText numberOfLines={1} style={{ fontWeight: '500' }}>{rule.merchant}</AppText>
-        <AppText secondary variant="footnote" numberOfLines={1}>{FREQUENCY[rule.frequency]} · {date}{account ? ' · ' + account.name : ''}</AppText>
+        <AppText numberOfLines={2} style={{ fontWeight: '500' }}>{rule.merchant}</AppText>
+        <AppText secondary variant="footnote" numberOfLines={2}>{FREQUENCY[rule.frequency]} · {date}{account ? ' · ' + account.name : ''}</AppText>
       </View>
-      <View style={{ alignItems: 'flex-end', gap: 3 }}>
+      <View style={{ alignItems: 'flex-end', gap: 3, maxWidth: '50%' }}>
         {account && <Money minor={income ? rule.amountMinor : -rule.amountMinor} currency={account.currency} signed tone={income ? 'income' : 'expense'} />}
         <AppText variant="caption" style={{ color: rule.active && days <= 1 ? p.warning : p.secondary, fontWeight: rule.active && days <= 1 ? '600' : '400' }}>{when}</AppText>
       </View>

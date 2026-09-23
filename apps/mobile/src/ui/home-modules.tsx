@@ -1,10 +1,10 @@
 import { useEffect, useRef } from 'react';
-import { Alert, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { Alert, StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import Animated, { useAnimatedStyle, useSharedValue, withDelay, withTiming } from 'react-native-reanimated';
 import { formatMinorUnits, labelFromISO, type Account, type CategorySpending, type Currency, type MonthlyBudgetSummary, type RecurringRule } from '@finanzapp/domain';
-import { AppText, CategoryBadge, Money, PressFeedback, Surface } from './components';
+import { AppText, CategoryBadge, Money, PressFeedback, Surface, useStacked } from './components';
 import { budgetHomeHeadline, budgetTone, categoriesStatus, percentUsed } from './budget-presentation';
 import { washOf } from './category-color';
 import { useCategoryLook } from './category-hues';
@@ -54,7 +54,6 @@ function RankedRow({ category, totalMinor, currency, index, last, onPress }: {
   const p = usePalette();
   const reduced = useReduceMotion();
   const { hex: color, label: name } = useCategoryLook(category.category);
-  const { fontScale } = useWindowDimensions();
   const { fraction, label } = spendingShare(category.amountMinor, totalMinor);
   // First data: the fill grows from zero (or, under Reduce Motion, fades in already sized). Later data: the fill moves to the new share.
   const progress = useSharedValue(reduced ? fraction : 0);
@@ -71,7 +70,7 @@ function RankedRow({ category, totalMinor, currency, index, last, onPress }: {
     progress.value = withTiming(fraction, timing('data', reduced));
   }, [fraction, reduced, index, progress, opacity]);
   const fill = useAnimatedStyle(() => ({ width: `${progress.value * 100}%` as `${number}%`, opacity: opacity.value }));
-  const stacked = fontScale > 1.3;
+  const stacked = useStacked();
   return <PressFeedback feedback="highlight" accessibilityRole="button" accessibilityHint="Abre los movimientos de esta categoría este mes"
     accessibilityLabel={`${name}, ${formatMinorUnits(category.amountMinor)} ${currency}, ${label} del gasto del mes`}
     onPress={onPress} style={[styles.row, last && styles.rowLast]}
@@ -80,7 +79,7 @@ function RankedRow({ category, totalMinor, currency, index, last, onPress }: {
     </View>}>
     <CategoryBadge category={category.category} />
     <View style={{ flex: 1, minWidth: 0, flexDirection: stacked ? 'column' : 'row', gap: stacked ? 2 : 12, alignItems: stacked ? 'flex-start' : 'center' }}>
-      <AppText numberOfLines={1} style={{ flex: stacked ? undefined : 1, minWidth: 0, fontWeight: '500' }}>{name}</AppText>
+      <AppText numberOfLines={stacked ? undefined : 2} style={{ flex: stacked ? undefined : 1, minWidth: 0, fontWeight: '500' }}>{name}</AppText>
       <Money minor={category.amountMinor} currency={currency} />
     </View>
   </PressFeedback>;
@@ -117,11 +116,11 @@ export function BudgetHomeCard({ summary }: { summary: MonthlyBudgetSummary }) {
     <Surface style={{ gap: 12 }}>
       <View style={{ flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', gap: 12 }}>
         <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
-          <AppText secondary variant="caption" numberOfLines={1} style={{ fontWeight: '500' }}>{title} · {remaining < 0 ? 'excedido' : 'te queda'}</AppText>
+          <AppText secondary variant="caption" numberOfLines={2} style={{ fontWeight: '500' }}>{title} · {remaining < 0 ? 'excedido' : 'te queda'}</AppText>
           <Money minor={Math.abs(remaining)} currency={currency} size={24} weight="700" color={color} />
         </View>
-        <View style={{ alignItems: 'flex-end', gap: 2 }}>
-          <AppText secondary variant="caption">de {symbol}{formatMinorUnits(budget.amountMinor)} · {percent} %</AppText>
+        <View style={{ alignItems: 'flex-end', gap: 2, flexShrink: 1, maxWidth: '50%' }}>
+          <AppText secondary variant="caption" style={{ textAlign: 'right' }}>de {symbol}{formatMinorUnits(budget.amountMinor)} · {percent} %</AppText>
           {!!status && <AppText variant="footnote" style={{ color: headline.exceededCategories ? p.expense : p.secondary, fontWeight: headline.exceededCategories ? '600' : '400' }}>{status}</AppText>}
         </View>
       </View>
@@ -145,10 +144,10 @@ export function UpcomingRecurringRow({ rule, account, day, last }: {
     style={[styles.row, { borderBottomWidth: last ? 0 : StyleSheet.hairlineWidth, borderBottomColor: p.line }]}>
     <CategoryBadge category={rule.category} kind={rule.kind} />
     <View style={{ flex: 1, minWidth: 0, gap: 3 }}>
-      <AppText numberOfLines={1} style={{ fontWeight: '500' }}>{rule.merchant}</AppText>
-      <AppText secondary variant="footnote" numberOfLines={1}>{date} · {account.name}</AppText>
+      <AppText numberOfLines={2} style={{ fontWeight: '500' }}>{rule.merchant}</AppText>
+      <AppText secondary variant="footnote" numberOfLines={2}>{date} · {account.name}</AppText>
     </View>
-    <View style={{ alignItems: 'flex-end', gap: 3 }}>
+    <View style={{ alignItems: 'flex-end', gap: 3, maxWidth: '50%' }}>
       <Money minor={rule.amountMinor} currency={account.currency} />
       <AppText variant="caption" style={{ color: days <= 1 ? p.warning : p.secondary, fontWeight: days <= 1 ? '600' : '400' }}>{when}</AppText>
     </View>

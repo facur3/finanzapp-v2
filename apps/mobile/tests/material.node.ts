@@ -4,6 +4,9 @@ import { test } from 'node:test';
 import { runInNewContext } from 'node:vm';
 import ts from 'typescript';
 import { MATERIAL_LABELS, composerBottomPadding, drawReason, glassDisabledBy, loadReason, materialFor, subscribeReduceTransparency } from '../src/ui/material-policy.ts';
+import * as i18nFormat from '../src/i18n/format.ts';
+import { bindLocale } from '../src/i18n/bind.ts';
+const i18nProvider = { useI18n: () => bindLocale('es-AR') };
 
 // Producto 22: the material decision (native Liquid Glass or the opaque
 // control surface) and the adapter that is the only door to
@@ -81,6 +84,7 @@ function loadMaterial({ platform = 'ios', expoGo = { expoGoConfig: null, appOwne
   let required = 0;
   const policy = { drawReason, glassDisabledBy, loadReason, materialFor };
   const modules: Record<string, unknown> = {
+    '../i18n/format': i18nFormat, '../src/i18n/format': i18nFormat, '../../src/i18n/format': i18nFormat, '../i18n/provider': i18nProvider, '../src/i18n/provider': i18nProvider, '../../src/i18n/provider': i18nProvider,
     react: { useMemo: (fn: () => unknown) => fn() },
     'react/jsx-runtime': { jsx, jsxs: jsx },
     'react-native': { View: 'View', Platform: { OS: platform } },
