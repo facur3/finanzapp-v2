@@ -453,6 +453,26 @@ export function NavigationRow({ title, subtitle, icon, leading, onPress, last = 
   </PressFeedback>;
 }
 
+/** One option of a list where exactly one is chosen (Idioma, Región): the
+ * NavigationRow shape (title over a footnote subtitle, each up to two lines,
+ * 60 pt minimum) with a checkmark on the chosen option instead of a chevron,
+ * because pressing it chooses rather than navigates. VoiceOver reads the
+ * title and subtitle as one label and "selected" on the chosen one. */
+export function CheckRow({ title, subtitle, selected, onPress, last = false, disabled = false }: {
+  title: string; subtitle?: string; selected: boolean; onPress: () => void; last?: boolean; disabled?: boolean;
+}) {
+  const p = usePalette();
+  return <PressFeedback feedback="highlight" accessibilityRole="button" accessibilityLabel={subtitle ? title + ', ' + subtitle : title}
+    disabled={disabled} accessibilityState={{ disabled, selected }} onPress={onPress}
+    style={[styles.navigationRow, { borderBottomColor: p.line, borderBottomWidth: last ? 0 : StyleSheet.hairlineWidth, opacity: disabled ? 0.6 : 1 }]}>
+    <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+      <AppText numberOfLines={2} style={{ fontWeight: '600' }}>{title}</AppText>
+      {!!subtitle && <AppText secondary variant="footnote" numberOfLines={2}>{subtitle}</AppText>}
+    </View>
+    <View style={styles.navigationGlyph}>{selected && <Ionicons name="checkmark" size={22} color={p.primary} accessible={false} />}</View>
+  </PressFeedback>;
+}
+
 /** A row that holds a chosen value and, when pressed, opens its chooser: a
  * glyph or identity tile, the field label as a caption, the value as the
  * primary line and an optional detail line (a currency code and symbol, an

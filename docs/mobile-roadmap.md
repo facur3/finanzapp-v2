@@ -1,6 +1,6 @@
 # FinanzApp mobile: living roadmap
 
-Updated: 2026-09-22. Read [decision 001](decisions/001-native-mobile.md),
+Updated: 2026-09-23. Read [decision 001](decisions/001-native-mobile.md),
 [decision 002](decisions/002-spending-first.md) and
 [decision 003](decisions/003-five-tabs-and-cards.md). Decision 002 supersedes earlier
 full-finance migration phases and the local-only AI preference. Handoff entries
@@ -15,10 +15,107 @@ server-keyed; manual recording and local data work without connectivity. Recurri
 expenses, debts, budgets and cards remain in scope. Native navigation, accessible
 amounts, real data and recoverable durable writes remain requirements.
 
-## Status and current delivery — Producto 23.0
+## Status and current delivery — Producto 23.1A
 
 Implemented is code, checked names a test, device-verified needs a physical result,
 and released means distributed. Neither a bundle nor a screenshot is App Store QA.
+
+Producto 23.1 (complete internationalization) is split into three independent PRs:
+**23.1A** reactive language and region architecture (this delivery), **23.1B** every
+screen's copy in the catalogue, **23.1C** regional money formats and the amount field,
+the English release and the native language configuration. 23.1A changes no visible
+text beyond the new Idioma row and screen, no financial semantics, schema, backup,
+migration, AmountField or `money-input.ts`, and adds no native module.
+
+- [x] **Problem.** `AppLocale` ('es-AR' | 'en-US') tied the language to the region, so
+  English with Argentine formats or Spanish with US formats could not be expressed;
+  one stored preference held the whole tag; the provider resolved once at launch, so a
+  choice could only take effect after a restart.
+- [x] **Model** (`src/i18n/locale.ts`). Two registries: `LANGUAGES` (es, en; each with
+  its own name) and `REGIONS` (AR, US; decimal and thousands separators, numeric date
+  order, 12/24 h clock, and which currency a bare "$" names). `AppLocale` is only the
+  composition `${language}-${region}`, so `es-AR`, `es-US`, `en-AR` and `en-US` all
+  exist and a new language or region is one registry entry (plus a catalogue).
+  `resolveLanguage` (explicit released choice → first released device language →
+  Spanish) and `resolveRegion` (explicit released choice → the device's Region setting,
+  the first locale's `regionCode` or, from Intl, its tag → Argentina) are independent;
+  the region is never taken from a second preferred language, and the Arabic tag "ar"
+  is never read as Argentina. Separate release gates: `RELEASED_LANGUAGES = ['es']`,
+  `RELEASED_REGIONS = ['AR']`. Interface language, region, an account's currency, a
+  future main report currency and the stored integer amount stay five separate things.
+- [x] **Unsupported device values.** A device in Portuguese, French or any language
+  without a catalogue reads Spanish (the next supported preferred language first, once
+  released); a region without conventions (Uruguay, Spain, Brazil) reads Argentina.
+  "Según el dispositivo" says what the device gives right now ("Ahora: Español").
+- [x] **Formats** (`src/i18n/format.ts`). Words follow the language (month and weekday
+  names, relative days, long-date phrasing, spoken amounts, currency names, the space
+  before "%"); conventions follow the region (separators of amounts, counts and
+  percentages, `formatNumericDate` and `formatDateTime` day/month order, 24 h or
+  AM/PM, "$" vs "AR$"). With Argentina every output is byte-identical to Producto 23.0
+  and `formatAmount` is still the domain's `formatMinorUnits` string. Nothing
+  persisted changes.
+- [x] **Catalogues** are per language (`messages/es.ts`, `messages/en.ts`; `translate`
+  and `translator` take a language), with the new `preferences.*` keys: Idioma,
+  Región, Según el dispositivo, the notes, the save-failure message and the region
+  names. The rest of the screen copy is 23.1B.
+- [x] **Preferences** (`src/i18n/preference.ts`): two keys in expo-sqlite's key-value
+  store, `finanzapp.language` and `finanzapp.region`, outside the ledger and outside
+  backups; "follow the device" is the absence of the key; values are validated on read
+  (the 23.0 tag shape "es-AR" still reads as Spanish); an unreadable store follows the
+  device and never deletes or resets anything; a failed write reports false.
+- [x] **Live store and provider** (`src/i18n/store.ts`, `src/i18n/provider.tsx`). The
+  store saves first and applies second (a rejected write changes nothing), refuses a
+  value outside the release gate whoever asks, and replaces its state only when
+  something visible changed. `I18nProvider` holds one store for the app's lifetime and
+  subscribes with `useSyncExternalStore`; the translator/formatter context is rebuilt
+  only when the resolved locale changes, so only `useI18n()` consumers re-render. The
+  provider never keys or remounts its children: the ledger provider (SQLite), the
+  navigation stack, the current screen, a half-typed form and the Assistant
+  conversation keep their state. "Según el dispositivo" is re-read when the app returns
+  to the foreground (`AppState`), so a Region change in iOS Settings is followed without
+  a restart. `useLocalePreferences()` gives the chooser the state and the setters.
+- [x] **Interface.** Más → App y datos gains **Idioma** (`NavigationRow`, neutral
+  `language-outline` glyph, subtitle "Español · según el dispositivo" or "Español"). It
+  pushes `app/language.tsx`: one grouped list of `CheckRow`s (the NavigationRow shape
+  with a checkmark instead of a chevron; VoiceOver reads title, subtitle and
+  "selected"), "Según el dispositivo" first, then the released languages; a selection
+  haptic; the header title comes from the catalogue; a failed save keeps the checkmark
+  and shows an error; a footnote says Spanish is the only language for now and that
+  neither preference touches movements, accounts or backups. **English is not listed**,
+  not even greyed out.
+- [x] **Decision: Región is prepared, not activated.** `app/region.tsx` (Según el
+  dispositivo, Argentina, and from 23.1C United States, each with a sample
+  "22/9/2026 · 1.234,56") is built and tested but Más shows its row only when more than
+  one region is released (`showsPreference`). Reason: the amount field
+  (`money-input.ts`) still types and parses Argentine separators, so a US region would
+  write amounts one way and let the person type them another. 23.1C releases the US
+  region together with the amount field's separators.
+- [x] **Checked on Linux:** 323 mobile tests (in `i18n.node.ts` eight new cases replace
+  the two 23.0 locale cases: the four combinations, tag parsing, language and region resolution,
+  unsupported devices, both keys with failing reads/writes, words vs conventions;
+  `locale-switch.node.ts` with the live store and the real provider and Idioma screen
+  on `react-test-renderer` (14 cases), switching language and region while a form draft and an
+  Assistant conversation stay mounted, the ledger provider never re-rendered, the
+  AppState refresh and its cleanup, the release gate; one `more-routes.node.ts` case:
+  Más shows Idioma and hides Región), TypeScript, `expo install --check`, dependency tree, `npm audit` (0),
+  Metro iOS export (Hermes), 397 root tests, Vite build, repo hygiene. A mutation that
+  keys the context on the locale fails three of the switch tests.
+- [x] **Dependency:** `react-test-renderer@19.2.3` as a dev dependency only (matches
+  React 19.2.3; not in the app bundle). No runtime or native dependency changed; the
+  installed FinanzApp Dev runs this PR from Metro without a rebuild.
+- [ ] **Not device-verified:** the Idioma row and screen at the largest Dynamic Type,
+  with VoiceOver, both themes and Reduce Transparency; the preference surviving a force
+  quit; no visible change anywhere else. The in-place switch to another language cannot
+  be seen on the iPhone until English is released (23.1C); it is proven by the tests.
+- [ ] **Pending in Producto 23.1:** **23.1B** every screen, header, tab label, sheet,
+  alert, empty state, VoiceOver string and the Assistant copy through the catalogue
+  (Navigation headers read `useI18n()`), with the English catalogue complete and still
+  gated; **23.1C** the US region released together with locale-aware `Money` and the
+  amount field's separators, English released (`RELEASED_LANGUAGES`), the Región row in
+  Más, date pickers' locale and `expo-localization`'s `supportedLocales` config plugin
+  (a native rebuild).
+
+### Previous delivery — Producto 23.0
 
 Producto 23.0 — Interaction Polish & Localization Foundation fixes the two reported
 form defects at their root, audits the shared rows for text that could clip or split,
@@ -981,7 +1078,11 @@ by CI and merged into master before the next starts:
 13. ~~Interaction polish and localization foundation~~ — delivered in Producto 23.0
     (SelectionRow, anchored amount field, overflow audit, `src/i18n` with es-AR and
     en-US catalogues, English not yet released).
-14. **Producto 23.1 — complete internationalization:** every screen's copy in the
+14. **Producto 23.1 — complete internationalization**, in three PRs: **23.1A**
+    (reactive language/region architecture, the Idioma preference; this delivery),
+    **23.1B** (every screen's copy through the catalogue, English complete but gated),
+    **23.1C** (regional money formats and amount-field separators, the US region and
+    English released, `supportedLocales`). Original scope: every screen's copy in the
     catalogue, English released (`RELEASED_LOCALES`), `expo-localization`'s
     `supportedLocales` plugin (a native rebuild), locale-aware money presentation in
     `Money` and the amount field's separators, VoiceOver strings, date pickers and the
@@ -1124,6 +1225,25 @@ amount uses `useStacked()` and gives the name two lines. 44-point targets, Voice
 safe areas, system text and separate currencies apply to every new screen.
 
 ## Handoff log (historical evidence)
+
+### 2026-09-23 — Producto 23.1A: reactive language and region architecture
+
+- Language and region split into two registries and two independent preferences
+  (each "follow the device" by default, each with its own release gate); `AppLocale`
+  is their composition, so the four es/en × AR/US combinations exist; words follow the
+  language and separators, numeric date order, clock and "$" follow the region, with
+  Argentine output byte-identical to 23.0; per-language catalogues; two key-value-store
+  keys outside the ledger and backups; a live store (save first, gate enforced, device
+  re-read on foreground) behind `useSyncExternalStore`, so a change re-renders only
+  `useI18n()` consumers and never remounts the ledger, navigation, a form or the
+  Assistant; Más → App y datos → Idioma with Según el dispositivo and Español
+  (`CheckRow`). Región is built and tested but not linked until 23.1C (the amount field
+  still types Argentine separators). English stays unreleased and unlisted.
+- **Checked on Linux:** 323 mobile tests, TypeScript, Expo dependency check, dependency
+  tree, audit, Metro iOS export, 397 root tests, Vite build, repo hygiene. **Not
+  device-verified:** the Idioma row and screen (Dynamic Type, VoiceOver, themes,
+  Reduce Transparency), persistence across a force quit. No native rebuild needed.
+- **Left for 23.1B/23.1C:** listed under the current delivery.
 
 ### 2026-09-22 — Producto 23.0: interaction polish and localization foundation
 

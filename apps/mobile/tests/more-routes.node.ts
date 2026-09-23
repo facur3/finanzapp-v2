@@ -9,7 +9,17 @@ import * as appearance from '../src/ui/appearance.ts';
 import * as materialPolicy from '../src/ui/material-policy.ts';
 import * as i18nFormat from '../src/i18n/format.ts';
 import { bindLocale } from '../src/i18n/bind.ts';
-const i18nProvider = { useI18n: () => bindLocale('es-AR') };
+import * as localeOptions from '../src/ui/locale-options.ts';
+import { createLocaleStore } from '../src/i18n/store.ts';
+import type { ReleasedSets } from '../src/i18n/locale.ts';
+function localeStore(released?: ReleasedSets) {
+  const rows = new Map<string, string>();
+  return createLocaleStore({ devices: () => ({ source: 'native', locales: [{ languageTag: 'es-AR', regionCode: 'AR' }] }), released,
+    store: () => ({ getItemSync: key => rows.get(key) ?? null, setItemSync: (key, value) => { rows.set(key, value); }, removeItemSync: key => rows.delete(key) }) });
+}
+let currentLocaleStore = localeStore();
+const i18nProvider = { useI18n: () => bindLocale(currentLocaleStore.getState().locale),
+  useLocalePreferences: () => ({ state: currentLocaleStore.getState(), setLanguage: currentLocaleStore.setLanguage, setRegion: currentLocaleStore.setRegion }) };
 
 // Producto 18: the Más hub, the backup screen and the read-only categories
 // screen with native hosts replaced by descriptors. Not a rendered iOS screen.
@@ -30,7 +40,8 @@ const undone = domain.initialRecord({ id: 'e4', accountId: cash.id, kind: 'expen
 const archive: domain.LedgerArchive = { accounts: [cash, debtAccount], records: [...entries.map(domain.initialRecord), { ...undone, voided: true }],
   debts: [debt], recurring: [rule], budgets: [] };
 
-function harness(file: string, data: domain.LedgerArchive = archive) {
+function harness(file: string, data: domain.LedgerArchive = archive, released?: ReleasedSets) {
+  currentLocaleStore = localeStore(released);
   const source = readFileSync(new URL('../app/' + file, import.meta.url), 'utf8');
   const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText;
   const jsx = (type: unknown, props: Record<string, unknown>) => ({ type, props });
@@ -61,6 +72,7 @@ function harness(file: string, data: domain.LedgerArchive = archive) {
     '../src/ui/category-hues': { useCategoryColor: () => '#3E6FB0', useCategoryLabel: (s: string) => s, useCategoryDefinitions: () => [], useCategoryLook: (s: string) => ({ label: s, storedLabel: s, key: String(s).toLowerCase(), hex: '#3E6FB0', glyph: 'pricetag-outline' }), useCategoryLookOf: () => (s: string) => ({ label: s, storedLabel: s, key: String(s).toLowerCase(), hex: '#3E6FB0', glyph: 'pricetag-outline' }), useAccountLook: () => ({ icon: 'wallet', color: 'cobalt', glyph: 'wallet-outline', hex: '#2557D6' }), useAccountLookOf: () => () => ({ icon: 'wallet', color: 'cobalt', glyph: 'wallet-outline', hex: '#2557D6' }) }, '../../src/ui/category-hues': { useCategoryColor: () => '#3E6FB0', useCategoryLabel: (s: string) => s, useCategoryDefinitions: () => [], useCategoryLook: (s: string) => ({ label: s, storedLabel: s, key: String(s).toLowerCase(), hex: '#3E6FB0', glyph: 'pricetag-outline' }), useCategoryLookOf: () => (s: string) => ({ label: s, storedLabel: s, key: String(s).toLowerCase(), hex: '#3E6FB0', glyph: 'pricetag-outline' }), useAccountLook: () => ({ icon: 'wallet', color: 'cobalt', glyph: 'wallet-outline', hex: '#2557D6' }), useAccountLookOf: () => () => ({ icon: 'wallet', color: 'cobalt', glyph: 'wallet-outline', hex: '#2557D6' }) },
     '../src/ui/theme': theme, '../../src/ui/theme': theme,
     '../src/ui/material': { useMaterialDecision: () => ({ material: 'opaque', reason: 'expo-go' }) }, '../../src/ui/material': { useMaterialDecision: () => ({ material: 'opaque', reason: 'expo-go' }) },
+    '../../src/ui/locale-options': localeOptions,
     '../src/ui/material-policy': materialPolicy, '../../src/ui/material-policy': materialPolicy,
   };
   const module = { exports: {} as { default?: () => Node } };
@@ -85,7 +97,7 @@ test('Más groups permanent navigation into Finanzas and App y datos, with live 
   const root = view.render();
   assert.deepEqual(nodes(root).filter(node => node.type === 'SectionTitle').map(node => node.props.children), ['Finanzas', 'App y datos']);
   const labels = rows(root).map(row => row.props.title);
-  assert.deepEqual(labels, ['Cuentas', 'Tarjetas', 'Presupuestos', 'Recurrentes', 'Deudas y cobros', 'Categorías', 'Copia de seguridad', 'Movimientos deshechos']);
+  assert.deepEqual(labels, ['Cuentas', 'Tarjetas', 'Presupuestos', 'Recurrentes', 'Deudas y cobros', 'Categorías', 'Copia de seguridad', 'Movimientos deshechos', 'Idioma']);
   assert.equal(labels.includes('Asistente'), false, 'the Assistant is the centre tab, not a Más row');
   const value = (label: string) => rows(root).find(row => row.props.title === label)!.props.subtitle;
   assert.equal(value('Tarjetas'), 'Compras y resúmenes', 'no cards recorded: an honest placeholder');
@@ -94,21 +106,43 @@ test('Más groups permanent navigation into Finanzas and App y datos, with live 
   assert.equal(value('Presupuestos'), 'Plan mensual');
   assert.equal(value('Movimientos deshechos'), '1 recuperable');
   for (const row of rows(root)) row.props.onPress();
-  assert.deepEqual(view.pushed, ['/accounts', '/cards', '/budgets', '/recurring', '/debts', '/categories', '/backup', '/undone-entries']);
+  assert.deepEqual(view.pushed, ['/accounts', '/cards', '/budgets', '/recurring', '/debts', '/categories', '/backup', '/undone-entries', '/language']);
   // Each group closes its last row; no export button or sharing lives on the hub any more.
-  assert.deepEqual(rows(root).filter(row => row.props.last).map(row => row.props.title), ['Categorías', 'Movimientos deshechos']);
+  assert.deepEqual(rows(root).filter(row => row.props.last).map(row => row.props.title), ['Categorías', 'Idioma']);
   assert.equal(nodes(root).some(node => node.type === 'ActionButton'), false);
   const texts = nodes(root).filter(node => node.type === 'AppText').map(node => String(node.props.children)).join(' ');
-  assert.match(texts, /Producto 23\.0/);
+  assert.match(texts, /Producto 23\.1A/);
   assert.match(texts, /Material opaco \(Expo Go\)/, 'the footer says which control material this session draws, so a tester can confirm the mode');
   assert.equal(value('Categorías'), 'Gastos e ingresos');
   // Finanzas rows carry a soft identity tile from the shared palette; App y datos rows stay neutral glyphs.
   const leading = rows(root).map(row => row.props.leading?.type ?? null);
-  assert.deepEqual(leading, ['GlyphTile', 'GlyphTile', 'GlyphTile', 'GlyphTile', 'GlyphTile', 'GlyphTile', null, null]);
+  assert.deepEqual(leading, ['GlyphTile', 'GlyphTile', 'GlyphTile', 'GlyphTile', 'GlyphTile', 'GlyphTile', null, null, null]);
   assert.equal(new Set(rows(root).slice(0, 6).map(row => row.props.leading.props.color)).size, 6, 'six distinct restrained colours, no row painted');
-  assert.deepEqual(rows(root).slice(6).map(row => row.props.icon), ['save-outline', 'arrow-undo-outline'], 'App y datos keeps neutral glyphs');
+  assert.deepEqual(rows(root).slice(6).map(row => row.props.icon), ['save-outline', 'arrow-undo-outline', 'language-outline'], 'App y datos keeps neutral glyphs');
   assert.equal(rows(root).some(row => 'value' in row.props || 'label' in row.props), false, 'no leftover label/value props');
   assert.match(texts, /sincronización todavía no está activada/);
+});
+
+test('Más → App y datos: Idioma says what is in use and whether it follows the device; Región stays hidden until a second region is released', () => {
+  const view = harness('(tabs)/settings.tsx');
+  const root = view.render();
+  const titles = rows(root).map(row => row.props.title);
+  assert.equal(titles.includes('Región'), false, 'no region chooser while only Argentina is released (Producto 23.1C)');
+  const language = rows(root).find(row => row.props.title === 'Idioma')!;
+  assert.equal(language.props.subtitle, 'Español · según el dispositivo');
+  assert.equal(currentLocaleStore.setLanguage('es'), true);
+  assert.equal(rows(view.render()).find(row => row.props.title === 'Idioma')!.props.subtitle, 'Español', 'an explicit choice reads plainly');
+  assert.equal(currentLocaleStore.setLanguage('en'), false, 'English cannot be chosen while unreleased, whoever asks');
+  // Once 23.1C releases the US region, the same hub shows Región under Idioma and closes the group with it.
+  const later = harness('(tabs)/settings.tsx', archive, { languages: ['es', 'en'], regions: ['AR', 'US'] });
+  const laterRows = rows(later.render());
+  assert.deepEqual(laterRows.slice(6).map(row => row.props.title), ['Copia de seguridad', 'Movimientos deshechos', 'Idioma', 'Región']);
+  assert.deepEqual(laterRows.filter(row => row.props.last).map(row => row.props.title), ['Categorías', 'Región']);
+  const region = laterRows.find(row => row.props.title === 'Región')!;
+  assert.equal(region.props.subtitle, 'Argentina · según el dispositivo');
+  assert.equal(region.props.icon, 'globe-outline');
+  region.props.onPress();
+  assert.deepEqual(later.pushed, ['/region']);
 });
 
 test('Más → Tarjetas counts active credit cards and opens the pushed Tarjetas screen', () => {

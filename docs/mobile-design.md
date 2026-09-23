@@ -380,6 +380,25 @@ importe, moneda y estado.
   muestra hasta que toda la app lo tenga (23.1): un iPhone en inglés sigue leyendo
   español antes que media app traducida.
 
+## Producto 23.1A — idioma y región (sin rediseño)
+
+- **Dos preferencias independientes.** Idioma (las palabras) y región (separadores,
+  orden de la fecha numérica, reloj de 12 o 24 h, qué moneda es un "$" solo). Cada una
+  sigue al dispositivo por defecto. Nunca cambian la moneda de una cuenta ni un dato
+  guardado.
+- **Más → App y datos → Idioma.** `NavigationRow` con glifo neutro y el valor en uso como
+  subtítulo ("Español · según el dispositivo"). La pantalla es una lista agrupada de
+  `CheckRow`: la forma de la fila de navegación con una tilde azul en lugar del chevron,
+  "Según el dispositivo" primero con lo que da el dispositivo ahora, después los idiomas
+  por su propio nombre. Un háptico de selección; ningún botón Guardar: elegir es guardar,
+  y si no se pudo guardar la tilde no se mueve y se explica.
+- **Solo lo que funciona.** Un idioma sin traducción completa no aparece, ni siquiera
+  deshabilitado. La fila Región no aparece hasta 23.1C, porque el campo de importe todavía
+  escribe con separadores argentinos.
+- **Cambio en el lugar.** Cambiar el idioma o la región vuelve a dibujar los textos en la
+  misma pantalla: no se reinicia la app, no se pierde la navegación, un borrador ni la
+  conversación del Asistente, y no hay animación propia (solo el cambio de texto).
+
 ## Producto 22.1 — claridad y formularios (sin rediseño)
 
 - **Fila de navegación.** Tile tintado (Finanzas) o glifo neutro en una columna fija de

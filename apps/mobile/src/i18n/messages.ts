@@ -1,12 +1,14 @@
-/** Typed message lookup. `Messages` is the shape of the Spanish catalogue with
+/** Typed message lookup. Catalogues belong to a language, not to a locale:
+ * the region never changes a word, so English with Argentine formats and
+ * English with US formats read the same catalogue. `Messages` is the shape of the Spanish catalogue with
  * every leaf widened to a string (or a plural pair), so the English catalogue
  * must carry exactly the same keys. `t` resolves a dotted key, fills `{name}`
  * placeholders and picks the plural form for `{count}`. Spanish and English
  * share one plural rule (one vs. other), so no Intl.PluralRules is needed on
  * Hermes. Pure: no React, no device access. */
-import { es } from './messages/es-AR.ts';
-import { en } from './messages/en-US.ts';
-import { DEFAULT_LOCALE, type AppLocale } from './locale.ts';
+import { es } from './messages/es.ts';
+import { en } from './messages/en.ts';
+import { DEFAULT_LANGUAGE, type LanguageCode } from './locale.ts';
 
 export type PluralForms = { one: string; other: string };
 type Widen<T> = T extends string ? string : T extends { one: string; other: string } ? PluralForms : { [K in keyof T]: Widen<T[K]> };
@@ -20,10 +22,11 @@ export type MessageKey = Leaves<Messages>;
 
 export type MessageParams = Record<string, string | number>;
 
-const catalogues: Record<AppLocale, Messages> = { 'es-AR': es, 'en-US': en };
+/** One catalogue per language in `LANGUAGES`: a language without one is a compile error. */
+const catalogues: Record<LanguageCode, Messages> = { es, en };
 
-export function catalogue(locale: AppLocale): Messages {
-  return catalogues[locale] ?? catalogues[DEFAULT_LOCALE];
+export function catalogue(language: LanguageCode): Messages {
+  return catalogues[language] ?? catalogues[DEFAULT_LANGUAGE];
 }
 
 function lookup(messages: Messages, key: string): string | PluralForms | undefined {
@@ -40,21 +43,21 @@ export function interpolate(template: string, params: MessageParams = {}): strin
   return template.replace(/\{([a-zA-Z0-9_]+)\}/g, (match, name: string) => name in params ? String(params[name]) : match);
 }
 
-/** The message for `key` in `locale`, falling back to Spanish for a key the
- * locale lacks and to the key itself when nothing has it (never an empty
+/** The message for `key` in `language`, falling back to Spanish for a key the
+ * language lacks and to the key itself when nothing has it (never an empty
  * label). A plural entry needs `count`. */
-export function translate(locale: AppLocale, key: MessageKey, params?: MessageParams): string {
-  const entry = lookup(catalogue(locale), key) ?? lookup(es as unknown as Messages, key);
+export function translate(language: LanguageCode, key: MessageKey, params?: MessageParams): string {
+  const entry = lookup(catalogue(language), key) ?? lookup(es as unknown as Messages, key);
   if (entry === undefined) return key;
   if (typeof entry === 'string') return interpolate(entry, params);
   const count = Number(params?.count);
   return interpolate(count === 1 ? entry.one : entry.other, params);
 }
 
-/** A translator bound to one locale, the shape components receive. */
+/** A translator bound to one language, the shape components receive. */
 export type Translate = (key: MessageKey, params?: MessageParams) => string;
-export function translator(locale: AppLocale): Translate {
-  return (key, params) => translate(locale, key, params);
+export function translator(language: LanguageCode): Translate {
+  return (key, params) => translate(language, key, params);
 }
 
 /** All dotted keys of a catalogue, for the completeness test. */
