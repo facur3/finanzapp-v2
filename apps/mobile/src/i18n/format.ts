@@ -1,15 +1,21 @@
 /** Presentation formats per locale: dates, counts, percentages and the way an
- * amount is written for a reader. Everything is pure and deterministic: the
+ * amount is written for a reader. The locale's two halves play different
+ * parts: the **language** gives the words (month and weekday names, relative
+ * days, the phrasing of a long date, spoken amounts, currency names, the space
+ * before "%"); the **region** gives the conventions (decimal and thousands
+ * separators, the order of a numeric date, 24 h or AM/PM, which currency a
+ * bare "$" means). English with Argentine conventions reads "Sep 22" and
+ * "1.234,56"; Spanish with US conventions reads "22 sep" and "1,234.56". Everything is pure and deterministic: the
  * month and weekday names are tables, not the device's ICU data, so a label
  * reads the same on every iPhone and in Node, and the domain's integer
  * amounts are formatted by string transforms only. No floating-point value
  * ever stands for money here.
  *
  * `formatMinorUnits` (the domain) remains the one money formatter and its
- * Argentine output is unchanged; en-US only swaps the separators of that
- * output. Storage, parsing and the amount field are untouched. */
+ * Argentine output is unchanged; a region with other separators only swaps
+ * them in that output. Storage, parsing and the amount field are untouched. */
 import { formatMinorUnits, type Currency } from '@finanzapp/domain';
-import { DEFAULT_LOCALE, languageOf, type AppLocale } from './locale.ts';
+import { DEFAULT_LOCALE, conventionsOf, languageOf, type AppLocale } from './locale.ts';
 
 const NBSP = '\u00A0';
 
@@ -98,22 +104,33 @@ export function relativeDayName(dateISO: string, todayISO: string, locale: AppLo
   return null;
 }
 
+/** A stored date as numbers in the region's order: "22/9/2026" (Argentina) or "9/22/2026" (United States). */
+export function formatNumericDate(dateISO: string, locale: AppLocale = DEFAULT_LOCALE): string {
+  const date = dateFromISO(dateISO);
+  if (!date) return String(dateISO ?? '');
+  return conventionsOf(locale).dateOrder === 'mdy' ? `${date.month}/${date.day}/${date.year}` : `${date.day}/${date.month}/${date.year}`;
+}
+
 /** An ISO timestamp as a short local date and time, minutes precision. */
 export function formatDateTime(iso: string, locale: AppLocale = DEFAULT_LOCALE): string {
   const time = new Date(iso);
   if (Number.isNaN(time.getTime())) return String(iso ?? '');
   const day = time.getDate(), month = time.getMonth() + 1, year = time.getFullYear();
   const minutes = String(time.getMinutes()).padStart(2, '0');
-  if (languageOf(locale) === 'en') {
-    const hours = time.getHours() % 12 || 12;
-    return `${month}/${day}/${year}, ${hours}:${minutes} ${time.getHours() < 12 ? 'AM' : 'PM'}`;
+  const conventions = conventionsOf(locale);
+  // The region orders the numbers and picks the clock; the language names the day period.
+  const date = conventions.dateOrder === 'mdy' ? `${month}/${day}/${year}` : `${day}/${month}/${year}`;
+  if (conventions.hour12) {
+    const hours = time.getHours() % 12 || 12, morning = time.getHours() < 12;
+    const period = languageOf(locale) === 'en' ? (morning ? 'AM' : 'PM') : (morning ? 'a.\u00A0m.' : 'p.\u00A0m.');
+    return `${date}, ${hours}:${minutes}${NBSP}${period}`;
   }
-  return `${day}/${month}/${year}, ${String(time.getHours()).padStart(2, '0')}:${minutes}`;
+  return `${date}, ${String(time.getHours()).padStart(2, '0')}:${minutes}`;
 }
 
-/** Groups the digits of a non-negative integer string with the locale's thousands separator. */
+/** Groups the digits of a non-negative integer string with the region's thousands separator. */
 function groupDigits(digits: string, locale: AppLocale): string {
-  return digits.replace(/\B(?=(\d{3})+(?!\d))/g, languageOf(locale) === 'en' ? ',' : '.');
+  return digits.replace(/\B(?=(\d{3})+(?!\d))/g, conventionsOf(locale).group);
 }
 
 /** A count (of movements, of days) with thousands grouping. Not for money. */
@@ -122,38 +139,41 @@ export function formatCount(value: number, locale: AppLocale = DEFAULT_LOCALE): 
   return (value < 0 ? '-' : '') + groupDigits(String(Math.abs(value)), locale);
 }
 
-/** A ratio as a percentage: 0.3 → "30 %" (es) / "30%" (en), at most one
+/** A ratio as a percentage: 0.3 → "30 %" (Spanish) / "30%" (English), at most one
  * decimal, rounded half up on the decimal value ("12,35" → "12,4"). A
  * positive share below a tenth of a percent reads "<0,1 %" rather than "0 %",
  * so a real expense never looks like nothing. Display only: the ratio itself
  * was computed by the caller from integer amounts. */
 export function formatPercent(fraction: number, locale: AppLocale = DEFAULT_LOCALE): string {
-  const en = languageOf(locale) === 'en';
-  const suffix = en ? '%' : NBSP + '%';
+  const suffix = languageOf(locale) === 'en' ? '%' : NBSP + '%';
+  const decimal = conventionsOf(locale).decimal;
   if (!Number.isFinite(fraction)) return '—';
   const value = Math.abs(fraction) * 100;
-  if (value > 0 && value < 0.1) return '<' + (en ? '0.1' : '0,1') + suffix;
+  if (value > 0 && value < 0.1) return '<0' + decimal + '1' + suffix;
   // Round on the shortest decimal representation, as a person would, not on the binary double.
   const tenths = Math.round(Number(value.toFixed(10)) * 10);
   const whole = Math.floor(tenths / 10), tenth = tenths % 10;
-  const digits = groupDigits(String(whole), locale) + (tenth ? (en ? '.' : ',') + tenth : '');
+  const digits = groupDigits(String(whole), locale) + (tenth ? decimal + tenth : '');
   return (fraction < 0 ? '−' : '') + digits + suffix;
 }
 
-/** The currency's short sign for the locale. In Argentine Spanish "$" is the
- * peso and the dollar carries its prefix; in US English "$" would read as
- * the dollar, so both are prefixed and neither is ambiguous. */
+/** The currency's short sign where the reader is: a region decides what a
+ * bare "$" means. In Argentina "$" is the peso and the dollar carries its
+ * prefix; in the United States "$" would read as the dollar, so both are
+ * prefixed ("AR$", "US$") and neither is ambiguous. The language plays no part. */
 export function currencySymbol(currency: Currency, locale: AppLocale = DEFAULT_LOCALE): string {
-  if (languageOf(locale) === 'en') return currency === 'USD' ? 'US$' : 'AR$';
-  return currency === 'USD' ? 'US$' : '$';
+  if (currency === 'USD') return 'US$';
+  return conventionsOf(locale).dollarSignCurrency === currency ? '$' : 'AR$';
 }
 
-/** The domain's formatted amount in the locale's separators. Argentine
- * output is the domain string itself; US English swaps "." and ",". The
- * digits, the sign and the two decimals never change. */
+/** The domain's formatted amount in the region's separators. Argentine output
+ * is the domain string itself; another region only replaces the separators.
+ * The digits, the sign and the two decimals never change. */
 export function formatAmount(minor: number, locale: AppLocale = DEFAULT_LOCALE): string {
   const text = formatMinorUnits(minor);
-  return languageOf(locale) === 'en' ? text.replace(/[.,]/g, char => char === '.' ? ',' : '.') : text;
+  const { decimal, group } = conventionsOf(locale);
+  if (decimal === ',' && group === '.') return text;
+  return text.replace(/[.,]/g, char => char === '.' ? group : decimal);
 }
 
 /** An amount for prose and detail rows: sign, symbol, a non-breaking space

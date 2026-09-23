@@ -120,6 +120,29 @@ the expo-localization/Intl device adapter, the key-value-store preference and th
 dependency `expo-localization`; its config plugin is not enabled). No domain, schema,
 backup, cloud or financial change.
 
+**Producto 23.1A (2026-09-23)** splits the locale into two independent, live
+preferences. `src/i18n/locale.ts` has a `LANGUAGES` registry (es, en) and a `REGIONS`
+registry (AR, US, each with its separators, numeric date order, clock and the currency a
+bare "$" names); `AppLocale` is only their composition (`es-AR`, `en-AR`, `es-US`,
+`en-US`), and `resolveLanguage` / `resolveRegion` decide each half from its own stored
+preference and the device (languages in order; the region from the device's Region
+setting, never from a second language), with separate release gates
+(`RELEASED_LANGUAGES = ['es']`, `RELEASED_REGIONS = ['AR']`). In `format.ts` words
+follow the language and conventions follow the region; with Argentina every output is
+byte-identical to before. Catalogues are per language (`messages/es.ts`,
+`messages/en.ts`). `store.ts` is a pure live store (save first, apply second; unreleased
+values refused; the state object changes only when something visible changes; the
+device is re-read when the app returns to the foreground) and `I18nProvider` subscribes
+to it with `useSyncExternalStore`, so a change re-renders only `useI18n()` consumers:
+the ledger provider, the navigation, the current screen, a draft and the Assistant
+conversation are not remounted. Más → App y datos → **Idioma** (`app/language.tsx`,
+`CheckRow`) lists "Según el dispositivo" and Español; English is not offered until the
+translation is complete. **Región** (`app/region.tsx`) is built and tested but not
+linked from Más until 23.1C, because the amount field still types Argentine separators.
+Both preferences live in the expo-sqlite key-value store (`finanzapp.language`,
+`finanzapp.region`), outside the ledger and backups. No native change: the installed
+FinanzApp Dev with Metro is enough.
+
 **expo-localization needs a new development build.** It is a native module: Expo Go
 already contains it, but a FinanzApp Dev binary compiled before this PR does not, and
 Metro cannot add native code. On such a binary the app still starts and works:
@@ -131,8 +154,10 @@ run of this PR). Without the module, the **fallback** keeps: the device's primar
 language through Hermes `Intl` (enough while Spanish is the only released locale), every
 date, percentage and amount format (they come from FinanzApp's own tables, not from the
 device), the catalogues and the stored language preference. It loses: the ordered list
-of preferred languages beyond the first, the device's region code, and live locale
-change events (none are used before 23.1). The Más footer says which path this launch
+of preferred languages beyond the first and the device's Region setting (the region
+then comes from the Intl tag; neither matters while only Spanish and Argentina are
+released). Changes of the device settings are picked up when the app returns to the
+foreground (23.1A), not through the module's change events. The Más footer says which path this launch
 took: "Idioma: módulo nativo" (the build links expo-localization), "Idioma: Intl (sin
 módulo nativo)" (an older build) or "Idioma: predeterminado" (neither answered). A fault
 inside a registered module is not treated as absence and still surfaces.
@@ -502,7 +527,16 @@ formatted digit, the catalogue label) and extends `ui-rows.node.ts` (SelectionRo
 the stacked currency row and its read-only form, DetailRow stacking, Stat/StatRow at
 large text, segmented caps, and EntryRow / AccountRow / TransferRow with two-line names
 and amount-aware stacking through `rowStacks`); every route harness mocks `src/i18n/format` and
-`src/i18n/provider`. It also updates
+`src/i18n/provider`. Producto 23.1A rewrites the locale cases of `i18n.node.ts`
+(the two registries and the four combinations, tag parsing, language and region
+resolution with the release gates, unsupported device languages and regions, both
+preference keys with failing reads and writes, words by language and conventions by
+region) and adds `locale-switch.node.ts`: the live store (save first, no change on a
+failed write, the gate, device refresh) and the real `I18nProvider` and Idioma screen on
+a real React reconciler (`react-test-renderer`, a dev dependency): switching language
+and region with a form draft and an Assistant conversation mounted changes the labels,
+amounts and header title in place with no remount and no re-render of the ledger
+provider. It also updates
 the navigation, Más, Cards, composer and quick-action guards for the centre tab, the
 pushed Tarjetas screen and the glass branch. These are **not** native rendering/gesture tests;
 use the physical checklist. The root suite also tests the shared monthly summary
@@ -513,7 +547,7 @@ For the intermittent black-tab report, update to `master`, restart with
 and repeat the **Interfaz 02** tab checks, **Interfaz 03** report checks and
 **Interfaz 04/05** correction/recovery and transfer checks, plus **Interfaz 06** daily/comparison reports and **Interfaz 08** recurring/upcoming
 checks, plus **Interfaz 10** cards/debts and five-tab checks and **Interfaz 11** Home,
-Movimientos and detail checks, **Interfaz 12** form checks, **Interfaz 13** Reportes checks, **Interfaz 14** budgets/recurring/accounts checks, **Interfaz 15** motion checks, **Interfaz 16** cohesion checks, **Interfaz 17** identity and money-input checks **Producto 18** Más / Tarjetas / amount-shortcut checks, **Producto 19** budget checks, **Producto 20** account/category identity checks **Producto 21** Assistant checks, **Producto 22** reachability/material checks, **Producto 22.1** clarity checks and **Producto 23.0** amount-field, row and localization checks. The current footer (Más) says Producto 23.0.
+Movimientos and detail checks, **Interfaz 12** form checks, **Interfaz 13** Reportes checks, **Interfaz 14** budgets/recurring/accounts checks, **Interfaz 15** motion checks, **Interfaz 16** cohesion checks, **Interfaz 17** identity and money-input checks **Producto 18** Más / Tarjetas / amount-shortcut checks, **Producto 19** budget checks, **Producto 20** account/category identity checks **Producto 21** Assistant checks, **Producto 22** reachability/material checks, **Producto 22.1** clarity checks, **Producto 23.0** amount-field, row and localization checks and **Producto 23.1A** language-preference checks. The current footer (Más) says Producto 23.1A.
 Before updating, save a private pilot copy; do not uninstall or add fake movements.
 
 If a storage/refresh error occurs, the form retains the exact submitted command
@@ -546,8 +580,9 @@ npm run check:repo
 
 - `app/`: Expo Router routes, tabs, detail screens and native modal forms.
 - `src/ui/`: shared theme, accessible controls and restrained motion.
-- `src/i18n/`: locale resolution, table-based formats, typed es-AR/en-US catalogues,
-  device and preference adapters and the provider (pure modules, Node-testable).
+- `src/i18n/`: language and region registries and resolution, table-based formats,
+  typed es/en catalogues, device and preference adapters, the live locale store and the
+  provider (pure modules except the provider and the runtime adapter, Node-testable).
 - `src/assistant/`: the Assistant conversation model, client boundary, runtime selection
   and test fixtures (no React, no network in the model).
 - `src/integrations/`: the HTTPS integration client and the on-device evidence builder.

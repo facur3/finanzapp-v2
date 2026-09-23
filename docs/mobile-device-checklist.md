@@ -1,5 +1,40 @@
 # Physical iPhone acceptance checklist
 
+## Producto 23.1A — language and region architecture (pending device review)
+
+No native change: the **installed FinanzApp Dev** (the build rebuilt for 23.0 with
+expo-localization) runs this PR from Metro. From `apps/mobile`: `git pull`, `npm install`
+(adds a test-only dev dependency), `npm run start:dev-client -- --clear`, open FinanzApp
+Dev and reload. Expo Go works too (`npm start -- --clear`). Share a private backup first.
+
+- [ ] Más footer reads "Producto 23.1A" and still ends with "Idioma: módulo nativo".
+- [ ] Más → App y datos: rows Copia de seguridad, Movimientos deshechos, **Idioma**
+  (language glyph, subtitle "Español · según el dispositivo"); there is **no Región row**
+  (it arrives in 23.1C). Idioma closes the group (no separator below it) and Movimientos
+  deshechos now has one.
+- [ ] Tap Idioma: a pushed screen titled "Idioma" with a native back swipe; one grouped
+  list "Según el dispositivo / Ahora: Español" (checkmark) and "Español"; **no English
+  option**, not even greyed out; the footnote says Spanish is the only language for now
+  and that the setting does not change movements, accounts or backups.
+- [ ] Tap Español: the checkmark moves, one selection tick, nothing else on screen or in
+  the app changes; back in Más the subtitle reads "Español". Tap it again: no tick.
+- [ ] Force quit and reopen: Idioma still reads "Español". Choose "Según el dispositivo",
+  force quit, reopen: "Español · según el dispositivo".
+- [ ] With the iPhone set to English (Settings → General → Language & Region), reopen
+  FinanzApp: the whole app is still in Spanish, "Según el dispositivo" says "Ahora:
+  Español" (English is not released). Set the iPhone's Region to United States: the app
+  still writes "$ 1.234,56" and "22 sep 2026" (the US region is not released). Put the
+  iPhone back to your usual settings.
+- [ ] Leave a half-typed amount in Registrar gasto and a message in the Asistente, go to
+  Más → Idioma, change the choice, come back: the draft and the conversation are
+  intact, the tab and screen are the same.
+- [ ] Idioma row and screen at the largest Dynamic Type sizes (titles and subtitles wrap
+  to two lines, the checkmark stays visible), with VoiceOver ("Según el dispositivo,
+  Ahora: Español, seleccionado, botón"), in light and dark, with Reduce Transparency and
+  Reduce Motion on.
+- [ ] No account, card, movement, budget or rule changed; a backup exported afterwards
+  contains no language or region field.
+
 ## Producto 23.0 — interaction polish and localization foundation (pending device review)
 
 Expo Go already contains `expo-localization`: stop Metro, run `npm start -- --clear` from
