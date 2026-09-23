@@ -90,9 +90,10 @@ yet. No financial semantics, schema, backup, migration or cloud change.
   `formatPercent` (non-breaking space before "%"). The remaining screen copy is still
   Spanish literals: Producto 23.1.
 - [x] **Dependency:** `expo-localization@~57.0.2` (the Expo SDK 57 module; bundled in
-  Expo Go, so Metro is enough there). The existing FinanzApp Dev build lacks its native
-  module until it is rebuilt; until then `deviceLocales()` falls back to Intl and, with
-  only Spanish released, nothing visible depends on it. Its config plugin is not enabled:
+  Expo Go, so Metro is enough there). FinanzApp Dev needs a new development build to
+  contain it; an older build falls back to Intl through the probed loader (see the
+  device-blocker entry below: the first version of this fallback did not prevent
+  Metro's red screen). Its config plugin is not enabled:
   `supportedLocales` (which lists the app's languages for iOS Settings) belongs to 23.1.
 - [x] **Checked on Linux:** 297 mobile tests (14 new: `i18n.node.ts`, the anchored amount
   field in `typography.node.ts`, SelectionRow, DetailRow stacking, StatRow, segmented caps
@@ -117,7 +118,24 @@ yet. No financial semantics, schema, backup, migration or cloud change.
   the real Assistant afterwards) is reconciled with the historical entries, which keep
   their text with a "superseded" note; the AI draft rule is stated once for every
   phase; the AI cost/limit/quota/abuse backlog is listed, not built.
-- [ ] **Not device-verified:** the anchored amount field while typing fast, at the
+- [x] **Device blocker fixed (2026-09-22, same PR).** The owner approved the rows, the
+  selectors and the amount layout on the iPhone; FinanzApp Dev (built before this PR)
+  then showed "Cannot find native module 'ExpoLocalization'" from `deviceLocales()` /
+  `startupLocale()` / `I18nProvider`. Cause: expo-localization binds its module while
+  it is evaluated, and Metro's dev runtime reports a throw during module initialisation
+  even when the caller catches it. Fix: `src/i18n/device-runtime.ts` probes
+  `requireOptionalNativeModule('ExpoLocalization')` (from `expo`) and evaluates the
+  package only when it is registered; `src/i18n/device.ts` is the pure reader (native
+  list, else Intl, else empty → Spanish) and no longer catches faults of a registered
+  module; `startupLocale` has no broad catch. The Más footer names the source of this
+  launch. `expo-modules-autolinking resolve --platform ios` lists expo-localization /
+  ExpoLocalization, so a new development build links it; that the rebuilt iPhone app
+  reads "Idioma: módulo nativo" is still to be seen on the device. Tests: module
+  registered, module absent (the loader is never called), a registered module's fault
+  propagates, and a source guard (only the runtime adapter requires the package, only
+  after the probe, never statically). No design change.
+- [ ] **Not device-verified:** the old dev build starting without the red screen and the
+  rebuilt one reporting the native module; the anchored amount field while typing fast, at the
   grouping transitions, with decimals, pasting, backspace over a dot, a tap in the middle,
   ARS/USD switch and the largest Dynamic Type; the currency row and sheet; stacked
   statistics and rows at large text on a narrow iPhone; long names and 13-digit amounts

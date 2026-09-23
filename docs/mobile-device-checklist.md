@@ -2,9 +2,19 @@
 
 ## Producto 23.0 — interaction polish and localization foundation (pending device review)
 
-No native change is required in Expo Go: stop Metro, run `npm start -- --clear` from
-`apps/mobile`, reload. A development build keeps working without a rebuild (the new
-`expo-localization` module is optional at runtime); rebuild it only to pick up the module.
+Expo Go already contains `expo-localization`: stop Metro, run `npm start -- --clear` from
+`apps/mobile`, reload. FinanzApp Dev needs a **new development build** to contain the
+native module (commands in `apps/mobile/README.md`, profile `development`, bundle
+identifier `com.facur3.finanzapp.dev`; FinanzApp Preview is not rebuilt or touched).
+
+- [ ] **Old FinanzApp Dev (built before this PR), before rebuilding:** `npm run
+  start:dev-client -- --clear`, open the app: no red screen and no "Cannot find native
+  module 'ExpoLocalization'" in the app or in the Metro terminal; the app starts in
+  Spanish; Más footer ends with "Idioma: Intl (sin módulo nativo)".
+- [ ] **New FinanzApp Dev (rebuilt with this PR):** the app starts, Más footer ends with
+  "Idioma: módulo nativo" (proof the binary links expo-localization); the app still
+  reads Spanish on an English iPhone (English is not released); all data intact.
+- [ ] **Expo Go:** Más footer ends with "Idioma: módulo nativo" as well.
 
 - [ ] Más footer reads Producto 23.0; no account, card, movement, budget or rule changed
   after updating (share a private copy first).

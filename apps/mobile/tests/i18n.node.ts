@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { formatMinorUnits } from '@finanzapp/domain';
-import { deviceLocales } from '../src/i18n/device.ts';
+import { readdirSync, readFileSync } from 'node:fs';
+import { deviceLocales, readDeviceLocales } from '../src/i18n/device.ts';
 import { codedAmount, currencyName, currencySymbol, dateFromISO, daysAgo, formatAmount, formatCount, formatDate, formatDateTime, formatMonth, formatPercent,
   moneyText, relativeDayName, spokenMoney, withCurrencyCode } from '../src/i18n/format.ts';
 import { DEFAULT_LOCALE, RELEASED_LOCALES, SUPPORTED_LOCALES, languagePreferenceFrom, localeForTag, resolveLocale } from '../src/i18n/locale.ts';
@@ -49,15 +50,80 @@ test('resolution: a released preference wins, then the first released device lan
   assert.equal(languagePreferenceFrom(null), 'system');
 });
 
-test('device locales come from expo-localization when present, else Intl, else nothing; never a throw', () => {
-  const native = deviceLocales(() => ({ getLocales: () => [{ languageTag: 'en-US', languageCode: 'en', regionCode: 'US' }, { languageTag: 'es-AR', languageCode: 'es', regionCode: 'AR' }] }));
-  assert.deepEqual(native.map(locale => locale.languageTag).join(','), 'en-US,es-AR');
-  assert.equal(native[0].regionCode, 'US');
-  const fallback = deviceLocales(() => { throw new Error('Cannot find native module ExpoLocalization'); }, () => 'es-AR');
-  assert.deepEqual(fallback.map(locale => locale.languageTag).join(','), 'es-AR', 'a binary without the module reads Intl');
-  assert.deepEqual(deviceLocales(() => ({ getLocales: () => [] }), () => 'en-US').map(locale => locale.languageTag).join(','), 'en-US', 'an empty native list also falls back');
-  assert.deepEqual(deviceLocales(() => { throw new Error('x'); }, () => { throw new Error('y'); }), [], 'both failing: an empty list, and resolution picks the default');
-  assert.equal(resolveLocale(deviceLocales(() => { throw new Error('x'); }, () => undefined)), 'es-AR');
+// The device reader, both scenarios. The failure it guards against: in a
+// development build compiled before expo-localization was added, evaluating
+// the package runs requireNativeModule('ExpoLocalization'), which throws, and
+// Metro's dev runtime shows that throw even when the caller catches it. So the
+// package may only be evaluated after the optional-module probe says yes.
+function deps(registered: boolean, native: { languageTag: string; languageCode?: string | null; regionCode?: string | null }[] = [], intl: string | null = 'es-AR') {
+  const calls = { probe: 0, load: 0, intl: 0 };
+  return { calls, deps: {
+    nativeRegistered: () => { calls.probe++; return registered; },
+    load: () => { calls.load++; if (!registered) throw new Error("Cannot find native module 'ExpoLocalization'"); return { getLocales: () => native }; },
+    intlLocale: () => { calls.intl++; return intl ?? undefined; },
+  } };
+}
+
+test('module registered: expo-localization is loaded once, after the probe, and its ordered list is used', () => {
+  const { calls, deps: d } = deps(true, [{ languageTag: 'en-US', languageCode: 'en', regionCode: 'US' }, { languageTag: 'es-AR', languageCode: 'es', regionCode: 'AR' }]);
+  const read = readDeviceLocales(d);
+  assert.equal(read.source, 'native');
+  assert.equal(read.locales.map(locale => locale.languageTag).join(','), 'en-US,es-AR');
+  assert.equal(read.locales[0].regionCode, 'US');
+  assert.deepEqual(calls, { probe: 1, load: 1, intl: 0 }, 'Intl is not consulted when the native list is usable');
+  assert.equal(deviceLocales(deps(true, [{ languageTag: 'es-AR' }]).deps).map(locale => locale.languageTag).join(','), 'es-AR');
+  // A registered module that answers nothing usable still falls back to Intl.
+  const empty = deps(true, [], 'en-US');
+  assert.equal(readDeviceLocales(empty.deps).source, 'intl');
+  assert.deepEqual(empty.calls, { probe: 1, load: 1, intl: 1 });
+});
+
+test('module absent (an older development build): the package is never evaluated, Intl answers silently, Spanish when nothing is usable', () => {
+  const absent = deps(false, [], 'en-GB');
+  const read = readDeviceLocales(absent.deps);
+  assert.equal(absent.calls.load, 0, 'expo-localization is never loaded when the native module is not registered');
+  assert.equal(read.source, 'intl');
+  assert.equal(read.locales.map(locale => locale.languageTag).join(','), 'en-GB', 'the device language still arrives through Intl');
+  const nothing = deps(false, [], null);
+  const bare = readDeviceLocales(nothing.deps);
+  assert.equal(nothing.calls.load, 0);
+  assert.equal(bare.source, 'none');
+  assert.equal(bare.locales.length, 0);
+  assert.equal(resolveLocale(bare.locales), 'es-AR', 'no module and no Intl: Spanish');
+  assert.equal(startupLocale(() => readDeviceLocales(deps(false, [], null).deps), () => 'system').locale, 'es-AR');
+  assert.equal(startupLocale(() => readDeviceLocales(deps(false).deps), () => 'system').source, 'intl');
+});
+
+test('a fault in a registered module is not disguised as a missing one', () => {
+  const broken = { nativeRegistered: () => true, load: () => ({ getLocales: (): never => { throw new TypeError('getLocales is broken'); } }), intlLocale: () => 'es-AR' };
+  assert.throws(() => readDeviceLocales(broken), /getLocales is broken/);
+  assert.throws(() => startupLocale(() => readDeviceLocales(broken), () => 'system'), /getLocales is broken/, 'startup does not swallow it either');
+  const probeFault = { nativeRegistered: (): boolean => { throw new Error('probe fault'); }, load: () => ({ getLocales: () => [] }), intlLocale: () => 'es-AR' };
+  assert.throws(() => readDeviceLocales(probeFault), /probe fault/);
+});
+
+test('the runtime wiring probes with requireOptionalNativeModule and only then requires expo-localization; nothing imports it statically', () => {
+  const runtime = readFileSync(new URL('../src/i18n/device-runtime.ts', import.meta.url), 'utf8');
+  assert.match(runtime, /import \{ requireOptionalNativeModule \} from 'expo';/, 'the official optional probe from the expo package');
+  assert.match(runtime, /nativeRegistered: \(\) => requireOptionalNativeModule\('ExpoLocalization'\) != null/);
+  assert.match(runtime, /load: \(\) => require\('expo-localization'\)/, 'a lazy require inside the loader, evaluated only when called');
+  assert.equal(/^import [^\n]*'expo-localization'/m.test(runtime), false);
+  const offenders: string[] = [];
+  const walk = (dir: URL) => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      if (entry.name === 'node_modules') continue;
+      const url = new URL(entry.name + (entry.isDirectory() ? '/' : ''), dir);
+      if (entry.isDirectory()) walk(url);
+      else if (/\.tsx?$/.test(entry.name) && /(from|require\()\s*'expo-localization'/.test(readFileSync(url, 'utf8')) && !url.pathname.endsWith('src/i18n/device-runtime.ts')) offenders.push(url.pathname);
+    }
+  };
+  walk(new URL('../src/', import.meta.url));
+  walk(new URL('../app/', import.meta.url));
+  assert.equal(offenders.join(','), '', 'only the runtime adapter imports or requires the package');
+  const pure = readFileSync(new URL('../src/i18n/device.ts', import.meta.url), 'utf8');
+  assert.equal(/require\(|from 'expo'/.test(pure), false, 'the pure reader neither requires nor imports Expo');
+  const provider = readFileSync(new URL('../src/i18n/provider.tsx', import.meta.url), 'utf8');
+  assert.match(provider, /startupLocale\(readRuntimeDeviceLocales\)/, 'the app reads the device through the probed adapter');
 });
 
 test('the language preference lives in the key-value store, validated on read; a broken store means "follow the device"', () => {
@@ -74,8 +140,8 @@ test('the language preference lives in the key-value store, validated on read; a
   const broken = () => { throw new Error('database locked'); };
   assert.equal(readLanguagePreference(broken), 'system');
   assert.equal(writeLanguagePreference('es-AR', broken), false, 'a failed write reports false instead of throwing');
-  assert.equal(startupLocale(() => 'en-US', () => [{ languageTag: 'en-US' }]), 'es-AR', 'startup honours the release gate');
-  assert.equal(startupLocale(() => { throw new Error('x'); }, () => { throw new Error('y'); }), 'es-AR', 'startup never throws');
+  assert.equal(startupLocale(() => ({ source: 'native', locales: [{ languageTag: 'en-US' }] }), () => 'en-US').locale, 'es-AR', 'startup honours the release gate');
+  assert.equal(startupLocale(() => ({ source: 'none', locales: [] }), () => readLanguagePreference(broken)).locale, 'es-AR', 'an unreadable preference store still starts in Spanish');
 });
 
 test('dates are written from tables, identically on every device: Spanish keeps the ledger abbreviations, English uses US order', () => {
@@ -194,6 +260,8 @@ test('both catalogues carry the same keys with the same placeholders, and lookup
 test('a bound locale gives components one object of translator and formatters', () => {
   const es = bindLocale('es-AR');
   assert.equal(es.locale, 'es-AR');
+  assert.equal(es.localeSource, 'none');
+  assert.equal(bindLocale('es-AR', 'native').localeSource, 'native');
   assert.equal(es.t('common.done'), 'Listo');
   assert.equal(es.formatDate('2026-09-22', 'dayYear'), '22 sep 2026');
   assert.equal(es.formatMonth('2026-09'), 'septiembre de 2026');

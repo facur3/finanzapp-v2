@@ -7,6 +7,10 @@ import { AppText, GlyphTile, NavigationRow, Screen, SectionTitle, Surface } from
 import { useMaterialDecision } from '../../src/ui/material';
 import { MATERIAL_LABELS } from '../../src/ui/material-policy';
 import { usePalette } from '../../src/ui/theme';
+import { useI18n } from '../../src/i18n/provider';
+
+// Diagnostic: where this launch read the device languages. "módulo nativo" proves the build links expo-localization.
+const LOCALE_SOURCE_LABELS = { native: 'Idioma: módulo nativo', intl: 'Idioma: Intl (sin módulo nativo)', none: 'Idioma: predeterminado' } as const;
 
 /** Más is the secondary navigation hub: everything that is not one of the four
  * other tabs, in two native grouped lists. Finanzas holds the tools that
@@ -20,6 +24,7 @@ export default function MoreScreen() {
   const p = usePalette();
   // Which control material this session draws and why: lets a tester confirm the opaque or glass mode without guessing.
   const material = useMaterialDecision();
+  const { localeSource } = useI18n();
   const activeRecurring = archive?.recurring?.filter(rule => rule.active).length ?? 0;
   const activeDebts = archive?.debts?.filter(debt => debt.active).length ?? 0;
   const currentBudgets = archive?.budgets?.filter(budget => budget.active && budget.monthISO === currentMonthISO(todayKey())).length ?? 0;
@@ -51,6 +56,6 @@ export default function MoreScreen() {
         Tus registros quedan en este dispositivo y podés registrar sin conexión. La sincronización todavía no está activada.
       </AppText>
     </View>
-    <AppText secondary style={{ textAlign: 'center', fontSize: 13 }}>FinanzApp · Piloto nativo 0.1.0 · Producto 23.0 · {MATERIAL_LABELS[material.reason]}</AppText>
+    <AppText secondary style={{ textAlign: 'center', fontSize: 13 }}>FinanzApp · Piloto nativo 0.1.0 · Producto 23.0 · {MATERIAL_LABELS[material.reason]} · {LOCALE_SOURCE_LABELS[localeSource]}</AppText>
   </Screen>;
 }

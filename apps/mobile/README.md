@@ -117,9 +117,40 @@ fix the overflow audit's shared patterns. `src/i18n/` holds the locale (es-AR, e
 (`format.ts`, Spanish money output identical to `formatMinorUnits`), typed catalogues,
 the expo-localization/Intl device adapter, the key-value-store preference and the
 `I18nProvider`/`useI18n()` used by the shared components and every date label. New
-dependency `expo-localization` (bundled in Expo Go; the development build needs a
-rebuild to get its native module, the Intl fallback covers it until then; its config
-plugin is not enabled). No domain, schema, backup, cloud or financial change.
+dependency `expo-localization`; its config plugin is not enabled). No domain, schema,
+backup, cloud or financial change.
+
+**expo-localization needs a new development build.** It is a native module: Expo Go
+already contains it, but a FinanzApp Dev binary compiled before this PR does not, and
+Metro cannot add native code. On such a binary the app still starts and works:
+`src/i18n/device-runtime.ts` first asks `requireOptionalNativeModule('ExpoLocalization')`
+and only evaluates the package when the module is registered, because evaluating it
+without the module throws "Cannot find native module 'ExpoLocalization'" and Metro's
+development runtime shows that error even when the caller catches it (the first device
+run of this PR). Without the module, the **fallback** keeps: the device's primary
+language through Hermes `Intl` (enough while Spanish is the only released locale), every
+date, percentage and amount format (they come from FinanzApp's own tables, not from the
+device), the catalogues and the stored language preference. It loses: the ordered list
+of preferred languages beyond the first, the device's region code, and live locale
+change events (none are used before 23.1). The Más footer says which path this launch
+took: "Idioma: módulo nativo" (the build links expo-localization), "Idioma: Intl (sin
+módulo nativo)" (an older build) or "Idioma: predeterminado" (neither answered). A fault
+inside a registered module is not treated as absence and still surfaces.
+
+Rebuild FinanzApp Dev (profile `development`, bundle identifier
+`com.facur3.finanzapp.dev`; the preview app is untouched), from `apps/mobile`:
+
+```bash
+npx eas-cli@latest whoami                       # logged in as facur3
+npx eas-cli@latest build --profile development --platform ios
+# install: open the build page URL (or scan its QR) on the iPhone, tap Install;
+# the iPhone must be registered (npx eas-cli@latest device:create) and in
+# Developer Mode (Settings → Privacy & Security → Developer Mode)
+npm run start:dev-client -- --clear               # Metro for the dev client
+```
+
+Then open FinanzApp Dev on the iPhone (same Wi-Fi as the computer) and pick the Metro
+server, or scan the QR Metro prints with the Camera app.
 
 **Producto 22.1 (2026-09-22)** is clarity and form polish, not a redesign: Más → Finanzas
 and App y datos rows, the Reportes "Comparar con el mes anterior" row and the backup
