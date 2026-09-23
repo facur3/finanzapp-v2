@@ -13,6 +13,7 @@ import { LedgerProvider, useLedger } from '../src/storage/LedgerProvider';
 import { CategoryHuesProvider } from '../src/ui/category-hues';
 import { ActionButton, AppText, ErrorMessage } from '../src/ui/components';
 import { UIProvider, usePalette, useReduceMotion } from '../src/ui/theme';
+import { I18nProvider } from '../src/i18n/provider';
 
 void SplashScreen.preventAutoHideAsync().catch(() => {});
 
@@ -21,7 +22,7 @@ export const unstable_settings = { initialRouteName: '(tabs)' };
 export default function RootLayout() {
   const p = usePalette();
   return <GestureHandlerRootView style={{ flex: 1, backgroundColor: p.background }}>
-    <SafeAreaProvider><UIProvider><LedgerProvider><CategoryHuesProvider><Navigation /></CategoryHuesProvider></LedgerProvider></UIProvider></SafeAreaProvider>
+    <SafeAreaProvider><UIProvider><I18nProvider><LedgerProvider><CategoryHuesProvider><Navigation /></CategoryHuesProvider></LedgerProvider></I18nProvider></UIProvider></SafeAreaProvider>
   </GestureHandlerRootView>;
 }
 

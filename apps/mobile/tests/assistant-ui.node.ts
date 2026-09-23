@@ -6,6 +6,9 @@ import ts from 'typescript';
 import * as conversation from '../src/assistant/conversation.ts';
 import * as materialPolicy from '../src/ui/material-policy.ts';
 import * as presentation from '../src/ui/presentation.ts';
+import * as i18nFormat from '../src/i18n/format.ts';
+import { bindLocale } from '../src/i18n/bind.ts';
+const i18nProvider = { useI18n: () => bindLocale('es-AR') };
 
 // Producto 21: the composer and the message components at source level, with
 // React Native, Reanimated and the safe area replaced by descriptors. This
@@ -24,6 +27,7 @@ function load(file: string, { reduced = false, fontScale = 1, dark = false, bott
     ? { isDark: true, background: '#000', surface: '#1C1C1E', inset: '#2C2C2E', text: '#F5F5F7', secondary: '#A0A0A8', tertiary: '#7C7C84', line: '#2C2C30', primary: '#5B87FF', primaryFill: '#3565EA', onPrimary: '#FFF', primarySoft: '#122048', income: '#3DBE86', warning: '#E8A030' }
     : { isDark: false, background: '#F2F2F6', surface: '#FFFFFF', inset: '#EEEEF3', text: '#0A0A0C', secondary: '#6E7078', tertiary: '#8E9098', line: '#E6E6EC', primary: '#2557D6', primaryFill: '#2557D6', onPrimary: '#FFF', primarySoft: '#E5ECFB', income: '#15804F', warning: '#B45309' };
   const modules: Record<string, any> = {
+    '../i18n/format': i18nFormat, '../src/i18n/format': i18nFormat, '../../src/i18n/format': i18nFormat, '../i18n/provider': i18nProvider, '../src/i18n/provider': i18nProvider, '../../src/i18n/provider': i18nProvider,
     react: { useState: (initial: unknown) => { const index = cursor++; if (!(index in state)) state[index] = initial; return [state[index], (value: unknown) => { state[index] = typeof value === 'function' ? (value as (c: unknown) => unknown)(state[index]) : value; }]; },
       useRef: (initial: unknown) => { const index = cursor++; if (!(index in state)) state[index] = { current: initial }; return state[index]; },
       useEffect: (fn: () => unknown) => { fn(); } },

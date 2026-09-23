@@ -1,23 +1,21 @@
 import { labelFromISO, type Account, type Currency, type Entry, type EntryKind, type Transfer } from '@finanzapp/domain';
+import { dateFromISO, daysAgo, formatDate, relativeDayName } from '../i18n/format.ts';
+import { DEFAULT_LOCALE, type AppLocale } from '../i18n/locale.ts';
 
 export type EntryFilter = 'all' | EntryKind | 'transfer';
-const WEEKDAYS = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
-// Same abbreviations as the ledger's date labels, independent of the device ICU data.
-const MONTHS = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
 
 /** Section label for an activity date: Hoy · 20 sep, Ayer · 19 sep, a weekday
- * within the last week, then the plain date (with the year when it differs). */
-export function activityDateLabel(dateISO: string, todayISO: string): string {
-  const relative = labelFromISO(dateISO, new Date(todayISO + 'T12:00:00'));
-  const [year, month, day] = dateISO.split('-').map(Number);
-  const date = new Date(year, month - 1, day, 12);
-  if (Number.isNaN(date.getTime())) return relative;
-  const short = day + ' ' + MONTHS[month - 1];
-  const days = Math.round((Date.parse(todayISO + 'T12:00:00Z') - Date.parse(dateISO + 'T12:00:00Z')) / 86400000);
-  if (days === 0) return 'Hoy · ' + short;
-  if (days === 1) return 'Ayer · ' + short;
-  if (days > 1 && days < 7) return WEEKDAYS[date.getDay()] + ' · ' + short;
-  return relative;
+ * within the last week, then the plain date (with the year when it differs).
+ * Names come from the locale tables, never from the device's ICU data. */
+export function activityDateLabel(dateISO: string, todayISO: string, locale: AppLocale = DEFAULT_LOCALE): string {
+  const date = dateFromISO(dateISO);
+  if (!date) return labelFromISO(dateISO, new Date(todayISO + 'T12:00:00'));
+  const days = daysAgo(dateISO, todayISO);
+  const short = formatDate(dateISO, 'day', locale);
+  if (days !== null && days >= 0 && days < 7 && days !== 2) return relativeDayName(dateISO, todayISO, locale) + ' · ' + short;
+  if (days === 2) return (locale === 'es-AR' ? 'Anteayer' : relativeDayName(dateISO, todayISO, locale)) + ' · ' + short;
+  const today = dateFromISO(todayISO);
+  return today && today.year === date.year ? short : formatDate(dateISO, 'dayYear', locale);
 }
 
 /** Net recorded flow of one day's entries in one currency (income minus

@@ -1,5 +1,6 @@
 import { validDateISO, type Currency, type LedgerSnapshot, type ReportPeriod } from '@finanzapp/domain';
 import { availableCurrencies } from './presentation.ts';
+import { formatMonth, formatPercent } from '../i18n/format.ts';
 
 export function reportSelection(snapshot: LedgerSnapshot, currencyParam: unknown, monthParam: unknown, day: string) {
   const currencies = availableCurrencies(snapshot.accounts);
@@ -20,7 +21,7 @@ export function shiftReportMonth(monthISO: string, delta: -1 | 1): string {
 }
 
 export function reportMonthLabel(monthISO: string): string {
-  return new Date(monthISO + '-01T12:00:00').toLocaleDateString('es-AR', { month: 'long', year: 'numeric' });
+  return formatMonth(monthISO);
 }
 
 export function reportPeriodLabel(period: ReportPeriod, day: string): string {
@@ -39,9 +40,7 @@ export function reportCutoff(monthISO: string, through: unknown, today: string):
 
 export function changePercent(delta: number, previous: number): string {
   if (!Number.isSafeInteger(delta) || !Number.isSafeInteger(previous) || previous <= 0) return '—';
-  const fraction = Math.abs(delta) / previous;
-  if (fraction > 0 && fraction < 0.001) return '<0,1 %';
-  return (fraction * 100).toLocaleString('es-AR', { maximumFractionDigits: 1 }) + ' %';
+  return formatPercent(Math.abs(delta) / previous);
 }
 
 export function dateRangeLabel(period: ReportPeriod): string {
@@ -53,7 +52,5 @@ export function spendingShare(amountMinor: number, totalMinor: number): { fracti
     || amountMinor < 0 || totalMinor <= 0 || amountMinor > totalMinor) return { fraction: 0, label: '—' };
   // Divide before multiplying: cents remain exact; the ratio is display-only.
   const fraction = amountMinor / totalMinor;
-  const label = fraction > 0 && fraction < 0.001 ? '<0,1 %'
-    : (fraction * 100).toLocaleString('es-AR', { maximumFractionDigits: 1 }) + ' %';
-  return { fraction, label };
+  return { fraction, label: formatPercent(fraction) };
 }

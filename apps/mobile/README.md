@@ -101,6 +101,57 @@ form prefilled. Voice is a visible affordance only (the microphone explains that
 transcription needs the development build). Scripted fixtures exist for tests and,
 under `EXPO_PUBLIC_ASSISTANT_FIXTURES=1` in a development bundle only, for seeing the
 states on the iPhone behind a visible "Vista de prueba" banner that never saves.
+**Producto 23.0 (2026-09-22)** is interaction polish and the localization foundation:
+the currency selector is a stacked `SelectionRow` ("Moneda / Dólares estadounidenses /
+USD · US$", the same row read-only in Editar cuenta) and the compact account and
+category selectors share it; `DetailRow` stacks a long label/value pair instead of
+wrapping the value into right-aligned fragments; the amount field anchors its symbol at
+the left and lets the digits grow from a fixed origin in tabular figures, so nothing on
+screen moves at "999 → 1.000" or "999.999 → 1.000.000" and the size steps down only
+when the whole amount would not fit (`amountFieldLayout` returns a size, never a
+position); a shared `useStacked()` threshold, `Stat`/`StatRow`, capped segmented labels,
+two-line names beside bounded amount columns and non-breaking joins for currency codes
+fix the overflow audit's shared patterns. `src/i18n/` holds the locale (es-AR, en-US;
+`resolveLocale` from the device and a stored preference, English gated by
+`RELEASED_LOCALES` until 23.1), table-based date/number/percent/amount presentation
+(`format.ts`, Spanish money output identical to `formatMinorUnits`), typed catalogues,
+the expo-localization/Intl device adapter, the key-value-store preference and the
+`I18nProvider`/`useI18n()` used by the shared components and every date label. New
+dependency `expo-localization`; its config plugin is not enabled). No domain, schema,
+backup, cloud or financial change.
+
+**expo-localization needs a new development build.** It is a native module: Expo Go
+already contains it, but a FinanzApp Dev binary compiled before this PR does not, and
+Metro cannot add native code. On such a binary the app still starts and works:
+`src/i18n/device-runtime.ts` first asks `requireOptionalNativeModule('ExpoLocalization')`
+and only evaluates the package when the module is registered, because evaluating it
+without the module throws "Cannot find native module 'ExpoLocalization'" and Metro's
+development runtime shows that error even when the caller catches it (the first device
+run of this PR). Without the module, the **fallback** keeps: the device's primary
+language through Hermes `Intl` (enough while Spanish is the only released locale), every
+date, percentage and amount format (they come from FinanzApp's own tables, not from the
+device), the catalogues and the stored language preference. It loses: the ordered list
+of preferred languages beyond the first, the device's region code, and live locale
+change events (none are used before 23.1). The Más footer says which path this launch
+took: "Idioma: módulo nativo" (the build links expo-localization), "Idioma: Intl (sin
+módulo nativo)" (an older build) or "Idioma: predeterminado" (neither answered). A fault
+inside a registered module is not treated as absence and still surfaces.
+
+Rebuild FinanzApp Dev (profile `development`, bundle identifier
+`com.facur3.finanzapp.dev`; the preview app is untouched), from `apps/mobile`:
+
+```bash
+npx eas-cli@latest whoami                       # logged in as facur3
+npx eas-cli@latest build --profile development --platform ios
+# install: open the build page URL (or scan its QR) on the iPhone, tap Install;
+# the iPhone must be registered (npx eas-cli@latest device:create) and in
+# Developer Mode (Settings → Privacy & Security → Developer Mode)
+npm run start:dev-client -- --clear               # Metro for the dev client
+```
+
+Then open FinanzApp Dev on the iPhone (same Wi-Fi as the computer) and pick the Metro
+server, or scan the QR Metro prints with the Camera app.
+
 **Producto 22.1 (2026-09-22)** is clarity and form polish, not a redesign: Más → Finanzas
 and App y datos rows, the Reportes "Comparar con el mes anterior" row and the backup
 import row use one `NavigationRow` (tinted tile or neutral glyph, the title as the primary
@@ -440,7 +491,18 @@ unsafe path), `ui-rows.node.ts` (NavigationRow hierarchy and labels, FieldNote a
 alert, the calmer EmptyState, the currency row and sheet, the ARS/USD list and search
 helper), `worklets.node.ts` (every animated file compiled with `babel-preset-expo`
 as Metro does for iOS; a function captured by a UI-runtime callback must be a worklet,
-which is what `composerBottomPadding` was missing on the first device run) and updates
+which is what `composerBottomPadding` was missing on the first device run). Producto 23.0
+adds `i18n.node.ts` (locale mapping and resolution with the release gate, the device
+adapter's fallbacks, the stored preference, table-based dates and relative names in both
+locales, counts and percentages, money presentation byte-identical to the domain in
+Spanish, catalogue completeness and placeholders, the bound translator), rewrites the
+amount-field cases in `typography.node.ts` (a size-only layout, identical at "999 → 1.000"
+and "999.999 → 1.000.000", the anchored row with no transform, the caret after the
+formatted digit, the catalogue label) and extends `ui-rows.node.ts` (SelectionRow,
+the stacked currency row and its read-only form, DetailRow stacking, Stat/StatRow at
+large text, segmented caps, and EntryRow / AccountRow / TransferRow with two-line names
+and amount-aware stacking through `rowStacks`); every route harness mocks `src/i18n/format` and
+`src/i18n/provider`. It also updates
 the navigation, Más, Cards, composer and quick-action guards for the centre tab, the
 pushed Tarjetas screen and the glass branch. These are **not** native rendering/gesture tests;
 use the physical checklist. The root suite also tests the shared monthly summary
@@ -451,7 +513,7 @@ For the intermittent black-tab report, update to `master`, restart with
 and repeat the **Interfaz 02** tab checks, **Interfaz 03** report checks and
 **Interfaz 04/05** correction/recovery and transfer checks, plus **Interfaz 06** daily/comparison reports and **Interfaz 08** recurring/upcoming
 checks, plus **Interfaz 10** cards/debts and five-tab checks and **Interfaz 11** Home,
-Movimientos and detail checks, **Interfaz 12** form checks, **Interfaz 13** Reportes checks, **Interfaz 14** budgets/recurring/accounts checks, **Interfaz 15** motion checks, **Interfaz 16** cohesion checks, **Interfaz 17** identity and money-input checks **Producto 18** Más / Tarjetas / amount-shortcut checks, **Producto 19** budget checks, **Producto 20** account/category identity checks **Producto 21** Assistant checks, **Producto 22** reachability/material checks and **Producto 22.1** clarity checks. The current footer (Más) says Producto 22.1.
+Movimientos and detail checks, **Interfaz 12** form checks, **Interfaz 13** Reportes checks, **Interfaz 14** budgets/recurring/accounts checks, **Interfaz 15** motion checks, **Interfaz 16** cohesion checks, **Interfaz 17** identity and money-input checks **Producto 18** Más / Tarjetas / amount-shortcut checks, **Producto 19** budget checks, **Producto 20** account/category identity checks **Producto 21** Assistant checks, **Producto 22** reachability/material checks, **Producto 22.1** clarity checks and **Producto 23.0** amount-field, row and localization checks. The current footer (Más) says Producto 23.0.
 Before updating, save a private pilot copy; do not uninstall or add fake movements.
 
 If a storage/refresh error occurs, the form retains the exact submitted command
@@ -484,6 +546,8 @@ npm run check:repo
 
 - `app/`: Expo Router routes, tabs, detail screens and native modal forms.
 - `src/ui/`: shared theme, accessible controls and restrained motion.
+- `src/i18n/`: locale resolution, table-based formats, typed es-AR/en-US catalogues,
+  device and preference adapters and the provider (pure modules, Node-testable).
 - `src/assistant/`: the Assistant conversation model, client boundary, runtime selection
   and test fixtures (no React, no network in the model).
 - `src/integrations/`: the HTTPS integration client and the on-device evidence builder.

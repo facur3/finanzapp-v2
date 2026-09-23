@@ -4,6 +4,7 @@ import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { debtOutstandingMinor, labelFromISO, liabilityActivity } from '@finanzapp/domain';
 import { useLedger } from '../../src/storage/LedgerProvider';
 import { ActionButton, AppText, DetailRow, EmptyState, GlyphTile, IconButton, Money, Screen, SectionTitle, Surface } from '../../src/ui/components';
+import { withCurrencyCode } from '../../src/i18n/format';
 import { EntryList } from '../../src/ui/entry-list';
 import { space, useCurrentDay, usePalette } from '../../src/ui/theme';
 
@@ -37,7 +38,7 @@ export default function DebtDetailScreen() {
       header={<View style={{ gap: space.xl, paddingBottom: 4 }}>
         <View style={{ gap: 12, alignItems: 'center', paddingTop: 8 }}>
           <GlyphTile icon={owed ? 'arrow-up-outline' : 'arrow-down-outline'} tone={owed ? 'warning' : 'income'} large />
-          <AppText secondary variant="footnote" style={{ fontWeight: '500' }}>{owed ? 'Debo a' : 'Me debe'} {debt.counterparty} · {account.currency}</AppText>
+          <AppText secondary variant="footnote" style={{ fontWeight: '500', textAlign: 'center' }}>{withCurrencyCode((owed ? 'Debo a ' : 'Me debe ') + debt.counterparty, account.currency)}</AppText>
           <Money minor={outstanding} currency={account.currency} large size={40} align="center" />
           <AppText variant="subhead" style={{ color: overdue ? p.expense : p.secondary, fontWeight: overdue ? '600' : '400' }}>{status}</AppText>
         </View>

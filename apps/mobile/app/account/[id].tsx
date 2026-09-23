@@ -1,9 +1,10 @@
 import { useMemo } from 'react';
 import { View } from 'react-native';
 import { Redirect, router, Stack, useLocalSearchParams } from 'expo-router';
-import { accountBalanceMinor, currentMonthISO, formatMinorUnits } from '@finanzapp/domain';
+import { accountBalanceMinor, currentMonthISO } from '@finanzapp/domain';
 import { useLedger } from '../../src/storage/LedgerProvider';
-import { AccountBadge, AppText, DetailRow, EmptyState, IconButton, Money, Screen, SectionTitle, Stat, Surface } from '../../src/ui/components';
+import { AccountBadge, AppText, DetailRow, EmptyState, IconButton, Money, Screen, SectionTitle, Stat, Surface, StatRow } from '../../src/ui/components';
+import { codedAmount } from '../../src/i18n/format';
 import { QuickActions } from '../../src/ui/quick-actions';
 import { EntryList } from '../../src/ui/entry-list';
 import { selectEntries, selectTransfers } from '../../src/ui/presentation';
@@ -48,15 +49,15 @@ export default function AccountScreen() {
         </View>
         <Money minor={balance} currency={account.currency} large color={balance < 0 ? p.expense : undefined} />
       </View>
-      {month && <Surface style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 12 }}>
+      {month && <Surface><StatRow>
         <Stat label="Gastos este mes"><Money minor={-month.expense} currency={account.currency} size={17} tone="expense" signed={month.expense > 0} /></Stat>
-        <Stat label="Ingresos este mes" align="right"><Money minor={month.income} currency={account.currency} size={17} tone={month.income ? 'income' : 'neutral'} signed={month.income > 0} /></Stat>
-      </Surface>}
+        <Stat label="Ingresos este mes"><Money minor={month.income} currency={account.currency} size={17} tone={month.income ? 'income' : 'neutral'} signed={month.income > 0} /></Stat>
+      </StatRow></Surface>}
       <QuickActions accountId={id} currency={account.currency} />
       <Surface grouped>
         <DetailRow label="Recurrentes" value={recurringCount ? recurringCount + (recurringCount === 1 ? ' activo' : ' activos') : 'Programar'} icon="repeat-outline"
           onPress={() => router.push({ pathname: '/recurring', params: { accountId: id } })} />
-        <DetailRow label="Saldo inicial" value={account.currency + ' ' + formatMinorUnits(account.openingMinor)} icon="flag-outline" last />
+        <DetailRow label="Saldo inicial" value={codedAmount(account.openingMinor, account.currency)} icon="flag-outline" last />
       </Surface>
       <SectionTitle>Movimientos</SectionTitle>
     </View>} empty={<AppText secondary variant="subhead">Todavía no hay movimientos en esta cuenta.</AppText>} />

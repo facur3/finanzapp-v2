@@ -7,15 +7,13 @@ import { currentMonthISO, formatMinorUnits, shiftMonthISO, summarizeMonthlyBudge
 import { useLedger } from '../src/storage/LedgerProvider';
 import { budgetTone, percentUsed } from '../src/ui/budget-presentation';
 import { useCategoryLabel } from '../src/ui/category-hues';
-import { ActionButton, AppText, CategoryBadge, Choices, EmptyState, IconButton, Money, PressFeedback, Screen, SectionTitle, Stat, Surface } from '../src/ui/components';
+import { ActionButton, AppText, CategoryBadge, Choices, EmptyState, IconButton, Money, PressFeedback, Screen, SectionTitle, Stat, StatRow, Surface } from '../src/ui/components';
+import { formatMonth } from '../src/i18n/format';
 import { availableCurrencies } from '../src/ui/presentation';
 import { timing } from '../src/ui/motion';
 import { space, useCurrentDay, usePalette, useReduceMotion } from '../src/ui/theme';
 
-function monthLabel(monthISO: string) {
-  const [year, month] = monthISO.split('-').map(Number);
-  return new Date(year, month - 1, 1, 12).toLocaleDateString('es-AR', { month: 'long', year: 'numeric' });
-}
+const monthLabel = (monthISO: string) => formatMonth(monthISO);
 
 /** Hierarchy: the general budget (the month's ceiling over every recorded
  * expense) is the primary summary when it exists; category sublimits sit
@@ -113,10 +111,10 @@ function TotalPanel({ total, currency, money }: { total: BudgetProgress<TotalMon
       <Money minor={Math.abs(remaining)} currency={currency} large color={tone === 'neutral' ? undefined : tone === 'expense' ? p.expense : p.warning} />
     </View>
     <TotalBar spent={total.spentMinor} total={total.budget.amountMinor} progress={total} />
-    <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 12 }}>
+    <StatRow>
       <Stat label="Gastado"><Money minor={total.spentMinor} currency={currency} size={17} /></Stat>
-      <Stat label="Límite" align="right"><Money minor={total.budget.amountMinor} currency={currency} size={17} /></Stat>
-    </View>
+      <Stat label="Límite"><Money minor={total.budget.amountMinor} currency={currency} size={17} /></Stat>
+    </StatRow>
     <AppText variant="footnote" style={{ color, fontWeight: tone === 'neutral' ? '400' : '600' }}>
       {percent} % utilizado{tone === 'expense' ? ' · excedido' : tone === 'warning' ? (remaining === 0 ? ' · límite alcanzado' : ' · cerca del límite') : ''}
     </AppText>
@@ -142,13 +140,11 @@ function BudgetRow({ row, money, last }: { row: BudgetProgress<CategoryMonthlyBu
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
       <CategoryBadge category={row.budget.category} tone={state} />
       <View style={{ flex: 1, minWidth: 0, gap: 3 }}>
-        <AppText numberOfLines={1} style={{ fontWeight: '500' }}>{name}</AppText>
+        <AppText numberOfLines={2} style={{ fontWeight: '500' }}>{name}</AppText>
         <AppText variant="footnote" style={{ color: state === 'neutral' ? p.secondary : tone }}>{status}</AppText>
-      </View>
-      <View style={{ alignItems: 'flex-end', gap: 3 }}>
-        <AppText style={{ fontWeight: '600', fontVariant: ['tabular-nums'], color: tone }}>{percent} %</AppText>
         <AppText secondary variant="caption" style={{ fontVariant: ['tabular-nums'] }}>{money(row.spentMinor)} de {money(row.budget.amountMinor)}</AppText>
       </View>
+      <AppText style={{ fontWeight: '600', fontVariant: ['tabular-nums'], color: tone }}>{percent} %</AppText>
     </View>
     <View accessible={false} style={{ height: 4, borderRadius: 2, backgroundColor: p.inset, overflow: 'hidden' }}>
       <Animated.View style={[{ height: 4, borderRadius: 2, backgroundColor: tone }, bar]} />

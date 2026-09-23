@@ -6,6 +6,7 @@ import * as Haptics from 'expo-haptics';
 import { BACKUP_MAX_BYTES, parsePilotBackup, previewBackupImport, type ImportPreview, type ParsedBackup } from '@finanzapp/domain';
 import { useLedger } from '../src/storage/LedgerProvider';
 import { ActionButton, AppText, DetailRow, EmptyState, ErrorMessage, Money, Screen, SectionTitle, Surface } from '../src/ui/components';
+import { formatDateTime } from '../src/i18n/format';
 
 type Review = { backup: ParsedBackup; preview: ImportPreview; name: string };
 
@@ -83,7 +84,7 @@ export default function BackupImportScreen() {
       {review && plan && <>
         <View style={{ gap: 6 }}><SectionTitle>Revisar copia</SectionTitle>
           <AppText secondary numberOfLines={2} style={{ fontSize: 14 }}>{review.name}</AppText>
-          <AppText secondary style={{ fontSize: 13 }}>{new Date(review.backup.exportedAt).toLocaleString('es-AR')}</AppText>
+          <AppText secondary style={{ fontSize: 13 }}>{formatDateTime(review.backup.exportedAt)}</AppText>
         </View>
         <Surface grouped>
           <DetailRow label="Cuentas nuevas" value={String(plan.accounts.filter(account => !hiddenIncoming.has(account.id)).length)} />

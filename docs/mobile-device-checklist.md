@@ -1,5 +1,77 @@
 # Physical iPhone acceptance checklist
 
+## Producto 23.0 — interaction polish and localization foundation (pending device review)
+
+Expo Go already contains `expo-localization`: stop Metro, run `npm start -- --clear` from
+`apps/mobile`, reload. FinanzApp Dev needs a **new development build** to contain the
+native module (commands in `apps/mobile/README.md`, profile `development`, bundle
+identifier `com.facur3.finanzapp.dev`; FinanzApp Preview is not rebuilt or touched).
+
+- [ ] **Old FinanzApp Dev (built before this PR), before rebuilding:** `npm run
+  start:dev-client -- --clear`, open the app: no red screen and no "Cannot find native
+  module 'ExpoLocalization'" in the app or in the Metro terminal; the app starts in
+  Spanish; Más footer ends with "Idioma: Intl (sin módulo nativo)".
+- [ ] **New FinanzApp Dev (rebuilt with this PR):** the app starts, Más footer ends with
+  "Idioma: módulo nativo" (proof the binary links expo-localization); the app still
+  reads Spanish on an English iPhone (English is not released); all data intact.
+- [ ] **Expo Go:** Más footer ends with "Idioma: módulo nativo" as well.
+
+- [ ] Más footer reads Producto 23.0; no account, card, movement, budget or rule changed
+  after updating (share a private copy first).
+- [ ] Nueva cuenta → Moneda: one row reading "Moneda" over "Pesos argentinos" over
+  "ARS · $"; tap it, choose Dólares: the row reads "Dólares estadounidenses" with
+  "USD · US$" on its own line, the amount symbol becomes US$, one selection tick. At the
+  largest Dynamic Type sizes and on a narrow iPhone the name wraps and the code keeps a
+  whole line; the chevron stays visible; both themes. VoiceOver reads "Moneda: Dólares
+  estadounidenses, USD · US$".
+- [ ] Editar cuenta: the same currency row, read-only (no chevron, nothing happens on tap).
+- [ ] Amount field (Registrar gasto): type 9, 9, 9, 9 slowly and then fast: the "$" never
+  moves; "999" becomes "1.000" with the "1" staying where the first "9" was; continue to
+  "999.999" → "1.000.000"; the caret stays after the last digit; nothing jumps or fades.
+- [ ] Amount field: type "1234,5", then tap between "2" and "3" and type "9" ("12.934,5"),
+  backspace over the grouping dot (removes the digit before it), paste "2.000.000,50"
+  and "2,000,000.50" (both read 2.000.000,50), switch the account to a USD one: only the
+  symbol changes to US$. With 13 whole digits the size steps down and the whole amount
+  stays visible; at the largest Dynamic Type the field still shows the whole amount or
+  scrolls, never clips.
+- [ ] Amount field with Reduce Motion on and off: identical behaviour (nothing animates).
+- [ ] Presupuestos (general budget), Cuenta detail, Tarjetas, a card detail, Recurrentes
+  (Próximos 30 días) and Deudas totals at the largest Dynamic Type: the statistics stack
+  one under the other and every amount and date is whole; at the default size they sit
+  side by side as before.
+- [ ] Movimientos filter (Todos / Gastos / Ingresos / Transf.), the form's Gasto /
+  Ingreso / Transferencia switch and the Pesos · ARS / Dólares · USD switches at the
+  largest Dynamic Type: labels fit their segment (slightly smaller), never "…".
+- [ ] Inicio with two currencies at large text: the Gastos / Disponible control and the
+  ARS / USD control stack vertically instead of squeezing.
+- [ ] Long names at the default text size: an account "Cuenta sueldo Banco de la
+  Provincia de Buenos Aires" and a merchant of 60 characters in Movimientos, Cuentas,
+  Recurrentes, Inicio (categorías y próximos pagos), Reportes → comercios and
+  categorías, Deudas and Categorías wrap to two lines while the amount stays whole on
+  the right and never overlaps the name; the third line is cut with "…" only on the
+  name, never on the amount.
+- [ ] Long amounts at the default text size: an expense of $ 999.999.999,99 and one of
+  $ 9.999.999.999.999,99 (13 digits) in the same rows. On an iPhone 14 Pro the nine-digit
+  amount sits beside the name at full size and the 13-digit one moves under the name,
+  left-aligned, whole; on an iPhone SE / 13 mini (375 pt) both move under the name. A
+  −US$ 999.999.999,99 transfer inside an account does the same. No amount is ever
+  shrunk below its neighbours' size or cut.
+- [ ] Large text: every row above stacks (amount under the name), whatever the amount.
+- [ ] Reportes: the eyebrow "Gastado · ARS", Tarjetas "Deuda registrada · ARS",
+  Recurrentes "Pagos · ARS" and the day header net amount never break between the words
+  and the code or number.
+- [ ] Reportes budget rows: name over "spent de limit", the percentage on the right; a
+  long category name wraps rather than truncates.
+- [ ] Transfer preview rows ("Banco después / ARS 1.234,56") stack when the name is long;
+  the code and the amount stay together.
+- [ ] Dates: the entry form's date row reads "22 sep 2026" (the ledger abbreviation, not
+  the device's "sept"); entry and transfer details read "martes, 22 de septiembre de
+  2026"; Reportes and Presupuestos read "septiembre de 2026"; Copia de seguridad →
+  Importar shows the export date as "22/9/2026, 14:03".
+- [ ] Device in English: the app still reads Spanish everywhere (English is not released).
+- [ ] Not fixed, observe and report: the credit card face at the largest text sizes
+  (fixed aspect ratio) and the donut's centre label in Reportes.
+
 ## Producto 22.1 — UI clarity and form polish (pending device review)
 
 - [ ] Más footer reads Producto 22.1. Más → Finanzas: each row shows the tile, the title in bold and the description under it; "Deudas y cobros / Debo · me deben" and "Tarjetas / Compras y resúmenes" never share a line or clip; App y datos rows show neutral glyphs; at the largest Dynamic Type sizes titles and descriptions wrap to two lines and the chevron stays visible; both themes.

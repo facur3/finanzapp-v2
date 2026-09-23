@@ -3,14 +3,14 @@ import { Keyboard, View } from 'react-native';
 import { router, Stack } from 'expo-router';
 import { randomUUID } from 'expo-crypto';
 import * as Haptics from 'expo-haptics';
-import { accountBalanceMinor, categoryKey, formatMinorUnits, makeEntryChange, parseMinorUnits, sameEntry, summarizeMonthlyBudgets, todayKey,
-  validateEntry, validateEntryChange, type Entry, type EntryChange, type EntryKind, type EntryRecord } from '@finanzapp/domain';
+import { accountBalanceMinor, categoryKey, formatMinorUnits, makeEntryChange, parseMinorUnits, sameEntry, summarizeMonthlyBudgets, todayKey, validateEntry, validateEntryChange, type Entry, type EntryChange, type EntryKind, type EntryRecord } from '@finanzapp/domain';
 import { useLedger } from '../storage/LedgerProvider';
 import { budgetTone } from './budget-presentation';
 import { ActionButton, AmountField, AppText, Choices, EmptyState, ErrorMessage, Field, IconButton, Screen, Surface } from './components';
 import { AccountField, CategoryField, DateField } from './form-controls';
 import { accountKindLabel, postingAccounts } from './liability-presentation';
 import { initialAccountId } from './presentation';
+import { moneyText } from '../i18n/format';
 import { space } from './theme';
 
 type FormKind = EntryKind | 'transfer';
@@ -75,7 +75,7 @@ export function EntryForm({ original, accountId: requestedAccount, currency, kin
   }, [account, snapshot, archive?.budgets, kind, category, date]);
   let parsed: number | null = null;
   try { parsed = parseMinorUnits(amount); } catch { parsed = null; }
-  const amountEcho = parsed && parsed > 0 && account ? ` · ${account.currency === 'USD' ? 'US$ ' : '$ '}${formatMinorUnits(parsed)}` : '';
+  const amountEcho = parsed && parsed > 0 && account ? '\u00A0·\u00A0' + moneyText(parsed, account.currency) : '';
 
   async function save() {
     if (saving.current) return;

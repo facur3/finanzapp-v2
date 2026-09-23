@@ -7,6 +7,9 @@ import * as domain from '@finanzapp/domain';
 import * as appearance from '../src/ui/appearance.ts';
 import * as currencies from '../src/ui/currencies.ts';
 import * as categories from '../src/ui/categories.ts';
+import * as i18nFormat from '../src/i18n/format.ts';
+import { bindLocale } from '../src/i18n/bind.ts';
+const i18nProvider = { useI18n: () => bindLocale('es-AR') };
 
 // Producto 20: the account forms, the category form and the selectors, with
 // native hosts replaced by descriptors. Handler logic only; not a rendered
@@ -42,10 +45,11 @@ function harness(file: string, props: any = {}, options: { data?: domain.LedgerA
   const hues = { useCategoryDefinitions: () => identity.definitions, useCategoryLook: (s: string, kind = 'expense') => appearance.resolveCategoryLook(kind as domain.EntryKind, s, identity, p),
     useCategoryLabel: (s: string, kind = 'expense') => appearance.resolveCategoryLook(kind as domain.EntryKind, s, identity, p).label,
     useAccountLook: (id: string) => appearance.resolveAccountLook(id, identity.appearances, p), useAccountLookOf: () => (id: string) => appearance.resolveAccountLook(id, identity.appearances, p) };
-  const components = Object.fromEntries(['Screen', 'ActionButton', 'AmountField', 'AppText', 'Choices', 'DetailRow', 'EmptyState', 'ErrorMessage', 'Field', 'FieldNote', 'IconButton', 'InfoButton', 'NavigationRow', 'Surface',
+  const components = Object.fromEntries(['Screen', 'ActionButton', 'AmountField', 'AppText', 'Choices', 'DetailRow', 'SelectionRow', 'EmptyState', 'ErrorMessage', 'Field', 'FieldNote', 'IconButton', 'InfoButton', 'NavigationRow', 'Surface',
     'CategoryBadge', 'AccountBadge', 'GlyphTile', 'PressFeedback', 'SectionTitle'].map(name => [name, name]));
   (components as any).surfaceShadow = () => ({});
   const modules: Record<string, unknown> = {
+    '../i18n/format': i18nFormat, '../src/i18n/format': i18nFormat, '../../src/i18n/format': i18nFormat, '../i18n/provider': i18nProvider, '../src/i18n/provider': i18nProvider, '../../src/i18n/provider': i18nProvider,
     react: { useState: (initial: any) => { const i = cursor++; if (!(i in state)) state[i] = typeof initial === 'function' ? initial() : initial;
       return [state[i], (next: any) => { state[i] = typeof next === 'function' ? next(state[i]) : next; }]; },
     useRef: (initial: any) => { const i = refCursor++; return refs[i] ??= { current: initial }; }, useMemo: (fn: () => any) => fn() },
@@ -285,12 +289,14 @@ function pickerHarness(props: any, reduced: boolean) {
   const jsx = (type: Node['type'], props: Node['props']) => ({ type, props });
   let haptics = 0;
   const modules: Record<string, unknown> = {
+    '../i18n/format': i18nFormat, '../src/i18n/format': i18nFormat, '../../src/i18n/format': i18nFormat, '../i18n/provider': i18nProvider, '../src/i18n/provider': i18nProvider, '../../src/i18n/provider': i18nProvider,
     'react/jsx-runtime': { jsx, jsxs: jsx, Fragment: 'Fragment' },
     'react-native': { View: 'View', StyleSheet: { create: (styles: unknown) => styles } },
     'react-native-reanimated': { __esModule: true, default: { View: 'Animated.View' } },
     '@expo/vector-icons/Ionicons': 'Ionicons',
     './components': { AppText: 'AppText', GlyphTile: 'GlyphTile', PressFeedback: 'PressFeedback' },
     './appearance': appearance,
+    '@finanzapp/domain': domain,
     './category-color': { tintOf: (color: string) => color + '24' },
     './motion': { duration: { state: 200 }, selectionHaptic: () => { haptics++; } },
     './theme': { space: { l: 16 }, usePalette: () => ({ isDark: false, surface: '#fff', inset: '#eee', secondary: '#666' }), useReduceMotion: () => reduced },

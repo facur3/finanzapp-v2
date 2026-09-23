@@ -4,7 +4,8 @@ import { router } from 'expo-router';
 import { currentMonthISO, hiddenLiabilityAccountIds, liquidTotalsByCurrency, spendingOverview, spendingWindow,
   summarizeMonthlyBudgets, type Currency } from '@finanzapp/domain';
 import { useLedger } from '../../src/storage/LedgerProvider';
-import { ActionButton, AppText, Choices, EmptyState, EntryRow, Money, Screen, SectionTitle, Surface } from '../../src/ui/components';
+import { ActionButton, AppText, Choices, EmptyState, EntryRow, Money, Screen, SectionTitle, Surface, useStacked } from '../../src/ui/components';
+import { formatDate } from '../../src/i18n/format';
 import { BudgetHomeCard, CategoryRanking, MetricHelp, UpcomingRecurringRow } from '../../src/ui/home-modules';
 import { Reflow, ValueTransition } from '../../src/ui/motion';
 import { availableCurrencies, selectEntries } from '../../src/ui/presentation';
@@ -17,7 +18,7 @@ const AVAILABLE_HELP = 'Es el dinero registrado en tus cuentas de esta moneda: s
   + 'No incluye tarjetas ni deudas, y no es un saldo bancario ni tu patrimonio.';
 
 const monthName = (day: string) => {
-  const label = new Date(day + 'T12:00:00').toLocaleDateString('es-AR', { month: 'long' });
+  const label = formatDate(day, 'month');
   return label.charAt(0).toUpperCase() + label.slice(1);
 };
 
@@ -28,6 +29,7 @@ export default function HomeScreen() {
   const { snapshot, archive } = useLedger();
   const day = useCurrentDay();
   const p = usePalette();
+  const stacked = useStacked();
   const [selectedCurrency, setCurrency] = useState<Currency>('ARS');
   const [metric, setMetric] = useState<HomeMetric>('spending');
   const currencies = availableCurrencies(snapshot?.accounts ?? []);
@@ -67,8 +69,8 @@ export default function HomeScreen() {
       detail="Elegí una cuenta para agrupar tus movimientos. Podés empezar sin cargar tu saldo bancario."
       icon="receipt-outline" action={<ActionButton label="Empezar" icon="add-outline" onPress={() => router.push('/new-account')} />} /> : <>
       <View style={{ gap: space.xl }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-          <View style={{ flex: 1, maxWidth: 232 }}>
+        <View style={{ flexDirection: stacked ? 'column' : 'row', alignItems: stacked ? 'stretch' : 'center', justifyContent: 'space-between', gap: 12 }}>
+          <View style={{ flex: stacked ? undefined : 1, maxWidth: stacked ? undefined : 232 }}>
             <Choices value={metric} onChange={setMetric}
               options={[{ value: 'spending', label: 'Gastos' }, { value: 'available', label: 'Disponible' }]} />
           </View>

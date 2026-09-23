@@ -6,6 +6,7 @@ import * as Haptics from 'expo-haptics';
 import { accountKind, formatMinorUnits, makeTransferChange, type Account, type TransferRecord, type TransferChange } from '@finanzapp/domain';
 import { useLedger } from '../../src/storage/LedgerProvider';
 import { AccountBadge, ActionButton, AppText, DetailRow, EmptyState, ErrorMessage, GlyphTile, Money, Screen, Surface } from '../../src/ui/components';
+import { formatDate } from '../../src/i18n/format';
 import { space, usePalette } from '../../src/ui/theme';
 
 export default function TransferScreen() {
@@ -55,7 +56,7 @@ function TransferDetail({ record, accounts }: { record: TransferRecord; accounts
       ], { cancelable: true, onDismiss: () => { confirming.current = false; } });
   }
   const [year, month, day] = t.dateISO.split('-').map(Number);
-  const date = new Date(year, month - 1, day, 12).toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+  const date = formatDate(t.dateISO, 'weekdayLong');
   const status = record.voided ? 'Deshecha · no afecta los saldos' : kindTitle === 'Transferencia' ? 'Entre tus cuentas · no es gasto ni ingreso'
     : 'Mueve saldo hacia la obligación · no es gasto ni ingreso';
   return <Screen gap={space.xl}>

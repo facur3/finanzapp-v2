@@ -1,9 +1,9 @@
 import { useEffect } from 'react';
-import { StyleSheet, View, useWindowDimensions } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import Animated, { cancelAnimation, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { formatMinorUnits, type CategorySpending, type Currency } from '@finanzapp/domain';
-import { AppText, CategoryBadge, Money, PressFeedback } from './components';
+import { AppText, CategoryBadge, Money, PressFeedback, useStacked } from './components';
 import { useCategoryLook } from './category-hues';
 import { spendingShare } from './report-presentation';
 import { timing } from './motion';
@@ -32,10 +32,9 @@ export function CategorySpendingRow({ category, totalMinor, currency, onPress, l
 }) {
   const p = usePalette();
   const { hex: color, label: name } = useCategoryLook(category.category);
-  const { fontScale, width } = useWindowDimensions();
   const { fraction, label } = spendingShare(category.amountMinor, totalMinor);
   const count = category.count === 1 ? '1 gasto' : category.count + ' gastos';
-  const stacked = fontScale > 1.3 || width < 360;
+  const stacked = useStacked({ minor: category.amountMinor, currency });
   return <PressFeedback feedback="highlight" accessibilityRole="button"
     accessibilityLabel={`${name}, ${formatMinorUnits(category.amountMinor)} ${currency}, ${label} del gasto del ${periodName}, ${count}`}
     accessibilityHint={"Abre los movimientos de esta categoría en el " + periodName + " seleccionado"}
@@ -59,11 +58,10 @@ export function CategoryLegendRow({ category, totalMinor, currency, onPress, las
   category: CategorySpending; totalMinor: number; currency: Currency; onPress: () => void; last?: boolean;
 }) {
   const p = usePalette();
-  const { fontScale } = useWindowDimensions();
   const name = useCategoryLook(category.category).label;
   const { label } = spendingShare(category.amountMinor, totalMinor);
   const count = category.count === 1 ? '1 gasto' : category.count + ' gastos';
-  const stacked = fontScale > 1.3;
+  const stacked = useStacked({ minor: category.amountMinor, currency });
   return <PressFeedback feedback="highlight" accessibilityRole="button"
     accessibilityLabel={`${name}, ${formatMinorUnits(category.amountMinor)} ${currency}, ${label} del gasto del mes, ${count}`}
     accessibilityHint="Abre los movimientos de esta categoría en el mes seleccionado"
@@ -72,7 +70,7 @@ export function CategoryLegendRow({ category, totalMinor, currency, onPress, las
     <CategoryBadge category={category.category} />
     <View style={{ flex: 1, minWidth: 0, gap: 8, flexDirection: stacked ? 'column' : 'row', alignItems: stacked ? 'flex-start' : 'center' }}>
       <View style={{ flex: stacked ? undefined : 1, minWidth: 0, gap: 3 }}>
-        <AppText numberOfLines={stacked ? undefined : 1} style={{ fontWeight: '500' }}>{name}</AppText>
+        <AppText numberOfLines={stacked ? undefined : 2} style={{ fontWeight: '500' }}>{name}</AppText>
         <AppText secondary variant="footnote">{count}</AppText>
       </View>
       <View style={{ alignItems: stacked ? 'flex-start' : 'flex-end', gap: 3 }}>

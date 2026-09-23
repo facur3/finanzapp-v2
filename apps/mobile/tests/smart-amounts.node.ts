@@ -6,6 +6,9 @@ import ts from 'typescript';
 import * as domain from '@finanzapp/domain';
 import * as presentation from '../src/ui/presentation.ts';
 import * as moneyInput from '../src/ui/money-input.ts';
+import * as i18nFormat from '../src/i18n/format.ts';
+import { bindLocale } from '../src/i18n/bind.ts';
+const i18nProvider = { useI18n: () => bindLocale('es-AR') };
 
 // Producto 18 smart amount shortcuts on the actual transfer form: Usar todo,
 // Pagar total, Saldar total and Cobrar total only fill the amount field from
@@ -44,6 +47,7 @@ function harness(props: any = {}, data: domain.LedgerArchive = archive, options:
   const components = Object.fromEntries(['Screen', 'EmptyState', 'ActionButton', 'AppText', 'AmountField', 'AmountShortcut', 'ErrorMessage', 'Field', 'IconButton',
     'Surface', 'DetailRow'].map(name => [name, name]));
   const modules: Record<string, unknown> = {
+    '../i18n/format': i18nFormat, '../src/i18n/format': i18nFormat, '../../src/i18n/format': i18nFormat, '../i18n/provider': i18nProvider, '../src/i18n/provider': i18nProvider, '../../src/i18n/provider': i18nProvider,
     react: { useState: (initial: any) => { const i = cursor++; if (!(i in state)) state[i] = typeof initial === 'function' ? initial() : initial;
       return [state[i], (next: any) => { state[i] = typeof next === 'function' ? next(state[i]) : next; }]; },
     useRef: (initial: any) => { const i = refCursor++; return refs[i] ??= { current: initial }; } },
@@ -98,7 +102,7 @@ test('Usar todo fills the complete positive recorded balance of the source accou
   // The person still reviews and confirms; the value can also be edited downward.
   find(root, 'AccountField', 'Hacia').props.onChange('b');
   root = view.render();
-  assert.equal(find(root, 'DetailRow', 'Flor después').props.value, 'ARS 0,00');
+  assert.equal(find(root, 'DetailRow', 'Flor después').props.value, 'ARS\u00A00,00');
   await find(root, 'ActionButton', 'Registrar transferencia').props.onPress();
   assert.equal(view.transfers.length, 1);
   assert.deepEqual([view.transfers[0].fromAccountId, view.transfers[0].toAccountId, view.transfers[0].amountMinor], ['a', 'b', 19016200]);

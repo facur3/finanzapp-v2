@@ -351,6 +351,35 @@ importe, moneda y estado.
   enviar, el texto vuelve intacto al campo y una nota con ícono lo explica. Sin respuesta
   inventada, sin envío remoto.
 
+## Producto 23.0 — pulido de interacción y base de localización (sin rediseño)
+
+- **Fila de selección.** Para moneda, cuenta y categoría en su forma compacta: glifo o
+  tile de identidad, la etiqueta como caption, el valor elegido como línea principal (hasta
+  tres líneas) y una línea de detalle (código y símbolo, tipo de cuenta), chevron. Todo
+  apilado: un nombre largo baja, el código conserva su línea, nada compite en horizontal.
+  Sin `onPress` es el mismo dato en solo lectura (la moneda de una cuenta existente).
+  `DetailRow` sigue para pares cortos y se apila solo cuando el par es largo o el texto
+  es grande, de modo que un valor nunca se parte en fragmentos alineados a la derecha.
+- **Campo de importe.** El símbolo queda anclado al borde izquierdo y los dígitos crecen
+  hacia la derecha desde un origen fijo, en cifras tabulares, como una columna de libro
+  mayor: al agregar un dígito o un punto de miles no se mueve nada de lo que ya estaba.
+  El tamaño baja únicamente cuando el importe completo no entra junto al símbolo. No hay
+  animación de layout por pulsación ni posición estimada del símbolo; el importe se lee
+  alineado a la izquierda como el héroe de Inicio y el atajo bajo el campo lo acompaña.
+  Se descartó el centrado: centrar obliga a mover todo el par en cada tecla, y una
+  posición estimada nunca coincide exactamente con los glifos reales.
+- **Apilado compartido.** Un solo umbral (`useStacked`, escala mayor a 1,2) para toda fila
+  que ponga un nombre junto a un importe; `StatRow` pone dos o tres estadísticas lado a
+  lado y una debajo de otra con texto grande; los segmentados limitan su escala a 1,3× y
+  ajustan la etiqueta al segmento; los nombres tienen dos líneas y la columna del importe
+  ocupa como máximo la mitad; "Deuda registrada · ARS" y "ARS 1.234,56" se unen con
+  espacios duros para que el código o el número nunca queden solos.
+- **Localización.** Idioma, región, moneda de la cuenta y valor almacenado son cuatro
+  cosas distintas. Las fechas y los porcentajes salen de tablas (el mismo "22 sep" en toda
+  la app, no el "sept" del ICU del dispositivo). El inglés existe como catálogo y no se
+  muestra hasta que toda la app lo tenga (23.1): un iPhone en inglés sigue leyendo
+  español antes que media app traducida.
+
 ## Producto 22.1 — claridad y formularios (sin rediseño)
 
 - **Fila de navegación.** Tile tintado (Finanzas) o glifo neutro en una columna fija de
@@ -395,6 +424,12 @@ importe, moneda y estado.
   fase de development build, no una capa de vidrio forzada encima).
 
 ## Pendiente de revisión en iPhone
+
+- Producto 23.0: el campo de importe al teclear rápido (999 → 1.000, 999.999 →
+  1.000.000), con decimales, pegando, borrando sobre un punto, tocando en medio y al
+  cambiar ARS/USD; el símbolo quieto y el cursor detrás del último dígito; la fila de
+  moneda y su hoja; las estadísticas y filas apiladas con texto grande y en un iPhone
+  angosto; segmentados con texto grande; ambos temas; VoiceOver en las filas nuevas.
 
 - Producto 22: si Expo Go en el iPhone 14 Pro (iOS 26.6.1) informa Liquid Glass
   disponible y cómo se ven los cuatro círculos y el compositor sobre ambos fondos;

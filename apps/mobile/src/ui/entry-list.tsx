@@ -2,6 +2,7 @@ import { useMemo, type ReactNode } from 'react';
 import { SectionList, View } from 'react-native';
 import { formatMinorUnits, type Account, type Entry, type Transfer } from '@finanzapp/domain';
 import { AppText, MovementRow, type RowContext } from './components';
+import { moneyText } from '../i18n/format';
 import { activityDateLabel, dayNetMinor, groupActivity, mergeActivity, type ActivityItem } from './presentation';
 import { useCurrentDay, usePalette } from './theme';
 
@@ -28,7 +29,7 @@ export function EntryList({ entries, transfers, accounts, accountId, header, emp
         </AppText>
         {net && net.minor !== 0 && <AppText secondary variant="footnote" style={{ fontVariant: ['tabular-nums'] }}
           accessibilityLabel={`Neto del día ${net.minor < 0 ? 'menos ' : ''}${formatMinorUnits(Math.abs(net.minor))} ${net.currency}`}>
-          {net.minor < 0 ? '−' : '+'}{net.currency === 'USD' ? 'US$ ' : '$ '}{formatMinorUnits(Math.abs(net.minor))}
+          {net.minor < 0 ? '−' : '+'}{moneyText(Math.abs(net.minor), net.currency)}
         </AppText>}
       </View>;
     }}

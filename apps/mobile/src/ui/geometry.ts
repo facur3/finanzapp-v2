@@ -40,41 +40,55 @@ export function amountSymbolSize(fontSize: number): number {
   return fontSize >= 40 ? 32 : fontSize >= 30 ? 26 : 22;
 }
 
-/** Geometry of the amount field, from the width of its row. The input spans
- * the whole row and centres its text natively inside fixed padding, so its
- * box never changes while typing: a new digit or grouping dot only lets the
- * text grow symmetrically around the box's centre, as any centred field does.
- * `paddingLeft` reserves the symbol and the gap, `paddingRight` the caret;
- * the number therefore sits a little right of the row's centre and the
- * symbol beside it, so the pair reads as centred. The symbol is drawn at
- * `symbolX` from the row's left, one gap before the text's left edge, from
- * the estimated text width: it slides half an advance per digit, like that
- * edge, and its position is arithmetic, never a layout pass. The size steps
- * down from `base` only when the text would not fit between the paddings,
- * never by character count. Before layout the field keeps the base size and
- * the symbol is not placed. */
-export function amountFieldLayout(text: string, rowWidth: number, symbol: string, gap: number, fontScale = 1): {
-  fontSize: number; symbolSize: number; paddingLeft: number; paddingRight: number; symbolX: number | null;
-} {
+/** Geometry of the amount field, from the width of its row. The symbol is
+ * anchored at the row's left edge and the input takes the rest of the row,
+ * left-aligned, so the origin of the digits never depends on the text: a
+ * keystroke only adds glyphs at the right. The only variable is the size,
+ * and it steps down from `base` only when the amount would not fit between
+ * the symbol, the gap and the caret's own room, never by character count;
+ * the symbol's size follows the amount's. Before layout the base size
+ * renders. Nothing here is a position: there is nothing to place. */
+export function amountFieldLayout(text: string, rowWidth: number, symbol: string, gap: number, fontScale = 1): { fontSize: number; symbolSize: number } {
   const display = text || '0';
   const scale = Math.max(fontScale, 0.5);
   const symbolWidth = (size: number) => Math.ceil(amountWidthEm(symbol) * amountSymbolSize(size) * scale);
-  const paddingRight = AMOUNT_FIELD.caret;
-  if (!(rowWidth > 0)) return { fontSize: AMOUNT_FIELD.base, symbolSize: amountSymbolSize(AMOUNT_FIELD.base), paddingLeft: symbolWidth(AMOUNT_FIELD.base) + gap, paddingRight, symbolX: null };
-  // The symbol's size follows the amount's, so shrinking the amount can only free room.
+  if (!(rowWidth > 0)) return { fontSize: AMOUNT_FIELD.base, symbolSize: amountSymbolSize(AMOUNT_FIELD.base) };
+  // Shrinking the amount also shrinks the symbol, which can only free room, so the loop converges downward.
   let fontSize: number = AMOUNT_FIELD.base;
   for (;;) {
-    const next = fitFontSize(display, rowWidth - symbolWidth(fontSize) - gap - paddingRight, AMOUNT_FIELD.base, AMOUNT_FIELD.min, scale);
+    const next = fitFontSize(display, rowWidth - symbolWidth(fontSize) - gap - AMOUNT_FIELD.caret, AMOUNT_FIELD.base, AMOUNT_FIELD.min, scale);
     if (next >= fontSize) break;
     fontSize = next;
   }
-  const symbolSize = amountSymbolSize(fontSize);
-  const paddingLeft = symbolWidth(fontSize) + gap;
-  // Advance widths without the fit's safety margin: the symbol should hug the text, not the estimate.
-  const textWidth = amountWidthEm(display) / SAFETY * fontSize * scale;
-  const textLeft = paddingLeft + (rowWidth - paddingLeft - paddingRight - textWidth) / 2;
-  const symbolX = Math.max(0, Math.round(textLeft - gap - symbolWidth(fontSize)));
-  return { fontSize, symbolSize, paddingLeft, paddingRight, symbolX };
+  return { fontSize, symbolSize: amountSymbolSize(fontSize) };
+}
+
+/** The room the input has for its text at a given row width and symbol size. */
+export function amountTextRoom(rowWidth: number, symbol: string, symbolSize: number, gap: number, fontScale = 1): number {
+  return rowWidth - Math.ceil(amountWidthEm(symbol) * symbolSize * Math.max(fontScale, 0.5)) - gap - AMOUNT_FIELD.caret;
+}
+
+/** Rows that put a name beside an amount stack (amount under the name) at this system text scale. */
+export const ROW_STACK_SCALE = 1.2;
+/** Points a list row spends around its text on a phone: screen padding (20 + 20), row padding (16 + 16), the identity tile (40) and its gap (12). */
+export const ROW_CHROME = 124;
+/** The widest share of the remaining row an amount may take beside a name. */
+export const AMOUNT_SHARE = 0.56;
+/** Row amounts render at the body size. */
+export const ROW_AMOUNT_SIZE = 17;
+
+/** Whether a row must put its amount under the name instead of beside it:
+ * always at large text, and otherwise when the amount, at its full row size,
+ * would not fit in its share of the row on this screen width (a 13-digit
+ * price on any iPhone, a nine-digit one on a 375 pt iPhone). Stacking is
+ * preferred to shrinking: an amount is never truncated and never squeezed
+ * to read smaller than its neighbours because the row happened to be narrow.
+ * Before layout (no width) only the text scale decides. */
+export function rowStacks(windowWidth: number, fontScale: number, amountText?: string): boolean {
+  if (fontScale > ROW_STACK_SCALE) return true;
+  if (!amountText || !(windowWidth > 0)) return false;
+  const room = Math.max(0, windowWidth - ROW_CHROME) * AMOUNT_SHARE;
+  return amountWidthEm(amountText) * ROW_AMOUNT_SIZE * Math.max(fontScale, 0.5) > room;
 }
 
 /** The largest font size, at most `base` and at least `min`, at which `text`

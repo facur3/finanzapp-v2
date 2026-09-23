@@ -3,6 +3,7 @@ import { useLocalSearchParams } from 'expo-router';
 import { expensesInPeriod, spendingOverview, validDateISO, type ReportPeriod } from '@finanzapp/domain';
 import { useLedger } from '../src/storage/LedgerProvider';
 import { AppText, CategoryBadge, EmptyState, Money, Screen, SectionTitle } from '../src/ui/components';
+import { withCurrencyCode } from '../src/i18n/format';
 import { EntryList } from '../src/ui/entry-list';
 import { selectEntries } from '../src/ui/presentation';
 import { periodLabel } from '../src/ui/spending-timeline';
@@ -30,7 +31,7 @@ export default function SpendingDetailScreen() {
     <View style={{ gap: 12, paddingTop: 8 }}>
       {group && <CategoryBadge category={group.category} large />}
       <AppText accessibilityRole="header" variant="title1">{group ? lookOf(group.category).label : 'Gastos registrados'}</AppText>
-      <AppText secondary variant="subhead">{periodLabel(period)} · {currency}</AppText>
+      <AppText secondary variant="subhead">{withCurrencyCode(periodLabel(period), currency)}</AppText>
     </View>
     <View style={{ gap: 10 }}>
       {total !== null ? <Money minor={total} currency={currency} large /> : <AppText secondary>No podemos mostrar este total con precisión.</AppText>}

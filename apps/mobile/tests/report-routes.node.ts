@@ -9,6 +9,9 @@ import * as reportPresentation from '../src/ui/report-presentation.ts';
 import * as budgetPresentation from '../src/ui/budget-presentation.ts';
 import * as categoryColor from '../src/ui/category-color.ts';
 import * as liabilityPresentation from '../src/ui/liability-presentation.ts';
+import * as i18nFormat from '../src/i18n/format.ts';
+import { bindLocale } from '../src/i18n/bind.ts';
+const i18nProvider = { useI18n: () => bindLocale('es-AR') };
 
 // Exercise the actual routes' data/handlers with host components replaced by
 // descriptors. This is NOT a rendered iOS screen or gesture/animation test.
@@ -33,6 +36,7 @@ function routeHarness(file: string, params: Record<string, unknown>, data = snap
   let cursor = 0;
   const componentNames = ['AppText', 'Choices', 'DetailRow', 'EmptyState', 'IconButton', 'Money', 'PressFeedback', 'SectionTitle', 'Surface', 'CategoryBadge', 'Screen', 'GlyphTile'];
   const modules: Record<string, unknown> = {
+    '../i18n/format': i18nFormat, '../src/i18n/format': i18nFormat, '../../src/i18n/format': i18nFormat, '../i18n/provider': i18nProvider, '../src/i18n/provider': i18nProvider, '../../src/i18n/provider': i18nProvider,
     react: { useMemo: (fn: () => unknown) => fn(), useState: (initial?: unknown) => {
       const index = cursor++;
       if (!(index in state)) state[index] = initial;

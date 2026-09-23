@@ -27,7 +27,7 @@ export function IconColorPicker({ icons, colors, icon, color, onIconChange, onCo
       style={{ flexDirection: 'row', alignItems: 'center', gap: 14, padding: 14, borderRadius: 16, backgroundColor: p.surface }}>
       <GlyphTile icon={current.glyph} color={hex} size={52} large />
       <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
-        <AppText numberOfLines={1} style={{ fontWeight: '600' }}>{previewLabel?.trim() || 'Sin nombre'}</AppText>
+        <AppText numberOfLines={2} style={{ fontWeight: '600' }}>{previewLabel?.trim() || 'Sin nombre'}</AppText>
         <AppText secondary variant="footnote">{current.name} · {appearanceName(color)}</AppText>
       </View>
     </View>

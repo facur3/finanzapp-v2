@@ -7,6 +7,7 @@ import { categoryKey, formatMinorUnits, makeEntryChange, summarizeMonthlyBudgets
 import { useLedger } from '../../src/storage/LedgerProvider';
 import { budgetTone } from '../../src/ui/budget-presentation';
 import { AccountBadge, ActionButton, AppText, CategoryBadge, DetailRow, EmptyState, ErrorMessage, Money, Screen, Surface } from '../../src/ui/components';
+import { currencyName, formatDate } from '../../src/i18n/format';
 import { useCategoryLabel } from '../../src/ui/category-hues';
 import { space, usePalette } from '../../src/ui/theme';
 
@@ -62,8 +63,7 @@ function EntryDetail({ record, account }: { record: EntryRecord; account: Accoun
       ], { cancelable: true, onDismiss: () => { confirming.current = false; } });
   }
   const income = entry.kind === 'income';
-  const [year, month, day] = entry.dateISO.split('-').map(Number);
-  const date = new Date(year, month - 1, day, 12).toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+  const date = formatDate(entry.dateISO, 'weekdayLong');
   // Budget context only when a matching active budget exists for this month, currency and category.
   let budget: { ratio: number; remainingMinor: number; exceeded: boolean } | null = null;
   if (!income && !record.voided && snapshot) {
@@ -96,7 +96,7 @@ function EntryDetail({ record, account }: { record: EntryRecord; account: Accoun
       {budget && <DetailRow label="Presupuesto" icon="speedometer-outline" tone={budgetTone(budget)}
         value={budget.exceeded ? `Excedido por ${formatMinorUnits(-budget.remainingMinor)}` : `${Math.round(budget.ratio * 100)} % usado · quedan ${formatMinorUnits(budget.remainingMinor)}`}
         onPress={() => router.push({ pathname: '/budgets', params: { currency: account.currency, month: entry.dateISO.slice(0, 7) } })} />}
-      <DetailRow label="Moneda" value={account.currency === 'ARS' ? 'Pesos argentinos' : 'Dólares estadounidenses'} last />
+      <DetailRow label="Moneda" value={currencyName(account.currency)} last />
     </Surface>
     <ErrorMessage message={error} />
     <View style={{ gap: 10 }}>
