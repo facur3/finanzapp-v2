@@ -5,6 +5,8 @@ import { runInNewContext } from 'node:vm';
 import ts from 'typescript';
 import { CURRENCIES, currencyOption, currencyOptions, searchCurrencies } from '../src/ui/currencies.ts';
 import { bindLocale } from '../src/i18n/bind.ts';
+import * as geometry from '../src/ui/geometry.ts';
+import { formatMinorUnits } from '@finanzapp/domain';
 
 // Producto 22.1: the row and field components at source level (React Native
 // replaced by descriptors). Structure, hierarchy and labels are checked here;
@@ -32,13 +34,13 @@ function load(file: string, extra: Record<string, unknown> = {}, fontScale = 1) 
     '@react-native-community/datetimepicker': 'DateTimePicker',
     '@expo/vector-icons/Ionicons': 'Ionicons',
     'expo-router': { router: { push: () => {} } },
-    '@finanzapp/domain': { accountBalanceMinor: () => 0, formatMinorUnits: (n: number) => String(n), labelFromISO: (d: string) => d, categoryKey: (s: string) => s.toLowerCase(), todayKey: (d: Date) => d.toISOString().slice(0, 10) },
+    '@finanzapp/domain': { accountBalanceMinor: () => 0, formatMinorUnits, labelFromISO: (d: string) => d, categoryKey: (s: string) => s.toLowerCase(), todayKey: (d: Date) => d.toISOString().slice(0, 10) },
     '../i18n/provider': { useI18n: () => bindLocale('es-AR') },
     './theme': { radius: { chip: 14, tile: 12, group: 16, card: 20, sheet: 24, creditCard: 18, button: 14 }, space: { xs: 4, s: 8, m: 12, l: 16, xl: 20, xxl: 24, xxxl: 32 },
       type: { body: { fontSize: 17 }, subhead: { fontSize: 15 }, footnote: { fontSize: 13 }, caption: { fontSize: 12 }, title2: { fontSize: 22 }, title3: { fontSize: 20 }, headline: { fontSize: 17 }, eyebrow: {} },
       usePalette: () => p, useReduceMotion: () => true, useCurrentDay: () => '2026-09-22' },
     './categories': {}, './category-color': { tintOf: () => '#EEE' }, './category-hues': { useAccountLook: () => ({ glyph: 'wallet-outline', hex: '#2557D6' }), useCategoryLook: () => ({ glyph: 'pricetag-outline', hex: '#3E6FB0', label: 'x' }), useAccountLookOf: () => () => ({ glyph: 'wallet-outline', hex: '#2557D6' }), useCategoryDefinitions: () => [] },
-    './geometry': { SEGMENT_GAP: 2, SEGMENT_PADDING: 2, amountFieldLayout: () => ({}), fitFontSize: () => 17, segmentLayout: () => ({}) },
+    './geometry': geometry,
     './motion': { duration: { press: 100, release: 160 }, easeOut: 'ease', selectionHaptic: () => haptics.push('selection'), timing: () => ({}) },
     './money-input': { EMPTY_AMOUNT: '', amountFromCanonical: () => '', readAmountChange: () => ({}), renderAmount: () => ({ text: '', caret: 0 }), settleAmount: () => ({}), splitAmount: () => null },
     './presentation': {}, './currencies': { CURRENCIES, currencyOption, searchCurrencies },
@@ -227,6 +229,37 @@ test('Stat rows stack at large text and every Stat may shrink, so amounts and da
   assert.equal(large.render('StatRow', { children: [{ type: 'Stat', props: {} }, { type: 'Stat', props: {} }] }).props.style.flexDirection, 'column', 'one under the other at large text');
   const column = nodes(large.render('DetailRow', { label: 'Moneda', value: 'ARS' })).find(node => is(node, 'View') && node.props.style?.flex === 1)!;
   assert.equal(column.props.style.flexDirection, 'column', 'DetailRow stacks at large text too');
+});
+
+test('EntryRow gives the merchant two lines beside a bounded amount column at normal sizes, and stacks the amount under the name when it would not fit', () => {
+  const ui = load('components.tsx');
+  const account = { id: 'a', name: 'Cuenta sueldo Banco de la Provincia de Buenos Aires', currency: 'ARS', openingMinor: 0, createdAt: 't' };
+  const entry = (amountMinor: number) => ({ id: 'e', accountId: 'a', kind: 'expense', merchant: 'Supermercado Carrefour Market Palermo Hollywood', category: 'Comida', amountMinor, dateISO: '2026-09-22', createdAt: 't' });
+  const rowOf = (root: Node) => nodes(root).find(node => is(node, 'View') && node.props.style?.flex === 1 && 'flexDirection' in node.props.style)!;
+  const everyday = ui.render('EntryRow', { entry: entry(1250000), account });
+  assert.equal(rowOf(everyday).props.style.flexDirection, 'row', 'an everyday amount sits beside the name');
+  const [merchant, detail] = texts(everyday);
+  assert.equal(merchant.props.numberOfLines, 2, 'a long merchant wraps to two lines instead of truncating');
+  assert.equal(detail.props.numberOfLines, 2, 'so does the category · account · date line');
+  const amountColumn = nodes(everyday).find(node => is(node, 'View') && node.props.style?.alignItems === 'flex-end')!;
+  assert.equal(amountColumn.props.style.maxWidth, '56%', 'the amount column is bounded so the name keeps room');
+  const money = nodes(everyday).find(node => is(node, 'Money') || node.type?.name === 'Money')!;
+  assert.equal(money.props.currency, 'ARS');
+  const huge = ui.render('EntryRow', { entry: entry(999999999999999), account });
+  assert.equal(rowOf(huge).props.style.flexDirection, 'column', 'a 13-digit amount takes the whole row under the name');
+  assert.equal(texts(huge)[0].props.numberOfLines, undefined, 'stacked: the name is not limited');
+  assert.equal(nodes(huge).find(node => is(node, 'View') && node.props.style?.alignItems === 'flex-end')!.props.style.maxWidth, '100%');
+  const large = load('components.tsx', {}, 1.5);
+  assert.equal(rowOf(large.render('EntryRow', { entry: entry(1250000), account })).props.style.flexDirection, 'column', 'large text stacks every row');
+  // The same rule serves accounts and transfers.
+  const balance = ui.render('AccountRow', { account, entries: [], transfers: [] });
+  assert.equal(texts(balance)[0].props.numberOfLines, 2);
+  assert.equal(rowOf(balance).props.style.flexDirection, 'row');
+  const usd = { ...account, id: 'b', name: 'Caja de ahorro en dólares', currency: 'USD' };
+  const transfer = { id: 't', fromAccountId: 'a', toAccountId: 'b', amountMinor: 99999999999, dateISO: '2026-09-22', createdAt: 't', note: '' };
+  const wide = ui.render('TransferRow', { transfer, accounts: [account, usd], accountId: 'a' });
+  assert.equal(rowOf(wide).props.style.flexDirection, 'column', 'a nine-digit signed transfer on a 390 pt screen stacks');
+  assert.equal(texts(ui.render('TransferRow', { transfer: { ...transfer, amountMinor: 150000 }, accounts: [account, usd] }))[0].props.numberOfLines, 2);
 });
 
 test('segmented labels cap their scaling and fit their segment instead of truncating', () => {

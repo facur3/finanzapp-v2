@@ -70,7 +70,7 @@ function RankedRow({ category, totalMinor, currency, index, last, onPress }: {
     progress.value = withTiming(fraction, timing('data', reduced));
   }, [fraction, reduced, index, progress, opacity]);
   const fill = useAnimatedStyle(() => ({ width: `${progress.value * 100}%` as `${number}%`, opacity: opacity.value }));
-  const stacked = useStacked();
+  const stacked = useStacked({ minor: category.amountMinor, currency });
   return <PressFeedback feedback="highlight" accessibilityRole="button" accessibilityHint="Abre los movimientos de esta categoría este mes"
     accessibilityLabel={`${name}, ${formatMinorUnits(category.amountMinor)} ${currency}, ${label} del gasto del mes`}
     onPress={onPress} style={[styles.row, last && styles.rowLast]}
@@ -135,6 +135,7 @@ export function UpcomingRecurringRow({ rule, account, day, last }: {
   rule: RecurringRule; account: Account; day: string; last: boolean;
 }) {
   const p = usePalette();
+  const stacked = useStacked({ minor: rule.amountMinor, currency: account.currency });
   const date = labelFromISO(rule.nextDateISO, new Date(day + 'T12:00:00'));
   const days = Math.round((Date.parse(rule.nextDateISO + 'T12:00:00Z') - Date.parse(day + 'T12:00:00Z')) / 86400000);
   const when = days === 0 ? 'Hoy' : days === 1 ? 'Mañana' : `En ${days} días`;
@@ -143,13 +144,15 @@ export function UpcomingRecurringRow({ rule, account, day, last }: {
     onPress={() => router.push({ pathname: '/edit-recurring/[id]', params: { id: rule.id } })}
     style={[styles.row, { borderBottomWidth: last ? 0 : StyleSheet.hairlineWidth, borderBottomColor: p.line }]}>
     <CategoryBadge category={rule.category} kind={rule.kind} />
-    <View style={{ flex: 1, minWidth: 0, gap: 3 }}>
-      <AppText numberOfLines={2} style={{ fontWeight: '500' }}>{rule.merchant}</AppText>
-      <AppText secondary variant="footnote" numberOfLines={2}>{date} · {account.name}</AppText>
-    </View>
-    <View style={{ alignItems: 'flex-end', gap: 3, maxWidth: '50%' }}>
-      <Money minor={rule.amountMinor} currency={account.currency} />
-      <AppText variant="caption" style={{ color: days <= 1 ? p.warning : p.secondary, fontWeight: days <= 1 ? '600' : '400' }}>{when}</AppText>
+    <View style={{ flex: 1, minWidth: 0, gap: 8, flexDirection: stacked ? 'column' : 'row', alignItems: stacked ? 'flex-start' : 'center' }}>
+      <View style={{ flex: stacked ? undefined : 1, minWidth: 0, gap: 3 }}>
+        <AppText numberOfLines={stacked ? undefined : 2} style={{ fontWeight: '500' }}>{rule.merchant}</AppText>
+        <AppText secondary variant="footnote" numberOfLines={stacked ? undefined : 2}>{date} · {account.name}</AppText>
+      </View>
+      <View style={{ alignItems: stacked ? 'flex-start' : 'flex-end', gap: 3, maxWidth: stacked ? '100%' : '56%' }}>
+        <Money minor={rule.amountMinor} currency={account.currency} />
+        <AppText variant="caption" style={{ color: days <= 1 ? p.warning : p.secondary, fontWeight: days <= 1 ? '600' : '400' }}>{when}</AppText>
+      </View>
     </View>
   </PressFeedback>;
 }

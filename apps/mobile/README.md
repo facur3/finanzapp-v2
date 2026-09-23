@@ -469,7 +469,8 @@ amount-field cases in `typography.node.ts` (a size-only layout, identical at "99
 and "999.999 → 1.000.000", the anchored row with no transform, the caret after the
 formatted digit, the catalogue label) and extends `ui-rows.node.ts` (SelectionRow,
 the stacked currency row and its read-only form, DetailRow stacking, Stat/StatRow at
-large text, segmented caps); every route harness mocks `src/i18n/format` and
+large text, segmented caps, and EntryRow / AccountRow / TransferRow with two-line names
+and amount-aware stacking through `rowStacks`); every route harness mocks `src/i18n/format` and
 `src/i18n/provider`. It also updates
 the navigation, Más, Cards, composer and quick-action guards for the centre tab, the
 pushed Tarjetas screen and the glass branch. These are **not** native rendering/gesture tests;

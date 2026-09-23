@@ -6,7 +6,7 @@ import { dailyAverageMinor, dailySpending, formatMinorUnits, monthlySpendingTren
   summarizeMonthlyBudgets, topMerchants, type CategorySpending, type Currency, type DailySpending, type SpendingInsight } from '@finanzapp/domain';
 import { useLedger } from '../../src/storage/LedgerProvider';
 import { budgetTone, percentUsed } from '../../src/ui/budget-presentation';
-import { AppText, CategoryBadge, Choices, DetailRow, EmptyState, GlyphTile, IconButton, Money, NavigationRow, PressFeedback, SectionTitle, Surface } from '../../src/ui/components';
+import { AppText, CategoryBadge, Choices, DetailRow, EmptyState, GlyphTile, IconButton, Money, NavigationRow, PressFeedback, SectionTitle, Surface, useStacked } from '../../src/ui/components';
 import { withCurrencyCode } from '../../src/i18n/format';
 import { useCategoryColor, useCategoryLookOf } from '../../src/ui/category-hues';
 import { DonutChart, MonthBars, OTHERS_KEY, donutSlices } from '../../src/ui/charts';
@@ -154,11 +154,7 @@ export default function ReportsScreen() {
             borderBottomWidth: index === merchants.length - 1 ? 0 : 0.5, borderBottomColor: p.line }}>
             <AppText tertiary variant="footnote" style={{ width: 16, textAlign: 'center', fontVariant: ['tabular-nums'], fontWeight: '600' }}>{index + 1}</AppText>
             <CategoryBadge category={merchant.category} />
-            <View style={{ flex: 1, minWidth: 0, gap: 3 }}>
-              <AppText numberOfLines={2} style={{ fontWeight: '500' }}>{merchant.merchant}</AppText>
-              <AppText secondary variant="footnote" numberOfLines={2}>{merchant.count === 1 ? '1 compra' : merchant.count + ' compras'} · {lookOf(merchant.category).label}</AppText>
-            </View>
-            <View style={{ maxWidth: '50%', alignItems: 'flex-end' }}><Money minor={merchant.amountMinor} currency={currency} /></View>
+            <MerchantCells merchant={merchant} currency={currency} label={lookOf(merchant.category).label} />
           </View>)}
         </Surface>
       </View>}
@@ -220,4 +216,16 @@ function BudgetStatusRow({ category, spent, limit, progress, money, last, onPres
       <View style={{ width: `${Math.min(100, Math.max(ratio > 0 ? 1.5 : 0, ratio * 100))}%`, height: 4, backgroundColor: color }} />
     </View>
   </PressFeedback>;
+}
+
+/** Name and category beside the amount, or the amount under them when the row is narrow for it or the text is large. */
+function MerchantCells({ merchant, currency, label }: { merchant: { merchant: string; count: number; amountMinor: number }; currency: Currency; label: string }) {
+  const stacked = useStacked({ minor: merchant.amountMinor, currency });
+  return <View style={{ flex: 1, minWidth: 0, gap: 8, flexDirection: stacked ? 'column' : 'row', alignItems: stacked ? 'flex-start' : 'center' }}>
+    <View style={{ flex: stacked ? undefined : 1, minWidth: 0, gap: 3 }}>
+      <AppText numberOfLines={stacked ? undefined : 2} style={{ fontWeight: '500' }}>{merchant.merchant}</AppText>
+      <AppText secondary variant="footnote" numberOfLines={stacked ? undefined : 2}>{merchant.count === 1 ? '1 compra' : merchant.count + ' compras'} · {label}</AppText>
+    </View>
+    <View style={{ maxWidth: stacked ? '100%' : '56%', alignItems: stacked ? 'flex-start' : 'flex-end' }}><Money minor={merchant.amountMinor} currency={currency} /></View>
+  </View>;
 }

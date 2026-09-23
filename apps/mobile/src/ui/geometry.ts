@@ -68,6 +68,29 @@ export function amountTextRoom(rowWidth: number, symbol: string, symbolSize: num
   return rowWidth - Math.ceil(amountWidthEm(symbol) * symbolSize * Math.max(fontScale, 0.5)) - gap - AMOUNT_FIELD.caret;
 }
 
+/** Rows that put a name beside an amount stack (amount under the name) at this system text scale. */
+export const ROW_STACK_SCALE = 1.2;
+/** Points a list row spends around its text on a phone: screen padding (20 + 20), row padding (16 + 16), the identity tile (40) and its gap (12). */
+export const ROW_CHROME = 124;
+/** The widest share of the remaining row an amount may take beside a name. */
+export const AMOUNT_SHARE = 0.56;
+/** Row amounts render at the body size. */
+export const ROW_AMOUNT_SIZE = 17;
+
+/** Whether a row must put its amount under the name instead of beside it:
+ * always at large text, and otherwise when the amount, at its full row size,
+ * would not fit in its share of the row on this screen width (a 13-digit
+ * price on any iPhone, a nine-digit one on a 375 pt iPhone). Stacking is
+ * preferred to shrinking: an amount is never truncated and never squeezed
+ * to read smaller than its neighbours because the row happened to be narrow.
+ * Before layout (no width) only the text scale decides. */
+export function rowStacks(windowWidth: number, fontScale: number, amountText?: string): boolean {
+  if (fontScale > ROW_STACK_SCALE) return true;
+  if (!amountText || !(windowWidth > 0)) return false;
+  const room = Math.max(0, windowWidth - ROW_CHROME) * AMOUNT_SHARE;
+  return amountWidthEm(amountText) * ROW_AMOUNT_SIZE * Math.max(fontScale, 0.5) > room;
+}
+
 /** The largest font size, at most `base` and at least `min`, at which `text`
  * fits `width` on one line once the system text scale is applied. Scaling only
  * happens when needed, so a short amount stays at `base`; a long one shrinks

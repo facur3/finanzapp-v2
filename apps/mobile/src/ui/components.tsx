@@ -10,7 +10,7 @@ import { radius, space, type, useCurrentDay, usePalette, useReduceMotion, type P
 import type { IconName } from './categories';
 import { tintOf } from './category-color';
 import { useAccountLook, useCategoryLook } from './category-hues';
-import { AMOUNT_FIELD, SEGMENT_GAP, SEGMENT_PADDING, amountFieldLayout, fitFontSize, segmentLayout } from './geometry';
+import { AMOUNT_FIELD, ROW_STACK_SCALE, SEGMENT_GAP, SEGMENT_PADDING, amountFieldLayout, fitFontSize, rowStacks, segmentLayout } from './geometry';
 import { duration, easeOut, selectionHaptic, timing } from './motion';
 import { EMPTY_AMOUNT, amountFromCanonical, readAmountChange, renderAmount, settleAmount, splitAmount } from './money-input';
 import { useI18n } from '../i18n/provider';
@@ -32,12 +32,20 @@ export function toneColors(p: Palette, tone: Tone): { color: string; soft: strin
 /** Whether a row should stack its label and value (or name and amount) as
  * two lines instead of sharing one: at large Dynamic Type sizes a name and a
  * money value no longer fit side by side, and truncating either would hide
- * data. One threshold for every row, so the interface changes shape at one
- * text size rather than row by row. */
-export const STACK_AT_SCALE = 1.2;
-export function useStacked(): boolean {
-  const { fontScale } = useWindowDimensions();
-  return fontScale > STACK_AT_SCALE;
+ * data. With an amount, the row also stacks on a screen too narrow for that
+ * amount beside a name (rowStacks), so a 13-digit price or a long currency
+ * prefix gets the whole row instead of shrinking or clipping. One rule for
+ * every row, so the interface changes shape for one reason, not row by row. */
+export const STACK_AT_SCALE = ROW_STACK_SCALE;
+export function useStacked(amount?: { minor: number; currency: Currency; signed?: boolean }): boolean {
+  const { fontScale, width } = useWindowDimensions();
+  return rowStacks(width, fontScale, amount ? rowAmountText(amount.minor, amount.currency, amount.signed ?? false) : undefined);
+}
+
+/** The string a row amount renders (sign, symbol, grouped number), for width estimates. */
+export function rowAmountText(minor: number, currency: Currency, signed = false): string {
+  const sign = minor < 0 ? '−' : signed && minor > 0 ? '+' : '';
+  return sign + (currency === 'USD' ? 'US$ ' : '$ ') + formatMinorUnits(Math.abs(minor));
 }
 
 /** Text in one of the named styles. A larger `fontSize` in `style` without
@@ -370,11 +378,10 @@ export function Money({ minor, currency, large = false, color, signed = false, s
   const { fontScale } = useWindowDimensions();
   const { spokenMoney } = useI18n();
   const [width, setWidth] = useState(0);
-  const sign = minor < 0 ? '−' : signed && minor > 0 ? '+' : '';
   const semantic = tone === 'income' ? p.income : tone === 'expense' ? p.text : tone === 'transfer' ? p.transfer : tone === 'warning' ? p.warning : p.text;
   const base = size ?? (large ? 44 : 17);
   const hero = base >= 28;
-  const text = sign + (currency === 'USD' ? 'US$ ' : '$ ') + formatMinorUnits(Math.abs(minor));
+  const text = rowAmountText(minor, currency, signed);
   const fontSize = hero ? fitFontSize(text, width, base, Math.round(base / 2), Math.min(fontScale, HERO_MAX_SCALE)) : base;
   const label = spokenMoney(minor, currency);
   const ink = color ?? semantic;
@@ -523,7 +530,7 @@ export function EntryRow({ entry, account, last = false, showDate = true, showAc
   const day = useCurrentDay();
   const dateLabel = labelFromISO(entry.dateISO, new Date(day + 'T12:00:00'));
   const income = entry.kind === 'income';
-  const stacked = useStacked();
+  const stacked = useStacked({ minor: entry.amountMinor, currency: account.currency, signed: true });
   const category = useCategoryLook(entry.category, entry.kind).label;
   const detail = [category, showAccount ? account.name : null, showDate ? dateLabel : null].filter(Boolean).join(' · ');
   return <PressFeedback feedback="highlight" accessibilityRole="button"
@@ -533,8 +540,8 @@ export function EntryRow({ entry, account, last = false, showDate = true, showAc
     <CategoryBadge category={entry.category} kind={entry.kind} tone={income ? 'income' : 'neutral'} />
     <View style={{ flex: 1, minWidth: 0, gap: 8, flexDirection: stacked ? 'column' : 'row', alignItems: stacked ? 'flex-start' : 'center' }}>
       <View style={{ flex: stacked ? undefined : 1, minWidth: 0, gap: 3 }}>
-        <AppText numberOfLines={stacked ? undefined : 1} style={{ fontWeight: '500' }}>{entry.merchant}</AppText>
-        <AppText secondary variant="footnote" numberOfLines={stacked ? undefined : 1}>{detail}</AppText>
+        <AppText numberOfLines={stacked ? undefined : 2} style={{ fontWeight: '500' }}>{entry.merchant}</AppText>
+        <AppText secondary variant="footnote" numberOfLines={stacked ? undefined : 2}>{detail}</AppText>
       </View>
       <View style={{ maxWidth: stacked ? '100%' : AMOUNT_COLUMN, alignItems: 'flex-end' }}>
         <Money minor={income ? entry.amountMinor : -entry.amountMinor} currency={account.currency} signed tone={income ? 'income' : 'expense'} />
@@ -548,17 +555,19 @@ export function AccountRow({ account, entries, transfers, last = false, kindLabe
 }) {
   const p = usePalette();
   const balance = accountBalanceMinor(account, entries, transfers);
-  const stacked = useStacked();
+  const stacked = useStacked({ minor: balance, currency: account.currency });
   return <PressFeedback feedback="highlight" accessibilityRole="button" accessibilityLabel={'Ver cuenta ' + account.name + ', saldo ' + formatMinorUnits(balance) + ' ' + account.currency}
     onPress={() => router.push({ pathname: '/account/[id]', params: { id: account.id } })}
     style={[styles.row, { borderBottomColor: p.line, borderBottomWidth: last ? 0 : StyleSheet.hairlineWidth }]}>
     <AccountBadge accountId={account.id} />
     <View style={{ flex: 1, minWidth: 0, gap: 8, flexDirection: stacked ? 'column' : 'row', alignItems: stacked ? 'flex-start' : 'center' }}>
       <View style={{ flex: stacked ? undefined : 1, minWidth: 0, gap: 3 }}>
-        <AppText numberOfLines={stacked ? undefined : 1} style={{ fontWeight: '500' }}>{account.name}</AppText>
+        <AppText numberOfLines={stacked ? undefined : 2} style={{ fontWeight: '500' }}>{account.name}</AppText>
         <AppText secondary variant="footnote">{kindLabel} · {account.currency}</AppText>
       </View>
-      <Money minor={balance} currency={account.currency} color={balance < 0 ? p.expense : undefined} />
+      <View style={{ maxWidth: stacked ? '100%' : AMOUNT_COLUMN, alignItems: 'flex-end' }}>
+        <Money minor={balance} currency={account.currency} color={balance < 0 ? p.expense : undefined} />
+      </View>
     </View>
     <Ionicons name="chevron-forward" size={16} color={p.tertiary} accessible={false} />
   </PressFeedback>;
@@ -582,13 +591,13 @@ export function TransferRow({ transfer: t, accounts, accountId, last = false, sh
   const day = useCurrentDay();
   const from = accounts.find(a => a.id === t.fromAccountId)!, to = accounts.find(a => a.id === t.toAccountId)!;
   const date = labelFromISO(t.dateISO, new Date(day + 'T12:00:00'));
-  const stacked = useStacked();
   const outgoing = accountId === from.id;
   const incoming = accountId === to.id;
   const title = context === 'card' ? (incoming ? 'Pago de tarjeta' : 'Transferencia') : context === 'debt' ? (incoming ? 'Pago' : 'Cobro') : t.note || 'Transferencia';
   const detail = context ? [t.note && t.note !== title ? t.note : null, incoming ? 'desde ' + from.name : 'hacia ' + to.name, showDate ? date : null].filter(Boolean).join(' · ')
     : `${from.name} → ${to.name}${showDate ? ' · ' + date : ''}`;
   const signed = !!accountId && !context;
+  const stacked = useStacked({ minor: signed && outgoing ? -t.amountMinor : t.amountMinor, currency: from.currency, signed });
   return <PressFeedback feedback="highlight" accessibilityRole="button"
     accessibilityLabel={`${title}, de ${from.name} a ${to.name}, ${formatMinorUnits(t.amountMinor)} ${from.currency}, ${date}${t.note ? ', ' + t.note : ''}`}
     onPress={() => router.push({ pathname: '/transfer/[id]', params: { id: t.id } })}
@@ -596,8 +605,8 @@ export function TransferRow({ transfer: t, accounts, accountId, last = false, sh
     <GlyphTile icon={context === 'card' ? 'card-outline' : context === 'debt' ? 'people-outline' : 'swap-horizontal-outline'} tone="transfer" />
     <View style={{ flex: 1, minWidth: 0, gap: 8, flexDirection: stacked ? 'column' : 'row', alignItems: stacked ? 'flex-start' : 'center' }}>
       <View style={{ flex: stacked ? undefined : 1, minWidth: 0, gap: 3 }}>
-        <AppText numberOfLines={stacked ? undefined : 1} style={{ fontWeight: '500' }}>{title}</AppText>
-        <AppText secondary variant="footnote" numberOfLines={stacked ? undefined : 1}>{detail}</AppText>
+        <AppText numberOfLines={stacked ? undefined : 2} style={{ fontWeight: '500' }}>{title}</AppText>
+        <AppText secondary variant="footnote" numberOfLines={stacked ? undefined : 2}>{detail}</AppText>
       </View>
       <View style={{ maxWidth: stacked ? '100%' : AMOUNT_COLUMN, alignItems: 'flex-end' }}>
         <Money minor={signed && outgoing ? -t.amountMinor : t.amountMinor} currency={from.currency} signed={signed} tone="transfer"

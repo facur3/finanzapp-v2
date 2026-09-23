@@ -122,6 +122,29 @@ test('AmountField anchors the symbol before a left-aligned input that fills the 
   assert.equal(untitled.props.children[0].props.children.join(''), 'Monto · ARS', 'the default label comes from the catalogue');
 });
 
+// A row that puts a name beside an amount: the amount gets the whole row
+// (under the name) when it would not fit its share beside the name at this
+// width, and always at large text. A 13-digit price on any iPhone and a
+// nine-digit one on a 375 pt iPhone stack; everyday amounts stay inline.
+test('rowStacks: large text always stacks; otherwise a long amount stacks on a narrow screen and everyday amounts stay beside the name', () => {
+  const { rowStacks } = geometry;
+  const thirteen = '$ 9.999.999.999.999,99', nine = '$ 999.999.999,99', dollars = '−US$ 999.999.999,99', everyday = '−$ 12.500,00';
+  assert.equal(rowStacks(393, 1, everyday), false, 'a normal expense sits beside its name on the iPhone 14 Pro');
+  assert.equal(rowStacks(375, 1, everyday), false, 'and on an SE / mini width');
+  assert.equal(rowStacks(375, 1, '+US$ 1.234,56'), false, 'a signed dollar amount too');
+  assert.equal(rowStacks(393, 1, thirteen), true, 'the longest safe amount never shares a line with a name');
+  assert.equal(rowStacks(430, 1, thirteen), true, 'not even on the widest iPhone');
+  assert.equal(rowStacks(375, 1, nine), true, 'nine digits stack on a 375 pt iPhone');
+  assert.equal(rowStacks(393, 1, nine), false, 'and fit beside the name on a 393 pt one');
+  assert.equal(rowStacks(393, 1, dollars), true, 'the US$ prefix and the sign count as width');
+  assert.equal(rowStacks(393, 1.3, everyday), true, 'large text stacks every row, whatever the amount');
+  assert.equal(rowStacks(393, 1.2, everyday), false, 'the threshold is above 1.2');
+  assert.equal(rowStacks(393, 1.1, nine), true, 'a mild text scale still counts in the width');
+  assert.equal(rowStacks(0, 1, thirteen), false, 'before layout only the text scale decides');
+  assert.equal(rowStacks(393, 1), false, 'a row without an amount stacks only at large text');
+  assert.equal(rowStacks(393, 1.5), true);
+});
+
 // The Money component itself: heroes measure their container and size from it;
 // rows keep the native fit without a fixed line height.
 function loadComponents() {

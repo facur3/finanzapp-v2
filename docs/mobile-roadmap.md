@@ -99,11 +99,30 @@ yet. No financial semantics, schema, backup, migration or cloud change.
   and the read-only currency row in `ui-rows.node.ts`; every route harness mocks
   `src/i18n`), TypeScript, Expo dependency check, dependency tree, audit, Metro iOS
   export, 397 root tests, Vite build, repo hygiene.
+- [x] **Review follow-up (2026-09-22, same PR).** Names and merchants beside an amount
+  had one line at normal text sizes and only expanded at large text. `EntryRow`,
+  `AccountRow`, `TransferRow`, the ranked and legend category rows, Recurrentes and
+  upcoming rows, debts and Reportes merchants now give the name (and its detail line)
+  two lines at every size, bound the amount column to 56 % of the row, and stack the
+  amount under the name through one rule, `rowStacks` (`src/ui/geometry.ts`): always
+  above the 1.2 text scale, and otherwise whenever the amount at its row size would not
+  fit its share of the row on this screen width (a 13-digit price on any iPhone, a
+  nine-digit one or a signed US$ amount on a 375 pt iPhone). Stacking is preferred to
+  shrinking, so an amount is never truncated, never squeezed smaller than its
+  neighbours, and never overlaps a name. `useStacked(amount?)` is the hook; rows
+  without an amount keep the text-scale rule. Tests: `rowStacks` cases in
+  `typography.node.ts`; EntryRow, AccountRow and TransferRow at normal, huge and large
+  text in `ui-rows.node.ts` (the harness now uses the real geometry and money
+  formatter). Roadmap: the vigente order (23.1 internationalization, 24 multi-currency,
+  the real Assistant afterwards) is reconciled with the historical entries, which keep
+  their text with a "superseded" note; the AI draft rule is stated once for every
+  phase; the AI cost/limit/quota/abuse backlog is listed, not built.
 - [ ] **Not device-verified:** the anchored amount field while typing fast, at the
   grouping transitions, with decimals, pasting, backspace over a dot, a tap in the middle,
   ARS/USD switch and the largest Dynamic Type; the currency row and sheet; stacked
-  statistics and rows at large text on a narrow iPhone; segmented labels at large text;
-  both themes; VoiceOver on the new rows. See the checklist.
+  statistics and rows at large text on a narrow iPhone; long names and 13-digit amounts
+  in the rows at normal text on a 375 pt iPhone; segmented labels at large text; both
+  themes; VoiceOver on the new rows. See the checklist.
 
 ### Previous delivery — Producto 22.1
 
@@ -244,7 +263,8 @@ native Liquid Glass where iOS provides it. No financial semantics, no cloud.
   "Material opaco (Expo Go)", the
   composer resting on the tab bar and rising with the keyboard, the centre tab with
   VoiceOver and large text, Tarjetas from Más with its header "+". Glass itself (look,
-  Reduce Transparency flip) waits for the development build (Producto 23).
+  Reduce Transparency flip) waits for the development-build phase (written as
+  "Producto 23" at the time; superseded, see the vigente order).
 
 ### Previous delivery — Producto 21
 
@@ -934,25 +954,50 @@ by CI and merged into master before the next starts:
     remains the source of truth and activation is the next phase.
 11. ~~AI reachability and native material~~ — delivered in Producto 22 (Assistant
     centre tab, Tarjetas under Más, Liquid Glass on the two control surfaces with the
-    opaque fallback). Producto 23 is the real cloud/text Assistant activation.
+    opaque fallback). *Superseded (2026-09-22):* this entry once named "Producto 23"
+    as the real cloud/text Assistant activation. Producto 23 became 23.0 (polish and
+    the localization foundation) and 23.1 (full internationalization); Producto 24 is
+    the multi-currency engine; the real Assistant activation comes after them (item 16).
 12. ~~UI clarity and form polish~~ — delivered in Producto 22.1 (NavigationRow,
     FieldNote, CurrencyField, calmer empty states).
 13. ~~Interaction polish and localization foundation~~ — delivered in Producto 23.0
     (SelectionRow, anchored amount field, overflow audit, `src/i18n` with es-AR and
     en-US catalogues, English not yet released).
 14. **Producto 23.1 — complete internationalization:** every screen's copy in the
-    catalogue, English released (`RELEASED_LOCALES`), the language row under Más →
-    App y datos writing the stored preference, `expo-localization`'s `supportedLocales`
-    plugin (a native rebuild), locale-aware money presentation in `Money` and the
-    amount field's separators, VoiceOver strings, date pickers and the Assistant copy.
+    catalogue, English released (`RELEASED_LOCALES`), `expo-localization`'s
+    `supportedLocales` plugin (a native rebuild), locale-aware money presentation in
+    `Money` and the amount field's separators, VoiceOver strings, date pickers and the
+    Assistant copy. Requirements fixed now: **language and region are chosen
+    independently** (the interface language and the writing conventions for dates,
+    numbers and amounts are two preferences: a person can read English with Argentine
+    formats or Spanish with US formats; `AppLocale` therefore splits into a language
+    preference and a region preference, with "follow the device" as the default of
+    each, both in the key-value store, neither in the ledger or backups); and
+    **changing the language inside the app updates the interface correctly**: the
+    provider re-binds the translator and formatters and every mounted screen, header,
+    tab label, sheet and VoiceOver string re-renders in place, without a restart and
+    without losing the current screen, a draft being typed or the Assistant
+    conversation (a test drives the switch on a mounted tree; the iPhone confirms the
+    navigation headers, which expo-router sets from options).
 15. **Producto 24 — multi-currency engine:** currencies beyond ARS and USD only with
     dated exchange rates in the domain, the searchable currency screen the sheet
     seeds, per-account currency identity everywhere, reports that never add
-    currencies without a rate. Not before the domain and its tests exist.
+    currencies without a rate. Not before the domain and its tests exist. Rules fixed
+    now: **each account keeps its own currency** as a property of the account (its
+    balance, movements, transfers, budgets and reports stay in that currency; a
+    currency is never converted in storage and an account never changes currency);
+    an **optional main currency for reports** may express totals across accounts only
+    through **explicit, traceable conversions**: each converted figure carries the
+    rate used, its date and its source, the report shows that it is converted and at
+    which rate, an unknown rate yields "unknown" rather than a guessed number, and the
+    rate table is user data with history (never a fabricated market series). Same-day
+    ARS/USD transfers inside the ledger still need the person's own dated rate.
 16. Then, in order: first-entry onboarding, financial productivity (reminders,
-    smarter budgets and recurring rules), the real cloud/text Assistant activation,
-    Apple integrations on the development build (Face ID, notifications with the card
-    due-date reminder, Apple Pay capture, App Intents), monetization, brand and launch.
+    smarter budgets and recurring rules), the real cloud/text Assistant activation
+    (its cost and abuse controls listed under "Activate smart capture" must exist
+    before any paid call), Apple integrations on the development build (Face ID,
+    notifications with the card due-date reminder, Apple Pay capture, App Intents),
+    monetization, brand and launch.
 
 ### 1. Complete the daily tracking loop
 
@@ -970,6 +1015,14 @@ by CI and merged into master before the next starts:
 
 Use [integration contracts](mobile-integrations.md) as the implementation boundary.
 
+**Rule for every phase, past and future: an AI-generated movement is a draft until
+the person confirms it explicitly.** Confirmar on the draft card is the only path that
+writes an Entry to SQLite; Apple Pay captures, Shortcut messages, audio transcriptions
+and inbox deliveries produce drafts in the review tray, never ledger rows. There is no
+"auto-registration" mode in the product: the earlier wording below that allowed an
+opt-in automatic write for "complete supported operations" is withdrawn (2026-09-22)
+and kept only as history.
+
 - [ ] Staging Supabase setup, mobile sign-in and cloud-data consent; no login needed
   for the local core. The existing web snapshot is not a mobile sync engine.
 - [x] Text assistant UI (Producto 21: conversation, drafts, clarifications, evidence,
@@ -977,16 +1030,30 @@ Use [integration contracts](mobile-integrations.md) as the implementation bounda
   deletion (development build). Review/edit/undo with no phantom success or discarded draft.
 - [ ] Evaluate Spanish phrases, ambiguous categories, currencies, loans/refunds,
   questions and failure handling with owned test data and measured provider usage.
-- [ ] Safe auto-registration opt-in only for complete supported operations and
-  owned account/card mappings. Ambiguous messages stay drafts.
+- ~~Safe auto-registration opt-in only for complete supported operations and
+  owned account/card mappings.~~ *Superseded (2026-09-22):* no automatic write of any
+  kind; complete and ambiguous messages alike become drafts that require explicit
+  confirmation before SQLite changes. Owned account/card mappings only pre-fill a draft.
 - [ ] Scoped/revocable Shortcut pairing token; current base endpoint uses session
   JWT and is not a turnkey background Shortcut integration.
-- [ ] Durable inbox → SQLite receipt → acknowledgement, repeated delivery after
-  edits/deletions and cross-device conflict tests before autonomous ingestion.
+- [ ] Durable inbox → local review tray → acknowledgement, repeated delivery after
+  edits/deletions and cross-device conflict tests before any background ingestion.
+  Ingestion fills the tray; the receipt in SQLite is the draft's arrival, not a movement.
 - [ ] Actual iPhone Apple Pay transaction trigger, available fields, missing amount,
   duplicate triggers, offline catch-up and cancellation verified without bank execution.
 - [ ] Explain only deterministic facts, disclose partial records, and link supporting
   movements. Savings plans need goals/timeframe and explicit assumptions.
+- [ ] **Cost and abuse controls before the first paid call (backlog, not built):**
+  evaluate cost per model (input/output tokens, per request and per typical
+  conversation, for each candidate model) with owned test data; daily and monthly
+  limits per user, enforced server-side and shown in the app before they are hit; a
+  token budget per request and per conversation (prompt trimming, evidence caps,
+  a hard stop rather than a silent truncation); provider quotas and rate limits mapped
+  to graceful states (the disconnected note, "try later"), never a retry storm;
+  abuse protection (per-user and per-device rate limits, request signing tied to the
+  session, anomaly cut-offs, a kill switch the owner controls, no anonymous endpoint);
+  a monthly spend ceiling on the provider account and alerts before it. None of these
+  services exist yet and none is implemented in this phase.
 
 ### 3. Commitments and cards
 
@@ -1057,10 +1124,16 @@ safe areas, system text and separate currencies apply to every new screen.
   device-verified:** the amount field's typing feel and caret at the grouping
   transitions, the stacked rows and statistics at large text and on a narrow iPhone,
   the currency row and sheet, both themes, VoiceOver.
-- **Left for 23.1:** all screen copy, English release, the language preference screen,
-  `supportedLocales`, locale-aware `Money` and amount separators. **Noted, not done:**
-  the card face's fixed aspect ratio and the donut centre at the largest text sizes;
-  screen-local hardcoded `fontSize` values.
+- **Left for 23.1:** all screen copy, English release, the language and region
+  preferences (chosen independently, switchable in place), `supportedLocales`,
+  locale-aware `Money` and amount separators. **Noted, not done:** the card face's
+  fixed aspect ratio and the donut centre at the largest text sizes; screen-local
+  hardcoded `fontSize` values.
+- **Review follow-up, same day and PR:** two-line names at every size and
+  amount-aware stacking (`rowStacks`) in every name-beside-amount row; roadmap
+  reconciled (superseded notes, one AI draft-confirmation rule, AI cost and abuse
+  backlog, 23.1 language/region and in-place switch requirements, 24 per-account
+  currency and traceable conversions). 299 mobile tests.
 
 ### 2026-09-22 — Producto 22.1: UI clarity and form polish
 

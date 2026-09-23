@@ -98,9 +98,11 @@ bloquean la IA; nunca abren un camino de consumo ilimitado.
    endpoint base usa un JWT de sesión: **no copiar un JWT temporal ni un refresh
    token a un Atajo permanente**. Antes de habilitar automatización sin intervención,
    emitir credenciales revocables, acotadas solo a captura, con expiración y revocación.
-4. Incorporar bandeja local y UI de revisar/editar/deshacer. Solo activar auto-registro
-   si el usuario lo elige, el tipo/moneda/cuenta están resueltos, hay recibo único y
-   es una operación soportada. Préstamos/reintegros/cuotas incompletos piden aclaración.
+4. Incorporar bandeja local y UI de revisar/editar/deshacer. Todo lo que llega por
+   captura, Atajo, audio o bandeja es un **borrador**: solo Confirmar escribe en SQLite,
+   también cuando tipo, moneda y cuenta están resueltos y el recibo es único (el
+   "auto-registro" opcional que se mencionaba acá quedó reemplazado el 2026-09-22; ver
+   el roadmap). Préstamos/reintegros/cuotas incompletos piden aclaración.
 5. Evaluar frases argentinas reales autorizadas, ambigüedades, negaciones, preguntas,
    múltiples gastos, cuentas equivocadas, devoluciones, offline, 401, 429 y duplicados.
 6. Verificar RLS con dos usuarios en staging, TTL/retención/exportación/borrado,

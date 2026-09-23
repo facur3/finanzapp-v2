@@ -5,7 +5,7 @@ import * as Haptics from 'expo-haptics';
 import { advanceRecurringDate, formatMinorUnits, labelFromISO, recurringOccurrencesThrough, todayKey,
   type Currency, type RecurringFrequency, type RecurringRule } from '@finanzapp/domain';
 import { useLedger } from '../src/storage/LedgerProvider';
-import { ActionButton, AppText, CategoryBadge, EmptyState, ErrorMessage, IconButton, Money, PressFeedback, Screen, SectionTitle, Stat, StatRow, Surface } from '../src/ui/components';
+import { ActionButton, AppText, CategoryBadge, EmptyState, ErrorMessage, IconButton, Money, PressFeedback, Screen, SectionTitle, Stat, StatRow, Surface, useStacked } from '../src/ui/components';
 import { withCurrencyCode } from '../src/i18n/format';
 import { space, useCurrentDay, usePalette } from '../src/ui/theme';
 
@@ -99,18 +99,21 @@ function RecurringRow({ rule, accounts, day, last, busy, onToggle }: {
   const days = Math.round((Date.parse(rule.nextDateISO + 'T12:00:00Z') - Date.parse(day + 'T12:00:00Z')) / 86400000);
   const when = !rule.active ? 'Pausado' : days <= 0 ? 'Hoy' : days === 1 ? 'Mañana' : `En ${days} días`;
   const income = rule.kind === 'income';
+  const stacked = useStacked(account ? { minor: income ? rule.amountMinor : -rule.amountMinor, currency: account.currency, signed: true } : undefined);
   return <View style={{ flexDirection: 'row', alignItems: 'center', borderBottomColor: p.line, borderBottomWidth: last ? 0 : StyleSheet.hairlineWidth, opacity: rule.active ? 1 : 0.6 }}>
     <PressFeedback feedback="highlight" accessibilityRole="button" accessibilityLabel={`Editar recurrente ${rule.merchant}, ${FREQUENCY[rule.frequency].toLowerCase()}, ${formatMinorUnits(rule.amountMinor)} ${account?.currency ?? ''}, próximo ${date}`}
       onPress={() => router.push({ pathname: '/edit-recurring/[id]', params: { id: rule.id } })}
       containerStyle={{ flex: 1 }} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, paddingLeft: 16, minHeight: 64 }}>
       <CategoryBadge category={rule.category} kind={rule.kind} tone={income ? 'income' : 'neutral'} />
-      <View style={{ flex: 1, minWidth: 0, gap: 3 }}>
-        <AppText numberOfLines={2} style={{ fontWeight: '500' }}>{rule.merchant}</AppText>
-        <AppText secondary variant="footnote" numberOfLines={2}>{FREQUENCY[rule.frequency]} · {date}{account ? ' · ' + account.name : ''}</AppText>
-      </View>
-      <View style={{ alignItems: 'flex-end', gap: 3, maxWidth: '50%' }}>
-        {account && <Money minor={income ? rule.amountMinor : -rule.amountMinor} currency={account.currency} signed tone={income ? 'income' : 'expense'} />}
-        <AppText variant="caption" style={{ color: rule.active && days <= 1 ? p.warning : p.secondary, fontWeight: rule.active && days <= 1 ? '600' : '400' }}>{when}</AppText>
+      <View style={{ flex: 1, minWidth: 0, gap: 8, flexDirection: stacked ? 'column' : 'row', alignItems: stacked ? 'flex-start' : 'center' }}>
+        <View style={{ flex: stacked ? undefined : 1, minWidth: 0, gap: 3 }}>
+          <AppText numberOfLines={stacked ? undefined : 2} style={{ fontWeight: '500' }}>{rule.merchant}</AppText>
+          <AppText secondary variant="footnote" numberOfLines={stacked ? undefined : 2}>{FREQUENCY[rule.frequency]} · {date}{account ? ' · ' + account.name : ''}</AppText>
+        </View>
+        <View style={{ alignItems: stacked ? 'flex-start' : 'flex-end', gap: 3, maxWidth: stacked ? '100%' : '56%' }}>
+          {account && <Money minor={income ? rule.amountMinor : -rule.amountMinor} currency={account.currency} signed tone={income ? 'income' : 'expense'} />}
+          <AppText variant="caption" style={{ color: rule.active && days <= 1 ? p.warning : p.secondary, fontWeight: rule.active && days <= 1 ? '600' : '400' }}>{when}</AppText>
+        </View>
       </View>
     </PressFeedback>
     <View style={{ paddingHorizontal: 12 }}>

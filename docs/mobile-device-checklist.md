@@ -34,10 +34,19 @@ No native change is required in Expo Go: stop Metro, run `npm start -- --clear` 
   largest Dynamic Type: labels fit their segment (slightly smaller), never "…".
 - [ ] Inicio with two currencies at large text: the Gastos / Disponible control and the
   ARS / USD control stack vertically instead of squeezing.
-- [ ] Long names: an account "Cuenta sueldo Banco de la Provincia de Buenos Aires" and a
-  merchant of 60 characters in Movimientos, Recurrentes, Reportes → comercios, Deudas and
-  Categorías wrap to two lines while the amount stays whole on the right; at large text
-  the rows stack (amount under the name).
+- [ ] Long names at the default text size: an account "Cuenta sueldo Banco de la
+  Provincia de Buenos Aires" and a merchant of 60 characters in Movimientos, Cuentas,
+  Recurrentes, Inicio (categorías y próximos pagos), Reportes → comercios and
+  categorías, Deudas and Categorías wrap to two lines while the amount stays whole on
+  the right and never overlaps the name; the third line is cut with "…" only on the
+  name, never on the amount.
+- [ ] Long amounts at the default text size: an expense of $ 999.999.999,99 and one of
+  $ 9.999.999.999.999,99 (13 digits) in the same rows. On an iPhone 14 Pro the nine-digit
+  amount sits beside the name at full size and the 13-digit one moves under the name,
+  left-aligned, whole; on an iPhone SE / 13 mini (375 pt) both move under the name. A
+  −US$ 999.999.999,99 transfer inside an account does the same. No amount is ever
+  shrunk below its neighbours' size or cut.
+- [ ] Large text: every row above stacks (amount under the name), whatever the amount.
 - [ ] Reportes: the eyebrow "Gastado · ARS", Tarjetas "Deuda registrada · ARS",
   Recurrentes "Pagos · ARS" and the day header net amount never break between the words
   and the code or number.
