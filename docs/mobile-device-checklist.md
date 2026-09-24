@@ -1,5 +1,49 @@
 # Physical iPhone acceptance checklist
 
+## Producto 23.1B2 — translation of the remaining screens (pending device review)
+
+No native change: the installed **FinanzApp Dev** runs this PR from Metro (`git pull`,
+`npm install`, `npm run start:dev-client -- --clear`, reload); Expo Go works too. English
+is still **not** released: on the iPhone everything must read exactly as before, in
+Spanish. Share a private backup first.
+
+- [ ] Más footer reads "Producto 23.1B2" and still ends with the material and "Idioma:"
+  diagnostics in Spanish (e.g. "Liquid Glass · Idioma: módulo nativo").
+- [ ] Más: section titles, Finanzas rows with their counts ("2 tarjetas", "1 deuda"…), App y
+  datos rows, Idioma screen — same text as before.
+- [ ] Reportes: header, Pesos · ARS / Dólares · USD, month arrows, change vs last month,
+  trend and donut captions, VoiceOver on a bar and a slice, budgets, merchants, insights
+  ("Restaurantes superó…"), the day list "N gastos", category / day / comparison screens.
+  A day with one expense now reads "1 gasto registrado" (grammar fix).
+- [ ] Tarjetas: list, carousel VoiceOver ("Tarjeta 1 de 2"), card detail (Cierre,
+  Vencimiento, "Resumen abierto desde…", purchases/payments counts), Pagar tarjeta: the
+  payment screen title, "Pagar total", the default note ("Pago Visa"), the saved payment.
+  Nueva/Editar tarjeta form, validation (closing day 0 → message), Archivar alert.
+- [ ] Deudas y cobros: list sections Debo / Me deben, a debt detail, Registrar pago and
+  Registrar cobro (title, default note, locked side reads "Debo · Juan"), Movimientos row
+  "Caja → Debo · Juan", the transfer detail Desde/Hacia, the debt form and its alert.
+- [ ] Cuentas: list, account detail (Gastado este mes, Recurrentes "N activos"), Nueva
+  cuenta, Editar cuenta and the balance-correction alert text.
+- [ ] Presupuestos: month header and arrows, overall card, category rows, "Por categoría"
+  caption, VoiceOver sentences, the form (Pesos · ARS / Dólares · USD), Eliminar alert.
+- [ ] Recurrentes: sections (Próximos 30 días, Activos, Pausados), frequency words,
+  "En N días", pause/resume VoiceOver, the form and its past-date message.
+- [ ] Categorías: list with counts, a built-in (Comida) and a custom one, edit a built-in
+  and save only a new colour: the name stays "Comida" and nothing else changes; icon and
+  colour names in the picker; archive/restore; "Ya existe una categoría llamada «…»".
+- [ ] Copia de seguridad: export sheet texts, import review rows and counts, the conflict
+  message (one record reads "Hay 1 registro…"), the too-large file message. Export a
+  backup and import it again: nothing is duplicated.
+- [ ] Asistente: title, suggestions, composer placeholder and voice affordance, the
+  disconnected note, a draft card (Confirmar / Editar / Descartar) if the fixture build
+  is used, evidence links "Ver movimientos / categoría / presupuesto".
+- [ ] A built-in category you renamed (if any) shows its new name in Reportes → budgets and
+  insights, like in Presupuestos (deliberate consistency fix).
+- [ ] Errors in Spanish as before (future date in a recurring rule, duplicate category).
+- [ ] Largest Dynamic Type, light and dark, Reduce Transparency and Reduce Motion: no new
+  truncation or overlap on the screens above; VoiceOver reads the same sentences.
+- [ ] No account, card, debt, movement, budget, rule or category changed.
+
 ## Producto 23.1B1 — translation of navigation, Inicio, Movimientos and forms (pending device review)
 
 No native change: the installed **FinanzApp Dev** runs this PR from Metro. From

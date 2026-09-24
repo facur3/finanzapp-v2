@@ -4,6 +4,7 @@ import { test } from 'node:test';
 import { runInNewContext } from 'node:vm';
 import ts from 'typescript';
 import { MATERIAL_LABELS, composerBottomPadding, drawReason, glassDisabledBy, loadReason, materialFor, subscribeReduceTransparency } from '../src/ui/material-policy.ts';
+import { translator } from '../src/i18n/messages.ts';
 import * as i18nFormat from '../src/i18n/format.ts';
 import { bindLocale } from '../src/i18n/bind.ts';
 const i18nProvider = { useI18n: () => bindLocale('es-AR') };
@@ -40,6 +41,17 @@ test('glass is drawn only with Liquid Glass available, the API present and Reduc
   assert.equal(glassDisabledBy({ EXPO_PUBLIC_DISABLE_GLASS: '1' }), true);
   assert.equal(glassDisabledBy({ EXPO_PUBLIC_DISABLE_GLASS: '0' }), false);
   assert.equal(glassDisabledBy({}), false);
+});
+
+test('23.1B2: every material label is a catalogue key, read in Spanish as it always was and in English; the reason ids stay the same', () => {
+  const es = translator('es'), en = translator('en');
+  assert.equal(Object.keys(MATERIAL_LABELS).join(','), 'disabled,expo-go,platform,not-registered,unavailable,api,reduce-transparency,glass');
+  assert.equal(Object.values(MATERIAL_LABELS).map(key => es(key)).join('|'), ['Material opaco (desactivado)', 'Material opaco (Expo Go)', 'Material opaco',
+    'Material opaco (sin módulo nativo)', 'Material opaco (iOS sin Liquid Glass)', 'Material opaco (API no disponible)', 'Material opaco (Reducir transparencia)', 'Liquid Glass'].join('|'));
+  for (const key of Object.values(MATERIAL_LABELS)) {
+    assert.notEqual(en(key), key, key + ' resolves in English');
+    assert.ok(key === 'settings.material.glass' || /^Opaque material/.test(en(key)), en(key));
+  }
 });
 
 test('the Reduce Transparency subscription feature-detects the API and never throws: missing, rejecting or throwing keeps opaque', async () => {

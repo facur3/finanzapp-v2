@@ -3,12 +3,14 @@ import { Platform, StyleSheet, TextInput, View, useWindowDimensions } from 'reac
 import Animated, { useAnimatedKeyboard, useAnimatedStyle } from 'react-native-reanimated';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useI18n } from '../i18n/provider';
 import { AppText, PressFeedback } from './components';
 import { ControlSurface, useMaterial } from './material';
 import { composerBottomPadding } from './material-policy';
 import { space, usePalette } from './theme';
 
-export const COMPOSER_PLACEHOLDER = 'Preguntá o registrá algo…';
+/** The placeholder's catalogue key. */
+export const COMPOSER_PLACEHOLDER = 'assistant.composer.placeholder' as const;
 /** The composer grows with the message up to about five lines, then scrolls inside. */
 export const COMPOSER_MAX_LINES = 5;
 const LINE_HEIGHT = 22;
@@ -35,6 +37,7 @@ export function AssistantComposer({ value, onChange, onSend, onStop, busy, disab
   note?: ReactNode;
 }) {
   const p = usePalette();
+  const { t } = useI18n();
   const material = useMaterial();
   const insets = useSafeAreaInsets();
   const { fontScale } = useWindowDimensions();
@@ -45,19 +48,19 @@ export function AssistantComposer({ value, onChange, onSend, onStop, busy, disab
     ...(p.isDark ? {} : styles.barShadow) };
   return <KeyboardSpace bottomInset={insets.bottom}>
     <ControlSurface material={material} style={styles.bar} opaque={opaque}>
-      <TextInput value={value} onChangeText={onChange} multiline editable={!disabled} placeholder={COMPOSER_PLACEHOLDER} placeholderTextColor={p.tertiary}
-        accessibilityLabel="Mensaje para el Asistente" accessibilityHint="Escribí una pregunta sobre tu dinero o un gasto para registrar"
+      <TextInput value={value} onChangeText={onChange} multiline editable={!disabled} placeholder={t(COMPOSER_PLACEHOLDER)} placeholderTextColor={p.tertiary}
+        accessibilityLabel={t('assistant.composer.label')} accessibilityHint={t('assistant.composer.hint')}
         selectionColor={p.primary} keyboardAppearance={p.isDark ? 'dark' : 'light'} textAlignVertical="center"
         style={[styles.input, { color: p.text, maxHeight, lineHeight: LINE_HEIGHT }]} />
-      <PressFeedback feedback="opacity" accessibilityRole="button" accessibilityLabel="Dictar" accessibilityHint="Todavía no disponible en esta versión"
+      <PressFeedback feedback="opacity" accessibilityRole="button" accessibilityLabel={t('assistant.composer.dictate')} accessibilityHint={t('assistant.composer.dictateHint')}
         onPress={() => setMicNote(current => !current)} style={styles.round}>
         <Ionicons name="mic-outline" size={22} color={p.secondary} accessible={false} />
       </PressFeedback>
       {busy
-        ? <PressFeedback accessibilityRole="button" accessibilityLabel="Detener respuesta" onPress={onStop} style={styles.round}>
+        ? <PressFeedback accessibilityRole="button" accessibilityLabel={t('assistant.composer.stop')} onPress={onStop} style={styles.round}>
           <View style={[styles.send, { backgroundColor: p.inset }]}><Ionicons name="stop" size={14} color={p.text} accessible={false} /></View>
         </PressFeedback>
-        : <PressFeedback accessibilityRole="button" accessibilityLabel="Enviar" accessibilityState={{ disabled: !canSend }} disabled={!canSend}
+        : <PressFeedback accessibilityRole="button" accessibilityLabel={t('assistant.composer.send')} accessibilityState={{ disabled: !canSend }} disabled={!canSend}
           onPress={onSend} style={styles.round}>
           <View style={[styles.send, { backgroundColor: canSend ? p.primaryFill : p.inset }]}>
             <Ionicons name="arrow-up" size={18} color={canSend ? p.onPrimary : p.tertiary} accessible={false} />
@@ -65,7 +68,7 @@ export function AssistantComposer({ value, onChange, onSend, onStop, busy, disab
         </PressFeedback>}
     </ControlSurface>
     {micNote && <AppText secondary variant="footnote" style={styles.note} accessibilityLiveRegion="polite">
-      El dictado llega con la versión instalable: la transcripción de voz necesita el development build, no Expo Go.
+      {t('assistant.composer.dictationNote')}
     </AppText>}
     {note}
   </KeyboardSpace>;

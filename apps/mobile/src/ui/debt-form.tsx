@@ -5,6 +5,7 @@ import { randomUUID } from 'expo-crypto';
 import * as Haptics from 'expo-haptics';
 import { parseMinorUnits, samePersonalDebtProfile, todayKey, validateAccount, validatePersonalDebtProfile,
   type Account, type Currency, type DebtDirection, type PersonalDebtProfile } from '@finanzapp/domain';
+import { useI18n } from '../i18n/provider';
 import { useLedger } from '../storage/LedgerProvider';
 import { ActionButton, AmountField, AppText, Choices, DetailRow, ErrorMessage, Field, IconButton, Screen, Surface } from './components';
 import { DateField } from './form-controls';
@@ -17,6 +18,7 @@ type PendingCreate = { account: Account; debt: PersonalDebtProfile };
  * the principal) or edits its profile. Amounts change only through payments. */
 export function DebtForm({ original }: { original?: PersonalDebtProfile }) {
   const { snapshot, addDebt, saveDebt } = useLedger();
+  const { t } = useI18n();
   const account = snapshot?.accounts.find(item => item.id === original?.accountId);
   const [before] = useState(original);
   const [identity] = useState(() => ({ id: randomUUID(), accountId: randomUUID(), createdAt: new Date().toISOString() }));
@@ -68,11 +70,12 @@ export function DebtForm({ original }: { original?: PersonalDebtProfile }) {
         let submission = pendingCreate;
         if (!submission) {
           const principal = parseMinorUnits(amount);
-          if (principal <= 0) throw new Error('Ingresá un monto mayor que cero.');
+          if (principal <= 0) throw new Error('debts.form.amountPositive'); // A catalogue key, translated when shown (ErrorMessage).
           const debt: PersonalDebtProfile = { ...profileBase(), active: true, revision: 0, updatedAt: identity.createdAt };
           const newAccount: Account = {
             id: identity.accountId,
-            name: (direction === 'owed_by_me' ? 'Debo · ' : 'Me deben · ') + counterparty.trim(),
+            // Stored name of the hidden account, not an interface label: it stays the same in every language.
+            name: (direction === 'owed_by_me' ? 'Debo · ' : 'Me deben · ') + counterparty.trim(), // i18n-ignore: stored data
             currency,
             openingMinor: direction === 'owed_by_me' ? -principal : principal,
             createdAt: identity.createdAt,
@@ -87,7 +90,7 @@ export function DebtForm({ original }: { original?: PersonalDebtProfile }) {
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       saving.current = false; close();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'No pudimos guardar la deuda. Reintentá el mismo envío.');
+      setError(cause instanceof Error ? cause.message : 'debts.form.saveFailed');
     } finally { saving.current = false; setBusy(false); }
   }
 
@@ -100,7 +103,7 @@ export function DebtForm({ original }: { original?: PersonalDebtProfile }) {
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       saving.current = false; close();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'No pudimos archivar la deuda. Reintentá el mismo cambio.');
+      setError(cause instanceof Error ? cause.message : 'debts.form.archiveFailed');
     } finally { saving.current = false; setBusy(false); }
   }
   function archive() {
@@ -108,52 +111,52 @@ export function DebtForm({ original }: { original?: PersonalDebtProfile }) {
     if (pendingArchive) { void commitArchive(pendingArchive); return; }
     const submission = { ...before, active: !before.active, revision: before.revision + 1, updatedAt: new Date().toISOString() };
     if (!before.active) { void commitArchive(submission); return; }
-    Alert.alert('¿Archivar esta deuda?', 'Los pagos o cobros anteriores siguen guardados. Solo deja de aparecer como pendiente.', [
-      { text: 'Cancelar', style: 'cancel' },
-      { text: 'Archivar', style: 'destructive', onPress: () => { void commitArchive(submission); } },
+    Alert.alert(t('debts.form.archiveTitle'), t('debts.form.archiveDetail'), [
+      { text: t('common.cancel'), style: 'cancel' },
+      { text: t('debts.form.archiveConfirm'), style: 'destructive', onPress: () => { void commitArchive(submission); } },
     ]);
   }
 
   return <Screen>
-    <Stack.Screen options={{ title: before ? 'Editar deuda' : 'Nueva deuda', gestureEnabled: !busy,
-      headerLeft: () => <IconButton name="close" label="Cerrar" onPress={close} disabled={busy} /> }} />
+    <Stack.Screen options={{ title: t(before ? 'nav.titles.editDebt' : 'nav.titles.newDebt'), gestureEnabled: !busy,
+      headerLeft: () => <IconButton name="close" label={t('common.close')} onPress={close} disabled={busy} /> }} />
 
     {before && account ? <Surface grouped>
-      <DetailRow label={owed ? 'Debo a' : 'Me debe'} value={before.counterparty} />
-      <DetailRow label="Moneda" value={account.currency} last />
+      <DetailRow label={t(owed ? 'debts.form.owedTo' : 'debts.form.owedBy')} value={before.counterparty} />
+      <DetailRow label={t('debts.form.currency')} value={account.currency} last />
     </Surface> : <>
       <Choices value={direction} onChange={setDirection} disabled={locked}
-        options={[{ value: 'owed_by_me', label: 'Debo' }, { value: 'owed_to_me', label: 'Me deben' }]} />
-      <AmountField label={owed ? 'Monto que debés' : 'Monto que te deben'} currency={currency} value={amount}
+        options={[{ value: 'owed_by_me', label: t('debts.form.owed') }, { value: 'owed_to_me', label: t('debts.form.receivable') }]} />
+      <AmountField label={t(owed ? 'debts.form.amountOwed' : 'debts.form.amountReceivable')} currency={currency} value={amount}
         onChangeText={value => { setAmount(value); setError(null); }} editable={!locked} />
       <Choices value={currency} onChange={setCurrency} disabled={locked}
-        options={[{ value: 'ARS', label: 'Pesos · ARS' }, { value: 'USD', label: 'Dólares · USD' }]} />
+        options={[{ value: 'ARS', label: t('debts.form.pesos') }, { value: 'USD', label: t('debts.form.dollars') }]} />
     </>}
 
-    <Field label={owed ? 'Persona o entidad' : 'Persona o cliente'} value={counterparty} onChangeText={setCounterparty}
-      placeholder="Nombre o concepto" maxLength={80} autoCapitalize="words" editable={!locked} />
+    <Field label={t(owed ? 'debts.form.counterpartyOwed' : 'debts.form.counterpartyReceivable')} value={counterparty} onChangeText={setCounterparty}
+      placeholder={t('debts.form.counterpartyPlaceholder')} maxLength={80} autoCapitalize="words" editable={!locked} />
 
     <View style={{ gap: space.s }}>
-      <AppText secondary variant="footnote" style={{ fontWeight: '500' }}>Vencimiento</AppText>
+      <AppText secondary variant="footnote" style={{ fontWeight: '500' }}>{t('debts.form.due')}</AppText>
       <Choices value={dueMode} onChange={setDueMode} disabled={locked}
-        options={[{ value: 'none', label: 'Sin fecha' }, { value: 'dated', label: 'Con fecha' }]} />
+        options={[{ value: 'none', label: t('debts.form.noDate') }, { value: 'dated', label: t('debts.form.dated') }]} />
     </View>
     {dueMode === 'dated' && <Surface grouped>
-      <DateField value={dueDate} onChange={setDueDate} disabled={locked} allowFuture label="Fecha límite" />
+      <DateField value={dueDate} onChange={setDueDate} disabled={locked} allowFuture label={t('debts.form.dueDate')} />
     </Surface>}
 
-    <Field label="Nota (opcional)" value={note} onChangeText={setNote} maxLength={120} autoCapitalize="sentences" editable={!locked} />
+    <Field label={t('debts.form.note')} value={note} onChangeText={setNote} maxLength={120} autoCapitalize="sentences" editable={!locked} />
 
     <AppText secondary variant="footnote">
-      {owed ? 'Cada pago que registres sale de una cuenta y baja este saldo.' : 'Cada cobro que registres entra a una cuenta y baja este saldo.'} No se crean gastos ni ingresos al saldar una deuda.
+      {t(owed ? 'debts.form.explainOwed' : 'debts.form.explainReceivable')}
     </AppText>
     <ErrorMessage message={error} />
     {(pendingCreate || pendingEdit) && error && <AppText secondary variant="footnote">
-      El envío quedó congelado para que Reintentar no cree otra obligación ni aplique cambios dos veces.
+      {t('debts.form.frozenNote')}
     </AppText>}
-    <ActionButton label={error && (pendingCreate || pendingEdit) ? 'Reintentar guardado' : before ? 'Guardar cambios' : 'Crear deuda'}
+    <ActionButton label={error && (pendingCreate || pendingEdit) ? t('common.retrySave') : before ? t('common.saveChanges') : t('debts.form.create')}
       onPress={save} busy={busy} disabled={before ? !counterparty.trim() : !counterparty.trim() || !amount.trim()} />
-    {before && <ActionButton label={pendingArchive && error ? 'Reintentar' : before.active ? 'Archivar deuda' : 'Reactivar deuda'}
+    {before && <ActionButton label={t(pendingArchive && error ? 'debts.form.retry' : before.active ? 'debts.form.archive' : 'debts.form.reactivate')}
       onPress={archive} secondary disabled={busy || !!pendingEdit} />}
   </Screen>;
 }

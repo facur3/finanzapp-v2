@@ -13,7 +13,8 @@ import { disconnectedAssistant } from '../src/assistant/client.ts';
 import { FIXTURE_ANSWER, FIXTURE_DRAFT, FIXTURE_DRAFT_NO_ACCOUNT, FIXTURE_FACTS, fixtureAssistant } from '../src/assistant/fixtures.ts';
 import * as i18nFormat from '../src/i18n/format.ts';
 import { bindLocale } from '../src/i18n/bind.ts';
-const i18nProvider = { useI18n: () => bindLocale('es-AR') };
+import type { AppLocale } from '../src/i18n/locale.ts';
+const es = bindLocale('es-AR');
 
 // Producto 21: the Assistant screen's handlers, with React, native hosts and the
 // UI modules replaced by descriptors and a scripted client. Not a rendered
@@ -41,9 +42,11 @@ function scriptedClient(mode: AssistantClient['mode'] = 'remote') {
   return { client, asks, reply(events: AssistantEvent[]) { queue = events; release?.(); release = null; }, get waiting() { return release !== null; } };
 }
 
-function harness({ client, accounts = [visa, cash, usd], data = entries, params = {}, reduced = false, addEntry }: {
-  client: AssistantClient; accounts?: domain.Account[]; data?: domain.Entry[]; params?: Record<string, string>; reduced?: boolean; addEntry?: (entry: domain.Entry) => Promise<void>;
+function harness({ client, accounts = [visa, cash, usd], data = entries, params = {}, reduced = false, addEntry, locale = 'es-AR' }: {
+  client: AssistantClient; accounts?: domain.Account[]; data?: domain.Entry[]; params?: Record<string, string>; reduced?: boolean; addEntry?: (entry: domain.Entry) => Promise<void>; locale?: AppLocale;
 }) {
+  let i18n = bindLocale(locale);
+  const i18nProvider = { useI18n: () => i18n };
   const source = readFileSync(new URL('../app/(tabs)/assistant.tsx', import.meta.url), 'utf8');
   const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText;
   const jsx = (type: unknown, props: Record<string, unknown>) => ({ type, props });
@@ -100,7 +103,7 @@ function harness({ client, accounts = [visa, cash, usd], data = entries, params 
     const screen = nodes(root).find(node => node.type === 'Tabs.Screen')!;
     return { root, list, items, composer, screen, empty: list.props.ListEmptyComponent as Node, messages: list.props.data as conversation.Message[] };
   };
-  return { render, pushed, written, scrolled, haptics, effects };
+  return { render, pushed, written, scrolled, haptics, effects, setLocale: (next: AppLocale) => { i18n = bindLocale(next); } };
 }
 function nodes(value: any): Node[] {
   if (!value || typeof value !== 'object') return [];
@@ -117,7 +120,8 @@ test('a new conversation is quiet: no messages, four suggestions, an empty compo
   const { messages, empty, composer, screen, list } = view.render();
   assert.equal(messages.length, 0);
   assert.equal(empty.type, 'Suggestions');
-  assert.deepEqual([...empty.props.items], [...conversation.SUGGESTIONS]);
+  assert.deepEqual([...empty.props.items], conversation.SUGGESTIONS.map(key => es.t(key)));
+  assert.deepEqual([...empty.props.items], ['¿Por qué gasté más este mes?', '¿Cuánto gasté en comida?', 'Registrar un gasto', '¿Cómo voy con mi presupuesto?']);
   assert.equal(empty.props.items.length, 4);
   assert.equal(composer.props.value, '');
   assert.equal(composer.props.busy, false);
@@ -208,10 +212,10 @@ test('an answer renders its text and evidence rows/links from the cited facts, a
   assert.equal(find([answer], 'AssistantText')[0].props.status, 'done');
   assert.equal(find([answer], 'AssistantText')[0].props.text, FIXTURE_ANSWER.message);
   const proof = find([answer], 'AnswerEvidence')[0];
-  assert.deepEqual(proof.props.content.rows.map((row: any) => row.label), ['Gastos registrados', 'Restaurantes', 'Supermercado', 'Transporte']);
+  assert.deepEqual(proof.props.content.rows.map((row: any) => conversation.evidenceLabel(row)), ['Gastos registrados', 'Restaurantes', 'Supermercado', 'Transporte']);
   assert.equal(proof.props.content.rows[1].amountMinor, 4250000);
   assert.equal(proof.props.currency, 'ARS');
-  assert.deepEqual(proof.props.content.links.map((link: any) => link.label), ['Ver movimientos']);
+  assert.deepEqual(proof.props.content.links.map((link: any) => link.id), ['movements']);
   proof.props.onOpen(proof.props.content.links[0].href);
   assert.deepEqual(view.pushed, ['/activity']);
   assert.equal(screen.composer.props.busy, false);
@@ -223,7 +227,7 @@ test('an answer renders its text and evidence rows/links from the cited facts, a
   single.reply([{ type: 'result', result: { kind: 'answer', draft: null, message: 'En Supermercado llevás $121.200.', factIds: ['current.category.1'] }, facts: FIXTURE_FACTS }]);
   await settle();
   const links = find([view2.render().items[1]], 'AnswerEvidence')[0].props.content.links;
-  assert.deepEqual(links.map((link: any) => link.label), ['Ver categoría', 'Ver movimientos']);
+  assert.deepEqual(links.map((link: any) => link.id), ['category', 'movements']);
   find([view2.render().items[1]], 'AnswerEvidence')[0].props.onOpen(links[0].href);
   assert.equal(JSON.stringify(view2.pushed.at(-1)), JSON.stringify({ pathname: '/spending-detail', params: { currency: 'ARS', startISO: '2026-09-01', endISO: '2026-09-21', category: 'Supermercado' } }));
 });
@@ -394,7 +398,8 @@ test('the fixture client shows a visible test banner and a confirm never writes'
   screen = view.render();
   assert.equal(view.written.length, 0, 'fixture drafts are examples, never records');
   assert.equal(find([screen.items[1]], 'DraftCard')[0].props.content.status, 'pending');
-  assert.match(String(screen.messages.at(-1)?.text), /Vista de prueba/);
+  assert.equal(screen.messages.at(-1)?.text, 'assistant.fixtureConfirmRefused', 'the note is stored as its key');
+  assert.match(es.errorText(String(screen.messages.at(-1)?.text)), /Vista de prueba/);
   assert.equal(view.haptics.includes('success'), false);
 });
 
@@ -452,4 +457,78 @@ test('the Assistant is the centre tab and the Home quick action lands on it; the
   assert.match(actions, /router\.navigate\(\{ pathname: '\/assistant'/, 'navigate, not push: switching to the tab, never stacking a copy');
   assert.throws(() => readFileSync(new URL('../app/assistant-preview.tsx', import.meta.url)));
   assert.throws(() => readFileSync(new URL('../app/assistant.tsx', import.meta.url)));
+});
+
+test('English: the screen\'s own words are English, the model\'s answer and the user\'s words are untouched, and a confirmed draft writes the same Entry', async () => {
+  const scripted = scriptedClient();
+  const view = harness({ client: scripted.client, locale: 'en-AR' });
+  let screen = view.render();
+  assert.equal(screen.screen.props.options.title, 'Assistant');
+  assert.deepEqual([...screen.empty.props.items], ['Why did I spend more this month?', 'How much did I spend on food?', 'Log an expense', 'How am I doing on my budget?']);
+  // A tapped chip sends its English text; an English question is still explained against evidence.
+  screen.empty.props.onPick('Why did I spend more this month?');
+  await tick();
+  assert.equal(scripted.asks[0].text, 'Why did I spend more this month?');
+  assert.equal(scripted.asks[0].action, 'explain');
+  // Protocol labels sent to the server do not follow the interface language.
+  assert.ok(scripted.asks[0].facts.every((fact: any) => /^(Gastos registrados|Ingresos registrados|Categoría de gasto: )/.test(fact.label)));
+  scripted.reply([{ type: 'result', result: FIXTURE_ANSWER, facts: FIXTURE_FACTS }]);
+  await settle();
+  screen = view.render();
+  assert.equal(find([screen.items[1]], 'AssistantText')[0].props.text, FIXTURE_ANSWER.message, 'the model\'s words are content, never translated');
+  assert.equal(typeof screen.screen.props.options.headerRight().props.label, 'string');
+  assert.equal(screen.screen.props.options.headerRight().props.label, 'New chat');
+  // The app's own question reads in English; the account chips are the user's names; choosing writes nothing yet.
+  const ask = scriptedClient();
+  const english = harness({ client: ask.client, locale: 'en-AR' });
+  english.render().empty.props.onPick('Spent 18k at the grocery store');
+  await tick();
+  assert.equal(ask.asks[0].action, 'parse');
+  ask.reply([{ type: 'result', result: FIXTURE_DRAFT_NO_ACCOUNT, facts: [] }]);
+  await settle();
+  let items = english.render().items;
+  assert.equal(find([items[1]], 'AssistantText')[0].props.text, 'What did you pay with?');
+  const choices = find([items[1]], 'ClarificationChoices')[0];
+  assert.equal(JSON.stringify(choices.props.options), JSON.stringify([{ id: 'visa', label: 'Visa Galicia' }, { id: 'cash', label: 'Efectivo' }]), 'account names are never translated');
+  choices.props.onChoose(choices.props.options[0], 'Visa Galicia');
+  items = english.render().items;
+  assert.equal(find([items[2]], 'UserMessage')[0].props.text, 'Visa Galicia');
+  assert.equal(find([items[3]], 'AssistantText')[0].props.text, 'Review the draft before saving it.');
+  // The same question follows a language change already on screen: it is stored as a key.
+  english.setLocale('es-AR');
+  assert.equal(find([english.render().items[1]], 'AssistantText')[0].props.text, '¿Con qué lo pagaste?');
+  english.setLocale('en-AR');
+  find([english.render().items[3]], 'DraftCard')[0].props.onConfirm();
+  await settle();
+  assert.equal(english.written.length, 1);
+  // The same flow in Spanish writes the identical Entry: language never reaches the ledger.
+  const spanishAsk = scriptedClient();
+  const spanish = harness({ client: spanishAsk.client });
+  spanish.render().empty.props.onPick('Gasté 18 mil en el súper');
+  await tick();
+  spanishAsk.reply([{ type: 'result', result: FIXTURE_DRAFT_NO_ACCOUNT, facts: [] }]);
+  await settle();
+  const spanishChoices = find([spanish.render().items[1]], 'ClarificationChoices')[0];
+  spanishChoices.props.onChoose(spanishChoices.props.options[0], 'Visa Galicia');
+  find([spanish.render().items[3]], 'DraftCard')[0].props.onConfirm();
+  await settle();
+  const stable = (written: domain.Entry[]) => JSON.stringify(written.map(({ createdAt: _stamp, ...entry }) => entry));
+  assert.equal(stable(english.written), stable(spanish.written), 'identical except the write timestamp');
+  assert.equal(english.written[0].category, 'Supermercado', 'the stored category stays the stored string');
+  // Notes are stored as keys and read in English; a remote failure's specific message is shown through errorText.
+  const offline = scriptedClient();
+  const noted = harness({ client: offline.client, locale: 'en-AR' });
+  noted.render().empty.props.onPick('How much did I spend on food?');
+  await tick();
+  offline.reply([{ type: 'error', reason: 'offline', message: '' }]);
+  await settle();
+  const note = noted.render().messages[1];
+  assert.equal(note.text, 'assistant.reasons.offline');
+  assert.equal(bindLocale('en-AR').errorText(note.text), 'No connection. Your transactions didn’t change; you can retry.');
+  // The disconnected caption and the test banner.
+  const quiet = harness({ client: disconnectedAssistant(), locale: 'en-AR' });
+  const caption = nodes(quiet.render().composer.props.note).find(node => node.type === 'AppText')!;
+  assert.equal(caption.props.children, 'Not connected in this version. What you type stays on your iPhone.');
+  const banner = nodes(harness({ client: fixtureAssistant(0), locale: 'en-AR' }).render().root).filter(node => node.type === 'AppText').map(node => String(node.props.children));
+  assert.ok(banner.includes('Test view: sample replies, nothing is saved.'));
 });

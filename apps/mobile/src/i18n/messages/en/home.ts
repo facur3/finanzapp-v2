@@ -1,0 +1,59 @@
+import type { Messages } from '../../messages.ts';
+
+/** Inicio: the hero, the budget card, upcoming commitments, the category ranking and the quick actions. */
+export const home: Pick<Messages, 'home' | 'budgetStatus' | 'quickActions'> = {
+  home: {
+    emptyTitle: 'Understand your spending.',
+    emptyDetail: 'Choose an account to group your transactions. You can start without entering your bank balance.',
+    start: 'Get started',
+    spending: 'Spending',
+    available: 'Available',
+    recordedBalance: 'Recorded balance',
+    availableHelp: 'The money recorded in your accounts in this currency: opening balance plus income, minus expenses and transfers. '
+      + 'It excludes cards and debts, and it is not a bank balance or your net worth.',
+    spendingOutOfRange: 'The total is beyond the range we can show precisely. Your transactions are still saved.',
+    balanceOutOfRange: 'The total balance is beyond the range we can show precisely. Your accounts are still saved.',
+    accounts: { one: '{count} account', other: '{count} accounts' },
+    monthBudget: 'Budget this month',
+    whereSpent: 'Where your money went',
+    reports: 'Reports',
+    categoriesEmpty: 'Your categories appear once you record an expense this month.',
+    categoriesInActivity: 'The breakdown is available in your transactions.',
+    upcoming: 'Coming up',
+    recent: 'Latest transactions',
+    recentEmpty: 'No transactions this month yet.',
+    rankingLabel: '{name}, {amount}, {share} of this month’s spending',
+    rankingHint: 'Opens this category’s transactions this month',
+    budget: {
+      general: 'Overall budget',
+      exceeded: 'over',
+      left: 'remaining',
+      of: 'of {amount} · {percent}%',
+      categories: { one: '{count} category', other: '{count} categories' },
+      exceededCount: { one: '{count} over', other: '{count} over' },
+      perCategory: 'Category limit',
+      labelLeft: '{title}: {amount} left of {total}, {percent} percent used.',
+      labelExceeded: '{title}: over by {amount} of {total}, {percent} percent used.',
+    },
+    upcomingRow: {
+      today: 'Today',
+      tomorrow: 'Tomorrow',
+      inDays: { one: 'In {count} day', other: 'In {count} days' },
+      label: '{merchant}, {amount}, next payment {date}',
+    },
+  },
+  budgetStatus: {
+    inOrder: { one: '{count} category on track', other: '{count} categories on track' },
+    exceeded: { one: '{count} category over', other: '{count} categories over' },
+  },
+  quickActions: {
+    assistant: 'Assistant',
+    openAssistant: 'Open the Assistant',
+    expense: 'Expense',
+    recordExpense: 'Record an expense',
+    income: 'Income',
+    recordIncome: 'Record income',
+    transfer: 'Transfer',
+    transferBetween: 'Transfer between accounts',
+  },
+};

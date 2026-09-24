@@ -7,6 +7,7 @@ import { AppText, CategoryBadge, Money, PressFeedback, useStacked } from './comp
 import { useCategoryLook } from './category-hues';
 import { spendingShare } from './report-presentation';
 import { timing } from './motion';
+import { useI18n } from '../i18n/provider';
 import { usePalette, useReduceMotion } from './theme';
 
 function ShareBar({ fraction, color }: { fraction: number; color: string }) {
@@ -26,18 +27,20 @@ function ShareBar({ fraction, color }: { fraction: number; color: string }) {
   </View>;
 }
 
-export function CategorySpendingRow({ category, totalMinor, currency, onPress, last = false, compact = false, periodName = 'mes' }: {
+/** A category's share of the month's spending, with a bar. */
+export function CategorySpendingRow({ category, totalMinor, currency, onPress, last = false, compact = false }: {
   category: CategorySpending; totalMinor: number; currency: Currency;
-  onPress: () => void; last?: boolean; compact?: boolean; periodName?: string;
+  onPress: () => void; last?: boolean; compact?: boolean;
 }) {
   const p = usePalette();
+  const { t, locale } = useI18n();
   const { hex: color, label: name } = useCategoryLook(category.category);
-  const { fraction, label } = spendingShare(category.amountMinor, totalMinor);
-  const count = category.count === 1 ? '1 gasto' : category.count + ' gastos';
+  const { fraction, label } = spendingShare(category.amountMinor, totalMinor, locale);
+  const count = t('count.expenses', { count: category.count });
   const stacked = useStacked({ minor: category.amountMinor, currency });
   return <PressFeedback feedback="highlight" accessibilityRole="button"
-    accessibilityLabel={`${name}, ${formatMinorUnits(category.amountMinor)} ${currency}, ${label} del gasto del ${periodName}, ${count}`}
-    accessibilityHint={"Abre los movimientos de esta categoría en el " + periodName + " seleccionado"}
+    accessibilityLabel={t('reports.chart.categoryLabel', { name, amount: formatMinorUnits(category.amountMinor), currency, share: label, count })}
+    accessibilityHint={t('reports.chart.categoryHint')}
     onPress={onPress} style={{ paddingHorizontal: 16, paddingVertical: 16, flexDirection: 'row', gap: 12, alignItems: 'center',
       borderBottomWidth: last ? 0 : StyleSheet.hairlineWidth, borderBottomColor: p.line }}>
     <CategoryBadge category={category.category} />
@@ -58,13 +61,14 @@ export function CategoryLegendRow({ category, totalMinor, currency, onPress, las
   category: CategorySpending; totalMinor: number; currency: Currency; onPress: () => void; last?: boolean;
 }) {
   const p = usePalette();
+  const { t, locale } = useI18n();
   const name = useCategoryLook(category.category).label;
-  const { label } = spendingShare(category.amountMinor, totalMinor);
-  const count = category.count === 1 ? '1 gasto' : category.count + ' gastos';
+  const { label } = spendingShare(category.amountMinor, totalMinor, locale);
+  const count = t('count.expenses', { count: category.count });
   const stacked = useStacked({ minor: category.amountMinor, currency });
   return <PressFeedback feedback="highlight" accessibilityRole="button"
-    accessibilityLabel={`${name}, ${formatMinorUnits(category.amountMinor)} ${currency}, ${label} del gasto del mes, ${count}`}
-    accessibilityHint="Abre los movimientos de esta categoría en el mes seleccionado"
+    accessibilityLabel={t('reports.chart.categoryLabel', { name, amount: formatMinorUnits(category.amountMinor), currency, share: label, count })}
+    accessibilityHint={t('reports.chart.categoryHint')}
     onPress={onPress} style={{ paddingHorizontal: 16, paddingVertical: 12, minHeight: 60, flexDirection: 'row', gap: 12, alignItems: 'center',
       borderBottomWidth: last ? 0 : StyleSheet.hairlineWidth, borderBottomColor: p.line }}>
     <CategoryBadge category={category.category} />

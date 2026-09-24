@@ -11,7 +11,7 @@ import * as categoryColor from '../src/ui/category-color.ts';
 import * as liabilityPresentation from '../src/ui/liability-presentation.ts';
 import * as i18nFormat from '../src/i18n/format.ts';
 import { bindLocale } from '../src/i18n/bind.ts';
-const i18nProvider = { useI18n: () => bindLocale('es-AR') };
+import type { AppLocale } from '../src/i18n/locale.ts';
 
 // Exercise the actual routes' data/handlers with host components replaced by
 // descriptors. This is NOT a rendered iOS screen or gesture/animation test.
@@ -27,7 +27,8 @@ const snapshot: domain.LedgerSnapshot = { accounts: [
   { id: 'u', accountId: 'u', kind: 'expense', amountMinor: 999, merchant: 'Prueba', category: 'Salud', dateISO: '2026-08-10', createdAt },
 ] };
 
-function routeHarness(file: string, params: Record<string, unknown>, data = snapshot) {
+function routeHarness(file: string, params: Record<string, unknown>, data = snapshot, { locale = 'es-AR' as AppLocale } = {}) {
+  const i18nProvider = { useI18n: () => bindLocale(locale) };
   const source = readFileSync(new URL('../app/' + file, import.meta.url), 'utf8');
   const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText;
   const jsx = (type: string, props: Record<string, unknown>) => ({ type, props });
@@ -58,7 +59,7 @@ function routeHarness(file: string, params: Record<string, unknown>, data = snap
     '../src/ui/spending-chart': { CategorySpendingRow: 'CategorySpendingRow', CategoryLegendRow: 'CategoryLegendRow' },
     '../src/ui/liability-presentation': liabilityPresentation,
     '../src/ui/category-color': categoryColor,
-    '../src/ui/category-hues': { useCategoryColor: () => '#3E6FB0', useCategoryLabel: (s: string) => s, useCategoryDefinitions: () => [], useCategoryLook: (s: string) => ({ label: s, storedLabel: s, key: String(s).toLowerCase(), hex: '#3E6FB0', glyph: 'pricetag-outline' }), useCategoryLookOf: () => (s: string) => ({ label: s, storedLabel: s, key: String(s).toLowerCase(), hex: '#3E6FB0', glyph: 'pricetag-outline' }), useAccountLook: () => ({ icon: 'wallet', color: 'cobalt', glyph: 'wallet-outline', hex: '#2557D6' }), useAccountLookOf: () => () => ({ icon: 'wallet', color: 'cobalt', glyph: 'wallet-outline', hex: '#2557D6' }) },
+    '../src/ui/category-hues': { useCategoryColor: () => '#3E6FB0', useCategoryLabel: (s: string) => s, useCategoryDefinitions: () => [], useCategoryLook: (s: string) => ({ label: s, storedLabel: s, key: String(s).toLowerCase(), hex: '#3E6FB0', glyph: 'pricetag-outline' }), useCategoryLookOf: () => (s: string) => ({ label: s, storedLabel: s, key: String(s).toLowerCase(), hex: '#3E6FB0', glyph: 'pricetag-outline' }), useAccountLook: () => ({ icon: 'wallet', color: 'cobalt', glyph: 'wallet-outline', hex: '#2557D6' }), useAccountNameOf: () => (account: any) => account.name, useAccountLookOf: () => () => ({ icon: 'wallet', color: 'cobalt', glyph: 'wallet-outline', hex: '#2557D6' }) },
     '../src/ui/quick-actions': { QuickActions: 'QuickActions' },
     '../src/ui/motion': { ValueTransition: 'ValueTransition', Reflow: 'Reflow', selectionHaptic: () => {}, impactHaptic: () => {}, timing: (kind: string, reduced: boolean) => ({ duration: reduced ? 0 : 260 }) },
     '../src/ui/theme': { useCurrentDay: () => '2026-09-12', space: { xs: 4, s: 8, m: 12, l: 16, xl: 20, xxl: 24, xxxl: 32 },
@@ -196,4 +197,77 @@ test('reports show a six-month trend that selects months, a donut for categories
   assert.equal(nodes(routeHarness('(tabs)/reports.tsx', {}).render()).some(node => node.type === 'DonutChart'), false);
   const empty = routeHarness('(tabs)/reports.tsx', {}, { ...snapshot, entries: [] }).render();
   assert.equal(nodes(empty).some(node => node.type === 'DonutChart' || node.type === 'MonthBars'), false);
+});
+
+function texts(root: any): string[] {
+  return nodes(root).flatMap(node => [node.props.label, node.props.title, node.props.detail, node.props.accessibilityLabel, node.props.caption,
+    ...[node.props.children].flat().filter(child => typeof child === 'string' || typeof child === 'number')]).filter(value => value !== undefined).map(String);
+}
+
+test('Spanish insights rebuilt by the screen read exactly as the domain states them', () => {
+  const view = routeHarness('(tabs)/reports.tsx', { currency: 'ARS', month: '2026-08' });
+  const money = (minor: number) => '$ ' + domain.formatMinorUnits(minor);
+  const facts = domain.spendingInsights(snapshot, [], 'ARS', '2026-08', '2026-09-12', money);
+  assert.ok(facts.length > 0);
+  const shown = texts(view.render());
+  for (const fact of facts) {
+    assert.ok(shown.includes(fact.title), 'missing ' + fact.title);
+    assert.ok(shown.includes(fact.detail), 'missing ' + fact.detail);
+  }
+});
+
+test('23.1B2: Reportes in English changes only words; amounts, user data and routes stay the same', () => {
+  const params = { currency: 'ARS', month: '2026-08' };
+  const es = routeHarness('(tabs)/reports.tsx', params);
+  const en = routeHarness('(tabs)/reports.tsx', params, snapshot, { locale: 'en-AR' });
+  const root = en.render(), words = texts(root);
+  find(root, 'IconButton', 'Previous month');
+  find(root, 'IconButton', 'Next month');
+  assert.ok(words.includes('August 2026'));
+  assert.ok(words.includes('Full month · ARS'));
+  assert.ok(words.includes('Spent\u00A0·\u00A0ARS'));
+  assert.equal(find(root, 'DonutChart').props.caption, 'Period total');
+  assert.ok(words.includes('Your largest expense was Prueba'), 'the merchant is the person\'s own words');
+  assert.ok(words.includes('Recorded income') && words.includes('Net flow'));
+  assert.ok(words.includes('Compare with last month'));
+  assert.equal(words.some(text => /Gastado|Mes anterior|Flujo neto|Tu mayor gasto|Solo movimientos/.test(text)), false, 'no Spanish copy left: ' + words.join(' | '));
+  // Same numbers and the same data behind the words.
+  assert.equal(find(root, 'Money').props.minor, find(es.render(), 'Money').props.minor);
+  assert.equal(root.props.data.map((item: domain.CategorySpending) => item.key + ':' + item.amountMinor).join(','),
+    es.render().props.data.map((item: domain.CategorySpending) => item.key + ':' + item.amountMinor).join(','));
+  // Day by day: a plural count and the same drill-down route.
+  nodes(root).find(n => n.type === 'Choices' && n.props.value === 'categories')!.props.onChange('days');
+  const days = en.render();
+  const row = days.props.renderItem({ item: days.props.data[1], index: 1 });
+  assert.equal(find(row, 'DetailRow').props.label, 'Aug 10 · 2 expenses');
+  const first = days.props.renderItem({ item: days.props.data[0], index: 0 });
+  assert.equal(find(first, 'DetailRow').props.label, 'Aug 31 · 1 expense');
+  find(row, 'DetailRow').props.onPress();
+  assert.equal(JSON.stringify(en.pushed[0]), JSON.stringify({ pathname: '/report-day', params: { currency: 'ARS', date: '2026-08-10' } }));
+  const day = routeHarness('report-day.tsx', en.pushed[0].params, snapshot, { locale: 'en-AR' }).render();
+  assert.equal(find(day, 'Money').props.minor, 505);
+  assert.ok(texts(day).includes('August 10, 2026'));
+  assert.ok(texts(day).includes('2 recorded expenses\u00A0·\u00A0ARS'));
+  // Spanish keeps its wording, plural included.
+  nodes(es.render()).find(n => n.type === 'Choices' && n.props.value === 'categories')!.props.onChange('days');
+  const esDays = es.render();
+  assert.equal(find(esDays.props.renderItem({ item: esDays.props.data[0], index: 0 }), 'DetailRow').props.label.endsWith(' · 1 gasto'), true);
+  assert.equal(find(esDays.props.renderItem({ item: esDays.props.data[1], index: 1 }), 'DetailRow').props.label.endsWith(' · 2 gastos'), true);
+});
+
+test('23.1B2: category and comparison details in English', () => {
+  const data = { ...snapshot, entries: [...snapshot.entries, { ...snapshot.entries[0], id: 'now', dateISO: '2026-09-10', amountMinor: 400 }] };
+  const detail = routeHarness('report-category.tsx', { currency: 'ARS', month: '2026-08', category: 'salud' }, data, { locale: 'en-AR' }).render();
+  assert.ok(texts(detail).includes('2 recorded expenses'));
+  assert.ok(texts(detail).includes('Transactions'));
+  const empty = routeHarness('report-category.tsx', { currency: 'ARS', month: '2026-08', category: 'missing' }, data, { locale: 'en-AR' }).render();
+  assert.equal(find(empty, 'EmptyState').props.title, 'No expenses in this category');
+  const view = routeHarness('report-comparison.tsx', { currency: 'ARS', month: '2026-09' }, data, { locale: 'en-AR' });
+  const list = view.render();
+  assert.ok(texts(list).includes('September 1–12, 2026'), texts(list).join(' | '));
+  assert.ok(texts(list).includes('August 1–12, 2026'));
+  const row = list.props.renderItem({ item: list.props.data.find((item: domain.CategoryChange) => item.key === 'salud') });
+  find(row, 'DetailRow', 'Previous').props.onPress();
+  assert.equal(view.pushed[0].params.through, '2026-08-12');
+  assert.equal(find(routeHarness('report-day.tsx', { currency: 'ARS', date: 'bad' }, data, { locale: 'en-AR' }).render(), 'EmptyState').props.title, 'Invalid day');
 });

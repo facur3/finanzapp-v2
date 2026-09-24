@@ -1,8 +1,9 @@
 import { createContext, createElement, useContext, useMemo, type ReactNode } from 'react';
-import type { AccountAppearance, CategoryDefinition, EntryKind } from '@finanzapp/domain';
+import type { Account, AccountAppearance, CategoryDefinition, EntryKind, PersonalDebtProfile } from '@finanzapp/domain';
 import { useLedger } from '../storage/LedgerProvider';
 import { resolveAccountLook, resolveCategoryLook, type AccountLook, type CategoryLook } from './appearance';
 import { assignCategoryHues } from './category-color';
+import { accountDisplayName } from './liability-presentation';
 import { usePalette } from './theme';
 import { useI18n } from '../i18n/provider';
 
@@ -13,8 +14,8 @@ export type { AccountLook, CategoryLook } from './appearance';
  * its detail, every selector and every detail row. The resolution itself is
  * pure (appearance.ts); this file only provides the data. It keeps its
  * historical name. */
-type Identity = { definitions: CategoryDefinition[]; appearances: AccountAppearance[]; hues: Map<string, number> };
-const IdentityContext = createContext<Identity>({ definitions: [], appearances: [], hues: new Map() });
+type Identity = { definitions: CategoryDefinition[]; appearances: AccountAppearance[]; hues: Map<string, number>; debts: PersonalDebtProfile[] };
+const IdentityContext = createContext<Identity>({ definitions: [], appearances: [], hues: new Map(), debts: [] });
 
 export function CategoryHuesProvider({ children }: { children: ReactNode }) {
   const { snapshot, archive } = useLedger();
@@ -22,7 +23,8 @@ export function CategoryHuesProvider({ children }: { children: ReactNode }) {
     definitions: archive?.categories ?? [],
     appearances: archive?.appearances ?? [],
     hues: assignCategoryHues(snapshot?.entries ?? []),
-  }), [archive?.categories, archive?.appearances, snapshot?.entries]);
+    debts: archive?.debts ?? [],
+  }), [archive?.categories, archive?.appearances, snapshot?.entries, archive?.debts]);
   return createElement(IdentityContext.Provider, { value }, children);
 }
 
@@ -65,4 +67,12 @@ export function useAccountLookOf(): (accountId: string) => AccountLook {
   const { appearances } = useContext(IdentityContext);
   const p = usePalette();
   return useMemo(() => (accountId: string) => resolveAccountLook(accountId, appearances, p), [appearances, p.isDark]);
+}
+
+/** The name an account shows as one side of a transfer: a personal debt's hidden account reads
+ * "Debo · Juan" / "I owe · Juan" from the debt itself; every other account its own name. */
+export function useAccountNameOf(): (account: Account) => string {
+  const { debts } = useContext(IdentityContext);
+  const { t } = useI18n();
+  return useMemo(() => (account: Account) => accountDisplayName(account, debts, t), [debts, t]);
 }

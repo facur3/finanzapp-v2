@@ -6,6 +6,7 @@ import { AppText, DetailRow, EmptyState, Money, SectionTitle, Surface } from '..
 import { codedAmount } from '../src/i18n/format';
 import { useCategoryLookOf } from '../src/ui/category-hues';
 import { changePercent, dateRangeLabel, reportSelection } from '../src/ui/report-presentation';
+import { useI18n } from '../src/i18n/provider';
 import { useCurrentDay, usePalette } from '../src/ui/theme';
 
 export default function ReportComparisonScreen() {
@@ -13,6 +14,7 @@ export default function ReportComparisonScreen() {
   const { snapshot } = useLedger();
   const lookOf = useCategoryLookOf('expense');
   const today = useCurrentDay(), p = usePalette();
+  const { t, locale } = useI18n();
   if (!snapshot) return null;
   const selection = reportSelection(snapshot, params.currency, params.month, today);
   const comparison = spendingComparison(snapshot, selection.currency, selection.monthISO, today);
@@ -24,29 +26,31 @@ export default function ReportComparisonScreen() {
     style={{ flex: 1, backgroundColor: p.background }} contentContainerStyle={{ padding: 20, gap: 16, paddingBottom: 40 }}
     contentInsetAdjustmentBehavior="automatic" removeClippedSubviews={false}
     ListHeaderComponent={<View style={{ gap: 20 }}>
-      <AppText secondary>{comparison.mode === 'matching-days' ? 'La misma cantidad de días de cada mes' : 'Meses completos · pueden tener distinta cantidad de días'}</AppText>
-      {comparison.capped && <AppText secondary>Esta comparación llega hasta el día {Number(current.endISO.slice(-2))} en ambos meses porque el anterior fue más corto. El reporte mensual conserva todos los días.</AppText>}
-      {comparison.status === 'out-of-range' ? <EmptyState title="El total supera el rango disponible" detail="Tus movimientos siguen guardados. No mostramos una comparación imprecisa." /> : <>
+      <AppText secondary>{t(comparison.mode === 'matching-days' ? 'reports.comparison.matchingDays' : 'reports.comparison.fullMonths')}</AppText>
+      {comparison.capped && <AppText secondary>{t('reports.comparison.capped', { day: Number(current.endISO.slice(-2)) })}</AppText>}
+      {comparison.status === 'out-of-range' ? <EmptyState title={t('reports.outOfRangeTitle')} detail={t('reports.comparison.outOfRangeDetail')} /> : <>
         {comparison.status === 'ready' && deltaMinor !== null && previous?.status === 'ready' && <View style={{ gap: 10 }}>
-          <AppText accessibilityRole="header" variant="title2">{deltaMinor === 0 ? 'El mismo gasto registrado' : changePercent(deltaMinor, previous.expenseMinor) + (deltaMinor > 0 ? ' más registrado' : ' menos registrado')}</AppText>
+          <AppText accessibilityRole="header" variant="title2">{deltaMinor === 0 ? t('reports.comparison.same')
+            : t(deltaMinor > 0 ? 'reports.comparison.more' : 'reports.comparison.less', { percent: changePercent(deltaMinor, previous.expenseMinor, locale) })}</AppText>
           <Money minor={deltaMinor} currency={selection.currency} large />
-          <AppText secondary>Diferencia respecto del período anterior</AppText>
+          <AppText secondary>{t('reports.comparison.difference')}</AppText>
         </View>}
         <Surface grouped>
-          {current.status === 'ready' && <DetailRow label={dateRangeLabel(current)} value={amount(current.expenseMinor)} last={!previous} />}
-          {previous?.status === 'ready' && <DetailRow label={dateRangeLabel(previous)} value={amount(previous.expenseMinor)} last />}
+          {current.status === 'ready' && <DetailRow label={dateRangeLabel(current, t, locale)} value={amount(current.expenseMinor)} last={!previous} />}
+          {previous?.status === 'ready' && <DetailRow label={dateRangeLabel(previous, t, locale)} value={amount(previous.expenseMinor)} last />}
         </Surface>
-        {comparison.status === 'insufficient' && <EmptyState title="Todavía no hay suficiente información" detail="La comparación necesita gastos registrados en ambos períodos. Que no haya registros no significa que no hayas gastado." />}
+        {comparison.status === 'insufficient' && <EmptyState title={t('reports.comparison.insufficientTitle')} detail={t('reports.comparison.insufficientDetail')} />}
       </>}
-      {comparison.categories.length > 0 && <SectionTitle>Qué categorías cambiaron</SectionTitle>}
+      {comparison.categories.length > 0 && <SectionTitle>{t('reports.comparison.changedTitle')}</SectionTitle>}
     </View>}
     renderItem={({ item }) => <Surface grouped>
       <View style={{ padding: 16, gap: 6 }}>
         <AppText style={{ fontWeight: '600', fontSize: 17 }}>{lookOf(item.category).label}</AppText>
-        <AppText secondary>{item.deltaMinor === 0 ? 'Sin cambio' : amount(Math.abs(item.deltaMinor)) + (item.deltaMinor > 0 ? ' más' : ' menos')}</AppText>
+        <AppText secondary>{item.deltaMinor === 0 ? t('reports.comparison.noChange')
+          : t(item.deltaMinor > 0 ? 'reports.comparison.amountMore' : 'reports.comparison.amountLess', { amount: amount(Math.abs(item.deltaMinor)) })}</AppText>
       </View>
-      <DetailRow label="Este período" value={amount(item.currentMinor)} onPress={item.currentCount ? () => openCategory(current, item.key) : undefined} />
-      <DetailRow label="Anterior" value={amount(item.previousMinor)} last onPress={item.previousCount && previous ? () => openCategory(previous, item.key) : undefined} />
+      <DetailRow label={t('reports.comparison.thisPeriod')} value={amount(item.currentMinor)} onPress={item.currentCount ? () => openCategory(current, item.key) : undefined} />
+      <DetailRow label={t('reports.comparison.previous')} value={amount(item.previousMinor)} last onPress={item.previousCount && previous ? () => openCategory(previous, item.key) : undefined} />
     </Surface>}
-    ListFooterComponent={<AppText secondary style={{ fontSize: 12, lineHeight: 18 }}>Solo gastos registrados en {selection.currency}, sin transferencias ni saldos iniciales. Las diferencias describen tus registros, no los motivos de tus gastos ni un ahorro confirmado.</AppText>} />;
+    ListFooterComponent={<AppText secondary style={{ fontSize: 12, lineHeight: 18 }}>{t('reports.comparison.footer', { currency: selection.currency })}</AppText>} />;
 }

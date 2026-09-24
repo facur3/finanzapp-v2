@@ -7,6 +7,7 @@ import { accountKind, formatMinorUnits, makeTransferChange, type Account, type T
 import { useLedger } from '../../src/storage/LedgerProvider';
 import { AccountBadge, ActionButton, AppText, DetailRow, EmptyState, ErrorMessage, GlyphTile, Money, Screen, Surface } from '../../src/ui/components';
 import { useI18n } from '../../src/i18n/provider';
+import { useAccountNameOf } from '../../src/ui/category-hues';
 import { space, usePalette } from '../../src/ui/theme';
 
 export default function TransferScreen() {
@@ -22,6 +23,7 @@ function TransferDetail({ record, accounts }: { record: TransferRecord; accounts
   const { updateTransfer, archive } = useLedger();
   const p = usePalette();
   const { t: tr, formatDate } = useI18n();
+  const nameOf = useAccountNameOf();
   const t = record.transfer;
   const from = accounts.find(a => a.id === t.fromAccountId)!, to = accounts.find(a => a.id === t.toAccountId)!;
   const cards = archive?.cards ?? [], debts = archive?.debts ?? [];
@@ -54,7 +56,7 @@ function TransferDetail({ record, accounts }: { record: TransferRecord; accounts
     const change = makeTransferChange(randomUUID(), record, record.voided ? 'restore' : 'void', new Date().toISOString());
     Alert.alert(tr(record.voided ? 'transferDetail.restoreQuestion' : 'transferDetail.voidQuestion'),
       tr('transferDetail.effect', { amount: formatMinorUnits(t.amountMinor) + ' ' + from.currency,
-        from: record.voided ? from.name : to.name, to: record.voided ? to.name : from.name }), [
+        from: nameOf(record.voided ? from : to), to: nameOf(record.voided ? to : from) }), [
         { text: tr('common.cancel'), style: 'cancel', onPress: () => { confirming.current = false; } },
         { text: tr(record.voided ? 'entryDetail.restore' : 'entryDetail.void'), style: record.voided ? 'default' : 'destructive', onPress: () => { confirming.current = false; void apply(change); } },
       ], { cancelable: true, onDismiss: () => { confirming.current = false; } });
@@ -74,8 +76,8 @@ function TransferDetail({ record, accounts }: { record: TransferRecord; accounts
       <AppText accessibilityLiveRegion="polite" variant="caption" style={{ color: record.voided ? p.warning : p.secondary, fontWeight: '500', textAlign: 'center' }}>{status}</AppText>
     </View>
     <Surface grouped>
-      <DetailRow label={tr('transferForm.from')} value={from.name} icon="arrow-up-outline" leading={fromKind === 'cash' ? <AccountBadge accountId={from.id} size={28} /> : undefined} disabled={busy} onPress={() => router.push(linkFor(from))} />
-      <DetailRow label={tr('transferForm.to')} value={to.name} icon="arrow-down-outline" leading={toKind === 'cash' ? <AccountBadge accountId={to.id} size={28} /> : undefined} disabled={busy} onPress={() => router.push(linkFor(to))} last={!t.note} />
+      <DetailRow label={tr('transferForm.from')} value={nameOf(from)} icon="arrow-up-outline" leading={fromKind === 'cash' ? <AccountBadge accountId={from.id} size={28} /> : undefined} disabled={busy} onPress={() => router.push(linkFor(from))} />
+      <DetailRow label={tr('transferForm.to')} value={nameOf(to)} icon="arrow-down-outline" leading={toKind === 'cash' ? <AccountBadge accountId={to.id} size={28} /> : undefined} disabled={busy} onPress={() => router.push(linkFor(to))} last={!t.note} />
       {!!t.note && <DetailRow label={tr('transferDetail.note')} value={t.note} last />}
     </Surface>
     <ErrorMessage message={error} />

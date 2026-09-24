@@ -8,7 +8,7 @@ import * as presentation from '../src/ui/presentation.ts';
 import * as budgetPresentation from '../src/ui/budget-presentation.ts';
 import * as i18nFormat from '../src/i18n/format.ts';
 import { bindLocale } from '../src/i18n/bind.ts';
-const i18nProvider = { useI18n: () => bindLocale('es-AR') };
+import type { AppLocale } from '../src/i18n/locale.ts';
 
 // Budgets, Recurrentes, Cuentas and account detail handlers with native hosts
 // replaced by descriptors. Not a rendered iOS screen or gesture test.
@@ -33,7 +33,8 @@ const rule: domain.RecurringRule = { id: 'rent', accountId: cash.id, kind: 'expe
   anchorDateISO: '2026-10-01', nextDateISO: '2026-10-01', active: true, createdAt, revision: 0, updatedAt: createdAt };
 const archive: domain.LedgerArchive = { accounts: [cash, wallet, usd, cardAccount], records: entries.map(domain.initialRecord), cards: [card], budgets, recurring: [rule] };
 
-function harness(file: string, params: Record<string, unknown> = {}, data: domain.LedgerArchive = archive) {
+function harness(file: string, params: Record<string, unknown> = {}, data: domain.LedgerArchive = archive, locale: AppLocale = 'es-AR') {
+  const i18nProvider = { useI18n: () => bindLocale(locale) };
   const source = readFileSync(new URL('../app/' + file, import.meta.url), 'utf8');
   const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText;
   const jsx = (type: unknown, props: Record<string, unknown>) => ({ type, props });
@@ -68,7 +69,7 @@ function harness(file: string, params: Record<string, unknown> = {}, data: domai
     '../src/ui/presentation': presentation, '../../src/ui/presentation': presentation,
     '../src/ui/budget-presentation': budgetPresentation, '../../src/ui/budget-presentation': budgetPresentation,
     '../src/ui/theme': theme, '../../src/ui/theme': theme,
-    '../src/ui/category-hues': { useCategoryColor: () => '#3E6FB0', useCategoryLabel: (s: string) => s, useCategoryDefinitions: () => [], useCategoryLook: (s: string) => ({ label: s, storedLabel: s, key: String(s).toLowerCase(), hex: '#3E6FB0', glyph: 'pricetag-outline' }), useCategoryLookOf: () => (s: string) => ({ label: s, storedLabel: s, key: String(s).toLowerCase(), hex: '#3E6FB0', glyph: 'pricetag-outline' }), useAccountLook: () => ({ icon: 'wallet', color: 'cobalt', glyph: 'wallet-outline', hex: '#2557D6' }), useAccountLookOf: () => () => ({ icon: 'wallet', color: 'cobalt', glyph: 'wallet-outline', hex: '#2557D6' }) }, '../../src/ui/category-hues': { useCategoryColor: () => '#3E6FB0', useCategoryLabel: (s: string) => s, useCategoryDefinitions: () => [], useCategoryLook: (s: string) => ({ label: s, storedLabel: s, key: String(s).toLowerCase(), hex: '#3E6FB0', glyph: 'pricetag-outline' }), useCategoryLookOf: () => (s: string) => ({ label: s, storedLabel: s, key: String(s).toLowerCase(), hex: '#3E6FB0', glyph: 'pricetag-outline' }), useAccountLook: () => ({ icon: 'wallet', color: 'cobalt', glyph: 'wallet-outline', hex: '#2557D6' }), useAccountLookOf: () => () => ({ icon: 'wallet', color: 'cobalt', glyph: 'wallet-outline', hex: '#2557D6' }) },
+    '../src/ui/category-hues': { useCategoryColor: () => '#3E6FB0', useCategoryLabel: (s: string) => s, useCategoryDefinitions: () => [], useCategoryLook: (s: string) => ({ label: s, storedLabel: s, key: String(s).toLowerCase(), hex: '#3E6FB0', glyph: 'pricetag-outline' }), useCategoryLookOf: () => (s: string) => ({ label: s, storedLabel: s, key: String(s).toLowerCase(), hex: '#3E6FB0', glyph: 'pricetag-outline' }), useAccountLook: () => ({ icon: 'wallet', color: 'cobalt', glyph: 'wallet-outline', hex: '#2557D6' }), useAccountNameOf: () => (account: any) => account.name, useAccountLookOf: () => () => ({ icon: 'wallet', color: 'cobalt', glyph: 'wallet-outline', hex: '#2557D6' }) }, '../../src/ui/category-hues': { useCategoryColor: () => '#3E6FB0', useCategoryLabel: (s: string) => s, useCategoryDefinitions: () => [], useCategoryLook: (s: string) => ({ label: s, storedLabel: s, key: String(s).toLowerCase(), hex: '#3E6FB0', glyph: 'pricetag-outline' }), useCategoryLookOf: () => (s: string) => ({ label: s, storedLabel: s, key: String(s).toLowerCase(), hex: '#3E6FB0', glyph: 'pricetag-outline' }), useAccountLook: () => ({ icon: 'wallet', color: 'cobalt', glyph: 'wallet-outline', hex: '#2557D6' }), useAccountNameOf: () => (account: any) => account.name, useAccountLookOf: () => () => ({ icon: 'wallet', color: 'cobalt', glyph: 'wallet-outline', hex: '#2557D6' }) },
   };
   const module = { exports: {} as { default?: () => Node } };
   runInNewContext(code, { module, exports: module.exports, require: (name: string) => {
@@ -197,4 +198,63 @@ test('account detail shows this month in and out, three actions and redirects ob
   const redirect = harness('account/[id].tsx', { id: 'card-acc' }).render();
   assert.equal(redirect.type, 'Redirect');
   assert.equal(JSON.stringify(redirect.props.href), JSON.stringify({ pathname: '/card/[id]', params: { id: 'card' } }));
+});
+
+test('in English Recurrentes reads in English, keeps merchant and account names, and pausing writes what Spanish writes', async () => {
+  const english = harness('recurring.tsx', {}, archive, 'en-AR'), spanish = harness('recurring.tsx');
+  const root = english.render();
+  assert.equal(find(root, 'Stack.Screen').props.options.title, 'Recurring');
+  assert.equal(nodes(root).filter(node => node.type === 'Stat').map(node => node.props.label).slice(0, 3).join(','), 'Payments · ARS,Due,Income');
+  const sections = nodes(root).filter(node => node.type === 'SectionTitle').map(node => node.props.children);
+  assert.equal(sections.join(','), 'Next 30 days,Active');
+  const press = nodes(root).find(node => node.type === 'PressFeedback')!;
+  assert.equal(press.props.accessibilityLabel, 'Edit recurring Alquiler, monthly, 400,00 ARS, next Oct 1');
+  const captions = texts(root);
+  assert.ok(captions.includes('Monthly · Oct 1 · Banco'), 'merchant and account name stay as the user wrote them');
+  assert.ok(captions.includes('In 11 days'));
+  assert.ok(texts(spanish.render()).includes('Mensual · 1 oct · Banco'));
+  assert.ok(texts(spanish.render()).includes('En 11 días'));
+  await find(root, 'Switch', 'Pause Alquiler').props.onValueChange();
+  await find(spanish.render(), 'Switch', 'Pausar Alquiler').props.onValueChange();
+  const stable = (rule: domain.RecurringRule) => JSON.stringify({ ...rule, updatedAt: '' });
+  assert.equal(stable(english.saved[0]), stable(spanish.saved[0]));
+  const paused = harness('recurring.tsx', {}, { ...archive, recurring: [{ ...rule, active: false }] }, 'en-AR').render();
+  assert.ok(texts(paused).includes('Paused'));
+  assert.equal(find(paused, 'SectionTitle', undefined).props.caption, 'Not recorded until you turn them back on');
+});
+
+test('in English Presupuestos names the month, the states and the VoiceOver sentences in English; category names are untouched', () => {
+  const root = harness('budgets.tsx', { currency: 'ARS', month: '2026-09' }, { ...archive, budgets: [...budgets, total] }, 'en-AR').render();
+  assert.equal(find(root, 'Stack.Screen').props.options.title, 'Budgets');
+  const shown = texts(root);
+  assert.ok(shown.includes('September 2026'));
+  assert.ok(shown.includes('Current month'));
+  const byCategory = nodes(root).find(node => node.type === 'SectionTitle' && node.props.children === 'By category')!;
+  assert.equal(byCategory.props.caption, '2 categories · 1 over · 1 near the limit');
+  const spanish = harness('budgets.tsx', { currency: 'ARS', month: '2026-09' }, { ...archive, budgets: [...budgets, total] }).render();
+  assert.equal(nodes(spanish).find(node => node.type === 'SectionTitle' && node.props.children === 'Por categoría')!.props.caption,
+    '2 categorías · 1 excedida · 1 cerca del límite');
+  const labels = nodes(root).map(node => node.props.accessibilityLabel).filter(Boolean);
+  assert.ok(labels.some(label => /^Café budget: \$ 30,00 of \$ 25,00, 120 percent\. Over by \$ 5,00$/.test(label)), 'the category keeps its stored name');
+  assert.ok(labels.some(label => /^Overall budget: \$ 120,00 of \$ 200,00, 60 percent used\. \$ 80,00 available$/.test(label)));
+  assert.ok(shown.includes('60% used'));
+  assert.ok(shown.includes('Supermercado'));
+  assert.equal(nodes(root).filter(node => node.type === 'Stat').map(node => node.props.label).join(','), 'Spent,Limit');
+});
+
+test('in English Cuentas and the account detail read in English; account names stay as written', () => {
+  const list = harness('accounts.tsx', {}, archive, 'en-AR').render();
+  const sectionList = find(list, 'SectionList');
+  assert.ok(texts(sectionList.props.renderSectionHeader({ section: sectionList.props.sections[0] })).includes('Argentine pesos'));
+  const spanishList = find(harness('accounts.tsx').render(), 'SectionList');
+  assert.ok(texts(spanishList.props.renderSectionHeader({ section: spanishList.props.sections[1] })).includes('Dólares estadounidenses'));
+  const root = harness('account/[id].tsx', { id: 'cash' }, archive, 'en-AR').render();
+  assert.equal(find(root, 'Stack.Screen').props.options.title, 'Banco');
+  assert.equal(nodes(root).filter(node => node.type === 'Stat').map(node => node.props.label).join(','), 'Spent this month,Income this month');
+  const rows = nodes(root).filter(node => node.type === 'DetailRow');
+  assert.equal(rows.map(node => node.props.label).join(','), 'Recurring,Opening balance');
+  assert.equal(rows[0].props.value, '1 active');
+  assert.equal(find(harness('account/[id].tsx', { id: 'cash' }).render(), 'DetailRow').props.value, '1 activo');
+  const missing = harness('account/[id].tsx', { id: 'nope' }, archive, 'en-AR').render();
+  assert.equal(find(missing, 'EmptyState').props.title, 'We couldn’t find this account');
 });

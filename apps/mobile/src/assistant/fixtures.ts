@@ -6,7 +6,12 @@ import type { AssistantAsk, AssistantClient, AssistantEvent } from './client.ts'
  * rendered without a model. They are not production AI responses: the runtime
  * only selects this client in a development bundle started with
  * EXPO_PUBLIC_ASSISTANT_FIXTURES=1, and the screen then shows a visible
- * "Vista de prueba" banner and refuses to write anything to the ledger. */
+ * "Vista de prueba" banner and refuses to write anything to the ledger.
+ *
+ * Language: these replies stand in for the model's output, which is content,
+ * not interface copy, so they are deliberately left in Spanish and never go
+ * through the catalogue (the interface around them is translated). The fact
+ * labels are protocol data (see FACT_LABELS in src/integrations/evidence.ts). */
 
 export const FIXTURE_FACTS: AssistantFact[] = [
   { id: 'current.expenses', label: 'Gastos registrados', amountMinor: 41230000, count: 38, startISO: '2026-09-01', endISO: '2026-09-21' },

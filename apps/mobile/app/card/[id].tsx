@@ -1,7 +1,8 @@
 import { useMemo } from 'react';
 import { View, useWindowDimensions } from 'react-native';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
-import { cardCreditMinor, cardStatementActivity, formatMinorUnits, labelFromISO, liabilityActivity } from '@finanzapp/domain';
+import { cardCreditMinor, cardStatementActivity, formatMinorUnits, liabilityActivity } from '@finanzapp/domain';
+import { useI18n } from '../../src/i18n/provider';
 import { useLedger } from '../../src/storage/LedgerProvider';
 import { ActionButton, AppText, EmptyState, IconButton, Money, Screen, SectionTitle, Stat, Surface, StatRow } from '../../src/ui/components';
 import { CardFace } from '../../src/ui/card-visual';
@@ -14,6 +15,7 @@ export default function CardDetailScreen() {
   const { archive, snapshot } = useLedger();
   const day = useCurrentDay();
   const p = usePalette();
+  const { t, relativeDate } = useI18n();
   const { width } = useWindowDimensions();
   const card = archive?.cards?.find(item => item.id === id);
   const summary = useMemo(() => card && snapshot ? summarizeCard(card, snapshot, day) : null, [card, snapshot, day]);
@@ -21,51 +23,51 @@ export default function CardDetailScreen() {
   const activity = useMemo(() => summary && snapshot ? liabilityActivity(summary.account.id, snapshot) : { entries: [], transfers: [] }, [summary, snapshot]);
 
   if (!snapshot || !archive || !card || !summary || !statement) return <Screen>
-    <EmptyState title="No encontramos esta tarjeta" detail="Volvé a Tarjetas para elegir una tarjeta guardada en este dispositivo." icon="card-outline" />
+    <EmptyState title={t('cards.panel.notFoundTitle')} detail={t('cards.panel.notFoundDetail')} icon="card-outline" />
   </Screen>;
   const { account, debtMinor, availableMinor, usage, closingISO, dueISO } = summary;
   const credit = cardCreditMinor(card, snapshot);
-  const relative = (iso: string) => labelFromISO(iso, new Date(day + 'T12:00:00'));
+  const relative = (iso: string) => relativeDate(iso, day);
   const money = (minor: number) => (account.currency === 'USD' ? 'US$ ' : '$ ') + formatMinorUnits(minor);
   const tone = usageTone(usage);
 
   return <>
     <Stack.Screen options={{ title: account.name,
-      headerRight: () => <IconButton name="create-outline" label="Editar tarjeta"
+      headerRight: () => <IconButton name="create-outline" label={t('cards.panel.editCard')}
         onPress={() => router.push({ pathname: '/edit-card/[id]', params: { id: card.id } })} /> }} />
     <EntryList entries={activity.entries} transfers={activity.transfers} accountId={account.id} accounts={snapshot.accounts} context="card"
       header={<View style={{ gap: space.xl, paddingBottom: 4 }}>
         <CardFace id={card.id} name={account.name} issuer={card.issuer} last4={card.last4} currency={account.currency} width={Math.min(width - space.xl * 2, 420)} />
         {/* Identity (the card) → state (the debt) → three facts → primary → secondary → activity. Issuer and currency already live on the card face. */}
         <View style={{ gap: 6 }}>
-          <AppText secondary variant="subhead" style={{ fontWeight: '500' }}>{card.active ? 'Deuda registrada' : 'Tarjeta archivada · deuda registrada'}</AppText>
+          <AppText secondary variant="subhead" style={{ fontWeight: '500' }}>{t(card.active ? 'cards.panel.recordedDebt' : 'cards.panel.archivedDebt')}</AppText>
           <Money minor={debtMinor} currency={account.currency} large />
-          {credit > 0 && <AppText variant="subhead" style={{ color: p.income, fontWeight: '600' }}>Saldo a favor · {money(credit)}</AppText>}
+          {credit > 0 && <AppText variant="subhead" style={{ color: p.income, fontWeight: '600' }}>{t('cards.panel.credit', { amount: money(credit) })}</AppText>}
         </View>
 
         <Surface style={{ gap: 14 }}>
           <StatRow>
-            <Stat label="Disponible">
+            <Stat label={t('cards.panel.available')}>
               {availableMinor !== null ? <Money minor={availableMinor} currency={account.currency} size={17} color={tone === 'neutral' ? undefined : tone === 'warning' ? p.warning : p.expense} />
-                : <AppText secondary variant="subhead">Sin límite</AppText>}
-              {card.creditLimitMinor !== null && <AppText tertiary variant="caption">de {money(card.creditLimitMinor)}</AppText>}
+                : <AppText secondary variant="subhead">{t('cards.panel.noLimit')}</AppText>}
+              {card.creditLimitMinor !== null && <AppText tertiary variant="caption">{t('cards.panel.ofLimit', { amount: money(card.creditLimitMinor) })}</AppText>}
             </Stat>
-            <Stat label="Cierre"><AppText style={{ fontWeight: '600' }}>{relative(closingISO)}</AppText></Stat>
-            <Stat label="Vencimiento">
+            <Stat label={t('cards.panel.closing')}><AppText style={{ fontWeight: '600' }}>{relative(closingISO)}</AppText></Stat>
+            <Stat label={t('cards.panel.due')}>
               <AppText style={{ fontWeight: '600', color: tone !== 'neutral' && debtMinor > 0 ? p.warning : p.text }}>{relative(dueISO)}</AppText>
             </Stat>
           </StatRow>
         </Surface>
 
         <View style={{ gap: 10 }}>
-          <ActionButton label="Registrar compra" icon="cart-outline" disabled={!card.active}
+          <ActionButton label={t('cards.panel.recordPurchase')} icon="cart-outline" disabled={!card.active}
             onPress={() => router.push({ pathname: '/new-entry', params: { accountId: account.id, kind: 'expense' } })} />
-          <ActionButton label="Pagar tarjeta" icon="arrow-forward-outline" secondary tone="transfer" disabled={debtMinor === 0}
-            onPress={() => router.push({ pathname: '/new-transfer', params: { toAccountId: account.id, title: 'Pagar tarjeta', note: 'Pago ' + account.name, maxAmountMinor: String(debtMinor) } })} />
+          <ActionButton label={t('cards.panel.pay')} icon="arrow-forward-outline" secondary tone="transfer" disabled={debtMinor === 0}
+            onPress={() => router.push({ pathname: '/new-transfer', params: { toAccountId: account.id, maxAmountMinor: String(debtMinor) } })} />
         </View>
 
-        <SectionTitle caption={statementCaption(statement, relative) + (statement.refundsMinor > 0 ? ` · devoluciones ${money(statement.refundsMinor)}` : '')}>Movimientos</SectionTitle>
+        <SectionTitle caption={statementCaption(statement, relative, t) + (statement.refundsMinor > 0 ? t('cards.panel.refunds', { amount: money(statement.refundsMinor) }) : '')}>{t('cards.panel.movements')}</SectionTitle>
       </View>}
-      empty={<AppText secondary variant="subhead">Todavía no registraste compras ni pagos en esta tarjeta.</AppText>} />
+      empty={<AppText secondary variant="subhead">{t('cards.panel.noActivity')}</AppText>} />
   </>;
 }

@@ -5,8 +5,9 @@ import { randomUUID } from 'expo-crypto';
 import { formatMinorUnits, validateEntry, type Currency, type Entry } from '@finanzapp/domain';
 import { assistantForBuild } from '../../src/assistant/runtime';
 import { REASON_TEXT, SUGGESTIONS, classifyIntent, completeDraft, contentFromResult, conversationReducer, emptyConversation, entryFromDraft,
-  shouldAutoscroll, type ClarificationOption, type DraftContent, type EvidenceLink, type Message } from '../../src/assistant/conversation';
+  optionText, shouldAutoscroll, type ClarificationOption, type DraftContent, type EvidenceLink, type Message } from '../../src/assistant/conversation';
 import { monthlyEvidence } from '../../src/integrations/evidence';
+import { useI18n } from '../../src/i18n/provider';
 import { useLedger } from '../../src/storage/LedgerProvider';
 import { AssistantComposer } from '../../src/ui/assistant-composer';
 import { AnswerEvidence, AssistantText, ClarificationChoices, DraftCard, Suggestions, SystemNote, UserMessage } from '../../src/ui/assistant-messages';
@@ -27,13 +28,18 @@ import { space, useCurrentDay, usePalette, useReduceMotion } from '../../src/ui/
  * the user confirms a draft card, the draft becomes an Entry that the domain
  * validates and the storage repository saves. Nothing else here can write.
  * Questions are explained against `monthlyEvidence`, aggregated on-device;
- * the answer's rows and links come from those facts, never from prose. */
+ * the answer's rows and links come from those facts, never from prose.
+ *
+ * Language: the app's own words (title, notes, suggestions, the questions it
+ * asks) follow the interface language and are stored as catalogue keys; the
+ * model's answer and the user's words are shown exactly as they arrived. */
 export default function AssistantScreen() {
   const params = useLocalSearchParams<{ currency?: string }>();
   const { snapshot, archive, addEntry } = useLedger();
   const day = useCurrentDay();
   const p = usePalette();
   const reduced = useReduceMotion();
+  const { t } = useI18n();
   const [state, dispatch] = useReducer(conversationReducer, emptyConversation);
   const client = useMemo(() => assistantForBuild(), []);
   const [writing, setWriting] = useState<string | null>(null);
@@ -65,6 +71,7 @@ export default function AssistantScreen() {
         if (controller.signal.aborted) break;
         if (event.type === 'delta') dispatch({ type: 'delta', text: event.text });
         else if (event.type === 'result') dispatch({ type: 'answer', ...contentFromResult(event.result, event.facts, accounts, entries, currency, day) });
+        // A failure's message is a catalogue key or a caught sentence; the note translates it through errorText.
         else dispatch({ type: 'fail', reason: event.reason, text: event.reason === 'failed' && event.message ? event.message : REASON_TEXT[event.reason], sent: raw });
       }
     } catch {
@@ -76,15 +83,16 @@ export default function AssistantScreen() {
 
   const stop = useCallback(() => { request.current?.abort(); request.current = null; dispatch({ type: 'stop' }); }, []);
 
-  const choose = useCallback((messageId: string, option: ClarificationOption) => {
+  // `shown` is what the chip displayed: it becomes the user's own words in the thread.
+  const choose = useCallback((messageId: string, option: ClarificationOption, shown?: string) => {
     const next = state.pending ? completeDraft(state.pending, option.id, accounts, entries, day) : null;
-    dispatch({ type: 'choose', messageId, optionId: option.id, label: option.label, next });
-  }, [state.pending, accounts, entries, day]);
+    dispatch({ type: 'choose', messageId, optionId: option.id, label: shown ?? optionText(option, t), next });
+  }, [state.pending, accounts, entries, day, t]);
 
   const confirm = useCallback(async (messageId: string, content: DraftContent) => {
     // Only a pending draft can be written, and only one write at a time: a stale tap on a confirmed card is a no-op.
     if (writing || content.status !== 'pending') return;
-    if (client.mode === 'fixture') { dispatch({ type: 'note', reason: 'info', text: 'Vista de prueba: este borrador es de ejemplo y no se guarda.' }); return; }
+    if (client.mode === 'fixture') { dispatch({ type: 'note', reason: 'info', text: 'assistant.fixtureConfirmRefused' }); return; }
     setWriting(messageId);
     try {
       // Build once, validate with the domain, write through the repository. A retry reuses the same Entry.
@@ -96,7 +104,7 @@ export default function AssistantScreen() {
       successHaptic();
       dispatch({ type: 'draft-confirmed', messageId, entryId: entry.id });
     } catch (cause) {
-      dispatch({ type: 'note', reason: 'failed', text: cause instanceof Error ? cause.message : 'No pudimos guardar el movimiento. El borrador sigue acá para reintentar.' });
+      dispatch({ type: 'note', reason: 'failed', text: cause instanceof Error ? cause.message : 'assistant.saveFailed' });
     } finally {
       setWriting(null);
     }
@@ -119,9 +127,9 @@ export default function AssistantScreen() {
     if (item.role === 'user') return <Appear><UserMessage text={item.text} /></Appear>;
     if (item.role === 'system') return <Appear><SystemNote message={item} onRetry={text => void send(text)} /></Appear>;
     return <View style={{ gap: space.m }}>
-      {(item.text || item.status === 'streaming') && <AssistantText text={item.text} status={item.status} />}
+      {(item.text || item.textKey || item.status === 'streaming') && <AssistantText text={item.textKey ? t(item.textKey) : item.text} status={item.status} />}
       {item.content?.kind === 'answer' && <AnswerEvidence content={item.content} currency={currency} onOpen={open} />}
-      {item.content?.kind === 'clarification' && <ClarificationChoices options={item.content.options} chosen={item.content.chosen} onChoose={option => choose(item.id, option)} />}
+      {item.content?.kind === 'clarification' && <ClarificationChoices options={item.content.options} chosen={item.content.chosen} onChoose={(option, shown) => choose(item.id, option, shown)} />}
       {item.content?.kind === 'draft' && <DraftCard content={item.content} accounts={accounts} busy={writing === item.id}
         onConfirm={() => void confirm(item.id, item.content as DraftContent)} onEdit={() => edit(item.id, item.content as DraftContent)}
         onCancel={() => dispatch({ type: 'draft-cancelled', messageId: item.id })} onOpenEntry={entryId => router.push({ pathname: '/entry/[id]', params: { id: entryId } })} />}
@@ -129,13 +137,13 @@ export default function AssistantScreen() {
   };
 
   const note = client.mode === 'disconnected' && !state.messages.some(message => message.role === 'system')
-    ? <AppText tertiary variant="caption" style={{ textAlign: 'center' }}>No conectado en esta versión. Lo que escribas queda en tu iPhone.</AppText> : null;
+    ? <AppText tertiary variant="caption" style={{ textAlign: 'center' }}>{t('assistant.disconnectedNote')}</AppText> : null;
 
   return <View style={{ flex: 1, backgroundColor: p.background }}>
-    <Tabs.Screen options={{ title: 'Asistente',
-      headerRight: state.messages.length ? () => <IconButton name="create-outline" label="Nuevo chat" onPress={() => { stop(); dispatch({ type: 'reset' }); }} /> : undefined }} />
+    <Tabs.Screen options={{ title: t('assistant.title'),
+      headerRight: state.messages.length ? () => <IconButton name="create-outline" label={t('assistant.newChat')} onPress={() => { stop(); dispatch({ type: 'reset' }); }} /> : undefined }} />
     {client.mode === 'fixture' && <View accessible accessibilityRole="text" style={{ backgroundColor: p.warningSoft, paddingHorizontal: space.xl, paddingVertical: space.s }}>
-      <AppText variant="footnote" style={{ color: p.warning, fontWeight: '600', textAlign: 'center' }}>Vista de prueba: respuestas de ejemplo, nada se guarda.</AppText>
+      <AppText variant="footnote" style={{ color: p.warning, fontWeight: '600', textAlign: 'center' }}>{t('assistant.fixtureBanner')}</AppText>
     </View>}
     <FlatList ref={list} data={state.messages} keyExtractor={message => message.id} renderItem={renderItem}
       contentInsetAdjustmentBehavior="automatic" keyboardDismissMode="interactive" keyboardShouldPersistTaps="handled"
@@ -143,7 +151,7 @@ export default function AssistantScreen() {
       onLayout={event => { scroll.current.viewport = event.nativeEvent.layout.height; follow(); }}
       onContentSizeChange={(_width, height) => { scroll.current.content = height; follow(); }}
       contentContainerStyle={{ padding: space.xl, gap: space.l, flexGrow: 1, justifyContent: state.messages.length ? 'flex-start' : 'center' }}
-      ListEmptyComponent={<Suggestions items={SUGGESTIONS} onPick={text => void send(text)} disabled={busy} />} />
+      ListEmptyComponent={<Suggestions items={SUGGESTIONS.map(key => t(key))} onPick={text => void send(text)} disabled={busy} />} />
     <AssistantComposer value={state.composer} onChange={text => dispatch({ type: 'compose', text })} onSend={() => void send(state.composer)} onStop={stop} busy={busy} note={note} />
   </View>;
 }

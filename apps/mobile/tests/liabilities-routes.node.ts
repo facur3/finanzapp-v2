@@ -8,7 +8,10 @@ import * as presentation from '../src/ui/presentation.ts';
 import * as liabilityPresentation from '../src/ui/liability-presentation.ts';
 import * as i18nFormat from '../src/i18n/format.ts';
 import { bindLocale } from '../src/i18n/bind.ts';
-const i18nProvider = { useI18n: () => bindLocale('es-AR') };
+import type { AppLocale } from '../src/i18n/locale.ts';
+// The locale every harness reads on render; an English test switches it and restores Spanish.
+let activeLocale: AppLocale = 'es-AR';
+const i18nProvider = { useI18n: () => bindLocale(activeLocale) };
 
 // Exercise the Cards tab, card detail and debts handlers with native hosts
 // replaced by descriptors. Not a rendered iOS screen, carousel or gesture test.
@@ -126,7 +129,7 @@ test('Tarjetas summarizes the selected card from recorded purchases and payments
   find(root, 'ActionButton', 'Registrar compra').props.onPress();
   assert.equal(JSON.stringify(view.pushed.at(-1)), JSON.stringify({ pathname: '/new-entry', params: { accountId: 'card-acc', kind: 'expense' } }));
   find(root, 'ActionButton', 'Pagar tarjeta').props.onPress();
-  assert.equal(JSON.stringify(view.pushed.at(-1)), JSON.stringify({ pathname: '/new-transfer', params: { toAccountId: 'card-acc', title: 'Pagar tarjeta', note: 'Pago Visa Gold', maxAmountMinor: '13100' } }));
+  assert.equal(JSON.stringify(view.pushed.at(-1)), JSON.stringify({ pathname: '/new-transfer', params: { toAccountId: 'card-acc', maxAmountMinor: '13100' } }), 'no visible title or note travels in the URL: the transfer form names the payment itself');
   const recent = nodes(root).filter(node => node.type === 'MovementRow');
   assert.equal(recent.length, 2);
   assert.ok(recent.every(node => node.props.context === 'card' && node.props.accountId === 'card-acc'));
@@ -162,7 +165,7 @@ test('card detail lists only that card account with card context and links purch
   const stats = nodes(root).filter(node => node.type === 'Stat').map(node => node.props.label);
   assert.deepEqual(stats, ['Disponible', 'Cierre', 'Vencimiento']);
   assert.ok(nodes(root).filter(node => node.type === 'Money').map(node => node.props.minor).includes(500000 - 13100), 'available limit');
-  assert.ok(nodes(root).some(node => node.type === 'AppText' && node.props.children?.[1] === '$ 5.000,00'), 'the limit is a caption under Disponible');
+  assert.ok(nodes(root).some(node => node.type === 'AppText' && node.props.children === 'de $ 5.000,00'), 'the limit is a caption under Disponible (one catalogue string)');
   const buttons = nodes(root).filter(node => node.type === 'ActionButton').map(node => node.props);
   assert.deepEqual(buttons.map(button => button.label), ['Registrar compra', 'Pagar tarjeta']);
   assert.equal(buttons[1].secondary, true);
@@ -191,5 +194,50 @@ test('debt detail offers a capped payment into the debt and lists its settlement
   assert.deepEqual(list.props.transfers, []);
   assert.equal(find(root, 'Money').props.minor, 30000);
   find(root, 'ActionButton', 'Registrar pago').props.onPress();
-  assert.equal(JSON.stringify(view.pushed[0]), JSON.stringify({ pathname: '/new-transfer', params: { toAccountId: 'debt-acc', title: 'Registrar pago', note: 'Pago a Juan', maxAmountMinor: '30000' } }));
+  assert.equal(JSON.stringify(view.pushed[0]), JSON.stringify({ pathname: '/new-transfer', params: { toAccountId: 'debt-acc', maxAmountMinor: '30000' } }));
+});
+
+test('Tarjetas and Deudas read English labels, keep user names as typed and send the same payment parameters', () => {
+  activeLocale = 'en-AR';
+  try {
+    const cardsView = harness('cards.tsx');
+    const cardsRoot = cardsView.render();
+    const header = nodes(cardsRoot).find(node => node.type === 'Stack.Screen')!.props.options;
+    assert.equal(header.title, 'Cards');
+    assert.deepEqual(nodes(cardsRoot).filter(node => node.type === 'Stat').map(node => node.props.label), ['Available', 'Closing', 'Due']);
+    assert.match(find(cardsRoot, 'SectionTitle').props.caption, /^Statement open since .* · 1 purchase · 1 payment$/);
+    find(cardsRoot, 'ActionButton', 'Pay card').props.onPress();
+    assert.equal(JSON.stringify(cardsView.pushed.at(-1)), JSON.stringify({ pathname: '/new-transfer', params: { toAccountId: 'card-acc', maxAmountMinor: '13100' } }));
+    const face = nodes(cardsRoot).find(node => node.type === 'CardFace')!;
+    assert.equal(face.props.name, 'Visa Gold', 'the card name is user data');
+    assert.equal(face.props.accessibilityHint, 'Opens the card details');
+
+    const detail = harness('card/[id].tsx', { id: 'card' }).render();
+    assert.ok(nodes(detail).some(node => node.type === 'AppText' && node.props.children === 'Recorded balance'));
+    assert.equal(nodes(detail).find(node => node.type === 'Stack.Screen')!.props.options.title, 'Visa Gold');
+
+    const debtView = harness('debt/[id].tsx', { id: 'debt' });
+    const debtRoot = debtView.render();
+    assert.equal(nodes(debtRoot).find(node => node.type === 'Stack.Screen')!.props.options.title, 'Juan', 'the counterparty is user data');
+    assert.ok(nodes(debtRoot).some(node => node.type === 'AppText' && node.props.children === 'Due Oct 1'));
+    const rows = nodes(debtRoot).filter(node => node.type === 'DetailRow').map(node => [node.props.label, node.props.value].join('='));
+    assert.equal(rows.join(','), 'Type=I owe,Due date=Oct 1,Status=Due Oct 1');
+    find(debtRoot, 'ActionButton', 'Record payment').props.onPress();
+    assert.equal(JSON.stringify(debtView.pushed[0]), JSON.stringify({ pathname: '/new-transfer', params: { toAccountId: 'debt-acc', maxAmountMinor: '30000' } }));
+
+    const debtsRoot = harness('debts.tsx').render();
+    assert.equal(nodes(debtsRoot).find(node => node.type === 'Stack.Screen')!.props.options.title, 'Debts & IOUs');
+    assert.deepEqual(nodes(debtsRoot).filter(node => node.type === 'SectionTitle').map(node => node.props.children), ['I owe']);
+  } finally { activeLocale = 'es-AR'; }
+});
+
+test('statement caption and due label keep the Spanish wording and follow a translator', () => {
+  const statement = { startISO: '2026-08-29', purchaseCount: 2, paymentCount: 1 };
+  const relative = (iso: string) => i18nFormat.relativeDate(iso, '2026-09-20');
+  assert.equal(liabilityPresentation.statementCaption(statement, relative), 'Resumen abierto desde 29 ago · 2 compras · 1 pago');
+  assert.equal(liabilityPresentation.statementCaption({ ...statement, purchaseCount: 1, paymentCount: 0 }, relative), 'Resumen abierto desde 29 ago · 1 compra · 0 pagos');
+  assert.equal(liabilityPresentation.statementCaption(statement, iso => i18nFormat.relativeDate(iso, '2026-09-20', 'en-AR'), bindLocale('en-AR').t),
+    'Statement open since Aug 29 · 2 purchases · 1 payment');
+  assert.equal(liabilityPresentation.dueLabel('2026-09-19', '2026-09-20'), domain.labelFromISO('2026-09-19', new Date('2026-09-20T12:00:00')));
+  assert.equal(liabilityPresentation.dueLabel('2026-10-01', '2026-09-20', 'en-US'), 'Oct 1');
 });

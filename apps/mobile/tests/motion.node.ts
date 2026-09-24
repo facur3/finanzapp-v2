@@ -213,7 +213,7 @@ test('form selectors keep the category hue and give the account the interaction 
     './components': { useStacked: () => false, AccountBadge: 'AccountBadge', AppText: 'AppText', CategoryBadge: 'CategoryBadge', DetailRow: 'DetailRow', SelectionRow: 'SelectionRow', Field: 'Field', GlyphTile: 'GlyphTile', PressFeedback: 'PressFeedback', Surface: 'Surface', surfaceShadow: () => ({}) },
     './currencies': currencies,
     '@finanzapp/domain': { todayKey: (d: Date) => d.toISOString().slice(0, 10) },
-    './category-hues': { useCategoryColor: (label: string) => label ? '#B0507A' : '#000', useCategoryDefinitions: () => [], useCategoryLook: (label: string) => ({ label, hex: label ? '#B0507A' : '#000', glyph: 'paw-outline' }), useAccountLookOf: () => () => ({ glyph: 'wallet-outline', hex: '#2557D6' }) },
+    './category-hues': { useCategoryColor: (label: string) => label ? '#B0507A' : '#000', useCategoryDefinitions: () => [], useCategoryLook: (label: string) => ({ label, hex: label ? '#B0507A' : '#000', glyph: 'paw-outline' }), useAccountNameOf: () => (account: any) => account.name, useAccountLookOf: () => () => ({ glyph: 'wallet-outline', hex: '#2557D6' }) },
     './motion': { selectionHaptic: () => {} },
     './theme': { radius: { group: 16 }, usePalette: () => ({ surface: '#fff', text: '#000', primary: '#2557D6', primarySoft: '#E5ECFB', secondary: '#666', tertiary: '#999', background: '#fff', isDark: false }), useReduceMotion: () => true },
     './categories': { categoryChoices: () => [], categoryIcon: () => 'paw-outline', categoryKey: (label: string) => label.toLowerCase(), customCategory: () => null },

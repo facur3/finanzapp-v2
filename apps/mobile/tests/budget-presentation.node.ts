@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import type { MonthlyBudgetSummary, TotalMonthlyBudget, CategoryMonthlyBudget } from '@finanzapp/domain';
-import { budgetHomeHeadline, budgetTone, categoriesStatus, percentUsed } from '../src/ui/budget-presentation.ts';
+import { budgetCategoriesCaption, budgetHomeHeadline, budgetTone, categoriesStatus, percentUsed } from '../src/ui/budget-presentation.ts';
+import { translator } from '../src/i18n/messages.ts';
 
 // Budget states use the domain thresholds and the three existing semantic tones only.
 const createdAt = '2026-09-01T12:00:00.000Z';
@@ -37,4 +38,15 @@ test('Home leads with the general budget, otherwise the tightest sublimit, other
   assert.equal(categoriesStatus(3, 0), '3 categorías en orden');
   assert.equal(categoriesStatus(3, 1), '1 categoría excedida');
   assert.equal(categoriesStatus(3, 2), '2 categorías excedidas');
+});
+
+test('the Por categoría caption counts sublimits, exceeded and near ones, in Spanish and English', () => {
+  const en = translator('en');
+  assert.equal(budgetCategoriesCaption(0, 0, 0), undefined);
+  assert.equal(budgetCategoriesCaption(1, 0, 0), '1 categoría · todas en orden');
+  assert.equal(budgetCategoriesCaption(3, 1, 1), '3 categorías · 1 excedida · 1 cerca del límite');
+  assert.equal(budgetCategoriesCaption(3, 2, 0), '3 categorías · 2 excedidas');
+  assert.equal(budgetCategoriesCaption(1, 0, 0, en), '1 category · all on track');
+  assert.equal(budgetCategoriesCaption(3, 1, 1, en), '3 categories · 1 over · 1 near the limit');
+  assert.equal(categoriesStatus(3, 2, en), '2 categories over');
 });

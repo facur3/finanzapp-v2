@@ -55,3 +55,16 @@ test('partial comparison periods are not mislabeled as full months', () => {
   assert.equal(changePercent(100, 0), '—');
   assert.equal(changePercent(-50, 100), '50\u00A0%');
 });
+
+test('23.1B2: report period labels keep their Spanish wording and read naturally in English', async () => {
+  const { dateRangeLabel } = await import('../src/ui/report-presentation.ts');
+  const { translator } = await import('../src/i18n/messages.ts');
+  const period = { currency: 'ARS' as const, startISO: '2026-08-01', endISO: '2026-08-12' };
+  assert.equal(dateRangeLabel(period), '1–12 de agosto de 2026');
+  assert.equal(dateRangeLabel(period, translator('en'), 'en-US'), 'August 1–12, 2026');
+  assert.equal(reportPeriodLabel(period, '2026-09-12', translator('en')), 'Days 1–12 · ARS');
+  assert.equal(reportPeriodLabel({ ...period, endISO: '2026-08-31' }, '2026-09-12', translator('en')), 'Full month · ARS');
+  assert.equal(reportPeriodLabel({ ...period, startISO: '2026-09-01', endISO: '2026-09-12' }, '2026-09-12'), 'Hasta hoy · ARS');
+  assert.equal(changePercent(-50, 100, 'en-US'), '50%');
+  assert.equal(spendingShare(300, 1000, 'en-US').label, '30%');
+});

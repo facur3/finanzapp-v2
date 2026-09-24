@@ -3,7 +3,11 @@ import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import type { Account, Entry } from '@finanzapp/domain';
 import { SUGGESTIONS, answerContent, categoryOptions, classifyIntent, completeDraft, contentFromResult, conversationReducer, draftGaps,
-  emptyConversation, entryFromDraft, resolveDraft, shouldAutoscroll, type ConversationState } from '../src/assistant/conversation.ts';
+  emptyConversation, entryFromDraft, evidenceLabel, optionText, resolveDraft, shouldAutoscroll, type ConversationState } from '../src/assistant/conversation.ts';
+import { FACT_LABELS, monthlyEvidence } from '../src/integrations/evidence.ts';
+import { integrationClient } from '../src/integrations/client.ts';
+import { translator } from '../src/i18n/messages.ts';
+import { bindLocale } from '../src/i18n/bind.ts';
 import { assistantForEnvironment, disconnectedAssistant, failureReason, remoteAssistant, type AssistantEvent } from '../src/assistant/client.ts';
 import { assistantForBuild } from '../src/assistant/runtime.ts';
 import { FIXTURE_ANSWER, FIXTURE_DRAFT, FIXTURE_DRAFT_NO_ACCOUNT, FIXTURE_FACTS, fixtureAssistant, fixtureReply } from '../src/assistant/fixtures.ts';
@@ -21,6 +25,8 @@ const entries: Entry[] = [
   { id: 'e3', accountId: 'visa', kind: 'expense', amountMinor: 1000, merchant: 'Coto', category: 'Supermercado', dateISO: '2026-09-04', createdAt },
   { id: 'e4', accountId: 'cash', kind: 'income', amountMinor: 1000, merchant: 'Sueldo', category: 'Trabajo', dateISO: '2026-09-05', createdAt },
 ];
+const es = translator('es');
+const en = translator('en');
 const run = (actions: Parameters<typeof conversationReducer>[1][], from: ConversationState = emptyConversation) => actions.reduce(conversationReducer, from);
 async function collect(events: AsyncIterable<AssistantEvent>) { const out: AssistantEvent[] = []; for await (const event of events) out.push(event); return out; }
 
@@ -84,7 +90,12 @@ test('reset returns to the empty conversation without reusing ids', () => {
 });
 
 test('questions are explained against evidence; sentences are parsed as actions', () => {
-  for (const question of SUGGESTIONS.filter(s => s.includes('?'))) assert.equal(classifyIntent(question), 'explain', question);
+  for (const t of [es, en]) {
+    const suggestions = SUGGESTIONS.map(key => t(key));
+    for (const question of suggestions.filter(s => s.includes('?'))) assert.equal(classifyIntent(question), 'explain', question);
+    assert.equal(classifyIntent(t('assistant.suggestions.recordExpense')), 'parse');
+  }
+  assert.equal(classifyIntent('how much did I spend on food'), 'explain');
   assert.equal(classifyIntent('cuánto gasté en comida'), 'explain');
   assert.equal(classifyIntent('Cómo voy con el presupuesto'), 'explain');
   assert.equal(classifyIntent('Registrar un gasto'), 'parse');
@@ -105,12 +116,15 @@ test('a draft with a named account resolves; with several possible accounts it a
   const ambiguous = resolveDraft(FIXTURE_DRAFT_NO_ACCOUNT.draft!, [visa, cash, usd], entries, 'ARS', today);
   assert.equal(ambiguous.kind, 'clarification');
   assert.equal(ambiguous.kind === 'clarification' && ambiguous.field, 'paymentMethod');
-  assert.equal(ambiguous.kind === 'clarification' && ambiguous.question, '¿Con qué lo pagaste?');
+  assert.equal(ambiguous.kind === 'clarification' && ambiguous.question, 'assistant.clarify.paidWith', 'the app\'s own question is a catalogue key');
+  assert.equal(es(ambiguous.kind === 'clarification' ? ambiguous.question : 'common.cancel'), '¿Con qué lo pagaste?');
   assert.deepEqual(ambiguous.kind === 'clarification' ? ambiguous.options.map(o => o.id) : [], ['visa', 'cash'], 'only accounts in the draft currency');
   const single = resolveDraft(FIXTURE_DRAFT_NO_ACCOUNT.draft!, [cash, usd], entries, 'ARS', today);
   assert.equal(single.kind === 'draft' && single.draft.accountId, 'cash', 'one eligible account is implied, not guessed among several');
   const noKind = resolveDraft({ ...FIXTURE_DRAFT.draft!, kind: null }, [visa], entries, 'ARS', today);
   assert.equal(noKind.kind === 'clarification' && noKind.field, 'kind');
+  assert.deepEqual(noKind.kind === 'clarification' ? noKind.options.map(o => optionText(o)) : [], ['Gasto', 'Ingreso']);
+  assert.deepEqual(noKind.kind === 'clarification' ? noKind.options.map(o => optionText(o, en)) : [], ['Expense', 'Income']);
   const noAmount = resolveDraft({ ...FIXTURE_DRAFT.draft!, amountMinor: null }, [visa], entries, 'ARS', today);
   assert.equal(noAmount.kind === 'clarification' && noAmount.field, 'amount');
   assert.equal(noAmount.kind === 'clarification' && noAmount.options.length, 0, 'an amount is typed, not picked');
@@ -122,7 +136,8 @@ test('a draft with a named account resolves; with several possible accounts it a
 test('choosing an option completes the parked draft, or asks the next question, and the draft still needs confirmation', () => {
   const asked = contentFromResult(FIXTURE_DRAFT_NO_ACCOUNT, [], [visa, cash], entries, 'ARS', today);
   assert.equal(asked.content?.kind, 'clarification');
-  assert.equal(asked.text, '¿Con qué lo pagaste?');
+  assert.equal(asked.textKey, 'assistant.clarify.paidWith');
+  assert.equal(asked.text, '', 'no Spanish sentence is stored for the app\'s own question');
   assert.ok(asked.pending);
   const next = completeDraft(asked.pending!, 'cash', [visa, cash], entries, today);
   assert.equal(next.content.kind, 'draft');
@@ -134,7 +149,7 @@ test('choosing an option completes the parked draft, or asks the next question, 
   assert.equal(twoGaps.content?.kind === 'clarification' && twoGaps.content.field, 'kind');
   const afterKind = completeDraft(twoGaps.pending!, 'expense', [visa, cash], entries, today);
   assert.equal(afterKind.content.kind === 'clarification' && afterKind.content.field, 'paymentMethod');
-  assert.equal(afterKind.text, '¿Con qué lo pagaste?');
+  assert.equal(afterKind.textKey, 'assistant.clarify.paidWith');
   assert.ok(afterKind.pending);
   const afterAccount = completeDraft(afterKind.pending!, 'visa', [visa, cash], entries, today);
   assert.equal(afterAccount.content.kind === 'draft' && afterAccount.content.draft.accountId, 'visa');
@@ -143,7 +158,8 @@ test('choosing an option completes the parked draft, or asks the next question, 
 
 test('the reducer records a choice as the user\'s own words and never confirms a draft on its own', () => {
   const asked = contentFromResult(FIXTURE_DRAFT_NO_ACCOUNT, [], [visa, cash], entries, 'ARS', today);
-  const state = run([{ type: 'send', text: 'Gasté 18 mil en el súper' }, { type: 'answer', text: asked.text, content: asked.content, pending: asked.pending }]);
+  const state = run([{ type: 'send', text: 'Gasté 18 mil en el súper' }, { type: 'answer', text: asked.text, textKey: asked.textKey, content: asked.content, pending: asked.pending }]);
+  assert.equal(state.messages[1].role === 'assistant' && state.messages[1].textKey, 'assistant.clarify.paidWith');
   const clarification = state.messages[1];
   const next = completeDraft(state.pending!, 'visa', [visa, cash], entries, today);
   const chosen = run([{ type: 'choose', messageId: clarification.id, optionId: 'visa', label: 'Visa Galicia', next }], state);
@@ -171,24 +187,30 @@ test('a confirmed draft becomes exactly one Entry for the domain to validate; ga
   const entry = entryFromDraft(draft, 'op-1', '2026-09-21T10:00:00.000Z');
   assert.deepEqual(entry, { id: 'op-1', accountId: 'visa', kind: 'expense', amountMinor: 1850000, merchant: 'Carrefour', category: 'Supermercado', dateISO: today, createdAt: '2026-09-21T10:00:00.000Z' });
   assert.deepEqual(draftGaps({ ...draft, merchant: ' ', accountId: null }), ['merchant', 'account']);
-  assert.throws(() => entryFromDraft({ ...draft, accountId: null }, 'op-2', createdAt), /cuenta/);
+  assert.throws(() => entryFromDraft({ ...draft, accountId: null }, 'op-2', createdAt), /^Error: assistant\.draft\.accountRequired$/);
+  assert.equal(bindLocale('es-AR').errorText('assistant.draft.accountRequired'), 'Elegí con qué cuenta se pagó antes de confirmar.');
 });
 
 test('answer rows and links come from the cited evidence: signed differences when both months are cited, absolute otherwise', () => {
   const content = answerContent(FIXTURE_ANSWER, FIXTURE_FACTS, 'ARS');
-  assert.deepEqual(content.rows.map(row => [row.label, row.amountMinor, row.signed]), [
+  assert.deepEqual(content.rows.map(row => [evidenceLabel(row), row.amountMinor, row.signed]), [
     ['Gastos registrados', 8430000, true], ['Restaurantes', 4250000, true], ['Supermercado', 3120000, true], ['Transporte', 890000, true]]);
-  assert.deepEqual(content.links.map(link => link.label), ['Ver movimientos'], 'three categories cited: no single category link');
+  assert.deepEqual(content.rows.map(row => row.subject.kind), ['expenses', 'category', 'category', 'category'], 'rows are named from the fact id, not its label');
+  assert.deepEqual(content.links.map(link => link.id), ['movements'], 'three categories cited: no single category link');
   const single = answerContent({ factIds: ['current.category.1'] }, FIXTURE_FACTS, 'ARS');
-  assert.deepEqual(single.rows.map(row => [row.label, row.amountMinor, row.signed]), [['Supermercado', 12120000, false]]);
-  assert.deepEqual(single.links.map(link => link.label), ['Ver categoría', 'Ver movimientos']);
+  assert.deepEqual(single.rows.map(row => [evidenceLabel(row), row.amountMinor, row.signed]), [['Supermercado', 12120000, false]]);
+  assert.deepEqual(single.links.map(link => link.id), ['category', 'movements']);
   assert.deepEqual(single.links[0].href, { pathname: '/spending-detail', params: { currency: 'ARS', startISO: '2026-09-01', endISO: '2026-09-21', category: 'Supermercado' } });
   const none = answerContent({ factIds: [] }, FIXTURE_FACTS, 'ARS');
   assert.deepEqual(none, { kind: 'answer', rows: [], links: [] }, 'prose without evidence gets no numbers and no links');
   const unknown = answerContent({ factIds: ['ghost'] }, FIXTURE_FACTS, 'ARS');
   assert.equal(unknown.rows.length, 0, 'an id that is not local evidence is ignored, never invented');
   const budget = answerContent({ factIds: ['budget.total'] }, [{ id: 'budget.total', label: 'Presupuesto general', amountMinor: 1, count: 1, startISO: today, endISO: today }], 'ARS');
-  assert.deepEqual(budget.links.map(link => link.label), ['Ver presupuesto', 'Ver movimientos']);
+  assert.deepEqual(budget.links.map(link => link.id), ['budget', 'movements']);
+  const unnamed = answerContent({ factIds: ['current.budget.total'] }, [{ id: 'current.budget.total', label: 'Presupuesto general', amountMinor: 1, count: 1, startISO: today, endISO: today }], 'ARS');
+  assert.equal(evidenceLabel(unnamed.rows[0], en), 'Presupuesto general', 'a fact this build cannot name shows its protocol label');
+  const previousOnly = answerContent({ factIds: ['previous.category.0'] }, FIXTURE_FACTS, 'ARS');
+  assert.equal(evidenceLabel(previousOnly.rows[0]), 'Restaurantes (mes anterior)');
 });
 
 test('categoryOptions counts by identity and caps the chips', () => {
@@ -238,6 +260,11 @@ test('the remote client wraps the existing endpoint contract and maps failures t
   assert.equal(failureReason(new Error('Llegaste al límite de uso.')), 'limit');
   assert.equal(failureReason(new Error('Iniciá sesión para usar la integración.')), 'session');
   assert.equal(failureReason(new Error('boom')), 'failed');
+  // The integration client throws catalogue keys; classification reads the key, never translated copy.
+  assert.equal(failureReason(new Error('assistant.integration.limit')), 'limit');
+  assert.equal(failureReason(new Error('assistant.integration.unavailable')), 'unavailable');
+  assert.equal(failureReason(new Error('assistant.integration.signIn')), 'session');
+  assert.equal(failureReason(new Error('assistant.integration.failed')), 'failed');
   // An aborted ask yields nothing after the abort: the screen stopped listening.
   const controller = new AbortController();
   controller.abort();
@@ -263,4 +290,42 @@ test('fixtures are scripted, stream word by word and stay out of the production 
   assert.equal(/from '\.\/fixtures/.test(clientSource), false);
   const route = readFileSync(new URL('../app/(tabs)/assistant.tsx', import.meta.url), 'utf8');
   assert.equal(/fixtures/.test(route), false, 'the screen asks the runtime for a client and never touches fixtures');
+});
+
+test('English: the app\'s own words translate, the model\'s words, the user\'s data and the protocol stay as they are', async () => {
+  // Evidence rows are named from the fact id; a built-in category name is resolved by the screen, a custom one is the user's.
+  const content = answerContent(FIXTURE_ANSWER, FIXTURE_FACTS, 'ARS');
+  const names: Record<string, string> = { Restaurantes: 'Restaurants', Supermercado: 'Groceries', Transporte: 'Transport' };
+  assert.deepEqual(content.rows.map(row => evidenceLabel(row, en, stored => names[stored] ?? stored)), ['Recorded expenses', 'Restaurants', 'Groceries', 'Transport']);
+  assert.equal(evidenceLabel(answerContent({ factIds: ['previous.category.0'] }, [{ ...FIXTURE_FACTS[3], id: 'previous.category.0', label: FACT_LABELS.categoryPrefix + 'Kiosco Pepe' }], 'ARS').rows[0], en),
+    'Kiosco Pepe (previous month)', 'a custom category is never translated');
+  // The link to the category still carries the stored name, whatever the language.
+  const single = answerContent({ factIds: ['current.category.1'] }, FIXTURE_FACTS, 'ARS');
+  assert.equal(single.links[0].href.params?.category, 'Supermercado');
+  assert.deepEqual(single.links.map(link => en(`assistant.links.${link.id}`)), ['View category', 'View transactions']);
+  // Clarifications and notes: keys that read in English; the model's message is never touched.
+  const draft = contentFromResult(FIXTURE_DRAFT, [], [visa, cash], entries, 'ARS', today);
+  assert.equal(draft.text, FIXTURE_DRAFT.message, 'the model\'s prose is content, stored as it arrived');
+  assert.equal(draft.textKey, undefined);
+  const asked = contentFromResult(FIXTURE_DRAFT_NO_ACCOUNT, [], [visa, cash], entries, 'ARS', today);
+  assert.equal(en(asked.textKey!), 'What did you pay with?');
+  assert.equal(en(completeDraft(asked.pending!, 'cash', [visa, cash], entries, today).textKey), 'Review the draft before saving it.');
+  const english = bindLocale('en-AR');
+  assert.equal(english.errorText('assistant.reasons.offline'), 'No connection. Your transactions didn’t change; you can retry.');
+  assert.equal(english.errorText('assistant.draft.accountRequired'), 'Choose which account paid before confirming.');
+  // The Entry a confirmed draft becomes does not depend on the language.
+  const resolved = resolveDraft(FIXTURE_DRAFT.draft!, [visa, cash], entries, 'ARS', today);
+  assert.deepEqual(entryFromDraft(resolved.kind === 'draft' ? resolved.draft : null!, 'op-1', createdAt).category, 'Supermercado');
+  // Protocol: the facts sent to the server keep their Spanish labels.
+  const snapshot: import('@finanzapp/domain').LedgerSnapshot = { accounts: [cash], entries: [
+    { id: 'x1', accountId: 'cash', kind: 'expense', amountMinor: 1000, merchant: 'Coto', category: 'Supermercado', dateISO: '2026-09-02', createdAt }], transfers: [] };
+  const facts = monthlyEvidence(snapshot, 'ARS', today);
+  assert.ok(facts.some(fact => fact.label === 'Gastos registrados'));
+  assert.ok(facts.some(fact => fact.label === 'Categoría de gasto: Supermercado'));
+  // The integration client's own failures are keys, translated at display.
+  assert.throws(() => integrationClient('http://insecure', async () => 't'), /^Error: assistant\.integration\.httpsOrigin$/);
+  const signedOut = integrationClient('https://finanzapp.example', async () => null);
+  await assert.rejects(signedOut.assistant({ version: 1, action: 'parse', text: 'x', todayISO: today, currency: 'ARS', facts: [] }), /^Error: assistant\.integration\.signIn$/);
+  assert.equal(bindLocale('es-AR').errorText('assistant.integration.signIn'), 'Iniciá sesión para usar la integración. El registro manual sigue disponible.');
+  assert.equal(english.errorText('assistant.integration.signIn'), 'Sign in to use the integration. Manual entry is still available.');
 });

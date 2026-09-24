@@ -36,3 +36,15 @@ export function categoriesStatus(categories: number, exceeded: number, t: Transl
   if (exceeded) return t('budgetStatus.exceeded', { count: exceeded });
   return t('budgetStatus.inOrder', { count: categories });
 }
+
+/** The caption of Presupuestos' "Por categoría" section: "3 categorías · 1
+ * excedida · 1 cerca del límite", or "… · todas en orden" when none needs
+ * attention; nothing without sublimits. */
+export function budgetCategoriesCaption(categories: number, exceeded: number, near: number, t: Translate = translator('es')): string | undefined {
+  if (!categories) return undefined;
+  const parts = [t('budgets.caption.categories', { count: categories })];
+  if (exceeded) parts.push(t('budgets.caption.exceeded', { count: exceeded }));
+  if (near) parts.push(t('budgets.caption.near', { count: near }));
+  if (!exceeded && !near) parts.push(t('budgets.caption.allInOrder'));
+  return parts.join(' · ');
+}

@@ -9,7 +9,7 @@ import * as currencies from '../src/ui/currencies.ts';
 import * as categories from '../src/ui/categories.ts';
 import * as i18nFormat from '../src/i18n/format.ts';
 import { bindLocale } from '../src/i18n/bind.ts';
-const i18nProvider = { useI18n: () => bindLocale('es-AR') };
+import type { AppLocale } from '../src/i18n/locale.ts';
 
 // Producto 20: the account forms, the category form and the selectors, with
 // native hosts replaced by descriptors. Handler logic only; not a rendered
@@ -24,7 +24,10 @@ const bankLook = domain.makeAccountAppearance(cash.id, 'bank', 'azure', createdA
 const entry: domain.Entry = { id: 'e1', accountId: cash.id, kind: 'expense', amountMinor: 3000, merchant: 'Kiosco', category: 'sjsjn', dateISO: '2026-09-10', createdAt };
 const archive: domain.LedgerArchive = { accounts: [cash, usd, cardAccount], records: [domain.initialRecord(entry)], cards: [card], appearances: [bankLook] };
 
-function harness(file: string, props: any = {}, options: { data?: domain.LedgerArchive; params?: any; fail?: () => void } = {}) {
+function harness(file: string, props: any = {}, options: { data?: domain.LedgerArchive; params?: any; fail?: () => void; locale?: AppLocale } = {}) {
+  // Read on every render, like the live provider: switching it re-labels the next render and keeps the form state.
+  let locale: AppLocale = options.locale ?? 'es-AR';
+  const i18nProvider = { useI18n: () => bindLocale(locale) };
   const source = readFileSync(new URL('../' + file, import.meta.url), 'utf8');
   const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText;
   const state: any[] = [], refs: any[] = [];
@@ -83,7 +86,7 @@ function harness(file: string, props: any = {}, options: { data?: domain.LedgerA
   return {
     render: (component?: string) => { cursor = 0; refCursor = 0; let node = (component ? module.exports[component] : module.exports.default ?? module.exports.CategoryForm)(props);
       while (typeof node.type === 'function') node = node.type(node.props); return node; },
-    pushed, alerts, added, changed, looks, definitions, backs: () => backs,
+    pushed, alerts, added, changed, looks, definitions, backs: () => backs, setLocale: (next: AppLocale) => { locale = next; },
   };
 }
 function nodes(value: any): Node[] {
@@ -188,7 +191,9 @@ test('category form: create adds a definition available at once; a taken name is
   const taken = harness('src/ui/category-form.tsx', {});
   find(taken.render(), 'Field').props.onChangeText('comida');
   await find(taken.render(), 'ActionButton').props.onPress();
-  assert.match(find(taken.render(), 'ErrorMessage').props.message, /Ya existe/);
+  const takenMessage = find(taken.render(), 'ErrorMessage').props.message;
+  assert.equal(takenMessage, 'categoryManager.form.nameTaken', 'the form stores its own error as a catalogue key');
+  assert.match(bindLocale('es-AR').errorText(takenMessage), /^Ya existe una categoría con ese nombre/);
   assert.equal(taken.definitions.length, 0);
 });
 test('category form: renaming a preset keeps its stored spelling and identity; an unchanged save closes without writing', async () => {
@@ -287,7 +292,8 @@ test('the category picker shows display names, records the stored spelling, and 
 
 // The shared picker on its own module: names for VoiceOver, one haptic per
 // change, no motion under Reduce Motion. Layout and touch need the iPhone.
-function pickerHarness(props: any, reduced: boolean) {
+function pickerHarness(props: any, reduced: boolean, locale: AppLocale = 'es-AR') {
+  const i18nProvider = { useI18n: () => bindLocale(locale) };
   const source = readFileSync(new URL('../src/ui/appearance-picker.tsx', import.meta.url), 'utf8');
   const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText;
   const jsx = (type: Node['type'], props: Node['props']) => ({ type, props });
@@ -353,4 +359,112 @@ test('Reduce Motion removes the picker transitions; disabled locks every option'
   const radios = deep(root).filter(node => node.type === 'PressFeedback' && node.props.accessibilityRole === 'radio');
   assert.ok(radios.every(node => node.props.disabled && node.props.accessibilityState.disabled));
   assert.equal(deep(root).find(node => node.type === 'AppText' && String(node.props.children).includes('Sin nombre')) !== undefined, true, 'no name yet reads honestly');
+});
+
+// Producto 23.1B2: the category form and the picker in English. Only words
+// change: a built-in category shows its English name, but its identity, its
+// stored spelling and the definition's label stay the Spanish ones, so an
+// untouched English name is never saved as a rename.
+const texts = (root: Node) => nodes(root).filter(node => node.type === 'AppText').map(node => [node.props.children].flat().join('')).join(' ');
+test('23.1B2 English category form: a built-in category is prefilled in English, and saving it untouched never stores the English word', async () => {
+  const original = domain.resolveCategory('expense', 'Comida');
+  const view = harness('src/ui/category-form.tsx', { original }, { locale: 'en-AR' });
+  let root = view.render();
+  assert.equal(find(root, 'Field').props.value, 'Food', 'the displayed name follows the language');
+  assert.equal(find(root, 'Field').props.label, 'Name');
+  assert.equal(nodes(root).find(node => node.type === 'Stack.Screen')!.props.options.title, 'Edit category');
+  assert.ok(find(root, 'ActionButton', 'Save changes'));
+  assert.ok(find(root, 'ActionButton', 'Archive category'));
+  assert.doesNotMatch(texts(root), /still recorded as/, 'the English prefill is not a rename');
+  await find(root, 'ActionButton', 'Save changes').props.onPress();
+  assert.equal(view.definitions.length, 0, 'an untouched save writes nothing');
+  assert.equal(view.backs(), 1);
+  // A look-only change adopts the preset with its Spanish label and spelling, exactly as in Spanish.
+  find(root, 'IconColorPicker').props.onColorChange('green');
+  root = view.render();
+  await find(root, 'ActionButton', 'Save changes').props.onPress();
+  const spanish = harness('src/ui/category-form.tsx', { original });
+  find(spanish.render(), 'IconColorPicker').props.onColorChange('green');
+  await find(spanish.render(), 'ActionButton', 'Guardar cambios').props.onPress();
+  assert.deepEqual({ ...view.definitions[0], createdAt: '', updatedAt: '' }, { ...spanish.definitions[0], createdAt: '', updatedAt: '' });
+  assert.deepEqual([view.definitions[0].key, view.definitions[0].storedLabel, view.definitions[0].label, view.definitions[0].color], ['comida', 'Comida', 'Comida', 'green']);
+  // A preset that already has a definition (only its look changed) keeps its label on the next revision too.
+  const decorated = domain.resolveCategory('expense', 'Comida', [view.definitions[0]]);
+  const next = harness('src/ui/category-form.tsx', { original: decorated }, { locale: 'en-AR' });
+  assert.equal(find(next.render(), 'Field').props.value, 'Food');
+  find(next.render(), 'IconColorPicker').props.onIconChange('cafe');
+  await find(next.render(), 'ActionButton', 'Save changes').props.onPress();
+  assert.deepEqual([next.definitions[0].label, next.definitions[0].storedLabel, next.definitions[0].icon, next.definitions[0].revision], ['Comida', 'Comida', 'cafe', 1]);
+  // Switching to Spanish with the English prefill still on screen does not turn it into a rename either.
+  const switching = harness('src/ui/category-form.tsx', { original }, { locale: 'en-AR' });
+  switching.render();
+  switching.setLocale('es-AR');
+  root = switching.render();
+  assert.equal(find(root, 'Field').props.value, 'Food', 'the draft is kept across the switch');
+  assert.ok(find(root, 'ActionButton', 'Guardar cambios'));
+  await find(root, 'ActionButton', 'Guardar cambios').props.onPress();
+  assert.equal(switching.definitions.length, 0);
+});
+test('23.1B2 English category form: a typed name is a real rename; custom and renamed names are never translated; archive and create read in English', async () => {
+  const original = domain.resolveCategory('expense', 'Comida');
+  const view = harness('src/ui/category-form.tsx', { original }, { locale: 'en-AR' });
+  find(view.render(), 'Field').props.onChangeText('Meals');
+  let root = view.render();
+  assert.match(texts(root), /Transactions are still recorded as “Comida” and shown as “Meals”\./);
+  await find(root, 'ActionButton', 'Save changes').props.onPress();
+  assert.deepEqual([view.definitions[0].key, view.definitions[0].storedLabel, view.definitions[0].label], ['comida', 'Comida', 'Meals']);
+  // The person's own words read the same in every language.
+  const renamed = domain.editedCategoryDefinition(original, { label: 'Alimentación' }, createdAt);
+  assert.equal(find(harness('src/ui/category-form.tsx', { original: domain.resolveCategory('expense', 'Comida', [renamed]) }, { locale: 'en-AR' }).render(), 'Field').props.value, 'Alimentación');
+  assert.equal(find(harness('src/ui/category-form.tsx', { original: domain.resolveCategory('expense', 'sjsjn') }, { locale: 'en-AR' }).render(), 'Field').props.value, 'sjsjn');
+  // Archiving asks in English, names the category as shown, and stores the Spanish identity.
+  const archiving = harness('src/ui/category-form.tsx', { original }, { locale: 'en-AR' });
+  find(archiving.render(), 'ActionButton', 'Archive category').props.onPress();
+  assert.equal(archiving.alerts[0].title, 'Archive category?');
+  assert.match(archiving.alerts[0].message, /^“Food” will no longer be offered/);
+  assert.equal(archiving.alerts[0].buttons.map((button: any) => button.text).join(','), 'Cancel,Archive');
+  archiving.alerts[0].buttons[1].onPress(); await flush();
+  assert.deepEqual([archiving.definitions[0].label, archiving.definitions[0].storedLabel, archiving.definitions[0].archived], ['Comida', 'Comida', true]);
+  // Creating: English labels, the same definition as Spanish, and the form's own error in English.
+  const create = harness('src/ui/category-form.tsx', {}, { locale: 'en-AR' });
+  root = create.render();
+  assert.equal(nodes(root).find(node => node.type === 'Stack.Screen')!.props.options.title, 'New category');
+  assert.equal(find(root, 'Choices').props.options.map((option: any) => option.label).join(','), 'Expense,Income');
+  assert.equal(find(root, 'Field').props.placeholder, 'e.g. Snacks');
+  assert.match(texts(root), /available right away when recording expenses/);
+  find(root, 'Field').props.onChangeText('Kiosco');
+  await find(create.render(), 'ActionButton', 'Create category').props.onPress();
+  assert.deepEqual([create.definitions[0].storedLabel, create.definitions[0].label], ['Kiosco', 'Kiosco']);
+  const taken = harness('src/ui/category-form.tsx', {}, { locale: 'en-AR' });
+  find(taken.render(), 'Field').props.onChangeText('comida');
+  await find(taken.render(), 'ActionButton').props.onPress();
+  assert.equal(bindLocale('en-AR').errorText(find(taken.render(), 'ErrorMessage').props.message), 'A category with that name already exists. Edit it from the list or choose another name.');
+  assert.equal(taken.definitions.length, 0);
+});
+test('23.1B2 English picker: icon and colour names come from the catalogue by id; the account set reads its own names; ids are unchanged', () => {
+  const chosen: string[] = [];
+  const view = pickerHarness({ icons: appearance.ACCOUNT_ICON_CHOICES, colors: appearance.COLOR_CHOICES, icon: 'investment', color: 'azure',
+    onIconChange: (id: string) => chosen.push(id), onColorChange: (id: string) => chosen.push(id), previewLabel: 'Banco Galicia' }, false, 'en-AR');
+  const root = view.render();
+  const radios = deep(root).filter(node => node.type === 'PressFeedback' && node.props.accessibilityRole === 'radio');
+  const labels = radios.map(node => node.props.accessibilityLabel);
+  assert.ok(labels.includes('Bank') && labels.includes('Digital wallet') && labels.includes('Sky blue') && labels.includes('Graphite'), labels.join(','));
+  assert.equal(labels.some(label => /[áéíóú]|Billetera|Celeste/.test(label)), false, 'no Spanish name left');
+  assert.equal(deep(root).find(node => node.type === 'View' && node.props.accessible)!.props.accessibilityLabel, 'Preview: Investment in Sky blue');
+  assert.ok(deep(root).some(node => node.type === 'AppText' && String(node.props.children) === 'Banco Galicia'), 'the account name is the person\'s, untranslated');
+  assert.ok(deep(root).some(node => node.type === 'AppText' && String(node.props.children) === 'Icon'));
+  radios.find(node => node.props.accessibilityLabel === 'Cash')!.props.onPress();
+  radios.find(node => node.props.accessibilityLabel === 'Teal')!.props.onPress();
+  assert.deepEqual(chosen, ['cash', 'teal'], 'the stored values are ids, never names');
+  const categories = pickerHarness({ icons: appearance.CATEGORY_ICON_CHOICES, colors: appearance.COLOR_CHOICES, icon: 'investment', color: 'rose',
+    onIconChange: () => {}, onColorChange: () => {} }, false, 'en-AR').render();
+  assert.equal(deep(categories).find(node => node.type === 'View' && node.props.accessible)!.props.accessibilityLabel, 'Preview: Investments in Rose', 'the category set names the same id differently');
+  assert.ok(deep(categories).some(node => node.type === 'AppText' && String(node.props.children) === 'No name'));
+  // Spanish reads the same names the domain always had.
+  const spanish = pickerHarness({ icons: appearance.CATEGORY_ICON_CHOICES, colors: appearance.COLOR_CHOICES, icon: 'investment', color: 'rose', onIconChange: () => {}, onColorChange: () => {} }, false).render();
+  assert.equal(deep(spanish).find(node => node.type === 'View' && node.props.accessible)!.props.accessibilityLabel, 'Vista previa: Inversiones en Rosa');
+  const es = bindLocale('es-AR').t;
+  for (const [group, list] of [['icons', domain.CATEGORY_ICONS], ['accountIcons', domain.ACCOUNT_ICONS], ['colors', domain.APPEARANCE_COLORS]] as const) {
+    for (const item of list) assert.equal(es(`categoryManager.${group}.${item.id}` as any), item.name, 'the Spanish catalogue matches the domain name of ' + group + '.' + item.id);
+  }
 });

@@ -78,7 +78,7 @@ function harness(file: string, props: any = {}, options: { data?: domain.LedgerA
     './theme': { space: { xs: 4, s: 8, m: 12, l: 16, xl: 20, xxl: 24, xxxl: 32 }, usePalette: () => ({ background: '#fff' }) },
     './entry-form': { EntryForm: 'EntryForm' }, './transfer-form': { TransferForm: 'TransferForm' },
     './motion': { ValueTransition: 'ValueTransition' },
-    './category-hues': { useCategoryColor: () => '#3E6FB0', useCategoryLabel: (s: string) => s, useCategoryDefinitions: () => [], useCategoryLook: (s: string) => ({ label: s, storedLabel: s, key: String(s).toLowerCase(), hex: '#3E6FB0', glyph: 'pricetag-outline' }), useCategoryLookOf: () => (s: string) => ({ label: s, storedLabel: s, key: String(s).toLowerCase(), hex: '#3E6FB0', glyph: 'pricetag-outline' }), useAccountLook: () => ({ icon: 'wallet', color: 'cobalt', glyph: 'wallet-outline', hex: '#2557D6' }), useAccountLookOf: () => () => ({ icon: 'wallet', color: 'cobalt', glyph: 'wallet-outline', hex: '#2557D6' }) }, '../src/ui/category-hues': { useCategoryColor: () => '#3E6FB0', useCategoryLabel: (s: string) => s, useCategoryDefinitions: () => [], useCategoryLook: (s: string) => ({ label: s, storedLabel: s, key: String(s).toLowerCase(), hex: '#3E6FB0', glyph: 'pricetag-outline' }), useCategoryLookOf: () => (s: string) => ({ label: s, storedLabel: s, key: String(s).toLowerCase(), hex: '#3E6FB0', glyph: 'pricetag-outline' }), useAccountLook: () => ({ icon: 'wallet', color: 'cobalt', glyph: 'wallet-outline', hex: '#2557D6' }), useAccountLookOf: () => () => ({ icon: 'wallet', color: 'cobalt', glyph: 'wallet-outline', hex: '#2557D6' }) }, '../../src/ui/category-hues': { useCategoryColor: () => '#3E6FB0', useCategoryLabel: (s: string) => s, useCategoryDefinitions: () => [], useCategoryLook: (s: string) => ({ label: s, storedLabel: s, key: String(s).toLowerCase(), hex: '#3E6FB0', glyph: 'pricetag-outline' }), useCategoryLookOf: () => (s: string) => ({ label: s, storedLabel: s, key: String(s).toLowerCase(), hex: '#3E6FB0', glyph: 'pricetag-outline' }), useAccountLook: () => ({ icon: 'wallet', color: 'cobalt', glyph: 'wallet-outline', hex: '#2557D6' }), useAccountLookOf: () => () => ({ icon: 'wallet', color: 'cobalt', glyph: 'wallet-outline', hex: '#2557D6' }) },
+    './category-hues': { useCategoryColor: () => '#3E6FB0', useCategoryLabel: (s: string) => s, useCategoryDefinitions: () => [], useCategoryLook: (s: string) => ({ label: s, storedLabel: s, key: String(s).toLowerCase(), hex: '#3E6FB0', glyph: 'pricetag-outline' }), useCategoryLookOf: () => (s: string) => ({ label: s, storedLabel: s, key: String(s).toLowerCase(), hex: '#3E6FB0', glyph: 'pricetag-outline' }), useAccountLook: () => ({ icon: 'wallet', color: 'cobalt', glyph: 'wallet-outline', hex: '#2557D6' }), useAccountNameOf: () => (account: any) => account.name, useAccountLookOf: () => () => ({ icon: 'wallet', color: 'cobalt', glyph: 'wallet-outline', hex: '#2557D6' }) }, '../src/ui/category-hues': { useCategoryColor: () => '#3E6FB0', useCategoryLabel: (s: string) => s, useCategoryDefinitions: () => [], useCategoryLook: (s: string) => ({ label: s, storedLabel: s, key: String(s).toLowerCase(), hex: '#3E6FB0', glyph: 'pricetag-outline' }), useCategoryLookOf: () => (s: string) => ({ label: s, storedLabel: s, key: String(s).toLowerCase(), hex: '#3E6FB0', glyph: 'pricetag-outline' }), useAccountLook: () => ({ icon: 'wallet', color: 'cobalt', glyph: 'wallet-outline', hex: '#2557D6' }), useAccountNameOf: () => (account: any) => account.name, useAccountLookOf: () => () => ({ icon: 'wallet', color: 'cobalt', glyph: 'wallet-outline', hex: '#2557D6' }) }, '../../src/ui/category-hues': { useCategoryColor: () => '#3E6FB0', useCategoryLabel: (s: string) => s, useCategoryDefinitions: () => [], useCategoryLook: (s: string) => ({ label: s, storedLabel: s, key: String(s).toLowerCase(), hex: '#3E6FB0', glyph: 'pricetag-outline' }), useCategoryLookOf: () => (s: string) => ({ label: s, storedLabel: s, key: String(s).toLowerCase(), hex: '#3E6FB0', glyph: 'pricetag-outline' }), useAccountLook: () => ({ icon: 'wallet', color: 'cobalt', glyph: 'wallet-outline', hex: '#2557D6' }), useAccountNameOf: () => (account: any) => account.name, useAccountLookOf: () => () => ({ icon: 'wallet', color: 'cobalt', glyph: 'wallet-outline', hex: '#2557D6' }) },
     '../src/ui/appearance': appearance, '../../src/ui/appearance': appearance,
     '../src/ui/appearance-picker': { IconColorPicker: 'IconColorPicker' }, '../../src/ui/appearance-picker': { IconColorPicker: 'IconColorPicker' },
   };
@@ -220,7 +220,9 @@ test('oversized files are rejected before reading their content', async () => {
     result: { size: domain.BACKUP_MAX_BYTES + 1, text: async () => { reads++; return '{}'; } } }) });
   await find(view.render(), 'ActionButton', 'Elegir copia').props.onPress();
   assert.equal(reads, 0);
-  assert.match(find(view.render(), 'ErrorMessage').props.message, /5 MB/);
+  const message = find(view.render(), 'ErrorMessage').props.message;
+  assert.equal(message, 'backup.import.tooLarge');
+  assert.match(bindLocale('es-AR').errorText(message), /^La copia supera 5 MB/);
 });
 test('backup preview shows exact totals, cancel stays read-only, confirm waits for storage', async () => {
   const json = JSON.stringify(domain.createRecoveryBackup(archive));
@@ -422,6 +424,41 @@ test('card payment locks the card as destination, caps at the recorded debt and 
   assert.equal(view.additions.length, 0);
 });
 
+test('a card payment, debt payment and collection name themselves and write the default note in the active language', async () => {
+  const receivableAccount: domain.Account = { ...account, id: 'rec-acc', name: 'Me deben · Ana', openingMinor: 4000 };
+  const receivable: domain.PersonalDebtProfile = { ...debt, id: 'rec', accountId: receivableAccount.id, direction: 'owed_to_me', counterparty: 'Ana' };
+  const data = { ...liabilityData, accounts: [...liabilityData.accounts, receivableAccount], debts: [debt, receivable] };
+  const title = (root: Node) => nodes(root).find(node => node.type === 'Stack.Screen')!.props.options.title;
+  const cases = [
+    [{ toAccountId: 'card-acc', maxAmountMinor: '5000' }, 'Pagar tarjeta', 'Pago Visa', 'Pay card', 'Visa payment'],
+    [{ toAccountId: 'debt-acc', maxAmountMinor: '7000' }, 'Registrar pago', 'Pago a Juan', 'Record payment', 'Payment to Juan'],
+    [{ fromAccountId: 'rec-acc', maxAmountMinor: '4000' }, 'Registrar cobro', 'Cobro de Ana', 'Record collection', 'Collection from Ana'],
+  ] as const;
+  for (const [props, esTitle, esNote, enTitle, enNote] of cases) {
+    const spanish = harness('src/ui/transfer-form.tsx', props, { data }).render();
+    assert.equal(title(spanish), esTitle);
+    assert.equal(find(spanish, 'Field').props.value, esNote);
+    const view = harness('src/ui/transfer-form.tsx', props, { data, locale: 'en-AR' });
+    const english = view.render();
+    assert.equal(title(english), enTitle);
+    assert.equal(find(english, 'Field').props.value, enNote, 'the counterparty and card name stay as typed');
+    // The title follows a language change; the note is the user's text from the moment the form opened.
+    view.setLocale('es-AR');
+    assert.equal(title(view.render()), esTitle);
+    assert.equal(find(view.render(), 'Field').props.value, enNote);
+  }
+  // An older deep link with a Spanish title no longer fixes the header; a caller's note still wins.
+  const legacy = harness('src/ui/transfer-form.tsx', { toAccountId: 'card-acc', title: 'Pagar tarjeta', defaultNote: 'Resumen julio' }, { data, locale: 'en-AR' });
+  assert.equal(title(legacy.render()), 'Pay card');
+  assert.equal(find(legacy.render(), 'Field').props.value, 'Resumen julio');
+  // Saving writes the same record shape in English: amounts, accounts and the note as shown.
+  const view = harness('src/ui/transfer-form.tsx', { toAccountId: 'card-acc', maxAmountMinor: '5000' }, { data, locale: 'en-AR' });
+  find(view.render(), 'AmountField').props.onChangeText('50');
+  await find(view.render(), 'ActionButton', 'Record payment').props.onPress();
+  assert.deepEqual([view.transfers[0].fromAccountId, view.transfers[0].toAccountId, view.transfers[0].amountMinor, view.transfers[0].note], ['a', 'card-acc', 5000, 'Visa payment']);
+  assert.equal(view.additions.length, 0);
+});
+
 test('a plain transfer between accounts never lists cards or debts, while editing one keeps its original accounts', async () => {
   const view = harness('src/ui/transfer-form.tsx', { accountId: 'a' }, { data: liabilityData });
   assert.deepEqual(find(view.render(), 'AccountField', 'Desde').props.accounts.map((item: domain.Account) => item.id), ['a', 'u']);
@@ -616,4 +653,77 @@ test('English movement detail and transfer form: titles, rows, confirmation and 
   assert.equal(find(form, 'AmountField').props.label, 'Transfer');
   assert.equal(find(form, 'Field').props.label, 'Note (optional)');
   assert.equal(find(form, 'ActionButton').props.label, 'Record transfer');
+});
+
+test('in English the account forms and the balance correction read in English and write exactly what Spanish writes', async () => {
+  const correct = async (locale: AppLocale) => {
+    const view = harness('app/edit-account/[id].tsx', {}, { params: { id: 'a' }, locale });
+    find(view.render(), 'AmountField').props.onChangeText('500');
+    find(view.render(), 'ActionButton').props.onPress();
+    view.alerts[0].buttons[1].onPress(); await flush();
+    return view;
+  };
+  const english = await correct('en-AR'), spanish = await correct('es-AR');
+  const root = english.render();
+  assert.equal(find(root, 'Stack.Screen').props.options.title, 'Edit account');
+  assert.equal(find(root, 'Field').props.label, 'Account name');
+  assert.equal(find(root, 'Field').props.value, 'Prueba ARS', 'the account name is never translated');
+  assert.equal(find(root, 'AmountField').props.label, 'Recorded balance');
+  assert.equal(english.alerts[0].title, 'Correct the balance?');
+  assert.equal(english.alerts[0].message, 'Prueba ARS: from 876,55 to 500,00 ARS. The opening balance will be adjusted; your transactions don’t change. This is not income or a transfer.');
+  assert.equal(spanish.alerts[0].message, 'Prueba ARS: de 876,55 a 500,00 ARS. Se ajustará el saldo inicial; tus movimientos no cambian. No es un ingreso ni una transferencia.');
+  assert.equal(english.alerts[0].buttons.map((button: any) => button.text).join(','), 'Cancel,Correct balance');
+  const stable = (change: domain.AccountChange) => JSON.stringify({ ...change, id: '', createdAt: '', after: { ...change.after, updatedAt: '' } });
+  assert.equal(stable(english.accountChanges[0]), stable(spanish.accountChanges[0]));
+  const created = harness('app/new-account.tsx', {}, { locale: 'en-AR' });
+  let form = created.render();
+  assert.equal(find(form, 'Field').props.placeholder, 'e.g. Bank, Cash, Brokerage');
+  assert.equal(find(form, 'AmountField').props.label, 'Opening balance');
+  assert.equal(find(form, 'ActionButton').props.label, 'Save account');
+  find(form, 'Field').props.onChangeText('Caja de ahorro');
+  await find(created.render(), 'ActionButton').props.onPress();
+  assert.equal(created.newAccounts[0].name, 'Caja de ahorro');
+  assert.equal(created.newAccounts[0].openingMinor, 0);
+});
+
+// Producto 23.1B2: the backup review in English. The copy, the counts'
+// labels, the confirmation and the conflict message change; the file that is
+// read, the preview and what is restored are exactly the Spanish ones.
+test('23.1B2 English backup import: review, confirmation and result are translated; the restored archive is identical to the Spanish import', async () => {
+  const json = JSON.stringify(domain.createRecoveryBackup(archive));
+  const picker = async () => ({ canceled: false, result: { size: json.length, name: 'test.json', text: async () => json } });
+  const empty = { accounts: [], records: [] };
+  const run = async (locale: AppLocale) => {
+    const view = harness('app/backup-import.tsx', {}, { data: empty, picker, locale });
+    return view;
+  };
+  const english = await run('en-AR');
+  let root = english.render();
+  assert.equal(find(root, 'EmptyState').props.title, 'Recover your records');
+  await find(root, 'ActionButton', 'Choose backup').props.onPress();
+  root = english.render();
+  assert.equal(nodes(root).filter(node => node.type === 'DetailRow').map(node => node.props.label + '=' + node.props.value).join(','),
+    'New accounts=2,New cards=0,New debts=0,New transactions=1,New transfers=0,New recurring items=0,New budgets=0,Undone to keep=0,Records already here=0');
+  assert.ok(nodes(root).some(node => node.type === 'AppText' && node.props.children === 'test.json'), 'the file name is shown as it is');
+  assert.ok(nodes(root).some(node => node.type === 'SectionTitle' && node.props.children === 'Available afterward'));
+  find(root, 'ActionButton', 'Confirm import').props.onPress();
+  assert.equal(english.alerts[0].title, 'Import this backup?');
+  assert.equal(english.alerts[0].buttons.map((button: any) => button.text).join(','), 'Cancel,Import');
+  english.alerts[0].buttons[1].onPress(); await flush();
+  assert.equal(find(english.render(), 'EmptyState').props.title, 'Backup imported');
+  const spanish = await run('es-AR');
+  await find(spanish.render(), 'ActionButton', 'Elegir copia').props.onPress();
+  find(spanish.render(), 'ActionButton', 'Confirmar importación').props.onPress();
+  spanish.alerts[0].buttons[1].onPress(); await flush();
+  assert.equal(JSON.stringify(english.restores), JSON.stringify(spanish.restores), 'the language never changes what is restored');
+  // A conflicting backup says so in English, with the count, and offers nothing to import.
+  const conflicting = harness('app/backup-import.tsx', {}, { data: { ...archive, records: [domain.makeEntryChange('undo', archive.records[0], 'void', createdAt).after] }, picker, locale: 'en-AR' });
+  await find(conflicting.render(), 'ActionButton', 'Choose backup').props.onPress();
+  root = conflicting.render();
+  assert.match(nodes(root).find(node => node.type === 'ErrorMessage' && node.props.message)!.props.message, /^1 record has different changes\. Nothing will be imported\./);
+  assert.equal(nodes(root).some(node => node.props.label === 'Confirm import'), false);
+  // The size limit is the form's own error, shown in English.
+  const large = harness('app/backup-import.tsx', {}, { locale: 'en-AR', picker: async () => ({ canceled: false, result: { size: domain.BACKUP_MAX_BYTES + 1, text: async () => '{}' } }) });
+  await find(large.render(), 'ActionButton', 'Choose backup').props.onPress();
+  assert.equal(bindLocale('en-AR').errorText(find(large.render(), 'ErrorMessage').props.message), 'The backup is over 5 MB. Keep the file; nothing was imported.');
 });

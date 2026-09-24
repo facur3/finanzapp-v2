@@ -32,18 +32,23 @@ export function disconnectedAssistant(reason: 'unavailable' | 'session' = 'unava
   return { mode: 'disconnected', async *ask() { yield { type: 'error', reason, message: '' }; } };
 }
 
-/** Classify a failure of the integration client without depending on its exact copy. */
+/** Classify a failure of the integration client by its catalogue key
+ * (`assistant.integration.*`), never by translated copy. The Spanish patterns
+ * remain for a message thrown as a sentence (a server or an older client). */
 export function failureReason(cause: unknown): AssistantReason {
   const message = cause instanceof Error ? cause.message : String(cause);
   const name = cause instanceof Error ? cause.name : '';
   if (name === 'AbortError' || /network request failed|fetch failed|timed out/i.test(message)) return 'offline';
+  if (message === 'assistant.integration.limit') return 'limit';
+  if (message === 'assistant.integration.unavailable' || message === 'assistant.integration.httpsOrigin') return 'unavailable';
+  if (message === 'assistant.integration.signIn') return 'session';
   if (/l[ií]mite/i.test(message)) return 'limit';
   if (/no est[aá] disponible/i.test(message)) return 'unavailable';
   if (/inici[aá] sesi[oó]n/i.test(message)) return 'session';
   return 'failed';
 }
 
-export function remoteAssistant(origin: string, getAccessToken: () => Promise<string | null>, fetcher: typeof fetch = fetch): AssistantClient {
+export function remoteAssistant(origin: string, getAccessToken: () => Promise<string | null>, fetcher: typeof fetch = fetch): AssistantClient { // i18n-ignore: a generic type, not copy
   const client = integrationClient(origin, getAccessToken, fetcher);
   return { mode: 'remote', async *ask(input, signal) {
     if (signal?.aborted) return;
@@ -62,7 +67,7 @@ export function remoteAssistant(origin: string, getAccessToken: () => Promise<st
  * configured origin has no session to present: the client stays disconnected
  * and no request is built. Activation (origin + session + consent) is the
  * next phase; it changes this function, not the screen. */
-export function assistantForEnvironment(env: Record<string, string | undefined>, getAccessToken?: () => Promise<string | null>, fetcher?: typeof fetch): AssistantClient {
+export function assistantForEnvironment(env: Record<string, string | undefined>, getAccessToken?: () => Promise<string | null>, fetcher?: typeof fetch): AssistantClient { // i18n-ignore: a generic type, not copy
   const origin = env.EXPO_PUBLIC_MOBILE_API_ORIGIN?.trim();
   if (!origin) return disconnectedAssistant('unavailable');
   if (!getAccessToken) return disconnectedAssistant('session');

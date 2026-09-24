@@ -10,18 +10,16 @@ import { ACCOUNT_ICON_CHOICES, COLOR_CHOICES } from '../../src/ui/appearance';
 import { IconColorPicker } from '../../src/ui/appearance-picker';
 import { ActionButton, AmountField, AppText, EmptyState, ErrorMessage, Field, FieldNote, IconButton, Screen } from '../../src/ui/components';
 import { CurrencyField } from '../../src/ui/form-controls';
-
-const BALANCE_HELP = 'El ícono y el color solo cambian cómo se ve la cuenta. Usá la corrección de saldo únicamente si está mal cargado: '
-  + 'queda un recibo de corrección, no un ingreso ni un gasto. Si recibiste, gastaste o moviste dinero, registrá el movimiento correspondiente.';
-const CURRENCY_HELP = 'La moneda no se cambia para no reinterpretar los movimientos anteriores. Una cuenta en otra moneda se agrega por separado.';
+import { useI18n } from '../../src/i18n/provider';
 
 export default function EditAccountScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { snapshot, archive } = useLedger();
   const account = snapshot?.accounts.find(a => a.id === id);
   const current = archive?.appearances?.find(item => item.accountId === id);
+  const { t } = useI18n();
   return account && snapshot ? <AccountEditor key={id} account={account} snapshot={snapshot} current={current} />
-    : <Screen><EmptyState title="No encontramos esta cuenta" detail="Volvé a tus cuentas para revisar los datos guardados." /></Screen>;
+    : <Screen><EmptyState title={t('accounts.detail.notFoundTitle')} detail={t('accounts.edit.notFoundDetail')} /></Screen>;
 }
 
 type Submission = { change: AccountChange | null; appearance: AccountAppearance | null };
@@ -31,6 +29,7 @@ type Submission = { change: AccountChange | null; appearance: AccountAppearance 
  * Everything is saved in one commit. Currency stays immutable. */
 function AccountEditor({ account, snapshot, current }: { account: Account; snapshot: LedgerSnapshot; current?: AccountAppearance }) {
   const { updateAccount, saveAppearance } = useLedger();
+  const { t } = useI18n();
   const [original] = useState(() => ({ account, snapshot, current, balance: accountBalanceMinor(account, snapshot.entries, snapshot.transfers),
     look: accountLook(account.id, current ? [current] : []) }));
   const [name, setName] = useState(account.name);
@@ -50,7 +49,7 @@ function AccountEditor({ account, snapshot, current }: { account: Account; snaps
       else if (submission.appearance) await saveAppearance(submission.appearance);
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       working.current = false; close();
-    } catch (cause) { setError(cause instanceof Error ? cause.message : 'No pudimos verificar el guardado. Reintentá el mismo cambio.'); }
+    } catch (cause) { setError(cause instanceof Error ? cause.message : 'accounts.edit.saveUnverified'); }
     finally { working.current = false; setBusy(false); }
   }
   function save() {
@@ -70,26 +69,26 @@ function AccountEditor({ account, snapshot, current }: { account: Account; snaps
       const submission = { change, appearance };
       if (!change || change.expectedBalanceMinor === null) { void apply(submission); return; }
       confirming.current = true;
-      Alert.alert('¿Corregir el saldo?', `${original.account.name}: de ${formatMinorUnits(original.balance)} a ${formatMinorUnits(target)} ${account.currency}. Se ajustará el saldo inicial; tus movimientos no cambian. No es un ingreso ni una transferencia.`, [
-        { text: 'Cancelar', style: 'cancel', onPress: () => { confirming.current = false; } },
-        { text: 'Corregir saldo', onPress: () => { confirming.current = false; void apply(submission); } },
+      Alert.alert(t('accounts.edit.correctTitle'), t('accounts.edit.correctMessage', { name: original.account.name, from: formatMinorUnits(original.balance), to: formatMinorUnits(target), currency: account.currency }), [
+        { text: t('common.cancel'), style: 'cancel', onPress: () => { confirming.current = false; } },
+        { text: t('accounts.edit.correctConfirm'), onPress: () => { confirming.current = false; void apply(submission); } },
       ], { cancelable: true, onDismiss: () => { confirming.current = false; } });
-    } catch (cause) { setError(cause instanceof Error ? cause.message : 'Revisá el nombre y el saldo.'); }
+    } catch (cause) { setError(cause instanceof Error ? cause.message : 'accounts.edit.invalid'); }
   }
   const locked = busy || pending !== null;
   return <Screen>
-    <Stack.Screen options={{ title: 'Editar cuenta', gestureEnabled: !busy,
-      headerLeft: () => <IconButton name="close" label="Cerrar" onPress={close} disabled={busy} /> }} />
-    <Field label="Nombre de la cuenta" value={name} onChangeText={setName} maxLength={80} editable={!locked} />
+    <Stack.Screen options={{ title: t('nav.titles.editAccount'), gestureEnabled: !busy,
+      headerLeft: () => <IconButton name="close" label={t('common.close')} onPress={close} disabled={busy} /> }} />
+    <Field label={t('accounts.form.name')} value={name} onChangeText={setName} maxLength={80} editable={!locked} />
     <IconColorPicker icons={ACCOUNT_ICON_CHOICES} colors={COLOR_CHOICES} icon={icon} color={color}
       onIconChange={setIcon} onColorChange={setColor} disabled={locked} previewLabel={name} />
-    <AmountField label="Saldo registrado" currency={account.currency} value={balance} onChangeText={setBalance}
+    <AmountField label={t('accounts.edit.recordedBalance')} currency={account.currency} value={balance} onChangeText={setBalance}
       keyboardType="numbers-and-punctuation" inputMode={undefined} editable={!locked} />
-    <FieldNote help={{ title: 'Saldo registrado', detail: BALANCE_HELP }}>Solo para corregir un saldo mal cargado.</FieldNote>
+    <FieldNote help={{ title: t('accounts.edit.recordedBalance'), detail: t('accounts.edit.balanceHelp') }}>{t('accounts.edit.balanceNote')}</FieldNote>
     <CurrencyField value={account.currency} />
-    <FieldNote help={{ title: 'Moneda', detail: CURRENCY_HELP }}>La moneda de una cuenta no se cambia.</FieldNote>
+    <FieldNote help={{ title: t('selection.currency'), detail: t('accounts.edit.currencyHelp') }}>{t('accounts.edit.currencyNote')}</FieldNote>
     <ErrorMessage message={error} />
-    {pending && error && <AppText secondary style={{ fontSize: 13 }}>Reintentá este mismo cambio. Para editarlo, cerrá y verificá primero el saldo guardado.</AppText>}
-    <ActionButton label={pending && error ? 'Reintentar guardado' : 'Guardar cambios'} onPress={save} busy={busy} disabled={!name.trim() || !balance.trim()} />
+    {pending && error && <AppText secondary style={{ fontSize: 13 }}>{t('accounts.edit.retryNote')}</AppText>}
+    <ActionButton label={pending && error ? t('common.retrySave') : t('common.saveChanges')} onPress={save} busy={busy} disabled={!name.trim() || !balance.trim()} />
   </Screen>;
 }

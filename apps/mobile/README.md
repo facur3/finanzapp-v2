@@ -159,6 +159,17 @@ historical categories are never translated. `AccountField` needs `typeOf` (the l
 `accountKind`) to draw card and debt glyphs; never infer meaning from a translated
 label. English stays unreleased (`RELEASED_LANGUAGES = ['es']`).
 
+**Producto 23.1B2 (2026-09-24)** translates every remaining screen and splits the
+catalogues into per-area modules (`src/i18n/messages/<language>/<area>.ts`, composed in
+`index.ts`; `messages.ts` stays the typed entry). Plurals follow each language's CLDR
+rule. Every domain and storage error is catalogued by its exact text (templates
+included). Before a PR that adds copy run `npm run i18n:extract` (copy outside the
+catalogue) and `npm run i18n:check` (keys, placeholders, plurals, stale translations);
+after reviewing English changes, `npm run i18n:check -- --accept en`. A new language
+starts with `npm run i18n:export -- <lang>`. The whole process, the glossary, RTL, the
+Crowdin plan, the library evaluation and the error-code migration are in
+[`docs/i18n.md`](../../docs/i18n.md).
+
 **expo-localization needs a new development build.** It is a native module: Expo Go
 already contains it, but a FinanzApp Dev binary compiled before this PR does not, and
 Metro cannot add native code. On such a binary the app still starts and works:
@@ -561,7 +572,11 @@ budgets for segments, tabs, buttons and headers) and English cases to
 `recovery-routes.node.ts` (a movement saved in English equals the Spanish one, a
 mid-draft switch keeps the fields, errors in either language, detail and transfer form),
 `navigation.node.ts` and `spending-home.node.ts`; those harnesses read a switchable
-locale. It also updates
+locale. Producto 23.1B2 adds English cases to every area's harness (reports, liabilities,
+budgets, polish, personalization, more, recovery, material, assistant) and extends
+`translation.node.ts` to the whole app: `i18n:extract` finds nothing, `i18n:check
+--strict` is clean, CLDR plural categories, the export brief, pseudo-locales, template
+errors and debt display names. It also updates
 the navigation, Más, Cards, composer and quick-action guards for the centre tab, the
 pushed Tarjetas screen and the glass branch. These are **not** native rendering/gesture tests;
 use the physical checklist. The root suite also tests the shared monthly summary
@@ -572,7 +587,7 @@ For the intermittent black-tab report, update to `master`, restart with
 and repeat the **Interfaz 02** tab checks, **Interfaz 03** report checks and
 **Interfaz 04/05** correction/recovery and transfer checks, plus **Interfaz 06** daily/comparison reports and **Interfaz 08** recurring/upcoming
 checks, plus **Interfaz 10** cards/debts and five-tab checks and **Interfaz 11** Home,
-Movimientos and detail checks, **Interfaz 12** form checks, **Interfaz 13** Reportes checks, **Interfaz 14** budgets/recurring/accounts checks, **Interfaz 15** motion checks, **Interfaz 16** cohesion checks, **Interfaz 17** identity and money-input checks **Producto 18** Más / Tarjetas / amount-shortcut checks, **Producto 19** budget checks, **Producto 20** account/category identity checks **Producto 21** Assistant checks, **Producto 22** reachability/material checks, **Producto 22.1** clarity checks, **Producto 23.0** amount-field, row and localization checks, **Producto 23.1A** language-preference checks and **Producto 23.1B1** translation checks. The current footer (Más) says Producto 23.1B1.
+Movimientos and detail checks, **Interfaz 12** form checks, **Interfaz 13** Reportes checks, **Interfaz 14** budgets/recurring/accounts checks, **Interfaz 15** motion checks, **Interfaz 16** cohesion checks, **Interfaz 17** identity and money-input checks **Producto 18** Más / Tarjetas / amount-shortcut checks, **Producto 19** budget checks, **Producto 20** account/category identity checks **Producto 21** Assistant checks, **Producto 22** reachability/material checks, **Producto 22.1** clarity checks, **Producto 23.0** amount-field, row and localization checks, **Producto 23.1A** language-preference checks, **Producto 23.1B1** and **23.1B2** translation checks. The current footer (Más) says Producto 23.1B2.
 Before updating, save a private pilot copy; do not uninstall or add fake movements.
 
 If a storage/refresh error occurs, the form retains the exact submitted command

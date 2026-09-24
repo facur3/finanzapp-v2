@@ -8,9 +8,7 @@ import { formatMinorUnits, parseMinorUnits, sameMonthlyBudget, validateMonthlyBu
 import { useLedger } from '../storage/LedgerProvider';
 import { ActionButton, AmountField, AppText, Choices, ErrorMessage, IconButton, Screen } from './components';
 import { CategoryField } from './form-controls';
-import { formatMonth } from '../i18n/format';
-
-const monthLabel = (monthISO: string) => formatMonth(monthISO);
+import { useI18n } from '../i18n/provider';
 
 /** One limit for one month and currency. The first question is what kind of
  * limit: General is the ceiling for all of the month's recorded expenses and
@@ -21,6 +19,7 @@ export function BudgetForm({ original, monthISO, currency: requestedCurrency, sc
   original?: MonthlyBudget; monthISO: string; currency?: string; scope?: string;
 }) {
   const { snapshot, saveBudget } = useLedger();
+  const { t, formatMonth } = useI18n();
   const [before] = useState(original);
   const [operation] = useState(() => ({ id: randomUUID(), createdAt: new Date().toISOString() }));
   const [scope, setScope] = useState<BudgetScope>(before?.scope ?? (requestedScope === 'total' ? 'total' : 'category'));
@@ -65,7 +64,7 @@ export function BudgetForm({ original, monthISO, currency: requestedCurrency, sc
       saving.current = false;
       close();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'No pudimos guardar el presupuesto. Reintentá con el mismo envío.');
+      setError(cause instanceof Error ? cause.message : 'budgets.form.saveFailed');
     } finally {
       saving.current = false;
       setBusy(false);
@@ -84,7 +83,7 @@ export function BudgetForm({ original, monthISO, currency: requestedCurrency, sc
       saving.current = false;
       close();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'No pudimos eliminar el presupuesto. Reintentá el mismo cambio.');
+      setError(cause instanceof Error ? cause.message : 'budgets.form.deleteFailed');
     } finally {
       saving.current = false;
       setBusy(false);
@@ -100,38 +99,37 @@ export function BudgetForm({ original, monthISO, currency: requestedCurrency, sc
     const submission: MonthlyBudget = {
       ...before, active: false, revision: before.revision + 1, updatedAt: new Date().toISOString(),
     };
-    Alert.alert('¿Eliminar este presupuesto?', 'Se deja de usar para este mes. Tus gastos y movimientos no se modifican.', [
-      { text: 'Cancelar', style: 'cancel' },
-      { text: 'Eliminar', style: 'destructive', onPress: () => { void commitArchive(submission); } },
+    Alert.alert(t('budgets.form.deleteTitle'), t('budgets.form.deleteMessage'), [
+      { text: t('common.cancel'), style: 'cancel' },
+      { text: t('budgets.form.deleteConfirm'), style: 'destructive', onPress: () => { void commitArchive(submission); } },
     ]);
   }
 
   const general = scope === 'total';
   return <Screen>
-    <Stack.Screen options={{ title: before ? 'Editar presupuesto' : 'Nuevo presupuesto', gestureEnabled: !busy,
-      headerLeft: () => <IconButton name="close" label="Cerrar" onPress={close} disabled={busy} /> }} />
+    <Stack.Screen options={{ title: t(before ? 'nav.titles.editBudget' : 'nav.titles.newBudget'), gestureEnabled: !busy,
+      headerLeft: () => <IconButton name="close" label={t('common.close')} onPress={close} disabled={busy} /> }} />
     <View style={{ gap: 4, alignItems: 'center', paddingTop: 8 }}>
-      <AppText secondary style={{ fontSize: 14, textTransform: 'capitalize' }}>{monthLabel(before?.monthISO ?? monthISO)}</AppText>
-      <AppText variant="title2">{general ? 'Presupuesto general' : 'Límite por categoría'}</AppText>
+      <AppText secondary style={{ fontSize: 14, textTransform: 'capitalize' }}>{formatMonth(before?.monthISO ?? monthISO)}</AppText>
+      <AppText variant="title2">{t(general ? 'budgets.form.general' : 'budgets.form.perCategory')}</AppText>
     </View>
     {!before && <Choices<BudgetScope> value={scope} onChange={setScope} disabled={locked}
-      options={[{ value: 'total', label: 'General' }, { value: 'category', label: 'Por categoría' }]} />}
+      options={[{ value: 'total', label: t('budgets.form.scopeGeneral') }, { value: 'category', label: t('budgets.form.scopeCategory') }]} />}
     {!before && <Choices value={currency} onChange={setCurrency} disabled={locked}
-      options={[{ value: 'ARS', label: 'Pesos · ARS' }, { value: 'USD', label: 'Dólares · USD' }]} />}
-    <AmountField label="Presupuesto" currency={currency} value={amount}
+      options={[{ value: 'ARS', label: t('budgets.currency.ARS') }, { value: 'USD', label: t('budgets.currency.USD') }]} />}
+    <AmountField label={t('budgets.form.amount')} currency={currency} value={amount}
       onChangeText={value => { setAmount(value); setError(null); }} editable={!locked} />
     {!general && <CategoryField entries={snapshot?.entries ?? []} kind="expense" value={category} onChange={setCategory} disabled={locked} prominent />}
     <AppText secondary variant="footnote" style={{ textAlign: 'center' }}>
-      {general ? 'Es el techo de todos los gastos registrados del mes en esta moneda. No cuenta ingresos, transferencias ni pagos de tarjeta; una compra con tarjeta cuenta una sola vez.'
-        : 'Se compara con los gastos registrados en esta categoría durante ese mes. Es un sublímite: no se suma al presupuesto general.'}
+      {t(general ? 'budgets.form.generalNote' : 'budgets.form.categoryNote')}
     </AppText>
     <ErrorMessage message={error} />
     {pending && error && <AppText secondary style={{ fontSize: 13, textAlign: 'center' }}>
-      El envío quedó congelado para que Reintentar no cree otro presupuesto.
+      {t('budgets.form.retryNote')}
     </AppText>}
-    <ActionButton label={pending && error ? 'Reintentar guardado' : before ? 'Guardar cambios' : 'Crear presupuesto'}
+    <ActionButton label={pending && error ? t('common.retrySave') : before ? t('common.saveChanges') : t('budgets.form.create')}
       onPress={save} busy={busy} disabled={!amount.trim() || (!general && !category.trim())} />
-    {before && <ActionButton label={archivePending && error ? 'Reintentar eliminación' : 'Eliminar presupuesto'}
+    {before && <ActionButton label={t(archivePending && error ? 'budgets.form.retryDelete' : 'budgets.form.delete')}
       onPress={archive} secondary disabled={busy || pending !== null} />}
   </Screen>;
 }

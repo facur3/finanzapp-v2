@@ -1,5 +1,7 @@
-import { accountKind, cardAvailableLimitMinor, cardCycle, cardDebtMinor, labelFromISO, type Account, type CreditCardProfile,
-  type Currency, type LedgerSnapshot, type PersonalDebtProfile } from '@finanzapp/domain';
+import { accountKind, cardAvailableLimitMinor, cardCycle, cardDebtMinor, type Account, type CreditCardProfile,
+  type LedgerSnapshot, type PersonalDebtProfile } from '@finanzapp/domain';
+import { relativeDate } from '../i18n/format.ts';
+import { DEFAULT_LOCALE, type AppLocale } from '../i18n/locale.ts';
 import { translator, type Translate } from '../i18n/messages.ts';
 
 export type CardSummary = {
@@ -40,9 +42,8 @@ export function usageTone(usage: number | null): 'neutral' | 'warning' | 'expens
   return 'neutral';
 }
 
-export function dueLabel(dateISO: string, todayISO: string): string {
-  const relative = labelFromISO(dateISO, new Date(todayISO + 'T12:00:00'));
-  return relative;
+export function dueLabel(dateISO: string, todayISO: string, locale: AppLocale = DEFAULT_LOCALE): string {
+  return relativeDate(dateISO, todayISO, locale);
 }
 
 export function daysUntil(dateISO: string, todayISO: string): number {
@@ -65,12 +66,21 @@ export function accountKindLabel(account: Account, cards: CreditCardProfile[] = 
   return t(kind === 'card' ? 'accountKinds.creditCard' : kind === 'debt' ? 'accountKinds.debt' : 'accountKinds.account');
 }
 
-export function currencyName(currency: Currency): string {
-  return currency === 'USD' ? 'Dólares estadounidenses' : 'Pesos argentinos';
+/** One line of statement facts under the activity title, instead of two cards. */
+export function statementCaption(statement: { startISO: string; purchaseCount: number; paymentCount: number }, relative: (iso: string) => string,
+  t: Translate = translator('es')): string {
+  return [t('cards.statement.openSince', { date: relative(statement.startISO) }), t('cards.statement.purchases', { count: statement.purchaseCount }),
+    t('cards.statement.payments', { count: statement.paymentCount })].join(' · ');
 }
 
-/** One line of statement facts under the activity title, instead of two cards. */
-export function statementCaption(statement: { startISO: string; purchaseCount: number; paymentCount: number }, relative: (iso: string) => string): string {
-  return [`Resumen abierto desde ${relative(statement.startISO)}`, statement.purchaseCount === 1 ? '1 compra' : statement.purchaseCount + ' compras',
-    statement.paymentCount === 1 ? '1 pago' : statement.paymentCount + ' pagos'].join(' · ');
+/** The name an account shows where it appears as one side of a transfer. A personal debt is stored as a
+ * hidden account named "Debo · Juan" / "Me deben · Juan" when it is created (and not renamed afterwards).
+ * The stored name is shown as it is, except that its Spanish prefix is read in the interface language
+ * ("I owe · Juan"); a name without that prefix (an older backup) and every other account show their own name. */
+export function accountDisplayName(account: Account, debts: PersonalDebtProfile[] = [], t: Translate = translator('es')): string {
+  const debt = debts.find(item => item.accountId === account.id);
+  if (!debt) return account.name;
+  const key = debt.direction === 'owed_by_me' ? 'debts.accountName.owedByMe' : 'debts.accountName.owedToMe';
+  const prefix = translator('es')(key, { name: '' });
+  return account.name.startsWith(prefix) ? t(key, { name: account.name.slice(prefix.length) }) : account.name;
 }

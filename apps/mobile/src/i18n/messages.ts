@@ -3,14 +3,17 @@
  * English with US formats read the same catalogue. `Messages` is the shape of the Spanish catalogue with
  * every leaf widened to a string (or a plural pair), so the English catalogue
  * must carry exactly the same keys. `t` resolves a dotted key, fills `{name}`
- * placeholders and picks the plural form for `{count}`. Spanish and English
- * share one plural rule (one vs. other), so no Intl.PluralRules is needed on
- * Hermes. Pure: no React, no device access. */
-import { es } from './messages/es.ts';
-import { en } from './messages/en.ts';
+ * placeholders and picks the plural form for `{count}` by the language's CLDR
+ * rule (`pluralCategory`). Pure: no React, no device access. */
+import { es } from './messages/es/index.ts';
+import { en } from './messages/en/index.ts';
 import { DEFAULT_LANGUAGE, type LanguageCode } from './locale.ts';
 
-export type PluralForms = { one: string; other: string };
+/** A plural entry: `one` and `other` always (the Spanish reference has both);
+ * a language whose CLDR rule has more categories (Arabic, Polish, Russian…)
+ * adds `zero`, `two`, `few` or `many`. A missing category reads `other`. */
+export type PluralCategory = 'zero' | 'one' | 'two' | 'few' | 'many' | 'other';
+export type PluralForms = { one: string; other: string } & Partial<Record<Exclude<PluralCategory, 'one' | 'other'>, string>>;
 type Widen<T> = T extends string ? string : T extends { one: string; other: string } ? PluralForms : { [K in keyof T]: Widen<T[K]> };
 export type Messages = Widen<typeof es>;
 
@@ -25,6 +28,14 @@ export type MessageParams = Record<string, string | number>;
 /** One catalogue per language in `LANGUAGES`: a language without one is a compile error. */
 const catalogues: Record<LanguageCode, Messages> = { es, en };
 
+const CATEGORIES = new Set<string>(['zero', 'one', 'two', 'few', 'many', 'other']);
+/** A plural entry: an object whose keys are all CLDR categories, `other` among them, each a string. A
+ * namespace that happens to hold an id called "other" (an icon, a category) is not a plural. */
+export function isPluralEntry(value: unknown): value is PluralForms {
+  if (!value || typeof value !== 'object' || typeof (value as { other?: unknown }).other !== 'string') return false;
+  return Object.entries(value).every(([key, text]) => CATEGORIES.has(key) && typeof text === 'string');
+}
+
 export function catalogue(language: LanguageCode): Messages {
   return catalogues[language] ?? catalogues[DEFAULT_LANGUAGE];
 }
@@ -35,7 +46,7 @@ function lookup(messages: Messages, key: string): string | PluralForms | undefin
     if (!node || typeof node !== 'object' || !(part in (node as object))) return undefined;
     node = (node as Record<string, unknown>)[part];
   }
-  return typeof node === 'string' || (node && typeof node === 'object' && 'one' in node) ? node as string | PluralForms : undefined;
+  return typeof node === 'string' || isPluralEntry(node) ? node as string | PluralForms : undefined;
 }
 
 /** Fills `{name}` placeholders. A placeholder without a value stays visible, so a missing parameter is noticed rather than blank. */
@@ -50,8 +61,24 @@ export function translate(language: LanguageCode, key: MessageKey, params?: Mess
   const entry = lookup(catalogue(language), key) ?? lookup(es as unknown as Messages, key);
   if (entry === undefined) return key;
   if (typeof entry === 'string') return interpolate(entry, params);
-  const count = Number(params?.count);
-  return interpolate(count === 1 ? entry.one : entry.other, params);
+  const category = pluralCategory(language, Number(params?.count));
+  return interpolate(entry[category] ?? (category === 'one' ? entry.one : entry.other), params);
+}
+
+const rules = new Map<string, Intl.PluralRules | null>();
+/** The CLDR plural category of `count` in `language`, from `Intl.PluralRules`
+ * (Hermes on iOS ships it). Without Intl, or for a value it cannot classify,
+ * the one/other rule Spanish and English share: exactly 1 is "one". */
+export function pluralCategory(language: string, count: number): PluralCategory {
+  if (!rules.has(language)) {
+    try { rules.set(language, typeof Intl !== 'undefined' && Intl.PluralRules ? new Intl.PluralRules(language) : null); }
+    catch { rules.set(language, null); }
+  }
+  const rule = rules.get(language);
+  if (rule && Number.isFinite(count)) {
+    try { return rule.select(count) as PluralCategory; } catch { /* fall through */ }
+  }
+  return count === 1 ? 'one' : 'other';
 }
 
 /** A translator bound to one language, the shape components receive. */
@@ -63,5 +90,5 @@ export function translator(language: LanguageCode): Translate {
 /** All dotted keys of a catalogue, for the completeness test. */
 export function messageKeys(messages: object, prefix = ''): string[] {
   return Object.entries(messages).flatMap(([key, value]) =>
-    typeof value === 'string' || (value && typeof value === 'object' && 'one' in value) ? [prefix + key] : messageKeys(value as object, prefix + key + '.'));
+    typeof value === 'string' || isPluralEntry(value) ? [prefix + key] : messageKeys(value as object, prefix + key + '.'));
 }

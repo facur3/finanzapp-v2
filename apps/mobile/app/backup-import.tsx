@@ -6,12 +6,13 @@ import * as Haptics from 'expo-haptics';
 import { BACKUP_MAX_BYTES, parsePilotBackup, previewBackupImport, type ImportPreview, type ParsedBackup } from '@finanzapp/domain';
 import { useLedger } from '../src/storage/LedgerProvider';
 import { ActionButton, AppText, DetailRow, EmptyState, ErrorMessage, Money, Screen, SectionTitle, Surface } from '../src/ui/components';
-import { formatDateTime } from '../src/i18n/format';
+import { useI18n } from '../src/i18n/provider';
 
 type Review = { backup: ParsedBackup; preview: ImportPreview; name: string };
 
 export default function BackupImportScreen() {
   const { archive, restoreBackup } = useLedger();
+  const { t, formatDateTime } = useI18n();
   const [review, setReview] = useState<Review | null>(null);
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
@@ -29,13 +30,13 @@ export default function BackupImportScreen() {
       if (picked.canceled) return;
       // Read only the selected file. Never remove/overwrite the original,
       // including Android document-provider URIs and iOS picker copies.
-      if (picked.result.size > BACKUP_MAX_BYTES) throw new Error('La copia supera 5 MB. Conservá el archivo; no se importó nada.');
+      if (picked.result.size > BACKUP_MAX_BYTES) throw new Error('backup.import.tooLarge');
       const backup = parsePilotBackup(await picked.result.text());
       setReview({ backup, preview: previewBackupImport(archive, backup.archive), name: picked.result.name });
       setDone(false);
     } catch (cause) {
       setReview(null);
-      setError(cause instanceof Error ? cause.message : 'No pudimos leer la copia. Tus datos y el archivo siguen intactos.');
+      setError(cause instanceof Error ? cause.message : 'backup.import.readFailed');
     } finally { working.current = false; setBusy(false); }
   }
 
@@ -44,7 +45,7 @@ export default function BackupImportScreen() {
     try {
       setReview({ ...review, preview: previewBackupImport(archive, review.backup.archive) });
       setError(null);
-    } catch (cause) { setError(cause instanceof Error ? cause.message : 'No pudimos revisar la copia.'); }
+    } catch (cause) { setError(cause instanceof Error ? cause.message : 'backup.import.reviewFailed'); }
   }
 
   async function apply(selected: Review) {
@@ -57,16 +58,16 @@ export default function BackupImportScreen() {
       setDone(true);
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'No pudimos verificar la importación. Reintentá con la misma copia para comprobarla sin duplicar datos.');
+      setError(cause instanceof Error ? cause.message : 'backup.import.verifyFailed');
     } finally { working.current = false; setBusy(false); }
   }
   function confirm() {
     if (!review || review.preview.conflicts || working.current || confirming.current || done) return;
     confirming.current = true;
     const selected = review;
-    Alert.alert('¿Importar esta copia?', 'Se agregarán únicamente los registros que faltan. No se reemplazan tus datos actuales.', [
-      { text: 'Cancelar', style: 'cancel', onPress: () => { confirming.current = false; } },
-      { text: 'Importar', onPress: () => { confirming.current = false; void apply(selected); } },
+    Alert.alert(t('backup.import.confirmTitle'), t('backup.import.confirmMessage'), [
+      { text: t('common.cancel'), style: 'cancel', onPress: () => { confirming.current = false; } },
+      { text: t('backup.import.confirmButton'), onPress: () => { confirming.current = false; void apply(selected); } },
     ], { cancelable: true, onDismiss: () => { confirming.current = false; } });
   }
 
@@ -76,47 +77,47 @@ export default function BackupImportScreen() {
   const hiddenIncoming = new Set([...plan?.cards ?? [], ...plan?.debts ?? []].map(item => item.accountId));
   return <Screen>
     <Stack.Screen options={{ gestureEnabled: !busy, headerBackVisible: !busy }} />
-    {done ? <EmptyState title="Copia incorporada" detail="Tus cuentas, tarjetas, deudas, movimientos, presupuestos y recurrentes ya están guardados en este dispositivo. No se duplicaron registros existentes." icon="checkmark-circle-outline"
-      action={<ActionButton label="Elegir otra copia" onPress={choose} busy={busy} secondary />} /> : <>
-      {!review && <EmptyState title="Recuperá tus registros" icon="folder-open-outline"
-        detail="Elegí una copia del piloto nativo. Podrás revisar los cambios antes de guardarlos. No se envía el archivo a ningún servidor."
-        action={<ActionButton label="Elegir copia" icon="document-outline" onPress={choose} busy={busy} disabled={!archive} />} />}
+    {done ? <EmptyState title={t('backup.import.doneTitle')} detail={t('backup.import.doneDetail')} icon="checkmark-circle-outline"
+      action={<ActionButton label={t('backup.import.chooseAnother')} onPress={choose} busy={busy} secondary />} /> : <>
+      {!review && <EmptyState title={t('backup.import.emptyTitle')} icon="folder-open-outline"
+        detail={t('backup.import.emptyDetail')}
+        action={<ActionButton label={t('backup.import.choose')} icon="document-outline" onPress={choose} busy={busy} disabled={!archive} />} />}
       {review && plan && <>
-        <View style={{ gap: 6 }}><SectionTitle>Revisar copia</SectionTitle>
+        <View style={{ gap: 6 }}><SectionTitle>{t('backup.import.reviewTitle')}</SectionTitle>
           <AppText secondary numberOfLines={2} style={{ fontSize: 14 }}>{review.name}</AppText>
           <AppText secondary style={{ fontSize: 13 }}>{formatDateTime(review.backup.exportedAt)}</AppText>
         </View>
         <Surface grouped>
-          <DetailRow label="Cuentas nuevas" value={String(plan.accounts.filter(account => !hiddenIncoming.has(account.id)).length)} />
-          <DetailRow label="Tarjetas nuevas" value={String(plan.cards.length)} />
-          <DetailRow label="Deudas nuevas" value={String(plan.debts.length)} />
-          <DetailRow label="Movimientos nuevos" value={String(plan.records.filter(record => !record.voided).length)} />
-          <DetailRow label="Transferencias nuevas" value={String(plan.transfers.filter(record => !record.voided).length)} />
-          <DetailRow label="Recurrentes nuevos" value={String(plan.recurring.length)} />
-          <DetailRow label="Presupuestos nuevos" value={String(plan.budgets.length)} />
-          <DetailRow label="Deshechos a conservar" value={String(plan.records.filter(record => record.voided).length + plan.transfers.filter(record => record.voided).length)} />
-          <DetailRow label="Registros ya presentes" value={String(plan.identical)} last />
+          <DetailRow label={t('backup.import.rows.accounts')} value={String(plan.accounts.filter(account => !hiddenIncoming.has(account.id)).length)} />
+          <DetailRow label={t('backup.import.rows.cards')} value={String(plan.cards.length)} />
+          <DetailRow label={t('backup.import.rows.debts')} value={String(plan.debts.length)} />
+          <DetailRow label={t('backup.import.rows.movements')} value={String(plan.records.filter(record => !record.voided).length)} />
+          <DetailRow label={t('backup.import.rows.transfers')} value={String(plan.transfers.filter(record => !record.voided).length)} />
+          <DetailRow label={t('backup.import.rows.recurring')} value={String(plan.recurring.length)} />
+          <DetailRow label={t('backup.import.rows.budgets')} value={String(plan.budgets.length)} />
+          <DetailRow label={t('backup.import.rows.voided')} value={String(plan.records.filter(record => record.voided).length + plan.transfers.filter(record => record.voided).length)} />
+          <DetailRow label={t('backup.import.rows.present')} value={String(plan.identical)} last />
         </Surface>
-        {plan.conflicts > 0 ? <ErrorMessage message={`Hay ${plan.conflicts} registros con cambios diferentes. No se importará nada. Esta copia no puede reemplazar correcciones locales ni reactivar movimientos deshechos.`} /> : <>
-          <Surface><SectionTitle caption="Solo cuentas de dinero. Tarjetas y deudas no se suman.">Disponible después</SectionTitle>
+        {plan.conflicts > 0 ? <ErrorMessage message={t('backup.import.conflicts', { count: plan.conflicts })} /> : <>
+          <Surface><SectionTitle caption={t('backup.import.availableCaption')}>{t('backup.import.availableAfter')}</SectionTitle>
             {(['ARS', 'USD'] as const).filter(currency => plan.after?.[currency] !== undefined).map(currency => <View key={currency} style={{ gap: 6 }}>
               <AppText secondary style={{ fontSize: 13 }}>{currency}</AppText>
               <Money minor={plan.after![currency]!} currency={currency} size={28} />
-              <AppText secondary style={{ fontSize: 13 }}>Ahora</AppText>
+              <AppText secondary style={{ fontSize: 13 }}>{t('backup.import.now')}</AppText>
               <Money minor={plan.before[currency] ?? 0} currency={currency} size={15} />
             </View>)}
-            {!Object.keys(plan.after ?? {}).length && <AppText secondary>No contiene cuentas.</AppText>}
+            {!Object.keys(plan.after ?? {}).length && <AppText secondary>{t('backup.import.noAccounts')}</AppText>}
           </Surface>
-          <AppText secondary style={{ fontSize: 13 }}>{additions ? 'Solo se agrega lo que falta. No se reemplaza ni se borra nada.' : 'Esta copia ya está incorporada. No hay nada nuevo para agregar.'}</AppText>
+          <AppText secondary style={{ fontSize: 13 }}>{additions ? t('backup.import.onlyMissing') : t('backup.import.nothingNew')}</AppText>
         </>}
       </>}
       <ErrorMessage message={error} />
       {review && <>
-        {error && <ActionButton label="Volver a revisar" onPress={refreshReview} secondary disabled={busy} />}
-        {!!plan && !plan.conflicts && additions > 0 && <ActionButton label="Confirmar importación" onPress={confirm} busy={busy} />}
-        <ActionButton label="Elegir otra copia" onPress={choose} disabled={busy} secondary />
+        {error && <ActionButton label={t('backup.import.reviewAgain')} onPress={refreshReview} secondary disabled={busy} />}
+        {!!plan && !plan.conflicts && additions > 0 && <ActionButton label={t('backup.import.confirmImport')} onPress={confirm} busy={busy} />}
+        <ActionButton label={t('backup.import.chooseAnother')} onPress={choose} disabled={busy} secondary />
       </>}
-      <AppText secondary style={{ fontSize: 13 }}>Copias nativas v1 a v8 · JSON de hasta 5 MB. La importación de la app web e inversiones llegará en otra etapa.</AppText>
+      <AppText secondary style={{ fontSize: 13 }}>{t('backup.import.formats')}</AppText>
     </>}
   </Screen>;
 }
