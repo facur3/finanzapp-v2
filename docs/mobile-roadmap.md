@@ -15,10 +15,60 @@ server-keyed; manual recording and local data work without connectivity. Recurri
 expenses, debts, budgets and cards remain in scope. Native navigation, accessible
 amounts, real data and recoverable durable writes remain requirements.
 
-## Status and current delivery — Producto 23.2
+## Status and current delivery — Producto 24A
 
 Implemented is code, checked names a test, device-verified needs a physical result,
 and released means distributed. Neither a bundle nor a screenshot is App Store QA.
+
+**24A lays the foundations of the international multi-currency engine without changing
+what the person sees or stores.** ARS and USD remain the only currencies an account,
+budget or recurring rule can hold; SQLite, the backup format, stored amounts, forms,
+screens, navigation, motion and surfaces are unchanged. The Más footer reads Producto 24A.
+Design, data, limits, the 24B plan and the 24C contract: [docs/currency.md](currency.md).
+
+- [x] **Catalogue from ISO 4217 and CLDR, generated and pinned.**
+  `apps/mobile/scripts/currency/generate.mjs` (no dependency) reads ISO 4217 List One
+  (published 2026-09-17) and CLDR 48.2.0 (cldr-json; 48.2.2 is a time-zone patch with
+  identical currency data), records sha256 in `sources.lock.json`, and writes
+  `packages/domain/currency-data.ts` (178 codes: numeric code, ISO minor unit, CLDR
+  digits and cash rounding, kind, status, language-neutral and narrow symbols, legal
+  tender territories) and one names module per language (`src/i18n/currencies/es.ts`,
+  `en.ts`). Only facts from SIX are committed (no source file, no ISO entity names);
+  CLDR data carries the Unicode License v3 (`LICENSES/Unicode-3.0.txt`). `--check`
+  proves the committed files are exactly the generator's output.
+- [x] **Availability:** `ledger` (ARS, USD), `ready` (151 fiat currencies with complete
+  data), `incomplete` (VED: no Spanish name in CLDR and not tender; SVC: ISO-active but no
+  territory uses it), `excluded` (23 funds, metals, units of account, XTS, XXX). Forms
+  still offer exactly ARS and USD; `validateAccount` is unchanged.
+- [x] **Amount model** (`packages/domain/money.ts`, `currency.ts`): the ISO minor unit is
+  the stored scale (0 for 16 currencies, 2, 3 for seven; 4 only for two excluded funds),
+  CLDR digits only format; every fiat exponent is pinned by a test; `storedExponent` is
+  the persistence contract for 24B (legacy rows are ARS/USD cents; a disagreeing scale is
+  refused, never rescaled). Exact parsing (canonical and explicit-separator forms), no
+  floating point, 15-digit entry bound (13 whole digits for ARS/USD as today), BigInt
+  sums, and no way to combine two currencies.
+- [x] **Presentation for any currency, ARS/USD byte-identical.** `format.ts` writes an
+  amount with its currency's decimals (trailing zeros trimmed to CLDR's digits, a stored
+  fraction never hidden), CLDR's unique language-neutral symbols ("€", "JP¥", "CA$";
+  "$" only for the peso in Argentina, "AR$" elsewhere, "US$" everywhere), CLDR names and
+  spoken units. `tests/currency-presentation.node.ts` compares every ARS/USD output with
+  the pre-24A code (copied verbatim) over more than 3 000 amounts in the four locales.
+- [x] **Selector metadata** (`src/ui/currencies.ts`: `catalogueCurrencies`,
+  `searchCatalogue`: code, numeric code, names, symbols, territories and their names,
+  ranked search) prepared for 24B; a test proves no screen uses it yet.
+- [x] **Audit for 24B:** every assumption of two currencies or two decimals in the domain,
+  storage, backups, budgets, cards, debts, recurring rules, movements, reports, forms,
+  i18n, the Assistant contract and the server prompt, with the ordered migration plan and
+  its risks (docs/currency.md §7).
+- [x] **Found and corrected:** Hermes on iOS has no `Intl.PluralRules` (its `Intl` has
+  only Collator, DateTimeFormat and NumberFormat at the engine React Native 0.86 ships);
+  a comment and docs/i18n.md said otherwise. Spanish and English are unaffected; a
+  language with more plural categories needs a committed rule table first.
+- [x] **Checked on Linux:** see the handoff entry below.
+- [ ] **Not device-verified:** nothing visible changed; ARS/USD strings are proven equal
+  in Node. The next EAS development build will also carry the 23.2 patch natives.
+
+### Previous delivery — Producto 23.2
 
 **23.2 is stabilization only: Expo's SDK 57 maintenance releases, and a diagnosis of the
 missing per-app Language row.** No feature, onboarding, currency, monetization, schema,
@@ -1455,25 +1505,42 @@ by CI and merged into master before the next starts:
     without losing the current screen, a draft being typed or the Assistant
     conversation (a test drives the switch on a mounted tree; the iPhone confirms the
     navigation headers, which expo-router sets from options).
-15. **Producto 24 — multi-currency engine:** currencies beyond ARS and USD only with
-    dated exchange rates in the domain, the searchable currency screen the sheet
-    seeds, per-account currency identity everywhere, reports that never add
-    currencies without a rate. Not before the domain and its tests exist. Rules fixed
-    now: **each account keeps its own currency** as a property of the account (its
-    balance, movements, transfers, budgets and reports stay in that currency; a
-    currency is never converted in storage and an account never changes currency);
-    an **optional main currency for reports** may express totals across accounts only
-    through **explicit, traceable conversions**: each converted figure carries the
-    rate used, its date and its source, the report shows that it is converted and at
-    which rate, an unknown rate yields "unknown" rather than a guessed number, and the
-    rate table is user data with history (never a fabricated market series). Same-day
-    ARS/USD transfers inside the ledger still need the person's own dated rate.
+15. **Producto 24 — multi-currency engine**, in three PRs, each merged before the next.
+    Rules fixed since 23.1: **each account keeps its own currency** as a property of the
+    account (its balance, movements, transfers, budgets and reports stay in that currency;
+    a currency is never converted in storage and an account never changes currency); an
+    **optional main currency for reports** may express totals across accounts only through
+    **explicit, traceable conversions**: each converted figure carries the rate used, its
+    date and its source, the report shows that it is converted and at which rate, an
+    unknown rate yields "unknown" rather than a guessed number, and the rate table is user
+    data with history (never a fabricated market series). Same-day ARS/USD transfers inside
+    the ledger still need the person's own dated rate. Design and data:
+    [docs/currency.md](currency.md).
+    - **24A — foundations (delivered in code, 2026-09-24).** The ISO 4217/CLDR catalogue
+      (178 codes: 2 ledger, 151 ready, 2 incomplete, 23 excluded), generated and pinned with
+      provenance and the Unicode licence; the pure amount model for exponents 0–4 (no
+      floating point, 15-digit entry bound, BigInt sums, no FX); presentation for any
+      currency with ARS/USD byte-identical; selector metadata prepared but unused. No
+      SQLite, backup, form or screen change.
+    - **24B — currency-aware storage and forms (next, not started).** The ordered plan,
+      risks and exact sites are in docs/currency.md §7: the scale recorded durably per
+      currency (schema v9, backup v9, v1–v8 restore unchanged), validators and CHECKs
+      opened only through the catalogue gate, every parse/prefill/shortcut with the
+      account's exponent, forms that re-validate a draft when the currency changes, the
+      searchable currency screen, per-currency groupings without the ARS/USD pair, the
+      Assistant contract v2 (server first). ARS/USD goldens stay byte-identical; the
+      ledger gate (`LEDGER_CURRENCIES`) opens last, in its own commit, after device QA.
+    - **24C — rates and the main currency for reports (after 24B, not started).** The
+      contract in docs/currency.md §8: manual, dated, sourced, append-only rate records
+      with tombstones; exact rational conversion, rounded once; no cross rates; a
+      `reportCurrency` preference outside the ledger; unknown totals when any rate is
+      missing; provenance on every converted figure.
 16. Then, in order: first-entry onboarding, financial productivity (backlog below),
     the real cloud/text Assistant activation with quotas and cost control (its cost and
     abuse controls listed under "Activate smart capture" must exist before any paid
     call), Apple integrations on the development build (Face ID, notifications with the
     card due-date reminder, Apple Pay capture, App Intents), monetization, brand and
-    launch. The multi-currency engine (item 15) precedes them.
+    launch. The multi-currency engine (item 15: 24B, then 24C) precedes them.
 17. **Financial productivity backlog** (ordered by the owner's priority; each a focused
     PR with its own domain tests, none started):
     - Card form and calendar: a clearer card form and a real calendar for closing and due
@@ -1494,11 +1561,13 @@ by CI and merged into master before the next starts:
     cryptocurrencies and broker connections. They stay outside the native scope of
     decision 002 until a separate decision with official data access, dated quotes and
     user consent; nothing in the ledger, schema or dependencies anticipates them.
-19. **Requirements agreed with the owner (2026-09-24), none started in 23.2:**
+19. **Requirements agreed with the owner (2026-09-24), none started in 23.2 or 24A:**
     - **First launch.** The person chooses language and region (both remain changeable in
       Más → Idioma / Región, with "Según el dispositivo" still available); then the main
-      currency and an optional first account once Producto 24 exists. Skippable, nothing
-      seeded, no balance invented.
+      currency and an optional first account once Producto 24 exists (the currency list
+      is 24A's catalogue through 24B's searchable screen; the main currency is 24C's
+      `reportCurrency`, never inferred from the region). Skippable, nothing seeded, no
+      balance invented.
     - **Progressive internationalization.** New languages arrive through the modular
       catalogues and the existing tooling (`i18n:export`, `i18n:check`), with assisted
       translation followed by human review; a language is released only when its catalogue
@@ -1506,7 +1575,8 @@ by CI and merged into master before the next starts:
     - **International currency catalogue** built on ISO 4217 (codes, minor units) and
       CLDR (names, symbols, per-locale display). Language, region and currency stay three
       separate things: a region never implies a currency, a language never changes an
-      amount, and each account keeps its own currency (item 15).
+      amount, and each account keeps its own currency (item 15). *Foundations delivered in
+      24A; storage and the screen in 24B.*
     - **Future paywall** with testimonials only from real, verifiable users, with their
       consent, once they exist; never invented reviews, ratings, quotes or user counts.
     - **App Store rating request** only after a satisfying moment (for example after
@@ -1628,6 +1698,27 @@ amount uses `useStacked()` and gives the name two lines. 44-point targets, Voice
 safe areas, system text and separate currencies apply to every new screen.
 
 ## Handoff log (historical evidence)
+
+### 2026-09-24 — Producto 24A: foundations of the international multi-currency engine
+
+- ISO 4217 (List One, 2026-09-17) and CLDR 48.2.0 catalogue generated and pinned
+  (`scripts/currency/generate.mjs`, `sources.lock.json` with source and output sha256,
+  Unicode License v3); statuses ledger/ready/incomplete/excluded; the ISO minor unit as the
+  stored scale with every fiat exponent and the fiat code set pinned; `storedExponent` as
+  24B's persistence contract; the exact amount model (`money.ts`); catalogue-driven
+  presentation with ARS/USD byte-identical; selector metadata prepared, unused; the full
+  audit, 24B plan and 24C contract in docs/currency.md. Found and corrected: Hermes on iOS
+  has no `Intl.PluralRules`. Más footer: Producto 24A.
+- **Review:** an adversarial review (five lenses, two skeptics per finding) confirmed 20
+  findings, all fixed before the PR: operand checks in every money operation, the legacy
+  scale set fixed to ARS/USD, the singular spoken unit for "1" of currencies shown without
+  decimals, legal tender read on the ISO publication date, output hashes in the lock for
+  CI, float-distinguishing and real SQLite round-trip tests, and documentation counts. No
+  caller can reach the catalogue formatters with an unvalidated code (checked twice).
+- **Checked on Linux:** see the PR. Not an Xcode build; nothing visible changed; not
+  device-verified. No EAS build, paid service or remote migration.
+- **Next:** the owner's decisions in docs/currency.md §7.6, then Producto 24B in the order
+  of §7.5. Onboarding, monetization and the other agreed items (item 19) have not started.
 
 ### 2026-09-24 — Producto 23.2: Expo maintenance releases and the per-app Language diagnosis
 

@@ -25,6 +25,12 @@ export const errors: Pick<Messages, 'errors'> = {
       transferChanged: 'The transfer changed. Open it again.',
       transferCurrency: 'Keep the transfer’s original currency.',
     },
+    money: {
+      unsupportedCurrency: 'Unsupported currency.',
+      currencyMismatch: 'Amounts in different currencies can’t be combined without an exchange rate.',
+      scaleMismatch: 'The currency’s scale doesn’t match the record.',
+      separators: 'Invalid separators.',
+    },
     storage: {
       newerVersion: 'This data needs a newer version of FinanzApp. Nothing was changed.',
       entryState: 'Invalid transaction state.',

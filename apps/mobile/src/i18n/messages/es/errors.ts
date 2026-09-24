@@ -28,6 +28,18 @@ export const errors = {
       transferChanged: 'La transferencia cambió. Volvé a abrirla.',
       transferCurrency: 'Conservá la moneda original de la transferencia.',
     },
+    /** Thrown by the currency catalogue and the amount model (packages/domain/currency.ts, money.ts,
+     * Producto 24A). None reaches a screen in 24A: they guard the multi-currency engine for 24B/24C. */
+    money: {
+      /** A code that is not an ISO 4217 currency with a minor unit (gold, XXX, a typo). */
+      unsupportedCurrency: 'Moneda no admitida.',
+      /** Adding or comparing amounts in two currencies: FinanzApp never converts without a dated rate. */
+      currencyMismatch: 'No se pueden combinar importes de monedas distintas sin una cotización.',
+      /** A stored amount whose recorded scale (decimal places) differs from its currency's: never rescaled silently. */
+      scaleMismatch: 'La escala de la moneda no coincide con el registro.',
+      /** A programming error: the decimal and group separators given to the amount reader are unusable. */
+      separators: 'Separadores inválidos.',
+    },
     storage: {
       newerVersion: 'Estos datos requieren una versión más nueva de FinanzApp. No se modificaron.',
       entryState: 'Estado de movimiento inválido.',

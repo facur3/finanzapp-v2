@@ -230,6 +230,18 @@ development client runs whatever JavaScript Metro serves, so Más working in Eng
 reads Pegar/Copiar only on a binary that declares its languages. Steps:
 [device checklist](../../docs/mobile-device-checklist.md) § Producto 23.2.
 
+**Producto 24A (2026-09-24)** lays the foundations of the multi-currency engine
+without changing what is stored or shown. `npm run currency:generate` builds the ISO
+4217/CLDR catalogue (`packages/domain/currency-data.ts`, `src/i18n/currencies/<lang>.ts`)
+from pinned sources (`scripts/currency/sources.lock.json`; `-- --download` refreshes them,
+`-- --check` proves the committed files match). `packages/domain/currency.ts` holds the
+statuses (`ledger` ARS/USD, `ready`, `incomplete`, `excluded`) and each currency's stored
+scale (the ISO minor unit); `money.ts` is the exact amount model (no floating point, no
+FX). `format.ts` formats any currency with its own decimals, CLDR symbols and names;
+ARS and USD are byte-identical (`tests/currency-presentation.node.ts`). Forms still offer
+exactly ARS and USD; SQLite and backups are untouched. Data, licences, limits, the 24B
+plan and the 24C contract: [`docs/currency.md`](../../docs/currency.md).
+
 **expo-localization needs a new development build.** It is a native module: Expo Go
 already contains it, but a FinanzApp Dev binary compiled before this PR does not, and
 Metro cannot add native code. On such a binary the app still starts and works:
@@ -564,6 +576,7 @@ npm run typecheck
 npm run test:storage
 npm run check
 npm run export:ios
+npm run currency:generate -- --check   # needs the cached sources (-- --download once)
 ```
 
 `test:storage` uses a real temporary SQLite database through Node's SQLite driver,
@@ -669,7 +682,7 @@ For the intermittent black-tab report, update to `master`, restart with
 and repeat the **Interfaz 02** tab checks, **Interfaz 03** report checks and
 **Interfaz 04/05** correction/recovery and transfer checks, plus **Interfaz 06** daily/comparison reports and **Interfaz 08** recurring/upcoming
 checks, plus **Interfaz 10** cards/debts and five-tab checks and **Interfaz 11** Home,
-Movimientos and detail checks, **Interfaz 12** form checks, **Interfaz 13** Reportes checks, **Interfaz 14** budgets/recurring/accounts checks, **Interfaz 15** motion checks, **Interfaz 16** cohesion checks, **Interfaz 17** identity and money-input checks **Producto 18** Más / Tarjetas / amount-shortcut checks, **Producto 19** budget checks, **Producto 20** account/category identity checks **Producto 21** Assistant checks, **Producto 22** reachability/material checks, **Producto 22.1** clarity checks, **Producto 23.0** amount-field, row and localization checks, **Producto 23.1A** language-preference checks, **Producto 23.1B1** and **23.1B2** translation checks, **Producto 23.1C1** regional-format checks, **Producto 23.1C2** release checks (new development build), **Producto 23.2** installed-binary and Language-row checks. The current footer (Más) says Producto 23.2.
+Movimientos and detail checks, **Interfaz 12** form checks, **Interfaz 13** Reportes checks, **Interfaz 14** budgets/recurring/accounts checks, **Interfaz 15** motion checks, **Interfaz 16** cohesion checks, **Interfaz 17** identity and money-input checks **Producto 18** Más / Tarjetas / amount-shortcut checks, **Producto 19** budget checks, **Producto 20** account/category identity checks **Producto 21** Assistant checks, **Producto 22** reachability/material checks, **Producto 22.1** clarity checks, **Producto 23.0** amount-field, row and localization checks, **Producto 23.1A** language-preference checks, **Producto 23.1B1** and **23.1B2** translation checks, **Producto 23.1C1** regional-format checks, **Producto 23.1C2** release checks (new development build), **Producto 23.2** installed-binary and Language-row checks (Producto 24A changes nothing visible). The current footer (Más) says Producto 24A.
 Before updating, save a private pilot copy; do not uninstall or add fake movements.
 
 If a storage/refresh error occurs, the form retains the exact submitted command

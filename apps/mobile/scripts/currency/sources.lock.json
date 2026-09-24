@@ -1,0 +1,53 @@
+{
+  "about": "Sources of the currency catalogue: URL, sha256 and size of the exact bytes the committed data was generated from. Updated only by `npm run currency:generate -- --download`.",
+  "cldr": "48.2.0",
+  "files": {
+    "list-one.xml": {
+      "url": "https://www.six-group.com/dam/download/financial-information/data-center/iso-currrency/lists/list-one.xml",
+      "sha256": "33139b438657d1cee116ba737807ea71d19d6de4b90f799a09c56f0cc6a1b0ff",
+      "bytes": 47491,
+      "retrieved": "2026-09-24"
+    },
+    "currencyData.json": {
+      "url": "https://raw.githubusercontent.com/unicode-org/cldr-json/48.2.0/cldr-json/cldr-core/supplemental/currencyData.json",
+      "sha256": "e50315091b1f34428480f82970be64159ad207af0bdcebe7faa6260d3e34c8a6",
+      "bytes": 71126,
+      "retrieved": "2026-09-24"
+    },
+    "currencies-und.json": {
+      "url": "https://raw.githubusercontent.com/unicode-org/cldr-json/48.2.0/cldr-json/cldr-numbers-full/main/und/currencies.json",
+      "sha256": "5b12623ed0fea4392d6e400d9a9eebc1d3f7b228cc970f8a6e31915ffb8be5ad",
+      "bytes": 8159,
+      "retrieved": "2026-09-24"
+    },
+    "currencies-en.json": {
+      "url": "https://raw.githubusercontent.com/unicode-org/cldr-json/48.2.0/cldr-json/cldr-numbers-full/main/en/currencies.json",
+      "sha256": "a6c41b28f4035f65ae698b53a66866982b4ff49bc0de7e840f91d2c6e6bdc23b",
+      "bytes": 71492,
+      "retrieved": "2026-09-24"
+    },
+    "territories-en.json": {
+      "url": "https://raw.githubusercontent.com/unicode-org/cldr-json/48.2.0/cldr-json/cldr-localenames-full/main/en/territories.json",
+      "sha256": "158c1d575308f7e46912edbeda435c8fe2ef5dad280798231f3a432e406b1807",
+      "bytes": 9956,
+      "retrieved": "2026-09-24"
+    },
+    "currencies-es.json": {
+      "url": "https://raw.githubusercontent.com/unicode-org/cldr-json/48.2.0/cldr-json/cldr-numbers-full/main/es/currencies.json",
+      "sha256": "521e4e42144dcacfef3d42fa00ffa6b1161637163671bc4e5d382dfa1bc4d9e1",
+      "bytes": 60098,
+      "retrieved": "2026-09-24"
+    },
+    "territories-es.json": {
+      "url": "https://raw.githubusercontent.com/unicode-org/cldr-json/48.2.0/cldr-json/cldr-localenames-full/main/es/territories.json",
+      "sha256": "027b9c91d4e923d506b404415648691ef41ebde721aa454cee4d9f7f66b3ea62",
+      "bytes": 9892,
+      "retrieved": "2026-09-24"
+    }
+  },
+  "outputs": {
+    "packages/domain/currency-data.ts": "05b56881b2baf740a213c0cc75ffc7a5e595ef0649451c0f0229e6fd126fa3d3",
+    "apps/mobile/src/i18n/currencies/en.ts": "8979df150a7a609bf46cd0e30860724c7658002208fce06ce712f68dd5265856",
+    "apps/mobile/src/i18n/currencies/es.ts": "cf4a65a7a13fe9ae41079c7ad5261ecf2331b3020afae91816f6e5c9a03e5723"
+  }
+}

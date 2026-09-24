@@ -12,7 +12,8 @@
     "check": "expo install --check",
     "i18n:check": "node --experimental-strip-types scripts/i18n/check.mjs",
     "i18n:extract": "node --experimental-strip-types scripts/i18n/extract.mjs",
-    "i18n:export": "node --experimental-strip-types scripts/i18n/export.mjs"
+    "i18n:export": "node --experimental-strip-types scripts/i18n/export.mjs",
+    "currency:generate": "node --experimental-strip-types scripts/currency/generate.mjs"
   },
   "engines": {
     "node": ">=22.22.0"
