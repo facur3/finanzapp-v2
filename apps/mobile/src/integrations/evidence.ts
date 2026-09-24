@@ -7,8 +7,9 @@ import type { AssistantFact } from '../../../../packages/integrations/contracts.
  * shows them: an answer's evidence rows are named from the fact id (and, for a
  * category, the stored category name) in the interface language; see
  * `answerContent` in src/assistant/conversation.ts.
- * TODO(i18n): the request should later carry the interface language so the
- * model answers in it; that is a contract change, out of scope here. */
+ * The v1 request carries no language (the contract rejects unknown keys) and
+ * the server answers in Spanish; how the interface language and region will
+ * reach the model, and how facts become language-neutral, is docs/i18n.md §11. */
 export const FACT_LABELS = { expenses: 'Gastos registrados', income: 'Ingresos registrados', categoryPrefix: 'Categoría de gasto: ' } as const;
 
 /** The stored category name a `*.category.N` fact is about, or null for any other fact.

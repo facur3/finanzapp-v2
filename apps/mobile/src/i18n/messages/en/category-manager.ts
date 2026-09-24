@@ -52,10 +52,10 @@ export const categoryManager: Pick<Messages, 'categoryManager'> = {
       color: 'Color',
     },
     icons: {
-      food: 'Food', groceries: 'Groceries', restaurant: 'Restaurants', cafe: 'Coffee', drinks: 'Drinks', transport: 'Transport',
+      food: 'Food', groceries: 'Groceries', restaurant: 'Restaurants', cafe: 'Coffee', drinks: 'Drinks', transport: 'Transportation',
       fuel: 'Fuel', plane: 'Travel', home: 'Home', rent: 'Rent', utilities: 'Utilities', internet: 'Internet', phone: 'Phone',
       subscriptions: 'Subscriptions', health: 'Health', pharmacy: 'Pharmacy', fitness: 'Sports', beauty: 'Beauty', education: 'Education',
-      clothing: 'Clothing', tech: 'Technology', leisure: 'Leisure', music: 'Music', games: 'Games', pets: 'Pets', gifts: 'Gifts',
+      clothing: 'Clothing', tech: 'Technology', leisure: 'Entertainment', music: 'Music', games: 'Games', pets: 'Pets', gifts: 'Gifts',
       family: 'Family', taxes: 'Taxes', insurance: 'Insurance', bank: 'Bank', work: 'Work', sales: 'Sales', investment: 'Investments',
       refund: 'Refunds', loan: 'Loans', repairs: 'Repairs', other: 'Other',
     },

@@ -294,8 +294,8 @@ test('the category picker shows display names, records the stored spelling, and 
 
 // The shared picker on its own module: names for VoiceOver, one haptic per
 // change, no motion under Reduce Motion. Layout and touch need the iPhone.
-function pickerHarness(props: any, reduced: boolean, locale: AppLocale = 'es-AR') {
-  const i18nProvider = { useI18n: () => bindLocale(locale) };
+function pickerHarness(props: any, reduced: boolean, locale: AppLocale = 'es-AR', deviceLanguage: string | null = null) {
+  const i18nProvider = { useI18n: () => bindLocale(locale, 'native', deviceLanguage) };
   const source = readFileSync(new URL('../src/ui/appearance-picker.tsx', import.meta.url), 'utf8');
   const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText;
   const jsx = (type: Node['type'], props: Node['props']) => ({ type, props });
@@ -469,4 +469,20 @@ test('23.1B2 English picker: icon and colour names come from the catalogue by id
   for (const [group, list] of [['icons', domain.CATEGORY_ICONS], ['accountIcons', domain.ACCOUNT_ICONS], ['colors', domain.APPEARANCE_COLORS]] as const) {
     for (const item of list) assert.equal(es(`categoryManager.${group}.${item.id}` as any), item.name, 'the Spanish catalogue matches the domain name of ' + group + '.' + item.id);
   }
+});
+
+test('23.1C2: the preview tile speaks the interface language only when it differs from the device language', () => {
+  const props = { icons: appearance.CATEGORY_ICON_CHOICES, colors: appearance.COLOR_CHOICES, icon: 'transport', color: 'teal', onIconChange: () => {}, onColorChange: () => {} };
+  const preview = (locale: AppLocale, device: string | null) => deep(pickerHarness(props, false, locale, device).render()).find(node => node.type === 'View' && node.props.accessible)!.props;
+  // English chosen in Más on a Spanish iPhone: VoiceOver reads the English label with an English voice.
+  assert.equal(preview('en-AR', 'es').accessibilityLanguage, 'en');
+  assert.equal(preview('en-AR', 'es').accessibilityLabel, 'Preview: Transportation in Teal');
+  // Spanish on a Portuguese iPhone (the fallback language): a Spanish voice.
+  assert.equal(preview('es-AR', 'pt').accessibilityLanguage, 'es');
+  // Device and app agree: nothing is set, so the person's own VoiceOver voice is untouched.
+  assert.equal(preview('es-AR', 'es').accessibilityLanguage, undefined);
+  assert.equal(preview('en-US', 'en').accessibilityLanguage, undefined);
+  assert.equal(preview('es-AR', null).accessibilityLanguage, undefined);
+  // The icon section title uses the accented rioplatense spelling, like every other Spanish "ícono".
+  assert.ok(deep(pickerHarness(props, false).render()).some(node => node.type === 'AppText' && String(node.props.children) === 'Ícono'));
 });

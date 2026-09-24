@@ -45,16 +45,18 @@ export type ResolvedDraft = {
 export type DraftField = 'kind' | 'amount' | 'paymentMethod' | 'category';
 /** A chip under a clarification. `label` is user data shown as is (an account
  * name); `labelKey` is the app's own word (Gasto/Ingreso), translated at
- * render; `category` marks a stored category name, shown with its localized
- * built-in name when it has one. Exactly one of `label` and `labelKey` is set. */
-export type ClarificationOption = { id: string; label?: string; labelKey?: MessageKey; category?: boolean };
+ * render; `category` marks a stored category name of that kind, shown with its
+ * localized built-in name when it has one (an income preset is only found as
+ * income). Exactly one of `label` and `labelKey` is set. */
+export type ClarificationOption = { id: string; label?: string; labelKey?: MessageKey; category?: EntryKind };
 
 /** The words a chip shows (and that are repeated as the user's message once chosen). */
 export function optionText(option: ClarificationOption, t: Translate = translator('es')): string {
   return option.labelKey ? t(option.labelKey) : option.label ?? '';
 }
 
-export type AnswerContent = { kind: 'answer'; rows: EvidenceRow[]; links: EvidenceLink[] };
+/** `currency` is the one the facts were computed in: the rows keep it even if the screen later shows another. */
+export type AnswerContent = { kind: 'answer'; rows: EvidenceRow[]; links: EvidenceLink[]; currency: Currency };
 export type DraftContent = { kind: 'draft'; draft: ResolvedDraft; status: 'pending' | 'confirmed' | 'cancelled' | 'edited'; entryId: string | null };
 export type ClarificationContent = { kind: 'clarification'; field: DraftField | null; options: ClarificationOption[]; chosen: string | null };
 export type AssistantContent = AnswerContent | DraftContent | ClarificationContent;
@@ -206,7 +208,7 @@ export function categoryOptions(entries: Entry[], kind: EntryKind, limit = 4): C
     if (current) current.count += 1; else counts.set(key, { label: entry.category, count: 1 });
   }
   return [...counts.values()].sort((a, b) => b.count - a.count || a.label.localeCompare(b.label)).slice(0, limit)
-    .map(item => ({ id: item.label, label: item.label, category: true }));
+    .map(item => ({ id: item.label, label: item.label, category: kind }));
 }
 
 /** Turn a CaptureDraft (the server contract, every field nullable) into either a
@@ -310,7 +312,7 @@ export function answerContent(result: Pick<AssistantResult, 'factIds'>, facts: A
     params: { currency, startISO: categories[0].startISO, endISO: categories[0].endISO, category: factCategory(categories[0])! } } });
   if (cited.some(fact => fact.id.startsWith('budget'))) links.push({ id: 'budget', href: { pathname: '/budgets', params: { currency } } });
   if (cited.length) links.push({ id: 'movements', href: { pathname: '/activity' } });
-  return { kind: 'answer', rows: rows.slice(0, 5), links };
+  return { kind: 'answer', rows: rows.slice(0, 5), links, currency };
 }
 
 /** The content the reducer stores for a validated server result. Drafts are resolved locally; answers get evidence. */

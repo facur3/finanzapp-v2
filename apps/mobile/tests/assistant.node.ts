@@ -2,13 +2,14 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import type { Account, Entry } from '@finanzapp/domain';
-import { SUGGESTIONS, answerContent, categoryOptions, classifyIntent, completeDraft, contentFromResult, conversationReducer, draftGaps,
+import { REASON_TEXT, SUGGESTIONS, answerContent, categoryOptions, classifyIntent, completeDraft, contentFromResult, conversationReducer, draftGaps,
   emptyConversation, entryFromDraft, evidenceLabel, optionText, resolveDraft, shouldAutoscroll, type ConversationState } from '../src/assistant/conversation.ts';
 import { FACT_LABELS, monthlyEvidence } from '../src/integrations/evidence.ts';
 import { integrationClient } from '../src/integrations/client.ts';
 import { translator } from '../src/i18n/messages.ts';
 import { bindLocale } from '../src/i18n/bind.ts';
-import { assistantForEnvironment, disconnectedAssistant, failureReason, remoteAssistant, type AssistantEvent } from '../src/assistant/client.ts';
+import { assistantForEnvironment, disconnectedAssistant, failureMessage, failureReason, remoteAssistant, type AssistantEvent } from '../src/assistant/client.ts';
+import { validateAssistantRequest } from '../../../packages/integrations/contracts.js';
 import { assistantForBuild } from '../src/assistant/runtime.ts';
 import { FIXTURE_ANSWER, FIXTURE_DRAFT, FIXTURE_DRAFT_NO_ACCOUNT, FIXTURE_FACTS, fixtureAssistant, fixtureReply } from '../src/assistant/fixtures.ts';
 
@@ -56,7 +57,7 @@ test('streaming grows one assistant message in place, the answer finalizes it an
   assert.equal(streaming.role, 'assistant');
   assert.equal(streaming.role === 'assistant' && streaming.status, 'streaming');
   assert.equal(streaming.text, 'Gastaste $84.300 más');
-  const done = run([{ type: 'answer', text: 'Gastaste $84.300 más que el mes pasado.', content: { kind: 'answer', rows: [], links: [] } }], started);
+  const done = run([{ type: 'answer', text: 'Gastaste $84.300 más que el mes pasado.', content: { kind: 'answer', rows: [], links: [], currency: 'ARS' } }], started);
   assert.equal(done.messages.length, 2, 'the final answer replaces the streaming message rather than adding one');
   assert.equal(done.messages[1].role === 'assistant' && done.messages[1].status, 'done');
   assert.equal(done.phase, 'idle');
@@ -202,7 +203,7 @@ test('answer rows and links come from the cited evidence: signed differences whe
   assert.deepEqual(single.links.map(link => link.id), ['category', 'movements']);
   assert.deepEqual(single.links[0].href, { pathname: '/spending-detail', params: { currency: 'ARS', startISO: '2026-09-01', endISO: '2026-09-21', category: 'Supermercado' } });
   const none = answerContent({ factIds: [] }, FIXTURE_FACTS, 'ARS');
-  assert.deepEqual(none, { kind: 'answer', rows: [], links: [] }, 'prose without evidence gets no numbers and no links');
+  assert.deepEqual(none, { kind: 'answer', rows: [], links: [], currency: 'ARS' }, 'prose without evidence gets no numbers and no links; it keeps the currency asked about');
   const unknown = answerContent({ factIds: ['ghost'] }, FIXTURE_FACTS, 'ARS');
   assert.equal(unknown.rows.length, 0, 'an id that is not local evidence is ignored, never invented');
   const budget = answerContent({ factIds: ['budget.total'] }, [{ id: 'budget.total', label: 'Presupuesto general', amountMinor: 1, count: 1, startISO: today, endISO: today }], 'ARS');
@@ -216,6 +217,9 @@ test('answer rows and links come from the cited evidence: signed differences whe
 test('categoryOptions counts by identity and caps the chips', () => {
   assert.deepEqual(categoryOptions(entries, 'expense', 1).map(o => o.label), ['Comida']);
   assert.deepEqual(categoryOptions(entries, 'income').map(o => o.label), ['Trabajo']);
+  // A chip carries its kind, so the screen finds an income preset (Sueldo) as income, never as an expense category.
+  assert.deepEqual(categoryOptions(entries, 'income').map(o => o.category), ['income']);
+  assert.deepEqual(categoryOptions(entries, 'expense').map(o => o.category), ['expense', 'expense']);
 });
 
 test('the disconnected client sends nothing and reports unavailable; a fixture-free environment stays disconnected', async () => {
@@ -312,7 +316,7 @@ test('English: the app\'s own words translate, the model\'s words, the user\'s d
   assert.equal(en(completeDraft(asked.pending!, 'cash', [visa, cash], entries, today).textKey), 'Review the draft before saving it.');
   const english = bindLocale('en-AR');
   assert.equal(english.errorText('assistant.reasons.offline'), 'No connection. Your transactions didn’t change; you can retry.');
-  assert.equal(english.errorText('assistant.draft.accountRequired'), 'Choose which account paid before confirming.');
+  assert.equal(english.errorText('assistant.draft.accountRequired'), 'Choose the account you paid with before confirming.');
   // The Entry a confirmed draft becomes does not depend on the language.
   const resolved = resolveDraft(FIXTURE_DRAFT.draft!, [visa, cash], entries, 'ARS', today);
   assert.deepEqual(entryFromDraft(resolved.kind === 'draft' ? resolved.draft : null!, 'op-1', createdAt).category, 'Supermercado');
@@ -328,4 +332,41 @@ test('English: the app\'s own words translate, the model\'s words, the user\'s d
   await assert.rejects(signedOut.assistant({ version: 1, action: 'parse', text: 'x', todayISO: today, currency: 'ARS', facts: [] }), /^Error: assistant\.integration\.signIn$/);
   assert.equal(bindLocale('es-AR').errorText('assistant.integration.signIn'), 'Iniciá sesión para usar la integración. El registro manual sigue disponible.');
   assert.equal(english.errorText('assistant.integration.signIn'), 'Sign in to use the integration. Manual entry is still available.');
+});
+
+test('a failure carries only the integration client\'s own keys: a contract rejection or an engine message becomes the reason\'s note in the interface language', async () => {
+  const origin = 'https://finanzapp.example';
+  const ask = { action: 'parse' as const, text: 'Spent 12 at Target', todayISO: today, currency: 'ARS' as const, facts: [] };
+  const replying = (body: () => unknown, status = 200) => remoteAssistant(origin, async () => 'jwt', (async () => ({ ok: status < 400, status, json: async () => body() })) as unknown as typeof fetch);
+  const failed = [{ type: 'error', reason: 'failed', message: '' }];
+  // 200 with a result the contract refuses (an answer to a parse): "Datos de captura inválidos." never reaches the screen.
+  assert.deepEqual(await collect(replying(() => ({ kind: 'answer', message: 'x', draft: null, factIds: [] })).ask(ask)), failed);
+  // 200 with a body that is not JSON: the engine's English text never reaches a Spanish screen.
+  assert.deepEqual(await collect(replying(() => JSON.parse('<html>')).ask(ask)), failed);
+  // A request the contract refuses before sending (more than 2 000 characters).
+  assert.deepEqual(await collect(replying(() => ({})).ask({ ...ask, text: 'a'.repeat(2001) })), failed);
+  // The client's own keys still pass and are translated at display.
+  assert.deepEqual(await collect(replying(() => ({}), 500).ask(ask)), [{ type: 'error', reason: 'failed', message: 'assistant.integration.failed' }]);
+  assert.equal(failureMessage(new Error('assistant.integration.limit')), 'assistant.integration.limit');
+  assert.equal(failureMessage(new Error('Datos de captura inválidos.')), '');
+  assert.equal(failureMessage(new Error('assistant.integration.limit extra')), '', 'a key, whole, or nothing');
+  assert.equal(failureMessage('assistant.integration.failed'), '', 'only an Error carries a key');
+  assert.equal(bindLocale('en-US').errorText(REASON_TEXT.failed), 'The request couldn’t be completed. Your transactions didn’t change.');
+  // The development fixtures fail the same way, and the English chips reach the same scripted replies (still Spanish: content).
+  for (const [text, reason] of [['error', 'failed'], ['offline', 'offline'], ['sin conexión', 'offline'], ['limit', 'limit'], ['límite', 'limit']] as const) {
+    assert.deepEqual(await collect(fixtureAssistant(0).ask({ ...ask, text })), [{ type: 'error', reason, message: '' }], text);
+  }
+  const explain = { ...ask, action: 'explain' as const };
+  const why = fixtureReply({ ...explain, text: en('assistant.suggestions.whySpentMore') });
+  assert.equal(why, fixtureReply({ ...explain, text: es('assistant.suggestions.whySpentMore') }));
+  assert.equal('result' in why && why.result, FIXTURE_ANSWER, 'the scripted answer, still in Spanish');
+  assert.equal(fixtureReply({ ...explain, text: en('assistant.suggestions.foodSpending') }), fixtureReply({ ...explain, text: es('assistant.suggestions.foodSpending') }));
+});
+
+test('the v1 Assistant contract carries no language: a locale is refused, so the server must accept it before any client sends it', () => {
+  const request = { version: 1, action: 'parse', text: 'Spent 12 at Target', todayISO: today, currency: 'ARS', facts: [] };
+  assert.deepEqual(validateAssistantRequest(request), request, 'the validated request is the exact wire shape the client posts');
+  assert.throws(() => validateAssistantRequest({ ...request, locale: { language: 'en', region: 'US' } }));
+  assert.throws(() => validateAssistantRequest({ ...request, replyLanguage: 'en-US' }));
+  assert.throws(() => validateAssistantRequest({ ...request, language: 'en' }));
 });

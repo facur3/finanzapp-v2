@@ -15,10 +15,94 @@ server-keyed; manual recording and local data work without connectivity. Recurri
 expenses, debts, budgets and cards remain in scope. Native navigation, accessible
 amounts, real data and recoverable durable writes remain requirements.
 
-## Status and current delivery — Producto 23.1C1
+## Status and current delivery — Producto 23.1C2
 
 Implemented is code, checked names a test, device-verified needs a physical result,
 and released means distributed. Neither a bundle nor a screenshot is App Store QA.
+
+**23.1C2 publishes the first official internationalization: Spanish and English,
+combined independently with Argentina and the United States.** English and the US region
+are released in code (`RELEASED_LANGUAGES = ['es', 'en']`, `RELEASED_REGIONS = ['AR', 'US']`)
+and declared to iOS; reaching the iPhone needs the new EAS development build below. No
+SQLite, schema, stored amount, accounting rule, backup format or currency change; ARS and
+USD remain the only currencies (more is Producto 24). No redesign. Process, precedence and
+iOS limits: [docs/i18n.md](i18n.md) §10 and §11.
+
+- [x] **Released in Más.** Idioma (Según el dispositivo, Español, English) and Región
+  (Según el dispositivo, Argentina, Estados Unidos, each with a sample) for everyone,
+  independent, persistent (two key-value keys outside the ledger and backups) and live.
+  The "Spanish only for now" note is gone; the store still refuses a value outside the
+  gate (tested with an explicit narrower gate). Choices saved in the 23.1C1 preview now
+  apply (expected).
+- [x] **iOS declares the released languages** (`app.config.ts`): the `expo-localization`
+  plugin with `supportedLocales: { ios: ['es', 'en'] }` writes `CFBundleLocalizations`
+  (kept equal to `RELEASED_LANGUAGES` by a test that also runs the real plugin; iOS-only
+  form, so no Android Gradle or locale files change), `CFBundleDevelopmentRegion` 'es'
+  (iOS's own text falls back to Spanish like the app) and
+  `UIPrefersShowingLanguageSettings` (the per-app language row always shows). iOS's edit
+  menu, share sheet and UIKit buttons now follow the app's language; the ⓘ alerts carry
+  the app's own "OK" (still the cancel action, so Esc and VoiceOver's escape gesture close
+  them). FinanzApp Preview is not built or touched.
+- [x] **Automatic preferences.** "Según el dispositivo" re-reads the device on return to
+  the foreground **and** on iOS's own locale-change event (`onLocaleSettingsChanged`, through
+  the probed module, so an older binary still never evaluates the package); both are
+  idempotent and a failed read keeps the last good one. iOS quits the app on an iPhone or
+  per-app language change (Apple), so the next launch reads the new language; a Region
+  change keeps it running and re-renders in place.
+- [x] **Nothing lost on a change.** No remount of navigation, forms, an open date sheet or
+  the Assistant (a request in flight is neither aborted nor re-sent); a half-typed amount
+  changes separators only; stored amounts never change (the real provider on a real
+  reconciler; the Assistant harness runs effects by their dependencies).
+- [x] **VoiceOver in the four combinations.** Spoken numbers use the language's decimal
+  mark **without grouping** ("1234,56 pesos", "1234.56 dollars"): a group separator is the
+  one mark a Spanish voice of another variety or Region could misread by a factor of a
+  thousand. Generic rows, fields, the account sheet, shortcuts and the Save button speak
+  their amounts through spoken twins; `accessibilityLanguage` is set only when the interface
+  language differs from the device's (the owner's es/es setup keeps its voice); Idioma speaks
+  each autonym in its own language; Assistant replies (Spanish in v1) keep a Spanish voice.
+  A TypeScript-checker test guards every accessibility attribute. Limits documented in
+  docs/i18n.md §10 (system chrome, VoiceOver's own words, announcements, text read as shown).
+- [x] **Date wheel.** Takes the language with its home region (`es_AR`, `en_US`) in all
+  four combinations, so months and column order follow the language and match the row;
+  Apple's own `en_AR` (day-first) and `es_US` (changed in April 2026) data would contradict
+  the app. `onValueChange`/`onDismiss` replace the deprecated `onChange`; the row is read as
+  the long date.
+- [x] **Copy in both languages.** A bilingual review with a second skeptical reviewer
+  per area: Spanish errors fixed (a collection's direction, "cuatro" named donut slices, a
+  wrong preposition, "Ícono", region-neutral placeholders instead of Carrefour/Galicia/
+  Cocos), English glossary and naturalness fixes (~70 keys: transaction, record, recurring
+  item, Transportation/Entertainment, errors), two domain budget errors that were shown in
+  Spanish now translated, the largest-expense day in the region's order ("9/22" in the
+  US), "Vence hoy"/"Due today" in lower case inside sentences, the currency code inside
+  obligation balances ("Owed ARS 50.00"), a card paid to zero reads "Sin deuda" (not "A
+  favor ARS 0,00") in the transfer form, and signed balances in the account sheet.
+- [x] **Assistant.** The interface follows the language; failures show only catalogue
+  notes (never a caught Spanish or engine sentence); income chips resolve as income;
+  evidence rows keep the currency the answer was computed in (a later change of the
+  screen's currency no longer relabels them) and say a difference that grew ("… más"). The
+  request still carries no language: the v2 design (locale as two codes, language-neutral
+  facts, server before app, category identity matching before connecting English) is in
+  docs/i18n.md §11. No paid AI.
+- [x] **Production builds do not depend on `EXPO_PUBLIC_LOCALE_PREVIEW`:** the flag now
+  changes nothing (`PREVIEW` equals `RELEASED`) and `tests/locale-release.node.ts` compiles
+  `provider.tsx` with babel-preset-expo for production with and without it (`__DEV__`
+  inlined as false), mounts the result and scans configs; the local iOS export contains
+  the flag's name 0 times.
+- [x] **Checked on Linux:** 454 mobile tests (389 before; new files `locale-release`,
+  `voiceover`, `date-field`), TypeScript, `i18n:extract` 0, `i18n:check --strict` 0 errors /
+  0 stale (English accepted after review), `expo install --check`, `npm ls --all`, Metro iOS
+  export, `expo config --type introspect` for both variants (development
+  `com.facur3.finanzapp.dev` and preview `com.facur3.finanzapp.preview` unchanged, both
+  `CFBundleLocalizations [es, en]`), root tests (398), Vite build, repo hygiene.
+- [ ] **Not device-verified:** everything above on the iPhone (checklist 23.1C2), in
+  particular the iOS Settings language list, system text after the build, Region while
+  running, relaunch on language changes, VoiceOver voices and number reading, and the
+  date wheel.
+- [ ] **Blocked on the owner:** the EAS development build (`eas build --profile development
+  --platform ios`) and its installation over FinanzApp Dev; no build, submission or paid
+  service was started.
+
+### Previous delivery — Producto 23.1C1
 
 **23.1C1 prepares the regional formats and the internationalized amount experience
 without publishing them.** Producto 23.1C is split in two: **23.1C1** (this PR) makes
@@ -82,7 +166,7 @@ USD remain the only currencies. Process, tables and iOS limits:
 - [ ] **Not device-verified:** everything above on the iPhone (checklist 23.1C1), in
   particular VoiceOver with a Spanish voice in the US region and the date wheel's column
   order for en-AR/es-US (iOS decides; record what it shows).
-- [ ] **Pending for 23.1C2:** release English and the US region (`RELEASED_LANGUAGES`,
+- [x] *(Delivered in 23.1C2.)* **Pending for 23.1C2:** release English and the US region (`RELEASED_LANGUAGES`,
   `RELEASED_REGIONS`), the Región row for everyone, `expo-localization`
   `supportedLocales` (native rebuild through EAS, with the owner's authorization), device
   QA of the four combinations at the largest Dynamic Type, the VoiceOver decision for
@@ -1315,7 +1399,7 @@ by CI and merged into master before the next starts:
     **23.1C1** (regional money formats, amount-field separators, VoiceOver amounts and
     the date picker's locale for the four combinations, still gated; delivered) and
     **23.1C2** (the US region and English released, `supportedLocales`, a new EAS build;
-    next). Original scope: every screen's copy in the
+    delivered in code, device QA pending). Original scope: every screen's copy in the
     catalogue, English released (`RELEASED_LOCALES`), `expo-localization`'s
     `supportedLocales` plugin (a native rebuild), locale-aware money presentation in
     `Money` and the amount field's separators, VoiceOver strings, date pickers and the
@@ -1478,6 +1562,19 @@ amount uses `useStacked()` and gives the name two lines. 44-point targets, Voice
 safe areas, system text and separate currencies apply to every new screen.
 
 ## Handoff log (historical evidence)
+
+### 2026-09-24 — Producto 23.1C2: English and the United States released
+
+- English and the US region released and declared to iOS (`supportedLocales`,
+  development region es, per-app language row); Idioma and Región in Más for everyone;
+  device changes re-read on foreground and on iOS's locale event; ungrouped VoiceOver
+  numbers, spoken twins and `accessibilityLanguage` on a mismatch; the date wheel on the
+  language's home locale; Assistant failures and income chips fixed, no language sent (v2
+  designed); bilingual copy review; tests proving release bundles ignore the preview flag.
+- **Checked on Linux:** 454 mobile tests and the checks listed under the current delivery.
+  **Not device-verified.** Needs a new EAS development build (owner).
+- **Next:** build and install FinanzApp Dev, device QA with the 23.1C2 checklist. Producto 24
+  (currencies) has not started.
 
 ### 2026-09-24 — Producto 23.1C1: regional formats and the internationalized amount field
 

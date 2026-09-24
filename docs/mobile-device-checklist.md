@@ -1,5 +1,111 @@
 # Physical iPhone acceptance checklist
 
+## Producto 23.1C2 — English and the United States released (pending device review)
+
+**Needs a new FinanzApp Dev build** (Info.plist changed: `CFBundleLocalizations`
+es/en, `CFBundleDevelopmentRegion` es, `UIPrefersShowingLanguageSettings`). Record the
+iPhone model and iOS version (last recorded: iPhone 14 Pro, iOS 26.6.1). Share a private
+backup first (Más → Copias de seguridad). Build **only** the `development` profile: it
+replaces FinanzApp Dev in place (bundle identifier `com.facur3.finanzapp.dev`, local data
+kept); FinanzApp Preview (`com.facur3.finanzapp.preview`) is not built or touched.
+
+```bash
+cd apps/mobile
+git fetch origin && git checkout feat/mobile-producto-23-1c2-i18n-release && git pull
+npm ci
+npx eas-cli@latest whoami                                   # facur3
+APP_VARIANT=development npx expo config --type introspect --json | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{const c=JSON.parse(s),p=c.ios.infoPlist;console.log(c.ios.bundleIdentifier,p.CFBundleLocalizations,p.CFBundleDevelopmentRegion,p.UIPrefersShowingLanguageSettings)})"
+# expected: com.facur3.finanzapp.dev [ 'es', 'en' ] es true
+npx eas-cli@latest build --profile development --platform ios
+# open the build page URL (or its QR) on the iPhone → Install; it updates FinanzApp Dev
+npm run start:dev-client -- --clear                         # no EXPO_PUBLIC_LOCALE_PREVIEW
+```
+
+**A. Before installing** (current FinanzApp Dev, EAS build bad52629): long-press the
+Movimientos search field and note whether the menu says Paste/Copy or Pegar/Copiar
+(expected: English today); tap an ⓘ glyph and note the alert button.
+
+**B. First launch of the new build**
+- [ ] Más footer: "Producto 23.1C2 · … · Idioma: módulo nativo". Más → App y datos shows
+  Idioma and Región (globe glyph), in that order, without any flag.
+- [ ] If English or Estados Unidos was chosen during the 23.1C1 preview, the app opens that
+  way and Más marks it: expected (the choice was saved on the iPhone and is now
+  released). Set both back to "Según el dispositivo" before section D.
+- [ ] Idioma lists Según el dispositivo ("Ahora: Español"), Español, English; no "por ahora"
+  note. Región lists Según el dispositivo, Argentina (22/9/2026 · 1.234,56), Estados
+  Unidos (9/22/2026 · 1,234.56). Each tap re-renders in place (the title too), with the
+  selection haptic; nothing restarts.
+- [ ] Force-quit and reopen: the choices persist.
+
+**C. iOS Settings and iOS's own text**
+- [ ] Settings → Apps → FinanzApp Dev → Idioma (Language) exists even with a single
+  preferred language and lists **exactly** Español and English. Record the row's title.
+- [ ] Spanish iPhone: the text-field menu reads Pegar/Copiar/Seleccionar todo; the share
+  sheet (backup export) is in Spanish; the ⓘ alert button reads "OK" and VoiceOver's
+  two-finger scrub (escape) closes it.
+- [ ] Choose English there with Más → Idioma on "Según el dispositivo": iOS quits the app;
+  reopen: FinanzApp and the menus are in English, Más → Idioma "Same as device · Now:
+  English", region unchanged, data intact. Record whether iOS added English to the
+  iPhone's preferred languages. Then set Más → Idioma = Español explicitly: FinanzApp's
+  text is Spanish while iOS's menu stays English (documented). Restore both.
+- [ ] Optional: make Português the only preferred language: FinanzApp **and** iOS's menus
+  in Spanish (fallback language es). Restore.
+
+**D. Changes made while the app runs** (Idioma and Región on "Según el dispositivo")
+- [ ] Open Nuevo gasto, type 1234,5 (caret after the 4), pick a category and yesterday.
+  Settings → General → Language & Region → Region → United States, return with the app
+  switcher: **no relaunch**, the same sheet, the field reads 1,234.5 with the caret after
+  the 4, category and date unchanged; typing 9 gives 12,349.5; save; switching back shows
+  $ 12.349,50. Repeat after a minute in the background. Record any case that only
+  updates after a relaunch.
+- [ ] Same with Región explicitly Argentina in Más: nothing on screen changes; Más → Región
+  "Según el dispositivo" reads "Ahora: Estados Unidos".
+- [ ] Open the date sheet, spin to another day, change the Region and return: the sheet is
+  still open with that day; Listo saves it.
+- [ ] iPhone Language → English with an unsaved Nuevo gasto open: iOS relaunches the app
+  (the unsaved form is gone: iOS behaviour); saved movements intact; the app reads English.
+- [ ] In-app: set an Actividad search, move Reportes to the previous month, leave an
+  Asistente conversation with a draft card; Más → Idioma English → Español and Región US →
+  AR: every tab keeps its state, the draft card and chips stay.
+
+**E. VoiceOver** (first, without FinanzApp: in Notes, write one per line `1.234,56`,
+`1,234.56`, `1234,56`, `1234.56`, `180000,00`, `9999999999999,99`, `-5,00`, `12,4 %`, `ARS`,
+`USD`, `15 sep`, and read them with the rotor in Español·Argentina, Español·Estados Unidos,
+English·Argentina, English·United States; record the voice in Accesibilidad → VoiceOver →
+Voz and exactly what is said)
+- [ ] FinanzApp in the four combinations: Inicio hero and budget card, a movement row, an
+  account row, an Actividad day header, the Reportes day row and a budget row, the entry
+  detail budget row, the transfer form's account cards and "Usar todo", the card usage
+  caption, an Asistente evidence row (a category that grew: "… 42500,00 pesos más"). Expected: "… mil doscientos treinta y cuatro coma
+  cincuenta y seis pesos" / "one thousand two hundred thirty-four point five six pesos",
+  never "punto" or "coma" before three digits. Record how "ARS"/"USD" and "15 sep" are read.
+- [ ] Spanish iPhone with Más → Idioma English: content rows switch to an English voice;
+  record what keeps the Spanish voice (headers, back button, tab bar, alerts, date wheel,
+  "botón", the paste-refusal announcement). Spanish iPhone with Idioma Español: the voice
+  is exactly the one used before this build.
+- [ ] Idioma screen: "English" is pronounced in English, "Español" in Spanish.
+- [ ] Asistente with English chosen (fixture build, `EXPO_PUBLIC_ASSISTANT_FIXTURES=1`): the
+  app's own question ("What did you pay with?") is read in the interface voice, the
+  Spanish sample answer in a Spanish voice.
+- [ ] Per-app English (section C) with Más on "Según el dispositivo": record whether
+  VoiceOver switches to an English voice for FinanzApp.
+
+**F. Date wheel** (Fecha in Nuevo gasto, the four combinations): Spanish shows
+day · month · year with Spanish months, English month · day · year with English months,
+matching the row above, in both regions. Record capitalization and full/abbreviated
+months. VoiceOver on the Fecha row reads the long date. No "onChange is deprecated"
+warning in the Metro console.
+
+**G. Every screen in English and in es-US** (category names, errors, budgets, cards,
+reports, forms): Inicio, Movimientos, a detail, Nuevo gasto/transferencia (a card payment
+reads "Owed ARS 50.00", not "ARS Owed"; paying it all shows "Visa después: Sin deuda"), Reportes (the largest-expense insight shows the
+day as 9/22 in the US and 22/09 in Argentina; "Compare with previous month"), Tarjetas
+("Recorded debt", "Statement open since yesterday"), Deudas ("Due today"), Presupuestos,
+Recurrentes ("Create recurring item"), Cuentas, Categorías (Transportation,
+Entertainment), backup import, Asistente. Trigger a budget duplicate (a second general
+budget for the same month and currency): the error is in English. Largest Dynamic Type on
+Más, Idioma, Región and Nuevo gasto: nothing clipped.
+
 ## Producto 23.1C1 — regional formats and the amount field (pending device review)
 
 No native change: the installed **FinanzApp Dev** runs this PR from Metro. From
@@ -57,8 +163,9 @@ English under Idioma and a Región row (Argentina · 22/9/2026 · 1.234,56, Unit
   interface language; **record** the column order iOS shows (it is iOS's choice).
 - [ ] Backups: export and import in the United States region; the review shows counts and
   the export date in US format and imports nothing twice.
-- [ ] Stop Metro, restart without the flag (run A): the app is back to Spanish · Argentina
-  whatever you chose in the preview, and no movement changed.
+- [ ] ~~Stop Metro, restart without the flag (run A): the app is back to Spanish · Argentina
+  whatever you chose in the preview~~ (superseded by 23.1C2: English and the United States
+  are released, so a choice made in the preview now applies); no movement changed.
 
 ## Producto 23.1B2 — translation of the remaining screens (pending device review)
 

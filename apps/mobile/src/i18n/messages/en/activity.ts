@@ -67,7 +67,7 @@ export const activity: Pick<Messages, 'activity' | 'rows' | 'entryDetail' | 'tra
     effect: '{amount}: will be taken from {from} and added to {to}. This only changes the record in this app; it moves no money at the bank.',
     statusVoided: 'Undone · does not affect balances',
     statusBetween: 'Between your accounts · not an expense or income',
-    statusObligation: 'Moves balance to the obligation · not an expense or income',
+    statusObligation: 'Moves balance between your account and the obligation · not an expense or income',
     voidedTitle: 'Undone transfer',
     note: 'Note',
     edit: 'Edit transfer',

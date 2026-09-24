@@ -40,7 +40,7 @@ export default function AssistantScreen() {
   const day = useCurrentDay();
   const p = usePalette();
   const reduced = useReduceMotion();
-  const { t } = useI18n();
+  const { t, speechLanguage } = useI18n();
   const [state, dispatch] = useReducer(conversationReducer, emptyConversation);
   const client = useMemo(() => assistantForBuild(), []);
   const [writing, setWriting] = useState<string | null>(null);
@@ -72,7 +72,7 @@ export default function AssistantScreen() {
         if (controller.signal.aborted) break;
         if (event.type === 'delta') dispatch({ type: 'delta', text: event.text });
         else if (event.type === 'result') dispatch({ type: 'answer', ...contentFromResult(event.result, event.facts, accounts, entries, currency, day) });
-        // A failure's message is a catalogue key or a caught sentence; the note translates it through errorText.
+        // A failure's message is the integration client's catalogue key or empty (then the reason's own note); the note translates it through errorText.
         else dispatch({ type: 'fail', reason: event.reason, text: event.reason === 'failed' && event.message ? event.message : REASON_TEXT[event.reason], sent: raw });
       }
     } catch {
@@ -128,8 +128,8 @@ export default function AssistantScreen() {
     if (item.role === 'user') return <Appear><UserMessage text={item.text} /></Appear>;
     if (item.role === 'system') return <Appear><SystemNote message={item} onRetry={text => void send(text)} /></Appear>;
     return <View style={{ gap: space.m }}>
-      {(item.text || item.textKey || item.status === 'streaming') && <AssistantText text={item.textKey ? t(item.textKey) : item.text} status={item.status} />}
-      {item.content?.kind === 'answer' && <AnswerEvidence content={item.content} currency={currency} onOpen={open} />}
+      {(item.text || item.textKey || item.status === 'streaming') && <AssistantText text={item.textKey ? t(item.textKey) : item.text} ownWords={!!item.textKey} status={item.status} />}
+      {item.content?.kind === 'answer' && <AnswerEvidence content={item.content} onOpen={open} />}
       {item.content?.kind === 'clarification' && <ClarificationChoices options={item.content.options} chosen={item.content.chosen} onChoose={(option, shown) => choose(item.id, option, shown)} />}
       {item.content?.kind === 'draft' && <DraftCard content={item.content} accounts={accounts} busy={writing === item.id}
         onConfirm={() => void confirm(item.id, item.content as DraftContent)} onEdit={() => edit(item.id, item.content as DraftContent)}
@@ -143,7 +143,7 @@ export default function AssistantScreen() {
   return <View style={{ flex: 1, backgroundColor: p.background }}>
     <Tabs.Screen options={{ title: t('assistant.title'),
       headerRight: state.messages.length ? () => <IconButton name="create-outline" label={t('assistant.newChat')} onPress={() => { stop(); dispatch({ type: 'reset' }); }} /> : undefined }} />
-    {client.mode === 'fixture' && <View accessible accessibilityRole="text" style={{ backgroundColor: p.warningSoft, paddingHorizontal: space.xl, paddingVertical: space.s }}>
+    {client.mode === 'fixture' && <View accessible accessibilityRole="text" accessibilityLanguage={speechLanguage} style={{ backgroundColor: p.warningSoft, paddingHorizontal: space.xl, paddingVertical: space.s }}>
       <AppText variant="footnote" style={{ color: p.warning, fontWeight: '600', textAlign: 'center' }}>{t('assistant.fixtureBanner')}</AppText>
     </View>}
     <FlatList ref={list} data={state.messages} keyExtractor={message => message.id} renderItem={renderItem}

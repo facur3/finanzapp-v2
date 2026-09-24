@@ -47,7 +47,7 @@ export default function CardsScreen() {
 function CardPanel({ summary, day }: { summary: CardSummary; day: string }) {
   const { snapshot } = useLedger();
   const p = usePalette();
-  const { t, relativeDate, moneyText } = useI18n();
+  const { t, relativeDate, moneyText, spokenMoney } = useI18n();
   const { card, account, debtMinor, availableMinor, usage, closingISO, dueISO } = summary;
   const statement = useMemo(() => snapshot ? cardStatementActivity(card, snapshot, day) : null, [card, snapshot, day]);
   const recent = useMemo(() => {
@@ -58,7 +58,10 @@ function CardPanel({ summary, day }: { summary: CardSummary; day: string }) {
   if (!snapshot) return null;
   const tone = usageTone(usage);
   const dueIn = daysUntil(dueISO, day);
+  const percent = Math.round(Math.min(usage ?? 0, 9.99) * 100);
   const relative = (iso: string) => relativeDate(iso, day);
+  // A day inside the statement sentence starts in lower case: "Resumen abierto desde ayer".
+  const inline = (iso: string) => relativeDate(iso, day, true);
   // The panel structure stays mounted across cards; only its values crossfade,
   // so the sections below never jump to a different height mid-transition.
   return <View style={{ gap: space.xl }}>
@@ -80,7 +83,8 @@ function CardPanel({ summary, day }: { summary: CardSummary; day: string }) {
         </Stat>
       </StatRow>
       {usage !== null && card.creditLimitMinor !== null && <UsageBar usage={usage} tone={tone}
-        label={t('cards.panel.usage', { percent: Math.round(Math.min(usage, 9.99) * 100), limit: moneyText(card.creditLimitMinor, account.currency) })} />}
+        label={t('cards.panel.usage', { percent, limit: moneyText(card.creditLimitMinor, account.currency) })}
+        spokenLabel={t('cards.panel.usage', { percent, limit: spokenMoney(card.creditLimitMinor, account.currency) })} />}
     </Surface></ValueTransition>
 
     {/* Primary above secondary, same width and height: hierarchy by fill, not by geometry. */}
@@ -93,7 +97,7 @@ function CardPanel({ summary, day }: { summary: CardSummary; day: string }) {
 
     <ValueTransition id={card.id} variant="fade">
       <SectionTitle action={t('cards.panel.seeAll')} onAction={() => router.push({ pathname: '/card/[id]', params: { id: card.id } })}
-        caption={statement ? statementCaption(statement, relative, t) : undefined}>{t('cards.panel.recent')}</SectionTitle>
+        caption={statement ? statementCaption(statement, inline, t) : undefined}>{t('cards.panel.recent')}</SectionTitle>
       {recent.length ? <Surface grouped>
         {recent.map((item, index) => <MovementRow key={item.key} item={item} accounts={snapshot.accounts} accountId={account.id} context="card" last={index === recent.length - 1} />)}
       </Surface> : <AppText secondary variant="subhead">{t('cards.panel.noActivity')}</AppText>}
@@ -101,7 +105,9 @@ function CardPanel({ summary, day }: { summary: CardSummary; day: string }) {
   </View>;
 }
 
-function UsageBar({ usage, tone, label }: { usage: number; tone: 'neutral' | 'warning' | 'expense'; label: string }) {
+/** The share of the limit used, as a bar and a caption. VoiceOver reads the caption as
+ * `spokenLabel`: the limit with the language's decimal mark and its currency in words. */
+function UsageBar({ usage, tone, label, spokenLabel }: { usage: number; tone: 'neutral' | 'warning' | 'expense'; label: string; spokenLabel: string }) {
   const p = usePalette();
   const reduced = useReduceMotion();
   const progress = useSharedValue(Math.min(1, usage));
@@ -112,6 +118,6 @@ function UsageBar({ usage, tone, label }: { usage: number; tone: 'neutral' | 'wa
     <View accessible={false} style={{ height: 6, borderRadius: 3, overflow: 'hidden', backgroundColor: p.inset }}>
       <Animated.View style={[{ height: 6, borderRadius: 3, backgroundColor: fill }, bar]} />
     </View>
-    <AppText secondary variant="caption" style={tone !== 'neutral' ? { color: toneColors(p, tone).color, fontWeight: '500' } : undefined}>{label}</AppText>
+    <AppText secondary variant="caption" accessibilityLabel={spokenLabel} style={tone !== 'neutral' ? { color: toneColors(p, tone).color, fontWeight: '500' } : undefined}>{label}</AppText>
   </View>;
 }

@@ -27,7 +27,7 @@ export function TransferForm({ original, accountId, fromAccountId: requestedFrom
 }) {
   const { snapshot, archive, addTransfer, updateTransfer } = useLedger();
   const p = usePalette();
-  const { t, formatAmount } = useI18n();
+  const { t, formatAmount, spokenNumber } = useI18n();
   // A debt's hidden account is named from the debt, in the interface language (see accountDisplayName).
   const nameOf = (account: Account) => accountDisplayName(account, archive?.debts ?? [], t);
   const accounts = snapshot?.accounts ?? [];
@@ -126,11 +126,16 @@ export function TransferForm({ original, accountId, fromAccountId: requestedFrom
     } catch (cause) { setError(cause instanceof Error ? cause.message : 'transferForm.saveUnverified'); }
     finally { saving.current = false; setBusy(false); }
   }
-  const balanceLabel = (id: string, value: number) => {
-    const kind = accountKind(id, cards, debts);
-    if (kind === 'card') return value < 0 ? t('transferForm.balanceDebt', { amount: formatAmount(-value) }) : t('transferForm.balanceCredit', { amount: formatAmount(value) });
-    if (kind === 'debt') return t('transferForm.balancePending', { amount: formatAmount(Math.abs(value)) });
-    return formatAmount(value);
+  // An account's recorded figure with its currency: a card owed or in credit and a debt pending are worded,
+  // with the code where the language places it ("Deuda ARS 50,00", "Owed ARS 50.00"); cash is its code and
+  // signed amount, joined so the code never ends a line alone. `number` writes the amount: the region's
+  // separators on screen (formatAmount), the language's for VoiceOver (spokenNumber).
+  const balanceLabel = (account: Account, value: number, number: (minor: number) => string = formatAmount) => {
+    const kind = accountKind(account.id, cards, debts), currency = account.currency;
+    if (kind === 'card') return value === 0 ? t('transferForm.balanceClear')
+      : t(value < 0 ? 'transferForm.balanceDebt' : 'transferForm.balanceCredit', { currency, amount: number(Math.abs(value)) });
+    if (kind === 'debt') return t('transferForm.balancePending', { currency, amount: number(Math.abs(value)) });
+    return currency + '\u00A0' + number(value);
   };
   // Paying an obligation only makes sense from cash in the same currency.
   const cashSources = sources.filter(a => !obligation || (a.id !== obligation.id && a.currency === obligation.currency));
@@ -155,13 +160,14 @@ export function TransferForm({ original, accountId, fromAccountId: requestedFrom
       // A card in credit has nothing to pay; an obligation is pending or settled, never negative; cash is shown as recorded.
       const figure = obligationKind === 'card' ? (context.minor < 0 ? ['transferForm.figureCredit', -context.minor] as const : ['transferForm.figureDebt', context.minor] as const)
         : obligationKind === 'debt' ? ['transferForm.figurePending', Math.max(0, context.minor)] as const : ['transferForm.figureBalance', context.minor] as const;
-      return { ...context, fill, text: t('transferForm.figure', { label: t(figure[0]), currency: context.account.currency, amount: formatAmount(figure[1]) }) };
+      const caption = (number: (minor: number) => string) => t('transferForm.figure', { label: t(figure[0]), currency: context.account.currency, amount: number(figure[1]) });
+      return { ...context, fill, text: caption(formatAmount), spoken: caption(spokenNumber) };
     } catch { return null; }
   })();
-  const balanceDetail = (id: string | undefined) => {
+  const balanceDetail = (id: string | undefined, number?: (minor: number) => string) => {
     const item = accounts.find(a => a.id === id);
     if (!item || !snapshot) return undefined;
-    return `${item.currency} ${balanceLabel(item.id, accountBalanceMinor(item, snapshot.entries, snapshot.transfers))}`;
+    return balanceLabel(item, accountBalanceMinor(item, snapshot.entries, snapshot.transfers), number);
   };
 
   return <Screen gap={space.l}>
@@ -173,30 +179,30 @@ export function TransferForm({ original, accountId, fromAccountId: requestedFrom
       action={<ActionButton label={t('common.addAccount')} onPress={() => router.replace({ pathname: '/new-account', params: obligation ? { currency: obligation.currency } : {} })} />} /> : <>
       <AmountField label={t(obligationKind === 'card' ? 'transferForm.payment' : obligationKind === 'debt' ? (lockedTo ? 'transferForm.payment' : 'transferForm.collection') : 'transferForm.transfer')}
         currency={(obligation ?? from)?.currency ?? 'ARS'} value={amount} onChangeText={value => { setAmount(value); setError(null); }} editable={!locked} tone="transfer" />
-      {shortcut && <AmountShortcut caption={shortcut.text} label={shortcut.fill > 0 ? shortcut.label : undefined} disabled={locked}
+      {shortcut && <AmountShortcut caption={shortcut.text} spokenCaption={shortcut.spoken} label={shortcut.fill > 0 ? shortcut.label : undefined} disabled={locked}
         onPress={shortcut.fill > 0 ? () => { setAmount(amountFromMinor(shortcut.fill)); setError(null); } : undefined} />}
       <View style={{ gap: space.m }}>
-        {lockedFrom ? <SelectorCard label={kindLabel(lockedFrom.id)} value={nameOf(lockedFrom)} placeholder="" detail={balanceDetail(lockedFrom.id)}
+        {lockedFrom ? <SelectorCard label={kindLabel(lockedFrom.id)} value={nameOf(lockedFrom)} placeholder="" detail={balanceDetail(lockedFrom.id)} spokenDetail={balanceDetail(lockedFrom.id, spokenNumber)}
           icon={obligationKind === 'card' ? 'card-outline' : 'people-outline'} color={p.primary} disabled onPress={() => {}} />
-          : <AccountField label={t('transferForm.from')} accounts={cashSources} value={fromId} disabled={locked} kindOf={kindLabel} typeOf={typeOf} prominent detail={balanceDetail(fromId)} onChange={id => {
+          : <AccountField label={t('transferForm.from')} accounts={cashSources} value={fromId} disabled={locked} kindOf={kindLabel} typeOf={typeOf} prominent detail={balanceDetail(fromId)} spokenDetail={balanceDetail(fromId, spokenNumber)} onChange={id => {
             setFromId(id);
             onAccountChange?.(id);
             const source = accounts.find(a => a.id === id);
             if (!lockedTo && (toId === id || to?.currency !== source?.currency)) setToId('');
           }} />}
-        {lockedTo ? <SelectorCard label={kindLabel(lockedTo.id)} value={nameOf(lockedTo)} placeholder="" detail={balanceDetail(lockedTo.id)}
+        {lockedTo ? <SelectorCard label={kindLabel(lockedTo.id)} value={nameOf(lockedTo)} placeholder="" detail={balanceDetail(lockedTo.id)} spokenDetail={balanceDetail(lockedTo.id, spokenNumber)}
           icon={obligationKind === 'card' ? 'card-outline' : 'people-outline'} color={p.primary} disabled onPress={() => {}} />
           : <AccountField label={t('transferForm.to')} accounts={lockedFrom ? targets.filter(a => a.id !== lockedFrom.id) : targets} value={toId} onChange={setToId}
             kindOf={kindLabel} typeOf={typeOf}
-            prominent detail={balanceDetail(toId)} disabled={locked || !targets.length} />}
+            prominent detail={balanceDetail(toId)} spokenDetail={balanceDetail(toId, spokenNumber)} disabled={locked || !targets.length} />}
       </View>
       <Surface grouped><DateField value={date} onChange={setDate} disabled={locked} /></Surface>
       {!obligation && !targets.length && <EmptyState title={t('transferForm.missingTitle')} detail={t('transferForm.missingDetail')}
         action={<ActionButton label={t('common.addAccount')} secondary disabled={locked} onPress={() => router.push({ pathname: '/new-account', params: { currency: from?.currency ?? 'ARS' } })} />} />}
       <Field label={t('transferForm.note')} value={note} onChangeText={setNote} maxLength={120} editable={!locked} />
       {preview && from && to && <Surface grouped>
-        <DetailRow label={t('transferForm.after', { name: nameOf(from) })} value={from.currency + '\u00A0' + balanceLabel(from.id, preview.from)} />
-        <DetailRow label={t('transferForm.after', { name: nameOf(to) })} value={to.currency + '\u00A0' + balanceLabel(to.id, preview.to)} last />
+        <DetailRow label={t('transferForm.after', { name: nameOf(from) })} value={balanceLabel(from, preview.from)} spokenValue={balanceLabel(from, preview.from, spokenNumber)} />
+        <DetailRow label={t('transferForm.after', { name: nameOf(to) })} value={balanceLabel(to, preview.to)} spokenValue={balanceLabel(to, preview.to, spokenNumber)} last />
       </Surface>}
       {preview && from && to && ((preview.from < 0 && !hidden.has(from.id)) || (preview.to < 0 && !hidden.has(to.id))) && <AppText secondary variant="subhead">
         {t('transferForm.negativeWarning')}

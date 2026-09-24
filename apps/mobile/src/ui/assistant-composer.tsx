@@ -37,7 +37,7 @@ export function AssistantComposer({ value, onChange, onSend, onStop, busy, disab
   note?: ReactNode;
 }) {
   const p = usePalette();
-  const { t } = useI18n();
+  const { t, speechLanguage } = useI18n();
   const material = useMaterial();
   const insets = useSafeAreaInsets();
   const { fontScale } = useWindowDimensions();
@@ -49,7 +49,7 @@ export function AssistantComposer({ value, onChange, onSend, onStop, busy, disab
   return <KeyboardSpace bottomInset={insets.bottom}>
     <ControlSurface material={material} style={styles.bar} opaque={opaque}>
       <TextInput value={value} onChangeText={onChange} multiline editable={!disabled} placeholder={t(COMPOSER_PLACEHOLDER)} placeholderTextColor={p.tertiary}
-        accessibilityLabel={t('assistant.composer.label')} accessibilityHint={t('assistant.composer.hint')}
+        accessibilityLabel={t('assistant.composer.label')} accessibilityHint={t('assistant.composer.hint')} accessibilityLanguage={speechLanguage}
         selectionColor={p.primary} keyboardAppearance={p.isDark ? 'dark' : 'light'} textAlignVertical="center"
         style={[styles.input, { color: p.text, maxHeight, lineHeight: LINE_HEIGHT }]} />
       <PressFeedback feedback="opacity" accessibilityRole="button" accessibilityLabel={t('assistant.composer.dictate')} accessibilityHint={t('assistant.composer.dictateHint')}

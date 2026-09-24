@@ -63,7 +63,7 @@ export function DonutChart({ slices, total, currency, size = 176, thickness = 22
   slices: (DonutSlice & { color: string })[]; total: number; currency: Currency; size?: number; thickness?: number; caption: string;
 }) {
   const p = usePalette();
-  const { t } = useI18n();
+  const { t, speechLanguage } = useI18n();
   const signature = slices.map(slice => slice.key + ':' + slice.value).join('|');
   const revealed = useRef(false);
   const reveal = !revealed.current;
@@ -83,7 +83,7 @@ export function DonutChart({ slices, total, currency, size = 176, thickness = 22
   }, [slices, size, thickness]);
   const label = slices.map(slice => t('reports.chart.slice', { label: slice.label, percent: Math.round(slice.value / Math.max(1, total) * 100) })).join(', ');
   return <ValueTransition id={signature} variant="fade" style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
-    <View accessible accessibilityRole="image" accessibilityLabel={t('reports.chart.donutLabel', { caption, slices: label })} style={{ width: size, height: size }}>
+    <View accessible accessibilityRole="image" accessibilityLabel={t('reports.chart.donutLabel', { caption, slices: label })} accessibilityLanguage={speechLanguage} style={{ width: size, height: size }}>
       <Sweep arcs={arcs} size={size} thickness={thickness} ring={p.inset} reveal={reveal} />
     </View>
     <View pointerEvents="none" style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center', gap: 2, paddingHorizontal: thickness + 8 }]}>
@@ -105,7 +105,8 @@ function Sweep({ arcs, size, thickness, ring, reveal }: {
   </Svg>;
 }
 
-/** The locale's short month name ("sep", "Sep"): its short date of the first, without the day. */
+/** The locale's short month name ("sep", "Sep"): its short date of the first, without the day. For the
+ * axis only: VoiceOver gets the full name, since a voice may read "mar" or "may" as a word. */
 export function shortMonth(monthISO: string, formatDate: (dateISO: string, style: 'day') => string): string {
   return formatDate(monthISO.slice(0, 7) + '-01', 'day').replace(/(^1\s+|\s+1$)/, '');
 }
@@ -118,7 +119,7 @@ export function MonthBars({ points, selected, onSelect, currency, height = 120 }
 }) {
   const p = usePalette();
   const reduced = useReduceMotion();
-  const { t, formatDate, currencySymbol, formatCount } = useI18n();
+  const { t, formatDate, currencySymbol, formatCount, speechLanguage } = useI18n();
   const max = Math.max(...points.map(point => point.amountMinor), 1);
   const current = points.find(point => point.monthISO === selected);
   return <View style={{ gap: 8 }}>
@@ -127,7 +128,7 @@ export function MonthBars({ points, selected, onSelect, currency, height = 120 }
         onPress={() => onSelect(point.monthISO)} currency={currency} height={height} />)}
     </View>
     <View style={{ flexDirection: 'row', gap: 6 }}>
-      {points.map(point => <Animated.Text key={point.monthISO} style={{ flex: 1, fontSize: 12, lineHeight: 16, textAlign: 'center', fontWeight: point.monthISO === selected ? '600' : '400',
+      {points.map(point => <Animated.Text key={point.monthISO} accessibilityLanguage={speechLanguage} style={{ flex: 1, fontSize: 12, lineHeight: 16, textAlign: 'center', fontWeight: point.monthISO === selected ? '600' : '400',
         color: point.monthISO === selected ? p.primary : p.secondary, transitionProperty: 'color', transitionDuration: reduced ? 0 : duration.state }}>
         {shortMonth(point.monthISO, formatDate)}
       </Animated.Text>)}
@@ -150,7 +151,7 @@ function Bar({ point, fraction, selected, onPress, currency, height }: {
   const style = useAnimatedStyle(() => ({ height: Math.max(point.amountMinor > 0 ? 3 : 0, value.value * (height - 4)) }));
   return <PressFeedback feedback="opacity" accessibilityRole="button" accessibilityState={{ selected }}
     accessibilityLabel={t(point.partial ? 'reports.chart.barPartial' : 'reports.chart.bar',
-      { month: shortMonth(point.monthISO, formatDate), year: point.monthISO.slice(0, 4), amount: spokenMoney(point.amountMinor, currency) })}
+      { month: formatDate(point.monthISO.slice(0, 7) + '-01', 'month'), year: point.monthISO.slice(0, 4), amount: spokenMoney(point.amountMinor, currency) })}
     onPress={onPress} containerStyle={{ flex: 1 }} style={{ height, justifyContent: 'flex-end', minHeight: undefined }}>
     <Animated.View style={[{ borderRadius: 6, backgroundColor: selected ? p.primary : p.inset, borderWidth: point.partial ? StyleSheet.hairlineWidth * 2 : 0, borderColor: p.secondary,
       transitionProperty: 'backgroundColor', transitionDuration: reduced ? 0 : duration.state }, style]} />

@@ -23,7 +23,7 @@ import { exportLanguage } from '../scripts/i18n/export.mjs';
 import { pseudoCatalogue, pseudoText } from '../scripts/i18n/pseudo.mjs';
 
 // Producto 23.1B1 and 23.1B2: every screen reads its visible strings from the
-// catalogues. English is complete and still unreleased (23.1C releases it).
+// catalogues. English is complete and released since Producto 23.1C2.
 
 const root = new URL('..', import.meta.url).pathname;
 const read = (file: string) => readFileSync(join(root, file), 'utf8');
@@ -37,8 +37,8 @@ function sourceFiles(dir: string): string[] {
   });
 }
 
-test('English stays unreleased until 23.1B2 and 23.1C are complete', () => {
-  assert.deepEqual([...RELEASED_LANGUAGES], ['es']);
+test('English is released (23.1C2)', () => {
+  assert.deepEqual([...RELEASED_LANGUAGES], ['es', 'en']);
 });
 
 test('no screen or component keeps visible copy outside the catalogue (npm run i18n:extract)', () => {

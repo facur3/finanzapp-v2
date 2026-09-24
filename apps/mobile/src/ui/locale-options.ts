@@ -1,15 +1,20 @@
 /** What the Idioma and Región choosers list, and what Más says about each.
- * Only released values are listed: an unfinished translation or a region whose
- * formats the amount field cannot type yet is never offered, not even greyed
- * out. "Follow the device" is always first and names what the device gives
- * right now. Pure, so Node tests every combination. */
+ * Only released values are listed (Español and English, Argentina and the
+ * United States since Producto 23.1C2): a catalogue still being translated is
+ * never offered, not even greyed out. "Follow the device" is always first and
+ * names what the device gives right now. Pure, so Node tests every combination. */
 import { formatAmount, formatNumericDate } from '../i18n/format.ts';
 import { LANGUAGES, composeLocale, type LanguageCode, type LanguagePreference, type RegionCode, type RegionPreference } from '../i18n/locale.ts';
 import type { Translate } from '../i18n/messages.ts';
 import { activeLanguageChoice, activeRegionChoice, type LocaleState } from '../i18n/store.ts';
 
 export type LocalePreferenceKind = 'language' | 'region';
-export interface PreferenceOption<T extends string> { value: T; title: string; subtitle?: string }
+export interface PreferenceOption<T extends string> {
+  value: T; title: string; subtitle?: string;
+  /** A language row's own language: its title is an autonym ("English",
+   * "Español") that VoiceOver speaks in that language, as iOS Settings does. */
+  language?: LanguageCode;
+}
 
 export const languageName = (language: LanguageCode) => LANGUAGES[language].name;
 export const regionName = (region: RegionCode, t: Translate) => t(`preferences.regionNames.${region}`);
@@ -23,7 +28,7 @@ export function regionSample(region: RegionCode, state: LocaleState, t: Translat
 export function languageOptions(state: LocaleState, t: Translate): PreferenceOption<LanguagePreference>[] {
   return [
     { value: 'system', title: t('preferences.followDevice'), subtitle: t('preferences.followDeviceNow', { value: languageName(state.device.language) }) },
-    ...state.released.languages.map(language => ({ value: language, title: languageName(language) })),
+    ...state.released.languages.map(language => ({ value: language, title: languageName(language), language })),
   ];
 }
 
@@ -49,11 +54,11 @@ export function preferenceSummary(kind: LocalePreferenceKind, state: LocaleState
 }
 
 /** A chooser is shown only when it offers a real choice between released values
- * or the device default. Language: always (Spanish is released; "follow the
- * device" is a stored choice that will matter the day English is released).
- * Region: only when more than one region is released, which is Producto 23.1C:
- * until the amount field types US separators, a US region would write amounts
- * one way and let the person type them another. */
+ * or the device default. Language: always (there is always a released
+ * language, and "follow the device" is itself a choice). Region: only when
+ * more than one region is released, which is every build since Producto
+ * 23.1C2 (Argentina and the United States); a build with a single released
+ * region hides the Más row. */
 export function showsPreference(kind: LocalePreferenceKind, state: LocaleState): boolean {
   return kind === 'language' ? state.released.languages.length > 0 : state.released.regions.length > 1;
 }

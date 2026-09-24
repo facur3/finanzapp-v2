@@ -650,6 +650,28 @@ test('duplicate active budget identity, stale revision and cross-currency edit a
   assert.equal(archiveKey(await readArchive(db)), archiveKey(before));
 });
 
+test('23.1C2: a second active budget is refused with the domain sentence, which reads in English for an English interface', async () => {
+  const { bindLocale } = await import('../src/i18n/bind.ts');
+  const { db } = setup();
+  await initializeDatabase(db);
+  await createAccount(db, account);
+  const overall: MonthlyBudget = { ...monthlyBudget, id: 'overall', scope: 'total', category: undefined, amountMinor: 50000 };
+  await saveMonthlyBudget(db, monthlyBudget);
+  await saveMonthlyBudget(db, overall);
+  const before = await readArchive(db);
+  const refusal = async (budget: MonthlyBudget) => { try { await saveMonthlyBudget(db, budget); } catch (cause) { return (cause as Error).message; } return ''; };
+  const category = await refusal({ ...monthlyBudget, id: 'second-category', category: ' fÍxture ' });
+  const general = await refusal({ ...overall, id: 'second-overall' });
+  // The storage layer keeps the domain's Spanish; the form translates it when shown (ErrorMessage, errorText).
+  assert.equal(category, 'Ya existe un presupuesto activo para esa categoría, moneda y mes.');
+  assert.equal(general, 'Ya existe un presupuesto general activo para esa moneda y mes.');
+  assert.equal(bindLocale('en-US').errorText(category), 'An active budget already exists for this category, currency and month.');
+  assert.equal(bindLocale('en-AR').errorText(general), 'An active overall budget already exists for this currency and month.');
+  assert.equal(bindLocale('es-US').errorText(category), category, 'Spanish shows the thrown sentence itself');
+  assert.equal(bindLocale('es-AR').errorText(general), general);
+  assert.equal(archiveKey(await readArchive(db)), archiveKey(before), 'nothing was written');
+});
+
 test('v5 backup/import preserves active and archived budgets without duplicating them', async () => {
   const { db } = setup();
   await initializeDatabase(db);

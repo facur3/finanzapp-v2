@@ -11,7 +11,7 @@
  *     changed, so re-reading an unchanged device or re-saving the same choice
  *     re-renders nothing;
  *   - nothing here touches the ledger, a backup or a stored amount. */
-import type { LocaleSource } from './device.ts';
+import { primaryLanguageOf, type LocaleSource } from './device.ts';
 import { RELEASED, SYSTEM_PREFERENCES, resolveLocale, type DeviceLocale, type LanguagePreference, type LocalePreferences,
   type RegionPreference, type ReleasedSets, type ResolvedLocale } from './locale.ts';
 import { readLocalePreferences, writeLanguagePreference, writeRegionPreference, type PreferenceStore } from './preference.ts';
@@ -20,8 +20,9 @@ export interface DeviceReading { source: LocaleSource; locales: DeviceLocale[] }
 
 export interface LocaleState extends ResolvedLocale {
   preferences: LocalePreferences;
-  /** What "follow the device" gives right now, shown beside that option. */
-  device: ResolvedLocale & { source: LocaleSource };
+  /** What "follow the device" gives right now, shown beside that option, and
+   * the device's first language as read (possibly one without a catalogue). */
+  device: ResolvedLocale & { source: LocaleSource; primaryLanguage: string | null };
   released: ReleasedSets;
 }
 
@@ -40,7 +41,9 @@ export interface LocaleStore {
   /** Saves and applies a language choice. False when refused or not saved; the state is then unchanged. */
   setLanguage: (preference: LanguagePreference) => boolean;
   setRegion: (preference: RegionPreference) => boolean;
-  /** Re-reads the device (the app came back to the foreground): "follow the device" follows it live. */
+  /** Re-reads the device (the app came back to the foreground, or iOS said its
+   * locale changed): "follow the device" follows it live. A failed read keeps
+   * the last good reading; it never throws and never resets a choice. */
   refreshDevice: () => void;
 }
 
@@ -51,12 +54,12 @@ function deviceKey(reading: DeviceReading): string {
 function compute(preferences: LocalePreferences, reading: DeviceReading, released: ReleasedSets): LocaleState {
   const resolved = resolveLocale(reading.locales, preferences, released);
   const device = resolveLocale(reading.locales, SYSTEM_PREFERENCES, released);
-  return { ...resolved, preferences, device: { ...device, source: reading.source }, released };
+  return { ...resolved, preferences, device: { ...device, source: reading.source, primaryLanguage: primaryLanguageOf(reading.locales) }, released };
 }
 
 function sameState(a: LocaleState, b: LocaleState): boolean {
   return a.locale === b.locale && a.preferences.language === b.preferences.language && a.preferences.region === b.preferences.region
-    && a.device.locale === b.device.locale && a.device.source === b.device.source;
+    && a.device.locale === b.device.locale && a.device.source === b.device.source && a.device.primaryLanguage === b.device.primaryLanguage;
 }
 
 export function createLocaleStore(environment: LocaleEnvironment): LocaleStore {
@@ -88,7 +91,10 @@ export function createLocaleStore(environment: LocaleEnvironment): LocaleStore {
       return true;
     },
     refreshDevice: () => {
-      const next = environment.devices();
+      let next: DeviceReading;
+      // Called from AppState and native event listeners, with a form possibly
+      // open: a fault of the device reader keeps what is on screen.
+      try { next = environment.devices(); } catch { return; }
       const key = deviceKey(next);
       if (key === lastDeviceKey) return;
       reading = next;
@@ -99,7 +105,7 @@ export function createLocaleStore(environment: LocaleEnvironment): LocaleStore {
 }
 
 /** The option a chooser marks: a stored value outside the release gate (a
- * later build's English, say) is not applied, so the list marks "follow the device". */
+ * language not released in this build) is not applied, so the list marks "follow the device". */
 export function activeLanguageChoice(state: LocaleState): LanguagePreference {
   const preference = state.preferences.language;
   return preference === 'system' || state.released.languages.includes(preference) ? preference : 'system';

@@ -404,7 +404,7 @@ test('card payment locks the card as destination, caps at the recorded debt and 
   let root = view.render();
   assert.equal(nodes(root).some(node => node.type === 'AccountField' && node.props.label === 'Hacia'), false);
   assert.equal(find(root, 'SelectorCard', 'Tarjeta').props.value, 'Visa');
-  assert.equal(find(root, 'SelectorCard', 'Tarjeta').props.detail, 'ARS Deuda 50,00');
+  assert.equal(find(root, 'SelectorCard', 'Tarjeta').props.detail, 'Deuda ARS 50,00');
   assert.equal(find(root, 'AccountField', 'Desde').props.value, 'a');
   assert.deepEqual(find(root, 'AccountField', 'Desde').props.accounts.map((item: domain.Account) => item.id), ['a']);
   assert.equal(find(root, 'Field').props.value, 'Pago Visa');
@@ -417,7 +417,7 @@ test('card payment locks the card as destination, caps at the recorded debt and 
   assert.equal(view.transfers.length, 0);
   find(view.render(), 'AmountField').props.onChangeText('50');
   root = view.render();
-  assert.equal(find(root, 'DetailRow', 'Visa después').props.value, 'ARS\u00A0A favor 0,00');
+  assert.equal(find(root, 'DetailRow', 'Visa después').props.value, 'Sin deuda', 'a card paid to zero owes nothing; it is not "in credit"');
   await find(root, 'ActionButton', 'Registrar pago').props.onPress();
   assert.equal(view.transfers.length, 1);
   assert.deepEqual([view.transfers[0].fromAccountId, view.transfers[0].toAccountId, view.transfers[0].amountMinor, view.transfers[0].note], ['a', 'card-acc', 5000, 'Pago Visa']);
@@ -703,9 +703,9 @@ test('23.1B2 English backup import: review, confirmation and result are translat
   await find(root, 'ActionButton', 'Choose backup').props.onPress();
   root = english.render();
   assert.equal(nodes(root).filter(node => node.type === 'DetailRow').map(node => node.props.label + '=' + node.props.value).join(','),
-    'New accounts=2,New cards=0,New debts=0,New transactions=1,New transfers=0,New recurring items=0,New budgets=0,Undone to keep=0,Records already here=0');
+    'New accounts=2,New cards=0,New debts=0,New transactions=1,New transfers=0,New recurring items=0,New budgets=0,Undone records to keep=0,Records already here=0');
   assert.ok(nodes(root).some(node => node.type === 'AppText' && node.props.children === 'test.json'), 'the file name is shown as it is');
-  assert.ok(nodes(root).some(node => node.type === 'SectionTitle' && node.props.children === 'Available afterward'));
+  assert.ok(nodes(root).some(node => node.type === 'SectionTitle' && node.props.children === 'Available after import'));
   find(root, 'ActionButton', 'Confirm import').props.onPress();
   assert.equal(english.alerts[0].title, 'Import this backup?');
   assert.equal(english.alerts[0].buttons.map((button: any) => button.text).join(','), 'Cancel,Import');
@@ -720,10 +720,165 @@ test('23.1B2 English backup import: review, confirmation and result are translat
   const conflicting = harness('app/backup-import.tsx', {}, { data: { ...archive, records: [domain.makeEntryChange('undo', archive.records[0], 'void', createdAt).after] }, picker, locale: 'en-AR' });
   await find(conflicting.render(), 'ActionButton', 'Choose backup').props.onPress();
   root = conflicting.render();
-  assert.match(nodes(root).find(node => node.type === 'ErrorMessage' && node.props.message)!.props.message, /^1 record has different changes\. Nothing will be imported\./);
+  assert.match(nodes(root).find(node => node.type === 'ErrorMessage' && node.props.message)!.props.message, /^1 record differs from the one on this device\. Nothing will be imported\./);
   assert.equal(nodes(root).some(node => node.props.label === 'Confirm import'), false);
   // The size limit is the form's own error, shown in English.
   const large = harness('app/backup-import.tsx', {}, { locale: 'en-AR', picker: async () => ({ canceled: false, result: { size: domain.BACKUP_MAX_BYTES + 1, text: async () => '{}' } }) });
   await find(large.render(), 'ActionButton', 'Choose backup').props.onPress();
   assert.equal(bindLocale('en-AR').errorText(find(large.render(), 'ErrorMessage').props.message), 'The backup is over 5 MB. Keep the file; nothing was imported.');
+});
+
+// Producto 23.1C2: English and the United States are released. A worded
+// balance carries its currency code where the language puts it, the account
+// sheet describes an option as the selected card does, and every amount a
+// VoiceOver label carries is the spoken twin of what the screen shows: the
+// region's separators on screen, the language's decimal mark and no grouping
+// in speech (es-US and en-AR are the pairs where the two differ).
+test('23.1C2: a worded balance carries its code where the language puts it; a cash account keeps its code and signed amount', async () => {
+  const spanish = harness('src/ui/transfer-form.tsx', { toAccountId: 'card-acc', maxAmountMinor: '5000' }, { data: liabilityData });
+  let root = spanish.render();
+  assert.equal(find(root, 'SelectorCard', 'Tarjeta').props.detail, 'Deuda ARS 50,00', 'never "ARS Deuda 50,00"');
+  assert.equal(find(root, 'AccountField', 'Desde').props.detail, 'ARS 876,55', 'a cash account is its code and amount, joined');
+  assert.equal(find(root, 'AmountShortcut').props.caption, 'Deuda registrada: ARS 50,00');
+  const english = harness('src/ui/transfer-form.tsx', { toAccountId: 'card-acc', maxAmountMinor: '5000' }, { data: liabilityData, locale: 'en-US' });
+  root = english.render();
+  assert.equal(find(root, 'SelectorCard', 'Card').props.detail, 'Owed ARS 50.00', 'never "ARS Owed 50.00"');
+  assert.equal(find(root, 'AccountField', 'From').props.detail, 'ARS 876.55');
+  find(root, 'AmountField').props.onChangeText('50');
+  root = english.render();
+  assert.equal(find(root, 'DetailRow', 'Visa afterwards').props.value, 'Nothing owed');
+  assert.equal(find(root, 'DetailRow', 'Prueba ARS afterwards').props.value, 'ARS 826.55');
+  // A debt is pending, in both languages; the collection side is a receivable.
+  const debtForm = (locale: AppLocale) => harness('src/ui/transfer-form.tsx', { toAccountId: 'debt-acc', maxAmountMinor: '7000' }, { data: liabilityData, locale }).render();
+  assert.equal(find(debtForm('es-AR'), 'SelectorCard', 'Deuda').props.detail, 'Pendiente ARS 70,00');
+  assert.equal(find(debtForm('en-AR'), 'SelectorCard', 'Debt').props.detail, 'Pending ARS 70,00');
+  // An overdrawn cash account keeps its sign.
+  const overdrawn: domain.Account = { ...account, id: 'red', name: 'En rojo', openingMinor: -50000 };
+  const red = harness('src/ui/transfer-form.tsx', { accountId: 'red' }, { data: { ...liabilityData, accounts: [...liabilityData.accounts, overdrawn] } }).render();
+  assert.equal(find(red, 'AccountField', 'Desde').props.detail, 'ARS -500,00');
+  assert.equal(find(red, 'AccountField', 'Desde').props.spokenDetail, 'ARS -500,00');
+});
+
+test('23.1C2: the transfer form gives VoiceOver the language’s numbers on the cards, the shortcut and the after rows', () => {
+  const cases = [
+    // [locale, card kind, after label, screen detail, spoken detail, screen caption, spoken caption, screen after, spoken after]
+    ['es-US', 'Tarjeta', 'Visa después', 'Deuda ARS 50.00', 'Deuda ARS 50,00', 'Deuda registrada: ARS 50.00', 'Deuda registrada: ARS 50,00', 'Sin deuda', 'Sin deuda'],
+    ['en-AR', 'Card', 'Visa afterwards', 'Owed ARS 50,00', 'Owed ARS 50.00', 'Recorded debt: ARS 50,00', 'Recorded debt: ARS 50.00', 'Nothing owed', 'Nothing owed'],
+  ] as const;
+  for (const [locale, kind, after, detail, spokenDetail, caption, spokenCaption, afterValue, spokenAfter] of cases) {
+    const view = harness('src/ui/transfer-form.tsx', { toAccountId: 'card-acc', maxAmountMinor: '5000' }, { data: liabilityData, locale });
+    let root = view.render();
+    const card = find(root, 'SelectorCard', kind);
+    assert.deepEqual([card.props.detail, card.props.spokenDetail].join('|'), detail + '|' + spokenDetail, locale);
+    const shortcut = find(root, 'AmountShortcut');
+    assert.deepEqual([shortcut.props.caption, shortcut.props.spokenCaption].join('|'), caption + '|' + spokenCaption, locale);
+    const source = nodes(root).find(node => node.type === 'AccountField')!;
+    assert.equal(source.props.spokenDetail, 'ARS ' + (locale === 'es-US' ? '876,55' : '876.55'), 'the spoken twin never groups and uses the language’s decimal mark');
+    find(root, 'AmountField').props.onChangeText('50');
+    root = view.render();
+    const row = find(root, 'DetailRow', after);
+    assert.deepEqual([row.props.value, row.props.spokenValue].join('|'), afterValue + '|' + spokenAfter, locale);
+  }
+  // A large amount: the screen groups, the spoken twin never does.
+  const rich: domain.Account = { ...account, id: 'rich', name: 'Ahorro', openingMinor: 123456789 };
+  const view = harness('src/ui/transfer-form.tsx', { accountId: 'rich' }, { data: { ...archive, accounts: [rich, { ...rich, id: 'other', name: 'Caja', openingMinor: 0 }] }, locale: 'es-US' });
+  const shortcut = find(view.render(), 'AmountShortcut');
+  assert.equal(shortcut.props.caption, 'Saldo registrado: ARS 1,234,567.89');
+  assert.equal(shortcut.props.spokenCaption, 'Saldo registrado: ARS 1234567,89');
+});
+
+test('23.1C2: the account sheet describes an option as the selected card does: signed cash, a card owed, in credit or clear', () => {
+  const overdrawn: domain.Account = { ...account, id: 'red', name: 'En rojo', openingMinor: -50000 };
+  const creditCard: domain.Account = { ...cardAccount, id: 'credit-acc', name: 'Master', openingMinor: 2500 };
+  const clearCard: domain.Account = { ...cardAccount, id: 'clear-acc', name: 'Amex', openingMinor: 0 };
+  const data: domain.LedgerArchive = { ...liabilityData, accounts: [...liabilityData.accounts, overdrawn, creditCard, clearCard],
+    cards: [card, { ...card, id: 'credit', accountId: creditCard.id }, { ...card, id: 'clear', accountId: clearCard.id }] };
+  const view = harness('src/ui/entry-form.tsx', { kind: 'expense' }, { data });
+  const describe = find(view.render(), 'AccountField').props.describe;
+  // Before 23.1C2 an overdrawn account read "saldo 500,00" and a card in credit "deuda 25,00".
+  assert.equal([account, overdrawn, cardAccount, creditCard, clearCard].map(describe).join('|'), 'saldo 876,55|saldo -500,00|deuda 50,00|a favor 25,00|sin deuda');
+  const detail = (id: string) => { find(view.render(), 'AccountField').props.onChange(id); return find(view.render(), 'AccountField').props.detail; };
+  assert.equal(detail('red'), 'Saldo registrado −$ 500,00', 'the selected card shows the same signed balance');
+  assert.equal(detail('credit-acc'), 'Tarjeta de crédito · a favor $ 25,00');
+  assert.equal(detail('clear-acc'), 'Tarjeta de crédito · sin deuda');
+  const english = find(harness('src/ui/entry-form.tsx', { kind: 'expense' }, { data, locale: 'en-US' }).render(), 'AccountField').props.describe;
+  assert.equal([account, overdrawn, cardAccount, creditCard, clearCard].map(english).join('|'), 'balance 876.55|balance -500.00|owed 50.00|in credit 25.00|nothing owed');
+  // VoiceOver hears each option's line after its name, kind and currency: the spoken amount with the currency in words, as the selected card says it.
+  const spoken = (locale: AppLocale) => find(harness('src/ui/entry-form.tsx', { kind: 'expense' }, { data, locale }).render(), 'AccountField').props.spokenDescribe;
+  assert.equal([account, overdrawn, cardAccount, creditCard, clearCard].map(spoken('es-AR')).join('|'),
+    'saldo 876,55 pesos|saldo Menos 500,00 pesos|deuda 50,00 pesos|a favor 25,00 pesos|sin deuda');
+  assert.equal([account, overdrawn, cardAccount, creditCard, clearCard].map(spoken('en-US')).join('|'),
+    'balance 876.55 pesos|balance Minus 500.00 pesos|owed 50.00 pesos|in credit 25.00 pesos|nothing owed');
+  const rich: domain.Account = { ...account, id: 'rich', name: 'Ahorro', openingMinor: 123456789 };
+  const wide = { ...data, accounts: [...data.accounts, rich] };
+  const shown = find(harness('src/ui/entry-form.tsx', { kind: 'expense' }, { data: wide, locale: 'es-US' }).render(), 'AccountField').props;
+  assert.equal(shown.describe(rich) + '|' + shown.spokenDescribe(rich), 'saldo 1,234,567.89|saldo 1234567,89 pesos', 'the sheet groups in the region\'s separators, the voice never does');
+});
+
+test('23.1C2: Save echoes the amount in the region\'s format on screen and in the spoken form for VoiceOver; editing and retrying have no echo', async () => {
+  const cases = [
+    ['es-AR', 'Guardar gasto\u00A0·\u00A0$\u00A01.234,50', 'Guardar gasto, 1234,50 pesos'],
+    ['es-US', 'Guardar gasto\u00A0·\u00A0AR$\u00A01,234.50', 'Guardar gasto, 1234,50 pesos'],
+    ['en-AR', 'Save expense\u00A0·\u00A0$\u00A01.234,50', 'Save expense, 1234.50 pesos'],
+    ['en-US', 'Save expense\u00A0·\u00A0AR$\u00A01,234.50', 'Save expense, 1234.50 pesos'],
+  ] as const;
+  for (const [locale, shown, spoken] of cases) {
+    const view = harness('src/ui/entry-form.tsx', { kind: 'expense' }, { data: liabilityData, locale });
+    assert.equal(find(view.render(), 'ActionButton').props.spokenLabel, undefined, locale + ': no amount yet, nothing to echo');
+    find(view.render(), 'AmountField').props.onChangeText('1234,5');
+    const save = find(view.render(), 'ActionButton');
+    assert.equal(save.props.label + '|' + save.props.spokenLabel, shown + '|' + spoken, locale);
+  }
+  const income = harness('src/ui/entry-form.tsx', { kind: 'income', currency: 'USD' }, { locale: 'en-US' });
+  find(income.render(), 'AmountField').props.onChangeText('20');
+  assert.equal(find(income.render(), 'ActionButton').props.spokenLabel, 'Save income, 20.00 dollars');
+  const editing = harness('src/ui/entry-form.tsx', { original: archive.records[0] }, { update: async () => { throw new Error('Refresh failed after commit'); } });
+  find(editing.render(), 'AmountField').props.onChangeText('1');
+  assert.equal(find(editing.render(), 'ActionButton', 'Guardar cambios').props.spokenLabel, undefined);
+  await find(editing.render(), 'ActionButton').props.onPress();
+  assert.equal(find(editing.render(), 'ActionButton', 'Reintentar guardado').props.spokenLabel, undefined);
+});
+
+test('23.1C2: the entry form and the entry detail give VoiceOver the language’s numbers for the balance and the budget', () => {
+  const budget: domain.MonthlyBudget = { id: 'b', scope: 'category', category: 'Salud', currency: 'ARS', monthISO: domain.todayKey().slice(0, 7), amountMinor: 50000, active: true, createdAt, revision: 0, updatedAt: createdAt };
+  const cases = [
+    ['es-US', 'Saldo registrado AR$ 876.55', 'Saldo registrado 876,55 pesos', 'AR$ 0.00 de AR$ 500.00 este mes', '0,00 pesos de 500,00 pesos este mes',
+      'Tarjeta de crédito · deuda AR$ 50.00', 'Tarjeta de crédito · deuda 50,00 pesos'],
+    ['en-AR', 'Recorded balance $ 876,55', 'Recorded balance 876.55 pesos', '$ 0,00 of $ 500,00 this month', '0.00 pesos of 500.00 pesos this month',
+      'Credit card · owed $ 50,00', 'Credit card · owed 50.00 pesos'],
+  ] as const;
+  for (const [locale, balance, spokenBalance, budgetText, spokenBudget, cardText, spokenCard] of cases) {
+    const view = harness('src/ui/entry-form.tsx', { kind: 'expense' }, { data: { ...liabilityData, budgets: [budget] }, locale });
+    const field = find(view.render(), 'AccountField');
+    assert.equal(field.props.detail + '|' + field.props.spokenDetail, balance + '|' + spokenBalance, locale);
+    find(view.render(), 'CategoryField').props.onChange('Salud');
+    const category = find(view.render(), 'CategoryField');
+    assert.equal(category.props.detail + '|' + category.props.spokenDetail, budgetText + '|' + spokenBudget, locale);
+    find(view.render(), 'AccountField').props.onChange('card-acc');
+    const card = find(view.render(), 'AccountField');
+    assert.equal(card.props.detail + '|' + card.props.spokenDetail, cardText + '|' + spokenCard, locale);
+  }
+  // The entry detail's budget row: the screen writes the region's separators, VoiceOver the language's, with the currency in words.
+  const monthly: domain.MonthlyBudget = { ...budget, category: 'salud', monthISO: '2026-01', amountMinor: 20000 };
+  const row = (locale: AppLocale, amountMinor = 20000) => {
+    const node = find(harness('app/entry/[id].tsx', {}, { data: { ...archive, budgets: [{ ...monthly, amountMinor }] }, params: { id: entry.id }, locale }).render(),
+      'DetailRow', locale.startsWith('en') ? 'Budget' : 'Presupuesto');
+    return node.props.value + '|' + node.props.spokenValue;
+  };
+  assert.equal(row('es-AR'), '62 % usado · quedan 76,55|62 % usado · quedan 76,55 pesos');
+  assert.equal(row('es-US'), '62 % usado · quedan 76.55|62 % usado · quedan 76,55 pesos');
+  assert.equal(row('en-AR'), '62% used · 76,55 left|62% used · 76.55 pesos left');
+  assert.equal(row('en-US', 10000), 'Over by 23.45|Over by 23.45 pesos');
+  assert.equal(row('es-US', 10000), 'Excedido por 23.45|Excedido por 23,45 pesos');
+});
+
+test('23.1C2: the backup review groups its counts on screen and gives VoiceOver the plain digits', async () => {
+  // 1.234 movements: "1,234" in the United States would be a decimal to a Spanish voice.
+  const records = Array.from({ length: 1234 }, (_, index) => domain.initialRecord({ ...entry, id: 'bulk-' + index }));
+  const json = JSON.stringify(domain.createRecoveryBackup({ ...archive, records }));
+  const picker = async () => ({ canceled: false, result: { size: json.length, name: 'test.json', text: async () => json } });
+  const view = harness('app/backup-import.tsx', {}, { data: { accounts: [], records: [] }, picker, locale: 'es-US' });
+  await find(view.render(), 'ActionButton', 'Elegir copia').props.onPress();
+  const rows = nodes(view.render()).filter(node => node.type === 'DetailRow');
+  assert.equal(rows.map(row => row.props.value + '/' + row.props.spokenValue).join(','), '2/2,0/0,0/0,1,234/1234,0/0,0/0,0/0,0/0,0/0');
 });

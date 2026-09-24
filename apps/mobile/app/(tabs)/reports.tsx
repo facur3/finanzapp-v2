@@ -26,7 +26,7 @@ export default function ReportsScreen() {
   const params = useLocalSearchParams<{ currency?: string | string[]; month?: string | string[] }>();
   const { snapshot, archive } = useLedger();
   const p = usePalette();
-  const { t, locale, formatMonth, moneyText, spokenMoney } = useI18n();
+  const { t, locale, formatMonth, formatDayMonth, moneyText, spokenMoney } = useI18n();
   const day = useCurrentDay();
   const [currencyOverride, setCurrency] = useState<Currency>();
   const [monthOverride, setMonth] = useState<string>();
@@ -35,7 +35,8 @@ export default function ReportsScreen() {
     [snapshot, currencyOverride, params.currency, monthOverride, params.month, day]);
   const report = useMemo(() => snapshot && selection ? spendingReport(snapshot, selection.currency, selection.monthISO, day) : null,
     [snapshot, selection, day]);
-  const money = (minor: number) => moneyText(minor, selection?.currency ?? 'ARS');
+  // One function per locale and currency, so the insights below recompute when either changes and only then.
+  const money = useMemo(() => (minor: number) => moneyText(minor, selection?.currency ?? 'ARS'), [moneyText, selection?.currency]);
   const spoken = (minor: number) => spokenMoney(minor, selection?.currency ?? 'ARS');
   const lookOf = useCategoryLookOf('expense');
   const trend = useMemo(() => {
@@ -54,9 +55,9 @@ export default function ReportsScreen() {
   const insights = useMemo(() => {
     if (!snapshot || !selection || !report || report.status !== 'ready') return [];
     return spendingInsights(snapshot, archive?.budgets ?? [], selection.currency, selection.monthISO, day, money);
-  }, [snapshot, archive?.budgets, selection, report, day]);
+  }, [snapshot, archive?.budgets, selection, report, day, money]);
   if (!snapshot || !report || !selection) return null;
-  const insightText = (insight: SpendingInsight) => localizedInsight(insight, { t, money, label: key => lookOf(key).label, budgets, comparison, entries: snapshot.entries });
+  const insightText = (insight: SpendingInsight) => localizedInsight(insight, { t, money, dayMonth: formatDayMonth, label: key => lookOf(key).label, budgets, comparison, entries: snapshot.entries });
 
   const ready = report.status === 'ready';
   const rows: (CategorySpending | DailySpending)[] = view === 'categories' ? report.categories : ready ? dailySpending(snapshot, report) : [];
@@ -138,7 +139,7 @@ export default function ReportsScreen() {
         currency={currency} last={index === report.categories.length - 1}
         onPress={() => router.push({ pathname: '/report-category', params: { currency, month: monthISO, category: item.key } })} />
         : <DetailRow label={t('reports.dayRow', { date: activityDateLabel(item.dateISO, day, locale), count: t('count.expenses', { count: item.count }) })}
-          value={money(item.amountMinor)} last={index === rows.length - 1}
+          value={money(item.amountMinor)} spokenValue={spoken(item.amountMinor)} last={index === rows.length - 1}
           onPress={() => router.push({ pathname: '/report-day', params: { currency, date: item.dateISO } })} />}
     </View>}
     ListEmptyComponent={ready ? <EmptyState title={t('reports.emptyTitle')} icon="pie-chart-outline"
@@ -184,8 +185,8 @@ export default function ReportsScreen() {
         </View>
       </View>}
       {ready && <Surface grouped>
-        <DetailRow label={t('reports.incomeRecorded')} value={money(report.incomeMinor)} icon="add-circle-outline" />
-        <DetailRow label={t('reports.netFlow')} value={money(report.incomeMinor - report.expenseMinor)} icon="swap-vertical-outline" />
+        <DetailRow label={t('reports.incomeRecorded')} value={money(report.incomeMinor)} spokenValue={spoken(report.incomeMinor)} icon="add-circle-outline" />
+        <DetailRow label={t('reports.netFlow')} value={money(report.incomeMinor - report.expenseMinor)} spokenValue={spoken(report.incomeMinor - report.expenseMinor)} icon="swap-vertical-outline" />
         <NavigationRow title={t('reports.compare')} subtitle={t('reports.compareSubtitle')} icon="git-compare-outline" last
           onPress={() => router.push({ pathname: '/report-comparison', params: { currency, month: monthISO } })} />
       </Surface>}
@@ -243,7 +244,7 @@ function MerchantCells({ merchant, currency, label }: { merchant: { merchant: st
 }
 
 type InsightSources = {
-  t: Translate; money: (minor: number) => string; label: (category: string) => string;
+  t: Translate; money: (minor: number) => string; dayMonth: (dateISO: string) => string; label: (category: string) => string;
   budgets: ReturnType<typeof summarizeMonthlyBudgets> | null; comparison: ReturnType<typeof spendingComparison> | null; entries: Entry[];
 };
 
@@ -251,7 +252,7 @@ type InsightSources = {
  * the fact in Spanish; its id names the kind and the record it is about, so
  * the screen rebuilds the sentence from the same records, with the built-in
  * category's localized name. A fact it cannot trace keeps the domain's text. */
-function localizedInsight(insight: SpendingInsight, { t, money, label, budgets, comparison, entries }: InsightSources): { title: string; detail: string } {
+function localizedInsight(insight: SpendingInsight, { t, money, dayMonth, label, budgets, comparison, entries }: InsightSources): { title: string; detail: string } {
   const [kind, ...rest] = insight.id.split(':');
   const id = rest.join(':');
   if (kind === 'over' || kind === 'near') {
@@ -267,9 +268,9 @@ function localizedInsight(insight: SpendingInsight, { t, money, label, budgets, 
   if (kind === 'largest') {
     const entry = entries.find(item => item.id === id);
     if (!entry) return insight;
+    // The day in the region's order: "22/09" in Argentina (the domain's own text), "9/22" in the United States.
     return { title: t('reports.insights.largest', { merchant: entry.merchant }),
-      detail: t('reports.insights.largestDetail', { amount: money(entry.amountMinor), category: label(entry.category),
-        day: entry.dateISO.slice(8, 10).replace(/^0/, ''), month: entry.dateISO.slice(5, 7) }) };
+      detail: t('reports.insights.largestDetail', { amount: money(entry.amountMinor), category: label(entry.category), date: dayMonth(entry.dateISO) }) };
   }
   if (kind === 'growth') {
     const change = comparison?.categories.find(item => item.key === id);

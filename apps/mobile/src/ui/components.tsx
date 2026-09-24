@@ -54,14 +54,25 @@ export function rowAmountText(minor: number, currency: Currency, signed = false,
 /** Text in one of the named styles. A larger `fontSize` in `style` without
  * its own `lineHeight` gets a line box that fits it, instead of inheriting the
  * variant's smaller one; on iOS a glyph taller than its line box is clipped
- * at the top ("Comida" lost its ascenders on the category detail). */
+ * at the top ("Comida" lost its ascenders on the category detail).
+ *
+ * VoiceOver's language: React Native has no inherited language, and UIKit
+ * reads an element without `accessibilityLanguage` in the device's language.
+ * So every element VoiceOver can focus takes `speechLanguage` from the locale
+ * (AppText, PressFeedback, Money, the two text fields, the segments, the error
+ * and the read-only SelectionRow here; raw elements at their call sites). It
+ * is undefined unless the interface language differs from the device's first
+ * language, so a matching setup keeps the voice chosen in iOS Settings. An
+ * explicit `accessibilityLanguage` from the caller wins (an autonym). */
 export function AppText({ children, style, secondary = false, tertiary = false, variant = 'body', ...props }: TextProps & {
   secondary?: boolean; tertiary?: boolean; variant?: keyof typeof type;
 }) {
   const p = usePalette();
+  const { speechLanguage } = useI18n();
   const flat = StyleSheet.flatten(style);
   const fits = flat?.fontSize && !flat.lineHeight ? { lineHeight: Math.round(flat.fontSize * 1.25) } : null;
-  return <Text {...props} style={[type[variant], { color: tertiary ? p.tertiary : secondary ? p.secondary : p.text }, style, fits]}>{children}</Text>;
+  return <Text {...props} accessibilityLanguage={props.accessibilityLanguage ?? speechLanguage}
+    style={[type[variant], { color: tertiary ? p.tertiary : secondary ? p.secondary : p.text }, style, fits]}>{children}</Text>;
 }
 
 export function Screen({ children, gap = space.xl }: { children: ReactNode; gap?: number }) {
@@ -111,6 +122,7 @@ export function PressFeedback({ children, style, containerStyle, feedback = 'sca
 }) {
   const p = usePalette();
   const reduced = useReduceMotion();
+  const { speechLanguage } = useI18n();
   const pressed = useSharedValue(0);
   useEffect(() => { if (props.disabled) pressed.value = 0; }, [props.disabled, pressed]);
   const animatedStyle = useAnimatedStyle(() => feedback === 'scale' ? { transform: [{ scale: 1 - 0.03 * pressed.value }] }
@@ -118,7 +130,8 @@ export function PressFeedback({ children, style, containerStyle, feedback = 'sca
   const highlightStyle = useAnimatedStyle(() => ({ opacity: pressed.value }));
   // Reduce Motion drops the scale but keeps the tint and dim: a colour change is not movement.
   const active = feedback !== 'scale' || !reduced;
-  return <Animated.View style={[containerStyle, animatedStyle]}><Pressable {...props}
+  // The Pressable is the VoiceOver element (its children's languages are not consulted), so it carries the language (see AppText).
+  return <Animated.View style={[containerStyle, animatedStyle]}><Pressable {...props} accessibilityLanguage={props.accessibilityLanguage ?? speechLanguage}
     style={[{ minHeight: 44, justifyContent: 'center' }, style]} pressRetentionOffset={12}
     onPressIn={event => { pressed.value = active ? withTiming(1, { duration: duration.press, easing: easeOut }) : 0; props.onPressIn?.(event); }}
     onPressOut={event => { pressed.value = withTiming(0, { duration: active ? duration.release : 0, easing: easeOut }); props.onPressOut?.(event); }}>
@@ -130,16 +143,19 @@ export function PressFeedback({ children, style, containerStyle, feedback = 'sca
 
 /** The one filled call to action on a screen is the brand primary with white
  * text. Secondary actions stay ink on the inset fill, so a screen has at most
- * one blue button; a semantic tone (a transfer, an income) still wins. */
-export function ActionButton({ label, onPress, disabled = false, busy = false, secondary = false, tone, icon, containerStyle, compact = false }: {
-  label: string; onPress: () => void; disabled?: boolean; busy?: boolean; secondary?: boolean; tone?: Exclude<Tone, 'neutral'>;
+ * one blue button; a semantic tone (a transfer, an income) still wins.
+ * `spokenLabel` is the label for VoiceOver when it carries an amount ("Guardar
+ * gasto, 1234,50 pesos", built with the spoken formatters); the button shows
+ * `label` unchanged. */
+export function ActionButton({ label, spokenLabel, onPress, disabled = false, busy = false, secondary = false, tone, icon, containerStyle, compact = false }: {
+  label: string; spokenLabel?: string; onPress: () => void; disabled?: boolean; busy?: boolean; secondary?: boolean; tone?: Exclude<Tone, 'neutral'>;
   icon?: IconName; containerStyle?: StyleProp<ViewStyle>; compact?: boolean;
 }) {
   const p = usePalette();
   const semantic = tone ? toneColors(p, tone) : null;
   const background = semantic ? (secondary ? semantic.soft : semantic.color) : secondary ? p.inset : p.primaryFill;
   const color = semantic ? (secondary ? semantic.color : '#FFFFFF') : secondary ? p.text : p.onPrimary;
-  return <PressFeedback accessibilityRole="button" accessibilityLabel={label} containerStyle={containerStyle}
+  return <PressFeedback accessibilityRole="button" accessibilityLabel={spokenLabel ?? label} containerStyle={containerStyle}
     accessibilityState={{ disabled: disabled || busy, busy }} disabled={disabled || busy}
     onPress={onPress} style={[styles.button, compact && styles.buttonCompact, { backgroundColor: background, opacity: disabled || busy ? 0.5 : 1 }]}>
     {busy ? <ActivityIndicator color={color} /> : <>
@@ -158,8 +174,10 @@ export function IconButton({ name, label, onPress, disabled = false, color }: { 
 
 export function Field({ label, ...props }: TextInputProps & { label: string }) {
   const p = usePalette();
+  const { speechLanguage } = useI18n();
   return <View style={{ gap: 8 }}><AppText secondary variant="footnote" style={{ fontWeight: '500' }}>{label}</AppText>
-    <TextInput returnKeyType="done" onSubmitEditing={Keyboard.dismiss} {...props} accessibilityLabel={label} placeholderTextColor={p.tertiary}
+    <TextInput returnKeyType="done" onSubmitEditing={Keyboard.dismiss} {...props} accessibilityLabel={label}
+      accessibilityLanguage={props.accessibilityLanguage ?? speechLanguage} placeholderTextColor={p.tertiary}
       selectionColor={p.primary} style={[styles.input, { color: p.text, backgroundColor: p.surface }, props.style]} />
   </View>;
 }
@@ -202,7 +220,7 @@ type Caret = { start: number; end: number };
  * under the caret. */
 export function AmountField({ label, currency, tone, value = '', onChangeText, ...props }: TextInputProps & { label?: string; currency: Currency; tone?: Tone }) {
   const p = usePalette();
-  const { t, amountFormat, currencySymbol } = useI18n();
+  const { t, amountFormat, currencySymbol, speechLanguage } = useI18n();
   const accessoryId = useId();
   const { fontScale } = useWindowDimensions();
   const [rowWidth, setRowWidth] = useState(0);
@@ -262,6 +280,7 @@ export function AmountField({ label, currency, tone, value = '', onChangeText, .
         selection={selection} onSelectionChange={select}
         onBlur={event => { settle(); props.onBlur?.(event); }} onSubmitEditing={event => { settle(); props.onSubmitEditing?.(event); }}
         accessibilityLabel={t('amount.accessibility', { label: title, currency: t(currency === 'ARS' ? 'amount.inPesos' : 'amount.inDollars') })}
+        accessibilityLanguage={props.accessibilityLanguage ?? speechLanguage}
         inputAccessoryViewID={Platform.OS === 'ios' ? accessoryId : undefined}
         selectionColor={p.primary} placeholderTextColor={p.tertiary} maxFontSizeMultiplier={HERO_MAX_SCALE}
         style={[styles.amountInput, { color, fontSize, paddingRight: AMOUNT_FIELD.caret }, props.style]} />
@@ -286,12 +305,17 @@ const clipped = (text: string) => text.length > 24 ? text.slice(0, 23) + '…' :
 
 /** A quiet contextual action under an amount ("Usar todo", "Pagar total"):
  * a footnote with the recorded figure and a text button that only fills the
- * field. Saving stays with the primary button, so the person still reviews. */
-export function AmountShortcut({ label, caption, onPress, disabled = false }: { label?: string; caption: string; onPress?: () => void; disabled?: boolean }) {
+ * field. Saving stays with the primary button, so the person still reviews.
+ * `spokenCaption` is the caption for VoiceOver when it carries an amount
+ * (built with the spoken formatters: the language's decimal mark, no
+ * grouping); the visible caption keeps the region's separators. */
+export function AmountShortcut({ label, caption, spokenCaption, onPress, disabled = false }: {
+  label?: string; caption: string; spokenCaption?: string; onPress?: () => void; disabled?: boolean;
+}) {
   const p = usePalette();
   return <View style={{ flexDirection: 'row', justifyContent: 'flex-start', alignItems: 'center', flexWrap: 'wrap', gap: 4, marginTop: -8 }}>
-    <AppText secondary variant="footnote">{caption}{label && onPress ? ' ·' : ''}</AppText>
-    {label && onPress && <PressFeedback feedback="opacity" accessibilityRole="button" accessibilityLabel={label + ', ' + caption}
+    <AppText secondary variant="footnote" accessibilityLabel={spokenCaption}>{caption}{label && onPress ? ' ·' : ''}</AppText>
+    {label && onPress && <PressFeedback feedback="opacity" accessibilityRole="button" accessibilityLabel={label + ', ' + (spokenCaption ?? caption)}
       onPress={onPress} disabled={disabled} accessibilityState={{ disabled }} hitSlop={8}
       style={{ paddingVertical: 6, paddingHorizontal: 4, opacity: disabled ? 0.5 : 1 }}>
       <AppText variant="footnote" style={{ color: p.primary, fontWeight: '600' }}>{label}</AppText>
@@ -302,7 +326,8 @@ export function AmountShortcut({ label, caption, onPress, disabled = false }: { 
 function Choice({ label, selected, disabled, onPress }: { label: string; selected: boolean; disabled?: boolean; onPress: () => void }) {
   const p = usePalette();
   const reduced = useReduceMotion();
-  return <Pressable accessibilityRole="button" accessibilityState={{ selected, disabled }} disabled={disabled}
+  const { speechLanguage } = useI18n();
+  return <Pressable accessibilityRole="button" accessibilityState={{ selected, disabled }} disabled={disabled} accessibilityLanguage={speechLanguage}
     onPress={onPress} style={styles.choice} hitSlop={4}>
     <Animated.Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8} maxFontSizeMultiplier={1.3}
       style={{ fontSize: 13, lineHeight: 18, textAlign: 'center', fontWeight: '600', color: selected ? p.primary : p.secondary,
@@ -364,12 +389,14 @@ export function EmptyState({ title, detail, action, icon = 'wallet-outline' }: {
 }
 
 /** Contextual help behind an information glyph: the full explanation lives in
- * a native alert, so a form keeps one short line next to the field. */
+ * a native alert, so a form keeps one short line next to the field. The alert
+ * names its button from the catalogue: without one, React Native takes UIKit's
+ * own "OK" string, in the iPhone's language rather than the one chosen in Más. */
 export function InfoButton({ title, detail, label }: { title: string; detail: string; label?: string }) {
   const p = usePalette();
   const { t } = useI18n();
   return <PressFeedback feedback="opacity" accessibilityRole="button" accessibilityLabel={label ?? t('common.moreInfoAbout', { title: title.toLowerCase() })} hitSlop={8}
-    onPress={() => Alert.alert(title, detail)} style={{ minHeight: 28, minWidth: 28, alignItems: 'center', justifyContent: 'center' }}>
+    onPress={() => Alert.alert(title, detail, [{ text: t('common.ok'), style: 'cancel' }])} style={{ minHeight: 28, minWidth: 28, alignItems: 'center', justifyContent: 'center' }}>
     <Ionicons name="information-circle-outline" size={18} color={p.tertiary} accessible={false} />
   </PressFeedback>;
 }
@@ -387,9 +414,9 @@ export function FieldNote({ children, help }: { children: string; help?: { title
  * already on screen follows a language change (see `src/i18n/errors.ts`). */
 export function ErrorMessage({ message }: { message: string | null }) {
   const p = usePalette();
-  const { errorText } = useI18n();
+  const { errorText, speechLanguage } = useI18n();
   return message ? <View style={{ padding: 14, borderRadius: radius.button, backgroundColor: p.expenseSoft }}>
-    <Text accessibilityRole="alert" accessibilityLiveRegion="polite" style={[type.subhead, { color: p.expense }]}>{errorText(message)}</Text>
+    <Text accessibilityRole="alert" accessibilityLiveRegion="polite" accessibilityLanguage={speechLanguage} style={[type.subhead, { color: p.expense }]}>{errorText(message)}</Text>
   </View> : null;
 }
 
@@ -413,7 +440,7 @@ export function Money({ minor, currency, large = false, color, signed = false, s
 }) {
   const p = usePalette();
   const { fontScale } = useWindowDimensions();
-  const { spokenMoney, locale, amountFormat } = useI18n();
+  const { spokenMoney, locale, amountFormat, speechLanguage } = useI18n();
   const [width, setWidth] = useState(0);
   const semantic = tone === 'income' ? p.income : tone === 'expense' ? p.text : tone === 'transfer' ? p.transfer : tone === 'warning' ? p.warning : p.text;
   const base = size ?? (large ? 44 : 17);
@@ -427,7 +454,7 @@ export function Money({ minor, currency, large = false, color, signed = false, s
   // baseline, one accessibility label; nested spans keep it one line.
   const parts = hero ? splitAmount(text, amountFormat) : null;
   const quiet = ink === p.text ? { symbol: p.secondary, cents: p.tertiary } : { symbol: ink + 'B3', cents: ink + '8C' };
-  const body = <Text accessibilityLabel={label} numberOfLines={1} adjustsFontSizeToFit={!hero} minimumFontScale={0.75}
+  const body = <Text accessibilityLabel={label} accessibilityLanguage={speechLanguage} numberOfLines={1} adjustsFontSizeToFit={!hero} minimumFontScale={0.75}
     maxFontSizeMultiplier={hero ? HERO_MAX_SCALE : ROW_MAX_SCALE}
     style={{ color: ink, fontSize, lineHeight: hero ? Math.round(fontSize * 1.18) : undefined, fontWeight: weight ?? (large ? '700' : '600'),
       letterSpacing: hero ? -fontSize * 0.03 : -0.2, fontVariant: ['tabular-nums'], flexShrink: 1, maxWidth: '100%', textAlign: align }}>
@@ -446,8 +473,14 @@ export function Money({ minor, currency, large = false, color, signed = false, s
  * into short fragments (the currency code or the amount alone on a line). */
 export const DETAIL_INLINE_LIMIT = 30;
 
-export function DetailRow({ label, value, icon, leading, onPress, last = false, disabled = false, tone = 'neutral', layout = 'auto' }: {
+export function DetailRow({ label, value, spokenValue, icon, leading, onPress, last = false, disabled = false, tone = 'neutral', layout = 'auto' }: {
   label: string; value: string; icon?: IconName; onPress?: () => void; last?: boolean; disabled?: boolean; tone?: Tone;
+  /** What VoiceOver says for the value when the shown one would be misread: an
+   * amount from the spoken formatters (the language's decimal mark, no
+   * grouping) or a date written out ("22 de septiembre de 2026"). A pressable
+   * row reads label + ': ' + this; a plain row gives it to the value text. The
+   * visible value is unchanged. */
+  spokenValue?: string;
   /** An identity tile (an account's look, a Más row) in place of the bare glyph. */
   leading?: ReactNode;
   /** `auto` stacks at large text or when the pair is long; `stacked` always; `inline` only at large text. */
@@ -460,12 +493,12 @@ export function DetailRow({ label, value, icon, leading, onPress, last = false, 
     {leading ?? (icon && <Ionicons name={icon} size={20} color={tone === 'neutral' ? p.secondary : toneColors(p, tone).color} accessible={false} />)}
     <View style={{ flex: 1, minWidth: 0, gap: 3, flexDirection: stacked ? 'column' : 'row', alignItems: stacked ? 'flex-start' : 'center' }}>
       <AppText secondary variant="subhead" style={{ flexShrink: 1 }}>{label}</AppText>
-      <AppText style={{ flex: stacked ? undefined : 1, textAlign: stacked ? 'left' : 'right', flexShrink: 1 }}>{value}</AppText>
+      <AppText accessibilityLabel={spokenValue} style={{ flex: stacked ? undefined : 1, textAlign: stacked ? 'left' : 'right', flexShrink: 1 }}>{value}</AppText>
     </View>
     {onPress && <Ionicons name="chevron-forward" size={16} color={p.tertiary} accessible={false} />}
   </>;
   const style: StyleProp<ViewStyle> = [styles.detailRow, { borderBottomColor: p.line, borderBottomWidth: last ? 0 : StyleSheet.hairlineWidth }];
-  return onPress ? <PressFeedback feedback="highlight" accessibilityRole="button" accessibilityLabel={label + ': ' + value}
+  return onPress ? <PressFeedback feedback="highlight" accessibilityRole="button" accessibilityLabel={label + ': ' + (spokenValue ?? value)}
     disabled={disabled} accessibilityState={{ disabled }} onPress={onPress} style={style}>{content}</PressFeedback> : <View style={style}>{content}</View>;
 }
 
@@ -494,13 +527,16 @@ export function NavigationRow({ title, subtitle, icon, leading, onPress, last = 
  * NavigationRow shape (title over a footnote subtitle, each up to two lines,
  * 60 pt minimum) with a checkmark on the chosen option instead of a chevron,
  * because pressing it chooses rather than navigates. VoiceOver reads the
- * title and subtitle as one label and "selected" on the chosen one. */
-export function CheckRow({ title, subtitle, selected, onPress, last = false, disabled = false }: {
-  title: string; subtitle?: string; selected: boolean; onPress: () => void; last?: boolean; disabled?: boolean;
+ * title and subtitle as one label and "selected" on the chosen one.
+ * `accessibilityLanguage` overrides the interface language for that label: a
+ * language option named in its own language ("English", "Español") is spoken
+ * by a voice of that language, as iOS Settings does. */
+export function CheckRow({ title, subtitle, selected, onPress, last = false, disabled = false, accessibilityLanguage }: {
+  title: string; subtitle?: string; selected: boolean; onPress: () => void; last?: boolean; disabled?: boolean; accessibilityLanguage?: string;
 }) {
   const p = usePalette();
   return <PressFeedback feedback="highlight" accessibilityRole="button" accessibilityLabel={subtitle ? title + ', ' + subtitle : title}
-    disabled={disabled} accessibilityState={{ disabled, selected }} onPress={onPress}
+    accessibilityLanguage={accessibilityLanguage} disabled={disabled} accessibilityState={{ disabled, selected }} onPress={onPress}
     style={[styles.navigationRow, { borderBottomColor: p.line, borderBottomWidth: last ? 0 : StyleSheet.hairlineWidth, opacity: disabled ? 0.6 : 1 }]}>
     <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
       <AppText numberOfLines={2} style={{ fontWeight: '600' }}>{title}</AppText>
@@ -518,12 +554,15 @@ export function CheckRow({ title, subtitle, selected, onPress, last = false, dis
  * the label and its code keeps its own line instead of being pushed to a
  * lone right-aligned fragment. Without `onPress` it is a read-only fact in
  * the same shape (the currency of an existing account). */
-export function SelectionRow({ label, value, detail, icon, leading, onPress, last = false, disabled = false, placeholder = false }: {
+export function SelectionRow({ label, value, detail, spokenDetail, icon, leading, onPress, last = false, disabled = false, placeholder = false }: {
   label: string; value: string; detail?: string; icon?: IconName; leading?: ReactNode; onPress?: () => void; last?: boolean; disabled?: boolean;
+  /** The detail as VoiceOver says it when it carries an amount (spoken formatters); the visible detail is unchanged. */
+  spokenDetail?: string;
   /** The value is a prompt ("Elegir cuenta"), drawn in the primary colour. */
   placeholder?: boolean;
 }) {
   const p = usePalette();
+  const { speechLanguage } = useI18n();
   const content = <>
     {leading ?? (icon && <View style={styles.navigationGlyph}><Ionicons name={icon} size={22} color={p.secondary} accessible={false} /></View>)}
     <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
@@ -534,10 +573,11 @@ export function SelectionRow({ label, value, detail, icon, leading, onPress, las
     {onPress && <Ionicons name="chevron-forward" size={16} color={p.tertiary} accessible={false} />}
   </>;
   const style: StyleProp<ViewStyle> = [styles.selectionRow, { borderBottomColor: p.line, borderBottomWidth: last ? 0 : StyleSheet.hairlineWidth, opacity: disabled ? 0.6 : 1 }];
-  const accessibilityLabel = label + ': ' + value + (detail ? ', ' + detail : '');
+  const spoken = spokenDetail ?? detail;
+  const accessibilityLabel = label + ': ' + value + (spoken ? ', ' + spoken : '');
   return onPress ? <PressFeedback feedback="highlight" accessibilityRole="button" accessibilityLabel={accessibilityLabel}
     disabled={disabled} accessibilityState={{ disabled }} onPress={onPress} style={style}>{content}</PressFeedback>
-    : <View accessible accessibilityLabel={accessibilityLabel} style={style}>{content}</View>;
+    : <View accessible accessibilityLabel={accessibilityLabel} accessibilityLanguage={speechLanguage} style={style}>{content}</View>;
 }
 
 /** Compact statistic: eyebrow label over a value. It may shrink and wrap, so

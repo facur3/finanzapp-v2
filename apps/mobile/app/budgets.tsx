@@ -101,13 +101,14 @@ export default function BudgetsScreen() {
  * of the month in this currency; sublimits do not change it. */
 function TotalPanel({ total, currency, spoken }: { total: BudgetProgress<TotalMonthlyBudget>; currency: Currency; spoken: (minor: number) => string }) {
   const p = usePalette();
-  const { t } = useI18n();
+  const { t, speechLanguage } = useI18n();
   const tone = budgetTone(total);
   const color = tone === 'expense' ? p.expense : tone === 'warning' ? p.warning : p.secondary;
   const percent = percentUsed(total);
   const remaining = total.remainingMinor;
   return <View accessible accessibilityLabel={t('budgets.total.label', { spent: spoken(total.spentMinor), limit: spoken(total.budget.amountMinor), percent,
-    status: remaining < 0 ? t('budgets.total.exceededBy', { amount: spoken(-remaining) }) : remaining === 0 ? t('budgets.total.reached') : t('budgets.total.availableAmount', { amount: spoken(remaining) }) })}><Surface style={{ gap: 12 }}>
+    status: remaining < 0 ? t('budgets.total.exceededBy', { amount: spoken(-remaining) }) : remaining === 0 ? t('budgets.total.reached') : t('budgets.total.availableAmount', { amount: spoken(remaining) }) })}
+    accessibilityLanguage={speechLanguage}><Surface style={{ gap: 12 }}>
     <View style={{ gap: 2 }}>
       <AppText secondary variant="caption" style={{ fontWeight: '500' }}>{t(remaining < 0 ? 'budgets.total.exceeded' : 'budgets.total.available')}</AppText>
       <Money minor={Math.abs(remaining)} currency={currency} large color={tone === 'neutral' ? undefined : tone === 'expense' ? p.expense : p.warning} />

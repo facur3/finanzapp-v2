@@ -186,6 +186,27 @@ now, start Metro with `EXPO_PUBLIC_LOCALE_PREVIEW=1 npm run start:dev-client -- 
 native change: FinanzApp Dev runs it from Metro. Details and iOS limits:
 [`docs/i18n.md`](../../docs/i18n.md) §9.
 
+**Producto 23.1C2 (2026-09-24)** releases English and the United States
+(`RELEASED_LANGUAGES = ['es', 'en']`, `RELEASED_REGIONS = ['AR', 'US']`): Más → App y
+datos lists Idioma and Región for everyone, both independent, persistent and live, with
+"Según el dispositivo" first. `app.config.ts` declares the released languages to iOS
+(`expo-localization` plugin, `supportedLocales: { ios: ['es', 'en'] }`, kept equal to
+`RELEASED_LANGUAGES` by a test), makes Spanish iOS's fallback language
+(`CFBundleDevelopmentRegion`) and always offers the per-app language row
+(`UIPrefersShowingLanguageSettings`): **this needs a new EAS development build**. The
+provider re-reads the device on iOS's locale-change event as well as on return to the
+foreground, and a failed read keeps the last good one. VoiceOver numbers use the
+language's decimal mark without grouping ("1234,56 pesos"), labels built by the generic
+rows speak their amounts, and FinanzApp sets `accessibilityLanguage` only when the
+interface language differs from the device's. The date wheel takes the language's home
+locale (`es_AR`/`en_US`), so its months and column order match the row. The Assistant
+shows only its own notes on failure and resolves income chips as income; its request
+still carries no language (design in [`docs/i18n.md`](../../docs/i18n.md) §11).
+`EXPO_PUBLIC_LOCALE_PREVIEW` no longer changes anything (everything the build carries is
+released) and a release bundle cannot use it (`tests/locale-release.node.ts`). A
+bilingual review fixed real copy errors in both catalogues. No SQLite, backup, accounting
+or currency change. Details, precedence and iOS limits: [`docs/i18n.md`](../../docs/i18n.md) §10.
+
 **expo-localization needs a new development build.** It is a native module: Expo Go
 already contains it, but a FinanzApp Dev binary compiled before this PR does not, and
 Metro cannot add native code. On such a binary the app still starts and works:
@@ -194,13 +215,13 @@ and only evaluates the package when the module is registered, because evaluating
 without the module throws "Cannot find native module 'ExpoLocalization'" and Metro's
 development runtime shows that error even when the caller catches it (the first device
 run of this PR). Without the module, the **fallback** keeps: the device's primary
-language through Hermes `Intl` (enough while Spanish is the only released locale), every
+language through Hermes `Intl` (since 23.1C2 the bundle-matched language, es or en, with the device region), every
 date, percentage and amount format (they come from FinanzApp's own tables, not from the
 device), the catalogues and the stored language preference. It loses: the ordered list
 of preferred languages beyond the first and the device's Region setting (the region
-then comes from the Intl tag; neither matters while only Spanish and Argentina are
-released). Changes of the device settings are picked up when the app returns to the
-foreground (23.1A), not through the module's change events. The Más footer says which path this launch
+then comes from the Intl tag; since English and the United States are released this
+matters, so use a build that links the module: every FinanzApp Dev since 23.0 does). Changes of the device settings are picked up when the app returns to the
+foreground (23.1A) and, since 23.1C2, on the module's locale-change event. The Más footer says which path this launch
 took: "Idioma: módulo nativo" (the build links expo-localization), "Idioma: Intl (sin
 módulo nativo)" (an older build) or "Idioma: predeterminado" (neither answered). A fault
 inside a registered module is not treated as absence and still surfaces.
@@ -598,7 +619,23 @@ pastes accepted and refused, region switches with the caret), adds the four
 language × region combinations to `i18n.node.ts` and `typography.node.ts` (Money and the
 anchored field with "AR$"), mounts the real `AmountField` under the real provider in
 `locale-switch.node.ts`, and checks in `database.node.ts` that an amount typed in either
-region is stored as the same integer and that formatting never touches the ledger. It also updates
+region is stored as the same integer and that formatting never touches the ledger. Producto
+23.1C2 adds `locale-release.node.ts` (the release set, `releasedForBuild` returning it for
+any flag in a release bundle, a scan proving only `provider.tsx` reads
+`EXPO_PUBLIC_LOCALE_PREVIEW` and no config, `eas.json` profile or `.env` sets it, and
+`provider.tsx` compiled with babel-preset-expo for production with and without the flag,
+then mounted: an English iPhone reads English), `voiceover.node.ts` (a TypeScript-checker
+scan of every accessibility attribute and spoken twin in `app/` and `src/ui/`: no visible
+formatter reaches VoiceOver, every focusable element carries `accessibilityLanguage`,
+with synthetic self-checks) and `date-field.node.ts` (the wheel's props and locale in the
+four combinations, open/cancel/done, a spun day surviving four locale switches, no
+deprecated `onChange`); rewrites the gate cases of `i18n.node.ts`, `locale-switch.node.ts`
+and `more-routes.node.ts` for the released gate with an explicit narrower gate still
+tested; adds iOS's locale event, a throwing device read, relaunch, preview choices, an
+explicit region ignoring the device and `speechLanguage` to `locale-switch.node.ts`, the
+plugin output and Info.plist keys to `app-config.node.ts`, a v1 no-language pin to
+`assistant.node.ts` and `server/mobile/handlers.test.js`, and spoken-twin, inline-date,
+template and translated-error cases to the route harnesses. It also updates
 the navigation, Más, Cards, composer and quick-action guards for the centre tab, the
 pushed Tarjetas screen and the glass branch. These are **not** native rendering/gesture tests;
 use the physical checklist. The root suite also tests the shared monthly summary
@@ -609,7 +646,7 @@ For the intermittent black-tab report, update to `master`, restart with
 and repeat the **Interfaz 02** tab checks, **Interfaz 03** report checks and
 **Interfaz 04/05** correction/recovery and transfer checks, plus **Interfaz 06** daily/comparison reports and **Interfaz 08** recurring/upcoming
 checks, plus **Interfaz 10** cards/debts and five-tab checks and **Interfaz 11** Home,
-Movimientos and detail checks, **Interfaz 12** form checks, **Interfaz 13** Reportes checks, **Interfaz 14** budgets/recurring/accounts checks, **Interfaz 15** motion checks, **Interfaz 16** cohesion checks, **Interfaz 17** identity and money-input checks **Producto 18** Más / Tarjetas / amount-shortcut checks, **Producto 19** budget checks, **Producto 20** account/category identity checks **Producto 21** Assistant checks, **Producto 22** reachability/material checks, **Producto 22.1** clarity checks, **Producto 23.0** amount-field, row and localization checks, **Producto 23.1A** language-preference checks, **Producto 23.1B1** and **23.1B2** translation checks, **Producto 23.1C1** regional-format checks. The current footer (Más) says Producto 23.1C1.
+Movimientos and detail checks, **Interfaz 12** form checks, **Interfaz 13** Reportes checks, **Interfaz 14** budgets/recurring/accounts checks, **Interfaz 15** motion checks, **Interfaz 16** cohesion checks, **Interfaz 17** identity and money-input checks **Producto 18** Más / Tarjetas / amount-shortcut checks, **Producto 19** budget checks, **Producto 20** account/category identity checks **Producto 21** Assistant checks, **Producto 22** reachability/material checks, **Producto 22.1** clarity checks, **Producto 23.0** amount-field, row and localization checks, **Producto 23.1A** language-preference checks, **Producto 23.1B1** and **23.1B2** translation checks, **Producto 23.1C1** regional-format checks, **Producto 23.1C2** release checks (new development build). The current footer (Más) says Producto 23.1C2.
 Before updating, save a private pilot copy; do not uninstall or add fake movements.
 
 If a storage/refresh error occurs, the form retains the exact submitted command

@@ -111,3 +111,29 @@ test('historical custom categories stay selectable and unrenamed next to the int
   assert.equal(JSON.stringify(history), before, 'nothing in the ledger was renamed or deleted');
   assert.equal(categoryKey('  JD '), 'jd');
 });
+
+// Producto 23.1C2 declares Spanish and English to iOS, so Hermes' default
+// collator on a Spanish iPhone moves from English to Spanish. assignCategoryHues
+// breaks ties with localeCompare and no locale; this pins that the change can
+// never recolour a category: the one letter the two collations order apart (ñ)
+// never reaches the comparison, because categoryKey drops the tilde and the
+// first-use stamps are ASCII dates.
+test('23.1C2: hue tie-breaks order the same under Spanish and English collation, so no category changes colour', () => {
+  const tied = ['Ñandú', 'Nube', 'Niño', 'nafta', 'Oso', 'Øl', 'Straße', 'Æble', 'Café', 'cafe 2'].map((category, index) =>
+    ({ ...entry, id: 'tie-' + index, category, dateISO: '2026-09-01', createdAt: '2026-09-01T12:00:00Z' }));
+  const staggered = tied.map((item, index) => ({ ...item, createdAt: `2026-09-01T12:00:0${index % 3}${index % 2 ? '.000' : ''}Z` }));
+  const native = String.prototype.localeCompare;
+  const under = (locale: string, entries: Entry[]) => {
+    String.prototype.localeCompare = function (this: string, that: string) { return new Intl.Collator(locale).compare(String(this), that); };
+    try { return JSON.stringify([...assignCategoryHues(entries)]); } finally { String.prototype.localeCompare = native; }
+  };
+  for (const entries of [tied, staggered]) {
+    const english = under('en', entries);
+    assert.equal(under('es', entries), english, 'the assignment and its order are identical');
+    assert.equal(under('es-AR', entries), english);
+    assert.equal(JSON.stringify([...assignCategoryHues(entries)]), english, 'and equal to this runtime’s default');
+  }
+  // The collations do differ on a raw ñ; the key never carries one.
+  assert.ok(new Intl.Collator('es').compare('ña', 'nz') > 0 && new Intl.Collator('en').compare('ña', 'nz') < 0);
+  assert.equal(categoryKey('Ñandú'), 'nandu');
+});

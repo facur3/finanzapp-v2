@@ -24,20 +24,30 @@ import { radius, space, useCurrentDay, usePalette, useReduceMotion } from './the
 
 export function UserMessage({ text }: { text: string }) {
   const p = usePalette();
-  const { t } = useI18n();
+  const { t, speechLanguage } = useI18n();
   return <View style={styles.userRow}>
-    <View accessible accessibilityLabel={t('assistant.message.user', { text })} style={[styles.userBubble, { backgroundColor: p.inset }]}>
+    <View accessible accessibilityLabel={t('assistant.message.user', { text })} accessibilityLanguage={speechLanguage} style={[styles.userBubble, { backgroundColor: p.inset }]}>
       <AppText>{text}</AppText>
     </View>
   </View>;
 }
 
 /** Streaming shows the words as they arrive, or "Pensando…" with a pulse
- * before the first one; a stopped answer says so under its partial text. */
-export function AssistantText({ text, status }: { text: string; status: 'streaming' | 'done' | 'stopped' }) {
-  const { t } = useI18n();
+ * before the first one; a stopped answer says so under its partial text.
+ * The model's words are content in the language they were written in, which
+ * for the v1 server is always Spanish (docs/i18n.md §11): VoiceOver reads them
+ * with a Spanish voice, the device's own when the device is in Spanish, even
+ * with English chosen in Más. A v2 reply will carry the language it was asked in.
+ * `ownWords` marks a turn the app wrote itself (a clarification question, "review
+ * the draft"): it is already in the interface language and follows the usual rule. */
+const REPLY_LANGUAGE_V1 = 'es';
+export function AssistantText({ text, status, ownWords = false }: { text: string; status: 'streaming' | 'done' | 'stopped'; ownWords?: boolean }) {
+  const { t, language, speechLanguage } = useI18n();
   if (!text && status === 'streaming') return <Thinking />;
-  return <View accessible accessibilityLabel={t('assistant.message.assistant', { text })} style={styles.assistantRow}>
+  // The interface's own words, or prose already in the interface language: the usual
+  // rule (nothing when the device agrees). Otherwise the prose names its own language.
+  const replyVoice = ownWords || language === REPLY_LANGUAGE_V1 ? speechLanguage : REPLY_LANGUAGE_V1;
+  return <View accessible accessibilityLabel={t('assistant.message.assistant', { text })} accessibilityLanguage={replyVoice} style={styles.assistantRow}>
     <AppText style={styles.assistantText}>{text}{status === 'streaming' ? <Cursor /> : null}</AppText>
     {status === 'stopped' && <AppText tertiary variant="footnote">{t('assistant.message.stopped')}</AppText>}
   </View>;
@@ -46,7 +56,7 @@ export function AssistantText({ text, status }: { text: string; status: 'streami
 function Thinking() {
   const p = usePalette();
   const reduced = useReduceMotion();
-  const { t } = useI18n();
+  const { t, speechLanguage } = useI18n();
   const pulse = useSharedValue(1);
   useEffect(() => {
     if (reduced) { pulse.value = 1; return; }
@@ -54,7 +64,7 @@ function Thinking() {
     return () => { pulse.value = 1; };
   }, [reduced, pulse]);
   const style = useAnimatedStyle(() => ({ opacity: pulse.value }));
-  return <View accessible accessibilityLabel={t('assistant.message.thinkingLabel')} accessibilityState={{ busy: true }} style={[styles.assistantRow, { flexDirection: 'row', alignItems: 'center', gap: 8 }]}>
+  return <View accessible accessibilityLabel={t('assistant.message.thinkingLabel')} accessibilityLanguage={speechLanguage} accessibilityState={{ busy: true }} style={[styles.assistantRow, { flexDirection: 'row', alignItems: 'center', gap: 8 }]}>
     <Animated.View style={[{ width: 8, height: 8, borderRadius: 4, backgroundColor: p.primary }, style]} />
     <AppText secondary>{t('assistant.message.thinking')}</AppText>
   </View>;
@@ -71,10 +81,10 @@ function Cursor() {
  * key or a caught message; `errorText` shows either in the interface language. */
 export function SystemNote({ message, onRetry }: { message: Message & { role: 'system' }; onRetry?: (text: string) => void }) {
   const p = usePalette();
-  const { t, errorText } = useI18n();
+  const { t, errorText, speechLanguage } = useI18n();
   const text = errorText(message.text);
   const icon: IconName = message.reason === 'offline' ? 'cloud-offline-outline' : message.reason === 'limit' ? 'time-outline' : 'information-circle-outline';
-  return <View accessible accessibilityRole="text" accessibilityLabel={text} style={styles.systemRow}>
+  return <View accessible accessibilityRole="text" accessibilityLabel={text} accessibilityLanguage={speechLanguage} style={styles.systemRow}>
     <Ionicons name={icon} size={16} color={p.tertiary} accessible={false} />
     <AppText secondary variant="footnote" style={{ flex: 1 }}>{text}</AppText>
     {message.retryText !== null && onRetry && <PressFeedback feedback="opacity" accessibilityRole="button" accessibilityLabel={t('assistant.message.retry')} onPress={() => onRetry(message.retryText!)} style={{ minHeight: 36, paddingLeft: 8 }}>
@@ -107,15 +117,17 @@ function Chip({ label, onPress, selected = false, disabled = false }: { label: s
 /** The options for a clarification, as chips under the question. One
  * selection haptic; once chosen the chips leave and the choice is repeated as
  * the user's own message (`shown`, the words the chip displayed). An app word
- * (Gasto/Ingreso) is translated; a built-in category shows its localized name;
- * an account or custom category name is the user's own. */
+ * (Gasto/Ingreso) is translated; a built-in category shows its localized name,
+ * looked up with the chip's own kind (Sueldo is only a built-in income
+ * category); an account or custom category name is the user's own. */
 export function ClarificationChoices({ options, chosen, onChoose }: { options: ClarificationOption[]; chosen: string | null; onChoose: (option: ClarificationOption, shown: string) => void }) {
   const { t } = useI18n();
-  const categoryLook = useCategoryLookOf('expense');
+  const expenseLook = useCategoryLookOf('expense');
+  const incomeLook = useCategoryLookOf('income');
   if (!options.length || chosen) return null;
   return <Reflow fade style={[styles.chips, styles.assistantRow]}>
     {options.map(option => {
-      const shown = option.category && option.label ? categoryLook(option.label).label : optionText(option, t);
+      const shown = option.category && option.label ? (option.category === 'income' ? incomeLook : expenseLook)(option.label).label : optionText(option, t);
       return <Chip key={option.id} label={shown} onPress={() => { selectionHaptic(); onChoose(option, shown); }} />;
     })}
   </Reflow>;
@@ -123,18 +135,27 @@ export function ClarificationChoices({ options, chosen, onChoose }: { options: C
 
 /** The numbers an answer rests on and the screens that hold them. A row is
  * a label and an amount (signed when it is a difference); a link is a text
- * button in the interaction colour. Never a dashboard. */
-export function AnswerEvidence({ content, currency, onOpen }: { content: AnswerContent; currency: 'ARS' | 'USD'; onOpen: (href: AnswerContent['links'][number]['href']) => void }) {
+ * button in the interaction colour. Never a dashboard. A row is one VoiceOver
+ * element, so its label says the amount too, in spoken form: the Money inside
+ * is not reached on its own. */
+export function AnswerEvidence({ content, onOpen }: { content: AnswerContent; onOpen: (href: AnswerContent['links'][number]['href']) => void }) {
   const p = usePalette();
-  const { t } = useI18n();
+  const { t, spokenMoney, speechLanguage } = useI18n();
   const categoryLook = useCategoryLookOf('expense');
   if (!content.rows.length && !content.links.length) return null;
+  const currency = content.currency;
+  // A difference that grew is said as such ("42500,00 pesos más"); a lower one already starts with "Menos".
+  const spoken = (row: AnswerContent['rows'][number]) => row.signed && row.amountMinor > 0
+    ? t('assistant.evidence.spokenIncrease', { amount: spokenMoney(row.amountMinor, currency) }) : spokenMoney(row.amountMinor, currency);
   return <View style={[styles.assistantRow, { gap: space.s }]}>
     {content.rows.length > 0 && <View style={[styles.evidence, { borderColor: p.line }]}>
-      {content.rows.map(row => { const label = evidenceLabel(row, t, stored => categoryLook(stored).label); return <View key={row.id} accessible accessibilityLabel={label} style={styles.evidenceRow}>
-        <AppText secondary variant="subhead" numberOfLines={2} style={{ flex: 1, minWidth: 0 }}>{label}</AppText>
-        <Money minor={row.amountMinor} currency={currency} signed={row.signed} size={15} weight="600" />
-      </View>; })}
+      {content.rows.map(row => {
+        const label = evidenceLabel(row, t, stored => categoryLook(stored).label);
+        return <View key={row.id} accessible accessibilityLabel={label + ', ' + spoken(row)} accessibilityLanguage={speechLanguage} style={styles.evidenceRow}>
+          <AppText secondary variant="subhead" numberOfLines={2} style={{ flex: 1, minWidth: 0 }}>{label}</AppText>
+          <Money minor={row.amountMinor} currency={currency} signed={row.signed} size={15} weight="600" />
+        </View>;
+      })}
     </View>}
     {content.links.length > 0 && <View style={styles.links}>
       {content.links.map(link => <PressFeedback key={link.id} feedback="opacity" accessibilityRole="link" accessibilityLabel={t(`assistant.links.${link.id}`)} onPress={() => onOpen(link.href)} style={styles.link}>
@@ -155,7 +176,7 @@ export function DraftCard({ content, accounts, onConfirm, onEdit, onCancel, onOp
 }) {
   const p = usePalette();
   const day = useCurrentDay();
-  const { t, locale } = useI18n();
+  const { t, locale, speechLanguage } = useI18n();
   const { draft } = content;
   // The stored category is never changed; a built-in one only reads in the interface language.
   const categoryName = useCategoryLook(draft.category.trim(), draft.kind).label;
@@ -163,7 +184,8 @@ export function DraftCard({ content, accounts, onConfirm, onEdit, onCancel, onOp
   const gaps = draftGaps(draft);
   const expense = draft.kind === 'expense';
   if (content.status === 'cancelled' || content.status === 'edited') {
-    return <View accessible accessibilityLabel={t(content.status === 'cancelled' ? 'assistant.draft.cancelledLabel' : 'assistant.draft.editedLabel')} style={[styles.assistantRow, styles.collapsed]}>
+    return <View accessible accessibilityLabel={t(content.status === 'cancelled' ? 'assistant.draft.cancelledLabel' : 'assistant.draft.editedLabel')} accessibilityLanguage={speechLanguage}
+      style={[styles.assistantRow, styles.collapsed]}>
       <Ionicons name={content.status === 'cancelled' ? 'close-circle-outline' : 'create-outline'} size={16} color={p.tertiary} accessible={false} />
       <AppText tertiary variant="footnote">{t(content.status === 'cancelled' ? 'assistant.draft.cancelled' : 'assistant.draft.edited')}</AppText>
     </View>;
@@ -204,8 +226,8 @@ export function DraftCard({ content, accounts, onConfirm, onEdit, onCancel, onOp
 
 function DraftRow({ label, value, leading, missing = false, last = false }: { label: string; value: string; leading?: ReactNode; missing?: boolean; last?: boolean }) {
   const p = usePalette();
-  const { t } = useI18n();
-  return <View accessible accessibilityLabel={t('assistant.draft.row', { label, value })} style={[styles.draftRow, { borderBottomColor: p.line, borderBottomWidth: last ? 0 : StyleSheet.hairlineWidth }]}>
+  const { t, speechLanguage } = useI18n();
+  return <View accessible accessibilityLabel={t('assistant.draft.row', { label, value })} accessibilityLanguage={speechLanguage} style={[styles.draftRow, { borderBottomColor: p.line, borderBottomWidth: last ? 0 : StyleSheet.hairlineWidth }]}>
     <AppText secondary variant="subhead" style={{ minWidth: 96, flexShrink: 1 }}>{label}</AppText>
     <View style={{ flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 8, justifyContent: 'flex-end' }}>
       {leading}

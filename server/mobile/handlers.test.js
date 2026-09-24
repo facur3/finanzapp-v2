@@ -59,6 +59,16 @@ describe('cloud integration boundary', () => {
     expect((await call('assistant', request, deps)).code).toBe(200);
     expect(deps.receiveCapture).not.toHaveBeenCalled();
   });
+  it('refuses a language the v1 contract does not carry before any quota or model call', async () => {
+    // Rollout order (docs/i18n.md §11): a server must accept a language before any app sends one; until then it costs nothing.
+    const deps = ports();
+    for (const extra of [{ locale: { language: 'en', region: 'US' } }, { replyLanguage: 'en-US' }]) {
+      const res = await call('assistant', { ...request, ...extra }, deps);
+      expect(res.code).toBe(400);
+    }
+    expect(deps.reserveAIQuota).not.toHaveBeenCalled();
+    expect(deps.respond).not.toHaveBeenCalled();
+  });
   it('rejects malformed model output and fabricated evidence or future dates', async () => {
     const deps = ports();
     for (const invalid of [{ ...answer, factIds: ['invented'] }, { ...answer, draft: { ...draft, dateISO: '2026-09-20' } }, { ...answer, draft: { ...draft, amountMinor: 1.5 } }]) {

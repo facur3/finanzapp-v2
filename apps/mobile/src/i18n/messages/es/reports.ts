@@ -30,7 +30,8 @@ export const reports = {
     periodTotal: 'Total del período',
     /** Name of the donut slice that groups the smaller categories. */
     others: 'Otras',
-    othersNote: 'Las cinco mayores con nombre propio; el resto se agrupa como Otras.',
+    /** Under the donut when the smaller categories are grouped: the donut names four categories and groups the rest (`donutSlices`). */
+    othersNote: 'Las cuatro mayores con nombre propio; el resto se agrupa como Otras.',
     daysNote: 'Solo días con gastos registrados. Tocá uno para ver los movimientos.',
     outOfRangeTitle: 'El total supera el rango disponible',
     outOfRangeDetail: 'Tus movimientos siguen guardados. No mostramos un total ni un gráfico redondeado que pueda ser incorrecto.',
@@ -64,8 +65,8 @@ export const reports = {
       overDetail: '{amount} por encima de {limit}',
       nearDetail: 'Quedan {amount} de {limit}',
       largest: 'Tu mayor gasto fue {merchant}',
-      /** Amount · category · date; `{day}`/`{month}` are the numbers of the date ("5/09"). */
-      largestDetail: '{amount} · {category} · {day}/{month}',
+      /** Amount · category · date; `{date}` is the day and month in the region's order ("5/09" in Argentina, "9/5" in the United States). */
+      largestDetail: '{amount} · {category} · {date}',
       growth: '{category} subió {amount}',
       growthMatchingDays: 'Frente a los mismos días del mes anterior',
       growthFullMonth: 'Frente al mes anterior completo',
@@ -88,13 +89,13 @@ export const reports = {
       /** VoiceOver for the donut: "Total del período: Comida 40 %, Salud 60 %". */
       donutLabel: '{caption}: {slices}',
       slice: '{label} {percent} %',
-      /** VoiceOver for one month bar: "sep 2026, 1.234,56 pesos". */
+      /** VoiceOver for one month bar: "septiembre 2026, 1234,56 pesos". `{month}` is the full month name (the axis under the bars keeps the short one). */
       bar: '{month} {year}, {amount}',
       barPartial: '{month} {year}, {amount}, mes en curso',
       partialMonth: 'Mes en curso hasta hoy',
       /** Under the bars: "Mes completo · escala de 0 a $ 1.234". */
       scale: '{status} · escala de 0 a {max}',
-      /** VoiceOver for a category row: "Comida, 1.234,56 ARS, 30 % del gasto del mes, 3 gastos". */
+      /** VoiceOver for a category row: "Comida, 1234,56 ARS, 30 % del gasto del mes, 3 gastos". */
       categoryLabel: '{name}, {amount} {currency}, {share} del gasto del mes, {count}',
       categoryHint: 'Abre los movimientos de esta categoría en el mes seleccionado',
       timelineMax: 'Gasto registrado · máximo {currency} {amount}',

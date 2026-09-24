@@ -1,12 +1,13 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { formatMinorUnits } from '@finanzapp/domain';
+import { formatMinorUnits, labelFromISO } from '@finanzapp/domain';
 import { readdirSync, readFileSync } from 'node:fs';
-import { deviceLocales, readDeviceLocales } from '../src/i18n/device.ts';
-import { codedAmount, currencyName, currencySymbol, dateFromISO, daysAgo, formatAmount, formatCount, formatDate, formatDateTime, formatMonth, formatNumericDate, formatPercent,
-  moneyText, pickerLocale, relativeDayName, speechLocale, spokenAmount, spokenMoney, spokenNumber, spokenPercent, withCurrencyCode } from '../src/i18n/format.ts';
-import { DEFAULT_LOCALE, LANGUAGES, REGIONS, RELEASED, RELEASED_LANGUAGES, RELEASED_REGIONS, releasedForBuild, SUPPORTED_LANGUAGES, SUPPORTED_REGIONS, composeLocale, languageForTag, languageOf,
-  languagePreferenceFrom, regionForCode, regionForTag, regionOf, regionPreferenceFrom, resolveLanguage, resolveLocale, resolveRegion, type AppLocale } from '../src/i18n/locale.ts';
+import { LOCALE_CHANGED_EVENT, deviceLocales, primaryLanguageOf, readDeviceLocales, subscribeDeviceLocaleChanges } from '../src/i18n/device.ts';
+import { codedAmount, currencyName, currencySymbol, dateFromISO, daysAgo, formatAmount, formatCount, formatDate, formatDateTime, formatDayMonth, formatMonth, formatNumericDate,
+  formatPercent, moneyText, pickerLocale, relativeDate, relativeDayName, speechLocale, spokenAmount, spokenMoney, spokenNumber, spokenPercent, withCurrencyCode } from '../src/i18n/format.ts';
+import { DEFAULT_LOCALE, LANGUAGES, PREVIEW, REGIONS, RELEASED, RELEASED_LANGUAGES, RELEASED_REGIONS, releasedForBuild, SUPPORTED_LANGUAGES, SUPPORTED_REGIONS, composeLocale, languageForTag,
+  languageOf, languagePreferenceFrom, regionForCode, regionForTag, regionOf, regionPreferenceFrom, resolveLanguage, resolveLocale, resolveRegion, type AppLocale,
+  type ReleasedSets } from '../src/i18n/locale.ts';
 import { catalogue, interpolate, messageKeys, translate, translator } from '../src/i18n/messages.ts';
 import { es } from '../src/i18n/messages/es/index.ts';
 import { en } from '../src/i18n/messages/en/index.ts';
@@ -16,18 +17,22 @@ import { bindLocale } from '../src/i18n/bind.ts';
 
 // Producto 23.0: the localization foundation. Language, region, an account's
 // currency and the stored amount are four separate things; translating a
-// label never touches SQLite. English exists as a catalogue but is not
-// released until every screen has one.
+// label never touches SQLite. English and the United States were released in
+// 23.1C2; the gate itself stays (a future catalogue is held back the same
+// way), so it is exercised here through an explicit narrower gate.
 
-const ALL = { languages: ['es', 'en'], regions: ['AR', 'US'] } as const;
+const LOCALES: AppLocale[] = ['es-AR', 'en-AR', 'es-US', 'en-US'];
+/** The gate as it stood until 23.1C1, standing in for any build with a language or region not yet released. */
+const SPANISH_ONLY: ReleasedSets = { languages: ['es'], regions: ['AR'] };
 
 test('language and region are two registries; a locale is only their composition, and the four combinations exist', () => {
   assert.deepEqual(SUPPORTED_LANGUAGES, ['es', 'en']);
   assert.deepEqual(SUPPORTED_REGIONS, ['AR', 'US']);
   assert.equal(LANGUAGES.es.name, 'Español', 'a language is listed by its own name');
   assert.equal(LANGUAGES.en.name, 'English');
-  assert.deepEqual([...RELEASED_LANGUAGES], ['es'], 'English is not offered until 23.1B translates every screen and 23.1C releases it');
-  assert.deepEqual([...RELEASED_REGIONS], ['AR'], 'the US region waits for 23.1C, when the amount field types US separators');
+  assert.deepEqual([...RELEASED_LANGUAGES], ['es', 'en'], 'English is released in 23.1C2, once 23.1B translated every screen');
+  assert.deepEqual([...RELEASED_REGIONS], ['AR', 'US'], 'the US region is released in 23.1C2, now that the amount field types US separators');
+  assert.deepEqual(RELEASED, { languages: SUPPORTED_LANGUAGES, regions: SUPPORTED_REGIONS }, 'everything the build carries is released');
   for (const language of SUPPORTED_LANGUAGES) for (const region of SUPPORTED_REGIONS) {
     const locale = composeLocale(language, region);
     assert.equal(locale, language + '-' + region);
@@ -58,32 +63,37 @@ test('a device tag gives a language by its first subtag and a region by a later 
   assert.equal(regionForCode(null), null);
 });
 
-test('language resolution: a released preference wins, then the first released device language, then Spanish; English cannot surface before its release', () => {
+test('language resolution: a released preference wins, then the first released device language, then Spanish; a language outside the gate never surfaces', () => {
   const english = [{ languageTag: 'en-US', languageCode: 'en', regionCode: 'US' }];
-  assert.equal(resolveLanguage(english), 'es', 'today an English iPhone still reads Spanish rather than half an app');
-  assert.equal(resolveLanguage(english, 'en'), 'es', 'a stored English preference is ignored while English is unreleased');
+  assert.equal(resolveLanguage(english), 'en', 'since 23.1C2 the device language decides: an English iPhone reads English');
+  assert.equal(resolveLanguage(english, 'en'), 'en');
   assert.equal(resolveLanguage([], 'system'), 'es');
-  assert.equal(resolveLanguage(english, 'system', ALL.languages), 'en', 'once released, the device language decides');
-  assert.equal(resolveLanguage([{ languageTag: 'es-AR' }, { languageTag: 'en-US' }], 'system', ALL.languages), 'es', 'the first preferred language wins');
-  assert.equal(resolveLanguage([{ languageTag: 'pt-BR' }, { languageTag: 'en-GB' }], 'system', ALL.languages), 'en', 'an unsupported first language falls through to the next');
-  assert.equal(resolveLanguage([{ languageTag: 'pt-BR' }, { languageTag: 'fr-FR' }], 'system', ALL.languages), 'es', 'no supported device language: Spanish');
-  assert.equal(resolveLanguage(english, 'es', ALL.languages), 'es', 'an explicit preference beats the device');
-  assert.equal(resolveLanguage([{ languageTag: 'es-AR' }], 'en', ALL.languages), 'en');
-  assert.equal(resolveLanguage([{ languageTag: '', languageCode: 'en' }], 'system', ALL.languages), 'en', 'a bare language code still counts');
+  assert.equal(resolveLanguage([{ languageTag: 'es-AR' }, { languageTag: 'en-US' }]), 'es', 'the first preferred language wins');
+  assert.equal(resolveLanguage([{ languageTag: 'pt-BR' }, { languageTag: 'en-GB' }]), 'en', 'an unsupported first language falls through to the next');
+  assert.equal(resolveLanguage([{ languageTag: 'pt-BR' }, { languageTag: 'fr-FR' }]), 'es', 'no supported device language: Spanish');
+  assert.equal(resolveLanguage(english, 'es'), 'es', 'an explicit preference beats the device');
+  assert.equal(resolveLanguage([{ languageTag: 'es-AR' }], 'en'), 'en');
+  assert.equal(resolveLanguage([{ languageTag: '', languageCode: 'en' }]), 'en', 'a bare language code still counts');
+  // The gate, for the next catalogue: a language outside it is neither followed nor applied when stored.
+  assert.equal(resolveLanguage(english, 'system', SPANISH_ONLY.languages), 'es', 'a device language outside the gate reads Spanish rather than half an app');
+  assert.equal(resolveLanguage(english, 'en', SPANISH_ONLY.languages), 'es', 'a stored preference outside the gate is ignored, not an error');
+  assert.equal(resolveLanguage([{ languageTag: 'en-GB' }, { languageTag: 'es-MX' }], 'system', SPANISH_ONLY.languages), 'es', 'the next released device language');
 });
 
 test('region resolution: a released preference wins, then the device region setting, then Argentina; never the region of a second language', () => {
   const usIPhone = [{ languageTag: 'es-AR', languageCode: 'es', regionCode: 'US' }];
-  assert.equal(resolveRegion(usIPhone), 'AR', 'while the US region is unreleased, Argentine conventions everywhere');
-  assert.equal(resolveRegion(usIPhone, 'US'), 'AR', 'a stored US preference is ignored while unreleased');
-  assert.equal(resolveRegion(usIPhone, 'system', ALL.regions), 'US', 'the Region setting, not the language tag, decides');
-  assert.equal(resolveRegion([{ languageTag: 'en-US', regionCode: 'AR' }], 'system', ALL.regions), 'AR', 'English language, Argentine region');
-  assert.equal(resolveRegion([{ languageTag: 'en-US' }], 'system', ALL.regions), 'US', 'Intl only: the tag carries the region');
-  assert.equal(resolveRegion([{ languageTag: 'es-UY', regionCode: 'UY' }, { languageTag: 'en-US', regionCode: 'US' }], 'system', ALL.regions), 'AR',
+  assert.equal(resolveRegion(usIPhone), 'US', 'the Region setting, not the language tag, decides');
+  assert.equal(resolveRegion(usIPhone, 'US'), 'US');
+  assert.equal(resolveRegion([{ languageTag: 'en-US', regionCode: 'AR' }]), 'AR', 'English language, Argentine region');
+  assert.equal(resolveRegion([{ languageTag: 'en-US' }]), 'US', 'Intl only: the tag carries the region');
+  assert.equal(resolveRegion([{ languageTag: 'es-UY', regionCode: 'UY' }, { languageTag: 'en-US', regionCode: 'US' }]), 'AR',
     'an unsupported device region reads the default, not the region of the next language');
-  assert.equal(resolveRegion([], 'system', ALL.regions), 'AR');
-  assert.equal(resolveRegion(usIPhone, 'AR', ALL.regions), 'AR', 'an explicit region beats the device');
-  assert.equal(resolveRegion([{ languageTag: 'es-AR', regionCode: 'AR' }], 'US', ALL.regions), 'US');
+  assert.equal(resolveRegion([]), 'AR');
+  assert.equal(resolveRegion(usIPhone, 'AR'), 'AR', 'an explicit region beats the device');
+  assert.equal(resolveRegion([{ languageTag: 'es-AR', regionCode: 'AR' }], 'US'), 'US');
+  // A region outside the gate is neither followed nor applied when stored.
+  assert.equal(resolveRegion(usIPhone, 'system', SPANISH_ONLY.regions), 'AR', 'a device region outside the gate reads Argentine conventions');
+  assert.equal(resolveRegion(usIPhone, 'US', SPANISH_ONLY.regions), 'AR', 'a stored region outside the gate is ignored');
 });
 
 test('each half resolves on its own: every language × region combination and "both follow the device"', () => {
@@ -101,11 +111,14 @@ test('each half resolves on its own: every language × region combination and "b
     [device('pt-BR', 'BR'), { language: 'system', region: 'system' }, 'es-AR'],
   ];
   for (const [devices, preferences, expected] of cases) {
-    const resolved = resolveLocale(devices, preferences, ALL);
+    const resolved = resolveLocale(devices, preferences);
     assert.equal(resolved.locale, expected, JSON.stringify([devices, preferences]));
     assert.equal(resolved.language + '-' + resolved.region, expected);
+    assert.equal(resolveLocale(devices, preferences, PREVIEW).locale, expected, 'the default gate is the preview set since 23.1C2');
   }
-  for (const [devices, preferences] of cases) assert.equal(resolveLocale(devices, preferences).locale, 'es-AR', 'with the release gate closed every case is es-AR');
+  for (const [devices, preferences] of cases) assert.equal(resolveLocale(devices, preferences, SPANISH_ONLY).locale, 'es-AR', 'a Spanish-only gate makes every case es-AR');
+  assert.equal(resolveLocale([{ languageTag: 'en-US', regionCode: 'US' }], { language: 'system', region: 'system' }, { languages: ['es', 'en'], regions: ['AR'] }).locale, 'en-AR',
+    'each half has its own gate');
   assert.equal(resolveLocale([]).locale, DEFAULT_LOCALE);
 });
 
@@ -172,12 +185,66 @@ test('a fault in a registered module is not disguised as a missing one', () => {
   assert.throws(() => readDeviceLocales(probeFault), /probe fault/);
 });
 
+test('the device\'s first language is read as its primary subtag, catalogue or not; nothing usable is null', () => {
+  assert.equal(primaryLanguageOf([{ languageTag: 'es-AR', languageCode: 'es', regionCode: 'AR' }]), 'es');
+  assert.equal(primaryLanguageOf([{ languageTag: 'EN_us' }]), 'en', 'case and separator of the tag do not matter');
+  assert.equal(primaryLanguageOf([{ languageTag: 'pt-BR' }, { languageTag: 'es-AR' }]), 'pt', 'only the first language; one without a catalogue still counts');
+  assert.equal(primaryLanguageOf([{ languageTag: 'zh-Hant-TW' }]), 'zh');
+  assert.equal(primaryLanguageOf([{ languageTag: 'yue-Hant-HK' }]), 'yue', 'three-letter language subtags');
+  assert.equal(primaryLanguageOf([{ languageTag: '', languageCode: 'fr' }]), 'fr', 'a bare language code when the tag is empty');
+  assert.equal(primaryLanguageOf([{ languageTag: ' es-AR ' }]), 'es');
+  assert.equal(primaryLanguageOf([]), null, 'nothing was read');
+  for (const tag of ['', 'x', '419', 'e1-AR', 'español']) assert.equal(primaryLanguageOf([{ languageTag: tag }]), null, 'not a language subtag: ' + JSON.stringify(tag));
+  assert.equal(primaryLanguageOf([{ languageTag: undefined as never, languageCode: null }]), null, 'a malformed native entry is not a language');
+});
+
+test('iOS\'s locale-change event: subscribed as a method call on the native emitter, only that event, removed once; anything else is a no-op', () => {
+  assert.equal(LOCALE_CHANGED_EVENT, 'onLocaleSettingsChanged', 'the event expo-localization\'s module sends on NSCurrentLocaleDidChangeNotification');
+  // An older binary (no module), Node, or a module object without an emitter: nothing to subscribe, nothing thrown.
+  for (const module of [null, undefined, { getLocales: () => [] }, { addListener: 'not a function' }]) {
+    let heard = 0;
+    const unsubscribe = subscribeDeviceLocaleChanges(module, () => heard++);
+    assert.equal(typeof unsubscribe, 'function');
+    unsubscribe();
+    unsubscribe();
+    assert.equal(heard, 0);
+  }
+  // A class-based emitter, like Expo's native module object: its methods need `this`.
+  class Emitter {
+    listeners = new Map<string, Set<(...args: unknown[]) => void>>();
+    subscribed: string[] = [];
+    removed = 0;
+    addListener(event: string, listener: (...args: unknown[]) => void) {
+      this.subscribed.push(event);
+      const set = this.listeners.get(event) ?? new Set();
+      this.listeners.set(event, set.add(listener));
+      return { remove: () => { this.removed++; set.delete(listener); } };
+    }
+    emit(event: string, ...args: unknown[]) { for (const listener of this.listeners.get(event) ?? []) listener(...args); }
+  }
+  const native = new Emitter();
+  const calls: unknown[][] = [];
+  const unsubscribe = subscribeDeviceLocaleChanges(native, (...args: unknown[]) => { calls.push(args); });
+  assert.equal(native.subscribed.join(','), 'onLocaleSettingsChanged', 'only the locale event');
+  native.emit('onCalendarSettingsChanged');
+  assert.equal(calls.length, 0, 'another event of the same module is not a locale change');
+  native.emit('onLocaleSettingsChanged', { payload: true });
+  assert.equal(JSON.stringify(calls), '[[]]', 'heard once, with no payload passed on');
+  unsubscribe();
+  unsubscribe();
+  assert.equal(native.removed, 1, 'unsubscribing twice removes the native subscription once');
+  native.emit('onLocaleSettingsChanged');
+  assert.equal(calls.length, 1, 'nothing is heard after unsubscribing');
+});
+
 test('the runtime wiring probes with requireOptionalNativeModule and only then requires expo-localization; nothing imports it statically', () => {
   const runtime = readFileSync(new URL('../src/i18n/device-runtime.ts', import.meta.url), 'utf8');
   assert.match(runtime, /import \{ requireOptionalNativeModule \} from 'expo';/, 'the official optional probe from the expo package');
   assert.match(runtime, /nativeRegistered: \(\) => requireOptionalNativeModule\('ExpoLocalization'\) != null/);
   assert.match(runtime, /load: \(\) => require\('expo-localization'\)/, 'a lazy require inside the loader, evaluated only when called');
   assert.equal(/^import [^\n]*'expo-localization'/m.test(runtime), false);
+  assert.match(runtime, /subscribeDeviceLocaleChanges\(requireOptionalNativeModule\('ExpoLocalization'\), listener\)/,
+    'the locale-change event comes from the probed module object, never from evaluating the package');
   const offenders: string[] = [];
   const walk = (dir: URL) => {
     for (const entry of readdirSync(dir, { withFileTypes: true })) {
@@ -313,7 +380,7 @@ test('money presentation: Spanish output is the domain string, English only swap
   assert.equal(codedAmount(123456, 'ARS'), 'ARS\u00A01.234,56');
   assert.equal(codedAmount(-100, 'USD', 'en-US'), 'USD\u00A0-1.00');
   assert.equal(withCurrencyCode('Deuda registrada', 'ARS'), 'Deuda registrada\u00A0·\u00A0ARS');
-  assert.equal(spokenMoney(123456, 'ARS'), '1.234,56 pesos');
+  assert.equal(spokenMoney(123456, 'ARS'), '1234,56 pesos', 'VoiceOver gets the digits ungrouped: a separator before three digits is one a voice can misread');
   assert.equal(spokenMoney(-100, 'USD'), 'Menos 1,00 dólares');
   assert.equal(spokenMoney(-100, 'USD', 'en-US'), 'Minus 1.00 dollars');
   assert.equal(currencyName('ARS'), 'Pesos argentinos');
@@ -343,7 +410,7 @@ test('words follow the language, conventions follow the region: English with Arg
   assert.equal(formatDateTime('2026-09-22T09:03:05', 'es-US'), '9/22/2026, 9:03\u00A0a.\u00A0m.');
   assert.equal(formatNumericDate('2026-09-22', 'es-US'), '9/22/2026');
   assert.equal(formatPercent(0.1235, 'es-US'), '12.4\u00A0%');
-  assert.equal(spokenMoney(123456, 'ARS', 'es-US'), '1.234,56 pesos', 'the Spanish voice gets Spanish numbers; the screen shows 1,234.56');
+  assert.equal(spokenMoney(123456, 'ARS', 'es-US'), '1234,56 pesos', 'the Spanish voice gets a Spanish decimal comma and no grouping; the screen shows 1,234.56');
   assert.equal(currencyName('USD', 'es-US'), 'Dólares estadounidenses');
   assert.equal(formatNumericDate('garbage', 'es-US'), 'garbage');
   // The default is byte-identical to the ledger for every amount.
@@ -395,7 +462,7 @@ test('a bound locale gives components one object of translator and formatters', 
   assert.equal(es.formatMonth('2026-09'), 'septiembre de 2026');
   assert.equal(es.formatPercent(0.5), '50\u00A0%');
   assert.equal(es.moneyText(150000, 'USD'), 'US$\u00A01.500,00');
-  assert.equal(es.spokenMoney(150000, 'USD'), '1.500,00 dólares');
+  assert.equal(es.spokenMoney(150000, 'USD'), '1500,00 dólares');
   assert.equal(es.currencyName('USD'), 'Dólares estadounidenses');
   assert.equal(es.language, 'es');
   assert.equal(es.region, 'AR');
@@ -407,23 +474,43 @@ test('a bound locale gives components one object of translator and formatters', 
   assert.equal(en.t('common.done'), 'Done');
   assert.equal(en.formatDate('2026-09-22', 'weekdayLong'), 'Tuesday, September 22, 2026');
   assert.equal(en.moneyText(150000, 'ARS'), 'AR$\u00A01,500.00');
+  assert.equal(en.formatDayMonth('2026-09-05'), '9/5');
+  assert.equal(es.formatDayMonth('2026-09-05'), '5/09');
+  assert.equal(en.relativeDate('2026-09-21', '2026-09-22', true), 'yesterday', 'the inline form reaches components');
+  assert.equal(es.relativeDate('2026-09-21', '2026-09-22'), 'Ayer', 'and the row form stays the default');
+  assert.deepEqual([es.t('common.ok'), en.t('common.ok')], ['OK', 'OK'], 'the alert button is written by the app, in the interface language');
 });
 
-test('Producto 23.1C1: every format in the four language × region combinations', () => {
+test('VoiceOver\'s language is named only when the interface language differs from the device\'s first language', () => {
+  const cases: [AppLocale, string | null, string | undefined][] = [
+    ['es-AR', 'es', undefined], ['es-US', 'es', undefined], ['en-US', 'en', undefined], ['en-AR', 'en', undefined],
+    ['en-AR', 'es', 'en'], ['en-US', 'es', 'en'], ['es-AR', 'en', 'es'], ['es-US', 'en', 'es'],
+    ['es-AR', 'pt', 'es'], ['es-US', 'fr', 'es'], ['en-US', 'pt', 'en'],
+    ['es-AR', null, undefined], ['en-US', null, undefined],
+  ];
+  for (const [locale, device, expected] of cases) {
+    const i18n = bindLocale(locale, 'native', device);
+    assert.equal(i18n.speechLanguage, expected, locale + ' on a device in ' + device);
+  }
+  assert.equal(bindLocale('en-US').speechLanguage, undefined, 'nothing read about the device: VoiceOver keeps the voice chosen in iOS Settings');
+  assert.equal(bindLocale('en-US', 'intl').speechLanguage, undefined);
+});
+
+test('Producto 23.1C1: every format in the four language × region combinations (spoken forms and the date wheel as of 23.1C2)', () => {
   type Row = { amount: string; big: string; negative: string; ars: string; usd: string; coded: string; spoken: string; spokenCoded: string;
-    percent: string; small: string; count: string; numeric: string; time: string; long: string; picker: string; decimal: string; group: string };
+    percent: string; small: string; count: string; numeric: string; dayMonth: string; time: string; long: string; picker: string; decimal: string; group: string };
   const rows: Record<AppLocale, Row> = {
     'es-AR': { amount: '1.234,56', big: '9.999.999.999.999,99', negative: '-45,99', ars: '$\u00A01.234,56', usd: '−US$\u00A01.234,56', coded: 'ARS\u00A01.234,56',
-      spoken: '1.234,56 pesos', spokenCoded: '1.234,56 ARS', percent: '12,4\u00A0%', small: '<0,1\u00A0%', count: '1.234.567', numeric: '22/9/2026',
+      spoken: '1234,56 pesos', spokenCoded: '1234,56 ARS', percent: '12,4\u00A0%', small: '<0,1\u00A0%', count: '1.234.567', numeric: '22/9/2026', dayMonth: '22/09',
       time: '22/9/2026, 14:03', long: '22 de septiembre de 2026', picker: 'es_AR', decimal: ',', group: '.' },
     'en-AR': { amount: '1.234,56', big: '9.999.999.999.999,99', negative: '-45,99', ars: '$\u00A01.234,56', usd: '−US$\u00A01.234,56', coded: 'ARS\u00A01.234,56',
-      spoken: '1,234.56 pesos', spokenCoded: '1,234.56 ARS', percent: '12,4%', small: '<0,1%', count: '1.234.567', numeric: '22/9/2026',
-      time: '22/9/2026, 14:03', long: 'September 22, 2026', picker: 'en_AR', decimal: ',', group: '.' },
+      spoken: '1234.56 pesos', spokenCoded: '1234.56 ARS', percent: '12,4%', small: '<0,1%', count: '1.234.567', numeric: '22/9/2026', dayMonth: '22/09',
+      time: '22/9/2026, 14:03', long: 'September 22, 2026', picker: 'en_US', decimal: ',', group: '.' },
     'es-US': { amount: '1,234.56', big: '9,999,999,999,999.99', negative: '-45.99', ars: 'AR$\u00A01,234.56', usd: '−US$\u00A01,234.56', coded: 'ARS\u00A01,234.56',
-      spoken: '1.234,56 pesos', spokenCoded: '1.234,56 ARS', percent: '12.4\u00A0%', small: '<0.1\u00A0%', count: '1,234,567', numeric: '9/22/2026',
-      time: '9/22/2026, 2:03\u00A0p.\u00A0m.', long: '22 de septiembre de 2026', picker: 'es_US', decimal: '.', group: ',' },
+      spoken: '1234,56 pesos', spokenCoded: '1234,56 ARS', percent: '12.4\u00A0%', small: '<0.1\u00A0%', count: '1,234,567', numeric: '9/22/2026', dayMonth: '9/22',
+      time: '9/22/2026, 2:03\u00A0p.\u00A0m.', long: '22 de septiembre de 2026', picker: 'es_AR', decimal: '.', group: ',' },
     'en-US': { amount: '1,234.56', big: '9,999,999,999,999.99', negative: '-45.99', ars: 'AR$\u00A01,234.56', usd: '−US$\u00A01,234.56', coded: 'ARS\u00A01,234.56',
-      spoken: '1,234.56 pesos', spokenCoded: '1,234.56 ARS', percent: '12.4%', small: '<0.1%', count: '1,234,567', numeric: '9/22/2026',
+      spoken: '1234.56 pesos', spokenCoded: '1234.56 ARS', percent: '12.4%', small: '<0.1%', count: '1,234,567', numeric: '9/22/2026', dayMonth: '9/22',
       time: '9/22/2026, 2:03\u00A0PM', long: 'September 22, 2026', picker: 'en_US', decimal: '.', group: ',' },
   };
   for (const [locale, row] of Object.entries(rows) as [AppLocale, Row][]) {
@@ -432,7 +519,7 @@ test('Producto 23.1C1: every format in the four language × region combinations'
       amount: i18n.formatAmount(123456), big: i18n.formatAmount(999999999999999), negative: i18n.formatAmount(-4599),
       ars: i18n.moneyText(123456, 'ARS'), usd: i18n.moneyText(-123456, 'USD'), coded: i18n.codedAmount(123456, 'ARS'),
       spoken: i18n.spokenMoney(123456, 'ARS'), spokenCoded: i18n.spokenAmount(123456, 'ARS'), percent: i18n.formatPercent(0.1235), small: i18n.formatPercent(0.0004),
-      count: i18n.formatCount(1234567), numeric: i18n.formatNumericDate('2026-09-22'), time: i18n.formatDateTime('2026-09-22T14:03:05'),
+      count: i18n.formatCount(1234567), numeric: i18n.formatNumericDate('2026-09-22'), dayMonth: i18n.formatDayMonth('2026-09-22'), time: i18n.formatDateTime('2026-09-22T14:03:05'),
       long: i18n.formatDate('2026-09-22', 'long'), picker: i18n.pickerLocale, decimal: i18n.amountFormat.decimal, group: i18n.amountFormat.group,
     };
     assert.deepEqual(got, row, locale);
@@ -446,10 +533,15 @@ test('Producto 23.1C1: every format in the four language × region combinations'
   }
   assert.equal(speechLocale('en-AR'), 'en-US');
   assert.equal(speechLocale('es-US'), 'es-AR');
-  assert.equal(spokenNumber(123456, 'es-US'), '1.234,56');
+  assert.equal(spokenNumber(123456, 'es-US'), '1234,56');
   assert.equal(spokenAmount(-100, 'USD', 'en-AR'), '-1.00 USD');
   assert.equal(spokenPercent(0.5, 'es-US'), '50\u00A0%');
-  assert.equal(pickerLocale('es-AR'), 'es_AR');
+  assert.equal(spokenPercent(12.345, 'es-US'), '1234,5\u00A0%', 'a spoken percentage above a thousand is not grouped either');
+  assert.equal(spokenPercent(12.345, 'en-AR'), '1234.5%');
+  // The date wheel takes the language with its home region: the worded wheel reads like the row it opens from, never a mixed pair.
+  assert.deepEqual(LOCALES.map(locale => [locale, pickerLocale(locale)]), [['es-AR', 'es_AR'], ['en-AR', 'en_US'], ['es-US', 'es_AR'], ['en-US', 'en_US']]);
+  assert.deepEqual([...new Set(LOCALES.map(locale => pickerLocale(locale)))].sort(), ['en_US', 'es_AR'], 'iOS is only ever given es_AR or en_US');
+  assert.equal(pickerLocale(), 'es_AR');
   // The currency of an account is never decided by the language or the region: the same amount in both currencies, four ways.
   for (const locale of ['es-AR', 'en-AR', 'es-US', 'en-US'] as AppLocale[]) {
     assert.ok(moneyText(100, 'ARS', locale) !== moneyText(100, 'USD', locale), locale + ': pesos and dollars never look alike');
@@ -457,7 +549,7 @@ test('Producto 23.1C1: every format in the four language × region combinations'
   }
 });
 
-test('money reaches the screen only through the central formatters, and 23.1C1 keeps English and the US region unreleased', () => {
+test('money reaches the screen only through the central formatters; 23.1C2 releases English and the US region and keeps the gate for the next language', () => {
   // Screens and components never format money themselves: no domain formatter, no hand-written currency sign.
   const offenders: string[] = [];
   const walk = (dir: URL) => {
@@ -475,16 +567,91 @@ test('money reaches the screen only through the central formatters, and 23.1C1 k
   walk(new URL('../app/', import.meta.url));
   walk(new URL('../src/ui/', import.meta.url));
   assert.deepEqual(offenders, [], 'visible amounts go through moneyText/formatAmount, VoiceOver through spoken*, drafts through money-input');
-  // The release gate is unchanged by this delivery: 23.1C2 opens it together with the native configuration.
-  assert.deepEqual([...RELEASED_LANGUAGES], ['es']);
-  assert.deepEqual([...RELEASED_REGIONS], ['AR']);
-  const config = readFileSync(new URL('../app.config.ts', import.meta.url), 'utf8');
-  assert.equal(/supportedLocales/.test(config), false, 'no supportedLocales before 23.1C2 (a native rebuild)');
-  // FinanzApp Dev can preview every language and region, only from a development bundle started with the flag.
+  // 23.1C2 opens the gate (the native language list is app-config's to check, tests/app-config.node.ts).
+  assert.deepEqual([...RELEASED_LANGUAGES], ['es', 'en']);
+  assert.deepEqual([...RELEASED_REGIONS], ['AR', 'US']);
+  // The preview flag stays for the next catalogue: only a development bundle started with it widens the gate,
+  // and since everything this build carries is released, it widens nothing today.
   assert.deepEqual(releasedForBuild('1', true), { languages: ['es', 'en'], regions: ['AR', 'US'] });
+  assert.deepEqual(PREVIEW, RELEASED, 'a tripwire for the next language: once a catalogue is held back, the preview is wider than the release');
   assert.equal(releasedForBuild('1', false), RELEASED, 'a release bundle ignores the flag');
   assert.equal(releasedForBuild(undefined, true), RELEASED, 'a normal development bundle keeps the gate');
   assert.equal(releasedForBuild('true', true), RELEASED, 'only the documented value opens it');
   const provider = readFileSync(new URL('../src/i18n/provider.tsx', import.meta.url), 'utf8');
   assert.match(provider, /releasedForBuild\(process\.env\.EXPO_PUBLIC_LOCALE_PREVIEW, typeof __DEV__ !== 'undefined' && __DEV__\)/, 'read by its literal name so Expo inlines it');
+});
+
+// ---- Producto 23.1C2 ---------------------------------------------------------
+
+/** "YYYY-MM-DD" `days` after `iso` (negative for before), by the calendar, not by a zone. */
+function shiftISO(iso: string, days: number): string {
+  const [year, month, day] = iso.split('-').map(Number);
+  return new Date(Date.UTC(year, month - 1, day + days)).toISOString().slice(0, 10);
+}
+
+test('a day of the period without its year is ordered by the region: 5/09 in Argentina, 9/5 in the United States', () => {
+  for (const locale of LOCALES) {
+    const us = regionOf(locale) === 'US';
+    assert.equal(formatDayMonth('2026-09-05', locale), us ? '9/5' : '5/09', locale);
+    assert.equal(formatDayMonth('2026-12-25', locale), us ? '12/25' : '25/12', locale);
+    assert.equal(formatDayMonth('2026-01-31', locale), us ? '1/31' : '31/01', locale);
+    for (const malformed of ['garbage', '2026-02-30', '2026-9-5', '05/09/2026', '']) assert.equal(formatDayMonth(malformed, locale), malformed, 'shown as stored, never invented: ' + malformed);
+    // Every day of a year agrees with the numeric date of the same region; only Argentina pads the month, as the domain's reports do.
+    for (let day = 0; day < 365; day++) {
+      const iso = shiftISO('2026-01-01', day), numeric = formatNumericDate(iso, locale), short = formatDayMonth(iso, locale);
+      if (us) assert.equal(short + '/2026', numeric, iso);
+      else assert.equal(short.replace(/\/0(\d)$/, '/$1') + '/2026', numeric, iso);
+    }
+  }
+  assert.equal(formatDayMonth('2026-09-05'), '5/09', 'the default locale is Argentine');
+  assert.equal(formatDayMonth(undefined as never), '');
+});
+
+test('relativeDate inline: hoy, ayer, anteayer, today, yesterday in lower case inside a sentence; the row form is unchanged byte for byte', () => {
+  const today = '2026-09-22';
+  assert.deepEqual(LOCALES.map(locale => [0, 1, 2].map(days => relativeDate(shiftISO(today, -days), today, locale, true)).join(',')),
+    ['hoy,ayer,anteayer', 'today,yesterday,Sep 20', 'hoy,ayer,anteayer', 'today,yesterday,Sep 20'], 'English has no "the day before yesterday": a date, as in a row');
+  assert.deepEqual(LOCALES.map(locale => [0, 1, 2].map(days => relativeDate(shiftISO(today, -days), today, locale)).join(',')),
+    ['Hoy,Ayer,Anteayer', 'Today,Yesterday,Sep 20', 'Hoy,Ayer,Anteayer', 'Today,Yesterday,Sep 20']);
+  assert.equal(relativeDate('2026-09-15', today, 'es-AR', true), '15 sep', 'a short date is the same inline');
+  assert.equal(relativeDate('2025-12-31', today, 'en-US', true), 'Dec 31, 2025', 'an English date inline still starts with its month');
+  assert.equal(relativeDate('2026-09-23', today, 'es-AR', true), '23 sep', 'the future is never relative, inline either');
+  assert.equal(relativeDate('nope', today, 'en-AR', true), 'nope');
+  const names = new Set(['Hoy', 'Ayer', 'Anteayer', 'Today', 'Yesterday']);
+  const now = new Date(today + 'T12:00:00');
+  for (const locale of LOCALES) for (let days = -30; days <= 420; days++) {
+    const iso = shiftISO(today, -days), row = relativeDate(iso, today, locale);
+    assert.equal(relativeDate(iso, today, locale, false), row, 'inline=false is the row form: ' + iso);
+    assert.equal(relativeDate(iso, today, locale, true), names.has(row) ? row.toLowerCase() : row, locale + ' ' + iso);
+    if (languageOf(locale) === 'es') assert.equal(row, labelFromISO(iso, now), 'the Spanish row form is still the domain\'s label: ' + iso);
+  }
+});
+
+test('VoiceOver numbers are never grouped in any locale and keep the exact amount, while the screen keeps its grouping', () => {
+  const grouped = /[.,]\d{3}(?!\d)/;
+  const amounts = [-999999999999999, -100000, -4599, -1, 0, 5, 99, 100, 99999, 100000, 123456, 1e8, 999999999999999];
+  for (let minor = -2000000; minor <= 2000000; minor += 9973) amounts.push(minor);
+  for (let minor = 1; minor < 1e15; minor = minor * 7 + 3) amounts.push(minor, -minor);
+  for (const locale of LOCALES) {
+    const decimal = languageOf(locale) === 'en' ? '.' : ',';
+    const i18n = bindLocale(locale);
+    for (const minor of amounts) {
+      const number = spokenNumber(minor, locale);
+      const spoken = [number, spokenAmount(minor, 'ARS', locale), spokenMoney(minor, 'ARS', locale), spokenMoney(minor, 'USD', locale),
+        i18n.spokenNumber(minor), i18n.spokenAmount(minor, 'USD'), i18n.spokenMoney(minor, 'ARS')];
+      for (const text of spoken) assert.doesNotMatch(text, grouped, locale + ': ' + text);
+      assert.match(number, decimal === '.' ? /^-?\d+\.\d{2}$/ : /^-?\d+,\d{2}$/, 'the language\'s decimal mark, before exactly two digits: ' + number);
+      assert.equal(BigInt(number.replace(decimal, '')), BigInt(minor), 'the same amount, digit for digit: ' + number);
+      const visible = formatAmount(minor, locale);
+      assert.equal(grouped.test(visible), Math.abs(minor) >= 100000, 'the screen groups thousands: ' + visible);
+      assert.equal(grouped.test(moneyText(minor, 'USD', locale)), Math.abs(minor) >= 100000);
+      assert.equal(visible.replace(/\D/g, ''), number.replace(/\D/g, ''), 'screen and voice carry the same digits');
+    }
+    for (let tenths = 0; tenths <= 2000000; tenths += 997) {
+      const fraction = tenths / 1000;
+      assert.doesNotMatch(spokenPercent(fraction, locale), grouped, locale + ': ' + spokenPercent(fraction, locale));
+      assert.doesNotMatch(spokenPercent(-fraction, locale), grouped);
+      assert.equal(grouped.test(formatPercent(fraction, locale)), fraction * 100 >= 1000, 'the screen groups a large percentage: ' + formatPercent(fraction, locale));
+    }
+  }
 });

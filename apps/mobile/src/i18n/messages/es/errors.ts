@@ -76,6 +76,9 @@ export const errors = {
       budgetState: 'Estado de presupuesto inválido.',
       budgetInitial: 'Estado inicial de presupuesto inválido.',
       duplicate: 'La copia repite un presupuesto.',
+      /** A second active budget for the same month and currency (and category): creating one, or moving a budget onto another's scope. */
+      duplicateGeneral: 'Ya existe un presupuesto general activo para esa moneda y mes.',
+      duplicateCategory: 'Ya existe un presupuesto activo para esa categoría, moneda y mes.',
       range: 'El presupuesto supera el rango seguro.',
       period: 'Período de presupuesto inválido.',
     },

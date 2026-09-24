@@ -33,20 +33,24 @@ const entries: domain.Entry[] = [
 /** A client the test drives by hand: it resolves whatever events the test queues, when the test says so. */
 function scriptedClient(mode: AssistantClient['mode'] = 'remote') {
   const asks: any[] = [];
+  const signals: (AbortSignal | undefined)[] = [];
   let queue: AssistantEvent[] = [];
   let release: (() => void) | null = null;
   const client: AssistantClient = { mode, async *ask(input, signal) {
     asks.push(input);
+    signals.push(signal);
     await new Promise<void>(resolve => { release = resolve; });
     for (const event of queue) { if (signal?.aborted) return; yield event; }
   } };
-  return { client, asks, reply(events: AssistantEvent[]) { queue = events; release?.(); release = null; }, get waiting() { return release !== null; } };
+  return { client, asks, signals, reply(events: AssistantEvent[]) { queue = events; release?.(); release = null; }, get waiting() { return release !== null; } };
 }
 
-function harness({ client, accounts = [visa, cash, usd], data = entries, params = {}, reduced = false, addEntry, locale = 'es-AR' }: {
+function harness({ client, accounts = [visa, cash, usd], data = entries, params = {}, reduced = false, addEntry, locale = 'es-AR', deviceLanguage = null }: {
   client: AssistantClient; accounts?: domain.Account[]; data?: domain.Entry[]; params?: Record<string, string>; reduced?: boolean; addEntry?: (entry: domain.Entry) => Promise<void>; locale?: AppLocale;
+  /** The device's first language, for `speechLanguage` (null: nothing read, so it is never set). */
+  deviceLanguage?: string | null;
 }) {
-  let i18n = bindLocale(locale);
+  let i18n = bindLocale(locale, 'none', deviceLanguage);
   const i18nProvider = { useI18n: () => i18n };
   const source = readFileSync(new URL('../app/(tabs)/assistant.tsx', import.meta.url), 'utf8');
   const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText;
@@ -66,7 +70,18 @@ function harness({ client, accounts = [visa, cash, usd], data = entries, params 
       useState: (initial: unknown) => { const index = slot(() => typeof initial === 'function' ? (initial as () => unknown)() : initial); return [state[index], (value: unknown) => { state[index] = typeof value === 'function' ? (value as (c: unknown) => unknown)(state[index]) : value; }]; },
       useReducer: (reducer: (s: unknown, a: unknown) => unknown, initial: unknown) => { const index = slot(() => initial); return [state[index], (action: unknown) => { state[index] = reducer(state[index], action); }]; },
       useRef: (initial: unknown) => { const index = slot(() => ({ current: initial })); return state[index]; },
-      useMemo: (fn: () => unknown) => fn(), useCallback: (fn: unknown) => fn, useEffect: (fn: () => unknown) => { const cleanup = fn(); if (typeof cleanup === 'function') effects.push(cleanup as () => void); },
+      useMemo: (fn: () => unknown) => fn(), useCallback: (fn: unknown) => fn,
+      // Like React: an effect runs on mount and again only when a dependency changed, after its previous
+      // cleanup. So an effect that aborted the request on a language change (deps [t]) would really abort here.
+      useEffect: (fn: () => unknown, deps?: unknown[]) => {
+        const index = slot(() => ({ deps: null as unknown[] | null, cleanup: undefined as unknown }));
+        const cell = state[index] as { deps: unknown[] | null; cleanup: unknown };
+        if (cell.deps && deps && deps.length === cell.deps.length && deps.every((dep, i) => Object.is(dep, cell.deps![i]))) return;
+        if (typeof cell.cleanup === 'function') (cell.cleanup as () => void)();
+        cell.cleanup = fn();
+        cell.deps = deps ?? null;
+        if (typeof cell.cleanup === 'function') effects.push(cell.cleanup as () => void);
+      },
     },
     'react/jsx-runtime': { jsx, jsxs: jsx, Fragment: 'Fragment' },
     'react-native': { View: 'View', FlatList: 'FlatList' },
@@ -105,7 +120,7 @@ function harness({ client, accounts = [visa, cash, usd], data = entries, params 
     const screen = nodes(root).find(node => node.type === 'Tabs.Screen')!;
     return { root, list, items, composer, screen, empty: list.props.ListEmptyComponent as Node, messages: list.props.data as conversation.Message[] };
   };
-  return { render, pushed, written, scrolled, haptics, effects, setLocale: (next: AppLocale) => { i18n = bindLocale(next); } };
+  return { render, pushed, written, scrolled, haptics, effects, setLocale: (next: AppLocale) => { i18n = bindLocale(next, 'none', deviceLanguage); } };
 }
 function nodes(value: any): Node[] {
   if (!value || typeof value !== 'object') return [];
@@ -216,7 +231,7 @@ test('an answer renders its text and evidence rows/links from the cited facts, a
   const proof = find([answer], 'AnswerEvidence')[0];
   assert.deepEqual(proof.props.content.rows.map((row: any) => conversation.evidenceLabel(row)), ['Gastos registrados', 'Restaurantes', 'Supermercado', 'Transporte']);
   assert.equal(proof.props.content.rows[1].amountMinor, 4250000);
-  assert.equal(proof.props.currency, 'ARS');
+  assert.equal(proof.props.content.currency, 'ARS', 'the rows keep the currency the facts were computed in');
   assert.deepEqual(proof.props.content.links.map((link: any) => link.id), ['movements']);
   proof.props.onOpen(proof.props.content.links[0].href);
   assert.deepEqual(view.pushed, ['/activity']);
@@ -466,7 +481,7 @@ test('English: the screen\'s own words are English, the model\'s answer and the 
   const view = harness({ client: scripted.client, locale: 'en-AR' });
   let screen = view.render();
   assert.equal(screen.screen.props.options.title, 'Assistant');
-  assert.deepEqual([...screen.empty.props.items], ['Why did I spend more this month?', 'How much did I spend on food?', 'Log an expense', 'How am I doing on my budget?']);
+  assert.deepEqual([...screen.empty.props.items], ['Why did I spend more this month?', 'How much did I spend on food?', 'Record an expense', 'How am I doing on my budget?']);
   // A tapped chip sends its English text; an English question is still explained against evidence.
   screen.empty.props.onPick('Why did I spend more this month?');
   await tick();
@@ -496,6 +511,8 @@ test('English: the screen\'s own words are English, the model\'s answer and the 
   items = english.render().items;
   assert.equal(find([items[2]], 'UserMessage')[0].props.text, 'Visa Galicia');
   assert.equal(find([items[3]], 'AssistantText')[0].props.text, 'Review the draft before saving it.');
+  assert.deepEqual([find([items[1]], 'AssistantText')[0].props.ownWords, find([items[3]], 'AssistantText')[0].props.ownWords], [true, true],
+    'the app\'s own questions are marked so VoiceOver reads them in the interface language, not as the model\'s Spanish prose');
   // The same question follows a language change already on screen: it is stored as a key.
   english.setLocale('es-AR');
   assert.equal(find([english.render().items[1]], 'AssistantText')[0].props.text, '¿Con qué lo pagaste?');
@@ -533,4 +550,54 @@ test('English: the screen\'s own words are English, the model\'s answer and the 
   assert.equal(caption.props.children, 'Not connected in this version. What you type stays on your iPhone.');
   const banner = nodes(harness({ client: fixtureAssistant(0), locale: 'en-AR' }).render().root).filter(node => node.type === 'AppText').map(node => String(node.props.children));
   assert.ok(banner.includes('Test view: sample replies, nothing is saved.'));
+});
+
+test('a language or region change while the Assistant answers: nothing is re-sent or aborted, the answer lands in the same thread untouched, and a failure note reads in the new language', async () => {
+  const scripted = scriptedClient();
+  const view = harness({ client: scripted.client });
+  view.render().empty.props.onPick('¿Por qué gasté más este mes?');
+  await tick();
+  // Más: English and the United States at once, while the request is still waiting.
+  view.setLocale('en-US');
+  let screen = view.render();
+  assert.equal(screen.composer.props.busy, true, 'still answering after the change');
+  assert.equal(screen.screen.props.options.title, 'Assistant');
+  assert.equal(screen.screen.props.options.headerRight().props.label, 'New chat');
+  assert.equal(scripted.signals[0]?.aborted, false, 'the change did not abort the request');
+  scripted.reply([{ type: 'result', result: FIXTURE_ANSWER, facts: FIXTURE_FACTS }]);
+  await settle();
+  screen = view.render();
+  assert.equal(scripted.asks.length, 1, 'no second request');
+  const v1 = ['action', 'currency', 'facts', 'text', 'todayISO'];
+  assert.equal(Object.keys(scripted.asks[0]).sort().join(), v1.join(), 'no language or region reaches a v1 request');
+  assert.equal(scripted.asks[0].currency, 'ARS', 'the region never changes the currency asked about');
+  assert.equal(screen.messages.map(message => message.id).join(), 'u-1,a-2');
+  assert.equal(screen.messages[0].text, '¿Por qué gasté más este mes?', 'the user\'s words keep the language they were sent in');
+  assert.equal(find([screen.items[1]], 'AssistantText')[0].props.text, FIXTURE_ANSWER.message, 'the model\'s words are content');
+  assert.equal(find([screen.items[1]], 'AssistantText')[0].props.ownWords, false, 'the model\'s prose keeps its own voice');
+  assert.equal(find([screen.items[1]], 'AnswerEvidence')[0].props.content.rows[1].amountMinor, 4250000, 'the evidence keeps its numbers');
+  // The next question goes out in the new language with the same v1 keys: the language is never on the wire.
+  view.render().composer.props.onChange('Why did I spend more this month?');
+  view.render().composer.props.onSend();
+  await tick();
+  assert.equal(scripted.asks.length, 2);
+  assert.equal(Object.keys(scripted.asks[1]).sort().join(), v1.join());
+  // A fixture failure carries no words: the note is the reason's key, read in the language on screen when shown.
+  const failing = harness({ client: fixtureAssistant(0), locale: 'en-US' });
+  failing.render().composer.props.onChange('error');
+  failing.render().composer.props.onSend();
+  await settle();
+  const note = failing.render().messages.at(-1)!;
+  assert.equal(note.text, conversation.REASON_TEXT.failed);
+  assert.equal(bindLocale('en-US').errorText(note.text), 'The request couldn’t be completed. Your transactions didn’t change.');
+  failing.setLocale('es-AR');
+  assert.equal(es.errorText(failing.render().messages.at(-1)!.text), 'No se pudo completar la consulta. Tus movimientos no cambiaron.');
+});
+
+test('VoiceOver: the test banner speaks the interface language when it differs from the device\'s', () => {
+  const banner = (deviceLanguage: string | null, locale: AppLocale) => nodes(harness({ client: fixtureAssistant(0), locale, deviceLanguage }).render().root)
+    .find(node => node.type === 'View' && node.props.accessible)!;
+  assert.equal(banner('es', 'en-US').props.accessibilityLanguage, 'en');
+  assert.equal(banner('en', 'es-AR').props.accessibilityLanguage, 'es');
+  assert.equal(banner('es', 'es-AR').props.accessibilityLanguage, undefined, 'device and app agree: the voice chosen in iOS Settings');
 });

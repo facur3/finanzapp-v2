@@ -23,7 +23,7 @@ export const accounts = {
     },
     form: {
       name: 'Nombre de la cuenta',
-      namePlaceholder: 'Ej. Banco, Efectivo, Cocos',
+      namePlaceholder: 'Ej. Banco, Efectivo, Inversiones',
       openingBalance: 'Saldo inicial',
       openingHelp: 'Podés dejarlo vacío para registrar desde cero. El saldo registrado será el resultado de tus movimientos; '
         + 'no representa tu saldo bancario. Si cargás un saldo inicial, es el punto de partida y no cuenta como ingreso.',

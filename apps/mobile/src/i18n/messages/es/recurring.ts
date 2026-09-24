@@ -30,7 +30,7 @@ export const recurring = {
       toggleFailed: 'No pudimos cambiar el estado del recurrente. Probá nuevamente.',
     },
     row: {
-      /** VoiceOver label of a rule: merchant (user data), frequency, amount, currency code and next date. */
+      /** VoiceOver label of a rule: merchant (user data), frequency, amount, currency code and next date (inside the sentence: "próximo hoy"). */
       label: 'Editar recurrente {merchant}, {frequency}, {amount} {currency}, próximo {date}',
       paused: 'Pausado',
       pause: 'Pausar {merchant}',

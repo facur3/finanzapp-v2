@@ -21,7 +21,7 @@ export const debts = {
       settled: 'Saldada',
       /** "Vencida · 1 oct". */
       overdue: 'Vencida · {date}',
-      /** "Vence 1 oct". */
+      /** "Vence 1 oct", "Vence hoy": `{date}` is the day inside the sentence (lower-case hoy). */
       due: 'Vence {date}',
       noDate: 'Sin fecha',
       noDue: 'Sin vencimiento',

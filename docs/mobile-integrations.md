@@ -61,6 +61,11 @@ nombres de cuentas ni movimientos completos. El usuario debe autorizar este env�
 La respuesta devuelve IDs de evidencia y los hechos originales. Esta validación
 no prueba que cada frase del modelo sea correcta: la evaluación y la UI que permite
 abrir esos hechos son requisitos antes de activar respuestas financieras.
+La v1 no lleva idioma ni región (el validador rechaza claves desconocidas) y el
+servidor responde en español argentino. El diseño de la v2 (idioma y región de la
+interfaz como dos códigos, hechos neutros al idioma, servidor antes que app, nombres
+de categoría resueltos por identidad antes de conectar un build con inglés) está en
+[docs/i18n.md §11](i18n.md). No se activó ningún proveedor.
 
 ## IA y control de costo
 

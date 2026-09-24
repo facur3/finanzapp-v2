@@ -32,8 +32,9 @@ const archive: domain.LedgerArchive = { accounts: [cash, cardAccount, usdCardAcc
   transfers: [domain.initialTransferRecord(payment)], cards: [card, usdCard], debts: [debt] };
 const empty: domain.LedgerArchive = { accounts: [cash], records: [] };
 
+// `file` is a route under app/, or a component module under src/ (its exports are returned too).
 function harness(file: string, params: Record<string, unknown> = {}, data: domain.LedgerArchive = archive) {
-  const source = readFileSync(new URL('../app/' + file, import.meta.url), 'utf8');
+  const source = readFileSync(new URL((file.startsWith('src/') ? '../' : '../app/') + file, import.meta.url), 'utf8');
   const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText;
   const jsx = (type: unknown, props: Record<string, unknown>) => ({ type, props });
   const state: unknown[] = [];
@@ -42,7 +43,7 @@ function harness(file: string, params: Record<string, unknown> = {}, data: domai
   const ledger = { useLedger: () => ({ archive: data, snapshot: domain.snapshotFromArchive(data) }) };
   const componentNames = ['ActionButton', 'AppText', 'DetailRow', 'EmptyState', 'GlyphTile', 'IconButton', 'Money', 'MovementRow', 'PressFeedback',
     'Screen', 'SectionTitle', 'Stat', 'Surface'];
-  const components = { ...Object.fromEntries(componentNames.map(name => [name, name])), toneColors: () => ({ color: '#000', soft: '#eee' }) };
+  const components = { ...Object.fromEntries(componentNames.map(name => [name, name])), toneColors: () => ({ color: '#000', soft: '#eee' }), useStacked: () => false };
   const theme = { space: { xs: 4, s: 8, m: 12, l: 16, xl: 20, xxl: 24, xxxl: 32 }, useCurrentDay: () => '2026-09-20', useReduceMotion: () => true,
     usePalette: () => ({ text: '#000', secondary: '#666', tertiary: '#999', line: '#ddd', inset: '#eee', expense: '#c00', income: '#080', warning: '#a60', transfer: '#03c', primary: '#2557D6' }) };
   const modules: Record<string, unknown> = {
@@ -58,23 +59,23 @@ function harness(file: string, params: Record<string, unknown> = {}, data: domai
       withTiming: (value: number) => value, useAnimatedStyle: (fn: () => unknown) => fn() },
     'expo-router': { Stack: { Screen: 'Stack.Screen' }, useLocalSearchParams: () => params, router: { push: (to: unknown) => pushed.push(to), navigate: (to: unknown) => pushed.push(to) } },
     '@finanzapp/domain': domain,
-    '../src/storage/LedgerProvider': ledger, '../../src/storage/LedgerProvider': ledger,
-    '../src/ui/components': components, '../../src/ui/components': components,
+    '../src/storage/LedgerProvider': ledger, '../../src/storage/LedgerProvider': ledger, '../storage/LedgerProvider': ledger,
+    '../src/ui/components': components, '../../src/ui/components': components, './components': components,
     '../src/ui/card-visual': { CardCarousel: 'CardCarousel', CardFace: 'CardFace' }, '../../src/ui/card-visual': { CardCarousel: 'CardCarousel', CardFace: 'CardFace' },
     '../src/ui/entry-list': { EntryList: 'EntryList' }, '../../src/ui/entry-list': { EntryList: 'EntryList' },
     '../src/ui/liability-presentation': liabilityPresentation, '../../src/ui/liability-presentation': liabilityPresentation,
     '../src/ui/presentation': presentation, '../../src/ui/presentation': presentation,
-    '../src/ui/theme': theme, '../../src/ui/theme': theme,
+    '../src/ui/theme': theme, '../../src/ui/theme': theme, './theme': theme,
     '../src/ui/liability-rows': { DebtRow: 'DebtRow' }, '../../src/ui/liability-rows': { DebtRow: 'DebtRow' },
     '../src/ui/quick-actions': { QuickActions: 'QuickActions' }, '../../src/ui/quick-actions': { QuickActions: 'QuickActions' },
     '../src/ui/motion': { ValueTransition: 'ValueTransition', Reflow: 'Reflow', selectionHaptic: () => {}, impactHaptic: () => {}, timing: (kind: string, reduced: boolean) => ({ duration: reduced ? 0 : 260 }) }, '../../src/ui/motion': { ValueTransition: 'ValueTransition', Reflow: 'Reflow', selectionHaptic: () => {}, impactHaptic: () => {}, timing: (kind: string, reduced: boolean) => ({ duration: reduced ? 0 : 260 }) },
   };
-  const module = { exports: {} as { default?: () => Node } };
+  const module = { exports: {} as { default?: () => Node } & Record<string, (props: any) => Node> };
   runInNewContext(code, { module, exports: module.exports, require: (name: string) => {
     if (!Object.hasOwn(modules, name)) throw new Error('Unexpected liabilities dependency: ' + name);
     return modules[name];
   } });
-  return { render: () => { cursor = 0; return module.exports.default!(); }, pushed };
+  return { render: () => { cursor = 0; return module.exports.default!(); }, pushed, exports: module.exports };
 }
 
 // Nested function components (CardPanel, UsageBar, DebtRow) are expanded so
@@ -213,7 +214,7 @@ test('Tarjetas and Deudas read English labels, keep user names as typed and send
     assert.equal(face.props.accessibilityHint, 'Opens the card details');
 
     const detail = harness('card/[id].tsx', { id: 'card' }).render();
-    assert.ok(nodes(detail).some(node => node.type === 'AppText' && node.props.children === 'Recorded balance'));
+    assert.ok(nodes(detail).some(node => node.type === 'AppText' && node.props.children === 'Recorded debt'), 'the same noun as the payment form (Recorded debt)');
     assert.equal(nodes(detail).find(node => node.type === 'Stack.Screen')!.props.options.title, 'Visa Gold');
 
     const debtView = harness('debt/[id].tsx', { id: 'debt' });
@@ -226,7 +227,7 @@ test('Tarjetas and Deudas read English labels, keep user names as typed and send
     assert.equal(JSON.stringify(debtView.pushed[0]), JSON.stringify({ pathname: '/new-transfer', params: { toAccountId: 'debt-acc', maxAmountMinor: '30000' } }));
 
     const debtsRoot = harness('debts.tsx').render();
-    assert.equal(nodes(debtsRoot).find(node => node.type === 'Stack.Screen')!.props.options.title, 'Debts & IOUs');
+    assert.equal(nodes(debtsRoot).find(node => node.type === 'Stack.Screen')!.props.options.title, 'Debts and IOUs', 'the same name as the Más row that opens it');
     assert.deepEqual(nodes(debtsRoot).filter(node => node.type === 'SectionTitle').map(node => node.props.children), ['I owe']);
   } finally { activeLocale = 'es-AR'; }
 });
@@ -240,4 +241,60 @@ test('statement caption and due label keep the Spanish wording and follow a tran
     'Statement open since Aug 29 · 2 purchases · 1 payment');
   assert.equal(liabilityPresentation.dueLabel('2026-09-19', '2026-09-20'), domain.labelFromISO('2026-09-19', new Date('2026-09-20T12:00:00')));
   assert.equal(liabilityPresentation.dueLabel('2026-10-01', '2026-09-20', 'en-US'), 'Oct 1');
+});
+
+test('23.1C2: a day inside a sentence starts in lower case; a day on its own keeps its capital', () => {
+  const dueToday: domain.PersonalDebtProfile = { ...debt, dueDateISO: '2026-09-20' };
+  const overdue: domain.PersonalDebtProfile = { ...debt, dueDateISO: '2026-09-19' };
+  const detailOf = (profile: domain.PersonalDebtProfile) => {
+    const root = harness('debt/[id].tsx', { id: 'debt' }, { ...archive, debts: [profile] }).render();
+    return { status: nodes(root).find(node => node.type === 'AppText' && node.props.variant === 'subhead')!.props.children,
+      rows: nodes(root).filter(node => node.type === 'DetailRow').map(node => [node.props.label, node.props.value].join('=')).join(',') };
+  };
+  const rowOf = (profile: domain.PersonalDebtProfile) => {
+    const row = harness('src/ui/liability-rows.tsx', {}, { ...archive, debts: [profile] }).exports.DebtRow({ debt: profile, last: true });
+    const caption = nodes(row).find(node => node.type === 'AppText' && node.props.variant === 'footnote')!.props.children;
+    return { label: row.props.accessibilityLabel, caption: [caption].flat().join('') };
+  };
+  assert.deepEqual(detailOf(dueToday), { status: 'Vence hoy', rows: 'Tipo=Yo debo,Vencimiento=Hoy,Estado=Vence hoy' });
+  assert.deepEqual(detailOf(overdue), { status: 'Vencida · Ayer', rows: 'Tipo=Yo debo,Vencimiento=Ayer,Estado=Vencida · Ayer' });
+  assert.deepEqual(rowOf(dueToday), { label: 'Debo a Juan, 300,00 ARS, Vence hoy', caption: 'Debo · Vence hoy' });
+  assert.equal(rowOf(overdue).caption, 'Debo · Vencida · Ayer');
+  assert.equal(rowOf(debt).caption, 'Debo · Vence 1 oct', 'a future date is never relative');
+  // Closing day 18, today the 20th: the statement opened yesterday.
+  const closedYesterday: domain.CreditCardProfile = { ...card, closingDay: 18 };
+  const caption = (file: string) => nodes(harness(file, { id: 'card' }, { ...archive, cards: [closedYesterday, usdCard] }).render())
+    .find(node => node.type === 'SectionTitle' && node.props.caption)!.props.caption;
+  assert.match(caption('cards.tsx'), /^Resumen abierto desde ayer · /);
+  assert.match(caption('card/[id].tsx'), /^Resumen abierto desde ayer · /);
+  activeLocale = 'en-US';
+  try {
+    assert.deepEqual(detailOf(dueToday), { status: 'Due today', rows: 'Type=I owe,Due date=Today,Status=Due today' });
+    assert.deepEqual(rowOf(dueToday), { label: 'I owe Juan, 300.00 ARS, Due today', caption: 'I owe · Due today' });
+    assert.equal(detailOf(debt).status, 'Due Oct 1', 'an English short date keeps its capital month');
+    assert.match(caption('cards.tsx'), /^Statement open since yesterday · /);
+  } finally { activeLocale = 'es-AR'; }
+  const inline = (locale: AppLocale) => (iso: string) => i18nFormat.relativeDate(iso, '2026-09-20', locale, true);
+  const statement = { startISO: '2026-09-19', purchaseCount: 2, paymentCount: 1 };
+  assert.equal(liabilityPresentation.statementCaption(statement, inline('es-AR')), 'Resumen abierto desde ayer · 2 compras · 1 pago');
+  assert.equal(liabilityPresentation.statementCaption(statement, inline('en-AR'), bindLocale('en-AR').t), 'Statement open since yesterday · 2 purchases · 1 payment');
+});
+
+test('23.1C2: the card usage caption is shown in the region\'s format and spoken in the language\'s numbers', () => {
+  // 13.100 of 5.000.000 cents used: 3 % of the limit.
+  const usage = () => nodes(harness('cards.tsx').render()).find(node => node.type === 'AppText' && typeof node.props.accessibilityLabel === 'string')!;
+  const expected: [AppLocale, string, string][] = [
+    ['es-AR', '3 % del límite de $\u00A05.000,00', '3 % del límite de 5000,00 pesos'],
+    ['es-US', '3 % del límite de AR$\u00A05,000.00', '3 % del límite de 5000,00 pesos'],
+    ['en-AR', '3% of the $\u00A05.000,00 limit', '3% of the 5000.00 pesos limit'],
+    ['en-US', '3% of the AR$\u00A05,000.00 limit', '3% of the 5000.00 pesos limit'],
+  ];
+  try {
+    for (const [locale, shown, spoken] of expected) {
+      activeLocale = locale;
+      const caption = usage();
+      assert.equal(caption.props.children, shown, locale + ' visible');
+      assert.equal(caption.props.accessibilityLabel, spoken, locale + ' spoken');
+    }
+  } finally { activeLocale = 'es-AR'; }
 });

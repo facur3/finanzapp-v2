@@ -150,7 +150,7 @@ test('rowStacks: large text always stacks; otherwise a long amount stacks on a n
 
 // The Money component itself: heroes measure their container and size from it;
 // rows keep the native fit without a fixed line height.
-function loadComponents(locale: AppLocale = 'es-AR') {
+function loadComponents(locale: AppLocale = 'es-AR', deviceLanguage: string | null = null) {
   const source = readFileSync(new URL('../src/ui/components.tsx', import.meta.url), 'utf8');
   const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText;
   const jsx = (type: any, props: any) => ({ type, props });
@@ -173,7 +173,7 @@ function loadComponents(locale: AppLocale = 'es-AR') {
     './categories': { categoryIcon: () => 'pricetag-outline' },
     './category-color': { tintOf: (c: string) => c }, './category-hues': { useCategoryColor: () => '#111', useCategoryLook: (label: string) => ({ label, hex: '#111', glyph: 'pricetag-outline' }), useAccountLook: () => ({ glyph: 'wallet-outline', hex: '#2557D6' }) },
     './geometry': geometry, './money-input': moneyInput, './motion': { duration: {}, easeOut: {}, selectionHaptic: () => {}, timing: () => ({}) },
-    '../i18n/provider': { useI18n: () => bindLocale(locale) }, '../i18n/format': i18nFormat, '../i18n/locale': i18nLocale,
+    '../i18n/provider': { useI18n: () => bindLocale(locale, 'native', deviceLanguage) }, '../i18n/format': i18nFormat, '../i18n/locale': i18nLocale,
   };
   const module = { exports: {} as Record<string, (props: any) => any> };
   runInNewContext(code, { module, exports: module.exports, require: (name: string) => {
@@ -204,7 +204,7 @@ test('Money sizes a hero from its measured width and leaves rows to the native f
   assert.equal(symbol.props.style.color, '#666', 'the symbol steps back to secondary');
   assert.equal(cents.props.style.color, '#999', 'the cents step back to tertiary');
   assert.equal(symbol.props.style.fontSize, undefined, 'no size change: the fit and the baseline stay one');
-  assert.equal(text.props.accessibilityLabel, '999.999.999,99 pesos', 'VoiceOver reads one amount');
+  assert.equal(text.props.accessibilityLabel, '999999999,99 pesos', 'VoiceOver reads one amount, ungrouped: no separator a voice could take for a decimal');
   assert.equal(text.props.style.fontSize, 40, 'sized from the measured width');
   assert.equal(text.props.style.lineHeight, Math.round(40 * 1.18));
   assert.equal(text.props.maxFontSizeMultiplier, 1.4);
@@ -231,12 +231,13 @@ test('Money sizes a hero from its measured width and leaves rows to the native f
 });
 
 test('Money in the four language × region combinations: the region writes the number and the symbol, the language speaks it', () => {
+  // Spoken amounts keep the language's decimal mark and drop the grouping (23.1C2): the screen groups, the voice reads plain digits.
   const cases: [AppLocale, string, string, string, string][] = [
     // locale, hero text, hero VoiceOver, negative USD row, its VoiceOver
-    ['es-AR', '$\u00A01.234.567,89', '1.234.567,89 pesos', '−US$\u00A01.234,50', 'Menos 1.234,50 dólares'],
-    ['en-AR', '$\u00A01.234.567,89', '1,234,567.89 pesos', '−US$\u00A01.234,50', 'Minus 1,234.50 dollars'],
-    ['es-US', 'AR$\u00A01,234,567.89', '1.234.567,89 pesos', '−US$\u00A01,234.50', 'Menos 1.234,50 dólares'],
-    ['en-US', 'AR$\u00A01,234,567.89', '1,234,567.89 pesos', '−US$\u00A01,234.50', 'Minus 1,234.50 dollars'],
+    ['es-AR', '$\u00A01.234.567,89', '1234567,89 pesos', '−US$\u00A01.234,50', 'Menos 1234,50 dólares'],
+    ['en-AR', '$\u00A01.234.567,89', '1234567.89 pesos', '−US$\u00A01.234,50', 'Minus 1234.50 dollars'],
+    ['es-US', 'AR$\u00A01,234,567.89', '1234567,89 pesos', '−US$\u00A01,234.50', 'Menos 1234,50 dólares'],
+    ['en-US', 'AR$\u00A01,234,567.89', '1234567.89 pesos', '−US$\u00A01,234.50', 'Minus 1234.50 dollars'],
   ];
   for (const [locale, heroText, heroSpoken, rowText, rowSpoken] of cases) {
     const { render } = loadComponents(locale);
@@ -245,12 +246,42 @@ test('Money in the four language × region combinations: the region writes the n
     assert.equal(symbol.props.children + whole + cents.props.children, heroText, locale);
     assert.equal(cents.props.children, heroText.slice(-3), locale + ': the cents start at the region decimal separator');
     assert.equal(hero.props.accessibilityLabel, heroSpoken, locale);
+    assert.equal(hero.props.accessibilityLanguage, undefined, locale + ': no device reading, so no voice is imposed');
     assert.deepEqual([...hero.props.style.fontVariant], ['tabular-nums']);
     const row = render('Money', { minor: -123450, currency: 'USD' });
     assert.equal(row.props.children, rowText, locale);
     assert.equal(row.props.accessibilityLabel, rowSpoken, locale);
     assert.equal(row.props.numberOfLines, 1, 'never wrapped or cut: rows shrink to 3/4 or stack (useStacked)');
   }
+});
+
+test('Producto 23.1C2: Money and the amount field speak in the interface language only when it differs from the device\'s', () => {
+  // English chosen in Más on a Spanish iPhone: VoiceOver would read "1234.56 dollars" with the Spanish voice, so the elements name their language.
+  const english = loadComponents('en-AR', 'es');
+  const hero = english.render('Money', { minor: 123456, currency: 'USD', large: true }).props.children;
+  assert.equal(hero.props.accessibilityLabel, '1234.56 dollars');
+  assert.equal(hero.props.accessibilityLanguage, 'en');
+  const row = english.render('Money', { minor: -123456, currency: 'ARS' });
+  assert.equal(row.props.accessibilityLanguage, 'en', 'a row amount too');
+  const field = english.render('AmountField', { label: 'Expense', currency: 'ARS', value: '', onChangeText: () => {} });
+  const [symbol, input] = field.props.children.find((child: any) => child?.props?.onLayout).props.children;
+  assert.equal(input.props.accessibilityLabel, 'Expense in Argentine pesos');
+  assert.equal(input.props.accessibilityLanguage, 'en', 'the amount field is read by an English voice');
+  assert.equal(symbol.type(symbol.props).props.accessibilityLanguage, 'en', 'AppText renders its Text with the language too');
+  assert.equal(english.render('AmountField', { currency: 'ARS', value: '', onChangeText: () => {}, accessibilityLanguage: 'es' })
+    .props.children.find((child: any) => child?.props?.onLayout).props.children[1].props.accessibilityLanguage, 'es', 'a caller may still name another language');
+  // Device and interface agree (the owner's es/es, or en/en): nothing is set, VoiceOver keeps the voice chosen in iOS Settings.
+  for (const [locale, device] of [['es-AR', 'es'], ['en-US', 'en'], ['es-US', null]] as [AppLocale, string | null][]) {
+    const same = loadComponents(locale, device);
+    assert.equal(same.render('Money', { minor: 100, currency: 'ARS', large: true }).props.children.props.accessibilityLanguage, undefined, locale);
+    assert.equal(same.render('Money', { minor: 100, currency: 'ARS' }).props.accessibilityLanguage, undefined, locale);
+    assert.equal(same.render('AmountField', { currency: 'ARS', value: '', onChangeText: () => {} })
+      .props.children.find((child: any) => child?.props?.onLayout).props.children[1].props.accessibilityLanguage, undefined, locale);
+  }
+  // Spanish on a Portuguese iPhone (Spanish is the fallback): a Spanish voice for "1234,56 pesos".
+  const spanish = loadComponents('es-AR', 'pt');
+  const peso = spanish.render('Money', { minor: 123456, currency: 'ARS' });
+  assert.deepEqual([peso.props.accessibilityLabel, peso.props.accessibilityLanguage], ['1234,56 pesos', 'es']);
 });
 
 test('Producto 23.1C1: the anchored field lays out US separators and the "AR$" sign exactly like Argentine ones, at every text size', () => {

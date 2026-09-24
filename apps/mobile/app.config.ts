@@ -28,13 +28,29 @@ const config: ExpoConfig = {
   ios: {
     bundleIdentifier: isDevelopment ? 'com.facur3.finanzapp.dev' : 'com.facur3.finanzapp.preview',
     supportsTablet: false,
+    infoPlist: {
+      // iOS's fallback language for its own text in the app (edit menu, share
+      // sheet) is the app's own fallback (DEFAULT_LANGUAGE): an iPhone in an
+      // unsupported language (Portuguese) gets Spanish there too, not English.
+      CFBundleDevelopmentRegion: 'es',
+      // Always offer Settings → Apps → FinanzApp → Language, even to a person
+      // with a single preferred language (WWDC24 "Build multilingual-ready apps").
+      UIPrefersShowingLanguageSettings: true,
+    },
   },
   android: {
     package: isDevelopment ? 'com.facur3.finanzapp.dev' : 'com.facur3.finanzapp.preview',
     permissions: [],
   },
   plugins: ['expo-router', 'expo-sqlite', '@react-native-community/datetimepicker', 'expo-system-ui',
-    ['expo-splash-screen', { backgroundColor: '#F5F6F8', dark: { backgroundColor: '#080B10' } }]],
+    ['expo-splash-screen', { backgroundColor: '#F5F6F8', dark: { backgroundColor: '#080B10' } }],
+    // CFBundleLocalizations: exactly the released interface languages
+    // (RELEASED_LANGUAGES in src/i18n/locale.ts; tests/app-config.node.ts keeps
+    // them equal), as bare language designators, because the region is a
+    // separate preference. iOS then lists them for a per-app language and runs
+    // its own text in the app's language. iOS only on purpose: the Android form
+    // also rewrites build.gradle and locale files that no Android build has verified.
+    ['expo-localization', { supportedLocales: { ios: ['es', 'en'] } }]],
   extra: { pilot: true, eas: { projectId } },
 };
 

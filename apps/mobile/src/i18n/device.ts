@@ -57,3 +57,34 @@ export function readDeviceLocales(deps: DeviceLocaleDeps): { source: LocaleSourc
 export function deviceLocales(deps: DeviceLocaleDeps): DeviceLocale[] {
   return readDeviceLocales(deps).locales;
 }
+
+/** The primary language subtag of the device's first locale ("es", "en",
+ * "pt"), whether or not the app has a catalogue for it; null when nothing was
+ * read. Compared with the interface language to decide VoiceOver's language. */
+export function primaryLanguageOf(locales: readonly DeviceLocale[]): string | null {
+  const first = locales[0];
+  const code = String(first?.languageTag || first?.languageCode || '').trim().toLowerCase().split(/[-_]/)[0];
+  return /^[a-z]{2,3}$/.test(code) ? code : null;
+}
+
+/** The event expo-localization's native module sends when iOS posts
+ * NSCurrentLocaleDidChangeNotification: a Region, calendar or clock change
+ * made while the app kept running (queued while suspended and delivered on
+ * resume, in no documented order with becoming active), once Foundation has
+ * dropped its cached `Locale.current`. A change of the iPhone's language or of
+ * FinanzApp's own language in iOS Settings quits the app instead; the next
+ * launch reads the new list. */
+export const LOCALE_CHANGED_EVENT = 'onLocaleSettingsChanged';
+export interface LocaleEventSource { addListener: (event: typeof LOCALE_CHANGED_EVENT, listener: () => void) => { remove: () => void } }
+
+/** Subscribes to that event when `module` is a registered native module that
+ * emits events; otherwise (an older binary, Node) a no-op. Returns the
+ * unsubscribe, safe to call twice. `addListener` is called as a method: the
+ * native emitter needs its `this`. */
+export function subscribeDeviceLocaleChanges(module: unknown, listener: () => void): () => void {
+  const source = module as Partial<LocaleEventSource> | null | undefined;
+  if (!source || typeof source.addListener !== 'function') return () => {};
+  const subscription = source.addListener(LOCALE_CHANGED_EVENT, () => listener());
+  let active = true;
+  return () => { if (active) { active = false; subscription.remove(); } };
+}

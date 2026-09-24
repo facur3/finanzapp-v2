@@ -14,13 +14,15 @@ export function DebtRow({ debt, last }: { debt: PersonalDebtProfile; last: boole
   const day = useCurrentDay();
   const { t, relativeDate, spokenNumber } = useI18n();
   const account = snapshot?.accounts.find(item => item.id === debt.accountId);
+  const outstanding = snapshot && account ? debtOutstandingMinor(debt, snapshot) : 0;
+  // A hook, so it runs before the early return on every render.
+  const stacked = useStacked(account ? { minor: outstanding, currency: account.currency } : undefined);
   if (!snapshot || !account) return null;
-  const outstanding = debtOutstandingMinor(debt, snapshot);
   const owed = debt.direction === 'owed_by_me';
   const overdue = !!debt.dueDateISO && debt.dueDateISO < day && outstanding > 0;
-  const due = debt.dueDateISO ? relativeDate(debt.dueDateISO, day) : null;
-  const stacked = useStacked({ minor: outstanding, currency: account.currency });
-  const status = outstanding === 0 ? t('debts.status.settled') : overdue ? t('debts.status.overdue', { date: due! }) : due ? t('debts.status.due', { date: due }) : t('debts.status.noDate');
+  // "Vencida · Ayer" names the day after a separator; "Vence hoy" places it inside the sentence.
+  const status = outstanding === 0 ? t('debts.status.settled') : overdue ? t('debts.status.overdue', { date: relativeDate(debt.dueDateISO!, day) })
+    : debt.dueDateISO ? t('debts.status.due', { date: relativeDate(debt.dueDateISO, day, true) }) : t('debts.status.noDate');
   return <PressFeedback feedback="highlight" accessibilityRole="button"
     accessibilityLabel={t(owed ? 'debts.row.owedLabel' : 'debts.row.receivableLabel', { name: debt.counterparty, amount: spokenNumber(outstanding), currency: account.currency, status })}
     onPress={() => router.push({ pathname: '/debt/[id]', params: { id: debt.id } })}
