@@ -235,13 +235,13 @@ export function AmountField({ label, currency, tone, value = '', onChangeText, .
   const { fontSize, symbolSize } = amountFieldLayout(text, rowWidth, symbol, AMOUNT_GAP, Math.min(fontScale, HERO_MAX_SCALE));
   const color = tone && tone !== 'neutral' ? toneColors(p, tone).color : p.text;
   const emit = (draft: string) => { if (draft !== emitted.current) { emitted.current = draft; onChangeText?.(draft); } };
-  const noticeText = notice ? t(PASTE_NOTICES[notice.reason], { text: clipped(notice.text), decimal }) : null;
+  const noticeText = notice ? t(PASTE_NOTICES[notice.reason], { text: clipped(notice.text), decimal, currency }) : null;
   const change = (event: { nativeEvent: { text: string; selection?: Caret } }) => {
     const { text: raw, selection: native } = event.nativeEvent;
-    const result = input.current!.change(raw, native ? native.end : null);
+    const result = input.current!.change(raw, native ? native.end : null, currency);
     setSelection({ start: result.view.caret, end: result.view.caret });
     setNotice(result.rejected);
-    if (result.rejected) AccessibilityInfo.announceForAccessibility?.(t(PASTE_NOTICES[result.rejected.reason], { text: clipped(result.rejected.text), decimal }));
+    if (result.rejected) AccessibilityInfo.announceForAccessibility?.(t(PASTE_NOTICES[result.rejected.reason], { text: clipped(result.rejected.text), decimal, currency }));
     emit(result.draft);
   };
   const select = (event: { nativeEvent: { selection: Caret; text?: string } }) => {
@@ -279,7 +279,7 @@ export function AmountField({ label, currency, tone, value = '', onChangeText, .
 
 /** The note under the field for a refused paste, by reason. */
 const PASTE_NOTICES: Record<PasteRejection, MessageKey> = {
-  ambiguous: 'amount.paste.ambiguous', precision: 'amount.paste.precision', invalid: 'amount.paste.invalid', tooLong: 'amount.paste.tooLong',
+  ambiguous: 'amount.paste.ambiguous', precision: 'amount.paste.precision', invalid: 'amount.paste.invalid', tooLong: 'amount.paste.tooLong', currencyMismatch: 'amount.paste.currencyMismatch',
 };
 /** A refused text quoted in the note: long enough to recognise, never a paragraph. */
 const clipped = (text: string) => text.length > 24 ? text.slice(0, 23) + '…' : text;
