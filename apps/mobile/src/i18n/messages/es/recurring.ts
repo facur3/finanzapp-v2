@@ -24,6 +24,8 @@ export const recurring = {
       /** Stat label: how many occurrences fall due in the next 30 days. */
       dueCount: 'Vencimientos',
       income: 'Ingresos',
+      /** Shown instead of the 30-day totals of one currency when their sum leaves the exact range (never rounded or hidden). */
+      outOfRange: 'Total fuera de rango',
       active: 'Activos',
       paused: 'Pausados',
       pausedCaption: 'No se registran hasta que los reactives',

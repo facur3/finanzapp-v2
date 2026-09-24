@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { StyleSheet, Switch, View } from 'react-native';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import * as Haptics from 'expo-haptics';
-import { advanceRecurringDate, recurringOccurrencesThrough, todayKey,
+import { advanceRecurringDate, recurringForecastByCurrency, todayKey,
   type Currency, type RecurringRule } from '@finanzapp/domain';
 import { useLedger } from '../src/storage/LedgerProvider';
 import { ActionButton, AppText, CategoryBadge, EmptyState, ErrorMessage, IconButton, Money, PressFeedback, Screen, SectionTitle, Stat, StatRow, Surface, useStacked } from '../src/ui/components';
@@ -28,7 +28,7 @@ export default function RecurringScreen() {
   const account = accounts.find(item => item.id === accountId);
   const active = rules.filter(rule => rule.active);
   const paused = rules.filter(rule => !rule.active);
-  const forecast = useMemo(() => buildForecast(active, accounts, day), [active, accounts, day]);
+  const forecast = useMemo(() => recurringForecastByCurrency(active, accounts, day, 30), [active, accounts, day]);
 
   async function toggle(rule: RecurringRule) {
     if (busyId) return;
@@ -67,11 +67,13 @@ export default function RecurringScreen() {
         {!!forecast.length && <View>
           <SectionTitle>{t('recurring.list.next30')}</SectionTitle>
           <View style={{ gap: 10 }}>
-            {forecast.map(item => <Surface key={item.currency}><StatRow>
-              <Stat label={withCurrencyCode(t('recurring.list.payments'), item.currency)}><Money minor={item.expense} currency={item.currency} size={20} weight="700" /></Stat>
+            {forecast.map(item => item.status === 'ready' ? <Surface key={item.currency}><StatRow>
+              <Stat label={withCurrencyCode(t('recurring.list.payments'), item.currency)}><Money minor={item.expenseMinor} currency={item.currency} size={20} weight="700" /></Stat>
               <Stat label={t('recurring.list.dueCount')}><AppText style={{ fontWeight: '600' }}>{item.count}</AppText></Stat>
-              <Stat label={t('recurring.list.income')}><Money minor={item.income} currency={item.currency} size={17} tone={item.income ? 'income' : 'neutral'} signed={item.income > 0} /></Stat>
-            </StatRow></Surface>)}
+              <Stat label={t('recurring.list.income')}><Money minor={item.incomeMinor} currency={item.currency} size={17} tone={item.incomeMinor ? 'income' : 'neutral'} signed={item.incomeMinor > 0} /></Stat>
+            </StatRow></Surface>
+              // A projection beyond the safe range is said, never rounded or dropped for that currency.
+              : <Surface key={item.currency}><AppText secondary>{withCurrencyCode(t('recurring.list.outOfRange'), item.currency)}</AppText></Surface>)}
           </View>
         </View>}
 
@@ -128,21 +130,3 @@ function RecurringRow({ rule, accounts, day, last, busy, onToggle }: {
   </View>;
 }
 
-function buildForecast(rules: RecurringRule[], accounts: { id: string; currency: Currency }[], day: string) {
-  const start = new Date(day + 'T12:00:00');
-  const end = new Date(start);
-  end.setDate(end.getDate() + 30);
-  const through = todayKey(end);
-  const map = new Map<Currency, { expense: number; income: number; count: number }>();
-  for (const rule of rules) {
-    const account = accounts.find(item => item.id === rule.accountId);
-    if (!account) continue;
-    const occurrences = recurringOccurrencesThrough(rule, through).length;
-    if (!occurrences) continue;
-    const current = map.get(account.currency) ?? { expense: 0, income: 0, count: 0 };
-    current[rule.kind] += rule.amountMinor * occurrences;
-    current.count += occurrences;
-    map.set(account.currency, current);
-  }
-  return [...map.entries()].map(([currency, value]) => ({ currency, ...value }));
-}

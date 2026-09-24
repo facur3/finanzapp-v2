@@ -3,7 +3,7 @@ import { Alert, View } from 'react-native';
 import { Stack } from 'expo-router';
 import { File } from 'expo-file-system';
 import * as Haptics from 'expo-haptics';
-import { BACKUP_MAX_BYTES, parsePilotBackup, previewBackupImport, type ImportPreview, type ParsedBackup } from '@finanzapp/domain';
+import { BACKUP_MAX_BYTES, parsePilotBackup, previewBackupImport, sortCurrencies, type Currency, type ImportPreview, type ParsedBackup } from '@finanzapp/domain';
 import { useLedger } from '../src/storage/LedgerProvider';
 import { ActionButton, AppText, DetailRow, EmptyState, ErrorMessage, Money, Screen, SectionTitle, Surface } from '../src/ui/components';
 import { useI18n } from '../src/i18n/provider';
@@ -102,7 +102,7 @@ export default function BackupImportScreen() {
         </Surface>
         {plan.conflicts > 0 ? <ErrorMessage message={t('backup.import.conflicts', { count: plan.conflicts })} /> : <>
           <Surface><SectionTitle caption={t('backup.import.availableCaption')}>{t('backup.import.availableAfter')}</SectionTitle>
-            {(['ARS', 'USD'] as const).filter(currency => plan.after?.[currency] !== undefined).map(currency => <View key={currency} style={{ gap: 6 }}>
+            {sortCurrencies(Object.keys(plan.after ?? {}) as Currency[]).map(currency => <View key={currency} style={{ gap: 6 }}>
               <AppText secondary style={{ fontSize: 13 }}>{currency}</AppText>
               <Money minor={plan.after![currency]!} currency={currency} size={28} />
               <AppText secondary style={{ fontSize: 13 }}>{t('backup.import.now')}</AppText>

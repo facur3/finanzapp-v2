@@ -1,5 +1,6 @@
 import { categoryKey } from './spending-report.ts';
-import { validDateISO, type Currency, type LedgerSnapshot } from './ledger.ts';
+import { accountIdsInCurrency, validDateISO, type Currency, type LedgerSnapshot } from './ledger.ts';
+import { LEDGER_CURRENCIES, assertLedgerCurrency, assertStorableCurrency, type CurrencyGate } from './currency.ts';
 
 /** A budget is a planning limit for one month and one currency. It never
  * changes what a movement is: expenses stay expenses, transfers stay
@@ -90,6 +91,8 @@ export function budgetIdentityKey(budget: Pick<MonthlyBudget, 'currency' | 'mont
   return [budget.currency, budget.monthISO, budget.scope === 'total' ? 'total' : 'category:' + categoryKey(budget.category ?? '')].join('|');
 }
 
+/** Read acceptance for a stored budget: its currency must be a storable ISO fiat code (a budget
+ * has no account, so its scale can only come from its code), never the creation gate. */
 export function validateMonthlyBudget(budget: MonthlyBudget): void {
   if (!validId(budget.id)) throw new Error('Identificador de presupuesto inválido.');
   if (budget.scope !== 'total' && budget.scope !== 'category') throw new Error('Elegí un presupuesto general o por categoría.');
@@ -99,7 +102,7 @@ export function validateMonthlyBudget(budget: MonthlyBudget): void {
   if (budget.scope === 'total' && budget.category !== undefined) {
     throw new Error('Un presupuesto general no lleva categoría.');
   }
-  if (!['ARS', 'USD'].includes(budget.currency)) throw new Error('Elegí ARS o USD.');
+  assertStorableCurrency(budget.currency);
   if (!validMonthISO(budget.monthISO)) throw new Error('Elegí un mes válido.');
   if (!Number.isSafeInteger(budget.amountMinor) || budget.amountMinor <= 0) {
     throw new Error('El presupuesto debe ser mayor que cero y tener hasta dos decimales.');
@@ -111,6 +114,13 @@ export function validateMonthlyBudget(budget: MonthlyBudget): void {
   if (budget.revision === 0 && budget.updatedAt !== budget.createdAt) {
     throw new Error('Estado inicial de presupuesto inválido.');
   }
+}
+
+/** The creation gate on top of read acceptance: a **new** budget may only be planned in a
+ * currency the gate offers (it needs no account in that currency, decision 7.6.3). */
+export function validateNewMonthlyBudget(budget: MonthlyBudget, gate: CurrencyGate = LEDGER_CURRENCIES): void {
+  validateMonthlyBudget(budget);
+  assertLedgerCurrency(budget.currency, gate);
 }
 
 export function validateBudgetCollection(budgets: MonthlyBudget[]): void {
@@ -150,10 +160,13 @@ function safeNumber(value: bigint): number {
 }
 
 export function summarizeMonthlyBudgets(snapshot: LedgerSnapshot, budgets: MonthlyBudget[], currency: Currency, monthISO: string): MonthlyBudgetSummary {
-  if (!validMonthISO(monthISO) || !['ARS', 'USD'].includes(currency)) throw new Error('Período de presupuesto inválido.');
+  // A view checks the code's shape (storable), never the gate: a stored budget in a currency no
+  // longer offered still summarises. The currency has its own error, apart from the month's.
+  assertStorableCurrency(currency);
+  if (!validMonthISO(monthISO)) throw new Error('Período de presupuesto inválido.');
   validateBudgetCollection(budgets);
   const active = budgets.filter(budget => budget.active && budget.currency === currency && budget.monthISO === monthISO);
-  const accountIds = new Set(snapshot.accounts.filter(account => account.currency === currency).map(account => account.id));
+  const accountIds = accountIdsInCurrency(snapshot.accounts, currency);
   const spentByCategory = new Map<string, bigint>();
   let totalSpent = 0n;
   for (const entry of snapshot.entries) {

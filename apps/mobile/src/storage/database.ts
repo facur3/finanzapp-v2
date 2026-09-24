@@ -1,12 +1,13 @@
 import {
   initialRecord, previewBackupImport, sameAccount, sameEntry, sameRecord, snapshotFromArchive,
-  totalsByCurrency, validateAccount, validateArchive, validateEntry, validateEntryChange,
+  totalsByCurrency, validateAccount, validateNewAccount, validateArchive, validateEntry, validateEntryChange,
   type Account, type Entry, type EntryChange, type EntryRecord, type LedgerArchive, type LedgerSnapshot,
   accountBalanceMinor, validateAccountChange, type AccountChange, initialTransferRecord, sameTransferRecord,
   sameTransfer, validateTransfer, validateTransferChange, type Transfer, type TransferChange, type TransferRecord,
-  materializeRecurringRule, sameRecurringRule, validateRecurringRule, type RecurringRule,
-  sameMonthlyBudget, scopedMonthlyBudget, validateMonthlyBudget, type MonthlyBudget,
+  materializeRecurringRule, sameRecurringRule, validateRecurringRule, validateRecurringRuleChange, type RecurringRule,
+  sameMonthlyBudget, scopedMonthlyBudget, validateMonthlyBudget, validateNewMonthlyBudget, type MonthlyBudget,
   assertPostingAccount, sameCreditCardProfile, samePersonalDebtProfile, validateCreditCardProfile, validatePersonalDebtProfile,
+  validateCreditCardChange, validatePersonalDebtChange,
   type CreditCardProfile, type PersonalDebtProfile,
   sameAccountAppearance, validateAccountAppearance, type AccountAppearance,
   sameCategoryDefinition, validateCategoryDefinition, type CategoryDefinition,
@@ -332,7 +333,7 @@ export async function readArchive(db: SqlExecutor): Promise<LedgerArchive> {
  * is presentation only; retrying with the same account and look is safe. */
 export async function createAccount(db: LedgerDatabase, input: Account, appearance?: AccountAppearance): Promise<void> {
   const account = { ...input, name: input.name.trim() };
-  validateAccount(account);
+  validateNewAccount(account); // The creation gate; stored rows are read with validateAccount only.
   if ((account.revision ?? 0) !== 0) throw new Error('Una cuenta nueva no puede tener correcciones previas.');
   if (appearance) {
     validateAccountAppearance(appearance, [account]);
@@ -601,14 +602,7 @@ export async function saveRecurringRule(db: LedgerDatabase, input: RecurringRule
       return;
     }
     if (sameRecurringRule(existing, rule)) return;
-    if (rule.createdAt !== existing.createdAt || rule.revision !== existing.revision + 1) {
-      throw new Error('El recurrente cambió desde que lo abriste. Volvé a revisarlo.');
-    }
-    const beforeAccount = archive.accounts.find(account => account.id === existing.accountId);
-    const afterAccount = archive.accounts.find(account => account.id === rule.accountId);
-    if (!beforeAccount || !afterAccount || beforeAccount.currency !== afterAccount.currency) {
-      throw new Error('Elegí una cuenta de la misma moneda. Cambiar la moneda requiere crear otro recurrente.');
-    }
+    validateRecurringRuleChange(existing, rule, archive.accounts);
     validateArchive({ ...archive, recurring: archive.recurring!.map(item => item.id === rule.id ? rule : item) });
     await tx.runAsync(`UPDATE recurring_rules SET accountId = ?, kind = ?, amountMinor = ?, merchant = ?, category = ?,
       frequency = ?, anchorDateISO = ?, nextDateISO = ?, active = ?, revision = ?, updatedAt = ? WHERE id = ?`,
@@ -673,6 +667,7 @@ export async function saveMonthlyBudget(db: LedgerDatabase, input: MonthlyBudget
     validateMonthlyBudget(budget);
     const existing = archive.budgets?.find(item => item.id === budget.id);
     if (!existing) {
+      validateNewMonthlyBudget(budget); // The creation gate applies to a new budget only, never to stored ones.
       if (budget.revision !== 0 || budget.updatedAt !== budget.createdAt) {
         throw new Error('Un presupuesto nuevo no puede tener cambios previos.');
       }
@@ -724,7 +719,7 @@ async function insertInternalAccount(tx: SqlExecutor, account: Account): Promise
 export async function createCreditCard(db: LedgerDatabase, accountInput: Account, cardInput: CreditCardProfile): Promise<void> {
   const account = { ...accountInput, name: accountInput.name.trim() };
   const card = { ...cardInput, issuer: cardInput.issuer.trim(), last4: cardInput.last4.trim() };
-  validateAccount(account);
+  validateNewAccount(account);
   if ((account.revision ?? 0) !== 0 || account.openingMinor > 0) {
     throw new Error('La tarjeta nueva debe comenzar sin crédito a favor y sin correcciones previas.');
   }
@@ -753,9 +748,7 @@ export async function saveCreditCard(db: LedgerDatabase, input: CreditCardProfil
     const existing = archive.cards?.find(item => item.id === card.id);
     if (!existing) throw new Error('No encontramos esta tarjeta.');
     if (sameCreditCardProfile(existing, card)) return; // Committed already; a refresh failed.
-    if (card.accountId !== existing.accountId || card.createdAt !== existing.createdAt || card.revision !== existing.revision + 1) {
-      throw new Error('La tarjeta cambió desde que la abriste. Volvé a revisarla.');
-    }
+    validateCreditCardChange(existing, card);
     validateArchive({ ...archive, cards: archive.cards!.map(item => item.id === card.id ? card : item) });
     await tx.runAsync(`UPDATE credit_cards SET issuer = ?, last4 = ?, creditLimitMinor = ?, closingDay = ?, dueDay = ?,
       active = ?, revision = ?, updatedAt = ? WHERE id = ?`, card.issuer, card.last4, card.creditLimitMinor,
@@ -768,7 +761,7 @@ export async function saveCreditCard(db: LedgerDatabase, input: CreditCardProfil
 export async function createPersonalDebt(db: LedgerDatabase, accountInput: Account, debtInput: PersonalDebtProfile): Promise<void> {
   const account = { ...accountInput, name: accountInput.name.trim() };
   const debt = { ...debtInput, counterparty: debtInput.counterparty.trim(), note: debtInput.note.trim() };
-  validateAccount(account);
+  validateNewAccount(account);
   if ((account.revision ?? 0) !== 0
     || (debt.direction === 'owed_by_me' && account.openingMinor > 0)
     || (debt.direction === 'owed_to_me' && account.openingMinor < 0)) {
@@ -799,10 +792,7 @@ export async function savePersonalDebt(db: LedgerDatabase, input: PersonalDebtPr
     const existing = archive.debts?.find(item => item.id === debt.id);
     if (!existing) throw new Error('No encontramos esta deuda.');
     if (samePersonalDebtProfile(existing, debt)) return;
-    if (debt.accountId !== existing.accountId || debt.direction !== existing.direction
-      || debt.createdAt !== existing.createdAt || debt.revision !== existing.revision + 1) {
-      throw new Error('La deuda cambió desde que la abriste. Volvé a revisarla.');
-    }
+    validatePersonalDebtChange(existing, debt);
     validateArchive({ ...archive, debts: archive.debts!.map(item => item.id === debt.id ? debt : item) });
     await tx.runAsync(`UPDATE personal_debts SET counterparty = ?, dueDateISO = ?, note = ?, active = ?,
       revision = ?, updatedAt = ? WHERE id = ?`, debt.counterparty, debt.dueDateISO, debt.note,

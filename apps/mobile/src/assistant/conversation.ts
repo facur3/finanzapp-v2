@@ -1,4 +1,4 @@
-import type { Account, Currency, Entry, EntryKind } from '@finanzapp/domain';
+import { isLegacyCurrency, type Account, type Currency, type Entry, type EntryKind, type LegacyCurrency } from '@finanzapp/domain';
 import type { AssistantFact, AssistantResult, CaptureDraft } from '../../../../packages/integrations/contracts.js';
 import { factCategory } from '../integrations/evidence.ts';
 import { translator, type MessageKey, type Translate } from '../i18n/messages.ts';
@@ -242,7 +242,8 @@ export function completeDraft(pending: { draft: Partial<ResolvedDraft>; field: D
   if (pending.field === 'kind') draft.kind = optionId === 'income' ? 'income' : 'expense';
   else if (pending.field === 'paymentMethod') draft.accountId = optionId;
   else if (pending.field === 'category') draft.category = optionId;
-  const currency = draft.currency ?? 'ARS';
+  // Contract v1 only ever parks ARS or USD drafts; the ARS default for a draft without a currency is stage 7's to remove.
+  const currency: LegacyCurrency = isLegacyCurrency(draft.currency) ? draft.currency : 'ARS';
   const capture: CaptureDraft = { kind: draft.kind ?? null, amountMinor: draft.amountMinor ?? null, currency, merchant: draft.merchant || null,
     category: draft.category || null, dateISO: draft.dateISO ?? null, paymentMethodRef: null };
   const next = resolveDraft(capture, draft.accountId ? accounts.filter(account => account.id === draft.accountId) : accounts, entries, currency, todayISO);

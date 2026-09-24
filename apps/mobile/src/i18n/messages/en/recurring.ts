@@ -23,6 +23,7 @@ export const recurring: Pick<Messages, 'recurring'> = {
       payments: 'Expenses',
       dueCount: 'Due',
       income: 'Income',
+      outOfRange: 'Total out of range',
       active: 'Active',
       paused: 'Paused',
       pausedCaption: 'Not recorded until you turn them back on',

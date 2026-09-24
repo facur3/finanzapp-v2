@@ -30,7 +30,9 @@ export default function HomeScreen() {
   const currencies = availableCurrencies(snapshot?.accounts ?? []);
   const currency = currencies.includes(selectedCurrency) ? selectedCurrency : currencies[0] ?? 'ARS';
   const period = useMemo(() => spendingWindow(currency, 'month', day), [currency, day]);
-  const summary = useMemo(() => snapshot ? spendingOverview(snapshot, period) : null, [snapshot, period]);
+  // A stored currency is always a storable code (read acceptance), so this only guards a
+  // programming error; Home must degrade to its empty state rather than crash the tab.
+  const summary = useMemo(() => { try { return snapshot ? spendingOverview(snapshot, period) : null; } catch { return null; } }, [snapshot, period]);
   // Disponible is recorded liquid money: cards, debts and receivables are never netted into it.
   const available = useMemo(() => {
     if (!snapshot) return { status: 'ready' as const, minor: 0 };

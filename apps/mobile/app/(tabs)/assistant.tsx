@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'r
 import { FlatList, View, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native';
 import { router, Tabs, useLocalSearchParams } from 'expo-router';
 import { randomUUID } from 'expo-crypto';
-import { validateEntry, type Currency, type Entry } from '@finanzapp/domain';
+import { isLegacyCurrency, validateEntry, type Currency, type Entry } from '@finanzapp/domain';
 import { assistantForBuild } from '../../src/assistant/runtime';
 import { REASON_TEXT, SUGGESTIONS, classifyIntent, completeDraft, contentFromResult, conversationReducer, emptyConversation, entryFromDraft,
   optionText, shouldAutoscroll, type ClarificationOption, type DraftContent, type EvidenceLink, type Message } from '../../src/assistant/conversation';
@@ -64,6 +64,8 @@ export default function AssistantScreen() {
     impactHaptic();
     dispatch({ type: 'send', text });
     const action = classifyIntent(text);
+    // Contract v1 knows ARS and USD only: the client never sends another currency (docs/currency.md §7.5, stage 7 brings the next version).
+    if (!isLegacyCurrency(currency)) { dispatch({ type: 'fail', reason: 'unavailable', text: REASON_TEXT.unavailable, sent: raw }); return; }
     const facts = action === 'explain' && snapshot ? monthlyEvidence(snapshot, currency, day) : [];
     const controller = new AbortController();
     request.current = controller;

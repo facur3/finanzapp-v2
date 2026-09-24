@@ -1,4 +1,5 @@
-import { totalsByCurrency, validateAccount, validateEntry, type Account, type Entry, type LedgerSnapshot } from './ledger.ts';
+import { LEGACY_EXPORT_MESSAGE, totalsByCurrency, validateAccount, validateEntry, type Account, type Entry, type LedgerSnapshot } from './ledger.ts';
+import { isLegacyCurrency } from './currency.ts';
 import { TRANSFER_KEYS, sameTransferRecord, validateTransferRecord, type TransferRecord } from './transfers.ts';
 import { sameRecurringRule, validateRecurringRule, type RecurringRule } from './recurring.ts';
 import { sameMonthlyBudget, scopedMonthlyBudget, validateBudgetCollection, validateMonthlyBudget, type MonthlyBudget } from './budgets.ts';
@@ -34,6 +35,14 @@ export interface EntryChange {
   after: EntryRecord;
 }
 export const BACKUP_MAX_BYTES = 5 * 1024 * 1024;
+/** Backups v1–v8 record one money unit and no scale per currency: they can only ever name
+ * ARS and USD cents, whatever the creation gate offers when the file is read. A file naming
+ * another code is refused whole (never read as cents); backup v9 (24B) will carry scales. */
+export const LEGACY_IMPORT_MESSAGE = 'Las copias v1 a v8 solo pueden contener cuentas y presupuestos en ARS o USD. No se importó nada; conservá el archivo.';
+function assertLegacyCurrencies(archive: Pick<LedgerArchive, 'accounts' | 'budgets'>, message: string): void {
+  if (archive.accounts.some(account => !isLegacyCurrency(account.currency))
+    || (archive.budgets ?? []).some(budget => !isLegacyCurrency(budget.currency))) throw new Error(message);
+}
 const ACCOUNT_KEYS = ['id', 'name', 'currency', 'openingMinor', 'createdAt'] as const;
 const ENTRY_KEYS = ['id', 'accountId', 'kind', 'amountMinor', 'merchant', 'category', 'dateISO', 'createdAt'] as const;
 const RECURRING_KEYS = ['id', 'accountId', 'kind', 'amountMinor', 'merchant', 'category', 'frequency',
@@ -225,6 +234,7 @@ export function validateEntryChange(change: EntryChange, accounts: Account[]): v
 
 export function createRecoveryBackup(archive: LedgerArchive, now = new Date()) {
   validateArchive(archive);
+  assertLegacyCurrencies(archive, LEGACY_EXPORT_MESSAGE); // v8 has no scale: only ARS/USD cents can be written.
   const canonical = canonicalArchive(archive);
   return { app: 'FinanzApp', schema: 'finanzapp.native-pilot.v8', exportedAt: now.toISOString(),
     moneyUnit: 'integer-minor-units', ...canonical, transfers: canonical.transfers ?? [],
@@ -297,6 +307,7 @@ export function parsePilotBackup(raw: string): ParsedBackup {
     ...(recurring.length ? { recurring } : {}), ...(budgets.length ? { budgets } : {}),
     ...(cards.length ? { cards } : {}), ...(debts.length ? { debts } : {}),
     ...(appearances.length ? { appearances } : {}), ...(categories.length ? { categories } : {}) };
+  assertLegacyCurrencies(archive, LEGACY_IMPORT_MESSAGE);
   validateArchive(archive);
   return { archive, exportedAt: header.exportedAt };
 }
