@@ -729,6 +729,31 @@ result. Do not commit screenshots containing actual balances, accounts or names.
 - [ ] Reduce Motion stops non-essential scale/slide effects.
 - [ ] Dark/light system appearance has readable contrast and no white flashes.
 
+## Producto 24B3 — presentation and copy for every currency (nothing visible in production)
+
+Nothing to verify on the device for 24B3 beyond the Más footer reading "Producto 24B3": with
+ARS and USD every amount, label and VoiceOver sentence is byte-identical to 24B2 (goldens), and
+the currency segments of Inicio, Reportes, Presupuestos and the card, debt and budget forms read
+exactly as before. A regression spot-check: the balance-correction alert, the movement detail's
+budget row and the transfer form's balances still show the region's separators; VoiceOver still
+reads "1234,56 pesos" / "1234.56 dollars".
+
+Reserved for stage 9, on a development build with a test gate that holds three or more
+currencies (never on real data):
+- [ ] The currency row on Inicio (bare code), Reportes and Presupuestos ("Yenes japoneses ·
+  JPY"): 44 pt tap target, the sheet slides up (fades under Reduce Motion), a checkmark on the
+  current currency, choosing one changes only the figures shown, nothing is converted.
+- [ ] The sheet with six or more currencies: the search field focuses without covering the
+  list, filters by code and name, clears on a choice; at the largest text sizes the rows wrap
+  and nothing is cut at 320 pt (iPhone SE class).
+- [ ] VoiceOver in Spanish and English: "1500 yenes japoneses" / "1500 Japanese yen",
+  "1234,567 dinares kuwaitíes" / "1234.567 Kuwaiti dinars" (three decimals read as a fraction,
+  not a thousands pattern), and with a CLP account beside ARS "pesos argentinos", with a CAD
+  account beside USD "dólares estadounidenses" / "US dollars"; the amount field's name and the
+  card face follow the same rule.
+- [ ] The MonthBars scale caption in JPY and KWD, and "—" with "Importe fuera de rango" for a
+  restored backup whose total leaves the safe range.
+
 ## Producto 24B2 — strict route currencies and the amount field by exponent (nothing visible in production)
 
 Nothing to verify on the device for 24B2 beyond the Más footer reading "Producto 24B2":
