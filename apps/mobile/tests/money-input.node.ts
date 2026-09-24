@@ -26,14 +26,16 @@ class Field {
   draft: string;
   notice: AmountNotice | null = null;
   private lag: boolean;
-  constructor(lag = false, format: AmountFormat = AR, draft = '') {
+  private expectedCurrency?: 'ARS' | 'USD';
+  constructor(lag = false, format: AmountFormat = AR, draft = '', expectedCurrency?: 'ARS' | 'USD') {
     this.lag = lag;
+    this.expectedCurrency = expectedCurrency;
     this.input = new AmountInput(draft, format);
     this.draft = draft;
     this.native = { ...this.input.view };
   }
   private apply(raw: string, rawCaret: number) {
-    const result = this.input.change(raw, rawCaret);
+    const result = this.input.change(raw, rawCaret, this.expectedCurrency);
     this.draft = result.draft;
     this.notice = result.rejected;
     this.native = this.lag ? { text: raw, caret: rawCaret } : { ...result.view };
@@ -270,6 +272,38 @@ test('pasting Argentine and US formatted numbers normalises by the separators th
   const into = new Field().typeAll('99');
   into.tap(1).paste('1.000,5');
   assert.deepEqual([into.canonical, into.text, into.caret], ['91000,59', '91.000,59', 8], 'a paste in the middle keeps its own decimals; the digit after it becomes a decimal');
+});
+
+
+test('a pasted explicit currency must match the account; no implicit FX conversion', () => {
+  const cases: [string, AmountFormat, 'ARS' | 'USD', string | null][] = [
+    ['US$ 12.30', AR, 'ARS', null],
+    ['USD 12.30', US, 'ARS', null],
+    ['U$S 100', AR, 'ARS', null],
+    ['AR$ 1,234.56', US, 'USD', null],
+    ['ARS 1.234,56', AR, 'USD', null],
+    ['US$ 12.30', AR, 'USD', '12,30'],
+    ['USD 12.30', US, 'USD', '12,30'],
+    ['U$S 100', AR, 'USD', '100'],
+    ['AR$ 1,234.56', US, 'ARS', '1234,56'],
+    ['ARS 1.234,56', AR, 'ARS', '1234,56'],
+    ['$ 50', AR, 'USD', '50'], // Bare $ is not unambiguous currency evidence.
+    ['50', US, 'ARS', '50'],
+  ];
+  for (const [paste, format, accountCurrency, canonical] of cases) {
+    const field = new Field(false, format, '', accountCurrency).typeAll('25');
+    const previous = field.draft;
+    field.replace(0, field.native.text.length, paste);
+    if (canonical === null) {
+      assert.equal(field.notice?.reason, 'currencyMismatch', paste + ' on ' + accountCurrency);
+      assert.equal(field.draft, previous, 'currency mismatch leaves the ledger draft untouched');
+      assert.equal(field.text, '25', 'currency mismatch leaves the visible number untouched');
+    } else {
+      assert.equal(field.notice, null, paste);
+      assert.equal(field.draft, canonical, paste + ' on ' + accountCurrency);
+    }
+  }
+  assert.deepEqual(readPastedAmount('USD ARS 100', AR, 'USD'), { ok: false, reason: 'invalid' }, 'multiple explicit currency markers are invalid');
 });
 
 test('a paste that could mean two amounts, or none, is refused with a reason and the field keeps its value', () => {
