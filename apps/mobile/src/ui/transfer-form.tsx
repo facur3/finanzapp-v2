@@ -132,7 +132,8 @@ export function TransferForm({ original, accountId, fromAccountId: requestedFrom
   // separators on screen (formatAmount), the language's for VoiceOver (spokenNumber).
   const balanceLabel = (account: Account, value: number, number: (minor: number) => string = formatAmount) => {
     const kind = accountKind(account.id, cards, debts), currency = account.currency;
-    if (kind === 'card') return t(value < 0 ? 'transferForm.balanceDebt' : 'transferForm.balanceCredit', { currency, amount: number(Math.abs(value)) });
+    if (kind === 'card') return value === 0 ? t('transferForm.balanceClear')
+      : t(value < 0 ? 'transferForm.balanceDebt' : 'transferForm.balanceCredit', { currency, amount: number(Math.abs(value)) });
     if (kind === 'debt') return t('transferForm.balancePending', { currency, amount: number(Math.abs(value)) });
     return currency + '\u00A0' + number(value);
   };

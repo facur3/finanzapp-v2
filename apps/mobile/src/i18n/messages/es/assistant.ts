@@ -72,6 +72,8 @@ export const assistant = {
       income: 'Ingresos registrados',
       /** A row cited only for the previous period: "Restaurantes (mes anterior)". */
       previousMonth: '{label} (mes anterior)',
+      /** VoiceOver for a difference that grew against the previous month (the screen shows "+$ 42.500,00"): "42500,00 pesos más". */
+      spokenIncrease: '{amount} más',
     },
     /** Text buttons under an answer that open the screens holding the records. */
     links: {

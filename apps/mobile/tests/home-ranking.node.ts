@@ -197,7 +197,7 @@ test('the metric help opens a native alert whose button is named in the interfac
       const help = exports.MetricHelp({ title: 'Disponible', detail: 'Es el dinero registrado.' });
       assert.equal(help.props.accessibilityLabel, locale === 'es-AR' ? 'Qué significa Disponible' : 'What Disponible means');
       help.props.onPress();
-      assert.equal(JSON.stringify(env.alerts), JSON.stringify([['Disponible', 'Es el dinero registrado.', [{ text: 'OK' }]]]), locale + ': one explicit button from the catalogue');
+      assert.equal(JSON.stringify(env.alerts), JSON.stringify([['Disponible', 'Es el dinero registrado.', [{ text: 'OK', style: 'cancel' }]]]), locale + ': one explicit button from the catalogue, still the cancel action (Esc and the escape gesture close it)');
     }
   } finally { current = 'es-AR'; }
 });

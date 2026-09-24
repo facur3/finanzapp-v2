@@ -57,7 +57,7 @@ test('streaming grows one assistant message in place, the answer finalizes it an
   assert.equal(streaming.role, 'assistant');
   assert.equal(streaming.role === 'assistant' && streaming.status, 'streaming');
   assert.equal(streaming.text, 'Gastaste $84.300 más');
-  const done = run([{ type: 'answer', text: 'Gastaste $84.300 más que el mes pasado.', content: { kind: 'answer', rows: [], links: [] } }], started);
+  const done = run([{ type: 'answer', text: 'Gastaste $84.300 más que el mes pasado.', content: { kind: 'answer', rows: [], links: [], currency: 'ARS' } }], started);
   assert.equal(done.messages.length, 2, 'the final answer replaces the streaming message rather than adding one');
   assert.equal(done.messages[1].role === 'assistant' && done.messages[1].status, 'done');
   assert.equal(done.phase, 'idle');
@@ -203,7 +203,7 @@ test('answer rows and links come from the cited evidence: signed differences whe
   assert.deepEqual(single.links.map(link => link.id), ['category', 'movements']);
   assert.deepEqual(single.links[0].href, { pathname: '/spending-detail', params: { currency: 'ARS', startISO: '2026-09-01', endISO: '2026-09-21', category: 'Supermercado' } });
   const none = answerContent({ factIds: [] }, FIXTURE_FACTS, 'ARS');
-  assert.deepEqual(none, { kind: 'answer', rows: [], links: [] }, 'prose without evidence gets no numbers and no links');
+  assert.deepEqual(none, { kind: 'answer', rows: [], links: [], currency: 'ARS' }, 'prose without evidence gets no numbers and no links; it keeps the currency asked about');
   const unknown = answerContent({ factIds: ['ghost'] }, FIXTURE_FACTS, 'ARS');
   assert.equal(unknown.rows.length, 0, 'an id that is not local evidence is ignored, never invented');
   const budget = answerContent({ factIds: ['budget.total'] }, [{ id: 'budget.total', label: 'Presupuesto general', amountMinor: 1, count: 1, startISO: today, endISO: today }], 'ARS');

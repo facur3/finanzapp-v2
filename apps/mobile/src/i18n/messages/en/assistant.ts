@@ -53,6 +53,7 @@ export const assistant: Pick<Messages, 'assistant'> = {
       expenses: 'Recorded expenses',
       income: 'Recorded income',
       previousMonth: '{label} (previous month)',
+      spokenIncrease: '{amount} more',
     },
     links: {
       movements: 'View transactions',

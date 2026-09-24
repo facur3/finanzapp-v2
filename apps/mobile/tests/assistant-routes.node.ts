@@ -70,7 +70,18 @@ function harness({ client, accounts = [visa, cash, usd], data = entries, params 
       useState: (initial: unknown) => { const index = slot(() => typeof initial === 'function' ? (initial as () => unknown)() : initial); return [state[index], (value: unknown) => { state[index] = typeof value === 'function' ? (value as (c: unknown) => unknown)(state[index]) : value; }]; },
       useReducer: (reducer: (s: unknown, a: unknown) => unknown, initial: unknown) => { const index = slot(() => initial); return [state[index], (action: unknown) => { state[index] = reducer(state[index], action); }]; },
       useRef: (initial: unknown) => { const index = slot(() => ({ current: initial })); return state[index]; },
-      useMemo: (fn: () => unknown) => fn(), useCallback: (fn: unknown) => fn, useEffect: (fn: () => unknown) => { const cleanup = fn(); if (typeof cleanup === 'function') effects.push(cleanup as () => void); },
+      useMemo: (fn: () => unknown) => fn(), useCallback: (fn: unknown) => fn,
+      // Like React: an effect runs on mount and again only when a dependency changed, after its previous
+      // cleanup. So an effect that aborted the request on a language change (deps [t]) would really abort here.
+      useEffect: (fn: () => unknown, deps?: unknown[]) => {
+        const index = slot(() => ({ deps: null as unknown[] | null, cleanup: undefined as unknown }));
+        const cell = state[index] as { deps: unknown[] | null; cleanup: unknown };
+        if (cell.deps && deps && deps.length === cell.deps.length && deps.every((dep, i) => Object.is(dep, cell.deps![i]))) return;
+        if (typeof cell.cleanup === 'function') (cell.cleanup as () => void)();
+        cell.cleanup = fn();
+        cell.deps = deps ?? null;
+        if (typeof cell.cleanup === 'function') effects.push(cell.cleanup as () => void);
+      },
     },
     'react/jsx-runtime': { jsx, jsxs: jsx, Fragment: 'Fragment' },
     'react-native': { View: 'View', FlatList: 'FlatList' },
@@ -220,7 +231,7 @@ test('an answer renders its text and evidence rows/links from the cited facts, a
   const proof = find([answer], 'AnswerEvidence')[0];
   assert.deepEqual(proof.props.content.rows.map((row: any) => conversation.evidenceLabel(row)), ['Gastos registrados', 'Restaurantes', 'Supermercado', 'Transporte']);
   assert.equal(proof.props.content.rows[1].amountMinor, 4250000);
-  assert.equal(proof.props.currency, 'ARS');
+  assert.equal(proof.props.content.currency, 'ARS', 'the rows keep the currency the facts were computed in');
   assert.deepEqual(proof.props.content.links.map((link: any) => link.id), ['movements']);
   proof.props.onOpen(proof.props.content.links[0].href);
   assert.deepEqual(view.pushed, ['/activity']);
@@ -500,6 +511,8 @@ test('English: the screen\'s own words are English, the model\'s answer and the 
   items = english.render().items;
   assert.equal(find([items[2]], 'UserMessage')[0].props.text, 'Visa Galicia');
   assert.equal(find([items[3]], 'AssistantText')[0].props.text, 'Review the draft before saving it.');
+  assert.deepEqual([find([items[1]], 'AssistantText')[0].props.ownWords, find([items[3]], 'AssistantText')[0].props.ownWords], [true, true],
+    'the app\'s own questions are marked so VoiceOver reads them in the interface language, not as the model\'s Spanish prose');
   // The same question follows a language change already on screen: it is stored as a key.
   english.setLocale('es-AR');
   assert.equal(find([english.render().items[1]], 'AssistantText')[0].props.text, '¿Con qué lo pagaste?');
@@ -561,6 +574,7 @@ test('a language or region change while the Assistant answers: nothing is re-sen
   assert.equal(screen.messages.map(message => message.id).join(), 'u-1,a-2');
   assert.equal(screen.messages[0].text, '¿Por qué gasté más este mes?', 'the user\'s words keep the language they were sent in');
   assert.equal(find([screen.items[1]], 'AssistantText')[0].props.text, FIXTURE_ANSWER.message, 'the model\'s words are content');
+  assert.equal(find([screen.items[1]], 'AssistantText')[0].props.ownWords, false, 'the model\'s prose keeps its own voice');
   assert.equal(find([screen.items[1]], 'AnswerEvidence')[0].props.content.rows[1].amountMinor, 4250000, 'the evidence keeps its numbers');
   // The next question goes out in the new language with the same v1 keys: the language is never on the wire.
   view.render().composer.props.onChange('Why did I spend more this month?');

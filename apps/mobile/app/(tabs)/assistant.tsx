@@ -128,8 +128,8 @@ export default function AssistantScreen() {
     if (item.role === 'user') return <Appear><UserMessage text={item.text} /></Appear>;
     if (item.role === 'system') return <Appear><SystemNote message={item} onRetry={text => void send(text)} /></Appear>;
     return <View style={{ gap: space.m }}>
-      {(item.text || item.textKey || item.status === 'streaming') && <AssistantText text={item.textKey ? t(item.textKey) : item.text} status={item.status} />}
-      {item.content?.kind === 'answer' && <AnswerEvidence content={item.content} currency={currency} onOpen={open} />}
+      {(item.text || item.textKey || item.status === 'streaming') && <AssistantText text={item.textKey ? t(item.textKey) : item.text} ownWords={!!item.textKey} status={item.status} />}
+      {item.content?.kind === 'answer' && <AnswerEvidence content={item.content} onOpen={open} />}
       {item.content?.kind === 'clarification' && <ClarificationChoices options={item.content.options} chosen={item.content.chosen} onChoose={(option, shown) => choose(item.id, option, shown)} />}
       {item.content?.kind === 'draft' && <DraftCard content={item.content} accounts={accounts} busy={writing === item.id}
         onConfirm={() => void confirm(item.id, item.content as DraftContent)} onEdit={() => edit(item.id, item.content as DraftContent)}

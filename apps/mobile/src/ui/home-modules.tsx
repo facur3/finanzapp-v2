@@ -20,7 +20,7 @@ export function MetricHelp({ title, detail }: { title: string; detail: string })
   const p = usePalette();
   const { t } = useI18n();
   return <PressFeedback feedback="opacity" accessibilityRole="button" accessibilityLabel={t('common.whatIs', { title })} hitSlop={8}
-    onPress={() => Alert.alert(title, detail, [{ text: t('common.ok') }])} style={{ minHeight: 24, paddingHorizontal: 4 }}>
+    onPress={() => Alert.alert(title, detail, [{ text: t('common.ok'), style: 'cancel' }])} style={{ minHeight: 24, paddingHorizontal: 4 }}>
     <Ionicons name="information-circle-outline" size={18} color={p.tertiary} accessible={false} />
   </PressFeedback>;
 }

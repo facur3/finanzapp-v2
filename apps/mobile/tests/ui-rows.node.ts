@@ -114,7 +114,7 @@ test('FieldNote keeps one short line under a field and opens the full explanatio
   assert.equal(info.props.hitSlop, 8, 'a small glyph with a comfortable target');
   info.props.onPress();
   // The button is named from the catalogue: left to iOS it would read "OK" in the bundle's language, whatever Más says.
-  assert.equal(JSON.stringify(ui.alerts), JSON.stringify([{ title: 'Saldo inicial', message: 'La explicación completa.', buttons: [{ text: 'OK' }] }]));
+  assert.equal(JSON.stringify(ui.alerts), JSON.stringify([{ title: 'Saldo inicial', message: 'La explicación completa.', buttons: [{ text: 'OK', style: 'cancel' }] }]), 'the catalogue\'s OK, still the cancel action');
   const bare = ui.render('FieldNote', { children: 'Solo texto.' });
   assert.equal(nodes(bare).some(node => is(node, 'PressFeedback')), false);
 });

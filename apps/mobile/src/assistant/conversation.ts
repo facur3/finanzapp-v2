@@ -55,7 +55,8 @@ export function optionText(option: ClarificationOption, t: Translate = translato
   return option.labelKey ? t(option.labelKey) : option.label ?? '';
 }
 
-export type AnswerContent = { kind: 'answer'; rows: EvidenceRow[]; links: EvidenceLink[] };
+/** `currency` is the one the facts were computed in: the rows keep it even if the screen later shows another. */
+export type AnswerContent = { kind: 'answer'; rows: EvidenceRow[]; links: EvidenceLink[]; currency: Currency };
 export type DraftContent = { kind: 'draft'; draft: ResolvedDraft; status: 'pending' | 'confirmed' | 'cancelled' | 'edited'; entryId: string | null };
 export type ClarificationContent = { kind: 'clarification'; field: DraftField | null; options: ClarificationOption[]; chosen: string | null };
 export type AssistantContent = AnswerContent | DraftContent | ClarificationContent;
@@ -311,7 +312,7 @@ export function answerContent(result: Pick<AssistantResult, 'factIds'>, facts: A
     params: { currency, startISO: categories[0].startISO, endISO: categories[0].endISO, category: factCategory(categories[0])! } } });
   if (cited.some(fact => fact.id.startsWith('budget'))) links.push({ id: 'budget', href: { pathname: '/budgets', params: { currency } } });
   if (cited.length) links.push({ id: 'movements', href: { pathname: '/activity' } });
-  return { kind: 'answer', rows: rows.slice(0, 5), links };
+  return { kind: 'answer', rows: rows.slice(0, 5), links, currency };
 }
 
 /** The content the reducer stores for a validated server result. Drafts are resolved locally; answers get evidence. */

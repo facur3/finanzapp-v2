@@ -264,7 +264,7 @@ test('answer evidence renders rows with the shared Money component and links as 
   assert.equal(money[0].props.signed, true);
   assert.equal(money[0].props.currency, 'ARS');
   // The row is one VoiceOver element: its label says the amount too, in spoken form (no grouping), not only the name.
-  assert.deepEqual(nodes(root).filter(node => node.type === 'View' && node.props.accessible).map(node => node.props.accessibilityLabel), ['Supermercado, 31200,00 pesos']);
+  assert.deepEqual(nodes(root).filter(node => node.type === 'View' && node.props.accessible).map(node => node.props.accessibilityLabel), ['Supermercado, 31200,00 pesos más'], 'a difference that grew says so; the screen shows +$ 31.200,00');
   const links = nodes(root).filter(node => node.props.accessibilityRole === 'link');
   assert.deepEqual(links.map(node => node.props.accessibilityLabel), ['Ver categoría', 'Ver movimientos']);
   links[1].props.onPress();
@@ -385,6 +385,17 @@ test('VoiceOver: with an interface language that differs from the device\'s, eve
   const englishDevice = nodes(load('assistant-messages.tsx', { locale: 'en-US', deviceLanguage: 'en' }).render('AssistantText', { text: 'Gastaste más.', status: 'done' }))
     .find(node => node.type === 'View' && node.props.accessible)!;
   assert.equal(englishDevice.props.accessibilityLanguage, 'es', 'an English iPhone reading an English interface still hears the Spanish answer in Spanish');
+  // The app's own turns (a clarification question, "review the draft") are interface copy, not model prose: the usual rule.
+  const own = (locale: AppLocale, deviceLanguage: string) => nodes(load('assistant-messages.tsx', { locale, deviceLanguage })
+    .render('AssistantText', { text: 'What did you pay with?', status: 'done', ownWords: true })).find(node => node.type === 'View' && node.props.accessible)!.props.accessibilityLanguage;
+  assert.deepEqual([own('en-US', 'en'), own('en-AR', 'es'), own('es-AR', 'es'), own('es-US', 'en')], [undefined, 'en', undefined, 'es']);
+  // An answer keeps the currency it was computed in, and a difference that grew says so in English too.
+  const dollars = conversation.answerContent({ factIds: ['current.category.1', 'previous.category.1'] },
+    [{ id: 'current.category.1', label: 'Categoría de gasto: Supermercado', amountMinor: 50000, count: 2, startISO: '2026-09-01', endISO: '2026-09-21' },
+      { id: 'previous.category.1', label: 'Categoría de gasto: Supermercado', amountMinor: 20000, count: 1, startISO: '2026-08-01', endISO: '2026-08-21' }], 'USD');
+  const usd = nodes(load('assistant-messages.tsx', { locale: 'en-US', deviceLanguage: 'en' }).render('AnswerEvidence', { content: dollars, onOpen: () => {} }));
+  assert.equal(usd.find(node => node.type === 'Money')!.props.currency, 'USD');
+  assert.deepEqual(usd.filter(node => node.type === 'View' && node.props.accessible).map(node => node.props.accessibilityLabel), ['Groceries, 300.00 dollars more']);
   // A difference below zero is said as such, in the language's words and decimal mark.
   assert.ok(elements.some(node => node.props.accessibilityLabel === 'Groceries, Minus 800.00 pesos'));
   const field = nodes(load('assistant-composer.tsx', { locale: 'en-US', deviceLanguage: 'es' }).render('AssistantComposer', { value: '', onChange: () => {}, onSend: () => {}, onStop: () => {}, busy: false }))

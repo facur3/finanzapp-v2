@@ -69,8 +69,11 @@ test('nothing configures the flag for a build, and only the provider reads it, b
   const eas = JSON.parse(readFileSync(join(root, 'eas.json'), 'utf8')) as { build: Record<string, { env?: Record<string, string> }> };
   assert.deepEqual(Object.keys(eas.build), ['development', 'preview', 'testflight']);
   for (const [profile, settings] of Object.entries(eas.build)) assert.equal(Object.keys(settings.env ?? {}).some(key => key.startsWith('EXPO_PUBLIC_LOCALE')), false, 'eas.json ' + profile);
-  // Expo CLI loads .env files into EXPO_PUBLIC_ variables; none may sit next to the app (and the root .gitignore keeps them out of Git).
-  assert.deepEqual(readdirSync(root).filter(name => name.startsWith('.env')), []);
+  // Expo CLI loads .env files into EXPO_PUBLIC_ variables. A local .env.local is fine (the README uses one for
+  // EXPO_PUBLIC_EAS_PROJECT_ID; .gitignore keeps them out of Git), but none may define the preview flag.
+  for (const name of readdirSync(root).filter(name => name.startsWith('.env'))) {
+    assert.equal(new RegExp('^\\s*(export\\s+)?' + FLAG + '\\s*=', 'm').test(readFileSync(join(root, name), 'utf8')), false, name);
+  }
 });
 
 /** A source file compiled by babel-preset-expo exactly as Metro compiles it

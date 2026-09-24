@@ -45,6 +45,8 @@ export const forms = {
     balanceDebt: 'Deuda {currency} {amount}',
     balanceCredit: 'A favor {currency} {amount}',
     balancePending: 'Pendiente {currency} {amount}',
+    /** A card paid down to exactly zero, as the entry form and the card detail say it. */
+    balanceClear: 'Sin deuda',
     recordPayment: 'Registrar pago',
     recordCollection: 'Registrar cobro',
     recordTransfer: 'Registrar transferencia',

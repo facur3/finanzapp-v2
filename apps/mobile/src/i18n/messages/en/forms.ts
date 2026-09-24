@@ -45,6 +45,7 @@ export const forms: Pick<Messages, 'entryForm' | 'transferForm'> = {
     balanceDebt: 'Owed {currency} {amount}',
     balanceCredit: 'In credit {currency} {amount}',
     balancePending: 'Pending {currency} {amount}',
+    balanceClear: 'Nothing owed',
     recordPayment: 'Record payment',
     recordCollection: 'Record collection',
     recordTransfer: 'Record transfer',

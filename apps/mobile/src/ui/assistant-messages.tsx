@@ -37,14 +37,16 @@ export function UserMessage({ text }: { text: string }) {
  * The model's words are content in the language they were written in, which
  * for the v1 server is always Spanish (docs/i18n.md §11): VoiceOver reads them
  * with a Spanish voice, the device's own when the device is in Spanish, even
- * with English chosen in Más. A v2 reply will carry the language it was asked in. */
+ * with English chosen in Más. A v2 reply will carry the language it was asked in.
+ * `ownWords` marks a turn the app wrote itself (a clarification question, "review
+ * the draft"): it is already in the interface language and follows the usual rule. */
 const REPLY_LANGUAGE_V1 = 'es';
-export function AssistantText({ text, status }: { text: string; status: 'streaming' | 'done' | 'stopped' }) {
+export function AssistantText({ text, status, ownWords = false }: { text: string; status: 'streaming' | 'done' | 'stopped'; ownWords?: boolean }) {
   const { t, language, speechLanguage } = useI18n();
   if (!text && status === 'streaming') return <Thinking />;
-  // Interface in the reply's language: the usual rule (nothing when the device agrees).
-  // Otherwise the prose is not in the interface language, so it names its own.
-  const replyVoice = language === REPLY_LANGUAGE_V1 ? speechLanguage : REPLY_LANGUAGE_V1;
+  // The interface's own words, or prose already in the interface language: the usual
+  // rule (nothing when the device agrees). Otherwise the prose names its own language.
+  const replyVoice = ownWords || language === REPLY_LANGUAGE_V1 ? speechLanguage : REPLY_LANGUAGE_V1;
   return <View accessible accessibilityLabel={t('assistant.message.assistant', { text })} accessibilityLanguage={replyVoice} style={styles.assistantRow}>
     <AppText style={styles.assistantText}>{text}{status === 'streaming' ? <Cursor /> : null}</AppText>
     {status === 'stopped' && <AppText tertiary variant="footnote">{t('assistant.message.stopped')}</AppText>}
@@ -136,16 +138,20 @@ export function ClarificationChoices({ options, chosen, onChoose }: { options: C
  * button in the interaction colour. Never a dashboard. A row is one VoiceOver
  * element, so its label says the amount too, in spoken form: the Money inside
  * is not reached on its own. */
-export function AnswerEvidence({ content, currency, onOpen }: { content: AnswerContent; currency: 'ARS' | 'USD'; onOpen: (href: AnswerContent['links'][number]['href']) => void }) {
+export function AnswerEvidence({ content, onOpen }: { content: AnswerContent; onOpen: (href: AnswerContent['links'][number]['href']) => void }) {
   const p = usePalette();
   const { t, spokenMoney, speechLanguage } = useI18n();
   const categoryLook = useCategoryLookOf('expense');
   if (!content.rows.length && !content.links.length) return null;
+  const currency = content.currency;
+  // A difference that grew is said as such ("42500,00 pesos más"); a lower one already starts with "Menos".
+  const spoken = (row: AnswerContent['rows'][number]) => row.signed && row.amountMinor > 0
+    ? t('assistant.evidence.spokenIncrease', { amount: spokenMoney(row.amountMinor, currency) }) : spokenMoney(row.amountMinor, currency);
   return <View style={[styles.assistantRow, { gap: space.s }]}>
     {content.rows.length > 0 && <View style={[styles.evidence, { borderColor: p.line }]}>
       {content.rows.map(row => {
         const label = evidenceLabel(row, t, stored => categoryLook(stored).label);
-        return <View key={row.id} accessible accessibilityLabel={label + ', ' + spokenMoney(row.amountMinor, currency)} accessibilityLanguage={speechLanguage} style={styles.evidenceRow}>
+        return <View key={row.id} accessible accessibilityLabel={label + ', ' + spoken(row)} accessibilityLanguage={speechLanguage} style={styles.evidenceRow}>
           <AppText secondary variant="subhead" numberOfLines={2} style={{ flex: 1, minWidth: 0 }}>{label}</AppText>
           <Money minor={row.amountMinor} currency={currency} signed={row.signed} size={15} weight="600" />
         </View>;

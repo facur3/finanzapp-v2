@@ -73,6 +73,15 @@ const TWINS: Record<string, [visible: string, spoken: string][]> = {
   AmountShortcut: [['caption', 'spokenCaption']],
   ActionButton: [['label', 'spokenLabel']],
 };
+/** Wrapper props with no spoken twin that the wrapper itself writes into its accessibilityLabel (components.tsx,
+ * form-controls.tsx): a visible format passed there reaches VoiceOver as surely as one written in the label.
+ * Not followed: an array element inside a `.map` callback (the Región sample in CheckRow subtitles is read as
+ * shown on purpose, docs/i18n.md §10). */
+const LABEL_PROPS: Record<string, string[]> = {
+  SectionTitle: ['action'], IconButton: ['label'], Field: ['label'], AmountField: ['label'], AmountShortcut: ['label'],
+  InfoButton: ['title', 'label'], DetailRow: ['label'], NavigationRow: ['title', 'subtitle'], CheckRow: ['title', 'subtitle'],
+  SelectorCard: ['label', 'value', 'placeholder'], SelectionRow: ['label', 'value'], AccountField: ['label'], CategoryField: ['label'],
+};
 /** The wrappers in components.tsx that own a raw focusable element and give it speechLanguage. */
 const WRAPPERS = ['AppText', 'PressFeedback', 'Field', 'AmountField', 'Choice', 'ErrorMessage', 'Money', 'SelectionRow'];
 /** Of those, the ones that spread the caller's props and let an explicit accessibilityLanguage win. */
@@ -312,6 +321,13 @@ function voiceover(program: ts.Program, root: string) {
           if (expression && taint(expression, NONE) && !attributes.has(spoken)) report(node, `<${node.tagName.text} ${visible}> without ${spoken}`);
         }
       }
+      if ((ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) && ts.isIdentifier(node.tagName) && Object.hasOwn(LABEL_PROPS, node.tagName.text)) {
+        const attributes = attributesOf(node);
+        for (const prop of LABEL_PROPS[node.tagName.text]) {
+          const expression = expressionOf(attributes.get(prop));
+          if (expression && taint(expression, NONE)) report(node, `<${node.tagName.text} ${prop}> reaches VoiceOver`);
+        }
+      }
     });
     return found;
   }
@@ -435,11 +451,13 @@ test('(a) the scanner follows helpers per call, memo and helper results per memb
           <DetailRow label="Saldo" value={money(minor, 'ARS')} />, // leak: <DetailRow value> without spokenValue
           <DetailRow label="Saldo" value={money(minor, 'ARS')} spokenValue={spokenMoney(minor, 'ARS')} />,
           <ActionButton label={'Guardar' + withDefault()} />, // leak: <ActionButton label> without spokenLabel
+          <NavigationRow title="Copia" subtitle={money(minor, 'ARS')} />, // leak: <NavigationRow subtitle> reaches VoiceOver
+          <NavigationRow title="Copia" subtitle={spokenMoney(minor, 'ARS')} />,
         ];
       }`,
   };
   const expected = marked(modules, '/probe', 'leak');
-  assert.equal(expected.length, 9);
+  assert.equal(expected.length, 10);
   assert.deepEqual(voiceover(memoryProgram(modules), '/probe').leaks(), expected);
 });
 

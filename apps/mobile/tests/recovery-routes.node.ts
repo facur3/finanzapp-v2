@@ -417,7 +417,7 @@ test('card payment locks the card as destination, caps at the recorded debt and 
   assert.equal(view.transfers.length, 0);
   find(view.render(), 'AmountField').props.onChangeText('50');
   root = view.render();
-  assert.equal(find(root, 'DetailRow', 'Visa después').props.value, 'A favor ARS 0,00');
+  assert.equal(find(root, 'DetailRow', 'Visa después').props.value, 'Sin deuda', 'a card paid to zero owes nothing; it is not "in credit"');
   await find(root, 'ActionButton', 'Registrar pago').props.onPress();
   assert.equal(view.transfers.length, 1);
   assert.deepEqual([view.transfers[0].fromAccountId, view.transfers[0].toAccountId, view.transfers[0].amountMinor, view.transfers[0].note], ['a', 'card-acc', 5000, 'Pago Visa']);
@@ -746,7 +746,7 @@ test('23.1C2: a worded balance carries its code where the language puts it; a ca
   assert.equal(find(root, 'AccountField', 'From').props.detail, 'ARS 876.55');
   find(root, 'AmountField').props.onChangeText('50');
   root = english.render();
-  assert.equal(find(root, 'DetailRow', 'Visa afterwards').props.value, 'In credit ARS 0.00');
+  assert.equal(find(root, 'DetailRow', 'Visa afterwards').props.value, 'Nothing owed');
   assert.equal(find(root, 'DetailRow', 'Prueba ARS afterwards').props.value, 'ARS 826.55');
   // A debt is pending, in both languages; the collection side is a receivable.
   const debtForm = (locale: AppLocale) => harness('src/ui/transfer-form.tsx', { toAccountId: 'debt-acc', maxAmountMinor: '7000' }, { data: liabilityData, locale }).render();
@@ -762,8 +762,8 @@ test('23.1C2: a worded balance carries its code where the language puts it; a ca
 test('23.1C2: the transfer form gives VoiceOver the language’s numbers on the cards, the shortcut and the after rows', () => {
   const cases = [
     // [locale, card kind, after label, screen detail, spoken detail, screen caption, spoken caption, screen after, spoken after]
-    ['es-US', 'Tarjeta', 'Visa después', 'Deuda ARS 50.00', 'Deuda ARS 50,00', 'Deuda registrada: ARS 50.00', 'Deuda registrada: ARS 50,00', 'A favor ARS 0.00', 'A favor ARS 0,00'],
-    ['en-AR', 'Card', 'Visa afterwards', 'Owed ARS 50,00', 'Owed ARS 50.00', 'Recorded debt: ARS 50,00', 'Recorded debt: ARS 50.00', 'In credit ARS 0,00', 'In credit ARS 0.00'],
+    ['es-US', 'Tarjeta', 'Visa después', 'Deuda ARS 50.00', 'Deuda ARS 50,00', 'Deuda registrada: ARS 50.00', 'Deuda registrada: ARS 50,00', 'Sin deuda', 'Sin deuda'],
+    ['en-AR', 'Card', 'Visa afterwards', 'Owed ARS 50,00', 'Owed ARS 50.00', 'Recorded debt: ARS 50,00', 'Recorded debt: ARS 50.00', 'Nothing owed', 'Nothing owed'],
   ] as const;
   for (const [locale, kind, after, detail, spokenDetail, caption, spokenCaption, afterValue, spokenAfter] of cases) {
     const view = harness('src/ui/transfer-form.tsx', { toAccountId: 'card-acc', maxAmountMinor: '5000' }, { data: liabilityData, locale });
