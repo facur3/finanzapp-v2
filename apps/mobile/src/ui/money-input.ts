@@ -156,13 +156,15 @@ export function amountFromView(view: AmountView, format: AmountFormat = LEDGER_F
  *   - `precision`: more than two decimals that are not trailing zeros ("12.345,678");
  *   - `invalid`: not an amount ("abc", "1.000.5", "12 34", a second sign or a
  *     second decimal separator once it lands in the field);
- *   - `tooLong`: more than thirteen whole digits. */
-export type PasteRejection = 'ambiguous' | 'precision' | 'invalid' | 'tooLong';
+ *   - `tooLong`: more than thirteen whole digits;
+ *   - `currencyMismatch`: an explicit currency conflicts with the account's currency. */
+export type PasteRejection = 'ambiguous' | 'precision' | 'invalid' | 'tooLong' | 'currencyMismatch';
 export interface AmountNotice { reason: PasteRejection; text: string }
 
 type PastedAmount = { ok: true; negative: boolean; canonical: string } | { ok: false; reason: PasteRejection };
 
-// Currency marks around a copied amount; the account, not the text, decides the currency.
+// Explicit ARS/USD markers must match the account. A bare "$" is ambiguous.
+const EXPLICIT_CURRENCY_MARKS = /U\$S|US\$|AR\$|\bARS\b|\bUSD\b/gi;
 const CURRENCY_MARKS = /U\$S|US\$|AR\$|\$|\bARS\b|\bUSD\b/gi;
 // \s covers the no-break and thin spaces other apps group thousands with.
 const SPACES = /\s+/g;
@@ -176,10 +178,15 @@ const SPACES = /\s+/g;
  *   - one separator followed by exactly three digits: a thousand when it is the
  *     region's group separator ("1.000" in Argentina), otherwise ambiguous;
  *   - spaces may group thousands ("1 234,56"); "$", "US$", "AR$", "U$S", "ARS"
- *     and "USD" are ignored, a leading minus is kept.
+ *     and "USD" are stripped only after checking their explicit currency against the account;
+ *     a mismatched currency is refused, never converted. A leading minus is kept.
  * Decimals beyond the second must be zeros. Only the digits are kept: no
  * number is ever computed from the text. */
-export function readPastedAmount(text: string, format: AmountFormat = LEDGER_FORMAT): PastedAmount {
+export function readPastedAmount(text: string, format: AmountFormat = LEDGER_FORMAT, expectedCurrency?: 'ARS' | 'USD'): PastedAmount {
+  const explicit = [...text.matchAll(EXPLICIT_CURRENCY_MARKS)].map(match =>
+    /^(?:U\$S|US\$|USD)$/i.test(match[0]) ? 'USD' : 'ARS');
+  if (explicit.length > 1) return { ok: false, reason: 'invalid' };
+  if (expectedCurrency && explicit.some(code => code !== expectedCurrency)) return { ok: false, reason: 'currencyMismatch' };
   let body = text.replace(CURRENCY_MARKS, ' ').replace(SPACES, ' ').trim();
   const negative = /^[-−]/.test(body);
   if (negative) body = body.slice(1).trim();
@@ -270,10 +277,11 @@ function carried(reference: RawText, raw: string, a: number, b: number): number 
  * state) when the text is not an unambiguous amount, or when it would give the
  * field a second sign, a second decimal separator, a third decimal or a
  * fourteenth whole digit. */
-function readPaste(raw: string, a: number, b: number, decimalAt: number, format: AmountFormat, previous: AmountEdit): AmountRead {
+function readPaste(raw: string, a: number, b: number, decimalAt: number, format: AmountFormat, previous: AmountEdit,
+  expectedCurrency?: 'ARS' | 'USD'): AmountRead {
   const inserted = raw.slice(a, raw.length - b);
   const refuse = (reason: PasteRejection): AmountRead => ({ state: previous, rejected: { reason, text: inserted.trim() }, raw: null });
-  const pasted = readPastedAmount(inserted, format);
+  const pasted = readPastedAmount(inserted, format, expectedCurrency);
   if (!pasted.ok) return refuse(pasted.reason);
   const before = canonicalSlice(raw, 0, a, decimalAt), after = canonicalSlice(raw, raw.length - b, raw.length, decimalAt);
   if (pasted.negative && before !== '') return refuse('invalid');
@@ -306,7 +314,7 @@ function readPaste(raw: string, a: number, b: number, decimalAt: number, format:
  * characters is a paste (readPaste), refused with a reason rather than
  * guessed when it is ambiguous. */
 export function readAmountInput(shown: AmountView, raw: string, rawCaret: number | null, format: AmountFormat = LEDGER_FORMAT,
-  previousRaw: RawText | null = null): AmountRead {
+  previousRaw: RawText | null = null, expectedCurrency?: 'ARS' | 'USD'): AmountRead {
   const previous = amountFromView(shown, format);
   const references: RawText[] = [{ text: shown.text, decimalAt: shown.text.indexOf(format.decimal) }];
   if (previousRaw && previousRaw.text !== shown.text) references.push(previousRaw);
@@ -318,7 +326,7 @@ export function readAmountInput(shown: AmountView, raw: string, rawCaret: number
   }
   const { reference, a, b, inserted } = best!;
   let decimalAt = carried(reference, raw, a, b);
-  if (inserted.length > 1 && /[^0-9]/.test(inserted)) return readPaste(raw, a, b, decimalAt, format, previous);
+  if (inserted.length > 1 && /[^0-9]/.test(inserted)) return readPaste(raw, a, b, decimalAt, format, previous, expectedCurrency);
   let text = raw;
   let caret = rawCaret ?? raw.length;
   const deleted = reference.text.slice(a, reference.text.length - b);
@@ -444,8 +452,8 @@ export class AmountInput {
     return this.view;
   }
 
-  change(raw: string, rawCaret: number | null): { view: AmountView; draft: string; rejected: AmountNotice | null } {
-    const read = readAmountInput(this.view, raw, rawCaret, this.format, this.raw);
+  change(raw: string, rawCaret: number | null, expectedCurrency?: 'ARS' | 'USD'): { view: AmountView; draft: string; rejected: AmountNotice | null } {
+    const read = readAmountInput(this.view, raw, rawCaret, this.format, this.raw, expectedCurrency);
     this.raw = read.raw;
     return { view: this.show(read.state), draft: this.draft, rejected: read.rejected };
   }
