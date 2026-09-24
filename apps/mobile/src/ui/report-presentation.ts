@@ -1,12 +1,23 @@
-import { validDateISO, type Currency, type LedgerSnapshot, type ReportPeriod } from '@finanzapp/domain';
+import { isStorableCurrency, validDateISO, type Currency, type LedgerSnapshot, type ReportPeriod } from '@finanzapp/domain';
 import { availableCurrencies } from './presentation.ts';
 import { formatMonth, formatPercent } from '../i18n/format.ts';
 import { DEFAULT_LOCALE, type AppLocale } from '../i18n/locale.ts';
 import { translator, type Translate } from '../i18n/messages.ts';
 
+/** A route's currency parameter, accepted only when it is a storable code that an account
+ * actually holds; anything else (an unknown code, a lowercase one, a currency with no
+ * account) is null, never coerced to ARS or to the first held currency. The creation gate
+ * plays no part: a stored currency stays reachable whatever the gate offers. */
+export function heldCurrency(accounts: readonly { currency: Currency }[], param: unknown): Currency | null {
+  return isStorableCurrency(param) && accounts.some(account => account.currency === param) ? param : null;
+}
+
+/** The Reportes tab's own selection: the route's currency when held, otherwise the first
+ * currency of the ledger (ARS in an empty ledger, decision 7.6.4). Drill-downs use
+ * `strictReportSelection`, which refuses instead of falling back. */
 export function reportSelection(snapshot: LedgerSnapshot, currencyParam: unknown, monthParam: unknown, day: string) {
   const currencies = availableCurrencies(snapshot.accounts);
-  const currency = currencies.includes(currencyParam as Currency) ? currencyParam as Currency : currencies[0] ?? 'ARS';
+  const currency = heldCurrency(snapshot.accounts, currencyParam) ?? currencies[0] ?? 'ARS';
   const currentMonth = day.slice(0, 7);
   const monthISO = typeof monthParam === 'string' && /^\d{4}-\d{2}$/.test(monthParam)
     && validDateISO(monthParam + '-01') && monthParam <= currentMonth ? monthParam : currentMonth;
@@ -14,6 +25,14 @@ export function reportSelection(snapshot: LedgerSnapshot, currencyParam: unknown
   const earliestMonth = snapshot.entries.reduce((earliest, entry) => accounts.has(entry.accountId) && entry.dateISO <= day
     && entry.dateISO.slice(0, 7) < earliest ? entry.dateISO.slice(0, 7) : earliest, currentMonth);
   return { currency, currencies, monthISO, earliestMonth, currentMonth };
+}
+
+/** A drill-down opened with a currency: null when the parameter is present but unknown,
+ * malformed or not held, so the screen shows its invalid state instead of another
+ * currency's figures. A link without a currency opens the ledger's first one, as the tab does. */
+export function strictReportSelection(snapshot: LedgerSnapshot, currencyParam: unknown, monthParam: unknown, day: string): ReturnType<typeof reportSelection> | null {
+  if (currencyParam !== undefined && !heldCurrency(snapshot.accounts, currencyParam)) return null;
+  return reportSelection(snapshot, currencyParam, monthParam, day);
 }
 
 export function shiftReportMonth(monthISO: string, delta: -1 | 1): string {

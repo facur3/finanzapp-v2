@@ -729,6 +729,15 @@ result. Do not commit screenshots containing actual balances, accounts or names.
 - [ ] Reduce Motion stops non-essential scale/slide effects.
 - [ ] Dark/light system appearance has readable contrast and no white flashes.
 
+## Producto 24B2 — strict route currencies and the amount field by exponent (nothing visible in production)
+
+Nothing to verify on the device for 24B2 beyond the Más footer reading "Producto 24B2":
+with ARS and USD the amount field behaves exactly as in 23.1C1 (re-run the **Producto
+23.1C1** amount-field checks if in doubt). Reserved for stage 9, on a development build with
+a test gate: the number pad at exponent 0, the kept-draft note after switching an account
+with a half-typed amount (the digits must not move; Save disabled; VoiceOver announces the
+note), and the catalogue paste markers.
+
 ## Producto 24B1 — currency safety net (nothing visible; checks reserved for 24B stage 9)
 
 Nothing to verify on the device for 24B1 beyond the Más footer reading "Producto 24B1".

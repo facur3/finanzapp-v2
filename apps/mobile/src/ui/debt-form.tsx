@@ -3,7 +3,7 @@ import { Alert, Keyboard, View } from 'react-native';
 import { router, Stack } from 'expo-router';
 import { randomUUID } from 'expo-crypto';
 import * as Haptics from 'expo-haptics';
-import { parseMinorUnits, samePersonalDebtProfile, todayKey, validateAccount, validatePersonalDebtProfile,
+import { draftFitsCurrency, minorFromLedgerDraft, samePersonalDebtProfile, todayKey, validateAccount, validatePersonalDebtProfile,
   type Account, type Currency, type DebtDirection, type PersonalDebtProfile } from '@finanzapp/domain';
 import { useI18n } from '../i18n/provider';
 import { useLedger } from '../storage/LedgerProvider';
@@ -69,7 +69,7 @@ export function DebtForm({ original }: { original?: PersonalDebtProfile }) {
       } else {
         let submission = pendingCreate;
         if (!submission) {
-          const principal = parseMinorUnits(amount);
+          const principal = minorFromLedgerDraft(amount, currency);
           if (principal <= 0) throw new Error('debts.form.amountPositive'); // A catalogue key, translated when shown (ErrorMessage).
           const debt: PersonalDebtProfile = { ...profileBase(), active: true, revision: 0, updatedAt: identity.createdAt };
           const newAccount: Account = {
@@ -155,7 +155,7 @@ export function DebtForm({ original }: { original?: PersonalDebtProfile }) {
       {t('debts.form.frozenNote')}
     </AppText>}
     <ActionButton label={error && (pendingCreate || pendingEdit) ? t('common.retrySave') : before ? t('common.saveChanges') : t('debts.form.create')}
-      onPress={save} busy={busy} disabled={before ? !counterparty.trim() : !counterparty.trim() || !amount.trim()} />
+      onPress={save} busy={busy} disabled={(before ? !counterparty.trim() : !counterparty.trim() || !amount.trim()) || !draftFitsCurrency(amount, currency).ok} />
     {before && <ActionButton label={t(pendingArchive && error ? 'debts.form.retry' : before.active ? 'debts.form.archive' : 'debts.form.reactivate')}
       onPress={archive} secondary disabled={busy || !!pendingEdit} />}
   </Screen>;

@@ -7,6 +7,8 @@ export const errors: Pick<Messages, 'errors'> = {
       invalidAmount: 'Invalid amount.',
       enterAmount: 'Enter a valid amount.',
       twoDecimals: 'Use numbers with up to two decimals.',
+      decimalsDigits: 'Use numbers with up to {digits} decimals.',
+      wholeNumbers: 'Use whole numbers: this currency has no decimals.',
       amountTooLarge: 'The amount is too large.',
       invalidId: 'Invalid identifier.',
       existingAccount: 'Choose an existing account.',

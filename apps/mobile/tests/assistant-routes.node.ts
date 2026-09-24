@@ -337,7 +337,8 @@ test('Editar hands the draft to the entry form prefilled and marks the card as e
   scripted.reply([{ type: 'result', result: FIXTURE_DRAFT, facts: [] }]);
   await settle();
   find([view.render().items[1]], 'DraftCard')[0].props.onEdit();
-  assert.equal(JSON.stringify(view.pushed), JSON.stringify([{ pathname: '/new-entry', params: { kind: 'expense', currency: 'ARS', accountId: 'visa', amount: '18.500,00', merchant: 'Carrefour', category: 'Supermercado', date: '2026-09-21' } }]));
+  // 24B2: the amount travels as minor units with its currency, never as a two-decimal string.
+  assert.equal(JSON.stringify(view.pushed), JSON.stringify([{ pathname: '/new-entry', params: { kind: 'expense', currency: 'ARS', accountId: 'visa', amountMinor: '1850000', merchant: 'Carrefour', category: 'Supermercado', date: '2026-09-21' } }]));
   assert.equal(find([view.render().items[1]], 'DraftCard')[0].props.content.status, 'edited');
   assert.equal(view.written.length, 0);
 });

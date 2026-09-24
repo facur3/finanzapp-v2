@@ -3,7 +3,7 @@ import { AccessibilityInfo, ActivityIndicator, Alert, InputAccessoryView, Keyboa
   useWindowDimensions, type PressableProps, type StyleProp, type TextInputProps, type TextProps, type ViewStyle } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { accountBalanceMinor, type Currency, type Entry, type EntryKind, type Account, type Transfer } from '@finanzapp/domain';
+import { accountBalanceMinor, editedDraftFits, type Currency, type Entry, type EntryKind, type Account, type StoredDraft, type Transfer } from '@finanzapp/domain';
 import type { ActivityItem } from './presentation';
 import { router } from 'expo-router';
 import { radius, space, type, useCurrentDay, usePalette, useReduceMotion, type Palette } from './theme';
@@ -12,7 +12,7 @@ import { tintOf } from './category-color';
 import { useAccountLook, useAccountNameOf, useCategoryLook } from './category-hues';
 import { AMOUNT_FIELD, ROW_STACK_SCALE, SEGMENT_GAP, SEGMENT_PADDING, amountFieldLayout, fitFontSize, rowStacks, segmentLayout } from './geometry';
 import { duration, easeOut, selectionHaptic, timing } from './motion';
-import { AmountInput, displayAmount, splitAmount, type AmountNotice, type PasteRejection } from './money-input';
+import { AmountInput, displayAmount, precisionOf, splitAmount, type AmountNotice, type PasteRejection } from './money-input';
 import { useI18n } from '../i18n/provider';
 import { moneyText } from '../i18n/format';
 import { DEFAULT_LOCALE, type AppLocale } from '../i18n/locale';
@@ -218,7 +218,9 @@ type Caret = { start: number; end: number };
  * left-aligned like the hero amounts of Inicio and the detail screens. No
  * negative tracking: on iOS it draws the last glyph past the measured width,
  * under the caret. */
-export function AmountField({ label, currency, tone, value = '', onChangeText, ...props }: TextInputProps & { label?: string; currency: Currency; tone?: Tone }) {
+export function AmountField({ label, currency, tone, value = '', onChangeText, stored, ...props }: TextInputProps & { label?: string; currency: Currency; tone?: Tone;
+  /** The stored amount an edit form prefilled the field from: while the text is exactly that prefill in its own currency, it always fits (a stored amount may exceed the entry bound). */
+  stored?: StoredDraft }) {
   const p = usePalette();
   const { t, amountFormat, currencySymbol, speechLanguage } = useI18n();
   const accessoryId = useId();
@@ -228,8 +230,16 @@ export function AmountField({ label, currency, tone, value = '', onChangeText, .
   const [notice, setNotice] = useState<AmountNotice | null>(null);
   // The editing model, kept in a ref so a second keystroke in the same frame reads the latest render.
   const input = useRef<AmountInput | null>(null);
-  if (!input.current) input.current = new AmountInput(value, amountFormat);
+  if (!input.current) input.current = new AmountInput(value, amountFormat, currency);
   const emitted = useRef(value);
+  const { decimals } = precisionOf(currency);
+  useEffect(() => {
+    // The account or the currency changed with a draft typed: the digits stay exactly as they are (ARS ↔ USD changes
+    // nothing); only the precision of the next keystroke changes, and a draft that no longer fits is said below and
+    // cannot be saved (the form asks draftFitsCurrency). Never truncated, rounded or rescaled.
+    input.current!.retarget(currency);
+    setNotice(null);
+  }, [currency]);
   useEffect(() => {
     if (value === emitted.current) return;
     // The form changed the value itself (a prefill, a shortcut or a reset): adopt it and let the caret settle at the end.
@@ -249,17 +259,23 @@ export function AmountField({ label, currency, tone, value = '', onChangeText, .
   const title = label ?? t('amount.label');
   const symbol = currencySymbol(currency);
   // Derived from the draft and the region, so the text follows a region change in the same render.
-  const text = displayAmount(value, amountFormat);
+  const text = displayAmount(value, amountFormat, currency);
+  // A kept draft that the currency cannot hold exactly: more decimals than it has, or more digits than it allows.
+  const fit = editedDraftFits(value, currency, stored);
+  const keptText = fit.ok ? null : t(fit.reason === 'tooLong' ? 'amount.kept.tooLong' : decimals === 0 ? 'amount.kept.noDecimals' : 'amount.kept.decimals', { currency, digits: decimals });
   const { fontSize, symbolSize } = amountFieldLayout(text, rowWidth, symbol, AMOUNT_GAP, Math.min(fontScale, HERO_MAX_SCALE));
   const color = tone && tone !== 'neutral' ? toneColors(p, tone).color : p.text;
   const emit = (draft: string) => { if (draft !== emitted.current) { emitted.current = draft; onChangeText?.(draft); } };
-  const noticeText = notice ? t(PASTE_NOTICES[notice.reason], { text: clipped(notice.text), decimal, currency }) : null;
+  // The precision sentence names the currency's own decimals; the two-decimal one keeps its exact wording for ARS and USD.
+  const pasteKey = (reason: PasteRejection): MessageKey => reason !== 'precision' || decimals === 2 ? PASTE_NOTICES[reason]
+    : decimals === 0 ? 'amount.paste.precisionNone' : 'amount.paste.precisionDigits';
+  const noticeText = notice ? t(pasteKey(notice.reason), { text: clipped(notice.text), decimal, currency, digits: decimals }) : keptText;
   const change = (event: { nativeEvent: { text: string; selection?: Caret } }) => {
     const { text: raw, selection: native } = event.nativeEvent;
-    const result = input.current!.change(raw, native ? native.end : null, currency);
+    const result = input.current!.change(raw, native ? native.end : null);
     setSelection({ start: result.view.caret, end: result.view.caret });
     setNotice(result.rejected);
-    if (result.rejected) AccessibilityInfo.announceForAccessibility?.(t(PASTE_NOTICES[result.rejected.reason], { text: clipped(result.rejected.text), decimal, currency }));
+    if (result.rejected) AccessibilityInfo.announceForAccessibility?.(t(pasteKey(result.rejected.reason), { text: clipped(result.rejected.text), decimal, currency, digits: decimals }));
     emit(result.draft);
   };
   const select = (event: { nativeEvent: { selection: Caret; text?: string } }) => {
@@ -276,7 +292,7 @@ export function AmountField({ label, currency, tone, value = '', onChangeText, .
     <View style={styles.amountRow} onLayout={event => setRowWidth(event.nativeEvent.layout.width)}>
       <AppText accessible={false} maxFontSizeMultiplier={HERO_MAX_SCALE}
         style={{ fontSize: symbolSize, lineHeight: Math.round(symbolSize * 1.25), color: p.secondary, fontWeight: '500' }}>{symbol}</AppText>
-      <TextInput keyboardType="decimal-pad" inputMode="decimal" maxLength={24} placeholder="0" {...props} value={text} onChange={change}
+      <TextInput keyboardType={decimals === 0 ? 'number-pad' : 'decimal-pad'} inputMode={decimals === 0 ? 'numeric' : 'decimal'} maxLength={24} placeholder="0" {...props} value={text} onChange={change}
         selection={selection} onSelectionChange={select}
         onBlur={event => { settle(); props.onBlur?.(event); }} onSubmitEditing={event => { settle(); props.onSubmitEditing?.(event); }}
         accessibilityLabel={t('amount.accessibility', { label: title, currency: t(currency === 'ARS' ? 'amount.inPesos' : 'amount.inDollars') })}

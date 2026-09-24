@@ -10,19 +10,21 @@ import { selectEntries } from '../src/ui/presentation';
 import { periodLabel } from '../src/ui/spending-timeline';
 import { useCategoryLookOf } from '../src/ui/category-hues';
 import { useCurrentDay } from '../src/ui/theme';
+import { heldCurrency } from '../src/ui/report-presentation';
 
 export default function SpendingDetailScreen() {
   const { snapshot } = useLedger();
   const today = useCurrentDay();
   const lookOf = useCategoryLookOf('expense');
   const { t, locale } = useI18n();
-  const { currency, startISO, endISO, category } = useLocalSearchParams<{ currency?: string; startISO?: string; endISO?: string; category?: string }>();
+  const params = useLocalSearchParams<{ currency?: string; startISO?: string; endISO?: string; category?: string }>();
+  const { startISO, endISO, category } = params;
   if (!snapshot) return null;
-  if ((currency !== 'ARS' && currency !== 'USD') || typeof startISO !== 'string' || typeof endISO !== 'string'
+  const currency = heldCurrency(snapshot.accounts, params.currency);
+  if (!currency || typeof startISO !== 'string' || typeof endISO !== 'string'
     || !validDateISO(startISO) || !validDateISO(endISO) || startISO > endISO || endISO > today
     || (Date.parse(endISO) - Date.parse(startISO)) / 86400000 > 30
-    || (category !== undefined && (typeof category !== 'string' || !category))
-    || !snapshot.accounts.some(a => a.currency === currency)) return <Screen><EmptyState title={t('spendingDetail.invalidTitle')} detail={t('spendingDetail.invalidDetail')} /></Screen>;
+    || (category !== undefined && (typeof category !== 'string' || !category))) return <Screen><EmptyState title={t('spendingDetail.invalidTitle')} detail={t('spendingDetail.invalidDetail')} /></Screen>;
   const period: ReportPeriod = { currency, startISO, endISO };
   const report = spendingOverview(snapshot, period);
   const entries = selectEntries(expensesInPeriod(snapshot, period, category), snapshot.accounts);

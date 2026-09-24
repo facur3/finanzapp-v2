@@ -10,6 +10,9 @@ export const errors = {
       invalidAmount: 'Monto inválido.',
       enterAmount: 'Ingresá un monto válido.',
       twoDecimals: 'Usá números con hasta dos decimales.',
+      /** The same refusal for a currency with another number of decimals (KWD: 3) or none (JPY); Producto 24B2. */
+      decimalsDigits: 'Usá números con hasta {digits} decimales.',
+      wholeNumbers: 'Usá números enteros: esta moneda no tiene decimales.',
       amountTooLarge: 'El monto es demasiado grande.',
       invalidId: 'Identificador inválido.',
       existingAccount: 'Elegí una cuenta existente.',

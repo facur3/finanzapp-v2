@@ -3,11 +3,13 @@ import { Keyboard, View } from 'react-native';
 import { router, Stack } from 'expo-router';
 import { randomUUID } from 'expo-crypto';
 import * as Haptics from 'expo-haptics';
-import { accountBalanceMinor, accountKind, categoryKey, makeEntryChange, parseMinorUnits, sameEntry, summarizeMonthlyBudgets, todayKey, validateEntry, validateEntryChange, type Account, type Entry, type EntryChange, type EntryKind, type EntryRecord } from '@finanzapp/domain';
+import { accountBalanceMinor, accountKind, categoryKey, editedDraftFits, makeEntryChange, minorFromEditedDraft, sameEntry, summarizeMonthlyBudgets, todayKey, validateEntry, validateEntryChange, type Account, type Entry, type EntryChange, type EntryKind, type EntryRecord, type StoredDraft } from '@finanzapp/domain';
 import { useLedger } from '../storage/LedgerProvider';
 import { budgetTone } from './budget-presentation';
 import { ActionButton, AmountField, AppText, Choices, EmptyState, ErrorMessage, Field, IconButton, Screen, Surface } from './components';
 import { draftFromMinor } from './money-input';
+import { prefillDraft, type EntryPrefill } from './entry-prefill';
+export type { EntryPrefill } from './entry-prefill';
 import { AccountField, CategoryField, DateField } from './form-controls';
 import { accountKindLabel, postingAccounts } from './liability-presentation';
 import { initialAccountId } from './presentation';
@@ -15,9 +17,6 @@ import { useI18n } from '../i18n/provider';
 import { space } from './theme';
 
 type FormKind = EntryKind | 'transfer';
-
-/** Seed values for a new posting (an Assistant draft handed to the form). Display strings; the amount is the same canonical text the field renders. */
-export type EntryPrefill = { amount?: string; merchant?: string; category?: string; dateISO?: string };
 
 /** One form for creating and correcting a posting. The amount, the kind, the
  * category and the account or card are the four things a user must see; a
@@ -39,7 +38,14 @@ export function EntryForm({ original, accountId: requestedAccount, currency, kin
   const [ownKind, setKind] = useState<EntryKind>(before?.entry.kind ?? (requestedKind === 'income' ? 'income' : 'expense'));
   const kind: EntryKind = onKindChange ? (requestedKind === 'income' ? 'income' : 'expense') : ownKind;
   const [accountId, setAccountId] = useState(() => before?.entry.accountId ?? initialAccountId(accounts, requestedAccount, currency));
-  const [amount, setAmount] = useState(before ? draftFromMinor(before.entry.amountMinor) : prefill?.amount ?? '');
+  // An edit is prefilled in the movement's own currency (its account's); a prefill in another currency is never reinterpreted.
+  // While the text stays exactly that prefill (same currency), saving keeps the stored minor units themselves: a stored amount
+  // may exceed the entry bound (a restored backup), and re-reading it would lock every other correction.
+  const [stored] = useState<StoredDraft | null>(() => {
+    const own = before ? accounts.find(item => item.id === before.entry.accountId)?.currency : undefined;
+    return before && own ? { minor: before.entry.amountMinor, currency: own, draft: draftFromMinor(before.entry.amountMinor, own) } : null;
+  });
+  const [amount, setAmount] = useState(() => before ? stored?.draft ?? '' : prefillDraft(prefill));
   const [merchant, setMerchant] = useState(before?.entry.merchant ?? prefill?.merchant ?? '');
   const [category, setCategory] = useState(before?.entry.category ?? prefill?.category ?? '');
   const [date, setDate] = useState(() => before ? new Date(before.entry.dateISO + 'T12:00:00') : prefill?.dateISO ? new Date(prefill.dateISO + 'T12:00:00') : new Date());
@@ -90,7 +96,9 @@ export function EntryForm({ original, accountId: requestedAccount, currency, kin
   const describeAccount = (item: Account) => optionLine(item, formatAmount);
   const spokenDescribeAccount = (item: Account) => optionLine(item, minor => spokenMoney(minor, item.currency));
   let parsed: number | null = null;
-  try { parsed = parseMinorUnits(amount); } catch { parsed = null; }
+  try { parsed = account ? minorFromEditedDraft(amount, account.currency, stored) : null; } catch { parsed = null; }
+  // A draft kept across an account change that the new currency cannot hold exactly blocks Save; the field says why.
+  const fit = account ? editedDraftFits(amount, account.currency, stored) : { ok: true as const };
 
   async function save() {
     if (saving.current) return;
@@ -104,7 +112,8 @@ export function EntryForm({ original, accountId: requestedAccount, currency, kin
         const dateISO = todayKey(date);
         // Messages are stored as catalogue keys and translated when shown (ErrorMessage), so they follow a language change.
         if (dateISO > todayKey()) throw new Error('entryForm.futureDate');
-        const entry: Entry = { ...(before?.entry ?? operation), kind, accountId, amountMinor: parseMinorUnits(amount),
+        if (!account) throw new Error('errors.domain.existingAccount'); // A catalogue key, translated when shown (ErrorMessage).
+        const entry: Entry = { ...(before?.entry ?? operation), kind, accountId, amountMinor: minorFromEditedDraft(amount, account.currency, stored),
           merchant: merchant.trim(), category: category.trim(), dateISO };
         validateEntry(entry, accounts);
         if (before && sameEntry(before.entry, entry)) { saving.current = false; close(); return; }
@@ -139,7 +148,7 @@ export function EntryForm({ original, accountId: requestedAccount, currency, kin
       action={<ActionButton label={t('common.addAccount')} onPress={() => router.replace('/new-account')} />} /> : <>
       {!onKindChange && <Choices<EntryKind> value={kind} onChange={setKind} disabled={locked}
         options={[{ value: 'expense', label: t('movement.expense') }, { value: 'income', label: t('movement.income') }]} />}
-      <AmountField currency={account?.currency ?? 'ARS'} value={amount} onChangeText={value => { setAmount(value); setError(null); }} editable={!locked}
+      <AmountField currency={account?.currency ?? 'ARS'} value={amount} onChangeText={value => { setAmount(value); setError(null); }} editable={!locked} stored={stored ?? undefined}
         tone={kind === 'income' ? 'income' : 'neutral'} label={t(kind === 'expense' ? 'movement.expense' : 'movement.income')} />
       <View style={{ gap: space.m }}>
         <CategoryField entries={snapshot?.entries ?? []} kind={kind} value={category} onChange={setCategory} disabled={locked}
@@ -158,7 +167,7 @@ export function EntryForm({ original, accountId: requestedAccount, currency, kin
       <ErrorMessage message={error} />
       {pending && !busy && error && <AppText secondary variant="footnote">{t('entryForm.retryNote')}</AppText>}
       <ActionButton label={submit.text} spokenLabel={submit.spoken}
-        onPress={save} busy={busy} disabled={!amount.trim() || !merchant.trim() || !category.trim() || !account} />
+        onPress={save} busy={busy} disabled={!amount.trim() || !merchant.trim() || !category.trim() || !account || !fit.ok} />
     </>}
   </Screen>;
 }

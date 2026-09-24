@@ -2,9 +2,9 @@ import { FlatList, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { spendingComparison, type CategoryChange, type ReportPeriod } from '@finanzapp/domain';
 import { useLedger } from '../src/storage/LedgerProvider';
-import { AppText, DetailRow, EmptyState, Money, SectionTitle, Surface } from '../src/ui/components';
+import { AppText, DetailRow, EmptyState, Money, Screen, SectionTitle, Surface } from '../src/ui/components';
 import { useCategoryLookOf } from '../src/ui/category-hues';
-import { changePercent, dateRangeLabel, reportSelection } from '../src/ui/report-presentation';
+import { changePercent, dateRangeLabel, strictReportSelection } from '../src/ui/report-presentation';
 import { useI18n } from '../src/i18n/provider';
 import { useCurrentDay, usePalette } from '../src/ui/theme';
 
@@ -15,7 +15,9 @@ export default function ReportComparisonScreen() {
   const today = useCurrentDay(), p = usePalette();
   const { t, locale, codedAmount, spokenAmount } = useI18n();
   if (!snapshot) return null;
-  const selection = reportSelection(snapshot, params.currency, params.month, today);
+  // A drill-down never falls back to another currency: an unknown or unheld code is an invalid link.
+  const selection = strictReportSelection(snapshot, params.currency, params.month, today);
+  if (!selection) return <Screen><EmptyState title={t('reports.comparison.invalidTitle')} detail={t('reports.comparison.invalidDetail')} /></Screen>;
   const comparison = spendingComparison(snapshot, selection.currency, selection.monthISO, today);
   const { current, previous, deltaMinor } = comparison;
   const amount = (minor: number) => codedAmount(minor, selection.currency);

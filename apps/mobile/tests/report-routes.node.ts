@@ -319,3 +319,19 @@ test('23.1C2: the comparison rows speak their coded amounts without grouping', (
     assert.notEqual(current.props.value, spoken, 'the visible value keeps the code first and the region\'s separators');
   }
 });
+
+test('24B2: report-day, report-category and report-comparison refuse a currency that is unknown, malformed or not held, never falling back to ARS', () => {
+  const emptyTitle = (root: any) => nodes(root).find(node => node.type === 'EmptyState')?.props.title;
+  for (const currency of ['ars', 'usd', 'XAU', 'ZZZ', 'CHF', 'EUR', '']) {
+    assert.equal(emptyTitle(routeHarness('report-day.tsx', { currency, date: '2026-08-10' }).render()), 'Día no válido', 'day ' + JSON.stringify(currency));
+    assert.equal(emptyTitle(routeHarness('report-category.tsx', { currency, month: '2026-08', category: 'salud' }).render()), 'Período no válido', 'category ' + JSON.stringify(currency));
+    assert.equal(emptyTitle(routeHarness('report-comparison.tsx', { currency, month: '2026-09' }).render()), 'Comparación no válida', 'comparison ' + JSON.stringify(currency));
+  }
+  assert.equal(nodes(routeHarness('report-day.tsx', { currency: 'ARS', date: '2026-08-10' }).render()).some(node => node.type === 'EmptyState' && node.props.title === 'Día no válido'), false);
+  assert.equal(find(routeHarness('report-day.tsx', { date: '2026-08-10' }).render(), 'EmptyState').props.title, 'Día no válido', 'a day link always names its currency');
+  assert.equal(nodes(routeHarness('report-comparison.tsx', { month: '2026-09' }).render()).some(node => node.type === 'EmptyState' && node.props.title === 'Comparación no válida'), false, 'a link without a currency opens the ledger\'s first one, as the tab does');
+  // A currency held by an account in a currency the gate does not offer still opens (read acceptance, never the gate).
+  const withYen = { ...snapshot, accounts: [...snapshot.accounts, { id: 'jpy', name: 'Yen', currency: 'JPY' as const, openingMinor: 1500, createdAt: snapshot.accounts[0].createdAt }] };
+  assert.equal(nodes(routeHarness('report-day.tsx', { currency: 'JPY', date: '2026-08-10' }, withYen).render()).some(node => node.type === 'EmptyState' && node.props.title === 'Día no válido'), false);
+  assert.equal(nodes(routeHarness('report-comparison.tsx', { currency: 'JPY', month: '2026-09' }, withYen).render()).some(node => node.type === 'EmptyState' && node.props.title === 'Comparación no válida'), false);
+});

@@ -3,7 +3,7 @@ import { Keyboard, View } from 'react-native';
 import { router, Stack } from 'expo-router';
 import { randomUUID } from 'expo-crypto';
 import * as Haptics from 'expo-haptics';
-import { accountBalanceMinor, accountKind, hiddenLiabilityAccountIds, makeTransferChange, parseMinorUnits, sameTransfer, todayKey,
+import { accountBalanceMinor, accountKind, editedDraftFits, hiddenLiabilityAccountIds, makeTransferChange, minorFromEditedDraft, sameTransfer, todayKey, type StoredDraft,
   totalsByCurrency, validateTransfer, validateTransferChange, type Account, type Transfer, type TransferChange, type TransferRecord } from '@finanzapp/domain';
 import { useLedger } from '../storage/LedgerProvider';
 import { ActionButton, AmountField, AmountShortcut, AppText, DetailRow, EmptyState, ErrorMessage, Field, IconButton, Screen, Surface } from './components';
@@ -45,7 +45,12 @@ export function TransferForm({ original, accountId, fromAccountId: requestedFrom
     ?? (lockedTo ? cash.find(a => a.currency === lockedTo.currency)?.id : undefined) ?? initialAccountId(cash, accountId));
   const [toId, setToId] = useState(() => before?.transfer.toAccountId ?? lockedTo?.id ?? requestedTarget?.id
     ?? (lockedFrom ? cash.find(a => a.currency === lockedFrom.currency)?.id : undefined) ?? '');
-  const [amount, setAmount] = useState(before ? draftFromMinor(before.transfer.amountMinor) : '');
+  // An untouched prefill keeps the stored minor units (a stored amount may exceed the entry bound); an edited text is a new entry.
+  const [stored] = useState<StoredDraft | null>(() => {
+    const own = before ? accounts.find(a => a.id === before.transfer.fromAccountId)?.currency : undefined;
+    return before && own ? { minor: before.transfer.amountMinor, currency: own, draft: draftFromMinor(before.transfer.amountMinor, own) } : null;
+  });
+  const [amount, setAmount] = useState(stored?.draft ?? '');
   // A card payment or a debt settlement writes its own default note in the language active when the form opens
   // (it is then the user's editable text); a caller's note, kept for older deep links, still wins.
   const [note, setNote] = useState(() => {
@@ -73,7 +78,10 @@ export function TransferForm({ original, accountId, fromAccountId: requestedFrom
   const targets = selectable.filter(a => a.id !== fromId && a.currency === from?.currency);
   const locked = busy || pending !== null;
   const close = () => { if (!saving.current) { if (router.canGoBack()) router.back(); else router.replace('/'); } };
-  const contextualMax = maxAmountMinor && /^\d{1,16}$/.test(maxAmountMinor) ? Number(maxAmountMinor) : null;
+  // Minor units of the obligation's own currency, at most 15 digits (the entry bound): never read as hundredths.
+  const contextualMax = maxAmountMinor && /^\d{1,15}$/.test(maxAmountMinor) ? Number(maxAmountMinor) : null;
+  const amountCurrency = (lockedTo ?? lockedFrom ?? from)?.currency;
+  const fit = amountCurrency ? editedDraftFits(amount, amountCurrency, stored) : { ok: true as const };
   const obligation = lockedTo ?? lockedFrom;
   const obligationKind = obligation ? accountKind(obligation.id, cards, debts) : 'cash';
   const typeOf = (id: string) => accountKind(id, cards, debts);
@@ -83,7 +91,8 @@ export function TransferForm({ original, accountId, fromAccountId: requestedFrom
   const kindLabel = (id: string) => { const kind = typeOf(id); return t(kind === 'card' ? 'accountKinds.card' : kind === 'debt' ? 'accountKinds.debt' : 'accountKinds.account'); };
 
   function draft(): Transfer {
-    return { ...(before?.transfer ?? operation), fromAccountId: fromId, toAccountId: toId, amountMinor: parseMinorUnits(amount), note: note.trim(), dateISO: todayKey(date) };
+    if (!amountCurrency) throw new Error('errors.domain.twoAccounts'); // A catalogue key, translated when shown (ErrorMessage).
+    return { ...(before?.transfer ?? operation), fromAccountId: fromId, toAccountId: toId, amountMinor: minorFromEditedDraft(amount, amountCurrency, stored), note: note.trim(), dateISO: todayKey(date) };
   }
   function validateContext(transfer: Transfer) {
     if (contextualMax !== null && Number.isSafeInteger(contextualMax) && transfer.amountMinor > contextualMax) {
@@ -178,9 +187,9 @@ export function TransferForm({ original, accountId, fromAccountId: requestedFrom
       : t('transferForm.needAccounts')}
       action={<ActionButton label={t('common.addAccount')} onPress={() => router.replace({ pathname: '/new-account', params: obligation ? { currency: obligation.currency } : {} })} />} /> : <>
       <AmountField label={t(obligationKind === 'card' ? 'transferForm.payment' : obligationKind === 'debt' ? (lockedTo ? 'transferForm.payment' : 'transferForm.collection') : 'transferForm.transfer')}
-        currency={(obligation ?? from)?.currency ?? 'ARS'} value={amount} onChangeText={value => { setAmount(value); setError(null); }} editable={!locked} tone="transfer" />
+        currency={(obligation ?? from)?.currency ?? 'ARS'} value={amount} onChangeText={value => { setAmount(value); setError(null); }} editable={!locked} tone="transfer" stored={stored ?? undefined} />
       {shortcut && <AmountShortcut caption={shortcut.text} spokenCaption={shortcut.spoken} label={shortcut.fill > 0 ? shortcut.label : undefined} disabled={locked}
-        onPress={shortcut.fill > 0 ? () => { setAmount(amountFromMinor(shortcut.fill)); setError(null); } : undefined} />}
+        onPress={shortcut.fill > 0 && amountCurrency ? () => { setAmount(amountFromMinor(shortcut.fill, amountCurrency)); setError(null); } : undefined} />}
       <View style={{ gap: space.m }}>
         {lockedFrom ? <SelectorCard label={kindLabel(lockedFrom.id)} value={nameOf(lockedFrom)} placeholder="" detail={balanceDetail(lockedFrom.id)} spokenDetail={balanceDetail(lockedFrom.id, spokenNumber)}
           icon={obligationKind === 'card' ? 'card-outline' : 'people-outline'} color={p.primary} disabled onPress={() => {}} />
@@ -212,7 +221,7 @@ export function TransferForm({ original, accountId, fromAccountId: requestedFrom
       </AppText>
       <ErrorMessage message={error} />
       {pending && error && <AppText secondary variant="footnote">{t('transferForm.retryNote')}</AppText>}
-      <ActionButton label={submitLabel} busy={busy} disabled={!amount.trim() || !from || !to || from.id === to.id || from.currency !== to.currency} onPress={save} />
+      <ActionButton label={submitLabel} busy={busy} disabled={!amount.trim() || !from || !to || from.id === to.id || from.currency !== to.currency || !fit.ok} onPress={save} />
     </>}
   </Screen>;
 }

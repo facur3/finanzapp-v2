@@ -25,10 +25,16 @@
  * which may not be the app region's), or a pasted number whose own separators
  * say so unambiguously. A pasted number that could mean two amounts is
  * refused with a reason instead of guessed. */
-import type { Currency } from '@finanzapp/domain';
+import { CURRENCY_CODES, currencyRecord, isStorableCurrency, maxWholeDigits, minorUnitExponent, splitMinor, type Currency } from '@finanzapp/domain';
 
-const MAX_WHOLE_DIGITS = 13; // 9.999.999.999.999,99 stays a safe integer in minor units.
-const MAX_DECIMALS = 2;
+/** How many digits an amount in a currency may have: its ISO exponent as decimals (0 for JPY,
+ * 2 for ARS/USD/EUR, 3 for KWD) and 15 − exponent whole digits (docs/currency.md §5: 13 for
+ * ARS and USD, as always). Every reader, writer and settle step takes the currency explicitly,
+ * so no site can assume two decimals by omission. */
+export interface AmountPrecision { readonly decimals: number; readonly wholeDigits: number }
+export function precisionOf(currency: Currency): AmountPrecision {
+  return { decimals: minorUnitExponent(currency), wholeDigits: maxWholeDigits(currency) };
+}
 
 /** The two separators an amount is written with. */
 export interface AmountFormat { decimal: string; group: string }
@@ -107,11 +113,15 @@ function canonicalText(display: string, format: AmountFormat): string {
 
 /** Reads a canonical-looking string (digits, one comma, optional sign; other
  * characters are dropped) into a state, with a logical caret. Leading zeros
- * are removed and the fraction keeps its first two digits (a third decimal
- * typed at the end simply does not appear). More than thirteen whole digits
- * gives `null`, so a caller can refuse that edit instead of changing the
- * number. */
-export function amountFromCanonical(text: string, caret: number = text.length): AmountEdit | null {
+ * are removed and the fraction keeps the currency's decimals (a digit typed
+ * past them simply does not appear; at zero decimals a comma is not kept).
+ * More whole digits than the currency allows gives `null`, so a caller can
+ * refuse that edit instead of changing the number. */
+export function amountFromCanonical(text: string, caret: number, currency: Currency): AmountEdit | null {
+  return readCanonical(text, caret, precisionOf(currency));
+}
+
+function readCanonical(text: string, caret: number, precision: AmountPrecision): AmountEdit | null {
   const negative = /^\s*[-−]/.test(text);
   const body = text.replace(/^\s*[-−]\s*/, '');
   const position = Math.max(0, caret - (text.length - body.length));
@@ -120,7 +130,7 @@ export function amountFromCanonical(text: string, caret: number = text.length): 
   for (let index = 0; index < body.length; index++) {
     const char = body[index];
     let kept = false;
-    if (char === ',' && !decimal) { decimal = true; kept = true; }
+    if (char === ',' && !decimal && precision.decimals > 0) { decimal = true; kept = true; }
     else if (/[0-9]/.test(char)) {
       kept = true;
       if (decimal) fraction += char;
@@ -137,15 +147,18 @@ export function amountFromCanonical(text: string, caret: number = text.length): 
     if (kept && index < position) logical++;
   }
   if (decimal && whole === '') { whole = '0'; if (position > 0) logical++; }
-  if (whole.length > MAX_WHOLE_DIGITS) return null;
-  const state: AmountEdit = { negative, whole, decimal, fraction: fraction.slice(0, MAX_DECIMALS), caret: 0 };
+  if (whole.length > precision.wholeDigits) return null;
+  const state: AmountEdit = { negative, whole, decimal, fraction: fraction.slice(0, precision.decimals), caret: 0 };
   state.caret = Math.max(0, Math.min((negative ? 1 : 0) + logical, canonicalAmount(state).length));
   return state;
 }
 
 /** The state a displayed field holds: its text read in `format`, its caret made logical. */
-export function amountFromView(view: AmountView, format: AmountFormat = LEDGER_FORMAT): AmountEdit {
-  return amountFromCanonical(canonicalText(view.text, format), logicalCaret(view.text, view.caret, format)) ?? EMPTY_AMOUNT;
+export function amountFromView(view: AmountView, format: AmountFormat, currency: Currency): AmountEdit {
+  return viewState(view, format, precisionOf(currency));
+}
+function viewState(view: AmountView, format: AmountFormat, precision: AmountPrecision): AmountEdit {
+  return readCanonical(canonicalText(view.text, format), logicalCaret(view.text, view.caret, format), precision) ?? EMPTY_AMOUNT;
 }
 
 // ---- Pasted text ------------------------------------------------------------
@@ -153,20 +166,42 @@ export function amountFromView(view: AmountView, format: AmountFormat = LEDGER_F
 /** Why a pasted text was not put in the field. Nothing is ever guessed:
  *   - `ambiguous`: one separator before exactly three digits, and it is not the
  *     region's group separator ("1,000" in Argentina, "1.000" in the United
- *     States): a thousand in one convention, one with three decimals in the other;
- *   - `precision`: more than two decimals that are not trailing zeros ("12.345,678");
+ *     States): a thousand in one convention, one with three decimals in the other.
+ *     In a currency with three decimals (KWD) that shape is ambiguous whatever the
+ *     separator: "1.234" may be a thousand dinars or one dinar and 234 fils;
+ *   - `precision`: more decimals than the currency has that are not trailing zeros
+ *     ("12.345,678" in pesos, "12,5" in yen);
  *   - `invalid`: not an amount ("abc", "1.000.5", "12 34", a second sign or a
  *     second decimal separator once it lands in the field);
- *   - `tooLong`: more than thirteen whole digits;
+ *   - `tooLong`: more whole digits than the currency allows (13 for ARS and USD);
  *   - `currencyMismatch`: an explicit currency conflicts with the account's currency. */
 export type PasteRejection = 'ambiguous' | 'precision' | 'invalid' | 'tooLong' | 'currencyMismatch';
 export interface AmountNotice { reason: PasteRejection; text: string }
 
 type PastedAmount = { ok: true; negative: boolean; canonical: string } | { ok: false; reason: PasteRejection };
 
-// Explicit ARS/USD markers must match the account. A bare "$" is ambiguous.
-const EXPLICIT_CURRENCY_MARKS = /U\$S|US\$|AR\$|\bARS\b|\bUSD\b/gi;
-const CURRENCY_MARKS = /U\$S|US\$|AR\$|\$|\bARS\b|\bUSD\b/gi;
+// Explicit currency markers must match the account: every storable ISO code and every
+// language-neutral symbol of the catalogue that names one currency ("US$", "€", "JP¥",
+// "KWD"), plus FinanzApp's "AR$" and the older "U$S". A bare "$" names nothing (29
+// currencies use it): it is stripped, never taken as evidence. Built once from the catalogue.
+const escapeRegExp = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const marks = (() => {
+  const byMark = new Map<string, Currency>([['AR$', 'ARS'], ['U$S', 'USD']]);
+  for (const code of CURRENCY_CODES) {
+    if (!isStorableCurrency(code)) continue;
+    byMark.set(code, code);
+    const { symbol } = currencyRecord(code);
+    if (symbol !== code && !byMark.has(symbol.toUpperCase())) byMark.set(symbol.toUpperCase(), code);
+  }
+  const letter = /[A-Za-z]/;
+  const alternatives = [...byMark.keys()].sort((a, b) => b.length - a.length).map(mark =>
+    (letter.test(mark[0]) ? '(?<![A-Za-z])' : '') + escapeRegExp(mark) + (letter.test(mark[mark.length - 1]) ? '(?![A-Za-z])' : ''));
+  return { byMark, explicit: new RegExp(alternatives.join('|'), 'gi'), all: new RegExp(alternatives.join('|') + '|\\$', 'gi') };
+})();
+/** The currency an explicit marker names, or null for text that is not one. */
+export function currencyOfMark(text: string): Currency | null {
+  return marks.byMark.get(text.toUpperCase()) ?? null;
+}
 // \s covers the no-break and thin spaces other apps group thousands with.
 const SPACES = /\s+/g;
 
@@ -183,12 +218,14 @@ const SPACES = /\s+/g;
  *     a mismatched currency is refused, never converted. A leading minus is kept.
  * Decimals beyond the second must be zeros. Only the digits are kept: no
  * number is ever computed from the text. */
-export function readPastedAmount(text: string, format: AmountFormat = LEDGER_FORMAT, expectedCurrency?: Currency): PastedAmount {
-  const explicit = [...text.matchAll(EXPLICIT_CURRENCY_MARKS)].map(match =>
-    /^(?:U\$S|US\$|USD)$/i.test(match[0]) ? 'USD' : 'ARS');
+export function readPastedAmount(text: string, format: AmountFormat, currency: Currency): PastedAmount {
+  return readPaste(text, format, precisionOf(currency), currency);
+}
+function readPaste(text: string, format: AmountFormat, precision: AmountPrecision, currency: Currency): PastedAmount {
+  const explicit = [...text.matchAll(marks.explicit)].map(match => currencyOfMark(match[0]));
   if (explicit.length > 1) return { ok: false, reason: 'invalid' };
-  if (expectedCurrency && explicit.some(code => code !== expectedCurrency)) return { ok: false, reason: 'currencyMismatch' };
-  let body = text.replace(CURRENCY_MARKS, ' ').replace(SPACES, ' ').trim();
+  if (explicit.some(code => code !== currency)) return { ok: false, reason: 'currencyMismatch' };
+  let body = text.replace(marks.all, ' ').replace(SPACES, ' ').trim();
   const negative = /^[-−]/.test(body);
   if (negative) body = body.slice(1).trim();
   if (!/^[0-9., ]+$/.test(body) || !/[0-9]/.test(body)) return { ok: false, reason: 'invalid' };
@@ -207,7 +244,8 @@ export function readPastedAmount(text: string, format: AmountFormat = LEDGER_FOR
     const [before, after] = runs;
     const couldGroup = after.length === 3 && before.length >= 1 && before.length <= 3 && !before.startsWith('0');
     if (!couldGroup) decimalAt = 0;
-    else if (separators[0] !== format.group) return { ok: false, reason: 'ambiguous' };
+    // Three digits after the region's group separator are a thousand, unless the currency itself has three decimals.
+    else if (separators[0] !== format.group || precision.decimals >= 3) return { ok: false, reason: 'ambiguous' };
   }
   const groups = decimalAt < 0 ? runs : runs.slice(0, decimalAt + 1);
   if (groups.length > 1 && (groups[0].length < 1 || groups[0].length > 3 || groups[0].startsWith('0') || groups.slice(1).some(run => run.length !== 3))) {
@@ -215,11 +253,11 @@ export function readPastedAmount(text: string, format: AmountFormat = LEDGER_FOR
   }
   const whole = groups.join('').replace(/^0+(?=\d)/, '');
   let fraction = decimalAt < 0 ? null : runs[decimalAt + 1];
-  if (fraction !== null && fraction.length > MAX_DECIMALS) {
-    if (!/^0+$/.test(fraction.slice(MAX_DECIMALS))) return { ok: false, reason: 'precision' };
-    fraction = fraction.slice(0, MAX_DECIMALS);
+  if (fraction !== null && fraction.length > precision.decimals) {
+    if (!/^0+$/.test(fraction.slice(precision.decimals))) return { ok: false, reason: 'precision' };
+    fraction = precision.decimals === 0 ? null : fraction.slice(0, precision.decimals);
   }
-  if (whole.length > MAX_WHOLE_DIGITS) return { ok: false, reason: 'tooLong' };
+  if (whole.length > precision.wholeDigits) return { ok: false, reason: 'tooLong' };
   return { ok: true, negative, canonical: (negative ? '-' : '') + whole + (fraction === null ? '' : ',' + fraction) };
 }
 
@@ -278,18 +316,18 @@ function carried(reference: RawText, raw: string, a: number, b: number): number 
  * state) when the text is not an unambiguous amount, or when it would give the
  * field a second sign, a second decimal separator, a third decimal or a
  * fourteenth whole digit. */
-function readPaste(raw: string, a: number, b: number, decimalAt: number, format: AmountFormat, previous: AmountEdit,
-  expectedCurrency?: Currency): AmountRead {
+function readPastedChange(raw: string, a: number, b: number, decimalAt: number, format: AmountFormat, previous: AmountEdit,
+  precision: AmountPrecision, currency: Currency): AmountRead {
   const inserted = raw.slice(a, raw.length - b);
   const refuse = (reason: PasteRejection): AmountRead => ({ state: previous, rejected: { reason, text: inserted.trim() }, raw: null });
-  const pasted = readPastedAmount(inserted, format, expectedCurrency);
+  const pasted = readPaste(inserted, format, precision, currency);
   if (!pasted.ok) return refuse(pasted.reason);
   const before = canonicalSlice(raw, 0, a, decimalAt), after = canonicalSlice(raw, raw.length - b, raw.length, decimalAt);
   if (pasted.negative && before !== '') return refuse('invalid');
   const combined = before + pasted.canonical + after;
   if (count(combined, ',') > 1) return refuse('invalid');
-  if (combined.includes(',') && combined.length - combined.indexOf(',') - 1 > MAX_DECIMALS) return refuse('precision');
-  const state = amountFromCanonical(combined, before.length + pasted.canonical.length);
+  if (combined.includes(',') && combined.length - combined.indexOf(',') - 1 > precision.decimals) return refuse('precision');
+  const state = readCanonical(combined, before.length + pasted.canonical.length, precision);
   if (!state) return refuse('tooLong');
   // The pasted decimal separator, when there is one, is the last "." or "," it contains.
   const own = pasted.canonical.includes(',') ? a + Math.max(inserted.lastIndexOf('.'), inserted.lastIndexOf(',')) : -1;
@@ -314,9 +352,13 @@ function readPaste(raw: string, a: number, b: number, decimalAt: number, format:
  * appear. An insertion of more than one character with separators or other
  * characters is a paste (readPaste), refused with a reason rather than
  * guessed when it is ambiguous. */
-export function readAmountInput(shown: AmountView, raw: string, rawCaret: number | null, format: AmountFormat = LEDGER_FORMAT,
-  previousRaw: RawText | null = null, expectedCurrency?: Currency): AmountRead {
-  const previous = amountFromView(shown, format);
+export function readAmountInput(shown: AmountView, raw: string, rawCaret: number | null, format: AmountFormat,
+  previousRaw: RawText | null, currency: Currency): AmountRead {
+  return readChange(shown, raw, rawCaret, format, previousRaw, precisionOf(currency), currency);
+}
+function readChange(shown: AmountView, raw: string, rawCaret: number | null, format: AmountFormat,
+  previousRaw: RawText | null, precision: AmountPrecision, currency: Currency): AmountRead {
+  const previous = viewState(shown, format, precision);
   const references: RawText[] = [{ text: shown.text, decimalAt: shown.text.indexOf(format.decimal) }];
   if (previousRaw && previousRaw.text !== shown.text) references.push(previousRaw);
   let best: { reference: RawText; a: number; b: number; inserted: string } | null = null;
@@ -327,7 +369,7 @@ export function readAmountInput(shown: AmountView, raw: string, rawCaret: number
   }
   const { reference, a, b, inserted } = best!;
   let decimalAt = carried(reference, raw, a, b);
-  if (inserted.length > 1 && /[^0-9]/.test(inserted)) return readPaste(raw, a, b, decimalAt, format, previous, expectedCurrency);
+  if (inserted.length > 1 && /[^0-9]/.test(inserted)) return readPastedChange(raw, a, b, decimalAt, format, previous, precision, currency);
   let text = raw;
   let caret = rawCaret ?? raw.length;
   const deleted = reference.text.slice(a, reference.text.length - b);
@@ -348,18 +390,21 @@ export function readAmountInput(shown: AmountView, raw: string, rawCaret: number
       if (decimalAt > typed) decimalAt--;
     }
   }
-  const state = amountFromCanonical(canonicalSlice(text, 0, text.length, decimalAt), canonicalSlice(text, 0, caret, decimalAt).length);
+  const state = readCanonical(canonicalSlice(text, 0, text.length, decimalAt), canonicalSlice(text, 0, caret, decimalAt).length, precision);
   if (state) return { state, rejected: null, raw: { text: raw, decimalAt: rawDecimalAt } };
-  // Past the thirteenth whole digit: one keystroke is silently refused, a pasted number says why.
+  // Past the last whole digit the currency allows: one keystroke is silently refused, a pasted number says why.
   return { state: previous, rejected: inserted.length > 1 ? { reason: 'tooLong', text: inserted } : null, raw: null };
 }
 
 /** When editing ends: no dangling decimal separator, started decimals
- * completed ("2.000,5" → "2.000,50"), a lone sign dropped. A whole amount stays whole. */
-export function settleAmount(state: AmountEdit): AmountEdit {
+ * completed to the currency's ("2.000,5" → "2.000,50" in pesos, "1,2" → "1,200" in
+ * dinars), a lone sign dropped. A whole amount stays whole. A fraction longer than the
+ * currency's (a draft kept across a currency change) is left as it is: never truncated. */
+export function settleAmount(state: AmountEdit, currency: Currency): AmountEdit {
+  const { decimals } = precisionOf(currency);
   const settled: AmountEdit = { ...state };
   if (settled.decimal && settled.fraction === '') settled.decimal = false;
-  else if (settled.decimal) settled.fraction = settled.fraction.padEnd(MAX_DECIMALS, '0');
+  else if (settled.decimal && settled.fraction.length < decimals) settled.fraction = settled.fraction.padEnd(decimals, '0');
   if (settled.whole === '' && !settled.decimal) settled.negative = false;
   settled.caret = canonicalAmount(settled).length;
   return settled;
@@ -367,15 +412,21 @@ export function settleAmount(state: AmountEdit): AmountEdit {
 
 /** The same field in another region: the value and the logical caret are
  * kept, only the separators (and so the display caret) change. */
-export function reformatAmount(view: AmountView, from: AmountFormat, to: AmountFormat): AmountView {
-  return renderAmount(amountFromView(view, from), to);
+export function reformatAmount(view: AmountView, from: AmountFormat, to: AmountFormat, currency: Currency): AmountView {
+  return renderAmount(amountFromView(view, from, currency), to);
 }
 
 // ---- Drafts (ledger notation) -----------------------------------------------
 
-/** A draft in the ledger's notation as a state, caret at the end. */
-export function amountFromDraft(draft: string): AmountEdit {
-  return amountFromCanonical(canonicalText(draft, LEDGER_FORMAT)) ?? EMPTY_AMOUNT;
+/** A draft in the ledger's notation as a state, caret at the end, read with the
+ * currency's precision (a draft that does not fit is read as far as it fits; the form
+ * keeps the draft string itself and refuses to save it, `draftFitsCurrency`). */
+export function amountFromDraft(draft: string, currency: Currency): AmountEdit {
+  return readDraft(draft, precisionOf(currency));
+}
+function readDraft(draft: string, precision: AmountPrecision): AmountEdit {
+  const canonical = canonicalText(draft, LEDGER_FORMAT);
+  return readCanonical(canonical, canonical.length, precision) ?? EMPTY_AMOUNT;
 }
 
 /** The draft a form keeps for a state: the ledger's notation ("-1.234,5"), whatever the region. */
@@ -383,16 +434,32 @@ export function draftFromAmount(state: AmountEdit): string {
   return renderAmount(state, LEDGER_FORMAT).text;
 }
 
-/** A draft as the field displays it in `format` ("1.234,5" → "1,234.5" in the United States). */
-export function displayAmount(draft: string, format: AmountFormat = LEDGER_FORMAT): string {
-  return renderAmount(amountFromDraft(draft), format).text;
+/** A draft as the field displays it in `format` ("1.234,5" → "1,234.5" in the United
+ * States). A draft with more decimals than the currency has is shown whole, never cut:
+ * the person sees exactly what they typed while the form says it cannot be saved as is. */
+export function displayAmount(draft: string, format: AmountFormat, currency: Currency): string {
+  return renderAmount(readDraft(draft, keeping(draft, currency)), format).text;
 }
 
-/** A stored amount as a form draft ("123456" minor → "1.234,56"), for prefilling an edit form. */
-export function draftFromMinor(minor: number): string {
+/** The currency's precision widened to what a draft already holds, so reading it back
+ * never drops a digit: the form, not the model, decides that such a draft cannot be saved. */
+function keeping(draft: string, currency: Currency): AmountPrecision {
+  const base = precisionOf(currency);
+  const canonical = canonicalText(draft, LEDGER_FORMAT).replace(/^-/, '');
+  const at = canonical.indexOf(',');
+  const whole = (at < 0 ? canonical : canonical.slice(0, at)).replace(/[^0-9]/g, '').replace(/^0+(?=\d)/, '');
+  const fraction = at < 0 ? '' : canonical.slice(at + 1).replace(/[^0-9]/g, '');
+  return { decimals: Math.max(base.decimals, fraction.length), wholeDigits: Math.max(base.wholeDigits, whole.length) };
+}
+
+/** A stored amount as a form draft ("123456" minor → "1.234,56" in pesos, "1500" → "1.500"
+ * in yen, "1234567" → "1.234,567" in dinars), for prefilling an edit form. The currency's
+ * exponent decides where the decimal mark goes; a wrong currency would misplace it by 10×
+ * or 100×, which is why it is a required parameter. */
+export function draftFromMinor(minor: number, currency: Currency): string {
   if (!Number.isSafeInteger(minor)) return '';
-  const digits = String(Math.abs(minor)).padStart(3, '0');
-  return draftFromAmount({ negative: minor < 0, whole: digits.slice(0, -2), decimal: true, fraction: digits.slice(-2), caret: 0 });
+  const { negative, whole, fraction } = splitMinor(minor, currency);
+  return draftFromAmount({ negative, whole, decimal: fraction.length > 0, fraction, caret: 0 });
 }
 
 /** A formatted amount ("−US$ 1.234,56", "$ 1,234.56") in the three parts a
@@ -409,15 +476,15 @@ export function splitAmount(text: string, format: AmountFormat = LEDGER_FORMAT):
 
 /** Integer minor units as the field would hold them after the user typed the
  * amount, as a draft: "19016200" → "190.162", "19016250" → "190.162,50",
- * "5" → "0,05". Whole amounts stay whole (no ",00"), so a shortcut fills the
- * field the way a person would have typed it. Negative or unsafe values give
- * an empty field: a shortcut never proposes a negative or fabricated amount. */
-export function amountFromMinor(minor: number): string {
+ * "5" → "0,05" in pesos; "1500" → "1.500" in yen; "1234500" → "1.234,500" in
+ * dinars. Whole amounts stay whole (no ",00"), so a shortcut fills the field the
+ * way a person would have typed it. Negative or unsafe values give an empty
+ * field: a shortcut never proposes a negative or fabricated amount. */
+export function amountFromMinor(minor: number, currency: Currency): string {
   if (!Number.isSafeInteger(minor) || minor <= 0) return '';
-  // Digits only: the last two are the cents, the rest the whole units.
-  const digits = String(minor).padStart(3, '0');
-  const whole = digits.slice(0, -2), cents = digits.slice(-2);
-  return displayAmount(whole + (cents === '00' ? '' : ',' + cents));
+  // Digits only, split by the currency's exponent: no number is computed from them.
+  const { whole, fraction } = splitMinor(minor, currency);
+  return displayAmount(whole + (/^0*$/.test(fraction) ? '' : ',' + fraction), LEDGER_FORMAT, currency);
 }
 
 // ---- The field's controller -------------------------------------------------
@@ -435,17 +502,27 @@ export function amountFromMinor(minor: number): string {
  *     logical caret, same draft. */
 export class AmountInput {
   format: AmountFormat;
+  currency: Currency;
   state: AmountEdit;
   view: AmountView;
   private raw: RawText | null = null;
 
-  constructor(draft: string, format: AmountFormat) {
+  constructor(draft: string, format: AmountFormat, currency: Currency) {
     this.format = format;
-    this.state = amountFromDraft(draft);
+    this.currency = currency;
+    this.state = readDraft(draft, keeping(draft, currency));
     this.view = renderAmount(this.state, format);
   }
 
   get draft(): string { return draftFromAmount(this.state); }
+
+  /** The currency's precision, widened to whatever the field already holds: a draft kept
+   * across a currency change is never truncated by the model (the form refuses to save
+   * it instead), and it can only shrink from there, never grow past the currency's digits. */
+  private precision(): AmountPrecision {
+    const base = precisionOf(this.currency);
+    return { decimals: Math.max(base.decimals, this.state.fraction.length), wholeDigits: Math.max(base.wholeDigits, this.state.whole.length) };
+  }
 
   private show(state: AmountEdit): AmountView {
     this.state = state;
@@ -453,8 +530,8 @@ export class AmountInput {
     return this.view;
   }
 
-  change(raw: string, rawCaret: number | null, expectedCurrency?: Currency): { view: AmountView; draft: string; rejected: AmountNotice | null } {
-    const read = readAmountInput(this.view, raw, rawCaret, this.format, this.raw, expectedCurrency);
+  change(raw: string, rawCaret: number | null): { view: AmountView; draft: string; rejected: AmountNotice | null } {
+    const read = readChange(this.view, raw, rawCaret, this.format, this.raw, this.precision(), this.currency);
     this.raw = read.raw;
     return { view: this.show(read.state), draft: this.draft, rejected: read.rejected };
   }
@@ -469,12 +546,23 @@ export class AmountInput {
 
   settle(): { view: AmountView; draft: string } {
     this.raw = null;
-    return { view: this.show(settleAmount(this.state)), draft: this.draft };
+    return { view: this.show(settleAmount(this.state, this.currency)), draft: this.draft };
   }
 
   adopt(draft: string): AmountView {
     this.raw = null;
-    return this.show(amountFromDraft(draft));
+    return this.show(readDraft(draft, keeping(draft, this.currency)));
+  }
+
+  /** The field now belongs to another currency (the account or the currency choice changed):
+   * the digits, the draft and the caret stay exactly as they are (ARS ↔ USD changes nothing at
+   * all); only the precision of the next keystroke, paste or settle changes. Whether the kept
+   * draft can be saved in the new currency is the form's question (`draftFitsCurrency`). */
+  retarget(currency: Currency): AmountView {
+    if (currency === this.currency) return this.view;
+    this.currency = currency;
+    this.raw = null;
+    return this.view;
   }
 
   reformat(format: AmountFormat): AmountView {

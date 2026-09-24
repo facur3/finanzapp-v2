@@ -9,6 +9,7 @@ import * as presentation from '../src/ui/presentation.ts';
 import * as budgetPresentation from '../src/ui/budget-presentation.ts';
 import * as liabilityPresentation from '../src/ui/liability-presentation.ts';
 import * as moneyInput from '../src/ui/money-input.ts';
+import * as entryPrefill from '../src/ui/entry-prefill.ts';
 import * as appearance from '../src/ui/appearance.ts';
 import * as i18nFormat from '../src/i18n/format.ts';
 import { bindLocale } from '../src/i18n/bind.ts';
@@ -69,7 +70,7 @@ function harness(file: string, props: any = {}, options: { data?: domain.LedgerA
     './form-controls': { AccountField: 'AccountField', CategoryField: 'CategoryField', CurrencyField: 'CurrencyField', DateField: 'DateField', SelectorCard: 'SelectorCard' },
     '../src/ui/form-controls': { CurrencyField: 'CurrencyField' }, '../../src/ui/form-controls': { CurrencyField: 'CurrencyField' },
     '../src/ui/currencies': currencies, '../../src/ui/currencies': currencies,
-    './presentation': presentation,
+    './presentation': presentation, './entry-prefill': entryPrefill,
     './budget-presentation': budgetPresentation, '../../src/ui/budget-presentation': budgetPresentation,
     './money-input': moneyInput, '../../src/ui/money-input': moneyInput, '../src/ui/money-input': moneyInput,
     './liability-presentation': liabilityPresentation,
@@ -881,4 +882,50 @@ test('23.1C2: the backup review groups its counts on screen and gives VoiceOver 
   await find(view.render(), 'ActionButton', 'Elegir copia').props.onPress();
   const rows = nodes(view.render()).filter(node => node.type === 'DetailRow');
   assert.equal(rows.map(row => row.props.value + '/' + row.props.spokenValue).join(','), '2/2,0/0,0/0,1,234/1234,0/0,0/0,0/0,0/0,0/0');
+});
+
+test('24B2: switching the account with a half-typed amount keeps the digits and blocks Save when the new currency cannot hold them exactly', async () => {
+  const yen: domain.Account = { ...account, id: 'jpy', name: 'Yen', currency: 'JPY' };
+  const view = harness('src/ui/entry-form.tsx', {}, { data: { ...archive, accounts: [...archive.accounts, yen] } });
+  find(view.render(), 'AmountField').props.onChangeText('12,50');
+  find(view.render(), 'CategoryField').props.onChange('Comida');
+  find(view.render(), 'Field').props.onChangeText('Kiosco');
+  assert.equal(find(view.render(), 'ActionButton').props.disabled, false);
+  find(view.render(), 'AccountField').props.onChange('jpy');
+  let root = view.render();
+  assert.equal(find(root, 'AmountField').props.value, '12,50', 'the draft is kept exactly, never truncated or rescaled');
+  assert.equal(find(root, 'AmountField').props.currency, 'JPY');
+  assert.equal(find(root, 'ActionButton').props.disabled, true, 'Save is blocked while the amount cannot be kept in yen');
+  assert.equal(view.additions.length, 0);
+  find(root, 'AccountField').props.onChange('u');
+  root = view.render();
+  assert.deepEqual([find(root, 'AmountField').props.value, find(root, 'AmountField').props.currency, find(root, 'ActionButton').props.disabled], ['12,50', 'USD', false], 'ARS ↔ USD is a no-op');
+  find(root, 'AmountField').props.onChangeText('13');
+  find(view.render(), 'AccountField').props.onChange('jpy');
+  root = view.render();
+  assert.equal(find(root, 'ActionButton').props.disabled, false);
+  await find(root, 'ActionButton').props.onPress();
+  assert.deepEqual([view.additions[0].accountId, view.additions[0].amountMinor], ['jpy', 13], 'thirteen yen, not thirteen hundred');
+});
+
+test('24B2 review: a movement whose stored amount exceeds the entry bound (a restored backup) can be corrected without re-typing it; an edited amount is re-read', async () => {
+  const huge: domain.Entry = { ...entry, id: 'huge', amountMinor: domain.MAX_ENTRY_MINOR + 1 };
+  domain.validateEntry(huge, [account]); // a valid stored amount: any safe integer
+  const data: domain.LedgerArchive = { ...archive, accounts: [...archive.accounts, { ...account, id: 'jpy', name: 'Yen', currency: 'JPY' }], records: [domain.initialRecord(huge)] };
+  let view = harness('src/ui/entry-form.tsx', { original: data.records[0] }, { data });
+  assert.equal(find(view.render(), 'AmountField').props.value, '10.000.000.000.000,00');
+  assert.equal(find(view.render(), 'ActionButton').props.disabled, false);
+  find(view.render(), 'CategoryField').props.onChange('Regalo');
+  await find(view.render(), 'ActionButton', 'Guardar cambios').props.onPress();
+  assert.equal(view.updates.length, 1);
+  assert.deepEqual([view.updates[0].after.entry.amountMinor, view.updates[0].after.entry.category], [domain.MAX_ENTRY_MINOR + 1, 'Regalo'], 'the stored amount is kept exactly');
+  // Editing the text re-reads it with the entry bound: refused, nothing written.
+  view = harness('src/ui/entry-form.tsx', { original: data.records[0] }, { data });
+  find(view.render(), 'AmountField').props.onChangeText('10.000.000.000.000,01');
+  assert.equal(find(view.render(), 'ActionButton').props.disabled, true, 'Save is blocked while the edited amount does not fit');
+  await find(view.render(), 'ActionButton').props.onPress();
+  assert.equal(view.updates.length, 0);
+  // Moving the untouched draft to an account in another currency is not "unchanged": the currency guard still applies.
+  view = harness('src/ui/entry-form.tsx', { original: data.records[0] }, { data });
+  assert.deepEqual(find(view.render(), 'AccountField').props.accounts.map((a: domain.Account) => a.id), ['a'], 'an edit only offers accounts in the movement\'s currency, so the kept amount can never change currency');
 });

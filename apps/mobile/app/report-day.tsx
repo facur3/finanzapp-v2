@@ -6,6 +6,7 @@ import { withCurrencyCode } from '../src/i18n/format';
 import { useI18n } from '../src/i18n/provider';
 import { EntryList } from '../src/ui/entry-list';
 import { selectEntries } from '../src/ui/presentation';
+import { heldCurrency } from '../src/ui/report-presentation';
 import { useCurrentDay } from '../src/ui/theme';
 import { View } from 'react-native';
 
@@ -15,9 +16,11 @@ export default function ReportDayScreen() {
   const today = useCurrentDay();
   const { t, formatDate } = useI18n();
   if (!snapshot) return null;
-  const { currency, date } = params;
-  if ((currency !== 'ARS' && currency !== 'USD') || typeof date !== 'string' || !validDateISO(date) || date > today
-    || !snapshot.accounts.some(a => a.currency === currency)) return <Screen><EmptyState title={t('reports.day.invalidTitle')} detail={t('reports.day.invalidDetail')} /></Screen>;
+  const { date } = params;
+  const currency = heldCurrency(snapshot.accounts, params.currency);
+  if (!currency || typeof date !== 'string' || !validDateISO(date) || date > today) {
+    return <Screen><EmptyState title={t('reports.day.invalidTitle')} detail={t('reports.day.invalidDetail')} /></Screen>;
+  }
   const period: ReportPeriod = { currency, startISO: date, endISO: date };
   const entries = selectEntries(expensesInPeriod(snapshot, period), snapshot.accounts);
   let total: number | null = null;

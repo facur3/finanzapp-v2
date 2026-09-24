@@ -3,7 +3,7 @@ import { Keyboard } from 'react-native';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { randomUUID } from 'expo-crypto';
 import * as Haptics from 'expo-haptics';
-import { makeAccountAppearance, parseMinorUnits, validateAccount, validateAccountAppearance, type AccountAppearance, type Currency, type Account } from '@finanzapp/domain';
+import { draftFitsCurrency, isLedgerCurrency, makeAccountAppearance, minorFromLedgerDraft, validateAccount, validateAccountAppearance, type AccountAppearance, type Currency, type Account } from '@finanzapp/domain';
 import { useLedger } from '../src/storage/LedgerProvider';
 import { ACCOUNT_ICON_CHOICES, COLOR_CHOICES, DEFAULT_LOOK } from '../src/ui/appearance';
 import { IconColorPicker } from '../src/ui/appearance-picker';
@@ -23,7 +23,8 @@ export default function NewAccountScreen() {
   const [name, setName] = useState('');
   const [icon, setIcon] = useState<string>(DEFAULT_LOOK.icon);
   const [color, setColor] = useState<string>(DEFAULT_LOOK.color);
-  const [currency, setCurrency] = useState<Currency>(params.currency === 'USD' ? 'USD' : 'ARS');
+  // The route's currency is honoured only when the gate offers it (never coerced from an unknown code); ARS otherwise (decision 7.6.4).
+  const [currency, setCurrency] = useState<Currency>(isLedgerCurrency(params.currency) ? params.currency : 'ARS');
   const [opening, setOpening] = useState('');
   const [busy, setBusy] = useState(false);
   const [pending, setPending] = useState<{ account: Account; appearance: AccountAppearance } | null>(null);
@@ -40,7 +41,7 @@ export default function NewAccountScreen() {
     try {
       let submission = pending;
       if (!submission) {
-        const account: Account = { ...operation, name: name.trim(), currency, openingMinor: parseMinorUnits(opening.trim() || '0') };
+        const account: Account = { ...operation, name: name.trim(), currency, openingMinor: minorFromLedgerDraft(opening.trim() || '0', currency) };
         validateAccount(account);
         const appearance = makeAccountAppearance(account.id, icon as AccountAppearance['icon'], color as AccountAppearance['color'], operation.createdAt);
         validateAccountAppearance(appearance, [account]);
@@ -72,6 +73,6 @@ export default function NewAccountScreen() {
     <FieldNote help={{ title: t('accounts.form.openingBalance'), detail: t('accounts.form.openingHelp') }}>{t('accounts.form.openingNote')}</FieldNote>
     <ErrorMessage message={error} />
     {pending && error && <AppText secondary style={{ fontSize: 13 }}>{t('accounts.form.retryNote')}</AppText>}
-    <ActionButton label={pending && error ? t('common.retrySave') : t('accounts.form.save')} onPress={save} busy={busy} disabled={!name.trim()} />
+    <ActionButton label={pending && error ? t('common.retrySave') : t('accounts.form.save')} onPress={save} busy={busy} disabled={!name.trim() || !draftFitsCurrency(opening, currency).ok} />
   </Screen>;
 }

@@ -15,10 +15,58 @@ server-keyed; manual recording and local data work without connectivity. Recurri
 expenses, debts, budgets and cards remain in scope. Native navigation, accessible
 amounts, real data and recoverable durable writes remain requirements.
 
-## Status and current delivery — Producto 24B1
+## Status and current delivery — Producto 24B2
 
 Implemented is code, checked names a test, device-verified needs a physical result,
 and released means distributed. Neither a bundle nor a screenshot is App Store QA.
+
+**24B2 completes stage 2 and delivers stage 3 of docs/currency.md §7.5: strict route
+currencies and an amount path that knows each currency's decimals.** Production still
+stores and offers exactly ARS and USD; SQLite schema 8, backup v8, the currency choices of
+the forms and every visible ARS/USD output are unchanged. The Más footer reads Producto
+24B2. Design and status: [docs/currency.md](currency.md) §2.2, §7.5, §8–§11.
+
+- [x] **Routes validate their currency strictly.** `heldCurrency` accepts a route currency
+  only when it is a storable code an account holds; `report-day`, `spending-detail`,
+  `report-category` and `report-comparison` refuse anything else (a new "Comparación no
+  válida" state) instead of falling back to the first currency; `budgets`, `new-account`
+  and the budget form never coerce an unknown code to ARS (the gate decides a new record's
+  currency; ARS stays the empty-ledger default, decision 7.6.4). The allow-list of
+  `currency-guards.node.ts` shrank to the four stage-4 ternaries and the permanent rules.
+- [x] **The amount path by exponent.** `minorFromLedgerDraft`/`draftFitsCurrency` in the
+  domain (the sentence names the currency's decimals; the two-decimal one is unchanged);
+  every `money-input` helper and `AmountInput` take the currency (15 − exponent whole
+  digits, exponent decimals, `retarget` on a currency change); the field uses the number
+  pad at exponent 0, keeps a draft across an account or currency change untouched and
+  shows a note when it cannot be saved as is; paste markers come from the catalogue and a
+  separator before three digits is ambiguous in a three-decimal currency; every form
+  parses, prefills and fills shortcuts in the record's currency and disables Save for a
+  draft that does not fit; `maxAmountMinor` is minor units of the obligation's currency
+  (15 digits); the Assistant's Editar hands over `amountMinor` with its currency.
+  ARS/USD: the regional format, anchored symbol, stable caret, tabular figures and every
+  golden of `money-input.node.ts` are byte-identical; a sweep proves the new reader agrees
+  with `parseMinorUnits` on every draft the field can produce.
+- [x] **Tests.** `amount-exponents.node.ts` (JPY, KWD and EUR typing, pasting, settling,
+  prefills, shortcuts, kept drafts, the sweep, the `10 **` ban), plus cases in
+  `typography` (number pad, kept-draft notes), `report-routes` (strict currencies with
+  `ars`, `XAU`, `ZZZ`, `CHF`, `EUR`, `''` and a held JPY account), `recovery-routes` (an
+  account change keeps "12,50", blocks Save in yen, saves 13 yen not 1300) and
+  `assistant-routes` (the hand-off in minor units).
+- [x] **Design clarified** (docs/currency.md): an estimate from a reference rate is never a
+  debit; a posted balance and a pending estimated commitments figure per account, never
+  mixed, so a purchase is counted once and reports keep estimated and confirmed apart
+  (§9); Frankfurter v2's own statements verified on 2026-09-24 (206 currencies, 98
+  sources, free for commercial use without a key, provider terms apply, caching advised)
+  with what still needs verification per pair and date before any recommendation (§8.2);
+  the Assistant flow for "Gasté 30 dólares en Steam" and "¿Por qué gasté más este mes?",
+  languages, voice and the infrastructure before any paid call (§11, docs/i18n.md §11).
+  No API connected, no rate invented, contract v1 untouched.
+- [x] **Checked on Linux:** see the handoff entry below.
+- [ ] **Not device-verified:** the number pad at exponent 0 and the kept-draft note are
+  unreachable in production (no such currency is offered) and belong to stage 9's device
+  QA; nothing else visible changed.
+
+### Previous delivery — Producto 24B1
 
 **24B1 prepares the financial domain for several currencies without enabling any and
 without touching SQLite:** stages 1 (safety net) and 2 (one gate, complete groupings) of
@@ -1590,19 +1638,23 @@ by CI and merged into master before the next starts:
         gate with read acceptance apart, groupings over the currencies present, backups
         frozen to ARS/USD, pure guards, international fixtures, offline catalogue
         verification. No SQLite, backup, form or gate change.
-      - **24B2 (next, not started):** the remainder of stage 2 (a strict route-currency
-        parser for `report-day`, `spending-detail`, the drill-downs and quick actions; the
-        four binary ternaries become the `{name} · {code}` template), stage 3 (the amount
-        path by exponent: `minorFromAmount`/`draftFromMinor`/`amountFromMinor` with a
-        required currency, the amount field per exponent, paste tables, draft re-validation
-        on a currency change, `maxAmountMinor` read with the target's exponent) and stage 4
-        (presentation and copy: the 21 currency-less call sites move to
-        `formatMoneyAmount`/`spokenMinor`, the picker beyond two currencies, spoken units,
-        glossary, docs/i18n.md §9). Still no SQLite change and no new currency.
-      - **24B3 (after the owner's decision 7.6.5):** stage 5 (schema 9 with a
+      - **24B2 (delivered in code, 2026-09-24):** the rest of stage 2 (strict route
+        currencies, no coerced parameter) and stage 3 (the amount path by exponent:
+        `minorFromLedgerDraft`/`draftFitsCurrency`, every model helper with a required
+        currency, the field per exponent, catalogue paste markers, draft re-validation with
+        Save blocked, `maxAmountMinor` in the target's currency, the Assistant hand-off in
+        minor units). Still no SQLite change and no new currency.
+      - **24B3 (next, not started):** stage 4 (presentation and copy: the four binary
+        ternaries and the per-currency keys become the `{name} · {code}` template, the 21
+        currency-less call sites move to `formatMoneyAmount`/`spokenMinor`, the picker
+        beyond two currencies, spoken units beside a currency sharing the word, glossary,
+        docs/i18n.md §9, `charts.tsx` whole units from `splitMinor`, "—" for an unsafe
+        value). Still no SQLite change and no new currency.
+      - **24B4 (after the owner's decision 7.6.5):** stage 5 (schema 9 with a
         foreign-keys-off rebuild and `currency_units`), stage 6 (backup v9), stage 8 (the
-        searchable screen), device QA and stage 9 (the gate, one commit). Stage 7 (the
-        Assistant contract, server first) can land beside 24C.
+        searchable screen; the debt form chooses the currency before the amount), device QA
+        and stage 9 (the gate, one commit). Stage 7 (the Assistant contract, server first)
+        can land beside 24C.
     - **24C — rates and the main currency for reports (after 24B, not started).** The
       contract in docs/currency.md §8, revised on 2026-09-24: **automatic reference rates
       from an authorised provider are the planned main path** (provider research first:
@@ -1782,6 +1834,40 @@ amount uses `useStacked()` and gives the name two lines. 44-point targets, Voice
 safe areas, system text and separate currencies apply to every new screen.
 
 ## Handoff log (historical evidence)
+
+### 2026-09-24 — Producto 24B2: strict route currencies and the amount path by exponent
+
+- Stage 2 completed (`heldCurrency`, `strictReportSelection`, no route parameter coerced
+  to ARS) and stage 3 delivered (`minorFromLedgerDraft`, `draftFitsCurrency`, every
+  `money-input` helper and `AmountInput` with a required currency and `retarget`, the
+  number pad at exponent 0, the kept-draft note, catalogue paste markers, every form's
+  parse/prefill/shortcut in the record's currency with Save blocked for a draft that does
+  not fit, `maxAmountMinor` in the obligation's currency, the Assistant hand-off in minor
+  units through `src/ui/entry-prefill.ts`). The `currency-guards` allow-list shrank by
+  six entries.
+- Deliberate golden changes: the Editar parameters (`amountMinor`), `money-input.node.ts`
+  naming ARS in every call and pasting "US$ 12.30" into a dollar field, the entry bound
+  refusing a fourteenth whole digit, the footer label.
+- **Review fix (PR #48 thread on `edit-account/[id].tsx`):** an untouched prefill of a stored
+  amount above the entry bound (a balance that is a sum of valid movements, a movement from a
+  backup) is kept as the stored value in every edit form (`StoredDraft`,
+  `minorFromEditedDraft`, `editedDraftFits`, the field's `stored` prop), so renaming or
+  re-dressing an account, or re-categorising such a movement, works again; an edited text or
+  another currency is read as a new entry with every rule, and the entry bound is unchanged.
+  Regression tests for a balance above `MAX_ENTRY_MINOR` (rename only, look only, untouched,
+  a manual edit beyond the bound refused, a real correction still asking).
+- Docs: the estimate/debit clarification with a posted balance and pending estimated
+  commitments (§9), Frankfurter's statements verified on 2026-09-24 with the open
+  verification list (§8.2), the Assistant specification (§11), docs/i18n.md §9/§11,
+  mobile-design.md, the device checklist.
+- **Checked on Linux:** root `npm test` 441/441, `npm run build`, `npm run check:repo`;
+  mobile `npm run typecheck`, `npm run test:storage` 484/484, `npm run currency:verify`,
+  `npm run i18n:check -- --strict`, `npm run i18n:extract`, `npm run check` ("Dependencies
+  are up to date"), `npm run export:ios` (4,881,588 bytes, +9,450 over 24B1). Not an Xcode build;
+  not device-verified. No EAS
+  build, paid service, migration, API connection or remote change.
+- **Next:** Producto 24B3 (stage 4), then the owner's decision on the one-way SQLite
+  upgrade before 24B4.
 
 ### 2026-09-24 — Producto 24B1: currency safety net, one gate and dynamic groupings
 

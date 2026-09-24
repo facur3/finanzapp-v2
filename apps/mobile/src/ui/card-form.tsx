@@ -3,7 +3,7 @@ import { Alert, Keyboard, View } from 'react-native';
 import { router, Stack } from 'expo-router';
 import { randomUUID } from 'expo-crypto';
 import * as Haptics from 'expo-haptics';
-import { parseMinorUnits, sameCreditCardProfile, validateAccount, validateCreditCardProfile,
+import { draftFitsCurrency, editedDraftFits, minorFromEditedDraft, minorFromLedgerDraft, sameCreditCardProfile, validateAccount, validateCreditCardProfile, type StoredDraft,
   type Account, type CreditCardProfile, type Currency } from '@finanzapp/domain';
 import { useI18n } from '../i18n/provider';
 import type { MessageKey } from '../i18n/messages';
@@ -28,7 +28,10 @@ export function CardForm({ original }: { original?: CreditCardProfile }) {
   const [last4, setLast4] = useState(before?.last4 ?? '');
   const [currency, setCurrency] = useState<Currency>(account?.currency ?? 'ARS');
   const [debt, setDebt] = useState('');
-  const [limit, setLimit] = useState(before?.creditLimitMinor ? draftFromMinor(before.creditLimitMinor) : '');
+  // An untouched limit prefill keeps the stored minor units (a stored amount may exceed the entry bound); an edited text is a new entry.
+  const [storedLimit] = useState<StoredDraft | null>(() => before?.creditLimitMinor && account
+    ? { minor: before.creditLimitMinor, currency: account.currency, draft: draftFromMinor(before.creditLimitMinor, account.currency) } : null);
+  const [limit, setLimit] = useState(storedLimit?.draft ?? '');
   const [closingDay, setClosingDay] = useState(before ? String(before.closingDay) : '');
   const [dueDay, setDueDay] = useState(before ? String(before.dueDay) : '');
   const [busy, setBusy] = useState(false);
@@ -38,6 +41,8 @@ export function CardForm({ original }: { original?: CreditCardProfile }) {
   const [error, setError] = useState<string | null>(null);
   const saving = useRef(false);
   const locked = busy || !!pendingCreate || !!pendingEdit || !!pendingArchive;
+  // Drafts survive a currency switch untouched; one the new currency cannot hold exactly blocks Save (the field says why).
+  const fitsCurrency = draftFitsCurrency(debt, currency).ok && editedDraftFits(limit, currency, storedLimit).ok;
   const close = () => { if (!saving.current) { if (router.canGoBack()) router.back(); else router.replace('/cards'); } };
 
   // Errors the form raises itself are catalogue keys, translated when shown (ErrorMessage).
@@ -52,7 +57,7 @@ export function CardForm({ original }: { original?: CreditCardProfile }) {
       accountId: before?.accountId ?? identity.accountId,
       issuer: issuer.trim(),
       last4: last4.trim(),
-      creditLimitMinor: limit.trim() ? parseMinorUnits(limit) : null,
+      creditLimitMinor: limit.trim() ? minorFromEditedDraft(limit, currency, storedLimit) : null,
       closingDay: day(closingDay.trim(), 'cards.form.closingDayInvalid'),
       dueDay: day(dueDay.trim(), 'cards.form.dueDayInvalid'),
       createdAt: before?.createdAt ?? identity.createdAt,
@@ -77,7 +82,7 @@ export function CardForm({ original }: { original?: CreditCardProfile }) {
       } else {
         let submission = pendingCreate;
         if (!submission) {
-          const openingDebt = debt.trim() ? parseMinorUnits(debt) : 0;
+          const openingDebt = debt.trim() ? minorFromLedgerDraft(debt, currency) : 0;
           if (openingDebt < 0) throw new Error('cards.form.negativeDebt');
           const card: CreditCardProfile = { ...profileBase(), active: true, revision: 0, updatedAt: identity.createdAt };
           const newAccount: Account = { id: identity.accountId, name: name.trim(), currency, openingMinor: -openingDebt, createdAt: identity.createdAt };
@@ -142,7 +147,7 @@ export function CardForm({ original }: { original?: CreditCardProfile }) {
         placeholder="4009" keyboardType="number-pad" maxLength={4} editable={!locked} />
     </View>
 
-    <AmountField label={t('cards.form.limit')} currency={currency} value={limit}
+    <AmountField label={t('cards.form.limit')} currency={currency} value={limit} stored={storedLimit ?? undefined}
       onChangeText={value => { setLimit(value); setError(null); }} editable={!locked} />
 
     <View style={{ flexDirection: stacked ? 'column' : 'row', gap: 12 }}>
@@ -160,7 +165,7 @@ export function CardForm({ original }: { original?: CreditCardProfile }) {
       {t('cards.form.frozenNote')}
     </AppText>}
     <ActionButton label={error && (pendingCreate || pendingEdit) ? t('common.retrySave') : before ? t('common.saveChanges') : t('cards.form.create')}
-      onPress={save} busy={busy} disabled={before ? !closingDay || !dueDay : !name.trim() || !closingDay || !dueDay} />
+      onPress={save} busy={busy} disabled={(before ? !closingDay || !dueDay : !name.trim() || !closingDay || !dueDay) || !fitsCurrency} />
     {before && <ActionButton label={t(pendingArchive && error ? 'cards.form.retry' : before.active ? 'cards.form.archive' : 'cards.form.reactivate')}
       onPress={archive} secondary disabled={busy || !!pendingEdit} />}
   </Screen>;

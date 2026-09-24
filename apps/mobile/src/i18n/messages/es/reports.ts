@@ -121,6 +121,9 @@ export const reports = {
       emptyDetail: 'No hay gastos para este día y moneda.',
     },
     comparison: {
+      /** The comparison opened from a link whose currency is unknown or not held by any account (24B2). */
+      invalidTitle: 'Comparación no válida',
+      invalidDetail: 'Volvé al reporte para elegir la moneda.',
       matchingDays: 'La misma cantidad de días de cada mes',
       fullMonths: 'Meses completos · pueden tener distinta cantidad de días',
       capped: 'Esta comparación llega hasta el día {day} en ambos meses porque el anterior fue más corto. El reporte mensual conserva todos los días.',
