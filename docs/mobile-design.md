@@ -380,6 +380,20 @@ importe, moneda y estado.
   muestra hasta que toda la app lo tenga (23.1): un iPhone en inglés sigue leyendo
   español antes que media app traducida.
 
+## Producto 24A — base del motor multimoneda (sin cambios visuales)
+
+- **Nada cambia en pantalla.** Las cinco pestañas, el Asistente central, las superficies,
+  el material y el movimiento quedan igual; ARS y USD se leen byte a byte como antes
+  (probado contra el código anterior). Los formularios siguen ofreciendo solo ARS y USD.
+- **Reglas para cuando 24B muestre otras monedas.** Cada moneda con sus propios decimales
+  (yen sin decimales, dinar kuwaití con tres); un decimal registrado nunca se oculta. Un
+  "$" suelto es solo el peso en Argentina; el resto usa el símbolo neutral de CLDR, que
+  nombra una sola moneda ("US$", "€", "JP¥", "CA$") o el código ISO ("KWD"). Nombres de
+  CLDR en el idioma de la interfaz ("Yenes japoneses"), nunca en otro idioma.
+- **El selector buscable** (24B) seguirá la hoja actual de moneda (fila agrupada con
+  chevron, tilde en la actual): búsqueda por código, nombre, símbolo o país, las monedas
+  del libro primero, sin banderas ni colores por moneda. Diseño en docs/currency.md.
+
 ## Producto 23.1C2 — inglés y Estados Unidos publicados (sin rediseño)
 
 - **Mismo diseño.** Ningún cambio de layout, material, color, movimiento ni jerarquía:

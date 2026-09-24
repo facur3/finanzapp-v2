@@ -1,5 +1,18 @@
 # Physical iPhone acceptance checklist
 
+## Producto 24A — currency foundations (nothing new to see; a regression spot-check)
+
+No new build is required: 24A is JavaScript only (the next development build also carries
+the 23.2 patch natives). Metro from this branch on FinanzApp Dev `1d69d2d4`.
+
+- [ ] Más footer: "Producto 24A · …".
+- [ ] Amounts read as before in Español·Argentina and English·United States: Inicio hero
+  ("$ 1.234,56" / "AR$ 1,234.56"), a USD account ("US$"), Cuentas section titles "Pesos
+  argentinos" / "Dólares estadounidenses" (English "Argentine pesos" / "US dollars"), the
+  entry detail's currency row, VoiceOver on one amount ("… pesos", "… dólares").
+- [ ] Nuevo gasto, Nueva cuenta, presupuesto, tarjeta and deuda still offer exactly ARS and
+  USD; nothing mentions other currencies.
+
 ## Producto 23.2 — which binary is installed, and the per-app Language row
 
 **No new build and no reinstall-from-scratch.** Do not uninstall FinanzApp Dev or delete

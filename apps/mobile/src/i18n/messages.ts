@@ -67,8 +67,11 @@ export function translate(language: LanguageCode, key: MessageKey, params?: Mess
 
 const rules = new Map<string, Intl.PluralRules | null>();
 /** The CLDR plural category of `count` in `language`, from `Intl.PluralRules`
- * (Hermes on iOS ships it). Without Intl, or for a value it cannot classify,
- * the one/other rule Spanish and English share: exactly 1 is "one". */
+ * when the engine has it (Node does; Hermes on iOS does not: its Intl has only
+ * Collator, DateTimeFormat and NumberFormat, checked at hermes-v250829098.0.17).
+ * Without it, or for a value it cannot classify, the one/other rule Spanish and
+ * English share: exactly 1 is "one". A language with more categories needs a
+ * committed CLDR rule table before its release (docs/i18n.md §1). */
 export function pluralCategory(language: string, count: number): PluralCategory {
   if (!rules.has(language)) {
     try { rules.set(language, typeof Intl !== 'undefined' && Intl.PluralRules ? new Intl.PluralRules(language) : null); }
