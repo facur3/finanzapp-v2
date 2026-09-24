@@ -11,16 +11,23 @@
  * amounts are formatted by string transforms only. No floating-point value
  * ever stands for money here.
  *
- * `formatMinorUnits` (the domain) remains the one money formatter and its
- * Argentine output is unchanged; a region with other separators only swaps
- * them in that output. The screens never call it directly: every visible
- * amount goes through `formatAmount`/`moneyText` (the region's separators)
- * and every VoiceOver amount through the `spoken*` functions (the language's
- * own decimal separator and no grouping, see `spokenNumber`). Storage and parsing are untouched; the
+ * Since Producto 24A an amount with its currency is written from the
+ * domain's digits (`splitMinor`) with that currency's own decimals (ISO 4217
+ * minor unit, shown down to CLDR's display digits), so JPY has none and KWD
+ * three; ARS and USD keep exactly their two decimals and every string they had
+ * (tests/currency-presentation.node.ts compares them with the pre-24A code).
+ * `formatAmount` and `spokenNumber` (no currency) stay the ledger's two-decimal
+ * notation for the ARS/USD callers that do not pass one. The screens never
+ * call the domain formatter directly: every visible amount goes through
+ * `formatAmount`/`moneyText` (the region's separators) and every VoiceOver
+ * amount through the `spoken*` functions (the language's own decimal separator
+ * and no grouping, see `spokenNumber`). Storage and parsing are untouched; the
  * amount field reads and writes the region's separators through
  * `ui/money-input.ts` with the `amountFormat` below. */
-import { formatMinorUnits, type Currency } from '@finanzapp/domain';
-import { DEFAULT_LOCALE, SPEECH_REGIONS, composeLocale, conventionsOf, languageOf, type AppLocale } from './locale.ts';
+import { currencyRecord, displayDigits, formatMinorUnits, splitMinor, type IsoCurrencyCode } from '@finanzapp/domain';
+import { CURRENCY_NAMES } from './currencies/index.ts';
+import type { CurrencyNameForms } from './currencies/types.ts';
+import { DEFAULT_LOCALE, SPEECH_REGIONS, composeLocale, conventionsOf, languageOf, type AppLocale, type LanguageCode } from './locale.ts';
 
 const NBSP = '\u00A0';
 
@@ -187,13 +194,33 @@ export function formatPercent(fraction: number, locale: AppLocale = DEFAULT_LOCA
   return (fraction < 0 ? '−' : '') + digits + suffix;
 }
 
-/** The currency's short sign where the reader is: a region decides what a
- * bare "$" means. In Argentina "$" is the peso and the dollar carries its
- * prefix; in the United States "$" would read as the dollar, so both are
- * prefixed ("AR$", "US$") and neither is ambiguous. The language plays no part. */
-export function currencySymbol(currency: Currency, locale: AppLocale = DEFAULT_LOCALE): string {
-  if (currency === 'USD') return 'US$';
-  return conventionsOf(locale).dollarSignCurrency === currency ? '$' : 'AR$';
+/** The currency's short sign where the reader is. A region decides what a bare
+ * "$" means, and FinanzApp only ever writes a bare "$" for the peso in Argentina:
+ * elsewhere the peso is "AR$" (FinanzApp's convention, CLDR has no peso symbol),
+ * and every other currency takes CLDR's language-neutral symbol, which names one
+ * currency only ("US$", "CA$", "€", "JP¥"), or its ISO code ("KWD"). So the dollar
+ * reads "US$" in both regions, as it always has. The language plays no part. */
+export function currencySymbol(currency: IsoCurrencyCode, locale: AppLocale = DEFAULT_LOCALE): string {
+  if (currency === 'ARS') return conventionsOf(locale).dollarSignCurrency === 'ARS' ? '$' : 'AR$';
+  return currencyRecord(currency).symbol;
+}
+
+/** The fraction digits an amount shows: the currency's decimals, with trailing zeros
+ * dropped only down to its display digits, so a recorded fraction is never hidden. */
+function shownFraction(fraction: string, currency: IsoCurrencyCode): string {
+  const keep = displayDigits(currency);
+  let end = fraction.length;
+  while (end > keep && fraction[end - 1] === '0') end--;
+  return fraction.slice(0, end);
+}
+
+/** An amount of a currency in the region's separators, with that currency's decimals:
+ * "1.234,56" (ARS, USD), "1.500" (JPY), "1.234,567" (KWD), "1.500" and "1.500,5" (IQD,
+ * three ISO decimals shown down to CLDR's none). For ARS and USD it is `formatAmount`. */
+export function formatMoneyAmount(minor: number, currency: IsoCurrencyCode, locale: AppLocale = DEFAULT_LOCALE): string {
+  const { negative, whole, fraction } = splitMinor(minor, currency);
+  const shown = shownFraction(fraction, currency);
+  return (negative ? '-' : '') + groupDigits(whole, locale) + (shown ? conventionsOf(locale).decimal + shown : '');
 }
 
 /** The domain's formatted amount in the region's separators. Argentine output
@@ -216,20 +243,20 @@ export function amountFormat(locale: AppLocale = DEFAULT_LOCALE): { decimal: str
  * and the number, so "US$ 1.234,56" never splits at a line end. `absolute`
  * drops the sign for callers that word it ("deuda", "a favor"); `signed`
  * adds "+" to a positive amount (income). */
-export function moneyText(minor: number, currency: Currency, locale: AppLocale = DEFAULT_LOCALE, absolute = false, signed = false): string {
+export function moneyText(minor: number, currency: IsoCurrencyCode, locale: AppLocale = DEFAULT_LOCALE, absolute = false, signed = false): string {
   const value = absolute ? Math.abs(minor) : minor;
   const sign = value < 0 ? '−' : signed && value > 0 ? '+' : '';
-  return sign + currencySymbol(currency, locale) + NBSP + formatAmount(Math.abs(value), locale);
+  return sign + currencySymbol(currency, locale) + NBSP + formatMoneyAmount(Math.abs(value), currency, locale);
 }
 
 /** "ARS 1.234,56": the ISO code before the amount, joined so the code can never sit alone on a line. */
-export function codedAmount(minor: number, currency: Currency, locale: AppLocale = DEFAULT_LOCALE): string {
-  return currency + NBSP + formatAmount(minor, locale);
+export function codedAmount(minor: number, currency: IsoCurrencyCode, locale: AppLocale = DEFAULT_LOCALE): string {
+  return currency + NBSP + formatMoneyAmount(minor, currency, locale);
 }
 
 /** "Deuda registrada · ARS": a label with its currency code, joined so the
  * code stays with the last word when the line wraps. */
-export function withCurrencyCode(label: string, currency: Currency): string {
+export function withCurrencyCode(label: string, currency: IsoCurrencyCode): string {
   return label + NBSP + '·' + NBSP + currency;
 }
 
@@ -255,9 +282,18 @@ export function spokenNumber(minor: number, locale: AppLocale = DEFAULT_LOCALE):
   return formatMinorUnits(minor).replace(/\./g, '').replace(',', conventionsOf(speechLocale(locale)).decimal);
 }
 
+/** An amount of a currency for VoiceOver: its own decimals (shown as on screen), the
+ * language's decimal separator and no grouping. "1234,56" for ARS and USD in Spanish, as
+ * `spokenNumber`; "1500" for JPY; "1234.567" for KWD in English. */
+export function spokenMinor(minor: number, currency: IsoCurrencyCode, locale: AppLocale = DEFAULT_LOCALE): string {
+  const { negative, whole, fraction } = splitMinor(minor, currency);
+  const shown = shownFraction(fraction, currency);
+  return (negative ? '-' : '') + whole + (shown ? conventionsOf(speechLocale(locale)).decimal + shown : '');
+}
+
 /** An amount with its ISO code for a VoiceOver sentence ("1234,56 ARS"). */
-export function spokenAmount(minor: number, currency: Currency, locale: AppLocale = DEFAULT_LOCALE): string {
-  return spokenNumber(minor, locale) + ' ' + currency;
+export function spokenAmount(minor: number, currency: IsoCurrencyCode, locale: AppLocale = DEFAULT_LOCALE): string {
+  return spokenMinor(minor, currency, locale) + ' ' + currency;
 }
 
 /** A percentage for a VoiceOver sentence: the language's decimal separator, no grouping ("1234,5 %"). */
@@ -266,11 +302,25 @@ export function spokenPercent(fraction: number, locale: AppLocale = DEFAULT_LOCA
   return formatPercent(fraction, speech).split(conventionsOf(speech).group).join('');
 }
 
-/** What VoiceOver reads for an amount: the number, then the currency in words. */
-export function spokenMoney(minor: number, currency: Currency, locale: AppLocale = DEFAULT_LOCALE): string {
-  const en = languageOf(locale) === 'en';
-  const unit = currency === 'USD' ? (en ? 'dollars' : 'dólares') : 'pesos';
-  return (minor < 0 ? (en ? 'Minus ' : 'Menos ') : '') + spokenNumber(Math.abs(minor), locale) + ' ' + unit;
+/** FinanzApp's spoken units for its first two currencies, older than the catalogue and
+ * kept word for word: "pesos", "dólares" / "dollars". Every other currency is read with
+ * CLDR's name for a count (below). */
+const SPOKEN_UNITS: { readonly [Code in IsoCurrencyCode]?: { readonly [Language in LanguageCode]?: string } } = {
+  ARS: { es: 'pesos', en: 'pesos' },
+  USD: { es: 'dólares', en: 'dollars' },
+};
+
+/** What VoiceOver reads for an amount: the number, then the currency in words. Other
+ * currencies use CLDR's plural name ("1500 yenes japoneses", "1234.567 Kuwaiti dinars"),
+ * the singular only when the number read is exactly "1" (one yen; one Iraqi dinar, whose
+ * three ISO decimals are shown down to none), never for "1,00"; a currency the language
+ * has no name for is read by its code, never in another language. */
+export function spokenMoney(minor: number, currency: IsoCurrencyCode, locale: AppLocale = DEFAULT_LOCALE): string {
+  const language = languageOf(locale), en = language === 'en';
+  const number = spokenMinor(Math.abs(minor), currency, locale);
+  const forms = currencyNameForms(currency, language);
+  const unit = SPOKEN_UNITS[currency]?.[language] ?? (forms ? (number === '1' ? forms.one : forms.other) : currency);
+  return (minor < 0 ? (en ? 'Minus ' : 'Menos ') : '') + number + ' ' + unit;
 }
 
 /** The locale identifier iOS's date wheel takes: the interface language with
@@ -286,8 +336,16 @@ export function pickerLocale(locale: AppLocale = DEFAULT_LOCALE): string {
   return `${language}_${SPEECH_REGIONS[language]}`;
 }
 
-/** The full name of a currency for a chooser or a detail row. */
-export function currencyName(currency: Currency, locale: AppLocale = DEFAULT_LOCALE): string {
-  const en = languageOf(locale) === 'en';
-  return currency === 'USD' ? (en ? 'US dollars' : 'Dólares estadounidenses') : (en ? 'Argentine pesos' : 'Pesos argentinos');
+/** CLDR's names of a currency in a language (display, one, other), or null when CLDR
+ * has none in that language (its catalogue status is then `incomplete`). */
+export function currencyNameForms(currency: IsoCurrencyCode, language: LanguageCode): CurrencyNameForms | null {
+  return CURRENCY_NAMES[language].currencies[currency] ?? null;
+}
+
+/** The full name of a currency for a chooser or a detail row: CLDR's plural name in the
+ * interface language with a capital first letter ("Pesos argentinos", "US dollars",
+ * "Yenes japoneses"); the ISO code when the language has no name for it. */
+export function currencyName(currency: IsoCurrencyCode, locale: AppLocale = DEFAULT_LOCALE): string {
+  const other = currencyNameForms(currency, languageOf(locale))?.other;
+  return other ? other.charAt(0).toUpperCase() + other.slice(1) : currency;
 }

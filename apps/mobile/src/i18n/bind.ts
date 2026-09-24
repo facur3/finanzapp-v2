@@ -5,9 +5,9 @@
  * separators, date order and clock from the region). The financial values a
  * component formats are still integer minor units from the ledger; only their
  * presentation follows the locale. */
-import type { Currency } from '@finanzapp/domain';
+import type { IsoCurrencyCode } from '@finanzapp/domain';
 import type { LocaleSource } from './device.ts';
-import { amountFormat, codedAmount, currencyName, currencySymbol, formatAmount, formatCount, formatDate, formatDateTime, formatDayMonth, formatMonth,
+import { amountFormat, codedAmount, currencyName, currencySymbol, formatAmount, formatCount, formatMoneyAmount, formatDate, formatDateTime, formatDayMonth, formatMonth,
   formatNumericDate, formatPercent, moneyText, pickerLocale, relativeDate, spokenAmount, spokenMoney, spokenNumber, spokenPercent, type DateStyle } from './format.ts';
 import { localizeError } from './errors.ts';
 import { languageOf, regionOf, type AppLocale, type LanguageCode, type RegionCode } from './locale.ts';
@@ -34,16 +34,18 @@ export interface I18n {
   formatDayMonth: (dateISO: string) => string;
   formatCount: (value: number) => string;
   formatPercent: (fraction: number) => string;
-  /** The number alone in the region's separators ("1.234,56", "1,234.56"); visible text only. */
+  /** The number alone in the region's separators ("1.234,56", "1,234.56"), two decimals (ARS, USD); visible text only. */
   formatAmount: (minor: number) => string;
+  /** The number alone with the currency's own decimals ("1.500" JPY, "1.234,567" KWD); visible text only (Producto 24A). */
+  formatMoneyAmount: (minor: number, currency: IsoCurrencyCode) => string;
   /** Sign, symbol and number ("−US$ 1.234,56"); `signed` adds "+" to a positive amount. Visible text only. */
-  moneyText: (minor: number, currency: Currency, absolute?: boolean, signed?: boolean) => string;
+  moneyText: (minor: number, currency: IsoCurrencyCode, absolute?: boolean, signed?: boolean) => string;
   /** "ARS 1.234,56". */
-  codedAmount: (minor: number, currency: Currency) => string;
+  codedAmount: (minor: number, currency: IsoCurrencyCode) => string;
   /** VoiceOver: the amount with the currency in words ("1234.56 dollars"), the language's decimal mark, no grouping. */
-  spokenMoney: (minor: number, currency: Currency) => string;
+  spokenMoney: (minor: number, currency: IsoCurrencyCode) => string;
   /** VoiceOver: the number and its code ("1234,56 ARS"), the language's decimal mark, no grouping. */
-  spokenAmount: (minor: number, currency: Currency) => string;
+  spokenAmount: (minor: number, currency: IsoCurrencyCode) => string;
   /** VoiceOver: the number alone, the language's decimal mark, no grouping. */
   spokenNumber: (minor: number) => string;
   /** VoiceOver: a percentage, the language's decimal mark, no grouping. */
@@ -52,8 +54,8 @@ export interface I18n {
   amountFormat: { decimal: string; group: string };
   /** The date wheel's locale identifier: the language with its home region ("es_AR", "en_US"). */
   pickerLocale: string;
-  currencySymbol: (currency: Currency) => string;
-  currencyName: (currency: Currency) => string;
+  currencySymbol: (currency: IsoCurrencyCode) => string;
+  currencyName: (currency: IsoCurrencyCode) => string;
   /** "Hoy", "Ayer", "13 jul" relative to `todayISO`; `inline` for a day inside a sentence ("hoy", "ayer"). */
   relativeDate: (dateISO: string, todayISO: string, inline?: boolean) => string;
   /** A caught or stored error message in the interface language (see errors.ts). */
@@ -75,6 +77,7 @@ export function bindLocale(locale: AppLocale, localeSource: LocaleSource = 'none
     formatCount: value => formatCount(value, locale),
     formatPercent: fraction => formatPercent(fraction, locale),
     formatAmount: minor => formatAmount(minor, locale),
+    formatMoneyAmount: (minor, currency) => formatMoneyAmount(minor, currency, locale),
     moneyText: (minor, currency, absolute, signed) => moneyText(minor, currency, locale, absolute, signed),
     codedAmount: (minor, currency) => codedAmount(minor, currency, locale),
     spokenMoney: (minor, currency) => spokenMoney(minor, currency, locale),

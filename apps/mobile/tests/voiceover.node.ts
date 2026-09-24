@@ -13,7 +13,7 @@ import ts from 'typescript';
 //     format. An accessibilityLabel/Hint/Value expression, an
 //     announceForAccessibility argument and a spoken twin (spokenValue,
 //     spokenDetail, spokenCaption, spokenLabel, spokenDescribe) are not built
-//     with moneyText, formatAmount, codedAmount, formatPercent, formatCount,
+//     with moneyText, formatAmount, formatMoneyAmount, codedAmount, formatPercent, formatCount,
 //     formatNumericDate, formatDateTime, formatDayMonth or rowAmountText,
 //     directly or through a helper or value written in the scanned source.
 //     The expressions are parsed with the TypeScript compiler and followed
@@ -60,7 +60,7 @@ function memoryProgram(modules: Record<string, string>): ts.Program {
 }
 
 /** The visible formatters: the region's separators and grouping, for the screen only. */
-const VISIBLE = new Set(['moneyText', 'formatAmount', 'codedAmount', 'formatPercent', 'formatCount', 'formatNumericDate', 'formatDateTime', 'formatDayMonth', 'rowAmountText']);
+const VISIBLE = new Set(['moneyText', 'formatAmount', 'formatMoneyAmount', 'codedAmount', 'formatPercent', 'formatCount', 'formatNumericDate', 'formatDateTime', 'formatDayMonth', 'rowAmountText']);
 /** Attributes VoiceOver reads, and the spoken twins the wrappers turn into labels. */
 const SPOKEN = new Set(['accessibilityLabel', 'accessibilityHint', 'accessibilityValue', 'spokenValue', 'spokenDetail', 'spokenCaption', 'spokenLabel', 'spokenDescribe']);
 /** A wrapper's visible prop that becomes (part of) its VoiceOver label, and the twin read instead. */
