@@ -60,6 +60,7 @@ export const common = {
       ambiguous: 'No se pegó «{text}»: puede leerse de dos maneras. Escribí los decimales con «{decimal}».',
       precision: 'No se pegó «{text}»: tiene más de dos decimales.',
       invalid: 'No se pegó «{text}»: no es un monto válido.',
+      currencyMismatch: 'No se pegó «{text}»: indica otra moneda. La cuenta está en {currency}; no se hizo ninguna conversión.'
       tooLong: 'No se pegó «{text}»: supera el monto máximo.',
     },
   },
