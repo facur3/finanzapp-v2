@@ -7,7 +7,8 @@
  * presentation follows the locale. */
 import type { Currency } from '@finanzapp/domain';
 import type { LocaleSource } from './device.ts';
-import { currencyName, currencySymbol, formatCount, formatDate, formatDateTime, formatMonth, formatPercent, moneyText, spokenMoney, type DateStyle } from './format.ts';
+import { currencyName, currencySymbol, formatCount, formatDate, formatDateTime, formatMonth, formatPercent, moneyText, relativeDate, spokenMoney, type DateStyle } from './format.ts';
+import { localizeError } from './errors.ts';
 import { languageOf, regionOf, type AppLocale, type LanguageCode, type RegionCode } from './locale.ts';
 import { translator, type Translate } from './messages.ts';
 
@@ -27,6 +28,10 @@ export interface I18n {
   spokenMoney: (minor: number, currency: Currency) => string;
   currencySymbol: (currency: Currency) => string;
   currencyName: (currency: Currency) => string;
+  /** "Hoy", "Ayer", "13 jul" relative to `todayISO`. */
+  relativeDate: (dateISO: string, todayISO: string) => string;
+  /** A caught or stored error message in the interface language (see errors.ts). */
+  errorText: (message: string) => string;
 }
 
 export function bindLocale(locale: AppLocale, localeSource: LocaleSource = 'none'): I18n {
@@ -41,5 +46,7 @@ export function bindLocale(locale: AppLocale, localeSource: LocaleSource = 'none
     spokenMoney: (minor, currency) => spokenMoney(minor, currency, locale),
     currencySymbol: currency => currencySymbol(currency, locale),
     currencyName: currency => currencyName(currency, locale),
+    relativeDate: (dateISO, todayISO) => relativeDate(dateISO, todayISO, locale),
+    errorText: message => localizeError(languageOf(locale), message),
   };
 }

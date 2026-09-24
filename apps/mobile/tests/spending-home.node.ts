@@ -11,7 +11,10 @@ import { monthlyEvidence } from '../src/integrations/evidence.ts';
 import { integrationClient } from '../src/integrations/client.ts';
 import * as i18nFormat from '../src/i18n/format.ts';
 import { bindLocale } from '../src/i18n/bind.ts';
-const i18nProvider = { useI18n: () => bindLocale('es-AR') };
+import type { AppLocale } from '../src/i18n/locale.ts';
+// Read on every render, like the live provider; a test may switch it and must restore it.
+let locale: AppLocale = 'es-AR';
+const i18nProvider = { useI18n: () => bindLocale(locale) };
 
 // Exercise the actual routes' data/handlers with host components replaced by
 // descriptors. This is NOT a rendered iOS screen or gesture/animation test.
@@ -207,4 +210,30 @@ test('Home shows the budget module for a general budget alone, for sublimits alo
   const archived = routeHarness('(tabs)/index.tsx', {}, homeData, { budgets: [{ ...total, active: false, revision: 1, updatedAt: '2026-09-02T12:00:00.000Z' }] }).render();
   assert.equal(nodes(archived).some(n => n.type === 'BudgetHomeCard'), false);
   assert.equal(nodes(archived).some(n => n.type === 'SectionTitle' && n.props.children === 'Presupuesto del mes'), false);
+});
+
+test('23.1B1: Home in English keeps the same numbers and routes; only words change, and the language can switch in place', () => {
+  const view = routeHarness('(tabs)/index.tsx', {}, homeData);
+  const spanish = view.render();
+  locale = 'en-AR';
+  try {
+    const root = view.render();
+    assert.equal(find(root, 'Money').props.minor, find(spanish, 'Money').props.minor, 'the figure never depends on the language');
+    const metric = nodes(root).find(n => n.type === 'Choices' && n.props.value === 'spending')!;
+    assert.equal(metric.props.options.map((option: any) => option.label).join(','), 'Spending,Available');
+    const texts = nodes(root).filter(n => n.type === 'AppText').map(n => String(n.props.children));
+    assert.ok(texts.includes('September'), 'the month is named in English');
+    const titles = nodes(root).filter(n => n.type === 'SectionTitle').map(n => String(n.props.children) + '|' + n.props.action);
+    assert.ok(titles.includes('Where your money went|Reports'), titles.join(' / '));
+    assert.ok(titles.includes('Latest transactions|See all'), titles.join(' / '));
+    metric.props.onChange('available');
+    const available = view.render();
+    const help = find(available, 'MetricHelp');
+    assert.equal(help.props.title, 'Available');
+    assert.match(help.props.detail, /^The money recorded in your accounts/);
+    assert.ok(nodes(available).some(n => n.type === 'AppText' && String(n.props.children) === '1 account'), 'plural of the account count');
+    locale = 'es-AR';
+    const back = view.render();
+    assert.equal(find(back, 'MetricHelp').props.title, 'Disponible', 'the chosen metric survives the switch');
+  } finally { locale = 'es-AR'; }
 });

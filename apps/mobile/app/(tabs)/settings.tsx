@@ -63,6 +63,6 @@ export default function MoreScreen() {
         Tus registros quedan en este dispositivo y podés registrar sin conexión. La sincronización todavía no está activada.
       </AppText>
     </View>
-    <AppText secondary style={{ textAlign: 'center', fontSize: 13 }}>FinanzApp · Piloto nativo 0.1.0 · Producto 23.1A · {MATERIAL_LABELS[material.reason]} · {LOCALE_SOURCE_LABELS[localeSource]}</AppText>
+    <AppText secondary style={{ textAlign: 'center', fontSize: 13 }}>FinanzApp · Piloto nativo 0.1.0 · Producto 23.1B1 · {MATERIAL_LABELS[material.reason]} · {LOCALE_SOURCE_LABELS[localeSource]}</AppText>
   </Screen>;
 }

@@ -3,7 +3,7 @@ import { Alert, StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import Animated, { useAnimatedStyle, useSharedValue, withDelay, withTiming } from 'react-native-reanimated';
-import { formatMinorUnits, labelFromISO, type Account, type CategorySpending, type Currency, type MonthlyBudgetSummary, type RecurringRule } from '@finanzapp/domain';
+import { formatMinorUnits, type Account, type CategorySpending, type Currency, type MonthlyBudgetSummary, type RecurringRule } from '@finanzapp/domain';
 import { AppText, CategoryBadge, Money, PressFeedback, Surface, useStacked } from './components';
 import { budgetHomeHeadline, budgetTone, categoriesStatus, percentUsed } from './budget-presentation';
 import { washOf } from './category-color';
@@ -11,12 +11,14 @@ import { useCategoryLook } from './category-hues';
 import { easeOut, timing } from './motion';
 import { spendingShare } from './report-presentation';
 import { usePalette, useReduceMotion } from './theme';
+import { useI18n } from '../i18n/provider';
 
 /** Contextual help for a metric: one native alert with the definition, so the
  * screen itself carries no disclaimer copy. */
 export function MetricHelp({ title, detail }: { title: string; detail: string }) {
   const p = usePalette();
-  return <PressFeedback feedback="opacity" accessibilityRole="button" accessibilityLabel={'Qué significa ' + title} hitSlop={8}
+  const { t } = useI18n();
+  return <PressFeedback feedback="opacity" accessibilityRole="button" accessibilityLabel={t('common.whatIs', { title })} hitSlop={8}
     onPress={() => Alert.alert(title, detail)} style={{ minHeight: 24, paddingHorizontal: 4 }}>
     <Ionicons name="information-circle-outline" size={18} color={p.tertiary} accessible={false} />
   </PressFeedback>;
@@ -53,6 +55,7 @@ function RankedRow({ category, totalMinor, currency, index, last, onPress }: {
 }) {
   const p = usePalette();
   const reduced = useReduceMotion();
+  const { t } = useI18n();
   const { hex: color, label: name } = useCategoryLook(category.category);
   const { fraction, label } = spendingShare(category.amountMinor, totalMinor);
   // First data: the fill grows from zero (or, under Reduce Motion, fades in already sized). Later data: the fill moves to the new share.
@@ -71,8 +74,8 @@ function RankedRow({ category, totalMinor, currency, index, last, onPress }: {
   }, [fraction, reduced, index, progress, opacity]);
   const fill = useAnimatedStyle(() => ({ width: `${progress.value * 100}%` as `${number}%`, opacity: opacity.value }));
   const stacked = useStacked({ minor: category.amountMinor, currency });
-  return <PressFeedback feedback="highlight" accessibilityRole="button" accessibilityHint="Abre los movimientos de esta categoría este mes"
-    accessibilityLabel={`${name}, ${formatMinorUnits(category.amountMinor)} ${currency}, ${label} del gasto del mes`}
+  return <PressFeedback feedback="highlight" accessibilityRole="button" accessibilityHint={t('home.rankingHint')}
+    accessibilityLabel={t('home.rankingLabel', { name, amount: formatMinorUnits(category.amountMinor) + ' ' + currency, share: label })}
     onPress={onPress} style={[styles.row, last && styles.rowLast]}
     backdrop={<View pointerEvents="none" accessible={false} style={styles.fillTrack}>
       <Animated.View style={[styles.fill, { backgroundColor: washOf(color, p) }, fill]} />
@@ -93,6 +96,7 @@ function RankedRow({ category, totalMinor, currency, index, last, onPress }: {
 export function BudgetHomeCard({ summary }: { summary: MonthlyBudgetSummary }) {
   const p = usePalette();
   const reduced = useReduceMotion();
+  const { t } = useI18n();
   const headline = budgetHomeHeadline(summary);
   const { currency } = summary;
   const progressValue = headline ? Math.min(1, headline.progress.ratio) : 0;
@@ -105,22 +109,25 @@ export function BudgetHomeCard({ summary }: { summary: MonthlyBudgetSummary }) {
   const { remainingMinor: remaining, budget } = headline.progress;
   const tone = budgetTone(headline.progress);
   const color = tone === 'expense' ? p.expense : tone === 'warning' ? p.warning : p.text;
-  const title = headline.kind === 'total' ? 'Presupuesto general' : categoryLabel;
+  const title = headline.kind === 'total' ? t('home.budget.general') : categoryLabel;
   const percent = percentUsed(headline.progress);
-  const status = headline.kind === 'total' ? categoriesStatus(headline.categories, headline.exceededCategories)
-    : headline.categories > 1 ? `${headline.categories} categorías${headline.exceededCategories ? ` · ${headline.exceededCategories} ${headline.exceededCategories === 1 ? 'excedida' : 'excedidas'}` : ''}` : 'Límite por categoría';
+  const status = headline.kind === 'total' ? categoriesStatus(headline.categories, headline.exceededCategories, t)
+    : headline.categories > 1 ? t('home.budget.categories', { count: headline.categories })
+      + (headline.exceededCategories ? ' · ' + t('home.budget.exceededCount', { count: headline.exceededCategories }) : '') : t('home.budget.perCategory');
   const symbol = currency === 'USD' ? 'US$ ' : '$ ';
+  const spoken = t(remaining < 0 ? 'home.budget.labelExceeded' : 'home.budget.labelLeft',
+    { title, amount: formatMinorUnits(Math.abs(remaining)) + ' ' + currency, total: formatMinorUnits(budget.amountMinor), percent });
   return <PressFeedback accessibilityRole="button"
-    accessibilityLabel={`${title}: ${remaining < 0 ? 'excedido en ' : 'quedan '}${formatMinorUnits(Math.abs(remaining))} ${currency} de ${formatMinorUnits(budget.amountMinor)}, ${percent} por ciento usado.${status ? ' ' + status : ''}`}
+    accessibilityLabel={spoken + (status ? ' ' + status : '')}
     onPress={() => router.push({ pathname: '/budgets', params: { currency } })}>
     <Surface style={{ gap: 12 }}>
       <View style={{ flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', gap: 12 }}>
         <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
-          <AppText secondary variant="caption" numberOfLines={2} style={{ fontWeight: '500' }}>{title} · {remaining < 0 ? 'excedido' : 'te queda'}</AppText>
+          <AppText secondary variant="caption" numberOfLines={2} style={{ fontWeight: '500' }}>{title} · {remaining < 0 ? t('home.budget.exceeded') : t('home.budget.left')}</AppText>
           <Money minor={Math.abs(remaining)} currency={currency} size={24} weight="700" color={color} />
         </View>
         <View style={{ alignItems: 'flex-end', gap: 2, flexShrink: 1, maxWidth: '50%' }}>
-          <AppText secondary variant="caption" style={{ textAlign: 'right' }}>de {symbol}{formatMinorUnits(budget.amountMinor)} · {percent} %</AppText>
+          <AppText secondary variant="caption" style={{ textAlign: 'right' }}>{t('home.budget.of', { amount: symbol + formatMinorUnits(budget.amountMinor), percent })}</AppText>
           {!!status && <AppText variant="footnote" style={{ color: headline.exceededCategories ? p.expense : p.secondary, fontWeight: headline.exceededCategories ? '600' : '400' }}>{status}</AppText>}
         </View>
       </View>
@@ -135,12 +142,13 @@ export function UpcomingRecurringRow({ rule, account, day, last }: {
   rule: RecurringRule; account: Account; day: string; last: boolean;
 }) {
   const p = usePalette();
+  const { t, relativeDate } = useI18n();
   const stacked = useStacked({ minor: rule.amountMinor, currency: account.currency });
-  const date = labelFromISO(rule.nextDateISO, new Date(day + 'T12:00:00'));
+  const date = relativeDate(rule.nextDateISO, day);
   const days = Math.round((Date.parse(rule.nextDateISO + 'T12:00:00Z') - Date.parse(day + 'T12:00:00Z')) / 86400000);
-  const when = days === 0 ? 'Hoy' : days === 1 ? 'Mañana' : `En ${days} días`;
+  const when = days === 0 ? t('home.upcomingRow.today') : days === 1 ? t('home.upcomingRow.tomorrow') : t('home.upcomingRow.inDays', { count: days });
   return <PressFeedback feedback="highlight" accessibilityRole="button"
-    accessibilityLabel={`${rule.merchant}, ${formatMinorUnits(rule.amountMinor)} ${account.currency}, próximo pago ${date}`}
+    accessibilityLabel={t('home.upcomingRow.label', { merchant: rule.merchant, amount: formatMinorUnits(rule.amountMinor) + ' ' + account.currency, date })}
     onPress={() => router.push({ pathname: '/edit-recurring/[id]', params: { id: rule.id } })}
     style={[styles.row, { borderBottomWidth: last ? 0 : StyleSheet.hairlineWidth, borderBottomColor: p.line }]}>
     <CategoryBadge category={rule.category} kind={rule.kind} />

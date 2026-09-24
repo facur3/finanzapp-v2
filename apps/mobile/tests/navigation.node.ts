@@ -6,7 +6,10 @@ import ts from 'typescript';
 import { tabHostOptions, tabScreenOptions } from '../src/ui/navigation.ts';
 import * as i18nFormat from '../src/i18n/format.ts';
 import { bindLocale } from '../src/i18n/bind.ts';
-const i18nProvider = { useI18n: () => bindLocale('es-AR') };
+import type { AppLocale } from '../src/i18n/locale.ts';
+// Read on every render, like the live provider; a test may switch it and must restore it.
+let locale: AppLocale = 'es-AR';
+const i18nProvider = { useI18n: () => bindLocale(locale) };
 
 // A configuration regression guard over the actual layout module, NOT an iOS
 // render/gesture test. It catches overrides that accidentally bring back the
@@ -76,4 +79,19 @@ test('the Assistant is the centre tab, Tarjetas left the bar for Más, and Home 
   home.props.onPress();
   assert.deepEqual(pushed.at(-1), '/accounts');
   assert.equal(JSON.stringify(screens).includes('assistant-preview'), false);
+});
+
+test('23.1B1: tab labels and the header actions follow the language; routes and order never change', () => {
+  const labels = () => {
+    const { props } = renderLayout('#F5F6F8');
+    return props.children.map((screen: any) => screen.props.name + '=' + screen.props.options.title).join(',');
+  };
+  assert.equal(labels(), 'index=Inicio,activity=Movimientos,assistant=Asistente,reports=Reportes,settings=Más');
+  locale = 'en-AR';
+  try {
+    assert.equal(labels(), 'index=Home,activity=Activity,assistant=Assistant,reports=Reports,settings=More');
+    const { props } = renderLayout('#F5F6F8');
+    assert.equal(props.children[0].props.options.headerRight().props.label, 'View my accounts');
+    assert.equal(props.children[1].props.options.headerRight().props.label, 'Record a transaction');
+  } finally { locale = 'es-AR'; }
 });

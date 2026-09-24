@@ -380,6 +380,22 @@ importe, moneda y estado.
   muestra hasta que toda la app lo tenga (23.1): un iPhone en inglés sigue leyendo
   español antes que media app traducida.
 
+## Producto 23.1B1 — traducción de navegación, Inicio, Movimientos y formularios (sin rediseño)
+
+- **Mismo diseño, otras palabras.** Ningún cambio de layout, espaciado, material,
+  movimiento ni posición (el Asistente sigue en la pestaña central, Tarjetas bajo Más).
+  El español se ve idéntico; el inglés existe y sigue oculto hasta 23.1B2 y 23.1C.
+- **Longitud.** Los textos en inglés de segmentados, pestañas y acciones rápidas no son
+  más largos que los españoles (All / Expenses / Income / Transfers; Expense / Income /
+  Transfer); botones y títulos de cabecera caben en una línea de un iPhone de 320 pt. Si
+  un texto nuevo no entra, se acorta la palabra, no se achica la fuente ni se trunca.
+- **Categorías predeterminadas.** Muestran su nombre en el idioma de la interfaz
+  ("Comida" → "Food") sin cambiar el texto guardado ni su identidad; una categoría
+  creada o renombrada por la persona se muestra siempre como la escribió.
+- **Errores.** Se traducen al mostrarse, así un error visible sigue un cambio de idioma.
+- **Cabeceras.** Los títulos salen del catálogo y cambian en el lugar, sin reiniciar la
+  pila de navegación.
+
 ## Producto 23.1A — idioma y región (sin rediseño)
 
 - **Dos preferencias independientes.** Idioma (las palabras) y región (separadores,

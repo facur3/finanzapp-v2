@@ -104,6 +104,20 @@ export function relativeDayName(dateISO: string, todayISO: string, locale: AppLo
   return null;
 }
 
+/** A row's date: Hoy, Ayer, Anteayer (Today, Yesterday), otherwise the short
+ * date, with the year when it is not the current one. In Spanish this is the
+ * domain's `labelFromISO` byte for byte; a future date is never relative. */
+export function relativeDate(dateISO: string, todayISO: string, locale: AppLocale = DEFAULT_LOCALE): string {
+  const date = dateFromISO(dateISO), today = dateFromISO(todayISO);
+  if (!date || !today) return String(dateISO ?? '');
+  const days = daysAgo(dateISO, todayISO);
+  const en = languageOf(locale) === 'en';
+  if (days === 0) return en ? 'Today' : 'Hoy';
+  if (days === 1) return en ? 'Yesterday' : 'Ayer';
+  if (days === 2 && !en) return 'Anteayer';
+  return formatDate(dateISO, date.year === today.year ? 'day' : 'dayYear', locale);
+}
+
 /** A stored date as numbers in the region's order: "22/9/2026" (Argentina) or "9/22/2026" (United States). */
 export function formatNumericDate(dateISO: string, locale: AppLocale = DEFAULT_LOCALE): string {
   const date = dateFromISO(dateISO);

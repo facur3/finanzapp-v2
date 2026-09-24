@@ -1,4 +1,5 @@
 import { budgetState, type BudgetProgress, type CategoryMonthlyBudget, type MonthlyBudgetSummary, type TotalMonthlyBudget } from '@finanzapp/domain';
+import { translator, type Translate } from '../i18n/messages.ts';
 
 /** Budget states map onto the existing semantic tones, and nothing else:
  * calm is neutral, approaching the limit is warning, exceeded is expense.
@@ -30,8 +31,8 @@ export function budgetHomeHeadline(summary: MonthlyBudgetSummary): BudgetHomeHea
 }
 
 /** "2 categorías en orden", "1 categoría excedida", or nothing without sublimits. */
-export function categoriesStatus(categories: number, exceeded: number): string {
+export function categoriesStatus(categories: number, exceeded: number, t: Translate = translator('es')): string {
   if (!categories) return '';
-  if (exceeded) return `${exceeded} ${exceeded === 1 ? 'categoría excedida' : 'categorías excedidas'}`;
-  return `${categories} ${categories === 1 ? 'categoría en orden' : 'categorías en orden'}`;
+  if (exceeded) return t('budgetStatus.exceeded', { count: exceeded });
+  return t('budgetStatus.inOrder', { count: categories });
 }

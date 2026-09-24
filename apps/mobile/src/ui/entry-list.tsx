@@ -2,7 +2,7 @@ import { useMemo, type ReactNode } from 'react';
 import { SectionList, View } from 'react-native';
 import { formatMinorUnits, type Account, type Entry, type Transfer } from '@finanzapp/domain';
 import { AppText, MovementRow, type RowContext } from './components';
-import { moneyText } from '../i18n/format';
+import { useI18n } from '../i18n/provider';
 import { activityDateLabel, dayNetMinor, groupActivity, mergeActivity, type ActivityItem } from './presentation';
 import { useCurrentDay, usePalette } from './theme';
 
@@ -11,6 +11,7 @@ export function EntryList({ entries, transfers, accounts, accountId, header, emp
 }) {
   const p = usePalette();
   const day = useCurrentDay();
+  const { t, locale, moneyText } = useI18n();
   const sections = useMemo(() => groupActivity(mergeActivity(entries, transfers)), [entries, transfers]);
   return <SectionList<ActivityItem, { dateISO: string; data: ActivityItem[] }> sections={sections} keyExtractor={item => item.key}
     style={{ flex: 1, backgroundColor: p.background }}
@@ -25,10 +26,10 @@ export function EntryList({ entries, transfers, accounts, accountId, header, emp
       const net = context ? null : dayNetMinor(section.data.filter(item => item.type === 'entry').map(item => item.value as Entry), accounts);
       return <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', gap: 12, paddingTop: 20, paddingBottom: 8, paddingHorizontal: 4 }}>
         <AppText accessibilityRole="header" secondary variant="footnote" style={{ fontWeight: '600', flexShrink: 1 }}>
-          {activityDateLabel(section.dateISO, day)}
+          {activityDateLabel(section.dateISO, day, locale)}
         </AppText>
         {net && net.minor !== 0 && <AppText secondary variant="footnote" style={{ fontVariant: ['tabular-nums'] }}
-          accessibilityLabel={`Neto del día ${net.minor < 0 ? 'menos ' : ''}${formatMinorUnits(Math.abs(net.minor))} ${net.currency}`}>
+          accessibilityLabel={t(net.minor < 0 ? 'activity.dayNetNegative' : 'activity.dayNet', { amount: formatMinorUnits(Math.abs(net.minor)) + ' ' + net.currency })}>
           {net.minor < 0 ? '−' : '+'}{moneyText(Math.abs(net.minor), net.currency)}
         </AppText>}
       </View>;

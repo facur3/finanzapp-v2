@@ -3,7 +3,7 @@ import { ActivityIndicator, Alert, InputAccessoryView, Keyboard, Platform, Press
   useWindowDimensions, type PressableProps, type StyleProp, type TextInputProps, type TextProps, type ViewStyle } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { accountBalanceMinor, formatMinorUnits, labelFromISO, type Currency, type Entry, type EntryKind, type Account, type Transfer } from '@finanzapp/domain';
+import { accountBalanceMinor, formatMinorUnits, type Currency, type Entry, type EntryKind, type Account, type Transfer } from '@finanzapp/domain';
 import type { ActivityItem } from './presentation';
 import { router } from 'expo-router';
 import { radius, space, type, useCurrentDay, usePalette, useReduceMotion, type Palette } from './theme';
@@ -349,10 +349,14 @@ export function FieldNote({ children, help }: { children: string; help?: { title
   </View>;
 }
 
+/** A caught or stored error, shown in the interface language: a catalogue key
+ * or a known thrown message is translated here, at display time, so an error
+ * already on screen follows a language change (see `src/i18n/errors.ts`). */
 export function ErrorMessage({ message }: { message: string | null }) {
   const p = usePalette();
+  const { errorText } = useI18n();
   return message ? <View style={{ padding: 14, borderRadius: radius.button, backgroundColor: p.expenseSoft }}>
-    <Text accessibilityRole="alert" accessibilityLiveRegion="polite" style={[type.subhead, { color: p.expense }]}>{message}</Text>
+    <Text accessibilityRole="alert" accessibilityLiveRegion="polite" style={[type.subhead, { color: p.expense }]}>{errorText(message)}</Text>
   </View> : null;
 }
 
@@ -548,13 +552,14 @@ export function EntryRow({ entry, account, last = false, showDate = true, showAc
 }) {
   const p = usePalette();
   const day = useCurrentDay();
-  const dateLabel = labelFromISO(entry.dateISO, new Date(day + 'T12:00:00'));
+  const { t, relativeDate } = useI18n();
+  const dateLabel = relativeDate(entry.dateISO, day);
   const income = entry.kind === 'income';
   const stacked = useStacked({ minor: entry.amountMinor, currency: account.currency, signed: true });
   const category = useCategoryLook(entry.category, entry.kind).label;
   const detail = [category, showAccount ? account.name : null, showDate ? dateLabel : null].filter(Boolean).join(' · ');
   return <PressFeedback feedback="highlight" accessibilityRole="button"
-    accessibilityLabel={[entry.merchant, income ? 'ingreso' : 'gasto', formatMinorUnits(entry.amountMinor) + ' ' + account.currency, category, account.name, dateLabel].join(', ')}
+    accessibilityLabel={[entry.merchant, t(income ? 'movement.incomeWord' : 'movement.expenseWord'), formatMinorUnits(entry.amountMinor) + ' ' + account.currency, category, account.name, dateLabel].join(', ')}
     onPress={() => router.push({ pathname: '/entry/[id]', params: { id: entry.id } })}
     style={[styles.row, { borderBottomColor: p.line, borderBottomWidth: last ? 0 : StyleSheet.hairlineWidth }]}>
     <CategoryBadge category={entry.category} kind={entry.kind} tone={income ? 'income' : 'neutral'} />
@@ -570,20 +575,21 @@ export function EntryRow({ entry, account, last = false, showDate = true, showAc
   </PressFeedback>;
 }
 
-export function AccountRow({ account, entries, transfers, last = false, kindLabel = 'Cuenta' }: {
+export function AccountRow({ account, entries, transfers, last = false, kindLabel }: {
   account: Account; entries: Entry[]; transfers?: Transfer[]; last?: boolean; kindLabel?: string;
 }) {
   const p = usePalette();
+  const { t } = useI18n();
   const balance = accountBalanceMinor(account, entries, transfers);
   const stacked = useStacked({ minor: balance, currency: account.currency });
-  return <PressFeedback feedback="highlight" accessibilityRole="button" accessibilityLabel={'Ver cuenta ' + account.name + ', saldo ' + formatMinorUnits(balance) + ' ' + account.currency}
+  return <PressFeedback feedback="highlight" accessibilityRole="button" accessibilityLabel={t('rows.accountLabel', { name: account.name, amount: formatMinorUnits(balance) + ' ' + account.currency })}
     onPress={() => router.push({ pathname: '/account/[id]', params: { id: account.id } })}
     style={[styles.row, { borderBottomColor: p.line, borderBottomWidth: last ? 0 : StyleSheet.hairlineWidth }]}>
     <AccountBadge accountId={account.id} />
     <View style={{ flex: 1, minWidth: 0, gap: 8, flexDirection: stacked ? 'column' : 'row', alignItems: stacked ? 'flex-start' : 'center' }}>
       <View style={{ flex: stacked ? undefined : 1, minWidth: 0, gap: 3 }}>
         <AppText numberOfLines={stacked ? undefined : 2} style={{ fontWeight: '500' }}>{account.name}</AppText>
-        <AppText secondary variant="footnote">{kindLabel} · {account.currency}</AppText>
+        <AppText secondary variant="footnote">{kindLabel ?? t('accountKinds.account')} · {account.currency}</AppText>
       </View>
       <View style={{ maxWidth: stacked ? '100%' : AMOUNT_COLUMN, alignItems: 'flex-end' }}>
         <Money minor={balance} currency={account.currency} color={balance < 0 ? p.expense : undefined} />
@@ -609,17 +615,18 @@ export function TransferRow({ transfer: t, accounts, accountId, last = false, sh
 }) {
   const p = usePalette();
   const day = useCurrentDay();
+  const { t: tr, relativeDate } = useI18n();
   const from = accounts.find(a => a.id === t.fromAccountId)!, to = accounts.find(a => a.id === t.toAccountId)!;
-  const date = labelFromISO(t.dateISO, new Date(day + 'T12:00:00'));
+  const date = relativeDate(t.dateISO, day);
   const outgoing = accountId === from.id;
   const incoming = accountId === to.id;
-  const title = context === 'card' ? (incoming ? 'Pago de tarjeta' : 'Transferencia') : context === 'debt' ? (incoming ? 'Pago' : 'Cobro') : t.note || 'Transferencia';
-  const detail = context ? [t.note && t.note !== title ? t.note : null, incoming ? 'desde ' + from.name : 'hacia ' + to.name, showDate ? date : null].filter(Boolean).join(' · ')
+  const title = context === 'card' ? tr(incoming ? 'rows.cardPayment' : 'rows.transfer') : context === 'debt' ? tr(incoming ? 'rows.payment' : 'rows.collection') : t.note || tr('rows.transfer');
+  const detail = context ? [t.note && t.note !== title ? t.note : null, incoming ? tr('rows.fromAccount', { name: from.name }) : tr('rows.toAccount', { name: to.name }), showDate ? date : null].filter(Boolean).join(' · ')
     : `${from.name} → ${to.name}${showDate ? ' · ' + date : ''}`;
   const signed = !!accountId && !context;
   const stacked = useStacked({ minor: signed && outgoing ? -t.amountMinor : t.amountMinor, currency: from.currency, signed });
   return <PressFeedback feedback="highlight" accessibilityRole="button"
-    accessibilityLabel={`${title}, de ${from.name} a ${to.name}, ${formatMinorUnits(t.amountMinor)} ${from.currency}, ${date}${t.note ? ', ' + t.note : ''}`}
+    accessibilityLabel={tr('rows.transferLabel', { title, from: from.name, to: to.name, amount: formatMinorUnits(t.amountMinor) + ' ' + from.currency, date }) + (t.note ? ', ' + t.note : '')}
     onPress={() => router.push({ pathname: '/transfer/[id]', params: { id: t.id } })}
     style={[styles.row, { borderBottomColor: p.line, borderBottomWidth: last ? 0 : StyleSheet.hairlineWidth }]}>
     <GlyphTile icon={context === 'card' ? 'card-outline' : context === 'debt' ? 'people-outline' : 'swap-horizontal-outline'} tone="transfer" />

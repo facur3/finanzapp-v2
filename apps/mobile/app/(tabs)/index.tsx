@@ -5,7 +5,7 @@ import { currentMonthISO, hiddenLiabilityAccountIds, liquidTotalsByCurrency, spe
   summarizeMonthlyBudgets, type Currency } from '@finanzapp/domain';
 import { useLedger } from '../../src/storage/LedgerProvider';
 import { ActionButton, AppText, Choices, EmptyState, EntryRow, Money, Screen, SectionTitle, Surface, useStacked } from '../../src/ui/components';
-import { formatDate } from '../../src/i18n/format';
+import { useI18n } from '../../src/i18n/provider';
 import { BudgetHomeCard, CategoryRanking, MetricHelp, UpcomingRecurringRow } from '../../src/ui/home-modules';
 import { Reflow, ValueTransition } from '../../src/ui/motion';
 import { availableCurrencies, selectEntries } from '../../src/ui/presentation';
@@ -14,13 +14,7 @@ import { space, useCurrentDay, usePalette } from '../../src/ui/theme';
 
 type HomeMetric = 'spending' | 'available';
 
-const AVAILABLE_HELP = 'Es el dinero registrado en tus cuentas de esta moneda: saldo inicial más ingresos, menos gastos y transferencias. '
-  + 'No incluye tarjetas ni deudas, y no es un saldo bancario ni tu patrimonio.';
-
-const monthName = (day: string) => {
-  const label = formatDate(day, 'month');
-  return label.charAt(0).toUpperCase() + label.slice(1);
-};
+const capitalized = (label: string) => label.charAt(0).toUpperCase() + label.slice(1);
 
 /** Home answers one question at a time: how much did I spend this month, or
  * how much recorded money do I have. One number, its month, and nothing else
@@ -30,6 +24,7 @@ export default function HomeScreen() {
   const day = useCurrentDay();
   const p = usePalette();
   const stacked = useStacked();
+  const { t, formatDate } = useI18n();
   const [selectedCurrency, setCurrency] = useState<Currency>('ARS');
   const [metric, setMetric] = useState<HomeMetric>('spending');
   const currencies = availableCurrencies(snapshot?.accounts ?? []);
@@ -65,14 +60,14 @@ export default function HomeScreen() {
   const heroId = `${metric}|${currency}`;
 
   return <Screen gap={space.xxl}>
-    {!snapshot.accounts.length ? <EmptyState title="Entendé tus gastos."
-      detail="Elegí una cuenta para agrupar tus movimientos. Podés empezar sin cargar tu saldo bancario."
-      icon="receipt-outline" action={<ActionButton label="Empezar" icon="add-outline" onPress={() => router.push('/new-account')} />} /> : <>
+    {!snapshot.accounts.length ? <EmptyState title={t('home.emptyTitle')}
+      detail={t('home.emptyDetail')}
+      icon="receipt-outline" action={<ActionButton label={t('home.start')} icon="add-outline" onPress={() => router.push('/new-account')} />} /> : <>
       <View style={{ gap: space.xl }}>
         <View style={{ flexDirection: stacked ? 'column' : 'row', alignItems: stacked ? 'stretch' : 'center', justifyContent: 'space-between', gap: 12 }}>
           <View style={{ flex: stacked ? undefined : 1, maxWidth: stacked ? undefined : 232 }}>
             <Choices value={metric} onChange={setMetric}
-              options={[{ value: 'spending', label: 'Gastos' }, { value: 'available', label: 'Disponible' }]} />
+              options={[{ value: 'spending', label: t('home.spending') }, { value: 'available', label: t('home.available') }]} />
           </View>
           {currencies.length > 1 && <Choices value={currency} onChange={setCurrency}
             options={currencies.map(value => ({ value, label: value }))} />}
@@ -80,49 +75,49 @@ export default function HomeScreen() {
 
         <ValueTransition id={heroId} style={{ gap: 6, paddingVertical: space.s }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
-            <AppText secondary variant="subhead" style={{ fontWeight: '500' }}>{spending ? monthName(day) : 'Saldo registrado'}</AppText>
-            {!spending && <MetricHelp title="Disponible" detail={AVAILABLE_HELP} />}
+            <AppText secondary variant="subhead" style={{ fontWeight: '500' }}>{spending ? capitalized(formatDate(day, 'month')) : t('home.recordedBalance')}</AppText>
+            {!spending && <MetricHelp title={t('home.available')} detail={t('home.availableHelp')} />}
           </View>
           {spending ? summary.status === 'ready'
             ? <Money minor={summary.expenseMinor} currency={currency} large />
-            : <AppText secondary variant="subhead">El total supera el rango que podemos mostrar con precisión. Tus movimientos siguen guardados.</AppText>
+            : <AppText secondary variant="subhead">{t('home.spendingOutOfRange')}</AppText>
             : available.status === 'ready'
               ? <Money minor={available.minor} currency={currency} large color={available.minor < 0 ? p.expense : undefined} />
-              : <AppText secondary variant="subhead">El saldo total supera el rango que podemos mostrar con precisión. Tus cuentas siguen guardadas.</AppText>}
-          {!spending && <AppText secondary variant="footnote">{accountCount} {accountCount === 1 ? 'cuenta' : 'cuentas'}</AppText>}
+              : <AppText secondary variant="subhead">{t('home.balanceOutOfRange')}</AppText>}
+          {!spending && <AppText secondary variant="footnote">{t('home.accounts', { count: accountCount })}</AppText>}
         </ValueTransition>
       </View>
 
       <QuickActions currency={currency} assistant />
 
       {monthBudget !== null && (monthBudget.total !== null || monthBudget.rows.length > 0) && <Reflow fade>
-        <SectionTitle action="Ver" onAction={() => router.push({ pathname: '/budgets', params: { currency } })}>Presupuesto del mes</SectionTitle>
+        <SectionTitle action={t('common.see')} onAction={() => router.push({ pathname: '/budgets', params: { currency } })}>{t('home.monthBudget')}</SectionTitle>
         <BudgetHomeCard summary={monthBudget} />
       </Reflow>}
 
       <Reflow>
-        <SectionTitle action="Reportes" onAction={openReport}>En qué gastaste</SectionTitle>
+        <SectionTitle action={t('home.reports')} onAction={openReport}>{t('home.whereSpent')}</SectionTitle>
         <ValueTransition id={currency} variant="fade">
           {summary.categories.length && summary.status === 'ready' ? <CategoryRanking categories={summary.categories} totalMinor={summary.expenseMinor} currency={currency}
             onPressCategory={category => router.push({ pathname: '/spending-detail', params: { ...period, category: category.key } })} />
             : <AppText secondary variant="subhead">
-              {summary.status === 'ready' ? 'Tus categorías aparecerán cuando registres un gasto este mes.' : 'El desglose está disponible en tus movimientos.'}
+              {summary.status === 'ready' ? t('home.categoriesEmpty') : t('home.categoriesInActivity')}
             </AppText>}
         </ValueTransition>
       </Reflow>
 
       {upcoming.length > 0 && <Reflow fade>
-        <SectionTitle action="Ver todos" onAction={() => router.push('/recurring')}>Próximos compromisos</SectionTitle>
+        <SectionTitle action={t('common.seeAll')} onAction={() => router.push('/recurring')}>{t('home.upcoming')}</SectionTitle>
         <Surface grouped>{upcoming.map((rule, index) => <UpcomingRecurringRow key={rule.id} rule={rule}
           account={snapshot.accounts.find(account => account.id === rule.accountId)!} day={day} last={index === upcoming.length - 1} />)}</Surface>
       </Reflow>}
 
       <Reflow>
-        <SectionTitle action="Ver todos" onAction={() => router.navigate('/activity')}>Últimos movimientos</SectionTitle>
+        <SectionTitle action={t('common.seeAll')} onAction={() => router.navigate('/activity')}>{t('home.recent')}</SectionTitle>
         <ValueTransition id={currency} variant="fade">
           {recent.length ? <Surface grouped>{recent.map((entry, index) => <EntryRow key={entry.id} entry={entry}
             account={snapshot.accounts.find(a => a.id === entry.accountId)!} last={index === recent.length - 1} />)}</Surface>
-            : <AppText secondary variant="subhead">Todavía no hay movimientos este mes.</AppText>}
+            : <AppText secondary variant="subhead">{t('home.recentEmpty')}</AppText>}
         </ValueTransition>
       </Reflow>
     </>}

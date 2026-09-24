@@ -4,6 +4,7 @@ import { expensesInPeriod, spendingOverview, validDateISO, type ReportPeriod } f
 import { useLedger } from '../src/storage/LedgerProvider';
 import { AppText, CategoryBadge, EmptyState, Money, Screen, SectionTitle } from '../src/ui/components';
 import { withCurrencyCode } from '../src/i18n/format';
+import { useI18n } from '../src/i18n/provider';
 import { EntryList } from '../src/ui/entry-list';
 import { selectEntries } from '../src/ui/presentation';
 import { periodLabel } from '../src/ui/spending-timeline';
@@ -14,13 +15,14 @@ export default function SpendingDetailScreen() {
   const { snapshot } = useLedger();
   const today = useCurrentDay();
   const lookOf = useCategoryLookOf('expense');
+  const { t, locale } = useI18n();
   const { currency, startISO, endISO, category } = useLocalSearchParams<{ currency?: string; startISO?: string; endISO?: string; category?: string }>();
   if (!snapshot) return null;
   if ((currency !== 'ARS' && currency !== 'USD') || typeof startISO !== 'string' || typeof endISO !== 'string'
     || !validDateISO(startISO) || !validDateISO(endISO) || startISO > endISO || endISO > today
     || (Date.parse(endISO) - Date.parse(startISO)) / 86400000 > 30
     || (category !== undefined && (typeof category !== 'string' || !category))
-    || !snapshot.accounts.some(a => a.currency === currency)) return <Screen><EmptyState title="Período no válido" detail="Volvé a Inicio para elegir las fechas." /></Screen>;
+    || !snapshot.accounts.some(a => a.currency === currency)) return <Screen><EmptyState title={t('spendingDetail.invalidTitle')} detail={t('spendingDetail.invalidDetail')} /></Screen>;
   const period: ReportPeriod = { currency, startISO, endISO };
   const report = spendingOverview(snapshot, period);
   const entries = selectEntries(expensesInPeriod(snapshot, period, category), snapshot.accounts);
@@ -30,13 +32,13 @@ export default function SpendingDetailScreen() {
   return <EntryList entries={entries} accounts={snapshot.accounts} header={<View style={{ gap: 22 }}>
     <View style={{ gap: 12, paddingTop: 8 }}>
       {group && <CategoryBadge category={group.category} large />}
-      <AppText accessibilityRole="header" variant="title1">{group ? lookOf(group.category).label : 'Gastos registrados'}</AppText>
-      <AppText secondary variant="subhead">{withCurrencyCode(periodLabel(period), currency)}</AppText>
+      <AppText accessibilityRole="header" variant="title1">{group ? lookOf(group.category).label : t('spendingDetail.allExpenses')}</AppText>
+      <AppText secondary variant="subhead">{withCurrencyCode(periodLabel(period, locale), currency)}</AppText>
     </View>
     <View style={{ gap: 10 }}>
-      {total !== null ? <Money minor={total} currency={currency} large /> : <AppText secondary>No podemos mostrar este total con precisión.</AppText>}
-      <AppText secondary variant="subhead">{entries.length === 1 ? '1 gasto registrado' : entries.length + ' gastos registrados'}</AppText>
+      {total !== null ? <Money minor={total} currency={currency} large /> : <AppText secondary>{t('spendingDetail.totalUnavailable')}</AppText>}
+      <AppText secondary variant="subhead">{t('spendingDetail.count', { count: entries.length })}</AppText>
     </View>
-    {entries.length ? <SectionTitle>Movimientos</SectionTitle> : <AppText secondary>No hay gastos registrados para estas fechas y moneda.</AppText>}
+    {entries.length ? <SectionTitle>{t('spendingDetail.movements')}</SectionTitle> : <AppText secondary>{t('spendingDetail.none')}</AppText>}
   </View>} />;
 }

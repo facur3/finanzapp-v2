@@ -37,14 +37,17 @@ export function dayNetMinor(entries: Entry[], accounts: Account[]): { currency: 
 export type EntrySection = { dateISO: string; data: Entry[] };
 const searchable = (text: string) => text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('es-AR');
 
-// Filtering never changes stored data or adds currencies together.
-export function selectEntries(entries: Entry[], accounts: Account[], filter: EntryFilter = 'all', query = '', accountId?: string) {
+// Filtering never changes stored data or adds currencies together. `categoryLabel`
+// adds the name a category shows (a built-in one in the interface language) to the
+// searchable text, so "food" finds a Comida movement when the app reads English.
+export function selectEntries(entries: Entry[], accounts: Account[], filter: EntryFilter = 'all', query = '', accountId?: string,
+  categoryLabel?: (entry: Entry) => string) {
   const names = new Map(accounts.map(account => [account.id, account.name]));
   const terms = searchable(query).trim().split(/\s+/).filter(Boolean);
   if (filter === 'transfer') return [];
   return entries.filter(entry => {
     if ((filter !== 'all' && entry.kind !== filter) || (accountId && entry.accountId !== accountId)) return false;
-    const text = searchable([entry.merchant, entry.category, names.get(entry.accountId) ?? ''].join(' '));
+    const text = searchable([entry.merchant, entry.category, categoryLabel?.(entry) ?? '', names.get(entry.accountId) ?? ''].join(' '));
     return terms.every(term => text.includes(term));
   }).sort((a, b) => {
     if (a.dateISO !== b.dateISO) return a.dateISO < b.dateISO ? 1 : -1;
@@ -75,11 +78,12 @@ export function availableCurrencies(accounts: Account[]): Currency[] {
 }
 
 export type ActivityItem = { type: 'entry'; key: string; value: Entry } | { type: 'transfer'; key: string; value: Transfer };
-export function selectTransfers(transfers: Transfer[], accounts: Account[], query = '', accountId?: string): Transfer[] {
+/** `transferWord` is the word a transfer answers to in the interface language, besides the Spanish one. */
+export function selectTransfers(transfers: Transfer[], accounts: Account[], query = '', accountId?: string, transferWord = ''): Transfer[] {
   const names = new Map(accounts.map(a => [a.id, a.name]));
   const terms = searchable(query).trim().split(/\s+/).filter(Boolean);
   return transfers.filter(t => (!accountId || t.fromAccountId === accountId || t.toAccountId === accountId)
-    && terms.every(term => searchable(['transferencia', t.note, names.get(t.fromAccountId), names.get(t.toAccountId)].join(' ')).includes(term)));
+    && terms.every(term => searchable(['transferencia', transferWord, t.note, names.get(t.fromAccountId), names.get(t.toAccountId)].join(' ')).includes(term)));
 }
 export function mergeActivity(entries: Entry[], transfers: Transfer[] = []): ActivityItem[] {
   const items: ActivityItem[] = [...entries.map(value => ({ type: 'entry' as const, key: 'entry-' + value.id, value })),

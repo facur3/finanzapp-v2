@@ -11,13 +11,14 @@ import { amountFromMinor } from './money-input';
 import { AccountField, DateField, SelectorCard } from './form-controls';
 import { initialAccountId } from './presentation';
 import { space, usePalette } from './theme';
+import { useI18n } from '../i18n/provider';
 
 /** One form for three movements that are never spending or income: a transfer
  * between cash accounts, a card payment (cash → card) and a debt payment or
  * collection (cash → debt, receivable → cash). The obligation side is fixed by
  * the caller; only the cash side is chosen here. */
 export function TransferForm({ original, accountId, fromAccountId: requestedFrom, toAccountId: requestedTo,
-  title = 'Entre mis cuentas', defaultNote = '', maxAmountMinor, onAccountChange }: {
+  title, defaultNote = '', maxAmountMinor, onAccountChange }: {
   original?: TransferRecord; accountId?: string; fromAccountId?: string; toAccountId?: string; title?: string;
   defaultNote?: string; maxAmountMinor?: string;
   /** Lets the host carry the source account over when the mode changes. */
@@ -25,6 +26,7 @@ export function TransferForm({ original, accountId, fromAccountId: requestedFrom
 }) {
   const { snapshot, archive, addTransfer, updateTransfer } = useLedger();
   const p = usePalette();
+  const { t } = useI18n();
   const accounts = snapshot?.accounts ?? [];
   const cards = archive?.cards ?? [], debts = archive?.debts ?? [];
   const hidden = hiddenLiabilityAccountIds(cards, debts);
@@ -59,15 +61,16 @@ export function TransferForm({ original, accountId, fromAccountId: requestedFrom
   const contextualMax = maxAmountMinor && /^\d{1,16}$/.test(maxAmountMinor) ? Number(maxAmountMinor) : null;
   const obligation = lockedTo ?? lockedFrom;
   const obligationKind = obligation ? accountKind(obligation.id, cards, debts) : 'cash';
-  const kindLabel = (id: string) => { const kind = accountKind(id, cards, debts); return kind === 'card' ? 'Tarjeta' : kind === 'debt' ? 'Deuda' : 'Cuenta'; };
+  const typeOf = (id: string) => accountKind(id, cards, debts);
+  const kindLabel = (id: string) => { const kind = typeOf(id); return t(kind === 'card' ? 'accountKinds.card' : kind === 'debt' ? 'accountKinds.debt' : 'accountKinds.account'); };
 
   function draft(): Transfer {
     return { ...(before?.transfer ?? operation), fromAccountId: fromId, toAccountId: toId, amountMinor: parseMinorUnits(amount), note: note.trim(), dateISO: todayKey(date) };
   }
   function validateContext(transfer: Transfer) {
     if (contextualMax !== null && Number.isSafeInteger(contextualMax) && transfer.amountMinor > contextualMax) {
-      throw new Error(obligationKind === 'card' ? 'El pago supera la deuda registrada de la tarjeta. Si pagaste de más, registrá primero el resumen real.'
-        : 'El monto supera el saldo pendiente de esta obligación.');
+      // Catalogue keys, translated when shown (ErrorMessage).
+      throw new Error(obligationKind === 'card' ? 'transferForm.overCardDebt' : 'transferForm.overObligation');
     }
   }
   // Show the full effect of an edit (remove the old transfer, then apply the new one).
@@ -92,7 +95,7 @@ export function TransferForm({ original, accountId, fromAccountId: requestedFrom
         const transfer = draft();
         validateTransfer(transfer, accounts);
         validateContext(transfer);
-        if (transfer.dateISO > todayKey()) throw new Error('Elegí hoy o una fecha anterior.');
+        if (transfer.dateISO > todayKey()) throw new Error('transferForm.futureDate');
         totalsByCurrency(proposed(transfer));
         if (before && sameTransfer(before.transfer, transfer)) { saving.current = false; close(); return; }
         const change = before ? makeTransferChange(operation.id, before, 'edit', new Date().toISOString(), transfer) : undefined;
@@ -102,20 +105,20 @@ export function TransferForm({ original, accountId, fromAccountId: requestedFrom
       if (submission.change) await updateTransfer(submission.change); else await addTransfer(submission.transfer);
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       saving.current = false; close();
-    } catch (cause) { setError(cause instanceof Error ? cause.message : 'No pudimos verificar el guardado. Reintentá este mismo envío.'); }
+    } catch (cause) { setError(cause instanceof Error ? cause.message : 'transferForm.saveUnverified'); }
     finally { saving.current = false; setBusy(false); }
   }
   const balanceLabel = (id: string, value: number) => {
     const kind = accountKind(id, cards, debts);
-    if (kind === 'card') return value < 0 ? 'Deuda ' + formatMinorUnits(-value) : 'A favor ' + formatMinorUnits(value);
-    if (kind === 'debt') return 'Pendiente ' + formatMinorUnits(Math.abs(value));
+    if (kind === 'card') return value < 0 ? t('transferForm.balanceDebt', { amount: formatMinorUnits(-value) }) : t('transferForm.balanceCredit', { amount: formatMinorUnits(value) });
+    if (kind === 'debt') return t('transferForm.balancePending', { amount: formatMinorUnits(Math.abs(value)) });
     return formatMinorUnits(value);
   };
   // Paying an obligation only makes sense from cash in the same currency.
   const cashSources = sources.filter(a => !obligation || (a.id !== obligation.id && a.currency === obligation.currency));
   const noCashCounterpart = !!obligation && !cash.some(a => a.currency === obligation.currency);
-  const submitLabel = pending && error ? 'Reintentar guardado' : before ? 'Guardar cambios'
-    : obligationKind === 'card' ? 'Registrar pago' : obligationKind === 'debt' ? (lockedTo ? 'Registrar pago' : 'Registrar cobro') : 'Registrar transferencia';
+  const submitLabel = pending && error ? t('common.retrySave') : before ? t('common.saveChanges')
+    : t(obligationKind === 'card' ? 'transferForm.recordPayment' : obligationKind === 'debt' ? (lockedTo ? 'transferForm.recordPayment' : 'transferForm.recordCollection') : 'transferForm.recordTransfer');
   // The whole recorded figure a shortcut may fill: the source's positive balance
   // for a transfer, the outstanding obligation for a payment or collection. It is
   // read from the current records (minus the transfer being edited), never from a
@@ -125,16 +128,16 @@ export function TransferForm({ original, accountId, fromAccountId: requestedFrom
     if (!snapshot) return null;
     const recorded = (item: Account) => accountBalanceMinor(item, snapshot.entries, (snapshot.transfers ?? []).filter(t => t.id !== before?.transfer.id));
     try {
-      const context = lockedTo ? { account: lockedTo, minor: -recorded(lockedTo), label: obligationKind === 'card' ? 'Pagar total' : 'Saldar total' }
-        : lockedFrom ? { account: lockedFrom, minor: recorded(lockedFrom), label: 'Cobrar total' }
-          : from ? { account: from, minor: recorded(from), label: 'Usar todo' } : null;
+      const context = lockedTo ? { account: lockedTo, minor: -recorded(lockedTo), label: t(obligationKind === 'card' ? 'transferForm.payTotal' : 'transferForm.settleTotal') }
+        : lockedFrom ? { account: lockedFrom, minor: recorded(lockedFrom), label: t('transferForm.collectTotal') }
+          : from ? { account: from, minor: recorded(from), label: t('transferForm.useAll') } : null;
       if (!context) return null;
       let fill = Math.max(0, context.minor);
       if (contextualMax !== null && Number.isSafeInteger(contextualMax)) fill = Math.min(fill, contextualMax);
       // A card in credit has nothing to pay; an obligation is pending or settled, never negative; cash is shown as recorded.
-      const figure = obligationKind === 'card' ? (context.minor < 0 ? ['A favor', -context.minor] as const : ['Deuda registrada', context.minor] as const)
-        : obligationKind === 'debt' ? ['Pendiente', Math.max(0, context.minor)] as const : ['Saldo registrado', context.minor] as const;
-      return { ...context, fill, text: `${figure[0]}: ${context.account.currency} ${formatMinorUnits(figure[1])}` };
+      const figure = obligationKind === 'card' ? (context.minor < 0 ? ['transferForm.figureCredit', -context.minor] as const : ['transferForm.figureDebt', context.minor] as const)
+        : obligationKind === 'debt' ? ['transferForm.figurePending', Math.max(0, context.minor)] as const : ['transferForm.figureBalance', context.minor] as const;
+      return { ...context, fill, text: t('transferForm.figure', { label: t(figure[0]), currency: context.account.currency, amount: formatMinorUnits(figure[1]) }) };
     } catch { return null; }
   })();
   const balanceDetail = (id: string | undefined) => {
@@ -144,20 +147,20 @@ export function TransferForm({ original, accountId, fromAccountId: requestedFrom
   };
 
   return <Screen gap={space.l}>
-    <Stack.Screen options={{ title: before ? 'Editar transferencia' : title, gestureEnabled: !busy,
-      headerLeft: () => <IconButton name="close" label="Cerrar" onPress={close} disabled={busy} /> }} />
-    {!sources.length || noCashCounterpart ? <EmptyState title="Primero, una cuenta" detail={obligation
-      ? `Necesitás una cuenta en ${obligation.currency} desde donde ${lockedTo ? 'sale' : 'entra'} el dinero.`
-      : 'Agregá las cuentas entre las que movés tu dinero.'}
-      action={<ActionButton label="Agregar cuenta" onPress={() => router.replace({ pathname: '/new-account', params: obligation ? { currency: obligation.currency } : {} })} />} /> : <>
-      <AmountField label={obligationKind === 'card' ? 'Pago' : obligationKind === 'debt' ? (lockedTo ? 'Pago' : 'Cobro') : 'Transferencia'}
+    <Stack.Screen options={{ title: before ? t('transferForm.editTitle') : title ?? t('transferForm.title'), gestureEnabled: !busy,
+      headerLeft: () => <IconButton name="close" label={t('common.close')} onPress={close} disabled={busy} /> }} />
+    {!sources.length || noCashCounterpart ? <EmptyState title={t('entryForm.noAccountTitle')} detail={obligation
+      ? t(lockedTo ? 'transferForm.needAccountOut' : 'transferForm.needAccountIn', { currency: obligation.currency })
+      : t('transferForm.needAccounts')}
+      action={<ActionButton label={t('common.addAccount')} onPress={() => router.replace({ pathname: '/new-account', params: obligation ? { currency: obligation.currency } : {} })} />} /> : <>
+      <AmountField label={t(obligationKind === 'card' ? 'transferForm.payment' : obligationKind === 'debt' ? (lockedTo ? 'transferForm.payment' : 'transferForm.collection') : 'transferForm.transfer')}
         currency={(obligation ?? from)?.currency ?? 'ARS'} value={amount} onChangeText={value => { setAmount(value); setError(null); }} editable={!locked} tone="transfer" />
       {shortcut && <AmountShortcut caption={shortcut.text} label={shortcut.fill > 0 ? shortcut.label : undefined} disabled={locked}
         onPress={shortcut.fill > 0 ? () => { setAmount(amountFromMinor(shortcut.fill)); setError(null); } : undefined} />}
       <View style={{ gap: space.m }}>
         {lockedFrom ? <SelectorCard label={kindLabel(lockedFrom.id)} value={lockedFrom.name} placeholder="" detail={balanceDetail(lockedFrom.id)}
           icon={obligationKind === 'card' ? 'card-outline' : 'people-outline'} color={p.primary} disabled onPress={() => {}} />
-          : <AccountField label="Desde" accounts={cashSources} value={fromId} disabled={locked} kindOf={kindLabel} prominent detail={balanceDetail(fromId)} onChange={id => {
+          : <AccountField label={t('transferForm.from')} accounts={cashSources} value={fromId} disabled={locked} kindOf={kindLabel} typeOf={typeOf} prominent detail={balanceDetail(fromId)} onChange={id => {
             setFromId(id);
             onAccountChange?.(id);
             const source = accounts.find(a => a.id === id);
@@ -165,27 +168,26 @@ export function TransferForm({ original, accountId, fromAccountId: requestedFrom
           }} />}
         {lockedTo ? <SelectorCard label={kindLabel(lockedTo.id)} value={lockedTo.name} placeholder="" detail={balanceDetail(lockedTo.id)}
           icon={obligationKind === 'card' ? 'card-outline' : 'people-outline'} color={p.primary} disabled onPress={() => {}} />
-          : <AccountField label="Hacia" accounts={lockedFrom ? targets.filter(a => a.id !== lockedFrom.id) : targets} value={toId} onChange={setToId} kindOf={kindLabel}
+          : <AccountField label={t('transferForm.to')} accounts={lockedFrom ? targets.filter(a => a.id !== lockedFrom.id) : targets} value={toId} onChange={setToId}
+            kindOf={kindLabel} typeOf={typeOf}
             prominent detail={balanceDetail(toId)} disabled={locked || !targets.length} />}
       </View>
       <Surface grouped><DateField value={date} onChange={setDate} disabled={locked} /></Surface>
-      {!obligation && !targets.length && <EmptyState title="Falta otra cuenta en esta moneda" detail="Las transferencias de esta etapa son entre cuentas en pesos o entre cuentas en dólares, sin conversión."
-        action={<ActionButton label="Agregar cuenta" secondary disabled={locked} onPress={() => router.push({ pathname: '/new-account', params: { currency: from?.currency ?? 'ARS' } })} />} />}
-      <Field label="Nota (opcional)" value={note} onChangeText={setNote} maxLength={120} editable={!locked} />
+      {!obligation && !targets.length && <EmptyState title={t('transferForm.missingTitle')} detail={t('transferForm.missingDetail')}
+        action={<ActionButton label={t('common.addAccount')} secondary disabled={locked} onPress={() => router.push({ pathname: '/new-account', params: { currency: from?.currency ?? 'ARS' } })} />} />}
+      <Field label={t('transferForm.note')} value={note} onChangeText={setNote} maxLength={120} editable={!locked} />
       {preview && from && to && <Surface grouped>
-        <DetailRow label={from.name + ' después'} value={from.currency + '\u00A0' + balanceLabel(from.id, preview.from)} />
-        <DetailRow label={to.name + ' después'} value={to.currency + '\u00A0' + balanceLabel(to.id, preview.to)} last />
+        <DetailRow label={t('transferForm.after', { name: from.name })} value={from.currency + '\u00A0' + balanceLabel(from.id, preview.from)} />
+        <DetailRow label={t('transferForm.after', { name: to.name })} value={to.currency + '\u00A0' + balanceLabel(to.id, preview.to)} last />
       </Surface>}
       {preview && from && to && ((preview.from < 0 && !hidden.has(from.id)) || (preview.to < 0 && !hidden.has(to.id))) && <AppText secondary variant="subhead">
-        Una cuenta quedará con saldo negativo. Revisá el importe y tus movimientos; podés registrarlo si refleja lo que realmente ocurrió.
+        {t('transferForm.negativeWarning')}
       </AppText>}
       <AppText secondary variant="footnote">
-        {obligationKind === 'card' ? 'El pago baja la deuda de la tarjeta y el saldo de la cuenta. La compra original ya contó como gasto; esto no lo duplica.'
-          : obligationKind === 'debt' ? 'Mueve saldo entre tu cuenta y la obligación. No es un gasto ni un ingreso.'
-            : 'Solo registra un movimiento entre tus cuentas. No envía dinero al banco ni cuenta como gasto o ingreso.'}
+        {t(obligationKind === 'card' ? 'transferForm.explainCard' : obligationKind === 'debt' ? 'transferForm.explainDebt' : 'transferForm.explainTransfer')}
       </AppText>
       <ErrorMessage message={error} />
-      {pending && error && <AppText secondary variant="footnote">El envío quedó fijo para reintentar sin duplicarlo. Antes de cambiarlo, cerrá y revisá Movimientos.</AppText>}
+      {pending && error && <AppText secondary variant="footnote">{t('transferForm.retryNote')}</AppText>}
       <ActionButton label={submitLabel} busy={busy} disabled={!amount.trim() || !from || !to || from.id === to.id || from.currency !== to.currency} onPress={save} />
     </>}
   </Screen>;
