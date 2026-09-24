@@ -3,7 +3,7 @@ import { AccessibilityInfo, ActivityIndicator, Alert, InputAccessoryView, Keyboa
   useWindowDimensions, type PressableProps, type StyleProp, type TextInputProps, type TextProps, type ViewStyle } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { accountBalanceMinor, draftFitsCurrency, type Currency, type Entry, type EntryKind, type Account, type Transfer } from '@finanzapp/domain';
+import { accountBalanceMinor, editedDraftFits, type Currency, type Entry, type EntryKind, type Account, type StoredDraft, type Transfer } from '@finanzapp/domain';
 import type { ActivityItem } from './presentation';
 import { router } from 'expo-router';
 import { radius, space, type, useCurrentDay, usePalette, useReduceMotion, type Palette } from './theme';
@@ -218,7 +218,9 @@ type Caret = { start: number; end: number };
  * left-aligned like the hero amounts of Inicio and the detail screens. No
  * negative tracking: on iOS it draws the last glyph past the measured width,
  * under the caret. */
-export function AmountField({ label, currency, tone, value = '', onChangeText, ...props }: TextInputProps & { label?: string; currency: Currency; tone?: Tone }) {
+export function AmountField({ label, currency, tone, value = '', onChangeText, stored, ...props }: TextInputProps & { label?: string; currency: Currency; tone?: Tone;
+  /** The stored amount an edit form prefilled the field from: while the text is exactly that prefill in its own currency, it always fits (a stored amount may exceed the entry bound). */
+  stored?: StoredDraft }) {
   const p = usePalette();
   const { t, amountFormat, currencySymbol, speechLanguage } = useI18n();
   const accessoryId = useId();
@@ -259,7 +261,7 @@ export function AmountField({ label, currency, tone, value = '', onChangeText, .
   // Derived from the draft and the region, so the text follows a region change in the same render.
   const text = displayAmount(value, amountFormat, currency);
   // A kept draft that the currency cannot hold exactly: more decimals than it has, or more digits than it allows.
-  const fit = draftFitsCurrency(value, currency);
+  const fit = editedDraftFits(value, currency, stored);
   const keptText = fit.ok ? null : t(fit.reason === 'tooLong' ? 'amount.kept.tooLong' : decimals === 0 ? 'amount.kept.noDecimals' : 'amount.kept.decimals', { currency, digits: decimals });
   const { fontSize, symbolSize } = amountFieldLayout(text, rowWidth, symbol, AMOUNT_GAP, Math.min(fontScale, HERO_MAX_SCALE));
   const color = tone && tone !== 'neutral' ? toneColors(p, tone).color : p.text;

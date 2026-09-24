@@ -3,8 +3,8 @@ import { Alert, Keyboard } from 'react-native';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { randomUUID } from 'expo-crypto';
 import * as Haptics from 'expo-haptics';
-import { accountBalanceMinor, accountLook, makeAccountAppearance, makeAccountChange, minorFromLedgerDraft, validateAccountAppearance,
-  validateAccountChange, type Account, type AccountAppearance, type AccountChange, type LedgerSnapshot } from '@finanzapp/domain';
+import { accountBalanceMinor, accountLook, makeAccountAppearance, makeAccountChange, minorFromEditedDraft, validateAccountAppearance,
+  validateAccountChange, type Account, type AccountAppearance, type AccountChange, type LedgerSnapshot, type StoredDraft } from '@finanzapp/domain';
 import { useLedger } from '../../src/storage/LedgerProvider';
 import { ACCOUNT_ICON_CHOICES, COLOR_CHOICES } from '../../src/ui/appearance';
 import { IconColorPicker } from '../../src/ui/appearance-picker';
@@ -36,7 +36,10 @@ function AccountEditor({ account, snapshot, current }: { account: Account; snaps
   const [name, setName] = useState(account.name);
   const [icon, setIcon] = useState<string>(original.look.icon);
   const [color, setColor] = useState<string>(original.look.color);
-  const [balance, setBalance] = useState(draftFromMinor(original.balance, account.currency));
+  // The recorded balance as the field shows it. While the text stays exactly this prefill, saving keeps `original.balance` itself
+  // (a balance is a sum of valid movements and may exceed the entry bound); an edited text is read as a new entry with every rule.
+  const [stored] = useState<StoredDraft>(() => ({ minor: original.balance, currency: account.currency, draft: draftFromMinor(original.balance, account.currency) }));
+  const [balance, setBalance] = useState(stored.draft);
   const [busy, setBusy] = useState(false);
   const [pending, setPending] = useState<Submission | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -58,7 +61,7 @@ function AccountEditor({ account, snapshot, current }: { account: Account; snaps
     Keyboard.dismiss(); setError(null);
     if (pending) { void apply(pending); return; }
     try {
-      const target = minorFromLedgerDraft(balance, account.currency);
+      const target = minorFromEditedDraft(balance, account.currency, stored);
       const now = new Date().toISOString();
       const lookChanged = icon !== original.look.icon || color !== original.look.color;
       const appearance = lookChanged ? makeAccountAppearance(account.id, icon as AccountAppearance['icon'], color as AccountAppearance['color'], now, original.current) : null;
@@ -83,7 +86,7 @@ function AccountEditor({ account, snapshot, current }: { account: Account; snaps
     <Field label={t('accounts.form.name')} value={name} onChangeText={setName} maxLength={80} editable={!locked} />
     <IconColorPicker icons={ACCOUNT_ICON_CHOICES} colors={COLOR_CHOICES} icon={icon} color={color}
       onIconChange={setIcon} onColorChange={setColor} disabled={locked} previewLabel={name} />
-    <AmountField label={t('accounts.edit.recordedBalance')} currency={account.currency} value={balance} onChangeText={setBalance}
+    <AmountField label={t('accounts.edit.recordedBalance')} currency={account.currency} value={balance} onChangeText={setBalance} stored={stored}
       keyboardType="numbers-and-punctuation" inputMode={undefined} editable={!locked} />
     <FieldNote help={{ title: t('accounts.edit.recordedBalance'), detail: t('accounts.edit.balanceHelp') }}>{t('accounts.edit.balanceNote')}</FieldNote>
     <CurrencyField value={account.currency} />

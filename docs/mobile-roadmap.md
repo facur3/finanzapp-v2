@@ -1848,6 +1848,14 @@ safe areas, system text and separate currencies apply to every new screen.
 - Deliberate golden changes: the Editar parameters (`amountMinor`), `money-input.node.ts`
   naming ARS in every call and pasting "US$ 12.30" into a dollar field, the entry bound
   refusing a fourteenth whole digit, the footer label.
+- **Review fix (PR #48 thread on `edit-account/[id].tsx`):** an untouched prefill of a stored
+  amount above the entry bound (a balance that is a sum of valid movements, a movement from a
+  backup) is kept as the stored value in every edit form (`StoredDraft`,
+  `minorFromEditedDraft`, `editedDraftFits`, the field's `stored` prop), so renaming or
+  re-dressing an account, or re-categorising such a movement, works again; an edited text or
+  another currency is read as a new entry with every rule, and the entry bound is unchanged.
+  Regression tests for a balance above `MAX_ENTRY_MINOR` (rename only, look only, untouched,
+  a manual edit beyond the bound refused, a real correction still asking).
 - Docs: the estimate/debit clarification with a posted balance and pending estimated
   commitments (§9), Frankfurter's statements verified on 2026-09-24 with the open
   verification list (§8.2), the Assistant specification (§11), docs/i18n.md §9/§11,

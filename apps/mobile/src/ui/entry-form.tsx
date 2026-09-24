@@ -3,7 +3,7 @@ import { Keyboard, View } from 'react-native';
 import { router, Stack } from 'expo-router';
 import { randomUUID } from 'expo-crypto';
 import * as Haptics from 'expo-haptics';
-import { accountBalanceMinor, accountKind, categoryKey, draftFitsCurrency, makeEntryChange, minorFromLedgerDraft, sameEntry, summarizeMonthlyBudgets, todayKey, validateEntry, validateEntryChange, type Account, type Entry, type EntryChange, type EntryKind, type EntryRecord } from '@finanzapp/domain';
+import { accountBalanceMinor, accountKind, categoryKey, editedDraftFits, makeEntryChange, minorFromEditedDraft, sameEntry, summarizeMonthlyBudgets, todayKey, validateEntry, validateEntryChange, type Account, type Entry, type EntryChange, type EntryKind, type EntryRecord, type StoredDraft } from '@finanzapp/domain';
 import { useLedger } from '../storage/LedgerProvider';
 import { budgetTone } from './budget-presentation';
 import { ActionButton, AmountField, AppText, Choices, EmptyState, ErrorMessage, Field, IconButton, Screen, Surface } from './components';
@@ -39,11 +39,13 @@ export function EntryForm({ original, accountId: requestedAccount, currency, kin
   const kind: EntryKind = onKindChange ? (requestedKind === 'income' ? 'income' : 'expense') : ownKind;
   const [accountId, setAccountId] = useState(() => before?.entry.accountId ?? initialAccountId(accounts, requestedAccount, currency));
   // An edit is prefilled in the movement's own currency (its account's); a prefill in another currency is never reinterpreted.
-  const [amount, setAmount] = useState(() => {
-    if (!before) return prefillDraft(prefill);
-    const own = accounts.find(item => item.id === before.entry.accountId)?.currency;
-    return own ? draftFromMinor(before.entry.amountMinor, own) : '';
+  // While the text stays exactly that prefill (same currency), saving keeps the stored minor units themselves: a stored amount
+  // may exceed the entry bound (a restored backup), and re-reading it would lock every other correction.
+  const [stored] = useState<StoredDraft | null>(() => {
+    const own = before ? accounts.find(item => item.id === before.entry.accountId)?.currency : undefined;
+    return before && own ? { minor: before.entry.amountMinor, currency: own, draft: draftFromMinor(before.entry.amountMinor, own) } : null;
   });
+  const [amount, setAmount] = useState(() => before ? stored?.draft ?? '' : prefillDraft(prefill));
   const [merchant, setMerchant] = useState(before?.entry.merchant ?? prefill?.merchant ?? '');
   const [category, setCategory] = useState(before?.entry.category ?? prefill?.category ?? '');
   const [date, setDate] = useState(() => before ? new Date(before.entry.dateISO + 'T12:00:00') : prefill?.dateISO ? new Date(prefill.dateISO + 'T12:00:00') : new Date());
@@ -94,9 +96,9 @@ export function EntryForm({ original, accountId: requestedAccount, currency, kin
   const describeAccount = (item: Account) => optionLine(item, formatAmount);
   const spokenDescribeAccount = (item: Account) => optionLine(item, minor => spokenMoney(minor, item.currency));
   let parsed: number | null = null;
-  try { parsed = account ? minorFromLedgerDraft(amount, account.currency) : null; } catch { parsed = null; }
+  try { parsed = account ? minorFromEditedDraft(amount, account.currency, stored) : null; } catch { parsed = null; }
   // A draft kept across an account change that the new currency cannot hold exactly blocks Save; the field says why.
-  const fit = account ? draftFitsCurrency(amount, account.currency) : { ok: true as const };
+  const fit = account ? editedDraftFits(amount, account.currency, stored) : { ok: true as const };
 
   async function save() {
     if (saving.current) return;
@@ -111,7 +113,7 @@ export function EntryForm({ original, accountId: requestedAccount, currency, kin
         // Messages are stored as catalogue keys and translated when shown (ErrorMessage), so they follow a language change.
         if (dateISO > todayKey()) throw new Error('entryForm.futureDate');
         if (!account) throw new Error('errors.domain.existingAccount'); // A catalogue key, translated when shown (ErrorMessage).
-        const entry: Entry = { ...(before?.entry ?? operation), kind, accountId, amountMinor: minorFromLedgerDraft(amount, account.currency),
+        const entry: Entry = { ...(before?.entry ?? operation), kind, accountId, amountMinor: minorFromEditedDraft(amount, account.currency, stored),
           merchant: merchant.trim(), category: category.trim(), dateISO };
         validateEntry(entry, accounts);
         if (before && sameEntry(before.entry, entry)) { saving.current = false; close(); return; }
@@ -146,7 +148,7 @@ export function EntryForm({ original, accountId: requestedAccount, currency, kin
       action={<ActionButton label={t('common.addAccount')} onPress={() => router.replace('/new-account')} />} /> : <>
       {!onKindChange && <Choices<EntryKind> value={kind} onChange={setKind} disabled={locked}
         options={[{ value: 'expense', label: t('movement.expense') }, { value: 'income', label: t('movement.income') }]} />}
-      <AmountField currency={account?.currency ?? 'ARS'} value={amount} onChangeText={value => { setAmount(value); setError(null); }} editable={!locked}
+      <AmountField currency={account?.currency ?? 'ARS'} value={amount} onChangeText={value => { setAmount(value); setError(null); }} editable={!locked} stored={stored ?? undefined}
         tone={kind === 'income' ? 'income' : 'neutral'} label={t(kind === 'expense' ? 'movement.expense' : 'movement.income')} />
       <View style={{ gap: space.m }}>
         <CategoryField entries={snapshot?.entries ?? []} kind={kind} value={category} onChange={setCategory} disabled={locked}

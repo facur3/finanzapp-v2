@@ -907,3 +907,25 @@ test('24B2: switching the account with a half-typed amount keeps the digits and 
   await find(root, 'ActionButton').props.onPress();
   assert.deepEqual([view.additions[0].accountId, view.additions[0].amountMinor], ['jpy', 13], 'thirteen yen, not thirteen hundred');
 });
+
+test('24B2 review: a movement whose stored amount exceeds the entry bound (a restored backup) can be corrected without re-typing it; an edited amount is re-read', async () => {
+  const huge: domain.Entry = { ...entry, id: 'huge', amountMinor: domain.MAX_ENTRY_MINOR + 1 };
+  domain.validateEntry(huge, [account]); // a valid stored amount: any safe integer
+  const data: domain.LedgerArchive = { ...archive, accounts: [...archive.accounts, { ...account, id: 'jpy', name: 'Yen', currency: 'JPY' }], records: [domain.initialRecord(huge)] };
+  let view = harness('src/ui/entry-form.tsx', { original: data.records[0] }, { data });
+  assert.equal(find(view.render(), 'AmountField').props.value, '10.000.000.000.000,00');
+  assert.equal(find(view.render(), 'ActionButton').props.disabled, false);
+  find(view.render(), 'CategoryField').props.onChange('Regalo');
+  await find(view.render(), 'ActionButton', 'Guardar cambios').props.onPress();
+  assert.equal(view.updates.length, 1);
+  assert.deepEqual([view.updates[0].after.entry.amountMinor, view.updates[0].after.entry.category], [domain.MAX_ENTRY_MINOR + 1, 'Regalo'], 'the stored amount is kept exactly');
+  // Editing the text re-reads it with the entry bound: refused, nothing written.
+  view = harness('src/ui/entry-form.tsx', { original: data.records[0] }, { data });
+  find(view.render(), 'AmountField').props.onChangeText('10.000.000.000.000,01');
+  assert.equal(find(view.render(), 'ActionButton').props.disabled, true, 'Save is blocked while the edited amount does not fit');
+  await find(view.render(), 'ActionButton').props.onPress();
+  assert.equal(view.updates.length, 0);
+  // Moving the untouched draft to an account in another currency is not "unchanged": the currency guard still applies.
+  view = harness('src/ui/entry-form.tsx', { original: data.records[0] }, { data });
+  assert.deepEqual(find(view.render(), 'AccountField').props.accounts.map((a: domain.Account) => a.id), ['a'], 'an edit only offers accounts in the movement\'s currency, so the kept amount can never change currency');
+});

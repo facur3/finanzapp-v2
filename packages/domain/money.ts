@@ -169,6 +169,37 @@ export function draftFitsCurrency(draft: string, currency: IsoCurrencyCode): { o
   return { ok: false, reason: reading.reason };
 }
 
+/** A stored amount shown for editing: the minor units a record already holds, the currency
+ * they are in, and the draft the form prefilled from them (`draftFromMinor`). */
+export interface StoredDraft { readonly minor: number; readonly currency: IsoCurrencyCode; readonly draft: string }
+
+/** Whether a draft is still exactly the prefilled stored amount, in the same currency: then the
+ * stored minor units are kept as they are. A stored amount may legitimately exceed the entry
+ * bound (a balance is a sum of valid movements; a backup may carry any safe integer), so
+ * re-reading its own prefill as a new entry would refuse it and lock every other edit. Any
+ * change to the text, or a different currency, makes it a new entry again. */
+export function isUnchangedStoredDraft(draft: string, currency: IsoCurrencyCode, stored: StoredDraft | null | undefined): stored is StoredDraft {
+  return !!stored && stored.currency === currency && draft === stored.draft;
+}
+
+/** `minorFromLedgerDraft` for an edit form: the stored minor units when the draft is the
+ * untouched prefill in its own currency (still required to be a storable safe integer),
+ * otherwise the draft read as a new entry with every entry rule (the bound, the decimals,
+ * never rounded). A stored amount is never rescaled by this path. */
+export function minorFromEditedDraft(draft: string, currency: IsoCurrencyCode, stored: StoredDraft | null | undefined): number {
+  if (isUnchangedStoredDraft(draft, currency, stored)) {
+    if (!isStorableMinor(stored.minor)) throw new Error('Monto inválido.');
+    return stored.minor;
+  }
+  return minorFromLedgerDraft(draft, currency);
+}
+
+/** `draftFitsCurrency` for an edit form: an untouched stored prefill always fits (it is what
+ * the record holds); anything edited must fit as a new entry. */
+export function editedDraftFits(draft: string, currency: IsoCurrencyCode, stored: StoredDraft | null | undefined): ReturnType<typeof draftFitsCurrency> {
+  return isUnchangedStoredDraft(draft, currency, stored) ? { ok: true } : draftFitsCurrency(draft, currency);
+}
+
 /** An operand must be a safe integer in a currency with a minor unit: a hand-built
  * `{ minor: 2 ** 53 }` or `{ minor: NaN }` is refused, never computed with. */
 function checked(a: MoneyAmount): MoneyAmount {

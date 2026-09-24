@@ -169,7 +169,7 @@ function loadComponents(locale: AppLocale = 'es-AR', deviceLanguage: string | nu
       withTiming: (value: number) => value, useAnimatedStyle: (fn: () => unknown) => fn() },
     '@expo/vector-icons/Ionicons': 'Ionicons',
     '@finanzapp/domain': { formatMinorUnits: (minor: number) => (minor / 100).toLocaleString('es-AR', { minimumFractionDigits: 2 }), accountBalanceMinor: () => 0, labelFromISO: () => '',
-      draftFitsCurrency: domain.draftFitsCurrency },
+      draftFitsCurrency: domain.draftFitsCurrency, editedDraftFits: domain.editedDraftFits },
     'expo-router': { router: {} },
     './theme': { radius: {}, space: {}, type: { body: { fontSize: 17, lineHeight: 22 } }, useCurrentDay: () => '2026-09-20', useReduceMotion: () => true, usePalette: () => ({ text: '#000', secondary: '#666', tertiary: '#999', income: '#008800', transfer: '#03c', warning: '#a60' }) },
     './categories': { categoryIcon: () => 'pricetag-outline' },
@@ -323,6 +323,12 @@ test('24B2: the amount field keys and notes follow the currency\'s exponent; ARS
   const dinar = render('AmountField', { label: 'Gasto', currency: 'KWD', value: '1,2345', onChangeText: () => {} });
   const dinarNotes = nodes(dinar).filter(isText).map(node => [node.props.children].flat().join(''));
   assert.ok(dinarNotes.includes('El importe tiene más decimales de los que admite KWD (3). Corregilo antes de guardar; no se redondea.'), dinarNotes.join(' | '));
+  // A stored prefill above the entry bound shows no note while untouched; the same text edited by one digit does (never re-read otherwise).
+  const stored = { minor: 1000000000000000, currency: 'ARS', draft: '10.000.000.000.000' };
+  const untouched = render('AmountField', { label: 'Saldo', currency: 'ARS', value: stored.draft, stored, onChangeText: () => {} });
+  assert.equal(nodes(untouched).some(node => isText(node) && /Corregilo/.test([node.props.children].flat().join(''))), false);
+  const edited = render('AmountField', { label: 'Saldo', currency: 'ARS', value: '10.000.000.000.001', stored, onChangeText: () => {} });
+  assert.ok(nodes(edited).some(node => isText(node) && [node.props.children].flat().join('') === 'El importe supera el máximo de ARS. Corregilo antes de guardar.'));
   const fine = render('AmountField', { label: 'Gasto', currency: 'USD', value: '12,50', onChangeText: () => {} });
   assert.equal(nodes(fine).some(node => isText(node) && /redondea/.test([node.props.children].flat().join(''))), false, 'a draft that fits shows no note');
 });

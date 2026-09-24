@@ -486,3 +486,55 @@ test('23.1C2: the preview tile speaks the interface language only when it differ
   // The icon section title uses the accented rioplatense spelling, like every other Spanish "ícono".
   assert.ok(deep(pickerHarness(props, false).render()).some(node => node.type === 'AppText' && String(node.props.children) === 'Ícono'));
 });
+
+test('24B2 review: an account whose balance exceeds the entry bound can still be renamed and re-dressed; only an edited balance is re-read', async () => {
+  // Opening 9e14 plus an income of 2e14: a valid balance of 1,100,000,000,000,000 minor units, above MAX_ENTRY_MINOR (999,999,999,999,999) and safe.
+  const big: domain.Account = { ...cash, id: 'big', name: 'Grande', openingMinor: 900000000000000 };
+  const income: domain.Entry = { ...entry, id: 'big-income', accountId: 'big', kind: 'income', amountMinor: 200000000000000 };
+  const data: domain.LedgerArchive = { ...archive, accounts: [...archive.accounts, big], records: [...archive.records, domain.initialRecord(income)], appearances: [bankLook, domain.makeAccountAppearance('big', 'bank', 'azure', createdAt)] };
+  const balance = domain.accountBalanceMinor(big, domain.snapshotFromArchive(data).entries, []);
+  assert.ok(balance > domain.MAX_ENTRY_MINOR && Number.isSafeInteger(balance));
+  // The prefill shows the stored balance whole.
+  let view = harness('app/edit-account/[id].tsx', {}, { data, params: { id: 'big' } });
+  assert.equal(find(view.render(), 'AmountField').props.value, '11.000.000.000.000,00');
+  assert.equal(JSON.stringify(find(view.render(), 'AmountField').props.stored), JSON.stringify({ minor: balance, currency: 'ARS', draft: '11.000.000.000.000,00' }));
+  assert.equal(find(view.render(), 'ActionButton').props.disabled, false);
+  // Rename only: saved through the account change with the balance untouched, no correction, no confirmation.
+  find(view.render(), 'Field').props.onChangeText('Grande renombrada');
+  find(view.render(), 'ActionButton').props.onPress(); await flush();
+  assert.equal(view.alerts.length, 0);
+  assert.equal(view.changed.length, 1);
+  assert.deepEqual([view.changed[0].change.after.name, view.changed[0].change.after.openingMinor, view.changed[0].change.expectedBalanceMinor], ['Grande renombrada', big.openingMinor, null]);
+  assert.equal(view.changed[0].appearance, undefined, 'no look change travels with the rename');
+  assert.equal(view.backs(), 1);
+  // Look only: the appearance write alone, no account change.
+  view = harness('app/edit-account/[id].tsx', {}, { data, params: { id: 'big' } });
+  find(view.render(), 'IconColorPicker').props.onColorChange('green');
+  find(view.render(), 'ActionButton').props.onPress(); await flush();
+  assert.equal(view.changed.length, 0);
+  assert.equal(view.alerts.length, 0);
+  assert.equal(view.looks.length, 1);
+  assert.equal(view.looks[0].color, 'green');
+  // Nothing edited: no write at all.
+  view = harness('app/edit-account/[id].tsx', {}, { data, params: { id: 'big' } });
+  find(view.render(), 'ActionButton').props.onPress(); await flush();
+  assert.equal(view.changed.length + view.looks.length + view.alerts.length, 0);
+  assert.equal(view.backs(), 1);
+  // Editing the balance itself beyond the entry bound is still refused, with the entry sentence, and nothing is written.
+  view = harness('app/edit-account/[id].tsx', {}, { data, params: { id: 'big' } });
+  find(view.render(), 'AmountField').props.onChangeText('11.000.000.000.000,01');
+  find(view.render(), 'ActionButton').props.onPress(); await flush();
+  assert.equal(find(view.render(), 'ErrorMessage').props.message, 'El monto es demasiado grande.');
+  assert.equal(view.changed.length + view.looks.length + view.alerts.length, 0);
+  // Retyping exactly the prefill counts as untouched; a valid different balance still asks for confirmation as before.
+  find(view.render(), 'AmountField').props.onChangeText('11.000.000.000.000,00');
+  find(view.render(), 'Field').props.onChangeText('Otra');
+  find(view.render(), 'ActionButton').props.onPress(); await flush();
+  assert.equal(view.alerts.length, 0);
+  assert.equal(view.changed[0].change.expectedBalanceMinor, null);
+  view = harness('app/edit-account/[id].tsx', {}, { data, params: { id: 'big' } });
+  find(view.render(), 'AmountField').props.onChangeText('5');
+  find(view.render(), 'ActionButton').props.onPress(); await flush();
+  assert.equal(view.alerts.length, 1, 'a real correction waits for confirmation');
+  assert.equal(view.changed.length, 0);
+});

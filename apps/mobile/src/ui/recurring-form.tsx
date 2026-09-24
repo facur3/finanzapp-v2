@@ -3,7 +3,7 @@ import { Keyboard, View } from 'react-native';
 import { router, Stack } from 'expo-router';
 import { randomUUID } from 'expo-crypto';
 import * as Haptics from 'expo-haptics';
-import { accountKind, draftFitsCurrency, minorFromLedgerDraft, sameRecurringRule, todayKey, validateRecurringRule,
+import { accountKind, editedDraftFits, minorFromEditedDraft, sameRecurringRule, todayKey, validateRecurringRule, type StoredDraft,
   type EntryKind, type RecurringFrequency, type RecurringRule } from '@finanzapp/domain';
 import { useLedger } from '../storage/LedgerProvider';
 import { ActionButton, AmountField, AppText, Choices, EmptyState, ErrorMessage, Field, IconButton, Screen, Surface } from './components';
@@ -22,11 +22,12 @@ export function RecurringForm({ original, accountId: requestedAccount }: { origi
   const [operation] = useState(() => ({ id: randomUUID(), createdAt: new Date().toISOString() }));
   const [kind, setKind] = useState<EntryKind>(before?.kind ?? 'expense');
   const [accountId, setAccountId] = useState(() => before?.accountId ?? initialAccountId(accounts, requestedAccount));
-  const [amount, setAmount] = useState(() => {
-    if (!before) return '';
-    const own = accounts.find(item => item.id === before.accountId)?.currency;
-    return own ? draftFromMinor(before.amountMinor, own) : '';
+  // An untouched prefill keeps the stored minor units (a stored amount may exceed the entry bound); an edited text is a new entry.
+  const [stored] = useState<StoredDraft | null>(() => {
+    const own = before ? accounts.find(item => item.id === before.accountId)?.currency : undefined;
+    return before && own ? { minor: before.amountMinor, currency: own, draft: draftFromMinor(before.amountMinor, own) } : null;
   });
+  const [amount, setAmount] = useState(stored?.draft ?? '');
   const [merchant, setMerchant] = useState(before?.merchant ?? '');
   const [category, setCategory] = useState(before?.category ?? '');
   const [frequency, setFrequency] = useState<RecurringFrequency>(before?.frequency ?? 'monthly');
@@ -40,7 +41,7 @@ export function RecurringForm({ original, accountId: requestedAccount }: { origi
   // The rule's amount is minor units of its account's currency; a draft kept across an account change that the new
   // currency cannot hold exactly blocks Save (the field says why).
   const ruleCurrency = () => { if (!account) throw new Error('errors.recurring.account'); return account.currency; }; // A catalogue key, translated when shown.
-  const fit = account ? draftFitsCurrency(amount, account.currency) : { ok: true as const };
+  const fit = account ? editedDraftFits(amount, account.currency, stored) : { ok: true as const };
   const originalCurrency = accounts.find(item => item.id === before?.accountId)?.currency;
   const eligibleAccounts = before ? accounts.filter(item => item.currency === originalCurrency) : accounts;
   const locked = busy || pending !== null;
@@ -64,7 +65,7 @@ export function RecurringForm({ original, accountId: requestedAccount }: { origi
             ...before,
             accountId,
             kind,
-            amountMinor: minorFromLedgerDraft(amount, ruleCurrency()),
+            amountMinor: minorFromEditedDraft(amount, ruleCurrency(), stored),
             merchant: merchant.trim(),
             category: category.trim(),
             frequency,
@@ -82,7 +83,7 @@ export function RecurringForm({ original, accountId: requestedAccount }: { origi
             revision: 0,
             accountId,
             kind,
-            amountMinor: minorFromLedgerDraft(amount, ruleCurrency()),
+            amountMinor: minorFromEditedDraft(amount, ruleCurrency(), stored),
             merchant: merchant.trim(),
             category: category.trim(),
             frequency,
@@ -114,7 +115,7 @@ export function RecurringForm({ original, accountId: requestedAccount }: { origi
       action={<ActionButton label={t('common.addAccount')} onPress={() => router.replace('/new-account')} />} /> : <>
       <Choices value={kind} onChange={setKind} disabled={locked}
         options={[{ value: 'expense', label: t('movement.expense') }, { value: 'income', label: t('movement.income') }]} />
-      <AmountField currency={account?.currency ?? 'ARS'} value={amount} label={t(kind === 'expense' ? 'recurring.form.expenseAmount' : 'recurring.form.incomeAmount')}
+      <AmountField currency={account?.currency ?? 'ARS'} value={amount} label={t(kind === 'expense' ? 'recurring.form.expenseAmount' : 'recurring.form.incomeAmount')} stored={stored ?? undefined}
         onChangeText={value => { setAmount(value); setError(null); }} editable={!locked} tone={kind === 'income' ? 'income' : 'neutral'} />
       <View style={{ gap: space.m }}>
         <CategoryField entries={snapshot?.entries ?? []} kind={kind} value={category} onChange={setCategory} disabled={locked} prominent />

@@ -1,7 +1,7 @@
 import { createRequire } from 'node:module';
 import { describe, expect, it } from 'vitest';
 import { formatMinorUnits, parseMinorUnits } from './ledger';
-import { MAX_AMOUNT_DIGITS, MAX_ENTRY_MINOR, addMoney, compareMoney, isEntryMinor, isStorableMinor, majorStringToMinor, maxWholeDigits,
+import { editedDraftFits, isUnchangedStoredDraft, minorFromEditedDraft, minorFromLedgerDraft, MAX_AMOUNT_DIGITS, MAX_ENTRY_MINOR, addMoney, compareMoney, isEntryMinor, isStorableMinor, majorStringToMinor, maxWholeDigits,
   minorToMajorString, moneyAmount, negateMoney, parseLocalizedAmount, splitMinor, subtractMoney, sumMoney, type AmountReading } from './money';
 
 // Node's own SQLite (the driver the mobile storage tests use); Vite cannot resolve it as an import.
@@ -241,5 +241,35 @@ describe('money arithmetic in one currency', () => {
     expect(() => compareMoney(nan, moneyAmount(5, 'USD'))).toThrow('Monto inválido.');
     expect(() => compareMoney(unsafe, { minor: 2 ** 53 + 1, currency: 'USD' })).toThrow('Monto inválido.');
     expect(() => compareMoney(gold, gold)).toThrow('Moneda no admitida.');
+  });
+});
+
+describe('editing a stored amount (Producto 24B2 review fix)', () => {
+  // A stored amount may exceed the entry bound and still be a valid safe integer (a balance is a sum of movements; a backup carries any safe integer).
+  const large = MAX_ENTRY_MINOR + 12345;
+  const stored = { minor: large, currency: 'ARS' as const, draft: '10.000.000.000.123,44' };
+  it('keeps an untouched prefill exactly, whatever its size, and reads an edited text as a new entry with every rule', () => {
+    expect(Number.isSafeInteger(large) && large > MAX_ENTRY_MINOR).toBe(true);
+    expect(isUnchangedStoredDraft(stored.draft, 'ARS', stored)).toBe(true);
+    expect(minorFromEditedDraft(stored.draft, 'ARS', stored)).toBe(large);
+    expect(editedDraftFits(stored.draft, 'ARS', stored)).toEqual({ ok: true });
+    // Any edit of the text goes through the entry bound and the decimals: never truncated, rounded or reinterpreted.
+    expect(() => minorFromEditedDraft('10.000.000.000.123,45', 'ARS', stored)).toThrow('El monto es demasiado grande.');
+    expect(editedDraftFits('10.000.000.000.123,45', 'ARS', stored)).toEqual({ ok: false, reason: 'tooLong' });
+    expect(minorFromEditedDraft('500', 'ARS', stored)).toBe(50000);
+    expect(minorFromEditedDraft('500', 'ARS', stored)).toBe(minorFromLedgerDraft('500', 'ARS'));
+    expect(() => minorFromEditedDraft('12,345', 'ARS', stored)).toThrow('Usá números con hasta dos decimales.');
+    // The same draft in another currency is not the stored amount: 12,50 pesos are never 1250 yen.
+    expect(isUnchangedStoredDraft('12,50', 'JPY', { minor: 1250, currency: 'ARS', draft: '12,50' })).toBe(false);
+    expect(() => minorFromEditedDraft('12,50', 'JPY', { minor: 1250, currency: 'ARS', draft: '12,50' })).toThrow('Usá números enteros: esta moneda no tiene decimales.');
+    expect(editedDraftFits('12,50', 'JPY', { minor: 1250, currency: 'ARS', draft: '12,50' })).toEqual({ ok: false, reason: 'precision' });
+    // Without a stored amount (a new record) both are exactly the entry functions.
+    expect(minorFromEditedDraft('1.234,56', 'ARS', null)).toBe(123456);
+    expect(() => minorFromEditedDraft(stored.draft, 'ARS', null)).toThrow('El monto es demasiado grande.');
+    expect(editedDraftFits('12,5', 'JPY', undefined)).toEqual({ ok: false, reason: 'precision' });
+    // A stored value that is not a safe integer is refused, never kept; the entry bound itself is unchanged.
+    expect(() => minorFromEditedDraft('x', 'ARS', { minor: 2 ** 53, currency: 'ARS', draft: 'x' })).toThrow('Monto inválido.');
+    expect(isStorableMinor(large)).toBe(true);
+    expect(isEntryMinor(large)).toBe(false);
   });
 });
