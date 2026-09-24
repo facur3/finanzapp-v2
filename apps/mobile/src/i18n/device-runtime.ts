@@ -4,7 +4,7 @@
  * `require` below runs only after it answered yes, so expo-localization's
  * own `requireNativeModule` is never evaluated in a binary without it. */
 import { requireOptionalNativeModule } from 'expo';
-import { intlLocale, readDeviceLocales, type DeviceLocaleDeps, type LocalizationModule } from './device';
+import { intlLocale, readDeviceLocales, subscribeDeviceLocaleChanges, type DeviceLocaleDeps, type LocalizationModule } from './device';
 
 export const runtimeDeviceLocaleDeps: DeviceLocaleDeps = {
   nativeRegistered: () => requireOptionalNativeModule('ExpoLocalization') != null,
@@ -13,3 +13,9 @@ export const runtimeDeviceLocaleDeps: DeviceLocaleDeps = {
 };
 
 export const readRuntimeDeviceLocales = () => readDeviceLocales(runtimeDeviceLocaleDeps);
+
+/** iOS's own "locale changed" event, from the same probed module object that
+ * expo-localization's listener uses (the package itself is never evaluated
+ * for it); a no-op in a binary without the module. */
+export const subscribeRuntimeLocaleChanges = (listener: () => void) =>
+  subscribeDeviceLocaleChanges(requireOptionalNativeModule('ExpoLocalization'), listener);

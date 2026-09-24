@@ -6,6 +6,7 @@ export const common: Pick<Messages, 'common' | 'movement' | 'accountKinds' | 'se
     cancel: 'Cancel',
     done: 'Done',
     close: 'Close',
+    ok: 'OK',
     see: 'View',
     seeAll: 'See all',
     addAccount: 'Add account',

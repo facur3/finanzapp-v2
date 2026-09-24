@@ -26,10 +26,12 @@ export const LANGUAGES = {
 } as const;
 export type LanguageCode = keyof typeof LANGUAGES;
 
-/** The region whose conventions a language's own speech uses: a VoiceOver
- * string is written for a voice of the interface language, so "1.234,56
- * pesos" in Spanish and "1,234.56 dollars" in English, whatever region the
- * screen writes numbers in. A new language names its region here. */
+/** A language's home region. It gives the decimal mark of a VoiceOver string
+ * (written for a voice of the interface language: "1234,56 pesos" in Spanish,
+ * "1234.56 dollars" in English, never grouped, whatever region the screen
+ * writes numbers in) and the region of the date wheel's locale ("es_AR",
+ * "en_US"), whose month names and column order follow the language. A new
+ * language names its region here. */
 export const SPEECH_REGIONS: Record<LanguageCode, RegionCode> = { es: 'AR', en: 'US' };
 
 /** How a region writes numbers, dates and times. Words stay with the language. */
@@ -64,15 +66,19 @@ export const DEFAULT_LOCALE: AppLocale = 'es-AR';
 export const SUPPORTED_LANGUAGES = Object.keys(LANGUAGES) as LanguageCode[];
 export const SUPPORTED_REGIONS = Object.keys(REGIONS) as RegionCode[];
 
-/** Languages complete enough to be shown and chosen. English joins in Producto
- * 23.1C, once every screen has its catalogue (23.1B); until then an English
- * device still reads Spanish rather than a half-translated app, and English is
- * not offered in the language list. */
-export const RELEASED_LANGUAGES: readonly LanguageCode[] = ['es'];
-/** Regions whose conventions the whole app honours. The United States joins in
- * Producto 23.1C: the amount field (`money-input.ts`) still types Argentine
- * separators, so US formats elsewhere would disagree with what the person types. */
-export const RELEASED_REGIONS: readonly RegionCode[] = ['AR'];
+/** Languages complete enough to be shown and chosen. English was released in
+ * Producto 23.1C2, once every screen had its catalogue (23.1B) and the formats
+ * were checked (23.1C1). A language in `LANGUAGES` but not here (a catalogue
+ * still being translated) is never offered and never applied, even when the
+ * device or a stored choice asks for it. This list is also what iOS declares:
+ * `supportedLocales.ios` in app.config.ts must name exactly these languages
+ * (tests/app-config.node.ts keeps them equal), and changing it needs a new
+ * native build. */
+export const RELEASED_LANGUAGES: readonly LanguageCode[] = ['es', 'en'];
+/** Regions whose conventions the whole app honours, the amount field
+ * included (`money-input.ts`). The United States was released in Producto
+ * 23.1C2. */
+export const RELEASED_REGIONS: readonly RegionCode[] = ['AR', 'US'];
 
 export interface ReleasedSets { languages: readonly LanguageCode[]; regions: readonly RegionCode[] }
 export const RELEASED: ReleasedSets = { languages: RELEASED_LANGUAGES, regions: RELEASED_REGIONS };
@@ -80,10 +86,13 @@ export const RELEASED: ReleasedSets = { languages: RELEASED_LANGUAGES, regions: 
 export const PREVIEW: ReleasedSets = { languages: SUPPORTED_LANGUAGES, regions: SUPPORTED_REGIONS };
 
 /** What a bundle may show: the release gate; or, only in a development bundle
- * started with `EXPO_PUBLIC_LOCALE_PREVIEW=1`, every language and region, so
- * the owner can check unreleased formats on the iPhone from FinanzApp Dev
- * (Más then lists English and Región). A release bundle ignores the flag, and
- * a choice saved during a preview is not applied once the flag is gone. */
+ * started with `EXPO_PUBLIC_LOCALE_PREVIEW=1`, every language and region this
+ * build carries, so a catalogue that is not released yet can be checked on the
+ * iPhone from FinanzApp Dev. Since 23.1C2 everything the build carries is
+ * released (`PREVIEW` equals `RELEASED`), so the flag changes nothing; it stays
+ * for the next language. A release bundle can never use it: babel-preset-expo
+ * inlines `__DEV__` as false (tests/locale-release.node.ts). A choice saved
+ * during a preview is applied only once its value is released. */
 export function releasedForBuild(flag: string | undefined, development: boolean): ReleasedSets {
   return development && flag === '1' ? PREVIEW : RELEASED;
 }
@@ -145,9 +154,12 @@ export function regionForTag(tag: string | null | undefined): RegionCode | null 
 
 /** The language to use: an explicit, released preference first; otherwise the
  * first device language that is released; otherwise the default. An
- * unreleased language is ignored even when chosen, so a stored English
- * preference can never surface before its release. A device whose languages
- * are all unsupported (Portuguese, French) reads Spanish. */
+ * unreleased language is ignored even when chosen, so a stored preference can
+ * never surface before its release. A device whose languages are all
+ * unsupported (Portuguese, French) reads Spanish, which is also iOS's fallback
+ * for the app's own system text (`CFBundleDevelopmentRegion` 'es'). On iOS the
+ * device list already starts with the language chosen for FinanzApp in
+ * Settings (a per-app language), so "follow the device" follows that too. */
 export function resolveLanguage(devices: readonly DeviceLocale[], preference: LanguagePreference = 'system',
   released: readonly LanguageCode[] = RELEASED_LANGUAGES): LanguageCode {
   const usable = (language: LanguageCode | null): language is LanguageCode => !!language && released.includes(language);

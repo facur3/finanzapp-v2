@@ -4,6 +4,8 @@ export const common = {
     cancel: 'Cancelar',
     done: 'Listo',
     close: 'Cerrar',
+    /** The button that closes an information alert (the ⓘ glyphs). Written by the app so it follows the interface language, not iOS's. */
+    ok: 'OK',
     see: 'Ver',
     seeAll: 'Ver todos',
     addAccount: 'Agregar cuenta',

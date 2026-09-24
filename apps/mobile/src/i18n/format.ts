@@ -16,7 +16,7 @@
  * them in that output. The screens never call it directly: every visible
  * amount goes through `formatAmount`/`moneyText` (the region's separators)
  * and every VoiceOver amount through the `spoken*` functions (the language's
- * own separators, see `speechLocale`). Storage and parsing are untouched; the
+ * own decimal separator and no grouping, see `spokenNumber`). Storage and parsing are untouched; the
  * amount field reads and writes the region's separators through
  * `ui/money-input.ts` with the `amountFormat` below. */
 import { formatMinorUnits, type Currency } from '@finanzapp/domain';
@@ -111,15 +111,17 @@ export function relativeDayName(dateISO: string, todayISO: string, locale: AppLo
 
 /** A row's date: Hoy, Ayer, Anteayer (Today, Yesterday), otherwise the short
  * date, with the year when it is not the current one. In Spanish this is the
- * domain's `labelFromISO` byte for byte; a future date is never relative. */
-export function relativeDate(dateISO: string, todayISO: string, locale: AppLocale = DEFAULT_LOCALE): string {
+ * domain's `labelFromISO` byte for byte; a future date is never relative.
+ * `inline` is for a day placed inside a sentence ("Vence hoy", "open since
+ * yesterday"): the relative names start in lower case. The short dates are
+ * the same either way; an English one starts with its month ("Due Oct 1"). */
+export function relativeDate(dateISO: string, todayISO: string, locale: AppLocale = DEFAULT_LOCALE, inline = false): string {
   const date = dateFromISO(dateISO), today = dateFromISO(todayISO);
   if (!date || !today) return String(dateISO ?? '');
   const days = daysAgo(dateISO, todayISO);
   const en = languageOf(locale) === 'en';
-  if (days === 0) return en ? 'Today' : 'Hoy';
-  if (days === 1) return en ? 'Yesterday' : 'Ayer';
-  if (days === 2 && !en) return 'Anteayer';
+  const name = days === 0 ? (en ? 'Today' : 'Hoy') : days === 1 ? (en ? 'Yesterday' : 'Ayer') : days === 2 && !en ? 'Anteayer' : null;
+  if (name) return inline ? name.toLowerCase() : name;
   return formatDate(dateISO, date.year === today.year ? 'day' : 'dayYear', locale);
 }
 
@@ -128,6 +130,15 @@ export function formatNumericDate(dateISO: string, locale: AppLocale = DEFAULT_L
   const date = dateFromISO(dateISO);
   if (!date) return String(dateISO ?? '');
   return conventionsOf(locale).dateOrder === 'mdy' ? `${date.month}/${date.day}/${date.year}` : `${date.day}/${date.month}/${date.year}`;
+}
+
+/** A day of the current period as numbers without the year, in the region's
+ * order: "5/09" in Argentina (as the domain's reports write it) and "9/5" in
+ * the United States, where "5/09" would read as May 9. */
+export function formatDayMonth(dateISO: string, locale: AppLocale = DEFAULT_LOCALE): string {
+  const date = dateFromISO(dateISO);
+  if (!date) return String(dateISO ?? '');
+  return conventionsOf(locale).dateOrder === 'mdy' ? `${date.month}/${date.day}` : `${date.day}/${String(date.month).padStart(2, '0')}`;
 }
 
 /** An ISO timestamp as a short local date and time, minutes precision. */
@@ -223,29 +234,36 @@ export function withCurrencyCode(label: string, currency: Currency): string {
 }
 
 /** The locale a VoiceOver string is written in: the interface language with
- * the separators of that language's own speech (`SPEECH_REGIONS`). The words
- * of a VoiceOver label are in the interface language, so the voice reading
- * them expects that language's numbers: an English voice reads "1.234,56" as
- * "one point two three four comma fifty-six". The screen keeps the region's
+ * the decimal separator of that language's own speech (`SPEECH_REGIONS`). The
+ * words of a VoiceOver label are in the interface language, so the voice
+ * reading them expects that language's decimal mark: an English voice reads
+ * "1234,56" as "one two three four, fifty-six". The screen keeps the region's
  * separators; only what is spoken changes. */
 export function speechLocale(locale: AppLocale = DEFAULT_LOCALE): AppLocale {
   const language = languageOf(locale);
   return composeLocale(language, SPEECH_REGIONS[language]);
 }
 
-/** A number of minor units for VoiceOver ("1.234,56" in Spanish, "1,234.56" in English). */
+/** A number of minor units for VoiceOver: the language's decimal separator and
+ * no thousands grouping, "1234,56" in Spanish and "1234.56" in English (23.1C2).
+ * A group separator is the one mark a voice can misread by a factor of a
+ * thousand: a Spanish voice of a variety that writes 1,234.56 (Mexico), or a
+ * device Region that does, may read "1.234" as "uno punto dos tres cuatro".
+ * Plain digits are the same number for every voice, and a separator before two
+ * digits can only be a decimal. The screen keeps the region's grouping. */
 export function spokenNumber(minor: number, locale: AppLocale = DEFAULT_LOCALE): string {
-  return formatAmount(minor, speechLocale(locale));
+  return formatMinorUnits(minor).replace(/\./g, '').replace(',', conventionsOf(speechLocale(locale)).decimal);
 }
 
-/** An amount with its ISO code for a VoiceOver sentence ("1.234,56 ARS"). */
+/** An amount with its ISO code for a VoiceOver sentence ("1234,56 ARS"). */
 export function spokenAmount(minor: number, currency: Currency, locale: AppLocale = DEFAULT_LOCALE): string {
   return spokenNumber(minor, locale) + ' ' + currency;
 }
 
-/** A percentage for a VoiceOver sentence, in the language's own separators. */
+/** A percentage for a VoiceOver sentence: the language's decimal separator, no grouping ("1234,5 %"). */
 export function spokenPercent(fraction: number, locale: AppLocale = DEFAULT_LOCALE): string {
-  return formatPercent(fraction, speechLocale(locale));
+  const speech = speechLocale(locale);
+  return formatPercent(fraction, speech).split(conventionsOf(speech).group).join('');
 }
 
 /** What VoiceOver reads for an amount: the number, then the currency in words. */
@@ -255,11 +273,17 @@ export function spokenMoney(minor: number, currency: Currency, locale: AppLocale
   return (minor < 0 ? (en ? 'Minus ' : 'Menos ') : '') + spokenNumber(Math.abs(minor), locale) + ' ' + unit;
 }
 
-/** The locale identifier iOS's date picker takes ("es_AR", "en_US"): the
- * wheel's month names follow the language, its column order the pair as far
- * as iOS has data for it (see docs/i18n.md, date pickers). */
+/** The locale identifier iOS's date wheel takes: the interface language with
+ * its home region (`SPEECH_REGIONS`), "es_AR" or "en_US", whatever region the
+ * app writes numbers in. The wheel spells the month out, so it is a worded
+ * date and follows the language like the row it opens from
+ * (`formatDate(…, 'dayYear')`): Spanish day · month · year, English month ·
+ * day · year. The mixed pairs are never passed: iOS's own data for them
+ * disagrees with the app (Apple's en_AR is day-first) and changed between iOS
+ * 26 releases (es_US), see docs/i18n.md §9. */
 export function pickerLocale(locale: AppLocale = DEFAULT_LOCALE): string {
-  return locale.replace('-', '_');
+  const language = languageOf(locale);
+  return `${language}_${SPEECH_REGIONS[language]}`;
 }
 
 /** The full name of a currency for a chooser or a detail row. */
