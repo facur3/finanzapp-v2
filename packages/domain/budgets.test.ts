@@ -66,7 +66,7 @@ describe('monthly budgets', () => {
   it('validates exact integer money, month format and immutable initial timestamps', () => {
     validateMonthlyBudget(budget);
     for (const patch of [
-      { amountMinor: 0 }, { amountMinor: -5000 }, { amountMinor: 1.2 }, { currency: 'EUR' }, { monthISO: '2026-13' },
+      { amountMinor: 0 }, { amountMinor: -5000 }, { amountMinor: 1.2 }, { currency: 'XAU' }, { currency: 'ZZZ' }, { currency: 'ars' }, { monthISO: '2026-13' },
       { category: '' }, { category: undefined }, { scope: 'general' }, { active: 1 }, { revision: -1 }, { updatedAt: 'invalid' },
     ]) expect(() => validateMonthlyBudget({ ...budget, ...patch } as MonthlyBudget)).toThrow();
   });
