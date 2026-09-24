@@ -380,6 +380,29 @@ importe, moneda y estado.
   muestra hasta que toda la app lo tenga (23.1): un iPhone en inglés sigue leyendo
   español antes que media app traducida.
 
+## Producto 24B2 — rutas estrictas y campo de importe por moneda (sin cambios visuales en producción)
+
+Nada visible cambia con ARS y USD: el formato regional, el símbolo anclado, el cursor
+estable, las cifras tabulares y la escritura fluida del campo de importe son byte a byte
+los de 23.1C1 (`money-input.node.ts` conserva sus goldens). Lo que el campo ya sabe hacer,
+para cuando se habilite una moneda con otra precisión:
+- **Teclado numérico sin coma** en una moneda sin decimales (JPY); teclado decimal en las
+  demás. Tres decimales en KWD, con «Terminar» completando a tres.
+- **Borrador conservado al cambiar de cuenta o de moneda.** Los dígitos escritos no se
+  tocan (ARS ↔ USD no cambia nada). Si la nueva moneda no puede conservarlos exactamente,
+  aparece una nota discreta bajo el campo («JPY no lleva decimales. Quitá los decimales
+  antes de guardar; no se redondea.») y Guardar queda deshabilitado hasta corregirlos.
+  Nunca se trunca, redondea ni reinterpreta.
+- **Pegado sin adivinar.** Los marcadores de moneda vienen del catálogo («€», «JP¥», «KWD»);
+  un marcador distinto de la moneda de la cuenta se rechaza, nunca se convierte; un «$» suelto
+  no es evidencia; «1.234» en una moneda de tres decimales es ambiguo y se rechaza con motivo.
+- **Rutas estrictas.** Un enlace con una moneda desconocida o que ninguna cuenta tiene abre
+  el estado vacío de la pantalla («Día no válido», «Período no válido», «Comparación no
+  válida»), nunca otra moneda. Un enlace sin moneda abre la primera del ledger, como la
+  pestaña.
+Pendiente para 24B3 (etapa 4): los cuatro ternarios ARS/USD de presentación con la plantilla
+`{name} · {code}`, el picker más allá de dos monedas y las unidades habladas.
+
 ## Producto 24B1 — red de seguridad multimoneda (sin cambios visuales)
 
 Nada visible cambia salvo la etiqueta del pie de Más (Producto 24B1). El dominio agrupa por

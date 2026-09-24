@@ -1,6 +1,6 @@
 # FinanzApp mobile: currencies and the multi-currency engine
 
-Updated 2026-09-24 (Producto 24B1). Applies to the Expo app in `apps/mobile` and the
+Updated 2026-09-24 (Producto 24B2). Applies to the Expo app in `apps/mobile` and the
 shared `packages/domain`. The web/Capacitor app keeps its own float-based helpers
 (`src/domain/currency.js`) and is not changed. Read with [decision 002](decisions/002-spending-first.md)
 (ARS/USD kept apart, no invented rates), [docs/i18n.md](i18n.md) §9 and the roadmap's
@@ -54,6 +54,23 @@ the Assistant contract. No stored amount is reinterpreted. No exchange rate exis
 | Copy | `errors.accounts.currency` → "Elegí una moneda disponible." / "Choose an available currency."; new `errors.accounts.legacyExport`, `errors.recovery.legacyImport`, `debts.list.outOfRange`, `recurring.list.outOfRange` (es, en, lock). | |
 | Reproducibility | `scripts/currency/generate.mjs --verify`, `npm run currency:verify` | Offline integrity of the committed catalogue against the lock (§4); CI runs it and `npm run i18n:check`, which now requires a generated names module per catalogue language. `extract.mjs` exempts `src/i18n/currencies/` by directory and `GENERATED` header. |
 | Tests | `packages/domain/multi-currency.test.ts`, `tests/currency-guards.node.ts`, `tests/currency-goldens.node.ts`, plus cases in `currency.test.ts`, `budgets.test.ts`, `spending-chart.node.ts`, `spending-home.node.ts`, `i18n.node.ts` | EUR/JPY/KWD fixtures through every grouping, report, budget, transfer and backup path; the pair-literal scan with its shrinking allow-list; ARS/USD goldens for the card face, the timeline, the day-net header, the MonthBars scale and Home's Disponible; the money scan bans `splitMinor`, `minorToMajorString`, `fmtNum`, `parseMoneyInput` and `Intl.DisplayNames` in screens. |
+
+### 2.2 What Producto 24B2 delivers (the rest of stage 2, and stage 3)
+
+| Layer | File | Change |
+| --- | --- | --- |
+| Draft reader | `packages/domain/money.ts` | `minorFromLedgerDraft(draft, currency)` reads a form draft (ledger notation) as minor units of its currency, exactly: more decimals than the currency has are refused with the currency's own sentence ("Usá números con hasta 3 decimales.", "Usá números enteros: esta moneda no tiene decimales."; the two-decimal sentence unchanged for ARS/USD), more digits than the entry bound with "El monto es demasiado grande.". `draftFitsCurrency(draft, currency)` says whether a kept draft can be saved. A sweep proves it agrees with `parseMinorUnits` on every draft the field can produce (the only differences: zeros beyond the exponent are not a fraction, US separators are never guessed, and the entry bound of §5 applies). |
+| Amount model | `src/ui/money-input.ts` | Every reader, writer and settle step takes the currency: `precisionOf` (decimals = ISO exponent, whole digits = 15 − exponent), `amountFromCanonical`, `amountFromView`, `readPastedAmount`, `readAmountInput`, `settleAmount`, `amountFromDraft`, `displayAmount`, `draftFromMinor` (via `splitMinor`), `amountFromMinor`, `reformatAmount`, and `AmountInput(draft, format, currency)` with `retarget(currency)`. No `10 **`, no two-decimal constant, no cents slice (a test bans them). Paste markers come from the catalogue (`currencyOfMark`: every storable code and every unique root symbol, plus "AR$" and "U$S"); a bare "$" is still no evidence; a separator before three digits is ambiguous in a three-decimal currency whatever the separator. |
+| Field | `src/ui/components.tsx` `AmountField` | Number pad (no decimal key) at exponent 0; a draft kept across an account or currency change keeps its digits and shows a note when the new currency cannot hold it (`amount.kept.*`), never truncated, rounded or rescaled; the precision note of a refused paste names the currency's decimals (`amount.paste.precisionDigits`, `precisionNone`; the two-decimal sentence unchanged). |
+| Forms | entry, transfer, recurring, card, debt, budget, new account, edit account | Parse with `minorFromLedgerDraft(amount, currency)`, prefill with `draftFromMinor(minor, currency)` in the record's own currency, shortcut fills with `amountFromMinor(fill, currency)`; Save is disabled while `draftFitsCurrency` refuses the draft. `maxAmountMinor` is read as minor units of the obligation's currency, at most 15 digits. The Assistant's Editar hands over `amountMinor` (digits) with `currency`; the older `amount` draft still reads (`src/ui/entry-prefill.ts`). |
+| Routes | `report-day`, `spending-detail`, `report-category`, `report-comparison`, `budgets`, `new-account`, `budget-form`, `src/ui/report-presentation.ts` | `heldCurrency(accounts, param)`: a route currency is accepted only when it is a storable code an account holds; the drill-downs refuse anything else (`strictReportSelection`, a new "Comparación no válida" state) instead of falling back to the first currency; a link without a currency opens the tab's first one. New-account and new-budget honour the route's currency only when the gate offers it and never coerce an unknown code (ARS is the empty-ledger default, decision 7.6.4). |
+| Guards | `tests/currency-guards.node.ts` | The allow-list lost the two route whitelists, the three coerced parameters and the paste markers; the remaining entries are the four presentation ternaries (stage 4), the two permanent conventions, the production gate and contract v1. |
+| Tests | `tests/amount-exponents.node.ts`, cases in `typography`, `report-routes`, `recovery-routes`, `assistant-routes`, `money-input` (every call names ARS) | Typing, pasting, settling, prefilling and shortcuts in JPY, KWD and EUR; the parseMinorUnits sweep; a draft kept across ARS → USD → JPY → KWD changes; the entry form blocking Save on an account change and saving 13 yen, not 1300; the strict routes with `ars`, `XAU`, `ZZZ`, `CHF`, `EUR`, `''` and a held JPY account. |
+
+**Not changed in 24B2:** SQLite, backup v8, `currencyOptions` and the currency choices of the
+card, debt and budget forms (ARS/USD segments), the 21 currency-less presentation call sites,
+the spoken units, the glossary, contract v1 and the server, the Más footer label apart from
+its release. Production still stores and offers exactly ARS and USD.
 
 **Not changed in 24B1:** SQLite (schema 8, CHECKs, migrations, rows), backup v8, every
 form and route parameter, the amount field (still exponent 2), the searchable screen,
@@ -390,14 +407,21 @@ Sites are `file:line` at `1181ed1`, shortened to the file name. Domain files are
 | Stage | Status | What remains |
 | --- | --- | --- |
 | 1 Safety net | **complete** | — (the pair-literal allow-list in `tests/currency-guards.node.ts` names each remaining site with its stage) |
-| 2 One gate, complete groupings | **complete in the domain, storage validators, groupings, Home's `try`, the Assistant client bound to v1, `Currency` widened** | the route parsers that still whitelist the pair (`report-day.tsx`, `spending-detail.tsx`) and the drill-down fallbacks (`report-category.tsx`, `report-comparison.tsx`, the quick-action receivers): a strict route-currency parser over the held currencies; the four binary ternaries (`components.tsx:282`, `card-visual.tsx:37`, `(tabs)/reports.tsx:86`, `budgets.tsx:57`) go with stage 4's `{name} · {code}` template |
-| 3 The amount path by exponent | not started | all |
+| 2 One gate, complete groupings | **complete** (24B1: domain, storage validators, groupings, Home's `try`, the Assistant client bound to v1, `Currency` widened; 24B2: `heldCurrency`/`strictReportSelection` in every route and receiver, no coerced parameter) | the four binary ternaries (`components.tsx`, `card-visual.tsx`, `(tabs)/reports.tsx`, `budgets.tsx`) go with stage 4's `{name} · {code}` template |
+| 3 The amount path by exponent | **complete** (24B2: `minorFromLedgerDraft`/`draftFitsCurrency`, every model helper with a required currency, `AmountInput.retarget`, the number pad at exponent 0, catalogue paste markers, the ambiguity rule at exponent ≥ 3, settle to the exponent, re-validation with a note and Save blocked, every form parse/prefill/shortcut, `maxAmountMinor` at 15 digits in the target's currency, the Assistant hand-off in minor units, the `10 **` ban, the sweep against `parseMinorUnits`) | the debt form still chooses the currency after the amount (a layout change, with stage 8's screen); `amountFormat` stays currency-less (the field takes the currency itself) |
 | 4 Presentation and copy | not started | all |
 | 5 SQLite schema 9 | not started, **not authorized** (decision 7.6.5 pending) | all |
 | 6 Backup v9 | not started | all |
 | 7 Assistant contract, server first | not started | all (v1 refuses EUR; the client refuses to send a non-v1 currency since 24B1) |
 | 8 The searchable currency screen | not started | all |
 | 9 Device QA, then the gate | not started | all; three-decimal currencies only after the VoiceOver check on an iPhone |
+
+Deliberate golden changes made in 24B2: `assistant-routes.node.ts` "Editar" parameters carry
+`amountMinor` instead of `amount` (the stage 3 row of the table below); `money-input.node.ts`
+names ARS in every call and pastes "US$ 12.30" into a dollar field (a field always belongs to
+an account now, so a dollar mark in a peso field is refused, as the mismatch cases always
+said); the entry bound refuses a fourteenth whole digit that `parseMinorUnits` accepted (the
+field never produced it); the Más footer says Producto 24B2.
 
 Deliberate golden changes made in 24B1 (the table below listed them for stages 1 and 2):
 `budgets.test.ts` and `spending-home.node.ts` probe `XAU`, `ZZZ`, `ars` and a ready code outside the gate (`CHF`);
@@ -671,12 +695,28 @@ providers publish against one base, so KWD→ARS may be two ECB legs), the **dat
 (daily reference, publication time, weekends and holidays, historical depth), the
 **licence and commercial terms** (attribution wording, commercial use, redistribution,
 rate limits), **availability** (uptime, an API key or none), **cost** and **caching rules**.
-Candidates to review: [Frankfurter](https://www.frankfurter.app) (ECB reference rates, EUR
-base, ~30 currencies, free, no key), the ECB's own feed, national central banks (the BCRA
-for ARS official rates) and paid aggregators. What the review must not assume: that one
-official rate exists for every currency, that a reference rate is what a bank charges
-(ARS has several legal rates and card purchases add taxes), or that a provider covers
-every day a person records. Whatever is chosen: opt-in, the provider named to the
+Candidates to review: [Frankfurter](https://frankfurter.dev), the ECB's own feed, national
+central banks (the BCRA for ARS official rates) and paid aggregators.
+
+*Frankfurter, read on 2026-09-24 (frankfurter.dev).* The site states that v2 tracks **206
+currencies** from **98 central banks and official sources**, with history "back to 1948";
+that v1 (the ECB-only API, about 30 currencies against EUR) "is deprecated in favor of v2,
+but remains available indefinitely"; that almost all sources update daily, with HMRC monthly
+and the US Treasury quarterly; that it is free for commercial use with no API key, no quotas
+and no monthly or daily caps, but rate-limited against abuse; that rate data "fall under each
+provider's terms"; that high-volume use should cache responses, self-host or query the
+datasets directly; and that `expand=providers` reveals which sources a blended rate came
+from. What FinanzApp still has to verify before recommending it: the **effective coverage per
+pair and per date** (206 currencies listed is not 206 × 205 pairs every day: a rate for a pair
+may be blended across two sources or absent on a given day; an ARS rate from an official
+source is not what a card purchase costs), the terms of each contributing provider that an
+Argentine or international user's rates would come from (attribution, redistribution), the
+publication time of each source in the person's time zone, and the request policy FinanzApp
+would follow (one fetch per pair and day, cached forever, never back-filled). No figure here
+is a decision, and nothing is connected. What the review must not assume: that one official
+rate exists for every currency, that a reference rate is what a bank charges (ARS has
+several legal rates and card purchases add taxes), or that a provider covers every day a
+person records. Whatever is chosen: opt-in, the provider named to the
 person, no request without a purchase or a report that needs it, no key in the app
 bundle if a key is needed (server-side like the Assistant), and a stored `provider` rate
 carries its label, date and `fetchedAt`.
@@ -769,11 +809,29 @@ the person's own dated rate) and must not be modelled with one.
 - **Accounting uses the account's real currency and the amount actually debited.** The
   original amount is information about the purchase; it is never posted anywhere, so
   nothing is counted twice and no ARS balance ever contains dollars.
+- **An estimate is never a debit.** A figure converted with a reference rate (a provider's,
+  or one the person typed) is an *estimated commitment*: it carries its rate, date and
+  source, it is labelled estimated wherever it appears, and it is never written as the
+  account's posted amount. Only the bank's figure, entered or imported and confirmed, becomes
+  the posted amount. The two are different fields with different states, never one number
+  that changes meaning.
+- **Two balances, never mixed.** The **posted balance** of an account is the sum of confirmed
+  movements only, as today (`accountBalanceMinor`); it never moves on an estimate. Beside
+  it, a **pending estimated commitments** figure per account and currency sums the
+  estimated postings of pending foreign purchases (unknown when any of them has no
+  estimate). Home and the account detail show the posted balance as the balance, and the
+  pending figure as its own labelled line ("Compras pendientes · estimado"), never
+  subtracted into the balance and never added to spending. Confirming a purchase moves
+  its amount from the pending figure to the posted balance exactly once. Reports count a
+  pending purchase in the month's spending only as an estimated part, shown apart from
+  confirmed spending (the `estimatedMinor` of §8.4 at the movement level), so a report never
+  sums an estimate and its later confirmation.
 - **While the debit is unknown, nothing is invented.** If a reference rate is available
   (cached or fetched, §8), the movement is stored `pending` with an **estimated** posting
   amount and its provenance; if none is, the movement is stored `pending` with the original
   amount only, the posting amount **unknown**, and every screen says the equivalent is not
-  available yet. A pending movement is never shown as confirmed.
+  available yet. A pending movement is never shown as confirmed, and a missing estimate is
+  never shown as zero.
 - **Confirming** replaces the estimate with the bank's figure (typed by the person from the
   statement, or, later, imported through an authorised channel with consent), records the
   effective rate the debit implies and the fees/taxes, and flips the state. Editing keeps
@@ -824,18 +882,69 @@ the person's own dated rate) and must not be modelled with one.
   cost, licence, freshness and consent controls; nothing is connected and no rate is
   invented before it.
 
-## 11. The Assistant with several currencies and languages (design)
+## 11. The Assistant with several currencies and languages (design, not implemented)
 
 Contract v1 knows ARS and USD; the client does not send anything else (24B1). The next
 version (docs/i18n.md §11, stage 7 of §7.5) carries language and region as two separate
 preferences, validates currencies against a generated superset independent of the client
 gate, states the scale instead of "centavos", and returns draft amounts as canonical
-major-unit strings that the client converts and checks. Beyond that, when real AI arrives:
-the model must understand a message written in any language, including one different from
-the interface language, and answer in the interface language; voice needs a transcription
-provider with proven multilingual coverage; merchant names, custom categories and the
-person's own words are copied verbatim, never translated; ambiguous amounts, currencies
-and separators ("1.500", "$", "pesos" in a two-peso ledger) are asked about before any
-draft; a draft is only ever a proposal confirmed by the person; and the backend enforces
-quotas, per-request and per-person spend ceilings, cost telemetry and privacy. None of
-this is active in 24B1.
+major-unit strings that the client converts and checks. Nothing below is active; no paid
+AI is enabled and v1 is not modified.
+
+### 11.1 "Gasté 30 dólares en Steam."
+
+1. **The model reads, the app decides.** The model returns a draft: merchant "Steam", amount
+   `"30"` as a canonical major-unit string with `currency: 'USD'`, kind expense, a category
+   *suggestion* taken from the person's existing categories (the request carries the
+   category names as shown; the model never invents a category, and an unmatched word stays
+   the person's word). The app converts the string with `majorStringToMinor` and refuses a
+   draft beyond the currency's digits.
+2. **The paying account is the app's question, never the model's guess.** With exactly one
+   account (cash or card) in USD, the draft names it. With several, the app asks **one**
+   contextual question with quick options (the USD accounts, each with its kind and recorded
+   balance, as the form's account sheet describes them). With none, the app offers the
+   accounts in other currencies as a *foreign-currency purchase* (§9): "USD 30 pagado con …",
+   the original amount and currency kept, no rate and no debited amount invented.
+3. **Once the account is chosen, the app, not the model, looks for the reference rate**
+   when the account's currency differs and an authorised provider exists (§8.2), from the
+   cache first; the draft then shows the estimate with its source and date, or says the
+   equivalent is not available yet. The model never sees or produces a rate.
+4. **Nothing is recorded without confirmation.** The draft card is reviewable (Editar hands
+   `amountMinor` and the currency to the form, 24B2); Confirmar writes exactly one movement
+   with the draft's operation id, so a retry never duplicates it. A foreign purchase is
+   confirmed as **pending** (estimated posting, or unknown), visibly apart from the bank's
+   definitive debit, which the person confirms later in the detail (§9.1).
+
+Ambiguities the app asks about before any draft exists: "30 dólares" in a ledger with two
+dollar currencies (USD and CAD), "1.500" between a thousand and one-and-a-half in a
+three-decimal currency, "$" in a ledger that holds pesos and dollars, a merchant that
+matches two accounts' histories.
+
+### 11.2 "¿Por qué gasté más este mes?"
+
+The answer is built from **verifiable aggregations of the recorded history**, computed on
+the device (`spendingComparison`, `topMerchants`, the budget summary) and sent as facts with
+their currency, period and, when converted, provenance; the model narrates them and links
+each figure to the report it came from. It may say *what* grew (a category, a merchant, a
+larger single purchase, a month with more days) and by how much, in the person's currency
+and period. It must not claim *why* in the causal sense the data cannot show (prices rose,
+a habit changed, an emergency) unless the person said so in the conversation; "the data
+does not show why" is a valid answer. Each reply records the language it was asked in.
+
+### 11.3 Languages and voice
+
+The model must understand a message written in any language, including one different from
+the interface language, and reply in the interface language unless the person explicitly
+asks otherwise in the message. Merchant names, custom categories and the person's words
+are copied verbatim, never translated or "corrected". Voice needs a transcription provider
+with proven multilingual coverage before it is offered; a transcript is shown and editable
+before it becomes a draft.
+
+### 11.4 Infrastructure before any paid call
+
+Authorisation (a signed session, the server keyed, no key in the bundle), privacy (no
+prompt logging with content, facts only, the consent screen names what travels), per-user
+quotas and per-request, per-person and global spend ceilings, cost telemetry (usage and
+cost, not content), drafts with confirmation only, and idempotency by operation id on both
+the inbox and the ledger so a repeated request or a retried confirmation never records a
+movement twice. None of this exists in 24B2; the server contract v1 is unchanged.
