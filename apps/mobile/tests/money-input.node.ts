@@ -285,8 +285,8 @@ test('a pasted explicit currency must match the account; no implicit FX conversi
     ['US$ 12.30', AR, 'USD', '12,30'],
     ['USD 12.30', US, 'USD', '12,30'],
     ['U$S 100', AR, 'USD', '100'],
-    ['AR$ 1,234.56', US, 'ARS', '1234,56'],
-    ['ARS 1.234,56', AR, 'ARS', '1234,56'],
+    ['AR$ 1,234.56', US, 'ARS', '1.234,56'],
+    ['ARS 1.234,56', AR, 'ARS', '1.234,56'],
     ['$ 50', AR, 'USD', '50'], // Bare $ is not unambiguous currency evidence.
     ['50', US, 'ARS', '50'],
   ];
