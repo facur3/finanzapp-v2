@@ -115,13 +115,14 @@ export function RecurringForm({ original, accountId: requestedAccount }: { origi
       action={<ActionButton label={t('common.addAccount')} onPress={() => router.replace('/new-account')} />} /> : <>
       <Choices value={kind} onChange={setKind} disabled={locked}
         options={[{ value: 'expense', label: t('movement.expense') }, { value: 'income', label: t('movement.income') }]} />
+      {/* The account (and so the currency) before the amount (24B5): the field types with the right decimals from the first key. */}
+      <AccountField label={t(kind === 'expense' ? 'entryForm.paidWith' : 'entryForm.receivedIn')} accounts={eligibleAccounts} value={accountId} onChange={setAccountId} disabled={locked} prominent
+        kindOf={id => { const found = accounts.find(item => item.id === id); return found ? accountKindLabel(found, archive?.cards, archive?.debts, t) : t('accountKinds.account'); }}
+        typeOf={id => accountKind(id, archive?.cards, archive?.debts)} />
       <AmountField currency={account?.currency ?? 'ARS'} value={amount} label={t(kind === 'expense' ? 'recurring.form.expenseAmount' : 'recurring.form.incomeAmount')} stored={stored ?? undefined}
         onChangeText={value => { setAmount(value); setError(null); }} editable={!locked} tone={kind === 'income' ? 'income' : 'neutral'} />
       <View style={{ gap: space.m }}>
         <CategoryField entries={snapshot?.entries ?? []} kind={kind} value={category} onChange={setCategory} disabled={locked} prominent />
-        <AccountField label={t(kind === 'expense' ? 'entryForm.paidWith' : 'entryForm.receivedIn')} accounts={eligibleAccounts} value={accountId} onChange={setAccountId} disabled={locked} prominent
-          kindOf={id => { const found = accounts.find(item => item.id === id); return found ? accountKindLabel(found, archive?.cards, archive?.debts, t) : t('accountKinds.account'); }}
-          typeOf={id => accountKind(id, archive?.cards, archive?.debts)} />
       </View>
       <Field label={t(kind === 'expense' ? 'entryForm.merchantExpense' : 'entryForm.merchantIncome')} value={merchant}
         placeholder={t(kind === 'expense' ? 'recurring.form.merchantExpensePlaceholder' : 'recurring.form.merchantIncomePlaceholder')}

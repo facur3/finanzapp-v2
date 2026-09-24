@@ -5,7 +5,7 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { todayKey, type Account, type AccountKind, type Currency, type Entry, type EntryKind } from '@finanzapp/domain';
 import { AccountBadge, AppText, CategoryBadge, DetailRow, Field, GlyphTile, PressFeedback, SelectionRow, Surface, surfaceShadow, type IconName, type Tone } from './components';
-import { currencyOption, currencyOptions, searchCurrencies, type CurrencyOption } from './currencies';
+import { SEARCHABLE_FROM, currencyChoices, currencyOption, offeredCurrencies, searchChoices, type CurrencyChoice } from './currencies';
 import { useI18n } from '../i18n/provider';
 import { useAccountLookOf, useCategoryDefinitions, useCategoryLook } from './category-hues';
 import { selectionHaptic } from './motion';
@@ -113,23 +113,30 @@ export function AccountField({ accounts, value, onChange, disabled = false, labe
 /** The account's currency as one native row: the label "Moneda", the
  * currency's full name as the primary line, its code and symbol as the
  * detail line, a glyph and a chevron, stacked so "Dólares estadounidenses"
- * and "USD" each keep a whole line at any width or text size. The sheet
- * lists the currencies the ledger can hold (ARS and USD today) with a
- * checkmark on the current one; it is the seed of the searchable currency
- * screen the multi-currency phase adds. Only for a new account; an existing
- * account never changes currency (`onChange` absent: the same row, read-only,
- * without a chevron). */
-export function CurrencyField({ value, onChange, disabled = false }: { value: Currency; onChange?: (currency: Currency) => void; disabled?: boolean }) {
-  const { t, currencyName, locale } = useI18n();
+ * and "USD" each keep a whole line at any width or text size. The sheet is
+ * the currency screen of docs/currency.md §7.5 stage 8 (24B5): it lists the
+ * currencies the ledger can hold (`currencies`: the build's gate, ARS and USD
+ * in a release) with the catalogue's names, codes and symbols, a checkmark on
+ * the current one and, from six currencies on, a search field over code,
+ * name, symbol, numeric code and territory. Only for a new account; an
+ * existing account never changes currency (`onChange` absent: the same row,
+ * read-only, without a chevron, showing any stored code by its own name). */
+export function CurrencyField({ value, onChange, disabled = false, currencies }: {
+  value: Currency; onChange?: (currency: Currency) => void; disabled?: boolean;
+  /** The codes the person may choose: the build's creation gate. Never wider than what storage can hold. */
+  currencies?: readonly Currency[];
+}) {
+  const { t, locale } = useI18n();
   const [visible, setVisible] = useState(false);
   const selected = currencyOption(value, locale);
+  const options = useMemo(() => currencyChoices(currencies ?? offeredCurrencies(), locale), [currencies, locale]);
   const open = () => { Keyboard.dismiss(); setVisible(true); };
   return <>
     <Surface grouped>
-      <SelectionRow label={t('selection.currency')} value={currencyName(selected.code)} detail={selected.code + ' · ' + selected.symbol}
+      <SelectionRow label={t('selection.currency')} value={selected.name} detail={selected.code + ' · ' + selected.symbol}
         icon="cash-outline" last disabled={disabled} onPress={onChange ? open : undefined} />
     </Surface>
-    {onChange && <CurrencySheet visible={visible} title={t('selection.chooseCurrency')} options={searchCurrencies('', currencyOptions(locale))} value={value}
+    {onChange && <CurrencySheet visible={visible} title={t('selection.chooseCurrency')} options={options} value={value} searchable={options.length >= SEARCHABLE_FROM}
       note={t('selection.currencyNote')} onClose={() => setVisible(false)} onChange={currency => { onChange(currency); setVisible(false); }} />}
   </>;
 }
@@ -141,13 +148,13 @@ export function CurrencyField({ value, onChange, disabled = false }: { value: Cu
  * `searchable` a field at the top filters by code or name, accent- and case-insensitive, so a
  * long list never has to be scrolled through; the options are never reordered by it. */
 export function CurrencySheet({ visible, title, options, value, note, searchable = false, onClose, onChange }: {
-  visible: boolean; title: string; options: readonly CurrencyOption[]; value: Currency; note?: string; searchable?: boolean;
+  visible: boolean; title: string; options: readonly CurrencyChoice[]; value: Currency; note?: string; searchable?: boolean;
   onClose: () => void; onChange: (currency: Currency) => void;
 }) {
   const p = usePalette();
   const { t } = useI18n();
   const [query, setQuery] = useState('');
-  const shown = searchable ? searchCurrencies(query, options) : options;
+  const shown = searchable ? searchChoices(query, options) : options;
   return <SelectionSheet visible={visible} title={title} onClose={() => { setQuery(''); onClose(); }}>
     <FlatList data={shown} keyExtractor={option => option.code} contentContainerStyle={{ padding: 20, paddingTop: 0 }} keyboardShouldPersistTaps="handled"
       ListHeaderComponent={searchable ? <View style={{ paddingBottom: 16 }}>

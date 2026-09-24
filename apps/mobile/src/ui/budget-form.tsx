@@ -3,7 +3,7 @@ import { Alert, Keyboard, View } from 'react-native';
 import { router, Stack } from 'expo-router';
 import { randomUUID } from 'expo-crypto';
 import * as Haptics from 'expo-haptics';
-import { editedDraftFits, isLedgerCurrency, minorFromEditedDraft, sameMonthlyBudget, validateMonthlyBudget, type StoredDraft,
+import { LEDGER_CURRENCIES, editedDraftFits, isLedgerCurrency, minorFromEditedDraft, sameMonthlyBudget, validateMonthlyBudget, type StoredDraft,
   type BudgetScope, type Currency, type MonthlyBudget } from '@finanzapp/domain';
 import { useLedger } from '../storage/LedgerProvider';
 import { ActionButton, AmountField, AppText, Choices, ErrorMessage, IconButton, Screen } from './components';
@@ -21,13 +21,13 @@ import { useI18n } from '../i18n/provider';
 export function BudgetForm({ original, monthISO, currency: requestedCurrency, scope: requestedScope }: {
   original?: MonthlyBudget; monthISO: string; currency?: string; scope?: string;
 }) {
-  const { snapshot, saveBudget } = useLedger();
+  const { snapshot, saveBudget, gate = LEDGER_CURRENCIES } = useLedger();
   const { t, formatMonth } = useI18n();
   const [before] = useState(original);
   const [operation] = useState(() => ({ id: randomUUID(), createdAt: new Date().toISOString() }));
   const [scope, setScope] = useState<BudgetScope>(before?.scope ?? (requestedScope === 'total' ? 'total' : 'category'));
   // A new budget's currency comes from the route only when the gate offers it (never coerced from an unknown code); ARS otherwise (decision 7.6.4).
-  const [currency, setCurrency] = useState<Currency>(before?.currency ?? (isLedgerCurrency(requestedCurrency) ? requestedCurrency : 'ARS'));
+  const [currency, setCurrency] = useState<Currency>(before?.currency ?? (isLedgerCurrency(requestedCurrency, gate) ? requestedCurrency : 'ARS'));
   // An untouched prefill keeps the stored minor units (a stored amount may exceed the entry bound); an edited text is a new entry.
   const [stored] = useState<StoredDraft | null>(() => before ? { minor: before.amountMinor, currency: before.currency, draft: draftFromMinor(before.amountMinor, before.currency) } : null);
   const [amount, setAmount] = useState(stored?.draft ?? '');
@@ -121,7 +121,7 @@ export function BudgetForm({ original, monthISO, currency: requestedCurrency, sc
     </View>
     {!before && <Choices<BudgetScope> value={scope} onChange={setScope} disabled={locked}
       options={[{ value: 'total', label: t('budgets.form.scopeGeneral') }, { value: 'category', label: t('budgets.form.scopeCategory') }]} />}
-    {!before && <CurrencySwitch value={currency} currencies={offeredCurrencies()} onChange={setCurrency} disabled={locked} />}
+    {!before && <CurrencySwitch value={currency} currencies={offeredCurrencies(gate)} onChange={setCurrency} disabled={locked} />}
     <AmountField label={t('budgets.form.amount')} currency={currency} value={amount} stored={stored ?? undefined}
       onChangeText={value => { setAmount(value); setError(null); }} editable={!locked} />
     {!general && <CategoryField entries={snapshot?.entries ?? []} kind="expense" value={category} onChange={setCategory} disabled={locked} prominent />}

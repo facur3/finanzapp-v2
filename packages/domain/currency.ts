@@ -94,11 +94,11 @@ export function currencyRecord(code: IsoCurrencyCode): CurrencyRecord {
   return CURRENCY_DATA[code];
 }
 
-export function currencyStatus(code: IsoCurrencyCode): CurrencyStatus {
-  return isLedgerCurrency(code) ? 'ledger' : currencyRecord(code).status;
+export function currencyStatus(code: IsoCurrencyCode, gate: CurrencyGate = LEDGER_CURRENCIES): CurrencyStatus {
+  return isLedgerCurrency(code, gate) ? 'ledger' : currencyRecord(code).status;
 }
 
-/** Every code with one of these statuses, in code order. */
+/** Every code with one of these statuses, in code order (the production gate decides `ledger`). */
 export function currenciesWithStatus(...statuses: readonly CurrencyStatus[]): IsoCurrencyCode[] {
   return CURRENCY_CODES.filter(code => statuses.includes(currencyStatus(code)));
 }

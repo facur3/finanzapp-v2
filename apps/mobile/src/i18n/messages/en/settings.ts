@@ -32,6 +32,7 @@ export const settings: Pick<Messages, 'settings'> = {
       undoneCount: { one: '{count} can be restored', other: '{count} can be restored' },
     },
     localNote: 'Your records stay on this device and you can record offline. Sync is not turned on yet.',
+    currencyPreview: 'Test currencies enabled: {codes}. Only in this development build.',
     footer: 'FinanzApp · Native pilot {version} · Producto {release} · {material} · {source}',
     material: {
       disabled: 'Opaque material (turned off)',

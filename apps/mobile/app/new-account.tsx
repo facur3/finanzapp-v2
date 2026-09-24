@@ -3,7 +3,7 @@ import { Keyboard } from 'react-native';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { randomUUID } from 'expo-crypto';
 import * as Haptics from 'expo-haptics';
-import { draftFitsCurrency, isLedgerCurrency, makeAccountAppearance, minorFromLedgerDraft, validateAccount, validateAccountAppearance, type AccountAppearance, type Currency, type Account } from '@finanzapp/domain';
+import { LEDGER_CURRENCIES, draftFitsCurrency, isLedgerCurrency, makeAccountAppearance, minorFromLedgerDraft, validateAccount, validateAccountAppearance, type AccountAppearance, type Currency, type Account } from '@finanzapp/domain';
 import { useLedger } from '../src/storage/LedgerProvider';
 import { ACCOUNT_ICON_CHOICES, COLOR_CHOICES, DEFAULT_LOOK } from '../src/ui/appearance';
 import { IconColorPicker } from '../src/ui/appearance-picker';
@@ -13,18 +13,19 @@ import { useI18n } from '../src/i18n/provider';
 
 /** Nombre, icono, color, moneda, saldo inicial. The look is saved in the same
  * commit as the account; it is presentation only and never a financial field.
- * The currency is a native row with a sheet (ARS or USD, the two the ledger
- * holds), visible and changeable until the account exists. */
+ * The currency is chosen before the amount (a native row with the searchable sheet over the
+ * build's gate: ARS or USD in a release), so the opening balance is typed with the right
+ * decimals from the first key; it stays changeable until the account exists. */
 export default function NewAccountScreen() {
   const params = useLocalSearchParams<{ currency?: string }>();
-  const { addAccount } = useLedger();
+  const { addAccount, gate = LEDGER_CURRENCIES } = useLedger();
   const { t } = useI18n();
   const [operation] = useState(() => ({ id: randomUUID(), createdAt: new Date().toISOString() }));
   const [name, setName] = useState('');
   const [icon, setIcon] = useState<string>(DEFAULT_LOOK.icon);
   const [color, setColor] = useState<string>(DEFAULT_LOOK.color);
   // The route's currency is honoured only when the gate offers it (never coerced from an unknown code); ARS otherwise (decision 7.6.4).
-  const [currency, setCurrency] = useState<Currency>(isLedgerCurrency(params.currency) ? params.currency : 'ARS');
+  const [currency, setCurrency] = useState<Currency>(isLedgerCurrency(params.currency, gate) ? params.currency : 'ARS');
   const [opening, setOpening] = useState('');
   const [busy, setBusy] = useState(false);
   const [pending, setPending] = useState<{ account: Account; appearance: AccountAppearance } | null>(null);
@@ -67,7 +68,7 @@ export default function NewAccountScreen() {
       autoCapitalize="words" editable={!locked} placeholder={t('accounts.form.namePlaceholder')} />
     <IconColorPicker icons={ACCOUNT_ICON_CHOICES} colors={COLOR_CHOICES} icon={icon} color={color}
       onIconChange={setIcon} onColorChange={setColor} disabled={locked} previewLabel={name} />
-    <CurrencyField value={currency} onChange={setCurrency} disabled={locked} />
+    <CurrencyField value={currency} onChange={setCurrency} disabled={locked} currencies={gate} />
     <AmountField label={t('accounts.form.openingBalance')} currency={currency} value={opening} onChangeText={value => { setOpening(value); setError(null); }}
       keyboardType="numbers-and-punctuation" inputMode={undefined} editable={!locked} />
     <FieldNote help={{ title: t('accounts.form.openingBalance'), detail: t('accounts.form.openingHelp') }}>{t('accounts.form.openingNote')}</FieldNote>

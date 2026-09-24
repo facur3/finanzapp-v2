@@ -3,7 +3,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import type { Currency } from '@finanzapp/domain';
 import { AppText, Choices, PressFeedback } from './components';
 import { CurrencySheet } from './form-controls';
-import { currencyOptionLabel, currencySwitchMode, type CurrencyOption } from './currencies';
+import { SEARCHABLE_FROM, currencyChoices, currencyOptionLabel, currencySwitchMode, type CurrencyChoice } from './currencies';
 import { useI18n } from '../i18n/provider';
 import { radius, usePalette } from './theme';
 
@@ -21,10 +21,10 @@ export function CurrencySwitch({ value, currencies, onChange, disabled = false, 
   labels?: 'name' | 'code';
 }) {
   const p = usePalette();
-  const { t, locale, currencyName, currencySymbol } = useI18n();
+  const { t, locale, currencyName } = useI18n();
   const [visible, setVisible] = useState(false);
   const label = (currency: Currency) => labels === 'code' ? currency : currencyOptionLabel(currency, t, locale);
-  const options = useMemo<CurrencyOption[]>(() => currencies.map(code => ({ code, name: currencyName(code), symbol: currencySymbol(code) })), [currencies, currencyName, currencySymbol]);
+  const options = useMemo<CurrencyChoice[]>(() => currencyChoices(currencies, locale), [currencies, locale]);
   if (currencySwitchMode(currencies.length) === 'segments') {
     return <Choices value={value} onChange={onChange} disabled={disabled} options={currencies.map(currency => ({ value: currency, label: label(currency) }))} />;
   }
@@ -40,5 +40,4 @@ export function CurrencySwitch({ value, currencies, onChange, disabled = false, 
   </>;
 }
 
-/** A list this long gets a search field: fewer fit on one screen without scrolling at the default text size. */
-export const SEARCHABLE_FROM = 6;
+export { SEARCHABLE_FROM };

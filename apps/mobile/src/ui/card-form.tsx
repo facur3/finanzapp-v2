@@ -4,7 +4,7 @@ import { router, Stack } from 'expo-router';
 import { randomUUID } from 'expo-crypto';
 import * as Haptics from 'expo-haptics';
 import { draftFitsCurrency, editedDraftFits, minorFromEditedDraft, minorFromLedgerDraft, sameCreditCardProfile, validateAccount, validateCreditCardProfile, type StoredDraft,
-  type Account, type CreditCardProfile, type Currency } from '@finanzapp/domain';
+  type Account, type CreditCardProfile, type Currency, LEDGER_CURRENCIES } from '@finanzapp/domain';
 import { useI18n } from '../i18n/provider';
 import type { MessageKey } from '../i18n/messages';
 import { useLedger } from '../storage/LedgerProvider';
@@ -21,7 +21,7 @@ type PendingCreate = { account: Account; card: CreditCardProfile };
 export function CardForm({ original }: { original?: CreditCardProfile }) {
   const stacked = useStacked();
   const { t } = useI18n();
-  const { snapshot, addCard, saveCard } = useLedger();
+  const { snapshot, addCard, saveCard, gate = LEDGER_CURRENCIES } = useLedger();
   const account = snapshot?.accounts.find(item => item.id === original?.accountId);
   const [before] = useState(original);
   const [identity] = useState(() => ({ id: randomUUID(), accountId: randomUUID(), createdAt: new Date().toISOString() }));
@@ -135,7 +135,7 @@ export function CardForm({ original }: { original?: CreditCardProfile }) {
     </Surface> : <>
       <Field label={t('cards.form.name')} value={name} onChangeText={setName}
         placeholder={t('cards.form.namePlaceholder')} maxLength={80} autoCapitalize="words" editable={!locked} />
-      <CurrencySwitch value={currency} currencies={offeredCurrencies()} onChange={setCurrency} disabled={locked} />
+      <CurrencySwitch value={currency} currencies={offeredCurrencies(gate)} onChange={setCurrency} disabled={locked} />
       <AmountField label={t('cards.form.openingDebt')} currency={currency} value={debt}
         onChangeText={value => { setDebt(value); setError(null); }} editable={!locked} />
       <AppText secondary variant="footnote" style={{ marginTop: -space.m }}>{t('cards.form.openingDebtNote')}</AppText>
