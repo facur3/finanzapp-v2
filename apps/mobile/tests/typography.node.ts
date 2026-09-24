@@ -6,6 +6,9 @@ import ts from 'typescript';
 import * as geometry from '../src/ui/geometry.ts';
 import * as moneyInput from '../src/ui/money-input.ts';
 import { bindLocale } from '../src/i18n/bind.ts';
+import type { AppLocale } from '../src/i18n/locale.ts';
+import * as i18nFormat from '../src/i18n/format.ts';
+import * as i18nLocale from '../src/i18n/locale.ts';
 
 const { AMOUNT_FIELD, amountFieldLayout, amountWidthEm, fitFontSize } = geometry;
 const { displayAmount } = moneyInput;
@@ -147,7 +150,7 @@ test('rowStacks: large text always stacks; otherwise a long amount stacks on a n
 
 // The Money component itself: heroes measure their container and size from it;
 // rows keep the native fit without a fixed line height.
-function loadComponents() {
+function loadComponents(locale: AppLocale = 'es-AR') {
   const source = readFileSync(new URL('../src/ui/components.tsx', import.meta.url), 'utf8');
   const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText;
   const jsx = (type: any, props: any) => ({ type, props });
@@ -170,7 +173,7 @@ function loadComponents() {
     './categories': { categoryIcon: () => 'pricetag-outline' },
     './category-color': { tintOf: (c: string) => c }, './category-hues': { useCategoryColor: () => '#111', useCategoryLook: (label: string) => ({ label, hex: '#111', glyph: 'pricetag-outline' }), useAccountLook: () => ({ glyph: 'wallet-outline', hex: '#2557D6' }) },
     './geometry': geometry, './money-input': moneyInput, './motion': { duration: {}, easeOut: {}, selectionHaptic: () => {}, timing: () => ({}) },
-    '../i18n/provider': { useI18n: () => bindLocale('es-AR') },
+    '../i18n/provider': { useI18n: () => bindLocale(locale) }, '../i18n/format': i18nFormat, '../i18n/locale': i18nLocale,
   };
   const module = { exports: {} as Record<string, (props: any) => any> };
   runInNewContext(code, { module, exports: module.exports, require: (name: string) => {
@@ -196,7 +199,7 @@ test('Money sizes a hero from its measured width and leaves rows to the native f
   text = hero.props.children;
   // One amount, three quiet levels: the symbol and the cents are nested spans in the same size and baseline.
   const [symbol, whole, cents] = text.props.children.props.children;
-  assert.equal(symbol.props.children + whole + cents.props.children, '$ 999.999.999,99', 'the parts are the whole string');
+  assert.equal(symbol.props.children + whole + cents.props.children, '$\u00A0999.999.999,99', 'the parts are the whole string');
   assert.equal(symbol.type, 'Text'); assert.equal(cents.type, 'Text');
   assert.equal(symbol.props.style.color, '#666', 'the symbol steps back to secondary');
   assert.equal(cents.props.style.color, '#999', 'the cents step back to tertiary');
@@ -207,7 +210,7 @@ test('Money sizes a hero from its measured width and leaves rows to the native f
   assert.equal(text.props.maxFontSizeMultiplier, 1.4);
   const income = render({ minor: 1234, currency: 'USD', large: true, signed: true, tone: 'income' }).props.children;
   const [greenSymbol, greenWhole, greenCents] = income.props.children.props.children;
-  assert.equal(greenSymbol.props.children + greenWhole + greenCents.props.children, '+US$ 12,34');
+  assert.equal(greenSymbol.props.children + greenWhole + greenCents.props.children, '+US$\u00A012,34');
   assert.equal(greenSymbol.props.style.color, '#008800B3', 'a coloured hero keeps its hue and only lowers the alpha');
   assert.equal(income.props.style.color, '#008800');
   // Regression for the clipped category title: a larger fontSize on the body variant must not keep the 22 pt line box.
@@ -220,9 +223,53 @@ test('Money sizes a hero from its measured width and leaves rows to the native f
   assert.equal(body.lineHeight, 22, 'the variant line box stays when nothing overrides the size');
   const row = render({ minor: 1234, currency: 'USD' });
   assert.equal(row.type, 'Text', 'a row amount is a plain text');
-  assert.equal(row.props.children, 'US$ 12,34', 'row amounts stay one plain string');
+  assert.equal(row.props.children, 'US$\u00A012,34', 'row amounts stay one plain string; the symbol never wraps apart');
   assert.equal(row.props.adjustsFontSizeToFit, true);
   assert.equal(row.props.minimumFontScale, 0.75);
   assert.equal(row.props.style.lineHeight, undefined, 'no fixed line height for the native fit');
   assert.equal(row.props.style.fontSize, 17);
+});
+
+test('Money in the four language × region combinations: the region writes the number and the symbol, the language speaks it', () => {
+  const cases: [AppLocale, string, string, string, string][] = [
+    // locale, hero text, hero VoiceOver, negative USD row, its VoiceOver
+    ['es-AR', '$\u00A01.234.567,89', '1.234.567,89 pesos', '−US$\u00A01.234,50', 'Menos 1.234,50 dólares'],
+    ['en-AR', '$\u00A01.234.567,89', '1,234,567.89 pesos', '−US$\u00A01.234,50', 'Minus 1,234.50 dollars'],
+    ['es-US', 'AR$\u00A01,234,567.89', '1.234.567,89 pesos', '−US$\u00A01,234.50', 'Menos 1.234,50 dólares'],
+    ['en-US', 'AR$\u00A01,234,567.89', '1,234,567.89 pesos', '−US$\u00A01,234.50', 'Minus 1,234.50 dollars'],
+  ];
+  for (const [locale, heroText, heroSpoken, rowText, rowSpoken] of cases) {
+    const { render } = loadComponents(locale);
+    const hero = render('Money', { minor: 123456789, currency: 'ARS', large: true }).props.children;
+    const [symbol, whole, cents] = hero.props.children.props.children;
+    assert.equal(symbol.props.children + whole + cents.props.children, heroText, locale);
+    assert.equal(cents.props.children, heroText.slice(-3), locale + ': the cents start at the region decimal separator');
+    assert.equal(hero.props.accessibilityLabel, heroSpoken, locale);
+    assert.deepEqual([...hero.props.style.fontVariant], ['tabular-nums']);
+    const row = render('Money', { minor: -123450, currency: 'USD' });
+    assert.equal(row.props.children, rowText, locale);
+    assert.equal(row.props.accessibilityLabel, rowSpoken, locale);
+    assert.equal(row.props.numberOfLines, 1, 'never wrapped or cut: rows shrink to 3/4 or stack (useStacked)');
+  }
+});
+
+test('Producto 23.1C1: the anchored field lays out US separators and the "AR$" sign exactly like Argentine ones, at every text size', () => {
+  const us = (text: string) => text.replace(/[.,]/g, char => char === '.' ? ',' : '.');
+  for (const symbol of ['$', 'US$', 'AR$']) {
+    for (const scale of [1, 1.2, 1.4]) {
+      for (const text of DISPLAYS) {
+        // Both separators have the same advance, so the size never depends on the region.
+        assert.deepEqual(amountFieldLayout(us(text), PHONE, symbol, 6, scale), amountFieldLayout(text, PHONE, symbol, 6, scale), `${symbol} ${us(text)} ×${scale}`);
+        const box = amountFieldLayout(us(text), PHONE, symbol, 6, scale);
+        // Above the floor the whole amount fits beside the symbol; at the floor (13 digits at the largest text) the native field scrolls, as in Argentina.
+        if (box.fontSize > AMOUNT_FIELD.min) assert.ok(geometry.amountTextRoom(PHONE, symbol, box.symbolSize, 6, scale) >= amountWidthEm(us(text)) * box.fontSize * scale - 0.5, `${symbol} ${us(text)} ×${scale} fits: nothing is cut`);
+        assert.ok(box.fontSize >= AMOUNT_FIELD.min);
+      }
+    }
+    // The two transitions that used to move everything, at the default text size (as for Argentina above).
+    assert.deepEqual(amountFieldLayout('999', PHONE, symbol, 6), amountFieldLayout('1,000', PHONE, symbol, 6), symbol + ': 999 → 1,000');
+    assert.deepEqual(amountFieldLayout('999,999', PHONE, symbol, 6), amountFieldLayout('1,000,000', PHONE, symbol, 6), symbol + ': 999,999 → 1,000,000');
+  }
+  assert.ok(amountWidthEm('AR$') > amountWidthEm('$'), 'the prefixed sign is measured, not assumed to be one glyph');
+  assert.equal(amountWidthEm('$ 1'), amountWidthEm('$ 1'), 'a non-breaking space is measured like a space');
 });

@@ -1,5 +1,5 @@
 import type { Currency } from '@finanzapp/domain';
-import { currencyName } from '../i18n/format.ts';
+import { currencyName, currencySymbol } from '../i18n/format.ts';
 import { DEFAULT_LOCALE, type AppLocale } from '../i18n/locale.ts';
 
 /** The currencies an account can be created in. The financial engine stores
@@ -7,14 +7,15 @@ import { DEFAULT_LOCALE, type AppLocale } from '../i18n/locale.ts';
  * list shape (code, name, symbol, search text) is what a future searchable
  * currency screen will page through when more currencies arrive with their
  * dated exchange rates. Nothing here fakes a currency the ledger cannot hold.
- * The code and the symbol are the currency's own; the name follows the
- * interface language. */
+ * The code is the currency's own; the name follows the interface language and
+ * the symbol the region (a bare "$" is the peso in Argentina and the dollar in
+ * the United States, so the other one carries its prefix). */
 export type CurrencyOption = { code: Currency; name: string; symbol: string };
 
-const CODES: readonly { code: Currency; symbol: string }[] = [{ code: 'ARS', symbol: '$' }, { code: 'USD', symbol: 'US$' }];
+const CODES: readonly Currency[] = ['ARS', 'USD'];
 
 export function currencyOptions(locale: AppLocale = DEFAULT_LOCALE): CurrencyOption[] {
-  return CODES.map(({ code, symbol }) => ({ code, symbol, name: currencyName(code, locale) }));
+  return CODES.map(code => ({ code, symbol: currencySymbol(code, locale), name: currencyName(code, locale) }));
 }
 export const CURRENCIES: readonly CurrencyOption[] = currencyOptions();
 

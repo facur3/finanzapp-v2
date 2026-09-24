@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import { View } from 'react-native';
-import { debtOutstandingMinor, formatMinorUnits, type PersonalDebtProfile } from '@finanzapp/domain';
+import { debtOutstandingMinor, type PersonalDebtProfile } from '@finanzapp/domain';
 import { useI18n } from '../i18n/provider';
 import { useLedger } from '../storage/LedgerProvider';
 import { AppText, GlyphTile, Money, PressFeedback, useStacked } from './components';
@@ -12,7 +12,7 @@ export function DebtRow({ debt, last }: { debt: PersonalDebtProfile; last: boole
   const { snapshot } = useLedger();
   const p = usePalette();
   const day = useCurrentDay();
-  const { t, relativeDate } = useI18n();
+  const { t, relativeDate, spokenNumber } = useI18n();
   const account = snapshot?.accounts.find(item => item.id === debt.accountId);
   if (!snapshot || !account) return null;
   const outstanding = debtOutstandingMinor(debt, snapshot);
@@ -22,7 +22,7 @@ export function DebtRow({ debt, last }: { debt: PersonalDebtProfile; last: boole
   const stacked = useStacked({ minor: outstanding, currency: account.currency });
   const status = outstanding === 0 ? t('debts.status.settled') : overdue ? t('debts.status.overdue', { date: due! }) : due ? t('debts.status.due', { date: due }) : t('debts.status.noDate');
   return <PressFeedback feedback="highlight" accessibilityRole="button"
-    accessibilityLabel={t(owed ? 'debts.row.owedLabel' : 'debts.row.receivableLabel', { name: debt.counterparty, amount: formatMinorUnits(outstanding), currency: account.currency, status })}
+    accessibilityLabel={t(owed ? 'debts.row.owedLabel' : 'debts.row.receivableLabel', { name: debt.counterparty, amount: spokenNumber(outstanding), currency: account.currency, status })}
     onPress={() => router.push({ pathname: '/debt/[id]', params: { id: debt.id } })}
     style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, paddingHorizontal: 16, minHeight: 64,
       borderBottomWidth: last ? 0 : 0.5, borderBottomColor: p.line }}>

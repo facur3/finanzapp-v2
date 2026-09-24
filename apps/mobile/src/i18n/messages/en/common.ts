@@ -52,6 +52,13 @@ export const common: Pick<Messages, 'common' | 'movement' | 'accountKinds' | 'se
     accessibility: '{label} in {currency}',
     inPesos: 'Argentine pesos',
     inDollars: 'US dollars',
+    paste: {
+      ambiguous: 'Didn’t paste “{text}”: it can be read two ways. Type decimals with “{decimal}”.',
+      precision: 'Didn’t paste “{text}”: it has more than two decimals.',
+      invalid: 'Didn’t paste “{text}”: it isn’t a valid amount.',
+      currencyMismatch: 'Didn’t paste “{text}”: it specifies another currency. This account uses {currency}; nothing was converted.',
+      tooLong: 'Didn’t paste “{text}”: it’s above the maximum amount.',
+    },
   },
   count: {
     movements: { one: '{count} transaction', other: '{count} transactions' },

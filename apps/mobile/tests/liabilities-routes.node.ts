@@ -165,7 +165,7 @@ test('card detail lists only that card account with card context and links purch
   const stats = nodes(root).filter(node => node.type === 'Stat').map(node => node.props.label);
   assert.deepEqual(stats, ['Disponible', 'Cierre', 'Vencimiento']);
   assert.ok(nodes(root).filter(node => node.type === 'Money').map(node => node.props.minor).includes(500000 - 13100), 'available limit');
-  assert.ok(nodes(root).some(node => node.type === 'AppText' && node.props.children === 'de $ 5.000,00'), 'the limit is a caption under Disponible (one catalogue string)');
+  assert.ok(nodes(root).some(node => node.type === 'AppText' && node.props.children === 'de $\u00A05.000,00'), 'the limit is a caption under Disponible (one catalogue string)');
   const buttons = nodes(root).filter(node => node.type === 'ActionButton').map(node => node.props);
   assert.deepEqual(buttons.map(button => button.label), ['Registrar compra', 'Pagar tarjeta']);
   assert.equal(buttons[1].secondary, true);

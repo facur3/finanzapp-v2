@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { View, useWindowDimensions } from 'react-native';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
-import { cardCreditMinor, cardStatementActivity, formatMinorUnits, liabilityActivity } from '@finanzapp/domain';
+import { cardCreditMinor, cardStatementActivity, liabilityActivity } from '@finanzapp/domain';
 import { useI18n } from '../../src/i18n/provider';
 import { useLedger } from '../../src/storage/LedgerProvider';
 import { ActionButton, AppText, EmptyState, IconButton, Money, Screen, SectionTitle, Stat, Surface, StatRow } from '../../src/ui/components';
@@ -15,7 +15,7 @@ export default function CardDetailScreen() {
   const { archive, snapshot } = useLedger();
   const day = useCurrentDay();
   const p = usePalette();
-  const { t, relativeDate } = useI18n();
+  const { t, relativeDate, moneyText } = useI18n();
   const { width } = useWindowDimensions();
   const card = archive?.cards?.find(item => item.id === id);
   const summary = useMemo(() => card && snapshot ? summarizeCard(card, snapshot, day) : null, [card, snapshot, day]);
@@ -28,7 +28,7 @@ export default function CardDetailScreen() {
   const { account, debtMinor, availableMinor, usage, closingISO, dueISO } = summary;
   const credit = cardCreditMinor(card, snapshot);
   const relative = (iso: string) => relativeDate(iso, day);
-  const money = (minor: number) => (account.currency === 'USD' ? 'US$ ' : '$ ') + formatMinorUnits(minor);
+  const money = (minor: number) => moneyText(minor, account.currency);
   const tone = usageTone(usage);
 
   return <>

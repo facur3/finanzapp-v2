@@ -1133,3 +1133,52 @@ test('v8 backup round-trips looks and categories; v7 files import without them; 
   assert.throws(() => parsePilotBackup(JSON.stringify({ ...backup, appearances: [{ ...look, icon: 'rocket' }] })), /ícono/);
   assert.throws(() => parsePilotBackup(JSON.stringify({ ...backup, categories: [{ ...backup.categories[0], color: 'neon' }] })), /color/);
 });
+
+test('Producto 23.1C1: an amount typed with Argentine or US separators is stored as the same integer, and formatting in four locales never touches the ledger', async () => {
+  const { AmountInput } = await import('../src/ui/money-input.ts');
+  const { bindLocale } = await import('../src/i18n/bind.ts');
+  const { parseMinorUnits } = await import('@finanzapp/domain');
+  const typed = (format: { decimal: string; group: string }, keys: string) => {
+    const field = new AmountInput('', format);
+    for (const key of keys) {
+      const { text, caret } = field.view;
+      field.change(text.slice(0, caret) + key + text.slice(caret), caret + 1);
+    }
+    return field.settle().draft;
+  };
+  const { db } = setup();
+  await initializeDatabase(db);
+  const dollars: Account = { ...account, id: 'usd-account', name: 'Dólares', currency: 'USD', openingMinor: 0 };
+  await createAccount(db, account);
+  await createAccount(db, dollars);
+  const argentine = typed({ decimal: ',', group: '.' }, '1234567,89');
+  const american = typed({ decimal: '.', group: ',' }, '1234567.89');
+  assert.equal(argentine, '1.234.567,89');
+  assert.equal(american, argentine, 'the draft is the ledger notation in both regions');
+  await createEntry(db, { ...expense, id: 'typed-ar', amountMinor: parseMinorUnits(argentine) });
+  await createEntry(db, { ...expense, id: 'typed-us', accountId: dollars.id, amountMinor: parseMinorUnits(american) });
+  const before = await readArchive(db);
+  const version = (await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))?.user_version;
+  assert.deepEqual(before.records.map(record => [record.entry.id, record.entry.amountMinor]).sort(), [['typed-ar', 123456789], ['typed-us', 123456789]]);
+  // Presenting everything in every combination is read-only: no write, no migration, no rounding.
+  for (const locale of ['es-AR', 'en-AR', 'es-US', 'en-US'] as const) {
+    const i18n = bindLocale(locale);
+    for (const record of before.records) {
+      const currency = record.entry.accountId === dollars.id ? 'USD' : 'ARS';
+      assert.equal(i18n.formatAmount(record.entry.amountMinor).replace(/[.,]/g, ''), '123456789');
+      assert.ok(i18n.moneyText(record.entry.amountMinor, currency).length > 0);
+      assert.ok(i18n.spokenMoney(record.entry.amountMinor, currency).length > 0);
+    }
+  }
+  assert.deepEqual(await readArchive(db), before, 'the ledger is exactly as it was');
+  assert.equal((await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))?.user_version, version, 'no schema change');
+  const tables = (await db.getAllAsync<{ name: string }>("SELECT name FROM sqlite_master WHERE type = 'table'")).map(row => row.name);
+  assert.equal(tables.some(name => /locale|language|region|preference/i.test(name)), false, 'language and region live outside the ledger');
+  // Each account keeps its own currency: nothing converts pesos and dollars, in any locale.
+  await assert.rejects(createTransfer(db, { id: 'cross', fromAccountId: account.id, toAccountId: dollars.id, amountMinor: parseMinorUnits(american),
+    note: '', dateISO: '2026-09-11', createdAt: account.createdAt }), /misma moneda/);
+  const saved = await readSnapshot(db);
+  assert.deepEqual(saved.accounts.map(item => [item.id, item.currency]).sort(), [['test-account', 'ARS'], ['usd-account', 'USD']]);
+  assert.equal(saved.entries.length, 2, 'a refused transfer records nothing, and no transfer is ever an expense');
+  assert.equal((saved.transfers ?? []).length, 0);
+});

@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import * as moneyInput from '../src/ui/money-input.ts';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { runInNewContext } from 'node:vm';
@@ -69,6 +70,7 @@ function harness(file: string, props: any = {}, options: { data?: domain.LedgerA
     '@finanzapp/domain': domain,
     '../storage/LedgerProvider': ledger, '../src/storage/LedgerProvider': ledger, '../../src/storage/LedgerProvider': ledger,
     './components': components, '../src/ui/components': components, '../../src/ui/components': components,
+    './money-input': moneyInput, '../src/ui/money-input': moneyInput, '../../src/ui/money-input': moneyInput,
     './appearance': appearance, '../src/ui/appearance': appearance, '../../src/ui/appearance': appearance,
     './appearance-picker': { IconColorPicker: 'IconColorPicker' }, '../src/ui/appearance-picker': { IconColorPicker: 'IconColorPicker' }, '../../src/ui/appearance-picker': { IconColorPicker: 'IconColorPicker' },
     './category-hues': hues, '../src/ui/category-hues': hues, '../../src/ui/category-hues': hues,

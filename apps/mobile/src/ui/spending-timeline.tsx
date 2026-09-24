@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { ScrollView, View } from 'react-native';
 import Animated, { cancelAnimation, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { router } from 'expo-router';
-import { formatMinorUnits, type Currency, type ReportPeriod, type SpendingBucket } from '@finanzapp/domain';
+import { type Currency, type ReportPeriod, type SpendingBucket } from '@finanzapp/domain';
 import { AppText, PressFeedback } from './components';
 import { timing } from './motion';
 import { usePalette, useReduceMotion } from './theme';
@@ -28,14 +28,14 @@ function Bar({ fraction }: { fraction: number }) {
 }
 
 export function SpendingTimeline({ buckets, currency }: { buckets: SpendingBucket[]; currency: Currency }) {
-  const { t, locale } = useI18n();
+  const { t, locale, formatAmount, spokenNumber } = useI18n();
   const max = Math.max(...buckets.map(b => b.amountMinor), 0);
   if (!max) return null;
   return <View style={{ gap: 8 }}>
-    <AppText secondary style={{ fontSize: 12 }}>{t('reports.chart.timelineMax', { currency, amount: formatMinorUnits(max) })}</AppText>
+    <AppText secondary style={{ fontSize: 12 }}>{t('reports.chart.timelineMax', { currency, amount: formatAmount(max) })}</AppText>
     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ flexGrow: 1, gap: 4 }}>
       {buckets.map(bucket => <PressFeedback key={bucket.startISO} feedback="opacity" accessibilityRole="button"
-        accessibilityLabel={t('reports.chart.timelineBar', { period: periodLabel(bucket, locale), amount: formatMinorUnits(bucket.amountMinor), currency,
+        accessibilityLabel={t('reports.chart.timelineBar', { period: periodLabel(bucket, locale), amount: spokenNumber(bucket.amountMinor), currency,
           count: t('reports.recordedExpenses', { count: bucket.count }) })}
         accessibilityHint={t('reports.chart.timelineHint')} containerStyle={{ flex: 1, minWidth: 44 }}
         onPress={() => router.push({ pathname: '/spending-detail', params: { currency, startISO: bucket.startISO, endISO: bucket.endISO } })}

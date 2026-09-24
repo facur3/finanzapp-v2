@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import * as moneyInput from '../src/ui/money-input.ts';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { runInNewContext } from 'node:vm';
@@ -43,7 +44,7 @@ function harness(props: any, data: domain.LedgerArchive = archive, save?: (budge
     'expo-haptics': { NotificationFeedbackType: { Success: 'Success' }, notificationAsync: async () => {} },
     '@finanzapp/domain': domain,
     '../storage/LedgerProvider': ledger,
-    './components': components,
+    './components': components, './money-input': moneyInput,
     './form-controls': { CategoryField: 'CategoryField' },
   };
   const module = { exports: {} as Record<string, (props: any) => Node> };

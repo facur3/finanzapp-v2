@@ -2,7 +2,7 @@ import { useMemo, useState, type ReactNode } from 'react';
 import { FlatList, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { dailyAverageMinor, dailySpending, formatMinorUnits, monthlySpendingTrend, spendingComparison, spendingInsights, spendingReport,
+import { dailyAverageMinor, dailySpending, monthlySpendingTrend, spendingComparison, spendingInsights, spendingReport,
   summarizeMonthlyBudgets, topMerchants, type CategorySpending, type Currency, type DailySpending, type Entry, type SpendingInsight } from '@finanzapp/domain';
 import { useLedger } from '../../src/storage/LedgerProvider';
 import { budgetTone, percentUsed } from '../../src/ui/budget-presentation';
@@ -26,7 +26,7 @@ export default function ReportsScreen() {
   const params = useLocalSearchParams<{ currency?: string | string[]; month?: string | string[] }>();
   const { snapshot, archive } = useLedger();
   const p = usePalette();
-  const { t, locale, formatMonth } = useI18n();
+  const { t, locale, formatMonth, moneyText, spokenMoney } = useI18n();
   const day = useCurrentDay();
   const [currencyOverride, setCurrency] = useState<Currency>();
   const [monthOverride, setMonth] = useState<string>();
@@ -35,7 +35,8 @@ export default function ReportsScreen() {
     [snapshot, currencyOverride, params.currency, monthOverride, params.month, day]);
   const report = useMemo(() => snapshot && selection ? spendingReport(snapshot, selection.currency, selection.monthISO, day) : null,
     [snapshot, selection, day]);
-  const money = (minor: number) => (selection?.currency === 'USD' ? 'US$ ' : '$ ') + formatMinorUnits(minor);
+  const money = (minor: number) => moneyText(minor, selection?.currency ?? 'ARS');
+  const spoken = (minor: number) => spokenMoney(minor, selection?.currency ?? 'ARS');
   const lookOf = useCategoryLookOf('expense');
   const trend = useMemo(() => {
     if (!snapshot || !selection) return [];
@@ -148,10 +149,10 @@ export default function ReportsScreen() {
         <Surface grouped>
           {/* The month's ceiling first (all recorded expenses), then the category sublimits. */}
           {budgets.total && <BudgetStatusRow category={t('reports.budgets.general')} spent={budgets.total.spentMinor} limit={budgets.total.budget.amountMinor}
-            progress={budgets.total} money={money} last={budgets.rows.length === 0}
+            progress={budgets.total} money={money} spoken={spoken} last={budgets.rows.length === 0}
             onPress={() => router.push({ pathname: '/edit-budget/[id]', params: { id: budgets.total!.budget.id } })} />}
           {budgets.rows.map((row, index) => <BudgetStatusRow key={row.budget.id} category={lookOf(row.budget.category).label} spent={row.spentMinor} limit={row.budget.amountMinor}
-            progress={row} money={money} last={index === budgets.rows.length - 1}
+            progress={row} money={money} spoken={spoken} last={index === budgets.rows.length - 1}
             onPress={() => router.push({ pathname: '/edit-budget/[id]', params: { id: row.budget.id } })} />)}
         </Surface>
       </View>}
@@ -184,7 +185,7 @@ export default function ReportsScreen() {
       </View>}
       {ready && <Surface grouped>
         <DetailRow label={t('reports.incomeRecorded')} value={money(report.incomeMinor)} icon="add-circle-outline" />
-        <DetailRow label={t('reports.netFlow')} value={(report.incomeMinor - report.expenseMinor < 0 ? '−' : '') + money(Math.abs(report.incomeMinor - report.expenseMinor))} icon="swap-vertical-outline" />
+        <DetailRow label={t('reports.netFlow')} value={money(report.incomeMinor - report.expenseMinor)} icon="swap-vertical-outline" />
         <NavigationRow title={t('reports.compare')} subtitle={t('reports.compareSubtitle')} icon="git-compare-outline" last
           onPress={() => router.push({ pathname: '/report-comparison', params: { currency, month: monthISO } })} />
       </Surface>}
@@ -204,8 +205,8 @@ function InsightSurface({ tone, category, children }: { tone: SpendingInsight['t
   return <Surface style={[{ flexDirection: 'row', alignItems: 'center', gap: 12 }, color ? { backgroundColor: color + '14' } : null]}>{children}</Surface>;
 }
 
-function BudgetStatusRow({ category, spent, limit, progress, money, last, onPress }: {
-  category: string; spent: number; limit: number; progress: { ratio: number; exceeded: boolean }; money: (minor: number) => string; last: boolean; onPress: () => void;
+function BudgetStatusRow({ category, spent, limit, progress, money, spoken, last, onPress }: {
+  category: string; spent: number; limit: number; progress: { ratio: number; exceeded: boolean }; money: (minor: number) => string; spoken: (minor: number) => string; last: boolean; onPress: () => void;
 }) {
   const p = usePalette();
   const { t } = useI18n();
@@ -213,7 +214,7 @@ function BudgetStatusRow({ category, spent, limit, progress, money, last, onPres
   const tone = budgetTone(progress);
   const color = tone === 'expense' ? p.expense : tone === 'warning' ? p.warning : p.text;
   const percent = percentUsed(progress);
-  return <PressFeedback feedback="highlight" accessibilityRole="button" accessibilityLabel={t(exceeded ? 'reports.budgets.labelExceeded' : 'reports.budgets.label', { category, spent: money(spent), limit: money(limit), percent })}
+  return <PressFeedback feedback="highlight" accessibilityRole="button" accessibilityLabel={t(exceeded ? 'reports.budgets.labelExceeded' : 'reports.budgets.label', { category, spent: spoken(spent), limit: spoken(limit), percent })}
     onPress={onPress} style={{ paddingHorizontal: 16, paddingVertical: 12, gap: 8, borderBottomWidth: last ? 0 : 0.5, borderBottomColor: p.line }}>
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
       <View style={{ flex: 1, minWidth: 0, gap: 2 }}>

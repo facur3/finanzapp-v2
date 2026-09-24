@@ -91,7 +91,7 @@ test('rows fill in proportion to real spending, with no invented minimum and no 
     assert.equal(row.props.children[0].type, 'CategoryBadge', 'the category is the glyph on its hue, no emoji');
     assert.equal(row.props.style[0].borderBottomWidth, undefined, 'no separator cuts through the wash');
   }
-  assert.match(rows[1].props.accessibilityLabel, /ocio, 100 ARS, 0,1\u00A0% del gasto del mes/);
+  assert.match(rows[1].props.accessibilityLabel, /ocio, 1,00 ARS, 0,1\u00A0% del gasto del mes/);
   assert.equal(fillOf(rows[0]).props.style[1].backgroundColor, washOf('#AAAAA6', { isDark: true }), 'the wash is a faint tenth of the category hue');
   assert.equal(washOf('#AAAAA6', { isDark: true }), '#AAAAA61C');
   assert.equal(washOf('#AAAAA6', { isDark: false }), '#AAAAA614');
@@ -139,25 +139,25 @@ test('the Home budget card leads with the general budget and its share used, and
   const summary = { currency: 'ARS', monthISO: '2026-09', total: progress(totalBudget, 32000000), rows: [funRow, foodRow],
     budgetedMinor: 20000000, spentBudgetedMinor: 17500000, remainingMinor: 2500000, totalSpentMinor: 32000000, unbudgetedSpentMinor: 14500000 };
   const card = renderBudget(summary);
-  assert.equal(card.props.accessibilityLabel, 'Presupuesto general: quedan 18000000 ARS de 50000000, 64 por ciento usado. 1 categoría excedida');
+  assert.equal(card.props.accessibilityLabel, 'Presupuesto general: quedan 180.000,00 ARS de 500.000,00, 64 por ciento usado. 1 categoría excedida');
   const money = flatten(card).find(node => node.type === 'Money');
   assert.equal(money.props.minor, 18000000, 'what is left of the ceiling, never the sum of sublimits');
   const texts = flatten(card).filter(node => node.type === 'AppText').map(node => Array.isArray(node.props.children) ? node.props.children.join('') : String(node.props.children));
   assert.ok(texts.includes('Presupuesto general · te queda'));
-  assert.ok(texts.includes('de $ 50000000 · 64 %'));
+  assert.ok(texts.includes('de $\u00A0500.000,00 · 64 %'));
   assert.ok(texts.includes('1 categoría excedida'));
   const exceeded = renderBudget({ ...summary, total: progress(totalBudget, 60000000), rows: [] });
-  assert.match(exceeded.props.accessibilityLabel, /^Presupuesto general: excedido en 10000000 ARS de 50000000, 120 por ciento usado\.$/);
+  assert.match(exceeded.props.accessibilityLabel, /^Presupuesto general: excedido en 100\.000,00 ARS de 500\.000,00, 120 por ciento usado\.$/);
 });
 
 test('without a general budget the Home card falls back to the tightest sublimit and says how many there are', () => {
   const { renderBudget } = harness();
   const card = renderBudget({ currency: 'ARS', monthISO: '2026-09', total: null, rows: [funRow, foodRow],
     budgetedMinor: 20000000, spentBudgetedMinor: 17500000, remainingMinor: 2500000, totalSpentMinor: 32000000, unbudgetedSpentMinor: 14500000 });
-  assert.equal(card.props.accessibilityLabel, 'Ocio: excedido en 500000 ARS de 5000000, 110 por ciento usado. 2 categorías · 1 excedida');
+  assert.equal(card.props.accessibilityLabel, 'Ocio: excedido en 5.000,00 ARS de 50.000,00, 110 por ciento usado. 2 categorías · 1 excedida');
   assert.equal(flatten(card).find(node => node.type === 'Money').props.minor, 500000);
   assert.equal(flatten(card).some(node => node.type === 'Money' && node.props.minor === 2500000), false, 'no summed remaining');
   const single = renderBudget({ currency: 'ARS', monthISO: '2026-09', total: null, rows: [foodRow], budgetedMinor: 15000000, spentBudgetedMinor: 12000000, remainingMinor: 3000000, totalSpentMinor: 12000000, unbudgetedSpentMinor: 0 });
-  assert.equal(single.props.accessibilityLabel, 'Comida: quedan 3000000 ARS de 15000000, 80 por ciento usado. Límite por categoría');
+  assert.equal(single.props.accessibilityLabel, 'Comida: quedan 30.000,00 ARS de 150.000,00, 80 por ciento usado. Límite por categoría');
   assert.equal(renderBudget({ currency: 'ARS', monthISO: '2026-09', total: null, rows: [], budgetedMinor: 0, spentBudgetedMinor: 0, remainingMinor: 0, totalSpentMinor: 0, unbudgetedSpentMinor: 0 }), null);
 });

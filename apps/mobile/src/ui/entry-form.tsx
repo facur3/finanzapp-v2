@@ -3,10 +3,11 @@ import { Keyboard, View } from 'react-native';
 import { router, Stack } from 'expo-router';
 import { randomUUID } from 'expo-crypto';
 import * as Haptics from 'expo-haptics';
-import { accountBalanceMinor, accountKind, categoryKey, formatMinorUnits, makeEntryChange, parseMinorUnits, sameEntry, summarizeMonthlyBudgets, todayKey, validateEntry, validateEntryChange, type Entry, type EntryChange, type EntryKind, type EntryRecord } from '@finanzapp/domain';
+import { accountBalanceMinor, accountKind, categoryKey, makeEntryChange, parseMinorUnits, sameEntry, summarizeMonthlyBudgets, todayKey, validateEntry, validateEntryChange, type Entry, type EntryChange, type EntryKind, type EntryRecord } from '@finanzapp/domain';
 import { useLedger } from '../storage/LedgerProvider';
 import { budgetTone } from './budget-presentation';
 import { ActionButton, AmountField, AppText, Choices, EmptyState, ErrorMessage, Field, IconButton, Screen, Surface } from './components';
+import { draftFromMinor } from './money-input';
 import { AccountField, CategoryField, DateField } from './form-controls';
 import { accountKindLabel, postingAccounts } from './liability-presentation';
 import { initialAccountId } from './presentation';
@@ -30,7 +31,7 @@ export function EntryForm({ original, accountId: requestedAccount, currency, kin
   onAccountChange?: (accountId: string) => void;
 }) {
   const { snapshot, archive, addEntry, updateEntry } = useLedger();
-  const { t, moneyText } = useI18n();
+  const { t, moneyText, formatAmount } = useI18n();
   // Cash accounts and cards can carry an expense or income; a personal debt only changes through payments.
   const accounts = postingAccounts(snapshot?.accounts ?? [], archive?.debts);
   const [before] = useState(original);
@@ -38,7 +39,7 @@ export function EntryForm({ original, accountId: requestedAccount, currency, kin
   const [ownKind, setKind] = useState<EntryKind>(before?.entry.kind ?? (requestedKind === 'income' ? 'income' : 'expense'));
   const kind: EntryKind = onKindChange ? (requestedKind === 'income' ? 'income' : 'expense') : ownKind;
   const [accountId, setAccountId] = useState(() => before?.entry.accountId ?? initialAccountId(accounts, requestedAccount, currency));
-  const [amount, setAmount] = useState(before ? formatMinorUnits(before.entry.amountMinor) : prefill?.amount ?? '');
+  const [amount, setAmount] = useState(before ? draftFromMinor(before.entry.amountMinor) : prefill?.amount ?? '');
   const [merchant, setMerchant] = useState(before?.entry.merchant ?? prefill?.merchant ?? '');
   const [category, setCategory] = useState(before?.entry.category ?? prefill?.category ?? '');
   const [date, setDate] = useState(() => before ? new Date(before.entry.dateISO + 'T12:00:00') : prefill?.dateISO ? new Date(prefill.dateISO + 'T12:00:00') : new Date());
@@ -60,23 +61,22 @@ export function EntryForm({ original, accountId: requestedAccount, currency, kin
   const accountDetail = useMemo(() => {
     if (!account || !snapshot) return undefined;
     const balance = accountBalanceMinor(account, snapshot.entries, snapshot.transfers);
-    const money = (minor: number) => (account.currency === 'USD' ? 'US$ ' : '$ ') + formatMinorUnits(Math.abs(minor));
-    if (isCard) return balance < 0 ? t('entryForm.cardDebt', { amount: money(balance) })
-      : balance > 0 ? t('entryForm.cardCredit', { amount: money(balance) }) : t('entryForm.cardClear');
-    return t('entryForm.recordedBalance', { amount: (balance < 0 ? '−' : '') + money(balance) });
-  }, [account, snapshot, isCard, t]);
+    if (isCard) return balance < 0 ? t('entryForm.cardDebt', { amount: moneyText(balance, account.currency, true) })
+      : balance > 0 ? t('entryForm.cardCredit', { amount: moneyText(balance, account.currency) }) : t('entryForm.cardClear');
+    return t('entryForm.recordedBalance', { amount: moneyText(balance, account.currency) });
+  }, [account, snapshot, isCard, t, moneyText]);
   const budget = useMemo(() => {
     if (!account || !snapshot || kind !== 'expense' || !category.trim()) return null;
     try {
       const row = summarizeMonthlyBudgets(snapshot, archive?.budgets ?? [], account.currency, todayKey(date).slice(0, 7)).rows
         .find(item => categoryKey(item.budget.category) === categoryKey(category));
       if (!row) return null;
-      const money = (minor: number) => (account.currency === 'USD' ? 'US$ ' : '$ ') + formatMinorUnits(minor);
+      const money = (minor: number) => moneyText(minor, account.currency);
       return { text: row.exceeded ? t('entryForm.budgetExceeded', { amount: money(-row.remainingMinor) })
         : t('entryForm.budgetUsed', { spent: money(row.spentMinor), total: money(row.budget.amountMinor) }),
         tone: budgetTone(row) };
     } catch { return null; }
-  }, [account, snapshot, archive?.budgets, kind, category, date, t]);
+  }, [account, snapshot, archive?.budgets, kind, category, date, t, moneyText]);
   let parsed: number | null = null;
   try { parsed = parseMinorUnits(amount); } catch { parsed = null; }
   const amountEcho = parsed && parsed > 0 && account ? '\u00A0·\u00A0' + moneyText(parsed, account.currency) : '';
@@ -131,7 +131,7 @@ export function EntryForm({ original, accountId: requestedAccount, currency, kin
         <AccountField label={t(kind === 'expense' ? 'entryForm.paidWith' : 'entryForm.receivedIn')} accounts={eligibleAccounts} value={accountId} onChange={id => { setAccountId(id); onAccountChange?.(id); }} disabled={locked}
           prominent kindOf={kindOf} typeOf={typeOf} detail={accountDetail}
           describe={item => { const balance = snapshot ? accountBalanceMinor(item, snapshot.entries, snapshot.transfers) : 0;
-            return t(cards.some(card => card.accountId === item.id) ? 'entryForm.optionDebt' : 'entryForm.optionBalance', { amount: formatMinorUnits(Math.abs(balance)) }); }} />
+            return t(cards.some(card => card.accountId === item.id) ? 'entryForm.optionDebt' : 'entryForm.optionBalance', { amount: formatAmount(Math.abs(balance)) }); }} />
       </View>
       <Field label={t(kind === 'expense' ? 'entryForm.merchantExpense' : 'entryForm.merchantIncome')} value={merchant}
         placeholder={t(kind === 'expense' ? 'entryForm.merchantExpensePlaceholder' : 'entryForm.merchantIncomePlaceholder')}

@@ -12,7 +12,7 @@ type Review = { backup: ParsedBackup; preview: ImportPreview; name: string };
 
 export default function BackupImportScreen() {
   const { archive, restoreBackup } = useLedger();
-  const { t, formatDateTime } = useI18n();
+  const { t, formatDateTime, formatCount } = useI18n();
   const [review, setReview] = useState<Review | null>(null);
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
@@ -88,15 +88,15 @@ export default function BackupImportScreen() {
           <AppText secondary style={{ fontSize: 13 }}>{formatDateTime(review.backup.exportedAt)}</AppText>
         </View>
         <Surface grouped>
-          <DetailRow label={t('backup.import.rows.accounts')} value={String(plan.accounts.filter(account => !hiddenIncoming.has(account.id)).length)} />
-          <DetailRow label={t('backup.import.rows.cards')} value={String(plan.cards.length)} />
-          <DetailRow label={t('backup.import.rows.debts')} value={String(plan.debts.length)} />
-          <DetailRow label={t('backup.import.rows.movements')} value={String(plan.records.filter(record => !record.voided).length)} />
-          <DetailRow label={t('backup.import.rows.transfers')} value={String(plan.transfers.filter(record => !record.voided).length)} />
-          <DetailRow label={t('backup.import.rows.recurring')} value={String(plan.recurring.length)} />
-          <DetailRow label={t('backup.import.rows.budgets')} value={String(plan.budgets.length)} />
-          <DetailRow label={t('backup.import.rows.voided')} value={String(plan.records.filter(record => record.voided).length + plan.transfers.filter(record => record.voided).length)} />
-          <DetailRow label={t('backup.import.rows.present')} value={String(plan.identical)} last />
+          <DetailRow label={t('backup.import.rows.accounts')} value={formatCount(plan.accounts.filter(account => !hiddenIncoming.has(account.id)).length)} />
+          <DetailRow label={t('backup.import.rows.cards')} value={formatCount(plan.cards.length)} />
+          <DetailRow label={t('backup.import.rows.debts')} value={formatCount(plan.debts.length)} />
+          <DetailRow label={t('backup.import.rows.movements')} value={formatCount(plan.records.filter(record => !record.voided).length)} />
+          <DetailRow label={t('backup.import.rows.transfers')} value={formatCount(plan.transfers.filter(record => !record.voided).length)} />
+          <DetailRow label={t('backup.import.rows.recurring')} value={formatCount(plan.recurring.length)} />
+          <DetailRow label={t('backup.import.rows.budgets')} value={formatCount(plan.budgets.length)} />
+          <DetailRow label={t('backup.import.rows.voided')} value={formatCount(plan.records.filter(record => record.voided).length + plan.transfers.filter(record => record.voided).length)} />
+          <DetailRow label={t('backup.import.rows.present')} value={formatCount(plan.identical)} last />
         </Surface>
         {plan.conflicts > 0 ? <ErrorMessage message={t('backup.import.conflicts', { count: plan.conflicts })} /> : <>
           <Surface><SectionTitle caption={t('backup.import.availableCaption')}>{t('backup.import.availableAfter')}</SectionTitle>

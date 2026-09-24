@@ -218,7 +218,7 @@ test('switching the language with a form and a conversation mounted: labels chan
   act(() => { assert.equal(app.handles.choose!.setLanguage('en'), true); });
   assert.deepEqual([app.form().title, app.form().date, app.assistant().cancel], ['Amount', 'Sep 22, 2026', 'Cancel'], 'the words follow the new language at once');
   assert.equal(app.form().total, '$ 1.234,56', 'English with Argentine conventions: the amount is written exactly as before');
-  assert.equal(app.form().accessibilityLabel, '1.234,56 pesos', 'VoiceOver strings re-render too');
+  assert.equal(app.form().accessibilityLabel, '1,234.56 pesos', 'VoiceOver strings re-render too, in the numbers of the new language');
   assert.equal(app.form().draft, '1.234,5', 'the half-typed amount survives');
   assert.deepEqual(app.assistant().messages, ['¿Cuánto gasté en comida?'], 'the conversation survives');
   assert.deepEqual([app.counts.ledgerMounts, app.counts.navigationMounts, app.counts.formMounts, app.counts.assistantMounts, app.counts.unmounts], [1, 1, 1, 1, 0], 'nothing remounted');
@@ -346,5 +346,97 @@ test('Idioma with the gate closed lists no unfinished language and explains why;
   assert.deepEqual(root.root.findAllByType('CheckRow' as never).map(row => [row.props.title, row.props.subtitle]), [['Según el dispositivo', 'Ahora: Argentina'], ['Argentina', '22/9/2026 · 1.234,56']]);
   assert.equal(root.root.findByType('Stack.Screen' as never).props.options.title, 'Región');
   assert.match(root.root.findAllByType('AppText' as never).map(node => String(node.props.children)).join(' '), /No cambia la moneda de tus cuentas/);
+  act(() => root.unmount());
+});
+
+// ---- Producto 23.1C1: the real amount field under the real provider -------
+
+function loadAmountField(provider: Record<string, any>, announcements: string[]) {
+  const host = (name: string) => name;
+  const i18nFormat = require('../src/i18n/format.ts');
+  return loadModule('../src/ui/components.tsx', {
+    react: React, 'react/jsx-runtime': require('react/jsx-runtime'),
+    'react-native': { AccessibilityInfo: { announceForAccessibility: (text: string) => announcements.push(text) }, ActivityIndicator: host('ActivityIndicator'),
+      Alert: {}, InputAccessoryView: host('InputAccessoryView'), Keyboard: { dismiss() {} }, Platform: { OS: 'ios' }, Pressable: host('Pressable'),
+      ScrollView: host('ScrollView'), StyleSheet: { create: (styles: unknown) => styles, hairlineWidth: 0.5, absoluteFill: {}, flatten: (style: any) => Object.assign({}, ...[style].flat(Infinity).filter(Boolean)) },
+      Text: host('Text'), TextInput: host('TextInput'), View: host('View'), useWindowDimensions: () => ({ width: 390, height: 844, fontScale: 1 }) },
+    'react-native-reanimated': { __esModule: true, default: { View: host('Animated.View'), Text: host('Animated.Text') }, useSharedValue: (value: number) => ({ value }),
+      withTiming: (value: number) => value, useAnimatedStyle: (fn: () => unknown) => fn() },
+    '@expo/vector-icons/Ionicons': host('Ionicons'), 'expo-router': { router: {} },
+    '@finanzapp/domain': require('@finanzapp/domain'),
+    './theme': { radius: {}, space: { s: 8 }, type: { body: {}, footnote: {} }, useCurrentDay: () => '2026-09-22', useReduceMotion: () => true,
+      usePalette: () => ({ text: '#000', secondary: '#666', tertiary: '#999', primary: '#25D', surface: '#FFF', warning: '#A60', isDark: false }) },
+    './category-color': { tintOf: (color: string) => color }, './category-hues': { useAccountLook: () => ({}), useAccountNameOf: () => () => '', useCategoryLook: () => ({}) },
+    './geometry': require('../src/ui/geometry.ts'), './motion': { duration: {}, easeOut: {}, selectionHaptic: () => {}, timing: () => ({}) },
+    './money-input': require('../src/ui/money-input.ts'),
+    '../i18n/provider': provider, '../i18n/format': i18nFormat, '../i18n/locale': locale,
+  });
+}
+
+test('the amount field under the real provider: typing, a region change with the amount half-typed, a refused paste and a language change', () => {
+  const { parseMinorUnits } = require('@finanzapp/domain') as typeof import('@finanzapp/domain');
+  const store = createLocaleStore({ devices: () => device('es-AR', 'AR'), store: memory().store, released: ALL });
+  const { provider } = loadProvider();
+  const announcements: string[] = [];
+  const components = loadAmountField(provider, announcements);
+  const drafts: string[] = [];
+  let formMounts = 0;
+  let choose!: ReturnType<typeof provider.useLocalePreferences>;
+  function Form() {
+    React.useEffect(() => { formMounts++; }, []);
+    const [amount, setAmount] = React.useState('');
+    choose = provider.useLocalePreferences();
+    return h(components.AmountField, { currency: 'ARS', value: amount, onChangeText: (value: string) => { drafts.push(value); setAmount(value); } });
+  }
+  let root!: ReturnType<typeof renderer.create>;
+  act(() => { root = renderer.create(h(provider.I18nProvider, { store }, h(Form))); });
+  const input = () => root.root.findByType('TextInput' as never).props;
+  const texts = () => root.root.findAllByType('Text' as never).map(node => String([node.props.children].flat().join('')));
+  const type = (char: string) => {
+    const { value, selection } = input();
+    const caret = selection ? selection.end : value.length;
+    const text = value.slice(0, caret) + char + value.slice(caret);
+    act(() => input().onChange({ nativeEvent: { text, selection: { start: caret + char.length, end: caret + char.length } } }));
+  };
+  for (const key of '1234,5') type(key);
+  assert.equal(input().value, '1.234,5');
+  assert.equal(drafts.at(-1), '1.234,5');
+  assert.ok(texts().includes('$'), 'the peso is a bare "$" in Argentina');
+  act(() => input().onSelectionChange({ nativeEvent: { selection: { start: 5, end: 5 }, text: '1.234,5' } })); // after the 4
+  const before = drafts.length;
+  act(() => { choose.setRegion('US'); });
+  assert.equal(input().value, '1,234.5', 'the separators follow the region at once');
+  assert.deepEqual({ ...input().selection }, { start: 5, end: 5 }, 'the caret is still after the 4');
+  assert.equal(drafts.length, before, 'the draft is not rewritten: the form never hears of the region change');
+  assert.ok(texts().includes('AR$'), 'in the United States the peso carries its prefix');
+  type('9');
+  assert.deepEqual([input().value, drafts.at(-1)], ['12,349.5', '12.349,5']);
+  assert.equal(parseMinorUnits(drafts.at(-1)!), 1234950, 'the amount the form saves is exact integer minor units');
+  // An ambiguous paste in the United States: refused, explained, announced; nothing changes.
+  const { value } = input();
+  act(() => input().onChange({ nativeEvent: { text: value + '1.000', selection: { start: value.length + 5, end: value.length + 5 } } }));
+  assert.equal(input().value, '12,349.5');
+  assert.deepEqual({ ...input().selection }, { start: 6, end: 6 }, 'the caret is back where it was, after the 9');
+  assert.equal(drafts.at(-1), '12.349,5');
+  const note = 'No se pegó «1.000»: puede leerse de dos maneras. Escribí los decimales con «.».';
+  assert.ok(texts().includes(note), 'the note says why');
+  assert.deepEqual(announcements, [note], 'and VoiceOver hears it');
+  act(() => { choose.setLanguage('en'); });
+  assert.ok(texts().includes('Didn’t paste “1.000”: it can be read two ways. Type decimals with “.”.'), 'the note follows a language change like any label');
+  assert.equal(input().accessibilityLabel, 'Amount in Argentine pesos');
+  act(() => input().onSelectionChange({ nativeEvent: { selection: { start: 8, end: 8 }, text: '12,349.5' } }));
+  type('7');
+  assert.equal(texts().some(text => text.startsWith('Didn’t paste')), false, 'the next accepted edit clears the note');
+  act(() => { choose.setRegion('AR'); });
+  assert.equal(input().value, '12.349,57');
+  // A note about a refused paste belongs to the region that read it: a region change removes it.
+  act(() => input().onChange({ nativeEvent: { text: '12.349,571,000', selection: { start: 14, end: 14 } } }));
+  assert.equal(texts().some(text => text.startsWith('Didn’t paste')), true);
+  act(() => { choose.setRegion('US'); });
+  assert.equal(texts().some(text => text.startsWith('Didn’t paste')), false, 'no stale note after a region change');
+  act(() => { choose.setRegion('AR'); });
+  act(() => input().onBlur({}));
+  assert.deepEqual([input().value, drafts.at(-1)], ['12.349,57', '12.349,57']);
+  assert.equal(formMounts, 1, 'the form was never remounted');
   act(() => root.unmount());
 });

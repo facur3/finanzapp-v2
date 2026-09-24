@@ -3,11 +3,12 @@ import { Alert, Keyboard } from 'react-native';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { randomUUID } from 'expo-crypto';
 import * as Haptics from 'expo-haptics';
-import { accountBalanceMinor, accountLook, formatMinorUnits, makeAccountAppearance, makeAccountChange, parseMinorUnits, validateAccountAppearance,
+import { accountBalanceMinor, accountLook, makeAccountAppearance, makeAccountChange, parseMinorUnits, validateAccountAppearance,
   validateAccountChange, type Account, type AccountAppearance, type AccountChange, type LedgerSnapshot } from '@finanzapp/domain';
 import { useLedger } from '../../src/storage/LedgerProvider';
 import { ACCOUNT_ICON_CHOICES, COLOR_CHOICES } from '../../src/ui/appearance';
 import { IconColorPicker } from '../../src/ui/appearance-picker';
+import { draftFromMinor } from '../../src/ui/money-input';
 import { ActionButton, AmountField, AppText, EmptyState, ErrorMessage, Field, FieldNote, IconButton, Screen } from '../../src/ui/components';
 import { CurrencyField } from '../../src/ui/form-controls';
 import { useI18n } from '../../src/i18n/provider';
@@ -29,13 +30,13 @@ type Submission = { change: AccountChange | null; appearance: AccountAppearance 
  * Everything is saved in one commit. Currency stays immutable. */
 function AccountEditor({ account, snapshot, current }: { account: Account; snapshot: LedgerSnapshot; current?: AccountAppearance }) {
   const { updateAccount, saveAppearance } = useLedger();
-  const { t } = useI18n();
+  const { t, formatAmount } = useI18n();
   const [original] = useState(() => ({ account, snapshot, current, balance: accountBalanceMinor(account, snapshot.entries, snapshot.transfers),
     look: accountLook(account.id, current ? [current] : []) }));
   const [name, setName] = useState(account.name);
   const [icon, setIcon] = useState<string>(original.look.icon);
   const [color, setColor] = useState<string>(original.look.color);
-  const [balance, setBalance] = useState(formatMinorUnits(original.balance));
+  const [balance, setBalance] = useState(draftFromMinor(original.balance));
   const [busy, setBusy] = useState(false);
   const [pending, setPending] = useState<Submission | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -69,7 +70,7 @@ function AccountEditor({ account, snapshot, current }: { account: Account; snaps
       const submission = { change, appearance };
       if (!change || change.expectedBalanceMinor === null) { void apply(submission); return; }
       confirming.current = true;
-      Alert.alert(t('accounts.edit.correctTitle'), t('accounts.edit.correctMessage', { name: original.account.name, from: formatMinorUnits(original.balance), to: formatMinorUnits(target), currency: account.currency }), [
+      Alert.alert(t('accounts.edit.correctTitle'), t('accounts.edit.correctMessage', { name: original.account.name, from: formatAmount(original.balance), to: formatAmount(target), currency: account.currency }), [
         { text: t('common.cancel'), style: 'cancel', onPress: () => { confirming.current = false; } },
         { text: t('accounts.edit.correctConfirm'), onPress: () => { confirming.current = false; void apply(submission); } },
       ], { cancelable: true, onDismiss: () => { confirming.current = false; } });

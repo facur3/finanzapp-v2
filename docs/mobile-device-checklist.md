@@ -1,5 +1,65 @@
 # Physical iPhone acceptance checklist
 
+## Producto 23.1C1 — regional formats and the amount field (pending device review)
+
+No native change: the installed **FinanzApp Dev** runs this PR from Metro. From
+`apps/mobile`: `git pull`, `npm install`, then one of the two runs below and reload.
+Share a private backup first. English and the United States stay **unreleased**: a
+normal run must look like 23.1B2 except the items marked *changed*.
+
+**A. Normal run** (`npm run start:dev-client -- --clear`), Spanish · Argentina:
+- [ ] Más footer reads "Producto 23.1C1"; Más shows Idioma and **no** Región row; Idioma
+  lists "Según el dispositivo" and Español only.
+- [ ] Amount field, as in 23.0: type 999 then 1 → 9.991 without the "$" or the digits
+  moving; 999999 → 999.999, then 1 at the start → 1.999.999 with the caret after the 1;
+  1000000 typed fast; "," then two decimals; a third decimal ignored; backspace right
+  after a dot removes the digit before it; select a range and type over it; the Listo key;
+  blur completes "2.000,5" to "2.000,50".
+- [ ] If your iPhone's Region is the United States (the pad shows "."), "." types the
+  decimal comma; typed fast after "3000" it still gives "3.000,5".
+- [ ] Paste (long-press → Pegar) into an empty Monto: "1.234,56" and "1,234.56" both give
+  1.234,56; "1.000" gives 1.000; **"1,000" is refused**: the field keeps its value and a
+  note under it reads «No se pegó «1,000»: puede leerse de dos maneras. Escribí los
+  decimales con «,».»; the next digit you type clears the note. With VoiceOver on, the
+  note is announced.
+- [ ] Paste "US$ 12.30" into an ARS account: it is refused with a currency-mismatch note, keeping the old amount without conversion. "ARS 1.234,56" on an ARS account and "US$ 12.30" on a USD account are accepted. A bare "$" is not proof of a particular currency.
+- [ ] Save a gasto, a transfer, a budget, a recurring rule and a balance correction typed
+  with decimals: detail, Movimientos and Inicio show exactly what you typed; edit one and
+  the form prefills the same amount.
+- [ ] *Changed:* the date wheel (Fecha → sheet) shows Spanish month names even if the
+  iPhone is in English.
+- [ ] *Changed:* VoiceOver on a Presupuestos row and the general budget card now says
+  "pesos"/"dólares" instead of reading "$". Other VoiceOver amounts read as before.
+- [ ] Amounts on every screen (Inicio, Movimientos, Reportes, Presupuestos, Tarjetas,
+  Deudas, Recurrentes, Cuentas, details, the entry form's balance line) look as before;
+  "$" and "US$" never end up on a different line than their number.
+- [ ] Largest Dynamic Type: the amount field and the heroes are not cut; rows stack.
+
+**B. Preview run** (only on FinanzApp Dev, never in a TestFlight or store build):
+`EXPO_PUBLIC_LOCALE_PREVIEW=1 npm run start:dev-client -- --clear`. Más now lists
+English under Idioma and a Región row (Argentina · 22/9/2026 · 1.234,56, United States ·
+9/22/2026 · 1,234.56).
+- [ ] Try the four combinations (Español/English × Argentina/Estados Unidos): words
+  follow Idioma; separators, numeric dates and the clock follow Región; an account's
+  currency never changes.
+- [ ] United States: pesos read "AR$", dollars "US$"; the amount field types 999 → 1,000 and
+  999,999 → 1,000,000 with the caret steady; "," from an Argentine pad types the decimal
+  point; pasting "1.000" is refused with the note, "1,000" gives 1,000, "1.234,56" gives
+  1,234.56.
+- [ ] Open Nuevo gasto, type 1234,5, put the caret after the 4, go to Más → Región →
+  United States and come back: the field reads 1,234.5, the caret is still after the 4,
+  typing 9 gives 12,349.5; save: the movement is 12.349,50 when you switch back.
+- [ ] VoiceOver in each combination on a movement row, an Inicio hero and a budget: the
+  number is read correctly (English voice: "one thousand two hundred thirty-four point
+  five six"). **Record** whether a Spanish voice reads "1.234,56 pesos" correctly with an
+  iPhone Region of Estados Unidos (or a Spanish-US/Mexico voice): 23.1C2 decides from it.
+- [ ] Date wheel with English + Argentina and Spanish + United States: month names in the
+  interface language; **record** the column order iOS shows (it is iOS's choice).
+- [ ] Backups: export and import in the United States region; the review shows counts and
+  the export date in US format and imports nothing twice.
+- [ ] Stop Metro, restart without the flag (run A): the app is back to Spanish · Argentina
+  whatever you chose in the preview, and no movement changed.
+
 ## Producto 23.1B2 — translation of the remaining screens (pending device review)
 
 No native change: the installed **FinanzApp Dev** runs this PR from Metro (`git pull`,

@@ -2,36 +2,52 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { formatMinorUnits, parseMinorUnits } from '@finanzapp/domain';
-import { EMPTY_AMOUNT, amountFromCanonical, amountFromMinor, canonicalAmount, displayAmount, displayCaret, logicalCaret, readAmountChange, renderAmount,
-  settleAmount, splitAmount, type AmountEdit } from '../src/ui/money-input.ts';
+import { AmountInput, EMPTY_AMOUNT, LEDGER_FORMAT, amountFromCanonical, amountFromDraft, amountFromMinor, canonicalAmount, displayAmount, displayCaret,
+  draftFromMinor, logicalCaret, readPastedAmount, reformatAmount, renderAmount, settleAmount, splitAmount, type AmountFormat, type AmountNotice } from '../src/ui/money-input.ts';
 
 // The amount field keeps a canonical edit state (sign, whole digits, decimal
-// comma, fraction, logical caret) and derives the display string and display
-// caret from it. These tests drive that state the way the iPhone does: each
-// keystroke edits the native display text at the caret, and the native text
-// and caret come back through readAmountChange. Presentation only: the
-// display string still parses to integer minor units with parseMinorUnits.
+// mark, fraction, logical caret) and derives the display string and display
+// caret from it and the region's separators. These tests drive the real
+// controller (AmountInput, what AmountField forwards native events to) the way
+// the iPhone does: each keystroke edits the native display text at the caret,
+// and the native text and caret come back through `change`. Presentation
+// only: the draft the form receives is in the ledger's notation and parses to
+// integer minor units with parseMinorUnits, in every region.
 
-/** A simulated native field: the text and caret iOS holds, plus the state we render. */
+const AR: AmountFormat = { decimal: ',', group: '.' };
+const US: AmountFormat = { decimal: '.', group: ',' };
+
+/** A simulated native field over the real controller: the text and caret iOS holds, plus what the form received. */
 class Field {
-  state: AmountEdit = EMPTY_AMOUNT;
-  shown = renderAmount(EMPTY_AMOUNT);
-  /** The text the native view actually has; it lags `shown` when `lag` is set. */
+  input: AmountInput;
+  /** The text the native view actually has; it lags the render when `lag` is set. */
   native = { text: '', caret: 0 };
+  /** The last draft handed to the form (onChangeText). */
+  draft: string;
+  notice: AmountNotice | null = null;
   private lag: boolean;
-  constructor(lag = false) { this.lag = lag; }
+  private expectedCurrency?: 'ARS' | 'USD';
+  constructor(lag = false, format: AmountFormat = AR, draft = '', expectedCurrency?: 'ARS' | 'USD') {
+    this.lag = lag;
+    this.expectedCurrency = expectedCurrency;
+    this.input = new AmountInput(draft, format);
+    this.draft = draft;
+    this.native = { ...this.input.view };
+  }
   private apply(raw: string, rawCaret: number) {
-    this.state = readAmountChange(this.shown, raw, rawCaret);
-    this.shown = renderAmount(this.state);
-    this.native = this.lag ? { text: raw, caret: rawCaret } : { ...this.shown };
+    const result = this.input.change(raw, rawCaret, this.expectedCurrency);
+    this.draft = result.draft;
+    this.notice = result.rejected;
+    this.native = this.lag ? { text: raw, caret: rawCaret } : { ...result.view };
   }
   /** Lets a lagging native view catch up with the last render (the controlled update landing). */
-  sync() { this.native = { ...this.shown }; return this; }
+  sync() { this.native = { ...this.input.view }; return this; }
   type(char: string) {
     const { text, caret } = this.native;
     this.apply(text.slice(0, caret) + char + text.slice(caret), caret + 1);
     return this;
   }
+  typeAll(keys: string) { for (const key of keys) this.type(key); return this; }
   backspace() {
     const { text, caret } = this.native;
     if (caret === 0) return this;
@@ -41,8 +57,7 @@ class Field {
   /** Tap: move the caret to a display index (the native selection event). */
   tap(index: number) {
     this.native.caret = index;
-    this.shown = { ...this.shown, caret: index };
-    this.state = { ...this.state, caret: logicalCaret(this.shown.text, index) };
+    this.input.select(index, this.native.text);
     return this;
   }
   /** Replace a selected display range with text (typing over a selection, or a paste). */
@@ -52,11 +67,18 @@ class Field {
     return this;
   }
   paste(insert: string) { return this.replace(this.native.caret, this.native.caret, insert); }
-  get text() { return this.shown.text; }
-  get caret() { return this.shown.caret; }
-  get canonical() { return canonicalAmount(this.state); }
-  get logical() { return this.state.caret; }
+  /** The region changed with the form open. */
+  region(format: AmountFormat) { this.input.reformat(format); this.native = { ...this.input.view }; return this; }
+  settle() { this.draft = this.input.settle().draft; this.native = { ...this.input.view }; return this; }
+  get text() { return this.input.view.text; }
+  get caret() { return this.input.view.caret; }
+  get canonical() { return canonicalAmount(this.input.state); }
+  get logical() { return this.input.state.caret; }
+  get minor() { return parseMinorUnits(this.draft); }
 }
+
+/** The display text of a canonical string in a format ("1234,5" → "1,234.5" in the US). */
+const shown = (canonical: string, format: AmountFormat) => renderAmount(amountFromCanonical(canonical)!, format).text;
 
 type Step = [key: string, canonical: string, display: string, logical: number, displayCaret: number];
 
@@ -233,23 +255,113 @@ test('a typed period (en-US keypad or hardware keyboard) is explicit input and b
   assert.deepEqual([middle.canonical, middle.text, middle.caret], ['1234,56', '1.234,56', 6], 'the digits after become the (two) decimals');
 });
 
-test('pasting Argentine and US formatted numbers normalises by the separators the text itself uses', () => {
+test('pasting Argentine and US formatted numbers normalises by the separators the text itself uses, when they say it unambiguously', () => {
   const cases: [string, string, string][] = [
     ['2.000.000,50', '2000000,50', '2.000.000,50'], ['2,000,000.50', '2000000,50', '2.000.000,50'],
     ['2000000.5', '2000000,5', '2.000.000,5'], ['2000000', '2000000', '2.000.000'], ['1.000', '1000', '1.000'],
-    ['1.000.5', '1000,5', '1.000,5'], ['$ 1.234,56', '1234,56', '1.234,56'], ['US$ 12.30', '12,30', '12,30'],
-    ['1,000', '1,00', '1,00'], ['abc', '', ''], ['-500', '-500', '-500'], ['0007', '7', '7'], ['00,70', '0,70', '0,70'],
+    ['$ 1.234,56', '1234,56', '1.234,56'], ['US$ 12.30', '12,30', '12,30'], ['ARS 1.234,56', '1234,56', '1.234,56'],
+    ['-500', '-500', '-500'], ['0007', '7', '7'], ['00,70', '0,70', '0,70'], ['1 234,56', '1234,56', '1.234,56'], ['0,500', '0,50', '0,50'],
   ];
   for (const [pasted, canonical, display] of cases) {
     const field = new Field().paste(pasted);
     assert.equal(field.canonical, canonical, pasted);
     assert.equal(field.text, display, pasted);
     assert.equal(field.caret, display.length, pasted + ': the caret lands after the paste');
+    assert.equal(field.notice, null, pasted);
   }
-  const into = new Field();
-  for (const key of '99') into.type(key);
+  const into = new Field().typeAll('99');
   into.tap(1).paste('1.000,5');
   assert.deepEqual([into.canonical, into.text, into.caret], ['91000,59', '91.000,59', 8], 'a paste in the middle keeps its own decimals; the digit after it becomes a decimal');
+});
+
+
+test('a pasted explicit currency must match the account; no implicit FX conversion', () => {
+  const cases: [string, AmountFormat, 'ARS' | 'USD', string | null][] = [
+    ['US$ 12.30', AR, 'ARS', null],
+    ['USD 12.30', US, 'ARS', null],
+    ['U$S 100', AR, 'ARS', null],
+    ['AR$ 1,234.56', US, 'USD', null],
+    ['ARS 1.234,56', AR, 'USD', null],
+    ['US$ 12.30', AR, 'USD', '12,30'],
+    ['USD 12.30', US, 'USD', '12,30'],
+    ['U$S 100', AR, 'USD', '100'],
+    ['AR$ 1,234.56', US, 'ARS', '1.234,56'],
+    ['ARS 1.234,56', AR, 'ARS', '1.234,56'],
+    ['$ 50', AR, 'USD', '50'], // Bare $ is not unambiguous currency evidence.
+    ['50', US, 'ARS', '50'],
+  ];
+  for (const [paste, format, accountCurrency, canonical] of cases) {
+    const field = new Field(false, format, '', accountCurrency).typeAll('25');
+    const previous = field.draft;
+    field.replace(0, field.native.text.length, paste);
+    if (canonical === null) {
+      assert.equal(field.notice?.reason, 'currencyMismatch', paste + ' on ' + accountCurrency);
+      assert.equal(field.draft, previous, 'currency mismatch leaves the ledger draft untouched');
+      assert.equal(field.text, '25', 'currency mismatch leaves the visible number untouched');
+    } else {
+      assert.equal(field.notice, null, paste);
+      assert.equal(field.draft, canonical, paste + ' on ' + accountCurrency);
+    }
+  }
+  assert.deepEqual(readPastedAmount('USD ARS 100', AR, 'USD'), { ok: false, reason: 'invalid' }, 'multiple explicit currency markers are invalid');
+});
+
+test('a paste that could mean two amounts, or none, is refused with a reason and the field keeps its value', () => {
+  const refused: [string, AmountFormat, AmountNotice['reason']][] = [
+    ['1,000', AR, 'ambiguous'], ['12,345', AR, 'ambiguous'], ['1.000', US, 'ambiguous'], ['999.999', US, 'ambiguous'],
+    ['1.000.5', AR, 'invalid'], ['1,2,3', US, 'invalid'], ['abc', AR, 'invalid'], ['12 34', AR, 'invalid'], ['2 cafés a 1.500', AR, 'invalid'],
+    ['1..5', AR, 'invalid'], ['1.234,567', AR, 'precision'], ['1234,567', AR, 'precision'],
+    ['12345678901234', AR, 'tooLong'], ['1,234.567', US, 'precision'],
+  ];
+  for (const [pasted, format, reason] of refused) {
+    const field = new Field(false, format).typeAll('42');
+    const before = [field.text, field.draft, field.caret];
+    field.paste(pasted);
+    assert.deepEqual(field.notice, { reason, text: pasted.trim() }, pasted + ' in ' + format.decimal);
+    assert.deepEqual([field.text, field.draft, field.caret], before, pasted + ': the field is exactly as it was');
+  }
+  // The region's own convention is unambiguous for its reader.
+  assert.equal(new Field(false, AR).paste('12.345').text, '12.345');
+  assert.equal(new Field(false, US).paste('12,345').text, '12,345');
+  assert.equal(new Field(false, US).paste('12,345').minor, 1234500);
+  // Both separators, or a separator before one or two digits, mean the same thing in every region.
+  for (const format of [AR, US]) {
+    assert.equal(new Field(false, format).paste('1.234,56').minor, 123456);
+    assert.equal(new Field(false, format).paste('1,234.56').minor, 123456);
+    assert.equal(new Field(false, format).paste('1,5').minor, 150);
+    assert.equal(new Field(false, format).paste('1.5').minor, 150);
+    assert.equal(new Field(false, format).paste('1.234.567').minor, 123456700, 'a repeated separator can only group');
+    assert.equal(new Field(false, format).paste('1,234,567').minor, 123456700);
+  }
+  // A paste that would give the field a second decimal separator, a third decimal or a second sign.
+  const decimals = new Field().typeAll('5,5');
+  decimals.paste('1,25');
+  assert.equal(decimals.notice?.reason, 'invalid');
+  assert.equal(decimals.text, '5,5');
+  const third = new Field().typeAll('5,');
+  third.paste('123');
+  assert.equal(third.text, '5,12', 'digits alone are typing: a third decimal simply does not appear');
+  const sign = new Field().typeAll('12');
+  sign.paste('-5,5');
+  assert.equal(sign.notice?.reason, 'invalid', 'a minus inside a number is not a sign');
+  // A successful edit clears the note.
+  const recover = new Field().paste('1,000');
+  assert.equal(recover.notice?.reason, 'ambiguous');
+  recover.type('7');
+  assert.equal(recover.notice, null);
+  assert.equal(recover.text, '7');
+});
+
+test('the paste reader keeps digits only: no number is computed from the text, and every accepted paste parses to the same minor units', () => {
+  const accepted: [string, AmountFormat, number][] = [
+    ['1.234,56', AR, 123456], ['1,234.56', US, 123456], ['$1,234.56', US, 123456], ['AR$ 1.234,56', US, 123456], ['U$S 100', AR, 10000],
+    ['−1.000', AR, -100000], ['- $ 5', AR, -500], ['9.999.999.999.999,99', AR, 999999999999999], ['0,05', US, 5], ['.5', US, 50], [',5', AR, 50],
+  ];
+  for (const [text, format, minor] of accepted) {
+    const read = readPastedAmount(text, format);
+    assert.ok(read.ok, text);
+    if (read.ok) assert.equal(parseMinorUnits(displayAmount(read.canonical.replace(/^-/, ''))) * (read.negative ? -1 : 1), minor, text);
+  }
 });
 
 test('limits: thirteen whole digits and two decimals; a refused edit leaves the field exactly as it was', () => {
@@ -357,4 +469,156 @@ test('a shortcut fills the field as the person would have typed the amount, from
   assert.equal(amountFromMinor(-19016200), '');
   assert.equal(amountFromMinor(Number.MAX_SAFE_INTEGER + 2), '');
   assert.equal(amountFromMinor(12.5), '');
+});
+
+// ---- Producto 23.1C1: the region's separators ------------------------------
+
+test('999 → 1.000 and 999.999 → 1.000.000 in Argentina, 999 → 1,000 and 999,999 → 1,000,000 in the United States: the caret stays after the typed digit', () => {
+  for (const [format, thousand, million] of [[AR, '1.000', '1.000.000'], [US, '1,000', '1,000,000']] as const) {
+    const field = new Field(false, format).typeAll('999');
+    assert.deepEqual([field.text, field.caret], ['999', 3]);
+    field.replace(0, 3, '1000');
+    assert.deepEqual([field.text, field.caret, field.draft], [thousand, 5, '1.000'], 'the draft is always the ledger notation');
+    const typing = new Field(false, format).typeAll('999999');
+    assert.equal(typing.text, format === AR ? '999.999' : '999,999');
+    typing.tap(0).type('1');
+    assert.deepEqual([typing.text, typing.caret], [format === AR ? '1.999.999' : '1,999,999', 1], 'a caret before a new separator stays before it');
+    const grow = new Field(false, format).typeAll('100000');
+    grow.type('0');
+    assert.deepEqual([grow.text, grow.caret, grow.minor], [million, 9, 100000000]);
+    // Backspace back across the boundary.
+    grow.backspace();
+    assert.deepEqual([grow.text, grow.caret], [format === AR ? '100.000' : '100,000', 7]);
+  }
+});
+
+test('the same keystrokes give the same amount in all four language × region combinations; only the separators differ', () => {
+  // The amount field depends on the region alone; the language never reaches it.
+  for (const format of [AR, US]) {
+    for (const decimalKey of [',', '.']) {
+      // Either key of the decimal pad is the decimal separator: the pad shows the device's, which may not be the app region's.
+      const field = new Field(false, format).typeAll('1234567' + decimalKey + '89');
+      assert.equal(field.text, format === AR ? '1.234.567,89' : '1,234,567.89', decimalKey);
+      assert.equal(field.draft, '1.234.567,89');
+      assert.equal(field.minor, 123456789);
+      assert.equal(field.caret, field.text.length);
+      field.type(decimalKey === ',' ? '.' : ',');
+      assert.equal(field.text, format === AR ? '1.234.567,89' : '1,234,567.89', 'a second decimal separator of either kind is ignored');
+    }
+  }
+});
+
+test('United States: editing in the middle, backspace over a comma group, selections and negatives mirror Argentina', () => {
+  const field = new Field(false, US).typeAll('1234567.89');
+  assert.equal(field.text, '1,234,567.89');
+  field.tap(5); // "1,234|,567.89"
+  field.type('0');
+  assert.deepEqual([field.text, field.caret, field.logical], ['12,340,567.89', 6, 5]);
+  field.tap(3); // "12,|340,567.89": right after a group comma
+  field.backspace();
+  assert.deepEqual([field.text, field.caret], ['1,340,567.89', 1], 'the 2 before the comma goes');
+  field.tap(10); // "1,340,567.|89"
+  field.backspace();
+  assert.deepEqual([field.text, field.draft], ['134,056,789', '134.056.789'], 'deleting the decimal point merges the digits');
+  field.replace(0, 11, '');
+  assert.equal(field.text, '');
+  const negative = new Field(false, US, '-1.234,56');
+  assert.equal(negative.text, '-1,234.56', 'a prefilled negative balance renders with US separators');
+  negative.backspace();
+  assert.deepEqual([negative.text, negative.draft], ['-1,234.5', '-1.234,5']);
+  assert.equal(new Field(false, US).paste('−1,000').text, '-1,000');
+});
+
+test('a keystroke typed while the native view still shows the previous raw text reads as one keystroke, whatever key the pad shows', () => {
+  // Argentina with a US decimal pad ("."), typing faster than the render: the period is the decimal separator.
+  const ar = new Field(true, AR).typeAll('3000');
+  assert.equal(ar.native.text, '3000', 'the native view lags');
+  ar.type('.');
+  assert.deepEqual([ar.text, ar.canonical], ['3.000,', '3000,']);
+  ar.type('5');
+  assert.deepEqual([ar.text, ar.minor], ['3.000,5', 300050], 'the lagging period stays the decimal separator');
+  ar.type('0');
+  assert.equal(ar.text, '3.000,50');
+  // United States with an Argentine pad (","), same speed.
+  const us = new Field(true, US).typeAll('3000');
+  us.type(',');
+  us.type('5');
+  assert.deepEqual([us.text, us.minor], ['3,000.5', 300050]);
+  // Repeated zeroes in the US never turn a group comma into a decimal.
+  const zeros = new Field(true, US).type('3');
+  for (let index = 1; index <= 8; index++) zeros.type('0');
+  assert.deepEqual([zeros.text, zeros.canonical], ['300,000,000', '300000000']);
+  zeros.sync().backspace();
+  assert.equal(zeros.text, '30,000,000');
+});
+
+test('changing the region with a half-typed amount keeps the value, the draft and the logical caret; only the separators change', () => {
+  const field = new Field(false, AR).typeAll('1234567,5');
+  field.tap(5); // "1.234|.567,5": after the 4
+  const [draft, logical] = [field.draft, field.logical];
+  field.region(US);
+  assert.deepEqual([field.text, field.draft, field.logical, field.caret], ['1,234,567.5', draft, logical, 5]);
+  field.type('9');
+  assert.deepEqual([field.text, field.draft], ['12,349,567.5', '12.349.567,5'], 'typing continues where it was, in the new separators');
+  field.region(AR);
+  assert.deepEqual([field.text, field.caret], ['12.349.567,5', 6]);
+  field.settle();
+  assert.deepEqual([field.text, field.draft, field.minor], ['12.349.567,50', '12.349.567,50', 1234956750]);
+  // A dangling decimal and a lone sign survive a switch too.
+  const partial = new Field(false, US).typeAll('-12.');
+  partial.region(AR);
+  assert.deepEqual([partial.text, partial.draft, partial.caret], ['-12,', '-12,', 4]);
+  assert.equal(reformatAmount({ text: '1.234,5', caret: 5 }, AR, US).text, '1,234.5');
+  assert.deepEqual(reformatAmount({ text: '1.234,5', caret: 5 }, AR, US), { text: '1,234.5', caret: 5 });
+  // Switching to the same format is a no-op.
+  const same = new Field(false, AR).typeAll('12');
+  const view = same.input.view;
+  assert.equal(same.input.reformat({ ...AR }), view);
+});
+
+test('drafts are the ledger notation in every region: prefill, display and back to the same minor units', () => {
+  for (const minor of [0, 5, 100, 123456, -123456, 999999999999999]) {
+    const draft = draftFromMinor(minor);
+    assert.equal(draft, formatMinorUnits(minor), 'the prefill draft is what the domain writes');
+    assert.equal(parseMinorUnits(draft), minor);
+    for (const format of [AR, US]) {
+      const field = new Field(false, format, draft);
+      assert.equal(field.input.draft, draft, 'mounting the field never rewrites the draft');
+      assert.equal(parseMinorUnits(field.input.draft), minor);
+    }
+  }
+  assert.equal(displayAmount('1.234,56', US), '1,234.56');
+  assert.equal(displayAmount('-1.234,5', US), '-1,234.5');
+  assert.equal(displayAmount('1.234,56'), '1.234,56');
+  assert.equal(amountFromMinor(19016250), '190.162,50', 'a shortcut fills a ledger draft; the field shows it in the region');
+  assert.equal(new Field(false, US, amountFromMinor(19016250)).text, '190,162.50');
+  assert.deepEqual(amountFromDraft('1.234,5'), { negative: false, whole: '1234', decimal: true, fraction: '5', caret: 6 });
+  assert.equal(draftFromMinor(Number.MAX_SAFE_INTEGER + 2), '');
+  assert.deepEqual(LEDGER_FORMAT, AR);
+});
+
+test('settling and adopting a draft in the United States', () => {
+  const field = new Field(false, US).typeAll('2000.5');
+  assert.equal(field.text, '2,000.5');
+  field.settle();
+  assert.deepEqual([field.text, field.draft], ['2,000.50', '2.000,50']);
+  const shortcut = new Field(false, US).typeAll('12');
+  shortcut.input.adopt('1.500');
+  assert.deepEqual([shortcut.input.view.text, shortcut.input.view.caret], ['1,500', 5]);
+  const empty = new Field(false, US).typeAll('-');
+  empty.settle();
+  assert.deepEqual([empty.text, empty.draft], ['', '']);
+});
+
+test('hero amounts split with the region decimal separator; display caret mapping is the same in both regions', () => {
+  assert.deepEqual(splitAmount('$ 1,234.56', US), { prefix: '$ ', whole: '1,234', decimals: '.56' });
+  assert.deepEqual(splitAmount('−AR$ 2,000,000.00', US), { prefix: '−AR$ ', whole: '2,000,000', decimals: '.00' });
+  assert.deepEqual(splitAmount('US$ 12', US), { prefix: 'US$ ', whole: '12', decimals: '' });
+  assert.deepEqual(splitAmount('US$ 1.234,56', AR), { prefix: 'US$ ', whole: '1.234', decimals: ',56' });
+  const state = amountFromCanonical('3000000,50')!;
+  for (let logical = 0; logical <= 10; logical++) assert.equal(displayCaret(state, logical, US), displayCaret(state, logical, AR));
+  assert.equal(renderAmount(state, US).text, '3,000,000.50');
+  assert.equal(logicalCaret('3,000,000.50', 6, US), 4);
+  assert.equal(shown('-1234567', US), '-1,234,567');
+  assert.equal(EMPTY_AMOUNT.whole, '');
 });

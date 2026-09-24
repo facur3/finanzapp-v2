@@ -3,7 +3,6 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { spendingComparison, type CategoryChange, type ReportPeriod } from '@finanzapp/domain';
 import { useLedger } from '../src/storage/LedgerProvider';
 import { AppText, DetailRow, EmptyState, Money, SectionTitle, Surface } from '../src/ui/components';
-import { codedAmount } from '../src/i18n/format';
 import { useCategoryLookOf } from '../src/ui/category-hues';
 import { changePercent, dateRangeLabel, reportSelection } from '../src/ui/report-presentation';
 import { useI18n } from '../src/i18n/provider';
@@ -14,7 +13,7 @@ export default function ReportComparisonScreen() {
   const { snapshot } = useLedger();
   const lookOf = useCategoryLookOf('expense');
   const today = useCurrentDay(), p = usePalette();
-  const { t, locale } = useI18n();
+  const { t, locale, codedAmount } = useI18n();
   if (!snapshot) return null;
   const selection = reportSelection(snapshot, params.currency, params.month, today);
   const comparison = spendingComparison(snapshot, selection.currency, selection.monthISO, today);

@@ -3,12 +3,13 @@ import { Alert, Keyboard, View } from 'react-native';
 import { router, Stack } from 'expo-router';
 import { randomUUID } from 'expo-crypto';
 import * as Haptics from 'expo-haptics';
-import { formatMinorUnits, parseMinorUnits, sameCreditCardProfile, validateAccount, validateCreditCardProfile,
+import { parseMinorUnits, sameCreditCardProfile, validateAccount, validateCreditCardProfile,
   type Account, type CreditCardProfile, type Currency } from '@finanzapp/domain';
 import { useI18n } from '../i18n/provider';
 import type { MessageKey } from '../i18n/messages';
 import { useLedger } from '../storage/LedgerProvider';
 import { ActionButton, AmountField, AppText, Choices, DetailRow, ErrorMessage, Field, IconButton, Screen, Surface, useStacked } from './components';
+import { draftFromMinor } from './money-input';
 import { space } from './theme';
 
 type PendingCreate = { account: Account; card: CreditCardProfile };
@@ -27,7 +28,7 @@ export function CardForm({ original }: { original?: CreditCardProfile }) {
   const [last4, setLast4] = useState(before?.last4 ?? '');
   const [currency, setCurrency] = useState<Currency>(account?.currency ?? 'ARS');
   const [debt, setDebt] = useState('');
-  const [limit, setLimit] = useState(before?.creditLimitMinor ? formatMinorUnits(before.creditLimitMinor) : '');
+  const [limit, setLimit] = useState(before?.creditLimitMinor ? draftFromMinor(before.creditLimitMinor) : '');
   const [closingDay, setClosingDay] = useState(before ? String(before.closingDay) : '');
   const [dueDay, setDueDay] = useState(before ? String(before.dueDay) : '');
   const [busy, setBusy] = useState(false);

@@ -7,7 +7,8 @@
  * presentation follows the locale. */
 import type { Currency } from '@finanzapp/domain';
 import type { LocaleSource } from './device.ts';
-import { currencyName, currencySymbol, formatCount, formatDate, formatDateTime, formatMonth, formatPercent, moneyText, relativeDate, spokenMoney, type DateStyle } from './format.ts';
+import { amountFormat, codedAmount, currencyName, currencySymbol, formatAmount, formatCount, formatDate, formatDateTime, formatMonth, formatNumericDate,
+  formatPercent, moneyText, pickerLocale, relativeDate, spokenAmount, spokenMoney, spokenNumber, spokenPercent, type DateStyle } from './format.ts';
 import { localizeError } from './errors.ts';
 import { languageOf, regionOf, type AppLocale, type LanguageCode, type RegionCode } from './locale.ts';
 import { translator, type Translate } from './messages.ts';
@@ -22,10 +23,28 @@ export interface I18n {
   formatDate: (dateISO: string, style: DateStyle) => string;
   formatMonth: (monthISO: string, style?: 'month' | 'monthYear') => string;
   formatDateTime: (iso: string) => string;
+  /** "22/9/2026" or "9/22/2026". */
+  formatNumericDate: (dateISO: string) => string;
   formatCount: (value: number) => string;
   formatPercent: (fraction: number) => string;
-  moneyText: (minor: number, currency: Currency, absolute?: boolean) => string;
+  /** The number alone in the region's separators ("1.234,56", "1,234.56"); visible text only. */
+  formatAmount: (minor: number) => string;
+  /** Sign, symbol and number ("−US$ 1.234,56"); `signed` adds "+" to a positive amount. Visible text only. */
+  moneyText: (minor: number, currency: Currency, absolute?: boolean, signed?: boolean) => string;
+  /** "ARS 1.234,56". */
+  codedAmount: (minor: number, currency: Currency) => string;
+  /** VoiceOver: the amount in words of the language ("1,234.56 dollars"). */
   spokenMoney: (minor: number, currency: Currency) => string;
+  /** VoiceOver: the number and its code ("1.234,56 ARS"), in the language's own separators. */
+  spokenAmount: (minor: number, currency: Currency) => string;
+  /** VoiceOver: the number alone, in the language's own separators. */
+  spokenNumber: (minor: number) => string;
+  /** VoiceOver: a percentage in the language's own separators. */
+  spokenPercent: (fraction: number) => string;
+  /** The separators the amount field types in. */
+  amountFormat: { decimal: string; group: string };
+  /** The date picker's locale identifier ("es_AR"). */
+  pickerLocale: string;
   currencySymbol: (currency: Currency) => string;
   currencyName: (currency: Currency) => string;
   /** "Hoy", "Ayer", "13 jul" relative to `todayISO`. */
@@ -40,10 +59,18 @@ export function bindLocale(locale: AppLocale, localeSource: LocaleSource = 'none
     formatDate: (dateISO, style) => formatDate(dateISO, style, locale),
     formatMonth: (monthISO, style) => formatMonth(monthISO, locale, style),
     formatDateTime: iso => formatDateTime(iso, locale),
+    formatNumericDate: dateISO => formatNumericDate(dateISO, locale),
     formatCount: value => formatCount(value, locale),
     formatPercent: fraction => formatPercent(fraction, locale),
-    moneyText: (minor, currency, absolute) => moneyText(minor, currency, locale, absolute),
+    formatAmount: minor => formatAmount(minor, locale),
+    moneyText: (minor, currency, absolute, signed) => moneyText(minor, currency, locale, absolute, signed),
+    codedAmount: (minor, currency) => codedAmount(minor, currency, locale),
     spokenMoney: (minor, currency) => spokenMoney(minor, currency, locale),
+    spokenAmount: (minor, currency) => spokenAmount(minor, currency, locale),
+    spokenNumber: minor => spokenNumber(minor, locale),
+    spokenPercent: fraction => spokenPercent(fraction, locale),
+    amountFormat: amountFormat(locale),
+    pickerLocale: pickerLocale(locale),
     currencySymbol: currency => currencySymbol(currency, locale),
     currencyName: currency => currencyName(currency, locale),
     relativeDate: (dateISO, todayISO) => relativeDate(dateISO, todayISO, locale),

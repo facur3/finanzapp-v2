@@ -3,7 +3,7 @@ import { Alert, View } from 'react-native';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { randomUUID } from 'expo-crypto';
 import * as Haptics from 'expo-haptics';
-import { accountKind, formatMinorUnits, makeTransferChange, type Account, type TransferRecord, type TransferChange } from '@finanzapp/domain';
+import { accountKind, makeTransferChange, type Account, type TransferRecord, type TransferChange } from '@finanzapp/domain';
 import { useLedger } from '../../src/storage/LedgerProvider';
 import { AccountBadge, ActionButton, AppText, DetailRow, EmptyState, ErrorMessage, GlyphTile, Money, Screen, Surface } from '../../src/ui/components';
 import { useI18n } from '../../src/i18n/provider';
@@ -22,7 +22,7 @@ export default function TransferScreen() {
 function TransferDetail({ record, accounts }: { record: TransferRecord; accounts: Account[] }) {
   const { updateTransfer, archive } = useLedger();
   const p = usePalette();
-  const { t: tr, formatDate } = useI18n();
+  const { t: tr, formatDate, formatAmount } = useI18n();
   const nameOf = useAccountNameOf();
   const t = record.transfer;
   const from = accounts.find(a => a.id === t.fromAccountId)!, to = accounts.find(a => a.id === t.toAccountId)!;
@@ -55,7 +55,7 @@ function TransferDetail({ record, accounts }: { record: TransferRecord; accounts
     confirming.current = true;
     const change = makeTransferChange(randomUUID(), record, record.voided ? 'restore' : 'void', new Date().toISOString());
     Alert.alert(tr(record.voided ? 'transferDetail.restoreQuestion' : 'transferDetail.voidQuestion'),
-      tr('transferDetail.effect', { amount: formatMinorUnits(t.amountMinor) + ' ' + from.currency,
+      tr('transferDetail.effect', { amount: formatAmount(t.amountMinor) + ' ' + from.currency,
         from: nameOf(record.voided ? from : to), to: nameOf(record.voided ? to : from) }), [
         { text: tr('common.cancel'), style: 'cancel', onPress: () => { confirming.current = false; } },
         { text: tr(record.voided ? 'entryDetail.restore' : 'entryDetail.void'), style: record.voided ? 'default' : 'destructive', onPress: () => { confirming.current = false; void apply(change); } },

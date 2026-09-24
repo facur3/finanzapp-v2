@@ -7,6 +7,9 @@ import { CURRENCIES, currencyOption, currencyOptions, searchCurrencies } from '.
 import { bindLocale } from '../src/i18n/bind.ts';
 import * as geometry from '../src/ui/geometry.ts';
 import { formatMinorUnits } from '@finanzapp/domain';
+import * as i18nFormat from '../src/i18n/format.ts';
+import * as i18nLocale from '../src/i18n/locale.ts';
+import * as moneyInput from '../src/ui/money-input.ts';
 
 // Producto 22.1: the row and field components at source level (React Native
 // replaced by descriptors). Structure, hierarchy and labels are checked here;
@@ -35,15 +38,15 @@ function load(file: string, extra: Record<string, unknown> = {}, fontScale = 1) 
     '@expo/vector-icons/Ionicons': 'Ionicons',
     'expo-router': { router: { push: () => {} } },
     '@finanzapp/domain': { accountBalanceMinor: () => 0, formatMinorUnits, labelFromISO: (d: string) => d, categoryKey: (s: string) => s.toLowerCase(), todayKey: (d: Date) => d.toISOString().slice(0, 10) },
-    '../i18n/provider': { useI18n: () => bindLocale('es-AR') },
+    '../i18n/provider': { useI18n: () => bindLocale('es-AR') }, '../i18n/format': i18nFormat, '../i18n/locale': i18nLocale,
     './theme': { radius: { chip: 14, tile: 12, group: 16, card: 20, sheet: 24, creditCard: 18, button: 14 }, space: { xs: 4, s: 8, m: 12, l: 16, xl: 20, xxl: 24, xxxl: 32 },
       type: { body: { fontSize: 17 }, subhead: { fontSize: 15 }, footnote: { fontSize: 13 }, caption: { fontSize: 12 }, title2: { fontSize: 22 }, title3: { fontSize: 20 }, headline: { fontSize: 17 }, eyebrow: {} },
       usePalette: () => p, useReduceMotion: () => true, useCurrentDay: () => '2026-09-22' },
     './categories': {}, './category-color': { tintOf: () => '#EEE' }, './category-hues': { useAccountLook: () => ({ glyph: 'wallet-outline', hex: '#2557D6' }), useCategoryLook: () => ({ glyph: 'pricetag-outline', hex: '#3E6FB0', label: 'x' }), useAccountNameOf: () => (account: any) => account.name, useAccountLookOf: () => () => ({ glyph: 'wallet-outline', hex: '#2557D6' }), useCategoryDefinitions: () => [] },
     './geometry': geometry,
     './motion': { duration: { press: 100, release: 160 }, easeOut: 'ease', selectionHaptic: () => haptics.push('selection'), timing: () => ({}) },
-    './money-input': { EMPTY_AMOUNT: '', amountFromCanonical: () => '', readAmountChange: () => ({}), renderAmount: () => ({ text: '', caret: 0 }), settleAmount: () => ({}), splitAmount: () => null },
-    './presentation': {}, './currencies': { CURRENCIES, currencyOption, searchCurrencies },
+    './money-input': moneyInput,
+    './presentation': {}, './currencies': { CURRENCIES, currencyOption, currencyOptions, searchCurrencies },
     './components': Object.fromEntries(['AccountBadge', 'AppText', 'CategoryBadge', 'DetailRow', 'SelectionRow', 'Field', 'GlyphTile', 'PressFeedback', 'Surface'].map(name => [name, name])),
     ...extra,
   };
@@ -277,8 +280,12 @@ test('segmented labels cap their scaling and fit their segment instead of trunca
 test('the currency list is exactly ARS and USD, with a search helper ready for the future currency screen', () => {
   assert.deepEqual(CURRENCIES.map(option => option.code), ['ARS', 'USD']);
   assert.equal(currencyOption('USD').name, 'Dólares estadounidenses');
-  assert.equal(currencyOption('USD', 'en-US').name, 'US dollars', 'the name follows the interface language; code and symbol do not');
-  assert.deepEqual(currencyOptions('en-US').map(option => option.code + ' ' + option.symbol), ['ARS $', 'USD US$']);
+  assert.equal(currencyOption('USD', 'en-US').name, 'US dollars', 'the name follows the interface language');
+  // The symbol follows the region: a bare "$" is the peso in Argentina and the dollar in the United States.
+  assert.deepEqual(currencyOptions('en-AR').map(option => option.code + ' ' + option.symbol), ['ARS $', 'USD US$']);
+  assert.deepEqual(currencyOptions('es-AR').map(option => option.code + ' ' + option.symbol), ['ARS $', 'USD US$']);
+  assert.deepEqual(currencyOptions('en-US').map(option => option.code + ' ' + option.symbol), ['ARS AR$', 'USD US$']);
+  assert.deepEqual(currencyOptions('es-US').map(option => option.code + ' ' + option.symbol), ['ARS AR$', 'USD US$']);
   assert.equal(currencyOption('EUR').code, 'ARS', 'an unknown code falls back instead of inventing a currency');
   assert.deepEqual(searchCurrencies('').map(o => o.code), ['ARS', 'USD']);
   assert.deepEqual(searchCurrencies('dol').map(o => o.code), ['USD']);

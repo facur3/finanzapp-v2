@@ -71,7 +71,7 @@ function harness(file: string, props: any = {}, options: { data?: domain.LedgerA
     '../src/ui/currencies': currencies, '../../src/ui/currencies': currencies,
     './presentation': presentation,
     './budget-presentation': budgetPresentation, '../../src/ui/budget-presentation': budgetPresentation,
-    './money-input': moneyInput,
+    './money-input': moneyInput, '../../src/ui/money-input': moneyInput, '../src/ui/money-input': moneyInput,
     './liability-presentation': liabilityPresentation,
     '../../src/ui/theme': { space: { xs: 4, s: 8, m: 12, l: 16, xl: 20, xxl: 24, xxxl: 32 },
       usePalette: () => ({ text: '#000', positive: '#070', income: '#070', expense: '#700', primary: '#2557D6', warning: '#a60', secondary: '#666', tertiary: '#999' }) },
@@ -479,10 +479,10 @@ test('expense form offers cash accounts and cards but never a personal debt acco
   assert.equal(field.props.kindOf('a'), 'Cuenta');
   assert.equal(field.props.typeOf('card-acc'), 'card', 'the glyph follows the ledger kind, not the translated name');
   assert.equal(field.props.typeOf('a'), 'cash');
-  assert.equal(field.props.detail, 'Saldo registrado $ 876,55');
+  assert.equal(field.props.detail, 'Saldo registrado $\u00A0876,55');
   assert.equal(field.props.describe({ ...cardAccount }), 'deuda 50,00');
   find(view.render(), 'AccountField').props.onChange('card-acc');
-  assert.equal(find(view.render(), 'AccountField').props.detail, 'Tarjeta de crédito · deuda $ 50,00');
+  assert.equal(find(view.render(), 'AccountField').props.detail, 'Tarjeta de crédito · deuda $\u00A050,00');
   assert.equal(find(view.render(), 'Stack.Screen').props.options.title, 'Compra con tarjeta');
 });
 
@@ -521,7 +521,7 @@ test('the entry form shows the category budget live and echoes the amount on Sav
   const view = harness('src/ui/entry-form.tsx', { kind: 'expense' }, { data: { ...liabilityData, budgets: [budget] } });
   assert.equal(find(view.render(), 'CategoryField').props.detail, undefined);
   find(view.render(), 'CategoryField').props.onChange('salud');
-  assert.equal(find(view.render(), 'CategoryField').props.detail, '$ 0,00 de $ 500,00 este mes');
+  assert.equal(find(view.render(), 'CategoryField').props.detail, '$\u00A00,00 de $\u00A0500,00 este mes');
   find(view.render(), 'AmountField').props.onChangeText('1234,5');
   assert.equal(find(view.render(), 'ActionButton').props.label, 'Guardar gasto\u00A0·\u00A0$\u00A01.234,50');
   // On its own (edit mode and tests) the form keeps a Gasto / Ingreso switch; Transferencia is the host's job.
@@ -575,7 +575,7 @@ test('English entry form: every label comes from the catalogue and the saved mov
   assert.equal(nodes(english.root).find(node => node.type === 'Stack.Screen')!.props.options.title, 'Record an expense');
   assert.equal(find(english.root, 'AmountField').props.label, 'Expense');
   assert.equal(find(english.root, 'AccountField').props.label, 'Paid with');
-  assert.equal(find(english.root, 'AccountField').props.detail, 'Recorded balance $ 876,55');
+  assert.equal(find(english.root, 'AccountField').props.detail, 'Recorded balance $\u00A0876,55');
   assert.equal(find(english.root, 'Field').props.label, 'Merchant or description');
   assert.equal(find(english.root, 'Field').props.placeholder, 'e.g. Supermarket');
   assert.match(english.save.props.label, /^Save expense/);

@@ -4,7 +4,6 @@ import { Redirect, router, Stack, useLocalSearchParams } from 'expo-router';
 import { accountBalanceMinor, currentMonthISO } from '@finanzapp/domain';
 import { useLedger } from '../../src/storage/LedgerProvider';
 import { AccountBadge, AppText, DetailRow, EmptyState, IconButton, Money, Screen, SectionTitle, Stat, Surface, StatRow } from '../../src/ui/components';
-import { codedAmount } from '../../src/i18n/format';
 import { useI18n } from '../../src/i18n/provider';
 import { QuickActions } from '../../src/ui/quick-actions';
 import { EntryList } from '../../src/ui/entry-list';
@@ -19,7 +18,7 @@ export default function AccountScreen() {
   const { snapshot, archive } = useLedger();
   const day = useCurrentDay();
   const p = usePalette();
-  const { t } = useI18n();
+  const { t, codedAmount } = useI18n();
   const entries = useMemo(() => snapshot ? selectEntries(snapshot.entries, snapshot.accounts, 'all', '', id) : [], [snapshot, id]);
   const transfers = useMemo(() => snapshot ? selectTransfers(snapshot.transfers ?? [], snapshot.accounts, '', id) : [], [snapshot, id]);
   const account = snapshot?.accounts.find(item => item.id === id);
