@@ -8,8 +8,8 @@ import { codedAmount, currencyName, currencySymbol, dateFromISO, daysAgo, format
 import { DEFAULT_LOCALE, LANGUAGES, REGIONS, RELEASED_LANGUAGES, RELEASED_REGIONS, SUPPORTED_LANGUAGES, SUPPORTED_REGIONS, composeLocale, languageForTag, languageOf,
   languagePreferenceFrom, regionForCode, regionForTag, regionOf, regionPreferenceFrom, resolveLanguage, resolveLocale, resolveRegion, type AppLocale } from '../src/i18n/locale.ts';
 import { catalogue, interpolate, messageKeys, translate, translator } from '../src/i18n/messages.ts';
-import { es } from '../src/i18n/messages/es.ts';
-import { en } from '../src/i18n/messages/en.ts';
+import { es } from '../src/i18n/messages/es/index.ts';
+import { en } from '../src/i18n/messages/en/index.ts';
 import { LANGUAGE_PREFERENCE_KEY, REGION_PREFERENCE_KEY, readLanguagePreference, readLocalePreferences, readRegionPreference, writeLanguagePreference, writeRegionPreference,
   type PreferenceStore } from '../src/i18n/preference.ts';
 import { bindLocale } from '../src/i18n/bind.ts';

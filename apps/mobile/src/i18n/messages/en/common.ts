@@ -1,0 +1,60 @@
+import type { Messages } from '../../messages.ts';
+
+/** Words shared by every area: buttons, selectors, the amount field, movement and account kinds, counts. */
+export const common: Pick<Messages, 'common' | 'movement' | 'accountKinds' | 'selection' | 'amount' | 'count'> = {
+  common: {
+    cancel: 'Cancel',
+    done: 'Done',
+    close: 'Close',
+    see: 'View',
+    seeAll: 'See all',
+    addAccount: 'Add account',
+    retrySave: 'Retry saving',
+    retryChange: 'Retry change',
+    saveChanges: 'Save changes',
+    closeAmountKeyboard: 'Close the amount keyboard',
+    moreInfoAbout: 'More about {title}',
+    whatIs: 'What {title} means',
+  },
+  movement: {
+    expense: 'Expense',
+    income: 'Income',
+    transfer: 'Transfer',
+    expenseWord: 'expense',
+    incomeWord: 'income',
+  },
+  accountKinds: {
+    account: 'Account',
+    creditCard: 'Credit card',
+    card: 'Card',
+    debt: 'Debt',
+  },
+  selection: {
+    account: 'Account',
+    chooseAccount: 'Choose account',
+    category: 'Category',
+    chooseCategory: 'Choose category',
+    categories: 'Categories',
+    date: 'Date',
+    chooseDate: 'Choose date',
+    currency: 'Currency',
+    chooseCurrency: 'Choose currency',
+    currencyNote: 'For now accounts are kept in pesos or in dollars, never converted between them. Other currencies arrive with their exchange rate.',
+    searchOrCreateCategory: 'Search or create a category',
+    categoryNamePlaceholder: 'Category name',
+    useCategory: 'Use category {name}',
+    useNewCategory: 'Use “{name}”',
+    archivedStillValid: 'Archived · still valid for this transaction',
+    archived: 'archived',
+  },
+  amount: {
+    label: 'Amount',
+    accessibility: '{label} in {currency}',
+    inPesos: 'Argentine pesos',
+    inDollars: 'US dollars',
+  },
+  count: {
+    movements: { one: '{count} transaction', other: '{count} transactions' },
+    expenses: { one: '{count} expense', other: '{count} expenses' },
+  },
+};

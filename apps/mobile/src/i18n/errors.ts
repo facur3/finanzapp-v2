@@ -6,7 +6,7 @@
  * a thrown message is recognised by its exact Spanish text in `errors.*`.
  * Anything else (a message from a part of the app not yet translated) is
  * shown as it was thrown, never blank. Pure: no React, no device access. */
-import { es } from './messages/es.ts';
+import { es } from './messages/es/index.ts';
 import { translate, type MessageKey } from './messages.ts';
 import type { LanguageCode } from './locale.ts';
 

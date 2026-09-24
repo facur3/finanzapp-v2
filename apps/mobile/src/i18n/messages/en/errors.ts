@@ -1,0 +1,45 @@
+import type { Messages } from '../../messages.ts';
+
+/** Messages thrown by the domain and the storage layer, recognised by their exact Spanish text. */
+export const errors: Pick<Messages, 'errors'> = {
+  errors: {
+    domain: {
+      invalidAmount: 'Invalid amount.',
+      enterAmount: 'Enter a valid amount.',
+      twoDecimals: 'Use numbers with up to two decimals.',
+      amountTooLarge: 'The amount is too large.',
+      invalidId: 'Invalid identifier.',
+      existingAccount: 'Choose an existing account.',
+      expenseOrIncome: 'Choose expense or income.',
+      positiveAmount: 'The amount must be greater than zero, with up to two decimals.',
+      merchant: 'Enter a merchant or description of up to 120 characters.',
+      category: 'Enter a category of up to 60 characters.',
+      validDate: 'Choose a valid date.',
+      twoAccounts: 'Choose two different accounts.',
+      sameCurrency: 'Both accounts must have the same currency.',
+      transferAmount: 'Enter an amount greater than zero, with up to two decimals.',
+      note: 'Use a note of up to 120 characters.',
+      balanceRange: 'The balance is beyond the safe range.',
+      totalRange: 'The total is beyond the safe range.',
+      transferVersion: 'Invalid transfer version.',
+      transferChanged: 'The transfer changed. Open it again.',
+      transferCurrency: 'Keep the transfer’s original currency.',
+    },
+    storage: {
+      newerVersion: 'This data needs a newer version of FinanzApp. Nothing was changed.',
+      entryState: 'Invalid transaction state.',
+      transferState: 'Invalid transfer state.',
+      operationExistsForm: 'This operation already exists with different details. Open the form again.',
+      operationExistsMovements: 'This operation already exists with different details. Check your transactions.',
+      operationExistsEntry: 'This operation already exists with different details. Open the transaction again.',
+      operationExists: 'This operation already exists with different details.',
+      entryChanged: 'The transaction changed since you opened it. Close this form and check the current version.',
+      transferExists: 'This transfer already exists with different details.',
+      transferChanged: 'The transfer changed. Close the form and open it again.',
+      openFailed: 'We could not open your data. Nothing was deleted or replaced. Try again, or keep the app so the database can be recovered.',
+      verifyFailed: 'We could not check your local data or recurring due dates. Nothing changed outside a complete transaction.',
+      stillOpening: 'We are still opening your data.',
+      refreshFailed: 'The save finished, but we could not refresh the view. Check again before recording another transaction; do not enter it again.',
+    },
+  },
+};
