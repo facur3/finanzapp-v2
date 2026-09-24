@@ -15,10 +15,51 @@ server-keyed; manual recording and local data work without connectivity. Recurri
 expenses, debts, budgets and cards remain in scope. Native navigation, accessible
 amounts, real data and recoverable durable writes remain requirements.
 
-## Status and current delivery — Producto 23.1C2
+## Status and current delivery — Producto 23.2
 
 Implemented is code, checked names a test, device-verified needs a physical result,
 and released means distributed. Neither a bundle nor a screenshot is App Store QA.
+
+**23.2 is stabilization only: Expo's SDK 57 maintenance releases, and a diagnosis of the
+missing per-app Language row.** No feature, onboarding, currency, monetization, schema,
+ledger, backup or app-config change. The Más footer reads Producto 23.2.
+
+- [x] **CI repaired.** The post-merge run 36001508227 of #44 failed at `expo install
+  --check`: Expo expected `expo` ~57.0.25, `expo-glass-effect` ~57.0.4, `expo-linking`
+  ~57.0.11, `expo-router` ~57.0.23 and `expo-sharing` ~57.0.22. `npx expo install --fix`
+  moved exactly those five plus the patch releases they pin (`expo-modules-core` 57.0.19,
+  `expo-modules-jsi` 57.1.1, `babel-preset-expo` 57.0.13, `@expo/ui` 57.0.20, `@expo/cli`
+  57.0.27, `@expo/router-server` 57.0.11); all SDK 57, nothing else in the lockfile.
+  Reproducible from an empty `node_modules`: `npm ci`, `npm ls --all` (exit 0),
+  `expo install --check` ("Dependencies are up to date"), `npm audit` 0.
+- [x] **The native fingerprint changes** (`796b0b4…` → `fe40b24…`: `expo-modules-core`,
+  `expo-glass-effect/ios`, `@expo/ui/ios`, `expo-modules-jsi`, autolinking). The local
+  computation with master's lockfile gives `796b0b4…`, exactly EAS build `1d69d2d4`'s, so
+  the comparison is sound. The next development build picks the patches up; until then
+  FinanzApp Dev `1d69d2d4` runs this JavaScript with the previous patch natives (same SDK).
+- [x] **Language row diagnosed (binary, not source).** The IPA of development build
+  `1d69d2d4` (commit `cc6f6f9`, 23.1C2) was downloaded from EAS: its compiled `Info.plist`
+  has `CFBundleLocalizations` array `[es, en]`, `CFBundleDevelopmentRegion` string `es`,
+  `UIPrefersShowingLanguageSettings` boolean `true`, as `expo config --type introspect`
+  and `tests/app-config.node.ts` (strict assertions) predict. The two earlier development
+  builds (`bad52629`, `ed369b28`) have neither key and region `en`. No bundle has an
+  `.lproj` folder. Apple: `CFBundleLocalizations` is "the localizations handled manually
+  by your app" (the case of an app whose strings are not in `.lproj`), CoreFoundation
+  merges that key with any `.lproj` folders when it lists a bundle's localizations, and
+  WWDC24 10185 says the row appears for an app with several localizations when the person
+  has more than one preferred language, or always with `UIPrefersShowingLanguageSettings`
+  (Apple publishes no reference page for that key). Expo's `supportedLocales` writes only
+  `CFBundleLocalizations`. **No reproducible generation defect, so no code or plugin
+  change.** Every development build reports 0.1.0 (1) and a development client runs
+  Metro's JavaScript, so the likeliest explanation is an older binary still installed;
+  iOS's own text menu tells them apart (Pegar vs Paste on a Spanish iPhone).
+- [ ] **Device evidence pending:** checklist § Producto 23.2 (identify the binary, the row
+  with one and two preferred languages, the per-app selector). Only if the 23.1C2 binary
+  shows no row with two preferred languages: Expo's first-party `locales` key (per-language
+  `InfoPlist.strings` in `.lproj` folders), which needs a new build; proposed, not started.
+- [x] **Checked on Linux:** see the handoff entry below.
+
+### Previous delivery — Producto 23.1C2
 
 **23.1C2 publishes the first official internationalization: Spanish and English,
 combined independently with Argentina and the United States.** English and the US region
@@ -94,13 +135,12 @@ iOS limits: [docs/i18n.md](i18n.md) §10 and §11.
   export, `expo config --type introspect` for both variants (development
   `com.facur3.finanzapp.dev` and preview `com.facur3.finanzapp.preview` unchanged, both
   `CFBundleLocalizations [es, en]`), root tests (398), Vite build, repo hygiene.
-- [ ] **Not device-verified:** everything above on the iPhone (checklist 23.1C2), in
-  particular the iOS Settings language list, system text after the build, Region while
-  running, relaunch on language changes, VoiceOver voices and number reading, and the
-  date wheel.
-- [ ] **Blocked on the owner:** the EAS development build (`eas build --profile development
-  --platform ios`) and its installation over FinanzApp Dev; no build, submission or paid
-  service was started.
+- [x] **Device (owner, 2026-09-24, FinanzApp Dev):** Más → Idioma and Región, Spanish,
+  English and both regions passed. The owner reports installing the new EAS development
+  build (`1d69d2d4` is the only one with the 23.1C2 native keys; see 23.2).
+- [ ] **Not yet reported:** the iOS Settings language row (missing; diagnosed in 23.2),
+  system text after the build, Region while running, relaunch on language changes,
+  VoiceOver voices and number reading, and the date wheel (checklist 23.1C2 B–E).
 
 ### Previous delivery — Producto 23.1C1
 
@@ -1454,6 +1494,32 @@ by CI and merged into master before the next starts:
     cryptocurrencies and broker connections. They stay outside the native scope of
     decision 002 until a separate decision with official data access, dated quotes and
     user consent; nothing in the ledger, schema or dependencies anticipates them.
+19. **Requirements agreed with the owner (2026-09-24), none started in 23.2:**
+    - **First launch.** The person chooses language and region (both remain changeable in
+      Más → Idioma / Región, with "Según el dispositivo" still available); then the main
+      currency and an optional first account once Producto 24 exists. Skippable, nothing
+      seeded, no balance invented.
+    - **Progressive internationalization.** New languages arrive through the modular
+      catalogues and the existing tooling (`i18n:export`, `i18n:check`), with assisted
+      translation followed by human review; a language is released only when its catalogue
+      is complete and reviewed (`RELEASED_LANGUAGES` stays the gate).
+    - **International currency catalogue** built on ISO 4217 (codes, minor units) and
+      CLDR (names, symbols, per-locale display). Language, region and currency stay three
+      separate things: a region never implies a currency, a language never changes an
+      amount, and each account keeps its own currency (item 15).
+    - **Future paywall** with testimonials only from real, verifiable users, with their
+      consent, once they exist; never invented reviews, ratings, quotes or user counts.
+    - **App Store rating request** only after a satisfying moment (for example after
+      several successful saves, never after an error), through Apple's own prompt, never
+      on the first launch and never required to continue.
+    - **Premium AI** with per-user quotas, server-side cost ceilings (per request, per
+      person and global), consumption telemetry (usage and cost, not content) and margins
+      calculated from measured costs **before** choosing prices. Still opt-in and
+      server-keyed; manual entry stays offline and free.
+    - **Preserve the design:** iOS minimalism, the cobalt/sapphire colour, discreet
+      micro-animations that honour Reduce Motion, selective Liquid Glass (control surfaces
+      only, with the opaque fallback) and the current navigation (five tabs, Asistente in
+      the centre, Más as the secondary hub).
 
 ### 1. Complete the daily tracking loop
 
@@ -1562,6 +1628,25 @@ amount uses `useStacked()` and gives the name two lines. 44-point targets, Voice
 safe areas, system text and separate currencies apply to every new screen.
 
 ## Handoff log (historical evidence)
+
+### 2026-09-24 — Producto 23.2: Expo maintenance releases and the per-app Language diagnosis
+
+- `expo install --fix` for the five SDK 57 maintenance releases CI run 36001508227 asked
+  for (plus the patches they pin); no SDK change. Compiled `Info.plist` of EAS development
+  build `1d69d2d4` inspected: `CFBundleLocalizations [es, en]`, `CFBundleDevelopmentRegion`
+  `es`, `UIPrefersShowingLanguageSettings` `true`, with the right types; the earlier
+  development builds lack them. No generation defect found, no code or plugin change;
+  device steps in checklist § Producto 23.2. Owner requirements for first launch,
+  internationalization, currencies, paywall, rating request, premium AI and design
+  recorded under "Next deliverables" item 19. Más footer: Producto 23.2.
+- **Checked on Linux:** from an empty `node_modules`, `npm ci`, `npm ls --all`,
+  `expo install --check` and `npm audit` (0); TypeScript; 454 mobile tests; `i18n:extract`
+  0, `i18n:check --strict` 0 errors / 0 stale; Metro iOS export; root `npm ci`, 398 root
+  tests, Vite build, repo hygiene. Not an Xcode build. **Not device-verified.**
+- **Next:** the owner runs checklist § Producto 23.2 on FinanzApp Dev; a new development
+  build (to carry the patch natives, and the `.lproj` candidate only if the evidence asks
+  for it) waits for the owner's decision. Producto 24, onboarding and monetization have not
+  started.
 
 ### 2026-09-24 — Producto 23.1C2: English and the United States released
 
