@@ -1,8 +1,10 @@
 import { ACCOUNT_ICONS, APPEARANCE_COLORS, CATEGORY_ICONS, DEFAULT_ACCOUNT_ICON, DEFAULT_APPEARANCE_COLOR, DEFAULT_CATEGORY_ICON,
-  accountLook, appearanceColor, resolveCategory, type AccountAppearance, type AccountIconId, type AppearanceColorId, type CategoryDefinition,
+  accountLook, appearanceColor, categoryPreset, resolveCategory, type AccountAppearance, type AccountIconId, type AppearanceColorId, type CategoryDefinition,
   type CategoryIconId, type CategoryIdentity, type EntryKind } from '@finanzapp/domain';
 import type Ionicons from '@expo/vector-icons/Ionicons';
 import { categoryColor } from './category-color.ts';
+import { translate, type MessageKey } from '../i18n/messages.ts';
+import { DEFAULT_LANGUAGE, type LanguageCode } from '../i18n/locale.ts';
 
 export type IconName = keyof typeof Ionicons.glyphMap;
 
@@ -79,6 +81,27 @@ export function identityGlyph(identity: Pick<CategoryIdentity, 'icon' | 'key'>):
   return historicalGlyphs.get(identity.key) ?? 'pricetag-outline';
 }
 
+/** The name a category shows in the interface language. Only a built-in
+ * category the person has not renamed is translated ("Comida" reads "Food"):
+ * its identity key, the string its movements store, its budgets and its
+ * history stay exactly the same, so nothing splits or moves. A renamed preset,
+ * a custom category and a historical string are the person's own words and
+ * read the same in every language. */
+export function localizedCategoryLabel(identity: CategoryIdentity, language: LanguageCode = DEFAULT_LANGUAGE): string {
+  if (identity.source !== 'preset') return identity.label;
+  const preset = categoryPreset(identity.kind, identity.key);
+  if (!preset || (identity.definition && identity.definition.label !== preset.label)) return identity.label;
+  const key = `categories.${identity.kind}.${identity.key}` as MessageKey;
+  const text = translate(language, key);
+  return text === key ? identity.label : text;
+}
+
+/** The identity with its display label in the interface language; everything else, `storedLabel` included, untouched. */
+export function localizeCategory<T extends CategoryIdentity>(identity: T, language: LanguageCode = DEFAULT_LANGUAGE): T {
+  const label = localizedCategoryLabel(identity, language);
+  return label === identity.label ? identity : { ...identity, label };
+}
+
 export type CategoryLook = CategoryIdentity & { glyph: IconName; hex: string };
 export type AccountLook = { icon: string; color: string; glyph: IconName; hex: string };
 
@@ -86,8 +109,9 @@ export type AccountLook = { icon: string; color: string; glyph: IconName; hex: s
  * definition or preset gives label, icon and colour; a historical string keeps
  * its stored label, a synonym glyph and one of the muted hues assigned by
  * first use, so an old category never changes colour because a new one appeared. */
-export function resolveCategoryLook(kind: EntryKind, stored: string, identity: { definitions: CategoryDefinition[]; hues: Map<string, number> }, p: { isDark: boolean }): CategoryLook {
-  const resolved = resolveCategory(kind, stored, identity.definitions);
+export function resolveCategoryLook(kind: EntryKind, stored: string, identity: { definitions: CategoryDefinition[]; hues: Map<string, number> }, p: { isDark: boolean },
+  language: LanguageCode = DEFAULT_LANGUAGE): CategoryLook {
+  const resolved = localizeCategory(resolveCategory(kind, stored, identity.definitions), language);
   return { ...resolved, glyph: identityGlyph(resolved),
     hex: resolved.color ? appearanceHex(resolved.color, p) : categoryColor(stored, identity.hues, p) };
 }

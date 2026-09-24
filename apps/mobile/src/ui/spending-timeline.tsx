@@ -6,11 +6,12 @@ import { formatMinorUnits, type Currency, type ReportPeriod, type SpendingBucket
 import { AppText, PressFeedback } from './components';
 import { timing } from './motion';
 import { usePalette, useReduceMotion } from './theme';
+import { formatDate } from '../i18n/format';
+import { DEFAULT_LOCALE, type AppLocale } from '../i18n/locale';
 
-const MONTHS = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
-// Manual abbreviations keep "sep" stable across ICU versions (newer data says "sept").
-const dateLabel = (day: string) => Number(day.slice(8, 10)) + ' ' + MONTHS[Number(day.slice(5, 7)) - 1];
-export const periodLabel = (p: ReportPeriod) => p.startISO === p.endISO ? dateLabel(p.startISO) : dateLabel(p.startISO) + ' – ' + dateLabel(p.endISO);
+// The locale tables keep "sep" stable across ICU versions (newer data says "sept").
+export const periodLabel = (p: ReportPeriod, locale: AppLocale = DEFAULT_LOCALE) => p.startISO === p.endISO ? formatDate(p.startISO, 'day', locale)
+  : formatDate(p.startISO, 'day', locale) + ' – ' + formatDate(p.endISO, 'day', locale);
 
 function Bar({ fraction }: { fraction: number }) {
   const p = usePalette(), reduced = useReduceMotion();

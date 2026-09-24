@@ -3,7 +3,7 @@ import { Keyboard, View } from 'react-native';
 import { router, Stack } from 'expo-router';
 import { randomUUID } from 'expo-crypto';
 import * as Haptics from 'expo-haptics';
-import { formatMinorUnits, parseMinorUnits, sameRecurringRule, todayKey, validateRecurringRule,
+import { accountKind, formatMinorUnits, parseMinorUnits, sameRecurringRule, todayKey, validateRecurringRule,
   type EntryKind, type RecurringFrequency, type RecurringRule } from '@finanzapp/domain';
 import { useLedger } from '../storage/LedgerProvider';
 import { ActionButton, AmountField, AppText, Choices, EmptyState, ErrorMessage, Field, IconButton, Screen, Surface } from './components';
@@ -108,7 +108,8 @@ export function RecurringForm({ original, accountId: requestedAccount }: { origi
       <View style={{ gap: space.m }}>
         <CategoryField entries={snapshot?.entries ?? []} kind={kind} value={category} onChange={setCategory} disabled={locked} prominent />
         <AccountField label={kind === 'expense' ? 'Pagado con' : 'Ingresa en'} accounts={eligibleAccounts} value={accountId} onChange={setAccountId} disabled={locked} prominent
-          kindOf={id => { const found = accounts.find(item => item.id === id); return found ? accountKindLabel(found, archive?.cards, archive?.debts) : 'Cuenta'; }} />
+          kindOf={id => { const found = accounts.find(item => item.id === id); return found ? accountKindLabel(found, archive?.cards, archive?.debts) : 'Cuenta'; }}
+          typeOf={id => accountKind(id, archive?.cards, archive?.debts)} />
       </View>
       <Field label={kind === 'expense' ? 'Comercio o concepto' : 'Origen o concepto'} value={merchant} placeholder={kind === 'expense' ? 'Ej. Alquiler' : 'Ej. Sueldo'}
         onChangeText={setMerchant} maxLength={120} autoCapitalize="sentences" editable={!locked} />

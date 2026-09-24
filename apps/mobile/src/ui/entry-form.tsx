@@ -3,14 +3,14 @@ import { Keyboard, View } from 'react-native';
 import { router, Stack } from 'expo-router';
 import { randomUUID } from 'expo-crypto';
 import * as Haptics from 'expo-haptics';
-import { accountBalanceMinor, categoryKey, formatMinorUnits, makeEntryChange, parseMinorUnits, sameEntry, summarizeMonthlyBudgets, todayKey, validateEntry, validateEntryChange, type Entry, type EntryChange, type EntryKind, type EntryRecord } from '@finanzapp/domain';
+import { accountBalanceMinor, accountKind, categoryKey, formatMinorUnits, makeEntryChange, parseMinorUnits, sameEntry, summarizeMonthlyBudgets, todayKey, validateEntry, validateEntryChange, type Entry, type EntryChange, type EntryKind, type EntryRecord } from '@finanzapp/domain';
 import { useLedger } from '../storage/LedgerProvider';
 import { budgetTone } from './budget-presentation';
 import { ActionButton, AmountField, AppText, Choices, EmptyState, ErrorMessage, Field, IconButton, Screen, Surface } from './components';
 import { AccountField, CategoryField, DateField } from './form-controls';
 import { accountKindLabel, postingAccounts } from './liability-presentation';
 import { initialAccountId } from './presentation';
-import { moneyText } from '../i18n/format';
+import { useI18n } from '../i18n/provider';
 import { space } from './theme';
 
 type FormKind = EntryKind | 'transfer';
@@ -30,6 +30,7 @@ export function EntryForm({ original, accountId: requestedAccount, currency, kin
   onAccountChange?: (accountId: string) => void;
 }) {
   const { snapshot, archive, addEntry, updateEntry } = useLedger();
+  const { t, moneyText } = useI18n();
   // Cash accounts and cards can carry an expense or income; a personal debt only changes through payments.
   const accounts = postingAccounts(snapshot?.accounts ?? [], archive?.debts);
   const [before] = useState(original);
@@ -51,7 +52,8 @@ export function EntryForm({ original, accountId: requestedAccount, currency, kin
   const locked = busy || pending !== null;
   const close = () => { if (!saving.current) { if (router.canGoBack()) router.back(); else router.replace('/'); } };
   const cards = archive?.cards ?? [], debts = archive?.debts ?? [];
-  const kindOf = (id: string) => { const found = accounts.find(item => item.id === id); return found ? accountKindLabel(found, cards, debts) : 'Cuenta'; };
+  const kindOf = (id: string) => { const found = accounts.find(item => item.id === id); return found ? accountKindLabel(found, cards, debts, t) : t('accountKinds.account'); };
+  const typeOf = (id: string) => accountKind(id, cards, debts);
   const isCard = !!account && cards.some(card => card.accountId === account.id);
 
   // Live context for the two prominent selectors: recorded balance or card debt, and the category budget for that month.
@@ -59,9 +61,10 @@ export function EntryForm({ original, accountId: requestedAccount, currency, kin
     if (!account || !snapshot) return undefined;
     const balance = accountBalanceMinor(account, snapshot.entries, snapshot.transfers);
     const money = (minor: number) => (account.currency === 'USD' ? 'US$ ' : '$ ') + formatMinorUnits(Math.abs(minor));
-    if (isCard) return balance < 0 ? `Tarjeta de crédito · deuda ${money(balance)}` : `Tarjeta de crédito · ${balance > 0 ? 'a favor ' + money(balance) : 'sin deuda'}`;
-    return `Saldo registrado ${balance < 0 ? '−' : ''}${money(balance)}`;
-  }, [account, snapshot, isCard]);
+    if (isCard) return balance < 0 ? t('entryForm.cardDebt', { amount: money(balance) })
+      : balance > 0 ? t('entryForm.cardCredit', { amount: money(balance) }) : t('entryForm.cardClear');
+    return t('entryForm.recordedBalance', { amount: (balance < 0 ? '−' : '') + money(balance) });
+  }, [account, snapshot, isCard, t]);
   const budget = useMemo(() => {
     if (!account || !snapshot || kind !== 'expense' || !category.trim()) return null;
     try {
@@ -69,10 +72,11 @@ export function EntryForm({ original, accountId: requestedAccount, currency, kin
         .find(item => categoryKey(item.budget.category) === categoryKey(category));
       if (!row) return null;
       const money = (minor: number) => (account.currency === 'USD' ? 'US$ ' : '$ ') + formatMinorUnits(minor);
-      return { text: row.exceeded ? `Presupuesto excedido por ${money(-row.remainingMinor)}` : `${money(row.spentMinor)} de ${money(row.budget.amountMinor)} este mes`,
+      return { text: row.exceeded ? t('entryForm.budgetExceeded', { amount: money(-row.remainingMinor) })
+        : t('entryForm.budgetUsed', { spent: money(row.spentMinor), total: money(row.budget.amountMinor) }),
         tone: budgetTone(row) };
     } catch { return null; }
-  }, [account, snapshot, archive?.budgets, kind, category, date]);
+  }, [account, snapshot, archive?.budgets, kind, category, date, t]);
   let parsed: number | null = null;
   try { parsed = parseMinorUnits(amount); } catch { parsed = null; }
   const amountEcho = parsed && parsed > 0 && account ? '\u00A0·\u00A0' + moneyText(parsed, account.currency) : '';
@@ -87,7 +91,8 @@ export function EntryForm({ original, accountId: requestedAccount, currency, kin
       let submission = pending;
       if (!submission) {
         const dateISO = todayKey(date);
-        if (dateISO > todayKey()) throw new Error('Elegí hoy o una fecha anterior. Los movimientos programados llegan en otra etapa.');
+        // Messages are stored as catalogue keys and translated when shown (ErrorMessage), so they follow a language change.
+        if (dateISO > todayKey()) throw new Error('entryForm.futureDate');
         const entry: Entry = { ...(before?.entry ?? operation), kind, accountId, amountMinor: parseMinorUnits(amount),
           merchant: merchant.trim(), category: category.trim(), dateISO };
         validateEntry(entry, accounts);
@@ -103,41 +108,42 @@ export function EntryForm({ original, accountId: requestedAccount, currency, kin
       saving.current = false;
       close();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'No pudimos verificar el guardado. Reintentá con este mismo movimiento.');
+      setError(cause instanceof Error ? cause.message : 'entryForm.saveUnverified');
     } finally {
       saving.current = false;
       setBusy(false);
     }
   }
 
-  const title = before ? 'Editar movimiento' : kind === 'expense' ? (isCard ? 'Compra con tarjeta' : 'Registrar gasto') : 'Registrar ingreso';
+  const title = t(before ? 'entryForm.editTitle' : kind === 'expense' ? (isCard ? 'entryForm.cardPurchaseTitle' : 'entryForm.expenseTitle') : 'entryForm.incomeTitle');
   return <Screen gap={space.l}>
     <Stack.Screen options={{ title, gestureEnabled: !busy,
-      headerLeft: () => <IconButton name="close" label="Cerrar" onPress={close} disabled={busy} /> }} />
-    {!accounts.length ? <EmptyState title="Primero, una cuenta" detail="Cada movimiento necesita una cuenta para actualizar su saldo."
-      action={<ActionButton label="Agregar cuenta" onPress={() => router.replace('/new-account')} />} /> : <>
+      headerLeft: () => <IconButton name="close" label={t('common.close')} onPress={close} disabled={busy} /> }} />
+    {!accounts.length ? <EmptyState title={t('entryForm.noAccountTitle')} detail={t('entryForm.noAccountDetail')}
+      action={<ActionButton label={t('common.addAccount')} onPress={() => router.replace('/new-account')} />} /> : <>
       {!onKindChange && <Choices<EntryKind> value={kind} onChange={setKind} disabled={locked}
-        options={[{ value: 'expense', label: 'Gasto' }, { value: 'income', label: 'Ingreso' }]} />}
+        options={[{ value: 'expense', label: t('movement.expense') }, { value: 'income', label: t('movement.income') }]} />}
       <AmountField currency={account?.currency ?? 'ARS'} value={amount} onChangeText={value => { setAmount(value); setError(null); }} editable={!locked}
-        tone={kind === 'income' ? 'income' : 'neutral'} label={kind === 'expense' ? 'Gasto' : 'Ingreso'} />
+        tone={kind === 'income' ? 'income' : 'neutral'} label={t(kind === 'expense' ? 'movement.expense' : 'movement.income')} />
       <View style={{ gap: space.m }}>
         <CategoryField entries={snapshot?.entries ?? []} kind={kind} value={category} onChange={setCategory} disabled={locked}
           prominent detail={budget?.text} detailTone={budget?.tone} />
-        <AccountField label={kind === 'expense' ? 'Pagado con' : 'Ingresa en'} accounts={eligibleAccounts} value={accountId} onChange={id => { setAccountId(id); onAccountChange?.(id); }} disabled={locked}
-          prominent kindOf={kindOf} detail={accountDetail}
+        <AccountField label={t(kind === 'expense' ? 'entryForm.paidWith' : 'entryForm.receivedIn')} accounts={eligibleAccounts} value={accountId} onChange={id => { setAccountId(id); onAccountChange?.(id); }} disabled={locked}
+          prominent kindOf={kindOf} typeOf={typeOf} detail={accountDetail}
           describe={item => { const balance = snapshot ? accountBalanceMinor(item, snapshot.entries, snapshot.transfers) : 0;
-            return (cards.some(card => card.accountId === item.id) ? 'deuda ' : 'saldo ') + formatMinorUnits(Math.abs(balance)); }} />
+            return t(cards.some(card => card.accountId === item.id) ? 'entryForm.optionDebt' : 'entryForm.optionBalance', { amount: formatMinorUnits(Math.abs(balance)) }); }} />
       </View>
-      <Field label={kind === 'expense' ? 'Comercio o concepto' : 'Origen o concepto'} value={merchant} placeholder={kind === 'expense' ? 'Ej. Carrefour' : 'Ej. Sueldo'}
+      <Field label={t(kind === 'expense' ? 'entryForm.merchantExpense' : 'entryForm.merchantIncome')} value={merchant}
+        placeholder={t(kind === 'expense' ? 'entryForm.merchantExpensePlaceholder' : 'entryForm.merchantIncomePlaceholder')}
         onChangeText={setMerchant} maxLength={120} autoCapitalize="sentences" editable={!locked} />
       <Surface grouped><DateField value={date} onChange={setDate} disabled={locked} /></Surface>
       {isCard && kind === 'expense' && !before && <AppText secondary variant="footnote" style={{ textAlign: 'center' }}>
-        Cuenta como gasto una sola vez y suma a la deuda de la tarjeta. El pago del resumen se registra desde Tarjetas.
+        {t('entryForm.cardNote')}
       </AppText>}
-      {before && <AppText secondary variant="footnote" style={{ textAlign: 'center' }}>Corregís el movimiento original. No se registra otro gasto o ingreso.</AppText>}
+      {before && <AppText secondary variant="footnote" style={{ textAlign: 'center' }}>{t('entryForm.correctionNote')}</AppText>}
       <ErrorMessage message={error} />
-      {pending && !busy && error && <AppText secondary variant="footnote">Conservamos el envío para reintentar sin duplicarlo. Para cambiar los datos, cerrá y revisá primero Movimientos.</AppText>}
-      <ActionButton label={pending && error ? 'Reintentar guardado' : before ? 'Guardar cambios' : (kind === 'expense' ? 'Guardar gasto' : 'Guardar ingreso') + amountEcho}
+      {pending && !busy && error && <AppText secondary variant="footnote">{t('entryForm.retryNote')}</AppText>}
+      <ActionButton label={pending && error ? t('common.retrySave') : before ? t('common.saveChanges') : t(kind === 'expense' ? 'entryForm.saveExpense' : 'entryForm.saveIncome') + amountEcho}
         onPress={save} busy={busy} disabled={!amount.trim() || !merchant.trim() || !category.trim() || !account} />
     </>}
   </Screen>;

@@ -1,5 +1,6 @@
 import { accountKind, cardAvailableLimitMinor, cardCycle, cardDebtMinor, labelFromISO, type Account, type CreditCardProfile,
   type Currency, type LedgerSnapshot, type PersonalDebtProfile } from '@finanzapp/domain';
+import { translator, type Translate } from '../i18n/messages.ts';
 
 export type CardSummary = {
   /** Same as card.id; lets the carousel key items. */
@@ -59,9 +60,9 @@ export function cashAccounts(accounts: Account[], cards: CreditCardProfile[] = [
   return accounts.filter(account => accountKind(account.id, cards, debts) === 'cash');
 }
 
-export function accountKindLabel(account: Account, cards: CreditCardProfile[] = [], debts: PersonalDebtProfile[] = []): string {
+export function accountKindLabel(account: Account, cards: CreditCardProfile[] = [], debts: PersonalDebtProfile[] = [], t: Translate = translator('es')): string {
   const kind = accountKind(account.id, cards, debts);
-  return kind === 'card' ? 'Tarjeta de crédito' : kind === 'debt' ? 'Deuda' : 'Cuenta';
+  return t(kind === 'card' ? 'accountKinds.creditCard' : kind === 'debt' ? 'accountKinds.debt' : 'accountKinds.account');
 }
 
 export function currencyName(currency: Currency): string {

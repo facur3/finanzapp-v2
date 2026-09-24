@@ -3,7 +3,7 @@ import { FlatList, Keyboard, Modal, Platform, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { todayKey, type Account, type Currency, type Entry, type EntryKind } from '@finanzapp/domain';
+import { todayKey, type Account, type AccountKind, type Currency, type Entry, type EntryKind } from '@finanzapp/domain';
 import { AccountBadge, AppText, CategoryBadge, DetailRow, Field, GlyphTile, PressFeedback, SelectionRow, Surface, surfaceShadow, type IconName, type Tone } from './components';
 import { currencyOption, searchCurrencies } from './currencies';
 import { useI18n } from '../i18n/provider';
@@ -57,10 +57,12 @@ function SelectionSheet({ visible, title, onClose, onDone, children }: {
   </Modal>;
 }
 
-export function AccountField({ accounts, value, onChange, disabled = false, label, kindOf, prominent = false, detail, detailTone, describe }: {
+export function AccountField({ accounts, value, onChange, disabled = false, label, kindOf, typeOf, prominent = false, detail, detailTone, describe }: {
   accounts: Account[]; value: string; onChange: (id: string) => void; disabled?: boolean; label?: string;
   /** Names the kind of each option (Cuenta, Tarjeta, Deuda) so a card is never mistaken for cash. */
   kindOf?: (accountId: string) => string;
+  /** What each option is, for its glyph: a cash account shows its own look, a card or a debt its kind. Decided by the ledger, never by the translated name. */
+  typeOf?: (accountId: string) => AccountKind;
   /** Render as a full-width selector card with a live detail line instead of a compact row. */
   prominent?: boolean; detail?: string; detailTone?: 'neutral' | 'warning' | 'expense';
   /** Optional per-option second line in the sheet (for example the recorded balance). */
@@ -73,9 +75,10 @@ export function AccountField({ accounts, value, onChange, disabled = false, labe
   const selected = accounts.find(account => account.id === value);
   const title = label ?? t('selection.account');
   const kind = (id: string) => kindOf?.(id) ?? t('selection.account');
-  const isCash = (id: string) => !kind(id).startsWith('Tarjeta') && kind(id) !== 'Deuda';
+  const type = (id: string): AccountKind => typeOf?.(id) ?? 'cash';
+  const isCash = (id: string) => type(id) === 'cash';
   // A cash account shows its own look; a card or a debt keeps its kind glyph in the brand primary.
-  const icon = (id: string) => isCash(id) ? lookOf(id).glyph : kind(id).startsWith('Tarjeta') ? 'card-outline' : 'people-outline';
+  const icon = (id: string) => isCash(id) ? lookOf(id).glyph : type(id) === 'card' ? 'card-outline' : 'people-outline';
   const color = (id: string) => isCash(id) ? lookOf(id).hex : p.primary;
   const open = () => { Keyboard.dismiss(); setVisible(true); };
   return <>
@@ -170,13 +173,13 @@ export function CategoryField({ entries, kind, value, onChange, disabled = false
   prominent?: boolean; detail?: string; detailTone?: 'neutral' | 'warning' | 'expense';
 }) {
   const p = usePalette();
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   const definitions = useCategoryDefinitions();
   const look = useCategoryLook(value, kind);
   const [visible, setVisible] = useState(false);
   const [query, setQuery] = useState('');
-  // Choices are identities: the display name is shown, the stored spelling is what the movement records.
-  const choices = useMemo(() => categoryChoices(entries, kind, query, value, definitions), [entries, kind, query, value, definitions]);
+  // Choices are identities: the display name (a built-in one in the interface language) is shown, the stored spelling is what the movement records.
+  const choices = useMemo(() => categoryChoices(entries, kind, query, value, definitions, language), [entries, kind, query, value, definitions, language]);
   const custom = customCategory(query, choices, kind, definitions);
   const choose = (category: string) => { Keyboard.dismiss(); if (categoryKey(category) !== categoryKey(value)) selectionHaptic(); onChange(category); setVisible(false); };
   const open = () => { Keyboard.dismiss(); setQuery(''); setVisible(true); };
@@ -197,7 +200,7 @@ export function CategoryField({ entries, kind, value, onChange, disabled = false
           {custom && <PressFeedback feedback="highlight" accessibilityRole="button" accessibilityLabel={t('selection.useCategory', { name: custom })}
             onPress={() => choose(custom)} style={{ flexDirection: 'row', gap: 12, padding: 14, borderRadius: 16, backgroundColor: p.primarySoft, overflow: 'hidden' }}>
             <Ionicons name="add-circle-outline" color={p.primary} size={24} accessible={false} />
-            <AppText style={{ color: p.primary, fontWeight: '600', flex: 1 }}>Usar «{custom}»</AppText>
+            <AppText style={{ color: p.primary, fontWeight: '600', flex: 1 }}>{t('selection.useNewCategory', { name: custom })}</AppText>
           </PressFeedback>}
         </View>}
         renderItem={({ item }) => <PressFeedback feedback="highlight" accessibilityRole="button"

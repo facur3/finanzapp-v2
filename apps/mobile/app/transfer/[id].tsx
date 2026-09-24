@@ -6,25 +6,28 @@ import * as Haptics from 'expo-haptics';
 import { accountKind, formatMinorUnits, makeTransferChange, type Account, type TransferRecord, type TransferChange } from '@finanzapp/domain';
 import { useLedger } from '../../src/storage/LedgerProvider';
 import { AccountBadge, ActionButton, AppText, DetailRow, EmptyState, ErrorMessage, GlyphTile, Money, Screen, Surface } from '../../src/ui/components';
-import { formatDate } from '../../src/i18n/format';
+import { useI18n } from '../../src/i18n/provider';
 import { space, usePalette } from '../../src/ui/theme';
 
 export default function TransferScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { archive } = useLedger();
   const record = archive?.transfers?.find(r => r.transfer.id === id);
+  const { t } = useI18n();
   return record && archive ? <TransferDetail key={id} record={record} accounts={archive.accounts} />
-    : <Screen><EmptyState title="No encontramos esta transferencia" detail="Volvé a Movimientos para consultar tus registros." /></Screen>;
+    : <Screen><EmptyState title={t('transferDetail.notFoundTitle')} detail={t('transferDetail.notFoundDetail')} /></Screen>;
 }
 
 function TransferDetail({ record, accounts }: { record: TransferRecord; accounts: Account[] }) {
   const { updateTransfer, archive } = useLedger();
   const p = usePalette();
+  const { t: tr, formatDate } = useI18n();
   const t = record.transfer;
   const from = accounts.find(a => a.id === t.fromAccountId)!, to = accounts.find(a => a.id === t.toAccountId)!;
   const cards = archive?.cards ?? [], debts = archive?.debts ?? [];
   const toKind = accountKind(to.id, cards, debts), fromKind = accountKind(from.id, cards, debts);
-  const kindTitle = toKind === 'card' ? 'Pago de tarjeta' : toKind === 'debt' ? 'Pago de deuda' : fromKind === 'debt' ? 'Cobro' : 'Transferencia';
+  const kindId = toKind === 'card' ? 'cardPayment' : toKind === 'debt' ? 'debtPayment' : fromKind === 'debt' ? 'collection' : 'transfer';
+  const kindTitle = tr(`transferDetail.${kindId}`);
   const linkFor = (account: Account) => {
     const card = cards.find(item => item.accountId === account.id);
     const debt = debts.find(item => item.accountId === account.id);
@@ -41,7 +44,7 @@ function TransferDetail({ record, accounts }: { record: TransferRecord; accounts
     try {
       await updateTransfer(change); setPending(null);
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-    } catch (cause) { setError(cause instanceof Error ? cause.message : 'No pudimos verificar el cambio. Reintentá sin duplicarlo.'); }
+    } catch (cause) { setError(cause instanceof Error ? cause.message : 'transferDetail.changeUnverified'); }
     finally { working.current = false; setBusy(false); }
   }
   function confirm() {
@@ -49,18 +52,18 @@ function TransferDetail({ record, accounts }: { record: TransferRecord; accounts
     if (pending) { void apply(pending); return; }
     confirming.current = true;
     const change = makeTransferChange(randomUUID(), record, record.voided ? 'restore' : 'void', new Date().toISOString());
-    Alert.alert(record.voided ? '¿Recuperar transferencia?' : '¿Deshacer transferencia?',
-      `${formatMinorUnits(t.amountMinor)} ${from.currency}: se descontarán de ${record.voided ? from.name : to.name} y se sumarán a ${record.voided ? to.name : from.name}. Solo cambia el registro en esta app, no mueve dinero en el banco.`, [
-        { text: 'Cancelar', style: 'cancel', onPress: () => { confirming.current = false; } },
-        { text: record.voided ? 'Recuperar' : 'Deshacer', style: record.voided ? 'default' : 'destructive', onPress: () => { confirming.current = false; void apply(change); } },
+    Alert.alert(tr(record.voided ? 'transferDetail.restoreQuestion' : 'transferDetail.voidQuestion'),
+      tr('transferDetail.effect', { amount: formatMinorUnits(t.amountMinor) + ' ' + from.currency,
+        from: record.voided ? from.name : to.name, to: record.voided ? to.name : from.name }), [
+        { text: tr('common.cancel'), style: 'cancel', onPress: () => { confirming.current = false; } },
+        { text: tr(record.voided ? 'entryDetail.restore' : 'entryDetail.void'), style: record.voided ? 'default' : 'destructive', onPress: () => { confirming.current = false; void apply(change); } },
       ], { cancelable: true, onDismiss: () => { confirming.current = false; } });
   }
   const [year, month, day] = t.dateISO.split('-').map(Number);
   const date = formatDate(t.dateISO, 'weekdayLong');
-  const status = record.voided ? 'Deshecha · no afecta los saldos' : kindTitle === 'Transferencia' ? 'Entre tus cuentas · no es gasto ni ingreso'
-    : 'Mueve saldo hacia la obligación · no es gasto ni ingreso';
+  const status = tr(record.voided ? 'transferDetail.statusVoided' : kindId === 'transfer' ? 'transferDetail.statusBetween' : 'transferDetail.statusObligation');
   return <Screen gap={space.xl}>
-    <Stack.Screen options={{ title: record.voided ? 'Transferencia deshecha' : kindTitle, gestureEnabled: !busy, headerBackVisible: !busy }} />
+    <Stack.Screen options={{ title: record.voided ? tr('transferDetail.voidedTitle') : kindTitle, gestureEnabled: !busy, headerBackVisible: !busy }} />
     <View style={{ alignItems: 'center', gap: 14, paddingVertical: 12 }}>
       <GlyphTile icon={toKind === 'card' ? 'card-outline' : toKind === 'debt' || fromKind === 'debt' ? 'people-outline' : 'swap-horizontal-outline'} tone="transfer" large />
       <View style={{ alignItems: 'center', gap: 4, width: '100%' }}>
@@ -71,15 +74,15 @@ function TransferDetail({ record, accounts }: { record: TransferRecord; accounts
       <AppText accessibilityLiveRegion="polite" variant="caption" style={{ color: record.voided ? p.warning : p.secondary, fontWeight: '500', textAlign: 'center' }}>{status}</AppText>
     </View>
     <Surface grouped>
-      <DetailRow label="Desde" value={from.name} icon="arrow-up-outline" leading={fromKind === 'cash' ? <AccountBadge accountId={from.id} size={28} /> : undefined} disabled={busy} onPress={() => router.push(linkFor(from))} />
-      <DetailRow label="Hacia" value={to.name} icon="arrow-down-outline" leading={toKind === 'cash' ? <AccountBadge accountId={to.id} size={28} /> : undefined} disabled={busy} onPress={() => router.push(linkFor(to))} last={!t.note} />
-      {!!t.note && <DetailRow label="Nota" value={t.note} last />}
+      <DetailRow label={tr('transferForm.from')} value={from.name} icon="arrow-up-outline" leading={fromKind === 'cash' ? <AccountBadge accountId={from.id} size={28} /> : undefined} disabled={busy} onPress={() => router.push(linkFor(from))} />
+      <DetailRow label={tr('transferForm.to')} value={to.name} icon="arrow-down-outline" leading={toKind === 'cash' ? <AccountBadge accountId={to.id} size={28} /> : undefined} disabled={busy} onPress={() => router.push(linkFor(to))} last={!t.note} />
+      {!!t.note && <DetailRow label={tr('transferDetail.note')} value={t.note} last />}
     </Surface>
     <ErrorMessage message={error} />
     <View style={{ gap: 10 }}>
-      {!record.voided && <ActionButton label="Editar transferencia" icon="create-outline" disabled={busy || !!pending}
+      {!record.voided && <ActionButton label={tr('transferDetail.edit')} icon="create-outline" disabled={busy || !!pending}
         onPress={() => router.push({ pathname: '/edit-transfer/[id]', params: { id: t.id } })} />}
-      <ActionButton label={pending ? 'Reintentar cambio' : record.voided ? 'Recuperar transferencia' : 'Deshacer transferencia'}
+      <ActionButton label={pending ? tr('common.retryChange') : tr(record.voided ? 'transferDetail.restoreAction' : 'transferDetail.voidAction')}
         icon={record.voided ? 'arrow-redo-outline' : 'arrow-undo-outline'} busy={busy} secondary={!record.voided} onPress={confirm} />
     </View>
   </Screen>;

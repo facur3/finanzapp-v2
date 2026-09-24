@@ -13,7 +13,7 @@ import { LedgerProvider, useLedger } from '../src/storage/LedgerProvider';
 import { CategoryHuesProvider } from '../src/ui/category-hues';
 import { ActionButton, AppText, ErrorMessage } from '../src/ui/components';
 import { UIProvider, usePalette, useReduceMotion } from '../src/ui/theme';
-import { I18nProvider } from '../src/i18n/provider';
+import { I18nProvider, useI18n } from '../src/i18n/provider';
 
 void SplashScreen.preventAutoHideAsync().catch(() => {});
 
@@ -31,6 +31,8 @@ function Navigation() {
   const [fontsLoaded, fontError] = useFonts(Ionicons.font);
   const p = usePalette();
   const reduced = useReduceMotion();
+  // Headers read the catalogue here, so a language change re-titles every screen in place without touching the stack.
+  const { t } = useI18n();
   useEffect(() => {
     void SystemUI.setBackgroundColorAsync(p.background).catch(() => {});
   }, [p.background]);
@@ -43,10 +45,10 @@ function Navigation() {
   if (fontError || !snapshot || !fontsLoaded) return <SafeAreaView style={{ flex: 1, backgroundColor: p.background }}>
     <View style={{ flex: 1, padding: 28, justifyContent: 'center', gap: 20 }}>
       {error || fontError ? <>
-        <AppText variant="title1">No pudimos abrir FinanzApp</AppText>
-        <ErrorMessage message={error ?? 'No se pudieron cargar los recursos. Cerrá y abrí la app. Tus datos siguen guardados.'} />
-        {!fontError && <ActionButton label="Volver a intentar" onPress={retry} />}
-      </> : <ActivityIndicator accessibilityLabel="Abriendo tus datos" color={p.secondary} />}
+        <AppText variant="title1">{t('boot.openFailed')}</AppText>
+        <ErrorMessage message={error ?? t('boot.resourcesFailed')} />
+        {!fontError && <ActionButton label={t('boot.retry')} onPress={retry} />}
+      </> : <ActivityIndicator accessibilityLabel={t('boot.opening')} color={p.secondary} />}
     </View>
   </SafeAreaView>;
 
@@ -57,49 +59,49 @@ function Navigation() {
   return <ThemeProvider value={theme}><View style={{ flex: 1, backgroundColor: p.background }}>
     <StatusBar style={p.isDark ? 'light' : 'dark'} />
     {error && <SafeAreaView edges={['top']} style={{ padding: 16, backgroundColor: p.surface }}>
-      <ErrorMessage message={error} /><ActionButton label="Verificar de nuevo" onPress={retry} secondary />
+      <ErrorMessage message={error} /><ActionButton label={t('boot.verifyAgain')} onPress={retry} secondary />
     </SafeAreaView>}
     <Stack screenOptions={{ headerStyle: { backgroundColor: p.background }, headerTintColor: p.text,
       headerTitleStyle: { color: p.text }, headerShadowVisible: false,
       contentStyle: { backgroundColor: p.background }, animation: reduced ? 'fade' : 'default',
       headerBackButtonDisplayMode: 'minimal', gestureEnabled: true }}>
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-      <Stack.Screen name="account/[id]" options={{ title: 'Cuenta' }} />
-      <Stack.Screen name="accounts" options={{ title: 'Cuentas' }} />
-      <Stack.Screen name="entry/[id]" options={{ title: 'Movimiento' }} />
-      <Stack.Screen name="undone-entries" options={{ title: 'Movimientos deshechos' }} />
-      <Stack.Screen name="language" options={{ title: 'Idioma' }} />
-      <Stack.Screen name="region" options={{ title: 'Región' }} />
-      <Stack.Screen name="backup" options={{ title: 'Copia de seguridad' }} />
-      <Stack.Screen name="backup-import" options={{ title: 'Importar copia' }} />
-      <Stack.Screen name="categories" options={{ title: 'Categorías' }} />
-      <Stack.Screen name="new-category" options={{ title: 'Nueva categoría', presentation: 'modal' }} />
-      <Stack.Screen name="edit-category" options={{ title: 'Editar categoría', presentation: 'modal' }} />
-      <Stack.Screen name="spending-detail" options={{ title: 'Gastos del período' }} />
-      <Stack.Screen name="report-category" options={{ title: 'Categoría' }} />
-      <Stack.Screen name="report-day" options={{ title: 'Gastos del día' }} />
-      <Stack.Screen name="report-comparison" options={{ title: 'Comparar gastos' }} />
-      <Stack.Screen name="recurring" options={{ title: 'Recurrentes' }} />
-      <Stack.Screen name="budgets" options={{ title: 'Presupuestos' }} />
-      <Stack.Screen name="card/[id]" options={{ title: 'Tarjeta' }} />
-      <Stack.Screen name="debts" options={{ title: 'Deudas' }} />
-      <Stack.Screen name="debt/[id]" options={{ title: 'Deuda' }} />
-      <Stack.Screen name="cards" options={{ title: 'Tarjetas' }} />
-      <Stack.Screen name="new-account" options={{ title: 'Nueva cuenta', presentation: 'modal' }} />
-      <Stack.Screen name="new-entry" options={{ title: 'Nuevo movimiento', presentation: 'modal' }} />
-      <Stack.Screen name="edit-entry/[id]" options={{ title: 'Editar movimiento', presentation: 'modal' }} />
-      <Stack.Screen name="edit-account/[id]" options={{ title: 'Editar cuenta', presentation: 'modal' }} />
-      <Stack.Screen name="new-transfer" options={{ title: 'Entre mis cuentas', presentation: 'modal' }} />
-      <Stack.Screen name="new-recurring" options={{ title: 'Nuevo recurrente', presentation: 'modal' }} />
-      <Stack.Screen name="edit-recurring/[id]" options={{ title: 'Editar recurrente', presentation: 'modal' }} />
-      <Stack.Screen name="new-budget" options={{ title: 'Nuevo presupuesto', presentation: 'modal' }} />
-      <Stack.Screen name="edit-budget/[id]" options={{ title: 'Editar presupuesto', presentation: 'modal' }} />
-      <Stack.Screen name="new-card" options={{ title: 'Nueva tarjeta', presentation: 'modal' }} />
-      <Stack.Screen name="edit-card/[id]" options={{ title: 'Editar tarjeta', presentation: 'modal' }} />
-      <Stack.Screen name="new-debt" options={{ title: 'Nueva deuda', presentation: 'modal' }} />
-      <Stack.Screen name="edit-debt/[id]" options={{ title: 'Editar deuda', presentation: 'modal' }} />
-      <Stack.Screen name="edit-transfer/[id]" options={{ title: 'Editar transferencia', presentation: 'modal' }} />
-      <Stack.Screen name="transfer/[id]" options={{ title: 'Transferencia' }} />
+      <Stack.Screen name="account/[id]" options={{ title: t('nav.titles.account') }} />
+      <Stack.Screen name="accounts" options={{ title: t('nav.titles.accounts') }} />
+      <Stack.Screen name="entry/[id]" options={{ title: t('nav.titles.entry') }} />
+      <Stack.Screen name="undone-entries" options={{ title: t('nav.titles.undoneEntries') }} />
+      <Stack.Screen name="language" options={{ title: t('nav.titles.language') }} />
+      <Stack.Screen name="region" options={{ title: t('nav.titles.region') }} />
+      <Stack.Screen name="backup" options={{ title: t('nav.titles.backup') }} />
+      <Stack.Screen name="backup-import" options={{ title: t('nav.titles.backupImport') }} />
+      <Stack.Screen name="categories" options={{ title: t('nav.titles.categories') }} />
+      <Stack.Screen name="new-category" options={{ title: t('nav.titles.newCategory'), presentation: 'modal' }} />
+      <Stack.Screen name="edit-category" options={{ title: t('nav.titles.editCategory'), presentation: 'modal' }} />
+      <Stack.Screen name="spending-detail" options={{ title: t('nav.titles.spendingDetail') }} />
+      <Stack.Screen name="report-category" options={{ title: t('nav.titles.reportCategory') }} />
+      <Stack.Screen name="report-day" options={{ title: t('nav.titles.reportDay') }} />
+      <Stack.Screen name="report-comparison" options={{ title: t('nav.titles.reportComparison') }} />
+      <Stack.Screen name="recurring" options={{ title: t('nav.titles.recurring') }} />
+      <Stack.Screen name="budgets" options={{ title: t('nav.titles.budgets') }} />
+      <Stack.Screen name="card/[id]" options={{ title: t('nav.titles.card') }} />
+      <Stack.Screen name="debts" options={{ title: t('nav.titles.debts') }} />
+      <Stack.Screen name="debt/[id]" options={{ title: t('nav.titles.debt') }} />
+      <Stack.Screen name="cards" options={{ title: t('nav.titles.cards') }} />
+      <Stack.Screen name="new-account" options={{ title: t('nav.titles.newAccount'), presentation: 'modal' }} />
+      <Stack.Screen name="new-entry" options={{ title: t('nav.titles.newEntry'), presentation: 'modal' }} />
+      <Stack.Screen name="edit-entry/[id]" options={{ title: t('nav.titles.editEntry'), presentation: 'modal' }} />
+      <Stack.Screen name="edit-account/[id]" options={{ title: t('nav.titles.editAccount'), presentation: 'modal' }} />
+      <Stack.Screen name="new-transfer" options={{ title: t('nav.titles.newTransfer'), presentation: 'modal' }} />
+      <Stack.Screen name="new-recurring" options={{ title: t('nav.titles.newRecurring'), presentation: 'modal' }} />
+      <Stack.Screen name="edit-recurring/[id]" options={{ title: t('nav.titles.editRecurring'), presentation: 'modal' }} />
+      <Stack.Screen name="new-budget" options={{ title: t('nav.titles.newBudget'), presentation: 'modal' }} />
+      <Stack.Screen name="edit-budget/[id]" options={{ title: t('nav.titles.editBudget'), presentation: 'modal' }} />
+      <Stack.Screen name="new-card" options={{ title: t('nav.titles.newCard'), presentation: 'modal' }} />
+      <Stack.Screen name="edit-card/[id]" options={{ title: t('nav.titles.editCard'), presentation: 'modal' }} />
+      <Stack.Screen name="new-debt" options={{ title: t('nav.titles.newDebt'), presentation: 'modal' }} />
+      <Stack.Screen name="edit-debt/[id]" options={{ title: t('nav.titles.editDebt'), presentation: 'modal' }} />
+      <Stack.Screen name="edit-transfer/[id]" options={{ title: t('nav.titles.editTransfer'), presentation: 'modal' }} />
+      <Stack.Screen name="transfer/[id]" options={{ title: t('nav.titles.transfer') }} />
     </Stack>
   </View></ThemeProvider>;
 }

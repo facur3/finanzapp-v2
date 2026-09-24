@@ -15,13 +15,97 @@ server-keyed; manual recording and local data work without connectivity. Recurri
 expenses, debts, budgets and cards remain in scope. Native navigation, accessible
 amounts, real data and recoverable durable writes remain requirements.
 
-## Status and current delivery — Producto 23.1A
+## Status and current delivery — Producto 23.1B1
 
 Implemented is code, checked names a test, device-verified needs a physical result,
 and released means distributed. Neither a bundle nor a screenshot is App Store QA.
 
+Producto 23.1B (every screen's copy in the catalogue) is split into two PRs. **23.1B1**
+(this delivery): navigation, Inicio, Movimientos, the main movement forms and the shared
+components. **23.1B2** (next, after this PR is approved): the remaining financial
+screens, Reportes, Tarjetas, Deudas, Recurrentes, Presupuestos, Cuentas, Categorías,
+backup and the Asistente. English stays unreleased and unlisted until 23.1B2 and 23.1C
+are complete. No visible Spanish text changed; no schema, SQLite, stored amount,
+accounting rule, backup, currency engine, `AmountField` separator or `money-input.ts`
+change; no native module.
+
+- [x] **Catalogues** (`messages/es.ts`, `messages/en.ts`): new namespaces `nav` (five tab
+  labels, both header actions and every stack header title, B2 screens included, since
+  headers are navigation), `boot`, `home`, `budgetStatus`, `quickActions`, `activity`,
+  `movement`, `accountKinds`, `rows`, `entryForm`, `transferForm`, `entryDetail`,
+  `transferDetail`, `spendingDetail`, `categories` and `errors`. Every Spanish value is
+  the string the screen showed before, byte for byte (the 323 existing route tests,
+  which assert Spanish copy, pass unchanged apart from three contract updates below).
+  Plurals (`{ one, other }`) for movement, expense, account, category, day and budget
+  counts. The English catalogue is complete for the same keys.
+- [x] **Screens moved to the catalogue:** root layout (loading and failure screens,
+  every header), tab layout (labels, "Ver mis cuentas", "Registrar movimiento"), Inicio
+  (metric switch, hero, contextual help, section titles, empty states, budget card,
+  upcoming row, category ranking VoiceOver), quick actions, Movimientos (search,
+  filters, count, empty states, day headers and their VoiceOver net), movement detail
+  (title, status, rows, budget line, undo/restore alert, buttons), transfer detail,
+  spending period detail, Movimientos deshechos, the movement modal (Gasto / Ingreso /
+  Transferencia), the entry form and the transfer form (card payments and debt
+  settlements included, since they share it), edit-not-possible states, and the shared
+  components (`EntryRow`, `TransferRow`, `AccountRow`, `ErrorMessage`, `AccountField`,
+  `CategoryField`, `DateField`, `CurrencyField`, `AmountField`). Row dates go through the
+  new `relativeDate` (Spanish identical to the domain's `labelFromISO` for every day
+  tested); header titles are set from `useI18n()`, so they re-title in place.
+- [x] **Built-in categories** read in the interface language (`categories.<kind>.<key>`,
+  keyed by the identity key, e.g. `categories.expense.comida` → "Food"). Only the
+  display label changes (`localizedCategoryLabel` in `src/ui/appearance.ts`, applied by
+  `useCategoryLook`/`useCategoryLookOf`): the stored string ("Comida"), the identity key,
+  budgets, history, reports grouping and backups are untouched. A renamed preset, a
+  custom category and a historical string are the person's own words and are never
+  translated. The picker lists translated names, finds either name ("food" and "comida")
+  and never offers to create "Food" as a duplicate; Movimientos search also matches the
+  displayed name.
+- [x] **Errors in the reader's language, at display time.** `ErrorMessage` translates
+  through `errorText` (`src/i18n/errors.ts`): a form stores its own message as a catalogue
+  key (`entryForm.futureDate`), and a thrown domain/storage message is recognised by its
+  exact Spanish text (`errors.domain.*`, `errors.storage.*`). An error already on screen
+  therefore follows a language change; an unrecognised message (from a B2 area) is shown
+  as thrown, never blank. A test fails if any catalogued message stops being thrown
+  verbatim.
+- [x] **Card/debt glyph no longer depends on wording.** `AccountField` decided "card or
+  debt" by checking whether the kind label started with "Tarjeta"; it now takes `typeOf`
+  (the ledger's `accountKind`), so "Credit card" still shows the card glyph.
+- [x] **Overflow review for English.** Segment, tab and quick-action labels stay at or
+  under the Spanish length (Activity filters: All / Expenses / Income / Transfers;
+  movement modal: Expense / Income / Transfer); buttons ≤ 24 characters and header
+  titles ≤ 24 on a 320 pt iPhone; a length-budget test guards both catalogues. No
+  layout, spacing, material or motion changed; Dynamic Type, VoiceOver labels, both
+  themes, Reduce Transparency and Reduce Motion paths are the same components as before.
+- [x] **Checked on Linux:** 343 mobile tests (20 new: `translation.node.ts` with 14 cases
+  — release gate, no hard-coded copy left in the 20 B1 files, every key the code asks
+  for exists and parameterless calls have no placeholders, both catalogues complete and
+  really English, plurals for 0/1/2/21/1000, placeholder filling, error localisation,
+  catalogued errors still thrown verbatim, built-in category identities unchanged,
+  picker search and no duplicates, Movimientos search, row dates byte-identical to
+  `labelFromISO`, account kinds, length budgets; four in `recovery-routes.node.ts` — the
+  entry form in English saves a movement identical to the Spanish one, a language switch
+  mid-draft keeps every field, errors stored as keys or thrown text and shown in either
+  language, movement detail and transfer form in English; one in `navigation.node.ts` —
+  tab labels and header actions; one in `spending-home.node.ts` — Inicio in English with
+  the same figures and an in-place switch back), TypeScript, `expo install --check`,
+  dependency tree, `npm audit` (0), Metro iOS export (Hermes), 397 root tests, Vite build,
+  repo hygiene. Mutation checks: a reintroduced literal label and a misspelled key each
+  fail the scan tests.
+- [ ] **Not device-verified:** that nothing visible changed in Spanish on the iPhone
+  (every screen of the list above, both themes, largest Dynamic Type, VoiceOver). English
+  cannot be seen on the device until it is released (23.1C); its layout is checked by
+  the length budgets, not by UIKit.
+- [ ] **Known gaps left for 23.1B2:** the screens listed above as B2; the `title` and
+  `note` route parameters those screens pass to the transfer form (a card or debt payment
+  opened from Tarjetas/Deudas still carries a Spanish title); domain/storage errors of
+  cards, debts, budgets, recurring rules, categories and backups; `SpendingTimeline`
+  (unused) copy; accessibility amounts still use `formatMinorUnits` with the currency
+  code (regional separators are 23.1C).
+
+### Previous delivery — Producto 23.1A
+
 Producto 23.1 (complete internationalization) is split into three independent PRs:
-**23.1A** reactive language and region architecture (this delivery), **23.1B** every
+**23.1A** reactive language and region architecture, **23.1B** every
 screen's copy in the catalogue, **23.1C** regional money formats and the amount field,
 the English release and the native language configuration. 23.1A changes no visible
 text beyond the new Idioma row and screen, no financial semantics, schema, backup,
@@ -1078,9 +1162,11 @@ by CI and merged into master before the next starts:
 13. ~~Interaction polish and localization foundation~~ — delivered in Producto 23.0
     (SelectionRow, anchored amount field, overflow audit, `src/i18n` with es-AR and
     en-US catalogues, English not yet released).
-14. **Producto 23.1 — complete internationalization**, in three PRs: **23.1A**
-    (reactive language/region architecture, the Idioma preference; this delivery),
-    **23.1B** (every screen's copy through the catalogue, English complete but gated),
+14. **Producto 23.1 — complete internationalization**, in four PRs: **23.1A**
+    (reactive language/region architecture, the Idioma preference; delivered),
+    **23.1B1** (navigation, Inicio, Movimientos, main forms and shared components through
+    the catalogue; this delivery), **23.1B2** (remaining financial screens, Reportes,
+    Tarjetas, Deudas, Recurrentes, backup and the Asistente; English complete but gated),
     **23.1C** (regional money formats and amount-field separators, the US region and
     English released, `supportedLocales`). Original scope: every screen's copy in the
     catalogue, English released (`RELEASED_LOCALES`), `expo-localization`'s
@@ -1111,12 +1197,32 @@ by CI and merged into master before the next starts:
     which rate, an unknown rate yields "unknown" rather than a guessed number, and the
     rate table is user data with history (never a fabricated market series). Same-day
     ARS/USD transfers inside the ledger still need the person's own dated rate.
-16. Then, in order: first-entry onboarding, financial productivity (reminders,
-    smarter budgets and recurring rules), the real cloud/text Assistant activation
-    (its cost and abuse controls listed under "Activate smart capture" must exist
-    before any paid call), Apple integrations on the development build (Face ID,
-    notifications with the card due-date reminder, Apple Pay capture, App Intents),
-    monetization, brand and launch.
+16. Then, in order: first-entry onboarding, financial productivity (backlog below),
+    the real cloud/text Assistant activation with quotas and cost control (its cost and
+    abuse controls listed under "Activate smart capture" must exist before any paid
+    call), Apple integrations on the development build (Face ID, notifications with the
+    card due-date reminder, Apple Pay capture, App Intents), monetization, brand and
+    launch. The multi-currency engine (item 15) precedes them.
+17. **Financial productivity backlog** (ordered by the owner's priority; each a focused
+    PR with its own domain tests, none started):
+    - Card form and calendar: a clearer card form and a real calendar for closing and due
+      days.
+    - Real closing and due dates per statement (each statement carries its own dates
+      instead of a fixed monthly day).
+    - Notifications and reminders (opt-in, local first, private content by default,
+      deduplicated; device evidence required).
+    - Financial goals (target, date, progress from recorded movements; no simulated
+      returns).
+    - Rollover budgets (unused budget carried to the next month, explicit and reversible).
+    - Split expenses and tags (a movement split across categories or people; free tags
+      that never replace the category).
+    - CSV import and categorisation rules (a reviewed draft before anything is written;
+      rules only pre-fill).
+    - Reports and search improvements (account and custom-period filters, saved searches).
+18. **Future optional expansion (not planned, no dependency added now):** CEDEARs, ETFs,
+    cryptocurrencies and broker connections. They stay outside the native scope of
+    decision 002 until a separate decision with official data access, dated quotes and
+    user consent; nothing in the ledger, schema or dependencies anticipates them.
 
 ### 1. Complete the daily tracking loop
 
@@ -1225,6 +1331,23 @@ amount uses `useStacked()` and gives the name two lines. 44-point targets, Voice
 safe areas, system text and separate currencies apply to every new screen.
 
 ## Handoff log (historical evidence)
+
+### 2026-09-23 — Producto 23.1B1: translation of navigation, Inicio, Movimientos and main forms
+
+- Navigation (tab labels, header actions, every stack header), the loading/failure
+  screens, Inicio, quick actions, Movimientos, movement and transfer details, the
+  spending period, Movimientos deshechos, the movement modal, the entry and transfer
+  forms and the shared rows/selectors read the catalogues; Spanish output unchanged byte
+  for byte; English complete for these keys and still unreleased. Built-in categories
+  show a localized name with the same stored string, key, budgets and history; custom,
+  renamed and historical categories are never translated. Errors are translated when
+  shown (catalogue keys and known thrown messages). `AccountField` decides card/debt by
+  the ledger kind, not by the label.
+- **Checked on Linux:** 343 mobile tests, TypeScript, Expo dependency check, dependency
+  tree, audit, Metro iOS export, 397 root tests, Vite build, repo hygiene. **Not
+  device-verified:** Spanish unchanged on the iPhone; English layout only by length
+  budgets until 23.1C releases it. No native rebuild needed.
+- **Next:** 23.1B2 after this PR is approved (list under the current delivery).
 
 ### 2026-09-23 — Producto 23.1A: reactive language and region architecture
 

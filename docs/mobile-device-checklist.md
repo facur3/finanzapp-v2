@@ -1,5 +1,43 @@
 # Physical iPhone acceptance checklist
 
+## Producto 23.1B1 — translation of navigation, Inicio, Movimientos and forms (pending device review)
+
+No native change: the installed **FinanzApp Dev** runs this PR from Metro. From
+`apps/mobile`: `git pull`, `npm install`, `npm run start:dev-client -- --clear`, reload.
+Expo Go works too. English is **not** released, so on the iPhone this PR must look
+exactly like 23.1A in Spanish; the English layout is checked by tests only until 23.1C.
+
+- [ ] Más footer reads "Producto 23.1B1".
+- [ ] Tab bar: Inicio, Movimientos, Asistente (centre), Reportes, Más; header buttons
+  "Ver mis cuentas" (Inicio) and "+" (Movimientos) read the same with VoiceOver.
+- [ ] Inicio: Gastos / Disponible switch, month name, "Saldo registrado" with its ⓘ help
+  alert, "N cuentas", Presupuesto del mes card ("te queda" / "excedido", "de $ … · N %",
+  "N categorías en orden"), En qué gastaste (VoiceOver "Comida, …, 30 % del gasto del
+  mes"), Próximos compromisos ("Hoy", "Mañana", "En N días"), Últimos movimientos, the
+  four quick actions. Same text, same layout as before.
+- [ ] Movimientos: search field and placeholder, Todos / Gastos / Ingresos / Transf.,
+  "N movimientos", day headers (Hoy · 23 sep, Ayer · …), the day net and its VoiceOver
+  ("Neto del día …"), "Sin coincidencias" with Limpiar filtros, and the empty state on a
+  fresh install (do not delete data for this; skip if not possible).
+- [ ] Rows: category names (Comida, Supermercado, a custom category, a renamed one)
+  exactly as before; "Hoy", "Ayer", "Anteayer", "13 jul"; transfers "Caja → Banco".
+- [ ] Movement detail and transfer detail: titles, status line, rows, budget line,
+  Deshacer / Recuperar alerts (read the whole message, then Cancelar), Editar buttons.
+- [ ] Nuevo movimiento: Gasto / Ingreso / Transferencia; Pagado con / Ingresa en,
+  Comercio o concepto "Ej. Carrefour", the category sheet ("Buscar o crear categoría",
+  typing a new name shows "Usar «…»"), Fecha, "Guardar gasto · $ …". Pick a card:
+  the card glyph (not the wallet) in the selector and in the sheet.
+- [ ] Transfer form: Desde / Hacia, "Usar todo", "Nota (opcional)", "Caja después",
+  negative-balance warning. From Tarjetas → Pagar: "Pagar total", "Registrar pago".
+- [ ] Errors still read in Spanish: choose a future date (Elegí hoy o una fecha
+  anterior…), and try a card payment above the debt (El pago supera la deuda…).
+- [ ] Leave a half-typed movement open, go to Más → Idioma, change the choice, come back:
+  the draft is intact and the header title is unchanged.
+- [ ] Largest Dynamic Type, light and dark, Reduce Transparency and Reduce Motion: no
+  new truncation or overlap on the screens above.
+- [ ] No account, card, movement, budget or rule changed; a new backup restores the same
+  data.
+
 ## Producto 23.1A — language and region architecture (pending device review)
 
 No native change: the **installed FinanzApp Dev** (the build rebuilt for 23.0 with

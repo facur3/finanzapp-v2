@@ -240,20 +240,24 @@ test('edit-category route resolves presets and historical strings by (kind, key)
 });
 test('account selectors use the account identity: a cash account shows its own glyph and colour, a card keeps the card glyph', () => {
   const view = harness('src/ui/form-controls.tsx', { accounts: [cash, cardAccount], value: 'cash', onChange: () => {}, prominent: true,
-    kindOf: (id: string) => id === 'card-acc' ? 'Tarjeta de crédito' : 'Cuenta' });
+    kindOf: (id: string) => id === 'card-acc' ? 'Tarjeta de crédito' : 'Cuenta', typeOf: (id: string) => id === 'card-acc' ? 'card' : 'cash' });
   // The selector card unwraps to a PressFeedback whose first child is the identity tile.
   const selector = (root: any) => { let card = root.props.children[0]; while (typeof card.type === 'function') card = card.type(card.props); return card.props.children[0]; };
   let chosen = selector(view.render('AccountField'));
   assert.equal(chosen.props.icon, 'business-outline', 'Cocos was dressed as a bank');
   assert.equal(chosen.props.color, '#0B6BB3', 'in azure, not the generic primary');
   const asCard = harness('src/ui/form-controls.tsx', { accounts: [cash, cardAccount], value: 'card-acc', onChange: () => {}, prominent: true,
-    kindOf: (id: string) => id === 'card-acc' ? 'Tarjeta de crédito' : 'Cuenta' });
+    kindOf: (id: string) => id === 'card-acc' ? 'Tarjeta de crédito' : 'Cuenta', typeOf: (id: string) => id === 'card-acc' ? 'card' : 'cash' });
   chosen = selector(asCard.render('AccountField'));
   assert.equal(chosen.props.icon, 'card-outline');
   assert.equal(chosen.props.color, '#2557D6');
   const plain = harness('src/ui/form-controls.tsx', { accounts: [usd], value: 'usd', onChange: () => {}, prominent: true });
   chosen = selector(plain.render('AccountField'));
   assert.deepEqual([chosen.props.icon, chosen.props.color], ['wallet-outline', '#2557D6'], 'an undressed account keeps the default look');
+  // The glyph follows what the account is (typeOf), never its translated kind name: an English "Credit card" is still a card.
+  const english = harness('src/ui/form-controls.tsx', { accounts: [cash, cardAccount], value: 'card-acc', onChange: () => {}, prominent: true,
+    kindOf: (id: string) => id === 'card-acc' ? 'Credit card' : 'Account', typeOf: (id: string) => id === 'card-acc' ? 'card' : 'cash' });
+  assert.equal(selector(english.render('AccountField')).props.icon, 'card-outline');
   // The sheet rows use the same identity: a cash account is an AccountBadge, a card a plain tile.
   const sheet = nodes(view.render('AccountField')).find(node => node.type === 'FlatList')!;
   const rows = [cash, cardAccount].map(item => sheet.props.renderItem({ item }));

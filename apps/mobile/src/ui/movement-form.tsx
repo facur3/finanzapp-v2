@@ -5,6 +5,7 @@ import { EntryForm, type EntryPrefill } from './entry-form';
 import { ValueTransition } from './motion';
 import { space, usePalette } from './theme';
 import { TransferForm } from './transfer-form';
+import { useI18n } from '../i18n/provider';
 
 export type MovementKind = 'expense' | 'income' | 'transfer';
 
@@ -17,12 +18,13 @@ export function MovementForm({ kind: initialKind = 'expense', accountId, currenc
   kind?: string; accountId?: string; currency?: string; prefill?: EntryPrefill;
 }) {
   const p = usePalette();
+  const { t } = useI18n();
   const [kind, setKind] = useState<MovementKind>(initialKind === 'income' ? 'income' : initialKind === 'transfer' ? 'transfer' : 'expense');
   const [carried, setCarried] = useState<string | undefined>(accountId);
   return <View style={{ flex: 1, backgroundColor: p.background }}>
     <View style={{ paddingHorizontal: space.xl, paddingTop: space.m }}>
       <Choices<MovementKind> value={kind} onChange={setKind}
-        options={[{ value: 'expense', label: 'Gasto' }, { value: 'income', label: 'Ingreso' }, { value: 'transfer', label: 'Transferencia' }]} />
+        options={[{ value: 'expense', label: t('movement.expense') }, { value: 'income', label: t('movement.income') }, { value: 'transfer', label: t('movement.transfer') }]} />
     </View>
     <ValueTransition id={kind === 'transfer' ? 'transfer' : 'entry'} variant="fade" style={{ flex: 1 }}>
       {kind === 'transfer'

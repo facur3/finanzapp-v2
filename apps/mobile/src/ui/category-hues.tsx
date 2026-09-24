@@ -4,6 +4,7 @@ import { useLedger } from '../storage/LedgerProvider';
 import { resolveAccountLook, resolveCategoryLook, type AccountLook, type CategoryLook } from './appearance';
 import { assignCategoryHues } from './category-color';
 import { usePalette } from './theme';
+import { useI18n } from '../i18n/provider';
 
 export type { AccountLook, CategoryLook } from './appearance';
 
@@ -28,10 +29,12 @@ export function CategoryHuesProvider({ children }: { children: ReactNode }) {
 export const useCategoryHues = () => useContext(IdentityContext).hues;
 export const useCategoryDefinitions = () => useContext(IdentityContext).definitions;
 
+/** A built-in category's name follows the interface language; see `localizedCategoryLabel`. */
 export function useCategoryLook(stored: string, kind: EntryKind = 'expense'): CategoryLook {
   const identity = useContext(IdentityContext);
   const p = usePalette();
-  return useMemo(() => resolveCategoryLook(kind, stored, identity, p), [kind, stored, identity, p.isDark]);
+  const { language } = useI18n();
+  return useMemo(() => resolveCategoryLook(kind, stored, identity, p, language), [kind, stored, identity, p.isDark, language]);
 }
 
 /** The colour for a category label in the current theme. */
@@ -48,7 +51,8 @@ export function useCategoryLabel(stored: string, kind: EntryKind = 'expense'): s
 export function useCategoryLookOf(kind: EntryKind = 'expense'): (stored: string) => CategoryLook {
   const identity = useContext(IdentityContext);
   const p = usePalette();
-  return useMemo(() => (stored: string) => resolveCategoryLook(kind, stored, identity, p), [kind, identity, p.isDark]);
+  const { language } = useI18n();
+  return useMemo(() => (stored: string) => resolveCategoryLook(kind, stored, identity, p, language), [kind, identity, p.isDark, language]);
 }
 
 export function useAccountLook(accountId: string | undefined): AccountLook {

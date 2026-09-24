@@ -12,7 +12,7 @@ import * as moneyInput from '../src/ui/money-input.ts';
 import * as appearance from '../src/ui/appearance.ts';
 import * as i18nFormat from '../src/i18n/format.ts';
 import { bindLocale } from '../src/i18n/bind.ts';
-const i18nProvider = { useI18n: () => bindLocale('es-AR') };
+import type { AppLocale } from '../src/i18n/locale.ts';
 
 // Actual screen/form handlers with native hosts replaced by descriptors.
 // This does not render UIKit, the Files picker, animation frames or gestures.
@@ -26,7 +26,7 @@ function harness(file: string, props: any = {}, options: { data?: domain.LedgerA
   add?: (value: domain.Entry) => Promise<void>; update?: (value: domain.EntryChange) => Promise<void>;
   addTransfer?: (value: domain.Transfer) => Promise<void>; updateTransfer?: (value: domain.TransferChange) => Promise<void>;
   updateAccount?: (value: domain.AccountChange) => Promise<void>; addAccount?: (value: domain.Account) => Promise<void>;
-  restore?: (value: domain.LedgerArchive, baseline: string) => Promise<void>; picker?: () => Promise<any> } = {}) {
+  restore?: (value: domain.LedgerArchive, baseline: string) => Promise<void>; picker?: () => Promise<any>; locale?: AppLocale } = {}) {
   const source = readFileSync(new URL('../' + file, import.meta.url), 'utf8');
   const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText;
   const state: any[] = [];
@@ -35,6 +35,9 @@ function harness(file: string, props: any = {}, options: { data?: domain.LedgerA
   const pushed: any[] = [], alerts: any[] = [], updates: domain.EntryChange[] = [], additions: domain.Entry[] = [], restores: any[] = [];
   const transfers: domain.Transfer[] = [], transferChanges: domain.TransferChange[] = [], accountChanges: domain.AccountChange[] = [], newAccounts: domain.Account[] = [];
   let data = options.data ?? archive;
+  // The locale is read on every render, like the live provider: switching it re-labels the next render and keeps the state.
+  let locale: AppLocale = options.locale ?? 'es-AR';
+  const i18nProvider = { useI18n: () => bindLocale(locale) };
   const jsx = (type: Node['type'], props: Node['props']) => ({ type, props });
   const ledger = { useLedger: () => ({ archive: data, snapshot: domain.snapshotFromArchive(data),
     addEntry: async (value: domain.Entry) => { additions.push(value); await options.add?.(value); },
@@ -80,7 +83,7 @@ function harness(file: string, props: any = {}, options: { data?: domain.LedgerA
     '../src/ui/appearance-picker': { IconColorPicker: 'IconColorPicker' }, '../../src/ui/appearance-picker': { IconColorPicker: 'IconColorPicker' },
   };
   const module = { exports: {} as Record<string, (props: any) => Node> };
-  runInNewContext(code, { module, exports: module.exports, Date, require: (name: string) => {
+  runInNewContext(code, { module, exports: module.exports, Date, Error, require: (name: string) => {
     if (!Object.hasOwn(modules, name)) throw new Error('Unexpected recovery dependency: ' + name);
     return modules[name];
   } });
@@ -89,6 +92,7 @@ function harness(file: string, props: any = {}, options: { data?: domain.LedgerA
       while (typeof node.type === 'function') node = node.type(node.props);
       return node; },
     setData: (next: domain.LedgerArchive) => { data = next; },
+    setLocale: (next: AppLocale) => { locale = next; },
     pushed, alerts, updates, additions, restores, transfers, transferChanges, accountChanges, newAccounts, backs: () => backs,
   };
 }
@@ -405,7 +409,9 @@ test('card payment locks the card as destination, caps at the recorded debt and 
   find(root, 'AmountField').props.onChangeText('60');
   root = view.render();
   await find(root, 'ActionButton', 'Registrar pago').props.onPress();
-  assert.match(find(view.render(), 'ErrorMessage').props.message, /supera la deuda/);
+  // The form stores the catalogue key; ErrorMessage shows it in the interface language.
+  assert.equal(find(view.render(), 'ErrorMessage').props.message, 'transferForm.overCardDebt');
+  assert.match(bindLocale('es-AR').errorText('transferForm.overCardDebt'), /supera la deuda/);
   assert.equal(view.transfers.length, 0);
   find(view.render(), 'AmountField').props.onChangeText('50');
   root = view.render();
@@ -434,6 +440,8 @@ test('expense form offers cash accounts and cards but never a personal debt acco
   assert.equal(field.props.value, 'a');
   assert.equal(field.props.kindOf('card-acc'), 'Tarjeta de crédito');
   assert.equal(field.props.kindOf('a'), 'Cuenta');
+  assert.equal(field.props.typeOf('card-acc'), 'card', 'the glyph follows the ledger kind, not the translated name');
+  assert.equal(field.props.typeOf('a'), 'cash');
   assert.equal(field.props.detail, 'Saldo registrado $ 876,55');
   assert.equal(field.props.describe({ ...cardAccount }), 'deuda 50,00');
   find(view.render(), 'AccountField').props.onChange('card-acc');
@@ -507,4 +515,105 @@ test('entry detail shows budget context only for a matching active budget, and l
   assert.equal(nodes(other.render()).some(node => node.type === 'DetailRow' && node.props.label === 'Presupuesto'), false);
   const exceeded = harness('app/entry/[id].tsx', {}, { data: { ...archive, budgets: [{ ...budget, amountMinor: 10000 }] }, params: { id: entry.id } });
   assert.equal(find(exceeded.render(), 'DetailRow', 'Presupuesto').props.tone, 'expense');
+});
+
+// Producto 23.1B1: the same forms in English. The interface language changes
+// words only; what is saved (amount, category string, date, account) is
+// identical, and a language switch in the middle of a draft keeps the draft.
+async function recordExpense(locale: AppLocale) {
+  const view = harness('src/ui/entry-form.tsx', { kind: 'expense' }, { locale });
+  let root = view.render();
+  find(root, 'AmountField').props.onChangeText('1.234,50');
+  find(root, 'Field').props.onChangeText('Kiosco');
+  find(root, 'CategoryField').props.onChange('Comida');
+  root = view.render();
+  const save = nodes(root).find(node => node.type === 'ActionButton')!;
+  await save.props.onPress();
+  return { view, root, save };
+}
+
+test('English entry form: every label comes from the catalogue and the saved movement is identical to the Spanish one', async () => {
+  const spanish = await recordExpense('es-AR');
+  const english = await recordExpense('en-AR');
+  assert.equal(nodes(english.root).find(node => node.type === 'Stack.Screen')!.props.options.title, 'Record an expense');
+  assert.equal(find(english.root, 'AmountField').props.label, 'Expense');
+  assert.equal(find(english.root, 'AccountField').props.label, 'Paid with');
+  assert.equal(find(english.root, 'AccountField').props.detail, 'Recorded balance $ 876,55');
+  assert.equal(find(english.root, 'Field').props.label, 'Merchant or description');
+  assert.equal(find(english.root, 'Field').props.placeholder, 'e.g. Supermarket');
+  assert.match(english.save.props.label, /^Save expense/);
+  assert.equal(find(english.root, 'AccountField').props.kindOf('a'), 'Account');
+  assert.equal(spanish.view.additions.length, 1);
+  assert.equal(english.view.additions.length, 1);
+  const saved = ({ createdAt, ...rest }: domain.Entry) => JSON.stringify(rest);
+  assert.equal(saved(english.view.additions[0]), saved(spanish.view.additions[0]), 'language never reaches the ledger');
+  assert.equal(english.view.additions[0].category, 'Comida', 'the stored category string stays the built-in Spanish identity');
+  assert.equal(english.view.additions[0].amountMinor, 123450);
+});
+
+test('switching the language in the middle of a draft re-labels the form and keeps every field', () => {
+  const view = harness('src/ui/entry-form.tsx', { kind: 'expense' }, { locale: 'en-AR' });
+  let root = view.render();
+  find(root, 'AmountField').props.onChangeText('50');
+  find(root, 'Field').props.onChangeText('Farmacia del centro');
+  find(root, 'CategoryField').props.onChange('Farmacia');
+  root = view.render();
+  assert.equal(find(root, 'Field').props.label, 'Merchant or description');
+  view.setLocale('es-AR');
+  root = view.render();
+  assert.equal(find(root, 'Field').props.label, 'Comercio o concepto');
+  assert.equal(find(root, 'AmountField').props.value, '50');
+  assert.equal(find(root, 'Field').props.value, 'Farmacia del centro');
+  assert.equal(find(root, 'CategoryField').props.value, 'Farmacia');
+  assert.equal(view.additions.length, 0, 'switching never saves');
+});
+
+test('form errors are stored as keys or thrown messages and shown in the interface language', async () => {
+  const view = harness('src/ui/entry-form.tsx', { kind: 'expense' }, { locale: 'en-AR' });
+  let root = view.render();
+  find(root, 'AmountField').props.onChangeText('0');
+  find(root, 'Field').props.onChangeText('Kiosco');
+  find(root, 'CategoryField').props.onChange('Comida');
+  root = view.render();
+  await nodes(root).find(node => node.type === 'ActionButton')!.props.onPress();
+  const domainMessage = find(view.render(), 'ErrorMessage').props.message;
+  assert.equal(domainMessage, 'El monto debe ser mayor que cero y tener hasta dos decimales.', 'the domain message is kept as thrown');
+  assert.equal(bindLocale('en-AR').errorText(domainMessage), 'The amount must be greater than zero, with up to two decimals.');
+  assert.equal(bindLocale('es-AR').errorText(domainMessage), domainMessage);
+  assert.equal(view.additions.length, 0, 'a refused draft is not saved and stays on screen');
+  assert.equal(find(view.render(), 'Field').props.value, 'Kiosco');
+
+  const future = harness('src/ui/entry-form.tsx', { kind: 'expense' }, { locale: 'en-AR' });
+  root = future.render();
+  find(root, 'AmountField').props.onChangeText('10');
+  find(root, 'Field').props.onChangeText('Kiosco');
+  find(root, 'CategoryField').props.onChange('Comida');
+  find(root, 'DateField').props.onChange(new Date(Date.now() + 3 * 86400000));
+  await nodes(future.render()).find(node => node.type === 'ActionButton')!.props.onPress();
+  const key = find(future.render(), 'ErrorMessage').props.message;
+  assert.equal(key, 'entryForm.futureDate');
+  assert.match(bindLocale('en-AR').errorText(key), /^Choose today or an earlier date/);
+  assert.match(bindLocale('es-AR').errorText(key), /^Elegí hoy o una fecha anterior/);
+});
+
+test('English movement detail and transfer form: titles, rows, confirmation and buttons are translated; values are not', () => {
+  const detail = harness('app/entry/[id].tsx', {}, { params: { id: 'e' }, locale: 'en-AR' });
+  const root = detail.render();
+  assert.equal(nodes(root).find(node => node.type === 'Stack.Screen')!.props.options.title, 'Expense');
+  const rows = nodes(root).filter(node => node.type === 'DetailRow').map(node => node.props.label + '=' + node.props.value);
+  assert.deepEqual(rows, ['Category=Salud', 'Account=Prueba ARS', 'Currency=Argentine pesos'], 'the stored name and the account name are not translated');
+  find(root, 'ActionButton', 'Undo transaction').props.onPress();
+  assert.equal(detail.alerts[0].title, 'Undo transaction?');
+  assert.equal(detail.alerts[0].message, '123,45 ARS will be added to Prueba ARS. It will stop counting in your balances and reports. You can restore it later.');
+  assert.equal(detail.alerts[0].buttons.map((button: any) => button.text).join(','), 'Cancel,Undo');
+  assert.equal(detail.updates.length, 0, 'asking never writes');
+
+  const transfer = harness('src/ui/transfer-form.tsx', { accountId: 'a' }, { locale: 'en-AR',
+    data: { ...archive, accounts: [account, { ...account, id: 'b', name: 'Caja' }] } });
+  const form = transfer.render();
+  assert.equal(nodes(form).find(node => node.type === 'Stack.Screen')!.props.options.title, 'Between my accounts');
+  assert.deepEqual(nodes(form).filter(node => node.type === 'AccountField').map(node => node.props.label), ['From', 'To']);
+  assert.equal(find(form, 'AmountField').props.label, 'Transfer');
+  assert.equal(find(form, 'Field').props.label, 'Note (optional)');
+  assert.equal(find(form, 'ActionButton').props.label, 'Record transfer');
 });

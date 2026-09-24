@@ -5,6 +5,7 @@ import type { Currency } from '@finanzapp/domain';
 import { AppText, PressFeedback, toneColors, type IconName, type Tone } from './components';
 import { ControlSurface, useMaterial } from './material';
 import { space, usePalette, type Palette } from './theme';
+import { useI18n } from '../i18n/provider';
 
 type ActionKind = 'assistant' | 'expense' | 'income' | 'transfer';
 type Action = { kind: ActionKind; label: string; accessibilityLabel: string; icon: IconName; tone: Tone | 'primary'; onPress: () => void };
@@ -45,13 +46,14 @@ export function glassTint(p: Palette, assistant: boolean): string | undefined {
  * here is a discoverability shortcut: the persistent, thumb-reachable entry
  * is the centre tab, and both go to the same conversation. */
 export function QuickActions({ currency, accountId, assistant = false }: { currency?: Currency; accountId?: string; assistant?: boolean }) {
+  const { t } = useI18n();
   const params = { ...(accountId ? { accountId } : {}), ...(currency ? { currency } : {}) };
   const actions: Action[] = [
-    ...(assistant ? [{ kind: 'assistant' as const, label: 'Asistente', accessibilityLabel: 'Abrir el Asistente', icon: 'sparkles' as const, tone: 'primary' as const,
+    ...(assistant ? [{ kind: 'assistant' as const, label: t('quickActions.assistant'), accessibilityLabel: t('quickActions.openAssistant'), icon: 'sparkles' as const, tone: 'primary' as const,
       onPress: () => router.navigate({ pathname: '/assistant', params: currency ? { currency } : {} }) }] : []),
-    { kind: 'expense', label: 'Gasto', accessibilityLabel: 'Registrar gasto', icon: 'remove', tone: 'expense', onPress: () => router.push({ pathname: '/new-entry', params: { kind: 'expense', ...params } }) },
-    { kind: 'income', label: 'Ingreso', accessibilityLabel: 'Registrar ingreso', icon: 'add', tone: 'income', onPress: () => router.push({ pathname: '/new-entry', params: { kind: 'income', ...params } }) },
-    { kind: 'transfer', label: 'Transferir', accessibilityLabel: 'Transferir entre cuentas', icon: 'swap-horizontal', tone: 'transfer', onPress: () => router.push({ pathname: '/new-transfer', params: accountId ? { accountId } : {} }) },
+    { kind: 'expense', label: t('quickActions.expense'), accessibilityLabel: t('quickActions.recordExpense'), icon: 'remove', tone: 'expense', onPress: () => router.push({ pathname: '/new-entry', params: { kind: 'expense', ...params } }) },
+    { kind: 'income', label: t('quickActions.income'), accessibilityLabel: t('quickActions.recordIncome'), icon: 'add', tone: 'income', onPress: () => router.push({ pathname: '/new-entry', params: { kind: 'income', ...params } }) },
+    { kind: 'transfer', label: t('quickActions.transfer'), accessibilityLabel: t('quickActions.transferBetween'), icon: 'swap-horizontal', tone: 'transfer', onPress: () => router.push({ pathname: '/new-transfer', params: accountId ? { accountId } : {} }) },
   ];
   return <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: space.s, marginHorizontal: -space.xs }}>
     {actions.map(action => <QuickAction key={action.kind} {...action} />)}

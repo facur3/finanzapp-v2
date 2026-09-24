@@ -7,7 +7,7 @@ import { categoryKey, formatMinorUnits, makeEntryChange, summarizeMonthlyBudgets
 import { useLedger } from '../../src/storage/LedgerProvider';
 import { budgetTone } from '../../src/ui/budget-presentation';
 import { AccountBadge, ActionButton, AppText, CategoryBadge, DetailRow, EmptyState, ErrorMessage, Money, Screen, Surface } from '../../src/ui/components';
-import { currencyName, formatDate } from '../../src/i18n/format';
+import { useI18n } from '../../src/i18n/provider';
 import { useCategoryLabel } from '../../src/ui/category-hues';
 import { space, usePalette } from '../../src/ui/theme';
 
@@ -16,8 +16,9 @@ export default function EntryScreen() {
   const { archive } = useLedger();
   const record = archive?.records.find(item => item.entry.id === id);
   const account = archive?.accounts.find(item => item.id === record?.entry.accountId);
-  if (!record || !account) return <Screen><EmptyState title="No encontramos este movimiento"
-    detail="Volvé a Movimientos para consultar lo que guardaste en este dispositivo." /></Screen>;
+  const { t } = useI18n();
+  if (!record || !account) return <Screen><EmptyState title={t('entryDetail.notFoundTitle')}
+    detail={t('entryDetail.notFoundDetail')} /></Screen>;
   return <EntryDetail key={id} record={record} account={account} />;
 }
 
@@ -26,6 +27,7 @@ export default function EntryScreen() {
 function EntryDetail({ record, account }: { record: EntryRecord; account: Account }) {
   const { updateEntry, archive, snapshot } = useLedger();
   const p = usePalette();
+  const { t, formatDate, currencyName } = useI18n();
   const { entry } = record;
   const card = archive?.cards?.find(item => item.accountId === account.id);
   const categoryLabel = useCategoryLabel(entry.category, entry.kind);
@@ -45,7 +47,7 @@ function EntryDetail({ record, account }: { record: EntryRecord; account: Accoun
       setPending(null);
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'No pudimos verificar el cambio. Podés reintentarlo sin duplicar su efecto.');
+      setError(cause instanceof Error ? cause.message : 'entryDetail.changeUnverified');
     } finally { saving.current = false; setBusy(false); }
   }
   function confirm() {
@@ -55,11 +57,11 @@ function EntryDetail({ record, account }: { record: EntryRecord; account: Accoun
     const restore = record.voided;
     const change = makeEntryChange(randomUUID(), record, restore ? 'restore' : 'void', new Date().toISOString());
     const adds = restore ? entry.kind === 'income' : entry.kind === 'expense';
-    Alert.alert(restore ? '¿Recuperar movimiento?' : '¿Deshacer movimiento?',
-      `${adds ? 'Se sumarán' : 'Se descontarán'} ${formatMinorUnits(entry.amountMinor)} ${account.currency} ${adds ? 'a' : 'de'} ${account.name}. `
-      + (restore ? 'Volverá a aparecer en tus movimientos y reportes.' : 'Dejará de contar en tus saldos y reportes. Podés recuperarlo después.'), [
-        { text: 'Cancelar', style: 'cancel', onPress: () => { confirming.current = false; } },
-        { text: restore ? 'Recuperar' : 'Deshacer', style: restore ? 'default' : 'destructive', onPress: () => { confirming.current = false; void apply(change); } },
+    Alert.alert(t(restore ? 'entryDetail.restoreQuestion' : 'entryDetail.voidQuestion'),
+      t(adds ? 'entryDetail.willAdd' : 'entryDetail.willSubtract', { amount: formatMinorUnits(entry.amountMinor) + ' ' + account.currency, account: account.name }) + ' '
+      + t(restore ? 'entryDetail.restoreEffect' : 'entryDetail.voidEffect'), [
+        { text: t('common.cancel'), style: 'cancel', onPress: () => { confirming.current = false; } },
+        { text: t(restore ? 'entryDetail.restore' : 'entryDetail.void'), style: restore ? 'default' : 'destructive', onPress: () => { confirming.current = false; void apply(change); } },
       ], { cancelable: true, onDismiss: () => { confirming.current = false; } });
   }
   const income = entry.kind === 'income';
@@ -73,10 +75,10 @@ function EntryDetail({ record, account }: { record: EntryRecord; account: Accoun
       if (row) budget = { ratio: row.ratio, remainingMinor: row.remainingMinor, exceeded: row.exceeded };
     } catch { budget = null; }
   }
-  const status = record.voided ? 'Deshecho · no cuenta en saldos ni reportes' : record.revision > 0 ? 'Registrado · corregido' : 'Registrado';
+  const status = t(record.voided ? 'entryDetail.statusVoided' : record.revision > 0 ? 'entryDetail.statusCorrected' : 'entryDetail.statusRecorded');
 
   return <Screen gap={space.xl}>
-    <Stack.Screen options={{ title: record.voided ? 'Movimiento deshecho' : income ? 'Ingreso' : card ? 'Compra con tarjeta' : 'Gasto', gestureEnabled: !busy, headerBackVisible: !busy }} />
+    <Stack.Screen options={{ title: t(record.voided ? 'entryDetail.voidedTitle' : income ? 'movement.income' : card ? 'entryForm.cardPurchaseTitle' : 'movement.expense'), gestureEnabled: !busy, headerBackVisible: !busy }} />
     <View style={{ gap: 14, alignItems: 'center', paddingVertical: 12 }}>
       <CategoryBadge category={entry.category} kind={entry.kind} large tone={income ? 'income' : 'neutral'} />
       <View style={{ alignItems: 'center', gap: 4, width: '100%' }}>
@@ -88,21 +90,22 @@ function EntryDetail({ record, account }: { record: EntryRecord; account: Accoun
       <AppText accessibilityLiveRegion="polite" variant="caption" style={{ color: record.voided ? p.warning : p.secondary, fontWeight: '500', textAlign: 'center' }}>{status}</AppText>
     </View>
     <Surface grouped>
-      <DetailRow label="Categoría" value={categoryLabel} icon="pricetag-outline" />
-      <DetailRow label={card ? 'Tarjeta' : 'Cuenta'} value={account.name} icon={card ? 'card-outline' : 'wallet-outline'}
+      <DetailRow label={t('selection.category')} value={categoryLabel} icon="pricetag-outline" />
+      <DetailRow label={t(card ? 'entryDetail.card' : 'selection.account')} value={account.name} icon={card ? 'card-outline' : 'wallet-outline'}
         leading={card ? undefined : <AccountBadge accountId={account.id} size={28} />}
         disabled={busy}
         onPress={() => router.push(card ? { pathname: '/card/[id]', params: { id: card.id } } : { pathname: '/account/[id]', params: { id: account.id } })} />
-      {budget && <DetailRow label="Presupuesto" icon="speedometer-outline" tone={budgetTone(budget)}
-        value={budget.exceeded ? `Excedido por ${formatMinorUnits(-budget.remainingMinor)}` : `${Math.round(budget.ratio * 100)} % usado · quedan ${formatMinorUnits(budget.remainingMinor)}`}
+      {budget && <DetailRow label={t('entryDetail.budget')} icon="speedometer-outline" tone={budgetTone(budget)}
+        value={budget.exceeded ? t('entryDetail.budgetExceeded', { amount: formatMinorUnits(-budget.remainingMinor) })
+          : t('entryDetail.budgetUsed', { percent: Math.round(budget.ratio * 100), amount: formatMinorUnits(budget.remainingMinor) })}
         onPress={() => router.push({ pathname: '/budgets', params: { currency: account.currency, month: entry.dateISO.slice(0, 7) } })} />}
-      <DetailRow label="Moneda" value={currencyName(account.currency)} last />
+      <DetailRow label={t('selection.currency')} value={currencyName(account.currency)} last />
     </Surface>
     <ErrorMessage message={error} />
     <View style={{ gap: 10 }}>
-      {!record.voided && <ActionButton label="Editar movimiento" icon="create-outline" disabled={busy || !!pending}
+      {!record.voided && <ActionButton label={t('entryDetail.edit')} icon="create-outline" disabled={busy || !!pending}
         onPress={() => router.push({ pathname: '/edit-entry/[id]', params: { id: entry.id } })} />}
-      <ActionButton label={pending ? 'Reintentar cambio' : record.voided ? 'Recuperar movimiento' : 'Deshacer movimiento'}
+      <ActionButton label={pending ? t('common.retryChange') : t(record.voided ? 'entryDetail.restoreAction' : 'entryDetail.voidAction')}
         icon={record.voided ? 'arrow-redo-outline' : 'arrow-undo-outline'} onPress={confirm} busy={busy} secondary={!record.voided} />
     </View>
   </Screen>;

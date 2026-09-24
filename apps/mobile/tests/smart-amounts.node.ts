@@ -151,7 +151,9 @@ test('Pagar total fills the recorded card debt, never more than the registered d
   // Editing upward past the debt is still refused on submit; downward is allowed.
   amount(root).onChangeText('60');
   await find(view.render(), 'ActionButton', 'Registrar pago').props.onPress();
-  assert.match(find(view.render(), 'ErrorMessage').props.message, /supera la deuda/);
+  // The form stores the catalogue key; ErrorMessage shows it in the interface language.
+  assert.equal(find(view.render(), 'ErrorMessage').props.message, 'transferForm.overCardDebt');
+  assert.match(bindLocale('es-AR').errorText('transferForm.overCardDebt'), /supera la deuda/);
   assert.equal(view.transfers.length, 0);
   amount(view.render()).onChangeText('50');
   await find(view.render(), 'ActionButton', 'Registrar pago').props.onPress();
