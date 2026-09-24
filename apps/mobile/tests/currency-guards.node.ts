@@ -35,6 +35,7 @@ const ALLOWED_PAIRS: { file: string; includes: string; why: string }[] = [
   { file: 'packages/domain/currency.ts', includes: "LegacyCurrency = 'ARS' | 'USD'", why: 'the two currencies rows and backups from before 24B can name (permanent)' },
   { file: 'packages/domain/currency.ts', includes: "LEGACY_CURRENCIES: readonly LegacyCurrency[] = ['ARS', 'USD']", why: 'permanent' },
   { file: 'packages/domain/currency.ts', includes: "LEDGER_CURRENCIES: readonly IsoCurrencyCode[] = ['ARS', 'USD']", why: 'the production gate; stage 9 changes it in its own commit' },
+  { file: 'apps/mobile/src/storage/currency-gate.ts', includes: "PREVIEW_CURRENCIES: CurrencyGate = ['ARS', 'USD', 'EUR', 'GBP', 'JPY', 'CLP', 'KWD']", why: 'the development preview gate (24B5): the release pair plus the test currencies, reachable only in a development bundle' },
   { file: 'packages/integrations/contracts.d.ts', includes: "currency: 'ARS' | 'USD'", why: 'Assistant contract v1 is frozen; stage 7 adds the next version' },
   { file: 'packages/integrations/contracts.js', includes: "['ARS', 'USD'].includes", why: 'Assistant contract v1 is frozen; stage 7 adds the next version' },
   { file: 'server/mobile/openai.js', includes: "enum: ['ARS', 'USD', null]", why: 'the model schema of contract v1; stage 7 imports a generated superset' },

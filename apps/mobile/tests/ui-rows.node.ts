@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { runInNewContext } from 'node:vm';
 import ts from 'typescript';
+import * as currencies from '../src/ui/currencies.ts';
 import { CURRENCIES, currencyOption, currencyOptions, searchCurrencies } from '../src/ui/currencies.ts';
 import { bindLocale } from '../src/i18n/bind.ts';
 import * as geometry from '../src/ui/geometry.ts';
@@ -47,7 +48,7 @@ function load(file: string, extra: Record<string, unknown> = {}, fontScale = 1) 
     './geometry': geometry,
     './motion': { duration: { press: 100, release: 160 }, easeOut: 'ease', selectionHaptic: () => haptics.push('selection'), timing: () => ({}) },
     './money-input': moneyInput,
-    './presentation': {}, './currencies': { CURRENCIES, currencyOption, currencyOptions, searchCurrencies },
+    './presentation': {}, './currencies': currencies,
     './components': { ...Object.fromEntries(['AccountBadge', 'AppText', 'CategoryBadge', 'DetailRow', 'SelectionRow', 'Field', 'GlyphTile', 'PressFeedback', 'Surface'].map(name => [name, name])), surfaceShadow: () => ({}) },
     ...extra,
   };
@@ -288,7 +289,7 @@ test('the currency list is exactly ARS and USD, with a search helper ready for t
   assert.deepEqual(currencyOptions('es-AR').map(option => option.code + ' ' + option.symbol), ['ARS $', 'USD US$']);
   assert.deepEqual(currencyOptions('en-US').map(option => option.code + ' ' + option.symbol), ['ARS AR$', 'USD US$']);
   assert.deepEqual(currencyOptions('es-US').map(option => option.code + ' ' + option.symbol), ['ARS AR$', 'USD US$']);
-  assert.equal(currencyOption('EUR').code, 'ARS', 'an unknown code falls back instead of inventing a currency');
+  assert.equal(currencyOption('EUR').code, 'EUR', '24B5: a display lookup over the catalogue; the choices are still the gate\'s');
   assert.deepEqual(searchCurrencies('').map(o => o.code), ['ARS', 'USD']);
   assert.deepEqual(searchCurrencies('dol').map(o => o.code), ['USD']);
   assert.deepEqual(searchCurrencies('DÓLARES').map(o => o.code), ['USD']);
@@ -438,4 +439,46 @@ test('24B3: the currency sheet lists exactly the options it is given, searches b
   assert.equal(list().props.ListEmptyComponent, null);
   assert.equal(list().props.data.length, 3);
   assert.equal(list().props.ListFooterComponent, null, 'no note unless the caller gives one');
+});
+
+test('24B5: the currency field lists the gate\'s currencies with search over code, name, symbol and territory from six on, and a read-only row shows any stored code by its own name', () => {
+  const ui = load('form-controls.tsx');
+  const gate = ['ARS', 'USD', 'EUR', 'GBP', 'JPY', 'CLP', 'KWD'] as const;
+  const chosen: string[] = [];
+  const field = ui.render('CurrencyField', { value: 'ARS', onChange: (code: string) => chosen.push(code), currencies: gate });
+  const sheet = nodes(field).find(node => typeof node.type === 'function' && node.type.name === 'CurrencySheet')!;
+  assert.deepEqual(sheet.props.options.map((item: any) => item.code), [...gate], 'the gate, in its order, never the whole catalogue');
+  assert.deepEqual(sheet.props.options.map((item: any) => item.name), ['Pesos argentinos', 'Dólares estadounidenses', 'Euros', 'Libras esterlinas', 'Yenes japoneses', 'Pesos chilenos', 'Dinares kuwaitíes']);
+  assert.equal(sheet.props.searchable, true, 'seven currencies: a search field');
+  assert.equal(sheet.props.title, 'Elegir moneda');
+  assert.ok(sheet.props.options.every((item: any) => typeof item.searchText === 'string' && item.searchText.length > 0), 'every choice carries the catalogue\'s search text');
+  const release = nodes(ui.render('CurrencyField', { value: 'USD', onChange: () => {}, currencies: ['ARS', 'USD'] })).find(node => typeof node.type === 'function' && node.type.name === 'CurrencySheet')!;
+  assert.equal(release.props.searchable, false, 'two currencies (a release): no search field, as before');
+  assert.deepEqual(release.props.options.map((item: any) => item.code), ['ARS', 'USD']);
+  // The search itself, on the sheet: exact code, code prefix, name prefix, then territory or symbol; the gate's order within a rank.
+  const sheetUi = load('form-controls.tsx'); // Its own state slots: the harness shares them per module instance.
+  let view = sheetUi.render('CurrencySheet', { visible: true, title: 'Elegir moneda', options: sheet.props.options, value: 'ARS', searchable: true, onClose: () => {}, onChange: (code: string) => chosen.push(code) });
+  const list = () => nodes(view).find(node => node.type === 'FlatList')!;
+  const search = nodes(list().props.ListHeaderComponent).find(node => node.type === 'Field')!;
+  assert.equal(search.props.label, 'Buscar moneda');
+  const query = (text: string) => { search.props.onChangeText(text); view = sheetUi.render('CurrencySheet', { visible: true, title: 'Elegir moneda', options: sheet.props.options, value: 'ARS', searchable: true, onClose: () => {}, onChange: (code: string) => chosen.push(code) }); return list().props.data.map((item: any) => item.code); };
+  assert.deepEqual(query('yen'), ['JPY']);
+  assert.deepEqual(query('japón'), ['JPY'], 'a territory name in the interface language');
+  assert.deepEqual(query('reino unido'), ['GBP']);
+  assert.deepEqual(query('€'), ['EUR'], 'a symbol');
+  assert.deepEqual(query('pesos'), ['ARS', 'CLP'], 'name prefixes keep the gate\'s order');
+  assert.deepEqual(query('kw'), ['KWD']);
+  assert.deepEqual(query('chile'), ['CLP']);
+  assert.deepEqual(query('gbp'), ['GBP'], 'an exact code');
+  assert.deepEqual(query('zzz'), []);
+  assert.deepEqual(query('dinar'), ['KWD']);
+  const row = list().props.renderItem({ item: list().props.data[0] });
+  assert.equal(row.props.accessibilityLabel, 'Dinares kuwaitíes, KWD');
+  row.props.onPress();
+  assert.deepEqual(chosen, ['KWD']);
+  // Read-only: a stored euro account names itself, never ARS; a KWD one shows its code as its symbol.
+  const euro = nodes(ui.render('CurrencyField', { value: 'EUR' })).find(node => node.type === 'SelectionRow')!;
+  assert.deepEqual([euro.props.value, euro.props.detail, euro.props.onPress], ['Euros', 'EUR · €', undefined]);
+  const dinar = nodes(ui.render('CurrencyField', { value: 'KWD' })).find(node => node.type === 'SelectionRow')!;
+  assert.deepEqual([dinar.props.value, dinar.props.detail], ['Dinares kuwaitíes', 'KWD · KWD']);
 });

@@ -212,7 +212,7 @@ test('24B3: with three or more currencies the switch is a row that opens the cur
   assert.equal(sheet.props.title, 'Elegir moneda');
   assert.equal(sheet.props.value, 'JPY');
   assert.equal(sheet.props.searchable, false, 'three currencies need no search field');
-  assert.deepEqual(plain(sheet.props.options), [{ code: 'ARS', name: 'Pesos argentinos', symbol: '$' }, { code: 'USD', name: 'Dólares estadounidenses', symbol: 'US$' }, { code: 'JPY', name: 'Yenes japoneses', symbol: 'JP¥' }],
+  assert.deepEqual(plain(sheet.props.options).map(({ code, name, symbol }: any) => ({ code, name, symbol })), [{ code: 'ARS', name: 'Pesos argentinos', symbol: '$' }, { code: 'USD', name: 'Dólares estadounidenses', symbol: 'US$' }, { code: 'JPY', name: 'Yenes japoneses', symbol: 'JP¥' }],
     'the currencies given, in their order, with the language\'s names and the region\'s symbols: never the whole catalogue');
   row.props.onPress();
   view = es.render({ value: 'JPY', currencies: ['ARS', 'USD', 'JPY'], onChange: (code: string) => chosen.push(code) });

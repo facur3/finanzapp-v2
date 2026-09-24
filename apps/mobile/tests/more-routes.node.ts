@@ -4,6 +4,7 @@ import { test } from 'node:test';
 import { runInNewContext } from 'node:vm';
 import ts from 'typescript';
 import * as domain from '@finanzapp/domain';
+import * as currencyGate from '../src/storage/currency-gate.ts';
 import * as categories from '../src/ui/categories.ts';
 import * as appearance from '../src/ui/appearance.ts';
 import * as materialPolicy from '../src/ui/material-policy.ts';
@@ -43,7 +44,7 @@ const undone = domain.initialRecord({ id: 'e4', accountId: cash.id, kind: 'expen
 const archive: domain.LedgerArchive = { accounts: [cash, debtAccount], records: [...entries.map(domain.initialRecord), { ...undone, voided: true }],
   debts: [debt], recurring: [rule], budgets: [] };
 
-function harness(file: string, data: domain.LedgerArchive = archive, released?: ReleasedSets, locale: AppLocale | null = null) {
+function harness(file: string, data: domain.LedgerArchive = archive, released?: ReleasedSets, locale: AppLocale | null = null, gate?: domain.CurrencyGate) {
   currentLocaleStore = localeStore(released);
   forcedLocale = locale;
   const source = readFileSync(new URL('../app/' + file, import.meta.url), 'utf8');
@@ -52,7 +53,7 @@ function harness(file: string, data: domain.LedgerArchive = archive, released?: 
   const state: unknown[] = [];
   const pushed: any[] = [];
   let cursor = 0;
-  const ledger = { useLedger: () => ({ archive: data, snapshot: domain.snapshotFromArchive(data) }) };
+  const ledger = { useLedger: () => ({ ...(gate ? { gate } : {}), archive: data, snapshot: domain.snapshotFromArchive(data) }) };
   const names = ['ActionButton', 'AppText', 'CategoryBadge', 'DetailRow', 'ErrorMessage', 'GlyphTile', 'IconButton', 'NavigationRow', 'PressFeedback', 'Screen', 'SectionTitle', 'Surface'];
   const components = Object.fromEntries(names.map(name => [name, name]));
   const theme = { usePalette: () => ({ text: '#000', secondary: '#666', line: '#ddd', isDark: false }) };
@@ -70,6 +71,7 @@ function harness(file: string, data: domain.LedgerArchive = archive, released?: 
     'expo-sharing': { isAvailableAsync: async () => false, shareAsync: async () => {} },
     '@finanzapp/domain': domain,
     '../src/storage/LedgerProvider': ledger, '../../src/storage/LedgerProvider': ledger,
+ '../../src/storage/currency-gate': currencyGate, '../src/storage/currency-gate': currencyGate,
     '../src/ui/components': components, '../../src/ui/components': components,
     '../src/ui/categories': categories,
     '../src/ui/appearance': appearance, '../../src/ui/appearance': appearance,
@@ -115,7 +117,7 @@ test('Más groups permanent navigation into Finanzas and App y datos, with live 
   assert.deepEqual(rows(root).filter(row => row.props.last).map(row => row.props.title), ['Categorías', 'Región']);
   assert.equal(nodes(root).some(node => node.type === 'ActionButton'), false);
   const texts = nodes(root).filter(node => node.type === 'AppText').map(node => String(node.props.children)).join(' ');
-  assert.match(texts, /Producto 24B4 /);
+  assert.match(texts, /Producto 24B5 /);
   assert.match(texts, /Material opaco \(Expo Go\)/, 'the footer says which control material this session draws, so a tester can confirm the mode');
   assert.equal(value('Categorías'), 'Gastos e ingresos');
   // Finanzas rows carry a soft identity tile from the shared palette; App y datos rows stay neutral glyphs.
@@ -239,7 +241,7 @@ test('23.1B2 English Más: every row, count, note and the diagnostic footer are 
   for (const row of rows(root)) row.props.onPress();
   assert.equal(view.pushed.join(','), '/accounts,/cards,/budgets,/recurring,/debts,/categories,/backup,/undone-entries,/language,/region');
   const texts = nodes(root).filter(node => node.type === 'AppText').map(node => String(node.props.children)).join(' ');
-  assert.match(texts, /FinanzApp · Native pilot 0\.1\.0 · Producto 24B4 · Opaque material \(Expo Go\) · Language: default/);
+  assert.match(texts, /FinanzApp · Native pilot 0\.1\.0 · Producto 24B5 · Opaque material \(Expo Go\) · Language: default/);
   assert.match(texts, /Sync is not turned on yet/);
   assert.doesNotMatch(texts, /Material opaco|Idioma|Región|sincronización/);
   const card: domain.CreditCardProfile = { id: 'card', accountId: cash.id, issuer: 'Visa', last4: '4009', creditLimitMinor: null, closingDay: 28, dueDay: 5, active: true, createdAt, revision: 0, updatedAt: createdAt };
@@ -270,4 +272,14 @@ test('23.1B2 English backup screen and categories list: labels in English, store
   assert.equal(JSON.stringify(view.pushed), JSON.stringify([{ pathname: '/edit-category', params: { kind: 'expense', key: 'supermercado' } }]), 'the route carries the identity key, never a label');
   assert.equal(nodes(root).find(node => node.type === 'Stack.Screen')!.props.options.headerRight().props.label, 'New category');
   assert.equal(JSON.stringify(archive), before);
+});
+
+test('24B5: a release names no test currency in Más; a development preview gate is announced under the footer so nobody mistakes it for production', () => {
+  const release = harness('(tabs)/settings.tsx').render();
+  const texts = (root: any) => nodes(root).filter(node => node.type === 'AppText').map(node => String(node.props.children)).join(' ');
+  assert.doesNotMatch(texts(release), /Monedas de prueba/);
+  const preview = harness('(tabs)/settings.tsx', archive, undefined, null, currencyGate.PREVIEW_CURRENCIES).render();
+  assert.match(texts(preview), /Monedas de prueba activas: EUR, GBP, JPY, CLP, KWD\. Solo en esta compilación de desarrollo\./);
+  const english = harness('(tabs)/settings.tsx', archive, undefined, 'en-AR', currencyGate.PREVIEW_CURRENCIES).render();
+  assert.match(texts(english), /Test currencies enabled: EUR, GBP, JPY, CLP, KWD\. Only in this development build\./);
 });
