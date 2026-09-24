@@ -37,16 +37,10 @@ const ALLOWED_PAIRS: { file: string; includes: string; why: string }[] = [
   { file: 'server/mobile/openai.js', includes: "enum: ['ARS', 'USD', null]", why: 'the model schema of contract v1; stage 7 imports a generated superset' },
   { file: 'apps/mobile/src/i18n/locale.ts', includes: "dollarSignCurrency: 'ARS' | 'USD'", why: 'a region convention: which currency a bare $ names (permanent)' },
   { file: 'apps/mobile/src/i18n/format.ts', includes: "currency === 'ARS') return conventionsOf(locale).dollarSignCurrency === 'ARS' ? '$' : 'AR$'", why: 'the ARS symbol rule (permanent)' },
-  { file: 'apps/mobile/src/ui/money-input.ts', includes: "/^(?:U\\$S|US\\$|USD)$/i.test(match[0]) ? 'USD' : 'ARS'", why: 'paste markers; stage 3 takes them from the catalogue' },
   { file: 'apps/mobile/src/ui/components.tsx', includes: "currency === 'ARS' ? 'amount.inPesos' : 'amount.inDollars'", why: 'stage 4: a lookup keyed by code with the legacy words' },
   { file: 'apps/mobile/src/ui/card-visual.tsx', includes: "currency === 'USD' ? 'cards.face.dollars' : 'cards.face.pesos'", why: 'stage 4: a lookup keyed by code with the legacy words' },
   { file: 'apps/mobile/app/(tabs)/reports.tsx', includes: "value === 'ARS' ? 'reports.currencyARS' : 'reports.currencyUSD'", why: 'stage 4: one {name} · {code} template' },
   { file: 'apps/mobile/app/budgets.tsx', includes: "value === 'ARS' ? 'budgets.currency.ARS' : 'budgets.currency.USD'", why: 'stage 4: one {name} · {code} template' },
-  { file: 'apps/mobile/app/budgets.tsx', includes: "params.currency === 'USD' ? 'USD' : 'ARS'", why: 'stage 3: a validated route parameter, never coerced' },
-  { file: 'apps/mobile/app/new-account.tsx', includes: "params.currency === 'USD' ? 'USD' : 'ARS'", why: 'stage 3: a validated route parameter, never coerced' },
-  { file: 'apps/mobile/src/ui/budget-form.tsx', includes: "requestedCurrency === 'USD' ? 'USD' : 'ARS'", why: 'stage 3: a validated route parameter, never coerced' },
-  { file: 'apps/mobile/app/report-day.tsx', includes: "currency !== 'ARS' && currency !== 'USD'", why: 'stage 2 routes: a strict route-currency parser over the held currencies' },
-  { file: 'apps/mobile/app/spending-detail.tsx', includes: "currency !== 'ARS' && currency !== 'USD'", why: 'stage 2 routes: a strict route-currency parser over the held currencies' },
 ];
 
 test('24B1: no new place assumes exactly two currencies; the remaining ones are listed with their stage', () => {

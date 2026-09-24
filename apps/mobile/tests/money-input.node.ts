@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
-import { formatMinorUnits, parseMinorUnits } from '@finanzapp/domain';
+import { formatMinorUnits, parseMinorUnits, type Currency } from '@finanzapp/domain';
 import { AmountInput, EMPTY_AMOUNT, LEDGER_FORMAT, amountFromCanonical, amountFromDraft, amountFromMinor, canonicalAmount, displayAmount, displayCaret,
   draftFromMinor, logicalCaret, readPastedAmount, reformatAmount, renderAmount, settleAmount, splitAmount, type AmountFormat, type AmountNotice } from '../src/ui/money-input.ts';
 
@@ -26,16 +26,14 @@ class Field {
   draft: string;
   notice: AmountNotice | null = null;
   private lag: boolean;
-  private expectedCurrency?: 'ARS' | 'USD';
-  constructor(lag = false, format: AmountFormat = AR, draft = '', expectedCurrency?: 'ARS' | 'USD') {
+  constructor(lag = false, format: AmountFormat = AR, draft = '', currency: Currency = 'ARS') {
     this.lag = lag;
-    this.expectedCurrency = expectedCurrency;
-    this.input = new AmountInput(draft, format);
+    this.input = new AmountInput(draft, format, currency);
     this.draft = draft;
     this.native = { ...this.input.view };
   }
   private apply(raw: string, rawCaret: number) {
-    const result = this.input.change(raw, rawCaret, this.expectedCurrency);
+    const result = this.input.change(raw, rawCaret);
     this.draft = result.draft;
     this.notice = result.rejected;
     this.native = this.lag ? { text: raw, caret: rawCaret } : { ...result.view };
@@ -77,8 +75,10 @@ class Field {
   get minor() { return parseMinorUnits(this.draft); }
 }
 
+/** A canonical string as an ARS state (caret at the end): every case here is the two-decimal golden. */
+const canon = (text: string, caret = text.length) => amountFromCanonical(text, caret, 'ARS');
 /** The display text of a canonical string in a format ("1234,5" → "1,234.5" in the US). */
-const shown = (canonical: string, format: AmountFormat) => renderAmount(amountFromCanonical(canonical)!, format).text;
+const shown = (canonical: string, format: AmountFormat) => renderAmount(canon(canonical)!, format).text;
 
 type Step = [key: string, canonical: string, display: string, logical: number, displayCaret: number];
 
@@ -259,9 +259,12 @@ test('pasting Argentine and US formatted numbers normalises by the separators th
   const cases: [string, string, string][] = [
     ['2.000.000,50', '2000000,50', '2.000.000,50'], ['2,000,000.50', '2000000,50', '2.000.000,50'],
     ['2000000.5', '2000000,5', '2.000.000,5'], ['2000000', '2000000', '2.000.000'], ['1.000', '1000', '1.000'],
-    ['$ 1.234,56', '1234,56', '1.234,56'], ['US$ 12.30', '12,30', '12,30'], ['ARS 1.234,56', '1234,56', '1.234,56'],
+    ['$ 1.234,56', '1234,56', '1.234,56'], ['ARS 1.234,56', '1234,56', '1.234,56'],
     ['-500', '-500', '-500'], ['0007', '7', '7'], ['00,70', '0,70', '0,70'], ['1 234,56', '1234,56', '1.234,56'], ['0,500', '0,50', '0,50'],
   ];
+  // A field always belongs to an account: "US$ 12.30" lands in a dollar field (and is refused in a peso one, tested below).
+  const usd = new Field(false, AR, '', 'USD').paste('US$ 12.30');
+  assert.deepEqual([usd.canonical, usd.text, usd.notice], ['12,30', '12,30', null]);
   for (const [pasted, canonical, display] of cases) {
     const field = new Field().paste(pasted);
     assert.equal(field.canonical, canonical, pasted);
@@ -353,14 +356,14 @@ test('a paste that could mean two amounts, or none, is refused with a reason and
 });
 
 test('the paste reader keeps digits only: no number is computed from the text, and every accepted paste parses to the same minor units', () => {
-  const accepted: [string, AmountFormat, number][] = [
-    ['1.234,56', AR, 123456], ['1,234.56', US, 123456], ['$1,234.56', US, 123456], ['AR$ 1.234,56', US, 123456], ['U$S 100', AR, 10000],
+  const accepted: [string, AmountFormat, number, Currency?][] = [
+    ['1.234,56', AR, 123456], ['1,234.56', US, 123456], ['$1,234.56', US, 123456], ['AR$ 1.234,56', US, 123456], ['U$S 100', AR, 10000, 'USD'],
     ['−1.000', AR, -100000], ['- $ 5', AR, -500], ['9.999.999.999.999,99', AR, 999999999999999], ['0,05', US, 5], ['.5', US, 50], [',5', AR, 50],
   ];
-  for (const [text, format, minor] of accepted) {
-    const read = readPastedAmount(text, format);
+  for (const [text, format, minor, currency = 'ARS'] of accepted) {
+    const read = readPastedAmount(text, format, currency);
     assert.ok(read.ok, text);
-    if (read.ok) assert.equal(parseMinorUnits(displayAmount(read.canonical.replace(/^-/, ''))) * (read.negative ? -1 : 1), minor, text);
+    if (read.ok) assert.equal(parseMinorUnits(displayAmount(read.canonical.replace(/^-/, ''), AR, 'ARS')) * (read.negative ? -1 : 1), minor, text);
   }
 });
 
@@ -380,7 +383,7 @@ test('limits: thirteen whole digits and two decimals; a refused edit leaves the 
 
 test('a negative recorded balance keeps its sign through every edit', () => {
   assert.equal(formatMinorUnits(-123456), '-1.234,56');
-  assert.equal(displayAmount('-1.234,56'), '-1.234,56', 'a prefilled negative balance renders unchanged');
+  assert.equal(displayAmount('-1.234,56', AR, 'ARS'), '-1.234,56', 'a prefilled negative balance renders unchanged');
   const field = new Field();
   field.paste('-1.234,56');
   assert.deepEqual([field.canonical, field.text, field.caret], ['-1234,56', '-1.234,56', 9]);
@@ -399,7 +402,7 @@ test('a negative recorded balance keeps its sign through every edit', () => {
 });
 
 test('settling on blur drops a dangling comma or sign and completes the decimals without touching the value', () => {
-  const settle = (text: string) => renderAmount(settleAmount(amountFromCanonical(text.replace(/\./g, ''))!)).text;
+  const settle = (text: string) => renderAmount(settleAmount(canon(text.replace(/\./g, ''))!, 'ARS')).text;
   assert.equal(settle('2.000,'), '2.000');
   assert.equal(settle('2.000,5'), '2.000,50');
   assert.equal(settle('2.000'), '2.000', 'a whole amount does not grow ,00');
@@ -417,9 +420,9 @@ test('the display string round-trips through the domain parser to exact minor un
   ];
   for (const [display, minor] of cases) {
     assert.equal(parseMinorUnits(display), minor, display);
-    assert.equal(displayAmount(display), display, 'the display form is a fixed point');
-    assert.equal(displayAmount(formatMinorUnits(minor)), formatMinorUnits(minor), 'a stored amount renders unchanged');
-    assert.equal(parseMinorUnits(displayAmount(formatMinorUnits(minor))), minor);
+    assert.equal(displayAmount(display, AR, 'ARS'), display, 'the display form is a fixed point');
+    assert.equal(displayAmount(formatMinorUnits(minor), AR, 'ARS'), formatMinorUnits(minor), 'a stored amount renders unchanged');
+    assert.equal(parseMinorUnits(displayAmount(formatMinorUnits(minor), AR, 'ARS')), minor);
   }
   const period = new Field(), comma = new Field();
   for (const key of '1234567.89') period.type(key);
@@ -430,14 +433,14 @@ test('the display string round-trips through the domain parser to exact minor un
 });
 
 test('display caret mapping: grouping dots never move the logical position', () => {
-  const state = amountFromCanonical('3000000,50')!;
+  const state = canon('3000000,50')!;
   assert.deepEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(logical => displayCaret(state, logical)), [0, 1, 3, 4, 5, 7, 8, 9, 10, 11, 12]);
   assert.equal(displayCaret(state, 99), 12, 'clamped to the end');
   for (let index = 0; index <= '3.000.000,50'.length; index++) {
     const logical = logicalCaret('3.000.000,50', index);
     assert.ok(displayCaret(state, logical) === index || '3.000.000,50'[index - 1] === '.', 'display → logical → display returns to the same place, except a caret after a dot, which sits before it');
   }
-  const negative = amountFromCanonical('-1234567')!;
+  const negative = canon('-1234567')!;
   assert.equal(displayCaret(negative, 1), 1);
   assert.equal(displayCaret(negative, 8), 10);
   assert.equal(renderAmount(negative).text, '-1.234.567');
@@ -458,17 +461,17 @@ test('hero amounts split into symbol, whole units and decimals for a colour hier
 });
 
 test('a shortcut fills the field as the person would have typed the amount, from integer minor units', () => {
-  assert.equal(amountFromMinor(19016200), '190.162');
-  assert.equal(amountFromMinor(19016250), '190.162,50');
-  assert.equal(amountFromMinor(5), '0,05');
-  assert.equal(amountFromMinor(100), '1');
-  assert.equal(amountFromMinor(999999999999999), '9.999.999.999.999,99');
-  for (const minor of [19016200, 19016250, 5, 100, 1310, 999999999999999]) assert.equal(parseMinorUnits(amountFromMinor(minor)), minor, 'round trip ' + minor);
+  assert.equal(amountFromMinor(19016200, 'ARS'), '190.162');
+  assert.equal(amountFromMinor(19016250, 'ARS'), '190.162,50');
+  assert.equal(amountFromMinor(5, 'ARS'), '0,05');
+  assert.equal(amountFromMinor(100, 'ARS'), '1');
+  assert.equal(amountFromMinor(999999999999999, 'ARS'), '9.999.999.999.999,99');
+  for (const minor of [19016200, 19016250, 5, 100, 1310, 999999999999999]) assert.equal(parseMinorUnits(amountFromMinor(minor, 'ARS')), minor, 'round trip ' + minor);
   // Never a negative, zero or fabricated "all".
-  assert.equal(amountFromMinor(0), '');
-  assert.equal(amountFromMinor(-19016200), '');
-  assert.equal(amountFromMinor(Number.MAX_SAFE_INTEGER + 2), '');
-  assert.equal(amountFromMinor(12.5), '');
+  assert.equal(amountFromMinor(0, 'ARS'), '');
+  assert.equal(amountFromMinor(-19016200, 'ARS'), '');
+  assert.equal(amountFromMinor(Number.MAX_SAFE_INTEGER + 2, 'ARS'), '');
+  assert.equal(amountFromMinor(12.5, 'ARS'), '');
 });
 
 // ---- Producto 23.1C1: the region's separators ------------------------------
@@ -568,8 +571,8 @@ test('changing the region with a half-typed amount keeps the value, the draft an
   const partial = new Field(false, US).typeAll('-12.');
   partial.region(AR);
   assert.deepEqual([partial.text, partial.draft, partial.caret], ['-12,', '-12,', 4]);
-  assert.equal(reformatAmount({ text: '1.234,5', caret: 5 }, AR, US).text, '1,234.5');
-  assert.deepEqual(reformatAmount({ text: '1.234,5', caret: 5 }, AR, US), { text: '1,234.5', caret: 5 });
+  assert.equal(reformatAmount({ text: '1.234,5', caret: 5 }, AR, US, 'ARS').text, '1,234.5');
+  assert.deepEqual(reformatAmount({ text: '1.234,5', caret: 5 }, AR, US, 'ARS'), { text: '1,234.5', caret: 5 });
   // Switching to the same format is a no-op.
   const same = new Field(false, AR).typeAll('12');
   const view = same.input.view;
@@ -578,7 +581,7 @@ test('changing the region with a half-typed amount keeps the value, the draft an
 
 test('drafts are the ledger notation in every region: prefill, display and back to the same minor units', () => {
   for (const minor of [0, 5, 100, 123456, -123456, 999999999999999]) {
-    const draft = draftFromMinor(minor);
+    const draft = draftFromMinor(minor, 'ARS');
     assert.equal(draft, formatMinorUnits(minor), 'the prefill draft is what the domain writes');
     assert.equal(parseMinorUnits(draft), minor);
     for (const format of [AR, US]) {
@@ -587,13 +590,13 @@ test('drafts are the ledger notation in every region: prefill, display and back 
       assert.equal(parseMinorUnits(field.input.draft), minor);
     }
   }
-  assert.equal(displayAmount('1.234,56', US), '1,234.56');
-  assert.equal(displayAmount('-1.234,5', US), '-1,234.5');
-  assert.equal(displayAmount('1.234,56'), '1.234,56');
-  assert.equal(amountFromMinor(19016250), '190.162,50', 'a shortcut fills a ledger draft; the field shows it in the region');
-  assert.equal(new Field(false, US, amountFromMinor(19016250)).text, '190,162.50');
-  assert.deepEqual(amountFromDraft('1.234,5'), { negative: false, whole: '1234', decimal: true, fraction: '5', caret: 6 });
-  assert.equal(draftFromMinor(Number.MAX_SAFE_INTEGER + 2), '');
+  assert.equal(displayAmount('1.234,56', US, 'ARS'), '1,234.56');
+  assert.equal(displayAmount('-1.234,5', US, 'ARS'), '-1,234.5');
+  assert.equal(displayAmount('1.234,56', AR, 'ARS'), '1.234,56');
+  assert.equal(amountFromMinor(19016250, 'ARS'), '190.162,50', 'a shortcut fills a ledger draft; the field shows it in the region');
+  assert.equal(new Field(false, US, amountFromMinor(19016250, 'ARS')).text, '190,162.50');
+  assert.deepEqual(amountFromDraft('1.234,5', 'ARS'), { negative: false, whole: '1234', decimal: true, fraction: '5', caret: 6 });
+  assert.equal(draftFromMinor(Number.MAX_SAFE_INTEGER + 2, 'ARS'), '');
   assert.deepEqual(LEDGER_FORMAT, AR);
 });
 
@@ -615,7 +618,7 @@ test('hero amounts split with the region decimal separator; display caret mappin
   assert.deepEqual(splitAmount('−AR$ 2,000,000.00', US), { prefix: '−AR$ ', whole: '2,000,000', decimals: '.00' });
   assert.deepEqual(splitAmount('US$ 12', US), { prefix: 'US$ ', whole: '12', decimals: '' });
   assert.deepEqual(splitAmount('US$ 1.234,56', AR), { prefix: 'US$ ', whole: '1.234', decimals: ',56' });
-  const state = amountFromCanonical('3000000,50')!;
+  const state = canon('3000000,50')!;
   for (let logical = 0; logical <= 10; logical++) assert.equal(displayCaret(state, logical, US), displayCaret(state, logical, AR));
   assert.equal(renderAmount(state, US).text, '3,000,000.50');
   assert.equal(logicalCaret('3,000,000.50', 6, US), 4);

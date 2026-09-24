@@ -5,6 +5,7 @@ import { runInNewContext } from 'node:vm';
 import ts from 'typescript';
 import * as geometry from '../src/ui/geometry.ts';
 import * as moneyInput from '../src/ui/money-input.ts';
+import * as domain from '@finanzapp/domain';
 import { bindLocale } from '../src/i18n/bind.ts';
 import type { AppLocale } from '../src/i18n/locale.ts';
 import * as i18nFormat from '../src/i18n/format.ts';
@@ -74,7 +75,7 @@ test('the amount field has no text-dependent position: only a size, identical fo
   // Fast entry: thirteen digits typed one by one never grow the size back, and each step keeps the layout of the previous one until the row fills.
   let previous: number = AMOUNT_FIELD.base, firstDrop = 0;
   for (let index = 1; index <= 13; index++) {
-    const { fontSize } = amountFieldLayout(displayAmount('9'.repeat(index)), PHONE, 'US$', 6);
+    const { fontSize } = amountFieldLayout(displayAmount('9'.repeat(index), { decimal: ',', group: '.' }, 'ARS'), PHONE, 'US$', 6);
     assert.ok(fontSize <= previous, index + ' digits never enlarge the amount');
     if (fontSize < previous && !firstDrop) firstDrop = index;
     previous = fontSize;
@@ -167,7 +168,8 @@ function loadComponents(locale: AppLocale = 'es-AR', deviceLanguage: string | nu
     'react-native-reanimated': { __esModule: true, default: { View: 'Animated.View', Text: 'Animated.Text' }, useSharedValue: (value: number) => ({ value }),
       withTiming: (value: number) => value, useAnimatedStyle: (fn: () => unknown) => fn() },
     '@expo/vector-icons/Ionicons': 'Ionicons',
-    '@finanzapp/domain': { formatMinorUnits: (minor: number) => (minor / 100).toLocaleString('es-AR', { minimumFractionDigits: 2 }), accountBalanceMinor: () => 0, labelFromISO: () => '' },
+    '@finanzapp/domain': { formatMinorUnits: (minor: number) => (minor / 100).toLocaleString('es-AR', { minimumFractionDigits: 2 }), accountBalanceMinor: () => 0, labelFromISO: () => '',
+      draftFitsCurrency: domain.draftFitsCurrency },
     'expo-router': { router: {} },
     './theme': { radius: {}, space: {}, type: { body: { fontSize: 17, lineHeight: 22 } }, useCurrentDay: () => '2026-09-20', useReduceMotion: () => true, usePalette: () => ({ text: '#000', secondary: '#666', tertiary: '#999', income: '#008800', transfer: '#03c', warning: '#a60' }) },
     './categories': { categoryIcon: () => 'pricetag-outline' },
@@ -303,4 +305,24 @@ test('Producto 23.1C1: the anchored field lays out US separators and the "AR$" s
   }
   assert.ok(amountWidthEm('AR$') > amountWidthEm('$'), 'the prefixed sign is measured, not assumed to be one glyph');
   assert.equal(amountWidthEm('$ 1'), amountWidthEm('$ 1'), 'a non-breaking space is measured like a space');
+});
+
+test('24B2: the amount field keys and notes follow the currency\'s exponent; ARS and USD are unchanged', () => {
+  const { render } = loadComponents();
+  const nodes = (value: any): any[] => !value || typeof value !== 'object' ? [] : Array.isArray(value) ? value.flatMap(nodes) : [value, ...nodes(value.props?.children)];
+  const pad = (currency: string) => render('AmountField', { label: 'Gasto', currency, value: '', onChangeText: () => {} });
+  const input = (root: any) => nodes(root).find(node => node.type === 'TextInput')!;
+  assert.deepEqual([input(pad('ARS')).props.keyboardType, input(pad('USD')).props.keyboardType, input(pad('KWD')).props.keyboardType], ['decimal-pad', 'decimal-pad', 'decimal-pad']);
+  assert.deepEqual([input(pad('JPY')).props.keyboardType, input(pad('JPY')).props.inputMode], ['number-pad', 'numeric'], 'no decimal key for a currency without decimals');
+  // A draft typed in pesos, kept when the account switched to yen: shown whole, with the note, never rewritten.
+  const kept = render('AmountField', { label: 'Gasto', currency: 'JPY', value: '12,50', onChangeText: () => {} });
+  assert.equal(input(kept).props.value, '12,50');
+  const isText = (node: any) => node.type === 'AppText' || node.type?.name === 'AppText';
+  const notes = nodes(kept).filter(isText).map(node => [node.props.children].flat().join(''));
+  assert.ok(notes.includes('JPY no lleva decimales. Quitá los decimales antes de guardar; no se redondea.'), notes.join(' | '));
+  const dinar = render('AmountField', { label: 'Gasto', currency: 'KWD', value: '1,2345', onChangeText: () => {} });
+  const dinarNotes = nodes(dinar).filter(isText).map(node => [node.props.children].flat().join(''));
+  assert.ok(dinarNotes.includes('El importe tiene más decimales de los que admite KWD (3). Corregilo antes de guardar; no se redondea.'), dinarNotes.join(' | '));
+  const fine = render('AmountField', { label: 'Gasto', currency: 'USD', value: '12,50', onChangeText: () => {} });
+  assert.equal(nodes(fine).some(node => isText(node) && /redondea/.test([node.props.children].flat().join(''))), false, 'a draft that fits shows no note');
 });

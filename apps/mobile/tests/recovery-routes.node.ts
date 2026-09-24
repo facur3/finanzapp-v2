@@ -9,6 +9,7 @@ import * as presentation from '../src/ui/presentation.ts';
 import * as budgetPresentation from '../src/ui/budget-presentation.ts';
 import * as liabilityPresentation from '../src/ui/liability-presentation.ts';
 import * as moneyInput from '../src/ui/money-input.ts';
+import * as entryPrefill from '../src/ui/entry-prefill.ts';
 import * as appearance from '../src/ui/appearance.ts';
 import * as i18nFormat from '../src/i18n/format.ts';
 import { bindLocale } from '../src/i18n/bind.ts';
@@ -69,7 +70,7 @@ function harness(file: string, props: any = {}, options: { data?: domain.LedgerA
     './form-controls': { AccountField: 'AccountField', CategoryField: 'CategoryField', CurrencyField: 'CurrencyField', DateField: 'DateField', SelectorCard: 'SelectorCard' },
     '../src/ui/form-controls': { CurrencyField: 'CurrencyField' }, '../../src/ui/form-controls': { CurrencyField: 'CurrencyField' },
     '../src/ui/currencies': currencies, '../../src/ui/currencies': currencies,
-    './presentation': presentation,
+    './presentation': presentation, './entry-prefill': entryPrefill,
     './budget-presentation': budgetPresentation, '../../src/ui/budget-presentation': budgetPresentation,
     './money-input': moneyInput, '../../src/ui/money-input': moneyInput, '../src/ui/money-input': moneyInput,
     './liability-presentation': liabilityPresentation,
@@ -881,4 +882,28 @@ test('23.1C2: the backup review groups its counts on screen and gives VoiceOver 
   await find(view.render(), 'ActionButton', 'Elegir copia').props.onPress();
   const rows = nodes(view.render()).filter(node => node.type === 'DetailRow');
   assert.equal(rows.map(row => row.props.value + '/' + row.props.spokenValue).join(','), '2/2,0/0,0/0,1,234/1234,0/0,0/0,0/0,0/0,0/0');
+});
+
+test('24B2: switching the account with a half-typed amount keeps the digits and blocks Save when the new currency cannot hold them exactly', async () => {
+  const yen: domain.Account = { ...account, id: 'jpy', name: 'Yen', currency: 'JPY' };
+  const view = harness('src/ui/entry-form.tsx', {}, { data: { ...archive, accounts: [...archive.accounts, yen] } });
+  find(view.render(), 'AmountField').props.onChangeText('12,50');
+  find(view.render(), 'CategoryField').props.onChange('Comida');
+  find(view.render(), 'Field').props.onChangeText('Kiosco');
+  assert.equal(find(view.render(), 'ActionButton').props.disabled, false);
+  find(view.render(), 'AccountField').props.onChange('jpy');
+  let root = view.render();
+  assert.equal(find(root, 'AmountField').props.value, '12,50', 'the draft is kept exactly, never truncated or rescaled');
+  assert.equal(find(root, 'AmountField').props.currency, 'JPY');
+  assert.equal(find(root, 'ActionButton').props.disabled, true, 'Save is blocked while the amount cannot be kept in yen');
+  assert.equal(view.additions.length, 0);
+  find(root, 'AccountField').props.onChange('u');
+  root = view.render();
+  assert.deepEqual([find(root, 'AmountField').props.value, find(root, 'AmountField').props.currency, find(root, 'ActionButton').props.disabled], ['12,50', 'USD', false], 'ARS ↔ USD is a no-op');
+  find(root, 'AmountField').props.onChangeText('13');
+  find(view.render(), 'AccountField').props.onChange('jpy');
+  root = view.render();
+  assert.equal(find(root, 'ActionButton').props.disabled, false);
+  await find(root, 'ActionButton').props.onPress();
+  assert.deepEqual([view.additions[0].accountId, view.additions[0].amountMinor], ['jpy', 13], 'thirteen yen, not thirteen hundred');
 });

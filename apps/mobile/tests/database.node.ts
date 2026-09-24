@@ -1161,7 +1161,7 @@ test('Producto 23.1C1: an amount typed with Argentine or US separators is stored
   const { bindLocale } = await import('../src/i18n/bind.ts');
   const { parseMinorUnits } = await import('@finanzapp/domain');
   const typed = (format: { decimal: string; group: string }, keys: string) => {
-    const field = new AmountInput('', format);
+    const field = new AmountInput('', format, 'ARS');
     for (const key of keys) {
       const { text, caret } = field.view;
       field.change(text.slice(0, caret) + key + text.slice(caret), caret + 1);
