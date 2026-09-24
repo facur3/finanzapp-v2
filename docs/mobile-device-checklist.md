@@ -729,6 +729,43 @@ result. Do not commit screenshots containing actual balances, accounts or names.
 - [ ] Reduce Motion stops non-essential scale/slide effects.
 - [ ] Dark/light system appearance has readable contrast and no white flashes.
 
+## Producto 24B5 — the currency screen and the precisions, on FinanzApp Dev with the preview gate
+
+**Not done in 24B5: no EAS build was made and the iPhone was not touched.** These checks need a
+development build of this commit **started with the preview flag** and the 24B4 checks passed first.
+
+**How to enable the test currencies (development only, never a release):**
+1. Install the development build (see Producto 24B4 above; keep a v8 backup first).
+2. Start the bundler with the flag and a clean cache: `EXPO_PUBLIC_CURRENCY_PREVIEW=1 npm run
+   start:dev-client -- --clear` (Metro caches compiled code without the value; `--clear` after
+   changing it). Más must show, under the footer, "Monedas de prueba activas: EUR, GBP, JPY, CLP,
+   KWD. Solo en esta compilación de desarrollo." If the line is missing, the flag did not reach the
+   bundle: stop.
+3. A release or preview build never shows that line and offers ARS and USD only (the flag is compiled
+   away; `tests/currency-preview.node.ts`).
+
+**On the device (record each result here, es and en):**
+- [ ] Cuenta nueva → Moneda opens the sheet with seven rows (name, code, symbol) and a search field;
+  "yen", "japón", "€" and "840" find their currency; VoiceOver reads "Yenes japoneses, JPY" per row
+  and "seleccionado" on the current one; Dynamic Type at the largest sizes wraps the names and clips
+  nothing; Reduce Motion fades the sheet instead of sliding it.
+- [ ] Choose JPY before typing: the amount field shows the number pad (no decimal key) and "JP¥";
+  type 1500 → the account opens with 1.500 yen; Inicio shows "JP¥ 1.500"; VoiceOver reads
+  "1500 yenes japoneses" / "1500 Japanese yen".
+- [ ] Choose KWD: the decimal pad, three decimals ("1.234,567"); a fourth decimal is refused; Terminar
+  pads to three; VoiceOver reads "1234,567 dinares kuwaitíes" / "1234.567 Kuwaiti dinars" as a
+  fraction, never as thousands (the reason three-decimal currencies open last).
+- [ ] Tarjeta, Deuda y Presupuesto: the currency control comes before the amount (a row that opens the
+  sheet with seven currencies); switching currency with a draft typed keeps the digits and shows the
+  kept-draft note when they no longer fit; Recurrente: the account above the amount.
+- [ ] With a CLP account beside ARS, VoiceOver reads "pesos argentinos" (not "pesos") on Inicio and
+  in the amount field; with only ARS/USD, the words of always.
+- [ ] Copia de seguridad → Compartir copia gives a v9 file (`currencyUnits` with EUR, GBP, JPY, CLP,
+  KWD); reinstall or clear the app, restore it: every amount and currency identical, Inicio's switch
+  lists the seven currencies; restore it a second time: "nada nuevo para agregar".
+- [ ] Stop the bundler without the flag and reopen: the forms offer ARS and USD only, the existing
+  yen and dinar rows stay readable and editable, exporting still gives v9.
+
 ## Producto 24B4 — SQLite 9 and backup v9 (the one-way upgrade, on the owner's test data)
 
 Nothing visible changes with ARS and USD beyond the Más footer ("Producto 24B4"), the "Copias
