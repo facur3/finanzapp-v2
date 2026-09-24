@@ -11,6 +11,8 @@ import {
   type CreditCardProfile, type PersonalDebtProfile,
   sameAccountAppearance, validateAccountAppearance, type AccountAppearance,
   sameCategoryDefinition, validateCategoryDefinition, type CategoryDefinition,
+  LEDGER_CURRENCIES, archiveExponents, catalogueUnit, currenciesNeedingUnits, isLegacyCurrency, storedExponent, validateCurrencyUnit,
+  type Currency, type CurrencyGate, type CurrencyUnit,
 } from '@finanzapp/domain';
 
 type SqlValue = string | number | null;
@@ -21,11 +23,27 @@ export interface SqlExecutor {
   getAllAsync<T>(sql: string, ...params: SqlValue[]): Promise<T[]>;
 }
 export interface LedgerDatabase extends SqlExecutor {
+  /** Every write: a dedicated connection with foreign keys ON, BEGIN IMMEDIATE, rollback on any error. */
   withExclusiveTransactionAsync(task: (tx: SqlExecutor) => Promise<void>): Promise<void>;
+  /** A schema rebuild only (`MIGRATE_V9`): foreign keys OFF before BEGIN, `foreign_key_check` empty before COMMIT (transaction.ts). */
+  withMigrationTransactionAsync(task: (tx: SqlExecutor) => Promise<void>): Promise<void>;
 }
 
 export const DATABASE_NAME = 'finanzapp-native-pilot-v1.sqlite';
-export const DATABASE_VERSION = 8;
+export const DATABASE_VERSION = 9;
+
+/** Every column of each table, named: a row is read by these lists, never by `SELECT *`, so a
+ * column added later cannot leak into a strict-key object, a backup or an audit receipt. */
+const ACCOUNT_COLUMNS = 'id, name, currency, openingMinor, createdAt, revision, updatedAt';
+const ENTRY_COLUMNS = 'id, accountId, kind, amountMinor, merchant, category, dateISO, createdAt, revision, voided, updatedAt';
+const TRANSFER_COLUMNS = 'id, fromAccountId, toAccountId, amountMinor, note, dateISO, createdAt, revision, voided, updatedAt';
+const RECURRING_COLUMNS = 'id, accountId, kind, amountMinor, merchant, category, frequency, anchorDateISO, nextDateISO, active, createdAt, revision, updatedAt';
+const BUDGET_COLUMNS = 'id, scope, category, currency, monthISO, amountMinor, active, createdAt, revision, updatedAt';
+const CARD_COLUMNS = 'id, accountId, issuer, last4, creditLimitMinor, closingDay, dueDay, active, createdAt, revision, updatedAt';
+const DEBT_COLUMNS = 'id, accountId, direction, counterparty, dueDateISO, note, active, createdAt, revision, updatedAt';
+const APPEARANCE_COLUMNS = 'accountId, icon, color, createdAt, revision, updatedAt';
+const CATEGORY_COLUMNS = 'kind, key, storedLabel, label, icon, color, archived, createdAt, revision, updatedAt';
+const UNIT_COLUMNS = 'currency, minorUnitExponent, source, catalogVersion, createdAt';
 
 const SCHEMA = `
   CREATE TABLE accounts (
@@ -225,12 +243,69 @@ const MIGRATE_V8 = `
   PRAGMA user_version = 8;
 `;
 
+// Producto 24B4: storage that knows each currency's scale. SQLite cannot alter a CHECK, so
+// `accounts` (the parent of every ledger table) and `monthly_budgets` are rebuilt with the same
+// columns, the same CHECKs and a shape-only currency CHECK (three capital letters: which codes a
+// row may hold is decided by the domain's read acceptance and creation gate, two nets the schema
+// no longer duplicates). `currency_units` pins, once and for all, the minor-unit exponent of every
+// currency other than ARS/USD the ledger comes to hold, with its source and catalogue version:
+// rows are inserted on first use and never updated; ARS and USD get no row and read as cents
+// (LEGACY_EXPONENT). Runs in the migration transaction (foreign keys OFF before BEGIN, so the
+// parent can be dropped and renamed while its children keep their rows; foreign_key_check must
+// be empty before COMMIT). Guarded by user_version; an interruption leaves the schema 8 file
+// untouched. Earlier builds refuse a schema 9 file, unchanged: the upgrade is one-way.
+const MIGRATE_V9 = `
+  CREATE TABLE accounts_v9 (
+    id TEXT PRIMARY KEY NOT NULL,
+    name TEXT NOT NULL CHECK(length(trim(name)) BETWEEN 1 AND 80),
+    currency TEXT NOT NULL CHECK(length(currency) = 3 AND currency NOT GLOB '*[^A-Z]*'),
+    openingMinor INTEGER NOT NULL CHECK(abs(openingMinor) <= 9007199254740991),
+    createdAt TEXT NOT NULL,
+    revision INTEGER NOT NULL DEFAULT 0 CHECK(revision >= 0 AND revision <= 9007199254740991),
+    updatedAt TEXT NOT NULL DEFAULT ''
+  ) STRICT;
+  INSERT INTO accounts_v9 (id, name, currency, openingMinor, createdAt, revision, updatedAt)
+    SELECT id, name, currency, openingMinor, createdAt, revision, updatedAt FROM accounts;
+  DROP TABLE accounts;
+  ALTER TABLE accounts_v9 RENAME TO accounts;
+  CREATE TABLE monthly_budgets_v9 (
+    id TEXT PRIMARY KEY NOT NULL,
+    scope TEXT NOT NULL CHECK(scope IN ('total', 'category')),
+    category TEXT CHECK(
+      (scope = 'category' AND category IS NOT NULL AND length(trim(category)) BETWEEN 1 AND 60)
+      OR (scope = 'total' AND category IS NULL)),
+    currency TEXT NOT NULL CHECK(length(currency) = 3 AND currency NOT GLOB '*[^A-Z]*'),
+    monthISO TEXT NOT NULL,
+    amountMinor INTEGER NOT NULL CHECK(amountMinor > 0 AND amountMinor <= 9007199254740991),
+    active INTEGER NOT NULL CHECK(active IN (0, 1)),
+    createdAt TEXT NOT NULL,
+    revision INTEGER NOT NULL DEFAULT 0 CHECK(revision >= 0 AND revision <= 9007199254740991),
+    updatedAt TEXT NOT NULL
+  ) STRICT;
+  INSERT INTO monthly_budgets_v9 (id, scope, category, currency, monthISO, amountMinor, active, createdAt, revision, updatedAt)
+    SELECT id, scope, category, currency, monthISO, amountMinor, active, createdAt, revision, updatedAt FROM monthly_budgets;
+  DROP TABLE monthly_budgets;
+  ALTER TABLE monthly_budgets_v9 RENAME TO monthly_budgets;
+  CREATE INDEX budgets_period ON monthly_budgets(currency, monthISO, active);
+  CREATE TABLE currency_units (
+    currency TEXT PRIMARY KEY NOT NULL CHECK(length(currency) = 3 AND currency NOT GLOB '*[^A-Z]*'),
+    minorUnitExponent INTEGER NOT NULL CHECK(minorUnitExponent BETWEEN 0 AND 4),
+    source TEXT NOT NULL CHECK(length(trim(source)) BETWEEN 1 AND 80),
+    catalogVersion TEXT NOT NULL CHECK(length(trim(catalogVersion)) BETWEEN 1 AND 80),
+    createdAt TEXT NOT NULL
+  ) STRICT;
+  PRAGMA user_version = 9;
+`;
+
+/** Every schema script in order, for tests that build a real file at an earlier version (never run by the app outside `initializeDatabase`). */
+export const SCHEMA_SCRIPTS: readonly string[] = [SCHEMA, MIGRATE_V2, MIGRATE_V3, MIGRATE_V4, MIGRATE_V5, MIGRATE_V6, MIGRATE_V7, MIGRATE_V8, MIGRATE_V9];
+
 export async function initializeDatabase(db: LedgerDatabase): Promise<void> {
   // Set before opening a transaction; foreign_keys is connection-local.
   await db.execAsync('PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000;');
+  const readVersion = async (tx: SqlExecutor) => (await tx.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))?.user_version ?? 0;
   await db.withExclusiveTransactionAsync(async tx => {
-    const row = await tx.getFirstAsync<{ user_version: number }>('PRAGMA user_version');
-    const version = row?.user_version ?? 0;
+    const version = await readVersion(tx);
     if (version > DATABASE_VERSION) {
       throw new Error('Estos datos requieren una versión más nueva de FinanzApp. No se modificaron.');
     }
@@ -243,6 +318,12 @@ export async function initializeDatabase(db: LedgerDatabase): Promise<void> {
     if (version < 7) await tx.execAsync(MIGRATE_V7);
     if (version < 8) await tx.execAsync(MIGRATE_V8);
   });
+  // The one rebuild that needs foreign keys off: its own connection and transaction (the version is
+  // read again inside it, so two openers racing cannot run it twice). A schema 8 file that stops here
+  // is still a complete schema 8 file.
+  await db.withMigrationTransactionAsync(async tx => {
+    if (await readVersion(tx) < 9) await tx.execAsync(MIGRATE_V9);
+  });
   await readSnapshot(db); // Validate before showing a balance, not after a render.
 }
 
@@ -250,27 +331,33 @@ export async function readSnapshot(db: SqlExecutor): Promise<LedgerSnapshot> {
   return snapshotFromArchive(await readArchive(db));
 }
 
+/** Three checks, apart: read acceptance (each row's shape and a storable currency, the domain's
+ * validators), the creation gate (only in the create functions), and the precision check below:
+ * every currency the rows use reads at its pinned scale (`archiveExponents`), ARS/USD as cents and
+ * any other code only through its `currency_units` row, equal to the catalogue's exponent. A row
+ * whose currency has no pinned scale, or a pinned scale that disagrees, refuses the read by name;
+ * the file is never reset or rewritten. */
 export async function readArchive(db: SqlExecutor): Promise<LedgerArchive> {
-  const accountRows = await db.getAllAsync<Account>('SELECT * FROM accounts ORDER BY createdAt, id');
+  const accountRows = await db.getAllAsync<Account & { revision: number; updatedAt: string }>(`SELECT ${ACCOUNT_COLUMNS} FROM accounts ORDER BY createdAt, id`);
   const accounts = accountRows.map(row => {
     validateAccount(row);
     const { revision, updatedAt, ...account } = row;
     return revision === 0 ? account : row;
   });
   const rows = await db.getAllAsync<Entry & { revision: number; voided: number; updatedAt: string }>(
-    'SELECT * FROM entries ORDER BY dateISO DESC, createdAt DESC, id DESC');
+    `SELECT ${ENTRY_COLUMNS} FROM entries ORDER BY dateISO DESC, createdAt DESC, id DESC`);
   const records = rows.map(({ revision, voided, updatedAt, ...entry }) => {
     if (voided !== 0 && voided !== 1) throw new Error('Estado de movimiento inválido.');
     return { entry, revision, voided: voided === 1, updatedAt };
   });
   const transferRows = await db.getAllAsync<Transfer & { revision: number; voided: number; updatedAt: string }>(
-    'SELECT * FROM transfers ORDER BY dateISO DESC, createdAt DESC, id DESC');
+    `SELECT ${TRANSFER_COLUMNS} FROM transfers ORDER BY dateISO DESC, createdAt DESC, id DESC`);
   const transfers = transferRows.map(({ revision, voided, updatedAt, ...transfer }) => {
     if (voided !== 0 && voided !== 1) throw new Error('Estado de transferencia inválido.');
     return { transfer, revision, voided: voided === 1, updatedAt };
   });
   const recurringRows = await db.getAllAsync<Omit<RecurringRule, 'active'> & { active: number }>(
-    'SELECT * FROM recurring_rules ORDER BY active DESC, nextDateISO, createdAt, id');
+    `SELECT ${RECURRING_COLUMNS} FROM recurring_rules ORDER BY active DESC, nextDateISO, createdAt, id`);
   const recurring = recurringRows.map(({ active, ...row }) => {
     if (active !== 0 && active !== 1) throw new Error('Estado de recurrente inválido.');
     const rule = { ...row, active: active === 1 };
@@ -281,7 +368,7 @@ export async function readArchive(db: SqlExecutor): Promise<LedgerArchive> {
     amountMinor: number; active: number; createdAt: string; revision: number; updatedAt: string };
   // The total (category NULL) sorts before the sublimits of its month.
   const budgetRows = await db.getAllAsync<BudgetRow>(
-    'SELECT * FROM monthly_budgets ORDER BY monthISO DESC, currency, category IS NOT NULL, category, createdAt, id');
+    `SELECT ${BUDGET_COLUMNS} FROM monthly_budgets ORDER BY monthISO DESC, currency, category IS NOT NULL, category, createdAt, id`);
   const budgets = budgetRows.map(({ active, ...row }) => {
     if (active !== 0 && active !== 1) throw new Error('Estado de presupuesto inválido.');
     const budget = scopedMonthlyBudget({ ...row, active: active === 1 });
@@ -289,7 +376,7 @@ export async function readArchive(db: SqlExecutor): Promise<LedgerArchive> {
     return budget;
   });
   const cardRows = await db.getAllAsync<Omit<CreditCardProfile, 'active'> & { active: number }>(
-    'SELECT * FROM credit_cards ORDER BY active DESC, createdAt, id');
+    `SELECT ${CARD_COLUMNS} FROM credit_cards ORDER BY active DESC, createdAt, id`);
   const cards = cardRows.map(({ active, ...row }) => {
     if (active !== 0 && active !== 1) throw new Error('Estado de tarjeta inválido.');
     const card = { ...row, active: active === 1 };
@@ -297,24 +384,26 @@ export async function readArchive(db: SqlExecutor): Promise<LedgerArchive> {
     return card;
   });
   const debtRows = await db.getAllAsync<Omit<PersonalDebtProfile, 'active'> & { active: number }>(
-    'SELECT * FROM personal_debts ORDER BY active DESC, dueDateISO, createdAt, id');
+    `SELECT ${DEBT_COLUMNS} FROM personal_debts ORDER BY active DESC, dueDateISO, createdAt, id`);
   const debts = debtRows.map(({ active, ...row }) => {
     if (active !== 0 && active !== 1) throw new Error('Estado de deuda inválido.');
     const debt = { ...row, active: active === 1 };
     validatePersonalDebtProfile(debt, accounts);
     return debt;
   });
-  const appearanceRows = await db.getAllAsync<AccountAppearance>('SELECT * FROM account_appearances ORDER BY accountId');
+  const appearanceRows = await db.getAllAsync<AccountAppearance>(`SELECT ${APPEARANCE_COLUMNS} FROM account_appearances ORDER BY accountId`);
   const appearances = appearanceRows.map(row => { validateAccountAppearance(row, accounts); return row; });
   const categoryRows = await db.getAllAsync<Omit<CategoryDefinition, 'archived'> & { archived: number }>(
-    'SELECT * FROM category_definitions ORDER BY kind, key');
+    `SELECT ${CATEGORY_COLUMNS} FROM category_definitions ORDER BY kind, key`);
   const categories = categoryRows.map(({ archived, ...row }) => {
     if (archived !== 0 && archived !== 1) throw new Error('Estado de categoría inválido.');
     const definition = { ...row, archived: archived === 1 };
     validateCategoryDefinition(definition);
     return definition;
   });
-  const archive = {
+  const unitRows = await db.getAllAsync<CurrencyUnit & { createdAt: string }>(`SELECT ${UNIT_COLUMNS} FROM currency_units ORDER BY currency`);
+  const currencyUnits = unitRows.map(({ createdAt: _pinnedAt, ...unit }) => { validateCurrencyUnit(unit); return unit; });
+  const archive: LedgerArchive = {
     accounts,
     records,
     ...(transfers.length ? { transfers } : {}),
@@ -324,29 +413,61 @@ export async function readArchive(db: SqlExecutor): Promise<LedgerArchive> {
     ...(debts.length ? { debts } : {}),
     ...(appearances.length ? { appearances } : {}),
     ...(categories.length ? { categories } : {}),
+    currencyUnits,
   };
-  validateArchive(archive); // Including tombstones and safe integer totals.
+  validateArchive(archive); // Including tombstones, safe integer totals and the pinned scales.
+  archiveExponents(archive); // The precision check: every currency present reads at its pinned scale, never as cents by default.
   return archive;
+}
+
+/** Pins the scale of `currency` the first time a row in it is written, in the same transaction as
+ * that row: nothing for ARS/USD (cents, never pinned), the catalogue's unit for any other code, or
+ * a check that the row already pinned agrees with the catalogue (`storedExponent`: a disagreement
+ * refuses the write, never rescales). Idempotent: a retry finds the row it wrote. */
+async function ensureCurrencyUnit(tx: SqlExecutor, currency: Currency, createdAt: string): Promise<void> {
+  if (isLegacyCurrency(currency)) return;
+  const existing = await tx.getFirstAsync<CurrencyUnit>(`SELECT ${UNIT_COLUMNS} FROM currency_units WHERE currency = ?`, currency);
+  if (existing) { storedExponent(currency, existing.minorUnitExponent); return; }
+  const unit = catalogueUnit(currency);
+  await tx.runAsync(`INSERT INTO currency_units (${UNIT_COLUMNS}) VALUES (?, ?, ?, ?, ?)`,
+    unit.currency, unit.minorUnitExponent, unit.source, unit.catalogVersion, createdAt);
+}
+
+/** The units an archive will hold once `ensureCurrencyUnit(currency)` ran: for a validation of the archive-to-be. */
+const unitsWith = (units: readonly CurrencyUnit[] = [], currency: Currency): CurrencyUnit[] =>
+  isLegacyCurrency(currency) || units.some(unit => unit.currency === currency) ? [...units] : [...units, catalogueUnit(currency)];
+
+/** Inserts a scale a backup pins and this device lacks, exactly as the copy states it (already
+ * proven equal to the catalogue); a row that exists must agree. */
+async function insertCurrencyUnit(tx: SqlExecutor, unit: CurrencyUnit, createdAt: string): Promise<void> {
+  validateCurrencyUnit(unit);
+  const existing = await tx.getFirstAsync<CurrencyUnit>(`SELECT ${UNIT_COLUMNS} FROM currency_units WHERE currency = ?`, unit.currency);
+  if (existing) {
+    if (existing.minorUnitExponent !== unit.minorUnitExponent) throw new Error('La copia registra otra escala para una moneda ya guardada. No se importó nada.');
+    return;
+  }
+  await tx.runAsync(`INSERT INTO currency_units (${UNIT_COLUMNS}) VALUES (?, ?, ?, ?, ?)`,
+    unit.currency, unit.minorUnitExponent, unit.source, unit.catalogVersion, createdAt);
 }
 
 /** A new account and, optionally, its chosen look in the same commit. The look
  * is presentation only; retrying with the same account and look is safe. */
-export async function createAccount(db: LedgerDatabase, input: Account, appearance?: AccountAppearance): Promise<void> {
+export async function createAccount(db: LedgerDatabase, input: Account, appearance?: AccountAppearance, gate: CurrencyGate = LEDGER_CURRENCIES): Promise<void> {
   const account = { ...input, name: input.name.trim() };
-  validateNewAccount(account); // The creation gate; stored rows are read with validateAccount only.
+  validateNewAccount(account, gate); // The creation gate; stored rows are read with validateAccount only.
   if ((account.revision ?? 0) !== 0) throw new Error('Una cuenta nueva no puede tener correcciones previas.');
   if (appearance) {
     validateAccountAppearance(appearance, [account]);
     if (appearance.revision !== 0) throw new Error('La apariencia de una cuenta nueva no puede tener cambios previos.');
   }
   await db.withExclusiveTransactionAsync(async tx => {
-    const existing = await tx.getFirstAsync<Account>('SELECT * FROM accounts WHERE id = ?', account.id);
+    const existing = await tx.getFirstAsync<Account>(`SELECT ${ACCOUNT_COLUMNS} FROM accounts WHERE id = ?`, account.id);
     if (existing) {
       if (!sameAccount(existing, account)) {
         throw new Error('Esta operación ya existe con otros datos. Volvé a abrir el formulario.');
       }
       if (appearance) {
-        const look = await tx.getFirstAsync<AccountAppearance>('SELECT * FROM account_appearances WHERE accountId = ?', account.id);
+        const look = await tx.getFirstAsync<AccountAppearance>(`SELECT ${APPEARANCE_COLUMNS} FROM account_appearances WHERE accountId = ?`, account.id);
         if (!look) await insertAppearance(tx, appearance);
         else if (!sameAccountAppearance(look, appearance)) throw new Error('Esta operación ya existe con otros datos. Volvé a abrir el formulario.');
       }
@@ -354,6 +475,7 @@ export async function createAccount(db: LedgerDatabase, input: Account, appearan
     }
     const snapshot = await readSnapshot(tx);
     totalsByCurrency({ ...snapshot, accounts: [...snapshot.accounts, account] });
+    await ensureCurrencyUnit(tx, account.currency, account.createdAt); // The scale before the row that needs it.
     await tx.runAsync(
       'INSERT INTO accounts (id, name, currency, openingMinor, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?)',
       account.id, account.name, account.currency, account.openingMinor, account.createdAt, account.createdAt,
@@ -371,7 +493,7 @@ async function insertAppearance(tx: SqlExecutor, look: AccountAppearance): Promi
  * identical retry, or the next revision. Never touches `accounts`. */
 async function writeAppearance(tx: SqlExecutor, look: AccountAppearance, accounts: Account[]): Promise<void> {
   validateAccountAppearance(look, accounts);
-  const existing = await tx.getFirstAsync<AccountAppearance>('SELECT * FROM account_appearances WHERE accountId = ?', look.accountId);
+  const existing = await tx.getFirstAsync<AccountAppearance>(`SELECT ${APPEARANCE_COLUMNS} FROM account_appearances WHERE accountId = ?`, look.accountId);
   if (!existing) {
     if (look.revision !== 0) throw new Error('La apariencia cambió desde que la abriste. Volvé a revisarla.');
     await insertAppearance(tx, look);
@@ -481,10 +603,16 @@ export async function importArchive(db: LedgerDatabase, incoming: LedgerArchive,
   await db.withExclusiveTransactionAsync(async tx => {
     const current = await readArchive(tx);
     const plan = previewBackupImport(current, incoming);
+    if (plan.scaleConflicts.length) throw new Error('La copia registra otra escala para una moneda ya guardada. No se importó nada.');
     if (plan.conflicts) throw new Error('La copia contradice cambios locales. No se importó nada. Conservá ambas versiones.');
     if (!plan.accounts.length && !plan.records.length && !plan.transfers.length && !plan.recurring.length
       && !plan.budgets.length && !plan.cards.length && !plan.debts.length && !plan.appearances.length && !plan.categories.length) return;
     if (plan.baseline !== baseline) throw new Error('Tus datos cambiaron. Volvé a revisar la copia antes de importar.');
+    // Scales first, in the same transaction as the rows that need them: the copy's own units, then
+    // any currency the new rows use that neither side pinned (a v1–v8 file can only hold ARS/USD).
+    const pinnedAt = new Date().toISOString();
+    for (const unit of plan.currencyUnits) await insertCurrencyUnit(tx, unit, pinnedAt);
+    for (const code of currenciesNeedingUnits({ accounts: plan.accounts, budgets: plan.budgets })) await ensureCurrencyUnit(tx, code, pinnedAt);
     for (const account of plan.accounts) {
       await tx.runAsync('INSERT INTO accounts (id, name, currency, openingMinor, createdAt, revision, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?)',
         account.id, account.name, account.currency, account.openingMinor, account.createdAt, account.revision ?? 0, account.updatedAt ?? account.createdAt);
@@ -660,18 +788,19 @@ async function insertMonthlyBudget(tx: SqlExecutor, budget: MonthlyBudget): Prom
   budget.amountMinor, budget.active ? 1 : 0, budget.createdAt, budget.revision, budget.updatedAt);
 }
 
-export async function saveMonthlyBudget(db: LedgerDatabase, input: MonthlyBudget): Promise<void> {
+export async function saveMonthlyBudget(db: LedgerDatabase, input: MonthlyBudget, gate: CurrencyGate = LEDGER_CURRENCIES): Promise<void> {
   const budget: MonthlyBudget = input.scope === 'category' ? { ...input, category: input.category.trim() } : input;
   await db.withExclusiveTransactionAsync(async tx => {
     const archive = await readArchive(tx);
     validateMonthlyBudget(budget);
     const existing = archive.budgets?.find(item => item.id === budget.id);
     if (!existing) {
-      validateNewMonthlyBudget(budget); // The creation gate applies to a new budget only, never to stored ones.
+      validateNewMonthlyBudget(budget, gate); // The creation gate applies to a new budget only, never to stored ones.
       if (budget.revision !== 0 || budget.updatedAt !== budget.createdAt) {
         throw new Error('Un presupuesto nuevo no puede tener cambios previos.');
       }
-      validateArchive({ ...archive, budgets: [...archive.budgets ?? [], budget] });
+      await ensureCurrencyUnit(tx, budget.currency, budget.createdAt); // A budget has no account: its scale is pinned by its own code.
+      validateArchive({ ...archive, budgets: [...archive.budgets ?? [], budget], currencyUnits: unitsWith(archive.currencyUnits, budget.currency) });
       await insertMonthlyBudget(tx, budget);
       return;
     }
@@ -716,10 +845,10 @@ async function insertInternalAccount(tx: SqlExecutor, account: Account): Promise
 /** A card and its hidden account are created in one commit. The opening
  * balance is the debt already owed (negative) or zero; a card never starts
  * with money in the holder's favour. */
-export async function createCreditCard(db: LedgerDatabase, accountInput: Account, cardInput: CreditCardProfile): Promise<void> {
+export async function createCreditCard(db: LedgerDatabase, accountInput: Account, cardInput: CreditCardProfile, gate: CurrencyGate = LEDGER_CURRENCIES): Promise<void> {
   const account = { ...accountInput, name: accountInput.name.trim() };
   const card = { ...cardInput, issuer: cardInput.issuer.trim(), last4: cardInput.last4.trim() };
-  validateNewAccount(account);
+  validateNewAccount(account, gate);
   if ((account.revision ?? 0) !== 0 || account.openingMinor > 0) {
     throw new Error('La tarjeta nueva debe comenzar sin crédito a favor y sin correcciones previas.');
   }
@@ -734,7 +863,8 @@ export async function createCreditCard(db: LedgerDatabase, accountInput: Account
       if (existingAccount && existingCard && sameAccount(existingAccount, account) && sameCreditCardProfile(existingCard, card)) return;
       throw new Error('Esta tarjeta ya existe con otros datos. Volvé a abrir el formulario.');
     }
-    validateArchive({ ...archive, accounts: [...archive.accounts, account], cards: [...archive.cards ?? [], card] });
+    await ensureCurrencyUnit(tx, account.currency, account.createdAt);
+    validateArchive({ ...archive, accounts: [...archive.accounts, account], cards: [...archive.cards ?? [], card], currencyUnits: unitsWith(archive.currencyUnits, account.currency) });
     await insertInternalAccount(tx, account);
     await insertCreditCard(tx, card);
   });
@@ -758,10 +888,10 @@ export async function saveCreditCard(db: LedgerDatabase, input: CreditCardProfil
 
 /** A debt and its hidden account are created together. "I owe" starts with a
  * negative opening balance; "they owe me" starts positive. */
-export async function createPersonalDebt(db: LedgerDatabase, accountInput: Account, debtInput: PersonalDebtProfile): Promise<void> {
+export async function createPersonalDebt(db: LedgerDatabase, accountInput: Account, debtInput: PersonalDebtProfile, gate: CurrencyGate = LEDGER_CURRENCIES): Promise<void> {
   const account = { ...accountInput, name: accountInput.name.trim() };
   const debt = { ...debtInput, counterparty: debtInput.counterparty.trim(), note: debtInput.note.trim() };
-  validateNewAccount(account);
+  validateNewAccount(account, gate);
   if ((account.revision ?? 0) !== 0
     || (debt.direction === 'owed_by_me' && account.openingMinor > 0)
     || (debt.direction === 'owed_to_me' && account.openingMinor < 0)) {
@@ -778,7 +908,8 @@ export async function createPersonalDebt(db: LedgerDatabase, accountInput: Accou
       if (existingAccount && existingDebt && sameAccount(existingAccount, account) && samePersonalDebtProfile(existingDebt, debt)) return;
       throw new Error('Esta deuda ya existe con otros datos. Volvé a abrir el formulario.');
     }
-    validateArchive({ ...archive, accounts: [...archive.accounts, account], debts: [...archive.debts ?? [], debt] });
+    await ensureCurrencyUnit(tx, account.currency, account.createdAt);
+    validateArchive({ ...archive, accounts: [...archive.accounts, account], debts: [...archive.debts ?? [], debt], currencyUnits: unitsWith(archive.currencyUnits, account.currency) });
     await insertInternalAccount(tx, account);
     await insertPersonalDebt(tx, debt);
   });

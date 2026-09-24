@@ -19,7 +19,7 @@
  *   - `excluded`: not money a person spends (ISO funds, precious metals, units of
  *     account, the test code and XXX); never offered.
  * The data is generated (currency-data.ts); this module is the only API over it. */
-import { CURRENCY_CODES, CURRENCY_DATA, type CurrencyRecord, type IsoCurrencyCode } from './currency-data.ts';
+import { CURRENCY_CODES, CURRENCY_DATA, ISO_4217_PUBLISHED, type CurrencyRecord, type IsoCurrencyCode } from './currency-data.ts';
 
 export { CLDR_VERSION, CURRENCY_CODES, ISO_4217_PUBLISHED, type CurrencyDataStatus, type CurrencyKind, type CurrencyRecord,
   type IsoCurrencyCode } from './currency-data.ts';
@@ -135,10 +135,96 @@ export function storedExponent(code: IsoCurrencyCode, stored: number | null | un
   const exponent = minorUnitExponent(code);
   if (stored === null || stored === undefined) {
     if (!isLegacyCurrency(code) || exponent !== LEGACY_EXPONENT) {
-      throw new Error('La escala de la moneda no coincide con el registro.');
+      throw new Error(SCALE_CONFLICT_MESSAGE);
     }
     return LEGACY_EXPONENT;
   }
-  if (stored !== exponent) throw new Error('La escala de la moneda no coincide con el registro.');
+  if (stored !== exponent) throw new Error(SCALE_CONFLICT_MESSAGE);
   return exponent;
+}
+
+/** A stored scale that disagrees with the catalogue: never rescaled, never reset, an error to resolve. */
+export const SCALE_CONFLICT_MESSAGE = 'La escala de la moneda no coincide con el registro.';
+/** A stored row in a currency other than ARS/USD whose scale was never pinned (`{code}` is the currency). */
+export const scaleMissingMessage = (code: string) => `La moneda ${code} no tiene una escala registrada. No se modificó nada.`;
+/** A scale pinned for a currency that never needs one (ARS, USD) or that no row uses (a v9 file lists exactly the codes it uses). */
+export const UNIT_UNNEEDED_MESSAGE = 'La copia registra una escala para una moneda que no la necesita. No se importó nada.';
+
+/** The scale of one currency as storage pins it the first time a row in that currency is written
+ * (SQLite `currency_units`, backup v9 `currencyUnits`; Producto 24B4). Append-only and never
+ * updated: the exponent is ISO 4217's minor unit at the catalogue version named, so a later
+ * catalogue that disagrees is detected (`storedExponent`) instead of silently rescaling money.
+ * ARS and USD are never pinned: rows and backups from before 24B carry them as cents. */
+export interface CurrencyUnit {
+  currency: IsoCurrencyCode;
+  /** 0–4: ISO 4217's minor unit (JPY 0, USD 2, KWD 3, CLF 4). */
+  minorUnitExponent: number;
+  /** Which authority the exponent came from. */
+  source: string;
+  /** That authority's publication the catalogue was generated from (ISO 4217 List One's date). */
+  catalogVersion: string;
+}
+export const CURRENCY_UNIT_KEYS = ['currency', 'minorUnitExponent', 'source', 'catalogVersion'] as const;
+export const CURRENCY_UNIT_SOURCE = 'ISO 4217 List One';
+export const MAX_UNIT_EXPONENT = 4;
+
+/** The unit the catalogue pins for a storable currency today. Throws for a code that cannot be stored. */
+export function catalogueUnit(code: IsoCurrencyCode): CurrencyUnit {
+  assertStorableCurrency(code);
+  return { currency: code, minorUnitExponent: minorUnitExponent(code), source: CURRENCY_UNIT_SOURCE, catalogVersion: ISO_4217_PUBLISHED };
+}
+
+/** Read acceptance for one pinned unit: the exact key set, a storable code that is not ARS or
+ * USD, an integer exponent 0–4 that equals the catalogue's (anything else is `SCALE_CONFLICT_MESSAGE`),
+ * and non-empty provenance strings. The provenance is recorded, never compared: a unit pinned from
+ * an older catalogue version with the same exponent is the same scale. */
+export function validateCurrencyUnit(value: unknown): asserts value is CurrencyUnit {
+  if (!value || typeof value !== 'object' || Array.isArray(value)
+    || Object.keys(value).length !== CURRENCY_UNIT_KEYS.length || CURRENCY_UNIT_KEYS.some(key => !Object.hasOwn(value, key))) {
+    throw new Error('La copia contiene campos faltantes o no compatibles. No se importó nada.');
+  }
+  const unit = value as Record<string, unknown>;
+  assertStorableCurrency(unit.currency);
+  if (isLegacyCurrency(unit.currency)) throw new Error(UNIT_UNNEEDED_MESSAGE);
+  if (!Number.isInteger(unit.minorUnitExponent) || (unit.minorUnitExponent as number) < 0 || (unit.minorUnitExponent as number) > MAX_UNIT_EXPONENT) {
+    throw new Error(SCALE_CONFLICT_MESSAGE);
+  }
+  storedExponent(unit.currency, unit.minorUnitExponent as number);
+  for (const key of ['source', 'catalogVersion'] as const) {
+    if (typeof unit[key] !== 'string' || !(unit[key] as string).trim() || (unit[key] as string).length > 80) throw new Error('Origen de la escala inválido.');
+  }
+}
+
+/** The currencies of a set of accounts and budgets that need a pinned scale: every storable code
+ * present other than ARS and USD, in grouping order. */
+export function currenciesNeedingUnits(rows: { accounts: readonly { currency: IsoCurrencyCode }[]; budgets?: readonly { currency: IsoCurrencyCode }[] }): IsoCurrencyCode[] {
+  return sortCurrencies([...rows.accounts, ...rows.budgets ?? []].map(row => row.currency).filter(code => !isLegacyCurrency(code)));
+}
+
+/** A collection of pinned units against the currencies that use them: each unit valid, no code
+ * twice, every code in `used` pinned (`scaleMissingMessage`). With `exact`, a unit for a code that
+ * is not used is refused too (a backup lists exactly what it uses); storage tolerates one. */
+export function validateCurrencyUnits(units: readonly CurrencyUnit[], used: Iterable<IsoCurrencyCode>, exact = false): void {
+  const seen = new Set<string>();
+  for (const unit of units) {
+    validateCurrencyUnit(unit);
+    if (seen.has(unit.currency)) throw new Error('La copia repite la escala de una moneda. No se importó nada.');
+    seen.add(unit.currency);
+  }
+  const needed = new Set<string>();
+  for (const code of used) {
+    if (isLegacyCurrency(code)) continue;
+    needed.add(code);
+    if (!seen.has(code)) throw new Error(scaleMissingMessage(code));
+  }
+  if (exact) for (const code of seen) if (!needed.has(code)) throw new Error(UNIT_UNNEEDED_MESSAGE);
+}
+
+/** The exponent a stored row in `code` is read with: ARS/USD cents without a unit, otherwise the
+ * pinned unit's exponent, which must equal the catalogue's (`storedExponent`). A code without a
+ * pinned unit is refused by name: nothing is ever read as cents by default. */
+export function pinnedExponent(code: IsoCurrencyCode, units: readonly CurrencyUnit[]): number {
+  const unit = units.find(item => item.currency === code);
+  if (!unit && !isLegacyCurrency(code)) throw new Error(scaleMissingMessage(code));
+  return storedExponent(code, unit?.minorUnitExponent);
 }
