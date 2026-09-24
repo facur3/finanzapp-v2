@@ -1,6 +1,66 @@
 # Physical iPhone acceptance checklist
 
-## Producto 23.1C2 — English and the United States released (pending device review)
+## Producto 23.2 — which binary is installed, and the per-app Language row
+
+**No new build and no reinstall-from-scratch.** Do not uninstall FinanzApp Dev or delete
+its data. Record the iPhone model and iOS version (`UIPrefersShowingLanguageSettings` was
+introduced at WWDC24, iOS 18; last recorded iOS 26.6.1).
+
+Owner report (2026-09-24): 23.1C2 passed inside the app (Más → Idioma/Región, Spanish,
+English, both regions), but Settings → Apps → FinanzApp Dev lists Local Network, Siri,
+Search and Cellular Data and **no Language**.
+
+Diagnosis on Linux (compiled `Info.plist` of the IPAs downloaded from EAS; method in
+`apps/mobile/README.md` § Producto 23.2):
+
+| EAS development build | commit | `CFBundleLocalizations` | `CFBundleDevelopmentRegion` | `UIPrefersShowingLanguageSettings` |
+| --- | --- | --- | --- | --- |
+| `1d69d2d4` (2026-09-24 12:26 UTC) | `cc6f6f9` (23.1C2) | array `[es, en]` | string `es` | boolean `true` |
+| `bad52629` (2026-09-23) | `634d293` | absent | string `en` | absent |
+| `ed369b28` (2026-09-22) | `f14b16a` | absent | string `en` | absent |
+
+`1d69d2d4` is correct, with the types Apple expects; its native fingerprint (`796b0b4…`)
+equals master's. No bundle contains an `.lproj` folder (Expo's template has none; iOS
+reads the languages from `CFBundleLocalizations`). Every development build reports
+0.1.0 (1), and a development client runs whatever JavaScript Metro serves, so the
+selectors in Más prove nothing about the binary.
+
+**A. Identify the installed binary** (Metro from `master` or this branch, both fine)
+- [ ] With the iPhone in Spanish, long-press the Movimientos search field. **Pegar /
+  Copiar / Seleccionar todo** = a binary that declares its languages (`1d69d2d4`). **Paste /
+  Copy** = an older binary (`bad52629` or `ed369b28`): the 23.1C2 build is not installed.
+- [ ] If it reads Paste: share a private backup (Más → Copias de seguridad), then install
+  the **existing** build `1d69d2d4` over FinanzApp Dev from
+  https://expo.dev/accounts/facur3/projects/finanzapp-mobile/builds/1d69d2d4-c018-485c-b093-9d3b58f88a62
+  (Install on the iPhone; same bundle identifier, data kept; it expires 2026-10-08). No new
+  EAS build is needed. Repeat A.
+
+**B. The Language row on the 23.1C2 binary** (after A reads Pegar)
+- [ ] Force-quit Settings (app switcher, swipe up), reopen, Apps → FinanzApp Dev. Record
+  whether Language/Idioma appears.
+- [ ] If not: Settings → General → Language & Region → Add Language → English, keeping
+  Español first ("Keep Español"). Force-quit Settings, reopen, Apps → FinanzApp Dev.
+  Expected: Language, listing exactly Español and English. Record the row's title.
+- [ ] Still missing: restart the iPhone once and look again.
+- [ ] Per-app selector (Más → Idioma on "Según el dispositivo"): choose English in
+  Settings → Apps → FinanzApp Dev → Language; iOS quits FinanzApp; reopen (Metro running): FinanzApp and the text-field menu in
+  English, data intact. Back to Español. Then set Más → Idioma = Español explicitly and
+  English in Settings: FinanzApp's words stay Spanish, iOS's menu English (documented).
+  Restore both.
+- [ ] Remove English from the preferred languages again (Español only), force-quit Settings:
+  record whether the row **stays** (that is what `UIPrefersShowingLanguageSettings` adds).
+
+**C. Report back:** the iOS version, A's menu words, B's four results (row title, options,
+with one and with two preferred languages). If the 23.1C2 binary shows no row even with
+two preferred languages, the remaining difference from a typical Xcode app is that the
+bundle has no `.lproj` folder; the first-party candidate is Expo's `locales` key (writes
+`es.lproj`/`en.lproj/InfoPlist.strings` at prebuild), which needs a new build. It is
+proposed only on that evidence, not started.
+
+## Producto 23.1C2 — English and the United States released
+
+Owner, 2026-09-24, FinanzApp Dev: the Más selectors, Spanish, English and both regions
+passed. The Settings Language row was missing; it is diagnosed in Producto 23.2 above.
 
 **Needs a new FinanzApp Dev build** (Info.plist changed: `CFBundleLocalizations`
 es/en, `CFBundleDevelopmentRegion` es, `UIPrefersShowingLanguageSettings`). Record the

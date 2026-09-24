@@ -207,6 +207,29 @@ released) and a release bundle cannot use it (`tests/locale-release.node.ts`). A
 bilingual review fixed real copy errors in both catalogues. No SQLite, backup, accounting
 or currency change. Details, precedence and iOS limits: [`docs/i18n.md`](../../docs/i18n.md) §10.
 
+**Producto 23.2 (2026-09-24)** is stabilization only. The five Expo SDK 57 maintenance
+releases that `expo install --check` asked for after the 23.1C2 merge (`expo` 57.0.25,
+`expo-glass-effect` 57.0.4, `expo-linking` 57.0.11, `expo-router` 57.0.23, `expo-sharing`
+57.0.22, plus the patch releases they require) are installed with `expo install --fix`;
+no SDK change and no other dependency moves. It also records the per-app Language
+diagnosis. **The installed binary is what counts, not `app.config.ts`**: download the
+IPA of the build installed on the iPhone and read its compiled `Info.plist`:
+
+```bash
+npx eas-cli@latest build:list --platform ios --limit 5          # the build ID and its commit
+npx eas-cli@latest build:view <id> --json                        # artifacts.applicationArchiveUrl
+curl -sSL -o app.ipa "<applicationArchiveUrl>" && unzip -qo app.ipa 'Payload/*'
+python3 -c "import plistlib,glob; p=plistlib.load(open(glob.glob('Payload/*.app/Info.plist')[0],'rb')); [print(k, type(p.get(k)).__name__, p.get(k)) for k in ('CFBundleLocalizations','CFBundleDevelopmentRegion','UIPrefersShowingLanguageSettings')]"
+```
+
+Development build `1d69d2d4` (commit `cc6f6f9`) reads `list ['es', 'en']`, `str es`,
+`bool True`; the earlier development builds `bad52629` and `ed369b28` have neither key and
+`en` as development region. Every development build reports version 0.1.0 (1), and a
+development client runs whatever JavaScript Metro serves, so Más working in English does
+**not** identify the binary. iOS's own text does: on a Spanish iPhone the text-field menu
+reads Pegar/Copiar only on a binary that declares its languages. Steps:
+[device checklist](../../docs/mobile-device-checklist.md) § Producto 23.2.
+
 **expo-localization needs a new development build.** It is a native module: Expo Go
 already contains it, but a FinanzApp Dev binary compiled before this PR does not, and
 Metro cannot add native code. On such a binary the app still starts and works:
@@ -646,7 +669,7 @@ For the intermittent black-tab report, update to `master`, restart with
 and repeat the **Interfaz 02** tab checks, **Interfaz 03** report checks and
 **Interfaz 04/05** correction/recovery and transfer checks, plus **Interfaz 06** daily/comparison reports and **Interfaz 08** recurring/upcoming
 checks, plus **Interfaz 10** cards/debts and five-tab checks and **Interfaz 11** Home,
-Movimientos and detail checks, **Interfaz 12** form checks, **Interfaz 13** Reportes checks, **Interfaz 14** budgets/recurring/accounts checks, **Interfaz 15** motion checks, **Interfaz 16** cohesion checks, **Interfaz 17** identity and money-input checks **Producto 18** Más / Tarjetas / amount-shortcut checks, **Producto 19** budget checks, **Producto 20** account/category identity checks **Producto 21** Assistant checks, **Producto 22** reachability/material checks, **Producto 22.1** clarity checks, **Producto 23.0** amount-field, row and localization checks, **Producto 23.1A** language-preference checks, **Producto 23.1B1** and **23.1B2** translation checks, **Producto 23.1C1** regional-format checks, **Producto 23.1C2** release checks (new development build). The current footer (Más) says Producto 23.1C2.
+Movimientos and detail checks, **Interfaz 12** form checks, **Interfaz 13** Reportes checks, **Interfaz 14** budgets/recurring/accounts checks, **Interfaz 15** motion checks, **Interfaz 16** cohesion checks, **Interfaz 17** identity and money-input checks **Producto 18** Más / Tarjetas / amount-shortcut checks, **Producto 19** budget checks, **Producto 20** account/category identity checks **Producto 21** Assistant checks, **Producto 22** reachability/material checks, **Producto 22.1** clarity checks, **Producto 23.0** amount-field, row and localization checks, **Producto 23.1A** language-preference checks, **Producto 23.1B1** and **23.1B2** translation checks, **Producto 23.1C1** regional-format checks, **Producto 23.1C2** release checks (new development build), **Producto 23.2** installed-binary and Language-row checks. The current footer (Más) says Producto 23.2.
 Before updating, save a private pilot copy; do not uninstall or add fake movements.
 
 If a storage/refresh error occurs, the form retains the exact submitted command
