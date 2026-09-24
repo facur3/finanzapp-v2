@@ -28,14 +28,14 @@ function Bar({ fraction }: { fraction: number }) {
 }
 
 export function SpendingTimeline({ buckets, currency }: { buckets: SpendingBucket[]; currency: Currency }) {
-  const { t, locale, formatAmount, spokenNumber } = useI18n();
+  const { t, locale, formatMoneyAmount, spokenMinor } = useI18n();
   const max = Math.max(...buckets.map(b => b.amountMinor), 0);
   if (!max) return null;
   return <View style={{ gap: 8 }}>
-    <AppText secondary style={{ fontSize: 12 }}>{t('reports.chart.timelineMax', { currency, amount: formatAmount(max) })}</AppText>
+    <AppText secondary style={{ fontSize: 12 }}>{t('reports.chart.timelineMax', { currency, amount: formatMoneyAmount(max, currency) })}</AppText>
     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ flexGrow: 1, gap: 4 }}>
       {buckets.map(bucket => <PressFeedback key={bucket.startISO} feedback="opacity" accessibilityRole="button"
-        accessibilityLabel={t('reports.chart.timelineBar', { period: periodLabel(bucket, locale), amount: spokenNumber(bucket.amountMinor), currency,
+        accessibilityLabel={t('reports.chart.timelineBar', { period: periodLabel(bucket, locale), amount: spokenMinor(bucket.amountMinor, currency), currency,
           count: t('reports.recordedExpenses', { count: bucket.count }) })}
         accessibilityHint={t('reports.chart.timelineHint')} containerStyle={{ flex: 1, minWidth: 44 }}
         onPress={() => router.push({ pathname: '/spending-detail', params: { currency, startISO: bucket.startISO, endISO: bucket.endISO } })}

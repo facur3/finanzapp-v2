@@ -33,13 +33,13 @@ export function CategorySpendingRow({ category, totalMinor, currency, onPress, l
   onPress: () => void; last?: boolean; compact?: boolean;
 }) {
   const p = usePalette();
-  const { t, locale, spokenNumber, spokenPercent } = useI18n();
+  const { t, locale, spokenMinor, spokenPercent } = useI18n();
   const { hex: color, label: name } = useCategoryLook(category.category);
   const { fraction, label } = spendingShare(category.amountMinor, totalMinor, locale);
   const count = t('count.expenses', { count: category.count });
   const stacked = useStacked({ minor: category.amountMinor, currency });
   return <PressFeedback feedback="highlight" accessibilityRole="button"
-    accessibilityLabel={t('reports.chart.categoryLabel', { name, amount: spokenNumber(category.amountMinor), currency, share: spokenPercent(fraction), count })}
+    accessibilityLabel={t('reports.chart.categoryLabel', { name, amount: spokenMinor(category.amountMinor, currency), currency, share: spokenPercent(fraction), count })}
     accessibilityHint={t('reports.chart.categoryHint')}
     onPress={onPress} style={{ paddingHorizontal: 16, paddingVertical: 16, flexDirection: 'row', gap: 12, alignItems: 'center',
       borderBottomWidth: last ? 0 : StyleSheet.hairlineWidth, borderBottomColor: p.line }}>
@@ -61,13 +61,13 @@ export function CategoryLegendRow({ category, totalMinor, currency, onPress, las
   category: CategorySpending; totalMinor: number; currency: Currency; onPress: () => void; last?: boolean;
 }) {
   const p = usePalette();
-  const { t, locale, spokenNumber, spokenPercent } = useI18n();
+  const { t, locale, spokenMinor, spokenPercent } = useI18n();
   const name = useCategoryLook(category.category).label;
   const { fraction, label } = spendingShare(category.amountMinor, totalMinor, locale);
   const count = t('count.expenses', { count: category.count });
   const stacked = useStacked({ minor: category.amountMinor, currency });
   return <PressFeedback feedback="highlight" accessibilityRole="button"
-    accessibilityLabel={t('reports.chart.categoryLabel', { name, amount: spokenNumber(category.amountMinor), currency, share: spokenPercent(fraction), count })}
+    accessibilityLabel={t('reports.chart.categoryLabel', { name, amount: spokenMinor(category.amountMinor, currency), currency, share: spokenPercent(fraction), count })}
     accessibilityHint={t('reports.chart.categoryHint')}
     onPress={onPress} style={{ paddingHorizontal: 16, paddingVertical: 12, minHeight: 60, flexDirection: 'row', gap: 12, alignItems: 'center',
       borderBottomWidth: last ? 0 : StyleSheet.hairlineWidth, borderBottomColor: p.line }}>

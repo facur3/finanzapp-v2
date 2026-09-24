@@ -30,7 +30,7 @@ type Submission = { change: AccountChange | null; appearance: AccountAppearance 
  * Everything is saved in one commit. Currency stays immutable. */
 function AccountEditor({ account, snapshot, current }: { account: Account; snapshot: LedgerSnapshot; current?: AccountAppearance }) {
   const { updateAccount, saveAppearance } = useLedger();
-  const { t, formatAmount } = useI18n();
+  const { t, formatMoneyAmount } = useI18n();
   const [original] = useState(() => ({ account, snapshot, current, balance: accountBalanceMinor(account, snapshot.entries, snapshot.transfers),
     look: accountLook(account.id, current ? [current] : []) }));
   const [name, setName] = useState(account.name);
@@ -73,7 +73,7 @@ function AccountEditor({ account, snapshot, current }: { account: Account; snaps
       const submission = { change, appearance };
       if (!change || change.expectedBalanceMinor === null) { void apply(submission); return; }
       confirming.current = true;
-      Alert.alert(t('accounts.edit.correctTitle'), t('accounts.edit.correctMessage', { name: original.account.name, from: formatAmount(original.balance), to: formatAmount(target), currency: account.currency }), [
+      Alert.alert(t('accounts.edit.correctTitle'), t('accounts.edit.correctMessage', { name: original.account.name, from: formatMoneyAmount(original.balance, account.currency), to: formatMoneyAmount(target, account.currency), currency: account.currency }), [
         { text: t('common.cancel'), style: 'cancel', onPress: () => { confirming.current = false; } },
         { text: t('accounts.edit.correctConfirm'), onPress: () => { confirming.current = false; void apply(submission); } },
       ], { cancelable: true, onDismiss: () => { confirming.current = false; } });

@@ -20,7 +20,8 @@
  * to Spanish with Argentine conventions. */
 import { createContext, createElement, useContext, useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { AppState } from 'react-native';
-import { bindLocale, type I18n } from './bind.ts';
+import { bindLocale, withHeldCurrencies, type I18n } from './bind.ts';
+import type { HeldCurrencies } from './format.ts';
 import { readRuntimeDeviceLocales, subscribeRuntimeLocaleChanges } from './device-runtime';
 import { DEFAULT_LOCALE, languageOf, releasedForBuild, type AppLocale } from './locale.ts';
 import { defaultPreferenceStore } from './preference.ts';
@@ -65,6 +66,21 @@ export function I18nProvider({ children, locale, store }: { children: ReactNode;
 }
 
 export const useI18n = () => useContext(I18nContext);
+
+/** The currencies the ledger holds, told to the locale (Producto 24B3): the one ledger
+ * fact presentation needs, because "pesos" or "dólares" is ambiguous exactly when
+ * another held currency shares the word (ARS beside CLP, USD beside CAD), and then
+ * VoiceOver and the labels that name a currency use CLDR's full name. Rendered inside
+ * the ledger provider (`app/_layout.tsx`); the locale provider itself stays above the
+ * ledger and knows nothing of it. The value is rebuilt only when the locale binding or
+ * the set of codes changes, never on a write that keeps the same currencies, so a
+ * movement saved re-renders no consumer through this provider. */
+export function HeldCurrenciesProvider({ currencies, children }: { currencies: HeldCurrencies; children: ReactNode }) {
+  const base = useContext(I18nContext);
+  const key = currencies.join(',');
+  const value = useMemo(() => currencies.length ? withHeldCurrencies(base, currencies.slice()) : base, [base, key]);
+  return createElement(I18nContext.Provider, { value }, children);
+}
 
 /** The stored choices and their setters, for the language and region screens. Null outside a provider. */
 export const useLocalePreferences = () => useContext(PreferencesContext);

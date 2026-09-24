@@ -7,7 +7,8 @@ import { currentMonthISO, shiftMonthISO, summarizeMonthlyBudgets, type BudgetPro
 import { useLedger } from '../src/storage/LedgerProvider';
 import { budgetCategoriesCaption, budgetTone, percentUsed } from '../src/ui/budget-presentation';
 import { useCategoryLabel } from '../src/ui/category-hues';
-import { ActionButton, AppText, CategoryBadge, Choices, EmptyState, IconButton, Money, PressFeedback, Screen, SectionTitle, Stat, StatRow, Surface } from '../src/ui/components';
+import { ActionButton, AppText, CategoryBadge, EmptyState, IconButton, Money, PressFeedback, Screen, SectionTitle, Stat, StatRow, Surface } from '../src/ui/components';
+import { CurrencySwitch } from '../src/ui/currency-switch';
 import { useI18n } from '../src/i18n/provider';
 import { availableCurrencies } from '../src/ui/presentation';
 import { heldCurrency } from '../src/ui/report-presentation';
@@ -55,8 +56,7 @@ export default function BudgetsScreen() {
         onPress={() => router.push({ pathname: '/new-budget', params: { currency, month: monthISO } })} /> }} />
 
     <View style={{ gap: space.m }}>
-      {currencies.length > 1 && <Choices value={currency} onChange={setSelectedCurrency}
-        options={currencies.map(value => ({ value, label: t(value === 'ARS' ? 'budgets.currency.ARS' : 'budgets.currency.USD') }))} />}
+      {currencies.length > 1 && <CurrencySwitch value={currency} currencies={currencies} onChange={setSelectedCurrency} />}
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
         <IconButton name="chevron-back" label={t('budgets.screen.previousMonth')} onPress={() => setMonthISO(value => shiftMonthISO(value, -1))} />
         <View style={{ flex: 1, alignItems: 'center', gap: 2 }}>

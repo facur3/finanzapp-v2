@@ -103,3 +103,61 @@ test('the day-net header of the movement list: sign, visible amount and spoken t
   assert.deepEqual(read(bindLocale('es-AR'), [entry('e1', 'a', 'expense', 1), entry('e2', 'u', 'expense', 1)]).net, null);
   assert.deepEqual(read(bindLocale('es-AR'), [entry('e1', 'a', 'expense', 7), entry('i1', 'a', 'income', 7)]).net, null);
 });
+
+// ---- Producto 24B3 (stage 4): the same sites for the currencies the catalogue will open, and the shared-word rule ----
+
+test('24B3: the card face names any currency by CLDR, and a peso beside a Chilean peso by its full name', () => {
+  const read = (i18n: ReturnType<typeof bindLocale>, currency: domain.Currency) => {
+    const { CardFace } = load('card-visual.tsx', {
+      react: {}, 'react/jsx-runtime': { jsx, jsxs: jsx }, 'react-native-reanimated': reanimated, '@expo/vector-icons/Ionicons': 'Ionicons', '@finanzapp/domain': domain,
+      'react-native': { StyleSheet: { create: (s: unknown) => s, hairlineWidth: 0.5 }, Text: 'Text', View: 'View', useWindowDimensions: () => ({ width: 393, fontScale: 1 }) },
+      '../i18n/provider': { useI18n: () => i18n }, '../i18n/messages': {}, './components': { PressFeedback: 'PressFeedback' }, './geometry': { carouselIndex: () => 0 },
+      './motion': { duration: { state: 200 }, selectionHaptic: () => {} }, './theme': theme,
+    });
+    const face = CardFace({ id: 'card', name: 'Visa Gold', issuer: 'Galicia', last4: '4009', currency, width: 300 });
+    return { label: face.props.accessibilityLabel, chip: flat(face).find(node => node.type === 'Text' && node.props.children === currency)?.props.children };
+  };
+  assert.deepEqual(read(bindLocale('es-AR'), 'JPY'), { label: 'Tarjeta Visa Gold, Galicia, termina en 4009, yenes japoneses', chip: 'JPY' });
+  assert.equal(read(bindLocale('en-US'), 'JPY').label, 'Card Visa Gold, Galicia, ending in 4009, Japanese yen');
+  assert.equal(read(bindLocale('es-AR'), 'KWD').label, 'Tarjeta Visa Gold, Galicia, termina en 4009, dinares kuwaitíes');
+  assert.equal(read(bindLocale('en-AR'), 'KWD').label, 'Card Visa Gold, Galicia, ending in 4009, Kuwaiti dinars');
+  assert.equal(read(bindLocale('es-AR'), 'CLP').label, 'Tarjeta Visa Gold, Galicia, termina en 4009, pesos chilenos');
+  assert.equal(read(bindLocale('en-US'), 'CAD').label, 'Card Visa Gold, Galicia, ending in 4009, Canadian dollars');
+  // The legacy words stay while nothing shares them; a Chilean peso card in the ledger makes the Argentine one say its full name.
+  assert.equal(read(bindLocale('es-AR', 'none', null, ['ARS', 'USD']), 'ARS').label, 'Tarjeta Visa Gold, Galicia, termina en 4009, pesos');
+  assert.equal(read(bindLocale('es-AR', 'none', null, ['ARS', 'CLP']), 'ARS').label, 'Tarjeta Visa Gold, Galicia, termina en 4009, pesos argentinos');
+  assert.equal(read(bindLocale('es-AR', 'none', null, ['USD', 'CAD']), 'USD').label, 'Tarjeta Visa Gold, Galicia, termina en 4009, dólares estadounidenses');
+  assert.equal(read(bindLocale('en-US', 'none', null, ['USD', 'CAD']), 'USD').label, 'Card Visa Gold, Galicia, ending in 4009, US dollars', 'the English word was already the full name');
+  assert.equal(read(bindLocale('en-US', 'none', null, ['ARS', 'CLP']), 'ARS').label, 'Card Visa Gold, Galicia, ending in 4009, Argentine pesos');
+});
+
+test('24B3: the spending timeline and the day-net header show and speak yen without decimals and dinars with three', () => {
+  const timeline = (i18n: ReturnType<typeof bindLocale>, currency: domain.Currency, amounts: [number, number]) => {
+    const { SpendingTimeline } = load('spending-timeline.tsx', {
+      react: { useEffect: () => {} }, 'react/jsx-runtime': { jsx, jsxs: jsx }, 'react-native': { ScrollView: 'ScrollView', View: 'View' }, 'react-native-reanimated': reanimated,
+      'expo-router': { router: { push: () => {} } }, '@finanzapp/domain': domain, './components': { AppText: 'AppText', PressFeedback: 'PressFeedback' },
+      './motion': { timing: () => ({ duration: 0 }) }, './theme': theme, '../i18n/format': i18nFormat, '../i18n/locale': locale, '../i18n/provider': { useI18n: () => i18n },
+    });
+    const buckets: domain.SpendingBucket[] = [{ currency, startISO: '2026-09-01', endISO: '2026-09-07', amountMinor: amounts[0], count: 3 }, { currency, startISO: '2026-09-08', endISO: '2026-09-14', amountMinor: amounts[1], count: 1 }];
+    const tree = SpendingTimeline({ buckets, currency });
+    return { caption: [flat(tree).find(node => node.type === 'AppText')!.props.children].flat().join(''), bars: flat(tree).filter(node => node.type === 'PressFeedback').map(node => node.props.accessibilityLabel) };
+  };
+  assert.deepEqual(timeline(bindLocale('es-AR'), 'JPY', [1234567, 5]), { caption: 'Gasto registrado · máximo JPY 1.234.567', bars: ['1 sep – 7 sep, 1234567 JPY, 3 gastos registrados', '8 sep – 14 sep, 5 JPY, 1 gasto registrado'] });
+  assert.deepEqual(timeline(bindLocale('en-US'), 'KWD', [1234567, 5]), { caption: 'Recorded spending · max KWD 1,234.567', bars: ['Sep 1 – Sep 7, 1234.567 KWD, 3 recorded expenses', 'Sep 8 – Sep 14, 0.005 KWD, 1 recorded expense'] });
+  assert.equal(timeline(bindLocale('es-US'), 'KWD', [1234567, 5]).bars[1], '8 sep – 14 sep, 0,005 KWD, 1 gasto registrado', 'the language\'s decimal mark before three digits is the currency\'s own fraction');
+  assert.equal(timeline(bindLocale('en-AR'), 'EUR', [1234, 5]).caption, 'Recorded spending · max EUR 12,34');
+  const at = '2026-09-20T12:00:00.000Z';
+  const accounts: domain.Account[] = [{ id: 'y', name: 'Yenes', currency: 'JPY', openingMinor: 0, createdAt: at }, { id: 'k', name: 'Dinares', currency: 'KWD', openingMinor: 0, createdAt: at }];
+  const entry = (id: string, accountId: string, kind: domain.EntryKind, amountMinor: number): domain.Entry => ({ id, accountId, kind, amountMinor, merchant: 'Prueba', category: 'Comida', dateISO: '2026-09-19', createdAt: at });
+  const dayNet = (i18n: ReturnType<typeof bindLocale>, entries: domain.Entry[]) => {
+    const { EntryList } = load('entry-list.tsx', {
+      react: { useMemo: (fn: () => any) => fn() }, 'react/jsx-runtime': { jsx, jsxs: jsx }, 'react-native': { SectionList: 'SectionList', View: 'View' }, '@finanzapp/domain': domain,
+      './components': { AppText: 'AppText', MovementRow: 'MovementRow' }, '../i18n/provider': { useI18n: () => i18n }, './presentation': presentation, './theme': theme,
+    });
+    const list = EntryList({ entries, accounts });
+    const texts = flat(list.props.renderSectionHeader({ section: list.props.sections[0] })).filter(node => node.type === 'AppText');
+    return { net: [texts[1].props.children].flat().join(''), spoken: texts[1].props.accessibilityLabel };
+  };
+  assert.deepEqual(dayNet(bindLocale('es-AR'), [entry('e', 'y', 'expense', 1500), entry('i', 'y', 'income', 4000)]), { net: '+JP¥ 2.500', spoken: 'Neto del día 2500 JPY' });
+  assert.deepEqual(dayNet(bindLocale('en-US'), [entry('e', 'k', 'expense', 1234567)]), { net: '−KWD 1,234.567', spoken: 'Net for the day minus 1234.567 KWD' });
+});

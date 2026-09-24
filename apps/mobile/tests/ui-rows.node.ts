@@ -162,7 +162,7 @@ test('the currency row stacks label, full name and code so "Dólares estadounide
   assert.deepEqual(ui.haptics, ['selection']);
   items[1].props.onPress();
   assert.deepEqual(ui.haptics, ['selection'], 'choosing the current currency again does not tick');
-  assert.ok(nodes(list.props.ListFooterComponent).some(node => node.type === 'AppText' && /pesos o en dólares/.test(String(node.props.children))), 'the sheet says why the list is short');
+  assert.ok(nodes(list.props.ListFooterComponent).some(node => node.type === 'AppText' && /monedas disponibles hoy/.test(String(node.props.children))), 'the sheet says why the list is short, naming no currency');
   const disabled = ui.render('CurrencyField', { value: 'USD', onChange: () => {}, disabled: true });
   assert.equal(nodes(disabled).find(node => node.type === 'SelectionRow')!.props.disabled, true);
   // Read-only (an existing account): the same row shape, no chooser at all.
@@ -401,4 +401,41 @@ test('every wrapper VoiceOver focuses names the interface language when it diffe
     assert.equal(ui.render('AppText', { children: 'English', accessibilityLanguage: 'en' }).props.accessibilityLanguage, 'en');
     assert.equal(hosts(ui.render('Field', { label: 'x', value: '', accessibilityLanguage: 'fr' }), 'TextInput')[0].props.accessibilityLanguage, 'fr');
   }
+});
+
+test('24B3: the currency sheet lists exactly the options it is given, searches by code or name when asked, and clears the search on a choice', () => {
+  const ui = load('form-controls.tsx');
+  const chosen: string[] = [];
+  const options = ['ARS', 'USD', 'EUR', 'JPY', 'KWD', 'CLP', 'CAD'].map(code => ({ code, name: i18nFormat.currencyName(code as any), symbol: i18nFormat.currencySymbol(code as any) }));
+  const props = { visible: true, title: 'Elegir moneda', options, value: 'JPY', searchable: true, onClose: () => {}, onChange: (code: string) => chosen.push(code) };
+  let sheet = ui.render('CurrencySheet', props);
+  const list = () => nodes(sheet).find(node => node.type === 'FlatList')!;
+  assert.deepEqual(list().props.data.map((item: any) => item.code), ['ARS', 'USD', 'EUR', 'JPY', 'KWD', 'CLP', 'CAD'], 'the options given, in their order');
+  const field = nodes(list().props.ListHeaderComponent).find(node => node.type === 'Field')!;
+  assert.equal(field.props.label, 'Buscar moneda');
+  field.props.onChangeText('pesos');
+  sheet = ui.render('CurrencySheet', props);
+  assert.deepEqual(list().props.data.map((item: any) => item.code), ['ARS', 'CLP'], 'by name, accent- and case-insensitive');
+  field.props.onChangeText('kw');
+  sheet = ui.render('CurrencySheet', props);
+  assert.deepEqual(list().props.data.map((item: any) => item.code), ['KWD'], 'by code');
+  field.props.onChangeText('zzz');
+  sheet = ui.render('CurrencySheet', props);
+  assert.deepEqual(list().props.data, []);
+  assert.ok(nodes(list().props.ListEmptyComponent).some(node => node.type === 'AppText' && /Ninguna moneda/.test(String(node.props.children))));
+  field.props.onChangeText('yen');
+  sheet = ui.render('CurrencySheet', props);
+  const items = list().props.data.map((item: unknown) => list().props.renderItem({ item }));
+  assert.deepEqual(items.map((item: Node) => [item.props.accessibilityLabel, item.props.accessibilityState.selected]), [['Yenes japoneses, JPY', true]]);
+  items[0].props.onPress();
+  assert.deepEqual(chosen, ['JPY']);
+  assert.deepEqual(ui.haptics, [], 'choosing the current currency does not tick');
+  sheet = ui.render('CurrencySheet', props);
+  assert.equal(list().props.data.length, 7, 'the search is cleared by a choice');
+  // Without `searchable` (three currencies) there is no field and the whole list shows.
+  sheet = ui.render('CurrencySheet', { ...props, searchable: false, options: options.slice(0, 3) });
+  assert.equal(list().props.ListHeaderComponent, null);
+  assert.equal(list().props.ListEmptyComponent, null);
+  assert.equal(list().props.data.length, 3);
+  assert.equal(list().props.ListFooterComponent, null, 'no note unless the caller gives one');
 });

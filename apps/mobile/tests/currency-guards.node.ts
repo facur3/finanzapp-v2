@@ -8,6 +8,7 @@ import * as domain from '@finanzapp/domain';
 import { GENERATED_DIR, GENERATED_HEADER, findLiterals, isGeneratedModule } from '../scripts/i18n/extract.mjs';
 import { checkGeneratedModules } from '../scripts/i18n/check.mjs';
 import { SUPPORTED_LANGUAGES } from '../src/i18n/locale.ts';
+import { bindLocale } from '../src/i18n/bind.ts';
 import { CLDR_TAG, verifyOutputs } from '../scripts/currency/generate.mjs';
 
 // Producto 24B1, stage 1 of docs/currency.md §7.5: the static safety net. Every place that still
@@ -24,8 +25,10 @@ function walk(dir: string): string[] {
 }
 const stripComments = (source: string) => source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
 
-/** The pair literals and binary ternaries that remain, each with the stage that removes it. Every
- * occurrence must match an entry, and every entry must still match something: the list only shrinks. */
+/** The pair literals and binary ternaries that remain, each with the stage that removes it, or the reason it is
+ * permanent. Every occurrence must match an entry, and every entry must still match something: the list only
+ * shrinks. Since 24B3 (stage 4) only the permanent conventions, the production gate and contract v1 remain: the
+ * four presentation ternaries became lookups keyed by code and one `{name} · {code}` template. */
 const PAIR_PATTERNS = [/\['ARS', 'USD'\]/, /'ARS' \| 'USD'/, /"ARS", "USD"/, /=== 'USD' \?/, /=== 'ARS' \?/, /'USD' : 'ARS'/, /'ARS' : 'USD'/,
   /!== 'ARS' && \w+ !== 'USD'/, /'ARS', 'USD', /];
 const ALLOWED_PAIRS: { file: string; includes: string; why: string }[] = [
@@ -37,10 +40,6 @@ const ALLOWED_PAIRS: { file: string; includes: string; why: string }[] = [
   { file: 'server/mobile/openai.js', includes: "enum: ['ARS', 'USD', null]", why: 'the model schema of contract v1; stage 7 imports a generated superset' },
   { file: 'apps/mobile/src/i18n/locale.ts', includes: "dollarSignCurrency: 'ARS' | 'USD'", why: 'a region convention: which currency a bare $ names (permanent)' },
   { file: 'apps/mobile/src/i18n/format.ts', includes: "currency === 'ARS') return conventionsOf(locale).dollarSignCurrency === 'ARS' ? '$' : 'AR$'", why: 'the ARS symbol rule (permanent)' },
-  { file: 'apps/mobile/src/ui/components.tsx', includes: "currency === 'ARS' ? 'amount.inPesos' : 'amount.inDollars'", why: 'stage 4: a lookup keyed by code with the legacy words' },
-  { file: 'apps/mobile/src/ui/card-visual.tsx', includes: "currency === 'USD' ? 'cards.face.dollars' : 'cards.face.pesos'", why: 'stage 4: a lookup keyed by code with the legacy words' },
-  { file: 'apps/mobile/app/(tabs)/reports.tsx', includes: "value === 'ARS' ? 'reports.currencyARS' : 'reports.currencyUSD'", why: 'stage 4: one {name} · {code} template' },
-  { file: 'apps/mobile/app/budgets.tsx', includes: "value === 'ARS' ? 'budgets.currency.ARS' : 'budgets.currency.USD'", why: 'stage 4: one {name} · {code} template' },
 ];
 
 test('24B1: no new place assumes exactly two currencies; the remaining ones are listed with their stage', () => {
@@ -136,4 +135,30 @@ test('24B1: offline integrity (--verify) is separate from regeneration (--check)
   assert.match(ci, /npm run i18n:check/, 'CI checks the catalogues and the generated name modules');
   const scripts = JSON.parse(readFileSync(join(MOBILE, 'package.json'), 'utf8')).scripts;
   assert.equal(scripts['currency:verify'], 'node --experimental-strip-types scripts/currency/generate.mjs --verify');
+});
+
+test('24B3: screens never format or speak an amount without its currency, never write a catalogue symbol by hand, and the bound locale offers no such call', () => {
+  const offenders: string[] = [];
+  // Every root symbol of the catalogue that is not a plain code ("€", "JP¥", "US$", "KWD" is a code and is not scanned).
+  const symbols = [...new Set(domain.CURRENCY_CODES.map(code => domain.currencyRecord(code)).flatMap(record => [record.symbol, record.narrowSymbol]).filter(symbol => symbol && !/^[A-Z]{3}$/.test(symbol)))];
+  const escape = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const symbolPattern = new RegExp("['\"`](?:" + symbols.map(escape).join('|') + ")\\s?['\"`](?!\\s*:)");
+  for (const dir of ['apps/mobile/app', 'apps/mobile/src/ui']) {
+    for (const path of walk(join(ROOT, dir))) {
+      const file = relative(ROOT, path);
+      const source = stripComments(readFileSync(path, 'utf8'));
+      if (/\b(formatAmount|spokenNumber)\b/.test(source)) offenders.push(file + ': a currency-less formatter (use formatMoneyAmount / spokenMinor with the currency)');
+      if (/formatCount\(\s*Math\.round\(/.test(source) || /\/\s*100\b/.test(source.replace(/\* 100|\/ 100\)%|100%/g, ''))) offenders.push(file + ': cents divided by hand (use formatWholeUnits)');
+      if (symbolPattern.test(source)) offenders.push(file + ': a hand-written currency symbol');
+    }
+  }
+  assert.deepEqual(offenders, []);
+  assert.ok(symbols.includes('€') && symbols.includes('JP¥') && symbols.includes('US$'), 'the scan is driven by the catalogue');
+  const bound = bindLocale('es-AR');
+  assert.equal('formatAmount' in bound, false);
+  assert.equal('spokenNumber' in bound, false);
+  for (const name of ['formatMoneyAmount', 'formatWholeUnits', 'spokenMinor', 'spokenMoney', 'currencyUnit']) assert.equal(typeof bound[name as keyof typeof bound], 'function', name);
+  // The one remaining bare 'ARS' in presentation is the region sample, a two-decimal illustration that names no currency.
+  const sample = stripComments(readFileSync(join(MOBILE, 'src/ui/locale-options.ts'), 'utf8'));
+  assert.match(sample, /formatMoneyAmount\(123456, 'ARS', locale\)/);
 });

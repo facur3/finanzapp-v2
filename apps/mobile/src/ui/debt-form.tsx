@@ -8,6 +8,8 @@ import { draftFitsCurrency, minorFromLedgerDraft, samePersonalDebtProfile, today
 import { useI18n } from '../i18n/provider';
 import { useLedger } from '../storage/LedgerProvider';
 import { ActionButton, AmountField, AppText, Choices, DetailRow, ErrorMessage, Field, IconButton, Screen, Surface } from './components';
+import { CurrencySwitch } from './currency-switch';
+import { offeredCurrencies } from './currencies';
 import { DateField } from './form-controls';
 import { space } from './theme';
 
@@ -129,8 +131,7 @@ export function DebtForm({ original }: { original?: PersonalDebtProfile }) {
         options={[{ value: 'owed_by_me', label: t('debts.form.owed') }, { value: 'owed_to_me', label: t('debts.form.receivable') }]} />
       <AmountField label={t(owed ? 'debts.form.amountOwed' : 'debts.form.amountReceivable')} currency={currency} value={amount}
         onChangeText={value => { setAmount(value); setError(null); }} editable={!locked} />
-      <Choices value={currency} onChange={setCurrency} disabled={locked}
-        options={[{ value: 'ARS', label: t('debts.form.pesos') }, { value: 'USD', label: t('debts.form.dollars') }]} />
+      <CurrencySwitch value={currency} currencies={offeredCurrencies()} onChange={setCurrency} disabled={locked} />
     </>}
 
     <Field label={t(owed ? 'debts.form.counterpartyOwed' : 'debts.form.counterpartyReceivable')} value={counterparty} onChangeText={setCounterparty}

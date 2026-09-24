@@ -23,6 +23,16 @@
     { "es": "deshacer", "en": "undo", "note": "Voids a record; it can be restored ('recuperar' → 'restore'). Never 'delete'." },
     { "es": "borrador", "en": "draft", "note": "An Assistant proposal that is not saved until confirmed." },
     { "es": "Asistente", "en": "Assistant", "note": "Product name of the in-app assistant; capitalised." },
-    { "es": "comercio", "en": "merchant", "note": "Where an expense happened; user data is never translated." }
+    { "es": "comercio", "en": "merchant", "note": "Where an expense happened; user data is never translated." },
+    { "es": "moneda", "en": "currency", "note": "An ISO 4217 currency, a property of an account (never of the device, the language or the region). Named by CLDR in the interface language; 'moneda' is never 'divisa'." },
+    { "es": "código", "en": "code", "note": "The ISO 4217 alphabetic code (ARS, USD, JPY), shown as is in every language; never translated or replaced by a symbol." },
+    { "es": "símbolo", "en": "symbol", "note": "The short sign before an amount ($, US$, €, JP¥, or the code when CLDR has none). A bare $ is the peso only in Argentina." },
+    { "es": "decimales", "en": "decimals", "note": "The currency's own minor-unit digits (JPY none, KWD three). Never 'centavos' for a currency other than ARS/USD." },
+    { "es": "unidad menor", "en": "minor unit", "note": "The integer the ledger stores (cents, yen, fils). Never shown to the person as such." },
+    { "es": "cotización", "en": "exchange rate", "note": "A dated rate between two currencies, with its source. Never invented; none exists before Producto 24C." },
+    { "es": "moneda principal", "en": "main currency", "note": "The future currency of consolidated reports (24C); separate from an account's currency and from the region." },
+    { "es": "importe contabilizado", "en": "posted amount", "note": "What was actually debited in the account's currency. Distinct from an original foreign amount and from an estimate." },
+    { "es": "estimado", "en": "estimated", "note": "Computed from a reference rate, not debited. Always labelled as such; never counted as a balance." },
+    { "es": "fuera de rango", "en": "out of range", "note": "A total or amount beyond the exact integer range. Shown explicitly (a dash or a sentence), never rounded or dropped." }
   ]
 }

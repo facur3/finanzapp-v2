@@ -3,7 +3,7 @@
  * United States since Producto 23.1C2): a catalogue still being translated is
  * never offered, not even greyed out. "Follow the device" is always first and
  * names what the device gives right now. Pure, so Node tests every combination. */
-import { formatAmount, formatNumericDate } from '../i18n/format.ts';
+import { formatMoneyAmount, formatNumericDate } from '../i18n/format.ts';
 import { LANGUAGES, composeLocale, type LanguageCode, type LanguagePreference, type RegionCode, type RegionPreference } from '../i18n/locale.ts';
 import type { Translate } from '../i18n/messages.ts';
 import { activeLanguageChoice, activeRegionChoice, type LocaleState } from '../i18n/store.ts';
@@ -19,10 +19,11 @@ export interface PreferenceOption<T extends string> {
 export const languageName = (language: LanguageCode) => LANGUAGES[language].name;
 export const regionName = (region: RegionCode, t: Translate) => t(`preferences.regionNames.${region}`);
 
-/** A fixed illustration of a region's conventions (not ledger data): "22/9/2026 · 1.234,56". */
+/** A fixed illustration of a region's conventions (not ledger data): "22/9/2026 · 1.234,56". The sample is a two-decimal
+ * number written the region's way; it names no currency and the peso is only the two-decimal shape it borrows. */
 export function regionSample(region: RegionCode, state: LocaleState, t: Translate): string {
   const locale = composeLocale(state.language, region);
-  return t('preferences.regionSample', { date: formatNumericDate('2026-09-22', locale), amount: formatAmount(123456, locale) });
+  return t('preferences.regionSample', { date: formatNumericDate('2026-09-22', locale), amount: formatMoneyAmount(123456, 'ARS', locale) });
 }
 
 export function languageOptions(state: LocaleState, t: Translate): PreferenceOption<LanguagePreference>[] {

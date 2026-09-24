@@ -1,7 +1,7 @@
 import type { Messages } from '../../messages.ts';
 
 /** Words shared by every area: buttons, selectors, the amount field, movement and account kinds, counts. */
-export const common: Pick<Messages, 'common' | 'movement' | 'accountKinds' | 'selection' | 'amount' | 'count'> = {
+export const common: Pick<Messages, 'common' | 'movement' | 'accountKinds' | 'selection' | 'amount' | 'currency' | 'count'> = {
   common: {
     cancel: 'Cancel',
     done: 'Done',
@@ -40,7 +40,7 @@ export const common: Pick<Messages, 'common' | 'movement' | 'accountKinds' | 'se
     chooseDate: 'Choose date',
     currency: 'Currency',
     chooseCurrency: 'Choose currency',
-    currencyNote: 'For now, accounts are kept in pesos or dollars, with no conversion between them. Other currencies will be added along with exchange rates.',
+    currencyNote: 'Each account is kept in its own currency, with no conversion between them. The list shows the currencies available today; others will be added along with exchange rates.',
     searchOrCreateCategory: 'Search or create a category',
     categoryNamePlaceholder: 'Category name',
     useCategory: 'Use category {name}',
@@ -53,6 +53,7 @@ export const common: Pick<Messages, 'common' | 'movement' | 'accountKinds' | 'se
     accessibility: '{label} in {currency}',
     inPesos: 'Argentine pesos',
     inDollars: 'US dollars',
+    unavailable: 'Amount out of range',
     paste: {
       ambiguous: 'Didn’t paste “{text}”: it can be read two ways. Use “{decimal}” for decimals.',
       precision: 'Didn’t paste “{text}”: it has more than two decimals.',
@@ -67,6 +68,18 @@ export const common: Pick<Messages, 'common' | 'movement' | 'accountKinds' | 'se
       noDecimals: '{currency} has no decimals. Remove the decimals before saving; nothing is rounded.',
       tooLong: 'The amount is above the maximum for {currency}. Fix it before saving.',
     },
+  },
+  currency: {
+    option: '{name} · {code}',
+    short: {
+      ARS: 'Pesos',
+      USD: 'Dollars',
+    },
+    switchLabel: 'Currency: {name}',
+    switchHint: 'Opens the list of currencies to choose another',
+    switchTitle: 'Choose currency',
+    search: 'Search currency',
+    noMatches: 'No currency matches the search.',
   },
   count: {
     movements: { one: '{count} transaction', other: '{count} transactions' },

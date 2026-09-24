@@ -1,11 +1,6 @@
 /** Presupuestos: the month, the budget form. */
 export const budgets = {
   budgets: {
-    /** Segmented control between the two ledger currencies. */
-    currency: {
-      ARS: 'Pesos · ARS',
-      USD: 'Dólares · USD',
-    },
     screen: {
       noAccountTitle: 'Primero, una cuenta',
       noAccountDetail: 'Los presupuestos se comparan con gastos registrados en una moneda concreta.',

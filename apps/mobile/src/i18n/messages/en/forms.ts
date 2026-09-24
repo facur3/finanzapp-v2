@@ -67,7 +67,7 @@ export const forms: Pick<Messages, 'entryForm' | 'transferForm'> = {
     from: 'From',
     to: 'To',
     missingTitle: 'You need another account in this currency',
-    missingDetail: 'For now, transfers are between peso accounts or between dollar accounts, without conversion.',
+    missingDetail: 'Transfers are between accounts in the same currency, without conversion.',
     note: 'Note (optional)',
     after: '{name} afterwards',
     negativeWarning: 'An account will have a negative balance. Check the amount and your transactions; you can record it if it reflects what really happened.',

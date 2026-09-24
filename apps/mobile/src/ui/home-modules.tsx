@@ -97,7 +97,7 @@ function RankedRow({ category, totalMinor, currency, index, last, onPress }: {
 export function BudgetHomeCard({ summary }: { summary: MonthlyBudgetSummary }) {
   const p = usePalette();
   const reduced = useReduceMotion();
-  const { t, moneyText, spokenAmount, spokenNumber } = useI18n();
+  const { t, moneyText, spokenAmount, spokenMinor } = useI18n();
   const headline = budgetHomeHeadline(summary);
   const { currency } = summary;
   const progressValue = headline ? Math.min(1, headline.progress.ratio) : 0;
@@ -116,7 +116,7 @@ export function BudgetHomeCard({ summary }: { summary: MonthlyBudgetSummary }) {
     : headline.categories > 1 ? t('home.budget.categories', { count: headline.categories })
       + (headline.exceededCategories ? ' · ' + t('home.budget.exceededCount', { count: headline.exceededCategories }) : '') : t('home.budget.perCategory');
   const spoken = t(remaining < 0 ? 'home.budget.labelExceeded' : 'home.budget.labelLeft',
-    { title, amount: spokenAmount(Math.abs(remaining), currency), total: spokenNumber(budget.amountMinor), percent });
+    { title, amount: spokenAmount(Math.abs(remaining), currency), total: spokenMinor(budget.amountMinor, currency), percent });
   return <PressFeedback accessibilityRole="button"
     accessibilityLabel={spoken + (status ? ' ' + status : '')}
     onPress={() => router.push({ pathname: '/budgets', params: { currency } })}>

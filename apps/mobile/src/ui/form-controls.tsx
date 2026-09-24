@@ -5,7 +5,7 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { todayKey, type Account, type AccountKind, type Currency, type Entry, type EntryKind } from '@finanzapp/domain';
 import { AccountBadge, AppText, CategoryBadge, DetailRow, Field, GlyphTile, PressFeedback, SelectionRow, Surface, surfaceShadow, type IconName, type Tone } from './components';
-import { currencyOption, currencyOptions, searchCurrencies } from './currencies';
+import { currencyOption, currencyOptions, searchCurrencies, type CurrencyOption } from './currencies';
 import { useI18n } from '../i18n/provider';
 import { useAccountLookOf, useCategoryDefinitions, useCategoryLook } from './category-hues';
 import { selectionHaptic } from './motion';
@@ -120,7 +120,6 @@ export function AccountField({ accounts, value, onChange, disabled = false, labe
  * account never changes currency (`onChange` absent: the same row, read-only,
  * without a chevron). */
 export function CurrencyField({ value, onChange, disabled = false }: { value: Currency; onChange?: (currency: Currency) => void; disabled?: boolean }) {
-  const p = usePalette();
   const { t, currencyName, locale } = useI18n();
   const [visible, setVisible] = useState(false);
   const selected = currencyOption(value, locale);
@@ -130,19 +129,42 @@ export function CurrencyField({ value, onChange, disabled = false }: { value: Cu
       <SelectionRow label={t('selection.currency')} value={currencyName(selected.code)} detail={selected.code + ' · ' + selected.symbol}
         icon="cash-outline" last disabled={disabled} onPress={onChange ? open : undefined} />
     </Surface>
-    {onChange && <SelectionSheet visible={visible} title={t('selection.chooseCurrency')} onClose={() => setVisible(false)}>
-      <FlatList data={searchCurrencies('', currencyOptions(locale))} keyExtractor={option => option.code} contentContainerStyle={{ padding: 20, paddingTop: 0 }}
-        ListFooterComponent={<AppText secondary variant="footnote" style={{ paddingHorizontal: 4, paddingTop: 4 }}>{t('selection.currencyNote')}</AppText>}
-        renderItem={({ item }) => <PressFeedback feedback="highlight" accessibilityRole="button" accessibilityState={{ selected: value === item.code }}
-          accessibilityLabel={currencyName(item.code) + ', ' + item.code} onPress={() => { if (item.code !== value) selectionHaptic(); onChange(item.code); setVisible(false); }}
-          style={{ flexDirection: 'row', alignItems: 'center', padding: 14, gap: 14, backgroundColor: p.surface, borderRadius: 16, marginBottom: 8, overflow: 'hidden' }}>
-          <GlyphTile icon="cash-outline" />
-          <View style={{ flex: 1, minWidth: 0, gap: 3 }}><AppText style={{ fontWeight: '600' }}>{currencyName(item.code)}</AppText>
-            <AppText secondary variant="subhead">{item.code} · {item.symbol}</AppText></View>
-          {item.code === value && <Ionicons name="checkmark-circle" color={p.primary} size={24} accessible={false} />}
-        </PressFeedback>} />
-    </SelectionSheet>}
+    {onChange && <CurrencySheet visible={visible} title={t('selection.chooseCurrency')} options={searchCurrencies('', currencyOptions(locale))} value={value}
+      note={t('selection.currencyNote')} onClose={() => setVisible(false)} onChange={currency => { onChange(currency); setVisible(false); }} />}
   </>;
+}
+
+/** The sheet that lists currencies for a choice: one row per option (the full name, then the
+ * code and symbol), a checkmark on the current one, a selection tick when the choice changes.
+ * The new-account form lists the currencies the ledger can hold, with a note under them; the
+ * currency switch of Inicio, Reportes and Presupuestos lists the currencies held (24B3). With
+ * `searchable` a field at the top filters by code or name, accent- and case-insensitive, so a
+ * long list never has to be scrolled through; the options are never reordered by it. */
+export function CurrencySheet({ visible, title, options, value, note, searchable = false, onClose, onChange }: {
+  visible: boolean; title: string; options: readonly CurrencyOption[]; value: Currency; note?: string; searchable?: boolean;
+  onClose: () => void; onChange: (currency: Currency) => void;
+}) {
+  const p = usePalette();
+  const { t } = useI18n();
+  const [query, setQuery] = useState('');
+  const shown = searchable ? searchCurrencies(query, options) : options;
+  return <SelectionSheet visible={visible} title={title} onClose={() => { setQuery(''); onClose(); }}>
+    <FlatList data={shown} keyExtractor={option => option.code} contentContainerStyle={{ padding: 20, paddingTop: 0 }} keyboardShouldPersistTaps="handled"
+      ListHeaderComponent={searchable ? <View style={{ paddingBottom: 16 }}>
+        <Field label={t('currency.search')} value={query} onChangeText={setQuery} autoCapitalize="characters" autoCorrect={false} clearButtonMode="while-editing" maxLength={40} />
+      </View> : null}
+      ListEmptyComponent={searchable ? <AppText secondary variant="subhead" style={{ paddingHorizontal: 4 }}>{t('currency.noMatches')}</AppText> : null}
+      ListFooterComponent={note ? <AppText secondary variant="footnote" style={{ paddingHorizontal: 4, paddingTop: 4 }}>{note}</AppText> : null}
+      renderItem={({ item }) => <PressFeedback feedback="highlight" accessibilityRole="button" accessibilityState={{ selected: value === item.code }}
+        accessibilityLabel={item.name + ', ' + item.code}
+        onPress={() => { if (item.code !== value) selectionHaptic(); setQuery(''); onChange(item.code); }}
+        style={{ flexDirection: 'row', alignItems: 'center', padding: 14, gap: 14, backgroundColor: p.surface, borderRadius: 16, marginBottom: 8, overflow: 'hidden' }}>
+        <GlyphTile icon="cash-outline" />
+        <View style={{ flex: 1, minWidth: 0, gap: 3 }}><AppText style={{ fontWeight: '600' }}>{item.name}</AppText>
+          <AppText secondary variant="subhead">{item.code} · {item.symbol}</AppText></View>
+        {item.code === value && <Ionicons name="checkmark-circle" color={p.primary} size={24} accessible={false} />}
+      </PressFeedback>} />
+  </SelectionSheet>;
 }
 
 export function DateField({ value, onChange, disabled = false, allowFuture = false, label }: {

@@ -53,8 +53,6 @@ export const cards: Pick<Messages, 'cards'> = {
       currency: 'Currency',
       name: 'Card name',
       namePlaceholder: 'e.g. Visa Gold',
-      pesos: 'Pesos · ARS',
-      dollars: 'Dollars · USD',
       openingDebt: 'Current balance (optional)',
       openingDebtNote: 'What you already owe on this card today. It doesn’t count as spending: earlier purchases aren’t recorded again.',
       issuer: 'Issuer (optional)',

@@ -1,5 +1,5 @@
 import 'react-native-gesture-handler';
-import { useEffect } from 'react';
+import { useEffect, useMemo, type ReactNode } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -9,11 +9,12 @@ import { useFonts } from 'expo-font';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
+import { currenciesPresent } from '@finanzapp/domain';
 import { LedgerProvider, useLedger } from '../src/storage/LedgerProvider';
 import { CategoryHuesProvider } from '../src/ui/category-hues';
 import { ActionButton, AppText, ErrorMessage } from '../src/ui/components';
 import { UIProvider, usePalette, useReduceMotion } from '../src/ui/theme';
-import { I18nProvider, useI18n } from '../src/i18n/provider';
+import { HeldCurrenciesProvider, I18nProvider, useI18n } from '../src/i18n/provider';
 
 void SplashScreen.preventAutoHideAsync().catch(() => {});
 
@@ -22,8 +23,16 @@ export const unstable_settings = { initialRouteName: '(tabs)' };
 export default function RootLayout() {
   const p = usePalette();
   return <GestureHandlerRootView style={{ flex: 1, backgroundColor: p.background }}>
-    <SafeAreaProvider><UIProvider><I18nProvider><LedgerProvider><CategoryHuesProvider><Navigation /></CategoryHuesProvider></LedgerProvider></I18nProvider></UIProvider></SafeAreaProvider>
+    <SafeAreaProvider><UIProvider><I18nProvider><LedgerProvider><LedgerCurrencies><CategoryHuesProvider><Navigation /></CategoryHuesProvider></LedgerCurrencies></LedgerProvider></I18nProvider></UIProvider></SafeAreaProvider>
   </GestureHandlerRootView>;
+}
+
+/** Tells the locale which currencies the ledger holds (ARS, USD, then by code), so a spoken
+ * unit that another held currency shares is read with its full name (docs/currency.md §6). */
+function LedgerCurrencies({ children }: { children: ReactNode }) {
+  const { snapshot } = useLedger();
+  const currencies = useMemo(() => currenciesPresent(snapshot?.accounts ?? []), [snapshot?.accounts]);
+  return <HeldCurrenciesProvider currencies={currencies}>{children}</HeldCurrenciesProvider>;
 }
 
 function Navigation() {

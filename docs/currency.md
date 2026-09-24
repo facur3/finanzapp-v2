@@ -1,6 +1,6 @@
 # FinanzApp mobile: currencies and the multi-currency engine
 
-Updated 2026-09-24 (Producto 24B2). Applies to the Expo app in `apps/mobile` and the
+Updated 2026-09-24 (Producto 24B3). Applies to the Expo app in `apps/mobile` and the
 shared `packages/domain`. The web/Capacitor app keeps its own float-based helpers
 (`src/domain/currency.js`) and is not changed. Read with [decision 002](decisions/002-spending-first.md)
 (ARS/USD kept apart, no invented rates), [docs/i18n.md](i18n.md) §9 and the roadmap's
@@ -66,6 +66,25 @@ the Assistant contract. No stored amount is reinterpreted. No exchange rate exis
 | Routes | `report-day`, `spending-detail`, `report-category`, `report-comparison`, `budgets`, `new-account`, `budget-form`, `src/ui/report-presentation.ts` | `heldCurrency(accounts, param)`: a route currency is accepted only when it is a storable code an account holds; the drill-downs refuse anything else (`strictReportSelection`, a new "Comparación no válida" state) instead of falling back to the first currency; a link without a currency opens the tab's first one. New-account and new-budget honour the route's currency only when the gate offers it and never coerce an unknown code (ARS is the empty-ledger default, decision 7.6.4). |
 | Guards | `tests/currency-guards.node.ts` | The allow-list lost the two route whitelists, the three coerced parameters and the paste markers; the remaining entries are the four presentation ternaries (stage 4), the two permanent conventions, the production gate and contract v1. |
 | Tests | `tests/amount-exponents.node.ts`, cases in `typography`, `report-routes`, `recovery-routes`, `assistant-routes`, `money-input` (every call names ARS) | Typing, pasting, settling, prefilling and shortcuts in JPY, KWD and EUR; the parseMinorUnits sweep; a draft kept across ARS → USD → JPY → KWD changes; the entry form blocking Save on an account change and saving 13 yen, not 1300; the strict routes with `ars`, `XAU`, `ZZZ`, `CHF`, `EUR`, `''` and a held JPY account. |
+
+### 2.3 What Producto 24B3 delivers (stage 4)
+
+| Layer | File | Change |
+| --- | --- | --- |
+| Presentation | `src/i18n/format.ts` | `formatWholeUnits(minor, currency)` (a chart scale in whole units of the currency, rounded half up on the integer digits, the amount itself at exponent 0); `unitWordShared`/`currencyUnit(currency, locale, held, word?)`: a catalogued legacy word ("pesos", "dólares") stays while no other held currency's CLDR name contains it, otherwise CLDR's plural name; `spokenMoney(minor, currency, locale, held)` applies it. `formatAmount` and `spokenNumber` stay in the file as the pinned exponent-2 path (their unbound goldens are unchanged) but no screen reaches them. |
+| Binding | `bind.ts`, `provider.tsx`, `app/_layout.tsx` | `I18n` loses `formatAmount` and `spokenNumber`, gains `formatMoneyAmount` for every visible number, `spokenMinor` for every spoken one, `formatWholeUnits`, `currencyUnit` and `heldCurrencies`. `withHeldCurrencies(i18n, held)` rebinds only the unit words. `HeldCurrenciesProvider`, rendered inside the ledger provider, tells the locale the currencies present (ARS, USD, then by code); its value is rebuilt only when the set of codes changes, never on a write that keeps them. The locale provider stays above the ledger and knows nothing of it. |
+| Call sites | `recurring.tsx`, `transfer/[id].tsx`, `edit-account/[id].tsx`, `entry/[id].tsx`, `spending-chart.tsx`, `spending-timeline.tsx`, `liability-rows.tsx`, `home-modules.tsx`, `entry-form.tsx`, `transfer-form.tsx`, `locale-options.ts` | The 21 currency-less lines (22 with the timeline's caption counted apart) pass the record's currency: `formatMoneyAmount`/`spokenMinor` where the sentence carries the code, `moneyText`/`spokenMoney` where it carries the unit. The region sample is `formatMoneyAmount(123456, 'ARS', locale)` (same bytes: a two-decimal illustration that names no currency). `charts.tsx` scales with `formatWholeUnits` (same bytes for ARS/USD: 123456789 → "1.234.568"). |
+| Components | `components.tsx`, `card-visual.tsx` | The amount field's VoiceOver name and the card face's currency word are lookups keyed by code with the legacy keys (`amount.inPesos`/`inDollars`, `cards.face.pesos`/`dollars`) through `currencyUnit`; any other currency is named by CLDR ("Gasto en yenes japoneses", "…termina en 4009, dinares kuwaitíes"). `Money` and `rowAmountText` show "—" for a value outside the safe integers (NaN, ±Infinity, a fraction, beyond 2^53) with the label `amount.unavailable` ("Importe fuera de rango"), never a number. |
+| Switch | `src/ui/currency-switch.tsx`, `currencies.ts` (`currencyOptionLabel`, `currencySwitchMode`, `offeredCurrencies`), `form-controls.tsx` (`CurrencySheet`) | One `{name} · {code}` template (`currency.option`) with the short words `currency.short.ARS`/`USD` ("Pesos", "Dólares"/"Dollars") and CLDR's plural name for the rest. `CurrencySwitch` renders the two-segment control of before for one or two currencies (byte-identical labels, bare codes on Inicio) and, from three on, a compact row naming the chosen currency that opens `CurrencySheet` (the new-account sheet made reusable: the options given, a checkmark, a search field from six options). Inicio, Reportes and Presupuestos pass the currencies held; the card, debt and budget forms pass the gate's (`offeredCurrencies`). Choosing a currency changes only what is shown; nothing is converted. |
+| Copy | es, en, lock | Retired: `reports.currencyARS`/`USD`, `budgets.currency.ARS`/`USD`, `cards.form.pesos`/`dollars`, `debts.form.pesos`/`dollars` (eight keys, the four label pairs). New: `currency.option`, `currency.short.*`, `currency.switchLabel`/`switchHint`/`switchTitle`/`search`/`noMatches`, `amount.unavailable`. Currency-neutral: `selection.currencyNote`, `transferForm.missingDetail`. The glossary gains the engine's terms. |
+| Guards | `tests/currency-guards.node.ts` | The allow-list lost the four presentation ternaries; only the two permanent conventions, the production gate and contract v1 remain. A new scan fails on `formatAmount`/`spokenNumber` in `app/` or `src/ui/`, on cents divided by hand, and on any catalogue root or narrow symbol written between quotes (driven by `CURRENCY_CODES`), and asserts the bound locale offers no currency-less call. |
+| Tests | `tests/currency-copy.node.ts`, cases in `currency-goldens`, `spending-chart`, `typography`, `spending-home`, `report-routes`, `polish-routes`, `ui-rows` | Spoken goldens for ARS, USD, EUR, JPY, KWD, CLP and CAD in both languages and the four locales; ARS beside CLP and USD beside CAD (and the ARS/USD-only ledgers unchanged); `formatWholeUnits` per exponent; the template labels; the switch with one, two, three and seven currencies; `HeldCurrenciesProvider` on the real provider (rebuilt only when the set changes; composes with a language change); the longest amount of every exponent at 320 pt and at 1.4×/1.8× (hero fit, row stacking, the field beside "JP¥"/"KWD"/"CA$"); the card face, timeline, day-net, MonthBars and legend rows in JPY/KWD; the field's name per currency; `Money`'s dash; Home, Reportes and Presupuestos with a stored JPY account (read acceptance, the gate untouched); the searchable sheet. |
+
+**Not changed in 24B3:** SQLite, backup v8, `LEDGER_CURRENCIES` and `currencyOptions` (ARS and
+USD), the Assistant contract v1 and the server, the debt form's order (currency after the
+amount, stage 8), the searchable catalogue screen (stage 8), every ARS/USD visible string.
+Production still stores and offers exactly ARS and USD; the switch beyond two currencies, the
+search field and the shared-word rule are reachable only in tests.
 
 **Not changed in 24B2:** SQLite, backup v8, `currencyOptions` and the currency choices of the
 card, debt and budget forms (ARS/USD segments), the 21 currency-less presentation call sites,
@@ -266,9 +285,22 @@ header, a stale lock and a wrong CLDR tag.
 - **VoiceOver:** the currency's digits with the language's decimal mark and no grouping
   (unchanged rule), then the unit: "pesos", "dólares"/"dollars" for ARS and USD (kept word
   for word), CLDR's plural name otherwise, the singular only for exactly one unit of a
-  currency without decimals ("1 yen japonés"). In 24B, when a ledger holds two currencies
-  whose spoken unit is the same word (USD and CAD would both be "dólares" if shortened),
-  the full CLDR name must be used.
+  currency without decimals ("1 yen japonés"). Since 24B3, when the ledger holds another
+  currency whose CLDR name contains that short word (CLP "pesos chilenos" beside ARS, CAD
+  "dólares canadienses"/"Canadian dollars" beside USD), ARS and USD are read with their full
+  name ("pesos argentinos", "US dollars"); the comparison is on whole words (`unitWordShared`),
+  the set of held currencies reaches the formatters through `HeldCurrenciesProvider`, and a
+  ledger holding only ARS and USD, or nothing, keeps every word of 23.1C2. The same rule names
+  the amount field ("Gasto en dólares estadounidenses") and the card face.
+- **Chart scales:** whole units of the currency, rounded half up on the integer digits
+  (`formatWholeUnits`), never cents divided by a hundred; a currency without decimals shows the
+  amount itself.
+- **Unrepresentable values:** an amount outside the safe integers is shown as "—" with the
+  label "Importe fuera de rango", never NaN, Infinity or a zero.
+- **Choosers:** one template, "{name} · {code}", with "Pesos"/"Dólares" ("Dollars") for ARS and
+  USD and CLDR's plural name for the rest; one or two currencies are a segmented control, three
+  or more a row that opens the currency sheet, which lists only the currencies the screen can
+  use and searches from six.
 - **Proof:** `tests/currency-presentation.node.ts` keeps the pre-24A implementations
   verbatim and compares every ARS/USD output over more than 3 000 amounts in the four
   locales.
@@ -402,19 +434,27 @@ Sites are `file:line` at `1181ed1`, shortened to the file name. Domain files are
 
 ### 7.5 Safe implementation order for 24B
 
-**Status after Producto 24B1 (2026-09-24).**
+**Status after Producto 24B3 (2026-09-24).**
 
 | Stage | Status | What remains |
 | --- | --- | --- |
 | 1 Safety net | **complete** | — (the pair-literal allow-list in `tests/currency-guards.node.ts` names each remaining site with its stage) |
 | 2 One gate, complete groupings | **complete** (24B1: domain, storage validators, groupings, Home's `try`, the Assistant client bound to v1, `Currency` widened; 24B2: `heldCurrency`/`strictReportSelection` in every route and receiver, no coerced parameter) | the four binary ternaries (`components.tsx`, `card-visual.tsx`, `(tabs)/reports.tsx`, `budgets.tsx`) go with stage 4's `{name} · {code}` template |
 | 3 The amount path by exponent | **complete** (24B2: `minorFromLedgerDraft`/`draftFitsCurrency`, every model helper with a required currency, `AmountInput.retarget`, the number pad at exponent 0, catalogue paste markers, the ambiguity rule at exponent ≥ 3, settle to the exponent, re-validation with a note and Save blocked, every form parse/prefill/shortcut, `maxAmountMinor` at 15 digits in the target's currency, the Assistant hand-off in minor units, the `10 **` ban, the sweep against `parseMinorUnits`) | the debt form still chooses the currency after the amount (a layout change, with stage 8's screen); `amountFormat` stays currency-less (the field takes the currency itself) |
-| 4 Presentation and copy | not started | all |
+| 4 Presentation and copy | **complete** (24B3: every call site with the currency, `formatAmount`/`spokenNumber` unbound and banned in screens, `formatWholeUnits`, `Money`'s dash, `CurrencySwitch` and `CurrencySheet`, the `{name} · {code}` template, the shared-word rule through `HeldCurrenciesProvider`, currency-neutral notes, the glossary, docs/i18n.md §9, the symbol and currency-less scans, the four ternaries gone from the allow-list) | the debt form's currency still comes after the amount (stage 8's screen); device evidence for the switch and the spoken units is stage 9's |
 | 5 SQLite schema 9 | not started, **not authorized** (decision 7.6.5 pending) | all |
 | 6 Backup v9 | not started | all |
 | 7 Assistant contract, server first | not started | all (v1 refuses EUR; the client refuses to send a non-v1 currency since 24B1) |
 | 8 The searchable currency screen | not started | all |
 | 9 Device QA, then the gate | not started | all; three-decimal currencies only after the VoiceOver check on an iPhone |
+
+Deliberate golden changes made in 24B3: the eight retired label keys and the two neutral notes
+(es, en, lock; `ui-rows.node.ts` reads the new note, `translation.node.ts`'s `same` whitelist names
+`currency.option` and `currency.short.ARS`); the tests that found the currency segments by
+`Choices` now find `CurrencySwitch` (`spending-home`, `report-routes`, `budgets-routes`) and the
+labels are pinned in `currency-copy.node.ts`; `i18n.node.ts` and `database.node.ts` call
+`formatMoneyAmount`/`spokenMinor` with `'ARS'` (same strings); the Más footer says Producto 24B3.
+No ARS/USD-only golden saw a spoken change.
 
 Review fix in PR #48 (2026-09-24): an untouched prefill of a stored amount above the entry bound no longer blocks the other edits of the record (`minorFromEditedDraft`, tests in `money.test.ts`, `personalization-routes.node.ts`, `recovery-routes.node.ts`, `typography.node.ts`); the earlier "a balance above 13 whole digits blocks Editar cuenta" risk is gone.
 

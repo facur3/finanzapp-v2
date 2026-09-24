@@ -65,6 +65,7 @@ function harness(file: string, params: Record<string, unknown> = {}, data: domai
     '../src/storage/LedgerProvider': ledger, '../../src/storage/LedgerProvider': ledger,
     '../src/ui/components': { ...Object.fromEntries(names.map(name => [name, name])), useStacked: () => false }, '../../src/ui/components': { ...Object.fromEntries(names.map(name => [name, name])), useStacked: () => false },
     '../src/ui/entry-list': { EntryList: 'EntryList' }, '../../src/ui/entry-list': { EntryList: 'EntryList' },
+    '../src/ui/currency-switch': { CurrencySwitch: 'CurrencySwitch' }, '../../src/ui/currency-switch': { CurrencySwitch: 'CurrencySwitch' },
     '../src/ui/quick-actions': { QuickActions: 'QuickActions' }, '../../src/ui/quick-actions': { QuickActions: 'QuickActions' },
     '../src/ui/motion': { ValueTransition: 'ValueTransition', Reflow: 'Reflow', selectionHaptic: () => {}, impactHaptic: () => {}, duration: { press: 100, release: 160, state: 200, data: 260, enter: 200, exit: 100, reveal: 480 }, timing: (kind: string, reduced: boolean) => ({ duration: reduced ? 0 : 260 }) }, '../../src/ui/motion': { ValueTransition: 'ValueTransition', Reflow: 'Reflow', selectionHaptic: () => {}, impactHaptic: () => {}, duration: { press: 100, release: 160, state: 200, data: 260, enter: 200, exit: 100, reveal: 480 }, timing: (kind: string, reduced: boolean) => ({ duration: reduced ? 0 : 260 }) },
     '../src/ui/presentation': presentation, '../../src/ui/presentation': presentation, '../src/ui/report-presentation': reportPresentation,
@@ -288,4 +289,22 @@ test('23.1C2: the opening balance row groups on screen and gives VoiceOver the l
   assert.equal(opening('es-AR'), 'ARS 1.234.567,89|1234567,89 ARS');
   assert.equal(opening('en-AR'), 'ARS 1.234.567,89|1234567.89 ARS', 'an English voice gets the decimal point, not the Argentine grouping');
   assert.equal(opening('es-US'), 'ARS 1,234,567.89|1234567,89 ARS', 'a Spanish voice gets the decimal comma, not the US grouping');
+});
+
+test('24B3: Presupuestos with three currencies switches among the currencies present, and a yen budget is measured in yen', () => {
+  const yen: domain.Account = { id: 'yen', name: 'Yenes', currency: 'JPY', openingMinor: 0, createdAt };
+  const yenBudget: domain.MonthlyBudget = { id: 'b-yen', scope: 'total', currency: 'JPY', monthISO: '2026-09', amountMinor: 20000, active: true, createdAt, revision: 0, updatedAt: createdAt };
+  const yenEntry: domain.Entry = { id: 'y1', accountId: yen.id, kind: 'expense', amountMinor: 1500, merchant: 'Konbini', category: 'Comida', dateISO: '2026-09-10', createdAt };
+  const data: domain.LedgerArchive = { ...archive, accounts: [...archive.accounts, yen], records: [...archive.records, domain.initialRecord(yenEntry)], budgets: [...budgets, yenBudget] };
+  const view = harness('budgets.tsx', { currency: 'ARS' }, data);
+  let root = view.render();
+  const control = nodes(root).find(node => node.type === 'CurrencySwitch')!;
+  assert.deepEqual(control.props.currencies, ['ARS', 'USD', 'JPY']);
+  assert.equal(control.props.value, 'ARS');
+  control.props.onChange('JPY');
+  root = view.render();
+  assert.equal(nodes(root).find(node => node.type === 'CurrencySwitch')!.props.value, 'JPY');
+  const moneys = nodes(root).filter(node => node.type === 'Money').map(node => [node.props.currency, node.props.minor]);
+  assert.deepEqual(moneys, [['JPY', 18500], ['JPY', 1500], ['JPY', 20000]], 'left, spent and limit in yen: 20000 − 1500, never read as cents');
+  assert.equal(harness('budgets.tsx', { currency: 'JPY' }, data).render() && nodes(harness('budgets.tsx', { currency: 'JPY' }, data).render()).find(node => node.type === 'CurrencySwitch')!.props.value, 'JPY', 'a link to a held currency opens it');
 });

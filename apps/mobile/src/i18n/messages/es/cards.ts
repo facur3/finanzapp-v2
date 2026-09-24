@@ -52,6 +52,7 @@ export const cards = {
       /** VoiceOver: "Tarjeta Visa Gold, Galicia, termina en 4009, pesos". */
       label: 'Tarjeta {details}',
       endsIn: 'termina en {last4}',
+      /** The legacy words for a card in ARS or USD (unless another held currency shares the word); any other currency is read by CLDR's plural name. */
       pesos: 'pesos',
       dollars: 'dólares',
       /** VoiceOver name of the carousel page dots: "Tarjeta 1 de 3". */
@@ -63,8 +64,6 @@ export const cards = {
       name: 'Nombre de la tarjeta',
       /** An example name without a bank: the issuer has its own field, and a bank of one country reads oddly in another region. */
       namePlaceholder: 'Ej. Visa Gold',
-      pesos: 'Pesos · ARS',
-      dollars: 'Dólares · USD',
       openingDebt: 'Deuda actual (opcional)',
       openingDebtNote: 'Lo que ya debés hoy en esta tarjeta. No cuenta como gasto: las compras anteriores no se vuelven a registrar.',
       issuer: 'Emisor (opcional)',

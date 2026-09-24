@@ -516,7 +516,7 @@ test('Producto 23.1C1: every format in the four language × region combinations 
   for (const [locale, row] of Object.entries(rows) as [AppLocale, Row][]) {
     const i18n = bindLocale(locale);
     const got: Row = {
-      amount: i18n.formatAmount(123456), big: i18n.formatAmount(999999999999999), negative: i18n.formatAmount(-4599),
+      amount: i18n.formatMoneyAmount(123456, 'ARS'), big: i18n.formatMoneyAmount(999999999999999, 'ARS'), negative: i18n.formatMoneyAmount(-4599, 'ARS'),
       ars: i18n.moneyText(123456, 'ARS'), usd: i18n.moneyText(-123456, 'USD'), coded: i18n.codedAmount(123456, 'ARS'),
       spoken: i18n.spokenMoney(123456, 'ARS'), spokenCoded: i18n.spokenAmount(123456, 'ARS'), percent: i18n.formatPercent(0.1235), small: i18n.formatPercent(0.0004),
       count: i18n.formatCount(1234567), numeric: i18n.formatNumericDate('2026-09-22'), dayMonth: i18n.formatDayMonth('2026-09-22'), time: i18n.formatDateTime('2026-09-22T14:03:05'),
@@ -524,8 +524,8 @@ test('Producto 23.1C1: every format in the four language × region combinations 
     };
     assert.deepEqual(got, row, locale);
     // The amount itself never changes: only its writing. No floating point, no rounding, the sign and the cents kept.
-    assert.equal(i18n.formatAmount(123456).replace(/[.,]/g, ''), '123456');
-    assert.equal(i18n.spokenNumber(-5), locale.startsWith('en') ? '-0.05' : '-0,05');
+    assert.equal(i18n.formatMoneyAmount(123456, 'ARS').replace(/[.,]/g, ''), '123456');
+    assert.equal(i18n.spokenMinor(-5, 'ARS'), locale.startsWith('en') ? '-0.05' : '-0,05');
     assert.equal(i18n.moneyText(5, 'USD', false, true), '+US$\u00A0' + (locale.endsWith('US') ? '0.05' : '0,05'), 'income sign');
     assert.equal(i18n.moneyText(-5, 'ARS', true), (locale.endsWith('US') ? 'AR$' : '$') + '\u00A0' + (locale.endsWith('US') ? '0.05' : '0,05'), 'absolute');
     assert.equal(i18n.spokenPercent(0.1235), locale.startsWith('en') ? '12.4%' : '12,4\u00A0%', 'a spoken percentage follows the language');
@@ -640,7 +640,7 @@ test('VoiceOver numbers are never grouped in any locale and keep the exact amoun
     for (const minor of amounts) {
       const number = spokenNumber(minor, locale);
       const spoken = [number, spokenAmount(minor, 'ARS', locale), spokenMoney(minor, 'ARS', locale), spokenMoney(minor, 'USD', locale),
-        i18n.spokenNumber(minor), i18n.spokenAmount(minor, 'USD'), i18n.spokenMoney(minor, 'ARS')];
+        i18n.spokenMinor(minor, 'ARS'), i18n.spokenAmount(minor, 'USD'), i18n.spokenMoney(minor, 'ARS')];
       for (const text of spoken) assert.doesNotMatch(text, grouped, locale + ': ' + text);
       assert.match(number, decimal === '.' ? /^-?\d+\.\d{2}$/ : /^-?\d+,\d{2}$/, 'the language\'s decimal mark, before exactly two digits: ' + number);
       assert.equal(BigInt(number.replace(decimal, '')), BigInt(minor), 'the same amount, digit for digit: ' + number);

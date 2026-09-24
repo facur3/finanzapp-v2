@@ -7,8 +7,9 @@
  * presentation follows the locale. */
 import type { IsoCurrencyCode } from '@finanzapp/domain';
 import type { LocaleSource } from './device.ts';
-import { amountFormat, codedAmount, currencyName, currencySymbol, formatAmount, formatCount, formatMoneyAmount, formatDate, formatDateTime, formatDayMonth, formatMonth,
-  formatNumericDate, formatPercent, moneyText, pickerLocale, relativeDate, spokenAmount, spokenMoney, spokenNumber, spokenPercent, type DateStyle } from './format.ts';
+import { amountFormat, codedAmount, currencyName, currencySymbol, currencyUnit, formatCount, formatMoneyAmount, formatDate, formatDateTime, formatDayMonth, formatMonth,
+  formatNumericDate, formatPercent, formatWholeUnits, moneyText, pickerLocale, relativeDate, spokenAmount, spokenMinor, spokenMoney, spokenPercent, type DateStyle,
+  type HeldCurrencies } from './format.ts';
 import { localizeError } from './errors.ts';
 import { languageOf, regionOf, type AppLocale, type LanguageCode, type RegionCode } from './locale.ts';
 import { translator, type Translate } from './messages.ts';
@@ -34,22 +35,28 @@ export interface I18n {
   formatDayMonth: (dateISO: string) => string;
   formatCount: (value: number) => string;
   formatPercent: (fraction: number) => string;
-  /** The number alone in the region's separators ("1.234,56", "1,234.56"), two decimals (ARS, USD); visible text only. */
-  formatAmount: (minor: number) => string;
-  /** The number alone with the currency's own decimals ("1.500" JPY, "1.234,567" KWD); visible text only (Producto 24A). */
+  /** The number alone with the currency's own decimals ("1.234,56" ARS, "1.500" JPY, "1.234,567" KWD) in the region's separators; visible text only (Producto 24A). */
   formatMoneyAmount: (minor: number, currency: IsoCurrencyCode) => string;
+  /** The amount rounded to whole units of its currency, grouped ("1.234.568"): a chart's scale caption, never a ledger figure. */
+  formatWholeUnits: (minor: number, currency: IsoCurrencyCode) => string;
   /** Sign, symbol and number ("−US$ 1.234,56"); `signed` adds "+" to a positive amount. Visible text only. */
   moneyText: (minor: number, currency: IsoCurrencyCode, absolute?: boolean, signed?: boolean) => string;
   /** "ARS 1.234,56". */
   codedAmount: (minor: number, currency: IsoCurrencyCode) => string;
-  /** VoiceOver: the amount with the currency in words ("1234.56 dollars"), the language's decimal mark, no grouping. */
+  /** VoiceOver: the amount with the currency in words ("1234.56 dollars"), the language's decimal mark, no grouping. ARS and
+   * USD keep their short words unless another held currency shares them (`heldCurrencies`); then the full CLDR name. */
   spokenMoney: (minor: number, currency: IsoCurrencyCode) => string;
   /** VoiceOver: the number and its code ("1234,56 ARS"), the language's decimal mark, no grouping. */
   spokenAmount: (minor: number, currency: IsoCurrencyCode) => string;
-  /** VoiceOver: the number alone, the language's decimal mark, no grouping. */
-  spokenNumber: (minor: number) => string;
+  /** VoiceOver: the number alone with the currency's own decimals ("1234,56", "1500", "1234.567"), the language's decimal mark, no grouping. */
+  spokenMinor: (minor: number, currency: IsoCurrencyCode) => string;
   /** VoiceOver: a percentage, the language's decimal mark, no grouping. */
   spokenPercent: (fraction: number) => string;
+  /** A currency as a unit in words for a label: `word` (a catalogued legacy word, "pesos") unless another held currency shares
+   * it, then CLDR's plural name in the interface language; without a word, CLDR's plural name ("yenes japoneses"). */
+  currencyUnit: (currency: IsoCurrencyCode, word?: string) => string;
+  /** The currencies the ledger holds, as `HeldCurrenciesProvider` gave them (empty outside it or in an empty ledger). */
+  heldCurrencies: HeldCurrencies;
   /** The separators the amount field types in. */
   amountFormat: { decimal: string; group: string };
   /** The date wheel's locale identifier: the language with its home region ("es_AR", "en_US"). */
@@ -63,8 +70,11 @@ export interface I18n {
 }
 
 /** `deviceLanguage` is the primary language subtag of the device's first
- * locale ("es", "en", "pt"), or null when nothing was read. */
-export function bindLocale(locale: AppLocale, localeSource: LocaleSource = 'none', deviceLanguage: string | null = null): I18n {
+ * locale ("es", "en", "pt"), or null when nothing was read. `held` is the set
+ * of currencies the ledger holds (`withHeldCurrencies` rebinds a locale for it):
+ * the only ledger fact presentation needs, because a short spoken unit ("pesos")
+ * is ambiguous exactly when another held currency shares the word. */
+export function bindLocale(locale: AppLocale, localeSource: LocaleSource = 'none', deviceLanguage: string | null = null, held: HeldCurrencies = []): I18n {
   const language = languageOf(locale);
   return {
     locale, language, region: regionOf(locale), localeSource, t: translator(language),
@@ -76,14 +86,16 @@ export function bindLocale(locale: AppLocale, localeSource: LocaleSource = 'none
     formatDayMonth: dateISO => formatDayMonth(dateISO, locale),
     formatCount: value => formatCount(value, locale),
     formatPercent: fraction => formatPercent(fraction, locale),
-    formatAmount: minor => formatAmount(minor, locale),
     formatMoneyAmount: (minor, currency) => formatMoneyAmount(minor, currency, locale),
+    formatWholeUnits: (minor, currency) => formatWholeUnits(minor, currency, locale),
     moneyText: (minor, currency, absolute, signed) => moneyText(minor, currency, locale, absolute, signed),
     codedAmount: (minor, currency) => codedAmount(minor, currency, locale),
-    spokenMoney: (minor, currency) => spokenMoney(minor, currency, locale),
+    spokenMoney: (minor, currency) => spokenMoney(minor, currency, locale, held),
     spokenAmount: (minor, currency) => spokenAmount(minor, currency, locale),
-    spokenNumber: minor => spokenNumber(minor, locale),
+    spokenMinor: (minor, currency) => spokenMinor(minor, currency, locale),
     spokenPercent: fraction => spokenPercent(fraction, locale),
+    currencyUnit: (currency, word) => currencyUnit(currency, locale, held, word),
+    heldCurrencies: held,
     amountFormat: amountFormat(locale),
     pickerLocale: pickerLocale(locale),
     currencySymbol: currency => currencySymbol(currency, locale),
@@ -91,4 +103,14 @@ export function bindLocale(locale: AppLocale, localeSource: LocaleSource = 'none
     relativeDate: (dateISO, todayISO, inline) => relativeDate(dateISO, todayISO, locale, inline),
     errorText: message => localizeError(language, message),
   };
+}
+
+/** The same locale bound for a ledger that holds `held`: only the unit words change
+ * (`spokenMoney`, `currencyUnit`, `heldCurrencies`); every other formatter is the
+ * same function, so a consumer that formats but never speaks a unit sees no change. */
+export function withHeldCurrencies(i18n: I18n, held: HeldCurrencies): I18n {
+  const { locale } = i18n;
+  return { ...i18n, heldCurrencies: held,
+    spokenMoney: (minor, currency) => spokenMoney(minor, currency, locale, held),
+    currencyUnit: (currency, word) => currencyUnit(currency, locale, held, word) };
 }

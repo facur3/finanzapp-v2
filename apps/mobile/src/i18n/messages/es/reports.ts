@@ -1,9 +1,6 @@
 /** Reportes: periods, charts, comparisons, the category and day screens. */
 export const reports = {
   reports: {
-    /** The currency switch at the top of Reportes (segmented control). */
-    currencyARS: 'Pesos · ARS',
-    currencyUSD: 'Dólares · USD',
     previousMonth: 'Mes anterior',
     nextMonth: 'Mes siguiente',
     backToCurrentMonth: 'Volver al mes actual',

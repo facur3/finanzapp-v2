@@ -41,7 +41,8 @@ export const common = {
     chooseDate: 'Elegir fecha',
     currency: 'Moneda',
     chooseCurrency: 'Elegir moneda',
-    currencyNote: 'Por ahora las cuentas se registran en pesos o en dólares, sin convertir entre sí. Otras monedas llegan con su cotización.',
+    /** Under the currency sheet of a new account: why the list is short, without naming a currency (the list follows the ledger's gate). */
+    currencyNote: 'Cada cuenta se registra en su propia moneda, sin convertir entre sí. La lista muestra las monedas disponibles hoy; otras llegan con su cotización.',
     searchOrCreateCategory: 'Buscar o crear categoría',
     categoryNamePlaceholder: 'Nombre de la categoría',
     useCategory: 'Usar categoría {name}',
@@ -52,10 +53,13 @@ export const common = {
   },
   amount: {
     label: 'Monto',
-    /** VoiceOver name of the amount field: "Gasto en pesos argentinos". */
+    /** VoiceOver name of the amount field: "Gasto en pesos argentinos". {currency} is the unit in words: the two legacy words
+     * below for ARS and USD (unless another held currency shares the word), CLDR's plural name for any other currency. */
     accessibility: '{label} en {currency}',
     inPesos: 'pesos argentinos',
     inDollars: 'dólares',
+    /** Shown in place of an amount the app cannot represent exactly (beyond the safe integer range); also its VoiceOver label. */
+    unavailable: 'Importe fuera de rango',
     /** Under the amount field when a pasted text was not used; the field keeps its previous value. {text} is what was pasted. */
     paste: {
       /** "1,000" in Argentina: a thousand in one convention, one with three decimals in the other. {decimal} is the region's decimal separator. */
@@ -75,6 +79,24 @@ export const common = {
       noDecimals: '{currency} no lleva decimales. Quitá los decimales antes de guardar; no se redondea.',
       tooLong: 'El importe supera el máximo de {currency}. Corregilo antes de guardar.',
     },
+  },
+  /** How a currency is named wherever the person chooses one (Inicio, Reportes, Presupuestos, the card, debt and budget forms). */
+  currency: {
+    /** One template for every currency: {name} is the short word below for ARS and USD, CLDR's plural name otherwise; {code} the ISO code. */
+    option: '{name} · {code}',
+    /** The short words FinanzApp has always shown for its first two currencies ("Pesos · ARS", "Dólares · USD"). */
+    short: {
+      ARS: 'Pesos',
+      USD: 'Dólares',
+    },
+    /** The currency switch when three or more currencies are held: a row that opens the list. {name} is the chosen currency's full name. */
+    switchLabel: 'Moneda: {name}',
+    switchHint: 'Abre la lista de monedas para elegir otra',
+    /** Title of that list. */
+    switchTitle: 'Elegir moneda',
+    /** Search field of the list, shown only when it is long. */
+    search: 'Buscar moneda',
+    noMatches: 'Ninguna moneda coincide con la búsqueda.',
   },
   count: {
     movements: { one: '{count} movimiento', other: '{count} movimientos' },

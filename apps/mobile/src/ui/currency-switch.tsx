@@ -1,0 +1,44 @@
+import { useMemo, useState } from 'react';
+import Ionicons from '@expo/vector-icons/Ionicons';
+import type { Currency } from '@finanzapp/domain';
+import { AppText, Choices, PressFeedback } from './components';
+import { CurrencySheet } from './form-controls';
+import { currencyOptionLabel, currencySwitchMode, type CurrencyOption } from './currencies';
+import { useI18n } from '../i18n/provider';
+import { radius, usePalette } from './theme';
+
+/** The currency a screen shows (Inicio, Reportes, Presupuestos) or a new record takes (a card,
+ * a debt, a budget), chosen among the currencies that screen can actually use: the ones the
+ * ledger holds, or the ones the gate offers. With one or two currencies it is the segmented
+ * control of before, byte for byte ("Pesos · ARS" / "Dólares · USD", or the bare codes on
+ * Inicio). With three or more, segments would shrink below a readable width, so it becomes one
+ * compact row naming the chosen currency that opens the same sheet the new-account form uses
+ * (a checkmark on the current one, search when the list is long). Choosing a currency only
+ * changes which currency is shown; nothing is converted (docs/currency.md §10). */
+export function CurrencySwitch({ value, currencies, onChange, disabled = false, labels = 'name' }: {
+  value: Currency; currencies: readonly Currency[]; onChange: (currency: Currency) => void; disabled?: boolean;
+  /** `name` writes "Pesos · ARS"; `code` writes the bare code, for a control that sits beside another (Inicio). */
+  labels?: 'name' | 'code';
+}) {
+  const p = usePalette();
+  const { t, locale, currencyName, currencySymbol } = useI18n();
+  const [visible, setVisible] = useState(false);
+  const label = (currency: Currency) => labels === 'code' ? currency : currencyOptionLabel(currency, t, locale);
+  const options = useMemo<CurrencyOption[]>(() => currencies.map(code => ({ code, name: currencyName(code), symbol: currencySymbol(code) })), [currencies, currencyName, currencySymbol]);
+  if (currencySwitchMode(currencies.length) === 'segments') {
+    return <Choices value={value} onChange={onChange} disabled={disabled} options={currencies.map(currency => ({ value: currency, label: label(currency) }))} />;
+  }
+  return <>
+    <PressFeedback feedback="highlight" accessibilityRole="button" accessibilityLabel={t('currency.switchLabel', { name: currencyName(value) })}
+      accessibilityHint={t('currency.switchHint')} accessibilityState={{ disabled }} disabled={disabled} onPress={() => setVisible(true)}
+      style={{ flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 36, paddingVertical: 6, paddingHorizontal: 12, borderRadius: radius.button, backgroundColor: p.inset, alignSelf: 'flex-start', maxWidth: '100%' }}>
+      <AppText accessible={false} numberOfLines={1} variant="subhead" style={{ fontWeight: '600', color: p.primary, flexShrink: 1 }}>{label(value)}</AppText>
+      <Ionicons name="chevron-down" size={14} color={p.primary} accessible={false} />
+    </PressFeedback>
+    <CurrencySheet visible={visible} title={t('currency.switchTitle')} options={options} value={value} searchable={options.length >= SEARCHABLE_FROM}
+      onClose={() => setVisible(false)} onChange={currency => { onChange(currency); setVisible(false); }} />
+  </>;
+}
+
+/** A list this long gets a search field: fewer fit on one screen without scrolling at the default text size. */
+export const SEARCHABLE_FROM = 6;

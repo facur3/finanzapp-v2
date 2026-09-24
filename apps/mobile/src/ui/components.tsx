@@ -3,7 +3,7 @@ import { AccessibilityInfo, ActivityIndicator, Alert, InputAccessoryView, Keyboa
   useWindowDimensions, type PressableProps, type StyleProp, type TextInputProps, type TextProps, type ViewStyle } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { accountBalanceMinor, editedDraftFits, type Currency, type Entry, type EntryKind, type Account, type StoredDraft, type Transfer } from '@finanzapp/domain';
+import { accountBalanceMinor, editedDraftFits, type Currency, type Entry, type EntryKind, type Account, type LegacyCurrency, type StoredDraft, type Transfer } from '@finanzapp/domain';
 import type { ActivityItem } from './presentation';
 import { router } from 'expo-router';
 import { radius, space, type, useCurrentDay, usePalette, useReduceMotion, type Palette } from './theme';
@@ -46,10 +46,14 @@ export function useStacked(amount?: { minor: number; currency: Currency; signed?
   return rowStacks(width, fontScale, amount ? rowAmountText(amount.minor, amount.currency, amount.signed ?? false, locale) : undefined);
 }
 
-/** The string a row amount renders (sign, symbol, grouped number in the region's separators), for width estimates. */
+/** The string a row amount renders (sign, symbol, grouped number in the region's separators), for width estimates. A value
+ * outside the safe integer range (a sum the domain refused to bound, a corrupt figure) is an explicit dash, never NaN, Infinity
+ * or a zero that looks like money; `Money` says what it means (24B3). */
 export function rowAmountText(minor: number, currency: Currency, signed = false, locale: AppLocale = DEFAULT_LOCALE): string {
-  return moneyText(minor, currency, locale, false, signed);
+  return Number.isSafeInteger(minor) ? moneyText(minor, currency, locale, false, signed) : UNAVAILABLE_AMOUNT;
 }
+/** What an amount the app cannot represent exactly shows. */
+export const UNAVAILABLE_AMOUNT = '—';
 
 /** Text in one of the named styles. A larger `fontSize` in `style` without
  * its own `lineHeight` gets a line box that fits it, instead of inheriting the
@@ -222,7 +226,7 @@ export function AmountField({ label, currency, tone, value = '', onChangeText, s
   /** The stored amount an edit form prefilled the field from: while the text is exactly that prefill in its own currency, it always fits (a stored amount may exceed the entry bound). */
   stored?: StoredDraft }) {
   const p = usePalette();
-  const { t, amountFormat, currencySymbol, speechLanguage } = useI18n();
+  const { t, amountFormat, currencySymbol, currencyUnit, speechLanguage } = useI18n();
   const accessoryId = useId();
   const { fontScale } = useWindowDimensions();
   const [rowWidth, setRowWidth] = useState(0);
@@ -258,6 +262,7 @@ export function AmountField({ label, currency, tone, value = '', onChangeText, s
   }, [decimal, group]);
   const title = label ?? t('amount.label');
   const symbol = currencySymbol(currency);
+  const unitKey = (FIELD_UNIT_KEYS as { readonly [Code in Currency]?: MessageKey })[currency];
   // Derived from the draft and the region, so the text follows a region change in the same render.
   const text = displayAmount(value, amountFormat, currency);
   // A kept draft that the currency cannot hold exactly: more decimals than it has, or more digits than it allows.
@@ -295,7 +300,7 @@ export function AmountField({ label, currency, tone, value = '', onChangeText, s
       <TextInput keyboardType={decimals === 0 ? 'number-pad' : 'decimal-pad'} inputMode={decimals === 0 ? 'numeric' : 'decimal'} maxLength={24} placeholder="0" {...props} value={text} onChange={change}
         selection={selection} onSelectionChange={select}
         onBlur={event => { settle(); props.onBlur?.(event); }} onSubmitEditing={event => { settle(); props.onSubmitEditing?.(event); }}
-        accessibilityLabel={t('amount.accessibility', { label: title, currency: t(currency === 'ARS' ? 'amount.inPesos' : 'amount.inDollars') })}
+        accessibilityLabel={t('amount.accessibility', { label: title, currency: currencyUnit(currency, unitKey && t(unitKey)) })}
         accessibilityLanguage={props.accessibilityLanguage ?? speechLanguage}
         inputAccessoryViewID={Platform.OS === 'ios' ? accessoryId : undefined}
         selectionColor={p.primary} placeholderTextColor={p.tertiary} maxFontSizeMultiplier={HERO_MAX_SCALE}
@@ -311,6 +316,10 @@ export function AmountField({ label, currency, tone, value = '', onChangeText, s
     </InputAccessoryView>}
   </View>;
 }
+
+/** The words VoiceOver has always said for the field of an ARS or USD amount ("pesos argentinos", "dólares"), a lookup keyed by
+ * code; any other currency is named by CLDR's plural name, and a legacy word another held currency shares gives way to the full name. */
+const FIELD_UNIT_KEYS: { readonly [Code in LegacyCurrency]: MessageKey } = { ARS: 'amount.inPesos', USD: 'amount.inDollars' };
 
 /** The note under the field for a refused paste, by reason. */
 const PASTE_NOTICES: Record<PasteRejection, MessageKey> = {
@@ -456,19 +465,21 @@ export function Money({ minor, currency, large = false, color, signed = false, s
 }) {
   const p = usePalette();
   const { fontScale } = useWindowDimensions();
-  const { spokenMoney, locale, amountFormat, speechLanguage } = useI18n();
+  const { t, spokenMoney, locale, amountFormat, speechLanguage } = useI18n();
   const [width, setWidth] = useState(0);
   const semantic = tone === 'income' ? p.income : tone === 'expense' ? p.text : tone === 'transfer' ? p.transfer : tone === 'warning' ? p.warning : p.text;
   const base = size ?? (large ? 44 : 17);
   const hero = base >= 28;
+  const safe = Number.isSafeInteger(minor);
   const text = rowAmountText(minor, currency, signed, locale);
   const fontSize = hero ? fitFontSize(text, width, base, Math.round(base / 2), Math.min(fontScale, HERO_MAX_SCALE)) : base;
-  const label = spokenMoney(minor, currency);
+  // An unrepresentable value shows a dash and says so: never NaN, Infinity or a misleading zero (24B3).
+  const label = safe ? spokenMoney(minor, currency) : t('amount.unavailable');
   const ink = color ?? semantic;
   // A hero is one amount in three weights of the same colour: the symbol and
   // the cents step back so the whole units carry the number. Same size, same
   // baseline, one accessibility label; nested spans keep it one line.
-  const parts = hero ? splitAmount(text, amountFormat) : null;
+  const parts = hero && safe ? splitAmount(text, amountFormat) : null;
   const quiet = ink === p.text ? { symbol: p.secondary, cents: p.tertiary } : { symbol: ink + 'B3', cents: ink + '8C' };
   const body = <Text accessibilityLabel={label} accessibilityLanguage={speechLanguage} numberOfLines={1} adjustsFontSizeToFit={!hero} minimumFontScale={0.75}
     maxFontSizeMultiplier={hero ? HERO_MAX_SCALE : ROW_MAX_SCALE}

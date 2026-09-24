@@ -7,6 +7,8 @@ import { editedDraftFits, isLedgerCurrency, minorFromEditedDraft, sameMonthlyBud
   type BudgetScope, type Currency, type MonthlyBudget } from '@finanzapp/domain';
 import { useLedger } from '../storage/LedgerProvider';
 import { ActionButton, AmountField, AppText, Choices, ErrorMessage, IconButton, Screen } from './components';
+import { CurrencySwitch } from './currency-switch';
+import { offeredCurrencies } from './currencies';
 import { draftFromMinor } from './money-input';
 import { CategoryField } from './form-controls';
 import { useI18n } from '../i18n/provider';
@@ -119,8 +121,7 @@ export function BudgetForm({ original, monthISO, currency: requestedCurrency, sc
     </View>
     {!before && <Choices<BudgetScope> value={scope} onChange={setScope} disabled={locked}
       options={[{ value: 'total', label: t('budgets.form.scopeGeneral') }, { value: 'category', label: t('budgets.form.scopeCategory') }]} />}
-    {!before && <Choices value={currency} onChange={setCurrency} disabled={locked}
-      options={[{ value: 'ARS', label: t('budgets.currency.ARS') }, { value: 'USD', label: t('budgets.currency.USD') }]} />}
+    {!before && <CurrencySwitch value={currency} currencies={offeredCurrencies()} onChange={setCurrency} disabled={locked} />}
     <AmountField label={t('budgets.form.amount')} currency={currency} value={amount} stored={stored ?? undefined}
       onChangeText={value => { setAmount(value); setError(null); }} editable={!locked} />
     {!general && <CategoryField entries={snapshot?.entries ?? []} kind="expense" value={category} onChange={setCategory} disabled={locked} prominent />}

@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import * as moneyInput from '../src/ui/money-input.ts';
+import * as currencies from '../src/ui/currencies.ts';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { runInNewContext } from 'node:vm';
@@ -44,7 +45,7 @@ function harness(props: any, data: domain.LedgerArchive = archive, save?: (budge
     'expo-haptics': { NotificationFeedbackType: { Success: 'Success' }, notificationAsync: async () => {} },
     '@finanzapp/domain': domain,
     '../storage/LedgerProvider': ledger,
-    './components': components, './money-input': moneyInput,
+    './components': components, './money-input': moneyInput, './currencies': currencies, './currency-switch': { CurrencySwitch: 'CurrencySwitch' },
     './form-controls': { CategoryField: 'CategoryField' },
   };
   const module = { exports: {} as Record<string, (props: any) => Node> };
@@ -171,7 +172,8 @@ test('in English the budget form is labelled in English, keeps the category as s
   const root = english.root;
   assert.equal(find(root, 'Stack.Screen').props.options.title, 'New budget');
   assert.equal(choice(root, 'total').props.options.map((option: any) => option.label).join(','), 'Overall,By category');
-  assert.equal(choice(root, 'ARS').props.options.map((option: any) => option.label).join(','), 'Pesos · ARS,Dollars · USD');
+  // 24B3: the currency choice is the shared switch over the gate's currencies (its labels are tested in currency-switch.node.ts).
+  assert.deepEqual({ ...find(root, 'CurrencySwitch').props, onChange: undefined }, { value: 'ARS', currencies: ['ARS', 'USD'], disabled: false, onChange: undefined });
   assert.equal(find(root, 'AmountField').props.label, 'Budget');
   assert.ok(texts(root).includes('October 2026'));
   assert.ok(texts(root).includes('Category limit'));

@@ -380,6 +380,33 @@ importe, moneda y estado.
   muestra hasta que toda la app lo tenga (23.1): un iPhone en inglés sigue leyendo
   español antes que media app traducida.
 
+## Producto 24B3 — presentación y textos multimoneda (sin cambios visuales en producción)
+
+Con ARS y USD nada cambia: cada importe, etiqueta y frase hablada es byte a byte la de 24B2
+(goldens). Lo que la interfaz ya sabe hacer para cuando se habiliten otras monedas:
+- **Cada importe con su moneda.** Un yen sin decimales ("JP¥ 1.500"), un dinar con tres
+  ("KWD 1.234,567"), en los separadores de la región; las escalas de los gráficos en unidades
+  enteras de la moneda ("escala de 0 a JP¥ 1.234.567"), nunca centavos divididos por cien.
+- **Un valor fuera del rango exacto** se muestra como "—" y VoiceOver dice "Importe fuera de
+  rango": nunca NaN, Infinity ni un cero engañoso.
+- **Selector de moneda.** Con una o dos monedas, el control segmentado de siempre ("Pesos · ARS",
+  "Dólares · USD"; códigos sueltos en Inicio). Con tres o más, una fila compacta con la moneda
+  elegida y un chevron que abre la hoja de monedas ya existente (tilde en la actual; búsqueda
+  a partir de seis). Lista solo las monedas que esa pantalla puede usar; elegir una no convierte
+  nada. Sin menús de divisas en el gasto común ni pop-ups.
+- **Una sola plantilla** "{nombre} · {código}" para nombrar monedas, con "Pesos"/"Dólares" para
+  ARS/USD y el nombre de CLDR para el resto ("Yenes japoneses · JPY").
+- **VoiceOver** lee cada moneda en el idioma de la interfaz ("1500 yenes japoneses", "1234.567
+  Kuwaiti dinars"). Si el libro tiene otra moneda que comparte la palabra corta (pesos chilenos
+  junto a pesos, dólares canadienses junto a dólares), ARS y USD pasan a su nombre completo
+  ("pesos argentinos", "US dollars"); con solo ARS y USD, las palabras de siempre.
+- **Texto grande y 320 pt.** El importe más largo de cada exponente cabe en el héroe (se reduce
+  hasta la mitad de su tamaño, nunca se corta) y en una fila se apila bajo el nombre; el campo
+  conserva su piso junto a "JP¥", "KWD" o "CA$". Pendiente de iPhone (etapa 9): la fila del
+  selector y la hoja con los tamaños de texto mayores y Reduce Motion.
+Pendiente para 24B4: preparación segura de SQLite (esquema 9) y backup v9, con autorización
+del propietario para la actualización irreversible.
+
 ## Producto 24B2 — rutas estrictas y campo de importe por moneda (sin cambios visuales en producción)
 
 Nada visible cambia con ARS y USD: el formato regional, el símbolo anclado, el cursor
@@ -400,7 +427,7 @@ para cuando se habilite una moneda con otra precisión:
   el estado vacío de la pantalla («Día no válido», «Período no válido», «Comparación no
   válida»), nunca otra moneda. Un enlace sin moneda abre la primera del ledger, como la
   pestaña.
-Pendiente para 24B3 (etapa 4): los cuatro ternarios ARS/USD de presentación con la plantilla
+Entregado en 24B3 (etapa 4): los cuatro ternarios ARS/USD de presentación con la plantilla
 `{name} · {code}`, el picker más allá de dos monedas y las unidades habladas.
 
 ## Producto 24B1 — red de seguridad multimoneda (sin cambios visuales)

@@ -22,7 +22,7 @@ export default function TransferScreen() {
 function TransferDetail({ record, accounts }: { record: TransferRecord; accounts: Account[] }) {
   const { updateTransfer, archive } = useLedger();
   const p = usePalette();
-  const { t: tr, formatDate, formatAmount } = useI18n();
+  const { t: tr, formatDate, formatMoneyAmount } = useI18n();
   const nameOf = useAccountNameOf();
   const t = record.transfer;
   const from = accounts.find(a => a.id === t.fromAccountId)!, to = accounts.find(a => a.id === t.toAccountId)!;
@@ -55,7 +55,7 @@ function TransferDetail({ record, accounts }: { record: TransferRecord; accounts
     confirming.current = true;
     const change = makeTransferChange(randomUUID(), record, record.voided ? 'restore' : 'void', new Date().toISOString());
     Alert.alert(tr(record.voided ? 'transferDetail.restoreQuestion' : 'transferDetail.voidQuestion'),
-      tr('transferDetail.effect', { amount: formatAmount(t.amountMinor) + ' ' + from.currency,
+      tr('transferDetail.effect', { amount: formatMoneyAmount(t.amountMinor, from.currency) + ' ' + from.currency,
         from: nameOf(record.voided ? from : to), to: nameOf(record.voided ? to : from) }), [
         { text: tr('common.cancel'), style: 'cancel', onPress: () => { confirming.current = false; } },
         { text: tr(record.voided ? 'entryDetail.restore' : 'entryDetail.void'), style: record.voided ? 'default' : 'destructive', onPress: () => { confirming.current = false; void apply(change); } },

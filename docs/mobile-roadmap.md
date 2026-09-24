@@ -15,10 +15,56 @@ server-keyed; manual recording and local data work without connectivity. Recurri
 expenses, debts, budgets and cards remain in scope. Native navigation, accessible
 amounts, real data and recoverable durable writes remain requirements.
 
-## Status and current delivery — Producto 24B2
+## Status and current delivery — Producto 24B3
 
 Implemented is code, checked names a test, device-verified needs a physical result,
 and released means distributed. Neither a bundle nor a screenshot is App Store QA.
+
+**24B3 delivers stage 4 of docs/currency.md §7.5: presentation, copy and internationalization
+for every catalogue currency.** Production still stores and offers exactly ARS and USD;
+SQLite schema 8, backup v8, the gate, contract v1 and every visible ARS/USD string are
+unchanged. The Más footer reads Producto 24B3. Design and status: [docs/currency.md](currency.md)
+§2.3, §6, §7.5; [docs/i18n.md](i18n.md) §9.
+
+- [x] **Every amount names its currency.** The 21 currency-less call sites (recurring,
+  transfer and entry detail, the balance correction, the category and legend rows, the
+  timeline, the debt row, the Home budget card, the entry and transfer forms, the region
+  sample) pass the record's currency; `formatAmount` and `spokenNumber` left the bound locale
+  and a guard bans them in screens. Chart scales are whole units of the currency
+  (`formatWholeUnits`, same bytes for ARS/USD); `Money` shows "—" and says "Importe fuera de
+  rango" for a value outside the safe integers, never NaN, Infinity or a zero.
+- [x] **Copy through catalogues and one template.** "{name} · {code}" (`currency.option`) with
+  "Pesos"/"Dólares" kept for ARS/USD and CLDR's plural name for the rest replaces the four
+  per-currency label pairs (eight keys retired); the amount field and the card face name any
+  currency by CLDR through lookups keyed by code; the currency note and the transfer note are
+  currency-neutral; the glossary gains the engine's terms. The four ARS/USD presentation
+  ternaries are gone and the guards allow-list keeps only the permanent conventions, the gate
+  and contract v1.
+- [x] **The spoken unit follows the ledger.** `HeldCurrenciesProvider` (inside the ledger
+  provider) tells the locale which currencies are held; a short word another held currency
+  shares ("pesos" beside CLP, "dólares"/"dollars" beside CAD) gives way to the full CLDR name
+  in VoiceOver, the amount field and the card face. A ledger with only ARS and USD keeps every
+  word of 23.1C2 (goldens).
+- [x] **The currency switch.** `CurrencySwitch` is the two-segment control of before with one
+  or two currencies (byte-identical labels; bare codes on Inicio) and, from three on, a compact
+  row that opens the currency sheet (`CurrencySheet`, the new-account sheet made reusable: only
+  the currencies the screen can use, a checkmark, search from six). Inicio, Reportes and
+  Presupuestos pass the currencies held; the card, debt and budget forms pass the gate's.
+  Choosing a currency converts nothing.
+- [x] **Tests.** `currency-copy.node.ts` (spoken goldens for ARS, USD, EUR, JPY, KWD, CLP and
+  CAD in both languages; the shared-word rule; `formatWholeUnits`; the template; the switch with
+  one to seven currencies; the provider on a real React tree; the longest amount of every
+  exponent at 320 pt and at 1.4×/1.8×), plus cases in `currency-goldens` (card face, timeline,
+  day-net in JPY/KWD and beside CLP/CAD), `spending-chart` (MonthBars scale and legend rows),
+  `typography` (the field's name per currency, `Money`'s dash), `spending-home`,
+  `report-routes` and `polish-routes` (a stored JPY account: three currencies in the switch,
+  yen summed as yen), `ui-rows` (the searchable sheet) and `currency-guards` (the new scans).
+- [x] **Checked on Linux:** see the handoff entry below.
+- [ ] **Not device-verified:** the switch beyond two currencies, the search field, the spoken
+  units of JPY/KWD/CLP/CAD and the shared-word rule are unreachable in production (no such
+  currency is offered) and belong to stage 9's device QA; nothing visible changed with ARS/USD.
+
+### Previous delivery — Producto 24B2
 
 **24B2 completes stage 2 and delivers stage 3 of docs/currency.md §7.5: strict route
 currencies and an amount path that knows each currency's decimals.** Production still
@@ -1834,6 +1880,32 @@ amount uses `useStacked()` and gives the name two lines. 44-point targets, Voice
 safe areas, system text and separate currencies apply to every new screen.
 
 ## Handoff log (historical evidence)
+
+### 2026-09-24 — Producto 24B3: presentation, copy and internationalization for every currency
+
+- Stage 4 delivered: every visible and spoken amount passes its currency (`formatMoneyAmount`,
+  `spokenMinor`; `formatAmount`/`spokenNumber` unbound and banned in screens), `formatWholeUnits`
+  for chart scales, `Money`'s explicit "—" for an unrepresentable value, the `{name} · {code}`
+  template and the retired per-currency label keys, `currencyUnit` with the shared-word rule fed
+  by `HeldCurrenciesProvider`, `CurrencySwitch`/`CurrencySheet` for three or more currencies,
+  currency-neutral notes, the glossary terms, docs/i18n.md §9 and docs/currency.md §2.3/§6/§7.5.
+  The `currency-guards` allow-list lost its last four stage entries; a new scan bans currency-less
+  presentation calls, hand-divided cents and hand-written catalogue symbols in screens.
+- Deliberate golden changes: the eight retired keys and the two neutral notes (es, en, lock,
+  `same` whitelist), the currency segments found as `CurrencySwitch` in three harnesses,
+  `i18n.node.ts`/`database.node.ts` calling the currency-aware helpers with `'ARS'` (same
+  strings), the Más footer. No ARS/USD visible or spoken string changed.
+- **Checked on Linux:** root `npm test` 442/442, `npm run build`, `npm run check:repo`;
+  mobile `npm run typecheck`, `npm run test:storage` 507/507, `npm run currency:verify`,
+  `npm run i18n:check -- --strict` (0 errors, 0 stale), `npm run i18n:extract` (no copy outside
+  the catalogue), `npm run check` ("Dependencies are up to date"), `npm run export:ios`
+  (4,891,217 bytes, +9,629 over 24B2). Not an Xcode build; not device-verified. No EAS build,
+  paid service, migration, API connection or remote change.
+- **Pending on an iPhone (stage 9, with a test gate):** VoiceOver in Spanish and English on
+  JPY/KWD amounts and on ARS beside CLP; the switch row and sheet at the largest text sizes and
+  at 320 pt; the search field with the keyboard; Reduce Motion on the sheet.
+- **Next:** Producto 24B4 (stages 5 and 6: SQLite schema 9 and backup v9), subject to the
+  owner's authorization of the one-way upgrade (decision 7.6.5).
 
 ### 2026-09-24 — Producto 24B2: strict route currencies and the amount path by exponent
 
