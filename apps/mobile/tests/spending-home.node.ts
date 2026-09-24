@@ -54,6 +54,7 @@ function routeHarness(file: string, params: Record<string, unknown>, data = snap
     '@finanzapp/domain': domain,
     '../src/storage/LedgerProvider': { useLedger: () => ({ snapshot: data, archive: { accounts: data.accounts, records: [], ...extra } }) },
     '../src/ui/components': { ...Object.fromEntries(componentNames.map(name => [name, name])), useStacked: () => false },
+    '../src/ui/currency-switch': { CurrencySwitch: 'CurrencySwitch' },
     '../src/ui/entry-list': { EntryList: 'EntryList' },
     '../src/ui/presentation': presentation,
     '../src/ui/report-presentation': reportPresentation,
@@ -106,7 +107,7 @@ test('Home shows the current month only, scoped to the currency, with quick acti
   const texts = nodes(root).filter(n => n.type === 'AppText').map(n => String(n.props.children));
   assert.equal(texts.some(text => /gastos? registrados?|–|Gastado ·/.test(text)), false, 'no count or date-range copy near the hero');
   assert.ok(texts.includes('Septiembre'), 'the month names the number');
-  nodes(root).find(n => n.type === 'Choices' && n.props.value === 'ARS')!.props.onChange('USD');
+  find(root, 'CurrencySwitch').props.onChange('USD');
   root = view.render();
   assert.equal(find(root, 'Money').props.minor, 1000);
   assert.equal(find(root, 'QuickActions').props.currency, 'USD');
@@ -165,7 +166,7 @@ test('24B1: Disponible for a currency held only by a card is a true US$ 0,00, ne
     closingDay: 1, dueDay: 10, active: true, createdAt, revision: 0, updatedAt: createdAt }] });
   assert.deepEqual(presentation.availableCurrencies(cardOnly.accounts), ['ARS', 'USD'], 'the card account still makes USD a currency of the ledger');
   nodes(view.render()).find(n => n.type === 'Choices' && n.props.value === 'spending')!.props.onChange('available');
-  nodes(view.render()).find(n => n.type === 'Choices' && n.props.value === 'ARS')!.props.onChange('USD');
+  find(view.render(), 'CurrencySwitch').props.onChange('USD');
   const money = find(view.render(), 'Money');
   assert.deepEqual({ minor: money.props.minor, currency: money.props.currency }, { minor: 0, currency: 'USD' });
   assert.equal(i18nFormat.moneyText(0, 'USD'), 'US$\u00A00,00');
@@ -250,4 +251,25 @@ test('23.1B1: Home in English keeps the same numbers and routes; only words chan
     const back = view.render();
     assert.equal(find(back, 'MetricHelp').props.title, 'Disponible', 'the chosen metric survives the switch');
   } finally { locale = 'es-AR'; }
+});
+
+test('24B3: Home with three currencies lists them in the switch and shows each currency\'s own figures, converting nothing', () => {
+  // A stored JPY account is read acceptance (no gate opens in production): the ledger holds ARS, USD and JPY.
+  const yen: domain.Account = { id: 'y', name: 'Yenes', currency: 'JPY', openingMinor: 0, createdAt };
+  const data: domain.LedgerSnapshot = { ...homeData, accounts: [...homeData.accounts, yen], entries: [...homeData.entries,
+    { ...homeData.entries[0], id: 'yen-1', accountId: 'y', dateISO: '2026-09-11', amountMinor: 1500, category: 'Comida' }, { ...homeData.entries[0], id: 'yen-2', accountId: 'y', dateISO: '2026-09-12', amountMinor: 700, category: 'Salud' }] };
+  const view = routeHarness('(tabs)/index.tsx', {}, data);
+  let root = view.render();
+  const control = find(root, 'CurrencySwitch');
+  assert.deepEqual(control.props.currencies, ['ARS', 'USD', 'JPY'], 'the currencies present, ARS and USD first, then by code');
+  assert.equal(control.props.labels, 'code', 'Inicio keeps the compact codes beside the metric control');
+  assert.equal(control.props.value, 'ARS');
+  assert.equal(find(root, 'Money').props.minor, 300, 'ARS figures unchanged by the third currency');
+  control.props.onChange('JPY');
+  root = view.render();
+  assert.deepEqual({ minor: find(root, 'Money').props.minor, currency: find(root, 'Money').props.currency }, { minor: 2200, currency: 'JPY' }, 'yen are summed as yen, never as cents');
+  assert.equal(find(root, 'QuickActions').props.currency, 'JPY');
+  assert.deepEqual(nodes(root).filter(n => n.type === 'EntryRow').map(n => n.props.entry.id), ['yen-2', 'yen-1'], 'only the yen movements');
+  assert.deepEqual(find(root, 'CategoryRanking').props.categories.map((c: domain.CategorySpending) => [c.key, c.amountMinor]), [['comida', 1500], ['salud', 700]]);
+  assert.equal(find(root, 'CategoryRanking').props.currency, 'JPY');
 });

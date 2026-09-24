@@ -72,7 +72,7 @@ test('both catalogues are complete: no empty text, and English is really English
   // Identical in both languages on purpose: proper names, format-only templates and the one-word English plural.
   const same = new Set(['preferences.regionNames.AR', 'preferences.regionSample', 'transferForm.figure', 'selection.category',
     // "Pesos" is also the English word; format-only templates; proper and technical names.
-    'budgets.currency.ARS', 'reports.currencyARS', 'cards.form.pesos', 'debts.form.pesos', 'reports.dayRow', 'reports.insights.largestDetail',
+    'currency.option', 'currency.short.ARS', 'reports.dayRow', 'reports.insights.largestDetail',
     'reports.chart.donutLabel', 'reports.chart.bar', 'reports.chart.timelineBar', 'categoryManager.list.rowLabel', 'categoryManager.picker.color',
     'categoryManager.icons.internet', 'settings.material.glass', 'assistant.draft.eyebrow', 'assistant.draft.row']);
   for (const key of keys) {

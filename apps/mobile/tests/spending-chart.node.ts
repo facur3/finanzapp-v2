@@ -127,3 +127,47 @@ test('23.1C2: a month bar speaks the full month name and the axis keeps the shor
   assert.equal(donut(bindLocale('en-US', 'native', 'es')).props.accessibilityLanguage, 'en');
   assert.equal(donut(bindLocale('es-AR', 'native', 'es')).props.accessibilityLanguage, undefined);
 });
+
+test('24B3: the MonthBars scale and the bar labels use each currency\'s own units: yen whole, dinars to the fil', () => {
+  const points = [{ monthISO: '2026-03', amountMinor: 1234567, partial: false }, { monthISO: '2026-05', amountMinor: 5, partial: true }];
+  const read = (locale: Parameters<typeof bindLocale>[0], currency: domain.Currency) => {
+    const chart = chartsModule(bindLocale(locale)).MonthBars({ points, selected: '2026-05', onSelect: () => {}, currency });
+    const caption = flat(chart).filter(node => node.type === 'AppText').map(node => node.props.children).find(text => /escala|scale/.test(String(text)));
+    const bars = flat(chart).filter(node => typeof node.type === 'function').map(node => node.type(node.props).props.accessibilityLabel);
+    return { caption, bars };
+  };
+  assert.deepEqual(read('es-AR', 'JPY'), { caption: 'Mes en curso hasta hoy · escala de 0 a JP¥ 1.234.567', bars: ['marzo 2026, 1234567 yenes japoneses', 'mayo 2026, 5 yenes japoneses, mes en curso'] });
+  assert.deepEqual(read('en-US', 'KWD'), { caption: 'Month to date · scale 0 to KWD 1,235', bars: ['March 2026, 1234.567 Kuwaiti dinars', 'May 2026, 0.005 Kuwaiti dinars, month in progress'] });
+  assert.equal(read('es-US', 'KWD').caption, 'Mes en curso hasta hoy · escala de 0 a KWD 1,235', 'the scale is whole dinars, rounded half up');
+  assert.equal(read('en-AR', 'EUR').caption, 'Month to date · scale 0 to € 12.346');
+  assert.equal(read('es-AR', 'CLP').bars[0], 'marzo 2026, 1234567 pesos chilenos');
+});
+
+test('24B3: a category row speaks its amount with the currency\'s own decimals and the code', () => {
+  const source = readFileSync(new URL('../src/ui/spending-chart.tsx', import.meta.url), 'utf8');
+  const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText;
+  const jsx = (type: any, props: any) => ({ type, props });
+  const rows = (locale: Parameters<typeof bindLocale>[0]) => {
+    const modules: Record<string, any> = {
+      '../i18n/provider': { useI18n: () => bindLocale(locale) }, react: { useEffect: () => {} }, 'react/jsx-runtime': { jsx, jsxs: jsx },
+      'react-native': { View: 'View', StyleSheet: { hairlineWidth: 0.5 } }, '@expo/vector-icons/Ionicons': 'Icon', '@finanzapp/domain': domain,
+      'react-native-reanimated': { __esModule: true, default: { View: 'AnimatedView' }, useSharedValue: (value: number) => ({ value }), useAnimatedStyle: (fn: () => any) => fn, withTiming: (value: number) => value, cancelAnimation: () => {} },
+      './components': { AppText: 'AppText', CategoryBadge: 'CategoryBadge', Money: 'Money', PressFeedback: 'PressFeedback', useStacked: () => false },
+      './report-presentation': presentation, './motion': { timing: () => ({ duration: 0 }) }, './theme': { useReduceMotion: () => true, usePalette: () => ({ text: '#000', inset: '#ECEFF4', line: '#ddd', secondary: '#666', tertiary: '#999' }) },
+      './category-hues': { useCategoryLook: (s: string) => ({ label: s, hex: '#3E6FB0', glyph: 'pricetag-outline' }) },
+    };
+    const module = { exports: {} as Record<string, (props: any) => any> };
+    runInNewContext(code, { module, exports: module.exports, require: (name: string) => {
+      if (!Object.hasOwn(modules, name)) throw new Error('Unexpected chart dependency: ' + name);
+      return modules[name];
+    } });
+    return module.exports;
+  };
+  const category = { key: 'comida', category: 'Comida', amountMinor: 1234567, count: 2 };
+  const es = rows('es-AR');
+  assert.equal(es.CategorySpendingRow({ category, totalMinor: 2469134, currency: 'KWD', onPress: () => {} }).props.accessibilityLabel, 'Comida, 1234,567 KWD, 50 % del gasto del mes, 2 gastos');
+  assert.equal(es.CategoryLegendRow({ category, totalMinor: 2469134, currency: 'JPY', onPress: () => {} }).props.accessibilityLabel, 'Comida, 1234567 JPY, 50 % del gasto del mes, 2 gastos');
+  const en = rows('en-US');
+  assert.equal(en.CategoryLegendRow({ category, totalMinor: 2469134, currency: 'KWD', onPress: () => {} }).props.accessibilityLabel, 'Comida, 1234.567 KWD, 50% of the month’s spending, 2 expenses');
+  assert.equal(en.CategorySpendingRow({ category: { ...category, amountMinor: 123456 }, totalMinor: 246912, currency: 'ARS', onPress: () => {} }).props.accessibilityLabel, 'Comida, 1234.56 ARS, 50% of the month’s spending, 2 expenses', 'ARS unchanged');
+});

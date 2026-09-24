@@ -1187,7 +1187,7 @@ test('Producto 23.1C1: an amount typed with Argentine or US separators is stored
     const i18n = bindLocale(locale);
     for (const record of before.records) {
       const currency = record.entry.accountId === dollars.id ? 'USD' : 'ARS';
-      assert.equal(i18n.formatAmount(record.entry.amountMinor).replace(/[.,]/g, ''), '123456789');
+      assert.equal(i18n.formatMoneyAmount(record.entry.amountMinor, currency).replace(/[.,]/g, ''), '123456789');
       assert.ok(i18n.moneyText(record.entry.amountMinor, currency).length > 0);
       assert.ok(i18n.spokenMoney(record.entry.amountMinor, currency).length > 0);
     }

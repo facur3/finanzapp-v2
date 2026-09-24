@@ -151,7 +151,7 @@ test('rowStacks: large text always stacks; otherwise a long amount stacks on a n
 
 // The Money component itself: heroes measure their container and size from it;
 // rows keep the native fit without a fixed line height.
-function loadComponents(locale: AppLocale = 'es-AR', deviceLanguage: string | null = null) {
+function loadComponents(locale: AppLocale = 'es-AR', deviceLanguage: string | null = null, held: readonly domain.Currency[] = []) {
   const source = readFileSync(new URL('../src/ui/components.tsx', import.meta.url), 'utf8');
   const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText;
   const jsx = (type: any, props: any) => ({ type, props });
@@ -175,7 +175,7 @@ function loadComponents(locale: AppLocale = 'es-AR', deviceLanguage: string | nu
     './categories': { categoryIcon: () => 'pricetag-outline' },
     './category-color': { tintOf: (c: string) => c }, './category-hues': { useCategoryColor: () => '#111', useCategoryLook: (label: string) => ({ label, hex: '#111', glyph: 'pricetag-outline' }), useAccountLook: () => ({ glyph: 'wallet-outline', hex: '#2557D6' }) },
     './geometry': geometry, './money-input': moneyInput, './motion': { duration: {}, easeOut: {}, selectionHaptic: () => {}, timing: () => ({}) },
-    '../i18n/provider': { useI18n: () => bindLocale(locale, 'native', deviceLanguage) }, '../i18n/format': i18nFormat, '../i18n/locale': i18nLocale,
+    '../i18n/provider': { useI18n: () => bindLocale(locale, 'native', deviceLanguage, held) }, '../i18n/format': i18nFormat, '../i18n/locale': i18nLocale, '../i18n/messages': {},
   };
   const module = { exports: {} as Record<string, (props: any) => any> };
   runInNewContext(code, { module, exports: module.exports, require: (name: string) => {
@@ -331,4 +331,43 @@ test('24B2: the amount field keys and notes follow the currency\'s exponent; ARS
   assert.ok(nodes(edited).some(node => isText(node) && [node.props.children].flat().join('') === 'El importe supera el máximo de ARS. Corregilo antes de guardar.'));
   const fine = render('AmountField', { label: 'Gasto', currency: 'USD', value: '12,50', onChangeText: () => {} });
   assert.equal(nodes(fine).some(node => isText(node) && /redondea/.test([node.props.children].flat().join(''))), false, 'a draft that fits shows no note');
+});
+
+// ---- Producto 24B3: the field names any currency, and an unrepresentable amount is a dash, never a number ----
+test('24B3: the amount field is named by its currency in the interface language; a legacy word shared with another held currency gives way to the full name', () => {
+  const flatNodes = (value: any): any[] => !value || typeof value !== 'object' ? [] : Array.isArray(value) ? value.flatMap(flatNodes) : [value, ...flatNodes(value.props?.children)];
+  const label = (locale: AppLocale, currency: domain.Currency, held: readonly domain.Currency[] = []) => {
+    const field = loadComponents(locale, null, held).render('AmountField', { label: locale.startsWith('en') ? 'Expense' : 'Gasto', currency, value: '', onChangeText: () => {} });
+    return flatNodes(field).find(node => node.type === 'TextInput')!.props.accessibilityLabel;
+  };
+  assert.equal(label('es-AR', 'ARS'), 'Gasto en pesos argentinos');
+  assert.equal(label('es-AR', 'USD'), 'Gasto en dólares');
+  assert.equal(label('en-US', 'USD'), 'Expense in US dollars');
+  assert.equal(label('es-AR', 'JPY'), 'Gasto en yenes japoneses');
+  assert.equal(label('en-US', 'JPY'), 'Expense in Japanese yen');
+  assert.equal(label('es-AR', 'KWD'), 'Gasto en dinares kuwaitíes');
+  assert.equal(label('en-AR', 'EUR'), 'Expense in euros');
+  assert.equal(label('es-US', 'CLP'), 'Gasto en pesos chilenos');
+  assert.equal(label('es-AR', 'ARS', ['ARS', 'USD']), 'Gasto en pesos argentinos');
+  assert.equal(label('es-AR', 'USD', ['ARS', 'USD']), 'Gasto en dólares', 'an ARS/USD ledger keeps its words');
+  assert.equal(label('es-AR', 'USD', ['USD', 'CAD']), 'Gasto en dólares estadounidenses');
+  assert.equal(label('en-US', 'USD', ['USD', 'CAD']), 'Expense in US dollars');
+  assert.equal(label('es-AR', 'ARS', ['ARS', 'CLP']), 'Gasto en pesos argentinos');
+});
+
+test('24B3: Money shows a dash and says the amount is out of range for a value beyond the safe integers, never NaN, Infinity or a zero', () => {
+  const { render } = loadComponents();
+  for (const minor of [Number.MAX_SAFE_INTEGER + 2, -(Number.MAX_SAFE_INTEGER + 2), Infinity, -Infinity, NaN, 1.5]) {
+    const row = render('Money', { minor, currency: 'ARS' });
+    assert.equal(row.props.children, '—', String(minor));
+    assert.equal(row.props.accessibilityLabel, 'Importe fuera de rango', String(minor));
+    const hero = render('Money', { minor, currency: 'JPY', large: true }).props.children;
+    assert.equal(hero.props.children, '—', String(minor) + ' hero');
+    assert.equal(hero.props.accessibilityLabel, 'Importe fuera de rango');
+  }
+  assert.equal(loadComponents('en-US').render('Money', { minor: NaN, currency: 'USD' }).props.accessibilityLabel, 'Amount out of range');
+  assert.equal(render('Money', { minor: Number.MAX_SAFE_INTEGER, currency: 'JPY' }).props.children, 'JP¥ 9.007.199.254.740.991', 'the safe limit itself is a number');
+  assert.equal(render('Money', { minor: 0, currency: 'KWD' }).props.children, 'KWD 0,000', 'a true zero is a zero, with the dinar\'s three display digits');
+  assert.equal((loadComponents().module.exports.rowAmountText as (minor: number, currency: string) => string)(Infinity, 'ARS'), '—');
+  assert.equal(loadComponents().module.exports.UNAVAILABLE_AMOUNT, '—');
 });

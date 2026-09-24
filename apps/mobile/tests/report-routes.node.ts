@@ -52,6 +52,7 @@ function routeHarness(file: string, params: Record<string, unknown>, data = snap
     '../src/ui/charts': { DonutChart: 'DonutChart', MonthBars: 'MonthBars', OTHERS_KEY: '__others__',
       donutSlices: (items: { key: string; label: string; value: number }[]) => items.slice(0, 5).map((item, index) => ({ ...item, color: 'c' + index })) },
     '../src/ui/components': Object.fromEntries(componentNames.map(name => [name, name])),
+    '../src/ui/currency-switch': { CurrencySwitch: 'CurrencySwitch' },
     '../src/ui/entry-list': { EntryList: 'EntryList' },
     '../src/ui/presentation': presentation,
     '../src/ui/budget-presentation': budgetPresentation, '../../src/ui/budget-presentation': budgetPresentation,
@@ -101,7 +102,7 @@ test('report row pushes a scoped category detail; underlying period and currency
   assert.equal(detail.type, 'EntryList');
   assert.deepEqual(detail.props.entries.map((e: domain.Entry) => e.id), ['a', 'b']);
   assert.equal(find(detail, 'Money').props.minor, category.amountMinor);
-  assert.equal(find(view.render(), 'Choices').props.value, 'ARS');
+  assert.equal(find(view.render(), 'CurrencySwitch').props.value, 'ARS');
   assert.equal(find(view.render(), 'Money').props.minor, 606);
 });
 test('return-to-current-month works even when opened with a historical route parameter', () => {
@@ -117,7 +118,7 @@ test('month and currency controls update report data and enforce the available b
   let report = view.render();
   assert.equal(find(report, 'Money').props.minor, 606);
   assert.equal(find(report, 'IconButton', 'Mes anterior').props.disabled, true);
-  find(report, 'Choices').props.onChange('USD');
+  find(report, 'CurrencySwitch').props.onChange('USD');
   report = view.render();
   assert.equal(find(report, 'Money').props.currency, 'USD');
   assert.equal(find(report, 'Money').props.minor, 999);
@@ -334,4 +335,23 @@ test('24B2: report-day, report-category and report-comparison refuse a currency 
   const withYen = { ...snapshot, accounts: [...snapshot.accounts, { id: 'jpy', name: 'Yen', currency: 'JPY' as const, openingMinor: 1500, createdAt: snapshot.accounts[0].createdAt }] };
   assert.equal(nodes(routeHarness('report-day.tsx', { currency: 'JPY', date: '2026-08-10' }, withYen).render()).some(node => node.type === 'EmptyState' && node.props.title === 'Día no válido'), false);
   assert.equal(nodes(routeHarness('report-comparison.tsx', { currency: 'JPY', month: '2026-09' }, withYen).render()).some(node => node.type === 'EmptyState' && node.props.title === 'Comparación no válida'), false);
+});
+
+test('24B3: Reportes with three currencies offers the switch over the currencies present and reports each one on its own', () => {
+  const yen: domain.Account = { id: 'y', name: 'Yenes', currency: 'JPY', openingMinor: 0, createdAt };
+  const data: domain.LedgerSnapshot = { accounts: [...snapshot.accounts, yen], entries: [...snapshot.entries,
+    { id: 'y1', accountId: 'y', kind: 'expense', amountMinor: 1500, merchant: 'Konbini', category: 'Comida', dateISO: '2026-08-10', createdAt }] };
+  const view = routeHarness('(tabs)/reports.tsx', { month: '2026-08' }, data);
+  let root = view.render();
+  const control = find(root, 'CurrencySwitch');
+  assert.deepEqual(control.props.currencies, ['ARS', 'USD', 'JPY']);
+  assert.equal(control.props.value, 'ARS');
+  assert.equal(find(root, 'Money').props.minor, 606, 'the ARS report is unchanged');
+  control.props.onChange('JPY');
+  root = view.render();
+  assert.deepEqual({ minor: find(root, 'Money').props.minor, currency: find(root, 'Money').props.currency }, { minor: 1500, currency: 'JPY' });
+  assert.equal(find(root, 'CurrencySwitch').props.value, 'JPY');
+  const link = routeHarness('(tabs)/reports.tsx', { month: '2026-08', currency: 'JPY' }, data).render();
+  assert.equal(find(link, 'Money').props.currency, 'JPY', 'a link naming a held currency opens it');
+  assert.equal(find(routeHarness('(tabs)/reports.tsx', { month: '2026-08', currency: 'KWD' }, data).render(), 'Money').props.currency, 'ARS', 'a currency no account holds is not offered: the tab opens its first one');
 });

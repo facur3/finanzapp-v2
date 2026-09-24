@@ -5,6 +5,7 @@ import { runInNewContext } from 'node:vm';
 import ts from 'typescript';
 import * as domain from '@finanzapp/domain';
 import * as presentation from '../src/ui/presentation.ts';
+import * as currencies from '../src/ui/currencies.ts';
 import * as liabilityPresentation from '../src/ui/liability-presentation.ts';
 import * as i18nFormat from '../src/i18n/format.ts';
 import { bindLocale } from '../src/i18n/bind.ts';
@@ -61,6 +62,7 @@ function harness(file: string, params: Record<string, unknown> = {}, data: domai
     '@finanzapp/domain': domain,
     '../src/storage/LedgerProvider': ledger, '../../src/storage/LedgerProvider': ledger, '../storage/LedgerProvider': ledger,
     '../src/ui/components': components, '../../src/ui/components': components, './components': components,
+    './currencies': currencies, './currency-switch': { CurrencySwitch: 'CurrencySwitch' }, '../src/ui/currency-switch': { CurrencySwitch: 'CurrencySwitch' }, '../../src/ui/currency-switch': { CurrencySwitch: 'CurrencySwitch' },
     '../src/ui/card-visual': { CardCarousel: 'CardCarousel', CardFace: 'CardFace' }, '../../src/ui/card-visual': { CardCarousel: 'CardCarousel', CardFace: 'CardFace' },
     '../src/ui/entry-list': { EntryList: 'EntryList' }, '../../src/ui/entry-list': { EntryList: 'EntryList' },
     '../src/ui/liability-presentation': liabilityPresentation, '../../src/ui/liability-presentation': liabilityPresentation,
