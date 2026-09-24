@@ -1,4 +1,5 @@
-import { validDateISO, validateEntry, type Account, type Entry, type EntryKind } from './ledger.ts';
+import { validDateISO, validateEntry, type Account, type Currency, type Entry, type EntryKind } from './ledger.ts';
+import { assertStorableCurrency, sortCurrencies } from './currency.ts';
 
 export type RecurringFrequency = 'weekly' | 'monthly' | 'yearly';
 
@@ -58,6 +59,49 @@ export function validateRecurringRule(rule: RecurringRule, accounts: Account[]):
     throw new Error('Estado de recurrente inválido.');
   }
   if (rule.revision === 0 && rule.updatedAt !== rule.createdAt) throw new Error('Estado inicial de recurrente inválido.');
+}
+
+/** A saved rule keeps its creation date, advances one revision, and never changes currency:
+ * its amount is copied verbatim into every generated entry in the account's minor units,
+ * so moving it to an account in another currency would reinterpret the figure. */
+export function validateRecurringRuleChange(before: RecurringRule, after: RecurringRule, accounts: readonly Account[]): void {
+  if (after.createdAt !== before.createdAt || after.revision !== before.revision + 1) {
+    throw new Error('El recurrente cambió desde que lo abriste. Volvé a revisarlo.');
+  }
+  const beforeAccount = accounts.find(account => account.id === before.accountId);
+  const afterAccount = accounts.find(account => account.id === after.accountId);
+  if (!beforeAccount || !afterAccount || beforeAccount.currency !== afterAccount.currency) {
+    throw new Error('Elegí una cuenta de la misma moneda. Cambiar la moneda requiere crear otro recurrente.');
+  }
+}
+
+/** Recorded commitments due within `days` days per currency, exact and never added across
+ * currencies. `out-of-range` names the currency whose projection left the safe range. */
+export type RecurringForecast = { status: 'ready'; currency: Currency; expenseMinor: number; incomeMinor: number; count: number }
+  | { status: 'out-of-range'; currency: Currency };
+export function recurringForecastByCurrency(rules: readonly RecurringRule[], accounts: readonly Pick<Account, 'id' | 'currency'>[], dayISO: string, days = 30): RecurringForecast[] {
+  if (!validDateISO(dayISO) || !Number.isInteger(days) || days < 0 || days > 366) throw new Error('Fecha de procesamiento inválida.');
+  const start = fromISO(dayISO);
+  start.setDate(start.getDate() + days);
+  const through = toISO(start);
+  const sums = new Map<Currency, { expense: bigint; income: bigint; count: number }>();
+  for (const rule of rules) {
+    const account = accounts.find(item => item.id === rule.accountId);
+    if (!account) continue;
+    assertStorableCurrency(account.currency);
+    const occurrences = recurringOccurrencesThrough(rule, through).length;
+    if (!occurrences) continue;
+    const current = sums.get(account.currency) ?? { expense: 0n, income: 0n, count: 0 };
+    current[rule.kind] += BigInt(rule.amountMinor) * BigInt(occurrences);
+    current.count += occurrences;
+    sums.set(account.currency, current);
+  }
+  const safe = (value: bigint) => { if (value > BigInt(Number.MAX_SAFE_INTEGER)) throw new Error('El total supera el rango seguro.'); return Number(value); };
+  return sortCurrencies(sums.keys()).map(currency => {
+    const { expense, income, count } = sums.get(currency)!;
+    try { return { status: 'ready', currency, expenseMinor: safe(expense), incomeMinor: safe(income), count }; }
+    catch { return { status: 'out-of-range', currency }; }
+  });
 }
 
 export function sameRecurringRule(a: RecurringRule, b: RecurringRule): boolean {

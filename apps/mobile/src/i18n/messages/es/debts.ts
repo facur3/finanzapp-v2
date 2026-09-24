@@ -15,6 +15,8 @@ export const debts = {
       owed: 'Debo',
       /** Section and total label: what others owe me. */
       receivable: 'Me deben',
+      /** Shown instead of one currency's totals when their sum leaves the exact range (never rounded or hidden). */
+      outOfRange: 'Total fuera de rango',
     },
     /** A debt's state in a row and in its detail. */
     status: {

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { CLDR_VERSION, CURRENCY_CODES, ISO_4217_PUBLISHED, LEDGER_CURRENCIES, LEGACY_CURRENCIES, LEGACY_EXPONENT, currenciesWithStatus, currencyRecord, currencyStatus,
-  displayDigits, hasMinorUnit, isIsoCurrencyCode, isLedgerCurrency, minorUnitExponent, storedExponent, type IsoCurrencyCode } from './currency';
-import { validateAccount, type Account } from './ledger';
+import { CLDR_VERSION, CURRENCY_CODES, ISO_4217_PUBLISHED, LEDGER_CURRENCIES, LEGACY_CURRENCIES, LEGACY_EXPONENT, currenciesPresent, currenciesWithStatus, currencyRecord, currencyStatus,
+  displayDigits, hasMinorUnit, isIsoCurrencyCode, isLedgerCurrency, isLegacyCurrency, isStorableCurrency, minorUnitExponent, sortCurrencies, storedExponent, type IsoCurrencyCode } from './currency';
+import { validateAccount, validateNewAccount, type Account } from './ledger';
 
 const account = (currency: string): Account => ({ id: 'a', name: 'Caja', currency: currency as Account['currency'], openingMinor: 0, createdAt: '2026-01-01T12:00:00Z' });
 
@@ -36,14 +36,34 @@ describe('currency catalogue (Producto 24A)', () => {
     expect(currencyRecord('ARS').narrowSymbol).toBe('$');
   });
 
-  it('the ledger accepts exactly the ledger currencies, whatever the catalogue knows', () => {
+  it('a new account may hold exactly the gated currencies; a stored row may hold any storable one (Producto 24B1, stage 2)', () => {
+    const accepts = (check: (value: Account) => void, code: string) => { try { check(account(code)); return true; } catch { return false; } };
     for (const code of CURRENCY_CODES) {
-      const accepted = (() => { try { validateAccount(account(code)); return true; } catch { return false; } })();
-      expect(accepted, code).toBe(isLedgerCurrency(code));
+      expect(accepts(validateNewAccount, code), code).toBe(isLedgerCurrency(code));
+      expect(accepts(validateAccount, code), code).toBe(isStorableCurrency(code));
+      expect(isStorableCurrency(code), code).toBe(currencyRecord(code).kind === 'fiat');
     }
-    expect(() => validateAccount(account('EUR'))).toThrow('Elegí ARS o USD.');
-    expect(isLedgerCurrency('ars')).toBe(false);
-    expect(isLedgerCurrency(undefined)).toBe(false);
+    expect(() => validateNewAccount(account('EUR'))).toThrow('Elegí una moneda disponible.');
+    expect(() => validateAccount(account('EUR'))).not.toThrow();
+    expect(() => validateAccount(account('XAU'))).toThrow('Moneda no admitida.');
+    // An explicit gate opens creation for tests only; it never widens what is storable.
+    validateNewAccount(account('JPY'), ['ARS', 'USD', 'JPY']);
+    expect(() => validateNewAccount(account('KWD'), ['ARS', 'USD', 'JPY'])).toThrow('Elegí una moneda disponible.');
+    expect(() => validateNewAccount(account('XAU'), ['XAU'])).toThrow('Moneda no admitida.');
+    expect(isLedgerCurrency('XAU', ['XAU'])).toBe(false);
+    for (const value of ['ars', undefined, null, 'EURO', '']) {
+      expect(isLedgerCurrency(value)).toBe(false);
+      expect(isStorableCurrency(value)).toBe(false);
+      expect(isLegacyCurrency(value)).toBe(false);
+    }
+    expect(isLegacyCurrency('ARS') && isLegacyCurrency('USD') && !isLegacyCurrency('EUR')).toBe(true);
+  });
+
+  it('groups currencies in one order: ARS, USD, then by code, without dropping or duplicating any', () => {
+    expect(sortCurrencies(['KWD', 'USD', 'EUR', 'ARS', 'JPY', 'EUR'])).toEqual(['ARS', 'USD', 'EUR', 'JPY', 'KWD']);
+    expect(sortCurrencies(['USD'])).toEqual(['USD']);
+    expect(sortCurrencies([])).toEqual([]);
+    expect(currenciesPresent([{ currency: 'JPY' }, { currency: 'ARS' }, { currency: 'JPY' }])).toEqual(['ARS', 'JPY']);
   });
 
   it('gives every code one availability status', () => {

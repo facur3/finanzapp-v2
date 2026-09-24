@@ -159,9 +159,23 @@ test('Home keeps analysis in Reportes: no timeline bars, a Reportes link on cate
   assert.equal(nodes(cardView.render()).some(n => n.type === 'AppText' && /saldo bancario|patrimonio/.test(String(n.props.children))), false);
   assert.equal(find(cardView.render(), 'MetricHelp').props.title, 'Disponible');
 });
+test('24B1: Disponible for a currency held only by a card is a true US$ 0,00, never a dropped total', () => {
+  const cardOnly = { ...homeData, accounts: [homeData.accounts[0], { id: 'usd-card', name: 'Visa USD', currency: 'USD' as const, openingMinor: -5000, createdAt }] };
+  const view = routeHarness('(tabs)/index.tsx', {}, cardOnly, { cards: [{ id: 'card', accountId: 'usd-card', issuer: '', last4: '', creditLimitMinor: null,
+    closingDay: 1, dueDay: 10, active: true, createdAt, revision: 0, updatedAt: createdAt }] });
+  assert.deepEqual(presentation.availableCurrencies(cardOnly.accounts), ['ARS', 'USD'], 'the card account still makes USD a currency of the ledger');
+  nodes(view.render()).find(n => n.type === 'Choices' && n.props.value === 'spending')!.props.onChange('available');
+  nodes(view.render()).find(n => n.type === 'Choices' && n.props.value === 'ARS')!.props.onChange('USD');
+  const money = find(view.render(), 'Money');
+  assert.deepEqual({ minor: money.props.minor, currency: money.props.currency }, { minor: 0, currency: 'USD' });
+  assert.equal(i18nFormat.moneyText(0, 'USD'), 'US$\u00A00,00');
+  assert.deepEqual(domain.liquidTotalsByCurrency(cardOnly, [{ id: 'card', accountId: 'usd-card', issuer: '', last4: '', creditLimitMinor: null,
+    closingDay: 1, dueDay: 10, active: true, createdAt, revision: 0, updatedAt: createdAt }]), { ARS: 10000 - 101 - 202 - 303 - 100 - 200 + 500 }, 'no liquid USD account: no USD key, so Home shows a true zero');
+});
 test('expense detail rejects malformed scope and a category miss never opens all entries', () => {
   const valid = { currency: 'ARS', startISO: '2026-09-01', endISO: '2026-09-12' };
-  for (const override of [{ endISO: '2026-09-13' }, { startISO: '2026-07-01' }, { category: ['salud'] }, { currency: 'EUR' }]) {
+  // 'XAU' is never money in the ledger; 'CHF' is a ready catalogue currency outside the gate that no account holds.
+  for (const override of [{ endISO: '2026-09-13' }, { startISO: '2026-07-01' }, { category: ['salud'] }, { currency: 'XAU' }, { currency: 'CHF' }, { currency: 'ars' }]) {
     assert.equal(find(routeHarness('spending-detail.tsx', { ...valid, ...override }, homeData).render(), 'EmptyState').props.title, 'Período no válido');
   }
   assert.equal(routeHarness('spending-detail.tsx', { ...valid, category: 'sal' }, homeData).render().props.entries.length, 0);

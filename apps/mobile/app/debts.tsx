@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { View } from 'react-native';
 import { router, Stack } from 'expo-router';
-import { debtOutstandingMinor, type Currency } from '@finanzapp/domain';
+import { debtTotalsByCurrency } from '@finanzapp/domain';
 import { useLedger } from '../src/storage/LedgerProvider';
 import { ActionButton, AppText, EmptyState, IconButton, Money, Screen, SectionTitle, Stat, StatRow, Surface } from '../src/ui/components';
 import { withCurrencyCode } from '../src/i18n/format';
@@ -14,18 +14,8 @@ export default function DebtsScreen() {
   const p = usePalette();
   const { t } = useI18n();
   const debts = useMemo(() => (archive?.debts ?? []).filter(debt => debt.active), [archive?.debts]);
-  const totals = useMemo(() => {
-    if (!snapshot) return [];
-    const map = new Map<Currency, { owed: number; receivable: number }>();
-    for (const debt of debts) {
-      const account = snapshot.accounts.find(item => item.id === debt.accountId);
-      if (!account) continue;
-      const current = map.get(account.currency) ?? { owed: 0, receivable: 0 };
-      current[debt.direction === 'owed_by_me' ? 'owed' : 'receivable'] += debtOutstandingMinor(debt, snapshot);
-      map.set(account.currency, current);
-    }
-    return [...map.entries()];
-  }, [debts, snapshot]);
+  // Exact per-currency sums from the domain: every currency present, ARS and USD first, never added together.
+  const totals = useMemo(() => snapshot ? debtTotalsByCurrency(debts, snapshot) : [], [debts, snapshot]);
   if (!archive || !snapshot) return null;
   const owedByMe = debts.filter(debt => debt.direction === 'owed_by_me');
   const owedToMe = debts.filter(debt => debt.direction === 'owed_to_me');
@@ -36,10 +26,12 @@ export default function DebtsScreen() {
     {!debts.length ? <EmptyState title={t('debts.list.emptyTitle')} icon="people-outline"
       detail={t('debts.list.emptyDetail')}
       action={<ActionButton label={t('debts.list.add')} icon="add-outline" onPress={() => router.push('/new-debt')} />} /> : <>
-      {totals.map(([currency, value]) => <Surface key={currency}><StatRow>
-        <Stat label={withCurrencyCode(t('debts.list.owed'), currency)}><Money minor={value.owed} currency={currency} size={22} weight="700" color={value.owed ? p.warning : undefined} /></Stat>
-        <Stat label={withCurrencyCode(t('debts.list.receivable'), currency)}><Money minor={value.receivable} currency={currency} size={22} weight="700" tone={value.receivable ? 'income' : 'neutral'} /></Stat>
-      </StatRow></Surface>)}
+      {totals.map(item => item.status === 'ready' ? <Surface key={item.currency}><StatRow>
+        <Stat label={withCurrencyCode(t('debts.list.owed'), item.currency)}><Money minor={item.owedMinor} currency={item.currency} size={22} weight="700" color={item.owedMinor ? p.warning : undefined} /></Stat>
+        <Stat label={withCurrencyCode(t('debts.list.receivable'), item.currency)}><Money minor={item.receivableMinor} currency={item.currency} size={22} weight="700" tone={item.receivableMinor ? 'income' : 'neutral'} /></Stat>
+      </StatRow></Surface>
+        // A sum beyond the safe range is said for that currency, never rounded, dropped or shown as zero.
+        : <Surface key={item.currency}><AppText secondary>{withCurrencyCode(t('debts.list.outOfRange'), item.currency)}</AppText></Surface>)}
       {!!owedByMe.length && <View>
         <SectionTitle>{t('debts.list.owed')}</SectionTitle>
         <Surface grouped>{owedByMe.map((debt, index) => <DebtRow key={debt.id} debt={debt} last={index === owedByMe.length - 1} />)}</Surface>

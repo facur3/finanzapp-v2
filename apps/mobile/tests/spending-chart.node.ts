@@ -93,6 +93,20 @@ function chartsModule(i18n: ReturnType<typeof bindLocale>) {
 }
 const flat = (value: any): any[] => !value || typeof value !== 'object' ? [] : Array.isArray(value) ? value.flatMap(flat) : [value, ...flat(value.props?.children)];
 
+test('24B1: the MonthBars scale caption for ARS and USD, whole units from cents, in the four locales', () => {
+  const points = [{ monthISO: '2026-03', amountMinor: 123456789, partial: false }, { monthISO: '2026-05', amountMinor: 50, partial: true }];
+  const caption = (locale: Parameters<typeof bindLocale>[0], currency: 'ARS' | 'USD') => {
+    const chart = chartsModule(bindLocale(locale)).MonthBars({ points, selected: '2026-05', onSelect: () => {}, currency });
+    return flat(chart).filter(node => node.type === 'AppText').map(node => node.props.children).find(text => /escala|scale/.test(String(text)));
+  };
+  assert.equal(caption('es-AR', 'ARS'), 'Mes en curso hasta hoy · escala de 0 a $\u00A01.234.568');
+  assert.equal(caption('es-AR', 'USD'), 'Mes en curso hasta hoy · escala de 0 a US$\u00A01.234.568');
+  assert.equal(caption('en-US', 'ARS'), 'Month to date · scale 0 to AR$\u00A01,234,568');
+  assert.equal(caption('en-US', 'USD'), 'Month to date · scale 0 to US$\u00A01,234,568');
+  assert.equal(caption('en-AR', 'ARS'), 'Month to date · scale 0 to $\u00A01.234.568');
+  assert.equal(caption('es-US', 'USD'), 'Mes en curso hasta hoy · escala de 0 a US$\u00A01,234,568');
+});
+
 test('23.1C2: a month bar speaks the full month name and the axis keeps the short one', () => {
   const points = [{ monthISO: '2026-03', amountMinor: 123456, partial: false }, { monthISO: '2026-05', amountMinor: 50000, partial: true }];
   const read = (i18n: ReturnType<typeof bindLocale>) => {

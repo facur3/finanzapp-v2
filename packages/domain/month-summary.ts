@@ -1,4 +1,4 @@
-import { validDateISO, type Currency, type LedgerSnapshot } from './ledger.ts';
+import { accountIdsInCurrency, validDateISO, type Currency, type LedgerSnapshot } from './ledger.ts';
 
 export type MonthSummary = {
   currency: Currency;
@@ -12,7 +12,7 @@ export type MonthSummary = {
 export function summarizeMonth(snapshot: LedgerSnapshot, currency: Currency, asOfISO: string): MonthSummary {
   if (!validDateISO(asOfISO)) throw new Error('Fecha de resumen inválida.');
   const period = { currency, startISO: asOfISO.slice(0, 7) + '-01', endISO: asOfISO };
-  const accounts = new Set(snapshot.accounts.filter(account => account.currency === currency).map(account => account.id));
+  const accounts = accountIdsInCurrency(snapshot.accounts, currency);
   let incomeMinor = 0;
   let expenseMinor = 0;
   let count = 0;

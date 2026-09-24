@@ -61,11 +61,14 @@ export const errors = {
       adjustmentRange: 'El ajuste supera el rango seguro.',
       accountChanged: 'La cuenta cambió. Volvé a abrirla.',
       accountName: 'Ingresá un nombre de cuenta de hasta 80 caracteres.',
-      currency: 'Elegí ARS o USD.',
+      /** A new account, card, debt or budget in a currency the app does not offer yet (the creation gate, Producto 24B1). */
+      currency: 'Elegí una moneda disponible.',
       openingBalance: 'Saldo inicial inválido.',
       createdAt: 'Fecha de creación inválida.',
       accountVersion: 'Versión de cuenta inválida.',
       currentBackup: 'Usá la copia actual para conservar transferencias y correcciones de cuentas.',
+      /** Export refused: the v1/v8 backup formats record no scale per currency, so only ARS/USD cents can be written (24B1). */
+      legacyExport: 'Esta versión exporta copias solo con cuentas y presupuestos en ARS o USD. No se exportó nada.',
     },
     appearance: {
       appearanceState: 'Estado de apariencia inválido.',
@@ -144,6 +147,8 @@ export const errors = {
       notFinanzApp: 'El archivo no es una copia de FinanzApp.',
       version: 'Solo se pueden restaurar copias del piloto nativo v1 a v8. La app web/anterior y otras versiones todavía no son compatibles; conservá el archivo.',
       money: 'Formato o unidad monetaria no compatibles.',
+      /** A v1–v8 file naming a currency other than ARS or USD: it cannot be read as cents, whatever currencies the app offers (24B1). */
+      legacyImport: 'Las copias v1 a v8 solo pueden contener cuentas y presupuestos en ARS o USD. No se importó nada; conservá el archivo.',
       lists: 'La copia no tiene una lista válida de cuentas y movimientos (máximo 1.000 cuentas y 25.000 movimientos).',
       transfers: 'La copia supera el límite de movimientos o contiene transferencias inválidas.',
       recurring: 'La copia contiene demasiados recurrentes o un formato inválido.',

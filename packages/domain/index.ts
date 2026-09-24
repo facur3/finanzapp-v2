@@ -1,6 +1,7 @@
 // A typed, side-effect-free entry for native clients. The legacy UI continues
 // using src/domain. Move implementations only after both clients have parity.
-export { fmtNum, parseMoneyInput } from '../../src/domain/money.js';
+// The float-based web money helpers (fmtNum, parseMoneyInput) are deliberately not
+// re-exported: native money is integer minor units per currency (money.ts).
 export { todayKey, labelFromISO } from '../../src/domain/dates.js';
 export * from './ledger.ts';
 export * from './currency.ts';

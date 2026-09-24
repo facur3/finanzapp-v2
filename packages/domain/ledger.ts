@@ -1,7 +1,20 @@
-/** Native pilot ledger. All money uses exact integer cents (ARS/USD only).
+/** Native pilot ledger. All money uses exact integer minor units of one currency per
+ * account (cents for ARS and USD, the only currencies production offers today).
  * Existing legacy float rules are deliberately unchanged during migration. */
-export type Currency = 'ARS' | 'USD';
+import { LEDGER_CURRENCIES, assertLedgerCurrency, assertStorableCurrency, isLegacyCurrency, sortCurrencies,
+  type CurrencyGate, type IsoCurrencyCode } from './currency.ts';
+
+/** The currency of an account: any ISO 4217 code the catalogue knows. Which codes a row may
+ * actually hold is decided by `validateAccount` (read acceptance: a storable fiat currency)
+ * and `validateNewAccount` (the creation gate); `LegacyCurrency` names the two that rows and
+ * backups from before Producto 24B can carry. */
+export type Currency = IsoCurrencyCode;
+export type { LegacyCurrency } from './currency.ts';
 export type EntryKind = 'expense' | 'income';
+
+/** Thrown when an export format that records no scale (backup v1 and v8) meets a currency
+ * other than ARS or USD: the file would be misread as cents. Producto 24B's backup v9 lifts it. */
+export const LEGACY_EXPORT_MESSAGE = 'Esta versión exporta copias solo con cuentas y presupuestos en ARS o USD. No se exportó nada.';
 
 export interface Account {
   id: string;
@@ -88,17 +101,34 @@ function validTimestamp(value: string): boolean {
   return typeof value === 'string' && !Number.isNaN(Date.parse(value));
 }
 
+/** Read acceptance: what a stored account (a SQLite row, a backup, a validated archive) may
+ * look like. The currency must be a storable ISO fiat code, never checked against the
+ * creation gate, so a currency that stops being offered keeps its rows readable. */
 export function validateAccount(account: Account): void {
   if (!validId(account.id) || typeof account.name !== 'string' || !account.name.trim() || account.name.length > 80) {
     throw new Error('Ingresá un nombre de cuenta de hasta 80 caracteres.');
   }
-  if (!['ARS', 'USD'].includes(account.currency)) throw new Error('Elegí ARS o USD.');
+  assertStorableCurrency(account.currency);
   if (!Number.isSafeInteger(account.openingMinor)) throw new Error('Saldo inicial inválido.');
   if (!validTimestamp(account.createdAt)) throw new Error('Fecha de creación inválida.');
   if (account.revision !== undefined || account.updatedAt !== undefined) {
     if (!Number.isSafeInteger(account.revision) || account.revision! < 0 || !validTimestamp(account.updatedAt!)
       || (account.revision === 0 && account.updatedAt !== account.createdAt)) throw new Error('Versión de cuenta inválida.');
   }
+}
+
+/** The creation gate on top of read acceptance: a new account, card or debt may only hold a
+ * currency the gate offers (`LEDGER_CURRENCIES` in production; tests pass an explicit set). */
+export function validateNewAccount(account: Account, gate: CurrencyGate = LEDGER_CURRENCIES): void {
+  validateAccount(account);
+  assertLedgerCurrency(account.currency, gate);
+}
+
+/** The ids of the accounts held in one currency: the scope every report, budget summary and
+ * month summary filters by. A code that is not storable is refused with its own error. */
+export function accountIdsInCurrency(accounts: readonly Account[], currency: Currency): Set<string> {
+  assertStorableCurrency(currency);
+  return new Set(accounts.filter(account => account.currency === currency).map(account => account.id));
 }
 
 export function validateEntry(entry: Entry, accounts: Account[]): void {
@@ -140,16 +170,19 @@ export function accountBalanceMinor(account: Account, entries: Entry[], transfer
   return Number(total);
 }
 
-// Never sum currencies without a real exchange rate.
+/** One total per currency present in the ledger, keyed in grouping order (ARS, USD, then by
+ * code). Currencies are never added together: a rate is Producto 24C's job. Every currency's
+ * total is checked against the safe range, and a currency with accounts always has a key, so
+ * a missing key means "no account holds it", never a dropped total. */
 export function totalsByCurrency(snapshot: LedgerSnapshot): Partial<Record<Currency, number>> {
-  const sums: Partial<Record<Currency, bigint>> = {};
+  const sums = new Map<Currency, bigint>();
   for (const account of snapshot.accounts) {
-    sums[account.currency] = (sums[account.currency] ?? 0n) + BigInt(accountBalanceMinor(account, snapshot.entries, snapshot.transfers));
+    assertStorableCurrency(account.currency);
+    sums.set(account.currency, (sums.get(account.currency) ?? 0n) + BigInt(accountBalanceMinor(account, snapshot.entries, snapshot.transfers)));
   }
   const result: Partial<Record<Currency, number>> = {};
-  for (const currency of ['ARS', 'USD'] as const) {
-    const total = sums[currency];
-    if (total === undefined) continue;
+  for (const currency of sortCurrencies(sums.keys())) {
+    const total = sums.get(currency)!;
     if (total > BigInt(Number.MAX_SAFE_INTEGER) || total < -BigInt(Number.MAX_SAFE_INTEGER)) throw new Error('El total supera el rango seguro.');
     result[currency] = Number(total);
   }
@@ -162,6 +195,8 @@ export function createPilotBackup(snapshot: LedgerSnapshot, now: Date = new Date
   }
   snapshot.accounts.forEach(validateAccount);
   snapshot.entries.forEach(entry => validateEntry(entry, snapshot.accounts));
+  // The v1 file records one money unit and no scale: only ARS/USD cents can be written to it.
+  if (snapshot.accounts.some(account => !isLegacyCurrency(account.currency))) throw new Error(LEGACY_EXPORT_MESSAGE);
   return {
     app: 'FinanzApp',
     schema: 'finanzapp.native-pilot.v1',

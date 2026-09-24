@@ -1,4 +1,5 @@
 import { accountBalanceMinor, validDateISO, type Account, type Currency, type Entry, type LedgerSnapshot, type Transfer } from './ledger.ts';
+import { assertStorableCurrency, sortCurrencies } from './currency.ts';
 
 /** A credit card is a hidden internal ledger account. A purchase is an expense
  * posted to that account exactly once (it counts in reports and budgets and
@@ -112,6 +113,20 @@ export function validateLiabilityProfiles(cards: CreditCardProfile[], debts: Per
   }
 }
 
+/** An obligation never moves to another internal account (its currency and its balance live
+ * there), never changes its creation date, and advances exactly one revision per save. */
+export function validateCreditCardChange(before: CreditCardProfile, after: CreditCardProfile): void {
+  if (after.accountId !== before.accountId || after.createdAt !== before.createdAt || after.revision !== before.revision + 1) {
+    throw new Error('La tarjeta cambió desde que la abriste. Volvé a revisarla.');
+  }
+}
+export function validatePersonalDebtChange(before: PersonalDebtProfile, after: PersonalDebtProfile): void {
+  if (after.accountId !== before.accountId || after.direction !== before.direction
+    || after.createdAt !== before.createdAt || after.revision !== before.revision + 1) {
+    throw new Error('La deuda cambió desde que la abriste. Volvé a revisarla.');
+  }
+}
+
 export function sameCreditCardProfile(a: CreditCardProfile, b: CreditCardProfile): boolean {
   return CARD_KEYS.every(key => a[key] === b[key]);
 }
@@ -151,15 +166,36 @@ export function liquidTotalsByCurrency(snapshot: LedgerSnapshot, cards: CreditCa
   const totals = new Map<Currency, bigint>();
   for (const account of snapshot.accounts) {
     if (hidden.has(account.id)) continue;
+    assertStorableCurrency(account.currency);
     const balance = BigInt(accountBalanceMinor(account, snapshot.entries, snapshot.transfers));
     totals.set(account.currency, (totals.get(account.currency) ?? 0n) + balance);
   }
+  // Every currency a liquid account holds gets a key, in grouping order (ARS, USD, then by
+  // code): a missing key is a true "no liquid account in that currency", never a dropped total.
   const result: Partial<Record<Currency, number>> = {};
-  for (const currency of ['ARS', 'USD'] as const) {
-    const total = totals.get(currency);
-    if (total !== undefined) result[currency] = safeBigInt(total);
-  }
+  for (const currency of sortCurrencies(totals.keys())) result[currency] = safeBigInt(totals.get(currency)!);
   return result;
+}
+
+/** Outstanding personal debts and receivables per currency, exact and never added across
+ * currencies. `out-of-range` names the currency whose sum left the safe range instead of
+ * rounding it or dropping it. */
+export type DebtTotals = { status: 'ready'; currency: Currency; owedMinor: number; receivableMinor: number } | { status: 'out-of-range'; currency: Currency };
+export function debtTotalsByCurrency(debts: readonly PersonalDebtProfile[], snapshot: LedgerSnapshot): DebtTotals[] {
+  const sums = new Map<Currency, { owed: bigint; receivable: bigint }>();
+  for (const debt of debts) {
+    const account = snapshot.accounts.find(item => item.id === debt.accountId);
+    if (!account) continue;
+    assertStorableCurrency(account.currency);
+    const current = sums.get(account.currency) ?? { owed: 0n, receivable: 0n };
+    current[debt.direction === 'owed_by_me' ? 'owed' : 'receivable'] += BigInt(debtOutstandingMinor(debt, snapshot));
+    sums.set(account.currency, current);
+  }
+  return sortCurrencies(sums.keys()).map(currency => {
+    const { owed, receivable } = sums.get(currency)!;
+    try { return { status: 'ready', currency, owedMinor: safeBigInt(owed), receivableMinor: safeBigInt(receivable) }; }
+    catch { return { status: 'out-of-range', currency }; }
+  });
 }
 
 export function cardDebtMinor(card: CreditCardProfile, snapshot: LedgerSnapshot): number {

@@ -15,6 +15,7 @@ export const debts: Pick<Messages, 'debts'> = {
       emptyDetail: 'Record a loan, a debt with someone or an amount someone owes you. Each partial payment or collection lowers the balance due without creating fake expenses or income.',
       owed: 'I owe',
       receivable: 'Owed to me',
+      outOfRange: 'Total out of range',
     },
     status: {
       settled: 'Settled',

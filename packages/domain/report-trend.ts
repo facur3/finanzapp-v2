@@ -2,13 +2,7 @@ import { validDateISO, type Currency, type LedgerSnapshot } from './ledger.ts';
 import { categoryKey, expensesInPeriod, reportPeriod, type ReportPeriod } from './spending-report.ts';
 import { budgetState, shiftMonthISO, summarizeMonthlyBudgets, type MonthlyBudget } from './budgets.ts';
 import { spendingComparison } from './report-insights.ts';
-
-function safeSum(values: number[]): number {
-  let total = 0n;
-  for (const value of values) total += BigInt(value);
-  if (total > BigInt(Number.MAX_SAFE_INTEGER)) throw new Error('El total supera el rango seguro.');
-  return Number(total);
-}
+import { addMoney, moneyAmount, sumMoney } from './money.ts';
 
 export interface MonthlyTrendPoint {
   monthISO: string;
@@ -28,7 +22,7 @@ export function monthlySpendingTrend(snapshot: LedgerSnapshot, currency: Currenc
     const month = shiftMonthISO(monthISO, -offset);
     const period = reportPeriod(currency, month, asOfISO);
     const expenses = expensesInPeriod(snapshot, period);
-    points.push({ monthISO: month, amountMinor: safeSum(expenses.map(entry => entry.amountMinor)), count: expenses.length,
+    points.push({ monthISO: month, amountMinor: sumMoney(expenses.map(entry => moneyAmount(entry.amountMinor, currency)), currency).minor, count: expenses.length,
       partial: month === asOfISO.slice(0, 7) });
   }
   return points;
@@ -44,7 +38,7 @@ export function topMerchants(snapshot: LedgerSnapshot, period: ReportPeriod, lim
   for (const entry of expensesInPeriod(snapshot, period)) {
     const key = categoryKey(entry.merchant);
     const group = groups.get(key) ?? { key, merchant: entry.merchant.trim(), amountMinor: 0, count: 0, category: entry.category, categories: new Map() };
-    group.amountMinor = safeSum([group.amountMinor, entry.amountMinor]);
+    group.amountMinor = addMoney(moneyAmount(group.amountMinor, period.currency), moneyAmount(entry.amountMinor, period.currency)).minor;
     group.count++;
     group.categories.set(categoryKey(entry.category), (group.categories.get(categoryKey(entry.category)) ?? 0) + entry.amountMinor);
     groups.set(key, group);

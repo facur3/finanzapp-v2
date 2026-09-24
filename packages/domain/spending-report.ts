@@ -1,5 +1,6 @@
-import { validDateISO, type Currency, type Entry, type LedgerSnapshot } from './ledger.ts';
+import { accountIdsInCurrency, validDateISO, type Currency, type Entry, type LedgerSnapshot } from './ledger.ts';
 import { summarizeMonth, type MonthSummary } from './month-summary.ts';
+import { assertStorableCurrency } from './currency.ts';
 
 // The chooser and reports share one identity rule. Keep original labels in
 // storage; case, accents and extra spaces must not split a category's total.
@@ -11,6 +12,7 @@ export interface CategorySpending { key: string; category: string; amountMinor: 
 export type SpendingReport = MonthSummary & { categories: CategorySpending[] };
 
 export function reportPeriod(currency: Currency, monthISO: string, asOfISO: string): ReportPeriod {
+  assertStorableCurrency(currency);
   if (!validDateISO(asOfISO) || !/^\d{4}-\d{2}$/.test(monthISO)
     || !validDateISO(monthISO + '-01') || monthISO > asOfISO.slice(0, 7)) {
     throw new Error('Período de reporte inválido.');
@@ -24,7 +26,7 @@ export function reportPeriod(currency: Currency, monthISO: string, asOfISO: stri
 // Both the chart and its drill-down use this exact scope. Filtering by a
 // substring/search term would accidentally include similarly named categories.
 export function expensesInPeriod(snapshot: LedgerSnapshot, period: ReportPeriod, key?: string): Entry[] {
-  const accounts = new Set(snapshot.accounts.filter(account => account.currency === period.currency).map(account => account.id));
+  const accounts = accountIdsInCurrency(snapshot.accounts, period.currency);
   return snapshot.entries.filter(entry => entry.kind === 'expense' && accounts.has(entry.accountId)
     && entry.dateISO >= period.startISO && entry.dateISO <= period.endISO
     && (key === undefined || categoryKey(entry.category) === key));

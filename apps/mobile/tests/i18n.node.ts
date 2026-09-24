@@ -559,6 +559,8 @@ test('money reaches the screen only through the central formatters; 23.1C2 relea
       if (!/\.tsx?$/.test(entry.name) || url.pathname.endsWith('src/ui/money-input.ts')) continue;
       const source = readFileSync(url, 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
       if (/\bformatMinorUnits\b/.test(source)) offenders.push(entry.name + ': formatMinorUnits');
+      // 24B1: the machine form, the digit splitter, the web float helpers and the device's names never reach a screen either.
+      if (/\b(minorToMajorString|splitMinor|fmtNum|parseMoneyInput)\b|Intl\.DisplayNames/.test(source)) offenders.push(entry.name + ': a domain amount helper or device name lookup');
       // A glyph-width table key ('$': 0.62) is not a sign shown to anyone.
       if (/['"`](?:US|AR)?\$ ['"`]|['"`](?:US|AR)?\$['"`](?!\s*:)/.test(source)) offenders.push(entry.name + ': a hand-written currency sign');
       if (/toLocaleString|Intl\.NumberFormat|toFixed\(/.test(source)) offenders.push(entry.name + ': a device number formatter');
