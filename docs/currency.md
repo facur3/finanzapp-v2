@@ -1,6 +1,6 @@
 # FinanzApp mobile: currencies and the multi-currency engine
 
-Updated 2026-09-24 (Producto 24B3). Applies to the Expo app in `apps/mobile` and the
+Updated 2026-09-24 (Producto 24B4). Applies to the Expo app in `apps/mobile` and the
 shared `packages/domain`. The web/Capacitor app keeps its own float-based helpers
 (`src/domain/currency.js`) and is not changed. Read with [decision 002](decisions/002-spending-first.md)
 (ARS/USD kept apart, no invented rates), [docs/i18n.md](i18n.md) §9 and the roadmap's
@@ -79,6 +79,24 @@ the Assistant contract. No stored amount is reinterpreted. No exchange rate exis
 | Copy | es, en, lock | Retired: `reports.currencyARS`/`USD`, `budgets.currency.ARS`/`USD`, `cards.form.pesos`/`dollars`, `debts.form.pesos`/`dollars` (eight keys, the four label pairs). New: `currency.option`, `currency.short.*`, `currency.switchLabel`/`switchHint`/`switchTitle`/`search`/`noMatches`, `amount.unavailable`. Currency-neutral: `selection.currencyNote`, `transferForm.missingDetail`. The glossary gains the engine's terms. |
 | Guards | `tests/currency-guards.node.ts` | The allow-list lost the four presentation ternaries; only the two permanent conventions, the production gate and contract v1 remain. A new scan fails on `formatAmount`/`spokenNumber` in `app/` or `src/ui/`, on cents divided by hand, and on any catalogue root or narrow symbol written between quotes (driven by `CURRENCY_CODES`), and asserts the bound locale offers no currency-less call. |
 | Tests | `tests/currency-copy.node.ts`, cases in `currency-goldens`, `spending-chart`, `typography`, `spending-home`, `report-routes`, `polish-routes`, `ui-rows` | Spoken goldens for ARS, USD, EUR, JPY, KWD, CLP and CAD in both languages and the four locales; ARS beside CLP and USD beside CAD (and the ARS/USD-only ledgers unchanged); `formatWholeUnits` per exponent; the template labels; the switch with one, two, three and seven currencies; `HeldCurrenciesProvider` on the real provider (rebuilt only when the set changes; composes with a language change); the longest amount of every exponent at 320 pt and at 1.4×/1.8× (hero fit, row stacking, the field beside "JP¥"/"KWD"/"CA$"); the card face, timeline, day-net, MonthBars and legend rows in JPY/KWD; the field's name per currency; `Money`'s dash; Home, Reportes and Presupuestos with a stored JPY account (read acceptance, the gate untouched); the searchable sheet. |
+
+### 2.4 What Producto 24B4 delivers (stages 5 and 6)
+
+| Layer | File | Change |
+| --- | --- | --- |
+| Units | `packages/domain/currency.ts` | `CurrencyUnit` (`currency`, `minorUnitExponent` 0–4, `source`, `catalogVersion`), `catalogueUnit(code)` (ISO 4217 List One, `ISO_4217_PUBLISHED`), `validateCurrencyUnit` (exact keys, a storable non-ARS/USD code, an exponent equal to the catalogue's or `SCALE_CONFLICT_MESSAGE`), `validateCurrencyUnits(units, used, exact?)` (no duplicates, every used code pinned or `scaleMissingMessage(code)`, with `exact` no spare unit: `UNIT_UNNEEDED_MESSAGE`), `currenciesNeedingUnits`, `pinnedExponent`. |
+| Archive | `recovery.ts` | `LedgerArchive.currencyUnits?` (present when the archive knows its scales: read from SQLite 9 or parsed from a v9 file). `validateArchive` checks them against the codes used. `archiveExponents(archive)` is the precision check apart from read acceptance and the gate: ARS/USD read as cents without a unit, any other code only through its pinned unit; never cents by default. `archiveKey` includes units only when present, so an ARS/USD ledger keeps its key. |
+| Backup v9 | `recovery.ts` | `createRecoveryBackup` writes v8, byte for byte, while every row is ARS/USD, and `BACKUP_SCHEMA_V9` (v8 plus `currencyUnits`, the last key, one unit per non-ARS/USD code used, from the archive's own units or the catalogue) otherwise; `RecoveryBackup` is its type. `parsePilotBackup` reads v9 with strict keys and validates the units before any amount (a wrong, missing, duplicate, spare or ARS/USD unit refuses the file whole); v1–v8 stay frozen to ARS/USD. `previewBackupImport` returns `currencyUnits` to pin (the copy's units this device lacks) and `scaleConflicts` (defence in depth: both sides are validated against the catalogue first, so with one catalogue a disagreement is refused by name before a preview exists). |
+| SQLite 9 | `src/storage/database.ts`, `transaction.ts`, `nativeDatabase.ts` | `DATABASE_VERSION = 9`. `MIGRATE_V9` rebuilds `accounts` and `monthly_budgets` with the same columns and CHECKs and a shape-only currency CHECK (`length(currency) = 3 AND currency NOT GLOB '*[^A-Z]*'`), recreates `budgets_period`, creates `currency_units` (`currency` PK, `minorUnitExponent` 0–4, `source`, `catalogVersion`, `createdAt`). It runs in `runSchemaMigration`: its own connection, `PRAGMA foreign_keys = OFF` before `BEGIN IMMEDIATE`, `PRAGMA foreign_key_check` empty before `COMMIT` (`MIGRATION_REFERENCES_MESSAGE` and rollback otherwise); `withMigrationTransactionAsync` on `LedgerDatabase`. v0–v8 still migrate in the exclusive transaction first; the version is read again inside the migration transaction. Every read names its columns (`SELECT *` is banned by `currency-guards`), including the single-row lookups. `readArchive` reads `currency_units`, validates the archive and runs `archiveExponents`: a pinned scale that disagrees, a row whose currency was never pinned, or a row for ARS/USD refuse the read by name; nothing is reset. `ensureCurrencyUnit` pins a currency the first time an account, card, debt or budget in it is written, in the same transaction, idempotently; `importArchive` pins the copy's units and any code the new rows need before the rows. `createAccount`, `createCreditCard`, `createPersonalDebt` and `saveMonthlyBudget` take an explicit `gate` (default `LEDGER_CURRENCIES`) for tests. |
+| Copy | es, en, lock | `errors.recovery.version` and `backup.import.formats` say v1 a v9; new `errors.recovery.units`, `unitSource`, `unitUnneeded`, `duplicateUnit`, `scaleMissing` ({code}), `scaleConflict`; `errors.storage.migrationReferences`; `backup.import.units` (a review row) and `backup.import.scaleConflict` ({codes}). Nothing else visible changes. |
+| Tests | `tests/database.node.ts` (24B4 block), `packages/domain/multi-currency.test.ts`, `recovery.test.ts`, `recovery-routes.node.ts`, `currency-guards.node.ts` | A real schema 8 file built from the app's own scripts with every table populated (an edited account with its receipt, a voided entry and transfer with their receipts, a rule, a total and an archived category budget, a card, a debt, a look, a category) upgrades to identical rows, balances and identity, keeps the other CHECKs and the children's references, and reopens; a v3 file migrates through to 9; an interruption after the accounts rebuild (a stale scratch table) rolls back to an intact schema 8 file, still refusing a yen row, and succeeds once cleared; a schema 8 file with an orphan child row is refused by `foreign_key_check` before COMMIT. JPY, KWD and EUR through the explicit gate: pinned once per code with source and version, a budget pins its own code, ARS/USD never pinned; yen read as yen and fils as fils, a yen transfer, a cross-currency one refused, reopen; a hand-edited pinned scale, a missing unit and a spurious ARS row refuse to open and to write, with nothing rewritten; the gate closed again keeps stored yen readable, editable, exportable (v9) and restorable into a fresh device (the copy's scales first, the same transaction), while an ARS/USD ledger keeps the v8 key set; a failed v9 restore rolls back the pinned scales with the rows, a repeated restore is identical, a forged or incomplete unit is refused at parse; adversarial: duplicated ids, a commit whose refresh failed and a replayed copy never double a yen or a fil, and a 13-digit yen amount survives storage and backup unscaled. |
+
+**Not changed in 24B4:** `LEDGER_CURRENCIES` and every form (production still creates ARS and
+USD only; the gate is opened per call in tests), the amounts and balances of existing rows,
+the Assistant contract v1 and the server, exchange rates (none), every visible screen apart
+from the backup review row and the scale sentences. The schema 9 upgrade is one-way on a device:
+an earlier build refuses the file unchanged (decision 7.6.5 authorised for the prototype on
+2026-09-24; the device test is described in docs/mobile-device-checklist.md).
 
 **Not changed in 24B3:** SQLite, backup v8, `LEDGER_CURRENCIES` and `currencyOptions` (ARS and
 USD), the Assistant contract v1 and the server, the debt form's order (currency after the
@@ -434,7 +452,7 @@ Sites are `file:line` at `1181ed1`, shortened to the file name. Domain files are
 
 ### 7.5 Safe implementation order for 24B
 
-**Status after Producto 24B3 (2026-09-24).**
+**Status after Producto 24B4 (2026-09-24).**
 
 | Stage | Status | What remains |
 | --- | --- | --- |
@@ -442,11 +460,18 @@ Sites are `file:line` at `1181ed1`, shortened to the file name. Domain files are
 | 2 One gate, complete groupings | **complete** (24B1: domain, storage validators, groupings, Home's `try`, the Assistant client bound to v1, `Currency` widened; 24B2: `heldCurrency`/`strictReportSelection` in every route and receiver, no coerced parameter) | the four binary ternaries (`components.tsx`, `card-visual.tsx`, `(tabs)/reports.tsx`, `budgets.tsx`) go with stage 4's `{name} · {code}` template |
 | 3 The amount path by exponent | **complete** (24B2: `minorFromLedgerDraft`/`draftFitsCurrency`, every model helper with a required currency, `AmountInput.retarget`, the number pad at exponent 0, catalogue paste markers, the ambiguity rule at exponent ≥ 3, settle to the exponent, re-validation with a note and Save blocked, every form parse/prefill/shortcut, `maxAmountMinor` at 15 digits in the target's currency, the Assistant hand-off in minor units, the `10 **` ban, the sweep against `parseMinorUnits`) | the debt form still chooses the currency after the amount (a layout change, with stage 8's screen); `amountFormat` stays currency-less (the field takes the currency itself) |
 | 4 Presentation and copy | **complete** (24B3: every call site with the currency, `formatAmount`/`spokenNumber` unbound and banned in screens, `formatWholeUnits`, `Money`'s dash, `CurrencySwitch` and `CurrencySheet`, the `{name} · {code}` template, the shared-word rule through `HeldCurrenciesProvider`, currency-neutral notes, the glossary, docs/i18n.md §9, the symbol and currency-less scans, the four ternaries gone from the allow-list) | the debt form's currency still comes after the amount (stage 8's screen); device evidence for the switch and the spoken units is stage 9's |
-| 5 SQLite schema 9 | not started, **not authorized** (decision 7.6.5 pending) | all |
-| 6 Backup v9 | not started | all |
+| 5 SQLite schema 9 | **complete** (24B4: named columns, `runSchemaMigration`, `MIGRATE_V9`, `currency_units` pinned on first use, `archiveExponents` on every read, explicit gates in the create functions, real-file tests including interruption, `foreign_key_check`, a disagreeing scale and a closed gate; the owner authorised the one-way upgrade for the prototype's data on 2026-09-24) | device QA of the upgrade on FinanzApp Dev (docs/mobile-device-checklist.md, Producto 24B4), repeated in stage 9 |
+| 6 Backup v9 | **complete** (24B4: `currencyUnits`, strict keys, v8 kept byte-identical for ARS/USD, v1–v8 frozen, scales pinned before rows in one transaction, conflicts and refusals tested) | — |
 | 7 Assistant contract, server first | not started | all (v1 refuses EUR; the client refuses to send a non-v1 currency since 24B1) |
 | 8 The searchable currency screen | not started | all |
 | 9 Device QA, then the gate | not started | all; three-decimal currencies only after the VoiceOver check on an iPhone |
+
+Deliberate golden changes made in 24B4: `user_version` pins read `DATABASE_VERSION` (9) and the
+newer-schema probe `DATABASE_VERSION + 1`; the older-schema fixtures also drop `currency_units`;
+`recovery.test.ts` probes v10; `multi-currency.test.ts` "backups stay frozen" became the v9 block (a
+ledger with another currency now exports v9 instead of throwing `LEGACY_EXPORT_MESSAGE`, which
+`createPilotBackup` still throws); the "v1 a v8" sentences say v9 (es, en, lock); the Más footer
+says Producto 24B4. Every ARS/USD golden, the v8 bytes and `archiveKey` are unchanged.
 
 Deliberate golden changes made in 24B3: the eight retired label keys and the two neutral notes
 (es, en, lock; `ui-rows.node.ts` reads the new note, `translation.node.ts`'s `same` whitelist names
@@ -676,7 +701,7 @@ implies a currency) remain open; ARS stays the pilot's default meanwhile.
    - use the most-used account currency until 24C's `reportCurrency` exists
 
    Anything other than ARS flips `reports.node.ts:30` and the other empty-ledger fallback goldens.
-5. **The one-way upgrade.** Earlier builds cannot open schema 9: they refuse it, unchanged, as designed. Installing a 24B build on a device is therefore not reversible on that device. Backups stay v8 until a new currency is used. This needs an explicit release decision (AGENTS.md rule 3), and stages 5 and 9 need a development build.
+5. **The one-way upgrade.** Earlier builds cannot open schema 9: they refuse it, unchanged, as designed. Installing a 24B build on a device is therefore not reversible on that device. Backups stay v8 until a new currency is used. This needs an explicit release decision (AGENTS.md rule 3), and stages 5 and 9 need a development build. **Decided on 2026-09-24 (24B4 brief):** the owner is the only user and the iPhone holds test data; the irreversible migration is authorised for local development databases and fixtures, and for FinanzApp Dev once the owner is told which build to install, what happens to the existing data and how to keep a copy (the steps in docs/mobile-device-checklist.md). No EAS build was made in 24B4.
 6. **The Assistant in new currencies.** Either open the gate with the Assistant limited to ARS and USD until the new contract version is deployed on a server the owner configures, or hold the gate until that version is live.
 
 ## 8. Producto 24C contract: exchange rates and a main currency for reports

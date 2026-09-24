@@ -729,6 +729,39 @@ result. Do not commit screenshots containing actual balances, accounts or names.
 - [ ] Reduce Motion stops non-essential scale/slide effects.
 - [ ] Dark/light system appearance has readable contrast and no white flashes.
 
+## Producto 24B4 — SQLite 9 and backup v9 (the one-way upgrade, on the owner's test data)
+
+Nothing visible changes with ARS and USD beyond the Más footer ("Producto 24B4"), the "Copias
+nativas v1 a v9" note and a review row that only a v9 copy shows. What the device must prove is
+the migration itself. **Not done in 24B4: no EAS build was made and the iPhone was not touched.**
+
+**Before installing anything (the owner's decision, AGENTS.md rule 3):**
+1. The build to install is a development build of this commit (`eas build --profile development
+   --platform ios`, the same profile as 23.1C2; the owner runs it and pays for it). Expo Go cannot be
+   used: the migration runs inside the app's own SQLite file.
+2. What happens to the existing data: on first launch the app opens the schema 8 file and, in one
+   transaction, rebuilds `accounts` and `monthly_budgets` and creates `currency_units`, then sets
+   `user_version = 9`. Every row keeps its bytes (the Linux test proves it on a real file with every
+   table populated). If the migration fails, the file stays at schema 8 and the app shows the error
+   without resetting anything. **After it succeeds, an earlier build refuses the file** ("Estos datos
+   requieren una versión más nueva…"); going back means restoring a backup into a reinstall.
+3. How to keep a copy: before installing, in the current build, Más → Copia de seguridad → Compartir
+   copia, and save the JSON (v8) in Files or another private place; optionally also export from the
+   new build afterwards (still v8 while only ARS/USD exist). Do not uninstall the app.
+
+**On FinanzApp Dev, once installed:**
+- [ ] First launch opens without an error; Más says Producto 24B4; Inicio, Movimientos, Reportes,
+  Presupuestos, Tarjetas, Deudas and Recurrentes show the same figures as before the update.
+- [ ] Record one expense, one transfer and one budget edit; close the app fully and reopen: the
+  figures persist (schema 9 is read as is, nothing migrates twice).
+- [ ] Copia de seguridad → Compartir copia: the file is v8 (no `currencyUnits` key) and, imported into
+  the same app, shows "nada nuevo para agregar". Import the pre-update v8 copy: identical, nothing added.
+- [ ] Interrupt a launch (force-quit during the first seconds of the very first open, before the
+  migration is expected to finish) on a **copy** of the data only if such a copy exists; otherwise
+  skip: the Linux tests cover the rollback.
+- [ ] Reserved for stage 9 (a development build with a test gate): a JPY account, a v9 export with
+  `currencyUnits`, restore into a fresh install, VoiceOver on the review row.
+
 ## Producto 24B3 — presentation and copy for every currency (nothing visible in production)
 
 Nothing to verify on the device for 24B3 beyond the Más footer reading "Producto 24B3": with
