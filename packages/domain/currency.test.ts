@@ -102,6 +102,17 @@ describe('currency catalogue (Producto 24A)', () => {
     expect(byExponent[1]).toBeUndefined();
     expect(byExponent[4]).toBeUndefined();
     expect(Object.keys(byExponent).sort()).toEqual(['0', '2', '3']);
+    // …and the set itself: a code ISO withdraws (HRK, SLL, ZWL before it) fails here too, because rows stored in it
+    // would stop resolving. Keeping a withdrawn storable code as `historical` is part of Producto 24B.
+    const FIAT = `AED AFN ALL AMD AOA ARS AUD AWG AZN BAM BBD BDT BHD BIF BMD BND BOB BRL BSD BTN
+      BWP BYN BZD CAD CDF CHF CLP CNY COP CRC CUP CVE CZK DJF DKK DOP DZD EGP ERN ETB
+      EUR FJD FKP GBP GEL GHS GIP GMD GNF GTQ GYD HKD HNL HTG HUF IDR ILS INR IQD IRR
+      ISK JMD JOD JPY KES KGS KHR KMF KPW KRW KWD KYD KZT LAK LBP LKR LRD LSL LYD MAD
+      MDL MGA MKD MMK MNT MOP MRU MUR MVR MWK MXN MYR MZN NAD NGN NIO NOK NPR NZD OMR
+      PAB PEN PGK PHP PKR PLN PYG QAR RON RSD RUB RWF SAR SBD SCR SDG SEK SGD SHP SLE
+      SOS SRD SSP STN SVC SYP SZL THB TJS TMT TND TOP TRY TTD TWD TZS UAH UGX USD UYU
+      UZS VED VES VND VUV WST XAF XCD XCG XOF XPF YER ZAR ZMW ZWG`.split(/\s+/);
+    expect(CURRENCY_CODES.filter(code => currencyRecord(code).kind === 'fiat')).toEqual(FIAT);
   });
 
   it('validates codes without trusting their spelling', () => {
