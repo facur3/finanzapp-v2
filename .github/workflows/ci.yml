@@ -62,6 +62,12 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
+      - name: Currency catalogue integrity (offline, against the lock's output hashes)
+        run: npm run currency:verify
+
+      - name: Localization catalogues (keys, placeholders, plurals, generated currency names)
+        run: npm run i18n:check
+
       - name: SQLite persistence and dependency compatibility tests
         run: npm run test:storage
 
