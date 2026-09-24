@@ -1,8 +1,27 @@
 import { CURRENCY_CODES, LEDGER_CURRENCIES, currencyRecord, currencyStatus, hasMinorUnit, minorUnitExponent, type Currency, type CurrencyStatus,
-  type IsoCurrencyCode } from '@finanzapp/domain';
+  type IsoCurrencyCode, type LegacyCurrency } from '@finanzapp/domain';
 import { CURRENCY_NAMES } from '../i18n/currencies/index.ts';
 import { currencyName, currencyNameForms, currencySymbol } from '../i18n/format.ts';
 import { DEFAULT_LOCALE, languageOf, type AppLocale } from '../i18n/locale.ts';
+import type { MessageKey, Translate } from '../i18n/messages.ts';
+
+/** The short words FinanzApp has always shown for its first two currencies in a chooser ("Pesos", "Dólares"),
+ * a lookup keyed by code (never a two-way condition); every other currency takes CLDR's plural name. */
+const SHORT_NAME_KEYS: { readonly [Code in LegacyCurrency]: MessageKey } = { ARS: 'currency.short.ARS', USD: 'currency.short.USD' };
+
+/** "Pesos · ARS", "Dólares · USD", "Yenes japoneses · JPY": one catalogue template (`currency.option`) for every
+ * currency a switch or a segmented control names, so no screen writes a per-currency label. */
+export function currencyOptionLabel(currency: Currency, t: Translate, locale: AppLocale = DEFAULT_LOCALE): string {
+  const short = (SHORT_NAME_KEYS as { readonly [Code in Currency]?: MessageKey })[currency];
+  return t('currency.option', { name: short ? t(short) : currencyName(currency, locale), code: currency });
+}
+
+/** How a screen lets the person choose among `count` currencies: the segmented control keeps its two-segment
+ * layout (one or two currencies); from three on, segments would shrink below a readable width, so a row that
+ * opens the currency sheet takes its place (docs/currency.md §7.5, stage 4). */
+export function currencySwitchMode(count: number): 'segments' | 'picker' {
+  return count <= 2 ? 'segments' : 'picker';
+}
 
 /** The currencies an account can be created in: exactly the ledger's (ARS and USD,
  * `LEDGER_CURRENCIES`). Storage keeps integer minor units in those two only, so a form
@@ -17,6 +36,8 @@ export function currencyOptions(locale: AppLocale = DEFAULT_LOCALE): CurrencyOpt
   return LEDGER_CURRENCIES.map(code => ({ code, symbol: currencySymbol(code, locale), name: currencyName(code, locale) }));
 }
 export const CURRENCIES: readonly CurrencyOption[] = currencyOptions();
+/** The codes a new card, debt or budget may take: the gate's, as `currencyOptions` lists them. */
+export const offeredCurrencies = (): Currency[] => currencyOptions().map(option => option.code);
 
 export function currencyOption(code: string, locale: AppLocale = DEFAULT_LOCALE): CurrencyOption {
   const options = currencyOptions(locale);

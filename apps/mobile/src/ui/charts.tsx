@@ -119,7 +119,7 @@ export function MonthBars({ points, selected, onSelect, currency, height = 120 }
 }) {
   const p = usePalette();
   const reduced = useReduceMotion();
-  const { t, formatDate, currencySymbol, formatCount, speechLanguage } = useI18n();
+  const { t, formatDate, currencySymbol, formatWholeUnits, speechLanguage } = useI18n();
   const max = Math.max(...points.map(point => point.amountMinor), 1);
   const current = points.find(point => point.monthISO === selected);
   return <View style={{ gap: 8 }}>
@@ -135,7 +135,7 @@ export function MonthBars({ points, selected, onSelect, currency, height = 120 }
     </View>
     {current && <AppText secondary variant="caption" style={{ textAlign: 'center' }}>
       {t('reports.chart.scale', { status: t(current.partial ? 'reports.chart.partialMonth' : 'reports.period.fullMonth'),
-        max: currencySymbol(currency) + '\u00A0' + formatCount(Math.round(max / 100)) })}
+        max: currencySymbol(currency) + '\u00A0' + formatWholeUnits(max, currency) })}
     </AppText>}
   </View>;
 }

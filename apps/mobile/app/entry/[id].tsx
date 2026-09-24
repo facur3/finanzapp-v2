@@ -27,7 +27,7 @@ export default function EntryScreen() {
 function EntryDetail({ record, account }: { record: EntryRecord; account: Account }) {
   const { updateEntry, archive, snapshot } = useLedger();
   const p = usePalette();
-  const { t, formatDate, currencyName, formatAmount, spokenMoney } = useI18n();
+  const { t, formatDate, currencyName, formatMoneyAmount, spokenMoney } = useI18n();
   const { entry } = record;
   const card = archive?.cards?.find(item => item.accountId === account.id);
   const categoryLabel = useCategoryLabel(entry.category, entry.kind);
@@ -58,7 +58,7 @@ function EntryDetail({ record, account }: { record: EntryRecord; account: Accoun
     const change = makeEntryChange(randomUUID(), record, restore ? 'restore' : 'void', new Date().toISOString());
     const adds = restore ? entry.kind === 'income' : entry.kind === 'expense';
     Alert.alert(t(restore ? 'entryDetail.restoreQuestion' : 'entryDetail.voidQuestion'),
-      t(adds ? 'entryDetail.willAdd' : 'entryDetail.willSubtract', { amount: formatAmount(entry.amountMinor) + ' ' + account.currency, account: account.name }) + ' '
+      t(adds ? 'entryDetail.willAdd' : 'entryDetail.willSubtract', { amount: formatMoneyAmount(entry.amountMinor, account.currency) + ' ' + account.currency, account: account.name }) + ' '
       + t(restore ? 'entryDetail.restoreEffect' : 'entryDetail.voidEffect'), [
         { text: t('common.cancel'), style: 'cancel', onPress: () => { confirming.current = false; } },
         { text: t(restore ? 'entryDetail.restore' : 'entryDetail.void'), style: restore ? 'default' : 'destructive', onPress: () => { confirming.current = false; void apply(change); } },
@@ -99,7 +99,7 @@ function EntryDetail({ record, account }: { record: EntryRecord; account: Accoun
         disabled={busy}
         onPress={() => router.push(card ? { pathname: '/card/[id]', params: { id: card.id } } : { pathname: '/account/[id]', params: { id: account.id } })} />
       {budget && <DetailRow label={t('entryDetail.budget')} icon="speedometer-outline" tone={budgetTone(budget)}
-        value={budgetLine(budget, formatAmount)} spokenValue={budgetLine(budget, minor => spokenMoney(minor, account.currency))}
+        value={budgetLine(budget, minor => formatMoneyAmount(minor, account.currency))} spokenValue={budgetLine(budget, minor => spokenMoney(minor, account.currency))}
         onPress={() => router.push({ pathname: '/budgets', params: { currency: account.currency, month: entry.dateISO.slice(0, 7) } })} />}
       <DetailRow label={t('selection.currency')} value={currencyName(account.currency)} last />
     </Surface>

@@ -2,7 +2,8 @@ import type { ReactNode } from 'react';
 import { StyleSheet, Text, View, useWindowDimensions, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native';
 import Animated, { Extrapolation, interpolate, useAnimatedScrollHandler, useAnimatedStyle, useSharedValue, type SharedValue } from 'react-native-reanimated';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import type { Currency } from '@finanzapp/domain';
+import type { Currency, LegacyCurrency } from '@finanzapp/domain';
+import type { MessageKey } from '../i18n/messages';
 import { useI18n } from '../i18n/provider';
 import { PressFeedback } from './components';
 import { carouselIndex } from './geometry';
@@ -28,13 +29,18 @@ export function cardFaceIndex(id: string): number {
 
 export const CARD_ASPECT = 1.586;
 
+/** The words VoiceOver has always said for a card in ARS or USD, a lookup keyed by code; any other currency is read by
+ * CLDR's plural name, and a legacy word another held currency shares gives way to the full name (`currencyUnit`). */
+const FACE_UNIT_KEYS: { readonly [Code in LegacyCurrency]: MessageKey } = { ARS: 'cards.face.pesos', USD: 'cards.face.dollars' };
+
 export function CardFace({ id, name, issuer, last4, currency, width, onPress, accessibilityHint }: {
   id: string; name: string; issuer: string; last4: string; currency: Currency; width: number; onPress?: () => void; accessibilityHint?: string;
 }) {
-  const { t, speechLanguage } = useI18n();
+  const { t, currencyUnit, speechLanguage } = useI18n();
   const face = FACES[cardFaceIndex(id)];
   const height = Math.round(width / CARD_ASPECT);
-  const label = [name, issuer || null, last4 ? t('cards.face.endsIn', { last4 }) : null, t(currency === 'USD' ? 'cards.face.dollars' : 'cards.face.pesos')].filter(Boolean).join(', ');
+  const unitKey = (FACE_UNIT_KEYS as { readonly [Code in Currency]?: MessageKey })[currency];
+  const label = [name, issuer || null, last4 ? t('cards.face.endsIn', { last4 }) : null, currencyUnit(currency, unitKey && t(unitKey))].filter(Boolean).join(', ');
   const body = <View accessible accessibilityRole={onPress ? 'button' : 'image'} accessibilityLabel={t('cards.face.label', { details: label })} accessibilityHint={accessibilityHint}
     accessibilityLanguage={speechLanguage} style={[styles.face, { width, height, backgroundColor: face.base }]}>
     <View pointerEvents="none" style={[styles.sheen, { backgroundColor: face.highlight, width: height * 1.5, height: height * 1.5, borderRadius: height, right: -height * 0.55, top: -height * 0.75 }]} />

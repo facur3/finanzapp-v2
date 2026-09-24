@@ -65,8 +65,6 @@ export const debts: Pick<Messages, 'debts'> = {
       receivable: 'Owed to me',
       amountOwed: 'Amount you owe',
       amountReceivable: 'Amount you’re owed',
-      pesos: 'Pesos · ARS',
-      dollars: 'Dollars · USD',
       counterpartyOwed: 'Person or company',
       counterpartyReceivable: 'Person or client',
       counterpartyPlaceholder: 'Name or description',

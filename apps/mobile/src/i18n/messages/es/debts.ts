@@ -74,8 +74,6 @@ export const debts = {
       receivable: 'Me deben',
       amountOwed: 'Monto que debés',
       amountReceivable: 'Monto que te deben',
-      pesos: 'Pesos · ARS',
-      dollars: 'Dólares · USD',
       counterpartyOwed: 'Persona o entidad',
       counterpartyReceivable: 'Persona o cliente',
       counterpartyPlaceholder: 'Nombre o concepto',

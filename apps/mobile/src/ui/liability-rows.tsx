@@ -12,7 +12,7 @@ export function DebtRow({ debt, last }: { debt: PersonalDebtProfile; last: boole
   const { snapshot } = useLedger();
   const p = usePalette();
   const day = useCurrentDay();
-  const { t, relativeDate, spokenNumber } = useI18n();
+  const { t, relativeDate, spokenMinor } = useI18n();
   const account = snapshot?.accounts.find(item => item.id === debt.accountId);
   const outstanding = snapshot && account ? debtOutstandingMinor(debt, snapshot) : 0;
   // A hook, so it runs before the early return on every render.
@@ -24,7 +24,7 @@ export function DebtRow({ debt, last }: { debt: PersonalDebtProfile; last: boole
   const status = outstanding === 0 ? t('debts.status.settled') : overdue ? t('debts.status.overdue', { date: relativeDate(debt.dueDateISO!, day) })
     : debt.dueDateISO ? t('debts.status.due', { date: relativeDate(debt.dueDateISO, day, true) }) : t('debts.status.noDate');
   return <PressFeedback feedback="highlight" accessibilityRole="button"
-    accessibilityLabel={t(owed ? 'debts.row.owedLabel' : 'debts.row.receivableLabel', { name: debt.counterparty, amount: spokenNumber(outstanding), currency: account.currency, status })}
+    accessibilityLabel={t(owed ? 'debts.row.owedLabel' : 'debts.row.receivableLabel', { name: debt.counterparty, amount: spokenMinor(outstanding, account.currency), currency: account.currency, status })}
     onPress={() => router.push({ pathname: '/debt/[id]', params: { id: debt.id } })}
     style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, paddingHorizontal: 16, minHeight: 64,
       borderBottomWidth: last ? 0 : 0.5, borderBottomColor: p.line }}>

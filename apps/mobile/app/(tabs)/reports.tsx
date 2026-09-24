@@ -8,6 +8,7 @@ import { useLedger } from '../../src/storage/LedgerProvider';
 import { budgetTone, percentUsed } from '../../src/ui/budget-presentation';
 import { AppText, CategoryBadge, Choices, DetailRow, EmptyState, GlyphTile, IconButton, Money, NavigationRow, PressFeedback, SectionTitle, Surface, useStacked } from '../../src/ui/components';
 import { withCurrencyCode } from '../../src/i18n/format';
+import { CurrencySwitch } from '../../src/ui/currency-switch';
 import { useI18n } from '../../src/i18n/provider';
 import type { Translate } from '../../src/i18n/messages';
 import { useCategoryColor, useCategoryLookOf } from '../../src/ui/category-hues';
@@ -82,8 +83,7 @@ export default function ReportsScreen() {
     initialNumToRender={10} maxToRenderPerBatch={10} windowSize={7}
     ListHeaderComponent={<View style={{ gap: space.xxl, paddingBottom: space.m }}>
       <View style={{ gap: space.m }}>
-        {currencies.length > 1 && <Choices value={currency} onChange={setCurrency}
-          options={currencies.map(value => ({ value, label: t(value === 'ARS' ? 'reports.currencyARS' : 'reports.currencyUSD') }))} />}
+        {currencies.length > 1 && <CurrencySwitch value={currency} currencies={currencies} onChange={setCurrency} />}
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
           <IconButton name="chevron-back" label={t('reports.previousMonth')} disabled={!canPrevious}
             onPress={() => { if (canPrevious) goToMonth(shiftReportMonth(monthISO, -1)); }} />

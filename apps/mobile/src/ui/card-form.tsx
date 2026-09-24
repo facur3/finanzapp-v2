@@ -8,7 +8,9 @@ import { draftFitsCurrency, editedDraftFits, minorFromEditedDraft, minorFromLedg
 import { useI18n } from '../i18n/provider';
 import type { MessageKey } from '../i18n/messages';
 import { useLedger } from '../storage/LedgerProvider';
-import { ActionButton, AmountField, AppText, Choices, DetailRow, ErrorMessage, Field, IconButton, Screen, Surface, useStacked } from './components';
+import { ActionButton, AmountField, AppText, DetailRow, ErrorMessage, Field, IconButton, Screen, Surface, useStacked } from './components';
+import { CurrencySwitch } from './currency-switch';
+import { offeredCurrencies } from './currencies';
 import { draftFromMinor } from './money-input';
 import { space } from './theme';
 
@@ -133,8 +135,7 @@ export function CardForm({ original }: { original?: CreditCardProfile }) {
     </Surface> : <>
       <Field label={t('cards.form.name')} value={name} onChangeText={setName}
         placeholder={t('cards.form.namePlaceholder')} maxLength={80} autoCapitalize="words" editable={!locked} />
-      <Choices value={currency} onChange={setCurrency} disabled={locked}
-        options={[{ value: 'ARS', label: t('cards.form.pesos') }, { value: 'USD', label: t('cards.form.dollars') }]} />
+      <CurrencySwitch value={currency} currencies={offeredCurrencies()} onChange={setCurrency} disabled={locked} />
       <AmountField label={t('cards.form.openingDebt')} currency={currency} value={debt}
         onChangeText={value => { setDebt(value); setError(null); }} editable={!locked} />
       <AppText secondary variant="footnote" style={{ marginTop: -space.m }}>{t('cards.form.openingDebtNote')}</AppText>

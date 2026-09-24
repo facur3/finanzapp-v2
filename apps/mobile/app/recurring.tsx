@@ -96,7 +96,7 @@ function RecurringRow({ rule, accounts, day, last, busy, onToggle }: {
   rule: RecurringRule; accounts: { id: string; name: string; currency: Currency }[]; day: string; last: boolean; busy: boolean; onToggle: () => void;
 }) {
   const p = usePalette();
-  const { t, relativeDate, spokenNumber, speechLanguage } = useI18n();
+  const { t, relativeDate, spokenMinor, speechLanguage } = useI18n();
   const account = accounts.find(item => item.id === rule.accountId);
   // The caption names the day on its own ("Mensual · Hoy"); the VoiceOver sentence uses the inline form ("próximo hoy").
   const date = relativeDate(rule.nextDateISO, day);
@@ -107,7 +107,7 @@ function RecurringRow({ rule, accounts, day, last, busy, onToggle }: {
   const stacked = useStacked(account ? { minor: income ? rule.amountMinor : -rule.amountMinor, currency: account.currency, signed: true } : undefined);
   return <View style={{ flexDirection: 'row', alignItems: 'center', borderBottomColor: p.line, borderBottomWidth: last ? 0 : StyleSheet.hairlineWidth, opacity: rule.active ? 1 : 0.6 }}>
     <PressFeedback feedback="highlight" accessibilityRole="button" accessibilityLabel={t('recurring.row.label', { merchant: rule.merchant, frequency: t(`recurring.frequencySpoken.${rule.frequency}`),
-      amount: spokenNumber(rule.amountMinor), currency: account?.currency ?? '', date: relativeDate(rule.nextDateISO, day, true) })}
+      amount: account ? spokenMinor(rule.amountMinor, account.currency) : '', currency: account?.currency ?? '', date: relativeDate(rule.nextDateISO, day, true) })}
       onPress={() => router.push({ pathname: '/edit-recurring/[id]', params: { id: rule.id } })}
       containerStyle={{ flex: 1 }} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, paddingLeft: 16, minHeight: 64 }}>
       <CategoryBadge category={rule.category} kind={rule.kind} tone={income ? 'income' : 'neutral'} />

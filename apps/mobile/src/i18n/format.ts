@@ -17,13 +17,15 @@
  * three; ARS and USD keep exactly their two decimals and every string they had
  * (tests/currency-presentation.node.ts compares them with the pre-24A code).
  * `formatAmount` and `spokenNumber` (no currency) stay the ledger's two-decimal
- * notation for the ARS/USD callers that do not pass one. The screens never
+ * notation: since Producto 24B3 no screen calls them (they are not bound in
+ * `bind.ts`, and a test bans them in `app/` and `src/ui/`); they remain here as
+ * the pinned exponent-2 path their goldens compare against. The screens never
  * call the domain formatter directly: every visible amount goes through
- * `formatAmount`/`moneyText` (the region's separators) and every VoiceOver
- * amount through the `spoken*` functions (the language's own decimal separator
- * and no grouping, see `spokenNumber`). Storage and parsing are untouched; the
- * amount field reads and writes the region's separators through
- * `ui/money-input.ts` with the `amountFormat` below. */
+ * `formatMoneyAmount`/`moneyText` (the region's separators, the currency's
+ * decimals) and every VoiceOver amount through the `spoken*` functions (the
+ * language's own decimal separator and no grouping, see `spokenMinor`). Storage
+ * and parsing are untouched; the amount field reads and writes the region's
+ * separators through `ui/money-input.ts` with the `amountFormat` below. */
 import { currencyRecord, displayDigits, formatMinorUnits, splitMinor, type IsoCurrencyCode } from '@finanzapp/domain';
 import { CURRENCY_NAMES } from './currencies/index.ts';
 import type { CurrencyNameForms } from './currencies/types.ts';
@@ -223,9 +225,20 @@ export function formatMoneyAmount(minor: number, currency: IsoCurrencyCode, loca
   return (negative ? '-' : '') + groupDigits(whole, locale) + (shown ? conventionsOf(locale).decimal + shown : '');
 }
 
+/** An amount rounded to whole units of its currency, grouped, for a chart's scale
+ * caption ("escala de 0 a $ 1.234.568"): half a unit and above rounds up, exactly,
+ * on the integer digits (never a float). A currency without decimals is the amount
+ * itself. Display only: no ledger figure is ever rounded. */
+export function formatWholeUnits(minor: number, currency: IsoCurrencyCode, locale: AppLocale = DEFAULT_LOCALE): string {
+  const { negative, whole, fraction } = splitMinor(minor, currency);
+  const units = BigInt(whole) + (fraction && fraction.charCodeAt(0) >= 53 /* '5' */ ? 1n : 0n);
+  return (negative && units > 0n ? '-' : '') + groupDigits(units.toString(), locale);
+}
+
 /** The domain's formatted amount in the region's separators. Argentine output
  * is the domain string itself; another region only replaces the separators.
- * The digits, the sign and the two decimals never change. */
+ * The digits, the sign and the two decimals never change. Not bound for screens
+ * since 24B3 (see the header): `formatMoneyAmount` with the currency is. */
 export function formatAmount(minor: number, locale: AppLocale = DEFAULT_LOCALE): string {
   const text = formatMinorUnits(minor);
   const { decimal, group } = conventionsOf(locale);
@@ -277,7 +290,8 @@ export function speechLocale(locale: AppLocale = DEFAULT_LOCALE): AppLocale {
  * thousand: a Spanish voice of a variety that writes 1,234.56 (Mexico), or a
  * device Region that does, may read "1.234" as "uno punto dos tres cuatro".
  * Plain digits are the same number for every voice, and a separator before two
- * digits can only be a decimal. The screen keeps the region's grouping. */
+ * digits can only be a decimal. The screen keeps the region's grouping. Not
+ * bound for screens since 24B3: `spokenMinor` with the currency is. */
 export function spokenNumber(minor: number, locale: AppLocale = DEFAULT_LOCALE): string {
   return formatMinorUnits(minor).replace(/\./g, '').replace(',', conventionsOf(speechLocale(locale)).decimal);
 }
@@ -310,16 +324,52 @@ const SPOKEN_UNITS: { readonly [Code in IsoCurrencyCode]?: { readonly [Language 
   USD: { es: 'dólares', en: 'dollars' },
 };
 
-/** What VoiceOver reads for an amount: the number, then the currency in words. Other
- * currencies use CLDR's plural name ("1500 yenes japoneses", "1234.567 Kuwaiti dinars"),
- * the singular only when the number read is exactly "1" (one yen; one Iraqi dinar, whose
- * three ISO decimals are shown down to none), never for "1,00"; a currency the language
- * has no name for is read by its code, never in another language. */
-export function spokenMoney(minor: number, currency: IsoCurrencyCode, locale: AppLocale = DEFAULT_LOCALE): string {
+/** The currencies a ledger holds, as the presentation learns them (`HeldCurrenciesProvider`):
+ * the one input that can make a short unit word ambiguous. Empty means "nothing else is held". */
+export type HeldCurrencies = readonly IsoCurrencyCode[];
+
+/** Whether a short unit word ("pesos", "dólares", "dollars") could also name another
+ * currency the ledger holds: another held code whose CLDR plural name in the language
+ * contains that word ("pesos chilenos" beside ARS, "Canadian dollars" beside USD). The
+ * comparison is on whole words, so "US dollars" is not shared with "Canadian dollars"
+ * and "dólares" is not found inside "solares". The currency itself never counts. */
+export function unitWordShared(word: string, currency: IsoCurrencyCode, language: LanguageCode, held: HeldCurrencies): boolean {
+  const needle = ' ' + word.trim().toLowerCase() + ' ';
+  if (needle.trim() === '') return false;
+  for (const other of held) {
+    if (other === currency) continue;
+    const forms = currencyNameForms(other, language);
+    if (!forms) continue;
+    for (const name of [forms.other, forms.one, forms.name]) if ((' ' + name.toLowerCase() + ' ').includes(needle)) return true;
+  }
+  return false;
+}
+
+/** A currency as a unit in words, for a sentence VoiceOver reads or a label that names it:
+ * `word` (a catalogued legacy word such as "pesos" or "dólares") when no other held currency
+ * shares it, otherwise CLDR's plural name in the language ("pesos argentinos" beside CLP,
+ * "dólares estadounidenses" beside CAD); without a `word`, CLDR's plural name; the ISO code
+ * when the language has no name (never a name in another language). `count` selects the
+ * singular for exactly one whole unit of a currency without decimals ("1 yen japonés"). */
+export function currencyUnit(currency: IsoCurrencyCode, locale: AppLocale = DEFAULT_LOCALE, held: HeldCurrencies = [], word?: string, count?: string): string {
+  const language = languageOf(locale);
+  const forms = currencyNameForms(currency, language);
+  if (word !== undefined && !unitWordShared(word, currency, language, held)) return word;
+  if (!forms) return currency;
+  return count === '1' ? forms.one : forms.other;
+}
+
+/** What VoiceOver reads for an amount: the number, then the currency in words. ARS and USD
+ * keep "pesos" and "dólares"/"dollars" unless another held currency shares the word (24B3;
+ * then "pesos argentinos", "US dollars"). Other currencies use CLDR's plural name ("1500
+ * yenes japoneses", "1234.567 Kuwaiti dinars"), the singular only when the number read is
+ * exactly "1" (one yen; one Iraqi dinar, whose three ISO decimals are shown down to none),
+ * never for "1,00"; a currency the language has no name for is read by its code, never in
+ * another language. */
+export function spokenMoney(minor: number, currency: IsoCurrencyCode, locale: AppLocale = DEFAULT_LOCALE, held: HeldCurrencies = []): string {
   const language = languageOf(locale), en = language === 'en';
   const number = spokenMinor(Math.abs(minor), currency, locale);
-  const forms = currencyNameForms(currency, language);
-  const unit = SPOKEN_UNITS[currency]?.[language] ?? (forms ? (number === '1' ? forms.one : forms.other) : currency);
+  const unit = currencyUnit(currency, locale, held, SPOKEN_UNITS[currency]?.[language], number);
   return (minor < 0 ? (en ? 'Minus ' : 'Menos ') : '') + number + ' ' + unit;
 }
 

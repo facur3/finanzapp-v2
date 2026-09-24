@@ -69,7 +69,7 @@ export const forms = {
     from: 'Desde',
     to: 'Hacia',
     missingTitle: 'Falta otra cuenta en esta moneda',
-    missingDetail: 'Las transferencias de esta etapa son entre cuentas en pesos o entre cuentas en dólares, sin conversión.',
+    missingDetail: 'Las transferencias son entre cuentas de la misma moneda, sin conversión.',
     note: 'Nota (opcional)',
     after: '{name} después',
     negativeWarning: 'Una cuenta quedará con saldo negativo. Revisá el importe y tus movimientos; podés registrarlo si refleja lo que realmente ocurrió.',

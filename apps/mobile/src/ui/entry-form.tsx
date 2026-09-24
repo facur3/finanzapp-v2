@@ -30,7 +30,7 @@ export function EntryForm({ original, accountId: requestedAccount, currency, kin
   onAccountChange?: (accountId: string) => void;
 }) {
   const { snapshot, archive, addEntry, updateEntry } = useLedger();
-  const { t, moneyText, formatAmount, spokenMoney } = useI18n();
+  const { t, moneyText, formatMoneyAmount, spokenMoney } = useI18n();
   // Cash accounts and cards can carry an expense or income; a personal debt only changes through payments.
   const accounts = postingAccounts(snapshot?.accounts ?? [], archive?.debts);
   const [before] = useState(original);
@@ -93,7 +93,7 @@ export function EntryForm({ original, accountId: requestedAccount, currency, kin
     return balance < 0 ? t('entryForm.optionDebt', { amount: figure(-balance) })
       : balance > 0 ? t('entryForm.optionCredit', { amount: figure(balance) }) : t('entryForm.optionClear');
   };
-  const describeAccount = (item: Account) => optionLine(item, formatAmount);
+  const describeAccount = (item: Account) => optionLine(item, minor => formatMoneyAmount(minor, item.currency));
   const spokenDescribeAccount = (item: Account) => optionLine(item, minor => spokenMoney(minor, item.currency));
   let parsed: number | null = null;
   try { parsed = account ? minorFromEditedDraft(amount, account.currency, stored) : null; } catch { parsed = null; }

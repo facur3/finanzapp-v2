@@ -5,6 +5,7 @@ import { currentMonthISO, hiddenLiabilityAccountIds, liquidTotalsByCurrency, spe
   summarizeMonthlyBudgets, type Currency } from '@finanzapp/domain';
 import { useLedger } from '../../src/storage/LedgerProvider';
 import { ActionButton, AppText, Choices, EmptyState, EntryRow, Money, Screen, SectionTitle, Surface, useStacked } from '../../src/ui/components';
+import { CurrencySwitch } from '../../src/ui/currency-switch';
 import { useI18n } from '../../src/i18n/provider';
 import { BudgetHomeCard, CategoryRanking, MetricHelp, UpcomingRecurringRow } from '../../src/ui/home-modules';
 import { Reflow, ValueTransition } from '../../src/ui/motion';
@@ -71,8 +72,7 @@ export default function HomeScreen() {
             <Choices value={metric} onChange={setMetric}
               options={[{ value: 'spending', label: t('home.spending') }, { value: 'available', label: t('home.available') }]} />
           </View>
-          {currencies.length > 1 && <Choices value={currency} onChange={setCurrency}
-            options={currencies.map(value => ({ value, label: value }))} />}
+          {currencies.length > 1 && <CurrencySwitch value={currency} currencies={currencies} onChange={setCurrency} labels="code" />}
         </View>
 
         <ValueTransition id={heroId} style={{ gap: 6, paddingVertical: space.s }}>
