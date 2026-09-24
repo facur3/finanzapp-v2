@@ -380,6 +380,31 @@ importe, moneda y estado.
   muestra hasta que toda la app lo tenga (23.1): un iPhone en inglés sigue leyendo
   español antes que media app traducida.
 
+## Producto 23.1C2 — inglés y Estados Unidos publicados (sin rediseño)
+
+- **Mismo diseño.** Ningún cambio de layout, material, color, movimiento ni jerarquía:
+  cobalto/zafiro, superficies agrupadas, Liquid Glass sólo donde ya estaba (acciones de
+  Inicio y compositor del Asistente) y microanimaciones discretas, igual que en 23.1C1.
+- **Más → App y datos.** Idioma y Región son dos filas nativas del mismo grupo (Región
+  con el glifo de globo, cerrando el grupo). Cada pantalla es una lista agrupada estilo
+  Ajustes con "Según el dispositivo" primero y una marca en la opción en uso; Región
+  muestra una muestra de sus formatos debajo de cada país. La nota "por ahora sólo en
+  español" desapareció. Cambiar cualquiera re-renderiza en el lugar, con la háptica de
+  selección de siempre; nada se reinicia.
+- **Nombres de idioma.** "English" y "Español" se leen con la voz de su propio idioma,
+  como en Ajustes de iOS.
+- **Rueda de fecha.** Sigue siendo la rueda nativa en su hoja; los meses y el orden de
+  columnas siguen el idioma (español día · mes · año, inglés mes · día · año), igual que
+  la fila que la abre, en cualquier región.
+- **Textos de iOS.** Con el build nuevo, el menú de edición (Pegar/Copiar) y la hoja de
+  compartir aparecen en el idioma de la app según iOS; el botón de las alertas ⓘ es de
+  la app ("OK").
+- **Revisión de textos.** Se corrigieron errores reales en ambos idiomas (dirección de un
+  cobro, "cuatro" categorías con nombre en el donut, "Vence hoy" en minúscula, ejemplos
+  de marcas argentinas en placeholders) y el inglés de glosario ("transaction", nunca
+  "movement"; "record", nunca "log"). Las longitudes siguen dentro de los límites de
+  segmentos, pestañas, botones y cabeceras.
+
 ## Producto 23.1C1 — formatos regionales y campo de importe (sin rediseño)
 
 - **Mismo campo, separadores de la región.** El diseño aprobado de 23.0 no cambia: el
@@ -399,9 +424,8 @@ importe, moneda y estado.
 - **VoiceOver.** Los importes se leen con los números del idioma de la interfaz; las
   frases de presupuestos dicen "pesos" o "dólares" en lugar de "$".
 - **Selector de fecha.** La rueda usa el idioma de la interfaz para los meses.
-- **Oculto hasta 23.1C2.** Inglés y Estados Unidos siguen sin aparecer en Más; en el
-  iPhone todo se ve en español con formato argentino, salvo en la vista previa de
-  desarrollo (`EXPO_PUBLIC_LOCALE_PREVIEW=1`), que sólo existe en FinanzApp Dev.
+- **Oculto hasta 23.1C2.** Inglés y Estados Unidos no aparecían en Más salvo en la
+  vista previa de desarrollo (`EXPO_PUBLIC_LOCALE_PREVIEW=1`); 23.1C2 los publicó.
 
 ## Producto 23.1B1 — traducción de navegación, Inicio, Movimientos y formularios (sin rediseño)
 
