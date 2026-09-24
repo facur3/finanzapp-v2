@@ -3,7 +3,7 @@ import { Alert, Keyboard } from 'react-native';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { randomUUID } from 'expo-crypto';
 import * as Haptics from 'expo-haptics';
-import { accountBalanceMinor, accountLook, makeAccountAppearance, makeAccountChange, parseMinorUnits, validateAccountAppearance,
+import { accountBalanceMinor, accountLook, makeAccountAppearance, makeAccountChange, minorFromLedgerDraft, validateAccountAppearance,
   validateAccountChange, type Account, type AccountAppearance, type AccountChange, type LedgerSnapshot } from '@finanzapp/domain';
 import { useLedger } from '../../src/storage/LedgerProvider';
 import { ACCOUNT_ICON_CHOICES, COLOR_CHOICES } from '../../src/ui/appearance';
@@ -36,7 +36,7 @@ function AccountEditor({ account, snapshot, current }: { account: Account; snaps
   const [name, setName] = useState(account.name);
   const [icon, setIcon] = useState<string>(original.look.icon);
   const [color, setColor] = useState<string>(original.look.color);
-  const [balance, setBalance] = useState(draftFromMinor(original.balance));
+  const [balance, setBalance] = useState(draftFromMinor(original.balance, account.currency));
   const [busy, setBusy] = useState(false);
   const [pending, setPending] = useState<Submission | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -58,7 +58,7 @@ function AccountEditor({ account, snapshot, current }: { account: Account; snaps
     Keyboard.dismiss(); setError(null);
     if (pending) { void apply(pending); return; }
     try {
-      const target = parseMinorUnits(balance);
+      const target = minorFromLedgerDraft(balance, account.currency);
       const now = new Date().toISOString();
       const lookChanged = icon !== original.look.icon || color !== original.look.color;
       const appearance = lookChanged ? makeAccountAppearance(account.id, icon as AccountAppearance['icon'], color as AccountAppearance['color'], now, original.current) : null;

@@ -3,7 +3,7 @@ import { Keyboard, View } from 'react-native';
 import { router, Stack } from 'expo-router';
 import { randomUUID } from 'expo-crypto';
 import * as Haptics from 'expo-haptics';
-import { accountKind, parseMinorUnits, sameRecurringRule, todayKey, validateRecurringRule,
+import { accountKind, draftFitsCurrency, minorFromLedgerDraft, sameRecurringRule, todayKey, validateRecurringRule,
   type EntryKind, type RecurringFrequency, type RecurringRule } from '@finanzapp/domain';
 import { useLedger } from '../storage/LedgerProvider';
 import { ActionButton, AmountField, AppText, Choices, EmptyState, ErrorMessage, Field, IconButton, Screen, Surface } from './components';
@@ -22,7 +22,11 @@ export function RecurringForm({ original, accountId: requestedAccount }: { origi
   const [operation] = useState(() => ({ id: randomUUID(), createdAt: new Date().toISOString() }));
   const [kind, setKind] = useState<EntryKind>(before?.kind ?? 'expense');
   const [accountId, setAccountId] = useState(() => before?.accountId ?? initialAccountId(accounts, requestedAccount));
-  const [amount, setAmount] = useState(before ? draftFromMinor(before.amountMinor) : '');
+  const [amount, setAmount] = useState(() => {
+    if (!before) return '';
+    const own = accounts.find(item => item.id === before.accountId)?.currency;
+    return own ? draftFromMinor(before.amountMinor, own) : '';
+  });
   const [merchant, setMerchant] = useState(before?.merchant ?? '');
   const [category, setCategory] = useState(before?.category ?? '');
   const [frequency, setFrequency] = useState<RecurringFrequency>(before?.frequency ?? 'monthly');
@@ -33,6 +37,10 @@ export function RecurringForm({ original, accountId: requestedAccount }: { origi
   const [error, setError] = useState<string | null>(null);
 
   const account = accounts.find(item => item.id === accountId);
+  // The rule's amount is minor units of its account's currency; a draft kept across an account change that the new
+  // currency cannot hold exactly blocks Save (the field says why).
+  const ruleCurrency = () => { if (!account) throw new Error('errors.recurring.account'); return account.currency; }; // A catalogue key, translated when shown.
+  const fit = account ? draftFitsCurrency(amount, account.currency) : { ok: true as const };
   const originalCurrency = accounts.find(item => item.id === before?.accountId)?.currency;
   const eligibleAccounts = before ? accounts.filter(item => item.currency === originalCurrency) : accounts;
   const locked = busy || pending !== null;
@@ -56,7 +64,7 @@ export function RecurringForm({ original, accountId: requestedAccount }: { origi
             ...before,
             accountId,
             kind,
-            amountMinor: parseMinorUnits(amount),
+            amountMinor: minorFromLedgerDraft(amount, ruleCurrency()),
             merchant: merchant.trim(),
             category: category.trim(),
             frequency,
@@ -74,7 +82,7 @@ export function RecurringForm({ original, accountId: requestedAccount }: { origi
             revision: 0,
             accountId,
             kind,
-            amountMinor: parseMinorUnits(amount),
+            amountMinor: minorFromLedgerDraft(amount, ruleCurrency()),
             merchant: merchant.trim(),
             category: category.trim(),
             frequency,
@@ -127,7 +135,7 @@ export function RecurringForm({ original, accountId: requestedAccount }: { origi
         {t('recurring.form.retryNote')}
       </AppText>}
       <ActionButton label={pending && error ? t('common.retrySave') : before ? t('common.saveChanges') : t('recurring.form.create')}
-        onPress={save} busy={busy} disabled={!amount.trim() || !merchant.trim() || !category.trim() || !account} />
+        onPress={save} busy={busy} disabled={!amount.trim() || !merchant.trim() || !category.trim() || !account || !fit.ok} />
     </>}
   </Screen>;
 }

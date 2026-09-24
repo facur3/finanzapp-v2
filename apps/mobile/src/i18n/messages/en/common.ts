@@ -56,9 +56,16 @@ export const common: Pick<Messages, 'common' | 'movement' | 'accountKinds' | 'se
     paste: {
       ambiguous: 'Didn’t paste “{text}”: it can be read two ways. Use “{decimal}” for decimals.',
       precision: 'Didn’t paste “{text}”: it has more than two decimals.',
+      precisionDigits: 'Didn’t paste “{text}”: it has more than {digits} decimals.',
+      precisionNone: 'Didn’t paste “{text}”: this currency has no decimals.',
       invalid: 'Didn’t paste “{text}”: it isn’t a valid amount.',
       currencyMismatch: 'Didn’t paste “{text}”: it specifies another currency. This account uses {currency}; nothing was converted.',
       tooLong: 'Didn’t paste “{text}”: it’s above the maximum amount.',
+    },
+    kept: {
+      decimals: 'The amount has more decimals than {currency} allows ({digits}). Fix it before saving; nothing is rounded.',
+      noDecimals: '{currency} has no decimals. Remove the decimals before saving; nothing is rounded.',
+      tooLong: 'The amount is above the maximum for {currency}. Fix it before saving.',
     },
   },
   count: {

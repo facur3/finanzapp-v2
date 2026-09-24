@@ -13,7 +13,7 @@
  *
  * Nothing here converts between currencies. Combining two currencies is an error:
  * a conversion needs a dated, sourced rate (Producto 24C), never a guess. */
-import { minorUnitExponent, type IsoCurrencyCode } from './currency.ts';
+import { LEGACY_EXPONENT, minorUnitExponent, type IsoCurrencyCode } from './currency.ts';
 
 export interface MoneyAmount {
   /** Integer minor units: cents of a dollar, fils of a dinar, whole yen. */
@@ -128,6 +128,45 @@ export function parseLocalizedAmount(text: string, currency: IsoCurrencyCode, se
   else if (new RegExp(`^[1-9]\\d{0,2}(?:${escapeRegExp(group)}\\d{3})+$`).test(wholeText)) whole = wholeText.split(group).join('');
   else return { ok: false, reason: 'invalid' };
   return scaled(negative, whole, fraction ?? '', exponent);
+}
+
+/** The separators form drafts are kept in, whatever the region: what `formatMinorUnits`
+ * writes and `parseMinorUnits` reads ("-1.234,56"). Presentation reformats for the screen. */
+export const LEDGER_SEPARATORS: AmountSeparators = { decimal: ',', group: '.' };
+
+/** Why a ledger-notation draft is not an amount in `currency`, as the sentence the form shows.
+ * For ARS and USD the sentences are exactly `parseMinorUnits`'s; other exponents get their
+ * own ("hasta 3 decimales", "números enteros"). Never a rounding, never a guess. */
+export function draftRejectionMessage(reason: AmountRejection, currency: IsoCurrencyCode): string {
+  const digits = minorUnitExponent(currency);
+  if (reason === 'empty') return 'Ingresá un monto válido.';
+  if (reason === 'tooLong') return 'El monto es demasiado grande.';
+  if (digits === LEGACY_EXPONENT) return 'Usá números con hasta dos decimales.';
+  if (digits === 0) return 'Usá números enteros: esta moneda no tiene decimales.';
+  return `Usá números con hasta ${digits} decimales.`;
+}
+
+/** A form draft in the ledger's notation ("1.234,56", "1500", "-0,5") as integer minor units of
+ * `currency`, exactly: more decimals than the currency has are refused (never rounded), more
+ * digits than an amount may have are refused. This replaces `parseMinorUnits` in the forms; for
+ * ARS and USD it accepts and refuses the same drafts with the same sentences (a test sweeps them),
+ * except that it never guesses a separator: a draft is always ledger notation. */
+export function minorFromLedgerDraft(draft: string, currency: IsoCurrencyCode): number {
+  // The amount field holds at most 24 characters; a longer text is not a draft at all (parseMinorUnits's rule, kept).
+  if (String(draft ?? '').trim().length > 24) throw new Error('Ingresá un monto válido.');
+  const reading = parseLocalizedAmount(draft, currency, LEDGER_SEPARATORS);
+  if (!reading.ok) throw new Error(draftRejectionMessage(reading.reason, currency));
+  return reading.minor;
+}
+
+/** Whether a ledger-notation draft can be kept exactly in `currency`: an empty draft can, a
+ * draft with more decimals than the currency has cannot (it came from another currency), and
+ * so cannot one with more digits than the currency's entry bound. Text that is not an amount at
+ * all is not this function's concern (`minorFromLedgerDraft` refuses it when saving). */
+export function draftFitsCurrency(draft: string, currency: IsoCurrencyCode): { ok: true } | { ok: false; reason: 'precision' | 'tooLong' } {
+  const reading = parseLocalizedAmount(draft, currency, LEDGER_SEPARATORS);
+  if (reading.ok || reading.reason === 'empty' || reading.reason === 'invalid') return { ok: true };
+  return { ok: false, reason: reading.reason };
 }
 
 /** An operand must be a safe integer in a currency with a minor unit: a hand-built

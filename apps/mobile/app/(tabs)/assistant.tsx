@@ -12,7 +12,6 @@ import { useLedger } from '../../src/storage/LedgerProvider';
 import { AssistantComposer } from '../../src/ui/assistant-composer';
 import { AnswerEvidence, AssistantText, ClarificationChoices, DraftCard, Suggestions, SystemNote, UserMessage } from '../../src/ui/assistant-messages';
 import { AppText, IconButton } from '../../src/ui/components';
-import { draftFromMinor } from '../../src/ui/money-input';
 import { postingAccounts } from '../../src/ui/liability-presentation';
 import { Appear, impactHaptic, successHaptic } from '../../src/ui/motion';
 import { availableCurrencies } from '../../src/ui/presentation';
@@ -117,7 +116,7 @@ export default function AssistantScreen() {
     const { draft } = content;
     dispatch({ type: 'draft-edited', messageId });
     router.push({ pathname: '/new-entry', params: { kind: draft.kind, currency: draft.currency, ...(draft.accountId ? { accountId: draft.accountId } : {}),
-      amount: draftFromMinor(draft.amountMinor), merchant: draft.merchant, category: draft.category, date: draft.dateISO } });
+      amountMinor: String(draft.amountMinor), merchant: draft.merchant, category: draft.category, date: draft.dateISO } });
   }, []);
 
   const open = useCallback((href: EvidenceLink['href']) => { router.push(href.params ? { pathname: href.pathname, params: href.params } : href.pathname); }, []);

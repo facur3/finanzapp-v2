@@ -102,6 +102,8 @@ export const reports: Pick<Messages, 'reports'> = {
       emptyDetail: 'There are no expenses for this day and currency.',
     },
     comparison: {
+      invalidTitle: 'Invalid comparison',
+      invalidDetail: 'Go back to the report to choose the currency.',
       matchingDays: 'The same number of days in each month',
       fullMonths: 'Full months · they may have a different number of days',
       capped: 'This comparison runs through day {day} in both months because the previous one was shorter. The monthly report keeps every day.',

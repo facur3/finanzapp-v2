@@ -6,7 +6,7 @@ import { useLedger } from '../src/storage/LedgerProvider';
 import { AppText, CategoryBadge, EmptyState, Money, Screen, SectionTitle } from '../src/ui/components';
 import { EntryList } from '../src/ui/entry-list';
 import { selectEntries } from '../src/ui/presentation';
-import { reportPeriodLabel, reportSelection, reportCutoff } from '../src/ui/report-presentation';
+import { reportPeriodLabel, strictReportSelection, reportCutoff } from '../src/ui/report-presentation';
 import { useI18n } from '../src/i18n/provider';
 import { useCategoryLookOf } from '../src/ui/category-hues';
 import { useCurrentDay } from '../src/ui/theme';
@@ -18,15 +18,17 @@ export default function ReportCategoryScreen() {
   const { t, formatMonth } = useI18n();
   const lookOf = useCategoryLookOf('expense');
   const key = typeof params.category === 'string' ? params.category : '';
-  const selection = useMemo(() => snapshot ? reportSelection(snapshot, params.currency, params.month, day) : null,
+  // A drill-down never falls back to another currency: an unknown or unheld code is an invalid link.
+  const selection = useMemo(() => snapshot ? strictReportSelection(snapshot, params.currency, params.month, day) : null,
     [snapshot, params.currency, params.month, day]);
   const cutoff = selection ? reportCutoff(selection.monthISO, params.through, day) : null;
   const report = useMemo(() => snapshot && selection && cutoff ? spendingReport(snapshot, selection.currency, selection.monthISO, cutoff) : null,
     [snapshot, selection, cutoff]);
   const entries = useMemo(() => snapshot && report && key
     ? selectEntries(expensesInPeriod(snapshot, report, key), snapshot.accounts) : [], [snapshot, report, key]);
-  if (cutoff === null) return <Screen><EmptyState title={t('reports.category.invalidTitle')} detail={t('reports.category.invalidDetail')} /></Screen>;
-  if (!snapshot || !report || !selection) return null;
+  if (!snapshot) return null;
+  if (cutoff === null || !selection) return <Screen><EmptyState title={t('reports.category.invalidTitle')} detail={t('reports.category.invalidDetail')} /></Screen>;
+  if (!report) return null;
   if (!entries.length) return <Screen>
     <AppText secondary>{formatMonth(selection.monthISO)} · {reportPeriodLabel(report, day, t)}</AppText>
     <EmptyState title={t('reports.category.emptyTitle')} icon="receipt-outline"

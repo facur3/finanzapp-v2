@@ -61,9 +61,19 @@ export const common = {
       /** "1,000" in Argentina: a thousand in one convention, one with three decimals in the other. {decimal} is the region's decimal separator. */
       ambiguous: 'No se pegó «{text}»: puede leerse de dos maneras. Escribí los decimales con «{decimal}».',
       precision: 'No se pegó «{text}»: tiene más de dos decimales.',
+      /** The same refusal for a currency with another number of decimals (KWD: 3) or none (JPY). */
+      precisionDigits: 'No se pegó «{text}»: tiene más de {digits} decimales.',
+      precisionNone: 'No se pegó «{text}»: esta moneda no lleva decimales.',
       invalid: 'No se pegó «{text}»: no es un monto válido.',
       currencyMismatch: 'No se pegó «{text}»: indica otra moneda. La cuenta está en {currency}; no se hizo ninguna conversión.',
       tooLong: 'No se pegó «{text}»: supera el monto máximo.',
+    },
+    /** Under the field when the account or currency changed and the typed amount cannot be kept exactly in the new
+     * currency: the digits stay, nothing is rounded, and the form does not save until the person corrects them. */
+    kept: {
+      decimals: 'El importe tiene más decimales de los que admite {currency} ({digits}). Corregilo antes de guardar; no se redondea.',
+      noDecimals: '{currency} no lleva decimales. Quitá los decimales antes de guardar; no se redondea.',
+      tooLong: 'El importe supera el máximo de {currency}. Corregilo antes de guardar.',
     },
   },
   count: {

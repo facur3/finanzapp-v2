@@ -3,7 +3,7 @@ import { Alert, Keyboard, View } from 'react-native';
 import { router, Stack } from 'expo-router';
 import { randomUUID } from 'expo-crypto';
 import * as Haptics from 'expo-haptics';
-import { parseMinorUnits, sameMonthlyBudget, validateMonthlyBudget,
+import { draftFitsCurrency, isLedgerCurrency, minorFromLedgerDraft, sameMonthlyBudget, validateMonthlyBudget,
   type BudgetScope, type Currency, type MonthlyBudget } from '@finanzapp/domain';
 import { useLedger } from '../storage/LedgerProvider';
 import { ActionButton, AmountField, AppText, Choices, ErrorMessage, IconButton, Screen } from './components';
@@ -24,8 +24,9 @@ export function BudgetForm({ original, monthISO, currency: requestedCurrency, sc
   const [before] = useState(original);
   const [operation] = useState(() => ({ id: randomUUID(), createdAt: new Date().toISOString() }));
   const [scope, setScope] = useState<BudgetScope>(before?.scope ?? (requestedScope === 'total' ? 'total' : 'category'));
-  const [currency, setCurrency] = useState<Currency>(before?.currency ?? (requestedCurrency === 'USD' ? 'USD' : 'ARS'));
-  const [amount, setAmount] = useState(before ? draftFromMinor(before.amountMinor) : '');
+  // A new budget's currency comes from the route only when the gate offers it (never coerced from an unknown code); ARS otherwise (decision 7.6.4).
+  const [currency, setCurrency] = useState<Currency>(before?.currency ?? (isLedgerCurrency(requestedCurrency) ? requestedCurrency : 'ARS'));
+  const [amount, setAmount] = useState(before ? draftFromMinor(before.amountMinor, before.currency) : '');
   const [category, setCategory] = useState(before?.category ?? '');
   const [busy, setBusy] = useState(false);
   const [pending, setPending] = useState<MonthlyBudget | null>(null);
@@ -45,7 +46,7 @@ export function BudgetForm({ original, monthISO, currency: requestedCurrency, sc
       let submission = pending;
       if (!submission) {
         const now = new Date().toISOString();
-        const amountMinor = parseMinorUnits(amount);
+        const amountMinor = minorFromLedgerDraft(amount, currency);
         if (before) {
           // The kind never changes on edit: a total keeps no category, a sublimit keeps one.
           const candidate: MonthlyBudget = before.scope === 'total' ? { ...before, amountMinor }
@@ -129,7 +130,7 @@ export function BudgetForm({ original, monthISO, currency: requestedCurrency, sc
       {t('budgets.form.retryNote')}
     </AppText>}
     <ActionButton label={pending && error ? t('common.retrySave') : before ? t('common.saveChanges') : t('budgets.form.create')}
-      onPress={save} busy={busy} disabled={!amount.trim() || (!general && !category.trim())} />
+      onPress={save} busy={busy} disabled={!amount.trim() || (!general && !category.trim()) || !draftFitsCurrency(amount, currency).ok} />
     {before && <ActionButton label={t(archivePending && error ? 'budgets.form.retryDelete' : 'budgets.form.delete')}
       onPress={archive} secondary disabled={busy || pending !== null} />}
   </Screen>;

@@ -10,6 +10,7 @@ import { useCategoryLabel } from '../src/ui/category-hues';
 import { ActionButton, AppText, CategoryBadge, Choices, EmptyState, IconButton, Money, PressFeedback, Screen, SectionTitle, Stat, StatRow, Surface } from '../src/ui/components';
 import { useI18n } from '../src/i18n/provider';
 import { availableCurrencies } from '../src/ui/presentation';
+import { heldCurrency } from '../src/ui/report-presentation';
 import { timing } from '../src/ui/motion';
 import { space, useCurrentDay, usePalette, useReduceMotion } from '../src/ui/theme';
 
@@ -26,7 +27,8 @@ export default function BudgetsScreen() {
   const p = usePalette();
   const { t, formatMonth, moneyText, spokenMoney } = useI18n();
   const currencies = availableCurrencies(snapshot?.accounts ?? []);
-  const initialCurrency: Currency = params.currency === 'USD' ? 'USD' : 'ARS';
+  // The route's currency is honoured when an account holds it; an unknown code is never coerced (ARS is the empty-ledger fallback, decision 7.6.4).
+  const initialCurrency: Currency = heldCurrency(snapshot?.accounts ?? [], params.currency) ?? 'ARS';
   const [selectedCurrency, setSelectedCurrency] = useState<Currency>(initialCurrency);
   const [monthISO, setMonthISO] = useState(() => params.month && /^\d{4}-\d{2}$/.test(params.month) ? params.month : currentMonthISO(day));
   const currency = currencies.includes(selectedCurrency) ? selectedCurrency : currencies[0] ?? initialCurrency;
