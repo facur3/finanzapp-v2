@@ -8,6 +8,7 @@ import { timing } from './motion';
 import { usePalette, useReduceMotion } from './theme';
 import { formatDate } from '../i18n/format';
 import { DEFAULT_LOCALE, type AppLocale } from '../i18n/locale';
+import { useI18n } from '../i18n/provider';
 
 // The locale tables keep "sep" stable across ICU versions (newer data says "sept").
 export const periodLabel = (p: ReportPeriod, locale: AppLocale = DEFAULT_LOCALE) => p.startISO === p.endISO ? formatDate(p.startISO, 'day', locale)
@@ -27,14 +28,16 @@ function Bar({ fraction }: { fraction: number }) {
 }
 
 export function SpendingTimeline({ buckets, currency }: { buckets: SpendingBucket[]; currency: Currency }) {
+  const { t, locale } = useI18n();
   const max = Math.max(...buckets.map(b => b.amountMinor), 0);
   if (!max) return null;
   return <View style={{ gap: 8 }}>
-    <AppText secondary style={{ fontSize: 12 }}>Gasto registrado · máximo {currency} {formatMinorUnits(max)}</AppText>
+    <AppText secondary style={{ fontSize: 12 }}>{t('reports.chart.timelineMax', { currency, amount: formatMinorUnits(max) })}</AppText>
     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ flexGrow: 1, gap: 4 }}>
       {buckets.map(bucket => <PressFeedback key={bucket.startISO} feedback="opacity" accessibilityRole="button"
-        accessibilityLabel={`${periodLabel(bucket)}, ${formatMinorUnits(bucket.amountMinor)} ${currency}, ${bucket.count} gastos registrados`}
-        accessibilityHint="Abre los gastos de estas fechas" containerStyle={{ flex: 1, minWidth: 44 }}
+        accessibilityLabel={t('reports.chart.timelineBar', { period: periodLabel(bucket, locale), amount: formatMinorUnits(bucket.amountMinor), currency,
+          count: t('reports.recordedExpenses', { count: bucket.count }) })}
+        accessibilityHint={t('reports.chart.timelineHint')} containerStyle={{ flex: 1, minWidth: 44 }}
         onPress={() => router.push({ pathname: '/spending-detail', params: { currency, startISO: bucket.startISO, endISO: bucket.endISO } })}
         style={{ gap: 8, paddingTop: 8 }}>
         <Bar fraction={bucket.amountMinor / max} />
@@ -43,6 +46,6 @@ export function SpendingTimeline({ buckets, currency }: { buckets: SpendingBucke
         </AppText>
       </PressFeedback>)}
     </ScrollView>
-    <AppText secondary style={{ fontSize: 12 }}>Días del período · tocá una barra para ver el detalle</AppText>
+    <AppText secondary style={{ fontSize: 12 }}>{t('reports.chart.timelineFooter')}</AppText>
   </View>;
 }

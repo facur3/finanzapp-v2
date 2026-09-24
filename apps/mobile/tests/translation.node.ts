@@ -16,24 +16,19 @@ import { categoryChoices, categorySearchText, customCategory } from '../src/ui/c
 import { categoriesStatus } from '../src/ui/budget-presentation.ts';
 import { accountKindLabel } from '../src/ui/liability-presentation.ts';
 import { selectEntries, selectTransfers } from '../src/ui/presentation.ts';
-import { translator } from '../src/i18n/messages.ts';
+import { isPluralEntry, pluralCategory, translator } from '../src/i18n/messages.ts';
+import { findLiterals } from '../scripts/i18n/extract.mjs';
+import { checkCatalogues, requiredPlurals } from '../scripts/i18n/check.mjs';
+import { exportLanguage } from '../scripts/i18n/export.mjs';
+import { pseudoCatalogue, pseudoText } from '../scripts/i18n/pseudo.mjs';
 
-// Producto 23.1B1: navigation, Inicio, Movimientos, the main forms and the
-// shared components read every visible string from the catalogues. English is
-// complete for these screens and still unreleased.
+// Producto 23.1B1 and 23.1B2: every screen reads its visible strings from the
+// catalogues. English is complete and still unreleased (23.1C releases it).
 
 const root = new URL('..', import.meta.url).pathname;
 const read = (file: string) => readFileSync(join(root, file), 'utf8');
 const leaf = (catalogue: object, key: string): unknown => key.split('.').reduce<any>((node, part) => node?.[part], catalogue);
-const isPlural = (value: unknown): value is { one: string; other: string } => !!value && typeof value === 'object' && 'one' in value;
-
-/** Every screen and module this delivery moved to the catalogue. */
-const B1_FILES = [
-  'app/_layout.tsx', 'app/(tabs)/_layout.tsx', 'app/(tabs)/index.tsx', 'app/(tabs)/activity.tsx', 'app/entry/[id].tsx', 'app/transfer/[id].tsx',
-  'app/spending-detail.tsx', 'app/new-entry.tsx', 'app/new-transfer.tsx', 'app/edit-entry/[id].tsx', 'app/edit-transfer/[id].tsx', 'app/undone-entries.tsx',
-  'src/ui/home-modules.tsx', 'src/ui/quick-actions.tsx', 'src/ui/entry-list.tsx', 'src/ui/movement-form.tsx', 'src/ui/entry-form.tsx',
-  'src/ui/transfer-form.tsx', 'src/ui/form-controls.tsx', 'src/ui/components.tsx',
-];
+const isPlural = (value: unknown): value is { one: string; other: string } => isPluralEntry(value);
 
 function sourceFiles(dir: string): string[] {
   return readdirSync(join(root, dir)).flatMap(name => {
@@ -46,15 +41,9 @@ test('English stays unreleased until 23.1B2 and 23.1C are complete', () => {
   assert.deepEqual([...RELEASED_LANGUAGES], ['es']);
 });
 
-test('no screen of this delivery keeps a hard-coded Spanish label, title, placeholder or VoiceOver string', () => {
-  // A capitalised Spanish word opening a string literal, JSX text between tags, or a literal label/title/detail/placeholder attribute.
-  const literal = /(['"`][A-ZÁÉÍÓÚ¿¡][a-záéíóúñ]+[ ,.:'"`])|(>[^<>{}=;:?()]*[a-záéíóúñ]{3,}[^<>{}=;:?()]*<)|((label|title|detail|placeholder|accessibilityLabel|accessibilityHint)="[^"]*[a-zA-Z][^"]*")/;
-  for (const file of B1_FILES) {
-    read(file).split('\n').forEach((line, index) => {
-      const code = line.replace(/\/\/.*$/, '').replace(/^\s*(\/?\*+).*$/, '');
-      assert.ok(!literal.test(code), `${file}:${index + 1} still has visible copy outside the catalogue: ${line.trim()}`);
-    });
-  }
+test('no screen or component keeps visible copy outside the catalogue (npm run i18n:extract)', () => {
+  const found = findLiterals();
+  assert.equal(found.length, 0, found.map(item => `${item.file}:${item.line} ${item.text}`).join('\n'));
 });
 
 test('every key the code asks for exists, and a key called without values has no placeholder to fill', () => {
@@ -74,14 +63,18 @@ test('every key the code asks for exists, and a key called without values has no
       }
     }
   }
-  assert.ok(checked > 150, 'the scan found the translated screens (' + checked + ' calls)');
+  assert.ok(checked > 600, 'the scan found the translated screens (' + checked + ' calls)');
 });
 
 test('both catalogues are complete: no empty text, and English is really English', () => {
   const keys = messageKeys(es);
   assert.deepEqual(messageKeys(en), keys);
   // Identical in both languages on purpose: proper names, format-only templates and the one-word English plural.
-  const same = new Set(['preferences.regionNames.AR', 'preferences.regionSample', 'transferForm.figure', 'selection.category']);
+  const same = new Set(['preferences.regionNames.AR', 'preferences.regionSample', 'transferForm.figure', 'selection.category',
+    // "Pesos" is also the English word; format-only templates; proper and technical names.
+    'budgets.currency.ARS', 'reports.currencyARS', 'cards.form.pesos', 'debts.form.pesos', 'reports.dayRow', 'reports.insights.largestDetail',
+    'reports.chart.donutLabel', 'reports.chart.bar', 'reports.chart.timelineBar', 'categoryManager.list.rowLabel', 'categoryManager.picker.color',
+    'categoryManager.icons.internet', 'settings.material.glass', 'assistant.draft.eyebrow', 'assistant.draft.row']);
   for (const key of keys) {
     for (const catalogue of [es, en]) {
       const value = leaf(catalogue, key);
@@ -97,7 +90,8 @@ test('plurals pick one for exactly one and other for everything else, in both la
   assert.ok(plurals.length >= 9, 'counts, accounts, categories, days and budget states are plurals: ' + plurals.join(', '));
   for (const key of plurals) for (const language of ['es', 'en'] as const) {
     const forms = leaf(language === 'es' ? es : en, key) as { one: string; other: string };
-    assert.ok(forms.one.includes('{count}') && forms.other.includes('{count}'), key + ' shows its number');
+    // A plural may only choose the sentence ("Completá el dato que falta"); if "one" shows the number, "other" must too.
+    assert.ok(!forms.one.includes('{count}') || forms.other.includes('{count}'), key + ' shows its number in every form');
     assert.equal(translate(language, key as never, { count: 1 }), forms.one.replace('{count}', '1'));
     for (const count of [0, 2, 21, 1000]) assert.equal(translate(language, key as never, { count }), forms.other.replace('{count}', String(count)));
   }
@@ -133,12 +127,19 @@ test('errors: a stored key and a known thrown message read in the interface lang
   for (const message of [zero, same, unparsable]) assert.notEqual(localizeError('en', message), message, 'the domain still throws the catalogued text: ' + message);
 });
 
-test('every catalogued error is still thrown verbatim by the domain or the storage layer', () => {
+test('every catalogued error is still thrown verbatim by the domain, the storage layer or the integration client', () => {
   const sources = [...readdirSync(join(root, '../../packages/domain')).filter(name => name.endsWith('.ts') && !name.endsWith('.test.ts')).map(name => '../../packages/domain/' + name),
     ...sourceFiles('src/storage')].map(read).join('\n');
-  for (const [group, messages] of Object.entries(es.errors)) for (const [name, text] of Object.entries(messages)) {
-    assert.ok(sources.includes(`'${text}'`), `errors.${group}.${name} is no longer thrown as written; update the catalogue with the source`);
+  for (const [group, messages] of Object.entries(es.errors)) for (const [name, text] of Object.entries(messages as Record<string, string>)) {
+    // A template ("Ya existe una categoría llamada «{name}».") is thrown as a template literal with any expression in place of each placeholder.
+    // validateVersionedRecord builds four of them from `Estado de ${what} inválido.` with what = apariencia | categoría.
+    const generated = /^Estado (inicial )?de (apariencia|categoría) inválido\.$/.exec(text);
+    if (generated) { assert.ok(sources.includes(`Estado ${generated[1] ?? ''}de \${what} inválido.`), text); continue; }
+    const pattern = new RegExp("['`]" + text.split(/\{[a-zA-Z0-9_]+\}/).map(part => part.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('\\$\\{[^}]+\\}') + "['`]");
+    assert.ok(pattern.test(sources), `errors.${group}.${name} is no longer thrown as written; update the catalogue with the source`);
   }
+  assert.equal(localizeError('en', 'Ya existe una categoría llamada «Gym (2)».'), 'A category named “Gym (2)” already exists.', 'a template keeps its value');
+  assert.equal(localizeError('es', '«Kiosco» ya es el nombre de otra categoría.'), '«Kiosco» ya es el nombre de otra categoría.');
 });
 
 test('built-in categories: localized names, unchanged identities, stored strings, budgets and history', () => {
@@ -238,4 +239,69 @@ test('English fits where Spanish fits: segment, tab, quick-action, button and he
     const text = translate(language, key as never);
     assert.ok(text.length <= limit, `${language} ${key} "${text}" is ${text.length} characters, more than ${limit}`);
   }
+});
+
+test('plural categories come from the language’s CLDR rule; a category a catalogue lacks reads "other"', () => {
+  assert.equal(pluralCategory('es', 1), 'one');
+  assert.equal(pluralCategory('es', 0), 'other');
+  assert.equal(pluralCategory('en', 1), 'one');
+  assert.equal(pluralCategory('ar', 0), 'zero', 'Arabic has six categories');
+  assert.equal(pluralCategory('ar', 2), 'two');
+  assert.equal(pluralCategory('ar', 3), 'few');
+  assert.equal(pluralCategory('ru', 5), 'many');
+  assert.equal(pluralCategory('pl', 22), 'few');
+  assert.equal(translate('es', 'count.movements', { count: 1000000 }), '1000000 movimientos', 'Spanish "many" (millions) falls back to other');
+  assert.deepEqual(requiredPlurals('es'), ['one', 'other'], 'whole numbers in Spanish need one and other');
+  assert.deepEqual(requiredPlurals('ar'), ['few', 'many', 'one', 'other', 'two', 'zero']);
+  assert.deepEqual(requiredPlurals('ja'), ['other']);
+});
+
+test('the catalogue validator finds no missing keys, placeholder mismatches, plural gaps or stale English (npm run i18n:check)', async () => {
+  const report = await checkCatalogues({ strict: true });
+  assert.deepEqual(report.errors, []);
+  assert.deepEqual(report.stale, [], 'English was reviewed against the current Spanish (npm run i18n:check -- --accept en after a review)');
+});
+
+test('the translation brief for a new language carries source, English reference, context, placeholders, plural categories and glossary', async () => {
+  const { file, count } = await exportLanguage('ar', { all: true });
+  const brief = JSON.parse(readFileSync(file, 'utf8'));
+  assert.equal(count, messageKeys(es).length);
+  const accounts = brief.entries.find((entry: any) => entry.key === 'home.accounts');
+  assert.deepEqual(accounts.plural, ['few', 'many', 'one', 'other', 'two', 'zero']);
+  assert.deepEqual(accounts.placeholders, ['count']);
+  assert.equal(accounts.english.other, '{count} accounts');
+  const help = brief.entries.find((entry: any) => entry.key === 'home.availableHelp');
+  assert.ok(help.glossary.some((term: any) => term.es === 'saldo registrado' || term.es === 'cuenta'), 'glossary terms are attached');
+  const ranking = brief.entries.find((entry: any) => entry.key === 'home.rankingLabel');
+  assert.match(ranking.context, /Comida/, 'the comment above the key is its context');
+});
+
+test('pseudo-locales for layout testing keep every placeholder: long text grows about 40 %, RTL is wrapped in embedding marks', () => {
+  const long = pseudoText('Registrar {count} movimientos');
+  assert.ok(long.includes('{count}'));
+  assert.ok(long.length >= Math.round('Registrar {count} movimientos'.length * 1.3));
+  const rtl = pseudoText('Hola {name}', 'rtl');
+  assert.equal(rtl, '\u202BHólá {name}\u202C');
+  const pseudo = pseudoCatalogue(es, 'long') as any;
+  for (const key of messageKeys(es)) {
+    const a = JSON.stringify(leaf(es, key)), b = JSON.stringify(leaf(pseudo, key));
+    assert.deepEqual([...b.matchAll(/\{[a-zA-Z0-9_]+\}/g)].map(m => m[0]).sort(), [...a.matchAll(/\{[a-zA-Z0-9_]+\}/g)].map(m => m[0]).sort(), key);
+  }
+});
+
+test('a debt’s hidden account is named from the debt in the interface language; Spanish equals the stored name', async () => {
+  const { accountDisplayName } = await import('../src/ui/liability-presentation.ts');
+  const account: domain.Account = { id: 'd', name: 'Debo · Juan', currency: 'ARS', openingMinor: -100, createdAt: '2026-01-01T12:00:00Z' };
+  const debt = { id: 'x', accountId: 'd', direction: 'owed_by_me', counterparty: 'Juan' } as domain.PersonalDebtProfile;
+  assert.equal(accountDisplayName(account, [debt]), account.name, 'Spanish reads exactly the stored name');
+  assert.equal(accountDisplayName(account, [debt], translator('en')), 'I owe · Juan', 'the person’s name is kept');
+  assert.equal(accountDisplayName({ ...account, name: 'Me deben · Ana' }, [{ ...debt, direction: 'owed_to_me', counterparty: 'Ana' }], translator('en')), 'Owed to me · Ana');
+  assert.equal(accountDisplayName({ ...account, id: 'cash', name: 'Caja' }, [debt], translator('en')), 'Caja', 'a cash account keeps its own name');
+  // Editing the counterparty does not rename the hidden account: the stored name is what shows, in Spanish byte for byte.
+  const edited = { ...debt, counterparty: 'Juan Pérez' };
+  assert.equal(accountDisplayName(account, [edited]), 'Debo · Juan');
+  assert.equal(accountDisplayName(account, [edited], translator('en')), 'I owe · Juan');
+  assert.equal(accountDisplayName({ ...account, name: 'Préstamo Juan' }, [debt], translator('en')), 'Préstamo Juan', 'a name without the prefix is shown as stored');
+  // The debt form stores the hidden account with the Spanish formula the catalogue reproduces.
+  assert.match(read('src/ui/debt-form.tsx'), /'Debo · ' : 'Me deben · '\) \+ counterparty\.trim\(\)/);
 });

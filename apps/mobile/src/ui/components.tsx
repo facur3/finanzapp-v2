@@ -9,7 +9,7 @@ import { router } from 'expo-router';
 import { radius, space, type, useCurrentDay, usePalette, useReduceMotion, type Palette } from './theme';
 import type { IconName } from './categories';
 import { tintOf } from './category-color';
-import { useAccountLook, useCategoryLook } from './category-hues';
+import { useAccountLook, useAccountNameOf, useCategoryLook } from './category-hues';
 import { AMOUNT_FIELD, ROW_STACK_SCALE, SEGMENT_GAP, SEGMENT_PADDING, amountFieldLayout, fitFontSize, rowStacks, segmentLayout } from './geometry';
 import { duration, easeOut, selectionHaptic, timing } from './motion';
 import { EMPTY_AMOUNT, amountFromCanonical, readAmountChange, renderAmount, settleAmount, splitAmount } from './money-input';
@@ -617,16 +617,19 @@ export function TransferRow({ transfer: t, accounts, accountId, last = false, sh
   const day = useCurrentDay();
   const { t: tr, relativeDate } = useI18n();
   const from = accounts.find(a => a.id === t.fromAccountId)!, to = accounts.find(a => a.id === t.toAccountId)!;
+  // A debt's hidden account is named from the debt, in the interface language.
+  const nameOf = useAccountNameOf();
+  const fromName = nameOf(from), toName = nameOf(to);
   const date = relativeDate(t.dateISO, day);
   const outgoing = accountId === from.id;
   const incoming = accountId === to.id;
   const title = context === 'card' ? tr(incoming ? 'rows.cardPayment' : 'rows.transfer') : context === 'debt' ? tr(incoming ? 'rows.payment' : 'rows.collection') : t.note || tr('rows.transfer');
-  const detail = context ? [t.note && t.note !== title ? t.note : null, incoming ? tr('rows.fromAccount', { name: from.name }) : tr('rows.toAccount', { name: to.name }), showDate ? date : null].filter(Boolean).join(' · ')
-    : `${from.name} → ${to.name}${showDate ? ' · ' + date : ''}`;
+  const detail = context ? [t.note && t.note !== title ? t.note : null, incoming ? tr('rows.fromAccount', { name: fromName }) : tr('rows.toAccount', { name: toName }), showDate ? date : null].filter(Boolean).join(' · ')
+    : `${fromName} → ${toName}${showDate ? ' · ' + date : ''}`;
   const signed = !!accountId && !context;
   const stacked = useStacked({ minor: signed && outgoing ? -t.amountMinor : t.amountMinor, currency: from.currency, signed });
   return <PressFeedback feedback="highlight" accessibilityRole="button"
-    accessibilityLabel={tr('rows.transferLabel', { title, from: from.name, to: to.name, amount: formatMinorUnits(t.amountMinor) + ' ' + from.currency, date }) + (t.note ? ', ' + t.note : '')}
+    accessibilityLabel={tr('rows.transferLabel', { title, from: fromName, to: toName, amount: formatMinorUnits(t.amountMinor) + ' ' + from.currency, date }) + (t.note ? ', ' + t.note : '')}
     onPress={() => router.push({ pathname: '/transfer/[id]', params: { id: t.id } })}
     style={[styles.row, { borderBottomColor: p.line, borderBottomWidth: last ? 0 : StyleSheet.hairlineWidth }]}>
     <GlyphTile icon={context === 'card' ? 'card-outline' : context === 'debt' ? 'people-outline' : 'swap-horizontal-outline'} tone="transfer" />

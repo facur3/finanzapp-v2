@@ -55,9 +55,9 @@ function RankedRow({ category, totalMinor, currency, index, last, onPress }: {
 }) {
   const p = usePalette();
   const reduced = useReduceMotion();
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const { hex: color, label: name } = useCategoryLook(category.category);
-  const { fraction, label } = spendingShare(category.amountMinor, totalMinor);
+  const { fraction, label } = spendingShare(category.amountMinor, totalMinor, locale);
   // First data: the fill grows from zero (or, under Reduce Motion, fades in already sized). Later data: the fill moves to the new share.
   const progress = useSharedValue(reduced ? fraction : 0);
   const opacity = useSharedValue(reduced ? 0 : 1);

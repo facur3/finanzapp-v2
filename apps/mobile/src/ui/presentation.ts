@@ -1,6 +1,6 @@
 import { labelFromISO, type Account, type Currency, type Entry, type EntryKind, type Transfer } from '@finanzapp/domain';
 import { dateFromISO, daysAgo, formatDate, relativeDayName } from '../i18n/format.ts';
-import { DEFAULT_LOCALE, languageOf, type AppLocale } from '../i18n/locale.ts';
+import { DEFAULT_LOCALE, type AppLocale } from '../i18n/locale.ts';
 
 export type EntryFilter = 'all' | EntryKind | 'transfer';
 
@@ -12,8 +12,8 @@ export function activityDateLabel(dateISO: string, todayISO: string, locale: App
   if (!date) return labelFromISO(dateISO, new Date(todayISO + 'T12:00:00'));
   const days = daysAgo(dateISO, todayISO);
   const short = formatDate(dateISO, 'day', locale);
-  if (days !== null && days >= 0 && days < 7 && days !== 2) return relativeDayName(dateISO, todayISO, locale) + ' · ' + short;
-  if (days === 2) return (languageOf(locale) === 'es' ? 'Anteayer' : relativeDayName(dateISO, todayISO, locale)) + ' · ' + short;
+  // relativeDayName gives Hoy / Ayer / Anteayer (Today / Yesterday / a weekday) and weekdays within the week.
+  if (days !== null && days >= 0 && days < 7) return relativeDayName(dateISO, todayISO, locale) + ' · ' + short;
   const today = dateFromISO(todayISO);
   return today && today.year === date.year ? short : formatDate(dateISO, 'dayYear', locale);
 }

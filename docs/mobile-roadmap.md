@@ -15,13 +15,86 @@ server-keyed; manual recording and local data work without connectivity. Recurri
 expenses, debts, budgets and cards remain in scope. Native navigation, accessible
 amounts, real data and recoverable durable writes remain requirements.
 
-## Status and current delivery — Producto 23.1B1
+## Status and current delivery — Producto 23.1B2
 
 Implemented is code, checked names a test, device-verified needs a physical result,
 and released means distributed. Neither a bundle nor a screenshot is App Store QA.
 
+**23.1B2 completes the extraction and translation of the whole app.** Reportes,
+Tarjetas, Deudas y cobros, Cuentas, Presupuestos, Recurrentes, Categorías, copias de
+seguridad, Más/preferencias and the Asistente read every visible string, alert,
+confirmation, empty state, dynamic title, descriptive date, chart label and VoiceOver
+string from the catalogues. The English catalogue is complete (≈1 090 keys) and still
+unreleased (`RELEASED_LANGUAGES = ['es']`). Spanish is unchanged except three singular
+fixes ("1 gasto registrado" in the day report and in a timeline bar's VoiceOver, "Hay 1
+registro" in a backup conflict) and one consistency fix: a built-in category the person
+renamed now shows its new name in Reportes (budget rows, insights) and in the Asistente's
+evidence rows and chips, as it already did in Presupuestos and Movimientos.
+No SQLite, schema, stored amount, accounting rule, backup format, currency engine,
+amount-field separator, native module or dependency change. Process and architecture:
+[docs/i18n.md](i18n.md).
+
+- [x] **Modular catalogues.** `messages/es/*.ts` and `messages/en/*.ts`, one module per
+  area (common, navigation, home, activity, forms, categories, preferences, errors,
+  reports, cards, debts, accounts, budgets, recurring, category-manager, backup,
+  settings, assistant), composed in each `index.ts`; `messages.ts` remains the single
+  typed entry. English modules are typed `Pick<Messages, …>`, so a missing key fails to
+  compile in the module that owns it.
+- [x] **CLDR plurals.** Plural entries accept zero/one/two/few/many/other and are chosen
+  with `Intl.PluralRules`, falling back to one/other; plural detection is strict (a
+  namespace holding an id called "other" is not a plural).
+- [x] **Transfer form parameters.** Tarjetas and Deudas no longer send a Spanish `title`
+  or `note` in the URL: the form derives its title (card payment, debt payment,
+  collection) and writes its default note with `t(…)` (a caller's note still wins, so
+  Spanish notes such as "Pago Visa" are unchanged). A debt's hidden account ("Debo ·
+  Juan") keeps its stored name; only its Spanish prefix is read in the interface
+  language ("I owe · Juan", `accountDisplayName`, `useAccountNameOf`) in rows, the
+  transfer detail and the payment form, so Spanish is byte-identical even after the
+  counterparty is edited.
+- [x] **Categories.** Built-in names localized everywhere (lists, reports, budgets,
+  insights, the Asistente's chips); editing a built-in category in English without
+  renaming saves the identity's own label, never the English word; custom and renamed
+  names keep the person's text.
+- [x] **Asistente.** Interface copy (suggestions, notes, clarifications, draft card,
+  evidence rows and links, fixture banner) translated and stored as keys so it follows a
+  language change; model output and the development fixtures are content and stay as
+  written; the protocol fact labels sent to the server are unchanged and evidence is
+  shown from fact ids.
+- [x] **Errors.** Every message the domain and the storage layer throw is catalogued
+  (164 keys), including templates («{name}»), and shown in the reader's language by
+  `ErrorMessage`/`errorText`; forms and screens store their own errors as keys. Risks of
+  the text coupling and the migration to stable error codes: `docs/i18n.md` §5.
+- [x] **Tools for many languages** (local, no service): `npm run i18n:extract` (copy
+  outside the catalogue, with a justified allow-list), `npm run i18n:check` (missing
+  keys, placeholders, plural categories per language, empty text, stale translations via
+  `i18n/translations.lock.json`), `npm run i18n:export -- <lang>` (a brief per key with
+  source, English, context comment, placeholders, plural categories and glossary terms,
+  for AI-assisted translation or a platform), pseudo-locales (long and RTL) and
+  `i18n/glossary.json`. All run in the test suite. A library evaluation (FormatJS ICU,
+  i18next, Lingui), the Crowdin plan and the RTL checklist are in `docs/i18n.md`.
+- [x] **Decoupling reviewed.** The domain, SQLite and `money-input.ts` import nothing
+  from i18n; no component interpolates or picks plurals itself; only `useI18n()`.
+- [x] **Checked on Linux:** 372 mobile tests (29 new: English cases in every area's
+  harness — Reportes, Tarjetas, Deudas, Cuentas, Presupuestos, Recurrentes, Categorías
+  with the preset-identity case, backup review/restore identical to Spanish, Más,
+  material labels, Asistente with an unchanged model message and an identical confirmed
+  draft — plus plural categories, the validator, the export brief, pseudo-locales,
+  template errors and debt display names), TypeScript, `i18n:extract` 0, `i18n:check
+  --strict` 0 errors / 0 stale, `expo install --check`, dependency tree, `npm audit`,
+  Metro iOS export, root tests, Vite build, repo hygiene (results in the PR).
+- [ ] **Not device-verified:** that nothing visible changed in Spanish on the iPhone;
+  English is seen only in tests until 23.1C.
+- [ ] **Pending for 23.1C:** release English and the US region together; regional
+  separators in the amount field (`money-input.ts`), `Money`, row amounts and VoiceOver
+  amounts (still `formatMinorUnits` with Argentine separators); the Región row in Más;
+  date pickers' locale; `expo-localization` `supportedLocales` (native rebuild); device
+  QA of English at the largest Dynamic Type; decide whether the Assistant request carries
+  the interface language.
+
+### Previous delivery — Producto 23.1B1
+
 Producto 23.1B (every screen's copy in the catalogue) is split into two PRs. **23.1B1**
-(this delivery): navigation, Inicio, Movimientos, the main movement forms and the shared
+(delivered): navigation, Inicio, Movimientos, the main movement forms and the shared
 components. **23.1B2** (next, after this PR is approved): the remaining financial
 screens, Reportes, Tarjetas, Deudas, Recurrentes, Presupuestos, Cuentas, Categorías,
 backup and the Asistente. English stays unreleased and unlisted until 23.1B2 and 23.1C
@@ -1165,8 +1238,9 @@ by CI and merged into master before the next starts:
 14. **Producto 23.1 — complete internationalization**, in four PRs: **23.1A**
     (reactive language/region architecture, the Idioma preference; delivered),
     **23.1B1** (navigation, Inicio, Movimientos, main forms and shared components through
-    the catalogue; this delivery), **23.1B2** (remaining financial screens, Reportes,
-    Tarjetas, Deudas, Recurrentes, backup and the Asistente; English complete but gated),
+    the catalogue; delivered), **23.1B2** (remaining financial screens, Reportes,
+    Tarjetas, Deudas, Recurrentes, backup and the Asistente; English complete but gated;
+    modular catalogues and the tooling for many languages; this delivery),
     **23.1C** (regional money formats and amount-field separators, the US region and
     English released, `supportedLocales`). Original scope: every screen's copy in the
     catalogue, English released (`RELEASED_LOCALES`), `expo-localization`'s
@@ -1331,6 +1405,21 @@ amount uses `useStacked()` and gives the name two lines. 44-point targets, Voice
 safe areas, system text and separate currencies apply to every new screen.
 
 ## Handoff log (historical evidence)
+
+### 2026-09-24 — Producto 23.1B2: translation of the remaining screens and multi-language tooling
+
+- Every remaining screen reads the catalogues; English complete (≈1 090 keys) and still
+  unreleased; catalogues split into per-area modules with one typed entry; CLDR plurals;
+  every domain/storage error catalogued (templates included); transfer titles derived by
+  the form instead of travelling in the URL; debt accounts displayed from the debt;
+  built-in categories localized with identities untouched; the Asistente's interface
+  translated while model output and protocol labels stay as they are; local tools
+  (`i18n:extract`, `i18n:check`, `i18n:export`, pseudo-locales, glossary) and
+  `docs/i18n.md` (process for new languages, AI-assisted translation, Crowdin plan, RTL,
+  library evaluation, error-code migration).
+- **Checked on Linux:** 372 mobile tests and the checks listed under the current
+  delivery. **Not device-verified.** No native rebuild needed.
+- **Next:** Producto 23.1C (list under the current delivery).
 
 ### 2026-09-23 — Producto 23.1B1: translation of navigation, Inicio, Movimientos and main forms
 

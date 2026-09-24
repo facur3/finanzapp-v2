@@ -3,6 +3,7 @@ import { StyleSheet, Text, View, useWindowDimensions, type NativeScrollEvent, ty
 import Animated, { Extrapolation, interpolate, useAnimatedScrollHandler, useAnimatedStyle, useSharedValue, type SharedValue } from 'react-native-reanimated';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import type { Currency } from '@finanzapp/domain';
+import { useI18n } from '../i18n/provider';
 import { PressFeedback } from './components';
 import { carouselIndex } from './geometry';
 import { duration, selectionHaptic } from './motion';
@@ -30,10 +31,11 @@ export const CARD_ASPECT = 1.586;
 export function CardFace({ id, name, issuer, last4, currency, width, onPress, accessibilityHint }: {
   id: string; name: string; issuer: string; last4: string; currency: Currency; width: number; onPress?: () => void; accessibilityHint?: string;
 }) {
+  const { t } = useI18n();
   const face = FACES[cardFaceIndex(id)];
   const height = Math.round(width / CARD_ASPECT);
-  const label = [name, issuer || null, last4 ? 'termina en ' + last4 : null, currency === 'USD' ? 'dólares' : 'pesos'].filter(Boolean).join(', ');
-  const body = <View accessible accessibilityRole={onPress ? 'button' : 'image'} accessibilityLabel={'Tarjeta ' + label} accessibilityHint={accessibilityHint}
+  const label = [name, issuer || null, last4 ? t('cards.face.endsIn', { last4 }) : null, t(currency === 'USD' ? 'cards.face.dollars' : 'cards.face.pesos')].filter(Boolean).join(', ');
+  const body = <View accessible accessibilityRole={onPress ? 'button' : 'image'} accessibilityLabel={t('cards.face.label', { details: label })} accessibilityHint={accessibilityHint}
     style={[styles.face, { width, height, backgroundColor: face.base }]}>
     <View pointerEvents="none" style={[styles.sheen, { backgroundColor: face.highlight, width: height * 1.5, height: height * 1.5, borderRadius: height, right: -height * 0.55, top: -height * 0.75 }]} />
     <View pointerEvents="none" style={[styles.sheen, { backgroundColor: '#FFFFFF', opacity: 0.05, width: height, height, borderRadius: height, left: -height * 0.35, bottom: -height * 0.5 }]} />
@@ -60,6 +62,7 @@ export function CardCarousel<T extends { id: string }>({ items, render, onSelect
   items: T[]; render: (item: T, width: number) => ReactNode; onSelect: (index: number) => void; selectedIndex: number;
 }) {
   const p = usePalette();
+  const { t } = useI18n();
   const reduced = useReduceMotion();
   const { width: windowWidth } = useWindowDimensions();
   const width = Math.min(windowWidth - space.xl * 2, 420);
@@ -78,7 +81,7 @@ export function CardCarousel<T extends { id: string }>({ items, render, onSelect
       onScroll={onScroll} scrollEventThrottle={16} onMomentumScrollEnd={settle} onScrollEndDrag={settle}
       getItemLayout={(_, index) => ({ length: step, offset: step * index, index })}
       renderItem={({ item, index }) => <CarouselItem index={index} step={step} width={width} scrollX={scrollX} flat={reduced}>{render(item, width)}</CarouselItem>} />
-    {items.length > 1 && <View accessible accessibilityLabel={`Tarjeta ${selectedIndex + 1} de ${items.length}`} style={styles.dots}>
+    {items.length > 1 && <View accessible accessibilityLabel={t('cards.face.position', { index: selectedIndex + 1, count: items.length })} style={styles.dots}>
       {items.map((item, index) => <Animated.View key={item.id} style={[styles.dot, { backgroundColor: index === selectedIndex ? p.text : p.line,
         transitionProperty: 'backgroundColor', transitionDuration: reduced ? 0 : duration.state }]} />)}
     </View>}

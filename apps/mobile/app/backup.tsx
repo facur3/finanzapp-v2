@@ -5,12 +5,14 @@ import { router } from 'expo-router';
 import { BACKUP_MAX_BYTES, createRecoveryBackup, parsePilotBackup } from '@finanzapp/domain';
 import { useLedger } from '../src/storage/LedgerProvider';
 import { ActionButton, AppText, ErrorMessage, NavigationRow, Screen, SectionTitle, Surface } from '../src/ui/components';
+import { useI18n } from '../src/i18n/provider';
 
 /** Export and import of the native pilot backup, moved out of the Más hub so
  * that screen stays a list. The export logic is unchanged: a snapshot this app
  * can restore, shared through the system sheet, never uploaded on its own. */
 export default function BackupScreen() {
   const { archive } = useLedger();
+  const { t } = useI18n();
   const [busy, setBusy] = useState(false);
   const sharing = useRef(false);
   const [error, setError] = useState<string | null>(null);
@@ -22,18 +24,18 @@ export default function BackupScreen() {
     setError(null);
     let file: File | null = null;
     try {
-      if (!await Sharing.isAvailableAsync()) throw new Error('No está disponible el menú para compartir en este dispositivo.');
+      if (!await Sharing.isAvailableAsync()) throw new Error('backup.export.sharingUnavailable');
       const backup = createRecoveryBackup(archive);
       const json = JSON.stringify(backup, null, 2);
       parsePilotBackup(json); // Only export a snapshot this app can restore.
       file = new File(Paths.cache, `finanzapp-piloto-${Date.now()}.json`);
       file.create();
       file.write(json);
-      if (file.size > BACKUP_MAX_BYTES) throw new Error('La copia supera el límite de 5 MB de este piloto. No borres la app; conservá tus datos mientras ampliamos la recuperación.');
-      await Sharing.shareAsync(file.uri, { mimeType: 'application/json', UTI: 'public.json', dialogTitle: 'Guardar copia de FinanzApp' });
+      if (file.size > BACKUP_MAX_BYTES) throw new Error('backup.export.tooLarge');
+      await Sharing.shareAsync(file.uri, { mimeType: 'application/json', UTI: 'public.json', dialogTitle: t('backup.export.dialogTitle') });
       // The sheet can be cancelled. Do not announce a successful export here.
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'No se pudo preparar la copia. Tus datos siguen en el dispositivo.');
+      setError(cause instanceof Error ? cause.message : 'backup.export.prepareFailed');
     } finally {
       try { if (file?.exists) file.delete(); } catch { /* Only our temporary export; the OS can clear the cache later. */ }
       sharing.current = false;
@@ -42,16 +44,16 @@ export default function BackupScreen() {
   }
 
   return <Screen>
-    <Surface><SectionTitle>Compartir copia</SectionTitle>
-      <AppText secondary style={{ fontSize: 15 }}>Guardá tus cuentas, tarjetas, deudas, movimientos, presupuestos y recurrentes en un lugar privado antes de borrar la app o cambiar de teléfono.</AppText>
-      <AppText secondary style={{ fontSize: 13 }}>Incluye el estado actual y los movimientos deshechos. El archivo no está cifrado: guardalo en un lugar privado.</AppText>
+    <Surface><SectionTitle>{t('backup.export.share')}</SectionTitle>
+      <AppText secondary style={{ fontSize: 15 }}>{t('backup.export.intro')}</AppText>
+      <AppText secondary style={{ fontSize: 13 }}>{t('backup.export.note')}</AppText>
       <ErrorMessage message={error} />
-      <ActionButton label="Compartir copia" icon="share-outline" onPress={exportBackup} busy={busy} disabled={!archive} secondary />
+      <ActionButton label={t('backup.export.share')} icon="share-outline" onPress={exportBackup} busy={busy} disabled={!archive} secondary />
     </Surface>
     <Surface grouped>
-      <NavigationRow title="Importar copia" subtitle="Revisar el archivo antes de agregar" icon="download-outline" last disabled={busy}
+      <NavigationRow title={t('backup.export.importTitle')} subtitle={t('backup.export.importSubtitle')} icon="download-outline" last disabled={busy}
         onPress={() => router.push('/backup-import')} />
     </Surface>
-    <AppText secondary variant="footnote">Una copia es una foto de tus datos, no una sincronización entre dispositivos. Importar solo agrega lo que falta y nunca reemplaza registros existentes.</AppText>
+    <AppText secondary variant="footnote">{t('backup.export.footer')}</AppText>
   </Screen>;
 }

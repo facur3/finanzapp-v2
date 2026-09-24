@@ -5,15 +5,13 @@ import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-na
 import { currentMonthISO, formatMinorUnits, shiftMonthISO, summarizeMonthlyBudgets, type BudgetProgress, type CategoryMonthlyBudget, type Currency,
   type TotalMonthlyBudget } from '@finanzapp/domain';
 import { useLedger } from '../src/storage/LedgerProvider';
-import { budgetTone, percentUsed } from '../src/ui/budget-presentation';
+import { budgetCategoriesCaption, budgetTone, percentUsed } from '../src/ui/budget-presentation';
 import { useCategoryLabel } from '../src/ui/category-hues';
 import { ActionButton, AppText, CategoryBadge, Choices, EmptyState, IconButton, Money, PressFeedback, Screen, SectionTitle, Stat, StatRow, Surface } from '../src/ui/components';
-import { formatMonth } from '../src/i18n/format';
+import { useI18n } from '../src/i18n/provider';
 import { availableCurrencies } from '../src/ui/presentation';
 import { timing } from '../src/ui/motion';
 import { space, useCurrentDay, usePalette, useReduceMotion } from '../src/ui/theme';
-
-const monthLabel = (monthISO: string) => formatMonth(monthISO);
 
 /** Hierarchy: the general budget (the month's ceiling over every recorded
  * expense) is the primary summary when it exists; category sublimits sit
@@ -26,6 +24,7 @@ export default function BudgetsScreen() {
   const { archive, snapshot } = useLedger();
   const day = useCurrentDay();
   const p = usePalette();
+  const { t, formatMonth } = useI18n();
   const currencies = availableCurrencies(snapshot?.accounts ?? []);
   const initialCurrency: Currency = params.currency === 'USD' ? 'USD' : 'ARS';
   const [selectedCurrency, setSelectedCurrency] = useState<Currency>(initialCurrency);
@@ -38,9 +37,9 @@ export default function BudgetsScreen() {
   const money = (minor: number) => (currency === 'USD' ? 'US$ ' : '$ ') + formatMinorUnits(minor);
 
   if (!snapshot || !archive || !summary) return null;
-  if (!snapshot.accounts.length) return <Screen><EmptyState title="Primero, una cuenta"
-    detail="Los presupuestos se comparan con gastos registrados en una moneda concreta."
-    action={<ActionButton label="Agregar cuenta" onPress={() => router.push('/new-account')} />} /></Screen>;
+  if (!snapshot.accounts.length) return <Screen><EmptyState title={t('budgets.screen.noAccountTitle')}
+    detail={t('budgets.screen.noAccountDetail')}
+    action={<ActionButton label={t('common.addAccount')} onPress={() => router.push('/new-account')} />} /></Screen>;
   const exceeded = summary.rows.filter(row => budgetTone(row) === 'expense').length;
   const near = summary.rows.filter(row => budgetTone(row) === 'warning').length;
   const isCurrent = monthISO === currentMonthISO(day);
@@ -48,47 +47,47 @@ export default function BudgetsScreen() {
   const newBudget = (scope: 'total' | 'category') => router.push({ pathname: '/new-budget', params: { currency, month: monthISO, scope } });
 
   return <Screen gap={space.xxl}>
-    <Stack.Screen options={{ title: 'Presupuestos',
-      headerRight: () => <IconButton name="add" label="Agregar presupuesto"
+    <Stack.Screen options={{ title: t('nav.titles.budgets'),
+      headerRight: () => <IconButton name="add" label={t('budgets.screen.add')}
         onPress={() => router.push({ pathname: '/new-budget', params: { currency, month: monthISO } })} /> }} />
 
     <View style={{ gap: space.m }}>
       {currencies.length > 1 && <Choices value={currency} onChange={setSelectedCurrency}
-        options={currencies.map(value => ({ value, label: value === 'ARS' ? 'Pesos · ARS' : 'Dólares · USD' }))} />}
+        options={currencies.map(value => ({ value, label: t(value === 'ARS' ? 'budgets.currency.ARS' : 'budgets.currency.USD') }))} />}
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-        <IconButton name="chevron-back" label="Mes anterior" onPress={() => setMonthISO(value => shiftMonthISO(value, -1))} />
+        <IconButton name="chevron-back" label={t('budgets.screen.previousMonth')} onPress={() => setMonthISO(value => shiftMonthISO(value, -1))} />
         <View style={{ flex: 1, alignItems: 'center', gap: 2 }}>
-          <AppText accessibilityRole="header" variant="title3" style={{ textTransform: 'capitalize', textAlign: 'center' }}>{monthLabel(monthISO)}</AppText>
+          <AppText accessibilityRole="header" variant="title3" style={{ textTransform: 'capitalize', textAlign: 'center' }}>{formatMonth(monthISO)}</AppText>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-            <AppText secondary variant="caption">{isCurrent ? 'Mes en curso' : monthISO > currentMonthISO(day) ? 'Mes futuro · podés prepararlo' : 'Mes cerrado'}</AppText>
-            {!isCurrent && <PressFeedback feedback="opacity" accessibilityRole="button" accessibilityLabel="Volver al mes actual" onPress={() => setMonthISO(currentMonthISO(day))} style={{ minHeight: 28 }}>
-              <AppText variant="caption" style={{ fontWeight: '600', color: p.primary }}>Este mes</AppText>
+            <AppText secondary variant="caption">{t(isCurrent ? 'budgets.screen.currentMonth' : monthISO > currentMonthISO(day) ? 'budgets.screen.futureMonth' : 'budgets.screen.closedMonth')}</AppText>
+            {!isCurrent && <PressFeedback feedback="opacity" accessibilityRole="button" accessibilityLabel={t('budgets.screen.backToCurrent')} onPress={() => setMonthISO(currentMonthISO(day))} style={{ minHeight: 28 }}>
+              <AppText variant="caption" style={{ fontWeight: '600', color: p.primary }}>{t('budgets.screen.thisMonth')}</AppText>
             </PressFeedback>}
           </View>
         </View>
-        <IconButton name="chevron-forward" label="Mes siguiente" onPress={() => setMonthISO(value => shiftMonthISO(value, 1))} />
+        <IconButton name="chevron-forward" label={t('budgets.screen.nextMonth')} onPress={() => setMonthISO(value => shiftMonthISO(value, 1))} />
       </View>
     </View>
 
-    {!total && !activeCount ? <EmptyState title="Dale un límite a tu mes"
-      detail="Un presupuesto general es el techo de todos tus gastos del mes; los límites por categoría son sublímites dentro de él. FinanzApp los compara con tus gastos reales sin contar transferencias ni ingresos."
+    {!total && !activeCount ? <EmptyState title={t('budgets.screen.emptyTitle')}
+      detail={t('budgets.screen.emptyDetail')}
       icon="speedometer-outline"
-      action={<ActionButton label="Crear presupuesto" icon="add-outline" onPress={() => newBudget('total')} />} /> : <>
+      action={<ActionButton label={t('budgets.screen.create')} icon="add-outline" onPress={() => newBudget('total')} />} /> : <>
       {total ? <View>
-        <SectionTitle action="Editar" onAction={() => router.push({ pathname: '/edit-budget/[id]', params: { id: total.budget.id } })}>Presupuesto general</SectionTitle>
+        <SectionTitle action={t('budgets.screen.edit')} onAction={() => router.push({ pathname: '/edit-budget/[id]', params: { id: total.budget.id } })}>{t('budgets.screen.general')}</SectionTitle>
         <TotalPanel total={total} currency={currency} money={money} />
-      </View> : <ActionButton label="Agregar presupuesto general" icon="add-outline" secondary compact onPress={() => newBudget('total')} />}
+      </View> : <ActionButton label={t('budgets.screen.addGeneral')} icon="add-outline" secondary compact onPress={() => newBudget('total')} />}
 
       <View>
-        <SectionTitle action="Agregar" onAction={() => newBudget('category')}
-          caption={activeCount ? `${activeCount} ${activeCount === 1 ? 'categoría' : 'categorías'}${exceeded ? ` · ${exceeded} ${exceeded === 1 ? 'excedida' : 'excedidas'}` : ''}${near ? ` · ${near} cerca del límite` : ''}${!exceeded && !near ? ' · todas en orden' : ''}` : undefined}>
-          Por categoría
+        <SectionTitle action={t('budgets.screen.addCategory')} onAction={() => newBudget('category')}
+          caption={budgetCategoriesCaption(activeCount, exceeded, near, t)}>
+          {t('budgets.screen.byCategory')}
         </SectionTitle>
         {activeCount ? <Surface grouped>
           {summary.rows.map((row, index) => <BudgetRow key={row.budget.id} row={row} money={money} last={index === summary.rows.length - 1} />)}
-        </Surface> : <AppText secondary variant="subhead">Sin límites por categoría este mes. Son sublímites dentro del general y no se suman entre sí.</AppText>}
+        </Surface> : <AppText secondary variant="subhead">{t('budgets.screen.noSublimits')}</AppText>}
         {activeCount > 0 && summary.unbudgetedSpentMinor > 0 && <AppText secondary variant="footnote" style={{ marginTop: 8 }}>
-          Además gastaste {money(summary.unbudgetedSpentMinor)} en categorías sin límite propio.
+          {t('budgets.screen.unbudgeted', { amount: money(summary.unbudgetedSpentMinor) })}
         </AppText>}
       </View>
     </>}
@@ -101,22 +100,25 @@ export default function BudgetsScreen() {
  * of the month in this currency; sublimits do not change it. */
 function TotalPanel({ total, currency, money }: { total: BudgetProgress<TotalMonthlyBudget>; currency: Currency; money: (minor: number) => string }) {
   const p = usePalette();
+  const { t } = useI18n();
   const tone = budgetTone(total);
   const color = tone === 'expense' ? p.expense : tone === 'warning' ? p.warning : p.secondary;
   const percent = percentUsed(total);
   const remaining = total.remainingMinor;
-  return <View accessible accessibilityLabel={`Presupuesto general: ${money(total.spentMinor)} de ${money(total.budget.amountMinor)}, ${percent} por ciento usado. ${remaining < 0 ? 'Excedido por ' + money(-remaining) : remaining === 0 ? 'Límite alcanzado' : 'Disponible ' + money(remaining)}`}><Surface style={{ gap: 12 }}>
+  return <View accessible accessibilityLabel={t('budgets.total.label', { spent: money(total.spentMinor), limit: money(total.budget.amountMinor), percent,
+    status: remaining < 0 ? t('budgets.total.exceededBy', { amount: money(-remaining) }) : remaining === 0 ? t('budgets.total.reached') : t('budgets.total.availableAmount', { amount: money(remaining) }) })}><Surface style={{ gap: 12 }}>
     <View style={{ gap: 2 }}>
-      <AppText secondary variant="caption" style={{ fontWeight: '500' }}>{remaining < 0 ? 'Excedido' : 'Disponible'}</AppText>
+      <AppText secondary variant="caption" style={{ fontWeight: '500' }}>{t(remaining < 0 ? 'budgets.total.exceeded' : 'budgets.total.available')}</AppText>
       <Money minor={Math.abs(remaining)} currency={currency} large color={tone === 'neutral' ? undefined : tone === 'expense' ? p.expense : p.warning} />
     </View>
     <TotalBar spent={total.spentMinor} total={total.budget.amountMinor} progress={total} />
     <StatRow>
-      <Stat label="Gastado"><Money minor={total.spentMinor} currency={currency} size={17} /></Stat>
-      <Stat label="Límite"><Money minor={total.budget.amountMinor} currency={currency} size={17} /></Stat>
+      <Stat label={t('budgets.total.spent')}><Money minor={total.spentMinor} currency={currency} size={17} /></Stat>
+      <Stat label={t('budgets.total.limit')}><Money minor={total.budget.amountMinor} currency={currency} size={17} /></Stat>
     </StatRow>
     <AppText variant="footnote" style={{ color, fontWeight: tone === 'neutral' ? '400' : '600' }}>
-      {percent} % utilizado{tone === 'expense' ? ' · excedido' : tone === 'warning' ? (remaining === 0 ? ' · límite alcanzado' : ' · cerca del límite') : ''}
+      {t('budgets.total.used', { percent }) + (tone === 'expense' ? ' · ' + t('budgets.total.stateExceeded')
+        : tone === 'warning' ? ' · ' + t(remaining === 0 ? 'budgets.total.stateReached' : 'budgets.total.stateNear') : '')}
     </AppText>
   </Surface></View>;
 }
@@ -124,6 +126,7 @@ function TotalPanel({ total, currency, money }: { total: BudgetProgress<TotalMon
 function BudgetRow({ row, money, last }: { row: BudgetProgress<CategoryMonthlyBudget>; money: (minor: number) => string; last: boolean }) {
   const p = usePalette();
   const reduced = useReduceMotion();
+  const { t } = useI18n();
   const ratio = Math.min(1, row.ratio);
   const progress = useSharedValue(ratio);
   useEffect(() => { progress.value = withTiming(ratio, timing('data', reduced)); }, [ratio, reduced, progress]);
@@ -131,10 +134,11 @@ function BudgetRow({ row, money, last }: { row: BudgetProgress<CategoryMonthlyBu
   const state = budgetTone(row);
   const tone = state === 'expense' ? p.expense : state === 'warning' ? p.warning : p.text;
   const percent = percentUsed(row);
-  const status = row.exceeded ? `Excedido por ${money(-row.remainingMinor)}` : row.remainingMinor === 0 ? 'Límite alcanzado' : `Quedan ${money(row.remainingMinor)}`;
+  const status = row.exceeded ? t('budgets.row.exceededBy', { amount: money(-row.remainingMinor) }) : row.remainingMinor === 0 ? t('budgets.row.reached')
+    : t('budgets.row.left', { amount: money(row.remainingMinor) });
   const name = useCategoryLabel(row.budget.category);
   return <PressFeedback feedback="highlight" accessibilityRole="button"
-    accessibilityLabel={`Presupuesto ${name}: ${money(row.spentMinor)} de ${money(row.budget.amountMinor)}, ${percent} por ciento. ${status}`}
+    accessibilityLabel={t('budgets.row.label', { name, spent: money(row.spentMinor), limit: money(row.budget.amountMinor), percent, status })}
     onPress={() => router.push({ pathname: '/edit-budget/[id]', params: { id: row.budget.id } })}
     style={{ paddingHorizontal: 16, paddingVertical: 12, gap: 10, borderBottomWidth: last ? 0 : StyleSheet.hairlineWidth, borderBottomColor: p.line }}>
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
@@ -142,9 +146,9 @@ function BudgetRow({ row, money, last }: { row: BudgetProgress<CategoryMonthlyBu
       <View style={{ flex: 1, minWidth: 0, gap: 3 }}>
         <AppText numberOfLines={2} style={{ fontWeight: '500' }}>{name}</AppText>
         <AppText variant="footnote" style={{ color: state === 'neutral' ? p.secondary : tone }}>{status}</AppText>
-        <AppText secondary variant="caption" style={{ fontVariant: ['tabular-nums'] }}>{money(row.spentMinor)} de {money(row.budget.amountMinor)}</AppText>
+        <AppText secondary variant="caption" style={{ fontVariant: ['tabular-nums'] }}>{t('budgets.row.of', { spent: money(row.spentMinor), limit: money(row.budget.amountMinor) })}</AppText>
       </View>
-      <AppText style={{ fontWeight: '600', fontVariant: ['tabular-nums'], color: tone }}>{percent} %</AppText>
+      <AppText style={{ fontWeight: '600', fontVariant: ['tabular-nums'], color: tone }}>{t('budgets.row.percent', { percent })}</AppText>
     </View>
     <View accessible={false} style={{ height: 4, borderRadius: 2, backgroundColor: p.inset, overflow: 'hidden' }}>
       <Animated.View style={[{ height: 4, borderRadius: 2, backgroundColor: tone }, bar]} />

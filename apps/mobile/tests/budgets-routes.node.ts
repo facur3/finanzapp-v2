@@ -6,7 +6,7 @@ import ts from 'typescript';
 import * as domain from '@finanzapp/domain';
 import * as i18nFormat from '../src/i18n/format.ts';
 import { bindLocale } from '../src/i18n/bind.ts';
-const i18nProvider = { useI18n: () => bindLocale('es-AR') };
+import type { AppLocale } from '../src/i18n/locale.ts';
 
 // Producto 19: the budget form on the actual module, with native hosts replaced
 // by descriptors. The kind of limit (General / Por categoría) is the first
@@ -19,7 +19,8 @@ const total: domain.MonthlyBudget = { id: 'total', scope: 'total', currency: 'AR
 const food: domain.MonthlyBudget = { id: 'food', scope: 'category', category: 'Comida', currency: 'ARS', monthISO: '2026-09', amountMinor: 150000, active: true, createdAt, revision: 0, updatedAt: createdAt };
 const archive: domain.LedgerArchive = { accounts: [account], records: [domain.initialRecord(entry)], budgets: [total, food] };
 
-function harness(props: any, data: domain.LedgerArchive = archive, save?: (budget: domain.MonthlyBudget) => Promise<void>) {
+function harness(props: any, data: domain.LedgerArchive = archive, save?: (budget: domain.MonthlyBudget) => Promise<void>, locale: AppLocale = 'es-AR') {
+  const i18nProvider = { useI18n: () => bindLocale(locale) };
   const source = readFileSync(new URL('../src/ui/budget-form.tsx', import.meta.url), 'utf8');
   const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText;
   const state: any[] = [], refs: any[] = [];
@@ -154,4 +155,43 @@ test('a duplicate general budget, a zero amount and a failed save keep the draft
   archiving.alerts[0].buttons[1].onPress();
   await new Promise(resolve => setImmediate(resolve));
   assert.deepEqual([archiving.saved[0].scope, archiving.saved[0].active, archiving.saved[0].revision], ['total', false, 1]);
+});
+
+test('in English the budget form is labelled in English, keeps the category as stored and saves exactly what Spanish saves', async () => {
+  const run = async (locale: AppLocale) => {
+    const view = harness({ monthISO: '2026-10', currency: 'ARS' }, { ...archive, budgets: [] }, undefined, locale);
+    find(view.render(), 'AmountField').props.onChangeText('1.500');
+    find(view.render(), 'CategoryField').props.onChange('Comida');
+    const root = view.render();
+    await find(root, 'ActionButton', locale === 'en-AR' ? 'Create budget' : 'Crear presupuesto').props.onPress();
+    return { root, saved: view.saved };
+  };
+  const english = await run('en-AR'), spanish = await run('es-AR');
+  const root = english.root;
+  assert.equal(find(root, 'Stack.Screen').props.options.title, 'New budget');
+  assert.equal(choice(root, 'total').props.options.map((option: any) => option.label).join(','), 'Overall,By category');
+  assert.equal(choice(root, 'ARS').props.options.map((option: any) => option.label).join(','), 'Pesos · ARS,Dollars · USD');
+  assert.equal(find(root, 'AmountField').props.label, 'Budget');
+  assert.ok(texts(root).includes('October 2026'));
+  assert.ok(texts(root).includes('Category limit'));
+  assert.ok(texts(root).some(text => text.startsWith('Compared with the expenses recorded in this category')));
+  assert.equal(find(root, 'CategoryField').props.value, 'Comida', 'the stored category is never translated');
+  const stable = (saved: domain.MonthlyBudget[]) => JSON.stringify(saved.map(({ createdAt: _c, updatedAt: _u, ...rest }) => rest));
+  assert.equal(stable(english.saved), stable(spanish.saved), 'the language changes no stored field');
+  assert.equal(english.saved[0].category, 'Comida');
+  const archiving = harness({ original: total, monthISO: total.monthISO }, archive, undefined, 'en-AR');
+  await find(archiving.render(), 'ActionButton', 'Delete budget').props.onPress();
+  assert.equal(archiving.alerts[0].title, 'Delete this budget?');
+  assert.equal(archiving.alerts[0].buttons.map((button: any) => button.text).join(','), 'Cancel,Delete');
+  assert.equal(archiving.saved.length, 0);
+});
+
+test('a failed save stores the catalogue key, which reads the old Spanish text and English', async () => {
+  const view = harness({ monthISO: '2026-09', currency: 'ARS', scope: 'total' }, { ...archive, budgets: [] }, async () => { throw 'offline'; });
+  find(view.render(), 'AmountField').props.onChangeText('10');
+  await find(view.render(), 'ActionButton', 'Crear presupuesto').props.onPress();
+  const key = find(view.render(), 'ErrorMessage').props.message;
+  assert.equal(key, 'budgets.form.saveFailed');
+  assert.equal(bindLocale('es-AR').errorText(key), 'No pudimos guardar el presupuesto. Reintentá con el mismo envío.');
+  assert.equal(bindLocale('en-AR').errorText(key), 'We couldn’t save the budget. Retry with the same submission.');
 });

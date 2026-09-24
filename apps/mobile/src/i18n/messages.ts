@@ -28,6 +28,14 @@ export type MessageParams = Record<string, string | number>;
 /** One catalogue per language in `LANGUAGES`: a language without one is a compile error. */
 const catalogues: Record<LanguageCode, Messages> = { es, en };
 
+const CATEGORIES = new Set<string>(['zero', 'one', 'two', 'few', 'many', 'other']);
+/** A plural entry: an object whose keys are all CLDR categories, `other` among them, each a string. A
+ * namespace that happens to hold an id called "other" (an icon, a category) is not a plural. */
+export function isPluralEntry(value: unknown): value is PluralForms {
+  if (!value || typeof value !== 'object' || typeof (value as { other?: unknown }).other !== 'string') return false;
+  return Object.entries(value).every(([key, text]) => CATEGORIES.has(key) && typeof text === 'string');
+}
+
 export function catalogue(language: LanguageCode): Messages {
   return catalogues[language] ?? catalogues[DEFAULT_LANGUAGE];
 }
@@ -38,7 +46,7 @@ function lookup(messages: Messages, key: string): string | PluralForms | undefin
     if (!node || typeof node !== 'object' || !(part in (node as object))) return undefined;
     node = (node as Record<string, unknown>)[part];
   }
-  return typeof node === 'string' || (node && typeof node === 'object' && 'other' in node) ? node as string | PluralForms : undefined;
+  return typeof node === 'string' || isPluralEntry(node) ? node as string | PluralForms : undefined;
 }
 
 /** Fills `{name}` placeholders. A placeholder without a value stays visible, so a missing parameter is noticed rather than blank. */
@@ -82,5 +90,5 @@ export function translator(language: LanguageCode): Translate {
 /** All dotted keys of a catalogue, for the completeness test. */
 export function messageKeys(messages: object, prefix = ''): string[] {
   return Object.entries(messages).flatMap(([key, value]) =>
-    typeof value === 'string' || (value && typeof value === 'object' && 'other' in value) ? [prefix + key] : messageKeys(value as object, prefix + key + '.'));
+    typeof value === 'string' || isPluralEntry(value) ? [prefix + key] : messageKeys(value as object, prefix + key + '.'));
 }

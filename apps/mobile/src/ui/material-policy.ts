@@ -13,6 +13,8 @@
  * decision is layered: first whether the glass module may be *loaded* at all
  * (never in Expo Go, never when switched off, never when the running binary
  * has not registered the view), and only then whether glass is *drawn*. */
+import type { MessageKey } from '../i18n/messages.ts';
+
 export type Material = 'glass' | 'opaque';
 
 /** Why the session got its material; shown in Más so a tester can confirm the mode. */
@@ -66,20 +68,21 @@ export function glassDisabledBy(env: Record<string, string | undefined>): boolea
   return env.EXPO_PUBLIC_DISABLE_GLASS === '1';
 }
 
-export const MATERIAL_LABELS: Record<MaterialReason, string> = {
-  disabled: 'Material opaco (desactivado)',
-  'expo-go': 'Material opaco (Expo Go)',
-  platform: 'Material opaco',
-  'not-registered': 'Material opaco (sin módulo nativo)',
-  unavailable: 'Material opaco (iOS sin Liquid Glass)',
-  api: 'Material opaco (API no disponible)',
-  'reduce-transparency': 'Material opaco (Reducir transparencia)',
-  glass: 'Liquid Glass',
+/** The catalogue key of each reason's label, shown in the Más footer (`t(MATERIAL_LABELS[reason])`). */
+export const MATERIAL_LABELS: Record<MaterialReason, MessageKey> = {
+  disabled: 'settings.material.disabled',
+  'expo-go': 'settings.material.expoGo',
+  platform: 'settings.material.platform',
+  'not-registered': 'settings.material.notRegistered',
+  unavailable: 'settings.material.unavailable',
+  api: 'settings.material.api',
+  'reduce-transparency': 'settings.material.reduceTransparency',
+  glass: 'settings.material.glass',
 };
 
 /** The shape of React Native's AccessibilityInfo this code relies on; every member is optional because an older or mismatched runtime may lack it. */
 export type ReduceTransparencyAPI = {
-  isReduceTransparencyEnabled?: () => Promise<boolean>;
+  isReduceTransparencyEnabled?(): Promise<boolean>;
   addEventListener?: (event: 'reduceTransparencyChanged', handler: (value: boolean) => void) => { remove: () => void };
 };
 

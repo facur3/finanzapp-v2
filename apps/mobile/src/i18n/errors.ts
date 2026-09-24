@@ -11,8 +11,17 @@ import { translate, type MessageKey } from './messages.ts';
 import type { LanguageCode } from './locale.ts';
 
 const known = new Map<string, MessageKey>();
+/** Catalogued messages with a placeholder («{name}»): matched by a pattern built from the Spanish template. */
+const templates: { pattern: RegExp; names: string[]; key: MessageKey }[] = [];
+const escape = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 for (const [group, messages] of Object.entries(es.errors)) {
-  for (const [name, text] of Object.entries(messages)) known.set(text, `errors.${group}.${name}` as MessageKey);
+  for (const [name, text] of Object.entries(messages as Record<string, string>)) {
+    const key = `errors.${group}.${name}` as MessageKey;
+    const names = [...text.matchAll(/\{([a-zA-Z0-9_]+)\}/g)].map(match => match[1]);
+    if (!names.length) { known.set(text, key); continue; }
+    const pattern = new RegExp('^' + text.split(/\{[a-zA-Z0-9_]+\}/).map(escape).join('(.+?)') + '$');
+    templates.push({ pattern, names, key });
+  }
 }
 
 const KEY = /^[a-z][a-zA-Z]*(\.[a-zA-Z0-9]+)+$/;
@@ -24,5 +33,10 @@ export function localizeError(language: LanguageCode, message: string): string {
     if (text !== message) return text;
   }
   const key = known.get(message);
-  return key ? translate(language, key) : message;
+  if (key) return translate(language, key);
+  for (const template of templates) {
+    const match = template.pattern.exec(message);
+    if (match) return translate(language, template.key, Object.fromEntries(template.names.map((name, index) => [name, match[index + 1]])));
+  }
+  return message;
 }

@@ -12,13 +12,14 @@ import { AccountField, DateField, SelectorCard } from './form-controls';
 import { initialAccountId } from './presentation';
 import { space, usePalette } from './theme';
 import { useI18n } from '../i18n/provider';
+import { accountDisplayName } from './liability-presentation';
 
 /** One form for three movements that are never spending or income: a transfer
  * between cash accounts, a card payment (cash → card) and a debt payment or
  * collection (cash → debt, receivable → cash). The obligation side is fixed by
  * the caller; only the cash side is chosen here. */
 export function TransferForm({ original, accountId, fromAccountId: requestedFrom, toAccountId: requestedTo,
-  title, defaultNote = '', maxAmountMinor, onAccountChange }: {
+  title, defaultNote, maxAmountMinor, onAccountChange }: {
   original?: TransferRecord; accountId?: string; fromAccountId?: string; toAccountId?: string; title?: string;
   defaultNote?: string; maxAmountMinor?: string;
   /** Lets the host carry the source account over when the mode changes. */
@@ -27,6 +28,8 @@ export function TransferForm({ original, accountId, fromAccountId: requestedFrom
   const { snapshot, archive, addTransfer, updateTransfer } = useLedger();
   const p = usePalette();
   const { t } = useI18n();
+  // A debt's hidden account is named from the debt, in the interface language (see accountDisplayName).
+  const nameOf = (account: Account) => accountDisplayName(account, archive?.debts ?? [], t);
   const accounts = snapshot?.accounts ?? [];
   const cards = archive?.cards ?? [], debts = archive?.debts ?? [];
   const hidden = hiddenLiabilityAccountIds(cards, debts);
@@ -43,7 +46,19 @@ export function TransferForm({ original, accountId, fromAccountId: requestedFrom
   const [toId, setToId] = useState(() => before?.transfer.toAccountId ?? lockedTo?.id ?? requestedTarget?.id
     ?? (lockedFrom ? cash.find(a => a.currency === lockedFrom.currency)?.id : undefined) ?? '');
   const [amount, setAmount] = useState(before ? formatMinorUnits(before.transfer.amountMinor) : '');
-  const [note, setNote] = useState(before?.transfer.note ?? defaultNote);
+  // A card payment or a debt settlement writes its own default note in the language active when the form opens
+  // (it is then the user's editable text); a caller's note, kept for older deep links, still wins.
+  const [note, setNote] = useState(() => {
+    if (before) return before.transfer.note;
+    if (defaultNote !== undefined) return defaultNote;
+    const target = lockedTo ?? lockedFrom;
+    if (!target) return '';
+    const kind = accountKind(target.id, cards, debts);
+    if (kind === 'card') return t('cards.payment.note', { name: target.name });
+    if (kind !== 'debt') return '';
+    const name = debts.find(debt => debt.accountId === target.id)?.counterparty ?? target.name;
+    return t(lockedTo ? 'debts.payment.note' : 'debts.collection.note', { name });
+  });
   const [date, setDate] = useState(() => before ? new Date(before.transfer.dateISO + 'T12:00:00') : new Date());
   const [busy, setBusy] = useState(false);
   const [pending, setPending] = useState<{ transfer: Transfer; change?: TransferChange } | null>(null);
@@ -62,6 +77,9 @@ export function TransferForm({ original, accountId, fromAccountId: requestedFrom
   const obligation = lockedTo ?? lockedFrom;
   const obligationKind = obligation ? accountKind(obligation.id, cards, debts) : 'cash';
   const typeOf = (id: string) => accountKind(id, cards, debts);
+  // The screen names what it records, so the title follows a language change; a `title` parameter only serves older deep links.
+  const obligationTitle = obligationKind === 'card' ? t('cards.payment.title')
+    : obligationKind === 'debt' ? t(lockedTo ? 'debts.payment.title' : 'debts.collection.title') : undefined;
   const kindLabel = (id: string) => { const kind = typeOf(id); return t(kind === 'card' ? 'accountKinds.card' : kind === 'debt' ? 'accountKinds.debt' : 'accountKinds.account'); };
 
   function draft(): Transfer {
@@ -147,7 +165,7 @@ export function TransferForm({ original, accountId, fromAccountId: requestedFrom
   };
 
   return <Screen gap={space.l}>
-    <Stack.Screen options={{ title: before ? t('transferForm.editTitle') : title ?? t('transferForm.title'), gestureEnabled: !busy,
+    <Stack.Screen options={{ title: before ? t('transferForm.editTitle') : obligationTitle ?? title ?? t('transferForm.title'), gestureEnabled: !busy,
       headerLeft: () => <IconButton name="close" label={t('common.close')} onPress={close} disabled={busy} /> }} />
     {!sources.length || noCashCounterpart ? <EmptyState title={t('entryForm.noAccountTitle')} detail={obligation
       ? t(lockedTo ? 'transferForm.needAccountOut' : 'transferForm.needAccountIn', { currency: obligation.currency })
@@ -158,7 +176,7 @@ export function TransferForm({ original, accountId, fromAccountId: requestedFrom
       {shortcut && <AmountShortcut caption={shortcut.text} label={shortcut.fill > 0 ? shortcut.label : undefined} disabled={locked}
         onPress={shortcut.fill > 0 ? () => { setAmount(amountFromMinor(shortcut.fill)); setError(null); } : undefined} />}
       <View style={{ gap: space.m }}>
-        {lockedFrom ? <SelectorCard label={kindLabel(lockedFrom.id)} value={lockedFrom.name} placeholder="" detail={balanceDetail(lockedFrom.id)}
+        {lockedFrom ? <SelectorCard label={kindLabel(lockedFrom.id)} value={nameOf(lockedFrom)} placeholder="" detail={balanceDetail(lockedFrom.id)}
           icon={obligationKind === 'card' ? 'card-outline' : 'people-outline'} color={p.primary} disabled onPress={() => {}} />
           : <AccountField label={t('transferForm.from')} accounts={cashSources} value={fromId} disabled={locked} kindOf={kindLabel} typeOf={typeOf} prominent detail={balanceDetail(fromId)} onChange={id => {
             setFromId(id);
@@ -166,7 +184,7 @@ export function TransferForm({ original, accountId, fromAccountId: requestedFrom
             const source = accounts.find(a => a.id === id);
             if (!lockedTo && (toId === id || to?.currency !== source?.currency)) setToId('');
           }} />}
-        {lockedTo ? <SelectorCard label={kindLabel(lockedTo.id)} value={lockedTo.name} placeholder="" detail={balanceDetail(lockedTo.id)}
+        {lockedTo ? <SelectorCard label={kindLabel(lockedTo.id)} value={nameOf(lockedTo)} placeholder="" detail={balanceDetail(lockedTo.id)}
           icon={obligationKind === 'card' ? 'card-outline' : 'people-outline'} color={p.primary} disabled onPress={() => {}} />
           : <AccountField label={t('transferForm.to')} accounts={lockedFrom ? targets.filter(a => a.id !== lockedFrom.id) : targets} value={toId} onChange={setToId}
             kindOf={kindLabel} typeOf={typeOf}
@@ -177,8 +195,8 @@ export function TransferForm({ original, accountId, fromAccountId: requestedFrom
         action={<ActionButton label={t('common.addAccount')} secondary disabled={locked} onPress={() => router.push({ pathname: '/new-account', params: { currency: from?.currency ?? 'ARS' } })} />} />}
       <Field label={t('transferForm.note')} value={note} onChangeText={setNote} maxLength={120} editable={!locked} />
       {preview && from && to && <Surface grouped>
-        <DetailRow label={t('transferForm.after', { name: from.name })} value={from.currency + '\u00A0' + balanceLabel(from.id, preview.from)} />
-        <DetailRow label={t('transferForm.after', { name: to.name })} value={to.currency + '\u00A0' + balanceLabel(to.id, preview.to)} last />
+        <DetailRow label={t('transferForm.after', { name: nameOf(from) })} value={from.currency + '\u00A0' + balanceLabel(from.id, preview.from)} />
+        <DetailRow label={t('transferForm.after', { name: nameOf(to) })} value={to.currency + '\u00A0' + balanceLabel(to.id, preview.to)} last />
       </Surface>}
       {preview && from && to && ((preview.from < 0 && !hidden.has(from.id)) || (preview.to < 0 && !hidden.has(to.id))) && <AppText secondary variant="subhead">
         {t('transferForm.negativeWarning')}

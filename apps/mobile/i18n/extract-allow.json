@@ -1,0 +1,12 @@
+{
+  "about": "Files npm run i18n:extract skips, each with the reason. A single line can be skipped with a trailing // i18n-ignore comment.",
+  "files": {
+    "src/i18n/format.ts": "Locale tables (month and weekday names, day periods) per language, not interface copy.",
+    "src/i18n/locale.ts": "Language names in their own language (Español, English), shown untranslated on purpose.",
+    "src/assistant/fixtures.ts": "Development-only scripted model replies (content, not interface copy); never in a release bundle.",
+    "src/integrations/evidence.ts": "Protocol labels sent to the Assistant server; the interface shows evidence from fact ids.",
+    "src/storage/database.ts": "Storage errors, translated at display time by src/i18n/errors.ts from their exact text.",
+    "src/storage/transaction.ts": "Storage errors, translated at display time by src/i18n/errors.ts.",
+    "src/storage/LedgerProvider.tsx": "Storage errors, translated at display time by src/i18n/errors.ts."
+  }
+}

@@ -11,7 +11,9 @@ import { useI18n, useLocalePreferences } from '../../src/i18n/provider';
 import { preferenceSummary, showsPreference } from '../../src/ui/locale-options';
 
 // Diagnostic: where this launch read the device languages. "módulo nativo" proves the build links expo-localization.
-const LOCALE_SOURCE_LABELS = { native: 'Idioma: módulo nativo', intl: 'Idioma: Intl (sin módulo nativo)', none: 'Idioma: predeterminado' } as const;
+const LOCALE_SOURCE_LABELS = { native: 'settings.localeSource.native', intl: 'settings.localeSource.intl', none: 'settings.localeSource.none' } as const;
+/** The pilot's version and the internal release name; neither is translated. */
+const VERSION = '0.1.0', RELEASE = '23.1B2';
 
 /** Más is the secondary navigation hub: everything that is not one of the four
  * other tabs, in two native grouped lists. Finanzas holds the tools that
@@ -36,33 +38,32 @@ export default function MoreScreen() {
   const customCategories = archive?.categories?.filter(definition => !definition.archived).length ?? 0;
   const activeCards = archive?.cards?.filter(card => card.active).length ?? 0;
   const undone = (archive?.records.filter(record => record.voided).length ?? 0) + (archive?.transfers?.filter(record => record.voided).length ?? 0);
-  const plural = (count: number, one: string, many: string) => count + ' ' + (count === 1 ? one : many);
   const tile = (key: keyof typeof FINANCE_ROW_LOOKS) => <GlyphTile icon={FINANCE_ROW_LOOKS[key].glyph} color={appearanceHex(FINANCE_ROW_LOOKS[key].color, p)} size={34} />;
 
   return <Screen>
     <View>
-      <SectionTitle>Finanzas</SectionTitle>
+      <SectionTitle>{t('settings.sections.finance')}</SectionTitle>
       <Surface grouped>
-        <NavigationRow title="Cuentas" subtitle="Saldos y movimientos" leading={tile('accounts')} onPress={() => router.push('/accounts')} />
-        <NavigationRow title="Tarjetas" subtitle={activeCards ? plural(activeCards, 'tarjeta de crédito', 'tarjetas de crédito') : 'Compras y resúmenes'} leading={tile('cards')} onPress={() => router.push('/cards')} />
-        <NavigationRow title="Presupuestos" subtitle={currentBudgets ? currentBudgets + ' este mes' : 'Plan mensual'} leading={tile('budgets')} onPress={() => router.push('/budgets')} />
-        <NavigationRow title="Recurrentes" subtitle={activeRecurring ? plural(activeRecurring, 'activo', 'activos') : 'Pagos e ingresos'} leading={tile('recurring')} onPress={() => router.push('/recurring')} />
-        <NavigationRow title="Deudas y cobros" subtitle={activeDebts ? plural(activeDebts, 'pendiente', 'pendientes') : 'Debo · me deben'} leading={tile('debts')} onPress={() => router.push('/debts')} />
-        <NavigationRow title="Categorías" subtitle={customCategories ? plural(customCategories, 'personalizada', 'personalizadas') : 'Gastos e ingresos'} leading={tile('categories')} last onPress={() => router.push('/categories')} />
+        <NavigationRow title={t('settings.rows.accounts')} subtitle={t('settings.rows.accountsSubtitle')} leading={tile('accounts')} onPress={() => router.push('/accounts')} />
+        <NavigationRow title={t('settings.rows.cards')} subtitle={activeCards ? t('settings.rows.cardsCount', { count: activeCards }) : t('settings.rows.cardsSubtitle')} leading={tile('cards')} onPress={() => router.push('/cards')} />
+        <NavigationRow title={t('settings.rows.budgets')} subtitle={currentBudgets ? t('settings.rows.budgetsCount', { count: currentBudgets }) : t('settings.rows.budgetsSubtitle')} leading={tile('budgets')} onPress={() => router.push('/budgets')} />
+        <NavigationRow title={t('settings.rows.recurring')} subtitle={activeRecurring ? t('settings.rows.recurringCount', { count: activeRecurring }) : t('settings.rows.recurringSubtitle')} leading={tile('recurring')} onPress={() => router.push('/recurring')} />
+        <NavigationRow title={t('settings.rows.debts')} subtitle={activeDebts ? t('settings.rows.debtsCount', { count: activeDebts }) : t('settings.rows.debtsSubtitle')} leading={tile('debts')} onPress={() => router.push('/debts')} />
+        <NavigationRow title={t('settings.rows.categories')} subtitle={customCategories ? t('settings.rows.categoriesCount', { count: customCategories }) : t('settings.rows.categoriesSubtitle')} leading={tile('categories')} last onPress={() => router.push('/categories')} />
       </Surface>
     </View>
     <View style={{ gap: 10 }}>
-      <SectionTitle>App y datos</SectionTitle>
+      <SectionTitle>{t('settings.sections.appData')}</SectionTitle>
       <Surface grouped>
-        <NavigationRow title="Copia de seguridad" subtitle="Compartir e importar" icon="save-outline" onPress={() => router.push('/backup')} />
-        <NavigationRow title="Movimientos deshechos" subtitle={undone ? plural(undone, 'recuperable', 'recuperables') : 'Ninguno'} icon="arrow-undo-outline" last={!locale} onPress={() => router.push('/undone-entries')} />
+        <NavigationRow title={t('settings.rows.backup')} subtitle={t('settings.rows.backupSubtitle')} icon="save-outline" onPress={() => router.push('/backup')} />
+        <NavigationRow title={t('settings.rows.undone')} subtitle={undone ? t('settings.rows.undoneCount', { count: undone }) : t('settings.rows.undoneNone')} icon="arrow-undo-outline" last={!locale} onPress={() => router.push('/undone-entries')} />
         {locale && <NavigationRow title={t('preferences.language')} subtitle={preferenceSummary('language', locale.state, t)} icon="language-outline" last={!showsRegion} onPress={() => router.push('/language')} />}
         {locale && showsRegion && <NavigationRow title={t('preferences.region')} subtitle={preferenceSummary('region', locale.state, t)} icon="globe-outline" last onPress={() => router.push('/region')} />}
       </Surface>
       <AppText secondary variant="footnote" style={{ paddingHorizontal: 4 }}>
-        Tus registros quedan en este dispositivo y podés registrar sin conexión. La sincronización todavía no está activada.
+        {t('settings.localNote')}
       </AppText>
     </View>
-    <AppText secondary style={{ textAlign: 'center', fontSize: 13 }}>FinanzApp · Piloto nativo 0.1.0 · Producto 23.1B1 · {MATERIAL_LABELS[material.reason]} · {LOCALE_SOURCE_LABELS[localeSource]}</AppText>
+    <AppText secondary style={{ textAlign: 'center', fontSize: 13 }}>{t('settings.footer', { version: VERSION, release: RELEASE, material: t(MATERIAL_LABELS[material.reason]), source: t(LOCALE_SOURCE_LABELS[localeSource]) })}</AppText>
   </Screen>;
 }

@@ -11,14 +11,16 @@ import * as i18nFormat from '../src/i18n/format.ts';
 import { bindLocale } from '../src/i18n/bind.ts';
 import * as localeOptions from '../src/ui/locale-options.ts';
 import { createLocaleStore } from '../src/i18n/store.ts';
-import type { ReleasedSets } from '../src/i18n/locale.ts';
+import type { AppLocale, ReleasedSets } from '../src/i18n/locale.ts';
 function localeStore(released?: ReleasedSets) {
   const rows = new Map<string, string>();
   return createLocaleStore({ devices: () => ({ source: 'native', locales: [{ languageTag: 'es-AR', regionCode: 'AR' }] }), released,
     store: () => ({ getItemSync: key => rows.get(key) ?? null, setItemSync: (key, value) => { rows.set(key, value); }, removeItemSync: key => rows.delete(key) }) });
 }
 let currentLocaleStore = localeStore();
-const i18nProvider = { useI18n: () => bindLocale(currentLocaleStore.getState().locale),
+// English is unreleased, so the store cannot choose it; an English test renders with this override instead.
+let forcedLocale: AppLocale | null = null;
+const i18nProvider = { useI18n: () => bindLocale(forcedLocale ?? currentLocaleStore.getState().locale),
   useLocalePreferences: () => ({ state: currentLocaleStore.getState(), setLanguage: currentLocaleStore.setLanguage, setRegion: currentLocaleStore.setRegion }) };
 
 // Producto 18: the Más hub, the backup screen and the read-only categories
@@ -40,8 +42,9 @@ const undone = domain.initialRecord({ id: 'e4', accountId: cash.id, kind: 'expen
 const archive: domain.LedgerArchive = { accounts: [cash, debtAccount], records: [...entries.map(domain.initialRecord), { ...undone, voided: true }],
   debts: [debt], recurring: [rule], budgets: [] };
 
-function harness(file: string, data: domain.LedgerArchive = archive, released?: ReleasedSets) {
+function harness(file: string, data: domain.LedgerArchive = archive, released?: ReleasedSets, locale: AppLocale | null = null) {
   currentLocaleStore = localeStore(released);
+  forcedLocale = locale;
   const source = readFileSync(new URL('../app/' + file, import.meta.url), 'utf8');
   const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText;
   const jsx = (type: unknown, props: Record<string, unknown>) => ({ type, props });
@@ -69,7 +72,7 @@ function harness(file: string, data: domain.LedgerArchive = archive, released?: 
     '../src/ui/components': components, '../../src/ui/components': components,
     '../src/ui/categories': categories,
     '../src/ui/appearance': appearance, '../../src/ui/appearance': appearance,
-    '../src/ui/category-hues': { useCategoryColor: () => '#3E6FB0', useCategoryLabel: (s: string) => s, useCategoryDefinitions: () => [], useCategoryLook: (s: string) => ({ label: s, storedLabel: s, key: String(s).toLowerCase(), hex: '#3E6FB0', glyph: 'pricetag-outline' }), useCategoryLookOf: () => (s: string) => ({ label: s, storedLabel: s, key: String(s).toLowerCase(), hex: '#3E6FB0', glyph: 'pricetag-outline' }), useAccountLook: () => ({ icon: 'wallet', color: 'cobalt', glyph: 'wallet-outline', hex: '#2557D6' }), useAccountLookOf: () => () => ({ icon: 'wallet', color: 'cobalt', glyph: 'wallet-outline', hex: '#2557D6' }) }, '../../src/ui/category-hues': { useCategoryColor: () => '#3E6FB0', useCategoryLabel: (s: string) => s, useCategoryDefinitions: () => [], useCategoryLook: (s: string) => ({ label: s, storedLabel: s, key: String(s).toLowerCase(), hex: '#3E6FB0', glyph: 'pricetag-outline' }), useCategoryLookOf: () => (s: string) => ({ label: s, storedLabel: s, key: String(s).toLowerCase(), hex: '#3E6FB0', glyph: 'pricetag-outline' }), useAccountLook: () => ({ icon: 'wallet', color: 'cobalt', glyph: 'wallet-outline', hex: '#2557D6' }), useAccountLookOf: () => () => ({ icon: 'wallet', color: 'cobalt', glyph: 'wallet-outline', hex: '#2557D6' }) },
+    '../src/ui/category-hues': { useCategoryColor: () => '#3E6FB0', useCategoryLabel: (s: string) => s, useCategoryDefinitions: () => [], useCategoryLook: (s: string) => ({ label: s, storedLabel: s, key: String(s).toLowerCase(), hex: '#3E6FB0', glyph: 'pricetag-outline' }), useCategoryLookOf: () => (s: string) => ({ label: s, storedLabel: s, key: String(s).toLowerCase(), hex: '#3E6FB0', glyph: 'pricetag-outline' }), useAccountLook: () => ({ icon: 'wallet', color: 'cobalt', glyph: 'wallet-outline', hex: '#2557D6' }), useAccountNameOf: () => (account: any) => account.name, useAccountLookOf: () => () => ({ icon: 'wallet', color: 'cobalt', glyph: 'wallet-outline', hex: '#2557D6' }) }, '../../src/ui/category-hues': { useCategoryColor: () => '#3E6FB0', useCategoryLabel: (s: string) => s, useCategoryDefinitions: () => [], useCategoryLook: (s: string) => ({ label: s, storedLabel: s, key: String(s).toLowerCase(), hex: '#3E6FB0', glyph: 'pricetag-outline' }), useCategoryLookOf: () => (s: string) => ({ label: s, storedLabel: s, key: String(s).toLowerCase(), hex: '#3E6FB0', glyph: 'pricetag-outline' }), useAccountLook: () => ({ icon: 'wallet', color: 'cobalt', glyph: 'wallet-outline', hex: '#2557D6' }), useAccountNameOf: () => (account: any) => account.name, useAccountLookOf: () => () => ({ icon: 'wallet', color: 'cobalt', glyph: 'wallet-outline', hex: '#2557D6' }) },
     '../src/ui/theme': theme, '../../src/ui/theme': theme,
     '../src/ui/material': { useMaterialDecision: () => ({ material: 'opaque', reason: 'expo-go' }) }, '../../src/ui/material': { useMaterialDecision: () => ({ material: 'opaque', reason: 'expo-go' }) },
     '../../src/ui/locale-options': localeOptions,
@@ -111,7 +114,7 @@ test('Más groups permanent navigation into Finanzas and App y datos, with live 
   assert.deepEqual(rows(root).filter(row => row.props.last).map(row => row.props.title), ['Categorías', 'Idioma']);
   assert.equal(nodes(root).some(node => node.type === 'ActionButton'), false);
   const texts = nodes(root).filter(node => node.type === 'AppText').map(node => String(node.props.children)).join(' ');
-  assert.match(texts, /Producto 23\.1B1/);
+  assert.match(texts, /Producto 23\.1B2/);
   assert.match(texts, /Material opaco \(Expo Go\)/, 'the footer says which control material this session draws, so a tester can confirm the mode');
   assert.equal(value('Categorías'), 'Gastos e ingresos');
   // Finanzas rows carry a soft identity tile from the shared palette; App y datos rows stay neutral glyphs.
@@ -212,4 +215,53 @@ test('an archived definition moves its category to a quiet Archivadas group and 
   assert.ok(labels.includes('Alimentación, Predeterminada · editada'), labels.join(' | '));
   assert.ok(labels.includes('sjsjn, 1 movimiento · Propia, archivada'), 'an adopted historical string is now the user\'s own definition');
   assert.equal(labels.filter(label => label.startsWith('sjsjn')).length, 1, 'archived once, in its own group');
+});
+
+// Producto 23.1B2: Más, Copia de seguridad and Categorías in English. Words
+// change; routes, counts, the stored category strings and the ledger do not.
+test('23.1B2 English Más: every row, count, note and the diagnostic footer are translated; routes and order are the same', () => {
+  const view = harness('(tabs)/settings.tsx', archive, undefined, 'en-AR');
+  const root = view.render();
+  assert.equal(nodes(root).filter(node => node.type === 'SectionTitle').map(node => node.props.children).join(','), 'Finances,App and data');
+  assert.equal(rows(root).map(row => row.props.title).join(','), 'Accounts,Cards,Budgets,Recurring,Debts and IOUs,Categories,Backup,Undone transactions,Language');
+  const value = (label: string) => rows(root).find(row => row.props.title === label)!.props.subtitle;
+  assert.equal(value('Recurring'), '1 active');
+  assert.equal(value('Debts and IOUs'), '1 pending');
+  assert.equal(value('Undone transactions'), '1 recoverable');
+  assert.equal(value('Cards'), 'Purchases and statements');
+  assert.equal(value('Language'), 'Español · same as device', 'a language is named in its own language');
+  for (const row of rows(root)) row.props.onPress();
+  assert.equal(view.pushed.join(','), '/accounts,/cards,/budgets,/recurring,/debts,/categories,/backup,/undone-entries,/language');
+  const texts = nodes(root).filter(node => node.type === 'AppText').map(node => String(node.props.children)).join(' ');
+  assert.match(texts, /FinanzApp · Native pilot 0\.1\.0 · Producto 23\.1B2 · Opaque material \(Expo Go\) · Language: default/);
+  assert.match(texts, /Sync is not turned on yet/);
+  assert.doesNotMatch(texts, /Material opaco|Idioma|sincronización/);
+  const card: domain.CreditCardProfile = { id: 'card', accountId: cash.id, issuer: 'Visa', last4: '4009', creditLimitMinor: null, closingDay: 28, dueDay: 5, active: true, createdAt, revision: 0, updatedAt: createdAt };
+  const cards = harness('(tabs)/settings.tsx', { ...archive, cards: [card, { ...card, id: 'two' }] }, undefined, 'en-AR').render();
+  assert.equal(rows(cards).find(row => row.props.title === 'Cards')!.props.subtitle, '2 credit cards');
+});
+
+test('23.1B2 English backup screen and categories list: labels in English, stored category strings and routes untouched', () => {
+  const backup = harness('backup.tsx', archive, undefined, 'en-AR').render();
+  assert.equal(nodes(backup).find(node => node.type === 'ActionButton')!.props.label, 'Share backup');
+  const importRow = rows(backup)[0];
+  assert.equal([importRow.props.title, importRow.props.subtitle].join(' / '), 'Import backup / Review the file before adding');
+  const before = JSON.stringify(archive);
+  const renamed = domain.editedCategoryDefinition(domain.resolveCategory('expense', 'Comida'), { label: 'Alimentación' }, createdAt);
+  const view = harness('categories.tsx', { ...archive, categories: [renamed] }, undefined, 'en-AR');
+  const root = view.render();
+  assert.equal(nodes(root).filter(node => node.type === 'SectionTitle').map(node => node.props.children).join(','), 'Expenses,Income');
+  const badges = nodes(root).filter(node => node.type === 'CategoryBadge').map(node => node.props.category);
+  assert.equal(badges.slice(0, 3).join(','), 'Comida,Supermercado,Restaurantes', 'the badge still receives the stored spelling');
+  const labels = nodes(root).filter(node => node.type === 'PressFeedback').map(node => node.props.accessibilityLabel);
+  assert.ok(labels.includes('Groceries, 1 transaction · Built-in'), labels.join(' | '));
+  assert.ok(labels.includes('Alimentación, Built-in · edited'), 'a renamed preset keeps the person\'s name');
+  assert.ok(labels.includes('JD, 1 transaction · From history'), 'a historical string is never translated');
+  assert.ok(labels.includes('Salary, Built-in'));
+  const names = nodes(root).filter(node => node.type === 'AppText' && node.props.numberOfLines === 2).map(node => node.props.children);
+  assert.ok(names.includes('Groceries') && names.includes('Alimentación') && names.includes('sjsjn') && !names.includes('Supermercado'));
+  nodes(root).find(node => node.type === 'PressFeedback' && node.props.accessibilityLabel.startsWith('Groceries'))!.props.onPress();
+  assert.equal(JSON.stringify(view.pushed), JSON.stringify([{ pathname: '/edit-category', params: { kind: 'expense', key: 'supermercado' } }]), 'the route carries the identity key, never a label');
+  assert.equal(nodes(root).find(node => node.type === 'Stack.Screen')!.props.options.headerRight().props.label, 'New category');
+  assert.equal(JSON.stringify(archive), before);
 });

@@ -9,9 +9,7 @@ import { ACCOUNT_ICON_CHOICES, COLOR_CHOICES, DEFAULT_LOOK } from '../src/ui/app
 import { IconColorPicker } from '../src/ui/appearance-picker';
 import { ActionButton, AmountField, AppText, ErrorMessage, Field, FieldNote, IconButton, Screen } from '../src/ui/components';
 import { CurrencyField } from '../src/ui/form-controls';
-
-const OPENING_HELP = 'Podés dejarlo vacío para registrar desde cero. El saldo registrado será el resultado de tus movimientos; '
-  + 'no representa tu saldo bancario. Si cargás un saldo inicial, es el punto de partida y no cuenta como ingreso.';
+import { useI18n } from '../src/i18n/provider';
 
 /** Nombre, icono, color, moneda, saldo inicial. The look is saved in the same
  * commit as the account; it is presentation only and never a financial field.
@@ -20,6 +18,7 @@ const OPENING_HELP = 'Podés dejarlo vacío para registrar desde cero. El saldo 
 export default function NewAccountScreen() {
   const params = useLocalSearchParams<{ currency?: string }>();
   const { addAccount } = useLedger();
+  const { t } = useI18n();
   const [operation] = useState(() => ({ id: randomUUID(), createdAt: new Date().toISOString() }));
   const [name, setName] = useState('');
   const [icon, setIcon] = useState<string>(DEFAULT_LOOK.icon);
@@ -52,7 +51,7 @@ export default function NewAccountScreen() {
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       saving.current = false; close();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'No se pudo guardar. Conservamos lo que escribiste para que puedas reintentar.');
+      setError(cause instanceof Error ? cause.message : 'accounts.form.saveFailed');
     } finally {
       saving.current = false;
       setBusy(false);
@@ -62,17 +61,17 @@ export default function NewAccountScreen() {
   const locked = busy || !!pending;
   return <Screen>
     <Stack.Screen options={{ gestureEnabled: !busy,
-      headerLeft: () => <IconButton name="close" label="Cerrar" onPress={close} disabled={busy} /> }} />
-    <Field label="Nombre de la cuenta" value={name} onChangeText={setName} maxLength={80}
-      autoCapitalize="words" editable={!locked} placeholder="Ej. Banco, Efectivo, Cocos" />
+      headerLeft: () => <IconButton name="close" label={t('common.close')} onPress={close} disabled={busy} /> }} />
+    <Field label={t('accounts.form.name')} value={name} onChangeText={setName} maxLength={80}
+      autoCapitalize="words" editable={!locked} placeholder={t('accounts.form.namePlaceholder')} />
     <IconColorPicker icons={ACCOUNT_ICON_CHOICES} colors={COLOR_CHOICES} icon={icon} color={color}
       onIconChange={setIcon} onColorChange={setColor} disabled={locked} previewLabel={name} />
     <CurrencyField value={currency} onChange={setCurrency} disabled={locked} />
-    <AmountField label="Saldo inicial" currency={currency} value={opening} onChangeText={value => { setOpening(value); setError(null); }}
+    <AmountField label={t('accounts.form.openingBalance')} currency={currency} value={opening} onChangeText={value => { setOpening(value); setError(null); }}
       keyboardType="numbers-and-punctuation" inputMode={undefined} editable={!locked} />
-    <FieldNote help={{ title: 'Saldo inicial', detail: OPENING_HELP }}>Opcional. No cuenta como ingreso.</FieldNote>
+    <FieldNote help={{ title: t('accounts.form.openingBalance'), detail: t('accounts.form.openingHelp') }}>{t('accounts.form.openingNote')}</FieldNote>
     <ErrorMessage message={error} />
-    {pending && error && <AppText secondary style={{ fontSize: 13 }}>Reintentá el mismo envío para evitar duplicados. Para cambiarlo, cerrá y revisá primero tus cuentas.</AppText>}
-    <ActionButton label={pending && error ? 'Reintentar guardado' : 'Guardar cuenta'} onPress={save} busy={busy} disabled={!name.trim()} />
+    {pending && error && <AppText secondary style={{ fontSize: 13 }}>{t('accounts.form.retryNote')}</AppText>}
+    <ActionButton label={pending && error ? t('common.retrySave') : t('accounts.form.save')} onPress={save} busy={busy} disabled={!name.trim()} />
   </Screen>;
 }

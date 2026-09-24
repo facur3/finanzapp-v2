@@ -2,10 +2,11 @@ import { useEffect, useMemo, useState } from 'react';
 import { View } from 'react-native';
 import { router, Stack } from 'expo-router';
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
-import { cardStatementActivity, formatMinorUnits, labelFromISO, liabilityActivity } from '@finanzapp/domain';
+import { cardStatementActivity, liabilityActivity } from '@finanzapp/domain';
 import { useLedger } from '../src/storage/LedgerProvider';
 import { ActionButton, AppText, EmptyState, IconButton, Money, MovementRow, Screen, SectionTitle, Stat, Surface, toneColors, StatRow } from '../src/ui/components';
 import { moneyText, withCurrencyCode } from '../src/i18n/format';
+import { useI18n } from '../src/i18n/provider';
 import { CardCarousel, CardFace } from '../src/ui/card-visual';
 import { activeCards, daysUntil, statementCaption, usageTone, type CardSummary } from '../src/ui/liability-presentation';
 import { ValueTransition, timing } from '../src/ui/motion';
@@ -19,6 +20,7 @@ import { space, useCurrentDay, usePalette, useReduceMotion } from '../src/ui/the
  * are a different obligation and live under Más → Deudas y cobros. */
 export default function CardsScreen() {
   const { archive, snapshot } = useLedger();
+  const { t } = useI18n();
   const day = useCurrentDay();
   const cards = useMemo(() => snapshot ? activeCards(archive?.cards, snapshot, day) : [], [archive?.cards, snapshot, day]);
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -26,15 +28,15 @@ export default function CardsScreen() {
   if (!snapshot || !archive) return null;
 
   return <Screen gap={space.xxl}>
-    <Stack.Screen options={{ title: 'Tarjetas', headerRight: () => <IconButton name="add" label="Agregar tarjeta" onPress={() => router.push('/new-card')} /> }} />
-    {!cards.length ? <EmptyState title="Tus tarjetas, como en la billetera" icon="card-outline"
-      detail="Registrá cada compra una sola vez como gasto. Cuando pagás el resumen, el dinero sale de tu cuenta y baja la deuda de la tarjeta, sin volver a contar el consumo."
-      action={<ActionButton label="Agregar tarjeta" icon="add-outline" onPress={() => router.push('/new-card')} />} />
+    <Stack.Screen options={{ title: t('nav.titles.cards'), headerRight: () => <IconButton name="add" label={t('cards.list.add')} onPress={() => router.push('/new-card')} /> }} />
+    {!cards.length ? <EmptyState title={t('cards.list.emptyTitle')} icon="card-outline"
+      detail={t('cards.list.emptyDetail')}
+      action={<ActionButton label={t('cards.list.add')} icon="add-outline" onPress={() => router.push('/new-card')} />} />
       : <>
         <View style={{ marginHorizontal: -space.xl }}>
           <CardCarousel items={cards} selectedIndex={selectedIndex} onSelect={setSelectedIndex}
             render={(item, width) => <CardFace id={item.card.id} name={item.account.name} issuer={item.card.issuer} last4={item.card.last4}
-              currency={item.account.currency} width={width} accessibilityHint="Abre el detalle de la tarjeta"
+              currency={item.account.currency} width={width} accessibilityHint={t('cards.list.openHint')}
               onPress={() => router.push({ pathname: '/card/[id]', params: { id: item.card.id } })} />} />
         </View>
         {selected && <CardPanel summary={selected} day={day} />}
@@ -45,6 +47,7 @@ export default function CardsScreen() {
 function CardPanel({ summary, day }: { summary: CardSummary; day: string }) {
   const { snapshot } = useLedger();
   const p = usePalette();
+  const { t, relativeDate } = useI18n();
   const { card, account, debtMinor, availableMinor, usage, closingISO, dueISO } = summary;
   const statement = useMemo(() => snapshot ? cardStatementActivity(card, snapshot, day) : null, [card, snapshot, day]);
   const recent = useMemo(() => {
@@ -55,45 +58,45 @@ function CardPanel({ summary, day }: { summary: CardSummary; day: string }) {
   if (!snapshot) return null;
   const tone = usageTone(usage);
   const dueIn = daysUntil(dueISO, day);
-  const relative = (iso: string) => labelFromISO(iso, new Date(day + 'T12:00:00'));
+  const relative = (iso: string) => relativeDate(iso, day);
   // The panel structure stays mounted across cards; only its values crossfade,
   // so the sections below never jump to a different height mid-transition.
   return <View style={{ gap: space.xl }}>
     <ValueTransition id={card.id} style={{ gap: 6 }}>
-      <AppText secondary variant="footnote" style={{ fontWeight: '500' }}>{withCurrencyCode('Deuda registrada', account.currency)}</AppText>
+      <AppText secondary variant="footnote" style={{ fontWeight: '500' }}>{withCurrencyCode(t('cards.panel.recordedDebt'), account.currency)}</AppText>
       <Money minor={debtMinor} currency={account.currency} large size={40} />
-      {debtMinor === 0 && <AppText secondary variant="footnote">Sin deuda registrada en esta tarjeta.</AppText>}
+      {debtMinor === 0 && <AppText secondary variant="footnote">{t('cards.panel.noDebt')}</AppText>}
     </ValueTransition>
 
     <ValueTransition id={card.id} variant="fade"><Surface style={{ gap: 14 }}>
       <StatRow>
-        <Stat label="Disponible">
+        <Stat label={t('cards.panel.available')}>
           {availableMinor !== null ? <Money minor={availableMinor} currency={account.currency} size={17} color={availableMinor < 0 ? p.expense : undefined} />
-            : <AppText secondary variant="subhead">Sin límite cargado</AppText>}
+            : <AppText secondary variant="subhead">{t('cards.panel.noLimitLoaded')}</AppText>}
         </Stat>
-        <Stat label="Cierre"><AppText style={{ fontWeight: '600' }}>{relative(closingISO)}</AppText></Stat>
-        <Stat label="Vencimiento">
+        <Stat label={t('cards.panel.closing')}><AppText style={{ fontWeight: '600' }}>{relative(closingISO)}</AppText></Stat>
+        <Stat label={t('cards.panel.due')}>
           <AppText style={{ fontWeight: '600', color: dueIn <= 3 && debtMinor > 0 ? p.warning : p.text }}>{relative(dueISO)}</AppText>
         </Stat>
       </StatRow>
       {usage !== null && card.creditLimitMinor !== null && <UsageBar usage={usage} tone={tone}
-        label={`${Math.round(Math.min(usage, 9.99) * 100)} % del límite de ${moneyText(card.creditLimitMinor, account.currency)}`} />}
+        label={t('cards.panel.usage', { percent: Math.round(Math.min(usage, 9.99) * 100), limit: moneyText(card.creditLimitMinor, account.currency) })} />}
     </Surface></ValueTransition>
 
     {/* Primary above secondary, same width and height: hierarchy by fill, not by geometry. */}
     <View style={{ gap: 10 }}>
-      <ActionButton label="Registrar compra" icon="cart-outline"
+      <ActionButton label={t('cards.panel.recordPurchase')} icon="cart-outline"
         onPress={() => router.push({ pathname: '/new-entry', params: { accountId: account.id, kind: 'expense' } })} />
-      <ActionButton label="Pagar tarjeta" icon="arrow-forward-outline" secondary tone="transfer" disabled={debtMinor === 0}
-        onPress={() => router.push({ pathname: '/new-transfer', params: { toAccountId: account.id, title: 'Pagar tarjeta', note: 'Pago ' + account.name, maxAmountMinor: String(debtMinor) } })} />
+      <ActionButton label={t('cards.panel.pay')} icon="arrow-forward-outline" secondary tone="transfer" disabled={debtMinor === 0}
+        onPress={() => router.push({ pathname: '/new-transfer', params: { toAccountId: account.id, maxAmountMinor: String(debtMinor) } })} />
     </View>
 
     <ValueTransition id={card.id} variant="fade">
-      <SectionTitle action="Ver todo" onAction={() => router.push({ pathname: '/card/[id]', params: { id: card.id } })}
-        caption={statement ? statementCaption(statement, relative) : undefined}>Recientes</SectionTitle>
+      <SectionTitle action={t('cards.panel.seeAll')} onAction={() => router.push({ pathname: '/card/[id]', params: { id: card.id } })}
+        caption={statement ? statementCaption(statement, relative, t) : undefined}>{t('cards.panel.recent')}</SectionTitle>
       {recent.length ? <Surface grouped>
         {recent.map((item, index) => <MovementRow key={item.key} item={item} accounts={snapshot.accounts} accountId={account.id} context="card" last={index === recent.length - 1} />)}
-      </Surface> : <AppText secondary variant="subhead">Todavía no registraste compras ni pagos en esta tarjeta.</AppText>}
+      </Surface> : <AppText secondary variant="subhead">{t('cards.panel.noActivity')}</AppText>}
     </ValueTransition>
   </View>;
 }

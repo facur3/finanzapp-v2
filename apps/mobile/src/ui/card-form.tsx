@@ -5,6 +5,8 @@ import { randomUUID } from 'expo-crypto';
 import * as Haptics from 'expo-haptics';
 import { formatMinorUnits, parseMinorUnits, sameCreditCardProfile, validateAccount, validateCreditCardProfile,
   type Account, type CreditCardProfile, type Currency } from '@finanzapp/domain';
+import { useI18n } from '../i18n/provider';
+import type { MessageKey } from '../i18n/messages';
 import { useLedger } from '../storage/LedgerProvider';
 import { ActionButton, AmountField, AppText, Choices, DetailRow, ErrorMessage, Field, IconButton, Screen, Surface, useStacked } from './components';
 import { space } from './theme';
@@ -15,6 +17,7 @@ type PendingCreate = { account: Account; card: CreditCardProfile };
  * edits the card profile. A submitted command stays frozen across retries. */
 export function CardForm({ original }: { original?: CreditCardProfile }) {
   const stacked = useStacked();
+  const { t } = useI18n();
   const { snapshot, addCard, saveCard } = useLedger();
   const account = snapshot?.accounts.find(item => item.id === original?.accountId);
   const [before] = useState(original);
@@ -36,9 +39,10 @@ export function CardForm({ original }: { original?: CreditCardProfile }) {
   const locked = busy || !!pendingCreate || !!pendingEdit || !!pendingArchive;
   const close = () => { if (!saving.current) { if (router.canGoBack()) router.back(); else router.replace('/cards'); } };
 
-  function day(value: string, label: string): number {
+  // Errors the form raises itself are catalogue keys, translated when shown (ErrorMessage).
+  function day(value: string, invalid: MessageKey): number {
     const number = Number(value);
-    if (!/^\d{1,2}$/.test(value) || number < 1 || number > 31) throw new Error(`Ingresá el día de ${label} entre 1 y 31.`);
+    if (!/^\d{1,2}$/.test(value) || number < 1 || number > 31) throw new Error(invalid);
     return number;
   }
   function profileBase(): Omit<CreditCardProfile, 'revision' | 'updatedAt' | 'active'> {
@@ -48,8 +52,8 @@ export function CardForm({ original }: { original?: CreditCardProfile }) {
       issuer: issuer.trim(),
       last4: last4.trim(),
       creditLimitMinor: limit.trim() ? parseMinorUnits(limit) : null,
-      closingDay: day(closingDay.trim(), 'cierre'),
-      dueDay: day(dueDay.trim(), 'vencimiento'),
+      closingDay: day(closingDay.trim(), 'cards.form.closingDayInvalid'),
+      dueDay: day(dueDay.trim(), 'cards.form.dueDayInvalid'),
       createdAt: before?.createdAt ?? identity.createdAt,
     };
   }
@@ -73,7 +77,7 @@ export function CardForm({ original }: { original?: CreditCardProfile }) {
         let submission = pendingCreate;
         if (!submission) {
           const openingDebt = debt.trim() ? parseMinorUnits(debt) : 0;
-          if (openingDebt < 0) throw new Error('La deuda inicial no puede ser negativa. Si la tarjeta tiene saldo a favor, registralo después como devolución.');
+          if (openingDebt < 0) throw new Error('cards.form.negativeDebt');
           const card: CreditCardProfile = { ...profileBase(), active: true, revision: 0, updatedAt: identity.createdAt };
           const newAccount: Account = { id: identity.accountId, name: name.trim(), currency, openingMinor: -openingDebt, createdAt: identity.createdAt };
           validateAccount(newAccount);
@@ -86,7 +90,7 @@ export function CardForm({ original }: { original?: CreditCardProfile }) {
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       saving.current = false; close();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'No pudimos guardar la tarjeta. Reintentá el mismo envío.');
+      setError(cause instanceof Error ? cause.message : 'cards.form.saveFailed');
     } finally { saving.current = false; setBusy(false); }
   }
 
@@ -99,7 +103,7 @@ export function CardForm({ original }: { original?: CreditCardProfile }) {
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       saving.current = false; close();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'No pudimos archivar la tarjeta. Reintentá el mismo cambio.');
+      setError(cause instanceof Error ? cause.message : 'cards.form.archiveFailed');
     } finally { saving.current = false; setBusy(false); }
   }
   function archive() {
@@ -107,56 +111,56 @@ export function CardForm({ original }: { original?: CreditCardProfile }) {
     if (pendingArchive) { void commitArchive(pendingArchive); return; }
     const submission = { ...before, active: !before.active, revision: before.revision + 1, updatedAt: new Date().toISOString() };
     if (!before.active) { void commitArchive(submission); return; }
-    Alert.alert('¿Archivar esta tarjeta?', 'Las compras y pagos anteriores siguen en tus registros y reportes. La tarjeta deja de aparecer en Tarjetas.', [
-      { text: 'Cancelar', style: 'cancel' },
-      { text: 'Archivar', style: 'destructive', onPress: () => { void commitArchive(submission); } },
+    Alert.alert(t('cards.form.archiveTitle'), t('cards.form.archiveDetail'), [
+      { text: t('common.cancel'), style: 'cancel' },
+      { text: t('cards.form.archiveConfirm'), style: 'destructive', onPress: () => { void commitArchive(submission); } },
     ]);
   }
 
   return <Screen>
-    <Stack.Screen options={{ title: before ? 'Editar tarjeta' : 'Nueva tarjeta', gestureEnabled: !busy,
-      headerLeft: () => <IconButton name="close" label="Cerrar" onPress={close} disabled={busy} /> }} />
+    <Stack.Screen options={{ title: t(before ? 'nav.titles.editCard' : 'nav.titles.newCard'), gestureEnabled: !busy,
+      headerLeft: () => <IconButton name="close" label={t('common.close')} onPress={close} disabled={busy} /> }} />
 
     {before && account ? <Surface grouped>
-      <DetailRow label="Tarjeta" value={account.name} icon="card-outline" onPress={() => router.push({ pathname: '/edit-account/[id]', params: { id: account.id } })} />
-      <DetailRow label="Moneda" value={account.currency} last />
+      <DetailRow label={t('cards.form.card')} value={account.name} icon="card-outline" onPress={() => router.push({ pathname: '/edit-account/[id]', params: { id: account.id } })} />
+      <DetailRow label={t('cards.form.currency')} value={account.currency} last />
     </Surface> : <>
-      <Field label="Nombre de la tarjeta" value={name} onChangeText={setName}
-        placeholder="Ej. Visa Galicia" maxLength={80} autoCapitalize="words" editable={!locked} />
+      <Field label={t('cards.form.name')} value={name} onChangeText={setName}
+        placeholder={t('cards.form.namePlaceholder')} maxLength={80} autoCapitalize="words" editable={!locked} />
       <Choices value={currency} onChange={setCurrency} disabled={locked}
-        options={[{ value: 'ARS', label: 'Pesos · ARS' }, { value: 'USD', label: 'Dólares · USD' }]} />
-      <AmountField label="Deuda actual (opcional)" currency={currency} value={debt}
+        options={[{ value: 'ARS', label: t('cards.form.pesos') }, { value: 'USD', label: t('cards.form.dollars') }]} />
+      <AmountField label={t('cards.form.openingDebt')} currency={currency} value={debt}
         onChangeText={value => { setDebt(value); setError(null); }} editable={!locked} />
-      <AppText secondary variant="footnote" style={{ marginTop: -space.m }}>Lo que ya debés hoy en esta tarjeta. No cuenta como gasto: las compras anteriores no se vuelven a registrar.</AppText>
+      <AppText secondary variant="footnote" style={{ marginTop: -space.m }}>{t('cards.form.openingDebtNote')}</AppText>
     </>}
 
     <View style={{ gap: space.l }}>
-      <Field label="Emisor (opcional)" value={issuer} onChangeText={setIssuer}
-        placeholder="Banco o billetera" maxLength={80} autoCapitalize="words" editable={!locked} />
-      <Field label="Últimos 4 dígitos (opcional)" value={last4} onChangeText={value => setLast4(value.replace(/\D/g, '').slice(0, 4))}
+      <Field label={t('cards.form.issuer')} value={issuer} onChangeText={setIssuer}
+        placeholder={t('cards.form.issuerPlaceholder')} maxLength={80} autoCapitalize="words" editable={!locked} />
+      <Field label={t('cards.form.last4')} value={last4} onChangeText={value => setLast4(value.replace(/\D/g, '').slice(0, 4))}
         placeholder="4009" keyboardType="number-pad" maxLength={4} editable={!locked} />
     </View>
 
-    <AmountField label="Límite de crédito (opcional)" currency={currency} value={limit}
+    <AmountField label={t('cards.form.limit')} currency={currency} value={limit}
       onChangeText={value => { setLimit(value); setError(null); }} editable={!locked} />
 
     <View style={{ flexDirection: stacked ? 'column' : 'row', gap: 12 }}>
-      <View style={{ flex: stacked ? undefined : 1 }}><Field label="Día de cierre" value={closingDay} onChangeText={value => setClosingDay(value.replace(/\D/g, '').slice(0, 2))}
+      <View style={{ flex: stacked ? undefined : 1 }}><Field label={t('cards.form.closingDay')} value={closingDay} onChangeText={value => setClosingDay(value.replace(/\D/g, '').slice(0, 2))}
         placeholder="1–31" keyboardType="number-pad" maxLength={2} editable={!locked} /></View>
-      <View style={{ flex: stacked ? undefined : 1 }}><Field label="Día de vencimiento" value={dueDay} onChangeText={value => setDueDay(value.replace(/\D/g, '').slice(0, 2))}
+      <View style={{ flex: stacked ? undefined : 1 }}><Field label={t('cards.form.dueDay')} value={dueDay} onChangeText={value => setDueDay(value.replace(/\D/g, '').slice(0, 2))}
         placeholder="1–31" keyboardType="number-pad" maxLength={2} editable={!locked} /></View>
     </View>
     <AppText secondary variant="footnote" style={{ marginTop: -space.s }}>
-      Están en tu resumen. Con ellos FinanzApp calcula el próximo cierre y vencimiento; no consulta al banco.
+      {t('cards.form.daysNote')}
     </AppText>
 
     <ErrorMessage message={error} />
     {(pendingCreate || pendingEdit) && error && <AppText secondary variant="footnote">
-      El envío quedó congelado para que Reintentar no cree otra tarjeta ni aplique cambios dos veces.
+      {t('cards.form.frozenNote')}
     </AppText>}
-    <ActionButton label={error && (pendingCreate || pendingEdit) ? 'Reintentar guardado' : before ? 'Guardar cambios' : 'Crear tarjeta'}
+    <ActionButton label={error && (pendingCreate || pendingEdit) ? t('common.retrySave') : before ? t('common.saveChanges') : t('cards.form.create')}
       onPress={save} busy={busy} disabled={before ? !closingDay || !dueDay : !name.trim() || !closingDay || !dueDay} />
-    {before && <ActionButton label={pendingArchive && error ? 'Reintentar' : before.active ? 'Archivar tarjeta' : 'Reactivar tarjeta'}
+    {before && <ActionButton label={t(pendingArchive && error ? 'cards.form.retry' : before.active ? 'cards.form.archive' : 'cards.form.reactivate')}
       onPress={archive} secondary disabled={busy || !!pendingEdit} />}
   </Screen>;
 }

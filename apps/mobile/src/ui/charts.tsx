@@ -3,7 +3,7 @@ import { StyleSheet, View } from 'react-native';
 import Animated, { useAnimatedProps, useAnimatedStyle, useSharedValue, withTiming, type SharedValue } from 'react-native-reanimated';
 import Svg, { Circle, Path } from 'react-native-svg';
 import { AppText, Money, PressFeedback } from './components';
-import { currencySymbol, formatCount, spokenMoney } from '../i18n/format';
+import { useI18n } from '../i18n/provider';
 import { categoryColor, othersColor } from './category-color';
 import { ValueTransition, duration, timing } from './motion';
 import { usePalette, useReduceMotion, type Palette } from './theme';
@@ -13,15 +13,15 @@ export const OTHERS_KEY = '__others__';
 
 export type DonutSlice = { key: string; label: string; value: number };
 
-/** Groups the tail of a ranked list into "Otras" so the donut keeps at most
- * five readable slices. Each named slice takes its category hue; the tail is
- * neutral because it is not one category. */
-export function donutSlices(items: DonutSlice[], p: Palette, hues: Map<string, number> | ((key: string) => string), max = 5): (DonutSlice & { color: string; count?: number })[] {
+/** Groups the tail of a ranked list into one slice named `othersLabel`
+ * ("Otras") so the donut keeps at most five readable slices. Each named slice
+ * takes its category hue; the tail is neutral because it is not one category. */
+export function donutSlices(items: DonutSlice[], p: Palette, hues: Map<string, number> | ((key: string) => string), othersLabel: string, max = 5): (DonutSlice & { color: string; count?: number })[] {
   const colorOf = typeof hues === 'function' ? hues : (key: string) => categoryColor(key, hues, p);
   const head = items.slice(0, items.length > max ? max - 1 : max).map(item => ({ ...item, color: colorOf(item.key) }));
   const tail = items.slice(head.length);
   if (!tail.length) return head;
-  return [...head, { key: OTHERS_KEY, label: 'Otras', value: tail.reduce((sum, item) => sum + item.value, 0), color: othersColor(p), count: tail.length }];
+  return [...head, { key: OTHERS_KEY, label: othersLabel, value: tail.reduce((sum, item) => sum + item.value, 0), color: othersColor(p), count: tail.length }];
 }
 
 function arcPath(cx: number, cy: number, radius: number, startAngle: number, endAngle: number): string {
@@ -63,6 +63,7 @@ export function DonutChart({ slices, total, currency, size = 176, thickness = 22
   slices: (DonutSlice & { color: string })[]; total: number; currency: Currency; size?: number; thickness?: number; caption: string;
 }) {
   const p = usePalette();
+  const { t } = useI18n();
   const signature = slices.map(slice => slice.key + ':' + slice.value).join('|');
   const revealed = useRef(false);
   const reveal = !revealed.current;
@@ -80,9 +81,9 @@ export function DonutChart({ slices, total, currency, size = 176, thickness = 22
       return { key: slice.key, start, end, color: slice.color, radius };
     });
   }, [slices, size, thickness]);
-  const label = slices.map(slice => `${slice.label} ${Math.round(slice.value / Math.max(1, total) * 100)} %`).join(', ');
+  const label = slices.map(slice => t('reports.chart.slice', { label: slice.label, percent: Math.round(slice.value / Math.max(1, total) * 100) })).join(', ');
   return <ValueTransition id={signature} variant="fade" style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
-    <View accessible accessibilityRole="image" accessibilityLabel={`${caption}: ${label}`} style={{ width: size, height: size }}>
+    <View accessible accessibilityRole="image" accessibilityLabel={t('reports.chart.donutLabel', { caption, slices: label })} style={{ width: size, height: size }}>
       <Sweep arcs={arcs} size={size} thickness={thickness} ring={p.inset} reveal={reveal} />
     </View>
     <View pointerEvents="none" style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center', gap: 2, paddingHorizontal: thickness + 8 }]}>
@@ -104,7 +105,10 @@ function Sweep({ arcs, size, thickness, ring, reveal }: {
   </Svg>;
 }
 
-const MONTHS = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+/** The locale's short month name ("sep", "Sep"): its short date of the first, without the day. */
+export function shortMonth(monthISO: string, formatDate: (dateISO: string, style: 'day') => string): string {
+  return formatDate(monthISO.slice(0, 7) + '-01', 'day').replace(/(^1\s+|\s+1$)/, '');
+}
 
 /** Six monthly bars on a common zero-to-max scale. The selected month is the
  * brand primary, the rest are graphite; a partial (current) month is outlined.
@@ -114,6 +118,7 @@ export function MonthBars({ points, selected, onSelect, currency, height = 120 }
 }) {
   const p = usePalette();
   const reduced = useReduceMotion();
+  const { t, formatDate, currencySymbol, formatCount } = useI18n();
   const max = Math.max(...points.map(point => point.amountMinor), 1);
   const current = points.find(point => point.monthISO === selected);
   return <View style={{ gap: 8 }}>
@@ -124,11 +129,12 @@ export function MonthBars({ points, selected, onSelect, currency, height = 120 }
     <View style={{ flexDirection: 'row', gap: 6 }}>
       {points.map(point => <Animated.Text key={point.monthISO} style={{ flex: 1, fontSize: 12, lineHeight: 16, textAlign: 'center', fontWeight: point.monthISO === selected ? '600' : '400',
         color: point.monthISO === selected ? p.primary : p.secondary, transitionProperty: 'color', transitionDuration: reduced ? 0 : duration.state }}>
-        {MONTHS[Number(point.monthISO.slice(5, 7)) - 1]}
+        {shortMonth(point.monthISO, formatDate)}
       </Animated.Text>)}
     </View>
     {current && <AppText secondary variant="caption" style={{ textAlign: 'center' }}>
-      {current.partial ? 'Mes en curso hasta hoy' : 'Mes completo'} · escala de 0 a {currencySymbol(currency)}{'\u00A0'}{formatCount(Math.round(max / 100))}
+      {t('reports.chart.scale', { status: t(current.partial ? 'reports.chart.partialMonth' : 'reports.period.fullMonth'),
+        max: currencySymbol(currency) + '\u00A0' + formatCount(Math.round(max / 100)) })}
     </AppText>}
   </View>;
 }
@@ -138,11 +144,13 @@ function Bar({ point, fraction, selected, onPress, currency, height }: {
 }) {
   const p = usePalette();
   const reduced = useReduceMotion();
+  const { t, formatDate, spokenMoney } = useI18n();
   const value = useSharedValue(fraction);
   useEffect(() => { value.value = withTiming(fraction, timing('data', reduced)); }, [fraction, reduced, value]);
   const style = useAnimatedStyle(() => ({ height: Math.max(point.amountMinor > 0 ? 3 : 0, value.value * (height - 4)) }));
   return <PressFeedback feedback="opacity" accessibilityRole="button" accessibilityState={{ selected }}
-    accessibilityLabel={`${MONTHS[Number(point.monthISO.slice(5, 7)) - 1]} ${point.monthISO.slice(0, 4)}, ${spokenMoney(point.amountMinor, currency)}${point.partial ? ', mes en curso' : ''}`}
+    accessibilityLabel={t(point.partial ? 'reports.chart.barPartial' : 'reports.chart.bar',
+      { month: shortMonth(point.monthISO, formatDate), year: point.monthISO.slice(0, 4), amount: spokenMoney(point.amountMinor, currency) })}
     onPress={onPress} containerStyle={{ flex: 1 }} style={{ height, justifyContent: 'flex-end', minHeight: undefined }}>
     <Animated.View style={[{ borderRadius: 6, backgroundColor: selected ? p.primary : p.inset, borderWidth: point.partial ? StyleSheet.hairlineWidth * 2 : 0, borderColor: p.secondary,
       transitionProperty: 'backgroundColor', transitionDuration: reduced ? 0 : duration.state }, style]} />

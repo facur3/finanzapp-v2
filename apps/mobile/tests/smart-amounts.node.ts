@@ -5,6 +5,7 @@ import { runInNewContext } from 'node:vm';
 import ts from 'typescript';
 import * as domain from '@finanzapp/domain';
 import * as presentation from '../src/ui/presentation.ts';
+import * as liabilityPresentation from '../src/ui/liability-presentation.ts';
 import * as moneyInput from '../src/ui/money-input.ts';
 import * as i18nFormat from '../src/i18n/format.ts';
 import { bindLocale } from '../src/i18n/bind.ts';
@@ -60,7 +61,7 @@ function harness(props: any = {}, data: domain.LedgerArchive = archive, options:
     '../storage/LedgerProvider': ledger,
     './components': components,
     './form-controls': { AccountField: 'AccountField', DateField: 'DateField', SelectorCard: 'SelectorCard' },
-    './presentation': presentation,
+    './presentation': presentation, './liability-presentation': liabilityPresentation,
     './money-input': moneyInput,
     './theme': { space: { xs: 4, s: 8, m: 12, l: 16, xl: 20, xxl: 24, xxxl: 32 }, usePalette: () => ({ primary: '#2557D6' }) },
   };

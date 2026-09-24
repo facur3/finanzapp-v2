@@ -8,14 +8,23 @@ import * as materialPolicy from '../src/ui/material-policy.ts';
 import * as presentation from '../src/ui/presentation.ts';
 import * as i18nFormat from '../src/i18n/format.ts';
 import { bindLocale } from '../src/i18n/bind.ts';
-const i18nProvider = { useI18n: () => bindLocale('es-AR') };
+import { translate, type MessageKey } from '../src/i18n/messages.ts';
+import type { AppLocale } from '../src/i18n/locale.ts';
 
 // Producto 21: the composer and the message components at source level, with
 // React Native, Reanimated and the safe area replaced by descriptors. This
 // checks structure, labels and state logic; rendering, VoiceOver order,
 // keyboard tracking and the pulse need the iPhone.
 type Node = { type: any; props: Record<string, any> };
-function load(file: string, { reduced = false, fontScale = 1, dark = false, bottomInset = 34, material = 'opaque' as 'opaque' | 'glass' } = {}) {
+function load(file: string, { reduced = false, fontScale = 1, dark = false, bottomInset = 34, material = 'opaque' as 'opaque' | 'glass', locale = 'es-AR' as AppLocale } = {}) {
+  const i18n = bindLocale(locale);
+  const i18nProvider = { useI18n: () => i18n };
+  // A built-in category reads in the interface language (the real resolver's rule, reduced to the catalogue lookup); anything else is the user's word.
+  const categoryLabel = (stored: string) => {
+    const key = `categories.expense.${stored.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()}` as MessageKey;
+    const text = translate(i18n.language, key);
+    return text === key ? stored : text;
+  };
   const source = readFileSync(new URL('../src/ui/' + file, import.meta.url), 'utf8');
   const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText;
   const jsx = (type: any, props: any) => ({ type, props });
@@ -47,6 +56,7 @@ function load(file: string, { reduced = false, fontScale = 1, dark = false, bott
     './theme': { radius: { chip: 14, tile: 12, group: 16, card: 20, sheet: 24, creditCard: 18, button: 14 }, space: { xs: 4, s: 8, m: 12, l: 16, xl: 20, xxl: 24, xxxl: 32 },
       usePalette: () => palette, useReduceMotion: () => reduced, useCurrentDay: () => '2026-09-21' },
     '../assistant/conversation': conversation,
+    './category-hues': { useCategoryLook: (stored: string) => ({ label: categoryLabel(stored) }), useCategoryLookOf: () => (stored: string) => ({ label: categoryLabel(stored) }) },
   };
   const module = { exports: {} as Record<string, (props: any) => Node> };
   runInNewContext(code, { module, exports: module.exports, require: (name: string) => {
@@ -73,7 +83,8 @@ test('the composer labels its field, microphone and send; send is disabled when 
   let root = ui.render('AssistantComposer', props);
   const input = nodes(root).find(node => node.type === 'TextInput')!;
   assert.equal(input.props.accessibilityLabel, 'Mensaje para el Asistente');
-  assert.equal(input.props.placeholder, ui.exports.COMPOSER_PLACEHOLDER as unknown as string);
+  assert.equal(input.props.placeholder, bindLocale('es-AR').t(ui.exports.COMPOSER_PLACEHOLDER as unknown as MessageKey));
+  assert.equal(input.props.placeholder, 'Preguntá o registrá algo…');
   assert.equal(input.props.multiline, true);
   assert.equal(flat(input.props.style).maxHeight, 22 * 5, 'about five lines, then the field scrolls inside');
   const mic = byLabel(root, 'Dictar')!;
@@ -254,4 +265,81 @@ test('answer evidence renders rows with the shared Money component and links as 
   links[1].props.onPress();
   assert.equal(JSON.stringify(opened), JSON.stringify([{ pathname: '/activity' }]));
   assert.equal(ui.render('AnswerEvidence', { content: { kind: 'answer', rows: [], links: [] }, currency: 'ARS', onOpen: () => {} }), null);
+});
+
+test('English: every word the Assistant UI says is English; account names, merchants, custom categories and the model\'s text are untouched', () => {
+  const ui = load('assistant-messages.tsx', { locale: 'en-AR' });
+  const accounts = [{ id: 'visa', name: 'Visa Galicia', currency: 'ARS', openingMinor: 0, createdAt: 'x' }];
+  const draft = { kind: 'expense', amountMinor: 1850000, currency: 'ARS', merchant: 'Carrefour', category: 'Supermercado', dateISO: '2026-09-21', accountId: 'visa' };
+  const handlers = { accounts, onConfirm: () => {}, onEdit: () => {}, onCancel: () => {}, onOpenEntry: () => {} };
+  const pending = ui.render('DraftCard', { content: { kind: 'draft', draft, status: 'pending', entryId: null }, ...handlers });
+  const labels = nodes(pending).map(node => node.props.accessibilityLabel).filter((label): label is string => typeof label === 'string');
+  assert.deepEqual(labels.filter(label => label.includes(': ')), ['Merchant: Carrefour', 'Category: Groceries', 'Paid with: Visa Galicia', 'Date: Today · Sep 21']);
+  assert.ok(nodes(pending).some(node => node.type === 'CategoryBadge' && node.props.category === 'Supermercado'), 'the stored category is what the badge receives');
+  assert.ok(nodes(pending).some(node => node.type === 'AppText' && textOf(node) === 'Draft · Expense'));
+  assert.deepEqual(nodes(pending).filter(node => node.type === 'ActionButton').map(node => node.props.label), ['Confirm', 'Edit']);
+  assert.ok(byLabel(pending, 'Discard draft'));
+  const custom = ui.render('DraftCard', { content: { kind: 'draft', draft: { ...draft, category: 'Kiosco Pepe', merchant: '', accountId: null }, status: 'pending', entryId: null }, ...handlers });
+  const customLabels = nodes(custom).map(node => node.props.accessibilityLabel);
+  assert.ok(customLabels.includes('Category: Kiosco Pepe'), 'a custom category is the user\'s word');
+  assert.ok(customLabels.includes('Merchant: Missing'));
+  assert.ok(customLabels.includes('Paid with: Not chosen'));
+  assert.ok(nodes(custom).some(node => node.type === 'AppText' && textOf(node) === 'Fill in the missing details with Edit before confirming.'));
+  const income = ui.render('DraftCard', { content: { kind: 'draft', draft: { ...draft, kind: 'income', merchant: 'Sueldo' }, status: 'confirmed', entryId: 'e' }, ...handlers });
+  assert.ok(nodes(income).some(node => node.props.accessibilityLabel === 'Received in: Visa Galicia'));
+  assert.ok(nodes(income).some(node => node.props.accessibilityLabel === 'Source: Sueldo'));
+  assert.ok(nodes(income).some(node => node.type === 'AppText' && textOf(node) === 'Saved · Income'));
+  assert.deepEqual(nodes(income).filter(node => node.type === 'ActionButton').map(node => node.props.label), ['View transaction']);
+  assert.equal(ui.render('DraftCard', { content: { kind: 'draft', draft, status: 'cancelled', entryId: null }, ...handlers }).props.accessibilityLabel, 'Draft discarded');
+  // The model's text is shown as it arrived; only the frame around it is English.
+  const answer = ui.render('AssistantText', { text: 'Gastaste más.', status: 'stopped' });
+  assert.equal(answer.props.accessibilityLabel, 'Assistant: Gastaste más.');
+  assert.ok(nodes(answer).some(node => node.type === 'AppText' && node.props.children === 'Response stopped.'));
+  assert.equal(nodes(ui.render('UserMessage', { text: 'Gasté 500' })).find(node => node.props.accessibilityLabel)!.props.accessibilityLabel, 'You: Gasté 500');
+  const thinking = nodes(ui.render('AssistantText', { text: '', status: 'streaming' }));
+  assert.ok(thinking.some(node => node.props.accessibilityLabel === 'Assistant: thinking'));
+  assert.ok(thinking.some(node => node.type === 'AppText' && node.props.children === 'Thinking…'));
+  // A note stored as a key reads in English; a caught sentence nobody translated is shown as it was thrown.
+  const note = ui.render('SystemNote', { message: { id: 's', role: 'system', reason: 'offline', text: 'assistant.reasons.offline', retryText: 'hola' }, onRetry: () => {} });
+  assert.equal(note.props.accessibilityLabel, 'No connection. Your transactions didn’t change; you can retry.');
+  assert.ok(byLabel(note, 'Retry'));
+  assert.equal(ui.render('SystemNote', { message: { id: 's', role: 'system', reason: 'failed', text: 'Respuesta inválida del servidor.', retryText: null } }).props.accessibilityLabel, 'Respuesta inválida del servidor.');
+  // Clarification chips: the app's words translate, account names do not, a built-in category reads localized and is echoed as shown.
+  const chosen: string[] = [];
+  const kinds = nodes(ui.render('ClarificationChoices', { options: [{ id: 'expense', labelKey: 'movement.expense' }, { id: 'income', labelKey: 'movement.income' }], chosen: null, onChoose: (_o: unknown, shown: string) => chosen.push(shown) }))
+    .filter(node => node.props.accessibilityRole === 'button');
+  assert.deepEqual(kinds.map(node => node.props.accessibilityLabel), ['Expense', 'Income']);
+  kinds[1].props.onPress();
+  const categories = nodes(ui.render('ClarificationChoices', { options: conversation.categoryOptions([
+    { id: 'a', accountId: 'visa', kind: 'expense', amountMinor: 1, merchant: 'x', category: 'Supermercado', dateISO: '2026-09-01', createdAt: 'x' },
+    { id: 'b', accountId: 'visa', kind: 'expense', amountMinor: 1, merchant: 'x', category: 'Kiosco Pepe', dateISO: '2026-09-01', createdAt: 'x' }], 'expense'), chosen: null,
+  onChoose: (option: any, shown: string) => chosen.push(option.id + '=' + shown) })).filter(node => node.props.accessibilityRole === 'button');
+  assert.deepEqual(categories.map(node => node.props.accessibilityLabel), ['Kiosco Pepe', 'Groceries']);
+  categories[1].props.onPress();
+  assert.deepEqual(chosen, ['Income', 'Supermercado=Groceries'], 'the option id stays the stored category; the echo is what was shown');
+  const accountsChips = nodes(ui.render('ClarificationChoices', { options: [{ id: 'visa', label: 'Visa Galicia' }], chosen: null, onChoose: () => {} })).filter(node => node.props.accessibilityRole === 'button');
+  assert.deepEqual(accountsChips.map(node => node.props.accessibilityLabel), ['Visa Galicia']);
+  // Evidence: rows named from the fact id in English, built-in categories localized; links from their stable ids.
+  const content = conversation.answerContent({ factIds: ['current.expenses', 'current.category.1', 'previous.category.0'] }, [
+    { id: 'current.expenses', label: 'Gastos registrados', amountMinor: 5, count: 1, startISO: '2026-09-01', endISO: '2026-09-21' },
+    { id: 'current.category.1', label: 'Categoría de gasto: Supermercado', amountMinor: 3, count: 1, startISO: '2026-09-01', endISO: '2026-09-21' },
+    { id: 'previous.category.0', label: 'Categoría de gasto: Kiosco Pepe', amountMinor: 2, count: 1, startISO: '2026-08-01', endISO: '2026-08-21' }], 'ARS');
+  const evidence = ui.render('AnswerEvidence', { content, currency: 'ARS', onOpen: () => {} });
+  const rows = nodes(evidence).filter(node => node.type === 'View' && node.props.accessible).map(node => node.props.accessibilityLabel);
+  assert.deepEqual(rows, ['Recorded expenses', 'Groceries', 'Kiosco Pepe (previous month)']);
+  assert.deepEqual(nodes(evidence).filter(node => node.props.accessibilityRole === 'link').map(node => node.props.accessibilityLabel), ['View category', 'View transactions']);
+  const suggestions = ui.render('Suggestions', { items: ['Log an expense'], onPick: () => {} });
+  assert.ok(nodes(suggestions).some(node => node.props.accessibilityRole === 'header' && node.props.children === 'How can I help?'));
+  // The composer.
+  const composer = load('assistant-composer.tsx', { locale: 'en-AR' });
+  let bar = composer.render('AssistantComposer', { value: '', onChange: () => {}, onSend: () => {}, onStop: () => {}, busy: false });
+  const input = nodes(bar).find(node => node.type === 'TextInput')!;
+  assert.equal(input.props.placeholder, 'Ask or log something…');
+  assert.equal(input.props.accessibilityLabel, 'Message for the Assistant');
+  assert.equal(byLabel(bar, 'Dictate')!.props.accessibilityHint, 'Not available in this version yet');
+  assert.ok(byLabel(bar, 'Send'));
+  byLabel(bar, 'Dictate')!.props.onPress();
+  bar = composer.render('AssistantComposer', { value: 'x', onChange: () => {}, onSend: () => {}, onStop: () => {}, busy: true });
+  assert.ok(byLabel(bar, 'Stop response'));
+  assert.ok(nodes(bar).some(node => node.type === 'AppText' && /^Dictation comes with the installable version/.test(String(node.props.children))));
 });

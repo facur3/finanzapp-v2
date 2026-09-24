@@ -1,6 +1,8 @@
 import { validDateISO, type Currency, type LedgerSnapshot, type ReportPeriod } from '@finanzapp/domain';
 import { availableCurrencies } from './presentation.ts';
 import { formatMonth, formatPercent } from '../i18n/format.ts';
+import { DEFAULT_LOCALE, type AppLocale } from '../i18n/locale.ts';
+import { translator, type Translate } from '../i18n/messages.ts';
 
 export function reportSelection(snapshot: LedgerSnapshot, currencyParam: unknown, monthParam: unknown, day: string) {
   const currencies = availableCurrencies(snapshot.accounts);
@@ -20,15 +22,16 @@ export function shiftReportMonth(monthISO: string, delta: -1 | 1): string {
   return String(date.getFullYear()).padStart(4, '0') + '-' + String(date.getMonth() + 1).padStart(2, '0');
 }
 
-export function reportMonthLabel(monthISO: string): string {
-  return formatMonth(monthISO);
+export function reportMonthLabel(monthISO: string, locale: AppLocale = DEFAULT_LOCALE): string {
+  return formatMonth(monthISO, locale);
 }
 
-export function reportPeriodLabel(period: ReportPeriod, day: string): string {
+/** "Hasta hoy · ARS", "Mes completo · ARS" or "Del 1 al 12 · ARS": which days a report covers. */
+export function reportPeriodLabel(period: ReportPeriod, day: string, t: Translate = translator('es')): string {
   const [year, month] = period.endISO.split('-').map(Number);
   const lastDay = new Date(year, month, 0, 12).getDate();
-  const label = period.endISO === day ? 'Hasta hoy' : Number(period.endISO.slice(-2)) === lastDay
-    ? 'Mes completo' : `Del 1 al ${Number(period.endISO.slice(-2))}`;
+  const label = period.endISO === day ? t('reports.period.untilToday') : Number(period.endISO.slice(-2)) === lastDay
+    ? t('reports.period.fullMonth') : t('reports.period.untilDay', { day: Number(period.endISO.slice(-2)) });
   return label + ' · ' + period.currency;
 }
 
@@ -38,19 +41,21 @@ export function reportCutoff(monthISO: string, through: unknown, today: string):
   return typeof through === 'string' && validDateISO(through) && through.slice(0, 7) === monthISO && through <= today ? through : null;
 }
 
-export function changePercent(delta: number, previous: number): string {
+export function changePercent(delta: number, previous: number, locale: AppLocale = DEFAULT_LOCALE): string {
   if (!Number.isSafeInteger(delta) || !Number.isSafeInteger(previous) || previous <= 0) return '—';
-  return formatPercent(Math.abs(delta) / previous);
+  return formatPercent(Math.abs(delta) / previous, locale);
 }
 
-export function dateRangeLabel(period: ReportPeriod): string {
-  return `1–${Number(period.endISO.slice(-2))} de ${reportMonthLabel(period.startISO.slice(0, 7))}`;
+/** "1–12 de agosto de 2026": a comparison period from the first of its month. */
+export function dateRangeLabel(period: ReportPeriod, t: Translate = translator('es'), locale: AppLocale = DEFAULT_LOCALE): string {
+  const month = period.startISO.slice(0, 7);
+  return t('reports.period.range', { day: Number(period.endISO.slice(-2)), month: formatMonth(month, locale, 'month'), year: month.slice(0, 4) });
 }
 
-export function spendingShare(amountMinor: number, totalMinor: number): { fraction: number; label: string } {
+export function spendingShare(amountMinor: number, totalMinor: number, locale: AppLocale = DEFAULT_LOCALE): { fraction: number; label: string } {
   if (!Number.isSafeInteger(amountMinor) || !Number.isSafeInteger(totalMinor)
     || amountMinor < 0 || totalMinor <= 0 || amountMinor > totalMinor) return { fraction: 0, label: '—' };
   // Divide before multiplying: cents remain exact; the ratio is display-only.
   const fraction = amountMinor / totalMinor;
-  return { fraction, label: formatPercent(fraction) };
+  return { fraction, label: formatPercent(fraction, locale) };
 }

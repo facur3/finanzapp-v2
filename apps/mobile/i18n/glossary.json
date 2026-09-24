@@ -1,0 +1,28 @@
+{
+  "about": "Financial terms FinanzApp uses with one meaning each. Every translation keeps these distinctions; the export script attaches the terms a key contains. Add a term before translating a new concept.",
+  "terms": [
+    { "es": "gasto", "en": "expense", "note": "Money spent and recorded. Never 'payment' (a payment settles a card or a debt)." },
+    { "es": "ingreso", "en": "income", "note": "Money received. Uncountable in English: '3 income entries', not '3 incomes'." },
+    { "es": "movimiento", "en": "transaction", "note": "Any recorded expense, income or transfer. Not 'movement'." },
+    { "es": "transferencia", "en": "transfer", "note": "Between the person's own accounts; never spending or income." },
+    { "es": "saldo registrado", "en": "recorded balance", "note": "What the app computed from the records. Never 'bank balance'." },
+    { "es": "disponible", "en": "available", "note": "Recorded liquid money in one currency; excludes cards and debts. Never 'net worth'." },
+    { "es": "presupuesto", "en": "budget", "note": "Monthly ceiling, overall or per category." },
+    { "es": "tarjeta", "en": "card", "note": "A credit card tracked as a liability." },
+    { "es": "resumen", "en": "statement", "note": "The credit-card statement for one cycle." },
+    { "es": "cierre", "en": "closing date", "note": "Last day purchases enter a statement." },
+    { "es": "vencimiento", "en": "due date", "note": "Last day to pay a statement or a debt." },
+    { "es": "deuda", "en": "debt", "note": "Money the person owes (debo) — see 'cobro' for money owed to them." },
+    { "es": "cobro", "en": "collection", "note": "Receiving money someone owed the person." },
+    { "es": "a favor", "en": "in credit", "note": "A card balance in the person's favour." },
+    { "es": "recurrente", "en": "recurring", "note": "A scheduled expense or income rule; scheduled is not paid." },
+    { "es": "cuota", "en": "installment", "note": "One part of a purchase paid in several months." },
+    { "es": "categoría", "en": "category", "note": "Built-in names are translated; the person's own names never are." },
+    { "es": "cuenta", "en": "account", "note": "A place the person keeps money (cash, bank, wallet), tracked manually." },
+    { "es": "copia de seguridad", "en": "backup", "note": "A JSON file the person exports and imports." },
+    { "es": "deshacer", "en": "undo", "note": "Voids a record; it can be restored ('recuperar' → 'restore'). Never 'delete'." },
+    { "es": "borrador", "en": "draft", "note": "An Assistant proposal that is not saved until confirmed." },
+    { "es": "Asistente", "en": "Assistant", "note": "Product name of the in-app assistant; capitalised." },
+    { "es": "comercio", "en": "merchant", "note": "Where an expense happened; user data is never translated." }
+  ]
+}
