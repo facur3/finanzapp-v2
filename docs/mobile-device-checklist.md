@@ -22,6 +22,7 @@ normal run must look like 23.1B2 except the items marked *changed*.
   note under it reads «No se pegó «1,000»: puede leerse de dos maneras. Escribí los
   decimales con «,».»; the next digit you type clears the note. With VoiceOver on, the
   note is announced.
+- [ ] Paste "US$ 12.30" into an ARS account: it is refused with a currency-mismatch note, keeping the old amount without conversion. "ARS 1.234,56" on an ARS account and "US$ 12.30" on a USD account are accepted. A bare "$" is not proof of a particular currency.
 - [ ] Save a gasto, a transfer, a budget, a recurring rule and a balance correction typed
   with decimals: detail, Movimientos and Inicio show exactly what you typed; edit one and
   the form prefills the same amount.
