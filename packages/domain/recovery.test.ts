@@ -100,7 +100,7 @@ describe('native edit and recovery domain', () => {
       expect(previewBackupImport(incoming, archive).after).toBeNull();
     }
   });
-  it.each(['not json', 'null', '[]', '{}', JSON.stringify({ schema: 'finanzapp.native-pilot.v9' }),
+  it.each(['not json', 'null', '[]', '{}', JSON.stringify({ schema: 'finanzapp.native-pilot.v10' }),
     JSON.stringify({ version: 1, transactions: [], investments: [] }), 'x'.repeat(BACKUP_MAX_BYTES + 1)])('rejects unsupported input (%#)', raw => {
     expect(() => parsePilotBackup(raw)).toThrow();
   });

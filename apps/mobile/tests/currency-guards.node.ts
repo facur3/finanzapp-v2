@@ -70,9 +70,11 @@ test('24B1: the typed domain entry no longer carries the web float helpers, and 
   assert.equal(typeof domain.validateNewAccount, 'function');
   assert.equal(typeof domain.validateNewMonthlyBudget, 'function');
   const storage = stripComments(readFileSync(join(MOBILE, 'src/storage/database.ts'), 'utf8'));
-  assert.equal(/createAccount[\s\S]*?validateNewAccount\(account\)/.test(storage), true, 'a new account goes through the creation gate');
-  assert.equal((storage.match(/validateNewAccount\(account\)/g) ?? []).length, 3, 'accounts, cards and debts are created through the gate');
-  assert.equal(/validateNewMonthlyBudget\(budget\)/.test(storage), true, 'a new budget goes through the creation gate');
+  assert.equal(/createAccount[\s\S]*?validateNewAccount\(account, gate\)/.test(storage), true, 'a new account goes through the creation gate');
+  assert.equal((storage.match(/validateNewAccount\(account, gate\)/g) ?? []).length, 3, 'accounts, cards and debts are created through the gate (an explicit one in tests only)');
+  assert.equal(/validateNewMonthlyBudget\(budget, gate\)/.test(storage), true, 'a new budget goes through the creation gate');
+  assert.equal((storage.match(/gate: CurrencyGate = LEDGER_CURRENCIES/g) ?? []).length, 4, 'the production gate is the default of every create function');
+  assert.equal(/SELECT \* FROM/.test(storage), false, '24B4: every row is read by its named columns, never SELECT *');
   assert.equal(/readArchive[\s\S]*?validateAccount\(row\)/.test(storage), true, 'stored rows are read with read acceptance only');
   assert.equal(/i18n\//.test(storage), false, 'storage never reads presentation');
 });
