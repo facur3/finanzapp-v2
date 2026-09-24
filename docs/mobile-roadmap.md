@@ -15,10 +15,69 @@ server-keyed; manual recording and local data work without connectivity. Recurri
 expenses, debts, budgets and cards remain in scope. Native navigation, accessible
 amounts, real data and recoverable durable writes remain requirements.
 
-## Status and current delivery — Producto 24A
+## Status and current delivery — Producto 24B1
 
 Implemented is code, checked names a test, device-verified needs a physical result,
 and released means distributed. Neither a bundle nor a screenshot is App Store QA.
+
+**24B1 prepares the financial domain for several currencies without enabling any and
+without touching SQLite:** stages 1 (safety net) and 2 (one gate, complete groupings) of
+docs/currency.md §7.5. Production still stores and offers exactly ARS and USD; SQLite
+schema 8, backup v8, every form, the amount field, the searchable screen and the Assistant
+contract are unchanged. The Más footer reads Producto 24B1. Design and status:
+[docs/currency.md](currency.md) §2.1, §7.5 (status table), §8–§11.
+
+- [x] **One gate for new records, read acceptance for stored ones.** `LEDGER_CURRENCIES`
+  gates creation only (`validateNewAccount`, `validateNewMonthlyBudget`, called by
+  `createAccount`, `createCreditCard`, `createPersonalDebt` and a new budget in
+  `saveMonthlyBudget`); tests pass an explicit gate. Stored rows, backups and views are
+  checked by shape (`isStorableCurrency`: an ISO fiat code with a minor unit), never by
+  the gate, so a currency that stops being offered keeps its data readable. `Currency` is
+  `IsoCurrencyCode`; `LegacyCurrency` names ARS/USD for v1–v8 and contract v1.
+- [x] **Groupings follow the data.** `totalsByCurrency`, `liquidTotalsByCurrency`,
+  `availableCurrencies` and the import review list every currency present (ARS, USD,
+  then by code); debt and recurring totals are BigInt domain helpers with an explicit
+  `out-of-range` per currency; reports, month summaries and budget summaries refuse a
+  non-storable code with "Moneda no admitida." instead of a silent 0; Home wraps
+  `spendingOverview`. The 24A audit probe (ARS 5 + JPY 700 → `{ ARS: 5 }`) now returns
+  both.
+- [x] **Backups frozen to ARS/USD until v9.** A v1–v8 file naming another currency is
+  refused whole (never read as cents), whatever the gate; v8/v1 export refuses a ledger
+  with another currency explicitly. The v8 bytes and `archiveKey` of an ARS/USD ledger
+  are pinned. No format change.
+- [x] **Pure guards** for a recurring rule's currency, a card's or debt's internal account,
+  and transfers/entries across currencies, all tested in `packages/domain`.
+- [x] **Safety net.** `tests/currency-guards.node.ts` scans for pair literals and binary
+  ternaries with an allow-list that names each remaining site and its stage;
+  `tests/currency-goldens.node.ts` pins the card face, timeline, day-net header, MonthBars
+  scale and Home Disponible ("US$ 0,00" for ARS cash plus only a USD card) for ARS/USD;
+  `packages/domain/multi-currency.test.ts` runs EUR (2), JPY (0) and KWD (3 decimals)
+  through every grouping, report, budget, transfer and backup path with an explicit
+  gate; EUR probes that meant "unsupported" now use XAU/ZZZ and a ready code outside the
+  gate (CHF).
+- [x] **Reproducibility.** `npm run currency:verify` (offline integrity of the committed
+  catalogue against the lock's output hashes and headers) is separate from regeneration
+  (`--check`, needs the cache) and refresh (`--download`, needs the network); CI runs
+  `currency:verify` and `i18n:check` on a clean checkout. Generated name modules are
+  exempt from the copy scan by directory and header, and `i18n:check` requires one per
+  catalogue language.
+- [x] **Assistant bound to v1.** The client never sends a currency contract v1 does not
+  know; a parked draft is typed `LegacyCurrency`. Contract, server and prompts unchanged.
+- [x] **Copy.** `errors.accounts.currency` is code-neutral ("Elegí una moneda
+  disponible."); new sentences for the legacy export/import refusals and the out-of-range
+  totals (es, en, lock).
+- [x] **Design for later deliveries** (owner's decisions of 2026-09-24): foreign-currency
+  purchases as one expense with original/estimated/debited/fees kept apart (docs/currency.md
+  §9), automatic reference rates as the planned main path with manual adjustment hidden in
+  the detail (§8, provider research before 24C), Home and consolidated reports (§10), the
+  multilingual Assistant (§11, docs/i18n.md §11). Nothing connected, no rate invented.
+- [x] **Checked on Linux:** see the handoff entry below. iOS export 4,872,138 bytes
+  (+3,434 over 24A).
+- [ ] **Not device-verified:** nothing visible changed apart from the footer; ARS/USD
+  strings are proven equal in Node. Zero- and three-decimal VoiceOver checks belong to
+  stage 9, on a development build.
+
+### Previous delivery — Producto 24A
 
 **24A lays the foundations of the international multi-currency engine without changing
 what the person sees or stores.** ARS and USD remain the only currencies an account,
@@ -1522,20 +1581,43 @@ by CI and merged into master before the next starts:
       floating point, 15-digit entry bound, BigInt sums, no FX); presentation for any
       currency with ARS/USD byte-identical; selector metadata prepared but unused. No
       SQLite, backup, form or screen change.
-    - **24B — currency-aware storage and forms (next, not started).** The ordered plan,
-      risks and exact sites are in docs/currency.md §7: the scale recorded durably per
-      currency (schema v9, backup v9, v1–v8 restore unchanged), validators and CHECKs
-      opened only through the catalogue gate, every parse/prefill/shortcut with the
-      account's exponent, forms that re-validate a draft when the currency changes, the
-      searchable currency screen, per-currency groupings without the ARS/USD pair, the
-      Assistant contract v2 (server first). ARS/USD goldens stay byte-identical; the
-      ledger gate (`LEDGER_CURRENCIES`) opens last, in its own commit, after device QA.
+    - **24B — currency-aware storage and forms**, in sub-deliveries. The ordered plan,
+      risks and exact sites are in docs/currency.md §7; the status table in §7.5 says
+      which stage is done. ARS/USD goldens stay byte-identical; the ledger gate
+      (`LEDGER_CURRENCIES`) opens last, in its own commit, after device QA, and the 151
+      `ready` currencies open progressively (three-decimal ones after a VoiceOver check).
+      - **24B1 (delivered in code, 2026-09-24):** stages 1–2: the safety net, one creation
+        gate with read acceptance apart, groupings over the currencies present, backups
+        frozen to ARS/USD, pure guards, international fixtures, offline catalogue
+        verification. No SQLite, backup, form or gate change.
+      - **24B2 (next, not started):** the remainder of stage 2 (a strict route-currency
+        parser for `report-day`, `spending-detail`, the drill-downs and quick actions; the
+        four binary ternaries become the `{name} · {code}` template), stage 3 (the amount
+        path by exponent: `minorFromAmount`/`draftFromMinor`/`amountFromMinor` with a
+        required currency, the amount field per exponent, paste tables, draft re-validation
+        on a currency change, `maxAmountMinor` read with the target's exponent) and stage 4
+        (presentation and copy: the 21 currency-less call sites move to
+        `formatMoneyAmount`/`spokenMinor`, the picker beyond two currencies, spoken units,
+        glossary, docs/i18n.md §9). Still no SQLite change and no new currency.
+      - **24B3 (after the owner's decision 7.6.5):** stage 5 (schema 9 with a
+        foreign-keys-off rebuild and `currency_units`), stage 6 (backup v9), stage 8 (the
+        searchable screen), device QA and stage 9 (the gate, one commit). Stage 7 (the
+        Assistant contract, server first) can land beside 24C.
     - **24C — rates and the main currency for reports (after 24B, not started).** The
-      contract in docs/currency.md §8: manual, dated, sourced, append-only rate records
-      with tombstones; exact rational conversion, rounded once; no cross rates; a
-      `reportCurrency` preference outside the ledger; unknown totals when any rate is
-      missing; provenance on every converted figure.
-16. Then, in order: first-entry onboarding, financial productivity (backlog below),
+      contract in docs/currency.md §8, revised on 2026-09-24: **automatic reference rates
+      from an authorised provider are the planned main path** (provider research first:
+      coverage, dates, licence, attribution, cost, cache), manual entry of a rate or of the
+      confirmed debit is a secondary adjustment in the detail; exact rational conversion,
+      rounded once; cached historical quotes, never re-fetched or back-filled; a
+      `reportCurrency` preference outside the ledger; estimated and confirmed figures kept
+      apart; unknown totals when any rate is missing; provenance on every converted
+      figure. It also brings the foreign-currency purchase (§9): one expense that keeps the
+      original amount and currency, the account debited in its own currency, the rate used,
+      its date and source, fees and taxes once, and a pending/confirmed state; the common
+      form does not change and the option stays secondary and discreet.
+16. Then, in order: first-entry onboarding (international: language, region, main
+    currency and an optional first account, nothing seeded), financial productivity
+    (backlog below), assisted translations to widen the released languages progressively,
     the real cloud/text Assistant activation with quotas and cost control (its cost and
     abuse controls listed under "Activate smart capture" must exist before any paid
     call), Apple integrations on the development build (Face ID, notifications with the
@@ -1556,6 +1638,8 @@ by CI and merged into master before the next starts:
       that never replace the category).
     - CSV import and categorisation rules (a reviewed draft before anything is written;
       rules only pre-fill).
+    - Confirmed bank debits for foreign purchases through authorised channels and with
+      consent (never assumed access to Apple Pay or bank history).
     - Reports and search improvements (account and custom-period filters, saved searches).
 18. **Future optional expansion (not planned, no dependency added now):** CEDEARs, ETFs,
     cryptocurrencies and broker connections. They stay outside the native scope of
@@ -1698,6 +1782,41 @@ amount uses `useStacked()` and gives the name two lines. 44-point targets, Voice
 safe areas, system text and separate currencies apply to every new screen.
 
 ## Handoff log (historical evidence)
+
+### 2026-09-24 — Producto 24B1: currency safety net, one gate and dynamic groupings
+
+- Stages 1 and 2 of docs/currency.md §7.5 in the domain and storage validators: creation
+  gate (`validateNewAccount`, `validateNewMonthlyBudget`, explicit `CurrencyGate` for
+  tests) apart from read acceptance (`isStorableCurrency`); `Currency` widened to
+  `IsoCurrencyCode` with `LegacyCurrency` for v1–v8 and contract v1; totals, liquid
+  totals, available currencies, import review, debt and recurring totals over the
+  currencies present in one order; reports and summaries refuse a malformed code; v1–v8
+  backups frozen to ARS/USD on import and export; pure change guards; the Assistant
+  client bound to v1; `packages/domain/index.ts` without the web float helpers.
+- Safety net: `currency-guards.node.ts` (pair-literal scan with a stage-labelled
+  allow-list, storage validates with the domain only, generated modules exempt by
+  header, `--verify` proven against a hand edit/stale lock/wrong tag),
+  `currency-goldens.node.ts` (card face, timeline, day-net header), MonthBars and Home
+  Disponible goldens, `multi-currency.test.ts` (EUR/JPY/KWD through every path, v8 bytes
+  and `archiveKey` pinned, adversarial codes). CI now runs `currency:verify` and
+  `i18n:check`.
+- Deliberate golden changes: `errors.accounts.currency` text, the currency error of
+  `summarizeMonthlyBudgets`/`spendingOverview`, the EUR probes, the footer label.
+- **Checked on Linux:** root `npm test` 441/441, `npm run build`, `npm run check:repo`;
+  mobile `npm run typecheck`, `npm run test:storage` 474/474, `npm run check`
+  ("Dependencies are up to date"), `npm run export:ios` (4,872,138 bytes),
+  `npm run currency:verify`, `npm run currency:generate -- --check` (with the cache),
+  `npm run i18n:check`, `npm run i18n:extract`. Not an Xcode build; nothing visible
+  changed apart from the footer; not device-verified. No EAS build, paid service,
+  migration or remote change.
+- **Owner's decisions recorded** (docs/currency.md §7.6, §8–§11): progressive opening of
+  the 151 ready currencies, VoiceOver device tests for 0/3-decimal currencies, the
+  selector lists only enabled currencies, budgets may have their own currency, onboarding
+  chooses the first currency, existing users untouched, SQLite upgrade not yet authorized,
+  Assistant limited to ARS/USD, automatic reference rates as 24C's main path with manual
+  adjustment secondary, foreign purchases as one expense.
+- **Next:** Producto 24B2 (rest of stage 2, stages 3 and 4), then the owner's decision on
+  the one-way SQLite upgrade before 24B3.
 
 ### 2026-09-24 — Producto 24A: foundations of the international multi-currency engine
 

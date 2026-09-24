@@ -1,6 +1,6 @@
 # FinanzApp mobile: currencies and the multi-currency engine
 
-Updated 2026-09-24 (Producto 24A). Applies to the Expo app in `apps/mobile` and the
+Updated 2026-09-24 (Producto 24B1). Applies to the Expo app in `apps/mobile` and the
 shared `packages/domain`. The web/Capacitor app keeps its own float-based helpers
 (`src/domain/currency.js`) and is not changed. Read with [decision 002](decisions/002-spending-first.md)
 (ARS/USD kept apart, no invented rates), [docs/i18n.md](i18n.md) §9 and the roadmap's
@@ -35,8 +35,33 @@ fifth, separate preference.
 | Generator | `apps/mobile/scripts/currency/generate.mjs`, `sources.lock.json` | Reproducible generation from pinned sources (§4). |
 
 **Not changed in 24A:** SQLite (schema, migrations, rows), the backup format, the ledger's
-validators (`validateAccount` still accepts only ARS and USD), every form, every screen,
+validators (`validateAccount` still accepted only ARS and USD), every form, every screen,
 the Assistant contract. No stored amount is reinterpreted. No exchange rate exists.
+
+### 2.1 What Producto 24B1 delivers (stages 1 and 2 of §7.5)
+
+| Layer | File | Change |
+| --- | --- | --- |
+| Gate and read acceptance | `packages/domain/currency.ts` | `LEDGER_CURRENCIES` gates **creation only** and takes an explicit `CurrencyGate` in tests; `isStorableCurrency`/`assertStorableCurrency` (an ISO fiat code with a minor unit, never the gate) is what stored rows, backups and views are checked against; `LegacyCurrency`/`isLegacyCurrency` name the two codes rows and backups written before 24B can carry; `sortCurrencies`/`currenciesPresent` give every grouping one order (ARS, USD, then by code). |
+| Ledger | `ledger.ts` | `Currency` is now `IsoCurrencyCode`. `validateAccount` is read acceptance; `validateNewAccount(account, gate?)` adds the gate and is what `createAccount`, `createCreditCard` and `createPersonalDebt` call. `totalsByCurrency` keys every currency present. `accountIdsInCurrency` is the one scope every report and summary filters by. `createPilotBackup` refuses a non-ARS/USD ledger (`LEGACY_EXPORT_MESSAGE`). |
+| Budgets | `budgets.ts` | `validateMonthlyBudget` is read acceptance; `validateNewMonthlyBudget(budget, gate?)` gates a new budget in `saveMonthlyBudget`. `summarizeMonthlyBudgets` refuses a non-storable code with "Moneda no admitida." and keeps "Período de presupuesto inválido." for the month. A budget may be in a currency no account holds (decision 7.6.3, allowed). |
+| Liabilities | `liabilities.ts` | `liquidTotalsByCurrency` keys every currency a liquid account holds. `debtTotalsByCurrency` sums debts per currency in BigInt with an explicit `out-of-range` status. `validateCreditCardChange`/`validatePersonalDebtChange` are the pure "same internal account" guards storage now calls. |
+| Recurring | `recurring.ts` | `validateRecurringRuleChange` (same currency when the account changes, one revision per save) replaces storage's inline check; `recurringForecastByCurrency` is the BigInt 30-day projection with a per-currency status the Recurrentes screen renders. |
+| Reports | `spending-overview.ts`, `spending-report.ts`, `report-trend.ts`, `month-summary.ts` | `spendingWindow`, `spendingOverview`, `reportPeriod`, `expensesInPeriod` and `summarizeMonth` refuse a non-storable code with its own error instead of "Período inválido." or a silent `ready` 0; the private `safeSum` is gone (`sumMoney`/`addMoney`). Home wraps `spendingOverview` in `try`. |
+| Backups | `recovery.ts` | v1–v8 are frozen to ARS/USD whatever the gate: a file naming another code is refused whole (`LEGACY_IMPORT_MESSAGE`), never read as cents; `createRecoveryBackup` refuses to write v8 for another currency (`LEGACY_EXPORT_MESSAGE`). The v8 bytes and `archiveKey` of an ARS/USD ledger are pinned. |
+| Presentation | `src/ui/presentation.ts`, `app/backup-import.tsx`, `app/debts.tsx`, `app/recurring.tsx` | `availableCurrencies` and the import review list the currencies present; debts and recurring totals come from the domain helpers. |
+| Assistant | `app/(tabs)/assistant.tsx`, `src/assistant/conversation.ts` | The client never sends a currency contract v1 does not know (a note instead of a request); a parked draft is typed `LegacyCurrency`. Contract v1, the server and the prompts are unchanged. |
+| Copy | `errors.accounts.currency` → "Elegí una moneda disponible." / "Choose an available currency."; new `errors.accounts.legacyExport`, `errors.recovery.legacyImport`, `debts.list.outOfRange`, `recurring.list.outOfRange` (es, en, lock). | |
+| Reproducibility | `scripts/currency/generate.mjs --verify`, `npm run currency:verify` | Offline integrity of the committed catalogue against the lock (§4); CI runs it and `npm run i18n:check`, which now requires a generated names module per catalogue language. `extract.mjs` exempts `src/i18n/currencies/` by directory and `GENERATED` header. |
+| Tests | `packages/domain/multi-currency.test.ts`, `tests/currency-guards.node.ts`, `tests/currency-goldens.node.ts`, plus cases in `currency.test.ts`, `budgets.test.ts`, `spending-chart.node.ts`, `spending-home.node.ts`, `i18n.node.ts` | EUR/JPY/KWD fixtures through every grouping, report, budget, transfer and backup path; the pair-literal scan with its shrinking allow-list; ARS/USD goldens for the card face, the timeline, the day-net header, the MonthBars scale and Home's Disponible; the money scan bans `splitMinor`, `minorToMajorString`, `fmtNum`, `parseMoneyInput` and `Intl.DisplayNames` in screens. |
+
+**Not changed in 24B1:** SQLite (schema 8, CHECKs, migrations, rows), backup v8, every
+form and route parameter, the amount field (still exponent 2), the searchable screen,
+contract v1 and the server, `currencyOptions` (still ARS and USD), the Más footer apart
+from its release label. Production still stores and offers exactly ARS and USD: the SQLite
+CHECKs and `LEDGER_CURRENCIES` are two independent nets. No stored amount is reinterpreted.
+No exchange rate exists. `packages/domain/index.ts` no longer re-exports the web's float
+helpers `fmtNum` and `parseMoneyInput` (they had no native consumer).
 
 **Cost:** the catalogue and the es/en names add 62,074 bytes (1.3%) to the iOS Hermes
 bundle (`expo export --platform ios`: 4,806,630 bytes at master 1181ed1, 4,868,704 with
@@ -46,7 +71,7 @@ bundle (`expo export --platform ios`: 4,806,630 bytes at master 1181ed1, 4,868,7
 
 | Status | Meaning | Today |
 | --- | --- | --- |
-| `ledger` | An account, budget or recurring rule can hold it; forms offer it. | ARS, USD |
+| `ledger` | A **new** account, budget or recurring rule can hold it; forms offer it. Since 24B1 this is the creation gate only: a stored row in any fiat currency with a minor unit stays readable and groupable, and export refuses it explicitly, whatever the gate says (`isStorableCurrency`). | ARS, USD |
 | `ready` | Fiat currency with complete data (ISO minor unit, CLDR names in every language the build carries, at least one territory where CLDR lists it as current legal tender). Presentation works; **not stored and not offered** until 24B. | 151 |
 | `incomplete` | Fiat currency missing data (`missing` lists `name:<language>` or `tender`). Never offered until completed upstream or by a reviewed decision; a missing name falls back to the ISO code, never to another language. | VED (no Spanish name in CLDR 48.2, and CLDR marks it not tender), SVC (ISO-active, but El Salvador uses USD: no territory) |
 | `excluded` | Not money a person spends: ISO funds (BOV, CHE, CHW, CLF, COU, MXV, USN, UYI, UYW, XAD), precious metals (XAG, XAU, XPD, XPT), units of account (XBA–XBD, XDR, XSU, XUA), the test code XTS and XXX. Never offered. | 23 |
@@ -130,6 +155,20 @@ generator refuses to run if ARS or USD stop being "ready, minor unit 2".
 
 ## 4. Updating the data
 
+Two different operations, never confused:
+
+| Operation | Command | Needs | Proves |
+| --- | --- | --- | --- |
+| **Regenerate** (refresh from upstream) | `npm run currency:generate -- --download`, then review the diff | network, the pinned URLs | the committed data is what the sources at these URLs say today |
+| **Regenerate from the cache** | `npm run currency:generate` (or `-- --check` to compare without writing) | the git-ignored source cache whose sha256 match the lock | the committed data is exactly what the generator writes from the locked bytes |
+| **Verify integrity, offline** | `npm run currency:verify` | nothing but the checkout | nobody edited a generated file by hand and the lock is consistent (each output's sha256, its `GENERATED` header, the CLDR tag and the source list); CI runs this on every push, with no cache and no network |
+
+`--verify` never says whether upstream changed; only `--download` does. `--check` is the
+release-checklist step (docs/mobile-roadmap.md); `--verify` is the CI step.
+`tests/currency-catalogue.node.ts` runs `--check` when the cache exists and the hash check
+always; `tests/currency-guards.node.ts` proves `--verify` catches a hand edit, a missing
+header, a stale lock and a wrong CLDR tag.
+
 1. `cd apps/mobile && npm run currency:generate -- --download` fetches the pinned URLs into
    the ignored cache and rewrites `sources.lock.json` (sha256, size; the retrieval date
    changes only for bytes that changed).
@@ -151,7 +190,10 @@ generator refuses to run if ARS or USD stop being "ready, minor unit 2".
 6. A new language: add it to `LANGUAGES`, regenerate (its `currencies-<lang>.json` and
    `territories-<lang>.json` are fetched), add the module to `src/i18n/currencies/index.ts`.
    Its missing names mark currencies `incomplete`; they are never filled with another
-   language.
+   language. `npm run i18n:check` fails until the generated module exists (a catalogue
+   language without `src/i18n/currencies/<lang>.ts`, or a hand-written file there), and
+   `npm run i18n:extract` exempts that directory by its `GENERATED` header, so no
+   allow-list entry is needed.
 
 ## 5. The amount model and its limits
 
@@ -343,6 +385,25 @@ Sites are `file:line` at `1181ed1`, shortened to the file name. Domain files are
 
 ### 7.5 Safe implementation order for 24B
 
+**Status after Producto 24B1 (2026-09-24).**
+
+| Stage | Status | What remains |
+| --- | --- | --- |
+| 1 Safety net | **complete** | — (the pair-literal allow-list in `tests/currency-guards.node.ts` names each remaining site with its stage) |
+| 2 One gate, complete groupings | **complete in the domain, storage validators, groupings, Home's `try`, the Assistant client bound to v1, `Currency` widened** | the route parsers that still whitelist the pair (`report-day.tsx`, `spending-detail.tsx`) and the drill-down fallbacks (`report-category.tsx`, `report-comparison.tsx`, the quick-action receivers): a strict route-currency parser over the held currencies; the four binary ternaries (`components.tsx:282`, `card-visual.tsx:37`, `(tabs)/reports.tsx:86`, `budgets.tsx:57`) go with stage 4's `{name} · {code}` template |
+| 3 The amount path by exponent | not started | all |
+| 4 Presentation and copy | not started | all |
+| 5 SQLite schema 9 | not started, **not authorized** (decision 7.6.5 pending) | all |
+| 6 Backup v9 | not started | all |
+| 7 Assistant contract, server first | not started | all (v1 refuses EUR; the client refuses to send a non-v1 currency since 24B1) |
+| 8 The searchable currency screen | not started | all |
+| 9 Device QA, then the gate | not started | all; three-decimal currencies only after the VoiceOver check on an iPhone |
+
+Deliberate golden changes made in 24B1 (the table below listed them for stages 1 and 2):
+`budgets.test.ts` and `spending-home.node.ts` probe `XAU`, `ZZZ`, `ars` and a ready code outside the gate (`CHF`);
+`currency.test.ts` "the ledger accepts exactly the ledger currencies" became "a new account may hold exactly the gated currencies; a stored row may hold any storable one";
+`errors.accounts.currency` is "Elegí una moneda disponible."; `summarizeMonthlyBudgets` and `spendingOverview` answer a bad currency with "Moneda no admitida."; the Más footer says Producto 24B1.
+
 Rules for every stage:
 - Production stores or offers no new currency before stage 9.
 - No stored amount is rewritten.
@@ -528,6 +589,18 @@ Rules for every stage:
 
 ### 7.6 Decisions for the owner before 24B
 
+**Decided on 2026-09-24 (24B1 brief).** The 151 `ready` currencies are prepared and opened
+**progressively**, each only when every path it touches is verified; zero- and
+three-decimal currencies need their own tests, including VoiceOver on an iPhone, before
+they open. The future selector lists only currencies actually enabled (7.6.2: the first
+option). A budget may be in a currency the person holds no account in (7.6.3: allowed).
+New users choose their first currency in the onboarding; the preferences and data of
+existing users are never changed automatically. The irreversible SQLite upgrade (7.6.5) is
+**not authorized yet**: compatibility is implemented and verified first. The Assistant stays
+limited to ARS/USD until the next server contract is implemented and tested (7.6.6: the
+first option). 7.6.1 (which currencies open first) and 7.6.4 (the default when nothing
+implies a currency) remain open; ARS stays the pilot's default meanwhile.
+
 1. **The first currencies to open.** Either a curated first list (for example the currencies of the first international users, including one without decimals) or all 151 `ready` currencies at once. Recommendation: curated. Open three-decimal currencies (BHD, IQD, JOD, KWD, LYD, OMR, TND) only after their VoiceOver check on a device.
 2. **What the currency screen lists.** Only currencies the ledger can hold (recommended), or also `ready` ones shown as unavailable. Either way, the region stays a search hint and never a preselection.
 3. **Budgets in a currency without an account.** Either allowed (a budget keeps its own code, and the scale is pinned per code) or limited to currencies the person holds accounts in.
@@ -542,9 +615,16 @@ Rules for every stage:
 
 ## 8. Producto 24C contract: exchange rates and a main currency for reports
 
-Designed in 24A, **not implemented**. It builds on 24B (currency-aware storage) and on
-decision 002: currencies are never summed without a real, dated rate; an unknown rate
-gives an unknown total, never a guess; nothing fabricates market history.
+Designed in 24A, **updated in 24B1 with the owner's decisions of 2026-09-24, not
+implemented**. It builds on 24B (currency-aware storage) and on decision 002: currencies
+are never summed without a real, dated rate; an unknown rate gives an unknown total, never
+a guess; nothing fabricates market history.
+
+**What changed in 24B1's revision.** The preferred experience is that FinanzApp **looks up
+a verifiable reference rate automatically** when a person records a purchase in a currency
+other than the account's (§9), so that the common form never asks for a rate. Manual entry
+of a rate or of the amount the bank actually debited stays as a **secondary, hidden
+adjustment** in the detail. A reference rate is an estimate; it never changes a balance.
 
 ### 8.1 The rate record
 
@@ -555,12 +635,13 @@ interface ExchangeRate {
   quote: IsoCurrencyCode;     // … = `rate` quote   (base ≠ quote, both storable)
   rate: string;               // exact decimal text, "1285.50": ≤ 18 significant digits,
                               // ≤ 12 decimals, > 0; never a float, never rounded on entry
-  effectiveDate: string;      // YYYY-MM-DD: the day the rate applies to (not when typed)
+  effectiveDate: string;      // YYYY-MM-DD: the day the rate applies to (not when fetched or typed)
   source: {
-    kind: 'manual' | 'statement' | 'official' | 'provider';
-    label: string;            // what the person or provider calls it ("Mi banco, compra",
-                              // "Resumen tarjeta 09/2026"), ≤ 80 chars, user data
-    reference?: string;       // optional URL or document reference, never credentials
+    kind: 'provider' | 'manual' | 'statement' | 'official';
+    label: string;            // "Frankfurter (ECB reference)", "Mi banco, compra",
+                              // "Resumen tarjeta 09/2026"; ≤ 80 chars
+    reference?: string;       // provider id or document reference, never credentials
+    fetchedAt?: string;       // ISO timestamp for `provider` rates (cache bookkeeping)
   };
   createdAt: string; updatedAt: string; revision: number;
   deletedAt?: string;         // tombstone: a deleted rate stays auditable and syncable
@@ -569,74 +650,192 @@ interface ExchangeRate {
 
 - **Exact arithmetic.** A conversion multiplies minor units by the rate as a rational number
   in BigInt and rescales by the two exponents: `target = round(minor × rate × 10^(e_target −
-  e_source))`. Rounding is **half away from zero, once, on the final converted figure**
-  (the way a person checks it on a receipt); nothing is rounded on the way, and the
-  unrounded value is never stored.
+  e_source))`. Rounding is **half away from zero, once, on the final converted figure**;
+  nothing is rounded on the way, and the unrounded value is never stored.
 - **Direction.** A record means `1 base = rate quote`. Using it the other way is allowed and
   exact (the inverse rational), and the converted figure says it was inverted. **No cross
-  rates in 24C:** without an EUR/ARS record (either direction) EUR → ARS is unknown, even
-  when EUR/USD and USD/ARS exist. Triangulation would be a later, explicit option that
-  shows both rates.
-- **History.** Rates are append-only: an edit is a new revision of the same id, a deletion
-  a tombstone; the list shows every revision with its date and source. Future sync carries
+  rates in 24C** unless the provider itself publishes the pair; triangulation would be a
+  later, explicit option that shows both rates.
+- **History and cache.** Rates are append-only: an edit is a new revision of the same id, a
+  deletion a tombstone. A provider rate for a (base, quote, date) is fetched **once** and
+  kept: a second purchase on the same day and pair reuses it, and a report for a past
+  period reuses what was cached then, so the app never re-asks a provider for history it
+  already holds and never back-fills a series it was not given. Future sync carries
   operation ids, revisions and tombstones like movements do (decision 001).
-- **Where rates come from.** 24C starts manual: the person types a rate, its date and its
-  source. An online provider is a later, separate decision (owner approval, licence,
-  attribution, cost); a fetched quote is still stored as a record with `kind: 'provider'`,
-  its date and its label, never as an invented series and never back-filled.
 
-### 8.2 The main currency for reports
+### 8.2 Where rates come from: the provider decision (research before 24C)
+
+Before 24C connects anything, the owner needs a provider review with, for each candidate,
+the **effective coverage** (which of the 153 fiat currencies, and which pairs: most
+providers publish against one base, so KWD→ARS may be two ECB legs), the **dates**
+(daily reference, publication time, weekends and holidays, historical depth), the
+**licence and commercial terms** (attribution wording, commercial use, redistribution,
+rate limits), **availability** (uptime, an API key or none), **cost** and **caching rules**.
+Candidates to review: [Frankfurter](https://www.frankfurter.app) (ECB reference rates, EUR
+base, ~30 currencies, free, no key), the ECB's own feed, national central banks (the BCRA
+for ARS official rates) and paid aggregators. What the review must not assume: that one
+official rate exists for every currency, that a reference rate is what a bank charges
+(ARS has several legal rates and card purchases add taxes), or that a provider covers
+every day a person records. Whatever is chosen: opt-in, the provider named to the
+person, no request without a purchase or a report that needs it, no key in the app
+bundle if a key is needed (server-side like the Assistant), and a stored `provider` rate
+carries its label, date and `fetchedAt`.
+
+### 8.3 The main currency for reports
 
 - `reportCurrency: IsoCurrencyCode | null`, a key-value preference beside language and
   region, **outside the ledger and outside backups' financial data**, default `null`: reports
   keep showing one total per currency, as today. It is never derived from the region or the
-  language, and choosing it never changes an account, a movement or a budget.
+  language, and choosing it never changes an account, a movement or a budget. The
+  onboarding will offer it as its own step, after language and region.
 - Only reports and summaries convert. Balances, movements, budgets (one currency each),
   recurring rules, cards and debts always show their own currency.
 
-### 8.3 Choosing a rate and the result of a conversion
+### 8.4 Choosing a rate and the result of a conversion
 
 - **Which rate:** for a total "as of" a day (a balance) or for a period (month spending),
   the rate with the latest `effectiveDate` on or before that day (the period's last day),
-  in the direct or inverse direction. None → **unknown**. A rate older than the period is
-  used but shown with its date (the person decides whether it is stale); a threshold can
-  be added later, never a silent substitute.
+  in the direct or inverse direction, from the cache first and from the provider only when
+  the cache has nothing for that day and the person opted in. None → **unknown**. A rate
+  older than the period is used but shown with its date; a threshold can be added later,
+  never a silent substitute.
 - **What is converted:** each currency's subtotal is converted once with one rate, then the
   converted subtotals are added; per-movement historical conversion is a later option.
+- **Estimated and confirmed are two things.** A figure converted with a `provider` or
+  `manual` rate is an **estimate** and is labelled as such; the amount a bank actually
+  debited (§9) is a **confirmed** figure in the account's own currency and needs no rate.
+  A consolidated total mixes the two only when every part is traceable, and says how much
+  of it is estimated.
 
 ```ts
 type ConvertedTotal =
   | { status: 'single'; currency: IsoCurrencyCode; minor: number }            // one currency, nothing converted
   | { status: 'converted'; currency: IsoCurrencyCode; minor: number;
-      parts: ConvertedPart[] }                                              // every part has a rate
+      estimatedMinor: number; parts: ConvertedPart[] }                        // every part has a rate; estimatedMinor ≤ minor
   | { status: 'unknown'; currency: IsoCurrencyCode; parts: ConvertedPart[];
       missing: { from: IsoCurrencyCode; to: IsoCurrencyCode }[] };          // no total at all
 
 interface ConvertedPart {
   currency: IsoCurrencyCode; minor: number;                                   // the original subtotal
   converted?: { minor: number; rateId: string; revision: number; rate: string;
-                effectiveDate: string; source: string; inverted: boolean };
+                effectiveDate: string; source: string; inverted: boolean; estimated: true };
 }
 ```
 
 - **Unknown is unknown.** If any part lacks a rate, there is no total: the screen lists each
   currency's own total and says which rate is missing ("Falta la cotización USD → ARS"),
-  with a way to add it. A partial sum is never shown as if it were the total, and a zero
-  is never substituted.
-- **Every converted figure carries its provenance** (rate, date, source, inverted or not),
-  visible on the report and read by VoiceOver.
+  with a way to fetch or add it. A partial sum is never shown as if it were the total, and
+  a zero is never substituted.
+- **Every converted figure carries its provenance** (rate, date, source, inverted or not,
+  estimated), visible on the report and read by VoiceOver.
 - **Budgets and the Assistant.** A budget stays in one currency; comparing a budget with
   converted spending is not in 24C. The Assistant receives already-computed facts with
   their currency and, when converted, the rate's provenance; it never converts.
 
-### 8.4 Storage and tests 24C must bring
+### 8.5 Storage and tests 24C must bring
 
 - SQLite: an additive `exchange_rates` table (id, base, quote, rate_text, effective_date,
-  source_kind, source_label, reference, created_at, updated_at, revision, deleted_at) with
-  CHECKs (`base <> quote`, rate text shape, ISO date); backup: a new backup version with an
-  `exchangeRates` array, validated like movements; older backups import without rates.
+  source_kind, source_label, reference, fetched_at, created_at, updated_at, revision,
+  deleted_at) with CHECKs (`base <> quote`, rate text shape, ISO date); backup: a new backup
+  version with an `exchangeRates` array, validated like movements; older backups import
+  without rates. The foreign-purchase fields of §9 ride on the same version.
 - Tests: exact conversion for exponents 0↔2↔3 in both directions, rounding at every
   half-way case, the 18-digit rate bound, BigInt overflow refusal, latest-rate selection by
-  date with ties decided by revision, tombstoned rates ignored, unknown totals whenever one
-  part lacks a rate, provenance on every converted figure, and a report whose main
-  currency is unset showing today's per-currency totals byte for byte.
+  date with ties decided by revision, tombstoned rates ignored, cache reuse (one fetch per
+  pair and day, none for a cached past period), unknown totals whenever one part lacks a
+  rate, estimated vs confirmed parts, provenance on every converted figure, a stubbed
+  provider (no network in tests), and a report whose main currency is unset showing
+  today's per-currency totals byte for byte.
+
+## 9. Foreign-currency purchases (design for 24C, not implemented)
+
+A person pays with an account in one currency for something priced in another: USD 30
+paid with an ARS account, debited as ARS 45.000 once the bank confirms. This is **one
+expense**, never two movements, never a transfer. It is distinct from a currency exchange
+(an ARS→USD transfer between two of the person's own accounts, which stays a transfer with
+the person's own dated rate) and must not be modelled with one.
+
+### 9.1 The record (conceptual)
+
+| Field | Meaning | Rule |
+| --- | --- | --- |
+| `accountId` | the account or card that paid | its currency is the **posting currency** |
+| `amountMinor`, account currency | what the account is charged: the confirmed debit, or, while pending, the estimate | the only figure balances, budgets and reports count |
+| `original: { minor, currency }` | the price as charged by the merchant | kept verbatim; shown as information |
+| `settlement: 'pending' \| 'confirmed'` | whether the bank's debit is known | pending never pretends |
+| `rate?: { rateId, revision, rate, effectiveDate, source, inverted, estimated }` | the rate used for the estimate, or the effective rate implied by the confirmed debit | provenance, never a bare number |
+| `fees?: [{ kind: 'fee' \| 'tax', minor, label }]` | bank fees and taxes identifiable on the debit | part of the confirmed amount, listed once, never added again |
+
+- **Accounting uses the account's real currency and the amount actually debited.** The
+  original amount is information about the purchase; it is never posted anywhere, so
+  nothing is counted twice and no ARS balance ever contains dollars.
+- **While the debit is unknown, nothing is invented.** If a reference rate is available
+  (cached or fetched, §8), the movement is stored `pending` with an **estimated** posting
+  amount and its provenance; if none is, the movement is stored `pending` with the original
+  amount only, the posting amount **unknown**, and every screen says the equivalent is not
+  available yet. A pending movement is never shown as confirmed.
+- **Confirming** replaces the estimate with the bank's figure (typed by the person from the
+  statement, or, later, imported through an authorised channel with consent), records the
+  effective rate the debit implies and the fees/taxes, and flips the state. Editing keeps
+  the movement's id and revision history like any correction.
+
+### 9.2 The form does not change
+
+- Recording an expense in the account's currency stays the default and the only thing the
+  common form shows. The foreign-currency purchase is a **secondary, discreet option**
+  (inside "Más opciones" or a contextual row that appears when the person chooses it),
+  never a currency selector, rate field or financial explanation on every expense, and
+  never a recurring pop-up asking to confirm the account's currency.
+- Choosing it adds one row: the original amount with its currency (the searchable
+  catalogue screen of stage 8, filtered to enabled currencies). The estimated equivalent,
+  when available, appears as secondary text with its source and date; when not, a short
+  note says it will be available later. Saving never blocks on a rate.
+- The adjustment (the real debit, a different rate, fees) lives in the movement's detail as
+  a secondary action, not in the form. Existing components, the discreet micro-animations,
+  the cobalt/sapphire palette and the native patterns are reused; no new surface.
+
+### 9.3 Storage, Assistant and later automation
+
+- Schema and backup fields ride on 24C's version (§8.5): additive nullable columns on
+  `entries` (`originalMinor`, `originalCurrency`, `settlement`, `rateId`, `rateRevision`)
+  and a small `entry_charges` table for fees/taxes; v1–v9 backups import with every
+  movement `confirmed` in its account currency, as today.
+- The Assistant may propose a foreign purchase as a draft with the original amount and
+  currency; the estimate and the posting stay the app's job, after confirmation.
+- Later, with the person's consent, authorised ways to bring in confirmed debits can be
+  studied (statement import, Apple Pay capture of the amount charged); none assumes access
+  to Apple Pay or bank history, and none replaces the person's confirmation.
+
+## 10. Home and reports with several currencies (design)
+
+- Each account shows its balance in the currency it holds; nothing on Home adds two
+  currencies. Home's currency switch lists the currencies present (24B1), in the order
+  ARS, USD, then by code.
+- An expense shows its **posted** amount first (the account's currency) and, when it is a
+  foreign purchase, the original amount underneath or in the detail. A pending foreign
+  purchase shows the **original amount first** and the estimate second, clearly labelled
+  as estimated with its source; once confirmed, the debited amount is the posted figure and
+  the original stays in the detail.
+- Consolidated reports exist only with a `reportCurrency` and only through traceable
+  conversions (§8.4); estimated and confirmed parts are distinguished, a missing rate means
+  per-currency subtotals with a visible "no verifiable total" note, and a partial sum is
+  never presented as final.
+- Automatic rate retrieval is the planned main path (§8.2) and is a separate decision with
+  cost, licence, freshness and consent controls; nothing is connected and no rate is
+  invented before it.
+
+## 11. The Assistant with several currencies and languages (design)
+
+Contract v1 knows ARS and USD; the client does not send anything else (24B1). The next
+version (docs/i18n.md §11, stage 7 of §7.5) carries language and region as two separate
+preferences, validates currencies against a generated superset independent of the client
+gate, states the scale instead of "centavos", and returns draft amounts as canonical
+major-unit strings that the client converts and checks. Beyond that, when real AI arrives:
+the model must understand a message written in any language, including one different from
+the interface language, and answer in the interface language; voice needs a transcription
+provider with proven multilingual coverage; merchant names, custom categories and the
+person's own words are copied verbatim, never translated; ambiguous amounts, currencies
+and separators ("1.500", "$", "pesos" in a two-peso ledger) are asked about before any
+draft; a draft is only ever a proposal confirmed by the person; and the backend enforces
+quotas, per-request and per-person spend ceilings, cost telemetry and privacy. None of
+this is active in 24B1.

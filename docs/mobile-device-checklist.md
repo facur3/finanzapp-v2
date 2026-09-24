@@ -729,6 +729,18 @@ result. Do not commit screenshots containing actual balances, accounts or names.
 - [ ] Reduce Motion stops non-essential scale/slide effects.
 - [ ] Dark/light system appearance has readable contrast and no white flashes.
 
+## Producto 24B1 — currency safety net (nothing visible; checks reserved for 24B stage 9)
+
+Nothing to verify on the device for 24B1 beyond the Más footer reading "Producto 24B1".
+Reserved for the development build of 24B stage 9, before any currency beyond ARS/USD opens:
+- [ ] VoiceOver in Spanish and English reads a zero-decimal amount ("1.500 JPY") and a
+  three-decimal amount ("1.234,567 KWD") unambiguously (no "1234,567" read as a
+  thousands pattern); the singular for exactly one unit of a currency without decimals.
+- [ ] The number pad at exponent 0 shows no decimal key; settle pads to the exponent.
+- [ ] The currency picker at the largest text sizes and at 320 pt; Reduce Motion honoured.
+- [ ] The currency-change notice on a kept draft.
+- [ ] The upgrade of a real v8 ledger and a backup export/restore, on a copy (decision 7.6.5).
+
 ## Later Apple gates
 
 Before starting this section, repeat the new visual iteration checks below.

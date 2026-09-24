@@ -576,7 +576,9 @@ npm run typecheck
 npm run test:storage
 npm run check
 npm run export:ios
-npm run currency:generate -- --check   # needs the cached sources (-- --download once)
+npm run currency:verify                # offline: the committed catalogue matches the lock (CI runs this)
+npm run i18n:check                     # catalogues, placeholders, plurals, generated currency-name modules (CI runs this)
+npm run currency:generate -- --check   # needs the cached sources (-- --download once); release checklist
 ```
 
 `test:storage` uses a real temporary SQLite database through Node's SQLite driver,
@@ -682,7 +684,8 @@ For the intermittent black-tab report, update to `master`, restart with
 and repeat the **Interfaz 02** tab checks, **Interfaz 03** report checks and
 **Interfaz 04/05** correction/recovery and transfer checks, plus **Interfaz 06** daily/comparison reports and **Interfaz 08** recurring/upcoming
 checks, plus **Interfaz 10** cards/debts and five-tab checks and **Interfaz 11** Home,
-Movimientos and detail checks, **Interfaz 12** form checks, **Interfaz 13** Reportes checks, **Interfaz 14** budgets/recurring/accounts checks, **Interfaz 15** motion checks, **Interfaz 16** cohesion checks, **Interfaz 17** identity and money-input checks **Producto 18** Más / Tarjetas / amount-shortcut checks, **Producto 19** budget checks, **Producto 20** account/category identity checks **Producto 21** Assistant checks, **Producto 22** reachability/material checks, **Producto 22.1** clarity checks, **Producto 23.0** amount-field, row and localization checks, **Producto 23.1A** language-preference checks, **Producto 23.1B1** and **23.1B2** translation checks, **Producto 23.1C1** regional-format checks, **Producto 23.1C2** release checks (new development build), **Producto 23.2** installed-binary and Language-row checks (Producto 24A changes nothing visible). The current footer (Más) says Producto 24A.
+Movimientos and detail checks, **Interfaz 12** form checks, **Interfaz 13** Reportes checks, **Interfaz 14** budgets/recurring/accounts checks, **Interfaz 15** motion checks, **Interfaz 16** cohesion checks, **Interfaz 17** identity and money-input checks **Producto 18** Más / Tarjetas / amount-shortcut checks, **Producto 19** budget checks, **Producto 20** account/category identity checks **Producto 21** Assistant checks, **Producto 22** reachability/material checks, **Producto 22.1** clarity checks, **Producto 23.0** amount-field, row and localization checks, **Producto 23.1A** language-preference checks, **Producto 23.1B1** and **23.1B2** translation checks, **Producto 23.1C1** regional-format checks, **Producto 23.1C2** release checks (new development build), **Producto 23.2** installed-binary and Language-row checks (Producto 24A and 24B1 change nothing visible). The current footer (Más) says Producto 24B1.
+Producto 24B1 adds `currency-guards.node.ts` (the pair-literal scan with a stage-labelled allow-list, storage validating with the domain only, generated modules exempt by header, the offline `--verify` proven against a hand edit), `currency-goldens.node.ts` (ARS/USD goldens for the card face, the spending timeline and the day-net header in the four locales), MonthBars and Home Disponible goldens, and `packages/domain/multi-currency.test.ts` (EUR/JPY/KWD fixtures through every grouping, report, budget, transfer and backup path with an explicit gate; the production gate stays ARS/USD).
 Before updating, save a private pilot copy; do not uninstall or add fake movements.
 
 If a storage/refresh error occurs, the form retains the exact submitted command

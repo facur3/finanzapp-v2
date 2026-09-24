@@ -380,6 +380,35 @@ importe, moneda y estado.
   muestra hasta que toda la app lo tenga (23.1): un iPhone en inglés sigue leyendo
   español antes que media app traducida.
 
+## Producto 24B1 — red de seguridad multimoneda (sin cambios visuales)
+
+Nada visible cambia salvo la etiqueta del pie de Más (Producto 24B1). El dominio agrupa por
+las monedas realmente presentes y los selectores de moneda de Inicio, Reportes,
+Presupuestos y el Asistente listan esas monedas (ARS, USD y luego por código); hoy siguen
+siendo exactamente ARS y USD. Dos textos nuevos, solo cuando una suma sale del rango exacto:
+"Total fuera de rango" en Deudas y Recurrentes, en lugar de redondear u ocultar la moneda.
+
+**Decisiones de diseño para compras en moneda extranjera (24C, no implementado).**
+- El formulario común no cambia: registrar un gasto en la moneda de la cuenta sigue siendo
+  la experiencia predeterminada y la única visible por defecto.
+- La compra en otra moneda es una opción secundaria y discreta (dentro de "Más opciones" o
+  una fila contextual que aparece al elegirla), con una sola fila nueva: el importe original
+  y su moneda. Nunca un selector de moneda extranjera, un campo de cotización ni una
+  explicación financiera en todos los gastos; nunca un pop-up recurrente para confirmar la
+  moneda de una cuenta.
+- El equivalente estimado, cuando exista, se muestra como texto secundario con fuente y
+  fecha; si no existe, una nota breve dice que todavía no está disponible. Guardar nunca se
+  bloquea por falta de cotización.
+- El ajuste manual (débito real, otra cotización, comisiones e impuestos) vive en el detalle
+  del movimiento como acción secundaria, no en el formulario.
+- Se reutilizan los componentes existentes, las microanimaciones discretas, la paleta
+  cobalt/sapphire y los patrones nativos; ninguna superficie nueva.
+- Inicio y reportes: cada cuenta en su moneda; un gasto muestra primero el importe
+  contabilizado y, si corresponde, el original debajo o en el detalle; una compra pendiente
+  prioriza el original y marca el estimado como tal; un total consolidado solo con
+  cotizaciones trazables y, si falta alguna, subtotales por moneda con aviso.
+Detalle en docs/currency.md §8–§10.
+
 ## Producto 24A — base del motor multimoneda (sin cambios visuales)
 
 - **Nada cambia en pantalla.** Las cinco pestañas, el Asistente central, las superficies,
