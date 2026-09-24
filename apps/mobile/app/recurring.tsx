@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { StyleSheet, Switch, View } from 'react-native';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import * as Haptics from 'expo-haptics';
-import { advanceRecurringDate, formatMinorUnits, recurringOccurrencesThrough, todayKey,
+import { advanceRecurringDate, recurringOccurrencesThrough, todayKey,
   type Currency, type RecurringRule } from '@finanzapp/domain';
 import { useLedger } from '../src/storage/LedgerProvider';
 import { ActionButton, AppText, CategoryBadge, EmptyState, ErrorMessage, IconButton, Money, PressFeedback, Screen, SectionTitle, Stat, StatRow, Surface, useStacked } from '../src/ui/components';
@@ -94,7 +94,7 @@ function RecurringRow({ rule, accounts, day, last, busy, onToggle }: {
   rule: RecurringRule; accounts: { id: string; name: string; currency: Currency }[]; day: string; last: boolean; busy: boolean; onToggle: () => void;
 }) {
   const p = usePalette();
-  const { t, relativeDate } = useI18n();
+  const { t, relativeDate, spokenNumber } = useI18n();
   const account = accounts.find(item => item.id === rule.accountId);
   const date = relativeDate(rule.nextDateISO, day);
   const days = Math.round((Date.parse(rule.nextDateISO + 'T12:00:00Z') - Date.parse(day + 'T12:00:00Z')) / 86400000);
@@ -104,7 +104,7 @@ function RecurringRow({ rule, accounts, day, last, busy, onToggle }: {
   const stacked = useStacked(account ? { minor: income ? rule.amountMinor : -rule.amountMinor, currency: account.currency, signed: true } : undefined);
   return <View style={{ flexDirection: 'row', alignItems: 'center', borderBottomColor: p.line, borderBottomWidth: last ? 0 : StyleSheet.hairlineWidth, opacity: rule.active ? 1 : 0.6 }}>
     <PressFeedback feedback="highlight" accessibilityRole="button" accessibilityLabel={t('recurring.row.label', { merchant: rule.merchant, frequency: t(`recurring.frequencySpoken.${rule.frequency}`),
-      amount: formatMinorUnits(rule.amountMinor), currency: account?.currency ?? '', date })}
+      amount: spokenNumber(rule.amountMinor), currency: account?.currency ?? '', date })}
       onPress={() => router.push({ pathname: '/edit-recurring/[id]', params: { id: rule.id } })}
       containerStyle={{ flex: 1 }} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, paddingLeft: 16, minHeight: 64 }}>
       <CategoryBadge category={rule.category} kind={rule.kind} tone={income ? 'income' : 'neutral'} />

@@ -5,7 +5,7 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { todayKey, type Account, type AccountKind, type Currency, type Entry, type EntryKind } from '@finanzapp/domain';
 import { AccountBadge, AppText, CategoryBadge, DetailRow, Field, GlyphTile, PressFeedback, SelectionRow, Surface, surfaceShadow, type IconName, type Tone } from './components';
-import { currencyOption, searchCurrencies } from './currencies';
+import { currencyOption, currencyOptions, searchCurrencies } from './currencies';
 import { useI18n } from '../i18n/provider';
 import { useAccountLookOf, useCategoryDefinitions, useCategoryLook } from './category-hues';
 import { selectionHaptic } from './motion';
@@ -114,9 +114,9 @@ export function AccountField({ accounts, value, onChange, disabled = false, labe
  * without a chevron). */
 export function CurrencyField({ value, onChange, disabled = false }: { value: Currency; onChange?: (currency: Currency) => void; disabled?: boolean }) {
   const p = usePalette();
-  const { t, currencyName } = useI18n();
+  const { t, currencyName, locale } = useI18n();
   const [visible, setVisible] = useState(false);
-  const selected = currencyOption(value);
+  const selected = currencyOption(value, locale);
   const open = () => { Keyboard.dismiss(); setVisible(true); };
   return <>
     <Surface grouped>
@@ -124,7 +124,7 @@ export function CurrencyField({ value, onChange, disabled = false }: { value: Cu
         icon="cash-outline" last disabled={disabled} onPress={onChange ? open : undefined} />
     </Surface>
     {onChange && <SelectionSheet visible={visible} title={t('selection.chooseCurrency')} onClose={() => setVisible(false)}>
-      <FlatList data={searchCurrencies('')} keyExtractor={option => option.code} contentContainerStyle={{ padding: 20, paddingTop: 0 }}
+      <FlatList data={searchCurrencies('', currencyOptions(locale))} keyExtractor={option => option.code} contentContainerStyle={{ padding: 20, paddingTop: 0 }}
         ListFooterComponent={<AppText secondary variant="footnote" style={{ paddingHorizontal: 4, paddingTop: 4 }}>{t('selection.currencyNote')}</AppText>}
         renderItem={({ item }) => <PressFeedback feedback="highlight" accessibilityRole="button" accessibilityState={{ selected: value === item.code }}
           accessibilityLabel={currencyName(item.code) + ', ' + item.code} onPress={() => { if (item.code !== value) selectionHaptic(); onChange(item.code); setVisible(false); }}
@@ -142,12 +142,13 @@ export function DateField({ value, onChange, disabled = false, allowFuture = fal
   value: Date; onChange: (date: Date) => void; disabled?: boolean; allowFuture?: boolean; label?: string;
 }) {
   const p = usePalette();
-  const { t, formatDate } = useI18n();
+  const { t, formatDate, pickerLocale } = useI18n();
   const title = label ?? t('selection.date');
   const [visible, setVisible] = useState(false);
   const [draft, setDraft] = useState(value);
   const open = () => { Keyboard.dismiss(); setDraft(new Date(value)); setVisible(true); };
-  const picker = <DateTimePicker value={draft} mode="date" display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+  // The wheel speaks the interface language (month names) instead of the device's; iOS decides the column order from the pair.
+  const picker = <DateTimePicker value={draft} mode="date" display={Platform.OS === 'ios' ? 'spinner' : 'default'} locale={pickerLocale}
     themeVariant={p.isDark ? 'dark' : 'light'} minimumDate={new Date(1900, 0, 1)}
     maximumDate={allowFuture ? new Date(2100, 11, 31) : new Date()}
     style={{ width: '100%' }} onChange={(event, next) => {

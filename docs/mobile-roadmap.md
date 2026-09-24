@@ -1,6 +1,6 @@
 # FinanzApp mobile: living roadmap
 
-Updated: 2026-09-23. Read [decision 001](decisions/001-native-mobile.md),
+Updated: 2026-09-24. Read [decision 001](decisions/001-native-mobile.md),
 [decision 002](decisions/002-spending-first.md) and
 [decision 003](decisions/003-five-tabs-and-cards.md). Decision 002 supersedes earlier
 full-finance migration phases and the local-only AI preference. Handoff entries
@@ -15,10 +15,81 @@ server-keyed; manual recording and local data work without connectivity. Recurri
 expenses, debts, budgets and cards remain in scope. Native navigation, accessible
 amounts, real data and recoverable durable writes remain requirements.
 
-## Status and current delivery — Producto 23.1B2
+## Status and current delivery — Producto 23.1C1
 
 Implemented is code, checked names a test, device-verified needs a physical result,
 and released means distributed. Neither a bundle nor a screenshot is App Store QA.
+
+**23.1C1 prepares the regional formats and the internationalized amount experience
+without publishing them.** Producto 23.1C is split in two: **23.1C1** (this PR) makes
+every amount, number, percentage and date correct for Spanish and English combined
+independently with Argentina and the United States, behind the unchanged release gate;
+**23.1C2** publishes English and the US region with `supportedLocales` and a new EAS
+build. The language gives the words, the region the separators, numeric dates and the
+clock, the account the currency. No SQLite, schema, stored amount, accounting rule,
+backup format, currency engine, native module, dependency or app-config change; ARS and
+USD remain the only currencies. Process, tables and iOS limits:
+[docs/i18n.md](i18n.md) §9.
+
+- [x] **Amount field in the region's separators** (`money-input.ts`, `AmountInput`,
+  `AmountField`). Argentina 1.234,56, United States 1,234.56; the 23.0 design kept
+  (anchored symbol, tabular figures, fixed origin, no movement at 999 → 1.000 /
+  999,999 → 1,000,000). Either key of the iOS decimal pad is the decimal separator (the
+  pad shows the device Region's and cannot be changed by an app). Each change is read
+  against the last render and the raw text the native view may still hold, so fast
+  typing reads as keystrokes; this also fixes a period typed from a US pad being lost
+  when the native view lagged (Argentina). The form's draft stays in the ledger notation
+  that `parseMinorUnits` reads, so a region change with a form open keeps the value, the
+  draft and the logical caret. No floating point.
+- [x] **Pastes that never guess.** "1.234,56" and "1,234.56" work in every region; a
+  repeated separator groups; one separator before one or two digits is decimal;
+  currency marks and spaces are ignored. Refused with a note under the field (announced
+  to VoiceOver) and the field unchanged: one separator before exactly three digits that
+  is not the region's group separator ("1,000" in Argentina, "1.000" in the US), extra
+  non-zero decimals, text that is not a number, a second decimal or sign, a fourteenth
+  whole digit.
+- [x] **One road for money.** Every visible amount goes through `moneyText` /
+  `formatAmount` / `codedAmount` (region; "AR$" for pesos in the US, a no-break space after
+  the symbol); every VoiceOver amount through `spokenMoney` / `spokenAmount` /
+  `spokenNumber` / `spokenPercent` (the interface language's own separators, so an
+  English voice never reads "1.234,56"); prefills through `draftFromMinor`. Replaced
+  ~40 direct `formatMinorUnits` calls and hand-written "$ "/"US$ " signs in Inicio,
+  Movimientos, Reportes, Presupuestos, Tarjetas, Deudas, Recurrentes, Cuentas, details,
+  forms, the currency picker and the Asistente's Editar; a test forbids them in `app/` and
+  `src/ui/`. Backup review counts use the region's grouping.
+- [x] **Spanish-Argentina differences (deliberate):** the date wheel's month names follow
+  the app language (`DateField` passes `es_AR`), budget VoiceOver sentences say
+  "pesos"/"dólares" instead of "$" (read as dollars by a Spanish voice), backup counts
+  above 999 are grouped, and symbol and number are joined by a no-break space. Everything
+  else reads byte for byte as before (tested).
+- [x] **Development preview:** a FinanzApp Dev bundle started with
+  `EXPO_PUBLIC_LOCALE_PREVIEW=1` lists English and Región in Más so the four
+  combinations can be checked on the iPhone now; release bundles ignore the flag and a
+  choice saved in the preview is not applied without it (same pattern as
+  `EXPO_PUBLIC_ASSISTANT_FIXTURES`).
+- [x] **Accounting safety:** amounts typed in either region are stored as the same integer
+  (real SQLite test); formatting in four locales leaves the ledger, the schema version
+  and every row identical; a transfer between ARS and USD is still refused by the domain
+  and never records an expense.
+- [x] **Checked on Linux:** 388 mobile tests (16 new, others rewritten: the amount controller
+  in both regions and both decimal keys, lagging native text, pastes accepted and refused,
+  region switches with the caret, drafts; formatters in the four combinations; Money and
+  the anchored field with "AR$" at every text size; the real `AmountField` mounted under
+  the real provider switching region and language with a half-typed amount; SQLite
+  persistence; the central-formatting guard and the preview gate), TypeScript,
+  `i18n:extract` 0, `i18n:check --strict` 0 errors / 0 stale, `expo install --check`,
+  Metro iOS export, root tests, Vite build, repo hygiene (results in the PR).
+- [ ] **Not device-verified:** everything above on the iPhone (checklist 23.1C1), in
+  particular VoiceOver with a Spanish voice in the US region and the date wheel's column
+  order for en-AR/es-US (iOS decides; record what it shows).
+- [ ] **Pending for 23.1C2:** release English and the US region (`RELEASED_LANGUAGES`,
+  `RELEASED_REGIONS`), the Región row for everyone, `expo-localization`
+  `supportedLocales` (native rebuild through EAS, with the owner's authorization), device
+  QA of the four combinations at the largest Dynamic Type, the VoiceOver decision for
+  es-US from the device check, and whether the Assistant request carries the interface
+  language.
+
+### Previous delivery — Producto 23.1B2
 
 **23.1B2 completes the extraction and translation of the whole app.** Reportes,
 Tarjetas, Deudas y cobros, Cuentas, Presupuestos, Recurrentes, Categorías, copias de
@@ -84,12 +155,12 @@ amount-field separator, native module or dependency change. Process and architec
   Metro iOS export, root tests, Vite build, repo hygiene (results in the PR).
 - [ ] **Not device-verified:** that nothing visible changed in Spanish on the iPhone;
   English is seen only in tests until 23.1C.
-- [ ] **Pending for 23.1C:** release English and the US region together; regional
+- [ ] **Pending for 23.1C (then):** release English and the US region together; regional
   separators in the amount field (`money-input.ts`), `Money`, row amounts and VoiceOver
-  amounts (still `formatMinorUnits` with Argentine separators); the Región row in Más;
-  date pickers' locale; `expo-localization` `supportedLocales` (native rebuild); device
-  QA of English at the largest Dynamic Type; decide whether the Assistant request carries
-  the interface language.
+  amounts; the Región row in Más; date pickers' locale; `expo-localization`
+  `supportedLocales` (native rebuild); device QA of English at the largest Dynamic Type;
+  decide whether the Assistant request carries the interface language. *(Formats, the
+  amount field and date pickers: delivered in 23.1C1; the rest is 23.1C2.)*
 
 ### Previous delivery — Producto 23.1B1
 
@@ -1240,9 +1311,11 @@ by CI and merged into master before the next starts:
     **23.1B1** (navigation, Inicio, Movimientos, main forms and shared components through
     the catalogue; delivered), **23.1B2** (remaining financial screens, Reportes,
     Tarjetas, Deudas, Recurrentes, backup and the Asistente; English complete but gated;
-    modular catalogues and the tooling for many languages; this delivery),
-    **23.1C** (regional money formats and amount-field separators, the US region and
-    English released, `supportedLocales`). Original scope: every screen's copy in the
+    modular catalogues and the tooling for many languages; delivered),
+    **23.1C1** (regional money formats, amount-field separators, VoiceOver amounts and
+    the date picker's locale for the four combinations, still gated; delivered) and
+    **23.1C2** (the US region and English released, `supportedLocales`, a new EAS build;
+    next). Original scope: every screen's copy in the
     catalogue, English released (`RELEASED_LOCALES`), `expo-localization`'s
     `supportedLocales` plugin (a native rebuild), locale-aware money presentation in
     `Money` and the amount field's separators, VoiceOver strings, date pickers and the
@@ -1405,6 +1478,18 @@ amount uses `useStacked()` and gives the name two lines. 44-point targets, Voice
 safe areas, system text and separate currencies apply to every new screen.
 
 ## Handoff log (historical evidence)
+
+### 2026-09-24 — Producto 23.1C1: regional formats and the internationalized amount field
+
+- The amount field types and pastes in the region's separators with the 23.0 design and
+  a ledger-notation draft; ambiguous pastes are refused with a note; region switches keep
+  value, draft and caret; every visible amount goes through the region formatters and
+  every VoiceOver amount through the language's; the date wheel takes the interface
+  locale; English and the US region stay gated, with a development-only preview flag.
+- **Checked on Linux:** 388 mobile tests and the checks listed under the current
+  delivery. **Not device-verified.** No native rebuild needed.
+- **Next:** device QA with the 23.1C1 checklist, then Producto 23.1C2 (release,
+  `supportedLocales`, EAS build). Producto 24 has not started.
 
 ### 2026-09-24 — Producto 23.1B2: translation of the remaining screens and multi-language tooling
 

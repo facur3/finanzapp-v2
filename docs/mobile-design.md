@@ -380,6 +380,29 @@ importe, moneda y estado.
   muestra hasta que toda la app lo tenga (23.1): un iPhone en inglés sigue leyendo
   español antes que media app traducida.
 
+## Producto 23.1C1 — formatos regionales y campo de importe (sin rediseño)
+
+- **Mismo campo, separadores de la región.** El diseño aprobado de 23.0 no cambia: el
+  símbolo anclado a la izquierda, cifras tabulares, los dígitos crecen desde un origen
+  fijo y nada se mueve al aparecer un separador (999 → 1.000 y 999.999 → 1.000.000 en
+  Argentina; 999 → 1,000 y 999,999 → 1,000,000 en Estados Unidos). Las dos regiones
+  miden igual, así que el tamaño nunca depende de la región.
+- **Símbolo por región.** En Argentina "$" es el peso y "US$" el dólar; en Estados Unidos
+  el peso es "AR$" y el dólar sigue "US$", para que ningún "$" sea ambiguo. El símbolo y
+  el número van unidos por un espacio duro: nunca quedan en líneas distintas.
+- **Pegado que no adivina.** Si el texto pegado puede leerse de dos maneras ("1,000" en
+  Argentina), el campo queda como estaba y una nota al pie, en el tono de advertencia,
+  dice por qué y cómo escribirlo; VoiceOver la anuncia. La nota desaparece con la
+  siguiente edición válida. No hay alerta modal ni animación.
+- **Cambio de región con el formulario abierto.** Sólo cambian los separadores del texto
+  visible; el importe, el borrador y la posición del cursor se conservan.
+- **VoiceOver.** Los importes se leen con los números del idioma de la interfaz; las
+  frases de presupuestos dicen "pesos" o "dólares" en lugar de "$".
+- **Selector de fecha.** La rueda usa el idioma de la interfaz para los meses.
+- **Oculto hasta 23.1C2.** Inglés y Estados Unidos siguen sin aparecer en Más; en el
+  iPhone todo se ve en español con formato argentino, salvo en la vista previa de
+  desarrollo (`EXPO_PUBLIC_LOCALE_PREVIEW=1`), que sólo existe en FinanzApp Dev.
+
 ## Producto 23.1B1 — traducción de navegación, Inicio, Movimientos y formularios (sin rediseño)
 
 - **Mismo diseño, otras palabras.** Ningún cambio de layout, espaciado, material,
@@ -459,6 +482,12 @@ importe, moneda y estado.
   fase de development build, no una capa de vidrio forzada encima).
 
 ## Pendiente de revisión en iPhone
+
+- Producto 23.1C1: nada visible debe cambiar en español-Argentina salvo el idioma de la
+  rueda de fechas (ahora el de la app) y los conteos de más de mil en la revisión de una
+  copia (1.234); el campo de importe teclea, borra y pega igual que en 23.0; pegar
+  "1,000" deja el campo como estaba con una nota al pie. Las cuatro combinaciones se
+  revisan en 23.1C2, cuando se publiquen.
 
 - Producto 23.0: el campo de importe al teclear rápido (999 → 1.000, 999.999 →
   1.000.000), con decimales, pegando, borrando sobre un punto, tocando en medio y al

@@ -13,9 +13,14 @@
  *
  * `formatMinorUnits` (the domain) remains the one money formatter and its
  * Argentine output is unchanged; a region with other separators only swaps
- * them in that output. Storage, parsing and the amount field are untouched. */
+ * them in that output. The screens never call it directly: every visible
+ * amount goes through `formatAmount`/`moneyText` (the region's separators)
+ * and every VoiceOver amount through the `spoken*` functions (the language's
+ * own separators, see `speechLocale`). Storage and parsing are untouched; the
+ * amount field reads and writes the region's separators through
+ * `ui/money-input.ts` with the `amountFormat` below. */
 import { formatMinorUnits, type Currency } from '@finanzapp/domain';
-import { DEFAULT_LOCALE, conventionsOf, languageOf, type AppLocale } from './locale.ts';
+import { DEFAULT_LOCALE, SPEECH_REGIONS, composeLocale, conventionsOf, languageOf, type AppLocale } from './locale.ts';
 
 const NBSP = '\u00A0';
 
@@ -190,12 +195,20 @@ export function formatAmount(minor: number, locale: AppLocale = DEFAULT_LOCALE):
   return text.replace(/[.,]/g, char => char === '.' ? group : decimal);
 }
 
+/** The separators the amount field types in: the region's. */
+export function amountFormat(locale: AppLocale = DEFAULT_LOCALE): { decimal: string; group: string } {
+  const { decimal, group } = conventionsOf(locale);
+  return { decimal, group };
+}
+
 /** An amount for prose and detail rows: sign, symbol, a non-breaking space
  * and the number, so "US$ 1.234,56" never splits at a line end. `absolute`
- * drops the sign for callers that word it ("deuda", "a favor"). */
-export function moneyText(minor: number, currency: Currency, locale: AppLocale = DEFAULT_LOCALE, absolute = false): string {
+ * drops the sign for callers that word it ("deuda", "a favor"); `signed`
+ * adds "+" to a positive amount (income). */
+export function moneyText(minor: number, currency: Currency, locale: AppLocale = DEFAULT_LOCALE, absolute = false, signed = false): string {
   const value = absolute ? Math.abs(minor) : minor;
-  return (value < 0 ? '−' : '') + currencySymbol(currency, locale) + NBSP + formatAmount(Math.abs(value), locale);
+  const sign = value < 0 ? '−' : signed && value > 0 ? '+' : '';
+  return sign + currencySymbol(currency, locale) + NBSP + formatAmount(Math.abs(value), locale);
 }
 
 /** "ARS 1.234,56": the ISO code before the amount, joined so the code can never sit alone on a line. */
@@ -209,11 +222,44 @@ export function withCurrencyCode(label: string, currency: Currency): string {
   return label + NBSP + '·' + NBSP + currency;
 }
 
+/** The locale a VoiceOver string is written in: the interface language with
+ * the separators of that language's own speech (`SPEECH_REGIONS`). The words
+ * of a VoiceOver label are in the interface language, so the voice reading
+ * them expects that language's numbers: an English voice reads "1.234,56" as
+ * "one point two three four comma fifty-six". The screen keeps the region's
+ * separators; only what is spoken changes. */
+export function speechLocale(locale: AppLocale = DEFAULT_LOCALE): AppLocale {
+  const language = languageOf(locale);
+  return composeLocale(language, SPEECH_REGIONS[language]);
+}
+
+/** A number of minor units for VoiceOver ("1.234,56" in Spanish, "1,234.56" in English). */
+export function spokenNumber(minor: number, locale: AppLocale = DEFAULT_LOCALE): string {
+  return formatAmount(minor, speechLocale(locale));
+}
+
+/** An amount with its ISO code for a VoiceOver sentence ("1.234,56 ARS"). */
+export function spokenAmount(minor: number, currency: Currency, locale: AppLocale = DEFAULT_LOCALE): string {
+  return spokenNumber(minor, locale) + ' ' + currency;
+}
+
+/** A percentage for a VoiceOver sentence, in the language's own separators. */
+export function spokenPercent(fraction: number, locale: AppLocale = DEFAULT_LOCALE): string {
+  return formatPercent(fraction, speechLocale(locale));
+}
+
 /** What VoiceOver reads for an amount: the number, then the currency in words. */
 export function spokenMoney(minor: number, currency: Currency, locale: AppLocale = DEFAULT_LOCALE): string {
   const en = languageOf(locale) === 'en';
   const unit = currency === 'USD' ? (en ? 'dollars' : 'dólares') : 'pesos';
-  return (minor < 0 ? (en ? 'Minus ' : 'Menos ') : '') + formatAmount(Math.abs(minor), locale) + ' ' + unit;
+  return (minor < 0 ? (en ? 'Minus ' : 'Menos ') : '') + spokenNumber(Math.abs(minor), locale) + ' ' + unit;
+}
+
+/** The locale identifier iOS's date picker takes ("es_AR", "en_US"): the
+ * wheel's month names follow the language, its column order the pair as far
+ * as iOS has data for it (see docs/i18n.md, date pickers). */
+export function pickerLocale(locale: AppLocale = DEFAULT_LOCALE): string {
+  return locale.replace('-', '_');
 }
 
 /** The full name of a currency for a chooser or a detail row. */

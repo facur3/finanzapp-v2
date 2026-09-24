@@ -3,11 +3,11 @@ import { Keyboard, View } from 'react-native';
 import { router, Stack } from 'expo-router';
 import { randomUUID } from 'expo-crypto';
 import * as Haptics from 'expo-haptics';
-import { accountBalanceMinor, accountKind, formatMinorUnits, hiddenLiabilityAccountIds, makeTransferChange, parseMinorUnits, sameTransfer, todayKey,
+import { accountBalanceMinor, accountKind, hiddenLiabilityAccountIds, makeTransferChange, parseMinorUnits, sameTransfer, todayKey,
   totalsByCurrency, validateTransfer, validateTransferChange, type Account, type Transfer, type TransferChange, type TransferRecord } from '@finanzapp/domain';
 import { useLedger } from '../storage/LedgerProvider';
 import { ActionButton, AmountField, AmountShortcut, AppText, DetailRow, EmptyState, ErrorMessage, Field, IconButton, Screen, Surface } from './components';
-import { amountFromMinor } from './money-input';
+import { amountFromMinor, draftFromMinor } from './money-input';
 import { AccountField, DateField, SelectorCard } from './form-controls';
 import { initialAccountId } from './presentation';
 import { space, usePalette } from './theme';
@@ -27,7 +27,7 @@ export function TransferForm({ original, accountId, fromAccountId: requestedFrom
 }) {
   const { snapshot, archive, addTransfer, updateTransfer } = useLedger();
   const p = usePalette();
-  const { t } = useI18n();
+  const { t, formatAmount } = useI18n();
   // A debt's hidden account is named from the debt, in the interface language (see accountDisplayName).
   const nameOf = (account: Account) => accountDisplayName(account, archive?.debts ?? [], t);
   const accounts = snapshot?.accounts ?? [];
@@ -45,7 +45,7 @@ export function TransferForm({ original, accountId, fromAccountId: requestedFrom
     ?? (lockedTo ? cash.find(a => a.currency === lockedTo.currency)?.id : undefined) ?? initialAccountId(cash, accountId));
   const [toId, setToId] = useState(() => before?.transfer.toAccountId ?? lockedTo?.id ?? requestedTarget?.id
     ?? (lockedFrom ? cash.find(a => a.currency === lockedFrom.currency)?.id : undefined) ?? '');
-  const [amount, setAmount] = useState(before ? formatMinorUnits(before.transfer.amountMinor) : '');
+  const [amount, setAmount] = useState(before ? draftFromMinor(before.transfer.amountMinor) : '');
   // A card payment or a debt settlement writes its own default note in the language active when the form opens
   // (it is then the user's editable text); a caller's note, kept for older deep links, still wins.
   const [note, setNote] = useState(() => {
@@ -128,9 +128,9 @@ export function TransferForm({ original, accountId, fromAccountId: requestedFrom
   }
   const balanceLabel = (id: string, value: number) => {
     const kind = accountKind(id, cards, debts);
-    if (kind === 'card') return value < 0 ? t('transferForm.balanceDebt', { amount: formatMinorUnits(-value) }) : t('transferForm.balanceCredit', { amount: formatMinorUnits(value) });
-    if (kind === 'debt') return t('transferForm.balancePending', { amount: formatMinorUnits(Math.abs(value)) });
-    return formatMinorUnits(value);
+    if (kind === 'card') return value < 0 ? t('transferForm.balanceDebt', { amount: formatAmount(-value) }) : t('transferForm.balanceCredit', { amount: formatAmount(value) });
+    if (kind === 'debt') return t('transferForm.balancePending', { amount: formatAmount(Math.abs(value)) });
+    return formatAmount(value);
   };
   // Paying an obligation only makes sense from cash in the same currency.
   const cashSources = sources.filter(a => !obligation || (a.id !== obligation.id && a.currency === obligation.currency));
@@ -155,7 +155,7 @@ export function TransferForm({ original, accountId, fromAccountId: requestedFrom
       // A card in credit has nothing to pay; an obligation is pending or settled, never negative; cash is shown as recorded.
       const figure = obligationKind === 'card' ? (context.minor < 0 ? ['transferForm.figureCredit', -context.minor] as const : ['transferForm.figureDebt', context.minor] as const)
         : obligationKind === 'debt' ? ['transferForm.figurePending', Math.max(0, context.minor)] as const : ['transferForm.figureBalance', context.minor] as const;
-      return { ...context, fill, text: t('transferForm.figure', { label: t(figure[0]), currency: context.account.currency, amount: formatMinorUnits(figure[1]) }) };
+      return { ...context, fill, text: t('transferForm.figure', { label: t(figure[0]), currency: context.account.currency, amount: formatAmount(figure[1]) }) };
     } catch { return null; }
   })();
   const balanceDetail = (id: string | undefined) => {

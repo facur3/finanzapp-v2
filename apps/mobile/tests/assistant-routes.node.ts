@@ -8,6 +8,7 @@ import * as conversation from '../src/assistant/conversation.ts';
 import * as evidence from '../src/integrations/evidence.ts';
 import * as liabilityPresentation from '../src/ui/liability-presentation.ts';
 import * as presentation from '../src/ui/presentation.ts';
+import * as moneyInput from '../src/ui/money-input.ts';
 import type { AssistantClient, AssistantEvent } from '../src/assistant/client.ts';
 import { disconnectedAssistant } from '../src/assistant/client.ts';
 import { FIXTURE_ANSWER, FIXTURE_DRAFT, FIXTURE_DRAFT_NO_ACCOUNT, FIXTURE_FACTS, fixtureAssistant } from '../src/assistant/fixtures.ts';
@@ -80,6 +81,7 @@ function harness({ client, accounts = [visa, cash, usd], data = entries, params 
     '../src/ui/assistant-messages': Object.fromEntries(['AnswerEvidence', 'AssistantText', 'ClarificationChoices', 'DraftCard', 'Suggestions', 'SystemNote', 'UserMessage'].map(n => [n, n])),
     '../src/ui/components': { AppText: 'AppText', IconButton: 'IconButton' },
     '../src/ui/liability-presentation': liabilityPresentation,
+    '../src/ui/money-input': moneyInput,
     '../src/ui/motion': { Appear: 'Appear', impactHaptic: () => haptics.push('impact'), successHaptic: () => haptics.push('success') },
     '../src/ui/presentation': presentation,
     '../src/ui/theme': { space: { xs: 4, s: 8, m: 12, l: 16, xl: 20, xxl: 24, xxxl: 32 }, useCurrentDay: () => '2026-09-21', useReduceMotion: () => reduced,

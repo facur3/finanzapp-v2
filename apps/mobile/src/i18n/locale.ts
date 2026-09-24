@@ -26,6 +26,12 @@ export const LANGUAGES = {
 } as const;
 export type LanguageCode = keyof typeof LANGUAGES;
 
+/** The region whose conventions a language's own speech uses: a VoiceOver
+ * string is written for a voice of the interface language, so "1.234,56
+ * pesos" in Spanish and "1,234.56 dollars" in English, whatever region the
+ * screen writes numbers in. A new language names its region here. */
+export const SPEECH_REGIONS: Record<LanguageCode, RegionCode> = { es: 'AR', en: 'US' };
+
 /** How a region writes numbers, dates and times. Words stay with the language. */
 export interface RegionConventions {
   /** Decimal and thousands separators of an amount, a count or a percentage. */
@@ -70,6 +76,17 @@ export const RELEASED_REGIONS: readonly RegionCode[] = ['AR'];
 
 export interface ReleasedSets { languages: readonly LanguageCode[]; regions: readonly RegionCode[] }
 export const RELEASED: ReleasedSets = { languages: RELEASED_LANGUAGES, regions: RELEASED_REGIONS };
+/** Every language and region this build carries, released or not. */
+export const PREVIEW: ReleasedSets = { languages: SUPPORTED_LANGUAGES, regions: SUPPORTED_REGIONS };
+
+/** What a bundle may show: the release gate; or, only in a development bundle
+ * started with `EXPO_PUBLIC_LOCALE_PREVIEW=1`, every language and region, so
+ * the owner can check unreleased formats on the iPhone from FinanzApp Dev
+ * (Más then lists English and Región). A release bundle ignores the flag, and
+ * a choice saved during a preview is not applied once the flag is gone. */
+export function releasedForBuild(flag: string | undefined, development: boolean): ReleasedSets {
+  return development && flag === '1' ? PREVIEW : RELEASED;
+}
 
 /** What the person chose for each, if anything: follow the device, or one value. */
 export type LanguagePreference = 'system' | LanguageCode;

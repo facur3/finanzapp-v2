@@ -17,7 +17,7 @@ import { createContext, createElement, useContext, useEffect, useMemo, useState,
 import { AppState } from 'react-native';
 import { bindLocale, type I18n } from './bind.ts';
 import { readRuntimeDeviceLocales } from './device-runtime';
-import { DEFAULT_LOCALE, type AppLocale } from './locale.ts';
+import { DEFAULT_LOCALE, releasedForBuild, type AppLocale } from './locale.ts';
 import { defaultPreferenceStore } from './preference.ts';
 import { createLocaleStore, type LocaleState, type LocaleStore } from './store.ts';
 
@@ -28,9 +28,14 @@ const I18nContext = createContext<I18n>(bindLocale(DEFAULT_LOCALE));
 export interface LocalePreferencesContext { state: LocaleState; setLanguage: LocaleStore['setLanguage']; setRegion: LocaleStore['setRegion'] }
 const PreferencesContext = createContext<LocalePreferencesContext | null>(null);
 
-/** The app's store: the probed device reader and the key-value store. */
+declare const __DEV__: boolean | undefined;
+
+/** The app's store: the probed device reader, the key-value store and the
+ * release gate (widened only for a development preview, see releasedForBuild;
+ * the flag is read by its literal name so Expo inlines it). */
 export function createRuntimeLocaleStore(): LocaleStore {
-  return createLocaleStore({ devices: readRuntimeDeviceLocales, store: defaultPreferenceStore });
+  return createLocaleStore({ devices: readRuntimeDeviceLocales, store: defaultPreferenceStore,
+    released: releasedForBuild(process.env.EXPO_PUBLIC_LOCALE_PREVIEW, typeof __DEV__ !== 'undefined' && __DEV__) });
 }
 
 export function I18nProvider({ children, locale, store }: { children: ReactNode; locale?: AppLocale; store?: LocaleStore }) {

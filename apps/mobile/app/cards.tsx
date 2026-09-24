@@ -5,7 +5,7 @@ import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-na
 import { cardStatementActivity, liabilityActivity } from '@finanzapp/domain';
 import { useLedger } from '../src/storage/LedgerProvider';
 import { ActionButton, AppText, EmptyState, IconButton, Money, MovementRow, Screen, SectionTitle, Stat, Surface, toneColors, StatRow } from '../src/ui/components';
-import { moneyText, withCurrencyCode } from '../src/i18n/format';
+import { withCurrencyCode } from '../src/i18n/format';
 import { useI18n } from '../src/i18n/provider';
 import { CardCarousel, CardFace } from '../src/ui/card-visual';
 import { activeCards, daysUntil, statementCaption, usageTone, type CardSummary } from '../src/ui/liability-presentation';
@@ -47,7 +47,7 @@ export default function CardsScreen() {
 function CardPanel({ summary, day }: { summary: CardSummary; day: string }) {
   const { snapshot } = useLedger();
   const p = usePalette();
-  const { t, relativeDate } = useI18n();
+  const { t, relativeDate, moneyText } = useI18n();
   const { card, account, debtMinor, availableMinor, usage, closingISO, dueISO } = summary;
   const statement = useMemo(() => snapshot ? cardStatementActivity(card, snapshot, day) : null, [card, snapshot, day]);
   const recent = useMemo(() => {

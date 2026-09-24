@@ -21,7 +21,8 @@ export function carouselIndex(offsetX: number, step: number, count: number): num
 /** Advance widths, in em, of the glyphs an amount can contain, measured
  * generously for SF Pro bold tabular figures. Tabular digits share one width,
  * which is what makes the estimate reliable without measuring text natively. */
-const ADVANCE: Record<string, number> = { '.': 0.3, ',': 0.3, ' ': 0.28, '$': 0.62, U: 0.74, S: 0.66, '−': 0.62, '+': 0.62 };
+// The non-breaking space joins a symbol to its number; "AR$" is the peso's sign in the United States.
+const ADVANCE: Record<string, number> = { '.': 0.3, ',': 0.3, ' ': 0.28, '\u00A0': 0.28, '$': 0.62, U: 0.74, S: 0.66, A: 0.74, R: 0.7, '−': 0.62, '+': 0.62, '-': 0.5 };
 const DIGIT = 0.6;
 export const SAFETY = 1.04;
 

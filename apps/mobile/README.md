@@ -170,6 +170,22 @@ starts with `npm run i18n:export -- <lang>`. The whole process, the glossary, RT
 Crowdin plan, the library evaluation and the error-code migration are in
 [`docs/i18n.md`](../../docs/i18n.md).
 
+**Producto 23.1C1 (2026-09-24)** prepares the regional formats without releasing them.
+The amount field types and pastes in the region's separators (`src/ui/money-input.ts`,
+`AmountInput`; Argentina 1.234,56, United States 1,234.56) while the form's draft stays in
+the ledger notation that `parseMinorUnits` reads, so a region change with a form open
+keeps the value, the draft and the caret. A paste that could mean two amounts ("1,000"
+in Argentina) is refused with a note, never guessed. Every visible amount goes through
+`moneyText`/`formatAmount` (region), every VoiceOver amount through `spoken*` (the
+interface language's separators), prefills through `draftFromMinor`; a test forbids
+`formatMinorUnits` and hand-written currency signs in `app/` and `src/ui/`. The date
+picker takes the interface locale. English and the US region stay unreleased (23.1C2
+opens them with `supportedLocales`, a new EAS build); to check them on FinanzApp Dev
+now, start Metro with `EXPO_PUBLIC_LOCALE_PREVIEW=1 npm run start:dev-client -- --clear`
+(development bundles only; Más then lists English and Región). No SQLite, backup, accounting or
+native change: FinanzApp Dev runs it from Metro. Details and iOS limits:
+[`docs/i18n.md`](../../docs/i18n.md) §9.
+
 **expo-localization needs a new development build.** It is a native module: Expo Go
 already contains it, but a FinanzApp Dev binary compiled before this PR does not, and
 Metro cannot add native code. On such a binary the app still starts and works:
@@ -576,7 +592,13 @@ locale. Producto 23.1B2 adds English cases to every area's harness (reports, lia
 budgets, polish, personalization, more, recovery, material, assistant) and extends
 `translation.node.ts` to the whole app: `i18n:extract` finds nothing, `i18n:check
 --strict` is clean, CLDR plural categories, the export brief, pseudo-locales, template
-errors and debt display names. It also updates
+errors and debt display names. Producto 23.1C1 rewrites `money-input.node.ts` around the
+real `AmountInput` controller (both regions, either decimal key, lagging native text,
+pastes accepted and refused, region switches with the caret), adds the four
+language × region combinations to `i18n.node.ts` and `typography.node.ts` (Money and the
+anchored field with "AR$"), mounts the real `AmountField` under the real provider in
+`locale-switch.node.ts`, and checks in `database.node.ts` that an amount typed in either
+region is stored as the same integer and that formatting never touches the ledger. It also updates
 the navigation, Más, Cards, composer and quick-action guards for the centre tab, the
 pushed Tarjetas screen and the glass branch. These are **not** native rendering/gesture tests;
 use the physical checklist. The root suite also tests the shared monthly summary
@@ -587,7 +609,7 @@ For the intermittent black-tab report, update to `master`, restart with
 and repeat the **Interfaz 02** tab checks, **Interfaz 03** report checks and
 **Interfaz 04/05** correction/recovery and transfer checks, plus **Interfaz 06** daily/comparison reports and **Interfaz 08** recurring/upcoming
 checks, plus **Interfaz 10** cards/debts and five-tab checks and **Interfaz 11** Home,
-Movimientos and detail checks, **Interfaz 12** form checks, **Interfaz 13** Reportes checks, **Interfaz 14** budgets/recurring/accounts checks, **Interfaz 15** motion checks, **Interfaz 16** cohesion checks, **Interfaz 17** identity and money-input checks **Producto 18** Más / Tarjetas / amount-shortcut checks, **Producto 19** budget checks, **Producto 20** account/category identity checks **Producto 21** Assistant checks, **Producto 22** reachability/material checks, **Producto 22.1** clarity checks, **Producto 23.0** amount-field, row and localization checks, **Producto 23.1A** language-preference checks, **Producto 23.1B1** and **23.1B2** translation checks. The current footer (Más) says Producto 23.1B2.
+Movimientos and detail checks, **Interfaz 12** form checks, **Interfaz 13** Reportes checks, **Interfaz 14** budgets/recurring/accounts checks, **Interfaz 15** motion checks, **Interfaz 16** cohesion checks, **Interfaz 17** identity and money-input checks **Producto 18** Más / Tarjetas / amount-shortcut checks, **Producto 19** budget checks, **Producto 20** account/category identity checks **Producto 21** Assistant checks, **Producto 22** reachability/material checks, **Producto 22.1** clarity checks, **Producto 23.0** amount-field, row and localization checks, **Producto 23.1A** language-preference checks, **Producto 23.1B1** and **23.1B2** translation checks, **Producto 23.1C1** regional-format checks. The current footer (Más) says Producto 23.1C1.
 Before updating, save a private pilot copy; do not uninstall or add fake movements.
 
 If a storage/refresh error occurs, the form retains the exact submitted command

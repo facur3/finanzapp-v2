@@ -108,8 +108,8 @@ test('budgets without a general budget list the sublimits, offer a compact gener
   const rows = nodes(root).filter(node => typeof node.type === 'function' && node.props.row);
   assert.deepEqual(rows.map(node => [node.props.row.budget.category, node.props.row.exceeded, Math.round(node.props.row.ratio * 100)]), [['Café', true, 120], ['Supermercado', false, 90]]);
   const labels = nodes(root).filter(node => node.type === 'PressFeedback').map(node => node.props.accessibilityLabel).filter(Boolean);
-  assert.ok(labels.some(label => /Café: \$ 30,00 de \$ 25,00, 120 por ciento\. Excedido por \$ 5,00/.test(label)));
-  assert.ok(labels.some(label => /Supermercado.*90 por ciento\. Quedan \$ 10,00/.test(label)));
+  assert.ok(labels.some(label => /Café: 30,00 pesos de 25,00 pesos, 120 por ciento\. Excedido por 5,00 pesos/.test(label)));
+  assert.ok(labels.some(label => /Supermercado.*90 por ciento\. Quedan 10,00 pesos/.test(label)));
   const section = find(root, 'SectionTitle', 'Agregar');
   assert.equal(section.props.children, 'Por categoría');
   assert.match(section.props.caption, /2 categorías · 1 excedida · 1 cerca del límite/);
@@ -117,7 +117,7 @@ test('budgets without a general budget list the sublimits, offer a compact gener
   assert.equal(JSON.stringify(view.pushed.at(-1)), JSON.stringify({ pathname: '/new-budget', params: { currency: 'ARS', month: '2026-09', scope: 'category' } }));
   assert.equal(texts(root).some(text => text.includes('Además gastaste')), false, 'every September expense has a sublimit here, so no unbudgeted line');
   const partial = harness('budgets.tsx', { currency: 'ARS' }, { ...archive, budgets: [budgets[0]] }).render();
-  assert.ok(texts(partial).some(text => text.includes('Además gastaste $ 90,00 en categorías sin límite propio')), 'unbudgeted spending stays visible');
+  assert.ok(texts(partial).some(text => text.includes('Además gastaste $\u00A090,00 en categorías sin límite propio')), 'unbudgeted spending stays visible');
   find(root, 'IconButton', 'Mes siguiente').props.onPress();
   assert.equal(find(view.render(), 'EmptyState').props.title, 'Dale un límite a tu mes');
 });
@@ -141,7 +141,7 @@ test('a general budget is the primary summary over all recorded expenses, with s
   assert.equal(nodes(root).some(node => node.type === 'ActionButton' && node.props.label === 'Agregar presupuesto general'), false);
   assert.equal(nodes(root).filter(node => typeof node.type === 'function' && node.props.row).length, 2, 'sublimits still listed');
   const label = nodes(root).find(node => node.type === 'View' && typeof node.props.accessibilityLabel === 'string' && node.props.accessibilityLabel.startsWith('Presupuesto general'))!;
-  assert.equal(label.props.accessibilityLabel, 'Presupuesto general: $ 120,00 de $ 200,00, 60 por ciento usado. Disponible $ 80,00');
+  assert.equal(label.props.accessibilityLabel, 'Presupuesto general: 120,00 pesos de 200,00 pesos, 60 por ciento usado. Disponible 80,00 pesos');
 });
 
 test('an exceeded general budget and a general budget alone are both honest', () => {
@@ -208,7 +208,7 @@ test('in English Recurrentes reads in English, keeps merchant and account names,
   const sections = nodes(root).filter(node => node.type === 'SectionTitle').map(node => node.props.children);
   assert.equal(sections.join(','), 'Next 30 days,Active');
   const press = nodes(root).find(node => node.type === 'PressFeedback')!;
-  assert.equal(press.props.accessibilityLabel, 'Edit recurring Alquiler, monthly, 400,00 ARS, next Oct 1');
+  assert.equal(press.props.accessibilityLabel, 'Edit recurring Alquiler, monthly, 400.00 ARS, next Oct 1');
   const captions = texts(root);
   assert.ok(captions.includes('Monthly · Oct 1 · Banco'), 'merchant and account name stay as the user wrote them');
   assert.ok(captions.includes('In 11 days'));
@@ -235,8 +235,8 @@ test('in English Presupuestos names the month, the states and the VoiceOver sent
   assert.equal(nodes(spanish).find(node => node.type === 'SectionTitle' && node.props.children === 'Por categoría')!.props.caption,
     '2 categorías · 1 excedida · 1 cerca del límite');
   const labels = nodes(root).map(node => node.props.accessibilityLabel).filter(Boolean);
-  assert.ok(labels.some(label => /^Café budget: \$ 30,00 of \$ 25,00, 120 percent\. Over by \$ 5,00$/.test(label)), 'the category keeps its stored name');
-  assert.ok(labels.some(label => /^Overall budget: \$ 120,00 of \$ 200,00, 60 percent used\. \$ 80,00 available$/.test(label)));
+  assert.ok(labels.some(label => /^Café budget: 30\.00 pesos of 25\.00 pesos, 120 percent\. Over by 5\.00 pesos$/.test(label)), 'the category keeps its stored name');
+  assert.ok(labels.some(label => /^Overall budget: 120\.00 pesos of 200\.00 pesos, 60 percent used\. 80\.00 pesos available$/.test(label)));
   assert.ok(shown.includes('60% used'));
   assert.ok(shown.includes('Supermercado'));
   assert.equal(nodes(root).filter(node => node.type === 'Stat').map(node => node.props.label).join(','), 'Spent,Limit');

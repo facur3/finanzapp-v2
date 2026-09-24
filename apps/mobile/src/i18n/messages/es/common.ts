@@ -54,6 +54,14 @@ export const common = {
     accessibility: '{label} en {currency}',
     inPesos: 'pesos argentinos',
     inDollars: 'dólares',
+    /** Under the amount field when a pasted text was not used; the field keeps its previous value. {text} is what was pasted. */
+    paste: {
+      /** "1,000" in Argentina: a thousand in one convention, one with three decimals in the other. {decimal} is the region's decimal separator. */
+      ambiguous: 'No se pegó «{text}»: puede leerse de dos maneras. Escribí los decimales con «{decimal}».',
+      precision: 'No se pegó «{text}»: tiene más de dos decimales.',
+      invalid: 'No se pegó «{text}»: no es un monto válido.',
+      tooLong: 'No se pegó «{text}»: supera el monto máximo.',
+    },
   },
   count: {
     movements: { one: '{count} movimiento', other: '{count} movimientos' },

@@ -3,10 +3,11 @@ import { Alert, Keyboard, View } from 'react-native';
 import { router, Stack } from 'expo-router';
 import { randomUUID } from 'expo-crypto';
 import * as Haptics from 'expo-haptics';
-import { formatMinorUnits, parseMinorUnits, sameMonthlyBudget, validateMonthlyBudget,
+import { parseMinorUnits, sameMonthlyBudget, validateMonthlyBudget,
   type BudgetScope, type Currency, type MonthlyBudget } from '@finanzapp/domain';
 import { useLedger } from '../storage/LedgerProvider';
 import { ActionButton, AmountField, AppText, Choices, ErrorMessage, IconButton, Screen } from './components';
+import { draftFromMinor } from './money-input';
 import { CategoryField } from './form-controls';
 import { useI18n } from '../i18n/provider';
 
@@ -24,7 +25,7 @@ export function BudgetForm({ original, monthISO, currency: requestedCurrency, sc
   const [operation] = useState(() => ({ id: randomUUID(), createdAt: new Date().toISOString() }));
   const [scope, setScope] = useState<BudgetScope>(before?.scope ?? (requestedScope === 'total' ? 'total' : 'category'));
   const [currency, setCurrency] = useState<Currency>(before?.currency ?? (requestedCurrency === 'USD' ? 'USD' : 'ARS'));
-  const [amount, setAmount] = useState(before ? formatMinorUnits(before.amountMinor) : '');
+  const [amount, setAmount] = useState(before ? draftFromMinor(before.amountMinor) : '');
   const [category, setCategory] = useState(before?.category ?? '');
   const [busy, setBusy] = useState(false);
   const [pending, setPending] = useState<MonthlyBudget | null>(null);

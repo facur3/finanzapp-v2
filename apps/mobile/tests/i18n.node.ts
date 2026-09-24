@@ -4,8 +4,8 @@ import { formatMinorUnits } from '@finanzapp/domain';
 import { readdirSync, readFileSync } from 'node:fs';
 import { deviceLocales, readDeviceLocales } from '../src/i18n/device.ts';
 import { codedAmount, currencyName, currencySymbol, dateFromISO, daysAgo, formatAmount, formatCount, formatDate, formatDateTime, formatMonth, formatNumericDate, formatPercent,
-  moneyText, relativeDayName, spokenMoney, withCurrencyCode } from '../src/i18n/format.ts';
-import { DEFAULT_LOCALE, LANGUAGES, REGIONS, RELEASED_LANGUAGES, RELEASED_REGIONS, SUPPORTED_LANGUAGES, SUPPORTED_REGIONS, composeLocale, languageForTag, languageOf,
+  moneyText, pickerLocale, relativeDayName, speechLocale, spokenAmount, spokenMoney, spokenNumber, spokenPercent, withCurrencyCode } from '../src/i18n/format.ts';
+import { DEFAULT_LOCALE, LANGUAGES, REGIONS, RELEASED, RELEASED_LANGUAGES, RELEASED_REGIONS, releasedForBuild, SUPPORTED_LANGUAGES, SUPPORTED_REGIONS, composeLocale, languageForTag, languageOf,
   languagePreferenceFrom, regionForCode, regionForTag, regionOf, regionPreferenceFrom, resolveLanguage, resolveLocale, resolveRegion, type AppLocale } from '../src/i18n/locale.ts';
 import { catalogue, interpolate, messageKeys, translate, translator } from '../src/i18n/messages.ts';
 import { es } from '../src/i18n/messages/es/index.ts';
@@ -193,7 +193,7 @@ test('the runtime wiring probes with requireOptionalNativeModule and only then r
   const pure = readFileSync(new URL('../src/i18n/device.ts', import.meta.url), 'utf8');
   assert.equal(/require\(|from 'expo'/.test(pure), false, 'the pure reader neither requires nor imports Expo');
   const provider = readFileSync(new URL('../src/i18n/provider.tsx', import.meta.url), 'utf8');
-  assert.match(provider, /createLocaleStore\(\{ devices: readRuntimeDeviceLocales, store: defaultPreferenceStore \}\)/, 'the app reads the device through the probed adapter');
+  assert.match(provider, /createLocaleStore\(\{ devices: readRuntimeDeviceLocales, store: defaultPreferenceStore,/, 'the app reads the device through the probed adapter');
 });
 
 function memoryStore() {
@@ -331,7 +331,7 @@ test('words follow the language, conventions follow the region: English with Arg
   assert.equal(formatNumericDate('2026-09-22', 'en-AR'), '22/9/2026');
   assert.equal(formatCount(1234567, 'en-AR'), '1.234.567');
   assert.equal(formatPercent(0.1235, 'en-AR'), '12,4%', 'the decimal comes from the region, the spacing from the language');
-  assert.equal(spokenMoney(-100, 'USD', 'en-AR'), 'Minus 1,00 dollars');
+  assert.equal(spokenMoney(-100, 'USD', 'en-AR'), 'Minus 1.00 dollars', 'VoiceOver reads English numbers to an English voice; the screen keeps 1,00');
   assert.equal(currencyName('ARS', 'en-AR'), 'Argentine pesos');
   // Spanish words, US numbers, month-first numeric dates and a 12-hour clock.
   assert.equal(formatDate('2026-09-22', 'long', 'es-US'), '22 de septiembre de 2026');
@@ -343,7 +343,7 @@ test('words follow the language, conventions follow the region: English with Arg
   assert.equal(formatDateTime('2026-09-22T09:03:05', 'es-US'), '9/22/2026, 9:03\u00A0a.\u00A0m.');
   assert.equal(formatNumericDate('2026-09-22', 'es-US'), '9/22/2026');
   assert.equal(formatPercent(0.1235, 'es-US'), '12.4\u00A0%');
-  assert.equal(spokenMoney(123456, 'ARS', 'es-US'), '1,234.56 pesos');
+  assert.equal(spokenMoney(123456, 'ARS', 'es-US'), '1.234,56 pesos', 'the Spanish voice gets Spanish numbers; the screen shows 1,234.56');
   assert.equal(currencyName('USD', 'es-US'), 'Dólares estadounidenses');
   assert.equal(formatNumericDate('garbage', 'es-US'), 'garbage');
   // The default is byte-identical to the ledger for every amount.
@@ -407,4 +407,84 @@ test('a bound locale gives components one object of translator and formatters', 
   assert.equal(en.t('common.done'), 'Done');
   assert.equal(en.formatDate('2026-09-22', 'weekdayLong'), 'Tuesday, September 22, 2026');
   assert.equal(en.moneyText(150000, 'ARS'), 'AR$\u00A01,500.00');
+});
+
+test('Producto 23.1C1: every format in the four language × region combinations', () => {
+  type Row = { amount: string; big: string; negative: string; ars: string; usd: string; coded: string; spoken: string; spokenCoded: string;
+    percent: string; small: string; count: string; numeric: string; time: string; long: string; picker: string; decimal: string; group: string };
+  const rows: Record<AppLocale, Row> = {
+    'es-AR': { amount: '1.234,56', big: '9.999.999.999.999,99', negative: '-45,99', ars: '$\u00A01.234,56', usd: '−US$\u00A01.234,56', coded: 'ARS\u00A01.234,56',
+      spoken: '1.234,56 pesos', spokenCoded: '1.234,56 ARS', percent: '12,4\u00A0%', small: '<0,1\u00A0%', count: '1.234.567', numeric: '22/9/2026',
+      time: '22/9/2026, 14:03', long: '22 de septiembre de 2026', picker: 'es_AR', decimal: ',', group: '.' },
+    'en-AR': { amount: '1.234,56', big: '9.999.999.999.999,99', negative: '-45,99', ars: '$\u00A01.234,56', usd: '−US$\u00A01.234,56', coded: 'ARS\u00A01.234,56',
+      spoken: '1,234.56 pesos', spokenCoded: '1,234.56 ARS', percent: '12,4%', small: '<0,1%', count: '1.234.567', numeric: '22/9/2026',
+      time: '22/9/2026, 14:03', long: 'September 22, 2026', picker: 'en_AR', decimal: ',', group: '.' },
+    'es-US': { amount: '1,234.56', big: '9,999,999,999,999.99', negative: '-45.99', ars: 'AR$\u00A01,234.56', usd: '−US$\u00A01,234.56', coded: 'ARS\u00A01,234.56',
+      spoken: '1.234,56 pesos', spokenCoded: '1.234,56 ARS', percent: '12.4\u00A0%', small: '<0.1\u00A0%', count: '1,234,567', numeric: '9/22/2026',
+      time: '9/22/2026, 2:03\u00A0p.\u00A0m.', long: '22 de septiembre de 2026', picker: 'es_US', decimal: '.', group: ',' },
+    'en-US': { amount: '1,234.56', big: '9,999,999,999,999.99', negative: '-45.99', ars: 'AR$\u00A01,234.56', usd: '−US$\u00A01,234.56', coded: 'ARS\u00A01,234.56',
+      spoken: '1,234.56 pesos', spokenCoded: '1,234.56 ARS', percent: '12.4%', small: '<0.1%', count: '1,234,567', numeric: '9/22/2026',
+      time: '9/22/2026, 2:03\u00A0PM', long: 'September 22, 2026', picker: 'en_US', decimal: '.', group: ',' },
+  };
+  for (const [locale, row] of Object.entries(rows) as [AppLocale, Row][]) {
+    const i18n = bindLocale(locale);
+    const got: Row = {
+      amount: i18n.formatAmount(123456), big: i18n.formatAmount(999999999999999), negative: i18n.formatAmount(-4599),
+      ars: i18n.moneyText(123456, 'ARS'), usd: i18n.moneyText(-123456, 'USD'), coded: i18n.codedAmount(123456, 'ARS'),
+      spoken: i18n.spokenMoney(123456, 'ARS'), spokenCoded: i18n.spokenAmount(123456, 'ARS'), percent: i18n.formatPercent(0.1235), small: i18n.formatPercent(0.0004),
+      count: i18n.formatCount(1234567), numeric: i18n.formatNumericDate('2026-09-22'), time: i18n.formatDateTime('2026-09-22T14:03:05'),
+      long: i18n.formatDate('2026-09-22', 'long'), picker: i18n.pickerLocale, decimal: i18n.amountFormat.decimal, group: i18n.amountFormat.group,
+    };
+    assert.deepEqual(got, row, locale);
+    // The amount itself never changes: only its writing. No floating point, no rounding, the sign and the cents kept.
+    assert.equal(i18n.formatAmount(123456).replace(/[.,]/g, ''), '123456');
+    assert.equal(i18n.spokenNumber(-5), locale.startsWith('en') ? '-0.05' : '-0,05');
+    assert.equal(i18n.moneyText(5, 'USD', false, true), '+US$\u00A0' + (locale.endsWith('US') ? '0.05' : '0,05'), 'income sign');
+    assert.equal(i18n.moneyText(-5, 'ARS', true), (locale.endsWith('US') ? 'AR$' : '$') + '\u00A0' + (locale.endsWith('US') ? '0.05' : '0,05'), 'absolute');
+    assert.equal(i18n.spokenPercent(0.1235), locale.startsWith('en') ? '12.4%' : '12,4\u00A0%', 'a spoken percentage follows the language');
+    assert.equal(i18n.moneyText(0, 'ARS').endsWith('0' + i18n.amountFormat.decimal + '00'), true);
+  }
+  assert.equal(speechLocale('en-AR'), 'en-US');
+  assert.equal(speechLocale('es-US'), 'es-AR');
+  assert.equal(spokenNumber(123456, 'es-US'), '1.234,56');
+  assert.equal(spokenAmount(-100, 'USD', 'en-AR'), '-1.00 USD');
+  assert.equal(spokenPercent(0.5, 'es-US'), '50\u00A0%');
+  assert.equal(pickerLocale('es-AR'), 'es_AR');
+  // The currency of an account is never decided by the language or the region: the same amount in both currencies, four ways.
+  for (const locale of ['es-AR', 'en-AR', 'es-US', 'en-US'] as AppLocale[]) {
+    assert.ok(moneyText(100, 'ARS', locale) !== moneyText(100, 'USD', locale), locale + ': pesos and dollars never look alike');
+    assert.match(moneyText(100, 'USD', locale), /^US\$/, 'the dollar keeps its prefix everywhere');
+  }
+});
+
+test('money reaches the screen only through the central formatters, and 23.1C1 keeps English and the US region unreleased', () => {
+  // Screens and components never format money themselves: no domain formatter, no hand-written currency sign.
+  const offenders: string[] = [];
+  const walk = (dir: URL) => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const url = new URL(entry.name + (entry.isDirectory() ? '/' : ''), dir);
+      if (entry.isDirectory()) { walk(url); continue; }
+      if (!/\.tsx?$/.test(entry.name) || url.pathname.endsWith('src/ui/money-input.ts')) continue;
+      const source = readFileSync(url, 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
+      if (/\bformatMinorUnits\b/.test(source)) offenders.push(entry.name + ': formatMinorUnits');
+      // A glyph-width table key ('$': 0.62) is not a sign shown to anyone.
+      if (/['"`](?:US|AR)?\$ ['"`]|['"`](?:US|AR)?\$['"`](?!\s*:)/.test(source)) offenders.push(entry.name + ': a hand-written currency sign');
+      if (/toLocaleString|Intl\.NumberFormat|toFixed\(/.test(source)) offenders.push(entry.name + ': a device number formatter');
+    }
+  };
+  walk(new URL('../app/', import.meta.url));
+  walk(new URL('../src/ui/', import.meta.url));
+  assert.deepEqual(offenders, [], 'visible amounts go through moneyText/formatAmount, VoiceOver through spoken*, drafts through money-input');
+  // The release gate is unchanged by this delivery: 23.1C2 opens it together with the native configuration.
+  assert.deepEqual([...RELEASED_LANGUAGES], ['es']);
+  assert.deepEqual([...RELEASED_REGIONS], ['AR']);
+  const config = readFileSync(new URL('../app.config.ts', import.meta.url), 'utf8');
+  assert.equal(/supportedLocales/.test(config), false, 'no supportedLocales before 23.1C2 (a native rebuild)');
+  // FinanzApp Dev can preview every language and region, only from a development bundle started with the flag.
+  assert.deepEqual(releasedForBuild('1', true), { languages: ['es', 'en'], regions: ['AR', 'US'] });
+  assert.equal(releasedForBuild('1', false), RELEASED, 'a release bundle ignores the flag');
+  assert.equal(releasedForBuild(undefined, true), RELEASED, 'a normal development bundle keeps the gate');
+  assert.equal(releasedForBuild('true', true), RELEASED, 'only the documented value opens it');
+  const provider = readFileSync(new URL('../src/i18n/provider.tsx', import.meta.url), 'utf8');
+  assert.match(provider, /releasedForBuild\(process\.env\.EXPO_PUBLIC_LOCALE_PREVIEW, typeof __DEV__ !== 'undefined' && __DEV__\)/, 'read by its literal name so Expo inlines it');
 });

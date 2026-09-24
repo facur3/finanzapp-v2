@@ -3,10 +3,11 @@ import { Keyboard, View } from 'react-native';
 import { router, Stack } from 'expo-router';
 import { randomUUID } from 'expo-crypto';
 import * as Haptics from 'expo-haptics';
-import { accountKind, formatMinorUnits, parseMinorUnits, sameRecurringRule, todayKey, validateRecurringRule,
+import { accountKind, parseMinorUnits, sameRecurringRule, todayKey, validateRecurringRule,
   type EntryKind, type RecurringFrequency, type RecurringRule } from '@finanzapp/domain';
 import { useLedger } from '../storage/LedgerProvider';
 import { ActionButton, AmountField, AppText, Choices, EmptyState, ErrorMessage, Field, IconButton, Screen, Surface } from './components';
+import { draftFromMinor } from './money-input';
 import { AccountField, CategoryField, DateField } from './form-controls';
 import { accountKindLabel, postingAccounts } from './liability-presentation';
 import { initialAccountId } from './presentation';
@@ -21,7 +22,7 @@ export function RecurringForm({ original, accountId: requestedAccount }: { origi
   const [operation] = useState(() => ({ id: randomUUID(), createdAt: new Date().toISOString() }));
   const [kind, setKind] = useState<EntryKind>(before?.kind ?? 'expense');
   const [accountId, setAccountId] = useState(() => before?.accountId ?? initialAccountId(accounts, requestedAccount));
-  const [amount, setAmount] = useState(before ? formatMinorUnits(before.amountMinor) : '');
+  const [amount, setAmount] = useState(before ? draftFromMinor(before.amountMinor) : '');
   const [merchant, setMerchant] = useState(before?.merchant ?? '');
   const [category, setCategory] = useState(before?.category ?? '');
   const [frequency, setFrequency] = useState<RecurringFrequency>(before?.frequency ?? 'monthly');

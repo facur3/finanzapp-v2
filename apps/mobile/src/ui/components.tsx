@@ -1,9 +1,9 @@
 import { Children, useEffect, useId, useRef, useState, type ReactNode } from 'react';
-import { ActivityIndicator, Alert, InputAccessoryView, Keyboard, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View,
+import { AccessibilityInfo, ActivityIndicator, Alert, InputAccessoryView, Keyboard, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View,
   useWindowDimensions, type PressableProps, type StyleProp, type TextInputProps, type TextProps, type ViewStyle } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { accountBalanceMinor, formatMinorUnits, type Currency, type Entry, type EntryKind, type Account, type Transfer } from '@finanzapp/domain';
+import { accountBalanceMinor, type Currency, type Entry, type EntryKind, type Account, type Transfer } from '@finanzapp/domain';
 import type { ActivityItem } from './presentation';
 import { router } from 'expo-router';
 import { radius, space, type, useCurrentDay, usePalette, useReduceMotion, type Palette } from './theme';
@@ -12,8 +12,11 @@ import { tintOf } from './category-color';
 import { useAccountLook, useAccountNameOf, useCategoryLook } from './category-hues';
 import { AMOUNT_FIELD, ROW_STACK_SCALE, SEGMENT_GAP, SEGMENT_PADDING, amountFieldLayout, fitFontSize, rowStacks, segmentLayout } from './geometry';
 import { duration, easeOut, selectionHaptic, timing } from './motion';
-import { EMPTY_AMOUNT, amountFromCanonical, readAmountChange, renderAmount, settleAmount, splitAmount } from './money-input';
+import { AmountInput, displayAmount, splitAmount, type AmountNotice, type PasteRejection } from './money-input';
 import { useI18n } from '../i18n/provider';
+import { moneyText } from '../i18n/format';
+import { DEFAULT_LOCALE, type AppLocale } from '../i18n/locale';
+import type { MessageKey } from '../i18n/messages';
 
 export type { IconName } from './categories';
 /** Colour carries meaning. Neutral is ink on fill; the rest are the four semantic tints. */
@@ -39,13 +42,13 @@ export function toneColors(p: Palette, tone: Tone): { color: string; soft: strin
 export const STACK_AT_SCALE = ROW_STACK_SCALE;
 export function useStacked(amount?: { minor: number; currency: Currency; signed?: boolean }): boolean {
   const { fontScale, width } = useWindowDimensions();
-  return rowStacks(width, fontScale, amount ? rowAmountText(amount.minor, amount.currency, amount.signed ?? false) : undefined);
+  const { locale } = useI18n();
+  return rowStacks(width, fontScale, amount ? rowAmountText(amount.minor, amount.currency, amount.signed ?? false, locale) : undefined);
 }
 
-/** The string a row amount renders (sign, symbol, grouped number), for width estimates. */
-export function rowAmountText(minor: number, currency: Currency, signed = false): string {
-  const sign = minor < 0 ? '−' : signed && minor > 0 ? '+' : '';
-  return sign + (currency === 'USD' ? 'US$ ' : '$ ') + formatMinorUnits(Math.abs(minor));
+/** The string a row amount renders (sign, symbol, grouped number in the region's separators), for width estimates. */
+export function rowAmountText(minor: number, currency: Currency, signed = false, locale: AppLocale = DEFAULT_LOCALE): string {
+  return moneyText(minor, currency, locale, false, signed);
 }
 
 /** Text in one of the named styles. A larger `fontSize` in `style` without
@@ -163,23 +166,29 @@ export function Field({ label, ...props }: TextInputProps & { label: string }) {
 
 type Caret = { start: number; end: number };
 
-/** The amount, formatted as the user types: "2000000" reads "2.000.000" and
- * "2000,5" reads "2.000,5". The value the form holds is that display string;
- * it still goes through parseMinorUnits, so the stored amount is the same
- * integer whether the user typed a comma or a period.
+/** The amount, formatted as the user types in the region's separators:
+ * "2000000" reads "2.000.000" in Argentina and "2,000,000" in the United
+ * States; "2000,5" reads "2.000,5" or "2,000.5". The value the form holds is
+ * the draft in the ledger's notation ("2.000,5") whatever the region; it
+ * still goes through parseMinorUnits, so the stored amount is the same
+ * integer whichever separator the user typed, and a region change with the
+ * form open rewrites only what is shown (same value, same logical caret).
  *
- * Editing is a canonical state (money-input.ts), not the display string. Each
- * native change event carries the new text and the native caret; both are
- * read into the state (digits and comma are the truth, a dot is grouping
- * unless it is explicit input), and the display text and display caret are
- * rendered from it and pushed back as the controlled `value` and `selection`
- * in one update. The caret is therefore a logical position among the digits,
- * which a grouping dot cannot move, and a change that arrives while the
- * native text still shows the previous, unformatted keystroke reads the same
- * digits. Selection events are mirrored into the state so a tap moves the
- * caret; one that describes a text other than the one shown (the raw text of
- * a keystroke being formatted) is ignored. A refused edit re-renders the same
- * value and caret, and React Native restores both natively.
+ * Editing is a canonical state (money-input.ts, `AmountInput`), not the
+ * display string. Each native change event carries the new text and the
+ * native caret; both are read into the state (digits and the decimal
+ * separator are the truth, a group separator is grouping unless it is one
+ * keystroke), and the display text and display caret are rendered from it and
+ * pushed back as the controlled `value` and `selection` in one update. The
+ * caret is therefore a logical position among the digits, which a group
+ * separator cannot move, and a change that arrives while the native text
+ * still shows the previous, unformatted keystroke reads the same digits.
+ * Selection events are mirrored into the state so a tap moves the caret; one
+ * that describes a text other than the one shown (the raw text of a keystroke
+ * being formatted) is ignored. A refused edit re-renders the same value and
+ * caret, and React Native restores both natively. A paste that could mean two
+ * amounts ("1,000" in Argentina) is refused, never guessed: the field keeps
+ * its value and a note under it says why (VoiceOver announces it).
  *
  * Geometry: the symbol is anchored at the left edge of the row and the
  * digits grow to the right from a fixed origin, in tabular figures, like a
@@ -193,47 +202,63 @@ type Caret = { start: number; end: number };
  * under the caret. */
 export function AmountField({ label, currency, tone, value = '', onChangeText, ...props }: TextInputProps & { label?: string; currency: Currency; tone?: Tone }) {
   const p = usePalette();
-  const { t } = useI18n();
+  const { t, amountFormat, currencySymbol } = useI18n();
   const accessoryId = useId();
   const { fontScale } = useWindowDimensions();
   const [rowWidth, setRowWidth] = useState(0);
   const [selection, setSelection] = useState<Caret>();
-  // What the field shows and where its caret is, kept in a ref so a second keystroke in the same frame reads the latest render.
-  const shown = useRef({ text: value, caret: value.length });
+  const [notice, setNotice] = useState<AmountNotice | null>(null);
+  // The editing model, kept in a ref so a second keystroke in the same frame reads the latest render.
+  const input = useRef<AmountInput | null>(null);
+  if (!input.current) input.current = new AmountInput(value, amountFormat);
   const emitted = useRef(value);
   useEffect(() => {
     if (value === emitted.current) return;
-    // The form changed the value itself (a prefill or a reset): adopt it and let the caret settle at the end.
+    // The form changed the value itself (a prefill, a shortcut or a reset): adopt it and let the caret settle at the end.
     emitted.current = value;
-    shown.current = { text: value, caret: value.length };
+    input.current!.adopt(value);
     setSelection(undefined);
+    setNotice(null);
   }, [value]);
+  const { decimal, group } = amountFormat;
+  useEffect(() => {
+    // The region changed with the form open: same value, same logical caret, the new separators. The draft is untouched.
+    // A refused paste's note was about the previous region's reading, so it goes too.
+    const view = input.current!.reformat({ decimal, group });
+    setSelection(current => current && { start: view.caret, end: view.caret });
+    setNotice(null);
+  }, [decimal, group]);
   const title = label ?? t('amount.label');
-  const symbol = currency === 'USD' ? 'US$' : '$';
-  const { fontSize, symbolSize } = amountFieldLayout(value, rowWidth, symbol, AMOUNT_GAP, Math.min(fontScale, HERO_MAX_SCALE));
+  const symbol = currencySymbol(currency);
+  // Derived from the draft and the region, so the text follows a region change in the same render.
+  const text = displayAmount(value, amountFormat);
+  const { fontSize, symbolSize } = amountFieldLayout(text, rowWidth, symbol, AMOUNT_GAP, Math.min(fontScale, HERO_MAX_SCALE));
   const color = tone && tone !== 'neutral' ? toneColors(p, tone).color : p.text;
-  const show = (rendered: { text: string; caret: number }) => {
-    shown.current = rendered;
-    setSelection({ start: rendered.caret, end: rendered.caret });
-    if (rendered.text !== emitted.current) { emitted.current = rendered.text; onChangeText?.(rendered.text); }
-  };
+  const emit = (draft: string) => { if (draft !== emitted.current) { emitted.current = draft; onChangeText?.(draft); } };
+  const noticeText = notice ? t(PASTE_NOTICES[notice.reason], { text: clipped(notice.text), decimal }) : null;
   const change = (event: { nativeEvent: { text: string; selection?: Caret } }) => {
-    const { text, selection: native } = event.nativeEvent;
-    show(renderAmount(readAmountChange(shown.current, text, native ? native.end : null)));
+    const { text: raw, selection: native } = event.nativeEvent;
+    const result = input.current!.change(raw, native ? native.end : null);
+    setSelection({ start: result.view.caret, end: result.view.caret });
+    setNotice(result.rejected);
+    if (result.rejected) AccessibilityInfo.announceForAccessibility?.(t(PASTE_NOTICES[result.rejected.reason], { text: clipped(result.rejected.text), decimal }));
+    emit(result.draft);
   };
   const select = (event: { nativeEvent: { selection: Caret; text?: string } }) => {
-    const { selection: native, text } = event.nativeEvent;
-    if (text !== undefined && text !== shown.current.text) return;
-    shown.current = { ...shown.current, caret: native.end };
-    setSelection(native);
+    const { selection: native, text: nativeText } = event.nativeEvent;
+    if (input.current!.select(native.end, nativeText)) setSelection(native);
   };
-  const settle = () => show(renderAmount(settleAmount(amountFromCanonical(shown.current.text.replace(/\./g, '')) ?? EMPTY_AMOUNT)));
+  const settle = () => {
+    const result = input.current!.settle();
+    setSelection({ start: result.view.caret, end: result.view.caret });
+    emit(result.draft);
+  };
   return <View style={{ gap: 6, paddingVertical: 8 }}>
     <AppText secondary variant="footnote" style={{ fontWeight: '500' }}>{title} · {currency}</AppText>
     <View style={styles.amountRow} onLayout={event => setRowWidth(event.nativeEvent.layout.width)}>
       <AppText accessible={false} maxFontSizeMultiplier={HERO_MAX_SCALE}
         style={{ fontSize: symbolSize, lineHeight: Math.round(symbolSize * 1.25), color: p.secondary, fontWeight: '500' }}>{symbol}</AppText>
-      <TextInput keyboardType="decimal-pad" inputMode="decimal" maxLength={24} placeholder="0" {...props} value={value} onChange={change}
+      <TextInput keyboardType="decimal-pad" inputMode="decimal" maxLength={24} placeholder="0" {...props} value={text} onChange={change}
         selection={selection} onSelectionChange={select}
         onBlur={event => { settle(); props.onBlur?.(event); }} onSubmitEditing={event => { settle(); props.onSubmitEditing?.(event); }}
         accessibilityLabel={t('amount.accessibility', { label: title, currency: t(currency === 'ARS' ? 'amount.inPesos' : 'amount.inDollars') })}
@@ -241,6 +266,7 @@ export function AmountField({ label, currency, tone, value = '', onChangeText, .
         selectionColor={p.primary} placeholderTextColor={p.tertiary} maxFontSizeMultiplier={HERO_MAX_SCALE}
         style={[styles.amountInput, { color, fontSize, paddingRight: AMOUNT_FIELD.caret }, props.style]} />
     </View>
+    {noticeText && <AppText variant="footnote" style={{ color: p.warning }}>{noticeText}</AppText>}
     {Platform.OS === 'ios' && <InputAccessoryView nativeID={accessoryId} backgroundColor={p.surface}>
       <View style={{ alignItems: 'flex-end', paddingHorizontal: 20 }}>
         <PressFeedback feedback="opacity" accessibilityRole="button" accessibilityLabel={t('common.closeAmountKeyboard')} onPress={Keyboard.dismiss} style={{ paddingHorizontal: 12 }}>
@@ -250,6 +276,13 @@ export function AmountField({ label, currency, tone, value = '', onChangeText, .
     </InputAccessoryView>}
   </View>;
 }
+
+/** The note under the field for a refused paste, by reason. */
+const PASTE_NOTICES: Record<PasteRejection, MessageKey> = {
+  ambiguous: 'amount.paste.ambiguous', precision: 'amount.paste.precision', invalid: 'amount.paste.invalid', tooLong: 'amount.paste.tooLong',
+};
+/** A refused text quoted in the note: long enough to recognise, never a paragraph. */
+const clipped = (text: string) => text.length > 24 ? text.slice(0, 23) + '…' : text;
 
 /** A quiet contextual action under an amount ("Usar todo", "Pagar total"):
  * a footnote with the recorded figure and a text button that only fills the
@@ -380,19 +413,19 @@ export function Money({ minor, currency, large = false, color, signed = false, s
 }) {
   const p = usePalette();
   const { fontScale } = useWindowDimensions();
-  const { spokenMoney } = useI18n();
+  const { spokenMoney, locale, amountFormat } = useI18n();
   const [width, setWidth] = useState(0);
   const semantic = tone === 'income' ? p.income : tone === 'expense' ? p.text : tone === 'transfer' ? p.transfer : tone === 'warning' ? p.warning : p.text;
   const base = size ?? (large ? 44 : 17);
   const hero = base >= 28;
-  const text = rowAmountText(minor, currency, signed);
+  const text = rowAmountText(minor, currency, signed, locale);
   const fontSize = hero ? fitFontSize(text, width, base, Math.round(base / 2), Math.min(fontScale, HERO_MAX_SCALE)) : base;
   const label = spokenMoney(minor, currency);
   const ink = color ?? semantic;
   // A hero is one amount in three weights of the same colour: the symbol and
   // the cents step back so the whole units carry the number. Same size, same
   // baseline, one accessibility label; nested spans keep it one line.
-  const parts = hero ? splitAmount(text) : null;
+  const parts = hero ? splitAmount(text, amountFormat) : null;
   const quiet = ink === p.text ? { symbol: p.secondary, cents: p.tertiary } : { symbol: ink + 'B3', cents: ink + '8C' };
   const body = <Text accessibilityLabel={label} numberOfLines={1} adjustsFontSizeToFit={!hero} minimumFontScale={0.75}
     maxFontSizeMultiplier={hero ? HERO_MAX_SCALE : ROW_MAX_SCALE}
@@ -552,14 +585,14 @@ export function EntryRow({ entry, account, last = false, showDate = true, showAc
 }) {
   const p = usePalette();
   const day = useCurrentDay();
-  const { t, relativeDate } = useI18n();
+  const { t, relativeDate, spokenAmount } = useI18n();
   const dateLabel = relativeDate(entry.dateISO, day);
   const income = entry.kind === 'income';
   const stacked = useStacked({ minor: entry.amountMinor, currency: account.currency, signed: true });
   const category = useCategoryLook(entry.category, entry.kind).label;
   const detail = [category, showAccount ? account.name : null, showDate ? dateLabel : null].filter(Boolean).join(' · ');
   return <PressFeedback feedback="highlight" accessibilityRole="button"
-    accessibilityLabel={[entry.merchant, t(income ? 'movement.incomeWord' : 'movement.expenseWord'), formatMinorUnits(entry.amountMinor) + ' ' + account.currency, category, account.name, dateLabel].join(', ')}
+    accessibilityLabel={[entry.merchant, t(income ? 'movement.incomeWord' : 'movement.expenseWord'), spokenAmount(entry.amountMinor, account.currency), category, account.name, dateLabel].join(', ')}
     onPress={() => router.push({ pathname: '/entry/[id]', params: { id: entry.id } })}
     style={[styles.row, { borderBottomColor: p.line, borderBottomWidth: last ? 0 : StyleSheet.hairlineWidth }]}>
     <CategoryBadge category={entry.category} kind={entry.kind} tone={income ? 'income' : 'neutral'} />
@@ -579,10 +612,10 @@ export function AccountRow({ account, entries, transfers, last = false, kindLabe
   account: Account; entries: Entry[]; transfers?: Transfer[]; last?: boolean; kindLabel?: string;
 }) {
   const p = usePalette();
-  const { t } = useI18n();
+  const { t, spokenAmount } = useI18n();
   const balance = accountBalanceMinor(account, entries, transfers);
   const stacked = useStacked({ minor: balance, currency: account.currency });
-  return <PressFeedback feedback="highlight" accessibilityRole="button" accessibilityLabel={t('rows.accountLabel', { name: account.name, amount: formatMinorUnits(balance) + ' ' + account.currency })}
+  return <PressFeedback feedback="highlight" accessibilityRole="button" accessibilityLabel={t('rows.accountLabel', { name: account.name, amount: spokenAmount(balance, account.currency) })}
     onPress={() => router.push({ pathname: '/account/[id]', params: { id: account.id } })}
     style={[styles.row, { borderBottomColor: p.line, borderBottomWidth: last ? 0 : StyleSheet.hairlineWidth }]}>
     <AccountBadge accountId={account.id} />
@@ -615,7 +648,7 @@ export function TransferRow({ transfer: t, accounts, accountId, last = false, sh
 }) {
   const p = usePalette();
   const day = useCurrentDay();
-  const { t: tr, relativeDate } = useI18n();
+  const { t: tr, relativeDate, spokenAmount } = useI18n();
   const from = accounts.find(a => a.id === t.fromAccountId)!, to = accounts.find(a => a.id === t.toAccountId)!;
   // A debt's hidden account is named from the debt, in the interface language.
   const nameOf = useAccountNameOf();
@@ -629,7 +662,7 @@ export function TransferRow({ transfer: t, accounts, accountId, last = false, sh
   const signed = !!accountId && !context;
   const stacked = useStacked({ minor: signed && outgoing ? -t.amountMinor : t.amountMinor, currency: from.currency, signed });
   return <PressFeedback feedback="highlight" accessibilityRole="button"
-    accessibilityLabel={tr('rows.transferLabel', { title, from: fromName, to: toName, amount: formatMinorUnits(t.amountMinor) + ' ' + from.currency, date }) + (t.note ? ', ' + t.note : '')}
+    accessibilityLabel={tr('rows.transferLabel', { title, from: fromName, to: toName, amount: spokenAmount(t.amountMinor, from.currency), date }) + (t.note ? ', ' + t.note : '')}
     onPress={() => router.push({ pathname: '/transfer/[id]', params: { id: t.id } })}
     style={[styles.row, { borderBottomColor: p.line, borderBottomWidth: last ? 0 : StyleSheet.hairlineWidth }]}>
     <GlyphTile icon={context === 'card' ? 'card-outline' : context === 'debt' ? 'people-outline' : 'swap-horizontal-outline'} tone="transfer" />

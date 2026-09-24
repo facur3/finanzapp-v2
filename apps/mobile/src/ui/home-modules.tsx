@@ -3,7 +3,7 @@ import { Alert, StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import Animated, { useAnimatedStyle, useSharedValue, withDelay, withTiming } from 'react-native-reanimated';
-import { formatMinorUnits, type Account, type CategorySpending, type Currency, type MonthlyBudgetSummary, type RecurringRule } from '@finanzapp/domain';
+import { type Account, type CategorySpending, type Currency, type MonthlyBudgetSummary, type RecurringRule } from '@finanzapp/domain';
 import { AppText, CategoryBadge, Money, PressFeedback, Surface, useStacked } from './components';
 import { budgetHomeHeadline, budgetTone, categoriesStatus, percentUsed } from './budget-presentation';
 import { washOf } from './category-color';
@@ -55,7 +55,7 @@ function RankedRow({ category, totalMinor, currency, index, last, onPress }: {
 }) {
   const p = usePalette();
   const reduced = useReduceMotion();
-  const { t, locale } = useI18n();
+  const { t, locale, spokenAmount, spokenPercent } = useI18n();
   const { hex: color, label: name } = useCategoryLook(category.category);
   const { fraction, label } = spendingShare(category.amountMinor, totalMinor, locale);
   // First data: the fill grows from zero (or, under Reduce Motion, fades in already sized). Later data: the fill moves to the new share.
@@ -75,7 +75,7 @@ function RankedRow({ category, totalMinor, currency, index, last, onPress }: {
   const fill = useAnimatedStyle(() => ({ width: `${progress.value * 100}%` as `${number}%`, opacity: opacity.value }));
   const stacked = useStacked({ minor: category.amountMinor, currency });
   return <PressFeedback feedback="highlight" accessibilityRole="button" accessibilityHint={t('home.rankingHint')}
-    accessibilityLabel={t('home.rankingLabel', { name, amount: formatMinorUnits(category.amountMinor) + ' ' + currency, share: label })}
+    accessibilityLabel={t('home.rankingLabel', { name, amount: spokenAmount(category.amountMinor, currency), share: spokenPercent(fraction) })}
     onPress={onPress} style={[styles.row, last && styles.rowLast]}
     backdrop={<View pointerEvents="none" accessible={false} style={styles.fillTrack}>
       <Animated.View style={[styles.fill, { backgroundColor: washOf(color, p) }, fill]} />
@@ -96,7 +96,7 @@ function RankedRow({ category, totalMinor, currency, index, last, onPress }: {
 export function BudgetHomeCard({ summary }: { summary: MonthlyBudgetSummary }) {
   const p = usePalette();
   const reduced = useReduceMotion();
-  const { t } = useI18n();
+  const { t, moneyText, spokenAmount, spokenNumber } = useI18n();
   const headline = budgetHomeHeadline(summary);
   const { currency } = summary;
   const progressValue = headline ? Math.min(1, headline.progress.ratio) : 0;
@@ -114,9 +114,8 @@ export function BudgetHomeCard({ summary }: { summary: MonthlyBudgetSummary }) {
   const status = headline.kind === 'total' ? categoriesStatus(headline.categories, headline.exceededCategories, t)
     : headline.categories > 1 ? t('home.budget.categories', { count: headline.categories })
       + (headline.exceededCategories ? ' · ' + t('home.budget.exceededCount', { count: headline.exceededCategories }) : '') : t('home.budget.perCategory');
-  const symbol = currency === 'USD' ? 'US$ ' : '$ ';
   const spoken = t(remaining < 0 ? 'home.budget.labelExceeded' : 'home.budget.labelLeft',
-    { title, amount: formatMinorUnits(Math.abs(remaining)) + ' ' + currency, total: formatMinorUnits(budget.amountMinor), percent });
+    { title, amount: spokenAmount(Math.abs(remaining), currency), total: spokenNumber(budget.amountMinor), percent });
   return <PressFeedback accessibilityRole="button"
     accessibilityLabel={spoken + (status ? ' ' + status : '')}
     onPress={() => router.push({ pathname: '/budgets', params: { currency } })}>
@@ -127,7 +126,7 @@ export function BudgetHomeCard({ summary }: { summary: MonthlyBudgetSummary }) {
           <Money minor={Math.abs(remaining)} currency={currency} size={24} weight="700" color={color} />
         </View>
         <View style={{ alignItems: 'flex-end', gap: 2, flexShrink: 1, maxWidth: '50%' }}>
-          <AppText secondary variant="caption" style={{ textAlign: 'right' }}>{t('home.budget.of', { amount: symbol + formatMinorUnits(budget.amountMinor), percent })}</AppText>
+          <AppText secondary variant="caption" style={{ textAlign: 'right' }}>{t('home.budget.of', { amount: moneyText(budget.amountMinor, currency), percent })}</AppText>
           {!!status && <AppText variant="footnote" style={{ color: headline.exceededCategories ? p.expense : p.secondary, fontWeight: headline.exceededCategories ? '600' : '400' }}>{status}</AppText>}
         </View>
       </View>
@@ -142,13 +141,13 @@ export function UpcomingRecurringRow({ rule, account, day, last }: {
   rule: RecurringRule; account: Account; day: string; last: boolean;
 }) {
   const p = usePalette();
-  const { t, relativeDate } = useI18n();
+  const { t, relativeDate, spokenAmount } = useI18n();
   const stacked = useStacked({ minor: rule.amountMinor, currency: account.currency });
   const date = relativeDate(rule.nextDateISO, day);
   const days = Math.round((Date.parse(rule.nextDateISO + 'T12:00:00Z') - Date.parse(day + 'T12:00:00Z')) / 86400000);
   const when = days === 0 ? t('home.upcomingRow.today') : days === 1 ? t('home.upcomingRow.tomorrow') : t('home.upcomingRow.inDays', { count: days });
   return <PressFeedback feedback="highlight" accessibilityRole="button"
-    accessibilityLabel={t('home.upcomingRow.label', { merchant: rule.merchant, amount: formatMinorUnits(rule.amountMinor) + ' ' + account.currency, date })}
+    accessibilityLabel={t('home.upcomingRow.label', { merchant: rule.merchant, amount: spokenAmount(rule.amountMinor, account.currency), date })}
     onPress={() => router.push({ pathname: '/edit-recurring/[id]', params: { id: rule.id } })}
     style={[styles.row, { borderBottomWidth: last ? 0 : StyleSheet.hairlineWidth, borderBottomColor: p.line }]}>
     <CategoryBadge category={rule.category} kind={rule.kind} />

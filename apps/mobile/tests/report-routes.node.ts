@@ -206,7 +206,7 @@ function texts(root: any): string[] {
 
 test('Spanish insights rebuilt by the screen read exactly as the domain states them', () => {
   const view = routeHarness('(tabs)/reports.tsx', { currency: 'ARS', month: '2026-08' });
-  const money = (minor: number) => '$ ' + domain.formatMinorUnits(minor);
+  const money = (minor: number) => '$\u00A0' + domain.formatMinorUnits(minor);
   const facts = domain.spendingInsights(snapshot, [], 'ARS', '2026-08', '2026-09-12', money);
   assert.ok(facts.length > 0);
   const shown = texts(view.render());
