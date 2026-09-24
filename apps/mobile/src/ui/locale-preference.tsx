@@ -6,8 +6,11 @@ import { AppText, CheckRow, ErrorMessage, Screen, Surface } from './components';
 import { preferenceChoices, type LocalePreferenceKind } from './locale-options';
 import { selectionHaptic } from './motion';
 
-/** Más → Idioma (and, from Producto 23.1C, Región): one grouped list, "follow
- * the device" first, a checkmark on the choice in use, iOS Settings style.
+/** Más → Idioma and Más → Región: one grouped list, "follow the device"
+ * first, a checkmark on the choice in use, iOS Settings style. A language row
+ * carries its own language for VoiceOver (`accessibilityLanguage`), so
+ * "English" is spoken by an English voice and "Español" by a Spanish one, as
+ * iOS Settings does; the other rows keep the interface's speech language.
  * A tap saves first and applies second: when the key-value store refuses the
  * write, the checkmark stays where it was and the screen says so. The change
  * re-renders the app in place (the title of this screen included); nothing is
@@ -26,17 +29,16 @@ export function LocalePreferenceScreen({ kind }: { kind: LocalePreferenceKind })
     setFailed(!saved);
     if (saved) selectionHaptic();
   };
-  const limited = kind === 'language' && preferences.state.released.languages.length < 2;
   return <Screen>
     <Stack.Screen options={{ title }} />
     <View style={{ gap: 10 }}>
       <Surface grouped>
         {options.map((option, index) => <CheckRow key={option.value} title={option.title} subtitle={option.subtitle} selected={option.value === selected}
-          last={index === options.length - 1} onPress={() => choose(option.value)} />)}
+          accessibilityLanguage={option.language} last={index === options.length - 1} onPress={() => choose(option.value)} />)}
       </Surface>
       <ErrorMessage message={failed ? t('preferences.saveFailed') : null} />
       <AppText secondary variant="footnote" style={{ paddingHorizontal: 4 }}>
-        {kind === 'language' ? (limited ? t('preferences.languageNote') + ' ' : '') + t('preferences.dataUntouched') : t('preferences.regionNote') + ' ' + t('preferences.dataUntouched')}
+        {kind === 'language' ? t('preferences.dataUntouched') : t('preferences.regionNote') + ' ' + t('preferences.dataUntouched')}
       </AppText>
     </View>
   </Screen>;

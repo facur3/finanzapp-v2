@@ -10,6 +10,7 @@ import { formatMinorUnits } from '@finanzapp/domain';
 import * as i18nFormat from '../src/i18n/format.ts';
 import * as i18nLocale from '../src/i18n/locale.ts';
 import * as moneyInput from '../src/ui/money-input.ts';
+import type { AppLocale } from '../src/i18n/locale.ts';
 
 // Producto 22.1: the row and field components at source level (React Native
 // replaced by descriptors). Structure, hierarchy and labels are checked here;
@@ -20,7 +21,7 @@ function load(file: string, extra: Record<string, unknown> = {}, fontScale = 1) 
   const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText;
   const jsx = (type: any, props: any) => ({ type, props });
   const state: unknown[] = [];
-  const alerts: { title: string; message: string }[] = [];
+  const alerts: { title: string; message: string; buttons?: { text: string }[] }[] = [];
   const haptics: string[] = [];
   let cursor = 0;
   const p = { isDark: false, surface: '#FFFFFF', inset: '#EEEEF3', text: '#0A0A0C', secondary: '#6E7078', tertiary: '#8E9098', line: '#E6E6EC', primary: '#2557D6', primaryFill: '#2557D6', onPrimary: '#FFF', primarySoft: '#E5ECFB', background: '#F2F2F6' };
@@ -31,7 +32,7 @@ function load(file: string, extra: Record<string, unknown> = {}, fontScale = 1) 
     'react/jsx-runtime': { jsx, jsxs: jsx, Fragment: 'Fragment' },
     'react-native': { View: 'View', Text: 'Text', TextInput: 'TextInput', ScrollView: 'ScrollView', Pressable: 'Pressable', ActivityIndicator: 'ActivityIndicator', InputAccessoryView: 'InputAccessoryView',
       FlatList: 'FlatList', Modal: 'Modal', Platform: { OS: 'ios' }, Keyboard: { dismiss() {} }, StyleSheet: { hairlineWidth: 0.5, create: (styles: unknown) => styles, flatten: (style: any) => Object.assign({}, ...(Array.isArray(style) ? style.flat(Infinity).filter(Boolean) : [style])), absoluteFill: {} },
-      useWindowDimensions: () => ({ fontScale, width: 390, height: 844 }), Alert: { alert: (title: string, message: string) => alerts.push({ title, message }) } },
+      useWindowDimensions: () => ({ fontScale, width: 390, height: 844 }), Alert: { alert: (title: string, message: string, buttons?: { text: string }[]) => alerts.push({ title, message, buttons }) } },
     'react-native-reanimated': { __esModule: true, default: { View: 'Animated.View', Text: 'Animated.Text' }, useSharedValue: (value: number) => ({ value }), withTiming: (value: number) => value, useAnimatedStyle: (fn: () => unknown) => fn() },
     'react-native-safe-area-context': { SafeAreaView: 'SafeAreaView' },
     '@react-native-community/datetimepicker': 'DateTimePicker',
@@ -47,7 +48,7 @@ function load(file: string, extra: Record<string, unknown> = {}, fontScale = 1) 
     './motion': { duration: { press: 100, release: 160 }, easeOut: 'ease', selectionHaptic: () => haptics.push('selection'), timing: () => ({}) },
     './money-input': moneyInput,
     './presentation': {}, './currencies': { CURRENCIES, currencyOption, currencyOptions, searchCurrencies },
-    './components': Object.fromEntries(['AccountBadge', 'AppText', 'CategoryBadge', 'DetailRow', 'SelectionRow', 'Field', 'GlyphTile', 'PressFeedback', 'Surface'].map(name => [name, name])),
+    './components': { ...Object.fromEntries(['AccountBadge', 'AppText', 'CategoryBadge', 'DetailRow', 'SelectionRow', 'Field', 'GlyphTile', 'PressFeedback', 'Surface'].map(name => [name, name])), surfaceShadow: () => ({}) },
     ...extra,
   };
   const module = { exports: {} as Record<string, (props: any) => Node> };
@@ -112,7 +113,8 @@ test('FieldNote keeps one short line under a field and opens the full explanatio
   assert.equal(info.props.accessibilityLabel, 'Más información sobre saldo inicial');
   assert.equal(info.props.hitSlop, 8, 'a small glyph with a comfortable target');
   info.props.onPress();
-  assert.deepEqual(ui.alerts, [{ title: 'Saldo inicial', message: 'La explicación completa.' }]);
+  // The button is named from the catalogue: left to iOS it would read "OK" in the bundle's language, whatever Más says.
+  assert.equal(JSON.stringify(ui.alerts), JSON.stringify([{ title: 'Saldo inicial', message: 'La explicación completa.', buttons: [{ text: 'OK' }] }]));
   const bare = ui.render('FieldNote', { children: 'Solo texto.' });
   assert.equal(nodes(bare).some(node => is(node, 'PressFeedback')), false);
 });
@@ -292,4 +294,111 @@ test('the currency list is exactly ARS and USD, with a search helper ready for t
   assert.deepEqual(searchCurrencies('DÓLARES').map(o => o.code), ['USD']);
   assert.deepEqual(searchCurrencies('ars').map(o => o.code), ['ARS']);
   assert.deepEqual(searchCurrencies('euro'), []);
+});
+
+// ---- Producto 23.1C2: what VoiceOver hears ---------------------------------
+
+/** The provider as the device would give it: `device` is the iPhone's first language (null: nothing read). */
+const speaking = (locale: AppLocale, device: string | null) => ({ '../i18n/provider': { useI18n: () => bindLocale(locale, 'native', device) } });
+
+test('a pressable DetailRow reads its spoken twin, a plain one gives it to the value text, and the screen keeps the visible value', () => {
+  const ui = load('components.tsx');
+  const pressable = ui.render('DetailRow', { label: 'Viernes 22', value: '$ 1.234,56', spokenValue: '1234,56 pesos', onPress: () => {} });
+  assert.equal(nodes(pressable).find(node => is(node, 'PressFeedback'))!.props.accessibilityLabel, 'Viernes 22: 1234,56 pesos');
+  assert.equal(texts(pressable)[1].props.children, '$ 1.234,56', 'the screen keeps the region\'s grouping');
+  const plain = ui.render('DetailRow', { label: 'Banco después', value: 'ARS 1.234,56', spokenValue: '1234,56 ARS' });
+  assert.equal(texts(plain)[1].props.accessibilityLabel, '1234,56 ARS', 'VoiceOver reads the value text by itself: it says the twin');
+  assert.equal(texts(plain)[1].props.children, 'ARS 1.234,56');
+  // Without a twin nothing changes: the label is the visible pair, the value text has no label of its own.
+  const bare = ui.render('DetailRow', { label: 'Moneda', value: 'ARS', onPress: () => {} });
+  assert.equal(nodes(bare).find(node => is(node, 'PressFeedback'))!.props.accessibilityLabel, 'Moneda: ARS');
+  assert.equal(texts(ui.render('DetailRow', { label: 'Moneda', value: 'ARS' }))[1].props.accessibilityLabel, undefined);
+});
+
+test('AmountShortcut and SelectionRow read their spoken twins; the visible caption and detail are untouched', () => {
+  const ui = load('components.tsx');
+  const shortcut = ui.render('AmountShortcut', { label: 'Usar todo', caption: 'Banco: ARS 1.234,56', spokenCaption: 'Banco: ARS 1234,56', onPress: () => {} });
+  assert.equal(nodes(shortcut).find(node => is(node, 'PressFeedback'))!.props.accessibilityLabel, 'Usar todo, Banco: ARS 1234,56');
+  const caption = texts(shortcut)[0];
+  assert.equal([caption.props.children].flat().join(''), 'Banco: ARS 1.234,56 ·');
+  assert.equal(caption.props.accessibilityLabel, 'Banco: ARS 1234,56', 'the caption text is read on its own too, without the visual separator');
+  const plain = ui.render('AmountShortcut', { label: 'Usar todo', caption: 'Saldo', onPress: () => {} });
+  assert.equal(nodes(plain).find(node => is(node, 'PressFeedback'))!.props.accessibilityLabel, 'Usar todo, Saldo');
+  assert.equal(texts(plain)[0].props.accessibilityLabel, undefined);
+  const row = ui.render('SelectionRow', { label: 'Cuenta', value: 'Banco', detail: 'Saldo $ 1.234,56', spokenDetail: 'Saldo 1234,56 pesos', onPress: () => {} });
+  assert.equal(nodes(row).find(node => is(node, 'PressFeedback'))!.props.accessibilityLabel, 'Cuenta: Banco, Saldo 1234,56 pesos');
+  assert.equal(texts(row)[2].props.children, 'Saldo $ 1.234,56');
+  const fact = ui.render('SelectionRow', { label: 'Cuenta', value: 'Banco', detail: 'Saldo $ 1.234,56', spokenDetail: 'Saldo 1234,56 pesos' });
+  assert.equal(fact.props.accessibilityLabel, 'Cuenta: Banco, Saldo 1234,56 pesos', 'the read-only fact too');
+});
+
+test('SelectorCard, AccountField and CategoryField read the spoken detail instead of the visible one', () => {
+  const ui = load('form-controls.tsx', { './categories': { categoryChoices: () => [], categoryKey: (label: string) => label.toLowerCase(), customCategory: () => null } });
+  const card = ui.render('SelectorCard', { label: 'Categoría', value: 'Comida', placeholder: 'Elegir', detail: 'Te quedan $ 1.234,56', spokenDetail: 'Te quedan 1234,56 pesos', icon: 'pricetag-outline', onPress: () => {} });
+  assert.equal(card.props.accessibilityLabel, 'Categoría: Comida, Te quedan 1234,56 pesos');
+  assert.ok(nodes(card).some(node => node.type === 'AppText' && node.props.children === 'Te quedan $ 1.234,56'), 'the card shows the region\'s amount');
+  assert.equal(ui.render('SelectorCard', { label: 'Categoría', value: 'Comida', placeholder: 'Elegir', detail: 'Límite', icon: 'pricetag-outline', onPress: () => {} }).props.accessibilityLabel,
+    'Categoría: Comida, Límite', 'without a twin the visible detail is read');
+  assert.equal(ui.render('SelectorCard', { label: 'Categoría', placeholder: 'Elegir categoría', icon: 'pricetag-outline', onPress: () => {} }).props.accessibilityLabel, 'Categoría: Elegir categoría');
+  const cardOf = (root: Node) => nodes(root).find(node => node.type === 'PressFeedback' && String(node.props.accessibilityLabel).includes(':'))!;
+  const accounts = [{ id: 'a', name: 'Banco', currency: 'ARS', openingMinor: 0, createdAt: 't' }];
+  const account = ui.render('AccountField', { accounts, value: 'a', onChange: () => {}, prominent: true, detail: 'Saldo registrado $ 1.234,56', spokenDetail: 'Saldo registrado 1234,56 pesos' });
+  assert.equal(cardOf(account).props.accessibilityLabel, 'Cuenta: Banco, Saldo registrado 1234,56 pesos');
+  const plainAccount = ui.render('AccountField', { accounts, value: 'a', onChange: () => {}, prominent: true });
+  assert.equal(cardOf(plainAccount).props.accessibilityLabel, 'Cuenta: Banco, Cuenta · ARS', 'the default detail has no amount and no twin');
+  const category = ui.render('CategoryField', { entries: [], kind: 'expense', value: 'Comida', onChange: () => {}, prominent: true,
+    detail: 'Presupuesto: 50 % usado · te quedan $ 1.234,56', spokenDetail: 'Presupuesto: 50 % usado · te quedan 1234,56 pesos' });
+  assert.equal(cardOf(category).props.accessibilityLabel, 'Categoría: x, Presupuesto: 50 % usado · te quedan 1234,56 pesos');
+});
+
+test('ActionButton reads its spoken label and shows the visible one; the account sheet speaks an option\'s line only from its spoken twin', () => {
+  const ui = load('components.tsx');
+  const visible = 'Guardar gasto\u00A0·\u00A0AR$\u00A01,234.50';
+  const save = ui.render('ActionButton', { label: visible, spokenLabel: 'Guardar gasto, 1234,50 pesos', onPress: () => {} });
+  assert.equal(nodes(save).find(node => is(node, 'PressFeedback'))!.props.accessibilityLabel, 'Guardar gasto, 1234,50 pesos');
+  assert.ok(nodes(save).some(node => node.type === 'Text' && node.props.children === visible), 'the button shows the region\'s amount');
+  assert.equal(nodes(ui.render('ActionButton', { label: 'Guardar cambios', onPress: () => {} })).find(node => is(node, 'PressFeedback'))!.props.accessibilityLabel, 'Guardar cambios');
+  const forms = load('form-controls.tsx', { './categories': { categoryChoices: () => [], categoryKey: (label: string) => label.toLowerCase(), customCategory: () => null } });
+  const accounts = [{ id: 'a', name: 'Banco', currency: 'ARS', openingMinor: 0, createdAt: 't' }];
+  const option = (props: Record<string, unknown>) => nodes(forms.render('AccountField', { accounts, value: 'a', onChange: () => {}, ...props }))
+    .find(node => node.type === 'FlatList')!.props.renderItem({ item: accounts[0] });
+  const spoken = option({ describe: () => 'saldo 1.234,56', spokenDescribe: (account: { currency: string }) => 'saldo 1234,56 ' + (account.currency === 'ARS' ? 'pesos' : '?') });
+  assert.equal(spoken.props.accessibilityLabel, 'Banco, Cuenta, ARS, saldo 1234,56 pesos');
+  assert.ok(nodes(spoken).some(node => node.type === 'AppText' && [node.props.children].flat().join('') === 'Cuenta · ARS · saldo 1.234,56'), 'the sheet shows the region\'s amount');
+  // Without a twin the label stays name, kind and currency: a line in the region's separators is shown, never spoken.
+  assert.equal(option({ describe: () => 'saldo 1.234,56' }).props.accessibilityLabel, 'Banco, Cuenta, ARS');
+  assert.equal(option({}).props.accessibilityLabel, 'Banco, Cuenta, ARS');
+});
+
+test('every wrapper VoiceOver focuses names the interface language when it differs from the device\'s, and names none when they agree', () => {
+  const hosts = (root: Node, type: string) => nodes(root).filter(node => node.type === type);
+  for (const [locale, device, expected] of [['en-AR', 'es', 'en'], ['es-US', 'pt', 'es'], ['es-AR', 'es', undefined], ['en-US', 'en', undefined], ['en-US', null, undefined]] as [AppLocale, string | null, string | undefined][]) {
+    const ui = load('components.tsx', speaking(locale, device));
+    const name = `${locale} on a ${device ?? 'silent'} device`;
+    // AppText and the Pressable inside PressFeedback (every row, button and chip goes through them).
+    const text = ui.render('AppText', { children: 'x' });
+    assert.equal(text.props.accessibilityLanguage, expected, name + ': AppText');
+    const row = ui.render('NavigationRow', { title: 'Backup', onPress: () => {} });
+    assert.equal(hosts(row, 'Pressable')[0].props.accessibilityLanguage, expected, name + ': PressFeedback');
+    // Money's Text carries the spoken amount and its language.
+    assert.equal(ui.render('Money', { minor: 123456, currency: 'USD' }).props.accessibilityLanguage, expected, name + ': Money');
+    // The text field, the segments, the error, the read-only fact.
+    assert.equal(hosts(ui.render('Field', { label: 'Name', value: '' }), 'TextInput')[0].props.accessibilityLanguage, expected, name + ': Field');
+    const segments = hosts(ui.render('Choices', { value: 'a', onChange: () => {}, options: [{ value: 'a', label: 'A' }, { value: 'b', label: 'B' }] }), 'Pressable');
+    assert.equal(segments.length, 2);
+    assert.ok(segments.every(segment => segment.props.accessibilityLanguage === expected), name + ': Choices');
+    const error = hosts(ui.render('ErrorMessage', { message: 'errors.storage.openFailed' }), 'Text').find(node => node.props.accessibilityRole === 'alert')!;
+    assert.equal(error.props.accessibilityLanguage, expected, name + ': ErrorMessage');
+    const fact = ui.render('SelectionRow', { label: 'Currency', value: 'ARS' });
+    assert.equal(fact.props.accessible, true);
+    assert.equal(fact.props.accessibilityLanguage, expected, name + ': the read-only SelectionRow');
+    // A CheckRow follows the interface unless its caller names the option's own language (an autonym).
+    const option = ui.render('CheckRow', { title: 'Same as device', selected: true, onPress: () => {} });
+    assert.equal(hosts(option, 'Pressable')[0].props.accessibilityLanguage, expected, name + ': CheckRow');
+    const autonym = ui.render('CheckRow', { title: 'Español', selected: false, onPress: () => {}, accessibilityLanguage: 'es' });
+    assert.equal(hosts(autonym, 'Pressable')[0].props.accessibilityLanguage, 'es', name + ': "Español" is spoken in Spanish whatever the interface');
+    // An explicit language from any caller wins over the interface's.
+    assert.equal(ui.render('AppText', { children: 'English', accessibilityLanguage: 'en' }).props.accessibilityLanguage, 'en');
+    assert.equal(hosts(ui.render('Field', { label: 'x', value: '', accessibilityLanguage: 'fr' }), 'TextInput')[0].props.accessibilityLanguage, 'fr');
+  }
 });

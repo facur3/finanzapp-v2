@@ -45,9 +45,10 @@ export type ResolvedDraft = {
 export type DraftField = 'kind' | 'amount' | 'paymentMethod' | 'category';
 /** A chip under a clarification. `label` is user data shown as is (an account
  * name); `labelKey` is the app's own word (Gasto/Ingreso), translated at
- * render; `category` marks a stored category name, shown with its localized
- * built-in name when it has one. Exactly one of `label` and `labelKey` is set. */
-export type ClarificationOption = { id: string; label?: string; labelKey?: MessageKey; category?: boolean };
+ * render; `category` marks a stored category name of that kind, shown with its
+ * localized built-in name when it has one (an income preset is only found as
+ * income). Exactly one of `label` and `labelKey` is set. */
+export type ClarificationOption = { id: string; label?: string; labelKey?: MessageKey; category?: EntryKind };
 
 /** The words a chip shows (and that are repeated as the user's message once chosen). */
 export function optionText(option: ClarificationOption, t: Translate = translator('es')): string {
@@ -206,7 +207,7 @@ export function categoryOptions(entries: Entry[], kind: EntryKind, limit = 4): C
     if (current) current.count += 1; else counts.set(key, { label: entry.category, count: 1 });
   }
   return [...counts.values()].sort((a, b) => b.count - a.count || a.label.localeCompare(b.label)).slice(0, limit)
-    .map(item => ({ id: item.label, label: item.label, category: true }));
+    .map(item => ({ id: item.label, label: item.label, category: kind }));
 }
 
 /** Turn a CaptureDraft (the server contract, every field nullable) into either a

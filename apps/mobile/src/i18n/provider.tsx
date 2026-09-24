@@ -6,9 +6,9 @@
  *     the same elements after a change, so the ledger provider (SQLite), the
  *     navigation stack, the current screen, a half-typed form and the
  *     Assistant conversation keep their state; only consumers re-render;
- *   - the context value is rebuilt only when the resolved locale or the
- *     device source changes, so saving a choice that resolves to the same
- *     locale re-renders no screen;
+ *   - the context value is rebuilt only when the resolved locale, the device
+ *     source or whether VoiceOver needs the interface language changes, so
+ *     saving a choice that resolves to the same locale re-renders no screen;
  *   - "follow the device" re-reads the device when the app returns to the
  *     foreground and when iOS says its locale changed: iOS keeps an app
  *     running across a Region change, while a change of the iPhone's
@@ -22,7 +22,7 @@ import { createContext, createElement, useContext, useEffect, useMemo, useState,
 import { AppState } from 'react-native';
 import { bindLocale, type I18n } from './bind.ts';
 import { readRuntimeDeviceLocales, subscribeRuntimeLocaleChanges } from './device-runtime';
-import { DEFAULT_LOCALE, releasedForBuild, type AppLocale } from './locale.ts';
+import { DEFAULT_LOCALE, languageOf, releasedForBuild, type AppLocale } from './locale.ts';
 import { defaultPreferenceStore } from './preference.ts';
 import { createLocaleStore, type LocaleState, type LocaleStore } from './store.ts';
 
@@ -56,8 +56,10 @@ export function I18nProvider({ children, locale, store }: { children: ReactNode;
     return () => { foreground.remove(); unsubscribe(); };
   }, [localeStore]);
   const resolved = locale ?? state.locale;
-  const value = useMemo(() => bindLocale(resolved, state.device.source, state.device.primaryLanguage),
-    [resolved, state.device.source, state.device.primaryLanguage]);
+  // The device's first language matters only through speechLanguage (does it differ from the
+  // interface's?), so a change between two languages without a catalogue (pt → fr) re-renders nothing.
+  const speaks = state.device.primaryLanguage !== null && state.device.primaryLanguage !== languageOf(resolved);
+  const value = useMemo(() => bindLocale(resolved, state.device.source, state.device.primaryLanguage), [resolved, state.device.source, speaks]);
   const preferences = useMemo(() => ({ state, setLanguage: localeStore.setLanguage, setRegion: localeStore.setRegion }), [state, localeStore]);
   return createElement(PreferencesContext.Provider, { value: preferences }, createElement(I18nContext.Provider, { value }, children));
 }

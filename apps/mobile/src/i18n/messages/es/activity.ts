@@ -66,7 +66,8 @@ export const activity = {
     effect: '{amount}: se descontarán de {from} y se sumarán a {to}. Solo cambia el registro en esta app, no mueve dinero en el banco.',
     statusVoided: 'Deshecha · no afecta los saldos',
     statusBetween: 'Entre tus cuentas · no es gasto ni ingreso',
-    statusObligation: 'Mueve saldo hacia la obligación · no es gasto ni ingreso',
+    /** Status of a card payment, a debt payment and a collection: the balance moves either way (a collection brings it into the account). */
+    statusObligation: 'Mueve saldo entre tu cuenta y la obligación · no es gasto ni ingreso',
     voidedTitle: 'Transferencia deshecha',
     note: 'Nota',
     edit: 'Editar transferencia',

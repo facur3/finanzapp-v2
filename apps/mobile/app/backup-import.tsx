@@ -75,6 +75,8 @@ export default function BackupImportScreen() {
   const additions = (plan?.accounts.length ?? 0) + (plan?.records.length ?? 0) + (plan?.transfers.length ?? 0)
     + (plan?.recurring.length ?? 0) + (plan?.budgets.length ?? 0) + (plan?.cards.length ?? 0) + (plan?.debts.length ?? 0);
   const hiddenIncoming = new Set([...plan?.cards ?? [], ...plan?.debts ?? []].map(item => item.accountId));
+  // A count is grouped on screen ("1.234", "1,234"); VoiceOver gets the plain digits, which every voice reads as one number.
+  const count = (value: number) => ({ value: formatCount(value), spokenValue: String(value) });
   return <Screen>
     <Stack.Screen options={{ gestureEnabled: !busy, headerBackVisible: !busy }} />
     {done ? <EmptyState title={t('backup.import.doneTitle')} detail={t('backup.import.doneDetail')} icon="checkmark-circle-outline"
@@ -88,15 +90,15 @@ export default function BackupImportScreen() {
           <AppText secondary style={{ fontSize: 13 }}>{formatDateTime(review.backup.exportedAt)}</AppText>
         </View>
         <Surface grouped>
-          <DetailRow label={t('backup.import.rows.accounts')} value={formatCount(plan.accounts.filter(account => !hiddenIncoming.has(account.id)).length)} />
-          <DetailRow label={t('backup.import.rows.cards')} value={formatCount(plan.cards.length)} />
-          <DetailRow label={t('backup.import.rows.debts')} value={formatCount(plan.debts.length)} />
-          <DetailRow label={t('backup.import.rows.movements')} value={formatCount(plan.records.filter(record => !record.voided).length)} />
-          <DetailRow label={t('backup.import.rows.transfers')} value={formatCount(plan.transfers.filter(record => !record.voided).length)} />
-          <DetailRow label={t('backup.import.rows.recurring')} value={formatCount(plan.recurring.length)} />
-          <DetailRow label={t('backup.import.rows.budgets')} value={formatCount(plan.budgets.length)} />
-          <DetailRow label={t('backup.import.rows.voided')} value={formatCount(plan.records.filter(record => record.voided).length + plan.transfers.filter(record => record.voided).length)} />
-          <DetailRow label={t('backup.import.rows.present')} value={formatCount(plan.identical)} last />
+          <DetailRow label={t('backup.import.rows.accounts')} {...count(plan.accounts.filter(account => !hiddenIncoming.has(account.id)).length)} />
+          <DetailRow label={t('backup.import.rows.cards')} {...count(plan.cards.length)} />
+          <DetailRow label={t('backup.import.rows.debts')} {...count(plan.debts.length)} />
+          <DetailRow label={t('backup.import.rows.movements')} {...count(plan.records.filter(record => !record.voided).length)} />
+          <DetailRow label={t('backup.import.rows.transfers')} {...count(plan.transfers.filter(record => !record.voided).length)} />
+          <DetailRow label={t('backup.import.rows.recurring')} {...count(plan.recurring.length)} />
+          <DetailRow label={t('backup.import.rows.budgets')} {...count(plan.budgets.length)} />
+          <DetailRow label={t('backup.import.rows.voided')} {...count(plan.records.filter(record => record.voided).length + plan.transfers.filter(record => record.voided).length)} />
+          <DetailRow label={t('backup.import.rows.present')} {...count(plan.identical)} last />
         </Surface>
         {plan.conflicts > 0 ? <ErrorMessage message={t('backup.import.conflicts', { count: plan.conflicts })} /> : <>
           <Surface><SectionTitle caption={t('backup.import.availableCaption')}>{t('backup.import.availableAfter')}</SectionTitle>

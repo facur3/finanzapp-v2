@@ -9,7 +9,7 @@ export const debts: Pick<Messages, 'debts'> = {
       owedToMe: 'Owed to me · {name}',
     },
     list: {
-      title: 'Debts & IOUs',
+      title: 'Debts and IOUs',
       add: 'Add debt',
       emptyTitle: 'What you owe and what you’re owed',
       emptyDetail: 'Record a loan, a debt with someone or an amount someone owes you. Each partial payment or collection lowers the balance due without creating fake expenses or income.',

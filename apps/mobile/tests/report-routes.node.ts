@@ -229,7 +229,7 @@ test('23.1B2: Reportes in English changes only words; amounts, user data and rou
   assert.equal(find(root, 'DonutChart').props.caption, 'Period total');
   assert.ok(words.includes('Your largest expense was Prueba'), 'the merchant is the person\'s own words');
   assert.ok(words.includes('Recorded income') && words.includes('Net flow'));
-  assert.ok(words.includes('Compare with last month'));
+  assert.ok(words.includes('Compare with previous month'), 'the row opens the month before the selected one, which may be a past month');
   assert.equal(words.some(text => /Gastado|Mes anterior|Flujo neto|Tu mayor gasto|Solo movimientos/.test(text)), false, 'no Spanish copy left: ' + words.join(' | '));
   // Same numbers and the same data behind the words.
   assert.equal(find(root, 'Money').props.minor, find(es.render(), 'Money').props.minor);
@@ -270,4 +270,52 @@ test('23.1B2: category and comparison details in English', () => {
   find(row, 'DetailRow', 'Previous').props.onPress();
   assert.equal(view.pushed[0].params.through, '2026-08-12');
   assert.equal(find(routeHarness('report-day.tsx', { currency: 'ARS', date: 'bad' }, data, { locale: 'en-AR' }).render(), 'EmptyState').props.title, 'Invalid day');
+});
+
+test('23.1C2: the largest expense names its day in the region\'s order; Argentina keeps the domain\'s text', () => {
+  const insightDetail = (root: Node) => texts(root).find(text => / · Salud · /.test(text))!;
+  for (const [dateISO, month, argentina, unitedStates] of [['2026-08-22', '2026-08', '22/08', '8/22'], ['2026-09-05', '2026-09', '5/09', '9/5']]) {
+    const data = { ...snapshot, entries: [...snapshot.entries, { ...snapshot.entries[0], id: 'big', amountMinor: 5000, dateISO }] };
+    const params = { currency: 'ARS', month };
+    const esAR = insightDetail(routeHarness('(tabs)/reports.tsx', params, data).render());
+    const domainText = domain.spendingInsights(data, [], 'ARS', month, '2026-09-12', minor => '$\u00A0' + domain.formatMinorUnits(minor)).find(fact => fact.id === 'largest:big')!.detail;
+    assert.equal(esAR, domainText, 'Spanish in Argentina is the domain\'s own sentence');
+    assert.ok(esAR.endsWith(' · ' + argentina), esAR);
+    assert.ok(insightDetail(routeHarness('(tabs)/reports.tsx', params, data, { locale: 'en-AR' }).render()).endsWith(' · ' + argentina), 'the region orders the day, not the language');
+    for (const locale of ['en-US', 'es-US'] as AppLocale[]) {
+      const detail = insightDetail(routeHarness('(tabs)/reports.tsx', params, data, { locale }).render());
+      assert.ok(detail.endsWith(' · ' + unitedStates), locale + ': ' + detail);
+    }
+  }
+});
+
+test('23.1C2: VoiceOver hears the day row and the totals in the language\'s numbers, not the region\'s', () => {
+  const data = { ...snapshot, entries: [...snapshot.entries, { ...snapshot.entries[0], id: 'big', amountMinor: 123456, dateISO: '2026-08-22' },
+    { ...snapshot.entries[0], id: 'pay', kind: 'income' as const, amountMinor: 200000, merchant: 'Sueldo', category: 'Sueldo', dateISO: '2026-08-01' }] };
+  const dayRow = (locale: AppLocale) => {
+    const view = routeHarness('(tabs)/reports.tsx', { currency: 'ARS', month: '2026-08' }, data, { locale });
+    nodes(view.render()).find(n => n.type === 'Choices' && n.props.value === 'categories')!.props.onChange('days');
+    const list = view.render();
+    const index = list.props.data.findIndex((item: domain.DailySpending) => item.dateISO === '2026-08-22');
+    return { row: find(list.props.renderItem({ item: list.props.data[index], index }), 'DetailRow'), root: list };
+  };
+  for (const [locale, spoken, visible, income] of [['es-AR', '1234,56 pesos', '$\u00A01.234,56', '2000,00 pesos'], ['es-US', '1234,56 pesos', 'AR$\u00A01,234.56', '2000,00 pesos'],
+    ['en-AR', '1234.56 pesos', '$\u00A01.234,56', '2000.00 pesos'], ['en-US', '1234.56 pesos', 'AR$\u00A01,234.56', '2000.00 pesos']] as [AppLocale, string, string, string][]) {
+    const { row, root } = dayRow(locale);
+    assert.equal(row.props.value, visible, locale + ': the screen keeps the region\'s format');
+    assert.equal(row.props.spokenValue, spoken, locale + ': the pressable row speaks the amount in the language\'s numbers');
+    assert.ok(typeof row.props.onPress === 'function', 'the day row is the pressable DetailRow whose label includes the value');
+    assert.equal(nodes(root).find(n => n.type === 'DetailRow' && n.props.icon === 'add-circle-outline')!.props.spokenValue, income, locale + ': recorded income');
+  }
+});
+
+test('23.1C2: the comparison rows speak their coded amounts without grouping', () => {
+  const data = { ...snapshot, entries: [...snapshot.entries, { ...snapshot.entries[0], id: 'now', dateISO: '2026-09-10', amountMinor: 123456 }] };
+  for (const [locale, spoken] of [['es-US', '1234,56 ARS'], ['en-AR', '1234.56 ARS']] as [AppLocale, string][]) {
+    const list = routeHarness('report-comparison.tsx', { currency: 'ARS', month: '2026-09' }, data, { locale }).render();
+    const row = list.props.renderItem({ item: list.props.data.find((item: domain.CategoryChange) => item.key === 'salud') });
+    const current = nodes(row).find(n => n.type === 'DetailRow' && typeof n.props.onPress === 'function')!;
+    assert.equal(current.props.spokenValue, spoken, locale);
+    assert.notEqual(current.props.value, spoken, 'the visible value keeps the code first and the region\'s separators');
+  }
 });

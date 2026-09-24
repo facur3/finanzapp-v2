@@ -18,7 +18,8 @@ function localeStore(released?: ReleasedSets) {
     store: () => ({ getItemSync: key => rows.get(key) ?? null, setItemSync: (key, value) => { rows.set(key, value); }, removeItemSync: key => rows.delete(key) }) });
 }
 let currentLocaleStore = localeStore();
-// English is unreleased, so the store cannot choose it; an English test renders with this override instead.
+// Renders a chosen locale without touching the store's device reading or saved choices (the 23.1B2 English tests).
+// English is released since 23.1C2, so a test may also choose it through the store, as a person does in Más.
 let forcedLocale: AppLocale | null = null;
 const i18nProvider = { useI18n: () => bindLocale(forcedLocale ?? currentLocaleStore.getState().locale),
   useLocalePreferences: () => ({ state: currentLocaleStore.getState(), setLanguage: currentLocaleStore.setLanguage, setRegion: currentLocaleStore.setRegion }) };
@@ -100,7 +101,7 @@ test('Más groups permanent navigation into Finanzas and App y datos, with live 
   const root = view.render();
   assert.deepEqual(nodes(root).filter(node => node.type === 'SectionTitle').map(node => node.props.children), ['Finanzas', 'App y datos']);
   const labels = rows(root).map(row => row.props.title);
-  assert.deepEqual(labels, ['Cuentas', 'Tarjetas', 'Presupuestos', 'Recurrentes', 'Deudas y cobros', 'Categorías', 'Copia de seguridad', 'Movimientos deshechos', 'Idioma']);
+  assert.deepEqual(labels, ['Cuentas', 'Tarjetas', 'Presupuestos', 'Recurrentes', 'Deudas y cobros', 'Categorías', 'Copia de seguridad', 'Movimientos deshechos', 'Idioma', 'Región']);
   assert.equal(labels.includes('Asistente'), false, 'the Assistant is the centre tab, not a Más row');
   const value = (label: string) => rows(root).find(row => row.props.title === label)!.props.subtitle;
   assert.equal(value('Tarjetas'), 'Compras y resúmenes', 'no cards recorded: an honest placeholder');
@@ -109,43 +110,47 @@ test('Más groups permanent navigation into Finanzas and App y datos, with live 
   assert.equal(value('Presupuestos'), 'Plan mensual');
   assert.equal(value('Movimientos deshechos'), '1 recuperable');
   for (const row of rows(root)) row.props.onPress();
-  assert.deepEqual(view.pushed, ['/accounts', '/cards', '/budgets', '/recurring', '/debts', '/categories', '/backup', '/undone-entries', '/language']);
+  assert.deepEqual(view.pushed, ['/accounts', '/cards', '/budgets', '/recurring', '/debts', '/categories', '/backup', '/undone-entries', '/language', '/region']);
   // Each group closes its last row; no export button or sharing lives on the hub any more.
-  assert.deepEqual(rows(root).filter(row => row.props.last).map(row => row.props.title), ['Categorías', 'Idioma']);
+  assert.deepEqual(rows(root).filter(row => row.props.last).map(row => row.props.title), ['Categorías', 'Región']);
   assert.equal(nodes(root).some(node => node.type === 'ActionButton'), false);
   const texts = nodes(root).filter(node => node.type === 'AppText').map(node => String(node.props.children)).join(' ');
-  assert.match(texts, /Producto 23\.1C1/);
+  assert.match(texts, /Producto 23\.1C2/);
   assert.match(texts, /Material opaco \(Expo Go\)/, 'the footer says which control material this session draws, so a tester can confirm the mode');
   assert.equal(value('Categorías'), 'Gastos e ingresos');
   // Finanzas rows carry a soft identity tile from the shared palette; App y datos rows stay neutral glyphs.
   const leading = rows(root).map(row => row.props.leading?.type ?? null);
-  assert.deepEqual(leading, ['GlyphTile', 'GlyphTile', 'GlyphTile', 'GlyphTile', 'GlyphTile', 'GlyphTile', null, null, null]);
+  assert.deepEqual(leading, ['GlyphTile', 'GlyphTile', 'GlyphTile', 'GlyphTile', 'GlyphTile', 'GlyphTile', null, null, null, null]);
   assert.equal(new Set(rows(root).slice(0, 6).map(row => row.props.leading.props.color)).size, 6, 'six distinct restrained colours, no row painted');
-  assert.deepEqual(rows(root).slice(6).map(row => row.props.icon), ['save-outline', 'arrow-undo-outline', 'language-outline'], 'App y datos keeps neutral glyphs');
+  assert.deepEqual(rows(root).slice(6).map(row => row.props.icon), ['save-outline', 'arrow-undo-outline', 'language-outline', 'globe-outline'], 'App y datos keeps neutral glyphs');
   assert.equal(rows(root).some(row => 'value' in row.props || 'label' in row.props), false, 'no leftover label/value props');
   assert.match(texts, /sincronización todavía no está activada/);
 });
 
-test('Más → App y datos: Idioma says what is in use and whether it follows the device; Región stays hidden until a second region is released', () => {
+test('Más → App y datos (23.1C2): Idioma and Región say what is in use and whether it follows the device; Región hides in a single-region build', () => {
+  // The default harness store uses the release gate itself (RELEASED), as the app does.
   const view = harness('(tabs)/settings.tsx');
   const root = view.render();
-  const titles = rows(root).map(row => row.props.title);
-  assert.equal(titles.includes('Región'), false, 'no region chooser while only Argentina is released (Producto 23.1C)');
-  const language = rows(root).find(row => row.props.title === 'Idioma')!;
-  assert.equal(language.props.subtitle, 'Español · según el dispositivo');
-  assert.equal(currentLocaleStore.setLanguage('es'), true);
-  assert.equal(rows(view.render()).find(row => row.props.title === 'Idioma')!.props.subtitle, 'Español', 'an explicit choice reads plainly');
-  assert.equal(currentLocaleStore.setLanguage('en'), false, 'English cannot be chosen while unreleased, whoever asks');
-  // Once 23.1C releases the US region, the same hub shows Región under Idioma and closes the group with it.
-  const later = harness('(tabs)/settings.tsx', archive, { languages: ['es', 'en'], regions: ['AR', 'US'] });
-  const laterRows = rows(later.render());
-  assert.deepEqual(laterRows.slice(6).map(row => row.props.title), ['Copia de seguridad', 'Movimientos deshechos', 'Idioma', 'Región']);
-  assert.deepEqual(laterRows.filter(row => row.props.last).map(row => row.props.title), ['Categorías', 'Región']);
-  const region = laterRows.find(row => row.props.title === 'Región')!;
+  assert.deepEqual(rows(root).slice(6).map(row => row.props.title), ['Copia de seguridad', 'Movimientos deshechos', 'Idioma', 'Región']);
+  assert.equal(rows(root).find(row => row.props.title === 'Idioma')!.props.subtitle, 'Español · según el dispositivo');
+  const region = rows(root).find(row => row.props.title === 'Región')!;
   assert.equal(region.props.subtitle, 'Argentina · según el dispositivo');
   assert.equal(region.props.icon, 'globe-outline');
+  assert.equal(region.props.last, true, 'Región closes App y datos');
   region.props.onPress();
-  assert.deepEqual(later.pushed, ['/region']);
+  assert.deepEqual(view.pushed, ['/region']);
+  assert.equal(currentLocaleStore.setLanguage('es'), true);
+  assert.equal(rows(view.render()).find(row => row.props.title === 'Idioma')!.props.subtitle, 'Español', 'an explicit choice reads plainly');
+  assert.equal(currentLocaleStore.setRegion('US'), true);
+  assert.equal(rows(view.render()).find(row => row.props.title === 'Región')!.props.subtitle, 'Estados Unidos', 'Spanish words, US conventions');
+  assert.equal(currentLocaleStore.setLanguage('en'), true, 'English is released: Más can choose it');
+  const english = rows(view.render());
+  assert.equal(english.find(row => row.props.title === 'Language')!.props.subtitle, 'English', 'the hub re-renders in English');
+  assert.equal(english.find(row => row.props.title === 'Region')!.props.subtitle, 'United States');
+  // A build with a single released region (a narrower gate) hides Región and closes the group with Idioma.
+  const single = rows(harness('(tabs)/settings.tsx', archive, { languages: ['es'], regions: ['AR'] }).render());
+  assert.equal(single.some(row => row.props.title === 'Región'), false);
+  assert.deepEqual(single.filter(row => row.props.last).map(row => row.props.title), ['Categorías', 'Idioma']);
 });
 
 test('Más → Tarjetas counts active credit cards and opens the pushed Tarjetas screen', () => {
@@ -223,19 +228,20 @@ test('23.1B2 English Más: every row, count, note and the diagnostic footer are 
   const view = harness('(tabs)/settings.tsx', archive, undefined, 'en-AR');
   const root = view.render();
   assert.equal(nodes(root).filter(node => node.type === 'SectionTitle').map(node => node.props.children).join(','), 'Finances,App and data');
-  assert.equal(rows(root).map(row => row.props.title).join(','), 'Accounts,Cards,Budgets,Recurring,Debts and IOUs,Categories,Backup,Undone transactions,Language');
+  assert.equal(rows(root).map(row => row.props.title).join(','), 'Accounts,Cards,Budgets,Recurring,Debts and IOUs,Categories,Backup,Undone transactions,Language,Region');
   const value = (label: string) => rows(root).find(row => row.props.title === label)!.props.subtitle;
   assert.equal(value('Recurring'), '1 active');
   assert.equal(value('Debts and IOUs'), '1 pending');
-  assert.equal(value('Undone transactions'), '1 recoverable');
+  assert.equal(value('Undone transactions'), '1 can be restored', 'the glossary word for recuperar, as on the screen it opens');
   assert.equal(value('Cards'), 'Purchases and statements');
   assert.equal(value('Language'), 'Español · same as device', 'a language is named in its own language');
+  assert.equal(value('Region'), 'Argentina · same as device', 'a region is named in the interface language');
   for (const row of rows(root)) row.props.onPress();
-  assert.equal(view.pushed.join(','), '/accounts,/cards,/budgets,/recurring,/debts,/categories,/backup,/undone-entries,/language');
+  assert.equal(view.pushed.join(','), '/accounts,/cards,/budgets,/recurring,/debts,/categories,/backup,/undone-entries,/language,/region');
   const texts = nodes(root).filter(node => node.type === 'AppText').map(node => String(node.props.children)).join(' ');
-  assert.match(texts, /FinanzApp · Native pilot 0\.1\.0 · Producto 23\.1C1 · Opaque material \(Expo Go\) · Language: default/);
+  assert.match(texts, /FinanzApp · Native pilot 0\.1\.0 · Producto 23\.1C2 · Opaque material \(Expo Go\) · Language: default/);
   assert.match(texts, /Sync is not turned on yet/);
-  assert.doesNotMatch(texts, /Material opaco|Idioma|sincronización/);
+  assert.doesNotMatch(texts, /Material opaco|Idioma|Región|sincronización/);
   const card: domain.CreditCardProfile = { id: 'card', accountId: cash.id, issuer: 'Visa', last4: '4009', creditLimitMinor: null, closingDay: 28, dueDay: 5, active: true, createdAt, revision: 0, updatedAt: createdAt };
   const cards = harness('(tabs)/settings.tsx', { ...archive, cards: [card, { ...card, id: 'two' }] }, undefined, 'en-AR').render();
   assert.equal(rows(cards).find(row => row.props.title === 'Cards')!.props.subtitle, '2 credit cards');

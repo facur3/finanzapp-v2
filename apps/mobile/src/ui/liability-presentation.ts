@@ -66,7 +66,9 @@ export function accountKindLabel(account: Account, cards: CreditCardProfile[] = 
   return t(kind === 'card' ? 'accountKinds.creditCard' : kind === 'debt' ? 'accountKinds.debt' : 'accountKinds.account');
 }
 
-/** One line of statement facts under the activity title, instead of two cards. */
+/** One line of statement facts under the activity title, instead of two cards. `relative`
+ * names the start day inside the sentence, so it takes the inline form (`relativeDate(…, true)`):
+ * "Resumen abierto desde ayer", "Statement open since yesterday". */
 export function statementCaption(statement: { startISO: string; purchaseCount: number; paymentCount: number }, relative: (iso: string) => string,
   t: Translate = translator('es')): string {
   return [t('cards.statement.openSince', { date: relative(statement.startISO) }), t('cards.statement.purchases', { count: statement.purchaseCount }),

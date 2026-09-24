@@ -13,7 +13,7 @@ import { preferenceSummary, showsPreference } from '../../src/ui/locale-options'
 // Diagnostic: where this launch read the device languages. "módulo nativo" proves the build links expo-localization.
 const LOCALE_SOURCE_LABELS = { native: 'settings.localeSource.native', intl: 'settings.localeSource.intl', none: 'settings.localeSource.none' } as const;
 /** The pilot's version and the internal release name; neither is translated. */
-const VERSION = '0.1.0', RELEASE = '23.1C1';
+const VERSION = '0.1.0', RELEASE = '23.1C2';
 
 /** Más is the secondary navigation hub: everything that is not one of the four
  * other tabs, in two native grouped lists. Finanzas holds the tools that
@@ -21,9 +21,10 @@ const VERSION = '0.1.0', RELEASE = '23.1C1';
  * Assistant), each with a soft tinted identity tile from the same palette
  * accounts and categories use (the row itself stays neutral); App y datos
  * stays neutral. Home only surfaces contextual information; permanent
- * navigation lives here. Idioma (and Región once a second region is
- * released) sit in App y datos: device settings, not ledger data. The route
- * file keeps its historical name (settings). */
+ * navigation lives here. Idioma and Región sit in App y datos: device
+ * settings, not ledger data. Región shows because two regions are released
+ * (Producto 23.1C2) and hides itself in a build with a single one
+ * (`showsPreference`). The route file keeps its historical name (settings). */
 export default function MoreScreen() {
   const { archive } = useLedger();
   const p = usePalette();

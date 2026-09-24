@@ -51,7 +51,7 @@ export const categoryManager = {
       /** VoiceOver name of the preview tile: "Vista previa: Banco en Celeste". */
       preview: 'Vista previa: {icon} en {color}',
       unnamed: 'Sin nombre',
-      icon: 'Icono',
+      icon: 'Ícono',
       color: 'Color',
     },
     /** Names of the category icons, by icon id (not by category). */

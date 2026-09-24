@@ -13,12 +13,14 @@ export default function ReportComparisonScreen() {
   const { snapshot } = useLedger();
   const lookOf = useCategoryLookOf('expense');
   const today = useCurrentDay(), p = usePalette();
-  const { t, locale, codedAmount } = useI18n();
+  const { t, locale, codedAmount, spokenAmount } = useI18n();
   if (!snapshot) return null;
   const selection = reportSelection(snapshot, params.currency, params.month, today);
   const comparison = spendingComparison(snapshot, selection.currency, selection.monthISO, today);
   const { current, previous, deltaMinor } = comparison;
   const amount = (minor: number) => codedAmount(minor, selection.currency);
+  // The VoiceOver twin of `amount`: the language's decimal mark, no grouping ("1234,56 ARS").
+  const spoken = (minor: number) => spokenAmount(minor, selection.currency);
   const openCategory = (period: ReportPeriod, key: string) => router.push({ pathname: '/report-category',
     params: { currency: selection.currency, month: period.startISO.slice(0, 7), category: key, through: period.endISO } });
   return <FlatList<CategoryChange> data={comparison.categories} keyExtractor={item => item.key}
@@ -35,8 +37,8 @@ export default function ReportComparisonScreen() {
           <AppText secondary>{t('reports.comparison.difference')}</AppText>
         </View>}
         <Surface grouped>
-          {current.status === 'ready' && <DetailRow label={dateRangeLabel(current, t, locale)} value={amount(current.expenseMinor)} last={!previous} />}
-          {previous?.status === 'ready' && <DetailRow label={dateRangeLabel(previous, t, locale)} value={amount(previous.expenseMinor)} last />}
+          {current.status === 'ready' && <DetailRow label={dateRangeLabel(current, t, locale)} value={amount(current.expenseMinor)} spokenValue={spoken(current.expenseMinor)} last={!previous} />}
+          {previous?.status === 'ready' && <DetailRow label={dateRangeLabel(previous, t, locale)} value={amount(previous.expenseMinor)} spokenValue={spoken(previous.expenseMinor)} last />}
         </Surface>
         {comparison.status === 'insufficient' && <EmptyState title={t('reports.comparison.insufficientTitle')} detail={t('reports.comparison.insufficientDetail')} />}
       </>}
@@ -48,8 +50,8 @@ export default function ReportComparisonScreen() {
         <AppText secondary>{item.deltaMinor === 0 ? t('reports.comparison.noChange')
           : t(item.deltaMinor > 0 ? 'reports.comparison.amountMore' : 'reports.comparison.amountLess', { amount: amount(Math.abs(item.deltaMinor)) })}</AppText>
       </View>
-      <DetailRow label={t('reports.comparison.thisPeriod')} value={amount(item.currentMinor)} onPress={item.currentCount ? () => openCategory(current, item.key) : undefined} />
-      <DetailRow label={t('reports.comparison.previous')} value={amount(item.previousMinor)} last onPress={item.previousCount && previous ? () => openCategory(previous, item.key) : undefined} />
+      <DetailRow label={t('reports.comparison.thisPeriod')} value={amount(item.currentMinor)} spokenValue={spoken(item.currentMinor)} onPress={item.currentCount ? () => openCategory(current, item.key) : undefined} />
+      <DetailRow label={t('reports.comparison.previous')} value={amount(item.previousMinor)} spokenValue={spoken(item.previousMinor)} last onPress={item.previousCount && previous ? () => openCategory(previous, item.key) : undefined} />
     </Surface>}
     ListFooterComponent={<AppText secondary style={{ fontSize: 12, lineHeight: 18 }}>{t('reports.comparison.footer', { currency: selection.currency })}</AppText>} />;
 }

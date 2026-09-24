@@ -28,6 +28,8 @@ export default function CardDetailScreen() {
   const { account, debtMinor, availableMinor, usage, closingISO, dueISO } = summary;
   const credit = cardCreditMinor(card, snapshot);
   const relative = (iso: string) => relativeDate(iso, day);
+  // A day inside the statement sentence starts in lower case: "Resumen abierto desde ayer".
+  const inline = (iso: string) => relativeDate(iso, day, true);
   const money = (minor: number) => moneyText(minor, account.currency);
   const tone = usageTone(usage);
 
@@ -66,7 +68,7 @@ export default function CardDetailScreen() {
             onPress={() => router.push({ pathname: '/new-transfer', params: { toAccountId: account.id, maxAmountMinor: String(debtMinor) } })} />
         </View>
 
-        <SectionTitle caption={statementCaption(statement, relative, t) + (statement.refundsMinor > 0 ? t('cards.panel.refunds', { amount: money(statement.refundsMinor) }) : '')}>{t('cards.panel.movements')}</SectionTitle>
+        <SectionTitle caption={statementCaption(statement, inline, t) + (statement.refundsMinor > 0 ? t('cards.panel.refunds', { amount: money(statement.refundsMinor) }) : '')}>{t('cards.panel.movements')}</SectionTitle>
       </View>}
       empty={<AppText secondary variant="subhead">{t('cards.panel.noActivity')}</AppText>} />
   </>;

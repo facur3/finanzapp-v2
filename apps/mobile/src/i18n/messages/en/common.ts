@@ -40,7 +40,7 @@ export const common: Pick<Messages, 'common' | 'movement' | 'accountKinds' | 'se
     chooseDate: 'Choose date',
     currency: 'Currency',
     chooseCurrency: 'Choose currency',
-    currencyNote: 'For now accounts are kept in pesos or in dollars, never converted between them. Other currencies arrive with their exchange rate.',
+    currencyNote: 'For now, accounts are kept in pesos or dollars, with no conversion between them. Other currencies will be added along with exchange rates.',
     searchOrCreateCategory: 'Search or create a category',
     categoryNamePlaceholder: 'Category name',
     useCategory: 'Use category {name}',
@@ -54,7 +54,7 @@ export const common: Pick<Messages, 'common' | 'movement' | 'accountKinds' | 'se
     inPesos: 'Argentine pesos',
     inDollars: 'US dollars',
     paste: {
-      ambiguous: 'Didn’t paste “{text}”: it can be read two ways. Type decimals with “{decimal}”.',
+      ambiguous: 'Didn’t paste “{text}”: it can be read two ways. Use “{decimal}” for decimals.',
       precision: 'Didn’t paste “{text}”: it has more than two decimals.',
       invalid: 'Didn’t paste “{text}”: it isn’t a valid amount.',
       currencyMismatch: 'Didn’t paste “{text}”: it specifies another currency. This account uses {currency}; nothing was converted.',

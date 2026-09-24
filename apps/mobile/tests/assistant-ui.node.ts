@@ -16,12 +16,14 @@ import type { AppLocale } from '../src/i18n/locale.ts';
 // checks structure, labels and state logic; rendering, VoiceOver order,
 // keyboard tracking and the pulse need the iPhone.
 type Node = { type: any; props: Record<string, any> };
-function load(file: string, { reduced = false, fontScale = 1, dark = false, bottomInset = 34, material = 'opaque' as 'opaque' | 'glass', locale = 'es-AR' as AppLocale } = {}) {
-  const i18n = bindLocale(locale);
+function load(file: string, { reduced = false, fontScale = 1, dark = false, bottomInset = 34, material = 'opaque' as 'opaque' | 'glass', locale = 'es-AR' as AppLocale,
+  deviceLanguage = null as string | null } = {}) {
+  const i18n = bindLocale(locale, 'none', deviceLanguage);
   const i18nProvider = { useI18n: () => i18n };
-  // A built-in category reads in the interface language (the real resolver's rule, reduced to the catalogue lookup); anything else is the user's word.
-  const categoryLabel = (stored: string) => {
-    const key = `categories.expense.${stored.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()}` as MessageKey;
+  // A built-in category reads in the interface language (the real resolver's rule, reduced to the catalogue lookup) and is only
+  // found under its own kind (Sueldo is an income preset, not an expense one); anything else is the user's word.
+  const categoryLabel = (stored: string, kind: 'expense' | 'income' = 'expense') => {
+    const key = `categories.${kind}.${stored.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()}` as MessageKey;
     const text = translate(i18n.language, key);
     return text === key ? stored : text;
   };
@@ -56,7 +58,8 @@ function load(file: string, { reduced = false, fontScale = 1, dark = false, bott
     './theme': { radius: { chip: 14, tile: 12, group: 16, card: 20, sheet: 24, creditCard: 18, button: 14 }, space: { xs: 4, s: 8, m: 12, l: 16, xl: 20, xxl: 24, xxxl: 32 },
       usePalette: () => palette, useReduceMotion: () => reduced, useCurrentDay: () => '2026-09-21' },
     '../assistant/conversation': conversation,
-    './category-hues': { useCategoryLook: (stored: string) => ({ label: categoryLabel(stored) }), useCategoryLookOf: () => (stored: string) => ({ label: categoryLabel(stored) }) },
+    './category-hues': { useCategoryLook: (stored: string, kind?: 'expense' | 'income') => ({ label: categoryLabel(stored, kind) }),
+      useCategoryLookOf: (kind?: 'expense' | 'income') => (stored: string) => ({ label: categoryLabel(stored, kind) }) },
   };
   const module = { exports: {} as Record<string, (props: any) => Node> };
   runInNewContext(code, { module, exports: module.exports, require: (name: string) => {
@@ -260,6 +263,8 @@ test('answer evidence renders rows with the shared Money component and links as 
   assert.equal(money[0].props.minor, 3120000);
   assert.equal(money[0].props.signed, true);
   assert.equal(money[0].props.currency, 'ARS');
+  // The row is one VoiceOver element: its label says the amount too, in spoken form (no grouping), not only the name.
+  assert.deepEqual(nodes(root).filter(node => node.type === 'View' && node.props.accessible).map(node => node.props.accessibilityLabel), ['Supermercado, 31200,00 pesos']);
   const links = nodes(root).filter(node => node.props.accessibilityRole === 'link');
   assert.deepEqual(links.map(node => node.props.accessibilityLabel), ['Ver categoría', 'Ver movimientos']);
   links[1].props.onPress();
@@ -317,6 +322,15 @@ test('English: every word the Assistant UI says is English; account names, merch
   assert.deepEqual(categories.map(node => node.props.accessibilityLabel), ['Kiosco Pepe', 'Groceries']);
   categories[1].props.onPress();
   assert.deepEqual(chosen, ['Income', 'Supermercado=Groceries'], 'the option id stays the stored category; the echo is what was shown');
+  // An income draft asks with income categories: a built-in one is found as income, so it reads in English too.
+  const incomeChips = nodes(ui.render('ClarificationChoices', { options: conversation.categoryOptions([
+    { id: 'c', accountId: 'visa', kind: 'income', amountMinor: 1, merchant: 'x', category: 'Sueldo', dateISO: '2026-09-01', createdAt: 'x' },
+    { id: 'd', accountId: 'visa', kind: 'income', amountMinor: 1, merchant: 'x', category: 'Sueldo', dateISO: '2026-09-02', createdAt: 'x' },
+    { id: 'e', accountId: 'visa', kind: 'income', amountMinor: 1, merchant: 'x', category: 'Clases de piano', dateISO: '2026-09-01', createdAt: 'x' }], 'income'), chosen: null,
+  onChoose: (option: any, shown: string) => chosen.push(option.id + '=' + shown) })).filter(node => node.props.accessibilityRole === 'button');
+  assert.deepEqual(incomeChips.map(node => node.props.accessibilityLabel), ['Salary', 'Clases de piano']);
+  incomeChips[0].props.onPress();
+  assert.equal(chosen.at(-1), 'Sueldo=Salary', 'the stored income category is what the draft receives');
   const accountsChips = nodes(ui.render('ClarificationChoices', { options: [{ id: 'visa', label: 'Visa Galicia' }], chosen: null, onChoose: () => {} })).filter(node => node.props.accessibilityRole === 'button');
   assert.deepEqual(accountsChips.map(node => node.props.accessibilityLabel), ['Visa Galicia']);
   // Evidence: rows named from the fact id in English, built-in categories localized; links from their stable ids.
@@ -326,15 +340,15 @@ test('English: every word the Assistant UI says is English; account names, merch
     { id: 'previous.category.0', label: 'Categoría de gasto: Kiosco Pepe', amountMinor: 2, count: 1, startISO: '2026-08-01', endISO: '2026-08-21' }], 'ARS');
   const evidence = ui.render('AnswerEvidence', { content, currency: 'ARS', onOpen: () => {} });
   const rows = nodes(evidence).filter(node => node.type === 'View' && node.props.accessible).map(node => node.props.accessibilityLabel);
-  assert.deepEqual(rows, ['Recorded expenses', 'Groceries', 'Kiosco Pepe (previous month)']);
+  assert.deepEqual(rows, ['Recorded expenses, 0.05 pesos', 'Groceries, 0.03 pesos', 'Kiosco Pepe (previous month), 0.02 pesos']);
   assert.deepEqual(nodes(evidence).filter(node => node.props.accessibilityRole === 'link').map(node => node.props.accessibilityLabel), ['View category', 'View transactions']);
-  const suggestions = ui.render('Suggestions', { items: ['Log an expense'], onPick: () => {} });
+  const suggestions = ui.render('Suggestions', { items: ['Record an expense'], onPick: () => {} });
   assert.ok(nodes(suggestions).some(node => node.props.accessibilityRole === 'header' && node.props.children === 'How can I help?'));
   // The composer.
   const composer = load('assistant-composer.tsx', { locale: 'en-AR' });
   let bar = composer.render('AssistantComposer', { value: '', onChange: () => {}, onSend: () => {}, onStop: () => {}, busy: false });
   const input = nodes(bar).find(node => node.type === 'TextInput')!;
-  assert.equal(input.props.placeholder, 'Ask or log something…');
+  assert.equal(input.props.placeholder, 'Ask or record something…');
   assert.equal(input.props.accessibilityLabel, 'Message for the Assistant');
   assert.equal(byLabel(bar, 'Dictate')!.props.accessibilityHint, 'Not available in this version yet');
   assert.ok(byLabel(bar, 'Send'));
@@ -342,4 +356,46 @@ test('English: every word the Assistant UI says is English; account names, merch
   bar = composer.render('AssistantComposer', { value: 'x', onChange: () => {}, onSend: () => {}, onStop: () => {}, busy: true });
   assert.ok(byLabel(bar, 'Stop response'));
   assert.ok(nodes(bar).some(node => node.type === 'AppText' && /^Dictation comes with the installable version/.test(String(node.props.children))));
+});
+
+test('VoiceOver: with an interface language that differs from the device\'s, every element the Assistant builds speaks it; amounts are said in spoken form', () => {
+  // English chosen in Más on a Spanish iPhone: each element VoiceOver reaches that is not a shared component carries the interface language.
+  const english = load('assistant-messages.tsx', { locale: 'en-US', deviceLanguage: 'es' });
+  const accounts = [{ id: 'visa', name: 'Visa Galicia', currency: 'ARS', openingMinor: 0, createdAt: 'x' }];
+  const draft = { kind: 'expense', amountMinor: 1850000, currency: 'ARS', merchant: 'Carrefour', category: 'Supermercado', dateISO: '2026-09-21', accountId: 'visa' };
+  const handlers = { accounts, onConfirm: () => {}, onEdit: () => {}, onCancel: () => {}, onOpenEntry: () => {} };
+  const content = conversation.answerContent({ factIds: ['current.category.1', 'previous.category.1'] },
+    [{ id: 'current.category.1', label: 'Categoría de gasto: Supermercado', amountMinor: 12120000, count: 11, startISO: '2026-09-01', endISO: '2026-09-21' },
+      { id: 'previous.category.1', label: 'Categoría de gasto: Supermercado', amountMinor: 12200000, count: 10, startISO: '2026-08-01', endISO: '2026-08-21' }], 'ARS');
+  const rendered = (ui: ReturnType<typeof load>) => [
+    ui.render('UserMessage', { text: 'Spent 500' }),
+    ui.render('AssistantText', { text: 'Gastaste más.', status: 'done' }),
+    ui.render('AssistantText', { text: '', status: 'streaming' }),
+    ui.render('SystemNote', { message: { id: 's', role: 'system', reason: 'offline', text: 'assistant.reasons.offline', retryText: null } }),
+    ui.render('AnswerEvidence', { content, currency: 'ARS', onOpen: () => {} }),
+    ui.render('DraftCard', { content: { kind: 'draft', draft, status: 'pending', entryId: null }, ...handlers }),
+    ui.render('DraftCard', { content: { kind: 'draft', draft, status: 'cancelled', entryId: null }, ...handlers }),
+  ].flatMap(nodes).filter(node => node.type === 'View' && node.props.accessible);
+  const elements = rendered(english);
+  assert.equal(elements.length, 10, 'user, answer, thinking, note, one evidence row, four draft rows, the collapsed card');
+  const answerLabel = (node: { props: { accessibilityLabel?: string } }) => /^Assistant: /.test(String(node.props.accessibilityLabel));
+  assert.deepEqual([...new Set(elements.filter(node => !answerLabel(node)).map(node => node.props.accessibilityLanguage))], ['en']);
+  // The model's prose is content: the v1 server writes Spanish, so it keeps a Spanish voice whatever the interface says.
+  assert.equal(elements.find(answerLabel)!.props.accessibilityLanguage, 'es');
+  const englishDevice = nodes(load('assistant-messages.tsx', { locale: 'en-US', deviceLanguage: 'en' }).render('AssistantText', { text: 'Gastaste más.', status: 'done' }))
+    .find(node => node.type === 'View' && node.props.accessible)!;
+  assert.equal(englishDevice.props.accessibilityLanguage, 'es', 'an English iPhone reading an English interface still hears the Spanish answer in Spanish');
+  // A difference below zero is said as such, in the language's words and decimal mark.
+  assert.ok(elements.some(node => node.props.accessibilityLabel === 'Groceries, Minus 800.00 pesos'));
+  const field = nodes(load('assistant-composer.tsx', { locale: 'en-US', deviceLanguage: 'es' }).render('AssistantComposer', { value: '', onChange: () => {}, onSend: () => {}, onStop: () => {}, busy: false }))
+    .find(node => node.type === 'TextInput')!;
+  assert.equal(field.props.accessibilityLanguage, 'en', 'the message field too');
+  // Device and app agree: nothing is set, so VoiceOver keeps the voice chosen in iOS Settings.
+  assert.deepEqual([...new Set(rendered(load('assistant-messages.tsx', { deviceLanguage: 'es' })).map(node => node.props.accessibilityLanguage))], [undefined]);
+  assert.equal(nodes(load('assistant-composer.tsx').render('AssistantComposer', { value: '', onChange: () => {}, onSend: () => {}, onStop: () => {}, busy: false }))
+    .find(node => node.type === 'TextInput')!.props.accessibilityLanguage, undefined);
+  // Spanish chosen on an English iPhone: the Spanish voice, and the Spanish decimal mark in the spoken amount.
+  const spanish = rendered(load('assistant-messages.tsx', { locale: 'es-US', deviceLanguage: 'en' }));
+  assert.deepEqual([...new Set(spanish.map(node => node.props.accessibilityLanguage))], ['es']);
+  assert.ok(spanish.some(node => node.props.accessibilityLabel === 'Supermercado, Menos 800,00 pesos'));
 });

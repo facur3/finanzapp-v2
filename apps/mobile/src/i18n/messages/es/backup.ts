@@ -43,7 +43,7 @@ export const backup = {
         voided: 'Deshechos a conservar',
         present: 'Registros ya presentes',
       },
-      /** Both Spanish forms keep the plural wording the screen has always shown. */
+      /** Records whose content differs from this device; nothing is imported. `one` is singular ("Hay 1 registro…"), `other` plural. */
       conflicts: {
         one: 'Hay {count} registro con cambios diferentes. No se importará nada. Esta copia no puede reemplazar correcciones locales ni reactivar movimientos deshechos.',
         other: 'Hay {count} registros con cambios diferentes. No se importará nada. Esta copia no puede reemplazar correcciones locales ni reactivar movimientos deshechos.',

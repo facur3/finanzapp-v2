@@ -32,7 +32,7 @@ function Navigation() {
   const p = usePalette();
   const reduced = useReduceMotion();
   // Headers read the catalogue here, so a language change re-titles every screen in place without touching the stack.
-  const { t } = useI18n();
+  const { t, speechLanguage } = useI18n();
   useEffect(() => {
     void SystemUI.setBackgroundColorAsync(p.background).catch(() => {});
   }, [p.background]);
@@ -48,7 +48,7 @@ function Navigation() {
         <AppText variant="title1">{t('boot.openFailed')}</AppText>
         <ErrorMessage message={error ?? t('boot.resourcesFailed')} />
         {!fontError && <ActionButton label={t('boot.retry')} onPress={retry} />}
-      </> : <ActivityIndicator accessibilityLabel={t('boot.opening')} color={p.secondary} />}
+      </> : <ActivityIndicator accessibilityLabel={t('boot.opening')} accessibilityLanguage={speechLanguage} color={p.secondary} />}
     </View>
   </SafeAreaView>;
 

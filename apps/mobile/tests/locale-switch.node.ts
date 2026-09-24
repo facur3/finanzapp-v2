@@ -10,7 +10,7 @@ import * as preference from '../src/i18n/preference.ts';
 import * as storeModule from '../src/i18n/store.ts';
 import * as localeOptions from '../src/ui/locale-options.ts';
 import { LANGUAGE_PREFERENCE_KEY, REGION_PREFERENCE_KEY, type PreferenceStore } from '../src/i18n/preference.ts';
-import { activeLanguageChoice, createLocaleStore, type DeviceReading, type LocaleStore } from '../src/i18n/store.ts';
+import { activeLanguageChoice, activeRegionChoice, createLocaleStore, type DeviceReading, type LocaleStore } from '../src/i18n/store.ts';
 import type { ReleasedSets } from '../src/i18n/locale.ts';
 
 // Producto 23.1A: language and region are two live preferences. A change made
@@ -18,6 +18,9 @@ import type { ReleasedSets } from '../src/i18n/locale.ts';
 // half-typed draft and the Assistant conversation survive; the ledger
 // provider is neither re-rendered nor remounted. These tests drive the real
 // provider on a real React reconciler (react-test-renderer), not a snapshot.
+// Producto 23.1C2 released English and the United States: the stores below use
+// the default gate unless a test narrows it to stand for a build with a
+// language or region not released yet.
 const require = createRequire(import.meta.url);
 const React = require('react') as typeof import('react');
 const renderer = require('react-test-renderer') as typeof import('react-test-renderer');
@@ -28,7 +31,8 @@ const consoleError = console.error;
 console.error = (...args: unknown[]) => { if (!String(args[0]).startsWith('react-test-renderer is deprecated')) consoleError(...args); };
 const h = React.createElement;
 
-const ALL: ReleasedSets = { languages: ['es', 'en'], regions: ['AR', 'US'] };
+/** The gate as it stood until 23.1C1, standing in for any build that holds a catalogue or a region back. */
+const SPANISH_ONLY: ReleasedSets = { languages: ['es'], regions: ['AR'] };
 
 function memory(initial: Record<string, string> = {}) {
   const rows = new Map(Object.entries(initial));
@@ -46,7 +50,7 @@ function device(languageTag: string, regionCode: string | null = null): DeviceRe
 
 test('the store resolves at creation from the saved preferences and the device, and only notifies on a visible change', () => {
   const saved = memory({ [LANGUAGE_PREFERENCE_KEY]: 'en', [REGION_PREFERENCE_KEY]: 'AR' });
-  const store = createLocaleStore({ devices: () => device('es-US', 'US'), store: saved.store, released: ALL });
+  const store = createLocaleStore({ devices: () => device('es-US', 'US'), store: saved.store });
   assert.equal(store.getState().locale, 'en-AR', 'both saved choices beat the device');
   assert.equal(store.getState().device.locale, 'es-US', '"follow the device" would give Spanish, United States');
   let notified = 0;
@@ -67,7 +71,7 @@ test('the store resolves at creation from the saved preferences and the device, 
 
 test('a choice is saved before it is applied: a failed write changes nothing and says so', () => {
   const saved = memory();
-  const store = createLocaleStore({ devices: () => device('es-AR', 'AR'), store: saved.store, released: ALL });
+  const store = createLocaleStore({ devices: () => device('es-AR', 'AR'), store: saved.store });
   let notified = 0;
   store.subscribe(() => notified++);
   const before = store.getState();
@@ -85,30 +89,84 @@ test('a choice is saved before it is applied: a failed write changes nothing and
 test('an unreadable store at launch follows the device and never throws', () => {
   const saved = memory({ [LANGUAGE_PREFERENCE_KEY]: 'en' });
   saved.faults.get = true;
-  const store = createLocaleStore({ devices: () => device('es-AR', 'US'), store: saved.store, released: ALL });
+  const store = createLocaleStore({ devices: () => device('es-AR', 'US'), store: saved.store });
   assert.deepEqual(store.getState().preferences, { language: 'system', region: 'system' });
   assert.equal(store.getState().locale, 'es-US');
   assert.equal(saved.rows.get(LANGUAGE_PREFERENCE_KEY), 'en', 'a failed read never deletes what is stored');
 });
 
-test('the release gate holds in the store: unreleased values are refused, and a stored one is not applied or marked', () => {
+test('a narrower gate still holds in the store: values outside it are refused, and a stored one is not applied or marked', () => {
   const saved = memory({ [LANGUAGE_PREFERENCE_KEY]: 'en', [REGION_PREFERENCE_KEY]: 'US' });
-  const store = createLocaleStore({ devices: () => device('en-US', 'US'), store: saved.store });
-  assert.equal(store.getState().locale, 'es-AR', 'English iPhone, US region, English and US saved: still Spanish, Argentina today');
+  const store = createLocaleStore({ devices: () => device('en-US', 'US'), store: saved.store, released: SPANISH_ONLY });
+  assert.equal(store.getState().locale, 'es-AR', 'English iPhone, US region, English and US saved: Spanish, Argentina, while they are held back');
   assert.equal(activeLanguageChoice(store.getState()), 'system', 'the chooser marks "follow the device", not an option it does not list');
+  assert.equal(activeRegionChoice(store.getState()), 'system');
   assert.equal(store.setLanguage('en'), false);
   assert.equal(store.setRegion('US'), false);
   assert.equal(saved.rows.get(LANGUAGE_PREFERENCE_KEY), 'en', 'refusing does not erase a later build\'s value either');
+  assert.equal(saved.rows.get(REGION_PREFERENCE_KEY), 'US');
   assert.equal(store.setLanguage('es'), true);
   assert.equal(store.setRegion('AR'), true);
   assert.equal(store.setLanguage('system'), true);
 });
 
+test('the default gate offers Spanish and English, Argentina and the United States: an English iPhone reads English', () => {
+  const state = createLocaleStore({ devices: () => device('en-US', 'US'), store: memory().store }).getState();
+  assert.equal(state.released, locale.RELEASED, 'no override: the release gate itself');
+  assert.equal(state.locale, 'en-US');
+  assert.deepEqual([state.device.locale, state.device.primaryLanguage], ['en-US', 'en']);
+  const t = bind.bindLocale(state.locale).t;
+  assert.deepEqual(localeOptions.preferenceChoices('language', state, t).options.map(option => option.value), ['system', 'es', 'en']);
+  assert.deepEqual(localeOptions.preferenceChoices('region', state, t).options.map(option => option.value), ['system', 'AR', 'US']);
+  assert.equal(localeOptions.showsPreference('language', state), true);
+  assert.equal(localeOptions.showsPreference('region', state), true, 'Más lists Región since 23.1C2');
+  assert.deepEqual([localeOptions.preferenceSummary('language', state, t), localeOptions.preferenceSummary('region', state, t)],
+    ['English · same as device', 'United States · same as device']);
+});
+
+test('choices saved during the 23.1C1 preview apply now that they are released: the choosers mark them, and "Según el dispositivo" clears both keys', () => {
+  // FinanzApp Dev kept these rows from a Metro session started with EXPO_PUBLIC_LOCALE_PREVIEW=1.
+  const saved = memory({ [LANGUAGE_PREFERENCE_KEY]: 'en', [REGION_PREFERENCE_KEY]: 'US' });
+  const store = createLocaleStore({ devices: () => device('es-AR', 'AR'), store: saved.store });
+  const state = store.getState();
+  assert.equal(state.locale, 'en-US', 'a Spanish iPhone in Argentina opens in English with US formats: the saved choices win');
+  assert.equal(state.device.locale, 'es-AR');
+  assert.deepEqual([activeLanguageChoice(state), activeRegionChoice(state)], ['en', 'US'], 'the choosers mark the saved choices, not "follow the device"');
+  const t = bind.bindLocale(state.locale).t;
+  assert.deepEqual([localeOptions.preferenceChoices('language', state, t).selected, localeOptions.preferenceChoices('region', state, t).selected], ['en', 'US']);
+  assert.deepEqual([localeOptions.preferenceSummary('language', state, t), localeOptions.preferenceSummary('region', state, t)], ['English', 'United States']);
+  assert.equal(store.setLanguage('system'), true);
+  assert.equal(store.setRegion('system'), true);
+  assert.deepEqual([saved.rows.has(LANGUAGE_PREFERENCE_KEY), saved.rows.has(REGION_PREFERENCE_KEY)], [false, false], 'both keys removed: the device decides again');
+  assert.equal(store.getState().locale, 'es-AR');
+  // The 23.0 value shape an older build saved still reads as its language.
+  const legacy = createLocaleStore({ devices: () => device('en-US', 'US'), store: memory({ [LANGUAGE_PREFERENCE_KEY]: 'es-AR' }).store }).getState();
+  assert.deepEqual([legacy.locale, activeLanguageChoice(legacy), activeRegionChoice(legacy)], ['es-US', 'es', 'system']);
+});
+
+test('a relaunch is a new store over the same saved rows: explicit choices persist, and "follow the device" reads the device of that launch', () => {
+  const saved = memory();
+  const first = createLocaleStore({ devices: () => device('es-AR', 'AR'), store: saved.store });
+  assert.equal(first.setLanguage('en'), true);
+  assert.equal(first.setRegion('US'), true);
+  const second = createLocaleStore({ devices: () => device('es-AR', 'AR'), store: saved.store });
+  assert.equal(second.getState().locale, 'en-US', 'the choices made before the relaunch');
+  assert.deepEqual({ ...second.getState().preferences }, { language: 'en', region: 'US' });
+  assert.equal(second.setLanguage('system'), true);
+  assert.equal(second.setRegion('system'), true);
+  const third = createLocaleStore({ devices: () => device('en-US', 'US'), store: saved.store });
+  assert.deepEqual([third.getState().locale, third.getState().preferences.language, third.getState().preferences.region], ['en-US', 'system', 'system'],
+    'both follow the device the app relaunched on (an iPhone language change quits the app)');
+  assert.equal(createLocaleStore({ devices: () => device('es-AR', 'US'), store: saved.store }).getState().locale, 'es-US');
+});
+
 test('a device the app does not support: Portuguese in Brazil reads Spanish with Argentine conventions, and says so beside "follow the device"', () => {
-  const store = createLocaleStore({ devices: () => device('pt-BR', 'BR'), store: memory().store, released: ALL });
+  const store = createLocaleStore({ devices: () => device('pt-BR', 'BR'), store: memory().store });
   const state = store.getState();
   assert.equal(state.locale, 'es-AR');
   assert.equal(state.device.locale, 'es-AR');
+  assert.equal(state.device.primaryLanguage, 'pt', 'the device language is kept as read, catalogue or not');
+  assert.equal(bind.bindLocale(state.locale, state.device.source, state.device.primaryLanguage).speechLanguage, 'es', 'so VoiceOver reads the Spanish labels with a Spanish voice');
   const t = bind.bindLocale(state.locale).t;
   assert.deepEqual(localeOptions.languageOptions(state, t).map(option => [option.value, option.title, option.subtitle ?? '']),
     [['system', 'Según el dispositivo', 'Ahora: Español'], ['es', 'Español', ''], ['en', 'English', '']]);
@@ -117,7 +175,7 @@ test('a device the app does not support: Portuguese in Brazil reads Spanish with
 test('"follow the device" follows it live: a changed device reading re-resolves only the halves that follow it', () => {
   let reading = device('es-AR', 'AR');
   const saved = memory({ [LANGUAGE_PREFERENCE_KEY]: 'es' });
-  const store = createLocaleStore({ devices: () => reading, store: saved.store, released: ALL });
+  const store = createLocaleStore({ devices: () => reading, store: saved.store });
   let notified = 0;
   store.subscribe(() => notified++);
   store.refreshDevice();
@@ -129,19 +187,21 @@ test('"follow the device" follows it live: a changed device reading re-resolves 
   assert.equal(notified, 1);
 });
 
-test('the chooser lists only released values; with the gate closed Idioma offers the device default and Español, and Región is not shown', () => {
-  const state = createLocaleStore({ devices: () => device('en-US', 'US'), store: memory().store }).getState();
+test('the chooser lists only released values: a Spanish-only gate offers the device default and Español and hides Región; the default gate lists both of each', () => {
+  const state = createLocaleStore({ devices: () => device('en-US', 'US'), store: memory().store, released: SPANISH_ONLY }).getState();
   const t = bind.bindLocale(state.locale).t;
   const languages = localeOptions.preferenceChoices('language', state, t);
-  assert.deepEqual(languages.options.map(option => option.value), ['system', 'es'], 'English is not offered, not even greyed out');
-  assert.equal(languages.options[0].subtitle, 'Ahora: Español', 'honest: the English iPhone gets Spanish today');
+  assert.deepEqual(languages.options.map(option => option.value), ['system', 'es'], 'a language held back is not offered, not even greyed out');
+  assert.equal(languages.options[0].subtitle, 'Ahora: Español', 'honest: the English iPhone gets Spanish in such a build');
   assert.equal(languages.selected, 'system');
   assert.equal(localeOptions.showsPreference('language', state), true);
-  assert.equal(localeOptions.showsPreference('region', state), false, 'Región waits for 23.1C');
+  assert.equal(localeOptions.showsPreference('region', state), false, 'a single released region: no Región row');
   assert.deepEqual(localeOptions.preferenceChoices('region', state, t).options.map(option => option.value), ['system', 'AR']);
   assert.equal(localeOptions.preferenceSummary('language', state, t), 'Español · según el dispositivo');
-  // With both released (the 23.1C state), each region shows its conventions in the current language.
-  const open = createLocaleStore({ devices: () => device('en-US', 'US'), store: memory().store, released: ALL }).getState();
+  // The default gate (23.1C2): each region shows its conventions in the current language.
+  const open = createLocaleStore({ devices: () => device('en-US', 'US'), store: memory().store }).getState();
+  assert.deepEqual(localeOptions.languageOptions(open, bind.bindLocale(open.locale).t).map(option => [option.value, option.title, option.subtitle ?? '']),
+    [['system', 'Same as device', 'Now: English'], ['es', 'Español', ''], ['en', 'English', '']], 'each language by its own name');
   const tEn = bind.bindLocale(open.locale).t;
   assert.deepEqual(localeOptions.regionOptions(open, tEn).map(option => [option.title, option.subtitle]),
     [['Same as device', 'Now: United States'], ['Argentina', '22/9/2026 · 1.234,56'], ['United States', '9/22/2026 · 1,234.56']]);
@@ -150,11 +210,12 @@ test('the chooser lists only released values; with the gate closed Idioma offers
 
 // ---- The real provider on a real reconciler ---------------------------------
 
-function loadModule(path: string, modules: Record<string, unknown>) {
+/** Runs a source file with a hand-written dependency map; `globals` are the bundle's own (process.env, __DEV__). */
+function loadModule(path: string, modules: Record<string, unknown>, globals: Record<string, unknown> = {}) {
   const source = readFileSync(new URL(path, import.meta.url), 'utf8');
   const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText;
   const module = { exports: {} as Record<string, any> };
-  runInNewContext(code, { module, exports: module.exports, require: (name: string) => {
+  runInNewContext(code, { ...globals, module, exports: module.exports, require: (name: string) => {
     if (!Object.hasOwn(modules, name)) throw new Error('Unexpected dependency of ' + path + ': ' + name);
     return modules[name];
   } });
@@ -167,23 +228,38 @@ function appState() {
     emit: (status: string) => { for (const listener of listeners) listener(status); } };
 }
 
-function loadProvider(runtimeStore?: () => LocaleStore) {
-  const native = appState();
+/** iOS's locale-change event as the provider reaches it (device-runtime's
+ * `subscribeRuntimeLocaleChanges`): the listeners are kept, the unsubscribe
+ * removes them, and `emit` stands for NSCurrentLocaleDidChangeNotification. */
+function localeEvents() {
+  const listeners = new Set<() => void>();
+  return { listeners, subscribe: (listener: () => void) => { listeners.add(listener); return () => { listeners.delete(listener); }; },
+    emit: () => { for (const listener of [...listeners]) listener(); } };
+}
+
+/** The real provider. `runtimeDevices` is what the probed device reader
+ * returns to a provider that builds its own store (no `store` prop). */
+function loadProvider(runtimeDevices?: () => DeviceReading, globals: Record<string, unknown> = {}) {
+  const native = appState(), events = localeEvents();
   const provider = loadModule('../src/i18n/provider.tsx', {
     react: React, 'react-native': { AppState: native.AppState },
     './bind.ts': bind, './locale.ts': locale, './preference.ts': preference, './store.ts': storeModule,
-    './device-runtime': { readRuntimeDeviceLocales: () => { if (!runtimeStore) throw new Error('the runtime device reader must not run when a store is given'); return runtimeStore().getState().device; } },
-  });
-  return { provider, native };
+    './device-runtime': {
+      readRuntimeDeviceLocales: () => { if (!runtimeDevices) throw new Error('the runtime device reader must not run when a store is given'); return runtimeDevices(); },
+      subscribeRuntimeLocaleChanges: events.subscribe,
+    },
+  }, globals);
+  return { provider, native, events };
 }
 
 /** A stand-in for the app: a ledger provider that must never re-render or
  * remount, a navigation stack holding a form with a half-typed draft and the
  * Assistant with a conversation, all under the real I18nProvider. */
 function mountApp(store: LocaleStore) {
-  const { provider, native } = loadProvider();
+  const { provider, native, events } = loadProvider();
   const counts = { ledgerRenders: 0, ledgerMounts: 0, navigationMounts: 0, formMounts: 0, formRenders: 0, assistantMounts: 0, unmounts: 0 };
-  const handles: { setDraft?: (value: string) => void; addMessage?: (value: string) => void; choose?: ReturnType<typeof provider.useLocalePreferences> } = {};
+  const handles: { setDraft?: (value: string) => void; addMessage?: (value: string) => void; choose?: ReturnType<typeof provider.useLocalePreferences>;
+    i18n?: ReturnType<typeof provider.useI18n> } = {};
   const lifecycle = (key: keyof typeof counts) => React.useEffect(() => { counts[key]++; return () => { counts.unmounts++; }; }, []);
   function Ledger({ children }: { children: React.ReactNode }) { counts.ledgerRenders++; lifecycle('ledgerMounts'); return children; }
   function Navigation({ children }: { children: React.ReactNode }) { lifecycle('navigationMounts'); return h('stack', null, children); }
@@ -193,7 +269,8 @@ function mountApp(store: LocaleStore) {
     const i18n = provider.useI18n();
     const [draft, setDraft] = React.useState('');
     handles.setDraft = setDraft;
-    return h('form', { title: i18n.t('amount.label'), draft, total: i18n.moneyText(123456, 'ARS'), date: i18n.formatDate('2026-09-22', 'dayYear'), accessibilityLabel: i18n.spokenMoney(123456, 'ARS') });
+    return h('form', { title: i18n.t('amount.label'), draft, total: i18n.moneyText(123456, 'ARS'), date: i18n.formatDate('2026-09-22', 'dayYear'),
+      accessibilityLabel: i18n.spokenMoney(123456, 'ARS'), accessibilityLanguage: i18n.speechLanguage });
   }
   function Assistant() {
     lifecycle('assistantMounts');
@@ -202,23 +279,24 @@ function mountApp(store: LocaleStore) {
     handles.addMessage = message => setMessages(list => [...list, message]);
     return h('assistant', { messages, cancel: t('common.cancel') });
   }
-  function Chooser() { handles.choose = provider.useLocalePreferences(); return null; }
+  // The chooser re-renders on every preferences change; the I18n value it reads shows whether the forms' value changed.
+  function Chooser() { handles.choose = provider.useLocalePreferences(); handles.i18n = provider.useI18n(); return null; }
   let root!: ReturnType<typeof renderer.create>;
   act(() => { root = renderer.create(h(provider.I18nProvider, { store }, h(Ledger, null, h(Navigation, null, h(EntryForm), h(Assistant), h(Chooser))))); });
   const form = () => root.root.findByType('form' as never).props;
   const assistant = () => root.root.findByType('assistant' as never).props;
-  return { root, counts, handles, form, assistant, native };
+  return { root, counts, handles, form, assistant, native, events };
 }
 
 test('switching the language with a form and a conversation mounted: labels change in place, nothing remounts, the draft and the messages survive', () => {
-  const store = createLocaleStore({ devices: () => device('es-AR', 'AR'), store: memory().store, released: ALL });
+  const store = createLocaleStore({ devices: () => device('es-AR', 'AR'), store: memory().store });
   const app = mountApp(store);
   assert.deepEqual([app.form().title, app.form().total, app.form().date, app.assistant().cancel], ['Monto', '$ 1.234,56', '22 sep 2026', 'Cancelar']);
   act(() => { app.handles.setDraft!('1.234,5'); app.handles.addMessage!('¿Cuánto gasté en comida?'); });
   act(() => { assert.equal(app.handles.choose!.setLanguage('en'), true); });
   assert.deepEqual([app.form().title, app.form().date, app.assistant().cancel], ['Amount', 'Sep 22, 2026', 'Cancel'], 'the words follow the new language at once');
   assert.equal(app.form().total, '$ 1.234,56', 'English with Argentine conventions: the amount is written exactly as before');
-  assert.equal(app.form().accessibilityLabel, '1,234.56 pesos', 'VoiceOver strings re-render too, in the numbers of the new language');
+  assert.equal(app.form().accessibilityLabel, '1234.56 pesos', 'VoiceOver strings re-render too, with the decimal mark of the new language and no grouping');
   assert.equal(app.form().draft, '1.234,5', 'the half-typed amount survives');
   assert.deepEqual(app.assistant().messages, ['¿Cuánto gasté en comida?'], 'the conversation survives');
   assert.deepEqual([app.counts.ledgerMounts, app.counts.navigationMounts, app.counts.formMounts, app.counts.assistantMounts, app.counts.unmounts], [1, 1, 1, 1, 0], 'nothing remounted');
@@ -235,7 +313,7 @@ test('switching the language with a form and a conversation mounted: labels chan
 
 test('saving a choice that resolves to the same locale re-renders no screen; a failed save re-renders nothing and keeps the choice', () => {
   const saved = memory();
-  const store = createLocaleStore({ devices: () => device('es-AR', 'AR'), store: saved.store, released: ALL });
+  const store = createLocaleStore({ devices: () => device('es-AR', 'AR'), store: saved.store });
   const app = mountApp(store);
   const renders = app.counts.formRenders;
   act(() => { app.handles.choose!.setLanguage('es'); });
@@ -253,7 +331,7 @@ test('saving a choice that resolves to the same locale re-renders no screen; a f
 
 test('returning to the foreground re-reads the device: "follow the device" updates in place; the listener is removed on unmount', () => {
   let reading = device('es-AR', 'AR');
-  const store = createLocaleStore({ devices: () => reading, store: memory().store, released: ALL });
+  const store = createLocaleStore({ devices: () => reading, store: memory().store });
   const app = mountApp(store);
   act(() => app.handles.setDraft!('50'));
   reading = device('en-US', 'US');
@@ -262,18 +340,128 @@ test('returning to the foreground re-reads the device: "follow the device" updat
   act(() => app.native.emit('active'));
   assert.deepEqual([app.form().title, app.form().total, app.form().draft], ['Amount', 'AR$ 1,234.56', '50']);
   assert.equal(app.counts.formMounts, 1);
-  assert.equal(app.native.listeners.size, 1);
+  assert.deepEqual([app.native.listeners.size, app.events.listeners.size], [1, 1]);
   act(() => app.root.unmount());
-  assert.equal(app.native.listeners.size, 0, 'no listener left behind');
+  assert.deepEqual([app.native.listeners.size, app.events.listeners.size], [0, 0], 'no listener left behind');
 });
 
-test('with the release gate closed, the provider keeps the whole app in Spanish with Argentine conventions whatever the device says', () => {
-  const store = createLocaleStore({ devices: () => device('en-US', 'US'), store: memory({ [LANGUAGE_PREFERENCE_KEY]: 'en', [REGION_PREFERENCE_KEY]: 'US' }).store });
+test('iOS\'s locale-change event re-reads the device with no foreground signal: labels change in place, the draft and the conversation survive, a following "active" re-renders nothing', () => {
+  let reading = device('es-AR', 'AR');
+  const store = createLocaleStore({ devices: () => reading, store: memory().store });
+  const app = mountApp(store);
+  assert.deepEqual([app.native.listeners.size, app.events.listeners.size], [1, 1], 'one listener for each signal');
+  act(() => { app.handles.setDraft!('1.234,5'); app.handles.addMessage!('¿Cuánto gasté en comida?'); });
+  const renders = app.counts.formRenders;
+  act(() => app.events.emit());
+  assert.equal(app.counts.formRenders, renders, 'an unchanged device re-renders nothing');
+  reading = device('en-US', 'US');
+  act(() => app.events.emit());
+  assert.deepEqual([app.form().title, app.form().total, app.form().date, app.assistant().cancel], ['Amount', 'AR$ 1,234.56', 'Sep 22, 2026', 'Cancel']);
+  assert.equal(app.form().draft, '1.234,5', 'the half-typed amount survives');
+  assert.deepEqual(app.assistant().messages, ['¿Cuánto gasté en comida?'], 'the conversation survives');
+  assert.deepEqual([app.counts.ledgerMounts, app.counts.navigationMounts, app.counts.formMounts, app.counts.assistantMounts, app.counts.unmounts], [1, 1, 1, 1, 0], 'nothing remounted');
+  assert.equal(app.counts.ledgerRenders, 1);
+  const after = app.counts.formRenders;
+  assert.equal(after, renders + 1, 'one re-render for the change');
+  // The two signals arrive in no documented order; whichever comes second finds the device already read.
+  act(() => app.native.emit('active'));
+  act(() => app.events.emit());
+  assert.equal(app.counts.formRenders, after, 'a following "active" (or a repeated event) re-renders nothing');
+  act(() => app.root.unmount());
+  assert.deepEqual([app.native.listeners.size, app.events.listeners.size], [0, 0], 'unmount removes both listeners');
+});
+
+test('a device read that throws, on return to the foreground or on iOS\'s event, keeps the locale and the draft and never throws out of the listener', () => {
+  let reading = device('es-AR', 'AR'), broken = false;
+  const store = createLocaleStore({ devices: () => { if (broken) throw new TypeError('getLocales is broken'); return reading; }, store: memory().store });
+  const app = mountApp(store);
+  act(() => app.handles.setDraft!('1.234,5'));
+  const renders = app.counts.formRenders;
+  broken = true;
+  reading = device('en-US', 'US');
+  assert.doesNotThrow(() => act(() => app.native.emit('active')));
+  assert.doesNotThrow(() => act(() => app.events.emit()));
+  assert.deepEqual([app.form().title, app.form().total, app.form().draft], ['Monto', '$ 1.234,56', '1.234,5'], 'the last good reading stays on screen, the draft with it');
+  assert.equal(app.counts.formRenders, renders, 'nothing re-rendered');
+  assert.equal(app.counts.formMounts, 1);
+  assert.deepEqual({ ...app.handles.choose!.state.preferences }, { language: 'system', region: 'system' }, 'no choice reset');
+  broken = false;
+  act(() => app.native.emit('active'));
+  assert.deepEqual([app.form().title, app.form().draft], ['Amount', '1.234,5'], 'the next good reading applies');
+  act(() => app.root.unmount());
+});
+
+test('an explicit region ignores a device Region change: forms do not re-render, only the chooser\'s "Según el dispositivo" subtitle moves', () => {
+  let reading = device('es-AR', 'AR');
+  const store = createLocaleStore({ devices: () => reading, store: memory().store });
+  const app = mountApp(store);
+  act(() => { assert.equal(app.handles.choose!.setRegion('AR'), true); });
+  act(() => app.handles.setDraft!('1.234,5'));
+  const renders = app.counts.formRenders, value = app.handles.i18n;
+  reading = device('es-AR', 'US');
+  act(() => app.native.emit('active'));
+  assert.equal(app.counts.formRenders, renders, 'the form does not re-render');
+  assert.equal(app.handles.i18n, value, 'the I18n value is the same object');
+  assert.deepEqual([app.form().total, app.form().draft], ['$ 1.234,56', '1.234,5']);
+  const state = app.handles.choose!.state;
+  assert.deepEqual([state.region, state.device.region], ['AR', 'US'], 'the chooser sees the device move');
+  assert.equal(localeOptions.regionOptions(state, app.handles.i18n!.t)[0].subtitle, 'Ahora: Estados Unidos');
+  act(() => app.root.unmount());
+});
+
+test('VoiceOver\'s language through the real provider: English on a Spanish iPhone names it, Spanish again clears it, and a same-locale save re-renders nothing', () => {
+  const app = mountApp(createLocaleStore({ devices: () => device('es-AR', 'AR'), store: memory().store }));
+  assert.equal(app.form().accessibilityLanguage, undefined, 'device and app agree: VoiceOver keeps the voice chosen in iOS Settings');
+  act(() => { app.handles.choose!.setLanguage('en'); });
+  assert.deepEqual([app.form().title, app.form().accessibilityLabel, app.form().accessibilityLanguage], ['Amount', '1234.56 pesos', 'en'],
+    'English labels on a Spanish iPhone are spoken by an English voice');
+  act(() => { app.handles.choose!.setLanguage('es'); });
+  assert.deepEqual([app.form().title, app.form().accessibilityLanguage], ['Monto', undefined]);
+  const renders = app.counts.formRenders;
+  act(() => { app.handles.choose!.setLanguage('system'); });
+  assert.equal(app.counts.formRenders, renders, 'Español → Según el dispositivo on a Spanish iPhone: same locale, same voice, no re-render');
+  act(() => app.root.unmount());
+  // A device language without a catalogue: the app reads Spanish and tells VoiceOver so.
+  let reading = device('pt-BR', 'BR');
+  const portuguese = mountApp(createLocaleStore({ devices: () => reading, store: memory().store }));
+  assert.deepEqual([portuguese.form().title, portuguese.form().accessibilityLanguage], ['Monto', 'es']);
+  // Portuguese → French: another language without a catalogue. Still Spanish, still a Spanish voice: nothing re-renders.
+  const before = portuguese.counts.formRenders;
+  reading = device('fr-FR', 'FR');
+  act(() => portuguese.events.emit());
+  assert.equal(portuguese.counts.formRenders, before, 'the I18n value is keyed on whether VoiceOver needs the interface language, not on the device language itself');
+  assert.equal(portuguese.form().accessibilityLanguage, 'es');
+  act(() => portuguese.root.unmount());
+});
+
+test('with a narrower gate, the provider keeps the whole app in Spanish with Argentine conventions whatever the device and the saved rows say', () => {
+  const store = createLocaleStore({ devices: () => device('en-US', 'US'), store: memory({ [LANGUAGE_PREFERENCE_KEY]: 'en', [REGION_PREFERENCE_KEY]: 'US' }).store,
+    released: SPANISH_ONLY });
   const app = mountApp(store);
   assert.deepEqual([app.form().title, app.form().total, app.form().date], ['Monto', '$ 1.234,56', '22 sep 2026']);
+  assert.equal(app.form().accessibilityLanguage, 'es', 'an English iPhone reading Spanish: VoiceOver is told the labels are Spanish');
   act(() => { assert.equal(app.handles.choose!.setLanguage('en'), false); });
   assert.equal(app.form().title, 'Monto');
   act(() => app.root.unmount());
+});
+
+test('the runtime store of a release bundle (no store prop, no preview flag) opens the default gate: an English iPhone reads English, and iOS\'s event reaches it', () => {
+  let reading = device('en-US', 'US');
+  // A release bundle: babel-preset-expo inlines __DEV__ as false and the flag as undefined. Node has no
+  // key-value store, which reads as "follow the device" (preference.ts never throws on it).
+  const { provider, native, events } = loadProvider(() => reading, { process: { env: {} }, __DEV__: false });
+  let i18n!: ReturnType<typeof provider.useI18n>, preferences!: ReturnType<typeof provider.useLocalePreferences>;
+  function Probe() { i18n = provider.useI18n(); preferences = provider.useLocalePreferences(); return null; }
+  let root!: ReturnType<typeof renderer.create>;
+  act(() => { root = renderer.create(h(provider.I18nProvider, null, h(Probe))); });
+  assert.deepEqual([i18n.locale, i18n.speechLanguage, i18n.localeSource], ['en-US', undefined, 'native']);
+  assert.equal(preferences!.state.released, locale.RELEASED, 'the release gate itself, not the preview set');
+  reading = device('en-US', 'AR');
+  act(() => events.emit());
+  assert.equal(i18n.locale, 'en-AR', 'a Region change while running, through the native event');
+  assert.deepEqual([native.listeners.size, events.listeners.size], [1, 1]);
+  act(() => root.unmount());
+  assert.deepEqual([native.listeners.size, events.listeners.size], [0, 0]);
 });
 
 test('without a store prop the provider builds the runtime store once; a provider without children changes is never recreated', () => {
@@ -304,7 +492,7 @@ function loadPreferenceScreen(provider: Record<string, any>) {
 
 test('Idioma: a tap saves and applies in place, the checkmark moves, the screen title follows the language, and a failed save keeps the old checkmark', () => {
   const saved = memory();
-  const store = createLocaleStore({ devices: () => device('es-AR', 'AR'), store: saved.store, released: ALL });
+  const store = createLocaleStore({ devices: () => device('es-AR', 'AR'), store: saved.store });
   const { provider } = loadProvider();
   const { screen, haptics } = loadPreferenceScreen(provider);
   let root!: ReturnType<typeof renderer.create>;
@@ -332,16 +520,37 @@ test('Idioma: a tap saves and applies in place, the checkmark moves, the screen 
   act(() => root.unmount());
 });
 
-test('Idioma with the gate closed lists no unfinished language and explains why; Región lists its conventions when opened', () => {
-  const store = createLocaleStore({ devices: () => device('en-US', 'US'), store: memory().store });
+test('Idioma and Región on the default gate: Según el dispositivo, Español and English; Argentina and Estados Unidos with their samples; no "for now" note', () => {
+  const store = createLocaleStore({ devices: () => device('es-AR', 'US'), store: memory().store });
   const { provider } = loadProvider();
   const { screen } = loadPreferenceScreen(provider);
   let root!: ReturnType<typeof renderer.create>;
   act(() => { root = renderer.create(h(provider.I18nProvider, { store }, h(screen.LocalePreferenceScreen, { kind: 'language' }))); });
-  assert.deepEqual(root.root.findAllByType('CheckRow' as never).map(row => row.props.title), ['Según el dispositivo', 'Español']);
-  const note = root.root.findAllByType('AppText' as never).map(node => String(node.props.children)).join(' ');
-  assert.match(note, /Por ahora FinanzApp está disponible en español/);
-  assert.match(note, /no modifica tus movimientos, tus cuentas ni tus copias de seguridad/);
+  const rows = () => root.root.findAllByType('CheckRow' as never).map(row => row.props);
+  const note = () => root.root.findAllByType('AppText' as never).map(node => String(node.props.children)).join(' ');
+  assert.equal(root.root.findByType('Stack.Screen' as never).props.options.title, 'Idioma');
+  assert.deepEqual(rows().map(row => [row.title, row.subtitle ?? '', row.selected]), [['Según el dispositivo', 'Ahora: Español', true], ['Español', '', false], ['English', '', false]]);
+  assert.deepEqual(rows().map(row => row.accessibilityLanguage ?? ''), ['', 'es', 'en'], 'each language is spoken in its own language, as in iOS Settings');
+  assert.doesNotMatch(note(), /Por ahora/, 'English is released: the note no longer says the app is Spanish-only');
+  assert.match(note(), /no modifica tus movimientos, tus cuentas ni tus copias de seguridad/);
+  act(() => root.update(h(provider.I18nProvider, { store }, h(screen.LocalePreferenceScreen, { kind: 'region' }))));
+  assert.equal(root.root.findByType('Stack.Screen' as never).props.options.title, 'Región');
+  assert.deepEqual(rows().map(row => [row.title, row.subtitle, row.selected]), [['Según el dispositivo', 'Ahora: Estados Unidos', true],
+    ['Argentina', '22/9/2026 · 1.234,56', false], ['Estados Unidos', '9/22/2026 · 1,234.56', false]], 'Spanish names, each region\'s own conventions');
+  assert.match(note(), /No cambia la moneda de tus cuentas/);
+  act(() => rows()[1].onPress());
+  assert.deepEqual(rows().map(row => row.selected), [false, true, false], 'Argentina chosen over the device\'s United States');
+  act(() => root.unmount());
+});
+
+test('Idioma with a narrower gate lists no unfinished language; Región lists only the released region', () => {
+  const store = createLocaleStore({ devices: () => device('en-US', 'US'), store: memory().store, released: SPANISH_ONLY });
+  const { provider } = loadProvider();
+  const { screen } = loadPreferenceScreen(provider);
+  let root!: ReturnType<typeof renderer.create>;
+  act(() => { root = renderer.create(h(provider.I18nProvider, { store }, h(screen.LocalePreferenceScreen, { kind: 'language' }))); });
+  assert.deepEqual(root.root.findAllByType('CheckRow' as never).map(row => [row.props.title, row.props.subtitle ?? '']), [['Según el dispositivo', 'Ahora: Español'], ['Español', '']]);
+  assert.match(root.root.findAllByType('AppText' as never).map(node => String(node.props.children)).join(' '), /no modifica tus movimientos, tus cuentas ni tus copias de seguridad/);
   act(() => root.update(h(provider.I18nProvider, { store }, h(screen.LocalePreferenceScreen, { kind: 'region' }))));
   assert.deepEqual(root.root.findAllByType('CheckRow' as never).map(row => [row.props.title, row.props.subtitle]), [['Según el dispositivo', 'Ahora: Argentina'], ['Argentina', '22/9/2026 · 1.234,56']]);
   assert.equal(root.root.findByType('Stack.Screen' as never).props.options.title, 'Región');
@@ -373,19 +582,19 @@ function loadAmountField(provider: Record<string, any>, announcements: string[])
   });
 }
 
-test('the amount field under the real provider: typing, a region change with the amount half-typed, a refused paste and a language change', () => {
-  const { parseMinorUnits } = require('@finanzapp/domain') as typeof import('@finanzapp/domain');
-  const store = createLocaleStore({ devices: () => device('es-AR', 'AR'), store: memory().store, released: ALL });
-  const { provider } = loadProvider();
+/** A form holding an ARS amount draft (ledger notation) in the real
+ * AmountField under the real provider; every draft the field emits is kept. */
+function mountAmountField(store: LocaleStore) {
+  const { provider, native, events } = loadProvider();
   const announcements: string[] = [];
   const components = loadAmountField(provider, announcements);
   const drafts: string[] = [];
-  let formMounts = 0;
-  let choose!: ReturnType<typeof provider.useLocalePreferences>;
+  const counts = { formMounts: 0 };
+  const handles: { choose?: ReturnType<typeof provider.useLocalePreferences> } = {};
   function Form() {
-    React.useEffect(() => { formMounts++; }, []);
+    React.useEffect(() => { counts.formMounts++; }, []);
     const [amount, setAmount] = React.useState('');
-    choose = provider.useLocalePreferences();
+    handles.choose = provider.useLocalePreferences();
     return h(components.AmountField, { currency: 'ARS', value: amount, onChangeText: (value: string) => { drafts.push(value); setAmount(value); } });
   }
   let root!: ReturnType<typeof renderer.create>;
@@ -398,6 +607,15 @@ test('the amount field under the real provider: typing, a region change with the
     const text = value.slice(0, caret) + char + value.slice(caret);
     act(() => input().onChange({ nativeEvent: { text, selection: { start: caret + char.length, end: caret + char.length } } }));
   };
+  return { root, input, texts, type, drafts, announcements, counts, choose: () => handles.choose!, native, events };
+}
+
+test('the amount field under the real provider: typing, a region change with the amount half-typed, a refused paste and a language change', () => {
+  const { parseMinorUnits } = require('@finanzapp/domain') as typeof import('@finanzapp/domain');
+  const store = createLocaleStore({ devices: () => device('es-AR', 'AR'), store: memory().store });
+  const field = mountAmountField(store);
+  const { root, input, texts, type, drafts, announcements, counts } = field;
+  const choose = field.choose();
   for (const key of '1234,5') type(key);
   assert.equal(input().value, '1.234,5');
   assert.equal(drafts.at(-1), '1.234,5');
@@ -422,7 +640,7 @@ test('the amount field under the real provider: typing, a region change with the
   assert.ok(texts().includes(note), 'the note says why');
   assert.deepEqual(announcements, [note], 'and VoiceOver hears it');
   act(() => { choose.setLanguage('en'); });
-  assert.ok(texts().includes('Didn’t paste “1.000”: it can be read two ways. Type decimals with “.”.'), 'the note follows a language change like any label');
+  assert.ok(texts().includes('Didn’t paste “1.000”: it can be read two ways. Use “.” for decimals.'), 'the note follows a language change like any label');
   assert.equal(input().accessibilityLabel, 'Amount in Argentine pesos');
   act(() => input().onSelectionChange({ nativeEvent: { selection: { start: 8, end: 8 }, text: '12,349.5' } }));
   type('7');
@@ -437,6 +655,34 @@ test('the amount field under the real provider: typing, a region change with the
   act(() => { choose.setRegion('AR'); });
   act(() => input().onBlur({}));
   assert.deepEqual([input().value, drafts.at(-1)], ['12.349,57', '12.349,57']);
-  assert.equal(formMounts, 1, 'the form was never remounted');
+  assert.equal(counts.formMounts, 1, 'the form was never remounted');
+  act(() => root.unmount());
+});
+
+test('following the device, a US→AR Region change on return to the foreground reformats a half-typed amount in place and emits no new draft', () => {
+  const { parseMinorUnits } = require('@finanzapp/domain') as typeof import('@finanzapp/domain');
+  let reading = device('es-US', 'US');
+  const store = createLocaleStore({ devices: () => reading, store: memory().store });
+  const { root, input, texts, type, drafts, counts, native } = mountAmountField(store);
+  for (const key of '1234.5') type(key);
+  assert.deepEqual([input().value, drafts.at(-1)], ['1,234.5', '1.234,5'], 'US separators on screen, ledger notation in the draft');
+  assert.ok(texts().includes('AR$'));
+  act(() => input().onSelectionChange({ nativeEvent: { selection: { start: 5, end: 5 }, text: '1,234.5' } })); // after the 4
+  // A refused paste leaves a note that belongs to the US reading of it.
+  act(() => input().onChange({ nativeEvent: { text: '1,234.51.000', selection: { start: 12, end: 12 } } }));
+  assert.equal(texts().some(text => text.startsWith('No se pegó')), true);
+  const before = drafts.length;
+  // iOS Settings → Region: Argentina, then back to FinanzApp (iOS keeps the app running across a Region change).
+  reading = device('es-AR', 'AR');
+  act(() => native.emit('active'));
+  assert.equal(input().value, '1.234,5', 'the separators follow the device region at once');
+  assert.deepEqual({ ...input().selection }, { start: 5, end: 5 }, 'the caret is still after the 4');
+  assert.equal(drafts.length, before, 'no new draft: the form never hears of the region change');
+  assert.equal(parseMinorUnits(drafts.at(-1)!), 123450, 'the amount the form would save is the same integer minor units');
+  assert.ok(texts().includes('$'), 'the peso is a bare "$" again');
+  assert.equal(texts().some(text => text.startsWith('No se pegó')), false, 'no stale note from the other region');
+  assert.equal(counts.formMounts, 1, 'nothing remounted');
+  type('9');
+  assert.deepEqual([input().value, drafts.at(-1)], ['12.349,5', '12.349,5'], 'typing goes on in Argentine separators');
   act(() => root.unmount());
 });

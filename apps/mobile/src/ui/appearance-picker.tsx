@@ -17,7 +17,7 @@ function nameOf(t: Translate, group: 'icons' | 'accountIcons' | 'colors', id: st
 }
 
 /** The one picker for a look, shared by accounts and categories: a preview
- * tile with the name, then Icono as a grid of round tiles and Color as a row
+ * tile with the name, then Ícono as a grid of round tiles and Color as a row
  * of dots. Selection is obvious (the chosen tile fills with the chosen colour
  * and gets a ring; the chosen dot gets a ring and a check), ticks one selection
  * haptic, animates only a colour change (nothing under Reduce Motion) and
@@ -32,7 +32,7 @@ export function IconColorPicker({ icons, colors, icon, color, onIconChange, onCo
   previewLabel?: string;
 }) {
   const p = usePalette();
-  const { t } = useI18n();
+  const { t, speechLanguage } = useI18n();
   const hex = appearanceHex(color, p);
   const iconGroup = icons === ACCOUNT_ICON_CHOICES ? 'accountIcons' : 'icons';
   const iconName = (item: IconChoice) => nameOf(t, iconGroup, item.id, item.name);
@@ -40,7 +40,7 @@ export function IconColorPicker({ icons, colors, icon, color, onIconChange, onCo
   const current = icons.find(item => item.id === icon) ?? icons[0];
   const currentColor = colorName(color, appearanceName(color));
   return <View style={{ gap: space.l }}>
-    <View accessible accessibilityLabel={t('categoryManager.picker.preview', { icon: iconName(current), color: currentColor })}
+    <View accessible accessibilityLabel={t('categoryManager.picker.preview', { icon: iconName(current), color: currentColor })} accessibilityLanguage={speechLanguage}
       style={{ flexDirection: 'row', alignItems: 'center', gap: 14, padding: 14, borderRadius: 16, backgroundColor: p.surface }}>
       <GlyphTile icon={current.glyph} color={hex} size={52} large />
       <View style={{ flex: 1, minWidth: 0, gap: 2 }}>

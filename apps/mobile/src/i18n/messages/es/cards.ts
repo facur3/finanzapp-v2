@@ -37,6 +37,7 @@ export const cards = {
     },
     /** One line of statement facts under the activity title. */
     statement: {
+      /** `{date}` is the day inside the sentence: "desde ayer", "desde 29 ago". */
       openSince: 'Resumen abierto desde {date}',
       purchases: { one: '{count} compra', other: '{count} compras' },
       payments: { one: '{count} pago', other: '{count} pagos' },
@@ -60,7 +61,8 @@ export const cards = {
       card: 'Tarjeta',
       currency: 'Moneda',
       name: 'Nombre de la tarjeta',
-      namePlaceholder: 'Ej. Visa Galicia',
+      /** An example name without a bank: the issuer has its own field, and a bank of one country reads oddly in another region. */
+      namePlaceholder: 'Ej. Visa Gold',
       pesos: 'Pesos · ARS',
       dollars: 'Dólares · USD',
       openingDebt: 'Deuda actual (opcional)',

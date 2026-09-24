@@ -5,7 +5,8 @@ import { validateAssistantRequest, validateAssistantResult, validateCapture,
  * Its own failures are thrown as catalogue keys (`assistant.integration.*`):
  * stable ids that callers classify (see `failureReason`) and that the screen
  * translates at display through `errorText`. Contract validation errors from
- * packages/integrations are thrown as they are. */
+ * packages/integrations are thrown as they are; the Assistant client lets only
+ * the keys reach the screen (`failureMessage` in src/assistant/client.ts). */
 export function integrationClient(baseURL: string, getAccessToken: () => Promise<string | null>, fetcher: typeof fetch = fetch) { // i18n-ignore: a generic type, not copy
   const url = new URL(baseURL);
   if (url.protocol !== 'https:' || url.username || url.password || url.search || url.hash || url.pathname !== '/') throw new Error('assistant.integration.httpsOrigin');

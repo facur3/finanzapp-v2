@@ -14,12 +14,13 @@ import { usePalette, useReduceMotion } from './theme';
 import { useI18n } from '../i18n/provider';
 
 /** Contextual help for a metric: one native alert with the definition, so the
- * screen itself carries no disclaimer copy. */
+ * screen itself carries no disclaimer copy. Its button is named from the
+ * catalogue, so it follows the interface language instead of the iPhone's (see InfoButton). */
 export function MetricHelp({ title, detail }: { title: string; detail: string }) {
   const p = usePalette();
   const { t } = useI18n();
   return <PressFeedback feedback="opacity" accessibilityRole="button" accessibilityLabel={t('common.whatIs', { title })} hitSlop={8}
-    onPress={() => Alert.alert(title, detail)} style={{ minHeight: 24, paddingHorizontal: 4 }}>
+    onPress={() => Alert.alert(title, detail, [{ text: t('common.ok') }])} style={{ minHeight: 24, paddingHorizontal: 4 }}>
     <Ionicons name="information-circle-outline" size={18} color={p.tertiary} accessible={false} />
   </PressFeedback>;
 }
@@ -146,8 +147,9 @@ export function UpcomingRecurringRow({ rule, account, day, last }: {
   const date = relativeDate(rule.nextDateISO, day);
   const days = Math.round((Date.parse(rule.nextDateISO + 'T12:00:00Z') - Date.parse(day + 'T12:00:00Z')) / 86400000);
   const when = days === 0 ? t('home.upcomingRow.today') : days === 1 ? t('home.upcomingRow.tomorrow') : t('home.upcomingRow.inDays', { count: days });
+  // The caption starts its line ("Hoy · Banco"); VoiceOver's sentence carries the day inside it ("próximo pago hoy").
   return <PressFeedback feedback="highlight" accessibilityRole="button"
-    accessibilityLabel={t('home.upcomingRow.label', { merchant: rule.merchant, amount: spokenAmount(rule.amountMinor, account.currency), date })}
+    accessibilityLabel={t('home.upcomingRow.label', { merchant: rule.merchant, amount: spokenAmount(rule.amountMinor, account.currency), date: relativeDate(rule.nextDateISO, day, true) })}
     onPress={() => router.push({ pathname: '/edit-recurring/[id]', params: { id: rule.id } })}
     style={[styles.row, { borderBottomWidth: last ? 0 : StyleSheet.hairlineWidth, borderBottomColor: p.line }]}>
     <CategoryBadge category={rule.category} kind={rule.kind} />

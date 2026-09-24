@@ -18,7 +18,7 @@ export default function AccountScreen() {
   const { snapshot, archive } = useLedger();
   const day = useCurrentDay();
   const p = usePalette();
-  const { t, codedAmount } = useI18n();
+  const { t, codedAmount, spokenAmount } = useI18n();
   const entries = useMemo(() => snapshot ? selectEntries(snapshot.entries, snapshot.accounts, 'all', '', id) : [], [snapshot, id]);
   const transfers = useMemo(() => snapshot ? selectTransfers(snapshot.transfers ?? [], snapshot.accounts, '', id) : [], [snapshot, id]);
   const account = snapshot?.accounts.find(item => item.id === id);
@@ -58,7 +58,8 @@ export default function AccountScreen() {
       <Surface grouped>
         <DetailRow label={t('accounts.detail.recurring')} value={recurringCount ? t('accounts.detail.activeRecurring', { count: recurringCount }) : t('accounts.detail.schedule')} icon="repeat-outline"
           onPress={() => router.push({ pathname: '/recurring', params: { accountId: id } })} />
-        <DetailRow label={t('accounts.detail.openingBalance')} value={codedAmount(account.openingMinor, account.currency)} icon="flag-outline" last />
+        <DetailRow label={t('accounts.detail.openingBalance')} value={codedAmount(account.openingMinor, account.currency)}
+          spokenValue={spokenAmount(account.openingMinor, account.currency)} icon="flag-outline" last />
       </Surface>
       <SectionTitle>{t('accounts.detail.movements')}</SectionTitle>
     </View>} empty={<AppText secondary variant="subhead">{t('accounts.detail.empty')}</AppText>} />

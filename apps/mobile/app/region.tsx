@@ -1,8 +1,8 @@
 import { LocalePreferenceScreen } from '../src/ui/locale-preference';
 
-/** Más → App y datos → Región. Built in Producto 23.1A; Más links it only once
- * a second region is released (23.1C), so until then it lists Argentina alone
- * and is reachable only by its route. */
+/** Más → App y datos → Región (released in Producto 23.1C2): Argentina or
+ * Estados Unidos, chosen independently of the language. Más hides the row in
+ * a build with a single released region. */
 export default function RegionScreen() {
   return <LocalePreferenceScreen kind="region" />;
 }

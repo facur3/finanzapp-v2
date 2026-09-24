@@ -46,11 +46,13 @@ type Script = { match: RegExp; reply: { result: AssistantResult; facts: Assistan
 const SCRIPTS: Script[] = [
   { match: /carrefour.*visa/i, reply: { result: FIXTURE_DRAFT, facts: [] } },
   { match: /s[uú]per/i, reply: { result: FIXTURE_DRAFT_NO_ACCOUNT, facts: [] } },
-  { match: /por qu[eé] gast[eé] m[aá]s/i, reply: { result: FIXTURE_ANSWER, facts: FIXTURE_FACTS } },
-  { match: /comida|supermercado/i, reply: { result: FIXTURE_CATEGORY_ANSWER, facts: FIXTURE_FACTS } },
-  { match: /^error$/i, reply: { error: { type: 'error', reason: 'failed', message: 'No se pudo completar la consulta. Tus movimientos no cambiaron.' } } },
-  { match: /^sin conexi[oó]n$/i, reply: { error: { type: 'error', reason: 'offline', message: 'Sin conexión.' } } },
-  { match: /^l[ií]mite$/i, reply: { error: { type: 'error', reason: 'limit', message: 'Llegaste al límite de uso.' } } },
+  // The English suggestion chips reach the same scripted replies; the replies stay Spanish (content, as the v1 server answers).
+  { match: /por qu[eé] gast[eé] m[aá]s|why did i spend more/i, reply: { result: FIXTURE_ANSWER, facts: FIXTURE_FACTS } },
+  { match: /comida|supermercado|food|groceries/i, reply: { result: FIXTURE_CATEGORY_ANSWER, facts: FIXTURE_FACTS } },
+  // A failure's words are the app's, not the model's: no message, so the screen shows the reason's note in the interface language.
+  { match: /^error$/i, reply: { error: { type: 'error', reason: 'failed', message: '' } } },
+  { match: /^(sin conexi[oó]n|offline)$/i, reply: { error: { type: 'error', reason: 'offline', message: '' } } },
+  { match: /^(l[ií]mite|limit)$/i, reply: { error: { type: 'error', reason: 'limit', message: '' } } },
 ];
 
 export function fixtureReply(ask: AssistantAsk): Script['reply'] {

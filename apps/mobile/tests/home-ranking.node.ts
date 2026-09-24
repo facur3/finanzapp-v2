@@ -8,7 +8,10 @@ import * as budgetPresentation from '../src/ui/budget-presentation.ts';
 import { washOf } from '../src/ui/category-color.ts';
 import * as i18nFormat from '../src/i18n/format.ts';
 import { bindLocale } from '../src/i18n/bind.ts';
-const i18nProvider = { useI18n: () => bindLocale('es-AR') };
+import type { AppLocale } from '../src/i18n/locale.ts';
+// Read on every render, like the live provider; a test may switch it and must restore it.
+let current: AppLocale = 'es-AR';
+const i18nProvider = { useI18n: () => bindLocale(current) };
 
 // A source/behaviour guard over the Home category module: honest proportions,
 // a reveal that runs once, interpolation on data changes and Reduce Motion.
@@ -20,15 +23,15 @@ function harness() {
   const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText;
   const jsx = (type: any, props: any) => ({ type, props });
   // Hooks persist by call order across renders, like React's, so a re-render keeps its refs and shared values.
-  const env = { reduced: false, shared: [] as (Shared & { initial: unknown })[], refs: [] as { current: unknown }[], cursor: { shared: 0, ref: 0 } };
+  const env = { reduced: false, shared: [] as (Shared & { initial: unknown })[], refs: [] as { current: unknown }[], cursor: { shared: 0, ref: 0 }, alerts: [] as unknown[][] };
   const modules: Record<string, any> = {
     '../i18n/format': i18nFormat, '../src/i18n/format': i18nFormat, '../../src/i18n/format': i18nFormat, '../i18n/provider': i18nProvider, '../src/i18n/provider': i18nProvider, '../../src/i18n/provider': i18nProvider,
     react: { useEffect: (fn: () => any) => { fn(); }, useRef: (value: unknown) => {
       const index = env.cursor.ref++;
       return env.refs[index] ??= { current: value }; } },
     'react/jsx-runtime': { jsx, jsxs: jsx, Fragment: 'Fragment' },
-    'react-native': { Alert: {}, StyleSheet: { create: (styles: unknown) => styles, hairlineWidth: 0.5 }, View: 'View', useWindowDimensions: () => ({ fontScale: 1 }) },
-    'expo-router': { router: {} },
+    'react-native': { Alert: { alert: (...args: unknown[]) => { env.alerts.push(args); } }, StyleSheet: { create: (styles: unknown) => styles, hairlineWidth: 0.5 }, View: 'View', useWindowDimensions: () => ({ fontScale: 1 }) },
+    'expo-router': { router: { push: () => {} } },
     '@expo/vector-icons/Ionicons': 'Ionicons',
     'react-native-reanimated': { __esModule: true, default: { View: 'Animated.View' },
       useSharedValue: (value: unknown) => { const index = env.cursor.shared++; return env.shared[index] ??= { value, initial: value }; },
@@ -55,7 +58,7 @@ function harness() {
     return { group, rows: group.props.children.map((row: any) => { const node = row.type(row.props); return node; }) };
   };
   const renderBudget = (summary: any) => { env.cursor.shared = 0; env.cursor.ref = 0; return module.exports.BudgetHomeCard({ summary }); };
-  return { env, render, renderBudget };
+  return { env, render, renderBudget, exports: module.exports };
 }
 function flatten(value: any): any[] {
   if (!value || typeof value !== 'object') return [];
@@ -139,7 +142,8 @@ test('the Home budget card leads with the general budget and its share used, and
   const summary = { currency: 'ARS', monthISO: '2026-09', total: progress(totalBudget, 32000000), rows: [funRow, foodRow],
     budgetedMinor: 20000000, spentBudgetedMinor: 17500000, remainingMinor: 2500000, totalSpentMinor: 32000000, unbudgetedSpentMinor: 14500000 };
   const card = renderBudget(summary);
-  assert.equal(card.props.accessibilityLabel, 'Presupuesto general: quedan 180.000,00 ARS de 500.000,00, 64 por ciento usado. 1 categoría excedida');
+  // VoiceOver hears ungrouped amounts in the language's decimal mark; the caption keeps the region's grouping.
+  assert.equal(card.props.accessibilityLabel, 'Presupuesto general: quedan 180000,00 ARS de 500000,00, 64 por ciento usado. 1 categoría excedida');
   const money = flatten(card).find(node => node.type === 'Money');
   assert.equal(money.props.minor, 18000000, 'what is left of the ceiling, never the sum of sublimits');
   const texts = flatten(card).filter(node => node.type === 'AppText').map(node => Array.isArray(node.props.children) ? node.props.children.join('') : String(node.props.children));
@@ -147,17 +151,72 @@ test('the Home budget card leads with the general budget and its share used, and
   assert.ok(texts.includes('de $\u00A0500.000,00 · 64 %'));
   assert.ok(texts.includes('1 categoría excedida'));
   const exceeded = renderBudget({ ...summary, total: progress(totalBudget, 60000000), rows: [] });
-  assert.match(exceeded.props.accessibilityLabel, /^Presupuesto general: excedido en 100\.000,00 ARS de 500\.000,00, 120 por ciento usado\.$/);
+  assert.match(exceeded.props.accessibilityLabel, /^Presupuesto general: excedido en 100000,00 ARS de 500000,00, 120 por ciento usado\.$/);
 });
 
 test('without a general budget the Home card falls back to the tightest sublimit and says how many there are', () => {
   const { renderBudget } = harness();
   const card = renderBudget({ currency: 'ARS', monthISO: '2026-09', total: null, rows: [funRow, foodRow],
     budgetedMinor: 20000000, spentBudgetedMinor: 17500000, remainingMinor: 2500000, totalSpentMinor: 32000000, unbudgetedSpentMinor: 14500000 });
-  assert.equal(card.props.accessibilityLabel, 'Ocio: excedido en 5.000,00 ARS de 50.000,00, 110 por ciento usado. 2 categorías · 1 excedida');
+  assert.equal(card.props.accessibilityLabel, 'Ocio: excedido en 5000,00 ARS de 50000,00, 110 por ciento usado. 2 categorías · 1 excedida');
   assert.equal(flatten(card).find(node => node.type === 'Money').props.minor, 500000);
   assert.equal(flatten(card).some(node => node.type === 'Money' && node.props.minor === 2500000), false, 'no summed remaining');
   const single = renderBudget({ currency: 'ARS', monthISO: '2026-09', total: null, rows: [foodRow], budgetedMinor: 15000000, spentBudgetedMinor: 12000000, remainingMinor: 3000000, totalSpentMinor: 12000000, unbudgetedSpentMinor: 0 });
-  assert.equal(single.props.accessibilityLabel, 'Comida: quedan 30.000,00 ARS de 150.000,00, 80 por ciento usado. Límite por categoría');
+  assert.equal(single.props.accessibilityLabel, 'Comida: quedan 30000,00 ARS de 150000,00, 80 por ciento usado. Límite por categoría');
   assert.equal(renderBudget({ currency: 'ARS', monthISO: '2026-09', total: null, rows: [], budgetedMinor: 0, spentBudgetedMinor: 0, remainingMinor: 0, totalSpentMinor: 0, unbudgetedSpentMinor: 0 }), null);
+});
+
+test('Producto 23.1C2: the budget card speaks the same amounts in every locale, and the caption keeps the region\'s grouping', () => {
+  const { renderBudget } = harness();
+  const summary = { currency: 'ARS', monthISO: '2026-09', total: progress(totalBudget, 32000000), rows: [],
+    budgetedMinor: 0, spentBudgetedMinor: 0, remainingMinor: 0, totalSpentMinor: 32000000, unbudgetedSpentMinor: 0 };
+  const expected: [AppLocale, string, string][] = [
+    ['es-AR', 'Presupuesto general: quedan 180000,00 ARS de 500000,00, 64 por ciento usado.', 'de $\u00A0500.000,00 · 64 %'],
+    ['en-AR', 'Overall budget: 180000.00 ARS left of 500000.00, 64 percent used.', 'of $\u00A0500.000,00 · 64%'],
+    ['es-US', 'Presupuesto general: quedan 180000,00 ARS de 500000,00, 64 por ciento usado.', 'de AR$\u00A0500,000.00 · 64 %'],
+    ['en-US', 'Overall budget: 180000.00 ARS left of 500000.00, 64 percent used.', 'of AR$\u00A0500,000.00 · 64%'],
+  ];
+  try {
+    for (const [locale, label, caption] of expected) {
+      current = locale;
+      const card = renderBudget(summary);
+      assert.equal(card.props.accessibilityLabel, label, locale);
+      assert.doesNotMatch(card.props.accessibilityLabel, /[.,]\d{3}(?!\d)/, locale + ': no separator a voice could read as a decimal before three digits');
+      const texts = flatten(card).filter(node => node.type === 'AppText').map(node => Array.isArray(node.props.children) ? node.props.children.join('') : String(node.props.children));
+      assert.ok(texts.includes(caption), locale + ': ' + texts.join(' | '));
+    }
+  } finally { current = 'es-AR'; }
+});
+
+test('the metric help opens a native alert whose button is named in the interface language, never left to iOS', () => {
+  const { env, exports } = harness();
+  try {
+    for (const locale of ['es-AR', 'en-US'] as AppLocale[]) {
+      current = locale;
+      env.alerts.length = 0;
+      const help = exports.MetricHelp({ title: 'Disponible', detail: 'Es el dinero registrado.' });
+      assert.equal(help.props.accessibilityLabel, locale === 'es-AR' ? 'Qué significa Disponible' : 'What Disponible means');
+      help.props.onPress();
+      assert.equal(JSON.stringify(env.alerts), JSON.stringify([['Disponible', 'Es el dinero registrado.', [{ text: 'OK' }]]]), locale + ': one explicit button from the catalogue');
+    }
+  } finally { current = 'es-AR'; }
+});
+
+test('an upcoming commitment reads its day inside the VoiceOver sentence in lower case, and keeps the capital where the caption starts', () => {
+  const { exports } = harness();
+  const rule = { id: 'r', merchant: 'Netflix', category: 'Suscripciones', kind: 'expense', amountMinor: 1234567, nextDateISO: '2026-09-22', accountId: 'a' };
+  const account = { id: 'a', name: 'Banco', currency: 'ARS' };
+  const caption = (row: any) => flatten(row).filter(node => node.type === 'AppText').map(node => [node.props.children].flat().join(''));
+  try {
+    const spanish = exports.UpcomingRecurringRow({ rule, account, day: '2026-09-22', last: true });
+    assert.equal(spanish.props.accessibilityLabel, 'Netflix, 12345,67 ARS, próximo pago hoy');
+    assert.ok(caption(spanish).includes('Hoy · Banco'), 'the visible line starts with the day, capitalised');
+    current = 'en-US';
+    const english = exports.UpcomingRecurringRow({ rule, account, day: '2026-09-22', last: true });
+    assert.equal(english.props.accessibilityLabel, 'Netflix, 12345.67 ARS, next payment today');
+    assert.ok(caption(english).includes('Today · Banco'));
+    // A later day is the short date either way.
+    assert.equal(exports.UpcomingRecurringRow({ rule: { ...rule, nextDateISO: '2026-10-01' }, account, day: '2026-09-22', last: true }).props.accessibilityLabel,
+      'Netflix, 12345.67 ARS, next payment Oct 1');
+  } finally { current = 'es-AR'; }
 });

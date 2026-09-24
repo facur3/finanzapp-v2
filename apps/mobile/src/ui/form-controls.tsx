@@ -16,14 +16,17 @@ import { categoryChoices, categoryKey, customCategory } from './categories';
  * a form: which category and which account or card. A 44 pt tile, the label,
  * the current value and a live detail line (balance, budget) sit on one card.
  * The value and the detail may each take two lines: a long account name or
- * a budget sentence with its amount is shown whole, never cut to fit. */
-export function SelectorCard({ label, value, placeholder, detail, icon, tone = 'neutral', color, disabled = false, onPress, detailTone }: {
-  label: string; value?: string; placeholder: string; detail?: string; icon: IconName; tone?: Tone; color?: string; disabled?: boolean; onPress: () => void;
+ * a budget sentence with its amount is shown whole, never cut to fit. A
+ * detail that carries an amount comes with `spokenDetail`, the same sentence
+ * built with the spoken formatters, which VoiceOver reads instead. */
+export function SelectorCard({ label, value, placeholder, detail, spokenDetail, icon, tone = 'neutral', color, disabled = false, onPress, detailTone }: {
+  label: string; value?: string; placeholder: string; detail?: string; spokenDetail?: string; icon: IconName; tone?: Tone; color?: string; disabled?: boolean; onPress: () => void;
   detailTone?: 'neutral' | 'warning' | 'expense';
 }) {
   const p = usePalette();
   const detailColor = detailTone === 'expense' ? p.expense : detailTone === 'warning' ? p.warning : p.secondary;
-  return <PressFeedback accessibilityRole="button" accessibilityLabel={`${label}: ${value ?? placeholder}${detail ? ', ' + detail : ''}`}
+  const spoken = spokenDetail ?? detail;
+  return <PressFeedback accessibilityRole="button" accessibilityLabel={`${label}: ${value ?? placeholder}${spoken ? ', ' + spoken : ''}`}
     accessibilityState={{ disabled }} disabled={disabled} onPress={onPress}
     style={[{ flexDirection: 'row', alignItems: 'center', gap: 14, padding: 14, borderRadius: radius.group, backgroundColor: p.surface, minHeight: 72, opacity: disabled ? 0.6 : 1 }, surfaceShadow(p)]}>
     <GlyphTile icon={icon} tone={tone} color={color} size={44} />
@@ -57,16 +60,19 @@ function SelectionSheet({ visible, title, onClose, onDone, children }: {
   </Modal>;
 }
 
-export function AccountField({ accounts, value, onChange, disabled = false, label, kindOf, typeOf, prominent = false, detail, detailTone, describe }: {
+export function AccountField({ accounts, value, onChange, disabled = false, label, kindOf, typeOf, prominent = false, detail, spokenDetail, detailTone, describe, spokenDescribe }: {
   accounts: Account[]; value: string; onChange: (id: string) => void; disabled?: boolean; label?: string;
   /** Names the kind of each option (Cuenta, Tarjeta, Deuda) so a card is never mistaken for cash. */
   kindOf?: (accountId: string) => string;
   /** What each option is, for its glyph: a cash account shows its own look, a card or a debt its kind. Decided by the ledger, never by the translated name. */
   typeOf?: (accountId: string) => AccountKind;
-  /** Render as a full-width selector card with a live detail line instead of a compact row. */
-  prominent?: boolean; detail?: string; detailTone?: 'neutral' | 'warning' | 'expense';
+  /** Render as a full-width selector card with a live detail line instead of a compact row. `spokenDetail` is that line for VoiceOver (see SelectorCard). */
+  prominent?: boolean; detail?: string; spokenDetail?: string; detailTone?: 'neutral' | 'warning' | 'expense';
   /** Optional per-option second line in the sheet (for example the recorded balance). */
   describe?: (account: Account) => string;
+  /** That line for VoiceOver, built with the spoken formatters; the option's label reads it after the kind and currency.
+   * Without it the label stays name, kind and currency: a line in the region's separators is shown, never spoken. */
+  spokenDescribe?: (account: Account) => string;
 }) {
   const p = usePalette();
   const { t } = useI18n();
@@ -83,7 +89,7 @@ export function AccountField({ accounts, value, onChange, disabled = false, labe
   const open = () => { Keyboard.dismiss(); setVisible(true); };
   return <>
     {prominent ? <SelectorCard label={title} value={selected ? selected.name : undefined} placeholder={t('selection.chooseAccount')}
-      detail={detail ?? (selected ? kind(selected.id) + ' · ' + selected.currency : undefined)} detailTone={detailTone}
+      detail={detail ?? (selected ? kind(selected.id) + ' · ' + selected.currency : undefined)} spokenDetail={spokenDetail} detailTone={detailTone}
       icon={selected ? icon(selected.id) : 'wallet-outline'} color={selected ? color(selected.id) : undefined} disabled={disabled} onPress={open} />
       : <SelectionRow label={title} value={selected ? selected.name : t('selection.chooseAccount')} placeholder={!selected}
         detail={selected ? kind(selected.id) + ' · ' + selected.currency : undefined} icon={selected ? icon(selected.id) : 'wallet-outline'}
@@ -92,7 +98,8 @@ export function AccountField({ accounts, value, onChange, disabled = false, labe
     <SelectionSheet visible={visible} title={label === undefined ? t('selection.chooseAccount') : label} onClose={() => setVisible(false)}>
       <FlatList data={accounts} keyExtractor={account => account.id} contentContainerStyle={{ padding: 20, paddingTop: 0 }}
         renderItem={({ item }) => <PressFeedback feedback="highlight" accessibilityRole="button" accessibilityState={{ selected: value === item.id }}
-          accessibilityLabel={item.name + ', ' + kind(item.id) + ', ' + item.currency} onPress={() => { if (item.id !== value) selectionHaptic(); onChange(item.id); setVisible(false); }}
+          accessibilityLabel={item.name + ', ' + kind(item.id) + ', ' + item.currency + (spokenDescribe ? ', ' + spokenDescribe(item) : '')}
+          onPress={() => { if (item.id !== value) selectionHaptic(); onChange(item.id); setVisible(false); }}
           style={{ flexDirection: 'row', alignItems: 'center', padding: 14, gap: 14, backgroundColor: p.surface, borderRadius: 16, marginBottom: 8, overflow: 'hidden' }}>
           {isCash(item.id) ? <AccountBadge accountId={item.id} /> : <GlyphTile icon={icon(item.id)} />}
           <View style={{ flex: 1, gap: 3 }}><AppText style={{ fontWeight: '600' }}>{item.name}</AppText>
@@ -147,19 +154,22 @@ export function DateField({ value, onChange, disabled = false, allowFuture = fal
   const [visible, setVisible] = useState(false);
   const [draft, setDraft] = useState(value);
   const open = () => { Keyboard.dismiss(); setDraft(new Date(value)); setVisible(true); };
-  // The wheel speaks the interface language (month names) instead of the device's; iOS decides the column order from the pair.
+  const day = todayKey(value);
+  // The wheel is a worded date: it follows the interface language with its home region (es_AR, en_US), like the row
+  // above it; the region never reorders it. Keep the spinner: inline and compact draw system text that ignores the locale.
+  // onValueChange/onDismiss, not the deprecated onChange: iOS spins the draft, which Listo saves; Android's dialog
+  // saves on a chosen value and closes either way.
   const picker = <DateTimePicker value={draft} mode="date" display={Platform.OS === 'ios' ? 'spinner' : 'default'} locale={pickerLocale}
     themeVariant={p.isDark ? 'dark' : 'light'} minimumDate={new Date(1900, 0, 1)}
     maximumDate={allowFuture ? new Date(2100, 11, 31) : new Date()}
-    style={{ width: '100%' }} onChange={(event, next) => {
-      if (Platform.OS !== 'ios') {
-        setVisible(false);
-        if (event.type === 'set' && next) onChange(next);
-      } else if (event.type === 'set' && next) setDraft(next);
-    }} />;
+    style={{ width: '100%' }} onValueChange={(_event, next) => {
+      if (Platform.OS === 'ios') setDraft(next);
+      else { setVisible(false); onChange(next); }
+    }} onDismiss={() => setVisible(false)} />;
   return <>
+    {/* VoiceOver hears the date written out ("22 de septiembre de 2026"), not the abbreviated month on screen. */}
     <DetailRow label={title} icon="calendar-outline" last disabled={disabled} onPress={open} layout="inline"
-      value={formatDate(todayKey(value), 'dayYear')} />
+      value={formatDate(day, 'dayYear')} spokenValue={formatDate(day, 'long')} />
     {Platform.OS === 'ios' ? <SelectionSheet visible={visible} title={label === undefined ? t('selection.chooseDate') : label} onClose={() => setVisible(false)}
       onDone={() => { onChange(draft); setVisible(false); }}>
       <View style={{ width: '100%', overflow: 'hidden', paddingTop: 20 }}>{picker}</View>
@@ -169,9 +179,10 @@ export function DateField({ value, onChange, disabled = false, allowFuture = fal
 
 /** The chosen category looks like itself here too: its glyph on its hue, as in
  * every row and detail. Income categories keep the income tone. */
-export function CategoryField({ entries, kind, value, onChange, disabled = false, prominent = false, detail, detailTone }: {
+export function CategoryField({ entries, kind, value, onChange, disabled = false, prominent = false, detail, spokenDetail, detailTone }: {
   entries: Entry[]; kind: EntryKind; value: string; onChange: (category: string) => void; disabled?: boolean;
-  prominent?: boolean; detail?: string; detailTone?: 'neutral' | 'warning' | 'expense';
+  /** `spokenDetail` is the detail line (a budget sentence with its amount) for VoiceOver (see SelectorCard). */
+  prominent?: boolean; detail?: string; spokenDetail?: string; detailTone?: 'neutral' | 'warning' | 'expense';
 }) {
   const p = usePalette();
   const { t, language } = useI18n();
@@ -185,7 +196,7 @@ export function CategoryField({ entries, kind, value, onChange, disabled = false
   const choose = (category: string) => { Keyboard.dismiss(); if (categoryKey(category) !== categoryKey(value)) selectionHaptic(); onChange(category); setVisible(false); };
   const open = () => { Keyboard.dismiss(); setQuery(''); setVisible(true); };
   return <>
-    {prominent ? <SelectorCard label={t('selection.category')} value={value ? look.label : undefined} placeholder={t('selection.chooseCategory')} detail={detail} detailTone={detailTone}
+    {prominent ? <SelectorCard label={t('selection.category')} value={value ? look.label : undefined} placeholder={t('selection.chooseCategory')} detail={detail} spokenDetail={spokenDetail} detailTone={detailTone}
       icon={value ? look.glyph : 'pricetag-outline'} tone={kind === 'income' && value ? 'income' : 'neutral'}
       color={value && kind === 'expense' ? look.hex : undefined} disabled={disabled} onPress={open} />
       : <SelectionRow label={t('selection.category')} value={value ? look.label : t('selection.chooseCategory')} placeholder={!value}

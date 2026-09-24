@@ -19,6 +19,7 @@ export type AssistantAsk = Omit<AssistantRequest, 'version'>;
 export type AssistantEvent =
   | { type: 'delta'; text: string }
   | { type: 'result'; result: AssistantResult; facts: AssistantFact[] }
+  /** `message` is a catalogue key the screen translates, or '' for the reason's own note (see `failureMessage`). */
   | { type: 'error'; reason: AssistantReason; message: string };
 
 export type AssistantMode = 'disconnected' | 'remote' | 'fixture';
@@ -48,6 +49,16 @@ export function failureReason(cause: unknown): AssistantReason {
   return 'failed';
 }
 
+/** The words a failure may carry to the screen: only the integration client's own
+ * catalogue keys (`assistant.integration.*`). A contract rejection ("Datos de captura
+ * inválidos."), an engine message (a JSON or network TypeError) or anything else is
+ * not interface copy: it yields no message, and the screen shows the reason's note in
+ * the interface language instead. */
+export function failureMessage(cause: unknown): string {
+  const message = cause instanceof Error ? cause.message : '';
+  return /^assistant\.integration\.[a-zA-Z]+$/.test(message) ? message : '';
+}
+
 export function remoteAssistant(origin: string, getAccessToken: () => Promise<string | null>, fetcher: typeof fetch = fetch): AssistantClient { // i18n-ignore: a generic type, not copy
   const client = integrationClient(origin, getAccessToken, fetcher);
   return { mode: 'remote', async *ask(input, signal) {
@@ -58,7 +69,7 @@ export function remoteAssistant(origin: string, getAccessToken: () => Promise<st
       yield { type: 'result', result, facts: evidence };
     } catch (cause) {
       if (signal?.aborted) return;
-      yield { type: 'error', reason: failureReason(cause), message: cause instanceof Error ? cause.message : '' };
+      yield { type: 'error', reason: failureReason(cause), message: failureMessage(cause) };
     }
   } };
 }

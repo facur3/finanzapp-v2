@@ -27,8 +27,9 @@ export default function DebtDetailScreen() {
   const owed = debt.direction === 'owed_by_me';
   const overdue = !!debt.dueDateISO && debt.dueDateISO < day && outstanding > 0;
   const dueLabel = debt.dueDateISO ? relativeDate(debt.dueDateISO, day) : t('debts.status.noDate');
+  // The Vencimiento row and "Vencida · Ayer" show the day on its own; "Vence hoy" places it inside the sentence.
   const status = outstanding === 0 ? t('debts.status.settled') : overdue ? t('debts.status.overdue', { date: dueLabel })
-    : debt.dueDateISO ? t('debts.status.due', { date: dueLabel }) : t('debts.status.noDue');
+    : debt.dueDateISO ? t('debts.status.due', { date: relativeDate(debt.dueDateISO, day, true) }) : t('debts.status.noDue');
   // The transfer form names the payment or collection and writes its default note itself, in the current language.
   const transferParams = owed
     ? { toAccountId: account.id, maxAmountMinor: String(outstanding) }

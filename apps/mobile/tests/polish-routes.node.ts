@@ -204,7 +204,7 @@ test('in English Recurrentes reads in English, keeps merchant and account names,
   const english = harness('recurring.tsx', {}, archive, 'en-AR'), spanish = harness('recurring.tsx');
   const root = english.render();
   assert.equal(find(root, 'Stack.Screen').props.options.title, 'Recurring');
-  assert.equal(nodes(root).filter(node => node.type === 'Stat').map(node => node.props.label).slice(0, 3).join(','), 'Payments · ARS,Due,Income');
+  assert.equal(nodes(root).filter(node => node.type === 'Stat').map(node => node.props.label).slice(0, 3).join(','), 'Expenses · ARS,Due,Income');
   const sections = nodes(root).filter(node => node.type === 'SectionTitle').map(node => node.props.children);
   assert.equal(sections.join(','), 'Next 30 days,Active');
   const press = nodes(root).find(node => node.type === 'PressFeedback')!;
@@ -221,6 +221,25 @@ test('in English Recurrentes reads in English, keeps merchant and account names,
   const paused = harness('recurring.tsx', {}, { ...archive, recurring: [{ ...rule, active: false }] }, 'en-AR').render();
   assert.ok(texts(paused).includes('Paused'));
   assert.equal(find(paused, 'SectionTitle', undefined).props.caption, 'Not recorded until you turn them back on');
+});
+
+test('23.1C2: a Recurrentes row due today says the day inside its VoiceOver sentence in lower case; the caption keeps it on its own', () => {
+  // The harness day is 2026-09-20. The amount is spoken with the language's decimal mark, whatever the region writes.
+  const due = { ...archive, recurring: [{ ...rule, nextDateISO: '2026-09-20' }] };
+  const cases = [
+    ['es-AR', 'Editar recurrente Alquiler, mensual, 400,00 ARS, próximo hoy', 'Mensual · Hoy · Banco'],
+    ['es-US', 'Editar recurrente Alquiler, mensual, 400,00 ARS, próximo hoy', 'Mensual · Hoy · Banco'],
+    ['en-AR', 'Edit recurring Alquiler, monthly, 400.00 ARS, next today', 'Monthly · Today · Banco'],
+    ['en-US', 'Edit recurring Alquiler, monthly, 400.00 ARS, next today', 'Monthly · Today · Banco'],
+  ] as const;
+  for (const [locale, label, caption] of cases) {
+    const root = harness('recurring.tsx', {}, due, locale).render();
+    assert.equal(nodes(root).find(node => node.type === 'PressFeedback')!.props.accessibilityLabel, label, locale);
+    assert.ok(texts(root).includes(caption), locale + ': ' + texts(root).join(' | '));
+  }
+  // A day that is not today or yesterday reads the same inline and on its own.
+  const later = nodes(harness('recurring.tsx', {}, archive, 'es-AR').render()).find(node => node.type === 'PressFeedback')!;
+  assert.equal(later.props.accessibilityLabel, 'Editar recurrente Alquiler, mensual, 400,00 ARS, próximo 1 oct');
 });
 
 test('in English Presupuestos names the month, the states and the VoiceOver sentences in English; category names are untouched', () => {
@@ -257,4 +276,15 @@ test('in English Cuentas and the account detail read in English; account names s
   assert.equal(find(harness('account/[id].tsx', { id: 'cash' }).render(), 'DetailRow').props.value, '1 activo');
   const missing = harness('account/[id].tsx', { id: 'nope' }, archive, 'en-AR').render();
   assert.equal(find(missing, 'EmptyState').props.title, 'We couldn’t find this account');
+});
+
+test('23.1C2: the opening balance row groups on screen and gives VoiceOver the language’s numbers without grouping', () => {
+  const rich = { ...archive, accounts: archive.accounts.map(account => account.id === 'cash' ? { ...account, openingMinor: 123456789 } : account) };
+  const opening = (locale: AppLocale) => {
+    const row = nodes(harness('account/[id].tsx', { id: 'cash' }, rich, locale).render()).filter(node => node.type === 'DetailRow')[1];
+    return row.props.value + '|' + row.props.spokenValue;
+  };
+  assert.equal(opening('es-AR'), 'ARS 1.234.567,89|1234567,89 ARS');
+  assert.equal(opening('en-AR'), 'ARS 1.234.567,89|1234567.89 ARS', 'an English voice gets the decimal point, not the Argentine grouping');
+  assert.equal(opening('es-US'), 'ARS 1,234,567.89|1234567,89 ARS', 'a Spanish voice gets the decimal comma, not the US grouping');
 });

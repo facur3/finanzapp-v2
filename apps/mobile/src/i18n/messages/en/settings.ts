@@ -29,7 +29,7 @@ export const settings: Pick<Messages, 'settings'> = {
       backupSubtitle: 'Share and import',
       undone: 'Undone transactions',
       undoneNone: 'None',
-      undoneCount: { one: '{count} recoverable', other: '{count} recoverable' },
+      undoneCount: { one: '{count} can be restored', other: '{count} can be restored' },
     },
     localNote: 'Your records stay on this device and you can record offline. Sync is not turned on yet.',
     footer: 'FinanzApp · Native pilot {version} · Producto {release} · {material} · {source}',

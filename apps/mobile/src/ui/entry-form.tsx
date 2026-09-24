@@ -3,7 +3,7 @@ import { Keyboard, View } from 'react-native';
 import { router, Stack } from 'expo-router';
 import { randomUUID } from 'expo-crypto';
 import * as Haptics from 'expo-haptics';
-import { accountBalanceMinor, accountKind, categoryKey, makeEntryChange, parseMinorUnits, sameEntry, summarizeMonthlyBudgets, todayKey, validateEntry, validateEntryChange, type Entry, type EntryChange, type EntryKind, type EntryRecord } from '@finanzapp/domain';
+import { accountBalanceMinor, accountKind, categoryKey, makeEntryChange, parseMinorUnits, sameEntry, summarizeMonthlyBudgets, todayKey, validateEntry, validateEntryChange, type Account, type Entry, type EntryChange, type EntryKind, type EntryRecord } from '@finanzapp/domain';
 import { useLedger } from '../storage/LedgerProvider';
 import { budgetTone } from './budget-presentation';
 import { ActionButton, AmountField, AppText, Choices, EmptyState, ErrorMessage, Field, IconButton, Screen, Surface } from './components';
@@ -31,7 +31,7 @@ export function EntryForm({ original, accountId: requestedAccount, currency, kin
   onAccountChange?: (accountId: string) => void;
 }) {
   const { snapshot, archive, addEntry, updateEntry } = useLedger();
-  const { t, moneyText, formatAmount } = useI18n();
+  const { t, moneyText, formatAmount, spokenMoney } = useI18n();
   // Cash accounts and cards can carry an expense or income; a personal debt only changes through payments.
   const accounts = postingAccounts(snapshot?.accounts ?? [], archive?.debts);
   const [before] = useState(original);
@@ -58,28 +58,39 @@ export function EntryForm({ original, accountId: requestedAccount, currency, kin
   const isCard = !!account && cards.some(card => card.accountId === account.id);
 
   // Live context for the two prominent selectors: recorded balance or card debt, and the category budget for that month.
+  // Each line has a VoiceOver twin, the same sentence with the amount in the language's spoken form (spokenMoney).
   const accountDetail = useMemo(() => {
     if (!account || !snapshot) return undefined;
     const balance = accountBalanceMinor(account, snapshot.entries, snapshot.transfers);
-    if (isCard) return balance < 0 ? t('entryForm.cardDebt', { amount: moneyText(balance, account.currency, true) })
-      : balance > 0 ? t('entryForm.cardCredit', { amount: moneyText(balance, account.currency) }) : t('entryForm.cardClear');
-    return t('entryForm.recordedBalance', { amount: moneyText(balance, account.currency) });
-  }, [account, snapshot, isCard, t, moneyText]);
+    const line = (money: (minor: number) => string) => isCard ? balance < 0 ? t('entryForm.cardDebt', { amount: money(-balance) })
+      : balance > 0 ? t('entryForm.cardCredit', { amount: money(balance) }) : t('entryForm.cardClear')
+      : t('entryForm.recordedBalance', { amount: money(balance) });
+    return { text: line(minor => moneyText(minor, account.currency)), spoken: line(minor => spokenMoney(minor, account.currency)) };
+  }, [account, snapshot, isCard, t, moneyText, spokenMoney]);
   const budget = useMemo(() => {
     if (!account || !snapshot || kind !== 'expense' || !category.trim()) return null;
     try {
       const row = summarizeMonthlyBudgets(snapshot, archive?.budgets ?? [], account.currency, todayKey(date).slice(0, 7)).rows
         .find(item => categoryKey(item.budget.category) === categoryKey(category));
       if (!row) return null;
-      const money = (minor: number) => moneyText(minor, account.currency);
-      return { text: row.exceeded ? t('entryForm.budgetExceeded', { amount: money(-row.remainingMinor) })
-        : t('entryForm.budgetUsed', { spent: money(row.spentMinor), total: money(row.budget.amountMinor) }),
-        tone: budgetTone(row) };
+      const line = (money: (minor: number) => string) => row.exceeded ? t('entryForm.budgetExceeded', { amount: money(-row.remainingMinor) })
+        : t('entryForm.budgetUsed', { spent: money(row.spentMinor), total: money(row.budget.amountMinor) });
+      return { text: line(minor => moneyText(minor, account.currency)), spoken: line(minor => spokenMoney(minor, account.currency)), tone: budgetTone(row) };
     } catch { return null; }
-  }, [account, snapshot, archive?.budgets, kind, category, date, t, moneyText]);
+  }, [account, snapshot, archive?.budgets, kind, category, date, t, moneyText, spokenMoney]);
+  // Each option in the account sheet reads like the card it would select: cash with its signed balance, a card as owed, in credit or clear.
+  // `figure` writes the amount: the region's separators on screen, where the line already names the currency; for VoiceOver the
+  // spoken form with the currency in words, as the selected card's spoken detail says it.
+  const optionLine = (item: Account, figure: (minor: number) => string) => {
+    const balance = snapshot ? accountBalanceMinor(item, snapshot.entries, snapshot.transfers) : 0;
+    if (!cards.some(card => card.accountId === item.id)) return t('entryForm.optionBalance', { amount: figure(balance) });
+    return balance < 0 ? t('entryForm.optionDebt', { amount: figure(-balance) })
+      : balance > 0 ? t('entryForm.optionCredit', { amount: figure(balance) }) : t('entryForm.optionClear');
+  };
+  const describeAccount = (item: Account) => optionLine(item, formatAmount);
+  const spokenDescribeAccount = (item: Account) => optionLine(item, minor => spokenMoney(minor, item.currency));
   let parsed: number | null = null;
   try { parsed = parseMinorUnits(amount); } catch { parsed = null; }
-  const amountEcho = parsed && parsed > 0 && account ? '\u00A0·\u00A0' + moneyText(parsed, account.currency) : '';
 
   async function save() {
     if (saving.current) return;
@@ -116,6 +127,11 @@ export function EntryForm({ original, accountId: requestedAccount, currency, kin
   }
 
   const title = t(before ? 'entryForm.editTitle' : kind === 'expense' ? (isCard ? 'entryForm.cardPurchaseTitle' : 'entryForm.expenseTitle') : 'entryForm.incomeTitle');
+  // A new movement's Save echoes the amount it records; VoiceOver hears the echo in the spoken form ("Guardar gasto, 1234,50 pesos").
+  const saveWord = t(kind === 'expense' ? 'entryForm.saveExpense' : 'entryForm.saveIncome');
+  const submit: { text: string; spoken?: string } = pending && error ? { text: t('common.retrySave') } : before ? { text: t('common.saveChanges') }
+    : parsed && parsed > 0 && account ? { text: saveWord + '\u00A0·\u00A0' + moneyText(parsed, account.currency), spoken: saveWord + ', ' + spokenMoney(parsed, account.currency) }
+      : { text: saveWord };
   return <Screen gap={space.l}>
     <Stack.Screen options={{ title, gestureEnabled: !busy,
       headerLeft: () => <IconButton name="close" label={t('common.close')} onPress={close} disabled={busy} /> }} />
@@ -127,11 +143,9 @@ export function EntryForm({ original, accountId: requestedAccount, currency, kin
         tone={kind === 'income' ? 'income' : 'neutral'} label={t(kind === 'expense' ? 'movement.expense' : 'movement.income')} />
       <View style={{ gap: space.m }}>
         <CategoryField entries={snapshot?.entries ?? []} kind={kind} value={category} onChange={setCategory} disabled={locked}
-          prominent detail={budget?.text} detailTone={budget?.tone} />
+          prominent detail={budget?.text} spokenDetail={budget?.spoken} detailTone={budget?.tone} />
         <AccountField label={t(kind === 'expense' ? 'entryForm.paidWith' : 'entryForm.receivedIn')} accounts={eligibleAccounts} value={accountId} onChange={id => { setAccountId(id); onAccountChange?.(id); }} disabled={locked}
-          prominent kindOf={kindOf} typeOf={typeOf} detail={accountDetail}
-          describe={item => { const balance = snapshot ? accountBalanceMinor(item, snapshot.entries, snapshot.transfers) : 0;
-            return t(cards.some(card => card.accountId === item.id) ? 'entryForm.optionDebt' : 'entryForm.optionBalance', { amount: formatAmount(Math.abs(balance)) }); }} />
+          prominent kindOf={kindOf} typeOf={typeOf} detail={accountDetail?.text} spokenDetail={accountDetail?.spoken} describe={describeAccount} spokenDescribe={spokenDescribeAccount} />
       </View>
       <Field label={t(kind === 'expense' ? 'entryForm.merchantExpense' : 'entryForm.merchantIncome')} value={merchant}
         placeholder={t(kind === 'expense' ? 'entryForm.merchantExpensePlaceholder' : 'entryForm.merchantIncomePlaceholder')}
@@ -143,7 +157,7 @@ export function EntryForm({ original, accountId: requestedAccount, currency, kin
       {before && <AppText secondary variant="footnote" style={{ textAlign: 'center' }}>{t('entryForm.correctionNote')}</AppText>}
       <ErrorMessage message={error} />
       {pending && !busy && error && <AppText secondary variant="footnote">{t('entryForm.retryNote')}</AppText>}
-      <ActionButton label={pending && error ? t('common.retrySave') : before ? t('common.saveChanges') : t(kind === 'expense' ? 'entryForm.saveExpense' : 'entryForm.saveIncome') + amountEcho}
+      <ActionButton label={submit.text} spokenLabel={submit.spoken}
         onPress={save} busy={busy} disabled={!amount.trim() || !merchant.trim() || !category.trim() || !account} />
     </>}
   </Screen>;
