@@ -45,6 +45,8 @@ export const errors = {
     },
     storage: {
       newerVersion: 'Estos datos requieren una versión más nueva de FinanzApp. No se modificaron.',
+      /** The schema 9 rebuild found a row pointing to a missing parent: rolled back whole (24B4). */
+      migrationReferences: 'La actualización de los datos dejó referencias incompletas. Se canceló sin modificar nada.',
       entryState: 'Estado de movimiento inválido.',
       transferState: 'Estado de transferencia inválido.',
       operationExistsForm: 'Esta operación ya existe con otros datos. Volvé a abrir el formulario.',
@@ -148,7 +150,7 @@ export const errors = {
       fileSize: 'Elegí una copia JSON de hasta 5 MB.',
       notJson: 'El archivo no es una copia JSON válida.',
       notFinanzApp: 'El archivo no es una copia de FinanzApp.',
-      version: 'Solo se pueden restaurar copias del piloto nativo v1 a v8. La app web/anterior y otras versiones todavía no son compatibles; conservá el archivo.',
+      version: 'Solo se pueden restaurar copias del piloto nativo v1 a v9. La app web/anterior y otras versiones todavía no son compatibles; conservá el archivo.',
       money: 'Formato o unidad monetaria no compatibles.',
       /** A v1–v8 file naming a currency other than ARS or USD: it cannot be read as cents, whatever currencies the app offers (24B1). */
       legacyImport: 'Las copias v1 a v8 solo pueden contener cuentas y presupuestos en ARS o USD. No se importó nada; conservá el archivo.',
@@ -158,6 +160,15 @@ export const errors = {
       budgets: 'La copia contiene demasiados presupuestos o un formato inválido.',
       liabilities: 'La copia contiene demasiadas tarjetas/deudas o un formato inválido.',
       identities: 'La copia contiene demasiadas apariencias/categorías o un formato inválido.',
+      /** Backup v9 (24B4): the scales it pins for each currency other than ARS/USD. */
+      units: 'La copia contiene demasiadas escalas de moneda o un formato inválido.',
+      unitSource: 'Origen de la escala inválido.',
+      unitUnneeded: 'La copia registra una escala para una moneda que no la necesita. No se importó nada.',
+      duplicateUnit: 'La copia repite la escala de una moneda. No se importó nada.',
+      /** A stored or copied row in a currency whose scale was never pinned: never read as cents. {code} is the ISO code. */
+      scaleMissing: 'La moneda {code} no tiene una escala registrada. No se modificó nada.',
+      /** The copy pins a currency at another exponent than this device: a conflict, never a conversion. */
+      scaleConflict: 'La copia registra otra escala para una moneda ya guardada. No se importó nada.',
     },
     recurring: {
       recurringId: 'Identificador de recurrente inválido.',

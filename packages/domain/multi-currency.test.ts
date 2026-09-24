@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { LEDGER_CURRENCIES, LEGACY_CURRENCIES, currenciesWithStatus, isLedgerCurrency, isStorableCurrency, minorUnitExponent, type IsoCurrencyCode } from './currency';
+import { CURRENCY_UNIT_SOURCE, ISO_4217_PUBLISHED, LEDGER_CURRENCIES, LEGACY_CURRENCIES, SCALE_CONFLICT_MESSAGE, UNIT_UNNEEDED_MESSAGE, catalogueUnit, currenciesNeedingUnits,
+  currenciesWithStatus, isLedgerCurrency, isStorableCurrency, minorUnitExponent, pinnedExponent, validateCurrencyUnits, type IsoCurrencyCode } from './currency';
 import { LEGACY_EXPORT_MESSAGE, accountBalanceMinor, accountIdsInCurrency, createPilotBackup, totalsByCurrency, validateAccount, validateNewAccount,
   validateTransfer, type Account, type Entry, type LedgerSnapshot, type Transfer } from './ledger';
 import { MAX_ENTRY_MINOR, addMoney, compareMoney, maxWholeDigits, moneyAmount, parseLocalizedAmount, sumMoney } from './money';
@@ -11,8 +12,8 @@ import { spendingOverview, spendingWindow } from './spending-overview';
 import { dailySpending, spendingComparison } from './report-insights';
 import { monthlySpendingTrend, spendingInsights, topMerchants } from './report-trend';
 import { recurringForecastByCurrency, validateRecurringRuleChange, type RecurringRule } from './recurring';
-import { LEGACY_IMPORT_MESSAGE, archiveKey, createRecoveryBackup, initialRecord, makeEntryChange, parsePilotBackup, previewBackupImport, validateArchive,
-  validateEntryChange, type LedgerArchive } from './recovery';
+import { BACKUP_SCHEMA_V9, LEGACY_IMPORT_MESSAGE, archiveExponents, archiveKey, createRecoveryBackup, initialRecord, makeEntryChange, parsePilotBackup, previewBackupImport,
+  validateArchive, validateEntryChange, type LedgerArchive } from './recovery';
 import { initialTransferRecord, makeTransferChange, validateTransferChange } from './transfers';
 
 /** Producto 24B1: synthetic fixtures in EUR (two decimals), JPY (none) and KWD (three) that never
@@ -227,12 +228,94 @@ describe('amounts are conserved exactly in every exponent, and currencies never 
   });
 });
 
-describe('backups stay frozen to ARS/USD until v9 records a scale', () => {
-  it('a v8 or v1 export refuses a ledger with another currency instead of writing it as cents', () => {
-    expect(() => createRecoveryBackup(archive)).toThrow(LEGACY_EXPORT_MESSAGE);
-    expect(() => createRecoveryBackup({ accounts: [ars], records: [], budgets: [chfBudget] })).toThrow(LEGACY_EXPORT_MESSAGE);
+describe('backups: v1–v8 stay frozen to ARS/USD; v9 (24B4) records a scale per currency', () => {
+  it('a ledger with another currency exports v9 with its pinned scales; a v1 export still refuses it; an ARS/USD ledger stays v8', () => {
+    const backup = createRecoveryBackup(archive, new Date(at));
+    expect(backup.schema).toBe(BACKUP_SCHEMA_V9);
+    expect(backup.currencyUnits).toEqual([
+      { currency: 'CHF', minorUnitExponent: 2, source: CURRENCY_UNIT_SOURCE, catalogVersion: ISO_4217_PUBLISHED },
+      { currency: 'EUR', minorUnitExponent: 2, source: CURRENCY_UNIT_SOURCE, catalogVersion: ISO_4217_PUBLISHED },
+      { currency: 'JPY', minorUnitExponent: 0, source: CURRENCY_UNIT_SOURCE, catalogVersion: ISO_4217_PUBLISHED },
+      { currency: 'KWD', minorUnitExponent: 3, source: CURRENCY_UNIT_SOURCE, catalogVersion: ISO_4217_PUBLISHED },
+    ]);
+    expect(Object.keys(backup).at(-1)).toBe('currencyUnits');
+    expect(createRecoveryBackup({ accounts: [ars], records: [], budgets: [chfBudget] }).currencyUnits).toEqual([catalogueUnit('CHF')]);
     expect(() => createPilotBackup({ accounts: [jpy], entries: [] })).toThrow(LEGACY_EXPORT_MESSAGE);
     expect(createRecoveryBackup(legacyArchive).schema).toBe('finanzapp.native-pilot.v8');
+    expect('currencyUnits' in createRecoveryBackup(legacyArchive)).toBe(false);
+    // The archive's own pinned units are written as they are (they equal the catalogue); a missing one comes from the catalogue.
+    const pinned = { ...archive, currencyUnits: currenciesNeedingUnits(archive).map(code => code === 'JPY' ? { ...catalogueUnit(code), catalogVersion: '2025-01-01' } : catalogueUnit(code)) };
+    expect(createRecoveryBackup(pinned).currencyUnits!.find(unit => unit.currency === 'JPY')?.catalogVersion).toBe('2025-01-01');
+  });
+
+  it('a v9 file round-trips every amount in zero, two and three decimals, and is refused whole for a wrong, missing, duplicate, unneeded or legacy unit', () => {
+    const backup = createRecoveryBackup(archive);
+    const restored = parsePilotBackup(JSON.stringify(backup)).archive;
+    expect(restored.currencyUnits).toEqual(backup.currencyUnits);
+    expect(archiveKey(restored)).toBe(archiveKey({ ...archive, currencyUnits: backup.currencyUnits }));
+    expect(restored.records.map(record => record.entry.amountMinor).sort()).toEqual(entries.map(item => item.amountMinor).sort());
+    expect(previewBackupImport({ ...archive, currencyUnits: backup.currencyUnits }, restored)).toMatchObject({ accounts: [], records: [], budgets: [], conflicts: 0, scaleConflicts: [], currencyUnits: [] });
+    expect(archiveExponents(restored)).toEqual({ ARS: 2, USD: 2, CHF: 2, EUR: 2, JPY: 0, KWD: 3 });
+    const units = backup.currencyUnits!;
+    const withUnits = (currencyUnits: unknown) => JSON.stringify({ ...backup, currencyUnits });
+    expect(() => parsePilotBackup(withUnits(units.map(unit => unit.currency === 'JPY' ? { ...unit, minorUnitExponent: 2 } : unit)))).toThrow(SCALE_CONFLICT_MESSAGE);
+    expect(() => parsePilotBackup(withUnits(units.filter(unit => unit.currency !== 'KWD')))).toThrow('La moneda KWD no tiene una escala registrada. No se modificó nada.');
+    expect(() => parsePilotBackup(withUnits([...units, units[0]]))).toThrow('La copia repite la escala de una moneda. No se importó nada.');
+    expect(() => parsePilotBackup(withUnits([...units, catalogueUnit('GBP')]))).toThrow(UNIT_UNNEEDED_MESSAGE);
+    expect(() => parsePilotBackup(withUnits([...units, { currency: 'ARS', minorUnitExponent: 2, source: 'x', catalogVersion: 'y' }]))).toThrow(UNIT_UNNEEDED_MESSAGE);
+    expect(() => parsePilotBackup(withUnits(units.map(unit => ({ ...unit, extra: 1 }))))).toThrow('La copia contiene campos faltantes');
+    expect(() => parsePilotBackup(withUnits(units.map(unit => ({ ...unit, source: '' }))))).toThrow('Origen de la escala inválido.');
+    expect(() => parsePilotBackup(withUnits(units.map(unit => ({ ...unit, minorUnitExponent: 0.5 }))))).toThrow(SCALE_CONFLICT_MESSAGE);
+    expect(() => parsePilotBackup(withUnits('nope'))).toThrow('escalas de moneda');
+    expect(() => parsePilotBackup(JSON.stringify({ ...backup, currencyUnits: undefined }))).toThrow('campos faltantes');
+    // A v9 file whose rows are all ARS/USD carries an empty list, and a v8 file may not carry the key at all.
+    const legacyV9 = { ...createRecoveryBackup(legacyArchive), schema: BACKUP_SCHEMA_V9, currencyUnits: [] };
+    expect(parsePilotBackup(JSON.stringify(legacyV9)).archive).toEqual({ ...legacyArchive, currencyUnits: [] });
+    expect(() => parsePilotBackup(JSON.stringify({ ...createRecoveryBackup(legacyArchive), currencyUnits: [] }))).toThrow('campos faltantes');
+    // The unknown-version probe moves one up.
+    expect(() => parsePilotBackup(JSON.stringify({ ...backup, schema: 'finanzapp.native-pilot.v10' }))).toThrow('v1 a v9');
+  });
+
+  it('a copy\'s pinned scale is identical, new or a conflict on this device; a scale that disagrees with the catalogue never reaches a preview', () => {
+    const local: LedgerArchive = { ...legacyArchive, currencyUnits: [catalogueUnit('JPY')] };
+    const incoming = parsePilotBackup(JSON.stringify(createRecoveryBackup({ accounts: [jpy], records: [initialRecord(entries[1])] }))).archive;
+    const plan = previewBackupImport(local, incoming);
+    expect(plan.currencyUnits).toEqual([]);
+    expect(plan.scaleConflicts).toEqual([]);
+    expect(plan.identical).toBe(1);
+    expect(plan.accounts).toEqual([jpy]);
+    expect(plan.after).toEqual({ ARS: 100000 - 101, USD: 500, JPY: 1500 - 700 });
+    // A device that never pinned JPY receives the copy's unit in the plan, before the rows that need it.
+    const fresh = previewBackupImport({ accounts: [], records: [], currencyUnits: [] }, incoming);
+    expect(fresh.currencyUnits).toEqual([catalogueUnit('JPY')]);
+    expect(fresh.after).toEqual({ JPY: 1500 - 700 });
+    // Both sides are validated against the same catalogue before they are compared: a unit at another exponent
+    // is refused by name, on either side, so no amount can be previewed or written at a scale the catalogue disowns.
+    const forged = { ...incoming, currencyUnits: [{ ...catalogueUnit('JPY'), minorUnitExponent: 3 }] };
+    expect(() => previewBackupImport(local, forged)).toThrow(SCALE_CONFLICT_MESSAGE);
+    expect(() => previewBackupImport({ ...local, currencyUnits: [{ ...catalogueUnit('JPY'), minorUnitExponent: 2 }] }, incoming)).toThrow(SCALE_CONFLICT_MESSAGE);
+    // Units count in the concurrency baseline only when present, so an ARS/USD ledger keeps its key.
+    expect(archiveKey({ ...legacyArchive, currencyUnits: [] })).toBe(archiveKey(legacyArchive));
+    expect(archiveKey(local)).not.toBe(archiveKey(legacyArchive));
+  });
+
+  it('an archive that knows its scales must pin every currency it uses beyond ARS/USD, at the catalogue exponent', () => {
+    validateArchive({ accounts: [ars, usd], records: [], currencyUnits: [] });
+    validateArchive({ accounts: [jpy], records: [], currencyUnits: [catalogueUnit('JPY')] });
+    validateArchive({ accounts: [jpy], records: [], currencyUnits: [catalogueUnit('JPY'), catalogueUnit('KWD')] }); // storage tolerates a spare row
+    expect(() => validateArchive({ accounts: [jpy], records: [], currencyUnits: [] })).toThrow('La moneda JPY no tiene una escala registrada.');
+    expect(() => validateArchive({ accounts: [ars], records: [], budgets: [kwdTotal], currencyUnits: [] })).toThrow('La moneda KWD no tiene una escala registrada.');
+    expect(() => validateArchive({ accounts: [jpy], records: [], currencyUnits: [{ ...catalogueUnit('JPY'), minorUnitExponent: 2 }] })).toThrow(SCALE_CONFLICT_MESSAGE);
+    expect(() => archiveExponents({ accounts: [eur], currencyUnits: [] })).toThrow('La moneda EUR no tiene una escala registrada.');
+    expect(archiveExponents({ accounts: [ars, usd] })).toEqual({ ARS: 2, USD: 2 });
+    expect(pinnedExponent('KWD', [catalogueUnit('KWD')])).toBe(3);
+    expect(() => pinnedExponent('KWD', [])).toThrow('La moneda KWD no tiene una escala registrada.');
+    expect(pinnedExponent('USD', [])).toBe(2);
+    expect(currenciesNeedingUnits(archive)).toEqual(['CHF', 'EUR', 'JPY', 'KWD']);
+    expect(() => catalogueUnit('XAU')).toThrow('Moneda no admitida.');
+    expect(() => validateCurrencyUnits([catalogueUnit('JPY')], ['JPY', 'KWD'])).toThrow('La moneda KWD no tiene una escala registrada.');
+    expect(() => validateCurrencyUnits([catalogueUnit('JPY'), catalogueUnit('KWD')], ['JPY'], true)).toThrow(UNIT_UNNEEDED_MESSAGE);
+    validateCurrencyUnits([catalogueUnit('JPY'), catalogueUnit('KWD')], ['JPY']);
   });
 
   it('a v1–v8 file naming another currency is refused whole, even with a wider gate and a storable code', () => {

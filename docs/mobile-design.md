@@ -380,6 +380,15 @@ importe, moneda y estado.
   muestra hasta que toda la app lo tenga (23.1): un iPhone en inglés sigue leyendo
   español antes que media app traducida.
 
+## Producto 24B4 — SQLite 9 y copia v9 (sin cambios visuales)
+
+Nada cambia en pantalla con ARS y USD. En Importar copia, una copia v9 que registra escalas de
+otras monedas muestra una fila más en la revisión («Escalas de moneda nuevas») y, si la copia
+registrara otra cantidad de decimales que el dispositivo, un aviso en lugar del botón de importar.
+Los errores de escala («La moneda JPY no tiene una escala registrada», «La escala de la moneda no
+coincide con el registro») se muestran con el componente de error existente; nunca un diálogo
+nuevo ni un reset. El pie de Más dice Producto 24B4.
+
 ## Producto 24B3 — presentación y textos multimoneda (sin cambios visuales en producción)
 
 Con ARS y USD nada cambia: cada importe, etiqueta y frase hablada es byte a byte la de 24B2

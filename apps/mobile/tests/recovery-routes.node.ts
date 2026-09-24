@@ -253,6 +253,33 @@ test('identical or conflicting backups cannot show an enabled import action', as
   }
 });
 
+test('24B4: a v9 copy in yen lists the scales it pins as a review row, imports once, and the formats note names v9; a v8 file naming yen is refused by name', async () => {
+  const yen: domain.Account = { ...account, id: 'yen', name: 'Yenes', currency: 'JPY', openingMinor: 1500 };
+  const yenArchive: domain.LedgerArchive = { accounts: [yen], records: [domain.initialRecord({ ...entry, id: 'y1', accountId: 'yen', amountMinor: 700 })] };
+  const backup = domain.createRecoveryBackup(yenArchive);
+  assert.equal(backup.schema, 'finanzapp.native-pilot.v9');
+  const json = JSON.stringify(backup);
+  const view = harness('app/backup-import.tsx', {}, { data: { accounts: [], records: [], currencyUnits: [] }, locale: 'en-AR',
+    picker: async () => ({ canceled: false, result: { size: json.length, name: 'yen.json', text: async () => json } }) });
+  await find(view.render(), 'ActionButton', 'Choose backup').props.onPress();
+  const rows = nodes(view.render()).filter(node => node.type === 'DetailRow').map(node => [node.props.label, node.props.value]);
+  assert.ok(rows.some(([label, value]) => label === 'New currency scales' && value === '1'), JSON.stringify(rows));
+  assert.deepEqual({ minor: find(view.render(), 'Money').props.minor, currency: find(view.render(), 'Money').props.currency }, { minor: 800, currency: 'JPY' }, 'yen previewed as yen');
+  assert.ok(nodes(view.render()).some(node => node.type === 'AppText' && String(node.props.children).startsWith('Native backups v1 to v9')));
+  find(view.render(), 'ActionButton', 'Confirm import').props.onPress();
+  view.alerts[0].buttons[1].onPress();
+  await flush();
+  assert.equal(view.restores.length, 1);
+  assert.deepEqual(view.restores[0].value.currencyUnits, [domain.catalogueUnit('JPY')], 'the copy\'s pinned scale travels with the rows');
+  // The same bytes with the v8 header: refused whole, before any preview, with the legacy sentence.
+  const forged = JSON.stringify({ ...backup, schema: 'finanzapp.native-pilot.v8', currencyUnits: undefined });
+  const refused = harness('app/backup-import.tsx', {}, { data: { accounts: [], records: [] }, locale: 'en-AR',
+    picker: async () => ({ canceled: false, result: { size: forged.length, name: 'forged.json', text: async () => forged } }) });
+  await find(refused.render(), 'ActionButton', 'Choose backup').props.onPress();
+  assert.match(bindLocale('en-AR').errorText(find(refused.render(), 'ErrorMessage').props.message), /^Backups v1 to v8 can only contain accounts and budgets in ARS or USD/);
+  assert.equal(refused.restores.length, 0);
+});
+
 const destination: domain.Account = { ...account, id: 'b', name: 'Destino', openingMinor: 0 };
 const transfer: domain.Transfer = { id: 'transfer', fromAccountId: 'a', toAccountId: 'b', amountMinor: 1000, note: '', dateISO: entry.dateISO, createdAt };
 const transferData: domain.LedgerArchive = { ...archive, accounts: [...archive.accounts, destination] };

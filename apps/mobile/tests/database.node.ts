@@ -11,8 +11,8 @@ import { accountBalanceMinor, archiveKey, createRecoveryBackup, initialRecord, m
   summarizeMonthlyBudgets, type AccountAppearance } from '@finanzapp/domain';
 import { changeEntry, createAccount, createEntry, importArchive, initializeDatabase, readArchive, readSnapshot, changeAccount,
   createTransfer, changeTransfer, saveRecurringRule, processRecurring, saveMonthlyBudget,
-  createCreditCard, saveCreditCard, createPersonalDebt, savePersonalDebt, saveAccountAppearance, saveCategoryDefinition, type LedgerDatabase } from '../src/storage/database.ts';
-import { runExclusiveTransaction, type TransactionConnection } from '../src/storage/transaction.ts';
+  createCreditCard, saveCreditCard, createPersonalDebt, savePersonalDebt, saveAccountAppearance, saveCategoryDefinition, DATABASE_VERSION, SCHEMA_SCRIPTS, type LedgerDatabase } from '../src/storage/database.ts';
+import { MIGRATION_REFERENCES_MESSAGE, runExclusiveTransaction, runSchemaMigration, type TransactionConnection } from '../src/storage/transaction.ts';
 
 // Synthetic records in disposable databases only. Nothing seeds a user's app.
 const account: Account = { id: 'test-account', name: 'Test', currency: 'ARS', openingMinor: 100000,
@@ -47,7 +47,8 @@ function databaseAt(path: string): LedgerDatabase & { closeAsync(): Promise<void
   const closeAsync = async () => { if (!closed) { closed = true; await base.closeAsync(); } };
   cleanups.push(closeAsync);
   return { ...base, closeAsync,
-    withExclusiveTransactionAsync: work => runExclusiveTransaction(async () => connection(path), work) };
+    withExclusiveTransactionAsync: work => runExclusiveTransaction(async () => connection(path), work),
+    withMigrationTransactionAsync: work => runSchemaMigration(async () => connection(path), work) };
 }
 
 function setup() {
@@ -61,7 +62,7 @@ test('new install is empty; initialization can repeat without deleting data', as
   const { db } = setup();
   await initializeDatabase(db);
   assert.deepEqual(await readSnapshot(db), { accounts: [], entries: [] });
-  assert.equal((await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))?.user_version, 8);
+  assert.equal((await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))?.user_version, DATABASE_VERSION);
   await createAccount(db, account);
   await initializeDatabase(db);
   assert.deepEqual((await readSnapshot(db)).accounts, [account]);
@@ -147,9 +148,9 @@ test('newer database schema is refused intact instead of reset or downgraded', a
   const { db } = setup();
   await initializeDatabase(db);
   await createAccount(db, account);
-  await db.execAsync('PRAGMA user_version = 9');
+  await db.execAsync(`PRAGMA user_version = ${DATABASE_VERSION + 1}`);
   await assert.rejects(initializeDatabase(db), /versión más nueva/);
-  assert.equal((await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))?.user_version, 9);
+  assert.equal((await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))?.user_version, DATABASE_VERSION + 1);
   assert.deepEqual((await readSnapshot(db)).accounts, [account]);
 });
 
@@ -502,9 +503,9 @@ test('v3 database upgrades through recurring and budget schemas without changing
   const { db } = await transferReady();
   await createTransfer(db, transfer);
   const before = await readSnapshot(db);
-  await db.execAsync('PRAGMA user_version = 3; DROP TABLE IF EXISTS account_appearances; DROP TABLE IF EXISTS category_definitions; DROP TABLE IF EXISTS recurring_rules; DROP TABLE IF EXISTS monthly_budgets; DROP TABLE IF EXISTS credit_cards; DROP TABLE IF EXISTS personal_debts;');
+  await db.execAsync('PRAGMA user_version = 3; DROP TABLE IF EXISTS currency_units; DROP TABLE IF EXISTS account_appearances; DROP TABLE IF EXISTS category_definitions; DROP TABLE IF EXISTS recurring_rules; DROP TABLE IF EXISTS monthly_budgets; DROP TABLE IF EXISTS credit_cards; DROP TABLE IF EXISTS personal_debts;');
   await initializeDatabase(db);
-  assert.equal((await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))?.user_version, 8);
+  assert.equal((await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))?.user_version, DATABASE_VERSION);
   assert.deepEqual(await readSnapshot(db), before);
   assert.deepEqual((await readArchive(db)).recurring ?? [], []);
   assert.deepEqual((await readArchive(db)).budgets ?? [], []);
@@ -601,10 +602,10 @@ test('schema 4 upgrades to budget schema 5 without changing recurring rules or b
   await createAccount(db, account);
   await saveRecurringRule(db, recurring);
   const before = await readArchive(db);
-  await db.execAsync('DROP TABLE IF EXISTS account_appearances; DROP TABLE IF EXISTS category_definitions; DROP TABLE monthly_budgets; DROP TABLE credit_cards; DROP TABLE personal_debts; PRAGMA user_version = 4;');
+  await db.execAsync('DROP TABLE IF EXISTS currency_units; DROP TABLE IF EXISTS account_appearances; DROP TABLE IF EXISTS category_definitions; DROP TABLE monthly_budgets; DROP TABLE credit_cards; DROP TABLE personal_debts; PRAGMA user_version = 4;');
   await initializeDatabase(db);
   const after = await readArchive(db);
-  assert.equal((await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))?.user_version, 8);
+  assert.equal((await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))?.user_version, DATABASE_VERSION);
   assert.deepEqual(after.accounts, before.accounts);
   assert.deepEqual(after.records, before.records);
   assert.deepEqual(after.recurring, before.recurring);
@@ -715,7 +716,7 @@ test('schema 6 upgrades to scoped budget schema 7: every old budget survives exa
   await saveRecurringRule(db, recurring);
   const before = await readArchive(db);
   // Rebuild the v6 table by hand and insert rows the old way (no scope column), including an archived one and an odd spelling.
-  await db.execAsync('DROP TABLE IF EXISTS account_appearances; DROP TABLE IF EXISTS category_definitions; DROP TABLE monthly_budgets;' + V6_BUDGETS_TABLE + " PRAGMA user_version = 6;");
+  await db.execAsync('DROP TABLE IF EXISTS currency_units; DROP TABLE IF EXISTS account_appearances; DROP TABLE IF EXISTS category_definitions; DROP TABLE monthly_budgets;' + V6_BUDGETS_TABLE + " PRAGMA user_version = 6;");
   const legacy = [
     { ...monthlyBudget },
     { ...monthlyBudget, id: 'archived-fixture', category: ' fÍxture ', active: false, revision: 3, updatedAt: changedAt },
@@ -734,7 +735,7 @@ test('schema 6 upgrades to scoped budget schema 7: every old budget survives exa
   assert.equal((await db.getFirstAsync<{ n: number }>('SELECT count(*) AS n FROM monthly_budgets'))?.n, 3);
   await initializeDatabase(db);
   await initializeDatabase(db); // idempotent: a v7 file is not rebuilt again
-  assert.equal((await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))?.user_version, 8);
+  assert.equal((await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))?.user_version, DATABASE_VERSION);
   const after = await readArchive(db);
   assert.deepEqual(after.accounts, before.accounts);
   assert.deepEqual(after.records, before.records);
@@ -816,7 +817,7 @@ test('schema 5 upgrades to card/debt schema 6 preserving budgets, recurring rule
   await saveRecurringRule(db, recurring);
   await saveMonthlyBudget(db, monthlyBudget);
   const before = await readArchive(db);
-  await db.execAsync('DROP TABLE IF EXISTS account_appearances; DROP TABLE IF EXISTS category_definitions; DROP TABLE credit_cards; DROP TABLE personal_debts; PRAGMA user_version = 5;');
+  await db.execAsync('DROP TABLE IF EXISTS currency_units; DROP TABLE IF EXISTS account_appearances; DROP TABLE IF EXISTS category_definitions; DROP TABLE credit_cards; DROP TABLE personal_debts; PRAGMA user_version = 5;');
   const failing: LedgerDatabase = { ...db, withExclusiveTransactionAsync: work => db.withExclusiveTransactionAsync(tx => work({ ...tx,
     execAsync: async sql => { await tx.execAsync(sql); if (sql.includes('personal_debts')) throw new Error('Interrupted v6'); },
   })) };
@@ -824,7 +825,7 @@ test('schema 5 upgrades to card/debt schema 6 preserving budgets, recurring rule
   assert.equal((await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))?.user_version, 5);
   await initializeDatabase(db);
   const after = await readArchive(db);
-  assert.equal((await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))?.user_version, 8);
+  assert.equal((await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))?.user_version, DATABASE_VERSION);
   assert.equal(archiveKey(after), archiveKey(before));
   assert.deepEqual(after.cards ?? [], []);
   assert.deepEqual(after.debts ?? [], []);
@@ -978,7 +979,7 @@ test('schema 7 upgrades to identity schema 8 additively: existing accounts keep 
   await saveRecurringRule(db, recurring);
   await saveMonthlyBudget(db, monthlyBudget);
   const before = await readArchive(db);
-  await db.execAsync('DROP TABLE account_appearances; DROP TABLE category_definitions; PRAGMA user_version = 7;');
+  await db.execAsync('DROP TABLE currency_units; DROP TABLE account_appearances; DROP TABLE category_definitions; PRAGMA user_version = 7;');
   const failing: LedgerDatabase = { ...db, withExclusiveTransactionAsync: work => db.withExclusiveTransactionAsync(tx => work({ ...tx,
     execAsync: async sql => { await tx.execAsync(sql); if (sql.includes('category_definitions')) throw new Error('Interrupted v8'); },
   })) };
@@ -987,7 +988,7 @@ test('schema 7 upgrades to identity schema 8 additively: existing accounts keep 
   assert.equal((await db.getAllAsync("SELECT name FROM sqlite_master WHERE name IN ('account_appearances', 'category_definitions')")).length, 0);
   await initializeDatabase(db);
   await initializeDatabase(db); // idempotent
-  assert.equal((await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))?.user_version, 8);
+  assert.equal((await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))?.user_version, DATABASE_VERSION);
   const after = await readArchive(db);
   assert.equal(archiveKey(after), archiveKey(before), 'no financial row changed and no appearance/category row was seeded');
   assert.equal(after.appearances, undefined);
@@ -1203,4 +1204,315 @@ test('Producto 23.1C1: an amount typed with Argentine or US separators is stored
   assert.deepEqual(saved.accounts.map(item => [item.id, item.currency]).sort(), [['test-account', 'ARS'], ['usd-account', 'USD']]);
   assert.equal(saved.entries.length, 2, 'a refused transfer records nothing, and no transfer is ever an expense');
   assert.equal((saved.transfers ?? []).length, 0);
+});
+
+// ---- Producto 24B4: SQLite schema 9 and backup v9 --------------------------------------------
+// Real files at schema 8 are built from the app's own scripts (never a hand-written copy of an
+// old schema), populated through raw SQL with every child table, then opened by the current code.
+// The gate is opened per call (an explicit currency set) and never edited: production still
+// offers exactly ARS and USD, and the tests below also prove a closed gate keeps stored yen readable.
+import { CURRENCY_UNIT_SOURCE, ISO_4217_PUBLISHED, SCALE_CONFLICT_MESSAGE, archiveExponents, catalogueUnit, previewBackupImport, sameEntry, type IsoCurrencyCode, type MonthlyBudget as Budget } from '@finanzapp/domain';
+const GATE: readonly IsoCurrencyCode[] = ['ARS', 'USD', 'EUR', 'JPY', 'KWD'];
+const V8_SCRIPTS = SCHEMA_SCRIPTS.slice(0, 8);
+
+/** A real schema 8 file with every table populated: two cash accounts, a card, a debt, an entry with an
+ * edit and a tombstone, a transfer with a void, a recurring rule, a total and a category budget, a look and
+ * a category. Returns the database handle and the raw rows for later comparison. */
+async function realV8File() {
+  const { db, path } = setup();
+  await runExclusiveTransaction(async () => connection(path), async tx => { for (const script of V8_SCRIPTS) await tx.execAsync(script); });
+  assert.equal((await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))?.user_version, 8);
+  const at = '2026-09-10T12:00:00.000Z', later = '2026-09-12T12:00:00.000Z';
+  await db.withExclusiveTransactionAsync(async tx => {
+    // The schema 8 CHECK is the real one: a yen account cannot exist in this file.
+    await assert.rejects(tx.runAsync('INSERT INTO accounts (id, name, currency, openingMinor, createdAt, revision, updatedAt) VALUES (?, ?, ?, ?, ?, 0, ?)', 'yen', 'Yen', 'JPY', 0, at, at), /CHECK constraint failed/);
+    for (const [id, name, currency, opening] of [['cash', 'Banco', 'ARS', 100000], ['usd', 'Dólares', 'USD', 500], ['card-acc', 'Visa', 'ARS', -20000], ['debt-acc', 'Debo · Ana', 'USD', -300]] as const) {
+      await tx.runAsync('INSERT INTO accounts (id, name, currency, openingMinor, createdAt, revision, updatedAt) VALUES (?, ?, ?, ?, ?, 0, ?)', id, name, currency, opening, at, at);
+    }
+    await tx.runAsync('UPDATE accounts SET name = ?, revision = 1, updatedAt = ? WHERE id = ?', 'Banco Nación', later, 'cash');
+    await tx.runAsync('INSERT INTO account_changes (id, accountId, beforeJSON, afterJSON, expectedBalanceMinor) VALUES (?, ?, ?, ?, NULL)', 'ac', 'cash',
+      JSON.stringify({ id: 'cash', name: 'Banco', currency: 'ARS', openingMinor: 100000, createdAt: at }), JSON.stringify({ id: 'cash', name: 'Banco Nación', currency: 'ARS', openingMinor: 100000, createdAt: at, revision: 1, updatedAt: later }));
+    await tx.runAsync('INSERT INTO entries (id, accountId, kind, amountMinor, merchant, category, dateISO, createdAt, revision, voided, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', 'e1', 'cash', 'expense', 12345, 'Súper', 'Comida', '2026-09-10', at, 0, 0, at);
+    await tx.runAsync('INSERT INTO entries (id, accountId, kind, amountMinor, merchant, category, dateISO, createdAt, revision, voided, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', 'e2', 'cash', 'income', 5000, 'Sueldo', 'Sueldo', '2026-09-11', at, 1, 1, later);
+    await tx.runAsync('INSERT INTO entries (id, accountId, kind, amountMinor, merchant, category, dateISO, createdAt, revision, voided, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', 'e3', 'card-acc', 'expense', 999, 'Kiosco', 'Comida', '2026-09-11', at, 0, 0, at);
+    await tx.runAsync('INSERT INTO entry_changes (id, entryId, action, beforeJSON, afterJSON) VALUES (?, ?, ?, ?, ?)', 'ec', 'e2', 'void', '{}', '{}');
+    await tx.runAsync('INSERT INTO transfers (id, fromAccountId, toAccountId, amountMinor, note, dateISO, createdAt, revision, voided, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', 't1', 'cash', 'card-acc', 1000, 'Pago', '2026-09-11', at, 0, 0, at);
+    await tx.runAsync('INSERT INTO transfers (id, fromAccountId, toAccountId, amountMinor, note, dateISO, createdAt, revision, voided, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', 't2', 'usd', 'debt-acc', 100, 'Cuota', '2026-09-11', at, 1, 1, later);
+    await tx.runAsync('INSERT INTO transfer_changes (id, transferId, action, beforeJSON, afterJSON) VALUES (?, ?, ?, ?, ?)', 'tc', 't2', 'void', '{}', '{}');
+    await tx.runAsync('INSERT INTO recurring_rules (id, accountId, kind, amountMinor, merchant, category, frequency, anchorDateISO, nextDateISO, active, createdAt, revision, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', 'r1', 'cash', 'expense', 40000, 'Alquiler', 'Hogar', 'monthly', '2026-10-01', '2026-10-01', 1, at, 0, at);
+    await tx.runAsync('INSERT INTO monthly_budgets (id, scope, category, currency, monthISO, amountMinor, active, createdAt, revision, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', 'b-total', 'total', null, 'ARS', '2026-09', 500000, 1, at, 0, at);
+    await tx.runAsync('INSERT INTO monthly_budgets (id, scope, category, currency, monthISO, amountMinor, active, createdAt, revision, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', 'b-food', 'category', 'Comida', 'ARS', '2026-09', 150000, 0, at, 1, later);
+    await assert.rejects(tx.runAsync('INSERT INTO monthly_budgets (id, scope, category, currency, monthISO, amountMinor, active, createdAt, revision, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', 'b-yen', 'total', null, 'JPY', '2026-09', 1, 1, at, 0, at), /CHECK constraint failed/);
+    await tx.runAsync('INSERT INTO credit_cards (id, accountId, issuer, last4, creditLimitMinor, closingDay, dueDay, active, createdAt, revision, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', 'card', 'card-acc', 'Galicia', '4009', 300000, 28, 5, 1, at, 0, at);
+    await tx.runAsync('INSERT INTO personal_debts (id, accountId, direction, counterparty, dueDateISO, note, active, createdAt, revision, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', 'debt', 'debt-acc', 'owed_by_me', 'Ana', '2026-10-01', '', 1, at, 0, at);
+    await tx.runAsync('INSERT INTO account_appearances (accountId, icon, color, createdAt, revision, updatedAt) VALUES (?, ?, ?, ?, ?, ?)', 'cash', 'bank', 'azure', at, 0, at);
+    await tx.runAsync('INSERT INTO category_definitions (kind, key, storedLabel, label, icon, color, archived, createdAt, revision, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', 'expense', 'kiosco', 'Kiosco', 'Kiosco', 'cafe', 'ochre', 0, at, 0, at);
+  });
+  const dump = async () => {
+    const rows: Record<string, unknown[]> = {};
+    for (const table of ['accounts', 'entries', 'entry_changes', 'account_changes', 'transfers', 'transfer_changes', 'recurring_rules', 'monthly_budgets', 'credit_cards', 'personal_debts', 'account_appearances', 'category_definitions']) {
+      rows[table] = await db.getAllAsync(`SELECT * FROM ${table} ORDER BY 1, 2`);
+    }
+    return rows;
+  };
+  return { db, path, before: await dump(), dump };
+}
+
+test('24B4: a real schema 8 file with every table populated upgrades to schema 9 with identical rows, balances and identity, and reopens', async () => {
+  const { db, path, before, dump } = await realV8File();
+  await initializeDatabase(db);
+  assert.equal((await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))?.user_version, 9);
+  assert.deepEqual(await dump(), before, 'every row of every table, byte for byte, including audit receipts and tombstones');
+  assert.deepEqual(await db.getAllAsync('SELECT * FROM currency_units'), [], 'ARS and USD are never pinned: their rows stay cents');
+  const archive = await readArchive(db);
+  assert.deepEqual(archive.currencyUnits, []);
+  assert.deepEqual(archiveExponents(archive), { ARS: 2, USD: 2 });
+  const snapshot = snapshotFromArchive(archive);
+  assert.deepEqual(totalsByCurrency(snapshot), { ARS: 100000 - 12345 - 20000 - 999, USD: 500 - 300 });
+  assert.equal(accountBalanceMinor(snapshot.accounts.find(a => a.id === 'cash')!, snapshot.entries, snapshot.transfers), 100000 - 12345 - 1000);
+  assert.deepEqual(archive.accounts.find(a => a.id === 'cash'), { id: 'cash', name: 'Banco Nación', currency: 'ARS', openingMinor: 100000, createdAt: '2026-09-10T12:00:00.000Z', revision: 1, updatedAt: '2026-09-12T12:00:00.000Z' });
+  assert.deepEqual(archive.records.map(record => [record.entry.id, record.voided, record.revision]).sort(), [['e1', false, 0], ['e2', true, 1], ['e3', false, 0]]);
+  assert.deepEqual(archive.transfers!.map(record => [record.transfer.id, record.voided]).sort(), [['t1', false], ['t2', true]]);
+  assert.deepEqual(archive.budgets!.map(budget => [budget.id, budget.scope, budget.active]), [['b-total', 'total', true], ['b-food', 'category', false]]);
+  assert.equal(archive.cards![0].id, 'card'); assert.equal(archive.debts![0].id, 'debt'); assert.equal(archive.appearances![0].color, 'azure'); assert.equal(archive.categories![0].key, 'kiosco');
+  // The shape CHECK admits any ISO-shaped code; what a row may hold is decided by the domain, not the schema.
+  await db.withExclusiveTransactionAsync(async tx => {
+    await assert.rejects(tx.runAsync('INSERT INTO accounts (id, name, currency, openingMinor, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?)', 'bad', 'x', 'ars', 0, 'now', 'now'), /CHECK constraint failed/);
+    await assert.rejects(tx.runAsync('INSERT INTO accounts (id, name, currency, openingMinor, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?)', 'bad', 'x', 'EURO', 0, 'now', 'now'), /CHECK constraint failed/);
+    await assert.rejects(tx.runAsync('INSERT INTO accounts (id, name, currency, openingMinor, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?)', 'bad', '', 'ARS', 0, 'now', 'now'), /CHECK constraint failed/, 'the other CHECKs survived the rebuild');
+    await assert.rejects(tx.runAsync('INSERT INTO entries (id, accountId, kind, amountMinor, merchant, category, dateISO, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)', 'orphan', 'missing', 'expense', 1, 'x', 'x', '2026-09-11', 'now', 'now'), /FOREIGN KEY constraint failed/, 'children still reference the rebuilt parent');
+  });
+  // Close and reopen: schema 9 is read as is, nothing migrates twice, nothing changes.
+  await db.closeAsync();
+  const reopened = databaseAt(path);
+  await initializeDatabase(reopened);
+  assert.equal((await reopened.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))?.user_version, 9);
+  assert.equal(archiveKey(await readArchive(reopened)), archiveKey(archive));
+  assert.deepEqual((await reopened.getAllAsync<{ name: string }>("SELECT name FROM sqlite_master WHERE type = 'table' AND name LIKE '%_v9'")), [], 'no scratch table survives');
+  const indexes = (await reopened.getAllAsync<{ name: string }>("SELECT name FROM sqlite_master WHERE type = 'index' AND name = 'budgets_period'"));
+  assert.equal(indexes.length, 1);
+});
+
+test('24B4: an interrupted schema 9 migration leaves the schema 8 file intact and reopenable; a broken reference is refused before COMMIT', async () => {
+  const { db, before, dump } = await realV8File();
+  // A stale scratch table makes the budgets rebuild fail after the accounts rebuild already ran inside the transaction.
+  await db.execAsync('CREATE TABLE monthly_budgets_v9 (x INTEGER) STRICT');
+  await assert.rejects(initializeDatabase(db), /already exists/);
+  assert.equal((await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))?.user_version, 8);
+  assert.deepEqual(await dump(), before, 'the accounts rebuild was rolled back with everything else');
+  await db.withExclusiveTransactionAsync(async tx => {
+    await assert.rejects(tx.runAsync('INSERT INTO accounts (id, name, currency, openingMinor, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?)', 'yen', 'Yen', 'JPY', 0, 'now', 'now'), /CHECK constraint failed/, 'still the schema 8 CHECK');
+  });
+  assert.equal((await db.getAllAsync("SELECT name FROM sqlite_master WHERE name IN ('accounts_v9', 'currency_units')")).length, 0);
+  await db.execAsync('DROP TABLE monthly_budgets_v9');
+  await initializeDatabase(db);
+  assert.equal((await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))?.user_version, 9);
+  assert.deepEqual(await dump(), before);
+
+  // A schema 8 file holding a child row that points nowhere (foreign keys were off when it was written) never
+  // reaches schema 9: foreign_key_check refuses it before COMMIT and the file stays as it was.
+  const damaged = await realV8File();
+  const raw = connection(damaged.path);
+  await raw.execAsync("INSERT INTO entries (id, accountId, kind, amountMinor, merchant, category, dateISO, createdAt, revision, voided, updatedAt) VALUES ('orphan', 'gone', 'expense', 1, 'x', 'x', '2026-09-11', 'now', 0, 0, 'now')");
+  await raw.closeAsync();
+  await assert.rejects(initializeDatabase(damaged.db), new RegExp(MIGRATION_REFERENCES_MESSAGE.slice(0, 30)));
+  assert.equal((await damaged.db.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))?.user_version, 8);
+  assert.equal((await damaged.db.getAllAsync("SELECT name FROM sqlite_master WHERE name IN ('accounts_v9', 'monthly_budgets_v9', 'currency_units')")).length, 0);
+  await damaged.db.execAsync("DELETE FROM entries WHERE id = 'orphan'");
+  await initializeDatabase(damaged.db);
+  assert.equal((await damaged.db.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))?.user_version, 9);
+});
+
+test('24B4: an older schema (v3) still migrates through every step to schema 9 in one go', async () => {
+  const { db, path } = setup();
+  await runExclusiveTransaction(async () => connection(path), async tx => { for (const script of SCHEMA_SCRIPTS.slice(0, 3)) await tx.execAsync(script); });
+  await db.withExclusiveTransactionAsync(async tx => {
+    await tx.runAsync('INSERT INTO accounts (id, name, currency, openingMinor, createdAt, revision, updatedAt) VALUES (?, ?, ?, ?, ?, 0, ?)', 'a', 'Caja', 'ARS', 700, account.createdAt, account.createdAt);
+  });
+  await initializeDatabase(db);
+  assert.equal((await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))?.user_version, 9);
+  assert.deepEqual(totalsByCurrency(await readSnapshot(db)), { ARS: 700 });
+});
+
+const yen: Account = { id: 'yen', name: 'Yenes', currency: 'JPY', openingMinor: 1500, createdAt: account.createdAt };
+const dinar: Account = { id: 'dinar', name: 'Dinares', currency: 'KWD', openingMinor: 1234567, createdAt: account.createdAt };
+const euro: Account = { id: 'euro', name: 'Euros', currency: 'EUR', openingMinor: 5000, createdAt: account.createdAt };
+const yenExpense: Entry = { ...expense, id: 'yen-1', accountId: yen.id, amountMinor: 700 };
+const filExpense: Entry = { ...expense, id: 'fil-1', accountId: dinar.id, amountMinor: 5 };
+const yenBudget: Budget = { id: 'b-yen', scope: 'total', currency: 'JPY', monthISO: '2026-09', amountMinor: 20000, active: true, createdAt: account.createdAt, revision: 0, updatedAt: account.createdAt };
+
+/** A schema 9 ledger holding ARS, JPY (0 decimals), KWD (3) and EUR (2) through the explicit test gate. */
+async function threeCurrencies() {
+  const { db, path } = setup();
+  await initializeDatabase(db);
+  await createAccount(db, account);
+  await createAccount(db, yen, undefined, GATE);
+  await createAccount(db, dinar, undefined, GATE);
+  await createAccount(db, euro, undefined, GATE);
+  await createEntry(db, expense);
+  await createEntry(db, yenExpense);
+  await createEntry(db, filExpense);
+  await saveMonthlyBudget(db, yenBudget, GATE);
+  return { db, path };
+}
+
+test('24B4: a currency beyond ARS/USD is pinned once, on its first row, with its source and catalogue version; the gate stays closed in production', async () => {
+  const { db } = setup();
+  await initializeDatabase(db);
+  await assert.rejects(createAccount(db, yen), /moneda disponible/, 'the production gate refuses a yen account');
+  await assert.rejects(saveMonthlyBudget(db, yenBudget), /moneda disponible/);
+  assert.deepEqual(await db.getAllAsync('SELECT * FROM currency_units'), [], 'a refused creation pins nothing');
+  await createAccount(db, yen, undefined, GATE);
+  await createAccount(db, yen, undefined, GATE); // A retry finds the row it wrote.
+  const units = await db.getAllAsync<{ currency: string; minorUnitExponent: number; source: string; catalogVersion: string; createdAt: string }>('SELECT * FROM currency_units');
+  assert.deepEqual(units, [{ currency: 'JPY', minorUnitExponent: 0, source: CURRENCY_UNIT_SOURCE, catalogVersion: ISO_4217_PUBLISHED, createdAt: yen.createdAt }]);
+  await createAccount(db, { ...yen, id: 'yen-2', name: 'Otra' }, undefined, GATE);
+  assert.equal((await db.getAllAsync('SELECT * FROM currency_units')).length, 1, 'one row per currency, never one per account');
+  await saveMonthlyBudget(db, { ...yenBudget, id: 'b-kwd', currency: 'KWD', amountMinor: 1000 }, GATE);
+  assert.deepEqual((await db.getAllAsync<{ currency: string; minorUnitExponent: number }>('SELECT currency, minorUnitExponent FROM currency_units ORDER BY currency')), [{ currency: 'JPY', minorUnitExponent: 0 }, { currency: 'KWD', minorUnitExponent: 3 }], 'a budget pins its own code');
+  const archive = await readArchive(db);
+  assert.deepEqual(archive.currencyUnits, [catalogueUnit('JPY'), catalogueUnit('KWD')]);
+  assert.deepEqual(archiveExponents(archive), { JPY: 0, KWD: 3 }, 'only the currencies present');
+  // Stored ARS/USD rows never gain a unit row, whatever else is pinned.
+  await createAccount(db, account);
+  assert.equal((await db.getAllAsync('SELECT * FROM currency_units')).length, 2);
+});
+
+test('24B4: yen are stored and read as yen, fils as fils: no amount is ever read as cents, and each balance is exact in its own exponent', async () => {
+  const { db, path } = await threeCurrencies();
+  const snapshot = await readSnapshot(db);
+  assert.deepEqual(totalsByCurrency(snapshot), { ARS: 100000 - 12345, EUR: 5000, JPY: 1500 - 700, KWD: 1234567 - 5 });
+  assert.equal(snapshot.entries.find(e => e.id === 'yen-1')!.amountMinor, 700, '700 yen, not 7.00');
+  assert.equal(snapshot.entries.find(e => e.id === 'fil-1')!.amountMinor, 5, '5 fils, not 0.05 dinars');
+  assert.deepEqual(archiveExponents(await readArchive(db)), { ARS: 2, EUR: 2, JPY: 0, KWD: 3 });
+  // A transfer in yen moves 300 yen exactly; a cross-currency one is refused by the domain as before.
+  await createAccount(db, { ...yen, id: 'yen-2', name: 'Otra', openingMinor: 0 }, undefined, GATE);
+  await createTransfer(db, { id: 'ty', fromAccountId: yen.id, toAccountId: 'yen-2', amountMinor: 300, note: '', dateISO: expense.dateISO, createdAt: account.createdAt });
+  await assert.rejects(createTransfer(db, { id: 'tx', fromAccountId: yen.id, toAccountId: dinar.id, amountMinor: 300, note: '', dateISO: expense.dateISO, createdAt: account.createdAt }), /misma moneda/);
+  const after = await readSnapshot(db);
+  assert.equal(accountBalanceMinor(after.accounts.find(a => a.id === yen.id)!, after.entries, after.transfers), 1500 - 700 - 300);
+  assert.equal(accountBalanceMinor(after.accounts.find(a => a.id === 'yen-2')!, after.entries, after.transfers), 300);
+  // Close and reopen: the pinned scales are re-read, the totals are the same integers.
+  await db.closeAsync();
+  const reopened = databaseAt(path);
+  await initializeDatabase(reopened);
+  assert.deepEqual(totalsByCurrency(await readSnapshot(reopened)), { ARS: 100000 - 12345, EUR: 5000, JPY: 1500 - 700, KWD: 1234567 - 5 });
+});
+
+test('24B4: a pinned scale that disagrees with the catalogue, or a row whose currency was never pinned, refuses to open by name and changes nothing', async () => {
+  const { db } = await threeCurrencies();
+  const before = await db.getAllAsync('SELECT * FROM entries ORDER BY id');
+  // A hand-edited unit (what a catalogue that changed an exponent would look like): refused, never rescaled.
+  await db.execAsync("UPDATE currency_units SET minorUnitExponent = 2 WHERE currency = 'JPY'");
+  await assert.rejects(readArchive(db), new RegExp(SCALE_CONFLICT_MESSAGE.slice(0, 20)));
+  await assert.rejects(initializeDatabase(db), new RegExp(SCALE_CONFLICT_MESSAGE.slice(0, 20)));
+  await assert.rejects(createEntry(db, { ...yenExpense, id: 'yen-2' }), new RegExp(SCALE_CONFLICT_MESSAGE.slice(0, 20)), 'no write while the scale is in doubt');
+  assert.deepEqual(await db.getAllAsync('SELECT * FROM entries ORDER BY id'), before, 'nothing was rewritten or reset');
+  assert.equal((await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))?.user_version, 9);
+  await db.execAsync("UPDATE currency_units SET minorUnitExponent = 0 WHERE currency = 'JPY'");
+  assert.deepEqual(archiveExponents(await readArchive(db)), { ARS: 2, EUR: 2, JPY: 0, KWD: 3 });
+  // A row in a currency with no pinned scale (written by hand with foreign keys and the domain bypassed), even with the gate open.
+  await db.execAsync("DELETE FROM currency_units WHERE currency = 'EUR'");
+  await assert.rejects(readArchive(db), /La moneda EUR no tiene una escala registrada/);
+  await assert.rejects(createAccount(db, { ...euro, id: 'euro-2' }, undefined, GATE), /La moneda EUR no tiene una escala registrada/);
+  assert.equal((await db.getAllAsync("SELECT * FROM accounts WHERE id = 'euro-2'")).length, 0);
+  // A legacy code with a spurious row: harmless at 2, a conflict at anything else.
+  await db.execAsync(`INSERT INTO currency_units (currency, minorUnitExponent, source, catalogVersion, createdAt) VALUES ('EUR', 2, 'x', 'y', 'now')`);
+  await readArchive(db);
+  await db.execAsync(`INSERT INTO currency_units (currency, minorUnitExponent, source, catalogVersion, createdAt) VALUES ('ARS', 2, 'x', 'y', 'now')`);
+  await assert.rejects(readArchive(db), /no la necesita/, 'ARS is never pinned: a row for it is not the app\'s');
+});
+
+test('24B4: closing the gate again keeps stored yen readable, editable, exportable (v9) and restorable; ARS/USD-only ledgers still export v8 bytes', async () => {
+  const { db } = await threeCurrencies();
+  // Every operation below runs with the production gate (ARS/USD): the stored currencies are untouched by it.
+  await createEntry(db, { ...yenExpense, id: 'yen-2', amountMinor: 100 });
+  const record = (await readArchive(db)).records.find(item => item.entry.id === 'yen-1')!;
+  await changeEntry(db, makeEntryChange('edit-yen', record, 'edit', changedAt, { ...record.entry, amountMinor: 650 }));
+  await saveMonthlyBudget(db, { ...yenBudget, amountMinor: 25000, revision: 1, updatedAt: changedAt });
+  await assert.rejects(saveMonthlyBudget(db, { ...yenBudget, id: 'b-yen-2', monthISO: '2026-10' }), /moneda disponible/, 'a NEW yen budget needs the gate');
+  await assert.rejects(createAccount(db, { ...yen, id: 'yen-3' }), /moneda disponible/, 'a NEW yen account needs the gate');
+  const archive = await readArchive(db);
+  assert.equal(snapshotFromArchive(archive).entries.find(e => e.id === 'yen-1')!.amountMinor, 650);
+  const backup = createRecoveryBackup(archive);
+  assert.equal(backup.schema, 'finanzapp.native-pilot.v9');
+  assert.deepEqual(backup.currencyUnits!.map(unit => [unit.currency, unit.minorUnitExponent]), [['EUR', 2], ['JPY', 0], ['KWD', 3]]);
+  const incoming = parsePilotBackup(JSON.stringify(backup)).archive;
+  assert.equal(archiveKey(incoming), archiveKey(archive));
+  // Restore into a fresh device with the production gate: the copy's scales are pinned first, in the same transaction.
+  const other = setup().db;
+  await initializeDatabase(other);
+  const baseline = archiveKey(await readArchive(other));
+  const plan = previewBackupImport(await readArchive(other), incoming);
+  assert.deepEqual(plan.currencyUnits.map(unit => unit.currency), ['EUR', 'JPY', 'KWD']);
+  assert.deepEqual(plan.scaleConflicts, []);
+  await importArchive(other, incoming, baseline);
+  await importArchive(other, incoming, baseline); // The same frozen review after a failed refresh adds nothing twice.
+  const restored = await readArchive(other);
+  assert.equal(archiveKey(restored), archiveKey(archive));
+  assert.deepEqual(totalsByCurrency(snapshotFromArchive(restored)), totalsByCurrency(snapshotFromArchive(archive)));
+  assert.deepEqual((await other.getAllAsync<{ currency: string; minorUnitExponent: number }>('SELECT currency, minorUnitExponent FROM currency_units ORDER BY currency')), [{ currency: 'EUR', minorUnitExponent: 2 }, { currency: 'JPY', minorUnitExponent: 0 }, { currency: 'KWD', minorUnitExponent: 3 }]);
+  assert.equal(snapshotFromArchive(restored).entries.find(e => e.id === 'fil-1')!.amountMinor, 5, 'fils restored as fils');
+  // An ARS/USD ledger keeps the v8 format, byte for byte the shape 24B1 pinned.
+  const legacy = setup().db;
+  await initializeDatabase(legacy);
+  await createAccount(legacy, account);
+  await createEntry(legacy, expense);
+  const v8 = createRecoveryBackup(await readArchive(legacy));
+  assert.equal(v8.schema, 'finanzapp.native-pilot.v8');
+  assert.equal('currencyUnits' in v8, false);
+  assert.deepEqual(Object.keys(v8), ['app', 'schema', 'exportedAt', 'moneyUnit', 'accounts', 'records', 'transfers', 'recurring', 'budgets', 'cards', 'debts', 'appearances', 'categories']);
+});
+
+test('24B4: a failed v9 restore rolls back the pinned scales with the rows; a repeated restore is identical; a wrong or missing unit is refused before anything is written', async () => {
+  const source = await threeCurrencies();
+  const backup = createRecoveryBackup(await readArchive(source.db));
+  const incoming = parsePilotBackup(JSON.stringify(backup)).archive;
+  const { db } = setup();
+  await initializeDatabase(db);
+  const baseline = archiveKey(await readArchive(db));
+  const failing: LedgerDatabase = { ...db, withExclusiveTransactionAsync: work => db.withExclusiveTransactionAsync(tx => work({ ...tx,
+    runAsync: async (sql, ...params) => { if (params[0] === 'dinar') throw new Error('Interrupted v9 import'); return tx.runAsync(sql, ...params); },
+  })) };
+  await assert.rejects(importArchive(failing, incoming, baseline), /Interrupted v9 import/);
+  assert.equal(archiveKey(await readArchive(db)), baseline);
+  assert.deepEqual(await db.getAllAsync('SELECT * FROM currency_units'), [], 'the scales pinned before the failing row were rolled back with it');
+  assert.deepEqual(await db.getAllAsync('SELECT id FROM accounts'), [], 'no partial restore');
+  await importArchive(db, incoming, baseline);
+  const once = await readArchive(db);
+  await importArchive(db, incoming, baseline);
+  assert.equal(archiveKey(await readArchive(db)), archiveKey(once), 'a repeated restore adds nothing');
+  assert.equal(previewBackupImport(once, incoming).identical, incoming.records.length + (incoming.transfers?.length ?? 0) + (incoming.budgets?.length ?? 0) + incoming.currencyUnits!.length);
+  // Files that lie about a scale never produce a partial restore: refused at parse, before a preview exists.
+  const units = backup.currencyUnits!;
+  assert.throws(() => parsePilotBackup(JSON.stringify({ ...backup, currencyUnits: units.map(unit => unit.currency === 'KWD' ? { ...unit, minorUnitExponent: 2 } : unit) })), new RegExp(SCALE_CONFLICT_MESSAGE.slice(0, 20)));
+  assert.throws(() => parsePilotBackup(JSON.stringify({ ...backup, currencyUnits: units.filter(unit => unit.currency !== 'JPY') })), /La moneda JPY no tiene una escala registrada/);
+  assert.throws(() => parsePilotBackup(JSON.stringify({ ...backup, schema: 'finanzapp.native-pilot.v8', currencyUnits: undefined })), /v1 a v8 solo pueden contener/, 'a v8 file naming yen is still refused whole');
+  assert.equal(archiveKey(await readArchive(db)), archiveKey(once));
+  // A copy that pins a scale this device already pinned is identical, never re-inserted; the row keeps its first provenance.
+  const pinnedAt = (await db.getAllAsync<{ createdAt: string }>("SELECT createdAt FROM currency_units WHERE currency = 'JPY'"))[0].createdAt;
+  await createAccount(db, { ...yen, id: 'yen-local', name: 'Local' }, undefined, GATE);
+  assert.equal((await db.getAllAsync<{ createdAt: string }>("SELECT createdAt FROM currency_units WHERE currency = 'JPY'"))[0].createdAt, pinnedAt);
+});
+
+test('24B4: adversarial: duplicated ids, a retry after a commit and a copy replayed twice never double a yen movement or a fil', async () => {
+  const { db } = await threeCurrencies();
+  await createEntry(db, yenExpense); // Same id: committed already.
+  await assert.rejects(createEntry(db, { ...yenExpense, amountMinor: 701 }), /ya existe/);
+  await createEntry(db, filExpense);
+  const failingRefresh: LedgerDatabase = { ...db, withExclusiveTransactionAsync: work => db.withExclusiveTransactionAsync(async tx => { await work(tx); }) };
+  await createEntry(failingRefresh, { ...filExpense, id: 'fil-2', amountMinor: 1 });
+  await createEntry(db, { ...filExpense, id: 'fil-2', amountMinor: 1 });
+  const snapshot = await readSnapshot(db);
+  assert.equal(snapshot.entries.filter(e => e.accountId === yen.id).length, 1);
+  assert.equal(snapshot.entries.filter(e => e.accountId === dinar.id).length, 2);
+  assert.deepEqual(totalsByCurrency(snapshot), { ARS: 100000 - 12345, EUR: 5000, JPY: 800, KWD: 1234567 - 6 });
+  assert.ok(sameEntry(snapshot.entries.find(e => e.id === 'fil-2')!, { ...filExpense, id: 'fil-2', amountMinor: 1 }));
+  // Exponent confusion: a 13-digit yen amount is a valid safe integer of yen, never rescaled on the way in or out.
+  await createEntry(db, { ...yenExpense, id: 'yen-big', kind: 'income', amountMinor: 9999999999999 });
+  const big = (await readSnapshot(db)).entries.find(e => e.id === 'yen-big')!;
+  assert.equal(big.amountMinor, 9999999999999);
+  const restored = parsePilotBackup(JSON.stringify(createRecoveryBackup(await readArchive(db)))).archive;
+  assert.equal(snapshotFromArchive(restored).entries.find(e => e.id === 'yen-big')!.amountMinor, 9999999999999);
+  assert.deepEqual(archiveExponents(restored), { ARS: 2, EUR: 2, JPY: 0, KWD: 3 });
 });

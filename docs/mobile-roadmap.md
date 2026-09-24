@@ -15,10 +15,50 @@ server-keyed; manual recording and local data work without connectivity. Recurri
 expenses, debts, budgets and cards remain in scope. Native navigation, accessible
 amounts, real data and recoverable durable writes remain requirements.
 
-## Status and current delivery — Producto 24B3
+## Status and current delivery — Producto 24B4
 
 Implemented is code, checked names a test, device-verified needs a physical result,
 and released means distributed. Neither a bundle nor a screenshot is App Store QA.
+
+**24B4 delivers stages 5 and 6 of docs/currency.md §7.5: SQLite schema 9 and backup v9, the
+storage that knows each currency's scale.** Production still creates and offers exactly ARS and
+USD; no amount or balance changes; no rate exists; contract v1 is untouched; nothing visible
+changes beyond a backup review row and the scale sentences. The Más footer reads Producto 24B4.
+Design and status: [docs/currency.md](currency.md) §2.4, §7.5, §7.6.5.
+
+- [x] **Reads prepared.** Every SQLite read names its columns (`SELECT *` is banned by a guard),
+  including the single-row lookups. Three checks stand apart: read acceptance (the domain's
+  validators), the creation gate (only in the create functions, with an explicit gate
+  parameter for tests, `LEDGER_CURRENCIES` by default) and the precision check
+  (`archiveExponents`): ARS/USD read as cents, any other code only through its pinned scale.
+  No path reads an amount as cents by default.
+- [x] **SQLite 8 → 9.** `MIGRATE_V9` rebuilds `accounts` and `monthly_budgets` with the same
+  columns and CHECKs and a shape-only currency CHECK, and creates `currency_units` (exponent
+  0–4, source, catalogue version, pinned once on first use, never updated; ARS/USD never
+  pinned). It runs in `runSchemaMigration`: its own connection, foreign keys off before
+  `BEGIN IMMEDIATE`, `foreign_key_check` empty before `COMMIT`, rollback on any error; the
+  file reopens at schema 9 and an interruption leaves an intact schema 8 file. A pinned scale
+  that disagrees with the catalogue, or a row whose currency was never pinned, refuses to open
+  by name and rewrites nothing.
+- [x] **Backup v9.** v8 stays byte-identical while a ledger holds only ARS/USD; with another
+  currency the export is v9 (`currencyUnits`, strict keys). v1–v8 stay frozen to ARS/USD.
+  A v9 file's scales are validated against the catalogue before any amount is read; the
+  restore pins the copy's scales and the rows in one transaction; a scale that differs is a
+  conflict shown before confirming; an invalid file never produces a partial restore.
+- [x] **Real SQLite tests** (`database.node.ts`, 24B4 block): a real schema 8 file with every
+  table populated (built from the app's own scripts) upgrading to identical rows, balances and
+  identity and reopening; a v3 file through every step; interruption and `foreign_key_check`
+  refusal leaving schema 8 intact; JPY, KWD and EUR through the explicit gate (zero, two and
+  three decimals) pinned once; yen read as yen and fils as fils; a disagreeing and a missing
+  scale; the gate closed again with stored yen still readable, editable, exportable and
+  restorable; a failed v9 restore rolling back scales with rows; repeated restores; adversarial
+  duplicates and exponent confusion. Domain: the v9 block of `multi-currency.test.ts`.
+- [x] **Checked on Linux:** see the handoff entry below.
+- [ ] **Not device-verified, no EAS build made:** the one-way upgrade on FinanzApp Dev, with the
+  owner's steps in docs/mobile-device-checklist.md (which build, what happens to the data, how to
+  keep a copy). The owner authorised the migration for the prototype's data on 2026-09-24.
+
+### Previous delivery — Producto 24B3
 
 **24B3 delivers stage 4 of docs/currency.md §7.5: presentation, copy and internationalization
 for every catalogue currency.** Production still stores and offers exactly ARS and USD;
@@ -1602,6 +1642,38 @@ are not dead code.
 
 ## Next deliverables, in order
 
+### 0. The multi-currency engine, then the world, then the global onboarding (2026-09-24)
+
+- **Producto 24B5** — the searchable currency screen (`searchCatalogue` over the currencies the
+  ledger can hold), the card, debt and budget forms choosing the currency before the amount, device
+  QA of the schema 9 upgrade, the number pad, the VoiceOver units and the switch, and then one
+  commit that opens the owner's first currencies progressively (decision 7.6.1; three-decimal
+  currencies only after their VoiceOver check). Production forms stay ARS/USD until that commit.
+- **Producto 24C** — automatic, verifiable exchange rates as the main path (source, date and cache,
+  a provider chosen after docs/currency.md §8.2's verification, opt-in, no paid call before the owner
+  configures it), a foreign-currency purchase recorded as **one** expense with its original amount
+  and currency (a discreet secondary action in the common form, never a manual rate in the usual
+  flow; the manual adjustment lives in the movement's detail), the posted balance kept apart from
+  the estimated pending commitments, and a configurable main currency for reports with per-currency
+  subtotals whenever a rate is missing.
+- **Global regional internationalization** (docs/i18n.md §11a) — before the global onboarding:
+  device language and region detected independently and mapped to released values; correct regional
+  conventions where released; manual choices always win and stay saved, never changed by location,
+  device language or Region; only "Según el dispositivo" follows the system; account currencies
+  independent of both; languages published progressively, complete or not at all.
+- **Global onboarding** — detects language and region, shows them, lets the person change them and
+  choose the first currency of their first account (never a region-implied currency), and keeps the
+  preferences and data of existing users untouched.
+- **The Assistant with real AI and multilingual input** — understands messages in the released
+  languages, proposes an expense (merchant, amount, currency), asks only when something is
+  ambiguous, needs confirmation before saving, and answers analytical questions from the real
+  records with checkable aggregations (docs/currency.md §11, docs/i18n.md §11); server-keyed,
+  opt-in, quota-bounded, no paid call before the owner's account is configured.
+- Then, in the order below: onboarding and financial productivity (CSV import, goals, tags, split
+  expenses, rollover budgets), Face ID, notifications, Apple integrations (Wallet, Shortcuts, voice),
+  monetization (AI quotas, cost control, StoreKit, authentic testimonials only when they exist),
+  the definitive brand, TestFlight and launch.
+
 Interfaz 10 sequences the product/visual work as focused pull requests, each gated
 by CI and merged into master before the next starts:
 
@@ -1880,6 +1952,30 @@ amount uses `useStacked()` and gives the name two lines. 44-point targets, Voice
 safe areas, system text and separate currencies apply to every new screen.
 
 ## Handoff log (historical evidence)
+
+### 2026-09-24 — Producto 24B4: SQLite schema 9 and backup v9
+
+- Stages 5 and 6 delivered: `CurrencyUnit` and its validators in the domain, `archiveExponents`,
+  backup v9 (`currencyUnits`) with v8 kept byte-identical for ARS/USD ledgers and v1–v8 frozen,
+  `runSchemaMigration` (foreign keys off, `foreign_key_check` before commit), `MIGRATE_V9`,
+  `currency_units` pinned on first use, named columns everywhere, explicit gates in the create
+  functions, the review row and the scale sentences (es, en, lock), docs/currency.md §2.4/§7.5/§7.6.5,
+  docs/i18n.md §11a (the global regional internationalization deliverable), the device checklist.
+- Deliberate golden changes: `user_version` pins read `DATABASE_VERSION`; the newer-schema probe
+  `DATABASE_VERSION + 1`; the older-schema fixtures drop `currency_units`; the v10 probe in
+  `recovery.test.ts`; the "frozen backups" block of `multi-currency.test.ts` became the v9 block;
+  "v1 a v9" sentences; the Más footer. Every ARS/USD golden, the v8 bytes and `archiveKey` unchanged.
+- **Checked on Linux:** root `npm test` 445/445 (domain 243), `npm run build`, `npm run check:repo`;
+  mobile `npm run typecheck`, `npm run test:storage` (real SQLite through `node:sqlite`) all
+  passing, `npm run currency:verify`, `npm run i18n:check -- --strict` (0 errors, 0 stale),
+  `npm run i18n:extract`, `npm run check` ("Dependencies are up to date"), `npm run export:ios`
+  (4,913,820 bytes, +22,603 over 24B3). Not an Xcode build; **no EAS build; the iPhone was not
+  modified**; no paid service, API connection or remote change.
+- **Pending:** the one-way upgrade on FinanzApp Dev (docs/mobile-device-checklist.md, Producto
+  24B4: the build to install, what happens to the data, how to keep a copy), repeated in stage 9.
+- **Next:** Producto 24B5 (stage 8 and 9: the searchable currency screen, the card, debt and budget
+  forms choosing the currency before the amount, device QA, then the first currencies opened
+  progressively), then 24C.
 
 ### 2026-09-24 — Producto 24B3: presentation, copy and internationalization for every currency
 

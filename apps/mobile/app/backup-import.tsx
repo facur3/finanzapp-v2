@@ -97,10 +97,12 @@ export default function BackupImportScreen() {
           <DetailRow label={t('backup.import.rows.transfers')} {...count(plan.transfers.filter(record => !record.voided).length)} />
           <DetailRow label={t('backup.import.rows.recurring')} {...count(plan.recurring.length)} />
           <DetailRow label={t('backup.import.rows.budgets')} {...count(plan.budgets.length)} />
+          {plan.currencyUnits.length > 0 && <DetailRow label={t('backup.import.units')} {...count(plan.currencyUnits.length)} />}
           <DetailRow label={t('backup.import.rows.voided')} {...count(plan.records.filter(record => record.voided).length + plan.transfers.filter(record => record.voided).length)} />
           <DetailRow label={t('backup.import.rows.present')} {...count(plan.identical)} last />
         </Surface>
-        {plan.conflicts > 0 ? <ErrorMessage message={t('backup.import.conflicts', { count: plan.conflicts })} /> : <>
+        {plan.scaleConflicts.length > 0 ? <ErrorMessage message={t('backup.import.scaleConflict', { codes: plan.scaleConflicts.join(', ') })} />
+          : plan.conflicts > 0 ? <ErrorMessage message={t('backup.import.conflicts', { count: plan.conflicts })} /> : <>
           <Surface><SectionTitle caption={t('backup.import.availableCaption')}>{t('backup.import.availableAfter')}</SectionTitle>
             {sortCurrencies(Object.keys(plan.after ?? {}) as Currency[]).map(currency => <View key={currency} style={{ gap: 6 }}>
               <AppText secondary style={{ fontSize: 13 }}>{currency}</AppText>
