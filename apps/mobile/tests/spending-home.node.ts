@@ -17,6 +17,8 @@ import type { AppLocale } from '../src/i18n/locale.ts';
 // Read on every render, like the live provider; a test may switch it and must restore it.
 let locale: AppLocale = 'es-AR';
 const i18nProvider = { useI18n: () => bindLocale(locale) };
+/** The harness's category glyphs are one per category name; a test may alias a category onto another's glyph. */
+const glyphAliases = new Map<string, string>();
 
 // Exercise the actual routes' data/handlers with host components replaced by
 // descriptors. This is NOT a rendered iOS screen or gesture/animation test.
@@ -81,7 +83,7 @@ function routeHarness(file: string, params: Record<string, unknown>, initialData
     '@expo/vector-icons/Ionicons': 'Ionicons',
     '../src/ui/home-modules': { BudgetHomeCard: 'BudgetHomeCard', CategoryRanking: 'CategoryRanking', MetricHelp: 'MetricHelp', UpcomingRecurringRow: 'UpcomingRecurringRow' },
     '../src/ui/category-color': categoryColor,
-    '../src/ui/category-hues': { useCategoryColor: () => '#3E6FB0', useCategoryLabel: (s: string) => s, useCategoryDefinitions: () => [], useCategoryLook: (s: string) => ({ label: s, storedLabel: s, key: String(s).toLowerCase(), hex: '#3E6FB0', glyph: 'pricetag-outline' }), useCategoryLookOf: () => (s: string) => ({ label: s, storedLabel: s, key: String(s).toLowerCase(), hex: '#3E6FB0', glyph: 'pricetag-outline' }), useAccountLook: () => ({ icon: 'wallet', color: 'cobalt', glyph: 'wallet-outline', hex: '#2557D6' }), useAccountNameOf: () => (account: any) => account.name, useAccountLookOf: () => () => ({ icon: 'wallet', color: 'cobalt', glyph: 'wallet-outline', hex: '#2557D6' }) },
+    '../src/ui/category-hues': { useCategoryColor: () => '#3E6FB0', useCategoryLabel: (s: string) => s, useCategoryDefinitions: () => [], useCategoryLook: (s: string) => ({ label: s, storedLabel: s, key: String(s).toLowerCase(), hex: '#3E6FB0', glyph: 'pricetag-outline' }), useCategoryLookOf: () => (s: string) => ({ label: s, storedLabel: s, key: String(s).toLowerCase(), hex: '#3E6FB0', glyph: glyphAliases.get(s) ?? 'glyph-' + String(s).toLowerCase() }), useAccountLook: () => ({ icon: 'wallet', color: 'cobalt', glyph: 'wallet-outline', hex: '#2557D6' }), useAccountNameOf: () => (account: any) => account.name, useAccountLookOf: () => () => ({ icon: 'wallet', color: 'cobalt', glyph: 'wallet-outline', hex: '#2557D6' }) },
     '../src/ui/quick-actions': { QuickActions: 'QuickActions', AssistantEntry: 'AssistantEntry' },
     '../src/ui/motion': { ValueTransition: 'ValueTransition', Reflow: 'Reflow', selectionHaptic: () => {}, impactHaptic: () => {}, duration: { press: 100, release: 160, state: 200, data: 260, enter: 200, exit: 100, reveal: 480 }, timing: (kind: string, reduced: boolean) => ({ duration: reduced ? 0 : 260 }) },
     '../src/ui/theme': { useCurrentDay: () => '2026-09-12', useReduceMotion: () => false, space: { xs: 4, s: 8, m: 12, l: 16, xl: 20, xxl: 24, xxxl: 32 },
@@ -259,7 +261,7 @@ test('23.1B1: Home in English keeps the same numbers and routes; only words chan
     const texts = nodes(root).filter(n => n.type === 'AppText').map(n => String(n.props.children));
     assert.ok(texts.includes('September'), 'the month is named in English');
     const titles = nodes(root).filter(n => n.type === 'SectionTitle').map(n => String(n.props.children) + '|' + n.props.action);
-    assert.ok(titles.includes('Where your money went|Reports'), titles.join(' / '));
+    assert.ok(titles.includes('By category|Reports'), titles.join(' / '));
     assert.ok(titles.includes('Latest transactions|See all'), titles.join(' / '));
     metric.props.onChange('available');
     const available = view.render();
@@ -503,5 +505,91 @@ test('24UX3: a quiet header, a larger number, movements then the Assistant, quie
   assert.equal(surfaces.some(surface => nodes(surface).some(node => node.type === 'EntryRow')), false, 'the latest transactions are an open ledger, not a second slab');
   const ledger = nodes(root).filter(node => node.type === 'EntryRow');
   assert.ok(ledger.length > 0);
-  assert.equal(ledger.every(row => row.props.plain === true), true);
+  assert.equal(ledger.every(row => row.props.variant === 'home'), true, '24UX5: the explicit Home variant, not a global change of EntryRow');
+});
+
+// 24UX5: glyphs per category in the harness (the default mock gave every category one glyph); a test may alias two.
+test('24UX5: Home rows name the category only when it adds something, and both lists share one rule', () => {
+  const at = '2026-09-12T12:00:00Z';
+  const cash: domain.Account = { id: 'a', name: 'Efectivo', currency: 'ARS', openingMinor: 0, createdAt: at };
+  const entry = (id: string, merchant: string, category: string, kind: 'expense' | 'income' = 'expense'): domain.Entry =>
+    ({ id, accountId: 'a', kind, amountMinor: 100, merchant, category, dateISO: '2026-09-10', createdAt: at });
+  const data = { accounts: [cash], entries: [entry('named', 'Carrefour', 'Supermercado'), entry('short', 'f', 'Comida'), entry('generic', 'Varios', 'Hogar'),
+    entry('same', 'Transporte', 'Transporte')] };
+  const rule: domain.RecurringRule = { id: 'r', accountId: 'a', kind: 'expense', amountMinor: 100, merchant: 'Netflix', category: 'Suscripciones', frequency: 'monthly',
+    anchorDateISO: '2026-09-20', nextDateISO: '2026-09-20', active: true, deleted: false, createdAt: at, revision: 0, updatedAt: at };
+  const shows = (root: Node) => Object.fromEntries(nodes(root).filter(n => n.type === 'EntryRow' || n.type === 'UpcomingRecurringRow')
+    .map(n => [(n.props.entry ?? n.props.rule).id, n.props.showCategory]));
+  let root = routeHarness('(tabs)/index.tsx', {}, data, { recurring: [rule] }).render();
+  assert.deepEqual(shows(root), { r: false, named: false, short: true, generic: true, same: false },
+    'a clear name keeps the date alone; "f" and "Varios" keep their category; a name that is the category never repeats it');
+  // Two categories that draw the same glyph on one screen (across both lists) each say which they are.
+  glyphAliases.set('Supermercado', 'glyph-suscripciones');
+  try {
+    root = routeHarness('(tabs)/index.tsx', {}, data, { recurring: [rule] }).render();
+    assert.deepEqual(shows(root), { r: true, named: true, short: true, generic: true, same: false });
+  } finally { glyphAliases.clear(); }
+});
+
+test('24UX5: Home keeps the account in a row only when another account of the currency could be meant, and its links keep their targets', () => {
+  const at = '2026-09-12T12:00:00Z';
+  const accounts: domain.Account[] = [{ id: 'a', name: 'Efectivo', currency: 'ARS', openingMinor: 0, createdAt: at },
+    { id: 'b', name: 'Banco', currency: 'ARS', openingMinor: 0, createdAt: at }, { id: 'u', name: 'Dólares', currency: 'USD', openingMinor: 0, createdAt: at }];
+  const entries: domain.Entry[] = [{ id: 'e', accountId: 'a', kind: 'expense', amountMinor: 100, merchant: 'Café', category: 'Comida', dateISO: '2026-09-10', createdAt: at }];
+  const oneArs = routeHarness('(tabs)/index.tsx', {}, { accounts: [accounts[0], accounts[2]], entries }).render();
+  assert.equal(find(oneArs, 'EntryRow').props.showAccount, false, 'one ARS account (a USD one does not make it ambiguous)');
+  const view = routeHarness('(tabs)/index.tsx', {}, { accounts, entries });
+  const twoArs = view.render();
+  assert.equal(find(twoArs, 'EntryRow').props.showAccount, true);
+  const links = nodes(twoArs).filter(node => node.type === 'SectionTitle');
+  for (const link of links) link.props.onAction();
+  assert.equal(JSON.stringify(view.pushed), JSON.stringify([{ pathname: '/reports', params: { currency: 'ARS' } }, '/activity']), 'Reportes keeps the currency; Ver todos opens Movimientos');
+});
+
+// 24UX5 §8: the composition with more data. Whatever the ledger holds, Inicio keeps one order (header, number,
+// movements, the Assistant, then the sections) and each section its own shape; nothing new appears to show a feature.
+test('24UX5: Inicio keeps its hierarchy with no account, one or several accounts and currencies, categories, budgets, rules and huge amounts', () => {
+  const at = '2026-09-01T12:00:00.000Z';
+  const account = (id: string, currency: domain.Currency, name = id): domain.Account => ({ id, name, currency, openingMinor: 0, createdAt: at });
+  const spend = (id: string, accountId: string, category: string, amountMinor: number, kind: 'expense' | 'income' = 'expense'): domain.Entry =>
+    ({ id, accountId, kind, amountMinor, merchant: 'Comercio ' + id, category, dateISO: '2026-09-10', createdAt: at });
+  const rule = (id: string, overrides: Partial<domain.RecurringRule> = {}): domain.RecurringRule => ({ id, accountId: 'a', kind: 'expense', amountMinor: 100, merchant: 'Regla ' + id,
+    category: 'Servicios', frequency: 'monthly', anchorDateISO: '2026-09-20', nextDateISO: '2026-09-20', active: true, deleted: false, createdAt: at, revision: 0, updatedAt: at, ...overrides });
+  const total = (amountMinor: number): domain.MonthlyBudget => ({ id: 'total', scope: 'total', currency: 'ARS', monthISO: '2026-09', amountMinor, active: true, createdAt: at, revision: 0, updatedAt: at });
+  const order = (root: Node) => nodes(root).map(node => node.type === 'SectionTitle' ? 'title:' + node.props.children : node.type)
+    .filter(type => ['Choices', 'CurrencySwitch', 'Money', 'QuickActions', 'AssistantEntry', 'BudgetHomeCard', 'CategoryRanking', 'UpcomingRecurringRow', 'EntryRow', 'EmptyState'].includes(type) || type.startsWith('title:'))
+    .filter((type, index, all) => type !== all[index - 1]);
+  const expected = (sections: string[]) => ['Choices', 'Money', 'QuickActions', 'AssistantEntry', ...sections];
+
+  // No account: one calm empty state, nothing else.
+  assert.deepEqual(order(routeHarness('(tabs)/index.tsx', {}, { accounts: [], entries: [] }).render()), ['EmptyState']);
+  // One account, nothing recorded: the month says so once, under Últimos movimientos; no category card.
+  assert.deepEqual(order(routeHarness('(tabs)/index.tsx', {}, { accounts: [account('a', 'ARS')], entries: [] }).render()), expected(['title:Últimos movimientos']));
+  // Three or more categories, incomes and expenses, several accounts of one currency, a second currency, an overall
+  // budget already exceeded, one active rule, one paused and one deleted (neither shown), and an amount of 13 digits.
+  const data = { accounts: [account('a', 'ARS', 'Efectivo'), account('b', 'ARS', 'Banco'), account('u', 'USD', 'Dólares')],
+    entries: [spend('1', 'a', 'Comida', 9_999_999_999_999), spend('2', 'b', 'Transporte', 500), spend('3', 'a', 'Salud', 300), spend('4', 'a', 'Ocio', 200),
+      spend('5', 'b', 'Sueldo', 900_000, 'income'), spend('6', 'u', 'Viajes', 4_000)] };
+  const extra = { budgets: [total(1000)], recurring: [rule('on'), rule('paused', { active: false }), rule('gone', { active: false, deleted: true })] };
+  const view = routeHarness('(tabs)/index.tsx', {}, data, extra);
+  let root = view.render();
+  const full = expected(['title:Presupuesto del mes', 'BudgetHomeCard', 'title:En qué gastaste', 'CategoryRanking', 'title:Próximos compromisos', 'UpcomingRecurringRow',
+    'title:Últimos movimientos', 'EntryRow']);
+  full.splice(1, 0, 'CurrencySwitch');
+  assert.deepEqual(order(root), full);
+  assert.equal(find(root, 'Money').props.minor, 9_999_999_999_999 + 500 + 300 + 200, 'the huge amount reaches the hero exactly (Money fits it to the width)');
+  assert.equal(find(root, 'CategoryRanking').props.categories.length, 4, 'every category is handed over; the card shows its three');
+  assert.equal(nodes(root).filter(node => node.type === 'UpcomingRecurringRow').map(node => node.props.rule.id).join(), 'on', 'paused and deleted rules are not upcoming');
+  assert.equal(nodes(root).filter(node => node.type === 'EntryRow').every(node => node.props.showAccount), true, 'two ARS accounts: rows name theirs');
+  assert.ok(find(root, 'BudgetHomeCard').props.summary.total.exceeded, 'the exceeded budget keeps its place and its own card');
+  // Switching the currency keeps the same order; sections with nothing in USD simply stay out.
+  find(root, 'CurrencySwitch').props.onChange('USD');
+  root = view.render();
+  const usd = expected(['title:En qué gastaste', 'CategoryRanking', 'title:Últimos movimientos', 'EntryRow']);
+  usd.splice(1, 0, 'CurrencySwitch');
+  assert.deepEqual(order(root), usd);
+  assert.equal(nodes(root).filter(node => node.type === 'EntryRow').every(node => node.props.showAccount === false), true, 'one USD account: no account name');
+  // Several upcoming rules: at most three, soonest first.
+  const many = routeHarness('(tabs)/index.tsx', {}, data, { recurring: ['d', 'b', 'a', 'c'].map((id, index) => rule(id, { nextDateISO: '2026-09-2' + index, anchorDateISO: '2026-09-2' + index })) }).render();
+  assert.equal(nodes(many).filter(node => node.type === 'UpcomingRecurringRow').map(node => node.props.rule.id).join(), 'd,b,a');
 });

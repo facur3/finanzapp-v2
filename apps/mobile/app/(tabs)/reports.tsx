@@ -6,7 +6,7 @@ import { dailyAverageMinor, dailySpending, monthlySpendingTrend, spendingCompari
   summarizeMonthlyBudgets, topMerchants, type CategorySpending, type Currency, type DailySpending, type Entry, type SpendingInsight } from '@finanzapp/domain';
 import { useLedger } from '../../src/storage/LedgerProvider';
 import { budgetTone, percentUsed } from '../../src/ui/budget-presentation';
-import { AppText, CategoryBadge, Choices, DetailRow, EmptyState, GlyphTile, IconButton, Money, NavigationRow, PressFeedback, SectionTitle, Surface, useStacked } from '../../src/ui/components';
+import { AppText, CategoryBadge, Choices, DetailRow, EmptyState, GlyphTile, IconButton, InfoButton, Money, NavigationRow, PressFeedback, SectionTitle, Surface, useStacked } from '../../src/ui/components';
 import { withCurrencyCode } from '../../src/i18n/format';
 import { CurrencySwitch } from '../../src/ui/currency-switch';
 import { useDisplayCurrency } from '../../src/ui/display-currency-provider';
@@ -17,14 +17,18 @@ import { useCategoryColor, useCategoryLookOf } from '../../src/ui/category-hues'
 import { DonutChart, MonthBars, OTHERS_KEY, donutSlices } from '../../src/ui/charts';
 import { ValueTransition, selectionHaptic } from '../../src/ui/motion';
 import { activityDateLabel, availableCurrencies } from '../../src/ui/presentation';
-import { changePercent, reportPeriodLabel, reportSelection, shiftReportMonth } from '../../src/ui/report-presentation';
+import { changePercent, insightsBesideRanking, reportPeriodLabel, reportSelection, shiftReportMonth } from '../../src/ui/report-presentation';
 import { CategoryLegendRow } from '../../src/ui/spending-chart';
 import { space, useCurrentDay, usePalette } from '../../src/ui/theme';
 
 /** Reportes answers "¿a dónde fue mi plata?" for one month and one currency:
  * total and daily average, six-month trend, category donut with legend, day by
  * day, budgets, top merchants and factual insights. Every number is recorded
- * spending in that currency; nothing is estimated or converted. */
+ * spending in that currency; nothing is estimated or converted.
+ *
+ * 24UX5: what the report counts (one currency, no opening balances, transfers or card payments; a month without
+ * records is not a month without spending) is one tap away beside the total instead of a permanent paragraph at the
+ * end, and an insight that repeats a ranking row right above it is left out (`insightsBesideRanking`). */
 export default function ReportsScreen() {
   const params = useLocalSearchParams<{ currency?: string | string[]; month?: string | string[] }>();
   const { snapshot, archive } = useLedger();
@@ -69,8 +73,8 @@ export default function ReportsScreen() {
   const merchants = useMemo(() => report && report.status === 'ready' && snapshot ? topMerchants(snapshot, report, 5) : [], [snapshot, report]);
   const insights = useMemo(() => {
     if (!snapshot || !selection || !report || report.status !== 'ready') return [];
-    return spendingInsights(snapshot, archive?.budgets ?? [], selection.currency, selection.monthISO, day, money);
-  }, [snapshot, archive?.budgets, selection, report, day, money]);
+    return insightsBesideRanking(spendingInsights(snapshot, archive?.budgets ?? [], selection.currency, selection.monthISO, day, money), merchants, snapshot.entries);
+  }, [snapshot, archive?.budgets, selection, report, day, money, merchants]);
   if (!snapshot || !report || !selection) return null;
   const insightText = (insight: SpendingInsight) => localizedInsight(insight, { t, money, dayMonth: formatDayMonth, label: key => lookOf(key).label, budgets, comparison, entries: snapshot.entries });
 
@@ -105,7 +109,7 @@ export default function ReportsScreen() {
             <AppText accessibilityRole="header" variant="title3" style={{ textTransform: 'capitalize', textAlign: 'center' }}>{formatMonth(monthISO)}</AppText>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
               <AppText secondary variant="caption">{reportPeriodLabel(report, day, t)}</AppText>
-              {canNext && <PressFeedback feedback="opacity" accessibilityRole="button" onPress={() => goToMonth(currentMonth)} accessibilityLabel={t('reports.backToCurrentMonth')} style={{ minHeight: 28 }}>
+              {canNext && <PressFeedback feedback="opacity" accessibilityRole="button" onPress={() => goToMonth(currentMonth)} accessibilityLabel={t('reports.backToCurrentMonth')} hitSlop={8} style={{ minHeight: 28, justifyContent: 'center' }}>
                 <AppText variant="caption" style={{ fontWeight: '600', color: p.primary }}>{t('reports.thisMonth')}</AppText>
               </PressFeedback>}
             </View>
@@ -117,7 +121,10 @@ export default function ReportsScreen() {
 
       {ready ? <>
         <ValueTransition id={monthISO + '|' + currency} style={{ gap: 8 }}>
-          <AppText secondary variant="eyebrow">{withCurrencyCode(t('reports.spent'), currency)}</AppText>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
+            <AppText secondary variant="eyebrow">{withCurrencyCode(t('reports.spent'), currency)}</AppText>
+            <InfoButton title={t('reports.method.title')} detail={t('reports.method.detail', { currency })} />
+          </View>
           <Money minor={report.expenseMinor} currency={currency} large />
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6 }}>
             <AppText secondary variant="subhead">{report.count === 0 ? t('reports.noRecords') : t('reports.perDay', { amount: money(average) })}</AppText>
@@ -208,9 +215,6 @@ export default function ReportsScreen() {
         <NavigationRow title={t('reports.compare')} subtitle={t('reports.compareSubtitle')} icon="git-compare-outline" last
           onPress={() => router.push({ pathname: '/report-comparison', params: { currency, month: monthISO } })} />
       </Surface>}
-      <AppText tertiary variant="footnote" style={{ paddingHorizontal: 4 }}>
-        {t('reports.footer', { currency })}
-      </AppText>
     </View>} />;
 }
 

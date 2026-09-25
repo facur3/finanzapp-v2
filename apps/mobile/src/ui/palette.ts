@@ -24,6 +24,10 @@ export const lightPalette = {
   primaryWash: '#F5F8FF',
   /** The chosen segment of a compact segmented control (24UX3 review): white on the light inset track. */
   thumb: '#FFFFFF',
+  /** A secondary navigation link (24UX5): Inicio's section links (Reportes, Ver todos, Ver). A desaturated slate blue,
+   * so it reads as something to tap without becoming one more cobalt accent beside the Assistant and the tab bar; never
+   * a control, a selection or a meaning. 5.4:1 on the background, 6.0:1 on white. */
+  link: '#4A6390',
   expense: '#C42F39', income: '#15804F', transfer: '#0B6BB3', warning: '#B45309',
   expenseSoft: '#FBE9EA', incomeSoft: '#E6F5EE', transferSoft: '#E8F3FC', warningSoft: '#FCF1E0',
   /** Trailing swipe actions (24UX4): solid fills under a white label, as iOS draws them. Destructive is the
@@ -46,6 +50,8 @@ export const darkPalette: typeof lightPalette = {
   primaryWash: '#151B2C',
   /** Dark: a clear step above the #1C1C1E track (systemGray4-like), so the state reads without colour. */
   thumb: '#3A3A3E',
+  /** The owner's reference slate blue: 8.7:1 on black, 7.0:1 on the #1C1C1E surface. */
+  link: '#8EA7D8',
   expense: '#F0555C', income: '#3DBE86', transfer: '#4DB0FF', warning: '#E8A030',
   expenseSoft: '#3A1E20', incomeSoft: '#173126', transferSoft: '#14304A', warningSoft: '#3A2C14',
   /** Dark: deeper than the text tones (the bright red and blue hold white at only 3:1), still clearly red and blue on black. */

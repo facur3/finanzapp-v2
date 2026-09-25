@@ -143,16 +143,19 @@ export function BudgetHomeCard({ summary }: { summary: MonthlyBudgetSummary }) {
   </PressFeedback>;
 }
 
-/** One scheduled commitment on Inicio (24UX2): who is paid (the merchant as typed, with its mark), what for (the
- * category, the secondary signal, and the account only when more than one could be meant), and on the right the
- * amount with when it falls due. A scheduled date is an estimate, not a payment: nothing here is registered, and
- * the date appears once (the caption beside the amount), not twice as it did before.
+/** One scheduled commitment on Inicio (24UX2): who is paid (the merchant as typed, with its mark), and on the right
+ * the amount with when it falls due. A scheduled date is an estimate, not a payment: nothing here is registered, and
+ * the date appears once (the caption under the amount).
  *
- * 24UX3: the commitments are a light agenda, not a third card. Rows sit on the screen's ground with no surface,
- * a 32 pt mark and a hairline that starts under the text, like a plain list; the press answer is a dim, since there
- * is no cell to tint. The day stays beside the amount, amber only today and tomorrow. */
-export function UpcomingRecurringRow({ rule, account, day, last, showAccount = false }: {
-  rule: RecurringRule; account: Account; day: string; last: boolean; showAccount?: boolean;
+ * 24UX3: the commitments are a light agenda, not a third card. Rows sit on the screen's ground with no surface and a
+ * hairline that starts under the text, like a plain list; the press answer is a dim, since there is no cell to tint.
+ * 24UX5: the mark is 40 pt, the same container as the latest transactions, so the two lists line up; the agenda stays
+ * tighter (56 pt rows, 8 pt of padding) and its caption under the name appears only when it adds something: the
+ * category when the name and the glyph do not already say it (`showCategory`, see `homeNamesCategory`), the account
+ * when another could be meant. The day stays under the amount, amber only today and tomorrow. VoiceOver always hears
+ * merchant, category, amount and the estimated day. */
+export function UpcomingRecurringRow({ rule, account, day, last, showAccount = false, showCategory = true }: {
+  rule: RecurringRule; account: Account; day: string; last: boolean; showAccount?: boolean; showCategory?: boolean;
 }) {
   const p = usePalette();
   const { t, relativeDate, spokenAmount } = useI18n();
@@ -162,21 +165,21 @@ export function UpcomingRecurringRow({ rule, account, day, last, showAccount = f
   const when = due.kind === 'today' || due.kind === 'due' ? t('home.upcomingRow.today') : due.kind === 'tomorrow' ? t('home.upcomingRow.tomorrow')
     : due.kind === 'soon' ? t('home.upcomingRow.inDays', { count: due.days }) : relativeDate(rule.nextDateISO, day);
   const urgent = due.kind === 'today' || due.kind === 'tomorrow' || due.kind === 'due';
-  const detail = showAccount ? category + ' · ' + account.name : category;
+  const detail = [showCategory ? category : null, showAccount ? account.name : null].filter(Boolean).join(' · ');
   // VoiceOver hears merchant, category, amount and the estimated day in one sentence ("próximo pago hoy").
   return <PressFeedback feedback="opacity" accessibilityRole="button"
     accessibilityLabel={t('home.upcomingRow.label', { merchant: rule.merchant, category, amount: spokenAmount(rule.amountMinor, account.currency), date: relativeDate(rule.nextDateISO, day, true) })
       + (showAccount ? ', ' + account.name : '')}
     onPress={() => router.push({ pathname: '/edit-recurring/[id]', params: { id: rule.id } })}
     style={styles.agendaRow}>
-    <MerchantBadge merchant={rule.merchant} category={rule.category} kind={rule.kind} size={32} />
-    <View style={{ flex: 1, minWidth: 0, alignSelf: 'stretch', paddingVertical: 10, gap: 8, flexDirection: stacked ? 'column' : 'row', alignItems: stacked ? 'flex-start' : 'center',
+    <MerchantBadge merchant={rule.merchant} category={rule.category} kind={rule.kind} />
+    <View style={{ flex: 1, minWidth: 0, alignSelf: 'stretch', paddingVertical: 8, gap: 8, flexDirection: stacked ? 'column' : 'row', alignItems: stacked ? 'flex-start' : 'center',
       borderBottomWidth: last ? 0 : StyleSheet.hairlineWidth, borderBottomColor: p.line }}>
       <View style={{ flex: stacked ? undefined : 1, minWidth: 0, gap: 3 }}>
         <AppText numberOfLines={stacked ? undefined : 2} style={{ fontWeight: '500' }}>{rule.merchant}</AppText>
-        <AppText secondary variant="footnote" numberOfLines={stacked ? undefined : 2}>{detail}</AppText>
+        {!!detail && <AppText secondary variant="footnote" numberOfLines={stacked ? undefined : 2}>{detail}</AppText>}
       </View>
-      <View style={{ alignItems: stacked ? 'flex-start' : 'flex-end', gap: 3, maxWidth: stacked ? '100%' : '56%' }}>
+      <View style={{ alignItems: stacked ? 'flex-start' : 'flex-end', gap: 2, maxWidth: stacked ? '100%' : '56%' }}>
         <Money minor={rule.amountMinor} currency={account.currency} />
         <AppText variant="caption" style={{ color: urgent ? p.warning : p.secondary, fontWeight: urgent ? '600' : '400' }}>{when}</AppText>
       </View>

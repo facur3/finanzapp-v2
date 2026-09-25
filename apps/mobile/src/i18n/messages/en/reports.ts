@@ -23,12 +23,12 @@ export const reports: Pick<Messages, 'reports'> = {
     periodTotal: 'Period total',
     others: 'Others',
     othersNote: 'The four largest have their own slice; the rest are grouped as Others.',
-    daysNote: 'Only days with recorded expenses. Tap one to see its transactions.',
+    daysNote: 'Only days with recorded expenses.',
     outOfRangeTitle: 'The total is beyond the range we can show',
     outOfRangeDetail: 'Your transactions are still saved. We don’t show a rounded total or chart that could be wrong.',
     dayRow: '{date} · {count}',
     emptyTitle: 'No expenses in this period',
-    emptyDetail: 'Expenses recorded in this currency will appear here, grouped by category. Use the arrows to browse months with transactions.',
+    emptyDetail: 'Expenses you record in this currency appear here, by category.',
     budgets: {
       title: 'Budgets',
       manage: 'Manage',
@@ -60,7 +60,10 @@ export const reports: Pick<Messages, 'reports'> = {
     netFlow: 'Net flow',
     compare: 'Compare with previous month',
     compareSubtitle: 'Differences by category',
-    footer: 'Only transactions recorded in {currency}. Opening balances, transfers and card payments don’t count as income or expenses. A month without records doesn’t mean you didn’t spend.',
+    method: {
+      title: 'What this report counts',
+      detail: 'Only transactions recorded in {currency}, with no other currency converted. Opening balances, transfers and card payments don’t count as income or expenses. A month without records doesn’t mean you didn’t spend.',
+    },
     period: {
       untilToday: 'Through today',
       fullMonth: 'Full month',

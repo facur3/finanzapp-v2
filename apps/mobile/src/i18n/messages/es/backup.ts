@@ -12,7 +12,7 @@ export const backup = {
       /** Title of the system share sheet (shown by Android; iOS ignores it). */
       dialogTitle: 'Guardar copia de FinanzApp',
       sharingUnavailable: 'No está disponible el menú para compartir en este dispositivo.',
-      tooLarge: 'La copia supera el límite de 5 MB de este piloto. No borres la app; conservá tus datos mientras ampliamos la recuperación.',
+      tooLarge: 'La copia supera el límite de 5 MB. No borres la app: tus datos siguen guardados en este dispositivo.',
       prepareFailed: 'No se pudo preparar la copia. Tus datos siguen en el dispositivo.',
     },
     import: {
@@ -28,7 +28,7 @@ export const backup = {
       doneDetail: 'Tus cuentas, tarjetas, deudas, movimientos, presupuestos y recurrentes ya están guardados en este dispositivo. No se duplicaron registros existentes.',
       chooseAnother: 'Elegir otra copia',
       emptyTitle: 'Recuperá tus registros',
-      emptyDetail: 'Elegí una copia del piloto nativo. Podrás revisar los cambios antes de guardarlos. No se envía el archivo a ningún servidor.',
+      emptyDetail: 'Elegí una copia de FinanzApp. Vas a revisar los cambios antes de guardarlos. El archivo no se envía a ningún servidor.',
       choose: 'Elegir copia',
       reviewTitle: 'Revisar copia',
       /** Review rows: what the backup would add; the value is a count. */

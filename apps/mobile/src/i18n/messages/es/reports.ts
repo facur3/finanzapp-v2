@@ -29,13 +29,13 @@ export const reports = {
     others: 'Otras',
     /** Under the donut when the smaller categories are grouped: the donut names four categories and groups the rest (`donutSlices`). */
     othersNote: 'Las cuatro mayores con nombre propio; el resto se agrupa como Otras.',
-    daysNote: 'Solo días con gastos registrados. Tocá uno para ver los movimientos.',
+    daysNote: 'Solo días con gastos registrados.',
     outOfRangeTitle: 'El total supera el rango disponible',
     outOfRangeDetail: 'Tus movimientos siguen guardados. No mostramos un total ni un gráfico redondeado que pueda ser incorrecto.',
     /** A day row: "Hoy · 22 sep · 3 gastos". */
     dayRow: '{date} · {count}',
     emptyTitle: 'Sin gastos en este período',
-    emptyDetail: 'Los gastos registrados en esta moneda aparecerán acá, agrupados por categoría. Podés recorrer los meses con movimientos usando las flechas.',
+    emptyDetail: 'Los gastos que registres en esta moneda aparecen acá, por categoría.',
     budgets: {
       title: 'Presupuestos',
       manage: 'Administrar',
@@ -70,7 +70,11 @@ export const reports = {
     netFlow: 'Flujo neto',
     compare: 'Comparar con el mes anterior',
     compareSubtitle: 'Diferencias por categoría',
-    footer: 'Solo movimientos registrados en {currency}. Los saldos iniciales, las transferencias y los pagos de tarjeta no cuentan como ingresos ni gastos. Un mes sin registros no significa que no hayas gastado.',
+    /** 24UX5: what the report counts, behind the information glyph beside the total (it was a permanent paragraph at the end). */
+    method: {
+      title: 'Qué cuenta este reporte',
+      detail: 'Solo movimientos registrados en {currency}, sin convertir otras monedas. Los saldos iniciales, las transferencias y los pagos de tarjeta no cuentan como ingresos ni gastos. Un mes sin registros no significa que no hayas gastado.',
+    },
     /** Under the month name: which days the report covers. */
     period: {
       untilToday: 'Hasta hoy',

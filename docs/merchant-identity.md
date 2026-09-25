@@ -17,7 +17,11 @@ Nothing here is device-verified.
 | Logo: a picture of the brand | none (deferred to 25C2) | nothing in the app | The owner, after §4 |
 
 The category stays the financial classification: reports, budgets and the Assistant group by it,
-and every row keeps the category name in its caption; the leading tile is the category glyph. Nothing in this delivery changes a
+and every row keeps the category name in its caption; the leading tile is the category glyph.
+Exception (Producto 24UX5): Inicio's two short lists caption the date alone and bring the category
+back only when the name and the glyph do not say it (a name of one or two characters, with no letter or
+generic, or a glyph another category on screen also draws); VoiceOver, the detail, the filters and the
+search always keep it (docs/mobile-design.md, Producto 24UX5). Nothing in this delivery changes a
 stored movement, a rule, SQLite or a backup.
 
 ## 2. The identity layer (`packages/domain/merchants.ts`)
@@ -108,11 +112,14 @@ a switch to turn it off; the App Store privacy answers updated.
 
 ## 5. Recurring rules: scheduled is not paid
 
-Today (unchanged by 24UX2): a rule posts one normal movement when its date arrives
-(`processRecurring`, on launch, when the app returns to the foreground and after a rule or a restore is saved), with a deterministic id
+Today (unchanged by 24UX2; audited and pinned by `tests/recurring-audit.node.ts` in 24UX5): a rule posts one normal movement when its date arrives
+(`catchUpRecurring` through `processRecurring`, on launch, when the app returns to the foreground and after a rule or a restore is saved; never while the app is closed: a date passed meanwhile is recorded on the next open, dated on its due day), with a deterministic id
 `rec_<ruleId>_<yyyymmdd>`; a retry, a restore or a second device session can never post it twice
-(the storage refuses a different movement with the same id). The rule then advances its next
-date. Pausing stops the postings.
+(an occurrence whose id is already in the ledger counts as recorded, even if the person edited or undid
+it). The rule then advances its next date. Pausing stops the postings. A rule the catch-up cannot record
+(more than 366 pending dates) is set aside unchanged, never blocks the other rules or the opening of the
+data, and reads «Revisar» in Recurrentes until the person continues it from today. «Recorded by
+FinanzApp» is never «paid by the bank»: the app executes and confirms no payment.
 
 How the screens now tell the states apart:
 

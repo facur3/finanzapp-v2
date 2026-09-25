@@ -44,7 +44,7 @@ const undone = domain.initialRecord({ id: 'e4', accountId: cash.id, kind: 'expen
 const archive: domain.LedgerArchive = { accounts: [cash, debtAccount], records: [...entries.map(domain.initialRecord), { ...undone, voided: true }],
   debts: [debt], recurring: [rule], budgets: [] };
 
-function harness(file: string, data: domain.LedgerArchive = archive, released?: ReleasedSets, locale: AppLocale | null = null, gate?: domain.CurrencyGate) {
+function harness(file: string, data: domain.LedgerArchive = archive, released?: ReleasedSets, locale: AppLocale | null = null, gate?: domain.CurrencyGate, dev = true) {
   currentLocaleStore = localeStore(released);
   forcedLocale = locale;
   const source = readFileSync(new URL('../app/' + file, import.meta.url), 'utf8');
@@ -82,7 +82,8 @@ function harness(file: string, data: domain.LedgerArchive = archive, released?: 
     '../src/ui/material-policy': materialPolicy, '../../src/ui/material-policy': materialPolicy,
   };
   const module = { exports: {} as { default?: () => Node } };
-  runInNewContext(code, { module, exports: module.exports, Date, require: (name: string) => {
+  // A development build unless a test says otherwise (24UX5: the diagnostics line exists only there).
+  runInNewContext(code, { module, exports: module.exports, Date, __DEV__: dev, require: (name: string) => {
     if (!Object.hasOwn(modules, name)) throw new Error('Unexpected Más dependency: ' + name);
     return modules[name];
   } });
@@ -117,8 +118,9 @@ test('Más groups permanent navigation into Finanzas and App y datos, with live 
   assert.deepEqual(rows(root).filter(row => row.props.last).map(row => row.props.title), ['Categorías', 'Región']);
   assert.equal(nodes(root).some(node => node.type === 'ActionButton'), false);
   const texts = nodes(root).filter(node => node.type === 'AppText').map(node => String(node.props.children)).join(' ');
-  assert.match(texts, /Producto 24UX4 /);
-  assert.match(texts, /Material opaco \(Expo Go\)/, 'the footer says which control material this session draws, so a tester can confirm the mode');
+  assert.match(texts, /FinanzApp 0\.1\.0 \(24UX5\)/, 'the version line, like the About line of an iOS app');
+  assert.match(texts, /Material opaco \(Expo Go\)/, 'a development build says which control material this session draws, so a tester can confirm the mode');
+  assert.doesNotMatch(texts, /Piloto nativo|Producto 24/, '24UX5: no project vocabulary on the settings screen');
   assert.equal(value('Categorías'), 'Gastos e ingresos');
   // Finanzas rows carry a soft identity tile from the shared palette; App y datos rows stay neutral glyphs.
   const leading = rows(root).map(row => row.props.leading?.type ?? null);
@@ -126,7 +128,7 @@ test('Más groups permanent navigation into Finanzas and App y datos, with live 
   assert.equal(new Set(rows(root).slice(0, 6).map(row => row.props.leading.props.color)).size, 6, 'six distinct restrained colours, no row painted');
   assert.deepEqual(rows(root).slice(6).map(row => row.props.icon), ['save-outline', 'arrow-undo-outline', 'language-outline', 'globe-outline'], 'App y datos keeps neutral glyphs');
   assert.equal(rows(root).some(row => 'value' in row.props || 'label' in row.props), false, 'no leftover label/value props');
-  assert.match(texts, /sincronización todavía no está activada/);
+  assert.match(texts, /se guardan solo en este dispositivo y funcionan sin conexión/);
 });
 
 test('Más → App y datos (23.1C2): Idioma and Región say what is in use and whether it follows the device; Región hides in a single-region build', () => {
@@ -241,8 +243,9 @@ test('23.1B2 English Más: every row, count, note and the diagnostic footer are 
   for (const row of rows(root)) row.props.onPress();
   assert.equal(view.pushed.join(','), '/accounts,/cards,/budgets,/recurring,/debts,/categories,/backup,/undone-entries,/language,/region');
   const texts = nodes(root).filter(node => node.type === 'AppText').map(node => String(node.props.children)).join(' ');
-  assert.match(texts, /FinanzApp · Native pilot 0\.1\.0 · Producto 24UX4 · Opaque material \(Expo Go\) · Language: default/);
-  assert.match(texts, /Sync is not turned on yet/);
+  assert.match(texts, /FinanzApp 0\.1\.0 \(24UX5\)/);
+  assert.match(texts, /Opaque material \(Expo Go\) · Language: default/);
+  assert.match(texts, /saved only on this device and work offline/);
   assert.doesNotMatch(texts, /Material opaco|Idioma|Región|sincronización/);
   const card: domain.CreditCardProfile = { id: 'card', accountId: cash.id, issuer: 'Visa', last4: '4009', creditLimitMinor: null, closingDay: 28, dueDay: 5, active: true, createdAt, revision: 0, updatedAt: createdAt };
   const cards = harness('(tabs)/settings.tsx', { ...archive, cards: [card, { ...card, id: 'two' }] }, undefined, 'en-AR').render();
@@ -282,4 +285,14 @@ test('24B5: a release names no test currency in Más; a development preview gate
   assert.match(texts(preview), /Monedas de prueba activas: EUR, GBP, JPY, CLP, KWD\. Solo en esta compilación de desarrollo\./);
   const english = harness('(tabs)/settings.tsx', archive, undefined, 'en-AR', currencyGate.PREVIEW_CURRENCIES).render();
   assert.match(texts(english), /Test currencies enabled: EUR, GBP, JPY, CLP, KWD\. Only in this development build\./);
+});
+
+test('24UX5: a preview or store build shows the version and the local-storage note, never the diagnostics', () => {
+  for (const locale of [null, 'en-AR'] as const) {
+    const root = harness('(tabs)/settings.tsx', archive, undefined, locale, undefined, false).render();
+    const texts = nodes(root).filter(node => node.type === 'AppText').map(node => String(node.props.children)).join(' ');
+    assert.match(texts, /FinanzApp 0\.1\.0 \(24UX5\)/);
+    assert.doesNotMatch(texts, /Material|material|Idioma:|Language:/, 'no material or locale diagnostics outside a development build');
+    assert.match(texts, locale ? /saved only on this device/ : /se guardan solo en este dispositivo/, 'privacy and storage information stays');
+  }
 });

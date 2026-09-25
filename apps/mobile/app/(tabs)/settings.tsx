@@ -11,10 +11,14 @@ import { useI18n, useLocalePreferences } from '../../src/i18n/provider';
 import { previewOnlyCurrencies } from '../../src/storage/currency-gate';
 import { preferenceSummary, showsPreference } from '../../src/ui/locale-options';
 
+declare const __DEV__: boolean | undefined;
 // Diagnostic: where this launch read the device languages. "módulo nativo" proves the build links expo-localization.
 const LOCALE_SOURCE_LABELS = { native: 'settings.localeSource.native', intl: 'settings.localeSource.intl', none: 'settings.localeSource.none' } as const;
 /** The pilot's version and the internal release name; neither is translated. */
-const VERSION = '0.1.0', RELEASE = '24UX4';
+const VERSION = '0.1.0', RELEASE = '24UX5';
+/** 24UX5: the material and locale diagnostics are for a tester on a development build; everyone else sees the version,
+ * like the About line of an iOS app. `__DEV__` is false in a preview or store bundle, so the line is compiled away. */
+const DIAGNOSTICS = typeof __DEV__ !== 'undefined' && __DEV__;
 
 /** Más is the secondary navigation hub: everything that is not one of the four
  * other tabs, in two native grouped lists. Finanzas holds the tools that
@@ -68,7 +72,10 @@ export default function MoreScreen() {
         {t('settings.localNote')}
       </AppText>
     </View>
-    <AppText secondary style={{ textAlign: 'center', fontSize: 13 }}>{t('settings.footer', { version: VERSION, release: RELEASE, material: t(MATERIAL_LABELS[material.reason]), source: t(LOCALE_SOURCE_LABELS[localeSource]) })}</AppText>
+    <View style={{ gap: 2 }}>
+      <AppText secondary style={{ textAlign: 'center', fontSize: 13 }}>{t('settings.version', { version: VERSION, release: RELEASE })}</AppText>
+      {DIAGNOSTICS && <AppText tertiary style={{ textAlign: 'center', fontSize: 13 }}>{t('settings.diagnostics', { material: t(MATERIAL_LABELS[material.reason]), source: t(LOCALE_SOURCE_LABELS[localeSource]) })}</AppText>}
+    </View>
     {previewCurrencies.length > 0 && <AppText secondary style={{ textAlign: 'center', fontSize: 13 }}>{t('settings.currencyPreview', { codes: previewCurrencies.join(', ') })}</AppText>}
   </Screen>;
 }

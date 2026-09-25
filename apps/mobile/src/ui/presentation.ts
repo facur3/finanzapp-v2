@@ -132,3 +132,25 @@ export function namesAccount(accounts: readonly Account[], currency: Currency, d
 export function historyNamesAccount(entries: readonly Pick<Entry, 'accountId'>[], ruleAccountId: string): boolean {
   return entries.some(entry => entry.accountId !== ruleAccountId);
 }
+
+/** Names that say nothing about what a movement was for (compared after `searchable`): with them the category is the
+ * only way to tell rows apart, so Inicio keeps it in the caption. Short on purpose; a real name never matches. */
+const GENERIC_NAMES = new Set(['varios', 'compra', 'compras', 'pago', 'pagos', 'gasto', 'gastos', 'ingreso', 'ingresos', 'otro', 'otros',
+  'otra', 'otras', 'sin nombre', 'desconocido', 'misc', 'various', 'purchase', 'payment', 'expense', 'income', 'other', 'unknown', 'n/a', 'test', 'prueba']);
+
+/** Inicio's rows (24UX5) leave the category out of the caption when the glyph already says it, and keep it where the
+ * row would be ambiguous without it: a name too short or with no letter ("f", "a", "123"), a generic name ("Varios",
+ * "Pago"), or a glyph that another category on the same screen also draws. A name that is the category itself
+ * ("Comida" in Comida) never repeats it. VoiceOver, the detail, the filters and the search keep the category always. */
+export function homeNamesCategory(merchant: string, categoryLabel: string, glyphShared: boolean): boolean {
+  const name = searchable(merchant).trim().replace(/\s+/g, ' ');
+  if (name === searchable(categoryLabel).trim().replace(/\s+/g, ' ')) return false;
+  return glyphShared || name.length < 3 || !/\p{L}/u.test(name) || GENERIC_NAMES.has(name);
+}
+
+/** The glyphs that stand for more than one category among the rows on one screen. */
+export function sharedGlyphs(rows: readonly { category: string; glyph: string }[]): Set<string> {
+  const categories = new Map<string, Set<string>>();
+  for (const row of rows) categories.set(row.glyph, (categories.get(row.glyph) ?? new Set()).add(row.category));
+  return new Set([...categories].filter(([, names]) => names.size > 1).map(([glyph]) => glyph));
+}

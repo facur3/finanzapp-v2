@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import type { Account, Entry, Transfer } from '@finanzapp/domain';
-import { availableCurrencies, groupEntries, initialAccountId, selectEntries, selectTransfers, mergeActivity, groupActivity, activityDateLabel, dayNetMinor } from '../src/ui/presentation.ts';
+import { availableCurrencies, groupEntries, initialAccountId, selectEntries, selectTransfers, mergeActivity, groupActivity, activityDateLabel, dayNetMinor, homeNamesCategory, sharedGlyphs } from '../src/ui/presentation.ts';
 
 // Synthetic fixtures only; never loaded by the app or stored in a user database.
 const accounts: Account[] = [
@@ -79,4 +79,31 @@ test('a day net total only exists for entries of one currency and never counts t
   assert.equal(dayNetMinor(entries, accounts), null);
   assert.equal(dayNetMinor([], accounts), null);
   assert.equal(dayNetMinor([{ ...base, accountId: 'missing' }], accounts), null);
+});
+
+test('24UX5: search finds merchant, stored category, the localized category name and account; notes exist only on transfers', () => {
+  const at = '2026-09-12T12:00:00Z';
+  const accounts: Account[] = [{ id: 'a', name: 'Banco Nación', currency: 'ARS', openingMinor: 0, createdAt: at }, { id: 'b', name: 'Efectivo', currency: 'ARS', openingMinor: 0, createdAt: at }];
+  const entries = [{ id: 'e', accountId: 'a', kind: 'expense' as const, amountMinor: 100, merchant: 'Café Martínez', category: 'Comida', dateISO: '2026-09-10', createdAt: at }];
+  const english = (entry: { category: string }) => entry.category === 'Comida' ? 'Food' : entry.category;
+  for (const query of ['cafe', 'martinez', 'comida', 'food', 'nacion', 'banco cafe']) {
+    assert.equal(selectEntries(entries, accounts, 'all', query, undefined, english).length, 1, query);
+  }
+  assert.equal(selectEntries(entries, accounts, 'all', 'alquiler', undefined, english).length, 0);
+  // An expense or income has no note of its own (Entry carries none), so there is nothing else to match.
+  assert.equal(Object.hasOwn(entries[0], 'note'), false);
+  const transfers = [{ id: 't', fromAccountId: 'a', toAccountId: 'b', amountMinor: 100, note: 'Ahorro vacaciones', dateISO: '2026-09-10', createdAt: at }];
+  assert.equal(selectTransfers(transfers, accounts, 'vacaciones').length, 1, 'a transfer note is searchable');
+  assert.equal(selectTransfers(transfers, accounts, 'transfer', undefined, 'transfer').length, 1, 'the word in the interface language');
+  assert.equal(selectTransfers(transfers, accounts, 'efectivo').length, 1, 'either account');
+});
+
+test('24UX5: Inicio names the category only when the name and the glyph do not already say it', () => {
+  assert.equal(homeNamesCategory('Carrefour', 'Supermercado', false), false);
+  for (const weak of ['f', 'a', 'ok', '123', '—', '  x  ', 'Varios', 'PAGO', 'Unknown', 'sin nombre']) assert.equal(homeNamesCategory(weak, 'Comida', false), true, weak);
+  assert.equal(homeNamesCategory('Comida', 'Comida', true), false, 'a name that is the category never repeats it');
+  assert.equal(homeNamesCategory('comída ', 'Comida', false), false, 'compared without case, accents or spacing');
+  assert.equal(homeNamesCategory('Carrefour', 'Supermercado', true), true, 'a glyph shared with another category on screen');
+  assert.deepEqual([...sharedGlyphs([{ category: 'Comida', glyph: 'g1' }, { category: 'Comida', glyph: 'g1' }, { category: 'Café', glyph: 'g1' }, { category: 'Ocio', glyph: 'g2' }])], ['g1']);
+  assert.equal(sharedGlyphs([{ category: 'Comida', glyph: 'g1' }, { category: 'Comida', glyph: 'g1' }]).size, 0, 'the same category twice is not ambiguous');
 });

@@ -15,7 +15,7 @@ export const home: Pick<Messages, 'home' | 'budgetStatus' | 'quickActions'> = {
     balanceOutOfRange: 'The total balance is beyond the range we can show precisely. Your accounts are still saved.',
     accounts: { one: '{count} account', other: '{count} accounts' },
     monthBudget: 'Budget this month',
-    whereSpent: 'Where your money went',
+    whereSpent: 'By category',
     reports: 'Reports',
     categoriesEmpty: 'Your categories appear once you record an expense this month.',
     categoriesInActivity: 'The breakdown is available in your transactions.',
