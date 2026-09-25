@@ -458,7 +458,7 @@ test('24UX2: Home rows name the account only when another account of the currenc
   assert.equal(nodes(root).filter(node => node.type === 'EntryRow').every(node => node.props.showAccount === false), true);
   // The upcoming commitments follow the same rule.
   const rule: domain.RecurringRule = { id: 'r', accountId: 'a', kind: 'expense', amountMinor: 100, merchant: 'Netflix', category: 'Suscripciones', frequency: 'monthly',
-    anchorDateISO: '2026-09-20', nextDateISO: '2026-09-20', active: true, createdAt, revision: 0, updatedAt: createdAt };
+    anchorDateISO: '2026-09-20', nextDateISO: '2026-09-20', active: true, deleted: false, createdAt, revision: 0, updatedAt: createdAt };
   const upcoming = find(routeHarness('(tabs)/index.tsx', {}, twoCash, { recurring: [rule] }).render(), 'UpcomingRecurringRow');
   assert.equal(upcoming.props.showAccount, true);
   assert.equal(find(routeHarness('(tabs)/index.tsx', {}, homeData, { recurring: [rule] }).render(), 'UpcomingRecurringRow').props.showAccount, false);
@@ -466,7 +466,7 @@ test('24UX2: Home rows name the account only when another account of the currenc
 
 test('24UX2: Home keeps its modules and adds none', () => {
   const rule: domain.RecurringRule = { id: 'r', accountId: 'a', kind: 'expense', amountMinor: 100, merchant: 'Netflix', category: 'Suscripciones', frequency: 'monthly',
-    anchorDateISO: '2026-09-20', nextDateISO: '2026-09-20', active: true, createdAt, revision: 0, updatedAt: createdAt };
+    anchorDateISO: '2026-09-20', nextDateISO: '2026-09-20', active: true, deleted: false, createdAt, revision: 0, updatedAt: createdAt };
   const root = routeHarness('(tabs)/index.tsx', {}, homeData, { recurring: [rule] }).render();
   assert.equal(sectionTitles(root).join('|'), 'En qué gastaste|Próximos compromisos|Últimos movimientos');
   assert.equal(nodes(root).filter(node => node.type === 'QuickActions').length, 1);
@@ -481,7 +481,7 @@ test('24UX2: Home keeps its modules and adds none', () => {
 
 test('24UX3: a quiet header, a larger number, movements then the Assistant, quiet section links and three section shapes', () => {
   const rule: domain.RecurringRule = { id: 'r', accountId: 'a', kind: 'expense', amountMinor: 100, merchant: 'Netflix', category: 'Suscripciones', frequency: 'monthly',
-    anchorDateISO: '2026-09-20', nextDateISO: '2026-09-20', active: true, createdAt, revision: 0, updatedAt: createdAt };
+    anchorDateISO: '2026-09-20', nextDateISO: '2026-09-20', active: true, deleted: false, createdAt, revision: 0, updatedAt: createdAt };
   const root = routeHarness('(tabs)/index.tsx', {}, homeData, { recurring: [rule] }).render();
   // The header is the compact variant: the metric and the currency chip no longer weigh like the number.
   assert.equal(find(root, 'Choices').props.compact, true);

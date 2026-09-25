@@ -13,14 +13,20 @@ export interface RecurringRule {
   frequency: RecurringFrequency;
   anchorDateISO: string;
   nextDateISO: string;
+  /** false = paused: it records nothing until resumed. */
   active: boolean;
+  /** Producto 24UX4: a deletion record. The rule stops tracking for good and leaves every list, while the
+   * movements it already recorded stay in the ledger untouched (their ids still name the rule). The row is
+   * kept, never removed, so an older backup cannot bring the rule back. A deleted rule is never active and
+   * never changes again. */
+  deleted: boolean;
   createdAt: string;
   revision: number;
   updatedAt: string;
 }
 
 const RECURRING_KEYS = ['id', 'accountId', 'kind', 'amountMinor', 'merchant', 'category', 'frequency',
-  'anchorDateISO', 'nextDateISO', 'active', 'createdAt', 'revision', 'updatedAt'] as const;
+  'anchorDateISO', 'nextDateISO', 'active', 'deleted', 'createdAt', 'revision', 'updatedAt'] as const;
 
 function validId(value: string): boolean {
   return typeof value === 'string' && /^[a-zA-Z0-9_-]{1,70}$/.test(value);
@@ -54,7 +60,8 @@ export function validateRecurringRule(rule: RecurringRule, accounts: Account[]):
   if (!validDateISO(rule.anchorDateISO) || !validDateISO(rule.nextDateISO) || rule.nextDateISO < rule.anchorDateISO) {
     throw new Error('Elegí una próxima fecha válida.');
   }
-  if (typeof rule.active !== 'boolean' || !Number.isSafeInteger(rule.revision) || rule.revision < 0
+  if (typeof rule.active !== 'boolean' || typeof rule.deleted !== 'boolean' || (rule.deleted && rule.active)
+    || !Number.isSafeInteger(rule.revision) || rule.revision < 0
     || !validTimestamp(rule.createdAt) || !validTimestamp(rule.updatedAt)) {
     throw new Error('Estado de recurrente inválido.');
   }
@@ -65,6 +72,7 @@ export function validateRecurringRule(rule: RecurringRule, accounts: Account[]):
  * its amount is copied verbatim into every generated entry in the account's minor units,
  * so moving it to an account in another currency would reinterpret the figure. */
 export function validateRecurringRuleChange(before: RecurringRule, after: RecurringRule, accounts: readonly Account[]): void {
+  if (before.deleted) throw new Error('Este recurrente fue eliminado.');
   if (after.createdAt !== before.createdAt || after.revision !== before.revision + 1) {
     throw new Error('El recurrente cambió desde que lo abriste. Volvé a revisarlo.');
   }
@@ -203,4 +211,30 @@ export function moveRecurringForward(rule: RecurringRule, throughDateISO: string
   const next = { ...rule, nextDateISO, revision: rule.revision + 1, updatedAt: nowISO };
   validateRecurringRule(next, accounts);
   return next;
+}
+
+/** Pausing keeps the rule and its next date; nothing is recorded while it is paused (Producto 24UX4). */
+export function pauseRecurringRule(rule: RecurringRule, nowISO: string): RecurringRule {
+  if (rule.deleted) throw new Error('Este recurrente fue eliminado.');
+  if (!validTimestamp(nowISO)) throw new Error('Fecha de actualización inválida.');
+  return { ...rule, active: false, revision: rule.revision + 1, updatedAt: nowISO };
+}
+
+/** Resuming never records what fell due while the rule was paused: a next date before `todayISO` moves forward
+ * along the rule's own calendar (its anchor day) to the first occurrence on or after today, which is recorded
+ * when it arrives, today included. */
+export function resumeRecurringRule(rule: RecurringRule, todayISO: string, nowISO: string): RecurringRule {
+  if (rule.deleted) throw new Error('Este recurrente fue eliminado.');
+  if (!validDateISO(todayISO) || !validTimestamp(nowISO)) throw new Error('Fecha de recurrente inválida.');
+  let nextDateISO = rule.nextDateISO;
+  while (nextDateISO < todayISO) nextDateISO = advanceRecurringDate(nextDateISO, rule.frequency, rule.anchorDateISO);
+  return { ...rule, active: true, nextDateISO, revision: rule.revision + 1, updatedAt: nowISO };
+}
+
+/** The deletion record of a rule: inactive for good, every other field as it was. The movements it recorded are
+ * not touched here or anywhere else. */
+export function deleteRecurringRule(rule: RecurringRule, nowISO: string): RecurringRule {
+  if (rule.deleted) throw new Error('Este recurrente fue eliminado.');
+  if (!validTimestamp(nowISO)) throw new Error('Fecha de actualización inválida.');
+  return { ...rule, active: false, deleted: true, revision: rule.revision + 1, updatedAt: nowISO };
 }

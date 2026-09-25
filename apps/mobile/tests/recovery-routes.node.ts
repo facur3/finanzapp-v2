@@ -14,6 +14,7 @@ import * as appearance from '../src/ui/appearance.ts';
 import * as i18nFormat from '../src/i18n/format.ts';
 import { bindLocale } from '../src/i18n/bind.ts';
 import type { AppLocale } from '../src/i18n/locale.ts';
+import { realModule } from './real-module.ts';
 
 // Actual screen/form handlers with native hosts replaced by descriptors.
 // This does not render UIKit, the Files picker, animation frames or gestures.
@@ -23,7 +24,7 @@ const account: domain.Account = { id: 'a', name: 'Prueba ARS', currency: 'ARS', 
 const entry: domain.Entry = { id: 'e', accountId: 'a', kind: 'expense', amountMinor: 12345, merchant: 'Prueba', category: 'Salud', dateISO: '2026-01-01', createdAt };
 const archive: domain.LedgerArchive = { accounts: [account, { ...account, id: 'u', currency: 'USD' }], records: [domain.initialRecord(entry)] };
 
-function harness(file: string, props: any = {}, options: { data?: domain.LedgerArchive; params?: any;
+function harness(file: string, props: any = {}, options: { data?: domain.LedgerArchive | null; params?: any;
   add?: (value: domain.Entry) => Promise<void>; update?: (value: domain.EntryChange) => Promise<void>;
   addTransfer?: (value: domain.Transfer) => Promise<void>; updateTransfer?: (value: domain.TransferChange) => Promise<void>;
   updateAccount?: (value: domain.AccountChange) => Promise<void>; addAccount?: (value: domain.Account) => Promise<void>;
@@ -35,12 +36,13 @@ function harness(file: string, props: any = {}, options: { data?: domain.LedgerA
   let cursor = 0, refCursor = 0, uuid = 0, backs = 0;
   const pushed: any[] = [], alerts: any[] = [], updates: domain.EntryChange[] = [], additions: domain.Entry[] = [], restores: any[] = [];
   const transfers: domain.Transfer[] = [], transferChanges: domain.TransferChange[] = [], accountChanges: domain.AccountChange[] = [], newAccounts: domain.Account[] = [], rules: domain.RecurringRule[] = [];
-  let data = options.data ?? archive;
+  // null: the ledger has not hydrated yet; setData moves it on.
+  let data = (options.data === undefined ? archive : options.data) as domain.LedgerArchive;
   // The locale is read on every render, like the live provider: switching it re-labels the next render and keeps the state.
   let locale: AppLocale = options.locale ?? 'es-AR';
   const i18nProvider = { useI18n: () => bindLocale(locale) };
   const jsx = (type: Node['type'], props: Node['props']) => ({ type, props });
-  const ledger = { useLedger: () => ({ archive: data, snapshot: domain.snapshotFromArchive(data),
+  const ledger = { useLedger: () => ({ archive: data, snapshot: data ? domain.snapshotFromArchive(data) : null,
     addEntry: async (value: domain.Entry) => { additions.push(value); await options.add?.(value); },
     saveRecurring: async (value: domain.RecurringRule) => { rules.push(value); },
     updateEntry: async (value: domain.EntryChange) => { updates.push(value); await options.update?.(value); },
@@ -62,7 +64,7 @@ function harness(file: string, props: any = {}, options: { data?: domain.LedgerA
     'expo-router': { Stack: { Screen: 'Stack.Screen' }, useLocalSearchParams: () => options.params ?? {},
       router: { canGoBack: () => true, back: () => { backs++; }, push: (value: any) => pushed.push(value), replace: (value: any) => pushed.push(value) } },
     'expo-crypto': { randomUUID: () => 'operation-' + (++uuid) },
-    'expo-haptics': { NotificationFeedbackType: { Success: 'Success' }, notificationAsync: async () => {} },
+    'expo-haptics': { NotificationFeedbackType: { Success: 'Success' }, notificationAsync: async () => {}, selectionAsync: async () => {} },
     'expo-file-system': { File: { pickFileAsync: options.picker ?? (async () => ({ canceled: true })) } },
     '@finanzapp/domain': domain,
     '@expo/vector-icons/Ionicons': 'Ionicons',
@@ -79,21 +81,25 @@ function harness(file: string, props: any = {}, options: { data?: domain.LedgerA
       usePalette: () => ({ text: '#000', positive: '#070', income: '#070', expense: '#700', primary: '#2557D6', warning: '#a60', secondary: '#666', tertiary: '#999' }) },
     './theme': { space: { xs: 4, s: 8, m: 12, l: 16, xl: 20, xxl: 24, xxxl: 32 }, usePalette: () => ({ background: '#fff' }) },
     './entry-form': { EntryForm: 'EntryForm' }, './transfer-form': { TransferForm: 'TransferForm' },
+    '../../src/ui/recurring-form': { RecurringForm: 'RecurringForm' },
     './motion': { ValueTransition: 'ValueTransition' },
     './category-hues': { useCategoryColor: () => '#3E6FB0', useCategoryLabel: (s: string) => s, useCategoryDefinitions: () => [], useCategoryLook: (s: string) => ({ label: s, storedLabel: s, key: String(s).toLowerCase(), hex: '#3E6FB0', glyph: 'pricetag-outline' }), useCategoryLookOf: () => (s: string) => ({ label: s, storedLabel: s, key: String(s).toLowerCase(), hex: '#3E6FB0', glyph: 'pricetag-outline' }), useAccountLook: () => ({ icon: 'wallet', color: 'cobalt', glyph: 'wallet-outline', hex: '#2557D6' }), useAccountNameOf: () => (account: any) => account.name, useAccountLookOf: () => () => ({ icon: 'wallet', color: 'cobalt', glyph: 'wallet-outline', hex: '#2557D6' }) }, '../src/ui/category-hues': { useCategoryColor: () => '#3E6FB0', useCategoryLabel: (s: string) => s, useCategoryDefinitions: () => [], useCategoryLook: (s: string) => ({ label: s, storedLabel: s, key: String(s).toLowerCase(), hex: '#3E6FB0', glyph: 'pricetag-outline' }), useCategoryLookOf: () => (s: string) => ({ label: s, storedLabel: s, key: String(s).toLowerCase(), hex: '#3E6FB0', glyph: 'pricetag-outline' }), useAccountLook: () => ({ icon: 'wallet', color: 'cobalt', glyph: 'wallet-outline', hex: '#2557D6' }), useAccountNameOf: () => (account: any) => account.name, useAccountLookOf: () => () => ({ icon: 'wallet', color: 'cobalt', glyph: 'wallet-outline', hex: '#2557D6' }) }, '../../src/ui/category-hues': { useCategoryColor: () => '#3E6FB0', useCategoryLabel: (s: string) => s, useCategoryDefinitions: () => [], useCategoryLook: (s: string) => ({ label: s, storedLabel: s, key: String(s).toLowerCase(), hex: '#3E6FB0', glyph: 'pricetag-outline' }), useCategoryLookOf: () => (s: string) => ({ label: s, storedLabel: s, key: String(s).toLowerCase(), hex: '#3E6FB0', glyph: 'pricetag-outline' }), useAccountLook: () => ({ icon: 'wallet', color: 'cobalt', glyph: 'wallet-outline', hex: '#2557D6' }), useAccountNameOf: () => (account: any) => account.name, useAccountLookOf: () => () => ({ icon: 'wallet', color: 'cobalt', glyph: 'wallet-outline', hex: '#2557D6' }) },
     '../src/ui/appearance': appearance, '../../src/ui/appearance': appearance,
     '../src/ui/appearance-picker': { IconColorPicker: 'IconColorPicker' }, '../../src/ui/appearance-picker': { IconColorPicker: 'IconColorPicker' },
   };
-  const module = { exports: {} as Record<string, (props: any) => Node> };
-  runInNewContext(code, { module, exports: module.exports, Date, Error, require: (name: string) => {
+  const require = (name: string) => {
     if (!Object.hasOwn(modules, name)) throw new Error('Unexpected recovery dependency: ' + name);
     return modules[name];
-  } });
+  };
+  // 24UX4: the recurring detail's management runs for real (Alert, saveRecurring, router and haptics are the mocks above).
+  modules['./commitment-actions'] = realModule('src/ui/commitment-actions.ts', require);
+  const module = { exports: {} as Record<string, (props: any) => Node> };
+  runInNewContext(code, { module, exports: module.exports, Date, Error, require });
   return {
     render: () => { cursor = 0; refCursor = 0; let node = (module.exports.default ?? module.exports.EntryForm ?? module.exports.TransferForm ?? module.exports.MovementForm ?? module.exports.RecurringForm)(props);
       while (typeof node.type === 'function') node = node.type(node.props);
       return node; },
-    setData: (next: domain.LedgerArchive) => { data = next; },
+    setData: (next: domain.LedgerArchive | null) => { data = next as domain.LedgerArchive; },
     setLocale: (next: AppLocale) => { locale = next; },
     pushed, alerts, updates, additions, restores, transfers, transferChanges, accountChanges, newAccounts, rules, backs: () => backs,
   };
@@ -254,7 +260,7 @@ test('identical or conflicting backups cannot show an enabled import action', as
   }
 });
 
-test('24B4: a v9 copy in yen lists the scales it pins as a review row, imports once, and the formats note names v9; a v8 file naming yen is refused by name', async () => {
+test('24B4: a v9 copy in yen lists the scales it pins as a review row, imports once, and the formats note names v1 to v10; a v8 file naming yen is refused by name', async () => {
   const yen: domain.Account = { ...account, id: 'yen', name: 'Yenes', currency: 'JPY', openingMinor: 1500 };
   const yenArchive: domain.LedgerArchive = { accounts: [yen], records: [domain.initialRecord({ ...entry, id: 'y1', accountId: 'yen', amountMinor: 700 })] };
   const backup = domain.createRecoveryBackup(yenArchive);
@@ -266,7 +272,7 @@ test('24B4: a v9 copy in yen lists the scales it pins as a review row, imports o
   const rows = nodes(view.render()).filter(node => node.type === 'DetailRow').map(node => [node.props.label, node.props.value]);
   assert.ok(rows.some(([label, value]) => label === 'New currency scales' && value === '1'), JSON.stringify(rows));
   assert.deepEqual({ minor: find(view.render(), 'Money').props.minor, currency: find(view.render(), 'Money').props.currency }, { minor: 800, currency: 'JPY' }, 'yen previewed as yen');
-  assert.ok(nodes(view.render()).some(node => node.type === 'AppText' && String(node.props.children).startsWith('Native backups v1 to v9')));
+  assert.ok(nodes(view.render()).some(node => node.type === 'AppText' && String(node.props.children).startsWith('Native backups v1 to v10')));
   find(view.render(), 'ActionButton', 'Confirm import').props.onPress();
   view.alerts[0].buttons[1].onPress();
   await flush();
@@ -425,7 +431,7 @@ const debtAccount: domain.Account = { ...account, id: 'debt-acc', name: 'Debo ·
 const card: domain.CreditCardProfile = { id: 'card', accountId: cardAccount.id, issuer: 'Banco', last4: '1234', creditLimitMinor: null,
   closingDay: 28, dueDay: 5, active: true, createdAt, revision: 0, updatedAt: createdAt };
 const debt: domain.PersonalDebtProfile = { id: 'debt', accountId: debtAccount.id, direction: 'owed_by_me', counterparty: 'Juan', dueDateISO: null,
-  note: '', active: true, createdAt, revision: 0, updatedAt: createdAt };
+  note: '', active: true, deleted: false, createdAt, revision: 0, updatedAt: createdAt };
 const liabilityData: domain.LedgerArchive = { ...archive, accounts: [...archive.accounts, cardAccount, debtAccount], cards: [card], debts: [debt] };
 
 test('card payment locks the card as destination, caps at the recorded debt and never becomes an expense', async () => {
@@ -1036,7 +1042,7 @@ test('24B6: a recurring income offers cash accounts only, a card chosen for a re
   await find(view.render(), 'ActionButton').props.onPress();
   assert.deepEqual([view.rules[0].kind, view.rules[0].accountId], ['income', 'a']);
   const legacy: domain.RecurringRule = { id: 'cashback', accountId: 'card-acc', kind: 'income', amountMinor: 500, merchant: 'Cashback', category: 'Otros', frequency: 'monthly',
-    anchorDateISO: '2026-01-05', nextDateISO: '2026-10-05', active: true, createdAt, revision: 0, updatedAt: createdAt };
+    anchorDateISO: '2026-01-05', nextDateISO: '2026-10-05', active: true, deleted: false, createdAt, revision: 0, updatedAt: createdAt };
   const editing = harness('src/ui/recurring-form.tsx', { original: legacy }, { data: { ...liabilityData, recurring: [legacy] } });
   const field = find(editing.render(), 'AccountField');
   assert.deepEqual([field.props.value, field.props.accounts.map((item: domain.Account) => item.id)], ['card-acc', ['a', 'card-acc']], 'its own card stays offered beside cash in that currency');
@@ -1133,7 +1139,7 @@ test('24B6 review: a recurring income in a card-only ledger shows the no-account
   assert.equal(find(root, 'EmptyState').props.detail, 'Los recurrentes necesitan una cuenta para registrar cada vencimiento en la moneda correcta.');
   assert.equal(nodes(root).some(node => node.type === 'Choices'), false);
   const legacy: domain.RecurringRule = { id: 'cashback', accountId: 'card-acc', kind: 'income', amountMinor: 500, merchant: 'Cashback', category: 'Otros', frequency: 'monthly',
-    anchorDateISO: '2026-01-05', nextDateISO: '2026-10-05', active: true, createdAt, revision: 0, updatedAt: createdAt };
+    anchorDateISO: '2026-01-05', nextDateISO: '2026-10-05', active: true, deleted: false, createdAt, revision: 0, updatedAt: createdAt };
   const editing = harness('src/ui/recurring-form.tsx', { original: legacy }, { data: { ...cardOnly, recurring: [legacy] } });
   root = editing.render();
   assert.equal(nodes(root).some(node => node.type === 'EmptyState'), false, 'its own card is eligible');
@@ -1148,7 +1154,7 @@ test('24B6 review: a recurring income in a card-only ledger shows the no-account
 // ---- 24UX2: what a recurring rule actually recorded ------------------------------------------------------------
 
 const streaming: domain.RecurringRule = { id: 'netflix', accountId: 'a', kind: 'expense', amountMinor: 899900, merchant: 'Netflix', category: 'Suscripciones', frequency: 'monthly',
-  anchorDateISO: '2026-07-05', nextDateISO: '2026-10-05', active: true, createdAt, revision: 3, updatedAt: createdAt };
+  anchorDateISO: '2026-07-05', nextDateISO: '2026-10-05', active: true, deleted: false, createdAt, revision: 3, updatedAt: createdAt };
 const occurrence = (dateISO: string): domain.Entry => ({ id: domain.recurringEntryId(streaming.id, dateISO), accountId: 'a', kind: 'expense', amountMinor: 899900,
   merchant: 'Netflix', category: 'Suscripciones', dateISO, createdAt: dateISO + 'T12:00:00.000Z' });
 const historyOf = (root: Node) => {
@@ -1213,4 +1219,81 @@ test('24UX2 review: the history names each row\'s own account when the rule move
   // One occurrence corrected onto Efectivo ARS: every row names its own account.
   const corrected = dates.map(occurrence).map(entry => entry.dateISO === '2026-08-05' ? { ...entry, accountId: 'a2' } : entry);
   assert.equal(owned(rowsOf(streaming, corrected)), '2026-09-05@a+name,2026-08-05@a2+name,2026-07-05@a+name');
+});
+
+// ---- Producto 24UX4: pause, resume and delete from a rule's detail --------------------------------------------
+const settleAsync = async () => { await new Promise(resolve => setImmediate(resolve)); };
+
+test('24UX4: a rule\'s detail ends with Pausar recurrente and a red Eliminar recurrente; pausing saves the stored rule, not the draft, then closes', async () => {
+  const data: domain.LedgerArchive = { ...archive, recurring: [streaming] };
+  const view = harness('src/ui/recurring-form.tsx', { original: streaming }, { data });
+  const root = view.render();
+  const labels = nodes(root).filter(node => node.type === 'ActionButton').map(node => node.props.label).join(',');
+  assert.equal(labels, 'Guardar cambios,Pausar recurrente,Eliminar recurrente');
+  assert.equal(find(root, 'ActionButton', 'Eliminar recurrente').props.tone, 'expense');
+  // An edited, unsaved draft is not what Pausar writes.
+  find(root, 'Field', 'Comercio o concepto').props.onChangeText?.('Otro nombre');
+  await find(view.render(), 'ActionButton', 'Pausar recurrente').props.onPress();
+  await settleAsync();
+  assert.equal(view.rules.length, 1);
+  assert.equal(JSON.stringify({ ...view.rules[0], updatedAt: '' }), JSON.stringify({ ...streaming, active: false, revision: 4, updatedAt: '' }));
+  assert.equal(view.backs(), 1, 'the detail closes after a durable save');
+  // Paused: the detail says what pausing means and offers Reanudar.
+  const paused = { ...streaming, active: false, revision: 4 };
+  const pausedRoot = harness('src/ui/recurring-form.tsx', { original: paused }, { data: { ...archive, recurring: [paused] } }).render();
+  assert.ok(nodes(pausedRoot).some(node => node.type === 'AppText' && String(node.props.children).startsWith('Pausado: no registra nada')));
+  find(pausedRoot, 'ActionButton', 'Reanudar recurrente');
+});
+
+test('24UX4: Eliminar recurrente asks first, names the recorded movements, and on confirmation writes the deletion record and closes', async () => {
+  const data: domain.LedgerArchive = { ...archive, recurring: [streaming], records: [...archive.records, domain.initialRecord(occurrence('2026-09-05'))] };
+  const view = harness('src/ui/recurring-form.tsx', { original: streaming }, { data });
+  find(view.render(), 'ActionButton', 'Eliminar recurrente').props.onPress();
+  assert.equal(view.rules.length, 0);
+  const alert = view.alerts[0];
+  assert.equal(alert.title, '¿Eliminar «Netflix»?');
+  assert.equal(alert.message, 'Deja de registrarse. El movimiento que ya registró sigue en Movimientos.');
+  await alert.buttons[1].onPress();
+  await settleAsync();
+  assert.equal(JSON.stringify({ ...view.rules[0], updatedAt: '' }), JSON.stringify({ ...streaming, active: false, deleted: true, revision: 4, updatedAt: '' }));
+  assert.equal(view.backs(), 1);
+  // While the screen closes on a rule just deleted, the form stays drawn without its actions (no «not found» flash).
+  const closing = harness('app/edit-recurring/[id].tsx', {}, { data, params: { id: 'netflix' } });
+  assert.equal(closing.render().type, 'RecurringForm', 'opened on the live rule');
+  closing.setData({ ...data, recurring: [view.rules[0]] });
+  const kept = closing.render();
+  assert.equal(nodes(kept).some(node => node.type === 'EmptyState'), false);
+  assert.equal(kept.type, 'RecurringForm');
+  // A deep link to a deleted rule finds nothing; the movement it recorded is a plain movement.
+  const deletedData = { ...data, recurring: [view.rules[0]] };
+  assert.equal(find(harness('app/edit-recurring/[id].tsx', {}, { data: deletedData, params: { id: 'netflix' } }).render(), 'EmptyState').props.title, 'No encontramos este recurrente');
+  const movement = harness('app/entry/[id].tsx', {}, { data: deletedData, params: { id: occurrence('2026-09-05').id } }).render();
+  assert.equal(nodes(movement).some(node => node.type === 'DetailRow' && node.props.label === 'Recurrente'), false);
+});
+
+test('24UX4 review: a rule detail opened before the ledger hydrates shows the form once it loads, and after its own deletion keeps it locked until it closes; a link to a deleted rule is not found', async () => {
+  const data: domain.LedgerArchive = { ...archive, recurring: [streaming] };
+  const deleted = domain.deleteRecurringRule(streaming, '2026-09-25T12:00:00.000Z');
+  const view = harness('app/edit-recurring/[id].tsx', {}, { data: null, params: { id: 'netflix' } });
+  assert.equal(find(view.render(), 'EmptyState').props.title, 'No encontramos este recurrente', 'nothing to show before the ledger loads');
+  view.setData(data);
+  assert.equal(view.render().type, 'RecurringForm', 'the rule appears when the ledger arrives');
+  view.setData({ ...data, recurring: [deleted] });
+  const closing = view.render();
+  assert.equal(closing.type, 'RecurringForm', 'deleted from this screen: no «not found» flash while it closes');
+  assert.equal(closing.props.original.deleted, true);
+  // A cold link straight to the deleted rule, before and after hydration, is not found.
+  const cold = harness('app/edit-recurring/[id].tsx', {}, { data: null, params: { id: 'netflix' } });
+  cold.render();
+  cold.setData({ ...data, recurring: [deleted] });
+  assert.equal(find(cold.render(), 'EmptyState').props.title, 'No encontramos este recurrente');
+  // The form of a deleted rule cannot be saved, paused, resumed or deleted again.
+  const form = harness('src/ui/recurring-form.tsx', { original: deleted }, { data: { ...data, recurring: [deleted] } });
+  const root = form.render();
+  assert.equal(nodes(root).filter(node => node.type === 'ActionButton').map(node => node.props.label).join(','), 'Guardar cambios');
+  const save = find(root, 'ActionButton', 'Guardar cambios');
+  assert.equal(save.props.disabled, true);
+  await save.props.onPress();
+  assert.equal(form.rules.length, 0, 'nothing is written');
+  assert.equal(find(root, 'Field', 'Comercio o concepto').props.editable, false);
 });

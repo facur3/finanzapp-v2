@@ -75,9 +75,10 @@ function EntryDetail({ record, account }: { record: EntryRecord; account: Accoun
       if (row) budget = { ratio: row.ratio, remainingMinor: row.remainingMinor, exceeded: row.exceeded };
     } catch { budget = null; }
   }
-  // A movement a recurring rule recorded links back to its rule (24UX2); a rule deleted since leaves a plain movement.
+  // A movement a recurring rule recorded links back to its rule (24UX2); a rule deleted since (24UX4: its deletion
+  // record stays in storage) leaves a plain movement, unchanged.
   const occurrence = recurringOccurrenceOf(entry.id);
-  const rule = occurrence ? archive?.recurring?.find(item => item.id === occurrence.ruleId) : undefined;
+  const rule = occurrence ? archive?.recurring?.find(item => item.id === occurrence.ruleId && !item.deleted) : undefined;
   const status = t(record.voided ? 'entryDetail.statusVoided' : record.revision > 0 ? 'entryDetail.statusCorrected' : 'entryDetail.statusRecorded');
   // The budget row on screen (the region's separators) and for VoiceOver (the amount in the language's words).
   const budgetLine = (row: NonNullable<typeof budget>, money: (minor: number) => string) => row.exceeded ? t('entryDetail.budgetExceeded', { amount: money(-row.remainingMinor) })

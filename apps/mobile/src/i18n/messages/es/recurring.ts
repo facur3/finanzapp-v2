@@ -28,8 +28,7 @@ export const recurring = {
       outOfRange: 'Total fuera de rango',
       active: 'Activos',
       paused: 'Pausados',
-      pausedCaption: 'No se registran hasta que los reactives',
-      toggleFailed: 'No pudimos cambiar el estado del recurrente. Probá nuevamente.',
+      pausedCaption: 'No se registran hasta que los reanudes',
     },
     row: {
       /** VoiceOver label of a rule: merchant (user data), frequency, amount, currency code and next date (inside the sentence: "próximo hoy"). */
@@ -37,8 +36,27 @@ export const recurring = {
       /** 24UX2: a paused rule never announces a next date. */
       labelPaused: 'Editar recurrente {merchant}, {frequency}, {category}, {amount} {currency}, pausado',
       paused: 'Pausado',
-      pause: 'Pausar {merchant}',
-      activate: 'Activar {merchant}',
+    },
+    /** 24UX4: the trailing swipe actions of a rule (short) and the same actions in its detail (named). */
+    manage: {
+      pause: 'Pausar',
+      resume: 'Reanudar',
+      delete: 'Eliminar',
+      pauseRule: 'Pausar recurrente',
+      resumeRule: 'Reanudar recurrente',
+      deleteRule: 'Eliminar recurrente',
+      /** Over the detail's actions of a paused rule. */
+      pausedNote: 'Pausado: no registra nada hasta que lo reanudes. Lo que venza mientras tanto no se registra.',
+      /** The confirmation. `{merchant}` is the person's own text. */
+      deleteTitle: '¿Eliminar «{merchant}»?',
+      deleteDetail: {
+        one: 'Deja de registrarse. El movimiento que ya registró sigue en Movimientos.',
+        other: 'Deja de registrarse. Los {count} movimientos que ya registró siguen en Movimientos.',
+      },
+      deleteDetailEmpty: 'Deja de registrarse. No borra ningún movimiento.',
+      deleteConfirm: 'Eliminar',
+      failed: 'No pudimos cambiar el recurrente. Sigue como estaba; probá nuevamente.',
+      deleteFailed: 'No pudimos eliminar el recurrente. Sigue como estaba; probá nuevamente.',
     },
     form: {
       noAccountTitle: 'Primero, una cuenta',

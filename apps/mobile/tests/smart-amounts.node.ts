@@ -29,7 +29,7 @@ const receivableAccount: domain.Account = { id: 'rec-acc', name: 'Me debe · Ana
 const card: domain.CreditCardProfile = { id: 'card', accountId: cardAccount.id, issuer: 'Banco', last4: '1234', creditLimitMinor: null,
   closingDay: 28, dueDay: 5, active: true, createdAt, revision: 0, updatedAt: createdAt };
 const debt: domain.PersonalDebtProfile = { id: 'debt', accountId: debtAccount.id, direction: 'owed_by_me', counterparty: 'Juan', dueDateISO: null,
-  note: '', active: true, createdAt, revision: 0, updatedAt: createdAt };
+  note: '', active: true, deleted: false, createdAt, revision: 0, updatedAt: createdAt };
 const receivable: domain.PersonalDebtProfile = { ...debt, id: 'receivable', accountId: receivableAccount.id, direction: 'owed_to_me', counterparty: 'Ana' };
 const archive: domain.LedgerArchive = { accounts: [ars, other, usd, empty, overdrawn, cardAccount, debtAccount, receivableAccount],
   records: [domain.initialRecord(expense)], cards: [card], debts: [debt, receivable] };
@@ -236,4 +236,23 @@ test('a failed save keeps the same submission for retry and the shortcut cannot 
   assert.equal(view.transfers.length, 2, 'both attempts carried the same record');
   assert.equal(view.transfers[0].id, view.transfers[1].id, 'one operation ID, so storage can dedupe');
   assert.equal(view.transfers[1].amountMinor, 19016200);
+});
+
+test('24UX4: Saldar from a debt row opens the payment with the whole balance already typed; editing it is a new amount; a card is never prefilled', async () => {
+  const view = harness({ toAccountId: 'debt-acc', maxAmountMinor: '7000', amountMinor: '7000' });
+  let root = view.render();
+  assert.equal(amount(root).value, '70,00', 'the outstanding 70,00 is in the field');
+  assert.equal(view.transfers.length, 0, 'nothing is recorded until the person confirms');
+  await find(root, 'ActionButton', 'Registrar pago').props.onPress();
+  assert.deepEqual([view.transfers[0].toAccountId, view.transfers[0].amountMinor], ['debt-acc', 7000]);
+  // The person may pay less: the typed text wins over the prefill.
+  const partial = harness({ toAccountId: 'debt-acc', maxAmountMinor: '7000', amountMinor: '7000' });
+  amount(partial.render()).onChangeText('25');
+  await find(partial.render(), 'ActionButton', 'Registrar pago').props.onPress();
+  assert.equal(partial.transfers[0].amountMinor, 2500);
+  // A collection is prefilled the same way; a card payment or a malformed request starts empty.
+  assert.equal(amount(harness({ fromAccountId: 'rec-acc', maxAmountMinor: '4000', amountMinor: '4000' }).render()).value, '40,00');
+  assert.equal(amount(harness({ toAccountId: 'card-acc', maxAmountMinor: '5000', amountMinor: '5000' }).render()).value, '');
+  assert.equal(amount(harness({ toAccountId: 'debt-acc', amountMinor: '70.5' }).render()).value, '');
+  assert.equal(amount(harness({ toAccountId: 'debt-acc', amountMinor: '0' }).render()).value, '');
 });

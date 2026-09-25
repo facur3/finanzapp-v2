@@ -30,17 +30,17 @@ export interface LedgerDatabase extends SqlExecutor {
 }
 
 export const DATABASE_NAME = 'finanzapp-native-pilot-v1.sqlite';
-export const DATABASE_VERSION = 9;
+export const DATABASE_VERSION = 10;
 
 /** Every column of each table, named: a row is read by these lists, never by `SELECT *`, so a
  * column added later cannot leak into a strict-key object, a backup or an audit receipt. */
 const ACCOUNT_COLUMNS = 'id, name, currency, openingMinor, createdAt, revision, updatedAt';
 const ENTRY_COLUMNS = 'id, accountId, kind, amountMinor, merchant, category, dateISO, createdAt, revision, voided, updatedAt';
 const TRANSFER_COLUMNS = 'id, fromAccountId, toAccountId, amountMinor, note, dateISO, createdAt, revision, voided, updatedAt';
-const RECURRING_COLUMNS = 'id, accountId, kind, amountMinor, merchant, category, frequency, anchorDateISO, nextDateISO, active, createdAt, revision, updatedAt';
+const RECURRING_COLUMNS = 'id, accountId, kind, amountMinor, merchant, category, frequency, anchorDateISO, nextDateISO, active, deleted, createdAt, revision, updatedAt';
 const BUDGET_COLUMNS = 'id, scope, category, currency, monthISO, amountMinor, active, createdAt, revision, updatedAt';
 const CARD_COLUMNS = 'id, accountId, issuer, last4, creditLimitMinor, closingDay, dueDay, active, createdAt, revision, updatedAt';
-const DEBT_COLUMNS = 'id, accountId, direction, counterparty, dueDateISO, note, active, createdAt, revision, updatedAt';
+const DEBT_COLUMNS = 'id, accountId, direction, counterparty, dueDateISO, note, active, deleted, createdAt, revision, updatedAt';
 const APPEARANCE_COLUMNS = 'accountId, icon, color, createdAt, revision, updatedAt';
 const CATEGORY_COLUMNS = 'kind, key, storedLabel, label, icon, color, archived, createdAt, revision, updatedAt';
 const UNIT_COLUMNS = 'currency, minorUnitExponent, source, catalogVersion, createdAt';
@@ -297,8 +297,18 @@ const MIGRATE_V9 = `
   PRAGMA user_version = 9;
 `;
 
+// Producto 24UX4: deletion records for recurring rules and debt trackers. Additive: one column per table,
+// 0 for every existing row, and a deleted row is never active. The row is kept (never DELETEd), so the
+// movements and transfers it produced keep their meaning and an older backup cannot resurrect it. Guarded by
+// user_version, in the ordinary exclusive transaction; earlier builds refuse a schema 10 file, unchanged.
+const MIGRATE_V10 = `
+  ALTER TABLE recurring_rules ADD COLUMN deleted INTEGER NOT NULL DEFAULT 0 CHECK(deleted IN (0, 1) AND (deleted = 0 OR active = 0));
+  ALTER TABLE personal_debts ADD COLUMN deleted INTEGER NOT NULL DEFAULT 0 CHECK(deleted IN (0, 1) AND (deleted = 0 OR active = 0));
+  PRAGMA user_version = 10;
+`;
+
 /** Every schema script in order, for tests that build a real file at an earlier version (never run by the app outside `initializeDatabase`). */
-export const SCHEMA_SCRIPTS: readonly string[] = [SCHEMA, MIGRATE_V2, MIGRATE_V3, MIGRATE_V4, MIGRATE_V5, MIGRATE_V6, MIGRATE_V7, MIGRATE_V8, MIGRATE_V9];
+export const SCHEMA_SCRIPTS: readonly string[] = [SCHEMA, MIGRATE_V2, MIGRATE_V3, MIGRATE_V4, MIGRATE_V5, MIGRATE_V6, MIGRATE_V7, MIGRATE_V8, MIGRATE_V9, MIGRATE_V10];
 
 export async function initializeDatabase(db: LedgerDatabase): Promise<void> {
   // Set before opening a transaction; foreign_keys is connection-local.
@@ -323,6 +333,9 @@ export async function initializeDatabase(db: LedgerDatabase): Promise<void> {
   // is still a complete schema 8 file.
   await db.withMigrationTransactionAsync(async tx => {
     if (await readVersion(tx) < 9) await tx.execAsync(MIGRATE_V9);
+  });
+  await db.withExclusiveTransactionAsync(async tx => {
+    if (await readVersion(tx) < 10) await tx.execAsync(MIGRATE_V10);
   });
   await readSnapshot(db); // Validate before showing a balance, not after a render.
 }
@@ -356,11 +369,12 @@ export async function readArchive(db: SqlExecutor): Promise<LedgerArchive> {
     if (voided !== 0 && voided !== 1) throw new Error('Estado de transferencia inválido.');
     return { transfer, revision, voided: voided === 1, updatedAt };
   });
-  const recurringRows = await db.getAllAsync<Omit<RecurringRule, 'active'> & { active: number }>(
+  const recurringRows = await db.getAllAsync<Omit<RecurringRule, 'active' | 'deleted'> & { active: number; deleted: number }>(
     `SELECT ${RECURRING_COLUMNS} FROM recurring_rules ORDER BY active DESC, nextDateISO, createdAt, id`);
-  const recurring = recurringRows.map(({ active, ...row }) => {
+  const recurring = recurringRows.map(({ active, deleted, ...row }) => {
     if (active !== 0 && active !== 1) throw new Error('Estado de recurrente inválido.');
-    const rule = { ...row, active: active === 1 };
+    if (deleted !== 0 && deleted !== 1) throw new Error('Estado de recurrente inválido.');
+    const rule = { ...row, active: active === 1, deleted: deleted === 1 };
     validateRecurringRule(rule, accounts);
     return rule;
   });
@@ -383,11 +397,12 @@ export async function readArchive(db: SqlExecutor): Promise<LedgerArchive> {
     validateCreditCardProfile(card, accounts);
     return card;
   });
-  const debtRows = await db.getAllAsync<Omit<PersonalDebtProfile, 'active'> & { active: number }>(
+  const debtRows = await db.getAllAsync<Omit<PersonalDebtProfile, 'active' | 'deleted'> & { active: number; deleted: number }>(
     `SELECT ${DEBT_COLUMNS} FROM personal_debts ORDER BY active DESC, dueDateISO, createdAt, id`);
-  const debts = debtRows.map(({ active, ...row }) => {
+  const debts = debtRows.map(({ active, deleted, ...row }) => {
     if (active !== 0 && active !== 1) throw new Error('Estado de deuda inválido.');
-    const debt = { ...row, active: active === 1 };
+    if (deleted !== 0 && deleted !== 1) throw new Error('Estado de deuda inválido.');
+    const debt = { ...row, active: active === 1, deleted: deleted === 1 };
     validatePersonalDebtProfile(debt, accounts);
     return debt;
   });
@@ -717,9 +732,9 @@ export async function changeTransfer(db: LedgerDatabase, change: TransferChange)
 
 async function insertRecurringRule(tx: SqlExecutor, rule: RecurringRule): Promise<void> {
   await tx.runAsync(`INSERT INTO recurring_rules (id, accountId, kind, amountMinor, merchant, category, frequency,
-    anchorDateISO, nextDateISO, active, createdAt, revision, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    anchorDateISO, nextDateISO, active, deleted, createdAt, revision, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   rule.id, rule.accountId, rule.kind, rule.amountMinor, rule.merchant, rule.category, rule.frequency,
-  rule.anchorDateISO, rule.nextDateISO, rule.active ? 1 : 0, rule.createdAt, rule.revision, rule.updatedAt);
+  rule.anchorDateISO, rule.nextDateISO, rule.active ? 1 : 0, rule.deleted ? 1 : 0, rule.createdAt, rule.revision, rule.updatedAt);
 }
 
 export async function saveRecurringRule(db: LedgerDatabase, input: RecurringRule): Promise<void> {
@@ -732,7 +747,7 @@ export async function saveRecurringRule(db: LedgerDatabase, input: RecurringRule
     // 24B6: a recurring income posts to cash; a rule already paying an income into a card keeps doing so until it is moved or paused.
     if (rule.kind === 'income' && !(existing && keepsHistoricalCardIncome(existing, rule))) assertIncomeAccount(rule.accountId, archive.cards, archive.debts);
     if (!existing) {
-      if (rule.revision !== 0 || rule.updatedAt !== rule.createdAt) throw new Error('Un recurrente nuevo no puede tener cambios previos.');
+      if (rule.revision !== 0 || rule.updatedAt !== rule.createdAt || rule.deleted) throw new Error('Un recurrente nuevo no puede tener cambios previos.');
       validateArchive({ ...archive, recurring: [...archive.recurring ?? [], rule] });
       await insertRecurringRule(tx, rule);
       return;
@@ -740,10 +755,11 @@ export async function saveRecurringRule(db: LedgerDatabase, input: RecurringRule
     if (sameRecurringRule(existing, rule)) return;
     validateRecurringRuleChange(existing, rule, archive.accounts);
     validateArchive({ ...archive, recurring: archive.recurring!.map(item => item.id === rule.id ? rule : item) });
+    // A deletion is this same UPDATE with deleted = 1: the row stays, and no entry it recorded is touched.
     await tx.runAsync(`UPDATE recurring_rules SET accountId = ?, kind = ?, amountMinor = ?, merchant = ?, category = ?,
-      frequency = ?, anchorDateISO = ?, nextDateISO = ?, active = ?, revision = ?, updatedAt = ? WHERE id = ?`,
+      frequency = ?, anchorDateISO = ?, nextDateISO = ?, active = ?, deleted = ?, revision = ?, updatedAt = ? WHERE id = ?`,
     rule.accountId, rule.kind, rule.amountMinor, rule.merchant, rule.category, rule.frequency, rule.anchorDateISO,
-    rule.nextDateISO, rule.active ? 1 : 0, rule.revision, rule.updatedAt, rule.id);
+    rule.nextDateISO, rule.active ? 1 : 0, rule.deleted ? 1 : 0, rule.revision, rule.updatedAt, rule.id);
   });
 }
 
@@ -838,9 +854,9 @@ async function insertCreditCard(tx: SqlExecutor, card: CreditCardProfile): Promi
 }
 async function insertPersonalDebt(tx: SqlExecutor, debt: PersonalDebtProfile): Promise<void> {
   await tx.runAsync(`INSERT INTO personal_debts (id, accountId, direction, counterparty, dueDateISO, note,
-    active, createdAt, revision, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    active, deleted, createdAt, revision, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   debt.id, debt.accountId, debt.direction, debt.counterparty, debt.dueDateISO, debt.note,
-  debt.active ? 1 : 0, debt.createdAt, debt.revision, debt.updatedAt);
+  debt.active ? 1 : 0, debt.deleted ? 1 : 0, debt.createdAt, debt.revision, debt.updatedAt);
 }
 async function insertInternalAccount(tx: SqlExecutor, account: Account): Promise<void> {
   await tx.runAsync(
@@ -906,7 +922,7 @@ export async function createPersonalDebt(db: LedgerDatabase, accountInput: Accou
     throw new Error('El saldo inicial de la deuda no coincide con su dirección.');
   }
   if (debt.accountId !== account.id) throw new Error('La deuda no coincide con su cuenta interna.');
-  if (debt.revision !== 0 || debt.updatedAt !== debt.createdAt || !debt.active) throw new Error('Una deuda nueva no puede tener cambios previos.');
+  if (debt.revision !== 0 || debt.updatedAt !== debt.createdAt || !debt.active || debt.deleted) throw new Error('Una deuda nueva no puede tener cambios previos.');
   await db.withExclusiveTransactionAsync(async tx => {
     const archive = await readArchive(tx);
     validatePersonalDebtProfile(debt, [...archive.accounts, account]);
@@ -933,8 +949,9 @@ export async function savePersonalDebt(db: LedgerDatabase, input: PersonalDebtPr
     if (samePersonalDebtProfile(existing, debt)) return;
     validatePersonalDebtChange(existing, debt);
     validateArchive({ ...archive, debts: archive.debts!.map(item => item.id === debt.id ? debt : item) });
-    await tx.runAsync(`UPDATE personal_debts SET counterparty = ?, dueDateISO = ?, note = ?, active = ?,
+    // Closing, reopening and deleting are this same UPDATE: the hidden account and its transfers are never touched.
+    await tx.runAsync(`UPDATE personal_debts SET counterparty = ?, dueDateISO = ?, note = ?, active = ?, deleted = ?,
       revision = ?, updatedAt = ? WHERE id = ?`, debt.counterparty, debt.dueDateISO, debt.note,
-    debt.active ? 1 : 0, debt.revision, debt.updatedAt, debt.id);
+    debt.active ? 1 : 0, debt.deleted ? 1 : 0, debt.revision, debt.updatedAt, debt.id);
   });
 }

@@ -8,7 +8,7 @@ export default function EditDebtScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { archive } = useLedger();
   const { t } = useI18n();
-  const debt = archive?.debts?.find(item => item.id === id);
+  const debt = archive?.debts?.find(item => item.id === id && !item.deleted);
   if (!debt) return <Screen><EmptyState title={t('debts.detail.notFoundTitle')}
     detail={t('debts.detail.notFoundDetail')} icon="people-outline" /></Screen>;
   return <DebtForm key={id} original={debt} />;

@@ -40,9 +40,11 @@ export interface EntryChange {
   after: EntryRecord;
 }
 export const BACKUP_MAX_BYTES = 5 * 1024 * 1024;
-/** The newest backup format this build writes and reads: v9 = v8 plus `currencyUnits`. */
+/** The newest backup format this build writes and reads: v9 = v8 plus `currencyUnits`; v10 = v9 plus the
+ * `deleted` flag of every recurring rule and debt (Producto 24UX4). */
 export const BACKUP_SCHEMA_V8 = 'finanzapp.native-pilot.v8';
 export const BACKUP_SCHEMA_V9 = 'finanzapp.native-pilot.v9';
+export const BACKUP_SCHEMA_V10 = 'finanzapp.native-pilot.v10';
 export const MAX_BACKUP_CURRENCY_UNITS = 200;
 /** Backups v1–v8 record one money unit and no scale per currency: they can only ever name
  * ARS and USD cents, whatever the creation gate offers when the file is read. A file naming
@@ -54,8 +56,10 @@ function assertLegacyCurrencies(archive: Pick<LedgerArchive, 'accounts' | 'budge
 }
 const ACCOUNT_KEYS = ['id', 'name', 'currency', 'openingMinor', 'createdAt'] as const;
 const ENTRY_KEYS = ['id', 'accountId', 'kind', 'amountMinor', 'merchant', 'category', 'dateISO', 'createdAt'] as const;
-const RECURRING_KEYS = ['id', 'accountId', 'kind', 'amountMinor', 'merchant', 'category', 'frequency',
+// v4–v9 rules and v6–v9 debts carry no `deleted` key: every one of them is live (deleted: false).
+const LEGACY_RECURRING_KEYS = ['id', 'accountId', 'kind', 'amountMinor', 'merchant', 'category', 'frequency',
   'anchorDateISO', 'nextDateISO', 'active', 'createdAt', 'revision', 'updatedAt'] as const;
+const RECURRING_KEYS = [...LEGACY_RECURRING_KEYS, 'deleted'] as const;
 // v5/v6 budgets had no scope: every one of them is a category budget. v7 adds
 // `scope`; a total budget carries no `category` key at all.
 const LEGACY_BUDGET_KEYS = ['id', 'category', 'currency', 'monthISO', 'amountMinor', 'active',
@@ -64,8 +68,9 @@ const BUDGET_BASE_KEYS = ['id', 'scope', 'currency', 'monthISO', 'amountMinor', 
   'createdAt', 'revision', 'updatedAt'] as const;
 const CARD_KEYS = ['id', 'accountId', 'issuer', 'last4', 'creditLimitMinor', 'closingDay', 'dueDay',
   'active', 'createdAt', 'revision', 'updatedAt'] as const;
-const DEBT_KEYS = ['id', 'accountId', 'direction', 'counterparty', 'dueDateISO', 'note',
+const LEGACY_DEBT_KEYS = ['id', 'accountId', 'direction', 'counterparty', 'dueDateISO', 'note',
   'active', 'createdAt', 'revision', 'updatedAt'] as const;
+const DEBT_KEYS = [...LEGACY_DEBT_KEYS, 'deleted'] as const;
 
 function object(value: unknown, keys: readonly string[]): Record<string, unknown> {
   if (!value || typeof value !== 'object' || Array.isArray(value)
@@ -89,9 +94,9 @@ function entryValue(value: unknown, accounts: Account[]): Entry {
   validateEntry(item, accounts);
   return Object.fromEntries(ENTRY_KEYS.map(key => [key, item[key]])) as unknown as Entry;
 }
-function recurringValue(value: unknown, accounts: Account[]): RecurringRule {
-  const row = object(value, RECURRING_KEYS);
-  const rule = Object.fromEntries(RECURRING_KEYS.map(key => [key, row[key]])) as unknown as RecurringRule;
+function recurringValue(value: unknown, accounts: Account[], legacy = false): RecurringRule {
+  const row = object(value, legacy ? LEGACY_RECURRING_KEYS : RECURRING_KEYS);
+  const rule = Object.fromEntries(RECURRING_KEYS.map(key => [key, key === 'deleted' && legacy ? false : row[key]])) as unknown as RecurringRule;
   validateRecurringRule(rule, accounts);
   return rule;
 }
@@ -115,9 +120,9 @@ function cardValue(value: unknown, accounts: Account[]): CreditCardProfile {
   validateCreditCardProfile(card, accounts);
   return card;
 }
-function debtValue(value: unknown, accounts: Account[]): PersonalDebtProfile {
-  const row = object(value, DEBT_KEYS);
-  const debt = Object.fromEntries(DEBT_KEYS.map(key => [key, row[key]])) as unknown as PersonalDebtProfile;
+function debtValue(value: unknown, accounts: Account[], legacy = false): PersonalDebtProfile {
+  const row = object(value, legacy ? LEGACY_DEBT_KEYS : DEBT_KEYS);
+  const debt = Object.fromEntries(DEBT_KEYS.map(key => [key, key === 'deleted' && legacy ? false : row[key]])) as unknown as PersonalDebtProfile;
   validatePersonalDebtProfile(debt, accounts);
   return debt;
 }
@@ -269,25 +274,36 @@ export function validateEntryChange(change: EntryChange, accounts: Account[]): v
 /** The backup this build writes: v8, byte for byte as before, while every row is in ARS or USD
  * (v8 has no scale, and those two are cents); v9 as soon as another currency is used, with
  * `currencyUnits` naming the pinned scale of each such currency (the archive's own units when it
- * knows them, the catalogue's otherwise: they are equal, `validateArchive` proved it). */
+ * knows them, the catalogue's otherwise: they are equal, `validateArchive` proved it); v10 (24UX4)
+ * as soon as a recurring rule or a debt is deleted, so its deletion record travels with the copy
+ * and an import never brings it back. v10 always has `currencyUnits` (empty when only ARS/USD). */
 export interface RecoveryBackup {
   app: string; schema: string; exportedAt: string; moneyUnit: string;
   accounts: Account[]; records: EntryRecord[]; transfers: TransferRecord[]; recurring: RecurringRule[]; budgets: MonthlyBudget[];
   cards: CreditCardProfile[]; debts: PersonalDebtProfile[]; appearances: AccountAppearance[]; categories: CategoryDefinition[];
-  /** v9 only: the pinned scale of every currency the rows use beyond ARS/USD. A v8 file has no such key. */
+  /** v9 and v10: the pinned scale of every currency the rows use beyond ARS/USD. A v8 file has no such key. */
   currencyUnits?: CurrencyUnit[];
+}
+function withoutDeleted<T extends { deleted: boolean }>(row: T): Omit<T, 'deleted'> {
+  const { deleted: _deleted, ...rest } = row;
+  return rest;
 }
 export function createRecoveryBackup(archive: LedgerArchive, now = new Date()): RecoveryBackup {
   validateArchive(archive);
   const needed = currenciesNeedingUnits(archive);
   const canonical = canonicalArchive(archive);
   const { currencyUnits: _units, ...rows } = canonical;
-  const base: RecoveryBackup = { app: 'FinanzApp', schema: needed.length ? BACKUP_SCHEMA_V9 : BACKUP_SCHEMA_V8, exportedAt: now.toISOString(),
+  const tombstones = (canonical.recurring ?? []).some(rule => rule.deleted) || (canonical.debts ?? []).some(debt => debt.deleted);
+  // Without a deletion record the file stays v8/v9 byte for byte: its rules and debts carry no `deleted` key.
+  const recurring = tombstones ? canonical.recurring ?? [] : (canonical.recurring ?? []).map(withoutDeleted) as RecurringRule[];
+  const debts = tombstones ? canonical.debts ?? [] : (canonical.debts ?? []).map(withoutDeleted) as PersonalDebtProfile[];
+  const schema = tombstones ? BACKUP_SCHEMA_V10 : needed.length ? BACKUP_SCHEMA_V9 : BACKUP_SCHEMA_V8;
+  const base: RecoveryBackup = { app: 'FinanzApp', schema, exportedAt: now.toISOString(),
     moneyUnit: 'integer-minor-units', ...rows, transfers: canonical.transfers ?? [],
-    recurring: canonical.recurring ?? [], budgets: canonical.budgets ?? [],
-    cards: canonical.cards ?? [], debts: canonical.debts ?? [],
+    recurring, budgets: canonical.budgets ?? [],
+    cards: canonical.cards ?? [], debts,
     appearances: canonical.appearances ?? [], categories: canonical.categories ?? [] };
-  if (!needed.length) return base;
+  if (!needed.length) return tombstones ? { ...base, currencyUnits: [] } : base;
   const known = new Map((canonical.currencyUnits ?? []).map(unit => [unit.currency, unit]));
   const currencyUnits = needed.map(code => known.get(code) ?? catalogueUnit(code));
   validateCurrencyUnits(currencyUnits, needed, true);
@@ -309,11 +325,13 @@ export function parsePilotBackup(raw: string): ParsedBackup {
   const v7 = header.schema === 'finanzapp.native-pilot.v7';
   const v8 = header.schema === BACKUP_SCHEMA_V8;
   const v9 = header.schema === BACKUP_SCHEMA_V9;
-  if (!v1 && !v2 && !v3 && !v4 && !v5 && !v6 && !v7 && !v8 && !v9) {
-    throw new Error('Solo se pueden restaurar copias del piloto nativo v1 a v9. La app web/anterior y otras versiones todavía no son compatibles; conservá el archivo.');
+  const v10 = header.schema === BACKUP_SCHEMA_V10;
+  if (!v1 && !v2 && !v3 && !v4 && !v5 && !v6 && !v7 && !v8 && !v9 && !v10) {
+    throw new Error('Solo se pueden restaurar copias del piloto nativo v1 a v10. La app web/anterior y otras versiones todavía no son compatibles; conservá el archivo.');
   }
-  const hasTransfers = v3 || v4 || v5 || v6 || v7 || v8 || v9, hasRecurring = v4 || v5 || v6 || v7 || v8 || v9, hasBudgets = v5 || v6 || v7 || v8 || v9;
-  const hasLiabilities = v6 || v7 || v8 || v9, hasScopedBudgets = v7 || v8 || v9, hasIdentity = v8 || v9, hasUnits = v9;
+  const hasTransfers = !v1 && !v2, hasRecurring = hasTransfers && !v3, hasBudgets = hasRecurring && !v4;
+  const hasLiabilities = hasBudgets && !v5, hasScopedBudgets = hasLiabilities && !v6, hasIdentity = v8 || v9 || v10, hasUnits = v9 || v10;
+  const hasDeletions = v10;
   object(value, ['app', 'schema', 'exportedAt', 'moneyUnit', 'accounts', v1 ? 'entries' : 'records',
     ...(hasTransfers ? ['transfers'] : []), ...(hasRecurring ? ['recurring'] : []),
     ...(hasBudgets ? ['budgets'] : []), ...(hasLiabilities ? ['cards', 'debts'] : []),
@@ -350,11 +368,11 @@ export function parsePilotBackup(raw: string): ParsedBackup {
     return { entry: entryValue(record.entry, accounts), revision: record.revision as number, voided: record.voided as boolean, updatedAt: record.updatedAt as string };
   });
   const transfers = hasTransfers ? (header.transfers as unknown[]).map(t => transferValue(t, accounts)) : [];
-  const recurring = hasRecurring ? (header.recurring as unknown[]).map(rule => recurringValue(rule, accounts)) : [];
+  const recurring = hasRecurring ? (header.recurring as unknown[]).map(rule => recurringValue(rule, accounts, !hasDeletions)) : [];
   // Only a v7+ file may carry scoped budgets; v5/v6 budgets are read as category budgets.
   const budgets = hasBudgets ? (header.budgets as unknown[]).map(budget => budgetValue(budget, !hasScopedBudgets)) : [];
   const cards = hasLiabilities ? (header.cards as unknown[]).map(card => cardValue(card, accounts)) : [];
-  const debts = hasLiabilities ? (header.debts as unknown[]).map(debt => debtValue(debt, accounts)) : [];
+  const debts = hasLiabilities ? (header.debts as unknown[]).map(debt => debtValue(debt, accounts, !hasDeletions)) : [];
   // v1–v7 files carry no identity: their accounts show the default look and their categories resolve to presets or history.
   const appearances = hasIdentity ? (header.appearances as unknown[]).map(item => appearanceValue(item, accounts)) : [];
   const categories = hasIdentity ? (header.categories as unknown[]).map(item => categoryValue(item)) : [];

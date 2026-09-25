@@ -106,7 +106,7 @@ describe('rename as display identity', () => {
     expect(summary.rows[0].spentMinor).toBe(1200);
     expect(resolveCategory('expense', summary.rows[0].budget.category, [renamed]).label).toBe('Alimentación');
     const rule: RecurringRule = { id: 'r', accountId: 'a', kind: 'expense', amountMinor: 100, merchant: 'Delivery', category: 'Comida', frequency: 'monthly',
-      anchorDateISO: '2026-10-01', nextDateISO: '2026-10-01', active: true, createdAt, revision: 0, updatedAt: createdAt };
+      anchorDateISO: '2026-10-01', nextDateISO: '2026-10-01', active: true, deleted: false, createdAt, revision: 0, updatedAt: createdAt };
     expect(() => validateRecurringRule(rule, [account])).not.toThrow();
     expect(resolveCategory(rule.kind, rule.category, [renamed]).label).toBe('Alimentación');
   });

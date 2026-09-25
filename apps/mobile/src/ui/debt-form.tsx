@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { Alert, Keyboard, View } from 'react-native';
+import { Keyboard, View } from 'react-native';
 import { router, Stack } from 'expo-router';
 import { randomUUID } from 'expo-crypto';
 import * as Haptics from 'expo-haptics';
@@ -17,7 +17,8 @@ type DueMode = 'none' | 'dated';
 type PendingCreate = { account: Account; debt: PersonalDebtProfile };
 
 /** Creates a debt or receivable with its hidden account (opening balance is
- * the principal) or edits its profile. Amounts change only through payments. */
+ * the principal) or edits its profile. Amounts change only through payments.
+ * Closing, reopening and deleting live on the debt's detail and its row (24UX4). */
 export function DebtForm({ original }: { original?: PersonalDebtProfile }) {
   const { snapshot, addDebt, saveDebt, gate = LEDGER_CURRENCIES } = useLedger();
   const { t } = useI18n();
@@ -34,10 +35,9 @@ export function DebtForm({ original }: { original?: PersonalDebtProfile }) {
   const [busy, setBusy] = useState(false);
   const [pendingCreate, setPendingCreate] = useState<PendingCreate | null>(null);
   const [pendingEdit, setPendingEdit] = useState<PersonalDebtProfile | null>(null);
-  const [pendingArchive, setPendingArchive] = useState<PersonalDebtProfile | null>(null);
   const [error, setError] = useState<string | null>(null);
   const saving = useRef(false);
-  const locked = busy || !!pendingCreate || !!pendingEdit || !!pendingArchive;
+  const locked = busy || !!pendingCreate || !!pendingEdit;
   const owed = (before?.direction ?? direction) === 'owed_by_me';
   const close = () => { if (!saving.current) { if (router.canGoBack()) router.back(); else router.replace('/debts'); } };
 
@@ -60,7 +60,7 @@ export function DebtForm({ original }: { original?: PersonalDebtProfile }) {
       if (before) {
         let submission = pendingEdit;
         if (!submission) {
-          const candidate: PersonalDebtProfile = { ...profileBase(), active: before.active, revision: before.revision, updatedAt: before.updatedAt };
+          const candidate: PersonalDebtProfile = { ...profileBase(), active: before.active, deleted: before.deleted, revision: before.revision, updatedAt: before.updatedAt };
           validatePersonalDebtProfile(candidate, snapshot.accounts);
           if (samePersonalDebtProfile(candidate, before)) { saving.current = false; close(); return; }
           submission = { ...candidate, revision: before.revision + 1, updatedAt: new Date().toISOString() };
@@ -73,7 +73,7 @@ export function DebtForm({ original }: { original?: PersonalDebtProfile }) {
         if (!submission) {
           const principal = minorFromLedgerDraft(amount, currency);
           if (principal <= 0) throw new Error('debts.form.amountPositive'); // A catalogue key, translated when shown (ErrorMessage).
-          const debt: PersonalDebtProfile = { ...profileBase(), active: true, revision: 0, updatedAt: identity.createdAt };
+          const debt: PersonalDebtProfile = { ...profileBase(), active: true, deleted: false, revision: 0, updatedAt: identity.createdAt };
           const newAccount: Account = {
             id: identity.accountId,
             // Stored name of the hidden account, not an interface label: it stays the same in every language.
@@ -94,29 +94,6 @@ export function DebtForm({ original }: { original?: PersonalDebtProfile }) {
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'debts.form.saveFailed');
     } finally { saving.current = false; setBusy(false); }
-  }
-
-  async function commitArchive(submission: PersonalDebtProfile) {
-    if (saving.current) return;
-    saving.current = true; setBusy(true); setError(null);
-    try {
-      setPendingArchive(submission);
-      await saveDebt(submission);
-      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-      saving.current = false; close();
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'debts.form.archiveFailed');
-    } finally { saving.current = false; setBusy(false); }
-  }
-  function archive() {
-    if (!before || busy || saving.current) return;
-    if (pendingArchive) { void commitArchive(pendingArchive); return; }
-    const submission = { ...before, active: !before.active, revision: before.revision + 1, updatedAt: new Date().toISOString() };
-    if (!before.active) { void commitArchive(submission); return; }
-    Alert.alert(t('debts.form.archiveTitle'), t('debts.form.archiveDetail'), [
-      { text: t('common.cancel'), style: 'cancel' },
-      { text: t('debts.form.archiveConfirm'), style: 'destructive', onPress: () => { void commitArchive(submission); } },
-    ]);
   }
 
   return <Screen>
@@ -158,7 +135,5 @@ export function DebtForm({ original }: { original?: PersonalDebtProfile }) {
     </AppText>}
     <ActionButton label={error && (pendingCreate || pendingEdit) ? t('common.retrySave') : before ? t('common.saveChanges') : t('debts.form.create')}
       onPress={save} busy={busy} disabled={(before ? !counterparty.trim() : !counterparty.trim() || !amount.trim()) || !draftFitsCurrency(amount, currency).ok} />
-    {before && <ActionButton label={t(pendingArchive && error ? 'debts.form.retry' : before.active ? 'debts.form.archive' : 'debts.form.reactivate')}
-      onPress={archive} secondary disabled={busy || !!pendingEdit} />}
   </Screen>;
 }

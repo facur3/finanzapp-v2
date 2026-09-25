@@ -30,12 +30,15 @@ function TransferDetail({ record, accounts }: { record: TransferRecord; accounts
   const toKind = accountKind(to.id, cards, debts), fromKind = accountKind(from.id, cards, debts);
   const kindId = toKind === 'card' ? 'cardPayment' : toKind === 'debt' ? 'debtPayment' : fromKind === 'debt' ? 'collection' : 'transfer';
   const kindTitle = tr(`transferDetail.${kindId}`);
+  // A deleted debt tracker (24UX4) keeps naming its side of the payment, but there is no screen to open.
   const linkFor = (account: Account) => {
     const card = cards.find(item => item.accountId === account.id);
     const debt = debts.find(item => item.accountId === account.id);
+    if (debt?.deleted) return null;
     return card ? { pathname: '/card/[id]' as const, params: { id: card.id } } : debt ? { pathname: '/debt/[id]' as const, params: { id: debt.id } }
       : { pathname: '/account/[id]' as const, params: { id: account.id } };
   };
+  const fromLink = linkFor(from), toLink = linkFor(to);
   const [busy, setBusy] = useState(false);
   const [pending, setPending] = useState<TransferChange | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -76,8 +79,8 @@ function TransferDetail({ record, accounts }: { record: TransferRecord; accounts
       <AppText accessibilityLiveRegion="polite" variant="caption" style={{ color: record.voided ? p.warning : p.secondary, fontWeight: '500', textAlign: 'center' }}>{status}</AppText>
     </View>
     <Surface grouped>
-      <DetailRow label={tr('transferForm.from')} value={nameOf(from)} icon="arrow-up-outline" leading={fromKind === 'cash' ? <AccountBadge accountId={from.id} size={28} /> : undefined} disabled={busy} onPress={() => router.push(linkFor(from))} />
-      <DetailRow label={tr('transferForm.to')} value={nameOf(to)} icon="arrow-down-outline" leading={toKind === 'cash' ? <AccountBadge accountId={to.id} size={28} /> : undefined} disabled={busy} onPress={() => router.push(linkFor(to))} last={!t.note} />
+      <DetailRow label={tr('transferForm.from')} value={nameOf(from)} icon="arrow-up-outline" leading={fromKind === 'cash' ? <AccountBadge accountId={from.id} size={28} /> : undefined} disabled={busy} onPress={fromLink ? () => router.push(fromLink) : undefined} />
+      <DetailRow label={tr('transferForm.to')} value={nameOf(to)} icon="arrow-down-outline" leading={toKind === 'cash' ? <AccountBadge accountId={to.id} size={28} /> : undefined} disabled={busy} onPress={toLink ? () => router.push(toLink) : undefined} last={!t.note} />
       {!!t.note && <DetailRow label={tr('transferDetail.note')} value={t.note} last />}
     </Surface>
     <ErrorMessage message={error} />

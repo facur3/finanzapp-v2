@@ -1,6 +1,6 @@
 # FinanzApp mobile: living roadmap
 
-Updated: 2026-09-25 (Producto 24UX3). Read [decision 001](decisions/001-native-mobile.md),
+Updated: 2026-09-25 (Producto 24UX4). Read [decision 001](decisions/001-native-mobile.md),
 [decision 002](decisions/002-spending-first.md),
 [decision 003](decisions/003-five-tabs-and-cards.md) and
 [decision 004](decisions/004-native-first-and-web-retirement.md). Decision 002 supersedes
@@ -74,7 +74,9 @@ history file keeps the evidence of when and why.
   synthetic fixtures live only in tests; the repository is public and carries no financial
   backups, screenshots with real data, tokens, signing keys or bank credentials.
 - **Durable local writes, drafts kept on failure, never a reset on error.** SQLite is the ledger
-  (schema 9, backups v9, older backups still import); a write is confirmed only after it landed;
+  (schema 10, backups v10 once a deletion record exists, older backups still import); a write is
+  confirmed only after it landed; deleting a recurring rule or a debt tracker keeps its row as a
+  deletion record and never touches the movements it produced (24UX4);
   edits are audited and undoable; future sync needs operation IDs, revisions, tombstones,
   conflict handling and RLS (nothing in Supabase provides offline sync by itself).
 - **Every AI-generated movement is a draft until the person confirms it explicitly.**
@@ -104,14 +106,14 @@ history file keeps the evidence of when and why.
 
 ## 1. Implemented (current state)
 
-What exists in code on `master` as of Producto 24UX2 (PR #56), plus Producto 24UX3 on its branch
+What exists in code on `master` as of Producto 24UX3 (PR #57), plus Producto 24UX4 on its branch
 (marked). Per area, without test inventories (those are in apps/mobile/README.md and the history
 file).
 
 - **Product shape.** Five native tabs with the Assistant in the centre and Más as the grouped
   hub (Finanzas / App y datos: Cuentas, Tarjetas, Presupuestos, Recurrentes, Deudas y cobros,
   Categorías, Idioma, Región, Apariencia, backup, the Assistant's data note); a Más footer that
-  names the build, the material in use and the delivery (Producto 24UX3 on its branch). Liquid Glass on
+  names the build, the material in use and the delivery (Producto 24UX4 on its branch). Liquid Glass on
   Inicio's movement pills, its Assistant entry and the Assistant composer only in a development build on iOS 26 with
   the API present and without Reduce Transparency; opaque material otherwise.
 - **Inicio.** One main number (gasto registrado of the month, or Disponible: cash in normal
@@ -132,18 +134,24 @@ file).
   Ingresa en as stacked selection rows; the date wheel in a compact bottom sheet on iOS (24B6;
   its entrance is corrected in 24UX1); edit, undo, contextual account correction and recovery;
   a draft kept when a save fails; historical card incomes still editable.
-- **Ledger and storage.** SQLite schema 9 with `currency_units`, durable writes, audited
+- **Ledger and storage.** SQLite schema 10 (24UX4 on its branch: a `deleted` flag on recurring rules
+  and debt profiles; schema 9 added `currency_units`), durable writes, audited
   edits, same-currency internal transfers, balance corrections, accounts with identity
   (display rename, archive-first), category identity (presets in code, definitions per kind,
   normalised key, schema 8), cards and debts as internal accounts with profiles (issuer, last
   four digits, limit, closing and due days; counterparty, direction, due date), card rules
-  (24B6). Backups v9 export and import; v1–v8 still import; a failed restore rolls back.
+  (24B6). Backups v8/v9 export as before; v10 (24UX4 on its branch) only once a rule or debt is
+  deleted, carrying its deletion record; v1–v10 import; a failed restore rolls back.
 - **Commitments.** Weekly/monthly/yearly recurring rules with next occurrence, pause, edit,
   per-occurrence identity (scheduled is not paid; retries cannot duplicate); debts and
   receivables with partial payments; card purchases and payments; closing and due dates from
   the user's days. 24UX2: a rule's detail lists the movements it recorded (read by their
   deterministic id, never the scheduled dates), a recorded movement links back to its rule, a paused
-  rule reads "Pausado" at full contrast. No instalment plans yet.
+  rule reads "Pausado" at full contrast. 24UX4 (on its branch): a rule pauses, resumes (never
+  recording what fell due while paused) or is deleted, and a debt is settled (the reviewed payment
+  form, prefilled), closed (listed under Cerradas), reopened or deleted, from a trailing swipe on
+  its row or from its detail; deleting asks first and leaves every recorded movement, payment and
+  collection in the ledger. No instalment plans yet.
 - **Merchant identity (24UX2).** `packages/domain/merchants.ts`: normalized merchant keys, a
   curated catalogue of 35 unambiguous brands matched only by exact alias, never a category; the
   typed name is never rewritten; bare common words (Apple, Steam, Adobe, Despegar) stay
@@ -204,6 +212,11 @@ it was checked in). Metro from the branch on the installed FinanzApp Dev build s
 item unless a section says a new native build is needed. The checklist sections are in
 [mobile-device-checklist.md](mobile-device-checklist.md).
 
+- **24UX4 — managing recurring rules and debts:** the trailing swipe (feel, threshold, one row
+  open at a time, the native back swipe untouched, scroll vs swipe), the action colours in both
+  themes, the confirmations, VoiceOver's Actions rotor on the rows, Dynamic Type on the action
+  labels, Reduce Motion, the detail buttons, Saldar's prefilled payment, Cerradas, and the schema 10
+  upgrade of FinanzApp Dev's data with a backup first (checklist, Producto 24UX4).
 - **24UX3 — Home hierarchy:** first-glance clarity, the compact header, the 48 pt number, the
   three pills and the Assistant entry (prominence, reach, not read as search), the three section
   shapes, the cobalt balance, Dynamic Type, VoiceOver and Reduce Motion, in both themes and both
@@ -388,7 +401,7 @@ the owner authorises it; no EAS build or store submission without the owner.
     category glyph is the production presentation.
   - **Pending:** the device QA of §2. Alternative B was approved by the owner and delivered in 24UX3.
 
-### Producto 24UX3 — Home hierarchy (this PR)
+### Producto 24UX3 — Home hierarchy (PR #57)
 
 - **Goal.** A calmer, clearer Home with one focal point, without new modules, navigation targets
   or product scope: the owner's brief asked for a quieter header, a number that breathes, the
@@ -427,6 +440,82 @@ the owner authorises it; no EAS build or store submission without the owner.
     `export:ios` (iOS bundle exported, 5 MB). No EAS build; the iPhone was not touched.
   - **Pending:** the device QA of §2 (checklist, Producto 24UX3). Whether the Assistant entry
     should open the composer focused is a later decision with the Assistant's own delivery (25A).
+  - **Merged** on 2026-09-25 (`d5bdcfd`).
+
+### Producto 24UX4 — managing recurring rules and debts (this PR)
+
+- **Goal.** Native-feeling management of commitments: pause, resume and delete a recurring rule;
+  settle, close, reopen and delete a debt tracker; from an iOS trailing swipe on the list row and
+  from the detail screen, with a confirmation before anything destructive, and without deleting,
+  voiding or rewriting a single recorded movement, payment or collection.
+- **Out of scope.** Undo of a deletion (the record is kept, so a later restore is possible, but no
+  screen offers it), instalments, cards, budgets, Home and Reportes layouts, Android, EAS builds.
+- **Decisions.**
+  - *Deletion is a record, not a `DELETE`.* `RecurringRule.deleted` and
+    `PersonalDebtProfile.deleted` (a deleted row is never active and never changes again). A debt's
+    profile must survive its deletion: it is what keeps its hidden account a debt, so its payments
+    keep their «Debo · Juan» side, stay out of Disponible and never turn into a plain account. A
+    rule's row survives so an older backup cannot resurrect it: the import sees a conflict, not a
+    new rule, and nothing catches up the dates it would have recorded. This is the tombstone the
+    future sync needs (rule 9).
+  - *Schema 10 is additive* (`ALTER TABLE … ADD COLUMN deleted … CHECK (deleted = 0 OR active =
+    0)` on both tables, in the ordinary exclusive transaction); like schema 9 it is one-way: earlier
+    builds refuse a schema 10 file, unchanged.
+  - *Backup v10 only when needed.* Without a deletion record the file stays v8/v9 byte for byte (the
+    goldens are unchanged); with one it is v10 (v9 plus `deleted` on every rule and debt, and
+    `currencyUnits` always present). v1–v9 files read every rule and debt as not deleted.
+  - *Closing a debt* is the former «Archivar» (`active = false`), renamed and made reachable: closed
+    debts are listed under Cerradas, where they reopen or are deleted. Closing a settled debt needs
+    no confirmation; closing one with a balance left asks, since it stops showing as pending
+    without a payment. *«Saldar»* (mark as paid) opens the reviewed payment or collection form
+    with the whole balance typed in; nothing is marked paid without a recorded transfer.
+  - *The row's pause switch is gone*: pause/resume is a swipe action and a detail button, so a row
+    carries one control surface; the detail's actions write the stored rule, not the draft above
+    them, then close the form.
+  - *Resuming* never records what fell due while paused: the next date moves along the rule's own
+    calendar to today or later (`resumeRecurringRule`, the rule the list already applied).
+- **Status.** Delivered on this branch (2026-09-25), not device-verified.
+  - Domain: `recurring.ts` (`deleted`, `pauseRecurringRule`, `resumeRecurringRule`,
+    `deleteRecurringRule`; a deleted rule refuses any change), `liabilities.ts` (`deleted`,
+    `closePersonalDebt`, `reopenPersonalDebt`, `deletePersonalDebt`; `assertTransferSides` refuses a
+    new payment into a deleted tracker, historical ones stay editable in place), `recovery.ts`
+    (`BACKUP_SCHEMA_V10`, legacy key sets for v4–v9).
+  - Storage: `MIGRATE_V10`, `DATABASE_VERSION = 10`, the `deleted` column read, inserted and updated
+    by the existing `saveRecurringRule` / `savePersonalDebt` (no new write path, no row ever removed).
+  - App: `src/ui/swipe-actions.tsx` (`SwipeRow` over Gesture Handler's `ReanimatedSwipeable`:
+    trailing only, 76 pt actions, no overshoot so a full swipe never acts, one open row at a time,
+    a tap closes the row first; `swipeAccessibility` gives the same actions to VoiceOver as custom
+    actions), `src/ui/commitment-actions.ts` (`useRecurringManagement`, `useDebtManagement`: the
+    confirmations, the saves, the haptics and the error), Recurrentes and Deudas rows with swipe
+    actions, the rule detail's Pausar/Reanudar and red Eliminar recurrente, the debt detail's
+    Cerrar/Reabrir and Eliminar deuda (an `EntryList` footer), Cerradas in Deudas, `amountMinor` on
+    the payment form, `palette.ts` (`swipeDestructive`, `swipeNeutral`, `swipeAccent`, white text
+    ≥ 4.5:1 in both themes); deleted rules and debts leave every list, deep links and the movement
+    and transfer details (which keep showing the movement, without a link). The debt form lost its
+    archive button. Copy in es/en (English reviewed and accepted); the backup formats note and the
+    version error say v1 to v10.
+  - **Checked on Linux:** root `npm test` 297/297 (was 286: +4 recurring pause/resume/delete, +3 debt
+    close/reopen/delete and the deleted tracker's payments, +4 backup v10), `npm run check:repo`;
+    mobile `npm run typecheck`, `npm run test:storage` 617/617 (was 596: +4 real-SQLite in
+    `database.node.ts` (a real schema 9 file to 10, pause/resume through `processRecurring`, a
+    deletion keeping every entry byte for byte and surviving backup and an older copy's import,
+    a debt tracker's close/reopen/delete leaving accounts, transfers and Disponible unchanged), +4
+    `polish-routes`, +5 `liabilities-routes`, +3 `recovery-routes`, +1 `smart-amounts`, +4 new
+    `swipe-actions.node.ts`; the Recurrentes switch tests rewritten for the swipe; fixtures gained
+    `deleted: false`; the v8→v9 file test compares the v8 columns), `currency:verify`,
+    `regions:verify`, `i18n:check -- --strict` (0 errors, 0 stale; English reviewed and accepted),
+    `i18n:extract` (no copy outside the catalogue), `check` (up to date), `export:ios` (5,021,900-byte
+    bundle); `server/mobile/schema.test.sql` on postgres:17 in a local container (unchanged code,
+    passes). No EAS build; the iPhone was not touched; no paid service, currency or region enabled.
+  - **Review of PR #58:** both detail screens (rule, debt) remembered whether they had opened on a
+    live item with a one-time state initializer, which froze at «not seen» when a cold deep link
+    mounted before the ledger hydrated; after the item loaded, deleting it from its own detail could
+    flash «not found» before the pop. They now record, keyed by id, that they have *ever* shown the
+    item live (updated during render); a link to an already-deleted item is still not found, and a
+    deleted item's screen offers no edit, save or restore while it closes. Regression tests cover
+    null → live → deleted and a cold link to a deleted item on both screens.
+  - **Pending:** the device QA of §2 (checklist, Producto 24UX4). Installing this build upgrades
+    FinanzApp Dev's ledger to schema 10 (additive, one-way): export a backup first.
 
 ### Producto 24R2 — international regions released
 

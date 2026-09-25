@@ -18,7 +18,7 @@ const debtAccount: Account = { id: 'debt-acc', name: 'Debo \u00B7 Juan', currenc
 const card: CreditCardProfile = { id: 'card', accountId: cardAccount.id, issuer: 'Banco', last4: '1234', creditLimitMinor: 100000,
   closingDay: 28, dueDay: 5, active: true, createdAt: account.createdAt, revision: 0, updatedAt: account.createdAt };
 const debt: PersonalDebtProfile = { id: 'debt', accountId: debtAccount.id, direction: 'owed_by_me', counterparty: 'Juan', dueDateISO: null,
-  note: '', active: true, createdAt: account.createdAt, revision: 0, updatedAt: account.createdAt };
+  note: '', active: true, deleted: false, createdAt: account.createdAt, revision: 0, updatedAt: account.createdAt };
 const liabilities: LedgerArchive = { accounts: [account, cardAccount, debtAccount],
   records: [initialRecord(entry), initialRecord({ ...entry, id: 'purchase', accountId: cardAccount.id, amountMinor: 2000 })],
   transfers: [initialTransferRecord({ id: 't', fromAccountId: account.id, toAccountId: cardAccount.id, amountMinor: 1000, note: 'Pago', dateISO: entry.dateISO, createdAt: account.createdAt })],
@@ -100,7 +100,7 @@ describe('native edit and recovery domain', () => {
       expect(previewBackupImport(incoming, archive).after).toBeNull();
     }
   });
-  it.each(['not json', 'null', '[]', '{}', JSON.stringify({ schema: 'finanzapp.native-pilot.v10' }),
+  it.each(['not json', 'null', '[]', '{}', JSON.stringify({ schema: 'finanzapp.native-pilot.v11' }),
     JSON.stringify({ version: 1, transactions: [], investments: [] }), 'x'.repeat(BACKUP_MAX_BYTES + 1)])('rejects unsupported input (%#)', raw => {
     expect(() => parsePilotBackup(raw)).toThrow();
   });
@@ -203,5 +203,55 @@ describe('native edit and recovery domain', () => {
     expect(previewBackupImport(incoming, { ...archive, categories: [{ ...kiosco, label: 'Bar' }] }).conflicts).toBe(1);
     // A look for an account the copy does not carry is invalid on its own.
     expect(() => previewBackupImport(archive, { accounts: [], records: [], appearances: [look] })).toThrow(/cuenta existente/);
+  });
+});
+
+describe('backup v10: deletion records of recurring rules and debts (Producto 24UX4)', () => {
+  const rule = { id: 'rule', accountId: account.id, kind: 'expense' as const, amountMinor: 101, merchant: 'Netflix', category: 'Suscripciones',
+    frequency: 'monthly' as const, anchorDateISO: '2026-09-11', nextDateISO: '2026-10-11', active: true, deleted: false,
+    createdAt: account.createdAt, revision: 1, updatedAt: time };
+  const deletedRule = { ...rule, active: false, deleted: true, revision: 2 };
+  const deletedDebt = { ...debt, active: false, deleted: true, revision: 1, updatedAt: time };
+
+  it('stays v8 without a deletion record, with no deleted key on its rows', () => {
+    const backup = createRecoveryBackup({ ...liabilities, recurring: [rule] });
+    expect(backup.schema).toBe('finanzapp.native-pilot.v8');
+    expect(Object.hasOwn(backup.recurring[0], 'deleted')).toBe(false);
+    expect(Object.hasOwn(backup.debts[0], 'deleted')).toBe(false);
+    expect(parsePilotBackup(JSON.stringify(backup)).archive.recurring).toEqual([rule]);
+  });
+
+  it('writes v10 once a rule or a debt is deleted and round-trips it exactly', () => {
+    for (const archiveWithTombstone of [{ ...liabilities, recurring: [deletedRule] }, { ...liabilities, recurring: [rule], debts: [deletedDebt] }]) {
+      const backup = createRecoveryBackup(archiveWithTombstone);
+      expect(backup.schema).toBe('finanzapp.native-pilot.v10');
+      expect(backup.currencyUnits).toEqual([]);
+      const restored = parsePilotBackup(JSON.stringify(backup)).archive;
+      expect(restored.recurring).toEqual(archiveWithTombstone.recurring);
+      expect(restored.debts).toEqual(archiveWithTombstone.debts);
+      // Its payments and the hidden account travel with it.
+      expect(restored.transfers).toEqual(liabilities.transfers);
+      expect(restored.accounts).toEqual(expect.arrayContaining([debtAccount]));
+    }
+  });
+
+  it('a v10 file must carry the deleted key and older files may not', () => {
+    const v10 = createRecoveryBackup({ ...liabilities, recurring: [deletedRule] });
+    const withoutKey = { ...v10, recurring: v10.recurring.map(({ deleted: _d, ...item }) => item) };
+    expect(() => parsePilotBackup(JSON.stringify(withoutKey))).toThrow('campos faltantes');
+    expect(() => parsePilotBackup(JSON.stringify({ ...v10, schema: 'finanzapp.native-pilot.v9' }))).toThrow('campos faltantes');
+    expect(() => parsePilotBackup(JSON.stringify({ ...v10, recurring: [{ ...deletedRule, active: true }] }))).toThrow('Estado de recurrente inválido.');
+  });
+
+  it('importing an older copy never brings a deleted rule or debt back: the row is a conflict, not new', () => {
+    const before = { ...liabilities, recurring: [rule] };
+    const older = parsePilotBackup(JSON.stringify(createRecoveryBackup(before))).archive;
+    const current = { ...liabilities, recurring: [deletedRule], debts: [deletedDebt] };
+    const preview = previewBackupImport(current, older);
+    expect(preview.recurring).toEqual([]);
+    expect(preview.debts).toEqual([]);
+    expect(preview.conflicts).toBe(2);
+    // The same copy imported twice is identical, tombstones included.
+    expect(previewBackupImport(current, parsePilotBackup(JSON.stringify(createRecoveryBackup(current))).archive).conflicts).toBe(0);
   });
 });

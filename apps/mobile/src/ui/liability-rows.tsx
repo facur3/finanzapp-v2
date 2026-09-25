@@ -4,11 +4,14 @@ import { debtOutstandingMinor, type PersonalDebtProfile } from '@finanzapp/domai
 import { useI18n } from '../i18n/provider';
 import { useLedger } from '../storage/LedgerProvider';
 import { AppText, GlyphTile, Money, PressFeedback, useStacked } from './components';
+import { SwipeRow, swipeAccessibility, type SwipeAction } from './swipe-actions';
 import { useCurrentDay, usePalette } from './theme';
 
 /** One debt or receivable: who, status and the outstanding amount. Amber marks
- * what I owe, green what they owe me; the amount itself stays ink. */
-export function DebtRow({ debt, last }: { debt: PersonalDebtProfile; last: boolean }) {
+ * what I owe, green what they owe me; the amount itself stays ink. A closed debt
+ * says «Cerrada» where its due state would be. Its management actions (24UX4) are
+ * trailing swipe actions and VoiceOver custom actions on the same row. */
+export function DebtRow({ debt, last, actions = [] }: { debt: PersonalDebtProfile; last: boolean; actions?: SwipeAction[] }) {
   const { snapshot } = useLedger();
   const p = usePalette();
   const day = useCurrentDay();
@@ -21,10 +24,12 @@ export function DebtRow({ debt, last }: { debt: PersonalDebtProfile; last: boole
   const owed = debt.direction === 'owed_by_me';
   const overdue = !!debt.dueDateISO && debt.dueDateISO < day && outstanding > 0;
   // "Vencida · Ayer" names the day after a separator; "Vence hoy" places it inside the sentence.
-  const status = outstanding === 0 ? t('debts.status.settled') : overdue ? t('debts.status.overdue', { date: relativeDate(debt.dueDateISO!, day) })
-    : debt.dueDateISO ? t('debts.status.due', { date: relativeDate(debt.dueDateISO, day, true) }) : t('debts.status.noDate');
-  return <PressFeedback feedback="highlight" accessibilityRole="button"
+  const status = !debt.active ? t('debts.status.closed') : outstanding === 0 ? t('debts.status.settled')
+    : overdue ? t('debts.status.overdue', { date: relativeDate(debt.dueDateISO!, day) })
+      : debt.dueDateISO ? t('debts.status.due', { date: relativeDate(debt.dueDateISO, day, true) }) : t('debts.status.noDate');
+  return <SwipeRow actions={actions}><PressFeedback feedback="highlight" accessibilityRole="button"
     accessibilityLabel={t(owed ? 'debts.row.owedLabel' : 'debts.row.receivableLabel', { name: debt.counterparty, amount: spokenMinor(outstanding, account.currency), currency: account.currency, status })}
+    {...swipeAccessibility(actions)}
     onPress={() => router.push({ pathname: '/debt/[id]', params: { id: debt.id } })}
     style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, paddingHorizontal: 16, minHeight: 64,
       borderBottomWidth: last ? 0 : 0.5, borderBottomColor: p.line }}>
@@ -32,9 +37,9 @@ export function DebtRow({ debt, last }: { debt: PersonalDebtProfile; last: boole
     <View style={{ flex: 1, minWidth: 0, gap: 8, flexDirection: stacked ? 'column' : 'row', alignItems: stacked ? 'flex-start' : 'center' }}>
       <View style={{ flex: stacked ? undefined : 1, minWidth: 0, gap: 3 }}>
         <AppText numberOfLines={stacked ? undefined : 2} style={{ fontWeight: '500' }}>{debt.counterparty}</AppText>
-        <AppText secondary variant="footnote" style={overdue ? { color: p.expense } : undefined}>{t(owed ? 'debts.list.owed' : 'debts.list.receivable')} · {status}</AppText>
+        <AppText secondary variant="footnote" style={overdue && debt.active ? { color: p.expense } : undefined}>{t(owed ? 'debts.list.owed' : 'debts.list.receivable')} · {status}</AppText>
       </View>
       <View style={{ maxWidth: stacked ? '100%' : '56%', alignItems: stacked ? 'flex-start' : 'flex-end' }}><Money minor={outstanding} currency={account.currency} /></View>
     </View>
-  </PressFeedback>;
+  </PressFeedback></SwipeRow>;
 }

@@ -155,7 +155,7 @@ export const errors = {
       fileSize: 'Elegí una copia JSON de hasta 5 MB.',
       notJson: 'El archivo no es una copia JSON válida.',
       notFinanzApp: 'El archivo no es una copia de FinanzApp.',
-      version: 'Solo se pueden restaurar copias del piloto nativo v1 a v9. La app web/anterior y otras versiones todavía no son compatibles; conservá el archivo.',
+      version: 'Solo se pueden restaurar copias del piloto nativo v1 a v10. La app web/anterior y otras versiones todavía no son compatibles; conservá el archivo.',
       money: 'Formato o unidad monetaria no compatibles.',
       /** A v1–v8 file naming a currency other than ARS or USD: it cannot be read as cents, whatever currencies the app offers (24B1). */
       legacyImport: 'Las copias v1 a v8 solo pueden contener cuentas y presupuestos en ARS o USD. No se importó nada; conservá el archivo.',
@@ -230,6 +230,9 @@ export const errors = {
       debtExists: 'Esta deuda ya existe con otros datos. Volvé a abrir el formulario.',
       debtMissing: 'No encontramos esta deuda.',
       debtChanged: 'La deuda cambió desde que la abriste. Volvé a revisarla.',
+      /** 24UX4: a change to a rule or debt tracker that was deleted (on another screen, or by a restored copy). */
+      recurringDeleted: 'Este recurrente fue eliminado.',
+      debtDeleted: 'Esta deuda fue eliminada.',
     },
   },
 } as const;

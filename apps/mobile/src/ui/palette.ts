@@ -26,6 +26,10 @@ export const lightPalette = {
   thumb: '#FFFFFF',
   expense: '#C42F39', income: '#15804F', transfer: '#0B6BB3', warning: '#B45309',
   expenseSoft: '#FBE9EA', incomeSoft: '#E6F5EE', transferSoft: '#E8F3FC', warningSoft: '#FCF1E0',
+  /** Trailing swipe actions (24UX4): solid fills under a white label, as iOS draws them. Destructive is the
+   * expense red, the reversible action a quiet grey, the forward action (pay, resume) the transfer blue; each
+   * holds white text at 4.5:1 or more. */
+  swipeDestructive: '#C42F39', swipeNeutral: '#6E6F76', swipeAccent: '#0B6BB3',
   shadow: 'rgba(10, 10, 12, 0.08)',
   /** The dimming behind a compact bottom sheet (the date wheel): the screen stays legible underneath. */
   scrim: 'rgba(10, 10, 12, 0.32)',
@@ -44,6 +48,8 @@ export const darkPalette: typeof lightPalette = {
   thumb: '#3A3A3E',
   expense: '#F0555C', income: '#3DBE86', transfer: '#4DB0FF', warning: '#E8A030',
   expenseSoft: '#3A1E20', incomeSoft: '#173126', transferSoft: '#14304A', warningSoft: '#3A2C14',
+  /** Dark: deeper than the text tones (the bright red and blue hold white at only 3:1), still clearly red and blue on black. */
+  swipeDestructive: '#D93A40', swipeNeutral: '#5E5E64', swipeAccent: '#1F6FC0',
   shadow: 'rgba(0, 0, 0, 0)',
   scrim: 'rgba(0, 0, 0, 0.55)',
 };
