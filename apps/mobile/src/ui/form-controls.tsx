@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { FlatList, Keyboard, Modal, Platform, Pressable, StyleSheet, View } from 'react-native';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { FlatList, Keyboard, Modal, Platform, Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
 import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -9,7 +9,7 @@ import { AccountBadge, AppText, CategoryBadge, DetailRow, Field, GlyphTile, Pres
 import { SEARCHABLE_FROM, currencyChoices, currencyOption, offeredCurrencies, searchChoices, type CurrencyChoice } from './currencies';
 import { useI18n } from '../i18n/provider';
 import { useAccountLookOf, useCategoryDefinitions, useCategoryLook } from './category-hues';
-import { selectionHaptic, timing } from './motion';
+import { selectionHaptic, sheetTiming } from './motion';
 import { radius, space, usePalette, useReduceMotion } from './theme';
 import { categoryChoices, categoryKey, customCategory } from './categories';
 
@@ -181,11 +181,18 @@ export function CurrencySheet({ visible, title, options, value, note, searchable
  * near-empty screen; this card is the height of its header and its wheel, over a
  * scrim that keeps the form visible, with the home-indicator inset below (24B6).
  * Presentation is a transparent native modal (VoiceOver stays inside the card); the
- * motion is the app's own state timing: the scrim fades and the card rises from the
- * bottom edge, both interruptible; Reduce Motion keeps the fades and drops the rise.
- * The card stays mounted while it leaves, so nothing snaps away, and unmounts once
- * the exit ends. Cancel, the scrim and the system back gesture leave without saving;
- * only Listo commits. Nothing here captures a screen or replays a navigation. */
+ * motion is the sheet's own: the scrim fades while the card rises from the bottom
+ * edge on the iOS sheet curve (300 ms), both interruptible; Reduce Motion fades the
+ * card in place over the same time. The order matters (24UX1): the modal mounts
+ * first, with the card resting below the window and the scrim clear; the rise starts
+ * only once iOS has presented the modal (`onShow`) and laid the card out (`onLayout`),
+ * in either order. 24B6 started the timing in the same effect that mounted the modal,
+ * so by the first painted frame, one to four frames later, the ease-out curve had
+ * already covered most of the travel and the card seemed to appear in place. The card
+ * stays mounted while it leaves (200 ms), so nothing snaps away, and unmounts once the
+ * exit ends; an exit interrupted by a reopening never unmounts. Cancel, the scrim and
+ * the system back gesture leave without saving; only Listo commits. Nothing here
+ * captures a screen or replays a navigation. */
 function BottomSheet({ visible, title, onClose, onDone, children }: {
   visible: boolean; title: string; onClose: () => void; onDone: () => void; children: ReactNode;
 }) {
@@ -193,13 +200,30 @@ function BottomSheet({ visible, title, onClose, onDone, children }: {
   const reduced = useReduceMotion();
   const { t } = useI18n();
   const insets = useSafeAreaInsets();
+  const { height: windowHeight } = useWindowDimensions();
   const [shown, setShown] = useState(visible);
   const progress = useSharedValue(visible ? 1 : 0);
-  // The card's measured height, so the rise starts exactly below the screen edge whatever the text size; a guess until measured.
-  const height = useSharedValue(360);
+  // The card's measured height, so the rise starts exactly below the edge whatever the text size; until it is
+  // measured, a window height: below the edge for any card, so nothing of it shows before the rise.
+  const height = useSharedValue(windowHeight);
+  // What the rise waits for. `wanted` follows `visible`; the other two are set by iOS's events for the mounted
+  // modal and cleared whenever it is (re)mounted or unmounted, so an event of a dismissed modal raises nothing.
+  const ready = useRef({ wanted: visible, presented: false, measured: false });
+  const rise = () => {
+    const state = ready.current;
+    if (state.wanted && state.presented && state.measured) progress.value = withTiming(1, sheetTiming('sheet', reduced));
+  };
+  const unmount = () => { ready.current.presented = false; ready.current.measured = false; setShown(false); };
   useEffect(() => {
-    if (visible) { setShown(true); progress.value = withTiming(1, timing('state', reduced)); }
-    else if (shown) progress.value = withTiming(0, timing('exit', reduced), finished => { if (finished) runOnJS(setShown)(false); });
+    ready.current.wanted = visible;
+    if (visible) {
+      // Already mounted (reopened while leaving): rise from wherever the card is, which interrupts the exit and so
+      // keeps the modal. Not mounted: mount it and let its presentation and layout start the rise.
+      if (shown) rise();
+      else { ready.current.presented = false; ready.current.measured = false; setShown(true); }
+    } else if (shown) {
+      progress.value = withTiming(0, sheetTiming('sheetExit', reduced), finished => { if (finished) runOnJS(unmount)(); });
+    }
     // `shown` is read, not depended on: the exit runs once, when `visible` drops, not again when it unmounts the modal.
   }, [visible, reduced, progress]);
   const scrimStyle = useAnimatedStyle(() => ({ opacity: progress.value }));
@@ -207,13 +231,14 @@ function BottomSheet({ visible, title, onClose, onDone, children }: {
     opacity: reduced ? progress.value : 1,
     transform: [{ translateY: reduced ? 0 : (1 - progress.value) * height.value }],
   }));
-  return <Modal visible={shown} transparent animationType="none" statusBarTranslucent onRequestClose={onClose}>
+  return <Modal visible={shown} transparent animationType="none" statusBarTranslucent onRequestClose={onClose}
+    onShow={() => { ready.current.presented = true; rise(); }}>
     <View style={{ flex: 1, justifyContent: 'flex-end' }}>
       <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: p.scrim }, scrimStyle]}>
         {/* The scrim cancels; VoiceOver never lands on it (the card below is modal). */}
         <Pressable accessible={false} importantForAccessibility="no" style={{ flex: 1 }} onPress={onClose} />
       </Animated.View>
-      <Animated.View accessibilityViewIsModal onLayout={event => { height.value = event.nativeEvent.layout.height; }}
+      <Animated.View accessibilityViewIsModal onLayout={event => { height.value = event.nativeEvent.layout.height; ready.current.measured = true; rise(); }}
         style={[{ backgroundColor: p.surface, borderTopLeftRadius: radius.sheet, borderTopRightRadius: radius.sheet, overflow: 'hidden',
           paddingBottom: Math.max(insets.bottom, space.m) }, cardStyle]}>
         <View accessible={false} style={{ alignItems: 'center', paddingTop: 8 }}>

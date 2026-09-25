@@ -1,5 +1,41 @@
 # Physical iPhone acceptance checklist
 
+## Producto 24UX1 — the date sheet's corrected entrance (the owner's video, second 91)
+
+**Not done in 24UX1: no EAS build was made and the iPhone was not touched.** Metro from this branch
+(`npm run start:dev-client`) on the installed FinanzApp Dev build; no preview flag needed. The 24B6
+sheet started its rise in the same effect that mounted the modal, so the first painted frame already
+showed the card most of the way up; now the modal mounts with the card below the window, and the
+rise starts once iOS has presented the modal and measured the card. Judge it in a development build
+at least; a release build on the slowest device is the real verdict (a dev build's JS thread hides jank).
+
+- [ ] Nuevo gasto → Fecha: the card comes from below the bottom edge and settles over about 300 ms
+  on the iOS sheet curve; the dimming fades in over the same time; no frame shows the card already
+  in place, and nothing of the card is visible before it starts rising (also at the largest
+  accessibility text size, where the card is taller).
+- [ ] Listo, Cancelar and a tap on the dimmed area: the card leaves downwards over about 200 ms and
+  the dimming clears with it; the form has not moved; the next tap on the form works at once (no
+  invisible modal is left).
+- [ ] Fast opens and closes: tap Fecha and Cancelar at once, five times; tap Fecha, Cancelar, Fecha
+  within half a second (the card reverses mid-exit without a jump and without re-presenting); tap
+  Fecha twice quickly. Nothing stays half-shown, nothing stays blocking, Cancelar never saves.
+- [ ] Reduce Motion on: the card and the dimming fade in place over about 300 ms and out over
+  about 200 ms, with no vertical movement; nothing appears instantly.
+- [ ] Keyboard open on Concepto, then tap Fecha: the keyboard closes first, the card rises over a
+  form that has not jumped; Cancelar returns to the form with the keyboard closed.
+- [ ] Light → Dark and back with the sheet open (Control Centre or Settings): the card and the
+  dimming take the new palette without reopening; the wheel's text stays legible.
+- [ ] VoiceOver: the first element read once the card is up is Cancelar, then "Elegir fecha", then
+  Listo, then the wheel's columns; nothing behind the dimming is reachable; two-finger Z cancels;
+  the row's date is announced written out.
+- [ ] Dynamic Type at the largest accessibility sizes: the header wraps to two lines, the card is
+  taller and still fully rises from below the edge, the wheel keeps its native size, the last row
+  of the wheel clears the home indicator (iPhone 14 Pro and a phone without a home indicator).
+- [ ] Transferencia and Recurrente → Próxima fecha use the same sheet and behave the same; Cuenta,
+  Categoría and Moneda still open their unchanged page sheets.
+- [ ] The date semantics are untouched: Cancelar keeps the saved day, Listo saves the spun day,
+  yesterday is allowed and tomorrow is not on a movement, Recurrente allows a future date.
+
 ## Producto 24R1 — regional infrastructure (one visible line; nothing else until 24R2)
 
 **Not done in 24R1: no EAS build was made and the iPhone was not touched.** Metro from this branch on
@@ -823,7 +859,7 @@ development build of this commit **started with the preview flag** and the 24B4 
 **Owner's report (2026-09-24):** the 24B5 tests were completed on the iPhone and PR #51 was merged;
 the first finding (the date sheet almost empty, the wheel at the top) is fixed in Producto 24B6. The
 per-item results below were not recorded, so the boxes stay open: the gate-opening commit waits for
-them (the minimum set is listed in docs/mobile-roadmap.md, Producto 24B6 status).
+them (the minimum set is listed in docs/mobile-roadmap-history.md, Producto 24B6 status).
 
 **On the device (record each result here, es and en):**
 - [ ] Cuenta nueva → Moneda opens the sheet with seven rows (name, code, symbol) and a search field;

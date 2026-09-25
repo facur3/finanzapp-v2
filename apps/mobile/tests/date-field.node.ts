@@ -16,7 +16,7 @@ import * as currenciesModule from '../src/ui/currencies.ts';
 // spun survives a language or region change and is saved as an ISO key.
 type Node = { type: any; props: Record<string, any> };
 
-function harness(os: 'ios' | 'android' = 'ios', { reduced = true, insets = { top: 59, bottom: 34 }, currencies = {} as Record<string, unknown> } = {}) {
+function harness(os: 'ios' | 'android' = 'ios', { reduced = true, insets = { top: 59, bottom: 34 }, currencies = {} as Record<string, unknown>, manual = false } = {}) {
   let locale: AppLocale = 'es-AR';
   const source = readFileSync(new URL('../src/ui/form-controls.tsx', import.meta.url), 'utf8');
   const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText;
@@ -27,19 +27,27 @@ function harness(os: 'ios' | 'android' = 'ios', { reduced = true, insets = { top
   const deps: unknown[][] = [];
   let cursor = 0, effectCursor = 0, dirty = false;
   let queued: (() => void)[] = [];
-  // The animated values, readable by the tests: a timing lands immediately and its completion callback runs at once.
-  const timings: { to: number; duration: number }[] = [];
+  // The animated values, readable by the tests: a timing lands immediately and its completion callback runs at once,
+  // or, with `manual`, waits for `settle(finished)` so a test can hold a sheet mid-exit.
+  const timings: { to: number; duration: number; easing?: string }[] = [];
+  const pending: ((finished: boolean) => void)[] = [];
   const modules: Record<string, unknown> = {
     react: { useMemo: (fn: () => unknown) => fn(), useState: (initial: unknown) => { const index = cursor++; if (!(index in state)) state[index] = initial;
       return [state[index], (value: unknown) => { if (state[index] !== value) dirty = true; state[index] = value; }]; },
+    useRef: (initial: unknown) => { const index = cursor++; if (!(index in state)) state[index] = { current: initial }; return state[index]; },
     useEffect: (fn: () => void, next?: unknown[]) => { const index = effectCursor++; const previous = deps[index];
       if (!previous || !next || next.length !== previous.length || next.some((item, i) => item !== previous[i])) { deps[index] = next ?? []; queued.push(fn); } } },
     'react/jsx-runtime': { jsx, jsxs: jsx, Fragment: 'Fragment' },
-    'react-native': { FlatList: 'FlatList', Keyboard: { dismiss() {} }, Modal: 'Modal', Platform: { OS: os }, Pressable: 'Pressable', StyleSheet: { absoluteFill: 'absoluteFill' }, View: 'View' },
+    'react-native': { FlatList: 'FlatList', Keyboard: { dismiss() {} }, Modal: 'Modal', Platform: { OS: os }, Pressable: 'Pressable', StyleSheet: { absoluteFill: 'absoluteFill' }, View: 'View',
+      useWindowDimensions: () => ({ width: 393, height: 852 }) },
     // A shared value persists across renders by call order, like a hook.
     'react-native-reanimated': { __esModule: true, default: { View: 'Animated.View' }, useSharedValue: (value: unknown) => { const index = cursor++; if (!(index in state)) state[index] = { value }; return state[index]; },
       useAnimatedStyle: (fn: () => unknown) => fn(), runOnJS: (fn: (...args: unknown[]) => void) => fn,
-      withTiming: (to: number, config: { duration: number }, callback?: (finished: boolean) => void) => { timings.push({ to, duration: config.duration }); callback?.(true); return to; } },
+      withTiming: (to: number, config: { duration: number; easing?: string }, callback?: (finished: boolean) => void) => {
+        timings.push(config.easing === undefined ? { to, duration: config.duration } : { to, duration: config.duration, easing: config.easing });
+        if (callback) { if (manual) pending.push(callback); else callback(true); }
+        return to;
+      } },
     'react-native-safe-area-context': { SafeAreaView: 'SafeAreaView', useSafeAreaInsets: () => insets },
     '@react-native-community/datetimepicker': 'DateTimePicker',
     '@expo/vector-icons/Ionicons': 'Ionicons',
@@ -48,7 +56,9 @@ function harness(os: 'ios' | 'android' = 'ios', { reduced = true, insets = { top
     '../i18n/provider': { useI18n: () => bindLocale(locale) },
     './components': { AccountBadge: 'AccountBadge', AppText: 'AppText', CategoryBadge: 'CategoryBadge', DetailRow: 'DetailRow', SelectionRow: 'SelectionRow', Field: 'Field',
       GlyphTile: 'GlyphTile', PressFeedback: 'PressFeedback', Surface: 'Surface', surfaceShadow: () => ({}) },
-    './currencies': currencies, './category-hues': {}, './categories': {}, './motion': { selectionHaptic: () => {}, timing: (kind: string, reducedMotion: boolean) => ({ duration: reducedMotion ? 0 : kind === 'exit' ? 100 : 200 }) },
+    './currencies': currencies, './category-hues': {}, './categories': {}, './motion': { selectionHaptic: () => {}, timing: (kind: string, reducedMotion: boolean) => ({ duration: reducedMotion ? 0 : kind === 'exit' ? 100 : 200 }),
+      // The sheet's own timings (24UX1): a duration under Reduce Motion too (a timed fade), the iOS sheet curve when the card moves.
+      sheetTiming: (kind: string, reducedMotion: boolean) => ({ duration: kind === 'sheetExit' ? 200 : 300, easing: reducedMotion ? 'easeOut' : 'easeSheet' }) },
     './theme': { radius: { group: 16, sheet: 24 }, space: { xs: 4, s: 8, m: 12, l: 16, xl: 20 },
       usePalette: () => ({ isDark: false, primary: '#2557D6', background: '#F2F2F6', surface: '#FFFFFF', line: '#E6E6EC', scrim: 'rgba(10, 10, 12, 0.32)' }), useReduceMotion: () => reduced },
   };
@@ -70,7 +80,9 @@ function harness(os: 'ios' | 'android' = 'ios', { reduced = true, insets = { top
     }
     throw new Error('the tree never settled');
   };
-  return { render, saved, timings, setLocale: (next: AppLocale) => { locale = next; } };
+  /** Ends the oldest unfinished timing, as Reanimated would: finished, or interrupted by a newer one. */
+  const settle = (finished: boolean) => { const callback = pending.shift(); if (!callback) throw new Error('no timing to settle'); callback(finished); };
+  return { render, saved, timings, settle, pendingCount: () => pending.length, setLocale: (next: AppLocale) => { locale = next; } };
 }
 
 /** Every node, with local function components (the sheet) rendered in place. */
@@ -204,10 +216,17 @@ function sheet(root: Node) {
   return { modal, scrim, card, scrimStyle: flat(scrim?.props.style), cardStyle: flat(card?.props.style),
     wheelBox: nodes(card).find(node => node.type === 'View' && node.props.children?.type === 'DateTimePicker')! };
 }
+/** What iOS does after the modal mounts: lays the card out (its height) and presents the modal (`onShow`), in either order. */
+function present(root: Node, height = 360, order: 'layout-first' | 'show-first' = 'layout-first') {
+  const { modal, card } = sheet(root);
+  const layout = () => card.props.onLayout({ nativeEvent: { layout: { x: 0, y: 0, width: 393, height } } });
+  if (order === 'layout-first') { layout(); modal.props.onShow(); } else { modal.props.onShow(); layout(); }
+}
 
 test('24B6: the date wheel opens in a compact bottom sheet sized to its content, not a page sheet: a scrim, a card with the header and the wheel centred, the home-indicator inset below', () => {
   const field = harness('ios', { reduced: false });
   find(field.render(), 'DetailRow')!.props.onPress();
+  present(field.render());
   const root = field.render();
   const { modal, scrim, card, scrimStyle, cardStyle, wheelBox } = sheet(root);
   assert.equal(modal.props.visible, true);
@@ -246,26 +265,120 @@ test('24B6: the date wheel opens in a compact bottom sheet sized to its content,
   assert.equal(todayKey(find(field.render(), 'DateTimePicker')!.props.value), '2026-09-22', 'reopened on the saved day');
 });
 
-test('24B6: the sheet rises with the state timing and leaves with the exit timing; Reduce Motion keeps only the fades; a phone without a home indicator keeps a minimum inset', () => {
-  const moving = harness('ios', { reduced: false, insets: { top: 20, bottom: 0 } });
-  find(moving.render(), 'DetailRow')!.props.onPress();
-  let root = moving.render();
-  assert.deepEqual(moving.timings, [{ to: 1, duration: 200 }], 'the entrance is the state timing (200 ms), interruptible; nothing animates at mount');
-  assert.equal(sheet(root).cardStyle.paddingBottom, 12, 'a minimum inset below the wheel when the safe area has none');
+test('24UX1: the rise starts only once the modal is on screen and the card measured; until then the card rests below the window and the scrim is clear', () => {
+  const field = harness('ios', { reduced: false, insets: { top: 20, bottom: 0 } });
+  find(field.render(), 'DetailRow')!.props.onPress();
+  let root = field.render();
+  let s = sheet(root);
+  assert.equal(s.modal.props.visible, true, 'the modal mounts first');
+  assert.equal(typeof s.modal.props.onShow, 'function', 'and says when iOS has presented it');
+  assert.deepEqual(field.timings, [], 'no timing runs before the card can be seen: the 24B6 entrance started here, one to four frames before the modal was presented, and the ease-out curve had covered most of the rise by the first painted frame');
+  assert.equal(JSON.stringify(s.cardStyle.transform), '[{"translateY":852}]', 'unmeasured: a window height below the edge, off screen whatever the card\'s height');
+  assert.equal(s.scrimStyle.opacity, 0);
+  assert.equal(s.cardStyle.opacity, 1);
+  s.card.props.onLayout({ nativeEvent: { layout: { x: 0, y: 0, width: 393, height: 420 } } });
+  root = field.render(); s = sheet(root);
+  assert.deepEqual(field.timings, [], 'measured but not yet presented: still waiting');
+  assert.equal(JSON.stringify(s.cardStyle.transform), '[{"translateY":420}]', 'exactly its own height below the edge');
+  s.modal.props.onShow();
+  root = field.render(); s = sheet(root);
+  assert.deepEqual(field.timings, [{ to: 1, duration: 300, easing: 'easeSheet' }], 'presented and measured: the rise, on the iOS sheet curve, 300 ms');
+  assert.equal(JSON.stringify(s.cardStyle.transform), '[{"translateY":0}]', 'open: the card rests at the bottom edge');
+  assert.equal(s.scrimStyle.opacity, 1, 'the scrim follows the same progress');
+  assert.equal(s.cardStyle.paddingBottom, 12, 'a minimum inset below the wheel when the safe area has none');
   button(root, 'Listo').props.onPress();
-  root = moving.render();
-  assert.deepEqual(moving.timings.at(-1), { to: 0, duration: 100 }, 'the exit is shorter than the entrance');
-  assert.equal(find(root, 'Modal')!.props.visible, false);
-  assert.deepEqual(moving.saved, ['2026-09-22']);
+  root = field.render();
+  assert.deepEqual(field.timings.at(-1), { to: 0, duration: 200, easing: 'easeSheet' }, 'the exit is shorter than the entrance');
+  assert.equal(find(root, 'Modal')!.props.visible, false, 'unmounted once the exit finished');
+  assert.deepEqual(field.saved, ['2026-09-22']);
 
-  const still = harness('ios', { reduced: true });
-  find(still.render(), 'DetailRow')!.props.onPress();
-  root = still.render();
-  assert.deepEqual(still.timings, [{ to: 1, duration: 0 }], 'Reduce Motion: no timed movement');
-  const { cardStyle, scrimStyle } = sheet(root);
-  assert.equal(JSON.stringify(cardStyle.transform), '[{"translateY":0}]', 'the card never travels');
-  assert.equal(cardStyle.opacity, 1, 'it fades with the progress instead');
-  assert.equal(scrimStyle.opacity, 1);
+  // Presented before measured (the other order iOS may take): the rise waits for the measurement too.
+  const other = harness('ios', { reduced: false });
+  find(other.render(), 'DetailRow')!.props.onPress();
+  root = other.render();
+  sheet(root).modal.props.onShow();
+  root = other.render();
+  assert.deepEqual(other.timings, [], 'presented but unmeasured: the rise would start from a guessed height and jump when measured');
+  sheet(root).card.props.onLayout({ nativeEvent: { layout: { x: 0, y: 0, width: 393, height: 380 } } });
+  root = other.render();
+  assert.deepEqual(other.timings, [{ to: 1, duration: 300, easing: 'easeSheet' }]);
+  assert.equal(JSON.stringify(sheet(root).cardStyle.transform), '[{"translateY":0}]');
+});
+
+test('24UX1: the card stays mounted while it leaves; a reopen mid-exit reverses at once without a new presentation; an interrupted exit never unmounts; a finished one always does', () => {
+  const field = harness('ios', { reduced: false, manual: true });
+  find(field.render(), 'DetailRow')!.props.onPress();
+  present(field.render(), 400);
+  let root = field.render();
+  assert.equal(field.pendingCount(), 0, 'a rise has no completion to wait for: only an exit decides an unmount');
+  button(root, 'Cancelar').props.onPress();
+  root = field.render();
+  assert.deepEqual(field.timings.at(-1), { to: 0, duration: 200, easing: 'easeSheet' });
+  assert.equal(find(root, 'Modal')!.props.visible, true, 'still mounted while the exit runs: nothing snaps away');
+  // Reopened before the exit ended: the same presented modal rises again, no onShow needed, and the old exit is interrupted.
+  find(root, 'DetailRow')!.props.onPress();
+  root = field.render();
+  assert.deepEqual(field.timings.at(-1), { to: 1, duration: 300, easing: 'easeSheet' }, 'the rise restarts from wherever the card was');
+  field.settle(false); // Reanimated ends the interrupted exit with finished=false
+  root = field.render();
+  assert.equal(find(root, 'Modal')!.props.visible, true, 'an interrupted exit never unmounts the card that is rising again');
+  assert.equal(JSON.stringify(sheet(root).cardStyle.transform), '[{"translateY":0}]');
+  button(root, 'Listo').props.onPress();
+  root = field.render();
+  assert.equal(find(root, 'Modal')!.props.visible, true, 'the exit runs before the modal goes');
+  field.settle(true);
+  root = field.render();
+  assert.equal(find(root, 'Modal')!.props.visible, false, 'a finished exit unmounts: no invisible modal is left over the form');
+  assert.equal(field.pendingCount(), 0);
+  assert.deepEqual(field.saved, ['2026-09-22']);
+  // The next opening waits for the new presentation again: nothing rises on a modal that is not on screen.
+  find(root, 'DetailRow')!.props.onPress();
+  root = field.render();
+  assert.deepEqual(field.timings.at(-1), { to: 0, duration: 200, easing: 'easeSheet' }, 'no new timing yet: the last one is still the exit');
+  assert.equal(field.timings.length, 4, 'rise, exit, rise, exit');
+  assert.equal(JSON.stringify(sheet(root).cardStyle.transform), '[{"translateY":400}]', 'the measured height is kept: off screen at once');
+  present(root, 400, 'show-first');
+  assert.equal(field.timings.length, 5);
+});
+
+test('24UX1: a close before the modal is on screen leaves nothing behind, and a late onShow raises nothing', () => {
+  const field = harness('ios', { reduced: false, manual: true });
+  find(field.render(), 'DetailRow')!.props.onPress();
+  let root = field.render();
+  const { modal, card } = sheet(root);
+  button(root, 'Cancelar').props.onPress();
+  root = field.render();
+  assert.deepEqual(field.timings, [{ to: 0, duration: 200, easing: 'easeSheet' }], 'the exit runs from where the card is (below the edge)');
+  field.settle(true);
+  root = field.render();
+  assert.equal(find(root, 'Modal')!.props.visible, false, 'gone: no transparent modal blocking the form');
+  card.props.onLayout({ nativeEvent: { layout: { x: 0, y: 0, width: 393, height: 400 } } });
+  modal.props.onShow(); // iOS may still deliver the presentation of the modal that was already dismissed
+  root = field.render();
+  assert.equal(field.timings.length, 1, 'a stale presentation starts no rise');
+  assert.equal(find(root, 'Modal')!.props.visible, false);
+  assert.deepEqual(field.saved, []);
+});
+
+test('24UX1: Reduce Motion: a timed fade with no displacement, invisible until the modal is on screen', () => {
+  const field = harness('ios', { reduced: true });
+  find(field.render(), 'DetailRow')!.props.onPress();
+  let root = field.render();
+  let s = sheet(root);
+  assert.deepEqual(field.timings, [], 'nothing before the presentation');
+  assert.equal(JSON.stringify(s.cardStyle.transform), '[{"translateY":0}]', 'the card never travels');
+  assert.equal(s.cardStyle.opacity, 0, 'it is clear until it fades in');
+  assert.equal(s.scrimStyle.opacity, 0);
+  present(root);
+  root = field.render(); s = sheet(root);
+  assert.deepEqual(field.timings, [{ to: 1, duration: 300, easing: 'easeOut' }], 'Reduce Motion: a fade with a duration, not an instant appearance (24B6 wrote a zero-length timing here)');
+  assert.equal(s.cardStyle.opacity, 1);
+  assert.equal(s.scrimStyle.opacity, 1);
+  assert.equal(JSON.stringify(s.cardStyle.transform), '[{"translateY":0}]');
+  button(root, 'Cancelar').props.onPress();
+  root = field.render();
+  assert.deepEqual(field.timings.at(-1), { to: 0, duration: 200, easing: 'easeOut' }, 'and a timed fade out');
+  assert.equal(find(root, 'Modal')!.props.visible, false);
 });
 
 test('24B6: the list sheets keep their page-sheet geometry: only the date field changed', () => {
