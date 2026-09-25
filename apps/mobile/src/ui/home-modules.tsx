@@ -15,13 +15,15 @@ import { useI18n } from '../i18n/provider';
 
 /** Contextual help for a metric: one native alert with the definition, so the
  * screen itself carries no disclaimer copy. Its button is named from the
- * catalogue, so it follows the interface language instead of the iPhone's (see InfoButton). */
+ * catalogue, so it follows the interface language instead of the iPhone's (see InfoButton).
+ * The glyph is a control, so it is drawn in secondary, not tertiary: it sits on the
+ * background beside the hero's label and must read as something to tap (24UX1). */
 export function MetricHelp({ title, detail }: { title: string; detail: string }) {
   const p = usePalette();
   const { t } = useI18n();
   return <PressFeedback feedback="opacity" accessibilityRole="button" accessibilityLabel={t('common.whatIs', { title })} hitSlop={8}
     onPress={() => Alert.alert(title, detail, [{ text: t('common.ok'), style: 'cancel' }])} style={{ minHeight: 24, paddingHorizontal: 4 }}>
-    <Ionicons name="information-circle-outline" size={18} color={p.tertiary} accessible={false} />
+    <Ionicons name="information-circle-outline" size={18} color={p.secondary} accessible={false} />
   </PressFeedback>;
 }
 

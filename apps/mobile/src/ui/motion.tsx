@@ -1,6 +1,6 @@
 import { useEffect, useRef, type ReactNode } from 'react';
 import type { StyleProp, ViewStyle } from 'react-native';
-import Animated, { Easing, FadeIn, FadeInUp, FadeOut, LinearTransition, type WithTimingConfig } from 'react-native-reanimated';
+import Animated, { Easing, FadeIn, FadeInUp, FadeOut, LinearTransition, ReduceMotion, type WithTimingConfig } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import { useReduceMotion } from './theme';
 
@@ -9,6 +9,10 @@ import { useReduceMotion } from './theme';
  * the opacity changes that explain a state and drops movement and reveals. */
 export const easeOut = Easing.bezier(0.23, 1, 0.32, 1);
 export const easeInOut = Easing.bezier(0.77, 0, 0.175, 1);
+/** iOS's own sheet curve: a quick start that settles long, the way a presented sheet
+ * rises. `easeOut` covers 60 % of a travel in its first 33 ms, right for a value or a
+ * thumb, too abrupt for a card the eye follows from the bottom edge (24UX1). */
+export const easeSheet = Easing.bezier(0.32, 0.72, 0, 1);
 
 export const duration = {
   /** Press-in on a control. */
@@ -25,6 +29,10 @@ export const duration = {
   exit: 100,
   /** A chart drawn for the first time. */
   reveal: 480,
+  /** A sheet rising from the bottom edge (about what iOS gives its own sheets). */
+  sheet: 300,
+  /** A sheet leaving: shorter than its rise, so the form is back at once, long enough to be seen going. */
+  sheetExit: 200,
 } as const;
 
 export type Duration = keyof typeof duration;
@@ -32,6 +40,18 @@ export type Duration = keyof typeof duration;
 /** Timing config for a data or state change; zero-length when motion is reduced. */
 export function timing(kind: Duration, reduced: boolean): WithTimingConfig {
   return { duration: reduced ? 0 : duration[kind], easing: easeOut };
+}
+
+/** Timing config for a sheet's own entrance or exit. Unlike `timing`, Reduce Motion keeps
+ * the duration: the sheet then fades in place instead of rising, and a fade needs its time
+ * (an instant appearance is the jarring change the fade is there to prevent). The curve is
+ * the sheet's when the card moves, the plain ease-out for the fade. The policy is explicit:
+ * a `withTiming` without one follows the device setting (`ReduceMotion.System`) and, with
+ * Reduce Motion on, lands on its target in one frame whatever the duration says (Reanimated
+ * 4, `animation/util.ts` onStart), which would make the fade instant. `Never` leaves the
+ * decision to the caller, who already drops the movement from its own reading (PR #54). */
+export function sheetTiming(kind: 'sheet' | 'sheetExit', reduced: boolean): WithTimingConfig {
+  return { duration: duration[kind], easing: reduced ? easeOut : easeSheet, reduceMotion: ReduceMotion.Never };
 }
 
 /** A value ticked past a step: segmented control, month arrow, picker row. */

@@ -39,6 +39,15 @@ for (const [name, p] of [['light', lightPalette], ['dark', darkPalette]] as cons
     assert.ok(contrast(p.text, p.surface) >= 12, 'normal text stays high-contrast neutral');
     assert.ok(contrast(p.secondary, p.surface) >= 4.5);
   });
+  test(`${name}: secondary text and tertiary glyphs read on every ground of Inicio (24UX1)`, () => {
+    // Secondary is text: the hero's month, the quick-action captions and the empty sentences sit on the background,
+    // the unselected segment labels on the inset track. Before 24UX1 the light palette gave 4.42:1 and 4.27:1.
+    for (const ground of [p.background, p.surface, p.inset]) assert.ok(contrast(p.secondary, ground) >= 4.5, `secondary on ${ground}: ${contrast(p.secondary, ground).toFixed(2)}`);
+    // Tertiary is never body text: chevrons, placeholders, the hero's cents at 44 pt bold. A glyph or large text needs 3:1.
+    for (const ground of [p.background, p.surface, p.inset]) assert.ok(contrast(p.tertiary, ground) >= 3, `tertiary on ${ground}: ${contrast(p.tertiary, ground).toFixed(2)}`);
+    // Three distinct steps of ink remain: text, secondary, tertiary.
+    assert.ok(contrast(p.text, p.surface) > contrast(p.secondary, p.surface) && contrast(p.secondary, p.surface) > contrast(p.tertiary, p.surface));
+  });
 }
 
 test('the primary is a cobalt blue, not purple or green', () => {

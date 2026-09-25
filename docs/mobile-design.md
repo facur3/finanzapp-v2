@@ -16,8 +16,9 @@ mapas de comercios, estados bancarios ni acciones que la app no ejecuta.
 ## Sistema
 
 **Color.** Tinta sobre fondo. Claro: fondo #F2F2F6, superficie #FFFFFF, tinta
-#0A0A0C, secundario #6E7078, relleno #EEEEF3. Oscuro: fondo #000000, superficie
-#1C1C1E, elevado #242426, tinta #F5F5F7, secundario #A0A0A8. Los tokens viven en
+#0A0A0C, secundario #66686F, terciario #84868D, relleno #EEEEF3 (24UX1: secundario y
+terciario un paso más oscuros; antes #6E7078 y #8E9098). Oscuro: fondo #000000, superficie
+#1C1C1E, elevado #242426, tinta #F5F5F7, secundario #A0A0A8, terciario #7C7C84. Los tokens viven en
 `src/ui/palette.ts`, sin React Native, para poder medir su contraste en Node.
 
 **Primario FinanzApp.** Un azul cobalto para la interacción y la selección, y para
@@ -413,6 +414,8 @@ de Inicio, en las cuatro acciones, en la pestaña central del Asistente ni en el
   en ambos temas (blanco / `#1C1C1E`), esquinas de 24 pt, un velo (`scrim`) que deja ver el
   formulario. Motion propia del sistema: el velo se funde y la tarjeta sube con el tiempo de estado
   (200 ms, ease-out) y baja con el de salida (100 ms), interrumpible; con Reduce Motion solo fundidos.
+  (Corregido en 24UX1: la subida arrancaba antes de que el modal estuviera en pantalla; ahora usa la
+  curva de hoja de iOS a 300 ms y la salida 200 ms, ver más abajo.)
   Cancelar, el velo y el gesto de volver descartan; solo Listo guarda. Cuenta, Categoría y Moneda
   conservan su hoja de página: una lista que se desplaza necesita altura; una rueda, no. Se evaluó
   la hoja nativa con detent (`formSheet` + `fitToContents` vía router) y queda para comparar en el
@@ -673,6 +676,133 @@ Detalle en docs/currency.md §8–§10.
   tarjeta de borrador y la evidencia del Asistente, cabeceras y barra de pestañas (la
   barra JS sigue opaca; una UITabBar del sistema con material nativo es trabajo de la
   fase de development build, no una capa de vidrio forzada encima).
+
+## Producto 24UX1 — la entrada de la hoja de fecha, auditoría de Inicio y dirección nativa
+
+### La hoja de fecha: por qué aparecía de golpe y cómo entra ahora
+
+El propietario vio en el iPhone que la tarjeta de 24B6 estaba casi en su sitio en muy pocos
+fotogramas (segundo 91 del video). La causa no era la geometría sino el orden: `BottomSheet`
+(`src/ui/form-controls.tsx`) montaba el modal (`setShown(true)`) y arrancaba `withTiming(1)` en el
+mismo efecto. Un `Modal` de React Native con `visible=false` no renderiza nada, y el nativo lo
+presenta recién cuando la vista llega a la ventana (`didMoveToWindow` → `presentViewController`,
+con `onShow` al completar): entre uno y cuatro fotogramas después de arrancar el timing. La curva
+ease-out del sistema (0,23, 1, 0,32, 1) recorre el 33 % del trayecto en el primer fotograma, el
+60 % en el segundo y el 78 % en el tercero, así que el primer fotograma pintado ya mostraba la
+tarjeta arriba y el resto aterrizaba en dos o tres más. Con Reduce Motion, además, `timing()`
+daba duración 0: la hoja aparecía instantáneamente, sin el fundido prometido.
+
+Ahora el orden es montar, medir y presentar, y recién entonces subir: el modal se monta con la
+tarjeta una altura de ventana por debajo del borde (fuera de pantalla sea cual sea su alto) y el
+velo transparente; la subida arranca cuando iOS presentó el modal (`onShow`) **y** midió la
+tarjeta (`onLayout`), en cualquier orden, desde su altura real, sin saltos por una altura
+adivinada. La curva es la de las hojas de iOS (0,32, 0,72, 0, 1) a 300 ms (`easeSheet`,
+`duration.sheet`), la salida 200 ms (`duration.sheetExit`); el velo sigue el mismo progreso.
+Con Reduce Motion la tarjeta se funde en su sitio con las mismas duraciones (`sheetTiming`
+conserva el tiempo: un fundido necesita su tiempo, la aparición instantánea es justamente el
+cambio brusco que evita). La política de Reanimated va explícita (`reduceMotion: Never`, revisión
+de la PR #54): un `withTiming` sin política sigue el ajuste del sistema y, con Reduce Motion
+activo, aterriza en el valor final en un fotograma sea cual sea la duración, así que el fundido
+habría sido instantáneo; la app decide sola qué quitar (el desplazamiento) desde su propia
+lectura del ajuste. El test emula esa política con los valores del enum del paquete instalado. La tarjeta queda montada mientras sale y se desmonta al terminar; una
+salida interrumpida por volver a abrir nunca desmonta ni deja un modal invisible bloqueando el
+formulario; un `onShow` tardío de un modal ya descartado no levanta nada. Nada cambia en las
+demás hojas ni en la semántica de las fechas (Cancelar descarta, Listo guarda). Pruebas en
+`tests/date-field.node.ts` (orden presentar/medir en ambos sentidos, cierre antes de presentar,
+reapertura a mitad de salida, Reduce Motion como fundido con duración); lo que solo el iPhone
+puede juzgar está en `docs/mobile-device-checklist.md` (Producto 24UX1).
+
+### Auditoría de Inicio (sin rediseño general)
+
+La composición de Inicio se conserva tal cual: control Gastos / Disponible con la moneda
+discreta a su derecha cuando hay más de una, el nombre del mes o «Saldo registrado» y el número
+principal, las cuatro acciones redondas, el presupuesto del mes si existe, «En qué gastaste»,
+los próximos compromisos si los hay y los últimos movimientos. El propietario está conforme con
+esa estructura; esta entrega la mide con el sistema visual actual (`app/(tabs)/index.tsx`,
+`src/ui/quick-actions.tsx`, `src/ui/home-modules.tsx`, `src/ui/components.tsx`,
+`src/ui/palette.ts`, `src/ui/theme.ts`) y corrige solo lo pequeño y demostrable. Nada de esto
+es una captura del iPhone: los contrastes son cálculo WCAG 2 sobre los tokens (`tests/theme.node.ts`),
+las medidas son las del código.
+
+**Hallazgos, por gravedad.**
+
+1. **Texto secundario por debajo de AA en claro (corregido).** `secondary` claro (#6E7078)
+   daba 4,42:1 sobre el fondo #F2F2F6 y 4,27:1 sobre el relleno #EEEEF3. Sobre el fondo van el
+   nombre del mes y «Saldo registrado» (subhead 15 pt, `index.tsx`), la leyenda «N cuentas»
+   (footnote 13 pt), las cuatro leyendas de las acciones (caption 12 pt, peso 500,
+   `quick-actions.tsx:74`) y las dos frases vacías de categorías y movimientos (subhead 15 pt);
+   sobre el relleno, la etiqueta no elegida del segmentado (13 pt, `components.tsx:358`). El
+   test de tema solo medía el secundario sobre la superficie blanca (4,94:1). Ahora `secondary`
+   claro es #66686F: 4,98:1 sobre fondo, 5,56:1 sobre superficie, 4,81:1 sobre relleno. En
+   oscuro no cambia nada (#A0A0A8: 8,1:1 / 6,6:1 / 5,4:1). Sigue habiendo tres escalones de
+   tinta (tinta, secundario, terciario), verificados.
+2. **Terciario por debajo de 3:1 para glifos y cifras grandes en claro (corregido).**
+   `tertiary` claro (#8E9098) daba 2,85:1 sobre el fondo y 3,19:1 sobre la superficie. Sobre el
+   fondo van los centavos del importe héroe (44 pt en negrita: texto grande, umbral 3:1) y el
+   glifo de información de Disponible (18 pt, un control). Ahora `tertiary` claro es #84868D:
+   3,26:1 sobre fondo, 3,64:1 sobre superficie, 3,14:1 sobre relleno; los chevrons y los
+   marcadores de posición de toda la app ganan lo mismo. El glifo de información de Inicio
+   (`MetricHelp`) pasa además a secundario, porque es algo que se toca (4,98:1), no una
+   decoración; `InfoButton` de los formularios conserva el terciario y queda para revisar con
+   la misma regla en su propia entrega. Ambos tokens quedan pinneados con umbrales en
+   `tests/theme.node.ts`; el color del glifo, en `tests/home-ranking.node.ts`.
+3. **Dos entradas al Asistente en la misma pantalla (documentado, sin cambio).** La primera
+   acción redonda y la pestaña central llevan a la misma conversación (`quick-actions.tsx:52`,
+   `app/(tabs)/_layout.tsx:39`). Producto 22 lo decidió así mientras la capacidad fuera nueva.
+   Con el Asistente como función central, la redundancia se vuelve visible: es la única acción
+   que existe dos veces en Inicio. No se retira sin comparación visual (abajo).
+4. **Las cuatro acciones y el pulgar (documentado).** La fila vive en el tercio superior:
+   con una mano, Gasto (la más frecuente) está a unos 200 pt del borde inferior en un iPhone
+   de 6,1″, fuera de la zona cómoda; la entrada alcanzable de Inicio es la pestaña central, que
+   es el Asistente, no Gasto. Movimientos tiene el «+» en la cabecera, aún más lejos. No se
+   introduce navegación nueva; es un dato para la comparación.
+5. **Espacio vacío con una moneda sin datos en el mes (documentado).** Con una moneda que no
+   tiene movimientos este mes, Inicio muestra «$ 0,00», las cuatro acciones y dos secciones
+   seguidas con solo una frase gris cada una («Tus categorías aparecerán cuando registres un
+   gasto este mes.» y «Todavía no hay movimientos este mes.»), cada una con su enlace de
+   sección (Reportes, Ver todo) que abre una pantalla sin datos de ese mes. Son dos frases
+   que dicen casi lo mismo a 24 pt de distancia. Con un libro sin cuentas, el `EmptyState`
+   único ya está bien. Se propone unificar el estado vacío del mes (abajo); no se cambia la
+   composición ahora.
+6. **Tamaño de las leyendas de las acciones (aceptable).** Caption 12 pt con peso 500 y dos
+   líneas posibles; es el mínimo del sistema (las pestañas van a 10 pt). Con Dynamic Type
+   escala sin tope (`allowFontScaling` por defecto) y las columnas flexionan; el círculo de
+   54 pt no escala. Correcto; el iPhone debe confirmar que a los tamaños de accesibilidad
+   mayores «Transferir» parte en dos líneas y no se recorta.
+7. **Jerarquía y espaciado (correctos).** 44 pt en negrita para el importe con símbolo y
+   centavos en escalones, 15 pt para su leyenda, 17 pt semibold para los títulos de sección,
+   24 pt entre bloques (`Screen gap={space.xxl}`) y 20 pt dentro del bloque del héroe. Nada
+   compite con el número; el control segmentado tiene 232 pt de ancho máximo para que la
+   moneda quepa a su lado sin un selector grande.
+8. **Accesibilidad (correcta).** Cada acción tiene su etiqueta completa («Registrar gasto»);
+   el importe héroe es un solo elemento que se lee con unidad y moneda; el glifo de ayuda dice
+   «Qué significa Disponible»; los títulos de sección llevan rol de encabezado; las filas de
+   categoría dicen nombre, importe y participación. Los segmentos exponen `selected`.
+9. **Fuera de Inicio, misma regla (nota).** La barra de pestañas pinta las inactivas en
+   terciario a 10 pt (`_layout.tsx:29-31`): 3,64:1 en claro y 4,11:1 en oscuro sobre la
+   superficie, por debajo de AA para texto de ese tamaño. Es la barra, no Inicio; queda
+   anotado para la entrega de la barra nativa.
+
+**Lo que cambió.** Dos tokens claros (`palette.ts`), el color del glifo de ayuda de Disponible
+(`home-modules.tsx`) y sus pruebas. Ningún golden de importes, rutas o copy; ninguna cadena
+nueva. El iPhone debe confirmar que el secundario más oscuro no endurece las leyendas de las
+acciones ni las filas en claro, y que el terciario sigue leyéndose como «apagado» en los
+centavos del héroe.
+
+**Propuestas para una iteración con comparación visual (no implementadas).** Cada una requiere
+dos capturas del mismo estado, claro y oscuro, en un iPhone de 6,1″ y en uno de 6,7″, al tamaño
+de texto por defecto y al mayor de accesibilidad:
+- *Asistente sin duplicado.* A: la fila actual (Asistente, Gasto, Ingreso, Transferir). B: tres
+  acciones (Gasto, Ingreso, Transferir) y, en el lugar del Asistente, una fila conversacional de
+  ancho completo bajo las acciones («Contale al Asistente…», con el glifo sparkles y el
+  micrófono) que abre la pestaña central con el compositor enfocado. C: la fila actual con el
+  Asistente en el centro. Comparar: reconocibilidad del Asistente como función central,
+  alcance con el pulgar, y si B se lee como un campo de búsqueda (riesgo).
+- *Estado vacío del mes.* A: las dos frases actuales. B: un solo bloque «Este mes todavía no
+  hay movimientos en ARS» con la acción Gasto como botón secundario, y los títulos de sección
+  ocultos hasta que haya datos. Comparar en un libro con datos en otra moneda y en otro mes.
+- *Escalones del secundario.* A y B con los tokens anteriores y los nuevos, misma pantalla, para
+  cerrar el punto 1 en el dispositivo.
 
 ## Pendiente de revisión en iPhone
 

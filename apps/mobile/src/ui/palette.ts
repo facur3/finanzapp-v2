@@ -9,7 +9,10 @@
  * category-color.ts are a separate, muted family. Normal text is never blue. */
 export const lightPalette = {
   background: '#F2F2F6', surface: '#FFFFFF', inset: '#EEEEF3', elevated: '#FFFFFF',
-  text: '#0A0A0C', secondary: '#6E7078', tertiary: '#8E9098', line: '#E6E6EC',
+  /** Secondary reads as text on every ground it sits on (24UX1: 5.0:1 on the background, 4.8:1 on the inset
+   * track; it was 4.4:1 and 4.3:1); tertiary is for glyphs, placeholders and the hero's cents, 3.3:1 on the
+   * background (it was 2.9:1). */
+  text: '#0A0A0C', secondary: '#66686F', tertiary: '#84868D', line: '#E6E6EC',
   /** Cobalt: selection, links and icons (6.2:1 on white). */
   primary: '#2557D6',
   /** The filled call to action; white text on it. */
