@@ -8,7 +8,7 @@ import { PREVIEW, REGIONS, REGION_REGISTRY, RELEASED, RELEASED_REGIONS, composeL
   type RegionCode, type ReleasedSets } from '../src/i18n/locale.ts';
 import { REGION_PREFERENCE_KEY, type PreferenceStore } from '../src/i18n/preference.ts';
 import { readRecent, rememberRecent } from '../src/i18n/recent.ts';
-import { REGION_RELEASE_STAGES, dateFamily, numberFamily, releasedByStages, stageFamilies, stageOf } from '../src/i18n/region-release.ts';
+import { REGION_RELEASE_STAGES, dateFamily, numberFamily, releasedByStages, stageFamilies, stageOf, writesNativeDigits } from '../src/i18n/region-release.ts';
 import { REGION_CODES, REGION_DATA } from '../src/i18n/regions/index.ts';
 import { activeRegionChoice, createLocaleStore, pendingRegionChoice, type DeviceReading } from '../src/i18n/store.ts';
 import { buildChoiceRows, filterChoices } from '../src/ui/choice-list.ts';
@@ -38,7 +38,7 @@ test('REGIONS is derived from the catalogue: 257 regions, every writing field CL
     const record = REGION_DATA[code], conventions = REGIONS[code];
     const expected = { decimal: record.decimal, group: record.group, dateOrder: record.dateOrder, hour12: record.hour12, dollarSignCurrency: record.dollarSignCurrency,
       dateSeparator: record.dateSeparator, paddedDate: record.paddedDate, secondaryGrouping: record.secondaryGrouping, minimumGroupingDigits: record.minimumGroupingDigits,
-      weekStart: record.weekStart, ...(REGION_REGISTRY as Record<string, object>)[code] };
+      weekStart: record.weekStart, datePattern: record.datePattern, dayMonthPattern: record.dayMonthPattern, timePattern: record.timePattern, ...(REGION_REGISTRY as Record<string, object>)[code] };
     assert.deepEqual({ ...conventions }, expected, code);
     assert.ok(isRegionCode(code));
     assert.equal(Object.isFrozen(conventions), true, 'no caller can change a region\'s writing at run time');
@@ -67,19 +67,19 @@ test('language × region: the words follow the language, every number, date and 
   // minimum grouping, a big one, yen, a negative dollar amount, a numeric date, a day of the period, a time, a count,
   // a percentage, a worded date, VoiceOver, the date wheel.
   const rows: [AppLocale, string][] = [
-    ['es-JP', '12,345.67 | 1,234.56 | 1,234,567,890.12 | 150,000 | −US$ 1,234.56 | 2026/09/05 | 09/05 | 2026/09/22, 14:03 | 12,345 | 12.3 % | 22 sep 2026 | 1234,56 pesos | es_AR'],
-    ['en-JP', '12,345.67 | 1,234.56 | 1,234,567,890.12 | 150,000 | −US$ 1,234.56 | 2026/09/05 | 09/05 | 2026/09/22, 14:03 | 12,345 | 12.3% | Sep 22, 2026 | 1234.56 pesos | en_US'],
+    ['es-JP', '12,345.67 | 1,234.56 | 1,234,567,890.12 | 150,000 | −US$ 1,234.56 | 2026/09/05 | 9/5 | 2026/09/22, 14:03 | 12,345 | 12.3 % | 22 sep 2026 | 1234,56 pesos | es_AR'],
+    ['en-JP', '12,345.67 | 1,234.56 | 1,234,567,890.12 | 150,000 | −US$ 1,234.56 | 2026/09/05 | 9/5 | 2026/09/22, 14:03 | 12,345 | 12.3% | Sep 22, 2026 | 1234.56 pesos | en_US'],
     ['en-IN', '12,345.67 | 1,234.56 | 1,23,45,67,890.12 | 1,50,000 | −US$ 1,234.56 | 5/9/2026 | 5/9 | 22/9/2026, 2:03 PM | 12,345 | 12.3% | Sep 22, 2026 | 1234.56 pesos | en_US'],
     ['es-IN', '12,345.67 | 1,234.56 | 1,23,45,67,890.12 | 1,50,000 | −US$ 1,234.56 | 5/9/2026 | 5/9 | 22/9/2026, 2:03 p. m. | 12,345 | 12.3 % | 22 sep 2026 | 1234,56 pesos | es_AR'],
-    ['es-CH', "12'345.67 | 1'234.56 | 1'234'567'890.12 | 150'000 | −US$ 1'234.56 | 05.09.2026 | 05.09 | 22.09.2026, 14:03 | 12'345 | 12.3 % | 22 sep 2026 | 1234,56 pesos | es_AR"],
-    ['es-DE', '12.345,67 | 1.234,56 | 1.234.567.890,12 | 150.000 | −US$ 1.234,56 | 05.09.2026 | 05.09 | 22.09.2026, 14:03 | 12.345 | 12,3 % | 22 sep 2026 | 1234,56 pesos | es_AR'],
+    ['es-CH', "12'345.67 | 1'234.56 | 1'234'567'890.12 | 150'000 | −US$ 1'234.56 | 05.09.2026 | 5.9. | 22.09.2026, 14:03 | 12'345 | 12.3 % | 22 sep 2026 | 1234,56 pesos | es_AR"],
+    ['es-DE', '12.345,67 | 1.234,56 | 1.234.567.890,12 | 150.000 | −US$ 1.234,56 | 05.09.2026 | 5.9. | 22.09.2026, 14:03 | 12.345 | 12,3 % | 22 sep 2026 | 1234,56 pesos | es_AR'],
     ['en-FR', '12 345,67 | 1 234,56 | 1 234 567 890,12 | 150 000 | −US$ 1 234,56 | 05/09/2026 | 05/09 | 22/09/2026, 14:03 | 12 345 | 12,3% | Sep 22, 2026 | 1234.56 pesos | en_US'],
-    ['es-PL', '12 345,67 | 1234,56 | 1 234 567 890,12 | 150 000 | −US$ 1234,56 | 05.09.2026 | 05.09 | 22.09.2026, 14:03 | 12 345 | 12,3 % | 22 sep 2026 | 1234,56 pesos | es_AR'],
+    ['es-PL', '12 345,67 | 1234,56 | 1 234 567 890,12 | 150 000 | −US$ 1234,56 | 5.09.2026 | 5.09 | 22.09.2026, 14:03 | 12 345 | 12,3 % | 22 sep 2026 | 1234,56 pesos | es_AR'],
     ['es-ES', '12.345,67 | 1234,56 | 1.234.567.890,12 | 150.000 | −US$ 1234,56 | 5/9/2026 | 5/9 | 22/9/2026, 14:03 | 12.345 | 12,3 % | 22 sep 2026 | 1234,56 pesos | es_AR'],
     ['en-GB', '12,345.67 | 1,234.56 | 1,234,567,890.12 | 150,000 | −US$ 1,234.56 | 05/09/2026 | 05/09 | 22/09/2026, 14:03 | 12,345 | 12.3% | Sep 22, 2026 | 1234.56 pesos | en_US'],
     ['es-CA', '12,345.67 | 1,234.56 | 1,234,567,890.12 | 150,000 | −US$ 1,234.56 | 2026-09-05 | 09-05 | 2026-09-22, 2:03 p. m. | 12,345 | 12.3 % | 22 sep 2026 | 1234,56 pesos | es_AR'],
     ['en-BR', '12.345,67 | 1.234,56 | 1.234.567.890,12 | 150.000 | −US$ 1.234,56 | 05/09/2026 | 05/09 | 22/09/2026, 14:03 | 12.345 | 12,3% | Sep 22, 2026 | 1234.56 pesos | en_US'],
-    ['es-MX', '12,345.67 | 1,234.56 | 1,234,567,890.12 | 150,000 | −US$ 1,234.56 | 05/09/2026 | 05/09 | 22/09/2026, 2:03 p. m. | 12,345 | 12.3 % | 22 sep 2026 | 1234,56 pesos | es_AR'],
+    ['es-MX', '12,345.67 | 1,234.56 | 1,234,567,890.12 | 150,000 | −US$ 1,234.56 | 05/09/2026 | 5/9 | 22/09/2026, 2:03 p. m. | 12,345 | 12.3 % | 22 sep 2026 | 1234,56 pesos | es_AR'],
     ['en-CR', '12 345,67 | 1 234,56 | 1 234 567 890,12 | 150 000 | −US$ 1 234,56 | 5/9/2026 | 5/9 | 22/9/2026, 2:03 PM | 12 345 | 12,3% | Sep 22, 2026 | 1234.56 pesos | en_US'],
   ];
   const plain = (text: string) => text.replace(/[  ]/g, ' ');
@@ -99,6 +99,34 @@ test('language × region: the words follow the language, every number, date and 
     ['1.234,56 | 5/9/2026 | 5/09 | 22/9/2026, 14:03', '1,234.56 | 9/5/2026 | 9/5 | 9/22/2026, 2:03 PM', '1.234,56 | 5/9/2026 | 5/09 | 22/9/2026, 14:03', '1,234.56 | 9/5/2026 | 9/5 | 9/22/2026, 2:03 p. m.']);
 });
 
+test('the 24R2B date audit: spaced and period-ended dates, words of another script dropped, the time separator and the unpadded 24-hour clock as CLDR writes them', () => {
+  const N = NBSP;
+  const cases: [AppLocale, string, string, string][] = [
+    ['es-KR', `2026.${N}9.${N}5.`, `9.${N}5.`, `2026.${N}9.${N}22.${N}9:03${N}a.${N}m.`],
+    ['en-HU', `2026.${N}09.${N}05.`, `9.${N}5.`, `2026.${N}09.${N}22.${N}9:03`],
+    ['es-HR', `05.${N}09.${N}2026.`, `05.${N}09.`, `22.${N}09.${N}2026.${N}09:03`],
+    ['es-RS', `5.${N}9.${N}2026.`, `5.${N}9.`, `22.${N}9.${N}2026.${N}09:03`],
+    ['es-SK', `5.${N}9.${N}2026`, `5.${N}9.`, `22.${N}9.${N}2026, 9:03`],
+    ['es-BG', '5.09.2026', '5.09', '22.09.2026, 09:03'],
+    ['es-MK', '5.9.2026', '5.9', '22.9.2026, 09:03'],
+    ['en-FI', '5.9.2026', '5.9.', '22.9.2026, 9.03'],
+    ['es-DK', '05.09.2026', '5.9', '22.09.2026, 09.03'],
+    ['es-TH', '5/9/2026', '5/9', '22/9/2026, 09:03'],
+    ['en-MN', '2026.09.05', '09.05', '2026.09.22, 09:03'],
+    ['es-CZ', '05.09.2026', `5.${N}9.`, '22.09.2026, 9:03'],
+    ['es-ES', '5/9/2026', '5/9', '22/9/2026, 9:03'],
+  ];
+  for (const [locale, date, dayMonth, time] of cases) {
+    const i = bindLocale(locale);
+    assert.deepEqual([i.formatNumericDate('2026-09-05'), i.formatDayMonth('2026-09-05'), i.formatDateTime('2026-09-22T09:03:00')], [date, dayMonth, time], locale);
+  }
+  // No date or time in the catalogue keeps a letter, a bidi mark or a plain (breakable) space.
+  for (const code of REGION_CODES) for (const field of ['datePattern', 'dayMonthPattern', 'timePattern'] as const) {
+    const template = REGIONS[code][field].replace(/y|MM?|dd?|HH?|mm/g, '');
+    assert.match(template, /^[./\-:\u00A0]*$/, `${code} ${field}: ${REGIONS[code][field]}`);
+  }
+});
+
 test('every catalogue region and both languages: no formatter throws, VoiceOver is never grouped, a spoken amount is the same number in every region', () => {
   for (const region of REGION_CODES) for (const language of ['es', 'en'] as const) {
     const i = bindLocale(composeLocale(language, region));
@@ -107,7 +135,7 @@ test('every catalogue region and both languages: no formatter throws, VoiceOver 
     assert.equal(i.pickerLocale, language === 'es' ? 'es_AR' : 'en_US', 'the date wheel follows the language');
     assert.ok(i.formatMoneyAmount(-123456789, 'ARS').startsWith('-'));
     assert.match(i.formatNumericDate('2026-09-05'), /2026/);
-    assert.match(i.formatDateTime('2026-09-22T14:03:00'), REGIONS[region].hour12 ? /2:03/ : /14:03/);
+    assert.match(i.formatDateTime('2026-09-22T14:03:00'), REGIONS[region].hour12 ? /\b2[:.]03\u00A0/ : /\b14[:.]03$/);
   }
 });
 
@@ -238,9 +266,13 @@ test('"Según el dispositivo" reads the iPhone\'s Region setting: never the lang
   assert.equal(read({ source: 'native', locales: [{ languageTag: 'es-AR', regionCode: 'CH' }, { languageTag: 'en-GB', regionCode: 'GB' }] }).region, 'CH', 'the first locale\'s Region, never a second language\'s');
   assert.equal(read({ source: 'intl', locales: [{ languageTag: 'de-CH' }] }).region, 'CH', 'only Intl answered (an older binary): the tag it gives');
   assert.equal(read(device('es-AR', 'ZZ')).region, 'AR', 'a Region the catalogue does not know: the default');
-  // Released gate: the device's Japan is detected and named, Argentina's formats stand in.
-  const release = createLocaleStore({ devices: () => device('es-AR', 'JP'), store: memory().store }).getState();
-  assert.deepEqual([release.region, release.device.detectedRegion], ['AR', 'JP']);
+  // The release gate (24R2B): the device's Japan is released and written; a blocked Saudi Arabia is detected and named,
+  // Argentina's formats stand in.
+  const japan = createLocaleStore({ devices: () => device('es-AR', 'JP'), store: memory().store }).getState();
+  assert.deepEqual([japan.region, japan.device.detectedRegion, japan.locale], ['JP', 'JP', 'es-JP'], 'the initial region comes from the device');
+  const saudi = createLocaleStore({ devices: () => device('ar-SA', 'SA'), store: memory().store }).getState();
+  assert.deepEqual([saudi.region, saudi.device.detectedRegion], ['AR', 'SA']);
+  assert.equal(regionChooser(saudi, bindLocale(saudi.locale).t).pinned.subtitle, 'Ahora: Arabia Saudí (formatos de Argentina)');
   // No location API anywhere in the app.
   const offenders: string[] = [];
   const walk = (dir: URL) => { for (const entry of readdirSync(dir, { withFileTypes: true })) {
@@ -256,34 +288,34 @@ test('"Según el dispositivo" reads the iPhone\'s Region setting: never the lang
 test('a region chosen in a development preview is saved, kept by a release build without being applied, shown with its stand-in, and applied once released', () => {
   const saved = memory();
   const preview = createLocaleStore({ devices: () => device('es-AR', 'AR'), store: saved.store, released: PREVIEW });
-  assert.equal(preview.setRegion('JP'), true, 'the preview offers every catalogue region');
-  assert.equal(preview.getState().locale, 'es-JP');
-  assert.equal(saved.rows.get(REGION_PREFERENCE_KEY), 'JP', 'saved before applied');
-  assert.equal(regionPreferenceFrom('JP'), 'JP');
-  // The same rows under a release build (RELEASED: AR and US): kept, not applied.
+  assert.equal(preview.setRegion('SA'), true, 'the preview offers every catalogue region, the blocked ones included');
+  assert.equal(preview.getState().locale, 'es-SA');
+  assert.equal(saved.rows.get(REGION_PREFERENCE_KEY), 'SA', 'saved before applied');
+  assert.equal(regionPreferenceFrom('SA'), 'SA');
+  // The same rows under the release build (Saudi Arabia blocked): kept, not applied.
   const release = createLocaleStore({ devices: () => device('es-AR', 'US'), store: saved.store });
   let state = release.getState();
-  assert.deepEqual([state.preferences.region, state.region, activeRegionChoice(state), pendingRegionChoice(state)], ['JP', 'US', 'system', 'JP'],
-    'the saved Japan waits; the device\'s released Region writes meanwhile');
-  assert.equal(saved.rows.get(REGION_PREFERENCE_KEY), 'JP', 'never overwritten by the app');
-  assert.equal(release.setRegion('JP'), false, 'a release build never saves an unreleased region');
+  assert.deepEqual([state.preferences.region, state.region, activeRegionChoice(state), pendingRegionChoice(state)], ['SA', 'US', 'system', 'SA'],
+    'the saved Saudi Arabia waits; the device\'s released Region writes meanwhile');
+  assert.equal(saved.rows.get(REGION_PREFERENCE_KEY), 'SA', 'never overwritten by the app');
+  assert.equal(release.setRegion('SA'), false, 'a release build never saves a blocked region');
   const t = bindLocale(state.locale).t;
-  assert.equal(preferenceSummary('region', state, t), 'Japón · formatos de Estados Unidos', 'the Más row says what is written');
+  assert.equal(preferenceSummary('region', state, t), 'Arabia Saudí · formatos de Estados Unidos', 'the Más row says what is written');
   const chooser = regionChooser(state, t);
-  assert.deepEqual(chooser.options.map(option => [option.value, option.subtitle]), [['AR', '22/9/2026 · 1.234,56'], ['US', '9/22/2026 · 1,234.56'],
-    ['JP', 'Todavía no disponible en esta versión · formatos de Estados Unidos']]);
-  assert.equal(chooser.selected, 'JP', 'the checkmark on what the person chose, with the stand-in named');
-  assert.equal(chooser.acceptRecent('JP'), false, 'an unreleased region is never offered as a recent');
-  // The next build releases Japan: the same rows apply with no action.
-  const later: ReleasedSets = { languages: RELEASED.languages, regions: [...RELEASED.regions, 'JP'] };
+  assert.equal(chooser.options.length, 235, 'the 234 released regions and the kept one');
+  assert.equal(chooser.options.find(option => option.value === 'SA')!.subtitle, 'Todavía no disponible en esta versión · formatos de Estados Unidos');
+  assert.equal(chooser.selected, 'SA', 'the checkmark on what the person chose, with the stand-in named');
+  assert.equal(chooser.acceptRecent('SA'), false, 'a blocked region is never offered as a recent');
+  // A build that releases it: the same rows apply with no action.
+  const later: ReleasedSets = { languages: RELEASED.languages, regions: [...RELEASED.regions, 'SA'] };
   state = createLocaleStore({ devices: () => device('es-AR', 'US'), store: saved.store, released: later }).getState();
-  assert.deepEqual([state.locale, pendingRegionChoice(state), activeRegionChoice(state)], ['es-JP', null, 'JP']);
+  assert.deepEqual([state.locale, pendingRegionChoice(state), activeRegionChoice(state)], ['es-SA', null, 'SA']);
   // Choosing a released region replaces it; "Según el dispositivo" removes the key.
-  assert.equal(release.setRegion('AR'), true);
-  assert.deepEqual([release.getState().region, pendingRegionChoice(release.getState())], ['AR', null]);
+  assert.equal(release.setRegion('JP'), true);
+  assert.deepEqual([release.getState().region, pendingRegionChoice(release.getState())], ['JP', null]);
   assert.equal(release.setRegion('system'), true);
   assert.equal(saved.rows.has(REGION_PREFERENCE_KEY), false);
-  assert.equal(resolveRegion([{ languageTag: 'es-AR', regionCode: 'JP' }], 'JP'), 'AR', 'an unreleased choice falls through to the device, then the default');
+  assert.equal(resolveRegion([{ languageTag: 'es-AR', regionCode: 'SA' }], 'SA'), 'AR', 'a blocked choice falls through to the device, then the default');
 });
 
 test('language and region stay independent across every combination: changing one never moves the other or the stored rows of the other', () => {
@@ -301,32 +333,34 @@ test('language and region stay independent across every combination: changing on
 
 // ---- The choosers -----------------------------------------------------------
 
-test('the choosers: a short released list is one card; the preview\'s 257 regions are searchable by name, ISO code, alpha-3, numeric code and currency, with recents and sections', () => {
+test('the choosers: two languages are one card; the 234 released regions are searchable by name, ISO code, alpha-3, numeric code and currency, with recents and sections, in both languages', () => {
   const release = createLocaleStore({ devices: () => device('es-AR', 'AR'), store: memory().store }).getState();
   const t = bindLocale('es-AR').t;
-  const short = regionChooser(release, t);
-  assert.deepEqual([short.pinned.value, ...short.options.map(option => option.value)], ['system', 'AR', 'US']);
-  assert.doesNotMatch(short.note, /Vista previa/, 'a release says nothing about previews');
   assert.deepEqual(languageChooser(release, t).options.map(option => [option.title, option.language]), [['Español', 'es'], ['English', 'en']], 'autonyms with their own voice');
   assert.deepEqual(filterChoices('english', languageChooser(release, t).options).map(option => option.value), ['en']);
-
-  const preview = createLocaleStore({ devices: () => device('es-AR', 'AR'), store: memory().store, released: PREVIEW }).getState();
-  const long = regionChooser(preview, t);
-  assert.equal(long.options.length, 257);
-  assert.match(long.note, /Vista previa de desarrollo/, 'the preview says its regions are not verified yet');
+  const long = regionChooser(release, t);
+  assert.equal(long.options.length, 234);
+  assert.doesNotMatch(long.note, /Vista previa/, 'a release says nothing about previews');
+  assert.equal(long.options.some(option => option.value === 'SA'), false, 'a blocked region is not offered');
   const search = (query: string) => filterChoices(query, long.options).slice(0, 3).map(option => option.value);
   assert.deepEqual(search('japon')[0], 'JP', 'by name, accents ignored');
   assert.deepEqual(search('jp')[0], 'JP', 'by alpha-2');
   assert.deepEqual(search('jpn')[0], 'JP', 'by alpha-3');
   assert.deepEqual(search('392')[0], 'JP', 'by numeric code');
   assert.ok(search('chf').includes('CH'), 'by currency');
+  assert.deepEqual(search('corea'), ['KP', 'KR'], 'both Koreas, alphabetically');
   assert.equal(long.options.find(option => option.value === 'IN')!.subtitle, '22/9/2026 · 1,234.56', 'each row shows its own formats');
+  assert.equal(long.options.find(option => option.value === 'KR')!.subtitle, '2026.\u00A09.\u00A022. · 1,234.56', 'Korea\'s date as CLDR writes it');
   const rows = buildChoiceRows({ pinned: long.pinned, recent: ['JP', 'IN'], options: long.options, selected: long.selected, recentTitle: 'Recientes' });
   assert.deepEqual(rows.slice(0, 5).map(row => row.kind === 'header' ? '# ' + row.title : row.option.value), ['system', '# Recientes', 'JP', 'IN', '# A']);
   // English interface: CLDR's English names, sections by their initials.
-  const english = regionChooser({ ...preview, language: 'en' }, bindLocale('en-AR').t);
+  const english = regionChooser({ ...release, language: 'en' }, bindLocale('en-AR').t);
   assert.equal(english.options.find(option => option.value === 'DE')!.title, 'Germany');
   assert.equal(filterChoices('alemania', english.options).length, 0, 'searched in the interface language');
+  // The preview adds the blocked 23 and says so.
+  const preview = regionChooser(createLocaleStore({ devices: () => device('es-AR', 'AR'), store: memory().store, released: PREVIEW }).getState(), t);
+  assert.equal(preview.options.length, 257);
+  assert.match(preview.note, /Vista previa de desarrollo/);
 });
 
 test('recents: the last three choices, most recent first, only values the chooser still accepts, stored beside the preferences', () => {
@@ -342,22 +376,27 @@ test('recents: the last three choices, most recent first, only values the choose
 
 // ---- The release plan ---------------------------------------------------------
 
-test('the release plan: RELEASED_REGIONS equals the released stages; the stages are disjoint and together cover every number family of the catalogue', () => {
-  assert.deepEqual([...releasedByStages()].sort(), [...RELEASED_REGIONS].sort(), 'opening a stage is one commit that flips its status after its device QA');
-  assert.deepEqual(REGION_RELEASE_STAGES.filter(stage => stage.status === 'released').map(stage => stage.id), ['home']);
+test('the release plan: every region in exactly one stage, five continents released on automated evidence, the 23 native-digit regions blocked with their reason', () => {
+  assert.deepEqual([...releasedByStages()], [...RELEASED_REGIONS]);
+  assert.deepEqual(REGION_RELEASE_STAGES.map(stage => [stage.id, stage.status, stage.evidence, stage.regions.length]), [
+    ['home', 'released', 'device', 2], ['americas', 'released', 'automated', 55], ['europe', 'released', 'automated', 53], ['asia', 'released', 'automated', 34],
+    ['africa', 'released', 'automated', 56], ['oceania', 'released', 'automated', 34], ['native-digits', 'blocked', null, 23]]);
   const planned = REGION_RELEASE_STAGES.flatMap(stage => stage.regions);
-  assert.equal(new Set(planned).size, planned.length, 'no region in two stages');
-  for (const code of planned) assert.ok(isRegionCode(code), code);
+  assert.equal(planned.length, 257, 'no region outside a stage');
+  assert.equal(new Set(planned).size, 257, 'no region in two stages');
+  for (const stage of REGION_RELEASE_STAGES) for (const code of stage.regions) {
+    if (stage.id !== 'home' && stage.id !== 'native-digits') assert.equal(REGION_DATA[code].continent, stage.id, code);
+    assert.equal(writesNativeDigits(code), stage.id === 'native-digits', code);
+  }
+  assert.deepEqual([...stageOf('SA')!.regions].sort(), ['AF', 'BD', 'BH', 'BT', 'EG', 'IQ', 'IR', 'JO', 'KM', 'KW', 'LB', 'MM', 'MR', 'NP', 'OM', 'PS', 'QA', 'SA', 'SD', 'SS', 'SY', 'TD', 'YE']);
+  assert.match(stageOf('SA')!.blocker!, /decimal pad/);
+  assert.equal(REGION_RELEASE_STAGES.every(stage => (stage.status === 'blocked') === (stage.blocker !== null)), true, 'a blocked stage says why, a released one does not');
+  // Every number family of the catalogue is released somewhere; the released stages cover them all.
   const families = new Set(REGION_CODES.map(numberFamily));
   assert.equal(families.size, 8, 'eight ways to write a number in the catalogue');
-  const covered = new Set(REGION_RELEASE_STAGES.flatMap(stage => stageFamilies(stage).numbers));
-  assert.deepEqual([...families].filter(family => !covered.has(family)), [], 'every number family has a stage that checks it on the iPhone');
-  assert.deepEqual(stageFamilies(REGION_RELEASE_STAGES.find(stage => stage.id === 'india')!).numbers, ["decimal '.' · group ',' · 3/2 · min 1"]);
-  assert.deepEqual(stageFamilies(REGION_RELEASE_STAGES.find(stage => stage.id === 'narrow-space')!).numbers, ["decimal ',' · group 'U+202F' · 3/3 · min 1"]);
-  assert.equal(dateFamily('JP'), "ymd '/' · padded · 24 h");
-  assert.equal(stageOf('MX')!.id, 'spanish');
-  assert.equal(stageOf('KP'), null, 'a region outside every stage stays unreleased until a later stage lists it');
-  // The preview offers the catalogue; the release only the released stages.
+  const released = new Set(REGION_RELEASE_STAGES.filter(stage => stage.status === 'released').flatMap(stage => stageFamilies(stage).numbers));
+  assert.deepEqual([...families].filter(family => !released.has(family)), []);
+  assert.equal(dateFamily('JP'), 'y/MM/dd · M/d · H:mm · 24 h');
+  assert.equal(dateFamily('KR'), 'y.␣M.␣d. · M.␣d. · HH:mm · 12 h');
   assert.equal(PREVIEW.regions.length, 257);
-  assert.deepEqual([...RELEASED.regions], ['AR', 'US']);
 });

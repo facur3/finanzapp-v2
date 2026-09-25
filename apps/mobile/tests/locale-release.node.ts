@@ -35,13 +35,14 @@ console.error = (...args: unknown[]) => { if (!String(args[0]).startsWith('react
 const root = resolve(new URL('..', import.meta.url).pathname);
 const FLAG = 'EXPO_PUBLIC_LOCALE_PREVIEW';
 
-test('the release: Spanish and English, Argentina and the United States; the development preview adds the catalogue regions only', () => {
+test('the release: Spanish and English, 234 regions (24R2B); the development preview adds only the 23 blocked native-digit regions', () => {
   assert.deepEqual([...RELEASED_LANGUAGES], ['es', 'en']);
-  assert.deepEqual([...RELEASED_REGIONS], ['AR', 'US']);
-  assert.deepEqual(RELEASED, { languages: ['es', 'en'], regions: ['AR', 'US'] });
+  assert.equal(RELEASED_REGIONS.length, 234);
+  assert.deepEqual(RELEASED, { languages: ['es', 'en'], regions: RELEASED_REGIONS });
+  assert.equal(PREVIEW.regions.filter(region => !RELEASED_REGIONS.includes(region)).length, 23);
   // A future catalogue may sit in LANGUAGES before RELEASED_LANGUAGES (previewable in FinanzApp Dev); update this line then.
   assert.deepEqual(PREVIEW.languages, RELEASED.languages, 'no language is held back');
-  assert.equal(PREVIEW.regions.length, 257, '24R2A: FinanzApp Dev started with the flag offers every catalogue region, for the family QA of 24R2B');
+  assert.equal(PREVIEW.regions.length, 257, 'FinanzApp Dev started with the flag offers every catalogue region');
   for (const language of RELEASED_LANGUAGES) assert.ok(SUPPORTED_LANGUAGES.includes(language), 'a released language has a catalogue: ' + language);
   for (const region of RELEASED_REGIONS) assert.ok(SUPPORTED_REGIONS.includes(region), 'a released region has conventions: ' + region);
 });
@@ -192,7 +193,9 @@ test('a release bundle mounted without a store prop, on an iPhone in English (Un
   assert.equal(state.released, RELEASED);
   assert.deepEqual(optionsOf('language', state, i18n!.t).map(option => [option.value, option.title, option.language ?? '']),
     [['system', 'Same as device', ''], ['es', 'Español', 'es'], ['en', 'English', 'en']]);
-  assert.deepEqual(optionsOf('region', state, i18n!.t).map(option => option.value), ['system', 'AR', 'US']);
+  const regions = optionsOf('region', state, i18n!.t).map(option => option.value);
+  assert.deepEqual([regions.length, regions[0], regions.includes('US'), regions.includes('JP'), regions.includes('SA')], [235, 'system', true, true, false],
+    '24R2B: the device option and the 234 released regions; no blocked one');
   assert.equal(localeOptions.showsPreference('region', state), true, 'Más shows Región');
   assert.deepEqual(events, ['add onLocaleSettingsChanged'], "subscribed to iOS's locale-change event");
   React.act(() => mounted.unmount());
@@ -214,7 +217,13 @@ test('the release bundle\'s Idioma lists Español and English, each spoken in it
   assert.equal(mounted.root.findByType('Stack.Screen' as never).props.options.title, 'Language', 'English chosen in a release bundle applies in place');
   assert.equal(note(), 'Changing the language or the region does not modify your transactions, accounts or backups.');
   React.act(() => mounted.update(React.createElement(provider.I18nProvider, null, React.createElement(LocalePreferenceScreen, { kind: 'region' }))));
-  assert.deepEqual(rows().map(row => [row.title, row.subtitle ?? '', row.accessibilityLanguage ?? '']),
-    [['Same as device', 'Now: Argentina', ''], ['Argentina', '22/9/2026 · 1.234,56', ''], ['United States', '9/22/2026 · 1,234.56', '']]);
+  // 24R2B: 234 regions, so the search field, the letter sections and the device row pinned above them.
+  assert.equal(rows().length, 235);
+  assert.deepEqual([rows()[0].title, rows()[0].subtitle], ['Same as device', 'Now: Argentina']);
+  React.act(() => mounted.root.findByType('Field' as never).props.onChangeText('united states'));
+  assert.deepEqual(rows().slice(0, 2).map(row => [row.title, row.subtitle ?? '', row.accessibilityLanguage ?? '']),
+    [['Same as device', 'Now: Argentina', ''], ['United States', '9/22/2026 · 1,234.56', '']]);
+  React.act(() => mounted.root.findByType('Field' as never).props.onChangeText('ARG'));
+  assert.deepEqual(rows().slice(0, 2).map(row => [row.title, row.subtitle ?? '']), [['Same as device', 'Now: Argentina'], ['Argentina', '22/9/2026 · 1.234,56']]);
   React.act(() => mounted.unmount());
 });

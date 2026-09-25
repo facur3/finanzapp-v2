@@ -79,8 +79,8 @@ test('the catalogue lists every country and territory once, named in every langu
   // Lakh and crore: the Indian grouping, only where CLDR writes it.
   assert.deepEqual(REGION_CODES.filter(code => REGION_DATA[code].secondaryGrouping === 2), ['BD', 'BT', 'IN', 'NP']);
   // A handful of pinned facts, so a regenerated catalogue that silently changed them fails here.
-  assert.deepEqual(REGION_DATA.JP, { alpha3: 'JPN', numeric: '392', language: 'ja', sourceLocale: 'ja', decimal: '.', group: ',', primaryGrouping: 3, secondaryGrouping: 3, minimumGroupingDigits: 1,
-    dateOrder: 'ymd', dateSeparator: '/', paddedDate: true, hour12: false, weekStart: 0, currencies: ['JPY'], dollarSignCurrency: null });
+  assert.deepEqual(REGION_DATA.JP, { alpha3: 'JPN', numeric: '392', continent: 'asia', language: 'ja', sourceLocale: 'ja', decimal: '.', group: ',', defaultDigits: 'latn', primaryGrouping: 3, secondaryGrouping: 3, minimumGroupingDigits: 1,
+    dateOrder: 'ymd', dateSeparator: '/', paddedDate: true, datePattern: 'y/MM/dd', dayMonthPattern: 'M/d', timePattern: 'H:mm', hour12: false, weekStart: 0, currencies: ['JPY'], dollarSignCurrency: null });
   assert.deepEqual([REGION_DATA.GB.dateOrder, REGION_DATA.GB.paddedDate, REGION_DATA.GB.hour12, REGION_DATA.GB.weekStart, REGION_DATA.GB.currencies], ['dmy', true, false, 1, ['GBP']]);
   assert.deepEqual([REGION_DATA.DE.decimal, REGION_DATA.DE.group, REGION_DATA.DE.dateSeparator, REGION_DATA.DE.currencies], [',', '.', '.', ['EUR']]);
   assert.deepEqual([REGION_DATA.CH.decimal, REGION_DATA.CH.group, REGION_DATA.CH.dateSeparator], ['.', "'", '.']);
@@ -94,7 +94,7 @@ test('the catalogue lists every country and territory once, named in every langu
 });
 
 test('the released registry is what CLDR says about Argentina and the United States, except the one deliberate deviation, which is listed with its reason', () => {
-  for (const code of RELEASED_REGIONS) {
+  for (const code of ['AR', 'US'] as const) {
     const cldr = REGION_DATA[code], registry = completeConventions(REGIONS[code]);
     for (const key of ['decimal', 'group', 'dateOrder', 'dollarSignCurrency'] as const) assert.equal(registry[key], cldr[key], `${code} ${key}`);
     assert.equal(cldr.paddedDate, false, code + ': CLDR writes the short date unpadded, as the registry does');
@@ -152,6 +152,7 @@ test('a synthetic build: two regions through the real generator, the English fal
     'weekData.json': JSON.stringify({ supplemental: { weekData: { firstDay: { '001': 'mon', US: 'sun' } } } }),
     'timeData.json': JSON.stringify({ supplemental: { timeData: { '001': { _preferred: 'H' }, AR: { _preferred: 'h' }, US: { _preferred: 'h' } } } }),
     'codeMappings.json': JSON.stringify({ supplemental: { codeMappings: { AR: { _alpha3: 'ARG', _numeric: '032' }, US: { _alpha3: 'USA', _numeric: '840' } } } }),
+    'territoryContainment.json': JSON.stringify({ supplemental: { territoryContainment: { '019': { _contains: ['005', '021'] }, '005': { _contains: ['AR'] }, '021': { _contains: ['US'] } } } }),
     'currencyData.json': JSON.stringify({ supplemental: { currencyData: { region: { AR: [{ ARA: { _from: '1985-06-14', _to: '1992-01-01' } }, { ARS: { _from: '1992-01-01' } }], US: [{ USD: { _from: '1792-01-01' } }, { USN: { _tender: 'false' } }] } } } }),
     'territories-es.json': JSON.stringify({ main: { es: { localeDisplayNames: { territories: { AR: 'Argentina', US: 'Estados Unidos' } } } } }),
     'territories-en.json': JSON.stringify({ main: { en: { localeDisplayNames: { territories: { AR: 'Argentina', US: 'United States' } } } } }),
@@ -162,21 +163,25 @@ test('a synthetic build: two regions through the real generator, the English fal
   const registry = { AR: { decimal: ',', group: '.', dateOrder: 'dmy', hour12: false, dollarSignCurrency: 'ARS' }, US: { decimal: '.', group: ',', dateOrder: 'mdy', hour12: true, dollarSignCurrency: 'USD' } };
   const { records } = build(files, ['en', 'es'], currencies, registry);
   assert.deepEqual(records.map((record: { code: string }) => record.code), ['AR', 'US'], 'EU is not a place');
-  assert.deepEqual(records[0], { code: 'AR', alpha3: 'ARG', numeric: '032', language: 'es', sourceLocale: 'es-AR', decimal: ',', group: '.', primaryGrouping: 3, secondaryGrouping: 3, minimumGroupingDigits: 1,
-    dateOrder: 'dmy', dateSeparator: '/', paddedDate: false, hour12: true, weekStart: 1, currencies: ['ARS'], dollarSignCurrency: 'ARS' });
+  assert.deepEqual(records[0], { code: 'AR', alpha3: 'ARG', numeric: '032', continent: 'americas', language: 'es', sourceLocale: 'es-AR', decimal: ',', group: '.', defaultDigits: 'latn', primaryGrouping: 3, secondaryGrouping: 3, minimumGroupingDigits: 1,
+    dateOrder: 'dmy', dateSeparator: '/', paddedDate: false, datePattern: 'd/M/y', dayMonthPattern: 'd/M', timePattern: 'HH:mm', hour12: true, weekStart: 1, currencies: ['ARS'], dollarSignCurrency: 'ARS' });
   assert.deepEqual([records[1].language, records[1].sourceLocale, records[1].weekStart, records[1].currencies, records[1].hour12], ['en', 'en', 0, ['USD'], true], 'und-US is absent: the bare und entry with the region put back');
   assert.throws(() => build(files, ['en', 'es'], currencies, { ...registry, US: { ...registry.US, hour12: false } }), /US: the catalogue disagrees with REGIONS \(hour12: CLDR true, REGIONS false\)/);
   assert.throws(() => build(files, ['en', 'es'], currencies, { ...registry, JP: registry.AR }), /JP is in REGIONS but not in the catalogue/);
+  assert.throws(() => build({ ...files, 'territoryContainment.json': JSON.stringify({ supplemental: { territoryContainment: { '019': { _contains: ['005'] }, '005': { _contains: ['AR'] } } } }) }, ['en', 'es'], currencies, registry),
+    /US is in no continent/, 'a place outside every continent stops the generator');
   assert.throws(() => build({ ...files, 'territories-en.json': JSON.stringify({ main: { en: { localeDisplayNames: { territories: { AR: 'Argentina' } } } } }) }, ['en', 'es'], currencies, registry), /US has no name in en/);
 });
 
 test('the region API: codes, status against a gate, the fallback that never impersonates a region, the device Region, names, ordering and search', () => {
   assert.deepEqual([catalogueRegionCode(' jp '), catalogueRegionCode('ar'), catalogueRegionCode('ZZ'), catalogueRegionCode('EU'), catalogueRegionCode(''), catalogueRegionCode(null), catalogueRegionCode(['JP'])], ['JP', 'AR', null, null, null, null, null]);
-  assert.deepEqual(['AR', 'US', 'JP', 'ZZ', 'ar', 'XK'].map(code => regionStatus(code)), ['released', 'released', 'catalogue', 'unknown', 'released', 'catalogue']);
+  assert.deepEqual(['AR', 'US', 'JP', 'ZZ', 'ar', 'XK', 'SA', 'NP'].map(code => regionStatus(code)), ['released', 'released', 'released', 'unknown', 'released', 'released', 'catalogue', 'catalogue'],
+    '24R2B: Japan and Kosovo released; Saudi Arabia and Nepal (native digits) blocked');
   assert.deepEqual(regionStatus('US', ['AR']), 'catalogue', 'a narrower gate: known but not honoured');
-  const japan = conventionsForRegion('JP');
-  assert.deepEqual([japan.region, japan.source, japan.requested], ['AR', 'default', 'JP'], 'Japan is not released: the default conventions, and the screen can say so');
-  assert.deepEqual(japan.conventions, completeConventions(REGIONS.AR));
+  const saudi = conventionsForRegion('SA');
+  assert.deepEqual([saudi.region, saudi.source, saudi.requested], ['AR', 'default', 'SA'], 'Saudi Arabia is not released: the default conventions, and the screen can say so');
+  assert.deepEqual(saudi.conventions, completeConventions(REGIONS.AR));
+  assert.deepEqual([conventionsForRegion('JP').region, conventionsForRegion('JP').source], ['JP', 'released']);
   const states = conventionsForRegion('us');
   assert.deepEqual([states.region, states.source, states.requested, states.conventions.hour12, states.conventions.dateOrder], ['US', 'released', 'US', true, 'mdy']);
   assert.deepEqual([conventionsForRegion('ZZ').source, conventionsForRegion('ZZ').requested, conventionsForRegion(undefined).region], ['default', null, 'AR']);

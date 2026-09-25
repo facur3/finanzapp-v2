@@ -17,10 +17,10 @@
  *
  * Adding a language is one entry in `LANGUAGES` plus its catalogue. Every
  * region of the CLDR catalogue already has its conventions (`REGIONS`, derived);
- * releasing one is adding it to `RELEASED_REGIONS` after its family's device
- * QA (`region-release.ts`). Nothing else enumerates them. */
+ * which ones a build releases is `region-stages.ts`. Nothing else enumerates them. */
 
 import { REGION_CODES, REGION_DATA, type CatalogueRegionCode } from './regions/data.ts';
+import { RELEASED_BY_STAGES } from './region-stages.ts';
 
 /** Languages with a catalogue in this build, keyed by ISO 639-1 code. `name` is
  * the language's own name (an autonym), the way iOS lists languages. */
@@ -62,17 +62,27 @@ export interface RegionConventions {
   minimumGroupingDigits?: number;
   /** First day of the week, 0 = Sunday … 6 = Saturday. */
   weekStart?: number;
+  /** The templates dates and times are written with (24R2B, from CLDR through the catalogue): fields d/dd, M/MM,
+   * y, H/HH, mm between literal separators ("d/M/y", "y.\u00A0MM.\u00A0dd.", "d.M.", "H.mm"). Absent, they follow
+   * the order, separator and padding above, and the 24-hour time is "HH:mm", as the registry always wrote. */
+  datePattern?: string;
+  dayMonthPattern?: string;
+  timePattern?: string;
 }
 
 /** The conventions with every optional field filled the way the released regions write. */
 export function completeConventions(conventions: RegionConventions): Required<RegionConventions> {
-  return { dateSeparator: '/', paddedDate: false, secondaryGrouping: 3, minimumGroupingDigits: 1, weekStart: 1, ...conventions };
+  const base = { dateSeparator: '/', paddedDate: false, secondaryGrouping: 3, minimumGroupingDigits: 1, weekStart: 1, ...conventions };
+  const day = base.paddedDate ? 'dd' : 'd', month = base.paddedDate ? 'MM' : 'M';
+  const order = base.dateOrder === 'mdy' ? [month, day, 'y'] : base.dateOrder === 'ymd' ? ['y', month, day] : [day, month, 'y'];
+  return { datePattern: order.join(base.dateSeparator), dayMonthPattern: order.filter(field => field !== 'y').join(base.dateSeparator), timePattern: 'HH:mm', ...base };
 }
 
 /** The fields a formatter reads. `weekStart` is data for a calendar, not a writing: the catalogue's
  * view of the United States starts the week on Sunday while the registry's default is Monday, and
  * both write every string alike. */
-const WRITING_FIELDS = ['decimal', 'group', 'dateOrder', 'hour12', 'dollarSignCurrency', 'dateSeparator', 'paddedDate', 'secondaryGrouping', 'minimumGroupingDigits'] as const satisfies readonly (keyof RegionConventions)[];
+const WRITING_FIELDS = ['decimal', 'group', 'dateOrder', 'hour12', 'dollarSignCurrency', 'dateSeparator', 'paddedDate', 'secondaryGrouping', 'minimumGroupingDigits',
+  'datePattern', 'dayMonthPattern', 'timePattern'] as const satisfies readonly (keyof RegionConventions)[];
 
 /** Whether two sets of conventions write the same strings: every writing field equal once both are
  * complete, so the registry's entry, the catalogue's view of the same region and a resolved region
@@ -109,6 +119,7 @@ export const REGIONS: Readonly<Record<RegionCode, Required<RegionConventions>>> 
     decimal: record.decimal, group: record.group, dateOrder: record.dateOrder, hour12: record.hour12,
     dollarSignCurrency: record.dollarSignCurrency, dateSeparator: record.dateSeparator, paddedDate: record.paddedDate,
     secondaryGrouping: record.secondaryGrouping, minimumGroupingDigits: record.minimumGroupingDigits, weekStart: record.weekStart,
+    datePattern: record.datePattern, dayMonthPattern: record.dayMonthPattern, timePattern: record.timePattern,
   };
   return [code, Object.freeze(isRegistryRegion(code) ? { ...fromCldr, ...REGION_REGISTRY[code] } : fromCldr)];
 })) as Record<RegionCode, Required<RegionConventions>>);
@@ -135,12 +146,11 @@ export const SUPPORTED_REGIONS: readonly RegionCode[] = REGION_CODES;
  * (tests/app-config.node.ts keeps them equal), and changing it needs a new
  * native build. */
 export const RELEASED_LANGUAGES: readonly LanguageCode[] = ['es', 'en'];
-/** Regions whose conventions the whole app honours, the amount field
- * included (`money-input.ts`). The United States was released in Producto
- * 23.1C2. Every other catalogue region opens by convention family, each
- * stage after its iPhone QA (`REGION_RELEASE_STAGES` in region-release.ts,
- * whose test keeps the two equal). */
-export const RELEASED_REGIONS: readonly RegionCode[] = ['AR', 'US'];
+/** Regions whose conventions the whole app honours, the amount field included (`money-input.ts`): the released
+ * stages of `region-stages.ts`. Argentina and the United States since 23.1C2 (device-checked); since 24R2B every
+ * catalogue region whose locale writes Latin digits, by continent, on the automated family verification; the 23
+ * native-digit regions stay blocked until an iPhone check of their decimal pad. */
+export const RELEASED_REGIONS: readonly RegionCode[] = RELEASED_BY_STAGES;
 
 export interface ReleasedSets { languages: readonly LanguageCode[]; regions: readonly RegionCode[] }
 export const RELEASED: ReleasedSets = { languages: RELEASED_LANGUAGES, regions: RELEASED_REGIONS };

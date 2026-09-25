@@ -3026,6 +3026,12 @@
       "bytes": 9892,
       "retrieved": "2026-09-25"
     },
+    "territoryContainment.json": {
+      "url": "https://raw.githubusercontent.com/unicode-org/cldr-json/48.2.0/cldr-json/cldr-core/supplemental/territoryContainment.json",
+      "sha256": "9f7d2eed5278ebb7c302b7536e391708b237945c314d09a206c632c2fab45ee2",
+      "bytes": 11959,
+      "retrieved": "2026-09-25"
+    },
     "territoryInfo.json": {
       "url": "https://raw.githubusercontent.com/unicode-org/cldr-json/48.2.0/cldr-json/cldr-core/supplemental/territoryInfo.json",
       "sha256": "b50369a0e1f5434c942dfe45064b39f488604ca0cedac5117e993248c19f2c0a",
@@ -3046,7 +3052,7 @@
     }
   },
   "outputs": {
-    "apps/mobile/src/i18n/regions/data.ts": "4edbb0fb294549c2230d4e815e3b2b82ecea34d6e8dc0c3f0141dd57de47be32",
+    "apps/mobile/src/i18n/regions/data.ts": "000b6aa7a769634851fb6406cc8ed7780f0c3baee48895d1a9b76ccaf8a44c52",
     "apps/mobile/src/i18n/regions/en.ts": "d2232fc87431527e747c253c3c8c9c11ba2c46ccfddcb9bb7bd2ee86c37f8484",
     "apps/mobile/src/i18n/regions/es.ts": "93186d24ee9c579dac8773a31fd63e372e74632b8291c7006ffd7f0524368641"
   }

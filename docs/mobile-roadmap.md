@@ -1,6 +1,6 @@
 # FinanzApp mobile: living roadmap
 
-Updated: 2026-09-25 (Producto 24R2A). Read [decision 001](decisions/001-native-mobile.md),
+Updated: 2026-09-25 (Producto 24R2B). Read [decision 001](decisions/001-native-mobile.md),
 [decision 002](decisions/002-spending-first.md),
 [decision 003](decisions/003-five-tabs-and-cards.md) and
 [decision 004](decisions/004-native-first-and-web-retirement.md). Decision 002 supersedes
@@ -65,8 +65,12 @@ history file keeps the evidence of when and why.
   only with a `reportCurrency` and traceable conversions; a missing rate gives per-currency
   subtotals with a visible note, never a guess; no fabricated market history; automatic rates
   are opt-in, provider named, no key in the bundle (docs/currency.md §8–§10).
-- **Three gates, each opened only after device QA, in its own commit:** `RELEASED_LANGUAGES`
-  (es, en), `RELEASED_REGIONS` (AR, US), `LEDGER_CURRENCIES` (ARS, USD). A preview flag
+- **Three gates:** `RELEASED_LANGUAGES` (es, en) and `LEDGER_CURRENCIES` (ARS, USD) open only after
+  device QA, in their own commit. `RELEASED_REGIONS` is the released stages of `region-stages.ts`
+  (234 of 257 since 24R2B): the owner decided on 2026-09-25, before any public release, to open regions
+  on the automated per-family verification and keep the short per-family iPhone sheet
+  (docs/region-families.md) as a gate of the first TestFlight; a stage with a known defect or an
+  unverified amount-entry path stays blocked (the 23 native-digit regions). A preview flag
   (`EXPO_PUBLIC_LOCALE_PREVIEW`, `EXPO_PUBLIC_CURRENCY_PREVIEW`) exists only in a development
   bundle. Language, region and each account's currency are three independent things: a region
   never implies a currency, a language never changes an amount (docs/i18n.md, docs/currency.md).
@@ -180,8 +184,8 @@ file).
   reservations (30 AI queries per user per day, 300 global; 120/2 000 captures), an OpenAI
   Responses adapter prepared (`gpt-5-mini`, strict JSON, `store:false`), the PostgreSQL schema
   tests; request contract v1 without a language. No paid call has ever been made.
-- **Internationalization.** Spanish and English released; Argentina and the United States
-  released; language and region chosen independently ("Según el dispositivo" or one value), both
+- **Internationalization.** Spanish and English released; 234 of the 257 catalogue regions
+  released (Argentina and the United States since 23.1C2, the rest in 24R2B); language and region chosen independently ("Según el dispositivo" or one value), both
   reactive without restart; every screen through modular catalogues with `i18n:check`,
   `i18n:extract`, `i18n:export`; regional money, date and percentage formats from tables;
   VoiceOver amounts in the language's own decimal mark; the date wheel in the language's home
@@ -195,6 +199,9 @@ file).
   recents, alphabetical sections, ranked search, the no-match sentence) not yet mounted, and
   `recent.ts` for the last three choices per chooser. The review of PR #53 made `formatDayMonth`
   path-independent (`registryRegionOf`, `sameWriting`) and fixed the chooser's no-match state.
+  Producto 24R2B released 234 regions by continent on automated per-family evidence (23
+  native-digit regions blocked), with CLDR's spaced dates, time separators, unpadded hours and
+  day-month order audited and fixed.
   Producto 24R2A derived `REGIONS` and `RegionCode` from the catalogue (the hand-written
   `REGION_REGISTRY` keeps AR/US byte-identical), mounted `ChoiceScreen` behind Más → Idioma and →
   Región (`LocaleChooser`, reusable by the onboarding), kept a region chosen in the development
@@ -252,10 +259,12 @@ item unless a section says a new native build is needed. The checklist sections 
   and safe areas; Reduce Motion as a timed fade; the darker light `secondary`/`tertiary` inks on the
   Home captions and the hero's cents (checklist, Producto 24UX1). No EAS build was made; judge the
   feel in at least the development build, ideally a release build.
+- **24R2B — 234 regions released:** the short sheet in docs/region-families.md (eight number families,
+  fifteen date writings, Spanish and English) and the chooser with 234 rows (search, recents, sections,
+  keyboard and safe areas, the largest Dynamic Type, VoiceOver, scrolling at 60/120 Hz) (checklist,
+  Producto 24R2B). Required before the first TestFlight, not before the merge.
 - **24R2A — the native choosers and the preview regions:** Más → Idioma and → Región as
-  `ChoiceScreen` (one card for the released values; in the preview, 257 regions with search, recents
-  and sections), the kept preview choice in a release build, formats and the amount field per family
-  in the preview (checklist, Producto 24R2A). The evidence that opens each 24R2B stage.
+  `ChoiceScreen`, the kept preview choice in a release build (checklist, Producto 24R2A).
 - **24R1 — the device-Region line:** an iPhone whose Region is an unreleased country shows
   "Ahora: … (formatos de Argentina)" in Más → Región.
 - **24B6 — the date sheet, one display currency, the card rules:** the compact card over the
@@ -644,7 +653,7 @@ the owner authorises it; no EAS build or store submission without the owner.
     previous code), plus every other gate below.
   - **Pending:** the device QA of §2 (checklist, Producto 24UX5).
 
-### Producto 24R2A — regions integrated, native choosers, formats for every family (this PR)
+### Producto 24R2A — regions integrated, native choosers, formats for every family (PR #60)
 
 - **Goal.** Everything a region needs, integrated and tested for all 257 catalogue regions, with the
   release gate unchanged: Spanish and English, Argentina and the United States stay the only published
@@ -687,7 +696,7 @@ the owner authorises it; no EAS build or store submission without the owner.
     group. A region change mid-edit keeps the draft (ledger notation) and the logical caret.
 - **Not changed.** SQLite, backups, accounting rules, enabled currencies, FX, the Home and Reportes
   design, any language (es/en only), `supportedLocales`, the bundle identifier. No new dependency.
-- **Status.** Delivered on this branch (2026-09-25), not device-verified.
+- **Status.** Merged (PR #60, 2026-09-25), not device-verified.
   - **Checked on Linux:** mobile `npm run typecheck`; `npm run test:storage` 669/669 (was 653: +15 new
     `regions-integration.node.ts` — the derived registry, grouping, 14 language × region goldens,
     every region × both languages, typing per family, the caret around a group, pasting, the 257-region
@@ -710,19 +719,59 @@ the owner authorises it; no EAS build or store submission without the owner.
     302/302, `check:repo`.
   - **Pending:** the device QA of §2 and the checklist section Producto 24R2A.
 
-### Producto 24R2B — regions released by family (next)
+### Producto 24R2B — international regions released (this PR)
 
-- **Goal.** Open `RELEASED_REGIONS` stage by stage (`REGION_RELEASE_STAGES`), each after its iPhone
-  evidence, in its own commit that flips the stage's status and adds its regions.
-- **Gates per stage** (checklist, Producto 24R2B): with the iPhone's Region set to a region of the stage
-  and FinanzApp Dev on the preview: the amount field typing, pasting and deleting around its group
-  separator; the pad's decimal key; numeric dates, the day of the period and the clock; VoiceOver amounts;
-  Reportes and Inicio at the largest Dynamic Type. Once per delivery: the chooser over 257 rows at
-  60/120 Hz, search, recents, VoiceOver order and header roles, Reduce Motion, a Region change with a
-  form open. Korean and Hungarian dates (a period followed by a space) are written without the space
-  until a stage decides it.
-- **Out of scope.** FX, SQLite changes, a new language, any currency, an EAS build without the owner.
-- **Depends on.** 24R2A (this PR) merged.
+- **Goal.** Use every catalogue region's conventions in the published app, faster than one delivery per
+  region, without risking an amount: 234 of the 257 regions released in one PR, by continent, on automated
+  per-family evidence; the rest blocked with a named reason.
+- **Audit and fixes (formats).** The catalogue records what FinanzApp writes as numeric templates
+  (`datePattern`, `dayMonthPattern`, `timePattern`, from CLDR's short date and its Md and Hm skeletons):
+  - *spaced dates and closing periods* (Korea «2026. 9. 22.», Hungary «2026. 09. 22.», Croatia, Serbia,
+    Bosnia, Montenegro, Slovakia, Slovenia) are written as CLDR writes them, spaces as no-break spaces,
+    and a date ending in a period is followed by the time after a space, not «, »;
+  - *the time separator* is the region's (Finland, Denmark, Indonesia, Sri Lanka, Greenland write «9.03»),
+    and *the 24-hour hour* is unpadded where CLDR says so (Spain, Czechia, Japan: «9:03»);
+  - *words in another script* are dropped with their period (Bulgarian «г.», «ч.», Thai «น.»): the words
+    follow the interface language;
+  - *the day and month* come from CLDR's Md («5.9.» in Germany, «9/5» in Japan) except where the locale
+    inherits an order that contradicts its own date (Ghana, Niger, Eritrea, Somalia, Malta inherit «M/d»
+    from English beside a day-first date): there the short date without its year is written, so «9/5» can
+    never be read the wrong way round.
+- **Stages** (`src/i18n/region-stages.ts`, derived from the catalogue): `home` (AR, US; device evidence,
+  23.1C2), `americas` 55, `europe` 53, `asia` 34, `africa` 56, `oceania` 34 (automated evidence, 24R2B,
+  continents from CLDR's territoryContainment, now a pinned generator source), and `native-digits` 23
+  **blocked**. `RELEASED_REGIONS` is the released stages (234); a test keeps every region in exactly one
+  stage and the continent stages exactly their continent.
+- **Pending and why.** Afghanistan, Bahrain, Bangladesh, Bhutan, Chad, Comoros, Egypt, Iran, Iraq, Jordan,
+  Kuwait, Lebanon, Mauritania, Myanmar, Nepal, Oman, Palestine, Qatar, Saudi Arabia, South Sudan, Sudan,
+  Syria and Yemen: their locale writes Arabic, Persian, Bengali, Devanagari, Burmese or Tibetan digits by
+  default, so the iPhone's decimal pad there types those digits and its own decimal key. The amount field
+  reads them (`latinDigits`, Node tests) but that input path has never run on an iPhone; they write
+  Argentine formats and say so until a device check of the pad in one Arabic-digit and one
+  Devanagari-digit region releases the stage (docs/region-families.md §4). A person there can still choose
+  any released region manually.
+- **Automated evidence** (`tests/region-families.node.ts`, every released region × es/en): the amount field
+  types exactly what the formatter writes with either pad key, keeps the caret, deletes across the group
+  separator, pastes the formatter's output back to the same minor units and refuses the ambiguous
+  «1{decimal}000»; yen keeps no decimals; VoiceOver is ungrouped in the language's mark; dates, day-month
+  and the clock read back to the same numbers through the region's templates; a day-month never
+  contradicts its date; the choice is saved first, survives a relaunch and beats the device; the initial
+  region comes from the device; no ledger, account or display-currency code reads the region. The iPhone
+  sheet `docs/region-families.md` is generated from the same code (`npm run regions:families`) and a test
+  fails when it is stale.
+- **Deliberate, documented writings** (docs/i18n.md §11a.7): Latin digits everywhere, a four-digit year,
+  the currency symbol before the amount, the day period after the time in the interface language, the
+  Gregorian calendar.
+- **Not changed.** SQLite, backups, accounting, enabled currencies (ARS, USD), FX, languages (es, en), the
+  Home and Reportes design, native configuration. No new dependency.
+- **Status.** Delivered on this branch (2026-09-25), not device-verified.
+  - **Checked on Linux:** mobile `npm run typecheck`; `npm run test:storage` 677/677 (was 671: +5
+    `region-families.node.ts`, +1 `regions-integration` date audit; the gate, chooser and catalogue tests
+    updated to the released stages, the two-region chooser tests pinned to the 23.1C2 gate explicitly);
+    `regions:verify`, `regions:generate -- --check`, `regions:families -- --check`, `currency:verify`,
+    `i18n:check -- --strict`, `i18n:extract`, `check`, `export:ios`; root `npm test` and `check:repo`.
+    No EAS build; the iPhone was not touched.
+  - **Pending:** the checklist section Producto 24R2B before the first TestFlight; the native-digit stage.
 
 ### Producto 24M — verified currencies opened
 

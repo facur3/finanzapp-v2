@@ -381,6 +381,14 @@ importe, moneda y estado.
   muestra hasta que toda la app lo tenga (23.1): un iPhone en inglés sigue leyendo
   español antes que media app traducida.
 
+## Producto 24R2B — 234 regiones publicadas, mismo selector
+
+Sin cambios de diseño: Más → Región publica ahora 234 regiones, así que en un build de publicación la
+pantalla muestra la forma larga de `ChoiceScreen` (buscador, Recientes, secciones por letra) que 24R2A
+diseñó para la vista previa. Cada fila lleva la muestra de formatos de su región («2026. 9. 22. · 1,234.56»
+en Corea). Las fechas con espacios usan espacios duros y nunca se cortan. Idioma sigue siendo una sola
+tarjeta con dos opciones.
+
 ## Producto 24R2A — Idioma y Región como selectores nativos (Argentina y Estados Unidos siguen siendo las únicas regiones publicadas)
 
 Más → Idioma y Más → Región pasan a ser `ChoiceScreen` (`src/ui/locale-choosers.tsx`), con el lenguaje

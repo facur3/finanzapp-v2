@@ -130,6 +130,7 @@ npm run i18n:check -- --strict         # catalogues, placeholders, plurals, gene
 npm run check                          # Expo dependency compatibility (EXPO_OFFLINE=1 for the bundled data only)
 npm run export:ios                     # Metro bundle for iOS: not an Xcode build, not a signed .ipa
 npm run regions:generate -- --check    # release checklist; needs the cached CLDR sources (-- --download once)
+npm run regions:families               # regenerates docs/region-families.md, the per-family iPhone sheet (tests check it)
 npm run currency:generate -- --check   # release checklist; same sources
 npm run i18n:extract                   # copy outside the catalogue (before a PR that adds copy)
 npm run i18n:check -- --accept en      # after reviewing English changes
@@ -162,7 +163,7 @@ prove it (`locale-release.node.ts`, `currency-preview.node.ts`). Never set them 
 | --- | --- |
 | `EXPO_PUBLIC_ASSISTANT_FIXTURES=1` | Development bundle only: scripted Assistant conversations behind a visible "Vista de prueba" banner; nothing is saved. |
 | `EXPO_PUBLIC_CURRENCY_PREVIEW=1` | Development bundle only: the forms also offer EUR, GBP, JPY, CLP and KWD; rows created in them stay readable and exportable (v9) when the flag is off. |
-| `EXPO_PUBLIC_LOCALE_PREVIEW=1` | Development bundle only: offers every language and region the build carries, released or not. Since 24R2A that is the 257 catalogue regions (their formats, the amount field, the chooser with search), for the family QA of 24R2B; the Región footnote says the preview is unverified. Start Metro with `--clear` after changing it. |
+| `EXPO_PUBLIC_LOCALE_PREVIEW=1` | Development bundle only: offers every language and region the build carries, released or not: since 24R2B that adds the 23 blocked native-digit regions, to check their decimal pad; the Región footnote says the preview is unverified. Start Metro with `--clear` after changing it. |
 | `EXPO_PUBLIC_MERCHANT_MARK_PREVIEW=1` | Development bundle only: a recognized merchant's row draws the brand's initial on a neutral tile instead of its category glyph, to check recognition on the iPhone. No asset, image or dependency; brand marks are deferred to Producto 25C2 (docs/merchant-identity.md). |
 | `EXPO_PUBLIC_DISABLE_GLASS=1` | Forces the opaque material everywhere; the glass module is never loaded. |
 | `EXPO_PUBLIC_MOBILE_API_ORIGIN` | The origin of the mobile API for the Assistant's remote runtime; unset means disconnected. |
@@ -174,7 +175,7 @@ prove it (`locale-release.node.ts`, `currency-preview.node.ts`). Never set them 
 | Area | Today |
 | --- | --- |
 | Languages | Spanish and English released (`RELEASED_LANGUAGES`), declared to iOS by `app.config.ts`; each Más → Idioma choice and "Según el dispositivo" are live. |
-| Regions | Argentina and the United States released (`RELEASED_REGIONS`). Since 24R2A every one of the 257 catalogue regions has its conventions (`REGIONS`, derived from CLDR), Más → Idioma and → Región are the searchable `ChoiceScreen` (`src/ui/locale-choosers.tsx`), and the amount field types and pastes every group family. Unreleased regions are a development preview only (`EXPO_PUBLIC_LOCALE_PREVIEW=1`); a region chosen there is kept, not applied, by a release build. 24R2B opens them by convention family after device QA (`src/i18n/region-release.ts`). |
+| Regions | 234 of the 257 catalogue regions released (Producto 24R2B): Argentina and the United States since 23.1C2, the rest by continent on automated per-family evidence (`src/i18n/region-stages.ts`, `tests/region-families.node.ts`). The 23 regions whose locale types non-Latin digits are blocked until an iPhone check of their decimal pad; they write Argentine formats and say so. Más → Idioma and → Región are the searchable `ChoiceScreen`. The per-family iPhone sheet is [docs/region-families.md](../../docs/region-families.md) (`npm run regions:families`). |
 | Currencies | ARS and USD in production (`LEDGER_CURRENCIES`). The multi-currency engine (any ISO currency's minor units, SQLite 9, backup v9, presentation in every currency) is implemented behind the preview gate; no other currency is opened, no exchange rate exists, nothing is converted. FX and international purchases are Producto 24C, not built. |
 | Assistant | A real conversation with drafts, clarifications and evidence, writing only on Confirmar; fixtures mode for tests; the remote runtime and the cloud provider are opt-in and unconfigured, so this build is disconnected. The multilingual, voice-capable Assistant with analytical answers is Producto 25A, not built. |
 | Platforms | iOS only. Android comes later from this same project (roadmap §5), sharing the router, the domain, the storage abstractions, i18n, the Assistant and the components; platform differences go behind `Platform.OS`, `.ios.tsx`/`.android.tsx` files or adapter modules (`DateField` already has its Android path). Nothing Android-specific is tested. |

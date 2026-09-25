@@ -33,8 +33,11 @@ test('language and region are two registries; a locale is only their composition
   assert.equal(LANGUAGES.es.name, 'Español', 'a language is listed by its own name');
   assert.equal(LANGUAGES.en.name, 'English');
   assert.deepEqual([...RELEASED_LANGUAGES], ['es', 'en'], 'English is released in 23.1C2, once 23.1B translated every screen');
-  assert.deepEqual([...RELEASED_REGIONS], ['AR', 'US'], 'the US region is released in 23.1C2, now that the amount field types US separators');
-  assert.deepEqual(RELEASED, { languages: SUPPORTED_LANGUAGES, regions: ['AR', 'US'] }, 'every language the build carries is released; two regions of 257');
+  assert.deepEqual(RELEASED_REGIONS.slice(0, 2), ['AR', 'US'], 'Argentina and the United States first, released in 23.1C2');
+  assert.equal(RELEASED_REGIONS.length, 234, '24R2B: every catalogue region whose locale writes Latin digits');
+  assert.ok(['BR', 'JP', 'IN', 'CH', 'KR', 'HU', 'FR', 'DE'].every(code => RELEASED_REGIONS.includes(code as never)));
+  assert.equal(['SA', 'EG', 'IR', 'NP', 'BD', 'MM'].some(code => RELEASED_REGIONS.includes(code as never)), false, 'the native-digit regions stay blocked');
+  assert.deepEqual(RELEASED, { languages: SUPPORTED_LANGUAGES, regions: RELEASED_REGIONS }, 'every language the build carries is released');
   for (const language of SUPPORTED_LANGUAGES) for (const region of RELEASED_REGIONS) {
     const locale = composeLocale(language, region);
     assert.equal(locale, language + '-' + region);
@@ -94,8 +97,9 @@ test('region resolution: a released preference wins, then the device region sett
   assert.equal(resolveRegion(usIPhone, 'US'), 'US');
   assert.equal(resolveRegion([{ languageTag: 'en-US', regionCode: 'AR' }]), 'AR', 'English language, Argentine region');
   assert.equal(resolveRegion([{ languageTag: 'en-US' }]), 'US', 'Intl only: the tag carries the region');
-  assert.equal(resolveRegion([{ languageTag: 'es-UY', regionCode: 'UY' }, { languageTag: 'en-US', regionCode: 'US' }]), 'AR',
-    'an unsupported device region reads the default, not the region of the next language');
+  assert.equal(resolveRegion([{ languageTag: 'es-UY', regionCode: 'UY' }, { languageTag: 'en-US', regionCode: 'US' }]), 'UY', 'released in 24R2B: Uruguay writes its own formats');
+  assert.equal(resolveRegion([{ languageTag: 'ar-SA', regionCode: 'SA' }, { languageTag: 'en-US', regionCode: 'US' }]), 'AR',
+    'a blocked device region reads the default, not the region of the next language');
   assert.equal(resolveRegion([]), 'AR');
   assert.equal(resolveRegion(usIPhone, 'AR'), 'AR', 'an explicit region beats the device');
   assert.equal(resolveRegion([{ languageTag: 'es-AR', regionCode: 'AR' }], 'US'), 'US');
@@ -116,14 +120,15 @@ test('each half resolves on its own: every language × region combination and "b
     [device('es-US', 'US'), { language: 'system', region: 'system' }, 'es-US'],
     [device('en-US', 'US'), { language: 'es', region: 'system' }, 'es-US'],
     [device('en-US', 'US'), { language: 'system', region: 'AR' }, 'en-AR'],
-    [device('pt-BR', 'BR'), { language: 'system', region: 'system' }, 'es-AR'],
+    [device('pt-BR', 'BR'), { language: 'system', region: 'system' }, 'es-BR'],
+    [device('ar-EG', 'EG'), { language: 'system', region: 'system' }, 'es-AR'],
   ];
   for (const [devices, preferences, expected] of cases) {
     const resolved = resolveLocale(devices, preferences);
     assert.equal(resolved.locale, expected, JSON.stringify([devices, preferences]));
     assert.equal(resolved.language + '-' + resolved.region, expected);
-    const previewed = devices[0].regionCode === 'BR' ? 'es-BR' : expected;
-    assert.equal(resolveLocale(devices, preferences, PREVIEW).locale, previewed, 'the development preview widens the regions only: Brazil writes its own formats there');
+    const previewed = devices[0].regionCode === 'EG' ? 'es-EG' : expected;
+    assert.equal(resolveLocale(devices, preferences, PREVIEW).locale, previewed, 'the development preview widens the regions only: blocked Egypt writes its own formats there');
   }
   for (const [devices, preferences] of cases) assert.equal(resolveLocale(devices, preferences, SPANISH_ONLY).locale, 'es-AR', 'a Spanish-only gate makes every case es-AR');
   assert.equal(resolveLocale([{ languageTag: 'en-US', regionCode: 'US' }], { language: 'system', region: 'system' }, { languages: ['es', 'en'], regions: ['AR'] }).locale, 'en-AR',
@@ -581,7 +586,7 @@ test('money reaches the screen only through the central formatters; 23.1C2 relea
   assert.deepEqual(offenders, [], 'visible amounts go through moneyText/formatAmount, VoiceOver through spoken*, drafts through money-input');
   // 23.1C2 opens the gate (the native language list is app-config's to check, tests/app-config.node.ts).
   assert.deepEqual([...RELEASED_LANGUAGES], ['es', 'en']);
-  assert.deepEqual([...RELEASED_REGIONS], ['AR', 'US']);
+  assert.equal(RELEASED_REGIONS.length, 234);
   // Only a development bundle started with the preview flag widens the gate: since 24R2A to every catalogue region
   // (the families still waiting for their device QA), with the same two languages.
   assert.deepEqual(releasedForBuild('1', true), { languages: ['es', 'en'], regions: REGION_CODES });

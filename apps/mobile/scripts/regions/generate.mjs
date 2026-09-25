@@ -54,7 +54,7 @@ async function currencyCatalogue() {
   return { catalogue: data.CURRENCY_DATA, published: data.ISO_4217_PUBLISHED };
 }
 
-const SUPPLEMENTAL = ['likelySubtags', 'weekData', 'timeData', 'codeMappings', 'territoryInfo', 'currencyData'];
+const SUPPLEMENTAL = ['likelySubtags', 'weekData', 'timeData', 'codeMappings', 'territoryInfo', 'currencyData', 'territoryContainment'];
 
 /** Conventions a released region writes on purpose against CLDR's preference, each with its reason (docs/i18n.md §11a).
  * The generator records what CLDR says; src/i18n/locale.ts keeps the deliberate value; anything else that disagrees stops it. */
@@ -136,6 +136,87 @@ export function parseDatePattern(pattern) {
     paddedDate: fields.some(field => field === 'MM' || field === 'dd') };
 }
 
+const NBSP = '\u00A0';
+const DATE_FIELD = /^(?:dd?|MM?|y)$/;
+const DATE_SEPARATOR = /^[./\-\u00A0]+$/;
+
+/** A CLDR date or time pattern reduced to FinanzApp's numeric template (Producto 24R2B): bidi marks dropped; quoted
+ * literals and words in the locale's own script dropped with the period that abbreviates them (Bulgarian 'г'.,
+ * 'ч'., Thai น.: words follow the interface language, and FinanzApp's are Spanish and English); every space a
+ * no-break space, so a date never breaks across lines; any year a full year ("y": four digits are never ambiguous). */
+export function numericTemplate(pattern) {
+  return pattern.replace(/[\u200E\u200F\u061C]/g, '')
+    .replace(/'[^']*'\.?/g, '')
+    .replace(/[^\s\p{P}\p{S}A-Za-z0-9]+\.?/gu, '')
+    .replace(/\s+/g, NBSP).replace(/^\u00A0+|\u00A0+$/g, '')
+    .replace(/y+/g, 'y');
+}
+
+/** The pieces of a numeric template: fields and the literal text between them ("d. M. y." → d, ". ", M, ". ", y, "."). */
+function templateParts(template) {
+  return template.split(/(dd?|MM?|y|HH?|mm)/).filter(part => part !== '');
+}
+
+/** The short numeric date as a template ("d/M/y", "dd.MM.y", "y.\u00A0MM.\u00A0dd.", "d.\u00A0M.\u00A0y."): three fields,
+ * two separators made of "/", ".", "-" and no-break spaces, and at most a trailing period (Korea, Hungary, Croatia,
+ * Serbia). Anything else stops the generator. */
+export function parseDateTemplate(pattern) {
+  const template = numericTemplate(pattern);
+  const parts = templateParts(template);
+  const fields = parts.filter(part => DATE_FIELD.test(part));
+  const literals = parts.filter(part => !DATE_FIELD.test(part));
+  const suffix = parts.length === 6 ? parts[5] : '';
+  const shaped = (parts.length === 5 || (parts.length === 6 && suffix === '.')) && fields.length === 3
+    && new Set(fields.map(field => field[0])).size === 3 && literals.every(literal => DATE_SEPARATOR.test(literal));
+  if (!shaped) throw new Error(`Date pattern "${pattern}" (template "${template}") is not a numeric date FinanzApp can write.`);
+  return template;
+}
+
+/** A day and month without the year, from CLDR's Md skeleton ("d.M.", "M.\u00A0d.", "dd/MM", "MM-dd"). The short date
+ * without its year and the separator beside it stands in when that skeleton is not numeric (Mongolia's narrow month
+ * name) or when it orders day and month against the region's own day-first or month-first date (an inheritance
+ * artefact: en-GH, so, mt and others inherit an "M/d" from English while writing "dd/MM/y", so "9/5" would read as
+ * 9 May beside their own "05/09/2026"). A year-first date says nothing about that order (Sweden: "y-MM-dd", "d/M"). */
+export function parseDayMonthTemplate(skeleton, datePattern) {
+  const template = numericTemplate(skeleton ?? '');
+  const parts = templateParts(template);
+  const fields = parts.filter(part => DATE_FIELD.test(part));
+  const dayFirst = (list) => list.findIndex(part => part[0] === 'd') < list.findIndex(part => part[0] === 'M');
+  const dateFields = templateParts(datePattern).filter(part => DATE_FIELD.test(part));
+  const agrees = dateFields[0] === 'y' || dayFirst(fields) === dayFirst(dateFields);
+  if ((parts.length === 3 || (parts.length === 4 && parts[3] === '.')) && fields.length === 2 && new Set(fields.map(field => field[0])).size === 2
+    && !fields.includes('y') && DATE_SEPARATOR.test(parts[1]) && agrees) return template;
+  const date = templateParts(datePattern);
+  const at = date.indexOf('y');
+  const withoutYear = at === 0 ? date.slice(2) : date.slice(0, at - 1).concat(date.slice(at + 1));
+  return withoutYear.join('');
+}
+
+/** The 24-hour time as a template, from CLDR's Hm skeleton: "HH:mm", "H:mm", "HH.mm" or "H.mm" (words dropped: Thai น.). */
+export function parseTimeTemplate(skeleton) {
+  const template = numericTemplate(skeleton ?? 'HH:mm');
+  if (!/^HH?[:.]mm$/.test(template)) throw new Error(`Time pattern "${skeleton}" (template "${template}") is not a time FinanzApp can write.`);
+  return template;
+}
+
+/** The UN M49 continents CLDR groups the world into (territoryContainment of 001); Outlying Oceania (QO: Antarctica,
+ * Ascension, Clipperton, Diego Garcia, Tristan da Cunha) is inside Oceania there. */
+const CONTINENTS = { '002': 'africa', '019': 'americas', '142': 'asia', '150': 'europe', '009': 'oceania' };
+
+/** Each place's continent, by walking CLDR's containment tree down from the five continents (the grouping of the
+ * release stages, 24R2B). A place no continent contains stops the generator. */
+export function continentsOf(containment) {
+  const out = {};
+  const walk = (group, continent) => {
+    for (const child of containment[group]?._contains ?? []) {
+      if (/^[A-Z]{2}$/.test(child) && !(child in containment)) out[child] ??= continent;
+      else walk(child, continent);
+    }
+  };
+  for (const [group, continent] of Object.entries(CONTINENTS)) walk(group, continent);
+  return out;
+}
+
 /** CLDR timeData's preferred hour cycle for a region: h and K are 12-hour, H and k 24-hour; null when unknown. */
 export function preferredHour12(entry) {
   const preferred = entry?._preferred;
@@ -173,6 +254,7 @@ export function build(files, langs, { catalogue: currencyData, published }, hand
   const week = supplemental(files, 'weekData');
   const time = supplemental(files, 'timeData');
   const mappings = supplemental(files, 'codeMappings');
+  const continents = continentsOf(supplemental(files, 'territoryContainment'));
   const tenderByRegion = supplemental(files, 'currencyData').region;
   const names = Object.fromEntries(langs.map(lang => [lang, JSON.parse(files[`territories-${lang}.json`]).main[lang].localeDisplayNames.territories]));
   // The day the tender is read on is fixed by the data, not by the clock: the currency catalogue's ISO publication
@@ -186,16 +268,20 @@ export function build(files, langs, { catalogue: currencyData, published }, hand
     if (!symbols?.decimal || !symbols?.group) throw new Error(`${sourceLocale}: no latn symbols.`);
     const grouping = parseGrouping(numbers['decimalFormats-numberSystem-latn'].standard);
     const date = parseDatePattern(gregorian.dateFormats.short);
+    const datePattern = parseDateTemplate(gregorian.dateFormats.short);
+    const formats = gregorian.dateTimeFormats?.availableFormats ?? {};
+    const patterns = { datePattern, dayMonthPattern: parseDayMonthTemplate(formats.Md, datePattern), timePattern: parseTimeTemplate(formats.Hm) };
     const tender = currentTender(tenderByRegion[code], day);
     const dollar = tender.find(currency => currencyData[currency]?.narrowSymbol === '$') ?? null;
     const mapping = mappings[code] ?? {};
     for (const lang of langs) if (!names[lang][code]) throw new Error(`${code} has no name in ${lang}.`);
+    if (!continents[code]) throw new Error(`${code} is in no continent of CLDR's territoryContainment.`);
     records.push({
-      code, alpha3: mapping._alpha3 ?? null, numeric: mapping._numeric ?? null, language, sourceLocale,
-      decimal: symbols.decimal, group: symbols.group, ...grouping,
+      code, alpha3: mapping._alpha3 ?? null, numeric: mapping._numeric ?? null, continent: continents[code], language, sourceLocale,
+      decimal: symbols.decimal, group: symbols.group, defaultDigits: numbers.defaultNumberingSystem ?? 'latn', ...grouping,
       minimumGroupingDigits: Number(numbers.minimumGroupingDigits ?? 1),
       // The clock is a property of the region in CLDR (timeData: the preferred hour cycle), the pattern only a fallback.
-      ...date, hour12: preferredHour12(time[code] ?? time['001']) ?? parseTimePattern(gregorian.timeFormats.short),
+      ...date, ...patterns, hour12: preferredHour12(time[code] ?? time['001']) ?? parseTimePattern(gregorian.timeFormats.short),
       weekStart: WEEKDAY_INDEX[week.firstDay[code] ?? week.firstDay['001']],
       currencies: tender, dollarSignCurrency: dollar,
     });
@@ -225,20 +311,26 @@ function dataModule({ records, day }, lock) {
     ' * One record per country or territory CLDR describes (its territoryInfo, minus the macro and placeholder',
     ' * codes): the ISO 3166-1 codes, the CLDR locale whose conventions stand for the region (likelySubtags),',
     ' * the number symbols and grouping of that locale (Latin digits), the order, separator and padding of its',
-    ' * short numeric date, its clock, the first day of the week and the current legal tender. This file is data;',
+    ' * short numeric date and the templates FinanzApp writes dates and times with, its clock, the first day of the week and the current legal tender. This file is data;',
     ' * src/i18n/regions.ts is the API and src/i18n/locale.ts decides which regions this build honours. */',
     '',
     "export type DateOrder = 'dmy' | 'mdy' | 'ymd';",
+    "export type Continent = 'africa' | 'americas' | 'asia' | 'europe' | 'oceania';",
     'export interface RegionRecord {',
     '  /** ISO 3166-1 alpha-3 and numeric codes (search aliases); null when CLDR maps none. */',
     '  readonly alpha3: string | null;',
     '  readonly numeric: string | null;',
+    '  /** The continent CLDR\'s territoryContainment places it in (the release stages group by it; Outlying Oceania is Oceania). */',
+    '  readonly continent: Continent;',
     '  /** The language CLDR considers most likely in the region, and the cldr-json directory the conventions come from. */',
     '  readonly language: string;',
     '  readonly sourceLocale: string;',
     '  /** Decimal and grouping separators for Latin digits. */',
     '  readonly decimal: string;',
     '  readonly group: string;',
+    '  /** The digits the region\'s locale writes by default (CLDR defaultNumberingSystem: "latn", or "arab", "deva"…).',
+    '   * FinanzApp always writes Latin digits; a region whose iPhone types other digits is a release blocker until checked. */',
+    '  readonly defaultDigits: string;',
     '  /** Digits in the last group and in the groups before it (3/3 almost everywhere, 3/2 for lakh and crore). */',
     '  readonly primaryGrouping: number;',
     '  readonly secondaryGrouping: number;',
@@ -248,6 +340,12 @@ function dataModule({ records, day }, lock) {
     '  readonly dateOrder: DateOrder;',
     '  readonly dateSeparator: string;',
     '  readonly paddedDate: boolean;',
+    '  /** What FinanzApp writes (24R2B): the short date, the day and month without the year and the 24-hour time as numeric',
+    '   * templates of the fields d/dd, M/MM, y (four digits), H/HH and mm between their literal separators (no-break spaces',
+    '   * where CLDR has spaces; words in the locale\'s own script dropped). */',
+    '  readonly datePattern: string;',
+    '  readonly dayMonthPattern: string;',
+    '  readonly timePattern: string;',
     '  /** A 12-hour clock with a day period. */',
     '  readonly hour12: boolean;',
     '  /** First day of the week, 0 = Sunday … 6 = Saturday. */',
@@ -268,7 +366,7 @@ function dataModule({ records, day }, lock) {
     'export const REGION_DATA: { readonly [Code in CatalogueRegionCode]: RegionRecord } = {');
   for (const record of records) {
     const { code, ...fields } = record;
-    lines.push(`  ${code}: { alpha3: ${q(fields.alpha3)}, numeric: ${q(fields.numeric)}, language: ${q(fields.language)}, sourceLocale: ${q(fields.sourceLocale)}, decimal: ${q(fields.decimal)}, group: ${q(fields.group)}, primaryGrouping: ${fields.primaryGrouping}, secondaryGrouping: ${fields.secondaryGrouping}, minimumGroupingDigits: ${fields.minimumGroupingDigits}, dateOrder: ${q(fields.dateOrder)}, dateSeparator: ${q(fields.dateSeparator)}, paddedDate: ${fields.paddedDate}, hour12: ${fields.hour12}, weekStart: ${fields.weekStart}, currencies: ${q(fields.currencies)}, dollarSignCurrency: ${q(fields.dollarSignCurrency)} },`);
+    lines.push(`  ${code}: { alpha3: ${q(fields.alpha3)}, numeric: ${q(fields.numeric)}, continent: ${q(fields.continent)}, language: ${q(fields.language)}, sourceLocale: ${q(fields.sourceLocale)}, decimal: ${q(fields.decimal)}, group: ${q(fields.group)}, defaultDigits: ${q(fields.defaultDigits)}, primaryGrouping: ${fields.primaryGrouping}, secondaryGrouping: ${fields.secondaryGrouping}, minimumGroupingDigits: ${fields.minimumGroupingDigits}, dateOrder: ${q(fields.dateOrder)}, dateSeparator: ${q(fields.dateSeparator)}, paddedDate: ${fields.paddedDate}, datePattern: ${q(fields.datePattern)}, dayMonthPattern: ${q(fields.dayMonthPattern)}, timePattern: ${q(fields.timePattern)}, hour12: ${fields.hour12}, weekStart: ${fields.weekStart}, currencies: ${q(fields.currencies)}, dollarSignCurrency: ${q(fields.dollarSignCurrency)} },`);
   }
   lines.push('};', '');
   return lines.join('\n');
