@@ -244,7 +244,10 @@ the owner authorises it; no EAS build or store submission without the owner.
     height below the edge and the scrim clear, and starts the rise only once iOS has presented the
     modal (`onShow`) and measured the card (`onLayout`), in either order; `easeSheet`
     (0.32, 0.72, 0, 1), `duration.sheet` 300 ms and `duration.sheetExit` 200 ms in `motion.tsx`;
-    `sheetTiming` keeps the durations under Reduce Motion (a fade in place). Diagnosis with
+    `sheetTiming` keeps the durations under Reduce Motion (a fade in place) and carries
+    Reanimated's explicit `ReduceMotion.Never`: without it the device setting makes a timing land
+    on its target in one frame, so the fade would have been instant (review of PR #54; the test
+    emulates the runtime's policy with the installed package's enum). Diagnosis with
     evidence in docs/mobile-design.md (Producto 24UX1): the 24B6 effect started `withTiming` in the
     same effect that mounted the modal, RN's `Modal` renders nothing while hidden and presents in
     `didMoveToWindow`, and the ease-out curve covered 60 % of the travel in two frames, so the first
@@ -262,10 +265,14 @@ the owner authorises it; no EAS build or store submission without the owner.
     commands and results; decision 001 marked superseded in part. Nothing deleted.
   - This roadmap: history moved verbatim to `docs/mobile-roadmap-history.md` (29 previous
     deliveries, 42 handoff entries, 3 notes); the Más footer reads Producto 24UX1.
+  - `apps/mobile/README.md` rewritten native-first (architecture, Fedora and iPhone setup, EAS
+    profiles, verification, test flags, the real status of languages, regions, currencies, the
+    Assistant and Android, and implemented / device-tested / released kept apart); its former
+    chronology and test inventory moved verbatim to the history file (review of PR #54).
   - **Checked on Linux:** root `npm test` 448/448, `npm run build`, `npm run check:repo`; mobile
-    `npm run typecheck`, `npm run test:storage` 576/576 (real SQLite), `npm run currency:verify`,
+    `npm run typecheck`, `npm run test:storage` 577/577 (real SQLite), `npm run currency:verify`,
     `npm run regions:verify`, `npm run i18n:check -- --strict` (0 errors, 0 stale), `npm run check`
-    (up to date), `npm run export:ios` (4,970,794 bytes). No EAS build; the iPhone was not modified;
+    (up to date), `npm run export:ios` (4,970,840 bytes). No EAS build; the iPhone was not modified;
     no paid service, currency or FX provider enabled.
   - **Pending:** the device QA of §2 (24UX1), then the retirement PR of decision 004, then 24R2.
 

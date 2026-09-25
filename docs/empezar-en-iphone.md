@@ -1,6 +1,14 @@
 # Probar FinanzApp en tu iPhone, desde Linux o Windows
 
-Actualizado: 21 de septiembre de 2026.
+Actualizado: 21 de septiembre de 2026 (encuadre revisado el 25 de septiembre de 2026).
+
+> **La app nativa es el producto** ([decisión 004](decisions/004-native-first-and-web-retirement.md)).
+> Esta guía se escribió cuando todavía se la llamaba "piloto" frente a la web; donde diga "piloto",
+> leé "la app". La web y Capacitor quedan congeladas hasta su PR de retiro y no son la app que se
+> prueba aquí. Los pasos de instalación y prueba siguen vigentes; el pie de Más dice hoy
+> **Producto 24UX1** y las comprobaciones de cada entrega están en
+> [mobile-device-checklist.md](mobile-device-checklist.md). Configuración y comandos al día:
+> [apps/mobile/README.md](../apps/mobile/README.md).
 
 > **Producto 18:** la quinta pestaña ahora se llama **Más** (antes Ajustes). Donde esta
 > guía diga "Ajustes → …", buscá lo mismo en Más: Cuentas, Presupuestos, Recurrentes,
