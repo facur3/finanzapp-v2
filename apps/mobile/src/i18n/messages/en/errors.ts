@@ -139,7 +139,7 @@ export const errors: Pick<Messages, 'errors'> = {
       fileSize: 'Choose a JSON backup of up to 5 MB.',
       notJson: 'The file is not a valid JSON backup.',
       notFinanzApp: 'The file is not a FinanzApp backup.',
-      version: 'Only native pilot backups v1 to v9 can be restored. Backups from the web app, the earlier app or other versions are not supported yet; keep the file.',
+      version: 'Only native pilot backups v1 to v10 can be restored. Backups from the web app, the earlier app or other versions are not supported yet; keep the file.',
       money: 'Unsupported format or monetary unit.',
       legacyImport: 'Backups v1 to v8 can only contain accounts and budgets in ARS or USD. Nothing was imported; keep the file.',
       lists: 'The backup has no valid list of accounts and transactions (at most 1,000 accounts and 25,000 transactions).',
@@ -210,6 +210,8 @@ export const errors: Pick<Messages, 'errors'> = {
       debtExists: 'This debt already exists with different details. Open the form again.',
       debtMissing: 'We could not find this debt.',
       debtChanged: 'The debt has changed since you opened it. Check it again.',
+      recurringDeleted: 'This recurring item was deleted.',
+      debtDeleted: 'This debt was deleted.',
     },
   },
 };

@@ -5,6 +5,7 @@ import { summarizeMonthlyBudgets, type MonthlyBudget } from './budgets';
 import { accountKind, assertIncomeAccount, assertPostingAccount, assertTransferSides, cardAvailableLimitMinor, keepsHistoricalCardIncome, postingAccountsFor, sameTransferSides, cardCreditMinor, cardCycle, cardDebtMinor, cardStatementActivity,
   debtOutstandingMinor, hiddenLiabilityAccountIds, liquidTotalsByCurrency, nextDayOfMonthISO, previousDayOfMonthISO,
   validateCreditCardProfile, validateLiabilityProfiles, validatePersonalDebtProfile,
+  closePersonalDebt, debtTotalsByCurrency, deletePersonalDebt, reopenPersonalDebt, validatePersonalDebtChange,
   type CreditCardProfile, type PersonalDebtProfile } from './liabilities';
 
 const createdAt = '2026-09-01T12:00:00.000Z';
@@ -18,7 +19,7 @@ const accounts = [cash, cardAccount, debtAccount, receivableAccount, usd];
 const card: CreditCardProfile = { id: 'card', accountId: cardAccount.id, issuer: 'Galicia', last4: '4009', creditLimitMinor: 500000,
   closingDay: 28, dueDay: 5, active: true, createdAt, revision: 0, updatedAt: createdAt };
 const debt: PersonalDebtProfile = { id: 'debt', accountId: debtAccount.id, direction: 'owed_by_me', counterparty: 'Juan',
-  dueDateISO: '2026-10-01', note: '', active: true, createdAt, revision: 0, updatedAt: createdAt };
+  dueDateISO: '2026-10-01', note: '', active: true, deleted: false, createdAt, revision: 0, updatedAt: createdAt };
 const receivable: PersonalDebtProfile = { ...debt, id: 'receivable', accountId: receivableAccount.id, direction: 'owed_to_me', counterparty: 'Ana', dueDateISO: null };
 
 const purchase: Entry = { id: 'purchase', accountId: cardAccount.id, kind: 'expense', amountMinor: 23100, merchant: 'Starbucks', category: 'Café', dateISO: '2026-09-12', createdAt };
@@ -189,5 +190,42 @@ describe('card flows (24B6)', () => {
     expect(sameTransferSides(payment, payment)).toBe(true);
     expect(sameTransferSides(payment, { ...payment, toAccountId: cash.id })).toBe(false);
     expect(sameTransferSides(payment, { ...payment, amountMinor: 1 })).toBe(true);
+  });
+});
+
+describe('closing, reopening and deleting a debt tracker (Producto 24UX4)', () => {
+  const now = '2026-09-20T09:00:00.000Z';
+  it('closing leaves the balance and the payments as they were; reopening brings it back', () => {
+    const closed = closePersonalDebt(debt, now);
+    expect(closed).toEqual({ ...debt, active: false, revision: 1, updatedAt: now });
+    expect(() => validatePersonalDebtChange(debt, closed)).not.toThrow();
+    expect(debtOutstandingMinor(closed, snapshot)).toBe(debtOutstandingMinor(debt, snapshot));
+    const reopened = reopenPersonalDebt(closed, now);
+    expect(reopened).toEqual({ ...debt, revision: 2, updatedAt: now });
+  });
+
+  it('a deleted tracker keeps its hidden account a debt, so its payments never turn into plain money', () => {
+    const deleted = deletePersonalDebt(debt, now);
+    expect(deleted).toEqual({ ...debt, active: false, deleted: true, revision: 1, updatedAt: now });
+    expect(() => validateLiabilityProfiles([card], [deleted, receivable], accounts)).not.toThrow();
+    expect(accountKind(debtAccount.id, [card], [deleted])).toBe('debt');
+    expect(hiddenLiabilityAccountIds([card], [deleted]).has(debtAccount.id)).toBe(true);
+    // Disponible is unchanged by the deletion: the payment still left cash, the debt account is still excluded.
+    expect(liquidTotalsByCurrency(snapshot, [card], [deleted, receivable])).toEqual(liquidTotalsByCurrency(snapshot, [card], [debt, receivable]));
+    expect(() => assertPostingAccount(debtAccount.id, [deleted])).toThrow();
+    // No new payment reaches a deleted tracker; its recorded ones stay editable in place (sides unchanged).
+    expect(() => assertTransferSides(debtPayment, [card], [deleted])).toThrow('Esta deuda fue eliminada.');
+    expect(sameTransferSides(debtPayment, { ...debtPayment, amountMinor: 1 })).toBe(true);
+    // Lists pass open trackers only; a deleted one leaves the totals.
+    expect(debtTotalsByCurrency([deleted, receivable].filter(item => item.active), snapshot)).toEqual([{ status: 'ready', currency: 'ARS', owedMinor: 0, receivableMinor: 10000 }]);
+  });
+
+  it('a deleted tracker is terminal and never active', () => {
+    const deleted = deletePersonalDebt(debt, now);
+    expect(() => validatePersonalDebtProfile({ ...deleted, active: true }, accounts)).toThrow('Estado de deuda inválido.');
+    expect(() => reopenPersonalDebt(deleted, now)).toThrow('Esta deuda fue eliminada.');
+    expect(() => closePersonalDebt(deleted, now)).toThrow('Esta deuda fue eliminada.');
+    expect(() => deletePersonalDebt(deleted, now)).toThrow('Esta deuda fue eliminada.');
+    expect(() => validatePersonalDebtChange(deleted, { ...deleted, note: 'x', revision: 2 })).toThrow('Esta deuda fue eliminada.');
   });
 });

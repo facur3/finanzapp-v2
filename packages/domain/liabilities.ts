@@ -32,7 +32,13 @@ export interface PersonalDebtProfile {
   counterparty: string;
   dueDateISO: string | null;
   note: string;
+  /** false = closed: kept under Cerradas, no longer pending (Producto 24UX4; «archivada» before). */
   active: boolean;
+  /** Producto 24UX4: a deletion record. The tracker leaves every list and total; its hidden account, the
+   * opening amount and every payment or collection stay in the ledger exactly as recorded, still read as this
+   * debt's (so a payment keeps its «Debo · Juan» side and never becomes a plain account). A deleted debt is
+   * never active and never changes again. */
+  deleted: boolean;
   createdAt: string;
   revision: number;
   updatedAt: string;
@@ -43,7 +49,7 @@ export type AccountKind = 'cash' | 'card' | 'debt';
 const CARD_KEYS = ['id', 'accountId', 'issuer', 'last4', 'creditLimitMinor', 'closingDay', 'dueDay',
   'active', 'createdAt', 'revision', 'updatedAt'] as const;
 const DEBT_KEYS = ['id', 'accountId', 'direction', 'counterparty', 'dueDateISO', 'note',
-  'active', 'createdAt', 'revision', 'updatedAt'] as const;
+  'active', 'deleted', 'createdAt', 'revision', 'updatedAt'] as const;
 
 function validId(value: string): boolean {
   return typeof value === 'string' && /^[a-zA-Z0-9_-]{1,100}$/.test(value);
@@ -90,7 +96,7 @@ export function validatePersonalDebtProfile(debt: PersonalDebtProfile, accounts:
   }
   if (debt.dueDateISO !== null && !validDateISO(debt.dueDateISO)) throw new Error('La fecha de vencimiento no es válida.');
   if (typeof debt.note !== 'string' || debt.note.length > 120) throw new Error('La nota debe tener hasta 120 caracteres.');
-  if (typeof debt.active !== 'boolean') throw new Error('Estado de deuda inválido.');
+  if (typeof debt.active !== 'boolean' || typeof debt.deleted !== 'boolean' || (debt.deleted && debt.active)) throw new Error('Estado de deuda inválido.');
   validateVersion(debt.createdAt, debt.revision, debt.updatedAt);
 }
 
@@ -121,6 +127,7 @@ export function validateCreditCardChange(before: CreditCardProfile, after: Credi
   }
 }
 export function validatePersonalDebtChange(before: PersonalDebtProfile, after: PersonalDebtProfile): void {
+  if (before.deleted) throw new Error('Esta deuda fue eliminada.');
   if (after.accountId !== before.accountId || after.direction !== before.direction
     || after.createdAt !== before.createdAt || after.revision !== before.revision + 1) {
     throw new Error('La deuda cambió desde que la abriste. Volvé a revisarla.');
@@ -187,6 +194,10 @@ export function postingAccountsFor(kind: EntryKind, accounts: readonly Account[]
  * `sameTransferSides` lets an edit keep historical sides. */
 export function assertTransferSides(transfer: Pick<Transfer, 'fromAccountId' | 'toAccountId'>, cards: CreditCardProfile[] = [], debts: PersonalDebtProfile[] = []): void {
   const from = accountKind(transfer.fromAccountId, cards, debts), to = accountKind(transfer.toAccountId, cards, debts);
+  // 24UX4: a deleted tracker keeps its recorded payments, but takes no new one (nothing would show it).
+  if (debts.some(debt => debt.deleted && (debt.accountId === transfer.fromAccountId || debt.accountId === transfer.toAccountId))) {
+    throw new Error('Esta deuda fue eliminada.');
+  }
   if (from === 'card') throw new Error('Una tarjeta se paga desde una cuenta; no puede ser el origen de una transferencia.');
   if (from !== 'cash' && to !== 'cash') throw new Error('Una transferencia entre dos obligaciones no se puede registrar.');
 }
@@ -352,4 +363,22 @@ export function liabilityActivity(accountId: string, snapshot: LedgerSnapshot): 
     entries: snapshot.entries.filter(entry => entry.accountId === accountId),
     transfers: (snapshot.transfers ?? []).filter(transfer => transfer.fromAccountId === accountId || transfer.toAccountId === accountId),
   };
+}
+
+/** Closing (Producto 24UX4) takes a debt out of the pending lists and totals and keeps it under Cerradas; its
+ * balance, payments and collections are untouched. Reopening brings it back as it was. */
+export function closePersonalDebt(debt: PersonalDebtProfile, nowISO: string): PersonalDebtProfile {
+  return debtStateChange(debt, { active: false }, nowISO);
+}
+export function reopenPersonalDebt(debt: PersonalDebtProfile, nowISO: string): PersonalDebtProfile {
+  return debtStateChange(debt, { active: true }, nowISO);
+}
+/** The deletion record of a debt tracker: its account and every transfer that touched it stay as recorded. */
+export function deletePersonalDebt(debt: PersonalDebtProfile, nowISO: string): PersonalDebtProfile {
+  return debtStateChange(debt, { active: false, deleted: true }, nowISO);
+}
+function debtStateChange(debt: PersonalDebtProfile, change: Partial<Pick<PersonalDebtProfile, 'active' | 'deleted'>>, nowISO: string): PersonalDebtProfile {
+  if (debt.deleted) throw new Error('Esta deuda fue eliminada.');
+  if (!validTimestamp(nowISO)) throw new Error('Estado de obligación inválido.');
+  return { ...debt, ...change, revision: debt.revision + 1, updatedAt: nowISO };
 }

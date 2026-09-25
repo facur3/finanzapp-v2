@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { advanceRecurringDate, materializeRecurringRule, recurringEntryId, recurringHistory, recurringOccurrenceOf, recurringOccurrencesThrough,
-  validateRecurringRule, type RecurringRule } from './recurring';
+import { advanceRecurringDate, deleteRecurringRule, materializeRecurringRule, pauseRecurringRule, recurringEntryId, recurringHistory, recurringOccurrenceOf, recurringOccurrencesThrough,
+  resumeRecurringRule, validateRecurringRule, validateRecurringRuleChange, type RecurringRule } from './recurring';
 import type { Account } from './ledger';
 
 const account: Account = {
@@ -21,6 +21,7 @@ const monthly: RecurringRule = {
   anchorDateISO: '2026-01-31',
   nextDateISO: '2026-01-31',
   active: true,
+  deleted: false,
   createdAt: '2026-01-01T12:00:00.000Z',
   revision: 0,
   updatedAt: '2026-01-01T12:00:00.000Z',
@@ -88,5 +89,45 @@ describe('the payments a rule registered', () => {
     expect(history.map(entry => entry.dateISO)).toEqual(['2026-03-31', '2026-03-02', '2026-01-31']);
     expect(recurringHistory(monthly, [])).toEqual([]);
     expect(recurringHistory({ id: 'rent_2' }, [sibling]).length).toBe(1);
+  });
+});
+
+describe('pausing, resuming and deleting a rule (Producto 24UX4)', () => {
+  const now = '2026-03-10T09:00:00.000Z';
+  it('pausing keeps the next date and records nothing while paused', () => {
+    const paused = pauseRecurringRule(monthly, now);
+    expect(paused).toMatchObject({ active: false, deleted: false, nextDateISO: monthly.nextDateISO, revision: 1, updatedAt: now });
+    expect(() => validateRecurringRule(paused, [account])).not.toThrow();
+    expect(materializeRecurringRule(paused, [account], '2026-12-31', now).entries).toEqual([]);
+  });
+
+  it('resuming skips what fell due while paused and keeps the anchor day', () => {
+    const paused = pauseRecurringRule(monthly, now);
+    const resumed = resumeRecurringRule(paused, '2026-04-10', now);
+    // January 31 → the first occurrence on or after April 10 on the 31st-anchored calendar is April 30.
+    expect(resumed).toMatchObject({ active: true, nextDateISO: '2026-04-30', anchorDateISO: '2026-01-31', revision: 2 });
+    expect(materializeRecurringRule(resumed, [account], '2026-04-10', now).entries).toEqual([]);
+    // A next date still ahead is kept as it was; one due today is recorded today.
+    expect(resumeRecurringRule({ ...paused, nextDateISO: '2026-05-31' }, '2026-04-10', now).nextDateISO).toBe('2026-05-31');
+    expect(resumeRecurringRule(paused, '2026-01-31', now).nextDateISO).toBe('2026-01-31');
+  });
+
+  it('a deletion record is inactive for good, keeps every other field and refuses any later change', () => {
+    const deleted = deleteRecurringRule(monthly, now);
+    expect(deleted).toEqual({ ...monthly, active: false, deleted: true, revision: 1, updatedAt: now });
+    expect(() => validateRecurringRule(deleted, [account])).not.toThrow();
+    expect(recurringOccurrencesThrough(deleted, '2026-12-31')).toEqual([]);
+    expect(() => validateRecurringRule({ ...deleted, active: true }, [account])).toThrow('Estado de recurrente inválido.');
+    expect(() => pauseRecurringRule(deleted, now)).toThrow('Este recurrente fue eliminado.');
+    expect(() => resumeRecurringRule(deleted, '2026-04-10', now)).toThrow('Este recurrente fue eliminado.');
+    expect(() => deleteRecurringRule(deleted, now)).toThrow('Este recurrente fue eliminado.');
+    expect(() => validateRecurringRuleChange(deleted, { ...deleted, merchant: 'Otro', revision: 2 }, [account])).toThrow('Este recurrente fue eliminado.');
+    expect(() => validateRecurringRule({ ...monthly, deleted: undefined as unknown as boolean }, [account])).toThrow('Estado de recurrente inválido.');
+  });
+
+  it('deleting never touches the movements the rule recorded: its history still reads them by id', () => {
+    const recorded = materializeRecurringRule(monthly, [account], '2026-02-28', now).entries;
+    deleteRecurringRule(monthly, now);
+    expect(recurringHistory(monthly, recorded).map(entry => entry.dateISO)).toEqual(['2026-02-28', '2026-01-31']);
   });
 });

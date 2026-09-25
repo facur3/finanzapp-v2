@@ -44,6 +44,8 @@ for (const [name, p] of [['light', lightPalette], ['dark', darkPalette]] as cons
     assert.ok(Math.abs(hue(p.transfer) - hue(p.primary)) >= 12, `transfer azure (${hue(p.transfer).toFixed(0)}°) sits apart from the cobalt primary (${hue(p.primary).toFixed(0)}°)`);
     assert.ok(contrast(p.transfer, p.transferSoft) >= 4.5, 'transfer text on its soft tile');
     assert.ok(contrast(p.text, p.surface) >= 12, 'normal text stays high-contrast neutral');
+    // 24UX4: white labels on the trailing swipe actions.
+    for (const fill of [p.swipeDestructive, p.swipeNeutral, p.swipeAccent]) assert.ok(contrast('#FFFFFF', fill) >= 4.5, `white on swipe action ${fill}: ${contrast('#FFFFFF', fill).toFixed(2)}`);
     assert.ok(contrast(p.secondary, p.surface) >= 4.5);
   });
   test(`${name}: secondary text and tertiary glyphs read on every ground of Inicio (24UX1)`, () => {

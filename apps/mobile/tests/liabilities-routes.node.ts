@@ -12,6 +12,7 @@ import * as liabilityPresentation from '../src/ui/liability-presentation.ts';
 import * as i18nFormat from '../src/i18n/format.ts';
 import { bindLocale } from '../src/i18n/bind.ts';
 import type { AppLocale } from '../src/i18n/locale.ts';
+import { realModule, swipeActionsMock } from './real-module.ts';
 // The locale every harness reads on render; an English test switches it and restores Spanish.
 let activeLocale: AppLocale = 'es-AR';
 const i18nProvider = { useI18n: () => bindLocale(activeLocale) };
@@ -28,7 +29,7 @@ const card: domain.CreditCardProfile = { id: 'card', accountId: cardAccount.id, 
   closingDay: 28, dueDay: 5, active: true, createdAt, revision: 0, updatedAt: createdAt };
 const usdCard: domain.CreditCardProfile = { ...card, id: 'usd-card', accountId: usdCardAccount.id, issuer: 'Amex', last4: '1001', creditLimitMinor: null };
 const debt: domain.PersonalDebtProfile = { id: 'debt', accountId: debtAccount.id, direction: 'owed_by_me', counterparty: 'Juan', dueDateISO: '2026-10-01',
-  note: '', active: true, createdAt, revision: 0, updatedAt: createdAt };
+  note: '', active: true, deleted: false, createdAt, revision: 0, updatedAt: createdAt };
 const purchase: domain.Entry = { id: 'purchase', accountId: cardAccount.id, kind: 'expense', amountMinor: 23100, merchant: 'Starbucks', category: 'Café', dateISO: '2026-09-12', createdAt };
 const payment: domain.Transfer = { id: 'payment', fromAccountId: cash.id, toAccountId: cardAccount.id, amountMinor: 30000, note: 'Pago Visa Gold', dateISO: '2026-09-15', createdAt };
 const archive: domain.LedgerArchive = { accounts: [cash, cardAccount, usdCardAccount, debtAccount], records: [domain.initialRecord(purchase)],
@@ -44,16 +45,19 @@ function harness(file: string, params: Record<string, unknown> = {}, data: domai
   const pushed: any[] = [];
   let cursor = 0;
   const cards: { account: domain.Account; card: domain.CreditCardProfile }[] = [], debts: { account: domain.Account; debt: domain.PersonalDebtProfile }[] = [];
+  const savedDebts: domain.PersonalDebtProfile[] = [], alerts: { title: string; message: string; buttons: any[] }[] = [];
+  let backs = 0;
   const ledger = { useLedger: () => ({ archive: data, snapshot: domain.snapshotFromArchive(data), ...(gate ? { gate } : {}),
     addCard: async (account: domain.Account, card: domain.CreditCardProfile) => { cards.push({ account, card }); }, saveCard: async () => {},
-    addDebt: async (account: domain.Account, debt: domain.PersonalDebtProfile) => { debts.push({ account, debt }); }, saveDebt: async () => {} }) };
+    addDebt: async (account: domain.Account, debt: domain.PersonalDebtProfile) => { debts.push({ account, debt }); },
+    saveDebt: async (debt: domain.PersonalDebtProfile) => { savedDebts.push(debt); } }) };
   const componentNames = ['ActionButton', 'AppText', 'DetailRow', 'EmptyState', 'GlyphTile', 'IconButton', 'Money', 'MovementRow', 'PressFeedback',
     'Screen', 'SectionTitle', 'Stat', 'Surface', 'AmountField', 'Field', 'Choices', 'ErrorMessage'];
   const components = { ...Object.fromEntries(componentNames.map(name => [name, name])), toneColors: () => ({ color: '#000', soft: '#eee' }), useStacked: () => false };
   const theme = { space: { xs: 4, s: 8, m: 12, l: 16, xl: 20, xxl: 24, xxxl: 32 }, useCurrentDay: () => '2026-09-20', useReduceMotion: () => true,
     usePalette: () => ({ text: '#000', secondary: '#666', tertiary: '#999', line: '#ddd', inset: '#eee', expense: '#c00', income: '#080', warning: '#a60', transfer: '#03c', primary: '#2557D6' }) };
   const modules: Record<string, unknown> = {
-    'expo-haptics': { NotificationFeedbackType: { Success: 'Success' }, notificationAsync: async () => {} },
+    'expo-haptics': { NotificationFeedbackType: { Success: 'Success' }, notificationAsync: async () => {}, selectionAsync: async () => {} },
     'expo-crypto': { randomUUID: () => 'id-' + Math.random().toString(36).slice(2, 8) },
     '../i18n/messages': {},
     './form-controls': { DateField: 'DateField' },
@@ -65,10 +69,11 @@ function harness(file: string, params: Record<string, unknown> = {}, data: domai
       return [state[index], (value: unknown) => { state[index] = typeof value === 'function' ? (value as (current: unknown) => unknown)(state[index]) : value; }];
     } },
     'react/jsx-runtime': { jsx, jsxs: jsx, Fragment: 'Fragment' },
-    'react-native': { View: 'View', Alert: { alert: () => {} }, Keyboard: { dismiss() {} }, useWindowDimensions: () => ({ width: 393, fontScale: 1 }) },
+    'react-native': { View: 'View', Alert: { alert: (title: string, message: string, buttons: any[]) => alerts.push({ title, message, buttons }) }, Keyboard: { dismiss() {} }, useWindowDimensions: () => ({ width: 393, fontScale: 1 }) },
     'react-native-reanimated': { __esModule: true, default: { View: 'Animated.View' }, useSharedValue: (value: number) => ({ value }),
       withTiming: (value: number) => value, useAnimatedStyle: (fn: () => unknown) => fn() },
-    'expo-router': { Stack: { Screen: 'Stack.Screen' }, useLocalSearchParams: () => params, router: { push: (to: unknown) => pushed.push(to), navigate: (to: unknown) => pushed.push(to) } },
+    'expo-router': { Stack: { Screen: 'Stack.Screen' }, useLocalSearchParams: () => params, router: { push: (to: unknown) => pushed.push(to), navigate: (to: unknown) => pushed.push(to),
+      canGoBack: () => true, back: () => { backs++; }, replace: (to: unknown) => pushed.push(to) } },
     '@finanzapp/domain': domain,
     '../src/storage/LedgerProvider': ledger, '../../src/storage/LedgerProvider': ledger, '../storage/LedgerProvider': ledger,
     '../src/ui/components': components, '../../src/ui/components': components, './components': components,
@@ -79,15 +84,21 @@ function harness(file: string, params: Record<string, unknown> = {}, data: domai
     '../src/ui/presentation': presentation, '../../src/ui/presentation': presentation,
     '../src/ui/theme': theme, '../../src/ui/theme': theme, './theme': theme,
     '../src/ui/liability-rows': { DebtRow: 'DebtRow' }, '../../src/ui/liability-rows': { DebtRow: 'DebtRow' },
+    './swipe-actions': swipeActionsMock,
     '../src/ui/quick-actions': { QuickActions: 'QuickActions', AssistantEntry: 'AssistantEntry' }, '../../src/ui/quick-actions': { QuickActions: 'QuickActions', AssistantEntry: 'AssistantEntry' },
     '../src/ui/motion': { ValueTransition: 'ValueTransition', Reflow: 'Reflow', selectionHaptic: () => {}, impactHaptic: () => {}, timing: (kind: string, reduced: boolean) => ({ duration: reduced ? 0 : 260 }) }, '../../src/ui/motion': { ValueTransition: 'ValueTransition', Reflow: 'Reflow', selectionHaptic: () => {}, impactHaptic: () => {}, timing: (kind: string, reduced: boolean) => ({ duration: reduced ? 0 : 260 }) },
   };
-  const module = { exports: {} as { default?: () => Node } & Record<string, (props: any) => Node> };
-  runInNewContext(code, { module, exports: module.exports, require: (name: string) => {
+  const require = (name: string) => {
     if (!Object.hasOwn(modules, name)) throw new Error('Unexpected liabilities dependency: ' + name);
     return modules[name];
-  } });
-  return { render: () => { cursor = 0; return module.exports.default!(); }, renderExport: (name: string, props: any = {}) => { cursor = 0; return module.exports[name](props); }, pushed, cards, debts, exports: module.exports };
+  };
+  // 24UX4: the management hooks run for real (Alert, saveDebt, router and haptics are the mocks above).
+  const management = realModule('src/ui/commitment-actions.ts', require);
+  modules['../src/ui/commitment-actions'] = management; modules['../../src/ui/commitment-actions'] = management;
+  const module = { exports: {} as { default?: () => Node } & Record<string, (props: any) => Node> };
+  runInNewContext(code, { module, exports: module.exports, require, Error });
+  return { render: () => { cursor = 0; return module.exports.default!(); }, renderExport: (name: string, props: any = {}) => { cursor = 0; return module.exports[name](props); },
+    pushed, cards, debts, savedDebts, alerts, backs: () => backs, exports: module.exports };
 }
 
 // Nested function components (CardPanel, UsageBar, DebtRow) are expanded so
@@ -97,7 +108,7 @@ function nodes(value: any): Node[] {
   if (Array.isArray(value)) return value.flatMap(nodes);
   if (!value.props) return [];
   const own = typeof value.type === 'function' ? nodes(value.type(value.props)) : [];
-  return [value, ...own, ...nodes(value.props.children), ...nodes(value.props.header), ...nodes(value.props.action),
+  return [value, ...own, ...nodes(value.props.children), ...nodes(value.props.header), ...nodes(value.props.action), ...nodes(value.props.footer),
     ...(typeof value.props.render === 'function' ? nodes(value.props.render(value.props.items?.[0], 353)) : [])];
 }
 function find(root: Node, type: string, label?: string): Node {
@@ -266,7 +277,8 @@ test('23.1C2: a day inside a sentence starts in lower case; a day on its own kee
   const rowOf = (profile: domain.PersonalDebtProfile) => {
     const row = harness('src/ui/liability-rows.tsx', {}, { ...archive, debts: [profile] }).exports.DebtRow({ debt: profile, last: true });
     const caption = nodes(row).find(node => node.type === 'AppText' && node.props.variant === 'footnote')!.props.children;
-    return { label: row.props.accessibilityLabel, caption: [caption].flat().join('') };
+    // 24UX4: the pressable row sits inside its SwipeRow.
+    return { label: find(row, 'PressFeedback').props.accessibilityLabel, caption: [caption].flat().join('') };
   };
   assert.deepEqual(detailOf(dueToday), { status: 'Vence hoy', rows: 'Tipo=Yo debo,Vencimiento=Hoy,Estado=Vence hoy' });
   assert.deepEqual(detailOf(overdue), { status: 'Vencida · Ayer', rows: 'Tipo=Yo debo,Vencimiento=Ayer,Estado=Vencida · Ayer' });
@@ -353,4 +365,114 @@ test('24B5: the card and debt forms choose the currency before the amount, over 
   // The same forms with the release gate never see the preview currencies, whatever the route or the draft says.
   const release = forms('src/ui/debt-form.tsx');
   assert.equal(nodes(release.render()).some(node => node.type === 'CurrencySwitch' && node.props.currencies.includes('KWD')), false);
+});
+
+// ---- Producto 24UX4: settle, close, reopen and delete a debt tracker ---------------------------
+const settledPayment: domain.Transfer = { id: 'settle-juan', fromAccountId: cash.id, toAccountId: debtAccount.id, amountMinor: 30000, note: 'Pago a Juan', dateISO: '2026-09-18', createdAt };
+const settledData: domain.LedgerArchive = { ...archive, transfers: [...archive.transfers!, domain.initialTransferRecord(settledPayment)] };
+const labelsOf = (actions: { label: string }[]) => actions.map(action => action.label).join(',');
+const rowsOf = (root: Node) => nodes(root).filter(node => node.type === 'DebtRow');
+const settle = async () => { await new Promise(resolve => setImmediate(resolve)); };
+
+test('24UX4: a debt row swipes to Saldar (the whole balance, prefilled) and Eliminar; a settled one to Cerrar; a closed one to Reabrir', async () => {
+  const view = harness('debts.tsx');
+  const [row] = rowsOf(view.render());
+  assert.equal(labelsOf(row.props.actions), 'Saldar,Eliminar');
+  assert.equal(row.props.actions.map((action: { tone: string }) => action.tone).join(','), 'accent,destructive');
+  row.props.actions[0].onPress();
+  assert.equal(JSON.stringify(view.pushed.at(-1)), JSON.stringify({ pathname: '/new-transfer', params: { toAccountId: 'debt-acc', maxAmountMinor: '30000', amountMinor: '30000' } }),
+    'Saldar opens the reviewed payment form; nothing is marked paid without a recorded transfer');
+  assert.equal(view.savedDebts.length, 0);
+
+  const settled = harness('debts.tsx', {}, settledData);
+  const [settledRow] = rowsOf(settled.render());
+  assert.equal(labelsOf(settledRow.props.actions), 'Cerrar,Eliminar');
+  await settledRow.props.actions[0].onPress();
+  await settle();
+  assert.equal(settled.alerts.length, 0, 'closing a settled debt needs no confirmation');
+  assert.equal(JSON.stringify({ ...settled.savedDebts[0], updatedAt: '' }), JSON.stringify({ ...debt, active: false, revision: 1, updatedAt: '' }));
+
+  // Closed: out of the pending totals, listed under Cerradas, reopened from its row.
+  const closed = harness('debts.tsx', {}, { ...settledData, debts: [settled.savedDebts[0]] });
+  const root = closed.render();
+  assert.equal(nodes(root).filter(node => node.type === 'SectionTitle').map(node => node.props.children).join(','), 'Cerradas');
+  assert.equal(find(root, 'SectionTitle').props.caption, 'No cuentan como pendientes');
+  assert.equal(nodes(root).some(node => node.type === 'Stat'), false, 'no open debt: no pending totals');
+  const [closedRow] = rowsOf(root);
+  assert.equal(labelsOf(closedRow.props.actions), 'Reabrir,Eliminar');
+  await closedRow.props.actions[0].onPress();
+  await settle();
+  assert.equal(closed.savedDebts[0].active, true);
+  assert.equal(closed.savedDebts[0].revision, 2);
+});
+
+test('24UX4: closing a debt with a balance left asks first and never records a payment', async () => {
+  const view = harness('debt/[id].tsx', { id: 'debt' });
+  const root = view.render();
+  const buttons = nodes(root).filter(node => node.type === 'ActionButton').map(node => node.props.label).join(',');
+  assert.equal(buttons, 'Registrar pago,Cerrar deuda,Eliminar deuda', 'the payment first; the management actions at the end of the screen');
+  assert.equal(find(root, 'ActionButton', 'Eliminar deuda').props.tone, 'expense');
+  find(root, 'ActionButton', 'Cerrar deuda').props.onPress();
+  const alert = view.alerts[0];
+  assert.equal(alert.title, '¿Cerrar la deuda con Juan?');
+  assert.equal(alert.message, 'Todavía quedan $ 300,00 pendientes. Cerrarla la saca de pendientes sin registrar un pago; podés reabrirla.');
+  assert.equal(alert.buttons.map((button: { text: string; style?: string }) => button.text + ':' + (button.style ?? '')).join(','), 'Cancelar:cancel,Cerrar:');
+  assert.equal(view.savedDebts.length, 0);
+  await alert.buttons[1].onPress();
+  await settle();
+  assert.equal(view.savedDebts[0].active, false);
+  assert.equal(view.savedDebts[0].deleted, false);
+  assert.equal(view.backs(), 0, 'closing keeps the detail open');
+  // Closed: the state says Cerrada, no payment can be recorded, the action reopens.
+  const closed = harness('debt/[id].tsx', { id: 'debt' }, { ...archive, debts: [view.savedDebts[0]] }).render();
+  assert.ok(nodes(closed).some(node => node.type === 'DetailRow' && node.props.value === 'Cerrada'));
+  assert.equal(find(closed, 'ActionButton', 'Registrar pago').props.disabled, true);
+  find(closed, 'ActionButton', 'Reabrir deuda');
+});
+
+test('24UX4: deleting a debt asks first, names the payments that stay, writes only the tracker\'s deletion record and leaves the detail', async () => {
+  const view = harness('debt/[id].tsx', { id: 'debt' }, settledData);
+  find(view.render(), 'ActionButton', 'Eliminar deuda').props.onPress();
+  const alert = view.alerts[0];
+  assert.equal(alert.title, '¿Eliminar la deuda con Juan?');
+  assert.equal(alert.message, 'Deja de seguirse. El pago registrado sigue en Movimientos.');
+  assert.equal(alert.buttons.map((button: { text: string; style?: string }) => button.text + ':' + (button.style ?? '')).join(','), 'Cancelar:cancel,Eliminar:destructive');
+  await alert.buttons[1].onPress();
+  await settle();
+  assert.equal(JSON.stringify({ ...view.savedDebts[0], updatedAt: '' }), JSON.stringify({ ...debt, active: false, deleted: true, revision: 1, updatedAt: '' }));
+  assert.equal(view.backs(), 1);
+  // Stored: gone from Deudas (no open, no closed row, no totals), a deep link finds nothing, the payment is still the ledger's.
+  const deletedData = { ...settledData, debts: [view.savedDebts[0]] };
+  const list = harness('debts.tsx', {}, deletedData).render();
+  assert.equal(rowsOf(list).length, 0);
+  assert.equal(find(list, 'EmptyState').props.title, 'Lo que debés y lo que te deben');
+  assert.equal(find(harness('debt/[id].tsx', { id: 'debt' }, deletedData).render(), 'EmptyState').props.title, 'No encontramos esta deuda');
+  assert.equal(domain.snapshotFromArchive(deletedData).transfers!.some(transfer => transfer.id === 'settle-juan'), true);
+  // A receivable with no collection yet: its own wording.
+  const receivableAccount: domain.Account = { id: 'rec-acc', name: 'Me deben · Ana', currency: 'ARS', openingMinor: 4000, createdAt };
+  const receivable: domain.PersonalDebtProfile = { ...debt, id: 'receivable', accountId: receivableAccount.id, direction: 'owed_to_me', counterparty: 'Ana', dueDateISO: null };
+  const other = harness('debts.tsx', {}, { ...archive, accounts: [...archive.accounts, receivableAccount], debts: [receivable] });
+  rowsOf(other.render())[0].props.actions[1].onPress();
+  assert.equal(other.alerts[0].title, '¿Eliminar lo que te debe Ana?');
+  assert.equal(other.alerts[0].message, 'Deja de seguirse. No borra ningún movimiento.');
+});
+
+test('24UX4: a closed row says Cerrada and carries its actions for VoiceOver; English reads the same flow', () => {
+  const closed = { ...debt, active: false, revision: 1 };
+  const view = harness('src/ui/liability-rows.tsx', {}, { ...archive, debts: [closed] });
+  const actions = [{ key: 'reopen', label: 'Reabrir', icon: 'arrow-undo', tone: 'accent', onPress: () => {} }];
+  const row = view.exports.DebtRow({ debt: closed, last: true, actions });
+  assert.equal(row.type, 'SwipeRow');
+  const press = find(row, 'PressFeedback');
+  assert.equal(press.props.accessibilityLabel, 'Debo a Juan, 300,00 ARS, Cerrada');
+  assert.equal(JSON.stringify(press.props.accessibilityActions), JSON.stringify([{ name: 'reopen', label: 'Reabrir' }]));
+  activeLocale = 'en-AR';
+  try {
+    const english = harness('debt/[id].tsx', { id: 'debt' });
+    const root = english.render();
+    assert.equal(nodes(root).filter(node => node.type === 'ActionButton').map(node => node.props.label).join(','), 'Record payment,Close debt,Delete debt');
+    find(root, 'ActionButton', 'Delete debt').props.onPress();
+    assert.equal(english.alerts[0].title, 'Delete your debt to Juan?');
+    assert.equal(labelsOf(rowsOf(harness('debts.tsx').render())[0].props.actions), 'Settle,Delete');
+  } finally { activeLocale = 'es-AR'; }
 });

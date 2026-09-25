@@ -8,7 +8,8 @@ import { accountBalanceMinor, archiveKey, createRecoveryBackup, initialRecord, m
   makeAccountChange, initialTransferRecord, makeTransferChange, type Transfer, type RecurringRule, type MonthlyBudget,
   cardDebtMinor, debtOutstandingMinor, liquidTotalsByCurrency, spendingOverview, type CreditCardProfile, type PersonalDebtProfile,
   makeAccountAppearance, accountLook, newCategoryDefinition, editedCategoryDefinition, resolveCategory, categoryOptions, spendingReport,
-  summarizeMonthlyBudgets, type AccountAppearance } from '@finanzapp/domain';
+  summarizeMonthlyBudgets, type AccountAppearance,
+  closePersonalDebt, deletePersonalDebt, deleteRecurringRule, pauseRecurringRule, reopenPersonalDebt, resumeRecurringRule, recurringHistory } from '@finanzapp/domain';
 import { changeEntry, createAccount, createEntry, importArchive, initializeDatabase, readArchive, readSnapshot, changeAccount,
   createTransfer, changeTransfer, saveRecurringRule, processRecurring, saveMonthlyBudget,
   createCreditCard, saveCreditCard, createPersonalDebt, savePersonalDebt, saveAccountAppearance, saveCategoryDefinition, DATABASE_VERSION, SCHEMA_SCRIPTS, type LedgerDatabase } from '../src/storage/database.ts';
@@ -494,6 +495,7 @@ const recurring: RecurringRule = {
   anchorDateISO: '2026-01-31',
   nextDateISO: '2026-01-31',
   active: true,
+  deleted: false,
   createdAt: '2026-01-01T12:00:00.000Z',
   revision: 0,
   updatedAt: '2026-01-01T12:00:00.000Z',
@@ -602,7 +604,7 @@ test('schema 4 upgrades to budget schema 5 without changing recurring rules or b
   await createAccount(db, account);
   await saveRecurringRule(db, recurring);
   const before = await readArchive(db);
-  await db.execAsync('DROP TABLE IF EXISTS currency_units; DROP TABLE IF EXISTS account_appearances; DROP TABLE IF EXISTS category_definitions; DROP TABLE monthly_budgets; DROP TABLE credit_cards; DROP TABLE personal_debts; PRAGMA user_version = 4;');
+  await db.execAsync('DROP TABLE IF EXISTS currency_units; DROP TABLE IF EXISTS account_appearances; DROP TABLE IF EXISTS category_definitions; DROP TABLE monthly_budgets; DROP TABLE credit_cards; DROP TABLE personal_debts; ALTER TABLE recurring_rules DROP COLUMN deleted; PRAGMA user_version = 4;');
   await initializeDatabase(db);
   const after = await readArchive(db);
   assert.equal((await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))?.user_version, DATABASE_VERSION);
@@ -716,7 +718,7 @@ test('schema 6 upgrades to scoped budget schema 7: every old budget survives exa
   await saveRecurringRule(db, recurring);
   const before = await readArchive(db);
   // Rebuild the v6 table by hand and insert rows the old way (no scope column), including an archived one and an odd spelling.
-  await db.execAsync('DROP TABLE IF EXISTS currency_units; DROP TABLE IF EXISTS account_appearances; DROP TABLE IF EXISTS category_definitions; DROP TABLE monthly_budgets;' + V6_BUDGETS_TABLE + " PRAGMA user_version = 6;");
+  await db.execAsync('DROP TABLE IF EXISTS currency_units; DROP TABLE IF EXISTS account_appearances; DROP TABLE IF EXISTS category_definitions; DROP TABLE monthly_budgets; ALTER TABLE recurring_rules DROP COLUMN deleted; ALTER TABLE personal_debts DROP COLUMN deleted;' + V6_BUDGETS_TABLE + " PRAGMA user_version = 6;");
   const legacy = [
     { ...monthlyBudget },
     { ...monthlyBudget, id: 'archived-fixture', category: ' fÍxture ', active: false, revision: 3, updatedAt: changedAt },
@@ -810,14 +812,14 @@ const cardPayment: Transfer = { id: 'card-payment', fromAccountId: account.id, t
   note: 'Pago Visa Gold', dateISO: '2026-09-15', createdAt: account.createdAt };
 const debtAccount: Account = { id: 'debt-account', name: 'Debo · Juan', currency: 'ARS', openingMinor: -30000, createdAt: account.createdAt };
 const debt: PersonalDebtProfile = { id: 'debt-fixture', accountId: debtAccount.id, direction: 'owed_by_me', counterparty: 'Juan',
-  dueDateISO: '2026-10-01', note: '', active: true, createdAt: account.createdAt, revision: 0, updatedAt: account.createdAt };
+  dueDateISO: '2026-10-01', note: '', active: true, deleted: false, createdAt: account.createdAt, revision: 0, updatedAt: account.createdAt };
 
 test('schema 5 upgrades to card/debt schema 6 preserving budgets, recurring rules and balances', async () => {
   const { db } = await funded();
   await saveRecurringRule(db, recurring);
   await saveMonthlyBudget(db, monthlyBudget);
   const before = await readArchive(db);
-  await db.execAsync('DROP TABLE IF EXISTS currency_units; DROP TABLE IF EXISTS account_appearances; DROP TABLE IF EXISTS category_definitions; DROP TABLE credit_cards; DROP TABLE personal_debts; PRAGMA user_version = 5;');
+  await db.execAsync('DROP TABLE IF EXISTS currency_units; DROP TABLE IF EXISTS account_appearances; DROP TABLE IF EXISTS category_definitions; DROP TABLE credit_cards; DROP TABLE personal_debts; ALTER TABLE recurring_rules DROP COLUMN deleted; PRAGMA user_version = 5;');
   const failing: LedgerDatabase = { ...db, withExclusiveTransactionAsync: work => db.withExclusiveTransactionAsync(tx => work({ ...tx,
     execAsync: async sql => { await tx.execAsync(sql); if (sql.includes('personal_debts')) throw new Error('Interrupted v6'); },
   })) };
@@ -979,7 +981,7 @@ test('schema 7 upgrades to identity schema 8 additively: existing accounts keep 
   await saveRecurringRule(db, recurring);
   await saveMonthlyBudget(db, monthlyBudget);
   const before = await readArchive(db);
-  await db.execAsync('DROP TABLE currency_units; DROP TABLE account_appearances; DROP TABLE category_definitions; PRAGMA user_version = 7;');
+  await db.execAsync('DROP TABLE currency_units; DROP TABLE account_appearances; DROP TABLE category_definitions; ALTER TABLE recurring_rules DROP COLUMN deleted; ALTER TABLE personal_debts DROP COLUMN deleted; PRAGMA user_version = 7;');
   const failing: LedgerDatabase = { ...db, withExclusiveTransactionAsync: work => db.withExclusiveTransactionAsync(tx => work({ ...tx,
     execAsync: async sql => { await tx.execAsync(sql); if (sql.includes('category_definitions')) throw new Error('Interrupted v8'); },
   })) };
@@ -1251,7 +1253,8 @@ async function realV8File() {
   const dump = async () => {
     const rows: Record<string, unknown[]> = {};
     for (const table of ['accounts', 'entries', 'entry_changes', 'account_changes', 'transfers', 'transfer_changes', 'recurring_rules', 'monthly_budgets', 'credit_cards', 'personal_debts', 'account_appearances', 'category_definitions']) {
-      rows[table] = await db.getAllAsync(`SELECT * FROM ${table} ORDER BY 1, 2`);
+      // 24UX4 adds `deleted` (0 on every existing row, asserted apart): the v8 → v9 comparison reads the v8 columns.
+      rows[table] = (await db.getAllAsync<Record<string, unknown>>(`SELECT * FROM ${table} ORDER BY 1, 2`)).map(({ deleted: _deleted, ...row }) => row);
     }
     return rows;
   };
@@ -1261,7 +1264,7 @@ async function realV8File() {
 test('24B4: a real schema 8 file with every table populated upgrades to schema 9 with identical rows, balances and identity, and reopens', async () => {
   const { db, path, before, dump } = await realV8File();
   await initializeDatabase(db);
-  assert.equal((await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))?.user_version, 9);
+  assert.equal((await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))?.user_version, DATABASE_VERSION);
   assert.deepEqual(await dump(), before, 'every row of every table, byte for byte, including audit receipts and tombstones');
   assert.deepEqual(await db.getAllAsync('SELECT * FROM currency_units'), [], 'ARS and USD are never pinned: their rows stay cents');
   const archive = await readArchive(db);
@@ -1286,7 +1289,7 @@ test('24B4: a real schema 8 file with every table populated upgrades to schema 9
   await db.closeAsync();
   const reopened = databaseAt(path);
   await initializeDatabase(reopened);
-  assert.equal((await reopened.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))?.user_version, 9);
+  assert.equal((await reopened.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))?.user_version, DATABASE_VERSION);
   assert.equal(archiveKey(await readArchive(reopened)), archiveKey(archive));
   assert.deepEqual((await reopened.getAllAsync<{ name: string }>("SELECT name FROM sqlite_master WHERE type = 'table' AND name LIKE '%_v9'")), [], 'no scratch table survives');
   const indexes = (await reopened.getAllAsync<{ name: string }>("SELECT name FROM sqlite_master WHERE type = 'index' AND name = 'budgets_period'"));
@@ -1306,7 +1309,7 @@ test('24B4: an interrupted schema 9 migration leaves the schema 8 file intact an
   assert.equal((await db.getAllAsync("SELECT name FROM sqlite_master WHERE name IN ('accounts_v9', 'currency_units')")).length, 0);
   await db.execAsync('DROP TABLE monthly_budgets_v9');
   await initializeDatabase(db);
-  assert.equal((await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))?.user_version, 9);
+  assert.equal((await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))?.user_version, DATABASE_VERSION);
   assert.deepEqual(await dump(), before);
 
   // A schema 8 file holding a child row that points nowhere (foreign keys were off when it was written) never
@@ -1320,7 +1323,7 @@ test('24B4: an interrupted schema 9 migration leaves the schema 8 file intact an
   assert.equal((await damaged.db.getAllAsync("SELECT name FROM sqlite_master WHERE name IN ('accounts_v9', 'monthly_budgets_v9', 'currency_units')")).length, 0);
   await damaged.db.execAsync("DELETE FROM entries WHERE id = 'orphan'");
   await initializeDatabase(damaged.db);
-  assert.equal((await damaged.db.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))?.user_version, 9);
+  assert.equal((await damaged.db.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))?.user_version, DATABASE_VERSION);
 });
 
 test('24B4: an older schema (v3) still migrates through every step to schema 9 in one go', async () => {
@@ -1330,7 +1333,7 @@ test('24B4: an older schema (v3) still migrates through every step to schema 9 i
     await tx.runAsync('INSERT INTO accounts (id, name, currency, openingMinor, createdAt, revision, updatedAt) VALUES (?, ?, ?, ?, ?, 0, ?)', 'a', 'Caja', 'ARS', 700, account.createdAt, account.createdAt);
   });
   await initializeDatabase(db);
-  assert.equal((await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))?.user_version, 9);
+  assert.equal((await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))?.user_version, DATABASE_VERSION);
   assert.deepEqual(totalsByCurrency(await readSnapshot(db)), { ARS: 700 });
 });
 
@@ -1408,7 +1411,7 @@ test('24B4: a pinned scale that disagrees with the catalogue, or a row whose cur
   await assert.rejects(initializeDatabase(db), new RegExp(SCALE_CONFLICT_MESSAGE.slice(0, 20)));
   await assert.rejects(createEntry(db, { ...yenExpense, id: 'yen-2' }), new RegExp(SCALE_CONFLICT_MESSAGE.slice(0, 20)), 'no write while the scale is in doubt');
   assert.deepEqual(await db.getAllAsync('SELECT * FROM entries ORDER BY id'), before, 'nothing was rewritten or reset');
-  assert.equal((await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))?.user_version, 9);
+  assert.equal((await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))?.user_version, DATABASE_VERSION);
   await db.execAsync("UPDATE currency_units SET minorUnitExponent = 0 WHERE currency = 'JPY'");
   assert.deepEqual(archiveExponents(await readArchive(db)), { ARS: 2, EUR: 2, JPY: 0, KWD: 3 });
   // A row in a currency with no pinned scale (written by hand with foreign keys and the domain bypassed), even with the gate open.
@@ -1649,4 +1652,126 @@ test('24B6: a new transfer never leaves a card or joins two obligations; card an
   assert.equal((await readArchive(db)).transfers!.find(item => item.transfer.id === 'legacy-advance')!.voided, false, 'undo and restore keep working on a historical row');
   await changeTransfer(db, makeTransferChange('legacy-fixed-sides', (await readArchive(db)).transfers!.find(item => item.transfer.id === 'legacy-advance')!, 'edit', '2026-09-14T14:00:00.000Z', { ...fixed.transfer, fromAccountId: account.id, toAccountId: cardAccount.id }));
   assert.equal(cardDebtMinor(card, await readSnapshot(db)), 5000 - 800, 'turned into the payment it should have been');
+});
+
+// Producto 24UX4: pause/resume/delete of recurring rules and close/reopen/delete of debt trackers, on real SQLite.
+
+test('24UX4: a real schema 9 file upgrades to schema 10 additively: every rule and debt reads deleted = false and a deleted row can never be active', async () => {
+  const { db, path } = setup();
+  await runExclusiveTransaction(async () => connection(path), async tx => { for (const script of SCHEMA_SCRIPTS.slice(0, 9)) await tx.execAsync(script); });
+  const at = '2026-09-10T12:00:00.000Z';
+  await db.withExclusiveTransactionAsync(async tx => {
+    await tx.runAsync('INSERT INTO accounts (id, name, currency, openingMinor, createdAt, revision, updatedAt) VALUES (?, ?, ?, ?, ?, 0, ?)', 'cash', 'Banco', 'ARS', 100000, at, at);
+    await tx.runAsync('INSERT INTO accounts (id, name, currency, openingMinor, createdAt, revision, updatedAt) VALUES (?, ?, ?, ?, ?, 0, ?)', 'debt-acc', 'Debo · Ana', 'ARS', -300, at, at);
+    await tx.runAsync('INSERT INTO recurring_rules (id, accountId, kind, amountMinor, merchant, category, frequency, anchorDateISO, nextDateISO, active, createdAt, revision, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', 'r1', 'cash', 'expense', 40000, 'Alquiler', 'Hogar', 'monthly', '2026-10-01', '2026-10-01', 0, at, 1, at);
+    await tx.runAsync('INSERT INTO personal_debts (id, accountId, direction, counterparty, dueDateISO, note, active, createdAt, revision, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', 'debt', 'debt-acc', 'owed_by_me', 'Ana', null, '', 0, at, 1, at);
+  });
+  const before = await db.getAllAsync('SELECT * FROM recurring_rules');
+  await initializeDatabase(db);
+  assert.equal((await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))?.user_version, 10);
+  assert.deepEqual(await db.getAllAsync('SELECT * FROM recurring_rules'), before.map(row => ({ ...row as object, deleted: 0 })));
+  const archive = await readArchive(db);
+  assert.deepEqual(archive.recurring!.map(rule => [rule.id, rule.active, rule.deleted]), [['r1', false, false]]);
+  assert.deepEqual(archive.debts!.map(debt => [debt.id, debt.active, debt.deleted]), [['debt', false, false]]);
+  await db.withExclusiveTransactionAsync(async tx => {
+    await assert.rejects(tx.runAsync("UPDATE recurring_rules SET active = 1, deleted = 1 WHERE id = 'r1'"), /CHECK constraint failed/);
+    await assert.rejects(tx.runAsync("UPDATE personal_debts SET active = 1, deleted = 1 WHERE id = 'debt'"), /CHECK constraint failed/);
+    await assert.rejects(tx.runAsync("UPDATE personal_debts SET deleted = 2 WHERE id = 'debt'"), /CHECK constraint failed/);
+  });
+  // Reopening reads schema 10 as it is.
+  await db.closeAsync();
+  const reopened = databaseAt(path);
+  await initializeDatabase(reopened);
+  assert.equal(archiveKey(await readArchive(reopened)), archiveKey(archive));
+});
+
+test('24UX4: pausing records nothing, resuming skips the paused dates and records today once; the history stays', async () => {
+  const { db } = setup();
+  await initializeDatabase(db);
+  await createAccount(db, account);
+  await saveRecurringRule(db, recurring);
+  assert.equal(await processRecurring(db, '2026-01-31'), 1);
+  const saved = (await readArchive(db)).recurring![0];
+  await saveRecurringRule(db, pauseRecurringRule(saved, '2026-02-01T00:00:00.000Z'));
+  assert.equal(await processRecurring(db, '2026-04-29'), 0, 'February, March and April fall due while paused: nothing is recorded');
+  const paused = (await readArchive(db)).recurring![0];
+  assert.deepEqual([paused.active, paused.nextDateISO], [false, '2026-02-28']);
+  await saveRecurringRule(db, resumeRecurringRule(paused, '2026-04-30', '2026-04-30T09:00:00.000Z'));
+  assert.equal(await processRecurring(db, '2026-04-30'), 1, 'resumed on its own day: that day is recorded once');
+  assert.equal(await processRecurring(db, '2026-04-30'), 0);
+  const snapshot = await readSnapshot(db);
+  assert.deepEqual(recurringHistory(recurring, snapshot.entries).map(entry => entry.dateISO), ['2026-04-30', '2026-01-31']);
+  assert.equal((await readArchive(db)).recurring![0].nextDateISO, '2026-05-31');
+});
+
+test('24UX4: deleting a rule keeps every movement it recorded byte for byte, stops tracking for good and survives backup and import', async () => {
+  const { db } = setup();
+  await initializeDatabase(db);
+  await createAccount(db, account);
+  await saveRecurringRule(db, recurring);
+  assert.equal(await processRecurring(db, '2026-02-28'), 2);
+  // One recorded occurrence was later corrected by hand: deleting the rule must keep that edit too.
+  const [february] = (await readArchive(db)).records.filter(record => record.entry.dateISO === '2026-02-28');
+  await changeEntry(db, makeEntryChange('fix-feb', february, 'edit', '2026-03-01T00:00:00.000Z', { ...february.entry, amountMinor: 5100 }));
+  const olderBackup = createRecoveryBackup(await readArchive(db));
+  const entriesBefore = await db.getAllAsync('SELECT * FROM entries ORDER BY id');
+  const balanceBefore = totalsByCurrency(await readSnapshot(db));
+
+  const live = (await readArchive(db)).recurring![0];
+  const deleted = deleteRecurringRule(live, '2026-03-02T00:00:00.000Z');
+  await saveRecurringRule(db, deleted);
+  await saveRecurringRule(db, deleted); // A retry of the same deletion is a no-op.
+  assert.deepEqual(await db.getAllAsync('SELECT * FROM entries ORDER BY id'), entriesBefore, 'no movement was deleted, voided or rewritten');
+  assert.deepEqual(totalsByCurrency(await readSnapshot(db)), balanceBefore);
+  assert.deepEqual((await readArchive(db)).recurring, [deleted], 'the row stays as its deletion record');
+  assert.equal(await processRecurring(db, '2026-12-31'), 0, 'a deleted rule never records again');
+  await assert.rejects(saveRecurringRule(db, resumeRecurringRule({ ...deleted, deleted: false }, '2026-03-02', '2026-03-03T00:00:00.000Z')), /eliminado/);
+  await assert.rejects(saveRecurringRule(db, { ...deleted, merchant: 'Otro', revision: deleted.revision + 1 }), /eliminado/);
+  assert.deepEqual(recurringHistory(recurring, (await readSnapshot(db)).entries).map(entry => entry.amountMinor), [5100, 5000]);
+
+  // The backup carries the deletion record (v10); a fresh device restores it deleted, entries included.
+  const backup = createRecoveryBackup(await readArchive(db));
+  assert.equal(backup.schema, 'finanzapp.native-pilot.v10');
+  const fresh = setup();
+  await initializeDatabase(fresh.db);
+  await importArchive(fresh.db, parsePilotBackup(JSON.stringify(backup)).archive, archiveKey(await readArchive(fresh.db)));
+  assert.equal(await processRecurring(fresh.db, '2026-12-31'), 0);
+  assert.equal(archiveKey(await readArchive(fresh.db)), archiveKey(await readArchive(db)));
+  // An older copy (made before the deletion) never brings the rule back: it contradicts the deletion record.
+  await assert.rejects(importArchive(db, parsePilotBackup(JSON.stringify(olderBackup)).archive, archiveKey(await readArchive(db))), /contradice/);
+  assert.deepEqual((await readArchive(db)).recurring, [deleted]);
+});
+
+test('24UX4: closing, reopening and deleting a debt tracker never touches its account, its opening amount or its payments', async () => {
+  const { db } = await funded();
+  const changedAt = '2026-09-20T12:00:00.000Z';
+  await createPersonalDebt(db, debtAccount, debt);
+  const payment: Transfer = { id: 'debt-payment', fromAccountId: account.id, toAccountId: debtAccount.id, amountMinor: 10000, note: 'Pago a Juan', dateISO: '2026-09-15', createdAt: account.createdAt };
+  await createTransfer(db, payment);
+  const ledgerRows = async () => ({ accounts: await db.getAllAsync('SELECT * FROM accounts ORDER BY id'),
+    entries: await db.getAllAsync('SELECT * FROM entries ORDER BY id'), transfers: await db.getAllAsync('SELECT * FROM transfers ORDER BY id') });
+  const before = await ledgerRows();
+  const liquid = async () => { const archive = await readArchive(db); return liquidTotalsByCurrency(snapshotFromArchive(archive), archive.cards, archive.debts); };
+  const liquidBefore = await liquid();
+
+  const closed = closePersonalDebt(debt, changedAt);
+  await savePersonalDebt(db, closed);
+  assert.equal(debtOutstandingMinor(closed, await readSnapshot(db)), 20000, 'closing does not settle anything');
+  const reopened = reopenPersonalDebt(closed, '2026-09-21T12:00:00.000Z');
+  await savePersonalDebt(db, reopened);
+  assert.deepEqual((await readArchive(db)).debts, [reopened]);
+
+  const deleted = deletePersonalDebt(reopened, '2026-09-22T12:00:00.000Z');
+  await savePersonalDebt(db, deleted);
+  assert.deepEqual(await ledgerRows(), before, 'the hidden account and the payment are exactly as recorded');
+  assert.deepEqual(await liquid(), liquidBefore, 'Disponible is unchanged: the payment still left cash, the debt account is still excluded');
+  assert.deepEqual((await readArchive(db)).debts, [deleted]);
+  // Still a debt account: no expense or recurring rule can post to it, no new payment can reach it through the form.
+  await assert.rejects(createEntry(db, { ...expense, id: 'after-delete', accountId: debtAccount.id }), /pagos o cobros/);
+  await assert.rejects(createTransfer(db, { ...payment, id: 'late-payment' }), /eliminada/, 'a deleted tracker takes no new payment');
+  await assert.rejects(savePersonalDebt(db, { ...deleted, active: true, deleted: false, revision: deleted.revision + 1 }), /eliminada/);
+  // The deletion travels in the backup and an older copy cannot bring the tracker back.
+  const backup = createRecoveryBackup(await readArchive(db));
+  assert.equal(backup.schema, 'finanzapp.native-pilot.v10');
+  assert.deepEqual(parsePilotBackup(JSON.stringify(backup)).archive.debts, [deleted]);
 });

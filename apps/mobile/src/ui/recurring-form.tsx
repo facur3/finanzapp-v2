@@ -13,6 +13,7 @@ import { accountKindLabel, postingAccounts } from './liability-presentation';
 import { historyNamesAccount, initialAccountId } from './presentation';
 import { space } from './theme';
 import { useI18n } from '../i18n/provider';
+import { useRecurringManagement } from './commitment-actions';
 
 export function RecurringForm({ original, accountId: requestedAccount }: { original?: RecurringRule; accountId?: string }) {
   const { snapshot, archive, saveRecurring } = useLedger();
@@ -36,6 +37,7 @@ export function RecurringForm({ original, accountId: requestedAccount }: { origi
   const [pending, setPending] = useState<RecurringRule | null>(null);
   const saving = useRef(false);
   const [error, setError] = useState<string | null>(null);
+  const manage = useRecurringManagement();
 
   // The accounts this kind may use (24B6): an expense to cash or a card, an income to cash only; a rule already paying an
   // income into a card keeps that card offered while it is edited. A card carried from Gasto gives way to cash for an income.
@@ -52,7 +54,8 @@ export function RecurringForm({ original, accountId: requestedAccount }: { origi
   // currency cannot hold exactly blocks Save (the field says why).
   const ruleCurrency = () => { if (!account) throw new Error('errors.recurring.account'); return account.currency; }; // A catalogue key, translated when shown.
   const fit = account ? editedDraftFits(amount, account.currency, stored) : { ok: true as const };
-  const locked = busy || pending !== null;
+  const managing = !!original && manage.busyId === original.id;
+  const locked = busy || pending !== null || managing;
   const close = () => { if (!saving.current) { if (router.canGoBack()) router.back(); else router.replace('/recurring'); } };
 
   async function save() {
@@ -98,6 +101,7 @@ export function RecurringForm({ original, accountId: requestedAccount }: { origi
             anchorDateISO: nextDateISO,
             nextDateISO,
             active: true,
+            deleted: false,
           };
         }
         validateRecurringRule(submission, accounts);
@@ -116,8 +120,8 @@ export function RecurringForm({ original, accountId: requestedAccount }: { origi
   }
 
   return <Screen gap={space.l}>
-    <Stack.Screen options={{ title: t(before ? 'nav.titles.editRecurring' : 'nav.titles.newRecurring'), gestureEnabled: !busy,
-      headerLeft: () => <IconButton name="close" label={t('common.close')} onPress={close} disabled={busy} /> }} />
+    <Stack.Screen options={{ title: t(before ? 'nav.titles.editRecurring' : 'nav.titles.newRecurring'), gestureEnabled: !busy && !managing,
+      headerLeft: () => <IconButton name="close" label={t('common.close')} onPress={close} disabled={busy || managing} /> }} />
     {/* The switch stays above the empty state of one kind, so Gasto is one tap away when Ingreso has no account. */}
     {accounts.length > 0 && <Choices value={kind} onChange={setKind} disabled={locked}
       options={[{ value: 'expense', label: t('movement.expense') }, { value: 'income', label: t('movement.income') }]} />}
@@ -152,6 +156,17 @@ export function RecurringForm({ original, accountId: requestedAccount }: { origi
       <ActionButton label={pending && error ? t('common.retrySave') : before ? t('common.saveChanges') : t('recurring.form.create')}
         onPress={save} busy={busy} disabled={!amount.trim() || !merchant.trim() || !category.trim() || !account || !fit.ok} />
       {before && <RecurringHistory ruleId={before.id} ruleAccountId={before.accountId} />}
+      {/* 24UX4: the same actions as the row's swipe, on the stored rule (not the draft above), then the screen closes.
+          Unsaved edits are not applied by these buttons; pending ones lock them. */}
+      {original && !original.deleted && <View style={{ gap: space.m, marginTop: space.l }}>
+        <ErrorMessage message={manage.error} />
+        {!original.active && <AppText secondary variant="footnote">{t('recurring.manage.pausedNote')}</AppText>}
+        <ActionButton secondary label={t(original.active ? 'recurring.manage.pauseRule' : 'recurring.manage.resumeRule')}
+          icon={original.active ? 'pause-outline' : 'play-outline'} busy={managing} disabled={busy || pending !== null}
+          onPress={() => { void (original.active ? manage.pause : manage.resume)(original, close); }} />
+        <ActionButton secondary tone="expense" label={t('recurring.manage.deleteRule')} icon="trash-outline" disabled={busy || pending !== null || managing}
+          onPress={() => manage.remove(original, close)} />
+      </View>}
     </>}
   </Screen>;
 }

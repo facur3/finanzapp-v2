@@ -17,6 +17,9 @@ export const debts = {
       receivable: 'Me deben',
       /** Shown instead of one currency's totals when their sum leaves the exact range (never rounded or hidden). */
       outOfRange: 'Total fuera de rango',
+      /** 24UX4: debts closed by the person (settled, forgiven or no longer followed); they can be reopened or deleted. */
+      closed: 'Cerradas',
+      closedCaption: 'No cuentan como pendientes',
     },
     /** A debt's state in a row and in its detail. */
     status: {
@@ -27,7 +30,8 @@ export const debts = {
       due: 'Vence {date}',
       noDate: 'Sin fecha',
       noDue: 'Sin vencimiento',
-      archived: 'Archivada',
+      /** 24UX4: a closed debt (was «Archivada»). */
+      closed: 'Cerrada',
     },
     row: {
       /** VoiceOver: "Debo a Juan, 300,00 ARS, Vence 1 oct". */
@@ -86,15 +90,38 @@ export const debts = {
       explainReceivable: 'Cada cobro que registres entra a una cuenta y baja este saldo. No se crean gastos ni ingresos al saldar una deuda.',
       frozenNote: 'El envío quedó congelado para que Reintentar no cree otra obligación ni aplique cambios dos veces.',
       create: 'Crear deuda',
-      retry: 'Reintentar',
-      archive: 'Archivar deuda',
-      reactivate: 'Reactivar deuda',
-      archiveTitle: '¿Archivar esta deuda?',
-      archiveDetail: 'Los pagos o cobros anteriores siguen guardados. Solo deja de aparecer como pendiente.',
-      archiveConfirm: 'Archivar',
       amountPositive: 'Ingresá un monto mayor que cero.',
       saveFailed: 'No pudimos guardar la deuda. Reintentá el mismo envío.',
-      archiveFailed: 'No pudimos archivar la deuda. Reintentá el mismo cambio.',
+    },
+    /** 24UX4: the trailing swipe actions of a debt (short) and the same actions in its detail (named). */
+    manage: {
+      /** Opens the payment (or collection) of everything outstanding, prefilled; the transfer form records it. */
+      settle: 'Saldar',
+      close: 'Cerrar',
+      reopen: 'Reabrir',
+      delete: 'Eliminar',
+      closeDebt: 'Cerrar deuda',
+      reopenDebt: 'Reabrir deuda',
+      deleteDebt: 'Eliminar deuda',
+      closeTitleOwed: '¿Cerrar la deuda con {name}?',
+      closeTitleReceivable: '¿Cerrar lo que te debe {name}?',
+      /** `{amount}` is the outstanding balance, formatted. */
+      closeDetail: 'Todavía quedan {amount} pendientes. Cerrarla la saca de pendientes sin registrar un pago; podés reabrirla.',
+      closeConfirm: 'Cerrar',
+      deleteTitleOwed: '¿Eliminar la deuda con {name}?',
+      deleteTitleReceivable: '¿Eliminar lo que te debe {name}?',
+      deleteDetailPayments: {
+        one: 'Deja de seguirse. El pago registrado sigue en Movimientos.',
+        other: 'Deja de seguirse. Los {count} pagos registrados siguen en Movimientos.',
+      },
+      deleteDetailCollections: {
+        one: 'Deja de seguirse. El cobro registrado sigue en Movimientos.',
+        other: 'Deja de seguirse. Los {count} cobros registrados siguen en Movimientos.',
+      },
+      deleteDetailEmpty: 'Deja de seguirse. No borra ningún movimiento.',
+      deleteConfirm: 'Eliminar',
+      failed: 'No pudimos cambiar la deuda. Sigue como estaba; probá nuevamente.',
+      deleteFailed: 'No pudimos eliminar la deuda. Sigue como estaba; probá nuevamente.',
     },
   },
 } as const;

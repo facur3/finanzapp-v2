@@ -995,7 +995,66 @@ Asistente se lea importante sin volverse un banner; que «Transferir» no se ach
 iPhone de 375 pt; que la agenda y el libro abiertos se distingan entre sí por densidad y no se
 lean como una sola lista larga.
 
+## Producto 24UX4 — gestionar recurrentes y deudas
+
+Pausar, reanudar y eliminar una regla; saldar, cerrar, reabrir y eliminar una deuda. Las mismas
+acciones viven en dos lugares, como en iOS: un deslizamiento hacia la izquierda sobre la fila y
+botones al final del detalle. Nada nuevo en Inicio, Movimientos ni Reportes.
+
+### Acciones al deslizar (`src/ui/swipe-actions.tsx`)
+
+- **Solo al final de la fila** (trailing), como Mail y Recordatorios. La fila sigue al dedo 1:1
+  (Gesture Handler en el hilo de UI); se abre si se suelta pasada la mitad de las acciones y se
+  cierra si no. **Sin deslizamiento completo**: arrastrar hasta el borde nunca ejecuta nada, así
+  que eliminar siempre pasa por un toque y una confirmación.
+- **Una fila abierta a la vez**: abrir otra cierra la anterior. Tocar una acción cierra la fila y
+  después actúa.
+- **Botones sólidos de 76 pt** con glifo y etiqueta blanca en una línea (crecen con el texto
+  grande): gris para lo reversible (Pausar, Cerrar), azul transferencia para lo que avanza (Reanudar,
+  Saldar, Reabrir), rojo para Eliminar, siempre el último, en el borde. Tres tonos nuevos en la
+  paleta (`swipeDestructive`, `swipeNeutral`, `swipeAccent`), más profundos en oscuro para que el
+  blanco mantenga 4,5:1 (el rojo y el azul de texto quedaban en 3:1).
+- **Sin ruido**: sin háptico al revelar (iOS no lo da); háptico de selección al pausar, cerrar o
+  reabrir, de éxito al eliminar, como cualquier escritura. Con Reducir movimiento el dedo sigue
+  moviendo la fila y el asentado es inmediato.
+- **VoiceOver**: un deslizamiento no es un gesto que se pueda hacer sobre una fila con VoiceOver,
+  así que las mismas acciones son acciones personalizadas de la fila (rotor «Acciones»).
+- La fila de Recurrentes pierde su interruptor: pausar es una acción del deslizamiento y del
+  detalle, y la fila queda con una sola superficie de control.
+
+### En el detalle
+
+- **Regla**: después de Registrados, «Pausar recurrente» / «Reanudar recurrente» (secundario) y
+  «Eliminar recurrente» (secundario rojo). Actúan sobre la regla guardada, no sobre el borrador de
+  arriba, y cierran el formulario; una regla pausada explica en una línea qué significa.
+- **Deuda**: al final de la lista de pagos, «Cerrar deuda» / «Reabrir deuda» y «Eliminar deuda».
+  Cerrar deja la pantalla abierta (el estado dice «Cerrada»); eliminar vuelve a Deudas.
+
+### Confirmaciones
+
+Una alerta nativa con Cancelar y la acción en rojo. El título nombra lo que se elimina con el texto
+de la persona («¿Eliminar «Netflix»?», «¿Eliminar la deuda con Juan?»); el mensaje dice lo que
+queda: cuántos movimientos, pagos o cobros siguen en Movimientos, o que no se borra ninguno. Cerrar
+una deuda saldada no pregunta; cerrarla con saldo pendiente sí (dice el monto: deja de figurar como
+pendiente sin registrar un pago), con un botón no destructivo.
+
+### Estados
+
+- **Deuda cerrada**: en una sección «Cerradas» al final de Deudas («No cuentan como pendientes»),
+  fuera de los totales, con «Cerrada» donde iría el vencimiento. Antes se «archivaba» y quedaba
+  inaccesible.
+- **Eliminada** (regla o deuda): sale de toda lista, total y enlace; el movimiento o la
+  transferencia que produjo sigue igual y ya no enlaza a la regla o la deuda.
+- **Saldar** abre el formulario de pago revisado con todo el saldo escrito; la persona elige la
+  cuenta y confirma. Nunca se marca pagada sin una transferencia registrada.
+
 ## Pendiente de revisión en iPhone
+
+- Producto 24UX4: el deslizamiento en Recurrentes y Deudas (sensación, umbral, una fila abierta,
+  desplazamiento vertical sin deslizamientos accidentales, el gesto atrás intacto), los tres tonos
+  en claro y oscuro, las alertas, los botones del detalle, Cerradas, Saldar con el monto escrito,
+  VoiceOver (rotor Acciones), Dynamic Type y Reducir movimiento. Lista en
+  docs/mobile-device-checklist.md.
 
 - Producto 24UX3: la jerarquía de Inicio en claro y oscuro, con material opaco y con vidrio:
   lectura de primer vistazo, cabecera compacta, número de 48 pt, las tres píldoras y la entrada

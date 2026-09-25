@@ -32,7 +32,7 @@ live in [docs/mobile-roadmap-history.md](../../docs/mobile-roadmap-history.md).
 | `app/` | Expo Router routes: the five tabs in `app/(tabs)/` (Inicio, Movimientos, Asistente, Reportes, Más), pushed detail screens, native modal forms, Idioma and Región, backup and recovery. Routes compose; they hold no financial rules. |
 | `src/ui/` | The visual system: palette and theme, typography, accessible rows and controls, the amount field (`money-input.ts`), form controls and sheets, the motion language (`motion.tsx`), the material adapter (`material.tsx`, the only door to `expo-glass-effect`), charts, the Home modules, the merchant tile (`merchant-mark.ts`, `MerchantBadge`: the category glyph; brand marks deferred to Producto 25C2) and the searchable chooser. |
 | `src/i18n/` | Language and region: the registries and release gates (`locale.ts`), table-based formats (`format.ts`), typed es/en catalogues (`messages/`), the device adapter, the preference store, the provider (`useI18n()`), the generated region catalogue (`regions/`) and its API, the Intl probe. |
-| `src/storage/` | The SQLite repository (`database.ts`, schema `DATABASE_VERSION = 9`, atomic migrations, operation IDs), the native driver binding, transactions, the currency gate (`currency-gate.ts`) and `LedgerProvider`. Writes are durable before the UI confirms; a failed write keeps the draft; no error resets storage. |
+| `src/storage/` | The SQLite repository (`database.ts`, schema `DATABASE_VERSION = 10`, atomic migrations, operation IDs, deletion records for recurring rules and debts), the native driver binding, transactions, the currency gate (`currency-gate.ts`) and `LedgerProvider`. Writes are durable before the UI confirms; a failed write keeps the draft; no error resets storage. |
 | `src/assistant/` | The Assistant's pure conversation model, the event-based client boundary, runtime selection and scripted fixtures. The only ledger write is an explicit Confirmar on a draft, validated by the domain. |
 | `src/integrations/` | The HTTPS client for the mobile API and the on-device evidence builder. |
 | `../../packages/domain` | The typed financial domain the app imports (`@finanzapp/domain`, linked as a `file:` dependency): ledger, budgets, categories, merchant identity, appearance, liabilities, money and the currency catalogue. Amounts are integers in each currency's minor unit; no floating point, no FX. |
@@ -42,7 +42,8 @@ live in [docs/mobile-roadmap-history.md](../../docs/mobile-roadmap-history.md).
 
 Local first: the ledger, the language, region and display-currency preferences and the
 backups are on the device. Backups export as JSON v8 while the ledger holds only ARS and
-USD and as v9 (adds `currencyUnits`) once another currency is stored; v1–v9 files import
+USD, as v9 (adds `currencyUnits`) once another currency is stored and as v10 (adds each recurring
+rule's and debt's `deleted` flag) once one is deleted; v1–v10 files import
 after a review that never overwrites. Cloud is opt-in: the Assistant's remote runtime,
 future sync and any AI provider need the owner's setup and consent; nothing leaves the
 device otherwise.

@@ -6,8 +6,10 @@ import { useI18n } from '../i18n/provider';
 import { activityDateLabel, dayNetMinor, groupActivity, mergeActivity, type ActivityItem } from './presentation';
 import { useCurrentDay, usePalette } from './theme';
 
-export function EntryList({ entries, transfers, accounts, accountId, header, empty, context }: {
-  entries: Entry[]; transfers?: Transfer[]; accounts: Account[]; accountId?: string; header?: ReactNode; empty?: ReactNode; context?: RowContext;
+export function EntryList({ entries, transfers, accounts, accountId, header, empty, footer, context }: {
+  entries: Entry[]; transfers?: Transfer[]; accounts: Account[]; accountId?: string; header?: ReactNode; empty?: ReactNode;
+  /** After the last movement: a detail screen's own actions (24UX4: close or delete a debt), where iOS places them. */
+  footer?: ReactNode; context?: RowContext;
 }) {
   const p = usePalette();
   const day = useCurrentDay();
@@ -22,6 +24,7 @@ export function EntryList({ entries, transfers, accounts, accountId, header, emp
     initialNumToRender={12} maxToRenderPerBatch={12} windowSize={7}
     ListHeaderComponent={header ? <View>{header}</View> : null}
     ListEmptyComponent={empty ? <View style={{ paddingTop: 16 }}>{empty}</View> : null}
+    ListFooterComponent={footer ? <View style={{ paddingTop: 32 }}>{footer}</View> : null}
     renderSectionHeader={({ section }) => {
       const net = context ? null : dayNetMinor(section.data.filter(item => item.type === 'entry').map(item => item.value as Entry), accounts);
       return <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', gap: 12, paddingTop: 20, paddingBottom: 8, paddingHorizontal: 4 }}>

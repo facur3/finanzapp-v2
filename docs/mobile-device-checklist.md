@@ -1,5 +1,77 @@
 # Physical iPhone acceptance checklist
 
+## Producto 24UX4 — managing recurring rules and debts
+
+**Not done in 24UX4: no EAS build was made and the iPhone was not touched.** Metro from this branch
+(`npm run start:dev-client`) on the installed FinanzApp Dev build; JavaScript only, no new native
+module (Gesture Handler and Reanimated are already in the build). Record each result with the
+language, the theme and the text size. Use your own small test data; never seed movements.
+
+**Before anything else — the schema 10 upgrade (one-way).** Opening this bundle upgrades FinanzApp
+Dev's ledger from schema 9 to 10 (one added column per table, every row kept). An older bundle then
+refuses the file until this branch (or a later one) runs again.
+
+- [ ] Más → Copia de seguridad → export a backup and keep the file off the phone before the first
+  launch of this branch.
+- [ ] Launch the branch: Inicio, Movimientos, Reportes, Cuentas, Deudas and Recurrentes show the same
+  figures as before; force-quit and reopen: nothing migrates twice, nothing changed.
+
+**Recurrentes (Más → Recurrentes; create two throwaway rules if you have none, e.g. «Prueba A»
+monthly and «Prueba B» weekly, and delete them at the end).**
+
+- [ ] The rows no longer carry a switch. Drag a row left: the row follows the finger, Pausar (grey)
+  and Eliminar (red, at the far edge) appear under it with white labels; release past about half →
+  it stays open; a short drag → it closes. A long fast swipe does *not* delete (it stops at the
+  actions). Tapping elsewhere or scrolling does not leave two rows open: opening a second row closes
+  the first.
+- [ ] Vertical scrolling over the rows still scrolls (no accidental swipe); a tap on a closed row
+  opens its detail; the native back swipe from the left edge still goes back.
+- [ ] **Pausar** from the swipe: the row moves to Pausados and says «Pausado»; selection haptic; the
+  Próximos 30 días and Inicio's Próximos compromisos no longer count it. **Reanudar** (blue) brings it
+  back to Activos with its next date today or later on its own day (a rule paused across its due day
+  does *not* record the missed one; one resumed on its due day records today once).
+- [ ] **Eliminar** from the swipe: an alert «¿Eliminar «Prueba A»?» that names how many movements it
+  already recorded and says they stay in Movimientos; Cancelar leaves everything; Eliminar (red)
+  removes the row. Then check in Movimientos that every movement it recorded is still there with the
+  same amount and date, and that opening one shows no «Recurrente» row any more.
+- [ ] **Detail** (tap a rule): after Registrados, «Pausar recurrente» (or, when paused, the note
+  «Pausado: …» and «Reanudar recurrente») and a red «Eliminar recurrente». Each writes and closes the
+  form; with an unsaved edit in the form, pausing does not apply the edit. Eliminar asks first as
+  above; the screen closes without flashing «No encontramos este recurrente».
+
+**Deudas y cobros (Más → Deudas y cobros; a throwaway «Prueba» debt of a small amount).**
+
+- [ ] A debt with a balance swipes to **Saldar** (blue) and **Eliminar** (red). Saldar opens «Registrar
+  pago» with the whole balance already typed; change the account, confirm → the debt reads Saldada.
+  A receivable opens «Registrar cobro» the same way.
+- [ ] A settled debt swipes to **Cerrar** (grey): no alert, it moves to a new «Cerradas» section at the
+  bottom («No cuentan como pendientes») and leaves the totals. A closed row swipes to **Reabrir**
+  (blue) and back.
+- [ ] **Detail:** after the payments, «Cerrar deuda» (or «Reabrir deuda») and a red «Eliminar deuda».
+  Closing a debt with a balance left asks «¿Cerrar la deuda con …?» with the amount and never records
+  a payment; the detail stays open and says «Cerrada»; «Registrar pago» is disabled while closed.
+- [ ] **Eliminar** (swipe or detail): the alert names how many payments or collections stay in
+  Movimientos; after confirming, the debt disappears from Deudas (open and Cerradas), from the totals
+  and from Más's count. Its payments are still in Movimientos with «Debo · Prueba» as a side; opening
+  one shows the side without a link; Disponible on Inicio is exactly what it was before deleting.
+- [ ] The edit form (pencil) no longer has «Archivar deuda».
+
+**Across both.**
+
+- [ ] Both themes: the red, grey and blue action fills read clearly with white labels; the rows are
+  opaque over the actions at rest (no colour bleeding through a grouped card's corners).
+- [ ] Dynamic Type at the largest accessibility size: action labels stay one line and the buttons
+  widen; the detail buttons wrap without clipping.
+- [ ] VoiceOver: on a row, swipe up/down reads the Actions rotor («Pausar», «Eliminar» / «Saldar»,
+  «Eliminar»…); double-tap on an action runs it (the confirmation alert appears for Eliminar). The row
+  label still reads as before (a closed debt says «Cerrada»).
+- [ ] Reduce Motion on: the row still follows the finger; the snap open/closed is immediate.
+- [ ] English (Más → Idioma → English): Pause/Resume/Delete, Settle/Close/Reopen/Delete, «Closed»,
+  the alerts in English.
+- [ ] A backup exported after a deletion is v10 and imports on a fresh install with the deleted rule
+  and debt still deleted; reviewing the backup from the first step (made before the deletions) on
+  this phone shows the conflict message and no Importar button, and nothing comes back.
+
 ## Producto 24UX3 — Home hierarchy
 
 **Not done in 24UX3: no EAS build was made and the iPhone was not touched.** Metro from this branch

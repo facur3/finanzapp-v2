@@ -19,9 +19,11 @@ import { accountDisplayName } from './liability-presentation';
  * collection (cash → debt, receivable → cash). The obligation side is fixed by
  * the caller; only the cash side is chosen here. */
 export function TransferForm({ original, accountId, fromAccountId: requestedFrom, toAccountId: requestedTo,
-  title, defaultNote, maxAmountMinor, onAccountChange }: {
+  title, defaultNote, maxAmountMinor, amountMinor, onAccountChange }: {
   original?: TransferRecord; accountId?: string; fromAccountId?: string; toAccountId?: string; title?: string;
   defaultNote?: string; maxAmountMinor?: string;
+  /** 24UX4 («Saldar»): a debt's whole outstanding balance, prefilled in its own minor units and still editable. */
+  amountMinor?: string;
   /** Lets the host carry the source account over when the mode changes. */
   onAccountChange?: (accountId: string) => void;
 }) {
@@ -49,7 +51,14 @@ export function TransferForm({ original, accountId, fromAccountId: requestedFrom
   // An untouched prefill keeps the stored minor units (a stored amount may exceed the entry bound); an edited text is a new entry.
   const [stored] = useState<StoredDraft | null>(() => {
     const own = before ? accounts.find(a => a.id === before.transfer.fromAccountId)?.currency : undefined;
-    return before && own ? { minor: before.transfer.amountMinor, currency: own, draft: draftFromMinor(before.transfer.amountMinor, own) } : null;
+    if (before && own) return { minor: before.transfer.amountMinor, currency: own, draft: draftFromMinor(before.transfer.amountMinor, own) };
+    // Only a debt settlement is prefilled, in the debt's currency; any other or malformed request starts empty.
+    const debtSide = lockedTo ?? lockedFrom;
+    const prefill = amountMinor && /^\d{1,15}$/.test(amountMinor) ? Number(amountMinor) : 0;
+    if (!before && debtSide && prefill > 0 && accountKind(debtSide.id, cards, debts) === 'debt') {
+      return { minor: prefill, currency: debtSide.currency, draft: draftFromMinor(prefill, debtSide.currency) };
+    }
+    return null;
   });
   const [amount, setAmount] = useState(stored?.draft ?? '');
   // A card payment or a debt settlement writes its own default note in the language active when the form opens

@@ -10,6 +10,7 @@ import * as budgetPresentation from '../src/ui/budget-presentation.ts';
 import * as i18nFormat from '../src/i18n/format.ts';
 import { bindLocale } from '../src/i18n/bind.ts';
 import type { AppLocale } from '../src/i18n/locale.ts';
+import { realModule, swipeActionsMock } from './real-module.ts';
 
 // Budgets, Recurrentes, Cuentas and account detail handlers with native hosts
 // replaced by descriptors. Not a rendered iOS screen or gesture test.
@@ -31,7 +32,7 @@ const budgets: domain.MonthlyBudget[] = [
   { id: 'b-super', scope: 'category', category: 'Supermercado', currency: 'ARS', monthISO: '2026-09', amountMinor: 10000, active: true, createdAt, revision: 0, updatedAt: createdAt },
 ];
 const rule: domain.RecurringRule = { id: 'rent', accountId: cash.id, kind: 'expense', amountMinor: 40000, merchant: 'Alquiler', category: 'Hogar', frequency: 'monthly',
-  anchorDateISO: '2026-10-01', nextDateISO: '2026-10-01', active: true, createdAt, revision: 0, updatedAt: createdAt };
+  anchorDateISO: '2026-10-01', nextDateISO: '2026-10-01', active: true, deleted: false, createdAt, revision: 0, updatedAt: createdAt };
 const archive: domain.LedgerArchive = { accounts: [cash, wallet, usd, cardAccount], records: entries.map(domain.initialRecord), cards: [card], budgets, recurring: [rule] };
 
 function harness(file: string, params: Record<string, unknown> = {}, data: domain.LedgerArchive = archive, locale: AppLocale = 'es-AR') {
@@ -42,27 +43,35 @@ function harness(file: string, params: Record<string, unknown> = {}, data: domai
   const state: unknown[] = [];
   const pushed: any[] = [];
   const saved: domain.RecurringRule[] = [];
-  let cursor = 0;
-  const ledger = { useLedger: () => ({ archive: data, snapshot: domain.snapshotFromArchive(data), saveRecurring: async (next: domain.RecurringRule) => { saved.push(next); } }) };
+  const alerts: { title: string; message: string; buttons: any[] }[] = [];
+  const refs: any[] = [];
+  let cursor = 0, refCursor = 0, failNext: Error | null = null;
+  const ledger = { useLedger: () => ({ archive: data, snapshot: domain.snapshotFromArchive(data), saveRecurring: async (next: domain.RecurringRule) => {
+    if (failNext) { const cause = failNext; failNext = null; throw cause; }
+    saved.push(next);
+  } }) };
   const names = ['ActionButton', 'AppText', 'CategoryBadge', 'MerchantBadge', 'Choices', 'DetailRow', 'EmptyState', 'ErrorMessage', 'IconButton', 'Money', 'PressFeedback',
     'Screen', 'SectionTitle', 'Stat', 'Surface', 'AccountRow', 'AccountBadge'];
   const theme = { space: { xs: 4, s: 8, m: 12, l: 16, xl: 20, xxl: 24, xxxl: 32 }, useCurrentDay: () => '2026-09-20', useReduceMotion: () => true,
     usePalette: () => ({ text: '#000', secondary: '#666', tertiary: '#999', line: '#ddd', inset: '#eee', expense: '#c00', income: '#080', warning: '#a60', primary: '#2557D6', background: '#fff', surface: '#fff' }) };
   const modules: Record<string, unknown> = {
     '../i18n/format': i18nFormat, '../src/i18n/format': i18nFormat, '../../src/i18n/format': i18nFormat, '../i18n/provider': i18nProvider, '../src/i18n/provider': i18nProvider, '../../src/i18n/provider': i18nProvider,
-    react: { useEffect: (fn: () => unknown) => { fn(); }, useMemo: (fn: () => unknown) => fn(), useState: (initial: unknown) => {
+    react: { useEffect: (fn: () => unknown) => { fn(); }, useMemo: (fn: () => unknown) => fn(),
+      useRef: (initial: unknown) => { const i = refCursor++; return refs[i] ??= { current: initial }; }, useState: (initial: unknown) => {
       const index = cursor++;
       if (!(index in state)) state[index] = typeof initial === 'function' ? (initial as () => unknown)() : initial;
       return [state[index], (value: unknown) => { state[index] = typeof value === 'function' ? (value as (current: unknown) => unknown)(state[index]) : value; }];
     } },
     'react/jsx-runtime': { jsx, jsxs: jsx, Fragment: 'Fragment' },
-    'react-native': { View: 'View', SectionList: 'SectionList', Switch: 'Switch', StyleSheet: { hairlineWidth: 0.5 } },
+    'react-native': { View: 'View', SectionList: 'SectionList', Switch: 'Switch', StyleSheet: { hairlineWidth: 0.5 },
+      Alert: { alert: (title: string, message: string, buttons: any[]) => alerts.push({ title, message, buttons }) } },
     'react-native-reanimated': { __esModule: true, default: { View: 'Animated.View' }, useSharedValue: (value: number) => ({ value }),
       withTiming: (value: number) => value, useAnimatedStyle: (fn: () => unknown) => fn() },
-    'expo-haptics': { selectionAsync: async () => {} },
+    'expo-haptics': { selectionAsync: async () => {}, notificationAsync: async () => {}, NotificationFeedbackType: { Success: 'Success' } },
     'expo-router': { Stack: { Screen: 'Stack.Screen' }, Redirect: 'Redirect', useLocalSearchParams: () => params, router: { push: (to: unknown) => pushed.push(to) } },
     '@finanzapp/domain': domain,
-    '../src/storage/LedgerProvider': ledger, '../../src/storage/LedgerProvider': ledger,
+    '../src/storage/LedgerProvider': ledger, '../../src/storage/LedgerProvider': ledger, '../storage/LedgerProvider': ledger,
+    '../src/ui/swipe-actions': swipeActionsMock, '../../src/ui/swipe-actions': swipeActionsMock,
     '../src/ui/components': { ...Object.fromEntries(names.map(name => [name, name])), useStacked: () => false }, '../../src/ui/components': { ...Object.fromEntries(names.map(name => [name, name])), useStacked: () => false },
     '../src/ui/entry-list': { EntryList: 'EntryList' }, '../../src/ui/entry-list': { EntryList: 'EntryList' },
     '../src/ui/currency-switch': { CurrencySwitch: 'CurrencySwitch' }, '../../src/ui/currency-switch': { CurrencySwitch: 'CurrencySwitch' },
@@ -73,12 +82,15 @@ function harness(file: string, params: Record<string, unknown> = {}, data: domai
     '../src/ui/theme': theme, '../../src/ui/theme': theme,
     '../src/ui/category-hues': { useCategoryColor: () => '#3E6FB0', useCategoryLabel: (s: string) => s, useCategoryDefinitions: () => [], useCategoryLook: (s: string) => ({ label: s, storedLabel: s, key: String(s).toLowerCase(), hex: '#3E6FB0', glyph: 'pricetag-outline' }), useCategoryLookOf: () => (s: string) => ({ label: s, storedLabel: s, key: String(s).toLowerCase(), hex: '#3E6FB0', glyph: 'pricetag-outline' }), useAccountLook: () => ({ icon: 'wallet', color: 'cobalt', glyph: 'wallet-outline', hex: '#2557D6' }), useAccountNameOf: () => (account: any) => account.name, useAccountLookOf: () => () => ({ icon: 'wallet', color: 'cobalt', glyph: 'wallet-outline', hex: '#2557D6' }) }, '../../src/ui/category-hues': { useCategoryColor: () => '#3E6FB0', useCategoryLabel: (s: string) => s, useCategoryDefinitions: () => [], useCategoryLook: (s: string) => ({ label: s, storedLabel: s, key: String(s).toLowerCase(), hex: '#3E6FB0', glyph: 'pricetag-outline' }), useCategoryLookOf: () => (s: string) => ({ label: s, storedLabel: s, key: String(s).toLowerCase(), hex: '#3E6FB0', glyph: 'pricetag-outline' }), useAccountLook: () => ({ icon: 'wallet', color: 'cobalt', glyph: 'wallet-outline', hex: '#2557D6' }), useAccountNameOf: () => (account: any) => account.name, useAccountLookOf: () => () => ({ icon: 'wallet', color: 'cobalt', glyph: 'wallet-outline', hex: '#2557D6' }) },
   };
-  const module = { exports: {} as { default?: () => Node } };
-  runInNewContext(code, { module, exports: module.exports, require: (name: string) => {
+  const require = (name: string) => {
     if (!Object.hasOwn(modules, name)) throw new Error('Unexpected polish dependency: ' + name);
     return modules[name];
-  } });
-  return { render: () => { cursor = 0; return module.exports.default!(); }, pushed, saved };
+  };
+  // 24UX4: the management hooks run for real (their Alert, save and haptic are the mocks above).
+  modules['../src/ui/commitment-actions'] = realModule('src/ui/commitment-actions.ts', require);
+  const module = { exports: {} as { default?: () => Node } };
+  runInNewContext(code, { module, exports: module.exports, require, Error });
+  return { render: () => { cursor = 0; refCursor = 0; return module.exports.default!(); }, pushed, saved, alerts, failSave: (cause: Error) => { failNext = cause; } };
 }
 function nodes(value: any): Node[] {
   if (!value || typeof value !== 'object') return [];
@@ -94,6 +106,9 @@ function find(root: Node, type: string, label?: string): Node {
   return node;
 }
 
+/** The trailing swipe actions of the first rule row, and one of them by key. */
+const swipeLabels = (root: Node) => find(root, 'SwipeRow').props.actions.map((action: { label: string }) => action.label).join(',');
+const swipe = (root: Node, key: string) => find(root, 'SwipeRow').props.actions.find((action: { key: string }) => action.key === key);
 const total: domain.MonthlyBudget = { id: 'b-total', scope: 'total', currency: 'ARS', monthISO: '2026-09', amountMinor: 20000, active: true, createdAt, revision: 0, updatedAt: createdAt };
 const texts = (root: Node) => nodes(root).filter(node => node.type === 'AppText').map(node => Array.isArray(node.props.children) ? node.props.children.join('') : String(node.props.children));
 
@@ -168,7 +183,8 @@ test('recurrentes projects the next 30 days per currency and pausing advances no
   assert.equal(find(root, 'Money').props.minor, 40000);
   const row = nodes(root).find(node => typeof node.type === 'function' && node.props.rule)!;
   assert.equal(row.props.rule.id, 'rent');
-  await find(root, 'Switch', 'Pausar Alquiler').props.onValueChange();
+  assert.equal(nodes(root).some(node => node.type === 'Switch'), false, '24UX4: the row switch gave way to the swipe actions');
+  await swipe(root, 'pause').onPress();
   assert.equal(view.saved[0].active, false);
   assert.equal(view.saved[0].nextDateISO, '2026-10-01');
   assert.equal(view.saved[0].revision, 1);
@@ -218,8 +234,9 @@ test('in English Recurrentes reads in English, keeps merchant and account names,
   assert.equal(captions.some(caption => /In 11 days|Oct 1 ·/.test(caption)), false, 'the date is not repeated');
   assert.ok(texts(spanish.render()).includes('Mensual · Hogar · Banco'));
   assert.ok(texts(spanish.render()).includes('1 oct'));
-  await find(root, 'Switch', 'Pause Alquiler').props.onValueChange();
-  await find(spanish.render(), 'Switch', 'Pausar Alquiler').props.onValueChange();
+  assert.equal(swipeLabels(root), 'Pause,Delete');
+  await swipe(root, 'pause').onPress();
+  await swipe(spanish.render(), 'pause').onPress();
   const stable = (rule: domain.RecurringRule) => JSON.stringify({ ...rule, updatedAt: '' });
   assert.equal(stable(english.saved[0]), stable(spanish.saved[0]));
   const paused = harness('recurring.tsx', {}, { ...archive, recurring: [{ ...rule, active: false }] }, 'en-AR').render();
@@ -227,7 +244,8 @@ test('in English Recurrentes reads in English, keeps merchant and account names,
   // 24UX2: a paused rule keeps full-contrast ink and never announces a next date.
   assert.equal(nodes(paused).find(node => node.type === 'PressFeedback')!.props.accessibilityLabel, 'Edit recurring Alquiler, monthly, Hogar, 400.00 ARS, paused');
   assert.equal(nodes(paused).some(node => node.type === 'View' && node.props.style?.opacity !== undefined && node.props.style.opacity < 1), false);
-  assert.equal(find(paused, 'SectionTitle', undefined).props.caption, 'Not recorded until you turn them back on');
+  assert.equal(find(paused, 'SectionTitle', undefined).props.caption, 'Not recorded until you resume them');
+  assert.equal(swipeLabels(paused), 'Resume,Delete');
 });
 
 test('23.1C2: a Recurrentes row due today says the day inside its VoiceOver sentence in lower case; the caption keeps it on its own', () => {
@@ -312,4 +330,72 @@ test('24B3: Presupuestos with three currencies switches among the currencies pre
   const moneys = nodes(root).filter(node => node.type === 'Money').map(node => [node.props.currency, node.props.minor]);
   assert.deepEqual(moneys, [['JPY', 18500], ['JPY', 1500], ['JPY', 20000]], 'left, spent and limit in yen: 20000 − 1500, never read as cents');
   assert.equal(harness('budgets.tsx', { currency: 'JPY' }, data).render() && nodes(harness('budgets.tsx', { currency: 'JPY' }, data).render()).find(node => node.type === 'CurrencySwitch')!.props.value, 'JPY', 'a link to a held currency opens it');
+});
+
+// ---- Producto 24UX4: pause, resume and delete from the Recurrentes list -----------------------
+const recorded = (dateISO: string): domain.Entry => ({ id: domain.recurringEntryId(rule.id, dateISO), accountId: cash.id, kind: 'expense', amountMinor: 40000,
+  merchant: 'Alquiler', category: 'Hogar', dateISO, createdAt });
+
+test('24UX4: each rule row swipes to Pausar/Reanudar and Eliminar, the same actions VoiceOver lists on the row', () => {
+  const root = harness('recurring.tsx').render();
+  assert.equal(swipeLabels(root), 'Pausar,Eliminar');
+  const tones = find(root, 'SwipeRow').props.actions.map((action: { tone: string }) => action.tone).join(',');
+  assert.equal(tones, 'neutral,destructive', 'delete is the red one, at the far edge');
+  const press = nodes(root).find(node => node.type === 'PressFeedback')!;
+  assert.equal(JSON.stringify(press.props.accessibilityActions), JSON.stringify([{ name: 'pause', label: 'Pausar' }, { name: 'delete', label: 'Eliminar' }]));
+  const paused = harness('recurring.tsx', {}, { ...archive, recurring: [{ ...rule, active: false }] }).render();
+  assert.equal(swipeLabels(paused), 'Reanudar,Eliminar');
+  assert.equal(find(paused, 'SwipeRow').props.actions[0].tone, 'accent');
+});
+
+test('24UX4: resuming never records what fell due while paused: the next date moves to today or later on the rule\'s own day', async () => {
+  const stale: domain.RecurringRule = { ...rule, active: false, anchorDateISO: '2026-01-31', nextDateISO: '2026-01-31', revision: 3 };
+  const view = harness('recurring.tsx', {}, { ...archive, recurring: [stale] });
+  await swipe(view.render(), 'resume').onPress();
+  const resumed = view.saved[0];
+  assert.equal(resumed.active, true);
+  assert.equal(resumed.revision, 4);
+  assert.ok(resumed.nextDateISO >= domain.todayKey(), 'nothing before today is left to catch up');
+  assert.equal(resumed.anchorDateISO, '2026-01-31');
+  assert.equal(domain.recurringOccurrencesThrough(resumed, domain.todayKey()).length <= 1, true, 'at most today is recorded');
+});
+
+test('24UX4: deleting asks first, names the movements that stay, and writes only the rule\'s deletion record', async () => {
+  const data = { ...archive, records: [...archive.records, ...['2026-07-01', '2026-08-01', '2026-09-01'].map(day => domain.initialRecord(recorded(day)))] };
+  const view = harness('recurring.tsx', {}, data);
+  swipe(view.render(), 'delete').onPress();
+  assert.equal(view.saved.length, 0, 'nothing is written before the confirmation');
+  const alert = view.alerts[0];
+  assert.equal(alert.title, '¿Eliminar «Alquiler»?');
+  assert.equal(alert.message, 'Deja de registrarse. Los 3 movimientos que ya registró siguen en Movimientos.');
+  assert.equal(alert.buttons.map((button: { text: string; style?: string }) => button.text + ':' + (button.style ?? '')).join(','), 'Cancelar:cancel,Eliminar:destructive');
+  alert.buttons[0].onPress?.();
+  assert.equal(view.saved.length, 0, 'Cancelar changes nothing');
+  await alert.buttons[1].onPress();
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(view.saved.length, 1);
+  assert.equal(JSON.stringify({ ...view.saved[0], updatedAt: '' }), JSON.stringify({ ...rule, active: false, deleted: true, revision: 1, updatedAt: '' }));
+  // Once stored, the rule leaves the list; the movements it recorded are untouched by this screen.
+  const after = harness('recurring.tsx', {}, { ...data, recurring: [view.saved[0]] }).render();
+  assert.equal(nodes(after).some(node => node.type === 'SwipeRow'), false);
+  assert.equal(find(after, 'EmptyState').props.title, 'Nada recurrente todavía');
+  // A rule that never recorded anything says so; English reads the same flow.
+  const fresh = harness('recurring.tsx', {}, archive, 'en-AR');
+  swipe(fresh.render(), 'delete').onPress();
+  assert.equal(fresh.alerts[0].title, 'Delete “Alquiler”?');
+  assert.equal(fresh.alerts[0].message, 'It stops being recorded. No movement is deleted.');
+});
+
+test('24UX4: a failed pause keeps the rule as it was and says so; a retry writes the same change once', async () => {
+  const view = harness('recurring.tsx');
+  view.failSave(new Error('Disk full'));
+  await swipe(view.render(), 'pause').onPress();
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(view.saved.length, 0);
+  assert.equal(find(view.render(), 'ErrorMessage').props.message, 'Disk full');
+  await swipe(view.render(), 'pause').onPress();
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(view.saved.length, 1);
+  assert.equal(view.saved[0].active, false);
+  assert.equal(find(view.render(), 'ErrorMessage').props.message, null);
 });
