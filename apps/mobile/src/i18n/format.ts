@@ -38,13 +38,21 @@ function conventions(locale: AppLocale, explicit?: RegionConventions): Required<
   return completeConventions(explicit ?? conventionsOf(locale));
 }
 
-/** A numeric date in the region's order, separator and padding. With `withYear` false the year is left
- * out. The released regions keep their 23.1 strings (unpadded, "/"). */
-function numericDate(date: { year: number; month: number; day: number }, c: Required<RegionConventions>, withYear: boolean): string {
-  const pad = (value: number) => c.paddedDate ? String(value).padStart(2, '0') : String(value);
-  const day = pad(date.day), month = pad(date.month), year = String(date.year);
-  const parts = c.dateOrder === 'mdy' ? [month, day, year] : c.dateOrder === 'ymd' ? [year, month, day] : [day, month, year];
-  return (withYear ? parts : parts.filter(part => part !== year)).join(c.dateSeparator);
+/** Writes a date or time template (`RegionConventions.datePattern`, `dayMonthPattern`, `timePattern`): each field
+ * token replaced by its number, padded when the token is doubled; every other character is the region's literal
+ * ("22.\u00A09.\u00A02026.", "2026.\u00A009.\u00A022.", "9.03"). */
+function writeTemplate(template: string, values: { y?: number; M?: number; d?: number; H?: number; m?: number }): string {
+  return template.replace(/y|MM?|dd?|HH?|mm/g, token => {
+    const value = values[token[0] as 'y' | 'M' | 'd' | 'H' | 'm'];
+    if (value === undefined) return token;
+    return token.length === 2 ? String(value).padStart(2, '0') : String(value);
+  });
+}
+
+/** A numeric date in the region's template ("22/9/2026", "9/22/2026", "2026/09/22", "2026.\u00A09.\u00A022."). The released
+ * regions keep their 23.1 strings (unpadded, "/"). */
+function numericDate(date: { year: number; month: number; day: number }, c: Required<RegionConventions>): string {
+  return writeTemplate(c.datePattern, { y: date.year, M: date.month, d: date.day });
 }
 
 const NBSP = '\u00A0';
@@ -162,7 +170,7 @@ export function relativeDate(dateISO: string, todayISO: string, locale: AppLocal
 export function formatNumericDate(dateISO: string, locale: AppLocale = DEFAULT_LOCALE, explicit?: RegionConventions): string {
   const date = dateFromISO(dateISO);
   if (!date) return String(dateISO ?? '');
-  return numericDate(date, conventions(locale, explicit), true);
+  return numericDate(date, conventions(locale, explicit));
 }
 
 /** A day of the current period as numbers without the year, in the region's
@@ -178,23 +186,26 @@ export function formatDayMonth(dateISO: string, locale: AppLocale = DEFAULT_LOCA
   // conventions: the locale, `REGIONS`, `catalogueConventions` or `conventionsForRegion` write the same "5/09"
   // (review of PR #53). A catalogue region's own conventions follow their padding.
   if (registryRegionOf(c)) return c.dateOrder === 'mdy' ? `${date.month}/${date.day}` : `${date.day}/${String(date.month).padStart(2, '0')}`;
-  return numericDate(date, c, false);
+  return writeTemplate(c.dayMonthPattern, { M: date.month, d: date.day });
 }
 
 /** An ISO timestamp as a short local date and time, minutes precision. */
 export function formatDateTime(iso: string, locale: AppLocale = DEFAULT_LOCALE, explicit?: RegionConventions): string {
   const time = new Date(iso);
   if (Number.isNaN(time.getTime())) return String(iso ?? '');
-  const minutes = String(time.getMinutes()).padStart(2, '0');
   const c = conventions(locale, explicit);
   // The region orders the numbers and picks the clock; the language names the day period.
-  const date = numericDate({ year: time.getFullYear(), month: time.getMonth() + 1, day: time.getDate() }, c, true);
+  // A date that ends in its own period (Korea, Hungary, Croatia, Serbia: "2026.\u00A09.\u00A022.") is followed by a space,
+  // as CLDR joins them there; everywhere else by ", ".
+  const date = numericDate({ year: time.getFullYear(), month: time.getMonth() + 1, day: time.getDate() }, c) + (c.datePattern.endsWith('.') ? NBSP : ', ');
   if (c.hour12) {
+    // A 12-hour clock: the hour unpadded, the region's time separator ("2.03" in Finland's style), the day period in the
+    // interface language after the time, as Spanish and English write it.
     const hours = time.getHours() % 12 || 12, morning = time.getHours() < 12;
     const period = languageOf(locale) === 'en' ? (morning ? 'AM' : 'PM') : (morning ? 'a.\u00A0m.' : 'p.\u00A0m.');
-    return `${date}, ${hours}:${minutes}${NBSP}${period}`;
+    return `${date}${writeTemplate(c.timePattern.replace(/^HH?/, 'H'), { H: hours, m: time.getMinutes() })}${NBSP}${period}`;
   }
-  return `${date}, ${String(time.getHours()).padStart(2, '0')}:${minutes}`;
+  return `${date}${writeTemplate(c.timePattern, { H: time.getHours(), m: time.getMinutes() })}`;
 }
 
 /** Groups the digits of a non-negative integer string with the region's separator: the last group of

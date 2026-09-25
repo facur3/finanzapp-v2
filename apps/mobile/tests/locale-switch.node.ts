@@ -13,6 +13,10 @@ import { LANGUAGE_PREFERENCE_KEY, REGION_PREFERENCE_KEY, type PreferenceStore } 
 import { activeLanguageChoice, activeRegionChoice, createLocaleStore, type DeviceReading, type LocaleStore } from '../src/i18n/store.ts';
 import type { ReleasedSets } from '../src/i18n/locale.ts';
 
+/** The gate as Producto 23.1C2 released it (Argentina and the United States): the tests of a two-region
+ * chooser, of a region the gate holds back and of travelling across one keep it explicitly since 24R2B opened
+ * the catalogue (`RELEASED` itself is tested in tests/regions-integration.node.ts and tests/i18n.node.ts). */
+const HOME_GATE: ReleasedSets = { languages: ['es', 'en'], regions: ['AR', 'US'] };
 /** The rows a chooser lists, "Según el dispositivo" first, and the chooser itself (24R2A: `ChoiceScreen`'s inputs). */
 const chooserOf = localeOptions.localeChooser;
 const optionsOf = (...args: Parameters<typeof localeOptions.localeChooser>) => { const chooser = chooserOf(...args); return [chooser.pinned, ...chooser.options]; };
@@ -114,9 +118,9 @@ test('a narrower gate still holds in the store: values outside it are refused, a
   assert.equal(store.setLanguage('system'), true);
 });
 
-test('the default gate offers Spanish and English, Argentina and the United States: an English iPhone reads English', () => {
-  const state = createLocaleStore({ devices: () => device('en-US', 'US'), store: memory().store }).getState();
-  assert.equal(state.released, locale.RELEASED, 'no override: the release gate itself');
+test('the 23.1C2 gate offers Spanish and English, Argentina and the United States: an English iPhone reads English', () => {
+  assert.equal(createLocaleStore({ devices: () => device('en-US', 'US'), store: memory().store }).getState().released, locale.RELEASED, 'no override: the release gate itself');
+  const state = createLocaleStore({ devices: () => device('en-US', 'US'), store: memory().store, released: HOME_GATE }).getState();
   assert.equal(state.locale, 'en-US');
   assert.deepEqual([state.device.locale, state.device.primaryLanguage], ['en-US', 'en']);
   const t = bind.bindLocale(state.locale).t;
@@ -165,7 +169,7 @@ test('a relaunch is a new store over the same saved rows: explicit choices persi
 });
 
 test('a device the app does not support: Portuguese in Brazil reads Spanish with Argentine conventions, and says so beside "follow the device"', () => {
-  const store = createLocaleStore({ devices: () => device('pt-BR', 'BR'), store: memory().store });
+  const store = createLocaleStore({ devices: () => device('pt-BR', 'BR'), store: memory().store, released: HOME_GATE });
   const state = store.getState();
   assert.equal(state.locale, 'es-AR');
   assert.equal(state.device.locale, 'es-AR');
@@ -203,7 +207,7 @@ test('the chooser lists only released values: a Spanish-only gate offers the dev
   assert.deepEqual(optionsOf('region', state, t).map(option => option.value), ['system', 'AR']);
   assert.equal(localeOptions.preferenceSummary('language', state, t), 'Español · según el dispositivo');
   // The default gate (23.1C2): each region shows its conventions in the current language.
-  const open = createLocaleStore({ devices: () => device('en-US', 'US'), store: memory().store }).getState();
+  const open = createLocaleStore({ devices: () => device('en-US', 'US'), store: memory().store, released: HOME_GATE }).getState();
   assert.deepEqual(optionsOf('language', open, bind.bindLocale(open.locale).t).map(option => [option.value, option.title, option.subtitle ?? '']),
     [['system', 'Same as device', 'Now: English'], ['es', 'Español', ''], ['en', 'English', '']], 'each language by its own name');
   const tEn = bind.bindLocale(open.locale).t;
@@ -414,7 +418,7 @@ test('an explicit region ignores a device Region change: forms do not re-render,
 });
 
 test('VoiceOver\'s language through the real provider: English on a Spanish iPhone names it, Spanish again clears it, and a same-locale save re-renders nothing', () => {
-  const app = mountApp(createLocaleStore({ devices: () => device('es-AR', 'AR'), store: memory().store }));
+  const app = mountApp(createLocaleStore({ devices: () => device('es-AR', 'AR'), store: memory().store, released: HOME_GATE }));
   assert.equal(app.form().accessibilityLanguage, undefined, 'device and app agree: VoiceOver keeps the voice chosen in iOS Settings');
   act(() => { app.handles.choose!.setLanguage('en'); });
   assert.deepEqual([app.form().title, app.form().accessibilityLabel, app.form().accessibilityLanguage], ['Amount', '1234.56 pesos', 'en'],
@@ -427,11 +431,11 @@ test('VoiceOver\'s language through the real provider: English on a Spanish iPho
   act(() => app.root.unmount());
   // A device language without a catalogue: the app reads Spanish and tells VoiceOver so.
   let reading = device('pt-BR', 'BR');
-  const portuguese = mountApp(createLocaleStore({ devices: () => reading, store: memory().store }));
+  const portuguese = mountApp(createLocaleStore({ devices: () => reading, store: memory().store, released: HOME_GATE }));
   assert.deepEqual([portuguese.form().title, portuguese.form().accessibilityLanguage], ['Monto', 'es']);
   // Portuguese → French: another language without a catalogue. Still Spanish, still a Spanish voice: nothing re-renders.
   const before = portuguese.counts.formRenders;
-  reading = device('fr-FR', 'FR');
+  reading = device('fr-BR', 'BR');
   act(() => portuguese.events.emit());
   assert.equal(portuguese.counts.formRenders, before, 'the I18n value is keyed on whether VoiceOver needs the interface language, not on the device language itself');
   assert.equal(portuguese.form().accessibilityLanguage, 'es');
@@ -541,7 +545,7 @@ test('Idioma: a tap saves and applies in place, the checkmark moves, the screen 
 test('LocaleChooser for the onboarding: confirming the checked value calls onChosen and writes nothing; Más (no onChosen) stays inert; a new value is saved once', () => {
   const saved = memory({ [REGION_PREFERENCE_KEY]: 'AR' });
   const recents = memory();
-  const store = createLocaleStore({ devices: () => device('es-AR', 'US'), store: saved.store });
+  const store = createLocaleStore({ devices: () => device('es-AR', 'US'), store: saved.store, released: HOME_GATE });
   const { provider } = loadProvider();
   const { screen } = loadPreferenceScreen(provider, recents.store);
   let notified = 0;
@@ -569,7 +573,7 @@ test('LocaleChooser for the onboarding: confirming the checked value calls onCho
 });
 
 test('Idioma and Región on the default gate: Según el dispositivo, Español and English; Argentina and Estados Unidos with their samples; no "for now" note', () => {
-  const store = createLocaleStore({ devices: () => device('es-AR', 'US'), store: memory().store });
+  const store = createLocaleStore({ devices: () => device('es-AR', 'US'), store: memory().store, released: HOME_GATE });
   const { provider } = loadProvider();
   const { screen } = loadPreferenceScreen(provider);
   let root!: ReturnType<typeof renderer.create>;
@@ -768,33 +772,33 @@ test('following the device, a US→AR Region change on return to the foreground 
 // ---- Producto 24R1: the device's Region as the catalogue names it ------------------------------------
 
 test('24R1: the device Region is read as a catalogue code, released or not, and "Según el dispositivo" names it with the formats that stand in; the resolved region stays a released one', () => {
-  const japan = createLocaleStore({ devices: () => device('ja-JP', 'JP'), store: memory().store });
+  const japan = createLocaleStore({ devices: () => device('ja-JP', 'JP'), store: memory().store, released: HOME_GATE });
   let state = japan.getState();
   assert.deepEqual([state.locale, state.region, state.device.region, state.device.detectedRegion, state.device.primaryLanguage], ['es-AR', 'AR', 'AR', 'JP', 'ja'], 'Japan is known, not released: Argentine formats, and the state says which iPhone this is');
   const t = bind.bindLocale('es-AR').t;
   assert.equal(optionsOf('region', state, t)[0].subtitle, 'Ahora: Japón (formatos de Argentina)');
-  const englishPhone = createLocaleStore({ devices: () => device('en-JP', 'JP'), store: memory().store }).getState();
+  const englishPhone = createLocaleStore({ devices: () => device('en-JP', 'JP'), store: memory().store, released: HOME_GATE }).getState();
   assert.deepEqual([englishPhone.language, englishPhone.region, englishPhone.device.detectedRegion], ['en', 'AR', 'JP']);
   assert.equal(localeOptions.deviceRegionSummary(englishPhone, bind.bindLocale('en-AR').t), 'Now: Japan (Argentina formats)', 'named in the interface language');
   assert.equal(localeOptions.preferenceSummary('region', state, t), 'Argentina · según el dispositivo', 'the Más row names the formats in use');
   // A released Region: the plain sentence, unchanged from 23.1C2.
-  state = createLocaleStore({ devices: () => device('es-US', 'US'), store: memory().store }).getState();
+  state = createLocaleStore({ devices: () => device('es-US', 'US'), store: memory().store, released: HOME_GATE }).getState();
   assert.deepEqual([state.device.detectedRegion, optionsOf('region', state, t)[0].subtitle], ['US', 'Ahora: Estados Unidos']);
   // A Region the catalogue does not know, or none: nothing detected, the plain sentence.
   for (const reading of [device('es-AR', 'ZZ'), device('es', null), { source: 'none' as const, locales: [] }]) {
-    state = createLocaleStore({ devices: () => reading, store: memory().store }).getState();
+    state = createLocaleStore({ devices: () => reading, store: memory().store, released: HOME_GATE }).getState();
     assert.equal(state.device.detectedRegion, null, JSON.stringify(reading));
     assert.equal(optionsOf('region', state, t)[0].subtitle, 'Ahora: Argentina');
   }
   // Only Intl answered (an older binary): the tag's region is read, never a second language's.
-  state = createLocaleStore({ devices: () => ({ source: 'intl', locales: [{ languageTag: 'en-GB' }] }), store: memory().store }).getState();
+  state = createLocaleStore({ devices: () => ({ source: 'intl', locales: [{ languageTag: 'en-GB' }] }), store: memory().store, released: HOME_GATE }).getState();
   assert.deepEqual([state.device.detectedRegion, state.region, state.language], ['GB', 'AR', 'en']);
 });
 
 test('24R1: travelling with "Según el dispositivo" follows the Region setting live, and only among released regions; a manual choice never moves, and a half-typed draft survives either way', () => {
   let reading = device('es-AR', 'AR');
   const saved = memory();
-  const store = createLocaleStore({ devices: () => reading, store: saved.store });
+  const store = createLocaleStore({ devices: () => reading, store: saved.store, released: HOME_GATE });
   const app = mountApp(store);
   act(() => app.handles.setDraft!('1.234,5'));
   // Following the device: Argentina → Japan (not released) keeps Argentine formats but names Japan; → United States applies US formats in place.
@@ -826,7 +830,7 @@ test('24R1: travelling with "Según el dispositivo" follows the Region setting l
   assert.equal(saved.rows.get(REGION_PREFERENCE_KEY), 'AR', 'the saved choice is untouched by travel');
   // A relaunch after the trip: the same saved choice, whatever the device says now.
   reading = device('ja-JP', 'JP');
-  const relaunched = createLocaleStore({ devices: () => reading, store: saved.store }).getState();
+  const relaunched = createLocaleStore({ devices: () => reading, store: saved.store, released: HOME_GATE }).getState();
   assert.deepEqual([relaunched.region, relaunched.preferences.region, relaunched.device.detectedRegion, relaunched.language], ['AR', 'AR', 'JP', 'es']);
   act(() => app.root.unmount());
 });

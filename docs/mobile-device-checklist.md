@@ -319,24 +319,37 @@ change). Record each result with the language and the iPhone Region it was check
   formatos de …», amounts use the stand-in's formats; choose Argentina and it replaces Japón.
 - [ ] No movement, balance, account currency or backup changed through any of the above.
 
-## Producto 24R2B — family gates before each stage opens (`src/i18n/region-release.ts`)
+## Producto 24R2B — 234 regions released (gate of the first TestFlight, not of the merge)
 
-Each stage opens in its own commit (status → `released`, its regions added to `RELEASED_REGIONS`) only
-after these checks pass on the iPhone for **one region of each of its number and date families**
-(`stageFamilies`), in Spanish and in English, with the iPhone's Region set to that region and the preview
-bundle:
-- [ ] Amount field: typing 1 → 1234567 and decimals; the pad's decimal key; deleting across the group
-  separator; pasting the region's own grouped amount and a refused ambiguous one; a currency without
-  decimals (only once 24M opens one).
-- [ ] Numeric dates and the day of the period (Reportes insights), the time in Más → Copias and detail
-  screens, 12/24 h as the region writes it.
-- [ ] VoiceOver: amounts ungrouped with the language's decimal («1234,56 pesos» / «1234.56 pesos»).
-- [ ] Inicio, Reportes and a detail screen at the largest Dynamic Type with the longest grouped amount.
-- [ ] Stages: `spanish` (PA and PR month-first; CL hyphenated and padded; ES minimum grouping two; CR a
-  no-break space; most with a 12-hour clock), `uk-canada` (GB padded, CA year-first hyphen), `brazil`, `japan`,
-  `india` (lakh), `germany` (dotted dates), `switzerland` (apostrophe), `narrow-space` (FR),
-  `space-minimum-two` (PL, PT). Korean and Hungarian dates stay unplanned until a stage decides their
-  trailing-period writing.
+**Not done in 24R2B: no EAS build was made and the iPhone was not touched.** Metro from the branch on the
+installed FinanzApp Dev build, **without** the preview flag (what a release shows); no new native build is
+needed. The expected strings are in [region-families.md](region-families.md), generated from the code; check
+each row in Spanish and in English and record the result here.
+
+- [ ] **Eight number families** (region-families.md §1): with iOS Region set to Alemania, Reino Unido,
+  Francia, Suecia, Polonia, Suiza, España and India in turn: Nuevo gasto typing «1234567», the pad's
+  decimal key, «89» shows the row's «Typed» value; the caret stays after the last digit; deleting the
+  group separator removes the digit before it; pasting the row's refused text keeps the field and shows
+  the note; saving records the amount and Inicio shows it grouped the same way; VoiceOver reads the saved
+  amount ungrouped.
+- [ ] **Date writings** (§2): Corea, Hungría, Croacia, Finlandia and Dinamarca at least: a movement's date,
+  Reportes' day of the month, the backup date and time; the spaces never break a date across lines.
+- [ ] **Chooser with 234 rows:** Más → Región opens fast; scroll top to bottom at 60/120 Hz without blank
+  rows; search «japon», «JP», «JPN», «392», «CHF», «corea»; «Recientes» on the next visit; letter headers
+  read as headers by VoiceOver; the largest accessibility text size; with the keyboard up, the last region
+  (Zimbabue) and the footnote reachable; the first row never under the navigation bar.
+- [ ] **Device first, choice wins:** with «Según el dispositivo», changing iOS Region (Japón → Brasil)
+  changes the formats live; after choosing Suiza manually, an iOS Region change does nothing and a
+  force-quit keeps Suiza; account currencies and balances never change.
+- [ ] **A blocked region:** iOS Region Arabia Saudí: Más → Región reads «Ahora: Arabia Saudí (formatos de
+  Argentina)».
+- [ ] **Per numbering system, evidence only (no stage opens from it):** for each row of region-families.md §4
+  (Arabia Saudí `arab`, Irán `arabext`, Bangladés `beng`, Nepal `deva`, Myanmar `mymr`, Bután `tibt`), with iOS
+  Region set there and, separately, iOS's Numbers setting on Latin and on native digits: record which digits
+  and which decimal key the pad actually offers (do not assume CLDR's default), what the field shows after
+  «1234567», the decimal key and «89», what a pasted native amount gives and how VoiceOver reads it. Expected
+  today: `arab`/`arabext` digits read as Latin; `beng`/`deva`/`mymr`/`tibt` digits enter nothing and a paste
+  is refused (not normalized yet).
 
 ## Producto 24R1 — regional infrastructure (one visible line; nothing else until 24R2)
 

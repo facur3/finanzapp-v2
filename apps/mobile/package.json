@@ -16,7 +16,8 @@
     "currency:generate": "node --experimental-strip-types scripts/currency/generate.mjs",
     "currency:verify": "node --experimental-strip-types scripts/currency/generate.mjs --verify",
     "regions:generate": "node --experimental-strip-types scripts/regions/generate.mjs",
-    "regions:verify": "node --experimental-strip-types scripts/regions/generate.mjs --verify"
+    "regions:verify": "node --experimental-strip-types scripts/regions/generate.mjs --verify",
+    "regions:families": "node --experimental-strip-types scripts/regions/families.mjs"
   },
   "engines": {
     "node": ">=22.22.0"

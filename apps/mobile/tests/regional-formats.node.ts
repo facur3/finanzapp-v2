@@ -18,7 +18,7 @@ test('a language with another region\'s conventions: Spanish in Japan, English i
   const es = (region: string) => bindLocale('es-AR', 'none', null, [], catalogueConventions(region as never));
   const en = (region: string) => bindLocale('en-US', 'none', null, [], catalogueConventions(region as never));
   const japan = es('JP');
-  assert.deepEqual([japan.formatNumericDate('2026-09-22'), japan.formatDayMonth('2026-09-05'), japan.formatDateTime('2026-09-22T14:03:05')], ['2026/09/22', '09/05', '2026/09/22, 14:03'], 'year first, zero-padded, 24 h');
+  assert.deepEqual([japan.formatNumericDate('2026-09-22'), japan.formatDayMonth('2026-09-05'), japan.formatDateTime('2026-09-22T14:03:05')], ['2026/09/22', '9/5', '2026/09/22, 14:03'], 'year first, zero-padded, 24 h; the day of the period as CLDR\'s Md writes it (24R2B)');
   assert.deepEqual([japan.formatMoneyAmount(123456, 'ARS'), japan.moneyText(123456, 'ARS'), japan.moneyText(-123456, 'USD'), japan.formatCount(1234567), japan.formatPercent(0.1235)],
     ['1,234.56', 'AR$' + NBSP + '1,234.56', '−US$' + NBSP + '1,234.56', '1,234,567', '12.4' + NBSP + '%'], 'Japanese separators; no bare $ in Japan, so the peso is AR$; the Spanish % keeps its space');
   assert.deepEqual([japan.formatMoneyAmount(150000, 'JPY'), japan.formatMoneyAmount(1234567, 'KWD'), japan.formatMoneyAmount(1500, 'IQD')], ['150,000', '1,234.567', '1.5'], 'each currency keeps its own decimals whatever the region (IQD: three ISO decimals shown down to CLDR\'s none)');
@@ -36,13 +36,14 @@ test('a language with another region\'s conventions: Spanish in Japan, English i
   const swiss = es('CH');
   assert.deepEqual([swiss.formatMoneyAmount(123456, 'CHF'), swiss.formatNumericDate('2026-09-22'), swiss.formatDateTime('2026-09-02T09:05:00'), swiss.moneyText(123456, 'CHF')], ["1'234.56", '22.09.2026', '22.09.2026'.replace('22', '02') + ', 09:05', 'CHF' + NBSP + "1'234.56"]);
   const germany = en('DE');
-  assert.deepEqual([germany.formatMoneyAmount(123456, 'EUR'), germany.formatNumericDate('2026-09-22'), germany.formatDayMonth('2026-09-05'), germany.formatPercent(0.1235), germany.moneyText(-123456, 'EUR')], ['1.234,56', '22.09.2026', '05.09', '12,4%', '−€' + NBSP + '1.234,56']);
+  assert.deepEqual([germany.formatMoneyAmount(123456, 'EUR'), germany.formatNumericDate('2026-09-22'), germany.formatDayMonth('2026-09-05'), germany.formatPercent(0.1235), germany.moneyText(-123456, 'EUR')], ['1.234,56', '22.09.2026', '5.9.', '12,4%', '−€' + NBSP + '1.234,56']);
   const korea = es('KR');
-  assert.deepEqual([korea.formatNumericDate('2026-09-22'), korea.formatDateTime('2026-09-22T14:03:05'), korea.formatMoneyAmount(1234567, 'KRW')], ['2026.9.22', '2026.9.22, 2:03' + NBSP + 'p.' + NBSP + 'm.', '1,234,567']);
+  assert.deepEqual([korea.formatNumericDate('2026-09-22'), korea.formatDateTime('2026-09-22T14:03:05'), korea.formatMoneyAmount(1234567, 'KRW')], ['2026.' + NBSP + '9.' + NBSP + '22.', '2026.' + NBSP + '9.' + NBSP + '22.' + NBSP + '2:03' + NBSP + 'p.' + NBSP + 'm.', '1,234,567'],
+    'Korea as CLDR writes it since 24R2B: a space after each period, the closing period, the time after a space');
   const brazil = en('BR');
   assert.deepEqual([brazil.formatMoneyAmount(123456, 'BRL'), brazil.formatNumericDate('2026-09-22'), brazil.formatDateTime('2026-09-22T14:03:05'), brazil.moneyText(123456, 'BRL')], ['1.234,56', '22/09/2026', '22/09/2026, 14:03', 'R$' + NBSP + '1.234,56']);
   const hungary = es('HU');
-  assert.deepEqual([hungary.formatCount(1234), hungary.formatCount(12345), hungary.formatNumericDate('2026-09-22')], ['1234', '12' + NBSP + '345', '2026.09.22'], 'two digits before the first separator: "1234" stays unbroken');
+  assert.deepEqual([hungary.formatCount(1234), hungary.formatCount(12345), hungary.formatNumericDate('2026-09-22')], ['1234', '12' + NBSP + '345', '2026.' + NBSP + '09.' + NBSP + '22.'], 'two digits before the first separator: "1234" stays unbroken');
   const egypt = en('EG');
   assert.deepEqual([egypt.formatMoneyAmount(123456, 'EGP'), egypt.formatNumericDate('2026-09-22')], ['1,234.56', '22/9/2026'], 'Latin digits and symbols even where the locale defaults to Arabic-script ones');
   // Argentina through the explicit path is Argentina: the registry's own value, the deliberate 24-hour clock included.
@@ -167,10 +168,10 @@ test('formatDayMonth: Argentina writes 5/09 through every path; a catalogue regi
     assert.equal(formatDayMonth('2026-09-05', 'es-US', conventions), '9/5', 'es-US through ' + path);
   }
   // Explicit international conventions keep their own order, separator and padding: none reads as Argentina.
-  assert.deepEqual([formatDayMonth('2026-09-05', 'es-AR', catalogueConventions('JP')), formatDayMonth('2026-09-05', 'en-US', catalogueConventions('JP'))], ['09/05', '09/05'], 'Japan: month first, zero-padded, in either language');
+  assert.deepEqual([formatDayMonth('2026-09-05', 'es-AR', catalogueConventions('JP')), formatDayMonth('2026-09-05', 'en-US', catalogueConventions('JP'))], ['9/5', '9/5'], 'Japan: month first, as CLDR\'s Md skeleton writes it (24R2B), in either language');
   assert.deepEqual([formatDayMonth('2026-09-05', 'es-AR', catalogueConventions('GB')), formatDayMonth('2026-09-05', 'en-US', catalogueConventions('GB'))], ['05/09', '05/09'], 'the United Kingdom: day first, both padded');
-  assert.deepEqual([formatDayMonth('2026-09-05', 'es-AR', catalogueConventions('CH')), formatDayMonth('2026-09-05', 'en-US', catalogueConventions('CH'))], ['05.09', '05.09'], 'Switzerland: a dot, both padded');
-  assert.deepEqual([formatDayMonth('2026-12-25', 'es-AR', catalogueConventions('JP')), formatDayMonth('2026-12-25', 'es-AR', catalogueConventions('GB')), formatDayMonth('2026-12-25', 'es-AR', catalogueConventions('CH'))], ['12/25', '25/12', '25.12']);
+  assert.deepEqual([formatDayMonth('2026-09-05', 'es-AR', catalogueConventions('CH')), formatDayMonth('2026-09-05', 'en-US', catalogueConventions('CH'))], ['5.9.', '5.9.'], 'Switzerland: CLDR\'s Md, "d.M." (24R2B)');
+  assert.deepEqual([formatDayMonth('2026-12-25', 'es-AR', catalogueConventions('JP')), formatDayMonth('2026-12-25', 'es-AR', catalogueConventions('GB')), formatDayMonth('2026-12-25', 'es-AR', catalogueConventions('CH'))], ['12/25', '25/12', '25.12.']);
   assert.equal(formatDayMonth('2026-09-05', 'es-AR', catalogueConventions('IN')), '5/9', 'a catalogue region with unpadded dates writes both numbers unpadded: the ledger\'s "5/09" is the registry\'s, not every dmy region\'s');
   // Only a registry region's own writing is the registry's; a catalogue region's never is.
   assert.deepEqual([registryRegionOf(REGIONS.AR), registryRegionOf(catalogueConventions('AR')), registryRegionOf(conventionsForRegion('AR').conventions), registryRegionOf(catalogueConventions('US')), registryRegionOf(conventionsForRegion('US').conventions)], ['AR', 'AR', 'AR', 'US', 'US']);
