@@ -29,7 +29,7 @@
 import { currencyRecord, displayDigits, formatMinorUnits, splitMinor, type IsoCurrencyCode } from '@finanzapp/domain';
 import { CURRENCY_NAMES } from './currencies/index.ts';
 import type { CurrencyNameForms } from './currencies/types.ts';
-import { DEFAULT_LOCALE, SPEECH_REGIONS, completeConventions, composeLocale, conventionsOf, languageOf, type AppLocale, type LanguageCode, type RegionConventions } from './locale.ts';
+import { DEFAULT_LOCALE, SPEECH_REGIONS, completeConventions, composeLocale, conventionsOf, languageOf, registryRegionOf, type AppLocale, type LanguageCode, type RegionConventions } from './locale.ts';
 
 /** The conventions a formatter writes in: the ones passed explicitly (a catalogue region under test or, from
  * 24R2, the resolved region), otherwise the released region of the locale. Every optional field filled. */
@@ -160,13 +160,16 @@ export function formatNumericDate(dateISO: string, locale: AppLocale = DEFAULT_L
 /** A day of the current period as numbers without the year, in the region's
  * order: "5/09" in Argentina (as the domain's reports write it) and "9/5" in
  * the United States, where "5/09" would read as May 9. A catalogue region
- * writes its own order, separator and padding ("09/22" in Japan). */
+ * writes its own order, separator and padding ("09/22" in Japan, "5/9" in
+ * India: both numbers unpadded). */
 export function formatDayMonth(dateISO: string, locale: AppLocale = DEFAULT_LOCALE, explicit?: RegionConventions): string {
   const date = dateFromISO(dateISO);
   if (!date) return String(dateISO ?? '');
   const c = conventions(locale, explicit);
-  // The released registry keeps the ledger's own writing (the month padded, the day not); a catalogue region follows its padding.
-  if (explicit === undefined || explicit.paddedDate === undefined) return c.dateOrder === 'mdy' ? `${date.month}/${date.day}` : `${date.day}/${String(date.month).padStart(2, '0')}`;
+  // The registry keeps the ledger's own writing (the month padded, the day not) whichever object carries its
+  // conventions: the locale, `REGIONS`, `catalogueConventions` or `conventionsForRegion` write the same "5/09"
+  // (review of PR #53). A catalogue region's own conventions follow their padding.
+  if (registryRegionOf(c)) return c.dateOrder === 'mdy' ? `${date.month}/${date.day}` : `${date.day}/${String(date.month).padStart(2, '0')}`;
   return numericDate(date, c, false);
 }
 

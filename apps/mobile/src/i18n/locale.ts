@@ -65,6 +65,19 @@ export function completeConventions(conventions: RegionConventions): Required<Re
   return { dateSeparator: '/', paddedDate: false, secondaryGrouping: 3, minimumGroupingDigits: 1, weekStart: 1, ...conventions };
 }
 
+/** The fields a formatter reads. `weekStart` is data for a calendar, not a writing: the catalogue's
+ * view of the United States starts the week on Sunday while the registry's default is Monday, and
+ * both write every string alike. */
+const WRITING_FIELDS = ['decimal', 'group', 'dateOrder', 'hour12', 'dollarSignCurrency', 'dateSeparator', 'paddedDate', 'secondaryGrouping', 'minimumGroupingDigits'] as const satisfies readonly (keyof RegionConventions)[];
+
+/** Whether two sets of conventions write the same strings: every writing field equal once both are
+ * complete, so the registry's entry, the catalogue's view of the same region and a resolved region
+ * are the same writing whichever object carries them. */
+export function sameWriting(a: RegionConventions, b: RegionConventions): boolean {
+  const x = completeConventions(a), y = completeConventions(b);
+  return WRITING_FIELDS.every(field => x[field] === y[field]);
+}
+
 /** Regions with conventions in this build, keyed by ISO 3166-1 alpha-2 code. */
 export const REGIONS = {
   AR: { decimal: ',', group: '.', dateOrder: 'dmy', hour12: false, dollarSignCurrency: 'ARS' },
@@ -145,6 +158,13 @@ export function regionOf(locale: AppLocale): RegionCode {
   return isRegionCode(region) ? region : DEFAULT_REGION;
 }
 export function conventionsOf(locale: AppLocale): RegionConventions { return REGIONS[regionOf(locale)]; }
+/** The registry region whose writing these conventions are (`sameWriting`), or null for a catalogue
+ * region's own. It is what decides a writing the registry keeps for the ledger's sake
+ * (`formatDayMonth`'s "5/09"), so the answer is the same for `REGIONS.AR`, `catalogueConventions('AR')`
+ * and `conventionsForRegion('AR').conventions`, never a matter of which path bound them. */
+export function registryRegionOf(conventions: RegionConventions): RegionCode | null {
+  return SUPPORTED_REGIONS.find(code => sameWriting(REGIONS[code], conventions)) ?? null;
+}
 
 /** The supported language a BCP 47 tag names: any Spanish variety is Spanish,
  * any English variety is English (regional spelling differences are not a

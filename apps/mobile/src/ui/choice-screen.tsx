@@ -16,7 +16,9 @@ import { radius, space, usePalette } from './theme';
  * the section, so two options or two hundred read alike. A row that names a
  * language in its own words carries `language`, so VoiceOver speaks it with
  * that voice. Nothing here saves: `onChoose` returns whether the caller saved,
- * and a refused save keeps the checkmark where it was and says so. Text scales
+ * and a refused save keeps the checkmark where it was and says so. A search
+ * that matches nothing says so under the field while the pinned option stays
+ * (the list is never empty then, so `ListEmptyComponent` would never show). Text scales
  * with Dynamic Type; no row has a fixed height. Not wired to a route yet. */
 export function ChoiceScreen<T extends string>({ title, options, pinned, recent, selected, onChoose, note, searchableFrom = SEARCHABLE_CHOICES }: {
   title: string; options: readonly ChoiceOption<T>[]; pinned?: ChoiceOption<T>; recent?: readonly T[]; selected: T | null;
@@ -33,6 +35,9 @@ export function ChoiceScreen<T extends string>({ title, options, pinned, recent,
   const searchable = options.length >= searchableFrom;
   const rows = useMemo(() => buildChoiceRows({ pinned, recent, options, selected, query: searchable ? query : '', recentTitle: t('preferences.recent') }),
     [pinned, recent, options, selected, query, searchable, t]);
+  // No real choice left (the pinned row does not count): the list is not empty while the pinned option stays,
+  // so the sentence is drawn from this, under the search field, never from `ListEmptyComponent`.
+  const noMatches = !rows.some(row => row.kind === 'choice' && !row.pinned);
   const choose = (value: T) => {
     if (value === selected) return;
     const saved = onChoose(value);
@@ -43,10 +48,10 @@ export function ChoiceScreen<T extends string>({ title, options, pinned, recent,
     <Stack.Screen options={{ title }} />
     <FlatList<ChoiceRow<T>> data={rows} keyExtractor={row => row.key} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag"
       contentContainerStyle={{ padding: space.xl, paddingBottom: 40 }} initialNumToRender={16} windowSize={7} removeClippedSubviews={false}
-      ListHeaderComponent={searchable ? <View style={{ paddingBottom: space.l }}>
-        <Field label={t('preferences.search')} value={query} onChangeText={setQuery} autoCapitalize="none" autoCorrect={false} clearButtonMode="while-editing" maxLength={40} />
+      ListHeaderComponent={searchable || noMatches ? <View style={{ paddingBottom: space.l, gap: space.m }}>
+        {searchable && <Field label={t('preferences.search')} value={query} onChangeText={setQuery} autoCapitalize="none" autoCorrect={false} clearButtonMode="while-editing" maxLength={40} />}
+        {noMatches && <AppText secondary variant="subhead" style={{ paddingHorizontal: 4 }}>{t('preferences.noMatches')}</AppText>}
       </View> : null}
-      ListEmptyComponent={<AppText secondary variant="subhead" style={{ paddingHorizontal: 4 }}>{t('preferences.noMatches')}</AppText>}
       ListFooterComponent={<View style={{ gap: 10, paddingTop: space.m }}>
         <ErrorMessage message={failed ? t('preferences.saveFailed') : null} />
         {!!note && <AppText secondary variant="footnote" style={{ paddingHorizontal: 4 }}>{note}</AppText>}

@@ -3,9 +3,9 @@ import { test } from 'node:test';
 import { bindLocale } from '../src/i18n/bind.ts';
 import { formatCount, formatDateTime, formatDayMonth, formatMoneyAmount, formatNumericDate, formatPercent, moneyText, spokenMoney } from '../src/i18n/format.ts';
 import { foldText, nameComparator, probeIntl } from '../src/i18n/intl-support.ts';
-import { REGIONS, completeConventions, type AppLocale } from '../src/i18n/locale.ts';
+import { REGIONS, completeConventions, registryRegionOf, sameWriting, type AppLocale, type RegionConventions } from '../src/i18n/locale.ts';
 import { RECENT_KEYS, RECENT_LIMIT, readRecent, rememberRecent } from '../src/i18n/recent.ts';
-import { catalogueConventions, isCatalogueRegion } from '../src/i18n/regions.ts';
+import { catalogueConventions, conventionsForRegion, isCatalogueRegion } from '../src/i18n/regions.ts';
 import type { PreferenceStore } from '../src/i18n/preference.ts';
 
 // Producto 24R1: the formatters written in a catalogue region's conventions, bound explicitly
@@ -59,9 +59,16 @@ test('the released four combinations are byte-identical with and without explici
     ['symbol', i18n => i18n.currencySymbol('ARS')], ['spoken', i18n => i18n.spokenMoney(123456, 'ARS')],
   ];
   for (const locale of ['es-AR', 'en-AR', 'es-US', 'en-US'] as AppLocale[]) {
-    const implicit = bindLocale(locale), explicit = bindLocale(locale, 'none', null, [], REGIONS[locale.endsWith('AR') ? 'AR' : 'US']);
-    for (const [name, sample] of samples) assert.equal(sample(explicit), sample(implicit), `${locale} ${name}`);
-    assert.deepEqual(implicit.conventions, completeConventions(REGIONS[locale.endsWith('AR') ? 'AR' : 'US']));
+    const region = locale.endsWith('AR') ? 'AR' : 'US';
+    const implicit = bindLocale(locale);
+    // Every way of binding a released region's conventions is the same region: the registry entry, the
+    // catalogue's view of it and the resolution 24R2's provider will bind (review of PR #53).
+    const paths: [string, RegionConventions][] = [['REGIONS', REGIONS[region]], ['catalogueConventions', catalogueConventions(region)], ['conventionsForRegion', conventionsForRegion(region).conventions]];
+    for (const [path, conventions] of paths) {
+      const explicit = bindLocale(locale, 'none', null, [], conventions);
+      for (const [name, sample] of samples) assert.equal(sample(explicit), sample(implicit), `${locale} ${name} through ${path}`);
+    }
+    assert.deepEqual(implicit.conventions, completeConventions(REGIONS[region]));
   }
   assert.equal(formatDayMonth('2026-09-05', 'es-AR'), '5/09', 'the ledger\'s own day/month writing is untouched');
   assert.equal(formatDayMonth('2026-09-05', 'en-US'), '9/5');
@@ -142,4 +149,35 @@ test('recent choices: most recent first, once each, at most three, junk skipped,
   assert.equal(rememberRecent('region', 'JP', region, store), false, 'unwritable: not remembered, and says so');
   assert.equal(rows.get(RECENT_KEYS.region), '["GB"]', 'the stored list is untouched');
   assert.equal(RECENT_KEYS.language, 'finanzapp.recent.language');
+});
+
+test('formatDayMonth: Argentina writes 5/09 through every path; a catalogue region never inherits the ledger\'s writing (review of PR #53)', () => {
+  // The ledger's own day/month writing (the month padded, the day not) belongs to the released registry,
+  // whichever object carries its conventions: the implicit locale, `REGIONS`, the catalogue's view of the
+  // region or the resolution the provider binds from 24R2. Before the fix the last two wrote "5/9".
+  const argentina: [string, RegionConventions | undefined][] = [['implicit', undefined], ['REGIONS', REGIONS.AR], ['catalogueConventions', catalogueConventions('AR')], ['conventionsForRegion', conventionsForRegion('AR').conventions]];
+  for (const [path, conventions] of argentina) {
+    assert.equal(formatDayMonth('2026-09-05', 'es-AR', conventions), '5/09', 'es-AR through ' + path);
+    assert.equal(formatDayMonth('2026-09-05', 'en-AR', conventions), '5/09', 'en-AR through ' + path);
+    assert.equal(formatDayMonth('2026-12-25', 'es-AR', conventions), '25/12', path);
+    assert.equal(bindLocale('es-AR', 'none', null, [], conventions).formatDayMonth('2026-09-05'), '5/09', 'bound through ' + path);
+  }
+  for (const [path, conventions] of [['catalogueConventions', catalogueConventions('US')], ['conventionsForRegion', conventionsForRegion('US').conventions]] as const) {
+    assert.equal(formatDayMonth('2026-09-05', 'en-US', conventions), '9/5', 'en-US through ' + path);
+    assert.equal(formatDayMonth('2026-09-05', 'es-US', conventions), '9/5', 'es-US through ' + path);
+  }
+  // Explicit international conventions keep their own order, separator and padding: none reads as Argentina.
+  assert.deepEqual([formatDayMonth('2026-09-05', 'es-AR', catalogueConventions('JP')), formatDayMonth('2026-09-05', 'en-US', catalogueConventions('JP'))], ['09/05', '09/05'], 'Japan: month first, zero-padded, in either language');
+  assert.deepEqual([formatDayMonth('2026-09-05', 'es-AR', catalogueConventions('GB')), formatDayMonth('2026-09-05', 'en-US', catalogueConventions('GB'))], ['05/09', '05/09'], 'the United Kingdom: day first, both padded');
+  assert.deepEqual([formatDayMonth('2026-09-05', 'es-AR', catalogueConventions('CH')), formatDayMonth('2026-09-05', 'en-US', catalogueConventions('CH'))], ['05.09', '05.09'], 'Switzerland: a dot, both padded');
+  assert.deepEqual([formatDayMonth('2026-12-25', 'es-AR', catalogueConventions('JP')), formatDayMonth('2026-12-25', 'es-AR', catalogueConventions('GB')), formatDayMonth('2026-12-25', 'es-AR', catalogueConventions('CH'))], ['12/25', '25/12', '25.12']);
+  assert.equal(formatDayMonth('2026-09-05', 'es-AR', catalogueConventions('IN')), '5/9', 'a catalogue region with unpadded dates writes both numbers unpadded: the ledger\'s "5/09" is the registry\'s, not every dmy region\'s');
+  // Only a registry region's own writing is the registry's; a catalogue region's never is.
+  assert.deepEqual([registryRegionOf(REGIONS.AR), registryRegionOf(catalogueConventions('AR')), registryRegionOf(conventionsForRegion('AR').conventions), registryRegionOf(catalogueConventions('US')), registryRegionOf(conventionsForRegion('US').conventions)], ['AR', 'AR', 'AR', 'US', 'US']);
+  assert.deepEqual(['JP', 'GB', 'CH', 'IN', 'DE'].map(code => registryRegionOf(catalogueConventions(code as never))), [null, null, null, null, null]);
+  assert.equal(registryRegionOf({ ...REGIONS.AR, hour12: true }), null, 'one writing field apart is another region');
+  assert.equal(sameWriting(REGIONS.AR, catalogueConventions('AR')), true);
+  assert.equal(sameWriting(REGIONS.AR, { ...completeConventions(REGIONS.AR), paddedDate: true }), false);
+  assert.notEqual(catalogueConventions('US').weekStart, completeConventions(REGIONS.US).weekStart, 'CLDR starts the American week on Sunday, the registry\'s default on Monday');
+  assert.equal(sameWriting(REGIONS.US, catalogueConventions('US')), true, 'the week start is calendar data, not a writing: no formatter reads it');
 });

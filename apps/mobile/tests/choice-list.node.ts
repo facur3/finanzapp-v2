@@ -27,6 +27,7 @@ test('rows: the pinned option first, the recent ones under their header, then al
   assert.deepEqual(rows.map(row => row.key).length, new Set(rows.map(row => row.key)).size, 'keys are unique although JP and AR appear twice');
   assert.equal(buildChoiceRows({ options, selected: null, recentTitle: 'Recientes' })[0].kind, 'header', 'no pinned option, no recent: the first section starts at once');
   assert.deepEqual(buildChoiceRows({ pinned, options: [], selected: 'system', recentTitle: 'Recientes' }).map(row => row.key), ['pinned:system']);
+  assert.deepEqual(rows.map(row => row.kind === 'choice' && row.pinned === true), [true, ...rows.slice(1).map(() => false)], 'only the pinned row is marked pinned, so a screen can tell a real match from it');
   assert.deepEqual([sectionInitial('Álava'), sectionInitial('åland'), sectionInitial('日本'), sectionInitial('  Zambia'), sectionInitial('1 de mayo'), sectionInitial('')], ['A', 'A', '#', 'Z', '#', '#']);
 });
 
@@ -112,11 +113,6 @@ test('the screen: a search field only from six options, header rows as VoiceOver
   field.props.onChangeText('jap');
   root = many.render();
   assert.deepEqual(list(root).props.data.map((row: any) => row.kind === 'header' ? '#' : row.option.value), ['system', 'JP'], 'a query: flat matches, the pinned option first');
-  field.props.onChangeText('xyzzy');
-  root = many.render();
-  assert.deepEqual(list(root).props.data.map((row: any) => row.option.value), ['system']);
-  assert.equal(nodes(list(root).props.ListEmptyComponent).length, 1, 'the empty sentence is drawn only when the list is empty; the pinned row keeps the list non-empty');
-  assert.equal(list(root).props.ListEmptyComponent.props.children, 'Sin coincidencias');
   // A refused save: the checkmark stays (selected unchanged), the footer says so.
   field.props.onChangeText('jap');
   root = many.render();
@@ -124,4 +120,51 @@ test('the screen: a search field only from six options, header rows as VoiceOver
   root = many.render();
   assert.equal(nodes(list(root).props.ListFooterComponent).find(node => node.type === 'ErrorMessage')!.props.message, 'No se pudo guardar la preferencia. Tu elección anterior sigue activa; probá de nuevo.');
   assert.deepEqual(many.haptics, []);
+});
+
+// The no-match sentence lives under the search field, not in `ListEmptyComponent`: with a pinned option
+// the list is never empty, so React Native would never draw it there (review of PR #53).
+const noMatchText = (root: Node) => nodes(list(root).props.ListHeaderComponent).filter(node => node.type === 'AppText').map(node => String(node.props.children));
+const regionScreen = (onChoose: (value: string) => boolean, withPinned = true) => screen({ title: 'Región', options: regionChoices('es').map(choice => ({ value: choice.code, title: choice.name, searchText: choice.searchText })), pinned: withPinned ? pinned : undefined, recent: ['JP'], selected: 'AR', onChoose });
+const searchField = (root: Node) => nodes(list(root).props.ListHeaderComponent).find(node => node.type === 'Field')!;
+
+test('a search with no match says so under the field although the pinned option stays; a match or a cleared search removes the sentence', () => {
+  const many = regionScreen(() => true);
+  let root = many.render();
+  assert.deepEqual(noMatchText(root), [], 'no query: no sentence');
+  searchField(root).props.onChangeText('xyzzy');
+  root = many.render();
+  assert.deepEqual(list(root).props.data.map((row: any) => row.option.value), ['system'], 'the pinned option remains: the list is not empty');
+  assert.deepEqual(noMatchText(root), ['Sin coincidencias'], 'the sentence is drawn nevertheless');
+  assert.equal(list(root).props.ListEmptyComponent, undefined, 'nothing relies on an empty list any more');
+  assert.equal(nodes(rendered(root)[0]).find(node => node.type === 'CheckRow')!.props.title, 'Según el dispositivo', 'the pinned row is still a row');
+  searchField(root).props.onChangeText('jap');
+  root = many.render();
+  assert.deepEqual([list(root).props.data.map((row: any) => row.option.value), noMatchText(root)], [['system', 'JP'], []], 'a successful search lists its matches and no sentence');
+  searchField(root).props.onChangeText('   ');
+  root = many.render();
+  assert.deepEqual([noMatchText(root), list(root).props.data.filter((row: any) => row.kind === 'choice').length], [[], 257 + 1 + 1], 'a blank query is the whole list');
+
+  const bare = regionScreen(() => true, false);
+  root = bare.render();
+  searchField(root).props.onChangeText('xyzzy');
+  root = bare.render();
+  assert.deepEqual([list(root).props.data, noMatchText(root)], [[], ['Sin coincidencias']], 'without a pinned option the list is empty and the same sentence is drawn in the same place');
+});
+
+test('choosing from the list while a search is active saves, ticks and keeps the query', () => {
+  const chosen: string[] = [];
+  const many = regionScreen(value => { chosen.push(value); return true; });
+  let root = many.render();
+  searchField(root).props.onChangeText('jap');
+  root = many.render();
+  const japan = nodes(rendered(root)[1]).find(node => node.type === 'CheckRow')!;
+  assert.deepEqual([japan.props.title, japan.props.selected], ['Japón', false]);
+  japan.props.onPress();
+  root = many.render();
+  assert.deepEqual([chosen, many.haptics], [['JP'], ['selection']]);
+  assert.equal(nodes(list(root).props.ListFooterComponent).find(node => node.type === 'ErrorMessage')!.props.message, null);
+  assert.deepEqual([searchField(root).props.value, list(root).props.data.map((row: any) => row.option.value), noMatchText(root)], ['jap', ['system', 'JP'], []], 'the search is not reset by a choice');
+  nodes(rendered(root)[0]).find(node => node.type === 'CheckRow')!.props.onPress();
+  assert.deepEqual(chosen, ['JP', 'system'], 'the pinned option is choosable with a search active too');
 });

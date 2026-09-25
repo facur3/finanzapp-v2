@@ -72,6 +72,14 @@ Producto 24R1. Design: [docs/i18n.md](i18n.md) §11a; the chooser: [docs/mobile-
   the registry agreement and the one deviation, the parsers and a synthetic build, the API,
   the ICU cross-check), `regional-formats.node.ts`, `choice-list.node.ts`, the detected-region and
   travel cases in `locale-switch.node.ts`; the released four combinations stay pinned.
+- [x] **Review fixes (PR #53, two threads):** `formatDayMonth` writes the ledger's "5/09" for
+  Argentina whichever object carries its conventions (`registryRegionOf` over the writing fields,
+  `sameWriting`), so `catalogueConventions('AR')` and the resolution 24R2's provider will bind agree
+  with the released path; Japan, the United Kingdom and Switzerland keep their own padding.
+  `ChoiceScreen` says "Sin coincidencias" under the search field from the absence of a real match,
+  since the pinned "Según el dispositivo" row kept the list non-empty and `ListEmptyComponent`
+  never showed. Tests: every binding path for AR and US, the explicit JP/GB/CH/IN day-month
+  strings, the no-match, matched and blank searches, a choice with a search active.
 - [x] **Checked on Linux:** see the handoff entry below.
 - [ ] **Not device-verified, no EAS build made:** an iPhone with its Region set to an unreleased
   country shows the new "Ahora: … (formatos de Argentina)" line (docs/mobile-device-checklist.md,
@@ -2201,6 +2209,16 @@ safe areas, system text and separate currencies apply to every new screen.
   0 stale), `npm run i18n:extract`, `npm run check` (up to date), `npm run export:ios` (4,969,129 bytes,
   +38,434 over 24B6: the catalogue and the names). Not an Xcode build; **no EAS build; the iPhone was not modified**;
   no FX or AI provider connected; SQLite, backups and the currency gate untouched.
+- **Review fixes (PR #53, two threads):** `registryRegionOf` and `sameWriting` in `locale.ts`; `formatDayMonth`
+  decides the ledger's writing by them (Argentina "5/09" through the locale, `REGIONS`, `catalogueConventions`
+  and `conventionsForRegion`; the catalogue's own padding elsewhere: "09/05" Japan, "05/09" United Kingdom,
+  "05.09" Switzerland, "5/9" India); the pinned row of `choice-list.ts` carries `pinned`, and `ChoiceScreen`
+  draws the no-match sentence under the search field from the absence of a real match (no
+  `ListEmptyComponent`). No golden of the released pairs changed. **Checked on Linux after the fixes:** root
+  `npm test` 448/448, `npm run build`, `npm run check:repo`; mobile `npm run typecheck`, `npm run test:storage`
+  569/569 (real SQLite), `npm run currency:verify`, `npm run regions:verify`, `npm run i18n:check -- --strict`
+  (0 errors, 0 stale), `npm run check` (up to date), `npm run export:ios` (4,969,673 bytes). No EAS build;
+  the iPhone was not modified.
 - **Pending:** the 24R1 device line; then Producto 24R2 (integration and the choosers with iPhone QA).
 - **Next:** 24R2, then 24C, then 24T.
 

@@ -9,8 +9,9 @@
  *     (folded: "Álava" sits under A), ordered as the caller ordered them
  *     (the region catalogue uses the language's collator);
  *   - with a query, one flat list of the matches in the caller's ranking, no
- *     headers, the pinned option still first; nothing at all when nothing
- *     matches (the screen shows its empty sentence).
+ *     headers, the pinned option still first; only that row (or nothing at
+ *     all) when nothing matches, and the screen says so from the absence of
+ *     a real match, not from an empty list.
  * A search field is worth showing only from `SEARCHABLE_CHOICES` options: two
  * languages or two regions are read, not searched. Rows carry their position
  * inside their group so a virtualized list can draw grouped corners. */
@@ -29,7 +30,9 @@ export interface ChoiceOption<T extends string = string> {
 export type GroupPosition = 'only' | 'first' | 'middle' | 'last';
 export type ChoiceRow<T extends string = string> =
   | { kind: 'header'; key: string; title: string }
-  | { kind: 'choice'; key: string; option: ChoiceOption<T>; position: GroupPosition; selected: boolean };
+  | { kind: 'choice'; key: string; option: ChoiceOption<T>; position: GroupPosition; selected: boolean;
+      /** The pinned option's row: never a search match, so a screen can tell that a query matched nothing although this row remains. */
+      pinned?: true };
 
 /** From how many options a chooser shows its search field. */
 export const SEARCHABLE_CHOICES = 6;
@@ -72,7 +75,7 @@ export function buildChoiceRows<T extends string>({ pinned, recent = [], options
   recentTitle: string;
 }): ChoiceRow<T>[] {
   const rows: ChoiceRow<T>[] = [];
-  if (pinned) rows.push(...grouped([pinned], selected, 'pinned:'));
+  if (pinned) rows.push(...grouped([pinned], selected, 'pinned:').map(row => ({ ...row, pinned: true as const })));
   const trimmed = query.trim();
   if (trimmed) {
     rows.push(...grouped(filterChoices(trimmed, options), selected, 'match:'));

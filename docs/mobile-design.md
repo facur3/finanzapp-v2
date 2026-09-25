@@ -391,7 +391,8 @@ publicada. Lo que queda preparado para 24R2:
   siempre primero y fuera de las secciones; «Recientes» con las tres últimas elecciones; secciones
   alfabéticas por inicial (sin acentos: Álava bajo A); un campo de búsqueda desde seis opciones que
   deja una lista plana ordenada por coincidencia (código exacto, prefijo de código, prefijo de
-  nombre, cualquier coincidencia); «Sin coincidencias» cuando no hay ninguna. Una sola lista
+  nombre, cualquier coincidencia); «Sin coincidencias» bajo el campo cuando ninguna opción real
+  coincide, aunque «Según el dispositivo» siga a la vista. Una sola lista
   virtualizada, sin altura fija por fila: el texto escala con Dynamic Type. Los encabezados tienen
   rol de encabezado; un idioma en su propio nombre lleva su idioma para VoiceOver. Un guardado
   rechazado deja la marca donde estaba y lo dice bajo la lista. La nota explicativa va debajo,
