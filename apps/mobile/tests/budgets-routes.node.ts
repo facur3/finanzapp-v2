@@ -7,6 +7,7 @@ import { runInNewContext } from 'node:vm';
 import ts from 'typescript';
 import * as domain from '@finanzapp/domain';
 import * as i18nFormat from '../src/i18n/format.ts';
+import { PREVIEW_CURRENCIES } from '../src/storage/currency-gate.ts';
 import { bindLocale } from '../src/i18n/bind.ts';
 import type { AppLocale } from '../src/i18n/locale.ts';
 
@@ -21,7 +22,7 @@ const total: domain.MonthlyBudget = { id: 'total', scope: 'total', currency: 'AR
 const food: domain.MonthlyBudget = { id: 'food', scope: 'category', category: 'Comida', currency: 'ARS', monthISO: '2026-09', amountMinor: 150000, active: true, createdAt, revision: 0, updatedAt: createdAt };
 const archive: domain.LedgerArchive = { accounts: [account], records: [domain.initialRecord(entry)], budgets: [total, food] };
 
-function harness(props: any, data: domain.LedgerArchive = archive, save?: (budget: domain.MonthlyBudget) => Promise<void>, locale: AppLocale = 'es-AR') {
+function harness(props: any, data: domain.LedgerArchive = archive, save?: (budget: domain.MonthlyBudget) => Promise<void>, locale: AppLocale = 'es-AR', gate?: domain.CurrencyGate) {
   const i18nProvider = { useI18n: () => bindLocale(locale) };
   const source = readFileSync(new URL('../src/ui/budget-form.tsx', import.meta.url), 'utf8');
   const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText;
@@ -30,7 +31,7 @@ function harness(props: any, data: domain.LedgerArchive = archive, save?: (budge
   const saved: domain.MonthlyBudget[] = [];
   const alerts: any[] = [];
   const jsx = (type: Node['type'], props: Node['props']) => ({ type, props });
-  const ledger = { useLedger: () => ({ archive: data, snapshot: domain.snapshotFromArchive(data),
+  const ledger = { useLedger: () => ({ archive: data, snapshot: domain.snapshotFromArchive(data), ...(gate ? { gate } : {}),
     saveBudget: async (budget: domain.MonthlyBudget) => { saved.push(budget); await save?.(budget); } }) };
   const components = Object.fromEntries(['Screen', 'ActionButton', 'AmountField', 'AppText', 'Choices', 'ErrorMessage', 'IconButton'].map(name => [name, name]));
   const modules: Record<string, unknown> = {
@@ -197,4 +198,23 @@ test('a failed save stores the catalogue key, which reads the old Spanish text a
   assert.equal(key, 'budgets.form.saveFailed');
   assert.equal(bindLocale('es-AR').errorText(key), 'No pudimos guardar el presupuesto. Reintentá con el mismo envío.');
   assert.equal(bindLocale('en-AR').errorText(key), 'We couldn’t save the budget. Retry with the same submission.');
+});
+
+test('24B5: the budget form offers the gate\'s currencies before the amount; with the preview gate a Chilean peso and a dinar budget are saved at their own scale, and a route currency outside the gate is never coerced into it', async () => {
+  const release = harness({ monthISO: '2026-10', currency: 'CLP' }, { ...archive, budgets: [] });
+  assert.deepEqual(find(release.render(), 'CurrencySwitch').props.currencies, ['ARS', 'USD']);
+  assert.equal(find(release.render(), 'CurrencySwitch').props.value, 'ARS', 'a route currency the release does not offer falls to ARS, never to CLP');
+  const clp = harness({ monthISO: '2026-10', currency: 'CLP', scope: 'total' }, { ...archive, budgets: [] }, undefined, 'es-AR', PREVIEW_CURRENCIES);
+  assert.deepEqual(find(clp.render(), 'CurrencySwitch').props.currencies, [...PREVIEW_CURRENCIES]);
+  assert.equal(find(clp.render(), 'CurrencySwitch').props.value, 'CLP', 'the preview gate honours the route currency');
+  assert.equal(find(clp.render(), 'AmountField').props.currency, 'CLP');
+  find(clp.render(), 'AmountField').props.onChangeText('25.000');
+  await find(clp.render(), 'ActionButton', 'Crear presupuesto').props.onPress();
+  assert.deepEqual([clp.saved[0].currency, clp.saved[0].amountMinor, clp.saved[0].scope], ['CLP', 25000, 'total'], '25.000 pesos chilenos are 25000 units');
+  const kwd = harness({ monthISO: '2026-10', scope: 'total' }, { ...archive, budgets: [] }, undefined, 'es-AR', PREVIEW_CURRENCIES);
+  find(kwd.render(), 'CurrencySwitch').props.onChange('KWD');
+  assert.equal(find(kwd.render(), 'AmountField').props.currency, 'KWD');
+  find(kwd.render(), 'AmountField').props.onChangeText('12,345');
+  await find(kwd.render(), 'ActionButton', 'Crear presupuesto').props.onPress();
+  assert.deepEqual([kwd.saved[0].currency, kwd.saved[0].amountMinor], ['KWD', 12345]);
 });

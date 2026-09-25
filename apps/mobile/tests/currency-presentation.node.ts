@@ -170,7 +170,11 @@ test('forms still offer exactly ARS and USD; the catalogue is prepared for the c
     assert.deepEqual(currencyOptions(locale).map(option => option.symbol), LEDGER_CURRENCIES.map(code => legacy.currencySymbol(code, locale)));
   }
   assert.deepEqual(CURRENCIES.map(option => option.code), ['ARS', 'USD']);
-  assert.equal(currencyOption('EUR').code, 'ARS', 'an unknown or unreleased code never becomes a choice');
+  // 24B5 (stage 8): the read-only lookup covers the whole catalogue, so a stored EUR row shows itself, never ARS; the choices stay the gate's.
+  assert.deepEqual(currencyOption('EUR'), { code: 'EUR', name: 'Euros', symbol: '€' });
+  assert.deepEqual(currencyOption('KWD', 'en-US'), { code: 'KWD', name: 'Kuwaiti dinars', symbol: 'KWD' });
+  assert.deepEqual(currencyOption('ZZZ'), { code: 'ZZZ', name: 'ZZZ', symbol: 'ZZZ' }, 'a code the catalogue does not know shows itself');
+  assert.deepEqual(currencyOptions('es-AR', ['ARS', 'USD', 'JPY']).map(option => option.code), ['ARS', 'USD', 'JPY'], 'an explicit gate (a development preview) widens the choices');
   assert.deepEqual(searchCurrencies('euro').map(option => option.code), []);
   assert.deepEqual(searchCurrencies('dól').map(option => option.code), ['USD']);
 

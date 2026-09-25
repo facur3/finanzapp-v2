@@ -29,6 +29,7 @@ describe('currency catalogue (Producto 24A)', () => {
       expect(minorUnitExponent(code)).toBe(LEGACY_EXPONENT);
       expect(displayDigits(code)).toBe(2);
       expect(currencyStatus(code)).toBe('ledger');
+      expect(currencyStatus(code, ['ARS', 'USD', 'EUR'])).toBe('ledger');
     }
     expect(currencyRecord('ARS').numeric).toBe('032');
     expect(currencyRecord('USD').numeric).toBe('840');
@@ -71,6 +72,9 @@ describe('currency catalogue (Producto 24A)', () => {
     const all = statuses.flatMap(status => currenciesWithStatus(status));
     expect(all.sort()).toEqual([...CURRENCY_CODES]);
     expect(currenciesWithStatus('ledger')).toEqual(['ARS', 'USD']);
+    expect(currencyStatus('EUR')).toBe('ready');
+    expect(currencyStatus('EUR', ['ARS', 'USD', 'EUR'])).toBe('ledger');
+    expect(currencyStatus('XAU', ['ARS', 'USD', 'XAU'] as never)).toBe('excluded');
     for (const code of currenciesWithStatus('excluded')) expect(currencyRecord(code).kind).not.toBe('fiat');
     for (const code of currenciesWithStatus('ready', 'incomplete', 'ledger')) expect(currencyRecord(code).kind).toBe('fiat');
     for (const code of currenciesWithStatus('incomplete')) expect(currencyRecord(code).missing.length).toBeGreaterThan(0);

@@ -35,6 +35,8 @@ export const settings = {
     },
     localNote: 'Tus registros quedan en este dispositivo y podés registrar sin conexión. La sincronización todavía no está activada.',
     /** Diagnostic footer; `release` is the internal release name ("23.1B2") and is not translated. */
+    /** Under the footer of a development bundle started with EXPO_PUBLIC_CURRENCY_PREVIEW=1: the extra currencies its forms offer. Never in a release. */
+    currencyPreview: 'Monedas de prueba activas: {codes}. Solo en esta compilación de desarrollo.',
     footer: 'FinanzApp · Piloto nativo {version} · Producto {release} · {material} · {source}',
     /** Which control material this session draws, for a tester. */
     material: {

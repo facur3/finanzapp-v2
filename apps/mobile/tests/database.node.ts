@@ -1516,3 +1516,42 @@ test('24B4: adversarial: duplicated ids, a retry after a commit and a copy repla
   assert.equal(snapshotFromArchive(restored).entries.find(e => e.id === 'yen-big')!.amountMinor, 9999999999999);
   assert.deepEqual(archiveExponents(restored), { ARS: 2, EUR: 2, JPY: 0, KWD: 3 });
 });
+
+test('24B5: seven currencies with zero, two and three decimals through the preview gate: create, edit, export v9, restore into a fresh device and reopen, without changing one amount or currency', async () => {
+  const { PREVIEW_CURRENCIES } = await import('../src/storage/currency-gate.ts');
+  const { db, path } = setup();
+  await initializeDatabase(db);
+  const openings: Record<string, number> = { ARS: 100000, USD: 500, EUR: 123456, GBP: 99, JPY: 1500, CLP: 25000, KWD: 1234567 };
+  const spends: Record<string, number> = { ARS: 12345, USD: 1, EUR: 6789, GBP: 99, JPY: 700, CLP: 990, KWD: 5 };
+  for (const code of PREVIEW_CURRENCIES) {
+    await createAccount(db, { id: 'acc-' + code, name: 'Caja ' + code, currency: code, openingMinor: openings[code], createdAt: account.createdAt }, undefined, PREVIEW_CURRENCIES);
+    await createEntry(db, { ...expense, id: 'e-' + code, accountId: 'acc-' + code, amountMinor: spends[code] });
+  }
+  await saveMonthlyBudget(db, { id: 'b-clp', scope: 'total', currency: 'CLP', monthISO: '2026-09', amountMinor: 30000, active: true, createdAt: account.createdAt, revision: 0, updatedAt: account.createdAt }, PREVIEW_CURRENCIES);
+  const kwd = (await readArchive(db)).records.find(record => record.entry.id === 'e-KWD')!;
+  await changeEntry(db, makeEntryChange('edit-kwd', kwd, 'edit', changedAt, { ...kwd.entry, amountMinor: 7 }));
+  const expected = Object.fromEntries(PREVIEW_CURRENCIES.map(code => [code, openings[code] - (code === 'KWD' ? 7 : spends[code])]));
+  const archive = await readArchive(db);
+  assert.deepEqual(totalsByCurrency(snapshotFromArchive(archive)), expected);
+  assert.deepEqual(archiveExponents(archive), { ARS: 2, USD: 2, CLP: 0, EUR: 2, GBP: 2, JPY: 0, KWD: 3 });
+  assert.deepEqual(archive.currencyUnits!.map(unit => [unit.currency, unit.minorUnitExponent]), [['CLP', 0], ['EUR', 2], ['GBP', 2], ['JPY', 0], ['KWD', 3]]);
+  const backup = createRecoveryBackup(archive);
+  assert.equal(backup.schema, 'finanzapp.native-pilot.v9');
+  const incoming = parsePilotBackup(JSON.stringify(backup)).archive;
+  const other = setup().db;
+  await initializeDatabase(other);
+  await importArchive(other, incoming, archiveKey(await readArchive(other))); // The release gate: restoring never consults it.
+  const restored = await readArchive(other);
+  assert.equal(archiveKey(restored), archiveKey(archive));
+  assert.deepEqual(totalsByCurrency(snapshotFromArchive(restored)), expected);
+  assert.deepEqual(restored.records.map(record => [record.entry.id, record.entry.amountMinor]).sort(), archive.records.map(record => [record.entry.id, record.entry.amountMinor]).sort());
+  assert.deepEqual(restored.accounts.map(item => [item.id, item.currency]).sort(), archive.accounts.map(item => [item.id, item.currency]).sort());
+  await db.closeAsync();
+  const reopened = databaseAt(path);
+  await initializeDatabase(reopened);
+  assert.equal(archiveKey(await readArchive(reopened)), archiveKey(archive), 'reopening changes nothing');
+  // With the release gate the stored currencies keep working; only creating a NEW record in them is refused.
+  await createEntry(reopened, { ...expense, id: 'e-GBP-2', accountId: 'acc-GBP', amountMinor: 1 });
+  await assert.rejects(createAccount(reopened, { id: 'acc-GBP-2', name: 'x', currency: 'GBP', openingMinor: 0, createdAt: account.createdAt }), /moneda disponible/);
+  assert.equal(totalsByCurrency(await readSnapshot(reopened)).GBP, expected.GBP - 1);
+});

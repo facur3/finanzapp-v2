@@ -9,6 +9,7 @@ import * as appearance from '../src/ui/appearance.ts';
 import * as currencies from '../src/ui/currencies.ts';
 import * as categories from '../src/ui/categories.ts';
 import * as i18nFormat from '../src/i18n/format.ts';
+import { PREVIEW_CURRENCIES } from '../src/storage/currency-gate.ts';
 import { bindLocale } from '../src/i18n/bind.ts';
 import type { AppLocale } from '../src/i18n/locale.ts';
 
@@ -25,7 +26,7 @@ const bankLook = domain.makeAccountAppearance(cash.id, 'bank', 'azure', createdA
 const entry: domain.Entry = { id: 'e1', accountId: cash.id, kind: 'expense', amountMinor: 3000, merchant: 'Kiosco', category: 'sjsjn', dateISO: '2026-09-10', createdAt };
 const archive: domain.LedgerArchive = { accounts: [cash, usd, cardAccount], records: [domain.initialRecord(entry)], cards: [card], appearances: [bankLook] };
 
-function harness(file: string, props: any = {}, options: { data?: domain.LedgerArchive; params?: any; fail?: () => void; locale?: AppLocale } = {}) {
+function harness(file: string, props: any = {}, options: { data?: domain.LedgerArchive; params?: any; fail?: () => void; locale?: AppLocale; gate?: domain.CurrencyGate } = {}) {
   // Read on every render, like the live provider: switching it re-labels the next render and keeps the form state.
   let locale: AppLocale = options.locale ?? 'es-AR';
   const i18nProvider = { useI18n: () => bindLocale(locale) };
@@ -39,7 +40,7 @@ function harness(file: string, props: any = {}, options: { data?: domain.LedgerA
   const looks: domain.AccountAppearance[] = [], definitions: domain.CategoryDefinition[] = [];
   const data = options.data ?? archive;
   const jsx = (type: Node['type'], props: Node['props']) => ({ type, props });
-  const ledger = { useLedger: () => ({ archive: data, snapshot: domain.snapshotFromArchive(data),
+  const ledger = { useLedger: () => ({ archive: data, snapshot: domain.snapshotFromArchive(data), ...(options.gate ? { gate: options.gate } : {}),
     addAccount: async (account: domain.Account, look?: domain.AccountAppearance) => { added.push({ account, appearance: look }); options.fail?.(); },
     updateAccount: async (change: domain.AccountChange, look?: domain.AccountAppearance) => { changed.push({ change, appearance: look }); options.fail?.(); },
     saveAppearance: async (look: domain.AccountAppearance) => { looks.push(look); options.fail?.(); },
@@ -537,4 +538,26 @@ test('24B2 review: an account whose balance exceeds the entry bound can still be
   find(view.render(), 'ActionButton').props.onPress(); await flush();
   assert.equal(view.alerts.length, 1, 'a real correction waits for confirmation');
   assert.equal(view.changed.length, 0);
+});
+
+test('24B5: a new account chooses its currency before the opening balance over the build\'s gate; the preview gate creates euro and yen accounts at their own scale, the release gate never sees them', async () => {
+  const release = harness('app/new-account.tsx', {}, { params: { currency: 'EUR' } });
+  const field = find(release.render(), 'CurrencyField');
+  assert.deepEqual(field.props.currencies, ['ARS', 'USD']);
+  assert.equal(field.props.value, 'ARS', 'a route currency outside the gate is never coerced in');
+  const preview = harness('app/new-account.tsx', {}, { params: { currency: 'EUR' }, gate: PREVIEW_CURRENCIES });
+  assert.deepEqual(find(preview.render(), 'CurrencyField').props.currencies, [...PREVIEW_CURRENCIES]);
+  assert.equal(find(preview.render(), 'CurrencyField').props.value, 'EUR');
+  assert.equal(find(preview.render(), 'AmountField').props.currency, 'EUR');
+  find(preview.render(), 'Field', 'Nombre de la cuenta').props.onChangeText('N26');
+  find(preview.render(), 'AmountField').props.onChangeText('1.234,56');
+  await find(preview.render(), 'ActionButton', 'Guardar cuenta').props.onPress();
+  assert.deepEqual([preview.added[0].account.currency, preview.added[0].account.openingMinor], ['EUR', 123456]);
+  const yen = harness('app/new-account.tsx', {}, { gate: PREVIEW_CURRENCIES });
+  find(yen.render(), 'CurrencyField').props.onChange('JPY');
+  assert.equal(find(yen.render(), 'AmountField').props.currency, 'JPY', 'the field is retargeted before the first digit');
+  find(yen.render(), 'Field', 'Nombre de la cuenta').props.onChangeText('Yenes');
+  find(yen.render(), 'AmountField').props.onChangeText('1500');
+  await find(yen.render(), 'ActionButton', 'Guardar cuenta').props.onPress();
+  assert.deepEqual([yen.added[0].account.currency, yen.added[0].account.openingMinor], ['JPY', 1500], '1500 yen, never 15.00');
 });

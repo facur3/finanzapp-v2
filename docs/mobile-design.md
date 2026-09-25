@@ -380,6 +380,24 @@ importe, moneda y estado.
   muestra hasta que toda la app lo tenga (23.1): un iPhone en inglés sigue leyendo
   español antes que media app traducida.
 
+## Producto 24B5 — selector de monedas y la moneda antes del importe (sin cambios visuales en producción)
+
+Con ARS y USD nada cambia: la fila «Moneda» de Cuenta nueva abre la misma hoja de siempre (dos filas,
+tilde en la actual, sin buscador); Tarjeta, Deuda y Presupuesto conservan su segmentado. Lo que ya
+está listo para cuando el gate se abra:
+- **La hoja de monedas** lista solo las monedas que la pantalla puede usar (el gate de la compilación),
+  con el nombre en el idioma de la interfaz, el código ISO y el símbolo de la región, y a partir de seis
+  monedas un campo de búsqueda que encuentra por código, nombre, símbolo, código numérico o país
+  («yen», «japón», «€», «840»). Filas compactas, sin banderas ni colores por moneda; nunca una lista
+  enorme en la pantalla principal.
+- **La moneda antes del importe** en cuenta, tarjeta, deuda, presupuesto y recurrente (en el
+  recurrente la cuenta, que fija la moneda, pasa arriba del importe): el campo usa la precisión
+  correcta desde la primera tecla (teclado numérico en yenes, tres decimales en dinares).
+- **Una cuenta existente** muestra su moneda por su propio nombre («Euros · EUR · €»), nunca ARS.
+- **Modo de prueba.** Una compilación de desarrollo iniciada con `EXPO_PUBLIC_CURRENCY_PREVIEW=1`
+  ofrece EUR, GBP, JPY, CLP y KWD y lo dice bajo el pie de Más («Monedas de prueba activas…»); una
+  compilación de release nunca las ve. El pie dice Producto 24B5.
+
 ## Producto 24B4 — SQLite 9 y copia v9 (sin cambios visuales)
 
 Nada cambia en pantalla con ARS y USD. En Importar copia, una copia v9 que registra escalas de

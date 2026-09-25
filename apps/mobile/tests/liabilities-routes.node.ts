@@ -5,6 +5,8 @@ import { runInNewContext } from 'node:vm';
 import ts from 'typescript';
 import * as domain from '@finanzapp/domain';
 import * as presentation from '../src/ui/presentation.ts';
+import * as moneyInput from '../src/ui/money-input.ts';
+import { PREVIEW_CURRENCIES } from '../src/storage/currency-gate.ts';
 import * as currencies from '../src/ui/currencies.ts';
 import * as liabilityPresentation from '../src/ui/liability-presentation.ts';
 import * as i18nFormat from '../src/i18n/format.ts';
@@ -34,28 +36,36 @@ const archive: domain.LedgerArchive = { accounts: [cash, cardAccount, usdCardAcc
 const empty: domain.LedgerArchive = { accounts: [cash], records: [] };
 
 // `file` is a route under app/, or a component module under src/ (its exports are returned too).
-function harness(file: string, params: Record<string, unknown> = {}, data: domain.LedgerArchive = archive) {
+function harness(file: string, params: Record<string, unknown> = {}, data: domain.LedgerArchive = archive, gate?: domain.CurrencyGate) {
   const source = readFileSync(new URL((file.startsWith('src/') ? '../' : '../app/') + file, import.meta.url), 'utf8');
   const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText;
   const jsx = (type: unknown, props: Record<string, unknown>) => ({ type, props });
   const state: unknown[] = [];
   const pushed: any[] = [];
   let cursor = 0;
-  const ledger = { useLedger: () => ({ archive: data, snapshot: domain.snapshotFromArchive(data) }) };
+  const cards: { account: domain.Account; card: domain.CreditCardProfile }[] = [], debts: { account: domain.Account; debt: domain.PersonalDebtProfile }[] = [];
+  const ledger = { useLedger: () => ({ archive: data, snapshot: domain.snapshotFromArchive(data), ...(gate ? { gate } : {}),
+    addCard: async (account: domain.Account, card: domain.CreditCardProfile) => { cards.push({ account, card }); }, saveCard: async () => {},
+    addDebt: async (account: domain.Account, debt: domain.PersonalDebtProfile) => { debts.push({ account, debt }); }, saveDebt: async () => {} }) };
   const componentNames = ['ActionButton', 'AppText', 'DetailRow', 'EmptyState', 'GlyphTile', 'IconButton', 'Money', 'MovementRow', 'PressFeedback',
-    'Screen', 'SectionTitle', 'Stat', 'Surface'];
+    'Screen', 'SectionTitle', 'Stat', 'Surface', 'AmountField', 'Field', 'Choices', 'ErrorMessage'];
   const components = { ...Object.fromEntries(componentNames.map(name => [name, name])), toneColors: () => ({ color: '#000', soft: '#eee' }), useStacked: () => false };
   const theme = { space: { xs: 4, s: 8, m: 12, l: 16, xl: 20, xxl: 24, xxxl: 32 }, useCurrentDay: () => '2026-09-20', useReduceMotion: () => true,
     usePalette: () => ({ text: '#000', secondary: '#666', tertiary: '#999', line: '#ddd', inset: '#eee', expense: '#c00', income: '#080', warning: '#a60', transfer: '#03c', primary: '#2557D6' }) };
   const modules: Record<string, unknown> = {
+    'expo-haptics': { NotificationFeedbackType: { Success: 'Success' }, notificationAsync: async () => {} },
+    'expo-crypto': { randomUUID: () => 'id-' + Math.random().toString(36).slice(2, 8) },
+    '../i18n/messages': {},
+    './form-controls': { DateField: 'DateField' },
+    './money-input': moneyInput,
     '../i18n/format': i18nFormat, '../src/i18n/format': i18nFormat, '../../src/i18n/format': i18nFormat, '../i18n/provider': i18nProvider, '../src/i18n/provider': i18nProvider, '../../src/i18n/provider': i18nProvider,
-    react: { useEffect: (fn: () => unknown) => { fn(); }, useMemo: (fn: () => unknown) => fn(), useState: (initial: unknown) => {
+    react: { useRef: (initial: unknown) => ({ current: initial }), useEffect: (fn: () => unknown) => { fn(); }, useMemo: (fn: () => unknown) => fn(), useState: (initial: unknown) => {
       const index = cursor++;
       if (!(index in state)) state[index] = typeof initial === 'function' ? (initial as () => unknown)() : initial;
       return [state[index], (value: unknown) => { state[index] = typeof value === 'function' ? (value as (current: unknown) => unknown)(state[index]) : value; }];
     } },
     'react/jsx-runtime': { jsx, jsxs: jsx, Fragment: 'Fragment' },
-    'react-native': { View: 'View', useWindowDimensions: () => ({ width: 393, fontScale: 1 }) },
+    'react-native': { View: 'View', Alert: { alert: () => {} }, Keyboard: { dismiss() {} }, useWindowDimensions: () => ({ width: 393, fontScale: 1 }) },
     'react-native-reanimated': { __esModule: true, default: { View: 'Animated.View' }, useSharedValue: (value: number) => ({ value }),
       withTiming: (value: number) => value, useAnimatedStyle: (fn: () => unknown) => fn() },
     'expo-router': { Stack: { Screen: 'Stack.Screen' }, useLocalSearchParams: () => params, router: { push: (to: unknown) => pushed.push(to), navigate: (to: unknown) => pushed.push(to) } },
@@ -77,7 +87,7 @@ function harness(file: string, params: Record<string, unknown> = {}, data: domai
     if (!Object.hasOwn(modules, name)) throw new Error('Unexpected liabilities dependency: ' + name);
     return modules[name];
   } });
-  return { render: () => { cursor = 0; return module.exports.default!(); }, pushed, exports: module.exports };
+  return { render: () => { cursor = 0; return module.exports.default!(); }, renderExport: (name: string, props: any = {}) => { cursor = 0; return module.exports[name](props); }, pushed, cards, debts, exports: module.exports };
 }
 
 // Nested function components (CardPanel, UsageBar, DebtRow) are expanded so
@@ -299,4 +309,48 @@ test('23.1C2: the card usage caption is shown in the region\'s format and spoken
       assert.equal(caption.props.accessibilityLabel, spoken, locale + ' spoken');
     }
   } finally { activeLocale = 'es-AR'; }
+});
+
+// ---- Producto 24B5: the currency before the amount, over the build's gate ----------------------
+function order(root: any, types: string[]): string[] {
+  const seen: string[] = [];
+  const walk = (value: any) => { if (!value || typeof value !== 'object') return; if (Array.isArray(value)) { value.forEach(walk); return; }
+    if (types.includes(value.type)) seen.push(value.type); walk(value.props?.children); };
+  walk(root);
+  return seen;
+}
+test('24B5: the card and debt forms choose the currency before the amount, over the gate; with the preview gate a card in yen and a debt in dinars are created at their own scale', async () => {
+  const forms = (file: string, gate?: domain.CurrencyGate) => {
+    const view = harness(file, {}, empty, gate);
+    const name = file.includes('card') ? 'CardForm' : 'DebtForm';
+    return { ...view, render: () => view.renderExport(name, {}) };
+  };
+  // A release: exactly ARS and USD, and the switch precedes the amount field in both forms.
+  for (const file of ['src/ui/card-form.tsx', 'src/ui/debt-form.tsx']) {
+    const view = forms(file);
+    const root = view.render();
+    assert.deepEqual(find(root, 'CurrencySwitch').props.currencies, ['ARS', 'USD'], file);
+    assert.deepEqual(order(root, ['CurrencySwitch', 'AmountField']).slice(0, 2), ['CurrencySwitch', 'AmountField'], file + ': the currency before the amount');
+  }
+  const card = forms('src/ui/card-form.tsx', PREVIEW_CURRENCIES);
+  assert.deepEqual(find(card.render(), 'CurrencySwitch').props.currencies, [...PREVIEW_CURRENCIES]);
+  find(card.render(), 'CurrencySwitch').props.onChange('JPY');
+  assert.equal(find(card.render(), 'AmountField').props.currency, 'JPY', 'the field knows the currency before a digit is typed');
+  find(card.render(), 'Field', 'Nombre de la tarjeta').props.onChangeText('Rakuten');
+  find(card.render(), 'AmountField', 'Deuda actual (opcional)').props.onChangeText('1500');
+  find(card.render(), 'Field', 'Día de cierre').props.onChangeText('28');
+  find(card.render(), 'Field', 'Día de vencimiento').props.onChangeText('5');
+  await find(card.render(), 'ActionButton', 'Crear tarjeta').props.onPress();
+  assert.equal(card.cards.length, 1);
+  assert.deepEqual([card.cards[0].account.currency, card.cards[0].account.openingMinor], ['JPY', -1500], '1500 yen owed, never 15.00');
+  const debt = forms('src/ui/debt-form.tsx', PREVIEW_CURRENCIES);
+  find(debt.render(), 'CurrencySwitch').props.onChange('KWD');
+  find(debt.render(), 'AmountField').props.onChangeText('1,234');
+  find(debt.render(), 'Field', 'Persona o entidad').props.onChangeText('Ana');
+  await find(debt.render(), 'ActionButton', 'Crear deuda').props.onPress();
+  assert.equal(debt.debts.length, 1);
+  assert.deepEqual([debt.debts[0].account.currency, debt.debts[0].account.openingMinor], ['KWD', -1234], '1,234 dinars are 1234 fils');
+  // The same forms with the release gate never see the preview currencies, whatever the route or the draft says.
+  const release = forms('src/ui/debt-form.tsx');
+  assert.equal(nodes(release.render()).some(node => node.type === 'CurrencySwitch' && node.props.currencies.includes('KWD')), false);
 });

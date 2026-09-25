@@ -3,13 +3,22 @@ import { AppState } from 'react-native';
 import { snapshotFromArchive, todayKey, type Account, type Entry, type EntryChange, type LedgerArchive, type LedgerSnapshot,
   type AccountChange, type Transfer, type TransferChange, type RecurringRule, type MonthlyBudget,
   type CreditCardProfile, type PersonalDebtProfile, type AccountAppearance, type CategoryDefinition } from '@finanzapp/domain';
+import type { CurrencyGate } from '@finanzapp/domain';
+import { currencyGateForBuild } from './currency-gate';
 import { changeEntry, createAccount, createEntry, importArchive, initializeDatabase, readArchive, changeAccount,
   createTransfer, changeTransfer, saveRecurringRule, processRecurring, saveMonthlyBudget,
   createCreditCard, saveCreditCard, createPersonalDebt, savePersonalDebt, saveAccountAppearance, saveCategoryDefinition,
   type LedgerDatabase } from './database';
 import { openLedgerDatabase } from './nativeDatabase';
 
+declare const __DEV__: boolean | undefined;
+/** The creation gate of this build (docs/currency.md §7.5, stage 9): the production ARS/USD, or the preview set in a
+ * development bundle started with the flag, read by its literal name so a release bundle inlines the constant. */
+export const BUILD_CURRENCY_GATE: CurrencyGate = currencyGateForBuild(process.env.EXPO_PUBLIC_CURRENCY_PREVIEW, typeof __DEV__ !== 'undefined' && __DEV__);
+
 type LedgerContextValue = {
+  /** The currencies a new account, card, debt or budget may take in this build. Reads never consult it. */
+  gate: CurrencyGate;
   snapshot: LedgerSnapshot | null;
   archive: LedgerArchive | null;
   error: string | null;
@@ -96,9 +105,9 @@ export function LedgerProvider({ children }: { children: ReactNode }) {
   }), [enqueue]);
 
   return <LedgerContext.Provider value={{
-    snapshot, archive, error,
+    gate: BUILD_CURRENCY_GATE, snapshot, archive, error,
     retry: () => setAttempt(value => value + 1),
-    addAccount: (account, appearance) => mutate(db => createAccount(db, account, appearance)),
+    addAccount: (account, appearance) => mutate(db => createAccount(db, account, appearance, BUILD_CURRENCY_GATE)),
     addEntry: entry => mutate(db => createEntry(db, entry)),
     updateEntry: change => mutate(db => changeEntry(db, change)),
     updateAccount: (change, appearance) => mutate(db => changeAccount(db, change, appearance)),
@@ -110,10 +119,10 @@ export function LedgerProvider({ children }: { children: ReactNode }) {
       await saveRecurringRule(db, rule);
       await processRecurring(db, todayKey());
     }),
-    saveBudget: budget => mutate(db => saveMonthlyBudget(db, budget)),
-    addCard: (account, card) => mutate(db => createCreditCard(db, account, card)),
+    saveBudget: budget => mutate(db => saveMonthlyBudget(db, budget, BUILD_CURRENCY_GATE)),
+    addCard: (account, card) => mutate(db => createCreditCard(db, account, card, BUILD_CURRENCY_GATE)),
     saveCard: card => mutate(db => saveCreditCard(db, card)),
-    addDebt: (account, debt) => mutate(db => createPersonalDebt(db, account, debt)),
+    addDebt: (account, debt) => mutate(db => createPersonalDebt(db, account, debt, BUILD_CURRENCY_GATE)),
     saveDebt: debt => mutate(db => savePersonalDebt(db, debt)),
     restoreBackup: (incoming, baseline) => mutate(async db => {
       await importArchive(db, incoming, baseline);

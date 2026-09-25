@@ -4,7 +4,7 @@ import { router, Stack } from 'expo-router';
 import { randomUUID } from 'expo-crypto';
 import * as Haptics from 'expo-haptics';
 import { draftFitsCurrency, minorFromLedgerDraft, samePersonalDebtProfile, todayKey, validateAccount, validatePersonalDebtProfile,
-  type Account, type Currency, type DebtDirection, type PersonalDebtProfile } from '@finanzapp/domain';
+  type Account, type Currency, type DebtDirection, type PersonalDebtProfile, LEDGER_CURRENCIES } from '@finanzapp/domain';
 import { useI18n } from '../i18n/provider';
 import { useLedger } from '../storage/LedgerProvider';
 import { ActionButton, AmountField, AppText, Choices, DetailRow, ErrorMessage, Field, IconButton, Screen, Surface } from './components';
@@ -19,7 +19,7 @@ type PendingCreate = { account: Account; debt: PersonalDebtProfile };
 /** Creates a debt or receivable with its hidden account (opening balance is
  * the principal) or edits its profile. Amounts change only through payments. */
 export function DebtForm({ original }: { original?: PersonalDebtProfile }) {
-  const { snapshot, addDebt, saveDebt } = useLedger();
+  const { snapshot, addDebt, saveDebt, gate = LEDGER_CURRENCIES } = useLedger();
   const { t } = useI18n();
   const account = snapshot?.accounts.find(item => item.id === original?.accountId);
   const [before] = useState(original);
@@ -129,9 +129,10 @@ export function DebtForm({ original }: { original?: PersonalDebtProfile }) {
     </Surface> : <>
       <Choices value={direction} onChange={setDirection} disabled={locked}
         options={[{ value: 'owed_by_me', label: t('debts.form.owed') }, { value: 'owed_to_me', label: t('debts.form.receivable') }]} />
+      {/* The currency before the amount (24B5): the field types with the right decimals from the first key. */}
+      <CurrencySwitch value={currency} currencies={offeredCurrencies(gate)} onChange={setCurrency} disabled={locked} />
       <AmountField label={t(owed ? 'debts.form.amountOwed' : 'debts.form.amountReceivable')} currency={currency} value={amount}
         onChangeText={value => { setAmount(value); setError(null); }} editable={!locked} />
-      <CurrencySwitch value={currency} currencies={offeredCurrencies()} onChange={setCurrency} disabled={locked} />
     </>}
 
     <Field label={t(owed ? 'debts.form.counterpartyOwed' : 'debts.form.counterpartyReceivable')} value={counterparty} onChangeText={setCounterparty}

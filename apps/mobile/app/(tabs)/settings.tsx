@@ -1,6 +1,6 @@
 import { View } from 'react-native';
 import { router } from 'expo-router';
-import { currentMonthISO, todayKey } from '@finanzapp/domain';
+import { currentMonthISO, todayKey, LEDGER_CURRENCIES } from '@finanzapp/domain';
 import { useLedger } from '../../src/storage/LedgerProvider';
 import { FINANCE_ROW_LOOKS, appearanceHex } from '../../src/ui/appearance';
 import { AppText, GlyphTile, NavigationRow, Screen, SectionTitle, Surface } from '../../src/ui/components';
@@ -8,12 +8,13 @@ import { useMaterialDecision } from '../../src/ui/material';
 import { MATERIAL_LABELS } from '../../src/ui/material-policy';
 import { usePalette } from '../../src/ui/theme';
 import { useI18n, useLocalePreferences } from '../../src/i18n/provider';
+import { previewOnlyCurrencies } from '../../src/storage/currency-gate';
 import { preferenceSummary, showsPreference } from '../../src/ui/locale-options';
 
 // Diagnostic: where this launch read the device languages. "módulo nativo" proves the build links expo-localization.
 const LOCALE_SOURCE_LABELS = { native: 'settings.localeSource.native', intl: 'settings.localeSource.intl', none: 'settings.localeSource.none' } as const;
 /** The pilot's version and the internal release name; neither is translated. */
-const VERSION = '0.1.0', RELEASE = '24B4';
+const VERSION = '0.1.0', RELEASE = '24B5';
 
 /** Más is the secondary navigation hub: everything that is not one of the four
  * other tabs, in two native grouped lists. Finanzas holds the tools that
@@ -26,11 +27,13 @@ const VERSION = '0.1.0', RELEASE = '24B4';
  * (Producto 23.1C2) and hides itself in a build with a single one
  * (`showsPreference`). The route file keeps its historical name (settings). */
 export default function MoreScreen() {
-  const { archive } = useLedger();
+  const { archive, gate = LEDGER_CURRENCIES } = useLedger();
   const p = usePalette();
   // Which control material this session draws and why: lets a tester confirm the opaque or glass mode without guessing.
   const material = useMaterialDecision();
   const { localeSource, t } = useI18n();
+  // A development bundle started with EXPO_PUBLIC_CURRENCY_PREVIEW=1 names its extra currencies here, so a tester never mistakes it for a release.
+  const previewCurrencies = previewOnlyCurrencies(gate);
   const locale = useLocalePreferences();
   const showsRegion = !!locale && showsPreference('region', locale.state);
   const activeRecurring = archive?.recurring?.filter(rule => rule.active).length ?? 0;
@@ -66,5 +69,6 @@ export default function MoreScreen() {
       </AppText>
     </View>
     <AppText secondary style={{ textAlign: 'center', fontSize: 13 }}>{t('settings.footer', { version: VERSION, release: RELEASE, material: t(MATERIAL_LABELS[material.reason]), source: t(LOCALE_SOURCE_LABELS[localeSource]) })}</AppText>
+    {previewCurrencies.length > 0 && <AppText secondary style={{ textAlign: 'center', fontSize: 13 }}>{t('settings.currencyPreview', { codes: previewCurrencies.join(', ') })}</AppText>}
   </Screen>;
 }

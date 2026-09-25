@@ -1,6 +1,6 @@
 # FinanzApp mobile: currencies and the multi-currency engine
 
-Updated 2026-09-24 (Producto 24B4). Applies to the Expo app in `apps/mobile` and the
+Updated 2026-09-24 (Producto 24B5). Applies to the Expo app in `apps/mobile` and the
 shared `packages/domain`. The web/Capacitor app keeps its own float-based helpers
 (`src/domain/currency.js`) and is not changed. Read with [decision 002](decisions/002-spending-first.md)
 (ARS/USD kept apart, no invented rates), [docs/i18n.md](i18n.md) §9 and the roadmap's
@@ -90,6 +90,21 @@ the Assistant contract. No stored amount is reinterpreted. No exchange rate exis
 | SQLite 9 | `src/storage/database.ts`, `transaction.ts`, `nativeDatabase.ts` | `DATABASE_VERSION = 9`. `MIGRATE_V9` rebuilds `accounts` and `monthly_budgets` with the same columns and CHECKs and a shape-only currency CHECK (`length(currency) = 3 AND currency NOT GLOB '*[^A-Z]*'`), recreates `budgets_period`, creates `currency_units` (`currency` PK, `minorUnitExponent` 0–4, `source`, `catalogVersion`, `createdAt`). It runs in `runSchemaMigration`: its own connection, `PRAGMA foreign_keys = OFF` before `BEGIN IMMEDIATE`, `PRAGMA foreign_key_check` empty before `COMMIT` (`MIGRATION_REFERENCES_MESSAGE` and rollback otherwise); `withMigrationTransactionAsync` on `LedgerDatabase`. v0–v8 still migrate in the exclusive transaction first; the version is read again inside the migration transaction. Every read names its columns (`SELECT *` is banned by `currency-guards`), including the single-row lookups. `readArchive` reads `currency_units`, validates the archive and runs `archiveExponents`: a pinned scale that disagrees, a row whose currency was never pinned, or a row for ARS/USD refuse the read by name; nothing is reset. `ensureCurrencyUnit` pins a currency the first time an account, card, debt or budget in it is written, in the same transaction, idempotently; `importArchive` pins the copy's units and any code the new rows need before the rows. `createAccount`, `createCreditCard`, `createPersonalDebt` and `saveMonthlyBudget` take an explicit `gate` (default `LEDGER_CURRENCIES`) for tests. |
 | Copy | es, en, lock | `errors.recovery.version` and `backup.import.formats` say v1 a v9; new `errors.recovery.units`, `unitSource`, `unitUnneeded`, `duplicateUnit`, `scaleMissing` ({code}), `scaleConflict`; `errors.storage.migrationReferences`; `backup.import.units` (a review row) and `backup.import.scaleConflict` ({codes}). Nothing else visible changes. |
 | Tests | `tests/database.node.ts` (24B4 block), `packages/domain/multi-currency.test.ts`, `recovery.test.ts`, `recovery-routes.node.ts`, `currency-guards.node.ts` | A real schema 8 file built from the app's own scripts with every table populated (an edited account with its receipt, a voided entry and transfer with their receipts, a rule, a total and an archived category budget, a card, a debt, a look, a category) upgrades to identical rows, balances and identity, keeps the other CHECKs and the children's references, and reopens; a v3 file migrates through to 9; an interruption after the accounts rebuild (a stale scratch table) rolls back to an intact schema 8 file, still refusing a yen row, and succeeds once cleared; a schema 8 file with an orphan child row is refused by `foreign_key_check` before COMMIT. JPY, KWD and EUR through the explicit gate: pinned once per code with source and version, a budget pins its own code, ARS/USD never pinned; yen read as yen and fils as fils, a yen transfer, a cross-currency one refused, reopen; a hand-edited pinned scale, a missing unit and a spurious ARS row refuse to open and to write, with nothing rewritten; the gate closed again keeps stored yen readable, editable, exportable (v9) and restorable into a fresh device (the copy's scales first, the same transaction), while an ARS/USD ledger keeps the v8 key set; a failed v9 restore rolls back the pinned scales with the rows, a repeated restore is identical, a forged or incomplete unit is refused at parse; adversarial: duplicated ids, a commit whose refresh failed and a replayed copy never double a yen or a fil, and a 13-digit yen amount survives storage and backup unscaled. |
+
+### 2.5 What Producto 24B5 delivers (stage 8, and the preparation of stage 9)
+
+| Layer | File | Change |
+| --- | --- | --- |
+| Development gate | `src/storage/currency-gate.ts`, `LedgerProvider.tsx` | `PREVIEW_CURRENCIES` (ARS, USD, EUR, GBP, JPY, CLP, KWD: two, zero and three decimals) and `currencyGateForBuild(flag, development)`: the preview set only in a development bundle started with `EXPO_PUBLIC_CURRENCY_PREVIEW=1`, the production `LEDGER_CURRENCIES` otherwise. The provider reads the flag by its literal name beside `__DEV__` (`BUILD_CURRENCY_GATE`), so a release bundle compiles to the production gate whatever the flag says (`tests/currency-preview.node.ts` compiles it with babel-preset-expo both ways, and checks no config, EAS profile, committed `.env` or CI sets it); it exposes `gate` in the ledger context and passes it to `createAccount`, `createCreditCard`, `createPersonalDebt` and `saveMonthlyBudget`. Reads, exports and restores never consult it. The Más footer names the preview currencies (`settings.currencyPreview`), never in a release. |
+| Choosers | `src/ui/currencies.ts` | `currencyOptions(locale, gate)`, `offeredCurrencies(gate)`, `catalogueCurrencies(locale, statuses, gate)`; `currencyOption(code)` is a display lookup over the whole catalogue (a stored EUR shows "Euros · EUR · €", never ARS; a code the catalogue does not know shows itself); `currencyChoices(codes, locale)` gives a list of codes the catalogue's names, symbols and search text (code, numeric code, the language's names, symbols, territory codes and names); `searchChoices` ranks an exact code, a code prefix, a name prefix, then any match; `SEARCHABLE_FROM = 6`. `currencyStatus(code, gate)` in the domain. |
+| The currency screen | `form-controls.tsx` (`CurrencyField`, `CurrencySheet`), `currency-switch.tsx` | `CurrencyField` takes `currencies` (the gate) and opens `CurrencySheet` over `currencyChoices`, searchable from six currencies (a release with two shows the same sheet as before, no search field); the read-only row of an existing account names any stored code. `CurrencySwitch` lists its options through `currencyChoices` too, so the picker beyond two currencies searches the same way. Built from the existing wrappers (`SelectionRow`, `SelectionSheet`, `Field`, `PressFeedback`); nothing new for the VoiceOver scan. |
+| Forms | `new-account.tsx`, `card-form.tsx`, `debt-form.tsx`, `budget-form.tsx`, `recurring-form.tsx` | Each reads `gate` from the ledger (`LEDGER_CURRENCIES` when absent) and offers exactly its currencies; a route currency outside the gate is never coerced in. The currency comes **before** the amount everywhere: the debt form's switch moved above its field, the recurring form's account selector (which fixes the currency) moved above its field; cards, budgets and accounts already did. The amount field is retargeted before the first digit, so a yen is typed on the number pad and a dinar with three decimals from the start. |
+| Tests | `currency-preview.node.ts`, cases in `ui-rows`, `personalization-routes`, `liabilities-routes` (the card and debt forms now render in its harness), `budgets-routes`, `more-routes`, `database.node.ts`, `currency-presentation`, `packages/domain/currency.test.ts` | The gate compiled both ways; the field with a seven-currency gate (order, names, search by code, name, symbol, territory; a release with two, no search; read-only EUR/KWD rows); a euro and a yen account, a yen card, a dinar debt, a Chilean peso and a dinar budget created through the preview gate at their own scale, and the release gate never showing them; the footer note in both languages; seven currencies through SQLite 9 and backup v9 (create, edit, export, restore into a fresh device, reopen) with every amount and currency unchanged and the release gate still refusing a new record in them. |
+
+**Not changed in 24B5:** `LEDGER_CURRENCIES` (the gate-opening commit is described in §7.5 stage 9
+and waits for the device tests and the owner's approval), the amounts of existing rows, contract
+v1, exchange rates (none), the entry form's order (amount first, its account is chosen by the
+hero design and its currency follows the account). No EAS build; the iPhone was not touched.
 
 **Not changed in 24B4:** `LEDGER_CURRENCIES` and every form (production still creates ARS and
 USD only; the gate is opened per call in tests), the amounts and balances of existing rows,
@@ -452,7 +467,7 @@ Sites are `file:line` at `1181ed1`, shortened to the file name. Domain files are
 
 ### 7.5 Safe implementation order for 24B
 
-**Status after Producto 24B4 (2026-09-24).**
+**Status after Producto 24B5 (2026-09-24).**
 
 | Stage | Status | What remains |
 | --- | --- | --- |
@@ -463,8 +478,20 @@ Sites are `file:line` at `1181ed1`, shortened to the file name. Domain files are
 | 5 SQLite schema 9 | **complete** (24B4: named columns, `runSchemaMigration`, `MIGRATE_V9`, `currency_units` pinned on first use, `archiveExponents` on every read, explicit gates in the create functions, real-file tests including interruption, `foreign_key_check`, a disagreeing scale and a closed gate; the owner authorised the one-way upgrade for the prototype's data on 2026-09-24) | device QA of the upgrade on FinanzApp Dev (docs/mobile-device-checklist.md, Producto 24B4), repeated in stage 9 |
 | 6 Backup v9 | **complete** (24B4: `currencyUnits`, strict keys, v8 kept byte-identical for ARS/USD, v1–v8 frozen, scales pinned before rows in one transaction, conflicts and refusals tested) | — |
 | 7 Assistant contract, server first | not started | all (v1 refuses EUR; the client refuses to send a non-v1 currency since 24B1) |
-| 8 The searchable currency screen | not started | all |
-| 9 Device QA, then the gate | not started | all; three-decimal currencies only after the VoiceOver check on an iPhone |
+| 8 The searchable currency screen | **complete** (24B5: `CurrencyField` over the build's gate with `currencyChoices`/`searchChoices`, the read-only lookup over the catalogue, the currency before the amount in every form) | — |
+| 9 Device QA, then the gate | **prepared, not run** (24B5: the development preview gate `EXPO_PUBLIC_CURRENCY_PREVIEW=1`, the device checklist, the gate commit described below) | the iPhone tests of docs/mobile-device-checklist.md (Producto 24B4 and 24B5), then the owner's approval, then the one commit that opens the first currencies |
+
+**The gate-opening commit (prepared, not applied; needs the device tests and the owner's approval).** One commit
+changes exactly: `LEDGER_CURRENCIES` in `packages/domain/currency.ts` (the proposal: `['ARS', 'USD', 'EUR', 'GBP',
+'JPY', 'CLP']`, two- and zero-decimal currencies first; KWD, BHD, JOD, OMR, TND, LYD and IQD only after the
+three-decimal VoiceOver check passes on an iPhone in both languages), the assertions that pin the production gate
+(`currency.test.ts` "keeps ARS and USD exactly…", `currency-catalogue.node.ts` "the catalogue today…" counts,
+`currency-presentation.node.ts` "forms still offer exactly ARS and USD…" and its `currencyOptions` lists,
+`ui-rows.node.ts` "the currency list is exactly ARS and USD…", `currency-preview.node.ts` `previewOnlyCurrencies`,
+`personalization-routes`/`liabilities-routes`/`budgets-routes` release-gate assertions, `more-routes` footer),
+the counts in §2 (`ledger` and `ready`), and `PREVIEW_CURRENCIES` (which then only adds KWD). Nothing else:
+storage, backups and every screen already work for any storable currency (24B1–24B5), and reverting the commit
+hides the currencies from the forms while their rows stay readable, exportable and restorable.
 
 Deliberate golden changes made in 24B4: `user_version` pins read `DATABASE_VERSION` (9) and the
 newer-schema probe `DATABASE_VERSION + 1`; the older-schema fixtures also drop `currency_units`;
@@ -692,7 +719,7 @@ limited to ARS/USD until the next server contract is implemented and tested (7.6
 first option). 7.6.1 (which currencies open first) and 7.6.4 (the default when nothing
 implies a currency) remain open; ARS stays the pilot's default meanwhile.
 
-1. **The first currencies to open.** Either a curated first list (for example the currencies of the first international users, including one without decimals) or all 151 `ready` currencies at once. Recommendation: curated. Open three-decimal currencies (BHD, IQD, JOD, KWD, LYD, OMR, TND) only after their VoiceOver check on a device.
+1. **The first currencies to open.** Proposal (24B5, pending the device tests): EUR, GBP (two decimals), JPY and CLP (none) in the first commit; the three-decimal currencies (KWD, BHD, JOD, OMR, TND, LYD, IQD) in a second one after their VoiceOver check. Either a curated first list (for example the currencies of the first international users, including one without decimals) or all 151 `ready` currencies at once. Recommendation: curated. Open three-decimal currencies (BHD, IQD, JOD, KWD, LYD, OMR, TND) only after their VoiceOver check on a device.
 2. **What the currency screen lists.** Only currencies the ledger can hold (recommended), or also `ready` ones shown as unavailable. Either way, the region stays a search hint and never a preselection.
 3. **Budgets in a currency without an account.** Either allowed (a budget keeps its own code, and the scale is pinned per code) or limited to currencies the person holds accounts in.
 4. **The default when nothing implies a currency.** Today ARS is preselected for a new account in an empty ledger, a new card or debt, and the empty Home/Reports fallback (`new-account.tsx:26`, `card-form.tsx:29`, `debt-form.tsx:27`, `report-presentation.ts:9`). The options are:

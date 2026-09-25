@@ -15,10 +15,45 @@ server-keyed; manual recording and local data work without connectivity. Recurri
 expenses, debts, budgets and cards remain in scope. Native navigation, accessible
 amounts, real data and recoverable durable writes remain requirements.
 
-## Status and current delivery — Producto 24B4
+## Status and current delivery — Producto 24B5
 
 Implemented is code, checked names a test, device-verified needs a physical result,
 and released means distributed. Neither a bundle nor a screenshot is App Store QA.
+
+**24B5 delivers stage 8 of docs/currency.md §7.5 and prepares stage 9: the searchable currency
+screen, the currency before the amount in every form, and a development preview gate to test
+seven currencies on FinanzApp Dev.** Production still creates and offers exactly ARS and USD:
+the gate-opening commit is described, not applied, and waits for the iPhone tests of 24B4 and
+24B5 and the owner's approval. The Más footer reads Producto 24B5. Design and status:
+[docs/currency.md](currency.md) §2.5, §7.5, §7.6.1.
+
+- [x] **The currency screen.** `CurrencyField` opens the sheet over the build's gate with the
+  catalogue's names, ISO codes and symbols, a checkmark on the current one and, from six
+  currencies, a search field over code, name, symbol, numeric code and territory
+  (`currencyChoices`, `searchChoices`). A release with two currencies shows the same sheet as
+  before. A stored currency outside the gate names itself in the read-only row ("Euros · EUR ·
+  €"), never ARS. Compact rows that open a sheet; no long list on any screen.
+- [x] **The currency before the amount** in accounts, cards, debts, budgets and recurring rules
+  (the debt form's switch and the recurring form's account selector moved above the field), so
+  the amount field types with the right decimals from the first key.
+- [x] **The development preview gate.** `EXPO_PUBLIC_CURRENCY_PREVIEW=1` in a development
+  bundle offers ARS, USD, EUR, GBP, JPY, CLP and KWD in every form and says so under the Más
+  footer; a release compiles the flag away (proven with babel-preset-expo both ways). The gate
+  reaches storage through the ledger provider; reads, exports and restores never consult it.
+- [x] **Verified with EUR, GBP, JPY, CLP and KWD** through the preview gate: a euro and a yen
+  account, a yen card, a dinar debt, a Chilean peso and a dinar budget created at their own
+  scale, and seven currencies through SQLite 9 and backup v9 (create, edit, export, restore into
+  a fresh device, reopen) with every amount and currency unchanged; ARS/USD amounts intact.
+- [x] **Checked on Linux:** see the handoff entry below.
+- [ ] **Not device-verified, no EAS build made:** the 24B4 migration on FinanzApp Dev and the 24B5
+  checks (number pad in yen, three decimals in dinars, VoiceOver in Spanish and English, the
+  searchable selector, Dynamic Type, Reduce Motion, export/restore v9) in
+  docs/mobile-device-checklist.md, with the preview flag.
+- [ ] **The gate-opening commit** (docs/currency.md §7.5, stage 9): after those tests and the
+  owner's approval; proposal EUR, GBP, JPY, CLP first, three-decimal currencies after their
+  VoiceOver check.
+
+### Previous delivery — Producto 24B4
 
 **24B4 delivers stages 5 and 6 of docs/currency.md §7.5: SQLite schema 9 and backup v9, the
 storage that knows each currency's scale.** Production still creates and offers exactly ARS and
@@ -1649,6 +1684,22 @@ are not dead code.
   QA of the schema 9 upgrade, the number pad, the VoiceOver units and the switch, and then one
   commit that opens the owner's first currencies progressively (decision 7.6.1; three-decimal
   currencies only after their VoiceOver check). Production forms stay ARS/USD until that commit.
+- **Producto 24R — global regional internationalization** (docs/i18n.md §11a), right after 24B5
+  and before any FX conversion: a wide catalogue of countries and territories keyed by standard
+  region identifiers and generated from pinned CLDR data; verified CLDR conventions per region
+  (separators, grouping, date order, week start, clock, the bare "$" rule); independent automatic
+  detection of the device's language and region; manual preferences that persist and never
+  change by themselves, with only "Según el dispositivo" following the system; compact native
+  screens with a search field, the automatic option first, recent choices and an alphabetical
+  list virtualized for hundreds of regions; tests across language × region × currency
+  combinations that never let a language imply a region or a region imply an account's currency;
+  fallbacks that never present the default conventions as a region's own. The app becomes usable
+  in any country with the published languages, wherever the platform provides the data.
+- **The language programme** (docs/i18n.md §12) — Spanish and English complete today; Portuguese,
+  French, German, Italian, Japanese and others by market, each published only when the catalogue,
+  the grammar review, the financial messages, the formats, VoiceOver and the length budgets are
+  done and a new build declares it natively; right-to-left as its own delivery; the Idioma chooser
+  with autonyms, search and a compact list.
 - **Producto 24C** — automatic, verifiable exchange rates as the main path (source, date and cache,
   a provider chosen after docs/currency.md §8.2's verification, opt-in, no paid call before the owner
   configures it), a foreign-currency purchase recorded as **one** expense with its original amount
@@ -1656,14 +1707,11 @@ are not dead code.
   flow; the manual adjustment lives in the movement's detail), the posted balance kept apart from
   the estimated pending commitments, and a configurable main currency for reports with per-currency
   subtotals whenever a rate is missing.
-- **Global regional internationalization** (docs/i18n.md §11a) — before the global onboarding:
-  device language and region detected independently and mapped to released values; correct regional
-  conventions where released; manual choices always win and stay saved, never changed by location,
-  device language or Region; only "Según el dispositivo" follows the system; account currencies
-  independent of both; languages published progressively, complete or not at all.
 - **Global onboarding** — detects language and region, shows them, lets the person change them and
-  choose the first currency of their first account (never a region-implied currency), and keeps the
-  preferences and data of existing users untouched.
+  choose the first currency of their first account (the detected region may **suggest** one, the
+  person always decides; an existing account's currency never changes with the device's region), and
+  keeps the preferences and data of existing users untouched. Accounts in EUR, GBP or any enabled
+  and verified fiat currency can be created whatever the language or location.
 - **The Assistant with real AI and multilingual input** — understands messages in the released
   languages, proposes an expense (merchant, amount, currency), asks only when something is
   ambiguous, needs confirmation before saving, and answers analytical questions from the real
@@ -1952,6 +2000,28 @@ amount uses `useStacked()` and gives the name two lines. 44-point targets, Voice
 safe areas, system text and separate currencies apply to every new screen.
 
 ## Handoff log (historical evidence)
+
+### 2026-09-24 — Producto 24B5: the currency screen, the currency before the amount, the preview gate
+
+- Stage 8 delivered and stage 9 prepared: `currencyChoices`/`searchChoices`/`SEARCHABLE_FROM`
+  and the gated `currencyOptions`/`offeredCurrencies`/`catalogueCurrencies` (`currencyStatus`
+  takes a gate), `currencyOption` as a display lookup over the catalogue, `CurrencyField` over the
+  gate with the searchable sheet, the switch's options through the catalogue, the currency before
+  the amount in the debt and recurring forms, `src/storage/currency-gate.ts` with
+  `PREVIEW_CURRENCIES` and `currencyGateForBuild`, `BUILD_CURRENCY_GATE` in the ledger provider
+  (read by its literal name, passed to the four create functions, exposed as `gate`), the Más
+  footer note, docs/currency.md §2.5/§7.5/§7.6.1, docs/i18n.md §11a (Producto 24R) and §12 (the
+  language programme), the design notes, the device checklist, the README.
+- Deliberate golden changes: `currencyOption('EUR')` is EUR (stage 8's row of the §7.5 table);
+  the Más footer; the liabilities harness renders the card and debt forms.
+- **Checked on Linux:** root `npm test` 445/445 (domain 243), `npm run build`, `npm run check:repo`;
+  mobile `npm run typecheck`, `npm run test:storage` 526/526 (real SQLite), `npm run currency:verify`,
+  `npm run i18n:check -- --strict` (0 errors, 0 stale), `npm run i18n:extract`, `npm run check` (up to
+  date), `npm run export:ios` (4,917,920 bytes, +4,100 over 24B4). Not an Xcode build; **no EAS build; the iPhone
+  was not modified**; no paid service, API connection or remote change.
+- **Pending:** the iPhone tests of 24B4 (the migration) and 24B5 (with the preview flag), then the
+  owner's approval, then the gate-opening commit.
+- **Next:** Producto 24R (global regional internationalization), then 24C.
 
 ### 2026-09-24 — Producto 24B4: SQLite schema 9 and backup v9
 
