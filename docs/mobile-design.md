@@ -380,6 +380,27 @@ importe, moneda y estado.
   muestra hasta que toda la app lo tenga (23.1): un iPhone en inglés sigue leyendo
   español antes que media app traducida.
 
+## Producto 24R1 — selectores regionales preparados (sin cambios visuales en producción)
+
+Nada cambia en un iPhone con Región Argentina o Estados Unidos. Con la Región en otro país, la fila
+«Según el dispositivo» de Más → Región dice «Ahora: Japón (formatos de Argentina)» en vez de «Ahora:
+Argentina»: nombra el país del teléfono y aclara qué formatos se usan mientras esa región no esté
+publicada. Lo que queda preparado para 24R2:
+- **Un selector de una sola elección, compacto y buscable** (`ChoiceScreen`): la misma fila
+  `CheckRow` de Idioma y Región, dibujada como tarjetas agrupadas por sección; «Según el dispositivo»
+  siempre primero y fuera de las secciones; «Recientes» con las tres últimas elecciones; secciones
+  alfabéticas por inicial (sin acentos: Álava bajo A); un campo de búsqueda desde seis opciones que
+  deja una lista plana ordenada por coincidencia (código exacto, prefijo de código, prefijo de
+  nombre, cualquier coincidencia); «Sin coincidencias» cuando no hay ninguna. Una sola lista
+  virtualizada, sin altura fija por fila: el texto escala con Dynamic Type. Los encabezados tienen
+  rol de encabezado; un idioma en su propio nombre lleva su idioma para VoiceOver. Un guardado
+  rechazado deja la marca donde estaba y lo dice bajo la lista. La nota explicativa va debajo,
+  nunca dentro de la lista.
+- **La fila resumida en Más** sigue siendo `NavigationRow` («Región · Argentina · según el
+  dispositivo»); en 24R2 nombra también la región del catálogo elegida.
+- Sin banderas, sin colores por país, sin lista interminable en Más: filas compactas que abren una
+  pantalla con búsqueda, como las monedas.
+
 ## Producto 24B6 — hoja de fecha compacta, moneda compartida y reglas de tarjeta (sin rediseño)
 
 Tres correcciones tras la primera prueba del propietario en el iPhone; nada cambia en la composición
@@ -653,6 +674,10 @@ Detalle en docs/currency.md §8–§10.
   fase de development build, no una capa de vidrio forzada encima).
 
 ## Pendiente de revisión en iPhone
+
+- Producto 24R1: con la Región del iPhone en un país no publicado (Japón, Reino Unido), Más →
+  Región → «Según el dispositivo» dice «Ahora: Japón (formatos de Argentina)» en ambos idiomas; con
+  Argentina o Estados Unidos, la frase de siempre. Nada más es visible hasta 24R2.
 
 - Producto 24B6: la hoja de fecha (alto, centrado de la rueda, velo, subida y bajada, Reduce
   Motion, ambos temas, Dynamic Type, VoiceOver, área segura); el cambio de moneda en Inicio visto

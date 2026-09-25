@@ -1,5 +1,21 @@
 # Physical iPhone acceptance checklist
 
+## Producto 24R1 — regional infrastructure (one visible line; nothing else until 24R2)
+
+**Not done in 24R1: no EAS build was made and the iPhone was not touched.** Metro from this branch on
+the installed FinanzApp Dev build; no new native build and no flag needed.
+
+- [ ] Settings → General → Language & Region → Region: Japan (keep the language). Reopen FinanzApp
+  (the app keeps running; iOS posts its locale event): Más → Región → "Según el dispositivo" reads
+  "Ahora: Japón (formatos de Argentina)" in Spanish and "Now: Japan (Argentina formats)" in English;
+  every amount, date and the amount field still write Argentine formats; no movement, balance or
+  currency changed.
+- [ ] Region back to Argentina, then United States: the plain "Ahora: Argentina" / "Ahora: Estados
+  Unidos"; with "Según el dispositivo" the formats follow; with a manual choice (Argentina) nothing
+  moves and Más → Región still marks Argentina.
+- [ ] Force-quit and reopen with the Region still set abroad: the same sentence, the same formats.
+- [ ] Más footer: "Producto 24R1 · …".
+
 ## Producto 24B6 — the date sheet, one display currency, the card rules
 
 **Not done in 24B6: no EAS build was made and the iPhone was not touched.** No new native build is

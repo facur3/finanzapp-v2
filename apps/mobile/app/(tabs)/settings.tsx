@@ -14,7 +14,7 @@ import { preferenceSummary, showsPreference } from '../../src/ui/locale-options'
 // Diagnostic: where this launch read the device languages. "módulo nativo" proves the build links expo-localization.
 const LOCALE_SOURCE_LABELS = { native: 'settings.localeSource.native', intl: 'settings.localeSource.intl', none: 'settings.localeSource.none' } as const;
 /** The pilot's version and the internal release name; neither is translated. */
-const VERSION = '0.1.0', RELEASE = '24B6';
+const VERSION = '0.1.0', RELEASE = '24R1';
 
 /** Más is the secondary navigation hub: everything that is not one of the four
  * other tabs, in two native grouped lists. Finanzas holds the tools that
