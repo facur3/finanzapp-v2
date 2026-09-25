@@ -82,7 +82,7 @@ function routeHarness(file: string, params: Record<string, unknown>, initialData
     '../src/ui/home-modules': { BudgetHomeCard: 'BudgetHomeCard', CategoryRanking: 'CategoryRanking', MetricHelp: 'MetricHelp', UpcomingRecurringRow: 'UpcomingRecurringRow' },
     '../src/ui/category-color': categoryColor,
     '../src/ui/category-hues': { useCategoryColor: () => '#3E6FB0', useCategoryLabel: (s: string) => s, useCategoryDefinitions: () => [], useCategoryLook: (s: string) => ({ label: s, storedLabel: s, key: String(s).toLowerCase(), hex: '#3E6FB0', glyph: 'pricetag-outline' }), useCategoryLookOf: () => (s: string) => ({ label: s, storedLabel: s, key: String(s).toLowerCase(), hex: '#3E6FB0', glyph: 'pricetag-outline' }), useAccountLook: () => ({ icon: 'wallet', color: 'cobalt', glyph: 'wallet-outline', hex: '#2557D6' }), useAccountNameOf: () => (account: any) => account.name, useAccountLookOf: () => () => ({ icon: 'wallet', color: 'cobalt', glyph: 'wallet-outline', hex: '#2557D6' }) },
-    '../src/ui/quick-actions': { QuickActions: 'QuickActions' },
+    '../src/ui/quick-actions': { QuickActions: 'QuickActions', AssistantEntry: 'AssistantEntry' },
     '../src/ui/motion': { ValueTransition: 'ValueTransition', Reflow: 'Reflow', selectionHaptic: () => {}, impactHaptic: () => {}, duration: { press: 100, release: 160, state: 200, data: 260, enter: 200, exit: 100, reveal: 480 }, timing: (kind: string, reduced: boolean) => ({ duration: reduced ? 0 : 260 }) },
     '../src/ui/theme': { useCurrentDay: () => '2026-09-12', useReduceMotion: () => false, space: { xs: 4, s: 8, m: 12, l: 16, xl: 20, xxl: 24, xxxl: 32 },
       usePalette: () => ({ background: '#F5F6F8', surface: '#FFFFFF', primary: '#2557D6', primaryFill: '#2557D6', onPrimary: '#fff', expense: '#C42F39',
@@ -470,7 +470,35 @@ test('24UX2: Home keeps its modules and adds none', () => {
   const root = routeHarness('(tabs)/index.tsx', {}, homeData, { recurring: [rule] }).render();
   assert.equal(sectionTitles(root).join('|'), 'En qué gastaste|Próximos compromisos|Últimos movimientos');
   assert.equal(nodes(root).filter(node => node.type === 'QuickActions').length, 1);
-  assert.equal(find(root, 'QuickActions').props.assistant, true, 'the Assistant keeps its prominent entry');
+  assert.equal(find(root, 'QuickActions').props.assistant, undefined, '24UX3: the movements are three pills; the Assistant has its own entry');
+  assert.equal(nodes(root).filter(node => node.type === 'AssistantEntry').length, 1, 'the Assistant keeps its prominent entry');
+  assert.equal(find(root, 'AssistantEntry').props.currency, 'ARS', 'it carries the currency Inicio shows');
   assert.equal(nodes(root).filter(node => node.type === 'Choices').length, 1, 'Gastos / Disponible');
   assert.equal(nodes(root).filter(node => node.type === 'CurrencySwitch').length, 1);
+});
+
+// ---- 24UX3: Home hierarchy ---------------------------------------------------------------------------------------
+
+test('24UX3: a quiet header, a larger number, movements then the Assistant, quiet section links and three section shapes', () => {
+  const rule: domain.RecurringRule = { id: 'r', accountId: 'a', kind: 'expense', amountMinor: 100, merchant: 'Netflix', category: 'Suscripciones', frequency: 'monthly',
+    anchorDateISO: '2026-09-20', nextDateISO: '2026-09-20', active: true, createdAt, revision: 0, updatedAt: createdAt };
+  const root = routeHarness('(tabs)/index.tsx', {}, homeData, { recurring: [rule] }).render();
+  // The header is the compact variant: the metric and the currency chip no longer weigh like the number.
+  assert.equal(find(root, 'Choices').props.compact, true);
+  assert.equal(find(root, 'CurrencySwitch').props.compact, true);
+  // The number is Inicio's own size, a step above the 44 pt hero elsewhere.
+  const hero = find(root, 'Money');
+  assert.equal(hero.props.large, true);
+  assert.equal(hero.props.size, 48);
+  // Movements, then the Assistant below them (nearer the thumb), in that order.
+  const order = nodes(root).map(node => node.type).filter(type => type === 'QuickActions' || type === 'AssistantEntry');
+  assert.equal(order.join('|'), 'QuickActions|AssistantEntry');
+  // Every section link stays (same targets) but is quiet: no row of cobalt words competing with the Assistant.
+  const titles = nodes(root).filter(node => node.type === 'SectionTitle');
+  assert.equal(titles.map(node => node.props.action).join('|'), 'Reportes|Ver todos|Ver todos');
+  assert.equal(titles.every(node => node.props.quiet === true && typeof node.props.onAction === 'function'), true);
+  // Three shapes: the categories as a card (CategoryRanking draws its own surface), the commitments on the ground, the ledger grouped.
+  const surfaces = nodes(root).filter(node => node.type === 'Surface');
+  assert.equal(surfaces.some(surface => nodes(surface).some(node => node.type === 'UpcomingRecurringRow')), false, 'commitments are an open agenda, not a third card');
+  assert.equal(surfaces.some(surface => surface.props.grouped && nodes(surface).some(node => node.type === 'EntryRow')), true, 'the latest transactions stay a grouped ledger');
 });

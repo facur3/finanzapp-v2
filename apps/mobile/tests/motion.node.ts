@@ -9,7 +9,9 @@ import { assignCategoryHues, categoryColor, hueColor, othersColor, CATEGORY_HUES
 import type { Entry } from '@finanzapp/domain';
 import * as i18nFormat from '../src/i18n/format.ts';
 import { bindLocale } from '../src/i18n/bind.ts';
-const i18nProvider = { useI18n: () => bindLocale('es-AR') };
+// Read on every render, so a test may switch it (and must restore it).
+let current: 'es-AR' | 'en-US' = 'es-AR';
+const i18nProvider = { useI18n: () => bindLocale(current) };
 
 // Pure geometry and colour rules behind the animated controls. Motion feel,
 // haptic timing and frame pacing remain physical-device acceptance items.
@@ -117,14 +119,15 @@ test('donut sweeps in from twelve o\'clock only the first time, then crossfades,
   assert.deepEqual(still.paths.map((path: any) => path.props.animatedProps().d), still.paths.map((path: any) => path.props.d));
 });
 
-test('quick actions are four equal columns on Home, Assistant first, and three on account detail; glass or opaque by material', () => {
+test('24UX3: three compact movement pills (Inicio and account detail) and one wide Assistant entry; glass or opaque by material', () => {
   const source = readFileSync(new URL('../src/ui/quick-actions.tsx', import.meta.url), 'utf8');
   const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText;
   const jsx = (type: any, props: any) => ({ type, props });
   const pushed: any[] = [];
-  const dark = { secondary: '#666', inset: '#2C2C2E', surface: '#1C1C1E', primary: '#5B87FF', primarySoft: '#122048', isDark: true };
+  const dark = { text: '#F5F5F7', secondary: '#666', tertiary: '#7C7C84', inset: '#2C2C2E', surface: '#1C1C1E', primary: '#5B87FF', primarySoft: '#122048', primaryWash: '#151B2C', isDark: true };
   let palette: any = dark;
   let material: 'opaque' | 'glass' = 'opaque';
+  let stacked = false;
   const modules: Record<string, any> = {
     '../i18n/format': i18nFormat, '../src/i18n/format': i18nFormat, '../../src/i18n/format': i18nFormat, '../i18n/provider': i18nProvider, '../src/i18n/provider': i18nProvider, '../../src/i18n/provider': i18nProvider,
     'react/jsx-runtime': { jsx, jsxs: jsx },
@@ -132,62 +135,91 @@ test('quick actions are four equal columns on Home, Assistant first, and three o
     './material': { ControlSurface: 'ControlSurface', useMaterial: () => material },
     'expo-router': { router: { push: (to: unknown) => pushed.push(to), navigate: (to: unknown) => pushed.push({ navigate: to }) } },
     '@expo/vector-icons/Ionicons': 'Ionicons',
-    './components': { AppText: 'AppText', PressFeedback: 'PressFeedback', toneColors: (_p: unknown, tone: string) => ({ color: tone, soft: tone + '-soft' }) },
-    './theme': { space: { xs: 4, s: 8, xxxl: 32 }, usePalette: () => palette },
+    './components': { AppText: 'AppText', PressFeedback: 'PressFeedback', useStacked: () => stacked, toneColors: (_p: unknown, tone: string) => ({ color: tone, soft: tone + '-soft' }) },
+    './theme': { space: { xs: 4, s: 8, m: 12, l: 16, xxxl: 32 }, usePalette: () => palette },
   };
-  const module = { exports: {} as { QuickActions?: (props: any) => any; quickActionMaterial?: (p: any, assistant: boolean) => any; QUICK_ACTION_SIZE?: number } };
+  const module = { exports: {} as Record<string, any> };
   runInNewContext(code, { module, exports: module.exports, require: (name: string) => {
     if (!Object.hasOwn(modules, name)) throw new Error('Unexpected quick-actions dependency: ' + name);
     return modules[name];
   } });
-  const render = (props: any) => module.exports.QuickActions!(props).props.children.map((child: any) => child.type(child.props));
-  // Home: four actions, the Assistant first, carrying the currency into the conversation.
-  const home = render({ currency: 'USD', assistant: true });
-  assert.equal(JSON.stringify(home.map((action: any) => action.props.accessibilityLabel)), JSON.stringify(['Abrir el Asistente', 'Registrar gasto', 'Registrar ingreso', 'Transferir entre cuentas']));
-  assert.equal(JSON.stringify(home.map((action: any) => action.props.children[1].props.children)), JSON.stringify(['Asistente', 'Gasto', 'Ingreso', 'Transferir']));
-  home.forEach((action: any) => action.props.onPress());
-  assert.equal(JSON.stringify(pushed[0]), JSON.stringify({ navigate: { pathname: '/assistant', params: { currency: 'USD' } } }), 'the Assistant is a tab: navigate to it, never push a copy');
-  // Geometry: equal flexible columns (no fixed gaps that overflow a narrow iPhone) and a caption allowed to wrap under large text with the full VoiceOver label kept.
+  const row = (props: any) => module.exports.QuickActions(props);
+  const render = (props: any) => row(props).props.children.map((child: any) => child.type(child.props));
+  const surface = (action: any) => action.props.children;
+  const pill = (action: any) => ({ ...surface(action).props.style, ...surface(action).props.opaque });
+  const label = (action: any) => surface(action).props.children[1];
+  const glyph = (action: any) => surface(action).props.children[0];
+
+  // The movements: three equal flexible pills in one row, never the Assistant (it has its own entry).
+  const home = render({ currency: 'USD' });
+  assert.equal(row({ currency: 'USD' }).props.style.flexDirection, 'row');
+  assert.equal(JSON.stringify(home.map((action: any) => action.props.accessibilityLabel)), JSON.stringify(['Registrar gasto', 'Registrar ingreso', 'Transferir entre cuentas']));
+  assert.equal(JSON.stringify(home.map((action: any) => label(action).props.children)), JSON.stringify(['Gasto', 'Ingreso', 'Transferir']));
+  assert.equal(module.exports.ACTION_PILL_HEIGHT, 40, 'a compact capsule; the pressable around it keeps the 44 pt target');
   for (const action of home) {
     assert.equal(action.props.containerStyle.flex, 1);
     assert.equal(action.props.containerStyle.minWidth, 0);
-    assert.equal(action.props.children[1].props.numberOfLines, 2);
-  }
-  assert.equal(module.exports.QUICK_ACTION_SIZE, 48, '24UX2: lighter beside the hero (was 54)');
-  // Restraint: neutral material with the semantic colour only in the glyph; the Assistant is the same object in the brand tint with a thin cobalt ring.
-  const surface = (action: any) => action.props.children[0];
-  const circle = (action: any) => ({ ...surface(action).props.style, ...surface(action).props.opaque });
-  for (const action of home) {
     assert.equal(surface(action).type, 'ControlSurface');
     assert.equal(surface(action).props.material, 'opaque');
-    assert.equal(circle(action).width, 48);
-    assert.equal(circle(action).borderRadius, 24);
+    assert.equal(pill(action).minHeight, 40);
+    assert.equal(pill(action).borderRadius, 20);
+    assert.equal(label(action).props.numberOfLines, 1, 'one line at the default size; a narrow iPhone shrinks it a little');
+    assert.equal(label(action).props.style.color, undefined, 'the label is ink: colour lives in the glyph');
   }
-  assert.equal(JSON.stringify(home.slice(1).map((action: any) => circle(action).backgroundColor)), JSON.stringify(['#2C2C2E', '#2C2C2E', '#2C2C2E']));
-  assert.equal(JSON.stringify(home.map((action: any) => surface(action).props.children.props.color)), JSON.stringify(['#5B87FF', 'expense', 'income', 'transfer']));
-  assert.equal(circle(home[0]).backgroundColor, '#122048');
-  assert.equal(circle(home[0]).borderWidth, 0.5, 'a hairline cobalt edge, not a ring');
-  assert.ok(String(circle(home[0]).borderColor).startsWith('#5B87FF'));
-  assert.equal(circle(home[1]).borderWidth, 0.5, 'a hairline edge, not a glow');
-  assert.equal(circle(home[1]).shadowOpacity, undefined, 'dark mode draws no shadow');
-  palette = { ...dark, isDark: false, surface: '#FFFFFF', primary: '#2557D6', primarySoft: '#E5ECFB' };
-  const light = render({ currency: 'ARS', assistant: true });
-  assert.equal(circle(light[1]).backgroundColor, '#FFFFFF');
-  // 24UX2: flat discs, no shadow and no cobalt halo in either theme; the hero keeps the only visual weight.
-  assert.equal(light.every((action: any) => circle(action).shadowOpacity === undefined), true);
-  assert.equal(circle(light[1]).borderWidth, 0.5);
+  // Restraint: the surface step with a hairline edge, no shadow, the semantic colour only in the glyph.
+  assert.equal(JSON.stringify(home.map((action: any) => pill(action).backgroundColor)), JSON.stringify(['#1C1C1E', '#1C1C1E', '#1C1C1E']));
+  assert.equal(JSON.stringify(home.map((action: any) => glyph(action).props.color)), JSON.stringify(['expense', 'income', 'transfer']));
+  assert.equal(home.every((action: any) => pill(action).borderWidth === 0.5 && pill(action).shadowOpacity === undefined), true);
+  palette = { ...dark, isDark: false, surface: '#FFFFFF', primary: '#2557D6', primarySoft: '#E5ECFB', primaryWash: '#F5F8FF' };
+  assert.equal(pill(render({ currency: 'ARS' })[0]).backgroundColor, '#FFFFFF');
+  palette = dark;
+  // Accessibility sizes: the pills stack at full width and the label may wrap.
+  stacked = true;
+  assert.equal(row({ currency: 'ARS' }).props.style.flexDirection, 'column');
+  const tall = render({ currency: 'ARS' });
+  assert.equal(tall[0].props.containerStyle, undefined);
+  assert.equal(label(tall[0]).props.numberOfLines, undefined);
+  stacked = false;
+
+  // The Assistant: one wide capsule, a button with its own spoken name and hint, landing on the centre tab.
+  const entry = module.exports.AssistantEntry({ currency: 'USD' });
+  assert.equal(entry.props.accessibilityRole, 'button');
+  assert.equal(entry.props.accessibilityLabel, 'Contale al Asistente');
+  assert.match(entry.props.accessibilityHint, /Asistente/);
+  pushed.length = 0;
+  entry.props.onPress();
+  assert.equal(JSON.stringify(pushed[0]), JSON.stringify({ navigate: { pathname: '/assistant', params: { currency: 'USD' } } }), 'the Assistant is a tab: navigate to it, never push a copy');
+  const capsule = entry.props.children;
+  const capsuleStyle = { ...capsule.props.style, ...capsule.props.opaque };
+  assert.equal(capsule.type, 'ControlSurface');
+  assert.equal(capsuleStyle.minHeight, 52);
+  assert.equal(capsuleStyle.borderRadius, 26);
+  assert.equal(capsuleStyle.backgroundColor, '#151B2C', 'the surface barely cooled by the brand, not a blue block');
+  assert.equal(capsuleStyle.borderWidth, 0.5);
+  assert.ok(String(capsuleStyle.borderColor).startsWith('#5B87FF'), 'a hairline cobalt edge');
+  const [disc, text, chevron] = capsule.props.children;
+  assert.equal(disc.props.children.props.name, 'sparkles');
+  assert.equal(disc.props.children.props.color, '#5B87FF', 'cobalt lives in the glyph');
+  assert.equal(text.props.children, 'Contale al Asistente');
+  assert.equal(text.props.style.color, undefined, 'the words are ink, never placeholder grey: it must not read as a search field');
+  assert.equal(chevron.props.name, 'chevron-forward');
+  current = 'en-US';
+  try { assert.equal(module.exports.AssistantEntry({}).props.accessibilityLabel, 'Ask the Assistant'); } finally { current = 'es-AR'; }
+
   // Native glass on iOS 26: same geometry, the opaque style handed over untouched as the fallback, a cobalt wash only on the Assistant.
   material = 'glass';
-  const glass = render({ currency: 'ARS', assistant: true });
-  assert.equal(JSON.stringify(glass.map((action: any) => surface(action).props.material)), JSON.stringify(['glass', 'glass', 'glass', 'glass']));
-  assert.equal(JSON.stringify(glass.map((action: any) => surface(action).props.tint ?? null)), JSON.stringify(['#2557D633', null, null, null]));
+  const glass = render({ currency: 'ARS' });
+  assert.equal(JSON.stringify(glass.map((action: any) => surface(action).props.material)), JSON.stringify(['glass', 'glass', 'glass']));
+  assert.equal(glass.every((action: any) => surface(action).props.tint === undefined), true);
   assert.equal(surface(glass[0]).props.opaque.borderWidth, 0.5, 'the opaque fallback is still the edged version');
-  assert.equal(JSON.stringify(glass.map((action: any) => surface(action).props.children.props.color)), JSON.stringify(['#2557D6', 'expense', 'income', 'transfer']), 'glyph colours are the same on glass');
+  const glassEntry = module.exports.AssistantEntry({ currency: 'ARS' }).props.children;
+  assert.equal(glassEntry.props.material, 'glass');
+  assert.equal(glassEntry.props.tint, '#5B87FF26');
   material = 'opaque';
-  // Account detail keeps the three movements with the account carried over.
+
+  // Account detail: the same three movements, with the account carried over.
   pushed.length = 0;
   const detail = render({ currency: 'USD', accountId: 'a' });
-  assert.equal(JSON.stringify(detail.map((action: any) => action.props.accessibilityLabel)), JSON.stringify(['Registrar gasto', 'Registrar ingreso', 'Transferir entre cuentas']));
   detail.forEach((action: any) => action.props.onPress());
   assert.equal(JSON.stringify(pushed), JSON.stringify([
     { pathname: '/new-entry', params: { kind: 'expense', accountId: 'a', currency: 'USD' } },

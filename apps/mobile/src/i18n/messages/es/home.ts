@@ -50,8 +50,9 @@ export const home = {
     exceeded: { one: '{count} categoría excedida', other: '{count} categorías excedidas' },
   },
   quickActions: {
-    assistant: 'Asistente',
-    openAssistant: 'Abrir el Asistente',
+    /** Inicio's wide Assistant entry under the three movements (24UX3): a button, never a placeholder. */
+    askAssistant: 'Contale al Asistente',
+    askAssistantHint: 'Abre el Asistente para registrar un movimiento o preguntar por tus gastos',
     expense: 'Gasto',
     recordExpense: 'Registrar gasto',
     income: 'Ingreso',

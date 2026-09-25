@@ -48,12 +48,10 @@ export const reports = {
     },
     merchants: {
       title: 'Dónde más gastaste',
-      caption: 'Por importe registrado en el período',
       purchases: { one: '{count} compra', other: '{count} compras' },
     },
     insights: {
       title: 'Para tener en cuenta',
-      caption: 'Hechos de tus registros, no consejos',
       overTotal: 'Superaste tu presupuesto general',
       nearTotal: 'Estás cerca de tu presupuesto general',
       overCategory: '{category} superó su presupuesto',

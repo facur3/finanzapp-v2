@@ -48,8 +48,8 @@ export const home: Pick<Messages, 'home' | 'budgetStatus' | 'quickActions'> = {
     exceeded: { one: '{count} category over', other: '{count} categories over' },
   },
   quickActions: {
-    assistant: 'Assistant',
-    openAssistant: 'Open the Assistant',
+    askAssistant: 'Ask the Assistant',
+    askAssistantHint: 'Opens the Assistant to record a transaction or ask about your spending',
     expense: 'Expense',
     recordExpense: 'Record an expense',
     income: 'Income',

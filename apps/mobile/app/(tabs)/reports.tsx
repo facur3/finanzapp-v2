@@ -172,7 +172,7 @@ export default function ReportsScreen() {
         </Surface>
       </View>}
       {ready && merchants.length > 0 && <View>
-        <SectionTitle caption={t('reports.merchants.caption')}>{t('reports.merchants.title')}</SectionTitle>
+        <SectionTitle>{t('reports.merchants.title')}</SectionTitle>
         <Surface grouped>
           {/* Rank stays a number; the tile carries the merchant's category, the one identity it really has. No decorative podium colours. */}
           {merchants.map((merchant, index) => <View key={merchant.key} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 12, minHeight: 64,
@@ -184,7 +184,7 @@ export default function ReportsScreen() {
         </Surface>
       </View>}
       {ready && insights.length > 0 && <View>
-        <SectionTitle caption={t('reports.insights.caption')}>{t('reports.insights.title')}</SectionTitle>
+        <SectionTitle>{t('reports.insights.title')}</SectionTitle>
         <View style={{ gap: 10 }}>
           {/* A fact about a category looks like that category; a warning or excess keeps its semantic tone. The surface takes only a whisper (8 %) of the colour so the text stays fully readable. */}
           {insights.map(insight => ({ ...insight, ...insightText(insight) })).map(insight => <InsightSurface key={insight.id} tone={insight.tone} category={insight.category}>

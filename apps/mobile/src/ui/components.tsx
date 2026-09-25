@@ -100,16 +100,27 @@ export function Surface({ children, style, grouped = false }: { children: ReactN
   return <View style={[styles.surface, { backgroundColor: p.surface }, grouped ? { padding: 0, gap: 0, overflow: 'hidden', borderRadius: radius.group } : surfaceShadow(p), style]}>{children}</View>;
 }
 
-export function SectionTitle({ children, action, onAction, caption }: { children: ReactNode; action?: string; onAction?: () => void; caption?: string }) {
+/** A section heading with an optional text action on the right. `quiet` (Inicio, 24UX3) draws the action in
+ * secondary ink at footnote size with a small chevron: still a visible, 44 pt tappable link, but no longer one more
+ * cobalt word competing with the hero, the Assistant and the tab bar. Elsewhere the action stays the cobalt link. */
+export function SectionTitle({ children, action, onAction, caption, quiet = false }: {
+  children: ReactNode; action?: string; onAction?: () => void; caption?: string; quiet?: boolean;
+}) {
   const p = usePalette();
   return <View style={styles.sectionHeading}>
     <View style={{ flex: 1, gap: 2 }}>
       <AppText accessibilityRole="header" variant="headline">{children}</AppText>
       {caption && <AppText secondary variant="footnote">{caption}</AppText>}
     </View>
-    {action && onAction && <PressFeedback feedback="opacity" accessibilityRole="button" accessibilityLabel={action} onPress={onAction} style={{ paddingLeft: 12, minHeight: 36 }}>
-      <AppText variant="subhead" style={{ color: p.primary, fontWeight: '500' }}>{action}</AppText>
-    </PressFeedback>}
+    {action && onAction && (quiet
+      ? <PressFeedback feedback="opacity" accessibilityRole="button" accessibilityLabel={action} onPress={onAction} hitSlop={{ top: 4, bottom: 4 }}
+        style={{ paddingLeft: 12, minHeight: 36, flexDirection: 'row', alignItems: 'center', gap: 2 }}>
+        <AppText variant="footnote" style={{ color: p.secondary, fontWeight: '500' }}>{action}</AppText>
+        <Ionicons name="chevron-forward" size={13} color={p.tertiary} accessible={false} />
+      </PressFeedback>
+      : <PressFeedback feedback="opacity" accessibilityRole="button" accessibilityLabel={action} onPress={onAction} style={{ paddingLeft: 12, minHeight: 36 }}>
+        <AppText variant="subhead" style={{ color: p.primary, fontWeight: '500' }}>{action}</AppText>
+      </PressFeedback>)}
   </View>;
 }
 
@@ -349,14 +360,15 @@ export function AmountShortcut({ label, caption, spokenCaption, onPress, disable
   </View>;
 }
 
-function Choice({ label, selected, disabled, onPress }: { label: string; selected: boolean; disabled?: boolean; onPress: () => void }) {
+function Choice({ label, selected, disabled, onPress, compact = false }: { label: string; selected: boolean; disabled?: boolean; onPress: () => void; compact?: boolean }) {
   const p = usePalette();
   const reduced = useReduceMotion();
   const { speechLanguage } = useI18n();
+  // Compact: 28 pt segments (32 pt with the track) and an 8 pt vertical slop, so the target stays 44 pt tall; none sideways, where the neighbour is.
   return <Pressable accessibilityRole="button" accessibilityState={{ selected, disabled }} disabled={disabled} accessibilityLanguage={speechLanguage}
-    onPress={onPress} style={styles.choice} hitSlop={4}>
+    onPress={onPress} style={[styles.choice, compact && styles.choiceCompact]} hitSlop={compact ? { top: 8, bottom: 8 } : 4}>
     <Animated.Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8} maxFontSizeMultiplier={1.3}
-      style={{ fontSize: 13, lineHeight: 18, textAlign: 'center', fontWeight: '600', color: selected ? p.primary : p.secondary,
+      style={{ fontSize: 13, lineHeight: 18, textAlign: 'center', fontWeight: '600', color: selected ? (compact ? p.text : p.primary) : p.secondary,
         transitionProperty: 'color', transitionDuration: reduced ? 0 : duration.state }}>{label}</Animated.Text>
   </Pressable>;
 }
@@ -365,9 +377,13 @@ function Choice({ label, selected, disabled, onPress }: { label: string; selecte
  * (interruptible, 200 ms ease-out, none under Reduce Motion) and the change
  * ticks with a selection haptic. The chosen label is the brand primary on a
  * neutral thumb: selection reads as selection without a filled blue block.
- * Tapping the current value does nothing. */
-export function Choices<T extends string>({ value, options, onChange, disabled }: {
-  value: T; options: { value: T; label: string }[]; onChange: (value: T) => void; disabled?: boolean;
+ * Tapping the current value does nothing. `compact` (Inicio's header, 24UX3)
+ * is the lighter variant of a system segmented control: 32 pt tall, the chosen
+ * label in ink on a lifted thumb (the way UISegmentedControl draws it), and in
+ * dark mode a track one step above the black ground instead of the brighter
+ * fill, so the header reads as a quiet switch above the number. */
+export function Choices<T extends string>({ value, options, onChange, disabled, compact = false }: {
+  value: T; options: { value: T; label: string }[]; onChange: (value: T) => void; disabled?: boolean; compact?: boolean;
 }) {
   const p = usePalette();
   const reduced = useReduceMotion();
@@ -382,10 +398,12 @@ export function Choices<T extends string>({ value, options, onChange, disabled }
     x.value = withTiming(offset, timing('state', reduced));
   }, [offset, reduced, trackWidth, x]);
   const thumbStyle = useAnimatedStyle(() => ({ transform: [{ translateX: x.value }] }));
-  return <View style={[styles.choices, { backgroundColor: p.inset }]} onLayout={event => setTrackWidth(event.nativeEvent.layout.width)}>
-    {width > 0 && <Animated.View pointerEvents="none" style={[styles.thumb, { width, backgroundColor: p.isDark ? p.elevated : p.surface },
+  const track = compact && p.isDark ? p.surface : p.inset;
+  const thumb = p.isDark ? (compact ? p.inset : p.elevated) : p.surface;
+  return <View style={[styles.choices, { backgroundColor: track }]} onLayout={event => setTrackWidth(event.nativeEvent.layout.width)}>
+    {width > 0 && <Animated.View pointerEvents="none" style={[styles.thumb, { width, backgroundColor: thumb },
       p.isDark ? {} : { shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 3, shadowOffset: { width: 0, height: 1 } }, thumbStyle]} />}
-    {options.map(option => <Choice key={option.value} label={option.label} selected={value === option.value}
+    {options.map(option => <Choice key={option.value} label={option.label} selected={value === option.value} compact={compact}
       disabled={disabled} onPress={() => { if (option.value !== value) { selectionHaptic(); onChange(option.value); } }} />)}
   </View>;
 }
@@ -780,6 +798,7 @@ const styles = StyleSheet.create({
   choices: { flexDirection: 'row', borderRadius: 10, padding: SEGMENT_PADDING, gap: SEGMENT_GAP },
   thumb: { position: 'absolute', top: SEGMENT_PADDING, bottom: SEGMENT_PADDING, left: 0, borderRadius: 8 },
   choice: { flex: 1, minWidth: 72, minHeight: 32, paddingHorizontal: 8, paddingVertical: 6, alignItems: 'center', justifyContent: 'center' },
+  choiceCompact: { minWidth: 64, minHeight: 28, paddingVertical: 4 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, paddingHorizontal: 16, minHeight: 64 },
   detailRow: { minHeight: 54, flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 14 },
   navigationRow: { minHeight: 60, flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 16, paddingVertical: 11 },

@@ -1,5 +1,53 @@
 # Physical iPhone acceptance checklist
 
+## Producto 24UX3 — Home hierarchy
+
+**Not done in 24UX3: no EAS build was made and the iPhone was not touched.** Metro from this branch
+(`npm run start:dev-client`) on the installed FinanzApp Dev build; JavaScript only, no new native
+module. Record each result with the language, the theme, the material and the text size. Use your
+own small real data (a few expenses, one recurring rule, ideally two currencies); never seed movements.
+
+- [ ] **First glance.** Open Inicio cold in dark and in light: within a second the eye lands on the
+  number first, then the actions, then the sections. Nothing above the number (segments, currency
+  chip) competes with it; the screen feels calmer than 24UX2, not emptier.
+- [ ] **Header.** Gastos / Disponible and the currency chip are 32 pt tall, the chosen label in ink
+  (not cobalt), easy to hit with a thumb (44 pt target); the thumb still slides (Reduce Motion: jumps).
+  With three or more currencies the chip is the compact "ARS ⌄" row and opens the sheet.
+- [ ] **Number.** 48 pt with visible room above and below; a long amount still fits on one line
+  (shrinks, never clips); Disponible's info glyph and "N cuentas" still read.
+- [ ] **Pills.** Gasto, Ingreso, Transferir: equal width, one line each on the narrowest iPhone at
+  hand (on a 375 pt phone "Transferir" may shrink slightly, never truncate); glyphs coral/green/azure;
+  press scales to 0,97; each opens its form with the currency carried over. They do not read as filters.
+- [ ] **Assistant entry — prominence and ergonomics.** Reads as the most important control after the
+  number without looking like a banner or an ad; the wash is subtle in both themes; it does not read
+  as a search field. One-handed on a 6,1″ iPhone: reach it with the thumb without regripping (note
+  whether it is easier than the old first disc). Tapping switches to the centre tab (no stacked
+  copy) and the conversation keeps Inicio's currency.
+- [ ] **Liquid Glass** (iOS 26, development build, Reduce Transparency off): pills are regular glass,
+  the Assistant entry glass with a faint cobalt wash; turn Reduce Transparency on and the opaque
+  material appears without relaunch.
+- [ ] **Section differentiation.** En qué gastaste is a compact card (52 pt rows, washes reveal as
+  before); Próximos compromisos is an open list on the background, aligned with its title, hairlines
+  starting under the text, a tap dims the row; Últimos movimientos is the grouped ledger. The three
+  no longer look like one repeated block, and the agenda does not look detached.
+- [ ] **Links.** Reportes / Ver / Ver todo are grey with a chevron, clearly tappable, open the same
+  screens as before (Reportes keeps the currency).
+- [ ] **Cobalt balance.** Count the cobalt on screen: the Assistant's glyph and edge, the active tab.
+  Nothing else competes.
+- [ ] **Dynamic Type** at the default, the largest standard and the largest accessibility size: the
+  pills stack at full width with wrapping labels; the Assistant entry grows in height and its label
+  wraps; the header stacks; section rows stack their amounts; nothing clips or overlaps.
+- [ ] **VoiceOver.** Order: title, Gastos/Disponible (selected state), currency, month, amount (one
+  element with currency), "Registrar gasto", "Registrar ingreso", "Transferir entre cuentas",
+  "Contale al Asistente, botón" + its hint, then each section header and its "Reportes"/"Ver todo"
+  button, category rows (name, amount, share), commitments (merchant, category, amount, next
+  payment), transactions. In English: "Ask the Assistant".
+- [ ] **Reduce Motion.** Switching Gastos/Disponible and currency cross-fades the number without
+  movement; the category fills fade in without growing; sections appearing fade only.
+- [ ] Reportes: «Dónde más gastaste» and «Para tener en cuenta» show no subtitle; nothing else moved.
+- [ ] Account detail: the same three pills, each opening its form with the account preselected.
+- [ ] Más footer reads "Producto 24UX3".
+
 ## Producto 24UX2 — merchant identity and Home refinement
 
 **Not done in 24UX2: no EAS build was made and the iPhone was not touched.** Metro from this branch
@@ -7,11 +55,11 @@
 module. Record each result with the language, the theme and the text size it was checked in. Use
 your own small real data; never seed movements.
 
-- [ ] Inicio, light and dark, opaque material and Liquid Glass (iOS 26 without Reduce Transparency):
+- [ ] (Superseded by 24UX3's pills and Assistant entry.) Inicio, light and dark, opaque material and Liquid Glass (iOS 26 without Reduce Transparency):
   the four actions are 48 pt flat discs with a hairline edge, no shadow and no cobalt halo; the
   Asistente still reads as the first of the family (cobalt glyph on a soft tint); the hero is the
   heaviest element on screen. Press feedback still scales to 0,97.
-- [ ] The actions at the largest accessibility text sizes on the narrowest phone available:
+- [ ] (Superseded by 24UX3.) The actions at the largest accessibility text sizes on the narrowest phone available:
   "Transferir" wraps to two lines, nothing clips, the four columns stay equal and tappable.
 - [ ] Próximos compromisos: each row shows merchant, the category below (and the account only if
   another account of that currency exists), the amount and "Hoy" / "Mañana" / "En N días" / a date

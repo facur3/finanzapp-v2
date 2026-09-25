@@ -2,75 +2,87 @@ import { StyleSheet, View, type ViewStyle } from 'react-native';
 import { router } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import type { Currency } from '@finanzapp/domain';
-import { AppText, PressFeedback, toneColors, type IconName, type Tone } from './components';
+import { AppText, PressFeedback, toneColors, useStacked, type IconName, type Tone } from './components';
 import { ControlSurface, useMaterial } from './material';
 import { space, usePalette, type Palette } from './theme';
 import { useI18n } from '../i18n/provider';
 
-type ActionKind = 'assistant' | 'expense' | 'income' | 'transfer';
-type Action = { kind: ActionKind; label: string; accessibilityLabel: string; icon: IconName; tone: Tone | 'primary'; onPress: () => void };
+type ActionKind = 'expense' | 'income' | 'transfer';
+type Action = { kind: ActionKind; label: string; accessibilityLabel: string; icon: IconName; tone: Tone; onPress: () => void };
 
-/** Diameter of the round action (24UX2: 48, was 54). Lighter beside the hero, still a comfortable target: the whole
- * column (circle and caption, about 80 × 76 pt) is what the finger hits. Four of them plus gaps fit a 320 pt content width. */
-export const QUICK_ACTION_SIZE = 48;
+/** Height of a movement pill (24UX3). The pressable around it is 44 pt, so the visible capsule stays compact
+ * while the target does not shrink. */
+export const ACTION_PILL_HEIGHT = 40;
+/** Height of the Assistant entry: the one wide control under the hero, taller than a pill and shorter than a row. */
+export const ASSISTANT_ENTRY_HEIGHT = 52;
 
-/** The opaque material of a round action, the designed state for every
- * device without Liquid Glass (older iOS, Android, Reduce Transparency).
- * Light: white with a hairline edge. Dark: a surface step with a faint light
- * edge, the way a control catches light. No shadow and no halo (24UX2): four
- * floating discs under the hero read as a row of buttons competing with the
- * number; flat discs read as tools. The Assistant is the same object in the
- * brand tint: a cobalt wash and a hairline cobalt edge, so it reads as the
- * first of a family, not as a different kind of button. On iOS 26 the same geometry is drawn as native glass (see
- * `glassTint`): regular glass for the three movements, a cobalt wash for the
- * Assistant, no ring, because the material itself carries the edge. */
-export function quickActionMaterial(p: Palette, assistant: boolean): ViewStyle {
-  if (assistant) return { backgroundColor: p.primarySoft, borderWidth: StyleSheet.hairlineWidth, borderColor: p.primary + (p.isDark ? '80' : '59') };
-  if (p.isDark) return { backgroundColor: p.inset, borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(255,255,255,0.10)' };
-  return { backgroundColor: p.surface, borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(10,10,12,0.12)' };
+/** The opaque material of a movement pill, the designed state for every device without Liquid Glass (older iOS,
+ * Android, Reduce Transparency): the surface step with a hairline edge, no shadow. Three quiet capsules read as tools
+ * under the number, not as buttons competing with it. On iOS 26 the same geometry is regular glass. */
+export function actionPillMaterial(p: Palette): ViewStyle {
+  return { backgroundColor: p.surface, borderWidth: StyleSheet.hairlineWidth, borderColor: p.isDark ? 'rgba(255,255,255,0.08)' : 'rgba(10,10,12,0.10)' };
 }
 
-/** The wash a glass action carries: cobalt at a fifth for the Assistant (24UX2: was a quarter), none for the movements. */
+/** The Assistant entry's opaque material: the surface barely cooled by the brand (`primaryWash`) and a hairline cobalt
+ * edge. It belongs to the screen's surfaces, not to a banner; the cobalt lives in the glyph. */
+export function assistantEntryMaterial(p: Palette): ViewStyle {
+  return { backgroundColor: p.primaryWash, borderWidth: StyleSheet.hairlineWidth, borderColor: p.primary + (p.isDark ? '4D' : '40') };
+}
+
+/** The wash a glass control carries: cobalt at 15 % for the Assistant, none for the movements. */
 export function glassTint(p: Palette, assistant: boolean): string | undefined {
-  return assistant ? p.primary + '33' : undefined;
+  return assistant ? p.primary + '26' : undefined;
 }
 
-/** The ways to act on money from Home, as equal-width round actions: the
- * Assistant first (typing, and later speaking, about your money), then the
- * three movements. Each column flexes, so four fit a small iPhone and the
- * captions may wrap under large text instead of the row overflowing. Colour
- * lives in the glyph (expense coral, income green, transfer azure) on a
- * neutral material; only the Assistant carries the brand tint. Account
- * detail keeps the three movements. The whole column (circle and caption,
- * about 80 × 76 pt) is the touch target; columns never overlap. The Assistant
- * here is a discoverability shortcut: the persistent, thumb-reachable entry
- * is the centre tab, and both go to the same conversation. */
-export function QuickActions({ currency, accountId, assistant = false }: { currency?: Currency; accountId?: string; assistant?: boolean }) {
+/** The three ways to record money, as one row of compact pills (24UX3; they were four round actions with the
+ * Assistant first). Equal widths, glyph in its semantic colour (expense coral, income green, transfer azure) and the
+ * label in ink, so colour carries meaning and the row stays lighter than the hero. On a narrow iPhone the label
+ * shrinks a little rather than wrapping; with accessibility text sizes the pills stack at full width and the label
+ * wraps. Inicio and account detail share this row; the Assistant has its own entry below it on Inicio. */
+export function QuickActions({ currency, accountId }: { currency?: Currency; accountId?: string }) {
   const { t } = useI18n();
+  const stacked = useStacked();
   const params = { ...(accountId ? { accountId } : {}), ...(currency ? { currency } : {}) };
   const actions: Action[] = [
-    ...(assistant ? [{ kind: 'assistant' as const, label: t('quickActions.assistant'), accessibilityLabel: t('quickActions.openAssistant'), icon: 'sparkles' as const, tone: 'primary' as const,
-      onPress: () => router.navigate({ pathname: '/assistant', params: currency ? { currency } : {} }) }] : []),
     { kind: 'expense', label: t('quickActions.expense'), accessibilityLabel: t('quickActions.recordExpense'), icon: 'remove', tone: 'expense', onPress: () => router.push({ pathname: '/new-entry', params: { kind: 'expense', ...params } }) },
     { kind: 'income', label: t('quickActions.income'), accessibilityLabel: t('quickActions.recordIncome'), icon: 'add', tone: 'income', onPress: () => router.push({ pathname: '/new-entry', params: { kind: 'income', ...params } }) },
     { kind: 'transfer', label: t('quickActions.transfer'), accessibilityLabel: t('quickActions.transferBetween'), icon: 'swap-horizontal', tone: 'transfer', onPress: () => router.push({ pathname: '/new-transfer', params: accountId ? { accountId } : {} }) },
   ];
-  return <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: space.s, marginHorizontal: -space.xs }}>
-    {actions.map(action => <QuickAction key={action.kind} {...action} />)}
+  return <View style={{ flexDirection: stacked ? 'column' : 'row', gap: space.s }}>
+    {actions.map(action => <ActionPill key={action.kind} {...action} stacked={stacked} />)}
   </View>;
 }
 
-function QuickAction({ label, accessibilityLabel, icon, tone, onPress }: Action) {
+function ActionPill({ label, accessibilityLabel, icon, tone, onPress, stacked }: Action & { stacked: boolean }) {
   const p = usePalette();
   const material = useMaterial();
-  const assistant = tone === 'primary';
-  const color = assistant ? p.primary : toneColors(p, tone).color;
-  return <PressFeedback accessibilityRole="button" accessibilityLabel={accessibilityLabel} onPress={onPress} containerStyle={{ flex: 1, minWidth: 0 }}
-    style={{ alignItems: 'center', gap: 6, paddingVertical: 2 }}>
-    <ControlSurface material={material} tint={glassTint(p, assistant)} opaque={quickActionMaterial(p, assistant)}
-      style={{ width: QUICK_ACTION_SIZE, height: QUICK_ACTION_SIZE, borderRadius: QUICK_ACTION_SIZE / 2, alignItems: 'center', justifyContent: 'center' }}>
-      <Ionicons name={icon} size={assistant ? 20 : 22} color={color} accessible={false} />
+  return <PressFeedback accessibilityRole="button" accessibilityLabel={accessibilityLabel} onPress={onPress} containerStyle={stacked ? undefined : { flex: 1, minWidth: 0 }}>
+    <ControlSurface material={material} opaque={actionPillMaterial(p)}
+      style={{ minHeight: ACTION_PILL_HEIGHT, borderRadius: ACTION_PILL_HEIGHT / 2, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingHorizontal: 10, paddingVertical: stacked ? 8 : 0 }}>
+      <Ionicons name={icon} size={17} color={toneColors(p, tone).color} accessible={false} />
+      <AppText variant="subhead" numberOfLines={stacked ? undefined : 1} adjustsFontSizeToFit={!stacked} minimumFontScale={0.8}
+        style={{ fontWeight: '600', flexShrink: 1 }}>{label}</AppText>
     </ControlSurface>
-    <AppText variant="caption" numberOfLines={2} style={{ fontWeight: '500', color: p.secondary, textAlign: 'center' }}>{label}</AppText>
+  </PressFeedback>;
+}
+
+/** The Assistant on Inicio (24UX3): one wide capsule under the movements, the nearest control to the thumb in the top
+ * half of the screen. It is a button, not a text field (no placeholder grey, no caret, no microphone), so it never
+ * reads as search: its glyph on a small cobalt disc, one line in ink, a chevron. It navigates to the centre tab (the
+ * same conversation, never a stacked copy) and carries the currency Inicio shows. */
+export function AssistantEntry({ currency }: { currency?: Currency }) {
+  const p = usePalette();
+  const material = useMaterial();
+  const { t } = useI18n();
+  return <PressFeedback accessibilityRole="button" accessibilityLabel={t('quickActions.askAssistant')} accessibilityHint={t('quickActions.askAssistantHint')}
+    onPress={() => router.navigate({ pathname: '/assistant', params: currency ? { currency } : {} })}>
+    <ControlSurface material={material} tint={glassTint(p, true)} opaque={assistantEntryMaterial(p)}
+      style={{ minHeight: ASSISTANT_ENTRY_HEIGHT, borderRadius: ASSISTANT_ENTRY_HEIGHT / 2, flexDirection: 'row', alignItems: 'center', gap: space.m, paddingLeft: 10, paddingRight: space.l, paddingVertical: 8 }}>
+      <View accessible={false} style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: p.primarySoft, alignItems: 'center', justifyContent: 'center' }}>
+        <Ionicons name="sparkles" size={16} color={p.primary} accessible={false} />
+      </View>
+      <AppText variant="subhead" style={{ flex: 1, minWidth: 0, fontWeight: '600' }}>{t('quickActions.askAssistant')}</AppText>
+      <Ionicons name="chevron-forward" size={15} color={p.tertiary} accessible={false} />
+    </ControlSurface>
   </PressFeedback>;
 }

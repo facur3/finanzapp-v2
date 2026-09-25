@@ -185,7 +185,7 @@ is distributed to people. Today:
 
 | | What |
 | --- | --- |
-| Implemented | Everything in the roadmap's §1, up to Producto 24UX2 (the Más footer reads Producto 24UX2). |
+| Implemented | Everything in the roadmap's §1, up to Producto 24UX3 (the Más footer reads Producto 24UX3). |
 | Device-tested | The first Expo Go flow (2026-09-12), the Interfaz 15 motion direction, the per-app Language row on build `1d69d2d4`, and the owner's 24B5/24B6 sessions that produced the 24B6 and 24UX1 corrections. Every later section of the [device checklist](../../docs/mobile-device-checklist.md) is still pending, and no per-item 24B5/24B6 result is recorded. |
 | Released | Nothing. No store build, no TestFlight, no production identity. |
 

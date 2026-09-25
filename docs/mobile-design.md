@@ -900,7 +900,85 @@ persona; la categoría sigue en la leyenda de la fila. Solo en desarrollo,
 7. Barra de pestañas: etiquetas inactivas en secundario.
 8. El pie de Más dice Producto 24UX2.
 
+## Producto 24UX3 — jerarquía de Inicio
+
+Sin rediseño desde cero y sin módulos nuevos: la misma estructura (título, Gastos / Disponible,
+la moneda a la derecha, el número, las acciones, las secciones), con un solo punto focal y menos
+cosas compitiendo. Reemplaza lo dicho sobre las acciones de Inicio en Producto 21, 22 y 24UX2:
+el propietario aprobó la alternativa B de 24UX2. Todo lo que sigue es código y cálculo sobre los
+tokens, no una captura del iPhone.
+
+```
+┌─────────────────────────────────────┐
+│ Inicio                              │
+│ [Gastos|Disponible]      [ARS|USD]  │  compactos: 32 pt, elegido en tinta
+│                                     │  28 pt de aire
+│ Septiembre                          │
+│ $ 123.456,78                        │  48 pt (44 en el resto de la app)
+│                                     │  32 pt
+│ (− Gasto) (+ Ingreso) (⇄ Transferir)│  píldoras de 40 pt, glifo en su color
+│ ( ✦  Contale al Asistente       › ) │  52 pt, lavado de marca, filo cobalto
+│                                     │
+│ En qué gastaste          Reportes › │  resumen compacto: tarjeta, filas 52 pt
+│ Próximos compromisos    Ver todos › │  agenda abierta, sobre el fondo
+│ Últimos movimientos     Ver todos › │  libro: lista agrupada
+└─────────────────────────────────────┘
+```
+
+**Qué cambió y por qué mejora la jerarquía.**
+
+1. **Cabecera más liviana.** El segmentado y la moneda usan la variante `compact` (32 pt en
+   vez de 36, 44 pt de objetivo con el `hitSlop`), la etiqueta elegida en tinta sobre un pulgar
+   elevado, como el control nativo, y en oscuro la pista es el escalón de superficie, no el
+   relleno más claro. Antes la cabecera tenía dos palabras cobalto encima del número.
+2. **El número respira.** 48 pt en Inicio (los otros héroes siguen en 44), 28 pt entre la
+   cabecera y el mes, 32 pt entre bloques (antes 20 y 24). `Money` sigue ajustando un importe
+   largo al ancho y limitando Dynamic Type.
+3. **Movimientos como píldoras.** Gasto, Ingreso y Transferir son tres cápsulas de igual ancho y
+   40 pt (el objetivo de toque es de 44), en el escalón de superficie con filo fino, el glifo en
+   su color semántico y la etiqueta en tinta. Pesan menos que los discos con leyenda y ocupan una
+   sola línea. En un iPhone angosto la etiqueta se achica hasta 80 % en vez de partirse; con los
+   tamaños de accesibilidad las píldoras se apilan a todo el ancho y la etiqueta parte. Detalle de
+   cuenta usa la misma fila.
+4. **El Asistente, una sola entrada ancha.** Debajo de los movimientos, más cerca del pulgar que
+   la fila anterior: una cápsula de 52 pt a todo el ancho sobre `primaryWash` (la superficie
+   apenas enfriada por la marca: #151B2C oscuro, #F5F8FF claro) con filo cobalto fino, el glifo
+   sparkles en un disco `primarySoft`, «Contale al Asistente» en tinta y un chevron. Es un botón,
+   no un campo: sin texto gris de marcador, sin cursor, sin micrófono, para que no se lea como un
+   buscador. Con Liquid Glass es vidrio regular con un lavado cobalto al 15 %. Navega a la pestaña
+   central (la misma conversación) con la moneda de Inicio; VoiceOver dice «Contale al Asistente,
+   botón» y una pista de qué hace. La pestaña central sigue siendo la entrada persistente.
+5. **Tres secciones, tres formas.** «En qué gastaste» es un resumen compacto: la única tarjeta,
+   filas de 52 pt (antes 64) con glifos de 32 pt y nombre e importe a 15 pt, los lavados de
+   siempre. «Próximos compromisos» es una agenda: sin tarjeta, las filas sobre el fondo alineadas
+   con el título, marca de 32 pt, filete que empieza bajo el texto y respuesta al toque por
+   atenuación. «Últimos movimientos» sigue siendo el libro: la lista agrupada con filas completas.
+6. **Enlaces de sección silenciosos.** Reportes, Ver y Ver todo en footnote, tinta secundaria y
+   un chevron terciario (`SectionTitle quiet`), con objetivo de 44 pt. Siguen en el mismo lugar y
+   abren lo mismo; el resto de la app conserva el enlace cobalto.
+7. **Menos cobalto a la vez.** En Inicio quedan el glifo y el filo del Asistente y la pestaña
+   activa. El presupuesto sigue en tinta, ámbar o coral según su estado.
+
+**Lo que no cambió a propósito.** La estructura y el orden de Inicio, qué muestra cada sección y
+cuántas filas, los destinos de navegación, el presupuesto del mes, el estado vacío, los lavados de
+categoría y su revelado, las filas de movimientos, Reduce Motion (los mismos `Reflow` y
+`ValueTransition`), los colores semánticos y la barra de pestañas. Ningún cálculo, dato o contrato.
+
+**Textos.** Reportes pierde dos subtítulos: «Por importe registrado en el período» (repetía el
+título) y «Hechos de tus registros, no consejos» (texto de descargo). La nota de Más sobre el
+guardado local se conserva: es información de estado, no ruido.
+
+**Riesgos a mirar en el iPhone.** Que las píldoras no se lean como filtros; que la entrada del
+Asistente se lea importante sin volverse un banner; que «Transferir» no se achique de más en un
+iPhone de 375 pt; que la agenda sin tarjeta no parezca suelta junto a las otras dos secciones.
+
 ## Pendiente de revisión en iPhone
+
+- Producto 24UX3: la jerarquía de Inicio en claro y oscuro, con material opaco y con vidrio:
+  lectura de primer vistazo, cabecera compacta, número de 48 pt, las tres píldoras y la entrada
+  del Asistente (importancia, alcance con el pulgar, que no parezca un buscador), las tres formas
+  de sección, el equilibrio del cobalto, Dynamic Type, VoiceOver y Reduce Motion. Lista en
+  docs/mobile-device-checklist.md.
 
 - Producto 24UX2: las acciones de 48 pt sin sombra en claro y oscuro, con vidrio y sin él (¿se
   leen como herramientas y no como botones sueltos?, ¿el Asistente sigue reconocible?); leyendas a

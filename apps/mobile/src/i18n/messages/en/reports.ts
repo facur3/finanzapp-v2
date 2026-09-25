@@ -40,12 +40,10 @@ export const reports: Pick<Messages, 'reports'> = {
     },
     merchants: {
       title: 'Where you spent most',
-      caption: 'By amount recorded in the period',
       purchases: { one: '{count} purchase', other: '{count} purchases' },
     },
     insights: {
       title: 'Worth noting',
-      caption: 'Facts from your records, not advice',
       overTotal: 'You went over your overall budget',
       nearTotal: 'You’re close to your overall budget',
       overCategory: '{category} went over its budget',
