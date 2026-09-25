@@ -238,3 +238,11 @@ export function deleteRecurringRule(rule: RecurringRule, nowISO: string): Recurr
   if (!validTimestamp(nowISO)) throw new Error('Fecha de actualización inválida.');
   return { ...rule, active: false, deleted: true, revision: rule.revision + 1, updatedAt: nowISO };
 }
+
+/** Producto 24UX5: an active rule whose next date is already before today was set aside by the catch-up (it runs on
+ * every launch and return to the foreground through today, so a healthy rule's next date is always after today, or
+ * today itself between midnight and the next foreground). It records nothing on its own until the person decides:
+ * continuing from today (`resumeRecurringRule`) never records the backlog. */
+export function recurringNeedsReview(rule: Pick<RecurringRule, 'active' | 'deleted' | 'nextDateISO'>, todayISO: string): boolean {
+  return rule.active && !rule.deleted && rule.nextDateISO < todayISO;
+}

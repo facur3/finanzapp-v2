@@ -763,29 +763,40 @@ export async function saveRecurringRule(db: LedgerDatabase, input: RecurringRule
   });
 }
 
+/** What one catch-up did: the movements it recorded, and the rules it set aside untouched (their ids). */
+export type RecurringCatchUp = { created: number; failed: string[] };
+
 /** Materialize every due occurrence once. Entry IDs are deterministic and the
- * rule advance is committed atomically with those postings. */
-export async function processRecurring(db: LedgerDatabase, throughDateISO: string, nowISO = new Date().toISOString()): Promise<number> {
-  let created = 0;
+ * rule advance is committed atomically with those postings.
+ *
+ * Producto 24UX5: one rule never blocks the others or the opening of the ledger. A rule whose occurrences cannot be
+ * materialized (more than the domain's 366 pending dates after a very long absence, or a rule that no longer
+ * validates) is set aside unchanged and reported in `failed`; the person resolves it from Recurrentes, where an
+ * active rule whose next date is already past reads as needing review. An occurrence whose deterministic id is
+ * already in the ledger is that same occurrence (the id is the rule and the date): it counts as recorded whatever the
+ * person did to it since (edited, moved, undone), so it is never recorded twice and never stops the catch-up. */
+export async function catchUpRecurring(db: LedgerDatabase, throughDateISO: string, nowISO = new Date().toISOString()): Promise<RecurringCatchUp> {
+  let result: RecurringCatchUp = { created: 0, failed: [] };
   await db.withExclusiveTransactionAsync(async tx => {
     const archive = await readArchive(tx);
     if (!archive.recurring?.length) return;
     const records = [...archive.records];
+    const known = new Set(records.map(record => record.entry.id));
     const recurring = [...archive.recurring];
     const inserts: EntryRecord[] = [];
     const updates: RecurringRule[] = [];
+    const failed: string[] = [];
 
     for (let index = 0; index < recurring.length; index++) {
       const current = recurring[index];
-      const materialized = materializeRecurringRule(current, archive.accounts, throughDateISO, nowISO);
+      let materialized: ReturnType<typeof materializeRecurringRule>;
+      try { materialized = materializeRecurringRule(current, archive.accounts, throughDateISO, nowISO); }
+      catch { failed.push(current.id); continue; }
       if (!materialized.entries.length) continue;
       for (const entry of materialized.entries) {
-        const existing = records.find(record => record.entry.id === entry.id);
-        if (existing) {
-          if (!sameEntry(existing.entry, entry)) throw new Error('Un vencimiento recurrente coincide con otro movimiento distinto.');
-          continue; // A restored/voided deterministic occurrence is never duplicated.
-        }
+        if (known.has(entry.id)) continue; // Already recorded (perhaps edited or undone since): never a duplicate.
         const record = initialRecord(entry);
+        known.add(entry.id);
         records.push(record);
         inserts.push(record);
       }
@@ -793,6 +804,7 @@ export async function processRecurring(db: LedgerDatabase, throughDateISO: strin
       updates.push(materialized.rule);
     }
 
+    result = { created: 0, failed };
     if (!updates.length) return;
     validateArchive({ ...archive, records, recurring });
     for (const record of inserts) await insertRecord(tx, record);
@@ -800,9 +812,14 @@ export async function processRecurring(db: LedgerDatabase, throughDateISO: strin
       await tx.runAsync('UPDATE recurring_rules SET nextDateISO = ?, revision = ?, updatedAt = ? WHERE id = ?',
         rule.nextDateISO, rule.revision, rule.updatedAt, rule.id);
     }
-    created = inserts.length;
+    result = { created: inserts.length, failed };
   });
-  return created;
+  return result;
+}
+
+/** The number of movements a catch-up recorded (see `catchUpRecurring`). */
+export async function processRecurring(db: LedgerDatabase, throughDateISO: string, nowISO = new Date().toISOString()): Promise<number> {
+  return (await catchUpRecurring(db, throughDateISO, nowISO)).created;
 }
 
 

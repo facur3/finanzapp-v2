@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { advanceRecurringDate, deleteRecurringRule, materializeRecurringRule, pauseRecurringRule, recurringEntryId, recurringHistory, recurringOccurrenceOf, recurringOccurrencesThrough,
+import { recurringNeedsReview, advanceRecurringDate, deleteRecurringRule, materializeRecurringRule, pauseRecurringRule, recurringEntryId, recurringHistory, recurringOccurrenceOf, recurringOccurrencesThrough,
   resumeRecurringRule, validateRecurringRule, validateRecurringRuleChange, type RecurringRule } from './recurring';
 import type { Account } from './ledger';
 
@@ -129,5 +129,24 @@ describe('pausing, resuming and deleting a rule (Producto 24UX4)', () => {
     const recorded = materializeRecurringRule(monthly, [account], '2026-02-28', now).entries;
     deleteRecurringRule(monthly, now);
     expect(recurringHistory(monthly, recorded).map(entry => entry.dateISO)).toEqual(['2026-02-28', '2026-01-31']);
+  });
+});
+
+describe('a rule the catch-up set aside (Producto 24UX5)', () => {
+  const base = { active: true, deleted: false, nextDateISO: '2026-09-20' };
+  it('needs review only while active, not deleted, with a next date before today', () => {
+    expect(recurringNeedsReview(base, '2026-09-25')).toBe(true);
+    expect(recurringNeedsReview({ ...base, nextDateISO: '2026-09-25' }, '2026-09-25')).toBe(false);
+    expect(recurringNeedsReview({ ...base, nextDateISO: '2026-10-01' }, '2026-09-25')).toBe(false);
+    expect(recurringNeedsReview({ ...base, active: false }, '2026-09-25')).toBe(false);
+    expect(recurringNeedsReview({ ...base, active: false, deleted: true }, '2026-09-25')).toBe(false);
+  });
+  it('continuing from today clears it without recording the backlog', () => {
+    const stale = { id: 'r', accountId: 'a', kind: 'expense' as const, amountMinor: 100, merchant: 'X', category: 'Y', frequency: 'weekly' as const,
+      anchorDateISO: '2019-01-03', nextDateISO: '2019-01-03', active: true, deleted: false, createdAt: '2019-01-01T00:00:00.000Z', revision: 0, updatedAt: '2019-01-01T00:00:00.000Z' };
+    const resumed = resumeRecurringRule(stale, '2026-09-25', '2026-09-25T12:00:00.000Z');
+    expect(recurringNeedsReview(resumed, '2026-09-25')).toBe(false);
+    expect(resumed.nextDateISO >= '2026-09-25').toBe(true);
+    expect(recurringOccurrencesThrough(resumed, '2026-09-25').length).toBeLessThanOrEqual(1);
   });
 });

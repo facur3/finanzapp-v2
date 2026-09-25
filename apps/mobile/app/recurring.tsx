@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
-import { recurringForecastByCurrency, type Currency, type RecurringRule } from '@finanzapp/domain';
+import { recurringForecastByCurrency, recurringNeedsReview, type Currency, type RecurringRule } from '@finanzapp/domain';
 import { useLedger } from '../src/storage/LedgerProvider';
 import { ActionButton, AppText, EmptyState, ErrorMessage, IconButton, MerchantBadge, Money, PressFeedback, Screen, SectionTitle, Stat, StatRow, Surface, useStacked } from '../src/ui/components';
 import { useCategoryLook } from '../src/ui/category-hues';
@@ -80,7 +80,9 @@ export default function RecurringScreen() {
  * category · account); on the right the amount and when it is next due, or that it is paused. The date appears
  * once. A paused rule keeps full-contrast ink (it was drawn at 60 % opacity, below AA for its caption) and says
  * «Pausado» where the due day would be, in its caption and in its VoiceOver sentence. Pause/resume and delete are
- * trailing swipe actions (24UX4, replacing the row's switch), and VoiceOver custom actions on the same row. */
+ * trailing swipe actions (24UX4, replacing the row's switch), and VoiceOver custom actions on the same row.
+ * 24UX5: an active rule the catch-up set aside (its next date is already past) says «Revisar» in amber where the day
+ * would be, never «Hoy»: its detail explains and offers to continue from today. */
 function RecurringRow({ rule, accounts, day, last, actions }: {
   rule: RecurringRule; accounts: { id: string; name: string; currency: Currency }[]; day: string; last: boolean; actions: SwipeAction[];
 }) {
@@ -89,16 +91,17 @@ function RecurringRow({ rule, accounts, day, last, actions }: {
   const account = accounts.find(item => item.id === rule.accountId);
   const category = useCategoryLook(rule.category, rule.kind).label;
   const due = dueWhen(rule.nextDateISO, day);
-  const when = !rule.active ? t('recurring.row.paused') : due.kind === 'today' || due.kind === 'due' ? t('home.upcomingRow.today')
+  const review = recurringNeedsReview(rule, day);
+  const when = !rule.active ? t('recurring.row.paused') : review ? t('recurring.row.review') : due.kind === 'today' ? t('home.upcomingRow.today')
     : due.kind === 'tomorrow' ? t('home.upcomingRow.tomorrow') : due.kind === 'soon' ? t('home.upcomingRow.inDays', { count: due.days })
       : relativeDate(rule.nextDateISO, day);
-  const urgent = rule.active && (due.kind === 'today' || due.kind === 'tomorrow' || due.kind === 'due');
+  const urgent = rule.active && (review || due.kind === 'today' || due.kind === 'tomorrow');
   const income = rule.kind === 'income';
   const stacked = useStacked(account ? { minor: income ? rule.amountMinor : -rule.amountMinor, currency: account.currency, signed: true } : undefined);
   const spoken = { merchant: rule.merchant, frequency: t(`recurring.frequencySpoken.${rule.frequency}`), category,
     amount: account ? spokenMinor(rule.amountMinor, account.currency) : '', currency: account?.currency ?? '', date: relativeDate(rule.nextDateISO, day, true) };
   return <SwipeRow actions={actions}><View style={{ borderBottomColor: p.line, borderBottomWidth: last ? 0 : StyleSheet.hairlineWidth }}>
-    <PressFeedback feedback="highlight" accessibilityRole="button" accessibilityLabel={t(rule.active ? 'recurring.row.label' : 'recurring.row.labelPaused', spoken)}
+    <PressFeedback feedback="highlight" accessibilityRole="button" accessibilityLabel={t(!rule.active ? 'recurring.row.labelPaused' : review ? 'recurring.row.labelReview' : 'recurring.row.label', spoken)}
       {...swipeAccessibility(actions)}
       onPress={() => router.push({ pathname: '/edit-recurring/[id]', params: { id: rule.id } })}
       style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, paddingHorizontal: 16, minHeight: 64 }}>

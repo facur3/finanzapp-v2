@@ -5,10 +5,11 @@ import { snapshotFromArchive, todayKey, type Account, type Entry, type EntryChan
   type CreditCardProfile, type PersonalDebtProfile, type AccountAppearance, type CategoryDefinition } from '@finanzapp/domain';
 import type { CurrencyGate } from '@finanzapp/domain';
 import { currencyGateForBuild } from './currency-gate';
-import { changeEntry, createAccount, createEntry, importArchive, initializeDatabase, readArchive, changeAccount,
+import { changeEntry, createAccount, createEntry, importArchive, readArchive, changeAccount,
   createTransfer, changeTransfer, saveRecurringRule, processRecurring, saveMonthlyBudget,
   createCreditCard, saveCreditCard, createPersonalDebt, savePersonalDebt, saveAccountAppearance, saveCategoryDefinition,
   type LedgerDatabase } from './database';
+import { openLedger, refreshLedger } from './ledger-session';
 import { openLedgerDatabase } from './nativeDatabase';
 
 declare const __DEV__: boolean | undefined;
@@ -65,10 +66,12 @@ export function LedgerProvider({ children }: { children: ReactNode }) {
     void enqueue(async () => {
       const db = database.current ?? await openLedgerDatabase();
       database.current = db;
-      await initializeDatabase(db);
-      await processRecurring(db, todayKey());
-      const next = await readArchive(db);
-      if (!cancelled) setArchive(next);
+      // 24UX5: the recurring catch-up never keeps the data closed. A rule it cannot record waits in Recurrentes for
+      // review; a catch-up that failed as a whole is said in the banner, over the open app, with its retry.
+      const session = await openLedger(db, todayKey());
+      if (cancelled) return;
+      setArchive(session.archive);
+      if (session.recurringError) setError('No pudimos verificar tus datos locales ni los vencimientos recurrentes. No se modificó nada fuera de una transacción completa.');
     }).catch(() => {
       if (!cancelled) setError('No pudimos abrir tus datos. No se borró ni reemplazó nada. Probá nuevamente o conservá la app para recuperar la base.');
     });
@@ -79,9 +82,10 @@ export function LedgerProvider({ children }: { children: ReactNode }) {
     const subscription = AppState.addEventListener('change', state => {
       if (state !== 'active' || !database.current || !snapshot) return;
       void enqueue(async () => {
-        await processRecurring(database.current!, todayKey());
-        const next = await readArchive(database.current!);
-        if (mounted.current) { setArchive(next); setError(null); }
+        const session = await refreshLedger(database.current!, todayKey());
+        if (!mounted.current) return;
+        setArchive(session.archive);
+        setError(session.recurringError ? 'No pudimos verificar tus datos locales ni los vencimientos recurrentes. No se modificó nada fuera de una transacción completa.' : null);
       }).catch(() => {
         if (mounted.current) setError('No pudimos verificar tus datos locales ni los vencimientos recurrentes. No se modificó nada fuera de una transacción completa.');
       });
