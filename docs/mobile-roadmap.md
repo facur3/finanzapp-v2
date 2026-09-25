@@ -698,6 +698,16 @@ the owner authorises it; no EAS build or store submission without the owner.
     `regions:generate -- --check`, `currency:generate -- --check`, `i18n:check -- --strict` (English
     reviewed and accepted), `i18n:extract`, `check`, `export:ios` (5 MB, no `LOCALE_PREVIEW`); root
     `npm test` 302/302 and `npm run check:repo`. No EAS build; the iPhone was not touched.
+  - **Review of PR #60:** `ChoiceScreen`'s list is now the screen's scroll view with the project's inset
+    mechanism (`contentInsetAdjustmentBehavior="automatic"`, `automaticallyAdjustKeyboardInsets`, interactive
+    keyboard dismissal, as `Screen` and the activity list): the navigation bar, the home indicator and the
+    keyboard no longer cover the last region, the error or the footnote. `LocaleChooser`'s `onChosen` also
+    fires when the checked value is tapped (`ChoiceScreen.onConfirm`), writing nothing, so the onboarding
+    can continue with it; Más passes no `onChosen` and stays inert. Checked: mobile `test:storage` 671/671
+    (+1 `choice-list`: insets and confirmation; +1 `locale-switch`: the real chooser confirms without a write,
+    re-render or recent, Más stays inert), typecheck, `i18n:check -- --strict`, `i18n:extract`,
+    `currency:verify`, `regions:verify`, `regions:generate -- --check`, `check`, `export:ios`; root `npm test`
+    302/302, `check:repo`.
   - **Pending:** the device QA of §2 and the checklist section Producto 24R2A.
 
 ### Producto 24R2B — regions released by family (next)

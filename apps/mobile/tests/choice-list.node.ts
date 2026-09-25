@@ -97,6 +97,13 @@ test('the screen: a search field only from six options, header rows as VoiceOver
     ['borderTopLeftRadius,borderTopRightRadius', 'borderBottomLeftRadius,borderBottomRightRadius', 'borderRadius,marginTop', ''], 'consecutive rows draw one grouped card');
   assert.match(nodes(list(root).props.ListFooterComponent).filter(node => node.type === 'AppText').map(node => String(node.props.children)).join(' '), /No modifica nada/);
   assert.equal(nodes(list(root).props.ListFooterComponent).find(node => node.type === 'ErrorMessage')!.props.message, null);
+  // Insets (review of PR #60): the list is the scroll view iOS insets, like `Screen`: navigation bar, home indicator and,
+  // with the search focused, the keyboard; the error and the footnote live in the list's footer, so they scroll clear too.
+  assert.deepEqual([list(root).props.contentInsetAdjustmentBehavior, list(root).props.automaticallyAdjustKeyboardInsets, list(root).props.keyboardDismissMode],
+    ['automatic', true, 'interactive']);
+  assert.equal(JSON.stringify(list(root).props.style), JSON.stringify({ flex: 1, backgroundColor: '#F2F2F6' }));
+  assert.equal(list(root).props.contentContainerStyle.flexGrow, 1);
+  assert.equal(nodes(root).filter(node => node.type === 'View' && node.props.style?.flex === 1).length, 0, 'no wrapper view between the screen and its scroll view');
   // Choosing: the current option does nothing; another saves, ticks and keeps no error.
   nodes(rows[1]).find(node => node.type === 'CheckRow')!.props.onPress();
   assert.deepEqual([chosen, few.haptics], [[], []]);
@@ -129,6 +136,23 @@ test('the screen: a search field only from six options, header rows as VoiceOver
 const noMatchText = (root: Node) => nodes(list(root).props.ListHeaderComponent).filter(node => node.type === 'AppText').map(node => String(node.props.children));
 const regionScreen = (onChoose: (value: string) => boolean, withPinned = true) => screen({ title: 'Región', options: regionChoices('es').map(choice => ({ value: choice.code, title: choice.name, searchText: choice.searchText })), pinned: withPinned ? pinned : undefined, recent: ['JP'], selected: 'AR', onChoose });
 const searchField = (root: Node) => nodes(list(root).props.ListHeaderComponent).find(node => node.type === 'Field')!;
+
+test('confirming the checked option: Más (no onConfirm) does nothing; a flow with onConfirm continues, and nothing is saved', () => {
+  const saves: string[] = [], confirmed: string[] = [];
+  const options = [{ value: 'es', title: 'Español', language: 'es' }, { value: 'en', title: 'English', language: 'en' }];
+  const more = screen({ title: 'Idioma', options, pinned, selected: 'es', onChoose: (value: string) => { saves.push(value); return true; } });
+  let root = more.render();
+  nodes(rendered(root)[1]).find(node => node.type === 'CheckRow')!.props.onPress();
+  assert.deepEqual([saves, more.haptics], [[], []], 'Más: a tap on the checked row changes nothing');
+  const onboarding = screen({ title: 'Idioma', options, pinned, selected: 'es', onChoose: (value: string) => { saves.push(value); return true; }, onConfirm: (value: string) => confirmed.push(value) });
+  root = onboarding.render();
+  nodes(rendered(root)[1]).find(node => node.type === 'CheckRow')!.props.onPress();
+  assert.deepEqual([saves, confirmed, onboarding.haptics], [[], ['es'], []], 'confirmed without a save or a haptic');
+  root = onboarding.render();
+  assert.equal(nodes(list(root).props.ListFooterComponent).find(node => node.type === 'ErrorMessage')!.props.message, null);
+  nodes(rendered(root)[2]).find(node => node.type === 'CheckRow')!.props.onPress();
+  assert.deepEqual([saves, confirmed], [['en'], ['es']], 'another option is still a save, not a confirmation');
+});
 
 test('a search with no match says so under the field although the pinned option stays; a match or a cleared search removes the sentence', () => {
   const many = regionScreen(() => true);

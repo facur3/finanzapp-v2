@@ -505,7 +505,7 @@ function loadPreferenceScreen(provider: Record<string, any>, recentStore = memor
       rememberRecent: (kind: string, value: string, accept: (value: unknown) => boolean) => recentModule.rememberRecent(kind, value, accept, recentStore),
     },
   });
-  return { screen: { ...screen, LocalePreferenceScreen: screen.LocaleChooser }, haptics: () => haptics };
+  return { screen: { LocaleChooser: screen.LocaleChooser, LocalePreferenceScreen: screen.LocaleChooser }, haptics: () => haptics };
 }
 
 test('Idioma: a tap saves and applies in place, the checkmark moves, the screen title follows the language, and a failed save keeps the old checkmark', () => {
@@ -535,6 +535,36 @@ test('Idioma: a tap saves and applies in place, the checkmark moves, the screen 
   act(() => rows()[0].onPress());
   assert.equal(root.root.findByType('ErrorMessage' as never).props.message, null, 'the error clears on the next successful save');
   assert.equal(saved.rows.has(LANGUAGE_PREFERENCE_KEY), false);
+  act(() => root.unmount());
+});
+
+test('LocaleChooser for the onboarding: confirming the checked value calls onChosen and writes nothing; Más (no onChosen) stays inert; a new value is saved once', () => {
+  const saved = memory({ [REGION_PREFERENCE_KEY]: 'AR' });
+  const recents = memory();
+  const store = createLocaleStore({ devices: () => device('es-AR', 'US'), store: saved.store });
+  const { provider } = loadProvider();
+  const { screen } = loadPreferenceScreen(provider, recents.store);
+  let notified = 0;
+  store.subscribe(() => notified++);
+  const chosen: string[] = [];
+  let root!: ReturnType<typeof renderer.create>;
+  act(() => { root = renderer.create(h(provider.I18nProvider, { store }, h(screen.LocaleChooser, { kind: 'region', onChosen: (value: string) => chosen.push(value) }))); });
+  const rows = () => root.root.findAllByType('CheckRow' as never).map(row => row.props);
+  const writes = () => JSON.stringify([...saved.rows], null) + JSON.stringify([...recents.rows]);
+  const before = writes();
+  act(() => rows()[1].onPress()); // Argentina, already checked
+  assert.deepEqual(chosen, ['AR'], 'the onboarding continues with the value in use');
+  assert.equal(writes(), before, 'no preference and no recent written');
+  assert.equal(notified, 0, 'the locale did not change: nothing re-renders');
+  assert.equal(root.root.findByType('ErrorMessage' as never).props.message, null);
+  act(() => rows()[2].onPress()); // Estados Unidos
+  assert.deepEqual(chosen, ['AR', 'US']);
+  assert.deepEqual([saved.rows.get(REGION_PREFERENCE_KEY), recents.rows.get('finanzapp.recent.region')], ['US', '["US"]'], 'a new value is saved first, then remembered');
+  // Más: the same screen without onChosen; a tap on the checked row does nothing at all.
+  act(() => root.update(h(provider.I18nProvider, { store }, h(screen.LocaleChooser, { kind: 'region' }))));
+  const again = writes(), count = notified;
+  act(() => rows()[2].onPress());
+  assert.deepEqual([writes(), notified, chosen.length], [again, count, 2]);
   act(() => root.unmount());
 });
 

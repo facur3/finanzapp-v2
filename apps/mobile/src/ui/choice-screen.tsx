@@ -21,10 +21,13 @@ import { radius, space, usePalette } from './theme';
  * (the list is never empty then, so `ListEmptyComponent` would never show). Text scales
  * with Dynamic Type; no row has a fixed height. Nothing here knows about
  * routes beyond the title, so the onboarding can show it as one of its steps. */
-export function ChoiceScreen<T extends string>({ title, options, pinned, recent, selected, onChoose, note, searchableFrom = SEARCHABLE_CHOICES }: {
+export function ChoiceScreen<T extends string>({ title, options, pinned, recent, selected, onChoose, onConfirm, note, searchableFrom = SEARCHABLE_CHOICES }: {
   title: string; options: readonly ChoiceOption<T>[]; pinned?: ChoiceOption<T>; recent?: readonly T[]; selected: T | null;
   /** Saves the choice; false when the store refused it (the screen says so and keeps the previous checkmark). */
   onChoose: (value: T) => boolean;
+  /** A tap on the option already checked. Absent (Más): nothing happens. A flow that continues after a choice (the
+   * onboarding) passes it to go on with the current value: nothing is saved, nothing changes, no error is shown. */
+  onConfirm?: (value: T) => void;
   /** A footnote under the list, never inside it. */
   note?: string;
   searchableFrom?: number;
@@ -41,15 +44,19 @@ export function ChoiceScreen<T extends string>({ title, options, pinned, recent,
   // so the sentence is drawn from this, under the search field, never from `ListEmptyComponent`.
   const noMatches = !rows.some(row => row.kind === 'choice' && !row.pinned);
   const choose = (value: T) => {
-    if (value === selected) return;
+    if (value === selected) { onConfirm?.(value); return; }
     const saved = onChoose(value);
     setFailed(!saved);
     if (saved) selectionHaptic();
   };
-  return <View style={{ flex: 1, backgroundColor: p.background }}>
+  // The list is the screen's scroll view, inset like `Screen` and the other lists: iOS adds the navigation bar, the home
+  // indicator's safe area and, while the search field is focused, the keyboard (`automaticallyAdjustKeyboardInsets`), so
+  // the last region, the error and the footnote scroll clear of all three. No fixed margin stands in for an inset.
+  return <>
     <Stack.Screen options={{ title }} />
-    <FlatList<ChoiceRow<T>> data={rows} keyExtractor={row => row.key} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag"
-      contentContainerStyle={{ padding: space.xl, paddingBottom: 40 }} initialNumToRender={16} windowSize={7} removeClippedSubviews={false}
+    <FlatList<ChoiceRow<T>> data={rows} keyExtractor={row => row.key} style={{ flex: 1, backgroundColor: p.background }}
+      contentInsetAdjustmentBehavior="automatic" automaticallyAdjustKeyboardInsets keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive"
+      contentContainerStyle={{ padding: space.xl, paddingBottom: 48, flexGrow: 1 }} initialNumToRender={16} windowSize={7} removeClippedSubviews={false}
       ListHeaderComponent={searchable || noMatches ? <View style={{ paddingBottom: space.l, gap: space.m }}>
         {searchable && <Field label={t('preferences.search')} value={query} onChangeText={setQuery} autoCapitalize="none" autoCorrect={false} clearButtonMode="while-editing" maxLength={40} />}
         {noMatches && <AppText secondary variant="subhead" style={{ paddingHorizontal: 4 }}>{t('preferences.noMatches')}</AppText>}
@@ -64,7 +71,7 @@ export function ChoiceScreen<T extends string>({ title, options, pinned, recent,
           <CheckRow title={item.option.title} subtitle={item.option.subtitle} selected={item.selected} accessibilityLanguage={item.option.language}
             last={item.position === 'last' || item.position === 'only'} onPress={() => choose(item.option.value)} />
         </View>} />
-  </View>;
+  </>;
 }
 
 /** The corners a row draws by its place in its group, so consecutive rows read as one grouped card. */

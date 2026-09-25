@@ -401,8 +401,13 @@ de Ajustes de iOS y sin rediseñar nada más:
   formatos de Estados Unidos». Nunca se presenta como si sus formatos estuvieran en uso.
 - **Las notas** (qué define la región, que no cambia la moneda ni los datos, y en la vista previa que
   sus regiones no se verificaron en un iPhone) van debajo de la lista, nunca dentro.
+- **Márgenes del sistema.** La lista es la vista desplazable de la pantalla, con los mismos insets
+  automáticos que `Screen`: barra de navegación, indicador de inicio y, con el buscador activo, el
+  teclado. La última región, el error y la nota siempre pueden desplazarse a la vista; ningún margen
+  fijo reemplaza un inset.
 - **Onboarding.** `LocaleChooser` acepta `onChosen`, así el paso de idioma y el de región del
-  onboarding (25B) son la misma pantalla.
+  onboarding (25B) son la misma pantalla. Tocar la opción ya marcada también llama a `onChosen`
+  («seguir con esta») sin guardar nada; en Más, sin `onChosen`, ese toque no hace nada.
 
 ## Producto 24R1 — selectores regionales preparados (sin cambios visuales en producción)
 

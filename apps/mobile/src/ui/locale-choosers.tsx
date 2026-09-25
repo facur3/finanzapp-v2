@@ -19,7 +19,8 @@ import { localeChooser, type LocalePreferenceKind } from './locale-options';
  * remounts, an open draft keeps its value. The recents are read once when the
  * screen opens, so the list never jumps under a finger; a choice is
  * remembered for the next visit. `onChosen` lets another flow (the
- * onboarding's language and region steps) continue after a saved choice. */
+ * onboarding's language and region steps) continue after a saved choice,
+ * or after a tap on the value already checked, which writes nothing. */
 export function LocaleChooser({ kind, onChosen }: { kind: LocalePreferenceKind; onChosen?: (value: LanguagePreference | RegionPreference) => void }) {
   const { t } = useI18n();
   const preferences = useLocalePreferences();
@@ -36,6 +37,9 @@ export function LocaleChooser({ kind, onChosen }: { kind: LocalePreferenceKind; 
     onChosen?.(value as LanguagePreference | RegionPreference);
     return true;
   };
+  // Confirming the value already checked (the onboarding's "continue with this") saves nothing: the preference is
+  // already that value. Más passes no `onChosen`, so there a tap on the checked row still does nothing at all.
+  const confirm = onChosen && ((value: string) => onChosen(value as LanguagePreference | RegionPreference));
   return <ChoiceScreen title={title} pinned={chooser.pinned} options={chooser.options} recent={recent} selected={chooser.selected}
-    onChoose={choose} note={chooser.note} />;
+    onChoose={choose} onConfirm={confirm} note={chooser.note} />;
 }

@@ -298,6 +298,11 @@ change). Record each result with the language and the iPhone Region it was check
   sections; the footnote says the preview is unverified. Scroll top to bottom fast: no blank rows or
   stutter at 60/120 Hz; the letter headers are read as headers by VoiceOver; Reduce Motion changes
   nothing in the list.
+- [ ] With the search field focused and the keyboard up, at the largest accessibility text size and with
+  VoiceOver: scroll to the end; the last region (Zimbabue), the save-error line (force it only if a
+  failure can be produced) and the footnote scroll fully above the keyboard; with the keyboard dismissed
+  (drag down, interactive), the footnote clears the home indicator; the first row is never under the
+  navigation bar.
 - [ ] Search «japon», «JP», «JPN», «392», «CHF»: Japón first for the first four, Suiza among the results
   for the last; «xyzzy» says «Sin coincidencias» under the field while «Según el dispositivo» stays.
 - [ ] Choose India: Inicio, Movimientos and Reportes write «1,23,456.78»-style amounts and «22/9/2026»;
