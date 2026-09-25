@@ -39,14 +39,14 @@ export const MERCHANT_CATALOG: readonly MerchantBrand[] = [
   brand('youtube-premium', 'YouTube Premium', 'youtube.com', ['youtube premium', 'youtube music']),
   brand('prime-video', 'Prime Video', 'primevideo.com', ['prime video', 'amazon prime video', 'amazon prime']),
   brand('hbo-max', 'HBO Max', 'hbomax.com', ['hbo max', 'hbomax']),
-  brand('apple', 'Apple', 'apple.com', ['apple', 'apple com', 'icloud', 'apple music', 'apple tv', 'app store']),
+  brand('apple', 'Apple', 'apple.com', ['apple com', 'icloud', 'apple music', 'apple tv', 'app store']),
   brand('google-one', 'Google One', 'one.google.com', ['google one']),
   brand('microsoft-365', 'Microsoft 365', 'microsoft.com', ['microsoft 365', 'office 365']),
   brand('chatgpt', 'ChatGPT', 'openai.com', ['chatgpt', 'chatgpt plus', 'openai']),
-  brand('adobe', 'Adobe', 'adobe.com', ['adobe', 'adobe creative cloud']),
+  brand('adobe', 'Adobe', 'adobe.com', ['adobe com', 'adobe creative cloud']),
   brand('dropbox', 'Dropbox', 'dropbox.com', ['dropbox']),
   brand('duolingo', 'Duolingo', 'duolingo.com', ['duolingo', 'duolingo plus', 'super duolingo']),
-  brand('steam', 'Steam', 'steampowered.com', ['steam', 'steam games']),
+  brand('steam', 'Steam', 'steampowered.com', ['steampowered', 'steampowered com', 'steam games']),
   brand('playstation', 'PlayStation', 'playstation.com', ['playstation', 'playstation plus', 'playstation store', 'ps plus']),
   brand('xbox', 'Xbox', 'xbox.com', ['xbox', 'xbox game pass', 'game pass']),
   brand('mercado-libre', 'Mercado Libre', 'mercadolibre.com.ar', ['mercado libre', 'mercadolibre']),
@@ -67,14 +67,19 @@ export const MERCHANT_CATALOG: readonly MerchantBrand[] = [
   brand('mcdonalds', "McDonald's", 'mcdonalds.com', ['mcdonalds', 'mc donalds']),
   brand('carrefour', 'Carrefour', 'carrefour.com.ar', ['carrefour']),
   brand('farmacity', 'Farmacity', 'farmacity.com', ['farmacity']),
-  brand('despegar', 'Despegar', 'despegar.com', ['despegar', 'despegar com']),
+  brand('despegar', 'Despegar', 'despegar.com', ['despegar com']),
 ];
 
 /** Ordinary words and ambiguous short names that must never be an alias,
  * even when a brand uses them: a person who writes "Personal" or "Día" may
- * mean anything. `validateMerchantCatalog` refuses them. */
+ * mean anything, and the merchant field also takes a free description, so
+ * "Apple" may be fruit, "Steam" a sauna, "Adobe" a building material and
+ * "Despegar" a verb. Their brands stay reachable through qualified aliases
+ * ("apple.com", "App Store", "Steam games"). `validateMerchantCatalog`
+ * refuses them. */
 export const AMBIGUOUS_MERCHANT_WORDS: readonly string[] = [
   'personal', 'claro', 'dia', 'coto', 'max', 'shell', 'jumbo', 'disco', 'vea', 'google', 'amazon', 'microsoft',
+  'apple', 'steam', 'adobe', 'despegar',
   'prime', 'plus', 'premium', 'pago', 'pagos', 'app', 'music', 'tv', 'store', 'online', 'suscripcion', 'subscription',
 ];
 

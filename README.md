@@ -77,7 +77,7 @@ npm run check:repo    # repository hygiene (below)
 - [docs/mobile-roadmap.md](docs/mobile-roadmap.md): status, device QA pending, next deliveries,
   launch, post-launch; [docs/mobile-roadmap-history.md](docs/mobile-roadmap-history.md): the
   detailed history of every delivery.
-- [docs/mobile-design.md](docs/mobile-design.md): the visual and motion direction; [docs/merchant-identity.md](docs/merchant-identity.md): merchants, logos and recurring history.
+- [docs/mobile-design.md](docs/mobile-design.md): the visual and motion direction; [docs/merchant-identity.md](docs/merchant-identity.md): merchants, brand marks (deferred) and recurring history.
 - [docs/mobile-device-checklist.md](docs/mobile-device-checklist.md): what only an iPhone can verify.
 - [docs/i18n.md](docs/i18n.md) and [docs/currency.md](docs/currency.md): languages, regions,
   currencies and the multi-currency engine.

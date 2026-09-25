@@ -34,10 +34,13 @@ your own small real data; never seed movements.
 - [ ] The tab bar's inactive labels (secondary ink) in both themes: legible without competing with
   the selected cobalt tab.
 - [ ] Development bundle with `EXPO_PUBLIC_MERCHANT_MARK_PREVIEW=1`: rows named "Netflix",
-  "spotify", "Mercado Pago", "Disney+" show the brand's initial on a neutral tile; "Pago Netflix",
-  "Personal", "Almacén" and every other name keep their category glyph; the large tile in a
-  movement's detail too. Without the flag (and in any release build) every row shows its category
-  glyph as before.
+  "spotify", "Mercado Pago", "Disney+", "App Store" show the brand's initial on a neutral tile;
+  "Apple", "Steam", "Pago Netflix", "Personal", "Almacén" and every other name keep their category
+  glyph; the large tile in a movement's detail too. Without the flag (and in any release build)
+  every row shows its category glyph as before: no logo exists in this build.
+- [ ] A rule moved to another account of the same currency (or one recorded payment corrected onto
+  another account): its Registrados rows name each payment's own account; a rule whose payments
+  are all in its current account shows no account names. VoiceOver names the account on every row.
 - [ ] Más footer reads "Producto 24UX2".
 
 ## Producto 24UX1 — the date sheet's corrected entrance (the owner's video, second 91)

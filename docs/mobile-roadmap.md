@@ -142,9 +142,10 @@ file).
   rule reads "Pausado" at full contrast. No instalment plans yet.
 - **Merchant identity (24UX2).** `packages/domain/merchants.ts`: normalized merchant keys, a
   curated catalogue of 35 unambiguous brands matched only by exact alias, never a category; the
-  typed name is never rewritten. `src/ui/merchant-mark.ts` and `MerchantBadge`: a licensed logo
-  when a provider exists, else the category glyph; no provider is configured, so production draws
-  the category glyph everywhere (docs/merchant-identity.md).
+  typed name is never rewritten; bare common words (Apple, Steam, Adobe, Despegar) stay
+  unrecognized. Typed metadata only: `MerchantBadge` draws the category glyph for every merchant;
+  brand marks are deferred to 25C2 (no logo API, bundled brand asset, upload or provider key); a
+  development-only initial preview checks recognition (docs/merchant-identity.md).
 - **Budgets and reports.** A monthly total budget plus category sublimits (schema 7); explicit
   remaining and exceeded states; Reportes with trend, donut and legend, day-by-day, budgets, top
   merchants, insights, previous-month and category comparison with explicit ranges and
@@ -341,8 +342,8 @@ the owner authorises it; no EAS build or store submission without the owner.
   touching the ledger: an audit of Inicio with incremental fixes; two alternatives for the quick
   actions (A, four actions with less weight, implemented; B, three movements plus a conversational
   Assistant row, documented for the owner's approval); a typed, tested merchant identity layer
-  independent of categories with a curated catalogue and exact matching; a logo-provider adapter
-  with the provider review done and nothing connected; recurring states told apart (estimated,
+  independent of categories with a curated catalogue and exact matching, kept as metadata (brand
+  marks deferred to 25C2; the provider review done as its input, nothing connected); recurring states told apart (estimated,
   recorded, paused, history); this roadmap extended.
 - **Out of scope.** SQLite, backups, new currencies or regions, the AI, any logo API, report
   calculations, instalments, EAS builds; Home alternative B until approved; the web's
@@ -353,24 +354,31 @@ the owner authorises it; no EAS build or store submission without the owner.
   - Domain: `merchants.ts` (`merchantKey`, `MERCHANT_CATALOG` with 35 brands, `AMBIGUOUS_MERCHANT_WORDS`,
     `validateMerchantCatalog`, `merchantIndex`, `resolveMerchant`) and, in `recurring.ts`,
     `recurringOccurrenceOf` and `recurringHistory` (read-only). Tests: 14 merchant, 2 recurring.
-  - App: `src/ui/merchant-mark.ts` (`MerchantLogoProvider`, `NO_LOGOS`, `merchantMark`, the
-    development-only `EXPO_PUBLIC_MERCHANT_MARK_PREVIEW`), `MerchantBadge` in `components.tsx` used by
+  - App: `src/ui/merchant-mark.ts` (`merchantMark`: the category glyph, or the development-only
+    initial preview behind `EXPO_PUBLIC_MERCHANT_MARK_PREVIEW`), `MerchantBadge` in `components.tsx` used by
     `EntryRow`, the movement detail, Recurrentes and the upcoming rows; `dueWhen` and `namesAccount`
     in `presentation.ts`; the Registrados section in `recurring-form.tsx`; the Recurrente row in the
     movement detail; the lighter `quick-actions.tsx`; Inicio's single empty sentence and account
     names; the tab bar's secondary inactive labels; new copy in es/en (English reviewed).
-  - Docs: docs/merchant-identity.md (model, catalogue criteria, provider review with coverage,
-    licence, attribution, cache, privacy and cost; the future expected/paid/skipped reconciliation),
+  - Docs: docs/merchant-identity.md (model, catalogue criteria, the brand-mark decision and the
+    provider review with coverage, licence, attribution, cache, privacy and cost as input for 25C2;
+    the future expected/paid/skipped reconciliation),
     docs/mobile-design.md (audit, alternatives A/B, what changed), the device checklist.
   - **Checked on Linux:** root `npm test` 286/286 (was 270: +14 `merchants.test.ts`, +2 recurring
-    history), `npm run check:repo`; mobile `npm run typecheck`, `npm run test:storage` 594/594 (was
-    577: +6 `merchant-mark.node.ts`, +4 `ui-rows`, +3 `spending-home`, +3 `recovery-routes`, +1
+    history), `npm run check:repo`; mobile `npm run typecheck`, `npm run test:storage` 592/592 (was
+    577: +4 `merchant-mark.node.ts`, +3 `ui-rows`, +3 `spending-home`, +4 `recovery-routes`, +1
     `home-ranking`; existing Recurrentes, upcoming-row and quick-action tests updated to the new
     captions, labels and sizes), `currency:verify`, `regions:verify`, `i18n:check -- --strict` (0
     errors, 0 stale; English reviewed and accepted), `i18n:extract` (no copy outside the catalogue),
-    `check` (up to date), `export:ios` (4,978,959-byte bundle). No EAS build; the iPhone was not
+    `check` (up to date), `export:ios` (4,978,057-byte bundle). Figures after the review of PR #56. No EAS build; the iPhone was not
     modified; no SQLite or backup change; no paid service, key, logo API, currency or region enabled.
-  - **Pending:** the owner's decision on alternative B and on a logo source; the device QA of §2.
+  - **Review of PR #56:** the recurring history names each row's own account unless every row
+    shown is in the rule's current account (a rule moved within its currency, or an occurrence
+    corrected onto another account, never reads as the current account's); the bare aliases
+    `apple`, `steam`, `adobe` and `despegar` removed and refused as ambiguous, their qualified
+    aliases kept; the owner deferred brand display to 25C2, so the logo adapter was removed and the
+    category glyph is the production presentation.
+  - **Pending:** the owner's decision on alternative B; the device QA of §2.
 
 ### Producto 24R2 — international regions released
 
@@ -524,10 +532,13 @@ the owner authorises it; no EAS build or store submission without the owner.
 Ordered after 25C and before 25D (its widgets read these records). Design in
 docs/merchant-identity.md.
 
-- **Scope.** Merchant marks: the owner's choice of source after the review in
-  docs/merchant-identity.md §4 (proposal: bundled, licence-checked marks for the catalogue; a
-  server-side provider only opt-in later), attribution where required, an on-device cache by brand
-  and scheme, a switch to turn them off; catalogue growth by reviewed PRs. Local categorisation
+- **Scope.** Brand marks, deferred here by the owner (2026-09-25): before any code, resolve the
+  licence (each brand's or a provider's terms), privacy (nothing about a person's merchants leaves
+  the device without consent; no key in the bundle), maintenance (keeping marks current,
+  correcting a wrong one) and visual coherence with the category hues and semantic colours, using
+  the review in docs/merchant-identity.md §4; then the chosen source, attribution where required,
+  an on-device cache, a switch to turn marks off; recognized brands only, the category glyph on any
+  failure; catalogue growth by reviewed PRs. Local categorisation
   rules: a merchant key pre-fills the category the person chose before, only pre-fills, visible and
   editable in Categorías, never rewrites a stored movement. Suggested recurring detection: the same
   merchant key, account, currency and amount repeating at a regular interval proposes a rule the
@@ -539,7 +550,8 @@ docs/merchant-identity.md.
 - **Gates.** Domain tests (matching, suggestions never applied without confirmation, occurrence
   states, migration of auto-registered movements to paid occurrences), schema and backup versions
   with rollback tests, the history and calendar on the iPhone with VoiceOver and large text.
-- **Depends on.** 24UX2 (merged); the owner's logo decision.
+- **Depends on.** 24UX2 (merged); the owner's decision on the brand-mark source after the four
+  questions above.
 
 ### Producto 25D — Face ID, notifications and Apple integrations
 

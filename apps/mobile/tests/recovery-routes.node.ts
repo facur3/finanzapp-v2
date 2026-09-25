@@ -1197,3 +1197,20 @@ test('24UX2: a movement a rule recorded links back to its rule from the detail; 
   const orphan = harness('app/entry/[id].tsx', {}, { data: { ...data, recurring: [] }, params: { id: recorded.id } });
   assert.equal(nodes(orphan.render()).some(node => node.type === 'DetailRow' && node.props.label === 'Recurrente'), false);
 });
+
+test('24UX2 review: the history names each row\'s own account when the rule moved or an occurrence was corrected, and hides it only when every row is in the rule\'s current account', () => {
+  const second: domain.Account = { ...account, id: 'a2', name: 'Efectivo ARS' };
+  const dates = ['2026-07-05', '2026-08-05', '2026-09-05'];
+  const rowsOf = (rule: domain.RecurringRule, entries: domain.Entry[]) => {
+    const data: domain.LedgerArchive = { ...archive, accounts: [...archive.accounts, second], recurring: [rule], records: entries.map(domain.initialRecord) };
+    return nodes(historyOf(harness('src/ui/recurring-form.tsx', { original: rule }, { data }).render())).filter(node => node.type === 'EntryRow');
+  };
+  const owned = (rows: Node[]) => rows.map(node => node.props.entry.dateISO + '@' + node.props.account.id + (node.props.showAccount ? '+name' : '')).join(',');
+  // Every occurrence in the rule's current account: the name would repeat the form above.
+  assert.equal(owned(rowsOf(streaming, dates.map(occurrence))), '2026-09-05@a,2026-08-05@a,2026-07-05@a');
+  // The rule moved to Efectivo ARS after recording in Prueba ARS: every row names Prueba ARS, never the current account.
+  assert.equal(owned(rowsOf({ ...streaming, accountId: 'a2' }, dates.map(occurrence))), '2026-09-05@a+name,2026-08-05@a+name,2026-07-05@a+name');
+  // One occurrence corrected onto Efectivo ARS: every row names its own account.
+  const corrected = dates.map(occurrence).map(entry => entry.dateISO === '2026-08-05' ? { ...entry, accountId: 'a2' } : entry);
+  assert.equal(owned(rowsOf(streaming, corrected)), '2026-09-05@a+name,2026-08-05@a2+name,2026-07-05@a+name');
+});

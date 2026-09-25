@@ -124,3 +124,11 @@ export function dueWhen(dateISO: string, todayISO: string): DueWhen {
 export function namesAccount(accounts: readonly Account[], currency: Currency, debtAccountIds: ReadonlySet<string> = new Set()): boolean {
   return accounts.filter(account => account.currency === currency && !debtAccountIds.has(account.id)).length > 1;
 }
+
+/** Whether the rows of a recurring rule's history must name their account (24UX2 review). They may leave it out
+ * only when every row shown was recorded in one account and that account is the rule's current one, the account
+ * the form above already shows. A rule moved to another account of the same currency, or one occurrence corrected
+ * onto another account, names the account on every row, so an old payment never reads as the current account's. */
+export function historyNamesAccount(entries: readonly Pick<Entry, 'accountId'>[], ruleAccountId: string): boolean {
+  return entries.some(entry => entry.accountId !== ruleAccountId);
+}

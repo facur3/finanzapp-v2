@@ -856,16 +856,20 @@ A · cuatro acciones, menos peso (implementada)   B · tres movimientos + Asiste
 
 ### Identidad de comercios en pantalla
 
+**Decisión del propietario (revisión de la PR #56): la categoría y su glifo son la presentación
+de producción; mostrar marcas queda diferido a Producto 25C2**, que antes debe resolver licencia,
+privacidad, mantenimiento y coherencia visual (marcas multicolores junto a los tonos apagados de
+categoría y los colores semánticos). No hay logos empaquetados ni assets de marcas, ni subidas de
+usuarios, ni claves de proveedores. La identidad de comercios queda como metadata tipada.
+
 Cada fila de movimiento, cada regla de Recurrentes, cada próximo compromiso y el detalle de un
-movimiento dibujan `MerchantBadge`: el logo licenciado de un comercio reconocido cuando la build
-tiene proveedor, si no el glifo de la categoría como siempre. **Esta build no tiene proveedor**,
-así que en producción nada cambia visualmente en el tile. El nombre mostrado es siempre el que
-escribió la persona; la categoría sigue en la leyenda de la fila. El logo iría en un tile blanco
-del mismo tamaño que el de categoría, con borde fino, oculto a VoiceOver. En desarrollo,
-`EXPO_PUBLIC_MERCHANT_MARK_PREVIEW=1` dibuja la inicial de la marca en un tile neutro para ver qué
-filas se reconocen. Modelo, catálogo, reglas contra coincidencias ambiguas y la revisión de
-proveedores (cobertura, licencias, atribución, caché, privacidad, costos) en
-[merchant-identity.md](merchant-identity.md).
+movimiento dibujan `MerchantBadge`, que en producción es el glifo de la categoría para todo
+comercio: nada cambia visualmente en el tile. El nombre mostrado es siempre el que escribió la
+persona; la categoría sigue en la leyenda de la fila. Solo en desarrollo,
+`EXPO_PUBLIC_MERCHANT_MARK_PREVIEW=1` dibuja la inicial de una marca reconocida en un tile neutro
+(sin assets ni dependencias) para validar la resolución en el iPhone: «App Store» se reconoce,
+«Apple» no. Modelo, catálogo, reglas contra coincidencias ambiguas y la revisión de proveedores
+(insumo para 25C2) en [merchant-identity.md](merchant-identity.md).
 
 ### Compromisos: estimado, registrado, pausado, historial
 

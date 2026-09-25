@@ -32,7 +32,7 @@ function load(file: string, extra: Record<string, unknown> = {}, fontScale = 1) 
       useEffect: () => {}, useId: () => 'id', useRef: (initial: unknown) => ({ current: initial }), useMemo: (fn: () => unknown) => fn(),
       Children: { map: (children: unknown, fn: (child: unknown) => unknown) => (Array.isArray(children) ? children : [children]).map(fn) } },
     'react/jsx-runtime': { jsx, jsxs: jsx, Fragment: 'Fragment' },
-    'react-native': { View: 'View', Text: 'Text', Image: 'Image', TextInput: 'TextInput', ScrollView: 'ScrollView', Pressable: 'Pressable', ActivityIndicator: 'ActivityIndicator', InputAccessoryView: 'InputAccessoryView',
+    'react-native': { View: 'View', Text: 'Text', TextInput: 'TextInput', ScrollView: 'ScrollView', Pressable: 'Pressable', ActivityIndicator: 'ActivityIndicator', InputAccessoryView: 'InputAccessoryView',
       FlatList: 'FlatList', Modal: 'Modal', Platform: { OS: 'ios' }, Keyboard: { dismiss() {} }, StyleSheet: { hairlineWidth: 0.5, create: (styles: unknown) => styles, flatten: (style: any) => Object.assign({}, ...(Array.isArray(style) ? style.flat(Infinity).filter(Boolean) : [style])), absoluteFill: {} },
       useWindowDimensions: () => ({ fontScale, width: 390, height: 844 }), Alert: { alert: (title: string, message: string, buttons?: { text: string }[]) => alerts.push({ title, message, buttons }) } },
     'react-native-reanimated': { __esModule: true, default: { View: 'Animated.View', Text: 'Animated.Text' }, useSharedValue: (value: number) => ({ value }), withTiming: (value: number) => value, useAnimatedStyle: (fn: () => unknown) => fn() },
@@ -486,32 +486,15 @@ test('24B5: the currency field lists the gate\'s currencies with search over cod
 
 // ---- 24UX2: the merchant mark --------------------------------------------------------------------------------
 
-const logoMark = (source: unknown) => ({ ...merchantMark, merchantMark: () => ({ kind: 'logo', brand: { id: 'netflix', name: 'Netflix', aliases: ['netflix'], domain: 'netflix.com' }, logo: { source, attribution: null } }) });
-
-test('24UX2: MerchantBadge falls back to the category glyph when no logo exists, the name is not recognized or the build has no provider', () => {
+test('24UX2: MerchantBadge draws the category glyph for every merchant in production, recognized or not', () => {
   const ui = load('components.tsx');
-  for (const merchant of ['Netflix', 'Almacén Don Pepe', '']) {
+  for (const merchant of ['Netflix', 'App Store', 'Apple', 'Almacén Don Pepe', '']) {
     const badge = ui.render('MerchantBadge', { merchant, category: 'Suscripciones', kind: 'expense', tone: 'neutral' });
     assert.equal(is(badge, 'CategoryBadge'), true, merchant);
     assert.equal(JSON.stringify([badge.props.category, badge.props.kind, badge.props.tone]), JSON.stringify(['Suscripciones', 'expense', 'neutral']));
   }
   const income = ui.render('MerchantBadge', { merchant: 'Sueldo', category: 'Sueldo', kind: 'income', tone: 'income', large: true });
   assert.equal(JSON.stringify([income.props.tone, income.props.large]), JSON.stringify(['income', true]), 'the income tone and the size pass through');
-});
-
-test('24UX2: a licensed logo is a picture hidden from VoiceOver, on a white tile of the category glyph\'s size; a failed load falls back for good', () => {
-  const ui = load('components.tsx', { './merchant-mark': logoMark({ uri: 'https://logos.example/netflix.png' }) });
-  const tile = ui.render('MerchantBadge', { merchant: 'Netflix', category: 'Suscripciones' });
-  assert.equal(tile.type, 'View');
-  assert.equal(tile.props.accessible, false);
-  assert.equal(tile.props.accessibilityElementsHidden, true);
-  assert.equal(JSON.stringify([tile.props.style.width, tile.props.style.height, tile.props.style.borderRadius]), JSON.stringify([40, 40, 12]));
-  const image = nodes(tile).find(node => is(node, 'Image'))!;
-  assert.equal(image.props.source.uri, 'https://logos.example/netflix.png');
-  assert.equal(image.props.resizeMode, 'contain');
-  image.props.onError();
-  assert.equal(is(ui.render('MerchantBadge', { merchant: 'Netflix', category: 'Suscripciones' }), 'CategoryBadge'), true);
-  assert.equal(is(ui.render('MerchantBadge', { merchant: 'Netflix', category: 'Suscripciones', large: true }), 'CategoryBadge'), true, 'the failure is remembered');
 });
 
 test('24UX2: the development monogram is a neutral tile with a fixed-size initial, never announced', () => {
@@ -534,4 +517,8 @@ test('24UX2: a movement row shows the name as typed beside its merchant mark, ke
   assert.ok(shown.some(text => text.startsWith('x · ')), 'the category label leads the caption');
   assert.equal(shown.some(text => text.includes('Banco')), false);
   assert.ok(texts(ui.render('EntryRow', { entry, account })).map(node => [node.props.children].flat().join('')).some(text => text.includes('Banco')));
+  // VoiceOver names the row's own account either way, so a hidden caption never hides which account paid.
+  const spoken = (props: any) => nodes(ui.render('EntryRow', props)).find(node => is(node, 'PressFeedback'))!.props.accessibilityLabel;
+  assert.equal(spoken({ entry, account, showAccount: false }), 'netflix.com, gasto, 8999,00 ARS, x, Banco, Hoy');
+  assert.equal(spoken({ entry: { ...entry, accountId: 'b' }, account: { ...account, id: 'b', name: 'Efectivo' }, showAccount: true }), 'netflix.com, gasto, 8999,00 ARS, x, Efectivo, Hoy');
 });

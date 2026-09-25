@@ -37,6 +37,16 @@ describe('recognition is an exact alias lookup', () => {
     expect(idOf('Mercado Pago')).toBe('mercado-pago');
     expect(idOf("McDonald's")).toBe('mcdonalds');
     expect(idOf('YPF')).toBe('ypf');
+    // 24UX2 review: brands whose bare name is a common word stay reachable through qualified aliases.
+    expect(idOf('apple.com')).toBe('apple');
+    expect(idOf('Apple Music')).toBe('apple');
+    expect(idOf('App Store')).toBe('apple');
+    expect(idOf('iCloud')).toBe('apple');
+    expect(idOf('Steam games')).toBe('steam');
+    expect(idOf('steampowered.com')).toBe('steam');
+    expect(idOf('Adobe Creative Cloud')).toBe('adobe');
+    expect(idOf('adobe.com')).toBe('adobe');
+    expect(idOf('Despegar.com')).toBe('despegar');
   });
 
   it('never matches a brand inside a longer or different name', () => {
@@ -53,7 +63,8 @@ describe('recognition is an exact alias lookup', () => {
   });
 
   it('leaves ordinary words and ambiguous names unrecognized', () => {
-    for (const name of ['Personal', 'Claro', 'Día', 'Coto', 'Max', 'Shell', 'Amazon', 'Google', 'Prime', 'Premium', 'Plus']) {
+    for (const name of ['Personal', 'Claro', 'Día', 'Coto', 'Max', 'Shell', 'Amazon', 'Google', 'Prime', 'Premium', 'Plus',
+      'Apple', 'APPLE', ' apple ', 'Apples', 'Steam', 'Adobe', 'Despegar']) {
       expect(resolveMerchant(name).status, name).toBe('unrecognized');
     }
   });
