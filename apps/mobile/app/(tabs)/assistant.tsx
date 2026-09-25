@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'r
 import { FlatList, View, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native';
 import { router, Tabs, useLocalSearchParams } from 'expo-router';
 import { randomUUID } from 'expo-crypto';
-import { isLegacyCurrency, validateEntry, type Currency, type Entry } from '@finanzapp/domain';
+import { isLegacyCurrency, postingAccountsFor, validateEntry, type Currency, type Entry } from '@finanzapp/domain';
 import { assistantForBuild } from '../../src/assistant/runtime';
 import { REASON_TEXT, SUGGESTIONS, classifyIntent, completeDraft, contentFromResult, conversationReducer, emptyConversation, entryFromDraft,
   optionText, shouldAutoscroll, type ClarificationOption, type DraftContent, type EvidenceLink, type Message } from '../../src/assistant/conversation';
@@ -52,6 +52,8 @@ export default function AssistantScreen() {
   const currencies = availableCurrencies(snapshot?.accounts ?? []);
   const currency: Currency = typeof params.currency === 'string' && currencies.includes(params.currency as Currency) ? params.currency as Currency : currencies[0] ?? 'ARS';
   const accounts = useMemo(() => postingAccounts(snapshot?.accounts ?? [], archive?.debts), [snapshot?.accounts, archive?.debts]);
+  // An income draft may only land in a cash account (24B6); a card is neither offered nor implied for it.
+  const incomeAccounts = useMemo(() => postingAccountsFor('income', snapshot?.accounts ?? [], archive?.cards, archive?.debts), [snapshot?.accounts, archive?.cards, archive?.debts]);
   const entries = snapshot?.entries ?? [];
   const busy = state.phase !== 'idle';
 
@@ -72,7 +74,7 @@ export default function AssistantScreen() {
       for await (const event of client.ask({ action, text, todayISO: day, currency, facts }, controller.signal)) {
         if (controller.signal.aborted) break;
         if (event.type === 'delta') dispatch({ type: 'delta', text: event.text });
-        else if (event.type === 'result') dispatch({ type: 'answer', ...contentFromResult(event.result, event.facts, accounts, entries, currency, day) });
+        else if (event.type === 'result') dispatch({ type: 'answer', ...contentFromResult(event.result, event.facts, accounts, entries, currency, day, incomeAccounts) });
         // A failure's message is the integration client's catalogue key or empty (then the reason's own note); the note translates it through errorText.
         else dispatch({ type: 'fail', reason: event.reason, text: event.reason === 'failed' && event.message ? event.message : REASON_TEXT[event.reason], sent: raw });
       }
@@ -81,15 +83,15 @@ export default function AssistantScreen() {
     } finally {
       if (request.current === controller) request.current = null;
     }
-  }, [client, snapshot, accounts, entries, currency, day]);
+  }, [client, snapshot, accounts, incomeAccounts, entries, currency, day]);
 
   const stop = useCallback(() => { request.current?.abort(); request.current = null; dispatch({ type: 'stop' }); }, []);
 
   // `shown` is what the chip displayed: it becomes the user's own words in the thread.
   const choose = useCallback((messageId: string, option: ClarificationOption, shown?: string) => {
-    const next = state.pending ? completeDraft(state.pending, option.id, accounts, entries, day) : null;
+    const next = state.pending ? completeDraft(state.pending, option.id, accounts, entries, day, incomeAccounts) : null;
     dispatch({ type: 'choose', messageId, optionId: option.id, label: shown ?? optionText(option, t), next });
-  }, [state.pending, accounts, entries, day, t]);
+  }, [state.pending, accounts, incomeAccounts, entries, day, t]);
 
   const confirm = useCallback(async (messageId: string, content: DraftContent) => {
     // Only a pending draft can be written, and only one write at a time: a stale tap on a confirmed card is a no-op.

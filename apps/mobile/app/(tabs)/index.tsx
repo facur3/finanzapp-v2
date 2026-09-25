@@ -2,10 +2,11 @@ import { useMemo, useState } from 'react';
 import { View } from 'react-native';
 import { router } from 'expo-router';
 import { currentMonthISO, hiddenLiabilityAccountIds, liquidTotalsByCurrency, spendingOverview, spendingWindow,
-  summarizeMonthlyBudgets, type Currency } from '@finanzapp/domain';
+  summarizeMonthlyBudgets } from '@finanzapp/domain';
 import { useLedger } from '../../src/storage/LedgerProvider';
 import { ActionButton, AppText, Choices, EmptyState, EntryRow, Money, Screen, SectionTitle, Surface, useStacked } from '../../src/ui/components';
 import { CurrencySwitch } from '../../src/ui/currency-switch';
+import { useDisplayCurrency } from '../../src/ui/display-currency-provider';
 import { useI18n } from '../../src/i18n/provider';
 import { BudgetHomeCard, CategoryRanking, MetricHelp, UpcomingRecurringRow } from '../../src/ui/home-modules';
 import { Reflow, ValueTransition } from '../../src/ui/motion';
@@ -26,10 +27,10 @@ export default function HomeScreen() {
   const p = usePalette();
   const stacked = useStacked();
   const { t, formatDate } = useI18n();
-  const [selectedCurrency, setCurrency] = useState<Currency>('ARS');
   const [metric, setMetric] = useState<HomeMetric>('spending');
   const currencies = availableCurrencies(snapshot?.accounts ?? []);
-  const currency = currencies.includes(selectedCurrency) ? selectedCurrency : currencies[0] ?? 'ARS';
+  // The display currency Inicio shares with Reportes (24B6): a stored preference resolved against the currencies held.
+  const { currency, setCurrency } = useDisplayCurrency(currencies);
   const period = useMemo(() => spendingWindow(currency, 'month', day), [currency, day]);
   // A stored currency is always a storable code (read acceptance), so this only guards a
   // programming error; Home must degrade to its empty state rather than crash the tab.

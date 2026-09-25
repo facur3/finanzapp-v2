@@ -1,5 +1,65 @@
 # Physical iPhone acceptance checklist
 
+## Producto 24B6 — the date sheet, one display currency, the card rules
+
+**Not done in 24B6: no EAS build was made and the iPhone was not touched.** No new native build is
+needed: Metro from this branch (`npm run start:dev-client`) on the installed FinanzApp Dev build
+`1d69d2d4` or later; the preview flag is not required for any 24B6 check. Record each result with
+the language it was checked in.
+
+**The date sheet (Nuevo gasto → Fecha; also Transferencia, Recurrente → Próxima fecha):**
+- [ ] The sheet is a card at the bottom of the screen, as tall as its header and the wheel, over
+  a dimmed but visible form; the wheel is centred in the card, not floating in an empty page; the
+  grabber, Cancelar · Elegir fecha · Listo and the wheel read in the interface language (es, en)
+  with the day, month and year order of 23.1C2.
+- [ ] Opening: the dimming fades in while the card rises from the bottom edge (about 200 ms),
+  with no jump of the form behind it; Listo, Cancelar or a tap on the dimmed area: the card
+  leaves downwards (about 100 ms) and the form has not moved. Nothing overlaps the tab bar or
+  the keyboard (the keyboard closes first).
+- [ ] The card's bottom padding clears the home indicator (iPhone 14 Pro: the wheel's last row
+  is fully visible above it); in landscape the sheet still fits or scrolls nothing off screen.
+- [ ] Reduce Motion on: the sheet and the dimming fade in and out with no vertical movement.
+- [ ] Dark Mode: the card is the elevated surface (`#1C1C1E`), the wheel's text is legible, the
+  dimming is darker than in Light Mode; Light Mode: a white card over a light grey dimming.
+- [ ] Dynamic Type at the largest accessibility sizes: the header wraps to two lines and
+  nothing clips; the wheel keeps its native size.
+- [ ] VoiceOver: the first element read is Cancelar, then the header "Elegir fecha", then Listo,
+  then the wheel's columns (adjustable); swiping never reaches the form behind the sheet; the
+  scrim is not an element; the Escape gesture (two-finger Z) cancels.
+- [ ] Spin to another day, Cancelar: the row keeps the old day; open again: the wheel shows the
+  saved day. Spin, Listo: the row shows the new day. Yesterday is allowed, tomorrow is not on a
+  movement; Recurrente allows a future date.
+- [ ] Cuenta, Categoría and Moneda still open the full page sheets of before (unchanged).
+
+**One display currency (with at least an ARS and a USD account):**
+- [ ] Inicio → choose USD; Reportes shows USD without touching its switch; Reportes → choose ARS;
+  Inicio shows ARS. The month and the Categorías/Días view of Reportes do not change with the
+  currency.
+- [ ] Choose USD, force-quit the app, reopen: Inicio and Reportes open on USD.
+- [ ] Inicio → "Reportes" from the categories section lands on the same currency Inicio shows.
+- [ ] With a single currency (a fresh ledger or only ARS accounts) neither screen shows a switch;
+  with three currencies (the preview gate) both show the compact row that opens the sheet, and the
+  choice still travels between them.
+- [ ] Más → Copia de seguridad → export, then restore the copy: the shown currency does not change
+  and the copy contains no currency preference.
+
+**Card flows (with a card and a cash account in ARS):**
+- [ ] Inicio "+" → Ingreso: the account sheet lists cash accounts only (no card, no debt).
+- [ ] Tarjetas → Registrar compra: Gasto opens on the card; switch the control to Ingreso: the
+  account becomes the cash account in the card's currency and the sheet shows no card; switch
+  back to Gasto: the card is selected again. Save a purchase: one expense on the card, the card
+  debt rises, Inicio's month spending rises once.
+- [ ] Tarjetas → Pagar tarjeta: the card is the fixed destination, "Desde" lists cash accounts in
+  the card's currency only, "Pagar total" fills the recorded debt; saving lowers the cash balance
+  and the card debt and adds no expense.
+- [ ] Inicio "+" → Transferencia: neither "Desde" nor "Hacia" lists a card or a debt.
+- [ ] Deudas → a debt's Registrar pago and a receivable's Registrar cobro still work as before.
+- [ ] If the test ledger holds an income on a card from before (a refund recorded through Ingreso
+  before 24B6): open it from Movimientos, change its amount, save: it stays on the card. Otherwise
+  note "no historical card income on this device".
+- [ ] Asistente (fixture mode, `EXPO_PUBLIC_ASSISTANT_FIXTURES=1`): an income draft never proposes
+  the card; an expense draft still asks which account when a card and a cash account exist.
+
 ## Producto 24A — currency foundations (nothing new to see; a regression spot-check)
 
 No new build is required: 24A is JavaScript only (the next development build also carries
@@ -743,6 +803,11 @@ development build of this commit **started with the preview flag** and the 24B4 
    bundle: stop.
 3. A release or preview build never shows that line and offers ARS and USD only (the flag is compiled
    away; `tests/currency-preview.node.ts`).
+
+**Owner's report (2026-09-24):** the 24B5 tests were completed on the iPhone and PR #51 was merged;
+the first finding (the date sheet almost empty, the wheel at the top) is fixed in Producto 24B6. The
+per-item results below were not recorded, so the boxes stay open: the gate-opening commit waits for
+them (the minimum set is listed in docs/mobile-roadmap.md, Producto 24B6 status).
 
 **On the device (record each result here, es and en):**
 - [ ] Cuenta nueva → Moneda opens the sheet with seven rows (name, code, symbol) and a search field;

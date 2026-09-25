@@ -19,6 +19,8 @@ export const lightPalette = {
   expense: '#C42F39', income: '#15804F', transfer: '#0B6BB3', warning: '#B45309',
   expenseSoft: '#FBE9EA', incomeSoft: '#E6F5EE', transferSoft: '#E8F3FC', warningSoft: '#FCF1E0',
   shadow: 'rgba(10, 10, 12, 0.08)',
+  /** The dimming behind a compact bottom sheet (the date wheel): the screen stays legible underneath. */
+  scrim: 'rgba(10, 10, 12, 0.32)',
 };
 
 export const darkPalette: typeof lightPalette = {
@@ -32,6 +34,7 @@ export const darkPalette: typeof lightPalette = {
   expense: '#F0555C', income: '#3DBE86', transfer: '#4DB0FF', warning: '#E8A030',
   expenseSoft: '#3A1E20', incomeSoft: '#173126', transferSoft: '#14304A', warningSoft: '#3A2C14',
   shadow: 'rgba(0, 0, 0, 0)',
+  scrim: 'rgba(0, 0, 0, 0.55)',
 };
 
 export type PaletteColors = typeof lightPalette;

@@ -6,6 +6,7 @@ import ts from 'typescript';
 import * as domain from '@finanzapp/domain';
 import * as presentation from '../src/ui/presentation.ts';
 import * as reportPresentation from '../src/ui/report-presentation.ts';
+import * as displayCurrency from '../src/ui/display-currency.ts';
 import * as budgetPresentation from '../src/ui/budget-presentation.ts';
 import * as categoryColor from '../src/ui/category-color.ts';
 import * as liabilityPresentation from '../src/ui/liability-presentation.ts';
@@ -27,26 +28,40 @@ const snapshot: domain.LedgerSnapshot = { accounts: [
   { id: 'u', accountId: 'u', kind: 'expense', amountMinor: 999, merchant: 'Prueba', category: 'Salud', dateISO: '2026-08-10', createdAt },
 ] };
 
-function routeHarness(file: string, params: Record<string, unknown>, data = snapshot, { locale = 'es-AR' as AppLocale } = {}) {
+/** A key-value store in memory for the shared display currency (24B6); `faults.set` makes every write fail. */
+function memoryPreferences(initial: Record<string, string> = {}) {
+  const rows = new Map(Object.entries(initial));
+  const faults = { set: false };
+  return { rows, faults, store: () => ({ getItemSync: (key: string) => rows.get(key) ?? null,
+    setItemSync: (key: string, value: string) => { if (faults.set) throw new Error('disk full'); rows.set(key, value); }, removeItemSync: (key: string) => rows.delete(key) }) };
+}
+
+function routeHarness(file: string, params: Record<string, unknown>, data = snapshot, { locale = 'es-AR' as AppLocale, display = displayCurrency.createDisplayCurrencyStore(memoryPreferences().store) } = {}) {
   const i18nProvider = { useI18n: () => bindLocale(locale) };
+  // The shared display currency, as the provider's hook gives it: the real store and resolution, no React context.
+  const displayProvider = { useDisplayCurrency: (held: readonly domain.Currency[]) => ({ currency: displayCurrency.resolveDisplayCurrency(display.getState(), held), preferred: display.getState(), setCurrency: (currency: domain.Currency) => { display.set(currency); } }) };
   const source = readFileSync(new URL('../app/' + file, import.meta.url), 'utf8');
   const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText;
   const jsx = (type: string, props: Record<string, unknown>) => ({ type, props });
   const state: unknown[] = [];
+  const deps: unknown[][] = [];
   const pushed: any[] = [];
-  let cursor = 0;
+  let cursor = 0, effectCursor = 0;
   const componentNames = ['AppText', 'Choices', 'DetailRow', 'EmptyState', 'IconButton', 'Money', 'PressFeedback', 'SectionTitle', 'Surface', 'CategoryBadge', 'Screen', 'GlyphTile'];
   const modules: Record<string, unknown> = {
     '../i18n/format': i18nFormat, '../src/i18n/format': i18nFormat, '../../src/i18n/format': i18nFormat, '../i18n/provider': i18nProvider, '../src/i18n/provider': i18nProvider, '../../src/i18n/provider': i18nProvider,
+    // Effects run in place, once per change of their dependencies (a route parameter arriving), like React's after commit.
     react: { useMemo: (fn: () => unknown) => fn(), useState: (initial?: unknown) => {
       const index = cursor++;
       if (!(index in state)) state[index] = initial;
       return [state[index], (value: unknown) => { state[index] = value; }];
-    } },
+    }, useEffect: (fn: () => void, next?: unknown[]) => { const index = effectCursor++; const previous = deps[index];
+      if (!previous || !next || next.length !== previous.length || next.some((item, i) => item !== previous[i])) { deps[index] = next ?? []; fn(); } } },
     'react/jsx-runtime': { jsx, jsxs: jsx, Fragment: 'Fragment' },
     'react-native': { View: 'View', FlatList: 'FlatList' },
     '@expo/vector-icons/Ionicons': 'Ionicons',
     'expo-router': { useLocalSearchParams: () => params, router: { push: (to: unknown) => pushed.push(to) } },
+    '../src/ui/display-currency-provider': displayProvider, '../src/ui/display-currency': displayCurrency,
     '@finanzapp/domain': domain,
     '../src/storage/LedgerProvider': { useLedger: () => ({ snapshot: data, archive: { accounts: data.accounts, records: [] } }) },
     '../src/ui/charts': { DonutChart: 'DonutChart', MonthBars: 'MonthBars', OTHERS_KEY: '__others__',
@@ -73,7 +88,7 @@ function routeHarness(file: string, params: Record<string, unknown>, data = snap
     if (!Object.hasOwn(modules, name)) throw new Error('Unexpected report dependency: ' + name);
     return modules[name];
   } });
-  return { render: () => { cursor = 0; return module.exports.default!(); }, pushed };
+  return { render: () => { cursor = 0; effectCursor = 0; return module.exports.default!(); }, pushed, display };
 }
 
 function nodes(value: any): Node[] {

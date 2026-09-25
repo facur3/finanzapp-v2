@@ -7,6 +7,8 @@ export const forms = {
     incomeTitle: 'Registrar ingreso',
     noAccountTitle: 'Primero, una cuenta',
     noAccountDetail: 'Cada movimiento necesita una cuenta para actualizar su saldo.',
+    /** 24B6: the ledger has accounts, but none an income may use (cards only). */
+    noCashAccountDetail: 'Un ingreso se registra en una cuenta normal, no en una tarjeta. Agregá una para continuar.',
     paidWith: 'Pagado con',
     receivedIn: 'Ingresa en',
     merchantExpense: 'Comercio o concepto',

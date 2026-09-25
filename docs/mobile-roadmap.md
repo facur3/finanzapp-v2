@@ -15,10 +15,86 @@ server-keyed; manual recording and local data work without connectivity. Recurri
 expenses, debts, budgets and cards remain in scope. Native navigation, accessible
 amounts, real data and recoverable durable writes remain requirements.
 
-## Status and current delivery — Producto 24B5
+## Status and current delivery — Producto 24B6
 
 Implemented is code, checked names a test, device-verified needs a physical result,
 and released means distributed. Neither a bundle nor a screenshot is App Store QA.
+
+**24B6 answers the owner's first iPhone findings on 24B5: the date wheel in a compact bottom
+sheet, one display currency shared by Inicio and Reportes, and cards that carry purchases and
+payments but never a plain income.** Production still creates and offers exactly ARS and USD:
+the gate-opening commit stays described, not applied (last item below; docs/currency.md §7.6.1).
+The Más footer reads Producto 24B6. Design: [docs/mobile-design.md](mobile-design.md)
+(Producto 24B6); the iPhone checks: [docs/mobile-device-checklist.md](mobile-device-checklist.md)
+(Producto 24B6).
+
+- [x] **The date sheet.** On the owner's iPhone `DateField` presented a page sheet with the
+  spinner near the top of an almost empty screen. On iOS it now opens a transparent native
+  modal with a scrim and a card anchored to the bottom, sized to its content: grabber,
+  Cancelar · title · Listo, the native wheel centred, the home-indicator inset from the safe
+  area, `p.surface` in both themes. The scrim fades and the card rises with the app's state
+  timing (200 ms) and leaves with the exit timing (100 ms), interruptible; Reduce Motion keeps
+  the fades only; the card stays mounted while it leaves. Cancel, the scrim and the back
+  gesture drop the wheel's draft; only Listo saves. The bounds (1900 to today, or 2100 with
+  `allowFuture`), the four locales' wheel and row, VoiceOver's written-out date and the
+  `onValueChange`/`onDismiss` contract are unchanged; Android keeps the system dialog. The
+  account, category and currency sheets keep their page-sheet geometry. A native detent sheet
+  (`formSheet` with `fitToContents` through the router) was considered and left for a device
+  comparison: it needs a route and a way back to the form's draft, and its sizing with a
+  native wheel is unverified.
+- [x] **One display currency.** Inicio and Reportes read and write one preference,
+  `finanzapp.displayCurrency`, in the key-value store beside the language and the region:
+  outside SQLite, outside backups, apart from each account's currency, persisted across
+  sessions. It is resolved against the currencies held (a preference no account holds any
+  more shows the first currency held, ARS in an empty ledger, without rewriting anything);
+  a choice on either screen re-renders the other in place, mounted or mounted later. A
+  Reportes link naming a held currency shows it and makes it the shared choice, once;
+  an unknown, malformed or unheld one is ignored and the choice stands. Period and category
+  filters stay Reportes' own; the switch keeps its one/two/three-or-more presentation; nothing
+  is converted. Presupuestos keeps its own selection (not asked for).
+- [x] **Card flows.** A new income posts to a cash account only: SQLite refuses a new income
+  on a card, an income moved onto one, an expense turned into a card income and a recurring
+  income into a card (`assertIncomeAccount`), while a historical income on a card (a refund
+  from before, a restored copy) stays readable, correctable in place, undoable, restorable
+  and movable to cash (`keepsHistoricalCardIncome`). A new transfer never leaves a card and
+  never joins two obligations (`assertTransferSides`); card and debt payments and
+  collections are unchanged; a stored transfer keeps its sides and an edit may only take
+  sides a new transfer could have. The Ingreso form and a recurring income offer cash only
+  (`postingAccountsFor`); the movement modal falls back to cash in the card's currency when
+  Gasto → Ingreso and finds the card again on the way back; editing a historical card income
+  keeps its card. The plain transfer ignores a card asked for as source; Pagar tarjeta still
+  fixes the card as the destination with same-currency cash sources. The Assistant never
+  implies or offers a card for an income draft. A purchase is still one expense that raises
+  the card's debt; a payment is still a transfer; nothing is counted twice. **The explicit
+  card-refund flow** (a refund tied to its purchase, lowering that category in reports and
+  budgets, never a salary-like income) is designed under Producto 24T below.
+- [x] **Tests:** `date-field.node.ts` (the real sheet with persisted hooks and effects:
+  geometry, insets, timings, Reduce Motion, scrim cancel, the list sheets unchanged),
+  `display-currency.node.ts` (the pure store, resolution, route precedence, the real provider
+  and hook on a React tree), cross-screen cases in `spending-home` (Inicio ↔ Reportes on one
+  store, relaunch, a vanished currency, valid and invalid links), the card rules in
+  `packages/domain/liabilities.test.ts`, `database.node.ts` (real SQLite), `recovery-routes`
+  (entry, recurring and transfer forms) and `assistant.node.ts`; the VoiceOver and worklet
+  scans over the new sheet.
+- [x] **Checked on Linux:** see the handoff entry below.
+- [ ] **Not device-verified, no EAS build made:** the sheet's geometry, motion, VoiceOver and
+  Dynamic Type; the shared currency across a relaunch; the card flows, all listed under
+  Producto 24B6 in docs/mobile-device-checklist.md. Nothing in 24B6 needs a new native build:
+  a Metro session from this branch on the installed FinanzApp Dev is enough.
+- [ ] **The gate-opening commit (EUR, GBP, JPY, CLP) still waits.** The owner reported on
+  2026-09-24 that the 24B5 iPhone tests were completed, merged PR #51 (d66c31c) and found the
+  date-sheet issue; the per-item results the 24B5 checklist asks for (es and en) are recorded
+  nowhere (not in the PR, not in the docs), so this delivery records that report and nothing
+  more, and leaves `LEDGER_CURRENCIES` intact. **Minimum evidence before the commit**, in the
+  24B5 section of docs/mobile-device-checklist.md, each line marked with the language it was
+  checked in: JPY on the number pad and in VoiceOver ("1500 yenes japoneses" / "1500 Japanese
+  yen"); a CLP account beside ARS ("pesos argentinos", not "pesos"); the searchable sheet at the
+  largest Dynamic Type and with Reduce Motion; one v9 export and restore holding EUR, GBP, JPY
+  and CLP. The commit itself is one line in `LEDGER_CURRENCIES` plus the tests listed in
+  docs/currency.md §7.5 stage 9. KWD and the other three-decimal currencies wait for their own
+  VoiceOver check on the iPhone.
+
+### Previous delivery — Producto 24B5
 
 **24B5 delivers stage 8 of docs/currency.md §7.5 and prepares stage 9: the searchable currency
 screen, the currency before the amount in every form, and a development preview gate to test
@@ -45,13 +121,14 @@ the gate-opening commit is described, not applied, and waits for the iPhone test
   scale, and seven currencies through SQLite 9 and backup v9 (create, edit, export, restore into
   a fresh device, reopen) with every amount and currency unchanged; ARS/USD amounts intact.
 - [x] **Checked on Linux:** see the handoff entry below.
-- [ ] **Not device-verified, no EAS build made:** the 24B4 migration on FinanzApp Dev and the 24B5
-  checks (number pad in yen, three decimals in dinars, VoiceOver in Spanish and English, the
-  searchable selector, Dynamic Type, Reduce Motion, export/restore v9) in
-  docs/mobile-device-checklist.md, with the preview flag.
-- [ ] **The gate-opening commit** (docs/currency.md §7.5, stage 9): after those tests and the
-  owner's approval; proposal EUR, GBP, JPY, CLP first, three-decimal currencies after their
-  VoiceOver check.
+- [ ] **Device tests reported, not recorded.** The owner reported on 2026-09-24 that the 24B5
+  iPhone tests were completed and merged PR #51; the first finding (the date sheet) is fixed in
+  24B6. The per-item results (number pad in yen, three decimals in dinars, VoiceOver in Spanish
+  and English, the searchable selector, Dynamic Type, Reduce Motion, export/restore v9) were not
+  written into docs/mobile-device-checklist.md, so its boxes stay open until they are.
+- [ ] **The gate-opening commit** (docs/currency.md §7.5, stage 9): after those results are
+  recorded and the owner approves; proposal EUR, GBP, JPY, CLP first, three-decimal currencies
+  after their VoiceOver check. See the 24B6 status above for the minimum evidence.
 
 ### Previous delivery — Producto 24B4
 
@@ -1684,6 +1761,10 @@ are not dead code.
   QA of the schema 9 upgrade, the number pad, the VoiceOver units and the switch, and then one
   commit that opens the owner's first currencies progressively (decision 7.6.1; three-decimal
   currencies only after their VoiceOver check). Production forms stay ARS/USD until that commit.
+- **Producto 24B6 (delivered in code, 2026-09-24)** — the owner's first iPhone findings on
+  24B5: the date wheel in a compact bottom sheet, one display currency shared by Inicio and
+  Reportes, and the card rules (no plain income on a card, a card never a transfer's source).
+  The gate-opening commit still waits for the recorded device evidence listed in the status.
 - **Producto 24R — global regional internationalization** (docs/i18n.md §11a), right after 24B5
   and before any FX conversion: a wide catalogue of countries and territories keyed by standard
   region identifiers and generated from pinned CLDR data; verified CLDR conventions per region
@@ -1707,6 +1788,27 @@ are not dead code.
   flow; the manual adjustment lives in the movement's detail), the posted balance kept apart from
   the estimated pending commitments, and a configurable main currency for reports with per-currency
   subtotals whenever a rate is missing.
+- **Producto 24T — cards and instalments** (after 24C and the rates it needs; design reviewed
+  before code): a financed purchase is **one** expense and a **finite** obligation plan, never
+  several duplicated expenses and never an unlimited recurring rule. The plan records the number
+  of instalments, the total, the principal, the interest and the fees (each with its own
+  category, so interest is never consumption); distributes the cents exactly at the currency's
+  precision (integer minor units, the remainder placed on named instalments, the sum proven equal
+  to the total, no floating point); ties each instalment to the statement it closes in and the
+  due date it is paid on; handles short months, leap years and the issuer's own rules (a closing
+  on the last day of the month, a due day before the closing day, weekend and holiday shifts as
+  the issuer states them); shows per-period summaries, the pending balance and partial payments;
+  supports early payments, cancellations, refunds and adjustments without a second expense;
+  records international instalment purchases with the rate of each debit when the issuer converts
+  per instalment (24C's rate record, provenance on every converted figure); and offers optional
+  reminders for closings, due dates and instalments that never claim a bank did not receive a
+  payment while the app is not synchronised ("Visa vence mañana · Deuda registrada", never
+  "Todavía no pagaste"). **Card refunds get their explicit flow here**: a refund (partial or
+  full) is tied to the original purchase, lowers that expense's category in reports and budgets
+  for the refund's month and reduces the card's debt, so it is never a salary-like income
+  (24B6 already refuses a plain income on a card and keeps historical ones editable). Domain
+  tests first: cent distribution for exponents 0, 2 and 3, cycle assignment across year ends and
+  February, early payment against later instalments, refund against a partly paid plan.
 - **Global onboarding** — detects language and region, shows them, lets the person change them and
   choose the first currency of their first account (the detected region may **suggest** one, the
   person always decides; an existing account's currency never changes with the device's region), and
@@ -1957,6 +2059,10 @@ and kept only as history.
 - [ ] Purchase counted once; installment/payment reduces obligation without a second
   expense. Early payment removes that amount from later scheduled payments.
 - [ ] Cash outflow, recorded expense and future commitment have distinct labels.
+- [x] A card never carries a plain income and is never a transfer's source; a purchase is one
+  expense, a payment one transfer (Producto 24B6).
+- [ ] Card refunds tied to the purchase and finite instalment plans with exact cents, statement
+  cycles and optional reminders (Producto 24T, after 24C).
 - [ ] No native FCI redemption, broker portfolio or simulated bank/card payment.
 
 ### 4. Independent build, Apple and optional sync
@@ -2000,6 +2106,40 @@ amount uses `useStacked()` and gives the name two lines. 44-point targets, Voice
 safe areas, system text and separate currencies apply to every new screen.
 
 ## Handoff log (historical evidence)
+
+### 2026-09-24 — Producto 24B6: the date sheet, one display currency, the card rules
+
+- Delivered: `BottomSheet` inside `src/ui/form-controls.tsx` for `DateField` (a transparent native
+  modal, the scrim and the rising card on Reanimated with the state and exit timings, Reduce Motion
+  fades, the safe-area inset, the new `scrim` palette token); `src/ui/display-currency.ts` (the pure
+  store over the key-value store, `finanzapp.displayCurrency`, resolution against the currencies
+  held, the route precedence) and `display-currency-provider.tsx` (`DisplayCurrencyProvider`,
+  `useDisplayCurrency`) used by Inicio and Reportes and mounted in `app/_layout.tsx`; the domain's
+  `assertIncomeAccount`, `keepsHistoricalCardIncome`, `postingAccountsFor`, `assertTransferSides` and
+  `sameTransferSides` applied in `createEntry`, `changeEntry`, `saveRecurringRule`, `createTransfer`
+  and `changeTransfer`; the entry, recurring and transfer forms; the Assistant's `resolveDraft`,
+  `completeDraft` and `contentFromResult` with an income account list; three catalogued sentences
+  (es, en, lock); the Más footer; this file, the device checklist, the design notes,
+  docs/currency.md §2.6/§7.6.1/§8.3 and the README.
+- Deliberate golden changes: the date field's modal (`transparent`, no `presentationStyle`); the Más
+  footer; the personalization harness mocks the sheet's modules; `report-routes` and
+  `spending-home` run the real display-currency store behind the hook; `recovery-routes` renders the
+  recurring form.
+- **Checked on Linux:** root `npm test` 448/448 (domain 246), `npm run build`, `npm run check:repo`;
+  mobile `npm run typecheck`, `npm run test:storage` 546/546 (real SQLite), `npm run currency:verify`,
+  `npm run i18n:check -- --strict` (0 errors, 0 stale), `npm run i18n:extract`, `npm run check` (up to
+  date), `npm run export:ios` (4,929,633 bytes, +11,713 over 24B5). Not an Xcode build; **no EAS
+  build; the iPhone was not modified**; no paid service, API connection or remote change; the
+  production gate untouched.
+- **Review fixes (PR #52, three threads):** Reportes applies a route currency exactly once and also when its
+  first account appears while the tab is mounted (`pendingRoute`, keyed on the parameter value; later ledger
+  changes never re-impose it); the entry and recurring forms show the no-account state with Agregar cuenta
+  when no account is eligible for the chosen kind (a card-only ledger asked for an income), pushed over the
+  draft with the carried card's currency, with the Gasto / Ingreso switch kept above it; historical card
+  incomes and rules stay editable with their identity. Tests: the unheld-then-held link, the card-only ledger
+  and the mixed ledger in `spending-home` and `recovery-routes`; `test:storage` 550/550, export 4,930,695 bytes.
+- **Pending:** the 24B6 device checks; the recorded 24B5 results; then the gate commit.
+- **Next:** Producto 24R (global regional internationalization), then 24C, then 24T.
 
 ### 2026-09-24 — Producto 24B5: the currency screen, the currency before the amount, the preview gate
 

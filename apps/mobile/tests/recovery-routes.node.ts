@@ -34,7 +34,7 @@ function harness(file: string, props: any = {}, options: { data?: domain.LedgerA
   const refs: any[] = [];
   let cursor = 0, refCursor = 0, uuid = 0, backs = 0;
   const pushed: any[] = [], alerts: any[] = [], updates: domain.EntryChange[] = [], additions: domain.Entry[] = [], restores: any[] = [];
-  const transfers: domain.Transfer[] = [], transferChanges: domain.TransferChange[] = [], accountChanges: domain.AccountChange[] = [], newAccounts: domain.Account[] = [];
+  const transfers: domain.Transfer[] = [], transferChanges: domain.TransferChange[] = [], accountChanges: domain.AccountChange[] = [], newAccounts: domain.Account[] = [], rules: domain.RecurringRule[] = [];
   let data = options.data ?? archive;
   // The locale is read on every render, like the live provider: switching it re-labels the next render and keeps the state.
   let locale: AppLocale = options.locale ?? 'es-AR';
@@ -42,6 +42,7 @@ function harness(file: string, props: any = {}, options: { data?: domain.LedgerA
   const jsx = (type: Node['type'], props: Node['props']) => ({ type, props });
   const ledger = { useLedger: () => ({ archive: data, snapshot: domain.snapshotFromArchive(data),
     addEntry: async (value: domain.Entry) => { additions.push(value); await options.add?.(value); },
+    saveRecurring: async (value: domain.RecurringRule) => { rules.push(value); },
     updateEntry: async (value: domain.EntryChange) => { updates.push(value); await options.update?.(value); },
     addTransfer: async (value: domain.Transfer) => { transfers.push(value); await options.addTransfer?.(value); },
     updateTransfer: async (value: domain.TransferChange) => { transferChanges.push(value); await options.updateTransfer?.(value); },
@@ -89,12 +90,12 @@ function harness(file: string, props: any = {}, options: { data?: domain.LedgerA
     return modules[name];
   } });
   return {
-    render: () => { cursor = 0; refCursor = 0; let node = (module.exports.default ?? module.exports.EntryForm ?? module.exports.TransferForm ?? module.exports.MovementForm)(props);
+    render: () => { cursor = 0; refCursor = 0; let node = (module.exports.default ?? module.exports.EntryForm ?? module.exports.TransferForm ?? module.exports.MovementForm ?? module.exports.RecurringForm)(props);
       while (typeof node.type === 'function') node = node.type(node.props);
       return node; },
     setData: (next: domain.LedgerArchive) => { data = next; },
     setLocale: (next: AppLocale) => { locale = next; },
-    pushed, alerts, updates, additions, restores, transfers, transferChanges, accountChanges, newAccounts, backs: () => backs,
+    pushed, alerts, updates, additions, restores, transfers, transferChanges, accountChanges, newAccounts, rules, backs: () => backs,
   };
 }
 function nodes(value: any): Node[] {
@@ -955,4 +956,191 @@ test('24B2 review: a movement whose stored amount exceeds the entry bound (a res
   // Moving the untouched draft to an account in another currency is not "unchanged": the currency guard still applies.
   view = harness('src/ui/entry-form.tsx', { original: data.records[0] }, { data });
   assert.deepEqual(find(view.render(), 'AccountField').props.accounts.map((a: domain.Account) => a.id), ['a'], 'an edit only offers accounts in the movement\'s currency, so the kept amount can never change currency');
+});
+
+// ---- Producto 24B6: cards carry purchases and payments, never a plain income -------------------------------
+
+test('24B6: the income form offers cash accounts only; the expense form keeps cash and cards; switching Gasto → Ingreso with a card chosen falls back to cash in the same currency and finds the card again on the way back', () => {
+  const income = harness('src/ui/entry-form.tsx', { kind: 'income', accountId: 'card-acc' }, { data: liabilityData });
+  let field = find(income.render(), 'AccountField');
+  assert.equal(field.props.label, 'Ingresa en');
+  assert.deepEqual(field.props.accounts.map((item: domain.Account) => item.id), ['a', 'u'], 'no card, no debt');
+  assert.equal(field.props.value, 'a', 'a card asked for by the link gives way to cash in the same currency');
+  assert.equal(find(income.render(), 'Stack.Screen').props.options.title, 'Registrar ingreso');
+  // The hosted form: the same instance switches kind as state (movement-form), so the chosen card must not leak into the income.
+  let kind = 'expense';
+  const hosted = harness('src/ui/entry-form.tsx', { get kind() { return kind; }, accountId: 'a', onKindChange: () => {} }, { data: liabilityData });
+  find(hosted.render(), 'AccountField').props.onChange('card-acc');
+  field = find(hosted.render(), 'AccountField');
+  assert.deepEqual([field.props.value, field.props.accounts.map((item: domain.Account) => item.id)], ['card-acc', ['a', 'u', 'card-acc']]);
+  kind = 'income';
+  field = find(hosted.render(), 'AccountField');
+  assert.deepEqual([field.props.value, field.props.accounts.map((item: domain.Account) => item.id)], ['a', ['a', 'u']], 'Ingreso: cash in the card\'s currency');
+  assert.equal(find(hosted.render(), 'AmountField').props.currency, 'ARS');
+  kind = 'expense';
+  assert.equal(find(hosted.render(), 'AccountField').props.value, 'card-acc', 'back on Gasto the card is still the choice');
+});
+
+test('24B6: a historical income on a card (a refund from before) opens on that card, is corrected in place and saved with the same account; a new income can never be saved on a card', async () => {
+  const refund: domain.Entry = { ...entry, id: 'refund', kind: 'income', accountId: 'card-acc', amountMinor: 2500, merchant: 'Devolución', category: 'Café' };
+  const data: domain.LedgerArchive = { ...liabilityData, records: [...liabilityData.records, domain.initialRecord(refund)] };
+  const editing = harness('src/ui/entry-form.tsx', { original: domain.initialRecord(refund) }, { data });
+  let root = editing.render();
+  const field = find(root, 'AccountField');
+  assert.deepEqual([field.props.value, field.props.accounts.map((item: domain.Account) => item.id)], ['card-acc', ['a', 'card-acc']], 'the card stays offered for its own historical income, beside cash in that currency');
+  assert.equal(field.props.typeOf('card-acc'), 'card');
+  find(root, 'AmountField').props.onChangeText('26');
+  await find(editing.render(), 'ActionButton', 'Guardar cambios').props.onPress();
+  assert.equal(editing.updates.length, 1);
+  assert.deepEqual([editing.updates[0].after.entry.accountId, editing.updates[0].after.entry.kind, editing.updates[0].after.entry.amountMinor], ['card-acc', 'income', 2600]);
+  // A new income with the storage refusing a card: the form shows the sentence and keeps the draft.
+  const refused = harness('src/ui/entry-form.tsx', { kind: 'income' }, { data: liabilityData, add: async () => { throw new Error('Un ingreso se registra en una cuenta normal, no en una tarjeta.'); } });
+  root = refused.render();
+  find(root, 'AmountField').props.onChangeText('10');
+  find(root, 'Field').props.onChangeText('Sueldo');
+  find(root, 'CategoryField').props.onChange('Sueldo');
+  await find(refused.render(), 'ActionButton').props.onPress();
+  assert.equal(find(refused.render(), 'ErrorMessage').props.message, 'Un ingreso se registra en una cuenta normal, no en una tarjeta.');
+  assert.equal(find(refused.render(), 'AmountField').props.value, '10', 'the draft is kept');
+});
+
+test('24B6: the plain transfer never offers a card on either side, a link asking to transfer out of a card opens a plain transfer, and Pagar tarjeta still fixes the card as the destination with same-currency cash sources', () => {
+  const usdCard: domain.Account = { ...cardAccount, id: 'usd-card', name: 'Visa USD', currency: 'USD' };
+  const data: domain.LedgerArchive = { ...liabilityData, accounts: [...liabilityData.accounts, usdCard], cards: [card, { ...card, id: 'usd', accountId: usdCard.id }] };
+  const plain = harness('src/ui/transfer-form.tsx', { accountId: 'a' }, { data });
+  assert.deepEqual(find(plain.render(), 'AccountField', 'Desde').props.accounts.map((item: domain.Account) => item.id), ['a', 'u']);
+  assert.deepEqual(find(plain.render(), 'AccountField', 'Hacia').props.accounts.map((item: domain.Account) => item.id), [], 'no other ARS cash account: nothing to pick, never the card or the debt');
+  const outOfCard = harness('src/ui/transfer-form.tsx', { fromAccountId: 'card-acc' }, { data });
+  const root = outOfCard.render();
+  assert.equal(nodes(root).some(node => node.type === 'SelectorCard'), false, 'the card is not locked as a source');
+  assert.equal(find(root, 'Stack.Screen').props.options.title, 'Entre mis cuentas', 'a plain transfer, not a collection');
+  assert.deepEqual(find(root, 'AccountField', 'Desde').props.accounts.map((item: domain.Account) => item.id), ['a', 'u']);
+  const payment = harness('src/ui/transfer-form.tsx', { toAccountId: 'usd-card', maxAmountMinor: '5000' }, { data });
+  const paying = payment.render();
+  assert.equal(find(paying, 'Stack.Screen').props.options.title, 'Pagar tarjeta');
+  assert.equal(find(paying, 'SelectorCard').props.value, 'Visa USD', 'the card is the fixed destination');
+  assert.deepEqual(find(paying, 'AccountField', 'Desde').props.accounts.map((item: domain.Account) => item.id), ['u'], 'only cash in the card\'s currency');
+  assert.equal(find(paying, 'AmountField').props.currency, 'USD');
+});
+
+test('24B6: a recurring income offers cash accounts only, a card chosen for a recurring expense gives way to cash when the kind flips, and a rule already paying an income into a card keeps that card while it is edited', async () => {
+  const view = harness('src/ui/recurring-form.tsx', { accountId: 'card-acc' }, { data: liabilityData });
+  let root = view.render();
+  assert.deepEqual([find(root, 'AccountField').props.value, find(root, 'AccountField').props.accounts.map((item: domain.Account) => item.id)], ['card-acc', ['a', 'u', 'card-acc']], 'a recurring purchase on the card is fine');
+  find(root, 'Choices').props.onChange('income');
+  root = view.render();
+  assert.deepEqual([find(root, 'AccountField').props.value, find(root, 'AccountField').props.accounts.map((item: domain.Account) => item.id)], ['a', ['a', 'u']], 'Ingreso: cash in the card\'s currency');
+  find(root, 'AmountField').props.onChangeText('100');
+  find(root, 'Field').props.onChangeText('Sueldo');
+  find(root, 'CategoryField').props.onChange('Sueldo');
+  await find(view.render(), 'ActionButton').props.onPress();
+  assert.deepEqual([view.rules[0].kind, view.rules[0].accountId], ['income', 'a']);
+  const legacy: domain.RecurringRule = { id: 'cashback', accountId: 'card-acc', kind: 'income', amountMinor: 500, merchant: 'Cashback', category: 'Otros', frequency: 'monthly',
+    anchorDateISO: '2026-01-05', nextDateISO: '2026-10-05', active: true, createdAt, revision: 0, updatedAt: createdAt };
+  const editing = harness('src/ui/recurring-form.tsx', { original: legacy }, { data: { ...liabilityData, recurring: [legacy] } });
+  const field = find(editing.render(), 'AccountField');
+  assert.deepEqual([field.props.value, field.props.accounts.map((item: domain.Account) => item.id)], ['card-acc', ['a', 'card-acc']], 'its own card stays offered beside cash in that currency');
+});
+
+// ---- 24B6 review: a ledger holding only cards ---------------------------------------------------------------
+
+const cardOnly: domain.LedgerArchive = { accounts: [cardAccount, { ...cardAccount, id: 'usd-card', name: 'Visa USD', currency: 'USD' }], records: [],
+  cards: [card, { ...card, id: 'usd', accountId: 'usd-card' }] };
+
+test('24B6 review: with only cards, Gasto still records a card purchase; Ingreso shows the no-account state with Agregar cuenta (pushed, the card\'s currency prefilled) and keeps the expense draft for the way back; a mixed ledger never shows it', async () => {
+  let kind = 'expense';
+  const view = harness('src/ui/entry-form.tsx', { get kind() { return kind; }, accountId: 'usd-card', onKindChange: () => {} }, { data: cardOnly });
+  let root = view.render();
+  assert.deepEqual([find(root, 'AccountField').props.value, find(root, 'AccountField').props.accounts.map((item: domain.Account) => item.id)], ['usd-card', ['card-acc', 'usd-card']]);
+  assert.equal(find(root, 'Stack.Screen').props.options.title, 'Compra con tarjeta');
+  assert.equal(nodes(root).some(node => node.type === 'EmptyState'), false);
+  find(root, 'AmountField').props.onChangeText('12,50');
+  find(root, 'Field').props.onChangeText('Steam');
+  kind = 'income';
+  root = view.render();
+  const empty = find(root, 'EmptyState');
+  assert.equal(empty.props.title, 'Primero, una cuenta');
+  assert.equal(empty.props.detail, 'Un ingreso se registra en una cuenta normal, no en una tarjeta. Agregá una para continuar.');
+  assert.equal(nodes(root).some(node => node.type === 'AccountField' || node.type === 'AmountField' || node.type === 'ActionButton' && node.props.label !== 'Agregar cuenta'), false, 'no empty picker, no disabled Save');
+  assert.equal(nodes(root).some(node => node.type === 'Choices'), false, 'the host owns the Gasto / Ingreso switch');
+  empty.props.action.props.onPress();
+  assert.equal(JSON.stringify(view.pushed[0]), JSON.stringify({ pathname: '/new-account', params: { currency: 'USD' } }), 'pushed over the modal, in the carried card\'s currency');
+  kind = 'expense';
+  root = view.render();
+  assert.equal(nodes(root).some(node => node.type === 'EmptyState'), false);
+  assert.deepEqual([find(root, 'AccountField').props.value, find(root, 'AmountField').props.value, find(root, 'Field').props.value], ['usd-card', '12,50', 'Steam'], 'the draft and the card survive the round trip');
+  find(root, 'CategoryField').props.onChange('Juegos');
+  await find(view.render(), 'ActionButton').props.onPress();
+  assert.deepEqual([view.additions[0].kind, view.additions[0].accountId, view.additions[0].amountMinor], ['expense', 'usd-card', 1250], 'a card purchase, saved once');
+  // The form's own switch stays visible above the empty state, so Gasto is one tap away.
+  const own = harness('src/ui/entry-form.tsx', { kind: 'income', accountId: 'card-acc' }, { data: cardOnly });
+  root = own.render();
+  assert.equal(find(root, 'EmptyState').props.title, 'Primero, una cuenta');
+  assert.equal(find(root, 'Choices').props.value, 'income');
+  find(root, 'Choices').props.onChange('expense');
+  root = own.render();
+  assert.equal(nodes(root).some(node => node.type === 'EmptyState'), false);
+  assert.equal(find(root, 'AccountField').props.value, 'card-acc');
+  // An empty ledger keeps the original no-account state (replace, no currency).
+  const none = harness('src/ui/entry-form.tsx', { kind: 'income' }, { data: { accounts: [], records: [] } });
+  root = none.render();
+  assert.equal(find(root, 'EmptyState').props.detail, 'Cada movimiento necesita una cuenta para actualizar su saldo.');
+  assert.equal(nodes(root).some(node => node.type === 'Choices'), false, 'nothing to switch between without an account');
+  find(root, 'EmptyState').props.action.props.onPress();
+  assert.equal(none.pushed[0], '/new-account');
+  // A mixed ledger: an income lands on cash, never on the empty state.
+  const mixed = harness('src/ui/entry-form.tsx', { kind: 'income', accountId: 'card-acc' }, { data: liabilityData });
+  root = mixed.render();
+  assert.equal(nodes(root).some(node => node.type === 'EmptyState'), false);
+  assert.equal(find(root, 'AccountField').props.value, 'a');
+});
+
+test('24B6 review: a historical card income in a card-only ledger still opens on its card and saves there with the same identity and revision', async () => {
+  const refund: domain.Entry = { ...entry, id: 'refund', kind: 'income', accountId: 'card-acc', amountMinor: 2500, merchant: 'Devolución', category: 'Café' };
+  const data: domain.LedgerArchive = { ...cardOnly, records: [domain.initialRecord(refund)] };
+  const view = harness('src/ui/entry-form.tsx', { original: domain.initialRecord(refund) }, { data });
+  let root = view.render();
+  assert.equal(nodes(root).some(node => node.type === 'EmptyState'), false, 'its own card is eligible');
+  assert.deepEqual([find(root, 'AccountField').props.value, find(root, 'AccountField').props.accounts.map((item: domain.Account) => item.id)], ['card-acc', ['card-acc']]);
+  find(root, 'AmountField').props.onChangeText('30');
+  await find(view.render(), 'ActionButton', 'Guardar cambios').props.onPress();
+  assert.equal(view.updates.length, 1);
+  assert.deepEqual([view.updates[0].before.entry.id, view.updates[0].after.entry.id, view.updates[0].after.entry.accountId, view.updates[0].after.entry.kind, view.updates[0].after.revision, view.updates[0].after.entry.amountMinor],
+    ['refund', 'refund', 'card-acc', 'income', 1, 3000]);
+});
+
+test('24B6 review: a recurring income in a card-only ledger shows the no-account state under the switch, Gasto brings the card and the draft back, and a historical card income rule is edited without changing its identity', async () => {
+  const view = harness('src/ui/recurring-form.tsx', { accountId: 'card-acc' }, { data: cardOnly });
+  let root = view.render();
+  assert.deepEqual([find(root, 'AccountField').props.value, find(root, 'AccountField').props.accounts.map((item: domain.Account) => item.id)], ['card-acc', ['card-acc', 'usd-card']]);
+  find(root, 'AmountField').props.onChangeText('999');
+  find(root, 'Choices').props.onChange('income');
+  root = view.render();
+  const empty = find(root, 'EmptyState');
+  assert.equal(empty.props.title, 'Primero, una cuenta');
+  assert.equal(empty.props.detail, 'Un ingreso recurrente se registra en una cuenta normal, no en una tarjeta. Agregá una para continuar.');
+  assert.equal(find(root, 'Choices').props.value, 'income', 'the switch stays above the empty state');
+  assert.equal(nodes(root).some(node => node.type === 'AccountField' || node.type === 'AmountField'), false, 'no empty selector, no disabled Create');
+  empty.props.action.props.onPress();
+  assert.equal(JSON.stringify(view.pushed[0]), JSON.stringify({ pathname: '/new-account', params: { currency: 'ARS' } }));
+  find(root, 'Choices').props.onChange('expense');
+  root = view.render();
+  assert.equal(nodes(root).some(node => node.type === 'EmptyState'), false);
+  assert.deepEqual([find(root, 'AccountField').props.value, find(root, 'AmountField').props.value], ['card-acc', '999'], 'the card and the draft come back');
+  assert.equal(view.rules.length, 0, 'nothing was written');
+  const none = harness('src/ui/recurring-form.tsx', {}, { data: { accounts: [], records: [] } });
+  root = none.render();
+  assert.equal(find(root, 'EmptyState').props.detail, 'Los recurrentes necesitan una cuenta para registrar cada vencimiento en la moneda correcta.');
+  assert.equal(nodes(root).some(node => node.type === 'Choices'), false);
+  const legacy: domain.RecurringRule = { id: 'cashback', accountId: 'card-acc', kind: 'income', amountMinor: 500, merchant: 'Cashback', category: 'Otros', frequency: 'monthly',
+    anchorDateISO: '2026-01-05', nextDateISO: '2026-10-05', active: true, createdAt, revision: 0, updatedAt: createdAt };
+  const editing = harness('src/ui/recurring-form.tsx', { original: legacy }, { data: { ...cardOnly, recurring: [legacy] } });
+  root = editing.render();
+  assert.equal(nodes(root).some(node => node.type === 'EmptyState'), false, 'its own card is eligible');
+  assert.deepEqual([find(root, 'AccountField').props.value, find(root, 'AccountField').props.accounts.map((item: domain.Account) => item.id)], ['card-acc', ['card-acc']]);
+  find(root, 'AmountField').props.onChangeText('6');
+  await find(editing.render(), 'ActionButton').props.onPress();
+  assert.equal(editing.rules.length, 1);
+  assert.deepEqual([editing.rules[0].id, editing.rules[0].accountId, editing.rules[0].kind, editing.rules[0].amountMinor, editing.rules[0].revision, editing.rules[0].createdAt],
+    ['cashback', 'card-acc', 'income', 600, 1, createdAt], 'same rule, same card, one revision up');
 });

@@ -119,6 +119,9 @@ export const errors: Pick<Messages, 'errors'> = {
       sharedAccount: 'One internal account cannot represent two obligations.',
       duplicateObligation: 'The backup contains a duplicate obligation.',
       debtEntries: 'A debt is settled with payments or collections, not with expenses or income.',
+      cardIncome: 'Income is recorded in a regular account, not on a card.',
+      cardSource: 'A card is paid from an account; it cannot be the source of a transfer.',
+      obligationToObligation: 'A transfer between two obligations cannot be recorded.',
       monthlyDate: 'Invalid monthly date.',
     },
     recovery: {

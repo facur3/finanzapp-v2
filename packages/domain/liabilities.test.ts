@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { accountBalanceMinor, totalsByCurrency, type Account, type Entry, type LedgerSnapshot, type Transfer } from './ledger';
 import { spendingOverview } from './spending-overview';
 import { summarizeMonthlyBudgets, type MonthlyBudget } from './budgets';
-import { accountKind, assertPostingAccount, cardAvailableLimitMinor, cardCreditMinor, cardCycle, cardDebtMinor, cardStatementActivity,
+import { accountKind, assertIncomeAccount, assertPostingAccount, assertTransferSides, cardAvailableLimitMinor, keepsHistoricalCardIncome, postingAccountsFor, sameTransferSides, cardCreditMinor, cardCycle, cardDebtMinor, cardStatementActivity,
   debtOutstandingMinor, hiddenLiabilityAccountIds, liquidTotalsByCurrency, nextDayOfMonthISO, previousDayOfMonthISO,
   validateCreditCardProfile, validateLiabilityProfiles, validatePersonalDebtProfile,
   type CreditCardProfile, type PersonalDebtProfile } from './liabilities';
@@ -144,5 +144,50 @@ describe('card calendar', () => {
     transfers: [payment, { ...payment, id: 'old-payment', dateISO: '2026-08-20' }, debtPayment] }, '2026-09-20');
     expect(activity).toMatchObject({ startISO: '2026-08-29', closingISO: '2026-09-28', purchasesMinor: 23100, purchaseCount: 1,
       refundsMinor: 100, paymentsMinor: 30000, paymentCount: 1 });
+  });
+});
+
+// ---- Producto 24B6: what a card may and may not carry --------------------------------------------
+
+describe('card flows (24B6)', () => {
+  const cards = [card], debts = [debt, receivable];
+
+  it('an expense may post to cash or a card; an income only to cash; a debt to neither', () => {
+    expect(postingAccountsFor('expense', accounts, cards, debts).map(a => a.id)).toEqual(['cash', 'card-acc', 'usd']);
+    expect(postingAccountsFor('income', accounts, cards, debts).map(a => a.id)).toEqual(['cash', 'usd']);
+    expect(postingAccountsFor('income', accounts).map(a => a.id)).toEqual(accounts.map(a => a.id), 'without profiles every account is cash');
+    expect(() => assertIncomeAccount(cash.id, cards, debts)).not.toThrow();
+    expect(() => assertIncomeAccount(cardAccount.id, cards, debts)).toThrow('Un ingreso se registra en una cuenta normal, no en una tarjeta.');
+    expect(() => assertIncomeAccount(debtAccount.id, cards, debts)).toThrow('pagos o cobros');
+    expect(() => assertIncomeAccount(cardAccount.id)).not.toThrow('an account is a card only through its profile');
+  });
+
+  it('a historical income keeps its card only while it stays an income on that same card', () => {
+    const refund = { kind: 'income' as const, accountId: cardAccount.id };
+    expect(keepsHistoricalCardIncome(refund, refund)).toBe(true);
+    expect(keepsHistoricalCardIncome(refund, { ...refund, accountId: cash.id })).toBe(false);
+    expect(keepsHistoricalCardIncome({ kind: 'expense', accountId: cardAccount.id }, refund)).toBe(false);
+    expect(keepsHistoricalCardIncome(refund, { kind: 'expense', accountId: cardAccount.id })).toBe(false);
+    expect(keepsHistoricalCardIncome({ kind: 'income', accountId: cash.id }, refund)).toBe(false);
+  });
+
+  it('a new transfer goes cash to cash, cash into a card or a debt, or out of a receivable; a card is never a source and two obligations never face each other', () => {
+    const sides = (fromAccountId: string, toAccountId: string) => () => assertTransferSides({ fromAccountId, toAccountId }, cards, debts);
+    expect(sides(cash.id, usd.id)).not.toThrow();
+    expect(sides(cash.id, cardAccount.id)).not.toThrow();
+    expect(sides(cash.id, debtAccount.id)).not.toThrow();
+    expect(sides(receivableAccount.id, cash.id)).not.toThrow();
+    expect(sides(cash.id, receivableAccount.id)).not.toThrow('lending more is money out of cash into the receivable');
+    expect(sides(debtAccount.id, cash.id)).not.toThrow('borrowing more is money out of the debt into cash');
+    expect(sides(cardAccount.id, cash.id)).toThrow('Una tarjeta se paga desde una cuenta; no puede ser el origen de una transferencia.');
+    expect(sides(cardAccount.id, cardAccount.id)).toThrow('no puede ser el origen');
+    expect(sides(cardAccount.id, debtAccount.id)).toThrow('no puede ser el origen');
+    expect(sides(debtAccount.id, cardAccount.id)).toThrow('Una transferencia entre dos obligaciones no se puede registrar.');
+    expect(sides(receivableAccount.id, debtAccount.id)).toThrow('entre dos obligaciones');
+    expect(sides(cardAccount.id, cash.id, )).toThrow();
+    expect(() => assertTransferSides({ fromAccountId: cardAccount.id, toAccountId: cash.id })).not.toThrow('without profiles nothing is a card');
+    expect(sameTransferSides(payment, payment)).toBe(true);
+    expect(sameTransferSides(payment, { ...payment, toAccountId: cash.id })).toBe(false);
+    expect(sameTransferSides(payment, { ...payment, amountMinor: 1 })).toBe(true);
   });
 });

@@ -133,6 +133,11 @@ export const errors = {
       sharedAccount: 'Una cuenta interna no puede representar dos obligaciones.',
       duplicateObligation: 'La copia repite una obligación.',
       debtEntries: 'Una deuda se salda con pagos o cobros, no con gastos o ingresos.',
+      /** 24B6: a plain income never posts to a card; an issuer's credit is a refund tied to its purchase (a later delivery). */
+      cardIncome: 'Un ingreso se registra en una cuenta normal, no en una tarjeta.',
+      /** 24B6: a new transfer's sides. A card is paid, never a source; two obligations never face each other. */
+      cardSource: 'Una tarjeta se paga desde una cuenta; no puede ser el origen de una transferencia.',
+      obligationToObligation: 'Una transferencia entre dos obligaciones no se puede registrar.',
       monthlyDate: 'Fecha mensual inválida.',
     },
     recovery: {

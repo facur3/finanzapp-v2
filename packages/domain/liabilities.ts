@@ -1,4 +1,4 @@
-import { accountBalanceMinor, validDateISO, type Account, type Currency, type Entry, type LedgerSnapshot, type Transfer } from './ledger.ts';
+import { accountBalanceMinor, validDateISO, type Account, type Currency, type Entry, type EntryKind, type LedgerSnapshot, type Transfer } from './ledger.ts';
 import { assertStorableCurrency, sortCurrencies } from './currency.ts';
 
 /** A credit card is a hidden internal ledger account. A purchase is an expense
@@ -150,6 +150,48 @@ export function assertPostingAccount(accountId: string, debts: PersonalDebtProfi
   if (debts.some(debt => debt.accountId === accountId)) {
     throw new Error('Una deuda se salda con pagos o cobros, no con gastos o ingresos.');
   }
+}
+
+/** A new income posts to a cash account only (Producto 24B6). A card is paid by a
+ * transfer; what an issuer gives back (a refund, a reversal, a bonus) is a refund
+ * tied to its purchase in a later delivery (the cards and instalments entry of the
+ * roadmap), never a plain income hidden inside the card's debt, where it would read
+ * as salary in reports and budgets. Historical incomes already stored on a card stay
+ * readable and editable in place (`keepsHistoricalCardIncome`). */
+export function assertIncomeAccount(accountId: string, cards: CreditCardProfile[] = [], debts: PersonalDebtProfile[] = []): void {
+  assertPostingAccount(accountId, debts);
+  if (cards.some(card => card.accountId === accountId)) {
+    throw new Error('Un ingreso se registra en una cuenta normal, no en una tarjeta.');
+  }
+}
+
+/** The one case a card may carry an income: a posting that already was an income on that
+ * card is corrected (amount, date, label) or restored without leaving it. */
+export function keepsHistoricalCardIncome(before: Pick<Entry, 'kind' | 'accountId'>, after: Pick<Entry, 'kind' | 'accountId'>): boolean {
+  return before.kind === 'income' && after.kind === 'income' && before.accountId === after.accountId;
+}
+
+/** The accounts a posting of that kind may use: cash and cards for an expense (a purchase
+ * is an expense that raises the card's debt), cash only for an income; never a debt. */
+export function postingAccountsFor(kind: EntryKind, accounts: readonly Account[], cards: CreditCardProfile[] = [], debts: PersonalDebtProfile[] = []): Account[] {
+  return accounts.filter(account => {
+    const kindOfAccount = accountKind(account.id, cards, debts);
+    return kindOfAccount === 'cash' || (kind === 'expense' && kindOfAccount === 'card');
+  });
+}
+
+/** The sides a new transfer may have (24B6): cash to cash, cash into a card (its payment),
+ * cash into a debt (its payment) or out of a receivable (its collection). A card is never
+ * the source (a cash advance or a balance transfer is not this ledger's transfer), and
+ * two obligations never face each other. Stored transfers are read as they are;
+ * `sameTransferSides` lets an edit keep historical sides. */
+export function assertTransferSides(transfer: Pick<Transfer, 'fromAccountId' | 'toAccountId'>, cards: CreditCardProfile[] = [], debts: PersonalDebtProfile[] = []): void {
+  const from = accountKind(transfer.fromAccountId, cards, debts), to = accountKind(transfer.toAccountId, cards, debts);
+  if (from === 'card') throw new Error('Una tarjeta se paga desde una cuenta; no puede ser el origen de una transferencia.');
+  if (from !== 'cash' && to !== 'cash') throw new Error('Una transferencia entre dos obligaciones no se puede registrar.');
+}
+export function sameTransferSides(a: Pick<Transfer, 'fromAccountId' | 'toAccountId'>, b: Pick<Transfer, 'fromAccountId' | 'toAccountId'>): boolean {
+  return a.fromAccountId === b.fromAccountId && a.toAccountId === b.toAccountId;
 }
 
 function safeBigInt(value: bigint): number {
