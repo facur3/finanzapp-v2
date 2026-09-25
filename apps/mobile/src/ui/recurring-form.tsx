@@ -55,11 +55,12 @@ export function RecurringForm({ original, accountId: requestedAccount }: { origi
   const ruleCurrency = () => { if (!account) throw new Error('errors.recurring.account'); return account.currency; }; // A catalogue key, translated when shown.
   const fit = account ? editedDraftFits(amount, account.currency, stored) : { ok: true as const };
   const managing = !!original && manage.busyId === original.id;
-  const locked = busy || pending !== null || managing;
+  // A rule deleted while its form is still on screen (it is closing) is never edited again.
+  const locked = busy || pending !== null || managing || !!original?.deleted;
   const close = () => { if (!saving.current) { if (router.canGoBack()) router.back(); else router.replace('/recurring'); } };
 
   async function save() {
-    if (saving.current) return;
+    if (saving.current || original?.deleted) return;
     saving.current = true;
     setBusy(true);
     setError(null);
@@ -154,7 +155,7 @@ export function RecurringForm({ original, accountId: requestedAccount }: { origi
         {t('recurring.form.retryNote')}
       </AppText>}
       <ActionButton label={pending && error ? t('common.retrySave') : before ? t('common.saveChanges') : t('recurring.form.create')}
-        onPress={save} busy={busy} disabled={!amount.trim() || !merchant.trim() || !category.trim() || !account || !fit.ok} />
+        onPress={save} busy={busy} disabled={!amount.trim() || !merchant.trim() || !category.trim() || !account || !fit.ok || !!original?.deleted} />
       {before && <RecurringHistory ruleId={before.id} ruleAccountId={before.accountId} />}
       {/* 24UX4: the same actions as the row's swipe, on the stored rule (not the draft above), then the screen closes.
           Unsaved edits are not applied by these buttons; pending ones lock them. */}

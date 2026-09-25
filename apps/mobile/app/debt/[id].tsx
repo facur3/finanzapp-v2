@@ -20,11 +20,14 @@ export default function DebtDetailScreen() {
   const account = snapshot?.accounts.find(item => item.id === debt?.accountId);
   const activity = useMemo(() => snapshot && account ? liabilityActivity(account.id, snapshot) : { entries: [], transfers: [] }, [snapshot, account]);
   const manage = useDebtManagement();
-  // A deleted tracker (24UX4) opens as not found; one deleted from this very screen stays drawn while the screen closes.
-  const [openedLive] = useState(() => !!debt && !debt.deleted);
+  // A deleted tracker (24UX4) opens as not found; one this screen has ever shown live (the ledger may hydrate after
+  // the screen mounts) stays drawn, without actions, while the screen closes after its own deletion. Keyed by id; set
+  // during render, React's pattern for information from previous renders.
+  const [seenLiveId, setSeenLiveId] = useState<string | null>(null);
+  if (debt && !debt.deleted && seenLiveId !== debt.id) setSeenLiveId(debt.id);
   const back = () => { if (router.canGoBack()) router.back(); else router.replace('/debts'); };
 
-  if (!snapshot || !archive || !debt || !account || (debt.deleted && !openedLive)) return <Screen>
+  if (!snapshot || !archive || !debt || !account || (debt.deleted && seenLiveId !== debt.id)) return <Screen>
     <EmptyState title={t('debts.detail.notFoundTitle')} detail={t('debts.detail.notFoundDetail')} icon="people-outline" />
   </Screen>;
 

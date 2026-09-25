@@ -24,7 +24,7 @@ const account: domain.Account = { id: 'a', name: 'Prueba ARS', currency: 'ARS', 
 const entry: domain.Entry = { id: 'e', accountId: 'a', kind: 'expense', amountMinor: 12345, merchant: 'Prueba', category: 'Salud', dateISO: '2026-01-01', createdAt };
 const archive: domain.LedgerArchive = { accounts: [account, { ...account, id: 'u', currency: 'USD' }], records: [domain.initialRecord(entry)] };
 
-function harness(file: string, props: any = {}, options: { data?: domain.LedgerArchive; params?: any;
+function harness(file: string, props: any = {}, options: { data?: domain.LedgerArchive | null; params?: any;
   add?: (value: domain.Entry) => Promise<void>; update?: (value: domain.EntryChange) => Promise<void>;
   addTransfer?: (value: domain.Transfer) => Promise<void>; updateTransfer?: (value: domain.TransferChange) => Promise<void>;
   updateAccount?: (value: domain.AccountChange) => Promise<void>; addAccount?: (value: domain.Account) => Promise<void>;
@@ -36,12 +36,13 @@ function harness(file: string, props: any = {}, options: { data?: domain.LedgerA
   let cursor = 0, refCursor = 0, uuid = 0, backs = 0;
   const pushed: any[] = [], alerts: any[] = [], updates: domain.EntryChange[] = [], additions: domain.Entry[] = [], restores: any[] = [];
   const transfers: domain.Transfer[] = [], transferChanges: domain.TransferChange[] = [], accountChanges: domain.AccountChange[] = [], newAccounts: domain.Account[] = [], rules: domain.RecurringRule[] = [];
-  let data = options.data ?? archive;
+  // null: the ledger has not hydrated yet; setData moves it on.
+  let data = (options.data === undefined ? archive : options.data) as domain.LedgerArchive;
   // The locale is read on every render, like the live provider: switching it re-labels the next render and keeps the state.
   let locale: AppLocale = options.locale ?? 'es-AR';
   const i18nProvider = { useI18n: () => bindLocale(locale) };
   const jsx = (type: Node['type'], props: Node['props']) => ({ type, props });
-  const ledger = { useLedger: () => ({ archive: data, snapshot: domain.snapshotFromArchive(data),
+  const ledger = { useLedger: () => ({ archive: data, snapshot: data ? domain.snapshotFromArchive(data) : null,
     addEntry: async (value: domain.Entry) => { additions.push(value); await options.add?.(value); },
     saveRecurring: async (value: domain.RecurringRule) => { rules.push(value); },
     updateEntry: async (value: domain.EntryChange) => { updates.push(value); await options.update?.(value); },
@@ -98,7 +99,7 @@ function harness(file: string, props: any = {}, options: { data?: domain.LedgerA
     render: () => { cursor = 0; refCursor = 0; let node = (module.exports.default ?? module.exports.EntryForm ?? module.exports.TransferForm ?? module.exports.MovementForm ?? module.exports.RecurringForm)(props);
       while (typeof node.type === 'function') node = node.type(node.props);
       return node; },
-    setData: (next: domain.LedgerArchive) => { data = next; },
+    setData: (next: domain.LedgerArchive | null) => { data = next as domain.LedgerArchive; },
     setLocale: (next: AppLocale) => { locale = next; },
     pushed, alerts, updates, additions, restores, transfers, transferChanges, accountChanges, newAccounts, rules, backs: () => backs,
   };
@@ -1268,4 +1269,31 @@ test('24UX4: Eliminar recurrente asks first, names the recorded movements, and o
   assert.equal(find(harness('app/edit-recurring/[id].tsx', {}, { data: deletedData, params: { id: 'netflix' } }).render(), 'EmptyState').props.title, 'No encontramos este recurrente');
   const movement = harness('app/entry/[id].tsx', {}, { data: deletedData, params: { id: occurrence('2026-09-05').id } }).render();
   assert.equal(nodes(movement).some(node => node.type === 'DetailRow' && node.props.label === 'Recurrente'), false);
+});
+
+test('24UX4 review: a rule detail opened before the ledger hydrates shows the form once it loads, and after its own deletion keeps it locked until it closes; a link to a deleted rule is not found', async () => {
+  const data: domain.LedgerArchive = { ...archive, recurring: [streaming] };
+  const deleted = domain.deleteRecurringRule(streaming, '2026-09-25T12:00:00.000Z');
+  const view = harness('app/edit-recurring/[id].tsx', {}, { data: null, params: { id: 'netflix' } });
+  assert.equal(find(view.render(), 'EmptyState').props.title, 'No encontramos este recurrente', 'nothing to show before the ledger loads');
+  view.setData(data);
+  assert.equal(view.render().type, 'RecurringForm', 'the rule appears when the ledger arrives');
+  view.setData({ ...data, recurring: [deleted] });
+  const closing = view.render();
+  assert.equal(closing.type, 'RecurringForm', 'deleted from this screen: no «not found» flash while it closes');
+  assert.equal(closing.props.original.deleted, true);
+  // A cold link straight to the deleted rule, before and after hydration, is not found.
+  const cold = harness('app/edit-recurring/[id].tsx', {}, { data: null, params: { id: 'netflix' } });
+  cold.render();
+  cold.setData({ ...data, recurring: [deleted] });
+  assert.equal(find(cold.render(), 'EmptyState').props.title, 'No encontramos este recurrente');
+  // The form of a deleted rule cannot be saved, paused, resumed or deleted again.
+  const form = harness('src/ui/recurring-form.tsx', { original: deleted }, { data: { ...data, recurring: [deleted] } });
+  const root = form.render();
+  assert.equal(nodes(root).filter(node => node.type === 'ActionButton').map(node => node.props.label).join(','), 'Guardar cambios');
+  const save = find(root, 'ActionButton', 'Guardar cambios');
+  assert.equal(save.props.disabled, true);
+  await save.props.onPress();
+  assert.equal(form.rules.length, 0, 'nothing is written');
+  assert.equal(find(root, 'Field', 'Comercio o concepto').props.editable, false);
 });

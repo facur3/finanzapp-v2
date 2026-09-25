@@ -496,17 +496,24 @@ the owner authorises it; no EAS build or store submission without the owner.
     version error say v1 to v10.
   - **Checked on Linux:** root `npm test` 297/297 (was 286: +4 recurring pause/resume/delete, +3 debt
     close/reopen/delete and the deleted tracker's payments, +4 backup v10), `npm run check:repo`;
-    mobile `npm run typecheck`, `npm run test:storage` 615/615 (was 596: +4 real-SQLite in
+    mobile `npm run typecheck`, `npm run test:storage` 617/617 (was 596: +4 real-SQLite in
     `database.node.ts` (a real schema 9 file to 10, pause/resume through `processRecurring`, a
     deletion keeping every entry byte for byte and surviving backup and an older copy's import,
     a debt tracker's close/reopen/delete leaving accounts, transfers and Disponible unchanged), +4
-    `polish-routes`, +4 `liabilities-routes`, +2 `recovery-routes`, +1 `smart-amounts`, +4 new
+    `polish-routes`, +5 `liabilities-routes`, +3 `recovery-routes`, +1 `smart-amounts`, +4 new
     `swipe-actions.node.ts`; the Recurrentes switch tests rewritten for the swipe; fixtures gained
     `deleted: false`; the v8→v9 file test compares the v8 columns), `currency:verify`,
     `regions:verify`, `i18n:check -- --strict` (0 errors, 0 stale; English reviewed and accepted),
-    `i18n:extract` (no copy outside the catalogue), `check` (up to date), `export:ios` (5,021,833-byte
+    `i18n:extract` (no copy outside the catalogue), `check` (up to date), `export:ios` (5,021,900-byte
     bundle); `server/mobile/schema.test.sql` on postgres:17 in a local container (unchanged code,
     passes). No EAS build; the iPhone was not touched; no paid service, currency or region enabled.
+  - **Review of PR #58:** both detail screens (rule, debt) remembered whether they had opened on a
+    live item with a one-time state initializer, which froze at «not seen» when a cold deep link
+    mounted before the ledger hydrated; after the item loaded, deleting it from its own detail could
+    flash «not found» before the pop. They now record, keyed by id, that they have *ever* shown the
+    item live (updated during render); a link to an already-deleted item is still not found, and a
+    deleted item's screen offers no edit, save or restore while it closes. Regression tests cover
+    null → live → deleted and a cold link to a deleted item on both screens.
   - **Pending:** the device QA of §2 (checklist, Producto 24UX4). Installing this build upgrades
     FinanzApp Dev's ledger to schema 10 (additive, one-way): export a backup first.
 

@@ -37,7 +37,9 @@ const archive: domain.LedgerArchive = { accounts: [cash, cardAccount, usdCardAcc
 const empty: domain.LedgerArchive = { accounts: [cash], records: [] };
 
 // `file` is a route under app/, or a component module under src/ (its exports are returned too).
-function harness(file: string, params: Record<string, unknown> = {}, data: domain.LedgerArchive = archive, gate?: domain.CurrencyGate) {
+function harness(file: string, params: Record<string, unknown> = {}, initial: domain.LedgerArchive | null = archive, gate?: domain.CurrencyGate) {
+  // null: the ledger has not hydrated yet (LedgerProvider reads SQLite asynchronously); setData moves it on.
+  let data = initial as domain.LedgerArchive;
   const source = readFileSync(new URL((file.startsWith('src/') ? '../' : '../app/') + file, import.meta.url), 'utf8');
   const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText;
   const jsx = (type: unknown, props: Record<string, unknown>) => ({ type, props });
@@ -47,7 +49,7 @@ function harness(file: string, params: Record<string, unknown> = {}, data: domai
   const cards: { account: domain.Account; card: domain.CreditCardProfile }[] = [], debts: { account: domain.Account; debt: domain.PersonalDebtProfile }[] = [];
   const savedDebts: domain.PersonalDebtProfile[] = [], alerts: { title: string; message: string; buttons: any[] }[] = [];
   let backs = 0;
-  const ledger = { useLedger: () => ({ archive: data, snapshot: domain.snapshotFromArchive(data), ...(gate ? { gate } : {}),
+  const ledger = { useLedger: () => ({ archive: data, snapshot: data ? domain.snapshotFromArchive(data) : null, ...(gate ? { gate } : {}),
     addCard: async (account: domain.Account, card: domain.CreditCardProfile) => { cards.push({ account, card }); }, saveCard: async () => {},
     addDebt: async (account: domain.Account, debt: domain.PersonalDebtProfile) => { debts.push({ account, debt }); },
     saveDebt: async (debt: domain.PersonalDebtProfile) => { savedDebts.push(debt); } }) };
@@ -98,7 +100,8 @@ function harness(file: string, params: Record<string, unknown> = {}, data: domai
   const module = { exports: {} as { default?: () => Node } & Record<string, (props: any) => Node> };
   runInNewContext(code, { module, exports: module.exports, require, Error });
   return { render: () => { cursor = 0; return module.exports.default!(); }, renderExport: (name: string, props: any = {}) => { cursor = 0; return module.exports[name](props); },
-    pushed, cards, debts, savedDebts, alerts, backs: () => backs, exports: module.exports };
+    pushed, cards, debts, savedDebts, alerts, backs: () => backs, exports: module.exports,
+    setData: (next: domain.LedgerArchive | null) => { data = next as domain.LedgerArchive; } };
 }
 
 // Nested function components (CardPanel, UsageBar, DebtRow) are expanded so
@@ -475,4 +478,30 @@ test('24UX4: a closed row says Cerrada and carries its actions for VoiceOver; En
     assert.equal(english.alerts[0].title, 'Delete your debt to Juan?');
     assert.equal(labelsOf(rowsOf(harness('debts.tsx').render())[0].props.actions), 'Settle,Delete');
   } finally { activeLocale = 'es-AR'; }
+});
+
+test('24UX4 review: a debt detail opened before the ledger hydrates shows the debt once it loads, and after its own deletion stays drawn without actions until it closes; a link to a deleted debt is not found', async () => {
+  const view = harness('debt/[id].tsx', { id: 'debt' }, null);
+  assert.equal(find(view.render(), 'EmptyState').props.title, 'No encontramos esta deuda', 'nothing to show before the ledger loads');
+  view.setData(archive);
+  const live = view.render();
+  assert.equal(nodes(live).some(node => node.type === 'EmptyState'), false, 'the debt appears when the ledger arrives');
+  assert.equal(find(live, 'Money').props.minor, 30000);
+  find(live, 'ActionButton', 'Eliminar deuda').props.onPress();
+  await view.alerts[0].buttons[1].onPress();
+  await settle();
+  assert.equal(view.backs(), 1);
+  // The store now holds the deletion record while the screen pops: no «not found» flash, and nothing to edit or restore.
+  view.setData({ ...archive, debts: [view.savedDebts[0]] });
+  const closing = view.render();
+  assert.equal(nodes(closing).some(node => node.type === 'EmptyState'), false);
+  assert.equal(find(closing, 'Money').props.minor, 30000);
+  assert.equal(nodes(closing).filter(node => node.type === 'ActionButton').map(node => node.props.label).join(','), 'Registrar pago');
+  assert.equal(find(closing, 'ActionButton', 'Registrar pago').props.disabled, true);
+  assert.equal(nodes(closing).find(node => node.type === 'Stack.Screen')!.props.options.headerRight(), null, 'no edit button');
+  // A cold link straight to the deleted tracker, before and after hydration, is not found.
+  const cold = harness('debt/[id].tsx', { id: 'debt' }, null);
+  cold.render();
+  cold.setData({ ...archive, debts: [view.savedDebts[0]] });
+  assert.equal(find(cold.render(), 'EmptyState').props.title, 'No encontramos esta deuda');
 });
