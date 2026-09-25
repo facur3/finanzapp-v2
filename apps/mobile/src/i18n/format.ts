@@ -29,7 +29,22 @@
 import { currencyRecord, displayDigits, formatMinorUnits, splitMinor, type IsoCurrencyCode } from '@finanzapp/domain';
 import { CURRENCY_NAMES } from './currencies/index.ts';
 import type { CurrencyNameForms } from './currencies/types.ts';
-import { DEFAULT_LOCALE, SPEECH_REGIONS, composeLocale, conventionsOf, languageOf, type AppLocale, type LanguageCode } from './locale.ts';
+import { DEFAULT_LOCALE, SPEECH_REGIONS, completeConventions, composeLocale, conventionsOf, languageOf, registryRegionOf, type AppLocale, type LanguageCode, type RegionConventions } from './locale.ts';
+
+/** The conventions a formatter writes in: the ones passed explicitly (a catalogue region under test or, from
+ * 24R2, the resolved region), otherwise the released region of the locale. Every optional field filled. */
+function conventions(locale: AppLocale, explicit?: RegionConventions): Required<RegionConventions> {
+  return completeConventions(explicit ?? conventionsOf(locale));
+}
+
+/** A numeric date in the region's order, separator and padding. With `withYear` false the year is left
+ * out. The released regions keep their 23.1 strings (unpadded, "/"). */
+function numericDate(date: { year: number; month: number; day: number }, c: Required<RegionConventions>, withYear: boolean): string {
+  const pad = (value: number) => c.paddedDate ? String(value).padStart(2, '0') : String(value);
+  const day = pad(date.day), month = pad(date.month), year = String(date.year);
+  const parts = c.dateOrder === 'mdy' ? [month, day, year] : c.dateOrder === 'ymd' ? [year, month, day] : [day, month, year];
+  return (withYear ? parts : parts.filter(part => part !== year)).join(c.dateSeparator);
+}
 
 const NBSP = '\u00A0';
 
@@ -134,32 +149,39 @@ export function relativeDate(dateISO: string, todayISO: string, locale: AppLocal
   return formatDate(dateISO, date.year === today.year ? 'day' : 'dayYear', locale);
 }
 
-/** A stored date as numbers in the region's order: "22/9/2026" (Argentina) or "9/22/2026" (United States). */
-export function formatNumericDate(dateISO: string, locale: AppLocale = DEFAULT_LOCALE): string {
+/** A stored date as numbers in the region's order: "22/9/2026" (Argentina), "9/22/2026" (United States),
+ * "2026/09/22" (a catalogue region such as Japan, through explicit conventions). */
+export function formatNumericDate(dateISO: string, locale: AppLocale = DEFAULT_LOCALE, explicit?: RegionConventions): string {
   const date = dateFromISO(dateISO);
   if (!date) return String(dateISO ?? '');
-  return conventionsOf(locale).dateOrder === 'mdy' ? `${date.month}/${date.day}/${date.year}` : `${date.day}/${date.month}/${date.year}`;
+  return numericDate(date, conventions(locale, explicit), true);
 }
 
 /** A day of the current period as numbers without the year, in the region's
  * order: "5/09" in Argentina (as the domain's reports write it) and "9/5" in
- * the United States, where "5/09" would read as May 9. */
-export function formatDayMonth(dateISO: string, locale: AppLocale = DEFAULT_LOCALE): string {
+ * the United States, where "5/09" would read as May 9. A catalogue region
+ * writes its own order, separator and padding ("09/22" in Japan, "5/9" in
+ * India: both numbers unpadded). */
+export function formatDayMonth(dateISO: string, locale: AppLocale = DEFAULT_LOCALE, explicit?: RegionConventions): string {
   const date = dateFromISO(dateISO);
   if (!date) return String(dateISO ?? '');
-  return conventionsOf(locale).dateOrder === 'mdy' ? `${date.month}/${date.day}` : `${date.day}/${String(date.month).padStart(2, '0')}`;
+  const c = conventions(locale, explicit);
+  // The registry keeps the ledger's own writing (the month padded, the day not) whichever object carries its
+  // conventions: the locale, `REGIONS`, `catalogueConventions` or `conventionsForRegion` write the same "5/09"
+  // (review of PR #53). A catalogue region's own conventions follow their padding.
+  if (registryRegionOf(c)) return c.dateOrder === 'mdy' ? `${date.month}/${date.day}` : `${date.day}/${String(date.month).padStart(2, '0')}`;
+  return numericDate(date, c, false);
 }
 
 /** An ISO timestamp as a short local date and time, minutes precision. */
-export function formatDateTime(iso: string, locale: AppLocale = DEFAULT_LOCALE): string {
+export function formatDateTime(iso: string, locale: AppLocale = DEFAULT_LOCALE, explicit?: RegionConventions): string {
   const time = new Date(iso);
   if (Number.isNaN(time.getTime())) return String(iso ?? '');
-  const day = time.getDate(), month = time.getMonth() + 1, year = time.getFullYear();
   const minutes = String(time.getMinutes()).padStart(2, '0');
-  const conventions = conventionsOf(locale);
+  const c = conventions(locale, explicit);
   // The region orders the numbers and picks the clock; the language names the day period.
-  const date = conventions.dateOrder === 'mdy' ? `${month}/${day}/${year}` : `${day}/${month}/${year}`;
-  if (conventions.hour12) {
+  const date = numericDate({ year: time.getFullYear(), month: time.getMonth() + 1, day: time.getDate() }, c, true);
+  if (c.hour12) {
     const hours = time.getHours() % 12 || 12, morning = time.getHours() < 12;
     const period = languageOf(locale) === 'en' ? (morning ? 'AM' : 'PM') : (morning ? 'a.\u00A0m.' : 'p.\u00A0m.');
     return `${date}, ${hours}:${minutes}${NBSP}${period}`;
@@ -167,15 +189,25 @@ export function formatDateTime(iso: string, locale: AppLocale = DEFAULT_LOCALE):
   return `${date}, ${String(time.getHours()).padStart(2, '0')}:${minutes}`;
 }
 
-/** Groups the digits of a non-negative integer string with the region's thousands separator. */
-function groupDigits(digits: string, locale: AppLocale): string {
-  return digits.replace(/\B(?=(\d{3})+(?!\d))/g, conventionsOf(locale).group);
+/** Groups the digits of a non-negative integer string with the region's separator: the last group of
+ * three, then groups of `secondaryGrouping` (3 almost everywhere, 2 for lakh and crore: "12,34,567"),
+ * and no separator at all below `minimumGroupingDigits` whole digits before the first one. */
+function groupDigits(digits: string, locale: AppLocale, explicit?: RegionConventions): string {
+  const c = conventions(locale, explicit);
+  if (digits.length < 3 + c.minimumGroupingDigits) return digits;
+  const groups: string[] = [];
+  let rest = digits;
+  groups.unshift(rest.slice(-3)); rest = rest.slice(0, -3);
+  const size = Math.max(1, c.secondaryGrouping);
+  while (rest.length > size) { groups.unshift(rest.slice(-size)); rest = rest.slice(0, -size); }
+  if (rest) groups.unshift(rest);
+  return groups.join(c.group);
 }
 
 /** A count (of movements, of days) with thousands grouping. Not for money. */
-export function formatCount(value: number, locale: AppLocale = DEFAULT_LOCALE): string {
+export function formatCount(value: number, locale: AppLocale = DEFAULT_LOCALE, explicit?: RegionConventions): string {
   if (!Number.isSafeInteger(value)) return String(value);
-  return (value < 0 ? '-' : '') + groupDigits(String(Math.abs(value)), locale);
+  return (value < 0 ? '-' : '') + groupDigits(String(Math.abs(value)), locale, explicit);
 }
 
 /** A ratio as a percentage: 0.3 → "30 %" (Spanish) / "30%" (English), at most one
@@ -183,16 +215,16 @@ export function formatCount(value: number, locale: AppLocale = DEFAULT_LOCALE): 
  * positive share below a tenth of a percent reads "<0,1 %" rather than "0 %",
  * so a real expense never looks like nothing. Display only: the ratio itself
  * was computed by the caller from integer amounts. */
-export function formatPercent(fraction: number, locale: AppLocale = DEFAULT_LOCALE): string {
+export function formatPercent(fraction: number, locale: AppLocale = DEFAULT_LOCALE, explicit?: RegionConventions): string {
   const suffix = languageOf(locale) === 'en' ? '%' : NBSP + '%';
-  const decimal = conventionsOf(locale).decimal;
+  const decimal = conventions(locale, explicit).decimal;
   if (!Number.isFinite(fraction)) return '—';
   const value = Math.abs(fraction) * 100;
   if (value > 0 && value < 0.1) return '<0' + decimal + '1' + suffix;
   // Round on the shortest decimal representation, as a person would, not on the binary double.
   const tenths = Math.round(Number(value.toFixed(10)) * 10);
   const whole = Math.floor(tenths / 10), tenth = tenths % 10;
-  const digits = groupDigits(String(whole), locale) + (tenth ? decimal + tenth : '');
+  const digits = groupDigits(String(whole), locale, explicit) + (tenth ? decimal + tenth : '');
   return (fraction < 0 ? '−' : '') + digits + suffix;
 }
 
@@ -202,8 +234,8 @@ export function formatPercent(fraction: number, locale: AppLocale = DEFAULT_LOCA
  * and every other currency takes CLDR's language-neutral symbol, which names one
  * currency only ("US$", "CA$", "€", "JP¥"), or its ISO code ("KWD"). So the dollar
  * reads "US$" in both regions, as it always has. The language plays no part. */
-export function currencySymbol(currency: IsoCurrencyCode, locale: AppLocale = DEFAULT_LOCALE): string {
-  if (currency === 'ARS') return conventionsOf(locale).dollarSignCurrency === 'ARS' ? '$' : 'AR$';
+export function currencySymbol(currency: IsoCurrencyCode, locale: AppLocale = DEFAULT_LOCALE, explicit?: RegionConventions): string {
+  if (currency === 'ARS') return conventions(locale, explicit).dollarSignCurrency === 'ARS' ? '$' : 'AR$';
   return currencyRecord(currency).symbol;
 }
 
@@ -219,20 +251,20 @@ function shownFraction(fraction: string, currency: IsoCurrencyCode): string {
 /** An amount of a currency in the region's separators, with that currency's decimals:
  * "1.234,56" (ARS, USD), "1.500" (JPY), "1.234,567" (KWD), "1.500" and "1.500,5" (IQD,
  * three ISO decimals shown down to CLDR's none). For ARS and USD it is `formatAmount`. */
-export function formatMoneyAmount(minor: number, currency: IsoCurrencyCode, locale: AppLocale = DEFAULT_LOCALE): string {
+export function formatMoneyAmount(minor: number, currency: IsoCurrencyCode, locale: AppLocale = DEFAULT_LOCALE, explicit?: RegionConventions): string {
   const { negative, whole, fraction } = splitMinor(minor, currency);
   const shown = shownFraction(fraction, currency);
-  return (negative ? '-' : '') + groupDigits(whole, locale) + (shown ? conventionsOf(locale).decimal + shown : '');
+  return (negative ? '-' : '') + groupDigits(whole, locale, explicit) + (shown ? conventions(locale, explicit).decimal + shown : '');
 }
 
 /** An amount rounded to whole units of its currency, grouped, for a chart's scale
  * caption ("escala de 0 a $ 1.234.568"): half a unit and above rounds up, exactly,
  * on the integer digits (never a float). A currency without decimals is the amount
  * itself. Display only: no ledger figure is ever rounded. */
-export function formatWholeUnits(minor: number, currency: IsoCurrencyCode, locale: AppLocale = DEFAULT_LOCALE): string {
+export function formatWholeUnits(minor: number, currency: IsoCurrencyCode, locale: AppLocale = DEFAULT_LOCALE, explicit?: RegionConventions): string {
   const { negative, whole, fraction } = splitMinor(minor, currency);
   const units = BigInt(whole) + (fraction && fraction.charCodeAt(0) >= 53 /* '5' */ ? 1n : 0n);
-  return (negative && units > 0n ? '-' : '') + groupDigits(units.toString(), locale);
+  return (negative && units > 0n ? '-' : '') + groupDigits(units.toString(), locale, explicit);
 }
 
 /** The domain's formatted amount in the region's separators. Argentine output
@@ -247,8 +279,8 @@ export function formatAmount(minor: number, locale: AppLocale = DEFAULT_LOCALE):
 }
 
 /** The separators the amount field types in: the region's. */
-export function amountFormat(locale: AppLocale = DEFAULT_LOCALE): { decimal: string; group: string } {
-  const { decimal, group } = conventionsOf(locale);
+export function amountFormat(locale: AppLocale = DEFAULT_LOCALE, explicit?: RegionConventions): { decimal: string; group: string } {
+  const { decimal, group } = conventions(locale, explicit);
   return { decimal, group };
 }
 
@@ -256,15 +288,15 @@ export function amountFormat(locale: AppLocale = DEFAULT_LOCALE): { decimal: str
  * and the number, so "US$ 1.234,56" never splits at a line end. `absolute`
  * drops the sign for callers that word it ("deuda", "a favor"); `signed`
  * adds "+" to a positive amount (income). */
-export function moneyText(minor: number, currency: IsoCurrencyCode, locale: AppLocale = DEFAULT_LOCALE, absolute = false, signed = false): string {
+export function moneyText(minor: number, currency: IsoCurrencyCode, locale: AppLocale = DEFAULT_LOCALE, absolute = false, signed = false, explicit?: RegionConventions): string {
   const value = absolute ? Math.abs(minor) : minor;
   const sign = value < 0 ? '−' : signed && value > 0 ? '+' : '';
-  return sign + currencySymbol(currency, locale) + NBSP + formatMoneyAmount(Math.abs(value), currency, locale);
+  return sign + currencySymbol(currency, locale, explicit) + NBSP + formatMoneyAmount(Math.abs(value), currency, locale, explicit);
 }
 
 /** "ARS 1.234,56": the ISO code before the amount, joined so the code can never sit alone on a line. */
-export function codedAmount(minor: number, currency: IsoCurrencyCode, locale: AppLocale = DEFAULT_LOCALE): string {
-  return currency + NBSP + formatMoneyAmount(minor, currency, locale);
+export function codedAmount(minor: number, currency: IsoCurrencyCode, locale: AppLocale = DEFAULT_LOCALE, explicit?: RegionConventions): string {
+  return currency + NBSP + formatMoneyAmount(minor, currency, locale, explicit);
 }
 
 /** "Deuda registrada · ARS": a label with its currency code, joined so the

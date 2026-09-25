@@ -552,7 +552,8 @@ test('Idioma with a narrower gate lists no unfinished language; Región lists on
   assert.deepEqual(root.root.findAllByType('CheckRow' as never).map(row => [row.props.title, row.props.subtitle ?? '']), [['Según el dispositivo', 'Ahora: Español'], ['Español', '']]);
   assert.match(root.root.findAllByType('AppText' as never).map(node => String(node.props.children)).join(' '), /no modifica tus movimientos, tus cuentas ni tus copias de seguridad/);
   act(() => root.update(h(provider.I18nProvider, { store }, h(screen.LocalePreferenceScreen, { kind: 'region' }))));
-  assert.deepEqual(root.root.findAllByType('CheckRow' as never).map(row => [row.props.title, row.props.subtitle]), [['Según el dispositivo', 'Ahora: Argentina'], ['Argentina', '22/9/2026 · 1.234,56']]);
+  // 24R1: the device's Region (US) is one the catalogue names but this gate does not honour: the subtitle says whose formats stand in.
+  assert.deepEqual(root.root.findAllByType('CheckRow' as never).map(row => [row.props.title, row.props.subtitle]), [['Según el dispositivo', 'Ahora: Estados Unidos (formatos de Argentina)'], ['Argentina', '22/9/2026 · 1.234,56']]);
   assert.equal(root.root.findByType('Stack.Screen' as never).props.options.title, 'Región');
   assert.match(root.root.findAllByType('AppText' as never).map(node => String(node.props.children)).join(' '), /No cambia la moneda de tus cuentas/);
   act(() => root.unmount());
@@ -685,4 +686,70 @@ test('following the device, a US→AR Region change on return to the foreground 
   type('9');
   assert.deepEqual([input().value, drafts.at(-1)], ['12.349,5', '12.349,5'], 'typing goes on in Argentine separators');
   act(() => root.unmount());
+});
+
+// ---- Producto 24R1: the device's Region as the catalogue names it ------------------------------------
+
+test('24R1: the device Region is read as a catalogue code, released or not, and "Según el dispositivo" names it with the formats that stand in; the resolved region stays a released one', () => {
+  const japan = createLocaleStore({ devices: () => device('ja-JP', 'JP'), store: memory().store });
+  let state = japan.getState();
+  assert.deepEqual([state.locale, state.region, state.device.region, state.device.detectedRegion, state.device.primaryLanguage], ['es-AR', 'AR', 'AR', 'JP', 'ja'], 'Japan is known, not released: Argentine formats, and the state says which iPhone this is');
+  const t = bind.bindLocale('es-AR').t;
+  assert.equal(localeOptions.regionOptions(state, t)[0].subtitle, 'Ahora: Japón (formatos de Argentina)');
+  const englishPhone = createLocaleStore({ devices: () => device('en-JP', 'JP'), store: memory().store }).getState();
+  assert.deepEqual([englishPhone.language, englishPhone.region, englishPhone.device.detectedRegion], ['en', 'AR', 'JP']);
+  assert.equal(localeOptions.deviceRegionSummary(englishPhone, bind.bindLocale('en-AR').t), 'Now: Japan (Argentina formats)', 'named in the interface language');
+  assert.equal(localeOptions.preferenceSummary('region', state, t), 'Argentina · según el dispositivo', 'the Más row names the formats in use');
+  // A released Region: the plain sentence, unchanged from 23.1C2.
+  state = createLocaleStore({ devices: () => device('en-US', 'US'), store: memory().store }).getState();
+  assert.deepEqual([state.device.detectedRegion, localeOptions.regionOptions(state, t)[0].subtitle], ['US', 'Ahora: Estados Unidos']);
+  // A Region the catalogue does not know, or none: nothing detected, the plain sentence.
+  for (const reading of [device('es-AR', 'ZZ'), device('es', null), { source: 'none' as const, locales: [] }]) {
+    state = createLocaleStore({ devices: () => reading, store: memory().store }).getState();
+    assert.equal(state.device.detectedRegion, null, JSON.stringify(reading));
+    assert.equal(localeOptions.regionOptions(state, t)[0].subtitle, 'Ahora: Argentina');
+  }
+  // Only Intl answered (an older binary): the tag's region is read, never a second language's.
+  state = createLocaleStore({ devices: () => ({ source: 'intl', locales: [{ languageTag: 'en-GB' }] }), store: memory().store }).getState();
+  assert.deepEqual([state.device.detectedRegion, state.region, state.language], ['GB', 'AR', 'en']);
+});
+
+test('24R1: travelling with "Según el dispositivo" follows the Region setting live, and only among released regions; a manual choice never moves, and a half-typed draft survives either way', () => {
+  let reading = device('es-AR', 'AR');
+  const saved = memory();
+  const store = createLocaleStore({ devices: () => reading, store: saved.store });
+  const app = mountApp(store);
+  act(() => app.handles.setDraft!('1.234,5'));
+  // Following the device: Argentina → Japan (not released) keeps Argentine formats but names Japan; → United States applies US formats in place.
+  reading = device('es-AR', 'JP');
+  act(() => app.native.emit('active'));
+  let state = app.handles.choose!.state;
+  assert.deepEqual([state.region, state.device.detectedRegion], ['AR', 'JP']);
+  assert.equal(localeOptions.regionOptions(state, app.handles.i18n!.t)[0].subtitle, 'Ahora: Japón (formatos de Argentina)');
+  assert.equal([app.form().total, app.form().draft].join('|'), '$\u00A01.234,56|1.234,5', 'nothing moved: Japan is not released');
+  reading = device('es-AR', 'US');
+  act(() => app.native.emit('active'));
+  state = app.handles.choose!.state;
+  assert.deepEqual([state.region, state.device.detectedRegion], ['US', 'US']);
+  // The stand-in form keeps its raw draft text; the real AmountField's re-writing of a draft on a region change is the 23.1C2 test above.
+  assert.equal([app.form().total, app.form().draft].join('|'), 'AR$\u00A01,234.56|1.234,5', 'US formats applied in place, the draft not lost');
+  assert.equal(saved.rows.size, 0, 'following the device stores nothing');
+  // A manual choice: Argentina. The phone then travels to Japan and to the United States: nothing changes but the chooser\'s subtitle.
+  act(() => { assert.equal(app.handles.choose!.setRegion('AR'), true); });
+  assert.equal(saved.rows.get(REGION_PREFERENCE_KEY), 'AR');
+  const renders = app.counts.formRenders;
+  for (const region of ['JP', 'US', 'GB', 'AR']) {
+    reading = device('es-AR', region);
+    act(() => app.native.emit('active'));
+    state = app.handles.choose!.state;
+    assert.deepEqual([state.region, state.preferences.region, state.device.detectedRegion], ['AR', 'AR', region], region);
+    assert.equal([app.form().total, app.form().draft].join('|'), '$\u00A01.234,56|1.234,5', region + ': the draft is kept');
+  }
+  assert.equal(app.counts.formRenders, renders, 'a manual region ignores every device change: the form never re-renders');
+  assert.equal(saved.rows.get(REGION_PREFERENCE_KEY), 'AR', 'the saved choice is untouched by travel');
+  // A relaunch after the trip: the same saved choice, whatever the device says now.
+  reading = device('ja-JP', 'JP');
+  const relaunched = createLocaleStore({ devices: () => reading, store: saved.store }).getState();
+  assert.deepEqual([relaunched.region, relaunched.preferences.region, relaunched.device.detectedRegion, relaunched.language], ['AR', 'AR', 'JP', 'es']);
+  act(() => app.root.unmount());
 });

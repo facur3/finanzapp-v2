@@ -34,17 +34,48 @@ export type LanguageCode = keyof typeof LANGUAGES;
  * language names its region here. */
 export const SPEECH_REGIONS: Record<LanguageCode, RegionCode> = { es: 'AR', en: 'US' };
 
-/** How a region writes numbers, dates and times. Words stay with the language. */
+/** How a region writes numbers, dates and times. Words stay with the language.
+ * The first five fields are the registry's since 23.1; the optional ones came with the
+ * region catalogue (24R1, `src/i18n/regions.ts`) and default to what Argentina and the
+ * United States write (`completeConventions`), so the released registry is unchanged. */
 export interface RegionConventions {
   /** Decimal and thousands separators of an amount, a count or a percentage. */
   decimal: string;
   group: string;
-  /** Order of a numeric date ("22/9/2026" or "9/22/2026"). */
-  dateOrder: 'dmy' | 'mdy';
+  /** Order of a numeric date ("22/9/2026", "9/22/2026" or "2026/9/22"). */
+  dateOrder: 'dmy' | 'mdy' | 'ymd';
   /** A 12-hour clock with a day-period marker instead of 24 hours. */
   hour12: boolean;
-  /** The currency a bare "$" names in this region; any other "$" currency carries its prefix. */
-  dollarSignCurrency: 'ARS' | 'USD';
+  /** The currency a bare "$" names in this region (ISO code), or null where none is tender; any other "$" currency carries its prefix. */
+  dollarSignCurrency: 'ARS' | 'USD' | (string & {}) | null;
+  /** The separator between the fields of a numeric date ("/", ".", "-"). */
+  dateSeparator?: string;
+  /** Whether day and month are zero-padded in a numeric date ("2026/09/22"). */
+  paddedDate?: boolean;
+  /** Digits per group before the last group of three (2 for the Indian lakh and crore). */
+  secondaryGrouping?: number;
+  /** Whole digits needed before the first group separator appears (2 where "1000" stays unbroken). */
+  minimumGroupingDigits?: number;
+  /** First day of the week, 0 = Sunday … 6 = Saturday. */
+  weekStart?: number;
+}
+
+/** The conventions with every optional field filled the way the released regions write. */
+export function completeConventions(conventions: RegionConventions): Required<RegionConventions> {
+  return { dateSeparator: '/', paddedDate: false, secondaryGrouping: 3, minimumGroupingDigits: 1, weekStart: 1, ...conventions };
+}
+
+/** The fields a formatter reads. `weekStart` is data for a calendar, not a writing: the catalogue's
+ * view of the United States starts the week on Sunday while the registry's default is Monday, and
+ * both write every string alike. */
+const WRITING_FIELDS = ['decimal', 'group', 'dateOrder', 'hour12', 'dollarSignCurrency', 'dateSeparator', 'paddedDate', 'secondaryGrouping', 'minimumGroupingDigits'] as const satisfies readonly (keyof RegionConventions)[];
+
+/** Whether two sets of conventions write the same strings: every writing field equal once both are
+ * complete, so the registry's entry, the catalogue's view of the same region and a resolved region
+ * are the same writing whichever object carries them. */
+export function sameWriting(a: RegionConventions, b: RegionConventions): boolean {
+  const x = completeConventions(a), y = completeConventions(b);
+  return WRITING_FIELDS.every(field => x[field] === y[field]);
 }
 
 /** Regions with conventions in this build, keyed by ISO 3166-1 alpha-2 code. */
@@ -127,6 +158,13 @@ export function regionOf(locale: AppLocale): RegionCode {
   return isRegionCode(region) ? region : DEFAULT_REGION;
 }
 export function conventionsOf(locale: AppLocale): RegionConventions { return REGIONS[regionOf(locale)]; }
+/** The registry region whose writing these conventions are (`sameWriting`), or null for a catalogue
+ * region's own. It is what decides a writing the registry keeps for the ledger's sake
+ * (`formatDayMonth`'s "5/09"), so the answer is the same for `REGIONS.AR`, `catalogueConventions('AR')`
+ * and `conventionsForRegion('AR').conventions`, never a matter of which path bound them. */
+export function registryRegionOf(conventions: RegionConventions): RegionCode | null {
+  return SUPPORTED_REGIONS.find(code => sameWriting(REGIONS[code], conventions)) ?? null;
+}
 
 /** The supported language a BCP 47 tag names: any Spanish variety is Spanish,
  * any English variety is English (regional spelling differences are not a

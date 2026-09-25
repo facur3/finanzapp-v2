@@ -39,8 +39,8 @@ const ALLOWED_PAIRS: { file: string; includes: string; why: string }[] = [
   { file: 'packages/integrations/contracts.d.ts', includes: "currency: 'ARS' | 'USD'", why: 'Assistant contract v1 is frozen; stage 7 adds the next version' },
   { file: 'packages/integrations/contracts.js', includes: "['ARS', 'USD'].includes", why: 'Assistant contract v1 is frozen; stage 7 adds the next version' },
   { file: 'server/mobile/openai.js', includes: "enum: ['ARS', 'USD', null]", why: 'the model schema of contract v1; stage 7 imports a generated superset' },
-  { file: 'apps/mobile/src/i18n/locale.ts', includes: "dollarSignCurrency: 'ARS' | 'USD'", why: 'a region convention: which currency a bare $ names (permanent)' },
-  { file: 'apps/mobile/src/i18n/format.ts', includes: "currency === 'ARS') return conventionsOf(locale).dollarSignCurrency === 'ARS' ? '$' : 'AR$'", why: 'the ARS symbol rule (permanent)' },
+  { file: 'apps/mobile/src/i18n/locale.ts', includes: "dollarSignCurrency: 'ARS' | 'USD' | (string & {}) | null", why: 'a region convention: which currency a bare $ names (permanent; any tender code since the 24R1 catalogue)' },
+  { file: 'apps/mobile/src/i18n/format.ts', includes: "currency === 'ARS') return conventions(locale, explicit).dollarSignCurrency === 'ARS' ? '$' : 'AR$'", why: 'the ARS symbol rule (permanent)' },
 ];
 
 test('24B1: no new place assumes exactly two currencies; the remaining ones are listed with their stage', () => {

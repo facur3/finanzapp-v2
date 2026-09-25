@@ -7,6 +7,9 @@
     "src/integrations/evidence.ts": "Protocol labels sent to the Assistant server; the interface shows evidence from fact ids.",
     "src/storage/database.ts": "Storage errors, translated at display time by src/i18n/errors.ts from their exact text.",
     "src/storage/transaction.ts": "Storage errors, translated at display time by src/i18n/errors.ts.",
-    "src/storage/LedgerProvider.tsx": "Storage errors, translated at display time by src/i18n/errors.ts."
+    "src/storage/LedgerProvider.tsx": "Storage errors, translated at display time by src/i18n/errors.ts.",
+    "src/i18n/regions/data.ts": "Generated region catalogue (CLDR codes and conventions), not interface copy.",
+    "src/i18n/regions/es.ts": "Generated region names from CLDR (data, not interface copy); the chooser shows them as CLDR wrote them.",
+    "src/i18n/regions/en.ts": "Generated region names from CLDR (data, not interface copy); the chooser shows them as CLDR wrote them."
   }
 }

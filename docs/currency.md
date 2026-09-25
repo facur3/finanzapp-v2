@@ -16,6 +16,11 @@ Producto 24 entries.
 | **Visual format** | CLDR display digits, symbol, name; the region's separators | `KWD 1.234,567` | presentation (`src/i18n`) |
 | **Regional preference** | separators, date order, what a bare "$" means | `AR` | the person (Más → Región) |
 
+Since Producto 24R1 the regional preference draws on a generated catalogue of 257 regions
+(docs/i18n.md §11a): a region's `currencies` and `dollarSignCurrency` there are search aliases and
+the bare-"$" rule, never a default for an account, and only released regions' conventions are
+written (the rest fall back to the default region and say so).
+
 The language gives words (currency names, spoken units); the region gives separators;
 the account gives the currency; the stored value never changes with any of them. A
 region never implies a currency (Argentina is not "ARS by default"; `territories` in

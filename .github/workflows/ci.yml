@@ -65,6 +65,9 @@ jobs:
       - name: Currency catalogue integrity (offline, against the lock's output hashes)
         run: npm run currency:verify
 
+      - name: Region catalogue integrity (offline, against the lock's output hashes)
+        run: npm run regions:verify
+
       - name: Localization catalogues (keys, placeholders, plurals, generated currency names)
         run: npm run i18n:check
 

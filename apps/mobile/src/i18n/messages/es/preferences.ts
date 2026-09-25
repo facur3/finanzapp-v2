@@ -6,6 +6,12 @@ export const preferences = {
     followDevice: 'Según el dispositivo',
     /** Subtitle of "Según el dispositivo": what the device resolves to right now. */
     followDeviceNow: 'Ahora: {value}',
+    /** The device Region is one the catalogue names but this build does not honour yet: which region's formats stand in (24R1). */
+    followDeviceNowFallback: 'Ahora: {value} (formatos de {fallback})',
+    /** The searchable choosers (24R1): the field, the recent section and the empty result. */
+    search: 'Buscar',
+    recent: 'Recientes',
+    noMatches: 'Sin coincidencias',
     /** Más row subtitle when the value follows the device: "Español · según el dispositivo". */
     followingDevice: '{value} · según el dispositivo',
     regionNote: 'La región define cómo se escriben las fechas, los números y los importes. No cambia la moneda de tus cuentas.',

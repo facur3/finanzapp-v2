@@ -15,10 +15,88 @@ server-keyed; manual recording and local data work without connectivity. Recurri
 expenses, debts, budgets and cards remain in scope. Native navigation, accessible
 amounts, real data and recoverable durable writes remain requirements.
 
-## Status and current delivery — Producto 24B6
+## Status and current delivery — Producto 24R1
 
 Implemented is code, checked names a test, device-verified needs a physical result,
 and released means distributed. Neither a bundle nor a screenshot is App Store QA.
+
+**24R1 lays the regional infrastructure for users of any country without assuming that
+language, region and currency are one thing: a generated catalogue of 257 regions with CLDR's
+conventions, independent detection of the device's Region setting, formatters that write any
+catalogue region's conventions, explicit Intl fallbacks, and the reusable searchable chooser.**
+Production still honours exactly Argentina and the United States (`RELEASED_REGIONS`), Spanish
+and English (`RELEASED_LANGUAGES`), ARS and USD; SQLite, backups and the currency gate are
+untouched. Nothing visible changes on an iPhone set to a released Region; on one set elsewhere,
+"Según el dispositivo" now names that Region and the formats standing in. The Más footer reads
+Producto 24R1. Design: [docs/i18n.md](i18n.md) §11a; the chooser: [docs/mobile-design.md](mobile-design.md)
+(Producto 24R1); the iPhone checks: [docs/mobile-device-checklist.md](mobile-device-checklist.md).
+
+- [x] **The region catalogue.** `scripts/regions/generate.mjs` builds `src/i18n/regions/data.ts`
+  and the es/en names from cldr-json 48.2.0 (the currency catalogue's release), pinned in
+  `scripts/regions/sources.lock.json` (509 files: the supplemental tables, the locale list, the
+  territory names and each source locale's numbers and Gregorian dates) with every output's
+  sha256; `npm run regions:verify` runs offline in CI. Each record: ISO 3166-1 alpha-2/alpha-3/
+  numeric, the likely language and the cldr-json directory the conventions come from (CLDR's own
+  "add likely subtags", the English fallback where CLDR omits the region, the region's English
+  locale where the likely language has no data), decimal and group separators for Latin digits,
+  primary/secondary grouping (lakh and crore where CLDR writes them), the minimum grouping digits,
+  the short date's order, separator and padding, the clock from CLDR's per-region `timeData`, the
+  first weekday, the current legal tender and the bare-"$" currency. The generator refuses a
+  catalogue that disagrees with `REGIONS` unless the deviation is listed with its reason: one
+  exists, Argentina's 24-hour clock (23.1C1) against CLDR's 12-hour preference.
+- [x] **Independent preferences and detection.** Unchanged rules, now checked against the
+  catalogue: the device's language and Region are read apart and each maps on its own; a manual
+  choice is saved before applied and never moves with travel, a new device language or a changed
+  Region (a store test drives Japan → United States → United Kingdom with a half-typed draft);
+  only "Según el dispositivo" follows the system, live, and only among released regions. The
+  store now carries `device.detectedRegion` (the Region setting as a catalogue code) and the
+  chooser says "Ahora: Japón (formatos de Argentina)" instead of "Ahora: Argentina" on a phone
+  set to an unreleased Region. Region, language, each account's currency and the future
+  consolidated currency stay four things; no ledger row, amount or currency is touched.
+- [x] **International formats.** `RegionConventions` gained the separator, padding, secondary
+  grouping, minimum grouping and week start (defaults keep AR/US byte-identical); every regional
+  formatter and `bindLocale` accept explicit conventions, so Spanish with Japanese conventions
+  writes "2026/09/22" and "1,234.56" while its words, wheel and VoiceOver stay Spanish; each
+  currency keeps its own decimals in every region. Cross combinations pinned in
+  `regional-formats.node.ts`: es·JP, en·AR, es·GB, en·IN, es·CH, en·DE, es·KR, en·BR, es·HU,
+  en·EG. `intl-support.ts` probes `Intl` per constructor (present, absent or throwing) and
+  gives the collator a folding fallback; a Node cross-check agrees with ICU on 27 curated regions
+  (the divergences, Arabic-script default digits and skeleton dates, are documented).
+- [x] **The chooser, prepared.** `choice-list.ts` (pure rows: the pinned option, recents, folded
+  alphabetical sections, ranked search from six options) and `ChoiceScreen` (one virtualized
+  `FlatList`, the same `CheckRow` drawn as grouped cards, autonyms with their own VoiceOver
+  language, headers with the header role, the failed-save note, Dynamic Type through the text
+  styles); `recent.ts` remembers the last three choices per chooser outside the ledger. Not wired
+  to Más yet: Idioma and Región keep their two-row screens until 24R2's device QA.
+- [x] **Tests:** `region-catalogue.node.ts` (lock and hashes, invariants over the 257 records,
+  the registry agreement and the one deviation, the parsers and a synthetic build, the API,
+  the ICU cross-check), `regional-formats.node.ts`, `choice-list.node.ts`, the detected-region and
+  travel cases in `locale-switch.node.ts`; the released four combinations stay pinned.
+- [x] **Review fixes (PR #53, two threads):** `formatDayMonth` writes the ledger's "5/09" for
+  Argentina whichever object carries its conventions (`registryRegionOf` over the writing fields,
+  `sameWriting`), so `catalogueConventions('AR')` and the resolution 24R2's provider will bind agree
+  with the released path; Japan, the United Kingdom and Switzerland keep their own padding.
+  `ChoiceScreen` says "Sin coincidencias" under the search field from the absence of a real match,
+  since the pinned "Según el dispositivo" row kept the list non-empty and `ListEmptyComponent`
+  never showed. Tests: every binding path for AR and US, the explicit JP/GB/CH/IN day-month
+  strings, the no-match, matched and blank searches, a choice with a search active.
+- [x] **Checked on Linux:** see the handoff entry below.
+- [ ] **Not device-verified, no EAS build made:** an iPhone with its Region set to an unreleased
+  country shows the new "Ahora: … (formatos de Argentina)" line (docs/mobile-device-checklist.md,
+  Producto 24R1). Everything else in 24R1 is invisible until 24R2.
+- [ ] **Producto 24R2 — integration and publication** (the plan): derive `REGIONS` from the
+  catalogue and widen `RegionCode`, `AppLocale` and the stored region preference to catalogue
+  codes (applied only when released, like a previewed language); release the first regions after
+  device QA (proposal: the Spanish-speaking Americas and Spain, the United Kingdom, Canada,
+  Brazil, Japan, India, Germany, Switzerland, one per convention family), each checked on the
+  iPhone with the amount field typing its separators (money-input with the region's group
+  character, lakh grouping, `'` and narrow spaces), the numeric dates, the clock and the spoken
+  forms; mount `ChoiceScreen` behind Más → Región and → Idioma (search, recents, sections, Dynamic
+  Type at the largest sizes, VoiceOver order, 60/120 Hz scrolling over 257 rows); the Más row
+  summary for a catalogue region; a currency-neutral onboarding hook. Still no FX, no SQLite
+  change, no new language.
+
+### Previous delivery — Producto 24B6
 
 **24B6 answers the owner's first iPhone findings on 24B5: the date wheel in a compact bottom
 sheet, one display currency shared by Inicio and Reportes, and cards that carry purchases and
@@ -1765,6 +1843,11 @@ are not dead code.
   24B5: the date wheel in a compact bottom sheet, one display currency shared by Inicio and
   Reportes, and the card rules (no plain income on a card, a card never a transfer's source).
   The gate-opening commit still waits for the recorded device evidence listed in the status.
+- **Producto 24R1 (delivered in code, 2026-09-25)** — the regional infrastructure: the generated
+  region catalogue, independent detection, explicit conventions in every formatter, the Intl
+  probe and fallbacks, the reusable searchable chooser, the tests. **Producto 24R2 (next)**
+  integrates the catalogue into the release gate and publishes the choosers with iPhone QA
+  (the plan in the status above).
 - **Producto 24R — global regional internationalization** (docs/i18n.md §11a), right after 24B5
   and before any FX conversion: a wide catalogue of countries and territories keyed by standard
   region identifiers and generated from pinned CLDR data; verified CLDR conventions per region
@@ -2106,6 +2189,38 @@ amount uses `useStacked()` and gives the name two lines. 44-point targets, Voice
 safe areas, system text and separate currencies apply to every new screen.
 
 ## Handoff log (historical evidence)
+
+### 2026-09-25 — Producto 24R1: the regional infrastructure
+
+- Delivered: `scripts/regions/generate.mjs` (+ `sources.lock.json`, `npm run regions:generate`/`regions:verify`,
+  the CI step), the generated `src/i18n/regions/{data,es,en}.ts`, `src/i18n/regions.ts` (the API, the
+  fallback that never impersonates a region, the device Region, choices and search), `intl-support.ts`
+  (the probe, folding, the name comparator), `recent.ts`; `RegionConventions` extended with defaults and
+  `completeConventions`; every regional formatter and `bindLocale` with explicit conventions (Indian
+  grouping, minimum grouping digits, ymd dates, separators, padding); `device.detectedRegion` in the
+  store and `deviceRegionSummary` in the chooser options with two catalogue keys; `src/ui/choice-list.ts`
+  and `choice-screen.tsx` (three catalogue keys); the Más footer; docs/i18n.md §11a, the design notes,
+  the device checklist, docs/currency.md §1, the README.
+- Deliberate golden changes: the narrower-gate chooser subtitle now names the device's unreleased Region;
+  the Más footer; `dollarSignCurrency` typed as any tender code (the guard allow-list follows).
+- **Checked on Linux:** root `npm test` 448/448, `npm run build`, `npm run check:repo`; mobile `npm run
+  typecheck`, `npm run test:storage` 566/566 (real SQLite), `npm run currency:verify`, `npm run
+  regions:verify` and `regions:generate -- --check` (up to date), `npm run i18n:check -- --strict` (0 errors,
+  0 stale), `npm run i18n:extract`, `npm run check` (up to date), `npm run export:ios` (4,969,129 bytes,
+  +38,434 over 24B6: the catalogue and the names). Not an Xcode build; **no EAS build; the iPhone was not modified**;
+  no FX or AI provider connected; SQLite, backups and the currency gate untouched.
+- **Review fixes (PR #53, two threads):** `registryRegionOf` and `sameWriting` in `locale.ts`; `formatDayMonth`
+  decides the ledger's writing by them (Argentina "5/09" through the locale, `REGIONS`, `catalogueConventions`
+  and `conventionsForRegion`; the catalogue's own padding elsewhere: "09/05" Japan, "05/09" United Kingdom,
+  "05.09" Switzerland, "5/9" India); the pinned row of `choice-list.ts` carries `pinned`, and `ChoiceScreen`
+  draws the no-match sentence under the search field from the absence of a real match (no
+  `ListEmptyComponent`). No golden of the released pairs changed. **Checked on Linux after the fixes:** root
+  `npm test` 448/448, `npm run build`, `npm run check:repo`; mobile `npm run typecheck`, `npm run test:storage`
+  569/569 (real SQLite), `npm run currency:verify`, `npm run regions:verify`, `npm run i18n:check -- --strict`
+  (0 errors, 0 stale), `npm run check` (up to date), `npm run export:ios` (4,969,673 bytes). No EAS build;
+  the iPhone was not modified.
+- **Pending:** the 24R1 device line; then Producto 24R2 (integration and the choosers with iPhone QA).
+- **Next:** 24R2, then 24C, then 24T.
 
 ### 2026-09-24 — Producto 24B6: the date sheet, one display currency, the card rules
 
