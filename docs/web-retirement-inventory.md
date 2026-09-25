@@ -1,10 +1,68 @@
-# Retiring the legacy web/Capacitor frontend: verifiable dependency inventory
+# The retired web/Capacitor frontend: inventory, execution and recovery
 
 Date: 2026-09-25. Companion to [decision 004](decisions/004-native-first-and-web-retirement.md).
-Nothing is deleted or moved by the PR that adds this document (Producto 24UX1); it records what a
-separate retirement PR may remove and what it must keep. Every claim below was established by
-the command shown next to it, run on this branch at the root of the repository. Re-run them before
-the retirement PR: the answers, not this text, are the source of truth.
+Written by Producto 24UX1 as the inventory a retirement PR had to follow; executed the same day by
+Producto 24REP. §0 records what was done and how to recover anything; §1–§6 are the inventory as
+it was established before the deletion (its commands were run on the tree at the tag
+`web-frontend-final`; the paths they name no longer exist on `master`).
+
+## 0. Executed (Producto 24REP)
+
+- **Tag.** `web-frontend-final` (annotated) → `ac4f0385cb600889122146c8c9997d0ce264e5d7`, the merge
+  of PR #54: the last commit on `master` that contains the whole web product. Nothing was
+  rewritten, squashed or force-pushed.
+- **Recover a file or a tree** (never into this working tree, never as an `archive/` folder):
+
+  ```bash
+  git show web-frontend-final:src/domain/assistant.js                # print one file
+  git show web-frontend-final:index.html > /tmp/index.html           # save one file
+  git ls-tree -r --name-only web-frontend-final -- src/app public ios # list a tree
+  git log --oneline web-frontend-final -- src/domain/dates.js        # a file's history
+  git worktree add /tmp/finanzapp-web web-frontend-final             # the whole product aside
+  git diff web-frontend-final master --stat                          # everything the retirement changed
+  ```
+
+- **Removed with `git rm`** (all confirmed web-only by §1–§2 and by a fresh scan of consumers
+  before the deletion; no native or backend consumer was found): `index.html`, `support.js`,
+  `capacitor.config.ts`, `public/` (11 files), root `ios/` (15), `src/app/` (5), `src/capacitor/`
+  (1), `src/domain/` (32, incl. `dates.js` after its port), `api/chart.js`, `api/chart.test.js`,
+  `api/fund-data.js`, `api/fund-data.test.js`, `design-reference/` (2), `scripts/build-app-shell.mjs`,
+  `scripts/build-domain.mjs`, `scripts/build-capacitor-bridge.mjs`, `SUPABASE_SETUP.md` (the web's
+  `user_data` JSON table and email login; the mobile backend has its own `server/mobile/schema.sql`
+  and [mobile-integrations.md](mobile-integrations.md)), `docs/production-release-checklist.md`,
+  `docs/mobile-install-qa.md`, `docs/offline-data-guarantees.md`, `docs/capacitor-ios-spike.md`.
+- **Moved.** `src/domain/dates.js` → `packages/domain/dates.ts` (typed; `todayKey` and
+  `labelFromISO`, the two exports the app consumes; the other seven functions were web-only and
+  retired) with `packages/domain/dates.test.ts` (8 tests: the legacy cases for those two functions
+  verbatim plus the app's edges; parity with the legacy module was checked over every day of
+  2024–2027 and on junk input before the deletion). `RELEASE_NOTES.md` →
+  `docs/history/web-release-notes.md`; `docs/assistant-and-market-data.md` →
+  `docs/history/web-assistant-and-market-data.md`; `docs/apple-pay-shortcut-spike.md` →
+  `docs/history/web-apple-pay-shortcut-capture.md`; `docs/product-rebuild-roadmap.md` →
+  `docs/history/web-product-rebuild-roadmap.md` (each with a header saying it is history).
+- **Root `package.json`.** Scripts: `test`, `check:repo`. Dependencies removed: `@capacitor/cli`,
+  `@capacitor/ios`, `@capacitor/app`, `@capacitor/core`, `@capacitor-community/speech-recognition`,
+  `vite`, `esbuild` (esbuild stays only as vitest's transitive dependency). Kept: `vitest`,
+  `typescript`. `package-lock.json` regenerated (266 → 116 `node_modules` entries).
+- **Guard.** `scripts/check-repo.mjs` fails on tracked generated files, on any path of the retired
+  tree or an `archive/` copy, on a product source (`apps/mobile`, `packages/`, `server/`,
+  `api/mobile/`) importing `src/…`, `support.js`, `window.FinanzDomain`, `api/chart`,
+  `api/fund-data` or `@capacitor/*`, on sensitive file names and on credential-shaped content;
+  `scripts/check-repo.test.js` (6 tests) pins each rule.
+- **CI.** `build` → `domain` (`npm ci`, `npm test`, `npm run check:repo`; the Vite build step is
+  gone); `mobile` and `mobile_api` unchanged.
+- **Vercel.** `vercel.json`: `framework: null`, `buildCommand: mkdir -p dist`, `outputDirectory:
+  dist`; the functions come from `api/mobile/` (nothing else remains under `api/`). Unconfigured,
+  `GET /api/mobile/*` → 405 and `POST` → 503 (fail closed, `server/mobile/handlers.js`); configured,
+  a request without a session → 401. `/` → 404: no web page is served. The environment variables
+  of `server/mobile/runtime.js` are unchanged.
+- **Tests.** Root `npm test`: 448 → 270 (246 domain + 10 handlers + 8 dates + 6 guard; the 192
+  web-only tests of §3 and the 19 legacy date tests left with the web). Mobile `test:storage`:
+  577, unchanged. `schema.test.sql`: unchanged, runs in `mobile_api`.
+- **Not done here** (by design): the bundle identifier, any Vercel environment variable, any
+  paid service, 24R2.
+
+
 
 ## 1. What the native product is made of
 

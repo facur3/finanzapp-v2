@@ -3,11 +3,11 @@
 FinanzApp is a native spending and commitments app: fast capture, understandable
 spending, upcoming payments, budgets, cards and debts, with optional manually tracked
 accounts. This directory is the product: an Expo + React Native + TypeScript app, iOS
-first, Android later from this same project. The old Vercel web app and its Capacitor
-shell are frozen legacy until a separate retirement PR removes them
-([decision 004](../../docs/decisions/004-native-first-and-web-retirement.md),
-[retirement inventory](../../docs/web-retirement-inventory.md)). The app never shares
-data with the web: its SQLite file, backups and preferences are its own.
+first, Android later from this same project
+([decision 004](../../docs/decisions/004-native-first-and-web-retirement.md)). The
+previous web/Capacitor app was retired on 2026-09-25 (Producto 24REP); its last version is
+the Git tag `web-frontend-final` ([inventory and recovery](../../docs/web-retirement-inventory.md)).
+The app never shared data with it: its SQLite file, backups and preferences are its own.
 
 Read before changing anything: [AGENTS.md](../../AGENTS.md), the
 [living roadmap](../../docs/mobile-roadmap.md) (status, device QA pending, next
@@ -111,8 +111,9 @@ npx eas-cli@latest build:list --platform ios --limit 5
 EAS compiles on hosted macOS; there is no local Xcode on Linux. **No EAS build, TestFlight
 submission, subscription or any paid step is started without the owner's explicit
 authorization**; committing to this repository never triggers one. The definitive
-production identity is a launch decision (roadmap, Producto 26); the legacy Capacitor
-app still owns `com.facur3.finanzapp`. To know which binary is installed, read the IPA's
+production identity is a launch decision (roadmap, Producto 26); `com.facur3.finanzapp`
+was registered by the retired Capacitor app and is not reassigned by the retirement. To know
+which binary is installed, read the IPA's
 compiled `Info.plist` (device checklist, Producto 23.2), not `app.config.ts`.
 
 ## Verification
@@ -134,11 +135,11 @@ npm run i18n:check -- --accept en      # after reviewing English changes
 npm run i18n:export -- <lang>          # the brief for a new language
 ```
 
-From the repository root, until the web is retired: `npm ci`, `npm test` (the domain and
-the legacy web), `npm run build`, `npm run check:repo`. CI (`.github/workflows/ci.yml`)
-runs the `mobile` job (isolated `npm ci`, `npm ls --all`, `check`, `typecheck`,
-`currency:verify`, `regions:verify`, `i18n:check`, `test:storage`, `export:ios`), the
-`mobile_api` job (the PostgreSQL inbox tests) and the root `build` job.
+From the repository root: `npm ci`, `npm test` (`packages/domain`, `server/mobile` and the
+repository guard) and `npm run check:repo`. CI (`.github/workflows/ci.yml`) runs the
+`mobile` job (isolated `npm ci`, `npm ls --all`, `check`, `typecheck`, `currency:verify`,
+`regions:verify`, `i18n:check`, `test:storage`, `export:ios`), the `mobile_api` job (the
+PostgreSQL inbox tests) and the root `domain` job (`npm test`, `npm run check:repo`).
 
 `test:storage` runs the storage repository against a real temporary SQLite database
 (persistence, rejected writes, atomic migrations, repeated operation IDs) and the route
@@ -174,7 +175,7 @@ prove it (`locale-release.node.ts`, `currency-preview.node.ts`). Never set them 
 | Regions | Argentina and the United States released (`RELEASED_REGIONS`). A 257-region catalogue with CLDR conventions, the device-Region detection and the searchable chooser are implemented (24R1) but not wired: every other region writes Argentine formats and the chooser says so. 24R2 opens regions after device QA. |
 | Currencies | ARS and USD in production (`LEDGER_CURRENCIES`). The multi-currency engine (any ISO currency's minor units, SQLite 9, backup v9, presentation in every currency) is implemented behind the preview gate; no other currency is opened, no exchange rate exists, nothing is converted. FX and international purchases are Producto 24C, not built. |
 | Assistant | A real conversation with drafts, clarifications and evidence, writing only on Confirmar; fixtures mode for tests; the remote runtime and the cloud provider are opt-in and unconfigured, so this build is disconnected. The multilingual, voice-capable Assistant with analytical answers is Producto 25A, not built. |
-| Platforms | iOS only. Android comes later from this same project (roadmap §5); nothing Android-specific is tested. |
+| Platforms | iOS only. Android comes later from this same project (roadmap §5), sharing the router, the domain, the storage abstractions, i18n, the Assistant and the components; platform differences go behind `Platform.OS`, `.ios.tsx`/`.android.tsx` files or adapter modules (`DateField` already has its Android path). Nothing Android-specific is tested. |
 | Distribution | Ad hoc development builds on the owner's registered iPhone. Nothing is on TestFlight or the App Store. |
 
 Three words mean three things here and in the roadmap: **implemented** is code with its
@@ -202,6 +203,6 @@ is distributed to people. Today:
 - Native navigation owns transitions; motion follows `src/ui/motion.tsx` and the rules in
   [docs/mobile-design.md](../../docs/mobile-design.md); Reduce Motion, Dynamic Type and
   safe areas are honoured everywhere.
-- Native code stays local to this app. Root `ios/` belongs to the legacy Capacitor shell;
-  generated `apps/mobile/ios/` and `android/` are ignored and created by EAS. No generated
-  app, personal backup, screenshot or signing secret belongs in Git.
+- Native code stays local to this app. The generated `apps/mobile/ios/` and `android/`
+  projects are ignored and created by EAS; there is no other native project in the
+  repository. No generated app, personal backup, screenshot or signing secret belongs in Git.
