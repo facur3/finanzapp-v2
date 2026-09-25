@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { runInNewContext } from 'node:vm';
 import ts from 'typescript';
+import * as merchantMark from '../src/ui/merchant-mark.ts';
 import * as geometry from '../src/ui/geometry.ts';
 import * as moneyInput from '../src/ui/money-input.ts';
 import * as domain from '@finanzapp/domain';
@@ -174,7 +175,7 @@ function loadComponents(locale: AppLocale = 'es-AR', deviceLanguage: string | nu
     './theme': { radius: {}, space: {}, type: { body: { fontSize: 17, lineHeight: 22 } }, useCurrentDay: () => '2026-09-20', useReduceMotion: () => true, usePalette: () => ({ text: '#000', secondary: '#666', tertiary: '#999', income: '#008800', transfer: '#03c', warning: '#a60' }) },
     './categories': { categoryIcon: () => 'pricetag-outline' },
     './category-color': { tintOf: (c: string) => c }, './category-hues': { useCategoryColor: () => '#111', useCategoryLook: (label: string) => ({ label, hex: '#111', glyph: 'pricetag-outline' }), useAccountLook: () => ({ glyph: 'wallet-outline', hex: '#2557D6' }) },
-    './geometry': geometry, './money-input': moneyInput, './motion': { duration: {}, easeOut: {}, selectionHaptic: () => {}, timing: () => ({}) },
+    './geometry': geometry, './merchant-mark': merchantMark, './money-input': moneyInput, './motion': { duration: {}, easeOut: {}, selectionHaptic: () => {}, timing: () => ({}) },
     '../i18n/provider': { useI18n: () => bindLocale(locale, 'native', deviceLanguage, held) }, '../i18n/format': i18nFormat, '../i18n/locale': i18nLocale, '../i18n/messages': {},
   };
   const module = { exports: {} as Record<string, (props: any) => any> };

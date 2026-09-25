@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { runInNewContext } from 'node:vm';
 import ts from 'typescript';
+import * as uiPresentation from '../src/ui/presentation.ts';
 import * as presentation from '../src/ui/report-presentation.ts';
 import * as budgetPresentation from '../src/ui/budget-presentation.ts';
 import { washOf } from '../src/ui/category-color.ts';
@@ -39,10 +40,10 @@ function harness() {
       withTiming: (value: number, options: { duration: number }) => ({ value, duration: options.duration, delay: 0 }),
       withDelay: (delay: number, animation: { value: number; duration: number }) => ({ ...animation, delay }) },
     '@finanzapp/domain': { formatMinorUnits: (minor: number) => String(minor), labelFromISO: () => '' },
-    './components': { AppText: 'AppText', CategoryBadge: 'CategoryBadge', Money: 'Money', PressFeedback: 'PressFeedback', Surface: 'Surface', useStacked: () => false },
+    './components': { AppText: 'AppText', CategoryBadge: 'CategoryBadge', MerchantBadge: 'MerchantBadge', Money: 'Money', PressFeedback: 'PressFeedback', Surface: 'Surface', useStacked: () => false },
     './category-color': { washOf },
     './category-hues': { useCategoryColor: (label: string) => '#' + label.length.toString().padStart(6, 'A'), useCategoryLook: (label: string) => ({ label, hex: '#' + label.length.toString().padStart(6, 'A'), glyph: 'pricetag-outline' }) },
-    './motion': { easeOut: 'ease-out', timing: (kind: string, reduced: boolean) => ({ duration: reduced ? 0 : 260 }) },
+    './presentation': uiPresentation, './motion': { easeOut: 'ease-out', timing: (kind: string, reduced: boolean) => ({ duration: reduced ? 0 : 260 }) },
     './report-presentation': presentation,
     './budget-presentation': budgetPresentation,
     './theme': { useReduceMotion: () => env.reduced, usePalette: () => ({ line: '#ddd', isDark: true, secondary: '#A0A0A8', tertiary: '#7C7C84' }) },
@@ -211,14 +212,27 @@ test('an upcoming commitment reads its day inside the VoiceOver sentence in lowe
   const caption = (row: any) => flatten(row).filter(node => node.type === 'AppText').map(node => [node.props.children].flat().join(''));
   try {
     const spanish = exports.UpcomingRecurringRow({ rule, account, day: '2026-09-22', last: true });
-    assert.equal(spanish.props.accessibilityLabel, 'Netflix, 12345,67 ARS, próximo pago hoy');
-    assert.ok(caption(spanish).includes('Hoy · Banco'), 'the visible line starts with the day, capitalised');
+    assert.equal(spanish.props.accessibilityLabel, 'Netflix, Suscripciones, 12345,67 ARS, próximo pago hoy');
+    // 24UX2: the caption is the category (the secondary signal); the day appears once, beside the amount, capitalised.
+    assert.equal(JSON.stringify(caption(spanish)), JSON.stringify(['Netflix', 'Suscripciones', 'Hoy']));
     current = 'en-US';
-    const english = exports.UpcomingRecurringRow({ rule, account, day: '2026-09-22', last: true });
-    assert.equal(english.props.accessibilityLabel, 'Netflix, 12345.67 ARS, next payment today');
-    assert.ok(caption(english).includes('Today · Banco'));
-    // A later day is the short date either way.
-    assert.equal(exports.UpcomingRecurringRow({ rule: { ...rule, nextDateISO: '2026-10-01' }, account, day: '2026-09-22', last: true }).props.accessibilityLabel,
-      'Netflix, 12345.67 ARS, next payment Oct 1');
+    const english = exports.UpcomingRecurringRow({ rule, account, day: '2026-09-22', last: true, showAccount: true });
+    assert.equal(english.props.accessibilityLabel, 'Netflix, Suscripciones, 12345.67 ARS, next payment today, Banco');
+    assert.ok(caption(english).includes('Suscripciones · Banco'), 'the account only when another could be meant');
+    assert.ok(caption(english).includes('Today'));
+    // A later day is the short date either way; within a week a count of days.
+    const later = exports.UpcomingRecurringRow({ rule: { ...rule, nextDateISO: '2026-10-01' }, account, day: '2026-09-22', last: true });
+    assert.equal(later.props.accessibilityLabel, 'Netflix, Suscripciones, 12345.67 ARS, next payment Oct 1');
+    assert.ok(caption(later).includes('Oct 1'));
+    assert.ok(caption(exports.UpcomingRecurringRow({ rule: { ...rule, nextDateISO: '2026-09-26' }, account, day: '2026-09-22', last: true })).includes('In 4 days'));
   } finally { current = 'es-AR'; }
+});
+
+test('24UX2: an upcoming commitment draws its merchant mark with the category behind it, never instead of the category name', () => {
+  const { exports } = harness();
+  const rule = { id: 'r', merchant: 'Netflix', category: 'Suscripciones', kind: 'expense', amountMinor: 100, nextDateISO: '2026-09-23', accountId: 'a' };
+  const row = exports.UpcomingRecurringRow({ rule, account: { id: 'a', name: 'Banco', currency: 'ARS' }, day: '2026-09-22', last: true });
+  const badge = flatten(row).find(node => node.type === 'MerchantBadge');
+  assert.equal(JSON.stringify([badge.props.merchant, badge.props.category, badge.props.kind]), JSON.stringify(['Netflix', 'Suscripciones', 'expense']));
+  assert.equal(flatten(row).some(node => node.type === 'CategoryBadge'), false, 'the badge owns its fallback to the category glyph');
 });

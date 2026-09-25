@@ -578,7 +578,7 @@ function loadAmountField(provider: Record<string, any>, announcements: string[])
       usePalette: () => ({ text: '#000', secondary: '#666', tertiary: '#999', primary: '#25D', surface: '#FFF', warning: '#A60', isDark: false }) },
     './category-color': { tintOf: (color: string) => color }, './category-hues': { useAccountLook: () => ({}), useAccountNameOf: () => () => '', useCategoryLook: () => ({}) },
     './geometry': require('../src/ui/geometry.ts'), './motion': { duration: {}, easeOut: {}, selectionHaptic: () => {}, timing: () => ({}) },
-    './money-input': require('../src/ui/money-input.ts'),
+    './money-input': require('../src/ui/money-input.ts'), './merchant-mark': require('../src/ui/merchant-mark.ts'),
     '../i18n/provider': provider, '../i18n/format': i18nFormat, '../i18n/locale': locale,
   });
 }

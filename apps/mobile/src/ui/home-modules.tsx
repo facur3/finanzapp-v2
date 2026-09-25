@@ -4,11 +4,12 @@ import { router } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import Animated, { useAnimatedStyle, useSharedValue, withDelay, withTiming } from 'react-native-reanimated';
 import { type Account, type CategorySpending, type Currency, type MonthlyBudgetSummary, type RecurringRule } from '@finanzapp/domain';
-import { AppText, CategoryBadge, Money, PressFeedback, Surface, useStacked } from './components';
+import { AppText, CategoryBadge, MerchantBadge, Money, PressFeedback, Surface, useStacked } from './components';
 import { budgetHomeHeadline, budgetTone, categoriesStatus, percentUsed } from './budget-presentation';
 import { washOf } from './category-color';
 import { useCategoryLook } from './category-hues';
 import { easeOut, timing } from './motion';
+import { dueWhen } from './presentation';
 import { spendingShare } from './report-presentation';
 import { usePalette, useReduceMotion } from './theme';
 import { useI18n } from '../i18n/provider';
@@ -140,29 +141,37 @@ export function BudgetHomeCard({ summary }: { summary: MonthlyBudgetSummary }) {
   </PressFeedback>;
 }
 
-export function UpcomingRecurringRow({ rule, account, day, last }: {
-  rule: RecurringRule; account: Account; day: string; last: boolean;
+/** One scheduled commitment on Inicio (24UX2): who is paid (the merchant as typed, with its mark), what for (the
+ * category, the secondary signal, and the account only when more than one could be meant), and on the right the
+ * amount with when it falls due. A scheduled date is an estimate, not a payment: nothing here is registered, and
+ * the date appears once (the caption beside the amount), not twice as it did before. */
+export function UpcomingRecurringRow({ rule, account, day, last, showAccount = false }: {
+  rule: RecurringRule; account: Account; day: string; last: boolean; showAccount?: boolean;
 }) {
   const p = usePalette();
   const { t, relativeDate, spokenAmount } = useI18n();
   const stacked = useStacked({ minor: rule.amountMinor, currency: account.currency });
-  const date = relativeDate(rule.nextDateISO, day);
-  const days = Math.round((Date.parse(rule.nextDateISO + 'T12:00:00Z') - Date.parse(day + 'T12:00:00Z')) / 86400000);
-  const when = days === 0 ? t('home.upcomingRow.today') : days === 1 ? t('home.upcomingRow.tomorrow') : t('home.upcomingRow.inDays', { count: days });
-  // The caption starts its line ("Hoy · Banco"); VoiceOver's sentence carries the day inside it ("próximo pago hoy").
+  const category = useCategoryLook(rule.category, rule.kind).label;
+  const due = dueWhen(rule.nextDateISO, day);
+  const when = due.kind === 'today' || due.kind === 'due' ? t('home.upcomingRow.today') : due.kind === 'tomorrow' ? t('home.upcomingRow.tomorrow')
+    : due.kind === 'soon' ? t('home.upcomingRow.inDays', { count: due.days }) : relativeDate(rule.nextDateISO, day);
+  const urgent = due.kind === 'today' || due.kind === 'tomorrow' || due.kind === 'due';
+  const detail = showAccount ? category + ' · ' + account.name : category;
+  // VoiceOver hears merchant, category, amount and the estimated day in one sentence ("próximo pago hoy").
   return <PressFeedback feedback="highlight" accessibilityRole="button"
-    accessibilityLabel={t('home.upcomingRow.label', { merchant: rule.merchant, amount: spokenAmount(rule.amountMinor, account.currency), date: relativeDate(rule.nextDateISO, day, true) })}
+    accessibilityLabel={t('home.upcomingRow.label', { merchant: rule.merchant, category, amount: spokenAmount(rule.amountMinor, account.currency), date: relativeDate(rule.nextDateISO, day, true) })
+      + (showAccount ? ', ' + account.name : '')}
     onPress={() => router.push({ pathname: '/edit-recurring/[id]', params: { id: rule.id } })}
     style={[styles.row, { borderBottomWidth: last ? 0 : StyleSheet.hairlineWidth, borderBottomColor: p.line }]}>
-    <CategoryBadge category={rule.category} kind={rule.kind} />
+    <MerchantBadge merchant={rule.merchant} category={rule.category} kind={rule.kind} />
     <View style={{ flex: 1, minWidth: 0, gap: 8, flexDirection: stacked ? 'column' : 'row', alignItems: stacked ? 'flex-start' : 'center' }}>
       <View style={{ flex: stacked ? undefined : 1, minWidth: 0, gap: 3 }}>
         <AppText numberOfLines={stacked ? undefined : 2} style={{ fontWeight: '500' }}>{rule.merchant}</AppText>
-        <AppText secondary variant="footnote" numberOfLines={stacked ? undefined : 2}>{date} · {account.name}</AppText>
+        <AppText secondary variant="footnote" numberOfLines={stacked ? undefined : 2}>{detail}</AppText>
       </View>
       <View style={{ alignItems: stacked ? 'flex-start' : 'flex-end', gap: 3, maxWidth: stacked ? '100%' : '56%' }}>
         <Money minor={rule.amountMinor} currency={account.currency} />
-        <AppText variant="caption" style={{ color: days <= 1 ? p.warning : p.secondary, fontWeight: days <= 1 ? '600' : '400' }}>{when}</AppText>
+        <AppText variant="caption" style={{ color: urgent ? p.warning : p.secondary, fontWeight: urgent ? '600' : '400' }}>{when}</AppText>
       </View>
     </View>
   </PressFeedback>;

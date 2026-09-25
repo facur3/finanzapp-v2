@@ -1,5 +1,48 @@
 # Physical iPhone acceptance checklist
 
+## Producto 24UX2 — merchant identity and Home refinement
+
+**Not done in 24UX2: no EAS build was made and the iPhone was not touched.** Metro from this branch
+(`npm run start:dev-client`) on the installed FinanzApp Dev build; JavaScript only, no new native
+module. Record each result with the language, the theme and the text size it was checked in. Use
+your own small real data; never seed movements.
+
+- [ ] Inicio, light and dark, opaque material and Liquid Glass (iOS 26 without Reduce Transparency):
+  the four actions are 48 pt flat discs with a hairline edge, no shadow and no cobalt halo; the
+  Asistente still reads as the first of the family (cobalt glyph on a soft tint); the hero is the
+  heaviest element on screen. Press feedback still scales to 0,97.
+- [ ] The actions at the largest accessibility text sizes on the narrowest phone available:
+  "Transferir" wraps to two lines, nothing clips, the four columns stay equal and tappable.
+- [ ] Próximos compromisos: each row shows merchant, the category below (and the account only if
+  another account of that currency exists), the amount and "Hoy" / "Mañana" / "En N días" / a date
+  beside it; the date is not repeated on the left. VoiceOver reads merchant, category, amount and
+  "próximo pago …".
+- [ ] Últimos movimientos with one account in the currency: no account name in the rows; add a
+  second account in the same currency and the names appear.
+- [ ] A month with nothing recorded in the currency (switch to a currency without movements this
+  month): one sentence under Últimos movimientos, with the currency code when several are held; no
+  En qué gastaste title. Record the first expense: En qué gastaste fades in and the neighbours glide
+  (Reduce Motion: the fade only).
+- [ ] Más → Recurrentes: "Mensual · Categoría · Cuenta" on the left, the day on the right; a paused
+  rule is drawn at full contrast with "Pausado"; VoiceOver on a paused rule says "pausado" and no
+  date.
+- [ ] Open a rule that has already recorded payments: "Registrados" lists them, newest first, with
+  the note that the next date is an estimate; tap one → the movement's detail. A rule that has not
+  recorded anything says so.
+- [ ] A movement recorded by a rule: its detail shows "Recurrente · Mensual"; tapping opens the rule.
+  A typed movement does not show it.
+- [ ] The tab bar's inactive labels (secondary ink) in both themes: legible without competing with
+  the selected cobalt tab.
+- [ ] Development bundle with `EXPO_PUBLIC_MERCHANT_MARK_PREVIEW=1`: rows named "Netflix",
+  "spotify", "Mercado Pago", "Disney+", "App Store" show the brand's initial on a neutral tile;
+  "Apple", "Steam", "Pago Netflix", "Personal", "Almacén" and every other name keep their category
+  glyph; the large tile in a movement's detail too. Without the flag (and in any release build)
+  every row shows its category glyph as before: no logo exists in this build.
+- [ ] A rule moved to another account of the same currency (or one recorded payment corrected onto
+  another account): its Registrados rows name each payment's own account; a rule whose payments
+  are all in its current account shows no account names. VoiceOver names the account on every row.
+- [ ] Más footer reads "Producto 24UX2".
+
 ## Producto 24UX1 — the date sheet's corrected entrance (the owner's video, second 91)
 
 **Not done in 24UX1: no EAS build was made and the iPhone was not touched.** Metro from this branch

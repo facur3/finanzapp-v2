@@ -103,3 +103,32 @@ export function groupActivity(items: ActivityItem[]): { dateISO: string; data: A
   }
   return sections;
 }
+
+/** When a scheduled commitment falls due, as the caption beside its amount says it (24UX2): today, tomorrow,
+ * within a week as a count of days, and beyond that the date itself (relative counts like "in 300 days" read
+ * worse than "3 oct"). A date already past (a paused rule) is `due`, never a negative count. */
+export type DueWhen = { kind: 'today' } | { kind: 'tomorrow' } | { kind: 'soon'; days: number } | { kind: 'date' } | { kind: 'due' };
+export function dueWhen(dateISO: string, todayISO: string): DueWhen {
+  const ago = daysAgo(dateISO, todayISO);
+  if (ago === null) return { kind: 'date' };
+  const days = -ago;
+  if (days < 0) return { kind: 'due' };
+  if (days === 0) return { kind: 'today' };
+  if (days === 1) return { kind: 'tomorrow' };
+  return days <= 7 ? { kind: 'soon', days } : { kind: 'date' };
+}
+
+/** Whether a row should name its account: only when more than one account of that currency could be meant.
+ * With one account the name repeats on every row and says nothing (24UX2). Cards count (a purchase on a card and one
+ * in cash are different facts); a personal debt's hidden account never pays an expense, so it does not. */
+export function namesAccount(accounts: readonly Account[], currency: Currency, debtAccountIds: ReadonlySet<string> = new Set()): boolean {
+  return accounts.filter(account => account.currency === currency && !debtAccountIds.has(account.id)).length > 1;
+}
+
+/** Whether the rows of a recurring rule's history must name their account (24UX2 review). They may leave it out
+ * only when every row shown was recorded in one account and that account is the rule's current one, the account
+ * the form above already shows. A rule moved to another account of the same currency, or one occurrence corrected
+ * onto another account, names the account on every row, so an old payment never reads as the current account's. */
+export function historyNamesAccount(entries: readonly Pick<Entry, 'accountId'>[], ruleAccountId: string): boolean {
+  return entries.some(entry => entry.accountId !== ruleAccountId);
+}

@@ -804,7 +804,111 @@ de texto por defecto y al mayor de accesibilidad:
 - *Escalones del secundario.* A y B con los tokens anteriores y los nuevos, misma pantalla, para
   cerrar el punto 1 en el dispositivo.
 
+## Producto 24UX2 — identidad de comercios y refinamiento de Inicio
+
+Sin rediseño general: Inicio conserva Gastos / Disponible, el importe grande, la moneda discreta
+cuando hay varias, las cuatro acciones, las categorías, los próximos compromisos y los últimos
+movimientos. No se agregó ningún módulo. Todo lo que sigue es cálculo sobre el código y los
+tokens, no una captura del iPhone.
+
+### Auditoría de Inicio
+
+| Punto | Hallazgo | Decisión |
+| --- | --- | --- |
+| Acciones rápidas | Cuatro discos de 54 pt con sombra (el del Asistente con halo cobalto) debajo del héroe: el bloque con más peso visual después del número, y el cobalto compite con el contenido financiero. | **Cambiado** (alternativa A, abajo): 48 pt, sin sombra ni halo, borde fino; glifos 22/20 pt; el Asistente conserva el tinte cobalto suave. |
+| Bloques de color | Los lavados de categoría (8 % claro, 11 % oscuro) y la barra del presupuesto ya son discretos. El bloque más saturado era el disco del Asistente con sombra cobalto. | Resuelto con las acciones; lavados sin cambio. |
+| Metadatos redundantes | Próximos compromisos mostraba la fecha dos veces («1 oct · Banco» a la izquierda y «En 11 días» a la derecha); Recurrentes igual («Mensual · 1 oct · Banco» + «En 11 días»). Con una sola cuenta en la moneda, cada fila de Inicio repetía su nombre. | **Cambiado**: la fecha una vez, junto al importe («Hoy», «Mañana», «En N días» hasta 7, después la fecha); a la izquierda la categoría (señal secundaria) y la cuenta solo si hay otra de la misma moneda. |
+| Estados vacíos | Un mes sin movimientos en la moneda mostraba dos frases casi iguales a 24 pt («Tus categorías aparecerán…» y «Todavía no hay movimientos…»), hallazgo 5 de 24UX1. | **Cambiado**: una sola frase bajo Últimos movimientos, con la moneda cuando hay varias («Todavía no hay movimientos en USD este mes.»); En qué gastaste vuelve con el primer gasto (con `Reflow` que funde). Con solo un ingreso el bloque de categorías sigue con su frase. |
+| Contraste secundario | Las etiquetas inactivas de la barra de pestañas (10 pt) en terciario: 3,6:1 claro, 4,1:1 oscuro (hallazgo 9 de 24UX1). Las filas pausadas de Recurrentes al 60 % de opacidad bajaban su leyenda por debajo de AA. | **Cambiado**: pestañas inactivas en secundario (5,6:1 / 6,6:1 sobre la barra); filas pausadas con tinta plena y «Pausado» donde iría el día. |
+| Jerarquía y proximidad | Héroe 44/700, títulos de sección 17/600 a 8 pt de su contenido, 24 pt entre bloques: la sección se lee como grupo y los bloques se separan. | Sin cambio (24UX1 punto 7). |
+| Una mano | Gasto en el tercio superior, fuera de la zona cómoda; la entrada alcanzable es la pestaña central (Asistente). | Documentado; lo resuelve la alternativa B si el propietario la aprueba. |
+| Scroll, Dynamic Type, VoiceOver, Reduce Motion | `Screen` con scroll nativo; filas apiladas con texto grande (`useStacked`); leyendas de acción a dos líneas; etiquetas de VoiceOver completas (el próximo compromiso ahora nombra la categoría; una regla pausada dice «pausado» y no anuncia fecha); `Reflow` funde con Reduce Motion. | Sin regresión; confirmar en iPhone. |
+| Cobalto | Pestaña activa, segmentos elegidos, enlaces de sección y el Asistente: interacción y navegación. Ningún importe ni texto normal en cobalto. | Correcto; el halo del Asistente fue lo único que competía. |
+
+### Dos alternativas para las acciones (comparación)
+
+Ambas usan componentes y tokens existentes. **A está implementada; B cambia la estructura de
+Inicio y queda pendiente de la aprobación del propietario.**
+
+```
+A · cuatro acciones, menos peso (implementada)   B · tres movimientos + Asistente en fila (propuesta)
+┌─────────────────────────────────────┐          ┌─────────────────────────────────────┐
+│ [Gastos|Disponible]         ARS|USD │          │ [Gastos|Disponible]         ARS|USD │
+│ Septiembre                          │          │ Septiembre                          │
+│ $ 123.456,78                        │          │ $ 123.456,78                        │
+│                                     │          │                                     │
+│  (✦)     (−)     (+)     (⇄)        │          │   (−)        (+)        (⇄)         │
+│ Asist.  Gasto  Ingreso Transferir   │          │  Gasto     Ingreso   Transferir     │
+│  48 pt, planos, borde fino          │          │ ┌─────────────────────────────────┐ │
+│                                     │          │ │ ✦  Contale al Asistente…     🎙 │ │
+│ En qué gastaste            Reportes │          │ └─────────────────────────────────┘ │
+│ …                                   │          │ En qué gastaste            Reportes │
+└─────────────────────────────────────┘          └─────────────────────────────────────┘
+```
+
+| | A | B |
+| --- | --- | --- |
+| Diferencia visual | Misma fila, discos 48 pt sin sombra; el héroe gana peso relativo. | Un disco menos; una fila conversacional de ancho completo (52 pt, material opaco, glifo sparkles cobalto, micrófono) que abre la pestaña central con el compositor enfocado. |
+| Ventajas | Cero cambio de estructura ni de navegación; nada que reaprender. | El Asistente deja de estar duplicado como botón y se lee como lo que es (hablar de tu plata); las tres columnas de movimiento son más anchas. |
+| Riesgos de accesibilidad | Disco más chico: el objetivo real es la columna (≈80 × 76 pt), sigue ≥ 44 pt; confirmar que «Transferir» a tamaños de accesibilidad parte en dos líneas sin recorte. | VoiceOver debe anunciarla como botón («Abrir el Asistente»), no como campo de texto; con texto grande la fila crece en alto; riesgo de que se lea como un buscador (probar con personas). |
+| Una mano | Sin cambio. | Sin cambio para Gasto; la fila del Asistente es igual de alta en pantalla. |
+| Costo | Hecho en esta entrega. | Un componente nuevo en `quick-actions.tsx`, parámetro de foco en la ruta del Asistente, pruebas de harness y de VoiceOver. |
+
+### Identidad de comercios en pantalla
+
+**Decisión del propietario (revisión de la PR #56): la categoría y su glifo son la presentación
+de producción; mostrar marcas queda diferido a Producto 25C2**, que antes debe resolver licencia,
+privacidad, mantenimiento y coherencia visual (marcas multicolores junto a los tonos apagados de
+categoría y los colores semánticos). No hay logos empaquetados ni assets de marcas, ni subidas de
+usuarios, ni claves de proveedores. La identidad de comercios queda como metadata tipada.
+
+Cada fila de movimiento, cada regla de Recurrentes, cada próximo compromiso y el detalle de un
+movimiento dibujan `MerchantBadge`, que en producción es el glifo de la categoría para todo
+comercio: nada cambia visualmente en el tile. El nombre mostrado es siempre el que escribió la
+persona; la categoría sigue en la leyenda de la fila. Solo en desarrollo,
+`EXPO_PUBLIC_MERCHANT_MARK_PREVIEW=1` dibuja la inicial de una marca reconocida en un tile neutro
+(sin assets ni dependencias) para validar la resolución en el iPhone: «App Store» se reconoce,
+«Apple» no. Modelo, catálogo, reglas contra coincidencias ambiguas y la revisión de proveedores
+(insumo para 25C2) en [merchant-identity.md](merchant-identity.md).
+
+### Compromisos: estimado, registrado, pausado, historial
+
+- **Próximo pago estimado**: el importe con «Hoy», «Mañana», «En N días» o la fecha; ámbar solo
+  hoy y mañana. Nada registrado.
+- **Pago registrado**: un movimiento normal. El detalle de la regla lista «Registrados» (los
+  movimientos que la regla registró, los doce más recientes y un conteo del resto) con la nota de
+  que la próxima fecha es una estimación; el detalle del movimiento muestra «Recurrente · Mensual»
+  y abre la regla.
+- **Suscripción pausada**: en Pausados, tinta plena, «Pausado» en lugar del día, VoiceOver dice
+  «pausado».
+- La conciliación futura (esperado → pagado / omitido / atrasado, sugerencias confirmadas por la
+  persona) está en merchant-identity.md §5; no se implementa ahora.
+
+### Lo que cambió visualmente (para comparar en el iPhone)
+
+1. Las cuatro acciones de Inicio: 54 → 48 pt, sin sombra en claro, sin halo cobalto en el
+   Asistente, borde fino; glifos 24 → 22 pt (Asistente 22 → 20); separación círculo-leyenda 8 → 6
+   pt; tinte del vidrio del Asistente 25 % → 20 %.
+2. Próximos compromisos: leyenda izquierda = categoría (· cuenta si hay otra en la moneda); la
+   fecha solo a la derecha.
+3. Últimos movimientos de Inicio: sin el nombre de la cuenta cuando es la única de la moneda.
+4. Mes vacío: una frase en vez de dos; sin el título En qué gastaste hasta el primer gasto.
+5. Recurrentes: leyenda «Mensual · Categoría · Cuenta», día a la derecha (fecha después de una
+   semana), pausadas sin opacidad.
+6. Detalle de una regla: sección Registrados. Detalle de un movimiento de una regla: fila
+   Recurrente.
+7. Barra de pestañas: etiquetas inactivas en secundario.
+8. El pie de Más dice Producto 24UX2.
+
 ## Pendiente de revisión en iPhone
+
+- Producto 24UX2: las acciones de 48 pt sin sombra en claro y oscuro, con vidrio y sin él (¿se
+  leen como herramientas y no como botones sueltos?, ¿el Asistente sigue reconocible?); leyendas a
+  tamaños de accesibilidad; Próximos compromisos y Recurrentes con la fecha una sola vez; el mes
+  vacío con una frase; Registrados en el detalle de una regla; la fila Recurrente del detalle; las
+  pestañas inactivas en secundario; VoiceOver en las filas nuevas. Con
+  `EXPO_PUBLIC_MERCHANT_MARK_PREVIEW=1`, que las filas reconocidas (Netflix, Spotify, Mercado Pago)
+  muestren la inicial y las demás su categoría. Lista en docs/mobile-device-checklist.md.
 
 - Producto 24R1: con la Región del iPhone en un país no publicado (Japón, Reino Unido), Más →
   Región → «Según el dispositivo» dice «Ahora: Japón (formatos de Argentina)» en ambos idiomas; con

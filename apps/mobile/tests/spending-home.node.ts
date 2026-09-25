@@ -422,3 +422,55 @@ test('24B6 review: a Reportes link naming a currency nobody holds yet is applied
   assert.equal(find(direct.render(), 'Money').props.currency, 'EUR');
   assert.equal(shared.getState(), 'EUR');
 });
+
+// ---- 24UX2: Home refinement --------------------------------------------------------------------------------------
+
+const homeTexts = (root: Node) => nodes(root).filter(node => node.type === 'AppText').map(node => [node.props.children].flat().join(''));
+const sectionTitles = (root: Node) => nodes(root).filter(node => node.type === 'SectionTitle').map(node => node.props.children);
+
+test('24UX2: a month with nothing recorded in the currency says so once, under Últimos movimientos, with the currency when several are held', () => {
+  // The fixture's movements are all in August; the harness day is 2026-09-12.
+  const root = routeHarness('(tabs)/index.tsx', {}, snapshot).render();
+  assert.equal(sectionTitles(root).join('|'), 'Últimos movimientos', 'no second empty section');
+  const shown = homeTexts(root);
+  assert.ok(shown.includes('Todavía no hay movimientos en ARS este mes.'));
+  assert.equal(shown.some(text => /Tus categorías aparecerán/.test(text)), false, 'the near-identical sentence is gone');
+  // One currency: the plain sentence.
+  const single = { ...snapshot, accounts: [snapshot.accounts[0]], entries: snapshot.entries.filter(entry => entry.accountId === 'a') };
+  assert.ok(homeTexts(routeHarness('(tabs)/index.tsx', {}, single).render()).includes('Todavía no hay movimientos este mes.'));
+  // Only an income this month: the categories block stays, with its own sentence, because there is a movement to list.
+  const incomeOnly = { ...single, entries: [...single.entries, { ...snapshot.entries[0], id: 'pay', kind: 'income' as const, category: 'Sueldo', dateISO: '2026-09-10' }] };
+  const withIncome = routeHarness('(tabs)/index.tsx', {}, incomeOnly).render();
+  assert.equal(sectionTitles(withIncome).join('|'), 'En qué gastaste|Últimos movimientos');
+  assert.ok(homeTexts(withIncome).includes('Tus categorías aparecerán cuando registres un gasto este mes.'));
+});
+
+test('24UX2: Home rows name the account only when another account of the currency could be meant', () => {
+  let root = routeHarness('(tabs)/index.tsx', {}, homeData).render();
+  assert.equal(nodes(root).filter(node => node.type === 'EntryRow').every(node => node.props.showAccount === false), true, 'one ARS account: the name says nothing');
+  const twoCash = { ...homeData, accounts: [...homeData.accounts, { id: 'b', name: 'Efectivo', currency: 'ARS' as const, openingMinor: 0, createdAt }] };
+  root = routeHarness('(tabs)/index.tsx', {}, twoCash).render();
+  assert.equal(nodes(root).filter(node => node.type === 'EntryRow').every(node => node.props.showAccount === true), true);
+  // A personal debt's hidden account never pays an expense, so it does not make the name necessary.
+  const withDebt = { ...homeData, accounts: [...homeData.accounts, { id: 'debt-acc', name: 'Debo', currency: 'ARS' as const, openingMinor: 0, createdAt }] };
+  const debts = [{ id: 'd', accountId: 'debt-acc', counterparty: 'Ana', direction: 'owe', dueDateISO: null, active: true, createdAt, revision: 0, updatedAt: createdAt }] as unknown as domain.PersonalDebtProfile[];
+  root = routeHarness('(tabs)/index.tsx', {}, withDebt, { debts }).render();
+  assert.equal(nodes(root).filter(node => node.type === 'EntryRow').every(node => node.props.showAccount === false), true);
+  // The upcoming commitments follow the same rule.
+  const rule: domain.RecurringRule = { id: 'r', accountId: 'a', kind: 'expense', amountMinor: 100, merchant: 'Netflix', category: 'Suscripciones', frequency: 'monthly',
+    anchorDateISO: '2026-09-20', nextDateISO: '2026-09-20', active: true, createdAt, revision: 0, updatedAt: createdAt };
+  const upcoming = find(routeHarness('(tabs)/index.tsx', {}, twoCash, { recurring: [rule] }).render(), 'UpcomingRecurringRow');
+  assert.equal(upcoming.props.showAccount, true);
+  assert.equal(find(routeHarness('(tabs)/index.tsx', {}, homeData, { recurring: [rule] }).render(), 'UpcomingRecurringRow').props.showAccount, false);
+});
+
+test('24UX2: Home keeps its modules and adds none', () => {
+  const rule: domain.RecurringRule = { id: 'r', accountId: 'a', kind: 'expense', amountMinor: 100, merchant: 'Netflix', category: 'Suscripciones', frequency: 'monthly',
+    anchorDateISO: '2026-09-20', nextDateISO: '2026-09-20', active: true, createdAt, revision: 0, updatedAt: createdAt };
+  const root = routeHarness('(tabs)/index.tsx', {}, homeData, { recurring: [rule] }).render();
+  assert.equal(sectionTitles(root).join('|'), 'En qué gastaste|Próximos compromisos|Últimos movimientos');
+  assert.equal(nodes(root).filter(node => node.type === 'QuickActions').length, 1);
+  assert.equal(find(root, 'QuickActions').props.assistant, true, 'the Assistant keeps its prominent entry');
+  assert.equal(nodes(root).filter(node => node.type === 'Choices').length, 1, 'Gastos / Disponible');
+  assert.equal(nodes(root).filter(node => node.type === 'CurrencySwitch').length, 1);
+});

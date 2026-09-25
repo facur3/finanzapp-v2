@@ -1,6 +1,6 @@
 # FinanzApp mobile: living roadmap
 
-Updated: 2026-09-25 (Producto 24REP). Read [decision 001](decisions/001-native-mobile.md),
+Updated: 2026-09-25 (Producto 24UX2). Read [decision 001](decisions/001-native-mobile.md),
 [decision 002](decisions/002-spending-first.md),
 [decision 003](decisions/003-five-tabs-and-cards.md) and
 [decision 004](decisions/004-native-first-and-web-retirement.md). Decision 002 supersedes
@@ -104,20 +104,23 @@ history file keeps the evidence of when and why.
 
 ## 1. Implemented (current state)
 
-What exists in code on `master` as of Producto 24R1 (PR #53). Per area, without test
-inventories (those are in apps/mobile/README.md and the history file).
+What exists in code on `master` as of Producto 24REP (PR #55), plus Producto 24UX2 on its branch
+(marked). Per area, without test inventories (those are in apps/mobile/README.md and the history
+file).
 
 - **Product shape.** Five native tabs with the Assistant in the centre and Más as the grouped
   hub (Finanzas / App y datos: Cuentas, Tarjetas, Presupuestos, Recurrentes, Deudas y cobros,
   Categorías, Idioma, Región, Apariencia, backup, the Assistant's data note); a Más footer that
-  names the build, the material in use and the delivery (Producto 24R1). Liquid Glass on
+  names the build, the material in use and the delivery (Producto 24UX2 on its branch). Liquid Glass on
   Inicio's four actions and the Assistant composer only in a development build on iOS 26 with
   the API present and without Reduce Transparency; opaque material otherwise.
 - **Inicio.** One main number (gasto registrado of the month, or Disponible: cash in normal
   accounts only), the Gastos / Disponible segment, the period, a discreet currency switch only
   when more than one currency is held (segment with two, compact row with three or more), four
-  equal quick actions with Asistente first, ranked category washes, the upcoming-payments block
-  only with real recurring data, recent movements, "Reportes" links that keep the currency.
+  equal quick actions with Asistente first (24UX2: 48 pt flat discs, no shadow or halo), ranked
+  category washes, the upcoming-payments block only with real recurring data (24UX2: category as
+  the caption, the due day once), recent movements (24UX2: the account named only when another of
+  the currency exists; an empty month says so once), "Reportes" links that keep the currency.
 - **Recording.** Gasto / Ingreso / Transferencia on one control; kind and amount first; the
   amount field anchored with tabular digits, typing and pasting in the region's separators,
   per-currency exponent (0, 2, 3), 15-digit bound, paste markers, shortcuts (Usar todo, Pagar
@@ -134,7 +137,15 @@ inventories (those are in apps/mobile/README.md and the history file).
 - **Commitments.** Weekly/monthly/yearly recurring rules with next occurrence, pause, edit,
   per-occurrence identity (scheduled is not paid; retries cannot duplicate); debts and
   receivables with partial payments; card purchases and payments; closing and due dates from
-  the user's days. No instalment plans yet.
+  the user's days. 24UX2: a rule's detail lists the movements it recorded (read by their
+  deterministic id, never the scheduled dates), a recorded movement links back to its rule, a paused
+  rule reads "Pausado" at full contrast. No instalment plans yet.
+- **Merchant identity (24UX2).** `packages/domain/merchants.ts`: normalized merchant keys, a
+  curated catalogue of 35 unambiguous brands matched only by exact alias, never a category; the
+  typed name is never rewritten; bare common words (Apple, Steam, Adobe, Despegar) stay
+  unrecognized. Typed metadata only: `MerchantBadge` draws the category glyph for every merchant;
+  brand marks are deferred to 25C2 (no logo API, bundled brand asset, upload or provider key); a
+  development-only initial preview checks recognition (docs/merchant-identity.md).
 - **Budgets and reports.** A monthly total budget plus category sublimits (schema 7); explicit
   remaining and exceeded states; Reportes with trend, donut and legend, day-by-day, budgets, top
   merchants, insights, previous-month and category comparison with explicit ranges and
@@ -189,6 +200,10 @@ it was checked in). Metro from the branch on the installed FinanzApp Dev build s
 item unless a section says a new native build is needed. The checklist sections are in
 [mobile-device-checklist.md](mobile-device-checklist.md).
 
+- **24UX2 — the Home refinement and the merchant mark:** the lighter actions in both themes and
+  materials, the upcoming and Recurrentes rows with the date once, the single empty sentence, the
+  Registrados history and the Recurrente row, paused rules at full contrast, the tab bar's
+  secondary labels, and the development monogram preview (checklist, Producto 24UX2).
 - **24UX1 — the date sheet's corrected entrance and the darker light-mode inks:** the card comes
   from below the edge over about 300 ms on the iOS sheet curve with no frame already in place;
   fast opens and closes, Cancelar/Listo/the scrim, keyboard, theme change, VoiceOver, Dynamic Type
@@ -280,7 +295,7 @@ the owner authorises it; no EAS build or store submission without the owner.
     no paid service, currency or FX provider enabled.
   - **Pending:** the device QA of §2 (24UX1); the retirement PR of decision 004 is 24REP, below.
 
-### Producto 24REP — native-first consolidation and retirement of the web/Capacitor frontend (this PR)
+### Producto 24REP — native-first consolidation and retirement of the web/Capacitor frontend (PR #55)
 
 - **Goal.** One PR that executes decision 004: the web/Capacitor frontend leaves the tree with
   Git history preserved, the last native dependency on `src/` moves into `packages/domain`, the
@@ -318,7 +333,52 @@ the owner authorises it; no EAS build or store submission without the owner.
     page; `/api/chart`, `/api/fund-data` → 404 (no function); `GET /api/mobile/{assistant,captures}`
     → 405; `POST` without or with a made-up token → 503 fail closed, no data in the body. No EAS
     build; the iPhone was not modified; no paid service, secret or Vercel setting changed.
-  - **Pending:** the device QA of §2 (24UX1), then 24R2.
+  - **Merged** on 2026-09-25 (`f341ab0`); the post-merge CI on `master` passed (run 36146008339:
+    `domain`, `mobile`, `mobile_api`).
+
+### Producto 24UX2 — merchant identity and Home refinement (this PR)
+
+- **Goal.** Better merchant identity and a calmer Home hierarchy without adding modules or
+  touching the ledger: an audit of Inicio with incremental fixes; two alternatives for the quick
+  actions (A, four actions with less weight, implemented; B, three movements plus a conversational
+  Assistant row, documented for the owner's approval); a typed, tested merchant identity layer
+  independent of categories with a curated catalogue and exact matching, kept as metadata (brand
+  marks deferred to 25C2; the provider review done as its input, nothing connected); recurring states told apart (estimated,
+  recorded, paused, history); this roadmap extended.
+- **Out of scope.** SQLite, backups, new currencies or regions, the AI, any logo API, report
+  calculations, instalments, EAS builds; Home alternative B until approved; the web's
+  `merchantRules` (not reintroduced; the native layer suggests no category).
+- **Gates.** Typecheck, the SQLite tests, currency and region verification, strict i18n, Expo
+  check, the iOS export, root tests and the guard, CI; the visual changes are device QA (§2).
+- **Status.** Delivered on this branch (2026-09-25), not device-verified.
+  - Domain: `merchants.ts` (`merchantKey`, `MERCHANT_CATALOG` with 35 brands, `AMBIGUOUS_MERCHANT_WORDS`,
+    `validateMerchantCatalog`, `merchantIndex`, `resolveMerchant`) and, in `recurring.ts`,
+    `recurringOccurrenceOf` and `recurringHistory` (read-only). Tests: 14 merchant, 2 recurring.
+  - App: `src/ui/merchant-mark.ts` (`merchantMark`: the category glyph, or the development-only
+    initial preview behind `EXPO_PUBLIC_MERCHANT_MARK_PREVIEW`), `MerchantBadge` in `components.tsx` used by
+    `EntryRow`, the movement detail, Recurrentes and the upcoming rows; `dueWhen` and `namesAccount`
+    in `presentation.ts`; the Registrados section in `recurring-form.tsx`; the Recurrente row in the
+    movement detail; the lighter `quick-actions.tsx`; Inicio's single empty sentence and account
+    names; the tab bar's secondary inactive labels; new copy in es/en (English reviewed).
+  - Docs: docs/merchant-identity.md (model, catalogue criteria, the brand-mark decision and the
+    provider review with coverage, licence, attribution, cache, privacy and cost as input for 25C2;
+    the future expected/paid/skipped reconciliation),
+    docs/mobile-design.md (audit, alternatives A/B, what changed), the device checklist.
+  - **Checked on Linux:** root `npm test` 286/286 (was 270: +14 `merchants.test.ts`, +2 recurring
+    history), `npm run check:repo`; mobile `npm run typecheck`, `npm run test:storage` 592/592 (was
+    577: +4 `merchant-mark.node.ts`, +3 `ui-rows`, +3 `spending-home`, +4 `recovery-routes`, +1
+    `home-ranking`; existing Recurrentes, upcoming-row and quick-action tests updated to the new
+    captions, labels and sizes), `currency:verify`, `regions:verify`, `i18n:check -- --strict` (0
+    errors, 0 stale; English reviewed and accepted), `i18n:extract` (no copy outside the catalogue),
+    `check` (up to date), `export:ios` (4,978,057-byte bundle). Figures after the review of PR #56. No EAS build; the iPhone was not
+    modified; no SQLite or backup change; no paid service, key, logo API, currency or region enabled.
+  - **Review of PR #56:** the recurring history names each row's own account unless every row
+    shown is in the rule's current account (a rule moved within its currency, or an occurrence
+    corrected onto another account, never reads as the current account's); the bare aliases
+    `apple`, `steam`, `adobe` and `despegar` removed and refused as ambiguous, their qualified
+    aliases kept; the owner deferred brand display to 25C2, so the logo adapter was removed and the
+    category glyph is the production presentation.
+  - **Pending:** the owner's decision on alternative B; the device QA of §2.
 
 ### Producto 24R2 — international regions released
 
@@ -401,8 +461,13 @@ the owner authorises it; no EAS build or store submission without the owner.
   facts and disclose partial records.
 - **Out of scope.** Automatic capture without consent; bank access; any paid call before the
   owner configures and approves the provider account.
-- **Gates.** Evaluation with owned test data (Spanish phrases, ambiguous categories, currencies,
-  loans and refunds, questions, failures) and measured provider usage; the disconnected and
+- **Gates.** An evaluation set of real phrases (written by the owner, anonymised, no real ledger)
+  and deliberately ambiguous ones ("pagué 30 en el super", "lo de Juan", "la cuota", a merchant and
+  a category with the same name, two accounts that fit, a currency never held) with the expected
+  draft or clarification for each, run and recorded before every model or prompt change; accuracy,
+  clarification rate and wrong-write rate (must be zero: every write is confirmed) reported;
+  owned test data for currencies, loans, refunds, questions and failures; measured provider usage
+  and cost per request; the disconnected and
   quota states on the iPhone; the consent screen naming what travels.
 - **Depends on.** 24C for foreign purchases and rates; 24M for currencies in v2; a session
   provider (staging) the owner sets up.
@@ -418,8 +483,9 @@ the owner authorises it; no EAS build or store submission without the owner.
   statement; short months, leap years and the issuer's rules (last-day closings, a due day
   before the closing day, weekend and holiday shifts as stated); per-period summaries, pending
   balance and partial payments; early payments, cancellations, refunds and adjustments without a
-  second expense; card refunds tied to the purchase (lowering the category for the refund's
-  month and the card's debt, never an income); international instalment purchases with the rate
+  second expense; refunds of any purchase (card or cash) linked to the original movement (lowering
+  the category for the refund's month, and the card's debt when paid by card, never an income;
+  a partial refund keeps the rest; the link survives edits, undo and backups); international instalment purchases with the rate
   of each debit (24C's record, provenance on every converted figure); optional reminders for
   closings, due dates and instalments that never claim a bank did not receive a payment; a
   clearer card form with a real calendar for closing and due days.
@@ -461,6 +527,32 @@ the owner authorises it; no EAS build or store submission without the owner.
   import preview on the iPhone with the owner's own CSV.
 - **Depends on.** Nothing outside 24M for currencies in imported rows.
 
+### Producto 25C2 — merchants, categorisation rules and commitments history
+
+Ordered after 25C and before 25D (its widgets read these records). Design in
+docs/merchant-identity.md.
+
+- **Scope.** Brand marks, deferred here by the owner (2026-09-25): before any code, resolve the
+  licence (each brand's or a provider's terms), privacy (nothing about a person's merchants leaves
+  the device without consent; no key in the bundle), maintenance (keeping marks current,
+  correcting a wrong one) and visual coherence with the category hues and semantic colours, using
+  the review in docs/merchant-identity.md §4; then the chosen source, attribution where required,
+  an on-device cache, a switch to turn marks off; recognized brands only, the category glyph on any
+  failure; catalogue growth by reviewed PRs. Local categorisation
+  rules: a merchant key pre-fills the category the person chose before, only pre-fills, visible and
+  editable in Categorías, never rewrites a stored movement. Suggested recurring detection: the same
+  merchant key, account, currency and amount repeating at a regular interval proposes a rule the
+  person confirms; nothing is created silently. Payment history and a calendar of commitments:
+  expected occurrences (expected → paid / skipped / late) linked to real movements by the person's
+  confirmation, per currency, never summed across currencies (§5 of the design).
+- **Rules.** The typed name stays; the category stays the classification; no ambiguous match; a
+  scheduled payment is never a movement; no connection to a merchant or a bank is implied.
+- **Gates.** Domain tests (matching, suggestions never applied without confirmation, occurrence
+  states, migration of auto-registered movements to paid occurrences), schema and backup versions
+  with rollback tests, the history and calendar on the iPhone with VoiceOver and large text.
+- **Depends on.** 24UX2 (merged); the owner's decision on the brand-mark source after the four
+  questions above.
+
 ### Producto 25D — Face ID, notifications and Apple integrations
 
 - **Scope.** Face ID with the device-passcode fallback, background privacy and Apple file
@@ -468,8 +560,10 @@ the owner authorises it; no EAS build or store submission without the owner.
   time zone, deduplication and no amounts by default (card closings and due dates, upcoming
   recurring payments, instalments); the Apple Pay/Wallet transaction trigger through a
   Shortcut/App Intent producing drafts only (available fields, missing amount, duplicates,
-  offline catch-up and cancellation verified on the iPhone without bank execution); App Intents,
-  widgets that hide amounts by default, Apple sign-in; each permission requested only when its
+  offline catch-up and cancellation verified on the iPhone without bank execution); App Intents
+  and Apple Shortcuts ("registrar un gasto", "¿cuánto gasté este mes?", each a draft or a read);
+  widgets of upcoming payments and of the month's spending that hide amounts by default and read
+  the 25C2 commitments; Apple sign-in; each permission requested only when its
   feature is enabled.
 - **Out of scope.** FinanceKit (not available for Argentine cards), any bank credential.
 - **Gates.** Signed development build evidence per integration; denied-permission paths; the
@@ -482,6 +576,9 @@ the owner authorises it; no EAS build or store submission without the owner.
   tombstones, conflict handling, RLS and user/session isolation; data export, deletion and
   recovery; provider privacy and retention documented; no mandatory account for local use; the
   consent screen; the web's last-write-wins JSON snapshot is not reused as a sync engine.
+  Authorised bank connections only through official, consented access where it exists (open
+  banking APIs or an aggregator with a contract), read-only, each import a reviewed draft; none
+  exists today and none is implied.
 - **Gates.** Two devices with conflicting edits, an offline queue replayed once, a deleted row
   staying deleted, a restore after reinstall; RLS proven with a second user.
 - **Depends on.** 25A's session provider; decision 001's data and security target.
@@ -495,7 +592,9 @@ the owner authorises it; no EAS build or store submission without the owner.
   verifiable users with consent; the App Store rating request only after a satisfying moment
   through Apple's prompt, never on first launch and never required; no silent telemetry.
 - **Gates.** Sandbox purchases and restores on the iPhone; the quota and ceiling states shown
-  before they are hit; the owner's pricing decision on measured costs.
+  before they are hit; a measured-cost report (cost per request, per active person and per month,
+  by model, from real usage in 25A) and a privacy review of what each request carries, before the
+  owner's pricing decision.
 - **Depends on.** 25A in production use with measured costs.
 
 ## 4. Launch
@@ -527,6 +626,9 @@ the owner authorises it; no EAS build or store submission without the owner.
   (the slowest supported device, a release build). Not started until its roadmap entry.
 
 ### Marketing, App Store Optimization, Instagram, advertising materials and conversion tests
+
+Only after real users exist (TestFlight or the App Store): demonstration videos from real screens
+with clearly marked fixture data, testimonials only from real, consenting users.
 
 - App Store listing (name, subtitle, keywords, screenshots per language and region, preview
   video from real screens with fixture data clearly marked, never a real user's ledger); the

@@ -30,7 +30,8 @@ export const recurring: Pick<Messages, 'recurring'> = {
       toggleFailed: 'We couldn’t change this recurring item. Please try again.',
     },
     row: {
-      label: 'Edit recurring {merchant}, {frequency}, {amount} {currency}, next {date}',
+      label: 'Edit recurring {merchant}, {frequency}, {category}, {amount} {currency}, next {date}',
+      labelPaused: 'Edit recurring {merchant}, {frequency}, {category}, {amount} {currency}, paused',
       paused: 'Paused',
       pause: 'Pause {merchant}',
       activate: 'Turn on {merchant}',
@@ -50,6 +51,12 @@ export const recurring: Pick<Messages, 'recurring'> = {
       create: 'Create recurring item',
       pastDate: 'The next date must be today or a future date.',
       saveFailed: 'The recurring item couldn’t be saved. We kept the same submission so you can retry without duplicating it.',
+    },
+    history: {
+      title: 'Recorded',
+      caption: 'Transactions this rule has already recorded. The next date is an estimate until it arrives.',
+      empty: 'Nothing recorded yet.',
+      older: { one: 'And {count} earlier record in Transactions.', other: 'And {count} earlier records in Transactions.' },
     },
     edit: {
       notFoundTitle: 'We couldn’t find this recurring item',

@@ -13,6 +13,7 @@ import { useAccountLook, useAccountNameOf, useCategoryLook } from './category-hu
 import { AMOUNT_FIELD, ROW_STACK_SCALE, SEGMENT_GAP, SEGMENT_PADDING, amountFieldLayout, fitFontSize, rowStacks, segmentLayout } from './geometry';
 import { duration, easeOut, selectionHaptic, timing } from './motion';
 import { AmountInput, displayAmount, precisionOf, splitAmount, type AmountNotice, type PasteRejection } from './money-input';
+import { BUILD_MERCHANT_MARK_PREVIEW, merchantMark } from './merchant-mark';
 import { useI18n } from '../i18n/provider';
 import { moneyText } from '../i18n/format';
 import { DEFAULT_LOCALE, type AppLocale } from '../i18n/locale';
@@ -638,6 +639,26 @@ export function CategoryBadge({ category, kind = 'expense', large = false, tone 
   return <GlyphTile icon={look.glyph} large={large} size={size} tone={tone} color={tone === 'neutral' ? look.hex : undefined} />;
 }
 
+/** Who was paid, as the row's leading tile (24UX2). In production this is the category glyph for every merchant:
+ * the category is the presentation, and brand marks are deferred to Producto 25C2 (docs/merchant-identity.md). No
+ * logo, bundled brand asset or upload is drawn. A development bundle with EXPO_PUBLIC_MERCHANT_MARK_PREVIEW=1 draws a
+ * recognized brand's initial on a neutral tile instead, only to check the catalogue's recognition on the iPhone; it
+ * is hidden from VoiceOver (the row's sentence already names merchant and category). */
+export function MerchantBadge({ merchant, category, kind = 'expense', large = false, tone = 'neutral', size }: {
+  merchant: string; category: string; kind?: EntryKind; large?: boolean; tone?: Tone; size?: number;
+}) {
+  const p = usePalette();
+  const mark = merchantMark(merchant, BUILD_MERCHANT_MARK_PREVIEW);
+  if (mark.kind === 'monogram') {
+    const side = size ?? (large ? 56 : 40);
+    return <View accessible={false} accessibilityElementsHidden importantForAccessibility="no-hide-descendants"
+      style={{ width: side, height: side, borderRadius: large ? 16 : radius.tile, backgroundColor: p.inset, alignItems: 'center', justifyContent: 'center' }}>
+      <AppText allowFontScaling={false} style={{ fontSize: large ? 24 : 17, fontWeight: '600' }}>{mark.letter}</AppText>
+    </View>;
+  }
+  return <CategoryBadge category={category} kind={kind} large={large} tone={tone} size={size} />;
+}
+
 /** A liquid account as one designed object: its chosen glyph on its chosen
  * colour, the same wherever the account appears. Cards and debts keep their
  * own glyphs and tones. */
@@ -662,7 +683,7 @@ export function EntryRow({ entry, account, last = false, showDate = true, showAc
     accessibilityLabel={[entry.merchant, t(income ? 'movement.incomeWord' : 'movement.expenseWord'), spokenAmount(entry.amountMinor, account.currency), category, account.name, dateLabel].join(', ')}
     onPress={() => router.push({ pathname: '/entry/[id]', params: { id: entry.id } })}
     style={[styles.row, { borderBottomColor: p.line, borderBottomWidth: last ? 0 : StyleSheet.hairlineWidth }]}>
-    <CategoryBadge category={entry.category} kind={entry.kind} tone={income ? 'income' : 'neutral'} />
+    <MerchantBadge merchant={entry.merchant} category={entry.category} kind={entry.kind} tone={income ? 'income' : 'neutral'} />
     <View style={{ flex: 1, minWidth: 0, gap: 8, flexDirection: stacked ? 'column' : 'row', alignItems: stacked ? 'flex-start' : 'center' }}>
       <View style={{ flex: stacked ? undefined : 1, minWidth: 0, gap: 3 }}>
         <AppText numberOfLines={stacked ? undefined : 2} style={{ fontWeight: '500' }}>{entry.merchant}</AppText>

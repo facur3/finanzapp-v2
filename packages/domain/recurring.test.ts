@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { advanceRecurringDate, materializeRecurringRule, recurringEntryId, recurringOccurrencesThrough,
+import { advanceRecurringDate, materializeRecurringRule, recurringEntryId, recurringHistory, recurringOccurrenceOf, recurringOccurrencesThrough,
   validateRecurringRule, type RecurringRule } from './recurring';
 import type { Account } from './ledger';
 
@@ -66,5 +66,27 @@ describe('native recurring schedules', () => {
     expect(() => validateRecurringRule({ ...monthly, amountMinor: 0 }, [account])).toThrow();
     expect(() => validateRecurringRule({ ...monthly, nextDateISO: '2025-12-31' }, [account])).toThrow();
     expect(() => validateRecurringRule({ ...monthly, updatedAt: 'invalid' }, [account])).toThrow();
+  });
+});
+
+describe('the payments a rule registered', () => {
+  it('reads the rule and date back from a registered occurrence id', () => {
+    expect(recurringOccurrenceOf(recurringEntryId('rent', '2026-03-31'))).toEqual({ ruleId: 'rent', dateISO: '2026-03-31' });
+    expect(recurringOccurrenceOf(recurringEntryId('a_b_20260101', '2026-02-01'))).toEqual({ ruleId: 'a_b_20260101', dateISO: '2026-02-01' });
+    expect(recurringOccurrenceOf('1f0c9a8e-uuid')).toBeNull();
+    expect(recurringOccurrenceOf('rec_rent_20261399')).toBeNull();
+    expect(recurringOccurrenceOf('rec__20260101')).toBeNull();
+  });
+
+  it('lists only the movements in the ledger, newest first, and never a scheduled date', () => {
+    const { entries } = materializeRecurringRule(monthly, [account], '2026-03-31', '2026-03-31T12:00:00.000Z');
+    const manual = { ...entries[0], id: 'manual', merchant: 'Alquiler' };
+    const sibling = { ...entries[0], id: recurringEntryId('rent_2', '2026-01-31') };
+    // The person moved the February payment to another day: it still belongs to its rule.
+    const moved = entries.map(entry => entry.dateISO === '2026-02-28' ? { ...entry, dateISO: '2026-03-02' } : entry);
+    const history = recurringHistory(monthly, [manual, sibling, ...moved]);
+    expect(history.map(entry => entry.dateISO)).toEqual(['2026-03-31', '2026-03-02', '2026-01-31']);
+    expect(recurringHistory(monthly, [])).toEqual([]);
+    expect(recurringHistory({ id: 'rent_2' }, [sibling]).length).toBe(1);
   });
 });

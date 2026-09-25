@@ -3,14 +3,14 @@ import { Keyboard, View } from 'react-native';
 import { router, Stack } from 'expo-router';
 import { randomUUID } from 'expo-crypto';
 import * as Haptics from 'expo-haptics';
-import { accountKind, editedDraftFits, keepsHistoricalCardIncome, minorFromEditedDraft, postingAccountsFor, sameRecurringRule, todayKey, validateRecurringRule, type StoredDraft,
+import { accountKind, editedDraftFits, keepsHistoricalCardIncome, minorFromEditedDraft, postingAccountsFor, recurringHistory, sameRecurringRule, todayKey, validateRecurringRule, type StoredDraft,
   type EntryKind, type RecurringFrequency, type RecurringRule } from '@finanzapp/domain';
 import { useLedger } from '../storage/LedgerProvider';
-import { ActionButton, AmountField, AppText, Choices, EmptyState, ErrorMessage, Field, IconButton, Screen, Surface } from './components';
+import { ActionButton, AmountField, AppText, Choices, EmptyState, EntryRow, ErrorMessage, Field, IconButton, Screen, SectionTitle, Surface } from './components';
 import { draftFromMinor } from './money-input';
 import { AccountField, CategoryField, DateField } from './form-controls';
 import { accountKindLabel, postingAccounts } from './liability-presentation';
-import { initialAccountId } from './presentation';
+import { historyNamesAccount, initialAccountId } from './presentation';
 import { space } from './theme';
 import { useI18n } from '../i18n/provider';
 
@@ -151,8 +151,33 @@ export function RecurringForm({ original, accountId: requestedAccount }: { origi
       </AppText>}
       <ActionButton label={pending && error ? t('common.retrySave') : before ? t('common.saveChanges') : t('recurring.form.create')}
         onPress={save} busy={busy} disabled={!amount.trim() || !merchant.trim() || !category.trim() || !account || !fit.ok} />
+      {before && <RecurringHistory ruleId={before.id} ruleAccountId={before.accountId} />}
     </>}
   </Screen>;
+}
+
+/** How many recorded movements the detail lists before pointing to Movimientos. */
+export const RECURRING_HISTORY_LIMIT = 12;
+
+/** What a rule actually recorded (24UX2), newest first: real movements from the ledger, read by their
+ * deterministic occurrence id, never the scheduled dates. Each row opens the movement itself; nothing here writes,
+ * merges or infers a payment. */
+function RecurringHistory({ ruleId, ruleAccountId }: { ruleId: string; ruleAccountId: string }) {
+  const { snapshot } = useLedger();
+  const { t } = useI18n();
+  const accounts = snapshot?.accounts ?? [];
+  const history = recurringHistory({ id: ruleId }, snapshot?.entries ?? []).filter(entry => accounts.some(item => item.id === entry.accountId));
+  const shown = history.slice(0, RECURRING_HISTORY_LIMIT);
+  const older = history.length - shown.length;
+  // The form above shows the rule's current account; a row may leave its account out only when that says it truly.
+  const showAccount = historyNamesAccount(shown, ruleAccountId);
+  return <View style={{ marginTop: space.l }}>
+    <SectionTitle caption={t('recurring.history.caption')}>{t('recurring.history.title')}</SectionTitle>
+    {shown.length ? <Surface grouped>{shown.map((entry, index) => <EntryRow key={entry.id} entry={entry} showAccount={showAccount}
+      account={accounts.find(item => item.id === entry.accountId)!} last={index === shown.length - 1} />)}</Surface>
+      : <AppText secondary variant="subhead">{t('recurring.history.empty')}</AppText>}
+    {!!older && <AppText secondary variant="footnote" style={{ marginTop: space.s }}>{t('recurring.history.older', { count: older })}</AppText>}
+  </View>;
 }
 
 function ViewFrequency({ value, onChange, disabled }: {

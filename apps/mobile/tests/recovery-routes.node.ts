@@ -51,7 +51,7 @@ function harness(file: string, props: any = {}, options: { data?: domain.LedgerA
     restoreBackup: async (value: domain.LedgerArchive, baseline: string) => { restores.push({ value, baseline }); await options.restore?.(value, baseline); },
   }) };
   const components = Object.fromEntries(['Screen', 'EmptyState', 'ActionButton', 'AppText', 'AmountField', 'AmountShortcut', 'Choices', 'ErrorMessage', 'Field', 'FieldNote', 'IconButton', 'Surface',
-    'CategoryBadge', 'DetailRow', 'Money', 'SectionTitle', 'GlyphTile', 'AccountBadge'].map(name => [name, name]));
+    'CategoryBadge', 'DetailRow', 'Money', 'SectionTitle', 'GlyphTile', 'AccountBadge', 'EntryRow', 'MerchantBadge'].map(name => [name, name]));
   const modules: Record<string, unknown> = {
     '../i18n/format': i18nFormat, '../src/i18n/format': i18nFormat, '../../src/i18n/format': i18nFormat, '../i18n/provider': i18nProvider, '../src/i18n/provider': i18nProvider, '../../src/i18n/provider': i18nProvider,
     react: { useState: (initial: any) => { const i = cursor++; if (!(i in state)) state[i] = typeof initial === 'function' ? initial() : initial;
@@ -1143,4 +1143,74 @@ test('24B6 review: a recurring income in a card-only ledger shows the no-account
   assert.equal(editing.rules.length, 1);
   assert.deepEqual([editing.rules[0].id, editing.rules[0].accountId, editing.rules[0].kind, editing.rules[0].amountMinor, editing.rules[0].revision, editing.rules[0].createdAt],
     ['cashback', 'card-acc', 'income', 600, 1, createdAt], 'same rule, same card, one revision up');
+});
+
+// ---- 24UX2: what a recurring rule actually recorded ------------------------------------------------------------
+
+const streaming: domain.RecurringRule = { id: 'netflix', accountId: 'a', kind: 'expense', amountMinor: 899900, merchant: 'Netflix', category: 'Suscripciones', frequency: 'monthly',
+  anchorDateISO: '2026-07-05', nextDateISO: '2026-10-05', active: true, createdAt, revision: 3, updatedAt: createdAt };
+const occurrence = (dateISO: string): domain.Entry => ({ id: domain.recurringEntryId(streaming.id, dateISO), accountId: 'a', kind: 'expense', amountMinor: 899900,
+  merchant: 'Netflix', category: 'Suscripciones', dateISO, createdAt: dateISO + 'T12:00:00.000Z' });
+const historyOf = (root: Node) => {
+  const section = nodes(root).find(node => typeof node.type === 'function' && node.type.name === 'RecurringHistory');
+  assert.ok(section, 'the history section');
+  return (section.type as (props: any) => Node)(section.props);
+};
+
+test('24UX2: a rule\'s detail lists only the movements it recorded, newest first, and never its scheduled dates', () => {
+  const manual: domain.Entry = { ...occurrence('2026-09-05'), id: 'manual-netflix' };
+  const data: domain.LedgerArchive = { ...archive, recurring: [streaming],
+    records: [...archive.records, ...['2026-07-05', '2026-08-05', '2026-09-05'].map(date => domain.initialRecord(occurrence(date))), domain.initialRecord(manual)] };
+  const history = historyOf(harness('src/ui/recurring-form.tsx', { original: streaming }, { data }).render());
+  assert.equal(find(history, 'SectionTitle').props.children, 'Registrados');
+  assert.match(find(history, 'SectionTitle').props.caption, /estimación/);
+  const rows = nodes(history).filter(node => node.type === 'EntryRow');
+  assert.equal(rows.map(node => node.props.entry.dateISO).join(','), '2026-09-05,2026-08-05,2026-07-05', 'the typed movement of the same merchant is not claimed');
+  assert.equal(rows.every(node => node.props.showAccount === false), true);
+  assert.equal(rows.some(node => node.props.entry.dateISO === streaming.nextDateISO), false, 'the next date is not a payment');
+  // A rule that has not recorded anything says so; a new rule shows no history at all.
+  const fresh = historyOf(harness('src/ui/recurring-form.tsx', { original: streaming }, { data: { ...archive, recurring: [streaming] } }).render());
+  assert.equal(nodes(fresh).filter(node => node.type === 'AppText').map(node => node.props.children).join('|'), 'Todavía no registró ningún movimiento.');
+  assert.equal(nodes(harness('src/ui/recurring-form.tsx', {}, { data: archive }).render()).some(node => typeof node.type === 'function' && node.type.name === 'RecurringHistory'), false);
+});
+
+test('24UX2: a long history shows the latest twelve and counts the rest; an undone occurrence is not listed', () => {
+  const dates = Array.from({ length: 15 }, (_, index) => `2025-${String((index % 12) + 1).padStart(2, '0')}-${index < 12 ? '05' : '06'}`);
+  const records = dates.map(date => domain.initialRecord(occurrence(date)));
+  records[0] = { ...records[0], voided: true };
+  const history = historyOf(harness('src/ui/recurring-form.tsx', { original: streaming }, { data: { ...archive, recurring: [streaming], records } }).render());
+  assert.equal(nodes(history).filter(node => node.type === 'EntryRow').length, 12);
+  assert.ok(nodes(history).some(node => node.type === 'AppText' && node.props.children === 'Y 2 registros anteriores en Movimientos.'));
+});
+
+test('24UX2: a movement a rule recorded links back to its rule from the detail; any other movement does not, and neither does one whose rule is gone', () => {
+  const recorded = occurrence('2026-09-05');
+  const data: domain.LedgerArchive = { ...archive, recurring: [streaming], records: [...archive.records, domain.initialRecord(recorded)] };
+  const view = harness('app/entry/[id].tsx', {}, { data, params: { id: recorded.id } });
+  const row = find(view.render(), 'DetailRow', 'Recurrente');
+  assert.equal(row.props.value, 'Mensual');
+  row.props.onPress();
+  assert.equal(JSON.stringify(view.pushed.at(-1)), JSON.stringify({ pathname: '/edit-recurring/[id]', params: { id: 'netflix' } }));
+  const badge = find(view.render(), 'MerchantBadge');
+  assert.equal(JSON.stringify([badge.props.merchant, badge.props.category, badge.props.large]), JSON.stringify(['Netflix', 'Suscripciones', true]));
+  assert.equal(nodes(harness('app/entry/[id].tsx', {}, { params: { id: entry.id } }).render()).some(node => node.type === 'DetailRow' && node.props.label === 'Recurrente'), false);
+  const orphan = harness('app/entry/[id].tsx', {}, { data: { ...data, recurring: [] }, params: { id: recorded.id } });
+  assert.equal(nodes(orphan.render()).some(node => node.type === 'DetailRow' && node.props.label === 'Recurrente'), false);
+});
+
+test('24UX2 review: the history names each row\'s own account when the rule moved or an occurrence was corrected, and hides it only when every row is in the rule\'s current account', () => {
+  const second: domain.Account = { ...account, id: 'a2', name: 'Efectivo ARS' };
+  const dates = ['2026-07-05', '2026-08-05', '2026-09-05'];
+  const rowsOf = (rule: domain.RecurringRule, entries: domain.Entry[]) => {
+    const data: domain.LedgerArchive = { ...archive, accounts: [...archive.accounts, second], recurring: [rule], records: entries.map(domain.initialRecord) };
+    return nodes(historyOf(harness('src/ui/recurring-form.tsx', { original: rule }, { data }).render())).filter(node => node.type === 'EntryRow');
+  };
+  const owned = (rows: Node[]) => rows.map(node => node.props.entry.dateISO + '@' + node.props.account.id + (node.props.showAccount ? '+name' : '')).join(',');
+  // Every occurrence in the rule's current account: the name would repeat the form above.
+  assert.equal(owned(rowsOf(streaming, dates.map(occurrence))), '2026-09-05@a,2026-08-05@a,2026-07-05@a');
+  // The rule moved to Efectivo ARS after recording in Prueba ARS: every row names Prueba ARS, never the current account.
+  assert.equal(owned(rowsOf({ ...streaming, accountId: 'a2' }, dates.map(occurrence))), '2026-09-05@a+name,2026-08-05@a+name,2026-07-05@a+name');
+  // One occurrence corrected onto Efectivo ARS: every row names its own account.
+  const corrected = dates.map(occurrence).map(entry => entry.dateISO === '2026-08-05' ? { ...entry, accountId: 'a2' } : entry);
+  assert.equal(owned(rowsOf(streaming, corrected)), '2026-09-05@a+name,2026-08-05@a2+name,2026-07-05@a+name');
 });

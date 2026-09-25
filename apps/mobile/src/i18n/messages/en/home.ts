@@ -22,6 +22,7 @@ export const home: Pick<Messages, 'home' | 'budgetStatus' | 'quickActions'> = {
     upcoming: 'Coming up',
     recent: 'Latest transactions',
     recentEmpty: 'No transactions this month yet.',
+    recentEmptyIn: 'No {currency} transactions this month yet.',
     rankingLabel: '{name}, {amount}, {share} of this month’s spending',
     rankingHint: 'Opens this category’s transactions this month',
     budget: {
@@ -39,7 +40,7 @@ export const home: Pick<Messages, 'home' | 'budgetStatus' | 'quickActions'> = {
       today: 'Today',
       tomorrow: 'Tomorrow',
       inDays: { one: 'In {count} day', other: 'In {count} days' },
-      label: '{merchant}, {amount}, next payment {date}',
+      label: '{merchant}, {category}, {amount}, next payment {date}',
     },
   },
   budgetStatus: {

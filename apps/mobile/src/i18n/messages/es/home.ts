@@ -20,6 +20,8 @@ export const home = {
     upcoming: 'Próximos compromisos',
     recent: 'Últimos movimientos',
     recentEmpty: 'Todavía no hay movimientos este mes.',
+    /** 24UX2: the one empty sentence of a month when more than one currency is held: "Todavía no hay movimientos en USD este mes." */
+    recentEmptyIn: 'Todavía no hay movimientos en {currency} este mes.',
     /** A category row of "En qué gastaste": "Comida, 1.234,56 ARS, 30 % del gasto del mes". */
     rankingLabel: '{name}, {amount}, {share} del gasto del mes',
     rankingHint: 'Abre los movimientos de esta categoría este mes',
@@ -39,7 +41,7 @@ export const home = {
       today: 'Hoy',
       tomorrow: 'Mañana',
       inDays: { one: 'En {count} día', other: 'En {count} días' },
-      label: '{merchant}, {amount}, próximo pago {date}',
+      label: '{merchant}, {category}, {amount}, próximo pago {date}',
     },
   },
   /** Budget sentences shared by Inicio and Presupuestos. */
