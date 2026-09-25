@@ -19,8 +19,11 @@ at least; a release build on the slowest device is the real verdict (a dev build
 - [ ] Fast opens and closes: tap Fecha and Cancelar at once, five times; tap Fecha, Cancelar, Fecha
   within half a second (the card reverses mid-exit without a jump and without re-presenting); tap
   Fecha twice quickly. Nothing stays half-shown, nothing stays blocking, Cancelar never saves.
-- [ ] Reduce Motion on: the card and the dimming fade in place over about 300 ms and out over
-  about 200 ms, with no vertical movement; nothing appears instantly.
+- [ ] Reduce Motion on (Settings → Accessibility → Motion): the card and the dimming fade in place
+  over about 300 ms and out over about 200 ms, with no vertical movement; nothing appears or
+  vanishes instantly (the sheet's timings carry Reanimated's `ReduceMotion.Never`, so the device
+  setting cannot shorten the fade; PR #54 review). Toggle the setting with the form open and open
+  the sheet again: the new behaviour applies without restarting.
 - [ ] Keyboard open on Concepto, then tap Fecha: the keyboard closes first, the card rises over a
   form that has not jumped; Cancelar returns to the form with the keyboard closed.
 - [ ] Light → Dark and back with the sheet open (Control Centre or Settings): the card and the
@@ -50,7 +53,7 @@ the installed FinanzApp Dev build; no new native build and no flag needed.
   Unidos"; with "Según el dispositivo" the formats follow; with a manual choice (Argentina) nothing
   moves and Más → Región still marks Argentina.
 - [ ] Force-quit and reopen with the Region still set abroad: the same sentence, the same formats.
-- [ ] Más footer: "Producto 24R1 · …".
+- [ ] Más footer (24UX1 or later; it said "Producto 24R1 ·" when this section was written): "Producto 24UX1 · …".
 
 ## Producto 24B6 — the date sheet, one display currency, the card rules
 

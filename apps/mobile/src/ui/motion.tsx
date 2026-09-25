@@ -1,6 +1,6 @@
 import { useEffect, useRef, type ReactNode } from 'react';
 import type { StyleProp, ViewStyle } from 'react-native';
-import Animated, { Easing, FadeIn, FadeInUp, FadeOut, LinearTransition, type WithTimingConfig } from 'react-native-reanimated';
+import Animated, { Easing, FadeIn, FadeInUp, FadeOut, LinearTransition, ReduceMotion, type WithTimingConfig } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import { useReduceMotion } from './theme';
 
@@ -45,9 +45,13 @@ export function timing(kind: Duration, reduced: boolean): WithTimingConfig {
 /** Timing config for a sheet's own entrance or exit. Unlike `timing`, Reduce Motion keeps
  * the duration: the sheet then fades in place instead of rising, and a fade needs its time
  * (an instant appearance is the jarring change the fade is there to prevent). The curve is
- * the sheet's when the card moves, the plain ease-out for the fade. */
+ * the sheet's when the card moves, the plain ease-out for the fade. The policy is explicit:
+ * a `withTiming` without one follows the device setting (`ReduceMotion.System`) and, with
+ * Reduce Motion on, lands on its target in one frame whatever the duration says (Reanimated
+ * 4, `animation/util.ts` onStart), which would make the fade instant. `Never` leaves the
+ * decision to the caller, who already drops the movement from its own reading (PR #54). */
 export function sheetTiming(kind: 'sheet' | 'sheetExit', reduced: boolean): WithTimingConfig {
-  return { duration: duration[kind], easing: reduced ? easeOut : easeSheet };
+  return { duration: duration[kind], easing: reduced ? easeOut : easeSheet, reduceMotion: ReduceMotion.Never };
 }
 
 /** A value ticked past a step: segmented control, month arrow, picker row. */

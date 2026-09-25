@@ -700,7 +700,11 @@ adivinada. La curva es la de las hojas de iOS (0,32, 0,72, 0, 1) a 300 ms (`ease
 `duration.sheet`), la salida 200 ms (`duration.sheetExit`); el velo sigue el mismo progreso.
 Con Reduce Motion la tarjeta se funde en su sitio con las mismas duraciones (`sheetTiming`
 conserva el tiempo: un fundido necesita su tiempo, la aparición instantánea es justamente el
-cambio brusco que evita). La tarjeta queda montada mientras sale y se desmonta al terminar; una
+cambio brusco que evita). La política de Reanimated va explícita (`reduceMotion: Never`, revisión
+de la PR #54): un `withTiming` sin política sigue el ajuste del sistema y, con Reduce Motion
+activo, aterriza en el valor final en un fotograma sea cual sea la duración, así que el fundido
+habría sido instantáneo; la app decide sola qué quitar (el desplazamiento) desde su propia
+lectura del ajuste. El test emula esa política con los valores del enum del paquete instalado. La tarjeta queda montada mientras sale y se desmonta al terminar; una
 salida interrumpida por volver a abrir nunca desmonta ni deja un modal invisible bloqueando el
 formulario; un `onShow` tardío de un modal ya descartado no levanta nada. Nada cambia en las
 demás hojas ni en la semántica de las fechas (Cancelar descarta, Listo guarda). Pruebas en
