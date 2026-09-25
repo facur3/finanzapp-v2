@@ -26,7 +26,7 @@ acotada y con clave en el servidor; el registro manual y los datos locales funci
 | Path | What it is |
 | --- | --- |
 | `apps/mobile/` | The app: Expo Router screens (`app/`), UI, i18n, storage (SQLite, backups) and the Assistant client (`src/`), Node tests (`tests/`), catalogue generators (`scripts/`), `app.config.ts`, `eas.json`. Own `package-lock.json`. |
-| `packages/domain/` | `@finanzapp/domain`: the typed, side-effect-free financial rules (integer minor units per currency, calendar days, ledger, transfers, budgets, liabilities, reports, recovery). Imports nothing outside the package. Tested at the root with vitest. |
+| `packages/domain/` | `@finanzapp/domain`: the typed, side-effect-free financial rules (integer minor units per currency, calendar days, ledger, transfers, budgets, liabilities, reports, recovery, merchant identity). Imports nothing outside the package. Tested at the root with vitest. |
 | `packages/integrations/` | The Assistant and capture contracts shared by the app and the backend. |
 | `server/mobile/`, `api/mobile/` | The mobile backend: authenticated handlers, quotas, the capture inbox, the AI responder, the PostgreSQL schema and its tests; the two Vercel function entry points (`/api/mobile/assistant`, `/api/mobile/captures`). Off until the owner configures it. |
 | `docs/` | Roadmap, design direction, i18n, currencies, device checklist, decisions; `docs/history/` holds documents kept for the record only. |
@@ -77,7 +77,7 @@ npm run check:repo    # repository hygiene (below)
 - [docs/mobile-roadmap.md](docs/mobile-roadmap.md): status, device QA pending, next deliveries,
   launch, post-launch; [docs/mobile-roadmap-history.md](docs/mobile-roadmap-history.md): the
   detailed history of every delivery.
-- [docs/mobile-design.md](docs/mobile-design.md): the visual and motion direction.
+- [docs/mobile-design.md](docs/mobile-design.md): the visual and motion direction; [docs/merchant-identity.md](docs/merchant-identity.md): merchants, logos and recurring history.
 - [docs/mobile-device-checklist.md](docs/mobile-device-checklist.md): what only an iPhone can verify.
 - [docs/i18n.md](docs/i18n.md) and [docs/currency.md](docs/currency.md): languages, regions,
   currencies and the multi-currency engine.

@@ -153,34 +153,35 @@ test('quick actions are four equal columns on Home, Assistant first, and three o
     assert.equal(action.props.containerStyle.minWidth, 0);
     assert.equal(action.props.children[1].props.numberOfLines, 2);
   }
-  assert.equal(module.exports.QUICK_ACTION_SIZE, 54);
+  assert.equal(module.exports.QUICK_ACTION_SIZE, 48, '24UX2: lighter beside the hero (was 54)');
   // Restraint: neutral material with the semantic colour only in the glyph; the Assistant is the same object in the brand tint with a thin cobalt ring.
   const surface = (action: any) => action.props.children[0];
   const circle = (action: any) => ({ ...surface(action).props.style, ...surface(action).props.opaque });
   for (const action of home) {
     assert.equal(surface(action).type, 'ControlSurface');
     assert.equal(surface(action).props.material, 'opaque');
-    assert.equal(circle(action).width, 54);
-    assert.equal(circle(action).borderRadius, 27);
+    assert.equal(circle(action).width, 48);
+    assert.equal(circle(action).borderRadius, 24);
   }
   assert.equal(JSON.stringify(home.slice(1).map((action: any) => circle(action).backgroundColor)), JSON.stringify(['#2C2C2E', '#2C2C2E', '#2C2C2E']));
   assert.equal(JSON.stringify(home.map((action: any) => surface(action).props.children.props.color)), JSON.stringify(['#5B87FF', 'expense', 'income', 'transfer']));
   assert.equal(circle(home[0]).backgroundColor, '#122048');
-  assert.equal(circle(home[0]).borderWidth, 1);
+  assert.equal(circle(home[0]).borderWidth, 0.5, 'a hairline cobalt edge, not a ring');
   assert.ok(String(circle(home[0]).borderColor).startsWith('#5B87FF'));
   assert.equal(circle(home[1]).borderWidth, 0.5, 'a hairline edge, not a glow');
   assert.equal(circle(home[1]).shadowOpacity, undefined, 'dark mode draws no shadow');
   palette = { ...dark, isDark: false, surface: '#FFFFFF', primary: '#2557D6', primarySoft: '#E5ECFB' };
   const light = render({ currency: 'ARS', assistant: true });
   assert.equal(circle(light[1]).backgroundColor, '#FFFFFF');
-  assert.ok(circle(light[1]).shadowOpacity <= 0.08, 'a soft card shadow in light');
-  assert.ok(circle(light[0]).shadowOpacity <= 0.2, 'the Assistant halo stays restrained');
+  // 24UX2: flat discs, no shadow and no cobalt halo in either theme; the hero keeps the only visual weight.
+  assert.equal(light.every((action: any) => circle(action).shadowOpacity === undefined), true);
+  assert.equal(circle(light[1]).borderWidth, 0.5);
   // Native glass on iOS 26: same geometry, the opaque style handed over untouched as the fallback, a cobalt wash only on the Assistant.
   material = 'glass';
   const glass = render({ currency: 'ARS', assistant: true });
   assert.equal(JSON.stringify(glass.map((action: any) => surface(action).props.material)), JSON.stringify(['glass', 'glass', 'glass', 'glass']));
-  assert.equal(JSON.stringify(glass.map((action: any) => surface(action).props.tint ?? null)), JSON.stringify(['#2557D640', null, null, null]));
-  assert.equal(surface(glass[0]).props.opaque.borderWidth, 1, 'the opaque fallback is still the ringed version');
+  assert.equal(JSON.stringify(glass.map((action: any) => surface(action).props.tint ?? null)), JSON.stringify(['#2557D633', null, null, null]));
+  assert.equal(surface(glass[0]).props.opaque.borderWidth, 0.5, 'the opaque fallback is still the edged version');
   assert.equal(JSON.stringify(glass.map((action: any) => surface(action).props.children.props.color)), JSON.stringify(['#2557D6', 'expense', 'income', 'transfer']), 'glyph colours are the same on glass');
   material = 'opaque';
   // Account detail keeps the three movements with the account carried over.

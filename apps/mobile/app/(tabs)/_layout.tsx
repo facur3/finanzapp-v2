@@ -25,8 +25,10 @@ export default function TabsLayout() {
     screenOptions={{ ...tabScreenOptions,
     headerStyle: { backgroundColor: p.background },
     headerTitleStyle: { color: p.text, fontWeight: '600' }, headerShadowVisible: false,
-    // The selected tab is the brand primary; the rest stay neutral. Switching is still instant.
-    tabBarActiveTintColor: p.primary, tabBarInactiveTintColor: p.tertiary,
+    // The selected tab is the brand primary; the rest stay neutral. Switching is still instant. Inactive labels are
+    // 10 pt text, so they take the secondary ink (5.6:1 light, 6.6:1 dark on the bar), not the tertiary (3.6:1 / 4.1:1,
+    // below AA; 24UX1 finding 9, fixed in 24UX2).
+    tabBarActiveTintColor: p.primary, tabBarInactiveTintColor: p.secondary,
     tabBarStyle: { backgroundColor: p.surface, borderTopColor: p.line },
     tabBarLabelStyle: { fontSize: 10, fontWeight: '500' },
     sceneStyle: { backgroundColor: p.background } }}>

@@ -44,6 +44,8 @@ export const activity = {
     statusVoided: 'Deshecho · no cuenta en saldos ni reportes',
     statusCorrected: 'Registrado · corregido',
     statusRecorded: 'Registrado',
+    /** 24UX2: the row that opens the recurring rule that recorded this movement. */
+    recurring: 'Recurrente',
     voidedTitle: 'Movimiento deshecho',
     card: 'Tarjeta',
     budget: 'Presupuesto',

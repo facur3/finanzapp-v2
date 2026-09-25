@@ -30,12 +30,12 @@ live in [docs/mobile-roadmap-history.md](../../docs/mobile-roadmap-history.md).
 | Where | What it owns |
 | --- | --- |
 | `app/` | Expo Router routes: the five tabs in `app/(tabs)/` (Inicio, Movimientos, Asistente, Reportes, Más), pushed detail screens, native modal forms, Idioma and Región, backup and recovery. Routes compose; they hold no financial rules. |
-| `src/ui/` | The visual system: palette and theme, typography, accessible rows and controls, the amount field (`money-input.ts`), form controls and sheets, the motion language (`motion.tsx`), the material adapter (`material.tsx`, the only door to `expo-glass-effect`), charts, the Home modules and the searchable chooser. |
+| `src/ui/` | The visual system: palette and theme, typography, accessible rows and controls, the amount field (`money-input.ts`), form controls and sheets, the motion language (`motion.tsx`), the material adapter (`material.tsx`, the only door to `expo-glass-effect`), charts, the Home modules, the merchant mark (`merchant-mark.ts`, `MerchantBadge`: a licensed logo when a provider exists, else the category glyph) and the searchable chooser. |
 | `src/i18n/` | Language and region: the registries and release gates (`locale.ts`), table-based formats (`format.ts`), typed es/en catalogues (`messages/`), the device adapter, the preference store, the provider (`useI18n()`), the generated region catalogue (`regions/`) and its API, the Intl probe. |
 | `src/storage/` | The SQLite repository (`database.ts`, schema `DATABASE_VERSION = 9`, atomic migrations, operation IDs), the native driver binding, transactions, the currency gate (`currency-gate.ts`) and `LedgerProvider`. Writes are durable before the UI confirms; a failed write keeps the draft; no error resets storage. |
 | `src/assistant/` | The Assistant's pure conversation model, the event-based client boundary, runtime selection and scripted fixtures. The only ledger write is an explicit Confirmar on a draft, validated by the domain. |
 | `src/integrations/` | The HTTPS client for the mobile API and the on-device evidence builder. |
-| `../../packages/domain` | The typed financial domain the app imports (`@finanzapp/domain`, linked as a `file:` dependency): ledger, budgets, categories, appearance, liabilities, money and the currency catalogue. Amounts are integers in each currency's minor unit; no floating point, no FX. |
+| `../../packages/domain` | The typed financial domain the app imports (`@finanzapp/domain`, linked as a `file:` dependency): ledger, budgets, categories, merchant identity, appearance, liabilities, money and the currency catalogue. Amounts are integers in each currency's minor unit; no floating point, no FX. |
 | `../../packages/integrations` | The request/response contracts shared with the backend. |
 | `../../server/mobile`, `../../api/mobile` | The mobile backend: authenticated Assistant and capture endpoints, provider adapter, pending inbox, quotas. Disabled until the owner configures an account; no paid call is made by this repository. |
 | `app.config.ts`, `eas.json` | App identities per variant, plugins, the EAS project link and the build profiles. No credentials. |
@@ -162,6 +162,7 @@ prove it (`locale-release.node.ts`, `currency-preview.node.ts`). Never set them 
 | `EXPO_PUBLIC_ASSISTANT_FIXTURES=1` | Development bundle only: scripted Assistant conversations behind a visible "Vista de prueba" banner; nothing is saved. |
 | `EXPO_PUBLIC_CURRENCY_PREVIEW=1` | Development bundle only: the forms also offer EUR, GBP, JPY, CLP and KWD; rows created in them stay readable and exportable (v9) when the flag is off. |
 | `EXPO_PUBLIC_LOCALE_PREVIEW=1` | Development bundle only: offers every language and region the build carries, released or not (since 23.1C2 the sets are equal, so it changes nothing today). |
+| `EXPO_PUBLIC_MERCHANT_MARK_PREVIEW=1` | Development bundle only: a recognized merchant's row draws the brand's initial on a neutral tile instead of its category glyph, to check recognition on the iPhone. Never a logo; no provider is configured (docs/merchant-identity.md). |
 | `EXPO_PUBLIC_DISABLE_GLASS=1` | Forces the opaque material everywhere; the glass module is never loaded. |
 | `EXPO_PUBLIC_MOBILE_API_ORIGIN` | The origin of the mobile API for the Assistant's remote runtime; unset means disconnected. |
 | `EXPO_PUBLIC_EAS_PROJECT_ID` | Overrides the default EAS project link (a fork or a second project). |
@@ -184,7 +185,7 @@ is distributed to people. Today:
 
 | | What |
 | --- | --- |
-| Implemented | Everything in the roadmap's §1, up to Producto 24UX1 (the Más footer reads Producto 24UX1). |
+| Implemented | Everything in the roadmap's §1, up to Producto 24UX2 (the Más footer reads Producto 24UX2). |
 | Device-tested | The first Expo Go flow (2026-09-12), the Interfaz 15 motion direction, the per-app Language row on build `1d69d2d4`, and the owner's 24B5/24B6 sessions that produced the 24B6 and 24UX1 corrections. Every later section of the [device checklist](../../docs/mobile-device-checklist.md) is still pending, and no per-item 24B5/24B6 result is recorded. |
 | Released | Nothing. No store build, no TestFlight, no production identity. |
 

@@ -148,6 +148,24 @@ export function recurringEntryId(ruleId: string, occurrenceDateISO: string): str
   return value;
 }
 
+/** The rule and date behind a movement a recurring rule registered, read from its deterministic id
+ * (`recurringEntryId`), or null for any other movement. The date is always the id's last segment, so a rule id
+ * containing underscores still parses. */
+export function recurringOccurrenceOf(entryId: string): { ruleId: string; dateISO: string } | null {
+  const match = /^rec_([a-zA-Z0-9_-]{1,70})_(\d{4})(\d{2})(\d{2})$/.exec(entryId);
+  if (!match) return null;
+  const dateISO = `${match[2]}-${match[3]}-${match[4]}`;
+  return validDateISO(dateISO) ? { ruleId: match[1], dateISO } : null;
+}
+
+/** The movements a rule actually registered, newest first. A scheduled date is not a payment: only a movement in
+ * the ledger counts, and one the person moved to another day or edited still belongs to its rule. Read-only; it
+ * never creates, merges or deduplicates anything. */
+export function recurringHistory(rule: Pick<RecurringRule, 'id'>, entries: readonly Entry[]): Entry[] {
+  return entries.filter(entry => recurringOccurrenceOf(entry.id)?.ruleId === rule.id)
+    .sort((a, b) => b.dateISO.localeCompare(a.dateISO) || b.id.localeCompare(a.id));
+}
+
 export function materializeRecurringRule(rule: RecurringRule, accounts: Account[], throughDateISO: string, nowISO: string) {
   validateRecurringRule(rule, accounts);
   if (!validTimestamp(nowISO)) throw new Error('Fecha de actualización inválida.');

@@ -5,13 +5,17 @@ import * as Haptics from 'expo-haptics';
 import { advanceRecurringDate, recurringForecastByCurrency, todayKey,
   type Currency, type RecurringRule } from '@finanzapp/domain';
 import { useLedger } from '../src/storage/LedgerProvider';
-import { ActionButton, AppText, CategoryBadge, EmptyState, ErrorMessage, IconButton, Money, PressFeedback, Screen, SectionTitle, Stat, StatRow, Surface, useStacked } from '../src/ui/components';
+import { ActionButton, AppText, EmptyState, ErrorMessage, IconButton, MerchantBadge, Money, PressFeedback, Screen, SectionTitle, Stat, StatRow, Surface, useStacked } from '../src/ui/components';
+import { useCategoryLook } from '../src/ui/category-hues';
+import { dueWhen } from '../src/ui/presentation';
 import { withCurrencyCode } from '../src/i18n/format';
 import { useI18n } from '../src/i18n/provider';
 import { space, useCurrentDay, usePalette } from '../src/ui/theme';
 
 /** Recurring rules are commitments, not payments: each one posts a normal
- * movement when its date arrives. The 30-day view is a projection per currency. */
+ * movement when its date arrives, once (a deterministic id per occurrence). The
+ * 30-day view is a projection per currency; the payments a rule actually
+ * registered are listed in its detail (24UX2). */
 export default function RecurringScreen() {
   const { accountId } = useLocalSearchParams<{ accountId?: string }>();
   const { archive, snapshot, saveRecurring } = useLedger();
@@ -92,33 +96,39 @@ export default function RecurringScreen() {
   </Screen>;
 }
 
+/** One rule (24UX2): who is paid (the typed name, with its mark), then how often and what for (frequency ·
+ * category · account); on the right the amount and when it is next due, or that it is paused. The date appears
+ * once. A paused rule keeps full-contrast ink (it was drawn at 60 % opacity, below AA for its caption) and says
+ * «Pausado» where the due day would be, in its caption and in its VoiceOver sentence. */
 function RecurringRow({ rule, accounts, day, last, busy, onToggle }: {
   rule: RecurringRule; accounts: { id: string; name: string; currency: Currency }[]; day: string; last: boolean; busy: boolean; onToggle: () => void;
 }) {
   const p = usePalette();
   const { t, relativeDate, spokenMinor, speechLanguage } = useI18n();
   const account = accounts.find(item => item.id === rule.accountId);
-  // The caption names the day on its own ("Mensual · Hoy"); the VoiceOver sentence uses the inline form ("próximo hoy").
-  const date = relativeDate(rule.nextDateISO, day);
-  const days = Math.round((Date.parse(rule.nextDateISO + 'T12:00:00Z') - Date.parse(day + 'T12:00:00Z')) / 86400000);
-  const when = !rule.active ? t('recurring.row.paused') : days <= 0 ? t('home.upcomingRow.today') : days === 1 ? t('home.upcomingRow.tomorrow')
-    : t('home.upcomingRow.inDays', { count: days });
+  const category = useCategoryLook(rule.category, rule.kind).label;
+  const due = dueWhen(rule.nextDateISO, day);
+  const when = !rule.active ? t('recurring.row.paused') : due.kind === 'today' || due.kind === 'due' ? t('home.upcomingRow.today')
+    : due.kind === 'tomorrow' ? t('home.upcomingRow.tomorrow') : due.kind === 'soon' ? t('home.upcomingRow.inDays', { count: due.days })
+      : relativeDate(rule.nextDateISO, day);
+  const urgent = rule.active && (due.kind === 'today' || due.kind === 'tomorrow' || due.kind === 'due');
   const income = rule.kind === 'income';
   const stacked = useStacked(account ? { minor: income ? rule.amountMinor : -rule.amountMinor, currency: account.currency, signed: true } : undefined);
-  return <View style={{ flexDirection: 'row', alignItems: 'center', borderBottomColor: p.line, borderBottomWidth: last ? 0 : StyleSheet.hairlineWidth, opacity: rule.active ? 1 : 0.6 }}>
-    <PressFeedback feedback="highlight" accessibilityRole="button" accessibilityLabel={t('recurring.row.label', { merchant: rule.merchant, frequency: t(`recurring.frequencySpoken.${rule.frequency}`),
-      amount: account ? spokenMinor(rule.amountMinor, account.currency) : '', currency: account?.currency ?? '', date: relativeDate(rule.nextDateISO, day, true) })}
+  const spoken = { merchant: rule.merchant, frequency: t(`recurring.frequencySpoken.${rule.frequency}`), category,
+    amount: account ? spokenMinor(rule.amountMinor, account.currency) : '', currency: account?.currency ?? '', date: relativeDate(rule.nextDateISO, day, true) };
+  return <View style={{ flexDirection: 'row', alignItems: 'center', borderBottomColor: p.line, borderBottomWidth: last ? 0 : StyleSheet.hairlineWidth }}>
+    <PressFeedback feedback="highlight" accessibilityRole="button" accessibilityLabel={t(rule.active ? 'recurring.row.label' : 'recurring.row.labelPaused', spoken)}
       onPress={() => router.push({ pathname: '/edit-recurring/[id]', params: { id: rule.id } })}
       containerStyle={{ flex: 1 }} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, paddingLeft: 16, minHeight: 64 }}>
-      <CategoryBadge category={rule.category} kind={rule.kind} tone={income ? 'income' : 'neutral'} />
+      <MerchantBadge merchant={rule.merchant} category={rule.category} kind={rule.kind} tone={income ? 'income' : 'neutral'} />
       <View style={{ flex: 1, minWidth: 0, gap: 8, flexDirection: stacked ? 'column' : 'row', alignItems: stacked ? 'flex-start' : 'center' }}>
         <View style={{ flex: stacked ? undefined : 1, minWidth: 0, gap: 3 }}>
           <AppText numberOfLines={stacked ? undefined : 2} style={{ fontWeight: '500' }}>{rule.merchant}</AppText>
-          <AppText secondary variant="footnote" numberOfLines={stacked ? undefined : 2}>{t(`recurring.frequency.${rule.frequency}`)} · {date}{account ? ' · ' + account.name : ''}</AppText>
+          <AppText secondary variant="footnote" numberOfLines={stacked ? undefined : 2}>{t(`recurring.frequency.${rule.frequency}`)} · {category}{account ? ' · ' + account.name : ''}</AppText>
         </View>
         <View style={{ alignItems: stacked ? 'flex-start' : 'flex-end', gap: 3, maxWidth: stacked ? '100%' : '56%' }}>
           {account && <Money minor={income ? rule.amountMinor : -rule.amountMinor} currency={account.currency} signed tone={income ? 'income' : 'expense'} />}
-          <AppText variant="caption" style={{ color: rule.active && days <= 1 ? p.warning : p.secondary, fontWeight: rule.active && days <= 1 ? '600' : '400' }}>{when}</AppText>
+          <AppText variant="caption" style={{ color: urgent ? p.warning : p.secondary, fontWeight: urgent ? '600' : '400' }}>{when}</AppText>
         </View>
       </View>
     </PressFeedback>
@@ -129,4 +139,3 @@ function RecurringRow({ rule, accounts, day, last, busy, onToggle }: {
     </View>
   </View>;
 }
-

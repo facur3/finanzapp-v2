@@ -45,6 +45,7 @@ export const activity: Pick<Messages, 'activity' | 'rows' | 'entryDetail' | 'tra
     statusVoided: 'Undone · not counted in balances or reports',
     statusCorrected: 'Recorded · corrected',
     statusRecorded: 'Recorded',
+    recurring: 'Recurring',
     voidedTitle: 'Undone transaction',
     card: 'Card',
     budget: 'Budget',

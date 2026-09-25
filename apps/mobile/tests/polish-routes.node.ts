@@ -44,7 +44,7 @@ function harness(file: string, params: Record<string, unknown> = {}, data: domai
   const saved: domain.RecurringRule[] = [];
   let cursor = 0;
   const ledger = { useLedger: () => ({ archive: data, snapshot: domain.snapshotFromArchive(data), saveRecurring: async (next: domain.RecurringRule) => { saved.push(next); } }) };
-  const names = ['ActionButton', 'AppText', 'CategoryBadge', 'Choices', 'DetailRow', 'EmptyState', 'ErrorMessage', 'IconButton', 'Money', 'PressFeedback',
+  const names = ['ActionButton', 'AppText', 'CategoryBadge', 'MerchantBadge', 'Choices', 'DetailRow', 'EmptyState', 'ErrorMessage', 'IconButton', 'Money', 'PressFeedback',
     'Screen', 'SectionTitle', 'Stat', 'Surface', 'AccountRow', 'AccountBadge'];
   const theme = { space: { xs: 4, s: 8, m: 12, l: 16, xl: 20, xxl: 24, xxxl: 32 }, useCurrentDay: () => '2026-09-20', useReduceMotion: () => true,
     usePalette: () => ({ text: '#000', secondary: '#666', tertiary: '#999', line: '#ddd', inset: '#eee', expense: '#c00', income: '#080', warning: '#a60', primary: '#2557D6', background: '#fff', surface: '#fff' }) };
@@ -210,18 +210,23 @@ test('in English Recurrentes reads in English, keeps merchant and account names,
   const sections = nodes(root).filter(node => node.type === 'SectionTitle').map(node => node.props.children);
   assert.equal(sections.join(','), 'Next 30 days,Active');
   const press = nodes(root).find(node => node.type === 'PressFeedback')!;
-  assert.equal(press.props.accessibilityLabel, 'Edit recurring Alquiler, monthly, 400.00 ARS, next Oct 1');
+  assert.equal(press.props.accessibilityLabel, 'Edit recurring Alquiler, monthly, Hogar, 400.00 ARS, next Oct 1');
   const captions = texts(root);
-  assert.ok(captions.includes('Monthly · Oct 1 · Banco'), 'merchant and account name stay as the user wrote them');
-  assert.ok(captions.includes('In 11 days'));
-  assert.ok(texts(spanish.render()).includes('Mensual · 1 oct · Banco'));
-  assert.ok(texts(spanish.render()).includes('En 11 días'));
+  // 24UX2: frequency · category · account on the left; the due day once, beside the amount (beyond a week, the date).
+  assert.ok(captions.includes('Monthly · Hogar · Banco'), 'merchant, category and account name stay as the user wrote them');
+  assert.ok(captions.includes('Oct 1'));
+  assert.equal(captions.some(caption => /In 11 days|Oct 1 ·/.test(caption)), false, 'the date is not repeated');
+  assert.ok(texts(spanish.render()).includes('Mensual · Hogar · Banco'));
+  assert.ok(texts(spanish.render()).includes('1 oct'));
   await find(root, 'Switch', 'Pause Alquiler').props.onValueChange();
   await find(spanish.render(), 'Switch', 'Pausar Alquiler').props.onValueChange();
   const stable = (rule: domain.RecurringRule) => JSON.stringify({ ...rule, updatedAt: '' });
   assert.equal(stable(english.saved[0]), stable(spanish.saved[0]));
   const paused = harness('recurring.tsx', {}, { ...archive, recurring: [{ ...rule, active: false }] }, 'en-AR').render();
   assert.ok(texts(paused).includes('Paused'));
+  // 24UX2: a paused rule keeps full-contrast ink and never announces a next date.
+  assert.equal(nodes(paused).find(node => node.type === 'PressFeedback')!.props.accessibilityLabel, 'Edit recurring Alquiler, monthly, Hogar, 400.00 ARS, paused');
+  assert.equal(nodes(paused).some(node => node.type === 'View' && node.props.style?.opacity !== undefined && node.props.style.opacity < 1), false);
   assert.equal(find(paused, 'SectionTitle', undefined).props.caption, 'Not recorded until you turn them back on');
 });
 
@@ -229,10 +234,10 @@ test('23.1C2: a Recurrentes row due today says the day inside its VoiceOver sent
   // The harness day is 2026-09-20. The amount is spoken with the language's decimal mark, whatever the region writes.
   const due = { ...archive, recurring: [{ ...rule, nextDateISO: '2026-09-20' }] };
   const cases = [
-    ['es-AR', 'Editar recurrente Alquiler, mensual, 400,00 ARS, próximo hoy', 'Mensual · Hoy · Banco'],
-    ['es-US', 'Editar recurrente Alquiler, mensual, 400,00 ARS, próximo hoy', 'Mensual · Hoy · Banco'],
-    ['en-AR', 'Edit recurring Alquiler, monthly, 400.00 ARS, next today', 'Monthly · Today · Banco'],
-    ['en-US', 'Edit recurring Alquiler, monthly, 400.00 ARS, next today', 'Monthly · Today · Banco'],
+    ['es-AR', 'Editar recurrente Alquiler, mensual, Hogar, 400,00 ARS, próximo hoy', 'Hoy'],
+    ['es-US', 'Editar recurrente Alquiler, mensual, Hogar, 400,00 ARS, próximo hoy', 'Hoy'],
+    ['en-AR', 'Edit recurring Alquiler, monthly, Hogar, 400.00 ARS, next today', 'Today'],
+    ['en-US', 'Edit recurring Alquiler, monthly, Hogar, 400.00 ARS, next today', 'Today'],
   ] as const;
   for (const [locale, label, caption] of cases) {
     const root = harness('recurring.tsx', {}, due, locale).render();
@@ -241,7 +246,7 @@ test('23.1C2: a Recurrentes row due today says the day inside its VoiceOver sent
   }
   // A day that is not today or yesterday reads the same inline and on its own.
   const later = nodes(harness('recurring.tsx', {}, archive, 'es-AR').render()).find(node => node.type === 'PressFeedback')!;
-  assert.equal(later.props.accessibilityLabel, 'Editar recurrente Alquiler, mensual, 400,00 ARS, próximo 1 oct');
+  assert.equal(later.props.accessibilityLabel, 'Editar recurrente Alquiler, mensual, Hogar, 400,00 ARS, próximo 1 oct');
 });
 
 test('in English Presupuestos names the month, the states and the VoiceOver sentences in English; category names are untouched', () => {

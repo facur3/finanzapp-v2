@@ -55,6 +55,9 @@ for (const [theme, background] of [['light', '#F5F6F8'], ['dark', '#080B10']]) {
       assert.equal(options.sceneStyle.backgroundColor, background);
       assert.equal(options.sceneStyle.opacity, undefined);
     }
+    // 24UX2: the 10 pt inactive labels are text, so they take the secondary ink (AA), never the tertiary.
+    assert.equal(props.screenOptions.tabBarInactiveTintColor, '#A6B0C0');
+    assert.equal(props.screenOptions.tabBarActiveTintColor, '#5B87FF');
   });
 }
 

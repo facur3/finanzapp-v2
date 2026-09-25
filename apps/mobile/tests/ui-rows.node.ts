@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { runInNewContext } from 'node:vm';
 import ts from 'typescript';
+import * as merchantMark from '../src/ui/merchant-mark.ts';
 import * as currencies from '../src/ui/currencies.ts';
 import { CURRENCIES, currencyOption, currencyOptions, searchCurrencies } from '../src/ui/currencies.ts';
 import { bindLocale } from '../src/i18n/bind.ts';
@@ -31,7 +32,7 @@ function load(file: string, extra: Record<string, unknown> = {}, fontScale = 1) 
       useEffect: () => {}, useId: () => 'id', useRef: (initial: unknown) => ({ current: initial }), useMemo: (fn: () => unknown) => fn(),
       Children: { map: (children: unknown, fn: (child: unknown) => unknown) => (Array.isArray(children) ? children : [children]).map(fn) } },
     'react/jsx-runtime': { jsx, jsxs: jsx, Fragment: 'Fragment' },
-    'react-native': { View: 'View', Text: 'Text', TextInput: 'TextInput', ScrollView: 'ScrollView', Pressable: 'Pressable', ActivityIndicator: 'ActivityIndicator', InputAccessoryView: 'InputAccessoryView',
+    'react-native': { View: 'View', Text: 'Text', Image: 'Image', TextInput: 'TextInput', ScrollView: 'ScrollView', Pressable: 'Pressable', ActivityIndicator: 'ActivityIndicator', InputAccessoryView: 'InputAccessoryView',
       FlatList: 'FlatList', Modal: 'Modal', Platform: { OS: 'ios' }, Keyboard: { dismiss() {} }, StyleSheet: { hairlineWidth: 0.5, create: (styles: unknown) => styles, flatten: (style: any) => Object.assign({}, ...(Array.isArray(style) ? style.flat(Infinity).filter(Boolean) : [style])), absoluteFill: {} },
       useWindowDimensions: () => ({ fontScale, width: 390, height: 844 }), Alert: { alert: (title: string, message: string, buttons?: { text: string }[]) => alerts.push({ title, message, buttons }) } },
     'react-native-reanimated': { __esModule: true, default: { View: 'Animated.View', Text: 'Animated.Text' }, useSharedValue: (value: number) => ({ value }), withTiming: (value: number) => value, useAnimatedStyle: (fn: () => unknown) => fn() },
@@ -45,7 +46,7 @@ function load(file: string, extra: Record<string, unknown> = {}, fontScale = 1) 
       type: { body: { fontSize: 17 }, subhead: { fontSize: 15 }, footnote: { fontSize: 13 }, caption: { fontSize: 12 }, title2: { fontSize: 22 }, title3: { fontSize: 20 }, headline: { fontSize: 17 }, eyebrow: {} },
       usePalette: () => p, useReduceMotion: () => true, useCurrentDay: () => '2026-09-22' },
     './categories': {}, './category-color': { tintOf: () => '#EEE' }, './category-hues': { useAccountLook: () => ({ glyph: 'wallet-outline', hex: '#2557D6' }), useCategoryLook: () => ({ glyph: 'pricetag-outline', hex: '#3E6FB0', label: 'x' }), useAccountNameOf: () => (account: any) => account.name, useAccountLookOf: () => () => ({ glyph: 'wallet-outline', hex: '#2557D6' }), useCategoryDefinitions: () => [] },
-    './geometry': geometry,
+    './geometry': geometry, './merchant-mark': merchantMark,
     './motion': { duration: { press: 100, release: 160 }, easeOut: 'ease', selectionHaptic: () => haptics.push('selection'), timing: () => ({}) },
     './money-input': moneyInput,
     './presentation': {}, './currencies': currencies,
@@ -481,4 +482,56 @@ test('24B5: the currency field lists the gate\'s currencies with search over cod
   assert.deepEqual([euro.props.value, euro.props.detail, euro.props.onPress], ['Euros', 'EUR · €', undefined]);
   const dinar = nodes(ui.render('CurrencyField', { value: 'KWD' })).find(node => node.type === 'SelectionRow')!;
   assert.deepEqual([dinar.props.value, dinar.props.detail], ['Dinares kuwaitíes', 'KWD · KWD']);
+});
+
+// ---- 24UX2: the merchant mark --------------------------------------------------------------------------------
+
+const logoMark = (source: unknown) => ({ ...merchantMark, merchantMark: () => ({ kind: 'logo', brand: { id: 'netflix', name: 'Netflix', aliases: ['netflix'], domain: 'netflix.com' }, logo: { source, attribution: null } }) });
+
+test('24UX2: MerchantBadge falls back to the category glyph when no logo exists, the name is not recognized or the build has no provider', () => {
+  const ui = load('components.tsx');
+  for (const merchant of ['Netflix', 'Almacén Don Pepe', '']) {
+    const badge = ui.render('MerchantBadge', { merchant, category: 'Suscripciones', kind: 'expense', tone: 'neutral' });
+    assert.equal(is(badge, 'CategoryBadge'), true, merchant);
+    assert.equal(JSON.stringify([badge.props.category, badge.props.kind, badge.props.tone]), JSON.stringify(['Suscripciones', 'expense', 'neutral']));
+  }
+  const income = ui.render('MerchantBadge', { merchant: 'Sueldo', category: 'Sueldo', kind: 'income', tone: 'income', large: true });
+  assert.equal(JSON.stringify([income.props.tone, income.props.large]), JSON.stringify(['income', true]), 'the income tone and the size pass through');
+});
+
+test('24UX2: a licensed logo is a picture hidden from VoiceOver, on a white tile of the category glyph\'s size; a failed load falls back for good', () => {
+  const ui = load('components.tsx', { './merchant-mark': logoMark({ uri: 'https://logos.example/netflix.png' }) });
+  const tile = ui.render('MerchantBadge', { merchant: 'Netflix', category: 'Suscripciones' });
+  assert.equal(tile.type, 'View');
+  assert.equal(tile.props.accessible, false);
+  assert.equal(tile.props.accessibilityElementsHidden, true);
+  assert.equal(JSON.stringify([tile.props.style.width, tile.props.style.height, tile.props.style.borderRadius]), JSON.stringify([40, 40, 12]));
+  const image = nodes(tile).find(node => is(node, 'Image'))!;
+  assert.equal(image.props.source.uri, 'https://logos.example/netflix.png');
+  assert.equal(image.props.resizeMode, 'contain');
+  image.props.onError();
+  assert.equal(is(ui.render('MerchantBadge', { merchant: 'Netflix', category: 'Suscripciones' }), 'CategoryBadge'), true);
+  assert.equal(is(ui.render('MerchantBadge', { merchant: 'Netflix', category: 'Suscripciones', large: true }), 'CategoryBadge'), true, 'the failure is remembered');
+});
+
+test('24UX2: the development monogram is a neutral tile with a fixed-size initial, never announced', () => {
+  const ui = load('components.tsx', { './merchant-mark': { ...merchantMark, merchantMark: () => ({ kind: 'monogram', brand: { id: 'spotify', name: 'Spotify', aliases: [], domain: 'spotify.com' }, letter: 'S' }) } });
+  const tile = ui.render('MerchantBadge', { merchant: 'Spotify', category: 'Suscripciones', large: true });
+  assert.equal(JSON.stringify([tile.props.accessible, tile.props.style.width, tile.props.style.backgroundColor]), JSON.stringify([false, 56, '#EEEEF3']));
+  const letter = nodes(tile).find(node => is(node, 'AppText'))!;
+  assert.equal(JSON.stringify([letter.props.children, letter.props.allowFontScaling]), JSON.stringify(['S', false]));
+});
+
+test('24UX2: a movement row shows the name as typed beside its merchant mark, keeps the category in its caption and names the account only when asked', () => {
+  const ui = load('components.tsx');
+  const entry = { id: 'e', accountId: 'a', kind: 'expense', amountMinor: 899900, merchant: 'netflix.com', category: 'Suscripciones', dateISO: '2026-09-22', createdAt: '' };
+  const account = { id: 'a', name: 'Banco', currency: 'ARS', openingMinor: 0, createdAt: '' };
+  const row = ui.render('EntryRow', { entry, account, showAccount: false });
+  const badge = nodes(row).find(node => is(node, 'MerchantBadge'))!;
+  assert.equal(JSON.stringify([badge.props.merchant, badge.props.category]), JSON.stringify(['netflix.com', 'Suscripciones']));
+  const shown = texts(row).map(node => [node.props.children].flat().join(''));
+  assert.ok(shown.includes('netflix.com'), 'the typed name, never the brand spelling');
+  assert.ok(shown.some(text => text.startsWith('x · ')), 'the category label leads the caption');
+  assert.equal(shown.some(text => text.includes('Banco')), false);
+  assert.ok(texts(ui.render('EntryRow', { entry, account })).map(node => [node.props.children].flat().join('')).some(text => text.includes('Banco')));
 });

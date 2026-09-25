@@ -33,7 +33,9 @@ export const recurring = {
     },
     row: {
       /** VoiceOver label of a rule: merchant (user data), frequency, amount, currency code and next date (inside the sentence: "próximo hoy"). */
-      label: 'Editar recurrente {merchant}, {frequency}, {amount} {currency}, próximo {date}',
+      label: 'Editar recurrente {merchant}, {frequency}, {category}, {amount} {currency}, próximo {date}',
+      /** 24UX2: a paused rule never announces a next date. */
+      labelPaused: 'Editar recurrente {merchant}, {frequency}, {category}, {amount} {currency}, pausado',
       paused: 'Pausado',
       pause: 'Pausar {merchant}',
       activate: 'Activar {merchant}',
@@ -54,6 +56,13 @@ export const recurring = {
       create: 'Crear recurrente',
       pastDate: 'La próxima fecha debe ser hoy o una fecha futura.',
       saveFailed: 'No se pudo guardar el recurrente. Conservamos el mismo envío para reintentar sin duplicarlo.',
+    },
+    /** 24UX2: the movements a rule already recorded, in its detail. A scheduled date is not one of them. */
+    history: {
+      title: 'Registrados',
+      caption: 'Movimientos que esta regla ya registró. La próxima fecha es una estimación hasta que llegue.',
+      empty: 'Todavía no registró ningún movimiento.',
+      older: { one: 'Y {count} registro anterior en Movimientos.', other: 'Y {count} registros anteriores en Movimientos.' },
     },
     edit: {
       notFoundTitle: 'No encontramos este recurrente',

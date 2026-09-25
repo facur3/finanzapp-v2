@@ -10,7 +10,7 @@ import { useDisplayCurrency } from '../../src/ui/display-currency-provider';
 import { useI18n } from '../../src/i18n/provider';
 import { BudgetHomeCard, CategoryRanking, MetricHelp, UpcomingRecurringRow } from '../../src/ui/home-modules';
 import { Reflow, ValueTransition } from '../../src/ui/motion';
-import { availableCurrencies, selectEntries } from '../../src/ui/presentation';
+import { availableCurrencies, namesAccount, selectEntries } from '../../src/ui/presentation';
 import { QuickActions } from '../../src/ui/quick-actions';
 import { space, useCurrentDay, usePalette } from '../../src/ui/theme';
 
@@ -60,6 +60,11 @@ export default function HomeScreen() {
   const accountCount = snapshot.accounts.filter(account => account.currency === currency && !hidden.has(account.id)).length;
   const openReport = () => router.navigate({ pathname: '/reports', params: { currency } });
   const spending = metric === 'spending';
+  // A row names its account only when another account of this currency could be meant (24UX2).
+  const showAccount = namesAccount(snapshot.accounts, currency, new Set((archive?.debts ?? []).map(debt => debt.accountId)));
+  // A month with nothing recorded in this currency says so once, under Últimos movimientos, instead of two
+  // near-identical sentences 24 pt apart (24UX1 finding 5). Categories return with the first expense.
+  const quietMonth = summary.status === 'ready' && !summary.categories.length && !recent.length;
   // Keyed by the choice, not the dates: a day boundary must not animate the hero on its own.
   const heroId = `${metric}|${currency}`;
 
@@ -98,7 +103,7 @@ export default function HomeScreen() {
         <BudgetHomeCard summary={monthBudget} />
       </Reflow>}
 
-      <Reflow>
+      {!quietMonth && <Reflow fade>
         <SectionTitle action={t('home.reports')} onAction={openReport}>{t('home.whereSpent')}</SectionTitle>
         <ValueTransition id={currency} variant="fade">
           {summary.categories.length && summary.status === 'ready' ? <CategoryRanking categories={summary.categories} totalMinor={summary.expenseMinor} currency={currency}
@@ -107,20 +112,20 @@ export default function HomeScreen() {
               {summary.status === 'ready' ? t('home.categoriesEmpty') : t('home.categoriesInActivity')}
             </AppText>}
         </ValueTransition>
-      </Reflow>
+      </Reflow>}
 
       {upcoming.length > 0 && <Reflow fade>
         <SectionTitle action={t('common.seeAll')} onAction={() => router.push('/recurring')}>{t('home.upcoming')}</SectionTitle>
-        <Surface grouped>{upcoming.map((rule, index) => <UpcomingRecurringRow key={rule.id} rule={rule}
+        <Surface grouped>{upcoming.map((rule, index) => <UpcomingRecurringRow key={rule.id} rule={rule} showAccount={showAccount}
           account={snapshot.accounts.find(account => account.id === rule.accountId)!} day={day} last={index === upcoming.length - 1} />)}</Surface>
       </Reflow>}
 
       <Reflow>
         <SectionTitle action={t('common.seeAll')} onAction={() => router.navigate('/activity')}>{t('home.recent')}</SectionTitle>
         <ValueTransition id={currency} variant="fade">
-          {recent.length ? <Surface grouped>{recent.map((entry, index) => <EntryRow key={entry.id} entry={entry}
+          {recent.length ? <Surface grouped>{recent.map((entry, index) => <EntryRow key={entry.id} entry={entry} showAccount={showAccount}
             account={snapshot.accounts.find(a => a.id === entry.accountId)!} last={index === recent.length - 1} />)}</Surface>
-            : <AppText secondary variant="subhead">{t('home.recentEmpty')}</AppText>}
+            : <AppText secondary variant="subhead">{currencies.length > 1 ? t('home.recentEmptyIn', { currency }) : t('home.recentEmpty')}</AppText>}
         </ValueTransition>
       </Reflow>
     </>}
