@@ -5,10 +5,12 @@ import { catchUpRecurring, initializeDatabase, readArchive, type LedgerDatabase 
  * set aside for review (their ids), and whether the recurring catch-up itself could not run. */
 export type LedgerSession = { archive: LedgerArchive; recurringFailures: string[]; recurringError: boolean };
 
-/** Producto 24UX5: recurring rules are recorded on launch and on every return to the foreground (`todayISO` is the
- * device's day), never while the app is closed. The catch-up is not a precondition for opening the data: a rule that
- * cannot be recorded is set aside (Recurrentes asks for review), and a catch-up that fails as a whole leaves the
- * ledger as it was (one transaction) and still opens it. Only initializing or reading the database can fail an open. */
+/** Producto 24UX5: recurring rules are recorded automatically on launch and on every return to the foreground
+ * (`todayISO` is the device's day), never while the app is closed; a date that passed meanwhile is recorded with its
+ * own date, and a long backlog in durable batches (`catchUpRecurring`). The catch-up is not a precondition for opening
+ * the data: a rule that cannot be recorded is left unchanged (Recurrentes asks for review), and a catch-up that fails
+ * as a whole keeps every step already committed and still opens the ledger. Only initializing or reading the database
+ * can fail an open. */
 export async function openLedger(db: LedgerDatabase, todayISO: string): Promise<LedgerSession> {
   await initializeDatabase(db);
   return refreshLedger(db, todayISO);

@@ -50,8 +50,8 @@ export const recurring = {
       deleteRule: 'Eliminar recurrente',
       /** Over the detail's actions of a paused rule. */
       pausedNote: 'Pausado: no registra nada hasta que lo reanudes. Lo que venza mientras tanto no se registra.',
-      /** 24UX5: over the detail's actions of a rule set aside by the catch-up (more than a year of weekly dates, for example). */
-      reviewNote: 'Sin registrar desde el {date}: son demasiados vencimientos para anotarlos solos. Continuá desde hoy para retomarlo sin registrar los anteriores, o pausalo.',
+      /** 24UX5: over the detail's actions of an active rule the catch-up could not record (a real failure; a long backlog is recorded on its own, in batches). */
+      reviewNote: 'FinanzApp no pudo registrar este recurrente desde el {date}. Continuá desde hoy para retomarlo sin registrar los anteriores, o pausalo.',
       continueFromToday: 'Continuar desde hoy',
       /** The confirmation. `{merchant}` is the person's own text. */
       deleteTitle: '¿Eliminar «{merchant}»?',

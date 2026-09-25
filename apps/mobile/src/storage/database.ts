@@ -4,7 +4,7 @@ import {
   type Account, type Entry, type EntryChange, type EntryRecord, type LedgerArchive, type LedgerSnapshot,
   accountBalanceMinor, validateAccountChange, type AccountChange, initialTransferRecord, sameTransferRecord,
   sameTransfer, validateTransfer, validateTransferChange, type Transfer, type TransferChange, type TransferRecord,
-  materializeRecurringRule, sameRecurringRule, validateRecurringRule, validateRecurringRuleChange, type RecurringRule,
+  materializeRecurringRule, RECURRING_BATCH_SIZE, sameRecurringRule, validateRecurringRule, validateRecurringRuleChange, type RecurringRule,
   sameMonthlyBudget, scopedMonthlyBudget, validateMonthlyBudget, validateNewMonthlyBudget, type MonthlyBudget,
   assertIncomeAccount, assertPostingAccount, assertTransferSides, keepsHistoricalCardIncome, sameTransferSides, sameCreditCardProfile, samePersonalDebtProfile, validateCreditCardProfile, validatePersonalDebtProfile,
   validateCreditCardChange, validatePersonalDebtChange,
@@ -763,21 +763,41 @@ export async function saveRecurringRule(db: LedgerDatabase, input: RecurringRule
   });
 }
 
-/** What one catch-up did: the movements it recorded, and the rules it set aside untouched (their ids). */
-export type RecurringCatchUp = { created: number; failed: string[] };
+/** What one catch-up did: the movements it recorded, the rules it could not record (their ids, left unchanged), and
+ * the rules whose backlog is still being recorded because the pass reached `maxSteps` (they continue on the next
+ * launch or foreground, from their saved next date). */
+export type RecurringCatchUp = { created: number; failed: string[]; behind: string[] };
+export type RecurringCatchUpOptions = { batchSize?: number; maxSteps?: number };
 
-/** Materialize every due occurrence once. Entry IDs are deterministic and the
- * rule advance is committed atomically with those postings.
+/** Materialize every due occurrence once, oldest first, with its original due date and its deterministic id.
  *
- * Producto 24UX5: one rule never blocks the others or the opening of the ledger. A rule whose occurrences cannot be
- * materialized (more than the domain's 366 pending dates after a very long absence) is set aside unchanged and
- * reported in `failed`; the materialization is isolated per rule, the SQLite writes stay one transaction. A rule that
- * fails validation is refused earlier, by `readArchive` itself, and is not isolated here; the person resolves it from Recurrentes, where an
- * active rule whose next date is already past reads as needing review. An occurrence whose deterministic id is
- * already in the ledger is that same occurrence (the id is the rule and the date): it counts as recorded whatever the
- * person did to it since (edited, moved, undone), so it is never recorded twice and never stops the catch-up. */
-export async function catchUpRecurring(db: LedgerDatabase, throughDateISO: string, nowISO = new Date().toISOString()): Promise<RecurringCatchUp> {
-  let result: RecurringCatchUp = { created: 0, failed: [] };
+ * 24UX5 review: a backlog is recorded automatically in steps of at most `batchSize` dates per rule (the domain's
+ * RECURRING_BATCH_SIZE, 366). Each step is one exclusive transaction that inserts its movements and advances the
+ * rules together, so an interruption between steps leaves a consistent ledger and the next launch resumes from the
+ * saved next date; nothing is recorded twice (an occurrence whose id is already in the ledger, edited, moved or
+ * undone, counts as recorded) and no date is dropped. A normal catch-up of a few days is one step, as before. The
+ * pass stops after `maxSteps` steps (default 64, about 23,000 dates per rule) to keep one launch bounded; a rule still
+ * behind is reported in `behind` and continues on the next launch or foreground. Memory per step is bounded by the
+ * batch, not by the backlog.
+ *
+ * The materialization is isolated per rule: a rule whose dates cannot be materialized is left unchanged and reported
+ * in `failed`, and the others are recorded. A rule that fails validation is refused earlier, by `readArchive`. */
+export async function catchUpRecurring(db: LedgerDatabase, throughDateISO: string, nowISO = new Date().toISOString(),
+  { batchSize = RECURRING_BATCH_SIZE, maxSteps = 64 }: RecurringCatchUpOptions = {}): Promise<RecurringCatchUp> {
+  let created = 0;
+  const failed = new Set<string>();
+  let behind: string[] = [];
+  for (let step = 0; step < maxSteps; step++) {
+    const result = await catchUpStep(db, throughDateISO, nowISO, batchSize, failed);
+    created += result.created;
+    behind = result.behind;
+    if (!behind.length) break;
+  }
+  return { created, failed: [...failed], behind };
+}
+
+async function catchUpStep(db: LedgerDatabase, throughDateISO: string, nowISO: string, batchSize: number, failed: Set<string>) {
+  let result = { created: 0, behind: [] as string[] };
   await db.withExclusiveTransactionAsync(async tx => {
     const archive = await readArchive(tx);
     if (!archive.recurring?.length) return;
@@ -786,13 +806,14 @@ export async function catchUpRecurring(db: LedgerDatabase, throughDateISO: strin
     const recurring = [...archive.recurring];
     const inserts: EntryRecord[] = [];
     const updates: RecurringRule[] = [];
-    const failed: string[] = [];
+    const behind: string[] = [];
 
     for (let index = 0; index < recurring.length; index++) {
       const current = recurring[index];
+      if (failed.has(current.id)) continue;
       let materialized: ReturnType<typeof materializeRecurringRule>;
-      try { materialized = materializeRecurringRule(current, archive.accounts, throughDateISO, nowISO); }
-      catch { failed.push(current.id); continue; }
+      try { materialized = materializeRecurringRule(current, archive.accounts, throughDateISO, nowISO, batchSize); }
+      catch { failed.add(current.id); continue; }
       if (!materialized.entries.length) continue;
       for (const entry of materialized.entries) {
         if (known.has(entry.id)) continue; // Already recorded (perhaps edited or undone since): never a duplicate.
@@ -803,9 +824,9 @@ export async function catchUpRecurring(db: LedgerDatabase, throughDateISO: strin
       }
       recurring[index] = materialized.rule;
       updates.push(materialized.rule);
+      if (!materialized.complete) behind.push(current.id);
     }
 
-    result = { created: 0, failed };
     if (!updates.length) return;
     validateArchive({ ...archive, records, recurring });
     for (const record of inserts) await insertRecord(tx, record);
@@ -813,7 +834,7 @@ export async function catchUpRecurring(db: LedgerDatabase, throughDateISO: strin
       await tx.runAsync('UPDATE recurring_rules SET nextDateISO = ?, revision = ?, updatedAt = ? WHERE id = ?',
         rule.nextDateISO, rule.revision, rule.updatedAt, rule.id);
     }
-    result = { created: inserts.length, failed };
+    result = { created: inserts.length, behind };
   });
   return result;
 }

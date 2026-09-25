@@ -4,9 +4,9 @@ import { DatabaseSync } from 'node:sqlite';
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { accountBalanceMinor, deleteRecurringRule, makeEntryChange, pauseRecurringRule, recurringHistory, resumeRecurringRule, snapshotFromArchive,
+import { accountBalanceMinor, archiveKey, createRecoveryBackup, deleteRecurringRule, parsePilotBackup, makeEntryChange, pauseRecurringRule, recurringHistory, recurringNeedsReview, resumeRecurringRule, snapshotFromArchive,
   type Account, type RecurringRule } from '@finanzapp/domain';
-import { changeEntry, createAccount, initializeDatabase, processRecurring, readArchive, saveRecurringRule, type LedgerDatabase } from '../src/storage/database.ts';
+import { catchUpRecurring, changeEntry, createAccount, importArchive, initializeDatabase, processRecurring, readArchive, saveRecurringRule, type LedgerDatabase } from '../src/storage/database.ts';
 import { openLedger, refreshLedger } from '../src/storage/ledger-session.ts';
 import { runExclusiveTransaction, runSchemaMigration, type TransactionConnection } from '../src/storage/transaction.ts';
 
@@ -147,39 +147,124 @@ test('opening several days late records every missed date once, in order', async
 });
 
 // Before 24UX5 one rule with more than 366 pending dates threw inside the single transaction that processes every
-// rule, and LedgerProvider showed "No pudimos abrir tus datos" on every launch: no screen could be opened at all.
-test('a rule with an extraordinary backlog is set aside for review; every other rule and all the data still open', async () => {
+// rule, and LedgerProvider showed "No pudimos abrir tus datos" on every launch. 24UX5 review (owner's decision): the
+// backlog is recorded automatically, in durable batches, with every original date; nothing is dropped.
+const weeklyDates = (fromISO: string, count: number) => Array.from({ length: count }, (_, index) => {
+  const [y, m, d] = fromISO.split('-').map(Number);
+  return new Date(Date.UTC(y, m - 1, d + index * 7)).toISOString().slice(0, 10);
+});
+
+test('an extraordinary backlog is recorded automatically in batches, with every original date, and the other rules and data still open', async () => {
   const { db, path } = await ledger();
   // A weekly rule left behind for more than seven years (the form refuses a past date; a long absence or an old
-  // restore can still produce it).
+  // restore can still produce it), and a healthy monthly rule.
   await saveRecurringRule(db, rule({ id: 'stale', frequency: 'weekly', anchorDateISO: '2026-01-01', nextDateISO: '2026-01-01' }));
   await saveRecurringRule(db, rule({ id: 'rent', anchorDateISO: '2033-06-01', nextDateISO: '2033-06-01' }));
   const opened = await openLedger(databaseAt(path), '2033-06-02');
-  assert.deepEqual(opened.recurringFailures, ['stale']);
+  assert.deepEqual(opened.recurringFailures, []);
+  assert.equal(opened.recurringError, false);
   assert.deepEqual(await datesOf(db, 'rent'), ['2033-06-01'], 'the healthy rule was recorded');
-  assert.deepEqual(await datesOf(db, 'stale'), [], 'nothing of the stale rule was recorded');
+  const expected = weeklyDates('2026-01-01', 388); // 2026-01-01 … 2033-06-02, every Thursday
+  assert.equal(expected.at(-1), '2033-06-02');
+  assert.deepEqual(await datesOf(db, 'stale'), expected, 'every date, in order, none dropped past 366');
   const stale = await ruleOf(db, 'stale');
-  assert.equal(stale.nextDateISO, '2026-01-01', 'the stale rule is untouched, waiting for the person');
-  assert.equal(stale.active, true);
-  // Controlled recovery: "Continuar desde hoy" is resume from today; the backlog is never recorded.
-  await saveRecurringRule(db, resumeRecurringRule(stale, '2033-06-02', '2033-06-02T12:00:00.000Z'));
-  const next = await openLedger(databaseAt(path), '2033-06-02');
-  assert.deepEqual(next.recurringFailures, []);
-  assert.equal((await ruleOf(db, 'stale')).nextDateISO, '2033-06-09', 'today was recorded; the rule runs on its weekday again');
-  assert.deepEqual(await datesOf(db, 'stale'), ['2033-06-02']);
+  assert.equal(stale.nextDateISO, '2033-06-09');
+  assert.equal(recurringNeedsReview(stale, '2033-06-02'), false, 'nothing is left for the person to review');
+  // Idempotent: opening again records nothing more.
+  await openLedger(databaseAt(path), '2033-06-02');
+  assert.equal((await readArchive(db)).records.length, 389);
 });
 
-test('the 366 limit is the boundary: 366 pending dates are recorded, 367 are set aside', async () => {
+test('the 366 boundary: 366 dates are one step; 367 and 733 are recorded in full over two and three steps', async () => {
+  for (const count of [366, 367, 733]) {
+    const { db } = await ledger();
+    const dates = weeklyDates('2026-01-01', count);
+    await saveRecurringRule(db, rule({ id: 'edge', frequency: 'weekly', anchorDateISO: '2026-01-01', nextDateISO: '2026-01-01' }));
+    const result = await catchUpRecurring(db, dates.at(-1)!, '2040-01-01T12:00:00.000Z');
+    assert.equal(result.created, count, String(count));
+    assert.deepEqual(result.behind, []);
+    assert.deepEqual(await datesOf(db, 'edge'), dates);
+    // One revision per step: a normal catch-up (one step) is exactly what it was before.
+    assert.equal((await ruleOf(db, 'edge')).revision, Math.ceil(count / 366), 'one committed step per 366 dates');
+  }
+});
+
+test('an interruption between batches keeps the steps already written; the next launch resumes without duplicates', async () => {
+  const { db, path } = await ledger();
+  await saveRecurringRule(db, rule({ id: 'stale', frequency: 'weekly', anchorDateISO: '2026-01-01', nextDateISO: '2026-01-01' }));
+  // The second step dies on disk (an app killed mid catch-up): its transaction rolls back as a whole.
+  let steps = 0;
+  const failing: LedgerDatabase = { ...db, withExclusiveTransactionAsync: work => {
+    steps++;
+    return db.withExclusiveTransactionAsync(tx => work(steps < 2 ? tx : { ...tx, runAsync: async (sql, ...params) => {
+      if (sql.startsWith('INSERT INTO entries')) throw new Error('Killed mid catch-up');
+      return tx.runAsync(sql, ...params);
+    } }));
+  } };
+  await assert.rejects(catchUpRecurring(failing, '2033-06-02', '2033-06-02T12:00:00.000Z', { batchSize: 100 }), /Killed/);
+  assert.deepEqual(await datesOf(db, 'stale'), weeklyDates('2026-01-01', 100), 'the first step is durable');
+  assert.equal((await ruleOf(db, 'stale')).nextDateISO, weeklyDates('2026-01-01', 101)[100], 'the rule advanced with it, not further');
+  // Relaunch: the rest, once.
+  await openLedger(databaseAt(path), '2033-06-02');
+  assert.deepEqual(await datesOf(db, 'stale'), weeklyDates('2026-01-01', 388));
+  assert.equal(new Set((await readArchive(db)).records.map(record => record.entry.id)).size, 388);
+});
+
+test('a backlog replayed over occurrences already recorded, edited or undone never duplicates them or undoes the person’s changes', async () => {
+  const { db, path } = await ledger();
+  await saveRecurringRule(db, rule({ id: 'stale', frequency: 'weekly', anchorDateISO: '2026-01-01', nextDateISO: '2026-01-01' }));
+  await catchUpRecurring(db, '2033-06-02', '2033-06-02T12:00:00.000Z', { batchSize: 100, maxSteps: 2 });
+  const records = (await readArchive(db)).records;
+  assert.equal(records.length, 200, 'two steps, then the pass stops (bounded launch)');
+  const edited = records.find(record => record.entry.dateISO === '2026-01-08')!;
+  const undone = records.find(record => record.entry.dateISO === '2027-01-07')!;
+  await changeEntry(db, makeEntryChange('edit', edited, 'edit', '2033-06-02T13:00:00.000Z', { ...edited.entry, amountMinor: 4321 }));
+  await changeEntry(db, makeEntryChange('void', undone, 'void', '2033-06-02T13:00:01.000Z'));
+  // The rule is moved back to its first date (an old restore, a manual correction): every date is materialized again.
+  const saved = await ruleOf(db, 'stale');
+  await saveRecurringRule(db, { ...saved, nextDateISO: '2026-01-01', revision: saved.revision + 1, updatedAt: '2033-06-02T13:01:00.000Z' });
+  const opened = await openLedger(databaseAt(path), '2033-06-02');
+  assert.deepEqual(opened.recurringFailures, []);
+  const after = (await readArchive(db)).records;
+  assert.equal(after.length, 388, 'each date exactly once');
+  assert.equal(after.find(record => record.entry.id === edited.entry.id)!.entry.amountMinor, 4321, 'the edit stands');
+  assert.equal(after.find(record => record.entry.id === undone.entry.id)!.voided, true, 'the undo stands');
+});
+
+test('one launch is bounded: a rule still behind after the step limit continues on the next launch, with no date lost', async () => {
   const { db } = await ledger();
-  // 2026-01-01 + 365 weeks = the 366th weekly date.
-  const day366 = new Date(Date.UTC(2026, 0, 1 + 365 * 7)).toISOString().slice(0, 10);
-  await saveRecurringRule(db, rule({ id: 'edge', frequency: 'weekly', anchorDateISO: '2026-01-01', nextDateISO: '2026-01-01' }));
-  assert.equal(await processRecurring(db, day366), 366);
-  const { db: other } = await ledger();
-  const day367 = new Date(Date.UTC(2026, 0, 1 + 366 * 7)).toISOString().slice(0, 10);
-  await saveRecurringRule(other, rule({ id: 'edge', frequency: 'weekly', anchorDateISO: '2026-01-01', nextDateISO: '2026-01-01' }));
-  assert.equal(await processRecurring(other, day367), 0);
-  assert.equal((await ruleOf(other, 'edge')).nextDateISO, '2026-01-01');
+  await saveRecurringRule(db, rule({ id: 'stale', frequency: 'weekly', anchorDateISO: '2026-01-01', nextDateISO: '2026-01-01' }));
+  const first = await catchUpRecurring(db, '2033-06-02', '2033-06-02T12:00:00.000Z', { batchSize: 50, maxSteps: 3 });
+  assert.equal(first.created, 150);
+  assert.deepEqual(first.behind, ['stale']);
+  const second = await catchUpRecurring(db, '2033-06-02', '2033-06-02T12:00:01.000Z', { batchSize: 50 });
+  assert.equal(second.created, 238);
+  assert.deepEqual(second.behind, []);
+  assert.deepEqual(await datesOf(db, 'stale'), weeklyDates('2026-01-01', 388));
+});
+
+test('an ordinary late opening (3 to 11 days) is one step and records the same movements as before', async () => {
+  for (const late of [3, 11]) {
+    const { db } = await ledger();
+    await saveRecurringRule(db, rule({ id: 'm', anchorDateISO: '2026-03-05', nextDateISO: '2026-03-05' }));
+    await saveRecurringRule(db, rule({ id: 'salary', kind: 'income', merchant: 'Sueldo', category: 'Sueldo', anchorDateISO: '2026-03-01', nextDateISO: '2026-03-01' }));
+    const today = '2026-03-' + String(5 + late).padStart(2, '0');
+    const result = await catchUpRecurring(db, today, today + 'T12:00:00.000Z');
+    assert.equal(result.created, 2);
+    assert.deepEqual([await datesOf(db, 'm'), await datesOf(db, 'salary')], [['2026-03-05'], ['2026-03-01']]);
+    assert.equal((await ruleOf(db, 'm')).revision, 1, 'one step');
+  }
+});
+
+test('an old backup restored years later records its rules’ whole backlog, in batches, once', async () => {
+  const { db } = await ledger();
+  await saveRecurringRule(db, rule({ id: 'stale', frequency: 'weekly', anchorDateISO: '2026-01-01', nextDateISO: '2026-01-01' }));
+  const backup = parsePilotBackup(JSON.stringify(createRecoveryBackup(await readArchive(db)))).archive;
+  const { db: fresh } = await ledger();
+  await importArchive(fresh, backup, archiveKey(await readArchive(fresh)));
+  await openLedger(fresh, '2033-06-02');
+  await openLedger(fresh, '2033-06-02');
+  assert.deepEqual(await datesOf(fresh, 'stale'), weeklyDates('2026-01-01', 388));
 });
 
 // Before 24UX5: a rule whose next date was set back onto a day it had already recorded, after the person edited that

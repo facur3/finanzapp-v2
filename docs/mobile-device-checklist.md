@@ -61,6 +61,8 @@ text size. Use your own small test data; never seed movements.
   opening day) the next time the app opens or comes back to the foreground.
 - [ ] The empty state, the form's note and the detail's Registrados caption say FinanzApp adds the
   movement when it comes due and that it does not pay, collect or confirm a bank payment.
+- [ ] No cosmetic re-check is needed for the backlog fix (review of `2a04d76`): a rule hundreds of dates behind
+  is covered by automated real-SQLite and rendered-screen tests (`recurring-audit.node.ts`, `polish-routes`).
 - [ ] (Only if one exists; never forge one.) A rule reading «Revisar» in amber: its detail explains
   since when it was not recorded and offers «Continuar desde hoy»; tapping it records nothing for the
   past dates and brings the rule back to its next date.

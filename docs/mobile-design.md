@@ -881,8 +881,8 @@ persona; la categoría sigue en la leyenda de la fila. Solo en desarrollo,
   y abre la regla.
 - **Suscripción pausada**: en Pausados, tinta plena, «Pausado» en lugar del día, VoiceOver dice
   «pausado».
-- La conciliación futura (esperado → pagado / omitido / atrasado, sugerencias confirmadas por la
-  persona) está en merchant-identity.md §5; no se implementa ahora.
+- Los recurrentes se registran solos (decisión del propietario, revisión de la PR #59): no hay
+  conciliación ni confirmación por regla, ni ahora ni en el roadmap (merchant-identity.md §5).
 
 ### Lo que cambió visualmente (para comparar en el iPhone)
 
@@ -1147,8 +1147,8 @@ esquema para esta entrega. Las notas buscables de gastos e ingresos quedan en la
 
 ### Recurrentes: un estado nuevo, solo si hace falta
 
-Una regla activa cuya próxima fecha ya pasó quedó apartada por la puesta al día (ver la auditoría en el
-roadmap, 24UX5). En su fila dice **«Revisar»** en ámbar donde iría el día (antes decía «Hoy», que era
+Un atraso largo se registra solo, en lotes, con sus fechas (ver la auditoría en el roadmap, 24UX5). Solo
+una regla activa que una falla real dejó con la próxima fecha en el pasado queda para revisar. En su fila dice **«Revisar»** en ámbar donde iría el día (antes decía «Hoy», que era
 falso); su detalle explica desde cuándo no se registra y ofrece **«Continuar desde hoy»** (reanudar desde
 hoy: no registra las fechas atrasadas). Los textos distinguen tres cosas: el movimiento que FinanzApp
 anota («lo anota en tus movimientos cuando vence»), un pago o cobro del banco («no confirman un pago del

@@ -117,8 +117,10 @@ Today (unchanged by 24UX2; audited and pinned by `tests/recurring-audit.node.ts`
 `rec_<ruleId>_<yyyymmdd>`; a retry, a restore or a second device session can never post it twice
 (an occurrence whose id is already in the ledger counts as recorded, even if the person edited or undid
 it). The rule then advances its next date. Pausing stops the postings. A rule the catch-up cannot record
-(more than 366 pending dates) is set aside unchanged, never blocks the other rules or the opening of the
-data, and reads «Revisar» in Recurrentes until the person continues it from today. «Recorded by
+because of a real failure is left unchanged, never blocks the other rules, Recurrentes or the opening of
+the data, and reads «Revisar» in Recurrentes until the person continues it from today. A long backlog is
+not a failure: it is recorded automatically in durable batches of at most 366 dates, each with its original
+date and id, resuming after an interruption without duplicates (24UX5 review). «Recorded by
 FinanzApp» is never «paid by the bank»: the app executes and confirms no payment.
 
 How the screens now tell the states apart:

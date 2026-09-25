@@ -157,8 +157,8 @@ file).
   form, prefilled), closed (listed under Cerradas), reopened or deleted, from a trailing swipe on
   its row or from its detail; deleting asks first and leaves every recorded movement, payment and
   collection in the ledger. 24UX5 (on its branch): the catch-up runs on launch and on every return to the
-  foreground and is pinned by real-SQLite tests; one rule can no longer keep the whole ledger closed (a rule it
-  cannot record is set aside and reads «Revisar» in Recurrentes, with «Continuar desde hoy»), and an occurrence
+  foreground and is pinned by real-SQLite tests; a long backlog is recorded automatically in durable batches
+  with its original dates (one rule can no longer keep the ledger or Recurrentes closed), and an occurrence
   already in the ledger counts as recorded even after the person edited or undid it. No instalment plans yet.
 - **Merchant identity (24UX2).** `packages/domain/merchants.ts`: normalized merchant keys, a
   curated catalogue of 35 unambiguous brands matched only by exact alias, never a category; the
@@ -546,22 +546,36 @@ the owner authorises it; no EAS build or store submission without the owner.
   closed is recorded with the due date; expenses and incomes both; five opens and foregrounds never record
   twice; pausing then resuming never records the paused dates; deleting never records again and keeps the
   recorded history; weekly, monthly and yearly calendars across month ends, a leap day, the turn of the
-  year and an open several days late; the 366-date boundary. Nothing runs while the app is closed: the
-  catch-up happens on the next open or foreground, dated on the due day.
+  year and an open several days late; the 366-date boundary and backlogs of 367 and 733 dates recorded in
+  full; an interruption between batches; a backlog replayed over edited and undone occurrences; the per-launch
+  step bound; an old backup restored years later. Nothing runs while the app is closed: the catch-up happens
+  on the next open or foreground, dated on the due day.
 - **Found and fixed.**
   - *One rule could keep every screen closed.* `recurringOccurrencesThrough` throws past 366 pending dates
     (a weekly rule untouched for seven years, an old restore), and `processRecurring` ran every rule in one
     transaction whose failure made LedgerProvider show «No pudimos abrir tus datos» on every launch.
-    Now `catchUpRecurring` materializes each rule on its own (the SQLite writes remain one transaction): a
-    rule whose occurrences cannot be materialized is set aside unchanged and reported, the others are
-    recorded, and the ledger opens. A rule that fails validation is still refused by `readArchive` before the
-    catch-up (as before) and is not isolated by it; no such rule can be saved through the app. `openLedger`/`refreshLedger`
-    (`src/storage/ledger-session.ts`) never let the catch-up fail an open: a catch-up that fails as a whole
-    leaves the ledger as it was (one transaction) and shows the existing «No pudimos verificar…» banner over
-    the open app. The set-aside rule (active, next date before today: `recurringNeedsReview`) reads
-    «Revisar» in Recurrentes (it used to say «Hoy») and its detail offers «Continuar desde hoy», which is
-    `resumeRecurringRule`: the backlog is never recorded. The limit stays at 366: recording hundreds of
-    movements on its own is not something the app should do silently.
+    **Final implementation (after the review of `2a04d76`, owner's decision: automatic, nothing dropped):**
+    `catchUpRecurring` records any backlog automatically in **batches** of at most `RECURRING_BATCH_SIZE`
+    (366) dates per rule (`recurringDueBatch`, `materializeRecurringRule(…, limit)`), oldest first, each date
+    with its original due date and deterministic id. Each batch is one exclusive transaction (movements and
+    the rule's advance together), so an interruption keeps the batches already written and the next launch
+    resumes from the saved next date, never duplicating (an id already in the ledger, edited, moved or undone,
+    counts as recorded). A normal catch-up (a few days) is one batch, as before. One launch runs at most 64
+    batches (about 23,000 dates per rule); a rule still behind continues on the next launch or foreground.
+    Memory per batch is bounded by the batch, not the backlog. Materialization is isolated per rule: a rule
+    whose dates cannot be materialized (a real failure; no known input reaches it) is left unchanged and
+    reported, the others are recorded. A rule that fails validation is refused earlier by `readArchive` (as
+    before). `openLedger`/`refreshLedger` (`src/storage/ledger-session.ts`) never let the catch-up fail an
+    open: a failing batch rolls back alone, the earlier ones stay, and the existing «No pudimos verificar…»
+    banner shows over the open app. Only a rule left behind by a real failure reads «Revisar» in Recurrentes
+    (`recurringNeedsReview`; it used to say «Hoy»), with «Continuar desde hoy» (`resumeRecurringRule`) as the
+    person's explicit choice.
+  - *Recurrentes crashed on the same rule.* `recurringForecastByCurrency` walked each rule's whole backlog
+    with the 366 guard during render, so the screen threw exactly when a rule was far behind (review thread
+    on `recurring.tsx`). The projection now counts only dates inside its window
+    (`recurringOccurrencesBetween`: past dates are walked, never collected) and leaves out, per rule, one it
+    cannot read; the other rules stay listed. A rendered-screen test covers a rule 800+ dates behind beside a
+    normal one.
   - *An edited occurrence could also block the app.* A rule moved back onto a day it had already recorded
     (the price changed: edit today's movement, then the rule with a new amount and today's date) threw «Un
     vencimiento recurrente coincide con otro movimiento distinto» inside the same catch-up, on every launch.
@@ -608,6 +622,15 @@ the owner authorises it; no EAS build or store submission without the owner.
     `recurring-audit`; the Home account test rewritten for the visible-rows rule), root `npm test` 299/299,
     `check:repo`, `typecheck`, `currency:verify`, `regions:verify`, `i18n:check -- --strict`, `i18n:extract`,
     `check`, `export:ios`.
+  - **Review of `2a04d76`** (two review threads): Recurrentes no longer crashes on a rule far behind (the
+    forecast counts only its window, per rule, defensively), and a backlog past 366 dates is recorded
+    automatically in durable batches with its original dates instead of being set aside (details above).
+    Checked: root `npm test` 302/302 (+3 `recurring.test.ts`: batches, materialization to completion, the
+    windowed forecast), mobile `test:storage` 653/653 (+5 net in `recurring-audit.node.ts` on real SQLite:
+    the backlog recorded in full, 366/367/733, an interruption between batches, a replay over edited and undone
+    occurrences, the per-launch bound, an ordinary 3–11-day late opening, an old backup restored years later;
+    +1 `polish-routes`: the rendered Recurrentes screen with a stale and a normal rule, which fails on the
+    previous code), plus every other gate below.
   - **Pending:** the device QA of §2 (checklist, Producto 24UX5).
 
 ### Producto 24R2 — international regions released

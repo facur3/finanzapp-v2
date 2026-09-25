@@ -97,7 +97,11 @@ export function recurringForecastByCurrency(rules: readonly RecurringRule[], acc
     const account = accounts.find(item => item.id === rule.accountId);
     if (!account) continue;
     assertStorableCurrency(account.currency);
-    const occurrences = recurringOccurrencesThrough(rule, through).length;
+    // 24UX5 review: only the dates inside the window count, whatever the rule's backlog. A rule still catching up
+    // (its next date before today) never throws here and never pushes its past dates into "the next 30 days"; a rule
+    // whose calendar cannot be read is left out of the projection instead of failing the whole screen.
+    let occurrences = 0;
+    try { occurrences = recurringOccurrencesBetween(rule, dayISO, through); } catch { continue; }
     if (!occurrences) continue;
     const current = sums.get(account.currency) ?? { expense: 0n, income: 0n, count: 0 };
     current[rule.kind] += BigInt(rule.amountMinor) * BigInt(occurrences);
@@ -135,6 +139,44 @@ export function advanceRecurringDate(currentISO: string, frequency: RecurringFre
   return toISO(new Date(year, month, Math.min(anchor.getDate(), daysInMonth(year, month)), 12));
 }
 
+/** How many dates of an active rule fall between `fromISO` and `throughISO`, both included. Dates before `fromISO` are
+ * walked over, never collected, so a long backlog costs time proportional to it and no memory. */
+export function recurringOccurrencesBetween(rule: RecurringRule, fromISO: string, throughISO: string): number {
+  if (!validDateISO(fromISO) || !validDateISO(throughISO)) throw new Error('Fecha de procesamiento inválida.');
+  if (!rule.active || rule.deleted) return 0;
+  let next = rule.nextDateISO, count = 0;
+  while (next <= throughISO) {
+    if (next >= fromISO) count++;
+    const advanced = advanceRecurringDate(next, rule.frequency, rule.anchorDateISO);
+    if (advanced <= next) throw new Error('La frecuencia recurrente no avanza.');
+    next = advanced;
+  }
+  return count;
+}
+
+/** How many due dates one catch-up step records per rule (24UX5 review). A backlog larger than this is recorded in
+ * several steps, each durable on its own, with every date kept; see `materializeRecurringRule`. */
+export const RECURRING_BATCH_SIZE = 366;
+
+/** The first `limit` due dates of an active rule through `throughDateISO`, oldest first, and whether that was all of
+ * them. Never throws for a long backlog: the caller records this batch and asks again. */
+export function recurringDueBatch(rule: RecurringRule, throughDateISO: string, limit = RECURRING_BATCH_SIZE): { dates: string[]; complete: boolean } {
+  if (!validDateISO(throughDateISO)) throw new Error('Fecha de procesamiento inválida.');
+  if (!Number.isInteger(limit) || limit < 1) throw new Error('Límite de vencimientos inválido.');
+  if (!rule.active || rule.nextDateISO > throughDateISO) return { dates: [], complete: true };
+  const dates: string[] = [];
+  let next = rule.nextDateISO;
+  while (next <= throughDateISO && dates.length < limit) {
+    dates.push(next);
+    const advanced = advanceRecurringDate(next, rule.frequency, rule.anchorDateISO);
+    if (advanced <= next) throw new Error('La frecuencia recurrente no avanza.');
+    next = advanced;
+  }
+  return { dates, complete: next > throughDateISO };
+}
+
+/** Every due date through `throughDateISO` at once, refusing a backlog over `limit` (a guard for callers that need the
+ * whole list; the catch-up uses `recurringDueBatch`). */
 export function recurringOccurrencesThrough(rule: RecurringRule, throughDateISO: string, limit = 366): string[] {
   if (!validDateISO(throughDateISO)) throw new Error('Fecha de procesamiento inválida.');
   if (!rule.active || rule.nextDateISO > throughDateISO) return [];
@@ -174,11 +216,15 @@ export function recurringHistory(rule: Pick<RecurringRule, 'id'>, entries: reado
     .sort((a, b) => b.dateISO.localeCompare(a.dateISO) || b.id.localeCompare(a.id));
 }
 
-export function materializeRecurringRule(rule: RecurringRule, accounts: Account[], throughDateISO: string, nowISO: string) {
+/** The movements of one catch-up step: at most `limit` due dates, each with its original date and deterministic id,
+ * and the rule advanced past the last of them. `complete` is false while older dates remain; recording the step and
+ * asking again finishes the backlog (24UX5 review), so no date is ever dropped and a step interrupted before its
+ * write leaves the rule where it was. */
+export function materializeRecurringRule(rule: RecurringRule, accounts: Account[], throughDateISO: string, nowISO: string, limit = RECURRING_BATCH_SIZE) {
   validateRecurringRule(rule, accounts);
   if (!validTimestamp(nowISO)) throw new Error('Fecha de actualización inválida.');
-  const dates = recurringOccurrencesThrough(rule, throughDateISO);
-  if (!dates.length) return { entries: [] as Entry[], rule };
+  const { dates, complete } = recurringDueBatch(rule, throughDateISO, limit);
+  if (!dates.length) return { entries: [] as Entry[], rule, complete: true };
   const entries = dates.map(dateISO => {
     const entry: Entry = {
       id: recurringEntryId(rule.id, dateISO),
@@ -199,7 +245,7 @@ export function materializeRecurringRule(rule: RecurringRule, accounts: Account[
   }
   const nextRule: RecurringRule = { ...rule, nextDateISO, revision: rule.revision + 1, updatedAt: nowISO };
   validateRecurringRule(nextRule, accounts);
-  return { entries, rule: nextRule };
+  return { entries, rule: nextRule, complete };
 }
 
 export function moveRecurringForward(rule: RecurringRule, throughDateISO: string, nowISO: string, accounts: Account[]): RecurringRule {
@@ -239,10 +285,10 @@ export function deleteRecurringRule(rule: RecurringRule, nowISO: string): Recurr
   return { ...rule, active: false, deleted: true, revision: rule.revision + 1, updatedAt: nowISO };
 }
 
-/** Producto 24UX5: an active rule whose next date is already before today was set aside by the catch-up (it runs on
- * every launch and return to the foreground through today, so a healthy rule's next date is always after today, or
- * today itself between midnight and the next foreground). It records nothing on its own until the person decides:
- * continuing from today (`resumeRecurringRule`) never records the backlog. */
+/** Producto 24UX5: an active rule whose next date is still before today after a catch-up could not be recorded (the
+ * catch-up runs on every launch and return to the foreground through today and records any backlog in batches, so a
+ * healthy rule's next date is after today, or today itself between midnight and the next foreground). Only a real
+ * failure leaves it there; the person may continue it from today (`resumeRecurringRule`) or pause it. */
 export function recurringNeedsReview(rule: Pick<RecurringRule, 'active' | 'deleted' | 'nextDateISO'>, todayISO: string): boolean {
   return rule.active && !rule.deleted && rule.nextDateISO < todayISO;
 }
