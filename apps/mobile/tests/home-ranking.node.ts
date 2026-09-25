@@ -45,7 +45,7 @@ function harness() {
     './motion': { easeOut: 'ease-out', timing: (kind: string, reduced: boolean) => ({ duration: reduced ? 0 : 260 }) },
     './report-presentation': presentation,
     './budget-presentation': budgetPresentation,
-    './theme': { useReduceMotion: () => env.reduced, usePalette: () => ({ line: '#ddd', isDark: true }) },
+    './theme': { useReduceMotion: () => env.reduced, usePalette: () => ({ line: '#ddd', isDark: true, secondary: '#A0A0A8', tertiary: '#7C7C84' }) },
   };
   const module = { exports: {} as Record<string, any> };
   runInNewContext(code, { module, exports: module.exports, require: (name: string) => {
@@ -196,6 +196,8 @@ test('the metric help opens a native alert whose button is named in the interfac
       env.alerts.length = 0;
       const help = exports.MetricHelp({ title: 'Disponible', detail: 'Es el dinero registrado.' });
       assert.equal(help.props.accessibilityLabel, locale === 'es-AR' ? 'Qué significa Disponible' : 'What Disponible means');
+      assert.equal(help.props.accessibilityRole, 'button');
+      assert.deepEqual([help.props.children.type, help.props.children.props.color, help.props.children.props.size], ['Ionicons', '#A0A0A8', 18], '24UX1: the glyph is a control drawn in secondary ink, never tertiary');
       help.props.onPress();
       assert.equal(JSON.stringify(env.alerts), JSON.stringify([['Disponible', 'Es el dinero registrado.', [{ text: 'OK', style: 'cancel' }]]]), locale + ': one explicit button from the catalogue, still the cancel action (Esc and the escape gesture close it)');
     }
