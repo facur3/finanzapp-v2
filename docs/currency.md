@@ -1,6 +1,6 @@
 # FinanzApp mobile: currencies and the multi-currency engine
 
-Updated 2026-09-24 (Producto 24B5). Applies to the Expo app in `apps/mobile` and the
+Updated 2026-09-24 (Producto 24B6). Applies to the Expo app in `apps/mobile` and the
 shared `packages/domain`. The web/Capacitor app keeps its own float-based helpers
 (`src/domain/currency.js`) and is not changed. Read with [decision 002](decisions/002-spending-first.md)
 (ARS/USD kept apart, no invented rates), [docs/i18n.md](i18n.md) §9 and the roadmap's
@@ -135,6 +135,14 @@ helpers `fmtNum` and `parseMoneyInput` (they had no native consumer).
 **Cost:** the catalogue and the es/en names add 62,074 bytes (1.3%) to the iOS Hermes
 bundle (`expo export --platform ios`: 4,806,630 bytes at master 1181ed1, 4,868,704 with
 24A). Everything is loaded from committed tables; nothing is read from the device's `Intl`.
+
+### 2.6 What Producto 24B6 delivers (corrections after the owner's iPhone tests; the gate untouched)
+
+| Layer | File | Change |
+| --- | --- | --- |
+| The display currency | `src/ui/display-currency.ts`, `display-currency-provider.tsx`, `app/(tabs)/index.tsx`, `app/(tabs)/reports.tsx`, `app/_layout.tsx` | One preference, `finanzapp.displayCurrency`, in the key-value store beside the language and the region (never in SQLite, never in a backup, never an account's currency): which of the currencies held Inicio and Reportes show. Read as a storable code or ignored; resolved against the currencies present (a preference no account holds any more shows the first currency held, ARS in an empty ledger, and is kept, not rewritten); applied to every subscriber at once and written (an unwritable store keeps the choice for the session and reports it). A Reportes route naming a held currency shows it and makes it the shared choice, once; anything else is ignored. It is a **filter**: nothing is converted. It is **not** §8.3's `reportCurrency` (the currency conversions will be expressed in), which stays a separate future key; the onboarding may set both. |
+| Card rules | `packages/domain/liabilities.ts`, `src/storage/database.ts` | `assertIncomeAccount` (a new income posts to cash only), `keepsHistoricalCardIncome` (a stored card income is corrected or restored in place), `postingAccountsFor`, `assertTransferSides` (a card is never a source; two obligations never face each other) and `sameTransferSides`, applied to new rows and to edits that change sides; reads, imports and exports unchanged. A currency-neutral rule: it holds for any account currency the ledger accepts. |
+| Not changed | `LEDGER_CURRENCIES`, `PREVIEW_CURRENCIES`, the catalogue, SQLite 9, backup v9, contract v1 | The gate-opening commit waits for the recorded device evidence (§7.6.1). No rate, no conversion, no catalogue edit. |
 
 ### Availability status
 
@@ -719,7 +727,7 @@ limited to ARS/USD until the next server contract is implemented and tested (7.6
 first option). 7.6.1 (which currencies open first) and 7.6.4 (the default when nothing
 implies a currency) remain open; ARS stays the pilot's default meanwhile.
 
-1. **The first currencies to open.** Proposal (24B5, pending the device tests): EUR, GBP (two decimals), JPY and CLP (none) in the first commit; the three-decimal currencies (KWD, BHD, JOD, OMR, TND, LYD, IQD) in a second one after their VoiceOver check. Either a curated first list (for example the currencies of the first international users, including one without decimals) or all 151 `ready` currencies at once. Recommendation: curated. Open three-decimal currencies (BHD, IQD, JOD, KWD, LYD, OMR, TND) only after their VoiceOver check on a device.
+1. **The first currencies to open.** Proposal (24B5, pending the device tests): EUR, GBP (two decimals), JPY and CLP (none) in the first commit; the three-decimal currencies (KWD, BHD, JOD, OMR, TND, LYD, IQD) in a second one after their VoiceOver check. **Status 2026-09-24 (24B6):** the owner reported the 24B5 iPhone tests done and merged PR #51, but no per-item result (number pad, VoiceOver es/en on JPY and CLP, the searchable sheet at large text and with Reduce Motion, a v9 export/restore) is recorded in docs/mobile-device-checklist.md, so the commit is still not applied; the minimum evidence is listed in docs/mobile-roadmap.md (Producto 24B6 status). The commit stays one line in `LEDGER_CURRENCIES` plus the stage-9 tests of §7.5. Either a curated first list (for example the currencies of the first international users, including one without decimals) or all 151 `ready` currencies at once. Recommendation: curated. Open three-decimal currencies (BHD, IQD, JOD, KWD, LYD, OMR, TND) only after their VoiceOver check on a device.
 2. **What the currency screen lists.** Only currencies the ledger can hold (recommended), or also `ready` ones shown as unavailable. Either way, the region stays a search hint and never a preselection.
 3. **Budgets in a currency without an account.** Either allowed (a budget keeps its own code, and the scale is pinned per code) or limited to currencies the person holds accounts in.
 4. **The default when nothing implies a currency.** Today ARS is preselected for a new account in an empty ledger, a new card or debt, and the empty Home/Reports fallback (`new-account.tsx:26`, `card-form.tsx:29`, `debt-form.tsx:27`, `report-presentation.ts:9`). The options are:
@@ -819,7 +827,7 @@ carries its label, date and `fetchedAt`.
 
 - `reportCurrency: IsoCurrencyCode | null`, a key-value preference beside language and
   region, **outside the ledger and outside backups' financial data**, default `null`: reports
-  keep showing one total per currency, as today. It is never derived from the region or the
+  keep showing one total per currency, as today. It is distinct from the display currency of 24B6 (§2.6, `finanzapp.displayCurrency`), which only chooses which held currency Inicio and Reportes show and converts nothing. It is never derived from the region or the
   language, and choosing it never changes an account, a movement or a budget. The
   onboarding will offer it as its own step, after language and region.
 - Only reports and summaries convert. Balances, movements, budgets (one currency each),

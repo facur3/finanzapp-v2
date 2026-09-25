@@ -380,6 +380,33 @@ importe, moneda y estado.
   muestra hasta que toda la app lo tenga (23.1): un iPhone en inglés sigue leyendo
   español antes que media app traducida.
 
+## Producto 24B6 — hoja de fecha compacta, moneda compartida y reglas de tarjeta (sin rediseño)
+
+Tres correcciones tras la primera prueba del propietario en el iPhone; nada cambia en la composición
+de Inicio, en las cuatro acciones, en la pestaña central del Asistente ni en el material.
+
+- **La hoja de fecha.** La rueda nativa ya no viaja en una hoja de página casi vacía. En iOS abre una
+  tarjeta anclada al borde inferior, del alto de su contenido: asa, Cancelar · Elegir fecha · Listo,
+  la rueda centrada y el margen del indicador de inicio tomado del área segura. Superficie `surface`
+  en ambos temas (blanco / `#1C1C1E`), esquinas de 24 pt, un velo (`scrim`) que deja ver el
+  formulario. Motion propia del sistema: el velo se funde y la tarjeta sube con el tiempo de estado
+  (200 ms, ease-out) y baja con el de salida (100 ms), interrumpible; con Reduce Motion solo fundidos.
+  Cancelar, el velo y el gesto de volver descartan; solo Listo guarda. Cuenta, Categoría y Moneda
+  conservan su hoja de página: una lista que se desplaza necesita altura; una rueda, no. Se evaluó
+  la hoja nativa con detent (`formSheet` + `fitToContents` vía router) y queda para comparar en el
+  dispositivo: exige una ruta y un canal de vuelta al borrador, y su medida con una rueda nativa no
+  está verificada.
+- **Una moneda para Inicio y Reportes.** El selector de moneda de ambas pantallas escribe la misma
+  preferencia (`finanzapp.displayCurrency`, junto a idioma y región, fuera del libro y de las
+  copias). Misma presentación de antes: sin selector con una moneda, segmentado con dos, fila
+  compacta que abre la hoja buscable con tres o más. No hay un selector grande junto al importe y
+  no se convierte nada: la elección filtra.
+- **Tarjetas.** Ingreso ofrece solo cuentas normales; Gasto sigue ofreciendo cuentas y tarjetas
+  (la compra es un gasto que aumenta la deuda); Pagar tarjeta sigue fijando la tarjeta como destino;
+  la transferencia general nunca lista una tarjeta. Al cambiar Gasto → Ingreso con una tarjeta
+  elegida, el selector pasa a una cuenta de la misma moneda y recupera la tarjeta al volver, sin
+  saltos: mismo formulario, mismo estado.
+
 ## Producto 24B5 — selector de monedas y la moneda antes del importe (sin cambios visuales en producción)
 
 Con ARS y USD nada cambia: la fila «Moneda» de Cuenta nueva abre la misma hoja de siempre (dos filas,
@@ -626,6 +653,12 @@ Detalle en docs/currency.md §8–§10.
   fase de development build, no una capa de vidrio forzada encima).
 
 ## Pendiente de revisión en iPhone
+
+- Producto 24B6: la hoja de fecha (alto, centrado de la rueda, velo, subida y bajada, Reduce
+  Motion, ambos temas, Dynamic Type, VoiceOver, área segura); el cambio de moneda en Inicio visto
+  en Reportes y viceversa, y tras reabrir la app; Ingreso sin tarjetas, Registrar compra → Ingreso
+  → Gasto, Pagar tarjeta, la transferencia general. Lista completa en
+  docs/mobile-device-checklist.md (Producto 24B6).
 
 - Producto 23.1C1: nada visible debe cambiar en español-Argentina salvo el idioma de la
   rueda de fechas (ahora el de la app) y los conteos de más de mil en la revisión de una
