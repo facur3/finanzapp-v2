@@ -154,10 +154,16 @@ export function EntryForm({ original, accountId: requestedAccount, currency, kin
   return <Screen gap={space.l}>
     <Stack.Screen options={{ title, gestureEnabled: !busy,
       headerLeft: () => <IconButton name="close" label={t('common.close')} onPress={close} disabled={busy} /> }} />
-    {!accounts.length ? <EmptyState title={t('entryForm.noAccountTitle')} detail={t('entryForm.noAccountDetail')}
-      action={<ActionButton label={t('common.addAccount')} onPress={() => router.replace('/new-account')} />} /> : <>
-      {!onKindChange && <Choices<EntryKind> value={kind} onChange={setKind} disabled={locked}
-        options={[{ value: 'expense', label: t('movement.expense') }, { value: 'income', label: t('movement.income') }]} />}
+    {/* The form's own switch stays above the empty state of one kind, so Gasto is one tap away when Ingreso has no account. */}
+    {!onKindChange && accounts.length > 0 && <Choices<EntryKind> value={kind} onChange={setKind} disabled={locked}
+      options={[{ value: 'expense', label: t('movement.expense') }, { value: 'income', label: t('movement.income') }]} />}
+    {!eligibleAccounts.length ? <EmptyState title={t('entryForm.noAccountTitle')}
+      /* No account at all, or none this kind may post to (a card-only ledger asked for an income): the action adds a cash
+         account, pushed over the draft (the carried card's currency prefilled) so the modal and its fields come back. */
+      detail={t(accounts.length ? 'entryForm.noCashAccountDetail' : 'entryForm.noAccountDetail')}
+      action={<ActionButton label={t('common.addAccount')} onPress={() => accounts.length
+        ? router.push({ pathname: '/new-account', params: { currency: accounts.find(item => item.id === chosenAccountId)?.currency ?? currency ?? accounts[0].currency } })
+        : router.replace('/new-account')} />} /> : <>
       <AmountField currency={account?.currency ?? 'ARS'} value={amount} onChangeText={value => { setAmount(value); setError(null); }} editable={!locked} stored={stored ?? undefined}
         tone={kind === 'income' ? 'income' : 'neutral'} label={t(kind === 'expense' ? 'movement.expense' : 'movement.income')} />
       <View style={{ gap: space.m }}>

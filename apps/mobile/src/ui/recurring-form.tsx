@@ -118,11 +118,16 @@ export function RecurringForm({ original, accountId: requestedAccount }: { origi
   return <Screen gap={space.l}>
     <Stack.Screen options={{ title: t(before ? 'nav.titles.editRecurring' : 'nav.titles.newRecurring'), gestureEnabled: !busy,
       headerLeft: () => <IconButton name="close" label={t('common.close')} onPress={close} disabled={busy} /> }} />
-    {!accounts.length ? <EmptyState title={t('recurring.form.noAccountTitle')}
-      detail={t('recurring.form.noAccountDetail')}
-      action={<ActionButton label={t('common.addAccount')} onPress={() => router.replace('/new-account')} />} /> : <>
-      <Choices value={kind} onChange={setKind} disabled={locked}
-        options={[{ value: 'expense', label: t('movement.expense') }, { value: 'income', label: t('movement.income') }]} />
+    {/* The switch stays above the empty state of one kind, so Gasto is one tap away when Ingreso has no account. */}
+    {accounts.length > 0 && <Choices value={kind} onChange={setKind} disabled={locked}
+      options={[{ value: 'expense', label: t('movement.expense') }, { value: 'income', label: t('movement.income') }]} />}
+    {!eligibleAccounts.length ? <EmptyState title={t('recurring.form.noAccountTitle')}
+      /* No account at all, or none this kind may use (a card-only ledger asked for a recurring income): the action adds a
+         cash account, pushed over the draft with the carried card's currency prefilled, so the form and its fields come back. */
+      detail={t(accounts.length ? 'recurring.form.noCashAccountDetail' : 'recurring.form.noAccountDetail')}
+      action={<ActionButton label={t('common.addAccount')} onPress={() => accounts.length
+        ? router.push({ pathname: '/new-account', params: { currency: accounts.find(item => item.id === chosenAccountId)?.currency ?? accounts[0].currency } })
+        : router.replace('/new-account')} />} /> : <>
       {/* The account (and so the currency) before the amount (24B5): the field types with the right decimals from the first key. */}
       <AccountField label={t(kind === 'expense' ? 'entryForm.paidWith' : 'entryForm.receivedIn')} accounts={eligibleAccounts} value={accountId} onChange={setAccountId} disabled={locked} prominent
         kindOf={id => { const found = accounts.find(item => item.id === id); return found ? accountKindLabel(found, archive?.cards, archive?.debts, t) : t('accountKinds.account'); }}

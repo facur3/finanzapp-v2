@@ -9,6 +9,7 @@ export const forms: Pick<Messages, 'entryForm' | 'transferForm'> = {
     incomeTitle: 'Record income',
     noAccountTitle: 'First, an account',
     noAccountDetail: 'Every transaction needs an account to update its balance.',
+    noCashAccountDetail: 'Income is recorded in a regular account, not on a card. Add one to continue.',
     paidWith: 'Paid with',
     receivedIn: 'Received in',
     merchantExpense: 'Merchant or description',

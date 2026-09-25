@@ -1041,3 +1041,106 @@ test('24B6: a recurring income offers cash accounts only, a card chosen for a re
   const field = find(editing.render(), 'AccountField');
   assert.deepEqual([field.props.value, field.props.accounts.map((item: domain.Account) => item.id)], ['card-acc', ['a', 'card-acc']], 'its own card stays offered beside cash in that currency');
 });
+
+// ---- 24B6 review: a ledger holding only cards ---------------------------------------------------------------
+
+const cardOnly: domain.LedgerArchive = { accounts: [cardAccount, { ...cardAccount, id: 'usd-card', name: 'Visa USD', currency: 'USD' }], records: [],
+  cards: [card, { ...card, id: 'usd', accountId: 'usd-card' }] };
+
+test('24B6 review: with only cards, Gasto still records a card purchase; Ingreso shows the no-account state with Agregar cuenta (pushed, the card\'s currency prefilled) and keeps the expense draft for the way back; a mixed ledger never shows it', async () => {
+  let kind = 'expense';
+  const view = harness('src/ui/entry-form.tsx', { get kind() { return kind; }, accountId: 'usd-card', onKindChange: () => {} }, { data: cardOnly });
+  let root = view.render();
+  assert.deepEqual([find(root, 'AccountField').props.value, find(root, 'AccountField').props.accounts.map((item: domain.Account) => item.id)], ['usd-card', ['card-acc', 'usd-card']]);
+  assert.equal(find(root, 'Stack.Screen').props.options.title, 'Compra con tarjeta');
+  assert.equal(nodes(root).some(node => node.type === 'EmptyState'), false);
+  find(root, 'AmountField').props.onChangeText('12,50');
+  find(root, 'Field').props.onChangeText('Steam');
+  kind = 'income';
+  root = view.render();
+  const empty = find(root, 'EmptyState');
+  assert.equal(empty.props.title, 'Primero, una cuenta');
+  assert.equal(empty.props.detail, 'Un ingreso se registra en una cuenta normal, no en una tarjeta. Agregá una para continuar.');
+  assert.equal(nodes(root).some(node => node.type === 'AccountField' || node.type === 'AmountField' || node.type === 'ActionButton' && node.props.label !== 'Agregar cuenta'), false, 'no empty picker, no disabled Save');
+  assert.equal(nodes(root).some(node => node.type === 'Choices'), false, 'the host owns the Gasto / Ingreso switch');
+  empty.props.action.props.onPress();
+  assert.equal(JSON.stringify(view.pushed[0]), JSON.stringify({ pathname: '/new-account', params: { currency: 'USD' } }), 'pushed over the modal, in the carried card\'s currency');
+  kind = 'expense';
+  root = view.render();
+  assert.equal(nodes(root).some(node => node.type === 'EmptyState'), false);
+  assert.deepEqual([find(root, 'AccountField').props.value, find(root, 'AmountField').props.value, find(root, 'Field').props.value], ['usd-card', '12,50', 'Steam'], 'the draft and the card survive the round trip');
+  find(root, 'CategoryField').props.onChange('Juegos');
+  await find(view.render(), 'ActionButton').props.onPress();
+  assert.deepEqual([view.additions[0].kind, view.additions[0].accountId, view.additions[0].amountMinor], ['expense', 'usd-card', 1250], 'a card purchase, saved once');
+  // The form's own switch stays visible above the empty state, so Gasto is one tap away.
+  const own = harness('src/ui/entry-form.tsx', { kind: 'income', accountId: 'card-acc' }, { data: cardOnly });
+  root = own.render();
+  assert.equal(find(root, 'EmptyState').props.title, 'Primero, una cuenta');
+  assert.equal(find(root, 'Choices').props.value, 'income');
+  find(root, 'Choices').props.onChange('expense');
+  root = own.render();
+  assert.equal(nodes(root).some(node => node.type === 'EmptyState'), false);
+  assert.equal(find(root, 'AccountField').props.value, 'card-acc');
+  // An empty ledger keeps the original no-account state (replace, no currency).
+  const none = harness('src/ui/entry-form.tsx', { kind: 'income' }, { data: { accounts: [], records: [] } });
+  root = none.render();
+  assert.equal(find(root, 'EmptyState').props.detail, 'Cada movimiento necesita una cuenta para actualizar su saldo.');
+  assert.equal(nodes(root).some(node => node.type === 'Choices'), false, 'nothing to switch between without an account');
+  find(root, 'EmptyState').props.action.props.onPress();
+  assert.equal(none.pushed[0], '/new-account');
+  // A mixed ledger: an income lands on cash, never on the empty state.
+  const mixed = harness('src/ui/entry-form.tsx', { kind: 'income', accountId: 'card-acc' }, { data: liabilityData });
+  root = mixed.render();
+  assert.equal(nodes(root).some(node => node.type === 'EmptyState'), false);
+  assert.equal(find(root, 'AccountField').props.value, 'a');
+});
+
+test('24B6 review: a historical card income in a card-only ledger still opens on its card and saves there with the same identity and revision', async () => {
+  const refund: domain.Entry = { ...entry, id: 'refund', kind: 'income', accountId: 'card-acc', amountMinor: 2500, merchant: 'Devolución', category: 'Café' };
+  const data: domain.LedgerArchive = { ...cardOnly, records: [domain.initialRecord(refund)] };
+  const view = harness('src/ui/entry-form.tsx', { original: domain.initialRecord(refund) }, { data });
+  let root = view.render();
+  assert.equal(nodes(root).some(node => node.type === 'EmptyState'), false, 'its own card is eligible');
+  assert.deepEqual([find(root, 'AccountField').props.value, find(root, 'AccountField').props.accounts.map((item: domain.Account) => item.id)], ['card-acc', ['card-acc']]);
+  find(root, 'AmountField').props.onChangeText('30');
+  await find(view.render(), 'ActionButton', 'Guardar cambios').props.onPress();
+  assert.equal(view.updates.length, 1);
+  assert.deepEqual([view.updates[0].before.entry.id, view.updates[0].after.entry.id, view.updates[0].after.entry.accountId, view.updates[0].after.entry.kind, view.updates[0].after.revision, view.updates[0].after.entry.amountMinor],
+    ['refund', 'refund', 'card-acc', 'income', 1, 3000]);
+});
+
+test('24B6 review: a recurring income in a card-only ledger shows the no-account state under the switch, Gasto brings the card and the draft back, and a historical card income rule is edited without changing its identity', async () => {
+  const view = harness('src/ui/recurring-form.tsx', { accountId: 'card-acc' }, { data: cardOnly });
+  let root = view.render();
+  assert.deepEqual([find(root, 'AccountField').props.value, find(root, 'AccountField').props.accounts.map((item: domain.Account) => item.id)], ['card-acc', ['card-acc', 'usd-card']]);
+  find(root, 'AmountField').props.onChangeText('999');
+  find(root, 'Choices').props.onChange('income');
+  root = view.render();
+  const empty = find(root, 'EmptyState');
+  assert.equal(empty.props.title, 'Primero, una cuenta');
+  assert.equal(empty.props.detail, 'Un ingreso recurrente se registra en una cuenta normal, no en una tarjeta. Agregá una para continuar.');
+  assert.equal(find(root, 'Choices').props.value, 'income', 'the switch stays above the empty state');
+  assert.equal(nodes(root).some(node => node.type === 'AccountField' || node.type === 'AmountField'), false, 'no empty selector, no disabled Create');
+  empty.props.action.props.onPress();
+  assert.equal(JSON.stringify(view.pushed[0]), JSON.stringify({ pathname: '/new-account', params: { currency: 'ARS' } }));
+  find(root, 'Choices').props.onChange('expense');
+  root = view.render();
+  assert.equal(nodes(root).some(node => node.type === 'EmptyState'), false);
+  assert.deepEqual([find(root, 'AccountField').props.value, find(root, 'AmountField').props.value], ['card-acc', '999'], 'the card and the draft come back');
+  assert.equal(view.rules.length, 0, 'nothing was written');
+  const none = harness('src/ui/recurring-form.tsx', {}, { data: { accounts: [], records: [] } });
+  root = none.render();
+  assert.equal(find(root, 'EmptyState').props.detail, 'Los recurrentes necesitan una cuenta para registrar cada vencimiento en la moneda correcta.');
+  assert.equal(nodes(root).some(node => node.type === 'Choices'), false);
+  const legacy: domain.RecurringRule = { id: 'cashback', accountId: 'card-acc', kind: 'income', amountMinor: 500, merchant: 'Cashback', category: 'Otros', frequency: 'monthly',
+    anchorDateISO: '2026-01-05', nextDateISO: '2026-10-05', active: true, createdAt, revision: 0, updatedAt: createdAt };
+  const editing = harness('src/ui/recurring-form.tsx', { original: legacy }, { data: { ...cardOnly, recurring: [legacy] } });
+  root = editing.render();
+  assert.equal(nodes(root).some(node => node.type === 'EmptyState'), false, 'its own card is eligible');
+  assert.deepEqual([find(root, 'AccountField').props.value, find(root, 'AccountField').props.accounts.map((item: domain.Account) => item.id)], ['card-acc', ['card-acc']]);
+  find(root, 'AmountField').props.onChangeText('6');
+  await find(editing.render(), 'ActionButton').props.onPress();
+  assert.equal(editing.rules.length, 1);
+  assert.deepEqual([editing.rules[0].id, editing.rules[0].accountId, editing.rules[0].kind, editing.rules[0].amountMinor, editing.rules[0].revision, editing.rules[0].createdAt],
+    ['cashback', 'card-acc', 'income', 600, 1, createdAt], 'same rule, same card, one revision up');
+});

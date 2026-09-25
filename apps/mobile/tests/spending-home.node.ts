@@ -38,7 +38,9 @@ function displayStore(initial: Record<string, string> = {}) {
   return displayCurrency.createDisplayCurrencyStore(() => ({ getItemSync: (key: string) => rows.get(key) ?? null, setItemSync: (key: string, value: string) => { rows.set(key, value); }, removeItemSync: (key: string) => rows.delete(key) }));
 }
 
-function routeHarness(file: string, params: Record<string, unknown>, data = snapshot, extra: Partial<domain.LedgerArchive> = {}, display = displayStore()) {
+function routeHarness(file: string, params: Record<string, unknown>, initialData = snapshot, extra: Partial<domain.LedgerArchive> = {}, display = displayStore()) {
+  // The ledger as the provider hands it; `setData` stands for a write landing while the screen stays mounted.
+  let data = initialData;
   const displayProvider = { useDisplayCurrency: (held: readonly domain.Currency[]) => ({ currency: displayCurrency.resolveDisplayCurrency(display.getState(), held), preferred: display.getState(), setCurrency: (currency: domain.Currency) => { display.set(currency); } }) };
   const source = readFileSync(new URL('../app/' + file, import.meta.url), 'utf8');
   const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText;
@@ -93,7 +95,7 @@ function routeHarness(file: string, params: Record<string, unknown>, data = snap
     if (!Object.hasOwn(modules, name)) throw new Error('Unexpected report dependency: ' + name);
     return modules[name];
   } });
-  return { render: () => { cursor = 0; effectCursor = 0; return module.exports.default!(); }, pushed, display };
+  return { render: () => { cursor = 0; effectCursor = 0; return module.exports.default!(); }, pushed, display, setData: (next: domain.LedgerSnapshot) => { data = next; } };
 }
 
 function nodes(value: any): Node[] {
@@ -363,4 +365,60 @@ test('24B6: a link into Reportes with a held currency shows it and makes it the 
   find(origin.render(), 'CurrencySwitch').props.onChange('USD');
   nodes(origin.render()).find(n => n.type === 'SectionTitle' && n.props.action === 'Reportes')!.props.onAction();
   assert.equal(JSON.stringify(origin.pushed.at(-1)), JSON.stringify({ pathname: '/reports', params: { currency: 'USD' } }));
+});
+
+test('24B6 review: a Reportes link naming a currency nobody holds yet is applied once the first account in it exists, then the switch, Inicio and later ledger changes decide; an invalid link never applies', () => {
+  const rows = new Map<string, string>([[displayCurrency.DISPLAY_CURRENCY_KEY, 'ARS']]);
+  const shared = displayCurrency.createDisplayCurrencyStore(() => ({ getItemSync: (key: string) => rows.get(key) ?? null, setItemSync: (key: string, value: string) => { rows.set(key, value); }, removeItemSync: (key: string) => rows.delete(key) }));
+  const reports = routeHarness('(tabs)/reports.tsx', { currency: 'EUR', month: '2026-08' }, homeData, {}, shared);
+  let root = reports.render();
+  assert.equal(find(root, 'Money').props.currency, 'ARS', 'no euro account: the shared choice shows');
+  assert.equal(shared.getState(), 'ARS', 'nothing applied');
+  reports.render(); reports.render();
+  assert.equal(shared.getState(), 'ARS', 'and nothing applied on later renders either');
+  // The person creates the first euro account while Reportes stays mounted (the ledger provider re-renders the tab).
+  const euro: domain.Account = { id: 'e', name: 'Euros', currency: 'EUR', openingMinor: 0, createdAt };
+  const withEuro: domain.LedgerSnapshot = { ...homeData, accounts: [...homeData.accounts, euro] };
+  reports.setData(withEuro);
+  root = reports.render();
+  assert.equal(find(root, 'Money').props.currency, 'EUR', 'the link is honoured the moment its currency is held');
+  assert.equal(shared.getState(), 'EUR', 'and applied to the shared choice');
+  assert.equal(rows.get(displayCurrency.DISPLAY_CURRENCY_KEY), 'EUR');
+  assert.deepEqual(find(root, 'CurrencySwitch').props.currencies, ['ARS', 'USD', 'EUR']);
+  const home = routeHarness('(tabs)/index.tsx', {}, withEuro, {}, shared);
+  assert.equal(find(home.render(), 'CurrencySwitch').props.value, 'EUR', 'Inicio follows');
+  // The switch on Reportes wins from now on, and an unrelated ledger change does not re-impose the link.
+  find(reports.render(), 'CurrencySwitch').props.onChange('USD');
+  assert.equal(find(reports.render(), 'Money').props.currency, 'USD');
+  assert.equal(shared.getState(), 'USD');
+  const more: domain.LedgerSnapshot = { ...withEuro, accounts: [...withEuro.accounts, { ...euro, id: 'e2', name: 'Más euros' }], entries: [...withEuro.entries, { ...withEuro.entries[0], id: 'e-1', accountId: 'e', amountMinor: 900 }] };
+  reports.setData(more);
+  assert.equal(find(reports.render(), 'Money').props.currency, 'USD', 'a new euro account and a euro movement do not bring the link back');
+  assert.equal(shared.getState(), 'USD');
+  // The euro accounts disappear (a restored older copy) and come back: still applied only once.
+  reports.setData(homeData);
+  assert.equal(find(reports.render(), 'Money').props.currency, 'USD');
+  reports.setData(withEuro);
+  assert.equal(find(reports.render(), 'Money').props.currency, 'USD', 'the link was already applied: the person\'s later choice stands');
+  assert.equal(shared.getState(), 'USD');
+  // Inicio, mounted or not, changes the choice and Reportes follows; the link still does not return.
+  home.setData(withEuro);
+  find(home.render(), 'CurrencySwitch').props.onChange('ARS');
+  assert.equal(find(reports.render(), 'Money').props.currency, 'ARS');
+  const later = routeHarness('(tabs)/reports.tsx', {}, withEuro, {}, shared);
+  assert.equal(find(later.render(), 'CurrencySwitch').props.value, 'ARS', 'a Reportes mounted later reads the same choice');
+  // A link that can never be held (a malformed or unknown code) applies nothing, before or after the ledger grows.
+  const bad = routeHarness('(tabs)/reports.tsx', { currency: 'ZZZ', month: '2026-08' }, homeData, {}, shared);
+  assert.equal(find(bad.render(), 'Money').props.currency, 'ARS');
+  bad.setData(more);
+  assert.equal(find(bad.render(), 'Money').props.currency, 'ARS');
+  assert.equal(shared.getState(), 'ARS');
+  // A held link applied at once is not applied again when the ledger changes afterwards.
+  const direct = routeHarness('(tabs)/reports.tsx', { currency: 'USD', month: '2026-08' }, withEuro, {}, shared);
+  assert.equal(find(direct.render(), 'Money').props.currency, 'USD');
+  assert.equal(shared.getState(), 'USD');
+  find(direct.render(), 'CurrencySwitch').props.onChange('EUR');
+  direct.setData(more);
+  assert.equal(find(direct.render(), 'Money').props.currency, 'EUR');
+  assert.equal(shared.getState(), 'EUR');
 });

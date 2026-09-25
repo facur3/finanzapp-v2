@@ -2131,6 +2131,13 @@ safe areas, system text and separate currencies apply to every new screen.
   date), `npm run export:ios` (4,929,633 bytes, +11,713 over 24B5). Not an Xcode build; **no EAS
   build; the iPhone was not modified**; no paid service, API connection or remote change; the
   production gate untouched.
+- **Review fixes (PR #52, three threads):** Reportes applies a route currency exactly once and also when its
+  first account appears while the tab is mounted (`pendingRoute`, keyed on the parameter value; later ledger
+  changes never re-impose it); the entry and recurring forms show the no-account state with Agregar cuenta
+  when no account is eligible for the chosen kind (a card-only ledger asked for an income), pushed over the
+  draft with the carried card's currency, with the Gasto / Ingreso switch kept above it; historical card
+  incomes and rules stay editable with their identity. Tests: the unheld-then-held link, the card-only ledger
+  and the mixed ledger in `spending-home` and `recovery-routes`; `test:storage` 550/550, export 4,930,695 bytes.
 - **Pending:** the 24B6 device checks; the recorded 24B5 results; then the gate commit.
 - **Next:** Producto 24R (global regional internationalization), then 24C, then 24T.
 

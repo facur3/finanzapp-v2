@@ -38,10 +38,14 @@ export default function ReportsScreen() {
   const held = useMemo(() => availableCurrencies(snapshot?.accounts ?? []), [snapshot?.accounts]);
   const { currency: shared, preferred, setCurrency } = useDisplayCurrency(held);
   const route = displayCurrencyForRoute(snapshot?.accounts ?? [], params.currency, preferred);
+  // `applied` remembers which parameter value was applied. A parameter is applied exactly once: when it arrives held, or
+  // later, the moment its first account exists (route.apply turns from null to the code); a parameter already applied
+  // is never applied again by a later change of the ledger, so the switch and Inicio decide from then on.
   const [applied, setApplied] = useState<unknown>();
-  useEffect(() => { if (route.apply) { setCurrency(route.apply); setApplied(params.currency); } }, [params.currency, snapshot === null]);
-  // The frame the parameter arrives already shows its currency; from then on the shared choice (the switch changes it).
-  const shownCurrency: Currency = route.apply && applied !== params.currency ? route.apply : shared;
+  const pendingRoute = route.apply && applied !== params.currency ? route.apply : null;
+  useEffect(() => { if (pendingRoute) { setCurrency(pendingRoute); setApplied(params.currency); } }, [params.currency, pendingRoute]);
+  // The frame the parameter arrives (or becomes held) already shows its currency; from then on the shared choice.
+  const shownCurrency: Currency = pendingRoute ?? shared;
   const selection = useMemo(() => snapshot ? reportSelection(snapshot, shownCurrency, monthOverride ?? params.month, day) : null,
     [snapshot, shownCurrency, monthOverride, params.month, day]);
   const report = useMemo(() => snapshot && selection ? spendingReport(snapshot, selection.currency, selection.monthISO, day) : null,

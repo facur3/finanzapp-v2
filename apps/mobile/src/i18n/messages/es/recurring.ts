@@ -41,6 +41,8 @@ export const recurring = {
     form: {
       noAccountTitle: 'Primero, una cuenta',
       noAccountDetail: 'Los recurrentes necesitan una cuenta para registrar cada vencimiento en la moneda correcta.',
+      /** 24B6: the ledger has accounts, but none a recurring income may use (cards only). */
+      noCashAccountDetail: 'Un ingreso recurrente se registra en una cuenta normal, no en una tarjeta. Agregá una para continuar.',
       expenseAmount: 'Gasto recurrente',
       incomeAmount: 'Ingreso recurrente',
       merchantExpensePlaceholder: 'Ej. Alquiler',

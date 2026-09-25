@@ -38,6 +38,7 @@ export const recurring: Pick<Messages, 'recurring'> = {
     form: {
       noAccountTitle: 'First, an account',
       noAccountDetail: 'Recurring items need an account so each one is recorded in the right currency when it comes due.',
+      noCashAccountDetail: 'A recurring income is recorded in a regular account, not on a card. Add one to continue.',
       expenseAmount: 'Recurring expense',
       incomeAmount: 'Recurring income',
       merchantExpensePlaceholder: 'e.g. Rent',
