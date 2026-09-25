@@ -820,8 +820,8 @@ the owner authorises it; no EAS build or store submission without the owner.
   146 + 7 currencies, every form, transfers (still one currency), the Assistant (contract v1, it receives the
   display currency as before), navigation, Inicio's design.
 - **Status.** Delivered on this branch (2026-09-25), not device-verified.
-  - **Checked on Linux:** root `npm test` 318/318 (+15 `packages/domain/fx.test.ts`); mobile `npm run typecheck`,
-    `npm run test:storage` 720/720 (+19 `tests/fx-rates.node.ts`: per-(quote, month) in-flight requests, the provider adapter with a stub, the cache on
+  - **Checked on Linux:** root `npm test` 320/320 (+17 `packages/domain/fx.test.ts`, 2 after the Codex review: cross rates on one common publication day); mobile `npm run typecheck`,
+    `npm run test:storage` 721/721 (+20 `tests/fx-rates.node.ts`: per-(quote, month) in-flight requests, the automatic retry after the back-off, the provider adapter with a stub, the cache on
     real SQLite, the request policy, offline and failing caches, the preference transition, consolidated figures in
     ARS, USD, EUR and JPY, negative balances, stale and missing rates; +5 route tests in `spending-home.node.ts`
     and `report-routes.node.ts`, +1 after the review: Inicio and Reportes consolidated, a past comparison not blocked by a later month, a past month at its own dates, the drill-down

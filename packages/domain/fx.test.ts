@@ -104,6 +104,25 @@ describe('the rate book', () => {
   });
 });
 
+describe('cross rates use one publication day', () => {
+  it('never mixes a Friday leg with a Monday leg: it falls back to the latest day both were published', () => {
+    const book = rateBook([
+      rate('ARS', '2026-09-11', '1500'), rate('EUR', '2026-09-11', '0.9'), // Friday: both
+      rate('ARS', '2026-09-14', '1600'),                                     // Monday: ARS only
+    ]);
+    // Monday: EUR's latest is Friday, so ARS must be Friday's too: 1500.00 ARS → 1.00 USD → 0.90 EUR.
+    expect(convertOn(book, 150000, 'ARS', 'EUR', '2026-09-14')).toEqual({ status: 'converted', minor: 90, legs: [
+      { quote: 'ARS', rate: '1500', effectiveDate: '2026-09-11', source: 'Prueba' }, { quote: 'EUR', rate: '0.9', effectiveDate: '2026-09-11', source: 'Prueba' }] });
+    // With the pivot on one side there is only one leg: Monday's ARS stands.
+    expect(convertOn(book, 160000, 'ARS', 'USD', '2026-09-14')).toMatchObject({ status: 'converted', minor: 100 });
+  });
+
+  it('is unknown when the two quotes share no publication day within the age limit', () => {
+    const book = rateBook([rate('ARS', '2026-09-14', '1600'), rate('EUR', '2026-09-11', '0.9')]);
+    expect(convertOn(book, 160000, 'ARS', 'EUR', '2026-09-14')).toEqual({ status: 'missing', from: 'ARS', to: 'EUR', quote: 'EUR', date: '2026-09-14', latest: '2026-09-11' });
+  });
+});
+
 describe('consolidated views', () => {
   // ARS cash, USD cash, a EUR card, a JPY account; deterministic rates for three days.
   const accounts = [account('ars', 'ARS', 1000000), account('usd', 'USD', 50000), account('card', 'EUR'), account('yen', 'JPY', 100000)];

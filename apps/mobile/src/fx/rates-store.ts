@@ -79,10 +79,18 @@ export function monthsEnding(monthISO: string, count: number): string[] {
   return Array.from({ length: count }, (_, index) => shiftMonthISO(monthISO, index - count + 1));
 }
 
-export function createRatesStore({ cache, fetchRates, now = () => new Date() }: {
+/** A timer that never keeps a Node test process alive (React Native's timers have no `unref`). */
+function laterTimer(run: () => void, ms: number): void {
+  const handle = setTimeout(run, ms) as unknown as { unref?: () => void };
+  handle.unref?.();
+}
+
+export function createRatesStore({ cache, fetchRates, now = () => new Date(), schedule = laterTimer }: {
   cache: RateCache;
   fetchRates: (request: RateRequest) => Promise<ExchangeRate[]>;
   now?: () => Date;
+  /** Runs the retry of a failed request once its back-off has passed (injected by tests). */
+  schedule?: (run: () => void, ms: number) => void;
 }): RatesStore {
   let rates: ExchangeRate[] = [];
   const coverage = new Map<string, RateCoverage>();
@@ -134,6 +142,9 @@ export function createRatesStore({ cache, fetchRates, now = () => new Date() }: 
         const failure = { at: now().getTime(), kind: error instanceof RateFetchError ? error.kind : 'provider' as const };
         for (const item of keys) failures.set(item, failure);
         emit();
+        // The screen that asked stays mounted with the same months and quotes, so nothing would ask again: the store
+        // retries by itself once the back-off has passed (a second failure schedules the next one).
+        schedule(() => store.ensure([month], quotes, today), RETRY_MS);
       } finally {
         inFlight.delete(requestKey);
         for (const item of keys) pendingQuotes.delete(item);

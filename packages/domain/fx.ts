@@ -160,20 +160,34 @@ export type Conversion =
 export function convertOn(book: RateBook, minor: number, from: IsoCurrencyCode, to: IsoCurrencyCode, date: string): Conversion {
   assertStorableCurrency(from); assertStorableCurrency(to);
   if (from === to) return { status: 'converted', minor, legs: [] };
-  const legs: RateLeg[] = [];
-  const leg = (currency: IsoCurrencyCode): Rational | null | 'missing' => {
-    if (currency === FX_PIVOT) return null;
-    const found = book.lookup(currency, date);
-    if (found.status !== 'ok') return 'missing';
-    legs.push(found.leg);
-    return found.rational;
-  };
-  const a = leg(from);
-  if (a === 'missing') return missingFor(book, from, from, to, date);
-  const b = leg(to);
-  if (b === 'missing') return missingFor(book, to, from, to, date);
-  const converted = convertMinor(minor, from, to, crossRate(a, b));
-  return converted === null ? { status: 'out-of-range' } : { status: 'converted', minor: converted, legs };
+  if (from !== FX_PIVOT && to !== FX_PIVOT) {
+    // A cross rate uses both legs of one publication day: the latest day on or before `date` (within the age
+    // limit) on which both quotes were published. Mixing Friday's leg with Monday's would not be that day's rate.
+    let day = date;
+    for (let step = 0; step <= RATE_MAX_AGE_DAYS + 1; step++) {
+      const a = book.lookup(from, day), b = book.lookup(to, day);
+      if (step === 0 && a.status !== 'ok') return missingFor(book, from, from, to, date);
+      if (step === 0 && b.status !== 'ok') return missingFor(book, to, from, to, date);
+      if (a.status !== 'ok' || b.status !== 'ok') break;
+      if (daysBetween(a.leg.effectiveDate, date) > RATE_MAX_AGE_DAYS || daysBetween(b.leg.effectiveDate, date) > RATE_MAX_AGE_DAYS) break;
+      if (a.leg.effectiveDate === b.leg.effectiveDate) {
+        const converted = convertMinor(minor, from, to, crossRate(a.rational, b.rational));
+        return converted === null ? { status: 'out-of-range' } : { status: 'converted', minor: converted, legs: [a.leg, b.leg] };
+      }
+      day = a.leg.effectiveDate < b.leg.effectiveDate ? a.leg.effectiveDate : b.leg.effectiveDate;
+    }
+    // No common publication day within the limit: unknown, never a mix of two days.
+    const latestFrom = book.lookup(from, date), latestTo = book.lookup(to, date);
+    const older = latestFrom.status === 'ok' && latestTo.status === 'ok' && latestFrom.leg.effectiveDate < latestTo.leg.effectiveDate ? from : to;
+    const found = book.lookup(older, date);
+    const latest = found.status === 'ok' ? found.leg.effectiveDate : found.latest;
+    return latest ? { status: 'missing', from, to, quote: older, date, latest } : { status: 'missing', from, to, quote: older, date };
+  }
+  const quote = from === FX_PIVOT ? to : from;
+  const found = book.lookup(quote, date);
+  if (found.status !== 'ok') return missingFor(book, quote, from, to, date);
+  const converted = convertMinor(minor, from, to, from === FX_PIVOT ? crossRate(null, found.rational) : crossRate(found.rational, null));
+  return converted === null ? { status: 'out-of-range' } : { status: 'converted', minor: converted, legs: [found.leg] };
 }
 
 function missingFor(book: RateBook, quote: IsoCurrencyCode, from: IsoCurrencyCode, to: IsoCurrencyCode, date: string): Conversion {

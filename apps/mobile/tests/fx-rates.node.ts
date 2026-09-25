@@ -218,6 +218,26 @@ test('offline: the cached rates keep working, the failure is reported, and the p
   assert.equal(store.activity(['2026-09'], ['ARS']), 'idle');
 });
 
+test('after a failure the store retries by itself once the back-off has passed, with the screen untouched', async () => {
+  let clock = new Date('2026-09-25T12:00:00.000Z');
+  const timers: { run: () => void; ms: number }[] = [];
+  const provider = stubProvider();
+  provider.fail('offline');
+  const store = createRatesStore({ cache: memoryCache().cache, fetchRates: provider.fetchRates, now: () => clock, schedule: (run, ms) => { timers.push({ run, ms }); } });
+  store.ensure(['2026-09'], ['EUR'], '2026-09-25');
+  await store.settled();
+  assert.equal(store.activity(['2026-09'], ['EUR']), 'offline');
+  assert.deepEqual(timers.map(timer => timer.ms), [RETRY_MS], 'one retry scheduled at the back-off');
+  provider.fail(null);
+  clock = new Date(clock.getTime() + RETRY_MS);
+  timers.shift()!.run();
+  await store.settled();
+  assert.equal(provider.requests.length, 2, 'asked again without any ensure from a screen');
+  assert.equal(store.activity(['2026-09'], ['EUR']), 'idle');
+  assert.equal(store.getState().book.lookup('EUR', '2026-09-25').status, 'ok');
+  assert.equal(timers.length, 0, 'a success schedules nothing');
+});
+
 test('a request for one currency in flight never blocks another currency of the same month (two screens, a quick change)', async () => {
   const { cache } = memoryCache();
   let release: () => void = () => {};
