@@ -10,7 +10,8 @@ import { useDisplayCurrency } from '../../src/ui/display-currency-provider';
 import { useI18n } from '../../src/i18n/provider';
 import { BudgetHomeCard, CategoryRanking, MetricHelp, UpcomingRecurringRow } from '../../src/ui/home-modules';
 import { Reflow, ValueTransition } from '../../src/ui/motion';
-import { availableCurrencies, namesAccount, selectEntries } from '../../src/ui/presentation';
+import { availableCurrencies, homeNamesCategory, selectEntries, sharedGlyphs, visibleNamesAccount } from '../../src/ui/presentation';
+import { useCategoryLookOf } from '../../src/ui/category-hues';
 import { AssistantEntry, QuickActions } from '../../src/ui/quick-actions';
 import { space, useCurrentDay, usePalette } from '../../src/ui/theme';
 
@@ -29,16 +30,19 @@ const HERO_SIZE = 48;
  * currency chip), the number with room around it, three compact movement
  * pills, the Assistant as the one wide control, then the one card (the
  * categories, a compact summary) followed by two open lists on the ground that
- * differ by density: the commitments as a tight agenda (32 pt marks, the due
- * day), the latest transactions as a full-height ledger (40 pt marks, signed
- * amounts). One heavy block, then lighter content, never card → list → card. Section links are quiet (secondary ink and a chevron), so
- * cobalt is left to the Assistant and the active tab. */
+ * differ by density: the commitments as a tight agenda (the due day under the
+ * amount), the latest transactions as a full-height ledger (signed amounts, the
+ * date as the caption); both draw the same 40 pt mark (24UX5). One heavy block,
+ * then lighter content, never card → list → card. Section links are quiet (the
+ * slate `link` ink and a chevron, 24UX5), so cobalt is left to the Assistant and
+ * the active tab. */
 export default function HomeScreen() {
   const { snapshot, archive } = useLedger();
   const day = useCurrentDay();
   const p = usePalette();
   const stacked = useStacked();
   const { t, formatDate } = useI18n();
+  const expenseLook = useCategoryLookOf('expense'), incomeLook = useCategoryLookOf('income');
   const [metric, setMetric] = useState<HomeMetric>('spending');
   const currencies = availableCurrencies(snapshot?.accounts ?? []);
   // The display currency Inicio shares with Reportes (24B6): a stored preference resolved against the currencies held.
@@ -72,11 +76,20 @@ export default function HomeScreen() {
   const accountCount = snapshot.accounts.filter(account => account.currency === currency && !hidden.has(account.id)).length;
   const openReport = () => router.navigate({ pathname: '/reports', params: { currency } });
   const spending = metric === 'spending';
-  // A row names its account only when another account of this currency could be meant (24UX2).
-  const showAccount = namesAccount(snapshot.accounts, currency, new Set((archive?.debts ?? []).map(debt => debt.accountId)));
+  // 24UX5 review: each list names accounts only when its visible rows come from more than one (two owned accounts with
+  // every visible row in one of them printed «· a ·» on each row). VoiceOver still says the account on every row.
+  const recentAccount = visibleNamesAccount(recent), upcomingAccount = visibleNamesAccount(upcoming);
   // A month with nothing recorded in this currency says so once, under Últimos movimientos, instead of two
   // near-identical sentences 24 pt apart (24UX1 finding 5). Categories return with the first expense.
   const quietMonth = summary.status === 'ready' && !summary.categories.length && !recent.length;
+  // 24UX5: a Home row names its category only when the name and the glyph do not already say it, or when another
+  // category on this screen draws the same glyph (the two lists are read together).
+  const lookOf = (kind: 'expense' | 'income', category: string) => (kind === 'income' ? incomeLook : expenseLook)(category);
+  const shared = sharedGlyphs([...upcoming, ...recent].map(row => { const look = lookOf(row.kind, row.category); return { category: look.label, glyph: look.glyph }; }));
+  const namesCategory = (row: { kind: 'expense' | 'income'; category: string; merchant: string }) => {
+    const look = lookOf(row.kind, row.category);
+    return homeNamesCategory(row.merchant, look.label, shared.has(look.glyph));
+  };
   // Keyed by the choice, not the dates: a day boundary must not animate the hero on its own.
   const heroId = `${metric}|${currency}`;
 
@@ -131,14 +144,14 @@ export default function HomeScreen() {
 
       {upcoming.length > 0 && <Reflow fade>
         <SectionTitle quiet action={t('common.seeAll')} onAction={() => router.push('/recurring')}>{t('home.upcoming')}</SectionTitle>
-        <View>{upcoming.map((rule, index) => <UpcomingRecurringRow key={rule.id} rule={rule} showAccount={showAccount}
+        <View>{upcoming.map((rule, index) => <UpcomingRecurringRow key={rule.id} rule={rule} showAccount={upcomingAccount} showCategory={namesCategory(rule)}
           account={snapshot.accounts.find(account => account.id === rule.accountId)!} day={day} last={index === upcoming.length - 1} />)}</View>
       </Reflow>}
 
       <Reflow>
         <SectionTitle quiet action={t('common.seeAll')} onAction={() => router.navigate('/activity')}>{t('home.recent')}</SectionTitle>
         <ValueTransition id={currency} variant="fade">
-          {recent.length ? <View>{recent.map((entry, index) => <EntryRow key={entry.id} entry={entry} showAccount={showAccount} plain
+          {recent.length ? <View>{recent.map((entry, index) => <EntryRow key={entry.id} entry={entry} showAccount={recentAccount} variant="home" showCategory={namesCategory(entry)}
             account={snapshot.accounts.find(a => a.id === entry.accountId)!} last={index === recent.length - 1} />)}</View>
             : <AppText secondary variant="subhead">{currencies.length > 1 ? t('home.recentEmptyIn', { currency }) : t('home.recentEmpty')}</AppText>}
         </ValueTransition>

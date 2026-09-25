@@ -47,7 +47,7 @@ function routeHarness(file: string, params: Record<string, unknown>, data = snap
   const deps: unknown[][] = [];
   const pushed: any[] = [];
   let cursor = 0, effectCursor = 0;
-  const componentNames = ['AppText', 'Choices', 'DetailRow', 'EmptyState', 'IconButton', 'Money', 'PressFeedback', 'SectionTitle', 'Surface', 'CategoryBadge', 'Screen', 'GlyphTile'];
+  const componentNames = ['AppText', 'Choices', 'DetailRow', 'EmptyState', 'IconButton', 'Money', 'PressFeedback', 'SectionTitle', 'Surface', 'CategoryBadge', 'Screen', 'GlyphTile', 'InfoButton'];
   const modules: Record<string, unknown> = {
     '../i18n/format': i18nFormat, '../src/i18n/format': i18nFormat, '../../src/i18n/format': i18nFormat, '../i18n/provider': i18nProvider, '../src/i18n/provider': i18nProvider, '../../src/i18n/provider': i18nProvider,
     // Effects run in place, once per change of their dependencies (a route parameter arriving), like React's after commit.
@@ -58,7 +58,7 @@ function routeHarness(file: string, params: Record<string, unknown>, data = snap
     }, useEffect: (fn: () => void, next?: unknown[]) => { const index = effectCursor++; const previous = deps[index];
       if (!previous || !next || next.length !== previous.length || next.some((item, i) => item !== previous[i])) { deps[index] = next ?? []; fn(); } } },
     'react/jsx-runtime': { jsx, jsxs: jsx, Fragment: 'Fragment' },
-    'react-native': { View: 'View', FlatList: 'FlatList' },
+    'react-native': { View: 'View', FlatList: 'FlatList', StyleSheet: { hairlineWidth: 0.5 } },
     '@expo/vector-icons/Ionicons': 'Ionicons',
     'expo-router': { useLocalSearchParams: () => params, router: { push: (to: unknown) => pushed.push(to) } },
     '../src/ui/display-currency-provider': displayProvider, '../src/ui/display-currency': displayCurrency,
@@ -240,7 +240,7 @@ test('23.1B2: Reportes in English changes only words; amounts, user data and rou
   find(root, 'IconButton', 'Previous month');
   find(root, 'IconButton', 'Next month');
   assert.ok(words.includes('August 2026'));
-  assert.ok(words.includes('Full month · ARS'));
+  assert.ok(words.includes('Full month'), '24UX5 review: no «· ARS» beside the period; the eyebrow names it');
   assert.ok(words.includes('Spent\u00A0·\u00A0ARS'));
   assert.equal(find(root, 'DonutChart').props.caption, 'Period total');
   assert.ok(words.includes('Your largest expense was Prueba'), 'the merchant is the person\'s own words');
@@ -291,7 +291,9 @@ test('23.1B2: category and comparison details in English', () => {
 test('23.1C2: the largest expense names its day in the region\'s order; Argentina keeps the domain\'s text', () => {
   const insightDetail = (root: Node) => texts(root).find(text => / · Salud · /.test(text))!;
   for (const [dateISO, month, argentina, unitedStates] of [['2026-08-22', '2026-08', '22/08', '8/22'], ['2026-09-05', '2026-09', '5/09', '9/5']]) {
-    const data = { ...snapshot, entries: [...snapshot.entries, { ...snapshot.entries[0], id: 'big', amountMinor: 5000, dateISO }] };
+    // A second purchase from the same merchant: the largest single one is then a fact the ranking does not show (24UX5).
+    const data = { ...snapshot, entries: [...snapshot.entries, { ...snapshot.entries[0], id: 'big', amountMinor: 5000, dateISO },
+      { ...snapshot.entries[0], id: 'small', amountMinor: 100, dateISO }] };
     const params = { currency: 'ARS', month };
     const esAR = insightDetail(routeHarness('(tabs)/reports.tsx', params, data).render());
     const domainText = domain.spendingInsights(data, [], 'ARS', month, '2026-09-12', minor => '$\u00A0' + domain.formatMinorUnits(minor)).find(fact => fact.id === 'largest:big')!.detail;
@@ -302,6 +304,37 @@ test('23.1C2: the largest expense names its day in the region\'s order; Argentin
       const detail = insightDetail(routeHarness('(tabs)/reports.tsx', params, data, { locale }).render());
       assert.ok(detail.endsWith(' · ' + unitedStates), locale + ': ' + detail);
     }
+  }
+});
+
+test('24UX5: "your largest expense" is left out when the ranking right above shows that same single purchase; budget facts stay', () => {
+  const at = '2026-09-12T12:00:00Z';
+  const cash: domain.Account = { id: 'a', name: 'Caja', currency: 'ARS', openingMinor: 0, createdAt: at };
+  const entry = (id: string, merchant: string, amountMinor: number): domain.Entry => ({ id, accountId: 'a', kind: 'expense', amountMinor, merchant, category: 'Hogar', dateISO: '2026-09-05', createdAt: at });
+  const titles = (root: Node) => texts(root);
+  // One purchase at Carrefour: the ranking's first row already says Carrefour, 1 compra, the amount and the category.
+  const single = { accounts: [cash], entries: [entry('big', 'Carrefour', 90000), entry('a', 'Kiosco', 1000), entry('b', 'Kiosco', 2000)] };
+  const alone = routeHarness('(tabs)/reports.tsx', { currency: 'ARS', month: '2026-09' }, single).render();
+  assert.equal(titles(alone).some(text => text.startsWith('Tu mayor gasto fue')), false);
+  assert.ok(nodes(alone).some(node => node.props.merchant?.merchant === 'Carrefour' && node.props.merchant.count === 1), 'the ranking keeps the purchase');
+  // Two purchases at Carrefour: the ranking shows their total, so the single largest one is an extra, checkable fact.
+  const repeated = { accounts: [cash], entries: [...single.entries, entry('again', 'Carrefour', 500)] };
+  assert.ok(titles(routeHarness('(tabs)/reports.tsx', { currency: 'ARS', month: '2026-09' }, repeated).render()).includes('Tu mayor gasto fue Carrefour'));
+  // The pure rule: only a "largest" fact is ever dropped.
+  const facts = [{ id: 'over:b1', title: '', detail: '', tone: 'expense' as const }, { id: 'largest:big', title: '', detail: '', tone: 'neutral' as const }];
+  assert.equal(reportPresentation.insightsBesideRanking(facts, [{ key: 'carrefour', count: 1 }], single.entries).map(fact => fact.id).join(), 'over:b1');
+  assert.equal(reportPresentation.insightsBesideRanking(facts, [{ key: 'carrefour', count: 2 }], single.entries).length, 2);
+});
+
+test('24UX5: what the report counts is behind an information button beside the total, not a permanent paragraph', () => {
+  const data = { ...snapshot, entries: [...snapshot.entries, { ...snapshot.entries[0], id: 'big', amountMinor: 5000, dateISO: '2026-09-05' }] };
+  for (const [locale, title] of [['es-AR', 'Qué cuenta este reporte'], ['en-US', 'What this report counts']] as [AppLocale, string][]) {
+    const root = routeHarness('(tabs)/reports.tsx', { currency: 'ARS', month: '2026-09' }, data, { locale }).render();
+    const info = nodes(root).find(node => node.type === 'InfoButton')!;
+    assert.equal(info.props.title, title);
+    assert.match(info.props.detail, /ARS/, 'names the currency the report is limited to');
+    const printed = nodes(root).filter(node => node.type === 'AppText').flatMap(node => [node.props.children].flat()).filter(child => typeof child === 'string');
+    assert.equal(printed.some(text => /saldos iniciales|Opening balances/.test(text)), false, 'the methodology is no longer printed on the screen');
   }
 });
 
@@ -384,4 +417,19 @@ test('24UX3 review: Dónde más gastaste is an open ranked list on the ground, n
   const badges = nodes(section).filter(node => node.type === 'CategoryBadge');
   assert.ok(badges.length > 0);
   assert.equal(badges.every(badge => badge.props.size === 32), true, 'compact marks, lighter than the category card');
+});
+
+test('24UX5 review: the month heading raises only its first letter, and the period line does not repeat the currency', () => {
+  const data = { ...snapshot, entries: [...snapshot.entries, { ...snapshot.entries[0], id: 'sep', amountMinor: 500, dateISO: '2026-09-05' }] };
+  for (const [locale, heading, period] of [['es-AR', 'Septiembre de 2026', 'Hasta hoy'], ['en-US', 'September 2026', 'Through today']] as [AppLocale, string, string][]) {
+    const root = routeHarness('(tabs)/reports.tsx', { currency: 'ARS', month: '2026-09' }, data, { locale }).render();
+    const title = nodes(root).find(node => node.type === 'AppText' && node.props.accessibilityRole === 'header' && node.props.variant === 'title3')!;
+    assert.equal(title.props.children, heading, locale);
+    assert.equal(title.props.style.textTransform, undefined, 'no style-level capitalize («Septiembre De 2026»)');
+    const words = texts(root);
+    assert.ok(words.includes(period), locale + ': the period alone');
+    assert.equal(words.some(text => text.startsWith(period + ' · ')), false, 'no «· ARS» after the period');
+    assert.ok(words.some(text => /ARS/.test(text) && /Gastado|Spent/.test(text)), 'the currency stays named beside the total');
+    assert.ok(nodes(root).some(node => node.type === 'InfoButton'), 'the method button stays');
+  }
 });

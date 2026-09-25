@@ -327,7 +327,7 @@ export function parsePilotBackup(raw: string): ParsedBackup {
   const v9 = header.schema === BACKUP_SCHEMA_V9;
   const v10 = header.schema === BACKUP_SCHEMA_V10;
   if (!v1 && !v2 && !v3 && !v4 && !v5 && !v6 && !v7 && !v8 && !v9 && !v10) {
-    throw new Error('Solo se pueden restaurar copias del piloto nativo v1 a v10. La app web/anterior y otras versiones todavía no son compatibles; conservá el archivo.');
+    throw new Error('Solo se pueden restaurar copias de FinanzApp de las versiones 1 a 10. Las de la app web anterior no son compatibles; conservá el archivo.');
   }
   const hasTransfers = !v1 && !v2, hasRecurring = hasTransfers && !v3, hasBudgets = hasRecurring && !v4;
   const hasLiabilities = hasBudgets && !v5, hasScopedBudgets = hasLiabilities && !v6, hasIdentity = v8 || v9 || v10, hasUnits = v9 || v10;

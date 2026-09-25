@@ -14,7 +14,7 @@ export const budgets = {
       backToCurrent: 'Volver al mes actual',
       thisMonth: 'Este mes',
       emptyTitle: 'Dale un límite a tu mes',
-      emptyDetail: 'Un presupuesto general es el techo de todos tus gastos del mes; los límites por categoría son sublímites dentro de él. FinanzApp los compara con tus gastos reales sin contar transferencias ni ingresos.',
+      emptyDetail: 'Un techo para todos tus gastos del mes y, si querés, límites por categoría dentro de él. Se comparan con los gastos que registrás.',
       create: 'Crear presupuesto',
       general: 'Presupuesto general',
       /** Section action beside "Presupuesto general". */
@@ -23,7 +23,7 @@ export const budgets = {
       /** Section action beside "Por categoría". */
       addCategory: 'Agregar',
       byCategory: 'Por categoría',
-      noSublimits: 'Sin límites por categoría este mes. Son sublímites dentro del general y no se suman entre sí.',
+      noSublimits: 'Sin límites por categoría este mes.',
       unbudgeted: 'Además gastaste {amount} en categorías sin límite propio.',
     },
     /** Caption of "Por categoría", parts joined with " · ": "3 categorías · 1 excedida · 1 cerca del límite". */

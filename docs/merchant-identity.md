@@ -17,7 +17,11 @@ Nothing here is device-verified.
 | Logo: a picture of the brand | none (deferred to 25C2) | nothing in the app | The owner, after §4 |
 
 The category stays the financial classification: reports, budgets and the Assistant group by it,
-and every row keeps the category name in its caption; the leading tile is the category glyph. Nothing in this delivery changes a
+and every row keeps the category name in its caption; the leading tile is the category glyph.
+Exception (Producto 24UX5): Inicio's two short lists caption the date alone and bring the category
+back only when the name and the glyph do not say it (a name of one or two characters, with no letter or
+generic, or a glyph another category on screen also draws); VoiceOver, the detail, the filters and the
+search always keep it (docs/mobile-design.md, Producto 24UX5). Nothing in this delivery changes a
 stored movement, a rule, SQLite or a backup.
 
 ## 2. The identity layer (`packages/domain/merchants.ts`)
@@ -108,11 +112,16 @@ a switch to turn it off; the App Store privacy answers updated.
 
 ## 5. Recurring rules: scheduled is not paid
 
-Today (unchanged by 24UX2): a rule posts one normal movement when its date arrives
-(`processRecurring`, on launch, when the app returns to the foreground and after a rule or a restore is saved), with a deterministic id
+Today (unchanged by 24UX2; audited and pinned by `tests/recurring-audit.node.ts` in 24UX5): a rule posts one normal movement when its date arrives
+(`catchUpRecurring` through `processRecurring`, on launch, when the app returns to the foreground and after a rule or a restore is saved; never while the app is closed: a date passed meanwhile is recorded on the next open, dated on its due day), with a deterministic id
 `rec_<ruleId>_<yyyymmdd>`; a retry, a restore or a second device session can never post it twice
-(the storage refuses a different movement with the same id). The rule then advances its next
-date. Pausing stops the postings.
+(an occurrence whose id is already in the ledger counts as recorded, even if the person edited or undid
+it). The rule then advances its next date. Pausing stops the postings. A rule the catch-up cannot record
+because of a real failure is left unchanged, never blocks the other rules, Recurrentes or the opening of
+the data, and reads «Revisar» in Recurrentes until the person continues it from today. A long backlog is
+not a failure: it is recorded automatically in durable batches of at most 366 dates, each with its original
+date and id, resuming after an interruption without duplicates (24UX5 review). «Recorded by
+FinanzApp» is never «paid by the bank»: the app executes and confirms no payment.
 
 How the screens now tell the states apart:
 
@@ -127,34 +136,20 @@ What is *not* done, on purpose: no movement is created, merged or deduplicated b
 scheduling a commitment; no guess links a typed "Netflix" movement to the Netflix rule; no
 connection to Netflix, Spotify or a bank exists or is implied.
 
-### Future: history and reconciliation (roadmap, not built)
+### Recurring rules stay automatic (owner's decision, review of PR #59)
 
-The current model registers on the due date, which is right for fixed debits and wrong when the
-amount or the day varies (a utility bill, a card statement). A later delivery should let a rule
-be **expected** instead of **auto-registered**:
-
-1. An expected occurrence is a local record `(ruleId, dueDateISO, status)` with status
-   `expected → paid | skipped | late`, never a movement. It carries no amount in reports.
-2. **Paid** is a link from the occurrence to one real movement: either the person confirms "Lo
-   pagué" (which creates the movement with the rule's defaults, editable, one write, operation
-   id), or picks an existing movement from suggestions. Suggestions come from the same account
-   and currency, a merchant key equal to the rule's, and a date window around the due date; they
-   are proposals, confirmed by the person, never applied silently. A movement links to at most
-   one occurrence.
-3. **Skipped** keeps the history honest (a paused month, a cancelled delivery). **Late** is a
-   display state for an expected occurrence past its date; reminders (25D) never claim a bank did
-   not receive a payment.
-4. The history of a rule is then its occurrences with their state and linked movement; a calendar
-   of commitments (per month, per day, per currency, never summed across currencies) is built on
-   the same records.
-5. Schema and backup version bump, migration with rollback tests; existing auto-registered
-   movements become `paid` occurrences by their deterministic id; sync (25E) carries occurrences
-   with operation ids and tombstones.
+A rule records its movement on its date, expenses and incomes alike; if the app was closed, on the
+next launch or return to the foreground, dated on the due day. The person manages a rule by pausing,
+resuming or deleting it, and edits a recorded movement like any other (a changed bill amount is an
+edit of that movement). An earlier exploratory design (an «expected» occurrence the person confirms,
+skips or links, and a per-rule «Esperar confirmación» mode) is **not approved** and not on the
+roadmap. Reviewing drafts before they are written is the Assistant's workflow for captures, a separate
+thing.
 
 ## 6. Related roadmap items
 
 Local categorisation rules (a merchant key pre-fills a category the person chose before, only
 pre-fills, never rewrites), suggested recurring detection (the same merchant key, account and
-amount repeating at a regular interval proposes a rule; never creates one), the payment history
-and commitments calendar above, widgets of upcoming payments (25D, amounts hidden by default) and
+amount repeating at a regular interval proposes a rule; never creates one), the commitments calendar
+(read from the rules and what they recorded), widgets of upcoming payments (25D, amounts hidden by default) and
 the brand-mark decision. See docs/mobile-roadmap.md §3 (Producto 25C2).

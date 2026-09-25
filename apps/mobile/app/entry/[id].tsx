@@ -65,7 +65,9 @@ function EntryDetail({ record, account }: { record: EntryRecord; account: Accoun
       ], { cancelable: true, onDismiss: () => { confirming.current = false; } });
   }
   const income = entry.kind === 'income';
-  const date = formatDate(entry.dateISO, 'weekdayLong');
+  // First letter only (24UX5 review): a style-level capitalize drew «Martes, 22 De Septiembre De 2026».
+  const long = formatDate(entry.dateISO, 'weekdayLong');
+  const date = long.charAt(0).toLocaleUpperCase() + long.slice(1);
   // Budget context only when a matching active budget exists for this month, currency and category.
   let budget: { ratio: number; remainingMinor: number; exceeded: boolean } | null = null;
   if (!income && !record.voided && snapshot) {
@@ -92,7 +94,7 @@ function EntryDetail({ record, account }: { record: EntryRecord; account: Accoun
         <Money minor={income ? entry.amountMinor : -entry.amountMinor} currency={account.currency} large signed align="center"
           tone={income ? 'income' : 'expense'} color={record.voided ? p.tertiary : undefined} />
         <AppText variant="title3" style={{ textAlign: 'center' }}>{entry.merchant}</AppText>
-        <AppText secondary variant="subhead" style={{ textAlign: 'center', textTransform: 'capitalize' }}>{date}</AppText>
+        <AppText secondary variant="subhead" style={{ textAlign: 'center' }}>{date}</AppText>
       </View>
       <AppText accessibilityLiveRegion="polite" variant="caption" style={{ color: record.voided ? p.warning : p.secondary, fontWeight: '500', textAlign: 'center' }}>{status}</AppText>
     </View>

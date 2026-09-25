@@ -212,7 +212,7 @@ test('an upcoming commitment reads its day inside the VoiceOver sentence in lowe
   const caption = (row: any) => flatten(row).filter(node => node.type === 'AppText').map(node => [node.props.children].flat().join(''));
   try {
     const spanish = exports.UpcomingRecurringRow({ rule, account, day: '2026-09-22', last: true });
-    assert.equal(spanish.props.accessibilityLabel, 'Netflix, Suscripciones, 12345,67 ARS, próximo pago hoy');
+    assert.equal(spanish.props.accessibilityLabel, 'Netflix, Suscripciones, 12345,67 ARS, próximo pago hoy, Banco', 'the account is always spoken');
     // 24UX2: the caption is the category (the secondary signal); the day appears once, beside the amount, capitalised.
     assert.equal(JSON.stringify(caption(spanish)), JSON.stringify(['Netflix', 'Suscripciones', 'Hoy']));
     current = 'en-US';
@@ -222,10 +222,24 @@ test('an upcoming commitment reads its day inside the VoiceOver sentence in lowe
     assert.ok(caption(english).includes('Today'));
     // A later day is the short date either way; within a week a count of days.
     const later = exports.UpcomingRecurringRow({ rule: { ...rule, nextDateISO: '2026-10-01' }, account, day: '2026-09-22', last: true });
-    assert.equal(later.props.accessibilityLabel, 'Netflix, Suscripciones, 12345.67 ARS, next payment Oct 1');
+    assert.equal(later.props.accessibilityLabel, 'Netflix, Suscripciones, 12345.67 ARS, next payment Oct 1, Banco');
     assert.ok(caption(later).includes('Oct 1'));
     assert.ok(caption(exports.UpcomingRecurringRow({ rule: { ...rule, nextDateISO: '2026-09-26' }, account, day: '2026-09-22', last: true })).includes('In 4 days'));
   } finally { current = 'es-AR'; }
+});
+
+test('24UX5: an upcoming commitment names its category only when asked; the day stays under the amount and VoiceOver keeps everything', () => {
+  const { exports } = harness();
+  const rule = { id: 'r', merchant: 'Netflix', category: 'Suscripciones', kind: 'expense', amountMinor: 100, nextDateISO: '2026-09-23', accountId: 'a' };
+  const account = { id: 'a', name: 'Banco', currency: 'ARS' };
+  const texts = (row: any) => flatten(row).filter(node => node.type === 'AppText').map(node => [node.props.children].flat().join(''));
+  const bare = exports.UpcomingRecurringRow({ rule, account, day: '2026-09-22', last: true, showCategory: false });
+  assert.equal(JSON.stringify(texts(bare)), JSON.stringify(['Netflix', 'Mañana']), 'name, then the day under the amount');
+  assert.equal(bare.props.accessibilityLabel, 'Netflix, Suscripciones, 1,00 ARS, próximo pago 23 sep, Banco', '24UX5 review: VoiceOver keeps the account the caption leaves out');
+  const withAccount = exports.UpcomingRecurringRow({ rule, account, day: '2026-09-22', last: true, showCategory: false, showAccount: true });
+  assert.equal(JSON.stringify(texts(withAccount)), JSON.stringify(['Netflix', 'Banco', 'Mañana']));
+  const urgent = flatten(bare).filter(node => node.type === 'AppText').at(-1);
+  assert.equal(urgent.props.style.fontWeight, '600', 'tomorrow is urgent (the warning tone)');
 });
 
 test('24UX2: an upcoming commitment draws its merchant mark with the category behind it, never instead of the category name', () => {
@@ -250,8 +264,10 @@ test('24UX3: the category summary is compact and the commitments are an agenda o
   const row = exports.UpcomingRecurringRow({ rule, account, day: '2026-09-22', last: false });
   assert.equal(row.props.feedback, 'opacity', 'no cell to tint on the ground: the press answer is a dim');
   assert.equal(row.props.style.paddingHorizontal, undefined, 'aligned with the section title, no inset card padding');
-  assert.equal(flatten(row).find(node => node.type === 'MerchantBadge').props.size, 32);
+  assert.equal(flatten(row).find(node => node.type === 'MerchantBadge').props.size, undefined, '24UX5: the 40 pt mark of the latest transactions');
+  assert.equal(row.props.style.minHeight, 56, 'the agenda stays tighter than the 64 pt ledger rows');
   const content = row.props.children[1];
+  assert.equal(content.props.style.paddingVertical, 8);
   assert.equal(content.props.style.borderBottomWidth, 0.5, 'the hairline starts under the text, not under the mark');
   assert.equal(exports.UpcomingRecurringRow({ rule, account, day: '2026-09-22', last: true }).props.children[1].props.style.borderBottomWidth, 0);
 });

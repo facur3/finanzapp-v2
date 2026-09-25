@@ -238,20 +238,28 @@ test('Stat rows stack at large text and every Stat may shrink, so amounts and da
   assert.equal(column.props.style.flexDirection, 'column', 'DetailRow stacks at large text too');
 });
 
-test('24UX3 review: a plain EntryRow is an open ledger line, with the hairline under the text and a dim on press', () => {
+test('24UX3 review, 24UX5: the Home EntryRow is an open ledger line whose caption is the date, with the category or account only when asked', () => {
   const ui = load('components.tsx');
   const account = { id: 'a', name: 'Banco', currency: 'ARS', openingMinor: 0, createdAt: 't' };
   const entry = { id: 'e', accountId: 'a', kind: 'expense', merchant: 'Café', category: 'Comida', amountMinor: 1200, dateISO: '2026-09-22', createdAt: 't' };
   const column = (root: Node) => nodes(root).find(node => is(node, 'View') && node.props.style?.flex === 1 && 'flexDirection' in node.props.style)!;
+  const caption = (root: Node) => nodes(root).filter(node => is(node, 'AppText')).map(node => [node.props.children].flat().join(''))[1];
   const grouped = ui.render('EntryRow', { entry, account });
   assert.equal(grouped.props.feedback, 'highlight');
   assert.equal(column(grouped).props.style.borderBottomWidth, undefined, 'grouped: the separator belongs to the cell');
-  const plain = ui.render('EntryRow', { entry, account, plain: true });
-  assert.equal(plain.props.feedback, 'opacity', 'no cell to tint on the ground');
-  assert.equal(plain.props.style.paddingHorizontal, undefined, 'aligned with the section title');
-  assert.equal(column(plain).props.style.borderBottomWidth > 0, true, 'the hairline starts under the text');
-  assert.equal(column(ui.render('EntryRow', { entry, account, plain: true, last: true })).props.style.borderBottomWidth, 0);
-  assert.equal(plain.props.accessibilityLabel, grouped.props.accessibilityLabel, 'VoiceOver hears the same sentence');
+  const label = caption(grouped).split(' · ')[0];
+  assert.equal(caption(grouped), label + ' · Banco · Hoy', 'every other list keeps the full caption: category · account · date');
+  const home = ui.render('EntryRow', { entry, account, variant: 'home', showAccount: false, showCategory: false });
+  assert.equal(home.props.feedback, 'opacity', 'no cell to tint on the ground');
+  assert.equal(home.props.style.paddingHorizontal, undefined, 'aligned with the section title');
+  assert.equal(home.props.style.minHeight, 64, 'the ledger rows stay a little taller than the agenda');
+  assert.equal(column(home).props.style.borderBottomWidth > 0, true, 'the hairline starts under the text');
+  assert.equal(caption(home), 'Hoy', 'the date alone when the glyph already says the category');
+  assert.equal(caption(ui.render('EntryRow', { entry, account, variant: 'home', showAccount: true, showCategory: true })), label + ' · Banco · Hoy');
+  assert.equal(caption(ui.render('EntryRow', { entry, account, variant: 'home', showAccount: true, showCategory: false })), 'Banco · Hoy');
+  assert.equal(column(ui.render('EntryRow', { entry, account, variant: 'home', last: true })).props.style.borderBottomWidth, 0);
+  assert.equal(home.props.accessibilityLabel, grouped.props.accessibilityLabel, 'VoiceOver hears the same full sentence: merchant, kind, amount, category, account, date');
+  assert.ok(home.props.accessibilityLabel.startsWith('Café, ') && home.props.accessibilityLabel.endsWith(', ' + label + ', Banco, Hoy'));
 });
 
 test('EntryRow gives the merchant two lines beside a bounded amount column at normal sizes, and stacks the amount under the name when it would not fit', () => {

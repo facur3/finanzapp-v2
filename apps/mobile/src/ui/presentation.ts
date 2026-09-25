@@ -118,6 +118,13 @@ export function dueWhen(dateISO: string, todayISO: string): DueWhen {
   return days <= 7 ? { kind: 'soon', days } : { kind: 'date' };
 }
 
+/** Inicio's lists (24UX5 review): a row names its account only when the rows on screen come from more than one
+ * account. Owning a second account of the currency is not enough: when every visible row is from the same one, its
+ * name on each row says nothing. Each list decides on its own rows. VoiceOver, the detail and the search keep it. */
+export function visibleNamesAccount(rows: readonly { accountId: string }[]): boolean {
+  return new Set(rows.map(row => row.accountId)).size > 1;
+}
+
 /** Whether a row should name its account: only when more than one account of that currency could be meant.
  * With one account the name repeats on every row and says nothing (24UX2). Cards count (a purchase on a card and one
  * in cash are different facts); a personal debt's hidden account never pays an expense, so it does not. */
@@ -131,4 +138,26 @@ export function namesAccount(accounts: readonly Account[], currency: Currency, d
  * onto another account, names the account on every row, so an old payment never reads as the current account's. */
 export function historyNamesAccount(entries: readonly Pick<Entry, 'accountId'>[], ruleAccountId: string): boolean {
   return entries.some(entry => entry.accountId !== ruleAccountId);
+}
+
+/** Names that say nothing about what a movement was for (compared after `searchable`): with them the category is the
+ * only way to tell rows apart, so Inicio keeps it in the caption. Short on purpose; a real name never matches. */
+const GENERIC_NAMES = new Set(['varios', 'compra', 'compras', 'pago', 'pagos', 'gasto', 'gastos', 'ingreso', 'ingresos', 'otro', 'otros',
+  'otra', 'otras', 'sin nombre', 'desconocido', 'misc', 'various', 'purchase', 'payment', 'expense', 'income', 'other', 'unknown', 'n/a', 'test', 'prueba']);
+
+/** Inicio's rows (24UX5) leave the category out of the caption when the glyph already says it, and keep it where the
+ * row would be ambiguous without it: a name too short or with no letter ("f", "a", "123"), a generic name ("Varios",
+ * "Pago"), or a glyph that another category on the same screen also draws. A name that is the category itself
+ * ("Comida" in Comida) never repeats it. VoiceOver, the detail, the filters and the search keep the category always. */
+export function homeNamesCategory(merchant: string, categoryLabel: string, glyphShared: boolean): boolean {
+  const name = searchable(merchant).trim().replace(/\s+/g, ' ');
+  if (name === searchable(categoryLabel).trim().replace(/\s+/g, ' ')) return false;
+  return glyphShared || name.length < 3 || !/\p{L}/u.test(name) || GENERIC_NAMES.has(name);
+}
+
+/** The glyphs that stand for more than one category among the rows on one screen. */
+export function sharedGlyphs(rows: readonly { category: string; glyph: string }[]): Set<string> {
+  const categories = new Map<string, Set<string>>();
+  for (const row of rows) categories.set(row.glyph, (categories.get(row.glyph) ?? new Set()).add(row.category));
+  return new Set([...categories].filter(([, names]) => names.size > 1).map(([glyph]) => glyph));
 }

@@ -1,6 +1,6 @@
 # FinanzApp mobile: living roadmap
 
-Updated: 2026-09-25 (Producto 24UX4). Read [decision 001](decisions/001-native-mobile.md),
+Updated: 2026-09-25 (Producto 24UX5). Read [decision 001](decisions/001-native-mobile.md),
 [decision 002](decisions/002-spending-first.md),
 [decision 003](decisions/003-five-tabs-and-cards.md) and
 [decision 004](decisions/004-native-first-and-web-retirement.md). Decision 002 supersedes
@@ -106,14 +106,15 @@ history file keeps the evidence of when and why.
 
 ## 1. Implemented (current state)
 
-What exists in code on `master` as of Producto 24UX3 (PR #57), plus Producto 24UX4 on its branch
+What exists in code on `master` as of Producto 24UX4 (PR #58), plus Producto 24UX5 on its branch
 (marked). Per area, without test inventories (those are in apps/mobile/README.md and the history
 file).
 
 - **Product shape.** Five native tabs with the Assistant in the centre and Más as the grouped
   hub (Finanzas / App y datos: Cuentas, Tarjetas, Presupuestos, Recurrentes, Deudas y cobros,
-  Categorías, Idioma, Región, Apariencia, backup, the Assistant's data note); a Más footer that
-  names the build, the material in use and the delivery (Producto 24UX4 on its branch). Liquid Glass on
+  Categorías, Idioma, Región, Apariencia, backup, the Assistant's data note); a Más version line
+  («FinanzApp 0.1.0 (24UX5)»; 24UX5 on its branch: the material and locale diagnostics only in a development
+  build). Liquid Glass on
   Inicio's movement pills, its Assistant entry and the Assistant composer only in a development build on iOS 26 with
   the API present and without Reduce Transparency; opaque material otherwise.
 - **Inicio.** One main number (gasto registrado of the month, or Disponible: cash in normal
@@ -126,7 +127,11 @@ file).
   with real recurring data; category as the caption, the due day once) as a tight agenda, recent
   movements as a full-height open ledger (the account named only when another of the currency
   exists; an empty month says so once). Section links
-  (Reportes keeps the currency, Ver todos) are quiet: secondary ink and a chevron.
+  (Reportes keeps the currency, Ver todos) are quiet. 24UX5 (on its branch): the links take the slate `link`
+  token; both lists draw the same 40 pt mark (the agenda stays tighter); the Home rows (`EntryRow
+  variant="home"`) caption the date alone and add the category or the account only when needed to tell a row
+  apart (`homeNamesCategory`; the account only when the visible rows of that list come from more than one
+  account, `visibleNamesAccount`); VoiceOver keeps every field.
 - **Recording.** Gasto / Ingreso / Transferencia on one control; kind and amount first; the
   amount field anchored with tabular digits, typing and pasting in the region's separators,
   per-currency exponent (0, 2, 3), 15-digit bound, paste markers, shortcuts (Usar todo, Pagar
@@ -134,24 +139,27 @@ file).
   Ingresa en as stacked selection rows; the date wheel in a compact bottom sheet on iOS (24B6;
   its entrance is corrected in 24UX1); edit, undo, contextual account correction and recovery;
   a draft kept when a save fails; historical card incomes still editable.
-- **Ledger and storage.** SQLite schema 10 (24UX4 on its branch: a `deleted` flag on recurring rules
+- **Ledger and storage.** SQLite schema 10 (24UX4: a `deleted` flag on recurring rules
   and debt profiles; schema 9 added `currency_units`), durable writes, audited
   edits, same-currency internal transfers, balance corrections, accounts with identity
   (display rename, archive-first), category identity (presets in code, definitions per kind,
   normalised key, schema 8), cards and debts as internal accounts with profiles (issuer, last
   four digits, limit, closing and due days; counterparty, direction, due date), card rules
-  (24B6). Backups v8/v9 export as before; v10 (24UX4 on its branch) only once a rule or debt is
+  (24B6). Backups v8/v9 export as before; v10 (24UX4) only once a rule or debt is
   deleted, carrying its deletion record; v1–v10 import; a failed restore rolls back.
 - **Commitments.** Weekly/monthly/yearly recurring rules with next occurrence, pause, edit,
   per-occurrence identity (scheduled is not paid; retries cannot duplicate); debts and
   receivables with partial payments; card purchases and payments; closing and due dates from
   the user's days. 24UX2: a rule's detail lists the movements it recorded (read by their
   deterministic id, never the scheduled dates), a recorded movement links back to its rule, a paused
-  rule reads "Pausado" at full contrast. 24UX4 (on its branch): a rule pauses, resumes (never
+  rule reads "Pausado" at full contrast. 24UX4: a rule pauses, resumes (never
   recording what fell due while paused) or is deleted, and a debt is settled (the reviewed payment
   form, prefilled), closed (listed under Cerradas), reopened or deleted, from a trailing swipe on
   its row or from its detail; deleting asks first and leaves every recorded movement, payment and
-  collection in the ledger. No instalment plans yet.
+  collection in the ledger. 24UX5 (on its branch): the catch-up runs on launch and on every return to the
+  foreground and is pinned by real-SQLite tests; a long backlog is recorded automatically in durable batches
+  with its original dates (one rule can no longer keep the ledger or Recurrentes closed), and an occurrence
+  already in the ledger counts as recorded even after the person edited or undid it. No instalment plans yet.
 - **Merchant identity (24UX2).** `packages/domain/merchants.ts`: normalized merchant keys, a
   curated catalogue of 35 unambiguous brands matched only by exact alias, never a category; the
   typed name is never rewritten; bare common words (Apple, Steam, Adobe, Despegar) stay
@@ -212,6 +220,12 @@ it was checked in). Metro from the branch on the installed FinanzApp Dev build s
 item unless a section says a new native build is needed. The checklist sections are in
 [mobile-device-checklist.md](mobile-device-checklist.md).
 
+- **24UX5 — visual consistency, copy and the recurring audit:** the slate links in both themes, the
+  40 pt marks on both Home lists, the date-only captions and the cases that bring the category or the account
+  back, «By category», Reportes' information button and the insight no longer repeating the ranking, the
+  Más version line, the recurring catch-up on open and foreground with a due date passed while closed,
+  VoiceOver in both languages, the largest text size, a currency switch without flicker (checklist,
+  Producto 24UX5).
 - **24UX4 — managing recurring rules and debts:** the trailing swipe (feel, threshold, one row
   open at a time, the native back swipe untouched, scroll vs swipe), the action colours in both
   themes, the confirmations, VoiceOver's Actions rotor on the rows, Dynamic Type on the action
@@ -442,7 +456,7 @@ the owner authorises it; no EAS build or store submission without the owner.
     should open the composer focused is a later decision with the Assistant's own delivery (25A).
   - **Merged** on 2026-09-25 (`d5bdcfd`).
 
-### Producto 24UX4 — managing recurring rules and debts (this PR)
+### Producto 24UX4 — managing recurring rules and debts (PR #58)
 
 - **Goal.** Native-feeling management of commitments: pause, resume and delete a recurring rule;
   settle, close, reopen and delete a debt tracker; from an iOS trailing swipe on the list row and
@@ -516,6 +530,108 @@ the owner authorises it; no EAS build or store submission without the owner.
     null → live → deleted and a cold link to a deleted item on both screens.
   - **Pending:** the device QA of §2 (checklist, Producto 24UX4). Installing this build upgrades
     FinanzApp Dev's ledger to schema 10 (additive, one-way): export a backup first.
+  - **Merged** on 2026-09-25 (`dfa1fc8`); CI green on the merge commit.
+
+### Producto 24UX5 — final visual consistency, copy and recurring audit (this PR)
+
+- **Goal.** Finish the direction the owner approved on the iPhone in 24UX3 without a redesign: a token for
+  secondary links, one mark size across Inicio's two lists, a Home-only row presentation with less text,
+  shorter copy in es/en, a lighter Reportes, Más as a settings screen, and the recurring behaviour pinned
+  by tests, including the states the screenshots never showed.
+- **Out of scope.** Any new Home module or card (debts stay off Inicio), a schema or backup change,
+  background tasks, bank connections, FX, notes on expenses/incomes, EAS builds, 24R2.
+- **Recurring audit (what the code did, what the tests now pin).** `tests/recurring-audit.node.ts` runs
+  against a real SQLite file: an active rule records on open (`openLedger`) and on every return to the
+  foreground (`refreshLedger`, the two paths LedgerProvider takes); a date that passed while the app was
+  closed is recorded with the due date; expenses and incomes both; five opens and foregrounds never record
+  twice; pausing then resuming never records the paused dates; deleting never records again and keeps the
+  recorded history; weekly, monthly and yearly calendars across month ends, a leap day, the turn of the
+  year and an open several days late; the 366-date boundary and backlogs of 367 and 733 dates recorded in
+  full; an interruption between batches; a backlog replayed over edited and undone occurrences; the per-launch
+  step bound; an old backup restored years later. Nothing runs while the app is closed: the catch-up happens
+  on the next open or foreground, dated on the due day.
+- **Found and fixed.**
+  - *One rule could keep every screen closed.* `recurringOccurrencesThrough` throws past 366 pending dates
+    (a weekly rule untouched for seven years, an old restore), and `processRecurring` ran every rule in one
+    transaction whose failure made LedgerProvider show «No pudimos abrir tus datos» on every launch.
+    **Final implementation (after the review of `2a04d76`, owner's decision: automatic, nothing dropped):**
+    `catchUpRecurring` records any backlog automatically in **batches** of at most `RECURRING_BATCH_SIZE`
+    (366) dates per rule (`recurringDueBatch`, `materializeRecurringRule(…, limit)`), oldest first, each date
+    with its original due date and deterministic id. Each batch is one exclusive transaction (movements and
+    the rule's advance together), so an interruption keeps the batches already written and the next launch
+    resumes from the saved next date, never duplicating (an id already in the ledger, edited, moved or undone,
+    counts as recorded). A normal catch-up (a few days) is one batch, as before. One launch runs at most 64
+    batches (about 23,000 dates per rule); a rule still behind continues on the next launch or foreground.
+    Memory per batch is bounded by the batch, not the backlog. Materialization is isolated per rule: a rule
+    whose dates cannot be materialized (a real failure; no known input reaches it) is left unchanged and
+    reported, the others are recorded. A rule that fails validation is refused earlier by `readArchive` (as
+    before). `openLedger`/`refreshLedger` (`src/storage/ledger-session.ts`) never let the catch-up fail an
+    open: a failing batch rolls back alone, the earlier ones stay, and the existing «No pudimos verificar…»
+    banner shows over the open app. Only a rule left behind by a real failure reads «Revisar» in Recurrentes
+    (`recurringNeedsReview`; it used to say «Hoy»), with «Continuar desde hoy» (`resumeRecurringRule`) as the
+    person's explicit choice.
+  - *Recurrentes crashed on the same rule.* `recurringForecastByCurrency` walked each rule's whole backlog
+    with the 366 guard during render, so the screen threw exactly when a rule was far behind (review thread
+    on `recurring.tsx`). The projection now counts only dates inside its window
+    (`recurringOccurrencesBetween`: past dates are walked, never collected) and leaves out, per rule, one it
+    cannot read; the other rules stay listed. A rendered-screen test covers a rule 800+ dates behind beside a
+    normal one.
+  - *An edited occurrence could also block the app.* A rule moved back onto a day it had already recorded
+    (the price changed: edit today's movement, then the rule with a new amount and today's date) threw «Un
+    vencimiento recurrente coincide con otro movimiento distinto» inside the same catch-up, on every launch.
+    The occurrence id is the rule and the date, so an id already in the ledger *is* that occurrence: it now
+    counts as recorded whatever the person did to it (edited, moved, undone), is never recorded twice and
+    never stops the catch-up. The retired error string left the catalogue.
+- **Three words, three facts** (copy and docs): a movement **recorded by FinanzApp** (a normal movement it
+  adds when the date arrives and the app opens), a **bank payment or collection** (never confirmed or
+  executed by the app), and the **next due date** (an estimate). The Recurrentes empty state, the form's
+  note and the Registrados caption now say so; nothing claims a local rule pays money or runs on time with
+  the app closed.
+- **Decisions.** Link token `link` #4A6390 / #8EA7D8 (measured contrast, desaturated, apart from the cobalt
+  and the transfer azure) on Inicio's quiet links only. Home rows via an explicit `variant="home"`; the
+  category returns to a caption for short, letterless or generic names and for glyphs shared on screen
+  (`homeNamesCategory`, `sharedGlyphs`), the account only when a list's visible rows come from two accounts
+  (`visibleNamesAccount`, review of PR #59). «Where your money
+  went» → «By category»; «En qué gastaste», «Próximos compromisos» and «Últimos movimientos» kept (natural,
+  wrap instead of truncating). Reportes' methodology behind an `InfoButton`; «Tu mayor gasto» dropped only
+  when the ranking shows that same single purchase (`insightsBesideRanking`). Más: a version line, the
+  diagnostics only in `__DEV__`. `IconButton` 44 × 44. Details in docs/mobile-design.md (Producto 24UX5).
+- **Status.** Delivered on this branch (2026-09-25), not device-verified.
+  - **Checked on Linux:** root `npm test` 299/299 (was 297: +2 `recurringNeedsReview`; the backup version
+    error's wording updated in its test), `npm run check:repo`; mobile `npm run typecheck`, `npm run
+    test:storage` 643/643 (was 617: +13 new `recurring-audit.node.ts` on real SQLite, +3 `spending-home`
+    (row captions, accounts and link targets, the composition with no/one/several accounts, two
+    currencies, 3+ categories, an exceeded general budget, active/paused/deleted rules, a 13-digit amount
+    and a currency switch), +2 `presentation` (search fields; `homeNamesCategory`/`sharedGlyphs`), +2
+    `report-routes` (the insight rule, the information button), +1 `home-ranking`, +2 `theme` (the link
+    token in both themes; `appearance.node.ts` imports its contrast helper and so runs them again: +2
+    there), +1 `more-routes` (a release build shows no diagnostics); existing Home, rows, Más and report
+    tests updated), `currency:verify`, `regions:verify`, `i18n:check -- --strict` (0 errors, 0 stale;
+    English reviewed and accepted), `i18n:extract` (no copy outside the catalogue), `check` (up to date),
+    `export:ios` (iOS bundle exported, 5 MB); `server/mobile/schema.test.sql` on postgres:17 in a local
+    container (unchanged code, passes). No EAS build; the iPhone was not touched; no schema change.
+  - **Review of PR #59** (owner's iPhone screenshots): the Reportes heading read «Septiembre De 2026» (a
+    style-level `capitalize`); `formatMonthTitle` now raises the first letter only, also in Presupuestos, its
+    form and the long date of the movement and transfer details. The period line no longer repeats «· ARS»
+    (the chip and «Gastado · ARS» name it; the category detail keeps it). Home rows repeated «· a ·» when two
+    ARS accounts were owned but every visible row was in one: each Home list now names accounts only when its
+    visible rows come from more than one (`visibleNamesAccount`), Próximos compromisos independently; «f» and
+    «aa» keep their category; VoiceOver on an upcoming row always says the account. The per-rule confirmation
+    mode was removed from 25C2 and docs/merchant-identity.md: recurring rules stay automatic. Checked:
+    mobile `test:storage` 647/647 (+1 `report-routes`, +1 `reports`, +1 `presentation`, +1
+    `recurring-audit`; the Home account test rewritten for the visible-rows rule), root `npm test` 299/299,
+    `check:repo`, `typecheck`, `currency:verify`, `regions:verify`, `i18n:check -- --strict`, `i18n:extract`,
+    `check`, `export:ios`.
+  - **Review of `2a04d76`** (two review threads): Recurrentes no longer crashes on a rule far behind (the
+    forecast counts only its window, per rule, defensively), and a backlog past 366 dates is recorded
+    automatically in durable batches with its original dates instead of being set aside (details above).
+    Checked: root `npm test` 302/302 (+3 `recurring.test.ts`: batches, materialization to completion, the
+    windowed forecast), mobile `test:storage` 653/653 (+5 net in `recurring-audit.node.ts` on real SQLite:
+    the backlog recorded in full, 366/367/733, an interruption between batches, a replay over edited and undone
+    occurrences, the per-launch bound, an ordinary 3–11-day late opening, an old backup restored years later;
+    +1 `polish-routes`: the rendered Recurrentes screen with a stale and a normal rule, which fails on the
+    previous code), plus every other gate below.
+  - **Pending:** the device QA of §2 (checklist, Producto 24UX5).
 
 ### Producto 24R2 — international regions released
 
@@ -658,7 +774,11 @@ the owner authorises it; no EAS build or store submission without the owner.
   movements; no simulated returns); split expenses and free tags (never replacing the category);
   CSV import with a reviewed draft before anything is written and categorisation rules that only
   pre-fill; reports and search improvements (account and custom-period filters, saved
-  searches); legacy web import as an optional, previewed importer.
+  searches); legacy web import as an optional, previewed importer. **Searchable notes on expenses and
+  incomes** (24UX5 audit): today only a transfer carries a note, and the search reads merchant, category
+  (stored and localized) and account; a note on an `Entry` needs a schema and backup version, the form field,
+  the detail row, indexing in `selectEntries`, the Assistant's evidence (never sent without consent) and
+  its VoiceOver order.
 - **Rules.** Every write through the validators; imports are drafts; no invented balances.
 - **Gates.** Domain tests per feature; schema/backup version bumps with rollback tests; the
   import preview on the iPhone with the owner's own CSV.
@@ -679,14 +799,17 @@ docs/merchant-identity.md.
   rules: a merchant key pre-fills the category the person chose before, only pre-fills, visible and
   editable in Categorías, never rewrites a stored movement. Suggested recurring detection: the same
   merchant key, account, currency and amount repeating at a regular interval proposes a rule the
-  person confirms; nothing is created silently. Payment history and a calendar of commitments:
-  expected occurrences (expected → paid / skipped / late) linked to real movements by the person's
-  confirmation, per currency, never summed across currencies (§5 of the design).
+  person confirms; nothing is created silently. A calendar of commitments read from the rules and the
+  movements they already recorded, per currency, never summed across currencies. **Recurring rules stay
+  automatic** (owner's decision, review of PR #59): expenses and incomes are recorded on their date (on
+  launch or foreground when the app was closed); managing a rule is pause, resume and delete only. No
+  per-rule confirmation mode, expected-occurrence state or reconciliation screen is planned. Reviewing
+  drafts belongs to the Assistant's captures, a separate workflow.
 - **Rules.** The typed name stays; the category stays the classification; no ambiguous match; a
   scheduled payment is never a movement; no connection to a merchant or a bank is implied.
-- **Gates.** Domain tests (matching, suggestions never applied without confirmation, occurrence
-  states, migration of auto-registered movements to paid occurrences), schema and backup versions
-  with rollback tests, the history and calendar on the iPhone with VoiceOver and large text.
+- **Gates.** Domain tests (matching, suggestions never applied without confirmation, the calendar
+  per currency), schema and backup versions with rollback tests if any record is added, the history
+  and calendar on the iPhone with VoiceOver and large text.
 - **Depends on.** 24UX2 (merged); the owner's decision on the brand-mark source after the four
   questions above.
 

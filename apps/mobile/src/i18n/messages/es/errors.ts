@@ -155,7 +155,7 @@ export const errors = {
       fileSize: 'Elegí una copia JSON de hasta 5 MB.',
       notJson: 'El archivo no es una copia JSON válida.',
       notFinanzApp: 'El archivo no es una copia de FinanzApp.',
-      version: 'Solo se pueden restaurar copias del piloto nativo v1 a v10. La app web/anterior y otras versiones todavía no son compatibles; conservá el archivo.',
+      version: 'Solo se pueden restaurar copias de FinanzApp de las versiones 1 a 10. Las de la app web anterior no son compatibles; conservá el archivo.',
       money: 'Formato o unidad monetaria no compatibles.',
       /** A v1–v8 file naming a currency other than ARS or USD: it cannot be read as cents, whatever currencies the app offers (24B1). */
       legacyImport: 'Las copias v1 a v8 solo pueden contener cuentas y presupuestos en ARS o USD. No se importó nada; conservá el archivo.',
@@ -213,7 +213,6 @@ export const errors = {
       newRecurring: 'Un recurrente nuevo no puede tener cambios previos.',
       recurringChanged: 'El recurrente cambió desde que lo abriste. Volvé a revisarlo.',
       recurringCurrency: 'Elegí una cuenta de la misma moneda. Cambiar la moneda requiere crear otro recurrente.',
-      recurringCollision: 'Un vencimiento recurrente coincide con otro movimiento distinto.',
       newBudget: 'Un presupuesto nuevo no puede tener cambios previos.',
       budgetChanged: 'El presupuesto cambió desde que lo abriste. Volvé a revisarlo.',
       budgetCurrency: 'Para cambiar la moneda, creá otro presupuesto.',

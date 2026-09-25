@@ -17,7 +17,7 @@ export const recurring = {
       add: 'Agregar recurrente',
       emptyTitle: 'Nada recurrente todavía',
       emptyDetailAccount: 'Creá un pago o ingreso recurrente para esta cuenta.',
-      emptyDetail: 'Alquiler, suscripciones, sueldo o cualquier movimiento que se repita. FinanzApp lo registra al vencer, una sola vez.',
+      emptyDetail: 'Alquiler, suscripciones, sueldo o cualquier movimiento que se repita. FinanzApp lo anota en tus movimientos cuando vence, una sola vez. No paga ni cobra nada.',
       create: 'Crear recurrente',
       next30: 'Próximos 30 días',
       payments: 'Pagos',
@@ -36,6 +36,9 @@ export const recurring = {
       /** 24UX2: a paused rule never announces a next date. */
       labelPaused: 'Editar recurrente {merchant}, {frequency}, {category}, {amount} {currency}, pausado',
       paused: 'Pausado',
+      /** 24UX5: an active rule FinanzApp could not bring up to date (its next date is already past). */
+      review: 'Revisar',
+      labelReview: 'Editar recurrente {merchant}, {frequency}, {category}, {amount} {currency}, para revisar: sin registrar desde {date}',
     },
     /** 24UX4: the trailing swipe actions of a rule (short) and the same actions in its detail (named). */
     manage: {
@@ -47,6 +50,9 @@ export const recurring = {
       deleteRule: 'Eliminar recurrente',
       /** Over the detail's actions of a paused rule. */
       pausedNote: 'Pausado: no registra nada hasta que lo reanudes. Lo que venza mientras tanto no se registra.',
+      /** 24UX5: over the detail's actions of an active rule the catch-up could not record (a real failure; a long backlog is recorded on its own, in batches). */
+      reviewNote: 'FinanzApp no pudo registrar este recurrente desde el {date}. Continuá desde hoy para retomarlo sin registrar los anteriores, o pausalo.',
+      continueFromToday: 'Continuar desde hoy',
       /** The confirmation. `{merchant}` is the person's own text. */
       deleteTitle: '¿Eliminar «{merchant}»?',
       deleteDetail: {
@@ -69,7 +75,7 @@ export const recurring = {
       merchantIncomePlaceholder: 'Ej. Sueldo',
       frequency: 'Frecuencia',
       nextDate: 'Próxima fecha',
-      todayNote: 'Si la próxima fecha es hoy, FinanzApp registra ese movimiento al guardar. Luego avanza la fecha automáticamente sin duplicarlo.',
+      todayNote: 'Si la próxima fecha es hoy, FinanzApp anota ese movimiento al guardar. Después lo anota en cada vencimiento, al abrir la app, sin duplicarlo.',
       retryNote: 'El envío quedó congelado para que Reintentar no cree otra regla.',
       create: 'Crear recurrente',
       pastDate: 'La próxima fecha debe ser hoy o una fecha futura.',
@@ -78,7 +84,7 @@ export const recurring = {
     /** 24UX2: the movements a rule already recorded, in its detail. A scheduled date is not one of them. */
     history: {
       title: 'Registrados',
-      caption: 'Movimientos que esta regla ya registró. La próxima fecha es una estimación hasta que llegue.',
+      caption: 'Movimientos que FinanzApp anotó por esta regla; no confirman un pago del banco. La próxima fecha es una estimación.',
       empty: 'Todavía no registró ningún movimiento.',
       older: { one: 'Y {count} registro anterior en Movimientos.', other: 'Y {count} registros anteriores en Movimientos.' },
     },

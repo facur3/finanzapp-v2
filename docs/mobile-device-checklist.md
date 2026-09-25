@@ -1,5 +1,72 @@
 # Physical iPhone acceptance checklist
 
+## Producto 24UX5 — visual consistency, copy and the recurring audit
+
+**Not done in 24UX5: no EAS build was made and the iPhone was not touched.** Metro from this branch
+(`npm run start:dev-client`) on the installed FinanzApp Dev build; JavaScript only, no native change and
+no schema change (the ledger stays at schema 10). Record each result with the language, the theme and the
+text size. Use your own small test data; never seed movements.
+
+**Inicio (compare with 24UX3; the structure must be identical).**
+
+- [ ] Same order as before: title, Gastos / Disponible, the currency chip, the number, the three pills,
+  the Assistant, then Presupuesto del mes (if any), En qué gastaste, Próximos compromisos, Últimos
+  movimientos. Nothing new, no extra card.
+- [ ] Section links (Reportes, Ver todos, Ver) are a desaturated slate blue (#8EA7D8 in dark, #4A6390 in
+  light), with the chevron in the same ink; they read as links, not as body text and not as the cobalt of
+  the Assistant or the tab bar. Segments and the currency chip stay neutral. Each link opens what it did
+  (Reportes keeps the currency, Ver todos → Recurrentes / Movimientos); VoiceOver says the same names.
+- [ ] Próximos compromisos and Últimos movimientos draw the same 40 pt category tile, aligned on one
+  column. The agenda rows are tighter (56 pt), the ledger rows a little taller (64 pt); the due day sits
+  under the amount, amber for today and tomorrow.
+- [ ] A movement with a clear name ("Carrefour") shows only the date under it; one named "f", "a" or
+  "Varios" also shows its category ("Comida · Hoy"); two different categories that draw the same icon on
+  screen both show their category ("f" and "aa" keep «Comida · Hoy»). With two ARS accounts but every
+  visible movement in the same one, no row repeats the account; once the visible rows come from two
+  accounts, each shows its own ("Banco · Hoy"). Próximos compromisos decides the same on its own rows;
+  its amounts and days do not change.
+- [ ] VoiceOver on a movement row still says merchant, Gasto/Ingreso, amount, category, account and date;
+  on an upcoming row merchant, category, amount, the estimated day and the account (even when the
+  caption leaves it out). The same in English.
+- [ ] English: the category section reads «By category»; titles wrap rather than truncate at the largest
+  accessibility text size, with the link still reachable.
+- [ ] With a budget (general, exceeded), several categories, a second currency and a very large amount,
+  switching ARS/USD keeps the order and does not flicker or jump; nothing is remounted in a visible way.
+
+**Reportes.**
+
+- [ ] The month heading reads «Septiembre de 2026» (lower-case «de»; English «September 2026»); the
+  same in Presupuestos, and a movement's detail date reads «Martes, 22 de septiembre de 2026». The period
+  line under it says «Hasta hoy» with no «· ARS» (the chip and «Gastado · ARS» already name it).
+- [ ] Beside «Gastado · ARS» an information glyph opens «Qué cuenta este reporte» (the currency, no
+  opening balances, transfers or card payments, a month without records is not a month without
+  spending). The paragraph at the end of the screen is gone.
+- [ ] With a merchant bought once, the ranking shows it and «Para tener en cuenta» no longer repeats
+  «Tu mayor gasto fue …»; with a merchant bought twice the insight stays. Budget warnings stay.
+- [ ] The month arrows, «Este mes» and the header «+» buttons are easy to hit (44 pt targets); the
+  empty month and the «Día a día» note are one short sentence.
+
+**Más and other screens.**
+
+- [ ] The end of Más reads «FinanzApp 0.1.0 (24UX5)» and, on FinanzApp Dev only, the material and the
+  language source under it. The storage note says the records are saved only on this device and work
+  offline. Copia de seguridad → Importar no longer says «piloto».
+- [ ] Presupuestos with nothing set, and with no category limits: one short sentence each.
+
+**Recurring audit (Recurrentes).**
+
+- [ ] With a rule due today, force-quit and reopen: one movement for today, with today's date; reopen
+  again and background/foreground several times: still one.
+- [ ] A rule whose due date passed while the app was closed is recorded with the due date (not the
+  opening day) the next time the app opens or comes back to the foreground.
+- [ ] The empty state, the form's note and the detail's Registrados caption say FinanzApp adds the
+  movement when it comes due and that it does not pay, collect or confirm a bank payment.
+- [ ] No cosmetic re-check is needed for the backlog fix (review of `2a04d76`): a rule hundreds of dates behind
+  is covered by automated real-SQLite and rendered-screen tests (`recurring-audit.node.ts`, `polish-routes`).
+- [ ] (Only if one exists; never forge one.) A rule reading «Revisar» in amber: its detail explains
+  since when it was not recorded and offers «Continuar desde hoy»; tapping it records nothing for the
+  past dates and brings the rule back to its next date.
+
 ## Producto 24UX4 — managing recurring rules and debts
 
 **Not done in 24UX4: no EAS build was made and the iPhone was not touched.** Metro from this branch

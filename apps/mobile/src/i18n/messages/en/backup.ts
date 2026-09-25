@@ -12,7 +12,7 @@ export const backup: Pick<Messages, 'backup'> = {
       footer: 'A backup is a snapshot of your data, not a sync between devices. Importing only adds what is missing and never replaces existing records.',
       dialogTitle: 'Save FinanzApp backup',
       sharingUnavailable: 'The share menu isn’t available on this device.',
-      tooLarge: 'The backup is over this pilot’s 5 MB limit. Don’t delete the app; keep your data while we expand recovery.',
+      tooLarge: 'The backup is over the 5 MB limit. Don’t delete the app: your data is still saved on this device.',
       prepareFailed: 'The backup could not be prepared. Your data is still on the device.',
     },
     import: {
@@ -27,7 +27,7 @@ export const backup: Pick<Messages, 'backup'> = {
       doneDetail: 'Your accounts, cards, debts, transactions, budgets and recurring items are now saved on this device. No existing records were duplicated.',
       chooseAnother: 'Choose another backup',
       emptyTitle: 'Recover your records',
-      emptyDetail: 'Choose a backup from the native pilot. You can review the changes before saving them. The file is never sent to a server.',
+      emptyDetail: 'Choose a FinanzApp backup. You’ll review the changes before saving them. The file is never sent to a server.',
       choose: 'Choose backup',
       reviewTitle: 'Review backup',
       rows: {

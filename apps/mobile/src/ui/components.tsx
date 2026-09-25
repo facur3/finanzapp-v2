@@ -100,9 +100,10 @@ export function Surface({ children, style, grouped = false }: { children: ReactN
   return <View style={[styles.surface, { backgroundColor: p.surface }, grouped ? { padding: 0, gap: 0, overflow: 'hidden', borderRadius: radius.group } : surfaceShadow(p), style]}>{children}</View>;
 }
 
-/** A section heading with an optional text action on the right. `quiet` (Inicio, 24UX3) draws the action in
- * secondary ink at footnote size with a small secondary chevron: still a visible, 44 pt tappable link, but no longer one more
- * cobalt word competing with the hero, the Assistant and the tab bar. Elsewhere the action stays the cobalt link. */
+/** A section heading with an optional text action on the right. `quiet` (Inicio, 24UX3) draws the action at footnote
+ * size with a small chevron in the `link` slate blue (24UX5; secondary ink before): a visible, 44 pt tappable link that
+ * reads as navigation without becoming one more cobalt word competing with the hero, the Assistant and the tab bar.
+ * Elsewhere the action stays the cobalt link. */
 export function SectionTitle({ children, action, onAction, caption, quiet = false }: {
   children: ReactNode; action?: string; onAction?: () => void; caption?: string; quiet?: boolean;
 }) {
@@ -115,8 +116,8 @@ export function SectionTitle({ children, action, onAction, caption, quiet = fals
     {action && onAction && (quiet
       ? <PressFeedback feedback="opacity" accessibilityRole="button" accessibilityLabel={action} onPress={onAction} hitSlop={{ top: 4, bottom: 4 }}
         style={{ paddingLeft: 12, minHeight: 36, flexDirection: 'row', alignItems: 'center', gap: 2 }}>
-        <AppText variant="footnote" style={{ color: p.secondary, fontWeight: '500' }}>{action}</AppText>
-        <Ionicons name="chevron-forward" size={13} color={p.secondary} accessible={false} />
+        <AppText variant="footnote" style={{ color: p.link, fontWeight: '500' }}>{action}</AppText>
+        <Ionicons name="chevron-forward" size={13} color={p.link} accessible={false} />
       </PressFeedback>
       : <PressFeedback feedback="opacity" accessibilityRole="button" accessibilityLabel={action} onPress={onAction} style={{ paddingLeft: 12, minHeight: 36 }}>
         <AppText variant="subhead" style={{ color: p.primary, fontWeight: '500' }}>{action}</AppText>
@@ -185,7 +186,7 @@ export function IconButton({ name, label, onPress, disabled = false, color }: { 
   const p = usePalette();
   return <PressFeedback feedback="opacity" accessibilityRole="button" accessibilityLabel={label} onPress={onPress}
     disabled={disabled} accessibilityState={{ disabled }}
-    style={{ width: 44, alignItems: 'center', opacity: disabled ? 0.35 : 1 }}><Ionicons name={name} size={24} color={color ?? p.text} /></PressFeedback>;
+    style={{ width: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center', opacity: disabled ? 0.35 : 1 }}><Ionicons name={name} size={24} color={color ?? p.text} /></PressFeedback>;
 }
 
 export function Field({ label, ...props }: TextInputProps & { label: string }) {
@@ -688,31 +689,34 @@ export function AccountBadge({ accountId, large = false, size }: { accountId: st
   return <GlyphTile icon={look.glyph} large={large} size={size} color={look.hex} />;
 }
 
-/** One transaction line: merchant, then category · account · date; amount on the right. `plain` (Inicio's
- * latest transactions, 24UX3) draws the same row as an open ledger line on the screen's ground: no cell padding,
- * the hairline starting under the text, and a dim instead of a cell tint when pressed. */
-export function EntryRow({ entry, account, last = false, showDate = true, showAccount = true, plain = false }: {
-  entry: Entry; account: Account; last?: boolean; showDate?: boolean; showAccount?: boolean; plain?: boolean;
+/** One transaction line: merchant, then category · account · date; amount on the right. The `home` variant (Inicio's
+ * latest transactions, 24UX3 as `plain`, named in 24UX5) draws the row as an open ledger line on the screen's ground:
+ * no cell padding, the hairline starting under the text, a dim instead of a cell tint when pressed, and a caption that is
+ * the date alone unless the category (`showCategory`, see `homeNamesCategory`) or the account (`showAccount`) is needed
+ * to tell the row apart. Every other list keeps the full caption. VoiceOver hears the same full sentence in both. */
+export function EntryRow({ entry, account, last = false, showDate = true, showAccount = true, variant = 'list', showCategory = true }: {
+  entry: Entry; account: Account; last?: boolean; showDate?: boolean; showAccount?: boolean; variant?: 'list' | 'home'; showCategory?: boolean;
 }) {
   const p = usePalette();
   const day = useCurrentDay();
   const { t, relativeDate, spokenAmount } = useI18n();
   const dateLabel = relativeDate(entry.dateISO, day);
   const income = entry.kind === 'income';
+  const home = variant === 'home';
   const stacked = useStacked({ minor: entry.amountMinor, currency: account.currency, signed: true });
   const category = useCategoryLook(entry.category, entry.kind).label;
-  const detail = [category, showAccount ? account.name : null, showDate ? dateLabel : null].filter(Boolean).join(' · ');
+  const detail = [!home || showCategory ? category : null, showAccount ? account.name : null, showDate ? dateLabel : null].filter(Boolean).join(' · ');
   const separator = { borderBottomColor: p.line, borderBottomWidth: last ? 0 : StyleSheet.hairlineWidth };
-  return <PressFeedback feedback={plain ? 'opacity' : 'highlight'} accessibilityRole="button"
+  return <PressFeedback feedback={home ? 'opacity' : 'highlight'} accessibilityRole="button"
     accessibilityLabel={[entry.merchant, t(income ? 'movement.incomeWord' : 'movement.expenseWord'), spokenAmount(entry.amountMinor, account.currency), category, account.name, dateLabel].join(', ')}
     onPress={() => router.push({ pathname: '/entry/[id]', params: { id: entry.id } })}
-    style={plain ? styles.plainRow : [styles.row, separator]}>
+    style={home ? styles.plainRow : [styles.row, separator]}>
     <MerchantBadge merchant={entry.merchant} category={entry.category} kind={entry.kind} tone={income ? 'income' : 'neutral'} />
     <View style={{ flex: 1, minWidth: 0, gap: 8, flexDirection: stacked ? 'column' : 'row', alignItems: stacked ? 'flex-start' : 'center',
-      ...(plain ? { alignSelf: 'stretch', paddingVertical: 12, ...separator } : {}) }}>
+      ...(home ? { alignSelf: 'stretch', paddingVertical: 12, ...separator } : {}) }}>
       <View style={{ flex: stacked ? undefined : 1, minWidth: 0, gap: 3 }}>
         <AppText numberOfLines={stacked ? undefined : 2} style={{ fontWeight: '500' }}>{entry.merchant}</AppText>
-        <AppText secondary variant="footnote" numberOfLines={stacked ? undefined : 2}>{detail}</AppText>
+        {!!detail && <AppText secondary variant="footnote" numberOfLines={stacked ? undefined : 2}>{detail}</AppText>}
       </View>
       <View style={{ maxWidth: stacked ? '100%' : AMOUNT_COLUMN, alignItems: 'flex-end' }}>
         <Money minor={income ? entry.amountMinor : -entry.amountMinor} currency={account.currency} signed tone={income ? 'income' : 'expense'} />
@@ -807,7 +811,7 @@ const styles = StyleSheet.create({
   choice: { flex: 1, minWidth: 72, minHeight: 32, paddingHorizontal: 8, paddingVertical: 6, alignItems: 'center', justifyContent: 'center' },
   choiceCompact: { minWidth: 64, minHeight: 28, paddingVertical: 4 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, paddingHorizontal: 16, minHeight: 64 },
-  /** A row on the screen's ground (EntryRow plain): the vertical padding and the hairline live on the text column. */
+  /** A row on the screen's ground (EntryRow home): the vertical padding and the hairline live on the text column. */
   plainRow: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 64 },
   detailRow: { minHeight: 54, flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 14 },
   navigationRow: { minHeight: 60, flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 16, paddingVertical: 11 },

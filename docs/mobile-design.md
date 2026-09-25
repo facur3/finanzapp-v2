@@ -881,8 +881,8 @@ persona; la categoría sigue en la leyenda de la fila. Solo en desarrollo,
   y abre la regla.
 - **Suscripción pausada**: en Pausados, tinta plena, «Pausado» en lugar del día, VoiceOver dice
   «pausado».
-- La conciliación futura (esperado → pagado / omitido / atrasado, sugerencias confirmadas por la
-  persona) está en merchant-identity.md §5; no se implementa ahora.
+- Los recurrentes se registran solos (decisión del propietario, revisión de la PR #59): no hay
+  conciliación ni confirmación por regla, ni ahora ni en el roadmap (merchant-identity.md §5).
 
 ### Lo que cambió visualmente (para comparar en el iPhone)
 
@@ -1048,7 +1048,129 @@ pendiente sin registrar un pago), con un botón no destructivo.
 - **Saldar** abre el formulario de pago revisado con todo el saldo escrito; la persona elige la
   cuenta y confirma. Nunca se marca pagada sin una transferencia registrada.
 
+## Producto 24UX5 — consistencia visual, textos y auditoría de recurrentes
+
+Sin rediseño: la estructura de Inicio que el propietario aprobó en el iPhone queda igual (título,
+Gastos / Disponible, la moneda, el número, las tres píldoras, el Asistente, el orden de las secciones,
+la tarjeta de categorías seguida de las dos listas abiertas). Se terminan detalles de consistencia, se
+recortan textos redundantes y se fijan con tests los estados que las capturas no mostraban. Código y
+cálculo sobre los tokens; nada de esto está verificado en el iPhone.
+
+### Enlaces secundarios: un token propio
+
+`link` en `src/ui/palette.ts`: un azul pizarra desaturado para los enlaces de navegación secundaria de
+Inicio (Reportes, Ver todos, Ver) y su chevron. Oscuro **#8EA7D8** (la referencia del propietario: 8,7:1
+sobre negro, 7,0:1 sobre #1C1C1E); claro **#4A6390**, elegido por contraste medido (5,4:1 sobre el fondo
+#F2F2F6, 6,0:1 sobre blanco). Tono ~218°, saturación muy por debajo del cobalto, así que se lee como
+«se toca» sin sumar otro acento azul al lado del Asistente y la pestaña activa. `tests/theme.node.ts`
+verifica el contraste, el tono y que quede lejos del primario, del azul de transferencia y de la tinta
+secundaria. No se usa para controles, selección ni significado: los segmentados y el chip de moneda
+siguen neutros, los colores de categoría, gasto, ingreso y transferencia no cambian. El resto de la app
+conserva el enlace cobalto de `SectionTitle`.
+
+### Filas de Inicio: una marca, dos densidades
+
+| | Antes (24UX3) | Ahora (24UX5) |
+| --- | --- | --- |
+| Marca de Próximos compromisos | 32 pt | 40 pt, la misma columna que Últimos movimientos |
+| Fila de la agenda | 56 pt, 10 pt de relleno, categoría siempre | 56 pt, 8 pt de relleno, leyenda solo si aporta |
+| Fila del libro | 64 pt, «categoría · cuenta · fecha» | 64 pt, la fecha; categoría o cuenta solo si aportan |
+| Enlaces de sección | tinta secundaria | `link` pizarra |
+
+La variante es explícita: `EntryRow variant="home"` (antes `plain`); Movimientos, detalles de cuenta,
+tarjeta, deuda y la historia de una regla siguen con la leyenda completa. La decisión vive en funciones
+puras de `src/ui/presentation.ts`:
+
+- `homeNamesCategory(nombre, categoría, glifoCompartido)`: la categoría vuelve a la leyenda cuando el
+  nombre no alcanza (menos de tres caracteres, sin letras: «f», «a», «123»; genérico: «Varios», «Pago»,
+  «Unknown») o cuando otra categoría en pantalla dibuja el mismo glifo (`sharedGlyphs`, calculado sobre
+  las dos listas juntas). Un nombre que es la categoría («Transporte» en Transporte) nunca la repite.
+- La cuenta aparece solo cuando **las filas visibles de esa lista** vienen de más de una cuenta
+  (`visibleNamesAccount`, revisión de la PR #59). Tener dos cuentas en ARS no alcanza: si todo lo visible
+  es de la misma, repetir «· a ·» en cada fila no dice nada. Cada lista decide con sus propias filas;
+  Movimientos y los detalles siguen con `namesAccount`.
+
+VoiceOver no pierde nada: la fila del libro sigue diciendo comercio, Gasto/Ingreso, importe, categoría,
+cuenta y fecha; la de la agenda comercio, categoría, importe, el día estimado y la cuenta (antes la
+cuenta se decía solo cuando se dibujaba). El detalle, los filtros y
+la búsqueda siguen mostrando y encontrando todo.
+
+**Búsqueda y notas.** Movimientos busca comercio, categoría guardada, el nombre localizado de la
+categoría y la cuenta (`selectEntries`), y las transferencias también por su nota (`selectTransfers`).
+Un gasto o un ingreso no tiene nota propia (`Entry` no la lleva): no se inventa soporte ni se migra el
+esquema para esta entrega. Las notas buscables de gastos e ingresos quedan en la etapa de productividad
+(roadmap, Producto 25C).
+
+### Títulos y textos
+
+- Inglés: «Where your money went» → **«By category»**. Español: se mantiene «En qué gastaste» (dice
+  más que «Por categoría» y cabe).
+- «Próximos compromisos» / «Coming up» y «Últimos movimientos» / «Latest transactions» se mantienen:
+  son naturales, no ambiguos, y `SectionTitle` los parte en dos líneas antes que cortarlos; el enlace
+  sigue alcanzable con el texto más grande.
+- Reportes: «Tocá uno para ver los movimientos» (instrucción obvia) y la explicación de las flechas en
+  el mes vacío salen; el vacío es una frase.
+- Presupuestos: el vacío y «Sin límites por categoría» dejan de explicar dos veces qué es un sublímite
+  (lo dice el formulario, junto al campo).
+- Copia de seguridad: «piloto» / «piloto nativo» salen del texto visible y del error de versión.
+- Más: el pie era diagnóstico del proyecto («Piloto nativo 0.1.0 · Producto 24UX4 · Material opaco ·
+  Idioma: módulo nativo») para todos. Ahora es la línea de versión, como el «Acerca de» de iOS:
+  «FinanzApp 0.1.0 (24UX5)»; el material y el origen del idioma aparecen debajo solo en una build de
+  desarrollo (`__DEV__`). La nota de almacenamiento local se conserva, dicha como hecho: «Tus registros
+  se guardan solo en este dispositivo y funcionan sin conexión. No se sincronizan con otros
+  dispositivos.»
+
+### Reportes: menos texto permanente, los mismos datos
+
+- **Título del mes** (revisión de la PR #59). `textTransform: 'capitalize'` subía cada palabra y el
+  iPhone mostraba «Septiembre De 2026». `formatMonthTitle` (en `src/i18n/format.ts`, también en
+  `useI18n()`) sube solo la primera letra: «Septiembre de 2026», «September 2026». Lo mismo en
+  Presupuestos, su formulario y la fecha larga del detalle de un movimiento o una transferencia
+  («Martes, 22 de septiembre de 2026»). No queda ningún `capitalize` sobre texto localizado.
+- **Sin ARS repetido.** La línea del período dice «Hasta hoy» (antes «Hasta hoy · ARS»): el chip de
+  moneda y «Gastado · ARS» ya la nombran en la misma vista. El detalle de categoría conserva el código,
+  porque ahí nada más lo dice (`reportPeriodLabel(…, withCurrency)`).
+
+- **Metodología detrás de un botón.** El párrafo final («Solo movimientos registrados en ARS… Un mes sin
+  registros no significa que no hayas gastado») pasa a un `InfoButton` junto a «Gastado · ARS»: «Qué
+  cuenta este reporte», que además dice que no se convierte otra moneda. La advertencia sigue a un toque
+  y la moneda sigue escrita junto al total.
+- **Para tener en cuenta sin repetir.** «Tu mayor gasto fue X» no aparece cuando el ranking de arriba
+  ya muestra esa misma compra (una fila de ese comercio con una sola compra: nombre, importe y categoría
+  ya están en pantalla). Si el comercio tiene varias compras, el mayor gasto individual es un hecho
+  adicional y se queda. Los avisos de presupuesto y los aumentos por categoría no se tocan
+  (`insightsBesideRanking` en `src/ui/report-presentation.ts`).
+- **Controles.** `IconButton` (flechas del mes, «+» de las cabeceras) medía 44 pt de ancho pero 24 de
+  alto: ahora 44 × 44. «Este mes» suma 8 pt de `hitSlop` (44 pt de alto).
+- Sin cambios: selector de moneda, período, importe, tendencia, dona, categorías, ranking abierto,
+  accesos a detalle, fórmulas. Ninguna conversión.
+
+### Recurrentes: un estado nuevo, solo si hace falta
+
+Un atraso largo se registra solo, en lotes, con sus fechas (ver la auditoría en el roadmap, 24UX5). Solo
+una regla activa que una falla real dejó con la próxima fecha en el pasado queda para revisar. En su fila dice **«Revisar»** en ámbar donde iría el día (antes decía «Hoy», que era
+falso); su detalle explica desde cuándo no se registra y ofrece **«Continuar desde hoy»** (reanudar desde
+hoy: no registra las fechas atrasadas). Los textos distinguen tres cosas: el movimiento que FinanzApp
+anota («lo anota en tus movimientos cuando vence»), un pago o cobro del banco («no confirman un pago del
+banco», «no paga ni cobra nada») y el próximo vencimiento («es una estimación»).
+
+### Lo que no cambió a propósito
+
+La estructura y el orden de Inicio, los destinos de navegación, el presupuesto del mes, los lavados de
+categoría, las píldoras, el Asistente, el material, Reduce Motion (`Reflow`, `ValueTransition`, las
+mismas claves: cambiar de moneda no remonta más de lo que remontaba), los colores de categoría y
+semánticos, la barra de pestañas, las deudas fuera de Inicio. Literales de color que quedan en
+componentes (no en pantallas): blanco sobre rellenos sólidos (acciones al deslizar, tarjetas de
+crédito, marca elegida) y los filetes de las píldoras, el chip y el compositor; ningún `app/` tiene un
+color propio.
+
 ## Pendiente de revisión en iPhone
+
+- Producto 24UX5: el azul pizarra de los enlaces en claro y oscuro (¿se lee como enlace y no como texto
+  ni como el cobalto?), las marcas de 40 pt alineadas en las dos listas, la agenda más compacta, las
+  leyendas con solo la fecha y los casos que vuelven a mostrar la categoría o la cuenta, «By category»,
+  el botón de información de Reportes, el pie de Más, VoiceOver en ambos idiomas, texto de
+  accesibilidad máximo, cambio de moneda sin parpadeo. Lista en docs/mobile-device-checklist.md.
 
 - Producto 24UX4: el deslizamiento en Recurrentes y Deudas (sensación, umbral, una fila abierta,
   desplazamiento vertical sin deslizamientos accidentales, el gesto atrás intacto), los tres tonos

@@ -65,7 +65,9 @@ function TransferDetail({ record, accounts }: { record: TransferRecord; accounts
       ], { cancelable: true, onDismiss: () => { confirming.current = false; } });
   }
   const [year, month, day] = t.dateISO.split('-').map(Number);
-  const date = formatDate(t.dateISO, 'weekdayLong');
+  // First letter only (24UX5 review): a style-level capitalize drew «Martes, 22 De Septiembre De 2026».
+  const long = formatDate(t.dateISO, 'weekdayLong');
+  const date = long.charAt(0).toLocaleUpperCase() + long.slice(1);
   const status = tr(record.voided ? 'transferDetail.statusVoided' : kindId === 'transfer' ? 'transferDetail.statusBetween' : 'transferDetail.statusObligation');
   return <Screen gap={space.xl}>
     <Stack.Screen options={{ title: record.voided ? tr('transferDetail.voidedTitle') : kindTitle, gestureEnabled: !busy, headerBackVisible: !busy }} />
@@ -74,7 +76,7 @@ function TransferDetail({ record, accounts }: { record: TransferRecord; accounts
       <View style={{ alignItems: 'center', gap: 4, width: '100%' }}>
         <Money minor={t.amountMinor} currency={from.currency} large align="center" tone="transfer" color={record.voided ? p.tertiary : undefined} />
         <AppText variant="title3" style={{ textAlign: 'center' }}>{t.note || kindTitle}</AppText>
-        <AppText secondary variant="subhead" style={{ textAlign: 'center', textTransform: 'capitalize' }}>{date}</AppText>
+        <AppText secondary variant="subhead" style={{ textAlign: 'center' }}>{date}</AppText>
       </View>
       <AppText accessibilityLiveRegion="polite" variant="caption" style={{ color: record.voided ? p.warning : p.secondary, fontWeight: '500', textAlign: 'center' }}>{status}</AppText>
     </View>

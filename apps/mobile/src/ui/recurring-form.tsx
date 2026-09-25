@@ -3,7 +3,7 @@ import { Keyboard, View } from 'react-native';
 import { router, Stack } from 'expo-router';
 import { randomUUID } from 'expo-crypto';
 import * as Haptics from 'expo-haptics';
-import { accountKind, editedDraftFits, keepsHistoricalCardIncome, minorFromEditedDraft, postingAccountsFor, recurringHistory, sameRecurringRule, todayKey, validateRecurringRule, type StoredDraft,
+import { accountKind, editedDraftFits, keepsHistoricalCardIncome, minorFromEditedDraft, postingAccountsFor, recurringHistory, recurringNeedsReview, sameRecurringRule, todayKey, validateRecurringRule, type StoredDraft,
   type EntryKind, type RecurringFrequency, type RecurringRule } from '@finanzapp/domain';
 import { useLedger } from '../storage/LedgerProvider';
 import { ActionButton, AmountField, AppText, Choices, EmptyState, EntryRow, ErrorMessage, Field, IconButton, Screen, SectionTitle, Surface } from './components';
@@ -11,13 +11,14 @@ import { draftFromMinor } from './money-input';
 import { AccountField, CategoryField, DateField } from './form-controls';
 import { accountKindLabel, postingAccounts } from './liability-presentation';
 import { historyNamesAccount, initialAccountId } from './presentation';
-import { space } from './theme';
+import { space, usePalette } from './theme';
 import { useI18n } from '../i18n/provider';
 import { useRecurringManagement } from './commitment-actions';
 
 export function RecurringForm({ original, accountId: requestedAccount }: { original?: RecurringRule; accountId?: string }) {
   const { snapshot, archive, saveRecurring } = useLedger();
-  const { t } = useI18n();
+  const p = usePalette();
+  const { t, formatDate } = useI18n();
   const accounts = postingAccounts(snapshot?.accounts ?? [], archive?.debts);
   const [before] = useState(original);
   const [operation] = useState(() => ({ id: randomUUID(), createdAt: new Date().toISOString() }));
@@ -162,6 +163,12 @@ export function RecurringForm({ original, accountId: requestedAccount }: { origi
       {original && !original.deleted && <View style={{ gap: space.m, marginTop: space.l }}>
         <ErrorMessage message={manage.error} />
         {!original.active && <AppText secondary variant="footnote">{t('recurring.manage.pausedNote')}</AppText>}
+        {/* 24UX5: a rule the catch-up set aside. Continuing is resume from today: the backlog is never recorded. */}
+        {recurringNeedsReview(original, todayKey()) && <>
+          <AppText variant="footnote" style={{ color: p.warning, fontWeight: '500' }}>{t('recurring.manage.reviewNote', { date: formatDate(original.nextDateISO, 'long') })}</AppText>
+          <ActionButton label={t('recurring.manage.continueFromToday')} icon="play-forward-outline" busy={managing} disabled={busy || pending !== null}
+            onPress={() => { void manage.resume(original, close); }} />
+        </>}
         <ActionButton secondary label={t(original.active ? 'recurring.manage.pauseRule' : 'recurring.manage.resumeRule')}
           icon={original.active ? 'pause-outline' : 'play-outline'} busy={managing} disabled={busy || pending !== null}
           onPress={() => { void (original.active ? manage.pause : manage.resume)(original, close); }} />

@@ -1,4 +1,4 @@
-import { isStorableCurrency, validDateISO, type Currency, type LedgerSnapshot, type ReportPeriod } from '@finanzapp/domain';
+import { categoryKey, isStorableCurrency, validDateISO, type Currency, type Entry, type LedgerSnapshot, type MerchantSpending, type ReportPeriod, type SpendingInsight } from '@finanzapp/domain';
 import { availableCurrencies } from './presentation.ts';
 import { formatMonth, formatPercent } from '../i18n/format.ts';
 import { DEFAULT_LOCALE, type AppLocale } from '../i18n/locale.ts';
@@ -45,13 +45,15 @@ export function reportMonthLabel(monthISO: string, locale: AppLocale = DEFAULT_L
   return formatMonth(monthISO, locale);
 }
 
-/** "Hasta hoy · ARS", "Mes completo · ARS" or "Del 1 al 12 · ARS": which days a report covers. */
-export function reportPeriodLabel(period: ReportPeriod, day: string, t: Translate = translator('es')): string {
+/** "Hasta hoy · ARS", "Mes completo · ARS" or "Del 1 al 12 · ARS": which days a report covers. `withCurrency` false
+ * (Reportes' own header, 24UX5 review) leaves the code out where the chip and «Gastado · ARS» already name it; the
+ * category detail keeps it, since nothing else on that line says the currency. */
+export function reportPeriodLabel(period: ReportPeriod, day: string, t: Translate = translator('es'), withCurrency = true): string {
   const [year, month] = period.endISO.split('-').map(Number);
   const lastDay = new Date(year, month, 0, 12).getDate();
   const label = period.endISO === day ? t('reports.period.untilToday') : Number(period.endISO.slice(-2)) === lastDay
     ? t('reports.period.fullMonth') : t('reports.period.untilDay', { day: Number(period.endISO.slice(-2)) });
-  return label + ' · ' + period.currency;
+  return withCurrency ? label + ' · ' + period.currency : label;
 }
 
 /** Optional comparison cutoff must stay within the requested month and today. */
@@ -77,4 +79,17 @@ export function spendingShare(amountMinor: number, totalMinor: number, locale: A
   // Divide before multiplying: cents remain exact; the ratio is display-only.
   const fraction = amountMinor / totalMinor;
   return { fraction, label: formatPercent(fraction, locale) };
+}
+
+/** Producto 24UX5: the insights Reportes shows under "Dónde más gastaste". "Tu mayor gasto fue X" is dropped when the
+ * ranking right above already shows that same single purchase (a row for its merchant with one purchase): the name,
+ * the amount and the category are on screen, so the card would repeat them. When the merchant has several purchases the
+ * largest single one is an extra, checkable fact and stays. Budget warnings and growth facts always stay. */
+export function insightsBesideRanking(insights: readonly SpendingInsight[], ranking: readonly Pick<MerchantSpending, 'key' | 'count'>[],
+  entries: readonly Pick<Entry, 'id' | 'merchant'>[]): SpendingInsight[] {
+  return insights.filter(insight => {
+    if (!insight.id.startsWith('largest:')) return true;
+    const entry = entries.find(item => item.id === insight.id.slice('largest:'.length));
+    return !entry || !ranking.some(row => row.key === categoryKey(entry.merchant) && row.count === 1);
+  });
 }

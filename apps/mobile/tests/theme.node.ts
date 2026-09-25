@@ -35,6 +35,20 @@ for (const [name, p] of [['light', lightPalette], ['dark', darkPalette]] as cons
     assert.ok(contrast(p.text, p.thumb) >= 7, `ink on the compact thumb: ${contrast(p.text, p.thumb).toFixed(2)}`);
     if (p === darkPalette) assert.ok(contrast(p.thumb, p.surface) >= 1.4, `the dark thumb separates from its track: ${contrast(p.thumb, p.surface).toFixed(2)}`);
   });
+  test(`${name}: the secondary link is a readable slate blue, apart from the cobalt primary and the transfer azure (24UX5)`, () => {
+    // Inicio's section links sit on the background; the token also holds on a surface should a link ever sit on a card.
+    for (const ground of [p.background, p.surface]) assert.ok(contrast(p.link, ground) >= 4.5, `link on ${ground}: ${contrast(p.link, ground).toFixed(2)}`);
+    const saturation = (hex: string) => {
+      const [r, g, b] = [1, 3, 5].map(index => parseInt(hex.slice(index, index + 2), 16) / 255);
+      const max = Math.max(r, g, b), min = Math.min(r, g, b), l = (max + min) / 2;
+      return max === min ? 0 : (max - min) / (1 - Math.abs(2 * l - 1));
+    };
+    assert.ok(hue(p.link) >= 205 && hue(p.link) <= 230, `a blue (${hue(p.link).toFixed(0)}°)`);
+    assert.ok(saturation(p.link) < saturation(p.primary) - 0.2, `desaturated next to the primary (${saturation(p.link).toFixed(2)} vs ${saturation(p.primary).toFixed(2)})`);
+    for (const other of [p.primary, p.transfer, p.secondary]) assert.notEqual(p.link, other);
+    // It must not read as body text either: a visible step of hue away from the neutral secondary ink.
+    assert.ok(saturation(p.link) > saturation(p.secondary) + 0.15);
+  });
   test(`${name}: semantic colours stay distinct from the brand primary and readable`, () => {
     for (const semantic of [p.expense, p.income, p.transfer, p.warning]) {
       assert.ok(contrast(semantic, p.surface) >= 4.5, `${semantic} on surface`);

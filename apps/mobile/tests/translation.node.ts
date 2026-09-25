@@ -74,7 +74,9 @@ test('both catalogues are complete: no empty text, and English is really English
     // "Pesos" is also the English word; format-only templates; proper and technical names.
     'currency.option', 'currency.short.ARS', 'reports.dayRow', 'reports.insights.largestDetail',
     'reports.chart.donutLabel', 'reports.chart.bar', 'reports.chart.timelineBar', 'categoryManager.list.rowLabel', 'categoryManager.picker.color',
-    'categoryManager.icons.internet', 'settings.material.glass', 'assistant.draft.eyebrow', 'assistant.draft.row']);
+    'categoryManager.icons.internet', 'settings.material.glass', 'assistant.draft.eyebrow', 'assistant.draft.row',
+    // 24UX5: the product name with its version, the same in every language.
+    'settings.version']);
   for (const key of keys) {
     for (const catalogue of [es, en]) {
       const value = leaf(catalogue, key);

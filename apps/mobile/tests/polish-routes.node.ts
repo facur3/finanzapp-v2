@@ -190,6 +190,24 @@ test('recurrentes projects the next 30 days per currency and pausing advances no
   assert.equal(view.saved[0].revision, 1);
 });
 
+test('24UX5 review: Recurrentes opens with a rule more than 366 dates behind beside a normal one; the forecast counts only the next 30 days', () => {
+  // Before the fix, recurringForecastByCurrency threw for the stale rule during render and the screen never appeared.
+  const stale: domain.RecurringRule = { ...rule, id: 'stale', merchant: 'Gimnasio', frequency: 'weekly', amountMinor: 1000, anchorDateISO: '2010-01-07', nextDateISO: '2010-01-07' };
+  const data = { ...archive, recurring: [rule, stale] };
+  assert.throws(() => domain.recurringOccurrencesThrough(stale, '2026-10-20'), /demasiados/, 'the fixture really is past the 366 guard');
+  for (const locale of ['es-AR', 'en-AR'] as AppLocale[]) {
+    const root = harness('recurring.tsx', {}, data, locale).render();
+    const rows = nodes(root).filter(node => typeof node.type === 'function' && node.props.rule).map(node => node.props.rule.id);
+    assert.deepEqual(rows, ['stale', 'rent'], locale + ': both rules are listed');
+    // Next 30 days from 2026-09-20: rent on 2026-10-01 and the weekly rule's own dates inside the window (Thursdays
+    // 24 Sep, 1, 8, 15 Oct), never its past backlog.
+    const forecast = nodes(root).filter(node => node.type === 'Money')[0];
+    assert.equal(forecast.props.minor, 40000 + 4 * 1000);
+  }
+  // The pure projection stays defensive on its own too.
+  assert.deepEqual(domain.recurringForecastByCurrency([stale], [cash], '2026-09-20', 30).map(item => item.status === 'ready' && item.count), [4]);
+});
+
 test('accounts list shows liquid totals per currency and hides card accounts', () => {
   const root = harness('accounts.tsx').render();
   const list = find(root, 'SectionList');

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { advanceRecurringDate, deleteRecurringRule, materializeRecurringRule, pauseRecurringRule, recurringEntryId, recurringHistory, recurringOccurrenceOf, recurringOccurrencesThrough,
+import { RECURRING_BATCH_SIZE, recurringDueBatch, recurringForecastByCurrency, recurringNeedsReview, advanceRecurringDate, deleteRecurringRule, materializeRecurringRule, pauseRecurringRule, recurringEntryId, recurringHistory, recurringOccurrenceOf, recurringOccurrencesThrough,
   resumeRecurringRule, validateRecurringRule, validateRecurringRuleChange, type RecurringRule } from './recurring';
 import type { Account } from './ledger';
 
@@ -129,5 +129,52 @@ describe('pausing, resuming and deleting a rule (Producto 24UX4)', () => {
     const recorded = materializeRecurringRule(monthly, [account], '2026-02-28', now).entries;
     deleteRecurringRule(monthly, now);
     expect(recurringHistory(monthly, recorded).map(entry => entry.dateISO)).toEqual(['2026-02-28', '2026-01-31']);
+  });
+});
+
+describe('a rule the catch-up set aside (Producto 24UX5)', () => {
+  const base = { active: true, deleted: false, nextDateISO: '2026-09-20' };
+  it('needs review only while active, not deleted, with a next date before today', () => {
+    expect(recurringNeedsReview(base, '2026-09-25')).toBe(true);
+    expect(recurringNeedsReview({ ...base, nextDateISO: '2026-09-25' }, '2026-09-25')).toBe(false);
+    expect(recurringNeedsReview({ ...base, nextDateISO: '2026-10-01' }, '2026-09-25')).toBe(false);
+    expect(recurringNeedsReview({ ...base, active: false }, '2026-09-25')).toBe(false);
+    expect(recurringNeedsReview({ ...base, active: false, deleted: true }, '2026-09-25')).toBe(false);
+  });
+  it('continuing from today clears it without recording the backlog', () => {
+    const stale = { id: 'r', accountId: 'a', kind: 'expense' as const, amountMinor: 100, merchant: 'X', category: 'Y', frequency: 'weekly' as const,
+      anchorDateISO: '2019-01-03', nextDateISO: '2019-01-03', active: true, deleted: false, createdAt: '2019-01-01T00:00:00.000Z', revision: 0, updatedAt: '2019-01-01T00:00:00.000Z' };
+    const resumed = resumeRecurringRule(stale, '2026-09-25', '2026-09-25T12:00:00.000Z');
+    expect(recurringNeedsReview(resumed, '2026-09-25')).toBe(false);
+    expect(resumed.nextDateISO >= '2026-09-25').toBe(true);
+    expect(recurringOccurrencesThrough(resumed, '2026-09-25').length).toBeLessThanOrEqual(1);
+  });
+});
+
+describe('a long backlog in batches (24UX5 review)', () => {
+  const weekly = { id: 'w', accountId: 'a', kind: 'expense' as const, amountMinor: 100, merchant: 'Gym', category: 'Salud', frequency: 'weekly' as const,
+    anchorDateISO: '2010-01-07', nextDateISO: '2010-01-07', active: true, deleted: false, createdAt: '2010-01-01T00:00:00.000Z', revision: 0, updatedAt: '2010-01-01T00:00:00.000Z' };
+  const account = { id: 'a', name: 'Caja', currency: 'ARS' as const, openingMinor: 0, createdAt: '2010-01-01T00:00:00.000Z' };
+  it('hands out the oldest dates first, never throws, and says when more remain', () => {
+    const first = recurringDueBatch(weekly, '2026-09-20');
+    expect(first.dates.length).toBe(RECURRING_BATCH_SIZE);
+    expect(first.dates[0]).toBe('2010-01-07');
+    expect(first.complete).toBe(false);
+    expect(recurringDueBatch(weekly, '2010-01-20', 10)).toEqual({ dates: ['2010-01-07', '2010-01-14'], complete: true });
+  });
+  it('materializes one batch with the original dates and advances the rule just past it', () => {
+    const step = materializeRecurringRule(weekly, [account], '2026-09-20', '2026-09-20T12:00:00.000Z', 3);
+    expect(step.entries.map(entry => entry.dateISO)).toEqual(['2010-01-07', '2010-01-14', '2010-01-21']);
+    expect(step.rule.nextDateISO).toBe('2010-01-28');
+    expect(step.complete).toBe(false);
+    let rule = weekly, total = 0;
+    for (;;) { const next = materializeRecurringRule(rule, [account], '2026-09-20', '2026-09-20T12:00:00.000Z'); total += next.entries.length; rule = next.rule; if (next.complete) break; }
+    // Every Thursday from 2010-01-07 through 2026-09-20, counted independently of the batching.
+    expect(total).toBe(Math.floor((Date.UTC(2026, 8, 20) - Date.UTC(2010, 0, 7)) / (7 * 86400000)) + 1);
+    expect(rule.nextDateISO > '2026-09-20').toBe(true);
+  });
+  it('the forecast counts only the window, whatever the backlog, and never throws for it', () => {
+    const [forecast] = recurringForecastByCurrency([weekly], [account], '2026-09-20', 30);
+    expect(forecast).toEqual({ status: 'ready', currency: 'ARS', expenseMinor: 400, incomeMinor: 0, count: 4 });
   });
 });
