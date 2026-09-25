@@ -120,9 +120,10 @@ file).
   (24UX3) a hierarchy of one focal point: a compact header, a 48 pt number with room around it,
   three compact movement pills (Gasto, Ingreso, Transferir) and one wide Assistant entry below
   them, then three sections with their own shape: ranked category washes as a compact summary
-  card, the upcoming payments (only with real recurring data; category as the caption, the due
-  day once) as an open agenda on the ground, recent movements as the grouped ledger (the account
-  named only when another of the currency exists; an empty month says so once). Section links
+  card, then two open lists on the ground that differ by density: the upcoming payments (only
+  with real recurring data; category as the caption, the due day once) as a tight agenda, recent
+  movements as a full-height open ledger (the account named only when another of the currency
+  exists; an empty month says so once). Section links
   (Reportes keeps the currency, Ver todos) are quiet: secondary ink and a chevron.
 - **Recording.** Gasto / Ingreso / Transferencia on one control; kind and amount first; the
   amount field anchored with tabular digits, typing and pasting in the region's separators,
@@ -409,11 +410,19 @@ the owner authorises it; no EAS build or store submission without the owner.
     captions under «Dónde más gastaste» and «Para tener en cuenta» removed (one restated the
     title, the other was disclaimer copy); the Assistant quick-action strings replaced by the
     entry's label and VoiceOver hint (English reviewed and accepted).
+  - **Owner's iPhone review (same PR):** the card → list → card rhythm on Inicio and the two
+    matching slabs in Reportes resolved: `EntryRow plain` makes Últimos movimientos an open ledger
+    (64 pt rows, 40 pt marks, signed amounts; the agenda keeps 56 pt rows and 32 pt marks);
+    Reportes' «Dónde más gastaste» is an open ranked list (32 pt marks, hairline under the text);
+    the compact segment's thumb is a new `thumb` token (#3A3A3E dark) with a hairline edge, the
+    chosen label semibold and the others medium; the three-or-more currency chip gets a hairline
+    edge; the quiet links' chevron is secondary. The Assistant entry is unchanged.
   - Docs: docs/mobile-design.md (Producto 24UX3), the device checklist.
   - **Checked on Linux:** root `npm test` 286/286, `npm run check:repo`; mobile `npm run
-    typecheck`, `npm run test:storage` 594/594 (was 592: +1 `spending-home`, +1 `home-ranking`;
+    typecheck`, `npm run test:storage` 596/596 (was 592: +1 `spending-home`, +1 `home-ranking`,
+    +1 `ui-rows` for the plain ledger row, +1 `report-routes` for the open merchant list;
     the quick-action test in `motion.node.ts` rewritten for pills + entry; `theme.node.ts` pins
-    the wash's contrast in both themes; Home/Assistant route tests updated), `currency:verify`,
+    the wash's and the thumb's contrast in both themes; Home/Assistant route tests updated), `currency:verify`,
     `regions:verify`, `i18n:check -- --strict` (0 errors, 0 stale), `check` (up to date),
     `export:ios` (iOS bundle exported, 5 MB). No EAS build; the iPhone was not touched.
   - **Pending:** the device QA of §2 (checklist, Producto 24UX3). Whether the Assistant entry

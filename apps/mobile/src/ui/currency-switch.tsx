@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { StyleSheet } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import type { Currency } from '@finanzapp/domain';
 import { AppText, Choices, PressFeedback } from './components';
@@ -19,7 +20,7 @@ export function CurrencySwitch({ value, currencies, onChange, disabled = false, 
   value: Currency; currencies: readonly Currency[]; onChange: (currency: Currency) => void; disabled?: boolean;
   /** `name` writes "Pesos · ARS"; `code` writes the bare code, for a control that sits beside another (Inicio). */
   labels?: 'name' | 'code';
-  /** Inicio's header (24UX3): the compact segments, or a 32 pt chip in ink instead of cobalt. */
+  /** Inicio's header (24UX3): the compact segments, or a 32 pt chip in ink with a hairline edge instead of cobalt. */
   compact?: boolean;
 }) {
   const p = usePalette();
@@ -35,7 +36,8 @@ export function CurrencySwitch({ value, currencies, onChange, disabled = false, 
       accessibilityHint={t('currency.switchHint')} accessibilityState={{ disabled }} disabled={disabled} onPress={() => setVisible(true)}
       hitSlop={compact ? 6 : undefined}
       style={{ flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: compact ? 32 : 36, paddingVertical: compact ? 4 : 6, paddingHorizontal: 12,
-        borderRadius: compact ? 16 : radius.button, backgroundColor: compact && p.isDark ? p.surface : p.inset, alignSelf: 'flex-start', maxWidth: '100%' }}>
+        borderRadius: compact ? 16 : radius.button, backgroundColor: compact && p.isDark ? p.surface : p.inset, alignSelf: 'flex-start', maxWidth: '100%',
+        ...(compact ? { borderWidth: StyleSheet.hairlineWidth, borderColor: p.isDark ? 'rgba(255,255,255,0.12)' : 'rgba(10,10,12,0.10)' } : {}) }}>
       <AppText accessible={false} numberOfLines={1} variant={compact ? 'footnote' : 'subhead'} style={{ fontWeight: '600', color: compact ? p.text : p.primary, flexShrink: 1 }}>{label(value)}</AppText>
       <Ionicons name="chevron-down" size={compact ? 12 : 14} color={compact ? p.secondary : p.primary} accessible={false} />
     </PressFeedback>

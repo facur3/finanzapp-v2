@@ -101,7 +101,7 @@ export function Surface({ children, style, grouped = false }: { children: ReactN
 }
 
 /** A section heading with an optional text action on the right. `quiet` (Inicio, 24UX3) draws the action in
- * secondary ink at footnote size with a small chevron: still a visible, 44 pt tappable link, but no longer one more
+ * secondary ink at footnote size with a small secondary chevron: still a visible, 44 pt tappable link, but no longer one more
  * cobalt word competing with the hero, the Assistant and the tab bar. Elsewhere the action stays the cobalt link. */
 export function SectionTitle({ children, action, onAction, caption, quiet = false }: {
   children: ReactNode; action?: string; onAction?: () => void; caption?: string; quiet?: boolean;
@@ -116,7 +116,7 @@ export function SectionTitle({ children, action, onAction, caption, quiet = fals
       ? <PressFeedback feedback="opacity" accessibilityRole="button" accessibilityLabel={action} onPress={onAction} hitSlop={{ top: 4, bottom: 4 }}
         style={{ paddingLeft: 12, minHeight: 36, flexDirection: 'row', alignItems: 'center', gap: 2 }}>
         <AppText variant="footnote" style={{ color: p.secondary, fontWeight: '500' }}>{action}</AppText>
-        <Ionicons name="chevron-forward" size={13} color={p.tertiary} accessible={false} />
+        <Ionicons name="chevron-forward" size={13} color={p.secondary} accessible={false} />
       </PressFeedback>
       : <PressFeedback feedback="opacity" accessibilityRole="button" accessibilityLabel={action} onPress={onAction} style={{ paddingLeft: 12, minHeight: 36 }}>
         <AppText variant="subhead" style={{ color: p.primary, fontWeight: '500' }}>{action}</AppText>
@@ -368,7 +368,7 @@ function Choice({ label, selected, disabled, onPress, compact = false }: { label
   return <Pressable accessibilityRole="button" accessibilityState={{ selected, disabled }} disabled={disabled} accessibilityLanguage={speechLanguage}
     onPress={onPress} style={[styles.choice, compact && styles.choiceCompact]} hitSlop={compact ? { top: 8, bottom: 8 } : 4}>
     <Animated.Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8} maxFontSizeMultiplier={1.3}
-      style={{ fontSize: 13, lineHeight: 18, textAlign: 'center', fontWeight: '600', color: selected ? (compact ? p.text : p.primary) : p.secondary,
+      style={{ fontSize: 13, lineHeight: 18, textAlign: 'center', fontWeight: compact && !selected ? '500' : '600', color: selected ? (compact ? p.text : p.primary) : p.secondary,
         transitionProperty: 'color', transitionDuration: reduced ? 0 : duration.state }}>{label}</Animated.Text>
   </Pressable>;
 }
@@ -379,9 +379,10 @@ function Choice({ label, selected, disabled, onPress, compact = false }: { label
  * neutral thumb: selection reads as selection without a filled blue block.
  * Tapping the current value does nothing. `compact` (Inicio's header, 24UX3)
  * is the lighter variant of a system segmented control: 32 pt tall, the chosen
- * label in ink on a lifted thumb (the way UISegmentedControl draws it), and in
- * dark mode a track one step above the black ground instead of the brighter
- * fill, so the header reads as a quiet switch above the number. */
+ * label in ink (semibold, the others medium) on a lifted thumb with a hairline
+ * edge (the way UISegmentedControl draws it), and in dark mode a track one step
+ * above the black ground with a clearly brighter thumb (`thumb`), so the header
+ * is quiet but its state is unmistakable, without cobalt. */
 export function Choices<T extends string>({ value, options, onChange, disabled, compact = false }: {
   value: T; options: { value: T; label: string }[]; onChange: (value: T) => void; disabled?: boolean; compact?: boolean;
 }) {
@@ -399,9 +400,11 @@ export function Choices<T extends string>({ value, options, onChange, disabled, 
   }, [offset, reduced, trackWidth, x]);
   const thumbStyle = useAnimatedStyle(() => ({ transform: [{ translateX: x.value }] }));
   const track = compact && p.isDark ? p.surface : p.inset;
-  const thumb = p.isDark ? (compact ? p.inset : p.elevated) : p.surface;
+  const thumb = p.isDark ? (compact ? p.thumb : p.elevated) : p.surface;
+  // The compact thumb carries a hairline edge in both themes, so the chosen segment reads as a state, not a tint.
+  const thumbEdge = compact ? { borderWidth: StyleSheet.hairlineWidth, borderColor: p.isDark ? 'rgba(255,255,255,0.10)' : 'rgba(10,10,12,0.08)' } : {};
   return <View style={[styles.choices, { backgroundColor: track }]} onLayout={event => setTrackWidth(event.nativeEvent.layout.width)}>
-    {width > 0 && <Animated.View pointerEvents="none" style={[styles.thumb, { width, backgroundColor: thumb },
+    {width > 0 && <Animated.View pointerEvents="none" style={[styles.thumb, { width, backgroundColor: thumb }, thumbEdge,
       p.isDark ? {} : { shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 3, shadowOffset: { width: 0, height: 1 } }, thumbStyle]} />}
     {options.map(option => <Choice key={option.value} label={option.label} selected={value === option.value} compact={compact}
       disabled={disabled} onPress={() => { if (option.value !== value) { selectionHaptic(); onChange(option.value); } }} />)}
@@ -685,9 +688,11 @@ export function AccountBadge({ accountId, large = false, size }: { accountId: st
   return <GlyphTile icon={look.glyph} large={large} size={size} color={look.hex} />;
 }
 
-/** One transaction line: merchant, then category · account · date; amount on the right. */
-export function EntryRow({ entry, account, last = false, showDate = true, showAccount = true }: {
-  entry: Entry; account: Account; last?: boolean; showDate?: boolean; showAccount?: boolean;
+/** One transaction line: merchant, then category · account · date; amount on the right. `plain` (Inicio's
+ * latest transactions, 24UX3) draws the same row as an open ledger line on the screen's ground: no cell padding,
+ * the hairline starting under the text, and a dim instead of a cell tint when pressed. */
+export function EntryRow({ entry, account, last = false, showDate = true, showAccount = true, plain = false }: {
+  entry: Entry; account: Account; last?: boolean; showDate?: boolean; showAccount?: boolean; plain?: boolean;
 }) {
   const p = usePalette();
   const day = useCurrentDay();
@@ -697,12 +702,14 @@ export function EntryRow({ entry, account, last = false, showDate = true, showAc
   const stacked = useStacked({ minor: entry.amountMinor, currency: account.currency, signed: true });
   const category = useCategoryLook(entry.category, entry.kind).label;
   const detail = [category, showAccount ? account.name : null, showDate ? dateLabel : null].filter(Boolean).join(' · ');
-  return <PressFeedback feedback="highlight" accessibilityRole="button"
+  const separator = { borderBottomColor: p.line, borderBottomWidth: last ? 0 : StyleSheet.hairlineWidth };
+  return <PressFeedback feedback={plain ? 'opacity' : 'highlight'} accessibilityRole="button"
     accessibilityLabel={[entry.merchant, t(income ? 'movement.incomeWord' : 'movement.expenseWord'), spokenAmount(entry.amountMinor, account.currency), category, account.name, dateLabel].join(', ')}
     onPress={() => router.push({ pathname: '/entry/[id]', params: { id: entry.id } })}
-    style={[styles.row, { borderBottomColor: p.line, borderBottomWidth: last ? 0 : StyleSheet.hairlineWidth }]}>
+    style={plain ? styles.plainRow : [styles.row, separator]}>
     <MerchantBadge merchant={entry.merchant} category={entry.category} kind={entry.kind} tone={income ? 'income' : 'neutral'} />
-    <View style={{ flex: 1, minWidth: 0, gap: 8, flexDirection: stacked ? 'column' : 'row', alignItems: stacked ? 'flex-start' : 'center' }}>
+    <View style={{ flex: 1, minWidth: 0, gap: 8, flexDirection: stacked ? 'column' : 'row', alignItems: stacked ? 'flex-start' : 'center',
+      ...(plain ? { alignSelf: 'stretch', paddingVertical: 12, ...separator } : {}) }}>
       <View style={{ flex: stacked ? undefined : 1, minWidth: 0, gap: 3 }}>
         <AppText numberOfLines={stacked ? undefined : 2} style={{ fontWeight: '500' }}>{entry.merchant}</AppText>
         <AppText secondary variant="footnote" numberOfLines={stacked ? undefined : 2}>{detail}</AppText>
@@ -800,6 +807,8 @@ const styles = StyleSheet.create({
   choice: { flex: 1, minWidth: 72, minHeight: 32, paddingHorizontal: 8, paddingVertical: 6, alignItems: 'center', justifyContent: 'center' },
   choiceCompact: { minWidth: 64, minHeight: 28, paddingVertical: 4 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, paddingHorizontal: 16, minHeight: 64 },
+  /** A row on the screen's ground (EntryRow plain): the vertical padding and the hairline live on the text column. */
+  plainRow: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 64 },
   detailRow: { minHeight: 54, flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 14 },
   navigationRow: { minHeight: 60, flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 16, paddingVertical: 11 },
   navigationGlyph: { width: 30, alignItems: 'center' },

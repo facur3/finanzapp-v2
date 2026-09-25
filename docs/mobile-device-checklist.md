@@ -12,7 +12,9 @@ own small real data (a few expenses, one recurring rule, ideally two currencies)
   chip) competes with it; the screen feels calmer than 24UX2, not emptier.
 - [ ] **Header.** Gastos / Disponible and the currency chip are 32 pt tall, the chosen label in ink
   (not cobalt), easy to hit with a thumb (44 pt target); the thumb still slides (Reduce Motion: jumps).
-  With three or more currencies the chip is the compact "ARS ⌄" row and opens the sheet.
+  In dark the chosen segment is clearly lifted (a lighter thumb with a thin edge) and reads as the
+  current state at a glance, without blue. With three or more currencies the chip is the compact
+  "ARS ⌄" row with a thin edge and opens the sheet.
 - [ ] **Number.** 48 pt with visible room above and below; a long amount still fits on one line
   (shrinks, never clips); Disponible's info glyph and "N cuentas" still read.
 - [ ] **Pills.** Gasto, Ingreso, Transferir: equal width, one line each on the narrowest iPhone at
@@ -26,11 +28,12 @@ own small real data (a few expenses, one recurring rule, ideally two currencies)
 - [ ] **Liquid Glass** (iOS 26, development build, Reduce Transparency off): pills are regular glass,
   the Assistant entry glass with a faint cobalt wash; turn Reduce Transparency on and the opaque
   material appears without relaunch.
-- [ ] **Section differentiation.** En qué gastaste is a compact card (52 pt rows, washes reveal as
-  before); Próximos compromisos is an open list on the background, aligned with its title, hairlines
-  starting under the text, a tap dims the row; Últimos movimientos is the grouped ledger. The three
-  no longer look like one repeated block, and the agenda does not look detached.
-- [ ] **Links.** Reportes / Ver / Ver todo are grey with a chevron, clearly tappable, open the same
+- [ ] **Section rhythm.** En qué gastaste is the only card (52 pt rows, washes reveal as before);
+  below it Próximos compromisos (tight agenda: small marks, the due day) and Últimos movimientos
+  (open ledger: full rows, larger marks, signed amounts) sit on the background, aligned with their
+  titles, hairlines under the text, a tap dims the row. No card → list → card cut; the two lists
+  read as two different things, not one long list.
+- [ ] **Links.** Reportes / Ver / Ver todo are grey with a grey chevron, clearly tappable, open the same
   screens as before (Reportes keeps the currency).
 - [ ] **Cobalt balance.** Count the cobalt on screen: the Assistant's glyph and edge, the active tab.
   Nothing else competes.
@@ -44,7 +47,9 @@ own small real data (a few expenses, one recurring rule, ideally two currencies)
   payment), transactions. In English: "Ask the Assistant".
 - [ ] **Reduce Motion.** Switching Gastos/Disponible and currency cross-fades the number without
   movement; the category fills fade in without growing; sections appearing fade only.
-- [ ] Reportes: «Dónde más gastaste» and «Para tener en cuenta» show no subtitle; nothing else moved.
+- [ ] Reportes: «Dónde más gastaste» is an open ranked list under the donut's category card (rank,
+  small mark, hairline under the text), no longer a second heavy block; it and «Para tener en
+  cuenta» show no subtitle; the donut and the category list are unchanged.
 - [ ] Account detail: the same three pills, each opening its form with the account preselected.
 - [ ] Más footer reads "Producto 24UX3".
 

@@ -920,8 +920,8 @@ tokens, no una captura del iPhone.
 │ ( ✦  Contale al Asistente       › ) │  52 pt, lavado de marca, filo cobalto
 │                                     │
 │ En qué gastaste          Reportes › │  resumen compacto: tarjeta, filas 52 pt
-│ Próximos compromisos    Ver todos › │  agenda abierta, sobre el fondo
-│ Últimos movimientos     Ver todos › │  libro: lista agrupada
+│ Próximos compromisos    Ver todos › │  agenda abierta: marcas de 32 pt, el día
+│ Últimos movimientos     Ver todos › │  libro abierto: marcas de 40 pt, importes
 └─────────────────────────────────────┘
 ```
 
@@ -952,16 +952,38 @@ tokens, no una captura del iPhone.
    filas de 52 pt (antes 64) con glifos de 32 pt y nombre e importe a 15 pt, los lavados de
    siempre. «Próximos compromisos» es una agenda: sin tarjeta, las filas sobre el fondo alineadas
    con el título, marca de 32 pt, filete que empieza bajo el texto y respuesta al toque por
-   atenuación. «Últimos movimientos» sigue siendo el libro: la lista agrupada con filas completas.
+   atenuación. «Últimos movimientos» es el libro (abierto desde la revisión, abajo).
 6. **Enlaces de sección silenciosos.** Reportes, Ver y Ver todo en footnote, tinta secundaria y
-   un chevron terciario (`SectionTitle quiet`), con objetivo de 44 pt. Siguen en el mismo lugar y
+   un chevron secundario (`SectionTitle quiet`), con objetivo de 44 pt. Siguen en el mismo lugar y
    abren lo mismo; el resto de la app conserva el enlace cobalto.
 7. **Menos cobalto a la vez.** En Inicio quedan el glifo y el filo del Asistente y la pestaña
    activa. El presupuesto sigue en tinta, ámbar o coral según su estado.
 
+**Revisión en el iPhone (misma entrega).** El ritmo tarjeta → lista → tarjeta hacía que
+Próximos compromisos cortara el flujo entre dos bloques pesados, y en Reportes «Dónde más
+gastaste» repetía la losa agrupada de las categorías. Cambios:
+
+- **Una sola tarjeta, después contenido liviano.** «Últimos movimientos» pasa a libro abierto
+  sobre el fondo (`EntryRow plain`: sin padding de celda, filete bajo el texto, atenuación al
+  tocar). Se distingue de la agenda por densidad y contenido: filas completas de 64 pt con marcas
+  de 40 pt e importes con signo, frente a filas de 56 pt, marcas de 32 pt y el día en ámbar.
+- **Reportes.** «Dónde más gastaste» es una lista ordenada abierta (número, marca de 32 pt,
+  filete bajo el texto, filas de 60 pt); la dona y la lista de categorías no cambian. Sus filas
+  siguen sin ser tocables, como antes.
+- **Estado de la cabecera más claro, sin cobalto.** El pulgar del segmentado compacto es un token
+  propio, `thumb` (#3A3A3E en oscuro, un escalón visible sobre la pista #1C1C1E; blanco en claro),
+  con filo fino; la etiqueta elegida en tinta semibold y las otras en medium. El chip de moneda de
+  tres o más monedas suma un filo fino.
+- **Enlaces.** Siguen silenciosos; el chevron pasa de terciario a secundario para que se lea
+  como algo que se toca.
+- **Asistente.** Sin cambios: funcionaba.
+
+El ritmo resultante es un bloque pesado (el resumen) seguido de dos listas que cambian de
+densidad, en vez de dos losas iguales con una lista en medio.
+
 **Lo que no cambió a propósito.** La estructura y el orden de Inicio, qué muestra cada sección y
 cuántas filas, los destinos de navegación, el presupuesto del mes, el estado vacío, los lavados de
-categoría y su revelado, las filas de movimientos, Reduce Motion (los mismos `Reflow` y
+categoría y su revelado, el contenido de las filas de movimientos, Reduce Motion (los mismos `Reflow` y
 `ValueTransition`), los colores semánticos y la barra de pestañas. Ningún cálculo, dato o contrato.
 
 **Textos.** Reportes pierde dos subtítulos: «Por importe registrado en el período» (repetía el
@@ -970,7 +992,8 @@ guardado local se conserva: es información de estado, no ruido.
 
 **Riesgos a mirar en el iPhone.** Que las píldoras no se lean como filtros; que la entrada del
 Asistente se lea importante sin volverse un banner; que «Transferir» no se achique de más en un
-iPhone de 375 pt; que la agenda sin tarjeta no parezca suelta junto a las otras dos secciones.
+iPhone de 375 pt; que la agenda y el libro abiertos se distingan entre sí por densidad y no se
+lean como una sola lista larga.
 
 ## Pendiente de revisión en iPhone
 

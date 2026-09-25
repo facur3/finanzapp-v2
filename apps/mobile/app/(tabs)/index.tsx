@@ -4,7 +4,7 @@ import { router } from 'expo-router';
 import { currentMonthISO, hiddenLiabilityAccountIds, liquidTotalsByCurrency, spendingOverview, spendingWindow,
   summarizeMonthlyBudgets } from '@finanzapp/domain';
 import { useLedger } from '../../src/storage/LedgerProvider';
-import { ActionButton, AppText, Choices, EmptyState, EntryRow, Money, Screen, SectionTitle, Surface, useStacked } from '../../src/ui/components';
+import { ActionButton, AppText, Choices, EmptyState, EntryRow, Money, Screen, SectionTitle, useStacked } from '../../src/ui/components';
 import { CurrencySwitch } from '../../src/ui/currency-switch';
 import { useDisplayCurrency } from '../../src/ui/display-currency-provider';
 import { useI18n } from '../../src/i18n/provider';
@@ -27,10 +27,11 @@ const HERO_SIZE = 48;
  *
  * Hierarchy (24UX3), top to bottom: a quiet header (compact segments, the
  * currency chip), the number with room around it, three compact movement
- * pills, the Assistant as the one wide control, then three sections that each
- * have their own shape: the categories as a compact summary card, the
- * commitments as an open agenda on the ground, the latest transactions as the
- * grouped ledger. Section links are quiet (secondary ink and a chevron), so
+ * pills, the Assistant as the one wide control, then the one card (the
+ * categories, a compact summary) followed by two open lists on the ground that
+ * differ by density: the commitments as a tight agenda (32 pt marks, the due
+ * day), the latest transactions as a full-height ledger (40 pt marks, signed
+ * amounts). One heavy block, then lighter content, never card → list → card. Section links are quiet (secondary ink and a chevron), so
  * cobalt is left to the Assistant and the active tab. */
 export default function HomeScreen() {
   const { snapshot, archive } = useLedger();
@@ -137,8 +138,8 @@ export default function HomeScreen() {
       <Reflow>
         <SectionTitle quiet action={t('common.seeAll')} onAction={() => router.navigate('/activity')}>{t('home.recent')}</SectionTitle>
         <ValueTransition id={currency} variant="fade">
-          {recent.length ? <Surface grouped>{recent.map((entry, index) => <EntryRow key={entry.id} entry={entry} showAccount={showAccount}
-            account={snapshot.accounts.find(a => a.id === entry.accountId)!} last={index === recent.length - 1} />)}</Surface>
+          {recent.length ? <View>{recent.map((entry, index) => <EntryRow key={entry.id} entry={entry} showAccount={showAccount} plain
+            account={snapshot.accounts.find(a => a.id === entry.accountId)!} last={index === recent.length - 1} />)}</View>
             : <AppText secondary variant="subhead">{currencies.length > 1 ? t('home.recentEmptyIn', { currency }) : t('home.recentEmpty')}</AppText>}
         </ValueTransition>
       </Reflow>

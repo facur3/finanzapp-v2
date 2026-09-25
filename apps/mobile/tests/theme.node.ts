@@ -31,6 +31,9 @@ for (const [name, p] of [['light', lightPalette], ['dark', darkPalette]] as cons
     assert.ok(contrast(p.text, p.primaryWash) >= 7, `ink on the Assistant wash: ${contrast(p.text, p.primaryWash).toFixed(2)}`);
     assert.ok(contrast(p.primary, p.primaryWash) >= 4.5, `primary on the Assistant wash: ${contrast(p.primary, p.primaryWash).toFixed(2)}`);
     assert.ok(contrast(p.primaryWash, p.surface) < 1.15, 'the wash is a whisper next to the surface, not a blue block');
+    // The compact segment's thumb: ink stays AAA on it, and in dark it is a visible step above the surface track.
+    assert.ok(contrast(p.text, p.thumb) >= 7, `ink on the compact thumb: ${contrast(p.text, p.thumb).toFixed(2)}`);
+    if (p === darkPalette) assert.ok(contrast(p.thumb, p.surface) >= 1.4, `the dark thumb separates from its track: ${contrast(p.thumb, p.surface).toFixed(2)}`);
   });
   test(`${name}: semantic colours stay distinct from the brand primary and readable`, () => {
     for (const semantic of [p.expense, p.income, p.transfer, p.warning]) {

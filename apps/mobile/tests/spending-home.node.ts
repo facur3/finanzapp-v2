@@ -497,8 +497,11 @@ test('24UX3: a quiet header, a larger number, movements then the Assistant, quie
   const titles = nodes(root).filter(node => node.type === 'SectionTitle');
   assert.equal(titles.map(node => node.props.action).join('|'), 'Reportes|Ver todos|Ver todos');
   assert.equal(titles.every(node => node.props.quiet === true && typeof node.props.onAction === 'function'), true);
-  // Three shapes: the categories as a card (CategoryRanking draws its own surface), the commitments on the ground, the ledger grouped.
+  // One card (CategoryRanking draws its own surface), then two open lists on the ground: never card → list → card (24UX3 review).
   const surfaces = nodes(root).filter(node => node.type === 'Surface');
-  assert.equal(surfaces.some(surface => nodes(surface).some(node => node.type === 'UpcomingRecurringRow')), false, 'commitments are an open agenda, not a third card');
-  assert.equal(surfaces.some(surface => surface.props.grouped && nodes(surface).some(node => node.type === 'EntryRow')), true, 'the latest transactions stay a grouped ledger');
+  assert.equal(surfaces.some(surface => nodes(surface).some(node => node.type === 'UpcomingRecurringRow')), false, 'commitments are an open agenda, not a card');
+  assert.equal(surfaces.some(surface => nodes(surface).some(node => node.type === 'EntryRow')), false, 'the latest transactions are an open ledger, not a second slab');
+  const ledger = nodes(root).filter(node => node.type === 'EntryRow');
+  assert.ok(ledger.length > 0);
+  assert.equal(ledger.every(row => row.props.plain === true), true);
 });

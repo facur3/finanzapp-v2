@@ -370,3 +370,18 @@ test('24B3: Reportes with three currencies offers the switch over the currencies
   assert.equal(find(link, 'Money').props.currency, 'JPY', 'a link naming a held currency opens it');
   assert.equal(find(routeHarness('(tabs)/reports.tsx', { month: '2026-08', currency: 'KWD' }, data).render(), 'Money').props.currency, 'ARS', 'a currency no account holds is not offered: the tab opens its first one');
 });
+
+test('24UX3 review: Dónde más gastaste is an open ranked list on the ground, not a second grouped slab', () => {
+  const list = routeHarness('(tabs)/reports.tsx', { currency: 'ARS', month: '2026-08' }).render();
+  const footer = nodes(list.props.ListFooterComponent);
+  const title = footer.find(node => node.type === 'SectionTitle' && node.props.children === 'Dónde más gastaste');
+  assert.ok(title, 'the merchants section renders for a month with expenses');
+  assert.equal(title.props.caption, undefined, 'no subtitle restating the title');
+  const cells = (root: Node) => nodes(root).filter(node => (node.type as unknown as { name?: string })?.name === 'MerchantCells');
+  assert.ok(cells({ type: 'root', props: { children: list.props.ListFooterComponent } } as Node).length > 0);
+  assert.equal(footer.filter(node => node.type === 'Surface').some(surface => cells(surface).length > 0), false);
+  const section = footer.find(node => node.type === 'View' && [node.props.children].flat().includes(title))!;
+  const badges = nodes(section).filter(node => node.type === 'CategoryBadge');
+  assert.ok(badges.length > 0);
+  assert.equal(badges.every(badge => badge.props.size === 32), true, 'compact marks, lighter than the category card');
+});
