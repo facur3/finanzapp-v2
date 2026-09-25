@@ -308,8 +308,8 @@ the owner authorises it; no EAS build or store submission without the owner.
   - Docs: README, AGENTS, apps/mobile/README, decisions 001 and 004, the inventory (§0 executed),
     currency.md and empezar-en-iphone.md no longer describe the web as present; Android's
     shared-code rule recorded (AGENTS rule 13, README, §5 below).
-  - **Checked on Linux:** root `npm test` 270/270 (was 448: −192 web-only tests, −19 legacy date
-    tests, +8 `dates.test.ts`, +6 guard tests), `npm run check:repo`; mobile `npm run typecheck`,
+  - **Checked on Linux:** root `npm test` 270/270 (was 448: −192 retired tests in 19 files, of
+    which 173 web-only and 19 legacy date tests; +8 `dates.test.ts`, +6 guard tests), `npm run check:repo`; mobile `npm run typecheck`,
     `npm run test:storage` 577/577, `currency:verify`, `regions:verify`, `i18n:check -- --strict`
     (0 errors, 0 stale), `i18n:extract` (no change), `check` (up to date), `export:ios` (5 MB
     bundle); `schema.test.sql` on postgres:17 in a container. CI green on PR #55 (`domain`,

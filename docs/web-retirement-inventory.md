@@ -58,7 +58,7 @@ it was established before the deletion (its commands were run on the tree at the
   a request without a session → 401. `/` → 404: no web page is served. The environment variables
   of `server/mobile/runtime.js` are unchanged.
 - **Tests.** Root `npm test`: 448 → 270 (246 domain + 10 handlers + 8 dates + 6 guard; the 192
-  web-only tests of §3 and the 19 legacy date tests left with the web). Mobile `test:storage`:
+  tests in 19 files of §3 left with the web: 173 web-only and the 19 legacy date tests). Mobile `test:storage`:
   577, unchanged. `schema.test.sql`: unchanged, runs in `mobile_api`.
 - **Not done here** (by design): the bundle identifier, any Vercel environment variable, any
   paid service, 24R2.
