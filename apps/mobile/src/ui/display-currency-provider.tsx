@@ -6,7 +6,7 @@
  * store stands in, so nothing throws and nothing is persisted. */
 import { createContext, useContext, useState, useSyncExternalStore, type ReactNode } from 'react';
 import type { Currency } from '@finanzapp/domain';
-import { createDisplayCurrencyStore, resolveDisplayCurrency, type DisplayCurrencyStore } from './display-currency';
+import { createDisplayCurrencyStore, resolveDisplayCurrency, type DisplayCurrencyStore, type DisplayMode } from './display-currency';
 import type { PreferenceStore } from '../i18n/preference';
 
 const DisplayCurrencyContext = createContext<DisplayCurrencyStore | null>(null);
@@ -20,9 +20,13 @@ export function DisplayCurrencyProvider({ children, store }: { children: ReactNo
 }
 
 /** The currency a screen shows among the currencies it can show (`held`, the ledger's, in
- * grouping order), and the setter both Inicio and Reportes share. Choosing converts nothing. */
-export function useDisplayCurrency(held: readonly Currency[]): { currency: Currency; preferred: Currency | null; setCurrency: (currency: Currency) => void } {
+ * grouping order), the display mode (24C1), and the setters both Inicio and Reportes share.
+ * Choosing never changes a stored amount; in `consolidated` mode the screens convert for the view. */
+export function useDisplayCurrency(held: readonly Currency[]): { currency: Currency; preferred: Currency | null; mode: DisplayMode;
+  setCurrency: (currency: Currency) => void; setMode: (mode: DisplayMode) => void } {
   const store = useContext(DisplayCurrencyContext) ?? (fallback ??= createDisplayCurrencyStore(memoryStore));
   const preferred = useSyncExternalStore(store.subscribe, store.getState, store.getState);
-  return { currency: resolveDisplayCurrency(preferred, held), preferred, setCurrency: currency => { store.set(currency); } };
+  const mode = useSyncExternalStore(store.subscribe, store.getMode, store.getMode);
+  return { currency: resolveDisplayCurrency(preferred, held, mode), preferred, mode,
+    setCurrency: currency => { store.set(currency); }, setMode: next => { store.setMode(next); } };
 }

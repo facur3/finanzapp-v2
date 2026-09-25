@@ -19,12 +19,28 @@ export function reportSelection(snapshot: LedgerSnapshot, currencyParam: unknown
   const currencies = availableCurrencies(snapshot.accounts);
   const currency = heldCurrency(snapshot.accounts, currencyParam) ?? currencies[0] ?? 'ARS';
   const currentMonth = day.slice(0, 7);
-  const monthISO = typeof monthParam === 'string' && /^\d{4}-\d{2}$/.test(monthParam)
-    && validDateISO(monthParam + '-01') && monthParam <= currentMonth ? monthParam : currentMonth;
+  const monthISO = requestedReportMonth(monthParam, day);
   const accounts = new Set(snapshot.accounts.filter(account => account.currency === currency).map(account => account.id));
   const earliestMonth = snapshot.entries.reduce((earliest, entry) => accounts.has(entry.accountId) && entry.dateISO <= day
     && entry.dateISO.slice(0, 7) < earliest ? entry.dateISO.slice(0, 7) : earliest, currentMonth);
   return { currency, currencies, monthISO, earliestMonth, currentMonth };
+}
+
+/** The month a report shows: the parameter when it is a valid month not after today's, else today's month. */
+export function requestedReportMonth(monthParam: unknown, day: string): string {
+  const currentMonth = day.slice(0, 7);
+  return typeof monthParam === 'string' && /^\d{4}-\d{2}$/.test(monthParam)
+    && validDateISO(monthParam + '-01') && monthParam <= currentMonth ? monthParam : currentMonth;
+}
+
+/** The first month with a recorded movement up to `day`, over every account (a consolidated report can go back to it). */
+export function earliestRecordedMonth(snapshot: LedgerSnapshot, day: string): string {
+  let earliest = day.slice(0, 7);
+  for (const entry of snapshot.entries) {
+    const month = entry.dateISO.slice(0, 7);
+    if (entry.dateISO <= day && month < earliest) earliest = month;
+  }
+  return earliest;
 }
 
 /** A drill-down opened with a currency: null when the parameter is present but unknown,

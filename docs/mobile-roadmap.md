@@ -1,6 +1,6 @@
 # FinanzApp mobile: living roadmap
 
-Updated: 2026-09-25 (Producto 24M). Read [decision 001](decisions/001-native-mobile.md),
+Updated: 2026-09-25 (Producto 24C1). Read [decision 001](decisions/001-native-mobile.md),
 [decision 002](decisions/002-spending-first.md),
 [decision 003](decisions/003-five-tabs-and-cards.md) and
 [decision 004](decisions/004-native-first-and-web-retirement.md). Decision 002 supersedes
@@ -61,10 +61,13 @@ history file keeps the evidence of when and why.
   floating point anywhere near an amount, no `10 **`, sums in BigInt; each account keeps its
   own currency for ever; storage never converts; the amount field and the formatters go through
   `money-input.ts` and `src/i18n/format.ts` (docs/currency.md §1, §5, §6).
-- **No FX without a real, dated, sourced rate; unknown is unknown.** Consolidated totals exist
-  only with a `reportCurrency` and traceable conversions; a missing rate gives per-currency
-  subtotals with a visible note, never a guess; no fabricated market history; automatic rates
-  are opt-in, provider named, no key in the bundle (docs/currency.md §8–§10).
+- **No FX without a real, dated, sourced rate; unknown is unknown.** One original currency per
+  account for ever; one display currency for the totals; conversions **only in the views** (24C1),
+  each movement at the reference rate of its own date, exact BigInt arithmetic rounded once, the rate
+  stored with its source and date; nothing stored is ever converted and the person never types a rate.
+  A missing or stale rate gives per-currency subtotals with a discreet note, never a partial total or a
+  guess; no fabricated market history. Rates come automatically from Frankfurter (free, no key, named in
+  the info button), only when a view needs a month it lacks (docs/currency.md §2.8, §8).
 - **Three gates:** `RELEASED_LANGUAGES` (es, en) opens only after device QA, in its own commit.
   `LEDGER_CURRENCIES` holds 146 currencies since 24M (ARS, USD and every ready currency with 0 or 2
   decimals; the seven three-decimal ones held for their VoiceOver check, docs/currency.md §2.7).
@@ -176,8 +179,10 @@ file).
 - **Budgets and reports.** A monthly total budget plus category sublimits (schema 7); explicit
   remaining and exceeded states; Reportes with trend, donut and legend, day-by-day, budgets, top
   merchants, insights, previous-month and category comparison with explicit ranges and
-  missing-history guards; one display currency shared by Inicio and Reportes
-  (`finanzapp.displayCurrency`, outside the ledger and backups); nothing converts.
+  missing-history guards; one display mode and currency shared by Inicio and Reportes
+  (`finanzapp.displayMode`, `finanzapp.displayCurrency`, outside the ledger and backups): since 24C1 a
+  consolidated total converted in the view (each movement at its own date's rate) or one currency on
+  its own; charts, categories, merchants, budgets and comparisons add up to the same total.
 - **Assistant.** The conversational screen (Producto 21/22): composer with a visible voice
   affordance, streaming-ready event client over the authenticated integration client, draft
   cards with explicit Confirmar, clarification chips, evidence rows and links from cited facts,
@@ -219,8 +224,10 @@ file).
   amount path by exponent, schema 9 and backup v9, the searchable currency screen, the
   currency chosen before the amount in card, debt and budget forms); since 24M the ledger gate
   offers 146 currencies (144 new: 128 with two decimals, 16 without), the three-decimal ones only on
-  a development preview; the Assistant stays ARS/USD (contract v1). No exchange rate, no conversion,
-  no provider.
+  a development preview; the Assistant stays ARS/USD (contract v1). Since 24C1: reference rates from
+  Frankfurter v2 in a separate SQLite cache (`finanzapp-rates-v1.sqlite`), exact conversion in
+  `packages/domain/fx.ts`, consolidated views on Inicio, Reportes, their drill-downs and Presupuestos;
+  nothing stored converts; purchases paid from an account in another currency are 24C2.
 - **Motion and material.** `src/ui/motion.tsx` (strong ease-out, named durations, value
   crossfades, reflow, haptic helpers), press feedback, segmented control, category washes,
   the card carousel on the UI thread, Reduce Motion everywhere (rules in §6).
@@ -238,6 +245,10 @@ it was checked in). Metro from the branch on the installed FinanzApp Dev build s
 item unless a section says a new native build is needed. The checklist sections are in
 [mobile-device-checklist.md](mobile-device-checklist.md).
 
+- **24C1 — consolidated finances:** the checklist section Producto 24C1 (accounts in ARS, USD, EUR and JPY;
+  the display sheet; the consolidated total in four currencies; a past month against its own dates; flight mode;
+  the info buttons; single mode; VoiceOver and the largest text on the subtotals). Required before the first
+  TestFlight, not before the merge.
 - **24UX5 — visual consistency, copy and the recurring audit:** the slate links in both themes, the
   40 pt marks on both Home lists, the date-only captions and the cases that bring the category or the account
   back, «By category», Reportes' information button and the insight no longer repeating the ranking, the
@@ -787,7 +798,41 @@ the owner authorises it; no EAS build or store submission without the owner.
     hypothesis to verify, the plan is per numbering system, and a test pins today's normalization per
     system. The region-QA strategy is described as provisional, not as the owner's authorization.
 
-### Producto 24M — global currency release (this PR)
+### Producto 24C1 — consolidated multicurrency finances (this PR)
+
+- **Goal.** Accounts in different currencies and one chosen currency to see the total money and all spending,
+  converted automatically in the views only; the owner's simplified model of 2026-09-25 (docs/currency.md §2.8).
+- **Delivered.** `packages/domain/fx.ts` (exact rational conversion, rounding once half away from zero, USD-pivot
+  cross rates with both legs of the same day, a rate book with a 7-day age limit, a consolidated ledger per target
+  with each movement at its own date's rate and the unconverted ones listed, balances converted at the day's
+  rate); Frankfurter v2 chosen after the provider review (§8.2: all 146 + 7 currencies covered, daily history,
+  free for commercial use, no key; ECB lacks ARS, Open Exchange Rates is paid for this use, ExchangeRate-API has
+  no history on its free endpoint); a separate rate cache on SQLite (`finanzapp-rates-v1.sqlite`, schema 1;
+  provisional same-day rates replaced, final ones never rewritten) and a request policy (cache first; one
+  request per month and missing quotes; final months never again; 6 h refresh of the running month; 60 s back-off
+  after a failure; nothing when nothing needs converting); the display mode `finanzapp.displayMode`
+  (`consolidated` for new installations; a device with a 24B6 display currency keeps `single`, written once);
+  Inicio (same composition; the chip now always present, "EUR" or "Solo EUR", opening one sheet: Total
+  consolidado · Ver solamente una moneda · Moneda de visualización; an info button with source and date; per-
+  currency subtotals and the reason when a rate is missing), Reportes and its drill-downs, Presupuestos (budgets
+  measured against the consolidated spending in their currency), es/en copy.
+- **Not changed.** The ledger (schema 10), backups v8–v10, accounts' and movements' amounts and currencies, the
+  146 + 7 currencies, every form, transfers (still one currency), the Assistant (contract v1, it receives the
+  display currency as before), navigation, Inicio's design.
+- **Status.** Delivered on this branch (2026-09-25), not device-verified.
+  - **Checked on Linux:** root `npm test` 318/318 (+15 `packages/domain/fx.test.ts`); mobile `npm run typecheck`,
+    `npm run test:storage` 718/718 (+18 `tests/fx-rates.node.ts`: the provider adapter with a stub, the cache on
+    real SQLite, the request policy, offline and failing caches, the preference transition, consolidated figures in
+    ARS, USD, EUR and JPY, negative balances, stale and missing rates; +5 route tests in `spending-home.node.ts`
+    and `report-routes.node.ts`: Inicio and Reportes consolidated, a past month at its own dates, the drill-down
+    rows' original amounts, subtotals without a rate, no request for a one-currency ledger; the 24B6 harnesses
+    now run in `single` mode and use the new chip), `currency:verify`, `regions:verify`, `i18n:check -- --strict`,
+    `i18n:extract`, `check`, `export:ios` (Hermes bundle 5,117,746 bytes). The live API was read on 2026-09-25 for
+    the review only; tests use a stub provider and fixed rates. No EAS build; the iPhone was not touched.
+  - **Pending:** the checklist section Producto 24C1 before the first TestFlight; the privacy policy naming the
+    rate provider (Producto 26).
+
+### Producto 24M — global currency release (PR #62)
 
 - **Goal.** Every ISO 4217 fiat currency that is really ready, in one delivery grouped by exponent, without
   risking an amount.
@@ -833,25 +878,16 @@ the owner authorises it; no EAS build or store submission without the owner.
 - **Out of scope.** Writing non-Latin digits (the interface languages are Spanish and English), right-to-left layout.
 - **Depends on.** 24R2B (merged).
 
-### Producto 24C — FX, international purchases and reports
+### Producto 24C2 — international purchases (optional)
 
-- **Goal.** A foreign-currency purchase recorded once and a consolidated report with traceable
-  conversions, per the contract in docs/currency.md §8–§10.
-- **Scope.** The provider decision first (§8.2: Frankfurter, the ECB feed, central banks, paid
-  aggregators, each judged on coverage per pair and date, licence, publication time, cost,
-  cache; nothing connected before the review); the rate record with provider, date and
-  `fetchedAt`, cached and never back-filled; exact rational conversion rounded once; the
-  `reportCurrency` preference outside the ledger and backups; the foreign purchase as one
-  expense with original amount and currency, the account debited in its own currency, fees and
-  taxes once, pending and confirmed kept apart, the manual adjustment only in the detail;
-  Home and Reportes with per-currency subtotals and a visible "no verifiable total" when a rate
-  is missing.
-- **Out of scope.** Bank debits read from any source; instalment plans (24T); trading.
-- **Gates.** Domain tests for every conversion path and rounding; no request without a purchase
-  or a report that needs it; opt-in with the provider named; server-side key if any; the owner
-  configures the provider before any live fetch.
-- **Depends on.** 24M for the currencies it converts; 24R2B for the separators of the regions it
-  writes in.
+- **Goal.** A purchase priced in one currency and paid from an account in another, recorded once, per
+  docs/currency.md §9: the account debited in its own currency, the original amount and currency kept as
+  information, pending (estimated with 24C1's rates) and confirmed (the bank's figure) kept apart, fees and
+  taxes once, the manual adjustment only in the detail.
+- **Out of scope.** Bank debits read from any source; instalment plans (24T); trading; changing 24C1's views.
+- **Gates.** The owner decides whether it is needed; schema and backup changes reviewed first; no paid
+  service.
+- **Depends on.** 24C1 (rates, cache and views).
 
 ### Producto 25A — the real Assistant: multilingual, voice, analytical questions, drafts and confirmation
 
@@ -889,7 +925,7 @@ the owner authorises it; no EAS build or store submission without the owner.
   owned test data for currencies, loans, refunds, questions and failures; measured provider usage
   and cost per request; the disconnected and
   quota states on the iPhone; the consent screen naming what travels.
-- **Depends on.** 24C for foreign purchases and rates; 24M for currencies in v2; a session
+- **Depends on.** 24C1 for rates and consolidated facts, 24C2 for foreign purchases; 24M for currencies in v2; a session
   provider (staging) the owner sets up.
 
 ### Producto 24T — instalments and complete cards
@@ -906,7 +942,7 @@ the owner authorises it; no EAS build or store submission without the owner.
   second expense; refunds of any purchase (card or cash) linked to the original movement (lowering
   the category for the refund's month, and the card's debt when paid by card, never an income;
   a partial refund keeps the rest; the link survives edits, undo and backups); international instalment purchases with the rate
-  of each debit (24C's record, provenance on every converted figure); optional reminders for
+  of each debit (24C2's record, provenance on every converted figure); optional reminders for
   closings, due dates and instalments that never claim a bank did not receive a payment; a
   clearer card form with a real calendar for closing and due days.
 - **Rules.** Never duplicate an expense through a recurring rule; scheduled is not paid; the
@@ -916,7 +952,7 @@ the owner authorises it; no EAS build or store submission without the owner.
   across year ends and February, early payment against later instalments, refund against a
   partly paid plan; schema and backup versions with a rollback test; Tarjetas and Deudas on the
   iPhone.
-- **Depends on.** 24C for the rates of international instalments (a same-currency plan could
+- **Depends on.** 24C1 for the rates of international instalments (a same-currency plan could
   land first if the owner prefers).
 
 ### Producto 25B — global onboarding and preferences
@@ -926,13 +962,13 @@ the owner authorises it; no EAS build or store submission without the owner.
 - **Scope.** The first-launch flow reusing `ChoiceScreen` (language and region detected and
   shown, changeable, "Según el dispositivo" available), the first account's currency chosen from
   the catalogue (the region may suggest, the person decides; an existing account's currency never
-  changes), `reportCurrency` as its own step once 24C exists, skippable, existing users' data and
+  changes), the display currency (24C1) as its own step, skippable, existing users' data and
   preferences untouched; Más → preferences consolidated (Idioma, Región, Apariencia, currency,
   reminders when they exist).
 - **Out of scope.** Any account requirement, telemetry, a paywall.
 - **Gates.** A fresh install and an upgrade on the iPhone, both languages, VoiceOver through the
   whole flow, nothing written until the person finishes.
-- **Depends on.** 24R2B (regions), 24M (currencies); 24C for the report-currency step.
+- **Depends on.** 24R2B (regions), 24M (currencies); 24C1 for the display-currency step.
 
 ### Producto 25C — budgets with rollover, goals, CSV and productivity
 

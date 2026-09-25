@@ -28,6 +28,20 @@ export function MetricHelp({ title, detail }: { title: string; detail: string })
   </PressFeedback>;
 }
 
+/** Each currency's own figure when a consolidated total cannot be given (24C1): a rate is missing, stale, not
+ * fetched yet, or the phone is offline. The subtotals stand where the total would, one per line, a step below the
+ * hero's size, followed by one quiet line and the info button with the reason. Never a partial sum, never a zero. */
+export function CurrencyParts({ parts, line, detail }: { parts: readonly { currency: Currency; minor: number }[]; line: string; detail: string }) {
+  const { t } = useI18n();
+  return <View style={{ gap: 4 }}>
+    {parts.map(part => <Money key={part.currency} minor={part.minor} currency={part.currency} size={28} weight="700" />)}
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
+      <AppText secondary variant="footnote" style={{ flexShrink: 1 }}>{line}</AppText>
+      <MetricHelp title={t('fx.infoTitle')} detail={detail} />
+    </View>
+  </View>;
+}
+
 /** How the row fill reveals: from zero on the first data, 300 ms ease-out with
  * a 50 ms stagger per row; later changes interpolate from the previous share
  * with no delay. Reduce Motion removes the width motion and keeps a 200 ms

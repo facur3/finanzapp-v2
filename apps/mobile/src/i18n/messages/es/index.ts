@@ -22,6 +22,7 @@ import { categoryManager } from './category-manager.ts';
 import { backup } from './backup.ts';
 import { settings } from './settings.ts';
 import { assistant } from './assistant.ts';
+import { display } from './display.ts';
 
 export const es = {
   ...common,
@@ -42,4 +43,5 @@ export const es = {
   ...backup,
   ...settings,
   ...assistant,
+  ...display,
 } as const;

@@ -1,23 +1,30 @@
 import { FlatList, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
-import { spendingComparison, type CategoryChange, type ReportPeriod } from '@finanzapp/domain';
-import { useLedger } from '../src/storage/LedgerProvider';
+import { useMemo } from 'react';
+import { isStorableCurrency, shiftMonthISO, spendingComparison, type CategoryChange, type ReportPeriod } from '@finanzapp/domain';
+import { useFinanceView } from '../src/fx/rates-provider';
 import { AppText, DetailRow, EmptyState, Money, Screen, SectionTitle, Surface } from '../src/ui/components';
 import { useCategoryLookOf } from '../src/ui/category-hues';
-import { changePercent, dateRangeLabel, strictReportSelection } from '../src/ui/report-presentation';
+import { changePercent, dateRangeLabel, requestedReportMonth, strictReportSelection } from '../src/ui/report-presentation';
 import { useI18n } from '../src/i18n/provider';
 import { useCurrentDay, usePalette } from '../src/ui/theme';
 
 export default function ReportComparisonScreen() {
   const params = useLocalSearchParams<{ currency?: string; month?: string }>();
-  const { snapshot } = useLedger();
   const lookOf = useCategoryLookOf('expense');
   const today = useCurrentDay(), p = usePalette();
   const { t, locale, codedAmount, spokenAmount } = useI18n();
-  if (!snapshot) return null;
+  // 24C1: both months as Reportes counts them (converted in consolidated mode, each movement at its own day's rate).
+  const month = requestedReportMonth(params.month, today);
+  const months = useMemo(() => [shiftMonthISO(month, -1), month], [month]);
+  const view = useFinanceView(months, isStorableCurrency(params.currency) ? params.currency : undefined);
+  const snapshot = view?.snapshot;
+  if (!snapshot || !view) return null;
   // A drill-down never falls back to another currency: an unknown or unheld code is an invalid link.
   const selection = strictReportSelection(snapshot, params.currency, params.month, today);
   if (!selection) return <Screen><EmptyState title={t('reports.comparison.invalidTitle')} detail={t('reports.comparison.invalidDetail')} /></Screen>;
+  // Two months compared only when every expense in both had a rate; otherwise no difference is claimed.
+  if (!view.complete(months[0] + '-01', today, 'expense')) return <Screen><EmptyState title={t('fx.infoTitle')} detail={t('fx.unavailable', { currency: selection.currency })} /></Screen>;
   const comparison = spendingComparison(snapshot, selection.currency, selection.monthISO, today);
   const { current, previous, deltaMinor } = comparison;
   const amount = (minor: number) => codedAmount(minor, selection.currency);
@@ -55,5 +62,5 @@ export default function ReportComparisonScreen() {
       <DetailRow label={t('reports.comparison.thisPeriod')} value={amount(item.currentMinor)} spokenValue={spoken(item.currentMinor)} onPress={item.currentCount ? () => openCategory(current, item.key) : undefined} />
       <DetailRow label={t('reports.comparison.previous')} value={amount(item.previousMinor)} spokenValue={spoken(item.previousMinor)} last onPress={item.previousCount && previous ? () => openCategory(previous, item.key) : undefined} />
     </Surface>}
-    ListFooterComponent={<AppText secondary style={{ fontSize: 12, lineHeight: 18 }}>{t('reports.comparison.footer', { currency: selection.currency })}</AppText>} />;
+    ListFooterComponent={<AppText secondary style={{ fontSize: 12, lineHeight: 18 }}>{t(view.mode === 'consolidated' ? 'fx.comparisonFooter' : 'reports.comparison.footer', { currency: selection.currency })}</AppText>} />;
 }

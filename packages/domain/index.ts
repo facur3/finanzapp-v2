@@ -20,3 +20,4 @@ export * from './report-trend.ts';
 export * from './appearance.ts';
 export * from './categories.ts';
 export * from './merchants.ts';
+export * from './fx.ts';

@@ -1,6 +1,6 @@
 # FinanzApp mobile: currencies and the multi-currency engine
 
-Updated 2026-09-25 (Producto 24M). Applies to the Expo app in `apps/mobile` and the
+Updated 2026-09-25 (Producto 24C1: consolidated multicurrency finances, §2.8 and §8). Applies to the Expo app in `apps/mobile` and the
 shared `packages/domain`. The retired web app had its own float-based helpers
 (`src/domain/currency.js`, readable at the tag `web-frontend-final`); the native code never used
 them. Read with [decision 002](decisions/002-spending-first.md)
@@ -25,8 +25,8 @@ written (the rest fall back to the default region and say so).
 The language gives words (currency names, spoken units); the region gives separators;
 the account gives the currency; the stored value never changes with any of them. A
 region never implies a currency (Argentina is not "ARS by default"; `territories` in
-the data is a search hint only), and a future **main currency for reports** (§8) is a
-fifth, separate preference.
+the data is a search hint only), and the **display currency** Inicio and Reportes express totals
+in (§2.8, since 24C1 the "main currency for reports" of §8.3) is a fifth, separate preference.
 
 ## 2. What Producto 24A delivers
 
@@ -191,6 +191,55 @@ show one currency at a time with the display-currency switch over the currencies
 currency's rules, FX (24C: nothing is converted or summed across currencies) and the Assistant: contract v1 carries ARS and
 USD only, so with another display currency the Assistant does not send and says it is not available (25A brings the next
 contract). The default for a new account stays ARS (§7.6.4, still open).
+
+### 2.8 What Producto 24C1 delivers (consolidated finances; nothing stored is converted)
+
+**The model, in three lines.** One original currency per account, for ever. One display currency, chosen by the
+person, for the totals of Inicio and Reportes. Conversions happen **only in those views**, automatically, with
+dated reference rates; no balance, movement, transfer or budget is ever rewritten, and the person never types a
+rate.
+
+| Layer | File | What it does |
+| --- | --- | --- |
+| Exact conversion | `packages/domain/fx.ts` | Rate text read into a BigInt rational (`parseRate`: ≤ 18 significant digits, ≤ 12 decimals, > 0); `convertMinor` = minor × rate × 10^(e_to − e_from) rounded half away from zero **once**, null outside the safe range; cross rates through the USD pivot the provider publishes (`crossRate`: r_to / r_from, both legs of the same day); `rateBook` (latest publication on or before a day, at most `RATE_MAX_AGE_DAYS` = 7 days old; an older one is *stale*, i.e. unknown); `consolidatedLedger` (a view: every account carries the target, every movement is converted with **its own date's** rate, transfers left out, unknown movements listed apart with the leg that was missing; `complete(period)` says whether a period may be shown as a total); `convertTotals` (per-currency balances as of one day → one total, or `unknown` with the parts); `quotesNeeded`. |
+| Provider | `apps/mobile/src/fx/frankfurter.ts` | Frankfurter v2 (§8.2): `GET /v2/rates?from&to&base=USD&quotes=…`, no key; the JSON number of a rate is recovered as its exact decimal text (`rateText`, ≤ 15 significant digits or dropped), every row checked (base, asked quote, date inside the window); a failure is `offline` or `provider`, never a partial set. |
+| Rate cache | `apps/mobile/src/storage/rates-database.ts`, `nativeDatabase.ts` (`openRatesDatabase`) | Its own SQLite file, `finanzapp-rates-v1.sqlite` (schema 1): `exchange_rates` (base = USD, quote, effectiveDate, rate text, source, fetchedAt; CHECKs) and `rate_coverage` (which month was asked for which quote, through which day, when). A rate fetched on or before its own day is provisional and replaced by a later download; one fetched after its day is final and never rewritten, so a past month's report is reproducible. The ledger (schema 10), its migrations and its backups are untouched; a cache from a newer build is read and never written; nothing is reset on an error. |
+| When to ask | `apps/mobile/src/fx/rates-store.ts`, `rates-provider.tsx` | The cache is read first. A request only when a screen needs a month in a currency it holds that differs from the target; one request per calendar month (the month and the week before it, through today) for the quotes it still lacks; a month asked after it ended is final; the running month again at most every 6 h; a failure is remembered for 60 s. A ledger in one currency shown in that currency never asks anything; `single` mode never asks anything. |
+| The view | `apps/mobile/src/fx/finance-view.ts`, `fx-copy.ts` | `financeView` (the ledger as the mode shows it), `spendingFigure` and `availableFigure` (a total, or each currency's subtotal with the reason: fetching, offline, provider, missing, stale), `listingSnapshot` (drill-downs list the real movements with their original amounts), the info and shortfall texts. |
+| Preference | `apps/mobile/src/ui/display-currency.ts` | `finanzapp.displayMode` beside `finanzapp.displayCurrency`: `consolidated` (default of a new installation) or `single` (the 24B6 filter). A device that had chosen a display currency under 24B6 is read as `single` with that currency and the reading is written once (it keeps what it showed); one that never chose starts consolidated. In consolidated mode any storable currency may be the display currency (held or not); in single mode only a held one. |
+| Screens | `app/(tabs)/index.tsx`, `app/(tabs)/reports.tsx`, `report-category`, `report-day`, `report-comparison`, `spending-detail`, `budgets` | Inicio's composition is unchanged: the same chip (now present whenever an account exists, "EUR" or "Solo EUR") opens one discreet sheet (Total consolidado · Ver solamente una moneda · Moneda de visualización; `DisplaySheet`, `DisplayCurrencyButton`). One number, never an equivalent under it; an info button carries source and date. Reportes, its drill-downs and Presupuestos read the same view, so charts, categories, merchants, budgets, days, insights and the comparison add up to the total. |
+
+**Rounding and sums.** Each movement is converted once and rounded once; every aggregate is the integer sum of the
+converted movements, so a category ranking, a donut, a merchant list, a day list and a budget always add up to
+the displayed total exactly. A balance total is the sum of each currency's balance converted once. Negative
+balances round symmetrically (half away from zero).
+
+**Historical rates.** A movement of 12 September uses the publication of 12 September (or the last one before it,
+within a week); September's total never uses today's rate. The report's info button names the range of rate days
+used ("del 4/9/2026 al 11/9/2026, nunca la de hoy para un mes pasado"). Disponible, a balance *as of today*, uses
+today's rate (the latest publication).
+
+**Unknown stays unknown.** When any expense of a period has no usable rate (not fetched yet, offline, the provider
+failed, none published, or the last one is more than a week old), the screen shows **each currency's own
+subtotal** instead of a total, with one quiet line ("Sin cotización para sumarlo en EUR") and an info button saying
+which rate is missing and why. No partial sum is ever shown as a total, and no zero is substituted. The trend
+appears only when all six months are complete; the comparison and the growth insight only when the previous month
+is complete; income and net flow only when the month's income is complete.
+
+**Budgets.** A budget keeps its one currency. In consolidated mode it is measured against every account's spending
+converted into its currency (the figure Inicio's card, Reportes and Presupuestos all show); in single mode against
+the accounts in its currency, as before. A month with an unconverted expense shows the per-currency spending
+instead of a partial progress.
+
+**Transfers and card payments** are never spending in either mode (they are transfers, not entries); a card
+purchase is one expense on the card. Disponible never includes cards, debts or receivables.
+
+**Not changed in 24C1.** SQLite ledger schema 10, backups v8/v9/v10 (rates are reference data and are not backed
+up; a restored ledger fetches what its screens need), `LEDGER_CURRENCIES` (146) and the seven held three-decimal
+currencies (storable, readable, and convertible in a view), every form (an account's currency, the amount field),
+the Assistant (contract v1, ARS/USD; Inicio passes it the display currency as before), transfers between
+currencies (still refused), accounts and movements' own amounts everywhere they are shown. **Not in 24C1:** a
+purchase paid from an account in another currency (24C2, §9), a manual rate, bank data of any kind.
 
 ### Availability status
 
@@ -787,10 +836,13 @@ implies a currency) remain open; ARS stays the app's default meanwhile.
 5. **The one-way upgrade.** Earlier builds cannot open schema 9: they refuse it, unchanged, as designed. Installing a 24B build on a device is therefore not reversible on that device. Backups stay v8 until a new currency is used. This needs an explicit release decision (AGENTS.md rule 3), and stages 5 and 9 need a development build. **Decided on 2026-09-24 (24B4 brief):** the owner is the only user and the iPhone holds test data; the irreversible migration is authorised for local development databases and fixtures, and for FinanzApp Dev once the owner is told which build to install, what happens to the existing data and how to keep a copy (the steps in docs/mobile-device-checklist.md). No EAS build was made in 24B4.
 6. **The Assistant in new currencies.** Either open the gate with the Assistant limited to ARS and USD until the new contract version is deployed on a server the owner configures, or hold the gate until that version is live.
 
-## 8. Producto 24C contract: exchange rates and a main currency for reports
+## 8. Exchange rates and the display currency (implemented in 24C1; the purchase record of §9 is 24C2)
 
-Designed in 24A, **updated in 24B1 with the owner's decisions of 2026-09-24, not
-implemented**. It builds on 24B (currency-aware storage) and on decision 002: currencies
+Designed in 24A, updated in 24B1 with the owner's decisions of 2026-09-24, **implemented in 24C1 for
+consolidated views** (§2.8) with the owner's simplification of 2026-09-25: rates are fetched automatically
+(no opt-in step, no manual rate), only the views convert, and the person never enters a rate. §8.1's record
+is implemented as `ExchangeRate` (base, quote, rate text, effectiveDate, source, fetchedAt) in a separate
+cache; ids, revisions and tombstones wait for sync (a provider rate is reference data, re-downloadable). It builds on 24B (currency-aware storage) and on decision 002: currencies
 are never summed without a real, dated rate; an unknown rate gives an unknown total, never
 a guess; nothing fabricates market history.
 
@@ -837,7 +889,38 @@ interface ExchangeRate {
   already holds and never back-fills a series it was not given. Future sync carries
   operation ids, revisions and tombstones like movements do (decision 001).
 
-### 8.2 Where rates come from: the provider decision (research before 24C)
+### 8.2 Where rates come from: the provider decision (made in 24C1)
+
+**Decision (2026-09-25): Frankfurter v2 (`api.frankfurter.dev/v2`), called directly from the app, no key.**
+Verified on 2026-09-25 against the live API and its documentation:
+
+| Criterion | Frankfurter v2 (chosen) | ECB reference feed | Open Exchange Rates | ExchangeRate-API (open access) |
+| --- | --- | --- | --- | --- |
+| Coverage of FinanzApp's currencies | **All 146 ledger currencies and the 7 held ones** are listed by `/v2/currencies` with data through 2026-09-25 (compared code by code with `LEDGER_CURRENCIES` and `HELD_CURRENCIES` on that day; none missing) | ~30 currencies against EUR; **no ARS** | 200+ | 160+ |
+| Pairs | any base; FinanzApp asks USD → quotes and crosses locally with both legs of the same day | EUR only | USD base on the free plan | USD base |
+| History | daily, back to 1948 for some currencies; `from`/`to` ranges in one request | daily since 1999 | time series only on paid plans | none on the open endpoint |
+| Commercial terms | "free for commercial use"; "the rates themselves fall under each provider's terms" (the central banks) | ECB terms (free, attribution) | free plan: 1,000 requests/month; commercial plans from US$ 12/month | free with mandatory attribution link; no redistribution |
+| Key, limits | no key; no quota, rate-limited against abuse; caching advised | none | key required | none |
+| Cost | none | none | paid for this use | none |
+
+What a Frankfurter rate is: a **blended reference (mid) rate** of the central banks and official sources that
+published that day (for USD → ARS on 2026-09-15: BCRA, BNA and eight others, `expand=providers`); weekends and
+holidays have no publication for most sources, so a day takes the latest publication before it. It is **not**
+what a bank or a card charges (ARS has several legal rates; card purchases add taxes): FinanzApp labels every
+converted figure as converted with a reference rate and never uses one as a debit (that is 24C2's confirmed
+amount, §9).
+
+Why this one for an international commercial app: it is the only candidate that covers every currency FinanzApp
+can hold, with history per day, at no cost and with no key to protect (nothing in the iOS bundle is secret: the
+request carries a date window and currency codes, never an amount, an account or a person). Its limits, recorded
+for launch: it is a free service with no SLA (the cache keeps every rate already fetched, so an outage only delays
+months never seen); the underlying providers' terms apply (the info button names the source); a person's
+currencies and IP reach a third party (to be named in the privacy policy before TestFlight, Producto 26). If
+volume or terms require it, the same API can be **self-hosted** (open source, Docker) or proxied through
+`api/mobile` with a server-side cache without changing the app's contract (`frankfurter.ts` is the only adapter).
+No paid service was enabled.
+
+The review notes of 24B1 follow, kept for the record.
 
 Before 24C connects anything, the owner needs a provider review with, for each candidate,
 the **effective coverage** (which of the 153 fiat currencies, and which pairs: most
@@ -873,11 +956,13 @@ carries its label, date and `fetchedAt`.
 
 ### 8.3 The main currency for reports
 
-- `reportCurrency: IsoCurrencyCode | null`, a key-value preference beside language and
-  region, **outside the ledger and outside backups' financial data**, default `null`: reports
-  keep showing one total per currency, as today. It is distinct from the display currency of 24B6 (§2.6, `finanzapp.displayCurrency`), which only chooses which held currency Inicio and Reportes show and converts nothing. It is never derived from the region or the
-  language, and choosing it never changes an account, a movement or a budget. The
-  onboarding will offer it as its own step, after language and region.
+- **Implemented in 24C1 as the display currency** (`finanzapp.displayCurrency`) with a mode
+  (`finanzapp.displayMode`: `consolidated` | `single`), key-value preferences beside language and
+  region, **outside the ledger and outside backups**. A separate `reportCurrency` key was never written,
+  so nothing migrates; the 24B6 key simply gained the mode (§2.8 for the transition of existing
+  devices). It is never derived from the region or the language, and choosing it never changes an
+  account, a movement or a budget. The onboarding (25B) will offer it as its own step, after language
+  and region.
 - Only reports and summaries convert. Balances, movements, budgets (one currency each),
   recurring rules, cards and debts always show their own currency.
 
@@ -889,8 +974,10 @@ carries its label, date and `fetchedAt`.
   the cache has nothing for that day and the person opted in. None → **unknown**. A rate
   older than the period is used but shown with its date; a threshold can be added later,
   never a silent substitute.
-- **What is converted:** each currency's subtotal is converted once with one rate, then the
-  converted subtotals are added; per-movement historical conversion is a later option.
+- **What is converted (24C1):** for spending and every flow, **each movement with the rate of its own
+  date**, rounded once, then added in integers (so parts add up to the total); for a balance, each
+  currency's subtotal once with the rate of the day. (The 24A draft converted one subtotal per currency
+  with the period's last rate; the owner's direction of 2026-09-25 asked for each movement's date.)
 - **Estimated and confirmed are two things.** A figure converted with a `provider` or
   `manual` rate is an **estimate** and is labelled as such; the amount a bank actually
   debited (§9) is a **confirmed** figure in the account's own currency and needs no rate.
@@ -937,7 +1024,7 @@ interface ConvertedPart {
   provider (no network in tests), and a report whose main currency is unset showing
   today's per-currency totals byte for byte.
 
-## 9. Foreign-currency purchases (design for 24C, not implemented)
+## 9. Foreign-currency purchases (design for 24C2, optional; not implemented)
 
 A person pays with an account in one currency for something priced in another: USD 30
 paid with an ARS account, debited as ARS 45.000 once the bank confirms. This is **one
@@ -1016,21 +1103,19 @@ the person's own dated rate) and must not be modelled with one.
 
 ## 10. Home and reports with several currencies (design)
 
-- Each account shows its balance in the currency it holds; nothing on Home adds two
-  currencies. Home's currency switch lists the currencies present (24B1), in the order
-  ARS, USD, then by code.
+- Each account shows its balance in the currency it holds. Since 24C1 Inicio's number is, by
+  default, the consolidated total in the display currency (§2.8); the "one currency only" mode keeps
+  the 24B6 filter. Accounts, movements and their details always show their own currency and amount.
 - An expense shows its **posted** amount first (the account's currency) and, when it is a
   foreign purchase, the original amount underneath or in the detail. A pending foreign
   purchase shows the **original amount first** and the estimate second, clearly labelled
   as estimated with its source; once confirmed, the debited amount is the posted figure and
   the original stays in the detail.
-- Consolidated reports exist only with a `reportCurrency` and only through traceable
-  conversions (§8.4); estimated and confirmed parts are distinguished, a missing rate means
-  per-currency subtotals with a visible "no verifiable total" note, and a partial sum is
-  never presented as final.
-- Automatic rate retrieval is the planned main path (§8.2) and is a separate decision with
-  cost, licence, freshness and consent controls; nothing is connected and no rate is
-  invented before it.
+- Consolidated totals exist only through traceable conversions (§8.4); a missing rate means
+  per-currency subtotals with a quiet note and an info button, and a partial sum is never
+  presented as final (implemented in 24C1). Estimated vs confirmed parts arrive with 24C2's purchases.
+- Automatic rate retrieval (§8.2) is implemented: Frankfurter, no key, cached, named in the
+  info button; no rate is invented.
 
 ## 11. The Assistant with several currencies and languages (design, not implemented)
 

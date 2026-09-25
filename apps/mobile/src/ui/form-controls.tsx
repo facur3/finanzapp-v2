@@ -152,29 +152,82 @@ export function CurrencySheet({ visible, title, options, value, note, searchable
   visible: boolean; title: string; options: readonly CurrencyChoice[]; value: Currency; note?: string; searchable?: boolean;
   onClose: () => void; onChange: (currency: Currency) => void;
 }) {
+  const [query, setQuery] = useState('');
+  return <SelectionSheet visible={visible} title={title} onClose={() => { setQuery(''); onClose(); }}>
+    <CurrencyList options={options} value={value} note={note} searchable={searchable} query={query} onQuery={setQuery}
+      onChange={currency => { setQuery(''); onChange(currency); }} />
+  </SelectionSheet>;
+}
+
+/** The currency rows of a sheet: the searchable, windowed list both `CurrencySheet` and the display sheet draw. */
+function CurrencyList({ options, value, note, searchable, query, onQuery, onChange }: {
+  options: readonly CurrencyChoice[]; value: Currency; note?: string; searchable: boolean; query: string; onQuery: (query: string) => void; onChange: (currency: Currency) => void;
+}) {
   const p = usePalette();
   const { t } = useI18n();
-  const [query, setQuery] = useState('');
   const shown = searchable ? searchChoices(query, options) : options;
-  return <SelectionSheet visible={visible} title={title} onClose={() => { setQuery(''); onClose(); }}>
-    {/* 146 currencies since 24M: a window of rows, never all at once. The sheet's SafeAreaView keeps the home indicator
-        clear; the keyboard insets the list while searching, so the last currency and the note stay reachable. */}
-    <FlatList data={shown} keyExtractor={option => option.code} contentContainerStyle={{ padding: 20, paddingTop: 0, paddingBottom: 48 }} keyboardShouldPersistTaps="handled"
-      automaticallyAdjustKeyboardInsets keyboardDismissMode="interactive" initialNumToRender={14} windowSize={7}
-      ListHeaderComponent={searchable ? <View style={{ paddingBottom: 16 }}>
-        <Field label={t('currency.search')} value={query} onChangeText={setQuery} autoCapitalize="characters" autoCorrect={false} clearButtonMode="while-editing" maxLength={40} />
-      </View> : null}
-      ListEmptyComponent={searchable ? <AppText secondary variant="subhead" style={{ paddingHorizontal: 4 }}>{t('currency.noMatches')}</AppText> : null}
-      ListFooterComponent={note ? <AppText secondary variant="footnote" style={{ paddingHorizontal: 4, paddingTop: 4 }}>{note}</AppText> : null}
-      renderItem={({ item }) => <PressFeedback feedback="highlight" accessibilityRole="button" accessibilityState={{ selected: value === item.code }}
-        accessibilityLabel={item.name + ', ' + item.code}
-        onPress={() => { if (item.code !== value) selectionHaptic(); setQuery(''); onChange(item.code); }}
-        style={{ flexDirection: 'row', alignItems: 'center', padding: 14, gap: 14, backgroundColor: p.surface, borderRadius: 16, marginBottom: 8, overflow: 'hidden' }}>
-        <GlyphTile icon="cash-outline" />
-        <View style={{ flex: 1, minWidth: 0, gap: 3 }}><AppText style={{ fontWeight: '600' }}>{item.name}</AppText>
-          <AppText secondary variant="subhead">{item.code} · {item.symbol}</AppText></View>
-        {item.code === value && <Ionicons name="checkmark-circle" color={p.primary} size={24} accessible={false} />}
-      </PressFeedback>} />
+  /* 146 currencies since 24M: a window of rows, never all at once. The sheet's SafeAreaView keeps the home indicator
+     clear; the keyboard insets the list while searching, so the last currency and the note stay reachable. */
+  return <FlatList data={shown} keyExtractor={option => option.code} contentContainerStyle={{ padding: 20, paddingTop: 0, paddingBottom: 48 }} keyboardShouldPersistTaps="handled"
+    automaticallyAdjustKeyboardInsets keyboardDismissMode="interactive" initialNumToRender={14} windowSize={7}
+    ListHeaderComponent={searchable ? <View style={{ paddingBottom: 16 }}>
+      <Field label={t('currency.search')} value={query} onChangeText={onQuery} autoCapitalize="characters" autoCorrect={false} clearButtonMode="while-editing" maxLength={40} />
+    </View> : null}
+    ListEmptyComponent={searchable ? <AppText secondary variant="subhead" style={{ paddingHorizontal: 4 }}>{t('currency.noMatches')}</AppText> : null}
+    ListFooterComponent={note ? <AppText secondary variant="footnote" style={{ paddingHorizontal: 4, paddingTop: 4 }}>{note}</AppText> : null}
+    renderItem={({ item }) => <PressFeedback feedback="highlight" accessibilityRole="button" accessibilityState={{ selected: value === item.code }}
+      accessibilityLabel={item.name + ', ' + item.code}
+      onPress={() => { if (item.code !== value) selectionHaptic(); onChange(item.code); }}
+      style={{ flexDirection: 'row', alignItems: 'center', padding: 14, gap: 14, backgroundColor: p.surface, borderRadius: 16, marginBottom: 8, overflow: 'hidden' }}>
+      <GlyphTile icon="cash-outline" />
+      <View style={{ flex: 1, minWidth: 0, gap: 3 }}><AppText style={{ fontWeight: '600' }}>{item.name}</AppText>
+        <AppText secondary variant="subhead">{item.code} · {item.symbol}</AppText></View>
+      {item.code === value && <Ionicons name="checkmark-circle" color={p.primary} size={24} accessible={false} />}
+    </PressFeedback>} />;
+}
+
+/** How Inicio and Reportes show money (24C1): a consolidated total of every account in one currency, or one
+ * currency on its own, and the currency itself. One page sheet, reached from the currency chip only, never a
+ * control on the screen: two choices with a checkmark, the currency row, one sentence saying nothing is converted
+ * in the accounts. The currency row turns the same sheet into the searchable currency list (the one the forms use),
+ * so there is never a second modal over the first; choosing a currency returns to the options. */
+export function DisplaySheet({ visible, mode, currency, consolidatedOptions, singleOptions, onClose, onMode, onCurrency }: {
+  visible: boolean; mode: 'consolidated' | 'single'; currency: Currency;
+  /** The currencies a consolidated total can be expressed in, and the ones held (single mode). */
+  consolidatedOptions: readonly CurrencyChoice[]; singleOptions: readonly CurrencyChoice[];
+  onClose: () => void; onMode: (mode: 'consolidated' | 'single') => void; onCurrency: (currency: Currency) => void;
+}) {
+  const p = usePalette();
+  const { t, currencyName } = useI18n();
+  const [step, setStep] = useState<'options' | 'currency'>('options');
+  const [query, setQuery] = useState('');
+  const close = () => { setStep('options'); setQuery(''); onClose(); };
+  const options = mode === 'consolidated' ? consolidatedOptions : singleOptions;
+  const modeRow = (value: 'consolidated' | 'single', title: string, detail: string, last: boolean) =>
+    <PressFeedback key={value} feedback="highlight" accessibilityRole="button" accessibilityState={{ selected: mode === value }}
+      accessibilityLabel={title + '. ' + detail} onPress={() => { if (value !== mode) { selectionHaptic(); onMode(value); } }}
+      style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, paddingHorizontal: 16, minHeight: 60,
+        borderBottomWidth: last ? 0 : StyleSheet.hairlineWidth, borderBottomColor: p.line }}>
+      <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+        <AppText style={{ fontWeight: '600' }}>{title}</AppText>
+        <AppText secondary variant="footnote">{detail}</AppText>
+      </View>
+      {mode === value && <Ionicons name="checkmark" color={p.primary} size={22} accessible={false} />}
+    </PressFeedback>;
+  return <SelectionSheet visible={visible} title={step === 'options' ? t('display.title') : t('display.currency')} onClose={close}>
+    {step === 'options' ? <View style={{ paddingHorizontal: 20, gap: space.l }}>
+      <Surface grouped>
+        {modeRow('consolidated', t('display.consolidated'), t('display.consolidatedDetail'), false)}
+        {modeRow('single', t('display.single'), t('display.singleDetail'), true)}
+      </Surface>
+      <Surface grouped>
+        <SelectionRow label={t('display.currency')} value={currencyName(currency) + ' · ' + currency} icon="cash-outline" last
+          onPress={() => setStep('currency')} />
+      </Surface>
+      <AppText secondary variant="footnote" style={{ paddingHorizontal: 4 }}>{t('display.note')}</AppText>
+    </View>
+      : <CurrencyList options={options} value={currency} searchable={options.length >= SEARCHABLE_FROM} query={query} onQuery={setQuery}
+        onChange={code => { setQuery(''); onCurrency(code); setStep('options'); }} />}
   </SelectionSheet>;
 }
 

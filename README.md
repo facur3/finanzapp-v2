@@ -11,7 +11,9 @@ works without connectivity. It is built with **Expo, React Native and TypeScript
 ## Dirección del producto
 
 La app se enfoca en **gastos y compromisos cotidianos**, con cuentas simples opcionales. Inicio
-muestra el gasto de la semana y del mes; tarjetas, deudas, recurrentes y presupuestos están en
+muestra el gasto del mes o el dinero disponible; cada cuenta conserva su moneda original y, por
+defecto, los totales se consolidan en una moneda elegida con cotizaciones de referencia fechadas,
+solo en la vista (nada almacenado se convierte; docs/currency.md §2.8); tarjetas, deudas, recurrentes y presupuestos están en
 la app; inversiones y patrimonio quedan fuera del alcance. El Asistente es una capacidad central:
 propone movimientos y cambios como borradores, pide la aclaración mínima y responde preguntas
 con datos verificables del libro; nunca escribe sin confirmación. La IA en la nube es opcional,
@@ -87,7 +89,10 @@ npm run check:repo    # repository hygiene (below)
   [004 native-first and web retirement](docs/decisions/004-native-first-and-web-retirement.md).
 
 User data starts empty: the app never seeds balances, movements or market history. Money is
-stored in integer minor units per currency; currencies are never mixed without a dated rate.
+stored in integer minor units per currency; currencies are never mixed without a dated rate: since
+Producto 24C1 Inicio and Reportes consolidate totals in a display currency with reference rates from
+Frankfurter (free, no key), exact and per movement date, in the view only; a missing rate shows
+per-currency subtotals, never a partial total.
 Writes are saved locally before success is confirmed, and a failed write keeps the draft.
 
 ## Continuous integration

@@ -12,6 +12,9 @@
     "src/i18n/regions/es.ts": "Generated region names from CLDR (data, not interface copy); the chooser shows them as CLDR wrote them.",
     "src/i18n/regions/en.ts": "Generated region names from CLDR (data, not interface copy); the chooser shows them as CLDR wrote them.",
     "src/i18n/region-release.ts": "The regions' release plan (stage ids and the purpose of each device check) for developers and the checklist; never shown in the app.",
-    "src/i18n/region-stages.ts": "The regions' release stages and the blocker of the held-back stage, for developers and the checklist; never shown in the app."
+    "src/i18n/region-stages.ts": "The regions' release stages and the blocker of the held-back stage, for developers and the checklist; never shown in the app.",
+    "src/fx/frankfurter.ts": "The rate provider's client (24C1): its source name is a proper noun passed into catalogue sentences, and its errors are internal (the screens say why from fx.reason.*), never shown.",
+    "src/fx/rates-store.ts": "The rate cache's bookkeeping (24C1): types and timing only, no interface copy.",
+    "src/storage/rates-database.ts": "The rate cache's SQLite schema (24C1): SQL and types, no interface copy."
   }
 }

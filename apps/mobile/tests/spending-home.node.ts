@@ -7,6 +7,9 @@ import * as domain from '@finanzapp/domain';
 import * as presentation from '../src/ui/presentation.ts';
 import * as reportPresentation from '../src/ui/report-presentation.ts';
 import * as displayCurrency from '../src/ui/display-currency.ts';
+import * as financeView from '../src/fx/finance-view.ts';
+import * as fxCopy from '../src/fx/fx-copy.ts';
+import * as ratesStore from '../src/fx/rates-store.ts';
 import * as budgetPresentation from '../src/ui/budget-presentation.ts';
 import * as categoryColor from '../src/ui/category-color.ts';
 import { monthlyEvidence } from '../src/integrations/evidence.ts';
@@ -34,16 +37,28 @@ const snapshot: domain.LedgerSnapshot = { accounts: [
   { id: 'u', accountId: 'u', kind: 'expense', amountMinor: 999, merchant: 'Prueba', category: 'Salud', dateISO: '2026-08-10', createdAt },
 ] };
 
-/** The shared display currency of Inicio and Reportes (24B6), on the real store over a key-value store in memory; a test may hand one store to two screens. */
+/** The shared display currency of Inicio and Reportes (24B6), on the real store over a key-value store in memory; a test may hand one store to two screens.
+ * The tests written before 24C1 exercise one currency at a time, so the harness starts in `single` mode unless a test says otherwise. */
 function displayStore(initial: Record<string, string> = {}) {
-  const rows = new Map(Object.entries(initial));
+  const rows = new Map(Object.entries({ [displayCurrency.DISPLAY_MODE_KEY]: 'single', ...initial }));
   return displayCurrency.createDisplayCurrencyStore(() => ({ getItemSync: (key: string) => rows.get(key) ?? null, setItemSync: (key: string, value: string) => { rows.set(key, value); }, removeItemSync: (key: string) => rows.delete(key) }));
 }
 
-function routeHarness(file: string, params: Record<string, unknown>, initialData = snapshot, extra: Partial<domain.LedgerArchive> = {}, display = displayStore()) {
+function routeHarness(file: string, params: Record<string, unknown>, initialData = snapshot, extra: Partial<domain.LedgerArchive> = {}, display = displayStore(),
+  rates: { book: domain.RateBook; activity?: ratesStore.RatesActivity; ensured?: { months: readonly string[]; quotes: readonly string[] }[] } = { book: domain.rateBook([]) }) {
   // The ledger as the provider hands it; `setData` stands for a write landing while the screen stays mounted.
   let data = initialData;
-  const displayProvider = { useDisplayCurrency: (held: readonly domain.Currency[]) => ({ currency: displayCurrency.resolveDisplayCurrency(display.getState(), held), preferred: display.getState(), setCurrency: (currency: domain.Currency) => { display.set(currency); } }) };
+  const displayProvider = { useDisplayCurrency: (held: readonly domain.Currency[]) => ({ currency: displayCurrency.resolveDisplayCurrency(display.getState(), held, display.getMode()),
+    preferred: display.getState(), mode: display.getMode(), setCurrency: (currency: domain.Currency) => { display.set(currency); }, setMode: (mode: displayCurrency.DisplayMode) => { display.setMode(mode); } }) };
+  // 24C1: the finance view as the provider builds it, over a fixed rate book (no network); `ensured` records what the screen asked for.
+  const ratesProvider = { useFinanceView: (months: readonly string[], currency?: domain.Currency) => {
+    const held = presentation.availableCurrencies(data.accounts);
+    const mode = display.getMode();
+    const target = currency ?? displayCurrency.resolveDisplayCurrency(display.getState(), held, mode);
+    const built = financeView.financeView(data, mode, target, rates.book);
+    if (built.quotes.length) rates.ensured?.push({ months, quotes: built.quotes });
+    return { ...built, activity: rates.activity ?? 'idle', loaded: true, lastFetchedAt: null, book: rates.book, held };
+  } };
   const source = readFileSync(new URL('../app/' + file, import.meta.url), 'utf8');
   const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText;
   const jsx = (type: string, props: Record<string, unknown>) => ({ type, props });
@@ -71,8 +86,9 @@ function routeHarness(file: string, params: Record<string, unknown>, initialData
     '@finanzapp/domain': domain,
     '../src/storage/LedgerProvider': { useLedger: () => ({ snapshot: data, archive: { accounts: data.accounts, records: [], ...extra } }) },
     '../src/ui/components': { ...Object.fromEntries(componentNames.map(name => [name, name])), useStacked: () => false },
-    '../src/ui/currency-switch': { CurrencySwitch: 'CurrencySwitch' },
+    '../src/ui/currency-switch': { CurrencySwitch: 'CurrencySwitch', DisplayCurrencyButton: 'DisplayCurrencyButton' },
     '../src/ui/display-currency-provider': displayProvider, '../src/ui/display-currency': displayCurrency,
+    '../src/fx/rates-provider': ratesProvider, '../src/fx/finance-view': financeView, '../src/fx/fx-copy': fxCopy, '../src/fx/rates-store': ratesStore,
     '../src/ui/entry-list': { EntryList: 'EntryList' },
     '../src/ui/presentation': presentation,
     '../src/ui/report-presentation': reportPresentation,
@@ -81,7 +97,7 @@ function routeHarness(file: string, params: Record<string, unknown>, initialData
       donutSlices: (items: { key: string; label: string; value: number }[]) => items.slice(0, 5).map((item, index) => ({ ...item, color: 'c' + index })) },
     '../src/ui/budget-presentation': budgetPresentation,
     '@expo/vector-icons/Ionicons': 'Ionicons',
-    '../src/ui/home-modules': { BudgetHomeCard: 'BudgetHomeCard', CategoryRanking: 'CategoryRanking', MetricHelp: 'MetricHelp', UpcomingRecurringRow: 'UpcomingRecurringRow' },
+    '../src/ui/home-modules': { BudgetHomeCard: 'BudgetHomeCard', CategoryRanking: 'CategoryRanking', CurrencyParts: 'CurrencyParts', MetricHelp: 'MetricHelp', UpcomingRecurringRow: 'UpcomingRecurringRow' },
     '../src/ui/category-color': categoryColor,
     '../src/ui/category-hues': { useCategoryColor: () => '#3E6FB0', useCategoryLabel: (s: string) => s, useCategoryDefinitions: () => [], useCategoryLook: (s: string) => ({ label: s, storedLabel: s, key: String(s).toLowerCase(), hex: '#3E6FB0', glyph: 'pricetag-outline' }), useCategoryLookOf: () => (s: string) => ({ label: s, storedLabel: s, key: String(s).toLowerCase(), hex: '#3E6FB0', glyph: glyphAliases.get(s) ?? 'glyph-' + String(s).toLowerCase() }), useAccountLook: () => ({ icon: 'wallet', color: 'cobalt', glyph: 'wallet-outline', hex: '#2557D6' }), useAccountNameOf: () => (account: any) => account.name, useAccountLookOf: () => () => ({ icon: 'wallet', color: 'cobalt', glyph: 'wallet-outline', hex: '#2557D6' }) },
     '../src/ui/quick-actions': { QuickActions: 'QuickActions', AssistantEntry: 'AssistantEntry' },
@@ -129,7 +145,7 @@ test('Home shows the current month only, scoped to the currency, with quick acti
   const texts = nodes(root).filter(n => n.type === 'AppText').map(n => String(n.props.children));
   assert.equal(texts.some(text => /gastos? registrados?|–|Gastado ·/.test(text)), false, 'no count or date-range copy near the hero');
   assert.ok(texts.includes('Septiembre'), 'the month names the number');
-  find(root, 'CurrencySwitch').props.onChange('USD');
+  find(root, 'DisplayCurrencyButton').props.onCurrency('USD');
   root = view.render();
   assert.equal(find(root, 'Money').props.minor, 1000);
   assert.equal(find(root, 'QuickActions').props.currency, 'USD');
@@ -188,7 +204,7 @@ test('24B1: Disponible for a currency held only by a card is a true US$ 0,00, ne
     closingDay: 1, dueDay: 10, active: true, createdAt, revision: 0, updatedAt: createdAt }] });
   assert.deepEqual(presentation.availableCurrencies(cardOnly.accounts), ['ARS', 'USD'], 'the card account still makes USD a currency of the ledger');
   nodes(view.render()).find(n => n.type === 'Choices' && n.props.value === 'spending')!.props.onChange('available');
-  find(view.render(), 'CurrencySwitch').props.onChange('USD');
+  find(view.render(), 'DisplayCurrencyButton').props.onCurrency('USD');
   const money = find(view.render(), 'Money');
   assert.deepEqual({ minor: money.props.minor, currency: money.props.currency }, { minor: 0, currency: 'USD' });
   assert.equal(i18nFormat.moneyText(0, 'USD'), 'US$\u00A00,00');
@@ -282,12 +298,12 @@ test('24B3: Home with three currencies lists them in the switch and shows each c
     { ...homeData.entries[0], id: 'yen-1', accountId: 'y', dateISO: '2026-09-11', amountMinor: 1500, category: 'Comida' }, { ...homeData.entries[0], id: 'yen-2', accountId: 'y', dateISO: '2026-09-12', amountMinor: 700, category: 'Salud' }] };
   const view = routeHarness('(tabs)/index.tsx', {}, data);
   let root = view.render();
-  const control = find(root, 'CurrencySwitch');
-  assert.deepEqual(control.props.currencies, ['ARS', 'USD', 'JPY'], 'the currencies present, ARS and USD first, then by code');
-  assert.equal(control.props.labels, 'code', 'Inicio keeps the compact codes beside the metric control');
-  assert.equal(control.props.value, 'ARS');
+  const control = find(root, 'DisplayCurrencyButton');
+  assert.deepEqual(control.props.held, ['ARS', 'USD', 'JPY'], 'the currencies present, ARS and USD first, then by code');
+  assert.equal(control.props.compact, true, 'Inicio keeps the compact chip beside the metric control');
+  assert.equal(control.props.currency, 'ARS');
   assert.equal(find(root, 'Money').props.minor, 300, 'ARS figures unchanged by the third currency');
-  control.props.onChange('JPY');
+  control.props.onCurrency('JPY');
   root = view.render();
   assert.deepEqual({ minor: find(root, 'Money').props.minor, currency: find(root, 'Money').props.currency }, { minor: 2200, currency: 'JPY' }, 'yen are summed as yen, never as cents');
   assert.equal(find(root, 'QuickActions').props.currency, 'JPY');
@@ -299,27 +315,27 @@ test('24B3: Home with three currencies lists them in the switch and shows each c
 // ---- Producto 24B6: one display currency shared by Inicio and Reportes ------------------------------------
 
 test('24B6: choosing a currency on Inicio changes Reportes and choosing on Reportes changes Inicio, through one persisted preference; a switch within either screen keeps working', () => {
-  const rows = new Map<string, string>();
+  const rows = new Map<string, string>([[displayCurrency.DISPLAY_MODE_KEY, 'single']]); // 24C1: the one-currency filter of 24B6
   const shared = displayCurrency.createDisplayCurrencyStore(() => ({ getItemSync: (key: string) => rows.get(key) ?? null, setItemSync: (key: string, value: string) => { rows.set(key, value); }, removeItemSync: (key: string) => rows.delete(key) }));
   const home = routeHarness('(tabs)/index.tsx', {}, homeData, {}, shared);
   const reports = routeHarness('(tabs)/reports.tsx', {}, homeData, {}, shared);
-  assert.equal(find(home.render(), 'CurrencySwitch').props.value, 'ARS', 'no preference yet: the first currency held');
-  assert.equal(find(reports.render(), 'CurrencySwitch').props.value, 'ARS');
-  find(home.render(), 'CurrencySwitch').props.onChange('USD');
+  assert.equal(find(home.render(), 'DisplayCurrencyButton').props.currency, 'ARS', 'no preference yet: the first currency held');
+  assert.equal(find(reports.render(), 'DisplayCurrencyButton').props.currency, 'ARS');
+  find(home.render(), 'DisplayCurrencyButton').props.onCurrency('USD');
   assert.equal(find(home.render(), 'Money').props.currency, 'USD');
-  assert.equal(find(reports.render(), 'CurrencySwitch').props.value, 'USD', 'Reportes follows Inicio without being told');
+  assert.equal(find(reports.render(), 'DisplayCurrencyButton').props.currency, 'USD', 'Reportes follows Inicio without being told');
   assert.equal(find(reports.render(), 'Money').props.currency, 'USD');
   assert.equal(rows.get(displayCurrency.DISPLAY_CURRENCY_KEY), 'USD', 'persisted outside the ledger, under its own key');
-  find(reports.render(), 'CurrencySwitch').props.onChange('ARS');
-  assert.equal(find(home.render(), 'CurrencySwitch').props.value, 'ARS', 'and Inicio follows Reportes');
+  find(reports.render(), 'DisplayCurrencyButton').props.onCurrency('ARS');
+  assert.equal(find(home.render(), 'DisplayCurrencyButton').props.currency, 'ARS', 'and Inicio follows Reportes');
   assert.equal(find(home.render(), 'Money').props.minor, 300);
   assert.equal(rows.get(displayCurrency.DISPLAY_CURRENCY_KEY), 'ARS');
   // A screen mounted later reads the same preference.
   const later = routeHarness('(tabs)/reports.tsx', {}, homeData, {}, shared);
-  assert.equal(find(later.render(), 'CurrencySwitch').props.value, 'ARS');
+  assert.equal(find(later.render(), 'DisplayCurrencyButton').props.currency, 'ARS');
   // Reportes' month and view stay its own: switching the currency changes neither.
   nodes(reports.render()).find(n => n.type === 'Choices' && n.props.value === 'categories')!.props.onChange('days');
-  find(reports.render(), 'CurrencySwitch').props.onChange('USD');
+  find(reports.render(), 'DisplayCurrencyButton').props.onCurrency('USD');
   assert.equal(nodes(reports.render()).some(n => n.type === 'Choices' && n.props.value === 'days'), true, 'the days view survives the currency change');
   assert.equal(nodes(home.render()).some(n => n.type === 'Choices' && n.props.value === 'spending'), true, 'Inicio\'s metric is untouched');
 });
@@ -333,11 +349,12 @@ test('24B6: a stored preference survives a relaunch; one no account holds any mo
   const withoutDollars = routeHarness('(tabs)/index.tsx', {}, onlyPesos, {}, displayCurrency.createDisplayCurrencyStore(preferences));
   const root = withoutDollars.render();
   assert.equal(find(root, 'Money').props.currency, 'ARS', 'no USD account: the first currency held');
-  assert.equal(nodes(root).some(n => n.type === 'CurrencySwitch'), false, 'one currency: no switch');
+  // 24C1: the chip stays with one currency: it is the way to the consolidated total (and to another display currency).
+  assert.equal(find(root, 'DisplayCurrencyButton').props.currency, 'ARS', 'one currency: the chip names it');
   assert.equal(rows.get(displayCurrency.DISPLAY_CURRENCY_KEY), 'USD', 'the preference is not rewritten; nothing else is touched');
   const reports = routeHarness('(tabs)/reports.tsx', {}, onlyPesos, {}, displayCurrency.createDisplayCurrencyStore(preferences));
   assert.equal(find(reports.render(), 'Money').props.currency, 'ARS');
-  assert.equal(nodes(reports.render()).some(n => n.type === 'CurrencySwitch'), false);
+  assert.equal(find(reports.render(), 'DisplayCurrencyButton').props.currency, 'ARS');
 });
 
 test('24B6: a link into Reportes with a held currency shows it and makes it the shared choice; an unknown, malformed or unheld one shows the shared choice and never overwrites it', () => {
@@ -349,9 +366,9 @@ test('24B6: a link into Reportes with a held currency shows it and makes it the 
   assert.equal(shared.getState(), 'USD', 'the explicit currency became the shared choice');
   assert.equal(rows.get(displayCurrency.DISPLAY_CURRENCY_KEY), 'USD');
   const home = routeHarness('(tabs)/index.tsx', {}, homeData, {}, shared);
-  assert.equal(find(home.render(), 'CurrencySwitch').props.value, 'USD', 'Inicio agrees');
+  assert.equal(find(home.render(), 'DisplayCurrencyButton').props.currency, 'USD', 'Inicio agrees');
   // The switch on the linked screen still wins afterwards: the parameter is applied once, not on every render.
-  find(linked.render(), 'CurrencySwitch').props.onChange('ARS');
+  find(linked.render(), 'DisplayCurrencyButton').props.onCurrency('ARS');
   assert.equal(find(linked.render(), 'Money').props.currency, 'ARS');
   assert.equal(find(linked.render(), 'Money').props.currency, 'ARS', 'a re-render does not re-apply the link');
   assert.equal(shared.getState(), 'ARS');
@@ -364,7 +381,7 @@ test('24B6: a link into Reportes with a held currency shows it and makes it the 
   // Inicio's own link to Reportes carries the currency it shows, so the two agree even on a phone that never stored a choice.
   const fresh = displayCurrency.createDisplayCurrencyStore(() => ({ getItemSync: () => null, setItemSync: () => {}, removeItemSync: () => false }));
   const origin = routeHarness('(tabs)/index.tsx', {}, homeData, {}, fresh);
-  find(origin.render(), 'CurrencySwitch').props.onChange('USD');
+  find(origin.render(), 'DisplayCurrencyButton').props.onCurrency('USD');
   nodes(origin.render()).find(n => n.type === 'SectionTitle' && n.props.action === 'Reportes')!.props.onAction();
   assert.equal(JSON.stringify(origin.pushed.at(-1)), JSON.stringify({ pathname: '/reports', params: { currency: 'USD' } }));
 });
@@ -386,11 +403,11 @@ test('24B6 review: a Reportes link naming a currency nobody holds yet is applied
   assert.equal(find(root, 'Money').props.currency, 'EUR', 'the link is honoured the moment its currency is held');
   assert.equal(shared.getState(), 'EUR', 'and applied to the shared choice');
   assert.equal(rows.get(displayCurrency.DISPLAY_CURRENCY_KEY), 'EUR');
-  assert.deepEqual(find(root, 'CurrencySwitch').props.currencies, ['ARS', 'USD', 'EUR']);
+  assert.deepEqual(find(root, 'DisplayCurrencyButton').props.held, ['ARS', 'USD', 'EUR']);
   const home = routeHarness('(tabs)/index.tsx', {}, withEuro, {}, shared);
-  assert.equal(find(home.render(), 'CurrencySwitch').props.value, 'EUR', 'Inicio follows');
+  assert.equal(find(home.render(), 'DisplayCurrencyButton').props.currency, 'EUR', 'Inicio follows');
   // The switch on Reportes wins from now on, and an unrelated ledger change does not re-impose the link.
-  find(reports.render(), 'CurrencySwitch').props.onChange('USD');
+  find(reports.render(), 'DisplayCurrencyButton').props.onCurrency('USD');
   assert.equal(find(reports.render(), 'Money').props.currency, 'USD');
   assert.equal(shared.getState(), 'USD');
   const more: domain.LedgerSnapshot = { ...withEuro, accounts: [...withEuro.accounts, { ...euro, id: 'e2', name: 'Más euros' }], entries: [...withEuro.entries, { ...withEuro.entries[0], id: 'e-1', accountId: 'e', amountMinor: 900 }] };
@@ -405,10 +422,10 @@ test('24B6 review: a Reportes link naming a currency nobody holds yet is applied
   assert.equal(shared.getState(), 'USD');
   // Inicio, mounted or not, changes the choice and Reportes follows; the link still does not return.
   home.setData(withEuro);
-  find(home.render(), 'CurrencySwitch').props.onChange('ARS');
+  find(home.render(), 'DisplayCurrencyButton').props.onCurrency('ARS');
   assert.equal(find(reports.render(), 'Money').props.currency, 'ARS');
   const later = routeHarness('(tabs)/reports.tsx', {}, withEuro, {}, shared);
-  assert.equal(find(later.render(), 'CurrencySwitch').props.value, 'ARS', 'a Reportes mounted later reads the same choice');
+  assert.equal(find(later.render(), 'DisplayCurrencyButton').props.currency, 'ARS', 'a Reportes mounted later reads the same choice');
   // A link that can never be held (a malformed or unknown code) applies nothing, before or after the ledger grows.
   const bad = routeHarness('(tabs)/reports.tsx', { currency: 'ZZZ', month: '2026-08' }, homeData, {}, shared);
   assert.equal(find(bad.render(), 'Money').props.currency, 'ARS');
@@ -419,7 +436,7 @@ test('24B6 review: a Reportes link naming a currency nobody holds yet is applied
   const direct = routeHarness('(tabs)/reports.tsx', { currency: 'USD', month: '2026-08' }, withEuro, {}, shared);
   assert.equal(find(direct.render(), 'Money').props.currency, 'USD');
   assert.equal(shared.getState(), 'USD');
-  find(direct.render(), 'CurrencySwitch').props.onChange('EUR');
+  find(direct.render(), 'DisplayCurrencyButton').props.onCurrency('EUR');
   direct.setData(more);
   assert.equal(find(direct.render(), 'Money').props.currency, 'EUR');
   assert.equal(shared.getState(), 'EUR');
@@ -486,7 +503,7 @@ test('24UX2: Home keeps its modules and adds none', () => {
   assert.equal(nodes(root).filter(node => node.type === 'AssistantEntry').length, 1, 'the Assistant keeps its prominent entry');
   assert.equal(find(root, 'AssistantEntry').props.currency, 'ARS', 'it carries the currency Inicio shows');
   assert.equal(nodes(root).filter(node => node.type === 'Choices').length, 1, 'Gastos / Disponible');
-  assert.equal(nodes(root).filter(node => node.type === 'CurrencySwitch').length, 1);
+  assert.equal(nodes(root).filter(node => node.type === 'DisplayCurrencyButton').length, 1);
 });
 
 // ---- 24UX3: Home hierarchy ---------------------------------------------------------------------------------------
@@ -497,7 +514,7 @@ test('24UX3: a quiet header, a larger number, movements then the Assistant, quie
   const root = routeHarness('(tabs)/index.tsx', {}, homeData, { recurring: [rule] }).render();
   // The header is the compact variant: the metric and the currency chip no longer weigh like the number.
   assert.equal(find(root, 'Choices').props.compact, true);
-  assert.equal(find(root, 'CurrencySwitch').props.compact, true);
+  assert.equal(find(root, 'DisplayCurrencyButton').props.compact, true);
   // The number is Inicio's own size, a step above the 44 pt hero elsewhere.
   const hero = find(root, 'Money');
   assert.equal(hero.props.large, true);
@@ -567,9 +584,10 @@ test('24UX5: Inicio keeps its hierarchy with no account, one or several accounts
     category: 'Servicios', frequency: 'monthly', anchorDateISO: '2026-09-20', nextDateISO: '2026-09-20', active: true, deleted: false, createdAt: at, revision: 0, updatedAt: at, ...overrides });
   const total = (amountMinor: number): domain.MonthlyBudget => ({ id: 'total', scope: 'total', currency: 'ARS', monthISO: '2026-09', amountMinor, active: true, createdAt: at, revision: 0, updatedAt: at });
   const order = (root: Node) => nodes(root).map(node => node.type === 'SectionTitle' ? 'title:' + node.props.children : node.type)
-    .filter(type => ['Choices', 'CurrencySwitch', 'Money', 'QuickActions', 'AssistantEntry', 'BudgetHomeCard', 'CategoryRanking', 'UpcomingRecurringRow', 'EntryRow', 'EmptyState'].includes(type) || type.startsWith('title:'))
+    .filter(type => ['Choices', 'DisplayCurrencyButton', 'Money', 'QuickActions', 'AssistantEntry', 'BudgetHomeCard', 'CategoryRanking', 'UpcomingRecurringRow', 'EntryRow', 'EmptyState'].includes(type) || type.startsWith('title:'))
     .filter((type, index, all) => type !== all[index - 1]);
-  const expected = (sections: string[]) => ['Choices', 'Money', 'QuickActions', 'AssistantEntry', ...sections];
+  // 24C1: the chip is part of the header whenever an account exists.
+  const expected = (sections: string[]) => ['Choices', 'DisplayCurrencyButton', 'Money', 'QuickActions', 'AssistantEntry', ...sections];
 
   // No account: one calm empty state, nothing else.
   assert.deepEqual(order(routeHarness('(tabs)/index.tsx', {}, { accounts: [], entries: [] }).render()), ['EmptyState']);
@@ -585,7 +603,6 @@ test('24UX5: Inicio keeps its hierarchy with no account, one or several accounts
   let root = view.render();
   const full = expected(['title:Presupuesto del mes', 'BudgetHomeCard', 'title:En qué gastaste', 'CategoryRanking', 'title:Próximos compromisos', 'UpcomingRecurringRow',
     'title:Últimos movimientos', 'EntryRow']);
-  full.splice(1, 0, 'CurrencySwitch');
   assert.deepEqual(order(root), full);
   assert.equal(find(root, 'Money').props.minor, 9_999_999_999_999 + 500 + 300 + 200, 'the huge amount reaches the hero exactly (Money fits it to the width)');
   assert.equal(find(root, 'CategoryRanking').props.categories.length, 4, 'every category is handed over; the card shows its three');
@@ -593,13 +610,70 @@ test('24UX5: Inicio keeps its hierarchy with no account, one or several accounts
   assert.equal(nodes(root).filter(node => node.type === 'EntryRow').every(node => node.props.showAccount), true, 'two ARS accounts: rows name theirs');
   assert.ok(find(root, 'BudgetHomeCard').props.summary.total.exceeded, 'the exceeded budget keeps its place and its own card');
   // Switching the currency keeps the same order; sections with nothing in USD simply stay out.
-  find(root, 'CurrencySwitch').props.onChange('USD');
+  find(root, 'DisplayCurrencyButton').props.onCurrency('USD');
   root = view.render();
   const usd = expected(['title:En qué gastaste', 'CategoryRanking', 'title:Últimos movimientos', 'EntryRow']);
-  usd.splice(1, 0, 'CurrencySwitch');
   assert.deepEqual(order(root), usd);
   assert.equal(nodes(root).filter(node => node.type === 'EntryRow').every(node => node.props.showAccount === false), true, 'one USD account: no account name');
   // Several upcoming rules: at most three, soonest first.
   const many = routeHarness('(tabs)/index.tsx', {}, data, { recurring: ['d', 'b', 'a', 'c'].map((id, index) => rule(id, { nextDateISO: '2026-09-2' + index, anchorDateISO: '2026-09-2' + index })) }).render();
   assert.equal(nodes(many).filter(node => node.type === 'UpcomingRecurringRow').map(node => node.props.rule.id).join(), 'd,b,a');
+});
+
+// ---- Producto 24C1: the consolidated total ------------------------------------------------------------------
+// Synthetic rates from a fixed book (no network): 1 USD = 1000 ARS from the 1st, 2000 ARS from the 10th.
+
+const consolidatedRates = () => domain.rateBook([
+  { base: 'USD', quote: 'ARS', rate: '1000', effectiveDate: '2026-09-01', source: 'Frankfurter', fetchedAt: '2026-09-12T12:00:00.000Z' },
+  { base: 'USD', quote: 'ARS', rate: '2000', effectiveDate: '2026-09-10', source: 'Frankfurter', fetchedAt: '2026-09-12T12:00:00.000Z' },
+]);
+
+test('24C1: a new installation opens Inicio on the consolidated total: every account, each expense at its own date, original rows, the rate behind an info button', () => {
+  const display = displayStore({ [displayCurrency.DISPLAY_MODE_KEY]: 'consolidated' });
+  const ensured: { months: readonly string[]; quotes: readonly string[] }[] = [];
+  const view = routeHarness('(tabs)/index.tsx', {}, homeData, {}, display, { book: consolidatedRates(), ensured });
+  let root = view.render();
+  // ARS 1,00 + 2,00, and USD 10,00 of the 11th at 2000 → ARS 20.000,00.
+  assert.deepEqual([find(root, 'Money').props.minor, find(root, 'Money').props.currency], [100 + 200 + 2000000, 'ARS']);
+  assert.equal(nodes(root).filter(n => n.type === 'Money').length, 1, 'one number: no equivalent under it');
+  assert.equal(find(root, 'DisplayCurrencyButton').props.mode, 'consolidated');
+  assert.match(find(root, 'MetricHelp').props.detail, /^Gastos de todas tus cuentas en Pesos argentinos\. .*Frankfurter.*10\/9\/2026/);
+  assert.deepEqual(nodes(root).filter(n => n.type === 'EntryRow').map(n => [n.props.entry.id, n.props.entry.amountMinor, n.props.account.currency]),
+    [['income', 500, 'ARS'], ['usd', 1000, 'USD'], ['now', 200, 'ARS'], ['early', 100, 'ARS']], 'rows keep their own amount and currency');
+  assert.deepEqual(find(root, 'CategoryRanking').props.categories.map((c: domain.CategorySpending) => [c.key, c.amountMinor]), [['salud', 2000300]], 'categories add up to the total');
+  assert.equal(JSON.stringify(ensured.at(-1)), JSON.stringify({ months: ['2026-09'], quotes: ['ARS'] }), 'only the month shown and the one quote it needs');
+  // Disponible: ARS 95,94 and USD 80,01 at today's rate (the 10th's, 2000) → ARS 160.020,00.
+  nodes(root).find(n => n.type === 'Choices' && n.props.value === 'spending')!.props.onChange('available');
+  root = view.render();
+  assert.equal(find(root, 'Money').props.minor, 9594 + 16002000);
+  assert.match(find(root, 'MetricHelp').props.detail, /^Dinero registrado en todas tus cuentas, en Pesos argentinos, con la cotización de referencia del 10\/9\/2026/);
+  // The secondary option: one currency only, the 24B6 filter.
+  find(root, 'DisplayCurrencyButton').props.onMode('single');
+  root = view.render();
+  assert.equal(find(root, 'Money').props.minor, 9594, 'the ARS accounts alone, nothing converted');
+  assert.equal(display.getMode(), 'single');
+});
+
+test('24C1: without a rate Inicio shows each currency\'s own figure and why, never a partial sum; a display currency no account holds is allowed', () => {
+  const display = displayStore({ [displayCurrency.DISPLAY_MODE_KEY]: 'consolidated', [displayCurrency.DISPLAY_CURRENCY_KEY]: 'EUR' });
+  const ensured: { months: readonly string[]; quotes: readonly string[] }[] = [];
+  const root = routeHarness('(tabs)/index.tsx', {}, homeData, {}, display, { book: consolidatedRates(), activity: 'offline', ensured }).render();
+  assert.equal(nodes(root).some(n => n.type === 'Money'), false, 'no total');
+  const parts = find(root, 'CurrencyParts');
+  assert.equal(JSON.stringify(parts.props.parts), JSON.stringify([{ currency: 'ARS', minor: 300 }, { currency: 'USD', minor: 1000 }]));
+  assert.equal(parts.props.line, 'Sin cotización para sumarlo en EUR');
+  assert.match(parts.props.detail, /^Sin conexión: no pudimos obtener la cotización USD → EUR del 1\/9\/2026/);
+  assert.equal(nodes(root).some(n => n.type === 'CategoryRanking'), false, 'no category shares of a partial month');
+  assert.equal(nodes(root).some(n => n.type === 'BudgetHomeCard'), false);
+  assert.equal(ensured.at(-1)?.quotes.join(), 'ARS,EUR');
+  assert.equal(find(root, 'QuickActions').props.currency, undefined, 'no EUR account to preselect');
+});
+
+test('24C1: a ledger in one currency shown in that currency asks the provider nothing and reads as before', () => {
+  const onlyPesos: domain.LedgerSnapshot = { ...homeData, accounts: homeData.accounts.filter(account => account.currency === 'ARS'), entries: homeData.entries.filter(entry => entry.accountId === 'a') };
+  const ensured: { months: readonly string[]; quotes: readonly string[] }[] = [];
+  const root = routeHarness('(tabs)/index.tsx', {}, onlyPesos, {}, displayStore({ [displayCurrency.DISPLAY_MODE_KEY]: 'consolidated' }), { book: domain.rateBook([]), ensured }).render();
+  assert.equal(find(root, 'Money').props.minor, 300);
+  assert.equal(ensured.length, 0);
+  assert.equal(nodes(root).some(n => n.type === 'MetricHelp'), false, 'nothing converted: no rate to explain');
 });
