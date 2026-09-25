@@ -101,7 +101,8 @@ ownership and quota tests) and `domain` (the root vitest suite over `packages/do
 ## Hosting
 
 The Vercel project `finanzapp-v2` deploys `api/mobile/*` as functions from this repository; its
-static output is an empty directory, so `/` answers 404 and no web page is served. Without the
+static output holds only a plain `404.html` (Vercel refuses an empty output directory), so `/`
+and every other path answer 404 and no web page is served. Without the
 owner's configuration (`server/mobile/runtime.js` reads `MOBILE_INTEGRATIONS_ENABLED`,
 `MOBILE_SUPABASE_URL`, `MOBILE_SUPABASE_PUBLISHABLE_KEY`, `MOBILE_AI_ENABLED`,
 `MOBILE_OPENAI_API_KEY`) every endpoint fails closed: `GET` answers 405, `POST` answers 503;

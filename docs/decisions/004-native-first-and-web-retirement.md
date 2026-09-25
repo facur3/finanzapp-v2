@@ -80,8 +80,9 @@ and the same Vercel project deploys both the static web and the mobile API funct
   job became `domain` (`npm ci`, `npm test`, `npm run check:repo`); `mobile` and `mobile_api` are
   unchanged. `scripts/check-repo.mjs` now also fails on the legacy tree reappearing, on a product
   source importing a retired path, and on sensitive files or credential-shaped content.
-- **Hosting.** `vercel.json` keeps the project for `api/mobile/*` only: no framework, an empty
-  static output (`/` answers 404), the functions auto-detected from `api/`. Unconfigured, the
+- **Hosting.** `vercel.json` keeps the project for `api/mobile/*` only: no framework, a static
+  output that holds only a plain `404.html` (`/` and every other path answer 404), the functions
+  auto-detected from `api/`. Unconfigured, the
   endpoints fail closed (`GET` 405, `POST` 503); configured, a request without a session is 401.
 - **Android.** Built later in `apps/mobile` from the same code (navigation, domain, storage
   abstractions, i18n, Assistant, components); platform differences behind `Platform.OS`,

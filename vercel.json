@@ -1,6 +1,6 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": null,
-  "buildCommand": "mkdir -p dist",
+  "buildCommand": "mkdir -p dist && printf '<!doctype html><meta charset=utf-8><title>FinanzApp</title><p>FinanzApp is a native app; this host serves only its mobile API.</p>' > dist/404.html",
   "outputDirectory": "dist"
 }

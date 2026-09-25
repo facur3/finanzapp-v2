@@ -304,7 +304,7 @@ the owner authorises it; no EAS build or store submission without the owner.
     Capacitor packages gone; `scripts/check-repo.mjs` guards generated files, the legacy tree, imports
     from retired paths, sensitive files and credential-shaped content (`check-repo.test.js`). CI:
     `build` → `domain` without the Vite build; `mobile` and `mobile_api` unchanged. `vercel.json`:
-    functions only, empty static output.
+    functions only, a static output holding one plain `404.html`.
   - Docs: README, AGENTS, apps/mobile/README, decisions 001 and 004, the inventory (§0 executed),
     currency.md and empezar-en-iphone.md no longer describe the web as present; Android's
     shared-code rule recorded (AGENTS rule 13, README, §5 below).

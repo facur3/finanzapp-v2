@@ -69,10 +69,14 @@ describe('check:repo', () => {
       expect(SENSITIVE_FILES.some(re => re.test(path)), path).toBe(true);
     }
     expect(SENSITIVE_FILES.some(re => re.test('apps/mobile/tests/fixtures/backup-v8.json'))).toBe(false);
+    // The shapes are assembled at run time so this file never contains one (the guard scans it too).
+    const fakeKey = ['sk', 'proj', 'abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGH'].join('-');
+    const fakeBlock = ['-----BEGIN RSA', 'PRIVATE KEY-----'].join(' ');
+    const fakeUrl = ['postgres', '://app:S3cretPassw0rd@db.example.com/finanzapp'].join('');
     const secrets = run({ ...clean,
-      'server/mobile/openai.js': "const key = 'sk-proj-abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGH';\n",
-      'docs/x.md': '-----BEGIN RSA PRIVATE KEY-----\nMIIE\n',
-      'scripts/db.mjs': "const url = 'postgres://app:S3cretPassw0rd@db.example.com/finanzapp';\n" }).secrets;
+      'server/mobile/openai.js': `const key = '${fakeKey}';\n`,
+      'docs/x.md': `${fakeBlock}\nMIIE\n`,
+      'scripts/db.mjs': `const url = '${fakeUrl}';\n` }).secrets;
     expect(secrets.map(h => [h.file, h.name])).toEqual([
       ['server/mobile/openai.js', 'OpenAI API key'], ['docs/x.md', 'private key block'], ['scripts/db.mjs', 'Postgres URL with password']]);
     expect(run(clean).secrets).toEqual([]);

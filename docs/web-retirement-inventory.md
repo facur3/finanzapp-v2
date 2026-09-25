@@ -51,8 +51,9 @@ it was established before the deletion (its commands were run on the tree at the
   `scripts/check-repo.test.js` (6 tests) pins each rule.
 - **CI.** `build` → `domain` (`npm ci`, `npm test`, `npm run check:repo`; the Vite build step is
   gone); `mobile` and `mobile_api` unchanged.
-- **Vercel.** `vercel.json`: `framework: null`, `buildCommand: mkdir -p dist`, `outputDirectory:
-  dist`; the functions come from `api/mobile/` (nothing else remains under `api/`). Unconfigured,
+- **Vercel.** `vercel.json`: `framework: null`, a `buildCommand` that writes only a plain
+  `dist/404.html` (Vercel refuses an empty output directory), `outputDirectory: dist`; the
+  functions come from `api/mobile/` (nothing else remains under `api/`). Unconfigured,
   `GET /api/mobile/*` → 405 and `POST` → 503 (fail closed, `server/mobile/handlers.js`); configured,
   a request without a session → 401. `/` → 404: no web page is served. The environment variables
   of `server/mobile/runtime.js` are unchanged.
