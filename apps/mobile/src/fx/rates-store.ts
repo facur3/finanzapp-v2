@@ -88,9 +88,11 @@ export function createRatesStore({ cache, fetchRates, now = () => new Date() }: 
   const coverage = new Map<string, RateCoverage>();
   let state: RatesSnapshot = { book: rateBook([]), loaded: false, lastFetchedAt: null };
   const listeners = new Set<() => void>();
-  const inFlight = new Map<string, Promise<void>>(); // by month
-  const inFlightQuotes = new Map<string, Set<Currency>>();
-  const failures = new Map<string, { at: number; kind: 'offline' | 'provider'; quotes: Set<Currency> }>(); // by month
+  // In flight and failed are tracked per (quote, month): a request for EUR in September never blocks one for JPY
+  // in September started while it is pending (two screens, or two quick changes of the display currency).
+  const inFlight = new Map<string, Promise<void>>(); // by request (month and its quotes)
+  const pendingQuotes = new Set<string>();           // quote|month keys being fetched
+  const failures = new Map<string, { at: number; kind: 'offline' | 'provider' }>(); // by quote|month
   const waiting: { months: string[]; quotes: Currency[]; today: string }[] = [];
   const key = (quote: Currency, month: string) => quote + '|' + month;
   // Every notification carries a new snapshot object (same book when only the activity changed), so a
@@ -109,7 +111,9 @@ export function createRatesStore({ cache, fetchRates, now = () => new Date() }: 
 
   const fetchMonth = (month: string, quotes: Currency[], today: string) => {
     const request = monthRequest(month, quotes, today);
-    inFlightQuotes.set(month, new Set(quotes));
+    const keys = quotes.map(quote => key(quote, month));
+    for (const item of keys) pendingQuotes.add(item);
+    const requestKey = month + ':' + request.quotes.join(',');
     const task = (async () => {
       try {
         const fetched = await fetchRates(request);
@@ -123,18 +127,19 @@ export function createRatesStore({ cache, fetchRates, now = () => new Date() }: 
         }
         rates = [...replaced.values()];
         for (const item of covered) coverage.set(key(item.quote, item.monthISO), item);
-        failures.delete(month);
+        for (const item of keys) failures.delete(item);
         try { await cache.save(fetched, covered); } catch { /* kept in memory for this session */ }
         publish(fetchedAt);
       } catch (error) {
-        failures.set(month, { at: now().getTime(), kind: error instanceof RateFetchError ? error.kind : 'provider', quotes: new Set(quotes) });
+        const failure = { at: now().getTime(), kind: error instanceof RateFetchError ? error.kind : 'provider' as const };
+        for (const item of keys) failures.set(item, failure);
         emit();
       } finally {
-        inFlight.delete(month);
-        inFlightQuotes.delete(month);
+        inFlight.delete(requestKey);
+        for (const item of keys) pendingQuotes.delete(item);
       }
     })();
-    inFlight.set(month, task);
+    inFlight.set(requestKey, task);
     emit();
   };
 
@@ -146,18 +151,20 @@ export function createRatesStore({ cache, fetchRates, now = () => new Date() }: 
       if (!state.loaded) { waiting.push({ months: [...months], quotes: [...quotes], today }); return; }
       const moment = now();
       for (const month of new Set(months)) {
-        if (inFlight.has(month)) continue;
-        const failure = failures.get(month);
-        if (failure && moment.getTime() - failure.at < RETRY_MS) continue;
-        const missing = quotes.filter(quote => needsFetch(coverage.get(key(quote, month)), month, today, moment));
+        const missing = quotes.filter(quote => {
+          const item = key(quote, month), failure = failures.get(item);
+          if (pendingQuotes.has(item) || (failure && moment.getTime() - failure.at < RETRY_MS)) return false;
+          return needsFetch(coverage.get(item), month, today, moment);
+        });
         if (missing.length) fetchMonth(month, missing, today);
       }
     },
     activity(months, quotes) {
       if (!quotes.length) return 'idle';
       if (!state.loaded) return 'loading';
-      if (months.some(month => [...(inFlightQuotes.get(month) ?? [])].some(quote => quotes.includes(quote)))) return 'fetching';
-      const failure = months.map(month => failures.get(month)).find(item => item && quotes.some(quote => item.quotes.has(quote)));
+      const keys = months.flatMap(month => quotes.map(quote => key(quote, month)));
+      if (keys.some(item => pendingQuotes.has(item))) return 'fetching';
+      const failure = keys.map(item => failures.get(item)).find(Boolean);
       return failure ? failure.kind : 'idle';
     },
     async settled() {

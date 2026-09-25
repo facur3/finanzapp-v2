@@ -218,6 +218,25 @@ test('offline: the cached rates keep working, the failure is reported, and the p
   assert.equal(store.activity(['2026-09'], ['ARS']), 'idle');
 });
 
+test('a request for one currency in flight never blocks another currency of the same month (two screens, a quick change)', async () => {
+  const { cache } = memoryCache();
+  let release: () => void = () => {};
+  const gate = new Promise<void>(resolve => { release = resolve; });
+  const requests: RateRequest[] = [];
+  const store = createRatesStore({ cache, now: () => new Date('2026-09-25T12:00:00.000Z'),
+    fetchRates: async request => { requests.push(request); await gate; return request.quotes.map(quote => rate(quote, request.to, '2')); } });
+  await store.settled();
+  store.ensure(['2026-09'], ['EUR'], '2026-09-25');
+  store.ensure(['2026-09'], ['EUR', 'JPY'], '2026-09-25');
+  store.ensure(['2026-09'], ['EUR', 'JPY'], '2026-09-25');
+  assert.deepEqual(requests.map(request => request.quotes.join()), ['EUR', 'JPY'], 'JPY asked at once; nothing asked twice');
+  assert.equal(store.activity(['2026-09'], ['JPY']), 'fetching');
+  release();
+  await store.settled();
+  assert.equal(store.getState().book.lookup('JPY', '2026-09-25').status, 'ok');
+  assert.equal(store.activity(['2026-09'], ['EUR', 'JPY']), 'idle');
+});
+
 test('a cache that cannot be read or written leaves the session\'s rates in memory and deletes nothing', async () => {
   const { cache, faults, stored } = memoryCache({ rates: [rate('ARS', '2026-09-18', '1500')] }, { load: true, save: true });
   const provider = stubProvider();

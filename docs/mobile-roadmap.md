@@ -821,10 +821,10 @@ the owner authorises it; no EAS build or store submission without the owner.
   display currency as before), navigation, Inicio's design.
 - **Status.** Delivered on this branch (2026-09-25), not device-verified.
   - **Checked on Linux:** root `npm test` 318/318 (+15 `packages/domain/fx.test.ts`); mobile `npm run typecheck`,
-    `npm run test:storage` 718/718 (+18 `tests/fx-rates.node.ts`: the provider adapter with a stub, the cache on
+    `npm run test:storage` 720/720 (+19 `tests/fx-rates.node.ts`: per-(quote, month) in-flight requests, the provider adapter with a stub, the cache on
     real SQLite, the request policy, offline and failing caches, the preference transition, consolidated figures in
     ARS, USD, EUR and JPY, negative balances, stale and missing rates; +5 route tests in `spending-home.node.ts`
-    and `report-routes.node.ts`: Inicio and Reportes consolidated, a past month at its own dates, the drill-down
+    and `report-routes.node.ts`, +1 after the review: Inicio and Reportes consolidated, a past comparison not blocked by a later month, a past month at its own dates, the drill-down
     rows' original amounts, subtotals without a rate, no request for a one-currency ledger; the 24B6 harnesses
     now run in `single` mode and use the new chip), `currency:verify`, `regions:verify`, `i18n:check -- --strict`,
     `i18n:extract`, `check`, `export:ios` (Hermes bundle 5,117,746 bytes). The live API was read on 2026-09-25 for

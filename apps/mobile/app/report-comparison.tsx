@@ -24,7 +24,7 @@ export default function ReportComparisonScreen() {
   const selection = strictReportSelection(snapshot, params.currency, params.month, today);
   if (!selection) return <Screen><EmptyState title={t('reports.comparison.invalidTitle')} detail={t('reports.comparison.invalidDetail')} /></Screen>;
   // Two months compared only when every expense in both had a rate; otherwise no difference is claimed.
-  if (!view.complete(months[0] + '-01', today, 'expense')) return <Screen><EmptyState title={t('fx.infoTitle')} detail={t('fx.unavailable', { currency: selection.currency })} /></Screen>;
+  if (!view.complete(months[0] + '-01', month === today.slice(0, 7) ? today : month + '-31', 'expense')) return <Screen><EmptyState title={t('fx.infoTitle')} detail={t('fx.unavailable', { currency: selection.currency })} /></Screen>;
   const comparison = spendingComparison(snapshot, selection.currency, selection.monthISO, today);
   const { current, previous, deltaMinor } = comparison;
   const amount = (minor: number) => codedAmount(minor, selection.currency);

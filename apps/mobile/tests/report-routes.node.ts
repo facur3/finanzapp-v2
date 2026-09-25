@@ -489,3 +489,17 @@ test('24C1: a consolidated month with an expense that has no rate shows per-curr
   const comparison = routeHarness('report-comparison.tsx', { currency: 'EUR', month: '2026-08' }, snapshot, { display }).render();
   assert.equal(find(comparison, 'EmptyState').props.detail, 'Sin cotización para sumarlo en EUR', 'no difference is claimed');
 });
+
+test('24C1 review: comparing two complete past months is not blocked by a later month still waiting for its rate', () => {
+  const book = domain.rateBook([
+    { base: 'USD', quote: 'ARS', rate: '1000', effectiveDate: '2026-08-07', source: 'Frankfurter', fetchedAt: '2026-09-01T00:00:00.000Z' },
+    { base: 'USD', quote: 'ARS', rate: '1000', effectiveDate: '2026-08-28', source: 'Frankfurter', fetchedAt: '2026-09-01T00:00:00.000Z' },
+  ]);
+  const display = displayCurrency.createDisplayCurrencyStore(memoryPreferences({ [displayCurrency.DISPLAY_MODE_KEY]: 'consolidated', [displayCurrency.DISPLAY_CURRENCY_KEY]: 'USD' }).store);
+  const later: domain.LedgerSnapshot = { ...snapshot, entries: [...snapshot.entries,
+    { id: 'sep', accountId: 'a', kind: 'expense', amountMinor: 5000, merchant: 'Prueba', category: 'Salud', dateISO: '2026-09-11', createdAt }] };
+  const august = routeHarness('report-comparison.tsx', { currency: 'USD', month: '2026-08' }, later, { display, book }).render();
+  assert.equal(nodes(august).some(n => n.type === 'EmptyState' && n.props.title === 'Cotizaciones'), false, 'August against July needs no September rate');
+  const september = routeHarness('report-comparison.tsx', { currency: 'USD', month: '2026-09' }, later, { display, book }).render();
+  assert.equal(find(september, 'EmptyState').props.title, 'Cotizaciones', 'September itself has no rate: no difference is claimed');
+});
