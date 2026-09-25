@@ -164,6 +164,7 @@ function loadSwitch(tag: AppLocale = 'es-AR', held: readonly Currency[] = []) {
     react: { useState: (initial: unknown) => { const index = cursor++; if (!(index in state)) state[index] = initial; return [state[index], (value: unknown) => { state[index] = value; }]; }, useMemo: (fn: () => unknown) => fn() },
     'react/jsx-runtime': { jsx, jsxs: jsx, Fragment: 'Fragment' },
     '@expo/vector-icons/Ionicons': 'Ionicons',
+    'react-native': { StyleSheet: { hairlineWidth: 0.5 } },
     '@finanzapp/domain': domain,
     './components': { AppText: 'AppText', Choices: 'Choices', PressFeedback: 'PressFeedback' },
     './form-controls': { CurrencySheet: 'CurrencySheet' },

@@ -19,6 +19,11 @@ export const lightPalette = {
   primaryFill: '#2557D6', onPrimary: '#FFFFFF',
   /** A whisper of the primary for a tinted row or tile. */
   primarySoft: '#E5ECFB',
+  /** The Assistant's entry on Inicio (24UX3): a surface barely cooled by the primary, so the one wide control reads as
+   * part of the brand without becoming a blue block. Ink and the cobalt glyph both stay AA on it. */
+  primaryWash: '#F5F8FF',
+  /** The chosen segment of a compact segmented control (24UX3 review): white on the light inset track. */
+  thumb: '#FFFFFF',
   expense: '#C42F39', income: '#15804F', transfer: '#0B6BB3', warning: '#B45309',
   expenseSoft: '#FBE9EA', incomeSoft: '#E6F5EE', transferSoft: '#E8F3FC', warningSoft: '#FCF1E0',
   shadow: 'rgba(10, 10, 12, 0.08)',
@@ -34,6 +39,9 @@ export const darkPalette: typeof lightPalette = {
   /** A deeper cobalt under white button text (5:1), so the button is a solid object rather than a glow. */
   primaryFill: '#3565EA', onPrimary: '#FFFFFF',
   primarySoft: '#122048',
+  primaryWash: '#151B2C',
+  /** Dark: a clear step above the #1C1C1E track (systemGray4-like), so the state reads without colour. */
+  thumb: '#3A3A3E',
   expense: '#F0555C', income: '#3DBE86', transfer: '#4DB0FF', warning: '#E8A030',
   expenseSoft: '#3A1E20', incomeSoft: '#173126', transferSoft: '#14304A', warningSoft: '#3A2C14',
   shadow: 'rgba(0, 0, 0, 0)',

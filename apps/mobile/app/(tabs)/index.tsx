@@ -4,23 +4,35 @@ import { router } from 'expo-router';
 import { currentMonthISO, hiddenLiabilityAccountIds, liquidTotalsByCurrency, spendingOverview, spendingWindow,
   summarizeMonthlyBudgets } from '@finanzapp/domain';
 import { useLedger } from '../../src/storage/LedgerProvider';
-import { ActionButton, AppText, Choices, EmptyState, EntryRow, Money, Screen, SectionTitle, Surface, useStacked } from '../../src/ui/components';
+import { ActionButton, AppText, Choices, EmptyState, EntryRow, Money, Screen, SectionTitle, useStacked } from '../../src/ui/components';
 import { CurrencySwitch } from '../../src/ui/currency-switch';
 import { useDisplayCurrency } from '../../src/ui/display-currency-provider';
 import { useI18n } from '../../src/i18n/provider';
 import { BudgetHomeCard, CategoryRanking, MetricHelp, UpcomingRecurringRow } from '../../src/ui/home-modules';
 import { Reflow, ValueTransition } from '../../src/ui/motion';
 import { availableCurrencies, namesAccount, selectEntries } from '../../src/ui/presentation';
-import { QuickActions } from '../../src/ui/quick-actions';
+import { AssistantEntry, QuickActions } from '../../src/ui/quick-actions';
 import { space, useCurrentDay, usePalette } from '../../src/ui/theme';
 
 type HomeMetric = 'spending' | 'available';
 
 const capitalized = (label: string) => label.charAt(0).toUpperCase() + label.slice(1);
+/** Inicio's number (24UX3): 48 pt, a step above the 44 pt hero of the other screens, because on Inicio it is the
+ * one figure the screen exists for. `Money` still fits a long amount to the width and caps Dynamic Type. */
+const HERO_SIZE = 48;
 
 /** Home answers one question at a time: how much did I spend this month, or
  * how much recorded money do I have. One number, its month, and nothing else
- * competing with it. Periods and analysis live in Reportes; cards in Tarjetas. */
+ * competing with it. Periods and analysis live in Reportes; cards in Tarjetas.
+ *
+ * Hierarchy (24UX3), top to bottom: a quiet header (compact segments, the
+ * currency chip), the number with room around it, three compact movement
+ * pills, the Assistant as the one wide control, then the one card (the
+ * categories, a compact summary) followed by two open lists on the ground that
+ * differ by density: the commitments as a tight agenda (32 pt marks, the due
+ * day), the latest transactions as a full-height ledger (40 pt marks, signed
+ * amounts). One heavy block, then lighter content, never card → list → card. Section links are quiet (secondary ink and a chevron), so
+ * cobalt is left to the Assistant and the active tab. */
 export default function HomeScreen() {
   const { snapshot, archive } = useLedger();
   const day = useCurrentDay();
@@ -68,43 +80,46 @@ export default function HomeScreen() {
   // Keyed by the choice, not the dates: a day boundary must not animate the hero on its own.
   const heroId = `${metric}|${currency}`;
 
-  return <Screen gap={space.xxl}>
+  return <Screen gap={space.xxxl}>
     {!snapshot.accounts.length ? <EmptyState title={t('home.emptyTitle')}
       detail={t('home.emptyDetail')}
       icon="receipt-outline" action={<ActionButton label={t('home.start')} icon="add-outline" onPress={() => router.push('/new-account')} />} /> : <>
-      <View style={{ gap: space.xl }}>
+      <View style={{ gap: 28 }}>
         <View style={{ flexDirection: stacked ? 'column' : 'row', alignItems: stacked ? 'stretch' : 'center', justifyContent: 'space-between', gap: 12 }}>
-          <View style={{ flex: stacked ? undefined : 1, maxWidth: stacked ? undefined : 232 }}>
-            <Choices value={metric} onChange={setMetric}
+          <View style={{ flex: stacked ? undefined : 1, maxWidth: stacked ? undefined : 208 }}>
+            <Choices compact value={metric} onChange={setMetric}
               options={[{ value: 'spending', label: t('home.spending') }, { value: 'available', label: t('home.available') }]} />
           </View>
-          {currencies.length > 1 && <CurrencySwitch value={currency} currencies={currencies} onChange={setCurrency} labels="code" />}
+          {currencies.length > 1 && <CurrencySwitch compact value={currency} currencies={currencies} onChange={setCurrency} labels="code" />}
         </View>
 
-        <ValueTransition id={heroId} style={{ gap: 6, paddingVertical: space.s }}>
+        <ValueTransition id={heroId} style={{ gap: 4, paddingBottom: space.xs }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
             <AppText secondary variant="subhead" style={{ fontWeight: '500' }}>{spending ? capitalized(formatDate(day, 'month')) : t('home.recordedBalance')}</AppText>
             {!spending && <MetricHelp title={t('home.available')} detail={t('home.availableHelp')} />}
           </View>
           {spending ? summary.status === 'ready'
-            ? <Money minor={summary.expenseMinor} currency={currency} large />
+            ? <Money minor={summary.expenseMinor} currency={currency} large size={HERO_SIZE} />
             : <AppText secondary variant="subhead">{t('home.spendingOutOfRange')}</AppText>
             : available.status === 'ready'
-              ? <Money minor={available.minor} currency={currency} large color={available.minor < 0 ? p.expense : undefined} />
+              ? <Money minor={available.minor} currency={currency} large size={HERO_SIZE} color={available.minor < 0 ? p.expense : undefined} />
               : <AppText secondary variant="subhead">{t('home.balanceOutOfRange')}</AppText>}
           {!spending && <AppText secondary variant="footnote">{t('home.accounts', { count: accountCount })}</AppText>}
         </ValueTransition>
       </View>
 
-      <QuickActions currency={currency} assistant />
+      <View style={{ gap: space.m }}>
+        <QuickActions currency={currency} />
+        <AssistantEntry currency={currency} />
+      </View>
 
       {monthBudget !== null && (monthBudget.total !== null || monthBudget.rows.length > 0) && <Reflow fade>
-        <SectionTitle action={t('common.see')} onAction={() => router.push({ pathname: '/budgets', params: { currency } })}>{t('home.monthBudget')}</SectionTitle>
+        <SectionTitle quiet action={t('common.see')} onAction={() => router.push({ pathname: '/budgets', params: { currency } })}>{t('home.monthBudget')}</SectionTitle>
         <BudgetHomeCard summary={monthBudget} />
       </Reflow>}
 
       {!quietMonth && <Reflow fade>
-        <SectionTitle action={t('home.reports')} onAction={openReport}>{t('home.whereSpent')}</SectionTitle>
+        <SectionTitle quiet action={t('home.reports')} onAction={openReport}>{t('home.whereSpent')}</SectionTitle>
         <ValueTransition id={currency} variant="fade">
           {summary.categories.length && summary.status === 'ready' ? <CategoryRanking categories={summary.categories} totalMinor={summary.expenseMinor} currency={currency}
             onPressCategory={category => router.push({ pathname: '/spending-detail', params: { ...period, category: category.key } })} />
@@ -115,16 +130,16 @@ export default function HomeScreen() {
       </Reflow>}
 
       {upcoming.length > 0 && <Reflow fade>
-        <SectionTitle action={t('common.seeAll')} onAction={() => router.push('/recurring')}>{t('home.upcoming')}</SectionTitle>
-        <Surface grouped>{upcoming.map((rule, index) => <UpcomingRecurringRow key={rule.id} rule={rule} showAccount={showAccount}
-          account={snapshot.accounts.find(account => account.id === rule.accountId)!} day={day} last={index === upcoming.length - 1} />)}</Surface>
+        <SectionTitle quiet action={t('common.seeAll')} onAction={() => router.push('/recurring')}>{t('home.upcoming')}</SectionTitle>
+        <View>{upcoming.map((rule, index) => <UpcomingRecurringRow key={rule.id} rule={rule} showAccount={showAccount}
+          account={snapshot.accounts.find(account => account.id === rule.accountId)!} day={day} last={index === upcoming.length - 1} />)}</View>
       </Reflow>}
 
       <Reflow>
-        <SectionTitle action={t('common.seeAll')} onAction={() => router.navigate('/activity')}>{t('home.recent')}</SectionTitle>
+        <SectionTitle quiet action={t('common.seeAll')} onAction={() => router.navigate('/activity')}>{t('home.recent')}</SectionTitle>
         <ValueTransition id={currency} variant="fade">
-          {recent.length ? <Surface grouped>{recent.map((entry, index) => <EntryRow key={entry.id} entry={entry} showAccount={showAccount}
-            account={snapshot.accounts.find(a => a.id === entry.accountId)!} last={index === recent.length - 1} />)}</Surface>
+          {recent.length ? <View>{recent.map((entry, index) => <EntryRow key={entry.id} entry={entry} showAccount={showAccount} plain
+            account={snapshot.accounts.find(a => a.id === entry.accountId)!} last={index === recent.length - 1} />)}</View>
             : <AppText secondary variant="subhead">{currencies.length > 1 ? t('home.recentEmptyIn', { currency }) : t('home.recentEmpty')}</AppText>}
         </ValueTransition>
       </Reflow>

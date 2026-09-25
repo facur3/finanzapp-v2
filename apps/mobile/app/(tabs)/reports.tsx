@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { FlatList, View } from 'react-native';
+import { FlatList, StyleSheet, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { dailyAverageMinor, dailySpending, monthlySpendingTrend, spendingComparison, spendingInsights, spendingReport,
@@ -172,19 +172,23 @@ export default function ReportsScreen() {
         </Surface>
       </View>}
       {ready && merchants.length > 0 && <View>
-        <SectionTitle caption={t('reports.merchants.caption')}>{t('reports.merchants.title')}</SectionTitle>
-        <Surface grouped>
-          {/* Rank stays a number; the tile carries the merchant's category, the one identity it really has. No decorative podium colours. */}
-          {merchants.map((merchant, index) => <View key={merchant.key} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 12, minHeight: 64,
-            borderBottomWidth: index === merchants.length - 1 ? 0 : 0.5, borderBottomColor: p.line }}>
+        <SectionTitle>{t('reports.merchants.title')}</SectionTitle>
+        {/* 24UX3 review: an open ranked list on the ground, not a second slab under the category card. Rank stays a number; the
+            tile carries the merchant's category, the one identity it really has. No decorative podium colours. The hairline starts
+            under the text. */}
+        <View>
+          {merchants.map((merchant, index) => <View key={merchant.key} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 60 }}>
             <AppText tertiary variant="footnote" style={{ width: 16, textAlign: 'center', fontVariant: ['tabular-nums'], fontWeight: '600' }}>{index + 1}</AppText>
-            <CategoryBadge category={merchant.category} />
-            <MerchantCells merchant={merchant} currency={currency} label={lookOf(merchant.category).label} />
+            <CategoryBadge category={merchant.category} size={32} />
+            <View style={{ flex: 1, minWidth: 0, alignSelf: 'stretch', justifyContent: 'center', paddingVertical: 10,
+              borderBottomWidth: index === merchants.length - 1 ? 0 : StyleSheet.hairlineWidth, borderBottomColor: p.line }}>
+              <MerchantCells merchant={merchant} currency={currency} label={lookOf(merchant.category).label} />
+            </View>
           </View>)}
-        </Surface>
+        </View>
       </View>}
       {ready && insights.length > 0 && <View>
-        <SectionTitle caption={t('reports.insights.caption')}>{t('reports.insights.title')}</SectionTitle>
+        <SectionTitle>{t('reports.insights.title')}</SectionTitle>
         <View style={{ gap: 10 }}>
           {/* A fact about a category looks like that category; a warning or excess keeps its semantic tone. The surface takes only a whisper (8 %) of the colour so the text stays fully readable. */}
           {insights.map(insight => ({ ...insight, ...insightText(insight) })).map(insight => <InsightSurface key={insight.id} tone={insight.tone} category={insight.category}>

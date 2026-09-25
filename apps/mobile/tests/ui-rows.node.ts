@@ -238,6 +238,22 @@ test('Stat rows stack at large text and every Stat may shrink, so amounts and da
   assert.equal(column.props.style.flexDirection, 'column', 'DetailRow stacks at large text too');
 });
 
+test('24UX3 review: a plain EntryRow is an open ledger line, with the hairline under the text and a dim on press', () => {
+  const ui = load('components.tsx');
+  const account = { id: 'a', name: 'Banco', currency: 'ARS', openingMinor: 0, createdAt: 't' };
+  const entry = { id: 'e', accountId: 'a', kind: 'expense', merchant: 'Café', category: 'Comida', amountMinor: 1200, dateISO: '2026-09-22', createdAt: 't' };
+  const column = (root: Node) => nodes(root).find(node => is(node, 'View') && node.props.style?.flex === 1 && 'flexDirection' in node.props.style)!;
+  const grouped = ui.render('EntryRow', { entry, account });
+  assert.equal(grouped.props.feedback, 'highlight');
+  assert.equal(column(grouped).props.style.borderBottomWidth, undefined, 'grouped: the separator belongs to the cell');
+  const plain = ui.render('EntryRow', { entry, account, plain: true });
+  assert.equal(plain.props.feedback, 'opacity', 'no cell to tint on the ground');
+  assert.equal(plain.props.style.paddingHorizontal, undefined, 'aligned with the section title');
+  assert.equal(column(plain).props.style.borderBottomWidth > 0, true, 'the hairline starts under the text');
+  assert.equal(column(ui.render('EntryRow', { entry, account, plain: true, last: true })).props.style.borderBottomWidth, 0);
+  assert.equal(plain.props.accessibilityLabel, grouped.props.accessibilityLabel, 'VoiceOver hears the same sentence');
+});
+
 test('EntryRow gives the merchant two lines beside a bounded amount column at normal sizes, and stacks the amount under the name when it would not fit', () => {
   const ui = load('components.tsx');
   const account = { id: 'a', name: 'Cuenta sueldo Banco de la Provincia de Buenos Aires', currency: 'ARS', openingMinor: 0, createdAt: 't' };

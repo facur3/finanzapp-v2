@@ -1,6 +1,6 @@
 # FinanzApp mobile: living roadmap
 
-Updated: 2026-09-25 (Producto 24UX2). Read [decision 001](decisions/001-native-mobile.md),
+Updated: 2026-09-25 (Producto 24UX3). Read [decision 001](decisions/001-native-mobile.md),
 [decision 002](decisions/002-spending-first.md),
 [decision 003](decisions/003-five-tabs-and-cards.md) and
 [decision 004](decisions/004-native-first-and-web-retirement.md). Decision 002 supersedes
@@ -104,23 +104,27 @@ history file keeps the evidence of when and why.
 
 ## 1. Implemented (current state)
 
-What exists in code on `master` as of Producto 24REP (PR #55), plus Producto 24UX2 on its branch
+What exists in code on `master` as of Producto 24UX2 (PR #56), plus Producto 24UX3 on its branch
 (marked). Per area, without test inventories (those are in apps/mobile/README.md and the history
 file).
 
 - **Product shape.** Five native tabs with the Assistant in the centre and Más as the grouped
   hub (Finanzas / App y datos: Cuentas, Tarjetas, Presupuestos, Recurrentes, Deudas y cobros,
   Categorías, Idioma, Región, Apariencia, backup, the Assistant's data note); a Más footer that
-  names the build, the material in use and the delivery (Producto 24UX2 on its branch). Liquid Glass on
-  Inicio's four actions and the Assistant composer only in a development build on iOS 26 with
+  names the build, the material in use and the delivery (Producto 24UX3 on its branch). Liquid Glass on
+  Inicio's movement pills, its Assistant entry and the Assistant composer only in a development build on iOS 26 with
   the API present and without Reduce Transparency; opaque material otherwise.
 - **Inicio.** One main number (gasto registrado of the month, or Disponible: cash in normal
   accounts only), the Gastos / Disponible segment, the period, a discreet currency switch only
-  when more than one currency is held (segment with two, compact row with three or more), four
-  equal quick actions with Asistente first (24UX2: 48 pt flat discs, no shadow or halo), ranked
-  category washes, the upcoming-payments block only with real recurring data (24UX2: category as
-  the caption, the due day once), recent movements (24UX2: the account named only when another of
-  the currency exists; an empty month says so once), "Reportes" links that keep the currency.
+  when more than one currency is held (segment with two, compact row with three or more), and
+  (24UX3) a hierarchy of one focal point: a compact header, a 48 pt number with room around it,
+  three compact movement pills (Gasto, Ingreso, Transferir) and one wide Assistant entry below
+  them, then three sections with their own shape: ranked category washes as a compact summary
+  card, then two open lists on the ground that differ by density: the upcoming payments (only
+  with real recurring data; category as the caption, the due day once) as a tight agenda, recent
+  movements as a full-height open ledger (the account named only when another of the currency
+  exists; an empty month says so once). Section links
+  (Reportes keeps the currency, Ver todos) are quiet: secondary ink and a chevron.
 - **Recording.** Gasto / Ingreso / Transferencia on one control; kind and amount first; the
   amount field anchored with tabular digits, typing and pasting in the region's separators,
   per-currency exponent (0, 2, 3), 15-digit bound, paste markers, shortcuts (Usar todo, Pagar
@@ -200,6 +204,10 @@ it was checked in). Metro from the branch on the installed FinanzApp Dev build s
 item unless a section says a new native build is needed. The checklist sections are in
 [mobile-device-checklist.md](mobile-device-checklist.md).
 
+- **24UX3 — Home hierarchy:** first-glance clarity, the compact header, the 48 pt number, the
+  three pills and the Assistant entry (prominence, reach, not read as search), the three section
+  shapes, the cobalt balance, Dynamic Type, VoiceOver and Reduce Motion, in both themes and both
+  materials (checklist, Producto 24UX3).
 - **24UX2 — the Home refinement and the merchant mark:** the lighter actions in both themes and
   materials, the upcoming and Recurrentes rows with the date once, the single empty sentence, the
   Registrados history and the Recurrente row, paused rules at full contrast, the tab bar's
@@ -336,7 +344,7 @@ the owner authorises it; no EAS build or store submission without the owner.
   - **Merged** on 2026-09-25 (`f341ab0`); the post-merge CI on `master` passed (run 36146008339:
     `domain`, `mobile`, `mobile_api`).
 
-### Producto 24UX2 — merchant identity and Home refinement (this PR)
+### Producto 24UX2 — merchant identity and Home refinement (PR #56)
 
 - **Goal.** Better merchant identity and a calmer Home hierarchy without adding modules or
   touching the ledger: an audit of Inicio with incremental fixes; two alternatives for the quick
@@ -378,7 +386,47 @@ the owner authorises it; no EAS build or store submission without the owner.
     `apple`, `steam`, `adobe` and `despegar` removed and refused as ambiguous, their qualified
     aliases kept; the owner deferred brand display to 25C2, so the logo adapter was removed and the
     category glyph is the production presentation.
-  - **Pending:** the owner's decision on alternative B; the device QA of §2.
+  - **Pending:** the device QA of §2. Alternative B was approved by the owner and delivered in 24UX3.
+
+### Producto 24UX3 — Home hierarchy (this PR)
+
+- **Goal.** A calmer, clearer Home with one focal point, without new modules, navigation targets
+  or product scope: the owner's brief asked for a quieter header, a number that breathes, the
+  movements as compact pills with the Assistant as its own wide entry below them (24UX2's
+  alternative B), three sections that stop repeating one block pattern, quieter section links and
+  less competing cobalt.
+- **Out of scope.** The data model, SQLite, backups, currencies, regions, recurring logic, report
+  calculations, backend/API contracts, logos or remote assets, the Assistant's own screen (no
+  focused-composer parameter), Android, EAS builds.
+- **Status.** Delivered on this branch (2026-09-25), not device-verified.
+  - App: `quick-actions.tsx` (`QuickActions` is three 40 pt pills, shared with account detail;
+    new `AssistantEntry`, a 52 pt capsule on `primaryWash` with a hairline cobalt edge, the
+    sparkles glyph on a small cobalt disc and "Contale al Asistente" / "Ask the Assistant");
+    `components.tsx` (`Choices compact`: 32 pt, ink selected label; `SectionTitle quiet`:
+    footnote secondary link with a chevron, 44 pt target); `currency-switch.tsx` (`compact`);
+    `palette.ts` (`primaryWash`); `home-modules.tsx` (52 pt summary rows with 32 pt glyphs and
+    15 pt text; the upcoming rows as an open agenda with inset hairlines); Inicio's spacing
+    (32 pt between blocks, 28 pt above the number) and its 48 pt number. Copy: the two Reportes
+    captions under «Dónde más gastaste» and «Para tener en cuenta» removed (one restated the
+    title, the other was disclaimer copy); the Assistant quick-action strings replaced by the
+    entry's label and VoiceOver hint (English reviewed and accepted).
+  - **Owner's iPhone review (same PR):** the card → list → card rhythm on Inicio and the two
+    matching slabs in Reportes resolved: `EntryRow plain` makes Últimos movimientos an open ledger
+    (64 pt rows, 40 pt marks, signed amounts; the agenda keeps 56 pt rows and 32 pt marks);
+    Reportes' «Dónde más gastaste» is an open ranked list (32 pt marks, hairline under the text);
+    the compact segment's thumb is a new `thumb` token (#3A3A3E dark) with a hairline edge, the
+    chosen label semibold and the others medium; the three-or-more currency chip gets a hairline
+    edge; the quiet links' chevron is secondary. The Assistant entry is unchanged.
+  - Docs: docs/mobile-design.md (Producto 24UX3), the device checklist.
+  - **Checked on Linux:** root `npm test` 286/286, `npm run check:repo`; mobile `npm run
+    typecheck`, `npm run test:storage` 596/596 (was 592: +1 `spending-home`, +1 `home-ranking`,
+    +1 `ui-rows` for the plain ledger row, +1 `report-routes` for the open merchant list;
+    the quick-action test in `motion.node.ts` rewritten for pills + entry; `theme.node.ts` pins
+    the wash's and the thumb's contrast in both themes; Home/Assistant route tests updated), `currency:verify`,
+    `regions:verify`, `i18n:check -- --strict` (0 errors, 0 stale), `check` (up to date),
+    `export:ios` (iOS bundle exported, 5 MB). No EAS build; the iPhone was not touched.
+  - **Pending:** the device QA of §2 (checklist, Producto 24UX3). Whether the Assistant entry
+    should open the composer focused is a later decision with the Assistant's own delivery (25A).
 
 ### Producto 24R2 — international regions released
 

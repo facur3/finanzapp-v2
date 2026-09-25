@@ -43,7 +43,9 @@ export const RANKING_REVEAL = { duration: 300, stagger: 50, fade: 200 } as const
  * rather than a filled bar. The category is one object (glyph on its hue), the
  * amount sits right; no percentages, no bar under the row. Reportes has the
  * full picture. Washes are absolute, childless and behind the content, so
- * the animation costs no layout and never blocks a tap. */
+ * the animation costs no layout and never blocks a tap. On Inicio it is the
+ * compact summary of the three sections (24UX3): 52 pt rows, 32 pt glyphs,
+ * name and amount at 15 pt, so it reads as a glance, not as a ledger. */
 export function CategoryRanking({ categories, totalMinor, currency, limit = 3, onPressCategory }: {
   categories: CategorySpending[]; totalMinor: number; currency: Currency; limit?: number; onPressCategory: (category: CategorySpending) => void;
 }) {
@@ -80,14 +82,14 @@ function RankedRow({ category, totalMinor, currency, index, last, onPress }: {
   const stacked = useStacked({ minor: category.amountMinor, currency });
   return <PressFeedback feedback="highlight" accessibilityRole="button" accessibilityHint={t('home.rankingHint')}
     accessibilityLabel={t('home.rankingLabel', { name, amount: spokenAmount(category.amountMinor, currency), share: spokenPercent(fraction) })}
-    onPress={onPress} style={[styles.row, last && styles.rowLast]}
+    onPress={onPress} style={[styles.summaryRow, last && styles.summaryRowLast]}
     backdrop={<View pointerEvents="none" accessible={false} style={styles.fillTrack}>
       <Animated.View style={[styles.fill, { backgroundColor: washOf(color, p) }, fill]} />
     </View>}>
-    <CategoryBadge category={category.category} />
+    <CategoryBadge category={category.category} size={32} />
     <View style={{ flex: 1, minWidth: 0, flexDirection: stacked ? 'column' : 'row', gap: stacked ? 2 : 12, alignItems: stacked ? 'flex-start' : 'center' }}>
-      <AppText numberOfLines={stacked ? undefined : 2} style={{ flex: stacked ? undefined : 1, minWidth: 0, fontWeight: '500' }}>{name}</AppText>
-      <Money minor={category.amountMinor} currency={currency} />
+      <AppText variant="subhead" numberOfLines={stacked ? undefined : 2} style={{ flex: stacked ? undefined : 1, minWidth: 0, fontWeight: '500' }}>{name}</AppText>
+      <Money minor={category.amountMinor} currency={currency} size={15} />
     </View>
   </PressFeedback>;
 }
@@ -144,7 +146,11 @@ export function BudgetHomeCard({ summary }: { summary: MonthlyBudgetSummary }) {
 /** One scheduled commitment on Inicio (24UX2): who is paid (the merchant as typed, with its mark), what for (the
  * category, the secondary signal, and the account only when more than one could be meant), and on the right the
  * amount with when it falls due. A scheduled date is an estimate, not a payment: nothing here is registered, and
- * the date appears once (the caption beside the amount), not twice as it did before. */
+ * the date appears once (the caption beside the amount), not twice as it did before.
+ *
+ * 24UX3: the commitments are a light agenda, not a third card. Rows sit on the screen's ground with no surface,
+ * a 32 pt mark and a hairline that starts under the text, like a plain list; the press answer is a dim, since there
+ * is no cell to tint. The day stays beside the amount, amber only today and tomorrow. */
 export function UpcomingRecurringRow({ rule, account, day, last, showAccount = false }: {
   rule: RecurringRule; account: Account; day: string; last: boolean; showAccount?: boolean;
 }) {
@@ -158,13 +164,14 @@ export function UpcomingRecurringRow({ rule, account, day, last, showAccount = f
   const urgent = due.kind === 'today' || due.kind === 'tomorrow' || due.kind === 'due';
   const detail = showAccount ? category + ' · ' + account.name : category;
   // VoiceOver hears merchant, category, amount and the estimated day in one sentence ("próximo pago hoy").
-  return <PressFeedback feedback="highlight" accessibilityRole="button"
+  return <PressFeedback feedback="opacity" accessibilityRole="button"
     accessibilityLabel={t('home.upcomingRow.label', { merchant: rule.merchant, category, amount: spokenAmount(rule.amountMinor, account.currency), date: relativeDate(rule.nextDateISO, day, true) })
       + (showAccount ? ', ' + account.name : '')}
     onPress={() => router.push({ pathname: '/edit-recurring/[id]', params: { id: rule.id } })}
-    style={[styles.row, { borderBottomWidth: last ? 0 : StyleSheet.hairlineWidth, borderBottomColor: p.line }]}>
-    <MerchantBadge merchant={rule.merchant} category={rule.category} kind={rule.kind} />
-    <View style={{ flex: 1, minWidth: 0, gap: 8, flexDirection: stacked ? 'column' : 'row', alignItems: stacked ? 'flex-start' : 'center' }}>
+    style={styles.agendaRow}>
+    <MerchantBadge merchant={rule.merchant} category={rule.category} kind={rule.kind} size={32} />
+    <View style={{ flex: 1, minWidth: 0, alignSelf: 'stretch', paddingVertical: 10, gap: 8, flexDirection: stacked ? 'column' : 'row', alignItems: stacked ? 'flex-start' : 'center',
+      borderBottomWidth: last ? 0 : StyleSheet.hairlineWidth, borderBottomColor: p.line }}>
       <View style={{ flex: stacked ? undefined : 1, minWidth: 0, gap: 3 }}>
         <AppText numberOfLines={stacked ? undefined : 2} style={{ fontWeight: '500' }}>{rule.merchant}</AppText>
         <AppText secondary variant="footnote" numberOfLines={stacked ? undefined : 2}>{detail}</AppText>
@@ -178,9 +185,10 @@ export function UpcomingRecurringRow({ rule, account, day, last, showAccount = f
 }
 
 const styles = StyleSheet.create({
-  row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10, paddingHorizontal: 16, minHeight: 64 },
-  rowLast: { paddingBottom: 12 },
+  summaryRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 8, paddingHorizontal: 14, minHeight: 52 },
+  summaryRowLast: { paddingBottom: 10 },
+  agendaRow: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 56 },
   // The wash lives in a track inset from the row, so it is a rounded shape of its own, never cut by the surface's edges or a separator.
-  fillTrack: { position: 'absolute', left: 6, right: 6, top: 5, bottom: 5 },
-  fill: { position: 'absolute', left: 0, top: 0, bottom: 0, borderRadius: 12 },
+  fillTrack: { position: 'absolute', left: 5, right: 5, top: 4, bottom: 4 },
+  fill: { position: 'absolute', left: 0, top: 0, bottom: 0, borderRadius: 10 },
 });

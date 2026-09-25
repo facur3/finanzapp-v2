@@ -236,3 +236,22 @@ test('24UX2: an upcoming commitment draws its merchant mark with the category be
   assert.equal(JSON.stringify([badge.props.merchant, badge.props.category, badge.props.kind]), JSON.stringify(['Netflix', 'Suscripciones', 'expense']));
   assert.equal(flatten(row).some(node => node.type === 'CategoryBadge'), false, 'the badge owns its fallback to the category glyph');
 });
+
+test('24UX3: the category summary is compact and the commitments are an agenda on the ground', () => {
+  const { render, exports } = harness();
+  const { rows } = render({ categories: [category('comida', 600), category('ocio', 400)], totalMinor: 1000, currency: 'ARS', onPressCategory: () => {} });
+  for (const row of rows) {
+    assert.equal(row.props.style[0].minHeight, 52, 'a glance, not a ledger row');
+    assert.equal(flatten(row).find(node => node.type === 'CategoryBadge').props.size, 32);
+    assert.equal(flatten(row).find(node => node.type === 'Money').props.size, 15);
+  }
+  const rule = { id: 'r', merchant: 'Netflix', category: 'Suscripciones', kind: 'expense', amountMinor: 100, nextDateISO: '2026-09-23', accountId: 'a' };
+  const account = { id: 'a', name: 'Banco', currency: 'ARS' };
+  const row = exports.UpcomingRecurringRow({ rule, account, day: '2026-09-22', last: false });
+  assert.equal(row.props.feedback, 'opacity', 'no cell to tint on the ground: the press answer is a dim');
+  assert.equal(row.props.style.paddingHorizontal, undefined, 'aligned with the section title, no inset card padding');
+  assert.equal(flatten(row).find(node => node.type === 'MerchantBadge').props.size, 32);
+  const content = row.props.children[1];
+  assert.equal(content.props.style.borderBottomWidth, 0.5, 'the hairline starts under the text, not under the mark');
+  assert.equal(exports.UpcomingRecurringRow({ rule, account, day: '2026-09-22', last: true }).props.children[1].props.style.borderBottomWidth, 0);
+});
