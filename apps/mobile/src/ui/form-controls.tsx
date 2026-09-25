@@ -130,7 +130,7 @@ export function CurrencyField({ value, onChange, disabled = false, currencies }:
   const { t, locale } = useI18n();
   const [visible, setVisible] = useState(false);
   const selected = currencyOption(value, locale);
-  const options = useMemo(() => currencyChoices(currencies ?? offeredCurrencies(), locale), [currencies, locale]);
+  const options = useMemo(() => currencyChoices(offeredCurrencies(currencies, locale), locale), [currencies, locale]);
   const open = () => { Keyboard.dismiss(); setVisible(true); };
   return <>
     <Surface grouped>
@@ -157,7 +157,10 @@ export function CurrencySheet({ visible, title, options, value, note, searchable
   const [query, setQuery] = useState('');
   const shown = searchable ? searchChoices(query, options) : options;
   return <SelectionSheet visible={visible} title={title} onClose={() => { setQuery(''); onClose(); }}>
-    <FlatList data={shown} keyExtractor={option => option.code} contentContainerStyle={{ padding: 20, paddingTop: 0 }} keyboardShouldPersistTaps="handled"
+    {/* 146 currencies since 24M: a window of rows, never all at once. The sheet's SafeAreaView keeps the home indicator
+        clear; the keyboard insets the list while searching, so the last currency and the note stay reachable. */}
+    <FlatList data={shown} keyExtractor={option => option.code} contentContainerStyle={{ padding: 20, paddingTop: 0, paddingBottom: 48 }} keyboardShouldPersistTaps="handled"
+      automaticallyAdjustKeyboardInsets keyboardDismissMode="interactive" initialNumToRender={14} windowSize={7}
       ListHeaderComponent={searchable ? <View style={{ paddingBottom: 16 }}>
         <Field label={t('currency.search')} value={query} onChangeText={setQuery} autoCapitalize="characters" autoCorrect={false} clearButtonMode="while-editing" maxLength={40} />
       </View> : null}

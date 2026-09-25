@@ -71,15 +71,15 @@ test('every language this build carries names every ready currency, from CLDR on
   assert.equal(CURRENCY_NAMES.en.currencies.USD?.other, 'US dollars');
 });
 
-test('the catalogue today: 155 fiat currencies, two in the ledger, 151 ready for 24B, two incomplete', () => {
+test('the catalogue today: 155 fiat currencies, 146 in the ledger (24M), 7 ready and held (three decimals), two incomplete', () => {
   const fiat = CURRENCY_CODES.filter(code => currencyRecord(code).kind === 'fiat');
   assert.equal(fiat.length, currenciesWithStatus('ledger', 'ready', 'incomplete').length);
-  assert.deepEqual(currenciesWithStatus('ledger'), ['ARS', 'USD']);
+  assert.equal(currenciesWithStatus('ledger').length, 146);
   assert.deepEqual(currenciesWithStatus('incomplete'), ['SVC', 'VED']);
   assert.deepEqual([...currencyRecord('VED').missing], ['name:es', 'tender'], 'CLDR 48.2 has no Spanish name for the digital bolívar and marks it tender="false"');
   assert.deepEqual([...currencyRecord('SVC').missing], ['tender'], 'ISO keeps the colón active; El Salvador uses the dollar (CLDR)');
-  assert.equal(currencyStatus('VES'), 'ready');
-  assert.equal(currenciesWithStatus('ready').length, 151);
+  assert.equal(currencyStatus('VES'), 'ledger');
+  assert.deepEqual(currenciesWithStatus('ready'), ['BHD', 'IQD', 'JOD', 'KWD', 'LYD', 'OMR', 'TND']);
   assert.equal(currencyRecord('AR' + 'S' as IsoCurrencyCode).territories.join(), 'AR');
   assert.ok(currencyRecord('EUR').territories.includes('ES'));
 });

@@ -543,10 +543,11 @@ test('24B2 review: an account whose balance exceeds the entry bound can still be
 });
 
 test('24B5: a new account chooses its currency before the opening balance over the build\'s gate; the preview gate creates euro and yen accounts at their own scale, the release gate never sees them', async () => {
-  const release = harness('app/new-account.tsx', {}, { params: { currency: 'EUR' } });
+  const release = harness('app/new-account.tsx', {}, { params: { currency: 'KWD' } });
   const field = find(release.render(), 'CurrencyField');
-  assert.deepEqual(field.props.currencies, ['ARS', 'USD']);
-  assert.equal(field.props.value, 'ARS', 'a route currency outside the gate is never coerced in');
+  assert.deepEqual(field.props.currencies, domain.LEDGER_CURRENCIES, '24M: the production gate, 146 currencies');
+  assert.equal(field.props.value, 'ARS', 'a route currency outside the gate (held KWD) is never coerced in');
+  assert.equal(find(harness('app/new-account.tsx', {}, { params: { currency: 'EUR' } }).render(), 'CurrencyField').props.value, 'EUR', '24M: the release offers EUR');
   const preview = harness('app/new-account.tsx', {}, { params: { currency: 'EUR' }, gate: PREVIEW_CURRENCIES });
   assert.deepEqual(find(preview.render(), 'CurrencyField').props.currencies, [...PREVIEW_CURRENCIES]);
   assert.equal(find(preview.render(), 'CurrencyField').props.value, 'EUR');

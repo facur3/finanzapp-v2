@@ -1,8 +1,9 @@
-import { CURRENCY_CODES, LEDGER_CURRENCIES, currencyRecord, currencyStatus, hasMinorUnit, isIsoCurrencyCode, minorUnitExponent, type Currency, type CurrencyGate,
+import { CURRENCY_CODES, LEDGER_CURRENCIES, LEGACY_CURRENCIES, currencyRecord, currencyStatus, hasMinorUnit, isIsoCurrencyCode, minorUnitExponent, type Currency, type CurrencyGate,
   type CurrencyStatus, type IsoCurrencyCode, type LegacyCurrency } from '@finanzapp/domain';
 import { CURRENCY_NAMES } from '../i18n/currencies/index.ts';
 import { currencyName, currencyNameForms, currencySymbol } from '../i18n/format.ts';
 import { DEFAULT_LOCALE, languageOf, type AppLocale } from '../i18n/locale.ts';
+import { nameComparator } from '../i18n/intl-support.ts';
 import type { MessageKey, Translate } from '../i18n/messages.ts';
 
 /** The short words FinanzApp has always shown for its first two currencies in a chooser ("Pesos", "Dólares"),
@@ -36,8 +37,15 @@ export function currencyOptions(locale: AppLocale = DEFAULT_LOCALE, gate: Curren
   return gate.map(code => ({ code, symbol: currencySymbol(code, locale), name: currencyName(code, locale) }));
 }
 export const CURRENCIES: readonly CurrencyOption[] = currencyOptions();
-/** The codes a new card, debt or budget may take: the gate's, as `currencyOptions` lists them. */
-export const offeredCurrencies = (gate: CurrencyGate = LEDGER_CURRENCIES): Currency[] => currencyOptions(DEFAULT_LOCALE, gate).map(option => option.code);
+/** The codes a new account, card, debt or budget may take, in the order a chooser lists them: ARS and USD first (the
+ * currencies every earlier ledger holds), then the rest by their name in the interface language (24M: 146 currencies,
+ * so an order by code would bury "Euros" under "EUR" between "ETB" and "FJD"). Nothing is dropped or added. */
+export function offeredCurrencies(gate: CurrencyGate = LEDGER_CURRENCIES, locale: AppLocale = DEFAULT_LOCALE): Currency[] {
+  const { compare } = nameComparator(languageOf(locale));
+  const rank = (code: Currency) => { const index = (LEGACY_CURRENCIES as readonly string[]).indexOf(code); return index === -1 ? LEGACY_CURRENCIES.length : index; };
+  const named = gate.map(code => ({ code, name: currencyName(code, locale) }));
+  return named.sort((a, b) => rank(a.code) - rank(b.code) || compare(a.name, b.name) || (a.code < b.code ? -1 : 1)).map(item => item.code);
+}
 
 /** A display lookup over the whole catalogue (24B5): the name and symbol of any code the ledger can
  * store, gated or not, so a read-only row (the currency of an existing account) shows a stored EUR as

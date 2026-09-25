@@ -163,24 +163,29 @@ test('names and spoken units come from CLDR in the interface language, never fro
   }
 });
 
-test('forms still offer exactly ARS and USD; the catalogue is prepared for the currency screen, not shown', () => {
+test('24M: forms offer the 146 gated currencies with their catalogue names and symbols; the held and excluded ones never', () => {
   for (const locale of LOCALES) {
-    assert.deepEqual(currencyOptions(locale).map(option => option.code), ['ARS', 'USD']);
-    assert.deepEqual(currencyOptions(locale).map(option => option.name), LEDGER_CURRENCIES.map(code => legacy.currencyName(code, locale)));
-    assert.deepEqual(currencyOptions(locale).map(option => option.symbol), LEDGER_CURRENCIES.map(code => legacy.currencySymbol(code, locale)));
+    assert.deepEqual(currencyOptions(locale).map(option => option.code), [...LEDGER_CURRENCIES]);
+    // ARS and USD keep the names and symbols the pre-24A code wrote (the historical golden).
+    assert.deepEqual(currencyOptions(locale).slice(0, 2).map(option => option.name), ['ARS', 'USD'].map(code => legacy.currencyName(code as never, locale)));
+    assert.deepEqual(currencyOptions(locale).slice(0, 2).map(option => option.symbol), ['ARS', 'USD'].map(code => legacy.currencySymbol(code as never, locale)));
   }
-  assert.deepEqual(CURRENCIES.map(option => option.code), ['ARS', 'USD']);
+  assert.equal(CURRENCIES.length, 146);
+  assert.equal(CURRENCIES.some(option => ['KWD', 'VED', 'XAU', 'CLF'].includes(option.code)), false);
   // 24B5 (stage 8): the read-only lookup covers the whole catalogue, so a stored EUR row shows itself, never ARS; the choices stay the gate's.
   assert.deepEqual(currencyOption('EUR'), { code: 'EUR', name: 'Euros', symbol: '€' });
   assert.deepEqual(currencyOption('KWD', 'en-US'), { code: 'KWD', name: 'Kuwaiti dinars', symbol: 'KWD' });
   assert.deepEqual(currencyOption('ZZZ'), { code: 'ZZZ', name: 'ZZZ', symbol: 'ZZZ' }, 'a code the catalogue does not know shows itself');
   assert.deepEqual(currencyOptions('es-AR', ['ARS', 'USD', 'JPY']).map(option => option.code), ['ARS', 'USD', 'JPY'], 'an explicit gate (a development preview) widens the choices');
-  assert.deepEqual(searchCurrencies('euro').map(option => option.code), []);
-  assert.deepEqual(searchCurrencies('dól').map(option => option.code), ['USD']);
+  assert.deepEqual(searchCurrencies('euro').map(option => option.code), ['EUR']);
+  const dollars = searchCurrencies('dól').map(option => option.code);
+  assert.equal(dollars[0], 'USD', 'every dollar the gate offers, the US dollar first (gate order)');
+  assert.ok(['AUD', 'CAD', 'NZD', 'HKD'].every(code => dollars.includes(code as never)));
 
   const all = catalogueCurrencies('es-AR');
   assert.equal(all.length, currenciesWithStatus('ledger', 'ready').length);
-  assert.deepEqual(all.slice(0, 2).map(item => item.code), ['USD', 'ARS'], 'the ledger\'s currencies first, by name');
+  assert.deepEqual(all.slice(0, 2).map(item => item.code), ['AFN', 'MGA'], 'the ledger\'s currencies first, by name (Afganis, Ariaris)');
+  assert.deepEqual(all.slice(-7).map(item => item.status), Array(7).fill('ready'), 'then the held ones');
   assert.ok(!all.some(item => item.status === 'excluded' || item.status === 'incomplete'));
   assert.deepEqual(catalogueCurrencies('es-AR', ['incomplete']).map(item => item.code), ['SVC', 'VED']);
   const excluded = catalogueCurrencies('en-US', ['excluded']);

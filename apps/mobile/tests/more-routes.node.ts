@@ -282,9 +282,9 @@ test('24B5: a release names no test currency in Más; a development preview gate
   const texts = (root: any) => nodes(root).filter(node => node.type === 'AppText').map(node => String(node.props.children)).join(' ');
   assert.doesNotMatch(texts(release), /Monedas de prueba/);
   const preview = harness('(tabs)/settings.tsx', archive, undefined, null, currencyGate.PREVIEW_CURRENCIES).render();
-  assert.match(texts(preview), /Monedas de prueba activas: EUR, GBP, JPY, CLP, KWD\. Solo en esta compilación de desarrollo\./);
+  assert.match(texts(preview), /Monedas de prueba activas: BHD, IQD, JOD, KWD, LYD, OMR, TND\. Solo en esta compilación de desarrollo\./);
   const english = harness('(tabs)/settings.tsx', archive, undefined, 'en-AR', currencyGate.PREVIEW_CURRENCIES).render();
-  assert.match(texts(english), /Test currencies enabled: EUR, GBP, JPY, CLP, KWD\. Only in this development build\./);
+  assert.match(texts(english), /Test currencies enabled: BHD, IQD, JOD, KWD, LYD, OMR, TND\. Only in this development build\./);
 });
 
 test('24UX5: a preview or store build shows the version and the local-storage note, never the diagnostics', () => {

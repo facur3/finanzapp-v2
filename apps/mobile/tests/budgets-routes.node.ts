@@ -6,6 +6,7 @@ import { test } from 'node:test';
 import { runInNewContext } from 'node:vm';
 import ts from 'typescript';
 import * as domain from '@finanzapp/domain';
+import { offeredCurrencies } from '../src/ui/currencies.ts';
 import * as i18nFormat from '../src/i18n/format.ts';
 import { PREVIEW_CURRENCIES } from '../src/storage/currency-gate.ts';
 import { bindLocale } from '../src/i18n/bind.ts';
@@ -38,7 +39,7 @@ function harness(props: any, data: domain.LedgerArchive = archive, save?: (budge
     '../i18n/format': i18nFormat, '../src/i18n/format': i18nFormat, '../../src/i18n/format': i18nFormat, '../i18n/provider': i18nProvider, '../src/i18n/provider': i18nProvider, '../../src/i18n/provider': i18nProvider,
     react: { useState: (initial: any) => { const i = cursor++; if (!(i in state)) state[i] = typeof initial === 'function' ? initial() : initial;
       return [state[i], (next: any) => { state[i] = typeof next === 'function' ? next(state[i]) : next; }]; },
-    useRef: (initial: any) => { const i = refCursor++; return refs[i] ??= { current: initial }; } },
+    useRef: (initial: any) => { const i = refCursor++; return refs[i] ??= { current: initial }; }, useMemo: (fn: () => unknown) => fn() },
     'react/jsx-runtime': { jsx, jsxs: jsx, Fragment: 'Fragment' },
     'react-native': { View: 'View', Keyboard: { dismiss() {} }, Alert: { alert: (title: string, message: string, buttons: any[]) => alerts.push({ title, message, buttons }) } },
     'expo-router': { Stack: { Screen: 'Stack.Screen' }, router: { canGoBack: () => true, back: () => { backs++; }, push: () => {}, replace: () => {} } },
@@ -174,7 +175,7 @@ test('in English the budget form is labelled in English, keeps the category as s
   assert.equal(find(root, 'Stack.Screen').props.options.title, 'New budget');
   assert.equal(choice(root, 'total').props.options.map((option: any) => option.label).join(','), 'Overall,By category');
   // 24B3: the currency choice is the shared switch over the gate's currencies (its labels are tested in currency-switch.node.ts).
-  assert.deepEqual({ ...find(root, 'CurrencySwitch').props, onChange: undefined }, { value: 'ARS', currencies: ['ARS', 'USD'], disabled: false, onChange: undefined });
+  assert.deepEqual({ ...find(root, 'CurrencySwitch').props, onChange: undefined }, { value: 'ARS', currencies: offeredCurrencies(domain.LEDGER_CURRENCIES, 'en-AR'), disabled: false, onChange: undefined });
   assert.equal(find(root, 'AmountField').props.label, 'Budget');
   assert.ok(texts(root).includes('October 2026'));
   assert.ok(texts(root).includes('Category limit'));
@@ -201,11 +202,12 @@ test('a failed save stores the catalogue key, which reads the old Spanish text a
 });
 
 test('24B5: the budget form offers the gate\'s currencies before the amount; with the preview gate a Chilean peso and a dinar budget are saved at their own scale, and a route currency outside the gate is never coerced into it', async () => {
-  const release = harness({ monthISO: '2026-10', currency: 'CLP' }, { ...archive, budgets: [] });
-  assert.deepEqual(find(release.render(), 'CurrencySwitch').props.currencies, ['ARS', 'USD']);
-  assert.equal(find(release.render(), 'CurrencySwitch').props.value, 'ARS', 'a route currency the release does not offer falls to ARS, never to CLP');
+  const release = harness({ monthISO: '2026-10', currency: 'KWD' }, { ...archive, budgets: [] });
+  assert.deepEqual(find(release.render(), 'CurrencySwitch').props.currencies, offeredCurrencies(domain.LEDGER_CURRENCIES, 'es-AR'), '24M: the 146 gated currencies, ARS and USD first');
+  assert.equal(find(release.render(), 'CurrencySwitch').props.value, 'ARS', 'a route currency the release does not offer (held KWD) falls to ARS, never to KWD');
+  assert.equal(find(harness({ monthISO: '2026-10', currency: 'CLP' }, { ...archive, budgets: [] }).render(), 'CurrencySwitch').props.value, 'CLP', '24M: the release offers CLP');
   const clp = harness({ monthISO: '2026-10', currency: 'CLP', scope: 'total' }, { ...archive, budgets: [] }, undefined, 'es-AR', PREVIEW_CURRENCIES);
-  assert.deepEqual(find(clp.render(), 'CurrencySwitch').props.currencies, [...PREVIEW_CURRENCIES]);
+  assert.deepEqual(find(clp.render(), 'CurrencySwitch').props.currencies, offeredCurrencies(PREVIEW_CURRENCIES, 'es-AR'));
   assert.equal(find(clp.render(), 'CurrencySwitch').props.value, 'CLP', 'the preview gate honours the route currency');
   assert.equal(find(clp.render(), 'AmountField').props.currency, 'CLP');
   find(clp.render(), 'AmountField').props.onChangeText('25.000');

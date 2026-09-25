@@ -145,7 +145,14 @@ test('24B3: one template names every currency in a chooser, with the short words
   assert.equal(currencyOptionLabel('CAD', en, 'en-US'), 'Canadian dollars · CAD');
   assert.equal(currencyOptionLabel('VED', es, 'es-AR'), 'VED · VED', 'no name in the language: the code stands in, never another language');
   assert.deepEqual([0, 1, 2, 3, 7, 150].map(currencySwitchMode), ['segments', 'segments', 'segments', 'picker', 'picker', 'picker']);
-  assert.deepEqual(currencies.offeredCurrencies(), ['ARS', 'USD'], 'a new card, debt or budget still takes exactly the gate\'s currencies');
+  // 24M: a new account, card, debt or budget takes the gate's 146 currencies, ARS and USD first, then by name in the language.
+  const offered = currencies.offeredCurrencies(), offeredEn = currencies.offeredCurrencies(undefined, 'en-US');
+  assert.deepEqual([offered.length, offered.slice(0, 2)], [146, ['ARS', 'USD']]);
+  assert.deepEqual([...offered].sort(), [...domain.LEDGER_CURRENCIES].sort(), 'exactly the gate, reordered only');
+  const folded = (codes: readonly string[], locale: 'es-AR' | 'en-US') => codes.slice(2).map(code => currencyName(code as never, locale).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase());
+  assert.deepEqual(folded(offered, 'es-AR'), [...folded(offered, 'es-AR')].sort((a, b) => a.localeCompare(b, 'es')), 'Spanish names in order');
+  assert.deepEqual(folded(offeredEn, 'en-US'), [...folded(offeredEn, 'en-US')].sort((a, b) => a.localeCompare(b, 'en')), 'English names in order');
+  assert.equal(offered.indexOf('EUR') < offered.indexOf('JPY'), true, 'Euros before Yenes japoneses');
 });
 
 // ---- The currency switch component --------------------------------------------------------

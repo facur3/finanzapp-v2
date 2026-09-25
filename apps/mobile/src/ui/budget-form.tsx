@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { Alert, Keyboard, View } from 'react-native';
 import { router, Stack } from 'expo-router';
 import { randomUUID } from 'expo-crypto';
@@ -22,7 +22,9 @@ export function BudgetForm({ original, monthISO, currency: requestedCurrency, sc
   original?: MonthlyBudget; monthISO: string; currency?: string; scope?: string;
 }) {
   const { snapshot, saveBudget, gate = LEDGER_CURRENCIES } = useLedger();
-  const { t, formatMonthTitle } = useI18n();
+  const { t, locale, formatMonthTitle } = useI18n();
+  // 146 currencies since 24M: ordered and named once per gate and language, not on every keystroke.
+  const offered = useMemo(() => offeredCurrencies(gate, locale), [gate, locale]);
   const [before] = useState(original);
   const [operation] = useState(() => ({ id: randomUUID(), createdAt: new Date().toISOString() }));
   const [scope, setScope] = useState<BudgetScope>(before?.scope ?? (requestedScope === 'total' ? 'total' : 'category'));
@@ -121,7 +123,7 @@ export function BudgetForm({ original, monthISO, currency: requestedCurrency, sc
     </View>
     {!before && <Choices<BudgetScope> value={scope} onChange={setScope} disabled={locked}
       options={[{ value: 'total', label: t('budgets.form.scopeGeneral') }, { value: 'category', label: t('budgets.form.scopeCategory') }]} />}
-    {!before && <CurrencySwitch value={currency} currencies={offeredCurrencies(gate)} onChange={setCurrency} disabled={locked} />}
+    {!before && <CurrencySwitch value={currency} currencies={offered} onChange={setCurrency} disabled={locked} />}
     <AmountField label={t('budgets.form.amount')} currency={currency} value={amount} stored={stored ?? undefined}
       onChangeText={value => { setAmount(value); setError(null); }} editable={!locked} />
     {!general && <CategoryField entries={snapshot?.entries ?? []} kind="expense" value={category} onChange={setCategory} disabled={locked} prominent />}

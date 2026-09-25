@@ -1359,11 +1359,13 @@ async function threeCurrencies() {
   return { db, path };
 }
 
-test('24B4: a currency beyond ARS/USD is pinned once, on its first row, with its source and catalogue version; the gate stays closed in production', async () => {
+test('24B4: a currency beyond ARS/USD is pinned once, on its first row, with its source and catalogue version; a closed gate pins nothing', async () => {
   const { db } = setup();
   await initializeDatabase(db);
-  await assert.rejects(createAccount(db, yen), /moneda disponible/, 'the production gate refuses a yen account');
-  await assert.rejects(saveMonthlyBudget(db, yenBudget), /moneda disponible/);
+  const CLOSED = ['ARS', 'USD'] as const; // The gate as it stood until 24M.
+  await assert.rejects(createAccount(db, yen, undefined, CLOSED), /moneda disponible/, 'a closed gate refuses a yen account');
+  await assert.rejects(saveMonthlyBudget(db, yenBudget, CLOSED), /moneda disponible/);
+  await assert.rejects(createAccount(db, { ...yen, id: 'kwd-probe', currency: 'KWD' }), /moneda disponible/, '24M: the production gate refuses a held three-decimal account');
   assert.deepEqual(await db.getAllAsync('SELECT * FROM currency_units'), [], 'a refused creation pins nothing');
   await createAccount(db, yen, undefined, GATE);
   await createAccount(db, yen, undefined, GATE); // A retry finds the row it wrote.
@@ -1428,13 +1430,14 @@ test('24B4: a pinned scale that disagrees with the catalogue, or a row whose cur
 
 test('24B4: closing the gate again keeps stored yen readable, editable, exportable (v9) and restorable; ARS/USD-only ledgers still export v8 bytes', async () => {
   const { db } = await threeCurrencies();
-  // Every operation below runs with the production gate (ARS/USD): the stored currencies are untouched by it.
+  // Every operation below runs with the pre-24M gate (ARS/USD): the stored currencies are untouched by it.
+  const CLOSED = ['ARS', 'USD'] as const;
   await createEntry(db, { ...yenExpense, id: 'yen-2', amountMinor: 100 });
   const record = (await readArchive(db)).records.find(item => item.entry.id === 'yen-1')!;
   await changeEntry(db, makeEntryChange('edit-yen', record, 'edit', changedAt, { ...record.entry, amountMinor: 650 }));
-  await saveMonthlyBudget(db, { ...yenBudget, amountMinor: 25000, revision: 1, updatedAt: changedAt });
-  await assert.rejects(saveMonthlyBudget(db, { ...yenBudget, id: 'b-yen-2', monthISO: '2026-10' }), /moneda disponible/, 'a NEW yen budget needs the gate');
-  await assert.rejects(createAccount(db, { ...yen, id: 'yen-3' }), /moneda disponible/, 'a NEW yen account needs the gate');
+  await saveMonthlyBudget(db, { ...yenBudget, amountMinor: 25000, revision: 1, updatedAt: changedAt }, CLOSED);
+  await assert.rejects(saveMonthlyBudget(db, { ...yenBudget, id: 'b-yen-2', monthISO: '2026-10' }, CLOSED), /moneda disponible/, 'a NEW yen budget needs the gate');
+  await assert.rejects(createAccount(db, { ...yen, id: 'yen-3' }, undefined, CLOSED), /moneda disponible/, 'a NEW yen account needs the gate');
   const archive = await readArchive(db);
   assert.equal(snapshotFromArchive(archive).entries.find(e => e.id === 'yen-1')!.amountMinor, 650);
   const backup = createRecoveryBackup(archive);
@@ -1521,7 +1524,8 @@ test('24B4: adversarial: duplicated ids, a retry after a commit and a copy repla
 });
 
 test('24B5: seven currencies with zero, two and three decimals through the preview gate: create, edit, export v9, restore into a fresh device and reopen, without changing one amount or currency', async () => {
-  const { PREVIEW_CURRENCIES } = await import('../src/storage/currency-gate.ts');
+  // The seven currencies 24B5 exercised; since 24M the preview gate is wider, the test keeps this explicit set.
+  const PREVIEW_CURRENCIES = ['ARS', 'USD', 'EUR', 'GBP', 'JPY', 'CLP', 'KWD'] as const;
   const { db, path } = setup();
   await initializeDatabase(db);
   const openings: Record<string, number> = { ARS: 100000, USD: 500, EUR: 123456, GBP: 99, JPY: 1500, CLP: 25000, KWD: 1234567 };
@@ -1553,10 +1557,14 @@ test('24B5: seven currencies with zero, two and three decimals through the previ
   const reopened = databaseAt(path);
   await initializeDatabase(reopened);
   assert.equal(archiveKey(await readArchive(reopened)), archiveKey(archive), 'reopening changes nothing');
-  // With the release gate the stored currencies keep working; only creating a NEW record in them is refused.
+  // With the release gate the stored currencies keep working; since 24M a new pound account is allowed, a new dinar
+  // account (held: three decimals) is refused, and the stored dinars stay readable and writable.
   await createEntry(reopened, { ...expense, id: 'e-GBP-2', accountId: 'acc-GBP', amountMinor: 1 });
-  await assert.rejects(createAccount(reopened, { id: 'acc-GBP-2', name: 'x', currency: 'GBP', openingMinor: 0, createdAt: account.createdAt }), /moneda disponible/);
+  await createAccount(reopened, { id: 'acc-GBP-2', name: 'x', currency: 'GBP', openingMinor: 0, createdAt: account.createdAt });
+  await assert.rejects(createAccount(reopened, { id: 'acc-KWD-2', name: 'x', currency: 'KWD', openingMinor: 0, createdAt: account.createdAt }), /moneda disponible/);
+  await createEntry(reopened, { ...expense, id: 'e-KWD-2', accountId: 'acc-KWD', amountMinor: 1 });
   assert.equal(totalsByCurrency(await readSnapshot(reopened)).GBP, expected.GBP - 1);
+  assert.equal(totalsByCurrency(await readSnapshot(reopened)).KWD, expected.KWD - 1);
 });
 
 // ---- Producto 24B6: what a card may carry, in real SQLite ------------------------------------------------

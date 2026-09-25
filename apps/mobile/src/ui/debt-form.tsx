@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { Keyboard, View } from 'react-native';
 import { router, Stack } from 'expo-router';
 import { randomUUID } from 'expo-crypto';
@@ -21,7 +21,9 @@ type PendingCreate = { account: Account; debt: PersonalDebtProfile };
  * Closing, reopening and deleting live on the debt's detail and its row (24UX4). */
 export function DebtForm({ original }: { original?: PersonalDebtProfile }) {
   const { snapshot, addDebt, saveDebt, gate = LEDGER_CURRENCIES } = useLedger();
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
+  // 146 currencies since 24M: ordered and named once per gate and language, not on every keystroke.
+  const offered = useMemo(() => offeredCurrencies(gate, locale), [gate, locale]);
   const account = snapshot?.accounts.find(item => item.id === original?.accountId);
   const [before] = useState(original);
   const [identity] = useState(() => ({ id: randomUUID(), accountId: randomUUID(), createdAt: new Date().toISOString() }));
@@ -107,7 +109,7 @@ export function DebtForm({ original }: { original?: PersonalDebtProfile }) {
       <Choices value={direction} onChange={setDirection} disabled={locked}
         options={[{ value: 'owed_by_me', label: t('debts.form.owed') }, { value: 'owed_to_me', label: t('debts.form.receivable') }]} />
       {/* The currency before the amount (24B5): the field types with the right decimals from the first key. */}
-      <CurrencySwitch value={currency} currencies={offeredCurrencies(gate)} onChange={setCurrency} disabled={locked} />
+      <CurrencySwitch value={currency} currencies={offered} onChange={setCurrency} disabled={locked} />
       <AmountField label={t(owed ? 'debts.form.amountOwed' : 'debts.form.amountReceivable')} currency={currency} value={amount}
         onChangeText={value => { setAmount(value); setError(null); }} editable={!locked} />
     </>}

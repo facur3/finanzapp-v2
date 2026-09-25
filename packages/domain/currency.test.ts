@@ -1,9 +1,40 @@
 import { describe, expect, it } from 'vitest';
-import { CLDR_VERSION, CURRENCY_CODES, ISO_4217_PUBLISHED, LEDGER_CURRENCIES, LEGACY_CURRENCIES, LEGACY_EXPONENT, currenciesPresent, currenciesWithStatus, currencyRecord, currencyStatus,
+import { CLDR_VERSION, CURRENCY_CODES, HELD_CURRENCIES, ISO_4217_PUBLISHED, LEDGER_CURRENCIES, LEGACY_CURRENCIES, LEGACY_EXPONENT, currenciesPresent, currenciesWithStatus, currencyRecord, currencyStatus,
   displayDigits, hasMinorUnit, isIsoCurrencyCode, isLedgerCurrency, isLegacyCurrency, isStorableCurrency, minorUnitExponent, sortCurrencies, storedExponent, type IsoCurrencyCode } from './currency';
 import { validateAccount, validateNewAccount, type Account } from './ledger';
 
 const account = (currency: string): Account => ({ id: 'a', name: 'Caja', currency: currency as Account['currency'], openingMinor: 0, createdAt: '2026-01-01T12:00:00Z' });
+
+describe('the 24M creation gate', () => {
+  it('opens exactly the ready currencies with 0 or 2 decimals, ARS and USD first, and holds the three-decimal ones with a reason', () => {
+    const ready = CURRENCY_CODES.filter(code => currencyRecord(code).status === 'ready');
+    const expected = ready.filter(code => [0, 2].includes(minorUnitExponent(code)));
+    // Written out, not derived: a catalogue update that changes this set fails here until reviewed.
+    expect([...LEDGER_CURRENCIES].sort()).toEqual(expected.sort());
+    expect(LEDGER_CURRENCIES).toHaveLength(146);
+    expect(new Set(LEDGER_CURRENCIES).size).toBe(146);
+    expect(LEDGER_CURRENCIES.slice(0, 2)).toEqual(['ARS', 'USD']);
+    expect(LEDGER_CURRENCIES.slice(2)).toEqual([...LEDGER_CURRENCIES.slice(2)].sort());
+    const byExponent = (exponent: number) => LEDGER_CURRENCIES.filter(code => minorUnitExponent(code) === exponent).length;
+    expect([byExponent(0), byExponent(2), byExponent(3)]).toEqual([16, 130, 0]);
+    expect(LEDGER_CURRENCIES.filter(code => displayDigits(code) === 0 && minorUnitExponent(code) === 2)).toEqual(['AFN', 'ALL', 'COP', 'HUF', 'IDR', 'IRR', 'KPW', 'LAK', 'LBP', 'MGA', 'MMK', 'PKR', 'SOS', 'SYP', 'YER']);
+    expect(Object.keys(HELD_CURRENCIES).sort()).toEqual(ready.filter(code => minorUnitExponent(code) === 3).sort());
+    expect(Object.keys(HELD_CURRENCIES)).toEqual(['BHD', 'IQD', 'JOD', 'KWD', 'LYD', 'OMR', 'TND']);
+    for (const code of Object.keys(HELD_CURRENCIES) as IsoCurrencyCode[]) {
+      expect(isLedgerCurrency(code), code).toBe(false);
+      expect(isStorableCurrency(code), code).toBe(true);
+    }
+    // Never a fund, metal, unit of account, test code or incomplete currency.
+    for (const code of LEDGER_CURRENCIES) {
+      expect(currencyRecord(code).kind, code).toBe('fiat');
+      expect(currencyRecord(code).status, code).toBe('ready');
+      expect(currencyRecord(code).missing, code).toEqual([]);
+    }
+    for (const code of ['VED', 'SVC', 'BOV', 'CHE', 'CHW', 'CLF', 'COU', 'MXV', 'USN', 'UYI', 'UYW', 'XAD', 'XAU', 'XAG', 'XPD', 'XPT', 'XDR', 'XSU', 'XUA', 'XBA', 'XTS', 'XXX']) {
+      expect(isLedgerCurrency(code), code).toBe(false);
+    }
+  });
+});
 
 describe('currency catalogue (Producto 24A)', () => {
   it('names its sources and covers ISO 4217 List One', () => {
@@ -24,8 +55,8 @@ describe('currency catalogue (Producto 24A)', () => {
   });
 
   it('keeps ARS and USD exactly as the ledger has always stored them', () => {
-    expect([...LEDGER_CURRENCIES]).toEqual(['ARS', 'USD']);
-    for (const code of LEDGER_CURRENCIES) {
+    expect(LEDGER_CURRENCIES.slice(0, 2)).toEqual(['ARS', 'USD']);
+    for (const code of LEGACY_CURRENCIES) {
       expect(minorUnitExponent(code)).toBe(LEGACY_EXPONENT);
       expect(displayDigits(code)).toBe(2);
       expect(currencyStatus(code)).toBe('ledger');
@@ -44,8 +75,10 @@ describe('currency catalogue (Producto 24A)', () => {
       expect(accepts(validateAccount, code), code).toBe(isStorableCurrency(code));
       expect(isStorableCurrency(code), code).toBe(currencyRecord(code).kind === 'fiat');
     }
-    expect(() => validateNewAccount(account('EUR'))).toThrow('Elegí una moneda disponible.');
-    expect(() => validateAccount(account('EUR'))).not.toThrow();
+    validateNewAccount(account('EUR')); // Open since 24M.
+    expect(() => validateNewAccount(account('KWD'))).toThrow('Elegí una moneda disponible.'); // Held: three decimals.
+    expect(() => validateNewAccount(account('VED'))).toThrow('Elegí una moneda disponible.'); // Incomplete data.
+    expect(() => validateAccount(account('KWD'))).not.toThrow();
     expect(() => validateAccount(account('XAU'))).toThrow('Moneda no admitida.');
     // An explicit gate opens creation for tests only; it never widens what is storable.
     validateNewAccount(account('JPY'), ['ARS', 'USD', 'JPY']);
@@ -71,9 +104,11 @@ describe('currency catalogue (Producto 24A)', () => {
     const statuses = ['ledger', 'ready', 'incomplete', 'excluded'] as const;
     const all = statuses.flatMap(status => currenciesWithStatus(status));
     expect(all.sort()).toEqual([...CURRENCY_CODES]);
-    expect(currenciesWithStatus('ledger')).toEqual(['ARS', 'USD']);
-    expect(currencyStatus('EUR')).toBe('ready');
-    expect(currencyStatus('EUR', ['ARS', 'USD', 'EUR'])).toBe('ledger');
+    expect(currenciesWithStatus('ledger')).toHaveLength(146);
+    expect(currenciesWithStatus('ready')).toEqual(['BHD', 'IQD', 'JOD', 'KWD', 'LYD', 'OMR', 'TND']);
+    expect(currencyStatus('EUR')).toBe('ledger');
+    expect(currencyStatus('KWD')).toBe('ready');
+    expect(currencyStatus('KWD', ['ARS', 'USD', 'KWD'])).toBe('ledger');
     expect(currencyStatus('XAU', ['ARS', 'USD', 'XAU'] as never)).toBe('excluded');
     for (const code of currenciesWithStatus('excluded')) expect(currencyRecord(code).kind).not.toBe('fiat');
     for (const code of currenciesWithStatus('ready', 'incomplete', 'ledger')) expect(currencyRecord(code).kind).toBe('fiat');

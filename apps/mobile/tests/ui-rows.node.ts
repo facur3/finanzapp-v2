@@ -135,7 +135,7 @@ test('EmptyState is one calm card: a 44 pt glyph, a title3 headline and one line
   assert.ok(nodes(empty).some(node => is(node, 'ActionButton')));
 });
 
-test('the currency row stacks label, full name and code so "Dólares estadounidenses · USD" never breaks across lines; the sheet lists the two ledger currencies', () => {
+test('the currency row stacks label, full name and code so "Dólares estadounidenses · USD" never breaks across lines; the sheet lists the ledger currencies', () => {
   const ui = load('form-controls.tsx');
   const chosen: string[] = [];
   let field = ui.render('CurrencyField', { value: 'USD', onChange: (code: string) => chosen.push(code) });
@@ -154,8 +154,11 @@ test('the currency row stacks label, full name and code so "Dólares estadounide
   assert.equal(nodes(field).find(node => node.type === 'Modal')!.props.visible, true);
   assert.equal(nodes(field).find(node => node.type === 'Modal')!.props.presentationStyle, 'pageSheet');
   const list = nodes(field).find(node => node.type === 'FlatList')!;
-  assert.deepEqual(list.props.data.map((item: any) => item.code), ['ARS', 'USD'], 'only the currencies the ledger can hold');
-  const items = list.props.data.map((item: unknown) => list.props.renderItem({ item }));
+  // 24M: the 146 currencies the ledger can create, ARS and USD first, then by name; a window of rows, the keyboard insetting the list.
+  assert.equal(list.props.data.length, 146, 'only the currencies the ledger can hold');
+  assert.deepEqual(list.props.data.slice(0, 4).map((item: any) => item.code), ['ARS', 'USD', 'AFN', 'MGA']);
+  assert.deepEqual([list.props.initialNumToRender, list.props.windowSize, list.props.automaticallyAdjustKeyboardInsets, list.props.keyboardDismissMode], [14, 7, true, 'interactive']);
+  const items = list.props.data.slice(0, 2).map((item: unknown) => list.props.renderItem({ item }));
   assert.deepEqual(items.map((item: Node) => item.props.accessibilityLabel), ['Pesos argentinos, ARS', 'Dólares estadounidenses, USD']);
   assert.deepEqual(items.map((item: Node) => item.props.accessibilityState.selected), [false, true]);
   assert.ok(nodes(items[1]).some(node => is(node, 'Ionicons') && node.props.name === 'checkmark-circle'), 'the current currency carries the checkmark');
@@ -164,7 +167,7 @@ test('the currency row stacks label, full name and code so "Dólares estadounide
   assert.deepEqual(ui.haptics, ['selection']);
   items[1].props.onPress();
   assert.deepEqual(ui.haptics, ['selection'], 'choosing the current currency again does not tick');
-  assert.ok(nodes(list.props.ListFooterComponent).some(node => node.type === 'AppText' && /monedas disponibles hoy/.test(String(node.props.children))), 'the sheet says why the list is short, naming no currency');
+  assert.ok(nodes(list.props.ListFooterComponent).some(node => node.type === 'AppText' && /nunca se suman ni se convierten/.test(String(node.props.children))), 'the sheet says currencies are never added or converted, naming none (24M)');
   const disabled = ui.render('CurrencyField', { value: 'USD', onChange: () => {}, disabled: true });
   assert.equal(nodes(disabled).find(node => node.type === 'SelectionRow')!.props.disabled, true);
   // Read-only (an existing account): the same row shape, no chooser at all.
@@ -305,21 +308,22 @@ test('segmented labels cap their scaling and fit their segment instead of trunca
   }
 });
 
-test('the currency list is exactly ARS and USD, with a search helper ready for the future currency screen', () => {
-  assert.deepEqual(CURRENCIES.map(option => option.code), ['ARS', 'USD']);
+test('the currency list is the 146 gated currencies (24M), ARS and USD first, with a search helper', () => {
+  assert.deepEqual([CURRENCIES.length, ...CURRENCIES.slice(0, 2).map(option => option.code)], [146, 'ARS', 'USD']);
   assert.equal(currencyOption('USD').name, 'Dólares estadounidenses');
   assert.equal(currencyOption('USD', 'en-US').name, 'US dollars', 'the name follows the interface language');
   // The symbol follows the region: a bare "$" is the peso in Argentina and the dollar in the United States.
-  assert.deepEqual(currencyOptions('en-AR').map(option => option.code + ' ' + option.symbol), ['ARS $', 'USD US$']);
-  assert.deepEqual(currencyOptions('es-AR').map(option => option.code + ' ' + option.symbol), ['ARS $', 'USD US$']);
-  assert.deepEqual(currencyOptions('en-US').map(option => option.code + ' ' + option.symbol), ['ARS AR$', 'USD US$']);
-  assert.deepEqual(currencyOptions('es-US').map(option => option.code + ' ' + option.symbol), ['ARS AR$', 'USD US$']);
+  assert.deepEqual(currencyOptions('en-AR').slice(0, 2).map(option => option.code + ' ' + option.symbol), ['ARS $', 'USD US$']);
+  assert.deepEqual(currencyOptions('es-AR').slice(0, 2).map(option => option.code + ' ' + option.symbol), ['ARS $', 'USD US$']);
+  assert.deepEqual(currencyOptions('en-US').slice(0, 2).map(option => option.code + ' ' + option.symbol), ['ARS AR$', 'USD US$']);
+  assert.deepEqual(currencyOptions('es-US').slice(0, 2).map(option => option.code + ' ' + option.symbol), ['ARS AR$', 'USD US$']);
   assert.equal(currencyOption('EUR').code, 'EUR', '24B5: a display lookup over the catalogue; the choices are still the gate\'s');
-  assert.deepEqual(searchCurrencies('').map(o => o.code), ['ARS', 'USD']);
-  assert.deepEqual(searchCurrencies('dol').map(o => o.code), ['USD']);
-  assert.deepEqual(searchCurrencies('DÓLARES').map(o => o.code), ['USD']);
+  assert.equal(searchCurrencies('').length, 146);
+  assert.equal(searchCurrencies('dol')[0].code, 'USD');
+  assert.equal(searchCurrencies('DÓLARES')[0].code, 'USD');
   assert.deepEqual(searchCurrencies('ars').map(o => o.code), ['ARS']);
-  assert.deepEqual(searchCurrencies('euro'), []);
+  assert.deepEqual(searchCurrencies('euro').map(o => o.code), ['EUR']);
+  assert.deepEqual(searchCurrencies('kuwait').map(o => o.code), [], 'a held three-decimal currency is not offered');
 });
 
 // ---- Producto 23.1C2: what VoiceOver hears ---------------------------------
@@ -472,8 +476,8 @@ test('24B5: the currency field lists the gate\'s currencies with search over cod
   const chosen: string[] = [];
   const field = ui.render('CurrencyField', { value: 'ARS', onChange: (code: string) => chosen.push(code), currencies: gate });
   const sheet = nodes(field).find(node => typeof node.type === 'function' && node.type.name === 'CurrencySheet')!;
-  assert.deepEqual(sheet.props.options.map((item: any) => item.code), [...gate], 'the gate, in its order, never the whole catalogue');
-  assert.deepEqual(sheet.props.options.map((item: any) => item.name), ['Pesos argentinos', 'Dólares estadounidenses', 'Euros', 'Libras esterlinas', 'Yenes japoneses', 'Pesos chilenos', 'Dinares kuwaitíes']);
+  assert.deepEqual(sheet.props.options.map((item: any) => item.code), ['ARS', 'USD', 'KWD', 'EUR', 'GBP', 'CLP', 'JPY'], 'the gate, never the whole catalogue: ARS and USD first, then by name (24M)');
+  assert.deepEqual(sheet.props.options.map((item: any) => item.name), ['Pesos argentinos', 'Dólares estadounidenses', 'Dinares kuwaitíes', 'Euros', 'Libras esterlinas', 'Pesos chilenos', 'Yenes japoneses']);
   assert.equal(sheet.props.searchable, true, 'seven currencies: a search field');
   assert.equal(sheet.props.title, 'Elegir moneda');
   assert.ok(sheet.props.options.every((item: any) => typeof item.searchText === 'string' && item.searchText.length > 0), 'every choice carries the catalogue\'s search text');
