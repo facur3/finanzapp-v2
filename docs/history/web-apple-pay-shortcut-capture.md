@@ -1,7 +1,15 @@
-# Apple Pay / iOS Shortcuts capture
+# The web app's Apple Pay / Shortcuts capture (history)
+
+> Kept for the record: the retired web app's Shortcut-driven capture and, above all, what Apple
+> does and does not expose (no Wallet transaction history for an app; a Shortcut can open the app
+> with parameters). The native capture goes through the mobile backend
+> ([mobile-integrations.md](../mobile-integrations.md)) and the Apple integrations are the
+> roadmap's Producto 25D. The URLs below no longer serve a web page.
+
+# Apple Pay / iOS Shortcuts capture (web)
 
 > This describes the existing web capture, not the new native implementation.
-> Follow [the mobile roadmap](mobile-roadmap.md) for the future App Intent and
+> Follow [the mobile roadmap](../mobile-roadmap.md) for the future App Intent and
 > real-device Wallet field validation. Do not interpret the old PWA recipe as
 > unrestricted Apple Pay history access or as a guarantee of automatic fields.
 

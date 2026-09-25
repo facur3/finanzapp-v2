@@ -1,4 +1,13 @@
-# Assistant and market data
+# The web app's Assistant and market data (history)
+
+> Kept for the record: how the retired web app's on-device intent engine
+> (`src/domain/assistant.js`, `assistantQueries.js`, at the tag `web-frontend-final`) and its
+> market-data proxies (`api/chart.js`, `api/fund-data.js`) behaved. The native Assistant is
+> described in [mobile-integrations.md](../mobile-integrations.md) and planned in the roadmap's
+> Producto 25A, which may read these parsing heuristics; market data is out of the native scope
+> ([decision 002](../decisions/002-spending-first.md)). Nothing below is deployed.
+
+# Assistant and market data (web)
 
 ## What the assistant does
 
