@@ -15,8 +15,12 @@
  * both valid. Translating a label never rewrites data: category names,
  * merchants and amounts in SQLite stay exactly what the person recorded.
  *
- * Adding a language is one entry in `LANGUAGES` plus its catalogue; adding a
- * region is one entry in `REGIONS`. Nothing else enumerates them. */
+ * Adding a language is one entry in `LANGUAGES` plus its catalogue. Every
+ * region of the CLDR catalogue already has its conventions (`REGIONS`, derived);
+ * releasing one is adding it to `RELEASED_REGIONS` after its family's device
+ * QA (`region-release.ts`). Nothing else enumerates them. */
+
+import { REGION_CODES, REGION_DATA, type CatalogueRegionCode } from './regions/data.ts';
 
 /** Languages with a catalogue in this build, keyed by ISO 639-1 code. `name` is
  * the language's own name (an autonym), the way iOS lists languages. */
@@ -78,12 +82,36 @@ export function sameWriting(a: RegionConventions, b: RegionConventions): boolean
   return WRITING_FIELDS.every(field => x[field] === y[field]);
 }
 
-/** Regions with conventions in this build, keyed by ISO 3166-1 alpha-2 code. */
-export const REGIONS = {
+/** The hand-written registry (Producto 23.1): the regions whose writing was checked on the iPhone
+ * before the catalogue existed, with the deliberate deviations from CLDR (Argentina's 24-hour clock,
+ * listed in the generator's `DELIBERATE_DEVIATIONS`). Each field here wins over the catalogue's
+ * value; the region generator stops when any other field disagrees with CLDR. It also names the
+ * regions whose day-and-month writing is the ledger's own ("5/09", `registryRegionOf`). */
+export const REGION_REGISTRY = {
   AR: { decimal: ',', group: '.', dateOrder: 'dmy', hour12: false, dollarSignCurrency: 'ARS' },
   US: { decimal: '.', group: ',', dateOrder: 'mdy', hour12: true, dollarSignCurrency: 'USD' },
-} as const satisfies Record<string, RegionConventions>;
-export type RegionCode = keyof typeof REGIONS;
+} as const satisfies Partial<Record<CatalogueRegionCode, RegionConventions>>;
+export type RegistryRegionCode = keyof typeof REGION_REGISTRY;
+
+/** Every country and territory of the catalogue (Producto 24R2A): ISO 3166-1 alpha-2 codes, 257. */
+export type RegionCode = CatalogueRegionCode;
+
+function isRegistryRegion(code: string): code is RegistryRegionCode {
+  return Object.hasOwn(REGION_REGISTRY, code);
+}
+
+/** Every region's conventions, derived from the catalogue (`regions/data.ts`, CLDR 48.2.0), with the
+ * registry's deliberate values winning field by field. Knowing a region's conventions is not
+ * releasing it: `RELEASED_REGIONS` decides which ones a build writes in. */
+export const REGIONS: Readonly<Record<RegionCode, Required<RegionConventions>>> = Object.freeze(Object.fromEntries(REGION_CODES.map(code => {
+  const record = REGION_DATA[code];
+  const fromCldr: Required<RegionConventions> = {
+    decimal: record.decimal, group: record.group, dateOrder: record.dateOrder, hour12: record.hour12,
+    dollarSignCurrency: record.dollarSignCurrency, dateSeparator: record.dateSeparator, paddedDate: record.paddedDate,
+    secondaryGrouping: record.secondaryGrouping, minimumGroupingDigits: record.minimumGroupingDigits, weekStart: record.weekStart,
+  };
+  return [code, Object.freeze(isRegistryRegion(code) ? { ...fromCldr, ...REGION_REGISTRY[code] } : fromCldr)];
+})) as Record<RegionCode, Required<RegionConventions>>);
 
 /** A resolved pair, written as a BCP 47 tag ("es-AR", "en-AR", "es-US", "en-US").
  * It is only ever the composition of an independently chosen language and region. */
@@ -95,7 +123,8 @@ export const DEFAULT_REGION: RegionCode = 'AR';
 export const DEFAULT_LOCALE: AppLocale = 'es-AR';
 
 export const SUPPORTED_LANGUAGES = Object.keys(LANGUAGES) as LanguageCode[];
-export const SUPPORTED_REGIONS = Object.keys(REGIONS) as RegionCode[];
+/** Every region this build knows (the catalogue), released or not. */
+export const SUPPORTED_REGIONS: readonly RegionCode[] = REGION_CODES;
 
 /** Languages complete enough to be shown and chosen. English was released in
  * Producto 23.1C2, once every screen had its catalogue (23.1B) and the formats
@@ -108,12 +137,15 @@ export const SUPPORTED_REGIONS = Object.keys(REGIONS) as RegionCode[];
 export const RELEASED_LANGUAGES: readonly LanguageCode[] = ['es', 'en'];
 /** Regions whose conventions the whole app honours, the amount field
  * included (`money-input.ts`). The United States was released in Producto
- * 23.1C2. */
+ * 23.1C2. Every other catalogue region opens by convention family, each
+ * stage after its iPhone QA (`REGION_RELEASE_STAGES` in region-release.ts,
+ * whose test keeps the two equal). */
 export const RELEASED_REGIONS: readonly RegionCode[] = ['AR', 'US'];
 
 export interface ReleasedSets { languages: readonly LanguageCode[]; regions: readonly RegionCode[] }
 export const RELEASED: ReleasedSets = { languages: RELEASED_LANGUAGES, regions: RELEASED_REGIONS };
-/** Every language and region this build carries, released or not. */
+/** Every language and region this build carries, released or not: since 24R2A the 257 catalogue
+ * regions, so a development preview can check a family before its release. */
 export const PREVIEW: ReleasedSets = { languages: SUPPORTED_LANGUAGES, regions: SUPPORTED_REGIONS };
 
 /** What a bundle may show: the release gate; or, only in a development bundle
@@ -143,7 +175,7 @@ export function isLanguageCode(value: unknown): value is LanguageCode {
   return typeof value === 'string' && Object.hasOwn(LANGUAGES, value);
 }
 export function isRegionCode(value: unknown): value is RegionCode {
-  return typeof value === 'string' && Object.hasOwn(REGIONS, value);
+  return typeof value === 'string' && Object.hasOwn(REGION_DATA, value);
 }
 
 export function composeLocale(language: LanguageCode, region: RegionCode): AppLocale { return `${language}-${region}`; }
@@ -162,8 +194,8 @@ export function conventionsOf(locale: AppLocale): RegionConventions { return REG
  * region's own. It is what decides a writing the registry keeps for the ledger's sake
  * (`formatDayMonth`'s "5/09"), so the answer is the same for `REGIONS.AR`, `catalogueConventions('AR')`
  * and `conventionsForRegion('AR').conventions`, never a matter of which path bound them. */
-export function registryRegionOf(conventions: RegionConventions): RegionCode | null {
-  return SUPPORTED_REGIONS.find(code => sameWriting(REGIONS[code], conventions)) ?? null;
+export function registryRegionOf(conventions: RegionConventions): RegistryRegionCode | null {
+  return (Object.keys(REGION_REGISTRY) as RegistryRegionCode[]).find(code => sameWriting(REGIONS[code], conventions)) ?? null;
 }
 
 /** The supported language a BCP 47 tag names: any Spanish variety is Spanish,
@@ -174,7 +206,7 @@ export function languageForTag(tag: string | null | undefined): LanguageCode | n
   return isLanguageCode(language) ? language : null;
 }
 
-/** The supported region a bare region code names ("US" → US, "UY" → unsupported). */
+/** The catalogue region a bare region code names ("us" → US, "UY" → UY, "EU" → none): known, not necessarily released. */
 export function regionForCode(code: string | null | undefined): RegionCode | null {
   const upper = String(code ?? '').trim().toUpperCase();
   return isRegionCode(upper) ? upper : null;
@@ -213,8 +245,11 @@ export function resolveLanguage(devices: readonly DeviceLocale[], preference: La
  * device's region setting (the first locale's `regionCode`, or the region of
  * its tag when only Intl answered) when it is released; otherwise the default.
  * The region never comes from a second preferred language: that is a
- * language the person reads, not where they are. An unsupported region
- * (Uruguay, Spain) reads Argentine conventions until one of its own exists. */
+ * language the person reads, not where they are. A region that is not
+ * released (Uruguay, Spain), chosen or read from the device, is not applied:
+ * the next rule answers (a stored choice falls through to the device, the
+ * device to the default), and the chooser names the stand-in. A stored choice
+ * is kept and applies by itself once its region is released. */
 export function resolveRegion(devices: readonly DeviceLocale[], preference: RegionPreference = 'system',
   released: readonly RegionCode[] = RELEASED_REGIONS): RegionCode {
   const usable = (region: RegionCode | null): region is RegionCode => !!region && released.includes(region);
@@ -244,7 +279,9 @@ export function languagePreferenceFrom(stored: unknown): LanguagePreference {
   return 'system';
 }
 
-/** Reads a stored region preference back; anything unknown follows the device. */
+/** Reads a stored region preference back. Any catalogue region is kept, released or not (a choice
+ * made in a development preview waits for its release, as a previewed language does); anything
+ * else follows the device. */
 export function regionPreferenceFrom(stored: unknown): RegionPreference {
   return stored === 'system' || isRegionCode(stored) ? stored : 'system';
 }

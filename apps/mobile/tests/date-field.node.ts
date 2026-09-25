@@ -134,11 +134,11 @@ const labelOf = (node: Node) => [node.props.children].flat().map(child => typeof
 const bar = (root: Node) => nodes(find(root, 'Modal')).filter(node => node.type === 'AppText').map(labelOf);
 const button = (root: Node, label: string) => nodes(find(root, 'Modal')).find(node => node.type === 'PressFeedback' && labelOf(node.props.children) === label)!;
 
-const LOCALES: AppLocale[] = ['es-AR', 'en-AR', 'es-US', 'en-US'];
+const LOCALES = ['es-AR', 'en-AR', 'es-US', 'en-US'] as const satisfies readonly AppLocale[];
 
 test('the row shows the short date in the interface language and VoiceOver hears it written out', () => {
   const field = harness();
-  const expected: Record<AppLocale, [string, string, string]> = {
+  const expected: Record<'es-AR' | 'en-AR' | 'es-US' | 'en-US', [string, string, string]> = {
     'es-AR': ['Fecha', '22 sep 2026', '22 de septiembre de 2026'],
     'en-AR': ['Date', 'Sep 22, 2026', 'September 22, 2026'],
     'es-US': ['Fecha', '22 sep 2026', '22 de septiembre de 2026'],
@@ -156,7 +156,7 @@ test('the row shows the short date in the interface language and VoiceOver hears
 
 test('the wheel is a worded date in the language\'s home locale for all four combinations, always the spinner, never the deprecated onChange', () => {
   const field = harness();
-  const home: Record<AppLocale, string> = { 'es-AR': 'es_AR', 'en-AR': 'en_US', 'es-US': 'es_AR', 'en-US': 'en_US' };
+  const home: Record<'es-AR' | 'en-AR' | 'es-US' | 'en-US', string> = { 'es-AR': 'es_AR', 'en-AR': 'en_US', 'es-US': 'es_AR', 'en-US': 'en_US' };
   for (const locale of LOCALES) {
     field.setLocale(locale);
     const picker = find(field.render(), 'DateTimePicker')!;

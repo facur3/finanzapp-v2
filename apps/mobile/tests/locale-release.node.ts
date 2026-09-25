@@ -14,6 +14,10 @@ import { PREVIEW, RELEASED, RELEASED_LANGUAGES, RELEASED_REGIONS, SUPPORTED_LANG
 import type { PreferenceStore } from '../src/i18n/preference.ts';
 import type { LocaleEnvironment } from '../src/i18n/store.ts';
 
+/** The rows a chooser lists, "Según el dispositivo" first, and the chooser itself (24R2A: `ChoiceScreen`'s inputs). */
+const chooserOf = localeOptions.localeChooser;
+const optionsOf = (...args: Parameters<typeof localeOptions.localeChooser>) => { const chooser = chooserOf(...args); return [chooser.pinned, ...chooser.options]; };
+
 // Producto 23.1C2: Spanish and English × Argentina and the United States are
 // released, and no production bundle depends on EXPO_PUBLIC_LOCALE_PREVIEW.
 // Three layers: the gate function; every place that could set or read the
@@ -31,18 +35,19 @@ console.error = (...args: unknown[]) => { if (!String(args[0]).startsWith('react
 const root = resolve(new URL('..', import.meta.url).pathname);
 const FLAG = 'EXPO_PUBLIC_LOCALE_PREVIEW';
 
-test('the release: Spanish and English, Argentina and the United States; the development preview adds nothing today', () => {
+test('the release: Spanish and English, Argentina and the United States; the development preview adds the catalogue regions only', () => {
   assert.deepEqual([...RELEASED_LANGUAGES], ['es', 'en']);
   assert.deepEqual([...RELEASED_REGIONS], ['AR', 'US']);
   assert.deepEqual(RELEASED, { languages: ['es', 'en'], regions: ['AR', 'US'] });
   // A future catalogue may sit in LANGUAGES before RELEASED_LANGUAGES (previewable in FinanzApp Dev); update this line then.
-  assert.deepEqual(PREVIEW, RELEASED, 'FinanzApp Dev started with the flag shows exactly what a release shows');
+  assert.deepEqual(PREVIEW.languages, RELEASED.languages, 'no language is held back');
+  assert.equal(PREVIEW.regions.length, 257, '24R2A: FinanzApp Dev started with the flag offers every catalogue region, for the family QA of 24R2B');
   for (const language of RELEASED_LANGUAGES) assert.ok(SUPPORTED_LANGUAGES.includes(language), 'a released language has a catalogue: ' + language);
   for (const region of RELEASED_REGIONS) assert.ok(SUPPORTED_REGIONS.includes(region), 'a released region has conventions: ' + region);
 });
 
 test('a release bundle gets the release gate itself, whatever the flag says', () => {
-  // Identity, not equality: PREVIEW deep-equals RELEASED today, so only `===` tells which one the gate returned.
+  // Identity: the gate returns one of the two objects.
   for (const flag of [undefined, '', '0', '1', 'true', ' 1 ']) assert.equal(releasedForBuild(flag, false), RELEASED, `production, ${FLAG}=${JSON.stringify(flag)}`);
   assert.equal(releasedForBuild(undefined, true), RELEASED, 'a development bundle without the flag');
   assert.equal(releasedForBuild('true', true), RELEASED, 'only the documented value widens it');
@@ -149,14 +154,24 @@ function releaseBundle(languageTag: string, regionCode: string) {
 }
 
 /** The Idioma / Región screen as the app ships it, with host components by name. */
+/** Más → Idioma / Región as a release bundle draws them (24R2A): the real `LocaleChooser` over the real `ChoiceScreen`. */
 function preferenceScreen(provider: Record<string, any>) {
-  const source = readFileSync(join(root, 'src/ui/locale-preference.tsx'), 'utf8');
-  const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText;
-  return run(code, {
-    react: React, 'react/jsx-runtime': require('react/jsx-runtime'), 'react-native': { View: 'View' }, 'expo-router': { Stack: { Screen: 'Stack.Screen' } },
-    '../i18n/provider': provider, './components': { AppText: 'AppText', CheckRow: 'CheckRow', ErrorMessage: 'ErrorMessage', Screen: 'Screen', Surface: 'Surface' },
-    './locale-options': localeOptions, './motion': { selectionHaptic() {} },
-  }).LocalePreferenceScreen;
+  const compile = (path: string) => ts.transpileModule(readFileSync(join(root, path), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText;
+  function FlatList(props: any) {
+    return React.createElement('FlatList', null, props.ListHeaderComponent,
+      ...props.data.map((item: any) => React.createElement(React.Fragment, { key: props.keyExtractor(item) }, props.renderItem({ item }))), props.ListFooterComponent);
+  }
+  const components = { AppText: 'AppText', CheckRow: 'CheckRow', ErrorMessage: 'ErrorMessage', Field: 'Field', Screen: 'Screen' };
+  const choiceScreen = run(compile('src/ui/choice-screen.tsx'), {
+    react: React, 'react/jsx-runtime': require('react/jsx-runtime'), 'react-native': { FlatList, View: 'View', StyleSheet: { create: (styles: unknown) => styles } },
+    'expo-router': { Stack: { Screen: 'Stack.Screen' } }, '../i18n/provider': provider, './components': components, './choice-list': require('../src/ui/choice-list.ts'),
+    './motion': { selectionHaptic() {} }, './theme': { radius: { group: 16 }, space: { s: 8, m: 12, l: 16, xl: 20 }, usePalette: () => ({ background: '#F2F2F6', surface: '#FFFFFF' }) },
+  });
+  return run(compile('src/ui/locale-choosers.tsx'), {
+    react: React, 'react/jsx-runtime': require('react/jsx-runtime'), 'expo-router': { Stack: { Screen: 'Stack.Screen' } }, '../i18n/provider': provider,
+    './choice-screen': choiceScreen, './components': components, './locale-options': localeOptions,
+    '../i18n/recent': { readRecent: () => [], rememberRecent: () => true },
+  }).LocaleChooser;
 }
 
 test('a release bundle mounted without a store prop, on an iPhone in English (United States), runs in en-US and offers English and the US region', () => {
@@ -175,9 +190,9 @@ test('a release bundle mounted without a store prop, on an iPhone in English (Un
   assert.equal(i18n!.moneyText(123456, 'USD'), 'US$\u00a01,234.56');
   const state = preferences!.state;
   assert.equal(state.released, RELEASED);
-  assert.deepEqual(localeOptions.languageOptions(state, i18n!.t).map(option => [option.value, option.title, option.language ?? '']),
+  assert.deepEqual(optionsOf('language', state, i18n!.t).map(option => [option.value, option.title, option.language ?? '']),
     [['system', 'Same as device', ''], ['es', 'Español', 'es'], ['en', 'English', 'en']]);
-  assert.deepEqual(localeOptions.regionOptions(state, i18n!.t).map(option => option.value), ['system', 'AR', 'US']);
+  assert.deepEqual(optionsOf('region', state, i18n!.t).map(option => option.value), ['system', 'AR', 'US']);
   assert.equal(localeOptions.showsPreference('region', state), true, 'Más shows Región');
   assert.deepEqual(events, ['add onLocaleSettingsChanged'], "subscribed to iOS's locale-change event");
   React.act(() => mounted.unmount());

@@ -7,11 +7,11 @@ import { SEARCHABLE_CHOICES, buildChoiceRows, type ChoiceOption, type ChoiceRow,
 import { selectionHaptic } from './motion';
 import { radius, space, usePalette } from './theme';
 
-/** A compact, searchable single-choice screen (Producto 24R1): the shape the
- * Región and Idioma choosers take once the catalogue's regions are released
- * (24R2). One list, virtualized: a search field from `SEARCHABLE_CHOICES`
- * options, the pinned option ("Según el dispositivo") first, the recent choices,
- * then alphabetical sections whose header is the initial. Rows are the same
+/** A compact, searchable single-choice screen (Producto 24R1, mounted behind
+ * Más → Región and → Idioma in 24R2A, `locale-choosers.tsx`). One list,
+ * virtualized: the pinned option ("Según el dispositivo") first; from
+ * `SEARCHABLE_CHOICES` options a search field, the recent choices and
+ * alphabetical sections whose header is the initial; below that, one card. Rows are the same
  * `CheckRow` as today's choosers, drawn as grouped cards by their position in
  * the section, so two options or two hundred read alike. A row that names a
  * language in its own words carries `language`, so VoiceOver speaks it with
@@ -19,11 +19,15 @@ import { radius, space, usePalette } from './theme';
  * and a refused save keeps the checkmark where it was and says so. A search
  * that matches nothing says so under the field while the pinned option stays
  * (the list is never empty then, so `ListEmptyComponent` would never show). Text scales
- * with Dynamic Type; no row has a fixed height. Not wired to a route yet. */
-export function ChoiceScreen<T extends string>({ title, options, pinned, recent, selected, onChoose, note, searchableFrom = SEARCHABLE_CHOICES }: {
+ * with Dynamic Type; no row has a fixed height. Nothing here knows about
+ * routes beyond the title, so the onboarding can show it as one of its steps. */
+export function ChoiceScreen<T extends string>({ title, options, pinned, recent, selected, onChoose, onConfirm, note, searchableFrom = SEARCHABLE_CHOICES }: {
   title: string; options: readonly ChoiceOption<T>[]; pinned?: ChoiceOption<T>; recent?: readonly T[]; selected: T | null;
   /** Saves the choice; false when the store refused it (the screen says so and keeps the previous checkmark). */
   onChoose: (value: T) => boolean;
+  /** A tap on the option already checked. Absent (Más): nothing happens. A flow that continues after a choice (the
+   * onboarding) passes it to go on with the current value: nothing is saved, nothing changes, no error is shown. */
+  onConfirm?: (value: T) => void;
   /** A footnote under the list, never inside it. */
   note?: string;
   searchableFrom?: number;
@@ -33,21 +37,26 @@ export function ChoiceScreen<T extends string>({ title, options, pinned, recent,
   const [query, setQuery] = useState('');
   const [failed, setFailed] = useState(false);
   const searchable = options.length >= searchableFrom;
-  const rows = useMemo(() => buildChoiceRows({ pinned, recent, options, selected, query: searchable ? query : '', recentTitle: t('preferences.recent') }),
-    [pinned, recent, options, selected, query, searchable, t]);
+  // A short list is one card under the pinned row: no search, no recents, no lettered sections.
+  const rows = useMemo(() => buildChoiceRows({ pinned, recent: searchable ? recent : [], options, selected, query: searchable ? query : '',
+    recentTitle: t('preferences.recent'), sections: searchable }), [pinned, recent, options, selected, query, searchable, t]);
   // No real choice left (the pinned row does not count): the list is not empty while the pinned option stays,
   // so the sentence is drawn from this, under the search field, never from `ListEmptyComponent`.
   const noMatches = !rows.some(row => row.kind === 'choice' && !row.pinned);
   const choose = (value: T) => {
-    if (value === selected) return;
+    if (value === selected) { onConfirm?.(value); return; }
     const saved = onChoose(value);
     setFailed(!saved);
     if (saved) selectionHaptic();
   };
-  return <View style={{ flex: 1, backgroundColor: p.background }}>
+  // The list is the screen's scroll view, inset like `Screen` and the other lists: iOS adds the navigation bar, the home
+  // indicator's safe area and, while the search field is focused, the keyboard (`automaticallyAdjustKeyboardInsets`), so
+  // the last region, the error and the footnote scroll clear of all three. No fixed margin stands in for an inset.
+  return <>
     <Stack.Screen options={{ title }} />
-    <FlatList<ChoiceRow<T>> data={rows} keyExtractor={row => row.key} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag"
-      contentContainerStyle={{ padding: space.xl, paddingBottom: 40 }} initialNumToRender={16} windowSize={7} removeClippedSubviews={false}
+    <FlatList<ChoiceRow<T>> data={rows} keyExtractor={row => row.key} style={{ flex: 1, backgroundColor: p.background }}
+      contentInsetAdjustmentBehavior="automatic" automaticallyAdjustKeyboardInsets keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive"
+      contentContainerStyle={{ padding: space.xl, paddingBottom: 48, flexGrow: 1 }} initialNumToRender={16} windowSize={7} removeClippedSubviews={false}
       ListHeaderComponent={searchable || noMatches ? <View style={{ paddingBottom: space.l, gap: space.m }}>
         {searchable && <Field label={t('preferences.search')} value={query} onChangeText={setQuery} autoCapitalize="none" autoCorrect={false} clearButtonMode="while-editing" maxLength={40} />}
         {noMatches && <AppText secondary variant="subhead" style={{ paddingHorizontal: 4 }}>{t('preferences.noMatches')}</AppText>}
@@ -62,7 +71,7 @@ export function ChoiceScreen<T extends string>({ title, options, pinned, recent,
           <CheckRow title={item.option.title} subtitle={item.option.subtitle} selected={item.selected} accessibilityLanguage={item.option.language}
             last={item.position === 'last' || item.position === 'only'} onPress={() => choose(item.option.value)} />
         </View>} />
-  </View>;
+  </>;
 }
 
 /** The corners a row draws by its place in its group, so consecutive rows read as one grouped card. */

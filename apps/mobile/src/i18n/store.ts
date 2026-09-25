@@ -13,7 +13,7 @@
  *   - nothing here touches the ledger, a backup or a stored amount. */
 import { primaryLanguageOf, type LocaleSource } from './device.ts';
 import { RELEASED, SYSTEM_PREFERENCES, resolveLocale, type DeviceLocale, type LanguagePreference, type LocalePreferences,
-  type RegionPreference, type ReleasedSets, type ResolvedLocale } from './locale.ts';
+  type RegionCode, type RegionPreference, type ReleasedSets, type ResolvedLocale } from './locale.ts';
 import { readLocalePreferences, writeLanguagePreference, writeRegionPreference, type PreferenceStore } from './preference.ts';
 import { deviceRegion, type CatalogueRegionCode } from './regions.ts';
 
@@ -117,4 +117,11 @@ export function activeLanguageChoice(state: LocaleState): LanguagePreference {
 export function activeRegionChoice(state: LocaleState): RegionPreference {
   const preference = state.preferences.region;
   return preference === 'system' || state.released.regions.includes(preference) ? preference : 'system';
+}
+/** A stored region this build does not release (chosen in a development preview, 24R2A): kept, never applied
+ * and never overwritten by the app. Formats follow the next rule (the device, then the default) and the
+ * chooser shows it with the stand-in's name; choosing anything else replaces it. Null when none. */
+export function pendingRegionChoice(state: LocaleState): RegionCode | null {
+  const preference = state.preferences.region;
+  return preference !== 'system' && !state.released.regions.includes(preference) ? preference : null;
 }

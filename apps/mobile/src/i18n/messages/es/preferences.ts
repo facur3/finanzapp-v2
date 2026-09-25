@@ -17,8 +17,12 @@ export const preferences = {
     regionNote: 'La región define cómo se escriben las fechas, los números y los importes. No cambia la moneda de tus cuentas.',
     dataUntouched: 'Cambiar el idioma o la región no modifica tus movimientos, tus cuentas ni tus copias de seguridad.',
     saveFailed: 'No se pudo guardar la preferencia. Tu elección anterior sigue activa; probá de nuevo.',
-    /** Region names in the interface language; languages are listed by their own names. */
-    regionNames: { AR: 'Argentina', US: 'Estados Unidos' },
+    /** A region chosen in a development preview that this build does not publish: kept, marked, and the formats that stand in for it (24R2A). */
+    pendingRegion: 'Todavía no disponible en esta versión · formatos de {fallback}',
+    /** Más row subtitle for that region: "Japón · formatos de Argentina". */
+    pendingSummary: '{value} · formatos de {fallback}',
+    /** Footnote of the Región chooser in a development preview only (EXPO_PUBLIC_LOCALE_PREVIEW=1), never in a release. */
+    previewNote: 'Vista previa de desarrollo: incluye regiones que todavía no se verificaron en un iPhone.',
     /** Example of the region's conventions under its name. */
     regionSample: '{date} · {amount}',
   },

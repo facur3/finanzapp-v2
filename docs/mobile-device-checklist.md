@@ -274,6 +274,70 @@ at least; a release build on the slowest device is the real verdict (a dev build
 - [ ] The date semantics are untouched: Cancelar keeps the saved day, Listo saves the spun day,
   yesterday is allowed and tomorrow is not on a movement, Recurrente allows a future date.
 
+## Producto 24R2A — native Idioma/Región choosers, regions in the development preview
+
+**Not done in 24R2A: no EAS build was made and the iPhone was not touched.** Metro from this branch on
+the installed FinanzApp Dev build; no new native build is needed (no native module, no Info.plist
+change). Record each result with the language and the iPhone Region it was checked in.
+
+**Release gate (Metro without the flag: what a release shows):**
+- [ ] Más → Idioma: «Según el dispositivo» on top with «Ahora: …», then one card with Español and
+  English; no search field, no «Recientes», no letters; «English» read by an English voice. A tap
+  changes the app in place (this title included); the checkmark moves; nothing remounts.
+- [ ] Más → Región: «Según el dispositivo», then one card with Argentina and Estados Unidos, each with
+  its sample («22/9/2026 · 1.234,56», «9/22/2026 · 1,234.56»); the footnote below the card; no
+  «Vista previa» sentence.
+- [ ] Largest accessibility text size: rows wrap, nothing truncates or overlaps, the checkmark stays
+  aligned; VoiceOver reads «Según el dispositivo», each row, «seleccionado» on the checked one.
+- [ ] Nuevo gasto open with «1234,5» typed, then Región changed from iOS Settings (with «Según el
+  dispositivo») Argentina → Estados Unidos: the field reads «1,234.5», the caret stays, saving records
+  the same amount.
+
+**Development preview (`EXPO_PUBLIC_LOCALE_PREVIEW=1 npm run start:dev-client -- --clear`):**
+- [ ] Más → Región lists 257 regions: the search field, «Recientes» after a choice (next visit), letter
+  sections; the footnote says the preview is unverified. Scroll top to bottom fast: no blank rows or
+  stutter at 60/120 Hz; the letter headers are read as headers by VoiceOver; Reduce Motion changes
+  nothing in the list.
+- [ ] With the search field focused and the keyboard up, at the largest accessibility text size and with
+  VoiceOver: scroll to the end; the last region (Zimbabue), the save-error line (force it only if a
+  failure can be produced) and the footnote scroll fully above the keyboard; with the keyboard dismissed
+  (drag down, interactive), the footnote clears the home indicator; the first row is never under the
+  navigation bar.
+- [ ] Search «japon», «JP», «JPN», «392», «CHF»: Japón first for the first four, Suiza among the results
+  for the last; «xyzzy» says «Sin coincidencias» under the field while «Según el dispositivo» stays.
+- [ ] Choose India: Inicio, Movimientos and Reportes write «1,23,456.78»-style amounts and «22/9/2026»;
+  Nuevo gasto types «1234567» as «12,34,567»; delete across a comma removes the digit before it; the
+  pad's decimal key (whatever it shows) writes «.».
+- [ ] Región on «Según el dispositivo», Nuevo gasto open with «1234567» typed and the caret between two
+  digits; set iOS Settings → Region to Switzerland, France and Poland in turn (a form is a modal, so the
+  change comes from iOS): «1'234'567», «1 234 567» (narrow space), «1 234 567» (no-break space); the caret
+  stays between the same digits and saving records the same amount.
+- [ ] Paste «12,34,567.89» (India), «1'234.56» (any region), «1.000» in Suiza (refused with the note),
+  «١٢٣٫٤٥» (123.45 in the region's writing).
+- [ ] With Japón chosen in the preview, restart Metro **without** the flag: Más → Región shows Japón
+  checked with «Todavía no disponible en esta versión · formatos de …», the Más row says «Japón ·
+  formatos de …», amounts use the stand-in's formats; choose Argentina and it replaces Japón.
+- [ ] No movement, balance, account currency or backup changed through any of the above.
+
+## Producto 24R2B — family gates before each stage opens (`src/i18n/region-release.ts`)
+
+Each stage opens in its own commit (status → `released`, its regions added to `RELEASED_REGIONS`) only
+after these checks pass on the iPhone for **one region of each of its number and date families**
+(`stageFamilies`), in Spanish and in English, with the iPhone's Region set to that region and the preview
+bundle:
+- [ ] Amount field: typing 1 → 1234567 and decimals; the pad's decimal key; deleting across the group
+  separator; pasting the region's own grouped amount and a refused ambiguous one; a currency without
+  decimals (only once 24M opens one).
+- [ ] Numeric dates and the day of the period (Reportes insights), the time in Más → Copias and detail
+  screens, 12/24 h as the region writes it.
+- [ ] VoiceOver: amounts ungrouped with the language's decimal («1234,56 pesos» / «1234.56 pesos»).
+- [ ] Inicio, Reportes and a detail screen at the largest Dynamic Type with the longest grouped amount.
+- [ ] Stages: `spanish` (PA and PR month-first; CL hyphenated and padded; ES minimum grouping two; CR a
+  no-break space; most with a 12-hour clock), `uk-canada` (GB padded, CA year-first hyphen), `brazil`, `japan`,
+  `india` (lakh), `germany` (dotted dates), `switzerland` (apostrophe), `narrow-space` (FR),
+  `space-minimum-two` (PL, PT). Korean and Hungarian dates stay unplanned until a stage decides their
+  trailing-period writing.
+
 ## Producto 24R1 — regional infrastructure (one visible line; nothing else until 24R2)
 
 **Not done in 24R1: no EAS build was made and the iPhone was not touched.** Metro from this branch on

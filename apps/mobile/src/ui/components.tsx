@@ -265,14 +265,14 @@ export function AmountField({ label, currency, tone, value = '', onChangeText, s
     setSelection(undefined);
     setNotice(null);
   }, [value]);
-  const { decimal, group } = amountFormat;
+  const { decimal, group, secondaryGrouping, minimumGroupingDigits } = amountFormat;
   useEffect(() => {
-    // The region changed with the form open: same value, same logical caret, the new separators. The draft is untouched.
-    // A refused paste's note was about the previous region's reading, so it goes too.
-    const view = input.current!.reformat({ decimal, group });
+    // The region changed with the form open: same value, same logical caret, the new separators and grouping. The draft
+    // is untouched. A refused paste's note was about the previous region's reading, so it goes too.
+    const view = input.current!.reformat({ decimal, group, secondaryGrouping, minimumGroupingDigits });
     setSelection(current => current && { start: view.caret, end: view.caret });
     setNotice(null);
-  }, [decimal, group]);
+  }, [decimal, group, secondaryGrouping, minimumGroupingDigits]);
   const title = label ?? t('amount.label');
   const symbol = currencySymbol(currency);
   const unitKey = (FIELD_UNIT_KEYS as { readonly [Code in Currency]?: MessageKey })[currency];

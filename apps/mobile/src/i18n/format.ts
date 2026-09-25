@@ -29,6 +29,7 @@
 import { currencyRecord, displayDigits, formatMinorUnits, splitMinor, type IsoCurrencyCode } from '@finanzapp/domain';
 import { CURRENCY_NAMES } from './currencies/index.ts';
 import type { CurrencyNameForms } from './currencies/types.ts';
+import { groupWhole, type Grouping } from './grouping.ts';
 import { DEFAULT_LOCALE, SPEECH_REGIONS, completeConventions, composeLocale, conventionsOf, languageOf, registryRegionOf, type AppLocale, type LanguageCode, type RegionConventions } from './locale.ts';
 
 /** The conventions a formatter writes in: the ones passed explicitly (a catalogue region under test or, from
@@ -198,17 +199,11 @@ export function formatDateTime(iso: string, locale: AppLocale = DEFAULT_LOCALE, 
 
 /** Groups the digits of a non-negative integer string with the region's separator: the last group of
  * three, then groups of `secondaryGrouping` (3 almost everywhere, 2 for lakh and crore: "12,34,567"),
- * and no separator at all below `minimumGroupingDigits` whole digits before the first one. */
+ * and no separator at all below `minimumGroupingDigits` whole digits before the first one
+ * (`grouping.ts`, shared with the amount field). */
 function groupDigits(digits: string, locale: AppLocale, explicit?: RegionConventions): string {
   const c = conventions(locale, explicit);
-  if (digits.length < 3 + c.minimumGroupingDigits) return digits;
-  const groups: string[] = [];
-  let rest = digits;
-  groups.unshift(rest.slice(-3)); rest = rest.slice(0, -3);
-  const size = Math.max(1, c.secondaryGrouping);
-  while (rest.length > size) { groups.unshift(rest.slice(-size)); rest = rest.slice(0, -size); }
-  if (rest) groups.unshift(rest);
-  return groups.join(c.group);
+  return groupWhole(digits, c.group, c);
 }
 
 /** A count (of movements, of days) with thousands grouping. Not for money. */
@@ -285,11 +280,13 @@ export function formatAmount(minor: number, locale: AppLocale = DEFAULT_LOCALE):
   return text.replace(/[.,]/g, char => char === '.' ? group : decimal);
 }
 
-/** The separators the amount field types in: the region's. */
-export function amountFormat(locale: AppLocale = DEFAULT_LOCALE, explicit?: RegionConventions): { decimal: string; group: string } {
-  const { decimal, group } = conventions(locale, explicit);
-  return { decimal, group };
+/** The separators and grouping the amount field types in: the region's (`AmountFormat` in money-input.ts). */
+export function amountFormat(locale: AppLocale = DEFAULT_LOCALE, explicit?: RegionConventions): RegionAmountFormat {
+  const { decimal, group, secondaryGrouping, minimumGroupingDigits } = conventions(locale, explicit);
+  return { decimal, group, secondaryGrouping, minimumGroupingDigits };
 }
+/** What the amount field needs of a region: its two separators and where the group separator goes. */
+export interface RegionAmountFormat extends Grouping { decimal: string; group: string }
 
 /** An amount for prose and detail rows: sign, symbol, a non-breaking space
  * and the number, so "US$ 1.234,56" never splits at a line end. `absolute`

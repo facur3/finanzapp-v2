@@ -47,7 +47,7 @@ const WEEKDAY_INDEX = { sun: 0, mon: 1, tue: 2, wed: 3, thu: 4, fri: 5, sat: 6 }
 
 async function languages() {
   const locale = await import(pathToFileURL(join(MOBILE, 'src', 'i18n', 'locale.ts')).href);
-  return { langs: [...locale.SUPPORTED_LANGUAGES].sort(), regions: locale.REGIONS };
+  return { langs: [...locale.SUPPORTED_LANGUAGES].sort(), regions: locale.REGION_REGISTRY };
 }
 async function currencyCatalogue() {
   const data = await import(pathToFileURL(join(ROOT, 'packages', 'domain', 'currency-data.ts')).href);
