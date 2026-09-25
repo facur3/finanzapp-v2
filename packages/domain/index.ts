@@ -1,8 +1,8 @@
-// A typed, side-effect-free entry for native clients. The legacy UI continues
-// using src/domain. Move implementations only after both clients have parity.
-// The float-based web money helpers (fmtNum, parseMoneyInput) are deliberately not
-// re-exported: native money is integer minor units per currency (money.ts).
-export { todayKey, labelFromISO } from '../../src/domain/dates.js';
+// The typed, side-effect-free entry of the financial domain the native app imports.
+// Everything here lives under packages/domain: nothing is taken from outside the
+// package (scripts/check-repo.mjs fails the build if an import reaches out).
+// Money is integer minor units per currency (money.ts); there are no float helpers.
+export * from './dates.ts';
 export * from './ledger.ts';
 export * from './currency.ts';
 export * from './money.ts';
