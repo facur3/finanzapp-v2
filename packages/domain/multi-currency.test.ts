@@ -47,11 +47,12 @@ const archive: LedgerArchive = { accounts, records: entries.map(initialRecord), 
 const legacyArchive: LedgerArchive = { accounts: [ars, usd], records: [initialRecord(entries[0])] };
 
 describe('one gate for new records, read acceptance for stored ones', () => {
-  it('production offers exactly ARS and USD; an explicit gate opens creation for tests only', () => {
-    expect([...LEDGER_CURRENCIES]).toEqual(['ARS', 'USD']);
+  it('production offers ARS, USD and (24M) every ready 0- or 2-decimal currency; the three-decimal ones only through an explicit gate', () => {
+    expect(LEDGER_CURRENCIES).toHaveLength(146);
     expect([...LEGACY_CURRENCIES]).toEqual(['ARS', 'USD']);
+    for (const account of [eur, jpy]) validateNewAccount(account);
+    expect(() => validateNewAccount(kwd)).toThrow('Elegí una moneda disponible.');
     for (const account of [eur, jpy, kwd]) {
-      expect(() => validateNewAccount(account)).toThrow('Elegí una moneda disponible.');
       validateNewAccount(account, GATE);
       validateAccount(account);
     }
@@ -59,8 +60,8 @@ describe('one gate for new records, read acceptance for stored ones', () => {
     expect(() => validateNewMonthlyBudget(kwdTotal)).toThrow('Elegí una moneda disponible.');
     validateNewMonthlyBudget(kwdTotal, GATE);
     validateMonthlyBudget(kwdTotal);
-    // A 'ready' or 'incomplete' code outside the gate: storable, never offered.
-    for (const code of ['CHF', 'VED', 'SVC'] as IsoCurrencyCode[]) {
+    // A 'ready' (held) or 'incomplete' code outside the gate: storable, never offered.
+    for (const code of ['KWD', 'VED', 'SVC'] as IsoCurrencyCode[]) {
       expect(isLedgerCurrency(code)).toBe(false);
       expect(isStorableCurrency(code)).toBe(true);
     }

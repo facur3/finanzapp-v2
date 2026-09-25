@@ -40,7 +40,7 @@ export const common: Pick<Messages, 'common' | 'movement' | 'accountKinds' | 'se
     chooseDate: 'Choose date',
     currency: 'Currency',
     chooseCurrency: 'Choose currency',
-    currencyNote: 'Each account is kept in its own currency, with no conversion between them. The list shows the currencies available today; others will be added along with exchange rates.',
+    currencyNote: 'Each account is recorded in its own currency. Amounts in different currencies are never added together or converted.',
     searchOrCreateCategory: 'Search or create a category',
     categoryNamePlaceholder: 'Category name',
     useCategory: 'Use category {name}',

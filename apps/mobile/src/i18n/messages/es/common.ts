@@ -42,7 +42,7 @@ export const common = {
     currency: 'Moneda',
     chooseCurrency: 'Elegir moneda',
     /** Under the currency sheet of a new account: why the list is short, without naming a currency (the list follows the ledger's gate). */
-    currencyNote: 'Cada cuenta se registra en su propia moneda, sin convertir entre sí. La lista muestra las monedas disponibles hoy; otras llegan con su cotización.',
+    currencyNote: 'Cada cuenta se registra en su propia moneda. Los importes de monedas distintas nunca se suman ni se convierten entre sí.',
     searchOrCreateCategory: 'Buscar o crear categoría',
     categoryNamePlaceholder: 'Nombre de la categoría',
     useCategory: 'Usar categoría {name}',

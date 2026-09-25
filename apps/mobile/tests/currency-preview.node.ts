@@ -14,18 +14,18 @@ const require = createRequire(import.meta.url);
 const { transformSync } = require('@babel/core') as { transformSync: (code: string, options: object) => { code: string } | null };
 const root = resolve(new URL('..', import.meta.url).pathname);
 
-test('the preview gate is the release pair plus five storable test currencies covering zero, two and three decimals; a release bundle gets the production gate whatever the flag says', () => {
-  assert.deepEqual([...PREVIEW_CURRENCIES], ['ARS', 'USD', 'EUR', 'GBP', 'JPY', 'CLP', 'KWD']);
+test('the preview gate is the release gate plus the seven held three-decimal currencies; a release bundle gets the production gate whatever the flag says', () => {
+  assert.deepEqual([...PREVIEW_CURRENCIES], [...LEDGER_CURRENCIES, 'BHD', 'IQD', 'JOD', 'KWD', 'LYD', 'OMR', 'TND']);
   assert.ok(PREVIEW_CURRENCIES.every(code => isStorableCurrency(code)));
-  assert.deepEqual(PREVIEW_CURRENCIES.map(code => minorUnitExponent(code)), [2, 2, 2, 2, 0, 0, 3]);
+  assert.deepEqual(PREVIEW_CURRENCIES.slice(-7).map(code => minorUnitExponent(code)), [3, 3, 3, 3, 3, 3, 3]);
   for (const flag of [undefined, '', '0', '1', 'true', ' 1 ']) assert.equal(currencyGateForBuild(flag, false), LEDGER_CURRENCIES, `production, ${CURRENCY_PREVIEW_FLAG}=${JSON.stringify(flag)}`);
   assert.equal(currencyGateForBuild(undefined, true), LEDGER_CURRENCIES, 'a development bundle without the flag');
   assert.equal(currencyGateForBuild('true', true), LEDGER_CURRENCIES, 'only the documented value widens it');
   assert.equal(currencyGateForBuild('1', true), PREVIEW_CURRENCIES);
   assert.equal(isPreviewGate(LEDGER_CURRENCIES), false);
-  assert.equal(isPreviewGate(['ARS', 'USD']), false, 'the same pair in another array is still the release');
+  assert.equal(isPreviewGate([...LEDGER_CURRENCIES]), false, 'the same list in another array is still the release');
   assert.equal(isPreviewGate(PREVIEW_CURRENCIES), true);
-  assert.deepEqual(previewOnlyCurrencies(PREVIEW_CURRENCIES), ['EUR', 'GBP', 'JPY', 'CLP', 'KWD']);
+  assert.deepEqual(previewOnlyCurrencies(PREVIEW_CURRENCIES), ['BHD', 'IQD', 'JOD', 'KWD', 'LYD', 'OMR', 'TND']);
   assert.deepEqual(previewOnlyCurrencies(LEDGER_CURRENCIES), []);
 });
 

@@ -319,6 +319,32 @@ change). Record each result with the language and the iPhone Region it was check
   formatos de …», amounts use the stand-in's formats; choose Argentina and it replaces Japón.
 - [ ] No movement, balance, account currency or backup changed through any of the above.
 
+## Producto 24M — 144 currencies opened (gate of the first TestFlight, not of the merge)
+
+**Not done in 24M: no EAS build was made and the iPhone was not touched.** Metro from the branch on the installed
+FinanzApp Dev build, no flag (what a release offers), unless an item says otherwise. **Keep a backup first**
+(Más → Copias de seguridad → Exportar) and use test data only. Record each result with the language and Region.
+
+- [ ] **The sheet over 146 currencies:** Más → Cuentas → Nueva cuenta → Moneda: ARS and USD on top, then by name;
+  scroll to the end fast (no blank rows); search «yen», «JPY», «392», «Japón», «€», «dólar» (many); the largest
+  accessibility text size (names wrap, nothing truncates); VoiceOver reads «Euros, EUR»; with the keyboard up the last
+  currency and the note stay reachable; «kuwait» finds nothing (held).
+- [ ] **Two decimals (EUR) — an account, a card, a debt, a budget, a recurring rule:** type «1234,56» (the pad has its
+  decimal key); a purchase on the card and its payment; Inicio's switch shows EUR alone, never added to pesos; Reportes
+  in EUR; VoiceOver reads «1234,56 euros».
+- [ ] **No decimals (JPY):** the pad has **no** decimal key; «1500» saves 1500 yen (not 15,00); pasting «12,5» is
+  refused; VoiceOver reads «1500 yenes japoneses».
+- [ ] **Two decimals shown whole (COP):** «150000» shows «150.000»; «1500,5» shows «1.500,5» (a recorded fraction is
+  never hidden).
+- [ ] **A backup round trip:** export with EUR, JPY and COP accounts, restore on a copy (or after reinstalling
+  FinanzApp Dev): every balance identical; a recurring rule deleted before the export stays deleted.
+- [ ] **Regions:** with Región Alemania and Suiza, the EUR and CHF amounts group as docs/region-families.md §1 says.
+- [ ] **Three decimals, preview only (`EXPO_PUBLIC_CURRENCY_PREVIEW=1`), decides the held seven:** a KWD account, an
+  expense of «1,234» (one dinar, 234 fils); with VoiceOver in Spanish and in English, and with iOS Region set to
+  Argentina and to the United States, record exactly what the voice says for the amount in the row and in the detail.
+  «un coma doscientos treinta y cuatro dinares» / «one point two three four» passes; «mil doscientos treinta y
+  cuatro» or «one thousand…» fails and keeps them held.
+
 ## Producto 24R2B — 234 regions released (gate of the first TestFlight, not of the merge)
 
 **Not done in 24R2B: no EAS build was made and the iPhone was not touched.** Metro from the branch on the

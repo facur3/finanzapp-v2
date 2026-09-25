@@ -1,6 +1,6 @@
 # FinanzApp mobile: currencies and the multi-currency engine
 
-Updated 2026-09-24 (Producto 24B6). Applies to the Expo app in `apps/mobile` and the
+Updated 2026-09-25 (Producto 24M). Applies to the Expo app in `apps/mobile` and the
 shared `packages/domain`. The retired web app had its own float-based helpers
 (`src/domain/currency.js`, readable at the tag `web-frontend-final`); the native code never used
 them. Read with [decision 002](decisions/002-spending-first.md)
@@ -150,19 +150,61 @@ bundle (`expo export --platform ios`: 4,806,630 bytes at master 1181ed1, 4,868,7
 | Card rules | `packages/domain/liabilities.ts`, `src/storage/database.ts` | `assertIncomeAccount` (a new income posts to cash only), `keepsHistoricalCardIncome` (a stored card income is corrected or restored in place), `postingAccountsFor`, `assertTransferSides` (a card is never a source; two obligations never face each other) and `sameTransferSides`, applied to new rows and to edits that change sides; reads, imports and exports unchanged. A currency-neutral rule: it holds for any account currency the ledger accepts. |
 | Not changed | `LEDGER_CURRENCIES`, `PREVIEW_CURRENCIES`, the catalogue, SQLite 9, backup v9, contract v1 | The gate-opening commit waits for the recorded device evidence (§7.6.1). No rate, no conversion, no catalogue edit. |
 
+### 2.7 What Producto 24M delivers (stage 9: the gate opened)
+
+**The audit.** ISO 4217 List One (2026-09-17) has 178 codes: 155 fiat, 23 excluded (10 funds, 4 metals, 7 units of
+account, XTS, XXX). Of the fiat ones, 153 are `ready` (complete data: ISO minor unit, CLDR names in Spanish and English,
+a territory where CLDR lists them as current tender, a root symbol no other fiat currency shares) and 2 `incomplete`.
+Everything a ready currency touches was built and tested by exponent in 24B1–24B6 (the amount model, the amount field and
+number pad per exponent, presentation and spoken units, SQLite's pinned scales in `currency_units`, backups v9/v10, the
+searchable currency sheet, the display currency) and is exercised again by `tests/currency-release.node.ts`.
+
+| Class | Exponent / CLDR display digits | Count | Status in 24M | Currencies |
+| --- | --- | --- | --- | --- |
+| Historical | 2 / 2 | 2 | ledger (unchanged) | ARS, USD |
+| Two decimals | 2 / 2 | 113 | **opened** | AED, AMD, AOA, AUD, AWG, AZN, BAM, BBD, BDT, BMD, BND, BOB, BRL, BSD, BTN, BWP, BYN, BZD, CAD, CDF, CHF, CNY, CRC, CUP, CVE, CZK, DKK, DOP, DZD, EGP, ERN, ETB, EUR, FJD, FKP, GBP, GEL, GHS, GIP, GMD, GTQ, GYD, HKD, HNL, HTG, ILS, INR, JMD, KES, KGS, KHR, KYD, KZT, LKR, LRD, LSL, MAD, MDL, MKD, MNT, MOP, MRU, MUR, MVR, MWK, MXN, MYR, MZN, NAD, NGN, NIO, NOK, NPR, NZD, PAB, PEN, PGK, PHP, PLN, QAR, RON, RSD, RUB, SAR, SBD, SCR, SDG, SEK, SGD, SHP, SLE, SRD, SSP, STN, SZL, THB, TJS, TMT, TOP, TRY, TTD, TWD, TZS, UAH, UYU, UZS, VES, WST, XCD, XCG, ZAR, ZMW, ZWG |
+| Two decimals, shown whole | 2 / 0 | 15 | **opened** (a recorded fraction is still shown: "1.500,5") | AFN, ALL, COP, HUF, IDR, IRR, KPW, LAK, LBP, MGA, MMK, PKR, SOS, SYP, YER |
+| No decimals | 0 / 0 | 16 | **opened** (number pad without a decimal key) | BIF, CLP, DJF, GNF, ISK, JPY, KMF, KRW, PYG, RWF, UGX, VND, VUV, XAF, XOF, XPF |
+| Three decimals | 3 / 3 (IQD 3 / 0) | 7 | **held** (`HELD_CURRENCIES`), preview only | BHD, IQD, JOD, KWD, LYD, OMR, TND |
+| Incomplete | — | 2 | never offered | SVC, VED |
+| Excluded | — | 23 | never offered | BOV, CHE, CHW, CLF, COU, MXV, USN, UYI, UYW, XAD; XAG, XAU, XPD, XPT; XBA, XBB, XBC, XBD, XDR, XSU, XUA; XTS; XXX |
+
+**144 currencies opened** (128 with two decimals, 16 without); `LEDGER_CURRENCIES` holds 146 with ARS and USD. The list
+is written out in `packages/domain/currency.ts`, not derived, and `currency.test.ts` compares it with the catalogue, so a
+catalogue update can never open a currency by itself.
+
+**Why the three-decimal currencies wait.** VoiceOver reads their amounts as "1234,567" (Spanish) or "1234.567" (English):
+the language's decimal mark before three digits. A voice that reads that mark as a thousands separator (the Region's
+convention, an unverified behaviour of iOS's voices, §9 of docs/i18n.md) would speak a thousand times the amount. It is
+the one known risk that could misstate an amount; it needs the iPhone check of stage 9 (docs/mobile-device-checklist.md,
+Producto 24M). They stay storable (a restored backup or the preview build can hold them, as 24B5 tested) and open in their
+own commit after that evidence. `EXPO_PUBLIC_CURRENCY_PREVIEW=1` now adds exactly these seven.
+
+**What changed in the app.** Every form that creates a record in a currency (new account, card, debt, budget) offers the
+146 through the searchable sheet (code, localized name, symbol, numeric code, country), ordered ARS, USD, then by the name
+in the interface language; the list is windowed and insets for the keyboard while searching, and each form computes it once
+per gate and language, not per keystroke. Recurring rules and movements take their account's currency. Inicio and Reportes
+show one currency at a time with the display-currency switch over the currencies held (§2.6), never a sum across them.
+
+**What did not change.** SQLite 10, backups v8/v9/v10 (an ARS/USD-only ledger still exports v8 bytes), `currency_units`
+(a scale is pinned on a currency's first row and never rewritten), ARS/USD goldens, language, region, the display
+currency's rules, FX (24C: nothing is converted or summed across currencies) and the Assistant: contract v1 carries ARS and
+USD only, so with another display currency the Assistant does not send and says it is not available (25A brings the next
+contract). The default for a new account stays ARS (§7.6.4, still open).
+
 ### Availability status
 
 | Status | Meaning | Today |
 | --- | --- | --- |
-| `ledger` | A **new** account, budget or recurring rule can hold it; forms offer it. Since 24B1 this is the creation gate only: a stored row in any fiat currency with a minor unit stays readable and groupable, and export refuses it explicitly, whatever the gate says (`isStorableCurrency`). | ARS, USD |
-| `ready` | Fiat currency with complete data (ISO minor unit, CLDR names in every language the build carries, at least one territory where CLDR lists it as current legal tender). Presentation works; **not stored and not offered** until 24B. | 151 |
+| `ledger` | A **new** account, card, debt, budget or recurring rule can hold it; forms offer it. Since 24B1 this is the creation gate only: a stored row in any fiat currency with a minor unit stays readable and groupable, and export refuses it explicitly, whatever the gate says (`isStorableCurrency`). | 146 since 24M: ARS, USD and every ready currency with 0 or 2 decimals (§2.7) |
+| `ready` | Fiat currency with complete data (ISO minor unit, CLDR names in every language the build carries, at least one territory where CLDR lists it as current legal tender), storable and presentable, **not offered** for new records. | 7: the three-decimal currencies, held until their VoiceOver check (§2.7) |
 | `incomplete` | Fiat currency missing data (`missing` lists `name:<language>` or `tender`). Never offered until completed upstream or by a reviewed decision; a missing name falls back to the ISO code, never to another language. | VED (no Spanish name in CLDR 48.2, and CLDR marks it not tender), SVC (ISO-active, but El Salvador uses USD: no territory) |
 | `excluded` | Not money a person spends: ISO funds (BOV, CHE, CHW, CLF, COU, MXV, USN, UYI, UYW, XAD), precious metals (XAG, XAU, XPD, XPT), units of account (XBA–XBD, XDR, XSU, XUA), the test code XTS and XXX. Never offered. | 23 |
 
 Legal tender is read on the ISO list's publication date, so a scheduled change (a euro
 adoption) counts from its date and the output never depends on the day it is generated.
-Adding a currency to `LEDGER_CURRENCIES` is Producto 24B's decision, after storage records
-each currency's scale; nothing in 24A offers a third currency. Rows written before 24B
+Producto 24M added 144 currencies to `LEDGER_CURRENCIES` (§2.7); the three-decimal ones open in their own commit after
+their device check. Rows written before 24B
 carry no scale and are read as cents only for `LEGACY_CURRENCIES` (ARS, USD), whatever the
 ledger set grows to.
 
@@ -733,7 +775,7 @@ limited to ARS/USD until the next server contract is implemented and tested (7.6
 first option). 7.6.1 (which currencies open first) and 7.6.4 (the default when nothing
 implies a currency) remain open; ARS stays the app's default meanwhile.
 
-1. **The first currencies to open.** Proposal (24B5, pending the device tests): EUR, GBP (two decimals), JPY and CLP (none) in the first commit; the three-decimal currencies (KWD, BHD, JOD, OMR, TND, LYD, IQD) in a second one after their VoiceOver check. **Status 2026-09-24 (24B6):** the owner reported the 24B5 iPhone tests done and merged PR #51, but no per-item result (number pad, VoiceOver es/en on JPY and CLP, the searchable sheet at large text and with Reduce Motion, a v9 export/restore) is recorded in docs/mobile-device-checklist.md, so the commit is still not applied; the minimum evidence is listed in docs/mobile-roadmap-history.md (Producto 24B6 status; the open item is in docs/mobile-roadmap.md §2 and Producto 24M). The commit stays one line in `LEDGER_CURRENCIES` plus the stage-9 tests of §7.5. Either a curated first list (for example the currencies of the first international users, including one without decimals) or all 151 `ready` currencies at once. Recommendation: curated. Open three-decimal currencies (BHD, IQD, JOD, KWD, LYD, OMR, TND) only after their VoiceOver check on a device.
+1. **The first currencies to open.** **Applied in 24M (2026-09-25)** as a development decision before launch: every ready currency with 0 or 2 decimals (144), the three-decimal ones held for their VoiceOver check (§2.7); the 24B5 device evidence below is still to be recorded before the first TestFlight. Earlier proposal (24B5, pending the device tests): EUR, GBP (two decimals), JPY and CLP (none) in the first commit; the three-decimal currencies (KWD, BHD, JOD, OMR, TND, LYD, IQD) in a second one after their VoiceOver check. **Status 2026-09-24 (24B6):** the owner reported the 24B5 iPhone tests done and merged PR #51, but no per-item result (number pad, VoiceOver es/en on JPY and CLP, the searchable sheet at large text and with Reduce Motion, a v9 export/restore) is recorded in docs/mobile-device-checklist.md, so the commit is still not applied; the minimum evidence is listed in docs/mobile-roadmap-history.md (Producto 24B6 status; the open item is in docs/mobile-roadmap.md §2 and Producto 24M). The commit stays one line in `LEDGER_CURRENCIES` plus the stage-9 tests of §7.5. Either a curated first list (for example the currencies of the first international users, including one without decimals) or all 151 `ready` currencies at once. Recommendation: curated. Open three-decimal currencies (BHD, IQD, JOD, KWD, LYD, OMR, TND) only after their VoiceOver check on a device.
 2. **What the currency screen lists.** Only currencies the ledger can hold (recommended), or also `ready` ones shown as unavailable. Either way, the region stays a search hint and never a preselection.
 3. **Budgets in a currency without an account.** Either allowed (a budget keeps its own code, and the scale is pinned per code) or limited to currencies the person holds accounts in.
 4. **The default when nothing implies a currency.** Today ARS is preselected for a new account in an empty ledger, a new card or debt, and the empty Home/Reports fallback (`new-account.tsx:26`, `card-form.tsx:29`, `debt-form.tsx:27`, `report-presentation.ts:9`). The options are:

@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { Alert, Keyboard, View } from 'react-native';
 import { router, Stack } from 'expo-router';
 import { randomUUID } from 'expo-crypto';
@@ -20,8 +20,10 @@ type PendingCreate = { account: Account; card: CreditCardProfile };
  * edits the card profile. A submitted command stays frozen across retries. */
 export function CardForm({ original }: { original?: CreditCardProfile }) {
   const stacked = useStacked();
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const { snapshot, addCard, saveCard, gate = LEDGER_CURRENCIES } = useLedger();
+  // 146 currencies since 24M: ordered and named once per gate and language, not on every keystroke.
+  const offered = useMemo(() => offeredCurrencies(gate, locale), [gate, locale]);
   const account = snapshot?.accounts.find(item => item.id === original?.accountId);
   const [before] = useState(original);
   const [identity] = useState(() => ({ id: randomUUID(), accountId: randomUUID(), createdAt: new Date().toISOString() }));
@@ -135,7 +137,7 @@ export function CardForm({ original }: { original?: CreditCardProfile }) {
     </Surface> : <>
       <Field label={t('cards.form.name')} value={name} onChangeText={setName}
         placeholder={t('cards.form.namePlaceholder')} maxLength={80} autoCapitalize="words" editable={!locked} />
-      <CurrencySwitch value={currency} currencies={offeredCurrencies(gate)} onChange={setCurrency} disabled={locked} />
+      <CurrencySwitch value={currency} currencies={offered} onChange={setCurrency} disabled={locked} />
       <AmountField label={t('cards.form.openingDebt')} currency={currency} value={debt}
         onChangeText={value => { setDebt(value); setError(null); }} editable={!locked} />
       <AppText secondary variant="footnote" style={{ marginTop: -space.m }}>{t('cards.form.openingDebtNote')}</AppText>

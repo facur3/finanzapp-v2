@@ -10,9 +10,10 @@
  *   - the regional preference: separators and what a bare "$" means, never a currency.
  *
  * Availability, one status per code:
- *   - `ledger`: an account can hold it now (ARS and USD);
- *   - `ready`: a fiat currency with complete data; presentation works, but it is not
- *     stored or offered anywhere until Producto 24B makes storage currency-aware;
+ *   - `ledger`: a new account can be created in it (`LEDGER_CURRENCIES`: ARS, USD and, since
+ *     Producto 24M, every ready currency with 0 or 2 decimals);
+ *   - `ready`: a fiat currency with complete data, storable and presentable, not offered for new
+ *     records (the three-decimal currencies, `HELD_CURRENCIES`);
  *   - `incomplete`: a fiat currency whose data lacks something (a name in a language
  *     this build carries, or any territory where CLDR lists it as current legal tender:
  *     VED, SVC); never offered until the data is completed or a reviewed decision;
@@ -34,11 +35,34 @@ export const LEGACY_CURRENCIES: readonly LegacyCurrency[] = ['ARS', 'USD'];
 /** What an amount written before Producto 24B means: ARS and USD cents. */
 export const LEGACY_EXPONENT = 2;
 
-/** The currencies an account, a budget or a recurring rule can hold today. Adding one
- * here is Producto 24B's decision (stage 9 of docs/currency.md §7.5), after storage
- * records each currency's scale. This list gates **creation only**; reading a stored
- * row never consults it (`isStorableCurrency`). */
-export const LEDGER_CURRENCIES: readonly IsoCurrencyCode[] = ['ARS', 'USD'];
+/** The currencies an account, a card, a debt, a budget or a recurring rule can be created in.
+ * This list gates **creation only**; reading a stored row never consults it (`isStorableCurrency`).
+ * ARS and USD since the beginning; since Producto 24M every `ready` fiat currency whose ISO minor
+ * unit is 0 or 2 (144 more: docs/currency.md §2.7), in code order after ARS and USD. The list is
+ * written out, not derived, so a catalogue update never opens a currency by itself: a test compares it
+ * with the catalogue and fails until the change is reviewed. The three-decimal currencies wait in
+ * `HELD_CURRENCIES`. */
+export const LEDGER_CURRENCIES: readonly IsoCurrencyCode[] = ['ARS', 'USD',
+  'AED', 'AFN', 'ALL', 'AMD', 'AOA', 'AUD', 'AWG', 'AZN', 'BAM', 'BBD', 'BDT', 'BIF', 'BMD', 'BND', 'BOB', 'BRL',
+  'BSD', 'BTN', 'BWP', 'BYN', 'BZD', 'CAD', 'CDF', 'CHF', 'CLP', 'CNY', 'COP', 'CRC', 'CUP', 'CVE', 'CZK', 'DJF',
+  'DKK', 'DOP', 'DZD', 'EGP', 'ERN', 'ETB', 'EUR', 'FJD', 'FKP', 'GBP', 'GEL', 'GHS', 'GIP', 'GMD', 'GNF', 'GTQ',
+  'GYD', 'HKD', 'HNL', 'HTG', 'HUF', 'IDR', 'ILS', 'INR', 'IRR', 'ISK', 'JMD', 'JPY', 'KES', 'KGS', 'KHR', 'KMF',
+  'KPW', 'KRW', 'KYD', 'KZT', 'LAK', 'LBP', 'LKR', 'LRD', 'LSL', 'MAD', 'MDL', 'MGA', 'MKD', 'MMK', 'MNT', 'MOP',
+  'MRU', 'MUR', 'MVR', 'MWK', 'MXN', 'MYR', 'MZN', 'NAD', 'NGN', 'NIO', 'NOK', 'NPR', 'NZD', 'PAB', 'PEN', 'PGK',
+  'PHP', 'PKR', 'PLN', 'PYG', 'QAR', 'RON', 'RSD', 'RUB', 'RWF', 'SAR', 'SBD', 'SCR', 'SDG', 'SEK', 'SGD', 'SHP',
+  'SLE', 'SOS', 'SRD', 'SSP', 'STN', 'SYP', 'SZL', 'THB', 'TJS', 'TMT', 'TOP', 'TRY', 'TTD', 'TWD', 'TZS', 'UAH',
+  'UGX', 'UYU', 'UZS', 'VES', 'VND', 'VUV', 'WST', 'XAF', 'XCD', 'XCG', 'XOF', 'XPF', 'YER', 'ZAR', 'ZMW', 'ZWG',
+];
+
+/** `ready` currencies deliberately not in `LEDGER_CURRENCIES`, each with the reason it waits (24M). The seven
+ * three-decimal currencies: VoiceOver reads their amounts as "1234,567" (the language's decimal mark before three
+ * digits), which a voice reading the mark as a thousands separator would speak as a thousand times more; that
+ * reading has never been checked on an iPhone (docs/currency.md §2.7, docs/mobile-device-checklist.md, Producto 24M).
+ * They stay storable (a restored backup or a preview build can hold them) and open in their own commit after the check. */
+export const HELD_CURRENCIES: { readonly [code: string]: 'threeDecimalVoiceOver' } = {
+  BHD: 'threeDecimalVoiceOver', IQD: 'threeDecimalVoiceOver', JOD: 'threeDecimalVoiceOver', KWD: 'threeDecimalVoiceOver',
+  LYD: 'threeDecimalVoiceOver', OMR: 'threeDecimalVoiceOver', TND: 'threeDecimalVoiceOver',
+};
 
 /** A set of currencies offered for new records: the production gate, or the explicit set
  * a test passes. A gate never widens what can be read, exported or restored. */
@@ -67,7 +91,7 @@ export function assertStorableCurrency(value: unknown): asserts value is IsoCurr
 }
 
 /** Creation gate: a currency a **new** account, card, debt or budget may hold. The
- * production gate is `LEDGER_CURRENCIES` (ARS and USD); tests pass an explicit set. A
+ * production gate is `LEDGER_CURRENCIES` (146 currencies since 24M); tests pass an explicit set. A
  * gated code must also be storable, so a gate can never open a fund or a metal. */
 export function isLedgerCurrency(value: unknown, gate: CurrencyGate = LEDGER_CURRENCIES): value is IsoCurrencyCode {
   return isStorableCurrency(value) && (gate as readonly string[]).includes(value);

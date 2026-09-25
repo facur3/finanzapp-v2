@@ -4,6 +4,7 @@ import { test } from 'node:test';
 import { runInNewContext } from 'node:vm';
 import ts from 'typescript';
 import * as domain from '@finanzapp/domain';
+import { offeredCurrencies } from '../src/ui/currencies.ts';
 import * as presentation from '../src/ui/presentation.ts';
 import * as moneyInput from '../src/ui/money-input.ts';
 import { PREVIEW_CURRENCIES } from '../src/storage/currency-gate.ts';
@@ -340,15 +341,15 @@ test('24B5: the card and debt forms choose the currency before the amount, over 
     const name = file.includes('card') ? 'CardForm' : 'DebtForm';
     return { ...view, render: () => view.renderExport(name, {}) };
   };
-  // A release: exactly ARS and USD, and the switch precedes the amount field in both forms.
+  // A release (24M): the 146 gated currencies, ARS and USD first, and the switch precedes the amount field in both forms.
   for (const file of ['src/ui/card-form.tsx', 'src/ui/debt-form.tsx']) {
     const view = forms(file);
     const root = view.render();
-    assert.deepEqual(find(root, 'CurrencySwitch').props.currencies, ['ARS', 'USD'], file);
+    assert.deepEqual(find(root, 'CurrencySwitch').props.currencies, offeredCurrencies(domain.LEDGER_CURRENCIES, 'es-AR'), file);
     assert.deepEqual(order(root, ['CurrencySwitch', 'AmountField']).slice(0, 2), ['CurrencySwitch', 'AmountField'], file + ': the currency before the amount');
   }
   const card = forms('src/ui/card-form.tsx', PREVIEW_CURRENCIES);
-  assert.deepEqual(find(card.render(), 'CurrencySwitch').props.currencies, [...PREVIEW_CURRENCIES]);
+  assert.deepEqual(find(card.render(), 'CurrencySwitch').props.currencies, offeredCurrencies(PREVIEW_CURRENCIES, 'es-AR'));
   find(card.render(), 'CurrencySwitch').props.onChange('JPY');
   assert.equal(find(card.render(), 'AmountField').props.currency, 'JPY', 'the field knows the currency before a digit is typed');
   find(card.render(), 'Field', 'Nombre de la tarjeta').props.onChangeText('Rakuten');

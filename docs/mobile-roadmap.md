@@ -1,6 +1,6 @@
 # FinanzApp mobile: living roadmap
 
-Updated: 2026-09-25 (Producto 24R2B). Read [decision 001](decisions/001-native-mobile.md),
+Updated: 2026-09-25 (Producto 24M). Read [decision 001](decisions/001-native-mobile.md),
 [decision 002](decisions/002-spending-first.md),
 [decision 003](decisions/003-five-tabs-and-cards.md) and
 [decision 004](decisions/004-native-first-and-web-retirement.md). Decision 002 supersedes
@@ -65,10 +65,12 @@ history file keeps the evidence of when and why.
   only with a `reportCurrency` and traceable conversions; a missing rate gives per-currency
   subtotals with a visible note, never a guess; no fabricated market history; automatic rates
   are opt-in, provider named, no key in the bundle (docs/currency.md §8–§10).
-- **Three gates:** `RELEASED_LANGUAGES` (es, en) and `LEDGER_CURRENCIES` (ARS, USD) open only after
-  device QA, in their own commit. `RELEASED_REGIONS` is the released stages of `region-stages.ts`
-  (234 of 257 since 24R2B). Opening regions on the automated per-family verification is a
-  provisional development strategy before launch (24R2B), not an explicit authorization by the owner:
+- **Three gates:** `RELEASED_LANGUAGES` (es, en) opens only after device QA, in its own commit.
+  `LEDGER_CURRENCIES` holds 146 currencies since 24M (ARS, USD and every ready currency with 0 or 2
+  decimals; the seven three-decimal ones held for their VoiceOver check, docs/currency.md §2.7).
+  `RELEASED_REGIONS` is the released stages of `region-stages.ts` (234 of 257 since 24R2B). Opening
+  regions and currencies on automated verification is a provisional development strategy before launch
+  (24R2B, 24M), not an explicit authorization by the owner:
   nothing is published, the short per-family iPhone sheet (docs/region-families.md) must pass before the
   first TestFlight, and any stage can be set back to blocked in one commit; a stage with a known defect or
   an unverified amount-entry path stays blocked (the 23 native-digit regions). A preview flag
@@ -215,9 +217,10 @@ file).
   currency with ARS/USD byte-identical goldens; storage and forms currency-aware (24B1–24B5:
   the safety net, one creation gate with read acceptance apart, strict route currencies, the
   amount path by exponent, schema 9 and backup v9, the searchable currency screen, the
-  currency chosen before the amount in card, debt and budget forms); the ledger gate still
-  ARS/USD (`LEDGER_CURRENCIES`); a development-only preview gate offers EUR, GBP, JPY, CLP and
-  more on FinanzApp Dev. No exchange rate, no conversion, no provider.
+  currency chosen before the amount in card, debt and budget forms); since 24M the ledger gate
+  offers 146 currencies (144 new: 128 with two decimals, 16 without), the three-decimal ones only on
+  a development preview; the Assistant stays ARS/USD (contract v1). No exchange rate, no conversion,
+  no provider.
 - **Motion and material.** `src/ui/motion.tsx` (strong ease-out, named durations, value
   crossfades, reflow, haptic helpers), press feedback, segmented control, category washes,
   the card carousel on the UI thread, Reduce Motion everywhere (rules in §6).
@@ -260,6 +263,9 @@ item unless a section says a new native build is needed. The checklist sections 
   and safe areas; Reduce Motion as a timed fade; the darker light `secondary`/`tertiary` inks on the
   Home captions and the hero's cents (checklist, Producto 24UX1). No EAS build was made; judge the
   feel in at least the development build, ideally a release build.
+- **24M — 144 currencies opened:** the checklist section Producto 24M (the sheet over 146 currencies, one account,
+  card, budget and recurring rule each in EUR, JPY and COP, a backup round trip, VoiceOver per exponent; the
+  three-decimal VoiceOver check on the preview that decides the held seven).
 - **24R2B — 234 regions released:** the short sheet in docs/region-families.md (eight number families,
   fifteen date writings, Spanish and English) and the chooser with 234 rows (search, recents, sections,
   keyboard and safe areas, the largest Dynamic Type, VoiceOver, scrolling at 60/120 Hz) (checklist,
@@ -720,7 +726,7 @@ the owner authorises it; no EAS build or store submission without the owner.
     302/302, `check:repo`.
   - **Pending:** the device QA of §2 and the checklist section Producto 24R2A.
 
-### Producto 24R2B — international regions released (this PR)
+### Producto 24R2B — international regions released (PR #61)
 
 - **Goal.** Use every catalogue region's conventions in the published app, faster than one delivery per
   region, without risking an amount: 234 of the 257 regions released in one PR, by continent, on automated
@@ -767,7 +773,7 @@ the owner authorises it; no EAS build or store submission without the owner.
   Gregorian calendar.
 - **Not changed.** SQLite, backups, accounting, enabled currencies (ARS, USD), FX, languages (es, en), the
   Home and Reportes design, native configuration. No new dependency.
-- **Status.** Delivered on this branch (2026-09-25), not device-verified.
+- **Status.** Merged (PR #61, 2026-09-25), not device-verified.
   - **Checked on Linux:** mobile `npm run typecheck`; `npm run test:storage` 677/677 (was 671: +5
     `region-families.node.ts`, +1 `regions-integration` date audit; the gate, chooser and catalogue tests
     updated to the released stages, the two-region chooser tests pinned to the 23.1C2 gate explicitly);
@@ -781,19 +787,51 @@ the owner authorises it; no EAS build or store submission without the owner.
     hypothesis to verify, the plan is per numbering system, and a test pins today's normalization per
     system. The region-QA strategy is described as provisional, not as the owner's authorization.
 
-### Producto 24M — verified currencies opened
+### Producto 24M — global currency release (this PR)
 
-- **Goal.** Accounts in currencies beyond ARS and USD, one verified currency at a time.
-- **Scope.** The gate-opening commit prepared since 24B5 (docs/currency.md §7.6.1): widen
-  `LEDGER_CURRENCIES` progressively from the 151 `ready` currencies; two-decimal currencies first
-  (proposal: EUR, GBP, then the Americas), zero-decimal (JPY, CLP) after the number-pad check,
-  three-decimal (KWD, BHD) only after their VoiceOver check; the display currency, budgets,
-  recurring rules, cards and debts in the opened currency; backups v9 round trips.
-- **Out of scope.** Any conversion or rate, the Assistant contract v2 (25A), a new language.
-- **Gates.** The 24B4/24B5/24B6 device QA recorded (§2); per currency: the amount field per
-  exponent, the switch, VoiceOver units, the searchable screen, a backup round trip on the
-  iPhone; ARS/USD goldens byte-identical.
-- **Depends on.** 24B (merged), the device evidence of §2.
+- **Goal.** Every ISO 4217 fiat currency that is really ready, in one delivery grouped by exponent, without
+  risking an amount.
+- **Audit** (docs/currency.md §2.7): 178 codes; 153 ready fiat, 2 incomplete (SVC, VED), 23 excluded (funds,
+  metals, units of account, XTS, XXX). Ready by exponent: 2 (130, of which 15 are shown without decimals), 0 (16),
+  3 (7). No two fiat currencies share a root symbol.
+- **Delivered.** `LEDGER_CURRENCIES` 146: ARS, USD and **144 new** currencies (128 with two decimals, 16 without),
+  written out and compared with the catalogue by a test. The **seven three-decimal currencies** (BHD, IQD, JOD, KWD,
+  LYD, OMR, TND) are **held** (`HELD_CURRENCIES`): VoiceOver reads "1234,567", which a voice reading the mark as a
+  thousands separator would speak a thousand times larger; they open after the iPhone check below, in their own
+  commit, and are what the development preview adds. New account, card, debt and budget offer the 146 through the
+  searchable sheet (code, localized name, symbol, numeric code, country), ARS and USD first, then by name in the
+  interface language; the list is windowed, insets for the keyboard, and each form builds it once per gate and
+  language. Inicio and Reportes keep one currency at a time (the display-currency switch over the currencies held);
+  nothing is converted or summed.
+- **Not changed.** SQLite 10, backups (v8 bytes for ARS/USD-only ledgers, v9/v10 otherwise), `currency_units`,
+  accounting rules, ARS/USD goldens, language and region, FX (24C), the Assistant (contract v1, ARS/USD only; with
+  another display currency it does not send and says it is not available; 25A). The default currency of a new
+  account stays ARS.
+- **Status.** Delivered on this branch (2026-09-25), not device-verified.
+  - **Checked on Linux:** root `npm test` 303/303 (+1 the 24M gate against the catalogue; gate tests updated);
+    mobile `npm run typecheck`, `npm run test:storage` 695/695 (+17 `currency-release.node.ts`: eleven currencies
+    across exponents 0/2/3 and display digits 0/2 through every flow on real SQLite — accounts, movements, edit,
+    undo, a negative balance, transfers and a refused cross-currency transfer that writes nothing, a card purchase
+    and payment, a debt payment, general and category budgets, a recurring rule recorded and deleted, Home and
+    Reportes totals per currency, backup v10 export and restore with the tombstone and the pinned scale — the
+    limits per exponent, rounding, symbols, the eight regional number families in both languages, the chooser
+    order; the gate, sheet, form and preview tests updated), `currency:verify`, `regions:verify`,
+    `i18n:check -- --strict`, `i18n:extract`, `check`, `export:ios`. No EAS build; the iPhone was not touched.
+  - **Pending:** the checklist section Producto 24M before the first TestFlight; the three-decimal commit after its
+    VoiceOver evidence.
+
+### Producto 24R3 — the 23 native-digit regions (before the international launch)
+
+- **Goal.** Release the regions whose locale defaults to non-Latin digits (AF, BD, BH, BT, EG, IQ, IR, JO, KM, KW, LB,
+  MM, MR, NP, OM, PS, QA, SA, SD, SS, SY, TD, YE), one numbering system at a time, before FinanzApp is launched outside
+  its first regions. Not enabled by 24M.
+- **Scope** (docs/region-families.md §4): per system (`arab`, `arabext`, `beng`, `deva`, `mymr`, `tibt`) the
+  normalization in `latinDigits` (today only `arab` and `arabext`), its tests (typing, pasting, caret, refusal of
+  mixed text), and the iPhone check of what the decimal pad really offers (Latin or native digits, with iOS's Numbers
+  setting both ways, and which decimal key), VoiceOver included; then the `native-digits` stage splits by system and
+  each opens in its own commit.
+- **Out of scope.** Writing non-Latin digits (the interface languages are Spanish and English), right-to-left layout.
+- **Depends on.** 24R2B (merged).
 
 ### Producto 24C — FX, international purchases and reports
 
