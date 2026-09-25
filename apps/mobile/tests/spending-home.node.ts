@@ -6,6 +6,8 @@ import ts from 'typescript';
 import * as domain from '@finanzapp/domain';
 import * as presentation from '../src/ui/presentation.ts';
 import * as reportPresentation from '../src/ui/report-presentation.ts';
+import * as displayCurrency from '../src/ui/display-currency.ts';
+import * as budgetPresentation from '../src/ui/budget-presentation.ts';
 import * as categoryColor from '../src/ui/category-color.ts';
 import { monthlyEvidence } from '../src/integrations/evidence.ts';
 import { integrationClient } from '../src/integrations/client.ts';
@@ -30,17 +32,28 @@ const snapshot: domain.LedgerSnapshot = { accounts: [
   { id: 'u', accountId: 'u', kind: 'expense', amountMinor: 999, merchant: 'Prueba', category: 'Salud', dateISO: '2026-08-10', createdAt },
 ] };
 
-function routeHarness(file: string, params: Record<string, unknown>, data = snapshot, extra: Partial<domain.LedgerArchive> = {}) {
+/** The shared display currency of Inicio and Reportes (24B6), on the real store over a key-value store in memory; a test may hand one store to two screens. */
+function displayStore(initial: Record<string, string> = {}) {
+  const rows = new Map(Object.entries(initial));
+  return displayCurrency.createDisplayCurrencyStore(() => ({ getItemSync: (key: string) => rows.get(key) ?? null, setItemSync: (key: string, value: string) => { rows.set(key, value); }, removeItemSync: (key: string) => rows.delete(key) }));
+}
+
+function routeHarness(file: string, params: Record<string, unknown>, data = snapshot, extra: Partial<domain.LedgerArchive> = {}, display = displayStore()) {
+  const displayProvider = { useDisplayCurrency: (held: readonly domain.Currency[]) => ({ currency: displayCurrency.resolveDisplayCurrency(display.getState(), held), preferred: display.getState(), setCurrency: (currency: domain.Currency) => { display.set(currency); } }) };
   const source = readFileSync(new URL('../app/' + file, import.meta.url), 'utf8');
   const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText;
   const jsx = (type: string, props: Record<string, unknown>) => ({ type, props });
   const state: unknown[] = [];
+  const deps: unknown[][] = [];
   const pushed: any[] = [];
-  let cursor = 0;
-  const componentNames = ['AppText', 'Choices', 'DetailRow', 'EmptyState', 'IconButton', 'Money', 'PressFeedback', 'SectionTitle', 'Surface', 'CategoryBadge', 'Screen', 'EntryActions', 'EntryRow', 'ActionButton', 'GlyphTile', 'Stat'];
+  let cursor = 0, effectCursor = 0;
+  const componentNames = ['AppText', 'Choices', 'DetailRow', 'EmptyState', 'IconButton', 'Money', 'PressFeedback', 'SectionTitle', 'Surface', 'CategoryBadge', 'Screen', 'EntryActions', 'EntryRow', 'ActionButton', 'GlyphTile', 'Stat', 'NavigationRow'];
   const modules: Record<string, unknown> = {
     '../i18n/format': i18nFormat, '../src/i18n/format': i18nFormat, '../../src/i18n/format': i18nFormat, '../i18n/provider': i18nProvider, '../src/i18n/provider': i18nProvider, '../../src/i18n/provider': i18nProvider,
-    react: { useEffect: (fn: () => unknown) => { fn(); }, useMemo: (fn: () => unknown) => fn(), useState: (initial?: unknown) => {
+    // Effects run in place, once per change of their dependencies (a route parameter arriving), like React's after commit.
+    react: { useEffect: (fn: () => void, next?: unknown[]) => { const index = effectCursor++; const previous = deps[index];
+      if (!previous || !next || next.length !== previous.length || next.some((item, i) => item !== previous[i])) { deps[index] = next ?? []; fn(); } },
+    useMemo: (fn: () => unknown) => fn(), useState: (initial?: unknown) => {
       const index = cursor++;
       if (!(index in state)) state[index] = initial;
       return [state[index], (value: unknown) => { state[index] = typeof value === 'function' ? (value as (current: unknown) => unknown)(state[index]) : value; }];
@@ -55,10 +68,15 @@ function routeHarness(file: string, params: Record<string, unknown>, data = snap
     '../src/storage/LedgerProvider': { useLedger: () => ({ snapshot: data, archive: { accounts: data.accounts, records: [], ...extra } }) },
     '../src/ui/components': { ...Object.fromEntries(componentNames.map(name => [name, name])), useStacked: () => false },
     '../src/ui/currency-switch': { CurrencySwitch: 'CurrencySwitch' },
+    '../src/ui/display-currency-provider': displayProvider, '../src/ui/display-currency': displayCurrency,
     '../src/ui/entry-list': { EntryList: 'EntryList' },
     '../src/ui/presentation': presentation,
     '../src/ui/report-presentation': reportPresentation,
-    '../src/ui/spending-chart': { CategorySpendingRow: 'CategorySpendingRow' },
+    '../src/ui/spending-chart': { CategorySpendingRow: 'CategorySpendingRow', CategoryLegendRow: 'CategoryLegendRow' },
+    '../src/ui/charts': { DonutChart: 'DonutChart', MonthBars: 'MonthBars', OTHERS_KEY: '__others__',
+      donutSlices: (items: { key: string; label: string; value: number }[]) => items.slice(0, 5).map((item, index) => ({ ...item, color: 'c' + index })) },
+    '../src/ui/budget-presentation': budgetPresentation,
+    '@expo/vector-icons/Ionicons': 'Ionicons',
     '../src/ui/home-modules': { BudgetHomeCard: 'BudgetHomeCard', CategoryRanking: 'CategoryRanking', MetricHelp: 'MetricHelp', UpcomingRecurringRow: 'UpcomingRecurringRow' },
     '../src/ui/category-color': categoryColor,
     '../src/ui/category-hues': { useCategoryColor: () => '#3E6FB0', useCategoryLabel: (s: string) => s, useCategoryDefinitions: () => [], useCategoryLook: (s: string) => ({ label: s, storedLabel: s, key: String(s).toLowerCase(), hex: '#3E6FB0', glyph: 'pricetag-outline' }), useCategoryLookOf: () => (s: string) => ({ label: s, storedLabel: s, key: String(s).toLowerCase(), hex: '#3E6FB0', glyph: 'pricetag-outline' }), useAccountLook: () => ({ icon: 'wallet', color: 'cobalt', glyph: 'wallet-outline', hex: '#2557D6' }), useAccountNameOf: () => (account: any) => account.name, useAccountLookOf: () => () => ({ icon: 'wallet', color: 'cobalt', glyph: 'wallet-outline', hex: '#2557D6' }) },
@@ -75,7 +93,7 @@ function routeHarness(file: string, params: Record<string, unknown>, data = snap
     if (!Object.hasOwn(modules, name)) throw new Error('Unexpected report dependency: ' + name);
     return modules[name];
   } });
-  return { render: () => { cursor = 0; return module.exports.default!(); }, pushed };
+  return { render: () => { cursor = 0; effectCursor = 0; return module.exports.default!(); }, pushed, display };
 }
 
 function nodes(value: any): Node[] {
@@ -272,4 +290,77 @@ test('24B3: Home with three currencies lists them in the switch and shows each c
   assert.deepEqual(nodes(root).filter(n => n.type === 'EntryRow').map(n => n.props.entry.id), ['yen-2', 'yen-1'], 'only the yen movements');
   assert.deepEqual(find(root, 'CategoryRanking').props.categories.map((c: domain.CategorySpending) => [c.key, c.amountMinor]), [['comida', 1500], ['salud', 700]]);
   assert.equal(find(root, 'CategoryRanking').props.currency, 'JPY');
+});
+
+// ---- Producto 24B6: one display currency shared by Inicio and Reportes ------------------------------------
+
+test('24B6: choosing a currency on Inicio changes Reportes and choosing on Reportes changes Inicio, through one persisted preference; a switch within either screen keeps working', () => {
+  const rows = new Map<string, string>();
+  const shared = displayCurrency.createDisplayCurrencyStore(() => ({ getItemSync: (key: string) => rows.get(key) ?? null, setItemSync: (key: string, value: string) => { rows.set(key, value); }, removeItemSync: (key: string) => rows.delete(key) }));
+  const home = routeHarness('(tabs)/index.tsx', {}, homeData, {}, shared);
+  const reports = routeHarness('(tabs)/reports.tsx', {}, homeData, {}, shared);
+  assert.equal(find(home.render(), 'CurrencySwitch').props.value, 'ARS', 'no preference yet: the first currency held');
+  assert.equal(find(reports.render(), 'CurrencySwitch').props.value, 'ARS');
+  find(home.render(), 'CurrencySwitch').props.onChange('USD');
+  assert.equal(find(home.render(), 'Money').props.currency, 'USD');
+  assert.equal(find(reports.render(), 'CurrencySwitch').props.value, 'USD', 'Reportes follows Inicio without being told');
+  assert.equal(find(reports.render(), 'Money').props.currency, 'USD');
+  assert.equal(rows.get(displayCurrency.DISPLAY_CURRENCY_KEY), 'USD', 'persisted outside the ledger, under its own key');
+  find(reports.render(), 'CurrencySwitch').props.onChange('ARS');
+  assert.equal(find(home.render(), 'CurrencySwitch').props.value, 'ARS', 'and Inicio follows Reportes');
+  assert.equal(find(home.render(), 'Money').props.minor, 300);
+  assert.equal(rows.get(displayCurrency.DISPLAY_CURRENCY_KEY), 'ARS');
+  // A screen mounted later reads the same preference.
+  const later = routeHarness('(tabs)/reports.tsx', {}, homeData, {}, shared);
+  assert.equal(find(later.render(), 'CurrencySwitch').props.value, 'ARS');
+  // Reportes' month and view stay its own: switching the currency changes neither.
+  nodes(reports.render()).find(n => n.type === 'Choices' && n.props.value === 'categories')!.props.onChange('days');
+  find(reports.render(), 'CurrencySwitch').props.onChange('USD');
+  assert.equal(nodes(reports.render()).some(n => n.type === 'Choices' && n.props.value === 'days'), true, 'the days view survives the currency change');
+  assert.equal(nodes(home.render()).some(n => n.type === 'Choices' && n.props.value === 'spending'), true, 'Inicio\'s metric is untouched');
+});
+
+test('24B6: a stored preference survives a relaunch; one no account holds any more shows the first currency held and is kept, so it returns with an account', () => {
+  const rows = new Map<string, string>([[displayCurrency.DISPLAY_CURRENCY_KEY, 'USD']]);
+  const preferences = () => ({ getItemSync: (key: string) => rows.get(key) ?? null, setItemSync: (key: string, value: string) => { rows.set(key, value); }, removeItemSync: (key: string) => rows.delete(key) });
+  const relaunched = routeHarness('(tabs)/index.tsx', {}, homeData, {}, displayCurrency.createDisplayCurrencyStore(preferences));
+  assert.equal(find(relaunched.render(), 'Money').props.currency, 'USD', 'the saved choice opens');
+  const onlyPesos: domain.LedgerSnapshot = { ...homeData, accounts: homeData.accounts.filter(account => account.currency === 'ARS') };
+  const withoutDollars = routeHarness('(tabs)/index.tsx', {}, onlyPesos, {}, displayCurrency.createDisplayCurrencyStore(preferences));
+  const root = withoutDollars.render();
+  assert.equal(find(root, 'Money').props.currency, 'ARS', 'no USD account: the first currency held');
+  assert.equal(nodes(root).some(n => n.type === 'CurrencySwitch'), false, 'one currency: no switch');
+  assert.equal(rows.get(displayCurrency.DISPLAY_CURRENCY_KEY), 'USD', 'the preference is not rewritten; nothing else is touched');
+  const reports = routeHarness('(tabs)/reports.tsx', {}, onlyPesos, {}, displayCurrency.createDisplayCurrencyStore(preferences));
+  assert.equal(find(reports.render(), 'Money').props.currency, 'ARS');
+  assert.equal(nodes(reports.render()).some(n => n.type === 'CurrencySwitch'), false);
+});
+
+test('24B6: a link into Reportes with a held currency shows it and makes it the shared choice; an unknown, malformed or unheld one shows the shared choice and never overwrites it', () => {
+  const rows = new Map<string, string>([[displayCurrency.DISPLAY_CURRENCY_KEY, 'ARS']]);
+  const preferences = () => ({ getItemSync: (key: string) => rows.get(key) ?? null, setItemSync: (key: string, value: string) => { rows.set(key, value); }, removeItemSync: (key: string) => rows.delete(key) });
+  const shared = displayCurrency.createDisplayCurrencyStore(preferences);
+  const linked = routeHarness('(tabs)/reports.tsx', { currency: 'USD', month: '2026-08' }, homeData, {}, shared);
+  assert.equal(find(linked.render(), 'Money').props.currency, 'USD', 'the frame the link arrives already shows its currency');
+  assert.equal(shared.getState(), 'USD', 'the explicit currency became the shared choice');
+  assert.equal(rows.get(displayCurrency.DISPLAY_CURRENCY_KEY), 'USD');
+  const home = routeHarness('(tabs)/index.tsx', {}, homeData, {}, shared);
+  assert.equal(find(home.render(), 'CurrencySwitch').props.value, 'USD', 'Inicio agrees');
+  // The switch on the linked screen still wins afterwards: the parameter is applied once, not on every render.
+  find(linked.render(), 'CurrencySwitch').props.onChange('ARS');
+  assert.equal(find(linked.render(), 'Money').props.currency, 'ARS');
+  assert.equal(find(linked.render(), 'Money').props.currency, 'ARS', 'a re-render does not re-apply the link');
+  assert.equal(shared.getState(), 'ARS');
+  for (const currency of ['usd', 'XAU', 'ZZZ', 'EUR', 'KWD', '', ['USD'], 42]) {
+    const bad = routeHarness('(tabs)/reports.tsx', { currency, month: '2026-08' }, homeData, {}, shared);
+    assert.equal(find(bad.render(), 'Money').props.currency, 'ARS', 'invalid ' + JSON.stringify(currency) + ': the shared choice');
+    assert.equal(shared.getState(), 'ARS', 'invalid ' + JSON.stringify(currency) + ': not overwritten');
+    assert.equal(rows.get(displayCurrency.DISPLAY_CURRENCY_KEY), 'ARS');
+  }
+  // Inicio's own link to Reportes carries the currency it shows, so the two agree even on a phone that never stored a choice.
+  const fresh = displayCurrency.createDisplayCurrencyStore(() => ({ getItemSync: () => null, setItemSync: () => {}, removeItemSync: () => false }));
+  const origin = routeHarness('(tabs)/index.tsx', {}, homeData, {}, fresh);
+  find(origin.render(), 'CurrencySwitch').props.onChange('USD');
+  nodes(origin.render()).find(n => n.type === 'SectionTitle' && n.props.action === 'Reportes')!.props.onAction();
+  assert.equal(JSON.stringify(origin.pushed.at(-1)), JSON.stringify({ pathname: '/reports', params: { currency: 'USD' } }));
 });

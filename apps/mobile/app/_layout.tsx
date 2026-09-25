@@ -12,6 +12,7 @@ import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { currenciesPresent } from '@finanzapp/domain';
 import { LedgerProvider, useLedger } from '../src/storage/LedgerProvider';
 import { CategoryHuesProvider } from '../src/ui/category-hues';
+import { DisplayCurrencyProvider } from '../src/ui/display-currency-provider';
 import { ActionButton, AppText, ErrorMessage } from '../src/ui/components';
 import { UIProvider, usePalette, useReduceMotion } from '../src/ui/theme';
 import { HeldCurrenciesProvider, I18nProvider, useI18n } from '../src/i18n/provider';
@@ -23,7 +24,7 @@ export const unstable_settings = { initialRouteName: '(tabs)' };
 export default function RootLayout() {
   const p = usePalette();
   return <GestureHandlerRootView style={{ flex: 1, backgroundColor: p.background }}>
-    <SafeAreaProvider><UIProvider><I18nProvider><LedgerProvider><LedgerCurrencies><CategoryHuesProvider><Navigation /></CategoryHuesProvider></LedgerCurrencies></LedgerProvider></I18nProvider></UIProvider></SafeAreaProvider>
+    <SafeAreaProvider><UIProvider><I18nProvider><LedgerProvider><LedgerCurrencies><DisplayCurrencyProvider><CategoryHuesProvider><Navigation /></CategoryHuesProvider></DisplayCurrencyProvider></LedgerCurrencies></LedgerProvider></I18nProvider></UIProvider></SafeAreaProvider>
   </GestureHandlerRootView>;
 }
 

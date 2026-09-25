@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { FlatList, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -9,12 +9,14 @@ import { budgetTone, percentUsed } from '../../src/ui/budget-presentation';
 import { AppText, CategoryBadge, Choices, DetailRow, EmptyState, GlyphTile, IconButton, Money, NavigationRow, PressFeedback, SectionTitle, Surface, useStacked } from '../../src/ui/components';
 import { withCurrencyCode } from '../../src/i18n/format';
 import { CurrencySwitch } from '../../src/ui/currency-switch';
+import { useDisplayCurrency } from '../../src/ui/display-currency-provider';
+import { displayCurrencyForRoute } from '../../src/ui/display-currency';
 import { useI18n } from '../../src/i18n/provider';
 import type { Translate } from '../../src/i18n/messages';
 import { useCategoryColor, useCategoryLookOf } from '../../src/ui/category-hues';
 import { DonutChart, MonthBars, OTHERS_KEY, donutSlices } from '../../src/ui/charts';
 import { ValueTransition, selectionHaptic } from '../../src/ui/motion';
-import { activityDateLabel } from '../../src/ui/presentation';
+import { activityDateLabel, availableCurrencies } from '../../src/ui/presentation';
 import { changePercent, reportPeriodLabel, reportSelection, shiftReportMonth } from '../../src/ui/report-presentation';
 import { CategoryLegendRow } from '../../src/ui/spending-chart';
 import { space, useCurrentDay, usePalette } from '../../src/ui/theme';
@@ -29,11 +31,19 @@ export default function ReportsScreen() {
   const p = usePalette();
   const { t, locale, formatMonth, formatDayMonth, moneyText, spokenMoney } = useI18n();
   const day = useCurrentDay();
-  const [currencyOverride, setCurrency] = useState<Currency>();
   const [monthOverride, setMonth] = useState<string>();
   const [view, setView] = useState<'categories' | 'days'>('categories');
-  const selection = useMemo(() => snapshot ? reportSelection(snapshot, currencyOverride ?? params.currency, monthOverride ?? params.month, day) : null,
-    [snapshot, currencyOverride, params.currency, monthOverride, params.month, day]);
+  // The display currency Reportes shares with Inicio (24B6). A route that names a currency an account holds shows it and
+  // makes it the shared choice (once, when the parameter arrives); an unknown or unheld one is ignored and the choice stands.
+  const held = useMemo(() => availableCurrencies(snapshot?.accounts ?? []), [snapshot?.accounts]);
+  const { currency: shared, preferred, setCurrency } = useDisplayCurrency(held);
+  const route = displayCurrencyForRoute(snapshot?.accounts ?? [], params.currency, preferred);
+  const [applied, setApplied] = useState<unknown>();
+  useEffect(() => { if (route.apply) { setCurrency(route.apply); setApplied(params.currency); } }, [params.currency, snapshot === null]);
+  // The frame the parameter arrives already shows its currency; from then on the shared choice (the switch changes it).
+  const shownCurrency: Currency = route.apply && applied !== params.currency ? route.apply : shared;
+  const selection = useMemo(() => snapshot ? reportSelection(snapshot, shownCurrency, monthOverride ?? params.month, day) : null,
+    [snapshot, shownCurrency, monthOverride, params.month, day]);
   const report = useMemo(() => snapshot && selection ? spendingReport(snapshot, selection.currency, selection.monthISO, day) : null,
     [snapshot, selection, day]);
   // One function per locale and currency, so the insights below recompute when either changes and only then.
