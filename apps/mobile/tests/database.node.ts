@@ -1555,3 +1555,98 @@ test('24B5: seven currencies with zero, two and three decimals through the previ
   await assert.rejects(createAccount(reopened, { id: 'acc-GBP-2', name: 'x', currency: 'GBP', openingMinor: 0, createdAt: account.createdAt }), /moneda disponible/);
   assert.equal(totalsByCurrency(await readSnapshot(reopened)).GBP, expected.GBP - 1);
 });
+
+// ---- Producto 24B6: what a card may carry, in real SQLite ------------------------------------------------
+
+test('24B6: a plain income never lands on a card (new, edited onto it, turned into one, or recurring); a purchase and a payment still do what they did', async () => {
+  const { db } = await funded();
+  await createCreditCard(db, cardAccount, card);
+  await createPersonalDebt(db, debtAccount, debt);
+  const income: Entry = { ...expense, id: 'salary', kind: 'income', amountMinor: 500000, merchant: 'Sueldo', category: 'Sueldo' };
+  await assert.rejects(createEntry(db, { ...income, accountId: cardAccount.id }), /Un ingreso se registra en una cuenta normal, no en una tarjeta\./);
+  await assert.rejects(createEntry(db, { ...income, accountId: debtAccount.id }), /pagos o cobros/, 'the debt refusal is unchanged');
+  await createEntry(db, income);
+  await assert.rejects(changeEntry(db, makeEntryChange('onto-card', initialRecord(income), 'edit', changedAt, { ...income, accountId: cardAccount.id })), /no en una tarjeta/, 'an income cannot be moved onto a card');
+  await createEntry(db, purchase);
+  await assert.rejects(changeEntry(db, makeEntryChange('into-income', initialRecord(purchase), 'edit', changedAt, { ...purchase, kind: 'income' })), /no en una tarjeta/, 'a purchase cannot become a card income');
+  await assert.rejects(saveRecurringRule(db, { ...recurring, id: 'card-salary', kind: 'income', accountId: cardAccount.id }), /no en una tarjeta/);
+  await saveRecurringRule(db, { ...recurring, id: 'card-subscription', accountId: cardAccount.id }); // A recurring purchase on the card is fine.
+  await createTransfer(db, cardPayment);
+  const snapshot = await readSnapshot(db);
+  assert.deepEqual(snapshot.entries.map(entry => entry.id).sort(), ['card-purchase', 'salary', 'test-entry'], 'nothing refused was written');
+  assert.equal(cardDebtMinor(card, snapshot), 20000 + 23100 - 30000);
+  assert.equal(accountBalanceMinor(account, snapshot.entries, snapshot.transfers), 100000 - 12345 + 500000 - 30000);
+  const overview = spendingOverview(snapshot, { currency: 'ARS', startISO: '2026-09-01', endISO: '2026-09-30' });
+  assert.equal(overview.status === 'ready' && overview.expenseMinor, 12345 + 23100, 'the purchase counts once; the payment never');
+});
+
+test('24B6: a historical income stored on a card (a restored copy) stays readable, correctable in place, undoable and restorable; moving it to cash is allowed, onto another card is not', async () => {
+  const { db, path } = await funded();
+  await createCreditCard(db, cardAccount, card);
+  const otherCardAccount: Account = { ...cardAccount, id: 'card-two', name: 'Master' };
+  await createCreditCard(db, otherCardAccount, { ...card, id: 'card-two-fixture', accountId: otherCardAccount.id });
+  // The refund arrived through a backup made before 24B6: the import reads rows as they are.
+  const refund: Entry = { ...expense, id: 'refund', kind: 'income', accountId: cardAccount.id, amountMinor: 2500, merchant: 'Devolución Starbucks', category: 'Café' };
+  const before = await readArchive(db);
+  const copy = { ...before, records: [...before.records, initialRecord(refund)] };
+  await importArchive(db, copy, archiveKey(before));
+  let snapshot = await readSnapshot(db);
+  assert.equal(cardDebtMinor(card, snapshot), 20000 - 2500, 'the refund lowers the card debt as before');
+  const corrected: Entry = { ...refund, amountMinor: 2600, merchant: 'Devolución Starbucks (ajuste)' };
+  await changeEntry(db, makeEntryChange('fix-refund', initialRecord(refund), 'edit', changedAt, corrected));
+  await changeEntry(db, makeEntryChange('fix-refund', initialRecord(refund), 'edit', changedAt, corrected)); // Retry after a failed refresh.
+  snapshot = await readSnapshot(db);
+  assert.equal(cardDebtMinor(card, snapshot), 20000 - 2600, 'corrected in place, on the card');
+  const current = (await readArchive(db)).records.find(record => record.entry.id === 'refund')!;
+  await assert.rejects(changeEntry(db, makeEntryChange('to-other-card', current, 'edit', changedAt, { ...corrected, accountId: otherCardAccount.id })), /no en una tarjeta/);
+  await changeEntry(db, makeEntryChange('undo-refund', current, 'void', changedAt));
+  const voided = (await readArchive(db)).records.find(record => record.entry.id === 'refund')!;
+  assert.equal(voided.voided, true);
+  await changeEntry(db, makeEntryChange('restore-refund', voided, 'restore', '2026-09-14T12:00:00.000Z'));
+  const restored = (await readArchive(db)).records.find(record => record.entry.id === 'refund')!;
+  assert.equal(restored.voided, false, 'restoring a historical card income is allowed: it stays where it was');
+  await changeEntry(db, makeEntryChange('to-cash', restored, 'edit', '2026-09-14T13:00:00.000Z', { ...corrected, accountId: account.id }));
+  await db.closeAsync();
+  const reopened = databaseAt(path);
+  await initializeDatabase(reopened);
+  snapshot = await readSnapshot(reopened);
+  assert.equal(snapshot.entries.find(entry => entry.id === 'refund')?.accountId, account.id, 'an income may always move to cash');
+  assert.equal(cardDebtMinor(card, snapshot), 20000);
+  assert.equal(accountBalanceMinor(account, snapshot.entries, snapshot.transfers), 100000 - 12345 + 2600);
+});
+
+test('24B6: a new transfer never leaves a card or joins two obligations; card and debt payments and collections still work; a historical card-source transfer stays editable and restorable but cannot take new invalid sides', async () => {
+  const { db } = await funded();
+  await createCreditCard(db, cardAccount, card);
+  await createPersonalDebt(db, debtAccount, debt);
+  const receivableAccount: Account = { id: 'receivable-account', name: 'Me deben · Ana', currency: 'ARS', openingMinor: 15000, createdAt: account.createdAt };
+  await createPersonalDebt(db, receivableAccount, { ...debt, id: 'receivable', accountId: receivableAccount.id, direction: 'owed_to_me', counterparty: 'Ana', dueDateISO: null });
+  const transfer = (id: string, fromAccountId: string, toAccountId: string, amountMinor = 1000): Transfer => ({ id, fromAccountId, toAccountId, amountMinor, note: id, dateISO: '2026-09-15', createdAt: account.createdAt });
+  await assert.rejects(createTransfer(db, transfer('cash-advance', cardAccount.id, account.id)), /Una tarjeta se paga desde una cuenta; no puede ser el origen de una transferencia\./);
+  await assert.rejects(createTransfer(db, transfer('card-to-debt', cardAccount.id, debtAccount.id)), /no puede ser el origen/);
+  await assert.rejects(createTransfer(db, transfer('debt-to-card', debtAccount.id, cardAccount.id)), /Una transferencia entre dos obligaciones no se puede registrar\./);
+  await assert.rejects(createTransfer(db, transfer('receivable-to-debt', receivableAccount.id, debtAccount.id)), /entre dos obligaciones/);
+  await createTransfer(db, transfer('card-payment', account.id, cardAccount.id, 15000));
+  await createTransfer(db, transfer('debt-payment', account.id, debtAccount.id, 10000));
+  await createTransfer(db, transfer('collection', receivableAccount.id, account.id, 5000));
+  let snapshot = await readSnapshot(db);
+  assert.deepEqual((snapshot.transfers ?? []).map(item => item.id).sort(), ['card-payment', 'collection', 'debt-payment'], 'nothing refused was written');
+  assert.equal(cardDebtMinor(card, snapshot), 20000 - 15000, 'the card payment lowered the opening debt');
+  assert.equal(accountBalanceMinor(account, snapshot.entries, snapshot.transfers), 100000 - 12345 - 15000 - 10000 + 5000);
+  // A card-source transfer from before 24B6 arrives through a copy: read as it is.
+  const archive = await readArchive(db);
+  const legacy = transfer('legacy-advance', cardAccount.id, account.id, 700);
+  await importArchive(db, { ...archive, transfers: [...archive.transfers ?? [], initialTransferRecord(legacy)] }, archiveKey(archive));
+  snapshot = await readSnapshot(db);
+  assert.equal(cardDebtMinor(card, snapshot), 5000 + 700, 'the historical row counts as stored: money left the card');
+  await changeTransfer(db, makeTransferChange('fix-legacy', initialTransferRecord(legacy), 'edit', changedAt, { ...legacy, amountMinor: 800 }));
+  const fixed = (await readArchive(db)).transfers!.find(item => item.transfer.id === 'legacy-advance')!;
+  assert.equal(fixed.transfer.amountMinor, 800, 'its amount can be corrected with its sides kept');
+  await assert.rejects(changeTransfer(db, makeTransferChange('legacy-to-debt', fixed, 'edit', '2026-09-14T12:00:00.000Z', { ...fixed.transfer, toAccountId: debtAccount.id })), /no puede ser el origen/, 'new sides must be sides a new transfer could have');
+  await changeTransfer(db, makeTransferChange('undo-legacy', fixed, 'void', '2026-09-14T12:00:00.000Z'));
+  const voided = (await readArchive(db)).transfers!.find(item => item.transfer.id === 'legacy-advance')!;
+  await changeTransfer(db, makeTransferChange('restore-legacy', voided, 'restore', '2026-09-14T13:00:00.000Z'));
+  assert.equal((await readArchive(db)).transfers!.find(item => item.transfer.id === 'legacy-advance')!.voided, false, 'undo and restore keep working on a historical row');
+  await changeTransfer(db, makeTransferChange('legacy-fixed-sides', (await readArchive(db)).transfers!.find(item => item.transfer.id === 'legacy-advance')!, 'edit', '2026-09-14T14:00:00.000Z', { ...fixed.transfer, fromAccountId: account.id, toAccountId: cardAccount.id }));
+  assert.equal(cardDebtMinor(card, await readSnapshot(db)), 5000 - 800, 'turned into the payment it should have been');
+});

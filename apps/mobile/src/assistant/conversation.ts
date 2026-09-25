@@ -217,7 +217,7 @@ export function categoryOptions(entries: Entry[], kind: EntryKind, limit = 4): C
  * posting in the draft's currency. A named payment method matches one account
  * by name (accent- and case-insensitive); with exactly one eligible account it
  * is implied; otherwise the user is asked, with the accounts as the options. */
-export function resolveDraft(draft: CaptureDraft, accounts: Account[], entries: Entry[], currency: Currency, todayISO: string):
+export function resolveDraft(draft: CaptureDraft, accounts: Account[], entries: Entry[], currency: Currency, todayISO: string, incomeAccounts: Account[] = accounts):
   { kind: 'draft'; draft: ResolvedDraft } | { kind: 'clarification'; field: DraftField; question: MessageKey; options: ClarificationOption[]; partial: Partial<ResolvedDraft> } {
   const resolvedCurrency = draft.currency ?? currency;
   const partial: Partial<ResolvedDraft> = { currency: resolvedCurrency, merchant: draft.merchant ?? '', category: draft.category ?? '',
@@ -225,7 +225,8 @@ export function resolveDraft(draft: CaptureDraft, accounts: Account[], entries: 
   if (!draft.kind) return { kind: 'clarification', field: 'kind', question: 'assistant.clarify.kind',
     options: [{ id: 'expense', labelKey: 'movement.expense' }, { id: 'income', labelKey: 'movement.income' }], partial };
   if (!draft.amountMinor) return { kind: 'clarification', field: 'amount', question: 'assistant.clarify.amount', options: [], partial };
-  const eligible = accounts.filter(account => account.currency === resolvedCurrency);
+  // An income goes to a cash account (24B6): a card is never offered or implied for it.
+  const eligible = (draft.kind === 'income' ? incomeAccounts : accounts).filter(account => account.currency === resolvedCurrency);
   const named = draft.paymentMethodRef ? eligible.filter(account => fold(account.name).includes(fold(draft.paymentMethodRef!)) || fold(draft.paymentMethodRef!).includes(fold(account.name))) : [];
   const accountId = named.length === 1 ? named[0].id : eligible.length === 1 ? eligible[0].id : null;
   if (!accountId) return { kind: 'clarification', field: 'paymentMethod', question: draft.kind === 'expense' ? 'assistant.clarify.paidWith' : 'assistant.clarify.receivedIn',
@@ -236,7 +237,7 @@ export function resolveDraft(draft: CaptureDraft, accounts: Account[], entries: 
 }
 
 /** Apply a chosen option to a parked draft. Returns the next turn: another clarification (still parked) or the draft. */
-export function completeDraft(pending: { draft: Partial<ResolvedDraft>; field: DraftField }, optionId: string, accounts: Account[], entries: Entry[], todayISO: string):
+export function completeDraft(pending: { draft: Partial<ResolvedDraft>; field: DraftField }, optionId: string, accounts: Account[], entries: Entry[], todayISO: string, incomeAccounts: Account[] = accounts):
   { textKey: MessageKey; content: AssistantContent; pending: ConversationState['pending'] } {
   const draft = { ...pending.draft };
   if (pending.field === 'kind') draft.kind = optionId === 'income' ? 'income' : 'expense';
@@ -246,7 +247,8 @@ export function completeDraft(pending: { draft: Partial<ResolvedDraft>; field: D
   const currency: LegacyCurrency = isLegacyCurrency(draft.currency) ? draft.currency : 'ARS';
   const capture: CaptureDraft = { kind: draft.kind ?? null, amountMinor: draft.amountMinor ?? null, currency, merchant: draft.merchant || null,
     category: draft.category || null, dateISO: draft.dateISO ?? null, paymentMethodRef: null };
-  const next = resolveDraft(capture, draft.accountId ? accounts.filter(account => account.id === draft.accountId) : accounts, entries, currency, todayISO);
+  const chosen = (pool: Account[]) => draft.accountId ? pool.filter(account => account.id === draft.accountId) : pool;
+  const next = resolveDraft(capture, chosen(accounts), entries, currency, todayISO, chosen(incomeAccounts));
   if (next.kind === 'draft') return { textKey: 'assistant.clarify.reviewDraft', pending: null,
     content: { kind: 'draft', draft: { ...next.draft, accountId: draft.accountId ?? next.draft.accountId }, status: 'pending', entryId: null } };
   return { textKey: next.question, content: { kind: 'clarification', field: next.field, options: next.options, chosen: null },
@@ -317,10 +319,10 @@ export function answerContent(result: Pick<AssistantResult, 'factIds'>, facts: A
 }
 
 /** The content the reducer stores for a validated server result. Drafts are resolved locally; answers get evidence. */
-export function contentFromResult(result: AssistantResult, facts: AssistantFact[], accounts: Account[], entries: Entry[], currency: Currency, todayISO: string):
+export function contentFromResult(result: AssistantResult, facts: AssistantFact[], accounts: Account[], entries: Entry[], currency: Currency, todayISO: string, incomeAccounts: Account[] = accounts):
   { text: string; textKey?: MessageKey; content: AssistantContent | null; pending: ConversationState['pending'] } {
   if (result.kind === 'draft' && result.draft) {
-    const resolved = resolveDraft(result.draft, accounts, entries, currency, todayISO);
+    const resolved = resolveDraft(result.draft, accounts, entries, currency, todayISO, incomeAccounts);
     if (resolved.kind === 'draft') return { text: result.message, content: { kind: 'draft', draft: resolved.draft, status: 'pending', entryId: null }, pending: null };
     return { text: '', textKey: resolved.question, content: { kind: 'clarification', field: resolved.field, options: resolved.options, chosen: null }, pending: { draft: resolved.partial, field: resolved.field } };
   }

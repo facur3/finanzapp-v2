@@ -6,7 +6,7 @@ import {
   sameTransfer, validateTransfer, validateTransferChange, type Transfer, type TransferChange, type TransferRecord,
   materializeRecurringRule, sameRecurringRule, validateRecurringRule, validateRecurringRuleChange, type RecurringRule,
   sameMonthlyBudget, scopedMonthlyBudget, validateMonthlyBudget, validateNewMonthlyBudget, type MonthlyBudget,
-  assertPostingAccount, sameCreditCardProfile, samePersonalDebtProfile, validateCreditCardProfile, validatePersonalDebtProfile,
+  assertIncomeAccount, assertPostingAccount, assertTransferSides, keepsHistoricalCardIncome, sameTransferSides, sameCreditCardProfile, samePersonalDebtProfile, validateCreditCardProfile, validatePersonalDebtProfile,
   validateCreditCardChange, validatePersonalDebtChange,
   type CreditCardProfile, type PersonalDebtProfile,
   sameAccountAppearance, validateAccountAppearance, type AccountAppearance,
@@ -552,6 +552,7 @@ export async function createEntry(db: LedgerDatabase, input: Entry): Promise<voi
     const snapshot = snapshotFromArchive(archive);
     validateEntry(entry, snapshot.accounts);
     assertPostingAccount(entry.accountId, archive.debts);
+    if (entry.kind === 'income') assertIncomeAccount(entry.accountId, archive.cards, archive.debts); // 24B6: never a plain income on a card.
     const existing = archive.records.find(item => item.entry.id === entry.id);
     if (existing) {
       if (existing.revision !== 0 || !sameEntry(existing.entry, entry)) {
@@ -577,6 +578,8 @@ export async function changeEntry(db: LedgerDatabase, change: EntryChange): Prom
     const archive = await readArchive(tx);
     validateEntryChange(change, archive.accounts);
     assertPostingAccount(change.after.entry.accountId, archive.debts);
+    // A historical income on a card is corrected or restored in place; an income moved onto a card, or an expense turned into one, is refused.
+    if (change.after.entry.kind === 'income' && !keepsHistoricalCardIncome(change.before.entry, change.after.entry)) assertIncomeAccount(change.after.entry.accountId, archive.cards, archive.debts);
     const beforeJSON = JSON.stringify(change.before), afterJSON = JSON.stringify(change.after);
     const receipt = await tx.getFirstAsync<{ action: string; beforeJSON: string; afterJSON: string }>(
       'SELECT action, beforeJSON, afterJSON FROM entry_changes WHERE id = ?', change.id);
@@ -675,6 +678,7 @@ export async function createTransfer(db: LedgerDatabase, input: Transfer): Promi
   await db.withExclusiveTransactionAsync(async tx => {
     const archive = await readArchive(tx);
     validateTransfer(transfer, archive.accounts);
+    assertTransferSides(transfer, archive.cards, archive.debts); // 24B6: a card is only ever paid, never a source; no obligation-to-obligation transfer.
     const existing = archive.transfers?.find(r => r.transfer.id === transfer.id);
     if (existing) {
       if (existing.revision !== 0 || !sameTransfer(existing.transfer, transfer)) throw new Error('Esta transferencia ya existe con otros datos.');
@@ -690,6 +694,8 @@ export async function changeTransfer(db: LedgerDatabase, change: TransferChange)
   await db.withExclusiveTransactionAsync(async tx => {
     const archive = await readArchive(tx);
     validateTransferChange(change, archive.accounts);
+    // A stored transfer keeps its sides whatever they are; sides that change must be sides a new transfer could have.
+    if (!sameTransferSides(change.before.transfer, change.after.transfer)) assertTransferSides(change.after.transfer, archive.cards, archive.debts);
     const receipt = await tx.getFirstAsync<{ action: string; beforeJSON: string; afterJSON: string }>(
       'SELECT action, beforeJSON, afterJSON FROM transfer_changes WHERE id = ?', change.id);
     if (receipt) {
@@ -723,6 +729,8 @@ export async function saveRecurringRule(db: LedgerDatabase, input: RecurringRule
     validateRecurringRule(rule, archive.accounts);
     assertPostingAccount(rule.accountId, archive.debts);
     const existing = archive.recurring?.find(item => item.id === rule.id);
+    // 24B6: a recurring income posts to cash; a rule already paying an income into a card keeps doing so until it is moved or paused.
+    if (rule.kind === 'income' && !(existing && keepsHistoricalCardIncome(existing, rule))) assertIncomeAccount(rule.accountId, archive.cards, archive.debts);
     if (!existing) {
       if (rule.revision !== 0 || rule.updatedAt !== rule.createdAt) throw new Error('Un recurrente nuevo no puede tener cambios previos.');
       validateArchive({ ...archive, recurring: [...archive.recurring ?? [], rule] });

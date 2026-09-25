@@ -36,7 +36,8 @@ export function TransferForm({ original, accountId, fromAccountId: requestedFrom
   const [before] = useState(original);
   const [operation] = useState(() => ({ id: randomUUID(), createdAt: new Date().toISOString() }));
   const requestedTarget = accounts.find(a => a.id === requestedTo);
-  const requestedSource = accounts.find(a => a.id === requestedFrom);
+  // A card is never a source (24B6): a link asking to transfer out of one opens a plain transfer instead.
+  const requestedSource = accounts.find(a => a.id === requestedFrom && accountKind(a.id, cards, debts) !== 'card');
   // A card payment or debt settlement fixes the obligation side of the transfer.
   const lockedTo = !before && requestedTarget && hidden.has(requestedTarget.id) ? requestedTarget : null;
   const lockedFrom = !before && requestedSource && hidden.has(requestedSource.id) ? requestedSource : null;

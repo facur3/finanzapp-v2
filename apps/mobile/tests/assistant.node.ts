@@ -370,3 +370,22 @@ test('the v1 Assistant contract carries no language: a locale is refused, so the
   assert.throws(() => validateAssistantRequest({ ...request, replyLanguage: 'en-US' }));
   assert.throws(() => validateAssistantRequest({ ...request, language: 'en' }));
 });
+
+test('24B6: an income draft is never implied to land on a card: with cash and a card, the cash account is implied for an income and the card is not offered; an expense still asks', () => {
+  const income = { ...FIXTURE_DRAFT_NO_ACCOUNT.draft!, kind: 'income' as const, merchant: 'Sueldo', category: 'Sueldo' };
+  const resolved = resolveDraft(income, [visa, cash], entries, 'ARS', today, [cash]);
+  assert.equal(resolved.kind, 'draft', 'one eligible cash account: implied');
+  assert.equal(resolved.kind === 'draft' && resolved.draft.accountId, 'cash');
+  const expense = resolveDraft(FIXTURE_DRAFT_NO_ACCOUNT.draft!, [visa, cash], entries, 'ARS', today, [cash]);
+  assert.equal(expense.kind === 'clarification' && expense.field, 'paymentMethod', 'an expense may go to the card, so it asks');
+  assert.deepEqual(expense.kind === 'clarification' ? expense.options.map(o => o.id) : [], ['visa', 'cash']);
+  const named = resolveDraft({ ...income, paymentMethodRef: 'visa' }, [visa, cash], entries, 'ARS', today, [cash]);
+  assert.equal(named.kind === 'draft' && named.draft.accountId, 'cash', 'a card named for an income is not matched; the only cash account is implied');
+  // Through the reducer path: kind asked first, "income" chosen, then no account question with a single cash account.
+  const asked = contentFromResult({ ...FIXTURE_DRAFT_NO_ACCOUNT, draft: { ...FIXTURE_DRAFT_NO_ACCOUNT.draft!, kind: null } }, [], [visa, cash], entries, 'ARS', today, [cash]);
+  const afterKind = completeDraft(asked.pending!, 'income', [visa, cash], entries, today, [cash]);
+  assert.equal(afterKind.content.kind === 'draft' && afterKind.content.draft.accountId, 'cash');
+  const afterExpense = completeDraft(asked.pending!, 'expense', [visa, cash], entries, today, [cash]);
+  assert.equal(afterExpense.content.kind === 'clarification' && afterExpense.content.field, 'paymentMethod');
+  assert.equal(resolveDraft(income, [visa, cash], entries, 'ARS', today).kind, 'clarification', 'without the income list (older callers) nothing changes');
+});

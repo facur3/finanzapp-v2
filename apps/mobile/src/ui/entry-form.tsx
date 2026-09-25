@@ -3,7 +3,7 @@ import { Keyboard, View } from 'react-native';
 import { router, Stack } from 'expo-router';
 import { randomUUID } from 'expo-crypto';
 import * as Haptics from 'expo-haptics';
-import { accountBalanceMinor, accountKind, categoryKey, editedDraftFits, makeEntryChange, minorFromEditedDraft, sameEntry, summarizeMonthlyBudgets, todayKey, validateEntry, validateEntryChange, type Account, type Entry, type EntryChange, type EntryKind, type EntryRecord, type StoredDraft } from '@finanzapp/domain';
+import { accountBalanceMinor, accountKind, categoryKey, editedDraftFits, keepsHistoricalCardIncome, makeEntryChange, minorFromEditedDraft, postingAccountsFor, sameEntry, summarizeMonthlyBudgets, todayKey, validateEntry, validateEntryChange, type Account, type Entry, type EntryChange, type EntryKind, type EntryRecord, type StoredDraft } from '@finanzapp/domain';
 import { useLedger } from '../storage/LedgerProvider';
 import { budgetTone } from './budget-presentation';
 import { ActionButton, AmountField, AppText, Choices, EmptyState, ErrorMessage, Field, IconButton, Screen, Surface } from './components';
@@ -37,7 +37,7 @@ export function EntryForm({ original, accountId: requestedAccount, currency, kin
   const [operation] = useState(() => ({ id: randomUUID(), createdAt: new Date().toISOString() }));
   const [ownKind, setKind] = useState<EntryKind>(before?.entry.kind ?? (requestedKind === 'income' ? 'income' : 'expense'));
   const kind: EntryKind = onKindChange ? (requestedKind === 'income' ? 'income' : 'expense') : ownKind;
-  const [accountId, setAccountId] = useState(() => before?.entry.accountId ?? initialAccountId(accounts, requestedAccount, currency));
+  const [chosenAccountId, setAccountId] = useState(() => before?.entry.accountId ?? initialAccountId(accounts, requestedAccount, currency));
   // An edit is prefilled in the movement's own currency (its account's); a prefill in another currency is never reinterpreted.
   // While the text stays exactly that prefill (same currency), saving keeps the stored minor units themselves: a stored amount
   // may exceed the entry bound (a restored backup), and re-reading it would lock every other correction.
@@ -53,12 +53,22 @@ export function EntryForm({ original, accountId: requestedAccount, currency, kin
   const [pending, setPending] = useState<{ entry: Entry; change?: EntryChange } | null>(null);
   const saving = useRef(false);
   const [error, setError] = useState<string | null>(null);
-  const account = accounts.find(item => item.id === accountId);
+  const cards = archive?.cards ?? [], debts = archive?.debts ?? [];
   const originalCurrency = accounts.find(item => item.id === before?.entry.accountId)?.currency;
-  const eligibleAccounts = before ? accounts.filter(item => item.currency === originalCurrency) : accounts;
+  // The accounts this kind may post to (24B6): an expense to cash or a card, an income to cash only. A historical income
+  // stored on a card keeps that card offered while it is edited, so it can be corrected in place without moving it.
+  const cashAndCards = postingAccountsFor(kind, accounts, cards, debts);
+  const historicalCard = before && kind === 'income' && keepsHistoricalCardIncome(before.entry, { kind, accountId: before.entry.accountId })
+    ? accounts.filter(item => item.id === before.entry.accountId && !cashAndCards.some(offered => offered.id === item.id)) : [];
+  const offered = historicalCard.length ? cashAndCards.concat(historicalCard) : cashAndCards;
+  const eligibleAccounts = before ? offered.filter(item => item.currency === originalCurrency) : offered;
+  // A card carried over from Gasto is no place for an income: the form shows a cash account in the same currency instead and
+  // keeps the carried choice, so switching back to Gasto finds the card again.
+  const accountId = eligibleAccounts.some(item => item.id === chosenAccountId) ? chosenAccountId
+    : initialAccountId(eligibleAccounts, undefined, accounts.find(item => item.id === chosenAccountId)?.currency ?? currency);
+  const account = accounts.find(item => item.id === accountId);
   const locked = busy || pending !== null;
   const close = () => { if (!saving.current) { if (router.canGoBack()) router.back(); else router.replace('/'); } };
-  const cards = archive?.cards ?? [], debts = archive?.debts ?? [];
   const kindOf = (id: string) => { const found = accounts.find(item => item.id === id); return found ? accountKindLabel(found, cards, debts, t) : t('accountKinds.account'); };
   const typeOf = (id: string) => accountKind(id, cards, debts);
   const isCard = !!account && cards.some(card => card.accountId === account.id);
