@@ -7,6 +7,7 @@ import { formatMoneyAmount, formatNumericDate } from '../i18n/format.ts';
 import { LANGUAGES, composeLocale, type LanguageCode, type LanguagePreference, type RegionCode, type RegionPreference } from '../i18n/locale.ts';
 import type { Translate } from '../i18n/messages.ts';
 import { activeLanguageChoice, activeRegionChoice, type LocaleState } from '../i18n/store.ts';
+import { regionDisplayName, regionStatus } from '../i18n/regions.ts';
 
 export type LocalePreferenceKind = 'language' | 'region';
 export interface PreferenceOption<T extends string> {
@@ -33,9 +34,20 @@ export function languageOptions(state: LocaleState, t: Translate): PreferenceOpt
   ];
 }
 
+/** What "Según el dispositivo" gives for the region right now. A device Region the catalogue knows but this
+ * build does not honour yet is named, with the region whose conventions stand in (24R1): "Ahora: Japón
+ * (formatos de Argentina)", never "Ahora: Argentina" as if the iPhone were set there. */
+export function deviceRegionSummary(state: LocaleState, t: Translate): string {
+  const detected = state.device.detectedRegion;
+  if (detected && regionStatus(detected, state.released.regions) === 'catalogue') {
+    return t('preferences.followDeviceNowFallback', { value: regionDisplayName(detected, state.language), fallback: regionName(state.device.region, t) });
+  }
+  return t('preferences.followDeviceNow', { value: regionName(state.device.region, t) });
+}
+
 export function regionOptions(state: LocaleState, t: Translate): PreferenceOption<RegionPreference>[] {
   return [
-    { value: 'system', title: t('preferences.followDevice'), subtitle: t('preferences.followDeviceNow', { value: regionName(state.device.region, t) }) },
+    { value: 'system', title: t('preferences.followDevice'), subtitle: deviceRegionSummary(state, t) },
     ...state.released.regions.map(region => ({ value: region, title: regionName(region, t), subtitle: regionSample(region, state, t) })),
   ];
 }

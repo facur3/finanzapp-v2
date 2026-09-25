@@ -11,7 +11,7 @@ import { amountFormat, codedAmount, currencyName, currencySymbol, currencyUnit, 
   formatNumericDate, formatPercent, formatWholeUnits, moneyText, pickerLocale, relativeDate, spokenAmount, spokenMinor, spokenMoney, spokenPercent, type DateStyle,
   type HeldCurrencies } from './format.ts';
 import { localizeError } from './errors.ts';
-import { languageOf, regionOf, type AppLocale, type LanguageCode, type RegionCode } from './locale.ts';
+import { completeConventions, conventionsOf, languageOf, regionOf, type AppLocale, type LanguageCode, type RegionCode, type RegionConventions } from './locale.ts';
 import { translator, type Translate } from './messages.ts';
 
 export interface I18n {
@@ -59,6 +59,8 @@ export interface I18n {
   heldCurrencies: HeldCurrencies;
   /** The separators the amount field types in. */
   amountFormat: { decimal: string; group: string };
+  /** The conventions every regional formatter above writes in: the locale's released region, or the explicit ones a caller bound (24R1). */
+  conventions: Required<RegionConventions>;
   /** The date wheel's locale identifier: the language with its home region ("es_AR", "en_US"). */
   pickerLocale: string;
   currencySymbol: (currency: IsoCurrencyCode) => string;
@@ -74,31 +76,36 @@ export interface I18n {
  * of currencies the ledger holds (`withHeldCurrencies` rebinds a locale for it):
  * the only ledger fact presentation needs, because a short spoken unit ("pesos")
  * is ambiguous exactly when another held currency shares the word. */
-export function bindLocale(locale: AppLocale, localeSource: LocaleSource = 'none', deviceLanguage: string | null = null, held: HeldCurrencies = []): I18n {
+/** `conventions`, when given, are the regional conventions every regional formatter writes in instead
+ * of the locale's released region: a catalogue region under test today, the resolved region from 24R2.
+ * Words, spoken forms and the date wheel still follow the language; nothing about money changes. */
+export function bindLocale(locale: AppLocale, localeSource: LocaleSource = 'none', deviceLanguage: string | null = null, held: HeldCurrencies = [], conventions?: RegionConventions): I18n {
   const language = languageOf(locale);
+  const c = conventions ? completeConventions(conventions) : completeConventions(conventionsOf(locale));
   return {
     locale, language, region: regionOf(locale), localeSource, t: translator(language),
     speechLanguage: deviceLanguage && deviceLanguage !== language ? language : undefined,
     formatDate: (dateISO, style) => formatDate(dateISO, style, locale),
     formatMonth: (monthISO, style) => formatMonth(monthISO, locale, style),
-    formatDateTime: iso => formatDateTime(iso, locale),
-    formatNumericDate: dateISO => formatNumericDate(dateISO, locale),
-    formatDayMonth: dateISO => formatDayMonth(dateISO, locale),
-    formatCount: value => formatCount(value, locale),
-    formatPercent: fraction => formatPercent(fraction, locale),
-    formatMoneyAmount: (minor, currency) => formatMoneyAmount(minor, currency, locale),
-    formatWholeUnits: (minor, currency) => formatWholeUnits(minor, currency, locale),
-    moneyText: (minor, currency, absolute, signed) => moneyText(minor, currency, locale, absolute, signed),
-    codedAmount: (minor, currency) => codedAmount(minor, currency, locale),
+    formatDateTime: iso => formatDateTime(iso, locale, conventions),
+    formatNumericDate: dateISO => formatNumericDate(dateISO, locale, conventions),
+    formatDayMonth: dateISO => formatDayMonth(dateISO, locale, conventions),
+    formatCount: value => formatCount(value, locale, conventions),
+    formatPercent: fraction => formatPercent(fraction, locale, conventions),
+    formatMoneyAmount: (minor, currency) => formatMoneyAmount(minor, currency, locale, conventions),
+    formatWholeUnits: (minor, currency) => formatWholeUnits(minor, currency, locale, conventions),
+    moneyText: (minor, currency, absolute, signed) => moneyText(minor, currency, locale, absolute, signed, conventions),
+    codedAmount: (minor, currency) => codedAmount(minor, currency, locale, conventions),
     spokenMoney: (minor, currency) => spokenMoney(minor, currency, locale, held),
     spokenAmount: (minor, currency) => spokenAmount(minor, currency, locale),
     spokenMinor: (minor, currency) => spokenMinor(minor, currency, locale),
     spokenPercent: fraction => spokenPercent(fraction, locale),
     currencyUnit: (currency, word) => currencyUnit(currency, locale, held, word),
     heldCurrencies: held,
-    amountFormat: amountFormat(locale),
+    amountFormat: amountFormat(locale, conventions),
+    conventions: c,
     pickerLocale: pickerLocale(locale),
-    currencySymbol: currency => currencySymbol(currency, locale),
+    currencySymbol: currency => currencySymbol(currency, locale, conventions),
     currencyName: currency => currencyName(currency, locale),
     relativeDate: (dateISO, todayISO, inline) => relativeDate(dateISO, todayISO, locale, inline),
     errorText: message => localizeError(language, message),

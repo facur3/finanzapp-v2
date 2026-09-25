@@ -15,14 +15,17 @@ import { primaryLanguageOf, type LocaleSource } from './device.ts';
 import { RELEASED, SYSTEM_PREFERENCES, resolveLocale, type DeviceLocale, type LanguagePreference, type LocalePreferences,
   type RegionPreference, type ReleasedSets, type ResolvedLocale } from './locale.ts';
 import { readLocalePreferences, writeLanguagePreference, writeRegionPreference, type PreferenceStore } from './preference.ts';
+import { deviceRegion, type CatalogueRegionCode } from './regions.ts';
 
 export interface DeviceReading { source: LocaleSource; locales: DeviceLocale[] }
 
 export interface LocaleState extends ResolvedLocale {
   preferences: LocalePreferences;
-  /** What "follow the device" gives right now, shown beside that option, and
-   * the device's first language as read (possibly one without a catalogue). */
-  device: ResolvedLocale & { source: LocaleSource; primaryLanguage: string | null };
+  /** What "follow the device" gives right now, shown beside that option, the
+   * device's first language as read (possibly one without a catalogue), and its
+   * Region setting as a catalogue code (24R1; possibly one not released yet, so
+   * the chooser can name it and say which conventions stand in). */
+  device: ResolvedLocale & { source: LocaleSource; primaryLanguage: string | null; detectedRegion: CatalogueRegionCode | null };
   released: ReleasedSets;
 }
 
@@ -54,12 +57,13 @@ function deviceKey(reading: DeviceReading): string {
 function compute(preferences: LocalePreferences, reading: DeviceReading, released: ReleasedSets): LocaleState {
   const resolved = resolveLocale(reading.locales, preferences, released);
   const device = resolveLocale(reading.locales, SYSTEM_PREFERENCES, released);
-  return { ...resolved, preferences, device: { ...device, source: reading.source, primaryLanguage: primaryLanguageOf(reading.locales) }, released };
+  return { ...resolved, preferences, device: { ...device, source: reading.source, primaryLanguage: primaryLanguageOf(reading.locales), detectedRegion: deviceRegion(reading.locales) }, released };
 }
 
 function sameState(a: LocaleState, b: LocaleState): boolean {
   return a.locale === b.locale && a.preferences.language === b.preferences.language && a.preferences.region === b.preferences.region
-    && a.device.locale === b.device.locale && a.device.source === b.device.source && a.device.primaryLanguage === b.device.primaryLanguage;
+    && a.device.locale === b.device.locale && a.device.source === b.device.source && a.device.primaryLanguage === b.device.primaryLanguage
+    && a.device.detectedRegion === b.device.detectedRegion;
 }
 
 export function createLocaleStore(environment: LocaleEnvironment): LocaleStore {
