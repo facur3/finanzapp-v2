@@ -1,319 +1,115 @@
 # FinanzApp
 
-## Dirección del producto — 19 de septiembre de 2026
+FinanzApp is a native personal-finance app for everyday spending and commitments: fast capture,
+understandable spending, upcoming payments, budgets, cards and debts, optional simple accounts,
+an Assistant that proposes drafts and answers questions from the ledger, and local data that
+works without connectivity. It is built with **Expo, React Native and TypeScript** in
+`apps/mobile`, iOS first, Android later from the same project. Since 2026-09-25 the native app is
+the product; the old web app is frozen legacy until its retirement (see below).
 
-La app nativa se enfoca en **gastos y compromisos cotidianos**, con cuentas simples
-opcionales. Inicio muestra gasto de la semana/mes. Tarjetas, deudas, recurrentes
-y presupuestos siguen en el plan; inversiones y patrimonio salen del alcance nativo.
+## Dirección del producto
 
-- [Decisión, alternativas y alcance](docs/decisions/002-spending-first.md)
+La app se enfoca en **gastos y compromisos cotidianos**, con cuentas simples opcionales. Inicio
+muestra el gasto de la semana y del mes; tarjetas, deudas, recurrentes y presupuestos están en
+la app; inversiones y patrimonio quedan fuera del alcance. El Asistente es una capacidad central:
+propone movimientos y cambios como borradores, pide la aclaración mínima y responde preguntas
+con datos verificables del libro; nunca escribe sin confirmación. La IA en la nube es opcional,
+acotada y con clave en el servidor; el registro manual y los datos locales funcionan sin conexión.
+
+- [Decisión 002: gastos primero, alternativas y alcance](docs/decisions/002-spending-first.md)
+- [Decisión 004: la app nativa es el producto; retiro de la web](docs/decisions/004-native-first-and-web-retirement.md)
 - [Base de IA en nube y Atajos: qué funciona y qué falta](docs/mobile-integrations.md)
 
-**Producto 23.0 (2026-09-22):** pulido de interacción y base de localización: el selector
-de moneda es una fila vertical (etiqueta, nombre completo, código y símbolo, ícono y
-chevron) y "Dólares estadounidenses · USD" ya no parte el código a otra línea; el campo de
-importe ancla el símbolo a la izquierda y los dígitos crecen desde un origen fijo en
-cifras tabulares (nada se mueve en 999 → 1.000 ni en 999.999 → 1.000.000; solo baja el
-tamaño cuando el importe no entra); filas, estadísticas y segmentados compartidos se
-apilan con texto grande en vez de recortar; `apps/mobile/src/i18n` resuelve el idioma
-del dispositivo, formatea fechas y porcentajes desde tablas y tiene catálogos es-AR y
-en-US, con el inglés todavía no habilitado (Producto 23.1 completa la traducción;
-Producto 24 es el motor multimoneda). Sin cambios financieros ni de esquema.
+## Where things live
 
-**Producto 19 (2026-09-21):** presupuestos completos en la app nativa: un
-**presupuesto general** mensual (techo de todos los gastos registrados del mes en una
-moneda) junto a **límites por categoría** que son sublímites y no se suman; modelo
-con `scope`, esquema SQLite 7 (los presupuestos existentes se conservan exactos como
-sublímites por categoría) y copia v7 (las v5/v6 siguen importándose). Sin rediseño.
+| Path | What it is |
+| --- | --- |
+| `apps/mobile/` | The app: Expo Router screens (`app/`), UI, i18n, storage (SQLite, backups) and the Assistant client (`src/`), Node tests (`tests/`), catalogue generators (`scripts/`), `app.config.ts`, `eas.json`. Own `package-lock.json`. |
+| `packages/domain/` | `@finanzapp/domain`: the typed, side-effect-free financial rules (integer minor units per currency, ledger, transfers, budgets, liabilities, reports, recovery). Tested at the root with vitest. |
+| `packages/integrations/` | The Assistant and capture contracts shared by the app and the backend. |
+| `server/mobile/`, `api/mobile/` | The mobile backend: authenticated handlers, quotas, the capture inbox, the AI responder, the PostgreSQL schema and its tests; the two Vercel function entry points. Off until the owner configures it. |
+| `docs/` | Roadmap, design direction, i18n, currencies, device checklist, decisions (below). |
+| `index.html`, `src/app`, `src/domain`, `support.js`, `public/`, `ios/`, `src/capacitor`, `api/chart.js`, `api/fund-data.js` | The legacy web/Capacitor app (frozen; see "Legacy web"). |
 
-**Producto 18 (2026-09-21):** la quinta pestaña nativa es **Más**, hub agrupado de
-Cuentas, Presupuestos, Recurrentes, Deudas y cobros, Categorías, Asistente y datos;
-Tarjetas queda solo para tarjetas de crédito; las transferencias, pagos de tarjeta y
-saldos de deudas ofrecen Usar todo / Pagar total / Saldar total / Cobrar total, que
-solo rellenan el importe. Sin rediseño visual ni cambios de esquema.
-
-**Producto 22 (2026-09-21):** el Asistente pasa a ser la pestaña central (Inicio,
-Movimientos, **Asistente**, Reportes, Más), alcanzable con cualquier pulgar desde
-cualquier pantalla; Tarjetas sale de la barra y es la segunda fila de Más → Finanzas,
-con su misma pantalla y su "+". Las cuatro acciones de Inicio y el compositor del
-Asistente se dibujan con Liquid Glass nativo (`expo-glass-effect`) solo en un
-development build en iOS 26 con la API disponible y sin Reducir transparencia; en Expo Go,
-y en cualquier otro caso, conservan el material opaco de Producto 21 y el módulo de vidrio
-ni siquiera se evalúa (`EXPO_PUBLIC_DISABLE_GLASS=1` lo fuerza en cualquier entorno). Sin
-cambios financieros ni activación de nube.
-
-**Interfaz 07:** nuevo Inicio con períodos, barras y detalle; saldo inicial opcional,
-paleta índigo y superficies tranquilas. Base de API autenticada, bandeja de capturas
-y límites de IA, apagada hasta configuración. No hay chat/Apple Pay activo todavía.
-Datos locales existentes preservados; sin cambios de esquema móvil ni datos de ejemplo.
-La web anterior mantiene sus funciones actuales. Detalle de pruebas en el roadmap.
-
-## Native mobile migration — start here
-
-The new iOS-first app is being built with **Expo + React Native + TypeScript** in
-`apps/mobile`. The current web/Capacitor app below remains operational; this is
-an isolated pilot, not a completed migration or an App Store release.
-
-- [Mobile setup and commands](apps/mobile/README.md)
-- [Paso a paso para probarlo en tu iPhone](docs/empezar-en-iphone.md)
-- [Living roadmap, status and next actions](docs/mobile-roadmap.md)
-- [Original iOS design direction and next screens](docs/mobile-design.md)
-- [Why Expo, when Swift makes sense, and the no-Mac workflow](docs/decisions/001-native-mobile.md)
-- [Real iPhone acceptance checklist](docs/mobile-device-checklist.md)
-- [Contributor/agent continuity instructions](AGENTS.md)
-
-No new GitHub repository is necessary. Keep these documents updated after each
-iteration. Existing data is not automatically shared between the web app and the
-new native app. Starting empty or entering a few real records manually is supported;
-legacy import is optional backlog, not a prerequisite for product development.
-
-**Interfaz 06 (2026-09-14):** daily expense drill-down and previous-month/category
-comparison inside Reports, with explicit date ranges and missing-history guards.
-No new dependencies, database schema or paid services. Physical review pending.
-See the Interfaz 06 section of the iPhone walkthrough above.
-
-**Interfaz 05 (2026-09-13):** the native pilot adds contextual account-name/balance
-correction and same-currency internal transfers, including edit/undo/recovery.
-Transfers never inflate income or spending. Native v3 backups preserve these
-records and corrections; import also accepts v1/v2 without overwriting local changes.
-It upgrades its existing local SQLite file in place; do not
-downgrade or uninstall. Legacy web import, cloud sync and physical acceptance of
-this iteration are still pending. See [the iPhone walkthrough](docs/empezar-en-iphone.md#10-interfaz-05-cuentas-y-transferencias).
-
-## Current web/Capacitor product
-
-FinanzApp is a personal finance app for Argentina: accounts, movements, cards,
-budgets, recurring movements, categories, tags and investments with local
-persistence. Its UI currently runs on the **Claude Design runtime** while the
-financial rules live in tested domain modules and the editable app shell is
-split by responsibility.
-
-## Architecture (read before changing anything)
-
-- `index.html` is generated. Do not edit it directly.
-- `src/app/index.shell.html` owns the document/PWA boot shell.
-- `src/app/template.html` owns the screen markup, `src/app/component.js` the UI
-  controller/state adapter, and `src/app/finanzapp.css` the visual/motion system.
-- `scripts/build-app-shell.mjs` assembles those files before dev/build.
-- `public/finanzapp.css` is its generated, service-worker-cacheable CSS copy.
-- `support.js` is the Design Components runtime. `public/support.js` is the copy
-  used by the production build/preview (Vite copies `public/` into `dist/`).
-- `design-reference/FinanzApp.dc.html` and `design-reference/support.js` are kept
-  as untouched reference files.
-
-This version intentionally **does not** convert the app to React — it runs from the
-Claude Design runtime (which uses React internally). `localStorage` is the source of
-truth. On top of that baseline the app now also has:
-
-- **Optional cloud sync** via Supabase (email + password auth, one JSONB row per user,
-  last-write-wins). Off until configured — see `SUPABASE_SETUP.md`. Without it the app
-  is 100% local, exactly as before.
-- **Web data services**: `api/chart.js` proxies market history and `api/fund-data.js`
-  serves fund data. This legacy web assistant remains local and needs no model key.
-  The new native cloud endpoints are separate and disabled until explicitly configured.
-
-Future refactors should preserve financial behavior and data migrations one flow
-at a time; the interface can continue evolving without tying the product to the
-original export.
-
-## Functionality included
-
-- Local state for accounts, movements, cards, categories, tags, investments and settings.
-- Verified local persistence with `localStorage`: integrity checksum, atomic
-  write, automatic previous-good snapshot, corruption quarantine and v2 migration.
-- Empty-first onboarding: the app never inserts sample balances or movements into user data.
-- Category chart tap filters Activity automatically.
-- Functional quick-add flows, movement detail, card purchase, card payment,
-  investment trade, account/category/tag/card forms, security/reset, settings and filters.
-- **Free local voice/text assistant** in Argentine Spanish for expenses, income,
-  transfers, card purchases/payments, stored recurring movements (for example
-  “Cobré el sueldo”), new recurrent rules, budgets, categories and tags. It
-  separates amount/currency, merchant, category, detail, account and card; supports
-  local forms such as `mil`, `lucas` and `palos`; rejects questions/negations; and
-  offers safe inline choices when a phrase is genuinely ambiguous. Dictation updates
-  the text as partial results arrive and every action shows a validated draft that can
-  be edited (type, amount, source/merchant, category, account and date) before saving.
-  It runs without an API key, paid tokens or a remote AI request.
-- iOS-style directional transitions and left-edge swipe back through the app's real
-  navigation history, including the previous tab or nested detail screen.
-- **Real dates** stored as ISO values, native calendar selection, and dynamic
-  “Hoy/Ayer/5 ago” labels that do not become stale after midnight.
-- **Investments**: CEDEARs, crypto, Argentine bonds/ON and FCI with live prices
-  (Binance/CoinGecko, Data912, Yahoo and CAFCI), portfolio donut, per-asset price
-  charts, USD valuation, cash-aware buys/sells and a reconciliation mode that fixes
-  a broker holding without inventing income, expenses or cash movements.
-- Animated ARS/USD conversion by tapping the large dashboard amount.
-- Mixed ARS/USD account totals and reports are normalized with the current quote;
-  each account and movement still shows its native currency.
-- **Budgets** (monthly limit per category), **savings goals**, and a **net-worth
-  trend** chart from daily snapshots.
-- **Optional cloud sync** (Supabase) so data can follow you across devices.
-- CSV export, JSON backup export, JSON backup import.
-- **Installable PWA shell** (manifest + service worker) with offline app-shell support.
-
-## Develop
-
-Install dependencies:
+## Run the app
 
 ```bash
-npm install
+cd apps/mobile
+npm ci
+npm run start:dev-client -- --clear     # Metro for the installed FinanzApp Dev build
+npm run start                           # Expo Go: a first look only, not the shipping app
 ```
 
-Run the dev server:
+Everything about the iPhone workflow from Linux or Windows (EAS development builds, device
+registration, TestFlight after the device gate), the verification commands, the preview flags
+and the test inventory is in [apps/mobile/README.md](apps/mobile/README.md) and
+[docs/empezar-en-iphone.md](docs/empezar-en-iphone.md). No EAS cloud build, subscription or
+store submission is made without the owner's account setup and authorization.
 
 ```bash
-npm run dev
+cd apps/mobile
+npm run typecheck && npm run test:storage        # TypeScript, and the tests over real SQLite
+npm run currency:verify && npm run regions:verify
+npm run i18n:check -- --strict && npm run check && npm run export:ios
 ```
 
-Open: http://localhost:5173
+## Read before changing anything
 
-### Local assistant (zero cost)
+- [AGENTS.md](AGENTS.md): the rules for contributors and agents.
+- [docs/mobile-roadmap.md](docs/mobile-roadmap.md): status, device QA pending, next deliveries,
+  launch, post-launch; [docs/mobile-roadmap-history.md](docs/mobile-roadmap-history.md): the
+  detailed history of every delivery.
+- [docs/mobile-design.md](docs/mobile-design.md): the visual and motion direction.
+- [docs/mobile-device-checklist.md](docs/mobile-device-checklist.md): what only an iPhone can verify.
+- [docs/i18n.md](docs/i18n.md) and [docs/currency.md](docs/currency.md): languages, regions,
+  currencies and the multi-currency engine.
+- Decisions: [001 native mobile](docs/decisions/001-native-mobile.md),
+  [002 spending-first](docs/decisions/002-spending-first.md),
+  [003 five tabs and cards](docs/decisions/003-five-tabs-and-cards.md),
+  [004 native-first and web retirement](docs/decisions/004-native-first-and-web-retirement.md).
 
-The assistant uses the tested on-device intent engine in `src/domain/assistant.js`.
-It does not require an account or API key and it never spends tokens. Clear and
-incomplete commands both stay on the device; incomplete drafts explain exactly
-which field is missing before the user can confirm them. See
-`docs/assistant-and-market-data.md` for the capability and privacy boundary.
+User data starts empty: the app never seeds balances, movements or market history. Money is
+stored in integer minor units per currency; currencies are never mixed without a dated rate.
+Writes are saved locally before success is confirmed, and a failed write keeps the draft.
 
-## Build
+## Continuous integration
+
+`.github/workflows/ci.yml` runs on every push and PR: `mobile` (isolated install, dependency
+tree, Expo compatibility, typecheck, the currency and region catalogue locks, the localization
+catalogues, the SQLite tests, the iOS JavaScript export), `mobile_api` (the PostgreSQL inbox,
+ownership and quota tests) and `build` (the root vitest suite over `packages/domain`,
+`server/mobile` and the legacy domain, the legacy web build, and the hygiene check).
+
+## Legacy web/Capacitor (frozen, retirement planned)
+
+The previous product was a web app on the Claude Design runtime with `localStorage` data, an
+installable PWA shell, a Capacitor iOS wrapper and market-data proxies, deployed to Vercel. It is
+not part of the new product: it receives no features, and a separate PR will remove it while
+keeping Git history. What it depends on, what the native product keeps and the steps of that PR
+are in [docs/web-retirement-inventory.md](docs/web-retirement-inventory.md). Until then its CI
+must stay green:
 
 ```bash
-npm run build
+npm ci
+npm test              # vitest: packages/domain, server/mobile and the legacy src/domain
+npm run build         # the legacy Vite build (index.html is generated from src/app; never hand-edit it)
+npm run check:repo    # fails if node_modules/, dist/, .vite/, .expo/, .playwright-mcp/, .env or generated native projects are tracked
 ```
 
-Output is written to `dist/`.
-
-## Preview the production build
-
-```bash
-npm run preview
-```
-
-This serves the built `dist/` directory (the service worker and manifest only
-behave fully in `build` + `preview`, not necessarily in `dev`).
-
-## Repository hygiene check
-
-```bash
-npm run check:repo
-```
-
-Fails if `node_modules/`, `dist/`, `.vite/`, `.playwright-mcp/`, or `.env` are tracked by git.
-
-## Deploy to Vercel
-
-Mostly static, plus `api/chart.js` (auto-detected by Vercel).
-`vercel.json` is included and already pins the build settings below.
-
-### One-time setup
-
-1. Push this repo to GitHub (already done on `master`).
-2. Go to <https://vercel.com> → **Add New… → Project**.
-3. **Import** the `finanzapp-v2` GitHub repository.
-4. When prompted for settings (these come from `vercel.json`, but confirm them):
-   - **Framework Preset:** Other (static — the project is not auto-detected as a framework)
-   - **Build Command:** `npm run build`
-   - **Output Directory:** `dist`
-   - **Install Command:** `npm install` (or `npm ci`)
-5. Click **Deploy**.
-6. No AI key or paid service is required for the assistant.
-
-### After deploy
-
-- Open the production URL Vercel gives you (e.g. `https://finanzapp-v2.vercel.app`).
-- Confirm the app loads and looks identical to local.
-- Open DevTools → **Application → Manifest**: manifest + icons load.
-- DevTools → **Application → Service Workers**: `sw.js` is registered and active.
-- DevTools → **Network**: no favicon 404; `/vendor/react*.js` load from your own
-  origin (not `unpkg.com`).
-- Console: no errors, no `[dc-runtime] logic class eval FAILED`.
-- Reload once, then toggle **Network → Offline** and reload again: the app shell
-  loads offline.
-
-Every push to `master` triggers an automatic production redeploy. GitHub Actions
-(`.github/workflows/ci.yml`) runs unit tests, builds and checks repository hygiene
-on each push/PR.
-
-### Release & QA docs
-
-- `docs/production-release-checklist.md` — full pre-deploy build/PWA/offline/hygiene
-  checklist plus step-by-step Vercel deploy.
-- `docs/mobile-install-qa.md` — real-device install + offline QA checklist (iPhone/Android).
-- `docs/offline-data-guarantees.md` — how data is persisted/loaded, the no-flicker
-  startup guarantee, offline behavior, and the future Dexie migration path.
-
-## Install as a PWA
-
-### iPhone / iPad (Safari)
-
-1. Open the deployed app in Safari.
-2. Tap the **Share** button.
-3. Choose **Add to Home Screen**.
-4. Confirm. The app launches fullscreen/standalone with the FinanzApp icon.
-
-> iOS does not support automatic install prompts; "Add to Home Screen" is the
-> supported path.
-
-### Android / Chrome
-
-1. Open the deployed app in Chrome.
-2. Use the **Install app** option from the browser menu (or the install prompt).
-3. The app installs with the FinanzApp icon and launches standalone.
-
-### Desktop Chrome / Edge
-
-Click the **Install** icon in the address bar (where supported).
-
-## Offline behavior
-
-After the first successful online load, the service worker caches the app shell
-(`index.html`, `support.js`, the vendored React runtime under `public/vendor/`,
-manifest, and icons). On subsequent visits the full app boots and renders
-offline, and existing `localStorage` data remains available. User data is never
-cached by the service worker.
-
-### Vendored runtime (no critical external CDN dependency)
-
-The Claude Design runtime (`support.js`) loads React/ReactDOM at boot. These are
-**vendored locally** under `public/vendor/` and served from the app's own origin,
-so the app no longer depends on `unpkg.com` to start. The files are the exact
-React 18.3.1 UMD builds — byte-identical to the CDN copies, verified by the
-runtime's existing Subresource Integrity (SRI) hashes, which were left unchanged.
+Vercel builds `dist/` from `npm run build` and serves `api/**` as functions; the same project
+hosts `api/mobile/*`, which the retirement keeps. Legacy documents: `SUPABASE_SETUP.md`,
+`docs/production-release-checklist.md`, `docs/mobile-install-qa.md`,
+`docs/offline-data-guarantees.md`, `docs/capacitor-ios-spike.md`, `RELEASE_NOTES.md`.
 
 ## Files that must never be committed
 
 - `node_modules/`
-- `dist/`
-- `.vite/`
+- `dist/`, `.vite/`, `.expo/`, `apps/mobile/ios/`, `apps/mobile/android/`
 - `.env`, `.env.*`
 - logs (`*.log`)
 - OS junk (`.DS_Store`, `Thumbs.db`, …)
-- local screenshots / temporary QA artifacts
-- `.playwright-mcp/`
+- local screenshots, backups, temporary QA artifacts, `.playwright-mcp/`
+- `*.ipa`, `*.apk`, `*.aab`, `*.p12`, `*.p8`, `*.mobileprovision`, `*.sqlite*`
 
-`npm run check:repo` and CI (`.github/workflows/ci.yml`) enforce this.
-
-## Current limitations
-
-- Market data is best-effort and comes from public providers; it is suitable for
-  personal tracking, not order execution or accounting statements. Manual price
-  overrides and backup/CSV flows remain available.
-- Cocos does not expose a documented public OAuth/account API in this integration,
-  so FinanzApp does **not** request Cocos credentials or claim to sync holdings.
-  Broker reconciliation should be added through an official API or a documented
-  export format when one is available.
-- Browser voice recognition depends on browser support. The Capacitor iOS shell
-  uses a native speech-recognition plugin and declares the required permissions.
-- **Babel standalone** (`@babel/standalone`) is still referenced from `unpkg.com`
-  in `support.js`, but it is **not a critical dependency**: it is only fetched
-  lazily to compile runtime JSX/TSX modules imported via `x-import`, and FinanzApp
-  imports none — so it never loads at runtime and never blocks boot or offline use.
-  It was intentionally **not** vendored to avoid committing ~2.9 MB of code the app
-  never executes. If a future feature adds JSX `x-import` modules, vendor it the
-  same way React was vendored.
-- There is no custom install banner, update prompt or offline status UI yet.
-  Service-worker updates apply on the next load.
-- iOS has no programmatic install; users add via "Add to Home Screen".
-- The generated runtime document is still consumed by Claude Design and is not
-  a conventional React application, but its editable shell, styles, controller
-  and tested domain logic are now separate source files.
+`npm run check:repo` and CI enforce this. The repository is public: no financial backups,
+screenshots with real data, tokens, signing keys or bank credentials.

@@ -1,6 +1,10 @@
 # Decision 001: the native mobile application
 
-Date: 2026-09-11. Status: accepted for a device-validated pilot.
+Date: 2026-09-11. Status: accepted; superseded in part by
+[decision 004](004-native-first-and-web-retirement.md) (2026-09-25), which makes the native app
+the product and retires the web/Capacitor app in a separate PR. The clause "keep the current
+web/Capacitor app operational until migration and real-device acceptance are complete" no longer
+applies: the web tree is frozen legacy until its retirement. Everything else below stands.
 
 ## Decision
 
