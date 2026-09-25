@@ -6,6 +6,7 @@ import ts from 'typescript';
 import { todayKey } from '@finanzapp/domain';
 import { bindLocale } from '../src/i18n/bind.ts';
 import type { AppLocale } from '../src/i18n/locale.ts';
+import * as currenciesModule from '../src/ui/currencies.ts';
 
 // Producto 23.1C2: the real DateField (src/ui/form-controls.tsx) under a
 // locale that switches between renders, like the live provider (which never
@@ -15,20 +16,31 @@ import type { AppLocale } from '../src/i18n/locale.ts';
 // spun survives a language or region change and is saved as an ISO key.
 type Node = { type: any; props: Record<string, any> };
 
-function harness(os: 'ios' | 'android' = 'ios') {
+function harness(os: 'ios' | 'android' = 'ios', { reduced = true, insets = { top: 59, bottom: 34 }, currencies = {} as Record<string, unknown> } = {}) {
   let locale: AppLocale = 'es-AR';
   const source = readFileSync(new URL('../src/ui/form-controls.tsx', import.meta.url), 'utf8');
   const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText;
   const jsx = (type: any, props: any) => ({ type, props });
-  // Hooks persist by call order across renders, like React's, so the sheet and the draft outlive a re-render.
+  // Hooks persist by call order across renders, like React's, so the sheet and the draft outlive a re-render. Effects run
+  // after the render that scheduled them and only when their dependencies changed; a state change inside one re-renders.
   const state: unknown[] = [];
-  let cursor = 0;
+  const deps: unknown[][] = [];
+  let cursor = 0, effectCursor = 0, dirty = false;
+  let queued: (() => void)[] = [];
+  // The animated values, readable by the tests: a timing lands immediately and its completion callback runs at once.
+  const timings: { to: number; duration: number }[] = [];
   const modules: Record<string, unknown> = {
     react: { useMemo: (fn: () => unknown) => fn(), useState: (initial: unknown) => { const index = cursor++; if (!(index in state)) state[index] = initial;
-      return [state[index], (value: unknown) => { state[index] = value; }]; } },
+      return [state[index], (value: unknown) => { if (state[index] !== value) dirty = true; state[index] = value; }]; },
+    useEffect: (fn: () => void, next?: unknown[]) => { const index = effectCursor++; const previous = deps[index];
+      if (!previous || !next || next.length !== previous.length || next.some((item, i) => item !== previous[i])) { deps[index] = next ?? []; queued.push(fn); } } },
     'react/jsx-runtime': { jsx, jsxs: jsx, Fragment: 'Fragment' },
-    'react-native': { FlatList: 'FlatList', Keyboard: { dismiss() {} }, Modal: 'Modal', Platform: { OS: os }, View: 'View' },
-    'react-native-safe-area-context': { SafeAreaView: 'SafeAreaView' },
+    'react-native': { FlatList: 'FlatList', Keyboard: { dismiss() {} }, Modal: 'Modal', Platform: { OS: os }, Pressable: 'Pressable', StyleSheet: { absoluteFill: 'absoluteFill' }, View: 'View' },
+    // A shared value persists across renders by call order, like a hook.
+    'react-native-reanimated': { __esModule: true, default: { View: 'Animated.View' }, useSharedValue: (value: unknown) => { const index = cursor++; if (!(index in state)) state[index] = { value }; return state[index]; },
+      useAnimatedStyle: (fn: () => unknown) => fn(), runOnJS: (fn: (...args: unknown[]) => void) => fn,
+      withTiming: (to: number, config: { duration: number }, callback?: (finished: boolean) => void) => { timings.push({ to, duration: config.duration }); callback?.(true); return to; } },
+    'react-native-safe-area-context': { SafeAreaView: 'SafeAreaView', useSafeAreaInsets: () => insets },
     '@react-native-community/datetimepicker': 'DateTimePicker',
     '@expo/vector-icons/Ionicons': 'Ionicons',
     // The real day key: local calendar fields, never toISOString (UTC), exactly what the forms store.
@@ -36,8 +48,9 @@ function harness(os: 'ios' | 'android' = 'ios') {
     '../i18n/provider': { useI18n: () => bindLocale(locale) },
     './components': { AccountBadge: 'AccountBadge', AppText: 'AppText', CategoryBadge: 'CategoryBadge', DetailRow: 'DetailRow', SelectionRow: 'SelectionRow', Field: 'Field',
       GlyphTile: 'GlyphTile', PressFeedback: 'PressFeedback', Surface: 'Surface', surfaceShadow: () => ({}) },
-    './currencies': {}, './category-hues': {}, './categories': {}, './motion': { selectionHaptic: () => {} },
-    './theme': { radius: { group: 16 }, usePalette: () => ({ isDark: false, primary: '#2557D6', background: '#F2F2F6' }), useReduceMotion: () => true },
+    './currencies': currencies, './category-hues': {}, './categories': {}, './motion': { selectionHaptic: () => {}, timing: (kind: string, reducedMotion: boolean) => ({ duration: reducedMotion ? 0 : kind === 'exit' ? 100 : 200 }) },
+    './theme': { radius: { group: 16, sheet: 24 }, space: { xs: 4, s: 8, m: 12, l: 16, xl: 20 },
+      usePalette: () => ({ isDark: false, primary: '#2557D6', background: '#F2F2F6', surface: '#FFFFFF', line: '#E6E6EC', scrim: 'rgba(10, 10, 12, 0.32)' }), useReduceMotion: () => reduced },
   };
   const module = { exports: {} as Record<string, (props: any) => Node> };
   runInNewContext(code, { module, exports: module.exports, require: (name: string) => {
@@ -46,8 +59,18 @@ function harness(os: 'ios' | 'android' = 'ios') {
   } });
   const saved: string[] = [];
   const props = { value: new Date(2026, 8, 22, 12), onChange: (date: Date) => saved.push(todayKey(date)) };
-  const render = () => { cursor = 0; return module.exports.DateField!(props); };
-  return { render, saved, setLocale: (next: AppLocale) => { locale = next; } };
+  const render = (component = 'DateField', ownProps: any = props) => {
+    for (let pass = 0; pass < 4; pass++) {
+      cursor = 0; effectCursor = 0; dirty = false; queued = [];
+      const root = module.exports[component]!(ownProps);
+      // Rendering the local sheet component in place queues its effects too.
+      nodes(root);
+      for (const effect of queued) effect();
+      if (!dirty) return root;
+    }
+    throw new Error('the tree never settled');
+  };
+  return { render, saved, timings, setLocale: (next: AppLocale) => { locale = next; } };
 }
 
 /** Every node, with local function components (the sheet) rendered in place. */
@@ -55,7 +78,9 @@ function nodes(value: any): Node[] {
   if (!value || typeof value !== 'object') return [];
   if (Array.isArray(value)) return value.flatMap(nodes);
   if (!value.props) return [];
-  return [value, ...(typeof value.type === 'function' ? nodes(value.type(value.props)) : []), ...nodes(value.props.children)];
+  // A local component is rendered once per element, so walking the tree twice never re-runs its hooks.
+  if (typeof value.type === 'function' && !('rendered' in value)) value.rendered = value.type(value.props);
+  return [value, ...('rendered' in value ? nodes(value.rendered) : []), ...nodes(value.props.children)];
 }
 const find = (root: Node, type: string) => nodes(root).find(node => node.type === type);
 const labelOf = (node: Node) => [node.props.children].flat().map(child => typeof child === 'object' ? child?.props?.children : child).join('');
@@ -103,7 +128,8 @@ test('open, cancel and done: the sheet speaks the interface language, Cancel kee
   const field = harness();
   let root = field.render();
   assert.equal(find(root, 'Modal')!.props.visible, false);
-  assert.equal(find(root, 'Modal')!.props.presentationStyle, 'pageSheet');
+  assert.equal(find(root, 'Modal')!.props.transparent, true, '24B6: a compact bottom sheet over a scrim, not a page sheet');
+  assert.equal('presentationStyle' in find(root, 'Modal')!.props, false);
   find(root, 'DetailRow')!.props.onPress();
   root = field.render();
   assert.equal(find(root, 'Modal')!.props.visible, true);
@@ -165,4 +191,88 @@ test('Android: the system dialog saves on a chosen day and closes either way; th
   picker.props.onValueChange({ nativeEvent: { timestamp: 0, utcOffset: 0 } }, new Date(2026, 8, 19, 12));
   assert.deepEqual(field.saved, ['2026-09-19'], 'a chosen day is saved at once');
   assert.equal(find(field.render(), 'DateTimePicker'), undefined, 'and the dialog is closed');
+});
+
+// ---- Producto 24B6: the compact bottom sheet --------------------------------------------------------------
+
+/** The sheet's parts on iOS: the scrim, the card and the wheel's container. */
+function sheet(root: Node) {
+  const modal = find(root, 'Modal')!;
+  const animated = nodes(modal).filter(node => node.type === 'Animated.View');
+  const [scrim, card] = animated;
+  const flat = (style: any): Record<string, any> => Object.assign({}, ...[style].flat(Infinity).filter(item => item && typeof item === 'object'));
+  return { modal, scrim, card, scrimStyle: flat(scrim?.props.style), cardStyle: flat(card?.props.style),
+    wheelBox: nodes(card).find(node => node.type === 'View' && node.props.children?.type === 'DateTimePicker')! };
+}
+
+test('24B6: the date wheel opens in a compact bottom sheet sized to its content, not a page sheet: a scrim, a card with the header and the wheel centred, the home-indicator inset below', () => {
+  const field = harness('ios', { reduced: false });
+  find(field.render(), 'DetailRow')!.props.onPress();
+  const root = field.render();
+  const { modal, scrim, card, scrimStyle, cardStyle, wheelBox } = sheet(root);
+  assert.equal(modal.props.visible, true);
+  assert.equal(modal.props.transparent, true, 'the form stays visible behind the scrim');
+  assert.equal(modal.props.animationType, 'none', 'the sheet animates itself: the scrim fades while the card rises');
+  assert.equal(typeof modal.props.onRequestClose, 'function', 'the system back gesture cancels');
+  assert.deepEqual(scrimStyle, { backgroundColor: 'rgba(10, 10, 12, 0.32)', opacity: 1 }, 'the scrim is the palette token, fully shown once open');
+  assert.equal(scrim.props.style[0], 'absoluteFill');
+  const scrimPress = nodes(scrim).find(node => node.type === 'Pressable')!;
+  assert.equal(scrimPress.props.accessible, false, 'VoiceOver never lands on the scrim');
+  assert.equal(card.props.accessibilityViewIsModal, true, 'VoiceOver stays inside the card');
+  assert.equal(cardStyle.borderTopLeftRadius, 24);
+  assert.equal(cardStyle.borderTopRightRadius, 24);
+  assert.equal(cardStyle.backgroundColor, '#FFFFFF');
+  assert.equal(cardStyle.paddingBottom, 34, 'the home-indicator inset, from the safe area, not a constant');
+  assert.equal(cardStyle.opacity, 1);
+  assert.equal(JSON.stringify(cardStyle.transform), '[{"translateY":0}]', 'open: the card rests at the bottom edge');
+  assert.deepEqual(bar(root), ['Cancelar', 'Elegir fecha', 'Listo'], 'the header inside the card, in the drawn order');
+  assert.equal(nodes(card).find(node => node.type === 'AppText' && labelOf(node) === 'Elegir fecha')!.props.accessibilityRole, 'header');
+  assert.equal(wheelBox.props.style.alignItems, 'center', 'the wheel is centred in the card');
+  assert.equal(wheelBox.props.style.alignSelf, 'stretch');
+  const picker = find(root, 'DateTimePicker')!;
+  assert.equal(JSON.stringify(picker.props.style), '{"width":"100%"}');
+  assert.equal(picker.props.display, 'spinner');
+  assert.equal(picker.props.themeVariant, 'light');
+  assert.equal(todayKey(picker.props.minimumDate), '1900-01-01', 'the lower bound is kept');
+  assert.equal(todayKey(picker.props.maximumDate), todayKey(new Date()), 'no future date without allowFuture');
+  assert.equal(nodes(root).some(node => node.type === 'SafeAreaView'), false, 'no full-height safe-area page: the inset is applied to the card itself');
+  // The scrim cancels like the Cancel button: nothing saved, the wheel's draft dropped.
+  picker.props.onValueChange({ nativeEvent: { timestamp: 0, utcOffset: 0 } }, new Date(2026, 8, 3, 12));
+  scrimPress.props.onPress();
+  const closed = field.render();
+  assert.equal(find(closed, 'Modal')!.props.visible, false, 'unmounted once the exit finished');
+  assert.deepEqual(field.saved, []);
+  find(closed, 'DetailRow')!.props.onPress();
+  assert.equal(todayKey(find(field.render(), 'DateTimePicker')!.props.value), '2026-09-22', 'reopened on the saved day');
+});
+
+test('24B6: the sheet rises with the state timing and leaves with the exit timing; Reduce Motion keeps only the fades; a phone without a home indicator keeps a minimum inset', () => {
+  const moving = harness('ios', { reduced: false, insets: { top: 20, bottom: 0 } });
+  find(moving.render(), 'DetailRow')!.props.onPress();
+  let root = moving.render();
+  assert.deepEqual(moving.timings, [{ to: 1, duration: 200 }], 'the entrance is the state timing (200 ms), interruptible; nothing animates at mount');
+  assert.equal(sheet(root).cardStyle.paddingBottom, 12, 'a minimum inset below the wheel when the safe area has none');
+  button(root, 'Listo').props.onPress();
+  root = moving.render();
+  assert.deepEqual(moving.timings.at(-1), { to: 0, duration: 100 }, 'the exit is shorter than the entrance');
+  assert.equal(find(root, 'Modal')!.props.visible, false);
+  assert.deepEqual(moving.saved, ['2026-09-22']);
+
+  const still = harness('ios', { reduced: true });
+  find(still.render(), 'DetailRow')!.props.onPress();
+  root = still.render();
+  assert.deepEqual(still.timings, [{ to: 1, duration: 0 }], 'Reduce Motion: no timed movement');
+  const { cardStyle, scrimStyle } = sheet(root);
+  assert.equal(JSON.stringify(cardStyle.transform), '[{"translateY":0}]', 'the card never travels');
+  assert.equal(cardStyle.opacity, 1, 'it fades with the progress instead');
+  assert.equal(scrimStyle.opacity, 1);
+});
+
+test('24B6: the list sheets keep their page-sheet geometry: only the date field changed', () => {
+  const field = harness('ios', { currencies: currenciesModule });
+  const root = field.render('CurrencyField', { value: 'ARS', onChange: () => {}, currencies: ['ARS', 'USD'] });
+  const modal = find(root, 'Modal')!;
+  assert.equal(modal.props.presentationStyle, 'pageSheet');
+  assert.equal(modal.props.allowSwipeDismissal, true);
+  assert.equal(nodes(root).some(node => node.type === 'SafeAreaView'), true);
 });

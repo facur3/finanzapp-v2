@@ -203,19 +203,21 @@ test('form selectors keep the category hue and give the account the interaction 
   let cursor = 0;
   const modules: Record<string, any> = {
     '../i18n/format': i18nFormat, '../src/i18n/format': i18nFormat, '../../src/i18n/format': i18nFormat, '../i18n/provider': i18nProvider, '../src/i18n/provider': i18nProvider, '../../src/i18n/provider': i18nProvider,
-    react: { useMemo: (fn: () => unknown) => fn(), useState: (initial: unknown) => { const index = cursor++; if (!(index in state)) state[index] = initial;
+    react: { useEffect: () => {}, useMemo: (fn: () => unknown) => fn(), useState: (initial: unknown) => { const index = cursor++; if (!(index in state)) state[index] = initial;
       return [state[index], (value: unknown) => { state[index] = value; }]; } },
     'react/jsx-runtime': { jsx, jsxs: jsx, Fragment: 'Fragment' },
-    'react-native': { FlatList: 'FlatList', Keyboard: { dismiss() {} }, Modal: 'Modal', Platform: { OS: 'ios' }, View: 'View' },
-    'react-native-safe-area-context': { SafeAreaView: 'SafeAreaView' },
+    'react-native': { FlatList: 'FlatList', Keyboard: { dismiss() {} }, Modal: 'Modal', Platform: { OS: 'ios' }, Pressable: 'Pressable', StyleSheet: { absoluteFill: 'absoluteFill' }, View: 'View' },
+    // The date field's compact sheet (24B6) animates with Reanimated and reads the safe area; date-field.node.ts exercises it.
+    'react-native-reanimated': { __esModule: true, default: { View: 'Animated.View' }, useSharedValue: (value: unknown) => ({ value }), useAnimatedStyle: (fn: () => unknown) => fn(), runOnJS: (fn: unknown) => fn, withTiming: (value: unknown) => value },
+    'react-native-safe-area-context': { SafeAreaView: 'SafeAreaView', useSafeAreaInsets: () => ({ top: 59, bottom: 34, left: 0, right: 0 }) },
     '@react-native-community/datetimepicker': 'DateTimePicker',
     '@expo/vector-icons/Ionicons': 'Ionicons',
     './components': { useStacked: () => false, AccountBadge: 'AccountBadge', AppText: 'AppText', CategoryBadge: 'CategoryBadge', DetailRow: 'DetailRow', SelectionRow: 'SelectionRow', Field: 'Field', GlyphTile: 'GlyphTile', PressFeedback: 'PressFeedback', Surface: 'Surface', surfaceShadow: () => ({}) },
     './currencies': currencies,
     '@finanzapp/domain': { todayKey: (d: Date) => d.toISOString().slice(0, 10) },
     './category-hues': { useCategoryColor: (label: string) => label ? '#B0507A' : '#000', useCategoryDefinitions: () => [], useCategoryLook: (label: string) => ({ label, hex: label ? '#B0507A' : '#000', glyph: 'paw-outline' }), useAccountNameOf: () => (account: any) => account.name, useAccountLookOf: () => () => ({ glyph: 'wallet-outline', hex: '#2557D6' }) },
-    './motion': { selectionHaptic: () => {} },
-    './theme': { radius: { group: 16 }, usePalette: () => ({ surface: '#fff', text: '#000', primary: '#2557D6', primarySoft: '#E5ECFB', secondary: '#666', tertiary: '#999', background: '#fff', isDark: false }), useReduceMotion: () => true },
+    './motion': { selectionHaptic: () => {}, timing: () => ({ duration: 0 }) },
+    './theme': { space: { s: 8, m: 12, l: 16 }, radius: { group: 16, sheet: 24 }, usePalette: () => ({ surface: '#fff', text: '#000', primary: '#2557D6', primarySoft: '#E5ECFB', secondary: '#666', tertiary: '#999', background: '#fff', isDark: false }), useReduceMotion: () => true },
     './categories': { categoryChoices: () => [], categoryIcon: () => 'paw-outline', categoryKey: (label: string) => label.toLowerCase(), customCategory: () => null },
   };
   const module = { exports: {} as Record<string, (props: any) => any> };

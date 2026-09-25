@@ -1,6 +1,7 @@
-import { useMemo, useState, type ReactNode } from 'react';
-import { FlatList, Keyboard, Modal, Platform, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { FlatList, Keyboard, Modal, Platform, Pressable, StyleSheet, View } from 'react-native';
+import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { todayKey, type Account, type AccountKind, type Currency, type Entry, type EntryKind } from '@finanzapp/domain';
@@ -8,8 +9,8 @@ import { AccountBadge, AppText, CategoryBadge, DetailRow, Field, GlyphTile, Pres
 import { SEARCHABLE_FROM, currencyChoices, currencyOption, offeredCurrencies, searchChoices, type CurrencyChoice } from './currencies';
 import { useI18n } from '../i18n/provider';
 import { useAccountLookOf, useCategoryDefinitions, useCategoryLook } from './category-hues';
-import { selectionHaptic } from './motion';
-import { radius, usePalette, useReduceMotion } from './theme';
+import { selectionHaptic, timing } from './motion';
+import { radius, space, usePalette, useReduceMotion } from './theme';
 import { categoryChoices, categoryKey, customCategory } from './categories';
 
 /** Full-width selector used for the two choices a user must never overlook in
@@ -174,6 +175,62 @@ export function CurrencySheet({ visible, title, options, value, note, searchable
   </SelectionSheet>;
 }
 
+/** A compact sheet anchored to the bottom of the screen, sized to its content, for a
+ * control that needs no list: the date wheel. A page sheet (`SelectionSheet`) is the
+ * right shape for a list that scrolls, but on an iPhone it gives a 216 pt wheel a
+ * near-empty screen; this card is the height of its header and its wheel, over a
+ * scrim that keeps the form visible, with the home-indicator inset below (24B6).
+ * Presentation is a transparent native modal (VoiceOver stays inside the card); the
+ * motion is the app's own state timing: the scrim fades and the card rises from the
+ * bottom edge, both interruptible; Reduce Motion keeps the fades and drops the rise.
+ * The card stays mounted while it leaves, so nothing snaps away, and unmounts once
+ * the exit ends. Cancel, the scrim and the system back gesture leave without saving;
+ * only Listo commits. Nothing here captures a screen or replays a navigation. */
+function BottomSheet({ visible, title, onClose, onDone, children }: {
+  visible: boolean; title: string; onClose: () => void; onDone: () => void; children: ReactNode;
+}) {
+  const p = usePalette();
+  const reduced = useReduceMotion();
+  const { t } = useI18n();
+  const insets = useSafeAreaInsets();
+  const [shown, setShown] = useState(visible);
+  const progress = useSharedValue(visible ? 1 : 0);
+  // The card's measured height, so the rise starts exactly below the screen edge whatever the text size; a guess until measured.
+  const height = useSharedValue(360);
+  useEffect(() => {
+    if (visible) { setShown(true); progress.value = withTiming(1, timing('state', reduced)); }
+    else if (shown) progress.value = withTiming(0, timing('exit', reduced), finished => { if (finished) runOnJS(setShown)(false); });
+    // `shown` is read, not depended on: the exit runs once, when `visible` drops, not again when it unmounts the modal.
+  }, [visible, reduced, progress]);
+  const scrimStyle = useAnimatedStyle(() => ({ opacity: progress.value }));
+  const cardStyle = useAnimatedStyle(() => ({
+    opacity: reduced ? progress.value : 1,
+    transform: [{ translateY: reduced ? 0 : (1 - progress.value) * height.value }],
+  }));
+  return <Modal visible={shown} transparent animationType="none" statusBarTranslucent onRequestClose={onClose}>
+    <View style={{ flex: 1, justifyContent: 'flex-end' }}>
+      <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: p.scrim }, scrimStyle]}>
+        {/* The scrim cancels; VoiceOver never lands on it (the card below is modal). */}
+        <Pressable accessible={false} importantForAccessibility="no" style={{ flex: 1 }} onPress={onClose} />
+      </Animated.View>
+      <Animated.View accessibilityViewIsModal onLayout={event => { height.value = event.nativeEvent.layout.height; }}
+        style={[{ backgroundColor: p.surface, borderTopLeftRadius: radius.sheet, borderTopRightRadius: radius.sheet, overflow: 'hidden',
+          paddingBottom: Math.max(insets.bottom, space.m) }, cardStyle]}>
+        <View accessible={false} style={{ alignItems: 'center', paddingTop: 8 }}>
+          <View style={{ width: 36, height: 5, borderRadius: 2.5, backgroundColor: p.line }} />
+        </View>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: space.l, paddingVertical: space.m, minHeight: 52 }}>
+          <PressFeedback feedback="opacity" accessibilityRole="button" onPress={onClose} hitSlop={8}><AppText style={{ color: p.primary, fontSize: 16 }}>{t('common.cancel')}</AppText></PressFeedback>
+          <AppText accessibilityRole="header" numberOfLines={2} style={{ flex: 1, textAlign: 'center', fontWeight: '600' }}>{title}</AppText>
+          <PressFeedback feedback="opacity" accessibilityRole="button" onPress={onDone} hitSlop={8}><AppText style={{ color: p.primary, fontSize: 16, fontWeight: '600' }}>{t('common.done')}</AppText></PressFeedback>
+        </View>
+        {/* The wheel sits centred in the card: as wide as the card's content, its columns centred by UIKit. */}
+        <View style={{ alignSelf: 'stretch', alignItems: 'center', paddingHorizontal: space.l, paddingBottom: space.s }}>{children}</View>
+      </Animated.View>
+    </View>
+  </Modal>;
+}
+
 export function DateField({ value, onChange, disabled = false, allowFuture = false, label }: {
   value: Date; onChange: (date: Date) => void; disabled?: boolean; allowFuture?: boolean; label?: string;
 }) {
@@ -199,10 +256,11 @@ export function DateField({ value, onChange, disabled = false, allowFuture = fal
     {/* VoiceOver hears the date written out ("22 de septiembre de 2026"), not the abbreviated month on screen. */}
     <DetailRow label={title} icon="calendar-outline" last disabled={disabled} onPress={open} layout="inline"
       value={formatDate(day, 'dayYear')} spokenValue={formatDate(day, 'long')} />
-    {Platform.OS === 'ios' ? <SelectionSheet visible={visible} title={label === undefined ? t('selection.chooseDate') : label} onClose={() => setVisible(false)}
+    {/* iOS: the compact bottom sheet (24B6); the list sheets of the other fields keep their page-sheet geometry. */}
+    {Platform.OS === 'ios' ? <BottomSheet visible={visible} title={label === undefined ? t('selection.chooseDate') : label} onClose={() => setVisible(false)}
       onDone={() => { onChange(draft); setVisible(false); }}>
-      <View style={{ width: '100%', overflow: 'hidden', paddingTop: 20 }}>{picker}</View>
-    </SelectionSheet> : visible && picker}
+      {picker}
+    </BottomSheet> : visible && picker}
   </>;
 }
 
