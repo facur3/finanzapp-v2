@@ -1,8 +1,9 @@
-import { LocalePreferenceScreen } from '../src/ui/locale-preference';
+import { LocaleChooser } from '../src/ui/locale-choosers';
 
-/** Más → App y datos → Región (released in Producto 23.1C2): Argentina or
- * Estados Unidos, chosen independently of the language. Más hides the row in
+/** Más → App y datos → Región: the released regions (Argentina and Estados
+ * Unidos; every catalogue region in a development preview, 24R2A), chosen
+ * independently of the language, drawn by `ChoiceScreen`. Más hides the row in
  * a build with a single released region. */
 export default function RegionScreen() {
-  return <LocalePreferenceScreen kind="region" />;
+  return <LocaleChooser kind="region" />;
 }

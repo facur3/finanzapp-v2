@@ -80,24 +80,25 @@ const rendered = (root: Node) => list(root).props.data.map((item: any) => list(r
 
 test('the screen: a search field only from six options, header rows as VoiceOver headers, CheckRow rows grouped by position, autonyms with their language, and the footnote outside the list', () => {
   const chosen: string[] = [];
-  const few = screen({ title: 'Idioma', options: [{ value: 'es', title: 'Español', language: 'es' }, { value: 'en', title: 'English', language: 'en' }], pinned, selected: 'es', onChoose: (value: string) => { chosen.push(value); return true; }, note: 'No modifica nada.' });
+  const few = screen({ title: 'Idioma', options: [{ value: 'es', title: 'Español', language: 'es' }, { value: 'en', title: 'English', language: 'en' }], pinned, recent: ['en'], selected: 'es', onChoose: (value: string) => { chosen.push(value); return true; }, note: 'No modifica nada.' });
   let root = few.render();
   assert.equal(nodes(root).find(node => node.type === 'Stack.Screen')!.props.options.title, 'Idioma');
   assert.equal(list(root).props.ListHeaderComponent, null, 'two options are read, not searched');
   assert.equal(list(root).props.keyboardShouldPersistTaps, 'handled');
   assert.equal(list(root).props.removeClippedSubviews, false);
   const rows = rendered(root);
-  assert.deepEqual(rows.map((row: Node) => nodes(row).find(node => node.type === 'CheckRow')?.props.title ?? '# ' + row.props.children), ['Según el dispositivo', '# E', 'Español', 'English'], 'the caller\'s order inside a section');
-  const english = nodes(rows[3]).find(node => node.type === 'CheckRow')!;
+  assert.deepEqual(rows.map((row: Node) => nodes(row).find(node => node.type === 'CheckRow')?.props.title ?? '# ' + row.props.children), ['Según el dispositivo', 'Español', 'English'],
+    'a short list (24R2A): one card in the caller\'s order under the pinned row, no recents, no lettered section');
+  const english = nodes(rows[2]).find(node => node.type === 'CheckRow')!;
   assert.deepEqual([english.props.accessibilityLanguage, english.props.selected, english.props.last], ['en', false, true], 'an autonym is spoken in its own language');
-  assert.deepEqual([nodes(rows[2]).find(node => node.type === 'CheckRow')!.props.selected, nodes(rows[2]).find(node => node.type === 'CheckRow')!.props.last, nodes(rows[2]).find(node => node.type === 'CheckRow')!.props.accessibilityLanguage], [true, false, 'es']);
-  assert.equal(rows[1].props.accessibilityRole, 'header');
+  assert.deepEqual([nodes(rows[1]).find(node => node.type === 'CheckRow')!.props.selected, nodes(rows[1]).find(node => node.type === 'CheckRow')!.props.last, nodes(rows[1]).find(node => node.type === 'CheckRow')!.props.accessibilityLanguage], [true, false, 'es']);
+  assert.deepEqual(list(root).props.data.map((row: any) => row.kind === 'choice' ? row.position : '#'), ['only', 'first', 'last']);
   assert.deepEqual([few.groupStyle('first'), few.groupStyle('last'), few.groupStyle('only'), few.groupStyle('middle')].map(style => Object.keys(style).sort().join(',')),
     ['borderTopLeftRadius,borderTopRightRadius', 'borderBottomLeftRadius,borderBottomRightRadius', 'borderRadius,marginTop', ''], 'consecutive rows draw one grouped card');
   assert.match(nodes(list(root).props.ListFooterComponent).filter(node => node.type === 'AppText').map(node => String(node.props.children)).join(' '), /No modifica nada/);
   assert.equal(nodes(list(root).props.ListFooterComponent).find(node => node.type === 'ErrorMessage')!.props.message, null);
   // Choosing: the current option does nothing; another saves, ticks and keeps no error.
-  nodes(rows[2]).find(node => node.type === 'CheckRow')!.props.onPress();
+  nodes(rows[1]).find(node => node.type === 'CheckRow')!.props.onPress();
   assert.deepEqual([chosen, few.haptics], [[], []]);
   english.props.onPress();
   assert.deepEqual([chosen, few.haptics], [['en'], ['selection']]);
@@ -109,6 +110,7 @@ test('the screen: a search field only from six options, header rows as VoiceOver
   assert.deepEqual([field.props.label, field.props.value, field.props.autoCapitalize], ['Buscar', '', 'none'], 'a search field over 257 regions');
   assert.deepEqual(list(root).props.data.slice(0, 5).map((row: any) => row.kind === 'header' ? '# ' + row.title : row.option.value), ['system', '# Recientes', 'JP', 'GB', '# A']);
   assert.equal(list(root).props.data.filter((row: any) => row.kind === 'choice').length, 257 + 1 + 2);
+  assert.equal(rendered(root)[1].props.accessibilityRole, 'header', 'a section header is a VoiceOver header');
   assert.equal(list(root).props.initialNumToRender, 16, 'virtualized: a window of rows, never the whole list at once');
   field.props.onChangeText('jap');
   root = many.render();

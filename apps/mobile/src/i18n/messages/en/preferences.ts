@@ -15,7 +15,9 @@ export const preferences: Pick<Messages, 'preferences'> = {
     regionNote: 'The region sets how dates, numbers and amounts are written. It does not change the currency of your accounts.',
     dataUntouched: 'Changing the language or the region does not modify your transactions, accounts or backups.',
     saveFailed: 'The preference could not be saved. Your previous choice is still active; please try again.',
-    regionNames: { AR: 'Argentina', US: 'United States' },
+    pendingRegion: 'Not available in this version yet · {fallback} formats',
+    pendingSummary: '{value} · {fallback} formats',
+    previewNote: 'Development preview: includes regions not yet verified on an iPhone.',
     regionSample: '{date} · {amount}',
   },
 };

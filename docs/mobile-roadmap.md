@@ -1,6 +1,6 @@
 # FinanzApp mobile: living roadmap
 
-Updated: 2026-09-25 (Producto 24UX5). Read [decision 001](decisions/001-native-mobile.md),
+Updated: 2026-09-25 (Producto 24R2A). Read [decision 001](decisions/001-native-mobile.md),
 [decision 002](decisions/002-spending-first.md),
 [decision 003](decisions/003-five-tabs-and-cards.md) and
 [decision 004](decisions/004-native-first-and-web-retirement.md). Decision 002 supersedes
@@ -195,6 +195,13 @@ file).
   recents, alphabetical sections, ranked search, the no-match sentence) not yet mounted, and
   `recent.ts` for the last three choices per chooser. The review of PR #53 made `formatDayMonth`
   path-independent (`registryRegionOf`, `sameWriting`) and fixed the chooser's no-match state.
+  Producto 24R2A derived `REGIONS` and `RegionCode` from the catalogue (the hand-written
+  `REGION_REGISTRY` keeps AR/US byte-identical), mounted `ChoiceScreen` behind Más → Idioma and →
+  Región (`LocaleChooser`, reusable by the onboarding), kept a region chosen in the development
+  preview across release builds with its stand-in named, taught the amount field every group family
+  (lakh, minimum grouping, apostrophe, narrow and no-break spaces, other scripts' digits on paste)
+  through one grouping rule, and wrote the release plan by convention family (`region-release.ts`);
+  AR and US are still the only released regions.
 - **Currencies.** The ISO 4217/CLDR catalogue (178 codes, pinned, `currency:verify` offline in
   CI); the pure amount model for exponents 0–4; presentation, copy and spoken forms for any
   currency with ARS/USD byte-identical goldens; storage and forms currency-aware (24B1–24B5:
@@ -245,8 +252,12 @@ item unless a section says a new native build is needed. The checklist sections 
   and safe areas; Reduce Motion as a timed fade; the darker light `secondary`/`tertiary` inks on the
   Home captions and the hero's cents (checklist, Producto 24UX1). No EAS build was made; judge the
   feel in at least the development build, ideally a release build.
+- **24R2A — the native choosers and the preview regions:** Más → Idioma and → Región as
+  `ChoiceScreen` (one card for the released values; in the preview, 257 regions with search, recents
+  and sections), the kept preview choice in a release build, formats and the amount field per family
+  in the preview (checklist, Producto 24R2A). The evidence that opens each 24R2B stage.
 - **24R1 — the device-Region line:** an iPhone whose Region is an unreleased country shows
-  "Ahora: … (formatos de Argentina)" in Más → Región; nothing else is visible until 24R2.
+  "Ahora: … (formatos de Argentina)" in Más → Región.
 - **24B6 — the date sheet, one display currency, the card rules:** the compact card over the
   scrim (geometry, inset, Dark Mode, Dynamic Type, VoiceOver order, Escape), Cancelar / Listo /
   scrim semantics, Reduce Motion; the display currency travelling between Inicio and Reportes
@@ -532,7 +543,7 @@ the owner authorises it; no EAS build or store submission without the owner.
     FinanzApp Dev's ledger to schema 10 (additive, one-way): export a backup first.
   - **Merged** on 2026-09-25 (`dfa1fc8`); CI green on the merge commit.
 
-### Producto 24UX5 — final visual consistency, copy and recurring audit (this PR)
+### Producto 24UX5 — final visual consistency, copy and recurring audit (PR #59)
 
 - **Goal.** Finish the direction the owner approved on the iPhone in 24UX3 without a redesign: a token for
   secondary links, one mark size across Inicio's two lists, a Home-only row presentation with less text,
@@ -633,24 +644,75 @@ the owner authorises it; no EAS build or store submission without the owner.
     previous code), plus every other gate below.
   - **Pending:** the device QA of §2 (checklist, Producto 24UX5).
 
-### Producto 24R2 — international regions released
+### Producto 24R2A — regions integrated, native choosers, formats for every family (this PR)
 
-- **Goal.** A person in any catalogue country gets that country's conventions once verified.
-- **Scope** (docs/i18n.md §11a.5): derive `REGIONS` from the catalogue and widen `RegionCode`,
-  `AppLocale`, `regionPreferenceFrom` and `SPEECH_REGIONS`' consumers to catalogue codes; a
-  stored region outside the gate is kept and applied only once released (as a previewed
-  language); `RELEASED_REGIONS` opens progressively; mount `ChoiceScreen` behind Más → Región
-  and → Idioma (search, recents, sections); the Más row summary and the fallback sentence for a
-  catalogue region; the currency-neutral onboarding hook; the amount field with the region's
-  separators (an apostrophe or narrow-space group character, lakh grouping, the decimal pad's
-  device separator).
-- **Out of scope.** FX, SQLite changes, a new language, any currency.
-- **Gates.** Per convention family on the iPhone before release (proposal: the Spanish-speaking
-  Americas and Spain, the United Kingdom, Canada, Brazil, Japan, India, Germany, Switzerland):
-  the amount field typing its separators, numeric dates, the clock, the spoken forms; the
-  chooser at 60/120 Hz over 257 rows, Dynamic Type at the largest sizes, VoiceOver order and
-  header roles, Reduce Motion. Each region released in its own commit after its evidence.
-- **Depends on.** 24R1 (merged), the 24UX1 chooser fixes, 24REP (merged before it starts).
+- **Goal.** Everything a region needs, integrated and tested for all 257 catalogue regions, with the
+  release gate unchanged: Spanish and English, Argentina and the United States stay the only published
+  values; every other region is a development preview until its family passes the iPhone QA of 24R2B.
+  Language, region and each account's currency stay three independent preferences.
+- **Delivered.**
+  - *The registry derived from the catalogue* (`src/i18n/locale.ts`): `RegionCode` is the catalogue's
+    257 codes; `REGIONS` is built from `regions/data.ts` (CLDR 48.2.0) with the hand-written
+    `REGION_REGISTRY` (Argentina and the United States, 23.1) winning field by field, so AR/US write
+    byte-identical strings (Argentina's 24-hour clock stays the one deliberate deviation; the generator
+    now checks the registry, not the derived map). `AppLocale` covers every language × region pair.
+    `registryRegionOf` (the ledger's "5/09") is limited to the registry.
+  - *The gate and the preview*: `RELEASED_REGIONS = ['AR', 'US']` unchanged; `PREVIEW.regions` is the
+    whole catalogue, reachable only in a development bundle started with `EXPO_PUBLIC_LOCALE_PREVIEW=1`
+    (a release bundle compiles the flag away; the export contains no `LOCALE_PREVIEW`).
+    `src/i18n/region-release.ts` holds the release plan: ten stages by convention family (the
+    released `home` stage, then Spanish-speaking regions, UK/Canada, Brazil, Japan, India, Germany,
+    Switzerland, France's narrow space, Poland/Portugal's space with minimum grouping two), covering the
+    eight number families of the catalogue; a test keeps `RELEASED_REGIONS` equal to the stages marked
+    released, so opening a stage is one commit after its evidence.
+  - *Device and preferences*: "Según el dispositivo" reads iOS's Region setting (expo-localization's
+    `regionCode` is `Locale.current`'s region), never a language, never a second language, never a
+    location (a test scans for location APIs). A manual choice is saved before it is applied and wins.
+    A region chosen in the preview is **kept** by a release build (`regionPreferenceFrom` accepts any
+    catalogue code), never applied or overwritten; formats fall through to the device, then Argentina;
+    Más says «Japón · formatos de Estados Unidos» and Región lists it, checked, «Todavía no disponible en
+    esta versión · formatos de …»; it applies by itself once released (`pendingRegionChoice`).
+  - *Choosers*: Más → Idioma and → Región are `ChoiceScreen` (`src/ui/locale-choosers.tsx`,
+    `LocaleChooser` with an `onChosen` for the onboarding): «Según el dispositivo» pinned; a short list
+    (two languages, two regions) is one grouped card; from six options a search field (name, alpha-2,
+    alpha-3, numeric code, currency; accent-insensitive), the last three choices and alphabetical
+    sections; autonyms spoken in their own language; header rows with the header role; one virtualized
+    list, no fixed row height (Dynamic Type). `locale-preference.tsx` was removed.
+  - *Formats and the amount field*: one grouping rule (`src/i18n/grouping.ts`) for the formatters and
+    `money-input.ts`: lakh/crore, minimum grouping two, and any one-character group (point, comma,
+    apostrophe, no-break or narrow no-break space). Typing keeps the caret on its digit; a backspace over
+    any group separator removes the digit before it; either pad key is the decimal; a paste reads lakh,
+    apostrophes and spaces as grouping only, Arabic-Indic, Eastern Arabic-Indic and full-width digits as
+    the same digits, and still refuses a lone separator before three digits that is not the region's
+    group. A region change mid-edit keeps the draft (ledger notation) and the logical caret.
+- **Not changed.** SQLite, backups, accounting rules, enabled currencies, FX, the Home and Reportes
+  design, any language (es/en only), `supportedLocales`, the bundle identifier. No new dependency.
+- **Status.** Delivered on this branch (2026-09-25), not device-verified.
+  - **Checked on Linux:** mobile `npm run typecheck`; `npm run test:storage` 669/669 (was 653: +15 new
+    `regions-integration.node.ts` — the derived registry, grouping, 14 language × region goldens,
+    every region × both languages, typing per family, the caret around a group, pasting, the 257-region
+    display→paste round trip and draft round trip, a region change mid-edit, the device Region, the
+    kept preview choice, the combinations, the choosers, recents, the release plan; +1 `locale-switch`:
+    the real `AmountField` under the real provider across India, Switzerland, France and a device
+    change to Poland; the chooser, gate and registry tests updated); `currency:verify`, `regions:verify`,
+    `regions:generate -- --check`, `currency:generate -- --check`, `i18n:check -- --strict` (English
+    reviewed and accepted), `i18n:extract`, `check`, `export:ios` (5 MB, no `LOCALE_PREVIEW`); root
+    `npm test` 302/302 and `npm run check:repo`. No EAS build; the iPhone was not touched.
+  - **Pending:** the device QA of §2 and the checklist section Producto 24R2A.
+
+### Producto 24R2B — regions released by family (next)
+
+- **Goal.** Open `RELEASED_REGIONS` stage by stage (`REGION_RELEASE_STAGES`), each after its iPhone
+  evidence, in its own commit that flips the stage's status and adds its regions.
+- **Gates per stage** (checklist, Producto 24R2B): with the iPhone's Region set to a region of the stage
+  and FinanzApp Dev on the preview: the amount field typing, pasting and deleting around its group
+  separator; the pad's decimal key; numeric dates, the day of the period and the clock; VoiceOver amounts;
+  Reportes and Inicio at the largest Dynamic Type. Once per delivery: the chooser over 257 rows at
+  60/120 Hz, search, recents, VoiceOver order and header roles, Reduce Motion, a Region change with a
+  form open. Korean and Hungarian dates (a period followed by a space) are written without the space
+  until a stage decides it.
+- **Out of scope.** FX, SQLite changes, a new language, any currency, an EAS build without the owner.
+- **Depends on.** 24R2A (this PR) merged.
 
 ### Producto 24M — verified currencies opened
 
@@ -683,7 +745,7 @@ the owner authorises it; no EAS build or store submission without the owner.
 - **Gates.** Domain tests for every conversion path and rounding; no request without a purchase
   or a report that needs it; opt-in with the provider named; server-side key if any; the owner
   configures the provider before any live fetch.
-- **Depends on.** 24M for the currencies it converts; 24R2 for the separators of the regions it
+- **Depends on.** 24M for the currencies it converts; 24R2B for the separators of the regions it
   writes in.
 
 ### Producto 25A — the real Assistant: multilingual, voice, analytical questions, drafts and confirmation
@@ -765,7 +827,7 @@ the owner authorises it; no EAS build or store submission without the owner.
 - **Out of scope.** Any account requirement, telemetry, a paywall.
 - **Gates.** A fresh install and an upgrade on the iPhone, both languages, VoiceOver through the
   whole flow, nothing written until the person finishes.
-- **Depends on.** 24R2 (regions), 24M (currencies); 24C for the report-currency step.
+- **Depends on.** 24R2B (regions), 24M (currencies); 24C for the report-currency step.
 
 ### Producto 25C — budgets with rollover, goals, CSV and productivity
 

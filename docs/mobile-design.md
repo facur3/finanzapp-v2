@@ -381,6 +381,29 @@ importe, moneda y estado.
   muestra hasta que toda la app lo tenga (23.1): un iPhone en inglés sigue leyendo
   español antes que media app traducida.
 
+## Producto 24R2A — Idioma y Región como selectores nativos (Argentina y Estados Unidos siguen siendo las únicas regiones publicadas)
+
+Más → Idioma y Más → Región pasan a ser `ChoiceScreen` (`src/ui/locale-choosers.tsx`), con el lenguaje
+de Ajustes de iOS y sin rediseñar nada más:
+- **Arriba, fijo, «Según el dispositivo»** con lo que da el iPhone ahora («Ahora: Estados Unidos»,
+  «Ahora: Japón (formatos de Argentina)»). Nunca se filtra ni entra en una sección.
+- **Lista corta = una tarjeta.** Con los valores publicados (dos idiomas, dos regiones) la pantalla es
+  la fila fijada y una sola tarjeta agrupada debajo: sin buscador, sin «Recientes», sin letras. Cada
+  región muestra su muestra de formatos («22/9/2026 · 1.234,56»); cada idioma, su autónimo leído por
+  su propia voz.
+- **Lista larga (vista previa de desarrollo, 257 regiones).** Desde seis opciones: el campo «Buscar»
+  (nombre sin acentos, código de dos o tres letras, código numérico, moneda), «Recientes» con las
+  tres últimas elecciones leídas al abrir (la lista nunca salta bajo el dedo), y secciones
+  alfabéticas por inicial con encabezados que VoiceOver anuncia como encabezados. Una sola lista
+  virtualizada, filas sin alto fijo (Dynamic Type), sin banderas ni colores por país.
+- **Una región elegida en la vista previa y no publicada** sigue guardada y marcada, con el subtítulo
+  «Todavía no disponible en esta versión · formatos de Estados Unidos»; la fila de Más dice «Japón ·
+  formatos de Estados Unidos». Nunca se presenta como si sus formatos estuvieran en uso.
+- **Las notas** (qué define la región, que no cambia la moneda ni los datos, y en la vista previa que
+  sus regiones no se verificaron en un iPhone) van debajo de la lista, nunca dentro.
+- **Onboarding.** `LocaleChooser` acepta `onChosen`, así el paso de idioma y el de región del
+  onboarding (25B) son la misma pantalla.
+
 ## Producto 24R1 — selectores regionales preparados (sin cambios visuales en producción)
 
 Nada cambia en un iPhone con Región Argentina o Estados Unidos. Con la Región en otro país, la fila
@@ -1192,9 +1215,14 @@ color propio.
   `EXPO_PUBLIC_MERCHANT_MARK_PREVIEW=1`, que las filas reconocidas (Netflix, Spotify, Mercado Pago)
   muestren la inicial y las demás su categoría. Lista en docs/mobile-device-checklist.md.
 
+- Producto 24R2A: Idioma y Región como una tarjeta bajo «Según el dispositivo» (tamaños de texto de
+  accesibilidad, VoiceOver, ambos temas); con `EXPO_PUBLIC_LOCALE_PREVIEW=1`, Región con 257 filas:
+  desplazamiento a 60/120 Hz, búsqueda, Recientes, encabezados de sección, Reduce Motion; la región
+  de la vista previa conservada en un build sin vista previa. Lista en docs/mobile-device-checklist.md.
+
 - Producto 24R1: con la Región del iPhone en un país no publicado (Japón, Reino Unido), Más →
   Región → «Según el dispositivo» dice «Ahora: Japón (formatos de Argentina)» en ambos idiomas; con
-  Argentina o Estados Unidos, la frase de siempre. Nada más es visible hasta 24R2.
+  Argentina o Estados Unidos, la frase de siempre. 
 
 - Producto 24B6: la hoja de fecha (alto, centrado de la rueda, velo, subida y bajada, Reduce
   Motion, ambos temas, Dynamic Type, VoiceOver, área segura); el cambio de moneda en Inicio visto

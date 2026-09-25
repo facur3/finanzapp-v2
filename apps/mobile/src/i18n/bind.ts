@@ -9,7 +9,7 @@ import type { IsoCurrencyCode } from '@finanzapp/domain';
 import type { LocaleSource } from './device.ts';
 import { amountFormat, codedAmount, currencyName, currencySymbol, currencyUnit, formatCount, formatMoneyAmount, formatDate, formatDateTime, formatDayMonth, formatMonth, formatMonthTitle,
   formatNumericDate, formatPercent, formatWholeUnits, moneyText, pickerLocale, relativeDate, spokenAmount, spokenMinor, spokenMoney, spokenPercent, type DateStyle,
-  type HeldCurrencies } from './format.ts';
+  type HeldCurrencies, type RegionAmountFormat } from './format.ts';
 import { localizeError } from './errors.ts';
 import { completeConventions, conventionsOf, languageOf, regionOf, type AppLocale, type LanguageCode, type RegionCode, type RegionConventions } from './locale.ts';
 import { translator, type Translate } from './messages.ts';
@@ -59,8 +59,8 @@ export interface I18n {
   currencyUnit: (currency: IsoCurrencyCode, word?: string) => string;
   /** The currencies the ledger holds, as `HeldCurrenciesProvider` gave them (empty outside it or in an empty ledger). */
   heldCurrencies: HeldCurrencies;
-  /** The separators the amount field types in. */
-  amountFormat: { decimal: string; group: string };
+  /** The separators and grouping the amount field types in. */
+  amountFormat: RegionAmountFormat;
   /** The conventions every regional formatter above writes in: the locale's released region, or the explicit ones a caller bound (24R1). */
   conventions: Required<RegionConventions>;
   /** The date wheel's locale identifier: the language with its home region ("es_AR", "en_US"). */

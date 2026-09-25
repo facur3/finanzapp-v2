@@ -70,7 +70,7 @@ test('both catalogues are complete: no empty text, and English is really English
   const keys = messageKeys(es);
   assert.deepEqual(messageKeys(en), keys);
   // Identical in both languages on purpose: proper names, format-only templates and the one-word English plural.
-  const same = new Set(['preferences.regionNames.AR', 'preferences.regionSample', 'transferForm.figure', 'selection.category',
+  const same = new Set(['preferences.regionSample', 'transferForm.figure', 'selection.category',
     // "Pesos" is also the English word; format-only templates; proper and technical names.
     'currency.option', 'currency.short.ARS', 'reports.dayRow', 'reports.insights.largestDetail',
     'reports.chart.donutLabel', 'reports.chart.bar', 'reports.chart.timelineBar', 'categoryManager.list.rowLabel', 'categoryManager.picker.color',

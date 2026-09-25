@@ -10,6 +10,7 @@
     "src/storage/LedgerProvider.tsx": "Storage errors, translated at display time by src/i18n/errors.ts.",
     "src/i18n/regions/data.ts": "Generated region catalogue (CLDR codes and conventions), not interface copy.",
     "src/i18n/regions/es.ts": "Generated region names from CLDR (data, not interface copy); the chooser shows them as CLDR wrote them.",
-    "src/i18n/regions/en.ts": "Generated region names from CLDR (data, not interface copy); the chooser shows them as CLDR wrote them."
+    "src/i18n/regions/en.ts": "Generated region names from CLDR (data, not interface copy); the chooser shows them as CLDR wrote them.",
+    "src/i18n/region-release.ts": "The regions' release plan (stage ids and the purpose of each device check) for developers and the checklist; never shown in the app."
   }
 }

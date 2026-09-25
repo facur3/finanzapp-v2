@@ -5,7 +5,7 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { LOCALE_CHANGED_EVENT, deviceLocales, primaryLanguageOf, readDeviceLocales, subscribeDeviceLocaleChanges } from '../src/i18n/device.ts';
 import { codedAmount, currencyName, currencySymbol, dateFromISO, daysAgo, formatAmount, formatCount, formatDate, formatDateTime, formatDayMonth, formatMonth, formatNumericDate,
   formatPercent, moneyText, pickerLocale, relativeDate, relativeDayName, speechLocale, spokenAmount, spokenMoney, spokenNumber, spokenPercent, withCurrencyCode } from '../src/i18n/format.ts';
-import { DEFAULT_LOCALE, LANGUAGES, PREVIEW, REGIONS, RELEASED, RELEASED_LANGUAGES, RELEASED_REGIONS, releasedForBuild, SUPPORTED_LANGUAGES, SUPPORTED_REGIONS, composeLocale, languageForTag,
+import { DEFAULT_LOCALE, LANGUAGES, PREVIEW, REGIONS, REGION_REGISTRY, RELEASED, completeConventions, RELEASED_LANGUAGES, RELEASED_REGIONS, releasedForBuild, SUPPORTED_LANGUAGES, SUPPORTED_REGIONS, composeLocale, languageForTag,
   languageOf, languagePreferenceFrom, regionForCode, regionForTag, regionOf, regionPreferenceFrom, resolveLanguage, resolveLocale, resolveRegion, type AppLocale,
   type ReleasedSets } from '../src/i18n/locale.ts';
 import { catalogue, interpolate, messageKeys, translate, translator } from '../src/i18n/messages.ts';
@@ -14,6 +14,7 @@ import { en } from '../src/i18n/messages/en/index.ts';
 import { LANGUAGE_PREFERENCE_KEY, REGION_PREFERENCE_KEY, readLanguagePreference, readLocalePreferences, readRegionPreference, writeLanguagePreference, writeRegionPreference,
   type PreferenceStore } from '../src/i18n/preference.ts';
 import { bindLocale } from '../src/i18n/bind.ts';
+import { REGION_CODES } from '../src/i18n/regions/index.ts';
 
 // Producto 23.0: the localization foundation. Language, region, an account's
 // currency and the stored amount are four separate things; translating a
@@ -21,19 +22,20 @@ import { bindLocale } from '../src/i18n/bind.ts';
 // 23.1C2; the gate itself stays (a future catalogue is held back the same
 // way), so it is exercised here through an explicit narrower gate.
 
-const LOCALES: AppLocale[] = ['es-AR', 'en-AR', 'es-US', 'en-US'];
+const LOCALES = ['es-AR', 'en-AR', 'es-US', 'en-US'] as const satisfies readonly AppLocale[];
 /** The gate as it stood until 23.1C1, standing in for any build with a language or region not yet released. */
 const SPANISH_ONLY: ReleasedSets = { languages: ['es'], regions: ['AR'] };
 
 test('language and region are two registries; a locale is only their composition, and the four combinations exist', () => {
   assert.deepEqual(SUPPORTED_LANGUAGES, ['es', 'en']);
-  assert.deepEqual(SUPPORTED_REGIONS, ['AR', 'US']);
+  assert.equal(SUPPORTED_REGIONS.length, 257, 'since 24R2A every catalogue region has its conventions (derived), released or not');
+  assert.deepEqual(SUPPORTED_REGIONS, REGION_CODES);
   assert.equal(LANGUAGES.es.name, 'Español', 'a language is listed by its own name');
   assert.equal(LANGUAGES.en.name, 'English');
   assert.deepEqual([...RELEASED_LANGUAGES], ['es', 'en'], 'English is released in 23.1C2, once 23.1B translated every screen');
   assert.deepEqual([...RELEASED_REGIONS], ['AR', 'US'], 'the US region is released in 23.1C2, now that the amount field types US separators');
-  assert.deepEqual(RELEASED, { languages: SUPPORTED_LANGUAGES, regions: SUPPORTED_REGIONS }, 'everything the build carries is released');
-  for (const language of SUPPORTED_LANGUAGES) for (const region of SUPPORTED_REGIONS) {
+  assert.deepEqual(RELEASED, { languages: SUPPORTED_LANGUAGES, regions: ['AR', 'US'] }, 'every language the build carries is released; two regions of 257');
+  for (const language of SUPPORTED_LANGUAGES) for (const region of RELEASED_REGIONS) {
     const locale = composeLocale(language, region);
     assert.equal(locale, language + '-' + region);
     assert.equal(languageOf(locale), language);
@@ -41,8 +43,12 @@ test('language and region are two registries; a locale is only their composition
   }
   assert.equal(languageOf('xx-AR' as AppLocale), 'es', 'an unknown half reads as the default, never undefined');
   assert.equal(regionOf('es-ZZ' as AppLocale), 'AR');
-  assert.deepEqual(REGIONS.AR, { decimal: ',', group: '.', dateOrder: 'dmy', hour12: false, dollarSignCurrency: 'ARS' });
-  assert.deepEqual(REGIONS.US, { decimal: '.', group: ',', dateOrder: 'mdy', hour12: true, dollarSignCurrency: 'USD' });
+  assert.deepEqual(REGION_REGISTRY.AR, { decimal: ',', group: '.', dateOrder: 'dmy', hour12: false, dollarSignCurrency: 'ARS' });
+  assert.deepEqual(REGION_REGISTRY.US, { decimal: '.', group: ',', dateOrder: 'mdy', hour12: true, dollarSignCurrency: 'USD' });
+  // The derived registry: the hand-written fields win, the rest are the catalogue's (and are the defaults AR/US always wrote).
+  assert.deepEqual(REGIONS.AR, { ...completeConventions(REGION_REGISTRY.AR) });
+  assert.deepEqual(REGIONS.US, { ...completeConventions(REGION_REGISTRY.US), weekStart: 0 });
+  assert.equal(regionOf('es-JP'), 'JP', 'a catalogue region is a region of a locale; whether it is written is the gate\'s question');
 });
 
 test('a device tag gives a language by its first subtag and a region by a later one; unsupported values give nothing', () => {
@@ -54,12 +60,14 @@ test('a device tag gives a language by its first subtag and a region by a later 
   assert.equal(languageForTag(undefined), null);
   assert.equal(regionForTag('en-US'), 'US');
   assert.equal(regionForTag('es_ar'), 'AR');
-  assert.equal(regionForTag('zh-Hant-TW'), null, 'script skipped, Taiwan unsupported');
+  assert.equal(regionForTag('zh-Hant-TW'), 'TW', 'script skipped; Taiwan is a catalogue region (released or not is the gate\'s question)');
   assert.equal(regionForTag('es-419'), null, 'a numeric region (Latin America) is not a country');
   assert.equal(regionForTag('ar'), null, 'the Arabic language tag is never read as Argentina');
   assert.equal(regionForTag('es'), null);
   assert.equal(regionForCode('us'), 'US');
-  assert.equal(regionForCode('UY'), null);
+  assert.equal(regionForCode('UY'), 'UY', 'a catalogue region, not released');
+  assert.equal(regionForCode('EU'), null, 'not a country or territory');
+  assert.equal(regionForCode('ZZ'), null);
   assert.equal(regionForCode(null), null);
 });
 
@@ -114,7 +122,8 @@ test('each half resolves on its own: every language × region combination and "b
     const resolved = resolveLocale(devices, preferences);
     assert.equal(resolved.locale, expected, JSON.stringify([devices, preferences]));
     assert.equal(resolved.language + '-' + resolved.region, expected);
-    assert.equal(resolveLocale(devices, preferences, PREVIEW).locale, expected, 'the default gate is the preview set since 23.1C2');
+    const previewed = devices[0].regionCode === 'BR' ? 'es-BR' : expected;
+    assert.equal(resolveLocale(devices, preferences, PREVIEW).locale, previewed, 'the development preview widens the regions only: Brazil writes its own formats there');
   }
   for (const [devices, preferences] of cases) assert.equal(resolveLocale(devices, preferences, SPANISH_ONLY).locale, 'es-AR', 'a Spanish-only gate makes every case es-AR');
   assert.equal(resolveLocale([{ languageTag: 'en-US', regionCode: 'US' }], { language: 'system', region: 'system' }, { languages: ['es', 'en'], regions: ['AR'] }).locale, 'en-AR',
@@ -132,7 +141,8 @@ test('stored preferences are validated on read; the 23.0 tag shape keeps only it
   assert.equal(languagePreferenceFrom(42), 'system');
   assert.equal(regionPreferenceFrom('US'), 'US');
   assert.equal(regionPreferenceFrom('us'), 'system', 'stored values are exact; only the writer produces them');
-  assert.equal(regionPreferenceFrom('UY'), 'system');
+  assert.equal(regionPreferenceFrom('UY'), 'UY', 'a catalogue region is kept although not released (24R2A): chosen in a preview, applied once released');
+  assert.equal(regionPreferenceFrom('EU'), 'system', 'not a catalogue region');
   assert.equal(regionPreferenceFrom(undefined), 'system');
 });
 
@@ -499,7 +509,7 @@ test('VoiceOver\'s language is named only when the interface language differs fr
 test('Producto 23.1C1: every format in the four language × region combinations (spoken forms and the date wheel as of 23.1C2)', () => {
   type Row = { amount: string; big: string; negative: string; ars: string; usd: string; coded: string; spoken: string; spokenCoded: string;
     percent: string; small: string; count: string; numeric: string; dayMonth: string; time: string; long: string; picker: string; decimal: string; group: string };
-  const rows: Record<AppLocale, Row> = {
+  const rows: Record<(typeof LOCALES)[number], Row> = {
     'es-AR': { amount: '1.234,56', big: '9.999.999.999.999,99', negative: '-45,99', ars: '$\u00A01.234,56', usd: '−US$\u00A01.234,56', coded: 'ARS\u00A01.234,56',
       spoken: '1234,56 pesos', spokenCoded: '1234,56 ARS', percent: '12,4\u00A0%', small: '<0,1\u00A0%', count: '1.234.567', numeric: '22/9/2026', dayMonth: '22/09',
       time: '22/9/2026, 14:03', long: '22 de septiembre de 2026', picker: 'es_AR', decimal: ',', group: '.' },
@@ -572,10 +582,10 @@ test('money reaches the screen only through the central formatters; 23.1C2 relea
   // 23.1C2 opens the gate (the native language list is app-config's to check, tests/app-config.node.ts).
   assert.deepEqual([...RELEASED_LANGUAGES], ['es', 'en']);
   assert.deepEqual([...RELEASED_REGIONS], ['AR', 'US']);
-  // The preview flag stays for the next catalogue: only a development bundle started with it widens the gate,
-  // and since everything this build carries is released, it widens nothing today.
-  assert.deepEqual(releasedForBuild('1', true), { languages: ['es', 'en'], regions: ['AR', 'US'] });
-  assert.deepEqual(PREVIEW, RELEASED, 'a tripwire for the next language: once a catalogue is held back, the preview is wider than the release');
+  // Only a development bundle started with the preview flag widens the gate: since 24R2A to every catalogue region
+  // (the families still waiting for their device QA), with the same two languages.
+  assert.deepEqual(releasedForBuild('1', true), { languages: ['es', 'en'], regions: REGION_CODES });
+  assert.deepEqual(PREVIEW.languages, RELEASED.languages, 'no language is held back yet');
   assert.equal(releasedForBuild('1', false), RELEASED, 'a release bundle ignores the flag');
   assert.equal(releasedForBuild(undefined, true), RELEASED, 'a normal development bundle keeps the gate');
   assert.equal(releasedForBuild('true', true), RELEASED, 'only the documented value opens it');

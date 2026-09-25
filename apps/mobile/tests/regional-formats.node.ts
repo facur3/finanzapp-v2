@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import { bindLocale } from '../src/i18n/bind.ts';
 import { formatCount, formatDateTime, formatDayMonth, formatMoneyAmount, formatNumericDate, formatPercent, moneyText, spokenMoney } from '../src/i18n/format.ts';
 import { foldText, nameComparator, probeIntl } from '../src/i18n/intl-support.ts';
-import { REGIONS, completeConventions, registryRegionOf, sameWriting, type AppLocale, type RegionConventions } from '../src/i18n/locale.ts';
+import { REGIONS, REGION_REGISTRY, completeConventions, registryRegionOf, sameWriting, type AppLocale, type RegionConventions } from '../src/i18n/locale.ts';
 import { RECENT_KEYS, RECENT_LIMIT, readRecent, rememberRecent } from '../src/i18n/recent.ts';
 import { catalogueConventions, conventionsForRegion, isCatalogueRegion } from '../src/i18n/regions.ts';
 import type { PreferenceStore } from '../src/i18n/preference.ts';
@@ -24,7 +24,7 @@ test('a language with another region\'s conventions: Spanish in Japan, English i
   assert.deepEqual([japan.formatMoneyAmount(150000, 'JPY'), japan.formatMoneyAmount(1234567, 'KWD'), japan.formatMoneyAmount(1500, 'IQD')], ['150,000', '1,234.567', '1.5'], 'each currency keeps its own decimals whatever the region (IQD: three ISO decimals shown down to CLDR\'s none)');
   assert.deepEqual([japan.formatDate('2026-09-22', 'long'), japan.formatDate('2026-09-22', 'day'), japan.pickerLocale, japan.language, japan.region], ['22 de septiembre de 2026', '22 sep', 'es_AR', 'es', 'AR'], 'words and the wheel stay with the language; the bound locale is still the released one');
   assert.deepEqual([japan.spokenMoney(123456, 'ARS'), japan.spokenMoney(150000, 'JPY'), japan.spokenMinor(1234567, 'KWD')], ['1234,56 pesos', '150000 yenes japoneses', '1234,567'], 'VoiceOver keeps the language\'s decimal mark and no grouping in every region');
-  assert.deepEqual(japan.amountFormat, { decimal: '.', group: ',' }, 'the amount field would type Japanese separators');
+  assert.deepEqual(japan.amountFormat, { decimal: '.', group: ',', secondaryGrouping: 3, minimumGroupingDigits: 1 }, 'the amount field would type Japanese separators and grouping');
   assert.deepEqual([japan.conventions.weekStart, japan.conventions.dateSeparator, japan.conventions.paddedDate], [0, '/', true]);
 
   const britain = es('GB');
@@ -178,6 +178,7 @@ test('formatDayMonth: Argentina writes 5/09 through every path; a catalogue regi
   assert.equal(registryRegionOf({ ...REGIONS.AR, hour12: true }), null, 'one writing field apart is another region');
   assert.equal(sameWriting(REGIONS.AR, catalogueConventions('AR')), true);
   assert.equal(sameWriting(REGIONS.AR, { ...completeConventions(REGIONS.AR), paddedDate: true }), false);
-  assert.notEqual(catalogueConventions('US').weekStart, completeConventions(REGIONS.US).weekStart, 'CLDR starts the American week on Sunday, the registry\'s default on Monday');
+  assert.equal(REGIONS.US.weekStart, 0, 'the derived registry (24R2A) keeps CLDR\'s Sunday for the United States; the hand-written registry never set a week start');
+  assert.equal(completeConventions(REGION_REGISTRY.US).weekStart, 1, 'the old default, which no formatter ever read');
   assert.equal(sameWriting(REGIONS.US, catalogueConventions('US')), true, 'the week start is calendar data, not a writing: no formatter reads it');
 });

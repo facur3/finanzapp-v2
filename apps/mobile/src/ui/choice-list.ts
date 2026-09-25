@@ -5,15 +5,16 @@
  *   - a pinned option first ("Según el dispositivo"), always visible, never
  *     filtered out and never in a lettered section;
  *   - then, without a query, the recent choices under one header;
- *   - then the options in alphabetical sections by the initial of their name
+ *   - then the options in alphabetical sections (or, for a short list, one group) by the initial of their name
  *     (folded: "Álava" sits under A), ordered as the caller ordered them
  *     (the region catalogue uses the language's collator);
  *   - with a query, one flat list of the matches in the caller's ranking, no
  *     headers, the pinned option still first; only that row (or nothing at
  *     all) when nothing matches, and the screen says so from the absence of
  *     a real match, not from an empty list.
- * A search field is worth showing only from `SEARCHABLE_CHOICES` options: two
- * languages or two regions are read, not searched. Rows carry their position
+ * A search field, the recents and the sections are worth showing only from
+ * `SEARCHABLE_CHOICES` options: two languages or two regions are read, not
+ * searched, and are one grouped card under the pinned row. Rows carry their position
  * inside their group so a virtualized list can draw grouped corners. */
 import { foldText } from '../i18n/intl-support.ts';
 
@@ -64,7 +65,7 @@ function grouped<T extends string>(options: readonly ChoiceOption<T>[], selected
     position: options.length === 1 ? 'only' : index === 0 ? 'first' : index === options.length - 1 ? 'last' : 'middle' }));
 }
 
-export function buildChoiceRows<T extends string>({ pinned, recent = [], options, selected, query = '', recentTitle }: {
+export function buildChoiceRows<T extends string>({ pinned, recent = [], options, selected, query = '', recentTitle, sections = true }: {
   /** The option shown first, outside every section ("Según el dispositivo"). */
   pinned?: ChoiceOption<T>;
   /** Values to list under "Recientes" (most recent first); unknown values are skipped. */
@@ -73,6 +74,9 @@ export function buildChoiceRows<T extends string>({ pinned, recent = [], options
   selected: T | null;
   query?: string;
   recentTitle: string;
+  /** Alphabetical sections by initial (the default). False for a short list read at a glance (two languages, two
+   * regions): its options are one grouped card with no headers. */
+  sections?: boolean;
 }): ChoiceRow<T>[] {
   const rows: ChoiceRow<T>[] = [];
   if (pinned) rows.push(...grouped([pinned], selected, 'pinned:').map(row => ({ ...row, pinned: true as const })));
@@ -87,13 +91,17 @@ export function buildChoiceRows<T extends string>({ pinned, recent = [], options
     rows.push({ kind: 'header', key: 'header:recent', title: recentTitle });
     rows.push(...grouped(recentOptions, selected, 'recent:'));
   }
-  const sections = new Map<string, ChoiceOption<T>[]>();
+  if (!sections) {
+    rows.push(...grouped(options, selected, 'option:'));
+    return rows;
+  }
+  const byInitial = new Map<string, ChoiceOption<T>[]>();
   for (const option of options) {
     const initial = sectionInitial(option.title);
-    if (!sections.has(initial)) sections.set(initial, []);
-    sections.get(initial)!.push(option);
+    if (!byInitial.has(initial)) byInitial.set(initial, []);
+    byInitial.get(initial)!.push(option);
   }
-  for (const [initial, members] of sections) {
+  for (const [initial, members] of byInitial) {
     rows.push({ kind: 'header', key: 'header:' + initial, title: initial });
     rows.push(...grouped(members, selected, initial + ':'));
   }

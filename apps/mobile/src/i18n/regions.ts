@@ -6,11 +6,12 @@
  * Three layers, kept apart:
  *   - the catalogue (`regions/data.ts`, generated): 257 regions, what CLDR
  *     says about each; data, never a promise;
- *   - the released registry (`REGIONS` in locale.ts, hand-written): the
- *     regions whose conventions the whole app honours today, the amount
- *     field, the goldens and the device checks included (Argentina and the
- *     United States); a deliberate deviation from CLDR lives there and is
- *     listed in the generator (`DELIBERATE_DEVIATIONS`);
+ *   - the conventions (`REGIONS` in locale.ts, derived from the catalogue
+ *     since 24R2A) with the hand-written registry (`REGION_REGISTRY`:
+ *     Argentina and the United States, checked on the iPhone) winning field
+ *     by field; a deliberate deviation from CLDR lives there and is listed in
+ *     the generator (`DELIBERATE_DEVIATIONS`); `RELEASED_REGIONS` says which
+ *     of them a build honours, the amount field included;
  *   - the fallback (`conventionsForRegion`): a region the catalogue knows but
  *     the build does not honour yet writes the default region's conventions
  *     and is *shown as such* ("Japón (formatos de Argentina)"), never as if
@@ -19,7 +20,7 @@
  * A region never implies an account's currency, a language never implies a
  * region (docs/currency.md §1); the catalogue's `currencies` are search
  * aliases and the bare "$" rule only. Pure: no React, no device access. */
-import { DEFAULT_REGION, REGIONS, RELEASED_REGIONS, completeConventions, isRegionCode, type DeviceLocale, type LanguageCode, type RegionCode, type RegionConventions } from './locale.ts';
+import { DEFAULT_REGION, REGIONS, RELEASED_REGIONS, type DeviceLocale, type LanguageCode, type RegionCode, type RegionConventions } from './locale.ts';
 import { foldText, nameComparator } from './intl-support.ts';
 import { REGION_CODES, REGION_DATA, REGION_NAMES, type CatalogueRegionCode, type RegionRecord } from './regions/index.ts';
 
@@ -40,16 +41,10 @@ export function regionRecord(code: CatalogueRegionCode): RegionRecord {
   return REGION_DATA[code];
 }
 
-/** What CLDR says a region writes in, as the app's conventions. For a released region the
- * hand-written registry wins field by field (its deliberate deviations are documented). */
+/** What a region writes in: the catalogue's CLDR values, with the registry's deliberate values winning
+ * for Argentina and the United States (`REGIONS` in locale.ts, derived since 24R2A). */
 export function catalogueConventions(code: CatalogueRegionCode): Required<RegionConventions> {
-  const record = REGION_DATA[code];
-  const fromCldr: Required<RegionConventions> = {
-    decimal: record.decimal, group: record.group, dateOrder: record.dateOrder, hour12: record.hour12,
-    dollarSignCurrency: record.dollarSignCurrency, dateSeparator: record.dateSeparator, paddedDate: record.paddedDate,
-    secondaryGrouping: record.secondaryGrouping, minimumGroupingDigits: record.minimumGroupingDigits, weekStart: record.weekStart,
-  };
-  return isRegionCode(code) ? { ...fromCldr, ...REGIONS[code] } : fromCldr;
+  return REGIONS[code];
 }
 
 export type RegionStatus = 'released' | 'catalogue' | 'unknown';
@@ -59,7 +54,7 @@ export type RegionStatus = 'released' | 'catalogue' | 'unknown';
 export function regionStatus(code: unknown, released: readonly RegionCode[] = RELEASED_REGIONS): RegionStatus {
   const region = catalogueRegionCode(code);
   if (!region) return 'unknown';
-  return isRegionCode(region) && released.includes(region) ? 'released' : 'catalogue';
+  return released.includes(region) ? 'released' : 'catalogue';
 }
 
 export interface RegionResolution {
@@ -76,11 +71,11 @@ export interface RegionResolution {
  * region's otherwise, and which of the two it is. Never invented conventions, never silent. */
 export function conventionsForRegion(code: unknown, released: readonly RegionCode[] = RELEASED_REGIONS): RegionResolution {
   const requested = catalogueRegionCode(code);
-  if (requested && isRegionCode(requested) && released.includes(requested)) {
-    return { region: requested, conventions: completeConventions(REGIONS[requested]), source: 'released', requested };
+  if (requested && released.includes(requested)) {
+    return { region: requested, conventions: REGIONS[requested], source: 'released', requested };
   }
   const region: RegionCode = released.includes(DEFAULT_REGION) ? DEFAULT_REGION : released[0] ?? DEFAULT_REGION;
-  return { region, conventions: completeConventions(REGIONS[region]), source: 'default', requested };
+  return { region, conventions: REGIONS[region], source: 'default', requested };
 }
 
 /** The name of a catalogue region in a published language, from CLDR ("Japón", "Japan"). */

@@ -26,6 +26,7 @@
  * say so unambiguously. A pasted number that could mean two amounts is
  * refused with a reason instead of guessed. */
 import { CURRENCY_CODES, currencyRecord, isStorableCurrency, maxWholeDigits, minorUnitExponent, splitMinor, type Currency } from '@finanzapp/domain';
+import { groupBreaks, groupWhole, type Grouping } from '../i18n/grouping.ts';
 
 /** How many digits an amount in a currency may have: its ISO exponent as decimals (0 for JPY,
  * 2 for ARS/USD/EUR, 3 for KWD) and 15 − exponent whole digits (docs/currency.md §5: 13 for
@@ -36,8 +37,11 @@ export function precisionOf(currency: Currency): AmountPrecision {
   return { decimals: minorUnitExponent(currency), wholeDigits: maxWholeDigits(currency) };
 }
 
-/** The two separators an amount is written with. */
-export interface AmountFormat { decimal: string; group: string }
+/** The two separators an amount is written with and where the group separator goes (Producto 24R2A:
+ * any catalogue region's grouping, `grouping.ts`): "1.234.567,5", "1,234,567.5", "12,34,567.5" (lakh),
+ * "1'234'567.5", "1 234 567,5" with a no-break or a narrow no-break space, "1000" unbroken where the
+ * region's minimum grouping says so. The group separator is always one character. */
+export interface AmountFormat extends Grouping { decimal: string; group: string }
 
 /** The ledger's notation ("-1.234,56"): what formatMinorUnits writes and
  * parseMinorUnits reads. Form drafts are kept in it in every region. */
@@ -64,16 +68,14 @@ export function canonicalAmount(state: AmountEdit): string {
   return (state.negative ? '-' : '') + state.whole + (state.decimal ? ',' + state.fraction : '');
 }
 
-/** Groups whole digits by thousands with the format's separator. */
+/** Groups whole digits with the format's separator and grouping. */
 function group(whole: string, format: AmountFormat): string {
-  return whole.replace(/\B(?=(\d{3})+(?!\d))/g, format.group);
+  return groupWhole(whole, format.group, format);
 }
 
-/** Number of group separators the display puts before the k-th whole digit. */
-function groupsBefore(wholeLength: number, digitsBefore: number): number {
-  let groups = 0;
-  for (let index = 1; index < digitsBefore; index++) if ((wholeLength - index) % 3 === 0) groups++;
-  return groups;
+/** Number of group separators the display puts before the k-th whole digit (a separator right after it is not counted). */
+function groupsBefore(wholeLength: number, digitsBefore: number, format: AmountFormat): number {
+  return groupBreaks(wholeLength, format).filter(at => at < digitsBefore).length;
 }
 
 /** Where a logical caret lands in the display string. A caret right before a
@@ -83,7 +85,7 @@ export function displayCaret(state: AmountEdit, logical: number, format: AmountF
   const caret = Math.max(0, Math.min(logical, canonicalAmount(state).length));
   if (caret <= sign) return caret;
   const digitsBefore = Math.min(caret - sign, state.whole.length);
-  const inWhole = sign + digitsBefore + groupsBefore(state.whole.length, digitsBefore) * format.group.length;
+  const inWhole = sign + digitsBefore + groupsBefore(state.whole.length, digitsBefore, format) * format.group.length;
   if (caret - sign <= state.whole.length) return inWhole;
   // Past the whole: the decimal separator and the fraction have no grouping.
   return sign + group(state.whole, format).length + (caret - sign - state.whole.length - 1) + format.decimal.length;
@@ -202,8 +204,34 @@ const marks = (() => {
 export function currencyOfMark(text: string): Currency | null {
   return marks.byMark.get(text.toUpperCase()) ?? null;
 }
-// \s covers the no-break and thin spaces other apps group thousands with.
+// \s covers the no-break, narrow no-break and thin spaces other apps group thousands with.
 const SPACES = /\s+/g;
+// An apostrophe only ever groups ("1'234.56", "1’234.56" in Switzerland): read like a space, never a decimal.
+const APOSTROPHES = /['\u2019\u02BC]/g;
+
+/** Digits another script's keyboard or a pasted text may carry, read as the same digits: Arabic-Indic and
+ * Eastern Arabic-Indic (an iPhone whose Region writes them shows them on the decimal pad) and full-width digits;
+ * the Arabic decimal separator is a decimal point and the Arabic thousands separator an apostrophe (grouping
+ * only). One UTF-16 unit for one, so every index into the text stays valid. Nothing is guessed: each of these
+ * characters has one meaning. */
+export function latinDigits(text: string): string {
+  return text.replace(/[\u0660-\u0669\u06F0-\u06F9\uFF10-\uFF19\u066B\u066C]/g, char => {
+    const code = char.charCodeAt(0);
+    if (code === 0x066B) return '.';
+    if (code === 0x066C) return "'";
+    return String(code - (code >= 0xFF10 ? 0xFF10 : code >= 0x06F0 ? 0x06F0 : 0x0660));
+  });
+}
+
+/** Whether whole-digit groups are written the way some region writes them: groups of three after a first
+ * group of one to three digits ("1.234.567"), or the Indian lakh and crore, a last group of three after groups
+ * of two ("12,34,567"). Either way the digits are the number; anything else ("1.2.3", "12 34") is not an amount. */
+function wellGrouped(groups: readonly string[]): boolean {
+  const first = groups[0], rest = groups.slice(1), last = groups[groups.length - 1];
+  if (!first || first.startsWith('0')) return false;
+  if (first.length <= 3 && rest.every(run => run.length === 3)) return true;
+  return first.length <= 2 && last.length === 3 && groups.slice(1, -1).every(run => run.length === 2);
+}
 
 /** A pasted text as a canonical amount ("-1234,5"), read by the separators the
  * text itself uses:
@@ -213,7 +241,9 @@ const SPACES = /\s+/g;
  *   - one separator followed by one or two digits (or none): decimals ("12,5", "12.50");
  *   - one separator followed by exactly three digits: a thousand when it is the
  *     region's group separator ("1.000" in Argentina), otherwise ambiguous;
- *   - spaces may group thousands ("1 234,56"); "$", "US$", "AR$", "U$S", "ARS"
+ *   - spaces and apostrophes only ever group ("1 234,56", "1'234.56"), lakh grouping is read
+ *     ("12,34,567.50"), and digits of another script are read as the same digits (`latinDigits`);
+ *     "$", "US$", "AR$", "U$S", "ARS"
  *     and "USD" are stripped only after checking their explicit currency against the account;
  *     a mismatched currency is refused, never converted. A leading minus is kept.
  * Decimals beyond the second must be zeros. Only the digits are kept: no
@@ -225,7 +255,7 @@ function readPaste(text: string, format: AmountFormat, precision: AmountPrecisio
   const explicit = [...text.matchAll(marks.explicit)].map(match => currencyOfMark(match[0]));
   if (explicit.length > 1) return { ok: false, reason: 'invalid' };
   if (explicit.some(code => code !== currency)) return { ok: false, reason: 'currencyMismatch' };
-  let body = text.replace(marks.all, ' ').replace(SPACES, ' ').trim();
+  let body = latinDigits(text).replace(marks.all, ' ').replace(APOSTROPHES, ' ').replace(SPACES, ' ').trim();
   const negative = /^[-−]/.test(body);
   if (negative) body = body.slice(1).trim();
   if (!/^[0-9., ]+$/.test(body) || !/[0-9]/.test(body)) return { ok: false, reason: 'invalid' };
@@ -248,9 +278,7 @@ function readPaste(text: string, format: AmountFormat, precision: AmountPrecisio
     else if (separators[0] !== format.group || precision.decimals >= 3) return { ok: false, reason: 'ambiguous' };
   }
   const groups = decimalAt < 0 ? runs : runs.slice(0, decimalAt + 1);
-  if (groups.length > 1 && (groups[0].length < 1 || groups[0].length > 3 || groups[0].startsWith('0') || groups.slice(1).some(run => run.length !== 3))) {
-    return { ok: false, reason: 'invalid' };
-  }
+  if (groups.length > 1 && !wellGrouped(groups)) return { ok: false, reason: 'invalid' };
   const whole = groups.join('').replace(/^0+(?=\d)/, '');
   let fraction = decimalAt < 0 ? null : runs[decimalAt + 1];
   if (fraction !== null && fraction.length > precision.decimals) {
@@ -358,6 +386,7 @@ export function readAmountInput(shown: AmountView, raw: string, rawCaret: number
 }
 function readChange(shown: AmountView, raw: string, rawCaret: number | null, format: AmountFormat,
   previousRaw: RawText | null, precision: AmountPrecision, currency: Currency): AmountRead {
+  raw = latinDigits(raw);
   const previous = viewState(shown, format, precision);
   const references: RawText[] = [{ text: shown.text, decimalAt: shown.text.indexOf(format.decimal) }];
   if (previousRaw && previousRaw.text !== shown.text) references.push(previousRaw);
@@ -414,6 +443,12 @@ export function settleAmount(state: AmountEdit, currency: Currency): AmountEdit 
  * kept, only the separators (and so the display caret) change. */
 export function reformatAmount(view: AmountView, from: AmountFormat, to: AmountFormat, currency: Currency): AmountView {
   return renderAmount(amountFromView(view, from, currency), to);
+}
+
+/** Whether two formats write every amount alike: the separators and the grouping. */
+export function sameAmountFormat(a: AmountFormat, b: AmountFormat): boolean {
+  return a.decimal === b.decimal && a.group === b.group && (a.secondaryGrouping ?? 3) === (b.secondaryGrouping ?? 3)
+    && (a.minimumGroupingDigits ?? 1) === (b.minimumGroupingDigits ?? 1);
 }
 
 // ---- Drafts (ledger notation) -----------------------------------------------
@@ -566,7 +601,7 @@ export class AmountInput {
   }
 
   reformat(format: AmountFormat): AmountView {
-    if (format.decimal === this.format.decimal && format.group === this.format.group) return this.view;
+    if (sameAmountFormat(format, this.format)) return this.view;
     this.format = format;
     this.raw = null;
     return this.show(this.state);
