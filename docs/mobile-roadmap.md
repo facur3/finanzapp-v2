@@ -312,8 +312,12 @@ the owner authorises it; no EAS build or store submission without the owner.
     tests, +8 `dates.test.ts`, +6 guard tests), `npm run check:repo`; mobile `npm run typecheck`,
     `npm run test:storage` 577/577, `currency:verify`, `regions:verify`, `i18n:check -- --strict`
     (0 errors, 0 stale), `i18n:extract` (no change), `check` (up to date), `export:ios` (5 MB
-    bundle); `schema.test.sql` on postgres:17 in a container. CI and the Vercel preview: see the
-    PR. No EAS build; the iPhone was not modified; no paid service enabled.
+    bundle); `schema.test.sql` on postgres:17 in a container. CI green on PR #55 (`domain`,
+    `mobile`, `mobile_api`). Vercel preview of the branch (SSO-protected, probed with its share
+    token): `/`, `/index.html`, `/support.js`, `/sw.js`, `/manifest.webmanifest` → the plain 404
+    page; `/api/chart`, `/api/fund-data` → 404 (no function); `GET /api/mobile/{assistant,captures}`
+    → 405; `POST` without or with a made-up token → 503 fail closed, no data in the body. No EAS
+    build; the iPhone was not modified; no paid service, secret or Vercel setting changed.
   - **Pending:** the device QA of §2 (24UX1), then 24R2.
 
 ### Producto 24R2 — international regions released
