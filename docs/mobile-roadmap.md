@@ -1,11 +1,12 @@
 # FinanzApp mobile: living roadmap
 
-Updated: 2026-09-25. Read [decision 001](decisions/001-native-mobile.md),
+Updated: 2026-09-25 (Producto 24REP). Read [decision 001](decisions/001-native-mobile.md),
 [decision 002](decisions/002-spending-first.md),
 [decision 003](decisions/003-five-tabs-and-cards.md) and
 [decision 004](decisions/004-native-first-and-web-retirement.md). Decision 002 supersedes
 earlier full-finance migration phases and the local-only AI preference; decision 004 makes
-the native app the product and plans the retirement of the web/Capacitor frontend. This file
+the native app the product; the web/Capacitor frontend was retired on 2026-09-25 (Producto
+24REP; its last version is the tag `web-frontend-final`). This file
 holds what exists, what still needs the iPhone and what comes next. The technical history of
 every delivery up to Producto 24R1 (the "Previous delivery" sections and the handoff log,
 moved verbatim on 2026-09-25) is in [mobile-roadmap-history.md](mobile-roadmap-history.md);
@@ -30,10 +31,13 @@ history file keeps the evidence of when and why.
 
 - **Native is the product** (decision 004, 2026-09-25). `apps/mobile`, `packages/domain` and
   the mobile backend contracts (`server/mobile`, docs/mobile-integrations.md) are the source of
-  truth. The web/Capacitor frontend is legacy and frozen: no new features, kept until its own
-  retirement PR, retired with Git history preserved (the verifiable inventory:
-  docs/web-retirement-inventory.md). Android will come from the same Expo/React Native project;
-  no second repository without an architectural reason.
+  truth. The web/Capacitor frontend was retired on 2026-09-25 (Producto 24REP) with Git history
+  preserved: the tag `web-frontend-final` marks its last commit, the tree holds no copy of it and
+  `npm run check:repo` refuses its return (docs/web-retirement-inventory.md §0 has the recovery
+  commands). Android will come from the same Expo/React Native project, sharing navigation,
+  domain, storage abstractions, i18n, the Assistant and the components, with platform
+  differences behind `Platform.OS`, `.ios.tsx`/`.android.tsx` files or adapter modules; no
+  second repository without an architectural reason recorded as a decision.
 - **Expo + React Native + TypeScript, Swift only for targeted Apple integrations**, a no-Mac
   workflow through EAS development builds on a registered iPhone (decision 001). No EAS cloud
   build, subscription or store submission without the owner's account setup and authorisation
@@ -94,7 +98,7 @@ history file keeps the evidence of when and why.
   semantic colours carry meaning; 44 pt targets; no decorative glassmorphism, no large currency
   selector beside the main amount, no new navigation without a decision.
 - **Legacy import stays optional backlog.** Never require JSON or a full portfolio re-entry;
-  data is not shared automatically between the web app and the native app.
+  data was never shared between the retired web app and the native app.
 - **Never merge all branches indiscriminately, never enable costs by accident**; one focused
   branch and PR per delivery, CI green, the checks recorded in this file at handoff.
 
@@ -224,7 +228,7 @@ proposal for ordering, not a commitment to dates. Standing in every delivery: no
 no new currency, no FX provider and no new language enabled unless the delivery says so and
 the owner authorises it; no EAS build or store submission without the owner.
 
-### Producto 24UX1 — date-sheet polish, native-first direction and roadmap (this PR)
+### Producto 24UX1 — date-sheet polish, native-first direction and roadmap (PR #54)
 
 - **Goal.** The compact date sheet enters from the bottom edge without a jump (the modal is
   mounted and measured before the rise starts; a timed fade under Reduce Motion; the card never
@@ -274,7 +278,47 @@ the owner authorises it; no EAS build or store submission without the owner.
     `npm run regions:verify`, `npm run i18n:check -- --strict` (0 errors, 0 stale), `npm run check`
     (up to date), `npm run export:ios` (4,970,840 bytes). No EAS build; the iPhone was not modified;
     no paid service, currency or FX provider enabled.
-  - **Pending:** the device QA of §2 (24UX1), then the retirement PR of decision 004, then 24R2.
+  - **Pending:** the device QA of §2 (24UX1); the retirement PR of decision 004 is 24REP, below.
+
+### Producto 24REP — native-first consolidation and retirement of the web/Capacitor frontend (this PR)
+
+- **Goal.** One PR that executes decision 004: the web/Capacitor frontend leaves the tree with
+  Git history preserved, the last native dependency on `src/` moves into `packages/domain`, the
+  root keeps only the tooling the product uses, the repository guard refuses the legacy tree and
+  imports from it, Vercel keeps `api/mobile/*` only, and the docs describe the repository as it is.
+- **Out of scope.** 24R2, any visible change to the app, the bundle identifier, Vercel
+  environment variables, Android.
+- **Gates.** Root `npm test` and `npm run check:repo`; every mobile check; the PostgreSQL schema
+  tests; CI green; a Vercel preview whose API fails closed and serves no page.
+- **Status.** Delivered on this branch (2026-09-25). Nothing to verify on the iPhone: the native
+  bundle imported nothing from the web tree.
+  - History: annotated tag `web-frontend-final` → `ac4f038` (the merge of PR #54), no rewrite.
+    Recovery commands in docs/web-retirement-inventory.md §0.
+  - Removed with `git rm`: `index.html`, `support.js`, `capacitor.config.ts`, `public/`, root
+    `ios/`, `src/` (app, capacitor, domain), `api/chart.js`, `api/fund-data.js` and tests,
+    `design-reference/`, the three web build scripts, `SUPABASE_SETUP.md`, four web-only docs.
+    Moved: `src/domain/dates.js` → `packages/domain/dates.ts` (`todayKey`, `labelFromISO`, typed,
+    parity proven before the deletion; the web-only functions retired); `RELEASE_NOTES.md` and
+    three web docs → `docs/history/` with history headers.
+  - Root: `package.json` keeps `test` and `check:repo` (vitest, typescript); Vite, esbuild and the
+    Capacitor packages gone; `scripts/check-repo.mjs` guards generated files, the legacy tree, imports
+    from retired paths, sensitive files and credential-shaped content (`check-repo.test.js`). CI:
+    `build` → `domain` without the Vite build; `mobile` and `mobile_api` unchanged. `vercel.json`:
+    functions only, a static output holding one plain `404.html`.
+  - Docs: README, AGENTS, apps/mobile/README, decisions 001 and 004, the inventory (§0 executed),
+    currency.md and empezar-en-iphone.md no longer describe the web as present; Android's
+    shared-code rule recorded (AGENTS rule 13, README, §5 below).
+  - **Checked on Linux:** root `npm test` 270/270 (was 448: −192 retired tests in 19 files, of
+    which 173 web-only and 19 legacy date tests; +8 `dates.test.ts`, +6 guard tests), `npm run check:repo`; mobile `npm run typecheck`,
+    `npm run test:storage` 577/577, `currency:verify`, `regions:verify`, `i18n:check -- --strict`
+    (0 errors, 0 stale), `i18n:extract` (no change), `check` (up to date), `export:ios` (5 MB
+    bundle); `schema.test.sql` on postgres:17 in a container. CI green on PR #55 (`domain`,
+    `mobile`, `mobile_api`). Vercel preview of the branch (SSO-protected, probed with its share
+    token): `/`, `/index.html`, `/support.js`, `/sw.js`, `/manifest.webmanifest` → the plain 404
+    page; `/api/chart`, `/api/fund-data` → 404 (no function); `GET /api/mobile/{assistant,captures}`
+    → 405; `POST` without or with a made-up token → 503 fail closed, no data in the body. No EAS
+    build; the iPhone was not modified; no paid service, secret or Vercel setting changed.
+  - **Pending:** the device QA of §2 (24UX1), then 24R2.
 
 ### Producto 24R2 — international regions released
 
@@ -293,7 +337,7 @@ the owner authorises it; no EAS build or store submission without the owner.
   the amount field typing its separators, numeric dates, the clock, the spoken forms; the
   chooser at 60/120 Hz over 257 rows, Dynamic Type at the largest sizes, VoiceOver order and
   header roles, Reduce Motion. Each region released in its own commit after its evidence.
-- **Depends on.** 24R1 (merged), the 24UX1 chooser fixes.
+- **Depends on.** 24R1 (merged), the 24UX1 chooser fixes, 24REP (merged before it starts).
 
 ### Producto 24M — verified currencies opened
 
@@ -473,11 +517,14 @@ the owner authorises it; no EAS build or store submission without the owner.
 
 ### Android from the same shared code
 
-- The same Expo/React Native project and the same domain; `DateField` already has its Android
-  path (the system dialog); a Material-free, platform-neutral press feedback; native navigation
-  through the same router; Play Store identity, signing and data safety answers; device evidence
-  on real Android hardware (the slowest supported device, a release build); no second repository
-  without an architectural reason.
+- The same Expo/React Native project (`apps/mobile`) and the same domain, sharing the router and
+  navigation, `packages/domain`, the storage abstractions (`src/storage`), i18n, the Assistant and
+  the components where they fit; `DateField` already has its Android path (the system dialog).
+  Platform differences live behind `Platform.OS`, `.ios.tsx`/`.android.tsx` files or adapter
+  modules such as `src/ui/material.tsx`, never in a second repository or native project
+  (decision 004, AGENTS rule 13). Still to do: a Material-free, platform-neutral press feedback;
+  Play Store identity, signing and data safety answers; device evidence on real Android hardware
+  (the slowest supported device, a release build). Not started until its roadmap entry.
 
 ### Marketing, App Store Optimization, Instagram, advertising materials and conversion tests
 
@@ -517,6 +564,9 @@ safe areas, system text and separate currencies apply to every new screen.
   decisions recorded at each handoff (newest first), moved there verbatim on 2026-09-25.
 - [mobile-device-checklist.md](mobile-device-checklist.md): the physical iPhone checks per delivery
   and their recorded results.
+- [web-retirement-inventory.md](web-retirement-inventory.md) and [history/](history/): what the
+  retired web app was, how to read it from the tag `web-frontend-final`, and its documents kept
+  for the record.
 - [mobile-design.md](mobile-design.md): the visual direction and the per-delivery design notes;
   [i18n.md](i18n.md), [currency.md](currency.md), [mobile-integrations.md](mobile-integrations.md):
   the contracts the deliveries above implement.

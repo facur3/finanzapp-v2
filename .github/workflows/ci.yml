@@ -7,8 +7,11 @@ on:
     branches: [master]
 
 jobs:
-  build:
+  domain:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -19,16 +22,13 @@ jobs:
           node-version: 24
           cache: npm
 
-      - name: Install dependencies
+      - name: Install root tooling (vitest, typescript)
         run: npm ci
 
-      - name: Unit tests
+      - name: Domain and mobile backend tests (packages/domain, server/mobile)
         run: npm test
 
-      - name: Build
-        run: npm run build
-
-      - name: Repository hygiene (no generated files tracked)
+      - name: Repository hygiene (no generated files, no legacy web tree, no imports from retired paths, no secrets)
         run: npm run check:repo
 
   mobile:

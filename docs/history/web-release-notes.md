@@ -1,4 +1,12 @@
-# Release Notes
+# Release notes of the retired web app (history)
+
+> Kept for the record. These are the release notes of the web/Capacitor app retired on
+> 2026-09-25 (Producto 24REP, [decision 004](../decisions/004-native-first-and-web-retirement.md)).
+> The tags `v53-stable` and `v54-stable-data-model` still exist; the last web commit is the tag
+> `web-frontend-final`. Nothing here describes the native app; its history is
+> [mobile-roadmap-history.md](../mobile-roadmap-history.md).
+
+# Release Notes (web)
 
 ## v54 — Stable data model (2026-07-01)
 

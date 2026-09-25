@@ -1,7 +1,16 @@
-# Product rebuild roadmap
+# The web app's product rebuild roadmap (history)
 
-> Mobile architecture update (2026-09-11): use [the living mobile roadmap](mobile-roadmap.md)
-> and [decision 001](decisions/001-native-mobile.md). The earlier recommendation to
+> Kept for the record: the 2026 plan to rebuild the web app incrementally. Superseded by
+> [decision 001](../decisions/001-native-mobile.md) (Expo) and
+> [decision 004](../decisions/004-native-first-and-web-retirement.md) (the web retired on
+> 2026-09-25). Its "Next: ledger and reconciliation" section is the origin of the integer
+> minor-unit ledger the native domain implements; the rest describes a product that no longer
+> exists.
+
+# Product rebuild roadmap (web)
+
+> Mobile architecture update (2026-09-11): use [the living mobile roadmap](../mobile-roadmap.md)
+> and [decision 001](../decisions/001-native-mobile.md). The earlier recommendation to
 > retain Capacitor below is historical, superseded for the new mobile UI. The
 > financial accuracy and reconciliation work in this document remains relevant.
 
