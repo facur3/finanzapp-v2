@@ -82,6 +82,34 @@ export async function familySheet() {
   for (const stage of REGION_RELEASE_STAGES.filter(item => item.status === 'blocked')) {
     lines.push(`- **${stage.id}** (${stage.regions.length}): ${stage.regions.join(', ')}. ${stage.blocker}`);
   }
+  // Per numbering system: whether the amount field reads its digits today is computed from `latinDigits` itself.
+  const { latinDigits } = await load('src/ui/money-input.ts');
+  const { REGION_DATA } = await load('src/i18n/regions/data.ts');
+  const blocked = REGION_RELEASE_STAGES.filter(item => item.status === 'blocked').flatMap(item => item.regions);
+  const systems = new Map();
+  for (const code of blocked) {
+    const system = REGION_DATA[code].defaultDigits;
+    if (!systems.has(system)) systems.set(system, []);
+    systems.get(system).push(code);
+  }
+  lines.push('', 'Each numbering system opens on its own, only when all of this holds (no assumption that the iOS pad uses',
+    'CLDR\'s default digits: it may show Latin digits, the native ones, or follow the Numbers setting under Language & Region):', '',
+    '1. **Normalization:** `latinDigits` maps the system\'s ten digits (and its decimal and group marks, if any) one character',
+    '   for one; until then a paste of them is refused as not a number, never guessed.',
+    '2. **Tests:** typing and pasting those digits give the same draft and minor units as Latin digits, the caret stays',
+    '   on its digit, a mixed or ambiguous text is refused (tests/region-families.node.ts pins today\'s state).',
+    '3. **iPhone:** with iOS Region set to the region named (and, separately, its Numbers setting on Latin and on native',
+    '   digits), record which digits and which decimal key the pad offers, what the field shows after typing',
+    '   «1234567», the decimal key and «89», what a pasted native amount gives, and how VoiceOver reads the field.', '',
+    '| Digits (CLDR) | Sample | Read by the amount field today | Regions | iPhone check in |', '| --- | --- | --- | --- | --- |');
+  const ZERO = { arab: 0x0660, arabext: 0x06F0, beng: 0x09E6, deva: 0x0966, mymr: 0x1040, tibt: 0x0F20 };
+  const CHECK_IN = { arab: 'SA', arabext: 'IR', beng: 'BD', deva: 'NP', mymr: 'MM', tibt: 'BT' };
+  for (const [system, codes] of systems) {
+    const sample = ZERO[system] === undefined ? '?' : Array.from({ length: 10 }, (_, digit) => String.fromCodePoint(ZERO[system] + digit)).join('');
+    const read = sample !== '?' && latinDigits(sample) === '0123456789';
+    const at = CHECK_IN[system] && codes.includes(CHECK_IN[system]) ? CHECK_IN[system] : codes[0];
+    lines.push(`| \`${system}\` | ${sample} | ${read ? 'yes (Node tests only)' : '**no** — normalization and tests missing'} | ${codes.join(', ')} | ${regionDisplayName(at, 'es')} (${at}) |`);
+  }
   return lines.join('\n') + '\n';
 }
 

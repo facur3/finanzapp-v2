@@ -112,4 +112,24 @@ no iPhone row needed beyond section 2.
 
 ## 4. Not released, and why
 
-- **native-digits** (23): AF, BD, BH, BT, EG, IQ, IR, JO, KM, KW, LB, MM, MR, NP, OM, PS, QA, SA, SD, SS, SY, TD, YE. The iPhone's decimal pad types native digits and its own decimal key there; the amount field reads them in Node tests only. Released after an iPhone check of the pad in one Arabic-digit and one Devanagari-digit region (docs/region-families.md).
+- **native-digits** (23): AF, BD, BH, BT, EG, IQ, IR, JO, KM, KW, LB, MM, MR, NP, OM, PS, QA, SA, SD, SS, SY, TD, YE. The locale's default digits are not Latin. What the iOS decimal pad types there (Latin or native digits, which decimal key) is unverified; latinDigits reads arab and arabext only, not beng, deva, mymr or tibt. Each numbering system needs its normalization, its tests and an iPhone check of its pad before its regions open (docs/region-families.md §4).
+
+Each numbering system opens on its own, only when all of this holds (no assumption that the iOS pad uses
+CLDR's default digits: it may show Latin digits, the native ones, or follow the Numbers setting under Language & Region):
+
+1. **Normalization:** `latinDigits` maps the system's ten digits (and its decimal and group marks, if any) one character
+   for one; until then a paste of them is refused as not a number, never guessed.
+2. **Tests:** typing and pasting those digits give the same draft and minor units as Latin digits, the caret stays
+   on its digit, a mixed or ambiguous text is refused (tests/region-families.node.ts pins today's state).
+3. **iPhone:** with iOS Region set to the region named (and, separately, its Numbers setting on Latin and on native
+   digits), record which digits and which decimal key the pad offers, what the field shows after typing
+   «1234567», the decimal key and «89», what a pasted native amount gives, and how VoiceOver reads the field.
+
+| Digits (CLDR) | Sample | Read by the amount field today | Regions | iPhone check in |
+| --- | --- | --- | --- | --- |
+| `arabext` | ۰۱۲۳۴۵۶۷۸۹ | yes (Node tests only) | AF, IR | Irán (IR) |
+| `beng` | ০১২৩৪৫৬৭৮৯ | **no** — normalization and tests missing | BD | Bangladés (BD) |
+| `arab` | ٠١٢٣٤٥٦٧٨٩ | yes (Node tests only) | BH, EG, IQ, JO, KM, KW, LB, MR, OM, PS, QA, SA, SD, SS, SY, TD, YE | Arabia Saudí (SA) |
+| `tibt` | ༠༡༢༣༤༥༦༧༨༩ | **no** — normalization and tests missing | BT | Bután (BT) |
+| `mymr` | ၀၁၂၃၄၅၆၇၈၉ | **no** — normalization and tests missing | MM | Myanmar (Birmania) (MM) |
+| `deva` | ०१२३४५६७८९ | **no** — normalization and tests missing | NP | Nepal (NP) |

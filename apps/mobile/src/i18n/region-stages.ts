@@ -3,15 +3,20 @@
  * 24R2A kept every region but Argentina and the United States behind the gate. 24R2B releases the rest by
  * continent (CLDR's territoryContainment), each continent a stage, on **automated** evidence: every convention
  * family the catalogue holds is exercised by `tests/regions-integration.node.ts` and `tests/region-families.node.ts`
- * (amounts, separators, caret, paste, dates, clock, spoken forms, persistence) in both languages. The owner decided
- * on 2026-09-25, before any public release, to open regions on that evidence and keep the per-family iPhone check
- * (docs/region-families.md) as a gate of the first TestFlight, instead of one delivery per region.
+ * (amounts, separators, caret, paste, dates, clock, spoken forms, persistence) in both languages. This is a
+ * provisional development strategy before launch, not an explicit authorization by the owner: nothing is published
+ * yet, and the per-family iPhone sheet (docs/region-families.md) must pass before the first TestFlight; any stage
+ * can be set back to blocked in one commit.
  *
- * One stage stays **blocked**: the regions whose locale writes other digits by default (Arabic, Persian, Bengali,
- * Devanagari, Burmese, Tibetan). FinanzApp writes Latin digits everywhere, but there the iPhone's decimal pad types
- * the native digits and its own decimal key; the amount field reads them (`latinDigits`, tested in Node) and that
- * path has never run on an iPhone. Amount entry is the one thing that must be exact, so those regions write the
- * default region's conventions (and say so) until a device check releases them.
+ * One stage stays **blocked**: the 23 regions whose locale writes other digits by default (CLDR's
+ * defaultNumberingSystem: Arabic-Indic `arab`, Eastern Arabic-Indic `arabext`, Bengali `beng`, Devanagari `deva`,
+ * Burmese `mymr`, Tibetan `tibt`). FinanzApp writes Latin digits everywhere. What the iPhone's decimal pad offers
+ * there is **not verified**: it may show Latin digits or the native ones (iOS can follow its own Numbers setting
+ * rather than CLDR's default), and its decimal key is unknown. `latinDigits` normalizes only `arab`, `arabext` and
+ * full-width digits; Bengali, Devanagari, Burmese and Tibetan digits are not read (a paste of them is refused, never
+ * guessed; `tests/region-families.node.ts` pins this). Each numbering system opens only after its normalization and
+ * tests exist and an iPhone check of its pad passed (docs/region-families.md §4); until then those regions write the
+ * default region's conventions and say so.
  *
  * Pure data over the generated catalogue; `RELEASED_REGIONS` (locale.ts) is `RELEASED_BY_STAGES`. */
 import { REGION_CODES, REGION_DATA, type CatalogueRegionCode, type Continent } from './regions/data.ts';
@@ -42,7 +47,7 @@ export const REGION_RELEASE_STAGES: readonly RegionReleaseStage[] = [
   ...(['americas', 'europe', 'asia', 'africa', 'oceania'] as const).map((continent): RegionReleaseStage =>
     ({ id: continent, delivery: '24R2B', status: 'released', evidence: 'automated', blocker: null, regions: byContinent(continent) })),
   { id: 'native-digits', delivery: '24R2B', status: 'blocked', evidence: null, regions: REGION_CODES.filter(writesNativeDigits),
-    blocker: 'The iPhone\'s decimal pad types native digits and its own decimal key there; the amount field reads them in Node tests only. Released after an iPhone check of the pad in one Arabic-digit and one Devanagari-digit region (docs/region-families.md).' },
+    blocker: 'The locale\'s default digits are not Latin. What the iOS decimal pad types there (Latin or native digits, which decimal key) is unverified; latinDigits reads arab and arabext only, not beng, deva, mymr or tibt. Each numbering system needs its normalization, its tests and an iPhone check of its pad before its regions open (docs/region-families.md §4).' },
 ];
 
 /** The regions of the released stages: what `RELEASED_REGIONS` is. */

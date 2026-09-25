@@ -149,7 +149,7 @@ export const RELEASED_LANGUAGES: readonly LanguageCode[] = ['es', 'en'];
 /** Regions whose conventions the whole app honours, the amount field included (`money-input.ts`): the released
  * stages of `region-stages.ts`. Argentina and the United States since 23.1C2 (device-checked); since 24R2B every
  * catalogue region whose locale writes Latin digits, by continent, on the automated family verification; the 23
- * native-digit regions stay blocked until an iPhone check of their decimal pad. */
+ * native-digit regions stay blocked until each numbering system is normalized, tested and checked on an iPhone. */
 export const RELEASED_REGIONS: readonly RegionCode[] = RELEASED_BY_STAGES;
 
 export interface ReleasedSets { languages: readonly LanguageCode[]; regions: readonly RegionCode[] }

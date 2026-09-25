@@ -67,10 +67,11 @@ history file keeps the evidence of when and why.
   are opt-in, provider named, no key in the bundle (docs/currency.md §8–§10).
 - **Three gates:** `RELEASED_LANGUAGES` (es, en) and `LEDGER_CURRENCIES` (ARS, USD) open only after
   device QA, in their own commit. `RELEASED_REGIONS` is the released stages of `region-stages.ts`
-  (234 of 257 since 24R2B): the owner decided on 2026-09-25, before any public release, to open regions
-  on the automated per-family verification and keep the short per-family iPhone sheet
-  (docs/region-families.md) as a gate of the first TestFlight; a stage with a known defect or an
-  unverified amount-entry path stays blocked (the 23 native-digit regions). A preview flag
+  (234 of 257 since 24R2B). Opening regions on the automated per-family verification is a
+  provisional development strategy before launch (24R2B), not an explicit authorization by the owner:
+  nothing is published, the short per-family iPhone sheet (docs/region-families.md) must pass before the
+  first TestFlight, and any stage can be set back to blocked in one commit; a stage with a known defect or
+  an unverified amount-entry path stays blocked (the 23 native-digit regions). A preview flag
   (`EXPO_PUBLIC_LOCALE_PREVIEW`, `EXPO_PUBLIC_CURRENCY_PREVIEW`) exists only in a development
   bundle. Language, region and each account's currency are three independent things: a region
   never implies a currency, a language never changes an amount (docs/i18n.md, docs/currency.md).
@@ -744,12 +745,14 @@ the owner authorises it; no EAS build or store submission without the owner.
   stage and the continent stages exactly their continent.
 - **Pending and why.** Afghanistan, Bahrain, Bangladesh, Bhutan, Chad, Comoros, Egypt, Iran, Iraq, Jordan,
   Kuwait, Lebanon, Mauritania, Myanmar, Nepal, Oman, Palestine, Qatar, Saudi Arabia, South Sudan, Sudan,
-  Syria and Yemen: their locale writes Arabic, Persian, Bengali, Devanagari, Burmese or Tibetan digits by
-  default, so the iPhone's decimal pad there types those digits and its own decimal key. The amount field
-  reads them (`latinDigits`, Node tests) but that input path has never run on an iPhone; they write
-  Argentine formats and say so until a device check of the pad in one Arabic-digit and one
-  Devanagari-digit region releases the stage (docs/region-families.md §4). A person there can still choose
-  any released region manually.
+  Syria and Yemen: CLDR's default digits for their locale are Arabic-Indic, Eastern Arabic-Indic, Bengali,
+  Devanagari, Burmese or Tibetan. What the iOS decimal pad offers there is an unverified hypothesis (Latin or
+  native digits, possibly following iOS's own Numbers setting; which decimal key). `latinDigits` reads only
+  Arabic-Indic and Eastern Arabic-Indic digits (Node tests); Bengali, Devanagari, Burmese and Tibetan digits are
+  not normalized, so a paste of them is refused and typing them enters nothing (pinned by a test). Each numbering
+  system opens separately after its normalization, its tests and an iPhone check of its pad
+  (docs/region-families.md §4 lists the six systems and where to check each). Until then they write Argentine
+  formats and say so; a person there can still choose any released region manually.
 - **Automated evidence** (`tests/region-families.node.ts`, every released region × es/en): the amount field
   types exactly what the formatter writes with either pad key, keeps the caret, deletes across the group
   separator, pastes the formatter's output back to the same minor units and refuses the ambiguous
@@ -771,7 +774,12 @@ the owner authorises it; no EAS build or store submission without the owner.
     `regions:verify`, `regions:generate -- --check`, `regions:families -- --check`, `currency:verify`,
     `i18n:check -- --strict`, `i18n:extract`, `check`, `export:ios`; root `npm test` and `check:repo`.
     No EAS build; the iPhone was not touched.
-  - **Pending:** the checklist section Producto 24R2B before the first TestFlight; the native-digit stage.
+  - **Pending:** the checklist section Producto 24R2B before the first TestFlight; per numbering system,
+    the normalization of `beng`, `deva`, `mymr` and `tibt`, the tests, and the iPhone check of all six.
+  - **Review of PR #61:** the claim that the amount field reads every blocked region's digits was wrong
+    (only `arab` and `arabext`); the docs, the blocker text and the PR now say so, the iPhone pad is a
+    hypothesis to verify, the plan is per numbering system, and a test pins today's normalization per
+    system. The region-QA strategy is described as provisional, not as the owner's authorization.
 
 ### Producto 24M — verified currencies opened
 

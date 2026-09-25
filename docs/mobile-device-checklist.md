@@ -342,8 +342,14 @@ each row in Spanish and in English and record the result here.
   changes the formats live; after choosing Suiza manually, an iOS Region change does nothing and a
   force-quit keeps Suiza; account currencies and balances never change.
 - [ ] **A blocked region:** iOS Region Arabia Saudí: Más → Región reads «Ahora: Arabia Saudí (formatos de
-  Argentina)»; the pad shows its own digits: type «١٢٣٫٤٥» and check whether the field shows «123,45»
-  (evidence toward releasing the `native-digits` stage; record which decimal key the pad offered).
+  Argentina)».
+- [ ] **Per numbering system, evidence only (no stage opens from it):** for each row of region-families.md §4
+  (Arabia Saudí `arab`, Irán `arabext`, Bangladés `beng`, Nepal `deva`, Myanmar `mymr`, Bután `tibt`), with iOS
+  Region set there and, separately, iOS's Numbers setting on Latin and on native digits: record which digits
+  and which decimal key the pad actually offers (do not assume CLDR's default), what the field shows after
+  «1234567», the decimal key and «89», what a pasted native amount gives and how VoiceOver reads it. Expected
+  today: `arab`/`arabext` digits read as Latin; `beng`/`deva`/`mymr`/`tibt` digits enter nothing and a paste
+  is refused (not normalized yet).
 
 ## Producto 24R1 — regional infrastructure (one visible line; nothing else until 24R2)
 

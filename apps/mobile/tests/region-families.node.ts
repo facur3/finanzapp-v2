@@ -147,3 +147,34 @@ test('no account, ledger or display-currency code reads the region: a region nev
   }
   assert.deepEqual(offenders, []);
 });
+
+test('the blocked numbering systems: what the amount field reads today, pinned per system (no stage opens on this alone)', async () => {
+  const { latinDigits } = await import('../src/ui/money-input.ts');
+  const { REGION_DATA } = await import('../src/i18n/regions/data.ts');
+  const { REGION_RELEASE_STAGES } = await import('../src/i18n/region-stages.ts');
+  const ZERO = { arab: 0x0660, arabext: 0x06F0, beng: 0x09E6, deva: 0x0966, mymr: 0x1040, tibt: 0x0F20 } as const;
+  const digits = (system: keyof typeof ZERO) => Array.from({ length: 10 }, (_, digit) => String.fromCodePoint(ZERO[system] + digit)).join('');
+  const blocked = REGION_RELEASE_STAGES.find(stage => stage.id === 'native-digits')!;
+  assert.equal(blocked.status, 'blocked');
+  assert.deepEqual([...new Set(blocked.regions.map(code => REGION_DATA[code].defaultDigits))].sort(), ['arab', 'arabext', 'beng', 'deva', 'mymr', 'tibt']);
+  const format = bindLocale('es-AR').amountFormat;
+  // Normalized today: Arabic-Indic and Eastern Arabic-Indic, one character for one; typing them gives the Latin draft.
+  for (const system of ['arab', 'arabext'] as const) {
+    assert.equal(latinDigits(digits(system)), '0123456789', system);
+    const pasted = readPastedAmount(digits(system).slice(1, 8), format, 'ARS');
+    assert.ok(pasted.ok && pasted.canonical === '1234567', system);
+    const input = new AmountInput('', format, 'ARS');
+    type(input, digits(system).slice(1, 5));
+    assert.equal(input.draft, '1.234', system);
+  }
+  // Not normalized: Bengali, Devanagari, Burmese, Tibetan. Left as they are, refused on paste, ignored when typed:
+  // never read as another number. Opening one of them needs its normalization and tests first (docs/region-families.md §4).
+  for (const system of ['beng', 'deva', 'mymr', 'tibt'] as const) {
+    assert.equal(latinDigits(digits(system)), digits(system), system);
+    const pasted = readPastedAmount(digits(system).slice(1, 8), format, 'ARS');
+    assert.deepEqual(pasted.ok ? 'accepted' : pasted.reason, 'invalid', system);
+    const input = new AmountInput('', format, 'ARS');
+    type(input, digits(system).slice(1, 5));
+    assert.equal(input.draft, '', system + ': typed native digits do not become an amount');
+  }
+});
