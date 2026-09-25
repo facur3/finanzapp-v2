@@ -10,7 +10,7 @@ import { useDisplayCurrency } from '../../src/ui/display-currency-provider';
 import { useI18n } from '../../src/i18n/provider';
 import { BudgetHomeCard, CategoryRanking, MetricHelp, UpcomingRecurringRow } from '../../src/ui/home-modules';
 import { Reflow, ValueTransition } from '../../src/ui/motion';
-import { availableCurrencies, homeNamesCategory, namesAccount, selectEntries, sharedGlyphs } from '../../src/ui/presentation';
+import { availableCurrencies, homeNamesCategory, selectEntries, sharedGlyphs, visibleNamesAccount } from '../../src/ui/presentation';
 import { useCategoryLookOf } from '../../src/ui/category-hues';
 import { AssistantEntry, QuickActions } from '../../src/ui/quick-actions';
 import { space, useCurrentDay, usePalette } from '../../src/ui/theme';
@@ -76,8 +76,9 @@ export default function HomeScreen() {
   const accountCount = snapshot.accounts.filter(account => account.currency === currency && !hidden.has(account.id)).length;
   const openReport = () => router.navigate({ pathname: '/reports', params: { currency } });
   const spending = metric === 'spending';
-  // A row names its account only when another account of this currency could be meant (24UX2).
-  const showAccount = namesAccount(snapshot.accounts, currency, new Set((archive?.debts ?? []).map(debt => debt.accountId)));
+  // 24UX5 review: each list names accounts only when its visible rows come from more than one (two owned accounts with
+  // every visible row in one of them printed «· a ·» on each row). VoiceOver still says the account on every row.
+  const recentAccount = visibleNamesAccount(recent), upcomingAccount = visibleNamesAccount(upcoming);
   // A month with nothing recorded in this currency says so once, under Últimos movimientos, instead of two
   // near-identical sentences 24 pt apart (24UX1 finding 5). Categories return with the first expense.
   const quietMonth = summary.status === 'ready' && !summary.categories.length && !recent.length;
@@ -143,14 +144,14 @@ export default function HomeScreen() {
 
       {upcoming.length > 0 && <Reflow fade>
         <SectionTitle quiet action={t('common.seeAll')} onAction={() => router.push('/recurring')}>{t('home.upcoming')}</SectionTitle>
-        <View>{upcoming.map((rule, index) => <UpcomingRecurringRow key={rule.id} rule={rule} showAccount={showAccount} showCategory={namesCategory(rule)}
+        <View>{upcoming.map((rule, index) => <UpcomingRecurringRow key={rule.id} rule={rule} showAccount={upcomingAccount} showCategory={namesCategory(rule)}
           account={snapshot.accounts.find(account => account.id === rule.accountId)!} day={day} last={index === upcoming.length - 1} />)}</View>
       </Reflow>}
 
       <Reflow>
         <SectionTitle quiet action={t('common.seeAll')} onAction={() => router.navigate('/activity')}>{t('home.recent')}</SectionTitle>
         <ValueTransition id={currency} variant="fade">
-          {recent.length ? <View>{recent.map((entry, index) => <EntryRow key={entry.id} entry={entry} showAccount={showAccount} variant="home" showCategory={namesCategory(entry)}
+          {recent.length ? <View>{recent.map((entry, index) => <EntryRow key={entry.id} entry={entry} showAccount={recentAccount} variant="home" showCategory={namesCategory(entry)}
             account={snapshot.accounts.find(a => a.id === entry.accountId)!} last={index === recent.length - 1} />)}</View>
             : <AppText secondary variant="subhead">{currencies.length > 1 ? t('home.recentEmptyIn', { currency }) : t('home.recentEmpty')}</AppText>}
         </ValueTransition>

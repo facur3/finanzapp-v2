@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import type { Account, Entry, Transfer } from '@finanzapp/domain';
-import { availableCurrencies, groupEntries, initialAccountId, selectEntries, selectTransfers, mergeActivity, groupActivity, activityDateLabel, dayNetMinor, homeNamesCategory, sharedGlyphs } from '../src/ui/presentation.ts';
+import { availableCurrencies, groupEntries, initialAccountId, selectEntries, selectTransfers, mergeActivity, groupActivity, activityDateLabel, dayNetMinor, homeNamesCategory, sharedGlyphs, visibleNamesAccount } from '../src/ui/presentation.ts';
 
 // Synthetic fixtures only; never loaded by the app or stored in a user database.
 const accounts: Account[] = [
@@ -106,4 +106,11 @@ test('24UX5: Inicio names the category only when the name and the glyph do not a
   assert.equal(homeNamesCategory('Carrefour', 'Supermercado', true), true, 'a glyph shared with another category on screen');
   assert.deepEqual([...sharedGlyphs([{ category: 'Comida', glyph: 'g1' }, { category: 'Comida', glyph: 'g1' }, { category: 'Café', glyph: 'g1' }, { category: 'Ocio', glyph: 'g2' }])], ['g1']);
   assert.equal(sharedGlyphs([{ category: 'Comida', glyph: 'g1' }, { category: 'Comida', glyph: 'g1' }]).size, 0, 'the same category twice is not ambiguous');
+});
+
+test('24UX5 review: a Home list names accounts only when its visible rows come from more than one; "aa" keeps its category', () => {
+  assert.equal(visibleNamesAccount([]), false);
+  assert.equal(visibleNamesAccount([{ accountId: 'a' }, { accountId: 'a' }, { accountId: 'a' }]), false);
+  assert.equal(visibleNamesAccount([{ accountId: 'a' }, { accountId: 'b' }]), true);
+  for (const name of ['f', 'aa', 'vv']) assert.equal(homeNamesCategory(name, 'Comida', false), true, name);
 });

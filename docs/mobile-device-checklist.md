@@ -21,10 +21,13 @@ text size. Use your own small test data; never seed movements.
   under the amount, amber for today and tomorrow.
 - [ ] A movement with a clear name ("Carrefour") shows only the date under it; one named "f", "a" or
   "Varios" also shows its category ("Comida · Hoy"); two different categories that draw the same icon on
-  screen both show their category; with two accounts of the currency the account appears
-  ("Banco · Hoy"), with one it does not. An upcoming rule shows a caption only in those same cases.
+  screen both show their category ("f" and "aa" keep «Comida · Hoy»). With two ARS accounts but every
+  visible movement in the same one, no row repeats the account; once the visible rows come from two
+  accounts, each shows its own ("Banco · Hoy"). Próximos compromisos decides the same on its own rows;
+  its amounts and days do not change.
 - [ ] VoiceOver on a movement row still says merchant, Gasto/Ingreso, amount, category, account and date;
-  on an upcoming row merchant, category, amount and the estimated day. The same in English.
+  on an upcoming row merchant, category, amount, the estimated day and the account (even when the
+  caption leaves it out). The same in English.
 - [ ] English: the category section reads «By category»; titles wrap rather than truncate at the largest
   accessibility text size, with the link still reachable.
 - [ ] With a budget (general, exceeded), several categories, a second currency and a very large amount,
@@ -32,6 +35,9 @@ text size. Use your own small test data; never seed movements.
 
 **Reportes.**
 
+- [ ] The month heading reads «Septiembre de 2026» (lower-case «de»; English «September 2026»); the
+  same in Presupuestos, and a movement's detail date reads «Martes, 22 de septiembre de 2026». The period
+  line under it says «Hasta hoy» with no «· ARS» (the chip and «Gastado · ARS» already name it).
 - [ ] Beside «Gastado · ARS» an information glyph opens «Qué cuenta este reporte» (the currency, no
   opening balances, transfers or card payments, a month without records is not a month without
   spending). The paragraph at the end of the screen is gone.

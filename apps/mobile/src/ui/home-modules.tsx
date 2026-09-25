@@ -166,10 +166,11 @@ export function UpcomingRecurringRow({ rule, account, day, last, showAccount = f
     : due.kind === 'soon' ? t('home.upcomingRow.inDays', { count: due.days }) : relativeDate(rule.nextDateISO, day);
   const urgent = due.kind === 'today' || due.kind === 'tomorrow' || due.kind === 'due';
   const detail = [showCategory ? category : null, showAccount ? account.name : null].filter(Boolean).join(' · ');
-  // VoiceOver hears merchant, category, amount and the estimated day in one sentence ("próximo pago hoy").
+  // VoiceOver hears merchant, category, amount, the estimated day and the account in one sentence, whatever the
+  // caption shows (24UX5 review: the account used to be spoken only when it was drawn).
   return <PressFeedback feedback="opacity" accessibilityRole="button"
     accessibilityLabel={t('home.upcomingRow.label', { merchant: rule.merchant, category, amount: spokenAmount(rule.amountMinor, account.currency), date: relativeDate(rule.nextDateISO, day, true) })
-      + (showAccount ? ', ' + account.name : '')}
+      + ', ' + account.name}
     onPress={() => router.push({ pathname: '/edit-recurring/[id]', params: { id: rule.id } })}
     style={styles.agendaRow}>
     <MerchantBadge merchant={rule.merchant} category={rule.category} kind={rule.kind} />

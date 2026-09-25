@@ -68,3 +68,16 @@ test('23.1B2: report period labels keep their Spanish wording and read naturally
   assert.equal(changePercent(-50, 100, 'en-US'), '50%');
   assert.equal(spendingShare(300, 1000, 'en-US').label, '30%');
 });
+
+test('24UX5 review: formatMonthTitle raises the first letter only; reportPeriodLabel can leave the currency out', async () => {
+  const { formatMonthTitle } = await import('../src/i18n/format.ts');
+  const { translator } = await import('../src/i18n/messages.ts');
+  assert.equal(formatMonthTitle('2026-09', 'es-AR'), 'Septiembre de 2026');
+  assert.equal(formatMonthTitle('2026-09', 'es-US'), 'Septiembre de 2026');
+  assert.equal(formatMonthTitle('2026-09', 'en-US'), 'September 2026');
+  assert.equal(formatMonthTitle('2026-09', 'es-AR', 'month'), 'Septiembre');
+  assert.equal(formatMonthTitle('bad', 'es-AR'), 'Bad', 'a malformed value is shown as given, never thrown');
+  const period = { currency: 'ARS' as const, startISO: '2026-09-01', endISO: '2026-09-12' };
+  assert.equal(reportPeriodLabel(period, '2026-09-12', translator('es'), false), 'Hasta hoy');
+  assert.equal(reportPeriodLabel(period, '2026-09-12'), 'Hasta hoy · ARS', 'the category detail keeps the code');
+});

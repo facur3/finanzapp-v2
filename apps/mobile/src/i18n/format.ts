@@ -107,6 +107,13 @@ export function formatDate(dateISO: string, style: DateStyle, locale: AppLocale 
   }
 }
 
+/** A month as a title: only the first letter is raised, the rest stays as the language writes it ("Septiembre de
+ * 2026", never "Septiembre De 2026" as a style-level capitalize draws it; "September 2026"). 24UX5 review. */
+export function formatMonthTitle(monthISO: string, locale: AppLocale = DEFAULT_LOCALE, style: 'month' | 'monthYear' = 'monthYear'): string {
+  const text = formatMonth(monthISO, locale, style);
+  return text.charAt(0).toLocaleUpperCase(locale) + text.slice(1);
+}
+
 /** "YYYY-MM" the way the locale names a month. */
 export function formatMonth(monthISO: string, locale: AppLocale = DEFAULT_LOCALE, style: 'month' | 'monthYear' = 'monthYear'): string {
   const text = /^\d{4}-\d{2}$/.test(monthISO) && dateFromISO(monthISO + '-01') ? formatDate(monthISO + '-01', style, locale) : null;

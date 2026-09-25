@@ -130,7 +130,8 @@ file).
   (Reportes keeps the currency, Ver todos) are quiet. 24UX5 (on its branch): the links take the slate `link`
   token; both lists draw the same 40 pt mark (the agenda stays tighter); the Home rows (`EntryRow
   variant="home"`) caption the date alone and add the category or the account only when needed to tell a row
-  apart (`homeNamesCategory`, `namesAccount`); VoiceOver keeps every field.
+  apart (`homeNamesCategory`; the account only when the visible rows of that list come from more than one
+  account, `visibleNamesAccount`); VoiceOver keeps every field.
 - **Recording.** Gasto / Ingreso / Transferencia on one control; kind and amount first; the
   amount field anchored with tabular digits, typing and pasting in the region's separators,
   per-currency exponent (0, 2, 3), 15-digit bound, paste markers, shortcuts (Usar todo, Pagar
@@ -551,8 +552,10 @@ the owner authorises it; no EAS build or store submission without the owner.
   - *One rule could keep every screen closed.* `recurringOccurrencesThrough` throws past 366 pending dates
     (a weekly rule untouched for seven years, an old restore), and `processRecurring` ran every rule in one
     transaction whose failure made LedgerProvider show «No pudimos abrir tus datos» on every launch.
-    Now `catchUpRecurring` materializes each rule on its own: a rule that cannot be recorded is set aside
-    unchanged and reported, the others are recorded, and the ledger opens. `openLedger`/`refreshLedger`
+    Now `catchUpRecurring` materializes each rule on its own (the SQLite writes remain one transaction): a
+    rule whose occurrences cannot be materialized is set aside unchanged and reported, the others are
+    recorded, and the ledger opens. A rule that fails validation is still refused by `readArchive` before the
+    catch-up (as before) and is not isolated by it; no such rule can be saved through the app. `openLedger`/`refreshLedger`
     (`src/storage/ledger-session.ts`) never let the catch-up fail an open: a catch-up that fails as a whole
     leaves the ledger as it was (one transaction) and shows the existing «No pudimos verificar…» banner over
     the open app. The set-aside rule (active, next date before today: `recurringNeedsReview`) reads
@@ -573,7 +576,8 @@ the owner authorises it; no EAS build or store submission without the owner.
 - **Decisions.** Link token `link` #4A6390 / #8EA7D8 (measured contrast, desaturated, apart from the cobalt
   and the transfer azure) on Inicio's quiet links only. Home rows via an explicit `variant="home"`; the
   category returns to a caption for short, letterless or generic names and for glyphs shared on screen
-  (`homeNamesCategory`, `sharedGlyphs`), the account for a second account of the currency. «Where your money
+  (`homeNamesCategory`, `sharedGlyphs`), the account only when a list's visible rows come from two accounts
+  (`visibleNamesAccount`, review of PR #59). «Where your money
   went» → «By category»; «En qué gastaste», «Próximos compromisos» and «Últimos movimientos» kept (natural,
   wrap instead of truncating). Reportes' methodology behind an `InfoButton`; «Tu mayor gasto» dropped only
   when the ranking shows that same single purchase (`insightsBesideRanking`). Más: a version line, the
@@ -592,6 +596,18 @@ the owner authorises it; no EAS build or store submission without the owner.
     English reviewed and accepted), `i18n:extract` (no copy outside the catalogue), `check` (up to date),
     `export:ios` (iOS bundle exported, 5 MB); `server/mobile/schema.test.sql` on postgres:17 in a local
     container (unchanged code, passes). No EAS build; the iPhone was not touched; no schema change.
+  - **Review of PR #59** (owner's iPhone screenshots): the Reportes heading read «Septiembre De 2026» (a
+    style-level `capitalize`); `formatMonthTitle` now raises the first letter only, also in Presupuestos, its
+    form and the long date of the movement and transfer details. The period line no longer repeats «· ARS»
+    (the chip and «Gastado · ARS» name it; the category detail keeps it). Home rows repeated «· a ·» when two
+    ARS accounts were owned but every visible row was in one: each Home list now names accounts only when its
+    visible rows come from more than one (`visibleNamesAccount`), Próximos compromisos independently; «f» and
+    «aa» keep their category; VoiceOver on an upcoming row always says the account. The per-rule confirmation
+    mode was removed from 25C2 and docs/merchant-identity.md: recurring rules stay automatic. Checked:
+    mobile `test:storage` 647/647 (+1 `report-routes`, +1 `reports`, +1 `presentation`, +1
+    `recurring-audit`; the Home account test rewritten for the visible-rows rule), root `npm test` 299/299,
+    `check:repo`, `typecheck`, `currency:verify`, `regions:verify`, `i18n:check -- --strict`, `i18n:extract`,
+    `check`, `export:ios`.
   - **Pending:** the device QA of §2 (checklist, Producto 24UX5).
 
 ### Producto 24R2 — international regions released
@@ -760,18 +776,17 @@ docs/merchant-identity.md.
   rules: a merchant key pre-fills the category the person chose before, only pre-fills, visible and
   editable in Categorías, never rewrites a stored movement. Suggested recurring detection: the same
   merchant key, account, currency and amount repeating at a regular interval proposes a rule the
-  person confirms; nothing is created silently. Payment history and a calendar of commitments:
-  expected occurrences (expected → paid / skipped / late) linked to real movements by the person's
-  confirmation, per currency, never summed across currencies (§5 of the design). **Per-rule mode**
-  (24UX5 audit): «Registrar automáticamente» (today's behaviour: the movement is added on the due date
-  when the app opens) or «Esperar confirmación» (an expected occurrence the person confirms, edits or skips;
-  for variable amounts and incomes of uncertain date). It is a recurring-rule setting, distinct from the
-  Assistant's captures, which are always drafts (no auto-registration there).
+  person confirms; nothing is created silently. A calendar of commitments read from the rules and the
+  movements they already recorded, per currency, never summed across currencies. **Recurring rules stay
+  automatic** (owner's decision, review of PR #59): expenses and incomes are recorded on their date (on
+  launch or foreground when the app was closed); managing a rule is pause, resume and delete only. No
+  per-rule confirmation mode, expected-occurrence state or reconciliation screen is planned. Reviewing
+  drafts belongs to the Assistant's captures, a separate workflow.
 - **Rules.** The typed name stays; the category stays the classification; no ambiguous match; a
   scheduled payment is never a movement; no connection to a merchant or a bank is implied.
-- **Gates.** Domain tests (matching, suggestions never applied without confirmation, occurrence
-  states, migration of auto-registered movements to paid occurrences), schema and backup versions
-  with rollback tests, the history and calendar on the iPhone with VoiceOver and large text.
+- **Gates.** Domain tests (matching, suggestions never applied without confirmation, the calendar
+  per currency), schema and backup versions with rollback tests if any record is added, the history
+  and calendar on the iPhone with VoiceOver and large text.
 - **Depends on.** 24UX2 (merged); the owner's decision on the brand-mark source after the four
   questions above.
 

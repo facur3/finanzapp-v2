@@ -22,7 +22,7 @@ export function BudgetForm({ original, monthISO, currency: requestedCurrency, sc
   original?: MonthlyBudget; monthISO: string; currency?: string; scope?: string;
 }) {
   const { snapshot, saveBudget, gate = LEDGER_CURRENCIES } = useLedger();
-  const { t, formatMonth } = useI18n();
+  const { t, formatMonthTitle } = useI18n();
   const [before] = useState(original);
   const [operation] = useState(() => ({ id: randomUUID(), createdAt: new Date().toISOString() }));
   const [scope, setScope] = useState<BudgetScope>(before?.scope ?? (requestedScope === 'total' ? 'total' : 'category'));
@@ -116,7 +116,7 @@ export function BudgetForm({ original, monthISO, currency: requestedCurrency, sc
     <Stack.Screen options={{ title: t(before ? 'nav.titles.editBudget' : 'nav.titles.newBudget'), gestureEnabled: !busy,
       headerLeft: () => <IconButton name="close" label={t('common.close')} onPress={close} disabled={busy} /> }} />
     <View style={{ gap: 4, alignItems: 'center', paddingTop: 8 }}>
-      <AppText secondary style={{ fontSize: 14, textTransform: 'capitalize' }}>{formatMonth(before?.monthISO ?? monthISO)}</AppText>
+      <AppText secondary style={{ fontSize: 14 }}>{formatMonthTitle(before?.monthISO ?? monthISO)}</AppText>
       <AppText variant="title2">{t(general ? 'budgets.form.general' : 'budgets.form.perCategory')}</AppText>
     </View>
     {!before && <Choices<BudgetScope> value={scope} onChange={setScope} disabled={locked}

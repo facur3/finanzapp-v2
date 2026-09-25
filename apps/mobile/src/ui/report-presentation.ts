@@ -45,13 +45,15 @@ export function reportMonthLabel(monthISO: string, locale: AppLocale = DEFAULT_L
   return formatMonth(monthISO, locale);
 }
 
-/** "Hasta hoy · ARS", "Mes completo · ARS" or "Del 1 al 12 · ARS": which days a report covers. */
-export function reportPeriodLabel(period: ReportPeriod, day: string, t: Translate = translator('es')): string {
+/** "Hasta hoy · ARS", "Mes completo · ARS" or "Del 1 al 12 · ARS": which days a report covers. `withCurrency` false
+ * (Reportes' own header, 24UX5 review) leaves the code out where the chip and «Gastado · ARS» already name it; the
+ * category detail keeps it, since nothing else on that line says the currency. */
+export function reportPeriodLabel(period: ReportPeriod, day: string, t: Translate = translator('es'), withCurrency = true): string {
   const [year, month] = period.endISO.split('-').map(Number);
   const lastDay = new Date(year, month, 0, 12).getDate();
   const label = period.endISO === day ? t('reports.period.untilToday') : Number(period.endISO.slice(-2)) === lastDay
     ? t('reports.period.fullMonth') : t('reports.period.untilDay', { day: Number(period.endISO.slice(-2)) });
-  return label + ' · ' + period.currency;
+  return withCurrency ? label + ' · ' + period.currency : label;
 }
 
 /** Optional comparison cutoff must stay within the requested month and today. */

@@ -1085,11 +1085,14 @@ puras de `src/ui/presentation.ts`:
   nombre no alcanza (menos de tres caracteres, sin letras: «f», «a», «123»; genérico: «Varios», «Pago»,
   «Unknown») o cuando otra categoría en pantalla dibuja el mismo glifo (`sharedGlyphs`, calculado sobre
   las dos listas juntas). Un nombre que es la categoría («Transporte» en Transporte) nunca la repite.
-- La cuenta aparece solo cuando otra cuenta de la misma moneda podría ser la del movimiento
-  (`namesAccount`, sin cambios).
+- La cuenta aparece solo cuando **las filas visibles de esa lista** vienen de más de una cuenta
+  (`visibleNamesAccount`, revisión de la PR #59). Tener dos cuentas en ARS no alcanza: si todo lo visible
+  es de la misma, repetir «· a ·» en cada fila no dice nada. Cada lista decide con sus propias filas;
+  Movimientos y los detalles siguen con `namesAccount`.
 
 VoiceOver no pierde nada: la fila del libro sigue diciendo comercio, Gasto/Ingreso, importe, categoría,
-cuenta y fecha; la de la agenda comercio, categoría, importe y el día estimado. El detalle, los filtros y
+cuenta y fecha; la de la agenda comercio, categoría, importe, el día estimado y la cuenta (antes la
+cuenta se decía solo cuando se dibujaba). El detalle, los filtros y
 la búsqueda siguen mostrando y encontrando todo.
 
 **Búsqueda y notas.** Movimientos busca comercio, categoría guardada, el nombre localizado de la
@@ -1118,6 +1121,15 @@ esquema para esta entrega. Las notas buscables de gastos e ingresos quedan en la
   dispositivos.»
 
 ### Reportes: menos texto permanente, los mismos datos
+
+- **Título del mes** (revisión de la PR #59). `textTransform: 'capitalize'` subía cada palabra y el
+  iPhone mostraba «Septiembre De 2026». `formatMonthTitle` (en `src/i18n/format.ts`, también en
+  `useI18n()`) sube solo la primera letra: «Septiembre de 2026», «September 2026». Lo mismo en
+  Presupuestos, su formulario y la fecha larga del detalle de un movimiento o una transferencia
+  («Martes, 22 de septiembre de 2026»). No queda ningún `capitalize` sobre texto localizado.
+- **Sin ARS repetido.** La línea del período dice «Hasta hoy» (antes «Hasta hoy · ARS»): el chip de
+  moneda y «Gastado · ARS» ya la nombran en la misma vista. El detalle de categoría conserva el código,
+  porque ahí nada más lo dice (`reportPeriodLabel(…, withCurrency)`).
 
 - **Metodología detrás de un botón.** El párrafo final («Solo movimientos registrados en ARS… Un mes sin
   registros no significa que no hayas gastado») pasa a un `InfoButton` junto a «Gastado · ARS»: «Qué

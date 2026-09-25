@@ -33,7 +33,7 @@ export default function ReportsScreen() {
   const params = useLocalSearchParams<{ currency?: string | string[]; month?: string | string[] }>();
   const { snapshot, archive } = useLedger();
   const p = usePalette();
-  const { t, locale, formatMonth, formatDayMonth, moneyText, spokenMoney } = useI18n();
+  const { t, locale, formatMonthTitle, formatDayMonth, moneyText, spokenMoney } = useI18n();
   const day = useCurrentDay();
   const [monthOverride, setMonth] = useState<string>();
   const [view, setView] = useState<'categories' | 'days'>('categories');
@@ -106,9 +106,9 @@ export default function ReportsScreen() {
           <IconButton name="chevron-back" label={t('reports.previousMonth')} disabled={!canPrevious}
             onPress={() => { if (canPrevious) goToMonth(shiftReportMonth(monthISO, -1)); }} />
           <ValueTransition id={monthISO + '|' + currency} variant="fade" style={{ flex: 1, alignItems: 'center', gap: 2 }}>
-            <AppText accessibilityRole="header" variant="title3" style={{ textTransform: 'capitalize', textAlign: 'center' }}>{formatMonth(monthISO)}</AppText>
+            <AppText accessibilityRole="header" variant="title3" style={{ textAlign: 'center' }}>{formatMonthTitle(monthISO)}</AppText>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-              <AppText secondary variant="caption">{reportPeriodLabel(report, day, t)}</AppText>
+              <AppText secondary variant="caption">{reportPeriodLabel(report, day, t, false)}</AppText>
               {canNext && <PressFeedback feedback="opacity" accessibilityRole="button" onPress={() => goToMonth(currentMonth)} accessibilityLabel={t('reports.backToCurrentMonth')} hitSlop={8} style={{ minHeight: 28, justifyContent: 'center' }}>
                 <AppText variant="caption" style={{ fontWeight: '600', color: p.primary }}>{t('reports.thisMonth')}</AppText>
               </PressFeedback>}

@@ -240,7 +240,7 @@ test('23.1B2: Reportes in English changes only words; amounts, user data and rou
   find(root, 'IconButton', 'Previous month');
   find(root, 'IconButton', 'Next month');
   assert.ok(words.includes('August 2026'));
-  assert.ok(words.includes('Full month · ARS'));
+  assert.ok(words.includes('Full month'), '24UX5 review: no «· ARS» beside the period; the eyebrow names it');
   assert.ok(words.includes('Spent\u00A0·\u00A0ARS'));
   assert.equal(find(root, 'DonutChart').props.caption, 'Period total');
   assert.ok(words.includes('Your largest expense was Prueba'), 'the merchant is the person\'s own words');
@@ -417,4 +417,19 @@ test('24UX3 review: Dónde más gastaste is an open ranked list on the ground, n
   const badges = nodes(section).filter(node => node.type === 'CategoryBadge');
   assert.ok(badges.length > 0);
   assert.equal(badges.every(badge => badge.props.size === 32), true, 'compact marks, lighter than the category card');
+});
+
+test('24UX5 review: the month heading raises only its first letter, and the period line does not repeat the currency', () => {
+  const data = { ...snapshot, entries: [...snapshot.entries, { ...snapshot.entries[0], id: 'sep', amountMinor: 500, dateISO: '2026-09-05' }] };
+  for (const [locale, heading, period] of [['es-AR', 'Septiembre de 2026', 'Hasta hoy'], ['en-US', 'September 2026', 'Through today']] as [AppLocale, string, string][]) {
+    const root = routeHarness('(tabs)/reports.tsx', { currency: 'ARS', month: '2026-09' }, data, { locale }).render();
+    const title = nodes(root).find(node => node.type === 'AppText' && node.props.accessibilityRole === 'header' && node.props.variant === 'title3')!;
+    assert.equal(title.props.children, heading, locale);
+    assert.equal(title.props.style.textTransform, undefined, 'no style-level capitalize («Septiembre De 2026»)');
+    const words = texts(root);
+    assert.ok(words.includes(period), locale + ': the period alone');
+    assert.equal(words.some(text => text.startsWith(period + ' · ')), false, 'no «· ARS» after the period');
+    assert.ok(words.some(text => /ARS/.test(text) && /Gastado|Spent/.test(text)), 'the currency stays named beside the total');
+    assert.ok(nodes(root).some(node => node.type === 'InfoButton'), 'the method button stays');
+  }
 });

@@ -134,34 +134,20 @@ What is *not* done, on purpose: no movement is created, merged or deduplicated b
 scheduling a commitment; no guess links a typed "Netflix" movement to the Netflix rule; no
 connection to Netflix, Spotify or a bank exists or is implied.
 
-### Future: history and reconciliation (roadmap, not built)
+### Recurring rules stay automatic (owner's decision, review of PR #59)
 
-The current model registers on the due date, which is right for fixed debits and wrong when the
-amount or the day varies (a utility bill, a card statement). A later delivery should let a rule
-be **expected** instead of **auto-registered**:
-
-1. An expected occurrence is a local record `(ruleId, dueDateISO, status)` with status
-   `expected → paid | skipped | late`, never a movement. It carries no amount in reports.
-2. **Paid** is a link from the occurrence to one real movement: either the person confirms "Lo
-   pagué" (which creates the movement with the rule's defaults, editable, one write, operation
-   id), or picks an existing movement from suggestions. Suggestions come from the same account
-   and currency, a merchant key equal to the rule's, and a date window around the due date; they
-   are proposals, confirmed by the person, never applied silently. A movement links to at most
-   one occurrence.
-3. **Skipped** keeps the history honest (a paused month, a cancelled delivery). **Late** is a
-   display state for an expected occurrence past its date; reminders (25D) never claim a bank did
-   not receive a payment.
-4. The history of a rule is then its occurrences with their state and linked movement; a calendar
-   of commitments (per month, per day, per currency, never summed across currencies) is built on
-   the same records.
-5. Schema and backup version bump, migration with rollback tests; existing auto-registered
-   movements become `paid` occurrences by their deterministic id; sync (25E) carries occurrences
-   with operation ids and tombstones.
+A rule records its movement on its date, expenses and incomes alike; if the app was closed, on the
+next launch or return to the foreground, dated on the due day. The person manages a rule by pausing,
+resuming or deleting it, and edits a recorded movement like any other (a changed bill amount is an
+edit of that movement). An earlier exploratory design (an «expected» occurrence the person confirms,
+skips or links, and a per-rule «Esperar confirmación» mode) is **not approved** and not on the
+roadmap. Reviewing drafts before they are written is the Assistant's workflow for captures, a separate
+thing.
 
 ## 6. Related roadmap items
 
 Local categorisation rules (a merchant key pre-fills a category the person chose before, only
 pre-fills, never rewrites), suggested recurring detection (the same merchant key, account and
-amount repeating at a regular interval proposes a rule; never creates one), the payment history
-and commitments calendar above, widgets of upcoming payments (25D, amounts hidden by default) and
+amount repeating at a regular interval proposes a rule; never creates one), the commitments calendar
+(read from the rules and what they recorded), widgets of upcoming payments (25D, amounts hidden by default) and
 the brand-mark decision. See docs/mobile-roadmap.md §3 (Producto 25C2).

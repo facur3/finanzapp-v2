@@ -447,23 +447,33 @@ test('24UX2: a month with nothing recorded in the currency says so once, under �
   assert.ok(homeTexts(withIncome).includes('Tus categorías aparecerán cuando registres un gasto este mes.'));
 });
 
-test('24UX2: Home rows name the account only when another account of the currency could be meant', () => {
-  let root = routeHarness('(tabs)/index.tsx', {}, homeData).render();
-  assert.equal(nodes(root).filter(node => node.type === 'EntryRow').every(node => node.props.showAccount === false), true, 'one ARS account: the name says nothing');
-  const twoCash = { ...homeData, accounts: [...homeData.accounts, { id: 'b', name: 'Efectivo', currency: 'ARS' as const, openingMinor: 0, createdAt }] };
-  root = routeHarness('(tabs)/index.tsx', {}, twoCash).render();
-  assert.equal(nodes(root).filter(node => node.type === 'EntryRow').every(node => node.props.showAccount === true), true);
-  // A personal debt's hidden account never pays an expense, so it does not make the name necessary.
-  const withDebt = { ...homeData, accounts: [...homeData.accounts, { id: 'debt-acc', name: 'Debo', currency: 'ARS' as const, openingMinor: 0, createdAt }] };
-  const debts = [{ id: 'd', accountId: 'debt-acc', counterparty: 'Ana', direction: 'owe', dueDateISO: null, active: true, createdAt, revision: 0, updatedAt: createdAt }] as unknown as domain.PersonalDebtProfile[];
-  root = routeHarness('(tabs)/index.tsx', {}, withDebt, { debts }).render();
-  assert.equal(nodes(root).filter(node => node.type === 'EntryRow').every(node => node.props.showAccount === false), true);
-  // The upcoming commitments follow the same rule.
-  const rule: domain.RecurringRule = { id: 'r', accountId: 'a', kind: 'expense', amountMinor: 100, merchant: 'Netflix', category: 'Suscripciones', frequency: 'monthly',
-    anchorDateISO: '2026-09-20', nextDateISO: '2026-09-20', active: true, deleted: false, createdAt, revision: 0, updatedAt: createdAt };
-  const upcoming = find(routeHarness('(tabs)/index.tsx', {}, twoCash, { recurring: [rule] }).render(), 'UpcomingRecurringRow');
-  assert.equal(upcoming.props.showAccount, true);
-  assert.equal(find(routeHarness('(tabs)/index.tsx', {}, homeData, { recurring: [rule] }).render(), 'UpcomingRecurringRow').props.showAccount, false);
+test('24UX5 review: Home rows name the account only when the visible rows of that list come from more than one account', () => {
+  const at = '2026-09-10T12:00:00Z';
+  const accounts: domain.Account[] = [{ id: 'a', name: 'a', currency: 'ARS', openingMinor: 0, createdAt: at }, { id: 'b', name: 'Banco', currency: 'ARS', openingMinor: 0, createdAt: at }];
+  const entry = (id: string, accountId: string, merchant: string, category: string): domain.Entry => ({ id, accountId, kind: 'expense', amountMinor: 100, merchant, category, dateISO: '2026-09-10', createdAt: at });
+  const shown = (root: Node, type: string) => nodes(root).filter(node => node.type === type).map(node => node.props.showAccount);
+  // The owner's screenshot: two ARS accounts owned, every visible movement in «a» → «Restaurantes · a · Hoy» on each row. No more.
+  const oneVisible = { accounts, entries: [entry('1', 'a', 'Parrilla', 'Restaurantes'), entry('2', 'a', 'Coto', 'Supermercado')] };
+  assert.equal(shown(routeHarness('(tabs)/index.tsx', {}, oneVisible).render(), 'EntryRow').join(), 'false,false');
+  // Two accounts among the visible rows: each row names its own.
+  const twoVisible = { accounts, entries: [...oneVisible.entries, entry('3', 'b', 'Farmacia', 'Salud')] };
+  assert.equal(shown(routeHarness('(tabs)/index.tsx', {}, twoVisible).render(), 'EntryRow').join(), 'true,true,true');
+  // Ambiguous names keep their category either way ("f", "aa").
+  const ambiguous = { accounts, entries: [entry('4', 'a', 'f', 'Comida'), entry('5', 'a', 'aa', 'Hogar'), entry('6', 'a', 'Carrefour', 'Supermercado')] };
+  const rows = nodes(routeHarness('(tabs)/index.tsx', {}, ambiguous).render()).filter(node => node.type === 'EntryRow');
+  assert.equal(rows.map(row => row.props.entry.merchant + ':' + row.props.showCategory + ':' + row.props.showAccount).sort().join(), 'Carrefour:false:false,aa:true:false,f:true:false');
+  // Próximos compromisos decides on its own rows, independently of the movements; amounts and dates are untouched.
+  const rule = (id: string, accountId: string, merchant = 'Netflix'): domain.RecurringRule => ({ id, accountId, kind: 'expense', amountMinor: 4321, merchant, category: 'Suscripciones',
+    frequency: 'monthly', anchorDateISO: '2026-09-20', nextDateISO: '2026-09-20', active: true, deleted: false, createdAt: at, revision: 0, updatedAt: at });
+  let root = routeHarness('(tabs)/index.tsx', {}, twoVisible, { recurring: [rule('r1', 'a'), rule('r2', 'a', 'aa')] }).render();
+  assert.equal(shown(root, 'UpcomingRecurringRow').join(), 'false,false', 'both rules in one account, even though the movements span two');
+  assert.equal(shown(root, 'EntryRow').join(), 'true,true,true');
+  const upcoming = nodes(root).filter(node => node.type === 'UpcomingRecurringRow');
+  assert.equal(upcoming.map(node => node.props.rule.merchant + ':' + node.props.showCategory).join(), 'aa:true,Netflix:false', '"aa" keeps its category in the agenda too');
+  assert.equal(upcoming.map(node => node.props.rule.amountMinor + '@' + node.props.rule.nextDateISO).join(), '4321@2026-09-20,4321@2026-09-20');
+  root = routeHarness('(tabs)/index.tsx', {}, oneVisible, { recurring: [rule('r1', 'a'), rule('r2', 'b')] }).render();
+  assert.equal(shown(root, 'UpcomingRecurringRow').join(), 'true,true');
+  assert.equal(shown(root, 'EntryRow').join(), 'false,false');
 });
 
 test('24UX2: Home keeps its modules and adds none', () => {
@@ -540,7 +550,7 @@ test('24UX5: Home keeps the account in a row only when another account of the cu
   assert.equal(find(oneArs, 'EntryRow').props.showAccount, false, 'one ARS account (a USD one does not make it ambiguous)');
   const view = routeHarness('(tabs)/index.tsx', {}, { accounts, entries });
   const twoArs = view.render();
-  assert.equal(find(twoArs, 'EntryRow').props.showAccount, true);
+  assert.equal(find(twoArs, 'EntryRow').props.showAccount, false, '24UX5 review: two accounts owned, one visible: no name');
   const links = nodes(twoArs).filter(node => node.type === 'SectionTitle');
   for (const link of links) link.props.onAction();
   assert.equal(JSON.stringify(view.pushed), JSON.stringify([{ pathname: '/reports', params: { currency: 'ARS' } }, '/activity']), 'Reportes keeps the currency; Ver todos opens Movimientos');

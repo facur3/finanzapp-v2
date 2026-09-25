@@ -770,8 +770,9 @@ export type RecurringCatchUp = { created: number; failed: string[] };
  * rule advance is committed atomically with those postings.
  *
  * Producto 24UX5: one rule never blocks the others or the opening of the ledger. A rule whose occurrences cannot be
- * materialized (more than the domain's 366 pending dates after a very long absence, or a rule that no longer
- * validates) is set aside unchanged and reported in `failed`; the person resolves it from Recurrentes, where an
+ * materialized (more than the domain's 366 pending dates after a very long absence) is set aside unchanged and
+ * reported in `failed`; the materialization is isolated per rule, the SQLite writes stay one transaction. A rule that
+ * fails validation is refused earlier, by `readArchive` itself, and is not isolated here; the person resolves it from Recurrentes, where an
  * active rule whose next date is already past reads as needing review. An occurrence whose deterministic id is
  * already in the ledger is that same occurrence (the id is the rule and the date): it counts as recorded whatever the
  * person did to it since (edited, moved, undone), so it is never recorded twice and never stops the catch-up. */

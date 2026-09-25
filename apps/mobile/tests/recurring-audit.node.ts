@@ -221,3 +221,17 @@ test('LedgerProvider opens and returns to the foreground through the session fun
   assert.match(source, /state !== 'active'[\s\S]*?await refreshLedger\(database\.current!, todayKey\(\)\)/);
   assert.doesNotMatch(source, /await processRecurring\(db, todayKey\(\)\);\s*const next = await readArchive/, 'opening no longer depends on processing succeeding');
 });
+
+// Owner's decision (review of PR #59): recurring expenses and incomes are recorded automatically; there is no per-rule
+// confirmation mode, now or on the roadmap. Managing a rule is pause, resume and delete.
+test('recurring rules stay automatic: no confirmation mode in the app, the catalogue or the roadmap', () => {
+  const read = (path: string) => readFileSync(new URL('../' + path, import.meta.url), 'utf8');
+  const roadmap = read('../../docs/mobile-roadmap.md'), identity = read('../../docs/merchant-identity.md');
+  for (const doc of [roadmap, identity]) {
+    assert.doesNotMatch(doc, /«Registrar automáticamente» \(today|Per-rule mode|expected → paid|be \*\*expected\*\* instead/);
+  }
+  assert.match(roadmap, /Recurring rules stay\s+automatic/);
+  for (const file of ['src/i18n/messages/es/recurring.ts', 'src/i18n/messages/en/recurring.ts', 'src/ui/recurring-form.tsx', 'src/ui/commitment-actions.ts']) {
+    assert.doesNotMatch(read(file), /Esperar confirmación|Wait for confirmation|confirmationMode|autoRecord/i, file);
+  }
+});

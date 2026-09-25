@@ -26,7 +26,7 @@ export default function BudgetsScreen() {
   const { archive, snapshot } = useLedger();
   const day = useCurrentDay();
   const p = usePalette();
-  const { t, formatMonth, moneyText, spokenMoney } = useI18n();
+  const { t, formatMonthTitle, moneyText, spokenMoney } = useI18n();
   const currencies = availableCurrencies(snapshot?.accounts ?? []);
   // The route's currency is honoured when an account holds it; an unknown code is never coerced (ARS is the empty-ledger fallback, decision 7.6.4).
   const initialCurrency: Currency = heldCurrency(snapshot?.accounts ?? [], params.currency) ?? 'ARS';
@@ -60,7 +60,7 @@ export default function BudgetsScreen() {
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
         <IconButton name="chevron-back" label={t('budgets.screen.previousMonth')} onPress={() => setMonthISO(value => shiftMonthISO(value, -1))} />
         <View style={{ flex: 1, alignItems: 'center', gap: 2 }}>
-          <AppText accessibilityRole="header" variant="title3" style={{ textTransform: 'capitalize', textAlign: 'center' }}>{formatMonth(monthISO)}</AppText>
+          <AppText accessibilityRole="header" variant="title3" style={{ textAlign: 'center' }}>{formatMonthTitle(monthISO)}</AppText>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
             <AppText secondary variant="caption">{t(isCurrent ? 'budgets.screen.currentMonth' : monthISO > currentMonthISO(day) ? 'budgets.screen.futureMonth' : 'budgets.screen.closedMonth')}</AppText>
             {!isCurrent && <PressFeedback feedback="opacity" accessibilityRole="button" accessibilityLabel={t('budgets.screen.backToCurrent')} onPress={() => setMonthISO(currentMonthISO(day))} style={{ minHeight: 28 }}>

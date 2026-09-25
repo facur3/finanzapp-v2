@@ -7,7 +7,7 @@
  * presentation follows the locale. */
 import type { IsoCurrencyCode } from '@finanzapp/domain';
 import type { LocaleSource } from './device.ts';
-import { amountFormat, codedAmount, currencyName, currencySymbol, currencyUnit, formatCount, formatMoneyAmount, formatDate, formatDateTime, formatDayMonth, formatMonth,
+import { amountFormat, codedAmount, currencyName, currencySymbol, currencyUnit, formatCount, formatMoneyAmount, formatDate, formatDateTime, formatDayMonth, formatMonth, formatMonthTitle,
   formatNumericDate, formatPercent, formatWholeUnits, moneyText, pickerLocale, relativeDate, spokenAmount, spokenMinor, spokenMoney, spokenPercent, type DateStyle,
   type HeldCurrencies } from './format.ts';
 import { localizeError } from './errors.ts';
@@ -28,6 +28,8 @@ export interface I18n {
   t: Translate;
   formatDate: (dateISO: string, style: DateStyle) => string;
   formatMonth: (monthISO: string, style?: 'month' | 'monthYear') => string;
+  /** The month as a heading: first letter raised only (24UX5 review). */
+  formatMonthTitle: (monthISO: string, style?: 'month' | 'monthYear') => string;
   formatDateTime: (iso: string) => string;
   /** "22/9/2026" or "9/22/2026". */
   formatNumericDate: (dateISO: string) => string;
@@ -87,6 +89,7 @@ export function bindLocale(locale: AppLocale, localeSource: LocaleSource = 'none
     speechLanguage: deviceLanguage && deviceLanguage !== language ? language : undefined,
     formatDate: (dateISO, style) => formatDate(dateISO, style, locale),
     formatMonth: (monthISO, style) => formatMonth(monthISO, locale, style),
+    formatMonthTitle: (monthISO, style) => formatMonthTitle(monthISO, locale, style),
     formatDateTime: iso => formatDateTime(iso, locale, conventions),
     formatNumericDate: dateISO => formatNumericDate(dateISO, locale, conventions),
     formatDayMonth: dateISO => formatDayMonth(dateISO, locale, conventions),
