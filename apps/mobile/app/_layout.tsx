@@ -1,7 +1,7 @@
 import 'react-native-gesture-handler';
-import { useEffect, useMemo, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { ActivityIndicator, View } from 'react-native';
-import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from 'expo-router';
+import { DarkTheme, DefaultTheme, Stack, ThemeProvider, router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
 import * as SystemUI from 'expo-system-ui';
@@ -17,6 +17,8 @@ import { RatesProvider } from '../src/fx/rates-provider';
 import { ActionButton, AppText, ErrorMessage } from '../src/ui/components';
 import { UIProvider, usePalette, useReduceMotion } from '../src/ui/theme';
 import { HeldCurrenciesProvider, I18nProvider, useI18n } from '../src/i18n/provider';
+import { defaultPreferenceStore } from '../src/i18n/preference';
+import { markOnboardingDone, onboardingDecision } from '../src/ui/onboarding-flow';
 
 void SplashScreen.preventAutoHideAsync().catch(() => {});
 
@@ -47,11 +49,22 @@ function Navigation() {
   useEffect(() => {
     void SystemUI.setBackgroundColorAsync(p.background).catch(() => {});
   }, [p.background]);
+  // The first opening (25B) is decided once, when the ledger first opens: a new installation is sent to the setup
+  // before the splash lifts (so the tabs never flash first); an existing person is marked done silently, nothing
+  // else of theirs touched. `null` until the ledger has opened.
+  const [onboarding, setOnboarding] = useState<'new' | 'existing' | 'done' | null>(null);
+  useEffect(() => {
+    if (!snapshot || onboarding !== null) return;
+    const decision = onboardingDecision(defaultPreferenceStore, snapshot.accounts.length > 0);
+    if (decision === 'existing') markOnboardingDone(defaultPreferenceStore);
+    setOnboarding(decision);
+  }, [snapshot !== null]);
   useEffect(() => {
     // Show a recoverable error as well as the successful app; never hold the
     // native splash forever when font or database initialization fails.
-    if (error || fontError || (fontsLoaded && snapshot)) void SplashScreen.hideAsync().catch(() => {});
-  }, [error, fontError, fontsLoaded, snapshot !== null]);
+    if (onboarding === 'new') router.replace('/onboarding');
+    if (error || fontError || (fontsLoaded && snapshot && onboarding !== null)) void SplashScreen.hideAsync().catch(() => {});
+  }, [error, fontError, fontsLoaded, snapshot !== null, onboarding]);
 
   if (fontError || !snapshot || !fontsLoaded) return <SafeAreaView style={{ flex: 1, backgroundColor: p.background }}>
     <View style={{ flex: 1, padding: 28, justifyContent: 'center', gap: 20 }}>
@@ -77,6 +90,7 @@ function Navigation() {
       contentStyle: { backgroundColor: p.background }, animation: reduced ? 'fade' : 'default',
       headerBackButtonDisplayMode: 'minimal', gestureEnabled: true }}>
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+      <Stack.Screen name="onboarding" options={{ headerShown: false, gestureEnabled: false, animation: 'fade' }} />
       <Stack.Screen name="account/[id]" options={{ title: t('nav.titles.account') }} />
       <Stack.Screen name="accounts" options={{ title: t('nav.titles.accounts') }} />
       <Stack.Screen name="entry/[id]" options={{ title: t('nav.titles.entry') }} />

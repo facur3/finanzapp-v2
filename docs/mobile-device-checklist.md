@@ -1,5 +1,37 @@
 # Physical iPhone acceptance checklist
 
+## Producto 25B — the first opening (a fresh install and an upgrade)
+
+**Not done in 25B: no EAS build was made and the iPhone was not touched.** Metro from this branch
+(`npm run start:dev-client -- --clear`) on the installed FinanzApp Dev build; JavaScript only, no native
+change, no schema change. Two runs are needed: one over your existing data and one on a clean install.
+
+**Brief test (≈8 minutes).**
+
+1. **Existing data first.** Keep a backup (Más → Copia de seguridad). Update Metro and open the app.
+   - [ ] The app opens on Inicio as always: no setup, no changed language, region, currency or data. The Más
+     footer reads «FinanzApp 0.1.0 (25B)».
+2. **Clean install.** Delete FinanzApp Dev, reinstall it from its EAS build page, start Metro from this branch.
+   - [ ] The splash lifts directly on the welcome ("Tus gastos, claros."), never on Inicio first. No header, no
+     back swipe. Set the iPhone to English first for one of the runs: the welcome is in English.
+   - [ ] Empezar → Idioma: "Según el dispositivo" is checked and names the device's language; tap the other
+     language: the whole screen (title, buttons, step counter) re-titles itself at once. Continuar.
+   - [ ] Región: your device's region is named under "Según el dispositivo"; search "Jap" and pick Japón, then
+     go back to "Según el dispositivo". Continuar.
+   - [ ] Moneda de los totales: the region's currency is pinned first ("Sugerida por tu región · ARS · $"), checked;
+     search "eur" and pick Euros. Continuar (VoiceOver reads "Continuar, euros").
+   - [ ] Tu primera cuenta: Crear una cuenta opens the usual form with EUR preselected; save an account; the
+     setup ends on Inicio by itself, chip "Total · EUR", one empty account listed in Más → Cuentas.
+   - [ ] Repeat the clean install and tap Omitir on the welcome: Inicio's empty state, nothing set (Más → Idioma
+     and Región on "Según el dispositivo", the chip "Total · ARS"). Force-quit and reopen: no setup again.
+   - [ ] Once more: reach Tu primera cuenta and tap Ahora no: Inicio empty, the currency chosen kept.
+3. **Accessibility.** VoiceOver through the whole flow in both languages (headers, the Omitir label, the
+   suggestion's subtitle, the rows' checked state); the largest Dynamic Type (nothing clipped, the button reachable
+   below the list); Reduce Motion (a plain fade between steps); light and dark.
+
+Record: the language and region the device was in, what each step suggested, and anything the flow wrote that
+you did not choose.
+
 ## Producto 24C1 — consolidated finances (gate of the first TestFlight, not of the merge)
 
 **Not done in 24C1: no EAS build was made and the iPhone was not touched.** Metro from this branch
