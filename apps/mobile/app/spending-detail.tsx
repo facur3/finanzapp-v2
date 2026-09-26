@@ -1,7 +1,10 @@
 import { View } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
-import { expensesInPeriod, spendingOverview, validDateISO, type ReportPeriod } from '@finanzapp/domain';
+import { expensesInPeriod, isStorableCurrency, spendingOverview, validDateISO, type ReportPeriod } from '@finanzapp/domain';
+import { useMemo } from 'react';
 import { useLedger } from '../src/storage/LedgerProvider';
+import { useFinanceView } from '../src/fx/rates-provider';
+import { listingSnapshot } from '../src/fx/finance-view';
 import { AppText, CategoryBadge, EmptyState, Money, Screen, SectionTitle } from '../src/ui/components';
 import { withCurrencyCode } from '../src/i18n/format';
 import { useI18n } from '../src/i18n/provider';
@@ -13,13 +16,18 @@ import { useCurrentDay } from '../src/ui/theme';
 import { heldCurrency } from '../src/ui/report-presentation';
 
 export default function SpendingDetailScreen() {
-  const { snapshot } = useLedger();
+  const { snapshot: real } = useLedger();
   const today = useCurrentDay();
   const lookOf = useCategoryLookOf('expense');
   const { t, locale } = useI18n();
   const params = useLocalSearchParams<{ currency?: string; startISO?: string; endISO?: string; category?: string }>();
   const { startISO, endISO, category } = params;
-  if (!snapshot) return null;
+  // 24C1: the period as Inicio counts it (converted in consolidated mode); its rows keep their original amounts.
+  const month = typeof startISO === 'string' ? startISO.slice(0, 7) : today.slice(0, 7);
+  const months = useMemo(() => [month], [month]);
+  const view = useFinanceView(months, isStorableCurrency(params.currency) ? params.currency : undefined);
+  const snapshot = view?.snapshot;
+  if (!snapshot || !real || !view) return null;
   const currency = heldCurrency(snapshot.accounts, params.currency);
   if (!currency || typeof startISO !== 'string' || typeof endISO !== 'string'
     || !validDateISO(startISO) || !validDateISO(endISO) || startISO > endISO || endISO > today
@@ -27,11 +35,11 @@ export default function SpendingDetailScreen() {
     || (category !== undefined && (typeof category !== 'string' || !category))) return <Screen><EmptyState title={t('spendingDetail.invalidTitle')} detail={t('spendingDetail.invalidDetail')} /></Screen>;
   const period: ReportPeriod = { currency, startISO, endISO };
   const report = spendingOverview(snapshot, period);
-  const entries = selectEntries(expensesInPeriod(snapshot, period, category), snapshot.accounts);
+  const entries = selectEntries(expensesInPeriod(listingSnapshot(real, view), period, category), real.accounts);
   const group = category ? report.categories.find(c => c.key === category) : undefined;
-  const total = report.status === 'ready' ? category ? group?.amountMinor ?? 0 : report.expenseMinor : null;
+  const total = report.status === 'ready' && view.complete(startISO, endISO, 'expense') ? category ? group?.amountMinor ?? 0 : report.expenseMinor : null;
   // Same header as the report's category screen: the category as its tile, the name, the period, the total.
-  return <EntryList entries={entries} accounts={snapshot.accounts} header={<View style={{ gap: 22 }}>
+  return <EntryList entries={entries} accounts={real.accounts} header={<View style={{ gap: 22 }}>
     <View style={{ gap: 12, paddingTop: 8 }}>
       {group && <CategoryBadge category={group.category} large />}
       <AppText accessibilityRole="header" variant="title1">{group ? lookOf(group.category).label : t('spendingDetail.allExpenses')}</AppText>

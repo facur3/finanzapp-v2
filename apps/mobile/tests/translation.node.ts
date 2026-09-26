@@ -76,7 +76,9 @@ test('both catalogues are complete: no empty text, and English is really English
     'reports.chart.donutLabel', 'reports.chart.bar', 'reports.chart.timelineBar', 'categoryManager.list.rowLabel', 'categoryManager.picker.color',
     'categoryManager.icons.internet', 'settings.material.glass', 'assistant.draft.eyebrow', 'assistant.draft.row',
     // 24UX5: the product name with its version, the same in every language.
-    'settings.version']);
+    'settings.version',
+    // 24C1: "Total · USD", a code with the same word in both languages.
+    'display.total']);
   for (const key of keys) {
     for (const catalogue of [es, en]) {
       const value = leaf(catalogue, key);

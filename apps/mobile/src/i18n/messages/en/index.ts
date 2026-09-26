@@ -20,6 +20,7 @@ import { categoryManager } from './category-manager.ts';
 import { backup } from './backup.ts';
 import { settings } from './settings.ts';
 import { assistant } from './assistant.ts';
+import { display } from './display.ts';
 
 export const en: Messages = {
   ...common,
@@ -40,4 +41,5 @@ export const en: Messages = {
   ...backup,
   ...settings,
   ...assistant,
+  ...display,
 };

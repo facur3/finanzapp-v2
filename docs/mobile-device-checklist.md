@@ -1,5 +1,53 @@
 # Physical iPhone acceptance checklist
 
+## Producto 24C1 — consolidated finances (gate of the first TestFlight, not of the merge)
+
+**Not done in 24C1: no EAS build was made and the iPhone was not touched.** Metro from this branch
+(`npm run start:dev-client -- --clear`) on the installed FinanzApp Dev build; JavaScript only (expo-sqlite is
+already linked: the rate cache is a second SQLite file, `finanzapp-rates-v1.sqlite`; the ledger stays at schema
+10). The phone needs internet for the first rates. Use your own small test data; never seed movements. Record
+each result with the language, the theme and the text size.
+
+**Brief test (≈10 minutes).**
+
+1. Keep a backup first (Más → Copia de seguridad). Update Metro and open the app.
+   - [ ] If you had chosen a currency on Inicio before (24B6), Inicio opens exactly as before and the chip reads
+     "Solo ARS" (or your currency): nothing changed by itself. On a fresh install (or after choosing it) the chip
+     reads "Total · ARS".
+2. Have at least an ARS and a USD account, plus a EUR and a JPY one (create them if needed; small amounts),
+   and one expense in each this month, one USD expense in a past month, a card purchase and a card payment.
+3. Tap the chip → the sheet: **Total consolidado**, **Ver solamente una moneda**, **Moneda de visualización**.
+   - [ ] Choose Total consolidado and ARS: Inicio shows **one** number, no second amount under it. The first time
+     it may say "Obteniendo cotizaciones" for a moment, with each currency on its own line.
+   - [ ] The ⓘ beside "Septiembre" names Frankfurter and a rate date (the latest publication, a weekday).
+   - [ ] Change the display currency to USD, EUR and JPY (JPY without decimals): the number changes; the account
+     balances in Más → Cuentas, every movement and its detail keep their own currency and amount.
+   - [ ] Disponible: one number for all normal accounts (no card, no debt); its ⓘ says the rate date and that it
+     is not your net worth. A negative account lowers it.
+   - [ ] The card purchase counts once in Gastos; the card payment is not an expense.
+   - [ ] With a general budget in ARS: its card shows the same spent figure in "Total · ARS", "Total · USD" and
+     "Solo ARS" (ARS spending only, never the converted euros or dollars); in "Total · USD" its section reads
+     "Presupuesto del mes · ARS" and Ver opens Presupuestos in ARS. Reportes' Presupuestos section does the same.
+4. Reportes follows Inicio (same mode, same currency). Go back to the past month: the ⓘ beside the total says
+   the range of rate dates used, from that month, never today's. Categories, the donut, merchants and budgets
+   add up to the total; open a category: its rows show the original amounts.
+5. Airplane mode, then force-quit and reopen.
+   - [ ] Months already seen still show their total (the rates are cached).
+   - [ ] A month never seen (or a new currency) shows each currency on its own line with "Sin cotización para
+     sumarlo en …" and an ⓘ saying there is no connection. No partial total, no zero.
+   - [ ] Turning airplane mode off and reopening Inicio brings the total back without any action.
+6. **Ver solamente una moneda:** Inicio and Reportes return to the 24B6 view (only that currency's accounts,
+   nothing converted); the chip reads "Solo USD".
+7. Accessibility.
+   - [ ] VoiceOver on the chip: "Total consolidado en pesos argentinos" / "Solo dólares estadounidenses", with the
+     hint; visually "Total · ARS" / "Solo USD"; in the sheet each option says whether it is selected; the subtotals read each amount with its unit.
+   - [ ] The largest Dynamic Type: the chip, the sheet rows and the subtotals wrap without clipping; Reduce Motion
+     changes nothing essential. Repeat once in English.
+
+Record: which currencies, the number shown in each display currency (a rough cross-check against a public rate is
+enough; a reference rate is not what a bank charges), airplane-mode behaviour, and any row that showed a
+converted amount where an original was expected.
+
 ## Producto 24UX5 — visual consistency, copy and the recurring audit
 
 **Not done in 24UX5: no EAS build was made and the iPhone was not touched.** Metro from this branch

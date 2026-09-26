@@ -47,6 +47,14 @@ export function offeredCurrencies(gate: CurrencyGate = LEDGER_CURRENCIES, locale
   return named.sort((a, b) => rank(a.code) - rank(b.code) || compare(a.name, b.name) || (a.code < b.code ? -1 : 1)).map(item => item.code);
 }
 
+/** The currencies the consolidated totals can be expressed in (24C1): the ones held first, in grouping order, then
+ * every other currency the gate offers, by name in the interface language. Held currencies outside the gate (a
+ * restored three-decimal one) stay reachable; nothing outside held ∪ gate is offered. */
+export function displayTargets(held: readonly Currency[], gate: CurrencyGate = LEDGER_CURRENCIES, locale: AppLocale = DEFAULT_LOCALE): Currency[] {
+  const seen = new Set(held);
+  return [...held, ...offeredCurrencies(gate, locale).filter(code => !seen.has(code))];
+}
+
 /** A display lookup over the whole catalogue (24B5): the name and symbol of any code the ledger can
  * store, gated or not, so a read-only row (the currency of an existing account) shows a stored EUR as
  * "Euros · EUR · €", never as ARS. A code the catalogue does not know shows itself. */
