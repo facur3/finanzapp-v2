@@ -478,3 +478,21 @@ test('a drill-down lists the real movements with their original amounts and curr
   assert.ok(listing.accounts.every(item => item.currency === 'EUR'), 'scoped like the view');
   assert.equal(listingSnapshot(ledger, financeView(ledger, 'single', 'EUR', rateBook(rates))), ledger);
 });
+
+test('24C1 review: an empty account in another currency never hides Disponible while its rate is missing; a non-zero amount still needs its rate', () => {
+  const noRates = rateBook([]);
+  const two: LedgerSnapshot = { accounts: [account('usd', 'USD', 1000), account('eur', 'EUR', 0)], entries: [] };
+  const offline = (target: Currency) => availableFigure(two, financeView(two, 'consolidated', target, noRates), noRates, '2026-09-25', 'offline', true);
+  // Read in USD: US$ 10,00, shown normally, nothing converted, no info about rates.
+  assert.deepEqual(offline('USD'), { status: 'ready', currency: 'USD', minor: 1000, converted: false, provenance: null });
+  // Read in ARS: the dollars need USD → ARS; each currency on its own, the empty euros among them, the reason named.
+  const ars = offline('ARS');
+  assert.equal(ars.status, 'unavailable');
+  if (ars.status !== 'unavailable') return;
+  assert.deepEqual([ars.reason, ars.missing, ars.parts], ['offline', { currency: 'ARS', date: '2026-09-25' }, [{ currency: 'USD', minor: 1000 }, { currency: 'EUR', minor: 0 }]]);
+  // An account later spending its zero balance below zero is a non-zero amount again: it needs its rate.
+  const spent: LedgerSnapshot = { ...two, entries: [{ id: 'e', accountId: 'eur', kind: 'expense', amountMinor: 100, merchant: 'M', category: 'Varios', dateISO: '2026-09-20', createdAt }] };
+  assert.equal(availableFigure(spent, financeView(spent, 'consolidated', 'USD', noRates), noRates, '2026-09-25', 'offline', true).status, 'unavailable');
+  // Single mode is untouched: the USD accounts alone.
+  assert.equal(availableFigure(two, financeView(two, 'single', 'USD', noRates), noRates, '2026-09-25', 'offline', true).status, 'ready');
+});

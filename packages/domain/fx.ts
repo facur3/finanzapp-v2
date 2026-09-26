@@ -159,7 +159,11 @@ export type Conversion =
 /** An amount recorded in `from` on `date`, expressed in `to` with that day's rates. Same currency: unchanged, no rate. */
 export function convertOn(book: RateBook, minor: number, from: IsoCurrencyCode, to: IsoCurrencyCode, date: string): Conversion {
   assertStorableCurrency(from); assertStorableCurrency(to);
+  if (!Number.isSafeInteger(minor)) throw new Error('Monto inválido.');
   if (from === to) return { status: 'converted', minor, legs: [] };
+  // Zero is zero at any positive rate: an empty account in another currency never needs a quote, so it can never hide
+  // a total (review of 24C1). The currencies were validated above; the part keeps its own zero row.
+  if (minor === 0) return { status: 'converted', minor: 0, legs: [] };
   if (from !== FX_PIVOT && to !== FX_PIVOT) {
     // A cross rate uses both legs of one publication day: the latest day on or before `date` (within the age
     // limit) on which both quotes were published. Mixing Friday's leg with Monday's would not be that day's rate.
@@ -289,7 +293,8 @@ export type ConvertedTotal =
 export interface ConvertedPart { currency: IsoCurrencyCode; minor: number; converted?: { minor: number; legs: RateLeg[] } }
 
 /** Per-currency amounts as of one day (balances) expressed in `target`: each part converted once
- * with that day's rate, then added exactly. A part without a usable rate makes the total unknown. */
+ * with that day's rate, then added exactly. A non-zero part without a usable rate makes the total
+ * unknown; a zero part needs no rate. */
 export function convertTotals(totals: Partial<Record<IsoCurrencyCode, number>>, target: IsoCurrencyCode, book: RateBook, date: string): ConvertedTotal {
   assertStorableCurrency(target);
   if (!validDateISO(date)) throw new Error('Fecha inválida.');

@@ -232,6 +232,21 @@ describe('consolidated views', () => {
     expect(convertTotals({ ARS: -80000 }, 'USD', book, '2026-09-25')).toMatchObject({ status: 'converted', minor: -50 });
   });
 
+  it('a zero balance in another currency needs no rate: it never hides a total, while a non-zero one still does', () => {
+    const empty = rateBook([]);
+    // USD 10,00 held, an empty EUR account, no rates at all: the USD total stands.
+    expect(convertTotals({ USD: 1000, EUR: 0 }, 'USD', empty, '2026-09-25')).toEqual({ status: 'single', currency: 'USD', minor: 1000, parts: [{ currency: 'USD', minor: 1000 }, { currency: 'EUR', minor: 0 }] });
+    // Read in ARS, the non-zero dollars still need their rate: unknown, never a partial figure.
+    expect(convertTotals({ USD: 1000, EUR: 0 }, 'ARS', empty, '2026-09-25')).toMatchObject({ status: 'unknown', missing: [{ from: 'USD', to: 'ARS', quote: 'ARS' }] });
+    // Read in EUR: the dollars need both legs; the zero euros none.
+    expect(convertTotals({ USD: 1000, EUR: 0 }, 'EUR', empty, '2026-09-25')).toMatchObject({ status: 'unknown', missing: [{ from: 'USD', to: 'EUR' }] });
+    expect(convertOn(empty, 0, 'EUR', 'USD', '2026-09-25')).toEqual({ status: 'converted', minor: 0, legs: [] });
+    expect(convertOn(empty, 0, 'EUR', 'JPY', '2026-09-25')).toEqual({ status: 'converted', minor: 0, legs: [] });
+    expect(() => convertOn(empty, 0, 'XAU' as never, 'USD', '2026-09-25')).toThrow();
+    expect(() => convertOn(empty, 0.5, 'EUR', 'USD', '2026-09-25')).toThrow('Monto inválido.');
+    expect(convertOn(empty, 1, 'EUR', 'USD', '2026-09-25').status).toBe('missing');
+  });
+
   it('asks for no quote when nothing needs converting', () => {
     expect(quotesNeeded(['ARS'], 'ARS')).toEqual([]);
     expect(quotesNeeded(['USD'], 'USD')).toEqual([]);

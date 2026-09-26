@@ -219,6 +219,10 @@ within a week); September's total never uses today's rate. The report's info but
 used ("del 4/9/2026 al 11/9/2026, nunca la de hoy para un mes pasado"). Disponible, a balance *as of today*, uses
 today's rate (the latest publication).
 
+**A zero amount needs no rate.** An empty account in another currency (its balance zero) contributes exactly zero
+whatever the rate, so it never withholds Disponible while its quote is missing; its zero row is still listed among
+the parts, and any non-zero amount still needs its rate (owner's review, 2026-09-26).
+
 **Unknown stays unknown.** When any expense of a period has no usable rate (not fetched yet, offline, the provider
 failed, none published, or the last one is more than a week old), the screen shows **each currency's own
 subtotal** instead of a total, with one quiet line ("Sin cotización para sumarlo en EUR") and an info button saying
