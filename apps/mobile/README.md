@@ -2,12 +2,10 @@
 
 FinanzApp is a native spending and commitments app: fast capture, understandable
 spending, upcoming payments, budgets, cards and debts, with optional manually tracked
-accounts. This directory is the product: an Expo + React Native + TypeScript app, iOS
-first, Android later from this same project
-([decision 004](../../docs/decisions/004-native-first-and-web-retirement.md)). The
-previous web/Capacitor app was retired on 2026-09-25 (Producto 24REP); its last version is
-the Git tag `web-frontend-final` ([inventory and recovery](../../docs/web-retirement-inventory.md)).
-The app never shared data with it: its SQLite file, backups and preferences are its own.
+accounts in any currency and consolidated totals in one display currency. This directory is
+the product: an Expo + React Native + TypeScript app, iOS first, Android later from this same
+project ([decision 004](../../docs/decisions/004-native-first-and-web-retirement.md)). Its
+SQLite file, backups and preferences are its own; there is no web version.
 
 Read before changing anything: [AGENTS.md](../../AGENTS.md), the
 [living roadmap](../../docs/mobile-roadmap.md) (status, device QA pending, next
@@ -29,8 +27,8 @@ live in [docs/mobile-roadmap-history.md](../../docs/mobile-roadmap-history.md).
 
 | Where | What it owns |
 | --- | --- |
-| `app/` | Expo Router routes: the five tabs in `app/(tabs)/` (Inicio, Movimientos, Asistente, Reportes, Más), pushed detail screens, native modal forms, Idioma and Región, backup and recovery. Routes compose; they hold no financial rules. |
-| `src/ui/` | The visual system: palette and theme, typography, accessible rows and controls, the amount field (`money-input.ts`), form controls and sheets, the motion language (`motion.tsx`), the material adapter (`material.tsx`, the only door to `expo-glass-effect`), charts, the Home modules, the merchant tile (`merchant-mark.ts`, `MerchantBadge`: the category glyph; brand marks deferred to Producto 25C2) and the searchable chooser. |
+| `app/` | Expo Router routes: the five tabs in `app/(tabs)/` (Inicio, Movimientos, Asistente, Reportes, Más), the first opening (`onboarding.tsx`, Producto 25B: welcome, language, region, the currency of the totals, an optional first account, every step skippable, shown once to a new installation), pushed detail screens, native modal forms, Idioma and Región, backup and recovery. Routes compose; they hold no financial rules. |
+| `src/ui/` | The visual system: palette and theme, typography, accessible rows and controls, the amount field (`money-input.ts`), form controls and sheets, the motion language (`motion.tsx`), the material adapter (`material.tsx`, the only door to `expo-glass-effect`), charts, the Home modules, the merchant tile (`merchant-mark.ts`, `MerchantBadge`: the category glyph; brand marks deferred to Producto 25C2), the searchable chooser and the first opening's rules (`onboarding-flow.ts`: when it is shown, what the region suggests, the steps). |
 | `src/i18n/` | Language and region: the registries and release gates (`locale.ts`), table-based formats (`format.ts`), typed es/en catalogues (`messages/`), the device adapter, the preference store, the provider (`useI18n()`), the generated region catalogue (`regions/`) and its API, the Intl probe. |
 | `src/storage/` | The SQLite repository (`database.ts`, schema `DATABASE_VERSION = 10`, atomic migrations, operation IDs, deletion records for recurring rules and debts), the exchange-rate cache in its own file (`rates-database.ts`, `finanzapp-rates-v1.sqlite`, 24C1), the native driver binding, transactions, the currency gate (`currency-gate.ts`), the open/foreground session (`ledger-session.ts`: the recurring catch-up per rule, never a precondition for opening the data) and `LedgerProvider`. Writes are durable before the UI confirms; a failed write keeps the draft; no error resets storage. |
 | `src/fx/` | Consolidated views (Producto 24C1): the Frankfurter adapter (`frankfurter.ts`, no key), the rate store and its request policy (`rates-store.ts`), the provider and `useFinanceView` (`rates-provider.tsx`), the pure view and its figures (`finance-view.ts`) and their words (`fx-copy.ts`). Nothing here writes to the ledger. |
@@ -42,7 +40,7 @@ live in [docs/mobile-roadmap-history.md](../../docs/mobile-roadmap-history.md).
 | `app.config.ts`, `eas.json` | App identities per variant, plugins, the EAS project link and the build profiles. No credentials. |
 
 Local first: the ledger, the language, region and display preferences (currency and mode), the
-exchange-rate cache and the backups are on the device. The only network call without the owner's
+first-opening mark (`finanzapp.onboarding`), the exchange-rate cache and the backups are on the device. The only network call without the owner's
 backend is the reference-rate download from Frankfurter (24C1): a date window and currency codes, no
 key, no amount, no account, only when a consolidated view needs a month it lacks. Backups export as JSON v8 while the ledger holds only ARS and
 USD, as v9 (adds `currencyUnits`) once another currency is stored and as v10 (adds each recurring
@@ -181,7 +179,7 @@ prove it (`locale-release.node.ts`, `currency-preview.node.ts`). Never set them 
 | Regions | 234 of the 257 catalogue regions released (Producto 24R2B): Argentina and the United States since 23.1C2, the rest by continent on automated per-family evidence (`src/i18n/region-stages.ts`, `tests/region-families.node.ts`). The 23 regions whose locale defaults to non-Latin digits are blocked until each numbering system is normalized, tested and checked on an iPhone (the amount field reads only Arabic-Indic and Eastern Arabic-Indic digits today); they write Argentine formats and say so. Más → Idioma and → Región are the searchable `ChoiceScreen`. The per-family iPhone sheet is [docs/region-families.md](../../docs/region-families.md) (`npm run regions:families`). |
 | Currencies | 146 currencies can be created since Producto 24M (`LEDGER_CURRENCIES`): ARS, USD and every ISO 4217 fiat currency with complete data and 0 or 2 decimals (144 new). The seven three-decimal currencies (BHD, IQD, JOD, KWD, LYD, OMR, TND) are held until an iPhone VoiceOver check and exist only on a development preview; SVC and VED (incomplete data), funds, metals and units of account are never offered. Every amount keeps its currency's own exponent. Since 24C1 Inicio, Reportes and Presupuestos consolidate totals in a display currency (each movement at its own date's reference rate, Frankfurter, exact, in the view only; subtotals per currency when a rate is missing); purchases paid from another currency are 24C2; the Assistant stays ARS/USD (25A). See [docs/currency.md](../../docs/currency.md) §2.7. |
 | Assistant | A real conversation with drafts, clarifications and evidence, writing only on Confirmar; fixtures mode for tests; the remote runtime and the cloud provider are opt-in and unconfigured, so this build is disconnected. The multilingual, voice-capable Assistant with analytical answers is Producto 25A, not built. |
-| Platforms | iOS only. Android comes later from this same project (roadmap §5), sharing the router, the domain, the storage abstractions, i18n, the Assistant and the components; platform differences go behind `Platform.OS`, `.ios.tsx`/`.android.tsx` files or adapter modules (`DateField` already has its Android path). Nothing Android-specific is tested. |
+| Platforms | iOS only. Android comes later from this same project (roadmap §5), sharing the router, the domain, the storage abstractions, i18n, the Assistant and the components; platform differences go behind `Platform.OS`, `.ios.tsx`/`.android.tsx` files or adapter modules (`DateField` and the first opening's hardware back already have their Android path). Nothing Android-specific is tested. |
 | Distribution | Ad hoc development builds on the owner's registered iPhone. Nothing is on TestFlight or the App Store. |
 
 Three words mean three things here and in the roadmap: **implemented** is code with its
@@ -190,7 +188,7 @@ is distributed to people. Today:
 
 | | What |
 | --- | --- |
-| Implemented | Everything in the roadmap's §1, up to Producto 24C1 (the version line still at the end of Más reads «FinanzApp 0.1.0 (24UX5)»; a development build adds the material and locale diagnostics under it). |
+| Implemented | Everything in the roadmap's §1, up to Producto 25B (the version line at the end of Más reads «FinanzApp 0.1.0 (25B)»; a development build adds the material and locale diagnostics under it). |
 | Device-tested | The first Expo Go flow (2026-09-12), the Interfaz 15 motion direction, the per-app Language row on build `1d69d2d4`, and the owner's 24B5/24B6 sessions that produced the 24B6 and 24UX1 corrections. Every later section of the [device checklist](../../docs/mobile-device-checklist.md) is still pending, and no per-item 24B5/24B6 result is recorded. |
 | Released | Nothing. No store build, no TestFlight, no production identity. |
 

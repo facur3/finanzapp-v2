@@ -381,6 +381,24 @@ importe, moneda y estado.
   muestra hasta que toda la app lo tenga (23.1): un iPhone en inglés sigue leyendo
   español antes que media app traducida.
 
+## Producto 25B — primera apertura nativa
+
+- **Cinco pantallas breves, una sola ruta.** Bienvenida, Idioma, Región, Moneda de los totales y Tu
+  primera cuenta cambian de paso en el mismo lugar (el mismo `ValueTransition` en fundido que el
+  número de Inicio; con Reduce Motion, un fundido igual). Sin barra de navegación ni gesto de
+  volver: no es una pila. Arriba a la derecha, "Omitir" en el azul de interacción; abajo, un solo
+  botón principal ("Empezar", "Continuar", "Crear una cuenta") y, en el último paso, uno secundario
+  ("Ahora no").
+- **Nada nuevo que aprender.** Idioma y Región son los mismos selectores de Más (`ChoiceScreen`,
+  tilde, "Según el dispositivo" primero); la moneda es la misma lista buscable de 146 con la
+  sugerencia de la región fijada arriba y su motivo en el subtítulo. Cabecera de cada paso: "Paso
+  2 de 4" en eyebrow, título en `title1`, una frase secundaria; la bienvenida usa `largeTitle`. Sin
+  ilustraciones, tarjetas ni explicaciones financieras; microcopy de una frase.
+- **Accesibilidad.** Cada título es un encabezado de VoiceOver; "Omitir" tiene etiqueta completa;
+  Continuar en el paso de moneda dice la moneda elegida; el texto escala con Dynamic Type (las
+  listas ya lo hacen); áreas seguras arriba y abajo; claro y oscuro con la paleta actual. En
+  Android, el botón físico de volver retrocede un paso (`BackHandler`), nunca sale del flujo.
+
 ## Producto 24C1 — totales consolidados, misma composición de Inicio
 
 - **Nada nuevo en pantalla.** Inicio conserva su orden (encabezado, número, tres acciones, Asistente,

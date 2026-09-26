@@ -15,7 +15,7 @@ declare const __DEV__: boolean | undefined;
 // Diagnostic: where this launch read the device languages. "módulo nativo" proves the build links expo-localization.
 const LOCALE_SOURCE_LABELS = { native: 'settings.localeSource.native', intl: 'settings.localeSource.intl', none: 'settings.localeSource.none' } as const;
 /** The pilot's version and the internal release name; neither is translated. */
-const VERSION = '0.1.0', RELEASE = '24UX5';
+const VERSION = '0.1.0', RELEASE = '25B';
 /** 24UX5: the material and locale diagnostics are for a tester on a development build; everyone else sees the version,
  * like the About line of an iOS app. `__DEV__` is false in a preview or store bundle, so the line is compiled away. */
 const DIAGNOSTICS = typeof __DEV__ !== 'undefined' && __DEV__;

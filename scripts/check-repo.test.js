@@ -8,7 +8,7 @@ const clean = {
   'server/mobile/handlers.js': "import { validate } from '../../packages/integrations/contracts.js';\n",
   'api/mobile/assistant.js': "import { createMobileHandler } from '../../server/mobile/handlers.js';\n",
   'server/mobile/schema.test.sql': "-- POSTGRES_PASSWORD: fixture-only\n",
-  'docs/web-retirement-inventory.md': "`git show web-frontend-final:src/domain/dates.js` recovers the module.\n",
+  'docs/decisions/004-native-first-and-web-retirement.md': "`git show web-frontend-final:src/domain/dates.js` recovers the module.\n",
   'apps/mobile/eas.json': '{ "build": { "development": {} } }\n',
   'LICENSES/Unicode-3.0.txt': 'UNICODE LICENSE V3\n',
 };
@@ -26,7 +26,7 @@ describe('check:repo', () => {
       'scripts/build-app-shell.mjs', 'archive/web/index.html', 'SUPABASE_SETUP.md', 'docs/offline-data-guarantees.md']) {
       expect(LEGACY_WEB.some(re => re.test(path)), path).toBe(true);
     }
-    for (const path of ['api/mobile/assistant.js', 'apps/mobile/src/storage/database.ts', 'scripts/check-repo.mjs', 'docs/history/web-release-notes.md',
+    for (const path of ['api/mobile/assistant.js', 'apps/mobile/src/storage/database.ts', 'scripts/check-repo.mjs', 'docs/mobile-roadmap-history.md',
       'packages/domain/dates.ts', 'server/mobile/schema.sql', 'apps/mobile/ios-placeholder.md']) {
       expect(LEGACY_WEB.some(re => re.test(path)), path).toBe(false);
     }

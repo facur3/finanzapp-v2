@@ -19,8 +19,7 @@ export const GENERATED = [
   /\.(ipa|apk|aab|p12|p8|mobileprovision|keystore|jks|sqlite(?:-shm|-wal)?)$/,
 ];
 
-/* The web-only trees of docs/web-retirement-inventory.md §2, plus the archive folder the
-   inventory ruled out. `src/` at the root was the web's source; the product's source is
+/* The web-only trees retired by Producto 24REP (decision 004), plus an archive folder. `src/` at the root was the web's source; the product's source is
    apps/mobile, packages/ and server/. */
 export const LEGACY_WEB = [
   /^(index\.html|support\.js|capacitor\.config\.(ts|js|json)|SUPABASE_SETUP\.md|RELEASE_NOTES\.md)$/,

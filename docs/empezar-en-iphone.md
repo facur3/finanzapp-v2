@@ -3,10 +3,9 @@
 Actualizado: 21 de septiembre de 2026 (encuadre revisado el 25 de septiembre de 2026).
 
 > **La app nativa es el producto** ([decisión 004](decisions/004-native-first-and-web-retirement.md)).
-> Esta guía se escribió cuando todavía se la llamaba "piloto" frente a la web; donde diga "piloto",
-> leé "la app". La web y Capacitor se retiraron el 25 de septiembre de 2026 (Producto 24REP; su última versión es el tag `web-frontend-final`) y no son la app que se
-> prueba aquí. Los pasos de instalación y prueba siguen vigentes; el pie de Más dice hoy
-> **Producto 24UX1** y las comprobaciones de cada entrega están en
+> Esta guía se escribió cuando la app todavía se llamaba "piloto"; donde diga "piloto", leé "la
+> app". Los pasos de instalación y prueba siguen vigentes; el pie de Más dice hoy
+> **FinanzApp 0.1.0 (25B)** y las comprobaciones de cada entrega están en
 > [mobile-device-checklist.md](mobile-device-checklist.md). Configuración y comandos al día:
 > [apps/mobile/README.md](../apps/mobile/README.md).
 

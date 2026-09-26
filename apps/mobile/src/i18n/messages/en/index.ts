@@ -21,6 +21,7 @@ import { backup } from './backup.ts';
 import { settings } from './settings.ts';
 import { assistant } from './assistant.ts';
 import { display } from './display.ts';
+import { onboarding } from './onboarding.ts';
 
 export const en: Messages = {
   ...common,
@@ -42,4 +43,5 @@ export const en: Messages = {
   ...settings,
   ...assistant,
   ...display,
+  ...onboarding,
 };

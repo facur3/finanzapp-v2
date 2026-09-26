@@ -57,7 +57,7 @@ export const backup = {
       nothingNew: 'Esta copia ya está incorporada. No hay nada nuevo para agregar.',
       reviewAgain: 'Volver a revisar',
       confirmImport: 'Confirmar importación',
-      formats: 'Copias nativas v1 a v10 · JSON de hasta 5 MB. La importación de la app web e inversiones llegará en otra etapa.',
+      formats: 'Copias de FinanzApp v1 a v10 · JSON de hasta 5 MB.',
       /** Review row: the currency scales a v9 copy pins that this device has not pinned yet. */
       units: 'Escalas de moneda nuevas',
       /** Shown instead of the import button when the copy pins a currency at another number of decimals than this device. {codes} lists them. */

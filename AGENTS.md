@@ -2,16 +2,13 @@
 
 FinanzApp is the native app in `apps/mobile` (Expo, React Native, TypeScript): iOS first,
 Android later from the same project. The source of truth is `apps/mobile`, `packages/domain`
-and the mobile backend contracts (`packages/integrations`, `server/mobile`, `api/mobile`). The
-previous web/Capacitor app was retired on 2026-09-25 (Producto 24REP,
-[decision 004](docs/decisions/004-native-first-and-web-retirement.md)); it no longer exists in
-the tree, and its last version is the tag `web-frontend-final`
-([inventory and recovery](docs/web-retirement-inventory.md)).
+and the mobile backend contracts (`packages/integrations`, `server/mobile`, `api/mobile`). There
+is no web version of the product ([decision 004](docs/decisions/004-native-first-and-web-retirement.md)).
 
 1. Read `README.md`, `docs/mobile-roadmap.md`, `docs/decisions/001-native-mobile.md`,
    `docs/decisions/002-spending-first.md` and `docs/decisions/004-native-first-and-web-retirement.md`
    before changing architecture or mobile code. Native scope is spending/commitments with
-   optional simple accounts; the web's portfolio/market-data hub was not migrated.
+   optional simple accounts; no portfolio, market data or investments.
 2. For mobile changes also read `apps/mobile/README.md` and `docs/mobile-device-checklist.md`;
    for UI changes read `docs/mobile-design.md`; for money, currencies or FX read
    `docs/currency.md`; for language or region read `docs/i18n.md`. Keep their status and next
@@ -19,11 +16,11 @@ the tree, and its last version is the tag `web-frontend-final`
 3. The native app is the product. Never change its bundle identifier, run a database
    migration remotely, make an EAS cloud build, a store submission or a paid subscription
    without an explicit release decision and the owner's authorization for any charge.
-4. The retired web stays retired. Do not restore `index.html`, `support.js`, `src/`, `public/`,
-   root `ios/`, `capacitor.config.ts`, `api/chart.js`, `api/fund-data.js` or an `archive/` copy;
-   read them with `git show web-frontend-final:<path>` when the history matters.
-   `npm run check:repo` fails if they come back or if `apps/mobile`, `packages/`, `server/` or
-   `api/mobile` import from them. Nothing under `api/` other than `api/mobile/` is deployed.
+4. The frontend retired in 2026 stays retired: never restore a root `src/`, `public/`, `ios/`,
+   `index.html`, `support.js`, `capacitor.config.ts`, `api/chart.js`, `api/fund-data.js` or an
+   `archive/` copy (its history is the tag `web-frontend-final`). `npm run check:repo` fails if
+   they come back or if `apps/mobile`, `packages/`, `server/` or `api/mobile` import from them.
+   Nothing under `api/` other than `api/mobile/` is deployed.
 5. Preserve unrelated worktree changes. Do not merge all branches blindly. Use a focused
    feature branch/PR and report exactly what was verified.
 6. User data starts empty. Never seed balances, holdings, movements or fabricated market
@@ -57,6 +54,10 @@ the tree, and its last version is the tag `web-frontend-final`
     `.ios.tsx`/`.android.tsx` files or adapter modules, never in a second repository or a second
     native project without an architectural decision recorded in `docs/decisions/`. Android is
     not implemented yet and is not started without a roadmap entry.
+15. The first opening (`app/onboarding.tsx`) is shown to a new installation only and every step
+    can be skipped; an existing person is marked done silently and nothing of theirs is changed.
+    It reuses the language, region and currency choosers; it never requires a connection, an
+    account, a bank or a subscription.
 14. Before handing off: run the checks listed in `apps/mobile/README.md` (typecheck, real
     SQLite tests, `currency:verify`, `regions:verify`, `i18n:check -- --strict`, `check`,
     `export:ios`) and the root `npm test` and `npm run check:repo`; the `mobile_api` job needs

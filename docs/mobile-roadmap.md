@@ -1,6 +1,6 @@
 # FinanzApp mobile: living roadmap
 
-Updated: 2026-09-25 (Producto 24C1). Read [decision 001](decisions/001-native-mobile.md),
+Updated: 2026-09-26 (Producto 25B). Read [decision 001](decisions/001-native-mobile.md),
 [decision 002](decisions/002-spending-first.md),
 [decision 003](decisions/003-five-tabs-and-cards.md) and
 [decision 004](decisions/004-native-first-and-web-retirement.md). Decision 002 supersedes
@@ -31,10 +31,9 @@ history file keeps the evidence of when and why.
 
 - **Native is the product** (decision 004, 2026-09-25). `apps/mobile`, `packages/domain` and
   the mobile backend contracts (`server/mobile`, docs/mobile-integrations.md) are the source of
-  truth. The web/Capacitor frontend was retired on 2026-09-25 (Producto 24REP) with Git history
-  preserved: the tag `web-frontend-final` marks its last commit, the tree holds no copy of it and
-  `npm run check:repo` refuses its return (docs/web-retirement-inventory.md §0 has the recovery
-  commands). Android will come from the same Expo/React Native project, sharing navigation,
+  truth; there is no web version of the product (the frontend retired on 2026-09-25, Producto
+  24REP, lives only in Git history at the tag `web-frontend-final`; `npm run check:repo` refuses its
+  return). Android will come from the same Expo/React Native project, sharing navigation,
   domain, storage abstractions, i18n, the Assistant and the components, with platform
   differences behind `Platform.OS`, `.ios.tsx`/`.android.tsx` files or adapter modules; no
   second repository without an architectural reason recorded as a decision.
@@ -116,15 +115,24 @@ history file keeps the evidence of when and why.
 
 ## 1. Implemented (current state)
 
-What exists in code on `master` as of Producto 24UX4 (PR #58), plus Producto 24UX5 on its branch
+What exists in code on `master` as of Producto 24C1 (PR #63), plus Producto 25B on its branch
 (marked). Per area, without test inventories (those are in apps/mobile/README.md and the history
-file).
+file). "Released" below names an in-app gate (`RELEASED_LANGUAGES`, `RELEASED_REGIONS`,
+`LEDGER_CURRENCIES`): what a build offers, verified on Linux; nothing is distributed to people yet
+(§4).
 
+- **First opening (25B, on its branch).** A new installation opens on a short native setup:
+  welcome, language and region (detected from the device, the same choosers as Más), the currency
+  of the totals suggested by the region and chosen by the person (146 currencies, searchable), an
+  optional first account through the normal form; Omitir at every step ends it writing nothing,
+  and the app works with empty data. Shown once (`finanzapp.onboarding`); anyone with accounts or
+  a saved preference is marked done silently and nothing of theirs changes. No connection, account,
+  bank or subscription required. Hardware back on Android steps back (`BackHandler`, the one
+  platform adapter it needs).
 - **Product shape.** Five native tabs with the Assistant in the centre and Más as the grouped
   hub (Finanzas / App y datos: Cuentas, Tarjetas, Presupuestos, Recurrentes, Deudas y cobros,
   Categorías, Idioma, Región, Apariencia, backup, the Assistant's data note); a Más version line
-  («FinanzApp 0.1.0 (24UX5)»; 24UX5 on its branch: the material and locale diagnostics only in a development
-  build). Liquid Glass on
+  («FinanzApp 0.1.0 (25B)»; the material and locale diagnostics only in a development build). Liquid Glass on
   Inicio's movement pills, its Assistant entry and the Assistant composer only in a development build on iOS 26 with
   the API present and without Reduce Transparency; opaque material otherwise.
 - **Inicio.** One main number (gasto registrado of the month, or Disponible: cash in normal
@@ -216,7 +224,7 @@ file).
   preview across release builds with its stand-in named, taught the amount field every group family
   (lakh, minimum grouping, apostrophe, narrow and no-break spaces, other scripts' digits on paste)
   through one grouping rule, and wrote the release plan by convention family (`region-release.ts`);
-  AR and US are still the only released regions.
+  since 24R2B the gate opens 234 regions (the 23 native-digit ones wait for 24R3); none of it is distributed yet.
 - **Currencies.** The ISO 4217/CLDR catalogue (178 codes, pinned, `currency:verify` offline in
   CI); the pure amount model for exponents 0–4; presentation, copy and spoken forms for any
   currency with ARS/USD byte-identical goldens; storage and forms currency-aware (24B1–24B5:
@@ -798,7 +806,7 @@ the owner authorises it; no EAS build or store submission without the owner.
     hypothesis to verify, the plan is per numbering system, and a test pins today's normalization per
     system. The region-QA strategy is described as provisional, not as the owner's authorization.
 
-### Producto 24C1 — consolidated multicurrency finances (this PR)
+### Producto 24C1 — consolidated multicurrency finances (PR #63)
 
 - **Goal.** Accounts in different currencies and one chosen currency to see the total money and all spending,
   converted automatically in the views only; the owner's simplified model of 2026-09-25 (docs/currency.md §2.8).
@@ -957,20 +965,47 @@ the owner authorises it; no EAS build or store submission without the owner.
 - **Depends on.** 24C1 for the rates of international instalments (a same-currency plan could
   land first if the owner prefers).
 
-### Producto 25B — global onboarding and preferences
+### Producto 25B — native onboarding and repository cleanup (this PR)
 
-- **Goal.** A first launch anywhere: language, region, the main currency and an optional first
-  account, nothing seeded.
-- **Scope.** The first-launch flow reusing `ChoiceScreen` (language and region detected and
-  shown, changeable, "Según el dispositivo" available), the first account's currency chosen from
-  the catalogue (the region may suggest, the person decides; an existing account's currency never
-  changes), the display currency (24C1) as its own step, skippable, existing users' data and
-  preferences untouched; Más → preferences consolidated (Idioma, Región, Apariencia, currency,
-  reminders when they exist).
-- **Out of scope.** Any account requirement, telemetry, a paywall.
-- **Gates.** A fresh install and an upgrade on the iPhone, both languages, VoiceOver through the
-  whole flow, nothing written until the person finishes.
-- **Depends on.** 24R2B (regions), 24M (currencies); 24C1 for the display-currency step.
+- **Goal.** A first launch anywhere, native, brief and skippable; a repository that describes only
+  the native product.
+- **Onboarding decisions.** One route (`app/onboarding.tsx`) that changes step in place, no header,
+  no back swipe: welcome → Idioma → Región → Moneda de los totales → Tu primera cuenta. Language and
+  region are the Más choosers (`LocaleChooser`), so a tap saves as in Más and the flow re-titles
+  itself in the new language; the region step exists only when the build offers a real choice. The
+  currency step is `ChoiceScreen` over the 146 offered currencies with the region's legal tender
+  pinned as the suggestion (`suggestedDisplayCurrency`: a held or unoffered tender falls back to the
+  default); it is written, with the consolidated mode, only on Continuar; it is the display currency
+  of 24C1, never an account's. The account step opens the normal New account form with the chosen
+  currency preselected and ends the setup by itself once an account exists; Ahora no ends it too.
+  Omitir at the top of every step ends everything writing no preference. Shown once: a new
+  installation is one with no accounts and no language, region or display-currency preference;
+  everyone else is marked done silently (`onboardingDecision` in `_layout.tsx`, before the splash
+  lifts, so neither the tabs nor the setup flash). Microcopy only; no financial explanations.
+- **Cleanup.** The root README describes the native product, its architecture, how to run and verify
+  it and the iOS/Android roadmap; AGENTS.md and apps/mobile/README.md no longer present the retired
+  frontend as part of FinanzApp; `docs/history/` (four web documents) and
+  `docs/web-retirement-inventory.md` removed (Git history and the tag keep them); links updated
+  (decision 004, this roadmap, the iPhone guide, currency.md, the guard's comments and test); the
+  backup copy no longer promises an import from a web app. The repository guard (`check-repo.mjs`)
+  keeps refusing the retired tree. Dependencies: `react-dom` removed from `apps/mobile` (no source
+  imports it; an optional peer of Expo and expo-router for the web target only; `npm ls --all`,
+  `expo install --check` and `export:ios` verified without it); every other package is used. No
+  script or config belonged only to the frontend any more (24REP removed them); `vercel.json`,
+  `api/mobile` and `server/mobile` untouched.
+- **Out of scope.** Any account requirement, telemetry, a paywall, the real Assistant (25A),
+  reminders, Más → preferences regrouping.
+- **Status.** Delivered on this branch (2026-09-26), not device-verified.
+  - **Checked on Linux:** root `npm test` 320/320; mobile `npm run typecheck`, `npm run test:storage`
+    733/733 (+6 `tests/onboarding.node.ts`: the decision for a fresh install, an existing ledger,
+    each saved preference and an unreadable store; the suggestion per region and gate; the steps; the
+    route through every step with the choices kept, Omitir writing nothing, Ahora no, a
+    single-region build, the layout's redirect and splash order), `currency:verify`,
+    `regions:verify`, `i18n:check -- --strict`, `i18n:extract`, `check`, `export:ios`. No EAS build;
+    the iPhone was not touched.
+  - **Pending:** the checklist section Producto 25B (a fresh install, an upgrade with data, both
+    languages, VoiceOver and the largest text through the flow).
+- **Depends on.** 24R2B (regions), 24M (currencies), 24C1 (the display currency).
 
 ### Producto 25C — budgets with rollover, goals, CSV and productivity
 
@@ -1131,9 +1166,6 @@ safe areas, system text and separate currencies apply to every new screen.
   decisions recorded at each handoff (newest first), moved there verbatim on 2026-09-25.
 - [mobile-device-checklist.md](mobile-device-checklist.md): the physical iPhone checks per delivery
   and their recorded results.
-- [web-retirement-inventory.md](web-retirement-inventory.md) and [history/](history/): what the
-  retired web app was, how to read it from the tag `web-frontend-final`, and its documents kept
-  for the record.
 - [mobile-design.md](mobile-design.md): the visual direction and the per-delivery design notes;
   [i18n.md](i18n.md), [currency.md](currency.md), [mobile-integrations.md](mobile-integrations.md):
   the contracts the deliveries above implement.
