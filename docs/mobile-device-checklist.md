@@ -13,7 +13,7 @@ each result with the language, the theme and the text size.
 1. Keep a backup first (Más → Copia de seguridad). Update Metro and open the app.
    - [ ] If you had chosen a currency on Inicio before (24B6), Inicio opens exactly as before and the chip reads
      "Solo ARS" (or your currency): nothing changed by itself. On a fresh install (or after choosing it) the chip
-     reads the code alone ("ARS").
+     reads "Total · ARS".
 2. Have at least an ARS and a USD account, plus a EUR and a JPY one (create them if needed; small amounts),
    and one expense in each this month, one USD expense in a past month, a card purchase and a card payment.
 3. Tap the chip → the sheet: **Total consolidado**, **Ver solamente una moneda**, **Moneda de visualización**.
@@ -25,6 +25,9 @@ each result with the language, the theme and the text size.
    - [ ] Disponible: one number for all normal accounts (no card, no debt); its ⓘ says the rate date and that it
      is not your net worth. A negative account lowers it.
    - [ ] The card purchase counts once in Gastos; the card payment is not an expense.
+   - [ ] With a general budget in ARS: its card shows the same spent figure in "Total · ARS", "Total · USD" and
+     "Solo ARS" (ARS spending only, never the converted euros or dollars); in "Total · USD" its section reads
+     "Presupuesto del mes · ARS" and Ver opens Presupuestos in ARS. Reportes' Presupuestos section does the same.
 4. Reportes follows Inicio (same mode, same currency). Go back to the past month: the ⓘ beside the total says
    the range of rate dates used, from that month, never today's. Categories, the donut, merchants and budgets
    add up to the total; open a category: its rows show the original amounts.
@@ -37,7 +40,7 @@ each result with the language, the theme and the text size.
    nothing converted); the chip reads "Solo USD".
 7. Accessibility.
    - [ ] VoiceOver on the chip: "Total consolidado en pesos argentinos" / "Solo dólares estadounidenses", with the
-     hint; in the sheet each option says whether it is selected; the subtotals read each amount with its unit.
+     hint; visually "Total · ARS" / "Solo USD"; in the sheet each option says whether it is selected; the subtotals read each amount with its unit.
    - [ ] The largest Dynamic Type: the chip, the sheet rows and the subtotals wrap without clipping; Reduce Motion
      changes nothing essential. Repeat once in English.
 

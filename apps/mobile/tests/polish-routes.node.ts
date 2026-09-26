@@ -4,9 +4,6 @@ import { test } from 'node:test';
 import { runInNewContext } from 'node:vm';
 import ts from 'typescript';
 import * as domain from '@finanzapp/domain';
-import * as financeView from '../src/fx/finance-view.ts';
-import * as fxCopy from '../src/fx/fx-copy.ts';
-import * as displayCurrencyModule from '../src/ui/display-currency.ts';
 import * as presentation from '../src/ui/presentation.ts';
 import * as reportPresentation from '../src/ui/report-presentation.ts';
 import * as budgetPresentation from '../src/ui/budget-presentation.ts';
@@ -38,14 +35,7 @@ const rule: domain.RecurringRule = { id: 'rent', accountId: cash.id, kind: 'expe
   anchorDateISO: '2026-10-01', nextDateISO: '2026-10-01', active: true, deleted: false, createdAt, revision: 0, updatedAt: createdAt };
 const archive: domain.LedgerArchive = { accounts: [cash, wallet, usd, cardAccount], records: entries.map(domain.initialRecord), cards: [card], budgets, recurring: [rule] };
 
-function harness(file: string, params: Record<string, unknown> = {}, data: domain.LedgerArchive = archive, locale: AppLocale = 'es-AR',
-  display: { mode: displayCurrencyModule.DisplayMode; book: domain.RateBook } = { mode: 'single', book: domain.rateBook([]) }) {
-  // 24C1: the display mode Presupuestos reads, and the finance view over a fixed rate book (no network).
-  const displayProvider = { useDisplayCurrency: (held: readonly domain.Currency[]) => ({ currency: held[0] ?? 'ARS', preferred: null, mode: display.mode, setCurrency: () => {}, setMode: () => {} }) };
-  const ratesProvider = { useFinanceView: (_months: readonly string[], currency: domain.Currency) => {
-    const built = financeView.financeView(domain.snapshotFromArchive(data), display.mode, currency, display.book);
-    return { ...built, activity: 'idle', loaded: true, lastFetchedAt: null, book: display.book, held: [] };
-  } };
+function harness(file: string, params: Record<string, unknown> = {}, data: domain.LedgerArchive = archive, locale: AppLocale = 'es-AR') {
   const i18nProvider = { useI18n: () => bindLocale(locale) };
   const source = readFileSync(new URL('../app/' + file, import.meta.url), 'utf8');
   const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText;
@@ -90,8 +80,6 @@ function harness(file: string, params: Record<string, unknown> = {}, data: domai
     '../src/ui/presentation': presentation, '../../src/ui/presentation': presentation, '../src/ui/report-presentation': reportPresentation,
     '../src/ui/budget-presentation': budgetPresentation, '../../src/ui/budget-presentation': budgetPresentation,
     '../src/ui/theme': theme, '../../src/ui/theme': theme,
-    '../src/ui/display-currency-provider': displayProvider, '../src/fx/rates-provider': ratesProvider, '../src/fx/finance-view': financeView, '../src/fx/fx-copy': fxCopy,
-    '../src/ui/home-modules': { CurrencyParts: 'CurrencyParts', MetricHelp: 'MetricHelp' },
     '../src/ui/category-hues': { useCategoryColor: () => '#3E6FB0', useCategoryLabel: (s: string) => s, useCategoryDefinitions: () => [], useCategoryLook: (s: string) => ({ label: s, storedLabel: s, key: String(s).toLowerCase(), hex: '#3E6FB0', glyph: 'pricetag-outline' }), useCategoryLookOf: () => (s: string) => ({ label: s, storedLabel: s, key: String(s).toLowerCase(), hex: '#3E6FB0', glyph: 'pricetag-outline' }), useAccountLook: () => ({ icon: 'wallet', color: 'cobalt', glyph: 'wallet-outline', hex: '#2557D6' }), useAccountNameOf: () => (account: any) => account.name, useAccountLookOf: () => () => ({ icon: 'wallet', color: 'cobalt', glyph: 'wallet-outline', hex: '#2557D6' }) }, '../../src/ui/category-hues': { useCategoryColor: () => '#3E6FB0', useCategoryLabel: (s: string) => s, useCategoryDefinitions: () => [], useCategoryLook: (s: string) => ({ label: s, storedLabel: s, key: String(s).toLowerCase(), hex: '#3E6FB0', glyph: 'pricetag-outline' }), useCategoryLookOf: () => (s: string) => ({ label: s, storedLabel: s, key: String(s).toLowerCase(), hex: '#3E6FB0', glyph: 'pricetag-outline' }), useAccountLook: () => ({ icon: 'wallet', color: 'cobalt', glyph: 'wallet-outline', hex: '#2557D6' }), useAccountNameOf: () => (account: any) => account.name, useAccountLookOf: () => () => ({ icon: 'wallet', color: 'cobalt', glyph: 'wallet-outline', hex: '#2557D6' }) },
   };
   const require = (name: string) => {

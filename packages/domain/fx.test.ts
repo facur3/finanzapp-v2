@@ -3,7 +3,6 @@ import { FX_PIVOT, RATE_MAX_AGE_DAYS, consolidatedLedger, convertMinor, convertO
   rateBook, roundHalfAwayFromZero, type ExchangeRate } from './fx';
 import type { Account, Entry, LedgerSnapshot, Transfer } from './ledger';
 import { liquidTotalsByCurrency, type CreditCardProfile } from './liabilities';
-import { summarizeMonthlyBudgets, type MonthlyBudget } from './budgets';
 import { spendingReport } from './spending-report';
 import { spendingOverview, spendingWindow } from './spending-overview';
 import { monthlySpendingTrend, topMerchants } from './report-trend';
@@ -204,19 +203,6 @@ describe('consolidated views', () => {
     const late = { ...snapshot, entries: [...entries, expense('late', 'yen', 100, '2026-09-28')] };
     const view = consolidatedLedger(late, 'USD', book);
     expect(view.unconverted.map(item => [item.entryId, item.latest])).toEqual([['late', '2026-09-20']]);
-  });
-
-  it('measures a budget in the target currency against every currency converted, without counting anything twice', () => {
-    const budgets: MonthlyBudget[] = [
-      { id: 'b-total', scope: 'total', currency: 'USD', monthISO: '2026-09', amountMinor: 2000, active: true, createdAt, revision: 0, updatedAt: createdAt } as MonthlyBudget,
-      { id: 'b-food', scope: 'category', category: 'Comida', currency: 'USD', monthISO: '2026-09', amountMinor: 1000, active: true, createdAt, revision: 0, updatedAt: createdAt } as MonthlyBudget,
-      { id: 'b-ars', scope: 'total', currency: 'ARS', monthISO: '2026-09', amountMinor: 100, active: true, createdAt, revision: 0, updatedAt: createdAt } as MonthlyBudget,
-    ];
-    const summary = summarizeMonthlyBudgets(consolidatedLedger(snapshot, 'USD', book).snapshot, budgets, 'USD', '2026-09');
-    expect(summary.total?.spentMinor).toBe(2450);
-    expect(summary.rows.map(row => [row.budget.id, row.spentMinor])).toEqual([['b-food', 1200]]);
-    // Filtered by the unconverted ledger, the USD budget sees only the USD account, as before 24C1.
-    expect(summarizeMonthlyBudgets(snapshot, budgets, 'USD', '2026-09').total?.spentMinor).toBe(250);
   });
 
   it('keeps trend, comparison and merchants coherent with the converted total', () => {

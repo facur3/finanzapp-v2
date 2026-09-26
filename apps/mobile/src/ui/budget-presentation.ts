@@ -1,4 +1,4 @@
-import { budgetState, type BudgetProgress, type CategoryMonthlyBudget, type MonthlyBudgetSummary, type TotalMonthlyBudget } from '@finanzapp/domain';
+import { budgetState, sortCurrencies, type BudgetProgress, type CategoryMonthlyBudget, type Currency, type MonthlyBudget, type MonthlyBudgetSummary, type TotalMonthlyBudget } from '@finanzapp/domain';
 import { translator, type Translate } from '../i18n/messages.ts';
 
 /** Budget states map onto the existing semantic tones, and nothing else:
@@ -47,4 +47,20 @@ export function budgetCategoriesCaption(categories: number, exceeded: number, ne
   if (near) parts.push(t('budgets.caption.near', { count: near }));
   if (!exceeded && !near) parts.push(t('budgets.caption.allInOrder'));
   return parts.join(' · ');
+}
+
+/** A budget keeps its one currency whatever Inicio and Reportes show (24C1 review): it is always measured against the
+ * recorded spending of the accounts in that currency, never against a converted total, so switching the display
+ * mode or currency never changes what a budget tracks. This chooses whose budgets a screen shows: in `single` mode
+ * the currency shown (as before); consolidated, the display currency when it has an active budget for the month,
+ * otherwise the first held currency (grouping order) that has one, so an existing ARS budget stays on Inicio while
+ * the total is read in USD. Null when no currency has a budget that month. The screen names the currency whenever
+ * it differs from the display currency (`labelsCurrency`). */
+export function budgetScope(budgets: readonly MonthlyBudget[], held: readonly Currency[], mode: 'consolidated' | 'single', display: Currency, monthISO: string):
+  { currency: Currency; labelsCurrency: boolean } | null {
+  const has = (currency: Currency) => budgets.some(budget => budget.active && budget.currency === currency && budget.monthISO === monthISO);
+  if (mode === 'single') return has(display) ? { currency: display, labelsCurrency: false } : null;
+  if (has(display)) return { currency: display, labelsCurrency: false };
+  const other = sortCurrencies(new Set(held)).find(has);
+  return other ? { currency: other, labelsCurrency: true } : null;
 }

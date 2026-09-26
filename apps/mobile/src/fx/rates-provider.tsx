@@ -26,7 +26,7 @@ function nativeCache(): RateCache {
 }
 
 const idle: RatesStore = { getState: () => ({ book: rateBook([]), loaded: true, lastFetchedAt: null }), subscribe: () => () => {}, ensure: () => {},
-  activity: () => 'idle', settled: async () => {} };
+  watch: () => () => {}, activity: () => 'idle', settled: async () => {} };
 
 export function RatesProvider({ children, store }: { children: ReactNode; store?: RatesStore }) {
   const [rates] = useState(() => store ?? createRatesStore({ cache: nativeCache(), fetchRates: request => fetchFrankfurter(request, fetch as never) }));
@@ -50,7 +50,9 @@ export function useFinanceView(months: readonly string[], currency?: Currency): 
   const target = currency ?? shared.currency;
   const view = useMemo(() => snapshot ? financeView(snapshot, shared.mode, target, state.book) : null, [snapshot, shared.mode, target, state.book]);
   const monthsKey = months.join(','), quotesKey = view?.quotes.join(',') ?? '';
-  useEffect(() => { if (view?.quotes.length) rates.ensure(months, view.quotes, day); }, [rates, monthsKey, quotesKey, day]);
+  // The watch lasts while this screen needs these rates: leaving it, or switching to `single` mode (no quotes), releases
+  // it, so a failed request is retried only while some view is still waiting for its answer.
+  useEffect(() => { if (view?.quotes.length) return rates.watch(months, view.quotes, day); }, [rates, monthsKey, quotesKey, day]);
   const activity = view ? rates.activity(months, view.quotes) : 'idle';
   // One object per change of what it carries, so the screens' memos recompute only then.
   return useMemo(() => view ? { ...view, activity, loaded: state.loaded, lastFetchedAt: state.lastFetchedAt, book: state.book, held } : null,

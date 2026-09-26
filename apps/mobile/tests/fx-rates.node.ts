@@ -218,24 +218,87 @@ test('offline: the cached rates keep working, the failure is reported, and the p
   assert.equal(store.activity(['2026-09'], ['ARS']), 'idle');
 });
 
-test('after a failure the store retries by itself once the back-off has passed, with the screen untouched', async () => {
-  let clock = new Date('2026-09-25T12:00:00.000Z');
-  const timers: { run: () => void; ms: number }[] = [];
+function retryHarness(clock: { now: Date }) {
+  const timers: { run: () => void; ms: number; cancelled: boolean }[] = [];
   const provider = stubProvider();
+  const store = createRatesStore({ cache: memoryCache().cache, fetchRates: provider.fetchRates, now: () => clock.now,
+    schedule: (run, ms) => { const timer = { run, ms, cancelled: false }; timers.push(timer); return () => { timer.cancelled = true; }; } });
+  const fire = () => { const timer = timers.shift()!; assert.ok(timer && !timer.cancelled, 'a live retry timer'); clock.now = new Date(clock.now.getTime() + timer.ms); timer.run(); };
+  return { timers, provider, store, fire };
+}
+
+test('after a failure the store retries by itself once the back-off has passed, while the view that asked is still active', async () => {
+  const clock = { now: new Date('2026-09-25T12:00:00.000Z') };
+  const { timers, provider, store, fire } = retryHarness(clock);
   provider.fail('offline');
-  const store = createRatesStore({ cache: memoryCache().cache, fetchRates: provider.fetchRates, now: () => clock, schedule: (run, ms) => { timers.push({ run, ms }); } });
-  store.ensure(['2026-09'], ['EUR'], '2026-09-25');
+  const release = store.watch(['2026-09'], ['EUR'], '2026-09-25');
   await store.settled();
   assert.equal(store.activity(['2026-09'], ['EUR']), 'offline');
   assert.deepEqual(timers.map(timer => timer.ms), [RETRY_MS], 'one retry scheduled at the back-off');
-  provider.fail(null);
-  clock = new Date(clock.getTime() + RETRY_MS);
-  timers.shift()!.run();
+  // Still offline: the retry fails again and schedules the next one; never more than one per month.
+  fire();
   await store.settled();
-  assert.equal(provider.requests.length, 2, 'asked again without any ensure from a screen');
+  assert.equal(provider.requests.length, 2);
+  assert.equal(timers.length, 1);
+  provider.fail(null);
+  fire();
+  await store.settled();
+  assert.equal(provider.requests.length, 3, 'asked again without any call from a screen');
   assert.equal(store.activity(['2026-09'], ['EUR']), 'idle');
   assert.equal(store.getState().book.lookup('EUR', '2026-09-25').status, 'ok');
   assert.equal(timers.length, 0, 'a success schedules nothing');
+  release();
+});
+
+test('a view that leaves (navigation, or a switch to one currency only) cancels its retries; repeated failures create no persistent requests', async () => {
+  const clock = { now: new Date('2026-09-25T12:00:00.000Z') };
+  const { timers, provider, store, fire } = retryHarness(clock);
+  provider.fail('offline');
+  // Reportes browses six months offline, then the person goes elsewhere.
+  const release = store.watch(['2026-04', '2026-05', '2026-06', '2026-07', '2026-08', '2026-09'], ['EUR'], '2026-09-25');
+  await store.settled();
+  assert.equal(provider.requests.length, 6);
+  assert.equal(timers.filter(timer => !timer.cancelled).length, 6, 'one retry per failed month while the view is active');
+  release();
+  assert.equal(timers.filter(timer => !timer.cancelled).length, 0, 'every retry cancelled the moment nothing watches those months');
+  // A timer that had already fired its callback path finds no watcher and asks nothing (belt and braces).
+  timers.length = 0;
+  const again = store.watch(['2026-09'], ['EUR'], '2026-09-25');
+  await store.settled();
+  assert.equal(provider.requests.length, 6, 'within the back-off: no new request');
+  clock.now = new Date(clock.now.getTime() + RETRY_MS);
+  store.ensure(['2026-09'], ['EUR'], '2026-09-25');
+  await store.settled();
+  assert.equal(provider.requests.length, 7, 'past the back-off, an active view asks again');
+  again();
+  const pending = timers.find(timer => !timer.cancelled);
+  assert.equal(pending, undefined, 'and leaving cancels the retry that failure scheduled');
+  // Without a watcher, a stray retry callback asks nothing.
+  const stray = timers[timers.length - 1];
+  clock.now = new Date(clock.now.getTime() + RETRY_MS);
+  stray.run();
+  await store.settled();
+  assert.equal(provider.requests.length, 7, 'no request for a month nobody watches');
+  // Ensure alone (no watch) never schedules a retry: only a watching view keeps recovery alive.
+  store.ensure(['2026-03'], ['EUR'], '2026-09-25');
+  await store.settled();
+  assert.equal(timers.filter(timer => !timer.cancelled).length, 0);
+});
+
+test('while one view keeps watching a month, another view leaving does not cancel its recovery', async () => {
+  const clock = { now: new Date('2026-09-25T12:00:00.000Z') };
+  const { timers, provider, store, fire } = retryHarness(clock);
+  provider.fail('provider');
+  const home = store.watch(['2026-09'], ['EUR'], '2026-09-25');
+  const reports = store.watch(['2026-08', '2026-09'], ['EUR'], '2026-09-25');
+  await store.settled();
+  reports();
+  assert.deepEqual(timers.filter(timer => !timer.cancelled).length, 1, 'August cancelled; September still watched by Inicio');
+  provider.fail(null);
+  fire();
+  await store.settled();
+  assert.equal(store.getState().book.lookup('EUR', '2026-09-25').status, 'ok');
+  home();
 });
 
 test('a request for one currency in flight never blocks another currency of the same month (two screens, a quick change)', async () => {

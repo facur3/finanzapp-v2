@@ -49,7 +49,8 @@ export function CurrencySwitch({ value, currencies, onChange, disabled = false, 
 }
 
 /** Inicio's and Reportes' currency chip since 24C1: the same compact chip, now always present while an account
- * exists, naming the currency the screen shows ("EUR"), or "Solo EUR" when one currency is shown on its own. It
+ * exists, saying what the number covers: "Total · EUR" (every account converted to euros) or "Solo EUR" (the euro
+ * accounts alone). It
  * opens the display sheet (consolidated total, one currency only, the display currency); nothing about the display
  * lives on the screen itself. Choosing never converts or rewrites an account. */
 export function DisplayCurrencyButton({ mode, currency, held, gate, onMode, onCurrency, compact = true }: {
@@ -61,7 +62,8 @@ export function DisplayCurrencyButton({ mode, currency, held, gate, onMode, onCu
   const [visible, setVisible] = useState(false);
   const consolidatedOptions = useMemo(() => visible ? currencyChoices(displayTargets(held, gate, locale), locale) : [], [visible, held, gate, locale]);
   const singleOptions = useMemo(() => visible ? currencyChoices(held, locale) : [], [visible, held, locale]);
-  const label = mode === 'consolidated' ? currency : t('display.only', { code: currency });
+  // What the number covers, in two words: "Total · USD" (every account, converted) or "Solo USD" (that currency alone).
+  const label = mode === 'consolidated' ? t('display.total', { code: currency }) : t('display.only', { code: currency });
   return <>
     <PressFeedback feedback="highlight" accessibilityRole="button" onPress={() => setVisible(true)} hitSlop={compact ? 6 : undefined}
       accessibilityLabel={t(mode === 'consolidated' ? 'display.chipConsolidated' : 'display.chipSingle', { name: currencyName(currency) })}

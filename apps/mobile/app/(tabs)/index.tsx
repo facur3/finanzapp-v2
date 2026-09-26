@@ -11,6 +11,8 @@ import { availableFigure, inView, spendingFigure } from '../../src/fx/finance-vi
 import { figureInfo, shortfallDetail } from '../../src/fx/fx-copy';
 import { useI18n } from '../../src/i18n/provider';
 import { BudgetHomeCard, CategoryRanking, CurrencyParts, MetricHelp, UpcomingRecurringRow } from '../../src/ui/home-modules';
+import { budgetScope } from '../../src/ui/budget-presentation';
+import { withCurrencyCode } from '../../src/i18n/format';
 import { Reflow, ValueTransition } from '../../src/ui/motion';
 import { availableCurrencies, homeNamesCategory, selectEntries, sharedGlyphs, visibleNamesAccount } from '../../src/ui/presentation';
 import { useCategoryLookOf } from '../../src/ui/category-hues';
@@ -70,13 +72,15 @@ export default function HomeScreen() {
   // Disponible is recorded liquid money: cards, debts and receivables are never netted into it.
   const availableHero = useMemo(() => snapshot && view ? availableFigure(snapshot, view, view.book, day, view.activity, view.loaded, archive?.cards, archive?.debts) : null,
     [snapshot, view, day, archive?.cards, archive?.debts]);
-  // A budget is measured against the month's spending as this view counts it: every currency converted into the
-  // budget's in consolidated mode, only when every expense of the month had a rate.
+  // A budget keeps its currency whatever the display shows (24C1 review): it is measured on the real ledger against the
+  // accounts in its own currency, never against a converted total. Consolidated, the card shows the display currency's
+  // budget when there is one, else the first held currency's, named in the section title.
+  const scope = budgetScope(archive?.budgets ?? [], currencies, mode, currency, month);
   const monthBudget = useMemo(() => {
-    if (!view || !complete) return null;
-    try { return summarizeMonthlyBudgets(view.snapshot, archive?.budgets ?? [], currency, month); }
+    if (!snapshot || !scope) return null;
+    try { return summarizeMonthlyBudgets(snapshot, archive?.budgets ?? [], scope.currency, month); }
     catch { return null; }
-  }, [view?.snapshot, complete, archive?.budgets, currency, month]);
+  }, [snapshot, archive?.budgets, scope?.currency, month]);
   // The lists keep each movement's and rule's own amount and currency; consolidated mode lists every account.
   const recent = useMemo(() => snapshot && view ? selectEntries(snapshot.entries.filter(entry =>
     snapshot.accounts.some(a => a.id === entry.accountId && inView(view, a))
@@ -148,8 +152,9 @@ export default function HomeScreen() {
         <AssistantEntry currency={currency} />
       </View>
 
-      {monthBudget !== null && (monthBudget.total !== null || monthBudget.rows.length > 0) && <Reflow fade>
-        <SectionTitle quiet action={t('common.see')} onAction={() => router.push({ pathname: '/budgets', params: { currency } })}>{t('home.monthBudget')}</SectionTitle>
+      {monthBudget !== null && scope && (monthBudget.total !== null || monthBudget.rows.length > 0) && <Reflow fade>
+        <SectionTitle quiet action={t('common.see')} onAction={() => router.push({ pathname: '/budgets', params: { currency: scope.currency } })}>
+          {scope.labelsCurrency ? withCurrencyCode(t('home.monthBudget'), scope.currency) : t('home.monthBudget')}</SectionTitle>
         <BudgetHomeCard summary={monthBudget} />
       </Reflow>}
 

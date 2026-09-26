@@ -5,7 +5,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { dailyAverageMinor, dailySpending, monthlySpendingTrend, shiftMonthISO, spendingComparison, spendingInsights, spendingReport,
   summarizeMonthlyBudgets, topMerchants, type CategorySpending, type Currency, type DailySpending, type Entry, type SpendingInsight } from '@finanzapp/domain';
 import { useLedger } from '../../src/storage/LedgerProvider';
-import { budgetTone, percentUsed } from '../../src/ui/budget-presentation';
+import { budgetScope, budgetTone, percentUsed } from '../../src/ui/budget-presentation';
 import { AppText, CategoryBadge, Choices, DetailRow, EmptyState, GlyphTile, IconButton, InfoButton, Money, NavigationRow, PressFeedback, SectionTitle, Surface, useStacked } from '../../src/ui/components';
 import { withCurrencyCode } from '../../src/i18n/format';
 import { DisplayCurrencyButton } from '../../src/ui/currency-switch';
@@ -39,7 +39,9 @@ import { space, useCurrentDay, usePalette } from '../../src/ui/theme';
  * trend, donut, categories, days, budgets, merchants, insights, comparison) comes from one ledger in which each
  * movement was converted with the rate of its own date, so a September total never uses today's rate and every part
  * adds up to the total. A month with a movement that has no rate shows each currency's subtotal instead of a total;
- * the trend and the comparison appear only when every month they cover is complete. */
+ * the trend and the comparison appear only when every month they cover is complete. Budgets are the exception by
+ * design (24C1 review): a budget keeps its currency and is measured on the real ledger against the accounts in that
+ * currency, never against the converted total; consolidated, the section names the currency it shows. */
 export default function ReportsScreen() {
   const params = useLocalSearchParams<{ currency?: string | string[]; month?: string | string[] }>();
   const { snapshot, archive, gate } = useLedger();
@@ -91,19 +93,27 @@ export default function ReportsScreen() {
     if (!ledger || !selection || !previousComplete) return null;
     try { return spendingComparison(ledger, selection.currency, selection.monthISO, day); } catch { return null; }
   }, [ledger, selection, day, previousComplete]);
+  const scope = selection && view ? budgetScope(archive?.budgets ?? [], held, view.mode, selection.currency, selection.monthISO) : null;
+  const budgetCurrency = scope?.currency ?? selection?.currency ?? 'ARS';
+  const budgetMoney = useMemo(() => (minor: number) => moneyText(minor, budgetCurrency), [moneyText, budgetCurrency]);
+  const budgetSpoken = (minor: number) => spokenMoney(minor, budgetCurrency);
+  // Budgets read the real ledger in their own currency (see the header), whatever the display mode.
   const budgets = useMemo(() => {
-    if (!ledger || !selection) return null;
-    try { return summarizeMonthlyBudgets(ledger, archive?.budgets ?? [], selection.currency, selection.monthISO); } catch { return null; }
-  }, [ledger, archive?.budgets, selection]);
+    if (!snapshot || !selection || !scope) return null;
+    try { return summarizeMonthlyBudgets(snapshot, archive?.budgets ?? [], scope.currency, selection.monthISO); } catch { return null; }
+  }, [snapshot, archive?.budgets, scope?.currency, selection]);
   const merchants = useMemo(() => report && report.status === 'ready' && ledger ? topMerchants(ledger, report, 5) : [], [ledger, report]);
   const insights = useMemo(() => {
-    if (!ledger || !selection || !report || report.status !== 'ready') return [];
-    // A growth fact reads the previous month: without all of its rates it would compare against a partial month.
-    return insightsBesideRanking(spendingInsights(ledger, archive?.budgets ?? [], selection.currency, selection.monthISO, day, money)
-      .filter(insight => previousComplete || !insight.id.startsWith('growth:')), merchants, ledger.entries);
-  }, [ledger, archive?.budgets, selection, report, day, money, merchants, previousComplete]);
+    if (!snapshot || !ledger || !selection || !report || report.status !== 'ready') return [];
+    // Budget facts come from the real ledger in the budget's currency; the largest expense and the growth from the
+    // shown ledger. A growth fact reads the previous month: without all of its rates it would compare a partial month.
+    const budgetFacts = scope ? spendingInsights(snapshot, archive?.budgets ?? [], scope.currency, selection.monthISO, day, budgetMoney)
+      .filter(insight => insight.id.startsWith('over:') || insight.id.startsWith('near:')) : [];
+    const facts = spendingInsights(ledger, [], selection.currency, selection.monthISO, day, money).filter(insight => previousComplete || !insight.id.startsWith('growth:'));
+    return insightsBesideRanking([...budgetFacts, ...facts].slice(0, 4), merchants, ledger.entries);
+  }, [snapshot, ledger, archive?.budgets, scope?.currency, selection, report, day, money, budgetMoney, merchants, previousComplete]);
   if (!snapshot || !ledger || !view || !report || !selection) return null;
-  const insightText = (insight: SpendingInsight) => localizedInsight(insight, { t, money, dayMonth: formatDayMonth, label: key => lookOf(key).label, budgets, comparison, entries: ledger.entries });
+  const insightText = (insight: SpendingInsight) => localizedInsight(insight, { t, money, budgetMoney, dayMonth: formatDayMonth, label: key => lookOf(key).label, budgets, comparison, entries: ledger.entries });
 
   const ready = report.status === 'ready' && complete;
   const rows: (CategorySpending | DailySpending)[] = !ready ? [] : tab === 'categories' ? report.categories : dailySpending(ledger, report);
@@ -197,15 +207,16 @@ export default function ReportsScreen() {
     ListEmptyComponent={ready ? <EmptyState title={t('reports.emptyTitle')} icon="pie-chart-outline"
       detail={t('reports.emptyDetail')} /> : null}
     ListFooterComponent={<View style={{ gap: space.xxl, paddingTop: space.xxl }}>
-      {ready && budgets && (budgets.total || budgets.rows.length > 0) && <View>
-        <SectionTitle action={t('reports.budgets.manage')} onAction={() => router.push({ pathname: '/budgets', params: { currency, month: monthISO } })}>{t('reports.budgets.title')}</SectionTitle>
+      {ready && budgets && scope && (budgets.total || budgets.rows.length > 0) && <View>
+        <SectionTitle action={t('reports.budgets.manage')} onAction={() => router.push({ pathname: '/budgets', params: { currency: scope.currency, month: monthISO } })}>
+          {scope.labelsCurrency ? withCurrencyCode(t('reports.budgets.title'), scope.currency) : t('reports.budgets.title')}</SectionTitle>
         <Surface grouped>
-          {/* The month's ceiling first (all recorded expenses), then the category sublimits. */}
+          {/* The month's ceiling first (all recorded expenses of the budget's currency), then the category sublimits. */}
           {budgets.total && <BudgetStatusRow category={t('reports.budgets.general')} spent={budgets.total.spentMinor} limit={budgets.total.budget.amountMinor}
-            progress={budgets.total} money={money} spoken={spoken} last={budgets.rows.length === 0}
+            progress={budgets.total} money={budgetMoney} spoken={budgetSpoken} last={budgets.rows.length === 0}
             onPress={() => router.push({ pathname: '/edit-budget/[id]', params: { id: budgets.total!.budget.id } })} />}
           {budgets.rows.map((row, index) => <BudgetStatusRow key={row.budget.id} category={lookOf(row.budget.category).label} spent={row.spentMinor} limit={row.budget.amountMinor}
-            progress={row} money={money} spoken={spoken} last={index === budgets.rows.length - 1}
+            progress={row} money={budgetMoney} spoken={budgetSpoken} last={index === budgets.rows.length - 1}
             onPress={() => router.push({ pathname: '/edit-budget/[id]', params: { id: row.budget.id } })} />)}
         </Surface>
       </View>}
@@ -298,7 +309,7 @@ function MerchantCells({ merchant, currency, label }: { merchant: { merchant: st
 }
 
 type InsightSources = {
-  t: Translate; money: (minor: number) => string; dayMonth: (dateISO: string) => string; label: (category: string) => string;
+  t: Translate; money: (minor: number) => string; budgetMoney: (minor: number) => string; dayMonth: (dateISO: string) => string; label: (category: string) => string;
   budgets: ReturnType<typeof summarizeMonthlyBudgets> | null; comparison: ReturnType<typeof spendingComparison> | null; entries: Entry[];
 };
 
@@ -306,9 +317,11 @@ type InsightSources = {
  * the fact in Spanish; its id names the kind and the record it is about, so
  * the screen rebuilds the sentence from the same records, with the built-in
  * category's localized name. A fact it cannot trace keeps the domain's text. */
-function localizedInsight(insight: SpendingInsight, { t, money, dayMonth, label, budgets, comparison, entries }: InsightSources): { title: string; detail: string } {
+function localizedInsight(insight: SpendingInsight, { t, money: shownMoney, budgetMoney, dayMonth, label, budgets, comparison, entries }: InsightSources): { title: string; detail: string } {
   const [kind, ...rest] = insight.id.split(':');
   const id = rest.join(':');
+  // A budget fact is written in the budget's currency; every other fact in the shown one.
+  const money = kind === 'over' || kind === 'near' ? budgetMoney : shownMoney;
   if (kind === 'over' || kind === 'near') {
     const total = budgets?.total?.budget.id === id ? budgets.total : null;
     const row = total ?? budgets?.rows.find(item => item.budget.id === id);

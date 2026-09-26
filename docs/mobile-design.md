@@ -385,8 +385,9 @@ importe, moneda y estado.
 
 - **Nada nuevo en pantalla.** Inicio conserva su orden (encabezado, número, tres acciones, Asistente,
   secciones) y su único número de 48 pt: nunca un segundo importe equivalente debajo. El chip de moneda
-  del encabezado es el mismo (32 pt, tinta neutra, borde fino) y ahora aparece siempre que haya una cuenta:
-  "EUR" en el total consolidado, "Solo EUR" cuando se ve una moneda sola.
+  del encabezado es el mismo (32 pt, tinta neutra, borde fino) y ahora aparece siempre que haya una cuenta y dice
+  qué cubre el número: "Total · EUR" (todas las cuentas convertidas a euros), "Solo EUR" (solo las cuentas en
+  euros). VoiceOver: "Total consolidado en euros" / "Solo euros".
 - **Una hoja discreta, no controles permanentes.** El chip abre una hoja de página nativa con dos opciones
   con tilde (Total consolidado · Ver solamente una moneda), la fila Moneda de visualización y una frase: cambiar
   cómo se muestran los totales no convierte ni modifica nada. La fila convierte la misma hoja en la lista
@@ -398,7 +399,9 @@ importe, moneda y estado.
   línea, y una sola línea secundaria ("Sin cotización para sumarlo en EUR") con ⓘ que explica el motivo. Sin
   colores de alerta, sin banner, sin suma parcial.
 - **Los importes originales se conservan** en filas, detalles, cuentas y desgloses; solo los totales y los
-  gráficos se expresan en la moneda de visualización. Movimiento: el mismo `ValueTransition` del número al
+  gráficos se expresan en la moneda de visualización. **Los presupuestos no cambian de significado** con el
+  modo: cada uno mide solo el gasto de las cuentas de su moneda; en el total consolidado la sección nombra esa
+  moneda ("Presupuesto del mes · ARS") cuando no es la de visualización. Movimiento: el mismo `ValueTransition` del número al
   cambiar de modo o moneda; Reduce Motion igual que antes.
 
 ## Producto 24R2B — 234 regiones publicadas, mismo selector

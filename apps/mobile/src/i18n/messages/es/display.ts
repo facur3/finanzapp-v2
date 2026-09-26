@@ -8,6 +8,8 @@ export const display = {
     singleDetail: 'Solo las cuentas de esa moneda, sin conversiones.',
     currency: 'Moneda de visualización',
     note: 'Cambiar cómo se muestran los totales no convierte ni modifica tus cuentas, saldos ni movimientos.',
+    /** The chip in consolidated mode: "Total · USD", every account converted to that currency. */
+    total: 'Total · {code}',
     /** The chip in single mode: "Solo USD". */
     only: 'Solo {code}',
     chipConsolidated: 'Total consolidado en {name}',

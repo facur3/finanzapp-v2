@@ -11,7 +11,10 @@
  *   - a month asked after it ended is final and never asked again; the current month (or one
  *     asked while it was still running) is asked again at most every REFRESH_MS;
  *   - a failure (offline, provider error) is remembered for RETRY_MS, so a screen that
- *     re-renders never hammers the provider; the cached rates keep working meanwhile.
+ *     re-renders never hammers the provider; the cached rates keep working meanwhile. Once the
+ *     back-off has passed the store retries by itself, but only while a view still **watches**
+ *     those months and quotes (`watch` registers interest and its release withdraws it): a screen
+ *     left, or switched to `single` mode, schedules nothing and cancels what it had scheduled.
  * The cache is read before anything is asked. A cache that cannot be read or written leaves the
  * rates of this session in memory; nothing is deleted. */
 import { rateBook, shiftMonthISO, type Currency, type ExchangeRate, type RateBook } from '@finanzapp/domain';
@@ -43,6 +46,8 @@ export interface RatesStore {
   subscribe(listener: () => void): () => void;
   /** Asks for whatever `months` × `quotes` still needs; returns at once (the answer arrives through `subscribe`). */
   ensure(months: readonly string[], quotes: readonly Currency[], today: string): void;
+  /** `ensure`, plus interest: failures are retried while the watch is held. The release withdraws it. */
+  watch(months: readonly string[], quotes: readonly Currency[], today: string): () => void;
   /** What is happening for these months and quotes: a request in flight, a recent failure, or nothing. */
   activity(months: readonly string[], quotes: readonly Currency[]): RatesActivity;
   /** Resolves when every request started so far has settled (tests; a pull-to-refresh). */
@@ -79,18 +84,19 @@ export function monthsEnding(monthISO: string, count: number): string[] {
   return Array.from({ length: count }, (_, index) => shiftMonthISO(monthISO, index - count + 1));
 }
 
-/** A timer that never keeps a Node test process alive (React Native's timers have no `unref`). */
-function laterTimer(run: () => void, ms: number): void {
+/** A cancellable timer that never keeps a Node test process alive (React Native's timers have no `unref`). */
+function laterTimer(run: () => void, ms: number): () => void {
   const handle = setTimeout(run, ms) as unknown as { unref?: () => void };
   handle.unref?.();
+  return () => clearTimeout(handle as unknown as ReturnType<typeof setTimeout>);
 }
 
 export function createRatesStore({ cache, fetchRates, now = () => new Date(), schedule = laterTimer }: {
   cache: RateCache;
   fetchRates: (request: RateRequest) => Promise<ExchangeRate[]>;
   now?: () => Date;
-  /** Runs the retry of a failed request once its back-off has passed (injected by tests). */
-  schedule?: (run: () => void, ms: number) => void;
+  /** Runs the retry of a failed request once its back-off has passed; returns its cancel (injected by tests). */
+  schedule?: (run: () => void, ms: number) => () => void;
 }): RatesStore {
   let rates: ExchangeRate[] = [];
   const coverage = new Map<string, RateCoverage>();
@@ -102,6 +108,16 @@ export function createRatesStore({ cache, fetchRates, now = () => new Date(), sc
   const pendingQuotes = new Set<string>();           // quote|month keys being fetched
   const failures = new Map<string, { at: number; kind: 'offline' | 'provider' }>(); // by quote|month
   const waiting: { months: string[]; quotes: Currency[]; today: string }[] = [];
+  // Views that currently need rates, and the retry timer of each month that failed while one of them watched it.
+  const watchers = new Set<{ months: string[]; quotes: Currency[]; today: string }>();
+  const retries = new Map<string, () => void>(); // by month: cancel
+  const watched = (month: string) => {
+    const quotes = new Set<Currency>();
+    let today = '';
+    for (const watcher of watchers) if (watcher.months.includes(month)) { for (const quote of watcher.quotes) quotes.add(quote); if (watcher.today > today) today = watcher.today; }
+    return { quotes: [...quotes], today };
+  };
+  const cancelRetry = (month: string) => { retries.get(month)?.(); retries.delete(month); };
   const key = (quote: Currency, month: string) => quote + '|' + month;
   // Every notification carries a new snapshot object (same book when only the activity changed), so a
   // `useSyncExternalStore` subscriber re-renders for "fetching" and "offline" too, not only for new rates.
@@ -143,8 +159,17 @@ export function createRatesStore({ cache, fetchRates, now = () => new Date(), sc
         for (const item of keys) failures.set(item, failure);
         emit();
         // The screen that asked stays mounted with the same months and quotes, so nothing would ask again: the store
-        // retries by itself once the back-off has passed (a second failure schedules the next one).
-        schedule(() => store.ensure([month], quotes, today), RETRY_MS);
+        // retries by itself once the back-off has passed, for the quotes some view still watches (a second failure
+        // schedules the next one; a view that left cancels it, and one that leaves meanwhile finds nothing to ask).
+        const interest = watched(month);
+        if (interest.quotes.some(quote => quotes.includes(quote))) {
+          cancelRetry(month);
+          retries.set(month, schedule(() => {
+            retries.delete(month);
+            const current = watched(month);
+            if (current.quotes.length) store.ensure([month], current.quotes, current.today);
+          }, RETRY_MS));
+        }
       } finally {
         inFlight.delete(requestKey);
         for (const item of keys) pendingQuotes.delete(item);
@@ -169,6 +194,15 @@ export function createRatesStore({ cache, fetchRates, now = () => new Date(), sc
         });
         if (missing.length) fetchMonth(month, missing, today);
       }
+    },
+    watch(months, quotes, today) {
+      const watcher = { months: [...months], quotes: [...quotes], today };
+      watchers.add(watcher);
+      store.ensure(months, quotes, today);
+      return () => {
+        watchers.delete(watcher);
+        for (const month of watcher.months) if (retries.has(month) && !watched(month).quotes.length) cancelRetry(month);
+      };
     },
     activity(months, quotes) {
       if (!quotes.length) return 'idle';

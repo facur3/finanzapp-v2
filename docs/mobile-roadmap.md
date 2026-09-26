@@ -812,19 +812,21 @@ the owner authorises it; no EAS build or store submission without the owner.
   request per month and missing quotes; final months never again; 6 h refresh of the running month; 60 s back-off
   after a failure; nothing when nothing needs converting); the display mode `finanzapp.displayMode`
   (`consolidated` for new installations; a device with a 24B6 display currency keeps `single`, written once);
-  Inicio (same composition; the chip now always present, "EUR" or "Solo EUR", opening one sheet: Total
-  consolidado · Ver solamente una moneda · Moneda de visualización; an info button with source and date; per-
-  currency subtotals and the reason when a rate is missing), Reportes and its drill-downs, Presupuestos (budgets
-  measured against the consolidated spending in their currency), es/en copy.
+  Inicio (same composition; the chip now always present and saying what the number covers, "Total · EUR" or
+  "Solo EUR", opening one sheet: Total consolidado · Ver solamente una moneda · Moneda de visualización; an info
+  button with source and date; per-currency subtotals and the reason when a rate is missing), Reportes and its
+  drill-downs, es/en copy. **Budgets keep their per-currency meaning in every mode** (owner's review of 2026-09-26):
+  measured on the real ledger against the accounts in their currency, never against a converted total; consolidated,
+  the section names the currency it shows; Presupuestos unchanged; no global budget.
 - **Not changed.** The ledger (schema 10), backups v8–v10, accounts' and movements' amounts and currencies, the
   146 + 7 currencies, every form, transfers (still one currency), the Assistant (contract v1, it receives the
   display currency as before), navigation, Inicio's design.
 - **Status.** Delivered on this branch (2026-09-25), not device-verified.
-  - **Checked on Linux:** root `npm test` 320/320 (+17 `packages/domain/fx.test.ts`, 2 after the Codex review: cross rates on one common publication day); mobile `npm run typecheck`,
-    `npm run test:storage` 721/721 (+20 `tests/fx-rates.node.ts`: per-(quote, month) in-flight requests, the automatic retry after the back-off, the provider adapter with a stub, the cache on
+  - **Checked on Linux:** root `npm test` 319/319 (+16 `packages/domain/fx.test.ts`, 2 after the Codex review: cross rates on one common publication day; the budget-over-consolidated-ledger case removed with the owner's decision); mobile `npm run typecheck`,
+    `npm run test:storage` 726/726 (+22 `tests/fx-rates.node.ts`: per-(quote, month) in-flight requests, the automatic retry after the back-off only while a view watches (leaving or switching to one currency cancels it; repeated failures leave no request behind), the provider adapter with a stub, the cache on
     real SQLite, the request policy, offline and failing caches, the preference transition, consolidated figures in
     ARS, USD, EUR and JPY, negative balances, stale and missing rates; +5 route tests in `spending-home.node.ts`
-    and `report-routes.node.ts`, +1 after the review: Inicio and Reportes consolidated, a past comparison not blocked by a later month, a past month at its own dates, the drill-down
+    and `report-routes.node.ts`, +1 after the review, +3 after the owner's review (an existing ARS budget tracks ARS spending only in single and consolidated mode with ARS and EUR accounts and budgets, the section named with its currency, the chip's "Total · USD" / "Solo USD" in both languages): Inicio and Reportes consolidated, a past comparison not blocked by a later month, a past month at its own dates, the drill-down
     rows' original amounts, subtotals without a rate, no request for a one-currency ledger; the 24B6 harnesses
     now run in `single` mode and use the new chip), `currency:verify`, `regions:verify`, `i18n:check -- --strict`,
     `i18n:extract`, `check`, `export:ios` (Hermes bundle 5,117,746 bytes). The live API was read on 2026-09-25 for

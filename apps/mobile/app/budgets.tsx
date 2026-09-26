@@ -2,65 +2,40 @@ import { useEffect, useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
-import { currentMonthISO, shiftMonthISO, sortCurrencies, summarizeMonthlyBudgets, type BudgetProgress, type CategoryMonthlyBudget, type Currency,
+import { currentMonthISO, shiftMonthISO, summarizeMonthlyBudgets, type BudgetProgress, type CategoryMonthlyBudget, type Currency,
   type TotalMonthlyBudget } from '@finanzapp/domain';
 import { useLedger } from '../src/storage/LedgerProvider';
 import { budgetCategoriesCaption, budgetTone, percentUsed } from '../src/ui/budget-presentation';
 import { useCategoryLabel } from '../src/ui/category-hues';
 import { ActionButton, AppText, CategoryBadge, EmptyState, IconButton, Money, PressFeedback, Screen, SectionTitle, Stat, StatRow, Surface } from '../src/ui/components';
 import { CurrencySwitch } from '../src/ui/currency-switch';
-import { useDisplayCurrency } from '../src/ui/display-currency-provider';
-import { useFinanceView } from '../src/fx/rates-provider';
-import { spendingFigure } from '../src/fx/finance-view';
-import { shortfallDetail } from '../src/fx/fx-copy';
-import { CurrencyParts } from '../src/ui/home-modules';
 import { useI18n } from '../src/i18n/provider';
 import { availableCurrencies } from '../src/ui/presentation';
 import { heldCurrency } from '../src/ui/report-presentation';
 import { timing } from '../src/ui/motion';
 import { space, useCurrentDay, usePalette, useReduceMotion } from '../src/ui/theme';
 
-function lastDay(monthISO: string): string {
-  const [year, month] = monthISO.split('-').map(Number);
-  return monthISO + '-' + String(new Date(year, month, 0, 12).getDate()).padStart(2, '0');
-}
-
 /** Hierarchy: the general budget (the month's ceiling over every recorded
  * expense) is the primary summary when it exists; category sublimits sit
  * under it as dense rows with one thin bar each. Without a general budget
  * there is a compact action to add one, never a giant empty card, and the
  * sublimits stay useful on their own. Sublimits are never summed into a
- * monthly figure.
- *
- * 24C1: a budget is measured the way Inicio and Reportes count spending. In consolidated mode every account's
- * expenses, each converted with its own day's rate, count against a budget in its currency (so the figure here is the
- * figure on Inicio's card); in single mode only the accounts in the budget's currency, as before. A month with an
- * expense that has no rate shows each currency's spending instead of a budget progress that would be partial. */
+ * monthly figure. */
 export default function BudgetsScreen() {
   const params = useLocalSearchParams<{ currency?: string; month?: string }>();
   const { archive, snapshot } = useLedger();
   const day = useCurrentDay();
   const p = usePalette();
-  const { t, formatMonthTitle, formatNumericDate, currencyName, moneyText, spokenMoney } = useI18n();
-  const held = availableCurrencies(snapshot?.accounts ?? []);
-  const { mode } = useDisplayCurrency(held);
-  // Consolidated, a budget may be in any currency the totals can be shown in; the ones with a budget are offered too.
-  const currencies = mode === 'consolidated' ? sortCurrencies(new Set([...held, ...(archive?.budgets ?? []).map(budget => budget.currency)])) : held;
+  const { t, formatMonthTitle, moneyText, spokenMoney } = useI18n();
+  const currencies = availableCurrencies(snapshot?.accounts ?? []);
   // The route's currency is honoured when an account holds it; an unknown code is never coerced (ARS is the empty-ledger fallback, decision 7.6.4).
-  const initialCurrency: Currency = (mode === 'consolidated' && currencies.includes(params.currency as Currency) ? params.currency as Currency : null)
-    ?? heldCurrency(snapshot?.accounts ?? [], params.currency) ?? 'ARS';
+  const initialCurrency: Currency = heldCurrency(snapshot?.accounts ?? [], params.currency) ?? 'ARS';
   const [selectedCurrency, setSelectedCurrency] = useState<Currency>(initialCurrency);
   const [monthISO, setMonthISO] = useState(() => params.month && /^\d{4}-\d{2}$/.test(params.month) ? params.month : currentMonthISO(day));
   const currency = currencies.includes(selectedCurrency) ? selectedCurrency : currencies[0] ?? initialCurrency;
   const budgets = archive?.budgets ?? [];
-  const months = useMemo(() => [monthISO], [monthISO]);
-  const view = useFinanceView(months, currency);
-  const monthEnd = monthISO + '-31';
-  const complete = view ? view.complete(monthISO + '-01', monthEnd, 'expense') : true;
-  const summary = useMemo(() => view ? summarizeMonthlyBudgets(view.snapshot, budgets, currency, monthISO) : null,
-    [view?.snapshot, budgets, currency, monthISO]);
-  const shortfall = view && snapshot && !complete
-    ? spendingFigure(snapshot, view, { startISO: monthISO + '-01', endISO: lastDay(monthISO) < day ? lastDay(monthISO) : day }, view.activity, view.loaded) : null;
+  const summary = useMemo(() => snapshot ? summarizeMonthlyBudgets(snapshot, budgets, currency, monthISO) : null,
+    [snapshot, budgets, currency, monthISO]);
   const activeCount = summary?.rows.length ?? 0;
   const money = (minor: number) => moneyText(minor, currency);
   const spoken = (minor: number) => spokenMoney(minor, currency);
@@ -97,9 +72,7 @@ export default function BudgetsScreen() {
       </View>
     </View>
 
-    {shortfall?.status === 'unavailable' ? <CurrencyParts parts={shortfall.parts} line={shortfall.reason === 'fetching' ? t('fx.fetching') : t('fx.unavailable', { currency })}
-      detail={shortfallDetail(shortfall, { t, date: formatNumericDate, currencyName })} />
-      : !total && !activeCount ? <EmptyState title={t('budgets.screen.emptyTitle')}
+    {!total && !activeCount ? <EmptyState title={t('budgets.screen.emptyTitle')}
       detail={t('budgets.screen.emptyDetail')}
       icon="speedometer-outline"
       action={<ActionButton label={t('budgets.screen.create')} icon="add-outline" onPress={() => newBudget('total')} />} /> : <>

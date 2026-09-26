@@ -41,7 +41,8 @@ function memoryPreferences(initial: Record<string, string> = {}) {
 }
 
 function routeHarness(file: string, params: Record<string, unknown>, data = snapshot, { locale = 'es-AR' as AppLocale, display = displayCurrency.createDisplayCurrencyStore(memoryPreferences().store),
-  book = domain.rateBook([]), activity = 'idle' as ratesStore.RatesActivity, ensured = [] as { months: readonly string[]; quotes: readonly string[] }[] } = {}) {
+  book = domain.rateBook([]), activity = 'idle' as ratesStore.RatesActivity, ensured = [] as { months: readonly string[]; quotes: readonly string[] }[],
+  archive = {} as Partial<domain.LedgerArchive> } = {}) {
   const i18nProvider = { useI18n: () => bindLocale(locale) };
   // The shared display currency, as the provider's hook gives it: the real store and resolution, no React context.
   const displayProvider = { useDisplayCurrency: (held: readonly domain.Currency[]) => ({ currency: displayCurrency.resolveDisplayCurrency(display.getState(), held, display.getMode()),
@@ -80,7 +81,7 @@ function routeHarness(file: string, params: Record<string, unknown>, data = snap
     '../src/fx/rates-provider': ratesProvider, '../src/fx/finance-view': financeView, '../src/fx/fx-copy': fxCopy, '../src/fx/rates-store': ratesStore,
     '../src/ui/home-modules': { CurrencyParts: 'CurrencyParts', MetricHelp: 'MetricHelp' },
     '@finanzapp/domain': domain,
-    '../src/storage/LedgerProvider': { useLedger: () => ({ snapshot: data, archive: { accounts: data.accounts, records: [] } }) },
+    '../src/storage/LedgerProvider': { useLedger: () => ({ snapshot: data, archive: { accounts: data.accounts, records: [], ...archive } }) },
     '../src/ui/charts': { DonutChart: 'DonutChart', MonthBars: 'MonthBars', OTHERS_KEY: '__others__',
       donutSlices: (items: { key: string; label: string; value: number }[]) => items.slice(0, 5).map((item, index) => ({ ...item, color: 'c' + index })) },
     '../src/ui/components': Object.fromEntries(componentNames.map(name => [name, name])),
@@ -502,4 +503,42 @@ test('24C1 review: comparing two complete past months is not blocked by a later 
   assert.equal(nodes(august).some(n => n.type === 'EmptyState' && n.props.title === 'Cotizaciones'), false, 'August against July needs no September rate');
   const september = routeHarness('report-comparison.tsx', { currency: 'USD', month: '2026-09' }, later, { display, book }).render();
   assert.equal(find(september, 'EmptyState').props.title, 'Cotizaciones', 'September itself has no rate: no difference is claimed');
+});
+
+test('24C1 review: Reportes keeps budgets in their own currency on the real ledger; consolidated, the section names it and its rows are in it', () => {
+  const accounts: domain.Account[] = [{ id: 'a', name: 'Pesos', currency: 'ARS', openingMinor: 0, createdAt }, { id: 'e', name: 'Euros', currency: 'EUR', openingMinor: 0, createdAt }];
+  const data: domain.LedgerSnapshot = { accounts, entries: [
+    { id: 'ars', accountId: 'a', kind: 'expense', amountMinor: 300, merchant: 'Kiosco', category: 'Comida', dateISO: '2026-09-11', createdAt },
+    { id: 'eur', accountId: 'e', kind: 'expense', amountMinor: 500, merchant: 'Bäckerei', category: 'Comida', dateISO: '2026-09-11', createdAt }] };
+  const budget: domain.MonthlyBudget = { id: 'b-ars', scope: 'total', currency: 'ARS', monthISO: '2026-09', amountMinor: 400, active: true, createdAt, revision: 0, updatedAt: createdAt };
+  const book = domain.rateBook([
+    { base: 'USD', quote: 'ARS', rate: '1000', effectiveDate: '2026-09-10', source: 'Frankfurter', fetchedAt: '2026-09-12T12:00:00.000Z' },
+    { base: 'USD', quote: 'EUR', rate: '0.5', effectiveDate: '2026-09-10', source: 'Frankfurter', fetchedAt: '2026-09-12T12:00:00.000Z' }]);
+  const rows = (root: Node) => nodes(root).filter(n => typeof n.type === 'function' && (n.type as { name: string }).name === 'BudgetStatusRow');
+  const harness = (mode: displayCurrency.DisplayMode, currency: string) => {
+    const display = displayCurrency.createDisplayCurrencyStore(memoryPreferences({ [displayCurrency.DISPLAY_MODE_KEY]: mode, [displayCurrency.DISPLAY_CURRENCY_KEY]: currency }).store);
+    return routeHarness('(tabs)/reports.tsx', {}, data, { display, book, archive: { budgets: [budget] } });
+  };
+  // Consolidated in USD: the total converts both accounts (ARS 3,00 → 0,00 USD; EUR 5,00 → 10,00 USD); the ARS budget counts ARS 3,00 only.
+  const usd = harness('consolidated', 'USD');
+  let root = usd.render();
+  assert.equal(find(root, 'Money').props.minor, 0 + 1000);
+  assert.equal(rows(root).length, 1);
+  assert.equal(JSON.stringify([rows(root)[0].props.spent, rows(root)[0].props.limit, rows(root)[0].props.money(300).replace(/\u00a0/g, ' ')]), JSON.stringify([300, 400, '$ 3,00']), 'ARS 3,00 of 4,00, written in pesos');
+  const title = nodes(root).find(n => n.type === 'SectionTitle' && String(n.props.children).startsWith('Presupuestos'))!;
+  assert.equal(String(title.props.children).replace(/\u00a0/g, ' '), 'Presupuestos · ARS');
+  title.props.onAction();
+  assert.equal(JSON.stringify(usd.pushed.at(-1)), JSON.stringify({ pathname: '/budgets', params: { currency: 'ARS', month: '2026-09' } }), 'Administrar opens the budget\'s own currency');
+  // The over-budget insight is a fact about the ARS budget, in pesos, beside the largest expense of the shown ledger.
+  const insightTitles = nodes(root).filter(n => n.type === 'AppText' && typeof n.props.children === 'string').map(n => n.props.children as string);
+  assert.ok(!insightTitles.some(text => /Superaste/.test(text)), 'ARS 3,00 of 4,00 is not exceeded');
+  // Consolidated in ARS: the budget is the display currency's; the section keeps its plain title; spent stays 3,00 (not 3,00 + converted euros).
+  root = harness('consolidated', 'ARS').render();
+  assert.equal(find(root, 'Money').props.minor, 300 + 1000000);
+  assert.equal(JSON.stringify([rows(root)[0].props.spent, String(nodes(root).find(n => n.type === 'SectionTitle' && String(n.props.children).startsWith('Presupuestos'))!.props.children)]), JSON.stringify([300, 'Presupuestos']));
+  // Single ARS: exactly as before 24C1.
+  root = harness('single', 'ARS').render();
+  assert.equal(JSON.stringify([find(root, 'Money').props.minor, rows(root)[0].props.spent]), JSON.stringify([300, 300]));
+  // Single EUR: no EUR budget, no section.
+  assert.equal(rows(harness('single', 'EUR').render()).length, 0);
 });

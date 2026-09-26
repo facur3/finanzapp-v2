@@ -8,6 +8,7 @@ export const display = {
     singleDetail: 'Only the accounts in that currency, nothing converted.',
     currency: 'Display currency',
     note: 'Changing how totals are shown never converts or changes your accounts, balances or transactions.',
+    total: 'Total · {code}',
     only: '{code} only',
     chipConsolidated: 'Consolidated total in {name}',
     chipSingle: '{name} only',

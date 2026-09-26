@@ -677,3 +677,72 @@ test('24C1: a ledger in one currency shown in that currency asks the provider no
   assert.equal(ensured.length, 0);
   assert.equal(nodes(root).some(n => n.type === 'MetricHelp'), false, 'nothing converted: no rate to explain');
 });
+
+// ---- 24C1 review: a budget keeps its currency whatever Inicio shows ---------------------------------------------
+
+/** ARS and EUR accounts, one expense each this month, and a general budget in each currency. Rates: 1 USD = 1000 ARS, 1 USD = 0.5 EUR. */
+const budgetLedger = (): { data: domain.LedgerSnapshot; extra: Partial<domain.LedgerArchive>; book: domain.RateBook } => {
+  const accounts: domain.Account[] = [{ id: 'a', name: 'Pesos', currency: 'ARS', openingMinor: 100000, createdAt }, { id: 'e', name: 'Euros', currency: 'EUR', openingMinor: 100000, createdAt }];
+  const entries: domain.Entry[] = [
+    { id: 'ars', accountId: 'a', kind: 'expense', amountMinor: 300, merchant: 'Kiosco', category: 'Comida', dateISO: '2026-09-11', createdAt },
+    { id: 'eur', accountId: 'e', kind: 'expense', amountMinor: 500, merchant: 'Bäckerei', category: 'Comida', dateISO: '2026-09-11', createdAt },
+  ];
+  const budget = (id: string, currency: domain.Currency, amountMinor: number): domain.MonthlyBudget =>
+    ({ id, scope: 'total', currency, monthISO: '2026-09', amountMinor, active: true, createdAt, revision: 0, updatedAt: createdAt });
+  const book = domain.rateBook([
+    { base: 'USD', quote: 'ARS', rate: '1000', effectiveDate: '2026-09-10', source: 'Frankfurter', fetchedAt: '2026-09-12T12:00:00.000Z' },
+    { base: 'USD', quote: 'EUR', rate: '0.5', effectiveDate: '2026-09-10', source: 'Frankfurter', fetchedAt: '2026-09-12T12:00:00.000Z' },
+  ]);
+  return { data: { accounts, entries }, extra: { budgets: [budget('b-ars', 'ARS', 1000), budget('b-eur', 'EUR', 2000)] }, book };
+};
+const sectionText = (node: Node) => Array.isArray(node.props.children) ? node.props.children.join('') : String(node.props.children);
+
+test('24C1 review: an existing ARS budget tracks ARS spending only, in single and in consolidated mode, whatever currency the total is read in', () => {
+  const { data, extra, book } = budgetLedger();
+  const display = displayStore({ [displayCurrency.DISPLAY_MODE_KEY]: 'single', [displayCurrency.DISPLAY_CURRENCY_KEY]: 'ARS' });
+  const view = routeHarness('(tabs)/index.tsx', {}, data, extra, display, { book });
+  let root = view.render();
+  const card = () => find(root, 'BudgetHomeCard').props.summary;
+  const title = () => sectionText(nodes(root).find(n => n.type === 'SectionTitle' && sectionText(n).startsWith('Presupuesto del mes'))!);
+  assert.deepEqual([card().currency, card().total.spentMinor, title()], ['ARS', 300, 'Presupuesto del mes'], 'single ARS: as before 24C1');
+  // Consolidated, total read in ARS: the number converts the euros (€5 → US$10 → ARS 10.000), the budget does not.
+  find(root, 'DisplayCurrencyButton').props.onMode('consolidated');
+  root = view.render();
+  assert.equal(find(root, 'Money').props.minor, 300 + 1000000, 'the total is every account');
+  assert.deepEqual([card().currency, card().total.spentMinor, card().total.remainingMinor, title()], ['ARS', 300, 700, 'Presupuesto del mes'], 'the ARS budget still counts ARS spending only');
+  // Total read in USD, a currency with no budget: the ARS budget stays on Inicio and the section names its currency.
+  find(root, 'DisplayCurrencyButton').props.onCurrency('USD');
+  root = view.render();
+  assert.deepEqual([card().currency, card().total.spentMinor], ['ARS', 300]);
+  assert.equal(title().replace(/\u00a0/g, ' '), 'Presupuesto del mes · ARS', 'labelled with its currency');
+  find(root, 'SectionTitle', 'Ver').props.onAction();
+  assert.equal(JSON.stringify(view.pushed.at(-1)), JSON.stringify({ pathname: '/budgets', params: { currency: 'ARS' } }), 'Ver opens the budget\'s own currency');
+  // Total read in EUR: the EUR budget takes the card, measured in euros only.
+  find(root, 'DisplayCurrencyButton').props.onCurrency('EUR');
+  root = view.render();
+  assert.deepEqual([card().currency, card().total.spentMinor, card().total.remainingMinor, title()], ['EUR', 500, 1500, 'Presupuesto del mes']);
+  // Back to single mode in EUR: identical.
+  find(root, 'DisplayCurrencyButton').props.onMode('single');
+  root = view.render();
+  assert.deepEqual([card().currency, card().total.spentMinor], ['EUR', 500]);
+  // A missing rate hides the consolidated total, never the budget (it needs no rate).
+  const offline = routeHarness('(tabs)/index.tsx', {}, data, extra, displayStore({ [displayCurrency.DISPLAY_MODE_KEY]: 'consolidated', [displayCurrency.DISPLAY_CURRENCY_KEY]: 'USD' }), { book: domain.rateBook([]), activity: 'offline' }).render();
+  assert.equal(nodes(offline).some(n => n.type === 'Money'), false);
+  assert.deepEqual([find(offline, 'BudgetHomeCard').props.summary.currency, find(offline, 'BudgetHomeCard').props.summary.total.spentMinor], ['ARS', 300]);
+});
+
+test('24C1 review: the chip says what the number covers: "Total · USD" for every account converted, "Solo USD" for that currency alone', () => {
+  const { data, extra, book } = budgetLedger();
+  const display = displayStore({ [displayCurrency.DISPLAY_MODE_KEY]: 'consolidated', [displayCurrency.DISPLAY_CURRENCY_KEY]: 'USD' });
+  const view = routeHarness('(tabs)/index.tsx', {}, data, extra, display, { book });
+  let chip = find(view.render(), 'DisplayCurrencyButton');
+  assert.deepEqual([chip.props.mode, chip.props.currency], ['consolidated', 'USD']);
+  const es = bindLocale('es-AR').t, en = bindLocale('en-US').t;
+  assert.deepEqual([es('display.total', { code: 'USD' }), es('display.only', { code: 'USD' })], ['Total · USD', 'Solo USD']);
+  assert.deepEqual([en('display.total', { code: 'USD' }), en('display.only', { code: 'USD' })], ['Total · USD', 'USD only']);
+  assert.deepEqual([es('display.chipConsolidated', { name: 'dólares estadounidenses' }), es('display.chipSingle', { name: 'dólares estadounidenses' })],
+    ['Total consolidado en dólares estadounidenses', 'Solo dólares estadounidenses'], 'VoiceOver says the scope in words');
+  chip.props.onMode('single');
+  chip = find(view.render(), 'DisplayCurrencyButton');
+  assert.deepEqual([chip.props.mode, chip.props.currency], ['single', 'ARS'], 'USD is not held: the first held currency, as 24B6 resolved it');
+});
