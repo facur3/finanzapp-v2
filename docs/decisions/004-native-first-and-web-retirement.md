@@ -27,7 +27,7 @@ device evidence recorded in `docs/mobile-device-checklist.md`. The web tree has 
 cost of every rule change and confuses contributors about where the truth lives (`AGENTS.md` and
 `README.md` still described the web as production until this decision).
 
-The inventory that backs this decision is [docs/web-retirement-inventory.md](../web-retirement-inventory.md):
+The inventory that backed this decision, `docs/web-retirement-inventory.md`, was removed with the other web-only documents in Producto 25B (2026-09-26; readable in Git history, e.g. `git show 1b6896d:docs/web-retirement-inventory.md`). It showed that:
 the native app imports nothing from the web tree except one module re-exported by
 `packages/domain/index.ts` (`src/domain/dates.js`), the mobile backend imports nothing from `src/`,
 and the same Vercel project deploys both the static web and the mobile API functions.
@@ -72,9 +72,10 @@ and the same Vercel project deploys both the static web and the mobile API funct
   the app consumes (`todayKey`, `labelFromISO`) and their regression tests
   (`packages/domain/dates.test.ts`; parity with the legacy module was proven over every day of
   2024–2027 before the deletion). The web's label parsing, monthly-occurrence helpers and
-  `dateLabel` sorting had no native consumer and retired with the web. Kept for the record under
-  `docs/history/`: the web release notes, its Assistant and market-data description, its
-  Shortcuts capture recipe and its rebuild roadmap.
+  `dateLabel` sorting had no native consumer and retired with the web. The web release notes, its
+  Assistant and market-data description, its Shortcuts capture recipe and its rebuild roadmap were
+  kept under `docs/history/` until Producto 25B removed them (their content stays in Git history and
+  at the tag).
 - **Root tooling.** `package.json` keeps `test` and `check:repo` with `vitest` and `typescript`;
   the Vite, esbuild and Capacitor dependencies and the web build scripts are gone. The CI `build`
   job became `domain` (`npm ci`, `npm test`, `npm run check:repo`); `mobile` and `mobile_api` are
@@ -104,10 +105,10 @@ and the same Vercel project deploys both the static web and the mobile API funct
 | Tests | `packages/domain/*.test.ts` (with `dates.test.ts`), `server/mobile/handlers.test.js`, `scripts/check-repo.test.js`, everything under `apps/mobile/tests` | Regression coverage of the product and of the repository guard |
 | EAS and Expo configuration | `apps/mobile/eas.json`, `app.config.ts`, `metro.config.js`, `package-lock.json` | The build profiles (development, preview, testflight) and the project link |
 | Licences and data | `LICENSES/Unicode-3.0.txt`, `apps/mobile/scripts/{currency,regions}` and their locks | The CLDR-derived catalogues |
-| Docs | `docs/mobile-*.md`, `docs/i18n.md`, `docs/currency.md`, `docs/mobile-integrations.md`, `docs/decisions/`, `docs/history/` | The product's design, checklist, roadmap and contracts; the web documents kept for the record |
+| Docs | `docs/mobile-*.md`, `docs/i18n.md`, `docs/currency.md`, `docs/mobile-integrations.md`, `docs/decisions/` | The product's design, checklist, roadmap and contracts (the web documents once under `docs/history/` were removed in 25B) |
 
 ## References
 
-- [docs/web-retirement-inventory.md](../web-retirement-inventory.md): the commands and results.
+- `docs/web-retirement-inventory.md` (removed in 25B; in Git history): the commands and results.
 - [Decision 001](001-native-mobile.md): why Expo, the no-Mac workflow, the Apple integrations.
 - [Decision 002](002-spending-first.md), [Decision 003](003-five-tabs-and-cards.md).

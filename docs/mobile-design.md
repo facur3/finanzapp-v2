@@ -381,6 +381,27 @@ importe, moneda y estado.
   muestra hasta que toda la app lo tenga (23.1): un iPhone en inglés sigue leyendo
   español antes que media app traducida.
 
+## Producto 25B — primera apertura nativa
+
+- **Dos etapas, una sola ruta.** Bienvenida y Tu primera cuenta cambian en el mismo lugar (el mismo
+  `ValueTransition` en fundido que el número de Inicio; con Reduce Motion, un fundido igual). Sin
+  barra de navegación ni gesto de volver: no es una pila. Arriba a la derecha, "Omitir" en el azul
+  de interacción, siempre visible; abajo, un botón principal ("Continuar", "Crear cuenta") y, en la
+  segunda etapa, uno secundario ("Ahora no"). Omitir salta lo que queda y conserva lo ya elegido; su
+  etiqueta y su pista lo dicen.
+- **Bienvenida.** Título en `largeTitle`, una frase de propuesta, y una tarjeta agrupada con dos filas
+  quietas, Idioma y Región, que dicen lo detectado ("Español · según el dispositivo") y abren los
+  mismos selectores de Más empujados sobre la bienvenida (una elección allí se guarda como en Más y
+  la bienvenida vuelve ya en el idioma nuevo). Una nota al pie: se pueden cambiar ahora o después.
+- **Primera cuenta.** Nombre, la fila de moneda de todos los formularios (con la sugerencia de la
+  región y su motivo en la nota; cualquiera de las 146 se puede elegir), saldo inicial opcional con
+  la nota habitual. Las mismas reglas de guardado que Nueva cuenta (reintento sin duplicar). Sin
+  icono ni color: se personalizan después en Cuentas.
+- **Accesibilidad.** Ambas etapas son un `ScrollView` con el pie dentro del contenido, así el texto
+  más grande sigue alcanzando los botones; cada título es un encabezado de VoiceOver; "Omitir" tiene
+  etiqueta y pista completas; áreas seguras arriba y abajo; claro y oscuro con la paleta actual. En
+  Android, el botón físico de volver vuelve a la bienvenida (`BackHandler`), nunca sale del flujo.
+
 ## Producto 24C1 — totales consolidados, misma composición de Inicio
 
 - **Nada nuevo en pantalla.** Inicio conserva su orden (encabezado, número, tres acciones, Asistente,

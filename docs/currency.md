@@ -1,9 +1,7 @@
 # FinanzApp mobile: currencies and the multi-currency engine
 
-Updated 2026-09-25 (Producto 24C1: consolidated multicurrency finances, §2.8 and §8). Applies to the Expo app in `apps/mobile` and the
-shared `packages/domain`. The retired web app had its own float-based helpers
-(`src/domain/currency.js`, readable at the tag `web-frontend-final`); the native code never used
-them. Read with [decision 002](decisions/002-spending-first.md)
+Updated 2026-09-26 (Producto 25B: the first opening suggests a display currency by region, §2.9). Applies to the Expo app in
+`apps/mobile` and the shared `packages/domain`. Read with [decision 002](decisions/002-spending-first.md)
 (ARS/USD kept apart, no invented rates), [docs/i18n.md](i18n.md) §9 and the roadmap's
 Producto 24 entries.
 
@@ -249,6 +247,18 @@ currencies (storable, readable, and convertible in a view), every form (an accou
 the Assistant (contract v1, ARS/USD; Inicio passes it the display currency as before), transfers between
 currencies (still refused), accounts and movements' own amounts everywhere they are shown. **Not in 24C1:** a
 purchase paid from an account in another currency (24C2, §9), a manual rate, bank data of any kind.
+
+### 2.9 What Producto 25B delivers (the first account's currency suggested by the region; it seeds the totals')
+
+The first opening never asks for the display currency on its own: with no account there is nothing to total. Its
+optional first-account stage suggests the account's currency from the region (`suggestedCurrency`: the first
+currency CLDR lists as the region's legal tender that the build offers; a held three-decimal currency or an unoffered
+one falls back to the default, ARS) through the same searchable field as every form, and the person decides (a
+device in Spain may open a USD account). When the account is created, its currency becomes the **first suggestion
+for the totals**: the display currency (§2.8) is written with it, in consolidated mode, and the chip changes it later
+as usual. Skipping the account writes no display currency, so the 24C1 defaults stand. Language, region, an
+account's currency and the display currency remain four independent preferences; a region never implies an
+account's currency, it only suggests the first one (§1).
 
 ### Availability status
 

@@ -23,6 +23,7 @@ import { backup } from './backup.ts';
 import { settings } from './settings.ts';
 import { assistant } from './assistant.ts';
 import { display } from './display.ts';
+import { onboarding } from './onboarding.ts';
 
 export const es = {
   ...common,
@@ -44,4 +45,5 @@ export const es = {
   ...settings,
   ...assistant,
   ...display,
+  ...onboarding,
 } as const;

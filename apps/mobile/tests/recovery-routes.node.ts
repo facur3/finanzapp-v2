@@ -272,7 +272,7 @@ test('24B4: a v9 copy in yen lists the scales it pins as a review row, imports o
   const rows = nodes(view.render()).filter(node => node.type === 'DetailRow').map(node => [node.props.label, node.props.value]);
   assert.ok(rows.some(([label, value]) => label === 'New currency scales' && value === '1'), JSON.stringify(rows));
   assert.deepEqual({ minor: find(view.render(), 'Money').props.minor, currency: find(view.render(), 'Money').props.currency }, { minor: 800, currency: 'JPY' }, 'yen previewed as yen');
-  assert.ok(nodes(view.render()).some(node => node.type === 'AppText' && String(node.props.children).startsWith('Native backups v1 to v10')));
+  assert.ok(nodes(view.render()).some(node => node.type === 'AppText' && String(node.props.children).startsWith('FinanzApp backups v1 to v10')));
   find(view.render(), 'ActionButton', 'Confirm import').props.onPress();
   view.alerts[0].buttons[1].onPress();
   await flush();

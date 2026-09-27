@@ -53,7 +53,7 @@ export const backup: Pick<Messages, 'backup'> = {
       nothingNew: 'This backup has already been imported. There is nothing new to add.',
       reviewAgain: 'Review again',
       confirmImport: 'Confirm import',
-      formats: 'Native backups v1 to v10 · JSON up to 5 MB. Import from the web app and investments will come in a later stage.',
+      formats: 'FinanzApp backups v1 to v10 · JSON up to 5 MB.',
       units: 'New currency scales',
       scaleConflict: 'The backup records a different number of decimals for {codes}. Nothing will be imported: amounts are never reinterpreted. Keep the file.',
     },

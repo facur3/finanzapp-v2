@@ -139,7 +139,7 @@ export const errors: Pick<Messages, 'errors'> = {
       fileSize: 'Choose a JSON backup of up to 5 MB.',
       notJson: 'The file is not a valid JSON backup.',
       notFinanzApp: 'The file is not a FinanzApp backup.',
-      version: 'Only FinanzApp backups from versions 1 to 10 can be restored. Backups from the earlier web app aren’t supported; keep the file.',
+      version: 'Only FinanzApp backups from versions 1 to 10 can be restored. This file is not one of them; keep it.',
       money: 'Unsupported format or monetary unit.',
       legacyImport: 'Backups v1 to v8 can only contain accounts and budgets in ARS or USD. Nothing was imported; keep the file.',
       lists: 'The backup has no valid list of accounts and transactions (at most 1,000 accounts and 25,000 transactions).',
