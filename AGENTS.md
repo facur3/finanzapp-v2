@@ -54,9 +54,11 @@ is no web version of the product ([decision 004](docs/decisions/004-native-first
     `.ios.tsx`/`.android.tsx` files or adapter modules, never in a second repository or a second
     native project without an architectural decision recorded in `docs/decisions/`. Android is
     not implemented yet and is not started without a roadmap entry.
-15. The first opening (`app/onboarding.tsx`) is shown to a new installation only and every step
-    can be skipped; an existing person is marked done silently and nothing of theirs is changed.
-    It reuses the language, region and currency choosers; it never requires a connection, an
+15. The first opening (`app/onboarding.tsx`) is shown to a new installation only (the route
+    checks it too, so a link into it never reaches an existing person); an existing person is
+    marked done silently and nothing of theirs is changed. Two stages, welcome and an optional first
+    account; Omitir skips the rest and keeps every choice already saved, never undoing one. It
+    reuses the Más choosers and the account form's rules; it never requires a connection, an
     account, a bank or a subscription.
 14. Before handing off: run the checks listed in `apps/mobile/README.md` (typecheck, real
     SQLite tests, `currency:verify`, `regions:verify`, `i18n:check -- --strict`, `check`,

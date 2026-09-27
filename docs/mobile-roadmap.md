@@ -121,14 +121,15 @@ file). "Released" below names an in-app gate (`RELEASED_LANGUAGES`, `RELEASED_RE
 `LEDGER_CURRENCIES`): what a build offers, verified on Linux; nothing is distributed to people yet
 (§4).
 
-- **First opening (25B, on its branch).** A new installation opens on a short native setup:
-  welcome, language and region (detected from the device, the same choosers as Más), the currency
-  of the totals suggested by the region and chosen by the person (146 currencies, searchable), an
-  optional first account through the normal form; Omitir at every step ends it writing nothing,
-  and the app works with empty data. Shown once (`finanzapp.onboarding`); anyone with accounts or
-  a saved preference is marked done silently and nothing of theirs changes. No connection, account,
-  bank or subscription required. Hardware back on Android steps back (`BackHandler`, the one
-  platform adapter it needs).
+- **First opening (25B, on its branch).** A new installation opens on a two-stage native setup: a
+  welcome with the language and region detected from the device (two quiet rows that open the Más
+  choosers), then an optional first account (name, the currency the region suggests through the
+  forms' searchable field, an optional opening balance) whose currency seeds the display currency of
+  the totals. Omitir skips the rest and keeps every choice already saved; the app works with empty
+  data. Shown once (`finanzapp.onboarding`): anyone with accounts or a saved preference is marked
+  done silently and nothing of theirs changes, and the route refuses them even through a link. No
+  connection, account, bank or subscription required. Both stages scroll at the largest text sizes.
+  Hardware back on Android steps back (`BackHandler`, the one platform adapter it needs).
 - **Product shape.** Five native tabs with the Assistant in the centre and Más as the grouped
   hub (Finanzas / App y datos: Cuentas, Tarjetas, Presupuestos, Recurrentes, Deudas y cobros,
   Categorías, Idioma, Región, Apariencia, backup, the Assistant's data note); a Más version line
@@ -969,19 +970,25 @@ the owner authorises it; no EAS build or store submission without the owner.
 
 - **Goal.** A first launch anywhere, native, brief and skippable; a repository that describes only
   the native product.
-- **Onboarding decisions.** One route (`app/onboarding.tsx`) that changes step in place, no header,
-  no back swipe: welcome → Idioma → Región → Moneda de los totales → Tu primera cuenta. Language and
-  region are the Más choosers (`LocaleChooser`), so a tap saves as in Más and the flow re-titles
-  itself in the new language; the region step exists only when the build offers a real choice. The
-  currency step is `ChoiceScreen` over the 146 offered currencies with the region's legal tender
-  pinned as the suggestion (`suggestedDisplayCurrency`: a held or unoffered tender falls back to the
-  default); it is written, with the consolidated mode, only on Continuar; it is the display currency
-  of 24C1, never an account's. The account step opens the normal New account form with the chosen
-  currency preselected and ends the setup by itself once an account exists; Ahora no ends it too.
-  Omitir at the top of every step ends everything writing no preference. Shown once: a new
-  installation is one with no accounts and no language, region or display-currency preference;
-  everyone else is marked done silently (`onboardingDecision` in `_layout.tsx`, before the splash
-  lifts, so neither the tabs nor the setup flash). Microcopy only; no financial explanations.
+- **Onboarding decisions** (revised after the PR #64 review, 2026-09-26). One route
+  (`app/onboarding.tsx`) with two stages that change in place, no header, no back swipe.
+  **Welcome:** title, one sentence, and the language and region detected from the device as two
+  quiet rows that push the Más choosers (`/language`, `/region`) over the setup: a choice there saves
+  as in Más and the welcome comes back already in the new language; a footnote says they can be
+  changed now or later. **First account, optional:** name, the currency the region suggests
+  (`suggestedCurrency`: the region's legal tender when the build offers it, else the default) through
+  the same `CurrencyField` as every form, an optional opening balance, Crear cuenta / Ahora no; the
+  same validation and retry rule as the New account form. The display currency of the totals is not
+  asked before an account exists: the first account's currency seeds it (written with the
+  consolidated mode when the account is created; nothing written otherwise). Language, region, an
+  account's currency and the display currency stay independent. **Omitir**, at the top of both
+  stages, skips the rest and keeps every choice already saved (its label and hint say so); nothing
+  is undone silently. **Shown once**: a new installation is one with no accounts and no language,
+  region or display-currency preference; everyone else is marked done silently
+  (`onboardingDecision` in `_layout.tsx`, before the splash lifts) **and the route checks the same
+  rule on mount**, so a link into `/onboarding` or a restored navigation on a device with data goes
+  straight to the app. Both stages are a `ScrollView` with the footer inside the content, so the
+  largest Dynamic Type still reaches the buttons. Microcopy only; no financial explanations.
 - **Cleanup.** The root README describes the native product, its architecture, how to run and verify
   it and the iOS/Android roadmap; AGENTS.md and apps/mobile/README.md no longer present the retired
   frontend as part of FinanzApp; `docs/history/` (four web documents) and
@@ -997,15 +1004,36 @@ the owner authorises it; no EAS build or store submission without the owner.
   reminders, Más → preferences regrouping.
 - **Status.** Delivered on this branch (2026-09-26), not device-verified.
   - **Checked on Linux:** root `npm test` 320/320; mobile `npm run typecheck`, `npm run test:storage`
-    733/733 (+6 `tests/onboarding.node.ts`: the decision for a fresh install, an existing ledger,
-    each saved preference and an unreadable store; the suggestion per region and gate; the steps; the
-    route through every step with the choices kept, Omitir writing nothing, Ahora no, a
-    single-region build, the layout's redirect and splash order), `currency:verify`,
+    735/735 (+8 `tests/onboarding.node.ts`: the decision for a fresh install, an existing ledger,
+    each saved preference and an unreadable store; the suggestion per region and gate (Spain → EUR,
+    the United States → USD); the two stages; the route: a new installation through both stages with
+    the account seeding the totals' currency, Spain with a currency other than the region's, Omitir
+    keeping a language chosen mid-flow across a cold reopen, Ahora no and a failed save's retry, an
+    existing installation reached through a link (nothing drawn, nothing written), the layout's
+    redirect and splash order), `currency:verify`,
     `regions:verify`, `i18n:check -- --strict`, `i18n:extract`, `check`, `export:ios`. No EAS build;
     the iPhone was not touched.
-  - **Pending:** the checklist section Producto 25B (a fresh install, an upgrade with data, both
-    languages, VoiceOver and the largest text through the flow).
+  - **Pending:** the checklist section Producto 25B (a fresh install, an upgrade with data, the link
+    into the setup with data, both languages, VoiceOver and the largest text through both stages).
 - **Depends on.** 24R2B (regions), 24M (currencies), 24C1 (the display currency).
+
+### Producto 25B2 — currency defaults and the account lifecycle (next, recorded from the PR #64 review)
+
+- **Goal.** Outside the first opening, the app still defaults to ARS where a better default exists,
+  and Inicio shows a display control that has nothing to choose with one currency held. One coherent
+  delivery, with the account and card lifecycle work, never a silent reinterpretation of an existing
+  account's currency.
+- **Scope.** New account, card, debt and budget forms default their currency to a relevant one: the
+  first account's from the region's legal tender (as the first opening does), and once accounts
+  exist, the selected ledger currency or the account the form is for, instead of ARS on a Spanish
+  device; Inicio and Reportes hide the consolidated/single control while exactly one currency is
+  held (the conversion settings stay reachable from Más); the rest of the account lifecycle
+  (archive, reorder, the card and debt profiles' edits) reviewed together.
+- **Out of scope.** Any migration that rewrites an existing account's or movement's currency; a
+  global budget; the onboarding itself (25B).
+- **Gates.** The existing forms' tests per currency; nothing stored changes; the owner decides the
+  default rule for a ledger with several currencies before code.
+- **Depends on.** 25B (the suggestion rule), 24C1 (the chip and the display preference).
 
 ### Producto 25C — budgets with rollover, goals, CSV and productivity
 

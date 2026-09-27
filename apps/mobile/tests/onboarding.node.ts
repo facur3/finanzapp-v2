@@ -7,16 +7,16 @@ import * as domain from '@finanzapp/domain';
 import * as i18nFormat from '../src/i18n/format.ts';
 import * as localeOptions from '../src/ui/locale-options.ts';
 import * as onboardingFlow from '../src/ui/onboarding-flow.ts';
+import { DEFAULT_LOOK } from '../src/ui/appearance.ts';
 import { bindLocale } from '../src/i18n/bind.ts';
 import { DISPLAY_CURRENCY_KEY } from '../src/ui/display-currency.ts';
 import { LANGUAGE_PREFERENCE_KEY, REGION_PREFERENCE_KEY, type PreferenceStore } from '../src/i18n/preference.ts';
 import { createLocaleStore, type DeviceReading } from '../src/i18n/store.ts';
-import type { ReleasedSets } from '../src/i18n/locale.ts';
+import { RELEASED, type ReleasedSets } from '../src/i18n/locale.ts';
 
-// Producto 25B: the first opening. The pure rules (when it is shown, what it suggests, the order of its steps) are
-// tested directly; the route runs in the harness with its hosts replaced by names. Not a rendered iPhone screen.
-const { ONBOARDING_KEY, currencyStepOptions, markOnboardingDone, nextStep, onboardingDecision, onboardingSteps, previousStep, stepPosition,
-  suggestedDisplayCurrency } = onboardingFlow;
+// Producto 25B: the first opening. The pure rules (when it is shown, what it suggests, the two stages) are tested
+// directly; the route runs in the harness with its hosts replaced by names. Not a rendered iPhone screen.
+const { ONBOARDING_KEY, markOnboardingDone, nextStep, onboardingDecision, previousStep, suggestedCurrency } = onboardingFlow;
 
 function memory(initial: Record<string, string> = {}) {
   const rows = new Map(Object.entries(initial));
@@ -29,7 +29,7 @@ function memory(initial: Record<string, string> = {}) {
   return { rows, faults, store: () => store };
 }
 
-test('the first opening is shown to a new installation only; anyone with accounts or a saved preference is marked done silently, untouched', () => {
+test('a new installation is shown the first opening; anyone with accounts or a saved preference is an existing person, marked done silently and untouched', () => {
   const fresh = memory();
   assert.equal(onboardingDecision(fresh.store, false), 'new');
   assert.equal(fresh.rows.size, 0, 'deciding writes nothing');
@@ -49,33 +49,16 @@ test('the first opening is shown to a new installation only; anyone with account
   assert.equal(markOnboardingDone(readOnly.store), false, 'reported, never thrown');
 });
 
-test('the region suggests a display currency the build offers, and only suggests: unknown regions and held currencies fall back to the default', () => {
-  assert.equal(suggestedDisplayCurrency('AR'), 'ARS');
-  assert.equal(suggestedDisplayCurrency('US'), 'USD');
-  assert.equal(suggestedDisplayCurrency('JP'), 'JPY');
-  assert.equal(suggestedDisplayCurrency('DE'), 'EUR');
-  assert.equal(suggestedDisplayCurrency('KW'), 'ARS', 'KWD is held (three decimals): nothing the build offers');
-  assert.equal(suggestedDisplayCurrency('KW', ['ARS', 'USD', 'KWD']), 'KWD', 'a preview gate that offers it');
-  assert.equal(suggestedDisplayCurrency(null), 'ARS');
-  assert.equal(suggestedDisplayCurrency('US', ['ARS']), 'ARS', 'a gate without the tender');
-});
-
-test('the steps: the welcome, then language, region (only when the build offers a choice), the currency of the totals, the optional account', () => {
-  assert.deepEqual(onboardingSteps(true), ['welcome', 'language', 'region', 'currency', 'account']);
-  assert.deepEqual(onboardingSteps(false), ['welcome', 'language', 'currency', 'account']);
-  const steps = onboardingSteps(true);
-  assert.equal(nextStep('welcome', steps), 'language');
-  assert.equal(nextStep('account', steps), null);
-  assert.equal(previousStep('welcome', steps), null);
-  assert.equal(previousStep('currency', steps), 'region');
-  assert.deepEqual(stepPosition('welcome', steps), null, 'the welcome is not a numbered step');
-  assert.deepEqual(stepPosition('region', steps), { index: 2, count: 4 });
-  assert.deepEqual(stepPosition('currency', onboardingSteps(false)), { index: 2, count: 3 });
-  const rows = currencyStepOptions('USD', domain.LEDGER_CURRENCIES, 'es-AR', 'Sugerida por tu región');
-  assert.deepEqual([rows.pinned.value, rows.pinned.title, rows.pinned.subtitle], ['USD', 'Dólares estadounidenses', 'Sugerida por tu región · USD · US$']);
-  assert.equal(rows.options.length, domain.LEDGER_CURRENCIES.length - 1, 'every offered currency once; the suggestion is not repeated');
-  assert.equal(rows.options.some(row => row.value === 'USD'), false);
-  assert.ok(rows.options.every(row => row.searchText), 'searchable by code, name, symbol and country');
+test('the region suggests the first account\'s currency when the build offers it; Spain → EUR, the United States → USD; unknown or held falls back to the default', () => {
+  assert.equal(suggestedCurrency('ES'), 'EUR');
+  assert.equal(suggestedCurrency('US'), 'USD');
+  assert.equal(suggestedCurrency('AR'), 'ARS');
+  assert.equal(suggestedCurrency('JP'), 'JPY');
+  assert.equal(suggestedCurrency('KW'), 'ARS', 'KWD is held (three decimals): nothing the build offers');
+  assert.equal(suggestedCurrency('KW', ['ARS', 'USD', 'KWD']), 'KWD', 'a preview gate that offers it');
+  assert.equal(suggestedCurrency(null), 'ARS');
+  assert.equal(suggestedCurrency('US', ['ARS']), 'ARS', 'a gate without the tender');
+  assert.deepEqual([nextStep('welcome'), nextStep('account'), previousStep('account'), previousStep('welcome')], ['account', null, 'welcome', null]);
 });
 
 // ---- the route ---------------------------------------------------------------------------------------------
@@ -85,39 +68,45 @@ const HOME_GATE: ReleasedSets = { languages: ['es', 'en'], regions: ['AR', 'US']
 function device(languageTag: string, regionCode: string | null = null): DeviceReading {
   return { source: 'native', locales: [{ languageTag, languageCode: languageTag.split('-')[0], regionCode }] };
 }
+const createdAt = '2026-09-26T12:00:00Z';
 
-function harness({ accounts = 0, reading = device('es-AR', 'AR'), released = HOME_GATE, gate = domain.LEDGER_CURRENCIES }: {
-  accounts?: number; reading?: DeviceReading; released?: ReleasedSets; gate?: domain.CurrencyGate } = {}) {
-  const prefs = memory();
+/** The route with its hosts replaced by names. `prefs` is the key-value store (shared with the locale store, like the
+ * device's); `accounts` the ledger's accounts; `addAccount` the real path into the ledger mock, so a saved account shows
+ * up in the snapshot on the next render. Pass the same `prefs` again to stand for a cold reopen. */
+function harness({ accounts = [] as domain.Account[], reading = device('es-AR', 'AR'), released = HOME_GATE, gate = domain.LEDGER_CURRENCIES, prefs = memory(), failSave = false } = {}) {
   const localeStore = createLocaleStore({ devices: () => reading, store: prefs.store, released });
   const display: { currency: string | null; mode: string | null } = { currency: null, mode: null };
   const source = readFileSync(new URL('../app/onboarding.tsx', import.meta.url), 'utf8');
   const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText;
   const jsx = (type: unknown, props: Record<string, unknown>) => ({ type, props });
   const state: unknown[] = [];
+  const refs: unknown[] = [];
   const deps: unknown[][] = [];
   const routes: unknown[] = [];
-  let cursor = 0, effectCursor = 0;
-  let accountCount = accounts;
-  const snapshot = () => ({ accounts: Array.from({ length: accountCount }, (_, index) => ({ id: 'a' + index, name: 'a', currency: 'ARS', openingMinor: 0, createdAt: '2026-09-26T12:00:00Z' })), entries: [] });
+  const saved: domain.Account[] = [];
+  let cursor = 0, refCursor = 0, effectCursor = 0;
+  const ledger = { accounts: [...accounts] };
   const modules: Record<string, unknown> = {
     react: { useState: (initial: unknown) => { const index = cursor++; if (!(index in state)) state[index] = typeof initial === 'function' ? (initial as () => unknown)() : initial;
       return [state[index], (value: unknown) => { state[index] = typeof value === 'function' ? (value as (current: unknown) => unknown)(state[index]) : value; }]; },
-    useMemo: (fn: () => unknown) => fn(),
+    useRef: (initial: unknown) => { const index = refCursor++; return (refs[index] ??= { current: initial }); },
     useEffect: (fn: () => void | (() => void), next?: unknown[]) => { const index = effectCursor++; const previous = deps[index];
       if (!previous || !next || next.length !== previous.length || next.some((item, i) => item !== previous[i])) { deps[index] = next ?? []; fn(); } } },
     'react/jsx-runtime': { jsx, jsxs: jsx, Fragment: 'Fragment' },
-    'react-native': { View: 'View', Platform: { OS: 'ios' }, BackHandler: { addEventListener: () => ({ remove() {} }) } },
+    'react-native': { View: 'View', ScrollView: 'ScrollView', Platform: { OS: 'ios' }, Keyboard: { dismiss() {} }, BackHandler: { addEventListener: () => ({ remove() {} }) } },
     'react-native-safe-area-context': { SafeAreaView: 'SafeAreaView' },
     'expo-router': { Stack: { Screen: 'Stack.Screen' }, router: { replace: (to: unknown) => routes.push({ replace: to }), push: (to: unknown) => routes.push({ push: to }) } },
+    'expo-crypto': { randomUUID: () => 'first-account' },
+    'expo-haptics': { NotificationFeedbackType: { Success: 'Success' }, notificationAsync: async () => {} },
     '@finanzapp/domain': domain,
-    '../src/storage/LedgerProvider': { useLedger: () => ({ snapshot: snapshot(), gate }) },
-    '../src/ui/components': { ActionButton: 'ActionButton', AppText: 'AppText', PressFeedback: 'PressFeedback' },
-    '../src/ui/choice-screen': { ChoiceScreen: 'ChoiceScreen' },
-    '../src/ui/locale-choosers': { LocaleChooser: 'LocaleChooser' },
+    '../src/storage/LedgerProvider': { useLedger: () => ({ snapshot: { accounts: ledger.accounts, entries: [] }, gate,
+      addAccount: async (account: domain.Account) => { if (failSave) throw new Error('disk full'); saved.push(account); ledger.accounts = [...ledger.accounts, account]; } }) },
+    '../src/ui/appearance': { DEFAULT_LOOK },
+    '../src/ui/components': Object.fromEntries(['ActionButton', 'AmountField', 'AppText', 'ErrorMessage', 'Field', 'FieldNote', 'NavigationRow', 'PressFeedback', 'Surface'].map(name => [name, name])),
+    '../src/ui/form-controls': { CurrencyField: 'CurrencyField' },
     '../src/ui/locale-options': localeOptions,
     '../src/ui/display-currency-provider': { useDisplayCurrency: () => ({ currency: 'ARS', preferred: null, mode: 'consolidated',
-      setCurrency: (currency: string) => { display.currency = currency; }, setMode: (mode: string) => { display.mode = mode; } }) },
+      setCurrency: (currency: string) => { display.currency = currency; prefs.rows.set(DISPLAY_CURRENCY_KEY, currency); }, setMode: (mode: string) => { display.mode = mode; } }) },
     '../src/ui/motion': { ValueTransition: 'ValueTransition' },
     '../src/ui/onboarding-flow': onboardingFlow,
     '../src/ui/theme': { space: { xs: 4, s: 8, m: 12, l: 16, xl: 20, xxl: 24, xxxl: 32 }, usePalette: () => ({ background: '#fff', primary: '#2557D6', text: '#000', secondary: '#666' }) },
@@ -126,11 +115,11 @@ function harness({ accounts = 0, reading = device('es-AR', 'AR'), released = HOM
     '../src/i18n/format': i18nFormat,
   };
   const module = { exports: {} as { default?: () => Node } };
-  runInNewContext(code, { module, exports: module.exports, require: (name: string) => {
+  runInNewContext(code, { module, exports: module.exports, Date, Error, require: (name: string) => {
     if (!Object.hasOwn(modules, name)) throw new Error('Unexpected onboarding dependency: ' + name);
     return modules[name];
   } });
-  return { render: () => { cursor = 0; effectCursor = 0; return module.exports.default!(); }, routes, prefs, display, localeStore, addAccount: () => { accountCount++; } };
+  return { render: () => { cursor = 0; refCursor = 0; effectCursor = 0; return module.exports.default!(); }, routes, prefs, display, localeStore, saved, ledger };
 }
 function nodes(value: any): Node[] {
   if (!value || typeof value !== 'object') return [];
@@ -138,77 +127,127 @@ function nodes(value: any): Node[] {
   if (!value.props) return [];
   return [value, ...nodes(value.props.children)];
 }
-const buttons = (root: Node) => nodes(root).filter(n => n.type === 'ActionButton');
-const button = (root: Node, label: string) => { const node = buttons(root).find(n => n.props.label === label); assert.ok(node, 'Missing button ' + label); return node; };
-const texts = (root: Node) => nodes(root).filter(n => n.type === 'AppText').map(n => Array.isArray(n.props.children) ? n.props.children.join('') : String(n.props.children));
+const find = (root: Node, type: string, label?: string) => { const node = nodes(root).find(n => n.type === type && (!label || n.props.label === label || n.props.title === label)); assert.ok(node, 'Missing ' + type + ' ' + (label ?? '')); return node; };
+const texts = (root: Node) => nodes(root).filter(n => n.type === 'AppText' || n.type === 'FieldNote').map(n => Array.isArray(n.props.children) ? n.props.children.join('') : String(n.props.children));
+const settle = () => new Promise(resolve => setTimeout(resolve, 0));
 
-test('a new installation walks welcome → language → region → currency → account; each step keeps its own choice and the end marks the setup done', () => {
+test('new installation: welcome with the device\'s language and region as quiet rows, then the first account with the region\'s currency; the account seeds the totals\' currency and ends the setup', async () => {
   const view = harness({ reading: device('en-US', 'US') });
   let root = view.render();
+  assert.equal(view.routes.length, 0, 'eligible: no redirect');
   assert.ok(texts(root).includes('Your spending, clear.'), 'the welcome, in the device\'s language');
-  assert.equal(nodes(root).find(n => n.type === 'Stack.Screen')!.props.options.headerShown, false);
-  button(root, 'Get started').props.onPress();
+  assert.equal(JSON.stringify(nodes(root).find(n => n.type === 'Stack.Screen')!.props.options), JSON.stringify({ headerShown: false, gestureEnabled: false }));
+  assert.equal(nodes(root).filter(n => n.type === 'ScrollView').length, 1, 'the stage scrolls (the largest text sizes)');
+  assert.match(find(root, 'NavigationRow', 'Language').props.subtitle, /English/);
+  assert.match(find(root, 'NavigationRow', 'Region').props.subtitle, /United States/);
+  find(root, 'NavigationRow', 'Language').props.onPress();
+  assert.equal(JSON.stringify(view.routes.at(-1)), JSON.stringify({ push: '/language' }), 'the secondary option is the Más chooser, pushed over the setup');
+  find(root, 'ActionButton', 'Continue').props.onPress();
   root = view.render();
-  assert.equal(find(root, 'LocaleChooser').props.kind, 'language', 'the same chooser as Más');
-  assert.ok(texts(root).includes('Step 1 of 4'));
-  // Choosing Spanish here re-titles the flow in place, like Más does.
-  view.localeStore.setLanguage('es');
+  assert.ok(texts(root).includes('Your first account'));
+  assert.equal(find(root, 'CurrencyField').props.value, 'USD', 'the United States suggests dollars');
+  assert.equal(find(root, 'CurrencyField').props.currencies, domain.LEDGER_CURRENCIES, 'any of the 146 can be chosen');
+  assert.ok(texts(root).some(text => text === 'Suggested by your region: US dollars. Each account keeps its own currency.'));
+  assert.equal(find(root, 'ActionButton', 'Create account').props.disabled, true, 'a name is needed');
+  find(root, 'Field').props.onChangeText('Checking');
   root = view.render();
-  assert.ok(texts(root).includes('Paso 1 de 4'));
-  button(root, 'Continuar').props.onPress();
+  find(root, 'AmountField').props.onChangeText('1.000,50');
   root = view.render();
-  assert.equal(find(root, 'LocaleChooser').props.kind, 'region');
-  button(root, 'Continuar').props.onPress();
-  root = view.render();
-  const chooser = find(root, 'ChoiceScreen');
-  assert.deepEqual([chooser.props.pinned.value, chooser.props.selected], ['USD', 'USD'], 'the United States suggests dollars, checked');
-  assert.match(chooser.props.pinned.subtitle, /^Sugerida por tu región · USD/);
-  assert.equal(view.display.currency, null, 'nothing written before Continuar');
-  chooser.props.onChoose('EUR');
-  root = view.render();
-  assert.equal(find(root, 'ChoiceScreen').props.selected, 'EUR');
-  button(root, 'Continuar').props.onPress();
-  assert.deepEqual(view.display, { currency: 'EUR', mode: 'consolidated' }, 'the display currency, consolidated, is a choice once continued');
-  root = view.render();
-  assert.ok(texts(root).includes('Tu primera cuenta'));
-  button(root, 'Crear una cuenta').props.onPress();
-  assert.equal(JSON.stringify(view.routes.at(-1)), JSON.stringify({ push: { pathname: '/new-account', params: { currency: 'EUR' } } }), 'the form, with the chosen currency preselected');
-  assert.equal(view.prefs.rows.get(ONBOARDING_KEY), undefined, 'not done yet');
-  view.addAccount();
-  view.render();
-  assert.equal(view.prefs.rows.get(ONBOARDING_KEY), 'done', 'an account created ends the setup');
+  assert.equal(find(root, 'ActionButton', 'Create account').props.disabled, false);
+  find(root, 'ActionButton', 'Create account').props.onPress();
+  await settle();
+  assert.equal(view.saved.length, 1);
+  assert.deepEqual([view.saved[0].name, view.saved[0].currency, view.saved[0].openingMinor, view.saved[0].id], ['Checking', 'USD', 100050, 'first-account']);
+  assert.deepEqual(view.display, { currency: 'USD', mode: 'consolidated' }, 'the first account\'s currency is the first suggestion for the totals');
+  assert.equal(view.prefs.rows.get(ONBOARDING_KEY), 'done');
   assert.equal(JSON.stringify(view.routes.at(-1)), JSON.stringify({ replace: '/' }));
-  assert.equal(view.prefs.rows.get(LANGUAGE_PREFERENCE_KEY), 'es', 'the language chosen stays');
-  assert.equal(view.prefs.rows.has(REGION_PREFERENCE_KEY), false, 'the region was not touched: it still follows the device');
+  assert.equal(view.prefs.rows.has(LANGUAGE_PREFERENCE_KEY), false, 'language and region were never written: they still follow the device');
+  assert.equal(view.prefs.rows.has(REGION_PREFERENCE_KEY), false);
 });
 
-test('Omitir at any step ends the setup writing no preference; "Ahora no" on the account step does the same; a single-region build skips the region step', () => {
-  const view = harness();
+test('Spain suggests EUR for the first account; the person may pick another currency, which is then the account\'s and the totals\'', async () => {
+  const spain = harness({ reading: device('es-ES', 'ES'), released: RELEASED });
+  let root = spain.render();
+  find(root, 'ActionButton', 'Continuar').props.onPress();
+  root = spain.render();
+  assert.equal(find(root, 'CurrencyField').props.value, 'EUR');
+  assert.ok(texts(root).some(text => text.startsWith('Sugerida por tu región: Euros.')));
+  // A different currency than the region's: the account is in it, nothing coerces it back.
+  find(root, 'CurrencyField').props.onChange('USD');
+  root = spain.render();
+  assert.equal(find(root, 'CurrencyField').props.value, 'USD');
+  assert.ok(texts(root).includes('Cada cuenta conserva su moneda.'), 'the note no longer claims the suggestion');
+  find(root, 'Field').props.onChangeText('Viajes');
+  root = spain.render();
+  find(root, 'ActionButton', 'Crear cuenta').props.onPress();
+  await settle();
+  assert.deepEqual([spain.saved[0].currency, spain.saved[0].openingMinor], ['USD', 0]);
+  assert.deepEqual(spain.display, { currency: 'USD', mode: 'consolidated' });
+  const usa = harness({ reading: device('en-US', 'US'), released: RELEASED });
+  root = usa.render();
+  find(root, 'ActionButton', 'Continue').props.onPress();
+  assert.equal(find(usa.render(), 'CurrencyField').props.value, 'USD');
+});
+
+test('Omitir skips the rest of the setup and keeps what was already saved: a language chosen in the pushed chooser survives the skip and a cold reopen; nothing else is written', () => {
+  const view = harness({ reading: device('en-US', 'US') });
   let root = view.render();
-  nodes(root).find(n => n.type === 'PressFeedback' && n.props.accessibilityLabel === 'Omitir la configuración inicial')!.props.onPress();
-  assert.deepEqual([...view.prefs.rows.entries()], [[ONBOARDING_KEY, 'done']]);
-  assert.equal(JSON.stringify(view.routes.at(-1)), JSON.stringify({ replace: '/' }));
+  // The Más chooser, opened from the welcome row, saved Spanish (as Más does); back on the welcome the copy is Spanish.
+  assert.equal(view.localeStore.setLanguage('es'), true);
+  root = view.render();
+  assert.ok(texts(root).includes('Tus gastos, claros.'));
+  assert.equal(view.prefs.rows.get(LANGUAGE_PREFERENCE_KEY), 'es');
+  find(root, 'ActionButton', 'Continuar').props.onPress();
+  root = view.render();
+  const skip = nodes(root).find(n => n.type === 'PressFeedback' && n.props.accessibilityLabel === 'Omitir el resto de la configuración')!;
+  assert.equal(skip.props.accessibilityHint, 'Conserva lo que ya elegiste y abre la app');
+  skip.props.onPress();
+  assert.deepEqual([...view.prefs.rows.entries()].sort(), [[LANGUAGE_PREFERENCE_KEY, 'es'], [ONBOARDING_KEY, 'done']].sort(), 'the language stays; nothing else was written');
   assert.deepEqual(view.display, { currency: null, mode: null });
-  const single = harness({ released: { languages: ['es'], regions: ['AR'] } });
-  root = single.render();
-  button(root, 'Empezar').props.onPress();
-  root = single.render();
-  assert.ok(texts(root).includes('Paso 1 de 3'), 'no region step when the build offers one region');
-  button(root, 'Continuar').props.onPress();
-  root = single.render();
-  assert.equal(find(root, 'ChoiceScreen').props.pinned.value, 'ARS', 'Argentina suggests pesos');
-  button(root, 'Continuar').props.onPress();
-  root = single.render();
-  button(root, 'Ahora no').props.onPress();
-  assert.deepEqual(single.display, { currency: 'ARS', mode: 'consolidated' });
-  assert.equal(single.prefs.rows.get(ONBOARDING_KEY), 'done');
+  assert.equal(view.saved.length, 0);
+  assert.equal(JSON.stringify(view.routes.at(-1)), JSON.stringify({ replace: '/' }));
+  // A cold reopen with the same store: the layout would not send anyone here (decision "done") and the route itself refuses.
+  assert.equal(onboardingDecision(view.prefs.store, false), 'done');
+  const reopened = harness({ reading: device('en-US', 'US'), prefs: view.prefs });
+  assert.equal(reopened.render(), null, 'nothing drawn');
+  assert.equal(JSON.stringify(reopened.routes), JSON.stringify([{ replace: '/' }]));
+  assert.equal(bindLocale(reopened.localeStore.getState().locale).t('onboarding.skip'), 'Omitir', 'Spanish still applies after the reopen');
 });
 
-function find(root: Node, type: string) {
-  const node = nodes(root).find(item => item.type === type);
-  assert.ok(node, 'Missing ' + type);
-  return node;
-}
+test('"Ahora no" on the account stage ends the setup with empty data; a failed save keeps the draft and its operation id for one retry', async () => {
+  const view = harness({ failSave: true });
+  let root = view.render();
+  find(root, 'ActionButton', 'Continuar').props.onPress();
+  root = view.render();
+  find(root, 'Field').props.onChangeText('Efectivo');
+  root = view.render();
+  find(root, 'ActionButton', 'Crear cuenta').props.onPress();
+  await settle();
+  root = view.render();
+  assert.equal(find(root, 'ErrorMessage').props.message, 'disk full');
+  assert.equal(find(root, 'ActionButton', 'Reintentar guardado').props.label, 'Reintentar guardado');
+  assert.equal(find(root, 'Field').props.editable, false, 'the draft is locked to the pending submission');
+  assert.equal(view.prefs.rows.has(ONBOARDING_KEY), false, 'not done: nothing was saved');
+  find(root, 'ActionButton', 'Ahora no').props.onPress();
+  assert.equal(view.prefs.rows.get(ONBOARDING_KEY), 'done');
+  assert.deepEqual(view.display, { currency: null, mode: null });
+  assert.equal(JSON.stringify(view.routes.at(-1)), JSON.stringify({ replace: '/' }));
+});
+
+test('an existing installation reached through a link or a restored navigation is sent straight to the app: nothing drawn, nothing written', () => {
+  const account: domain.Account = { id: 'a', name: 'Pesos', currency: 'ARS', openingMinor: 0, createdAt };
+  const withData = harness({ accounts: [account] });
+  assert.equal(withData.render(), null);
+  assert.equal(JSON.stringify(withData.routes), JSON.stringify([{ replace: '/' }]));
+  assert.equal(withData.prefs.rows.size, 0, 'the route never marks or writes anything; the layout does the silent mark');
+  const withPreference = harness({ prefs: memory({ [REGION_PREFERENCE_KEY]: 'US' }) });
+  assert.equal(withPreference.render(), null);
+  assert.equal(JSON.stringify(withPreference.routes), JSON.stringify([{ replace: '/' }]));
+  assert.equal(withPreference.prefs.rows.get(REGION_PREFERENCE_KEY), 'US', 'untouched');
+  const done = harness({ prefs: memory({ [ONBOARDING_KEY]: 'done' }) });
+  assert.equal(done.render(), null);
+  assert.equal(JSON.stringify(done.routes), JSON.stringify([{ replace: '/' }]));
+});
 
 test('the root layout sends a new installation to the setup before the splash lifts and marks an existing person done; the route has no header and no back swipe', () => {
   const layout = readFileSync(new URL('../app/_layout.tsx', import.meta.url), 'utf8');

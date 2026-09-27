@@ -14,9 +14,10 @@ muestra el gasto del mes o el dinero disponible; cada cuenta conserva su moneda 
 defecto, los totales se consolidan en una moneda elegida con cotizaciones de referencia fechadas,
 solo en la vista (nada almacenado se convierte; [docs/currency.md](docs/currency.md) §2.8).
 Tarjetas, deudas, recurrentes y presupuestos están en la app; inversiones y patrimonio quedan
-fuera del alcance. La primera apertura es breve y nativa: idioma y región detectados y
-modificables, la moneda de los totales sugerida por la región, una primera cuenta opcional; todo
-se puede omitir y la app funciona con datos vacíos. El Asistente es una capacidad central: propone
+fuera del alcance. La primera apertura es breve y nativa: una bienvenida con el idioma y la región
+detectados (y una vía secundaria para cambiarlos) y una primera cuenta opcional con la moneda que
+sugiere la región; Omitir salta el resto y conserva lo ya elegido, y la app funciona con datos
+vacíos. El Asistente es una capacidad central: propone
 movimientos y cambios como borradores, pide la aclaración mínima y responde preguntas con datos
 verificables del libro; nunca escribe sin confirmación. La IA en la nube es opcional, acotada y
 con clave en el servidor; el registro manual y los datos locales funcionan sin conexión.
