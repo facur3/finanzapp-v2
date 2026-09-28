@@ -1,6 +1,6 @@
 # FinanzApp mobile: living roadmap
 
-Updated: 2026-09-28 (Producto 25B2, debt lifecycle and instalment-contract round). Read [decision 001](decisions/001-native-mobile.md),
+Updated: 2026-09-28 (Producto 25B3, detail hierarchy polish). Read [decision 001](decisions/001-native-mobile.md),
 [decision 002](decisions/002-spending-first.md),
 [decision 003](decisions/003-five-tabs-and-cards.md) and
 [decision 004](decisions/004-native-first-and-web-retirement.md). Decision 002 supersedes
@@ -130,13 +130,23 @@ history file keeps the evidence of when and why.
 
 ## 1. Implemented (current state)
 
-What exists in code on `master` as of Producto 25B (PR #64), plus Producto 25B2 on its branch
+What exists in code on `master` as of Producto 25B2 (PR #65), plus Producto 25B3 on its branch
 (marked). Per area, without test inventories (those are in apps/mobile/README.md and the history
 file). "Released" below names an in-app gate (`RELEASED_LANGUAGES`, `RELEASED_REGIONS`,
 `LEDGER_CURRENCIES`): what a build offers, verified on Linux; nothing is distributed to people yet
 (§4).
 
-- **Currency defaults and the account/card lifecycle (25B2, on its branch).** One rule for the
+- **Detail hierarchy (25B3, on its branch).** Two corrections of hierarchy before instalments, no redesign: the
+  account detail no longer prints «Saldo inicial / Opening balance» as a row (`openingMinor` is unchanged in storage,
+  backups, migrations and every balance; the recorded balance still starts from it; nothing replaced the row), and a
+  recurring rule has its own detail screen (`app/recurring/[id].tsx`: the mark, the signed amount and currency as the
+  hero, the state Activo / Pausado / Revisar, the next date, the frequency, the category, the account or card it posts
+  to, «Registrados», and the row's own Pausar/Reanudar and Eliminar with the same confirmations; Editar in the header
+  opens the form, which is now only the form). Inicio → Próximos compromisos, Más → Recurrentes and a recorded
+  movement's «Recurrente» row open that detail, never the form; VoiceOver hears the rule («Alquiler, mensual, …»)
+  with the hint that the row opens details, never «Editar». The card design direction for 24T2 is recorded (24T below
+  and docs/mobile-design.md), documentation only.
+- **Currency defaults and the account/card lifecycle (25B2).** One rule for the
   currency a new account, card, debt or budget starts with (`defaultCurrency`: the account's, a gated
   route currency, the one currency held, the display currency among several, the region's tender
   before any account, ARS last; docs/currency.md §2.10); Inicio and Reportes show the display chip
@@ -161,7 +171,7 @@ file). "Released" below names an in-app gate (`RELEASED_LANGUAGES`, `RELEASED_RE
 - **Product shape.** Five native tabs with the Assistant in the centre and Más as the grouped
   hub (Finanzas / App y datos: Cuentas, Tarjetas, Presupuestos, Recurrentes, Deudas y cobros,
   Categorías, Idioma, Región, Apariencia, backup, the Assistant's data note); a Más version line
-  («FinanzApp 0.1.0 (25B)»; the material and locale diagnostics only in a development build). Liquid Glass on
+  («FinanzApp 0.1.0 (25B3)»; the material and locale diagnostics only in a development build). Liquid Glass on
   Inicio's movement pills, its Assistant entry and the Assistant composer only in a development build on iOS 26 with
   the API present and without Reduce Transparency; opaque material otherwise.
 - **Inicio.** One main number (gasto registrado of the month, or Disponible: cash in normal
@@ -206,7 +216,9 @@ file). "Released" below names an in-app gate (`RELEASED_LANGUAGES`, `RELEASED_RE
   collection in the ledger. 24UX5 (on its branch): the catch-up runs on launch and on every return to the
   foreground and is pinned by real-SQLite tests; a long backlog is recorded automatically in durable batches
   with its original dates (one rule can no longer keep the ledger or Recurrentes closed), and an occurrence
-  already in the ledger counts as recorded even after the person edited or undid it. No instalment plans yet.
+  already in the ledger counts as recorded even after the person edited or undid it. No instalment plans yet. 25B3: a rule
+  is read on its own detail before it is edited (row → detail → Editar), like a movement, an account, a card or a debt;
+  the history and the lifecycle actions moved from the form to that detail.
 - **Merchant identity (24UX2).** `packages/domain/merchants.ts`: normalized merchant keys, a
   curated catalogue of 35 unambiguous brands matched only by exact alias, never a category; the
   typed name is never rewritten; bare common words (Apple, Steam, Adobe, Despegar) stay
@@ -282,6 +294,10 @@ it was checked in). Metro from the branch on the installed FinanzApp Dev build s
 item unless a section says a new native build is needed. The checklist sections are in
 [mobile-device-checklist.md](mobile-device-checklist.md).
 
+- **25B3 — detail hierarchy polish:** the checklist section Producto 25B3 (the account detail without the opening
+  balance row and with the same balance; the recurring detail from Inicio, Recurrentes and a recorded movement; Editar
+  from the header; Pausar/Reanudar keeping the screen, Eliminar going back; the Revisar state; VoiceOver reading each
+  row as the rule with the «opens details» hint in both languages; the largest text; Reduce Motion).
 - **24C1 — consolidated finances:** the checklist section Producto 24C1 (accounts in ARS, USD, EUR and JPY;
   the display sheet; the consolidated total in four currencies; a past month against its own dates; flight mode;
   the info buttons; single mode; VoiceOver and the largest text on the subtotals). Required before the first
@@ -347,12 +363,14 @@ item unless a section says a new native build is needed. The checklist sections 
 
 ## 3. Next deliveries
 
-**Recommended next (2026-09-28):** after 25B2 merges, the next implementation is **Producto 24T**, in
+**Recommended next (2026-09-28):** 25B2 merged the same day (PR #65). After 25B3 (this PR: two hierarchy corrections,
+no instalments) merges, the next implementation is **Producto 24T**, in
 three focused PRs rather than one: 24T1 (domain, schema, backup and instalment mathematics), 24T2 (the
 card purchase, UI, statements and current-versus-future balances), 24T3 (refunds, early payments,
 lifecycle and the final device QA). 24C2 stays a separate currency delivery, but its contracts must be
 compatible with 24T's (recorded in both entries). The sections below keep their historical order; this
-paragraph is the order that binds. Nothing of 24T starts before 25B2 is merged.
+paragraph is the order that binds. Nothing of 24T starts before 25B3 is merged; 24T2 takes the card design direction
+recorded under 24T below and in docs/mobile-design.md (Producto 25B3).
 
 In order. Each is one focused PR, CI green, merged before the next starts; each records its
 checks here and its device evidence in the checklist. The names from Producto 25A on are a
@@ -981,7 +999,7 @@ the owner authorises it; no EAS build or store submission without the owner.
 
 ### Producto 24T — instalments and complete cards
 
-**Recommended next after 25B2** (see the head of this section), split into 24T1, 24T2 and 24T3. The
+**Recommended next after 25B3** (see the head of this section), split into 24T1, 24T2 and 24T3. The
 accounting contract below is decided (decision 003, rule 7, revised 2026-09-28); nothing of it is
 implemented yet.
 
@@ -1026,6 +1044,13 @@ implemented yet.
     instalments, per-statement summaries, the five figures above, pending balance and partial payments, a
     clearer card form with a real calendar for closing and due days; the available-credit gate decided
     first if the UI shows a limit.
+    *Design direction (recorded 2026-09-28 in Producto 25B3, documentation only; the rationale is in
+    docs/mobile-design.md, «Producto 25B3»):* Apple Wallet is a reference for hierarchy, tactility, depth and
+    clarity, never a visual copy; evaluate replacing the horizontal carousel with a selectable vertical stack/deck
+    when 24T2 designs Tarjetas; a selected card puts first its balance due now, then the next closing/due date, the
+    Pagar action, the future instalments/commitments and the movements; instalments are visually distinct from the
+    balance payable now; iOS minimalism, cobalt/sapphire and the FinanzApp materials stay; no gesture that competes
+    with back navigation or delete; a debit card remains future metadata of an account, never a ledger of its own.
   - **24T3 — refunds, early payments, lifecycle and final device QA.** Refunds and early payoff as above,
     cancellations and adjustments without a second expense, the deletion block for pending plans, Tarjetas
     and Deudas on the iPhone. Optional reminders for closings, due dates and instalments belong to 25D's
@@ -1040,7 +1065,7 @@ implemented yet.
 - **Depends on.** 25B2 merged; 24C1 for the rates of international instalments and 24C2's purchase record
   for them.
 
-### Producto 25B — native onboarding and repository cleanup (this PR)
+### Producto 25B — native onboarding and repository cleanup (PR #64)
 
 - **Goal.** A first launch anywhere, native, brief and skippable; a repository that describes only
   the native product.
@@ -1091,7 +1116,7 @@ implemented yet.
     into the setup with data, both languages, VoiceOver and the largest text through both stages).
 - **Depends on.** 24R2B (regions), 24M (currencies), 24C1 (the display currency).
 
-### Producto 25B2 — smart currency defaults and the account/card lifecycle (this PR)
+### Producto 25B2 — smart currency defaults and the account/card lifecycle (PR #65)
 
 - **Goal.** Close what the onboarding, 24M and 24C1 left open: forms that start in a logical currency,
   no display control without a choice, normal accounts that can be deleted, cards with a complete
@@ -1142,7 +1167,8 @@ implemented yet.
   balance payable and, once 24T exists, every pending instalment (recorded above); nothing is cancelled or
   written silently. The recurring catch-up (`processRecurring`, on opening and on returning to the
   foreground) is the second net: a rule whose account, card or debt is deleted records nothing whatever
-  its flag says, and Recurrentes offers such a rule Eliminar only (no Reanudar onto a closed row).
+  its flag says, and Recurrentes offers such a rule Eliminar as its only lifecycle action (no Reanudar onto a closed row);
+  its recovery path is Editar → a live account or card of the same currency → Reanudar (made explicit in 25B3).
 - **Debts and recurring.** Recurring audited, not redesigned: pause/resume/delete and their history are
   unchanged; deleting an account pauses its rules through `pauseRecurringRule`. Debts: close/reopen
   unchanged; deletion changed in the debt lifecycle round below.
@@ -1179,8 +1205,8 @@ implemented yet.
   24T is recorded above.
 - **Not changed.** Home's, Reportes' and the onboarding's design; the financial models (money, FX,
   budgets); `vercel.json`, `api/mobile`, `server/mobile`.
-- **Status.** Delivered on this branch (2026-09-27, review round the same day; card invariants round and debt lifecycle round
-  2026-09-28), not device-verified.
+- **Status.** Merged 2026-09-28 (PR #65; delivered 2026-09-27, review round the same day; card invariants round and debt
+  lifecycle round 2026-09-28), not device-verified.
   - **Debt lifecycle and instalment-contract round (2026-09-28).** Found: `deletePersonalDebt` could
     tombstone a tracker with a balance after payments (a partly settled obligation left inoperable), and the
     24T wording («un único gasto», «never several expenses», «counted once») read as recognising the whole
@@ -1232,6 +1258,80 @@ implemented yet.
     VoiceOver and the largest text on the swipe rows).
 - **Depends on.** 25B (the suggestion rule), 24C1 (the chip and the display preference), 24UX4 (the deletion
   records of rules and debts).
+
+### Producto 25B3 — detail hierarchy polish (this PR)
+
+- **Goal.** Two small hierarchy inconsistencies corrected before instalments start; no redesign, no financial
+  change, no EAS build.
+- **Account detail (exact).** The row «Saldo inicial / Opening balance» is gone from `app/account/[id].tsx`. The
+  opening balance is part of the ledger and is preserved exactly: `account.openingMinor` is not read differently,
+  written, migrated or backed up any differently; every historical balance is the same number (the hero, «Saldo
+  registrado», still starts from it: `accountBalanceMinor`); account creation (Nueva cuenta, the first opening's
+  account) and Editar cuenta are untouched. The month's expenses and income, the quick actions, the Recurrentes row
+  (now the group's only row, live accounts only) and Movimientos stay. No card or row replaced it. *Audit:* the
+  opening balance stays readable in every backup file (`accounts[].openingMinor`, every version) and is the
+  difference between «Saldo registrado» and the account's movements; no screen shows it on its own today. If a
+  reconciliation view is ever wanted, it belongs in Editar cuenta beside «Saldo registrado» as a quiet row, not in
+  the daily detail.
+- **Recurring detail (exact).** `app/recurring/[id].tsx` (Stack screen `recurring/[id]`, title «Recurrente» until
+  the rule loads, then the merchant): the merchant mark, «Gasto recurrente · ARS» / «Ingreso recurrente · ARS», the
+  amount signed and toned like its row, the state under it (Activo; «Pausado»; «Revisar» in amber, 24UX5); a grouped
+  card with Próxima fecha (active rules only: a paused rule never announces a next date, 24UX2; in the warning tone
+  when it needs review), Frecuencia, Categoría and Cuenta / Tarjeta (opens the account's or the card's detail, the
+  deleted account's history included); «Registrados» (`src/ui/recurring-history.tsx`, the 24UX2 history moved out of
+  the form: real movements by their occurrence id, twelve then a count, each row opens the movement); then the
+  lifecycle: Pausar/Reanudar recurrente and Eliminar recurrente with the same rules and confirmations as the row's
+  swipe (`useRecurringManagement`, now exposing `closed`: a rule whose account or card was deleted offers Eliminar
+  as its only lifecycle action and says why, «Pausado: su cuenta o tarjeta fue eliminada…», naming the recovery path below), the 24UX5 review note and «Continuar desde hoy».
+  Pausing or resuming keeps the detail open and updates the state (as a debt's Cerrar does); deleting asks first and
+  goes back to Recurrentes. Editar (header, hidden on a rule already deleted) opens `/edit-recurring/[id]`, which is
+  now only the form (Guardar cambios; no history, no lifecycle buttons). Hydration and deletion behave as the form
+  did (not found before the ledger loads or on a cold link to a deleted rule; a rule deleted from this screen stays
+  drawn without actions while it closes).
+- **Rule on a deleted account or card (exact, 2026-09-28 round).** Two things, kept apart. *Lifecycle:* the rule is
+  Pausado, records nothing, cannot be resumed while it points at the closed row (`closed`; storage refuses an active rule
+  there), and offers Eliminar. *Recovery:* Editar stays available because the form offers, beside the rule's own closed row,
+  the live cash accounts and cards of the same currency (`postingAccountsFor` + the kept row; never another deleted account
+  or card, a debt or receivable, or another currency); the form's own rule still applies (the next date must be today or
+  later, so a rule paused across its date is brought forward by the person, never backfilled); moving the rule there and
+  saving keeps it paused and returns to the detail, which no longer reads it as closed and offers Reanudar recurrente; Reanudar is `resumeRecurringRule` as always
+  (the next date moves to today or later on the rule's own day, nothing due while paused is recorded). Leaving the closed
+  row unchanged keeps Reanudar unavailable. The note says so: «Pausado: su cuenta o tarjeta fue eliminada, así que no
+  vuelve a registrarse. Podés elegir otra compatible desde Editar y después reanudarlo, o eliminar este recurrente.» No
+  storage, schema or backup change.
+- **Navigation (exact).** Inicio → Próximos compromisos → row, Más → Recurrentes → row, and Movimiento → «Recurrente»
+  row open `/recurring/[id]`; Editar is one step past the detail. Nothing else changed: Movimientos, Cuentas, Tarjetas
+  and Deudas keep their detail-first navigation; the account detail's Recurrentes row still opens the filtered list.
+- **VoiceOver.** The Recurrentes row reads «Alquiler, mensual, Hogar, 400,00 ARS, próximo 1 oct» (paused: «…,
+  pausado»; review: «…, para revisar: sin registrar desde …») with the hint «Abre el detalle del recurrente»; the
+  Inicio row keeps its sentence and gains the same hint. No row says «Editar». English mirrors it.
+- **Not changed.** How recurring rules materialise (`processRecurring`, the deterministic occurrence ids), the pause,
+  resume and delete semantics and their writes, the swipe actions, the forms' fields and validation, storage, backups,
+  the domain; Tarjetas (the 24T2 direction above is documentation only); Movimientos.
+- **Copy.** es/en: `recurring.row.label`, `labelPaused`, `labelReview` (no «Editar» prefix), `recurring.row.hint`,
+  `recurring.detail.edit`, `recurring.detail.active`, `recurring.manage.closedNote`, `nav.titles.recurringRule`;
+  `accounts.detail.openingBalance` removed (the form's `accounts.form.openingBalance` stays). The English lock
+  accepted for the eight keys. The Más version line reads «FinanzApp 0.1.0 (25B3)».
+- **Tests.** `polish-routes.node.ts` (+7: the detail in Spanish and English, states, Editar, pause keeping the screen,
+  resume, review, the closed-account rule, delete asking first and going back, a failed write, the card and income
+  rules, not found; the account detail without the row in three locales with the same balance and a changed
+  `openingMinor` moving the hero; the rows' labels, hints and targets), `recovery-routes.node.ts` (the 24UX2 history
+  and the 24UX4 lifecycle tests re-targeted to the detail, the form proven to be only the form, hydration and
+  deletion of the detail, the movement's Recurrente row), `home-ranking.node.ts` (+1: the Inicio row opens the detail
+  with the hint in both languages), `lifecycle-actions.node.ts` (`closed`), `more-routes.node.ts` (the version line),
+  `recurring-audit.node.ts` (the new files in the copy audit), the static VoiceOver and translation guards unchanged.
+  Recovery round: `recovery-routes.node.ts` (+1: a deleted account and a deleted card, each moved through the form to a
+  live same-currency account or card, saved paused, then Reanudar on the detail resuming from today with no backlog; the
+  other currency, another deleted account or card and the debt never offered; the closed row left unchanged keeps Reanudar
+  unavailable), `polish-routes.node.ts` (the note's wording).
+  Review round: the detail holds navigation while a pause, a resume or a confirmed deletion is written (`gestureEnabled`
+  and `headerBackVisible` from `busy`, as the movement detail), gives it back on success or failure, and a deletion pops
+  exactly once (`polish-routes.node.ts` +1, the harness holding a save mid-write).
+- **Status.** Delivered on this branch (2026-09-28), not device-verified. Checked on Linux: root `npm test`,
+  `check:repo`; mobile `typecheck`, `test:storage`, `currency:verify`, `regions:verify`, `i18n:check -- --strict`,
+  `i18n:extract`, `check`, `export:ios` (the counts are in the PR). No EAS build; the iPhone was not touched.
+  Pending: the checklist section Producto 25B3.
+- **Depends on.** 25B2 (the deleted-account rule states), 24UX4 (the lifecycle), 24UX2 (the history).
 
 ### Producto 25C — budgets with rollover, goals, CSV and productivity
 

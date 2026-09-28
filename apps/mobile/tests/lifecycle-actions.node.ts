@@ -157,6 +157,9 @@ test('a rule on a deleted account offers only Eliminar: it cannot be resumed ont
   const closed = harness({ deletedAccount: true });
   assert.equal(JSON.stringify(closed.render('useRecurringManagement').actions(rules[1]).map((action: any) => action.key)), JSON.stringify(['delete']));
   assert.equal(JSON.stringify(closed.render('useRecurringManagement').actions(rules[0]).map((action: any) => action.key)), JSON.stringify(['delete']), 'even one an older copy left active');
+  // 25B3: the rule's detail reads the same rule through `closed`, so it offers exactly what the row's swipe offers.
+  assert.equal(live.render('useRecurringManagement').closed(rules[1]), false);
+  assert.equal(closed.render('useRecurringManagement').closed(rules[1]), true);
 });
 
 const buttons = (alert: { buttons: { text: string; style?: string }[] }) => JSON.stringify(alert.buttons.map(button => [button.text, button.style ?? null]));

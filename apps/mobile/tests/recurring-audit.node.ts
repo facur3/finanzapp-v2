@@ -316,7 +316,7 @@ test('recurring rules stay automatic: no confirmation mode in the app, the catal
     assert.doesNotMatch(doc, /«Registrar automáticamente» \(today|Per-rule mode|expected → paid|be \*\*expected\*\* instead/);
   }
   assert.match(roadmap, /Recurring rules stay\s+automatic/);
-  for (const file of ['src/i18n/messages/es/recurring.ts', 'src/i18n/messages/en/recurring.ts', 'src/ui/recurring-form.tsx', 'src/ui/commitment-actions.ts']) {
+  for (const file of ['src/i18n/messages/es/recurring.ts', 'src/i18n/messages/en/recurring.ts', 'src/ui/recurring-form.tsx', 'src/ui/recurring-history.tsx', 'app/recurring/[id].tsx', 'src/ui/commitment-actions.ts']) {
     assert.doesNotMatch(read(file), /Esperar confirmación|Wait for confirmation|confirmationMode|autoRecord/i, file);
   }
 });

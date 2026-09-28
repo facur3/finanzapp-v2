@@ -46,13 +46,15 @@ function harness(file: string, params: Record<string, unknown> = {}, data: domai
   const removedIds: string[] = [];
   const alerts: { title: string; message: string; buttons: any[] }[] = [];
   const refs: any[] = [];
-  let cursor = 0, refCursor = 0, failNext: Error | null = null;
+  let cursor = 0, refCursor = 0, failNext: Error | null = null, held: Promise<void> | null = null;
   const ledger = { useLedger: () => ({ archive: data, snapshot: domain.snapshotFromArchive(data), removeAccount: async (id: string) => { if (failNext) { const cause = failNext; failNext = null; throw cause; } removedIds.push(id); }, saveRecurring: async (next: domain.RecurringRule) => {
+    if (held) { const pending = held; held = null; await pending; }
     if (failNext) { const cause = failNext; failNext = null; throw cause; }
     saved.push(next);
   } }) };
-  const names = ['ActionButton', 'AppText', 'CategoryBadge', 'MerchantBadge', 'Choices', 'DetailRow', 'EmptyState', 'ErrorMessage', 'IconButton', 'Money', 'PressFeedback',
+  const names = ['ActionButton', 'AppText', 'CategoryBadge', 'MerchantBadge', 'Choices', 'DetailRow', 'EmptyState', 'EntryRow', 'ErrorMessage', 'IconButton', 'Money', 'PressFeedback',
     'Screen', 'SectionTitle', 'Stat', 'Surface', 'AccountRow', 'AccountBadge'];
+  let backs = 0;
   const theme = { space: { xs: 4, s: 8, m: 12, l: 16, xl: 20, xxl: 24, xxxl: 32 }, useCurrentDay: () => '2026-09-20', useReduceMotion: () => true,
     usePalette: () => ({ text: '#000', secondary: '#666', tertiary: '#999', line: '#ddd', inset: '#eee', expense: '#c00', income: '#080', warning: '#a60', primary: '#2557D6', background: '#fff', surface: '#fff' }) };
   const modules: Record<string, unknown> = {
@@ -69,18 +71,20 @@ function harness(file: string, params: Record<string, unknown> = {}, data: domai
     'react-native-reanimated': { __esModule: true, default: { View: 'Animated.View' }, useSharedValue: (value: number) => ({ value }),
       withTiming: (value: number) => value, useAnimatedStyle: (fn: () => unknown) => fn() },
     'expo-haptics': { selectionAsync: async () => {}, notificationAsync: async () => {}, NotificationFeedbackType: { Success: 'Success' } },
-    'expo-router': { Stack: { Screen: 'Stack.Screen' }, Redirect: 'Redirect', useLocalSearchParams: () => params, router: { push: (to: unknown) => pushed.push(to) } },
+    'expo-router': { Stack: { Screen: 'Stack.Screen' }, Redirect: 'Redirect', useLocalSearchParams: () => params,
+      router: { push: (to: unknown) => pushed.push(to), replace: (to: unknown) => pushed.push(to), canGoBack: () => true, back: () => { backs++; } } },
     '@finanzapp/domain': domain,
     '../src/storage/LedgerProvider': ledger, '../../src/storage/LedgerProvider': ledger, '../storage/LedgerProvider': ledger,
     '../src/ui/swipe-actions': swipeActionsMock, '../../src/ui/swipe-actions': swipeActionsMock,
+    './components': { ...Object.fromEntries(names.map(name => [name, name])), useStacked: () => false },
     '../src/ui/components': { ...Object.fromEntries(names.map(name => [name, name])), useStacked: () => false }, '../../src/ui/components': { ...Object.fromEntries(names.map(name => [name, name])), useStacked: () => false },
     '../src/ui/entry-list': { EntryList: 'EntryList' }, '../../src/ui/entry-list': { EntryList: 'EntryList' },
     '../src/ui/currency-switch': { CurrencySwitch: 'CurrencySwitch' }, '../../src/ui/currency-switch': { CurrencySwitch: 'CurrencySwitch' },
     '../src/ui/quick-actions': { QuickActions: 'QuickActions', AssistantEntry: 'AssistantEntry' }, '../../src/ui/quick-actions': { QuickActions: 'QuickActions', AssistantEntry: 'AssistantEntry' },
     '../src/ui/motion': { ValueTransition: 'ValueTransition', Reflow: 'Reflow', selectionHaptic: () => {}, impactHaptic: () => {}, duration: { press: 100, release: 160, state: 200, data: 260, enter: 200, exit: 100, reveal: 480 }, timing: (kind: string, reduced: boolean) => ({ duration: reduced ? 0 : 260 }) }, '../../src/ui/motion': { ValueTransition: 'ValueTransition', Reflow: 'Reflow', selectionHaptic: () => {}, impactHaptic: () => {}, duration: { press: 100, release: 160, state: 200, data: 260, enter: 200, exit: 100, reveal: 480 }, timing: (kind: string, reduced: boolean) => ({ duration: reduced ? 0 : 260 }) },
-    '../src/ui/presentation': presentation, '../../src/ui/presentation': presentation, '../src/ui/report-presentation': reportPresentation,
+    './presentation': presentation, '../src/ui/presentation': presentation, '../../src/ui/presentation': presentation, '../src/ui/report-presentation': reportPresentation,
     '../src/ui/budget-presentation': budgetPresentation, '../../src/ui/budget-presentation': budgetPresentation,
-    '../src/ui/theme': theme, '../../src/ui/theme': theme,
+    './theme': theme, '../src/ui/theme': theme, '../../src/ui/theme': theme,
     '../src/ui/use-default-currency': { useDefaultCurrency: () => 'ARS' },
     '../src/ui/category-hues': { useCategoryColor: () => '#3E6FB0', useCategoryLabel: (s: string) => s, useCategoryDefinitions: () => [], useCategoryLook: (s: string) => ({ label: s, storedLabel: s, key: String(s).toLowerCase(), hex: '#3E6FB0', glyph: 'pricetag-outline' }), useCategoryLookOf: () => (s: string) => ({ label: s, storedLabel: s, key: String(s).toLowerCase(), hex: '#3E6FB0', glyph: 'pricetag-outline' }), useAccountLook: () => ({ icon: 'wallet', color: 'cobalt', glyph: 'wallet-outline', hex: '#2557D6' }), useAccountNameOf: () => (account: any) => account.name, useAccountLookOf: () => () => ({ icon: 'wallet', color: 'cobalt', glyph: 'wallet-outline', hex: '#2557D6' }) }, '../../src/ui/category-hues': { useCategoryColor: () => '#3E6FB0', useCategoryLabel: (s: string) => s, useCategoryDefinitions: () => [], useCategoryLook: (s: string) => ({ label: s, storedLabel: s, key: String(s).toLowerCase(), hex: '#3E6FB0', glyph: 'pricetag-outline' }), useCategoryLookOf: () => (s: string) => ({ label: s, storedLabel: s, key: String(s).toLowerCase(), hex: '#3E6FB0', glyph: 'pricetag-outline' }), useAccountLook: () => ({ icon: 'wallet', color: 'cobalt', glyph: 'wallet-outline', hex: '#2557D6' }), useAccountNameOf: () => (account: any) => account.name, useAccountLookOf: () => () => ({ icon: 'wallet', color: 'cobalt', glyph: 'wallet-outline', hex: '#2557D6' }) },
   };
@@ -88,11 +92,15 @@ function harness(file: string, params: Record<string, unknown> = {}, data: domai
     if (!Object.hasOwn(modules, name)) throw new Error('Unexpected polish dependency: ' + name);
     return modules[name];
   };
-  // 24UX4: the management hooks run for real (their Alert, save and haptic are the mocks above).
-  modules['../src/ui/commitment-actions'] = realModule('src/ui/commitment-actions.ts', require);
+  // 24UX4: the management hooks run for real (their Alert, save and haptic are the mocks above); 25B3: so does the
+  // rule detail's history (its rows are the EntryRow descriptor).
+  modules['../src/ui/commitment-actions'] = modules['../../src/ui/commitment-actions'] = realModule('src/ui/commitment-actions.ts', require);
+  modules['../../src/ui/recurring-history'] = realModule('src/ui/recurring-history.tsx', require);
   const module = { exports: {} as { default?: () => Node } };
   runInNewContext(code, { module, exports: module.exports, require, Error });
-  return { render: () => { cursor = 0; refCursor = 0; return module.exports.default!(); }, pushed, saved, alerts, removedIds, failSave: (cause: Error) => { failNext = cause; } };
+  return { render: () => { cursor = 0; refCursor = 0; return module.exports.default!(); }, pushed, saved, alerts, removedIds, backs: () => backs, failSave: (cause: Error) => { failNext = cause; },
+    // The next save waits until the returned function is called: the screen is observed mid-write.
+    holdSave: () => { let release!: () => void; held = new Promise<void>(resolve => { release = resolve; }); return release; } };
 }
 function nodes(value: any): Node[] {
   if (!value || typeof value !== 'object') return [];
@@ -246,7 +254,15 @@ test('in English Recurrentes reads in English, keeps merchant and account names,
   const sections = nodes(root).filter(node => node.type === 'SectionTitle').map(node => node.props.children);
   assert.equal(sections.join(','), 'Next 30 days,Active');
   const press = nodes(root).find(node => node.type === 'PressFeedback')!;
-  assert.equal(press.props.accessibilityLabel, 'Edit recurring Alquiler, monthly, Hogar, 400.00 ARS, next Oct 1');
+  // 25B3: the row is the rule, not an action: VoiceOver hears what it is and that it opens details; a tap opens the detail, never the form.
+  assert.equal(press.props.accessibilityLabel, 'Alquiler, monthly, Hogar, 400.00 ARS, next Oct 1');
+  assert.equal(press.props.accessibilityHint, 'Opens the details of this recurring item');
+  press.props.onPress();
+  assert.equal(JSON.stringify(english.pushed.at(-1)), JSON.stringify({ pathname: '/recurring/[id]', params: { id: 'rent' } }));
+  const spanishPress = nodes(spanish.render()).find(node => node.type === 'PressFeedback')!;
+  assert.equal(spanishPress.props.accessibilityHint, 'Abre el detalle del recurrente');
+  spanishPress.props.onPress();
+  assert.equal(JSON.stringify(spanish.pushed.at(-1)), JSON.stringify({ pathname: '/recurring/[id]', params: { id: 'rent' } }));
   const captions = texts(root);
   // 24UX2: frequency · category · account on the left; the due day once, beside the amount (beyond a week, the date).
   assert.ok(captions.includes('Monthly · Hogar · Banco'), 'merchant, category and account name stay as the user wrote them');
@@ -262,7 +278,7 @@ test('in English Recurrentes reads in English, keeps merchant and account names,
   const paused = harness('recurring.tsx', {}, { ...archive, recurring: [{ ...rule, active: false }] }, 'en-AR').render();
   assert.ok(texts(paused).includes('Paused'));
   // 24UX2: a paused rule keeps full-contrast ink and never announces a next date.
-  assert.equal(nodes(paused).find(node => node.type === 'PressFeedback')!.props.accessibilityLabel, 'Edit recurring Alquiler, monthly, Hogar, 400.00 ARS, paused');
+  assert.equal(nodes(paused).find(node => node.type === 'PressFeedback')!.props.accessibilityLabel, 'Alquiler, monthly, Hogar, 400.00 ARS, paused');
   assert.equal(nodes(paused).some(node => node.type === 'View' && node.props.style?.opacity !== undefined && node.props.style.opacity < 1), false);
   assert.equal(find(paused, 'SectionTitle', undefined).props.caption, 'Not recorded until you resume them');
   assert.equal(swipeLabels(paused), 'Resume,Delete');
@@ -272,10 +288,10 @@ test('23.1C2: a Recurrentes row due today says the day inside its VoiceOver sent
   // The harness day is 2026-09-20. The amount is spoken with the language's decimal mark, whatever the region writes.
   const due = { ...archive, recurring: [{ ...rule, nextDateISO: '2026-09-20' }] };
   const cases = [
-    ['es-AR', 'Editar recurrente Alquiler, mensual, Hogar, 400,00 ARS, próximo hoy', 'Hoy'],
-    ['es-US', 'Editar recurrente Alquiler, mensual, Hogar, 400,00 ARS, próximo hoy', 'Hoy'],
-    ['en-AR', 'Edit recurring Alquiler, monthly, Hogar, 400.00 ARS, next today', 'Today'],
-    ['en-US', 'Edit recurring Alquiler, monthly, Hogar, 400.00 ARS, next today', 'Today'],
+    ['es-AR', 'Alquiler, mensual, Hogar, 400,00 ARS, próximo hoy', 'Hoy'],
+    ['es-US', 'Alquiler, mensual, Hogar, 400,00 ARS, próximo hoy', 'Hoy'],
+    ['en-AR', 'Alquiler, monthly, Hogar, 400.00 ARS, next today', 'Today'],
+    ['en-US', 'Alquiler, monthly, Hogar, 400.00 ARS, next today', 'Today'],
   ] as const;
   for (const [locale, label, caption] of cases) {
     const root = harness('recurring.tsx', {}, due, locale).render();
@@ -284,7 +300,7 @@ test('23.1C2: a Recurrentes row due today says the day inside its VoiceOver sent
   }
   // A day that is not today or yesterday reads the same inline and on its own.
   const later = nodes(harness('recurring.tsx', {}, archive, 'es-AR').render()).find(node => node.type === 'PressFeedback')!;
-  assert.equal(later.props.accessibilityLabel, 'Editar recurrente Alquiler, mensual, Hogar, 400,00 ARS, próximo 1 oct');
+  assert.equal(later.props.accessibilityLabel, 'Alquiler, mensual, Hogar, 400,00 ARS, próximo 1 oct');
 });
 
 test('in English Presupuestos names the month, the states and the VoiceOver sentences in English; category names are untouched', () => {
@@ -316,22 +332,36 @@ test('in English Cuentas and the account detail read in English; account names s
   assert.equal(find(root, 'Stack.Screen').props.options.title, 'Banco');
   assert.equal(nodes(root).filter(node => node.type === 'Stat').map(node => node.props.label).join(','), 'Spent this month,Income this month');
   const rows = nodes(root).filter(node => node.type === 'DetailRow');
-  assert.equal(rows.map(node => node.props.label).join(','), 'Recurring,Opening balance');
+  assert.equal(rows.map(node => node.props.label).join(','), 'Recurring', '25B3: the opening balance is no longer a row');
   assert.equal(rows[0].props.value, '1 active');
   assert.equal(find(harness('account/[id].tsx', { id: 'cash' }).render(), 'DetailRow').props.value, '1 activo');
   const missing = harness('account/[id].tsx', { id: 'nope' }, archive, 'en-AR').render();
   assert.equal(find(missing, 'EmptyState').props.title, 'We couldn’t find this account');
 });
 
-test('23.1C2: the opening balance row groups on screen and gives VoiceOver the language’s numbers without grouping', () => {
+test('25B3: the account detail prints no opening balance in either language; the recorded balance still starts from openingMinor, which is untouched', () => {
+  // Until 25B3 the group under the quick actions ended with «Saldo inicial / Opening balance» (23.1C2 pinned its grouping and
+  // its spoken twin). The opening balance stays in storage and in every backup; on screen only the balance it starts is a fact.
   const rich = { ...archive, accounts: archive.accounts.map(account => account.id === 'cash' ? { ...account, openingMinor: 123456789 } : account) };
-  const opening = (locale: AppLocale) => {
-    const row = nodes(harness('account/[id].tsx', { id: 'cash' }, rich, locale).render()).filter(node => node.type === 'DetailRow')[1];
-    return row.props.value + '|' + row.props.spokenValue;
-  };
-  assert.equal(opening('es-AR'), 'ARS 1.234.567,89|1234567,89 ARS');
-  assert.equal(opening('en-AR'), 'ARS 1.234.567,89|1234567.89 ARS', 'an English voice gets the decimal point, not the Argentine grouping');
-  assert.equal(opening('es-US'), 'ARS 1,234,567.89|1234567,89 ARS', 'a Spanish voice gets the decimal comma, not the US grouping');
+  for (const locale of ['es-AR', 'en-AR', 'es-US'] as AppLocale[]) {
+    const root = harness('account/[id].tsx', { id: 'cash' }, rich, locale).render();
+    const rows = nodes(root).filter(node => node.type === 'DetailRow');
+    assert.equal(rows.map(node => node.props.label).join(','), locale.startsWith('es') ? 'Recurrentes' : 'Recurring', locale);
+    assert.equal(rows[0].props.last, true, 'the group closes on its one row');
+    const printed = texts(root).concat(nodes(root).map(node => String(node.props.spokenValue ?? node.props.value ?? ''))).join(' | ');
+    assert.doesNotMatch(printed, /Saldo inicial|Opening balance|1\.234\.567|1,234,567|1234567/, locale + ': the opening amount is not printed or spoken anywhere');
+    // The hero is the opening balance plus this account's recorded movements: 1.234.567,89 + 500,00 − 30,00 − 90,00 − 7,00.
+    assert.equal(find(root, 'Money').props.minor, 123456789 + 50000 - 3000 - 9000 - 700, locale);
+  }
+  // The stored opening (100000) with the same movements gives 137300: changing openingMinor moves the hero and nothing else.
+  assert.equal(find(harness('account/[id].tsx', { id: 'cash' }).render(), 'Money').props.minor, 137300);
+  assert.equal(archive.accounts[0].openingMinor, 100000, 'the field is read, never rewritten');
+  // A deleted account keeps its balance (25B2) and, with no Recurrentes row, draws no empty group at all.
+  const at = '2026-09-27T10:00:00.000Z';
+  const gone = nodes(harness('account/[id].tsx', { id: 'cash' }, { ...rich, accounts: rich.accounts.map(item => item.id === 'cash' ? { ...item, revision: 1, updatedAt: at, deletedAt: at } : item) }).render());
+  assert.equal(gone.some(node => node.type === 'DetailRow'), false);
+  assert.equal(gone.some(node => node.type === 'Surface' && node.props.grouped), false, 'no grouped surface without rows');
+  assert.equal(gone.find(node => node.type === 'Money')!.props.minor, 123456789 + 50000 - 3000 - 9000 - 700);
 });
 
 test('24B3: Presupuestos with three currencies switches among the currencies present, and a yen budget is measured in yen', () => {
@@ -468,4 +498,219 @@ test('25B2: a deleted account\'s detail reads its history and balance, with no e
   assert.equal(nodes(root).some(node => node.type === 'DetailRow' && node.props.label === 'Recurrentes'), false);
   assert.ok(nodes(root).some(node => node.type === 'Money'), 'the recorded balance, as history');
   assert.ok(find(root, 'EntryList').props.entries.length >= 1, 'its movements still list');
+});
+
+// ---- Producto 25B3: a rule's detail, read before it is edited ----------------------------------------------------------
+
+const settle = () => new Promise(resolve => setImmediate(resolve));
+const detailRows = (root: Node) => nodes(root).filter(node => node.type === 'DetailRow').map(node => node.props.label + '=' + node.props.value).join(',');
+const buttons = (root: Node) => nodes(root).filter(node => node.type === 'ActionButton').map(node => node.props.label).join(',');
+
+test('25B3: a rule\'s detail is its mark, its signed amount and its state, then only the facts it stores, Registrados and the row\'s own lifecycle; Editar in the header opens the form', () => {
+  const view = harness('recurring/[id].tsx', { id: 'rent' });
+  const root = view.render();
+  const screen = find(root, 'Stack.Screen').props.options;
+  assert.equal(screen.title, 'Alquiler', 'the merchant is the title, as a debt\'s counterparty is');
+  const edit = screen.headerRight();
+  assert.equal(JSON.stringify([edit.type, edit.props.name, edit.props.label]), JSON.stringify(['IconButton', 'create-outline', 'Editar recurrente']));
+  edit.props.onPress();
+  assert.equal(JSON.stringify(view.pushed.at(-1)), JSON.stringify({ pathname: '/edit-recurring/[id]', params: { id: 'rent' } }), 'the form is one step past the detail, never the row\'s target');
+  const badge = find(root, 'MerchantBadge');
+  assert.equal(JSON.stringify([badge.props.merchant, badge.props.category, badge.props.kind, badge.props.large]), JSON.stringify(['Alquiler', 'Hogar', 'expense', true]));
+  const hero = find(root, 'Money');
+  assert.equal(JSON.stringify([hero.props.minor, hero.props.currency, hero.props.large, hero.props.signed, hero.props.tone, hero.props.align]), JSON.stringify([-40000, 'ARS', true, true, 'expense', 'center']),
+    'the amount reads as its row does: signed, in the expense tone');
+  const shown = texts(root);
+  assert.ok(shown.includes('Gasto recurrente · ARS'), shown.join(' | '));
+  assert.ok(shown.includes('Activo'));
+  assert.equal(detailRows(root), 'Próxima fecha=1 oct,Frecuencia=Mensual,Categoría=Hogar,Cuenta=Banco', 'the next date once, then frequency, category and the account');
+  const accountRow = nodes(root).find(node => node.type === 'DetailRow' && node.props.label === 'Cuenta')!;
+  assert.equal(accountRow.props.leading.type, 'AccountBadge');
+  assert.equal(accountRow.props.last, true);
+  accountRow.props.onPress();
+  assert.equal(JSON.stringify(view.pushed.at(-1)), JSON.stringify({ pathname: '/account/[id]', params: { id: 'cash' } }));
+  // 24UX2: the history, now on the detail; a rule that recorded nothing says so.
+  assert.equal(find(root, 'SectionTitle').props.children, 'Registrados');
+  assert.match(find(root, 'SectionTitle').props.caption, /estimación/);
+  assert.ok(shown.includes('Todavía no registró ningún movimiento.'));
+  // 24UX4: the same two actions as the row's swipe, named; delete is red and last.
+  assert.equal(buttons(root), 'Pausar recurrente,Eliminar recurrente');
+  assert.equal(find(root, 'ActionButton', 'Eliminar recurrente').props.tone, 'expense');
+  assert.equal(nodes(root).some(node => node.type === 'Field' || node.type === 'AmountField' || node.type === 'Choices'), false, 'a detail, not a form');
+});
+
+test('25B3: pausing from the detail writes the stored rule and keeps the screen; a paused rule says why, hides its next date and offers Reanudar', async () => {
+  const view = harness('recurring/[id].tsx', { id: 'rent' });
+  await find(view.render(), 'ActionButton', 'Pausar recurrente').props.onPress();
+  await settle();
+  assert.equal(JSON.stringify({ ...view.saved[0], updatedAt: '' }), JSON.stringify({ ...rule, active: false, revision: 1, updatedAt: '' }));
+  assert.equal(view.backs(), 0, 'the detail stays: the state under the amount now reads Pausado');
+  const paused = harness('recurring/[id].tsx', { id: 'rent' }, { ...archive, recurring: [{ ...rule, active: false, revision: 1 }] });
+  const root = paused.render();
+  const shown = texts(root);
+  assert.ok(shown.includes('Pausado'));
+  assert.ok(shown.some(text => text.startsWith('Pausado: no registra nada hasta que lo reanudes')));
+  assert.equal(detailRows(root), 'Frecuencia=Mensual,Categoría=Hogar,Cuenta=Banco', '24UX2: a paused rule never announces a next date');
+  assert.equal(buttons(root), 'Reanudar recurrente,Eliminar recurrente');
+  await find(root, 'ActionButton', 'Reanudar recurrente').props.onPress();
+  await settle();
+  assert.equal(paused.saved[0].active, true);
+  assert.equal(paused.saved[0].revision, 2);
+  assert.equal(paused.backs(), 0);
+});
+
+test('25B3: an active rule the catch-up set aside reads Revisar in amber, explains since when, and Continuar desde hoy resumes it without recording the backlog', async () => {
+  const behind = { ...rule, nextDateISO: '2026-09-10', anchorDateISO: '2026-09-10' };
+  const view = harness('recurring/[id].tsx', { id: 'rent' }, { ...archive, recurring: [behind] });
+  const root = view.render();
+  const state = nodes(root).find(node => node.type === 'AppText' && node.props.children === 'Revisar')!;
+  assert.equal(JSON.stringify([state.props.style.color, state.props.style.fontWeight]), JSON.stringify(['#a60', '600']));
+  const next = nodes(root).find(node => node.type === 'DetailRow' && node.props.label === 'Próxima fecha')!;
+  assert.equal(JSON.stringify([next.props.value, next.props.tone]), JSON.stringify(['10 sep', 'warning']), 'the date it failed since, in the warning tone');
+  assert.ok(texts(root).some(text => /no pudo registrar este recurrente desde el 10 de septiembre de 2026/.test(text)));
+  assert.equal(buttons(root), 'Continuar desde hoy,Pausar recurrente,Eliminar recurrente');
+  await find(root, 'ActionButton', 'Continuar desde hoy').props.onPress();
+  await settle();
+  assert.equal(view.saved[0].active, true);
+  assert.ok(view.saved[0].nextDateISO >= domain.todayKey(), 'resumed from today: nothing before today is left to record');
+  assert.equal(view.backs(), 0);
+});
+
+test('25B3: a rule on a deleted account (paused by the deletion) offers Eliminar only, says why, and still opens its form and its account\'s history', () => {
+  const at = '2026-09-27T10:00:00.000Z';
+  const data = { ...archive, accounts: archive.accounts.map(item => item.id === 'cash' ? { ...item, revision: 1, updatedAt: at, deletedAt: at } : item), recurring: [{ ...rule, active: false, revision: 1 }] };
+  const view = harness('recurring/[id].tsx', { id: 'rent' }, data);
+  const root = view.render();
+  assert.equal(buttons(root), 'Eliminar recurrente', '25B2: never resumed onto a closed row');
+  assert.ok(texts(root).includes('Pausado: su cuenta o tarjeta fue eliminada, así que no vuelve a registrarse. Podés elegir otra compatible desde Editar y después reanudarlo, o eliminar este recurrente.'), 'the note names the recovery path, not only Eliminar');
+  assert.ok(find(root, 'Stack.Screen').props.options.headerRight, 'its history stays editable in place');
+  find(root, 'DetailRow', 'Cuenta').props.onPress();
+  assert.equal(JSON.stringify(view.pushed.at(-1)), JSON.stringify({ pathname: '/account/[id]', params: { id: 'cash' } }));
+});
+
+test('25B3: Eliminar recurrente asks first with the row\'s confirmation, Cancelar writes nothing, Eliminar writes the deletion record and goes back; the history lists what stays', async () => {
+  const data = { ...archive, records: [...archive.records, ...['2026-07-01', '2026-08-01', '2026-09-01'].map(day => domain.initialRecord(recorded(day)))] };
+  const view = harness('recurring/[id].tsx', { id: 'rent' }, data);
+  const root = view.render();
+  const rows = nodes(root).filter(node => node.type === 'EntryRow');
+  assert.equal(rows.map(node => node.props.entry.dateISO).join(','), '2026-09-01,2026-08-01,2026-07-01', 'newest first, the scheduled date never among them');
+  assert.equal(rows.every(node => node.props.showAccount === false && node.props.account.id === 'cash'), true);
+  find(root, 'ActionButton', 'Eliminar recurrente').props.onPress();
+  assert.equal(view.saved.length, 0, 'nothing is written before the confirmation');
+  const alert = view.alerts[0];
+  assert.equal(alert.title, '¿Eliminar «Alquiler»?');
+  assert.equal(alert.message, 'Deja de registrarse. Los 3 movimientos que ya registró siguen en Movimientos.');
+  assert.equal(alert.buttons.map((button: { text: string; style?: string }) => button.text + ':' + (button.style ?? '')).join(','), 'Cancelar:cancel,Eliminar:destructive');
+  alert.buttons[0].onPress?.();
+  assert.equal(view.saved.length + view.backs(), 0, 'Cancelar changes nothing and stays');
+  await alert.buttons[1].onPress();
+  await settle();
+  assert.equal(JSON.stringify({ ...view.saved[0], updatedAt: '' }), JSON.stringify({ ...rule, active: false, deleted: true, revision: 1, updatedAt: '' }));
+  assert.equal(view.backs(), 1, 'deleting goes back to the list');
+  // A failed write keeps the rule and says so on the detail.
+  const failing = harness('recurring/[id].tsx', { id: 'rent' });
+  failing.failSave(new Error('Disk full'));
+  await find(failing.render(), 'ActionButton', 'Pausar recurrente').props.onPress();
+  await settle();
+  assert.equal(failing.saved.length, 0);
+  assert.equal(find(failing.render(), 'ErrorMessage').props.message, 'Disk full');
+});
+
+test('25B3: in English the detail reads in English and keeps the merchant, category and account names; a card rule names its card and opens it; an income is positive', () => {
+  const view = harness('recurring/[id].tsx', { id: 'rent' }, archive, 'en-AR');
+  const root = view.render();
+  const screen = find(root, 'Stack.Screen').props.options;
+  assert.equal(screen.title, 'Alquiler');
+  assert.equal(screen.headerRight().props.label, 'Edit recurring item');
+  const shown = texts(root);
+  assert.ok(shown.includes('Recurring expense · ARS'));
+  assert.ok(shown.includes('Active'));
+  assert.equal(detailRows(root), 'Next date=Oct 1,Frequency=Monthly,Category=Hogar,Account=Banco');
+  assert.equal(find(root, 'SectionTitle').props.children, 'Recorded');
+  assert.ok(shown.includes('Nothing recorded yet.'));
+  assert.equal(buttons(root), 'Pause recurring item,Delete recurring item');
+  // The same words for a rule whose next date is today, in both languages, and the Spanish state of a paused rule.
+  assert.ok(texts(harness('recurring/[id].tsx', { id: 'rent' }, { ...archive, recurring: [{ ...rule, active: false }] }, 'en-AR').render()).includes('Paused'));
+  // A rule on a card: the row says Tarjeta / Card and opens the card's detail.
+  const onCard: domain.RecurringRule = { ...rule, id: 'sub', accountId: 'card-acc', merchant: 'Netflix', category: 'Suscripciones', amountMinor: 899900 };
+  const cardView = harness('recurring/[id].tsx', { id: 'sub' }, { ...archive, recurring: [onCard] }, 'en-AR');
+  const cardRoot = cardView.render();
+  const cardRow = nodes(cardRoot).find(node => node.type === 'DetailRow' && node.props.label === 'Card')!;
+  assert.equal(JSON.stringify([cardRow.props.value, cardRow.props.icon, cardRow.props.leading]), JSON.stringify(['Visa', 'card-outline', undefined]));
+  cardRow.props.onPress();
+  assert.equal(JSON.stringify(cardView.pushed.at(-1)), JSON.stringify({ pathname: '/card/[id]', params: { id: 'card' } }));
+  assert.equal(nodes(harness('recurring/[id].tsx', { id: 'sub' }, { ...archive, recurring: [onCard] }).render()).find(node => node.type === 'DetailRow' && node.props.label === 'Tarjeta')!.props.value, 'Visa');
+  // An income rule: the amount is positive in the income tone, under «Ingreso recurrente».
+  const salary: domain.RecurringRule = { ...rule, id: 'pay', kind: 'income', merchant: 'Sueldo', category: 'Sueldo', amountMinor: 150000 };
+  const income = harness('recurring/[id].tsx', { id: 'pay' }, { ...archive, recurring: [salary] }).render();
+  assert.equal(JSON.stringify([find(income, 'Money').props.minor, find(income, 'Money').props.tone]), JSON.stringify([150000, 'income']));
+  assert.ok(texts(income).includes('Ingreso recurrente · ARS'));
+  assert.equal(find(income, 'MerchantBadge').props.tone, 'income');
+});
+
+test('25B3: an unknown or deleted rule, or one without its account, is not found in both languages', () => {
+  assert.equal(find(harness('recurring/[id].tsx', { id: 'nope' }).render(), 'EmptyState').props.title, 'No encontramos este recurrente');
+  assert.equal(find(harness('recurring/[id].tsx', { id: 'nope' }, archive, 'en-AR').render(), 'EmptyState').props.title, 'We couldn’t find this recurring item');
+  const deleted = domain.deleteRecurringRule(rule, '2026-09-19T12:00:00.000Z');
+  assert.equal(find(harness('recurring/[id].tsx', { id: 'rent' }, { ...archive, recurring: [deleted] }).render(), 'EmptyState').props.title, 'No encontramos este recurrente', 'a cold link to a deleted rule');
+  assert.equal(find(harness('recurring/[id].tsx', { id: 'rent' }, { ...archive, accounts: archive.accounts.filter(item => item.id !== 'cash') }).render(), 'EmptyState').props.title, 'No encontramos este recurrente', 'no account, no currency to show');
+});
+
+test('25B3 review: while a pause, a resume or a confirmed deletion is being written the detail holds navigation (no native back, no back swipe, Editar disabled); success or failure gives it back, a failed write keeps the screen with its error, and a deletion pops exactly once', async () => {
+  const nav = (root: Node) => { const options = find(root, 'Stack.Screen').props.options; return [options.gestureEnabled, options.headerBackVisible, options.headerRight?.().props.disabled]; };
+  const busyButtons = (root: Node) => nodes(root).filter(node => node.type === 'ActionButton').map(node => node.props.busy || node.props.disabled).every(Boolean);
+  // Pausar pending.
+  const pausing = harness('recurring/[id].tsx', { id: 'rent' });
+  assert.deepEqual(nav(pausing.render()), [true, true, false], 'at rest the screen navigates as usual');
+  let release = pausing.holdSave();
+  const pausePress = find(pausing.render(), 'ActionButton', 'Pausar recurrente').props.onPress();
+  assert.deepEqual(nav(pausing.render()), [false, false, true], 'mid-write: back, swipe and Editar held');
+  assert.equal(busyButtons(pausing.render()), true);
+  release(); await pausePress; await settle();
+  assert.deepEqual(nav(pausing.render()), [true, true, false], 'released after the durable save');
+  assert.equal(pausing.backs(), 0);
+  // Reanudar pending.
+  const resuming = harness('recurring/[id].tsx', { id: 'rent' }, { ...archive, recurring: [{ ...rule, active: false, revision: 1 }] });
+  release = resuming.holdSave();
+  const resumePress = find(resuming.render(), 'ActionButton', 'Reanudar recurrente').props.onPress();
+  assert.deepEqual(nav(resuming.render()), [false, false, true]);
+  release(); await resumePress; await settle();
+  assert.deepEqual(nav(resuming.render()), [true, true, false]);
+  assert.equal(resuming.saved[0].active, true);
+  // Eliminar confirmed and pending: held, then exactly one back.
+  const deleting = harness('recurring/[id].tsx', { id: 'rent' });
+  find(deleting.render(), 'ActionButton', 'Eliminar recurrente').props.onPress();
+  assert.deepEqual(nav(deleting.render()), [true, true, false], 'the question alone holds nothing');
+  release = deleting.holdSave();
+  const confirm = deleting.alerts[0].buttons[1].onPress();
+  assert.deepEqual(nav(deleting.render()), [false, false, true]);
+  assert.equal(deleting.backs(), 0, 'no pop before the record is written');
+  release(); await confirm; await settle();
+  assert.equal(deleting.backs(), 1, 'exactly one back');
+  assert.equal(deleting.saved[0].deleted, true);
+  // A failed write: navigation comes back, the screen stays with its error, nothing popped.
+  const failing = harness('recurring/[id].tsx', { id: 'rent' });
+  failing.failSave(new Error('Disk full'));
+  release = failing.holdSave();
+  const failPress = find(failing.render(), 'ActionButton', 'Pausar recurrente').props.onPress();
+  assert.deepEqual(nav(failing.render()), [false, false, true]);
+  release(); await failPress; await settle();
+  assert.deepEqual(nav(failing.render()), [true, true, false]);
+  assert.equal(find(failing.render(), 'ErrorMessage').props.message, 'Disk full');
+  assert.equal(failing.backs() + failing.saved.length, 0);
+  // A failed deletion neither pops nor unmounts.
+  const failingDelete = harness('recurring/[id].tsx', { id: 'rent' });
+  failingDelete.failSave(new Error('Disk full'));
+  find(failingDelete.render(), 'ActionButton', 'Eliminar recurrente').props.onPress();
+  await failingDelete.alerts[0].buttons[1].onPress(); await settle();
+  assert.deepEqual(nav(failingDelete.render()), [true, true, false]);
+  assert.equal(find(failingDelete.render(), 'ErrorMessage').props.message, 'Disk full');
+  assert.equal(failingDelete.backs(), 0);
+  // Editar still opens the form at rest, and the recovery path of a rule on a deleted account is untouched.
+  find(pausing.render(), 'Stack.Screen').props.options.headerRight().props.onPress();
+  assert.equal(JSON.stringify(pausing.pushed.at(-1)), JSON.stringify({ pathname: '/edit-recurring/[id]', params: { id: 'rent' } }));
+  const at = '2026-09-27T10:00:00.000Z';
+  const closedRoot = harness('recurring/[id].tsx', { id: 'rent' }, { ...archive, accounts: archive.accounts.map(item => item.id === 'cash' ? { ...item, revision: 1, updatedAt: at, deletedAt: at } : item), recurring: [{ ...rule, active: false, revision: 1 }] }).render();
+  assert.deepEqual(nav(closedRoot), [true, true, false]);
+  assert.equal(buttons(closedRoot), 'Eliminar recurrente');
 });

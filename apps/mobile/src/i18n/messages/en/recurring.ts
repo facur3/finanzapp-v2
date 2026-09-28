@@ -29,11 +29,16 @@ export const recurring: Pick<Messages, 'recurring'> = {
       pausedCaption: 'Not recorded until you resume them',
     },
     row: {
-      label: 'Edit recurring {merchant}, {frequency}, {category}, {amount} {currency}, next {date}',
-      labelPaused: 'Edit recurring {merchant}, {frequency}, {category}, {amount} {currency}, paused',
+      label: '{merchant}, {frequency}, {category}, {amount} {currency}, next {date}',
+      labelPaused: '{merchant}, {frequency}, {category}, {amount} {currency}, paused',
+      hint: 'Opens the details of this recurring item',
       paused: 'Paused',
       review: 'Review',
-      labelReview: 'Edit recurring {merchant}, {frequency}, {category}, {amount} {currency}, needs review: not recorded since {date}',
+      labelReview: '{merchant}, {frequency}, {category}, {amount} {currency}, needs review: not recorded since {date}',
+    },
+    detail: {
+      edit: 'Edit recurring item',
+      active: 'Active',
     },
     manage: {
       pause: 'Pause',
@@ -43,6 +48,7 @@ export const recurring: Pick<Messages, 'recurring'> = {
       resumeRule: 'Resume recurring item',
       deleteRule: 'Delete recurring item',
       pausedNote: 'Paused: nothing is recorded until you resume it. Anything due in the meantime is not recorded.',
+      closedNote: 'Paused: its account or card was deleted, so it is not recorded again. Choose another compatible account or card from Edit and then resume it, or delete this recurring item.',
       reviewNote: 'FinanzApp couldn’t record this recurring rule since {date}. Continue from today to pick it up without recording the earlier ones, or pause it.',
       continueFromToday: 'Continue from today',
       deleteTitle: 'Delete “{merchant}”?',

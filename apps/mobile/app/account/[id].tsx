@@ -12,13 +12,16 @@ import { space, useCurrentDay, usePalette } from '../../src/ui/theme';
 
 /** A cash account as a financial object: its recorded balance, this month's
  * recorded income and expenses, the three actions it supports and its history.
- * Cards and debts redirect to their own screens. */
+ * Cards and debts redirect to their own screens. The opening balance (25B3) is
+ * part of the ledger (`openingMinor`: stored, backed up, the start of every
+ * balance) but not a daily figure, so it has no row here; the recorded balance
+ * already carries it, and the backup file keeps it readable for an audit. */
 export default function AccountScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { snapshot, archive } = useLedger();
   const day = useCurrentDay();
   const p = usePalette();
-  const { t, codedAmount, spokenAmount } = useI18n();
+  const { t } = useI18n();
   const entries = useMemo(() => snapshot ? selectEntries(snapshot.entries, snapshot.accounts, 'all', '', id) : [], [snapshot, id]);
   const transfers = useMemo(() => snapshot ? selectTransfers(snapshot.transfers ?? [], snapshot.accounts, '', id) : [], [snapshot, id]);
   const account = snapshot?.accounts.find(item => item.id === id);
@@ -58,12 +61,10 @@ export default function AccountScreen() {
         <Stat label={t('accounts.detail.monthIncome')}><Money minor={month.income} currency={account.currency} size={17} tone={month.income ? 'income' : 'neutral'} signed={month.income > 0} /></Stat>
       </StatRow></Surface>}
       {live && <QuickActions accountId={id} currency={account.currency} />}
-      <Surface grouped>
-        {live && <DetailRow label={t('accounts.detail.recurring')} value={recurringCount ? t('accounts.detail.activeRecurring', { count: recurringCount }) : t('accounts.detail.schedule')} icon="repeat-outline"
-          onPress={() => router.push({ pathname: '/recurring', params: { accountId: id } })} />}
-        <DetailRow label={t('accounts.detail.openingBalance')} value={codedAmount(account.openingMinor, account.currency)}
-          spokenValue={spokenAmount(account.openingMinor, account.currency)} icon="flag-outline" last />
-      </Surface>
+      {live && <Surface grouped>
+        <DetailRow label={t('accounts.detail.recurring')} value={recurringCount ? t('accounts.detail.activeRecurring', { count: recurringCount }) : t('accounts.detail.schedule')} icon="repeat-outline"
+          onPress={() => router.push({ pathname: '/recurring', params: { accountId: id } })} last />
+      </Surface>}
       <SectionTitle>{t('accounts.detail.movements')}</SectionTitle>
     </View>} empty={<AppText secondary variant="subhead">{t('accounts.detail.empty')}</AppText>} />
   </>;

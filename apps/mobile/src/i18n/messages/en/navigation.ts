@@ -29,6 +29,7 @@ export const navigation: Pick<Messages, 'nav' | 'boot'> = {
       reportDay: 'Spending for the day',
       reportComparison: 'Compare spending',
       recurring: 'Recurring',
+      recurringRule: 'Recurring item',
       budgets: 'Budgets',
       card: 'Card',
       debts: 'Debts',

@@ -15,9 +15,10 @@ import { space, useCurrentDay, usePalette } from '../src/ui/theme';
 /** Recurring rules are commitments, not payments: each one posts a normal
  * movement when its date arrives, once (a deterministic id per occurrence). The
  * 30-day view is a projection per currency; the payments a rule actually
- * registered are listed in its detail (24UX2). A row is paused, resumed or deleted
- * with a trailing swipe or from its detail (24UX4); a deleted rule leaves the list
- * while the movements it recorded stay in Movimientos. */
+ * registered are listed in its detail (24UX2). A row opens the rule's detail
+ * (25B3: read first, Editar from there, like every other financial object); it is
+ * paused, resumed or deleted with a trailing swipe or from that detail (24UX4); a
+ * deleted rule leaves the list while the movements it recorded stay in Movimientos. */
 export default function RecurringScreen() {
   const { accountId } = useLocalSearchParams<{ accountId?: string }>();
   const { archive, snapshot } = useLedger();
@@ -82,7 +83,8 @@ export default function RecurringScreen() {
  * «Pausado» where the due day would be, in its caption and in its VoiceOver sentence. Pause/resume and delete are
  * trailing swipe actions (24UX4, replacing the row's switch), and VoiceOver custom actions on the same row.
  * 24UX5: an active rule the catch-up set aside (its next date is already past) says «Revisar» in amber where the day
- * would be, never «Hoy»: its detail explains and offers to continue from today. */
+ * would be, never «Hoy»: its detail explains and offers to continue from today. 25B3: the row opens the detail, and
+ * VoiceOver hears the rule itself («Alquiler, mensual, …») with a hint that it opens details, never «Editar». */
 function RecurringRow({ rule, accounts, day, last, actions }: {
   rule: RecurringRule; accounts: { id: string; name: string; currency: Currency }[]; day: string; last: boolean; actions: SwipeAction[];
 }) {
@@ -102,8 +104,8 @@ function RecurringRow({ rule, accounts, day, last, actions }: {
     amount: account ? spokenMinor(rule.amountMinor, account.currency) : '', currency: account?.currency ?? '', date: relativeDate(rule.nextDateISO, day, true) };
   return <SwipeRow actions={actions}><View style={{ borderBottomColor: p.line, borderBottomWidth: last ? 0 : StyleSheet.hairlineWidth }}>
     <PressFeedback feedback="highlight" accessibilityRole="button" accessibilityLabel={t(!rule.active ? 'recurring.row.labelPaused' : review ? 'recurring.row.labelReview' : 'recurring.row.label', spoken)}
-      {...swipeAccessibility(actions)}
-      onPress={() => router.push({ pathname: '/edit-recurring/[id]', params: { id: rule.id } })}
+      accessibilityHint={t('recurring.row.hint')} {...swipeAccessibility(actions)}
+      onPress={() => router.push({ pathname: '/recurring/[id]', params: { id: rule.id } })}
       style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, paddingHorizontal: 16, minHeight: 64 }}>
       <MerchantBadge merchant={rule.merchant} category={rule.category} kind={rule.kind} tone={income ? 'income' : 'neutral'} />
       <View style={{ flex: 1, minWidth: 0, gap: 8, flexDirection: stacked ? 'column' : 'row', alignItems: stacked ? 'flex-start' : 'center' }}>

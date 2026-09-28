@@ -17,7 +17,6 @@ export const accounts: Pick<Messages, 'accounts'> = {
       recurring: 'Recurring',
       activeRecurring: { one: '{count} active', other: '{count} active' },
       schedule: 'Schedule',
-      openingBalance: 'Opening balance',
       movements: 'Transactions',
       empty: 'No transactions in this account yet.',
     },
