@@ -53,6 +53,8 @@ export const installments: Pick<Messages, 'installments'> = {
       interest: 'Includes interest {amount}',
       financing: 'Includes financing {amount}',
       recognised: 'Recorded',
+      partial: 'Partly recorded',
+      partialDetail: 'Counts {counted} · undone {undone}',
       next: 'Next',
       future: 'Upcoming',
       undone: 'Undone',

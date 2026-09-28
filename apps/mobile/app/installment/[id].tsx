@@ -110,7 +110,7 @@ export default function InstallmentPlanScreen() {
       <SectionTitle caption={t('installments.detail.scheduleCaption')}>{t('installments.detail.schedule')}</SectionTitle>
       <Surface grouped>
         {rows.map((row, index) => <ScheduleRow key={row.number} row={row} count={plan.count} currency={plan.currency} financing={financing} last={index === rows.length - 1}
-          onPress={row.state === 'recognised' || row.state === 'undone' ? () => router.push({ pathname: '/entry/[id]', params: { id: row.entryId } }) : undefined} />)}
+          onPress={row.state === 'recognised' || row.state === 'undone' || row.state === 'partial' ? () => router.push({ pathname: '/entry/[id]', params: { id: row.entryId } }) : undefined} />)}
       </Surface>
     </View>
     {summary.deletable && <View style={{ gap: space.m }}>

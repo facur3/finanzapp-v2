@@ -88,15 +88,18 @@ export function PlanRow({ summary, onPress, last = false }: { summary: PlanSumma
 }
 
 const STATE_GLYPH: Record<ScheduleRowState, IconName> = {
-  recognised: 'checkmark-circle', next: 'radio-button-on', future: 'ellipse-outline', undone: 'arrow-undo-circle-outline', cancelled: 'remove-circle-outline',
+  recognised: 'checkmark-circle', partial: 'checkmark-circle-outline', next: 'radio-button-on', future: 'ellipse-outline', undone: 'arrow-undo-circle-outline',
+  cancelled: 'remove-circle-outline',
 };
 function stateColor(p: Palette, state: ScheduleRowState): string {
-  return state === 'next' ? p.text : state === 'recognised' ? p.secondary : state === 'undone' ? p.warning : p.tertiary;
+  return state === 'next' ? p.text : state === 'recognised' ? p.secondary : state === 'undone' || state === 'partial' ? p.warning : p.tertiary;
 }
 
 /** One instalment of a plan's Calendario: «Cuota 3 de 12», the statement it belongs to (its closing) and that
- * statement's due date, what it charges and its state (Registrada, Próxima, Futura, Deshecha, Cancelada). A row whose
- * movement exists (recorded or undone) opens that movement. `financing` names the extra share: interest only, or a mix. */
+ * statement's due date, what it charges and its state (Registrada, Registrada en parte, Próxima, Futura, Deshecha,
+ * Cancelada). Each share has its own movement: when the person undid only one of them, the row says what still counts.
+ * A row whose movement exists (recorded, partial or undone) opens that movement. `financing` names the extra share:
+ * interest only, or a mix. */
 export function ScheduleRow({ row, count, currency, financing, onPress, last = false }: {
   row: PlanScheduleRow; count: number; currency: Currency; financing: 'interest' | 'financing'; onPress?: () => void; last?: boolean;
 }) {
@@ -111,7 +114,9 @@ export function ScheduleRow({ row, count, currency, financing, onPress, last = f
   const extraKey = financing === 'interest' ? 'installments.schedule.interest' : 'installments.schedule.financing';
   const extra = row.financingMinor > 0 ? t(extraKey, { amount: moneyText(row.financingMinor, currency) }) : null;
   const spokenExtra = row.financingMinor > 0 ? t(extraKey, { amount: spokenMoney(row.financingMinor, currency) }) : null;
-  const label = [title, spokenMoney(row.totalMinor, currency), state, spokenDates, spokenExtra].filter(Boolean).join(', ');
+  const partial = row.state === 'partial' ? t('installments.schedule.partialDetail', { counted: moneyText(row.recognisedMinor, currency), undone: moneyText(row.undoneMinor, currency) }) : null;
+  const spokenPartial = row.state === 'partial' ? t('installments.schedule.partialDetail', { counted: spokenMoney(row.recognisedMinor, currency), undone: spokenMoney(row.undoneMinor, currency) }) : null;
+  const label = [title, spokenMoney(row.totalMinor, currency), state, spokenPartial, spokenDates, spokenExtra].filter(Boolean).join(', ');
   const faded = row.state === 'undone' || row.state === 'cancelled';
   const content = <>
     <View style={styles.glyph}><Ionicons name={STATE_GLYPH[row.state]} size={20} color={stateColor(p, row.state)} accessible={false} /></View>
@@ -120,6 +125,7 @@ export function ScheduleRow({ row, count, currency, financing, onPress, last = f
         <AppText style={{ fontWeight: '500' }}>{title}</AppText>
         <AppText secondary variant="footnote">{dates}</AppText>
         {!!extra && <AppText tertiary variant="footnote">{extra}</AppText>}
+        {!!partial && <AppText variant="footnote" style={{ color: p.warning }}>{partial}</AppText>}
       </View>
       <View style={{ alignItems: stacked ? 'flex-start' : 'flex-end', maxWidth: stacked ? '100%' : '56%' }}>
         <Money minor={row.totalMinor} currency={currency} color={faded ? p.tertiary : undefined} />

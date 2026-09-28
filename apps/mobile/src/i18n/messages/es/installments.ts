@@ -70,6 +70,10 @@ export const installments = {
       financing: 'Incluye financiación {amount}',
       /** The instalment's state, one word (la cuota). */
       recognised: 'Registrada',
+      /** Some shares of the instalment count and the person undid another (its principal or its interest). */
+      partial: 'Registrada en parte',
+      /** Under a partial row: what still counts and what was undone. */
+      partialDetail: 'Cuenta {counted} · deshecho {undone}',
       next: 'Próxima',
       future: 'Futura',
       undone: 'Deshecha',
