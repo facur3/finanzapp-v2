@@ -2,12 +2,13 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { AppState } from 'react-native';
 import { snapshotFromArchive, todayKey, type Account, type Entry, type EntryChange, type LedgerArchive, type LedgerSnapshot,
   type AccountChange, type Transfer, type TransferChange, type RecurringRule, type MonthlyBudget,
-  type CreditCardProfile, type PersonalDebtProfile, type AccountAppearance, type CategoryDefinition } from '@finanzapp/domain';
+  type CreditCardProfile, type PersonalDebtProfile, type AccountAppearance, type CategoryDefinition, type InstallmentPlan } from '@finanzapp/domain';
 import type { CurrencyGate } from '@finanzapp/domain';
 import { currencyGateForBuild } from './currency-gate';
 import { changeEntry, createAccount, createEntry, deleteAccount, deleteCreditCard, importArchive, readArchive, changeAccount,
   createTransfer, changeTransfer, saveRecurringRule, processRecurring, saveMonthlyBudget,
   createCreditCard, saveCreditCard, createPersonalDebt, savePersonalDebt, deletePersonalDebt, saveAccountAppearance, saveCategoryDefinition,
+  createInstallmentPlan, cancelInstallmentPlan, deleteInstallmentPlan, catchUpInstallments,
   type LedgerDatabase } from './database';
 import { openLedger, refreshLedger } from './ledger-session';
 import { openLedgerDatabase } from './nativeDatabase';
@@ -44,6 +45,11 @@ type LedgerContextValue = {
   saveDebt: (debt: PersonalDebtProfile) => Promise<void>;
   /** 25B2 close: the deletion record of a debt tracker; refused with a balance left and recorded payments or collections. */
   removeDebt: (debtId: string) => Promise<void>;
+  /** Producto 24T1: a purchase in instalments (the plan only; its instalments are recognised as their statements close). */
+  addInstallmentPlan: (plan: InstallmentPlan) => Promise<void>;
+  cancelInstallmentPlan: (planId: string) => Promise<void>;
+  /** Only a plan that recorded nothing; one with history is cancelled. */
+  removeInstallmentPlan: (planId: string) => Promise<void>;
   restoreBackup: (incoming: LedgerArchive, baseline: string) => Promise<void>;
 };
 const LedgerContext = createContext<LedgerContextValue | null>(null);
@@ -137,9 +143,16 @@ export function LedgerProvider({ children }: { children: ReactNode }) {
     addDebt: (account, debt) => mutate(db => createPersonalDebt(db, account, debt, BUILD_CURRENCY_GATE)),
     saveDebt: debt => mutate(db => savePersonalDebt(db, debt)),
     removeDebt: debtId => mutate(db => deletePersonalDebt(db, debtId, new Date().toISOString())),
+    addInstallmentPlan: plan => mutate(async db => {
+      await createInstallmentPlan(db, plan);
+      await catchUpInstallments(db, todayKey()); // A first instalment on a statement already closed is recognised at once.
+    }),
+    cancelInstallmentPlan: planId => mutate(db => cancelInstallmentPlan(db, planId, new Date().toISOString())),
+    removeInstallmentPlan: planId => mutate(db => deleteInstallmentPlan(db, planId, new Date().toISOString())),
     restoreBackup: (incoming, baseline) => mutate(async db => {
       await importArchive(db, incoming, baseline);
       await processRecurring(db, todayKey());
+      await catchUpInstallments(db, todayKey());
     }),
   }}>{children}</LedgerContext.Provider>;
 }

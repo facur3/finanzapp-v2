@@ -381,6 +381,23 @@ importe, moneda y estado.
   muestra hasta que toda la app lo tenga (23.1): un iPhone en inglés sigue leyendo
   español antes que media app traducida.
 
+## Producto 24T1 — vocabulario de cuotas (sin cambios visuales)
+
+El motor de compras en cuotas existe en el dominio y el almacenamiento (decisión 003, regla 7); ninguna pantalla lo
+usa todavía. Las palabras que 24T2 dibujará y que ninguna pantalla mezcla:
+
+- **Compra**: la operación (comercio, precio, fecha). **Plan**: la fila que la representa, con su calendario exacto.
+- **Cuota futura**: sin movimiento en el libro; un compromiso, nunca un gasto. **Cuota reconocida / facturada**: su
+  movimiento está en el libro; cuenta una vez, en el mes de su cierre, en la categoría original, y sube el saldo
+  pendiente. **Cuota deshecha**: la persona la deshizo; no cuenta y la obligación sigue abierta.
+- **Saldo pendiente actual**: lo exigible hoy (compras y cuotas reconocidas menos pagos). **Cuotas comprometidas**:
+  el principal futuro, al lado del saldo pendiente y nunca dentro. **Principal restante**: lo no reconocido.
+- **Pago**: una transferencia a la tarjeta. Nunca «paga» una cuota concreta: no existe «3/12 pagadas»; existe «3/12
+  facturadas». La palabra «pagada» no aparece salvo que el sistema lo sepa de verdad.
+- **Financiación** (intereses, cargos, impuestos): un gasto aparte, en su propia categoría; nunca principal.
+- **Disponible de la tarjeta** con un plan pendiente: desconocido hasta que la decisión 003 registre cómo reserva el
+  emisor; 24T2 decide cómo se muestra (no un cero, no un número inventado).
+
 ## Producto 25B3 — jerarquía de detalle (sin rediseño)
 
 Dos correcciones pequeñas de jerarquía antes de empezar cuotas (24T). Nada cambia en cómo se registra,

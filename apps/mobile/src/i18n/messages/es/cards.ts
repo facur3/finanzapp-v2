@@ -98,6 +98,8 @@ export const cards = {
       blockedTitle: 'Todavía no se puede eliminar',
       blockedDetail: 'Esta tarjeta tiene un saldo pendiente de {amount}. Pagalo primero, o archivala: deja de aparecer y conserva el saldo para pagarlo cuando quieras.',
       blockedPay: 'Pagar',
+      /** 24T1: a card with a pending instalment plan (the same rule storage enforces). Archiving keeps every instalment payable. */
+      blockedPlanDetail: 'Esta tarjeta tiene cuotas pendientes. Archivala: deja de aparecer y sus cuotas siguen registrándose y pagándose cuando corresponde.',
       blockedArchive: 'Archivar',
       deleteConfirm: 'Eliminar',
       deleteFailed: 'No pudimos eliminar la tarjeta. Sigue como estaba; probá nuevamente.',

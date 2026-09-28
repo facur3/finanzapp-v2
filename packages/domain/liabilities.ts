@@ -1,5 +1,6 @@
 import { ACCOUNT_DELETED_MESSAGE, accountBalanceMinor, isLiveAccount, validDateISO, type Account, type Currency, type Entry, type EntryKind, type LedgerSnapshot, type Transfer } from './ledger.ts';
 import { assertStorableCurrency, sortCurrencies } from './currency.ts';
+import { CARD_PLAN_MESSAGE, cardHasPendingInstallments, type InstallmentPlan, type RecordedEntry } from './installments.ts';
 
 /** A credit card is a hidden internal ledger account. A purchase (without
  * instalments) is an expense posted to that account exactly once for its full price
@@ -198,10 +199,12 @@ export function assertOpenAccount(accountId: string, accounts: readonly Account[
   if (debts.some(debt => debt.deleted && debt.accountId === accountId)) throw new Error(DEBT_DELETED_MESSAGE);
 }
 
-/** Whether a card may be deleted now: no balance due (and, from 24T on, no pending instalment plan). */
-export function assertCardDeletable(card: CreditCardProfile, snapshot: LedgerSnapshot): void {
+/** Whether a card may be deleted now: no balance due and (24T1) no pending instalment plan: a live plan with an instalment
+ * not yet recognised (future, not recorded, or undone). The one place of that rule: storage and the UI both call it. */
+export function assertCardDeletable(card: CreditCardProfile, snapshot: LedgerSnapshot, plans: readonly InstallmentPlan[] = [], records: readonly RecordedEntry[] = []): void {
   if (card.deleted) throw new Error(CARD_DELETED_MESSAGE);
   if (cardDebtMinor(card, snapshot) > 0) throw new Error(CARD_DEBT_MESSAGE);
+  if (cardHasPendingInstallments(card, plans, records)) throw new Error(CARD_PLAN_MESSAGE);
 }
 
 /** The deletion record of a card (25B2): inactive, deleted, one revision on. Never twice. */
@@ -314,8 +317,12 @@ export function cardCreditMinor(card: CreditCardProfile, snapshot: LedgerSnapsho
   const account = accountFor(card.accountId, snapshot.accounts);
   return Math.max(0, accountBalanceMinor(account, snapshot.entries, snapshot.transfers));
 }
-export function cardAvailableLimitMinor(card: CreditCardProfile, snapshot: LedgerSnapshot): number | null {
+/** The limit left, or null without a limit. 24T1 gate: how the issuer reserves credit for pending instalments (the whole
+ * plan, or only the billed part) is not assumed, so a card with a pending plan answers null (unknown) until decision 003
+ * records the rule; 24T2 decides how that is shown. */
+export function cardAvailableLimitMinor(card: CreditCardProfile, snapshot: LedgerSnapshot, plans: readonly InstallmentPlan[] = [], records: readonly RecordedEntry[] = []): number | null {
   if (card.creditLimitMinor === null) return null;
+  if (cardHasPendingInstallments(card, plans, records)) return null;
   return card.creditLimitMinor - cardDebtMinor(card, snapshot);
 }
 

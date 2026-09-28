@@ -36,7 +36,7 @@ const rules: domain.RecurringRule[] = [
   { id: 'r2', accountId: 'cash', kind: 'expense', amountMinor: 100, merchant: 'Pausado', category: 'Salud', frequency: 'monthly', anchorDateISO: '2026-09-15', nextDateISO: '2026-10-15', active: false, deleted: false, createdAt, revision: 1, updatedAt: createdAt },
 ];
 
-function harness({ fail = false, language = 'es-AR' as const, paid = false, deletedAccount = false, debtTransfers = [] as domain.Transfer[] } = {}) {
+function harness({ fail = false, language = 'es-AR' as const, paid = false, deletedAccount = false, debtTransfers = [] as domain.Transfer[], plans = [] as domain.InstallmentPlan[] } = {}) {
   const source = readFileSync(new URL('../src/ui/commitment-actions.ts', import.meta.url), 'utf8');
   const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, esModuleInterop: true } }).outputText;
   const alerts: { title: string; message: string; buttons: { text: string; style?: string; onPress?: () => void }[] }[] = [];
@@ -54,7 +54,7 @@ function harness({ fail = false, language = 'es-AR' as const, paid = false, dele
     'expo-router': { router: { push: (target: unknown) => pushed.push(target) } },
     'expo-haptics': { NotificationFeedbackType: { Success: 'Success' }, notificationAsync: async () => {}, selectionAsync: async () => {} },
     '@finanzapp/domain': domain,
-    '../storage/LedgerProvider': { useLedger: () => ({ snapshot, archive: { accounts: snapshot.accounts, records: [], recurring: rules, cards: [card] },
+    '../storage/LedgerProvider': { useLedger: () => ({ snapshot, archive: { accounts: snapshot.accounts, records: entries.map(domain.initialRecord), recurring: rules, cards: [card], installmentPlans: plans },
       removeAccount: async (id: string) => { if (fail) throw new Error('disk full'); removed.push(id); },
       saveCard: async (next: domain.CreditCardProfile) => { if (fail) throw new Error('disk full'); savedCards.push(next); },
       removeCard: async (id: string) => { if (fail) throw new Error('disk full'); removedCards.push(id); },
@@ -263,4 +263,30 @@ test('25B2 close: Cerrar then Reabrir from the row keep the tracker as it was (r
   await settle();
   assert.deepEqual(view.savedDebts[1], { ...owed, revision: 2, updatedAt: view.savedDebts[1].updatedAt });
   assert.equal(view.removedDebts.length, 0);
+});
+
+// ---- Producto 24T1: a card with a pending instalment plan ----------------------------------------------------------------
+
+test('24T1: a card with a pending instalment plan and no balance due is not deleted: the dialog says so and offers Archivar (never Pagar); an archived card gets Cancelar only; nothing is written by the dialog', async () => {
+  const plan = domain.newInstallmentPlan({ id: 'tv', card, cardAccount, merchant: 'Electro', category: 'Hogar', purchaseDateISO: '2026-09-10', principalMinor: 120000, count: 12, placement: 'next', createdAt });
+  const view = harness({ paid: true, plans: [plan] });
+  let done = 0;
+  view.render('useCardManagement').remove(card, () => done++);
+  assert.equal(view.alerts[0].title, 'Todavía no se puede eliminar');
+  assert.equal(view.alerts[0].message, 'Esta tarjeta tiene cuotas pendientes. Archivala: deja de aparecer y sus cuotas siguen registrándose y pagándose cuando corresponde.');
+  assert.equal(buttons(view.alerts[0]), JSON.stringify([['Cancelar', 'cancel'], ['Archivar', null]]));
+  assert.equal(view.removedCards.length + view.savedCards.length + view.pushed.length, 0, 'the dialog writes nothing');
+  view.alerts[0].buttons[1].onPress!();
+  await settle();
+  assert.deepEqual([view.savedCards[0].active, view.savedCards[0].revision, done], [false, 1, 1], 'Archivar keeps the plan payable');
+  // The same domain rule as storage: with the balance due the debt dialog comes first; a cancelled plan no longer blocks.
+  const cancelled = harness({ paid: true, plans: [domain.cancelInstallmentPlan(plan, createdAt)] });
+  cancelled.render('useCardManagement').remove(card);
+  assert.equal(cancelled.alerts[0].title, '¿Eliminar esta tarjeta?');
+  const archived = harness({ paid: true, plans: [plan] });
+  archived.render('useCardManagement').remove({ ...card, active: false });
+  assert.equal(buttons(archived.alerts[0]), JSON.stringify([['Cancelar', 'cancel']]));
+  const english = harness({ paid: true, plans: [plan], language: 'en-US' as never });
+  english.render('useCardManagement').remove(card);
+  assert.equal(english.alerts[0].message, 'This card has pending instalments. Archive it: it leaves Cards and its instalments keep being recorded and paid when they come due.');
 });

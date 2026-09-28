@@ -6,13 +6,17 @@ import { CARD_DEBT_MESSAGE, CARD_DELETED_MESSAGE, accountKind, assertCardDeletab
 import { summarizeMonthlyBudgets, type MonthlyBudget } from './budgets';
 import { summarizeMonth } from './month-summary';
 import { spendingReport } from './spending-report';
+import { CARD_PLAN_MESSAGE, INSTALLMENT_ENTRY_MESSAGE, PLAN_CARD_MESSAGE, PLAN_CHANGE_MESSAGE, PLAN_FINANCING_MESSAGE, PLAN_TOO_SMALL_MESSAGE, assertInstallmentEntryChange, cardCommittedMinor, distributeMinor,
+  installmentEntryId, installmentOccurrenceOf, installmentPlanFigures, materializeInstallmentPlan, newInstallmentPlan, validateInstallmentPlan, validateInstallmentPlanChange } from './installments';
+import { deleteRecurringRule, materializeRecurringRule, pauseRecurringRule, recurringEntryId, recurringOccurrenceOf, type RecurringRule } from './recurring';
+import { initialRecord, type EntryRecord } from './recovery';
+import { cardAvailableLimitMinor } from './liabilities';
 
 /** The financial semantics of a credit card, recorded at the close of Producto 25B2 (decision 003,
  * «Invariantes contables de tarjetas»). Each block is one invariant; a change that breaks one is a
  * regression, not a redesign. 2 is a purchase **without** instalments (the full price, one expense, once).
- * Instalments (24T) are not modelled yet: 7 pins what exists today, and 7b lists the decided 24T contract
- * (revised 2026-09-28: the principal is recognised instalment by instalment, never the full price up front)
- * as `it.todo` until 24T1 implements it. */
+ * 7 pins the lifecycle without plans; 7b is the 24T contract (revised 2026-09-28: the principal is recognised
+ * instalment by instalment, never the full price up front), implemented by Producto 24T1. */
 const createdAt = '2026-09-01T12:00:00.000Z';
 const now = '2026-09-28T10:00:00.000Z';
 const bank: Account = { id: 'bank', name: 'Banco', currency: 'ARS', openingMinor: 100000, createdAt };
@@ -136,21 +140,115 @@ describe('7. lifecycle (what exists before 24T)', () => {
   });
 });
 
-// Decision 003, rule 7 (revised 2026-09-28). Not implemented: each line becomes a test in 24T1/24T2/24T3.
-describe('7b. instalments (the 24T contract, not implemented yet)', () => {
-  it.todo('a purchase in instalments is one purchase and one InstallmentPlan, never a RecurringRule');
-  it.todo('buying in instalments moves no cash account and does not count the full price as an expense on the purchase date');
-  it.todo('each principal instalment counts as an expense in its own period; the parent purchase never adds the full principal again');
-  it.todo('the principal instalments sum exactly to the total principal in minor units (exponents 0, 2 and 3)');
-  it.todo('interest, fees and financing taxes are recorded separately, never as principal');
-  it.todo('the card balance due holds only the instalments already on a statement; future instalments are separate commitments');
-  it.todo('purchase price, billed balance due, future committed instalments, plan remaining and already paid are distinct figures');
-  it.todo('paying the statement stays a transfer and never a second expense');
-  it.todo('available credit with pending plans is not computed until the issuer-reservation gate is decided');
-  it.todo('archiving keeps every plan payable; deleting is refused with a balance due or any pending plan; a deleted card keeps its finished plans');
-  it.todo('pausing or deleting a recurring rule never touches an instalment plan');
-  it.todo('a refund or an early payment is tied to the original purchase/plan and never duplicates an expense; a partial refund keeps the rest');
-  it.todo('a foreign-currency plan keeps purchase, billing and paying currencies, the exact debited and credited amounts, and the rate/fees with provenance');
+// Decision 003, rule 7 (revised 2026-09-28), implemented by Producto 24T1 (`installments.ts`): one test per line of the
+// contract. The refund/early-payoff operation itself and the foreign-currency record stay for 24T3 and 24C2: here the
+// model proves it cannot drift into the states those deliveries will fill.
+describe('7b. instalments (Producto 24T1)', () => {
+  const tv = newInstallmentPlan({ id: 'tv', card, cardAccount, merchant: 'Electro', category: 'Hogar', purchaseDateISO: '2026-09-10', principalMinor: 120000, count: 12, placement: 'current', createdAt });
+  const recognised = (throughISO: string) => materializeInstallmentPlan(tv, card, throughISO, new Set()).map(initialRecord);
+  const withPlan = (records: EntryRecord[], transfers: Transfer[] = []): LedgerSnapshot => ({ accounts, entries: records.map(record => record.entry), transfers });
+
+  it('a purchase in instalments is one purchase and one InstallmentPlan, never a RecurringRule', () => {
+    expect(tv.count).toBe(12);
+    expect(tv.schedule.length).toBe(12);
+    expect(Object.keys(tv)).not.toContain('frequency');
+    expect(recurringOccurrenceOf(installmentEntryId('tv', 1))).toBeNull();
+    expect(installmentOccurrenceOf(recurringEntryId('tv', '2026-09-20'))).toBeNull();
+    expect(() => validateInstallmentPlan({ ...tv, cardId: 'debt' }, [card], accounts)).toThrow(PLAN_CARD_MESSAGE);
+  });
+  it('buying in instalments moves no cash account and does not count the full price as an expense on the purchase date', () => {
+    const bought: LedgerSnapshot = withPlan(recognised('2026-09-10'));
+    expect(bought.entries).toEqual([]);
+    expect(expenseOf(bought)).toEqual({ minor: 0, count: 0 });
+    expect([balance(bank, bought), balance(wallet, bought)]).toEqual([100000, 20000]);
+    expect(cardDebtMinor(card, bought)).toBe(0);
+    expect(liquidTotalsByCurrency(bought, [card], [debt])).toEqual(liquidTotalsByCurrency(empty, [card], [debt]));
+  });
+  it('each principal instalment counts as an expense in its own period; the parent purchase never adds the full principal again', () => {
+    const records = recognised('2026-10-25');
+    const snapshot = withPlan(records);
+    expect(expenseOf(snapshot)).toEqual({ minor: 10000, count: 1 });
+    expect(monthOf(snapshot)).toEqual({ expense: 10000, income: 0, count: 1 });
+    const october = spendingReport(snapshot, 'ARS', '2026-10', '2026-10-31');
+    expect(october.status === 'ready' && october.expenseMinor).toBe(10000);
+    expect(snapshot.entries.some(entry => entry.amountMinor === 120000)).toBe(false);
+    expect(installmentPlanFigures(tv, records).recognisedMinor).toBe(20000);
+  });
+  it('the principal instalments sum exactly to the total principal in minor units (exponents 0, 2 and 3)', () => {
+    expect(tv.schedule.reduce((sum, row) => sum + row.principalMinor, 0)).toBe(120000);
+    expect(distributeMinor(100, 3)).toEqual([34, 33, 33]);
+    expect(distributeMinor(10000, 3)).toEqual([3334, 3333, 3333]);
+    expect(distributeMinor(100000, 3)).toEqual([33334, 33333, 33333]);
+    expect(() => distributeMinor(1, 2)).toThrow(PLAN_TOO_SMALL_MESSAGE);
+  });
+  it('interest, fees and financing taxes are recorded separately, never as principal', () => {
+    const financed = newInstallmentPlan({ id: 'fin', card, cardAccount, merchant: 'Electro', category: 'Hogar', purchaseDateISO: '2026-09-10', principalMinor: 120000, count: 12,
+      placement: 'current', interestMinor: 600, feeMinor: 300, taxMinor: 300, financingCategory: 'Intereses', createdAt });
+    expect(financed.principalMinor).toBe(120000);
+    const entries = materializeInstallmentPlan(financed, card, '2026-09-20', new Set());
+    expect(entries.map(entry => [entry.category, entry.amountMinor])).toEqual([['Hogar', 10000], ['Intereses', 100]]);
+    expect(() => newInstallmentPlan({ id: 'x', card, cardAccount, merchant: 'E', category: 'H', purchaseDateISO: '2026-09-10', principalMinor: 100, count: 1, placement: 'current', interestMinor: 5, createdAt })).toThrow(PLAN_FINANCING_MESSAGE);
+  });
+  it('the card balance due holds only the instalments already on a statement; future instalments are separate commitments', () => {
+    const records = recognised('2026-10-25');
+    expect(cardDebtMinor(card, withPlan(records))).toBe(20000);
+    expect(cardCommittedMinor(card, [tv], records)).toBe(100000);
+    expect(installmentPlanFigures(tv, records).scheduledMinor).toBe(100000);
+  });
+  it('purchase price, billed balance due, future committed instalments, plan remaining and already recognised are distinct figures; nothing is «paid» from a general payment', () => {
+    const records = recognised('2026-11-25');
+    const payment: Transfer = { id: 't', fromAccountId: bank.id, toAccountId: cardAccount.id, amountMinor: 25000, note: 'Pago', dateISO: '2026-11-26', createdAt };
+    const figures = installmentPlanFigures(tv, records);
+    expect([figures.principalMinor, cardDebtMinor(card, withPlan(records, [payment])), figures.scheduledMinor, figures.remainingMinor, figures.recognisedMinor]).toEqual([120000, 5000, 90000, 90000, 30000]);
+    expect(Object.keys(figures)).not.toContain('paidMinor');
+    expect(installmentPlanFigures(tv, records)).toEqual(figures);
+  });
+  it('paying the statement stays a transfer and never a second expense', () => {
+    const records = recognised('2026-09-25');
+    const payment: Transfer = { id: 't', fromAccountId: bank.id, toAccountId: cardAccount.id, amountMinor: 10000, note: 'Pago', dateISO: '2026-09-26', createdAt };
+    expect(() => assertTransferSides(payment, [card], [debt], accounts)).not.toThrow();
+    expect(expenseOf(withPlan(records, [payment]))).toEqual(expenseOf(withPlan(records)));
+    expect(cardDebtMinor(card, withPlan(records, [payment]))).toBe(0);
+    expect(balance(bank, withPlan(records, [payment]))).toBe(100000 - 10000);
+  });
+  it('available credit with pending plans is not computed until the issuer-reservation gate is decided', () => {
+    expect(cardAvailableLimitMinor(card, empty)).toBe(500000);
+    expect(cardAvailableLimitMinor(card, empty, [tv], [])).toBeNull();
+  });
+  it('archiving keeps every plan payable; deleting is refused with a balance due or any pending plan; a deleted card keeps its finished plans', () => {
+    const records = recognised('2026-09-25');
+    const paid: Transfer = { id: 't', fromAccountId: bank.id, toAccountId: cardAccount.id, amountMinor: 10000, note: 'Pago', dateISO: '2026-09-26', createdAt };
+    const archived = { ...card, active: false, revision: 1, updatedAt: now };
+    expect(materializeInstallmentPlan(tv, archived, '2026-10-25', new Set(records.map(record => record.entry.id))).length).toBe(1);
+    expect(() => assertTransferSides(paid, [archived], [debt], accounts)).not.toThrow();
+    expect(() => assertCardDeletable(card, withPlan(records), [tv], records)).toThrow(CARD_DEBT_MESSAGE);
+    expect(() => assertCardDeletable(card, withPlan(records, [paid]), [tv], records)).toThrow(CARD_PLAN_MESSAGE);
+    const done = recognised('2027-08-20');
+    const settled: Transfer = { ...paid, amountMinor: 120000 };
+    expect(() => assertCardDeletable(card, withPlan(done, [settled]), [tv], done)).not.toThrow();
+    const gone = deleteCreditCard(card, now);
+    expect(materializeInstallmentPlan(tv, gone, '2030-01-01', new Set())).toEqual([]);
+    expect(installmentPlanFigures(tv, done).status).toBe('completed');
+  });
+  it('pausing or deleting a recurring rule never touches an instalment plan', () => {
+    const rule: RecurringRule = { id: 'tv', accountId: cardAccount.id, kind: 'expense', amountMinor: 10000, merchant: 'Electro', category: 'Hogar', frequency: 'monthly',
+      anchorDateISO: '2026-09-20', nextDateISO: '2026-09-20', active: true, deleted: false, createdAt, revision: 0, updatedAt: createdAt };
+    const known = new Set(materializeRecurringRule(rule, accounts, '2026-09-25', now).entries.map(entry => entry.id));
+    expect(materializeInstallmentPlan(tv, card, '2026-09-25', known).map(entry => entry.id)).toEqual(['inst_tv_001']);
+    for (const changed of [pauseRecurringRule(rule, now), deleteRecurringRule(rule, now)]) {
+      expect(changed.id).toBe(tv.id);
+      expect(materializeInstallmentPlan(tv, card, '2026-09-25', new Set()).length).toBe(1);
+    }
+  });
+  it('a refund or an early payment is tied to the original purchase/plan and never duplicates an expense; a partial refund keeps the rest (24T3 fills the operation; the model refuses any other path)', () => {
+    for (const change of [{ principalMinor: 100000 }, { count: 10 }, { schedule: tv.schedule.slice(0, 11) }]) {
+      expect(() => validateInstallmentPlanChange(tv, { ...tv, ...change, revision: 1, updatedAt: now })).toThrow(PLAN_CHANGE_MESSAGE);
+    }
+    const [first] = materializeInstallmentPlan(tv, card, '2026-09-20', new Set());
+    expect(() => assertInstallmentEntryChange(first, { ...first, amountMinor: 5000 })).toThrow(INSTALLMENT_ENTRY_MESSAGE);
+    expect(() => assertIncomeAccount(cardAccount.id, [card], [debt])).toThrow('Un ingreso se registra en una cuenta normal, no en una tarjeta.');
+  });
+  it.todo('a foreign-currency plan keeps purchase, billing and paying currencies, the exact debited and credited amounts, and the rate/fees with provenance (24C2; a 24T1 plan is same-currency: PLAN_CURRENCY_MESSAGE)');
 });
 
 describe('8. visible copy', () => {

@@ -1,5 +1,5 @@
 import type { LedgerArchive } from '@finanzapp/domain';
-import { catchUpRecurring, initializeDatabase, readArchive, type LedgerDatabase } from './database.ts';
+import { catchUpInstallments, catchUpRecurring, initializeDatabase, readArchive, type LedgerDatabase } from './database.ts';
 
 /** What LedgerProvider shows after opening or returning to the foreground: the archive as stored, the recurring rules
  * set aside for review (their ids), and whether the recurring catch-up itself could not run. */
@@ -20,5 +20,8 @@ export async function refreshLedger(db: LedgerDatabase, todayISO: string): Promi
   let recurringFailures: string[] = [], recurringError = false;
   try { recurringFailures = (await catchUpRecurring(db, todayISO)).failed; }
   catch { recurringError = true; }
+  // 24T1: the instalments whose statements closed, in their own pass (never through the recurring one); a failure here
+  // leaves the ledger as it was and still opens it, like the recurring catch-up.
+  try { await catchUpInstallments(db, todayISO); } catch { /* reported by the next catch-up; the data opens regardless */ }
   return { archive: await readArchive(db), recurringFailures, recurringError };
 }

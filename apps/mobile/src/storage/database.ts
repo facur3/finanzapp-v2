@@ -16,6 +16,9 @@ import {
   OBLIGATION_ACCOUNT_MESSAGE, assertOpenAccount, deleteAccount as deleteAccountRecord, hiddenLiabilityAccountIds, isLiveAccount, pauseRecurringRule,
   CARD_DELETE_PATH_MESSAGE, assertCardDeletable, deleteCreditCard as deleteCreditCardRecord,
   DEBT_DELETE_PATH_MESSAGE, assertDebtDeletable, deletePersonalDebt as deletePersonalDebtRecord,
+  PLAN_DELETE_PATH_MESSAGE, PLAN_EXISTS_MESSAGE, PLAN_MISSING_MESSAGE, assertInstallmentEntryChange, assertInstallmentPlanDeletable, assertNewEntryId,
+  cancelInstallmentPlan as cancelInstallmentPlanRecord, deleteInstallmentPlan as deleteInstallmentPlanRecord, materializeInstallmentPlan, sameInstallmentPlan,
+  validateInstallmentPlan, validateInstallmentPlanChange, type Installment, type InstallmentPlan,
 } from '@finanzapp/domain';
 
 type SqlValue = string | number | null;
@@ -33,7 +36,7 @@ export interface LedgerDatabase extends SqlExecutor {
 }
 
 export const DATABASE_NAME = 'finanzapp-native-pilot-v1.sqlite';
-export const DATABASE_VERSION = 11;
+export const DATABASE_VERSION = 12;
 
 /** Every column of each table, named: a row is read by these lists, never by `SELECT *`, so a
  * column added later cannot leak into a strict-key object, a backup or an audit receipt. */
@@ -47,6 +50,8 @@ const DEBT_COLUMNS = 'id, accountId, direction, counterparty, dueDateISO, note, 
 const APPEARANCE_COLUMNS = 'accountId, icon, color, createdAt, revision, updatedAt';
 const CATEGORY_COLUMNS = 'kind, key, storedLabel, label, icon, color, archived, createdAt, revision, updatedAt';
 const UNIT_COLUMNS = 'currency, minorUnitExponent, source, catalogVersion, createdAt';
+const PLAN_COLUMNS = 'id, cardId, merchant, category, currency, purchaseDateISO, principalMinor, count, interestMinor, feeMinor, taxMinor, financingCategory, cancelledAt, deleted, createdAt, revision, updatedAt';
+const INSTALLMENT_COLUMNS = 'planId, number, billingDateISO, dueDateISO, principalMinor, financingMinor';
 
 const SCHEMA = `
   CREATE TABLE accounts (
@@ -320,6 +325,46 @@ const MIGRATE_V11 = `
   PRAGMA user_version = 11;
 `;
 
+// Producto 24T1: purchases in instalments. Two additive tables, nothing else touched: a plan (one row per financed
+// purchase, owned by its card) and its exact schedule (one row per instalment, written once). No existing row is read
+// differently and no plan is fabricated for old data: a schema 11 file opens with empty tables. The movements a plan
+// recognises are ordinary `entries` rows whose ids name the plan and the instalment. Rows are never DELETEd (a plan
+// created by mistake is a `deleted` flag, a plan with history is `cancelledAt`). Guarded by user_version, in the
+// ordinary exclusive transaction; earlier builds refuse a schema 12 file, unchanged.
+const MIGRATE_V12 = `
+  CREATE TABLE IF NOT EXISTS installment_plans (
+    id TEXT PRIMARY KEY NOT NULL,
+    cardId TEXT NOT NULL REFERENCES credit_cards(id) ON DELETE RESTRICT,
+    merchant TEXT NOT NULL CHECK(length(trim(merchant)) BETWEEN 1 AND 120),
+    category TEXT NOT NULL CHECK(length(trim(category)) BETWEEN 1 AND 60),
+    currency TEXT NOT NULL CHECK(length(currency) = 3 AND currency NOT GLOB '*[^A-Z]*'),
+    purchaseDateISO TEXT NOT NULL,
+    principalMinor INTEGER NOT NULL CHECK(principalMinor > 0 AND principalMinor <= 9007199254740991),
+    count INTEGER NOT NULL CHECK(count BETWEEN 1 AND 120),
+    interestMinor INTEGER NOT NULL CHECK(interestMinor >= 0 AND interestMinor <= 9007199254740991),
+    feeMinor INTEGER NOT NULL CHECK(feeMinor >= 0 AND feeMinor <= 9007199254740991),
+    taxMinor INTEGER NOT NULL CHECK(taxMinor >= 0 AND taxMinor <= 9007199254740991),
+    financingCategory TEXT NOT NULL CHECK(length(financingCategory) <= 60),
+    cancelledAt TEXT CHECK(cancelledAt IS NULL OR length(cancelledAt) BETWEEN 10 AND 40),
+    deleted INTEGER NOT NULL DEFAULT 0 CHECK(deleted IN (0, 1) AND (deleted = 0 OR cancelledAt IS NULL)),
+    createdAt TEXT NOT NULL,
+    revision INTEGER NOT NULL DEFAULT 0 CHECK(revision >= 0 AND revision <= 9007199254740991),
+    updatedAt TEXT NOT NULL
+  ) STRICT;
+  CREATE INDEX IF NOT EXISTS installment_plans_card ON installment_plans(cardId, deleted, cancelledAt);
+  CREATE TABLE IF NOT EXISTS installments (
+    planId TEXT NOT NULL REFERENCES installment_plans(id) ON DELETE RESTRICT,
+    number INTEGER NOT NULL CHECK(number BETWEEN 1 AND 120),
+    billingDateISO TEXT NOT NULL,
+    dueDateISO TEXT NOT NULL,
+    principalMinor INTEGER NOT NULL CHECK(principalMinor > 0 AND principalMinor <= 9007199254740991),
+    financingMinor INTEGER NOT NULL CHECK(financingMinor >= 0 AND financingMinor <= 9007199254740991),
+    PRIMARY KEY (planId, number)
+  ) STRICT;
+  CREATE INDEX IF NOT EXISTS installments_billing ON installments(billingDateISO);
+  PRAGMA user_version = 12;
+`;
+
 /** The v11 step, column by column: each ALTER runs only when its column is missing, so a file that already carries one
  * (an interrupted step, a fixture rebuilt from a later table) reaches 11 without an error and without a second column. */
 async function migrateV11(tx: SqlExecutor): Promise<void> {
@@ -330,7 +375,7 @@ async function migrateV11(tx: SqlExecutor): Promise<void> {
 }
 
 /** Every schema script in order, for tests that build a real file at an earlier version (never run by the app outside `initializeDatabase`). */
-export const SCHEMA_SCRIPTS: readonly string[] = [SCHEMA, MIGRATE_V2, MIGRATE_V3, MIGRATE_V4, MIGRATE_V5, MIGRATE_V6, MIGRATE_V7, MIGRATE_V8, MIGRATE_V9, MIGRATE_V10, MIGRATE_V11];
+export const SCHEMA_SCRIPTS: readonly string[] = [SCHEMA, MIGRATE_V2, MIGRATE_V3, MIGRATE_V4, MIGRATE_V5, MIGRATE_V6, MIGRATE_V7, MIGRATE_V8, MIGRATE_V9, MIGRATE_V10, MIGRATE_V11, MIGRATE_V12];
 
 export async function initializeDatabase(db: LedgerDatabase): Promise<void> {
   // Set before opening a transaction; foreign_keys is connection-local.
@@ -359,6 +404,7 @@ export async function initializeDatabase(db: LedgerDatabase): Promise<void> {
   await db.withExclusiveTransactionAsync(async tx => {
     if (await readVersion(tx) < 10) await tx.execAsync(MIGRATE_V10);
     if (await readVersion(tx) < 11) await migrateV11(tx);
+    if (await readVersion(tx) < 12) await tx.execAsync(MIGRATE_V12); // IF NOT EXISTS: an interrupted step reaches 12 without a second table.
   });
   await readSnapshot(db); // Validate before showing a balance, not after a render.
 }
@@ -443,6 +489,16 @@ export async function readArchive(db: SqlExecutor): Promise<LedgerArchive> {
   });
   const unitRows = await db.getAllAsync<CurrencyUnit & { createdAt: string }>(`SELECT ${UNIT_COLUMNS} FROM currency_units ORDER BY currency`);
   const currencyUnits = unitRows.map(({ createdAt: _pinnedAt, ...unit }) => { validateCurrencyUnit(unit); return unit; });
+  // 24T1: each plan with its schedule rows, in instalment order. Validated as a collection by validateArchive below.
+  const planRows = await db.getAllAsync<Omit<InstallmentPlan, 'schedule' | 'deleted'> & { deleted: number }>(`SELECT ${PLAN_COLUMNS} FROM installment_plans ORDER BY purchaseDateISO, createdAt, id`);
+  const installmentRows = await db.getAllAsync<Installment & { planId: string }>(`SELECT ${INSTALLMENT_COLUMNS} FROM installments ORDER BY planId, number`);
+  const installmentPlans = planRows.map(({ deleted, ...row }) => {
+    if (deleted !== 0 && deleted !== 1) throw new Error('Estado de plan de cuotas inválido.');
+    const schedule = installmentRows.filter(item => item.planId === row.id).map(({ planId: _planId, ...installment }) => installment);
+    const plan: InstallmentPlan = { ...row, schedule, deleted: deleted === 1 };
+    validateInstallmentPlan(plan, cards, accounts);
+    return plan;
+  });
   const archive: LedgerArchive = {
     accounts,
     records,
@@ -454,6 +510,7 @@ export async function readArchive(db: SqlExecutor): Promise<LedgerArchive> {
     ...(appearances.length ? { appearances } : {}),
     ...(categories.length ? { categories } : {}),
     currencyUnits,
+    ...(installmentPlans.length ? { installmentPlans } : {}),
   };
   validateArchive(archive); // Including tombstones, safe integer totals and the pinned scales.
   archiveExponents(archive); // The precision check: every currency present reads at its pinned scale, never as cents by default.
@@ -591,6 +648,7 @@ export async function createEntry(db: LedgerDatabase, input: Entry): Promise<voi
     const archive = await readArchive(tx);
     const snapshot = snapshotFromArchive(archive);
     validateEntry(entry, snapshot.accounts);
+    assertNewEntryId(entry.id); // 24T1: an instalment's id is written by the instalment catch-up only.
     assertPostingAccount(entry.accountId, archive.debts);
     assertOpenAccount(entry.accountId, archive.accounts, archive.cards, archive.debts); // 25B2: nothing new on a deleted account or card.
     if (entry.kind === 'income') assertIncomeAccount(entry.accountId, archive.cards, archive.debts); // 24B6: never a plain income on a card.
@@ -618,6 +676,7 @@ export async function changeEntry(db: LedgerDatabase, change: EntryChange): Prom
   await db.withExclusiveTransactionAsync(async tx => {
     const archive = await readArchive(tx);
     validateEntryChange(change, archive.accounts);
+    assertInstallmentEntryChange(change.before.entry, change.after.entry); // 24T1: an instalment keeps its amount, date, card and kind; undo/restore and labels are fine.
     // 25B2: a movement may be corrected where it is (history of a deleted account stays editable), never moved onto a deleted account or card.
     if (change.after.entry.accountId !== change.before.entry.accountId) assertOpenAccount(change.after.entry.accountId, archive.accounts, archive.cards, archive.debts);
     assertPostingAccount(change.after.entry.accountId, archive.debts);
@@ -652,7 +711,7 @@ export async function importArchive(db: LedgerDatabase, incoming: LedgerArchive,
     if (plan.scaleConflicts.length) throw new Error('La copia registra otra escala para una moneda ya guardada. No se importó nada.');
     if (plan.conflicts) throw new Error('La copia contradice cambios locales. No se importó nada. Conservá ambas versiones.');
     if (!plan.accounts.length && !plan.records.length && !plan.transfers.length && !plan.recurring.length
-      && !plan.budgets.length && !plan.cards.length && !plan.debts.length && !plan.appearances.length && !plan.categories.length) return;
+      && !plan.budgets.length && !plan.cards.length && !plan.debts.length && !plan.appearances.length && !plan.categories.length && !plan.installmentPlans.length) return;
     if (plan.baseline !== baseline) throw new Error('Tus datos cambiaron. Volvé a revisar la copia antes de importar.');
     // Scales first, in the same transaction as the rows that need them: the copy's own units, then
     // any currency the new rows use that neither side pinned (a v1–v8 file can only hold ARS/USD).
@@ -667,6 +726,7 @@ export async function importArchive(db: LedgerDatabase, incoming: LedgerArchive,
     for (const card of plan.cards) await insertCreditCard(tx, card);
     for (const debt of plan.debts) await insertPersonalDebt(tx, debt);
     for (const look of plan.appearances) await insertAppearance(tx, look);
+    for (const item of plan.installmentPlans) await insertInstallmentPlan(tx, item);
     for (const definition of plan.categories) {
       await tx.runAsync(`INSERT INTO category_definitions (kind, key, storedLabel, label, icon, color, archived, createdAt, revision, updatedAt)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, definition.kind, definition.key, definition.storedLabel, definition.label, definition.icon,
@@ -1014,7 +1074,7 @@ export async function deleteCreditCard(db: LedgerDatabase, cardId: string, nowIS
     const card = archive.cards?.find(item => item.id === cardId);
     if (!card) throw new Error('No encontramos esta tarjeta.');
     if (card.deleted) return; // Committed already; a refresh failed.
-    assertCardDeletable(card, snapshotFromArchive(archive));
+    assertCardDeletable(card, snapshotFromArchive(archive), archive.installmentPlans, archive.records); // 25B2: no balance due; 24T1: no pending plan.
     const tombstone = deleteCreditCardRecord(card, nowISO);
     const stopped = (archive.recurring ?? []).filter(rule => rule.accountId === card.accountId && rule.active && !rule.deleted).map(rule => pauseRecurringRule(rule, nowISO));
     const recurring = (archive.recurring ?? []).map(rule => stopped.find(item => item.id === rule.id) ?? rule);
@@ -1090,4 +1150,115 @@ export async function deletePersonalDebt(db: LedgerDatabase, debtId: string, now
     validateArchive({ ...archive, debts: archive.debts!.map(item => item.id === debtId ? tombstone : item) });
     await tx.runAsync('UPDATE personal_debts SET active = 0, deleted = 1, revision = ?, updatedAt = ? WHERE id = ?', tombstone.revision, tombstone.updatedAt, debtId);
   });
+}
+
+// ---- Producto 24T1: purchases in instalments ---------------------------------------------------------------------------
+
+async function insertInstallmentPlan(tx: SqlExecutor, plan: InstallmentPlan): Promise<void> {
+  await tx.runAsync(`INSERT INTO installment_plans (${PLAN_COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    plan.id, plan.cardId, plan.merchant, plan.category, plan.currency, plan.purchaseDateISO, plan.principalMinor, plan.count,
+    plan.interestMinor, plan.feeMinor, plan.taxMinor, plan.financingCategory, plan.cancelledAt, plan.deleted ? 1 : 0, plan.createdAt, plan.revision, plan.updatedAt);
+  for (const row of plan.schedule) {
+    await tx.runAsync(`INSERT INTO installments (${INSTALLMENT_COLUMNS}) VALUES (?, ?, ?, ?, ?, ?)`,
+      plan.id, row.number, row.billingDateISO, row.dueDateISO, row.principalMinor, row.financingMinor);
+  }
+}
+
+/** A financed purchase: one plan with its exact schedule, on an existing card that is not deleted (an archived card takes
+ * no new purchase in the UI, as today; storage keeps the same rule as a plain purchase). Nothing moves in any account
+ * and no movement is recorded here: the instalments are recognised by `catchUpInstallments` when their statements close.
+ * Retrying the same plan is a no-op; the same id with other data is refused. */
+export async function createInstallmentPlan(db: LedgerDatabase, input: InstallmentPlan): Promise<void> {
+  const plan = { ...input, merchant: input.merchant.trim(), category: input.category.trim(), financingCategory: input.financingCategory.trim() };
+  if (plan.revision !== 0 || plan.updatedAt !== plan.createdAt || plan.deleted || plan.cancelledAt !== null) throw new Error('Un plan de cuotas nuevo no puede tener cambios previos.');
+  await db.withExclusiveTransactionAsync(async tx => {
+    const archive = await readArchive(tx);
+    validateInstallmentPlan(plan, archive.cards ?? [], archive.accounts);
+    const card = archive.cards!.find(item => item.id === plan.cardId)!;
+    assertOpenAccount(card.accountId, archive.accounts, archive.cards, archive.debts);
+    const existing = archive.installmentPlans?.find(item => item.id === plan.id);
+    if (existing) {
+      if (sameInstallmentPlan(existing, plan)) return; // Committed already; a refresh failed.
+      throw new Error(PLAN_EXISTS_MESSAGE);
+    }
+    validateArchive({ ...archive, installmentPlans: [...archive.installmentPlans ?? [], plan] });
+    await insertInstallmentPlan(tx, plan);
+  });
+}
+
+async function writePlanLifecycle(tx: SqlExecutor, plan: InstallmentPlan): Promise<void> {
+  await tx.runAsync('UPDATE installment_plans SET cancelledAt = ?, deleted = ?, revision = ?, updatedAt = ? WHERE id = ?',
+    plan.cancelledAt, plan.deleted ? 1 : 0, plan.revision, plan.updatedAt, plan.id);
+}
+
+/** Cancelling a plan stops every future instalment and keeps the recognised ones exactly as recorded. A retry on a plan
+ * already cancelled is a no-op. */
+export async function cancelInstallmentPlan(db: LedgerDatabase, planId: string, nowISO: string): Promise<void> {
+  await db.withExclusiveTransactionAsync(async tx => {
+    const archive = await readArchive(tx);
+    const plan = archive.installmentPlans?.find(item => item.id === planId);
+    if (!plan) throw new Error(PLAN_MISSING_MESSAGE);
+    if (plan.cancelledAt !== null) return; // Committed already; a refresh failed.
+    const cancelled = cancelInstallmentPlanRecord(plan, nowISO);
+    validateInstallmentPlanChange(plan, cancelled);
+    validateArchive({ ...archive, installmentPlans: archive.installmentPlans!.map(item => item.id === planId ? cancelled : item) });
+    await writePlanLifecycle(tx, cancelled);
+  });
+}
+
+/** The deletion record of a plan that recorded nothing (created by mistake); one with history is cancelled instead. The
+ * row and its schedule stay. A retry on a plan already deleted is a no-op. */
+export async function deleteInstallmentPlan(db: LedgerDatabase, planId: string, nowISO: string): Promise<void> {
+  await db.withExclusiveTransactionAsync(async tx => {
+    const archive = await readArchive(tx);
+    const plan = archive.installmentPlans?.find(item => item.id === planId);
+    if (!plan) throw new Error(PLAN_MISSING_MESSAGE);
+    if (plan.deleted) return; // Committed already; a refresh failed.
+    assertInstallmentPlanDeletable(plan, archive.records);
+    const tombstone = deleteInstallmentPlanRecord(plan, nowISO);
+    validateInstallmentPlanChange(plan, tombstone);
+    validateArchive({ ...archive, installmentPlans: archive.installmentPlans!.map(item => item.id === planId ? tombstone : item) });
+    await writePlanLifecycle(tx, tombstone);
+  });
+}
+
+/** A plan's own fields are never saved through a data change (`PLAN_DELETE_PATH_MESSAGE`): its price, instalments and
+ * dates are fixed; cancelling and deleting have their own paths above. Kept for symmetry with the other profiles. */
+export async function saveInstallmentPlan(db: LedgerDatabase, input: InstallmentPlan): Promise<void> {
+  await db.withExclusiveTransactionAsync(async tx => {
+    const archive = await readArchive(tx);
+    const existing = archive.installmentPlans?.find(item => item.id === input.id);
+    if (!existing) throw new Error(PLAN_MISSING_MESSAGE);
+    if (sameInstallmentPlan(existing, input)) return;
+    validateInstallmentPlanChange(existing, input);
+    throw new Error(PLAN_DELETE_PATH_MESSAGE);
+  });
+}
+
+/** Recognise every instalment whose statement has closed by `throughDateISO` and is not in the ledger yet: one exclusive
+ * transaction, the principal (and financing) movements inserted with their deterministic ids and their statement dates.
+ * Idempotent and deterministic: an id already in the ledger (recorded, edited or undone) is skipped, so a duplicated
+ * invocation, a foreground after a crash, a retry or a restore adds nothing; a plan cancelled or deleted, or on a deleted
+ * card, records nothing. Apart from `catchUpRecurring`: neither calls the other. Returns the movements recorded. */
+export async function catchUpInstallments(db: LedgerDatabase, throughDateISO: string): Promise<number> {
+  let created = 0;
+  await db.withExclusiveTransactionAsync(async tx => {
+    const archive = await readArchive(tx);
+    if (!archive.installmentPlans?.length) return;
+    const known = new Set(archive.records.map(record => record.entry.id));
+    const inserts: EntryRecord[] = [];
+    for (const plan of archive.installmentPlans) {
+      const card = archive.cards?.find(item => item.id === plan.cardId);
+      if (!card) continue;
+      for (const entry of materializeInstallmentPlan(plan, card, throughDateISO, known)) {
+        known.add(entry.id);
+        inserts.push(initialRecord(entry));
+      }
+    }
+    if (!inserts.length) return;
+    validateArchive({ ...archive, records: [...archive.records, ...inserts] });
+    for (const record of inserts) await insertRecord(tx, record);
+    created = inserts.length;
+  });
+  return created;
 }

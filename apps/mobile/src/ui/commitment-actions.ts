@@ -2,7 +2,7 @@ import { useRef, useState } from 'react';
 import { Alert } from 'react-native';
 import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
-import { assertOpenAccount, cardDebtMinor, closePersonalDebt, debtDeletion, debtOutstandingMinor, deleteRecurringRule, liabilityActivity, pauseRecurringRule, recurringHistory,
+import { assertOpenAccount, cardDebtMinor, cardHasPendingInstallments, closePersonalDebt, debtDeletion, debtOutstandingMinor, deleteRecurringRule, liabilityActivity, pauseRecurringRule, recurringHistory,
   reopenPersonalDebt, resumeRecurringRule, todayKey, type Account, type CreditCardProfile, type PersonalDebtProfile, type RecurringRule } from '@finanzapp/domain';
 import { useLedger } from '../storage/LedgerProvider';
 import { useI18n } from '../i18n/provider';
@@ -214,7 +214,7 @@ export function useAccountManagement() {
  * silently. Without debt, the confirmation names that every purchase and payment stays, and Eliminar writes the record
  * through `removeCard` (which also stops the card's active rules, in the same commit). */
 export function useCardManagement() {
-  const { saveCard, removeCard, snapshot } = useLedger();
+  const { saveCard, removeCard, snapshot, archive: ledger } = useLedger();
   const { t, moneyText } = useI18n();
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -248,6 +248,13 @@ export function useCardManagement() {
       ];
       if (card.active) buttons.push({ text: t('cards.form.blockedArchive'), onPress: () => { void archive(card, done); } });
       Alert.alert(t('cards.form.blockedTitle'), t('cards.form.blockedDetail', { amount: moneyText(debt, account.currency) }), buttons);
+      return;
+    }
+    // 24T1: the same rule storage enforces (`assertCardDeletable`): a pending instalment plan is archived with the card, never deleted.
+    if (cardHasPendingInstallments(card, ledger?.installmentPlans, ledger?.records)) {
+      const buttons: Parameters<typeof Alert.alert>[2] = [{ text: t('common.cancel'), style: 'cancel' }];
+      if (card.active) buttons.push({ text: t('cards.form.blockedArchive'), onPress: () => { void archive(card, done); } });
+      Alert.alert(t('cards.form.blockedTitle'), t('cards.form.blockedPlanDetail'), buttons);
       return;
     }
     Alert.alert(t('cards.form.deleteTitle'), t('cards.form.deleteDetail'), [

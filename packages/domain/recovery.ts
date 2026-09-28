@@ -8,6 +8,7 @@ import { liquidTotalsByCurrency, sameCreditCardProfile, samePersonalDebtProfile,
   validatePersonalDebtProfile, type CreditCardProfile, type PersonalDebtProfile } from './liabilities.ts';
 import { APPEARANCE_KEYS, sameAccountAppearance, validateAccountAppearance, validateAccountAppearances, type AccountAppearance } from './appearance.ts';
 import { CATEGORY_DEFINITION_KEYS, sameCategoryDefinition, validateCategoryDefinition, validateCategoryDefinitions, type CategoryDefinition } from './categories.ts';
+import { INSTALLMENT_KEYS, INSTALLMENT_PLAN_KEYS, sameInstallmentPlan, validateInstallmentPlans, type Installment, type InstallmentPlan } from './installments.ts';
 
 /** The current version of every entry, including reversible tombstones.
  * Reports consume snapshotFromArchive, never the tombstones themselves. */
@@ -32,6 +33,9 @@ export interface LedgerArchive {
    * when the archive knows its scales (read from SQLite 9, parsed from a v9 file); absent in an
    * archive built by hand or parsed from a v1–v8 file, which can only hold ARS/USD cents. */
   currencyUnits?: CurrencyUnit[];
+  /** Producto 24T1: purchases in instalments, each with its exact schedule. The movements they recognised are ordinary
+   * records above (their ids name the plan and the instalment). */
+  installmentPlans?: InstallmentPlan[];
 }
 export interface EntryChange {
   id: string;
@@ -47,6 +51,8 @@ export const BACKUP_SCHEMA_V8 = 'finanzapp.native-pilot.v8';
 export const BACKUP_SCHEMA_V9 = 'finanzapp.native-pilot.v9';
 export const BACKUP_SCHEMA_V10 = 'finanzapp.native-pilot.v10';
 export const BACKUP_SCHEMA_V11 = 'finanzapp.native-pilot.v11';
+/** v12 = v11 plus `installmentPlans` (Producto 24T1), written as soon as a plan exists. */
+export const BACKUP_SCHEMA_V12 = 'finanzapp.native-pilot.v12';
 export const MAX_BACKUP_CURRENCY_UNITS = 200;
 /** Backups v1–v8 record one money unit and no scale per currency: they can only ever name
  * ARS and USD cents, whatever the creation gate offers when the file is read. A file naming
@@ -144,6 +150,12 @@ function categoryValue(value: unknown): CategoryDefinition {
   return definition;
 }
 const categoryIdentity = (definition: CategoryDefinition) => definition.kind + '|' + definition.key;
+function installmentPlanValue(value: unknown): InstallmentPlan {
+  const row = object(value, INSTALLMENT_PLAN_KEYS);
+  if (!Array.isArray(row.schedule) || row.schedule.length > 120) throw new Error('El calendario de cuotas no coincide con el plan.');
+  const schedule = row.schedule.map(item => { const installment = object(item, INSTALLMENT_KEYS); return Object.fromEntries(INSTALLMENT_KEYS.map(key => [key, installment[key]])) as unknown as Installment; });
+  return { ...Object.fromEntries(INSTALLMENT_PLAN_KEYS.filter(key => key !== 'schedule').map(key => [key, row[key]])), schedule } as unknown as InstallmentPlan;
+}
 export function initialRecord(entry: Entry): EntryRecord {
   return { entry, revision: 0, voided: false, updatedAt: entry.createdAt };
 }
@@ -190,6 +202,8 @@ export function validateArchive(archive: LedgerArchive): void {
   validateLiabilityProfiles(archive.cards ?? [], archive.debts ?? [], archive.accounts);
   validateAccountAppearances(archive.appearances ?? [], archive.accounts);
   validateCategoryDefinitions(archive.categories ?? []);
+  // 24T1: each plan against its card, and the ledger against every plan (an instalment movement matches its schedule).
+  validateInstallmentPlans(archive.installmentPlans ?? [], archive.cards ?? [], archive.accounts, archive.records);
   // An archive that knows its scales pins every currency its rows use beyond ARS/USD; each pinned
   // scale must be the catalogue's. Storage tolerates a pinned code no row uses (append-only rows).
   if (archive.currencyUnits) validateCurrencyUnits(archive.currencyUnits, currenciesNeedingUnits(archive));
@@ -238,6 +252,8 @@ function canonicalArchive(archive: LedgerArchive): LedgerArchive {
       .sort((a, b) => categoryIdentity(a).localeCompare(categoryIdentity(b))) } : {}),
     ...(archive.currencyUnits?.length ? { currencyUnits: archive.currencyUnits.map(unit => unitValue(unit))
       .sort((a, b) => a.currency.localeCompare(b.currency)) } : {}),
+    ...(archive.installmentPlans?.length ? { installmentPlans: archive.installmentPlans.map(plan => installmentPlanValue(plan))
+      .sort((a, b) => a.id.localeCompare(b.id)) } : {}),
   };
 }
 function unitValue(value: unknown): CurrencyUnit {
@@ -289,6 +305,8 @@ export interface RecoveryBackup {
   cards: CreditCardProfile[]; debts: PersonalDebtProfile[]; appearances: AccountAppearance[]; categories: CategoryDefinition[];
   /** v9 and v10: the pinned scale of every currency the rows use beyond ARS/USD. A v8 file has no such key. */
   currencyUnits?: CurrencyUnit[];
+  /** v12 (24T1): every instalment plan with its schedule. Older files have no such key. */
+  installmentPlans?: InstallmentPlan[];
 }
 function withoutDeleted<T extends { deleted: boolean }>(row: T): Omit<T, 'deleted'> {
   const { deleted: _deleted, ...rest } = row;
@@ -298,7 +316,7 @@ export function createRecoveryBackup(archive: LedgerArchive, now = new Date()): 
   validateArchive(archive);
   const needed = currenciesNeedingUnits(archive);
   const canonical = canonicalArchive(archive);
-  const { currencyUnits: _units, ...rows } = canonical;
+  const { currencyUnits: _units, installmentPlans, ...rows } = canonical;
   // 25B2: a deleted account or card makes the file v11; without one, cards carry no `deleted` key (a v10 or older
   // file, byte for byte) and no account carries `deletedAt`.
   const lifecycle = canonical.accounts.some(account => account.deletedAt !== undefined) || (canonical.cards ?? []).some(card => card.deleted);
@@ -307,17 +325,20 @@ export function createRecoveryBackup(archive: LedgerArchive, now = new Date()): 
   const recurring = tombstones ? canonical.recurring ?? [] : (canonical.recurring ?? []).map(withoutDeleted) as RecurringRule[];
   const debts = tombstones ? canonical.debts ?? [] : (canonical.debts ?? []).map(withoutDeleted) as PersonalDebtProfile[];
   const cards = lifecycle ? canonical.cards ?? [] : (canonical.cards ?? []).map(withoutDeleted) as CreditCardProfile[];
-  const schema = lifecycle ? BACKUP_SCHEMA_V11 : tombstones ? BACKUP_SCHEMA_V10 : needed.length ? BACKUP_SCHEMA_V9 : BACKUP_SCHEMA_V8;
+  // 24T1: a plan makes the file v12 (it carries `installmentPlans` and every lifecycle key); without one the file is v11 or older, byte for byte.
+  const plans = !!installmentPlans?.length;
+  const schema = plans ? BACKUP_SCHEMA_V12 : lifecycle ? BACKUP_SCHEMA_V11 : tombstones ? BACKUP_SCHEMA_V10 : needed.length ? BACKUP_SCHEMA_V9 : BACKUP_SCHEMA_V8;
   const base: RecoveryBackup = { app: 'FinanzApp', schema, exportedAt: now.toISOString(),
     moneyUnit: 'integer-minor-units', ...rows, transfers: canonical.transfers ?? [],
-    recurring, budgets: canonical.budgets ?? [],
-    cards, debts,
+    recurring: plans ? canonical.recurring ?? [] : recurring, budgets: canonical.budgets ?? [],
+    cards: plans ? canonical.cards ?? [] : cards, debts: plans ? canonical.debts ?? [] : debts,
     appearances: canonical.appearances ?? [], categories: canonical.categories ?? [] };
-  if (!needed.length) return tombstones ? { ...base, currencyUnits: [] } : base;
+  const withPlans = (backup: RecoveryBackup): RecoveryBackup => plans ? { ...backup, installmentPlans } : backup;
+  if (!needed.length) return withPlans(tombstones || plans ? { ...base, currencyUnits: [] } : base);
   const known = new Map((canonical.currencyUnits ?? []).map(unit => [unit.currency, unit]));
   const currencyUnits = needed.map(code => known.get(code) ?? catalogueUnit(code));
   validateCurrencyUnits(currencyUnits, needed, true);
-  return { ...base, currencyUnits };
+  return withPlans({ ...base, currencyUnits });
 }
 export interface ParsedBackup { archive: LedgerArchive; exportedAt: string; }
 export function parsePilotBackup(raw: string): ParsedBackup {
@@ -337,18 +358,21 @@ export function parsePilotBackup(raw: string): ParsedBackup {
   const v9 = header.schema === BACKUP_SCHEMA_V9;
   const v10 = header.schema === BACKUP_SCHEMA_V10;
   const v11 = header.schema === BACKUP_SCHEMA_V11;
-  if (!v1 && !v2 && !v3 && !v4 && !v5 && !v6 && !v7 && !v8 && !v9 && !v10 && !v11) {
-    throw new Error('Solo se pueden restaurar copias de FinanzApp de las versiones 1 a 11. Este archivo no es una de ellas; conservalo.');
+  const v12 = header.schema === BACKUP_SCHEMA_V12;
+  if (!v1 && !v2 && !v3 && !v4 && !v5 && !v6 && !v7 && !v8 && !v9 && !v10 && !v11 && !v12) {
+    throw new Error('Solo se pueden restaurar copias de FinanzApp de las versiones 1 a 12. Este archivo no es una de ellas; conservalo.');
   }
   const hasTransfers = !v1 && !v2, hasRecurring = hasTransfers && !v3, hasBudgets = hasRecurring && !v4;
-  const hasLiabilities = hasBudgets && !v5, hasScopedBudgets = hasLiabilities && !v6, hasIdentity = v8 || v9 || v10 || v11, hasUnits = v9 || v10 || v11;
-  const hasDeletions = v10 || v11;
+  const hasLiabilities = hasBudgets && !v5, hasScopedBudgets = hasLiabilities && !v6, hasIdentity = v8 || v9 || v10 || v11 || v12, hasUnits = v9 || v10 || v11 || v12;
+  const hasDeletions = v10 || v11 || v12;
   // v11 (25B2): cards carry `deleted`; a deleted account carries `deletedAt`. Older files carry neither.
-  const hasLifecycle = v11;
+  const hasLifecycle = v11 || v12;
+  // v12 (24T1): instalment plans with their schedules. Older files carry none, and a v1–v11 file never holds an instalment movement.
+  const hasPlans = v12;
   object(value, ['app', 'schema', 'exportedAt', 'moneyUnit', 'accounts', v1 ? 'entries' : 'records',
     ...(hasTransfers ? ['transfers'] : []), ...(hasRecurring ? ['recurring'] : []),
     ...(hasBudgets ? ['budgets'] : []), ...(hasLiabilities ? ['cards', 'debts'] : []),
-    ...(hasIdentity ? ['appearances', 'categories'] : []), ...(hasUnits ? ['currencyUnits'] : [])]);
+    ...(hasIdentity ? ['appearances', 'categories'] : []), ...(hasUnits ? ['currencyUnits'] : []), ...(hasPlans ? ['installmentPlans'] : [])]);
   if (header.app !== 'FinanzApp' || header.moneyUnit !== 'integer-minor-units') throw new Error('Formato o unidad monetaria no compatibles.');
   timestamp(header.exportedAt);
   const rows = v1 ? header.entries : header.records;
@@ -374,6 +398,9 @@ export function parsePilotBackup(raw: string): ParsedBackup {
   if (hasUnits && (!Array.isArray(header.currencyUnits) || header.currencyUnits.length > MAX_BACKUP_CURRENCY_UNITS)) {
     throw new Error('La copia contiene demasiadas escalas de moneda o un formato inválido.');
   }
+  if (hasPlans && (!Array.isArray(header.installmentPlans) || header.installmentPlans.length > 5000)) {
+    throw new Error('La copia contiene demasiados planes de cuotas o un formato inválido.');
+  }
   const accounts = header.accounts.map(a => accountValue(a, hasTransfers, hasLifecycle));
   const records = rows.map((value): EntryRecord => {
     if (v1) return initialRecord(entryValue(value, accounts));
@@ -393,11 +420,12 @@ export function parsePilotBackup(raw: string): ParsedBackup {
   // units are validated against the catalogue (a disagreeing exponent refuses the file whole)
   // before any amount is read; a v1–v8 file stays frozen to ARS/USD cents.
   const currencyUnits = hasUnits ? (header.currencyUnits as unknown[]).map(unit => unitValue(unit)) : [];
+  const installmentPlans = hasPlans ? (header.installmentPlans as unknown[]).map(plan => installmentPlanValue(plan)) : [];
   const archive: LedgerArchive = { accounts, records, ...(transfers.length ? { transfers } : {}),
     ...(recurring.length ? { recurring } : {}), ...(budgets.length ? { budgets } : {}),
     ...(cards.length ? { cards } : {}), ...(debts.length ? { debts } : {}),
     ...(appearances.length ? { appearances } : {}), ...(categories.length ? { categories } : {}),
-    ...(hasUnits ? { currencyUnits } : {}) };
+    ...(hasUnits ? { currencyUnits } : {}), ...(installmentPlans.length ? { installmentPlans } : {}) };
   if (!hasUnits) assertLegacyCurrencies(archive, LEGACY_IMPORT_MESSAGE);
   else validateCurrencyUnits(currencyUnits, currenciesNeedingUnits(archive), true);
   validateArchive(archive);
@@ -419,6 +447,8 @@ export interface ImportPreview {
   currencyUnits: CurrencyUnit[];
   /** Currencies whose pinned scale differs between the copy and this device: nothing is imported while any exists. */
   scaleConflicts: IsoCurrencyCode[];
+  /** 24T1: plans the copy holds and this device lacks, with their schedules. */
+  installmentPlans: InstallmentPlan[];
   identical: number;
   conflicts: number;
   /** Recorded liquid money by currency (cards and personal debts excluded). */
@@ -438,6 +468,8 @@ export function previewBackupImport(current: LedgerArchive, incoming: LedgerArch
   const debtMap = new Map((current.debts ?? []).map(debt => [debt.id, debt]));
   const appearanceMap = new Map((current.appearances ?? []).map(item => [item.accountId, item]));
   const categoryMap = new Map((current.categories ?? []).map(item => [categoryIdentity(item), item]));
+  const planMap = new Map((current.installmentPlans ?? []).map(plan => [plan.id, plan]));
+  const installmentPlans: InstallmentPlan[] = [];
   const transfers: TransferRecord[] = [];
   const recurring: RecurringRule[] = [];
   const budgets: MonthlyBudget[] = [];
@@ -513,14 +545,21 @@ export function previewBackupImport(current: LedgerArchive, incoming: LedgerArch
     else if (sameCategoryDefinition(existing, definition)) identical++;
     else conflicts++;
   }
+  for (const plan of incoming.installmentPlans ?? []) {
+    const existing = planMap.get(plan.id);
+    if (!existing) installmentPlans.push(plan);
+    else if (sameInstallmentPlan(existing, plan)) identical++;
+    else conflicts++;
+  }
   const combined: LedgerArchive = { accounts: [...current.accounts, ...accounts], records: [...current.records, ...records],
     transfers: [...current.transfers ?? [], ...transfers], recurring: [...current.recurring ?? [], ...recurring],
     budgets: [...current.budgets ?? [], ...budgets], cards: [...current.cards ?? [], ...cards],
     debts: [...current.debts ?? [], ...debts], appearances: [...current.appearances ?? [], ...appearances],
     categories: [...current.categories ?? [], ...categories],
-    ...(current.currencyUnits || incoming.currencyUnits ? { currencyUnits: [...current.currencyUnits ?? [], ...currencyUnits] } : {}) };
+    ...(current.currencyUnits || incoming.currencyUnits ? { currencyUnits: [...current.currencyUnits ?? [], ...currencyUnits] } : {}),
+    ...(current.installmentPlans?.length || installmentPlans.length ? { installmentPlans: [...current.installmentPlans ?? [], ...installmentPlans] } : {}) };
   if (!conflicts) validateArchive(combined);
-  return { baseline: archiveKey(current), accounts, records, transfers, recurring, budgets, cards, debts, appearances, categories, currencyUnits, scaleConflicts, identical, conflicts,
+  return { baseline: archiveKey(current), accounts, records, transfers, recurring, budgets, cards, debts, appearances, categories, currencyUnits, scaleConflicts, installmentPlans, identical, conflicts,
     before: liquidTotalsByCurrency(snapshotFromArchive(current), current.cards, current.debts),
     after: conflicts ? null : liquidTotalsByCurrency(snapshotFromArchive(combined), combined.cards, combined.debts) };
 }
