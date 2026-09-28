@@ -387,15 +387,16 @@ Nada cambia en pantalla. Refina la dirección de Tarjetas de 25B3 y fija cómo 2
 fechas del ciclo. El contrato exacto está en el roadmap («Producto 24T1C») y en la decisión 003, regla 7.
 
 - **Compra en cuotas: lo simple primero.** El caso normal es «12 cuotas sin interés» y debe sentirse tan liviano
-  como una compra común: el valor por defecto es **«Sin interés»** y la financiación va en una sección secundaria
-  plegable. Abierta muestra principal/precio, cantidad de cuotas, interés total, comisiones o cargos opcionales e
-  impuestos de financiación opcionales, todos en cero. El interés se escribe como importe total o, como ayuda, como
-  porcentaje total sobre el principal; el porcentaje se convierte en el momento a un importe exacto y es ese importe
-  el que se guarda. Sin «tasa mensual», sin CFT/TNA/TEA. Intereses, Comisiones e Impuestos siguen siendo tres
-  componentes separados de la Compra.
-- **Próximo cierre y próximo vencimiento, por separado.** Los días habituales son un valor por defecto; la fecha real
-  del ciclo actual se puede corregir sin tocar resúmenes, movimientos ni calendarios de planes ya creados. La
-  interfaz nunca funde las dos fechas en una línea ambigua y nunca inventa feriados ni corrimientos a días hábiles.
+  como una compra común: el valor por defecto es **«Sin interés»** y no aparece ningún campo financiero. Un único
+  interruptor secundario, **«Con interés»**, muestra un solo campo editable, **«Total financiado»** (precio ARS
+  1.000.000, total financiado ARS 1.200.000). Debajo, solo lectura: «Interés total: ARS 200.000» y, si ayuda, el valor
+  aproximado por cuota. Nada más: sin porcentaje, tasa mensual, TNA, TEA ni CFT, sin campos de comisión ni de
+  impuesto (el motor los conserva y este flujo los deja en cero).
+- **Próximo cierre y próximo vencimiento, por separado.** Los días habituales son el valor por defecto; el próximo
+  ciclo puede llevar una fecha exacta de cierre y otra de vencimiento, elegidas con un calendario completo (día, mes
+  y año), que pueden caer en meses distintos; el vencimiento siempre es posterior al cierre y una combinación
+  inválida no se guarda. Corregirlas no toca resúmenes, movimientos ni calendarios de planes ya creados. La interfaz
+  nunca funde las dos fechas en una línea ambigua y nunca inventa feriados ni corrimientos a días hábiles.
 - **Tarjetas: deck vertical seleccionable (a evaluar).** Un stack compacto en lugar del carrusel horizontal. Las caras
   de las tarjetas son de identidad (emisor, nombre, últimos cuatro, color) y sin cifras amontonadas. La tarjeta
   seleccionada revela debajo un resumen financiero, en este orden: saldo pendiente/facturado actual, próximo cierre,

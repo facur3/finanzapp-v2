@@ -230,20 +230,26 @@ y la decisión es la contraria (regla 7). 24T1 (PR #67) convirtió en pruebas 12
      24C2 agregará al lado el registro de la compra en moneda original (importe,
      tasa, cargos y procedencia); no se agregan columnas vacías hoy.
    - **Financiación en la interfaz (decidido el 2026-09-28, Producto 24T1C, para
-     24T2):** el camino principal es «Sin interés» y la financiación es una sección
-     secundaria plegable (principal, cantidad de cuotas, interés total, comisiones y
-     impuestos de financiación opcionales, todo en cero por defecto). El interés se
-     escribe como importe total o, solo como ayuda, como **porcentaje total** sobre el
-     principal, que se convierte al crear el plan en un importe exacto en unidades
-     menores; ningún porcentaje ni tasa en coma flotante se guarda como fuente de
-     verdad. Sin «tasa mensual» mientras su fórmula no esté definida; sin CFT, TNA ni
-     TEA salvo que se implemente su definición correctamente. Los cuatro componentes
-     conservan sus identidades separadas.
-   - **Fecha real del ciclo (requisito de 24T2):** los días de cierre y vencimiento
-     son un valor por defecto; la persona podrá corregir la fecha exacta del ciclo
-     actual (próximo cierre y próximo vencimiento, o un ajuste equivalente por ciclo)
-     sin reescribir resúmenes, movimientos ni calendarios de planes ya creados. Sin
-     feriados ni corrimientos a días hábiles simulados.
+     24T2):** el motor no cambia (principal, intereses, comisiones e impuestos siguen
+     siendo cuatro componentes separados). La interfaz es simple: por defecto «Sin
+     interés», sin ningún campo de financiación; un único interruptor secundario «Con
+     interés» muestra un solo campo, «Total financiado», y FinanzApp deriva
+     `interestMinor = totalFinancedMinor − principalMinor` en unidades menores (puede
+     mostrarlo solo lectura, «Interés total», y el valor aproximado por cuota). Un total
+     menor que el precio no se guarda. No se agregan porcentaje editable, tasa mensual,
+     TNA, TEA, CFT ni campos visibles de comisión o impuesto; comisiones e impuestos
+     quedan en cero desde este flujo y el dominio los conserva. Una financiación
+     avanzada sería una entrega propia.
+   - **Fechas exactas del ciclo (decidido para 24T2):** la tarjeta conserva los días
+     habituales de cierre y vencimiento como valor por defecto y puede tener, para el
+     próximo ciclo, una **fecha exacta de cierre** y una **fecha exacta de vencimiento**
+     elegidas con un calendario completo (día, mes y año). No tienen que caer en el
+     mismo mes (cierre 2026-10-28 y vencimiento 2026-11-05 es válido). La única regla
+     es **vencimiento > cierre**; sin límites artificiales de días. Una fecha inválida o
+     un vencimiento igual o anterior al cierre no se guarda. Cambiarlas no reescribe
+     movimientos, resúmenes ni calendarios de planes ya creados; puede cambiar cómo se
+     presenta o programa el próximo ciclo aún no materializado. Sin feriados ni
+     corrimientos a días hábiles simulados.
    - **Antes de 24T1:** archivar conservaba el saldo pendiente y seguía aceptando el
      pago; eliminar se rechazaba con saldo pendiente y se permitía en cero; una
      tarjeta eliminada no aceptaba pagos. Todo eso sigue igual.

@@ -392,13 +392,25 @@ item unless a section says a new native build is needed. The checklist sections 
 schema 12, backup v12, the instalment engine and 12 of the 13 card-invariant `it.todo` as tests (the remaining one,
 the foreign-currency plan record, belongs to 24C2). 24T1C (this PR) is documentation only. **The next implementation
 is 24T2**, then **24T3**: **Producto 24T** ships in three focused PRs: 24T1 (domain, schema, backup and instalment
-mathematics; merged), 24T2 (the card purchase with the financing UX, the exact current cycle, statements,
+mathematics; merged), 24T2 (the card purchase with the simple financing UX, the exact current-cycle dates, statements,
 current-versus-future balances and the Tarjetas direction, all recorded under 24T below and in «Producto 24T1C»),
-24T3 (refunds, early payments, lifecycle and the final device QA). After 24T the sections follow in the order they
-appear from 25A: **25A → 25C → 25C2 → 25D → 25E → 25F**, then **26** (launch). **24C2** (optional; the owner decides
-whether it is needed; its contracts stay compatible with 24T's, recorded in both entries) and **24R3** (before any
-launch outside the first regions) are placed by the owner. The sections below keep their historical order; this
-paragraph is the order that binds.
+24T3 (refunds, early payments, lifecycle and the final device QA).
+
+The binding order is **24T2 → 24T3 → 25A → 25C → 25C2 → 25D → 25E → 25F → 26** (launch). Every dependency points
+backwards in it; the scope that would need a later or optional delivery is split out explicitly (24T1C, 2026-09-28):
+
+- **24C2 is optional** and blocks nothing in this order. 25A's core works on what the ledger already represents; only
+  its foreign-purchase subflow (original currency different from the billing or paying currency) stays gated and
+  unavailable until 24C2 exists. If the owner schedules 24C2 before 25A, 25A consumes it; if not, 25A is a complete
+  delivery without that subflow. The instalment `it.todo` for a foreign-currency plan waits for 24C2 the same way.
+- **25D before 25E** ships only what works on the device or over the existing capture path (Face ID and privacy,
+  local notifications, App Intents / Shortcuts / Siri / Spotlight, Wallet automation → draft, widgets, Apple Watch,
+  the FinanceKit research gate). Remote push (APNs) that needs a backend or sync, and any Sign in with Apple tied to
+  25E's account/sync, are **deferred to 25E** or a follow-up after it; 25D neither implements them nor depends on 25E.
+- **24R3** is required only before a launch in the regions that need it (the native-digit regions); it blocks no
+  delivery in this order and the owner places it.
+
+The sections below keep their historical order; this paragraph is the order that binds.
 
 In order. Each is one focused PR, CI green, merged before the next starts; each records its
 checks here and its device evidence in the checklist. The names from Producto 25A on are a
@@ -996,7 +1008,9 @@ the owner authorises it; no EAS build or store submission without the owner.
   contract of docs/currency.md §11 ("Gasté 30 dólares en Steam": merchant, amount and currency
   read by the model, the category matched to the person's own identities, the paying account
   decided by the app with one question when several fit, a foreign purchase proposed when no
-  account holds the currency, the rate looked up by the app never the model; "¿Por qué gasté
+  account holds the currency (**this foreign-purchase subflow is gated and unavailable until 24C2 exists**: without
+  24C2 the Assistant says it cannot record that purchase yet and proposes nothing in another currency; the rest of
+  25A never waits for it), the rate looked up by the app never the model; "¿Por qué gasté
   más este mes?": aggregations the code computed, never a causal claim); understanding a message
   in any language and answering in the interface language, names and custom categories kept
   verbatim; a transcription provider with proven multilingual coverage before voice is offered,
@@ -1022,8 +1036,9 @@ the owner authorises it; no EAS build or store submission without the owner.
   owned test data for currencies, loans, refunds, questions and failures; measured provider usage
   and cost per request; the disconnected and
   quota states on the iPhone; the consent screen naming what travels.
-- **Depends on.** 24C1 for rates and consolidated facts, 24C2 for foreign purchases; 24M for currencies in v2; a session
-  provider (staging) the owner sets up.
+- **Depends on.** 24C1 for rates and consolidated facts; 24M for currencies in v2; a session provider (staging) the
+  owner sets up. **Not a dependency:** 24C2 (optional). Its foreign-purchase subflow is enabled only if 24C2 has
+  merged; otherwise 25A ships complete without it (24T1C, 2026-09-28).
 
 ### Producto 24T — instalments and complete cards
 
@@ -1084,8 +1099,9 @@ nothing of it is on a screen yet.
     balance payable now; iOS minimalism, cobalt/sapphire and the FinanzApp materials stay; no gesture that competes
     with back navigation or delete; a debit card remains future metadata of an account, never a ledger of its own.
     *Financing UX, closing/due dates and the refined card direction (decided 2026-09-28 in Producto 24T1C,
-    documentation only):* the purchase form defaults to «Sin interés» and keeps financing secondary; a card keeps
-    default closing and due days plus an exact date for the current cycle that never rewrites history; the Tarjetas
+    documentation only):* the purchase form defaults to «Sin interés» with one secondary «Con interés» toggle and a
+    single «Total financiado» field; a card keeps default closing and due days plus exact next closing and due dates
+    (full dates, due after closing, not necessarily the same month) that never rewrite history; the Tarjetas
     overview evaluates a selectable vertical deck with a financial snapshot under the selected card. The exact
     contracts are in «Producto 24T1C» below and in docs/mobile-design.md.
   - **24T3 — refunds, early payments, lifecycle and final device QA.** Refunds and early payoff as above,
@@ -1523,23 +1539,28 @@ nothing of it is on a screen yet.
   Commitments; §3's order; the 24T, 24T1 and 25B3 headings and status. Outside this file: decision 001's
   FinanceKit paragraph, decision 003's "las cuotas todavía no se modelan" and its `it.todo` note, and a duplicated
   backup sentence in apps/mobile/README.md that still said v1–v10.
-- **24T2 — financing UX (decided).** The main path optimises for purchases without interest: the default is
-  **«Sin interés»** and a «12 cuotas sin interés» purchase feels as simple as a plain purchase. Financing is a
-  secondary, collapsible section; when the person opens it: price/principal, number of instalments, total
-  interest, optional fees/charges, optional financing taxes, each zero by default. Interest may be typed as a
-  total amount or, as a UI helper only, as a **total percentage of the principal**, converted immediately to an
-  exact amount in minor units when the plan is created (integer arithmetic, rounded once, the rounding stated);
-  the percentage is never stored and no floating rate is ever a source of truth. **No monthly rate** until its
-  financial formula is defined; **no CFT/TNA/TEA** shown or promised unless a future delivery implements its
-  definition correctly. Principal, interest, fee and tax keep the four separate identities 24T1 implemented
-  (their own movements, ids and categories).
-- **24T2 — closing and due dates (requirement).** The usual closing/due days stay a useful default, but real
-  dates move between cycles. Evaluate a model of a default closing day, a default due day, and an exact next
-  closing date / next due date (or an equivalent per-cycle override). The person can correct the current
-  cycle's exact dates without rewriting historical statements, historical movements or the calendars of
-  instalment plans already created (24T1's calendar is contractual). No holidays or business-day shifts are
-  simulated. The UI communicates the next closing and the next due date separately. Schema and backup changes, if
-  any, follow the usual version and rollback tests.
+- **24T2 — financing UX (decided, simple).** The engine is unchanged: 24T1 keeps principal, interest, fee and
+  financing tax as four separate components. The first UI exposes much less. The default is **«Sin interés»**, and a
+  «12 cuotas sin interés» purchase shows no financing field at all. One secondary toggle, **«Con interés»**, reveals a
+  single editable field, **«Total financiado»** (for example price ARS 1.000.000, total financiado ARS 1.200.000).
+  FinanzApp derives `interestMinor = totalFinancedMinor − principalMinor` in integer minor units and may show it
+  read-only («Interés total: ARS 200.000») and/or the approximate amount per instalment. A total financed below the
+  price is refused and not saved. Not added now: an editable percentage, a monthly rate, TNA, TEA, CFT, a visible
+  fee/commission field, a visible financing-tax field. Fee and tax stay supported by the domain and storage for
+  future compatibility and are always zero from this flow; the engine keeps that capacity. Advanced financing, if
+  real users need it, is designed as its own delivery.
+- **24T2 — closing and due dates (decided).** A card keeps its usual closing day and usual due day as defaults.
+  For the next (current) cycle it may also hold an **exact next closing date** and an **exact next due date**, each
+  chosen with a full date field/calendar (day, month and year). Closing and due need **not** fall in the same month:
+  closing 2026-10-20 with due 2026-10-29 is valid, and so is closing 2026-10-28 with due 2026-11-05. The only cycle
+  invariant is **due date > closing date**; no artificial limit on the days between them is invented without a bank
+  rule that justifies it. An invalid date, or a due date on or before the closing date, is not saved. Changing the
+  exact dates of the next cycle never rewrites historical movements, historical statements or the schedules of
+  instalment plans already created (24T1's calendar is contractual); it may change how the next, not yet
+  materialised cycle is presented or scheduled, as 24T2 chooses and documents. No holidays or business-day shifts
+  are simulated. The UI shows the next closing and the next due date separately. Schema and backup changes, if any,
+  follow the usual version and rollback tests. 25D records that a date change cancels or replaces the reminders of
+  the old date.
 - **24T2 — visual direction (refined, document only).** The Wallet-inspired direction of 25B3 stands. Tarjetas
   evaluates a compact, selectable vertical deck/stack instead of the horizontal carousel; card faces stay
   identity-first and uncluttered; the selected card reveals a financial snapshot beneath it, in this priority:
@@ -1554,9 +1575,18 @@ nothing of it is on a screen yet.
   Wallet card → FinanzApp account mapping (25D) are recorded in their sections; none is implemented.
 - **Not changed.** Code, screens, catalogues, schema 12, backup v12, the release marker («FinanzApp 0.1.0
   (25B3)» stays: nothing visible changed), the device checklist (nothing to verify on the iPhone).
-- **Status.** Documentation only, on this branch (2026-09-28). Checked on Linux: root `npm test` (373 passed, 1
-  todo), `npm run check:repo`, mobile `test:storage` (794/794; it reads this file for the recurring-rules decision)
-  and `i18n:check -- --strict` (0 stale; no catalogue changed). No EAS build.
+- **Review round (2026-09-28).** The binding order's dependencies were resolved by splitting scope rather than
+  forcing optional deliveries: 25A no longer depends on 24C2 (its foreign-purchase subflow is gated until 24C2), and
+  25D no longer depends on 25E (remote push and Sign in with Apple move to 25E or later). The 24T2 financing UX was
+  simplified to «Sin interés» plus one «Con interés» toggle with a single «Total financiado» field (the engine keeps
+  its four components). The closing/due contract became full exact dates for the next cycle, due after closing, not
+  necessarily in the same month; 25D records that a date change replaces the old date's reminders.
+- **Status.** Documentation only, on this branch (2026-09-28). The full handoff suite, checked on Linux on the
+  review-round tree: root `npm test` (373 passed, 1 todo) and `npm run check:repo` (OK, 347 tracked files); mobile
+  `typecheck` (clean), `test:storage` (794/794; it reads this file for the recurring-rules decision),
+  `currency:verify` and `regions:verify` (catalogues verified offline), `i18n:check -- --strict` (0 errors, 0
+  stale), `i18n:extract` (no copy outside the catalogue), `check` (dependencies up to date) and `export:ios` (iOS
+  bundle exported, 1967 modules). No blocker. The `mobile_api` PostgreSQL job runs in CI. No EAS build.
 
 ### Producto 25C — budgets with rollover, goals, CSV and productivity
 
@@ -1618,7 +1648,11 @@ docs/merchant-identity.md.
 ### Producto 25D — Face ID, notifications and Apple integrations
 
 Documentation only until it starts (scope revised 2026-09-28); nothing here is implemented. Every
-permission is requested only when the person enables the feature that needs it, never at launch.
+permission is requested only when the person enables the feature that needs it, never at launch. **25D ships
+before 25E** and so contains only what works on the device or over the existing capture path: Face ID and
+privacy, local notifications, App Intents / Shortcuts / Siri / Spotlight, Wallet automation → draft, widgets,
+Apple Watch and the FinanceKit research gate. Remote push that needs a backend or sync and any Sign in with Apple
+tied to 25E's account are deferred to 25E or a follow-up after it (24T1C, 2026-09-28).
 
 - **Security and privacy.**
   - Face ID / Touch ID lock through LocalAuthentication, with the **device-passcode fallback**; the lock
@@ -1649,7 +1683,11 @@ permission is requested only when the person enables the feature that needs it, 
   scheduled local notification can fire with the app closed, but that does not prove the ledger materialised the
   occurrence in the background, so a notification that fires while the app is closed only ever uses the reminder
   wording, never the «registrado» wording, unless the record demonstrably exists.
-- **Remote push (APNs)** is a separate capability, added only when a backend event exists that justifies
+- **Card cycle date changes (24T2's exact next closing / due dates).** When the person changes a card's next
+  closing or due date, every future local notification tied to the previous date is cancelled or replaced in the
+  same step; notifications stay deduplicated (one per card, kind and cycle), and no reminder for the old date may
+  remain scheduled after the change.
+- **Remote push (APNs) — deferred to 25E or later, not part of 25D.** A separate capability, added only when a backend event exists that justifies
   it (for example an Assistant capture or a sync conflict from 25A/25E); local reminders never depend on
   push.
 - **App Intents, App Shortcuts, Siri and Spotlight:** "registrar un gasto" (a draft) and "¿cuánto gasté
@@ -1679,7 +1717,7 @@ permission is requested only when the person enables the feature that needs it, 
   spending, amounts hidden by default, reading 25C2's commitments.
 - **Apple Watch (explicit future surface):** a focused capture and read experience, a WidgetKit
   complication / Smart Stack widget and App Intents; **not** a full replica of the iPhone app.
-- **Sign in with Apple** when an account exists (25A/25E); never required for the local core.
+- **Sign in with Apple — deferred to 25E or later, not part of 25D**, when an account exists; never required for the local core.
 - **FinanceKit:** a future research gate (entitlement, Apple's approval, the institutions and regions it
   actually covers, what data it gives), not a dependency of the core and not a categorical claim about any
   region or card; any use is read-only, consented and produces drafts.
@@ -1688,8 +1726,9 @@ permission is requested only when the person enables the feature that needs it, 
   denied-permission paths; the private-content default checked on the Lock Screen and the app switcher;
   the Wallet trigger on iPhone and Watch separately; notifications across a time-zone change and a
   restart.
-- **Depends on.** 25A for the capture path (tray and pairing token); 24T for instalment reminders; 25C2
-  for the widgets' commitments; 25E for remote push and Sign in with Apple.
+- **Depends on.** 25A for the capture path (tray and pairing token); 24T for instalment and card reminders; 25C2
+  for the widgets' commitments. **Not a dependency:** 25E (remote push and Sign in with Apple move there) and 24C2
+  (optional).
 
 ### Producto 25E — optional sync and privacy
 
