@@ -394,9 +394,16 @@ importe, moneda y estado.
   de una cuenta eliminada se lee (saldo e historial), con «Cuenta eliminada» donde iba «Saldo registrado», sin
   botón de edición ni acciones rápidas.
 - **Eliminar una tarjeta.** Solo desde Editar tarjeta, como último botón, tras Archivar/Reactivar; **nunca por
-  deslizamiento en el carrusel**, que ya usa el gesto horizontal para cambiar de tarjeta. La confirmación nombra la
-  deuda registrada si la hay y que compras y pagos quedan. El detalle de una tarjeta eliminada se lee («Tarjeta
-  eliminada · deuda registrada»), sin edición, sin Registrar compra ni Pagar.
+  deslizamiento en el carrusel**, que ya usa el gesto horizontal para cambiar de tarjeta. Sin deuda, la confirmación
+  dice que compras y pagos quedan. Con deuda registrada no se elimina: un diálogo («Todavía no se puede eliminar»)
+  nombra la deuda y ofrece **Pagar** (abre el pago revisado, con tope en la deuda, como desde el detalle) y
+  **Archivar** (solo si está activa); Cancelar no escribe nada. Nada se cancela ni se escribe en silencio. El
+  detalle de una tarjeta eliminada se lee («Tarjeta eliminada · deuda registrada»), sin edición, sin Registrar
+  compra ni Pagar. En Recurrentes, una regla cuya cuenta o tarjeta fue eliminada ofrece solo Eliminar.
+- **Historial de una cuenta eliminada.** Editar uno de sus movimientos o reglas muestra su propia cuenta (la
+  eliminada) seleccionada, con el importe, la fecha y la moneda guardados; se corrige en el lugar. Un movimiento o
+  regla nuevos nunca la ofrecen. Inicio y Reportes conservan su moneda en el chip y en «Solo …» mientras el
+  historial tenga dos monedas; Disponible y los formularios ya no.
 - **Formularios.** La fila de moneda de cuenta, tarjeta, deuda y presupuesto arranca en la moneda que propone la
   regla (docs/currency.md §2.10); el control no cambia. Paleta, hápticos, Dynamic Type y Reduce Motion como siempre.
 

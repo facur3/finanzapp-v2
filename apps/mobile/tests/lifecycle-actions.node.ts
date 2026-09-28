@@ -27,25 +27,27 @@ const rules: domain.RecurringRule[] = [
   { id: 'r2', accountId: 'cash', kind: 'expense', amountMinor: 100, merchant: 'Pausado', category: 'Salud', frequency: 'monthly', anchorDateISO: '2026-09-15', nextDateISO: '2026-10-15', active: false, deleted: false, createdAt, revision: 1, updatedAt: createdAt },
 ];
 
-function harness({ fail = false, language = 'es-AR' as const } = {}) {
+function harness({ fail = false, language = 'es-AR' as const, paid = false, deletedAccount = false } = {}) {
   const source = readFileSync(new URL('../src/ui/commitment-actions.ts', import.meta.url), 'utf8');
   const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, esModuleInterop: true } }).outputText;
   const alerts: { title: string; message: string; buttons: { text: string; style?: string; onPress?: () => void }[] }[] = [];
-  const removed: string[] = [];
+  const removed: string[] = [], removedCards: string[] = [], pushed: unknown[] = [];
   const savedCards: domain.CreditCardProfile[] = [];
   const state: unknown[] = [], refs: unknown[] = [];
   let cursor = 0, refCursor = 0;
-  const snapshot: domain.LedgerSnapshot = { accounts: [cash, other, lonely, cardAccount], entries, transfers };
+  const accounts = deletedAccount ? [{ ...cash, revision: 1, updatedAt: createdAt, deletedAt: createdAt }, other, lonely, cardAccount] : [cash, other, lonely, cardAccount];
+  const snapshot: domain.LedgerSnapshot = { accounts, entries, transfers: paid ? transfers.concat({ id: 't2', fromAccountId: 'other', toAccountId: 'card-account', amountMinor: 12000, note: '', dateISO: '2026-09-12', createdAt }) : transfers };
   const modules: Record<string, unknown> = {
     react: { useState: (initial: unknown) => { const i = cursor++; if (!(i in state)) state[i] = initial; return [state[i], (next: unknown) => { state[i] = next; }]; },
       useRef: (initial: unknown) => { const i = refCursor++; return (refs[i] ??= { current: initial }); } },
     'react-native': { Alert: { alert: (title: string, message: string, buttons: any[]) => alerts.push({ title, message, buttons }) } },
-    'expo-router': { router: { push: () => {} } },
+    'expo-router': { router: { push: (target: unknown) => pushed.push(target) } },
     'expo-haptics': { NotificationFeedbackType: { Success: 'Success' }, notificationAsync: async () => {}, selectionAsync: async () => {} },
     '@finanzapp/domain': domain,
     '../storage/LedgerProvider': { useLedger: () => ({ snapshot, archive: { accounts: snapshot.accounts, records: [], recurring: rules, cards: [card] },
       removeAccount: async (id: string) => { if (fail) throw new Error('disk full'); removed.push(id); },
       saveCard: async (next: domain.CreditCardProfile) => { if (fail) throw new Error('disk full'); savedCards.push(next); },
+      removeCard: async (id: string) => { if (fail) throw new Error('disk full'); removedCards.push(id); },
       saveDebt: async () => {}, saveRecurring: async () => {} }) },
     '../i18n/provider': { useI18n: () => bindLocale(language) },
   };
@@ -54,8 +56,8 @@ function harness({ fail = false, language = 'es-AR' as const } = {}) {
     if (!Object.hasOwn(modules, name)) throw new Error('Unexpected lifecycle dependency: ' + name);
     return modules[name];
   } });
-  const render = (hook: 'useAccountManagement' | 'useCardManagement') => { cursor = 0; refCursor = 0; return module.exports[hook](); };
-  return { render, alerts, removed, savedCards };
+  const render = (hook: 'useAccountManagement' | 'useCardManagement' | 'useRecurringManagement') => { cursor = 0; refCursor = 0; return module.exports[hook](); };
+  return { render, alerts, removed, removedCards, savedCards, pushed };
 }
 const settle = () => new Promise(resolve => setTimeout(resolve, 0));
 
@@ -94,17 +96,53 @@ test('a failed deletion keeps the account as it was and says so; in English the 
   assert.match(english.alerts[0].message, /^It leaves your accounts, Available and the forms\. Nothing is erased: 2 transactions and 1 transfer stay/);
 });
 
-test('deleting a card names its recorded debt and that purchases and payments stay; Eliminar writes the deletion record through the card\'s own save', async () => {
+test('25B2 review: a card with a recorded debt is not deleted: the dialog names the debt and offers Pagar (the payment form) or Archivar; nothing is written on its own', async () => {
   const view = harness();
   let done = 0;
   view.render('useCardManagement').remove(card, () => done++);
-  assert.equal(view.alerts[0].title, '¿Eliminar esta tarjeta?');
+  assert.equal(view.alerts[0].title, 'Todavía no se puede eliminar');
   // e3 is 12.000 cents: $ 120,00 in Argentina (a bare $ is the peso there; the space is the formatter's no-break space).
-  assert.equal(view.alerts[0].message.replace(/\u00a0/g, ' '), 'Tiene una deuda registrada de $ 120,00, que queda tal cual en el libro. Deja de aparecer en Tarjetas y de aceptar compras y pagos. Las compras y los pagos anteriores siguen en tus registros y reportes; ningún saldo cambia.');
-  assert.equal(view.savedCards.length, 0);
+  assert.equal(view.alerts[0].message.replace(/\u00a0/g, ' '), 'Esta tarjeta tiene una deuda registrada de $ 120,00. Pagala primero, o archivala: deja de aparecer y conserva la deuda para pagarla cuando quieras.');
+  assert.equal(JSON.stringify(view.alerts[0].buttons.map(button => [button.text, button.style ?? null])), JSON.stringify([['Cancelar', 'cancel'], ['Pagar', null], ['Archivar', null]]));
+  assert.equal(view.removedCards.length + view.savedCards.length, 0, 'nothing written by the dialog itself');
+  view.alerts[0].buttons[1].onPress!();
+  assert.equal(JSON.stringify(view.pushed), JSON.stringify([{ pathname: '/new-transfer', params: { toAccountId: 'card-account', maxAmountMinor: '12000' } }]), 'Pagar opens the reviewed payment, capped at the debt, as the card detail does');
+  view.alerts[0].buttons[2].onPress!();
+  await settle();
+  assert.equal(JSON.stringify([view.savedCards.length, view.savedCards[0].active, view.savedCards[0].deleted, view.savedCards[0].revision, view.removedCards.length, done]), JSON.stringify([1, false, false, 1, 0, 1]), 'Archivar archives: never a deletion');
+  // An archived card with debt: the same dialog, without Archivar.
+  const archived = harness();
+  archived.render('useCardManagement').remove({ ...card, active: false });
+  assert.equal(JSON.stringify(archived.alerts[0].buttons.map(button => button.text)), JSON.stringify(['Cancelar', 'Pagar']));
+  const english = harness({ language: 'en-US' as never });
+  english.render('useCardManagement').remove(card);
+  assert.equal(english.alerts[0].title, 'Cannot be deleted yet');
+  assert.equal(JSON.stringify(english.alerts[0].buttons.map(button => button.text)), JSON.stringify(['Cancel', 'Pay', 'Archive']));
+});
+
+test('a card without debt asks first and says purchases and payments stay; Eliminar writes the deletion record through `removeCard`; a failed write keeps the card and says so', async () => {
+  const view = harness({ paid: true });
+  let done = 0;
+  view.render('useCardManagement').remove(card, () => done++);
+  assert.equal(view.alerts[0].title, '¿Eliminar esta tarjeta?');
+  assert.equal(view.alerts[0].message, 'Deja de aparecer en Tarjetas y de aceptar compras y pagos. Las compras y los pagos anteriores siguen en tus registros y reportes; ningún saldo cambia.');
+  assert.equal(JSON.stringify(view.alerts[0].buttons.map(button => [button.text, button.style])), JSON.stringify([['Cancelar', 'cancel'], ['Eliminar', 'destructive']]));
+  assert.equal(view.removedCards.length, 0);
   view.alerts[0].buttons[1].onPress!();
   await settle();
-  assert.equal(view.savedCards.length, 1);
-  assert.equal(JSON.stringify([view.savedCards[0].deleted, view.savedCards[0].active, view.savedCards[0].revision]), JSON.stringify([true, false, 1]));
-  assert.equal(done, 1);
+  assert.equal(JSON.stringify([view.removedCards, view.savedCards.length, done]), JSON.stringify([['card'], 0, 1]), 'the storage path, never a plain save with `deleted`');
+  const failing = harness({ paid: true, fail: true });
+  failing.render('useCardManagement').remove(card);
+  failing.alerts[0].buttons[1].onPress!();
+  await settle();
+  assert.equal(failing.render('useCardManagement').error, 'disk full');
+  assert.equal(failing.removedCards.length, 0);
+});
+
+test('a rule on a deleted account offers only Eliminar: it cannot be resumed onto a closed row', () => {
+  const live = harness();
+  assert.equal(JSON.stringify(live.render('useRecurringManagement').actions(rules[1]).map((action: any) => action.key)), JSON.stringify(['resume', 'delete']));
+  const closed = harness({ deletedAccount: true });
+  assert.equal(JSON.stringify(closed.render('useRecurringManagement').actions(rules[1]).map((action: any) => action.key)), JSON.stringify(['delete']));
+  assert.equal(JSON.stringify(closed.render('useRecurringManagement').actions(rules[0]).map((action: any) => action.key)), JSON.stringify(['delete']), 'even one an older copy left active');
 });

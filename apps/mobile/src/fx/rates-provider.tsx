@@ -8,7 +8,7 @@ import { initializeRatesDatabase, readRates, saveRates, type RatesDatabase } fro
 import { openRatesDatabase } from '../storage/nativeDatabase';
 import { useLedger } from '../storage/LedgerProvider';
 import { useDisplayCurrency } from '../ui/display-currency-provider';
-import { availableCurrencies } from '../ui/presentation';
+import { historyCurrencies } from '../ui/presentation';
 import { useCurrentDay } from '../ui/theme';
 import { fetchFrankfurter } from './frankfurter';
 import { financeView, type FinanceView } from './finance-view';
@@ -44,12 +44,13 @@ export function useFinanceView(months: readonly string[], currency?: Currency): 
   const { snapshot } = useLedger();
   const rates = useRates();
   const day = useCurrentDay();
-  const held = useMemo(() => availableCurrencies(snapshot?.accounts ?? []), [snapshot?.accounts]);
+  // Every currency the ledger ever held (deleted accounts included): a deleted account's movements still count and convert.
+  const held = useMemo(() => historyCurrencies(snapshot?.accounts ?? []), [snapshot?.accounts]);
   const shared = useDisplayCurrency(held);
   const state = useSyncExternalStore(rates.subscribe, rates.getState, rates.getState);
-  // 25B2: with zero or one currency held there is nothing to consolidate or filter: the view is that currency's own
-  // ledger, whatever the stored preference says (a display currency chosen for a ledger that later lost its second
-  // currency is kept, never applied, and never asks the provider for anything). A route's currency still wins.
+  // 25B2: with zero or one currency in the whole history there is nothing to consolidate or filter: the view is that
+  // currency's own ledger, whatever the stored preference says (a display currency chosen for a ledger that never held
+  // it is kept, never applied, and never asks the provider for anything). A route's currency still wins.
   const single = held.length <= 1;
   const mode = single ? 'single' : shared.mode;
   const target = currency ?? (single ? held[0] ?? shared.currency : shared.currency);

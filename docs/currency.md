@@ -1,6 +1,6 @@
 # FinanzApp mobile: currencies and the multi-currency engine
 
-Updated 2026-09-27 (Producto 25B2: one rule for the currency a form starts with, §2.10; the display control only with two or more currencies held). Applies to the Expo app in
+Updated 2026-09-27 (Producto 25B2: one rule for the currency a form starts with, §2.10; the display control only with two or more currencies in the history). Applies to the Expo app in
 `apps/mobile` and the shared `packages/domain`. Read with [decision 002](decisions/002-spending-first.md)
 (ARS/USD kept apart, no invented rates), [docs/i18n.md](i18n.md) §9 and the roadmap's
 Producto 24 entries.
@@ -286,9 +286,13 @@ chip: the number is that currency's own total, the view is the single one whatev
 never applied, never asking the provider for anything), and a second currency brings the chip back with the stored
 choice. With two or more, the 24C1 chip ("Total · USD" / "Solo USD") and its sheet are unchanged.
 
-**Deleted accounts and cards** (docs/mobile-roadmap.md, 25B2) keep their currency on every stored row; a deleted
-account's currency is not among the currencies held (`availableCurrencies`), so it neither offers a filter nor
-counts in rule 2, while its movements still convert and count in the consolidated views.
+**Deleted accounts and cards** (docs/mobile-roadmap.md, 25B2) keep their currency on every stored row. Two sets
+tell them apart (25B2 review): `availableCurrencies` is the live accounts' set (Disponible, the forms, rule 2 above,
+the quick actions' preselection), `historyCurrencies` is every account's, deleted included (`useFinanceView`,
+Inicio's and Reportes' chip, `reportSelection`). Deleting the last account of a currency removes it from the first
+set and never from the second: the chip stays while the history holds two currencies, «Solo USD» still shows that
+account's months, the consolidated total converts its movements at their dates, and a missing rate gives
+per-currency parts, never a partial sum. The view is forced single only when the whole history holds one currency.
 
 ### Availability status
 

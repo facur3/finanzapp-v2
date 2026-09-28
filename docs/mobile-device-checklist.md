@@ -21,10 +21,17 @@ unchanged: keep a backup first** (Más → Copia de seguridad). Use your own sma
    Reportes for that month keeps them; Recurrentes shows the rule paused; the account's detail (from a movement)
    reads "Cuenta eliminada" without Editar or actions; Nuevo gasto and Transferir no longer offer it. VoiceOver on a
    row: the Actions rotor lists Eliminar. Also from Editar cuenta → «Eliminar cuenta».
-4. **Delete a card** with a purchase and a payment (leave some debt): Tarjetas → card → Editar → «Eliminar tarjeta»:
-   the confirmation names the debt; confirm: the card leaves the carousel; its purchases and payments stay in
-   Movimientos; its detail reads "Tarjeta eliminada · deuda registrada" without Registrar compra ni Pagar. No swipe on
-   the carousel.
+4. **Delete a card** with a purchase, a payment and an active recurring rule on it. Leave some debt first: Tarjetas →
+   card → Editar → «Eliminar tarjeta» opens "Todavía no se puede eliminar" naming the debt, with Pagar and Archivar;
+   Cancelar changes nothing; Pagar opens the payment capped at the debt. Pay it to zero, then delete: the confirmation
+   says purchases and payments stay; confirm: the card leaves the carousel; its purchases and payments stay in
+   Movimientos; Recurrentes shows its rule paused, offering Eliminar only; force-quit, reopen and background/foreground
+   the app past the rule's next date: no new purchase on the card; the detail reads "Tarjeta eliminada" without
+   Registrar compra ni Pagar. No swipe on the carousel.
+   **History.** Delete the only account in a second currency (with a movement in a previous month): Inicio keeps the
+   chip; "Total · ARS" still counts that movement and "Solo USD" shows it; Reportes reaches its month; Disponible and
+   Nuevo gasto no longer offer the currency. Open one of its movements → Editar: the account and amount are prefilled;
+   correct the amount and save; it stays on that account.
 5. **Backup.** Export (it is v11 once something was deleted), reinstall or use a second device, import: the deleted
    account and card come back deleted; the older backup from step 0 is refused as contradicting local changes.
 6. **Accessibility.** The largest Dynamic Type on Cuentas rows with the swipe open; VoiceOver through the

@@ -25,6 +25,12 @@ export interface CreditCardProfile {
 }
 
 export const CARD_DELETED_MESSAGE = 'Esta tarjeta fue eliminada.';
+/** A card with a recorded debt is paid or archived, never deleted: deleting would leave money owed with no card to pay
+ * it from (a deleted card takes no payment). When Producto 24T exists, a pending instalment plan blocks deletion the
+ * same way (`assertCardDeletable` is where that check goes); archiving never erases a plan either. */
+export const CARD_DEBT_MESSAGE = 'Esta tarjeta tiene deuda registrada. Pagala o archivala; no se puede eliminar.';
+/** The deletion record is written by `deleteCreditCard` in storage (it also stops the card's rules); a plain save never flips it. */
+export const CARD_DELETE_PATH_MESSAGE = 'Una tarjeta se elimina con su propia acción, no con un cambio de datos.';
 
 export type DebtDirection = 'owed_by_me' | 'owed_to_me';
 
@@ -173,6 +179,12 @@ export function assertOpenAccount(accountId: string, accounts: readonly Account[
   if (account && !isLiveAccount(account)) throw new Error(ACCOUNT_DELETED_MESSAGE);
   if (cards.some(card => card.deleted && card.accountId === accountId)) throw new Error(CARD_DELETED_MESSAGE);
   if (debts.some(debt => debt.deleted && debt.accountId === accountId)) throw new Error('Esta deuda fue eliminada.');
+}
+
+/** Whether a card may be deleted now: no recorded debt (and, from 24T on, no pending instalment plan). */
+export function assertCardDeletable(card: CreditCardProfile, snapshot: LedgerSnapshot): void {
+  if (card.deleted) throw new Error(CARD_DELETED_MESSAGE);
+  if (cardDebtMinor(card, snapshot) > 0) throw new Error(CARD_DEBT_MESSAGE);
 }
 
 /** The deletion record of a card (25B2): inactive, deleted, one revision on. Never twice. */

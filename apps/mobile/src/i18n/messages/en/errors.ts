@@ -213,6 +213,8 @@ export const errors: Pick<Messages, 'errors'> = {
       debtDeleted: 'This debt was deleted.',
       accountDeleted: 'This account was deleted.',
       cardDeleted: 'This card was deleted.',
+      cardDebt: 'This card has a recorded debt. Pay it or archive it; it cannot be deleted.',
+      cardDeletePath: 'A card is deleted with its own action, not with a data change.',
       obligationAccount: 'A card or a debt is deleted from its own screen.',
       accountState: 'Invalid account state.',
     },

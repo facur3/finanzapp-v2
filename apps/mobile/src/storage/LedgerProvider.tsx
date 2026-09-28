@@ -5,7 +5,7 @@ import { snapshotFromArchive, todayKey, type Account, type Entry, type EntryChan
   type CreditCardProfile, type PersonalDebtProfile, type AccountAppearance, type CategoryDefinition } from '@finanzapp/domain';
 import type { CurrencyGate } from '@finanzapp/domain';
 import { currencyGateForBuild } from './currency-gate';
-import { changeEntry, createAccount, createEntry, deleteAccount, importArchive, readArchive, changeAccount,
+import { changeEntry, createAccount, createEntry, deleteAccount, deleteCreditCard, importArchive, readArchive, changeAccount,
   createTransfer, changeTransfer, saveRecurringRule, processRecurring, saveMonthlyBudget,
   createCreditCard, saveCreditCard, createPersonalDebt, savePersonalDebt, saveAccountAppearance, saveCategoryDefinition,
   type LedgerDatabase } from './database';
@@ -38,6 +38,8 @@ type LedgerContextValue = {
   saveBudget: (budget: MonthlyBudget) => Promise<void>;
   addCard: (account: Account, card: CreditCardProfile) => Promise<void>;
   saveCard: (card: CreditCardProfile) => Promise<void>;
+  /** Producto 25B2: the deletion record of a card (refused with a recorded debt; its active rules stop). */
+  removeCard: (cardId: string) => Promise<void>;
   addDebt: (account: Account, debt: PersonalDebtProfile) => Promise<void>;
   saveDebt: (debt: PersonalDebtProfile) => Promise<void>;
   restoreBackup: (incoming: LedgerArchive, baseline: string) => Promise<void>;
@@ -129,6 +131,7 @@ export function LedgerProvider({ children }: { children: ReactNode }) {
     saveBudget: budget => mutate(db => saveMonthlyBudget(db, budget, BUILD_CURRENCY_GATE)),
     addCard: (account, card) => mutate(db => createCreditCard(db, account, card, BUILD_CURRENCY_GATE)),
     saveCard: card => mutate(db => saveCreditCard(db, card)),
+    removeCard: cardId => mutate(db => deleteCreditCard(db, cardId, new Date().toISOString())),
     addDebt: (account, debt) => mutate(db => createPersonalDebt(db, account, debt, BUILD_CURRENCY_GATE)),
     saveDebt: debt => mutate(db => savePersonalDebt(db, debt)),
     restoreBackup: (incoming, baseline) => mutate(async db => {

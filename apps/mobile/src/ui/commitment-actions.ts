@@ -2,7 +2,7 @@ import { useRef, useState } from 'react';
 import { Alert } from 'react-native';
 import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
-import { cardDebtMinor, closePersonalDebt, debtOutstandingMinor, deleteCreditCard, deletePersonalDebt, deleteRecurringRule, liabilityActivity, pauseRecurringRule, recurringHistory,
+import { assertOpenAccount, cardDebtMinor, closePersonalDebt, debtOutstandingMinor, deletePersonalDebt, deleteRecurringRule, liabilityActivity, pauseRecurringRule, recurringHistory,
   reopenPersonalDebt, resumeRecurringRule, todayKey, type Account, type CreditCardProfile, type PersonalDebtProfile, type RecurringRule } from '@finanzapp/domain';
 import { useLedger } from '../storage/LedgerProvider';
 import { useI18n } from '../i18n/provider';
@@ -14,7 +14,7 @@ import type { SwipeAction } from './swipe-actions';
  * the movements, payments and collections already recorded are never touched. `done` runs after a durable save
  * (a detail screen closes itself there). */
 export function useRecurringManagement() {
-  const { saveRecurring, snapshot } = useLedger();
+  const { saveRecurring, snapshot, archive } = useLedger();
   const { t } = useI18n();
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -49,12 +49,18 @@ export function useRecurringManagement() {
           onPress: () => { void commit(deleteRecurringRule(rule, now()), 'recurring.manage.deleteFailed', 'success', done); } },
       ]);
   }
+  /** 25B2: a rule whose account or card was deleted can only be deleted itself; resuming it would post to a closed row. */
+  function closed(rule: RecurringRule): boolean {
+    try { assertOpenAccount(rule.accountId, snapshot?.accounts ?? [], archive?.cards, archive?.debts); return false; } catch { return true; }
+  }
   /** Pause or resume, then delete (always last, at the far edge). */
   function actions(rule: RecurringRule, done?: () => void): SwipeAction[] {
+    const remove_: SwipeAction = { key: 'delete', label: t('recurring.manage.delete'), icon: 'trash', tone: 'destructive', onPress: () => remove(rule, done) };
+    if (closed(rule)) return [remove_];
     return [
       rule.active ? { key: 'pause', label: t('recurring.manage.pause'), icon: 'pause', tone: 'neutral', onPress: () => { void pause(rule, done); } }
         : { key: 'resume', label: t('recurring.manage.resume'), icon: 'play', tone: 'accent', onPress: () => { void resume(rule, done); } },
-      { key: 'delete', label: t('recurring.manage.delete'), icon: 'trash', tone: 'destructive', onPress: () => remove(rule, done) },
+      remove_,
     ];
   }
   return { busyId, error, pause, resume, remove, actions };
@@ -180,36 +186,50 @@ export function useAccountManagement() {
 
 /** Producto 25B2: deleting a card from its edit screen. The confirmation names the recorded debt, when there is one,
  * and that every purchase and payment stays; the record is written through the same path as an archive. */
+/** Producto 25B2: deleting a card from its edit screen. A card with a recorded debt is not deleted: the dialog says so and
+ * offers to pay it (the reviewed transfer form, prefilled) or to archive it instead; nothing is cancelled or written
+ * silently. Without debt, the confirmation names that every purchase and payment stays, and Eliminar writes the record
+ * through `removeCard` (which also stops the card's active rules, in the same commit). */
 export function useCardManagement() {
-  const { saveCard, snapshot } = useLedger();
+  const { saveCard, removeCard, snapshot } = useLedger();
   const { t, moneyText } = useI18n();
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const writing = useRef(false);
 
-  async function commit(next: CreditCardProfile, done?: () => void) {
+  async function commit(id: string, write: () => Promise<void>, failure: string, done?: () => void) { // i18n-ignore: a type, not copy
     if (writing.current) return;
     writing.current = true;
-    setBusyId(next.id);
+    setBusyId(id);
     setError(null);
     try {
-      await saveCard(next);
+      await write();
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       done?.();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'cards.form.deleteFailed');
+      setError(cause instanceof Error ? cause.message : failure);
     } finally {
       writing.current = false;
       setBusyId(null);
     }
   }
+  const archive = (card: CreditCardProfile, done?: () => void) =>
+    commit(card.id, () => saveCard({ ...card, active: false, revision: card.revision + 1, updatedAt: new Date().toISOString() }), 'cards.form.archiveFailed', done);
   function remove(card: CreditCardProfile, done?: () => void) {
     const account = snapshot?.accounts.find(item => item.id === card.accountId);
     const debt = snapshot && account ? cardDebtMinor(card, snapshot) : 0;
-    const detail = (debt > 0 && account ? t('cards.form.deleteDebt', { amount: moneyText(debt, account.currency) }) : '') + t('cards.form.deleteDetail');
-    Alert.alert(t('cards.form.deleteTitle'), detail, [
+    if (debt > 0 && account) {
+      const buttons: Parameters<typeof Alert.alert>[2] = [
+        { text: t('common.cancel'), style: 'cancel' },
+        { text: t('cards.form.blockedPay'), onPress: () => router.push({ pathname: '/new-transfer', params: { toAccountId: account.id, maxAmountMinor: String(debt) } }) },
+      ];
+      if (card.active) buttons.push({ text: t('cards.form.blockedArchive'), onPress: () => { void archive(card, done); } });
+      Alert.alert(t('cards.form.blockedTitle'), t('cards.form.blockedDetail', { amount: moneyText(debt, account.currency) }), buttons);
+      return;
+    }
+    Alert.alert(t('cards.form.deleteTitle'), t('cards.form.deleteDetail'), [
       { text: t('common.cancel'), style: 'cancel' },
-      { text: t('cards.form.deleteConfirm'), style: 'destructive', onPress: () => { void commit(deleteCreditCard(card, new Date().toISOString()), done); } },
+      { text: t('cards.form.deleteConfirm'), style: 'destructive', onPress: () => { void commit(card.id, () => removeCard(card.id), 'cards.form.deleteFailed', done); } },
     ]);
   }
   return { busyId, error, remove };

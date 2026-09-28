@@ -93,8 +93,11 @@ export const cards = {
       delete: 'Eliminar tarjeta',
       deleteTitle: '¿Eliminar esta tarjeta?',
       deleteDetail: 'Deja de aparecer en Tarjetas y de aceptar compras y pagos. Las compras y los pagos anteriores siguen en tus registros y reportes; ningún saldo cambia.',
-      /** Prepended when the card still has a recorded debt: "Tiene una deuda registrada de 12.000,00 ARS." */
-      deleteDebt: 'Tiene una deuda registrada de {amount}, que queda tal cual en el libro. ',
+      /** 25B2 review: a card with a recorded debt is paid or archived, never deleted (a deleted card takes no payment). */
+      blockedTitle: 'Todavía no se puede eliminar',
+      blockedDetail: 'Esta tarjeta tiene una deuda registrada de {amount}. Pagala primero, o archivala: deja de aparecer y conserva la deuda para pagarla cuando quieras.',
+      blockedPay: 'Pagar',
+      blockedArchive: 'Archivar',
       deleteConfirm: 'Eliminar',
       deleteFailed: 'No pudimos eliminar la tarjeta. Sigue como estaba; probá nuevamente.',
     },

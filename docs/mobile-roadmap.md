@@ -131,8 +131,9 @@ file). "Released" below names an in-app gate (`RELEASED_LANGUAGES`, `RELEASED_RE
   only with two or more currencies held; a normal account can be deleted (a dated tombstone, schema
   11: every movement and transfer stays readable as its own, it leaves Disponible, the lists and the
   forms, its active rules stop; a trailing swipe on its row and «Eliminar cuenta» on its edit screen,
-  both with a destructive confirmation); a card can be deleted (a `deleted` flag: purchases, payments
-  and the internal account stay; no swipe on the carousel, «Eliminar tarjeta» last on its edit screen,
+  both with a destructive confirmation); a card without recorded debt can be deleted (a `deleted` flag:
+  purchases, payments and the internal account stay, its rules stop in the same commit; with debt the
+  dialog offers Pagar or Archivar instead; no swipe on the carousel, «Eliminar tarjeta» last on its edit screen,
   the recorded debt named in the confirmation). Backups v11 carry both records; v1–v10 still import.
 - **First opening (25B).** A new installation opens on a two-stage native setup: a
   welcome with the language and region detected from the device (two quiet rows that open the Más
@@ -1042,26 +1043,46 @@ the owner authorises it; no EAS build or store submission without the owner.
   opening's rule); 5) ARS. Applied to New account (a route currency wins), New card, New debt, New budget
   (the route wins), Presupuestos' initial currency. Recurring rules and movements take their account's
   currency. Nothing saved ever changes currency.
-- **Inicio and Reportes.** The chip (`Total · USD` / `Solo USD`, its sheet) only with two or more
-  currencies held; with zero or one the view is that currency's own ledger whatever the stored preference
-  says (kept, never applied, no request to the rate provider); no account selector on Inicio.
+- **Inicio and Reportes.** Two sets of currencies (review round): `availableCurrencies` (the live accounts':
+  Disponible, the forms, the default rule, the quick actions' preselection) and `historyCurrencies` (every
+  account's, deleted included: the view, its chip and `reportSelection`). The chip (`Total · USD` /
+  `Solo USD`, its sheet) only with two or more currencies **in the history**; with zero or one the view is
+  that currency's own ledger whatever the stored preference says (kept, never applied, no request to the
+  rate provider); no account selector on Inicio. Deleting the last account of a currency therefore keeps
+  that currency's movements in every period (consolidated at their dates, filterable as «Solo …», the
+  previous months reachable; a missing rate still gives per-currency parts, never a partial sum) while it
+  leaves Disponible and the forms.
 - **Account lifecycle (exact).** `deleteAccount` writes a dated tombstone (`deletedAt`, one revision on)
   and pauses the account's active recurring rules in the same commit; the row and every movement and
   transfer stay untouched, readable with the account's name and currency; the account leaves Cuentas,
   Disponible, the currencies held, `postingAccountsFor`, the transfer sides and the forms; a new
   movement, a transfer side or an active rule on it is refused («Esta cuenta fue eliminada.»); its history
-  stays editable in place and still counts in every report; its detail reads «Cuenta eliminada» without
+  stays editable in place (`postingAccounts(accounts, debts, keepId)`: the movement's or rule's own row
+  stays offered while it is edited, for its own kind, so amount, date, merchant and category are corrected
+  on the same account and currency; it may move to a live account of the currency, never onto a deleted
+  row; a new movement or rule never sees it) and still counts in every report; its detail reads «Cuenta eliminada» without
   Editar or actions; the edit screen refuses it. UX: Cuentas rows swipe to Eliminar (`SwipeRow`: a short
   swipe reveals, a full swipe only opens the confirmation, one row open at a time, the same action in
   VoiceOver's rotor), «Eliminar cuenta» last on Editar cuenta; the confirmation names the movements and
   transfers that stay and the rules that stop. Deleting again is a no-op (a retry after a failed refresh).
   A card's or a debt's internal account is refused («… se elimina desde su propia pantalla.»).
-- **Card lifecycle (exact).** Create, edit, archive and reactivate stay; `deleteCreditCard` sets
-  `deleted` (inactive, one revision on) through the same save path; a deleted card leaves Tarjetas and
-  the forms, takes no purchase and no payment («Esta tarjeta fue eliminada.»), is never reactivated or
-  edited, keeps its internal account, purchases and payments; its detail reads «Tarjeta eliminada ·
-  deuda registrada». «Eliminar tarjeta» is the last action of Editar tarjeta; no swipe on the carousel.
-  The confirmation names the recorded debt when there is one and that nothing is erased.
+- **Card lifecycle (exact).** Create, edit, archive and reactivate stay; the storage `deleteCreditCard`
+  (review round; `LedgerProvider.removeCard`) writes the deletion record (`deleted`, inactive, one
+  revision on) **and pauses the card's active recurring rules in the same commit**, and is **refused while
+  the card has a recorded debt** (`assertCardDeletable`, «Esta tarjeta tiene deuda registrada. Pagala o
+  archivala; no se puede eliminar.»): a deleted card takes no payment, so a debt would be stranded. A plain
+  `saveCreditCard` never flips `deleted` («Una tarjeta se elimina con su propia acción…»). A deleted card
+  leaves Tarjetas and the forms, takes no purchase and no payment («Esta tarjeta fue eliminada.»), is
+  never reactivated or edited, keeps its internal account, purchases and payments; its detail reads
+  «Tarjeta eliminada · deuda registrada» (the record of a card deleted by an older copy that still carried
+  debt, or paid to zero and later corrected). «Eliminar tarjeta» is the last action of Editar tarjeta; no
+  swipe on the carousel. With debt, the dialog («Todavía no se puede eliminar») names the debt and offers
+  **Pagar** (the reviewed payment form, capped at the debt, as the card detail does) and **Archivar** (an
+  active card only); without debt, the confirmation says purchases and payments stay. Archiving keeps the
+  debt payable and, once 24T exists, every pending instalment (recorded above); nothing is cancelled or
+  written silently. The recurring catch-up (`processRecurring`, on opening and on returning to the
+  foreground) is the second net: a rule whose account, card or debt is deleted records nothing whatever
+  its flag says, and Recurrentes offers such a rule Eliminar only (no Reanudar onto a closed row).
 - **Debts and recurring.** Audited, not redesigned: delete, close/reopen, pause/resume and their history
   are unchanged (the deletion guards run after the debt rule, so 24UX4's messages stay); deleting an
   account pauses its rules through `pauseRecurringRule`.
@@ -1075,24 +1096,32 @@ the owner authorises it; no EAS build or store submission without the owner.
   chip, rule 2/4 for the next form) while its movements still convert and count; a deleted account with a
   negative balance keeps it as history and leaves Disponible; a stored display currency whose last account
   was deleted is kept and not applied; the same operation retried after a failed refresh writes nothing
-  twice; a card with debt can be deleted (the debt stays recorded on its account) and cannot be paid
-  afterwards, as a deleted debt cannot (24UX4's precedent); a movement on a deleted account can be
-  corrected but not moved to another deleted row; the instalment invariant for 24T is recorded above.
+  twice; a card with debt is not deleted (paid or archived first); a movement on a deleted account can be
+  corrected but not moved to another deleted row; a payment link (`/new-transfer?toAccountId=…`) naming a
+  deleted card or account opens a plain transfer instead of preselecting it; the instalment invariant for
+  24T is recorded above.
 - **Not changed.** Home's, Reportes' and the onboarding's design; the financial models (money, FX,
   budgets); `vercel.json`, `api/mobile`, `server/mobile`.
-- **Status.** Delivered on this branch (2026-09-27), not device-verified.
+- **Status.** Delivered on this branch (2026-09-27, review round the same day), not device-verified.
   - **Checked on Linux:** root `npm test` 327/327 (+7 `packages/domain/lifecycle.test.ts`: the account tombstone,
     the card flag, the posting and transfer guards, Disponible, backup v11 round trip, legacy files, an older copy
-    as a conflict); mobile `npm run typecheck`, `npm run test:storage` 751/751 (+5 `tests/currency-defaults.node.ts`,
-    +5 `tests/lifecycle.node.ts` on real SQLite: schema 10 → 11 on a real file, deleting an account with entries,
+    as a conflict); mobile `npm run typecheck`, `npm run test:storage` 762/762 (+5 `tests/currency-defaults.node.ts`,
+    +9 `tests/lifecycle.node.ts` on real SQLite: schema 10 → 11 on a real file, deleting an account with entries,
     transfers and an active rule, restart, export and restore, the older copy refused, deleting a card with purchases
-    and payments, idempotent retries, the newer-schema refusal; +3 `tests/lifecycle-actions.node.ts`: the confirmations
-    and their writes; +2 account route tests; the harnesses' chip and default-currency expectations updated),
-    `currency:verify`, `regions:verify`, `i18n:check -- --strict`, `i18n:extract`, `check`, `export:ios`. No EAS
-    build; the iPhone was not touched.
+    and payments, idempotent retries, the newer-schema refusal, and the review round: a card's rules paused in the
+    same commit and silent through a restart, a foreground catch-up and a rule forced active; a card with debt
+    refused, then archived, paid and deleted; a movement on a deleted account corrected in place, moved to a live
+    account, never onto a deleted one; the last account of a currency deleted with Disponible, «Solo USD», the
+    previous month, the consolidated total and the missing rate; +5 `tests/lifecycle-actions.node.ts`: the
+    confirmations and their writes, the debt dialog's Pagar/Archivar, Eliminar only for a rule on a deleted account;
+    route tests: Inicio and Reportes with a deleted USD account (total, chip, filter, parts, comparison, drill-down,
+    live account count), entry-form and recurring-form editing on a deleted account, the deleted-card payment link;
+    the harnesses' chip and default-currency expectations updated), `currency:verify`, `regions:verify`,
+    `i18n:check -- --strict`, `i18n:extract`, `check`, `export:ios`. No EAS build; the iPhone was not touched.
   - **Pending:** the checklist section Producto 25B2 (the schema 11 upgrade of FinanzApp Dev's data with a backup
-    first, the defaults per region, the chip with one and two currencies, deleting an account and a card, the v11
-    backup round trip, VoiceOver and the largest text on the swipe rows).
+    first, the defaults per region, the chip with one and two currencies, deleting an account and a card, the
+    debt dialog, the paused card rules through a restart and a foreground return, the v11 backup round trip,
+    VoiceOver and the largest text on the swipe rows).
 - **Depends on.** 25B (the suggestion rule), 24C1 (the chip and the display preference), 24UX4 (the deletion
   records of rules and debts).
 

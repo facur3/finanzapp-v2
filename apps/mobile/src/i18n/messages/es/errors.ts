@@ -235,6 +235,8 @@ export const errors = {
       /** Producto 25B2: a deleted account or card keeps its history and takes nothing new. */
       accountDeleted: 'Esta cuenta fue eliminada.',
       cardDeleted: 'Esta tarjeta fue eliminada.',
+      cardDebt: 'Esta tarjeta tiene deuda registrada. Pagala o archivala; no se puede eliminar.',
+      cardDeletePath: 'Una tarjeta se elimina con su propia acción, no con un cambio de datos.',
       obligationAccount: 'Una tarjeta o deuda se elimina desde su propia pantalla.',
       accountState: 'Estado de cuenta inválido.',
     },

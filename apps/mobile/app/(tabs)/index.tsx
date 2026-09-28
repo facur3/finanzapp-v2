@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { View } from 'react-native';
 import { router } from 'expo-router';
-import { currentMonthISO, hiddenLiabilityAccountIds, spendingOverview, spendingWindow, summarizeMonthlyBudgets } from '@finanzapp/domain';
+import { currentMonthISO, hiddenLiabilityAccountIds, isLiveAccount, spendingOverview, spendingWindow, summarizeMonthlyBudgets } from '@finanzapp/domain';
 import { useLedger } from '../../src/storage/LedgerProvider';
 import { ActionButton, AppText, Choices, EmptyState, EntryRow, Money, Screen, SectionTitle, useStacked } from '../../src/ui/components';
 import { DisplayCurrencyButton } from '../../src/ui/currency-switch';
@@ -14,7 +14,7 @@ import { BudgetHomeCard, CategoryRanking, CurrencyParts, MetricHelp, UpcomingRec
 import { budgetScope } from '../../src/ui/budget-presentation';
 import { withCurrencyCode } from '../../src/i18n/format';
 import { Reflow, ValueTransition } from '../../src/ui/motion';
-import { availableCurrencies, homeNamesCategory, selectEntries, sharedGlyphs, visibleNamesAccount } from '../../src/ui/presentation';
+import { availableCurrencies, historyCurrencies, homeNamesCategory, selectEntries, sharedGlyphs, visibleNamesAccount } from '../../src/ui/presentation';
 import { useCategoryLookOf } from '../../src/ui/category-hues';
 import { AssistantEntry, QuickActions } from '../../src/ui/quick-actions';
 import { space, useCurrentDay, usePalette } from '../../src/ui/theme';
@@ -54,7 +54,8 @@ export default function HomeScreen() {
   const { t, formatDate, formatNumericDate, currencyName } = useI18n();
   const expenseLook = useCategoryLookOf('expense'), incomeLook = useCategoryLookOf('income');
   const [metric, setMetric] = useState<HomeMetric>('spending');
-  const currencies = availableCurrencies(snapshot?.accounts ?? []);
+  // Every currency the ledger ever held (25B2 review): a deleted account's history keeps its currency in the view and the chip.
+  const currencies = historyCurrencies(snapshot?.accounts ?? []);
   // The display mode and currency Inicio shares with Reportes (24B6, 24C1): a stored preference; in `consolidated` mode
   // the ledger is read converted into the currency (for this view only), in `single` mode filtered to it.
   const { setCurrency, setMode } = useDisplayCurrency(currencies);
@@ -93,7 +94,7 @@ export default function HomeScreen() {
 
   if (!snapshot || !summary || !view || !spendingHero || !availableHero) return null;
   const hidden = hiddenLiabilityAccountIds(archive?.cards, archive?.debts);
-  const accountCount = snapshot.accounts.filter(account => inView(view, account) && !hidden.has(account.id)).length;
+  const accountCount = snapshot.accounts.filter(account => inView(view, account) && !hidden.has(account.id) && isLiveAccount(account)).length;
   const openReport = () => router.navigate({ pathname: '/reports', params: { currency } });
   const spending = metric === 'spending';
   // 24UX5 review: each list names accounts only when its visible rows come from more than one (two owned accounts with
@@ -117,7 +118,8 @@ export default function HomeScreen() {
   const info = figureInfo(hero, spending ? 'spending' : 'available', words);
   // The quick actions preselect an account in the shown currency only when one exists (a consolidated total may be in a
   // currency no account holds). The Assistant receives the shown currency exactly as before 24C1 (it is not changed here).
-  const actionCurrency = currencies.includes(currency) ? currency : undefined;
+  // A new movement is preselected in the shown currency only while a live account holds it (a history-only currency has no account to post to).
+  const actionCurrency = availableCurrencies(snapshot?.accounts ?? []).includes(currency) ? currency : undefined;
 
   return <Screen gap={space.xxxl}>
     {!snapshot.accounts.length ? <EmptyState title={t('home.emptyTitle')}

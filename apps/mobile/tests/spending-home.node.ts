@@ -52,8 +52,8 @@ function routeHarness(file: string, params: Record<string, unknown>, initialData
     preferred: display.getState(), mode: display.getMode(), setCurrency: (currency: domain.Currency) => { display.set(currency); }, setMode: (mode: displayCurrency.DisplayMode) => { display.setMode(mode); } }) };
   // 24C1: the finance view as the provider builds it, over a fixed rate book (no network); `ensured` records what the screen asked for.
   const ratesProvider = { useFinanceView: (months: readonly string[], currency?: domain.Currency) => {
-    const held = presentation.availableCurrencies(data.accounts);
-    // 25B2: with one currency held the view is that currency's own ledger, whatever the preference says (rates-provider.tsx).
+    const held = presentation.historyCurrencies(data.accounts);
+    // 25B2: with one currency in the whole history the view is that currency's own ledger, whatever the preference says (rates-provider.tsx).
     const mode = held.length <= 1 ? 'single' : display.getMode();
     const target = currency ?? (held.length <= 1 ? held[0] ?? displayCurrency.resolveDisplayCurrency(display.getState(), held, mode) : displayCurrency.resolveDisplayCurrency(display.getState(), held, mode));
     const built = financeView.financeView(data, mode, target, rates.book);
@@ -746,4 +746,43 @@ test('24C1 review: the chip says what the number covers: "Total · USD" for ever
   chip.props.onMode('single');
   chip = find(view.render(), 'DisplayCurrencyButton');
   assert.deepEqual([chip.props.mode, chip.props.currency], ['single', 'ARS'], 'USD is not held: the first held currency, as 24B6 resolved it');
+});
+
+// ---- 25B2 review: a deleted account's currency stays in the history ------------------------------------------
+
+test('25B2 review: deleting the last USD account keeps its movements on Inicio: the consolidated total counts them, the chip stays, "Solo USD" still reads them, and without a rate the parts say so', () => {
+  const deletedAt = '2026-09-20T10:00:00.000Z';
+  const data: domain.LedgerSnapshot = { ...homeData, accounts: homeData.accounts.map(account => account.id === 'u' ? { ...account, revision: 1, updatedAt: deletedAt, deletedAt } : account) };
+  const display = displayStore({ [displayCurrency.DISPLAY_MODE_KEY]: 'consolidated', [displayCurrency.DISPLAY_CURRENCY_KEY]: 'ARS' });
+  const ensured: { months: readonly string[]; quotes: readonly string[] }[] = [];
+  const view = routeHarness('(tabs)/index.tsx', {}, data, {}, display, { book: consolidatedRates(), ensured });
+  let root = view.render();
+  assert.deepEqual([find(root, 'Money').props.minor, find(root, 'Money').props.currency], [100 + 200 + 2000000, 'ARS'], 'the USD expense of the 11th still converts at its date');
+  const chip = find(root, 'DisplayCurrencyButton');
+  assert.deepEqual([chip.props.mode, chip.props.currency], ['consolidated', 'ARS'], 'two currencies in the history: the chip stays');
+  assert.deepEqual(nodes(root).filter(n => n.type === 'EntryRow').map(n => [n.props.entry.id, n.props.account.currency]), [['income', 'ARS'], ['usd', 'USD'], ['now', 'ARS'], ['early', 'ARS']], 'the deleted account\'s row keeps its currency');
+  assert.equal(JSON.stringify(ensured.at(-1)), JSON.stringify({ months: ['2026-09'], quotes: ['ARS'] }), 'the provider is still asked for the USD → ARS rate');
+  // Disponible counts live accounts only: the deleted USD balance is history.
+  nodes(root).find(n => n.type === 'Choices' && n.props.value === 'spending')!.props.onChange('available');
+  root = view.render();
+  assert.equal(find(root, 'Money').props.minor, 9594, 'ARS 95,94 alone: no USD balance converted');
+  assert.equal(nodes(root).filter(n => n.type === 'AppText').map(n => String(n.props.children)).some(text => text === '1 cuenta'), true, 'one live account counted');
+  // "Solo USD" is still a view of the history: the USD expense alone, in its own currency.
+  chip.props.onMode('single');
+  chip.props.onCurrency?.('USD');
+  display.set('USD');
+  nodes(view.render()).find(n => n.type === 'Choices' && n.props.value === 'available')!.props.onChange('spending');
+  root = view.render();
+  assert.deepEqual([find(root, 'Money').props.minor, find(root, 'Money').props.currency], [1000, 'USD']);
+  assert.deepEqual([find(root, 'DisplayCurrencyButton').props.mode, find(root, 'DisplayCurrencyButton').props.currency], ['single', 'USD']);
+  assert.equal(find(root, 'QuickActions').props.currency, undefined, 'no live USD account to preselect for a new movement');
+  // Without the rate, consolidated: the parts name both currencies, never a partial ARS sum.
+  const offline = routeHarness('(tabs)/index.tsx', {}, data, {}, displayStore({ [displayCurrency.DISPLAY_MODE_KEY]: 'consolidated', [displayCurrency.DISPLAY_CURRENCY_KEY]: 'ARS' }), { book: domain.rateBook([]), activity: 'offline' }).render();
+  assert.equal(nodes(offline).some(n => n.type === 'Money'), false);
+  assert.equal(JSON.stringify(find(offline, 'CurrencyParts').props.parts), JSON.stringify([{ currency: 'ARS', minor: 300 }, { currency: 'USD', minor: 1000 }]));
+  // With every USD account deleted and no USD movement left, the history is ARS alone: no chip, that currency's own ledger.
+  const arsOnly: domain.LedgerSnapshot = { ...data, accounts: data.accounts.filter(account => account.currency === 'ARS') };
+  const plain = routeHarness('(tabs)/index.tsx', {}, arsOnly, {}, displayStore({ [displayCurrency.DISPLAY_MODE_KEY]: 'consolidated', [displayCurrency.DISPLAY_CURRENCY_KEY]: 'USD' })).render();
+  assert.equal(nodes(plain).some(n => n.type === 'DisplayCurrencyButton'), false);
+  assert.deepEqual([find(plain, 'Money').props.minor, find(plain, 'Money').props.currency], [300, 'ARS']);
 });

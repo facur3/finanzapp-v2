@@ -14,6 +14,7 @@ import {
   LEDGER_CURRENCIES, archiveExponents, catalogueUnit, currenciesNeedingUnits, isLegacyCurrency, storedExponent, validateCurrencyUnit,
   type Currency, type CurrencyGate, type CurrencyUnit,
   OBLIGATION_ACCOUNT_MESSAGE, assertOpenAccount, deleteAccount as deleteAccountRecord, hiddenLiabilityAccountIds, isLiveAccount, pauseRecurringRule,
+  CARD_DELETE_PATH_MESSAGE, assertCardDeletable, deleteCreditCard as deleteCreditCardRecord,
 } from '@finanzapp/domain';
 
 type SqlValue = string | number | null;
@@ -835,6 +836,9 @@ async function catchUpStep(db: LedgerDatabase, throughDateISO: string, nowISO: s
     for (let index = 0; index < recurring.length; index++) {
       const current = recurring[index];
       if (failed.has(current.id)) continue;
+      // 25B2: a rule whose account, card or debt was deleted records nothing more, whatever its flag says (the deletion
+      // paused it; this is the second net, for a rule an older copy or a race left active).
+      try { assertOpenAccount(current.accountId, archive.accounts, archive.cards, archive.debts); } catch { continue; }
       let materialized: ReturnType<typeof materializeRecurringRule>;
       try { materialized = materializeRecurringRule(current, archive.accounts, throughDateISO, nowISO, batchSize); }
       catch { failed.add(current.id); continue; }
@@ -989,11 +993,35 @@ export async function saveCreditCard(db: LedgerDatabase, input: CreditCardProfil
     if (!existing) throw new Error('No encontramos esta tarjeta.');
     if (sameCreditCardProfile(existing, card)) return; // Committed already; a refresh failed.
     validateCreditCardChange(existing, card);
+    // 25B2 review: the deletion record has its own path (`deleteCreditCard`, which checks the debt and stops the rules).
+    if (card.deleted) throw new Error(CARD_DELETE_PATH_MESSAGE);
     validateArchive({ ...archive, cards: archive.cards!.map(item => item.id === card.id ? card : item) });
-    // A deletion (25B2) is this same UPDATE with deleted = 1: the row, its account, its purchases and payments stay.
     await tx.runAsync(`UPDATE credit_cards SET issuer = ?, last4 = ?, creditLimitMinor = ?, closingDay = ?, dueDay = ?,
       active = ?, deleted = ?, revision = ?, updatedAt = ? WHERE id = ?`, card.issuer, card.last4, card.creditLimitMinor,
     card.closingDay, card.dueDay, card.active ? 1 : 0, card.deleted ? 1 : 0, card.revision, card.updatedAt, card.id);
+  });
+}
+
+/** Producto 25B2: the deletion record of a card, in one commit with the stop of its active recurring rules. Refused
+ * while the card has a recorded debt (pay it or archive it: a deleted card takes no payment, so a debt would be
+ * stranded); the row, its internal account, every purchase and every payment stay; nothing new lands on it
+ * afterwards (`assertOpenAccount`). Deleting a card already deleted is a no-op, so a retry after a failed refresh
+ * never fails. */
+export async function deleteCreditCard(db: LedgerDatabase, cardId: string, nowISO: string): Promise<void> {
+  await db.withExclusiveTransactionAsync(async tx => {
+    const archive = await readArchive(tx);
+    const card = archive.cards?.find(item => item.id === cardId);
+    if (!card) throw new Error('No encontramos esta tarjeta.');
+    if (card.deleted) return; // Committed already; a refresh failed.
+    assertCardDeletable(card, snapshotFromArchive(archive));
+    const tombstone = deleteCreditCardRecord(card, nowISO);
+    const stopped = (archive.recurring ?? []).filter(rule => rule.accountId === card.accountId && rule.active && !rule.deleted).map(rule => pauseRecurringRule(rule, nowISO));
+    const recurring = (archive.recurring ?? []).map(rule => stopped.find(item => item.id === rule.id) ?? rule);
+    validateArchive({ ...archive, cards: archive.cards!.map(item => item.id === cardId ? tombstone : item), recurring });
+    await tx.runAsync('UPDATE credit_cards SET active = 0, deleted = 1, revision = ?, updatedAt = ? WHERE id = ?', tombstone.revision, tombstone.updatedAt, cardId);
+    for (const rule of stopped) {
+      await tx.runAsync('UPDATE recurring_rules SET active = 0, revision = ?, updatedAt = ? WHERE id = ?', rule.revision, rule.updatedAt, rule.id);
+    }
   });
 }
 

@@ -1308,3 +1308,53 @@ test('24UX4 review: a rule detail opened before the ledger hydrates shows the fo
   assert.equal(form.rules.length, 0, 'nothing is written');
   assert.equal(find(root, 'Field', 'Comercio o concepto').props.editable, false);
 });
+
+// ---- 25B2 review: history on a deleted account is corrected in place -----------------------------------------
+
+test('25B2 review: editing a movement of a deleted account keeps its account, amount, date and currency, offers a live account of the currency, and never offers the deleted row to a new movement', async () => {
+  const deletedAt = '2026-09-20T10:00:00.000Z';
+  const second: domain.Account = { ...account, id: 'b', name: 'Banco ARS' };
+  const data: domain.LedgerArchive = { ...archive, accounts: [{ ...account, revision: 1, updatedAt: deletedAt, deletedAt }, second, archive.accounts[1]] };
+  const view = harness('src/ui/entry-form.tsx', { original: data.records[0] }, { data });
+  let root = view.render();
+  assert.equal(find(root, 'AmountField').props.value, '123,45', 'the stored amount, not an empty field');
+  assert.equal(find(root, 'AmountField').props.currency, 'ARS');
+  assert.equal(domain.todayKey(find(root, 'DateField').props.value), entry.dateISO);
+  assert.deepEqual([find(root, 'AccountField').props.value, find(root, 'AccountField').props.accounts.map((a: domain.Account) => a.id)], ['a', ['b', 'a']], 'its own (deleted) account stays selected; the live account of the currency is the other choice');
+  find(root, 'AmountField').props.onChangeText('120');
+  find(root, 'Field').props.onChangeText('Prueba corregida');
+  root = view.render();
+  await find(root, 'ActionButton', 'Guardar cambios').props.onPress();
+  assert.equal(view.updates.length, 1);
+  assert.deepEqual([view.updates[0].after.entry.accountId, view.updates[0].after.entry.amountMinor, view.updates[0].after.entry.merchant, view.updates[0].after.entry.dateISO, view.updates[0].after.entry.id],
+    ['a', 12000, 'Prueba corregida', entry.dateISO, entry.id], 'corrected in place, on the same account');
+  // A new movement never sees the deleted account; an Ingreso draft neither.
+  const fresh = harness('src/ui/entry-form.tsx', {}, { data });
+  assert.deepEqual(find(fresh.render(), 'AccountField').props.accounts.map((a: domain.Account) => a.id), ['b', 'u']);
+  // Editing while the kind flips: the deleted row is offered for the movement's own kind only.
+  const flipped = harness('src/ui/entry-form.tsx', { original: data.records[0] }, { data });
+  find(flipped.render(), 'Choices').props.onChange('income');
+  assert.deepEqual([find(flipped.render(), 'AccountField').props.value, find(flipped.render(), 'AccountField').props.accounts.map((a: domain.Account) => a.id)], ['b', ['b']], 'an income cannot be re-homed onto a deleted account');
+});
+
+test('25B2 review: a paused rule on a deleted account is edited on its own account; a new rule never offers it', () => {
+  const deletedAt = '2026-09-20T10:00:00.000Z';
+  const paused: domain.RecurringRule = { id: 'gym', accountId: 'a', kind: 'expense', amountMinor: 700, merchant: 'Gimnasio', category: 'Salud', frequency: 'monthly',
+    anchorDateISO: '2026-01-05', nextDateISO: '2026-10-05', active: false, deleted: false, createdAt, revision: 1, updatedAt: deletedAt };
+  const data: domain.LedgerArchive = { ...archive, accounts: [{ ...account, revision: 1, updatedAt: deletedAt, deletedAt }, archive.accounts[1]], recurring: [paused] };
+  const editing = harness('src/ui/recurring-form.tsx', { original: paused }, { data });
+  const field = find(editing.render(), 'AccountField');
+  assert.deepEqual([field.props.value, field.props.accounts.map((a: domain.Account) => a.id)], ['a', ['a']]);
+  assert.equal(find(editing.render(), 'AmountField').props.value, '7,00');
+  const fresh = harness('src/ui/recurring-form.tsx', {}, { data });
+  assert.deepEqual(find(fresh.render(), 'AccountField').props.accounts.map((a: domain.Account) => a.id), ['u']);
+});
+
+test('25B2 review: a payment link naming a deleted card opens a plain transfer instead of preselecting it', () => {
+  const deletedAt = '2026-09-20T10:00:00.000Z';
+  const data: domain.LedgerArchive = { ...liabilityData, cards: [{ ...card, active: false, deleted: true, revision: 1, updatedAt: deletedAt }] };
+  const view = harness('src/ui/transfer-form.tsx', { toAccountId: 'card-acc', title: 'Pagar tarjeta', maxAmountMinor: '5000' }, { data });
+  const root = view.render();
+  assert.equal(nodes(root).some(node => node.type === 'SelectorCard'), false, 'the card is not locked in as destination');
+  assert.equal(nodes(root).some(node => node.type === 'AccountField' && node.props.label === 'Hacia' && node.props.accounts.some((a: domain.Account) => a.id === 'card-acc')), false, 'and is not among the destinations');
+});

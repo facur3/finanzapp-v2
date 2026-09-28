@@ -77,8 +77,15 @@ export function initialAccountId(accounts: Account[], accountId?: string, curren
  * Home, Reportes, Presupuestos and the Assistant let the person switch between. Never a
  * fixed pair, so an account in any stored currency is always reachable. */
 export function availableCurrencies(accounts: Account[]): Currency[] {
-  // 25B2: a deleted account's currency is history, not a choice (its rows stay reachable through Movimientos).
+  // 25B2: the currencies the live accounts hold: what a new record, Disponible and the default rule work with.
   return currenciesPresent(liveAccounts(accounts));
+}
+
+/** Every currency the ledger ever held, deleted accounts included (25B2 review): the scope of Inicio's and Reportes'
+ * view and of its chip, so the history of a currency whose last account was deleted stays counted (converted at its
+ * dates in the consolidated total, filterable with "Solo …"), never dropped with the account. */
+export function historyCurrencies(accounts: Account[]): Currency[] {
+  return currenciesPresent(accounts);
 }
 
 export type ActivityItem = { type: 'entry'; key: string; value: Entry } | { type: 'transfer'; key: string; value: Transfer };

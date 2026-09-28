@@ -19,8 +19,8 @@ export function RecurringForm({ original, accountId: requestedAccount }: { origi
   const { snapshot, archive, saveRecurring } = useLedger();
   const p = usePalette();
   const { t, formatDate } = useI18n();
-  const accounts = postingAccounts(snapshot?.accounts ?? [], archive?.debts);
   const [before] = useState(original);
+  const accounts = postingAccounts(snapshot?.accounts ?? [], archive?.debts, before?.accountId);
   const [operation] = useState(() => ({ id: randomUUID(), createdAt: new Date().toISOString() }));
   const [kind, setKind] = useState<EntryKind>(before?.kind ?? 'expense');
   const [chosenAccountId, setAccountId] = useState(() => before?.accountId ?? initialAccountId(accounts, requestedAccount));
@@ -43,9 +43,10 @@ export function RecurringForm({ original, accountId: requestedAccount }: { origi
   // The accounts this kind may use (24B6): an expense to cash or a card, an income to cash only; a rule already paying an
   // income into a card keeps that card offered while it is edited. A card carried from Gasto gives way to cash for an income.
   const cashAndCards = postingAccountsFor(kind, accounts, archive?.cards, archive?.debts);
-  const historicalCard = before && kind === 'income' && keepsHistoricalCardIncome(before, { kind, accountId: before.accountId })
+  // 25B2: a rule on an account or card since deleted (paused by the deletion) keeps its own row offered while it is edited.
+  const historical = before && (keepsHistoricalCardIncome(before, { kind, accountId: before.accountId }) || kind === before.kind)
     ? accounts.filter(item => item.id === before.accountId && !cashAndCards.some(offered => offered.id === item.id)) : [];
-  const offered = historicalCard.length ? cashAndCards.concat(historicalCard) : cashAndCards;
+  const offered = historical.length ? cashAndCards.concat(historical) : cashAndCards;
   const originalCurrency = accounts.find(item => item.id === before?.accountId)?.currency;
   const eligibleAccounts = before ? offered.filter(item => item.currency === originalCurrency) : offered;
   const accountId = eligibleAccounts.some(item => item.id === chosenAccountId) ? chosenAccountId
