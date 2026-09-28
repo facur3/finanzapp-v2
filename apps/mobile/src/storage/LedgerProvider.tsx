@@ -2,14 +2,15 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { AppState } from 'react-native';
 import { snapshotFromArchive, todayKey, type Account, type Entry, type EntryChange, type LedgerArchive, type LedgerSnapshot,
   type AccountChange, type Transfer, type TransferChange, type RecurringRule, type MonthlyBudget,
-  type CreditCardProfile, type PersonalDebtProfile, type AccountAppearance, type CategoryDefinition } from '@finanzapp/domain';
+  type CreditCardProfile, type PersonalDebtProfile, type AccountAppearance, type CategoryDefinition, type InstallmentPlan } from '@finanzapp/domain';
 import type { CurrencyGate } from '@finanzapp/domain';
 import { currencyGateForBuild } from './currency-gate';
 import { changeEntry, createAccount, createEntry, deleteAccount, deleteCreditCard, importArchive, readArchive, changeAccount,
   createTransfer, changeTransfer, saveRecurringRule, processRecurring, saveMonthlyBudget,
   createCreditCard, saveCreditCard, createPersonalDebt, savePersonalDebt, deletePersonalDebt, saveAccountAppearance, saveCategoryDefinition,
+  createInstallmentPlan, cancelInstallmentPlan, deleteInstallmentPlan, catchUpInstallments,
   type LedgerDatabase } from './database';
-import { openLedger, refreshLedger } from './ledger-session';
+import { openLedger, refreshLedger, sessionWarning } from './ledger-session';
 import { openLedgerDatabase } from './nativeDatabase';
 
 declare const __DEV__: boolean | undefined;
@@ -44,6 +45,11 @@ type LedgerContextValue = {
   saveDebt: (debt: PersonalDebtProfile) => Promise<void>;
   /** 25B2 close: the deletion record of a debt tracker; refused with a balance left and recorded payments or collections. */
   removeDebt: (debtId: string) => Promise<void>;
+  /** Producto 24T1: a purchase in instalments (the plan only; its instalments are recognised as their statements close). */
+  addInstallmentPlan: (plan: InstallmentPlan) => Promise<void>;
+  cancelInstallmentPlan: (planId: string) => Promise<void>;
+  /** Only a plan that recorded nothing; one with history is cancelled. */
+  removeInstallmentPlan: (planId: string) => Promise<void>;
   restoreBackup: (incoming: LedgerArchive, baseline: string) => Promise<void>;
 };
 const LedgerContext = createContext<LedgerContextValue | null>(null);
@@ -58,6 +64,8 @@ export function LedgerProvider({ children }: { children: ReactNode }) {
   // Serializing client writes and reads avoids stale snapshots replacing a
   // newer balance. SQLite exclusive transactions provide durable atomicity.
   const queue = useRef<Promise<void>>(Promise.resolve());
+  /** 24T1: a warning a write left behind (its instalment recognition failed after the save): shown instead of clearing the banner. */
+  const pendingWarning = useRef<string | null>(null);
 
   const enqueue = useCallback((work: () => Promise<void>) => {
     const next = queue.current.then(work);
@@ -73,11 +81,12 @@ export function LedgerProvider({ children }: { children: ReactNode }) {
       const db = database.current ?? await openLedgerDatabase();
       database.current = db;
       // 24UX5: the recurring catch-up never keeps the data closed. A rule it cannot record waits in Recurrentes for
-      // review; a catch-up that failed as a whole is said in the banner, over the open app, with its retry.
+      // review; a catch-up that failed as a whole is said in the banner, over the open app, with its retry. 24T1: the
+      // same for the instalment catch-up, on its own flag (the retry reopens and runs both passes again).
       const session = await openLedger(db, todayKey());
       if (cancelled) return;
       setArchive(session.archive);
-      if (session.recurringError) setError('No pudimos verificar tus datos locales ni los vencimientos recurrentes. No se modificó nada fuera de una transacción completa.');
+      setError(sessionWarning(session));
     }).catch(() => {
       if (!cancelled) setError('No pudimos abrir tus datos. No se borró ni reemplazó nada. Probá nuevamente o conservá la app para recuperar la base.');
     });
@@ -91,7 +100,7 @@ export function LedgerProvider({ children }: { children: ReactNode }) {
         const session = await refreshLedger(database.current!, todayKey());
         if (!mounted.current) return;
         setArchive(session.archive);
-        setError(session.recurringError ? 'No pudimos verificar tus datos locales ni los vencimientos recurrentes. No se modificó nada fuera de una transacción completa.' : null);
+        setError(sessionWarning(session)); // A successful pass clears its warning; a failing one keeps it.
       }).catch(() => {
         if (mounted.current) setError('No pudimos verificar tus datos locales ni los vencimientos recurrentes. No se modificó nada fuera de una transacción completa.');
       });
@@ -101,12 +110,13 @@ export function LedgerProvider({ children }: { children: ReactNode }) {
 
   const mutate = useCallback((operation: (db: LedgerDatabase) => Promise<void>) => enqueue(async () => {
     if (!database.current) throw new Error('Todavía estamos abriendo tus datos.');
+    pendingWarning.current = null;
     await operation(database.current);
     // If this read fails after commit, the form keeps the same operation ID;
     // retrying cannot post a duplicate entry.
     try {
       const next = await readArchive(database.current);
-      if (mounted.current) { setArchive(next); setError(null); }
+      if (mounted.current) { setArchive(next); setError(pendingWarning.current); }
     } catch {
       const message = 'El guardado terminó, pero no pudimos actualizar la vista. Verificá de nuevo antes de registrar otro movimiento; no lo cargues otra vez.';
       if (mounted.current) setError(message);
@@ -137,9 +147,18 @@ export function LedgerProvider({ children }: { children: ReactNode }) {
     addDebt: (account, debt) => mutate(db => createPersonalDebt(db, account, debt, BUILD_CURRENCY_GATE)),
     saveDebt: debt => mutate(db => savePersonalDebt(db, debt)),
     removeDebt: debtId => mutate(db => deletePersonalDebt(db, debtId, new Date().toISOString())),
+    addInstallmentPlan: plan => mutate(async db => {
+      await createInstallmentPlan(db, plan);
+      // A first instalment on a statement already closed is recognised at once. The plan is saved either way: a failing
+      // recognition is reported in the banner (never as a failed save that would invite a duplicate) and retried.
+      try { await catchUpInstallments(db, todayKey()); } catch { pendingWarning.current = sessionWarning({ recurringError: false, installmentError: true }); }
+    }),
+    cancelInstallmentPlan: planId => mutate(db => cancelInstallmentPlan(db, planId, new Date().toISOString())),
+    removeInstallmentPlan: planId => mutate(db => deleteInstallmentPlan(db, planId, new Date().toISOString())),
     restoreBackup: (incoming, baseline) => mutate(async db => {
       await importArchive(db, incoming, baseline);
       await processRecurring(db, todayKey());
+      try { await catchUpInstallments(db, todayKey()); } catch { pendingWarning.current = sessionWarning({ recurringError: false, installmentError: true }); }
     }),
   }}>{children}</LedgerContext.Provider>;
 }

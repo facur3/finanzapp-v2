@@ -126,7 +126,8 @@ describe('backup v11', () => {
     const v11 = createRecoveryBackup({ ...archive, cards: [deleteCreditCard(card, now)] }, new Date(now));
     expect(() => parsePilotBackup(JSON.stringify({ ...v11, schema: BACKUP_SCHEMA_V10 }))).toThrow('campos faltantes');
     expect(() => parsePilotBackup(JSON.stringify({ ...v8, accounts: [{ ...cash, revision: 1, updatedAt: now, deletedAt: now }, bank, cardAccount] }))).toThrow('campos faltantes');
-    expect(() => parsePilotBackup(JSON.stringify({ ...v11, schema: 'finanzapp.native-pilot.v12' }))).toThrow('versiones 1 a 11');
+    expect(() => parsePilotBackup(JSON.stringify({ ...v11, schema: 'finanzapp.native-pilot.v12' }))).toThrow('campos faltantes', '24T1: a v12 file carries its plans');
+    expect(() => parsePilotBackup(JSON.stringify({ ...v11, schema: 'finanzapp.native-pilot.v13' }))).toThrow('versiones 1 a 12');
     expect(() => parsePilotBackup(JSON.stringify({ ...v11, cards: [{ ...v11.cards[0], active: true }] }))).toThrow('Estado de tarjeta inválido.');
   });
 });

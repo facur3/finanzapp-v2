@@ -22,7 +22,7 @@ export default function CardsScreen() {
   const { archive, snapshot } = useLedger();
   const { t } = useI18n();
   const day = useCurrentDay();
-  const cards = useMemo(() => snapshot ? activeCards(archive?.cards, snapshot, day) : [], [archive?.cards, snapshot, day]);
+  const cards = useMemo(() => snapshot ? activeCards(archive?.cards, snapshot, day, archive?.installmentPlans, archive?.records) : [], [archive?.cards, archive?.installmentPlans, archive?.records, snapshot, day]);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const selected = cards[Math.min(selectedIndex, Math.max(0, cards.length - 1))];
   if (!snapshot || !archive) return null;

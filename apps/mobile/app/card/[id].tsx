@@ -18,7 +18,7 @@ export default function CardDetailScreen() {
   const { t, relativeDate, moneyText } = useI18n();
   const { width } = useWindowDimensions();
   const card = archive?.cards?.find(item => item.id === id);
-  const summary = useMemo(() => card && snapshot ? summarizeCard(card, snapshot, day) : null, [card, snapshot, day]);
+  const summary = useMemo(() => card && snapshot ? summarizeCard(card, snapshot, day, archive?.installmentPlans, archive?.records) : null, [card, snapshot, day, archive?.installmentPlans, archive?.records]);
   const statement = useMemo(() => card && snapshot ? cardStatementActivity(card, snapshot, day) : null, [card, snapshot, day]);
   const activity = useMemo(() => summary && snapshot ? liabilityActivity(summary.account.id, snapshot) : { entries: [], transfers: [] }, [summary, snapshot]);
 

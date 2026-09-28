@@ -1,5 +1,27 @@
 # Physical iPhone acceptance checklist
 
+## Producto 24T1 — the instalment engine (nothing visible; a regression spot-check)
+
+**Not done in 24T1: no EAS build was made and the iPhone was not touched.** Metro from this branch on the installed
+FinanzApp Dev build; JavaScript only. **The ledger moves to schema 12 (two new empty tables for instalment plans) and an
+older build refuses the file unchanged: keep a backup first** (Más → Copia de seguridad). No screen creates a plan yet.
+
+- [ ] Open the app over your data: Inicio, Movimientos, Tarjetas, Recurrentes and Reportes show the same figures as
+  before; force-quit and reopen: nothing migrates twice, nothing changed.
+- [ ] Record a card purchase and a card payment as before: one expense, the balance due up then down, no cash account
+  touched by the purchase (decision 003, rules 2 and 3).
+- [ ] Más → Copia de seguridad → export: the file is still the version it was (v8–v11); import it back: «identical».
+- [ ] Archive a card (Tarjetas → card → Editar → Archivar): Nuevo gasto, Nuevo recurrente and the Assistant's confirm
+  no longer take it (the forms do not offer it; a confirm is refused with «Esta tarjeta está archivada…»); an existing
+  purchase on it still opens and is corrected in place; Pagar tarjeta still accepts a payment to it; a recurring rule
+  already on it keeps its own dates. Reactivate it: it is offered again.
+- [ ] With Airplane mode or a full disk you cannot easily force a write failure on the iPhone; the banner «No pudimos
+  registrar las cuotas vencidas…» with «Verificar de nuevo» is covered by the real-SQLite tests and is checked on the
+  device in 24T2, once a plan can be created.
+
+The device gates of instalments come with their screens: 24T2 (the purchase form, the five figures, the commitments on
+the card) and 24T3 (refunds, payoff, the deletion block, Tarjetas and Deudas on the iPhone).
+
 ## Producto 25B3 — detail hierarchy polish
 
 **Not done in 25B3: no EAS build was made and the iPhone was not touched.** Metro from this branch

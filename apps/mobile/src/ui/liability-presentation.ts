@@ -1,5 +1,5 @@
 import { accountKind, cardAvailableLimitMinor, cardCycle, cardDebtMinor, type Account, type CreditCardProfile,
-  type LedgerSnapshot, type PersonalDebtProfile, isLiveAccount } from '@finanzapp/domain';
+  type InstallmentPlan, type LedgerSnapshot, type PersonalDebtProfile, type RecordedEntry, isLiveAccount } from '@finanzapp/domain';
 import { relativeDate } from '../i18n/format.ts';
 import { DEFAULT_LOCALE, type AppLocale } from '../i18n/locale.ts';
 import { translator, type Translate } from '../i18n/messages.ts';
@@ -17,21 +17,22 @@ export type CardSummary = {
   dueISO: string;
 };
 
-/** Everything the Cards tab needs for one card, computed once from the snapshot. */
-export function summarizeCard(card: CreditCardProfile, snapshot: LedgerSnapshot, todayISO: string): CardSummary | null {
+/** Everything the Cards tab needs for one card, computed once from the snapshot. 24T1: with a pending instalment plan the
+ * available limit is unknown (null) until the issuer-reservation gate is decided; 24T2 draws that state. */
+export function summarizeCard(card: CreditCardProfile, snapshot: LedgerSnapshot, todayISO: string, plans: readonly InstallmentPlan[] = [], records: readonly RecordedEntry[] = []): CardSummary | null {
   const account = snapshot.accounts.find(item => item.id === card.accountId);
   if (!account) return null;
   const debtMinor = cardDebtMinor(card, snapshot);
-  const availableMinor = cardAvailableLimitMinor(card, snapshot);
+  const availableMinor = cardAvailableLimitMinor(card, snapshot, plans, records);
   const cycle = cardCycle(card, todayISO);
   return { id: card.id, card, account, debtMinor, availableMinor,
     usage: card.creditLimitMinor ? debtMinor / card.creditLimitMinor : null,
     closingISO: cycle.closingISO, dueISO: cycle.dueISO };
 }
 
-export function activeCards(cards: CreditCardProfile[] | undefined, snapshot: LedgerSnapshot, todayISO: string): CardSummary[] {
+export function activeCards(cards: CreditCardProfile[] | undefined, snapshot: LedgerSnapshot, todayISO: string, plans: readonly InstallmentPlan[] = [], records: readonly RecordedEntry[] = []): CardSummary[] {
   return (cards ?? []).filter(card => card.active)
-    .map(card => summarizeCard(card, snapshot, todayISO))
+    .map(card => summarizeCard(card, snapshot, todayISO, plans, records))
     .filter((summary): summary is CardSummary => summary !== null);
 }
 

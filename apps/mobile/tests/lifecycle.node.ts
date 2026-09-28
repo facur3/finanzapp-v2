@@ -80,14 +80,14 @@ test('schema 11 is reached from a real schema 10 file by an additive migration: 
     INSERT INTO credit_cards (id, accountId, issuer, last4, creditLimitMinor, closingDay, dueDay, active, createdAt, revision, updatedAt) VALUES ('card', 'c', 'Banco', '4009', NULL, 20, 5, 1, '${createdAt}', 0, '${createdAt}');`);
   assert.equal((await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))?.user_version, 10);
   await initializeDatabase(db);
-  assert.equal((await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))?.user_version, 11);
-  assert.equal(DATABASE_VERSION, 11);
+  assert.equal((await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))?.user_version, 12, '24T1: the file continues to schema 12 (two empty instalment tables)');
+  assert.equal(DATABASE_VERSION, 12);
   const archive = await readArchive(db);
   assert.deepEqual(archive.accounts[0], { id: 'a', name: 'Antigua', currency: 'ARS', openingMinor: 100, createdAt }, 'a live row reads exactly as it did: no deletedAt key, no revision');
   assert.deepEqual(archive.cards?.[0], { ...card, accountId: 'c' }, 'a card gains deleted: false');
   assert.equal((await db.getFirstAsync<{ n: number }>('SELECT count(*) AS n FROM accounts WHERE deletedAt IS NULL'))?.n, 2);
   // A newer schema is refused, unchanged, as ever.
-  await db.execAsync('PRAGMA user_version = 12');
+  await db.execAsync('PRAGMA user_version = 13');
   await assert.rejects(initializeDatabase(db), /versión más nueva/);
 });
 

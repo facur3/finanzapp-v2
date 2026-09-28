@@ -89,8 +89,9 @@ esa prueba hasta que 24T1 las implemente.
    que ya vive en una cuenta normal; si algún día existe `DebitCardProfile` será
    metadata vinculada a una cuenta, sin saldo, deuda, cuotas, cierre ni pagos
    propios.
-7. **Compras en cuotas (Producto 24T; contrato decidido el 2026-09-28, todavía sin
-   implementar).** Una compra financiada es **una compra y un plan**
+7. **Compras en cuotas (Producto 24T; contrato decidido el 2026-09-28; el motor,
+   el esquema y la copia implementados por 24T1 el 2026-09-28, la interfaz en 24T2,
+   reintegros y cancelaciones en 24T3).** Una compra financiada es **una compra y un plan**
    (`InstallmentPlan`), nunca una `RecurringRule`. Si la persona eligió cuotas,
    FinanzApp **no** contabiliza además el precio completo como gasto inmediato.
    Ejemplo: USD 1.200 en 12 × USD 100.
@@ -105,9 +106,15 @@ esa prueba hasta que 24T1 las implemente.
      principal total. Intereses, cargos e impuestos de financiación se registran por
      separado, con su propia categoría, y nunca se disfrazan de principal. Pagar el
      resumen sigue siendo una transferencia (regla 3), nunca un segundo gasto.
-   - **Cifras distintas que el diseño de 24T muestra y nunca mezcla:** precio total
-     de la compra; saldo pendiente facturado/exigible hoy; cuotas futuras
-     comprometidas; total restante del plan; lo ya pagado.
+   - **Cifras distintas que el diseño de 24T muestra y nunca mezcla** (revisado en
+     la revisión de 24T1): 1) precio / principal original de la compra; 2) saldo de
+     la tarjeta facturado/exigible hoy; 3) principal futuro comprometido; 4)
+     principal restante; 5) principal ya reconocido/facturado. La tarjeta puede
+     mostrar aparte sus pagos generales (transferencias al resumen), pero **nunca
+     deriva de ellos que una cuota o un plan estén pagados**: no existe «3/12
+     pagadas» a partir de una transferencia a la tarjeta; sí «3/12 facturadas».
+     programada ≠ reconocida/facturada ≠ pagada; «pagada» solo cuando FinanzApp
+     tenga evidencia real de ese pago concreto.
    - **Crédito disponible: gate abierto.** Cómo afectan las cuotas futuras al límite
      disponible del emisor (muchos emisores reservan el total; otros no) no se
      asume: se decide y se registra aquí antes de implementar
@@ -128,9 +135,101 @@ esa prueba hasta que 24T1 las implemente.
      moneda.
    - **Una compra sin cuotas** conserva el comportamiento actual (regla 2): gasto
      completo una vez y saldo pendiente completo.
-   - **Hoy (sin 24T):** archivar conserva el saldo pendiente y sigue aceptando el
-     pago; eliminar se rechaza con saldo pendiente y se permite en cero; una tarjeta
-     eliminada no acepta pagos.
+   - **Modelo de 24T1 (`packages/domain/installments.ts`, esquema SQLite 12, copia
+     v12).** `InstallmentPlan`: identidad propia (dos compras idénticas son dos
+     planes), la tarjeta (`cardId`; su cuenta interna recibe cada cuota), comercio,
+     categoría del principal, moneda (la de la tarjeta), fecha de compra, principal
+     total, cantidad de cuotas (1 a 120), y **cuatro componentes independientes**:
+     principal, intereses (`interestMinor` + `interestCategory`), comisiones
+     (`feeMinor` + `feeCategory`) e impuestos de financiación (`taxMinor` +
+     `taxCategory`); cada componente de financiación es cero o positivo y tiene su
+     propia categoría exactamente cuando es mayor que cero; ninguno se mezcla con
+     otro ni con el principal. El **calendario exacto** se escribe una sola vez (una
+     fila por cuota: cierre de resumen al que pertenece, vencimiento y la parte de
+     cada componente), más `cancelledAt`, `deleted`, revisión y fechas.
+     Vocabulario: *compra* (la operación), *plan* (la fila), *cuota futura* (sin
+     movimiento en el libro: compromiso, no gasto), *cuota reconocida/facturada* (su
+     movimiento está en el libro y cuenta una vez, en el mes de su cierre, en la
+     categoría original, y sube el saldo pendiente), *saldo pendiente actual* (saldo
+     negativo de la cuenta de la tarjeta), *pago* (transferencia a la tarjeta, nunca
+     asignada a un plan), *principal restante* (lo no reconocido). «Pagada» no se
+     deriva nunca: un pago general no marca ninguna cuota.
+   - **Reparto exacto:** `distributeMinor`: partes iguales en unidades menores y el
+     resto, de a una unidad, a las **primeras** cuotas (100/3 = 34, 33, 33 en
+     exponente 0; 3334, 3333, 3333 en exponente 2; 33334, 33333, 33333 en 3); la suma
+     es siempre el principal; se rechazan principal cero, negativo, no entero, fuera
+     del rango seguro, más de 120 cuotas y cuotas que quedarían en cero. Cada
+     componente de financiación se reparte por su cuenta con la misma regla (su resto
+     también va a las primeras cuotas); una parte de cero no genera movimiento.
+   - **Calendario:** la cuota 1 va al resumen actual (primer cierre en o después de
+     la compra; una compra el día de cierre entra en ese resumen) o al siguiente, a
+     elección; cada cuota siguiente al cierre del mes siguiente en el día de cierre
+     configurado (31 → 28/29 de febrero y vuelve al 31; años bisiestos y cambios de
+     año incluidos); el vencimiento es el día de vencimiento posterior al cierre. Solo
+     fechas, sin hora ni zona. El calendario es contractual: cambiar los días de la
+     tarjeta después no reescribe ninguna cuota (ni pasada ni futura); un realineo
+     será una operación explícita si 24T2 la necesita. Corrimientos por fin de semana
+     o feriado no se conocen y no se simulan (gate: solo con regla del emisor).
+   - **Reconocimiento y materialización:** cada cuota se reconoce cuando cierra su
+     resumen (`catchUpInstallments`, al abrir la app y al volver al frente, en su
+     propio paso, nunca dentro de `processRecurring`): un gasto normal en la cuenta
+     de la tarjeta por cada parte mayor que cero, con id determinista por componente
+     (`inst_` principal, `insti_` intereses, `instf_` comisiones, `instt_` impuestos,
+     más `<plan>_<nnn>`), en la categoría de su componente, fechado en el cierre.
+     Así Reportes y Presupuestos agrupan Compra, Intereses, Comisiones e Impuestos
+     por separado sin inferirlos de un total. Idempotente: un id ya presente en
+     el libro (registrado, editado o deshecho) no se vuelve a generar, así que una
+     invocación duplicada, un cierre de la app durante varios períodos, un reintento,
+     una caída o una restauración nunca registran una cuota dos veces. Un plan
+     cancelado o eliminado, o una tarjeta eliminada, no registra nada.
+   - **Estados, derivados del libro y nunca guardados dos veces**, por cuota **y por
+     componente** (cada parte es su propio movimiento): *scheduled* (sin movimiento),
+     *recognised* (movimiento presente), *undone* (la persona lo deshizo: no cuenta,
+     la obligación sigue abierta, la puesta al día no lo recrea; restaurarlo lo
+     devuelve). Deshacer el principal no toca sus intereses, comisiones ni impuestos,
+     y al revés: las cifras del plan cuentan cada parte por su propio movimiento, así
+     que siempre coinciden con el libro, el saldo de la tarjeta y Reportes. Plan:
+     *active*, *completed* (todas las partes reconocidas), *cancelled*, *deleted*.
+     Cifras por componente: total, reconocido, deshecho, futuro comprometido,
+     cancelado, restante; ninguna «pagado».
+   - **Guardas libro↔plan:** un movimiento de cuota conserva importe, fecha, cuenta y
+     tipo (comercio y categoría se corrigen; deshacer y restaurar son cambios
+     normales); un movimiento nuevo no puede usar un id de cuota; cada lectura del
+     archivo verifica que todo movimiento con id de cuota pertenezca a un plan y
+     coincida con su calendario (un desvío rechaza la escritura, nunca se muestra).
+   - **Ciclo de vida de la tarjeta (revisión de 24T1):** *activa*: acepta compras
+     nuevas, planes nuevos, recurrentes nuevos y pagos. *Archivada*: conserva todo su
+     historial y sus planes; los planes pendientes siguen reconociéndose; acepta
+     pagos; se puede reactivar; **no acepta** una compra nueva, un plan nuevo, un
+     recurrente nuevo ni un movimiento o recurrente movido hacia ella
+     (`assertAcceptsNewObligation`, en el almacenamiento; los formularios ya no la
+     ofrecen para algo nuevo y siguen mostrando la fila propia de un movimiento o
+     recurrente guardado allí, que se corrige en el lugar). Un recurrente que ya
+     estaba en la tarjeta es una obligación existente: sigue con su semántica actual
+     hasta que la persona lo pause, lo mueva o lo elimine. *Eliminada*: no acepta nada
+     nuevo; solo historial. Además: **eliminar la tarjeta se rechaza con saldo pendiente o
+     con cualquier plan pendiente** (`assertCardDeletable`, la única regla: el
+     almacenamiento y el diálogo la leen); una tarjeta eliminada no recibe cuotas ni
+     pagos y conserva sus planes terminados. Un plan recién creado sin cuotas
+     registradas se elimina (tombstone); con historia se cancela (las cuotas
+     reconocidas quedan). Ningún guardado cambia precio, cuotas ni fechas: un
+     reintegro, un pago anticipado o un ajuste será una operación del plan con su
+     propio registro (24T3); hasta entonces el validador rechaza ese estado.
+   - **Crédito disponible:** con un plan pendiente `cardAvailableLimitMinor` responde
+     null (desconocido) hasta que este documento registre la regla del emisor.
+   - **Falla de la puesta al día:** si el paso de cuotas no puede escribir (base llena,
+     bloqueada, error de E/S), los datos abren igual, nada se inventa, lo ya durable
+     queda, y la falla se informa en el aviso con «Verificar de nuevo»
+     (`installmentError`, independiente del de recurrentes): el saldo de tarjetas,
+     Reportes y Presupuestos pueden estar incompletos y la app lo dice. El siguiente
+     paso al frente o el reintento lo repite; un éxito limpia el aviso; los ids
+     deterministas impiden duplicar.
+   - **Moneda:** en 24T1 un plan es de la moneda de su tarjeta (`PLAN_CURRENCY_MESSAGE`).
+     24C2 agregará al lado el registro de la compra en moneda original (importe,
+     tasa, cargos y procedencia); no se agregan columnas vacías hoy.
+   - **Antes de 24T1:** archivar conservaba el saldo pendiente y seguía aceptando el
+     pago; eliminar se rechazaba con saldo pendiente y se permitía en cero; una
+     tarjeta eliminada no aceptaba pagos. Todo eso sigue igual.
 8. **Copy visible:** el saldo de una tarjeta es «Saldo pendiente» / «Saldo de
    tarjeta» (en inglés «Outstanding balance»), nunca «Deuda», que nombra la
    sección Deudas y cobros. Los nombres internos (`cardDebtMinor`, `CARD_DEBT_MESSAGE`,

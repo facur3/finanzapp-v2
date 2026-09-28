@@ -1,6 +1,6 @@
 # FinanzApp mobile: living roadmap
 
-Updated: 2026-09-28 (Producto 25B3, detail hierarchy polish). Read [decision 001](decisions/001-native-mobile.md),
+Updated: 2026-09-28 (Producto 24T1, the instalment engine, schema 12 and backup v12). Read [decision 001](decisions/001-native-mobile.md),
 [decision 002](decisions/002-spending-first.md),
 [decision 003](decisions/003-five-tabs-and-cards.md) and
 [decision 004](decisions/004-native-first-and-web-retirement.md). Decision 002 supersedes
@@ -130,13 +130,28 @@ history file keeps the evidence of when and why.
 
 ## 1. Implemented (current state)
 
-What exists in code on `master` as of Producto 25B2 (PR #65), plus Producto 25B3 on its branch
+What exists in code on `master` as of Producto 25B3 (PR #66), plus Producto 24T1 on its branch
 (marked). Per area, without test inventories (those are in apps/mobile/README.md and the history
 file). "Released" below names an in-app gate (`RELEASED_LANGUAGES`, `RELEASED_REGIONS`,
 `LEDGER_CURRENCIES`): what a build offers, verified on Linux; nothing is distributed to people yet
 (§4).
 
-- **Detail hierarchy (25B3, on its branch).** Two corrections of hierarchy before instalments, no redesign: the
+- **Instalment engine (24T1, on its branch; no UI yet).** `packages/domain/installments.ts`: an `InstallmentPlan` per
+  financed purchase (one purchase, one finite plan, never a `RecurringRule`), owned by a card, in the card's currency, with
+  explicit financing components and an exact schedule written once (statement closing and due date per instalment,
+  principals summing exactly to the price, the remainder on the first instalments). Buying records nothing and moves no
+  account; `catchUpInstallments` (on open and foreground, apart from the recurring pass) recognises each instalment as an
+  ordinary expense on the card's account when its statement closes, with a deterministic id (`inst_<plan>_<nnn>`,
+  `insti_`/`instf_`/`instt_` for interest, fee and tax, each in its own category), so nothing is ever recorded twice. States and figures are derived from the ledger (scheduled,
+  recognised, undone; price, recognised, undone, future committed, cancelled, remaining; no «paid»); the card balance due
+  holds only recognised instalments, the future ones are `cardCommittedMinor`; `cardAvailableLimitMinor` is null with a
+  pending plan (gate). Instalment movements keep amount, date, card and kind (labels, undo and restore are fine); a new
+  movement never takes an instalment id; every archive read checks the ledger against the schedules. Card deletion is
+  refused with a pending plan (`assertCardDeletable`, storage and the dialog); archiving keeps everything running; a plan
+  is deleted only without history, cancelled otherwise; no save changes price, count or dates. SQLite 12 (two additive
+  tables), backup v12 as soon as a plan exists (v1–v12 import). `LedgerProvider` exposes `addInstallmentPlan`,
+  `cancelInstallmentPlan`, `removeInstallmentPlan`; no screen creates a plan yet (24T2).
+- **Detail hierarchy (25B3).** Two corrections of hierarchy before instalments, no redesign: the
   account detail no longer prints «Saldo inicial / Opening balance» as a row (`openingMinor` is unchanged in storage,
   backups, migrations and every balance; the recorded balance still starts from it; nothing replaced the row), and a
   recurring rule has its own detail screen (`app/recurring/[id].tsx`: the mark, the signed amount and currency as the
@@ -196,7 +211,8 @@ file). "Released" below names an in-app gate (`RELEASED_LANGUAGES`, `RELEASED_RE
   Ingresa en as stacked selection rows; the date wheel in a compact bottom sheet on iOS (24B6;
   its entrance is corrected in 24UX1); edit, undo, contextual account correction and recovery;
   a draft kept when a save fails; historical card incomes still editable.
-- **Ledger and storage.** SQLite schema 10 (24UX4: a `deleted` flag on recurring rules
+- **Ledger and storage.** SQLite schema 12 (24T1: `installment_plans` and `installments`; 11 (25B2): the account
+  tombstone and the card flag; 10 (24UX4): a `deleted` flag on recurring rules
   and debt profiles; schema 9 added `currency_units`), durable writes, audited
   edits, same-currency internal transfers, balance corrections, accounts with identity
   (display rename, archive-first), category identity (presets in code, definitions per kind,
@@ -204,7 +220,8 @@ file). "Released" below names an in-app gate (`RELEASED_LANGUAGES`, `RELEASED_RE
   four digits, limit, closing and due days; counterparty, direction, due date), card rules
   (24B6). Backups v8/v9 export as before; v10 (24UX4) only once a rule or debt is
   deleted, carrying its deletion record; v1–v10 import; a failed restore rolls back.
-- **Commitments.** Weekly/monthly/yearly recurring rules with next occurrence, pause, edit,
+- **Commitments.** Purchases in instalments since 24T1 (the engine above; the purchase form and the card's figures are
+  24T2). Weekly/monthly/yearly recurring rules with next occurrence, pause, edit,
   per-occurrence identity (scheduled is not paid; retries cannot duplicate); debts and
   receivables with partial payments; card purchases and payments; closing and due dates from
   the user's days. 24UX2: a rule's detail lists the movements it recorded (read by their
@@ -294,6 +311,10 @@ it was checked in). Metro from the branch on the installed FinanzApp Dev build s
 item unless a section says a new native build is needed. The checklist sections are in
 [mobile-device-checklist.md](mobile-device-checklist.md).
 
+- **24T1 — the instalment engine:** nothing visible; the checklist section Producto 24T1 (a backup before the schema 12
+  upgrade of FinanzApp Dev's data, the app opening on the same figures, a regression spot-check of a card purchase and
+  payment). The device gates of instalments belong to 24T2 (the purchase form, the figures) and 24T3 (Tarjetas and
+  Deudas on the iPhone).
 - **25B3 — detail hierarchy polish:** the checklist section Producto 25B3 (the account detail without the opening
   balance row and with the same balance; the recurring detail from Inicio, Recurrentes and a recorded movement; Editar
   from the header; Pausar/Reanudar keeping the screen, Eliminar going back; the Revisar state; VoiceOver reading each
@@ -363,13 +384,13 @@ item unless a section says a new native build is needed. The checklist sections 
 
 ## 3. Next deliveries
 
-**Recommended next (2026-09-28):** 25B2 merged the same day (PR #65). After 25B3 (this PR: two hierarchy corrections,
-no instalments) merges, the next implementation is **Producto 24T**, in
+**Recommended next (2026-09-28):** 25B3 merged (PR #66). **24T1 is this PR** (the engine, schema 12, backup v12, the
+invariants; no UI). After it merges, the next implementation is **24T2**, then **24T3**: **Producto 24T** ships in
 three focused PRs rather than one: 24T1 (domain, schema, backup and instalment mathematics), 24T2 (the
 card purchase, UI, statements and current-versus-future balances), 24T3 (refunds, early payments,
 lifecycle and the final device QA). 24C2 stays a separate currency delivery, but its contracts must be
 compatible with 24T's (recorded in both entries). The sections below keep their historical order; this
-paragraph is the order that binds. Nothing of 24T starts before 25B3 is merged; 24T2 takes the card design direction
+paragraph is the order that binds. Nothing of 24T2 starts before 24T1 is merged; 24T2 takes the card design direction
 recorded under 24T below and in docs/mobile-design.md (Producto 25B3).
 
 In order. Each is one focused PR, CI green, merged before the next starts; each records its
@@ -999,9 +1020,9 @@ the owner authorises it; no EAS build or store submission without the owner.
 
 ### Producto 24T — instalments and complete cards
 
-**Recommended next after 25B3** (see the head of this section), split into 24T1, 24T2 and 24T3. The
-accounting contract below is decided (decision 003, rule 7, revised 2026-09-28); nothing of it is
-implemented yet.
+Split into 24T1 (this PR: the engine, see its own section below), 24T2 and 24T3. The accounting contract below is
+decided (decision 003, rule 7, revised 2026-09-28) and implemented by 24T1 in the domain, the storage and the backup;
+nothing of it is on a screen yet.
 
 - **Goal.** A financed purchase is **one purchase and one finite `InstallmentPlan`**. If the person chose
   instalments, FinanzApp does **not** also count the full price as an immediate expense.
@@ -1016,8 +1037,11 @@ implemented yet.
     never presented as principal. Paying the statement stays a transfer, never a second expense.
   - *A purchase without instalments* keeps today's behaviour: the full expense once and the full balance
     due (decision 003, rule 2).
-  - *Five distinct figures* the design shows and never merges: purchase price; balance due billed/payable
-    now; future committed instalments; plan remaining; already paid.
+  - *Five distinct figures* the design shows and never merges (wording revised in the 24T1 review): 1) purchase /
+    original principal; 2) card balance billed/payable now; 3) future committed principal; 4) remaining principal;
+    5) principal already recognised/billed. The card may show its generic statement payments apart, but never derives
+    from a transfer into the card that an instalment or a plan is paid: no «3/12 paid», only «3/12 billed».
+    scheduled ≠ recognised/billed ≠ paid; «paid» only with real evidence of that payment.
   - *Available credit — gate.* How pending instalments affect the issuer's available credit is not assumed
     (issuers differ: some reserve the whole plan, some only the billed part). The owner decides it and it
     is recorded in decision 003 before `cardAvailableLimitMinor` handles plans; until then the available
@@ -1039,7 +1063,8 @@ implemented yet.
     the recognition rule above as pure functions, exact cent distribution for exponents 0, 2 and 3, cycle
     assignment across year ends, short months and leap years (last-day closings, a due day before the
     closing day, weekend and holiday shifts as stated by the issuer), schema and backup versions with a
-    rollback test; the `it.todo` lines of `card-invariants.test.ts` (7b) become tests.
+    rollback test; the `it.todo` lines of `card-invariants.test.ts` (7b) become tests. **Delivered (this PR); see
+    «Producto 24T1» below.**
   - **24T2 — the card purchase, UI, statements and current-vs-future balances.** The purchase form with
     instalments, per-statement summaries, the five figures above, pending balance and partial payments, a
     clearer card form with a real calendar for closing and due days; the available-credit gate decided
@@ -1059,7 +1084,7 @@ implemented yet.
   recognised once in total, instalment by instalment.
 - **Out of scope.** Bank statements, disputes, freezing a card, FCI redemptions.
 - **Gates.** Domain tests first (24T1): cent distribution, cycle assignment, early payment against later
-  instalments, refund against a partly paid plan, the sum of recognised principal equal to the total;
+  instalments, refund against a partly recognised plan, the sum of recognised principal equal to the total;
   schema and backup versions with a rollback test; the available-credit decision; Tarjetas and Deudas on
   the iPhone (24T3).
 - **Depends on.** 25B2 merged; 24C1 for the rates of international instalments and 24C2's purchase record
@@ -1258,6 +1283,143 @@ implemented yet.
     VoiceOver and the largest text on the swipe rows).
 - **Depends on.** 25B (the suggestion rule), 24C1 (the chip and the display preference), 24UX4 (the deletion
   records of rules and debts).
+
+### Producto 24T1 — the instalment engine, schema 12 and backup v12 (this PR)
+
+- **Goal.** The real engine of purchases in instalments before any of its UI: the model, the exact money and calendar
+  rules, the idempotent recognition of instalments, the card and plan lifecycles, schema and backup, and the financial
+  invariants pinned by tests. No Tarjetas redesign, no purchase form, no Wallet deck, no refund or payoff UX, no 24C2.
+- **Architecture (why).** One new domain module, `packages/domain/installments.ts`, beside the existing liabilities:
+  the plan is a profile owned by a card (like a card is a profile over a hidden account), its instalments are ordinary
+  `entries` rows on the card's hidden account (so every balance, report, budget, audit, undo, backup and deletion rule
+  already applies to them unchanged, and «saldo pendiente» is still the account's balance), and the plan's state is
+  read from the ledger by deterministic ids rather than stored beside the schedule (no second source of truth, no
+  drift). The alternative, a fourth kind of account per plan, was rejected: it would net the plan against the card and
+  break rule 5/6 of decision 003. Storage follows the repository's pattern (validated archive-to-be, exclusive
+  transaction, idempotent creates, tombstones instead of DELETE, a dedicated deletion path, a column-aware migration).
+- **Model (exact).** `InstallmentPlan { id, cardId, merchant, category, currency, purchaseDateISO, principalMinor,
+  count, interestMinor, interestCategory, feeMinor, feeCategory, taxMinor, taxCategory, schedule[], cancelledAt, deleted,
+  createdAt, revision, updatedAt }`; `Installment { number, billingDateISO, dueDateISO, principalMinor, interestMinor, feeMinor,
+  taxMinor }`. Four independent components (review round): principal, interest, fee, financing tax, each with its exact
+  total, its exact split, its own category (a financing component has one exactly when it is above zero), its own
+  movement ids and its own ledger-derived state; none is ever inferred from a combined total. Identity is the
+  plan's own id: two identical purchases are two plans. The currency is the card's (24T1 is same-currency:
+  `PLAN_CURRENCY_MESSAGE`); the original-currency record of 24C2 will sit beside it.
+- **Money.** `distributeMinor`: equal integer parts, the remainder one unit at a time to the first instalments, for any
+  exponent (100/3 → 34/33/33; 10000/3 → 3334/3333/3333; 100000/3 → 33334/33333/33333; 1/2 in cents → 50/50, in a
+  zero-decimal currency refused as too small). Refused: zero, negative, fractional, unsafe or above the ledger bound,
+  more than 120 instalments, an empty instalment. Interest, fee and tax are each distributed on their own with the same
+  rule (their remainders independently on the first instalments) and each non-zero share is recognised as its own
+  expense in its own category (`insti_`, `instf_`, `instt_`), never as principal; a zero share records nothing.
+- **Calendar (exact).** Instalment 1 on the purchase's current statement (the first closing on or after the purchase;
+  a purchase on the closing day is on that statement) or the next; each following instalment on the next month's
+  closing, anchored on the configured day (31 → Feb 28/29 and back to 31; leap years and year ends covered; closing
+  28/29/30/31 tested); the due date is the due day after the closing (a due day before the closing day falls in the
+  following month). Dates only. The schedule is written once and is contractual: changing the card's days later
+  rewrites nothing, materialised or future; a realignment would be an explicit plan operation (24T2 if needed).
+  Weekend/holiday shifts are not simulated (gate: only with the issuer's rule).
+- **Recognition and materialisation.** Buying records nothing and moves no account. `catchUpInstallments(db, today)`
+  runs on open and on every foreground (`ledger-session.ts`), in its own pass after the recurring one, and after a
+  plan is created or a backup restored: for each live plan on a non-deleted card, every instalment whose statement
+  closed by today and whose id is not in the ledger becomes an expense on the card's account, dated on its closing,
+  in one exclusive transaction. Idempotent by id: recorded, edited or undone ids are never produced again; a
+  duplicated invocation, a crash before the write, a retry, several closed statements at once and a restore all
+  record each instalment exactly once (real-SQLite tests). `processRecurring` never touches a plan and the instalment
+  pass never touches a rule. **A failed pass is visible** (review round, P1): `refreshLedger` returns `installmentError`
+  beside `recurringError`, each independent; the ledger still opens with whatever was durable, nothing is fabricated,
+  and `sessionWarning` puts the matching sentence in the existing banner with «Verificar de nuevo» (the card balance,
+  Reportes and Presupuestos may be incomplete, and the app says so). The next foreground or the retry runs the pass
+  again; a success clears the warning. A plan saved whose first recognition then fails is not reported as a failed save
+  (which would invite a duplicate) but as the same warning.
+- **State model.** Per instalment **and per component**, from the ledger: *scheduled* (no movement), *recognised*
+  (movement present), *undone* (voided: counts nowhere, the obligation stays open, never recreated; restore brings it
+  back). Undoing the principal leaves its interest, fee and tax as they are, and the other way round (review round,
+  P2). Per plan: *active*, *completed* (every share of every component recognised), *cancelled*, *deleted*. Figures
+  (`installmentPlanFigures`): the principal's price, recognised, undone, future committed (`scheduledMinor`), cancelled
+  and remaining at the top level, every component's own figures in `components`, and `financingRecognisedMinor`
+  (interest + fee + tax, each from its own movement); `cardCommittedMinor` (future principal) per card. No «paid»
+  figure anywhere: a general payment is never assigned to a plan; scheduled ≠ recognised/billed ≠ paid.
+- **Guards.** `assertInstallmentEntryChange` (amount, date, card, kind frozen on instalment movements; labels, undo,
+  restore fine), `assertNewEntryId` (no typed movement takes an instalment id), `validateInstallmentPlans` (every
+  archive read: each instalment movement belongs to a plan and matches its schedule; a drifted row refuses the read
+  by name), `validateInstallmentPlanChange` (only `cancelledAt`/`deleted`/version move; a refund, payoff or
+  adjustment is 24T3's own operation), `assertInstallmentPlanDeletable` (history → cancel, never delete).
+- **Card lifecycle.** `assertCardDeletable(card, snapshot, plans, records)`: refused with a balance due
+  (`CARD_DEBT_MESSAGE`) or a pending plan (`CARD_PLAN_MESSAGE`); storage and `useCardManagement` both call the domain
+  (the dialog offers Archivar only). *Active*: new purchases, plans, recurring rules and payments. *Archived* (review
+  round): keeps its history and plans, pending plans keep being recognised, payments land, it can be reactivated, and
+  it takes **no new obligation**: `assertAcceptsNewObligation` refuses a new typed purchase (`createEntry`, which the
+  Assistant's confirm also uses), a new plan (`createInstallmentPlan`, and `newInstallmentPlan` in the domain), a new
+  recurring rule and a rule or a movement moved onto it (`CARD_ARCHIVED_MESSAGE`); `postingAccountsFor` no longer offers
+  it for anything new, while the forms keep a stored movement's or rule's own row offered so history is corrected in
+  place; a retry of a purchase committed before archiving is still a no-op. A recurring rule already on the card is an
+  existing obligation and keeps its semantics (recorded when due, edited in place, paused) until the person pauses,
+  moves or deletes it. *Deleted*: takes no instalment and no payment, keeps its finished plans. `cardAvailableLimitMinor` answers null with a pending plan
+  (the issuer-reservation gate stays open; 24T2 decides the presentation).
+- **Schema and backup.** SQLite **12** (`MIGRATE_V12`, `CREATE TABLE IF NOT EXISTS installment_plans` and
+  `installments`, foreign keys to `credit_cards` and to the plan, rows never DELETEd); a schema 11 file opens
+  unchanged with two empty tables and no fabricated plan; an interrupted step reaches 12 once; a schema 13 file is
+  refused intact. Backup **v12** (`installmentPlans`, each with its schedule) as soon as a plan exists; without one
+  the file stays v8–v11 byte for byte; v1–v12 import; a v12 file read as v11 or a v13 file is refused; an import is
+  additive by plan id (identical, added with its schedule, or a conflict), and the restored ids keep the catch-up
+  from recording anything twice.
+- **Interactions audit.** Normal accounts: a plan never touches one; deleting a cash account leaves every plan whole; a
+  payment from a deleted account is still refused by the existing rules. Purchases: a plain purchase keeps rule 2.
+  Transfers: a payment is a transfer, lowers the balance due, assigns nothing. Recurring: same merchant, amount and
+  date coexist as two facts; pausing or deleting a rule never touches a plan; neither catch-up sees the other.
+  Debts: an instalment is in no debt total, a debt is never in the card balance, settling a debt moves no plan, one
+  account holds one obligation. Movements: edit/undo as above. Budgets and reports: a recognised instalment counts
+  once, in its statement month, in its category (financing in its own); a future one nowhere; month summary, report
+  and budget totals agree. Currencies/FX: same-currency; consolidated views read the instalment movements like any
+  expense. Backup/import/restore, deletion records, offline/restart/foreground: covered by the real-SQLite tests.
+  Assistant contracts: untouched (v1 has no instalment concept; a draft that proposes one is 25A's).
+  **Contradictions found in the review round and fixed here:** a failed instalment catch-up was silent (P1); the
+  financing figure depended on the principal's state (P2); interest, fee and tax were collapsed into one movement and
+  one category; storage let a new purchase, rule or plan land on an archived card. **Remaining:** none known. The
+  Assistant's expense drafts still list an archived card as an account (its account list is not filtered by the card's
+  state); confirming one is refused by storage with the archived message, so nothing wrong is written; filtering the
+  list is a UI change left to 25A.
+- **Cross-feature matrix, re-run after the review round** (each cell covered by a named test): cash accounts (a plan
+  touches none; deleting one leaves plans whole); active/archived/deleted cards (the lifecycle above); normal purchases
+  (rule 2, refused on an archived card); plans (engine above); payments (transfers, accepted on archived cards, assign
+  nothing); recurring expenses and incomes (independent of plans; new ones refused on archived cards, stored ones keep
+  running; incomes never on a card); debts owed and receivable (independent both ways); movement edit/undo/restore (per
+  component, frozen amount/date/card/kind); reports, budgets and card balances (per component, exactly once);
+  backup/restore (v12, per-component identity and categories); restart/foreground (idempotent); durable-write failure
+  (visible, retried, no duplicate).
+- **Deferred.** 24T2: the purchase form and the placement choice, the five figures and the commitments on the card
+  screen, the available-credit presentation and the issuer decision in decision 003, a schedule realignment if
+  wanted. 24T3: refunds, early payoff, cancellation UX and adjustments with their own records, the deletion block on
+  the iPhone. 24C2: the original-currency purchase record. Not implemented on purpose: a «paid» state per instalment,
+  business-day shifting, available credit with plans.
+- **Copy.** es/en: the domain and storage refusal messages (`errors.installments.*`, 28 keys with `cardArchived`), the
+  catch-up warnings (`errors.storage.installmentsFailed`, `catchUpsFailed`), the card dialog
+  (`cards.form.blockedPlanDetail`), the backup formats line and the version refusal («1 a 12»). English lock
+  accepted.
+- **Tests.** Root `packages/domain/installments.test.ts` (+18: distribution per exponent with proofs of exact sums,
+  refusals, the calendar, plans and their validation, recognition, idempotency, states and figures, reports and
+  budgets exactly once, the card lifecycle, the available-credit gate, the plan lifecycle, the ledger guards, recurring
+  and debt coexistence, backup v12); `card-invariants.test.ts` (7b: 12 of the 13 `it.todo` are tests, the
+  foreign-currency one stays for 24C2); the version probes in `lifecycle.test.ts` and `multi-currency.test.ts`.
+  Mobile `tests/installments.node.ts` (+8 on real SQLite: the 11 → 12 migration with an interrupted step and the
+  newer-file refusal, creation and the catch-up through a restart and repeated foregrounds, a crash before the refresh
+  and a write failing midway, financing and the reports/budgets, payments and the movement guards with undo/restore
+  and drift, the plan lifecycle, the card lifecycle, recurring/debt/cash-account coexistence, backup v12 export,
+  restore, duplicate restore, conflict and the refusal contract); `lifecycle-actions.node.ts` (+1: the dialog);
+  `lifecycle.node.ts` (schema 12), the backup route copy.
+  Review round (2026-09-28): `installments.test.ts` +5 (four independent components with uneven remainders, one or no
+  component, per-component categories, reports/budgets/card balance equal to principal plus active financing, the five
+  undo/restore combinations of principal and financing with the figures always equal to the ledger, per-component
+  drift, the archived-card guard); `installments.node.ts` +5 on real SQLite (a failed instalment pass for a full and a
+  locked database: readable, reported, retried once, cleared; recurring and instalment errors independent and together;
+  a real lock held by another connection; the three components stored, undone, restored and round-tripped through
+  backup v12 with the schema's component/category CHECK; the archived-card lifecycle: new purchase, plan, rule and
+  moves refused, stored rule and plan running, history edited in place, payment accepted, reactivation). Root
+  `npm test` 373 passed, 1 todo; mobile `test:storage` 794/794.
+- **Status.** Delivered on this branch (2026-09-28), not device-verified (nothing visible). Checked on Linux: root
+  `npm test`, `check:repo`; mobile `typecheck`, `test:storage`, `currency:verify`, `regions:verify`,
+  `i18n:check -- --strict`, `i18n:extract`, `check`, `export:ios` (counts in the PR). No EAS build.
+- **Depends on.** 25B2 (card and account deletion records), 25B3 merged; decision 003 rule 7.
 
 ### Producto 25B3 — detail hierarchy polish (this PR)
 
