@@ -1,5 +1,5 @@
-import { accountKind, cardAvailableLimitMinor, cardCommittedMinor, cardCreditMinor, cardCycleDatesOf, cardCycleView, cardDebtMinor, pendingInstallmentPlans,
-  type Account, type CardCycleDates, type CardStatement, type CreditCardProfile, type InstallmentPlan, type LedgerSnapshot, type PersonalDebtProfile,
+import { accountKind, cardAvailableLimitMinor, cardCommittedMinor, cardCreditMinor, cardCycleDatesOf, cardCycleView, cardDebtMinor, installmentPlanFigures, pendingInstallmentPlans,
+  type Account, type AccountAppearance, type CardCycleDates, type CardStatement, type CreditCardProfile, type InstallmentPlan, type LedgerSnapshot, type PersonalDebtProfile,
   type RecordedEntry, isLiveAccount } from '@finanzapp/domain';
 import { relativeDate } from '../i18n/format.ts';
 import { DEFAULT_LOCALE, type AppLocale } from '../i18n/locale.ts';
@@ -39,6 +39,8 @@ export type CardSummary = {
   committedMinor: number;
   /** Plans with a share not yet recognised. */
   pendingPlans: InstallmentPlan[];
+  /** How many of them still have principal to come: the plans `committedMinor` adds up («en 2 planes»). */
+  futurePlanCount: number;
 };
 
 /** Everything Tarjetas needs for one card, computed once from the snapshot, the plans and the card's exact cycle dates. */
@@ -50,11 +52,13 @@ export function summarizeCard(card: CreditCardProfile, snapshot: LedgerSnapshot,
   const availableMinor = cardAvailableLimitMinor(card, snapshot, plans, records);
   const availability: CardAvailability = card.creditLimitMinor === null ? 'noLimit' : availableMinor === null ? 'unknownWithPlans' : 'known';
   const view = cardCycleView(card, cardCycleDatesOf(card.id, cycleDates), todayISO);
+  const pendingPlans = pendingInstallmentPlans(card, plans, records);
   return { id: card.id, card, account, debtMinor, creditMinor: cardCreditMinor(card, snapshot), availableMinor, availability,
     usage: availability === 'known' && card.creditLimitMinor ? debtMinor / card.creditLimitMinor : null,
     closingISO: view.open.closingISO, openDueISO: view.open.dueISO, openStartISO: view.openStartISO,
     nextDueISO: view.nextDue.dueISO, nextDueOfISO: view.nextDue.closingISO, toPay: view.toPay, previousClosingISO: view.previous.closingISO,
-    committedMinor: cardCommittedMinor(card, plans, records), pendingPlans: pendingInstallmentPlans(card, plans, records) };
+    committedMinor: cardCommittedMinor(card, plans, records), pendingPlans,
+    futurePlanCount: pendingPlans.filter(plan => installmentPlanFigures(plan, records).scheduledMinor > 0).length };
 }
 
 /** The cards Tarjetas shows in its deck, in their stored order (active first, then by creation). */
@@ -72,6 +76,25 @@ export function archivedCards(cards: CreditCardProfile[] | undefined, snapshot: 
   return (cards ?? []).filter(card => !card.active && !card.deleted)
     .map(card => summarizeCard(card, snapshot, todayISO, plans, records, cycleDates))
     .filter((summary): summary is CardSummary => summary !== null);
+}
+
+/** 24T2: the colour a card's face takes: the one chosen for its hidden account in Editar cuenta, or null when none was
+ * chosen (the face keeps its hash tone). `accountLook` cannot tell «never chose» from «chose cobalt», so the row itself
+ * is read. */
+export function cardFaceColor(card: Pick<CreditCardProfile, 'accountId'>, appearances: readonly AccountAppearance[] = []): string | null {
+  return appearances.find(item => item.accountId === card.accountId)?.color ?? null;
+}
+
+/** 24T2: a face prints its currency code only when the person holds cards in more than one currency: the live cards
+ * (active or archived; a deleted card shown in its own detail, `keepId`, counts too). */
+export function cardCurrenciesDiffer(cards: readonly CreditCardProfile[] = [], accounts: readonly Account[] = [], keepId?: string): boolean {
+  const currencies = new Set<string>();
+  for (const card of cards) {
+    if (card.deleted && card.id !== keepId) continue;
+    const account = accounts.find(item => item.id === card.accountId);
+    if (account) currencies.add(account.currency);
+  }
+  return currencies.size > 1;
 }
 
 export function usageTone(usage: number | null): 'neutral' | 'warning' | 'expense' {

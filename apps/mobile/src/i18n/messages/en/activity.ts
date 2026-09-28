@@ -54,6 +54,15 @@ export const activity: Pick<Messages, 'activity' | 'rows' | 'entryDetail' | 'tra
     edit: 'Edit transaction',
     restoreAction: 'Restore transaction',
     voidAction: 'Undo transaction',
+    installmentTitle: 'Card installment',
+    installment: 'Installment',
+    installmentOf: '{number} of {count}',
+    installmentShare: {
+      interest: '{number} of {count} · interest',
+      fee: '{number} of {count} · fee',
+      tax: '{number} of {count} · tax',
+    },
+    installmentVoidNote: 'The installment stays undone: it isn’t recorded again on its own and stays pending in its plan.',
   },
   transferDetail: {
     notFoundTitle: 'We could not find this transfer',

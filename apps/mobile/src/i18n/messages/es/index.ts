@@ -14,6 +14,7 @@ import { preferences } from './preferences.ts';
 import { errors } from './errors.ts';
 import { reports } from './reports.ts';
 import { cards } from './cards.ts';
+import { installments } from './installments.ts';
 import { debts } from './debts.ts';
 import { accounts } from './accounts.ts';
 import { budgets } from './budgets.ts';
@@ -36,6 +37,7 @@ export const es = {
   ...errors,
   ...reports,
   ...cards,
+  ...installments,
   ...debts,
   ...accounts,
   ...budgets,

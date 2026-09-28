@@ -4,15 +4,21 @@ export const cards = {
     list: {
       add: 'Agregar tarjeta',
       emptyTitle: 'Tus tarjetas, como en la billetera',
-      emptyDetail: 'Registrá cada compra una sola vez como gasto. Cuando pagás el resumen, el dinero sale de tu cuenta y baja el saldo pendiente de la tarjeta, sin volver a contar el consumo.',
-      /** VoiceOver hint of a card face in the carousel. */
+      /** 24T2: a purchase without instalments counts once; in instalments, each instalment counts when its statement closes. */
+      emptyDetail: 'Una compra sin cuotas cuenta como gasto una sola vez; en cuotas, cada cuota cuenta cuando cierra su resumen. Cuando pagás la tarjeta, el dinero sale de tu cuenta y baja el saldo pendiente, sin volver a contar el consumo.',
+      /** VoiceOver hint of the card in front of the deck (and of a row that opens a card). */
       openHint: 'Abre el detalle de la tarjeta',
+      /** VoiceOver hint of a card stacked in the deck: tapping it brings it to the front. */
+      selectHint: 'Selecciona esta tarjeta',
+      /** Only archived cards: shown in place of the deck, above the Archivadas section. */
+      noActiveTitle: 'Ninguna tarjeta activa',
+      noActiveDetail: 'Tus tarjetas archivadas están abajo. Agregá una tarjeta para registrar compras nuevas.',
     },
     panel: {
       /** The card's balance due (purchases minus payments). Always «saldo pendiente», never «deuda»: that word is the Deudas y cobros section. */
       recordedDebt: 'Saldo pendiente',
-      archivedDebt: 'Tarjeta archivada · saldo pendiente',
-      deletedDebt: 'Tarjeta eliminada · saldo pendiente',
+      /** The state line under an archived card's face in its detail. */
+      archivedTitle: 'Tarjeta archivada',
       deletedTitle: 'Tarjeta eliminada',
       deletedDetail: 'Sus compras y pagos siguen en Movimientos y en sus reportes. No se edita ni acepta movimientos nuevos.',
       noDebt: 'Sin saldo pendiente en esta tarjeta.',
@@ -20,15 +26,25 @@ export const cards = {
       credit: 'Saldo a favor · {amount}',
       available: 'Disponible',
       noLimitLoaded: 'Sin límite cargado',
-      noLimit: 'Sin límite',
+      /** 24T2: a card with pending instalments. How an issuer reserves credit for them is not assumed: never zero, never a guess. */
+      availableUnknown: 'No calculado con cuotas',
+      availableInfoTitle: 'Disponible con cuotas',
+      availableInfoDetail: 'Cada emisor reserva el límite de las compras en cuotas a su manera: algunos descuentan el total de la compra y otros solo las cuotas ya facturadas. FinanzApp no lo supone: mientras la tarjeta tenga cuotas pendientes, no calcula su disponible.',
       /** Caption under Disponible: "de $ 5.000,00" (of the credit limit). */
       ofLimit: 'de {amount}',
-      closing: 'Cierre',
-      due: 'Vencimiento',
+      /** 24T2: the next closing and the next due date, two separate facts (the due may belong to the statement that already closed). */
+      closing: 'Cierra',
+      due: 'Vence',
       /** Under the usage bar: "12 % del límite de $ 5.000,00". */
       usage: '{percent} % del límite de {limit}',
       recordPurchase: 'Registrar compra',
       pay: 'Pagar tarjeta',
+      /** 24T2: the principal of the card's plans not recognised yet, beside the balance and never inside it. */
+      future: 'Cuotas futuras',
+      futurePlans: { one: 'en {count} plan', other: 'en {count} planes' },
+      /** The card detail's section with its instalment plans; the caption is the future principal. */
+      plans: 'Cuotas',
+      plansCaption: 'Cuotas futuras {amount}',
       seeAll: 'Ver todo',
       recent: 'Recientes',
       movements: 'Movimientos',
@@ -39,12 +55,20 @@ export const cards = {
       notFoundTitle: 'No encontramos esta tarjeta',
       notFoundDetail: 'Volvé a Tarjetas para elegir una tarjeta guardada en este dispositivo.',
     },
-    /** One line of statement facts under the activity title. */
+    /** One line of open-cycle facts under the activity title («Este ciclo»): what the ledger holds, never a statement amount. */
     statement: {
       /** `{date}` is the day inside the sentence: "desde ayer", "desde 29 ago". */
-      openSince: 'Resumen abierto desde {date}',
+      openSince: 'Ciclo abierto desde {date}',
       purchases: { one: '{count} compra', other: '{count} compras' },
       payments: { one: '{count} pago', other: '{count} pagos' },
+    },
+    /** 24T2: archived cards (not deleted) stay reachable at the end of Tarjetas. */
+    archived: {
+      title: 'Archivadas',
+      caption: 'Siguen recibiendo pagos y registrando sus cuotas.',
+      /** A row's line: "Saldo pendiente $ 131,00". */
+      debt: 'Saldo pendiente {amount}',
+      clear: 'Sin saldo pendiente',
     },
     /** The transfer form when it pays a card. */
     payment: {
@@ -59,7 +83,7 @@ export const cards = {
       /** The legacy words for a card in ARS or USD (unless another held currency shares the word); any other currency is read by CLDR's plural name. */
       pesos: 'pesos',
       dollars: 'dólares',
-      /** VoiceOver name of the carousel page dots: "Tarjeta 1 de 3". */
+      /** VoiceOver: a card's place in the deck, after its sentence: "Tarjeta 1 de 3". */
       position: 'Tarjeta {index} de {count}',
     },
     form: {

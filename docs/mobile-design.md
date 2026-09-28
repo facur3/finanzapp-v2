@@ -238,12 +238,17 @@ siguen montadas, así un revelado al montar no se vería).
   Nunca responde al scroll.
 - **Formularios.** Gasto / Ingreso / Transferencia es un solo control sobre un
   solo modal: cambiar es estado, no navegación, y el formulario de abajo se funde.
-- **Carrusel de tarjetas.** La posición vive en el hilo de UI; las tarjetas vecinas
-  retroceden (0,94 / 0,7). Al asentarse en otra tarjeta suena un háptico; el panel
-  queda montado y solo sus valores se funden, así lo de abajo no salta. Reduce
-  Motion deja todas las tarjetas planas.
+- **Deck de tarjetas (24T2; reemplaza al carrusel horizontal).** Las tarjetas no elegidas
+  quedan apiladas arriba en su orden guardado, cada una mostrando solo su franja superior
+  (nombre y «•••• 4009», 50 pt como mínimo); la elegida queda al frente, abajo y entera, junto
+  a su resumen. Tocar una franja la elige (un háptico de selección); tocar la del frente abre
+  su detalle. Cada tarjeta viaja a su lugar en el hilo de UI (`timing('data')`, 260 ms,
+  ease-out, interrumpible) y se presiona como una tarjeta (0,97); ningún gesto horizontal ni de
+  arrastre compite con volver atrás. El resumen queda montado y solo sus valores se funden,
+  así lo de abajo no salta. Con Reduce Motion las tarjetas saltan a su lugar sin movimiento y
+  el resumen solo se funde.
 - **Hápticos.** Uno por acción del usuario (selección en segmentos, cambio de
-  pestaña, flechas de mes, categoría o cuenta elegida, tarjeta asentada; éxito al
+  pestaña, flechas de mes, categoría o cuenta elegida, tarjeta elegida en el deck; éxito al
   guardar) y siempre con una señal visual. Las pestañas cambian al instante, sin
   deslizamiento ni fundido.
 

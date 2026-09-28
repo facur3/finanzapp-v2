@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import { runInNewContext } from 'node:vm';
 import ts from 'typescript';
 import * as currencies from '../src/ui/currencies.ts';
-import { carouselIndex, segmentLayout } from '../src/ui/geometry.ts';
+import { segmentLayout } from '../src/ui/geometry.ts';
 import { assignCategoryHues, categoryColor, hueColor, othersColor, CATEGORY_HUES } from '../src/ui/category-color.ts';
 import type { Entry } from '@finanzapp/domain';
 import * as i18nFormat from '../src/i18n/format.ts';
@@ -27,14 +27,8 @@ test('segmented thumb covers equal segments and clamps the index', () => {
   assert.deepEqual(segmentLayout(0, 2, 1), { width: 0, offset: 0 }, 'nothing to draw before layout');
 });
 
-test('carousel index follows the settled offset within bounds', () => {
-  assert.equal(carouselIndex(0, 365, 3), 0);
-  assert.equal(carouselIndex(360, 365, 3), 1);
-  assert.equal(carouselIndex(200, 365, 3), 1, 'past the midpoint counts as the next card');
-  assert.equal(carouselIndex(5000, 365, 3), 2);
-  assert.equal(carouselIndex(-40, 365, 3), 0, 'rubber-band overscroll stays on the first card');
-  assert.equal(carouselIndex(100, 0, 3), 0);
-});
+// 24T2: the horizontal carousel of Tarjetas (and its settled-offset index) gave way to a vertical deck, whose pure
+// geometry is checked in cards-deck.node.ts.
 
 const createdAt = '2026-09-12T12:00:00Z';
 const entry = (id: string, category: string, dateISO: string, kind: 'expense' | 'income' = 'expense'): Entry =>
