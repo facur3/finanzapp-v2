@@ -6,6 +6,7 @@ import { accountKind, assertIncomeAccount, assertPostingAccount, assertTransferS
   debtOutstandingMinor, hiddenLiabilityAccountIds, liquidTotalsByCurrency, nextDayOfMonthISO, previousDayOfMonthISO,
   validateCreditCardProfile, validateLiabilityProfiles, validatePersonalDebtProfile,
   closePersonalDebt, debtTotalsByCurrency, deletePersonalDebt, reopenPersonalDebt, validatePersonalDebtChange,
+  DEBT_OUTSTANDING_MESSAGE, assertDebtDeletable, debtDeletion, debtHasHistory,
   type CreditCardProfile, type PersonalDebtProfile } from './liabilities';
 
 const createdAt = '2026-09-01T12:00:00.000Z';
@@ -227,5 +228,41 @@ describe('closing, reopening and deleting a debt tracker (Producto 24UX4)', () =
     expect(() => closePersonalDebt(deleted, now)).toThrow('Esta deuda fue eliminada.');
     expect(() => deletePersonalDebt(deleted, now)).toThrow('Esta deuda fue eliminada.');
     expect(() => validatePersonalDebtChange(deleted, { ...deleted, note: 'x', revision: 2 })).toThrow('Esta deuda fue eliminada.');
+  });
+});
+
+describe('when a debt tracker may be deleted (Producto 25B2 close)', () => {
+  const now = '2026-09-20T09:00:00.000Z';
+  const only = (transfers: Transfer[]): LedgerSnapshot => ({ accounts, entries: [], transfers });
+  for (const [label, tracker, partial, rest] of [
+    ['owed_by_me', debt, debtPayment, { ...debtPayment, id: 'debt-rest', amountMinor: 20000 }],
+    ['owed_to_me', receivable, collection, { ...collection, id: 'collection-rest', amountMinor: 10000 }],
+  ] as const) {
+    it(`${label}: a balance with recorded history is blocked; settled or untouched is deletable; nothing is ever recorded`, () => {
+      // Outstanding with history: blocked, with the balance named; closing still works and keeps everything.
+      const partly = only([partial]);
+      expect(debtHasHistory(tracker, partly)).toBe(true);
+      expect(debtDeletion(tracker, partly)).toEqual({ kind: 'blocked', outstandingMinor: label === 'owed_by_me' ? 20000 : 10000 });
+      expect(() => assertDebtDeletable(tracker, partly)).toThrow(DEBT_OUTSTANDING_MESSAGE);
+      const closed = closePersonalDebt(tracker, now);
+      expect(() => assertDebtDeletable(closed, partly)).toThrow(DEBT_OUTSTANDING_MESSAGE);
+      expect(debtOutstandingMinor(closed, partly)).toBe(debtOutstandingMinor(tracker, partly));
+      expect(reopenPersonalDebt(closed, now)).toEqual({ ...tracker, revision: 2, updatedAt: now });
+      // Zero outstanding (with history): deletable; the transfers are untouched inputs.
+      const settled = only([partial, rest]);
+      expect(debtDeletion(tracker, settled)).toEqual({ kind: 'settled' });
+      expect(() => assertDebtDeletable(tracker, settled)).not.toThrow();
+      // Newly created, no payment or collection: deletable, and the balance is named, not settled.
+      const fresh = only([]);
+      expect(debtHasHistory(tracker, fresh)).toBe(false);
+      expect(debtDeletion(tracker, fresh)).toEqual({ kind: 'untouched', outstandingMinor: label === 'owed_by_me' ? 30000 : 15000 });
+      expect(() => assertDebtDeletable(tracker, fresh)).not.toThrow();
+      expect(debtOutstandingMinor(deletePersonalDebt(tracker, now), fresh)).toBe(debtOutstandingMinor(tracker, fresh)); // deleting records no payment
+      // A deleted tracker is never deletable again (storage treats the retry as a no-op before this check).
+      expect(() => assertDebtDeletable(deletePersonalDebt(tracker, now), settled)).toThrow('Esta deuda fue eliminada.');
+    });
+  }
+  it('another account\'s transfers are not this tracker\'s history', () => {
+    expect(debtHasHistory(debt, only([payment, collection]))).toBe(false);
   });
 });

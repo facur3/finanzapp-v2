@@ -1,9 +1,11 @@
 import { ACCOUNT_DELETED_MESSAGE, accountBalanceMinor, isLiveAccount, validDateISO, type Account, type Currency, type Entry, type EntryKind, type LedgerSnapshot, type Transfer } from './ledger.ts';
 import { assertStorableCurrency, sortCurrencies } from './currency.ts';
 
-/** A credit card is a hidden internal ledger account. A purchase is an expense
- * posted to that account exactly once (it counts in reports and budgets and
- * increases the card's negative balance). A payment is an internal transfer from
+/** A credit card is a hidden internal ledger account. A purchase (without
+ * instalments) is an expense posted to that account exactly once for its full price
+ * (it counts in reports and budgets and increases the card's negative balance); a
+ * purchase in instalments (24T, not modelled yet) recognises its principal
+ * instalment by instalment instead, decision 003 rule 7. A payment is an internal transfer from
  * a cash account into the card account: it lowers liquid money and lowers the
  * card's balance due without ever creating a second expense. The card is tied to
  * no cash account: each payment names its source when it is recorded (a preferred
@@ -40,6 +42,14 @@ export const CARD_DEBT_MESSAGE = 'Esta tarjeta tiene saldo pendiente. Pagalo o a
 export const CARD_DELETE_PATH_MESSAGE = 'Una tarjeta se elimina con su propia acción, no con un cambio de datos.';
 
 export type DebtDirection = 'owed_by_me' | 'owed_to_me';
+
+export const DEBT_DELETED_MESSAGE = 'Esta deuda fue eliminada.';
+/** Producto 25B2 close: a debt or receivable with a balance left and a payment or collection already recorded is
+ * settled or closed, never deleted: a deleted tracker takes no new transfer, so a partly settled obligation would be
+ * stranded. Closing keeps it (balance, history, Reabrir) without implying a payment or a pardon. */
+export const DEBT_OUTSTANDING_MESSAGE = 'Esta deuda tiene saldo pendiente y pagos o cobros registrados. Saldala o cerrala; no se puede eliminar.';
+/** The deletion record is written by `deletePersonalDebt` in storage (it checks the rule above); a plain save never flips it. */
+export const DEBT_DELETE_PATH_MESSAGE = 'Una deuda se elimina con su propia acción, no con un cambio de datos.';
 
 /** A personal debt or receivable is also a hidden account. "I owe" starts with a
  * negative balance and is settled by transfers into it; "they owe me" starts
@@ -147,7 +157,7 @@ export function validateCreditCardChange(before: CreditCardProfile, after: Credi
   }
 }
 export function validatePersonalDebtChange(before: PersonalDebtProfile, after: PersonalDebtProfile): void {
-  if (before.deleted) throw new Error('Esta deuda fue eliminada.');
+  if (before.deleted) throw new Error(DEBT_DELETED_MESSAGE);
   if (after.accountId !== before.accountId || after.direction !== before.direction
     || after.createdAt !== before.createdAt || after.revision !== before.revision + 1) {
     throw new Error('La deuda cambió desde que la abriste. Volvé a revisarla.');
@@ -185,7 +195,7 @@ export function assertOpenAccount(accountId: string, accounts: readonly Account[
   const account = accounts.find(item => item.id === accountId);
   if (account && !isLiveAccount(account)) throw new Error(ACCOUNT_DELETED_MESSAGE);
   if (cards.some(card => card.deleted && card.accountId === accountId)) throw new Error(CARD_DELETED_MESSAGE);
-  if (debts.some(debt => debt.deleted && debt.accountId === accountId)) throw new Error('Esta deuda fue eliminada.');
+  if (debts.some(debt => debt.deleted && debt.accountId === accountId)) throw new Error(DEBT_DELETED_MESSAGE);
 }
 
 /** Whether a card may be deleted now: no balance due (and, from 24T on, no pending instalment plan). */
@@ -417,12 +427,32 @@ export function closePersonalDebt(debt: PersonalDebtProfile, nowISO: string): Pe
 export function reopenPersonalDebt(debt: PersonalDebtProfile, nowISO: string): PersonalDebtProfile {
   return debtStateChange(debt, { active: true }, nowISO);
 }
-/** The deletion record of a debt tracker: its account and every transfer that touched it stay as recorded. */
+/** Whether a payment or collection (or any posting) was ever recorded on the tracker's account. The opening amount is
+ * the account itself, not history: a tracker created by mistake has none. */
+export function debtHasHistory(debt: PersonalDebtProfile, snapshot: LedgerSnapshot): boolean {
+  const activity = liabilityActivity(debt.accountId, snapshot);
+  return activity.entries.length > 0 || activity.transfers.length > 0;
+}
+/** What deleting a tracker means now (25B2 close): `settled` (nothing outstanding) and `untouched` (a balance, but no
+ * payment or collection yet: a tracker created by mistake) may be deleted after a confirmation; `blocked` (a balance and
+ * recorded history) is settled or closed instead. Deleting never records a payment and never touches the ledger. */
+export type DebtDeletion = { kind: 'settled' } | { kind: 'untouched'; outstandingMinor: number } | { kind: 'blocked'; outstandingMinor: number };
+export function debtDeletion(debt: PersonalDebtProfile, snapshot: LedgerSnapshot): DebtDeletion {
+  const outstandingMinor = debtOutstandingMinor(debt, snapshot);
+  if (outstandingMinor === 0) return { kind: 'settled' };
+  return debtHasHistory(debt, snapshot) ? { kind: 'blocked', outstandingMinor } : { kind: 'untouched', outstandingMinor };
+}
+export function assertDebtDeletable(debt: PersonalDebtProfile, snapshot: LedgerSnapshot): void {
+  if (debt.deleted) throw new Error(DEBT_DELETED_MESSAGE);
+  if (debtDeletion(debt, snapshot).kind === 'blocked') throw new Error(DEBT_OUTSTANDING_MESSAGE);
+}
+/** The deletion record of a debt tracker: its account and every transfer that touched it stay as recorded. Storage
+ * writes it only after `assertDebtDeletable`. */
 export function deletePersonalDebt(debt: PersonalDebtProfile, nowISO: string): PersonalDebtProfile {
   return debtStateChange(debt, { active: false, deleted: true }, nowISO);
 }
 function debtStateChange(debt: PersonalDebtProfile, change: Partial<Pick<PersonalDebtProfile, 'active' | 'deleted'>>, nowISO: string): PersonalDebtProfile {
-  if (debt.deleted) throw new Error('Esta deuda fue eliminada.');
+  if (debt.deleted) throw new Error(DEBT_DELETED_MESSAGE);
   if (!validTimestamp(nowISO)) throw new Error('Estado de obligación inválido.');
   return { ...debt, ...change, revision: debt.revision + 1, updatedAt: nowISO };
 }

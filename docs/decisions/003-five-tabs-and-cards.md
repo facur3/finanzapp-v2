@@ -56,16 +56,22 @@ calendario y compromisos futuros, no gastos recurrentes duplicados.
 
 Auditadas contra el código al cerrar 25B2: la implementación las cumplía; se
 fijaron en `packages/domain/card-invariants.test.ts` (una prueba por regla) y en
-el copy. Un cambio que rompa una de ellas es una regresión, no un rediseño.
+el copy. Un cambio que rompa una de ellas es una regresión, no un rediseño. El
+2026-09-28 se corrigió la redacción de las reglas 2 y 7: «un único gasto» para una
+compra en cuotas podía leerse como reconocer todo el principal el día de la compra,
+y la decisión es la contraria (regla 7). Las partes de 24T quedan como `it.todo` en
+esa prueba hasta que 24T1 las implemente.
 
 1. **Una tarjeta de crédito no está vinculada contablemente a una cuenta bancaria
    por cada compra.** `CreditCardProfile` tiene un solo vínculo, `accountId`: su
    cuenta interna oculta. Cada pago nombra su origen al registrarse; dos compras
    de la misma tarjeta pueden pagarse desde dos cuentas distintas.
-2. **Una compra con tarjeta** se registra exactamente una vez como gasto (cuenta
-   una vez en Movimientos, Reportes, Presupuestos y el resumen del mes), aumenta
-   el saldo pendiente de la tarjeta y **no reduce ninguna cuenta de efectivo o
-   banco** (Disponible no cambia).
+2. **Una compra con tarjeta sin cuotas** se registra exactamente una vez como gasto
+   por su precio completo (cuenta una vez en Movimientos, Reportes, Presupuestos y
+   el resumen del mes), aumenta el saldo pendiente de la tarjeta por ese mismo
+   importe y **no reduce ninguna cuenta de efectivo o banco** (Disponible no
+   cambia). Una compra en cuotas **no** sigue esta regla para el reconocimiento del
+   gasto: sigue la regla 7.
 3. **Pagar una tarjeta** es una transferencia desde una cuenta normal hacia la
    cuenta interna de la tarjeta: reduce el dinero disponible de esa cuenta, reduce
    el saldo pendiente y **no genera un segundo gasto** (los totales de gasto del
@@ -83,13 +89,48 @@ el copy. Un cambio que rompa una de ellas es una regresión, no un rediseño.
    que ya vive en una cuenta normal; si algún día existe `DebitCardProfile` será
    metadata vinculada a una cuenta, sin saldo, deuda, cuotas, cierre ni pagos
    propios.
-7. **Producto 24T (cuando exista):** una compra en cuotas sigue siendo un único
-   gasto; las cuotas son el plan de obligación/pago y nunca vuelven a contabilizar
-   el gasto; archivar una tarjeta conserva las cuotas pendientes; eliminar una
-   tarjeta queda bloqueado mientras tenga saldo pendiente **o** planes de cuotas
-   pendientes (`assertCardDeletable` es el único lugar de esa regla). Hoy: archivar
-   conserva el saldo pendiente y sigue aceptando el pago; eliminar se rechaza con
-   saldo pendiente y se permite en cero; una tarjeta eliminada no acepta pagos.
+7. **Compras en cuotas (Producto 24T; contrato decidido el 2026-09-28, todavía sin
+   implementar).** Una compra financiada es **una compra y un plan**
+   (`InstallmentPlan`), nunca una `RecurringRule`. Si la persona eligió cuotas,
+   FinanzApp **no** contabiliza además el precio completo como gasto inmediato.
+   Ejemplo: USD 1.200 en 12 × USD 100.
+   - **Al comprar:** ninguna cuenta bancaria pierde USD 1.200; se crea el plan por
+     USD 1.200; la persona puede ver USD 1.200 como total comprometido; el saldo
+     pendiente exigible de la tarjeta contiene solo las cuotas que ya corresponden
+     a un resumen; las cuotas futuras aparecen aparte, como compromisos futuros.
+   - **Reconocimiento (Reportes, Presupuestos, resumen del mes):** cada cuota de
+     principal cuenta como gasto en el período al que corresponde; la compra madre
+     **no** vuelve a sumar USD 1.200; la suma exacta del principal de las cuotas
+     (enteros en unidades menores, el resto asignado a cuotas nombradas) es igual al
+     principal total. Intereses, cargos e impuestos de financiación se registran por
+     separado, con su propia categoría, y nunca se disfrazan de principal. Pagar el
+     resumen sigue siendo una transferencia (regla 3), nunca un segundo gasto.
+   - **Cifras distintas que el diseño de 24T muestra y nunca mezcla:** precio total
+     de la compra; saldo pendiente facturado/exigible hoy; cuotas futuras
+     comprometidas; total restante del plan; lo ya pagado.
+   - **Crédito disponible: gate abierto.** Cómo afectan las cuotas futuras al límite
+     disponible del emisor (muchos emisores reservan el total; otros no) no se
+     asume: se decide y se registra aquí antes de implementar
+     `cardAvailableLimitMinor` con planes. Hasta entonces el límite disponible no
+     se calcula para una tarjeta con planes.
+   - **Ciclo de vida:** archivar una tarjeta conserva sus planes y permite seguir
+     pagando todas las cuotas; eliminar una tarjeta queda bloqueado mientras tenga
+     saldo pendiente **o** cualquier plan pendiente (`assertCardDeletable` es el
+     único lugar de esa regla); una tarjeta eliminada conserva todo su historial y
+     sus planes terminados. Pausar o eliminar un recurrente nunca afecta un plan.
+   - **Reintegros y cancelación anticipada:** nunca duplican un gasto; quedan
+     vinculados a la compra/plan original; un reintegro parcial conserva el resto;
+     un pago anticipado reduce la obligación y no crea un gasto nuevo.
+   - **Moneda extranjera (24T + 24C2):** el modelo distingue moneda original de la
+     compra, moneda en que la tarjeta factura, moneda de la cuenta que paga, importe
+     exacto debitado y exacto acreditado, y tasa/cargos con su procedencia. Una
+     transferencia entre monedas nunca se modela como una transferencia de la misma
+     moneda.
+   - **Una compra sin cuotas** conserva el comportamiento actual (regla 2): gasto
+     completo una vez y saldo pendiente completo.
+   - **Hoy (sin 24T):** archivar conserva el saldo pendiente y sigue aceptando el
+     pago; eliminar se rechaza con saldo pendiente y se permite en cero; una tarjeta
+     eliminada no acepta pagos.
 8. **Copy visible:** el saldo de una tarjeta es «Saldo pendiente» / «Saldo de
    tarjeta» (en inglés «Outstanding balance»), nunca «Deuda», que nombra la
    sección Deudas y cobros. Los nombres internos (`cardDebtMinor`, `CARD_DEBT_MESSAGE`,

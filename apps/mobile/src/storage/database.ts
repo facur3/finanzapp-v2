@@ -15,6 +15,7 @@ import {
   type Currency, type CurrencyGate, type CurrencyUnit,
   OBLIGATION_ACCOUNT_MESSAGE, assertOpenAccount, deleteAccount as deleteAccountRecord, hiddenLiabilityAccountIds, isLiveAccount, pauseRecurringRule,
   CARD_DELETE_PATH_MESSAGE, assertCardDeletable, deleteCreditCard as deleteCreditCardRecord,
+  DEBT_DELETE_PATH_MESSAGE, assertDebtDeletable, deletePersonalDebt as deletePersonalDebtRecord,
 } from '@finanzapp/domain';
 
 type SqlValue = string | number | null;
@@ -1063,10 +1064,30 @@ export async function savePersonalDebt(db: LedgerDatabase, input: PersonalDebtPr
     if (!existing) throw new Error('No encontramos esta deuda.');
     if (samePersonalDebtProfile(existing, debt)) return;
     validatePersonalDebtChange(existing, debt);
+    // 25B2 close: the deletion record has its own path (`deletePersonalDebt`, which checks the balance and the history).
+    if (debt.deleted) throw new Error(DEBT_DELETE_PATH_MESSAGE);
     validateArchive({ ...archive, debts: archive.debts!.map(item => item.id === debt.id ? debt : item) });
-    // Closing, reopening and deleting are this same UPDATE: the hidden account and its transfers are never touched.
+    // Editing, closing and reopening are this same UPDATE: the hidden account and its transfers are never touched.
     await tx.runAsync(`UPDATE personal_debts SET counterparty = ?, dueDateISO = ?, note = ?, active = ?, deleted = ?,
       revision = ?, updatedAt = ? WHERE id = ?`, debt.counterparty, debt.dueDateISO, debt.note,
     debt.active ? 1 : 0, debt.deleted ? 1 : 0, debt.revision, debt.updatedAt, debt.id);
+  });
+}
+
+/** Producto 25B2 close: the deletion record of a debt or receivable tracker. Refused while a balance is left and a
+ * payment or collection is already recorded (settle it or close it: a deleted tracker takes no new transfer, so the rest
+ * would be stranded); a tracker with a balance and no history (created by mistake) is deleted without recording any
+ * payment. The row, its hidden account, the opening amount and every transfer stay exactly as recorded. Deleting a
+ * tracker already deleted is a no-op, so a retry after a failed refresh never fails. */
+export async function deletePersonalDebt(db: LedgerDatabase, debtId: string, nowISO: string): Promise<void> {
+  await db.withExclusiveTransactionAsync(async tx => {
+    const archive = await readArchive(tx);
+    const debt = archive.debts?.find(item => item.id === debtId);
+    if (!debt) throw new Error('No encontramos esta deuda.');
+    if (debt.deleted) return; // Committed already; a refresh failed.
+    assertDebtDeletable(debt, snapshotFromArchive(archive));
+    const tombstone = deletePersonalDebtRecord(debt, nowISO);
+    validateArchive({ ...archive, debts: archive.debts!.map(item => item.id === debtId ? tombstone : item) });
+    await tx.runAsync('UPDATE personal_debts SET active = 0, deleted = 1, revision = ?, updatedAt = ? WHERE id = ?', tombstone.revision, tombstone.updatedAt, debtId);
   });
 }

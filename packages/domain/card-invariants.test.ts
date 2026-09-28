@@ -9,7 +9,10 @@ import { spendingReport } from './spending-report';
 
 /** The financial semantics of a credit card, recorded at the close of Producto 25B2 (decision 003,
  * «Invariantes contables de tarjetas»). Each block is one invariant; a change that breaks one is a
- * regression, not a redesign. Instalments (24T) are not modelled yet: 7 covers what exists today. */
+ * regression, not a redesign. 2 is a purchase **without** instalments (the full price, one expense, once).
+ * Instalments (24T) are not modelled yet: 7 pins what exists today, and 7b lists the decided 24T contract
+ * (revised 2026-09-28: the principal is recognised instalment by instalment, never the full price up front)
+ * as `it.todo` until 24T1 implements it. */
 const createdAt = '2026-09-01T12:00:00.000Z';
 const now = '2026-09-28T10:00:00.000Z';
 const bank: Account = { id: 'bank', name: 'Banco', currency: 'ARS', openingMinor: 100000, createdAt };
@@ -53,8 +56,8 @@ describe('1. a card is not tied to a bank account per purchase', () => {
   });
 });
 
-describe('2. a card purchase', () => {
-  it('is recorded exactly once as an expense, raises the card balance due and leaves every cash account alone', () => {
+describe('2. a card purchase without instalments', () => {
+  it('is recorded exactly once as an expense for its full price, raises the card balance due and leaves every cash account alone', () => {
     expect(expenseOf(empty)).toEqual({ minor: 0, count: 0 });
     expect(expenseOf(bought)).toEqual({ minor: 23100, count: 1 });
     expect(monthOf(bought)).toEqual({ expense: 23100, income: 0, count: 1 });
@@ -131,6 +134,23 @@ describe('7. lifecycle (what exists before 24T)', () => {
     expect(expenseOf({ ...paid, accounts })).toEqual({ minor: 23100, count: 1 });
     expect(cardDebtMinor(gone, paid)).toBe(0);
   });
+});
+
+// Decision 003, rule 7 (revised 2026-09-28). Not implemented: each line becomes a test in 24T1/24T2/24T3.
+describe('7b. instalments (the 24T contract, not implemented yet)', () => {
+  it.todo('a purchase in instalments is one purchase and one InstallmentPlan, never a RecurringRule');
+  it.todo('buying in instalments moves no cash account and does not count the full price as an expense on the purchase date');
+  it.todo('each principal instalment counts as an expense in its own period; the parent purchase never adds the full principal again');
+  it.todo('the principal instalments sum exactly to the total principal in minor units (exponents 0, 2 and 3)');
+  it.todo('interest, fees and financing taxes are recorded separately, never as principal');
+  it.todo('the card balance due holds only the instalments already on a statement; future instalments are separate commitments');
+  it.todo('purchase price, billed balance due, future committed instalments, plan remaining and already paid are distinct figures');
+  it.todo('paying the statement stays a transfer and never a second expense');
+  it.todo('available credit with pending plans is not computed until the issuer-reservation gate is decided');
+  it.todo('archiving keeps every plan payable; deleting is refused with a balance due or any pending plan; a deleted card keeps its finished plans');
+  it.todo('pausing or deleting a recurring rule never touches an instalment plan');
+  it.todo('a refund or an early payment is tied to the original purchase/plan and never duplicates an expense; a partial refund keeps the rest');
+  it.todo('a foreign-currency plan keeps purchase, billing and paying currencies, the exact debited and credited amounts, and the rate/fees with provenance');
 });
 
 describe('8. visible copy', () => {

@@ -203,7 +203,9 @@ is distributed to people. Today:
   currency comes from one rule (`defaultCurrency`, 25B2) and never changes anything already saved;
 - Deleting a normal account or a card writes a deletion record (25B2): the row, every movement and
   every transfer stay, readable as that account's; nothing new lands on it; history is never erased; cards, debts and receivables are hidden accounts; a purchase, a
-  transfer and a card payment are each counted once.
+  transfer and a card payment are each counted once. A debt or receivable with a balance and a recorded
+  payment or collection is settled or closed, never deleted (`assertDebtDeletable`, 25B2 close); a card is
+  deleted only with no balance due (and, from 24T, no pending instalment plan).
 - Save locally before confirming; a failed write keeps the draft and its exact command
   for retry; no error resets storage; a newer database is refused intact.
 - User data starts empty. No seeded balances, movements or sample history, ever.

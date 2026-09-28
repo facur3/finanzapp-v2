@@ -32,6 +32,14 @@ unchanged: keep a backup first** (Más → Copia de seguridad). Use your own sma
    chip; "Total · ARS" still counts that movement and "Solo USD" shows it; Reportes reaches its month; Disponible and
    Nuevo gasto no longer offer the currency. Open one of its movements → Editar: the account and amount are prefilled;
    correct the amount and save; it stays on that account.
+4b. **Delete a debt or receivable** (Más → Deudas y cobros; debt lifecycle round, 2026-09-28). Create «Debo · Juan»
+   and record one partial payment: swipe → Eliminar (and from its detail, «Eliminar deuda») opens «Todavía no se puede
+   eliminar» naming the rest, with Cancelar, Saldar and Cerrar; opening it and Cancelar change nothing; Saldar opens the
+   payment prefilled with the rest; Cerrar moves it to Cerradas with its balance and history and the detail stays open;
+   Reabrir brings it back. Pay the rest, then Eliminar: the usual confirmation; confirm: it leaves Deudas and both
+   payments stay in Movimientos. A receivable with a partial collection offers Cobrar instead of Saldar. A tracker just
+   created with no payment: Eliminar says the balance is not settled and no payment is recorded, and deletes it.
+   VoiceOver reads the dialog's buttons in both languages.
 5. **Backup.** Export (it is v11 once something was deleted), reinstall or use a second device, import: the deleted
    account and card come back deleted; the older backup from step 0 is refused as contradicting local changes.
 6. **Accessibility.** The largest Dynamic Type on Cuentas rows with the swipe open; VoiceOver through the

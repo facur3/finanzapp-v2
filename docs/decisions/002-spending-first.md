@@ -55,6 +55,8 @@ no fue publicada y su esquema no forma parte de esta entrega.
 - Transferencias internas y correcciones de saldo no son gastos ni ingresos.
 - Para tarjetas, registrar la compra una vez; las cuotas representan compromisos
   de pago y la liquidación del resumen no vuelve a sumar la compra como gasto.
+  En una compra en cuotas, el principal se reconoce cuota por cuota en su período,
+  nunca todo el día de la compra ni dos veces (decisión 003, regla 7, 2026-09-28).
   El reporte de gasto y las próximas salidas de caja deben etiquetarse por separado.
 - Prestar/recibir un préstamo modifica una deuda, no salario ni consumo. Separar
   principal de intereses/comisiones; los reintegros deben enlazar su operación.

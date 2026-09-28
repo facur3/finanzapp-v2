@@ -232,6 +232,8 @@ export const errors = {
       /** 24UX4: a change to a rule or debt tracker that was deleted (on another screen, or by a restored copy). */
       recurringDeleted: 'Este recurrente fue eliminado.',
       debtDeleted: 'Esta deuda fue eliminada.',
+      debtOutstanding: 'Esta deuda tiene saldo pendiente y pagos o cobros registrados. Saldala o cerrala; no se puede eliminar.',
+      debtDeletePath: 'Una deuda se elimina con su propia acción, no con un cambio de datos.',
       /** Producto 25B2: a deleted account or card keeps its history and takes nothing new. */
       accountDeleted: 'Esta cuenta fue eliminada.',
       cardDeleted: 'Esta tarjeta fue eliminada.',

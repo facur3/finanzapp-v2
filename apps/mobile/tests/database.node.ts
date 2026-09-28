@@ -9,10 +9,10 @@ import { accountBalanceMinor, archiveKey, createRecoveryBackup, initialRecord, m
   cardDebtMinor, debtOutstandingMinor, liquidTotalsByCurrency, spendingOverview, type CreditCardProfile, type PersonalDebtProfile,
   makeAccountAppearance, accountLook, newCategoryDefinition, editedCategoryDefinition, resolveCategory, categoryOptions, spendingReport,
   summarizeMonthlyBudgets, type AccountAppearance,
-  closePersonalDebt, deletePersonalDebt, deleteRecurringRule, pauseRecurringRule, reopenPersonalDebt, resumeRecurringRule, recurringHistory } from '@finanzapp/domain';
+  DEBT_DELETE_PATH_MESSAGE, DEBT_OUTSTANDING_MESSAGE, closePersonalDebt, deletePersonalDebt, deleteRecurringRule, pauseRecurringRule, reopenPersonalDebt, resumeRecurringRule, recurringHistory } from '@finanzapp/domain';
 import { changeEntry, createAccount, createEntry, importArchive, initializeDatabase, readArchive, readSnapshot, changeAccount,
   createTransfer, changeTransfer, saveRecurringRule, processRecurring, saveMonthlyBudget,
-  createCreditCard, saveCreditCard, createPersonalDebt, savePersonalDebt, saveAccountAppearance, saveCategoryDefinition, DATABASE_VERSION, SCHEMA_SCRIPTS, type LedgerDatabase } from '../src/storage/database.ts';
+  createCreditCard, saveCreditCard, createPersonalDebt, savePersonalDebt, deletePersonalDebt as removePersonalDebt, saveAccountAppearance, saveCategoryDefinition, DATABASE_VERSION, SCHEMA_SCRIPTS, type LedgerDatabase } from '../src/storage/database.ts';
 import { MIGRATION_REFERENCES_MESSAGE, runExclusiveTransaction, runSchemaMigration, type TransactionConnection } from '../src/storage/transaction.ts';
 
 // Synthetic records in disposable databases only. Nothing seeds a user's app.
@@ -1769,10 +1769,19 @@ test('24UX4: closing, reopening and deleting a debt tracker never touches its ac
   await savePersonalDebt(db, reopened);
   assert.deepEqual((await readArchive(db)).debts, [reopened]);
 
+  // 25B2 close: a balance left after a recorded payment blocks the deletion; a plain save never writes it.
+  await assert.rejects(removePersonalDebt(db, debt.id, '2026-09-22T12:00:00.000Z'), new RegExp(DEBT_OUTSTANDING_MESSAGE));
+  await assert.rejects(savePersonalDebt(db, deletePersonalDebt(reopened, '2026-09-22T12:00:00.000Z')), new RegExp(DEBT_DELETE_PATH_MESSAGE));
+  assert.deepEqual((await readArchive(db)).debts, [reopened]);
+  await createTransfer(db, { ...payment, id: 'debt-rest', amountMinor: 20000, dateISO: '2026-09-21' });
+  const settledRows = await ledgerRows(), liquidSettled = await liquid();
+  assert.notDeepEqual(settledRows, before);
+  assert.notDeepEqual(liquidSettled, liquidBefore);
+
   const deleted = deletePersonalDebt(reopened, '2026-09-22T12:00:00.000Z');
-  await savePersonalDebt(db, deleted);
-  assert.deepEqual(await ledgerRows(), before, 'the hidden account and the payment are exactly as recorded');
-  assert.deepEqual(await liquid(), liquidBefore, 'Disponible is unchanged: the payment still left cash, the debt account is still excluded');
+  await removePersonalDebt(db, debt.id, deleted.updatedAt);
+  assert.deepEqual(await ledgerRows(), settledRows, 'the hidden account and both payments are exactly as recorded');
+  assert.deepEqual(await liquid(), liquidSettled, 'Disponible is unchanged: the payments still left cash, the debt account is still excluded');
   assert.deepEqual((await readArchive(db)).debts, [deleted]);
   // Still a debt account: no expense or recurring rule can post to it, no new payment can reach it through the form.
   await assert.rejects(createEntry(db, { ...expense, id: 'after-delete', accountId: debtAccount.id }), /pagos o cobros/);
@@ -1782,4 +1791,55 @@ test('24UX4: closing, reopening and deleting a debt tracker never touches its ac
   const backup = createRecoveryBackup(await readArchive(db));
   assert.equal(backup.schema, 'finanzapp.native-pilot.v10');
   assert.deepEqual(parsePilotBackup(JSON.stringify(backup)).archive.debts, [deleted]);
+});
+
+test('25B2 close: deleting a debt or receivable, in storage: blocked with a balance and history; settled or untouched is deleted; history stays; a retry is a no-op', async () => {
+  const { db } = await funded();
+  const receivableAccount: Account = { id: 'receivable-account', name: 'Me deben · Ana', currency: 'ARS', openingMinor: 15000, createdAt: account.createdAt };
+  const receivable: PersonalDebtProfile = { ...debt, id: 'receivable', accountId: receivableAccount.id, direction: 'owed_to_me', counterparty: 'Ana', dueDateISO: null };
+  const now = '2026-09-22T12:00:00.000Z';
+  const rows = async () => ({ accounts: await db.getAllAsync('SELECT * FROM accounts ORDER BY id'),
+    entries: await db.getAllAsync('SELECT * FROM entries ORDER BY id'), transfers: await db.getAllAsync('SELECT * FROM transfers ORDER BY id') });
+  const stored = async (id: string) => (await readArchive(db)).debts!.find(item => item.id === id)!;
+  for (const [tracker, trackerAccount, partial, rest] of [
+    [debt, debtAccount, { id: 'pay-1', fromAccountId: account.id, toAccountId: debtAccount.id, amountMinor: 10000 }, 20000],
+    [receivable, receivableAccount, { id: 'collect-1', fromAccountId: receivableAccount.id, toAccountId: account.id, amountMinor: 5000 }, 10000],
+  ] as const) {
+    await createPersonalDebt(db, trackerAccount, tracker);
+    const transfer = { ...partial, note: '', dateISO: '2026-09-15', createdAt: account.createdAt };
+    await createTransfer(db, transfer);
+    // Outstanding with history: refused, nothing written; closing keeps the balance and Reabrir brings it back.
+    await assert.rejects(removePersonalDebt(db, tracker.id, now), new RegExp(DEBT_OUTSTANDING_MESSAGE));
+    assert.deepEqual(await stored(tracker.id), tracker);
+    const closed = closePersonalDebt(tracker, now);
+    await savePersonalDebt(db, closed);
+    await assert.rejects(removePersonalDebt(db, tracker.id, now), new RegExp(DEBT_OUTSTANDING_MESSAGE), 'closing does not make it deletable');
+    assert.equal(debtOutstandingMinor(closed, await readSnapshot(db)), rest);
+    const reopened = reopenPersonalDebt(closed, now);
+    await savePersonalDebt(db, reopened);
+    // Zero outstanding: deleted; every transfer stays; a retry (the same id, a later clock) is a no-op.
+    await createTransfer(db, { ...transfer, id: transfer.id + '-rest', amountMinor: rest, dateISO: '2026-09-20' });
+    const before = await rows();
+    await removePersonalDebt(db, tracker.id, now);
+    await removePersonalDebt(db, tracker.id, '2026-09-23T12:00:00.000Z');
+    assert.deepEqual(await stored(tracker.id), deletePersonalDebt(reopened, now));
+    assert.deepEqual(await rows(), before, 'the account, its opening amount and every transfer are exactly as recorded');
+    // A deleted tracker takes no new transfer, in either direction.
+    await assert.rejects(createTransfer(db, { ...transfer, id: transfer.id + '-late' }), /eliminada/);
+  }
+  // Newly created with no payment or collection: deleted after all, the balance unsettled and nothing recorded.
+  for (const direction of ['owed_by_me', 'owed_to_me'] as const) {
+    const freshAccount: Account = { ...debtAccount, id: 'fresh-' + direction, openingMinor: direction === 'owed_by_me' ? -7000 : 7000 };
+    const fresh: PersonalDebtProfile = { ...debt, id: 'fresh-debt-' + direction, accountId: freshAccount.id, direction };
+    await createPersonalDebt(db, freshAccount, fresh);
+    const before = await rows();
+    await removePersonalDebt(db, fresh.id, now);
+    assert.equal((await stored(fresh.id)).deleted, true);
+    assert.deepEqual(await rows(), before, 'no payment or collection is invented');
+    assert.equal(debtOutstandingMinor(fresh, await readSnapshot(db)), 7000);
+  }
+  await assert.rejects(removePersonalDebt(db, 'missing', now), /No encontramos esta deuda/);
+  // The deletion records travel in the backup.
+  const backup = createRecoveryBackup(await readArchive(db));
+  assert.equal(parsePilotBackup(JSON.stringify(backup)).archive.debts!.filter(item => item.deleted).length, 4);
 });

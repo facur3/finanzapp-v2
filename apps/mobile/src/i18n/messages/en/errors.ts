@@ -211,6 +211,8 @@ export const errors: Pick<Messages, 'errors'> = {
       debtChanged: 'The debt has changed since you opened it. Check it again.',
       recurringDeleted: 'This recurring item was deleted.',
       debtDeleted: 'This debt was deleted.',
+      debtOutstanding: 'This debt has an outstanding balance and recorded payments or collections. Settle it or close it; it cannot be deleted.',
+      debtDeletePath: 'A debt is deleted with its own action, not with a data change.',
       accountDeleted: 'This account was deleted.',
       cardDeleted: 'This card was deleted.',
       cardDebt: 'This card has an outstanding balance. Pay it or archive it; it cannot be deleted.',

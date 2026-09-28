@@ -48,12 +48,18 @@ function harness(file: string, params: Record<string, unknown> = {}, initial: do
   const pushed: any[] = [];
   let cursor = 0;
   const cards: { account: domain.Account; card: domain.CreditCardProfile }[] = [], debts: { account: domain.Account; debt: domain.PersonalDebtProfile }[] = [];
-  const savedDebts: domain.PersonalDebtProfile[] = [], alerts: { title: string; message: string; buttons: any[] }[] = [];
+  const savedDebts: domain.PersonalDebtProfile[] = [], removedDebts: string[] = [], alerts: { title: string; message: string; buttons: any[] }[] = [];
   let backs = 0;
   const ledger = { useLedger: () => ({ archive: data, snapshot: data ? domain.snapshotFromArchive(data) : null, ...(gate ? { gate } : {}),
     addCard: async (account: domain.Account, card: domain.CreditCardProfile) => { cards.push({ account, card }); }, saveCard: async () => {},
     addDebt: async (account: domain.Account, debt: domain.PersonalDebtProfile) => { debts.push({ account, debt }); },
-    saveDebt: async (debt: domain.PersonalDebtProfile) => { savedDebts.push(debt); } }) };
+    saveDebt: async (debt: domain.PersonalDebtProfile) => { savedDebts.push(debt); },
+    // 25B2 close: what storage's `deletePersonalDebt` writes (the rule checked again, then the deletion record).
+    removeDebt: async (id: string) => {
+      const debt = data!.debts!.find(item => item.id === id)!;
+      domain.assertDebtDeletable(debt, domain.snapshotFromArchive(data!));
+      removedDebts.push(id); savedDebts.push(domain.deletePersonalDebt(debt, new Date().toISOString()));
+    } }) };
   const componentNames = ['ActionButton', 'AppText', 'DetailRow', 'EmptyState', 'GlyphTile', 'IconButton', 'Money', 'MovementRow', 'PressFeedback',
     'Screen', 'SectionTitle', 'Stat', 'Surface', 'AmountField', 'Field', 'Choices', 'ErrorMessage'];
   const components = { ...Object.fromEntries(componentNames.map(name => [name, name])), toneColors: () => ({ color: '#000', soft: '#eee' }), useStacked: () => false };
@@ -105,7 +111,7 @@ function harness(file: string, params: Record<string, unknown> = {}, initial: do
   const module = { exports: {} as { default?: () => Node } & Record<string, (props: any) => Node> };
   runInNewContext(code, { module, exports: module.exports, require, Error });
   return { render: () => { cursor = 0; return module.exports.default!(); }, renderExport: (name: string, props: any = {}) => { cursor = 0; return module.exports[name](props); },
-    pushed, cards, debts, savedDebts, alerts, backs: () => backs, exports: module.exports,
+    pushed, cards, debts, savedDebts, removedDebts, alerts, backs: () => backs, exports: module.exports,
     setData: (next: domain.LedgerArchive | null) => { data = next as domain.LedgerArchive; } };
 }
 
@@ -448,6 +454,7 @@ test('24UX4: deleting a debt asks first, names the payments that stay, writes on
   await alert.buttons[1].onPress();
   await settle();
   assert.equal(JSON.stringify({ ...view.savedDebts[0], updatedAt: '' }), JSON.stringify({ ...debt, active: false, deleted: true, revision: 1, updatedAt: '' }));
+  assert.equal(JSON.stringify(view.removedDebts), JSON.stringify(['debt']), 'through its own storage path (25B2 close)');
   assert.equal(view.backs(), 1);
   // Stored: gone from Deudas (no open, no closed row, no totals), a deep link finds nothing, the payment is still the ledger's.
   const deletedData = { ...settledData, debts: [view.savedDebts[0]] };
@@ -462,7 +469,23 @@ test('24UX4: deleting a debt asks first, names the payments that stay, writes on
   const other = harness('debts.tsx', {}, { ...archive, accounts: [...archive.accounts, receivableAccount], debts: [receivable] });
   rowsOf(other.render())[0].props.actions[1].onPress();
   assert.equal(other.alerts[0].title, '¿Eliminar lo que te debe Ana?');
-  assert.equal(other.alerts[0].message, 'Deja de seguirse. No borra ningún movimiento.');
+  // 25B2 close: no collection yet, so a tracker created by mistake: deleting says the balance is not collected.
+  assert.equal(other.alerts[0].message.replace(/\u00a0/g, ' '), 'Deja de seguirse sin registrar ningún cobro: los $ 40,00 no se cobran. No tiene cobros registrados.');
+});
+
+test('25B2 close: from the detail, a debt with a balance and a recorded payment is not deleted; the dialog offers Saldar or Cerrar and writes nothing on its own', async () => {
+  const partial = domain.initialTransferRecord({ ...settledPayment, id: 'partial-juan', amountMinor: 10000 });
+  const view = harness('debt/[id].tsx', { id: 'debt' }, { ...archive, transfers: [...archive.transfers!, partial] });
+  find(view.render(), 'ActionButton', 'Eliminar deuda').props.onPress();
+  const alert = view.alerts[0];
+  assert.equal(alert.title, 'Todavía no se puede eliminar');
+  assert.match(alert.message.replace(/\u00a0/g, ' '), /^Todavía le debés \$ 200,00 a Juan y ya hay pagos registrados\./);
+  assert.equal(alert.buttons.map((button: { text: string; style?: string }) => button.text + ':' + (button.style ?? '')).join(','), 'Cancelar:cancel,Saldar:,Cerrar:');
+  assert.equal(view.savedDebts.length + view.removedDebts.length + view.pushed.length + view.backs(), 0, 'opening the dialog writes nothing');
+  await alert.buttons[2].onPress();
+  await settle();
+  assert.equal(JSON.stringify([view.savedDebts.length, view.savedDebts[0].active, view.savedDebts[0].deleted, view.removedDebts.length]), JSON.stringify([1, false, false, 0]), 'Cerrar closes, keeping the balance');
+  assert.equal(view.backs(), 0, 'closing keeps the detail on screen, as its own Cerrar button does');
 });
 
 test('24UX4: a closed row says Cerrada and carries its actions for VoiceOver; English reads the same flow', () => {

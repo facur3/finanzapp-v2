@@ -33,10 +33,12 @@ is no web version of the product ([decision 004](docs/decisions/004-native-first
    exchange rate. Cash, holdings, liabilities and cost basis are distinct. Purchases, transfers,
    card payments and instalments must not be counted twice: an instalment plan is a finite
    obligation tied to one purchase, never a recurring expense. Unknown cost/quote is unknown,
-   not zero or a simulated value. The card invariants (one expense per purchase, a payment is a
-   transfer, no per-purchase bank link, personal debts never mixed with a card's balance, no
-   debit-card ledger, «Saldo pendiente» never «Deuda» in card copy) are in decision 003 and
-   pinned by `packages/domain/card-invariants.test.ts`.
+   not zero or a simulated value. The card invariants (one expense per purchase without
+   instalments; with instalments, one purchase and one plan whose principal is recognised
+   instalment by instalment, never the full price up front; a payment is a transfer, no
+   per-purchase bank link, personal debts never mixed with a card's balance, no debit-card
+   ledger, «Saldo pendiente» never «Deuda» in card copy) are in decision 003 and pinned by
+   `packages/domain/card-invariants.test.ts`.
 9. Save locally before confirming success. Failed writes keep the draft. Never reset storage on
    an error. Future sync needs operation IDs, conflict handling and deletion records; adding
    Supabase does not automatically provide offline sync.

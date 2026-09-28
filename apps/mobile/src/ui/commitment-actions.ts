@@ -2,7 +2,7 @@ import { useRef, useState } from 'react';
 import { Alert } from 'react-native';
 import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
-import { assertOpenAccount, cardDebtMinor, closePersonalDebt, debtOutstandingMinor, deletePersonalDebt, deleteRecurringRule, liabilityActivity, pauseRecurringRule, recurringHistory,
+import { assertOpenAccount, cardDebtMinor, closePersonalDebt, debtDeletion, debtOutstandingMinor, deleteRecurringRule, liabilityActivity, pauseRecurringRule, recurringHistory,
   reopenPersonalDebt, resumeRecurringRule, todayKey, type Account, type CreditCardProfile, type PersonalDebtProfile, type RecurringRule } from '@finanzapp/domain';
 import { useLedger } from '../storage/LedgerProvider';
 import { useI18n } from '../i18n/provider';
@@ -67,19 +67,20 @@ export function useRecurringManagement() {
 }
 
 export function useDebtManagement() {
-  const { saveDebt, snapshot } = useLedger();
+  const { saveDebt, removeDebt, snapshot } = useLedger();
   const { t, moneyText } = useI18n();
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const writing = useRef(false);
 
-  async function commit(next: PersonalDebtProfile, failure: string, feedback: 'selection' | 'success', done?: () => void) {
+  /** `next` is a revision saved as it is; a string is the id of a tracker to delete through its own storage path. */
+  async function commit(next: PersonalDebtProfile | string, failure: string, feedback: 'selection' | 'success', done?: () => void) {
     if (writing.current) return;
     writing.current = true;
-    setBusyId(next.id);
+    setBusyId(typeof next === 'string' ? next : next.id);
     setError(null);
     try {
-      await saveDebt(next);
+      await (typeof next === 'string' ? removeDebt(next) : saveDebt(next));
       void (feedback === 'success' ? Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success) : Haptics.selectionAsync()).catch(() => {});
       done?.();
     } catch (cause) {
@@ -113,15 +114,36 @@ export function useDebtManagement() {
     ]);
   }
   const reopen = (debt: PersonalDebtProfile, done?: () => void) => commit(reopenPersonalDebt(debt, now()), 'debts.manage.failed', 'selection', done);
+  /** 25B2 close. Settled: the usual confirmation (the recorded payments stay). A balance with no payment or collection yet
+   * (a tracker created by mistake): the confirmation says the balance is not settled and no payment is recorded. A balance
+   * with recorded history: not deleted; the dialog names the balance and offers Saldar/Cobrar (the reviewed transfer form)
+   * or Cerrar (kept with its balance and history, reopenable). Opening a dialog writes nothing; storage checks the rule again. */
   function remove(debt: PersonalDebtProfile, done?: () => void) {
-    const owed = debt.direction === 'owed_by_me';
-    const recorded = snapshot ? liabilityActivity(debt.accountId, snapshot).transfers.length : 0;
-    Alert.alert(t(owed ? 'debts.manage.deleteTitleOwed' : 'debts.manage.deleteTitleReceivable', { name: debt.counterparty }),
-      recorded ? t(owed ? 'debts.manage.deleteDetailPayments' : 'debts.manage.deleteDetailCollections', { count: recorded }) : t('debts.manage.deleteDetailEmpty'), [
+    const owed = debt.direction === 'owed_by_me', account = accountOf(debt);
+    const deletion = snapshot && account ? debtDeletion(debt, snapshot) : { kind: 'settled' as const };
+    const name = debt.counterparty;
+    if (deletion.kind === 'blocked' && account) {
+      const amount = moneyText(deletion.outstandingMinor, account.currency);
+      const buttons: Parameters<typeof Alert.alert>[2] = [
         { text: t('common.cancel'), style: 'cancel' },
-        { text: t('debts.manage.deleteConfirm'), style: 'destructive',
-          onPress: () => { void commit(deletePersonalDebt(debt, now()), 'debts.manage.deleteFailed', 'success', done); } },
-      ]);
+        { text: t(owed ? 'debts.manage.settle' : 'debts.manage.collect'), onPress: () => settle(debt) },
+      ];
+      // Closing from here needs no second question: this dialog already says it keeps the balance and records nothing.
+      // `done` is the deletion's (a detail goes back); a closed debt stays on screen, as with its own Cerrar button.
+      if (debt.active) buttons.push({ text: t('debts.manage.close'), onPress: () => { void commit(closePersonalDebt(debt, now()), 'debts.manage.failed', 'selection'); } });
+      Alert.alert(t('debts.manage.blockedTitle'), t(debt.active ? (owed ? 'debts.manage.blockedDetailOwed' : 'debts.manage.blockedDetailReceivable')
+        : (owed ? 'debts.manage.blockedDetailClosedOwed' : 'debts.manage.blockedDetailClosedReceivable'), { name, amount }), buttons);
+      return;
+    }
+    const recorded = snapshot ? liabilityActivity(debt.accountId, snapshot).transfers.length : 0;
+    const detail = deletion.kind === 'untouched' && account
+      ? t(owed ? 'debts.manage.deleteDetailUnpaidOwed' : 'debts.manage.deleteDetailUnpaidReceivable', { amount: moneyText(deletion.outstandingMinor, account.currency) })
+      : recorded ? t(owed ? 'debts.manage.deleteDetailPayments' : 'debts.manage.deleteDetailCollections', { count: recorded }) : t('debts.manage.deleteDetailEmpty');
+    Alert.alert(t(owed ? 'debts.manage.deleteTitleOwed' : 'debts.manage.deleteTitleReceivable', { name }), detail, [
+      { text: t('common.cancel'), style: 'cancel' },
+      { text: t('debts.manage.deleteConfirm'), style: 'destructive',
+        onPress: () => { void commit(debt.id, 'debts.manage.deleteFailed', 'success', done); } },
+    ]);
   }
   /** Open with a balance: Saldar. Open and settled: Cerrar. Closed: Reabrir. Then delete, always last. */
   function actions(debt: PersonalDebtProfile, done?: () => void): SwipeAction[] {

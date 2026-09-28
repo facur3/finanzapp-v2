@@ -7,7 +7,7 @@ import type { CurrencyGate } from '@finanzapp/domain';
 import { currencyGateForBuild } from './currency-gate';
 import { changeEntry, createAccount, createEntry, deleteAccount, deleteCreditCard, importArchive, readArchive, changeAccount,
   createTransfer, changeTransfer, saveRecurringRule, processRecurring, saveMonthlyBudget,
-  createCreditCard, saveCreditCard, createPersonalDebt, savePersonalDebt, saveAccountAppearance, saveCategoryDefinition,
+  createCreditCard, saveCreditCard, createPersonalDebt, savePersonalDebt, deletePersonalDebt, saveAccountAppearance, saveCategoryDefinition,
   type LedgerDatabase } from './database';
 import { openLedger, refreshLedger } from './ledger-session';
 import { openLedgerDatabase } from './nativeDatabase';
@@ -42,6 +42,8 @@ type LedgerContextValue = {
   removeCard: (cardId: string) => Promise<void>;
   addDebt: (account: Account, debt: PersonalDebtProfile) => Promise<void>;
   saveDebt: (debt: PersonalDebtProfile) => Promise<void>;
+  /** 25B2 close: the deletion record of a debt tracker; refused with a balance left and recorded payments or collections. */
+  removeDebt: (debtId: string) => Promise<void>;
   restoreBackup: (incoming: LedgerArchive, baseline: string) => Promise<void>;
 };
 const LedgerContext = createContext<LedgerContextValue | null>(null);
@@ -134,6 +136,7 @@ export function LedgerProvider({ children }: { children: ReactNode }) {
     removeCard: cardId => mutate(db => deleteCreditCard(db, cardId, new Date().toISOString())),
     addDebt: (account, debt) => mutate(db => createPersonalDebt(db, account, debt, BUILD_CURRENCY_GATE)),
     saveDebt: debt => mutate(db => savePersonalDebt(db, debt)),
+    removeDebt: debtId => mutate(db => deletePersonalDebt(db, debtId, new Date().toISOString())),
     restoreBackup: (incoming, baseline) => mutate(async db => {
       await importArchive(db, incoming, baseline);
       await processRecurring(db, todayKey());
