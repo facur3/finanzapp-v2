@@ -806,7 +806,7 @@ test('a total budget persists without a category, beside sublimits, once per cur
 
 const cardAccount: Account = { id: 'card-account', name: 'Visa Gold', currency: 'ARS', openingMinor: -20000, createdAt: account.createdAt };
 const card: CreditCardProfile = { id: 'card-fixture', accountId: cardAccount.id, issuer: 'Banco', last4: '4009', creditLimitMinor: 500000,
-  closingDay: 28, dueDay: 5, active: true, createdAt: account.createdAt, revision: 0, updatedAt: account.createdAt };
+  closingDay: 28, dueDay: 5, active: true, deleted: false, createdAt: account.createdAt, revision: 0, updatedAt: account.createdAt };
 const purchase: Entry = { ...expense, id: 'card-purchase', accountId: cardAccount.id, amountMinor: 23100, merchant: 'Starbucks', category: 'Café' };
 const cardPayment: Transfer = { id: 'card-payment', fromAccountId: account.id, toAccountId: cardAccount.id, amountMinor: 30000,
   note: 'Pago Visa Gold', dateISO: '2026-09-15', createdAt: account.createdAt };
@@ -1253,8 +1253,8 @@ async function realV8File() {
   const dump = async () => {
     const rows: Record<string, unknown[]> = {};
     for (const table of ['accounts', 'entries', 'entry_changes', 'account_changes', 'transfers', 'transfer_changes', 'recurring_rules', 'monthly_budgets', 'credit_cards', 'personal_debts', 'account_appearances', 'category_definitions']) {
-      // 24UX4 adds `deleted` (0 on every existing row, asserted apart): the v8 → v9 comparison reads the v8 columns.
-      rows[table] = (await db.getAllAsync<Record<string, unknown>>(`SELECT * FROM ${table} ORDER BY 1, 2`)).map(({ deleted: _deleted, ...row }) => row);
+      // 24UX4 adds `deleted` and 25B2 `deletedAt` (0 / NULL on every existing row, asserted apart): the v8 → today comparison reads the v8 columns.
+      rows[table] = (await db.getAllAsync<Record<string, unknown>>(`SELECT * FROM ${table} ORDER BY 1, 2`)).map(({ deleted: _deleted, deletedAt: _deletedAt, ...row }) => row);
     }
     return rows;
   };
@@ -1676,7 +1676,7 @@ test('24UX4: a real schema 9 file upgrades to schema 10 additively: every rule a
   });
   const before = await db.getAllAsync('SELECT * FROM recurring_rules');
   await initializeDatabase(db);
-  assert.equal((await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))?.user_version, 10);
+  assert.equal((await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))?.user_version, DATABASE_VERSION);
   assert.deepEqual(await db.getAllAsync('SELECT * FROM recurring_rules'), before.map(row => ({ ...row as object, deleted: 0 })));
   const archive = await readArchive(db);
   assert.deepEqual(archive.recurring!.map(rule => [rule.id, rule.active, rule.deleted]), [['r1', false, false]]);

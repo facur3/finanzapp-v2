@@ -129,7 +129,8 @@ export default function HomeScreen() {
             <Choices compact value={metric} onChange={setMetric}
               options={[{ value: 'spending', label: t('home.spending') }, { value: 'available', label: t('home.available') }]} />
           </View>
-          <DisplayCurrencyButton compact mode={mode} currency={currency} held={currencies} gate={gate} onMode={setMode} onCurrency={setCurrency} />
+          {/* 25B2: with one currency held there is nothing to choose; the number is simply that currency's total. */}
+          {currencies.length > 1 && <DisplayCurrencyButton compact mode={mode} currency={currency} held={currencies} gate={gate} onMode={setMode} onCurrency={setCurrency} />}
         </View>
 
         <ValueTransition id={heroId} style={{ gap: 4, paddingBottom: space.xs }}>

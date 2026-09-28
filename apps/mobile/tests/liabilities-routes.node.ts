@@ -27,7 +27,7 @@ const cardAccount: domain.Account = { id: 'card-acc', name: 'Visa Gold', currenc
 const usdCardAccount: domain.Account = { id: 'usd-card-acc', name: 'Amex USD', currency: 'USD', openingMinor: 0, createdAt };
 const debtAccount: domain.Account = { id: 'debt-acc', name: 'Debo · Juan', currency: 'ARS', openingMinor: -30000, createdAt };
 const card: domain.CreditCardProfile = { id: 'card', accountId: cardAccount.id, issuer: 'Galicia', last4: '4009', creditLimitMinor: 500000,
-  closingDay: 28, dueDay: 5, active: true, createdAt, revision: 0, updatedAt: createdAt };
+  closingDay: 28, dueDay: 5, active: true, deleted: false, createdAt, revision: 0, updatedAt: createdAt };
 const usdCard: domain.CreditCardProfile = { ...card, id: 'usd-card', accountId: usdCardAccount.id, issuer: 'Amex', last4: '1001', creditLimitMinor: null };
 const debt: domain.PersonalDebtProfile = { id: 'debt', accountId: debtAccount.id, direction: 'owed_by_me', counterparty: 'Juan', dueDateISO: '2026-10-01',
   note: '', active: true, deleted: false, createdAt, revision: 0, updatedAt: createdAt };
@@ -59,11 +59,15 @@ function harness(file: string, params: Record<string, unknown> = {}, initial: do
   const components = { ...Object.fromEntries(componentNames.map(name => [name, name])), toneColors: () => ({ color: '#000', soft: '#eee' }), useStacked: () => false };
   const theme = { space: { xs: 4, s: 8, m: 12, l: 16, xl: 20, xxl: 24, xxxl: 32 }, useCurrentDay: () => '2026-09-20', useReduceMotion: () => true,
     usePalette: () => ({ text: '#000', secondary: '#666', tertiary: '#999', line: '#ddd', inset: '#eee', expense: '#c00', income: '#080', warning: '#a60', transfer: '#03c', primary: '#2557D6' }) };
+  const GATE = (typeof gate !== 'undefined' && gate) || domain.LEDGER_CURRENCIES;
+  const defaults = { useDefaultCurrency: ({ accountCurrency, requested }: { accountCurrency?: string | null; requested?: unknown } = {}) => accountCurrency ?? (domain.isLedgerCurrency(requested, GATE) ? requested : 'ARS') };
   const modules: Record<string, unknown> = {
     'expo-haptics': { NotificationFeedbackType: { Success: 'Success' }, notificationAsync: async () => {}, selectionAsync: async () => {} },
     'expo-crypto': { randomUUID: () => 'id-' + Math.random().toString(36).slice(2, 8) },
     '../i18n/messages': {},
     './form-controls': { DateField: 'DateField' },
+    './use-default-currency': defaults, '../src/ui/use-default-currency': defaults,
+    './commitment-actions': { useCardManagement: () => ({ busyId: null, error: null, remove: () => {} }), useDebtManagement: () => ({ busyId: null, error: null, actions: () => [], remove: () => {}, settle: () => {}, close: () => {}, reopen: () => {} }), useRecurringManagement: () => ({ busyId: null, error: null, actions: () => [], remove: () => {} }), useAccountManagement: () => ({ busyId: null, error: null, actions: () => [], remove: () => {} }) },
     './money-input': moneyInput,
     '../i18n/format': i18nFormat, '../src/i18n/format': i18nFormat, '../../src/i18n/format': i18nFormat, '../i18n/provider': i18nProvider, '../src/i18n/provider': i18nProvider, '../../src/i18n/provider': i18nProvider,
     react: { useRef: (initial: unknown) => ({ current: initial }), useEffect: (fn: () => unknown) => { fn(); }, useMemo: (fn: () => unknown) => fn(), useState: (initial: unknown) => {

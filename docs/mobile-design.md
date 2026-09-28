@@ -381,6 +381,25 @@ importe, moneda y estado.
   muestra hasta que toda la app lo tenga (23.1): un iPhone en inglés sigue leyendo
   español antes que media app traducida.
 
+## Producto 25B2 — monedas iniciales lógicas y ciclo de vida de cuentas y tarjetas
+
+- **Sin controles vacíos.** Con cero o una moneda, Inicio y Reportes no muestran el chip de visualización: el
+  número es el total de esa moneda y no hay nada que decidir. Con dos o más, el chip de 24C1 y su hoja siguen
+  iguales. Ningún selector de cuentas en Inicio: las cuentas viven en Cuentas.
+- **Eliminar una cuenta.** En Cuentas, el deslizamiento trasero corto revela una sola acción, Eliminar (roja, en
+  el borde); un deslizamiento completo solo abre la misma confirmación: nunca se elimina por alcanzar el umbral,
+  siempre hay un diálogo destructivo antes de escribir, una sola fila abierta a la vez (`SwipeRow`, el mismo
+  componente de Recurrentes y Deudas), y la acción llega a VoiceOver como acción personalizada de la fila. En
+  Editar cuenta, «Eliminar cuenta» es el último botón, secundario en tono `expense`, separado de Guardar. El detalle
+  de una cuenta eliminada se lee (saldo e historial), con «Cuenta eliminada» donde iba «Saldo registrado», sin
+  botón de edición ni acciones rápidas.
+- **Eliminar una tarjeta.** Solo desde Editar tarjeta, como último botón, tras Archivar/Reactivar; **nunca por
+  deslizamiento en el carrusel**, que ya usa el gesto horizontal para cambiar de tarjeta. La confirmación nombra la
+  deuda registrada si la hay y que compras y pagos quedan. El detalle de una tarjeta eliminada se lee («Tarjeta
+  eliminada · deuda registrada»), sin edición, sin Registrar compra ni Pagar.
+- **Formularios.** La fila de moneda de cuenta, tarjeta, deuda y presupuesto arranca en la moneda que propone la
+  regla (docs/currency.md §2.10); el control no cambia. Paleta, hápticos, Dynamic Type y Reduce Motion como siempre.
+
 ## Producto 25B — primera apertura nativa
 
 - **Dos etapas, una sola ruta.** Bienvenida y Tu primera cuenta cambian en el mismo lugar (el mismo

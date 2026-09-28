@@ -24,6 +24,8 @@ const account: domain.Account = { id: 'a', name: 'Prueba ARS', currency: 'ARS', 
 const entry: domain.Entry = { id: 'e', accountId: 'a', kind: 'expense', amountMinor: 12345, merchant: 'Prueba', category: 'Salud', dateISO: '2026-01-01', createdAt };
 const archive: domain.LedgerArchive = { accounts: [account, { ...account, id: 'u', currency: 'USD' }], records: [domain.initialRecord(entry)] };
 
+/** 25B2: what the account lifecycle mock was asked to delete (its own confirmation flow is tested in lifecycle-actions.node.ts). */
+const removed: domain.Account[] = [];
 function harness(file: string, props: any = {}, options: { data?: domain.LedgerArchive | null; params?: any;
   add?: (value: domain.Entry) => Promise<void>; update?: (value: domain.EntryChange) => Promise<void>;
   addTransfer?: (value: domain.Transfer) => Promise<void>; updateTransfer?: (value: domain.TransferChange) => Promise<void>;
@@ -54,7 +56,16 @@ function harness(file: string, props: any = {}, options: { data?: domain.LedgerA
   }) };
   const components = Object.fromEntries(['Screen', 'EmptyState', 'ActionButton', 'AppText', 'AmountField', 'AmountShortcut', 'Choices', 'ErrorMessage', 'Field', 'FieldNote', 'IconButton', 'Surface',
     'CategoryBadge', 'DetailRow', 'Money', 'SectionTitle', 'GlyphTile', 'AccountBadge', 'EntryRow', 'MerchantBadge'].map(name => [name, name]));
+  const defaults = { useDefaultCurrency: ({ accountCurrency, requested }: { accountCurrency?: string | null; requested?: unknown } = {}) => accountCurrency ?? (domain.isLedgerCurrency(requested) ? requested : 'ARS') };
+  const accountManagement = { useAccountManagement: () => ({ busyId: null, error: null,
+    remove: (account: domain.Account, done?: () => void) => { removed.push(account); done?.(); },
+    actions: (account: domain.Account, done?: () => void) => [{ key: 'delete', label: 'Eliminar', icon: 'trash', tone: 'destructive', onPress: () => { removed.push(account); done?.(); } }],
+    consequences: () => ({ movements: 0, transfers: 0, recurring: 0 }) }) };
+  const swipe = { SwipeRow: 'SwipeRow', swipeAccessibility: (actions: { key: string; label: string; onPress: () => void }[]) => ({ accessibilityActions: actions.map(action => ({ name: action.key, label: action.label })),
+    onAccessibilityAction: (event: { nativeEvent: { actionName: string } }) => actions.find(action => action.key === event.nativeEvent.actionName)?.onPress() }) };
   const modules: Record<string, unknown> = {
+    '../src/ui/use-default-currency': defaults, '../../src/ui/use-default-currency': defaults, '../../src/ui/commitment-actions': accountManagement, '../src/ui/commitment-actions': accountManagement,
+    '../src/ui/swipe-actions': swipe, '../../src/ui/swipe-actions': swipe,
     '../i18n/format': i18nFormat, '../src/i18n/format': i18nFormat, '../../src/i18n/format': i18nFormat, '../i18n/provider': i18nProvider, '../src/i18n/provider': i18nProvider, '../../src/i18n/provider': i18nProvider,
     react: { useState: (initial: any) => { const i = cursor++; if (!(i in state)) state[i] = typeof initial === 'function' ? initial() : initial;
       return [state[i], (next: any) => { state[i] = typeof next === 'function' ? next(state[i]) : next; }]; },
@@ -272,7 +283,7 @@ test('24B4: a v9 copy in yen lists the scales it pins as a review row, imports o
   const rows = nodes(view.render()).filter(node => node.type === 'DetailRow').map(node => [node.props.label, node.props.value]);
   assert.ok(rows.some(([label, value]) => label === 'New currency scales' && value === '1'), JSON.stringify(rows));
   assert.deepEqual({ minor: find(view.render(), 'Money').props.minor, currency: find(view.render(), 'Money').props.currency }, { minor: 800, currency: 'JPY' }, 'yen previewed as yen');
-  assert.ok(nodes(view.render()).some(node => node.type === 'AppText' && String(node.props.children).startsWith('FinanzApp backups v1 to v10')));
+  assert.ok(nodes(view.render()).some(node => node.type === 'AppText' && String(node.props.children).startsWith('FinanzApp backups v1 to v11')));
   find(view.render(), 'ActionButton', 'Confirm import').props.onPress();
   view.alerts[0].buttons[1].onPress();
   await flush();
@@ -429,7 +440,7 @@ test('starting without a bank balance creates a zero tracking baseline, not an i
 const cardAccount: domain.Account = { ...account, id: 'card-acc', name: 'Visa', openingMinor: -5000 };
 const debtAccount: domain.Account = { ...account, id: 'debt-acc', name: 'Debo · Juan', openingMinor: -7000 };
 const card: domain.CreditCardProfile = { id: 'card', accountId: cardAccount.id, issuer: 'Banco', last4: '1234', creditLimitMinor: null,
-  closingDay: 28, dueDay: 5, active: true, createdAt, revision: 0, updatedAt: createdAt };
+  closingDay: 28, dueDay: 5, active: true, deleted: false, createdAt, revision: 0, updatedAt: createdAt };
 const debt: domain.PersonalDebtProfile = { id: 'debt', accountId: debtAccount.id, direction: 'owed_by_me', counterparty: 'Juan', dueDateISO: null,
   note: '', active: true, deleted: false, createdAt, revision: 0, updatedAt: createdAt };
 const liabilityData: domain.LedgerArchive = { ...archive, accounts: [...archive.accounts, cardAccount, debtAccount], cards: [card], debts: [debt] };

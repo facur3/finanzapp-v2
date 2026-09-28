@@ -11,6 +11,9 @@ export const cards = {
     panel: {
       recordedDebt: 'Deuda registrada',
       archivedDebt: 'Tarjeta archivada · deuda registrada',
+      deletedDebt: 'Tarjeta eliminada · deuda registrada',
+      deletedTitle: 'Tarjeta eliminada',
+      deletedDetail: 'Sus compras y pagos siguen en Movimientos y en sus reportes. No se edita ni acepta movimientos nuevos.',
       noDebt: 'Sin deuda registrada en esta tarjeta.',
       /** Card balance in the user's favour: "Saldo a favor · $ 1.000,00". */
       credit: 'Saldo a favor · {amount}',
@@ -86,6 +89,14 @@ export const cards = {
       negativeDebt: 'La deuda inicial no puede ser negativa. Si la tarjeta tiene saldo a favor, registralo después como devolución.',
       saveFailed: 'No pudimos guardar la tarjeta. Reintentá el mismo envío.',
       archiveFailed: 'No pudimos archivar la tarjeta. Reintentá el mismo cambio.',
+      /** Producto 25B2: deleting a card keeps its purchases, payments and internal account; only the card leaves. */
+      delete: 'Eliminar tarjeta',
+      deleteTitle: '¿Eliminar esta tarjeta?',
+      deleteDetail: 'Deja de aparecer en Tarjetas y de aceptar compras y pagos. Las compras y los pagos anteriores siguen en tus registros y reportes; ningún saldo cambia.',
+      /** Prepended when the card still has a recorded debt: "Tiene una deuda registrada de 12.000,00 ARS." */
+      deleteDebt: 'Tiene una deuda registrada de {amount}, que queda tal cual en el libro. ',
+      deleteConfirm: 'Eliminar',
+      deleteFailed: 'No pudimos eliminar la tarjeta. Sigue como estaba; probá nuevamente.',
     },
   },
 } as const;

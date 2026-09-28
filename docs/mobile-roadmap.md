@@ -1,6 +1,6 @@
 # FinanzApp mobile: living roadmap
 
-Updated: 2026-09-26 (Producto 25B). Read [decision 001](decisions/001-native-mobile.md),
+Updated: 2026-09-27 (Producto 25B2). Read [decision 001](decisions/001-native-mobile.md),
 [decision 002](decisions/002-spending-first.md),
 [decision 003](decisions/003-five-tabs-and-cards.md) and
 [decision 004](decisions/004-native-first-and-web-retirement.md). Decision 002 supersedes
@@ -55,7 +55,10 @@ history file keeps the evidence of when and why.
   card never carries a plain income and is never a transfer's source (24B6).
 - **Instalments are finite obligations tied to one purchase**, never several expenses and never
   an unlimited recurring rule; refunds tie to the purchase (Producto 24T, design reviewed before
-  code).
+  code). **Recorded now for 24T (25B2):** deleting or archiving a card never erases pending
+  instalments; an instalment plan continues until it ends on the card's kept internal account, or the
+  deletion is refused while a plan is pending; the rule is decided with 24T's design, never by the
+  deletion path.
 - **Money is integer minor units** per currency (ISO 4217 exponent, CLDR display digits), no
   floating point anywhere near an amount, no `10 **`, sums in BigInt; each account keeps its
   own currency for ever; storage never converts; the amount field and the formatters go through
@@ -115,13 +118,23 @@ history file keeps the evidence of when and why.
 
 ## 1. Implemented (current state)
 
-What exists in code on `master` as of Producto 24C1 (PR #63), plus Producto 25B on its branch
+What exists in code on `master` as of Producto 25B (PR #64), plus Producto 25B2 on its branch
 (marked). Per area, without test inventories (those are in apps/mobile/README.md and the history
 file). "Released" below names an in-app gate (`RELEASED_LANGUAGES`, `RELEASED_REGIONS`,
 `LEDGER_CURRENCIES`): what a build offers, verified on Linux; nothing is distributed to people yet
 (§4).
 
-- **First opening (25B, on its branch).** A new installation opens on a two-stage native setup: a
+- **Currency defaults and the account/card lifecycle (25B2, on its branch).** One rule for the
+  currency a new account, card, debt or budget starts with (`defaultCurrency`: the account's, a gated
+  route currency, the one currency held, the display currency among several, the region's tender
+  before any account, ARS last; docs/currency.md §2.10); Inicio and Reportes show the display chip
+  only with two or more currencies held; a normal account can be deleted (a dated tombstone, schema
+  11: every movement and transfer stays readable as its own, it leaves Disponible, the lists and the
+  forms, its active rules stop; a trailing swipe on its row and «Eliminar cuenta» on its edit screen,
+  both with a destructive confirmation); a card can be deleted (a `deleted` flag: purchases, payments
+  and the internal account stay; no swipe on the carousel, «Eliminar tarjeta» last on its edit screen,
+  the recorded debt named in the confirmation). Backups v11 carry both records; v1–v10 still import.
+- **First opening (25B).** A new installation opens on a two-stage native setup: a
   welcome with the language and region detected from the device (two quiet rows that open the Más
   choosers), then an optional first account (name, the currency the region suggests through the
   forms' searchable field, an optional opening balance) whose currency seeds the display currency of
@@ -1017,23 +1030,71 @@ the owner authorises it; no EAS build or store submission without the owner.
     into the setup with data, both languages, VoiceOver and the largest text through both stages).
 - **Depends on.** 24R2B (regions), 24M (currencies), 24C1 (the display currency).
 
-### Producto 25B2 — currency defaults and the account lifecycle (next, recorded from the PR #64 review)
+### Producto 25B2 — smart currency defaults and the account/card lifecycle (this PR)
 
-- **Goal.** Outside the first opening, the app still defaults to ARS where a better default exists,
-  and Inicio shows a display control that has nothing to choose with one currency held. One coherent
-  delivery, with the account and card lifecycle work, never a silent reinterpretation of an existing
-  account's currency.
-- **Scope.** New account, card, debt and budget forms default their currency to a relevant one: the
-  first account's from the region's legal tender (as the first opening does), and once accounts
-  exist, the selected ledger currency or the account the form is for, instead of ARS on a Spanish
-  device; Inicio and Reportes hide the consolidated/single control while exactly one currency is
-  held (the conversion settings stay reachable from Más); the rest of the account lifecycle
-  (archive, reorder, the card and debt profiles' edits) reviewed together.
-- **Out of scope.** Any migration that rewrites an existing account's or movement's currency; a
-  global budget; the onboarding itself (25B).
-- **Gates.** The existing forms' tests per currency; nothing stored changes; the owner decides the
-  default rule for a ledger with several currencies before code.
-- **Depends on.** 25B (the suggestion rule), 24C1 (the chip and the display preference).
+- **Goal.** Close what the onboarding, 24M and 24C1 left open: forms that start in a logical currency,
+  no display control without a choice, normal accounts that can be deleted, cards with a complete
+  lifecycle, and a financial history that is never lost.
+- **Defaults (exact).** `defaultCurrency` (`src/ui/currency-defaults.ts`, `useDefaultCurrency`): 1) the
+  account the form belongs to, or a route currency the gate offers; 2) the one currency the live accounts
+  hold; 3) with several, the display currency when an account holds it, else the first currency held
+  (grouping order); 4) with no account, the region's legal tender when the build offers it (the first
+  opening's rule); 5) ARS. Applied to New account (a route currency wins), New card, New debt, New budget
+  (the route wins), Presupuestos' initial currency. Recurring rules and movements take their account's
+  currency. Nothing saved ever changes currency.
+- **Inicio and Reportes.** The chip (`Total · USD` / `Solo USD`, its sheet) only with two or more
+  currencies held; with zero or one the view is that currency's own ledger whatever the stored preference
+  says (kept, never applied, no request to the rate provider); no account selector on Inicio.
+- **Account lifecycle (exact).** `deleteAccount` writes a dated tombstone (`deletedAt`, one revision on)
+  and pauses the account's active recurring rules in the same commit; the row and every movement and
+  transfer stay untouched, readable with the account's name and currency; the account leaves Cuentas,
+  Disponible, the currencies held, `postingAccountsFor`, the transfer sides and the forms; a new
+  movement, a transfer side or an active rule on it is refused («Esta cuenta fue eliminada.»); its history
+  stays editable in place and still counts in every report; its detail reads «Cuenta eliminada» without
+  Editar or actions; the edit screen refuses it. UX: Cuentas rows swipe to Eliminar (`SwipeRow`: a short
+  swipe reveals, a full swipe only opens the confirmation, one row open at a time, the same action in
+  VoiceOver's rotor), «Eliminar cuenta» last on Editar cuenta; the confirmation names the movements and
+  transfers that stay and the rules that stop. Deleting again is a no-op (a retry after a failed refresh).
+  A card's or a debt's internal account is refused («… se elimina desde su propia pantalla.»).
+- **Card lifecycle (exact).** Create, edit, archive and reactivate stay; `deleteCreditCard` sets
+  `deleted` (inactive, one revision on) through the same save path; a deleted card leaves Tarjetas and
+  the forms, takes no purchase and no payment («Esta tarjeta fue eliminada.»), is never reactivated or
+  edited, keeps its internal account, purchases and payments; its detail reads «Tarjeta eliminada ·
+  deuda registrada». «Eliminar tarjeta» is the last action of Editar tarjeta; no swipe on the carousel.
+  The confirmation names the recorded debt when there is one and that nothing is erased.
+- **Debts and recurring.** Audited, not redesigned: delete, close/reopen, pause/resume and their history
+  are unchanged (the deletion guards run after the debt rule, so 24UX4's messages stay); deleting an
+  account pauses its rules through `pauseRecurringRule`.
+- **Schema and backups.** SQLite 11 (`MIGRATE_V11`, additive and column-aware: `accounts.deletedAt`,
+  `credit_cards.deleted`; rows never DELETEd; an older build refuses a schema 11 file unchanged). Backup
+  **v11** as soon as an account or a card is deleted (cards carry `deleted`, a deleted account
+  `deletedAt`); without one the file stays v8/v9/v10 byte for byte; v1–v10 import (cards read as live);
+  a v11 file is refused by older builds («versiones 1 a 11»); an older copy that contradicts a tombstone
+  is a conflict, never applied. `sameAccount` compares the tombstone.
+- **Edge cases.** Deleting the only account of a currency removes that currency from the held set (no
+  chip, rule 2/4 for the next form) while its movements still convert and count; a deleted account with a
+  negative balance keeps it as history and leaves Disponible; a stored display currency whose last account
+  was deleted is kept and not applied; the same operation retried after a failed refresh writes nothing
+  twice; a card with debt can be deleted (the debt stays recorded on its account) and cannot be paid
+  afterwards, as a deleted debt cannot (24UX4's precedent); a movement on a deleted account can be
+  corrected but not moved to another deleted row; the instalment invariant for 24T is recorded above.
+- **Not changed.** Home's, Reportes' and the onboarding's design; the financial models (money, FX,
+  budgets); `vercel.json`, `api/mobile`, `server/mobile`.
+- **Status.** Delivered on this branch (2026-09-27), not device-verified.
+  - **Checked on Linux:** root `npm test` 327/327 (+7 `packages/domain/lifecycle.test.ts`: the account tombstone,
+    the card flag, the posting and transfer guards, Disponible, backup v11 round trip, legacy files, an older copy
+    as a conflict); mobile `npm run typecheck`, `npm run test:storage` 751/751 (+5 `tests/currency-defaults.node.ts`,
+    +5 `tests/lifecycle.node.ts` on real SQLite: schema 10 → 11 on a real file, deleting an account with entries,
+    transfers and an active rule, restart, export and restore, the older copy refused, deleting a card with purchases
+    and payments, idempotent retries, the newer-schema refusal; +3 `tests/lifecycle-actions.node.ts`: the confirmations
+    and their writes; +2 account route tests; the harnesses' chip and default-currency expectations updated),
+    `currency:verify`, `regions:verify`, `i18n:check -- --strict`, `i18n:extract`, `check`, `export:ios`. No EAS
+    build; the iPhone was not touched.
+  - **Pending:** the checklist section Producto 25B2 (the schema 11 upgrade of FinanzApp Dev's data with a backup
+    first, the defaults per region, the chip with one and two currencies, deleting an account and a card, the v11
+    backup round trip, VoiceOver and the largest text on the swipe rows).
+- **Depends on.** 25B (the suggestion rule), 24C1 (the chip and the display preference), 24UX4 (the deletion
+  records of rules and debts).
 
 ### Producto 25C — budgets with rollover, goals, CSV and productivity
 

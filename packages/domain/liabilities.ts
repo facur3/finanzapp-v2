@@ -1,4 +1,4 @@
-import { accountBalanceMinor, validDateISO, type Account, type Currency, type Entry, type EntryKind, type LedgerSnapshot, type Transfer } from './ledger.ts';
+import { ACCOUNT_DELETED_MESSAGE, accountBalanceMinor, isLiveAccount, validDateISO, type Account, type Currency, type Entry, type EntryKind, type LedgerSnapshot, type Transfer } from './ledger.ts';
 import { assertStorableCurrency, sortCurrencies } from './currency.ts';
 
 /** A credit card is a hidden internal ledger account. A purchase is an expense
@@ -15,10 +15,16 @@ export interface CreditCardProfile {
   closingDay: number;
   dueDay: number;
   active: boolean;
+  /** Producto 25B2: a deletion record. The card leaves Tarjetas and every form; its hidden account, every purchase
+   * and every payment stay in the ledger exactly as recorded and are still read as this card's. A deleted card is
+   * never active, takes no purchase and no payment, and never changes again. */
+  deleted: boolean;
   createdAt: string;
   revision: number;
   updatedAt: string;
 }
+
+export const CARD_DELETED_MESSAGE = 'Esta tarjeta fue eliminada.';
 
 export type DebtDirection = 'owed_by_me' | 'owed_to_me';
 
@@ -47,7 +53,7 @@ export interface PersonalDebtProfile {
 export type AccountKind = 'cash' | 'card' | 'debt';
 
 const CARD_KEYS = ['id', 'accountId', 'issuer', 'last4', 'creditLimitMinor', 'closingDay', 'dueDay',
-  'active', 'createdAt', 'revision', 'updatedAt'] as const;
+  'active', 'deleted', 'createdAt', 'revision', 'updatedAt'] as const;
 const DEBT_KEYS = ['id', 'accountId', 'direction', 'counterparty', 'dueDateISO', 'note',
   'active', 'deleted', 'createdAt', 'revision', 'updatedAt'] as const;
 
@@ -83,7 +89,7 @@ export function validateCreditCardProfile(card: CreditCardProfile, accounts: Acc
     || !Number.isInteger(card.dueDay) || card.dueDay < 1 || card.dueDay > 31) {
     throw new Error('Elegí días de cierre y vencimiento entre 1 y 31.');
   }
-  if (typeof card.active !== 'boolean') throw new Error('Estado de tarjeta inválido.');
+  if (typeof card.active !== 'boolean' || typeof card.deleted !== 'boolean' || (card.deleted && card.active)) throw new Error('Estado de tarjeta inválido.');
   validateVersion(card.createdAt, card.revision, card.updatedAt);
 }
 
@@ -122,6 +128,7 @@ export function validateLiabilityProfiles(cards: CreditCardProfile[], debts: Per
 /** An obligation never moves to another internal account (its currency and its balance live
  * there), never changes its creation date, and advances exactly one revision per save. */
 export function validateCreditCardChange(before: CreditCardProfile, after: CreditCardProfile): void {
+  if (before.deleted) throw new Error(CARD_DELETED_MESSAGE);
   if (after.accountId !== before.accountId || after.createdAt !== before.createdAt || after.revision !== before.revision + 1) {
     throw new Error('La tarjeta cambió desde que la abriste. Volvé a revisarla.');
   }
@@ -159,6 +166,22 @@ export function assertPostingAccount(accountId: string, debts: PersonalDebtProfi
   }
 }
 
+/** Producto 25B2: nothing new lands on a deleted account, a deleted card or a deleted debt. Stored rows on them stay
+ * readable; a new posting, a new transfer side or an active rule is refused with the record's own message. */
+export function assertOpenAccount(accountId: string, accounts: readonly Account[], cards: readonly CreditCardProfile[] = [], debts: readonly PersonalDebtProfile[] = []): void {
+  const account = accounts.find(item => item.id === accountId);
+  if (account && !isLiveAccount(account)) throw new Error(ACCOUNT_DELETED_MESSAGE);
+  if (cards.some(card => card.deleted && card.accountId === accountId)) throw new Error(CARD_DELETED_MESSAGE);
+  if (debts.some(debt => debt.deleted && debt.accountId === accountId)) throw new Error('Esta deuda fue eliminada.');
+}
+
+/** The deletion record of a card (25B2): inactive, deleted, one revision on. Never twice. */
+export function deleteCreditCard(card: CreditCardProfile, nowISO: string): CreditCardProfile {
+  if (card.deleted) throw new Error(CARD_DELETED_MESSAGE);
+  if (!validTimestamp(nowISO)) throw new Error('Fecha de actualización inválida.');
+  return { ...card, active: false, deleted: true, revision: card.revision + 1, updatedAt: nowISO };
+}
+
 /** A new income posts to a cash account only (Producto 24B6). A card is paid by a
  * transfer; what an issuer gives back (a refund, a reversal, a bonus) is a refund
  * tied to its purchase in a later delivery (the cards and instalments entry of the
@@ -182,6 +205,8 @@ export function keepsHistoricalCardIncome(before: Pick<Entry, 'kind' | 'accountI
  * is an expense that raises the card's debt), cash only for an income; never a debt. */
 export function postingAccountsFor(kind: EntryKind, accounts: readonly Account[], cards: CreditCardProfile[] = [], debts: PersonalDebtProfile[] = []): Account[] {
   return accounts.filter(account => {
+    // 25B2: a deleted account or card is history, never a choice.
+    if (!isLiveAccount(account) || cards.some(card => card.deleted && card.accountId === account.id)) return false;
     const kindOfAccount = accountKind(account.id, cards, debts);
     return kindOfAccount === 'cash' || (kind === 'expense' && kindOfAccount === 'card');
   });
@@ -192,12 +217,11 @@ export function postingAccountsFor(kind: EntryKind, accounts: readonly Account[]
  * the source (a cash advance or a balance transfer is not this ledger's transfer), and
  * two obligations never face each other. Stored transfers are read as they are;
  * `sameTransferSides` lets an edit keep historical sides. */
-export function assertTransferSides(transfer: Pick<Transfer, 'fromAccountId' | 'toAccountId'>, cards: CreditCardProfile[] = [], debts: PersonalDebtProfile[] = []): void {
+export function assertTransferSides(transfer: Pick<Transfer, 'fromAccountId' | 'toAccountId'>, cards: CreditCardProfile[] = [], debts: PersonalDebtProfile[] = [], accounts: readonly Account[] = []): void {
   const from = accountKind(transfer.fromAccountId, cards, debts), to = accountKind(transfer.toAccountId, cards, debts);
-  // 24UX4: a deleted tracker keeps its recorded payments, but takes no new one (nothing would show it).
-  if (debts.some(debt => debt.deleted && (debt.accountId === transfer.fromAccountId || debt.accountId === transfer.toAccountId))) {
-    throw new Error('Esta deuda fue eliminada.');
-  }
+  // 24UX4 / 25B2: a deleted tracker, card or account keeps its recorded transfers, but takes no new one.
+  assertOpenAccount(transfer.fromAccountId, accounts, cards, debts);
+  assertOpenAccount(transfer.toAccountId, accounts, cards, debts);
   if (from === 'card') throw new Error('Una tarjeta se paga desde una cuenta; no puede ser el origen de una transferencia.');
   if (from !== 'cash' && to !== 'cash') throw new Error('Una transferencia entre dos obligaciones no se puede registrar.');
 }
@@ -218,7 +242,8 @@ export function liquidTotalsByCurrency(snapshot: LedgerSnapshot, cards: CreditCa
   const hidden = hiddenLiabilityAccountIds(cards, debts);
   const totals = new Map<Currency, bigint>();
   for (const account of snapshot.accounts) {
-    if (hidden.has(account.id)) continue;
+    // 25B2: a deleted account's balance is history, not available money.
+    if (hidden.has(account.id) || !isLiveAccount(account)) continue;
     assertStorableCurrency(account.currency);
     const balance = BigInt(accountBalanceMinor(account, snapshot.entries, snapshot.transfers));
     totals.set(account.currency, (totals.get(account.currency) ?? 0n) + balance);

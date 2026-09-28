@@ -53,8 +53,9 @@ function routeHarness(file: string, params: Record<string, unknown>, initialData
   // 24C1: the finance view as the provider builds it, over a fixed rate book (no network); `ensured` records what the screen asked for.
   const ratesProvider = { useFinanceView: (months: readonly string[], currency?: domain.Currency) => {
     const held = presentation.availableCurrencies(data.accounts);
-    const mode = display.getMode();
-    const target = currency ?? displayCurrency.resolveDisplayCurrency(display.getState(), held, mode);
+    // 25B2: with one currency held the view is that currency's own ledger, whatever the preference says (rates-provider.tsx).
+    const mode = held.length <= 1 ? 'single' : display.getMode();
+    const target = currency ?? (held.length <= 1 ? held[0] ?? displayCurrency.resolveDisplayCurrency(display.getState(), held, mode) : displayCurrency.resolveDisplayCurrency(display.getState(), held, mode));
     const built = financeView.financeView(data, mode, target, rates.book);
     if (built.quotes.length) rates.ensured?.push({ months, quotes: built.quotes });
     return { ...built, activity: rates.activity ?? 'idle', loaded: true, lastFetchedAt: null, book: rates.book, held };
@@ -191,7 +192,7 @@ test('Home keeps analysis in Reportes: no timeline bars, a Reportes link on cate
   // Disponible excludes a card account's negative balance.
   const withCard = { ...homeData, accounts: [...homeData.accounts, { id: 'card-acc', name: 'Visa', currency: 'ARS' as const, openingMinor: -5000, createdAt }] };
   const cardView = routeHarness('(tabs)/index.tsx', {}, withCard, { cards: [{ id: 'card', accountId: 'card-acc', issuer: '', last4: '', creditLimitMinor: null,
-    closingDay: 1, dueDay: 10, active: true, createdAt, revision: 0, updatedAt: createdAt }] });
+    closingDay: 1, dueDay: 10, active: true, deleted: false, createdAt, revision: 0, updatedAt: createdAt }] });
   nodes(cardView.render()).find(n => n.type === 'Choices' && n.props.value === 'spending')!.props.onChange('available');
   // Account "a": opening 10000, expenses 101 + 202 + 303 + 100 + 200, income 500. The card's −5000 is excluded.
   assert.equal(find(cardView.render(), 'Money').props.minor, 10000 - 101 - 202 - 303 - 100 - 200 + 500);
@@ -201,7 +202,7 @@ test('Home keeps analysis in Reportes: no timeline bars, a Reportes link on cate
 test('24B1: Disponible for a currency held only by a card is a true US$ 0,00, never a dropped total', () => {
   const cardOnly = { ...homeData, accounts: [homeData.accounts[0], { id: 'usd-card', name: 'Visa USD', currency: 'USD' as const, openingMinor: -5000, createdAt }] };
   const view = routeHarness('(tabs)/index.tsx', {}, cardOnly, { cards: [{ id: 'card', accountId: 'usd-card', issuer: '', last4: '', creditLimitMinor: null,
-    closingDay: 1, dueDay: 10, active: true, createdAt, revision: 0, updatedAt: createdAt }] });
+    closingDay: 1, dueDay: 10, active: true, deleted: false, createdAt, revision: 0, updatedAt: createdAt }] });
   assert.deepEqual(presentation.availableCurrencies(cardOnly.accounts), ['ARS', 'USD'], 'the card account still makes USD a currency of the ledger');
   nodes(view.render()).find(n => n.type === 'Choices' && n.props.value === 'spending')!.props.onChange('available');
   find(view.render(), 'DisplayCurrencyButton').props.onCurrency('USD');
@@ -209,7 +210,7 @@ test('24B1: Disponible for a currency held only by a card is a true US$ 0,00, ne
   assert.deepEqual({ minor: money.props.minor, currency: money.props.currency }, { minor: 0, currency: 'USD' });
   assert.equal(i18nFormat.moneyText(0, 'USD'), 'US$\u00A00,00');
   assert.deepEqual(domain.liquidTotalsByCurrency(cardOnly, [{ id: 'card', accountId: 'usd-card', issuer: '', last4: '', creditLimitMinor: null,
-    closingDay: 1, dueDay: 10, active: true, createdAt, revision: 0, updatedAt: createdAt }]), { ARS: 10000 - 101 - 202 - 303 - 100 - 200 + 500 }, 'no liquid USD account: no USD key, so Home shows a true zero');
+    closingDay: 1, dueDay: 10, active: true, deleted: false, createdAt, revision: 0, updatedAt: createdAt }]), { ARS: 10000 - 101 - 202 - 303 - 100 - 200 + 500 }, 'no liquid USD account: no USD key, so Home shows a true zero');
 });
 test('expense detail rejects malformed scope and a category miss never opens all entries', () => {
   const valid = { currency: 'ARS', startISO: '2026-09-01', endISO: '2026-09-12' };
@@ -349,12 +350,12 @@ test('24B6: a stored preference survives a relaunch; one no account holds any mo
   const withoutDollars = routeHarness('(tabs)/index.tsx', {}, onlyPesos, {}, displayCurrency.createDisplayCurrencyStore(preferences));
   const root = withoutDollars.render();
   assert.equal(find(root, 'Money').props.currency, 'ARS', 'no USD account: the first currency held');
-  // 24C1: the chip stays with one currency: it is the way to the consolidated total (and to another display currency).
-  assert.equal(find(root, 'DisplayCurrencyButton').props.currency, 'ARS', 'one currency: the chip names it');
+  // 25B2: one currency held offers nothing to choose: no chip; the number is simply that currency's total.
+  assert.equal(nodes(root).some(n => n.type === 'DisplayCurrencyButton'), false, 'one currency: no chip');
   assert.equal(rows.get(displayCurrency.DISPLAY_CURRENCY_KEY), 'USD', 'the preference is not rewritten; nothing else is touched');
   const reports = routeHarness('(tabs)/reports.tsx', {}, onlyPesos, {}, displayCurrency.createDisplayCurrencyStore(preferences));
   assert.equal(find(reports.render(), 'Money').props.currency, 'ARS');
-  assert.equal(find(reports.render(), 'DisplayCurrencyButton').props.currency, 'ARS');
+  assert.equal(nodes(reports.render()).some(n => n.type === 'DisplayCurrencyButton'), false, 'one currency: no chip on Reportes either');
 });
 
 test('24B6: a link into Reportes with a held currency shows it and makes it the shared choice; an unknown, malformed or unheld one shows the shared choice and never overwrites it', () => {
@@ -586,8 +587,8 @@ test('24UX5: Inicio keeps its hierarchy with no account, one or several accounts
   const order = (root: Node) => nodes(root).map(node => node.type === 'SectionTitle' ? 'title:' + node.props.children : node.type)
     .filter(type => ['Choices', 'DisplayCurrencyButton', 'Money', 'QuickActions', 'AssistantEntry', 'BudgetHomeCard', 'CategoryRanking', 'UpcomingRecurringRow', 'EntryRow', 'EmptyState'].includes(type) || type.startsWith('title:'))
     .filter((type, index, all) => type !== all[index - 1]);
-  // 24C1: the chip is part of the header whenever an account exists.
-  const expected = (sections: string[]) => ['Choices', 'DisplayCurrencyButton', 'Money', 'QuickActions', 'AssistantEntry', ...sections];
+  // 24C1 / 25B2: the chip is part of the header only while two or more currencies are held.
+  const expected = (sections: string[], chip = false) => ['Choices', ...(chip ? ['DisplayCurrencyButton'] : []), 'Money', 'QuickActions', 'AssistantEntry', ...sections];
 
   // No account: one calm empty state, nothing else.
   assert.deepEqual(order(routeHarness('(tabs)/index.tsx', {}, { accounts: [], entries: [] }).render()), ['EmptyState']);
@@ -602,7 +603,7 @@ test('24UX5: Inicio keeps its hierarchy with no account, one or several accounts
   const view = routeHarness('(tabs)/index.tsx', {}, data, extra);
   let root = view.render();
   const full = expected(['title:Presupuesto del mes', 'BudgetHomeCard', 'title:En qué gastaste', 'CategoryRanking', 'title:Próximos compromisos', 'UpcomingRecurringRow',
-    'title:Últimos movimientos', 'EntryRow']);
+    'title:Últimos movimientos', 'EntryRow'], true);
   assert.deepEqual(order(root), full);
   assert.equal(find(root, 'Money').props.minor, 9_999_999_999_999 + 500 + 300 + 200, 'the huge amount reaches the hero exactly (Money fits it to the width)');
   assert.equal(find(root, 'CategoryRanking').props.categories.length, 4, 'every category is handed over; the card shows its three');
@@ -612,7 +613,7 @@ test('24UX5: Inicio keeps its hierarchy with no account, one or several accounts
   // Switching the currency keeps the same order; sections with nothing in USD simply stay out.
   find(root, 'DisplayCurrencyButton').props.onCurrency('USD');
   root = view.render();
-  const usd = expected(['title:En qué gastaste', 'CategoryRanking', 'title:Últimos movimientos', 'EntryRow']);
+  const usd = expected(['title:En qué gastaste', 'CategoryRanking', 'title:Últimos movimientos', 'EntryRow'], true);
   assert.deepEqual(order(root), usd);
   assert.equal(nodes(root).filter(node => node.type === 'EntryRow').every(node => node.props.showAccount === false), true, 'one USD account: no account name');
   // Several upcoming rules: at most three, soonest first.

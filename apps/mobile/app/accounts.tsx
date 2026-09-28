@@ -1,21 +1,26 @@
 import { SectionList, View } from 'react-native';
 import { router, Stack } from 'expo-router';
-import { hiddenLiabilityAccountIds, liquidTotalsByCurrency, type Account, type Currency } from '@finanzapp/domain';
+import { hiddenLiabilityAccountIds, isLiveAccount, liquidTotalsByCurrency, type Account, type Currency } from '@finanzapp/domain';
 import { useI18n } from '../src/i18n/provider';
 import { useLedger } from '../src/storage/LedgerProvider';
-import { AccountRow, ActionButton, AppText, EmptyState, IconButton, Money } from '../src/ui/components';
+import { useAccountManagement } from '../src/ui/commitment-actions';
+import { AccountRow, ActionButton, AppText, EmptyState, ErrorMessage, IconButton, Money } from '../src/ui/components';
+import { SwipeRow, swipeAccessibility } from '../src/ui/swipe-actions';
 import { availableCurrencies } from '../src/ui/presentation';
 import { space, usePalette } from '../src/ui/theme';
 
 /** Liquid accounts only, grouped by currency with each currency's recorded total.
- * Cards and debts live in Tarjetas; ARS and USD are never added together. */
+ * Cards and debts live in Tarjetas; ARS and USD are never added together. Since 25B2 a row's trailing swipe reveals
+ * Eliminar (a short swipe shows it, a full one only opens the same confirmation; nothing is deleted by reaching a
+ * threshold), the same action VoiceOver lists on the row; a deleted account leaves this list and keeps its history. */
 export default function AccountsScreen() {
   const { snapshot, archive } = useLedger();
   const p = usePalette();
   const { t, currencyName } = useI18n();
+  const manage = useAccountManagement();
   if (!snapshot) return null;
   const hidden = hiddenLiabilityAccountIds(archive?.cards, archive?.debts);
-  const visible = snapshot.accounts.filter(account => !hidden.has(account.id));
+  const visible = snapshot.accounts.filter(account => !hidden.has(account.id) && isLiveAccount(account));
   let totals: Partial<Record<Currency, number>> = {};
   try { totals = liquidTotalsByCurrency(snapshot, archive?.cards, archive?.debts); } catch { totals = {}; }
   const sections = availableCurrencies(visible).map(currency => ({ currency, data: visible.filter(account => account.currency === currency) }));
@@ -24,6 +29,7 @@ export default function AccountsScreen() {
     <SectionList<Account, typeof sections[number]> sections={sections} keyExtractor={account => account.id}
       style={{ flex: 1, backgroundColor: p.background }} contentContainerStyle={{ padding: space.xl, paddingBottom: 48, flexGrow: 1 }}
       contentInsetAdjustmentBehavior="automatic" stickySectionHeadersEnabled={false} removeClippedSubviews={false}
+      ListHeaderComponent={manage.error ? <View style={{ paddingBottom: space.m }}><ErrorMessage message={manage.error} /></View> : null}
       ListEmptyComponent={<EmptyState title={t('accounts.list.emptyTitle')} detail={t('accounts.list.emptyDetail')}
         action={<ActionButton label={t('common.addAccount')} onPress={() => router.push('/new-account')} />} />}
       renderSectionHeader={({ section }) => <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', gap: 12, paddingTop: 20, paddingBottom: 8, paddingHorizontal: 4 }}>
@@ -36,7 +42,9 @@ export default function AccountsScreen() {
       renderItem={({ item, index, section }) => <View style={{ backgroundColor: p.surface, overflow: 'hidden',
         borderTopLeftRadius: index === 0 ? 16 : 0, borderTopRightRadius: index === 0 ? 16 : 0,
         borderBottomLeftRadius: index === section.data.length - 1 ? 16 : 0, borderBottomRightRadius: index === section.data.length - 1 ? 16 : 0 }}>
-        <AccountRow account={item} entries={snapshot.entries} transfers={snapshot.transfers} last={index === section.data.length - 1} />
+        <SwipeRow actions={manage.actions(item)}>
+          <AccountRow account={item} entries={snapshot.entries} transfers={snapshot.transfers} last={index === section.data.length - 1} accessibility={swipeAccessibility(manage.actions(item))} />
+        </SwipeRow>
       </View>}
       />
   </>;

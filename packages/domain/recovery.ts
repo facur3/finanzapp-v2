@@ -41,10 +41,12 @@ export interface EntryChange {
 }
 export const BACKUP_MAX_BYTES = 5 * 1024 * 1024;
 /** The newest backup format this build writes and reads: v9 = v8 plus `currencyUnits`; v10 = v9 plus the
- * `deleted` flag of every recurring rule and debt (Producto 24UX4). */
+ * `deleted` flag of every recurring rule and debt (Producto 24UX4); v11 = v10 plus the `deleted` flag of every
+ * card and the `deletedAt` of a deleted account (Producto 25B2). */
 export const BACKUP_SCHEMA_V8 = 'finanzapp.native-pilot.v8';
 export const BACKUP_SCHEMA_V9 = 'finanzapp.native-pilot.v9';
 export const BACKUP_SCHEMA_V10 = 'finanzapp.native-pilot.v10';
+export const BACKUP_SCHEMA_V11 = 'finanzapp.native-pilot.v11';
 export const MAX_BACKUP_CURRENCY_UNITS = 200;
 /** Backups v1–v8 record one money unit and no scale per currency: they can only ever name
  * ARS and USD cents, whatever the creation gate offers when the file is read. A file naming
@@ -55,6 +57,9 @@ function assertLegacyCurrencies(archive: Pick<LedgerArchive, 'accounts' | 'budge
     || (archive.budgets ?? []).some(budget => !isLegacyCurrency(budget.currency))) throw new Error(message);
 }
 const ACCOUNT_KEYS = ['id', 'name', 'currency', 'openingMinor', 'createdAt'] as const;
+// v5–v10 cards carry no `deleted` key: every one of them is live (deleted: false). v11 files carry it.
+const LEGACY_CARD_KEYS = ['id', 'accountId', 'issuer', 'last4', 'creditLimitMinor', 'closingDay', 'dueDay', 'active', 'createdAt', 'revision', 'updatedAt'] as const;
+const CARD_KEYS = [...LEGACY_CARD_KEYS.slice(0, 8), 'deleted', ...LEGACY_CARD_KEYS.slice(8)] as const;
 const ENTRY_KEYS = ['id', 'accountId', 'kind', 'amountMinor', 'merchant', 'category', 'dateISO', 'createdAt'] as const;
 // v4–v9 rules and v6–v9 debts carry no `deleted` key: every one of them is live (deleted: false).
 const LEGACY_RECURRING_KEYS = ['id', 'accountId', 'kind', 'amountMinor', 'merchant', 'category', 'frequency',
@@ -66,8 +71,6 @@ const LEGACY_BUDGET_KEYS = ['id', 'category', 'currency', 'monthISO', 'amountMin
   'createdAt', 'revision', 'updatedAt'] as const;
 const BUDGET_BASE_KEYS = ['id', 'scope', 'currency', 'monthISO', 'amountMinor', 'active',
   'createdAt', 'revision', 'updatedAt'] as const;
-const CARD_KEYS = ['id', 'accountId', 'issuer', 'last4', 'creditLimitMinor', 'closingDay', 'dueDay',
-  'active', 'createdAt', 'revision', 'updatedAt'] as const;
 const LEGACY_DEBT_KEYS = ['id', 'accountId', 'direction', 'counterparty', 'dueDateISO', 'note',
   'active', 'createdAt', 'revision', 'updatedAt'] as const;
 const DEBT_KEYS = [...LEGACY_DEBT_KEYS, 'deleted'] as const;
@@ -82,9 +85,11 @@ function object(value: unknown, keys: readonly string[]): Record<string, unknown
 function timestamp(value: unknown): asserts value is string {
   if (typeof value !== 'string' || !Number.isFinite(Date.parse(value))) throw new Error('Fecha de modificación inválida.');
 }
-function accountValue(value: unknown, allowRevision = true): Account {
-  const keys = allowRevision && value && typeof value === 'object' && Object.hasOwn(value, 'revision')
-    ? [...ACCOUNT_KEYS, 'revision', 'updatedAt'] as const : ACCOUNT_KEYS;
+function accountValue(value: unknown, allowRevision = true, allowDeleted = true): Account {
+  const revised = allowRevision && !!value && typeof value === 'object' && Object.hasOwn(value, 'revision');
+  // A deletion record (25B2) rides on a revised row only; a file older than v11 never carries one.
+  const deleted = allowDeleted && revised && Object.hasOwn(value as object, 'deletedAt');
+  const keys = revised ? deleted ? [...ACCOUNT_KEYS, 'revision', 'updatedAt', 'deletedAt'] as const : [...ACCOUNT_KEYS, 'revision', 'updatedAt'] as const : ACCOUNT_KEYS;
   const item = object(value, keys) as unknown as Account;
   validateAccount(item);
   return Object.fromEntries((item.revision === 0 ? ACCOUNT_KEYS : keys).map(key => [key, item[key]])) as unknown as Account;
@@ -114,9 +119,9 @@ function budgetValue(value: unknown, legacy = false): MonthlyBudget {
   validateMonthlyBudget(budget);
   return budget;
 }
-function cardValue(value: unknown, accounts: Account[]): CreditCardProfile {
-  const row = object(value, CARD_KEYS);
-  const card = Object.fromEntries(CARD_KEYS.map(key => [key, row[key]])) as unknown as CreditCardProfile;
+function cardValue(value: unknown, accounts: Account[], legacy = false): CreditCardProfile {
+  const row = object(value, legacy ? LEGACY_CARD_KEYS : CARD_KEYS);
+  const card = Object.fromEntries(CARD_KEYS.map(key => [key, key === 'deleted' && legacy ? false : row[key]])) as unknown as CreditCardProfile;
   validateCreditCardProfile(card, accounts);
   return card;
 }
@@ -206,7 +211,7 @@ export function archiveExponents(archive: Pick<LedgerArchive, 'accounts' | 'budg
 }
 export function sameAccount(a: Account, b: Account): boolean {
   return ACCOUNT_KEYS.every(key => a[key] === b[key]) && (a.revision ?? 0) === (b.revision ?? 0)
-    && (a.updatedAt ?? a.createdAt) === (b.updatedAt ?? b.createdAt);
+    && (a.updatedAt ?? a.createdAt) === (b.updatedAt ?? b.createdAt) && (a.deletedAt ?? null) === (b.deletedAt ?? null);
 }
 export function sameEntry(a: Entry, b: Entry): boolean { return ENTRY_KEYS.every(key => a[key] === b[key]); }
 export function sameRecord(a: EntryRecord, b: EntryRecord): boolean {
@@ -276,7 +281,8 @@ export function validateEntryChange(change: EntryChange, accounts: Account[]): v
  * `currencyUnits` naming the pinned scale of each such currency (the archive's own units when it
  * knows them, the catalogue's otherwise: they are equal, `validateArchive` proved it); v10 (24UX4)
  * as soon as a recurring rule or a debt is deleted, so its deletion record travels with the copy
- * and an import never brings it back. v10 always has `currencyUnits` (empty when only ARS/USD). */
+ * and an import never brings it back. v10 always has `currencyUnits` (empty when only ARS/USD). v11 (25B2) as soon
+ * as an account or a card is deleted: cards carry `deleted`, a deleted account carries `deletedAt`. */
 export interface RecoveryBackup {
   app: string; schema: string; exportedAt: string; moneyUnit: string;
   accounts: Account[]; records: EntryRecord[]; transfers: TransferRecord[]; recurring: RecurringRule[]; budgets: MonthlyBudget[];
@@ -293,15 +299,19 @@ export function createRecoveryBackup(archive: LedgerArchive, now = new Date()): 
   const needed = currenciesNeedingUnits(archive);
   const canonical = canonicalArchive(archive);
   const { currencyUnits: _units, ...rows } = canonical;
-  const tombstones = (canonical.recurring ?? []).some(rule => rule.deleted) || (canonical.debts ?? []).some(debt => debt.deleted);
+  // 25B2: a deleted account or card makes the file v11; without one, cards carry no `deleted` key (a v10 or older
+  // file, byte for byte) and no account carries `deletedAt`.
+  const lifecycle = canonical.accounts.some(account => account.deletedAt !== undefined) || (canonical.cards ?? []).some(card => card.deleted);
+  const tombstones = lifecycle || (canonical.recurring ?? []).some(rule => rule.deleted) || (canonical.debts ?? []).some(debt => debt.deleted);
   // Without a deletion record the file stays v8/v9 byte for byte: its rules and debts carry no `deleted` key.
   const recurring = tombstones ? canonical.recurring ?? [] : (canonical.recurring ?? []).map(withoutDeleted) as RecurringRule[];
   const debts = tombstones ? canonical.debts ?? [] : (canonical.debts ?? []).map(withoutDeleted) as PersonalDebtProfile[];
-  const schema = tombstones ? BACKUP_SCHEMA_V10 : needed.length ? BACKUP_SCHEMA_V9 : BACKUP_SCHEMA_V8;
+  const cards = lifecycle ? canonical.cards ?? [] : (canonical.cards ?? []).map(withoutDeleted) as CreditCardProfile[];
+  const schema = lifecycle ? BACKUP_SCHEMA_V11 : tombstones ? BACKUP_SCHEMA_V10 : needed.length ? BACKUP_SCHEMA_V9 : BACKUP_SCHEMA_V8;
   const base: RecoveryBackup = { app: 'FinanzApp', schema, exportedAt: now.toISOString(),
     moneyUnit: 'integer-minor-units', ...rows, transfers: canonical.transfers ?? [],
     recurring, budgets: canonical.budgets ?? [],
-    cards: canonical.cards ?? [], debts,
+    cards, debts,
     appearances: canonical.appearances ?? [], categories: canonical.categories ?? [] };
   if (!needed.length) return tombstones ? { ...base, currencyUnits: [] } : base;
   const known = new Map((canonical.currencyUnits ?? []).map(unit => [unit.currency, unit]));
@@ -326,12 +336,15 @@ export function parsePilotBackup(raw: string): ParsedBackup {
   const v8 = header.schema === BACKUP_SCHEMA_V8;
   const v9 = header.schema === BACKUP_SCHEMA_V9;
   const v10 = header.schema === BACKUP_SCHEMA_V10;
-  if (!v1 && !v2 && !v3 && !v4 && !v5 && !v6 && !v7 && !v8 && !v9 && !v10) {
-    throw new Error('Solo se pueden restaurar copias de FinanzApp de las versiones 1 a 10. Este archivo no es una de ellas; conservalo.');
+  const v11 = header.schema === BACKUP_SCHEMA_V11;
+  if (!v1 && !v2 && !v3 && !v4 && !v5 && !v6 && !v7 && !v8 && !v9 && !v10 && !v11) {
+    throw new Error('Solo se pueden restaurar copias de FinanzApp de las versiones 1 a 11. Este archivo no es una de ellas; conservalo.');
   }
   const hasTransfers = !v1 && !v2, hasRecurring = hasTransfers && !v3, hasBudgets = hasRecurring && !v4;
-  const hasLiabilities = hasBudgets && !v5, hasScopedBudgets = hasLiabilities && !v6, hasIdentity = v8 || v9 || v10, hasUnits = v9 || v10;
-  const hasDeletions = v10;
+  const hasLiabilities = hasBudgets && !v5, hasScopedBudgets = hasLiabilities && !v6, hasIdentity = v8 || v9 || v10 || v11, hasUnits = v9 || v10 || v11;
+  const hasDeletions = v10 || v11;
+  // v11 (25B2): cards carry `deleted`; a deleted account carries `deletedAt`. Older files carry neither.
+  const hasLifecycle = v11;
   object(value, ['app', 'schema', 'exportedAt', 'moneyUnit', 'accounts', v1 ? 'entries' : 'records',
     ...(hasTransfers ? ['transfers'] : []), ...(hasRecurring ? ['recurring'] : []),
     ...(hasBudgets ? ['budgets'] : []), ...(hasLiabilities ? ['cards', 'debts'] : []),
@@ -361,7 +374,7 @@ export function parsePilotBackup(raw: string): ParsedBackup {
   if (hasUnits && (!Array.isArray(header.currencyUnits) || header.currencyUnits.length > MAX_BACKUP_CURRENCY_UNITS)) {
     throw new Error('La copia contiene demasiadas escalas de moneda o un formato inválido.');
   }
-  const accounts = header.accounts.map(a => accountValue(a, hasTransfers));
+  const accounts = header.accounts.map(a => accountValue(a, hasTransfers, hasLifecycle));
   const records = rows.map((value): EntryRecord => {
     if (v1) return initialRecord(entryValue(value, accounts));
     const record = object(value, ['entry', 'revision', 'voided', 'updatedAt']);
@@ -371,7 +384,7 @@ export function parsePilotBackup(raw: string): ParsedBackup {
   const recurring = hasRecurring ? (header.recurring as unknown[]).map(rule => recurringValue(rule, accounts, !hasDeletions)) : [];
   // Only a v7+ file may carry scoped budgets; v5/v6 budgets are read as category budgets.
   const budgets = hasBudgets ? (header.budgets as unknown[]).map(budget => budgetValue(budget, !hasScopedBudgets)) : [];
-  const cards = hasLiabilities ? (header.cards as unknown[]).map(card => cardValue(card, accounts)) : [];
+  const cards = hasLiabilities ? (header.cards as unknown[]).map(card => cardValue(card, accounts, !hasLifecycle)) : [];
   const debts = hasLiabilities ? (header.debts as unknown[]).map(debt => debtValue(debt, accounts, !hasDeletions)) : [];
   // v1–v7 files carry no identity: their accounts show the default look and their categories resolve to presets or history.
   const appearances = hasIdentity ? (header.appearances as unknown[]).map(item => appearanceValue(item, accounts)) : [];

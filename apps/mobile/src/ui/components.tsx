@@ -725,15 +725,17 @@ export function EntryRow({ entry, account, last = false, showDate = true, showAc
   </PressFeedback>;
 }
 
-export function AccountRow({ account, entries, transfers, last = false, kindLabel }: {
+export function AccountRow({ account, entries, transfers, last = false, kindLabel, accessibility }: {
   account: Account; entries: Entry[]; transfers?: Transfer[]; last?: boolean; kindLabel?: string;
+  /** The row's VoiceOver custom actions (25B2: Eliminar), the accessible twin of its trailing swipe. */
+  accessibility?: Pick<PressableProps, 'accessibilityActions' | 'onAccessibilityAction'>;
 }) {
   const p = usePalette();
   const { t, spokenAmount } = useI18n();
   const balance = accountBalanceMinor(account, entries, transfers);
   const stacked = useStacked({ minor: balance, currency: account.currency });
   return <PressFeedback feedback="highlight" accessibilityRole="button" accessibilityLabel={t('rows.accountLabel', { name: account.name, amount: spokenAmount(balance, account.currency) })}
-    onPress={() => router.push({ pathname: '/account/[id]', params: { id: account.id } })}
+    {...accessibility} onPress={() => router.push({ pathname: '/account/[id]', params: { id: account.id } })}
     style={[styles.row, { borderBottomColor: p.line, borderBottomWidth: last ? 0 : StyleSheet.hairlineWidth }]}>
     <AccountBadge accountId={account.id} />
     <View style={{ flex: 1, minWidth: 0, gap: 8, flexDirection: stacked ? 'column' : 'row', alignItems: stacked ? 'flex-start' : 'center' }}>

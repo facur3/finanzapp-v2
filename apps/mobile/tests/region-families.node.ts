@@ -142,6 +142,8 @@ test('no account, ledger or display-currency code reads the region: a region nev
     }
   };
   scan('src/storage');
+  // 25B/25B2: `src/ui/currency-defaults.ts` (and `use-default-currency.tsx`) read the region for one thing, the suggestion a
+  // form starts with before any account exists (a proposal the person changes); nothing here or below may.
   for (const file of ['app/new-account.tsx', 'src/ui/display-currency.ts', 'src/ui/display-currency-provider.tsx', 'src/ui/currencies.ts']) {
     if (/regions\/data|REGION_DATA|dollarSignCurrency|\.region\b|\.conventions\b/.test(readFileSync(new URL('../' + file, import.meta.url), 'utf8'))) offenders.push(file);
   }

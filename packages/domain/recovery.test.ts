@@ -16,7 +16,7 @@ const empty = { accounts: [], records: [] };
 const cardAccount: Account = { id: 'card-acc', name: 'Visa', currency: 'ARS', openingMinor: -5000, createdAt: account.createdAt };
 const debtAccount: Account = { id: 'debt-acc', name: 'Debo \u00B7 Juan', currency: 'ARS', openingMinor: -7000, createdAt: account.createdAt };
 const card: CreditCardProfile = { id: 'card', accountId: cardAccount.id, issuer: 'Banco', last4: '1234', creditLimitMinor: 100000,
-  closingDay: 28, dueDay: 5, active: true, createdAt: account.createdAt, revision: 0, updatedAt: account.createdAt };
+  closingDay: 28, dueDay: 5, active: true, deleted: false, createdAt: account.createdAt, revision: 0, updatedAt: account.createdAt };
 const debt: PersonalDebtProfile = { id: 'debt', accountId: debtAccount.id, direction: 'owed_by_me', counterparty: 'Juan', dueDateISO: null,
   note: '', active: true, deleted: false, createdAt: account.createdAt, revision: 0, updatedAt: account.createdAt };
 const liabilities: LedgerArchive = { accounts: [account, cardAccount, debtAccount],

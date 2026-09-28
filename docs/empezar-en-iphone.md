@@ -5,7 +5,7 @@ Actualizado: 21 de septiembre de 2026 (encuadre revisado el 25 de septiembre de 
 > **La app nativa es el producto** ([decisión 004](decisions/004-native-first-and-web-retirement.md)).
 > Esta guía se escribió cuando la app todavía se llamaba "piloto"; donde diga "piloto", leé "la
 > app". Los pasos de instalación y prueba siguen vigentes; el pie de Más dice hoy
-> **FinanzApp 0.1.0 (25B)** y las comprobaciones de cada entrega están en
+> **FinanzApp 0.1.0 (25B2)** y las comprobaciones de cada entrega están en
 > [mobile-device-checklist.md](mobile-device-checklist.md). Configuración y comandos al día:
 > [apps/mobile/README.md](../apps/mobile/README.md).
 

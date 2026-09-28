@@ -47,8 +47,13 @@ export function useFinanceView(months: readonly string[], currency?: Currency): 
   const held = useMemo(() => availableCurrencies(snapshot?.accounts ?? []), [snapshot?.accounts]);
   const shared = useDisplayCurrency(held);
   const state = useSyncExternalStore(rates.subscribe, rates.getState, rates.getState);
-  const target = currency ?? shared.currency;
-  const view = useMemo(() => snapshot ? financeView(snapshot, shared.mode, target, state.book) : null, [snapshot, shared.mode, target, state.book]);
+  // 25B2: with zero or one currency held there is nothing to consolidate or filter: the view is that currency's own
+  // ledger, whatever the stored preference says (a display currency chosen for a ledger that later lost its second
+  // currency is kept, never applied, and never asks the provider for anything). A route's currency still wins.
+  const single = held.length <= 1;
+  const mode = single ? 'single' : shared.mode;
+  const target = currency ?? (single ? held[0] ?? shared.currency : shared.currency);
+  const view = useMemo(() => snapshot ? financeView(snapshot, mode, target, state.book) : null, [snapshot, mode, target, state.book]);
   const monthsKey = months.join(','), quotesKey = view?.quotes.join(',') ?? '';
   // The watch lasts while this screen needs these rates: leaving it, or switching to `single` mode (no quotes), releases
   // it, so a failed request is retried only while some view is still waiting for its answer.

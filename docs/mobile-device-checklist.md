@@ -1,5 +1,38 @@
 # Physical iPhone acceptance checklist
 
+## Producto 25B2 — currency defaults and the account/card lifecycle
+
+**Not done in 25B2: no EAS build was made and the iPhone was not touched.** Metro from this branch
+(`npm run start:dev-client -- --clear`) on the installed FinanzApp Dev build; JavaScript only. **The ledger moves to
+schema 11 (additive: a tombstone date on accounts, a `deleted` flag on cards) and an older build refuses the file
+unchanged: keep a backup first** (Más → Copia de seguridad). Use your own small test data; never seed movements.
+
+**Brief test (≈10 minutes).**
+
+1. **Defaults.** With accounts in one currency only: Más → Cuentas → +, Tarjetas → +, Deudas → +, Presupuestos → +
+   all start in that currency. Add a second-currency account: with the chip on "Total · USD" the forms start in USD;
+   choose "Solo ARS" and they start in ARS. Delete every account (step 2) and open Cuentas → +: the region's
+   currency (Región on España → EUR, on Estados Unidos → USD, on Argentina → ARS).
+2. **Chip.** With one currency held Inicio and Reportes show no chip and the number is simply the total; add a
+   second currency: the chip appears with the previous choice; delete that account: the chip goes away again.
+3. **Delete an account** (one with movements, a transfer and an active recurring rule): a short swipe on its row
+   reveals Eliminar; a full swipe opens the confirmation without deleting; Cancelar leaves everything. Confirm: the
+   row leaves Cuentas and Disponible; Movimientos still lists its movements and transfers with the account's name;
+   Reportes for that month keeps them; Recurrentes shows the rule paused; the account's detail (from a movement)
+   reads "Cuenta eliminada" without Editar or actions; Nuevo gasto and Transferir no longer offer it. VoiceOver on a
+   row: the Actions rotor lists Eliminar. Also from Editar cuenta → «Eliminar cuenta».
+4. **Delete a card** with a purchase and a payment (leave some debt): Tarjetas → card → Editar → «Eliminar tarjeta»:
+   the confirmation names the debt; confirm: the card leaves the carousel; its purchases and payments stay in
+   Movimientos; its detail reads "Tarjeta eliminada · deuda registrada" without Registrar compra ni Pagar. No swipe on
+   the carousel.
+5. **Backup.** Export (it is v11 once something was deleted), reinstall or use a second device, import: the deleted
+   account and card come back deleted; the older backup from step 0 is refused as contradicting local changes.
+6. **Accessibility.** The largest Dynamic Type on Cuentas rows with the swipe open; VoiceOver through the
+   confirmations in both languages; Reduce Motion; light and dark.
+
+Record: the schema upgrade (the app opened, the data intact), each form's starting currency, and any deleted row that
+still accepted a movement or disappeared from Movimientos.
+
 ## Producto 25B — the first opening (a fresh install and an upgrade)
 
 **Not done in 25B: no EAS build was made and the iPhone was not touched.** Metro from this branch

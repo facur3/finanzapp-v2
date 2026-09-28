@@ -2,8 +2,8 @@ import { useRef, useState } from 'react';
 import { Alert } from 'react-native';
 import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
-import { closePersonalDebt, debtOutstandingMinor, deletePersonalDebt, deleteRecurringRule, liabilityActivity, pauseRecurringRule, recurringHistory,
-  reopenPersonalDebt, resumeRecurringRule, todayKey, type PersonalDebtProfile, type RecurringRule } from '@finanzapp/domain';
+import { cardDebtMinor, closePersonalDebt, debtOutstandingMinor, deleteCreditCard, deletePersonalDebt, deleteRecurringRule, liabilityActivity, pauseRecurringRule, recurringHistory,
+  reopenPersonalDebt, resumeRecurringRule, todayKey, type Account, type CreditCardProfile, type PersonalDebtProfile, type RecurringRule } from '@finanzapp/domain';
 import { useLedger } from '../storage/LedgerProvider';
 import { useI18n } from '../i18n/provider';
 import type { SwipeAction } from './swipe-actions';
@@ -125,4 +125,92 @@ export function useDebtManagement() {
     return [first, { key: 'delete', label: t('debts.manage.delete'), icon: 'trash', tone: 'destructive', onPress: () => remove(debt, done) }];
   }
   return { busyId, error, settle, close, reopen, remove, actions };
+}
+
+/** Producto 25B2: deleting a normal account, from its row (trailing swipe) or from its edit screen, with one rule.
+ * The confirmation names what stays (every movement and transfer, with the account's name and currency) and what
+ * stops (its active recurring rules); the deletion record is written before anything confirms it, and a failed save
+ * keeps the account as it was and says so. A card's or a debt's account is never offered here. */
+export function useAccountManagement() {
+  const { removeAccount, snapshot, archive } = useLedger();
+  const { t } = useI18n();
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const writing = useRef(false);
+
+  async function commit(account: Account, done?: () => void) {
+    if (writing.current) return;
+    writing.current = true;
+    setBusyId(account.id);
+    setError(null);
+    try {
+      await removeAccount(account.id);
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      done?.();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'accounts.manage.deleteFailed');
+    } finally {
+      writing.current = false;
+      setBusyId(null);
+    }
+  }
+  /** What deleting would leave and stop, for the confirmation. */
+  function consequences(account: Account) {
+    const movements = snapshot?.entries.filter(entry => entry.accountId === account.id).length ?? 0;
+    const transfers = snapshot?.transfers?.filter(transfer => transfer.fromAccountId === account.id || transfer.toAccountId === account.id).length ?? 0;
+    const recurring = archive?.recurring?.filter(rule => rule.accountId === account.id && rule.active && !rule.deleted).length ?? 0;
+    return { movements, transfers, recurring };
+  }
+  function remove(account: Account, done?: () => void) {
+    const { movements, transfers, recurring } = consequences(account);
+    const detail = (movements || transfers
+      ? t('accounts.manage.deleteDetail', { movements: t('accounts.manage.movements', { count: movements }), transfers: t('accounts.manage.transfers', { count: transfers }) })
+      : t('accounts.manage.deleteDetailEmpty')) + (recurring ? t('accounts.manage.deleteRecurring', { count: recurring }) : '');
+    Alert.alert(t('accounts.manage.deleteTitle', { name: account.name }), detail, [
+      { text: t('common.cancel'), style: 'cancel' },
+      { text: t('accounts.manage.deleteConfirm'), style: 'destructive', onPress: () => { void commit(account, done); } },
+    ]);
+  }
+  /** Delete only: a normal account has no other row action (its edits live on its screen). */
+  function actions(account: Account, done?: () => void): SwipeAction[] {
+    return [{ key: 'delete', label: t('accounts.manage.delete'), icon: 'trash', tone: 'destructive', onPress: () => remove(account, done) }];
+  }
+  return { busyId, error, remove, actions, consequences };
+}
+
+/** Producto 25B2: deleting a card from its edit screen. The confirmation names the recorded debt, when there is one,
+ * and that every purchase and payment stays; the record is written through the same path as an archive. */
+export function useCardManagement() {
+  const { saveCard, snapshot } = useLedger();
+  const { t, moneyText } = useI18n();
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const writing = useRef(false);
+
+  async function commit(next: CreditCardProfile, done?: () => void) {
+    if (writing.current) return;
+    writing.current = true;
+    setBusyId(next.id);
+    setError(null);
+    try {
+      await saveCard(next);
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      done?.();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'cards.form.deleteFailed');
+    } finally {
+      writing.current = false;
+      setBusyId(null);
+    }
+  }
+  function remove(card: CreditCardProfile, done?: () => void) {
+    const account = snapshot?.accounts.find(item => item.id === card.accountId);
+    const debt = snapshot && account ? cardDebtMinor(card, snapshot) : 0;
+    const detail = (debt > 0 && account ? t('cards.form.deleteDebt', { amount: moneyText(debt, account.currency) }) : '') + t('cards.form.deleteDetail');
+    Alert.alert(t('cards.form.deleteTitle'), detail, [
+      { text: t('common.cancel'), style: 'cancel' },
+      { text: t('cards.form.deleteConfirm'), style: 'destructive', onPress: () => { void commit(deleteCreditCard(card, new Date().toISOString()), done); } },
+    ]);
+  }
+  return { busyId, error, remove };
 }

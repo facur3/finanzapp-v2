@@ -141,7 +141,7 @@ export default function ReportsScreen() {
     initialNumToRender={10} maxToRenderPerBatch={10} windowSize={7}
     ListHeaderComponent={<View style={{ gap: space.xxl, paddingBottom: space.m }}>
       <View style={{ gap: space.m }}>
-        {snapshot.accounts.length > 0 && <DisplayCurrencyButton compact={false} mode={view.mode} currency={currency} held={held} gate={gate} onMode={setMode} onCurrency={setCurrency} />}
+        {held.length > 1 && <DisplayCurrencyButton compact={false} mode={view.mode} currency={currency} held={held} gate={gate} onMode={setMode} onCurrency={setCurrency} />}
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
           <IconButton name="chevron-back" label={t('reports.previousMonth')} disabled={!canPrevious}
             onPress={() => { if (canPrevious) goToMonth(shiftReportMonth(monthISO, -1)); }} />

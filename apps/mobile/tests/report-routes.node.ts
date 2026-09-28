@@ -50,8 +50,9 @@ function routeHarness(file: string, params: Record<string, unknown>, data = snap
   // 24C1: the finance view over a fixed rate book (no network); `ensured` records what the screen asked the provider for.
   const ratesProvider = { useFinanceView: (months: readonly string[], currency?: domain.Currency) => {
     const held = presentation.availableCurrencies(data.accounts);
-    const mode = display.getMode();
-    const target = currency ?? displayCurrency.resolveDisplayCurrency(display.getState(), held, mode);
+    // 25B2: with one currency held the view is that currency's own ledger, whatever the preference says (rates-provider.tsx).
+    const mode = held.length <= 1 ? 'single' : display.getMode();
+    const target = currency ?? (held.length <= 1 ? held[0] ?? displayCurrency.resolveDisplayCurrency(display.getState(), held, mode) : displayCurrency.resolveDisplayCurrency(display.getState(), held, mode));
     const built = financeView.financeView(data, mode, target, book);
     if (built.quotes.length) ensured.push({ months: [...months], quotes: built.quotes });
     return { ...built, activity, loaded: true, lastFetchedAt: null, book, held };

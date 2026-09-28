@@ -1,4 +1,4 @@
-import { currenciesPresent, labelFromISO, type Account, type Currency, type Entry, type EntryKind, type Transfer } from '@finanzapp/domain';
+import { currenciesPresent, liveAccounts, labelFromISO, type Account, type Currency, type Entry, type EntryKind, type Transfer } from '@finanzapp/domain';
 import { dateFromISO, daysAgo, formatDate, relativeDayName } from '../i18n/format.ts';
 import { DEFAULT_LOCALE, type AppLocale } from '../i18n/locale.ts';
 
@@ -77,7 +77,8 @@ export function initialAccountId(accounts: Account[], accountId?: string, curren
  * Home, Reportes, Presupuestos and the Assistant let the person switch between. Never a
  * fixed pair, so an account in any stored currency is always reachable. */
 export function availableCurrencies(accounts: Account[]): Currency[] {
-  return currenciesPresent(accounts);
+  // 25B2: a deleted account's currency is history, not a choice (its rows stay reachable through Movimientos).
+  return currenciesPresent(liveAccounts(accounts));
 }
 
 export type ActivityItem = { type: 'entry'; key: string; value: Entry } | { type: 'transfer'; key: string; value: Transfer };

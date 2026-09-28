@@ -3,7 +3,7 @@ import { Alert, Keyboard } from 'react-native';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { randomUUID } from 'expo-crypto';
 import * as Haptics from 'expo-haptics';
-import { accountBalanceMinor, accountLook, makeAccountAppearance, makeAccountChange, minorFromEditedDraft, validateAccountAppearance,
+import { accountBalanceMinor, accountLook, isLiveAccount, makeAccountAppearance, makeAccountChange, minorFromEditedDraft, validateAccountAppearance,
   validateAccountChange, type Account, type AccountAppearance, type AccountChange, type LedgerSnapshot, type StoredDraft } from '@finanzapp/domain';
 import { useLedger } from '../../src/storage/LedgerProvider';
 import { ACCOUNT_ICON_CHOICES, COLOR_CHOICES } from '../../src/ui/appearance';
@@ -11,6 +11,7 @@ import { IconColorPicker } from '../../src/ui/appearance-picker';
 import { draftFromMinor } from '../../src/ui/money-input';
 import { ActionButton, AmountField, AppText, EmptyState, ErrorMessage, Field, FieldNote, IconButton, Screen } from '../../src/ui/components';
 import { CurrencyField } from '../../src/ui/form-controls';
+import { useAccountManagement } from '../../src/ui/commitment-actions';
 import { useI18n } from '../../src/i18n/provider';
 
 export default function EditAccountScreen() {
@@ -19,6 +20,8 @@ export default function EditAccountScreen() {
   const account = snapshot?.accounts.find(a => a.id === id);
   const current = archive?.appearances?.find(item => item.accountId === id);
   const { t } = useI18n();
+  // 25B2: a deleted account is never edited again; its detail stays readable.
+  if (account && !isLiveAccount(account)) return <Screen><EmptyState title={t('accounts.manage.deletedTitle')} detail={t('accounts.manage.deletedNote')} /></Screen>;
   return account && snapshot ? <AccountEditor key={id} account={account} snapshot={snapshot} current={current} />
     : <Screen><EmptyState title={t('accounts.detail.notFoundTitle')} detail={t('accounts.edit.notFoundDetail')} /></Screen>;
 }
@@ -29,8 +32,11 @@ type Submission = { change: AccountChange | null; appearance: AccountAppearance 
  * balance correction touches a financial field, and it still asks first.
  * Everything is saved in one commit. Currency stays immutable. */
 function AccountEditor({ account, snapshot, current }: { account: Account; snapshot: LedgerSnapshot; current?: AccountAppearance }) {
-  const { updateAccount, saveAppearance } = useLedger();
+  const { updateAccount, saveAppearance, archive } = useLedger();
   const { t, formatMoneyAmount } = useI18n();
+  const manage = useAccountManagement();
+  // A card's or a debt's internal account is edited from its own screen and never deleted here.
+  const deletable = !archive?.cards?.some(card => card.accountId === account.id) && !archive?.debts?.some(debt => debt.accountId === account.id);
   const [original] = useState(() => ({ account, snapshot, current, balance: accountBalanceMinor(account, snapshot.entries, snapshot.transfers),
     look: accountLook(account.id, current ? [current] : []) }));
   const [name, setName] = useState(account.name);
@@ -94,5 +100,11 @@ function AccountEditor({ account, snapshot, current }: { account: Account; snaps
     <ErrorMessage message={error} />
     {pending && error && <AppText secondary style={{ fontSize: 13 }}>{t('accounts.edit.retryNote')}</AppText>}
     <ActionButton label={pending && error ? t('common.retrySave') : t('common.saveChanges')} onPress={save} busy={busy} disabled={!name.trim() || !balance.trim()} />
+    {/* 25B2: the destructive action last, apart from Save, with its own confirmation naming what stays. */}
+    {deletable && <>
+      <ErrorMessage message={manage.error} />
+      <ActionButton secondary tone="expense" label={t('accounts.manage.deleteAccount')} icon="trash-outline" disabled={locked || manage.busyId === account.id}
+        onPress={() => manage.remove(original.account, () => { (router as { dismissAll?: () => void }).dismissAll?.(); router.replace('/accounts'); })} />
+    </>}
   </Screen>;
 }

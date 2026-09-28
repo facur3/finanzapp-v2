@@ -13,6 +13,7 @@ import {
   sameCategoryDefinition, validateCategoryDefinition, type CategoryDefinition,
   LEDGER_CURRENCIES, archiveExponents, catalogueUnit, currenciesNeedingUnits, isLegacyCurrency, storedExponent, validateCurrencyUnit,
   type Currency, type CurrencyGate, type CurrencyUnit,
+  OBLIGATION_ACCOUNT_MESSAGE, assertOpenAccount, deleteAccount as deleteAccountRecord, hiddenLiabilityAccountIds, isLiveAccount, pauseRecurringRule,
 } from '@finanzapp/domain';
 
 type SqlValue = string | number | null;
@@ -30,16 +31,16 @@ export interface LedgerDatabase extends SqlExecutor {
 }
 
 export const DATABASE_NAME = 'finanzapp-native-pilot-v1.sqlite';
-export const DATABASE_VERSION = 10;
+export const DATABASE_VERSION = 11;
 
 /** Every column of each table, named: a row is read by these lists, never by `SELECT *`, so a
  * column added later cannot leak into a strict-key object, a backup or an audit receipt. */
-const ACCOUNT_COLUMNS = 'id, name, currency, openingMinor, createdAt, revision, updatedAt';
+const ACCOUNT_COLUMNS = 'id, name, currency, openingMinor, createdAt, revision, updatedAt, deletedAt';
 const ENTRY_COLUMNS = 'id, accountId, kind, amountMinor, merchant, category, dateISO, createdAt, revision, voided, updatedAt';
 const TRANSFER_COLUMNS = 'id, fromAccountId, toAccountId, amountMinor, note, dateISO, createdAt, revision, voided, updatedAt';
 const RECURRING_COLUMNS = 'id, accountId, kind, amountMinor, merchant, category, frequency, anchorDateISO, nextDateISO, active, deleted, createdAt, revision, updatedAt';
 const BUDGET_COLUMNS = 'id, scope, category, currency, monthISO, amountMinor, active, createdAt, revision, updatedAt';
-const CARD_COLUMNS = 'id, accountId, issuer, last4, creditLimitMinor, closingDay, dueDay, active, createdAt, revision, updatedAt';
+const CARD_COLUMNS = 'id, accountId, issuer, last4, creditLimitMinor, closingDay, dueDay, active, deleted, createdAt, revision, updatedAt';
 const DEBT_COLUMNS = 'id, accountId, direction, counterparty, dueDateISO, note, active, deleted, createdAt, revision, updatedAt';
 const APPEARANCE_COLUMNS = 'accountId, icon, color, createdAt, revision, updatedAt';
 const CATEGORY_COLUMNS = 'kind, key, storedLabel, label, icon, color, archived, createdAt, revision, updatedAt';
@@ -307,8 +308,27 @@ const MIGRATE_V10 = `
   PRAGMA user_version = 10;
 `;
 
+// Producto 25B2: deletion records for normal accounts (a dated tombstone) and cards (a flag, like debts). Additive:
+// NULL / 0 for every existing row; a deleted card is never active. Rows are kept (never DELETEd): every movement and
+// transfer keeps its account, its name and its currency, and an older backup cannot resurrect the row. Guarded by
+// user_version, in the ordinary exclusive transaction; earlier builds refuse a schema 11 file, unchanged.
+const MIGRATE_V11 = `
+  ALTER TABLE accounts ADD COLUMN deletedAt TEXT CHECK(deletedAt IS NULL OR length(deletedAt) BETWEEN 10 AND 40);
+  ALTER TABLE credit_cards ADD COLUMN deleted INTEGER NOT NULL DEFAULT 0 CHECK(deleted IN (0, 1) AND (deleted = 0 OR active = 0));
+  PRAGMA user_version = 11;
+`;
+
+/** The v11 step, column by column: each ALTER runs only when its column is missing, so a file that already carries one
+ * (an interrupted step, a fixture rebuilt from a later table) reaches 11 without an error and without a second column. */
+async function migrateV11(tx: SqlExecutor): Promise<void> {
+  const has = async (table: string, column: string) => (await tx.getAllAsync<{ name: string }>(`PRAGMA table_info(${table})`)).some(item => item.name === column);
+  if (!await has('accounts', 'deletedAt')) await tx.execAsync('ALTER TABLE accounts ADD COLUMN deletedAt TEXT CHECK(deletedAt IS NULL OR length(deletedAt) BETWEEN 10 AND 40)');
+  if (!await has('credit_cards', 'deleted')) await tx.execAsync('ALTER TABLE credit_cards ADD COLUMN deleted INTEGER NOT NULL DEFAULT 0 CHECK(deleted IN (0, 1) AND (deleted = 0 OR active = 0))');
+  await tx.execAsync('PRAGMA user_version = 11');
+}
+
 /** Every schema script in order, for tests that build a real file at an earlier version (never run by the app outside `initializeDatabase`). */
-export const SCHEMA_SCRIPTS: readonly string[] = [SCHEMA, MIGRATE_V2, MIGRATE_V3, MIGRATE_V4, MIGRATE_V5, MIGRATE_V6, MIGRATE_V7, MIGRATE_V8, MIGRATE_V9, MIGRATE_V10];
+export const SCHEMA_SCRIPTS: readonly string[] = [SCHEMA, MIGRATE_V2, MIGRATE_V3, MIGRATE_V4, MIGRATE_V5, MIGRATE_V6, MIGRATE_V7, MIGRATE_V8, MIGRATE_V9, MIGRATE_V10, MIGRATE_V11];
 
 export async function initializeDatabase(db: LedgerDatabase): Promise<void> {
   // Set before opening a transaction; foreign_keys is connection-local.
@@ -336,6 +356,7 @@ export async function initializeDatabase(db: LedgerDatabase): Promise<void> {
   });
   await db.withExclusiveTransactionAsync(async tx => {
     if (await readVersion(tx) < 10) await tx.execAsync(MIGRATE_V10);
+    if (await readVersion(tx) < 11) await migrateV11(tx);
   });
   await readSnapshot(db); // Validate before showing a balance, not after a render.
 }
@@ -351,11 +372,13 @@ export async function readSnapshot(db: SqlExecutor): Promise<LedgerSnapshot> {
  * whose currency has no pinned scale, or a pinned scale that disagrees, refuses the read by name;
  * the file is never reset or rewritten. */
 export async function readArchive(db: SqlExecutor): Promise<LedgerArchive> {
-  const accountRows = await db.getAllAsync<Account & { revision: number; updatedAt: string }>(`SELECT ${ACCOUNT_COLUMNS} FROM accounts ORDER BY createdAt, id`);
-  const accounts = accountRows.map(row => {
+  const accountRows = await db.getAllAsync<Account & { revision: number; updatedAt: string; deletedAt: string | null }>(`SELECT ${ACCOUNT_COLUMNS} FROM accounts ORDER BY createdAt, id`);
+  const accounts = accountRows.map(({ deletedAt, ...stored }) => {
+    // The tombstone (25B2) is a key only when set: a live row reads exactly as it did before schema 11.
+    const row: Account = deletedAt === null ? stored : { ...stored, deletedAt };
     validateAccount(row);
-    const { revision, updatedAt, ...account } = row;
-    return revision === 0 ? account : row;
+    const { revision, updatedAt, ...plain } = row;
+    return revision === 0 ? plain : row;
   });
   const rows = await db.getAllAsync<Entry & { revision: number; voided: number; updatedAt: string }>(
     `SELECT ${ENTRY_COLUMNS} FROM entries ORDER BY dateISO DESC, createdAt DESC, id DESC`);
@@ -389,11 +412,11 @@ export async function readArchive(db: SqlExecutor): Promise<LedgerArchive> {
     validateMonthlyBudget(budget);
     return budget;
   });
-  const cardRows = await db.getAllAsync<Omit<CreditCardProfile, 'active'> & { active: number }>(
+  const cardRows = await db.getAllAsync<Omit<CreditCardProfile, 'active' | 'deleted'> & { active: number; deleted: number }>(
     `SELECT ${CARD_COLUMNS} FROM credit_cards ORDER BY active DESC, createdAt, id`);
-  const cards = cardRows.map(({ active, ...row }) => {
-    if (active !== 0 && active !== 1) throw new Error('Estado de tarjeta inválido.');
-    const card = { ...row, active: active === 1 };
+  const cards = cardRows.map(({ active, deleted, ...row }) => {
+    if ((active !== 0 && active !== 1) || (deleted !== 0 && deleted !== 1)) throw new Error('Estado de tarjeta inválido.');
+    const card = { ...row, active: active === 1, deleted: deleted === 1 };
     validateCreditCardProfile(card, accounts);
     return card;
   });
@@ -567,6 +590,7 @@ export async function createEntry(db: LedgerDatabase, input: Entry): Promise<voi
     const snapshot = snapshotFromArchive(archive);
     validateEntry(entry, snapshot.accounts);
     assertPostingAccount(entry.accountId, archive.debts);
+    assertOpenAccount(entry.accountId, archive.accounts, archive.cards, archive.debts); // 25B2: nothing new on a deleted account or card.
     if (entry.kind === 'income') assertIncomeAccount(entry.accountId, archive.cards, archive.debts); // 24B6: never a plain income on a card.
     const existing = archive.records.find(item => item.entry.id === entry.id);
     if (existing) {
@@ -592,6 +616,8 @@ export async function changeEntry(db: LedgerDatabase, change: EntryChange): Prom
   await db.withExclusiveTransactionAsync(async tx => {
     const archive = await readArchive(tx);
     validateEntryChange(change, archive.accounts);
+    // 25B2: a movement may be corrected where it is (history of a deleted account stays editable), never moved onto a deleted account or card.
+    if (change.after.entry.accountId !== change.before.entry.accountId) assertOpenAccount(change.after.entry.accountId, archive.accounts, archive.cards, archive.debts);
     assertPostingAccount(change.after.entry.accountId, archive.debts);
     // A historical income on a card is corrected or restored in place; an income moved onto a card, or an expense turned into one, is refused.
     if (change.after.entry.kind === 'income' && !keepsHistoricalCardIncome(change.before.entry, change.after.entry)) assertIncomeAccount(change.after.entry.accountId, archive.cards, archive.debts);
@@ -631,10 +657,7 @@ export async function importArchive(db: LedgerDatabase, incoming: LedgerArchive,
     const pinnedAt = new Date().toISOString();
     for (const unit of plan.currencyUnits) await insertCurrencyUnit(tx, unit, pinnedAt);
     for (const code of currenciesNeedingUnits({ accounts: plan.accounts, budgets: plan.budgets })) await ensureCurrencyUnit(tx, code, pinnedAt);
-    for (const account of plan.accounts) {
-      await tx.runAsync('INSERT INTO accounts (id, name, currency, openingMinor, createdAt, revision, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?)',
-        account.id, account.name, account.currency, account.openingMinor, account.createdAt, account.revision ?? 0, account.updatedAt ?? account.createdAt);
-    }
+    for (const account of plan.accounts) await insertInternalAccount(tx, account);
     for (const record of plan.records) await insertRecord(tx, record);
     for (const record of plan.transfers) await insertTransferRecord(tx, record);
     for (const rule of plan.recurring) await insertRecurringRule(tx, rule);
@@ -693,7 +716,7 @@ export async function createTransfer(db: LedgerDatabase, input: Transfer): Promi
   await db.withExclusiveTransactionAsync(async tx => {
     const archive = await readArchive(tx);
     validateTransfer(transfer, archive.accounts);
-    assertTransferSides(transfer, archive.cards, archive.debts); // 24B6: a card is only ever paid, never a source; no obligation-to-obligation transfer.
+    assertTransferSides(transfer, archive.cards, archive.debts, archive.accounts); // 24B6: a card is only ever paid, never a source; no obligation-to-obligation transfer. 25B2: no deleted side.
     const existing = archive.transfers?.find(r => r.transfer.id === transfer.id);
     if (existing) {
       if (existing.revision !== 0 || !sameTransfer(existing.transfer, transfer)) throw new Error('Esta transferencia ya existe con otros datos.');
@@ -710,7 +733,7 @@ export async function changeTransfer(db: LedgerDatabase, change: TransferChange)
     const archive = await readArchive(tx);
     validateTransferChange(change, archive.accounts);
     // A stored transfer keeps its sides whatever they are; sides that change must be sides a new transfer could have.
-    if (!sameTransferSides(change.before.transfer, change.after.transfer)) assertTransferSides(change.after.transfer, archive.cards, archive.debts);
+    if (!sameTransferSides(change.before.transfer, change.after.transfer)) assertTransferSides(change.after.transfer, archive.cards, archive.debts, archive.accounts);
     const receipt = await tx.getFirstAsync<{ action: string; beforeJSON: string; afterJSON: string }>(
       'SELECT action, beforeJSON, afterJSON FROM transfer_changes WHERE id = ?', change.id);
     if (receipt) {
@@ -742,6 +765,7 @@ export async function saveRecurringRule(db: LedgerDatabase, input: RecurringRule
   await db.withExclusiveTransactionAsync(async tx => {
     const archive = await readArchive(tx);
     validateRecurringRule(rule, archive.accounts);
+    if (rule.active) assertOpenAccount(rule.accountId, archive.accounts, archive.cards, archive.debts); // 25B2: an active rule needs a live account; pausing or deleting one on a deleted account is allowed.
     assertPostingAccount(rule.accountId, archive.debts);
     const existing = archive.recurring?.find(item => item.id === rule.id);
     // 24B6: a recurring income posts to cash; a rule already paying an income into a card keeps doing so until it is moved or paused.
@@ -887,9 +911,9 @@ export async function saveMonthlyBudget(db: LedgerDatabase, input: MonthlyBudget
 
 async function insertCreditCard(tx: SqlExecutor, card: CreditCardProfile): Promise<void> {
   await tx.runAsync(`INSERT INTO credit_cards (id, accountId, issuer, last4, creditLimitMinor, closingDay, dueDay,
-    active, createdAt, revision, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    active, deleted, createdAt, revision, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   card.id, card.accountId, card.issuer, card.last4, card.creditLimitMinor, card.closingDay, card.dueDay,
-  card.active ? 1 : 0, card.createdAt, card.revision, card.updatedAt);
+  card.active ? 1 : 0, card.deleted ? 1 : 0, card.createdAt, card.revision, card.updatedAt);
 }
 async function insertPersonalDebt(tx: SqlExecutor, debt: PersonalDebtProfile): Promise<void> {
   await tx.runAsync(`INSERT INTO personal_debts (id, accountId, direction, counterparty, dueDateISO, note,
@@ -899,10 +923,33 @@ async function insertPersonalDebt(tx: SqlExecutor, debt: PersonalDebtProfile): P
 }
 async function insertInternalAccount(tx: SqlExecutor, account: Account): Promise<void> {
   await tx.runAsync(
-    'INSERT INTO accounts (id, name, currency, openingMinor, createdAt, revision, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?)',
+    'INSERT INTO accounts (id, name, currency, openingMinor, createdAt, revision, updatedAt, deletedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
     account.id, account.name, account.currency, account.openingMinor, account.createdAt,
-    account.revision ?? 0, account.updatedAt ?? account.createdAt,
+    account.revision ?? 0, account.updatedAt ?? account.createdAt, account.deletedAt ?? null,
   );
+}
+
+/** Producto 25B2: the deletion record of a normal account, in one commit with the stop of its active recurring rules.
+ * The row stays (its tombstone dated), every movement and transfer stays untouched, its name and currency keep
+ * naming them; nothing new lands on it afterwards (`assertOpenAccount`). A card's or a debt's internal account is
+ * refused: those are deleted from their own screens. Deleting an account already deleted is a no-op, so a retry
+ * after a failed refresh never fails. */
+export async function deleteAccount(db: LedgerDatabase, accountId: string, nowISO: string): Promise<void> {
+  await db.withExclusiveTransactionAsync(async tx => {
+    const archive = await readArchive(tx);
+    const account = archive.accounts.find(item => item.id === accountId);
+    if (!account) throw new Error('No encontramos esta cuenta.');
+    if (hiddenLiabilityAccountIds(archive.cards, archive.debts).has(accountId)) throw new Error(OBLIGATION_ACCOUNT_MESSAGE);
+    if (!isLiveAccount(account)) return; // Committed already; a refresh failed.
+    const tombstone = deleteAccountRecord(account, nowISO);
+    const stopped = (archive.recurring ?? []).filter(rule => rule.accountId === accountId && rule.active && !rule.deleted).map(rule => pauseRecurringRule(rule, nowISO));
+    const recurring = (archive.recurring ?? []).map(rule => stopped.find(item => item.id === rule.id) ?? rule);
+    validateArchive({ ...archive, accounts: archive.accounts.map(item => item.id === accountId ? tombstone : item), recurring });
+    await tx.runAsync('UPDATE accounts SET revision = ?, updatedAt = ?, deletedAt = ? WHERE id = ?', tombstone.revision!, tombstone.updatedAt!, tombstone.deletedAt!, accountId);
+    for (const rule of stopped) {
+      await tx.runAsync('UPDATE recurring_rules SET active = 0, revision = ?, updatedAt = ? WHERE id = ?', rule.revision, rule.updatedAt, rule.id);
+    }
+  });
 }
 
 /** A card and its hidden account are created in one commit. The opening
@@ -916,7 +963,7 @@ export async function createCreditCard(db: LedgerDatabase, accountInput: Account
     throw new Error('La tarjeta nueva debe comenzar sin crédito a favor y sin correcciones previas.');
   }
   if (card.accountId !== account.id) throw new Error('La tarjeta no coincide con su cuenta interna.');
-  if (card.revision !== 0 || card.updatedAt !== card.createdAt || !card.active) throw new Error('Una tarjeta nueva no puede tener cambios previos.');
+  if (card.revision !== 0 || card.updatedAt !== card.createdAt || !card.active || card.deleted) throw new Error('Una tarjeta nueva no puede tener cambios previos.');
   await db.withExclusiveTransactionAsync(async tx => {
     const archive = await readArchive(tx);
     validateCreditCardProfile(card, [...archive.accounts, account]);
@@ -943,9 +990,10 @@ export async function saveCreditCard(db: LedgerDatabase, input: CreditCardProfil
     if (sameCreditCardProfile(existing, card)) return; // Committed already; a refresh failed.
     validateCreditCardChange(existing, card);
     validateArchive({ ...archive, cards: archive.cards!.map(item => item.id === card.id ? card : item) });
+    // A deletion (25B2) is this same UPDATE with deleted = 1: the row, its account, its purchases and payments stay.
     await tx.runAsync(`UPDATE credit_cards SET issuer = ?, last4 = ?, creditLimitMinor = ?, closingDay = ?, dueDay = ?,
-      active = ?, revision = ?, updatedAt = ? WHERE id = ?`, card.issuer, card.last4, card.creditLimitMinor,
-    card.closingDay, card.dueDay, card.active ? 1 : 0, card.revision, card.updatedAt, card.id);
+      active = ?, deleted = ?, revision = ?, updatedAt = ? WHERE id = ?`, card.issuer, card.last4, card.creditLimitMinor,
+    card.closingDay, card.dueDay, card.active ? 1 : 0, card.deleted ? 1 : 0, card.revision, card.updatedAt, card.id);
   });
 }
 

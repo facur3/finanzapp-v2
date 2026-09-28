@@ -12,6 +12,9 @@ export const cards: Pick<Messages, 'cards'> = {
     panel: {
       recordedDebt: 'Recorded debt',
       archivedDebt: 'Archived card · recorded debt',
+      deletedDebt: 'Deleted card · recorded debt',
+      deletedTitle: 'Deleted card',
+      deletedDetail: 'Its purchases and payments stay in Transactions and in its reports. It cannot be edited and takes no new transactions.',
       noDebt: 'No debt recorded on this card.',
       credit: 'In credit · {amount}',
       available: 'Available',
@@ -75,6 +78,12 @@ export const cards: Pick<Messages, 'cards'> = {
       negativeDebt: 'The current balance can’t be negative. If the card has a credit balance, record it later as a refund.',
       saveFailed: 'We couldn’t save the card. Retry the same submission.',
       archiveFailed: 'We couldn’t archive the card. Retry the same change.',
+      delete: 'Delete card',
+      deleteTitle: 'Delete this card?',
+      deleteDetail: 'It leaves Cards and stops taking purchases and payments. Earlier purchases and payments stay in your records and reports; no balance changes.',
+      deleteDebt: 'It has a recorded debt of {amount}, which stays as it is in the ledger. ',
+      deleteConfirm: 'Delete',
+      deleteFailed: 'We could not delete the card. It stays as it was; try again.',
     },
   },
 };

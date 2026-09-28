@@ -5,7 +5,7 @@ import { snapshotFromArchive, todayKey, type Account, type Entry, type EntryChan
   type CreditCardProfile, type PersonalDebtProfile, type AccountAppearance, type CategoryDefinition } from '@finanzapp/domain';
 import type { CurrencyGate } from '@finanzapp/domain';
 import { currencyGateForBuild } from './currency-gate';
-import { changeEntry, createAccount, createEntry, importArchive, readArchive, changeAccount,
+import { changeEntry, createAccount, createEntry, deleteAccount, importArchive, readArchive, changeAccount,
   createTransfer, changeTransfer, saveRecurringRule, processRecurring, saveMonthlyBudget,
   createCreditCard, saveCreditCard, createPersonalDebt, savePersonalDebt, saveAccountAppearance, saveCategoryDefinition,
   type LedgerDatabase } from './database';
@@ -28,6 +28,8 @@ type LedgerContextValue = {
   addEntry: (entry: Entry) => Promise<void>;
   updateEntry: (change: EntryChange) => Promise<void>;
   updateAccount: (change: AccountChange, appearance?: AccountAppearance) => Promise<void>;
+  /** Producto 25B2: the deletion record of a normal account (its movements stay; its active rules stop). */
+  removeAccount: (accountId: string) => Promise<void>;
   saveAppearance: (appearance: AccountAppearance) => Promise<void>;
   saveCategory: (definition: CategoryDefinition) => Promise<void>;
   addTransfer: (transfer: Transfer) => Promise<void>;
@@ -115,6 +117,7 @@ export function LedgerProvider({ children }: { children: ReactNode }) {
     addEntry: entry => mutate(db => createEntry(db, entry)),
     updateEntry: change => mutate(db => changeEntry(db, change)),
     updateAccount: (change, appearance) => mutate(db => changeAccount(db, change, appearance)),
+    removeAccount: accountId => mutate(db => deleteAccount(db, accountId, new Date().toISOString())),
     saveAppearance: appearance => mutate(db => saveAccountAppearance(db, appearance)),
     saveCategory: definition => mutate(db => saveCategoryDefinition(db, definition)),
     addTransfer: transfer => mutate(db => createTransfer(db, transfer)),

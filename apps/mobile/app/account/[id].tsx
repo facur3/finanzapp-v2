@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { View } from 'react-native';
 import { Redirect, router, Stack, useLocalSearchParams } from 'expo-router';
-import { accountBalanceMinor, currentMonthISO } from '@finanzapp/domain';
+import { accountBalanceMinor, currentMonthISO, isLiveAccount } from '@finanzapp/domain';
 import { useLedger } from '../../src/storage/LedgerProvider';
 import { AccountBadge, AppText, DetailRow, EmptyState, IconButton, Money, Screen, SectionTitle, Stat, Surface, StatRow } from '../../src/ui/components';
 import { useI18n } from '../../src/i18n/provider';
@@ -39,25 +39,28 @@ export default function AccountScreen() {
   if (!account || !snapshot) return <Screen><EmptyState title={t('accounts.detail.notFoundTitle')}
     detail={t('accounts.detail.notFoundDetail')} /></Screen>;
   const balance = accountBalanceMinor(account, entries, transfers);
+  // 25B2: a deleted account is read, never edited or posted to; its history and balance stay exactly as recorded.
+  const live = isLiveAccount(account);
   return <>
-    <Stack.Screen options={{ title: account.name, headerRight: () => <IconButton name="create-outline" label={t('accounts.detail.edit')}
-      onPress={() => router.push({ pathname: '/edit-account/[id]', params: { id } })} /> }} />
+    <Stack.Screen options={{ title: account.name, headerRight: live ? () => <IconButton name="create-outline" label={t('accounts.detail.edit')}
+      onPress={() => router.push({ pathname: '/edit-account/[id]', params: { id } })} /> : undefined }} />
     <EntryList entries={entries} transfers={transfers} accountId={id} accounts={snapshot.accounts} header={<View style={{ gap: space.xl, paddingBottom: 4 }}>
       <View style={{ gap: 8, paddingTop: 8 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
           <AccountBadge accountId={id} size={32} />
-          <AppText secondary variant="subhead" style={{ fontWeight: '500' }}>{t('accounts.detail.recordedBalance')}</AppText>
+          <AppText secondary variant="subhead" style={{ fontWeight: '500' }}>{t(live ? 'accounts.detail.recordedBalance' : 'accounts.manage.deletedTitle')}</AppText>
         </View>
         <Money minor={balance} currency={account.currency} large color={balance < 0 ? p.expense : undefined} />
+        {!live && <AppText secondary variant="footnote">{t('accounts.manage.deletedNote')}</AppText>}
       </View>
       {month && <Surface><StatRow>
         <Stat label={t('accounts.detail.monthExpenses')}><Money minor={-month.expense} currency={account.currency} size={17} tone="expense" signed={month.expense > 0} /></Stat>
         <Stat label={t('accounts.detail.monthIncome')}><Money minor={month.income} currency={account.currency} size={17} tone={month.income ? 'income' : 'neutral'} signed={month.income > 0} /></Stat>
       </StatRow></Surface>}
-      <QuickActions accountId={id} currency={account.currency} />
+      {live && <QuickActions accountId={id} currency={account.currency} />}
       <Surface grouped>
-        <DetailRow label={t('accounts.detail.recurring')} value={recurringCount ? t('accounts.detail.activeRecurring', { count: recurringCount }) : t('accounts.detail.schedule')} icon="repeat-outline"
-          onPress={() => router.push({ pathname: '/recurring', params: { accountId: id } })} />
+        {live && <DetailRow label={t('accounts.detail.recurring')} value={recurringCount ? t('accounts.detail.activeRecurring', { count: recurringCount }) : t('accounts.detail.schedule')} icon="repeat-outline"
+          onPress={() => router.push({ pathname: '/recurring', params: { accountId: id } })} />}
         <DetailRow label={t('accounts.detail.openingBalance')} value={codedAmount(account.openingMinor, account.currency)}
           spokenValue={spokenAmount(account.openingMinor, account.currency)} icon="flag-outline" last />
       </Surface>

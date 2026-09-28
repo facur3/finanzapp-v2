@@ -28,7 +28,7 @@ const entry = (id: string, accountId: string, kind: Entry['kind'], amountMinor: 
   ({ id, accountId, kind, amountMinor, merchant: 'Fixture ' + id, category, dateISO, createdAt: at });
 const ars = cash('ars', 'ARS', 100000), usd = cash('usd', 'USD', 500), eur = cash('eur', 'EUR', 123456), jpy = cash('jpy', 'JPY', 1500), kwd = cash('kwd', 'KWD', 1234567);
 const kwdCardAccount = cash('kwd-card', 'KWD', 0), eurDebtAccount = cash('eur-debt', 'EUR', -5000);
-const kwdCard: CreditCardProfile = { id: 'card', accountId: kwdCardAccount.id, issuer: 'Banco', last4: '1234', creditLimitMinor: 500000, closingDay: 28, dueDay: 5, active: true, createdAt: at, revision: 0, updatedAt: at };
+const kwdCard: CreditCardProfile = { id: 'card', accountId: kwdCardAccount.id, issuer: 'Banco', last4: '1234', creditLimitMinor: 500000, closingDay: 28, dueDay: 5, active: true, deleted: false, createdAt: at, revision: 0, updatedAt: at };
 const eurDebt: PersonalDebtProfile = { id: 'debt', accountId: eurDebtAccount.id, direction: 'owed_by_me', counterparty: 'Ana', dueDateISO: null, note: '', active: true, deleted: false, createdAt: at, revision: 0, updatedAt: at };
 const entries: Entry[] = [
   entry('e-ars', 'ars', 'expense', 101), entry('e-jpy', 'jpy', 'expense', 700), entry('e-kwd', 'kwd', 'expense', 5, 'Transporte'),
@@ -274,7 +274,7 @@ describe('backups: v1–v8 stay frozen to ARS/USD; v9 (24B4) records a scale per
     expect(parsePilotBackup(JSON.stringify(legacyV9)).archive).toEqual({ ...legacyArchive, currencyUnits: [] });
     expect(() => parsePilotBackup(JSON.stringify({ ...createRecoveryBackup(legacyArchive), currencyUnits: [] }))).toThrow('campos faltantes');
     // The unknown-version probe moves one up.
-    expect(() => parsePilotBackup(JSON.stringify({ ...backup, schema: 'finanzapp.native-pilot.v11' }))).toThrow('versiones 1 a 10');
+    expect(() => parsePilotBackup(JSON.stringify({ ...backup, schema: 'finanzapp.native-pilot.v12' }))).toThrow('versiones 1 a 11');
   });
 
   it('a copy\'s pinned scale is identical, new or a conflict on this device; a scale that disagrees with the catalogue never reaches a preview', () => {

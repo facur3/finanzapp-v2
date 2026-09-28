@@ -17,7 +17,7 @@ const usd: Account = { id: 'usd', name: 'Dólares', currency: 'USD', openingMino
 const accounts = [cash, cardAccount, debtAccount, receivableAccount, usd];
 
 const card: CreditCardProfile = { id: 'card', accountId: cardAccount.id, issuer: 'Galicia', last4: '4009', creditLimitMinor: 500000,
-  closingDay: 28, dueDay: 5, active: true, createdAt, revision: 0, updatedAt: createdAt };
+  closingDay: 28, dueDay: 5, active: true, deleted: false, createdAt, revision: 0, updatedAt: createdAt };
 const debt: PersonalDebtProfile = { id: 'debt', accountId: debtAccount.id, direction: 'owed_by_me', counterparty: 'Juan',
   dueDateISO: '2026-10-01', note: '', active: true, deleted: false, createdAt, revision: 0, updatedAt: createdAt };
 const receivable: PersonalDebtProfile = { ...debt, id: 'receivable', accountId: receivableAccount.id, direction: 'owed_to_me', counterparty: 'Ana', dueDateISO: null };

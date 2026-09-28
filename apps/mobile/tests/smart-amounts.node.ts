@@ -27,7 +27,7 @@ const cardAccount: domain.Account = { id: 'card-acc', name: 'Visa', currency: 'A
 const debtAccount: domain.Account = { id: 'debt-acc', name: 'Debo · Juan', currency: 'ARS', openingMinor: -7000, createdAt };
 const receivableAccount: domain.Account = { id: 'rec-acc', name: 'Me debe · Ana', currency: 'ARS', openingMinor: 4000, createdAt };
 const card: domain.CreditCardProfile = { id: 'card', accountId: cardAccount.id, issuer: 'Banco', last4: '1234', creditLimitMinor: null,
-  closingDay: 28, dueDay: 5, active: true, createdAt, revision: 0, updatedAt: createdAt };
+  closingDay: 28, dueDay: 5, active: true, deleted: false, createdAt, revision: 0, updatedAt: createdAt };
 const debt: domain.PersonalDebtProfile = { id: 'debt', accountId: debtAccount.id, direction: 'owed_by_me', counterparty: 'Juan', dueDateISO: null,
   note: '', active: true, deleted: false, createdAt, revision: 0, updatedAt: createdAt };
 const receivable: domain.PersonalDebtProfile = { ...debt, id: 'receivable', accountId: receivableAccount.id, direction: 'owed_to_me', counterparty: 'Ana' };
