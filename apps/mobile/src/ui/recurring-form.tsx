@@ -44,6 +44,9 @@ export function RecurringForm({ original, accountId: requestedAccount }: { origi
   // income into a card keeps that card offered while it is edited. A card carried from Gasto gives way to cash for an income.
   const cashAndCards = postingAccountsFor(kind, accounts, archive?.cards, archive?.debts);
   // 25B2: a rule on an account or card since deleted (paused by the deletion) keeps its own row offered while it is edited.
+  // 25B3: that edit is the recovery path: the other choices are the live cash accounts and cards of the same currency, so the
+  // rule can be moved off the closed row (never onto another deleted account or card, a debt, or another currency) and then
+  // resumed from its detail; saving keeps it paused.
   const historical = before && (keepsHistoricalCardIncome(before, { kind, accountId: before.accountId }) || kind === before.kind)
     ? accounts.filter(item => item.id === before.accountId && !cashAndCards.some(offered => offered.id === item.id)) : [];
   const offered = historical.length ? cashAndCards.concat(historical) : cashAndCards;

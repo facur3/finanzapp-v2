@@ -48,7 +48,7 @@ export const recurring: Pick<Messages, 'recurring'> = {
       resumeRule: 'Resume recurring item',
       deleteRule: 'Delete recurring item',
       pausedNote: 'Paused: nothing is recorded until you resume it. Anything due in the meantime is not recorded.',
-      closedNote: 'Paused: its account or card was deleted, so it is not recorded again. You can delete it.',
+      closedNote: 'Paused: its account or card was deleted, so it is not recorded again. Choose another compatible account or card from Edit and then resume it, or delete this recurring item.',
       reviewNote: 'FinanzApp couldn’t record this recurring rule since {date}. Continue from today to pick it up without recording the earlier ones, or pause it.',
       continueFromToday: 'Continue from today',
       deleteTitle: 'Delete “{merchant}”?',

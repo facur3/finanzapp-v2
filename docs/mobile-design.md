@@ -401,7 +401,11 @@ se materializa o se guarda el dinero.
   una fecha, 24UX2; en tono de aviso si hay que revisarla), Frecuencia, Categoría y Cuenta o Tarjeta (abre
   su detalle). Después «Registrados» (el historial de 24UX2, que deja el formulario) y, al final, las mismas
   acciones del deslizamiento de la fila, con nombre: Pausar/Reanudar recurrente y Eliminar recurrente, con
-  las mismas confirmaciones; una regla cuya cuenta o tarjeta fue eliminada solo ofrece Eliminar y lo dice.
+  las mismas confirmaciones; una regla cuya cuenta o tarjeta fue eliminada ofrece Eliminar como única acción de ciclo
+  de vida y lo dice, y conserva Editar como vía de recuperación: el formulario ofrece las cuentas y tarjetas vivas de la
+  misma moneda (nunca otra eliminada, una deuda ni otra moneda; la próxima fecha debe ser hoy o posterior, como
+  siempre); movida allí sigue pausada, vuelve al detalle y aparece
+  Reanudar, que retoma desde hoy sin registrar lo vencido. Si se deja en la fila cerrada, sigue sin poder reanudarse.
   Pausar o reanudar deja la pantalla abierta y cambia el estado (como Cerrar en una deuda); Eliminar pregunta
   y vuelve a Recurrentes. Editar va en la cabecera y abre el formulario, que ahora es solo el formulario.
   Inicio → Próximos compromisos, Más → Recurrentes y la fila «Recurrente» de un movimiento registrado abren
@@ -440,7 +444,8 @@ se materializa o se guarda el dinero.
   eliminar») nombra el saldo y ofrece **Pagar** (abre el pago revisado, con tope en el saldo, como desde el detalle) y
   **Archivar** (solo si está activa); Cancelar no escribe nada. Nada se cancela ni se escribe en silencio. El
   detalle de una tarjeta eliminada se lee («Tarjeta eliminada · saldo pendiente»), sin edición, sin Registrar
-  compra ni Pagar. En Recurrentes, una regla cuya cuenta o tarjeta fue eliminada ofrece solo Eliminar.
+  compra ni Pagar. En Recurrentes, una regla cuya cuenta o tarjeta fue eliminada ofrece Eliminar como única acción de
+  ciclo de vida; Editar sigue disponible para moverla a una cuenta o tarjeta viva compatible y reanudarla (25B3).
 - **«Saldo pendiente», nunca «Deuda», para una tarjeta** (cierre de 25B2). Lo que se debe en una tarjeta
   (compras menos pagos) se llama «Saldo pendiente» en Tarjetas, en el detalle, en el formulario de compra
   («Tarjeta de crédito · saldo pendiente $ 50,00», «sin saldo pendiente»), en Pagar tarjeta («Saldo

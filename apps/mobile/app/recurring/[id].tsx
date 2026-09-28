@@ -39,7 +39,9 @@ export default function RecurringDetailScreen() {
 
   const income = rule.kind === 'income';
   const review = recurringNeedsReview(rule, day);
-  // 25B2: a rule whose account or card was deleted is paused for good; it can only be deleted (never resumed onto a closed row).
+  // 25B2: a rule whose account or card was deleted is paused and never resumed onto the closed row; its lifecycle here offers
+  // Eliminar only. Editar stays: the form offers a live account or card of the same currency (the recovery path); once the
+  // rule sits on one it is no longer closed, still paused, and Reanudar comes back (resume never records the backlog).
   const closed = manage.closed(rule);
   const card = archive.cards?.find(item => item.accountId === account.id);
   const busy = manage.busyId === rule.id;

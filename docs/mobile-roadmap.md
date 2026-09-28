@@ -1167,7 +1167,8 @@ implemented yet.
   balance payable and, once 24T exists, every pending instalment (recorded above); nothing is cancelled or
   written silently. The recurring catch-up (`processRecurring`, on opening and on returning to the
   foreground) is the second net: a rule whose account, card or debt is deleted records nothing whatever
-  its flag says, and Recurrentes offers such a rule Eliminar only (no Reanudar onto a closed row).
+  its flag says, and Recurrentes offers such a rule Eliminar as its only lifecycle action (no Reanudar onto a closed row);
+  its recovery path is Editar → a live account or card of the same currency → Reanudar (made explicit in 25B3).
 - **Debts and recurring.** Recurring audited, not redesigned: pause/resume/delete and their history are
   unchanged; deleting an account pauses its rules through `pauseRecurringRule`. Debts: close/reopen
   unchanged; deletion changed in the debt lifecycle round below.
@@ -1281,12 +1282,23 @@ implemented yet.
   the form: real movements by their occurrence id, twelve then a count, each row opens the movement); then the
   lifecycle: Pausar/Reanudar recurrente and Eliminar recurrente with the same rules and confirmations as the row's
   swipe (`useRecurringManagement`, now exposing `closed`: a rule whose account or card was deleted offers Eliminar
-  only and says why, «Pausado: su cuenta o tarjeta fue eliminada…»), the 24UX5 review note and «Continuar desde hoy».
+  as its only lifecycle action and says why, «Pausado: su cuenta o tarjeta fue eliminada…», naming the recovery path below), the 24UX5 review note and «Continuar desde hoy».
   Pausing or resuming keeps the detail open and updates the state (as a debt's Cerrar does); deleting asks first and
   goes back to Recurrentes. Editar (header, hidden on a rule already deleted) opens `/edit-recurring/[id]`, which is
   now only the form (Guardar cambios; no history, no lifecycle buttons). Hydration and deletion behave as the form
   did (not found before the ledger loads or on a cold link to a deleted rule; a rule deleted from this screen stays
   drawn without actions while it closes).
+- **Rule on a deleted account or card (exact, 2026-09-28 round).** Two things, kept apart. *Lifecycle:* the rule is
+  Pausado, records nothing, cannot be resumed while it points at the closed row (`closed`; storage refuses an active rule
+  there), and offers Eliminar. *Recovery:* Editar stays available because the form offers, beside the rule's own closed row,
+  the live cash accounts and cards of the same currency (`postingAccountsFor` + the kept row; never another deleted account
+  or card, a debt or receivable, or another currency); the form's own rule still applies (the next date must be today or
+  later, so a rule paused across its date is brought forward by the person, never backfilled); moving the rule there and
+  saving keeps it paused and returns to the detail, which no longer reads it as closed and offers Reanudar recurrente; Reanudar is `resumeRecurringRule` as always
+  (the next date moves to today or later on the rule's own day, nothing due while paused is recorded). Leaving the closed
+  row unchanged keeps Reanudar unavailable. The note says so: «Pausado: su cuenta o tarjeta fue eliminada, así que no
+  vuelve a registrarse. Podés elegir otra compatible desde Editar y después reanudarlo, o eliminar este recurrente.» No
+  storage, schema or backup change.
 - **Navigation (exact).** Inicio → Próximos compromisos → row, Más → Recurrentes → row, and Movimiento → «Recurrente»
   row open `/recurring/[id]`; Editar is one step past the detail. Nothing else changed: Movimientos, Cuentas, Tarjetas
   and Deudas keep their detail-first navigation; the account detail's Recurrentes row still opens the filtered list.
@@ -1308,6 +1320,10 @@ implemented yet.
   deletion of the detail, the movement's Recurrente row), `home-ranking.node.ts` (+1: the Inicio row opens the detail
   with the hint in both languages), `lifecycle-actions.node.ts` (`closed`), `more-routes.node.ts` (the version line),
   `recurring-audit.node.ts` (the new files in the copy audit), the static VoiceOver and translation guards unchanged.
+  Recovery round: `recovery-routes.node.ts` (+1: a deleted account and a deleted card, each moved through the form to a
+  live same-currency account or card, saved paused, then Reanudar on the detail resuming from today with no backlog; the
+  other currency, another deleted account or card and the debt never offered; the closed row left unchanged keeps Reanudar
+  unavailable), `polish-routes.node.ts` (the note's wording).
 - **Status.** Delivered on this branch (2026-09-28), not device-verified. Checked on Linux: root `npm test`,
   `check:repo`; mobile `typecheck`, `test:storage`, `currency:verify`, `regions:verify`, `i18n:check -- --strict`,
   `i18n:extract`, `check`, `export:ios` (the counts are in the PR). No EAS build; the iPhone was not touched.

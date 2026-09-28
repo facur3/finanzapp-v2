@@ -579,7 +579,7 @@ test('25B3: a rule on a deleted account (paused by the deletion) offers Eliminar
   const view = harness('recurring/[id].tsx', { id: 'rent' }, data);
   const root = view.render();
   assert.equal(buttons(root), 'Eliminar recurrente', '25B2: never resumed onto a closed row');
-  assert.ok(texts(root).includes('Pausado: su cuenta o tarjeta fue eliminada, así que no vuelve a registrarse. Podés eliminarlo.'));
+  assert.ok(texts(root).includes('Pausado: su cuenta o tarjeta fue eliminada, así que no vuelve a registrarse. Podés elegir otra compatible desde Editar y después reanudarlo, o eliminar este recurrente.'), 'the note names the recovery path, not only Eliminar');
   assert.ok(find(root, 'Stack.Screen').props.options.headerRight, 'its history stays editable in place');
   find(root, 'DetailRow', 'Cuenta').props.onPress();
   assert.equal(JSON.stringify(view.pushed.at(-1)), JSON.stringify({ pathname: '/account/[id]', params: { id: 'cash' } }));

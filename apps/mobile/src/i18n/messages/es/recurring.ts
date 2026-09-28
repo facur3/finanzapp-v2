@@ -60,8 +60,10 @@ export const recurring = {
       deleteRule: 'Eliminar recurrente',
       /** Over the detail's actions of a paused rule. */
       pausedNote: 'Pausado: no registra nada hasta que lo reanudes. Lo que venza mientras tanto no se registra.',
-      /** 25B2/25B3: over the detail's actions of a rule whose account or card was deleted (paused by the deletion; only Eliminar is offered). */
-      closedNote: 'Pausado: su cuenta o tarjeta fue eliminada, así que no vuelve a registrarse. Podés eliminarlo.',
+      /** 25B2/25B3: over the detail's actions of a rule whose account or card was deleted: paused by the deletion, it records nothing
+       * and cannot be resumed while it points at the closed row; Editar may move it to a live account or card of the same currency
+       * (the recovery path), after which Reanudar comes back; Eliminar is the other way out. */
+      closedNote: 'Pausado: su cuenta o tarjeta fue eliminada, así que no vuelve a registrarse. Podés elegir otra compatible desde Editar y después reanudarlo, o eliminar este recurrente.',
       /** 24UX5: over the detail's actions of an active rule the catch-up could not record (a real failure; a long backlog is recorded on its own, in batches). */
       reviewNote: 'FinanzApp no pudo registrar este recurrente desde el {date}. Continuá desde hoy para retomarlo sin registrar los anteriores, o pausalo.',
       continueFromToday: 'Continuar desde hoy',

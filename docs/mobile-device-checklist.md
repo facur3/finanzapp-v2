@@ -23,7 +23,12 @@ schema change, no data change. Use your own small test data; never seed movement
      Reanudar recurrente appears; the screen stays. Reanudar: «Activo» again with the next date on its own day.
    - [ ] Eliminar recurrente: the same «¿Eliminar «…»?» alert as the row's swipe; Cancelar changes nothing; Eliminar
      goes back to Recurrentes and the rule is gone; its recorded movements stay in Movimientos.
-   - [ ] A rule whose account was deleted (25B2): the detail offers Eliminar only and says why.
+   - [ ] A rule whose account was deleted (25B2): the detail offers Eliminar as its only lifecycle button and the note names
+     the way out. Editar: the account field offers the deleted row and the live accounts/cards of the same currency only
+     (no other currency, no deleted card, no debt); pick a live one and, if the next date is past, a date from today on
+     (Guardar refuses a past date); Guardar: back on the detail, still Pausado, Reanudar
+     recurrente now offered; Reanudar: Activo with the next date today or later, no movement recorded for the paused
+     period. Cancel the edit instead: still Eliminar only.
    - [ ] A rule with a next date already past (force-quit the app across a due day with the rule paused, resume it on
      its due day, or set the iPhone date forward): «Revisar» in amber, the note with the date, «Continuar desde hoy».
 3. **Accessibility.** VoiceOver on a Recurrentes row and on an Inicio commitment row reads the rule (merchant,
@@ -59,7 +64,7 @@ unchanged: keep a backup first** (Más → Copia de seguridad). Use your own sma
    card → Editar → «Eliminar tarjeta» opens "Todavía no se puede eliminar" naming the debt, with Pagar and Archivar;
    Cancelar changes nothing; Pagar opens the payment capped at the debt. Pay it to zero, then delete: the confirmation
    says purchases and payments stay; confirm: the card leaves the carousel; its purchases and payments stay in
-   Movimientos; Recurrentes shows its rule paused, offering Eliminar only; force-quit, reopen and background/foreground
+   Movimientos; Recurrentes shows its rule paused, offering Eliminar only (Editar can re-home it, 25B3); force-quit, reopen and background/foreground
    the app past the rule's next date: no new purchase on the card; the detail reads "Tarjeta eliminada" without
    Registrar compra ni Pagar. No swipe on the carousel.
    **History.** Delete the only account in a second currency (with a movement in a previous month): Inicio keeps the

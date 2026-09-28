@@ -1373,6 +1373,77 @@ test('25B2 review: a paused rule on a deleted account is edited on its own accou
   assert.deepEqual(find(fresh.render(), 'AccountField').props.accounts.map((a: domain.Account) => a.id), ['u']);
 });
 
+test('25B3: a rule on a deleted account or card is recovered through Editar: moved to a live same-currency account or card it stays paused and Reanudar comes back on the detail, resuming from today with no backlog; the closed row, another currency, another deleted row and a debt are never targets', async () => {
+  const deletedAt = '2026-09-20T10:00:00.000Z';
+  const gone = (row: domain.Account) => ({ ...row, revision: 1, updatedAt: deletedAt, deletedAt });
+  const live: domain.Account = { ...account, id: 'b', name: 'Banco ARS' };
+  const otherGone = gone({ ...account, id: 'c', name: 'Vieja ARS' });
+  const deadCard: domain.CreditCardProfile = { ...card, id: 'dead', accountId: 'dead-acc', active: false, deleted: true, revision: 1, updatedAt: deletedAt };
+  const deadCardAccount: domain.Account = { ...cardAccount, id: 'dead-acc', name: 'Visa vieja' };
+  // Paused by the deletion (25B2), its next date long past: what resuming must never record.
+  const rule = (accountId: string): domain.RecurringRule => ({ id: 'gym', accountId, kind: 'expense', amountMinor: 700, merchant: 'Gimnasio', category: 'Salud', frequency: 'monthly',
+    anchorDateISO: '2026-01-05', nextDateISO: '2026-02-05', active: false, deleted: false, createdAt, revision: 1, updatedAt: deletedAt });
+  const accounts = [gone(account), live, otherGone, archive.accounts[1], cardAccount, deadCardAccount, debtAccount];
+  const data = (accountId: string): domain.LedgerArchive => ({ ...archive, accounts, cards: [card, deadCard], debts: [debt], recurring: [rule(accountId)] });
+  const settled = async () => { await new Promise(resolve => setImmediate(resolve)); };
+
+  // Before the edit: closed on the detail, Eliminar the only lifecycle action, Editar in the header.
+  const before = harness('app/recurring/[id].tsx', {}, { data: data('a'), params: { id: 'gym' } });
+  const beforeRoot = before.render();
+  assert.equal(nodes(beforeRoot).filter(node => node.type === 'ActionButton').map(node => node.props.label).join(','), 'Eliminar recurrente');
+  assert.ok(nodes(beforeRoot).some(node => node.type === 'AppText' && String(node.props.children).includes('Podés elegir otra compatible desde Editar y después reanudarlo')));
+  assert.ok(find(beforeRoot, 'Stack.Screen').props.options.headerRight, 'Editar is the recovery path');
+
+  // The form offers the closed row and the live same-currency cash accounts and cards only.
+  const editing = harness('src/ui/recurring-form.tsx', { original: rule('a') }, { data: data('a') });
+  const field = find(editing.render(), 'AccountField');
+  assert.deepEqual([field.props.value, field.props.accounts.map((a: domain.Account) => a.id)], ['a', ['b', 'card-acc', 'a']],
+    'never the USD account, another deleted account, a deleted card or the debt');
+  // Saving it as it is: the form refuses a next date already past (the rule's own rule), so the closed row is never
+  // rewritten by accident; the detail stays closed, still without Reanudar.
+  await find(editing.render(), 'ActionButton').props.onPress();
+  assert.equal(editing.rules.length, 0);
+  assert.equal(find(editing.render(), 'ErrorMessage').props.message, 'recurring.form.pastDate');
+  assert.equal(editing.backs(), 0);
+  assert.equal(nodes(before.render()).filter(node => node.type === 'ActionButton').map(node => node.props.label).join(','), 'Eliminar recurrente');
+
+  // Moved to the live account with its next date brought to today: saved paused, one revision on, back to the detail.
+  const today = domain.todayKey();
+  find(editing.render(), 'DateField').props.onChange(new Date(today + 'T12:00:00'));
+  field.props.onChange('b');
+  await find(editing.render(), 'ActionButton').props.onPress();
+  await settled();
+  assert.equal(editing.rules.length, 1);
+  assert.deepEqual([editing.rules[0].accountId, editing.rules[0].active, editing.rules[0].revision, editing.rules[0].nextDateISO], ['b', false, 2, today], 'still paused: the move records nothing');
+  assert.equal(editing.backs(), 1);
+  const moved = harness('app/recurring/[id].tsx', {}, { data: { ...data('a'), recurring: [editing.rules[0]] }, params: { id: 'gym' } });
+  const movedRoot = moved.render();
+  assert.equal(nodes(movedRoot).filter(node => node.type === 'ActionButton').map(node => node.props.label).join(','), 'Reanudar recurrente,Eliminar recurrente', 'no longer closed');
+  assert.ok(nodes(movedRoot).some(node => node.type === 'AppText' && String(node.props.children).startsWith('Pausado: no registra nada')));
+  await find(movedRoot, 'ActionButton', 'Reanudar recurrente').props.onPress();
+  await settled();
+  const resumed = moved.rules[0];
+  assert.deepEqual([resumed.accountId, resumed.active, resumed.revision], ['b', true, 3]);
+  assert.ok(resumed.nextDateISO >= domain.todayKey(), 'resumed from today on its own day: nothing that fell due while paused is recorded');
+  assert.equal(domain.recurringOccurrencesThrough(resumed, domain.todayKey()).length <= 1, true, 'at most today, never the backlog');
+  assert.equal(moved.additions.length, 0, 'the detail itself records no movement');
+
+  // A rule on a deleted card, moved to a live card or cash account of the currency: the same recovery.
+  const onDeadCard = harness('src/ui/recurring-form.tsx', { original: rule('dead-acc') }, { data: data('dead-acc') });
+  const cardField = find(onDeadCard.render(), 'AccountField');
+  assert.deepEqual([cardField.props.value, cardField.props.accounts.map((a: domain.Account) => a.id)], ['dead-acc', ['b', 'card-acc', 'dead-acc']]);
+  find(onDeadCard.render(), 'DateField').props.onChange(new Date(today + 'T12:00:00'));
+  cardField.props.onChange('card-acc');
+  await find(onDeadCard.render(), 'ActionButton').props.onPress();
+  await settled();
+  assert.deepEqual([onDeadCard.rules[0].accountId, onDeadCard.rules[0].active], ['card-acc', false]);
+  const recoveredCard = harness('app/recurring/[id].tsx', {}, { data: { ...data('dead-acc'), recurring: [onDeadCard.rules[0]] }, params: { id: 'gym' } });
+  assert.equal(nodes(recoveredCard.render()).filter(node => node.type === 'ActionButton').map(node => node.props.label).join(','), 'Reanudar recurrente,Eliminar recurrente');
+  // Storage keeps the second net: a rule made active on a closed row is refused there (25B2), so the detail never asks it to.
+  assert.throws(() => domain.assertOpenAccount('a', accounts, [card, deadCard], [debt]));
+  assert.throws(() => domain.assertOpenAccount('dead-acc', accounts, [card, deadCard], [debt]));
+});
+
 test('25B2 review: a payment link naming a deleted card opens a plain transfer instead of preselecting it', () => {
   const deletedAt = '2026-09-20T10:00:00.000Z';
   const data: domain.LedgerArchive = { ...liabilityData, cards: [{ ...card, active: false, deleted: true, revision: 1, updatedAt: deletedAt }] };
