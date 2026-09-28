@@ -10,6 +10,7 @@ import * as moneyInput from '../src/ui/money-input.ts';
 import { PREVIEW_CURRENCIES } from '../src/storage/currency-gate.ts';
 import * as currencies from '../src/ui/currencies.ts';
 import * as liabilityPresentation from '../src/ui/liability-presentation.ts';
+import * as installmentPresentation from '../src/ui/installment-presentation.ts';
 import * as i18nFormat from '../src/i18n/format.ts';
 import { bindLocale } from '../src/i18n/bind.ts';
 import type { AppLocale } from '../src/i18n/locale.ts';
@@ -19,7 +20,7 @@ let activeLocale: AppLocale = 'es-AR';
 const i18nProvider = { useI18n: () => bindLocale(activeLocale) };
 
 // Exercise the Cards tab, card detail and debts handlers with native hosts
-// replaced by descriptors. Not a rendered iOS screen, carousel or gesture test.
+// replaced by descriptors. Not a rendered iOS screen, deck animation or gesture test.
 type Node = { type: any; props: Record<string, any> };
 const createdAt = '2026-09-01T12:00:00.000Z';
 const cash: domain.Account = { id: 'cash', name: 'Banco', currency: 'ARS', openingMinor: 100000, createdAt };
@@ -65,6 +66,8 @@ function harness(file: string, params: Record<string, unknown> = {}, initial: do
   const components = { ...Object.fromEntries(componentNames.map(name => [name, name])), toneColors: () => ({ color: '#000', soft: '#eee' }), useStacked: () => false };
   const theme = { space: { xs: 4, s: 8, m: 12, l: 16, xl: 20, xxl: 24, xxxl: 32 }, useCurrentDay: () => '2026-09-20', useReduceMotion: () => true,
     usePalette: () => ({ text: '#000', secondary: '#666', tertiary: '#999', line: '#ddd', inset: '#eee', expense: '#c00', income: '#080', warning: '#a60', transfer: '#03c', primary: '#2557D6' }) };
+  // 24T2 (stream A): the deck replaces the carousel; the face keeps its width rule.
+  const cardVisual = { CardDeck: 'CardDeck', CardFace: 'CardFace', cardFaceWidth: (windowWidth: number) => Math.min(windowWidth - 40, 420) };
   const GATE = (typeof gate !== 'undefined' && gate) || domain.LEDGER_CURRENCIES;
   const defaults = { useDefaultCurrency: ({ accountCurrency, requested }: { accountCurrency?: string | null; requested?: unknown } = {}) => accountCurrency ?? (domain.isLedgerCurrency(requested, GATE) ? requested : 'ARS') };
   const modules: Record<string, unknown> = {
@@ -91,7 +94,7 @@ function harness(file: string, params: Record<string, unknown> = {}, initial: do
     '../src/storage/LedgerProvider': ledger, '../../src/storage/LedgerProvider': ledger, '../storage/LedgerProvider': ledger,
     '../src/ui/components': components, '../../src/ui/components': components, './components': components,
     './currencies': currencies, './currency-switch': { CurrencySwitch: 'CurrencySwitch' }, '../src/ui/currency-switch': { CurrencySwitch: 'CurrencySwitch' }, '../../src/ui/currency-switch': { CurrencySwitch: 'CurrencySwitch' },
-    '../src/ui/card-visual': { CardCarousel: 'CardCarousel', CardFace: 'CardFace' }, '../../src/ui/card-visual': { CardCarousel: 'CardCarousel', CardFace: 'CardFace' },
+    '../src/ui/card-visual': cardVisual, '../../src/ui/card-visual': cardVisual,
     '../src/ui/entry-list': { EntryList: 'EntryList' }, '../../src/ui/entry-list': { EntryList: 'EntryList' },
     '../src/ui/liability-presentation': liabilityPresentation, '../../src/ui/liability-presentation': liabilityPresentation,
     '../src/ui/presentation': presentation, '../../src/ui/presentation': presentation,
@@ -101,6 +104,11 @@ function harness(file: string, params: Record<string, unknown> = {}, initial: do
     '../src/ui/quick-actions': { QuickActions: 'QuickActions', AssistantEntry: 'AssistantEntry' }, '../../src/ui/quick-actions': { QuickActions: 'QuickActions', AssistantEntry: 'AssistantEntry' },
     '../src/ui/motion': { ValueTransition: 'ValueTransition', Reflow: 'Reflow', selectionHaptic: () => {}, impactHaptic: () => {}, timing: (kind: string, reduced: boolean) => ({ duration: reduced ? 0 : 260 }) }, '../../src/ui/motion': { ValueTransition: 'ValueTransition', Reflow: 'Reflow', selectionHaptic: () => {}, impactHaptic: () => {}, timing: (kind: string, reduced: boolean) => ({ duration: reduced ? 0 : 260 }) },
   };
+  // 24T2 (stream A): the rows of the card surfaces as descriptors, the plan presentation and the snapshot's own imports.
+  Object.assign(components, { StatRow: 'StatRow' });
+  const cardRows = { FutureInstallmentsRow: 'FutureInstallmentsRow', ArchivedCardRow: 'ArchivedCardRow', PlanRow: 'PlanRow', ScheduleRow: 'ScheduleRow' };
+  Object.assign(modules, { '../src/ui/card-rows': cardRows, '../../src/ui/card-rows': cardRows, '../../src/ui/installment-presentation': installmentPresentation,
+    './liability-presentation': liabilityPresentation, './motion': modules['../src/ui/motion'], '@expo/vector-icons/Ionicons': 'Ionicons' });
   const require = (name: string) => {
     if (!Object.hasOwn(modules, name)) throw new Error('Unexpected liabilities dependency: ' + name);
     return modules[name];
@@ -108,6 +116,9 @@ function harness(file: string, params: Record<string, unknown> = {}, initial: do
   // 24UX4: the management hooks run for real (Alert, saveDebt, router and haptics are the mocks above).
   const management = realModule('src/ui/commitment-actions.ts', require);
   modules['../src/ui/commitment-actions'] = management; modules['../../src/ui/commitment-actions'] = management;
+  // 24T2 (stream A): the balance, the three facts and the usage bar run for real, so the screens' figures are inspected as rendered.
+  const panel = realModule('src/ui/card-panel.tsx', require);
+  modules['../src/ui/card-panel'] = panel; modules['../../src/ui/card-panel'] = panel;
   const module = { exports: {} as { default?: () => Node } & Record<string, (props: any) => Node> };
   runInNewContext(code, { module, exports: module.exports, require, Error });
   return { render: () => { cursor = 0; return module.exports.default!(); }, renderExport: (name: string, props: any = {}) => { cursor = 0; return module.exports[name](props); },
@@ -115,7 +126,7 @@ function harness(file: string, params: Record<string, unknown> = {}, initial: do
     setData: (next: domain.LedgerArchive | null) => { data = next as domain.LedgerArchive; } };
 }
 
-// Nested function components (CardPanel, UsageBar, DebtRow) are expanded so
+// Nested function components (CardSnapshot, CardFacts, UsageBar, DebtRow) are expanded so
 // their descriptors can be inspected like the host components.
 function nodes(value: any): Node[] {
   if (!value || typeof value !== 'object') return [];
@@ -134,7 +145,7 @@ function find(root: Node, type: string, label?: string): Node {
 test('Tarjetas shows an honest empty state and a debts invitation without any card', () => {
   const root = harness('cards.tsx', {}, empty).render();
   assert.equal(find(root, 'EmptyState').props.title, 'Tus tarjetas, como en la billetera');
-  assert.equal(nodes(root).some(node => node.type === 'CardCarousel'), false);
+  assert.equal(nodes(root).some(node => node.type === 'CardDeck'), false);
   find(root, 'EmptyState').props.action.props.onPress();
   assert.equal(nodes(root).some(node => node.type === 'DebtRow'), false);
   assert.equal(nodes(root).some(node => node.type === 'SectionTitle' && node.props.children === 'Deudas y cobros'), false, 'personal debts live under Más');
@@ -151,18 +162,23 @@ test('Tarjetas summarizes the selected card from recorded purchases and payments
   assert.equal(add.props.label, 'Agregar tarjeta');
   add.props.onPress();
   assert.equal(view.pushed.at(-1), '/new-card');
-  const carousel = find(root, 'CardCarousel');
-  assert.deepEqual(carousel.props.items.map((item: { id: string }) => item.id), ['card', 'usd-card']);
-  const face = find(root, 'CardFace');
-  assert.equal(face.props.name, 'Visa Gold');
-  assert.equal(face.props.last4, '4009');
-  assert.equal(face.props.currency, 'ARS');
+  // 24T2: a vertical deck in the stored order, the first card in front until another is chosen.
+  const deck = find(root, 'CardDeck');
+  assert.equal(deck.props.cards.map((item: { id: string }) => item.id).join(','), 'card,usd-card');
+  assert.equal(deck.props.selectedId, 'card');
+  const face = deck.props.cards[0];
+  assert.equal(face.name, 'Visa Gold');
+  assert.equal(face.last4, '4009');
+  assert.equal(face.currency, 'ARS');
+  assert.equal(face.issuer, 'Galicia');
+  assert.equal(face.color, null, 'no colour chosen in Editar cuenta: the face keeps its hash tone');
+  assert.equal(deck.props.showCurrency, true, 'cards in ARS and USD: each face prints its code');
   // 20.000 opening debt + 23.100 purchase − 30.000 payment.
   assert.equal(find(root, 'Money').props.minor, 13100);
   const purchases = nodes(root).filter(node => node.type === 'Money').map(node => node.props.minor);
   assert.ok(purchases.includes(500000 - 13100), 'available limit is limit minus recorded debt');
   const caption = nodes(root).find(node => node.type === 'SectionTitle' && node.props.action === 'Ver todo')!.props.caption;
-  assert.match(caption, /^Resumen abierto desde .* · 1 compra · 1 pago$/, 'statement facts live in one caption line');
+  assert.match(caption, /^Ciclo abierto desde .* · 1 compra · 1 pago$/, 'the open cycle\'s facts live in one caption line');
   assert.equal(nodes(root).filter(node => node.type === 'Surface').length >= 1, true);
   find(root, 'ActionButton', 'Registrar compra').props.onPress();
   assert.equal(JSON.stringify(view.pushed.at(-1)), JSON.stringify({ pathname: '/new-entry', params: { accountId: 'card-acc', kind: 'expense' } }));
@@ -178,14 +194,15 @@ test('Tarjetas summarizes the selected card from recorded purchases and payments
   assert.equal(nodes(root).filter(node => node.type === 'SectionTitle').map(node => node.props.children).join(','), 'Recientes');
 });
 
-test('switching the carousel selection changes the panel, and a card without limit hides availability', () => {
+test('choosing another card in the deck changes the snapshot, and a card without limit says so instead of a figure', () => {
   const view = harness('cards.tsx');
-  find(view.render(), 'CardCarousel').props.onSelect(1);
+  find(view.render(), 'CardDeck').props.onSelect('usd-card');
   const root = view.render();
-  assert.equal(find(root, 'CardCarousel').props.selectedIndex, 1);
+  assert.equal(find(root, 'CardDeck').props.selectedId, 'usd-card', 'the selection is the card, not a position');
   const panel = nodes(root).find(node => typeof node.type === 'function' && node.props.summary)!;
   assert.equal(panel.props.summary.card.id, 'usd-card');
   assert.equal(panel.props.summary.availableMinor, null);
+  assert.ok(nodes(root).some(node => node.type === 'AppText' && node.props.children === 'Sin límite cargado'));
   assert.equal(find(root, 'ActionButton', 'Pagar tarjeta').props.disabled, true, 'nothing to pay on a card without debt');
 });
 
@@ -201,14 +218,14 @@ test('card detail lists only that card account with card context and links purch
   // Identity on the card face, one debt, three facts, primary above secondary, then activity. No detail table.
   assert.equal(nodes(root).some(node => node.type === 'DetailRow'), false);
   const stats = nodes(root).filter(node => node.type === 'Stat').map(node => node.props.label);
-  assert.deepEqual(stats, ['Disponible', 'Cierre', 'Vencimiento']);
+  assert.equal(stats.join(','), 'Vence,Cierra,Disponible', '24T2: the next due date first, then the next closing, then what is available');
   assert.ok(nodes(root).filter(node => node.type === 'Money').map(node => node.props.minor).includes(500000 - 13100), 'available limit');
   assert.ok(nodes(root).some(node => node.type === 'AppText' && node.props.children === 'de $\u00A05.000,00'), 'the limit is a caption under Disponible (one catalogue string)');
   const buttons = nodes(root).filter(node => node.type === 'ActionButton').map(node => node.props);
   assert.deepEqual(buttons.map(button => button.label), ['Registrar compra', 'Pagar tarjeta']);
   assert.equal(buttons[1].secondary, true);
   assert.ok(buttons.every(button => button.containerStyle === undefined), 'both actions span the full width');
-  assert.match(find(root, 'SectionTitle').props.caption, /^Resumen abierto desde .* · 1 compra · 1 pago$/);
+  assert.match(find(root, 'SectionTitle').props.caption, /^Ciclo abierto desde .* · 1 compra · 1 pago$/);
   assert.equal(find(harness('card/[id].tsx', { id: 'missing' }).render(), 'EmptyState').props.title, 'No encontramos esta tarjeta');
 });
 
@@ -242,16 +259,15 @@ test('Tarjetas and Deudas read English labels, keep user names as typed and send
     const cardsRoot = cardsView.render();
     const header = nodes(cardsRoot).find(node => node.type === 'Stack.Screen')!.props.options;
     assert.equal(header.title, 'Cards');
-    assert.deepEqual(nodes(cardsRoot).filter(node => node.type === 'Stat').map(node => node.props.label), ['Available', 'Closing', 'Due']);
-    assert.match(find(cardsRoot, 'SectionTitle').props.caption, /^Statement open since .* · 1 purchase · 1 payment$/);
+    assert.equal(nodes(cardsRoot).filter(node => node.type === 'Stat').map(node => node.props.label).join(','), 'Due,Closes,Available');
+    assert.match(find(cardsRoot, 'SectionTitle').props.caption, /^Cycle open since .* · 1 purchase · 1 payment$/);
     find(cardsRoot, 'ActionButton', 'Pay card').props.onPress();
     assert.equal(JSON.stringify(cardsView.pushed.at(-1)), JSON.stringify({ pathname: '/new-transfer', params: { toAccountId: 'card-acc', maxAmountMinor: '13100' } }));
-    const face = nodes(cardsRoot).find(node => node.type === 'CardFace')!;
-    assert.equal(face.props.name, 'Visa Gold', 'the card name is user data');
-    assert.equal(face.props.accessibilityHint, 'Opens the card details');
+    // The deck's hints and labels are spoken by card-visual itself (cards-deck.node.ts).
+    assert.equal(find(cardsRoot, 'CardDeck').props.cards[0].name, 'Visa Gold', 'the card name is user data');
 
     const detail = harness('card/[id].tsx', { id: 'card' }).render();
-    assert.ok(nodes(detail).some(node => node.type === 'AppText' && node.props.children === 'Outstanding balance'), 'the same noun as the payment form (Outstanding balance)');
+    assert.ok(nodes(detail).some(node => node.type === 'AppText' && node.props.children === 'Outstanding balance\u00A0·\u00A0ARS'), 'the same noun as the payment form (Outstanding balance), with its currency as in Tarjetas');
     assert.equal(nodes(detail).find(node => node.type === 'Stack.Screen')!.props.options.title, 'Visa Gold');
 
     const debtView = harness('debt/[id].tsx', { id: 'debt' });
@@ -272,10 +288,10 @@ test('Tarjetas and Deudas read English labels, keep user names as typed and send
 test('statement caption and due label keep the Spanish wording and follow a translator', () => {
   const statement = { startISO: '2026-08-29', purchaseCount: 2, paymentCount: 1 };
   const relative = (iso: string) => i18nFormat.relativeDate(iso, '2026-09-20');
-  assert.equal(liabilityPresentation.statementCaption(statement, relative), 'Resumen abierto desde 29 ago · 2 compras · 1 pago');
-  assert.equal(liabilityPresentation.statementCaption({ ...statement, purchaseCount: 1, paymentCount: 0 }, relative), 'Resumen abierto desde 29 ago · 1 compra · 0 pagos');
+  assert.equal(liabilityPresentation.statementCaption(statement, relative), 'Ciclo abierto desde 29 ago · 2 compras · 1 pago');
+  assert.equal(liabilityPresentation.statementCaption({ ...statement, purchaseCount: 1, paymentCount: 0 }, relative), 'Ciclo abierto desde 29 ago · 1 compra · 0 pagos');
   assert.equal(liabilityPresentation.statementCaption(statement, iso => i18nFormat.relativeDate(iso, '2026-09-20', 'en-AR'), bindLocale('en-AR').t),
-    'Statement open since Aug 29 · 2 purchases · 1 payment');
+    'Cycle open since Aug 29 · 2 purchases · 1 payment');
   assert.equal(liabilityPresentation.dueLabel('2026-09-19', '2026-09-20'), domain.labelFromISO('2026-09-19', new Date('2026-09-20T12:00:00')));
   assert.equal(liabilityPresentation.dueLabel('2026-10-01', '2026-09-20', 'en-US'), 'Oct 1');
 });
@@ -303,24 +319,25 @@ test('23.1C2: a day inside a sentence starts in lower case; a day on its own kee
   const closedYesterday: domain.CreditCardProfile = { ...card, closingDay: 18 };
   const caption = (file: string) => nodes(harness(file, { id: 'card' }, { ...archive, cards: [closedYesterday, usdCard] }).render())
     .find(node => node.type === 'SectionTitle' && node.props.caption)!.props.caption;
-  assert.match(caption('cards.tsx'), /^Resumen abierto desde ayer · /);
-  assert.match(caption('card/[id].tsx'), /^Resumen abierto desde ayer · /);
+  assert.match(caption('cards.tsx'), /^Ciclo abierto desde ayer · /);
+  assert.match(caption('card/[id].tsx'), /^Ciclo abierto desde ayer · /);
   activeLocale = 'en-US';
   try {
     assert.deepEqual(detailOf(dueToday), { status: 'Due today', rows: 'Type=I owe,Due date=Today,Status=Due today' });
     assert.deepEqual(rowOf(dueToday), { label: 'I owe Juan, 300.00 ARS, Due today', caption: 'I owe · Due today' });
     assert.equal(detailOf(debt).status, 'Due Oct 1', 'an English short date keeps its capital month');
-    assert.match(caption('cards.tsx'), /^Statement open since yesterday · /);
+    assert.match(caption('cards.tsx'), /^Cycle open since yesterday · /);
   } finally { activeLocale = 'es-AR'; }
   const inline = (locale: AppLocale) => (iso: string) => i18nFormat.relativeDate(iso, '2026-09-20', locale, true);
   const statement = { startISO: '2026-09-19', purchaseCount: 2, paymentCount: 1 };
-  assert.equal(liabilityPresentation.statementCaption(statement, inline('es-AR')), 'Resumen abierto desde ayer · 2 compras · 1 pago');
-  assert.equal(liabilityPresentation.statementCaption(statement, inline('en-AR'), bindLocale('en-AR').t), 'Statement open since yesterday · 2 purchases · 1 payment');
+  assert.equal(liabilityPresentation.statementCaption(statement, inline('es-AR')), 'Ciclo abierto desde ayer · 2 compras · 1 pago');
+  assert.equal(liabilityPresentation.statementCaption(statement, inline('en-AR'), bindLocale('en-AR').t), 'Cycle open since yesterday · 2 purchases · 1 payment');
 });
 
 test('23.1C2: the card usage caption is shown in the region\'s format and spoken in the language\'s numbers', () => {
   // 13.100 of 5.000.000 cents used: 3 % of the limit.
-  const usage = () => nodes(harness('cards.tsx').render()).find(node => node.type === 'AppText' && typeof node.props.accessibilityLabel === 'string')!;
+  // 24T2: the dates above it carry their spoken form too; the usage caption is the one under the bar (caption size).
+  const usage = () => nodes(harness('cards.tsx').render()).find(node => node.type === 'AppText' && node.props.variant === 'caption' && typeof node.props.accessibilityLabel === 'string')!;
   const expected: [AppLocale, string, string][] = [
     ['es-AR', '3 % del límite de $\u00A05.000,00', '3 % del límite de 5000,00 pesos'],
     ['es-US', '3 % del límite de AR$\u00A05,000.00', '3 % del límite de 5000,00 pesos'],

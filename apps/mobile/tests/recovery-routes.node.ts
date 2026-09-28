@@ -8,6 +8,7 @@ import * as domain from '@finanzapp/domain';
 import * as presentation from '../src/ui/presentation.ts';
 import * as budgetPresentation from '../src/ui/budget-presentation.ts';
 import * as liabilityPresentation from '../src/ui/liability-presentation.ts';
+import * as installmentPresentation from '../src/ui/installment-presentation.ts';
 import * as moneyInput from '../src/ui/money-input.ts';
 import * as entryPrefill from '../src/ui/entry-prefill.ts';
 import * as appearance from '../src/ui/appearance.ts';
@@ -107,6 +108,8 @@ function harness(file: string, props: any = {}, options: { data?: domain.LedgerA
   modules['./commitment-actions'] = realModule('src/ui/commitment-actions.ts', require);
   modules['../../src/ui/commitment-actions'] = { ...(modules['./commitment-actions'] as object), useAccountManagement: accountManagement.useAccountManagement };
   modules['../../src/ui/recurring-history'] = realModule('src/ui/recurring-history.tsx', require);
+  // 24T2 (stream A): the movement detail reads which instalment of which plan recorded a movement.
+  modules['../../src/ui/installment-presentation'] = installmentPresentation;
   const module = { exports: {} as Record<string, (props: any) => Node> };
   runInNewContext(code, { module, exports: module.exports, Date, Error, require });
   return {

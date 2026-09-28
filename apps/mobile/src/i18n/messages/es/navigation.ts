@@ -32,6 +32,8 @@ export const navigation = {
       recurringRule: 'Recurrente',
       budgets: 'Presupuestos',
       card: 'Tarjeta',
+      /** 24T2: a purchase in instalments; the screen replaces it with the merchant's name once it has the plan. */
+      installment: 'Plan de cuotas',
       debts: 'Deudas',
       debt: 'Deuda',
       cards: 'Tarjetas',
