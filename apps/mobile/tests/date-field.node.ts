@@ -474,3 +474,57 @@ test('24B6: the list sheets keep their page-sheet geometry: only the date field 
   assert.equal(modal.props.allowSwipeDismissal, true);
   assert.equal(nodes(root).some(node => node.type === 'SafeAreaView'), true);
 });
+
+// ---- Producto 24T2 (stream B): optional props for the card form's statement dates -------------------------------------
+
+test('24T2: DateField keeps its defaults (the last row of its group, 1900-01-01 to today, to 2100-12-31 with allowFuture) and takes `last` and bounds', () => {
+  const saved: string[] = [];
+  const onChange = (date: Date) => saved.push(todayKey(date));
+  let root = harness().render();
+  assert.equal(find(root, 'DetailRow')!.props.last, true, 'by default the row is the last of its grouped surface');
+  assert.equal(todayKey(find(root, 'DateTimePicker')!.props.minimumDate), '1900-01-01');
+  assert.equal(todayKey(find(root, 'DateTimePicker')!.props.maximumDate), todayKey(new Date()));
+  root = harness().render('DateField', { value: new Date(2026, 8, 22, 12), onChange, allowFuture: true });
+  assert.equal(todayKey(find(root, 'DateTimePicker')!.props.maximumDate), '2100-12-31');
+  // Two dates in one group: the first draws its hairline; the bounds reach the wheel.
+  root = harness().render('DateField', { value: new Date(2026, 8, 28, 12), onChange, allowFuture: true, last: false,
+    minimumDate: new Date(2026, 8, 20), maximumDate: new Date(2027, 11, 31) });
+  assert.equal(find(root, 'DetailRow')!.props.last, false);
+  assert.deepEqual([todayKey(find(root, 'DateTimePicker')!.props.minimumDate), todayKey(find(root, 'DateTimePicker')!.props.maximumDate)], ['2026-09-20', '2027-12-31']);
+  assert.deepEqual([find(root, 'DetailRow')!.props.value, find(root, 'DetailRow')!.props.spokenValue], ['28 sep 2026', '28 de septiembre de 2026']);
+  assert.deepEqual(saved, []);
+});
+
+test('24T2: an unchosen date reads as a prompt, on screen and for VoiceOver; the wheel opens inside its bounds and Listo saves the day it shows', () => {
+  const saved: string[] = [];
+  const onChange = (date: Date) => saved.push(todayKey(date));
+  const field = harness();
+  const bounds = { minimumDate: new Date(2026, 8, 20), maximumDate: new Date(2100, 11, 31) };
+  const unchosen = { value: null, onChange, label: 'Próximo cierre', allowFuture: true, ...bounds };
+  let root = field.render('DateField', unchosen);
+  const row = find(root, 'DetailRow')!;
+  assert.deepEqual([row.props.label, row.props.value, row.props.spokenValue], ['Próximo cierre', 'Elegir fecha', 'Elegir fecha']);
+  assert.equal(typeof row.props.onPress, 'function');
+  // Without `initial`, the wheel opens on today, kept within the bounds.
+  row.props.onPress();
+  root = field.render('DateField', unchosen);
+  const today = todayKey(new Date()), lowest = '2026-09-20';
+  assert.equal(todayKey(find(root, 'DateTimePicker')!.props.value), today < lowest ? lowest : today);
+  button(root, 'Cancelar').props.onPress();
+  root = field.render('DateField', unchosen);
+  assert.deepEqual(saved, [], 'Cancel saves nothing');
+  assert.equal(find(root, 'DetailRow')!.props.value, 'Elegir fecha', 'still unchosen');
+  // `initial` places the wheel (below the minimum it is the minimum); Listo saves the day shown.
+  const other = harness();
+  const placed = { value: null, onChange, allowFuture: true, placeholder: 'Sin fecha', initial: new Date(2026, 8, 1, 12), ...bounds, minimumDate: new Date(2026, 9, 6) };
+  root = other.render('DateField', placed);
+  assert.equal(find(root, 'DetailRow')!.props.value, 'Sin fecha');
+  find(root, 'DetailRow')!.props.onPress();
+  root = other.render('DateField', placed);
+  assert.equal(todayKey(find(root, 'DateTimePicker')!.props.value), '2026-10-06');
+  button(root, 'Listo').props.onPress();
+  assert.deepEqual(saved, ['2026-10-06']);
+  const english = harness();
+  english.setLocale('en-US');
+  assert.equal(find(english.render('DateField', { value: null, onChange }), 'DetailRow')!.props.value, 'Choose date');
+});

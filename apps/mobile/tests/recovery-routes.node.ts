@@ -16,6 +16,8 @@ import * as i18nFormat from '../src/i18n/format.ts';
 import { bindLocale } from '../src/i18n/bind.ts';
 import type { AppLocale } from '../src/i18n/locale.ts';
 import { realModule } from './real-module.ts';
+// 24T2 (stream B): the entry form's «Pago» section derivation (pure, real in the harness).
+import * as purchasePlan from '../src/ui/purchase-plan.ts';
 
 // Actual screen/form handlers with native hosts replaced by descriptors.
 // This does not render UIKit, the Files picker, animation frames or gestures.
@@ -98,6 +100,8 @@ function harness(file: string, props: any = {}, options: { data?: domain.LedgerA
     './category-hues': { useCategoryColor: () => '#3E6FB0', useCategoryLabel: (s: string) => s, useCategoryDefinitions: () => [], useCategoryLook: (s: string) => ({ label: s, storedLabel: s, key: String(s).toLowerCase(), hex: '#3E6FB0', glyph: 'pricetag-outline' }), useCategoryLookOf: () => (s: string) => ({ label: s, storedLabel: s, key: String(s).toLowerCase(), hex: '#3E6FB0', glyph: 'pricetag-outline' }), useAccountLook: () => ({ icon: 'wallet', color: 'cobalt', glyph: 'wallet-outline', hex: '#2557D6' }), useAccountNameOf: () => (account: any) => account.name, useAccountLookOf: () => () => ({ icon: 'wallet', color: 'cobalt', glyph: 'wallet-outline', hex: '#2557D6' }) }, '../src/ui/category-hues': { useCategoryColor: () => '#3E6FB0', useCategoryLabel: (s: string) => s, useCategoryDefinitions: () => [], useCategoryLook: (s: string) => ({ label: s, storedLabel: s, key: String(s).toLowerCase(), hex: '#3E6FB0', glyph: 'pricetag-outline' }), useCategoryLookOf: () => (s: string) => ({ label: s, storedLabel: s, key: String(s).toLowerCase(), hex: '#3E6FB0', glyph: 'pricetag-outline' }), useAccountLook: () => ({ icon: 'wallet', color: 'cobalt', glyph: 'wallet-outline', hex: '#2557D6' }), useAccountNameOf: () => (account: any) => account.name, useAccountLookOf: () => () => ({ icon: 'wallet', color: 'cobalt', glyph: 'wallet-outline', hex: '#2557D6' }) }, '../../src/ui/category-hues': { useCategoryColor: () => '#3E6FB0', useCategoryLabel: (s: string) => s, useCategoryDefinitions: () => [], useCategoryLook: (s: string) => ({ label: s, storedLabel: s, key: String(s).toLowerCase(), hex: '#3E6FB0', glyph: 'pricetag-outline' }), useCategoryLookOf: () => (s: string) => ({ label: s, storedLabel: s, key: String(s).toLowerCase(), hex: '#3E6FB0', glyph: 'pricetag-outline' }), useAccountLook: () => ({ icon: 'wallet', color: 'cobalt', glyph: 'wallet-outline', hex: '#2557D6' }), useAccountNameOf: () => (account: any) => account.name, useAccountLookOf: () => () => ({ icon: 'wallet', color: 'cobalt', glyph: 'wallet-outline', hex: '#2557D6' }) },
     '../src/ui/appearance': appearance, '../../src/ui/appearance': appearance,
     '../src/ui/appearance-picker': { IconColorPicker: 'IconColorPicker' }, '../../src/ui/appearance-picker': { IconColorPicker: 'IconColorPicker' },
+    // 24T2 (stream B): the entry form's «Pago» section: its derivation is real, the section itself a descriptor (tests/installment-purchase.node.ts renders it).
+    './purchase-plan': purchasePlan, './installment-purchase': { InstallmentPurchase: 'InstallmentPurchase' },
   };
   const require = (name: string) => {
     if (!Object.hasOwn(modules, name)) throw new Error('Unexpected recovery dependency: ' + name);

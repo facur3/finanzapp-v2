@@ -15,6 +15,8 @@ import * as i18nFormat from '../src/i18n/format.ts';
 import { bindLocale } from '../src/i18n/bind.ts';
 import type { AppLocale } from '../src/i18n/locale.ts';
 import { realModule, swipeActionsMock } from './real-module.ts';
+// 24T2 (stream B): the card form's statement dates (pure, real in the harness).
+import * as cardCycleForm from '../src/ui/card-cycle-form.ts';
 // The locale every harness reads on render; an English test switches it and restores Spanish.
 let activeLocale: AppLocale = 'es-AR';
 const i18nProvider = { useI18n: () => bindLocale(activeLocale) };
@@ -103,6 +105,8 @@ function harness(file: string, params: Record<string, unknown> = {}, initial: do
     './swipe-actions': swipeActionsMock,
     '../src/ui/quick-actions': { QuickActions: 'QuickActions', AssistantEntry: 'AssistantEntry' }, '../../src/ui/quick-actions': { QuickActions: 'QuickActions', AssistantEntry: 'AssistantEntry' },
     '../src/ui/motion': { ValueTransition: 'ValueTransition', Reflow: 'Reflow', selectionHaptic: () => {}, impactHaptic: () => {}, timing: (kind: string, reduced: boolean) => ({ duration: reduced ? 0 : 260 }) }, '../../src/ui/motion': { ValueTransition: 'ValueTransition', Reflow: 'Reflow', selectionHaptic: () => {}, impactHaptic: () => {}, timing: (kind: string, reduced: boolean) => ({ duration: reduced ? 0 : 260 }) },
+    // 24T2 (stream B): the card form's statement dates (real) and its «Usar estos días todos los meses» switch (a descriptor).
+    './card-cycle-form': cardCycleForm, './switch-row': { SwitchRow: 'SwitchRow' },
   };
   // 24T2 (stream A): the rows of the card surfaces as descriptors, the plan presentation and the snapshot's own imports.
   Object.assign(components, { StatRow: 'StatRow' });
@@ -381,11 +385,13 @@ test('24B5: the card and debt forms choose the currency before the amount, over 
   assert.equal(find(card.render(), 'AmountField').props.currency, 'JPY', 'the field knows the currency before a digit is typed');
   find(card.render(), 'Field', 'Nombre de la tarjeta').props.onChangeText('Rakuten');
   find(card.render(), 'AmountField', 'Saldo pendiente hoy (opcional)').props.onChangeText('1500');
-  find(card.render(), 'Field', 'Día de cierre').props.onChangeText('28');
-  find(card.render(), 'Field', 'Día de vencimiento').props.onChangeText('5');
+  // 24T2: the statement dates on a calendar (the harness day is 2026-09-20): the next closing and the due of that closing.
+  find(card.render(), 'DateField', 'Próximo cierre').props.onChange(new Date(2026, 8, 28, 12));
+  find(card.render(), 'DateField', 'Vencimiento').props.onChange(new Date(2026, 9, 5, 12));
   await find(card.render(), 'ActionButton', 'Crear tarjeta').props.onPress();
   assert.equal(card.cards.length, 1);
   assert.deepEqual([card.cards[0].account.currency, card.cards[0].account.openingMinor], ['JPY', -1500], '1500 yen owed, never 15.00');
+  assert.deepEqual([card.cards[0].card.closingDay, card.cards[0].card.dueDay], [28, 5], '24T2: the usual days are the days of the dates entered');
   const debt = forms('src/ui/debt-form.tsx', PREVIEW_CURRENCIES);
   find(debt.render(), 'CurrencySwitch').props.onChange('KWD');
   find(debt.render(), 'AmountField').props.onChangeText('1,234');
