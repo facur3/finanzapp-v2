@@ -96,8 +96,8 @@ test('schema 13 is reached from a real schema 12 file by an additive migration: 
   assert.equal(await version(db), 14, 'refused unchanged');
   await db.execAsync('PRAGMA user_version = 13');
   // The row needs its card, and a due on or before its closing is refused by the schema itself.
-  await assert.rejects(db.withExclusiveTransactionAsync(async tx => { await tx.runAsync(`INSERT INTO card_cycle_dates (cardId, sequence, closingISO, dueISO, closingDay, dueDay, createdAt, revision, updatedAt) VALUES ('nope', 0, '2026-10-28', '2026-11-05', 28, 5, '${createdAt}', 0, '${createdAt}')`); }), /FOREIGN KEY/);
-  await assert.rejects(db.withExclusiveTransactionAsync(async tx => { await tx.runAsync(`INSERT INTO card_cycle_dates (cardId, sequence, closingISO, dueISO, closingDay, dueDay, createdAt, revision, updatedAt) VALUES ('card', 0, '2026-10-28', '2026-10-28', 28, 5, '${createdAt}', 0, '${createdAt}')`); }), /CHECK/);
+  await assert.rejects(db.withExclusiveTransactionAsync(async tx => { await tx.runAsync(`INSERT INTO card_cycle_dates (cardId, sequence, closingISO, dueISO, closingDay, dueDay, monthISO, createdAt, revision, updatedAt) VALUES ('nope', 0, '2026-10-28', '2026-11-05', 28, 5, '2026-10', '${createdAt}', 0, '${createdAt}')`); }), /FOREIGN KEY/);
+  await assert.rejects(db.withExclusiveTransactionAsync(async tx => { await tx.runAsync(`INSERT INTO card_cycle_dates (cardId, sequence, closingISO, dueISO, closingDay, dueDay, monthISO, createdAt, revision, updatedAt) VALUES ('card', 0, '2026-10-28', '2026-10-28', 28, 5, '2026-10', '${createdAt}', 0, '${createdAt}')`); }), /CHECK/);
 });
 
 test('a new card stores its first statement exactly only when its usual days cannot produce it, in the card’s own commit; a retry is a no-op and other dates are refused', async () => {
@@ -135,20 +135,23 @@ test('exact dates for the open statement freeze the statement before it in the s
   assert.deepEqual(await rowsOf(db), ['0 2026-09-28 2026-10-06 1', '1 2026-10-26 2026-11-04 0']);
   assert.deepEqual(await viewOn(db, '2026-10-03'), { open: '2026-10-26', openDue: '2026-11-04', previous: '2026-09-28', nextDue: '2026-10-06', toPay: '2026-09-28' });
   assert.deepEqual(await viewOn(db, '2026-10-27'), { open: '2026-11-15', openDue: '2026-11-25', previous: '2026-10-26', nextDue: '2026-11-04', toPay: '2026-10-26' });
-  // Weeks later, new days again: the statement that closed on 26 oct stays, the gap is frozen too, nothing closed moves.
+  // Weeks later, new days again: the statement that closed on 15 nov and the open one are frozen (the gap too), nothing
+  // closed moves, and the new days apply after the open statement.
   await saveCreditCard(db, edit(card, 4, '2026-12-01', { closingDay: 20, dueDay: 30 }), {}, '2026-12-01');
-  assert.deepEqual(await rowsOf(db), ['0 2026-09-28 2026-10-06 1', '1 2026-10-26 2026-11-04 0', '2 2026-11-15 2026-11-25 0']);
-  assert.deepEqual(await viewOn(db, '2026-12-01'), { open: '2026-12-20', openDue: '2026-12-30', previous: '2026-11-15', nextDue: '2026-12-30', toPay: null });
+  assert.deepEqual(await rowsOf(db), ['0 2026-09-28 2026-10-06 1', '1 2026-10-26 2026-11-04 0', '2 2026-11-15 2026-11-25 0', '3 2026-12-15 2026-12-25 0']);
+  assert.deepEqual(await viewOn(db, '2026-12-01'), { open: '2026-12-15', openDue: '2026-12-25', previous: '2026-11-15', nextDue: '2026-12-25', toPay: null });
+  assert.deepEqual(await viewOn(db, '2026-12-16'), { open: '2027-01-20', openDue: '2027-01-30', previous: '2026-12-15', nextDue: '2026-12-25', toPay: '2026-12-15' });
 });
 
-test('a card without exact dates keeps working exactly as before: an archive and a reactivation write no date; a days change freezes only the statement still counted', async () => {
+test('a card without exact dates keeps working exactly as before: an archive and a reactivation write no date; a days change freezes the statement still to pay and the open one', async () => {
   const { db } = await seeded();
   await saveCreditCard(db, edit(card, 1, '2026-10-01', { active: false }), {}, '2026-10-01');
   await saveCreditCard(db, edit(card, 2, '2026-10-01', { active: true, issuer: 'Otro banco' }), {}, '2026-10-01');
   assert.equal((await readArchive(db)).cardCycleDates, undefined);
   await saveCreditCard(db, edit(card, 3, '2026-10-02', { closingDay: 15, dueDay: 25, issuer: 'Otro banco' }), {}, '2026-10-02');
-  assert.deepEqual(await rowsOf(db), ['0 2026-09-28 2026-10-05 0']);
-  assert.deepEqual(await viewOn(db, '2026-10-02'), { open: '2026-10-15', openDue: '2026-10-25', previous: '2026-09-28', nextDue: '2026-10-05', toPay: '2026-09-28' });
+  assert.deepEqual(await rowsOf(db), ['0 2026-09-28 2026-10-05 0', '1 2026-10-28 2026-11-05 0']);
+  assert.deepEqual(await viewOn(db, '2026-10-02'), { open: '2026-10-28', openDue: '2026-11-05', previous: '2026-09-28', nextDue: '2026-10-05', toPay: '2026-09-28' });
+  assert.deepEqual(await viewOn(db, '2026-10-29'), { open: '2026-11-15', openDue: '2026-11-25', previous: '2026-10-28', nextDue: '2026-11-05', toPay: '2026-10-28' });
 });
 
 test('a plan created after exact dates uses them; one created before keeps its contractual schedule; recognition follows each stored schedule; a restart reads everything back', async () => {
@@ -247,8 +250,9 @@ test('review round: after new usual days the history before the chain keeps its 
   await createAccount(db, bank);
   await createCreditCard(db, cardAccount, { ...card, closingDay: 1, dueDay: 8 });
   await saveCreditCard(db, edit({ ...card, closingDay: 1, dueDay: 8 }, 1, '2026-10-02', { closingDay: 13, dueDay: 2 }), {}, '2026-10-02');
-  assert.deepEqual(await rowsOf(db), ['0 2026-10-01 2026-10-08 0']);
+  assert.deepEqual(await rowsOf(db), ['0 2026-10-01 2026-10-08 0', '1 2026-11-01 2026-11-08 0']);
   const archive = await readArchive(db);
-  assert.deepEqual(archive.cardCycleDates!.map(row => [row.closingDay, row.dueDay]), [[1, 8]], 'the frozen statement records the calendar it belonged to');
-  assert.deepEqual(await viewOn(db, '2026-10-02'), { open: '2026-11-13', openDue: '2026-12-02', previous: '2026-10-01', nextDue: '2026-10-08', toPay: '2026-10-01' });
+  assert.deepEqual(archive.cardCycleDates!.map(row => [row.closingDay, row.dueDay, row.monthISO]), [[1, 8, '2026-10'], [1, 8, '2026-11']],
+    'the frozen statements record the calendar and the slot they belong to');
+  assert.deepEqual(await viewOn(db, '2026-10-02'), { open: '2026-11-01', openDue: '2026-11-08', previous: '2026-10-01', nextDue: '2026-10-08', toPay: '2026-10-01' });
 });

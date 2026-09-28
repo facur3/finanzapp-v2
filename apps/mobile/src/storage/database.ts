@@ -53,7 +53,7 @@ const CATEGORY_COLUMNS = 'kind, key, storedLabel, label, icon, color, archived, 
 const UNIT_COLUMNS = 'currency, minorUnitExponent, source, catalogVersion, createdAt';
 const PLAN_COLUMNS = 'id, cardId, merchant, category, currency, purchaseDateISO, principalMinor, count, interestMinor, interestCategory, feeMinor, feeCategory, taxMinor, taxCategory, cancelledAt, deleted, createdAt, revision, updatedAt';
 const INSTALLMENT_COLUMNS = 'planId, number, billingDateISO, dueDateISO, principalMinor, interestMinor, feeMinor, taxMinor';
-const CARD_CYCLE_COLUMNS = 'cardId, sequence, closingISO, dueISO, closingDay, dueDay, createdAt, revision, updatedAt';
+const CARD_CYCLE_COLUMNS = 'cardId, sequence, closingISO, dueISO, closingDay, dueDay, monthISO, createdAt, revision, updatedAt';
 
 const SCHEMA = `
   CREATE TABLE accounts (
@@ -374,7 +374,8 @@ const MIGRATE_V12 = `
 
 // Producto 24T2: the exact statement dates of a card. One additive table, nothing else touched: each row is one statement
 // of one card (a closing and the due date of THAT closing, `dueISO > closingISO`, with the usual days of the calendar it
-// belongs to), and a card's rows form one chain of consecutive statements ordered by `sequence`
+// belongs to and the usual statement, `monthISO`, it stands for), and a card's rows form one chain of consecutive
+// statements ordered by `sequence`
 // (packages/domain/card-cycles.ts). The card's usual closing and due days stay on `credit_cards` as the grid of the months
 // after the chain; the first row's days are the grid before it. No row is fabricated for old data: a schema 12 file opens with
 // an empty table and every card reads exactly as before. Rows are never DELETEd (a correction updates its row, one revision
@@ -387,6 +388,7 @@ const MIGRATE_V13 = `
     dueISO TEXT NOT NULL CHECK(length(dueISO) = 10 AND dueISO > closingISO),
     closingDay INTEGER NOT NULL CHECK(closingDay BETWEEN 1 AND 31),
     dueDay INTEGER NOT NULL CHECK(dueDay BETWEEN 1 AND 31),
+    monthISO TEXT NOT NULL CHECK(length(monthISO) = 7),
     createdAt TEXT NOT NULL,
     revision INTEGER NOT NULL DEFAULT 0 CHECK(revision >= 0 AND revision <= 9007199254740991),
     updatedAt TEXT NOT NULL,
@@ -1026,8 +1028,8 @@ async function insertCreditCard(tx: SqlExecutor, card: CreditCardProfile): Promi
   card.active ? 1 : 0, card.deleted ? 1 : 0, card.createdAt, card.revision, card.updatedAt);
 }
 async function insertCardCycleDate(tx: SqlExecutor, row: CardCycleDates): Promise<void> {
-  await tx.runAsync(`INSERT INTO card_cycle_dates (${CARD_CYCLE_COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    row.cardId, row.sequence, row.closingISO, row.dueISO, row.closingDay, row.dueDay, row.createdAt, row.revision, row.updatedAt);
+  await tx.runAsync(`INSERT INTO card_cycle_dates (${CARD_CYCLE_COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    row.cardId, row.sequence, row.closingISO, row.dueISO, row.closingDay, row.dueDay, row.monthISO, row.createdAt, row.revision, row.updatedAt);
 }
 async function insertPersonalDebt(tx: SqlExecutor, debt: PersonalDebtProfile): Promise<void> {
   await tx.runAsync(`INSERT INTO personal_debts (id, accountId, direction, counterparty, dueDateISO, note,
