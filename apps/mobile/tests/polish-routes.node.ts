@@ -46,8 +46,9 @@ function harness(file: string, params: Record<string, unknown> = {}, data: domai
   const removedIds: string[] = [];
   const alerts: { title: string; message: string; buttons: any[] }[] = [];
   const refs: any[] = [];
-  let cursor = 0, refCursor = 0, failNext: Error | null = null;
+  let cursor = 0, refCursor = 0, failNext: Error | null = null, held: Promise<void> | null = null;
   const ledger = { useLedger: () => ({ archive: data, snapshot: domain.snapshotFromArchive(data), removeAccount: async (id: string) => { if (failNext) { const cause = failNext; failNext = null; throw cause; } removedIds.push(id); }, saveRecurring: async (next: domain.RecurringRule) => {
+    if (held) { const pending = held; held = null; await pending; }
     if (failNext) { const cause = failNext; failNext = null; throw cause; }
     saved.push(next);
   } }) };
@@ -97,7 +98,9 @@ function harness(file: string, params: Record<string, unknown> = {}, data: domai
   modules['../../src/ui/recurring-history'] = realModule('src/ui/recurring-history.tsx', require);
   const module = { exports: {} as { default?: () => Node } };
   runInNewContext(code, { module, exports: module.exports, require, Error });
-  return { render: () => { cursor = 0; refCursor = 0; return module.exports.default!(); }, pushed, saved, alerts, removedIds, backs: () => backs, failSave: (cause: Error) => { failNext = cause; } };
+  return { render: () => { cursor = 0; refCursor = 0; return module.exports.default!(); }, pushed, saved, alerts, removedIds, backs: () => backs, failSave: (cause: Error) => { failNext = cause; },
+    // The next save waits until the returned function is called: the screen is observed mid-write.
+    holdSave: () => { let release!: () => void; held = new Promise<void>(resolve => { release = resolve; }); return release; } };
 }
 function nodes(value: any): Node[] {
   if (!value || typeof value !== 'object') return [];
@@ -651,4 +654,63 @@ test('25B3: an unknown or deleted rule, or one without its account, is not found
   const deleted = domain.deleteRecurringRule(rule, '2026-09-19T12:00:00.000Z');
   assert.equal(find(harness('recurring/[id].tsx', { id: 'rent' }, { ...archive, recurring: [deleted] }).render(), 'EmptyState').props.title, 'No encontramos este recurrente', 'a cold link to a deleted rule');
   assert.equal(find(harness('recurring/[id].tsx', { id: 'rent' }, { ...archive, accounts: archive.accounts.filter(item => item.id !== 'cash') }).render(), 'EmptyState').props.title, 'No encontramos este recurrente', 'no account, no currency to show');
+});
+
+test('25B3 review: while a pause, a resume or a confirmed deletion is being written the detail holds navigation (no native back, no back swipe, Editar disabled); success or failure gives it back, a failed write keeps the screen with its error, and a deletion pops exactly once', async () => {
+  const nav = (root: Node) => { const options = find(root, 'Stack.Screen').props.options; return [options.gestureEnabled, options.headerBackVisible, options.headerRight?.().props.disabled]; };
+  const busyButtons = (root: Node) => nodes(root).filter(node => node.type === 'ActionButton').map(node => node.props.busy || node.props.disabled).every(Boolean);
+  // Pausar pending.
+  const pausing = harness('recurring/[id].tsx', { id: 'rent' });
+  assert.deepEqual(nav(pausing.render()), [true, true, false], 'at rest the screen navigates as usual');
+  let release = pausing.holdSave();
+  const pausePress = find(pausing.render(), 'ActionButton', 'Pausar recurrente').props.onPress();
+  assert.deepEqual(nav(pausing.render()), [false, false, true], 'mid-write: back, swipe and Editar held');
+  assert.equal(busyButtons(pausing.render()), true);
+  release(); await pausePress; await settle();
+  assert.deepEqual(nav(pausing.render()), [true, true, false], 'released after the durable save');
+  assert.equal(pausing.backs(), 0);
+  // Reanudar pending.
+  const resuming = harness('recurring/[id].tsx', { id: 'rent' }, { ...archive, recurring: [{ ...rule, active: false, revision: 1 }] });
+  release = resuming.holdSave();
+  const resumePress = find(resuming.render(), 'ActionButton', 'Reanudar recurrente').props.onPress();
+  assert.deepEqual(nav(resuming.render()), [false, false, true]);
+  release(); await resumePress; await settle();
+  assert.deepEqual(nav(resuming.render()), [true, true, false]);
+  assert.equal(resuming.saved[0].active, true);
+  // Eliminar confirmed and pending: held, then exactly one back.
+  const deleting = harness('recurring/[id].tsx', { id: 'rent' });
+  find(deleting.render(), 'ActionButton', 'Eliminar recurrente').props.onPress();
+  assert.deepEqual(nav(deleting.render()), [true, true, false], 'the question alone holds nothing');
+  release = deleting.holdSave();
+  const confirm = deleting.alerts[0].buttons[1].onPress();
+  assert.deepEqual(nav(deleting.render()), [false, false, true]);
+  assert.equal(deleting.backs(), 0, 'no pop before the record is written');
+  release(); await confirm; await settle();
+  assert.equal(deleting.backs(), 1, 'exactly one back');
+  assert.equal(deleting.saved[0].deleted, true);
+  // A failed write: navigation comes back, the screen stays with its error, nothing popped.
+  const failing = harness('recurring/[id].tsx', { id: 'rent' });
+  failing.failSave(new Error('Disk full'));
+  release = failing.holdSave();
+  const failPress = find(failing.render(), 'ActionButton', 'Pausar recurrente').props.onPress();
+  assert.deepEqual(nav(failing.render()), [false, false, true]);
+  release(); await failPress; await settle();
+  assert.deepEqual(nav(failing.render()), [true, true, false]);
+  assert.equal(find(failing.render(), 'ErrorMessage').props.message, 'Disk full');
+  assert.equal(failing.backs() + failing.saved.length, 0);
+  // A failed deletion neither pops nor unmounts.
+  const failingDelete = harness('recurring/[id].tsx', { id: 'rent' });
+  failingDelete.failSave(new Error('Disk full'));
+  find(failingDelete.render(), 'ActionButton', 'Eliminar recurrente').props.onPress();
+  await failingDelete.alerts[0].buttons[1].onPress(); await settle();
+  assert.deepEqual(nav(failingDelete.render()), [true, true, false]);
+  assert.equal(find(failingDelete.render(), 'ErrorMessage').props.message, 'Disk full');
+  assert.equal(failingDelete.backs(), 0);
+  // Editar still opens the form at rest, and the recovery path of a rule on a deleted account is untouched.
+  find(pausing.render(), 'Stack.Screen').props.options.headerRight().props.onPress();
+  assert.equal(JSON.stringify(pausing.pushed.at(-1)), JSON.stringify({ pathname: '/edit-recurring/[id]', params: { id: 'rent' } }));
+  const at = '2026-09-27T10:00:00.000Z';
+  const closedRoot = harness('recurring/[id].tsx', { id: 'rent' }, { ...archive, accounts: archive.accounts.map(item => item.id === 'cash' ? { ...item, revision: 1, updatedAt: at, deletedAt: at } : item), recurring: [{ ...rule, active: false, revision: 1 }] }).render();
+  assert.deepEqual(nav(closedRoot), [true, true, false]);
+  assert.equal(buttons(closedRoot), 'Eliminar recurrente');
 });

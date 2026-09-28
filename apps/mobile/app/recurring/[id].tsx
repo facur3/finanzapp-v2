@@ -48,7 +48,9 @@ export default function RecurringDetailScreen() {
   const state = !rule.active ? t('recurring.row.paused') : review ? t('recurring.row.review') : t('recurring.detail.active');
 
   return <Screen gap={space.xl}>
-    <Stack.Screen options={{ title: rule.merchant,
+    {/* A durable write in flight (pause, resume, the confirmed deletion) holds the screen, as the movement detail does: no
+        native back, no back swipe, Editar disabled; success or failure gives navigation back. A deletion pops exactly once. */}
+    <Stack.Screen options={{ title: rule.merchant, gestureEnabled: !busy, headerBackVisible: !busy,
       headerRight: rule.deleted ? undefined : () => <IconButton name="create-outline" label={t('recurring.detail.edit')} disabled={busy}
         onPress={() => router.push({ pathname: '/edit-recurring/[id]', params: { id: rule.id } })} /> }} />
     {/* Identity (the mark) → the amount, signed like its row → the state. The merchant is the header's title. */}

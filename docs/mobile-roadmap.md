@@ -1324,6 +1324,9 @@ implemented yet.
   live same-currency account or card, saved paused, then Reanudar on the detail resuming from today with no backlog; the
   other currency, another deleted account or card and the debt never offered; the closed row left unchanged keeps Reanudar
   unavailable), `polish-routes.node.ts` (the note's wording).
+  Review round: the detail holds navigation while a pause, a resume or a confirmed deletion is written (`gestureEnabled`
+  and `headerBackVisible` from `busy`, as the movement detail), gives it back on success or failure, and a deletion pops
+  exactly once (`polish-routes.node.ts` +1, the harness holding a save mid-write).
 - **Status.** Delivered on this branch (2026-09-28), not device-verified. Checked on Linux: root `npm test`,
   `check:repo`; mobile `typecheck`, `test:storage`, `currency:verify`, `regions:verify`, `i18n:check -- --strict`,
   `i18n:extract`, `check`, `export:ios` (the counts are in the PR). No EAS build; the iPhone was not touched.
