@@ -158,7 +158,7 @@ export const errors = {
       fileSize: 'Elegí una copia JSON de hasta 5 MB.',
       notJson: 'El archivo no es una copia JSON válida.',
       notFinanzApp: 'El archivo no es una copia de FinanzApp.',
-      version: 'Solo se pueden restaurar copias de FinanzApp de las versiones 1 a 12. Este archivo no es una de ellas; conservalo.',
+      version: 'Solo se pueden restaurar copias de FinanzApp de las versiones 1 a 13. Este archivo no es una de ellas; conservalo.',
       money: 'Formato o unidad monetaria no compatibles.',
       /** A v1–v8 file naming a currency other than ARS or USD: it cannot be read as cents, whatever currencies the app offers (24B1). */
       legacyImport: 'Las copias v1 a v8 solo pueden contener cuentas y presupuestos en ARS o USD. No se importó nada; conservá el archivo.',
@@ -276,6 +276,19 @@ export const errors = {
       tooMany: 'La copia contiene demasiados planes de cuotas o un formato inválido.',
       closingDate: 'Fecha de cierre inválida.',
       dueDate: 'Fecha de vencimiento inválida.',
+      /** 24T2: «Total financiado» below the price. */
+      totalBelowPrice: 'El total financiado no puede ser menor que el precio.',
+    },
+    /** Producto 24T2: the card's statement calendar (`packages/domain/card-cycles.ts`): a closing and its due date. */
+    cycles: {
+      dueOrder: 'El vencimiento de un resumen tiene que ser posterior a su cierre.',
+      closingOrder: 'El próximo cierre tiene que ser posterior al cierre anterior.',
+      stale: 'Las fechas del ciclo cambiaron desde que abriste la tarjeta. Volvé a revisarlas.',
+      history: 'Un resumen que ya cerró conserva sus fechas. No se modificó nada.',
+      invalid: 'Las fechas del ciclo de la tarjeta no son válidas.',
+      nextClosing: 'El próximo cierre tiene que ser hoy o una fecha posterior.',
+      duplicate: 'La copia repite una fecha del ciclo de una tarjeta.',
+      tooMany: 'La copia contiene demasiadas fechas de ciclo de tarjetas o un formato inválido.',
     },
   },
 } as const;

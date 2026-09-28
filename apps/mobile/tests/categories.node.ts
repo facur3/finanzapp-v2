@@ -92,7 +92,7 @@ const history: Entry[] = [
   { ...entry, id: 'h5', kind: 'income', category: 'Sueldo', dateISO: '2026-09-01' },
 ];
 const expensePresets = ['Comida', 'Supermercado', 'Restaurantes', 'Transporte', 'Combustible', 'Hogar', 'Alquiler', 'Servicios', 'Suscripciones', 'Salud',
-  'Farmacia', 'Educación', 'Ropa', 'Tecnología', 'Ocio', 'Viajes', 'Mascotas', 'Regalos', 'Impuestos', 'Seguros', 'Otros'];
+  'Farmacia', 'Educación', 'Ropa', 'Tecnología', 'Ocio', 'Viajes', 'Mascotas', 'Regalos', 'Impuestos', 'Seguros', 'Intereses', 'Otros'];
 const incomePresets = ['Sueldo', 'Trabajo', 'Ventas', 'Inversiones', 'Regalos', 'Reembolsos', 'Préstamos', 'Otros'];
 
 test('test-looking categories are not presets: an empty ledger offers exactly the defaults', () => {

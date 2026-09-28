@@ -288,5 +288,5 @@ test('24T1: a card with a pending instalment plan and no balance due is not dele
   assert.equal(buttons(archived.alerts[0]), JSON.stringify([['Cancelar', 'cancel']]));
   const english = harness({ paid: true, plans: [plan], language: 'en-US' as never });
   english.render('useCardManagement').remove(card);
-  assert.equal(english.alerts[0].message, 'This card has pending instalments. Archive it: it leaves Cards and its instalments keep being recorded and paid when they come due.');
+  assert.equal(english.alerts[0].message, 'This card has pending installments. Archive it: it leaves Cards and its installments keep being recorded and paid when they come due.');
 });

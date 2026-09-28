@@ -9,6 +9,7 @@ import { liquidTotalsByCurrency, sameCreditCardProfile, samePersonalDebtProfile,
 import { APPEARANCE_KEYS, sameAccountAppearance, validateAccountAppearance, validateAccountAppearances, type AccountAppearance } from './appearance.ts';
 import { CATEGORY_DEFINITION_KEYS, sameCategoryDefinition, validateCategoryDefinition, validateCategoryDefinitions, type CategoryDefinition } from './categories.ts';
 import { INSTALLMENT_KEYS, INSTALLMENT_PLAN_KEYS, sameInstallmentPlan, validateInstallmentPlans, type Installment, type InstallmentPlan } from './installments.ts';
+import { CARD_CYCLE_DATE_KEYS, sameCardCycleDate, validateCardCycleDates, type CardCycleDates } from './card-cycles.ts';
 
 /** The current version of every entry, including reversible tombstones.
  * Reports consume snapshotFromArchive, never the tombstones themselves. */
@@ -36,6 +37,8 @@ export interface LedgerArchive {
   /** Producto 24T1: purchases in instalments, each with its exact schedule. The movements they recognised are ordinary
    * records above (their ids name the plan and the instalment). */
   installmentPlans?: InstallmentPlan[];
+  /** Producto 24T2: the exact statement dates of cards (each a closing and its due), one chain per card (card-cycles.ts). */
+  cardCycleDates?: CardCycleDates[];
 }
 export interface EntryChange {
   id: string;
@@ -53,6 +56,9 @@ export const BACKUP_SCHEMA_V10 = 'finanzapp.native-pilot.v10';
 export const BACKUP_SCHEMA_V11 = 'finanzapp.native-pilot.v11';
 /** v12 = v11 plus `installmentPlans` (Producto 24T1), written as soon as a plan exists. */
 export const BACKUP_SCHEMA_V12 = 'finanzapp.native-pilot.v12';
+/** v13 = v12 plus `cardCycleDates` (Producto 24T2: a card's exact statement dates), written as soon as one exists; a v13
+ * file always carries `installmentPlans` too (possibly empty). */
+export const BACKUP_SCHEMA_V13 = 'finanzapp.native-pilot.v13';
 export const MAX_BACKUP_CURRENCY_UNITS = 200;
 /** Backups v1–v8 record one money unit and no scale per currency: they can only ever name
  * ARS and USD cents, whatever the creation gate offers when the file is read. A file naming
@@ -150,6 +156,10 @@ function categoryValue(value: unknown): CategoryDefinition {
   return definition;
 }
 const categoryIdentity = (definition: CategoryDefinition) => definition.kind + '|' + definition.key;
+function cycleDateValue(value: unknown): CardCycleDates {
+  const row = object(value, CARD_CYCLE_DATE_KEYS);
+  return Object.fromEntries(CARD_CYCLE_DATE_KEYS.map(key => [key, row[key]])) as unknown as CardCycleDates;
+}
 function installmentPlanValue(value: unknown): InstallmentPlan {
   const row = object(value, INSTALLMENT_PLAN_KEYS);
   if (!Array.isArray(row.schedule) || row.schedule.length > 120) throw new Error('El calendario de cuotas no coincide con el plan.');
@@ -204,6 +214,9 @@ export function validateArchive(archive: LedgerArchive): void {
   validateCategoryDefinitions(archive.categories ?? []);
   // 24T1: each plan against its card, and the ledger against every plan (an instalment movement matches its schedule).
   validateInstallmentPlans(archive.installmentPlans ?? [], archive.cards ?? [], archive.accounts, archive.records);
+  // 24T2: each card's exact statement dates, one ordered chain per card. A plan's schedule is contractual and is never
+  // compared with them (it was written with the calendar known when the plan was created).
+  validateCardCycleDates(archive.cardCycleDates ?? [], archive.cards ?? []);
   // An archive that knows its scales pins every currency its rows use beyond ARS/USD; each pinned
   // scale must be the catalogue's. Storage tolerates a pinned code no row uses (append-only rows).
   if (archive.currencyUnits) validateCurrencyUnits(archive.currencyUnits, currenciesNeedingUnits(archive));
@@ -254,6 +267,8 @@ function canonicalArchive(archive: LedgerArchive): LedgerArchive {
       .sort((a, b) => a.currency.localeCompare(b.currency)) } : {}),
     ...(archive.installmentPlans?.length ? { installmentPlans: archive.installmentPlans.map(plan => installmentPlanValue(plan))
       .sort((a, b) => a.id.localeCompare(b.id)) } : {}),
+    ...(archive.cardCycleDates?.length ? { cardCycleDates: archive.cardCycleDates.map(row => cycleDateValue(row))
+      .sort((a, b) => a.cardId.localeCompare(b.cardId) || a.sequence - b.sequence) } : {}),
   };
 }
 function unitValue(value: unknown): CurrencyUnit {
@@ -307,6 +322,8 @@ export interface RecoveryBackup {
   currencyUnits?: CurrencyUnit[];
   /** v12 (24T1): every instalment plan with its schedule. Older files have no such key. */
   installmentPlans?: InstallmentPlan[];
+  /** v13 (24T2): every card's exact statement dates. Older files have no such key. */
+  cardCycleDates?: CardCycleDates[];
 }
 function withoutDeleted<T extends { deleted: boolean }>(row: T): Omit<T, 'deleted'> {
   const { deleted: _deleted, ...rest } = row;
@@ -316,7 +333,7 @@ export function createRecoveryBackup(archive: LedgerArchive, now = new Date()): 
   validateArchive(archive);
   const needed = currenciesNeedingUnits(archive);
   const canonical = canonicalArchive(archive);
-  const { currencyUnits: _units, installmentPlans, ...rows } = canonical;
+  const { currencyUnits: _units, installmentPlans, cardCycleDates, ...rows } = canonical;
   // 25B2: a deleted account or card makes the file v11; without one, cards carry no `deleted` key (a v10 or older
   // file, byte for byte) and no account carries `deletedAt`.
   const lifecycle = canonical.accounts.some(account => account.deletedAt !== undefined) || (canonical.cards ?? []).some(card => card.deleted);
@@ -326,14 +343,17 @@ export function createRecoveryBackup(archive: LedgerArchive, now = new Date()): 
   const debts = tombstones ? canonical.debts ?? [] : (canonical.debts ?? []).map(withoutDeleted) as PersonalDebtProfile[];
   const cards = lifecycle ? canonical.cards ?? [] : (canonical.cards ?? []).map(withoutDeleted) as CreditCardProfile[];
   // 24T1: a plan makes the file v12 (it carries `installmentPlans` and every lifecycle key); without one the file is v11 or older, byte for byte.
-  const plans = !!installmentPlans?.length;
-  const schema = plans ? BACKUP_SCHEMA_V12 : lifecycle ? BACKUP_SCHEMA_V11 : tombstones ? BACKUP_SCHEMA_V10 : needed.length ? BACKUP_SCHEMA_V9 : BACKUP_SCHEMA_V8;
+  // 24T2: an exact statement date makes it v13 (every v12 key, `installmentPlans` even when empty, and `cardCycleDates`).
+  const cycles = !!cardCycleDates?.length;
+  const plans = !!installmentPlans?.length || cycles;
+  const schema = cycles ? BACKUP_SCHEMA_V13 : plans ? BACKUP_SCHEMA_V12 : lifecycle ? BACKUP_SCHEMA_V11 : tombstones ? BACKUP_SCHEMA_V10 : needed.length ? BACKUP_SCHEMA_V9 : BACKUP_SCHEMA_V8;
   const base: RecoveryBackup = { app: 'FinanzApp', schema, exportedAt: now.toISOString(),
     moneyUnit: 'integer-minor-units', ...rows, transfers: canonical.transfers ?? [],
     recurring: plans ? canonical.recurring ?? [] : recurring, budgets: canonical.budgets ?? [],
     cards: plans ? canonical.cards ?? [] : cards, debts: plans ? canonical.debts ?? [] : debts,
     appearances: canonical.appearances ?? [], categories: canonical.categories ?? [] };
-  const withPlans = (backup: RecoveryBackup): RecoveryBackup => plans ? { ...backup, installmentPlans } : backup;
+  const withPlans = (backup: RecoveryBackup): RecoveryBackup => !plans ? backup
+    : cycles ? { ...backup, installmentPlans: installmentPlans ?? [], cardCycleDates } : { ...backup, installmentPlans };
   if (!needed.length) return withPlans(tombstones || plans ? { ...base, currencyUnits: [] } : base);
   const known = new Map((canonical.currencyUnits ?? []).map(unit => [unit.currency, unit]));
   const currencyUnits = needed.map(code => known.get(code) ?? catalogueUnit(code));
@@ -359,20 +379,24 @@ export function parsePilotBackup(raw: string): ParsedBackup {
   const v10 = header.schema === BACKUP_SCHEMA_V10;
   const v11 = header.schema === BACKUP_SCHEMA_V11;
   const v12 = header.schema === BACKUP_SCHEMA_V12;
-  if (!v1 && !v2 && !v3 && !v4 && !v5 && !v6 && !v7 && !v8 && !v9 && !v10 && !v11 && !v12) {
-    throw new Error('Solo se pueden restaurar copias de FinanzApp de las versiones 1 a 12. Este archivo no es una de ellas; conservalo.');
+  const v13 = header.schema === BACKUP_SCHEMA_V13;
+  if (!v1 && !v2 && !v3 && !v4 && !v5 && !v6 && !v7 && !v8 && !v9 && !v10 && !v11 && !v12 && !v13) {
+    throw new Error('Solo se pueden restaurar copias de FinanzApp de las versiones 1 a 13. Este archivo no es una de ellas; conservalo.');
   }
   const hasTransfers = !v1 && !v2, hasRecurring = hasTransfers && !v3, hasBudgets = hasRecurring && !v4;
-  const hasLiabilities = hasBudgets && !v5, hasScopedBudgets = hasLiabilities && !v6, hasIdentity = v8 || v9 || v10 || v11 || v12, hasUnits = v9 || v10 || v11 || v12;
-  const hasDeletions = v10 || v11 || v12;
+  const hasLiabilities = hasBudgets && !v5, hasScopedBudgets = hasLiabilities && !v6, hasIdentity = v8 || v9 || v10 || v11 || v12 || v13, hasUnits = v9 || v10 || v11 || v12 || v13;
+  const hasDeletions = v10 || v11 || v12 || v13;
   // v11 (25B2): cards carry `deleted`; a deleted account carries `deletedAt`. Older files carry neither.
-  const hasLifecycle = v11 || v12;
+  const hasLifecycle = v11 || v12 || v13;
   // v12 (24T1): instalment plans with their schedules. Older files carry none, and a v1–v11 file never holds an instalment movement.
-  const hasPlans = v12;
+  const hasPlans = v12 || v13;
+  // v13 (24T2): the cards' exact statement dates. Older files carry none: their cards follow their usual days.
+  const hasCycles = v13;
   object(value, ['app', 'schema', 'exportedAt', 'moneyUnit', 'accounts', v1 ? 'entries' : 'records',
     ...(hasTransfers ? ['transfers'] : []), ...(hasRecurring ? ['recurring'] : []),
     ...(hasBudgets ? ['budgets'] : []), ...(hasLiabilities ? ['cards', 'debts'] : []),
-    ...(hasIdentity ? ['appearances', 'categories'] : []), ...(hasUnits ? ['currencyUnits'] : []), ...(hasPlans ? ['installmentPlans'] : [])]);
+    ...(hasIdentity ? ['appearances', 'categories'] : []), ...(hasUnits ? ['currencyUnits'] : []), ...(hasPlans ? ['installmentPlans'] : []),
+    ...(hasCycles ? ['cardCycleDates'] : [])]);
   if (header.app !== 'FinanzApp' || header.moneyUnit !== 'integer-minor-units') throw new Error('Formato o unidad monetaria no compatibles.');
   timestamp(header.exportedAt);
   const rows = v1 ? header.entries : header.records;
@@ -401,6 +425,9 @@ export function parsePilotBackup(raw: string): ParsedBackup {
   if (hasPlans && (!Array.isArray(header.installmentPlans) || header.installmentPlans.length > 5000)) {
     throw new Error('La copia contiene demasiados planes de cuotas o un formato inválido.');
   }
+  if (hasCycles && (!Array.isArray(header.cardCycleDates) || header.cardCycleDates.length > 20000)) {
+    throw new Error('La copia contiene demasiadas fechas de ciclo de tarjetas o un formato inválido.');
+  }
   const accounts = header.accounts.map(a => accountValue(a, hasTransfers, hasLifecycle));
   const records = rows.map((value): EntryRecord => {
     if (v1) return initialRecord(entryValue(value, accounts));
@@ -421,11 +448,13 @@ export function parsePilotBackup(raw: string): ParsedBackup {
   // before any amount is read; a v1–v8 file stays frozen to ARS/USD cents.
   const currencyUnits = hasUnits ? (header.currencyUnits as unknown[]).map(unit => unitValue(unit)) : [];
   const installmentPlans = hasPlans ? (header.installmentPlans as unknown[]).map(plan => installmentPlanValue(plan)) : [];
+  const cardCycleDates = hasCycles ? (header.cardCycleDates as unknown[]).map(row => cycleDateValue(row)) : [];
   const archive: LedgerArchive = { accounts, records, ...(transfers.length ? { transfers } : {}),
     ...(recurring.length ? { recurring } : {}), ...(budgets.length ? { budgets } : {}),
     ...(cards.length ? { cards } : {}), ...(debts.length ? { debts } : {}),
     ...(appearances.length ? { appearances } : {}), ...(categories.length ? { categories } : {}),
-    ...(hasUnits ? { currencyUnits } : {}), ...(installmentPlans.length ? { installmentPlans } : {}) };
+    ...(hasUnits ? { currencyUnits } : {}), ...(installmentPlans.length ? { installmentPlans } : {}),
+    ...(cardCycleDates.length ? { cardCycleDates } : {}) };
   if (!hasUnits) assertLegacyCurrencies(archive, LEGACY_IMPORT_MESSAGE);
   else validateCurrencyUnits(currencyUnits, currenciesNeedingUnits(archive), true);
   validateArchive(archive);
@@ -449,6 +478,8 @@ export interface ImportPreview {
   scaleConflicts: IsoCurrencyCode[];
   /** 24T1: plans the copy holds and this device lacks, with their schedules. */
   installmentPlans: InstallmentPlan[];
+  /** 24T2: the exact statement dates of the cards this copy adds (a card already on this device keeps its own). */
+  cardCycleDates: CardCycleDates[];
   identical: number;
   conflicts: number;
   /** Recorded liquid money by currency (cards and personal debts excluded). */
@@ -551,15 +582,28 @@ export function previewBackupImport(current: LedgerArchive, incoming: LedgerArch
     else if (sameInstallmentPlan(existing, plan)) identical++;
     else conflicts++;
   }
+  // 24T2: a card's chain travels with the card. For a card this copy adds, its rows are added; for a card already here,
+  // an identical row is identical and any other row contradicts the local calendar (the card's revision moves with each
+  // calendar change, so an identical card already has the same chain).
+  const addedCards = new Set(cards.map(card => card.id));
+  const localCycles = new Map((current.cardCycleDates ?? []).map(row => [row.cardId + '|' + row.sequence, row]));
+  const cardCycleDates: CardCycleDates[] = [];
+  for (const row of incoming.cardCycleDates ?? []) {
+    const existing = localCycles.get(row.cardId + '|' + row.sequence);
+    if (existing && sameCardCycleDate(existing, row)) identical++;
+    else if (!existing && addedCards.has(row.cardId)) cardCycleDates.push(row);
+    else conflicts++;
+  }
   const combined: LedgerArchive = { accounts: [...current.accounts, ...accounts], records: [...current.records, ...records],
     transfers: [...current.transfers ?? [], ...transfers], recurring: [...current.recurring ?? [], ...recurring],
     budgets: [...current.budgets ?? [], ...budgets], cards: [...current.cards ?? [], ...cards],
     debts: [...current.debts ?? [], ...debts], appearances: [...current.appearances ?? [], ...appearances],
     categories: [...current.categories ?? [], ...categories],
     ...(current.currencyUnits || incoming.currencyUnits ? { currencyUnits: [...current.currencyUnits ?? [], ...currencyUnits] } : {}),
-    ...(current.installmentPlans?.length || installmentPlans.length ? { installmentPlans: [...current.installmentPlans ?? [], ...installmentPlans] } : {}) };
+    ...(current.installmentPlans?.length || installmentPlans.length ? { installmentPlans: [...current.installmentPlans ?? [], ...installmentPlans] } : {}),
+    ...(current.cardCycleDates?.length || cardCycleDates.length ? { cardCycleDates: [...current.cardCycleDates ?? [], ...cardCycleDates] } : {}) };
   if (!conflicts) validateArchive(combined);
-  return { baseline: archiveKey(current), accounts, records, transfers, recurring, budgets, cards, debts, appearances, categories, currencyUnits, scaleConflicts, installmentPlans, identical, conflicts,
+  return { baseline: archiveKey(current), accounts, records, transfers, recurring, budgets, cards, debts, appearances, categories, currencyUnits, scaleConflicts, installmentPlans, cardCycleDates, identical, conflicts,
     before: liquidTotalsByCurrency(snapshotFromArchive(current), current.cards, current.debts),
     after: conflicts ? null : liquidTotalsByCurrency(snapshotFromArchive(combined), combined.cards, combined.debts) };
 }

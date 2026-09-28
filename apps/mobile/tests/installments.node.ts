@@ -81,8 +81,8 @@ test('schema 12 is reached from a real schema 11 file by an additive migration: 
     INSERT INTO entries (id, accountId, kind, amountMinor, merchant, category, dateISO, createdAt, revision, voided, updatedAt) VALUES ('p1', 'c', 'expense', 100, 'Súper', 'Comida', '2026-09-10', '${createdAt}', 0, 0, '${createdAt}');`);
   assert.equal((await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))?.user_version, 11);
   await initializeDatabase(db);
-  assert.equal((await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))?.user_version, 12);
-  assert.equal(DATABASE_VERSION, 12);
+  assert.equal((await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))?.user_version, 13, '24T2: the file continues to schema 13 (an empty card_cycle_dates table)');
+  assert.equal(DATABASE_VERSION, 13);
   const archive = await readArchive(db);
   assert.equal(archive.installmentPlans, undefined, 'old data gets no plan');
   assert.deepEqual(archive.cards?.[0], { ...card, accountId: 'c', creditLimitMinor: null });
@@ -91,8 +91,8 @@ test('schema 12 is reached from a real schema 11 file by an additive migration: 
   // Idempotent: the step runs again on a file that already has the tables (an interrupted step), and reaches 12 once more.
   await db.execAsync('PRAGMA user_version = 11');
   await initializeDatabase(db);
-  assert.equal((await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))?.user_version, 12);
-  await db.execAsync('PRAGMA user_version = 13');
+  assert.equal((await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))?.user_version, 13);
+  await db.execAsync('PRAGMA user_version = 14');
   await assert.rejects(initializeDatabase(db), /versión más nueva/);
   // The foreign keys hold: an instalment row needs its plan, a plan its card.
   await assert.rejects(db.withExclusiveTransactionAsync(async tx => { await tx.runAsync("INSERT INTO installments (planId, number, billingDateISO, dueDateISO, principalMinor, interestMinor, feeMinor, taxMinor) VALUES ('nope', 1, '2026-09-20', '2026-10-05', 1, 0, 0, 0)"); }), /FOREIGN KEY/);
@@ -348,9 +348,10 @@ test('backup v12: export, restore into a fresh device (nothing recorded twice, t
   assert.equal(older.conflicts, 1);
   await assert.rejects(importArchive(fresh, olderArchive, older.baseline), /contradice cambios locales/);
   assert.equal((await planOf(fresh, 'fin')).cancelledAt, now, 'the local cancellation stands');
-  // The refusal contract: a v12 file read by a build that knows up to v11 (its parser told the file is v11) refuses the extra key; a v13 file is refused by name.
+  // The refusal contract: a v12 file read by a build that knows up to v11 (its parser told the file is v11) refuses the extra key; a v14 file is refused by name.
   assert.throws(() => parsePilotBackup(JSON.stringify({ ...backup, schema: 'finanzapp.native-pilot.v11' })), /campos faltantes/);
-  assert.throws(() => parsePilotBackup(JSON.stringify({ ...backup, schema: 'finanzapp.native-pilot.v13' })), /versiones 1 a 12/);
+  assert.throws(() => parsePilotBackup(JSON.stringify({ ...backup, schema: 'finanzapp.native-pilot.v13' })), /campos faltantes/, 'a v12 file told v13 lacks cardCycleDates');
+  assert.throws(() => parsePilotBackup(JSON.stringify({ ...backup, schema: 'finanzapp.native-pilot.v14' })), /versiones 1 a 13/);
   // Without a plan the file stays as before (v11 here: the seeded card is live, so v8 with no plan).
   const plainDb = setup().db;
   await initializeDatabase(plainDb);

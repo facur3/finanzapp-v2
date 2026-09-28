@@ -48,7 +48,7 @@ function CardPanel({ summary, day }: { summary: CardSummary; day: string }) {
   const { snapshot } = useLedger();
   const p = usePalette();
   const { t, relativeDate, moneyText, spokenMoney } = useI18n();
-  const { card, account, debtMinor, availableMinor, usage, closingISO, dueISO } = summary;
+  const { card, account, debtMinor, availableMinor, usage, closingISO, nextDueISO: dueISO } = summary;
   const statement = useMemo(() => snapshot ? cardStatementActivity(card, snapshot, day) : null, [card, snapshot, day]);
   const recent = useMemo(() => {
     if (!snapshot) return [];

@@ -84,7 +84,7 @@ export const cards: Pick<Messages, 'cards'> = {
       blockedTitle: 'Cannot be deleted yet',
       blockedDetail: 'This card has an outstanding balance of {amount}. Pay it first, or archive it: it leaves Cards and keeps the balance to be paid whenever you want.',
       blockedPay: 'Pay',
-      blockedPlanDetail: 'This card has pending instalments. Archive it: it leaves Cards and its instalments keep being recorded and paid when they come due.',
+      blockedPlanDetail: 'This card has pending installments. Archive it: it leaves Cards and its installments keep being recorded and paid when they come due.',
       blockedArchive: 'Archive',
       deleteConfirm: 'Delete',
       deleteFailed: 'We could not delete the card. It stays as it was; try again.',

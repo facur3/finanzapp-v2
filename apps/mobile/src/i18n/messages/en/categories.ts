@@ -24,6 +24,7 @@ export const categories: Pick<Messages, 'categories'> = {
       regalos: 'Gifts',
       impuestos: 'Taxes',
       seguros: 'Insurance',
+      intereses: 'Interest',
       otros: 'Other',
     },
     income: {

@@ -25,7 +25,7 @@ export default function CardDetailScreen() {
   if (!snapshot || !archive || !card || !summary || !statement) return <Screen>
     <EmptyState title={t('cards.panel.notFoundTitle')} detail={t('cards.panel.notFoundDetail')} icon="card-outline" />
   </Screen>;
-  const { account, debtMinor, availableMinor, usage, closingISO, dueISO } = summary;
+  const { account, debtMinor, availableMinor, usage, closingISO, nextDueISO: dueISO } = summary;
   const credit = cardCreditMinor(card, snapshot);
   const relative = (iso: string) => relativeDate(iso, day);
   // A day inside the statement sentence starts in lower case: "Resumen abierto desde ayer".

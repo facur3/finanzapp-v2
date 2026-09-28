@@ -26,6 +26,8 @@ export const categories = {
       regalos: 'Regalos',
       impuestos: 'Impuestos',
       seguros: 'Seguros',
+      /** Producto 24T2: the interest of a purchase in instalments (the financing cost, never the price). */
+      intereses: 'Intereses',
       otros: 'Otros',
     },
     income: {

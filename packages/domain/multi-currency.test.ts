@@ -274,7 +274,7 @@ describe('backups: v1–v8 stay frozen to ARS/USD; v9 (24B4) records a scale per
     expect(parsePilotBackup(JSON.stringify(legacyV9)).archive).toEqual({ ...legacyArchive, currencyUnits: [] });
     expect(() => parsePilotBackup(JSON.stringify({ ...createRecoveryBackup(legacyArchive), currencyUnits: [] }))).toThrow('campos faltantes');
     // The unknown-version probe moves one up.
-    expect(() => parsePilotBackup(JSON.stringify({ ...backup, schema: 'finanzapp.native-pilot.v13' }))).toThrow('versiones 1 a 12');
+    expect(() => parsePilotBackup(JSON.stringify({ ...backup, schema: 'finanzapp.native-pilot.v14' }))).toThrow('versiones 1 a 13');
   });
 
   it('a copy\'s pinned scale is identical, new or a conflict on this device; a scale that disagrees with the catalogue never reaches a preview', () => {

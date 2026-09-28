@@ -197,10 +197,10 @@ test('the categories screen lists presets, custom and historical categories with
   const root = view.render();
   assert.deepEqual(nodes(root).filter(node => node.type === 'SectionTitle').map(node => node.props.children), ['Gastos', 'Ingresos'], 'no Archivadas group without archived categories');
   const badges = nodes(root).filter(node => node.type === 'CategoryBadge').map(node => node.props.category);
-  assert.deepEqual(badges.slice(0, 21), ['Comida', 'Supermercado', 'Restaurantes', 'Transporte', 'Combustible', 'Hogar', 'Alquiler', 'Servicios', 'Suscripciones', 'Salud',
-    'Farmacia', 'Educación', 'Ropa', 'Tecnología', 'Ocio', 'Viajes', 'Mascotas', 'Regalos', 'Impuestos', 'Seguros', 'Otros']);
-  assert.deepEqual(badges.slice(21, 23), ['JD', 'sjsjn'], 'historical custom categories stay, most used first, spelled as recorded');
-  assert.deepEqual(badges.slice(23), ['Sueldo', 'Trabajo', 'Ventas', 'Inversiones', 'Regalos', 'Reembolsos', 'Préstamos', 'Otros']);
+  assert.deepEqual(badges.slice(0, 22), ['Comida', 'Supermercado', 'Restaurantes', 'Transporte', 'Combustible', 'Hogar', 'Alquiler', 'Servicios', 'Suscripciones', 'Salud',
+    'Farmacia', 'Educación', 'Ropa', 'Tecnología', 'Ocio', 'Viajes', 'Mascotas', 'Regalos', 'Impuestos', 'Seguros', 'Intereses', 'Otros']);
+  assert.deepEqual(badges.slice(22, 24), ['JD', 'sjsjn'], 'historical custom categories stay, most used first, spelled as recorded');
+  assert.deepEqual(badges.slice(24), ['Sueldo', 'Trabajo', 'Ventas', 'Inversiones', 'Regalos', 'Reembolsos', 'Préstamos', 'Otros']);
   const pressables = nodes(root).filter(node => node.type === 'PressFeedback');
   const labels = pressables.map(node => node.props.accessibilityLabel);
   assert.ok(labels.includes('JD, 1 movimiento · Histórica'));

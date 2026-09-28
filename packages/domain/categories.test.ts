@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CATEGORY_PRESETS, categoryCatalog, categoryNameTaken, categoryOptions, customCategoryName, editedCategoryDefinition,
+import { CATEGORY_PRESETS, assertCategoryName, categoryCatalog, categoryNameTaken, categoryOptions, customCategoryName, editedCategoryDefinition, interestCategoryLabel,
   newCategoryDefinition, resolveCategory, sameCategoryDefinition, validateCategoryDefinition, validateCategoryDefinitions, type CategoryDefinition } from './categories';
 import { categoryKey, spendingReport } from './spending-report';
 import { summarizeMonthlyBudgets, type MonthlyBudget } from './budgets';
@@ -15,7 +15,7 @@ const entry = (id: string, category: string, dateISO = '2026-09-10', kind: Entry
 const history: Entry[] = [entry('h1', 'sjsjn', '2026-09-15'), entry('h2', 'JD', '2026-09-16'), entry('h3', 'JD', '2026-09-17'),
   entry('h4', 'Comida', '2026-09-18'), entry('h5', 'EDUCACION', '2026-09-12'), entry('h6', 'Sueldo', '2026-09-01', 'income')];
 const expensePresets = ['Comida', 'Supermercado', 'Restaurantes', 'Transporte', 'Combustible', 'Hogar', 'Alquiler', 'Servicios', 'Suscripciones', 'Salud',
-  'Farmacia', 'Educación', 'Ropa', 'Tecnología', 'Ocio', 'Viajes', 'Mascotas', 'Regalos', 'Impuestos', 'Seguros', 'Otros'];
+  'Farmacia', 'Educación', 'Ropa', 'Tecnología', 'Ocio', 'Viajes', 'Mascotas', 'Regalos', 'Impuestos', 'Seguros', 'Intereses', 'Otros'];
 const incomePresets = ['Sueldo', 'Trabajo', 'Ventas', 'Inversiones', 'Regalos', 'Reembolsos', 'Préstamos', 'Otros'];
 
 describe('presets', () => {
@@ -49,8 +49,8 @@ describe('historical and unknown strings', () => {
   });
   it('appear in the catalogue after the presets, most used first, with counts', () => {
     const rows = categoryCatalog('expense', [], history);
-    expect(rows.slice(0, 21).map(row => row.identity.label)).toEqual(expensePresets);
-    expect(rows.slice(21).map(row => [row.identity.label, row.identity.source, row.count])).toEqual([['JD', 'historical', 2], ['sjsjn', 'historical', 1]]);
+    expect(rows.slice(0, 22).map(row => row.identity.label)).toEqual(expensePresets);
+    expect(rows.slice(22).map(row => [row.identity.label, row.identity.source, row.count])).toEqual([['JD', 'historical', 2], ['sjsjn', 'historical', 1]]);
     expect(rows.find(row => row.identity.key === 'comida')?.count).toBe(1);
     expect(rows.find(row => row.identity.key === 'educacion')?.count).toBe(1);
     expect(categoryCatalog('income', [], history).filter(row => row.count)).toEqual([{ identity: resolveCategory('income', 'Sueldo'), count: 1 }]);
@@ -165,5 +165,24 @@ describe('picker options', () => {
     const renamed = editedCategoryDefinition(resolveCategory('expense', 'Comida'), { label: 'Alimentación' }, now);
     expect(categoryOptions('expense', [renamed], [], 'comida').map(i => i.label)).toEqual(['Alimentación']);
     expect(categoryOptions('expense', [], [], 'ción edu').map(i => i.label)).toEqual(['Educación']);
+  });
+});
+
+describe('Producto 24T2: the Intereses preset', () => {
+  it('is where a plan records its interest, keeping the identity of a renamed or restyled definition', () => {
+    expect(resolveCategory('expense', 'Intereses')).toMatchObject({ key: 'intereses', storedLabel: 'Intereses', icon: 'bank', source: 'preset' });
+    expect(interestCategoryLabel()).toBe('Intereses');
+    const renamed = editedCategoryDefinition(resolveCategory('expense', 'Intereses'), { label: 'Financiación' }, now);
+    expect(interestCategoryLabel([renamed])).toBe('Intereses');
+    expect(resolveCategory('expense', interestCategoryLabel([renamed]), [renamed]).label).toBe('Financiación');
+    expect(resolveCategory('income', 'Intereses').source).toBe('historical');
+  });
+  it('never locks a ledger that already had a category shown as «Intereses»; a new name or a rename still cannot take it', () => {
+    const otros = editedCategoryDefinition(resolveCategory('expense', 'Otros'), { label: 'Intereses' }, now);
+    expect(() => validateCategoryDefinitions([otros])).not.toThrow();
+    expect(() => assertCategoryName(otros)).toThrow('ya es el nombre de otra categoría');
+    expect(() => assertCategoryName(editedCategoryDefinition(resolveCategory('expense', 'Otros'), { label: 'Varios' }, now))).not.toThrow();
+    expect(() => validateCategoryDefinitions([editedCategoryDefinition(resolveCategory('expense', 'Otros'), { label: 'Comida' }, now)])).toThrow('ya es el nombre de otra categoría');
+    expect(categoryNameTaken('expense', 'intereses')).toBe(true);
   });
 });
