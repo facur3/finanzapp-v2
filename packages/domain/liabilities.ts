@@ -5,9 +5,15 @@ import { assertStorableCurrency, sortCurrencies } from './currency.ts';
  * posted to that account exactly once (it counts in reports and budgets and
  * increases the card's negative balance). A payment is an internal transfer from
  * a cash account into the card account: it lowers liquid money and lowers the
- * card debt without ever creating a second expense. */
+ * card's balance due without ever creating a second expense. The card is tied to
+ * no cash account: each payment names its source when it is recorded (a preferred
+ * account, if it ever exists, is a form preselection, never an imputation). The
+ * balance due is not a personal debt (`PersonalDebtProfile`): the two never share
+ * an account or a total. Decision 003, «Invariantes contables de tarjetas»;
+ * `card-invariants.test.ts` pins each rule. */
 export interface CreditCardProfile {
   id: string;
+  /** The hidden internal account that holds the balance due. The only account link a card has. */
   accountId: string;
   issuer: string;
   last4: string;
@@ -25,10 +31,11 @@ export interface CreditCardProfile {
 }
 
 export const CARD_DELETED_MESSAGE = 'Esta tarjeta fue eliminada.';
-/** A card with a recorded debt is paid or archived, never deleted: deleting would leave money owed with no card to pay
+/** A card with a balance due is paid or archived, never deleted: deleting would leave money owed with no card to pay
  * it from (a deleted card takes no payment). When Producto 24T exists, a pending instalment plan blocks deletion the
- * same way (`assertCardDeletable` is where that check goes); archiving never erases a plan either. */
-export const CARD_DEBT_MESSAGE = 'Esta tarjeta tiene deuda registrada. Pagala o archivala; no se puede eliminar.';
+ * same way (`assertCardDeletable` is where that check goes); archiving never erases a plan either. The copy says
+ * «saldo pendiente», never «deuda»: that word names the Deudas y cobros section (personal debts). */
+export const CARD_DEBT_MESSAGE = 'Esta tarjeta tiene saldo pendiente. Pagalo o archivala; no se puede eliminar.';
 /** The deletion record is written by `deleteCreditCard` in storage (it also stops the card's rules); a plain save never flips it. */
 export const CARD_DELETE_PATH_MESSAGE = 'Una tarjeta se elimina con su propia acción, no con un cambio de datos.';
 
@@ -181,7 +188,7 @@ export function assertOpenAccount(accountId: string, accounts: readonly Account[
   if (debts.some(debt => debt.deleted && debt.accountId === accountId)) throw new Error('Esta deuda fue eliminada.');
 }
 
-/** Whether a card may be deleted now: no recorded debt (and, from 24T on, no pending instalment plan). */
+/** Whether a card may be deleted now: no balance due (and, from 24T on, no pending instalment plan). */
 export function assertCardDeletable(card: CreditCardProfile, snapshot: LedgerSnapshot): void {
   if (card.deleted) throw new Error(CARD_DELETED_MESSAGE);
   if (cardDebtMinor(card, snapshot) > 0) throw new Error(CARD_DEBT_MESSAGE);

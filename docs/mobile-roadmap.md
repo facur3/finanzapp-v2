@@ -1,6 +1,6 @@
 # FinanzApp mobile: living roadmap
 
-Updated: 2026-09-27 (Producto 25B2). Read [decision 001](decisions/001-native-mobile.md),
+Updated: 2026-09-28 (Producto 25B2, card invariants round). Read [decision 001](decisions/001-native-mobile.md),
 [decision 002](decisions/002-spending-first.md),
 [decision 003](decisions/003-five-tabs-and-cards.md) and
 [decision 004](decisions/004-native-first-and-web-retirement.md). Decision 002 supersedes
@@ -50,9 +50,13 @@ history file keeps the evidence of when and why.
   Finanzas). The mounted-tab mitigation stays; no fade/detach/freeze; native stack and sheets
   own every screen transition. Tabs never slide.
 - **Cards and debts are internal accounts** (decision 003): a purchase is one expense on the
-  card, a payment is a transfer that lowers cash and debt and is never a second expense; a debt
-  or receivable moves only by transfers; Disponible excludes cards, debts and receivables; a
-  card never carries a plain income and is never a transfer's source (24B6).
+  card, a payment is a transfer that lowers cash and the card's balance due and is never a second
+  expense; a debt or receivable moves only by transfers; Disponible excludes cards, debts and
+  receivables; a card never carries a plain income and is never a transfer's source (24B6). The
+  eight card invariants (no per-purchase bank link, one expense per purchase, a payment is a
+  transfer, a preferred payment account would be a preselection only, personal debts never mix with
+  a card's balance, no debit-card ledger, the 24T instalment rules, «Saldo pendiente» never «Deuda»
+  in copy) are recorded in decision 003 and pinned by `packages/domain/card-invariants.test.ts`.
 - **Instalments are finite obligations tied to one purchase**, never several expenses and never
   an unlimited recurring rule; refunds tie to the purchase (Producto 24T, design reviewed before
   code). **Recorded now for 24T (25B2):** deleting or archiving a card never erases pending
@@ -131,10 +135,12 @@ file). "Released" below names an in-app gate (`RELEASED_LANGUAGES`, `RELEASED_RE
   only with two or more currencies held; a normal account can be deleted (a dated tombstone, schema
   11: every movement and transfer stays readable as its own, it leaves Disponible, the lists and the
   forms, its active rules stop; a trailing swipe on its row and «Eliminar cuenta» on its edit screen,
-  both with a destructive confirmation); a card without recorded debt can be deleted (a `deleted` flag:
-  purchases, payments and the internal account stay, its rules stop in the same commit; with debt the
-  dialog offers Pagar or Archivar instead; no swipe on the carousel, «Eliminar tarjeta» last on its edit screen,
-  the recorded debt named in the confirmation). Backups v11 carry both records; v1–v10 still import.
+  both with a destructive confirmation); a card without a balance due can be deleted (a `deleted` flag:
+  purchases, payments and the internal account stay, its rules stop in the same commit; with a balance due
+  the dialog offers Pagar or Archivar instead; no swipe on the carousel, «Eliminar tarjeta» last on its edit
+  screen, the balance named in the confirmation). Backups v11 carry both records; v1–v10 still import. The
+  card copy says «Saldo pendiente», never «Deuda» (the Deudas y cobros section); decision 003 records the
+  eight card invariants audited at the close of 25B2.
 - **First opening (25B).** A new installation opens on a two-stage native setup: a
   welcome with the language and region detected from the device (two quiet rows that open the Más
   choosers), then an optional first account (name, the currency the region suggests through the
@@ -1069,17 +1075,17 @@ the owner authorises it; no EAS build or store submission without the owner.
 - **Card lifecycle (exact).** Create, edit, archive and reactivate stay; the storage `deleteCreditCard`
   (review round; `LedgerProvider.removeCard`) writes the deletion record (`deleted`, inactive, one
   revision on) **and pauses the card's active recurring rules in the same commit**, and is **refused while
-  the card has a recorded debt** (`assertCardDeletable`, «Esta tarjeta tiene deuda registrada. Pagala o
-  archivala; no se puede eliminar.»): a deleted card takes no payment, so a debt would be stranded. A plain
+  the card has a balance due** (`assertCardDeletable`, «Esta tarjeta tiene saldo pendiente. Pagalo o
+  archivala; no se puede eliminar.»): a deleted card takes no payment, so a balance would be stranded. A plain
   `saveCreditCard` never flips `deleted` («Una tarjeta se elimina con su propia acción…»). A deleted card
   leaves Tarjetas and the forms, takes no purchase and no payment («Esta tarjeta fue eliminada.»), is
   never reactivated or edited, keeps its internal account, purchases and payments; its detail reads
-  «Tarjeta eliminada · deuda registrada» (the record of a card deleted by an older copy that still carried
-  debt, or paid to zero and later corrected). «Eliminar tarjeta» is the last action of Editar tarjeta; no
-  swipe on the carousel. With debt, the dialog («Todavía no se puede eliminar») names the debt and offers
-  **Pagar** (the reviewed payment form, capped at the debt, as the card detail does) and **Archivar** (an
-  active card only); without debt, the confirmation says purchases and payments stay. Archiving keeps the
-  debt payable and, once 24T exists, every pending instalment (recorded above); nothing is cancelled or
+  «Tarjeta eliminada · saldo pendiente» (the record of a card deleted by an older copy that still carried
+  a balance, or paid to zero and later corrected). «Eliminar tarjeta» is the last action of Editar tarjeta; no
+  swipe on the carousel. With a balance due, the dialog («Todavía no se puede eliminar») names it and offers
+  **Pagar** (the reviewed payment form, capped at the balance, as the card detail does) and **Archivar** (an
+  active card only); without one, the confirmation says purchases and payments stay. Archiving keeps the
+  balance payable and, once 24T exists, every pending instalment (recorded above); nothing is cancelled or
   written silently. The recurring catch-up (`processRecurring`, on opening and on returning to the
   foreground) is the second net: a rule whose account, card or debt is deleted records nothing whatever
   its flag says, and Recurrentes offers such a rule Eliminar only (no Reanudar onto a closed row).
@@ -1102,7 +1108,18 @@ the owner authorises it; no EAS build or store submission without the owner.
   24T is recorded above.
 - **Not changed.** Home's, Reportes' and the onboarding's design; the financial models (money, FX,
   budgets); `vercel.json`, `api/mobile`, `server/mobile`.
-- **Status.** Delivered on this branch (2026-09-27, review round the same day), not device-verified.
+- **Status.** Delivered on this branch (2026-09-27, review round the same day; card invariants round
+  2026-09-28), not device-verified.
+  - **Card invariants round (2026-09-28).** The eight card invariants (decision 003, «Invariantes contables
+    de tarjetas») were audited against the domain, the storage and the forms: no contradiction found, so
+    nothing was redesigned. Added `packages/domain/card-invariants.test.ts` (8 tests, one per invariant,
+    including type-level checks that the profile has no payment-account link and that the account kinds are
+    exactly cash/card/debt). Copy only: a card's balance is «Saldo pendiente» / «Outstanding balance», never
+    «Deuda» (Tarjetas, the card detail, the purchase and payment forms, the deletion dialog, the domain
+    refusal `CARD_DEBT_MESSAGE` and its catalogue entry); internal names unchanged; the glossary gains «saldo
+    pendiente»; the English lock accepted (19 keys). Root `npm test` 335/335, mobile `test:storage` 762/762
+    (the route tests that pin the copy updated), `typecheck`, `currency:verify`, `regions:verify`,
+    `i18n:check -- --strict`, `check`, `export:ios`, root `check:repo`.
   - **Checked on Linux:** root `npm test` 327/327 (+7 `packages/domain/lifecycle.test.ts`: the account tombstone,
     the card flag, the posting and transfer guards, Disponible, backup v11 round trip, legacy files, an older copy
     as a conflict); mobile `npm run typecheck`, `npm run test:storage` 762/762 (+5 `tests/currency-defaults.node.ts`,

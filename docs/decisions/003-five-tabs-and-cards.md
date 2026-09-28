@@ -52,6 +52,51 @@ auditoría de ediciones, deshacer/recuperar, copias v1–v6 y las mismas pruebas
 Límite conocido: las cuotas todavía no se modelan; requieren semántica de
 calendario y compromisos futuros, no gastos recurrentes duplicados.
 
+## Invariantes contables de tarjetas (2026-09-28, cierre de Producto 25B2)
+
+Auditadas contra el código al cerrar 25B2: la implementación las cumplía; se
+fijaron en `packages/domain/card-invariants.test.ts` (una prueba por regla) y en
+el copy. Un cambio que rompa una de ellas es una regresión, no un rediseño.
+
+1. **Una tarjeta de crédito no está vinculada contablemente a una cuenta bancaria
+   por cada compra.** `CreditCardProfile` tiene un solo vínculo, `accountId`: su
+   cuenta interna oculta. Cada pago nombra su origen al registrarse; dos compras
+   de la misma tarjeta pueden pagarse desde dos cuentas distintas.
+2. **Una compra con tarjeta** se registra exactamente una vez como gasto (cuenta
+   una vez en Movimientos, Reportes, Presupuestos y el resumen del mes), aumenta
+   el saldo pendiente de la tarjeta y **no reduce ninguna cuenta de efectivo o
+   banco** (Disponible no cambia).
+3. **Pagar una tarjeta** es una transferencia desde una cuenta normal hacia la
+   cuenta interna de la tarjeta: reduce el dinero disponible de esa cuenta, reduce
+   el saldo pendiente y **no genera un segundo gasto** (los totales de gasto del
+   mes son los mismos antes y después del pago). Nunca es un ingreso en la tarjeta
+   ni un gasto en la cuenta; una tarjeta nunca es origen de una transferencia.
+4. **Una cuenta de pago preferida**, si algún día existe, será solo una
+   preselección del formulario y nunca una imputación automática: hoy el perfil
+   no la tiene y el libro no deriva nada de una tarjeta hacia una cuenta.
+5. **Deudas y cobros son obligaciones personales independientes de las tarjetas.**
+   `PersonalDebtProfile` y el saldo pendiente de una tarjeta no comparten cuenta
+   (una cuenta interna representa una sola obligación) ni total (`debtTotalsByCurrency`
+   nunca incluye tarjetas; `cardDebtMinor` nunca incluye deudas).
+6. **No hay tarjetas de débito como libro aparte.** Los tipos de cuenta son
+   exactamente `cash`, `card` y `debt`. Una tarjeta de débito representa dinero
+   que ya vive en una cuenta normal; si algún día existe `DebitCardProfile` será
+   metadata vinculada a una cuenta, sin saldo, deuda, cuotas, cierre ni pagos
+   propios.
+7. **Producto 24T (cuando exista):** una compra en cuotas sigue siendo un único
+   gasto; las cuotas son el plan de obligación/pago y nunca vuelven a contabilizar
+   el gasto; archivar una tarjeta conserva las cuotas pendientes; eliminar una
+   tarjeta queda bloqueado mientras tenga saldo pendiente **o** planes de cuotas
+   pendientes (`assertCardDeletable` es el único lugar de esa regla). Hoy: archivar
+   conserva el saldo pendiente y sigue aceptando el pago; eliminar se rechaza con
+   saldo pendiente y se permite en cero; una tarjeta eliminada no acepta pagos.
+8. **Copy visible:** el saldo de una tarjeta es «Saldo pendiente» / «Saldo de
+   tarjeta» (en inglés «Outstanding balance»), nunca «Deuda», que nombra la
+   sección Deudas y cobros. Los nombres internos (`cardDebtMinor`, `CARD_DEBT_MESSAGE`,
+   `cards.panel.recordedDebt`, `transferForm.balanceDebt`…) no cambian por copy.
+   El glosario (`apps/mobile/i18n/glossary.json`) distingue «deuda» de «saldo
+   pendiente».
+
 ## Sistema visual
 
 Se retira el violeta como acento dominante. Base neutra (tinta sobre fondo

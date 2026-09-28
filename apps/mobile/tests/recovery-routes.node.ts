@@ -450,7 +450,7 @@ test('card payment locks the card as destination, caps at the recorded debt and 
   let root = view.render();
   assert.equal(nodes(root).some(node => node.type === 'AccountField' && node.props.label === 'Hacia'), false);
   assert.equal(find(root, 'SelectorCard', 'Tarjeta').props.value, 'Visa');
-  assert.equal(find(root, 'SelectorCard', 'Tarjeta').props.detail, 'Deuda ARS 50,00');
+  assert.equal(find(root, 'SelectorCard', 'Tarjeta').props.detail, 'Saldo pendiente ARS 50,00');
   assert.equal(find(root, 'AccountField', 'Desde').props.value, 'a');
   assert.deepEqual(find(root, 'AccountField', 'Desde').props.accounts.map((item: domain.Account) => item.id), ['a']);
   assert.equal(find(root, 'Field').props.value, 'Pago Visa');
@@ -459,11 +459,11 @@ test('card payment locks the card as destination, caps at the recorded debt and 
   await find(root, 'ActionButton', 'Registrar pago').props.onPress();
   // The form stores the catalogue key; ErrorMessage shows it in the interface language.
   assert.equal(find(view.render(), 'ErrorMessage').props.message, 'transferForm.overCardDebt');
-  assert.match(bindLocale('es-AR').errorText('transferForm.overCardDebt'), /supera la deuda/);
+  assert.match(bindLocale('es-AR').errorText('transferForm.overCardDebt'), /supera el saldo pendiente/);
   assert.equal(view.transfers.length, 0);
   find(view.render(), 'AmountField').props.onChangeText('50');
   root = view.render();
-  assert.equal(find(root, 'DetailRow', 'Visa después').props.value, 'Sin deuda', 'a card paid to zero owes nothing; it is not "in credit"');
+  assert.equal(find(root, 'DetailRow', 'Visa después').props.value, 'Sin saldo pendiente', 'a card paid to zero owes nothing; it is not "in credit"');
   await find(root, 'ActionButton', 'Registrar pago').props.onPress();
   assert.equal(view.transfers.length, 1);
   assert.deepEqual([view.transfers[0].fromAccountId, view.transfers[0].toAccountId, view.transfers[0].amountMinor, view.transfers[0].note], ['a', 'card-acc', 5000, 'Pago Visa']);
@@ -526,9 +526,9 @@ test('expense form offers cash accounts and cards but never a personal debt acco
   assert.equal(field.props.typeOf('card-acc'), 'card', 'the glyph follows the ledger kind, not the translated name');
   assert.equal(field.props.typeOf('a'), 'cash');
   assert.equal(field.props.detail, 'Saldo registrado $\u00A0876,55');
-  assert.equal(field.props.describe({ ...cardAccount }), 'deuda 50,00');
+  assert.equal(field.props.describe({ ...cardAccount }), 'saldo pendiente 50,00');
   find(view.render(), 'AccountField').props.onChange('card-acc');
-  assert.equal(find(view.render(), 'AccountField').props.detail, 'Tarjeta de crédito · deuda $\u00A050,00');
+  assert.equal(find(view.render(), 'AccountField').props.detail, 'Tarjeta de crédito · saldo pendiente $\u00A050,00');
   assert.equal(find(view.render(), 'Stack.Screen').props.options.title, 'Compra con tarjeta');
 });
 
@@ -783,16 +783,16 @@ test('23.1B2 English backup import: review, confirmation and result are translat
 test('23.1C2: a worded balance carries its code where the language puts it; a cash account keeps its code and signed amount', async () => {
   const spanish = harness('src/ui/transfer-form.tsx', { toAccountId: 'card-acc', maxAmountMinor: '5000' }, { data: liabilityData });
   let root = spanish.render();
-  assert.equal(find(root, 'SelectorCard', 'Tarjeta').props.detail, 'Deuda ARS 50,00', 'never "ARS Deuda 50,00"');
+  assert.equal(find(root, 'SelectorCard', 'Tarjeta').props.detail, 'Saldo pendiente ARS 50,00', 'never "ARS Saldo pendiente 50,00"');
   assert.equal(find(root, 'AccountField', 'Desde').props.detail, 'ARS 876,55', 'a cash account is its code and amount, joined');
-  assert.equal(find(root, 'AmountShortcut').props.caption, 'Deuda registrada: ARS 50,00');
+  assert.equal(find(root, 'AmountShortcut').props.caption, 'Saldo pendiente: ARS 50,00');
   const english = harness('src/ui/transfer-form.tsx', { toAccountId: 'card-acc', maxAmountMinor: '5000' }, { data: liabilityData, locale: 'en-US' });
   root = english.render();
-  assert.equal(find(root, 'SelectorCard', 'Card').props.detail, 'Owed ARS 50.00', 'never "ARS Owed 50.00"');
+  assert.equal(find(root, 'SelectorCard', 'Card').props.detail, 'Outstanding ARS 50.00', 'never "ARS Outstanding 50.00"');
   assert.equal(find(root, 'AccountField', 'From').props.detail, 'ARS 876.55');
   find(root, 'AmountField').props.onChangeText('50');
   root = english.render();
-  assert.equal(find(root, 'DetailRow', 'Visa afterwards').props.value, 'Nothing owed');
+  assert.equal(find(root, 'DetailRow', 'Visa afterwards').props.value, 'Nothing outstanding');
   assert.equal(find(root, 'DetailRow', 'Prueba ARS afterwards').props.value, 'ARS 826.55');
   // A debt is pending, in both languages; the collection side is a receivable.
   const debtForm = (locale: AppLocale) => harness('src/ui/transfer-form.tsx', { toAccountId: 'debt-acc', maxAmountMinor: '7000' }, { data: liabilityData, locale }).render();
@@ -808,8 +808,8 @@ test('23.1C2: a worded balance carries its code where the language puts it; a ca
 test('23.1C2: the transfer form gives VoiceOver the language’s numbers on the cards, the shortcut and the after rows', () => {
   const cases = [
     // [locale, card kind, after label, screen detail, spoken detail, screen caption, spoken caption, screen after, spoken after]
-    ['es-US', 'Tarjeta', 'Visa después', 'Deuda ARS 50.00', 'Deuda ARS 50,00', 'Deuda registrada: ARS 50.00', 'Deuda registrada: ARS 50,00', 'Sin deuda', 'Sin deuda'],
-    ['en-AR', 'Card', 'Visa afterwards', 'Owed ARS 50,00', 'Owed ARS 50.00', 'Recorded debt: ARS 50,00', 'Recorded debt: ARS 50.00', 'Nothing owed', 'Nothing owed'],
+    ['es-US', 'Tarjeta', 'Visa después', 'Saldo pendiente ARS 50.00', 'Saldo pendiente ARS 50,00', 'Saldo pendiente: ARS 50.00', 'Saldo pendiente: ARS 50,00', 'Sin saldo pendiente', 'Sin saldo pendiente'],
+    ['en-AR', 'Card', 'Visa afterwards', 'Outstanding ARS 50,00', 'Outstanding ARS 50.00', 'Outstanding balance: ARS 50,00', 'Outstanding balance: ARS 50.00', 'Nothing outstanding', 'Nothing outstanding'],
   ] as const;
   for (const [locale, kind, after, detail, spokenDetail, caption, spokenCaption, afterValue, spokenAfter] of cases) {
     const view = harness('src/ui/transfer-form.tsx', { toAccountId: 'card-acc', maxAmountMinor: '5000' }, { data: liabilityData, locale });
@@ -842,19 +842,19 @@ test('23.1C2: the account sheet describes an option as the selected card does: s
   const view = harness('src/ui/entry-form.tsx', { kind: 'expense' }, { data });
   const describe = find(view.render(), 'AccountField').props.describe;
   // Before 23.1C2 an overdrawn account read "saldo 500,00" and a card in credit "deuda 25,00".
-  assert.equal([account, overdrawn, cardAccount, creditCard, clearCard].map(describe).join('|'), 'saldo 876,55|saldo -500,00|deuda 50,00|a favor 25,00|sin deuda');
+  assert.equal([account, overdrawn, cardAccount, creditCard, clearCard].map(describe).join('|'), 'saldo 876,55|saldo -500,00|saldo pendiente 50,00|a favor 25,00|sin saldo pendiente');
   const detail = (id: string) => { find(view.render(), 'AccountField').props.onChange(id); return find(view.render(), 'AccountField').props.detail; };
   assert.equal(detail('red'), 'Saldo registrado −$ 500,00', 'the selected card shows the same signed balance');
   assert.equal(detail('credit-acc'), 'Tarjeta de crédito · a favor $ 25,00');
-  assert.equal(detail('clear-acc'), 'Tarjeta de crédito · sin deuda');
+  assert.equal(detail('clear-acc'), 'Tarjeta de crédito · sin saldo pendiente');
   const english = find(harness('src/ui/entry-form.tsx', { kind: 'expense' }, { data, locale: 'en-US' }).render(), 'AccountField').props.describe;
-  assert.equal([account, overdrawn, cardAccount, creditCard, clearCard].map(english).join('|'), 'balance 876.55|balance -500.00|owed 50.00|in credit 25.00|nothing owed');
+  assert.equal([account, overdrawn, cardAccount, creditCard, clearCard].map(english).join('|'), 'balance 876.55|balance -500.00|outstanding 50.00|in credit 25.00|nothing outstanding');
   // VoiceOver hears each option's line after its name, kind and currency: the spoken amount with the currency in words, as the selected card says it.
   const spoken = (locale: AppLocale) => find(harness('src/ui/entry-form.tsx', { kind: 'expense' }, { data, locale }).render(), 'AccountField').props.spokenDescribe;
   assert.equal([account, overdrawn, cardAccount, creditCard, clearCard].map(spoken('es-AR')).join('|'),
-    'saldo 876,55 pesos|saldo Menos 500,00 pesos|deuda 50,00 pesos|a favor 25,00 pesos|sin deuda');
+    'saldo 876,55 pesos|saldo Menos 500,00 pesos|saldo pendiente 50,00 pesos|a favor 25,00 pesos|sin saldo pendiente');
   assert.equal([account, overdrawn, cardAccount, creditCard, clearCard].map(spoken('en-US')).join('|'),
-    'balance 876.55 pesos|balance Minus 500.00 pesos|owed 50.00 pesos|in credit 25.00 pesos|nothing owed');
+    'balance 876.55 pesos|balance Minus 500.00 pesos|outstanding 50.00 pesos|in credit 25.00 pesos|nothing outstanding');
   const rich: domain.Account = { ...account, id: 'rich', name: 'Ahorro', openingMinor: 123456789 };
   const wide = { ...data, accounts: [...data.accounts, rich] };
   const shown = find(harness('src/ui/entry-form.tsx', { kind: 'expense' }, { data: wide, locale: 'es-US' }).render(), 'AccountField').props;
@@ -889,9 +889,9 @@ test('23.1C2: the entry form and the entry detail give VoiceOver the language’
   const budget: domain.MonthlyBudget = { id: 'b', scope: 'category', category: 'Salud', currency: 'ARS', monthISO: domain.todayKey().slice(0, 7), amountMinor: 50000, active: true, createdAt, revision: 0, updatedAt: createdAt };
   const cases = [
     ['es-US', 'Saldo registrado AR$ 876.55', 'Saldo registrado 876,55 pesos', 'AR$ 0.00 de AR$ 500.00 este mes', '0,00 pesos de 500,00 pesos este mes',
-      'Tarjeta de crédito · deuda AR$ 50.00', 'Tarjeta de crédito · deuda 50,00 pesos'],
+      'Tarjeta de crédito · saldo pendiente AR$ 50.00', 'Tarjeta de crédito · saldo pendiente 50,00 pesos'],
     ['en-AR', 'Recorded balance $ 876,55', 'Recorded balance 876.55 pesos', '$ 0,00 of $ 500,00 this month', '0.00 pesos of 500.00 pesos this month',
-      'Credit card · owed $ 50,00', 'Credit card · owed 50.00 pesos'],
+      'Credit card · outstanding $ 50,00', 'Credit card · outstanding 50.00 pesos'],
   ] as const;
   for (const [locale, balance, spokenBalance, budgetText, spokenBudget, cardText, spokenCard] of cases) {
     const view = harness('src/ui/entry-form.tsx', { kind: 'expense' }, { data: { ...liabilityData, budgets: [budget] }, locale });

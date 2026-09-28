@@ -4,17 +4,18 @@ export const cards = {
     list: {
       add: 'Agregar tarjeta',
       emptyTitle: 'Tus tarjetas, como en la billetera',
-      emptyDetail: 'Registrá cada compra una sola vez como gasto. Cuando pagás el resumen, el dinero sale de tu cuenta y baja la deuda de la tarjeta, sin volver a contar el consumo.',
+      emptyDetail: 'Registrá cada compra una sola vez como gasto. Cuando pagás el resumen, el dinero sale de tu cuenta y baja el saldo pendiente de la tarjeta, sin volver a contar el consumo.',
       /** VoiceOver hint of a card face in the carousel. */
       openHint: 'Abre el detalle de la tarjeta',
     },
     panel: {
-      recordedDebt: 'Deuda registrada',
-      archivedDebt: 'Tarjeta archivada · deuda registrada',
-      deletedDebt: 'Tarjeta eliminada · deuda registrada',
+      /** The card's balance due (purchases minus payments). Always «saldo pendiente», never «deuda»: that word is the Deudas y cobros section. */
+      recordedDebt: 'Saldo pendiente',
+      archivedDebt: 'Tarjeta archivada · saldo pendiente',
+      deletedDebt: 'Tarjeta eliminada · saldo pendiente',
       deletedTitle: 'Tarjeta eliminada',
       deletedDetail: 'Sus compras y pagos siguen en Movimientos y en sus reportes. No se edita ni acepta movimientos nuevos.',
-      noDebt: 'Sin deuda registrada en esta tarjeta.',
+      noDebt: 'Sin saldo pendiente en esta tarjeta.',
       /** Card balance in the user's favour: "Saldo a favor · $ 1.000,00". */
       credit: 'Saldo a favor · {amount}',
       available: 'Disponible',
@@ -67,7 +68,7 @@ export const cards = {
       name: 'Nombre de la tarjeta',
       /** An example name without a bank: the issuer has its own field, and a bank of one country reads oddly in another region. */
       namePlaceholder: 'Ej. Visa Gold',
-      openingDebt: 'Deuda actual (opcional)',
+      openingDebt: 'Saldo pendiente hoy (opcional)',
       openingDebtNote: 'Lo que ya debés hoy en esta tarjeta. No cuenta como gasto: las compras anteriores no se vuelven a registrar.',
       issuer: 'Emisor (opcional)',
       issuerPlaceholder: 'Banco o billetera',
@@ -86,16 +87,16 @@ export const cards = {
       archiveConfirm: 'Archivar',
       closingDayInvalid: 'Ingresá el día de cierre entre 1 y 31.',
       dueDayInvalid: 'Ingresá el día de vencimiento entre 1 y 31.',
-      negativeDebt: 'La deuda inicial no puede ser negativa. Si la tarjeta tiene saldo a favor, registralo después como devolución.',
+      negativeDebt: 'El saldo pendiente no puede ser negativo. Si la tarjeta tiene saldo a favor, registralo después como devolución.',
       saveFailed: 'No pudimos guardar la tarjeta. Reintentá el mismo envío.',
       archiveFailed: 'No pudimos archivar la tarjeta. Reintentá el mismo cambio.',
       /** Producto 25B2: deleting a card keeps its purchases, payments and internal account; only the card leaves. */
       delete: 'Eliminar tarjeta',
       deleteTitle: '¿Eliminar esta tarjeta?',
       deleteDetail: 'Deja de aparecer en Tarjetas y de aceptar compras y pagos. Las compras y los pagos anteriores siguen en tus registros y reportes; ningún saldo cambia.',
-      /** 25B2 review: a card with a recorded debt is paid or archived, never deleted (a deleted card takes no payment). */
+      /** 25B2 review: a card with a balance due is paid or archived, never deleted (a deleted card takes no payment). */
       blockedTitle: 'Todavía no se puede eliminar',
-      blockedDetail: 'Esta tarjeta tiene una deuda registrada de {amount}. Pagala primero, o archivala: deja de aparecer y conserva la deuda para pagarla cuando quieras.',
+      blockedDetail: 'Esta tarjeta tiene un saldo pendiente de {amount}. Pagalo primero, o archivala: deja de aparecer y conserva el saldo para pagarlo cuando quieras.',
       blockedPay: 'Pagar',
       blockedArchive: 'Archivar',
       deleteConfirm: 'Eliminar',

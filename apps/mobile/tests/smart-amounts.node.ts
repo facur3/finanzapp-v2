@@ -143,7 +143,7 @@ test('a zero or negative recorded balance shows the figure but offers no "all"',
 test('Pagar total fills the recorded card debt, never more than the registered debt, and the payment stays a transfer', async () => {
   const view = harness({ toAccountId: 'card-acc', title: 'Pagar tarjeta', defaultNote: 'Pago Visa', maxAmountMinor: '5000' });
   let root = view.render();
-  assert.equal(shortcut(root).caption, 'Deuda registrada: ARS 50,00');
+  assert.equal(shortcut(root).caption, 'Saldo pendiente: ARS 50,00');
   assert.equal(shortcut(root).label, 'Pagar total');
   shortcut(root).onPress();
   root = view.render();
@@ -154,7 +154,7 @@ test('Pagar total fills the recorded card debt, never more than the registered d
   await find(view.render(), 'ActionButton', 'Registrar pago').props.onPress();
   // The form stores the catalogue key; ErrorMessage shows it in the interface language.
   assert.equal(find(view.render(), 'ErrorMessage').props.message, 'transferForm.overCardDebt');
-  assert.match(bindLocale('es-AR').errorText('transferForm.overCardDebt'), /supera la deuda/);
+  assert.match(bindLocale('es-AR').errorText('transferForm.overCardDebt'), /supera el saldo pendiente/);
   assert.equal(view.transfers.length, 0);
   amount(view.render()).onChangeText('50');
   await find(view.render(), 'ActionButton', 'Registrar pago').props.onPress();
@@ -167,7 +167,7 @@ test('Pagar total is bounded by both the live recorded debt and the caller cap',
   // A stale, larger cap cannot raise the fill above the debt recorded right now.
   const stale = harness({ toAccountId: 'card-acc', maxAmountMinor: '9000' });
   let root = stale.render();
-  assert.equal(shortcut(root).caption, 'Deuda registrada: ARS 50,00');
+  assert.equal(shortcut(root).caption, 'Saldo pendiente: ARS 50,00');
   shortcut(root).onPress();
   assert.equal(amount(stale.render()).value, '50', 'the live debt bounds the fill');
   const capped = harness({ toAccountId: 'card-acc', maxAmountMinor: '3000' });

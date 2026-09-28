@@ -565,8 +565,8 @@ the language it was checked in.
   back to Gasto: the card is selected again. Save a purchase: one expense on the card, the card
   debt rises, Inicio's month spending rises once.
 - [ ] Tarjetas → Pagar tarjeta: the card is the fixed destination, "Desde" lists cash accounts in
-  the card's currency only, "Pagar total" fills the recorded debt; saving lowers the cash balance
-  and the card debt and adds no expense.
+  the card's currency only, "Pagar total" fills the outstanding balance; saving lowers the cash balance
+  and the card's balance due and adds no expense.
 - [ ] Inicio "+" → Transferencia: neither "Desde" nor "Hacia" lists a card or a debt.
 - [ ] Deudas → a debt's Registrar pago and a receivable's Registrar cobro still work as before.
 - [ ] If the test ledger holds an income on a card from before (a refund recorded through Ingreso
@@ -746,9 +746,9 @@ warning in the Metro console.
 
 **G. Every screen in English and in es-US** (category names, errors, budgets, cards,
 reports, forms): Inicio, Movimientos, a detail, Nuevo gasto/transferencia (a card payment
-reads "Owed ARS 50.00", not "ARS Owed"; paying it all shows "Visa después: Sin deuda"), Reportes (the largest-expense insight shows the
+reads "Outstanding ARS 50.00", not "ARS Outstanding"; paying it all shows "Visa después: Sin saldo pendiente"), Reportes (the largest-expense insight shows the
 day as 9/22 in the US and 22/09 in Argentina; "Compare with previous month"), Tarjetas
-("Recorded debt", "Statement open since yesterday"), Deudas ("Due today"), Presupuestos,
+("Outstanding balance", "Statement open since yesterday"), Deudas ("Due today"), Presupuestos,
 Recurrentes ("Create recurring item"), Cuentas, Categorías (Transportation,
 Entertainment), backup import, Asistente. Trigger a budget duplicate (a second general
 budget for the same month and currency): the error is in English. Largest Dynamic Type on
@@ -989,7 +989,7 @@ identifier `com.facur3.finanzapp.dev`; FinanzApp Preview is not rebuilt or touch
   −US$ 999.999.999,99 transfer inside an account does the same. No amount is ever
   shrunk below its neighbours' size or cut.
 - [ ] Large text: every row above stacks (amount under the name), whatever the amount.
-- [ ] Reportes: the eyebrow "Gastado · ARS", Tarjetas "Deuda registrada · ARS",
+- [ ] Reportes: the eyebrow "Gastado · ARS", Tarjetas "Saldo pendiente · ARS",
   Recurrentes "Pagos · ARS" and the day header net amount never break between the words
   and the code or number.
 - [ ] Reportes budget rows: name over "spent de limit", the percentage on the right; a
@@ -1081,10 +1081,10 @@ identifier `com.facur3.finanzapp.dev`; FinanzApp Preview is not rebuilt or touch
 - [ ] Más shows two groups, Finanzas (Cuentas, Presupuestos, Recurrentes, Deudas y cobros, Categorías) and App y datos (Asistente "Vista previa", Copia de seguridad, Movimientos deshechos), each row opening its screen; counts match your data; Tarjetas is not a row.
 - [ ] Copia de seguridad: Compartir copia opens the share sheet as before and Importar copia opens the review flow; cancelling the sheet reports nothing.
 - [ ] Categorías lists the defaults and every category you typed yourself (e.g. your test ones) with their usage; nothing can be renamed or deleted; the ledger is unchanged afterwards.
-- [ ] Tarjetas shows only cards: carousel, Deuda registrada, Disponible / Cierre / Vencimiento, Registrar compra, Pagar tarjeta, Recientes; no "Deudas y cobros" section. Your debts are intact under Más → Deudas y cobros with the same balances.
+- [ ] Tarjetas shows only cards: carousel, Saldo pendiente, Disponible / Cierre / Vencimiento, Registrar compra, Pagar tarjeta, Recientes; no "Deudas y cobros" section. Your debts are intact under Más → Deudas y cobros with the same balances.
 - [ ] Home header shows only the accounts button; no sparkles. Home keeps the existing budget card and upcoming commitments only when there is data.
 - [ ] Transfer: pick Desde; under the amount read "Saldo registrado: ARS …" with Usar todo; tap it: the field shows the whole balance formatted (e.g. 190.162, or 190.162,50 with cents) with the caret at the end, nothing is saved, Hacia still has to be chosen; change Desde to another account (and to USD): the figure and the fill follow; an account at $ 0 or negative shows the figure and no Usar todo; the saved transfer equals the filled value and the source ends at exactly zero.
-- [ ] Pagar tarjeta: "Deuda registrada: ARS …" with Pagar total; tap fills the debt; editing above it is still refused on Registrar pago; editing below it is saved as one payment; no new expense appears in Movimientos or Reportes; a card without debt shows no Pagar total.
+- [ ] Pagar tarjeta: "Saldo pendiente: ARS …" with Pagar total; tap fills the balance due; editing above it is still refused on Registrar pago; editing below it is saved as one payment; no new expense appears in Movimientos or Reportes; a card without debt shows no Pagar total.
 - [ ] Deuda (Debo): "Pendiente" with Saldar total fills the pending amount; Me deben: Cobrar total fills it; each save records one payment/collection, the pending amount reaches zero, and nothing appears as income or expense.
 - [ ] VoiceOver reads the shortcut as "Usar todo, Saldo registrado: …" (and the equivalents); large text keeps the footnote and action on one or two lines without clipping; Reduce Motion unchanged; both themes; Expo Go.
 
@@ -1196,7 +1196,7 @@ Save a private backup first and use small test amounts. Do not uninstall the onl
 - [ ] Tarjetas → + creates a card with name, currency, optional current debt, limit and closing/due days; it appears as a card face in the carousel.
 - [ ] With two cards, the carousel snaps one card at a time and the panel below changes to the selected card.
 - [ ] Registrar compra posts one expense on the card: Movimientos, Reportes and Presupuestos count it once; the card debt rises by the same amount; Disponible does not change.
-- [ ] Pagar tarjeta only offers cash accounts in the card's currency, caps at the recorded debt, lowers the cash balance and the card debt, and adds no expense or income.
+- [ ] Pagar tarjeta only offers cash accounts in the card's currency, caps at the outstanding balance, lowers the cash balance and the card's balance due, and adds no expense or income.
 - [ ] Card detail lists purchases and payments with "Pago de tarjeta · desde …" and links each purchase to its normal detail.
 - [ ] A card purchase detail's Tarjeta row opens the card, not a generic account screen; Cuentas never lists card or debt accounts.
 - [ ] Deudas → + creates "Debo" and "Me deben"; Registrar pago/cobro is capped at the pending amount and never appears as a gasto/ingreso.

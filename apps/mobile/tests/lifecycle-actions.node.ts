@@ -102,7 +102,7 @@ test('25B2 review: a card with a recorded debt is not deleted: the dialog names 
   view.render('useCardManagement').remove(card, () => done++);
   assert.equal(view.alerts[0].title, 'Todavía no se puede eliminar');
   // e3 is 12.000 cents: $ 120,00 in Argentina (a bare $ is the peso there; the space is the formatter's no-break space).
-  assert.equal(view.alerts[0].message.replace(/\u00a0/g, ' '), 'Esta tarjeta tiene una deuda registrada de $ 120,00. Pagala primero, o archivala: deja de aparecer y conserva la deuda para pagarla cuando quieras.');
+  assert.equal(view.alerts[0].message.replace(/\u00a0/g, ' '), 'Esta tarjeta tiene un saldo pendiente de $ 120,00. Pagalo primero, o archivala: deja de aparecer y conserva el saldo para pagarlo cuando quieras.');
   assert.equal(JSON.stringify(view.alerts[0].buttons.map(button => [button.text, button.style ?? null])), JSON.stringify([['Cancelar', 'cancel'], ['Pagar', null], ['Archivar', null]]));
   assert.equal(view.removedCards.length + view.savedCards.length, 0, 'nothing written by the dialog itself');
   view.alerts[0].buttons[1].onPress!();

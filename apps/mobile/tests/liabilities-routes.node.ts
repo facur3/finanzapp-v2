@@ -245,7 +245,7 @@ test('Tarjetas and Deudas read English labels, keep user names as typed and send
     assert.equal(face.props.accessibilityHint, 'Opens the card details');
 
     const detail = harness('card/[id].tsx', { id: 'card' }).render();
-    assert.ok(nodes(detail).some(node => node.type === 'AppText' && node.props.children === 'Recorded debt'), 'the same noun as the payment form (Recorded debt)');
+    assert.ok(nodes(detail).some(node => node.type === 'AppText' && node.props.children === 'Outstanding balance'), 'the same noun as the payment form (Outstanding balance)');
     assert.equal(nodes(detail).find(node => node.type === 'Stack.Screen')!.props.options.title, 'Visa Gold');
 
     const debtView = harness('debt/[id].tsx', { id: 'debt' });
@@ -357,7 +357,7 @@ test('24B5: the card and debt forms choose the currency before the amount, over 
   find(card.render(), 'CurrencySwitch').props.onChange('JPY');
   assert.equal(find(card.render(), 'AmountField').props.currency, 'JPY', 'the field knows the currency before a digit is typed');
   find(card.render(), 'Field', 'Nombre de la tarjeta').props.onChangeText('Rakuten');
-  find(card.render(), 'AmountField', 'Deuda actual (opcional)').props.onChangeText('1500');
+  find(card.render(), 'AmountField', 'Saldo pendiente hoy (opcional)').props.onChangeText('1500');
   find(card.render(), 'Field', 'Día de cierre').props.onChangeText('28');
   find(card.render(), 'Field', 'Día de vencimiento').props.onChangeText('5');
   await find(card.render(), 'ActionButton', 'Crear tarjeta').props.onPress();
