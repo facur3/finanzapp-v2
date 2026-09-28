@@ -1,7 +1,7 @@
 # FinanzApp mobile: living roadmap
 
-Updated: 2026-09-28 (Producto 24T1C, documentation only: the state after 24T1 merged as PR #67, schema 12 and
-backup v12, and the product decisions 24T2, 25C2 and 25D read). Read [decision 001](decisions/001-native-mobile.md),
+Updated: 2026-09-28 (Producto 24T2, on its branch: the purchase in cuotas, the card's statement calendar with exact
+dates, schema 13 and backup v13, and the Tarjetas deck; 24T1C merged as PR #68). Read [decision 001](decisions/001-native-mobile.md),
 [decision 002](decisions/002-spending-first.md),
 [decision 003](decisions/003-five-tabs-and-cards.md) and
 [decision 004](decisions/004-native-first-and-web-retirement.md). Decision 002 supersedes
@@ -99,7 +99,7 @@ history file keeps the evidence of when and why.
   synthetic fixtures live only in tests; the repository is public and carries no financial
   backups, screenshots with real data, tokens, signing keys or bank credentials.
 - **Durable local writes, drafts kept on failure, never a reset on error.** SQLite is the ledger
-  (schema 12; a backup takes the lowest version its content needs, up to v12, and v1–v12 import); a
+  (schema 13; a backup takes the lowest version its content needs, up to v13, and v1–v13 import); a
   write is confirmed only after it landed; deleting a recurring rule, a debt tracker, an account or a
   card keeps its row as a deletion record and never touches the movements it produced (24UX4, 25B2);
   edits are audited and undoable; future sync needs operation IDs, revisions, tombstones,
@@ -133,7 +133,8 @@ history file keeps the evidence of when and why.
 
 ## 1. Implemented (current state)
 
-What exists in code on `master` as of Producto 24T1 (PR #67, merged 2026-09-28), after 25B3 (PR #66). Per area, without test inventories (those are in apps/mobile/README.md and the history
+What exists in code on `master` as of Producto 24T1C (PR #68, merged 2026-09-28), after 24T1 (PR #67) and 25B3 (PR #66), plus
+Producto 24T2 on its branch. Per area, without test inventories (those are in apps/mobile/README.md and the history
 file). "Released" below names an in-app gate (`RELEASED_LANGUAGES`, `RELEASED_REGIONS`,
 `LEDGER_CURRENCIES`): what a build offers, verified on Linux; nothing is distributed to people yet
 (§4).
@@ -188,7 +189,7 @@ file). "Released" below names an in-app gate (`RELEASED_LANGUAGES`, `RELEASED_RE
 - **Product shape.** Five native tabs with the Assistant in the centre and Más as the grouped
   hub (Finanzas / App y datos: Cuentas, Tarjetas, Presupuestos, Recurrentes, Deudas y cobros,
   Categorías, Idioma, Región, Apariencia, backup, the Assistant's data note); a Más version line
-  («FinanzApp 0.1.0 (25B3)»; the material and locale diagnostics only in a development build). Liquid Glass on
+  («FinanzApp 0.1.0 (24T2)»; the material and locale diagnostics only in a development build). Liquid Glass on
   Inicio's movement pills, its Assistant entry and the Assistant composer only in a development build on iOS 26 with
   the API present and without Reduce Transparency; opaque material otherwise.
 - **Inicio.** One main number (gasto registrado of the month, or Disponible: cash in normal
@@ -213,7 +214,8 @@ file). "Released" below names an in-app gate (`RELEASED_LANGUAGES`, `RELEASED_RE
   Ingresa en as stacked selection rows; the date wheel in a compact bottom sheet on iOS (24B6;
   its entrance is corrected in 24UX1); edit, undo, contextual account correction and recovery;
   a draft kept when a save fails; historical card incomes still editable.
-- **Ledger and storage.** SQLite schema 12 (24T1: `installment_plans` and `installments`; 11 (25B2): the account
+- **Ledger and storage.** SQLite schema 13 (24T2: `card_cycle_dates`, a card's exact statement dates; 12 (24T1):
+  `installment_plans` and `installments`; 11 (25B2): the account
   tombstone and the card flag; 10 (24UX4): a `deleted` flag on recurring rules
   and debt profiles; schema 9 added `currency_units`), durable writes, audited
   edits, same-currency internal transfers, balance corrections, accounts with identity
@@ -222,9 +224,10 @@ file). "Released" below names an in-app gate (`RELEASED_LANGUAGES`, `RELEASED_RE
   four digits, limit, closing and due days; counterparty, direction, due date), card rules
   (24B6). A backup takes the lowest version its content needs: v8 (ARS/USD only), v9 (another currency),
   v10 (24UX4: a deleted rule or debt), v11 (25B2: a deleted account or card), v12 (24T1: an instalment
-  plan); v1–v12 import; an older build refuses a newer file unchanged; a failed restore rolls back.
-- **Commitments.** Purchases in instalments since 24T1 (the engine above; the purchase form and the card's figures are
-  24T2). Weekly/monthly/yearly recurring rules with next occurrence, pause, edit,
+  plan), v13 (24T2: an exact statement date); v1–v13 import; an older build refuses a newer file unchanged; a failed
+  restore rolls back.
+- **Commitments.** Purchases in instalments since 24T1 (the engine above; since 24T2 the purchase form, the plan detail
+  and the card's figures). Weekly/monthly/yearly recurring rules with next occurrence, pause, edit,
   per-occurrence identity (scheduled is not paid; retries cannot duplicate); debts and
   receivables with partial payments; card purchases and payments; closing and due dates from
   the user's days. 24UX2: a rule's detail lists the movements it recorded (read by their
@@ -1517,13 +1520,13 @@ nothing of it is on a screen yet.
   Review round: the detail holds navigation while a pause, a resume or a confirmed deletion is written (`gestureEnabled`
   and `headerBackVisible` from `busy`, as the movement detail), gives it back on success or failure, and a deletion pops
   exactly once (`polish-routes.node.ts` +1, the harness holding a save mid-write).
-- **Status.** Delivered on this branch (2026-09-28), not device-verified. Checked on Linux: root `npm test`,
+- **Status.** Delivered and merged (PR #66, 2026-09-28), not device-verified. Checked on Linux: root `npm test`,
   `check:repo`; mobile `typecheck`, `test:storage`, `currency:verify`, `regions:verify`, `i18n:check -- --strict`,
   `i18n:extract`, `check`, `export:ios` (the counts are in the PR). No EAS build; the iPhone was not touched.
   Pending: the checklist section Producto 25B3.
 - **Depends on.** 25B2 (the deleted-account rule states), 24UX4 (the lifecycle), 24UX2 (the history).
 
-### Producto 24T1C — roadmap reconciliation before 24T2 (this PR)
+### Producto 24T1C — roadmap reconciliation before 24T2 (PR #68)
 
 - **Goal.** Documentation only: the roadmap, the decisions, the READMEs and the design direction agree with
   `master` after 25B3 (PR #66) and 24T1 (PR #67) before 24T2 reads them, and the product decisions that 24T2, 25C2
@@ -1581,7 +1584,7 @@ nothing of it is on a screen yet.
   simplified to «Sin interés» plus one «Con interés» toggle with a single «Total financiado» field (the engine keeps
   its four components). The closing/due contract became full exact dates for the next cycle, due after closing, not
   necessarily in the same month; 25D records that a date change replaces the old date's reminders.
-- **Status.** Documentation only, on this branch (2026-09-28). The full handoff suite, checked on Linux on the
+- **Status.** Documentation only, merged (PR #68, 2026-09-28). The full handoff suite, checked on Linux on the
   review-round tree: root `npm test` (373 passed, 1 todo) and `npm run check:repo` (OK, 347 tracked files); mobile
   `typecheck` (clean), `test:storage` (794/794; it reads this file for the recurring-rules decision),
   `currency:verify` and `regions:verify` (catalogues verified offline), `i18n:check -- --strict` (0 errors, 0

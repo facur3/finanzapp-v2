@@ -43,9 +43,10 @@ personal o un cobro pendiente también es una cuenta interna con perfil
   rechaza en el almacenamiento, no solo en la interfaz.
 - **Disponible** en Inicio excluye tarjetas, deudas y cobros: es dinero
   registrado en cuentas normales, no patrimonio ni saldo bancario.
-- Cierre y vencimiento se calculan con los días cargados por el usuario. No hay
-  resumen bancario, estado "pendiente", congelar tarjeta ni disputas: FinanzApp no
-  opera la tarjeta.
+- Cierre y vencimiento se calculan con los días cargados por el usuario y, desde
+  24T2, con las fechas exactas que la persona corrigió (regla 7, «Ciclo del
+  resumen»). No hay resumen bancario, estado "pendiente", congelar tarjeta ni
+  disputas: FinanzApp no opera la tarjeta.
 
 Ventajas frente a un modelo separado: reutiliza saldos exactos en centavos,
 auditoría de ediciones, deshacer/recuperar, copias v1–v6 y las mismas pruebas.
@@ -121,7 +122,11 @@ y la decisión es la contraria (regla 7). 24T1 (PR #67) convirtió en pruebas 12
      disponible del emisor (muchos emisores reservan el total; otros no) no se
      asume: se decide y se registra aquí antes de implementar
      `cardAvailableLimitMinor` con planes. Hasta entonces el límite disponible no
-     se calcula para una tarjeta con planes.
+     se calcula para una tarjeta con planes. **24T2 (2026-09-28) decide solo la
+     presentación, no una fórmula:** sin límite cargado, «Sin límite cargado»; con
+     límite y sin plan pendiente, la cifra; con límite y un plan pendiente, «No
+     calculado con cuotas» con una ayuda que explica por qué. Nunca un cero ni una
+     cifra inventada, y sin barra de uso mientras es desconocido.
    - **Ciclo de vida:** archivar una tarjeta conserva sus planes y permite seguir
      pagando todas las cuotas; eliminar una tarjeta queda bloqueado mientras tenga
      saldo pendiente **o** cualquier plan pendiente (`assertCardDeletable` es el
@@ -230,7 +235,8 @@ y la decisión es la contraria (regla 7). 24T1 (PR #67) convirtió en pruebas 12
      24C2 agregará al lado el registro de la compra en moneda original (importe,
      tasa, cargos y procedencia); no se agregan columnas vacías hoy.
    - **Financiación en la interfaz (decidido el 2026-09-28, Producto 24T1C, para
-     24T2):** el motor no cambia (principal, intereses, comisiones e impuestos siguen
+     24T2; implementado en 24T2 con la categoría predefinida «Intereses», cuya etiqueta
+     guardada es la de su identidad, nunca una traducción):** el motor no cambia (principal, intereses, comisiones e impuestos siguen
      siendo cuatro componentes separados). La interfaz es simple: por defecto «Sin
      interés», sin ningún campo de financiación; un único interruptor secundario «Con
      interés» muestra un solo campo, «Total financiado», y FinanzApp deriva
@@ -250,6 +256,29 @@ y la decisión es la contraria (regla 7). 24T1 (PR #67) convirtió en pruebas 12
      movimientos, resúmenes ni calendarios de planes ya creados; puede cambiar cómo se
      presenta o programa el próximo ciclo aún no materializado. Sin feriados ni
      corrimientos a días hábiles simulados.
+   - **Ciclo del resumen (implementado en 24T2, vinculante).** Un **resumen** es un
+     cierre y el vencimiento **de ese cierre**, siempre juntos: `vencimiento > cierre`
+     vale dentro de un resumen y nunca entre dos. El **próximo vencimiento** es el
+     primer vencimiento de hoy en adelante y puede ser el del resumen que ya cerró
+     (cierre 28, vencimiento 5, el 2026-10-01: vence 5 oct —resumen del 28 sep— y
+     cierra 28 oct —que vence 5 nov—); el **próximo cierre** es el primer cierre de hoy
+     en adelante (el día del cierre el resumen sigue abierto). La interfaz los muestra
+     como dos datos («Vence 5 oct · Cierra 28 oct»), nunca como un par ambiguo. Modelo
+     (`packages/domain/card-cycles.ts`, esquema 13, copia v13): los días habituales son
+     la grilla (las fórmulas de 24T1, sin cambios); las fechas exactas son resúmenes
+     guardados (`card_cycle_dates`: cierre y su vencimiento), una **cadena de resúmenes
+     consecutivos** por tarjeta; antes y después de la cadena los resúmenes se generan
+     con los días habituales, anclados en la fila vecina (el cierre habitual más cercano
+     a un mes antes o después), así una fecha movida nunca duplica ni saltea un resumen,
+     aunque cruce de mes. **Todo cambio congela primero lo que ya cerró:** corregir el
+     próximo cierre o vencimiento, corregir el vencimiento del resumen cerrado que falta
+     pagar o cambiar los días habituales guarda antes, a sus fechas vigentes, cada
+     resumen desde el final de la cadena hasta el último cerrado; nunca se borra ni se
+     renumera una fila y el cierre de un resumen cerrado no cambia. Un formulario abierto
+     sobre un resumen que ya cerró se rechaza («Las fechas del ciclo cambiaron…»). Los
+     resúmenes anteriores a la primera fila guardada siguen siendo una estimación con
+     los días habituales actuales, como antes de 24T2. Un plan nuevo usa el calendario
+     vigente al crearse (fechas exactas incluidas); su calendario queda contractual.
    - **Antes de 24T1:** archivar conservaba el saldo pendiente y seguía aceptando el
      pago; eliminar se rechazaba con saldo pendiente y se permitía en cero; una
      tarjeta eliminada no aceptaba pagos. Todo eso sigue igual.

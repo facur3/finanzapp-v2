@@ -26,10 +26,12 @@ import type { CreditCardProfile } from './liabilities.ts';
  * paid: «pagada» is never derived, because a card mixes purchases, plans, charges and refunds and a general payment says
  * nothing about which share it covers.
  *
- * Gates for later deliveries: how pending instalments consume the issuer's available credit (24T2, decided in decision
- * 003 first; until then `cardAvailableLimitMinor` answers null for a card with a pending plan), refunds and early payoff
- * (24T3: no save changes a plan's money, count or dates, so those will be operations with their own records), and a
- * purchase whose currency differs from the card's billing currency (24C2: a plan is same-currency here). */
+ * Gates for later deliveries: how pending instalments consume the issuer's available credit stays open (decision 003:
+ * `cardAvailableLimitMinor` answers null for a card with a pending plan, and 24T2 shows «No calculado con cuotas», never a
+ * formula), refunds and early payoff (24T3: no save changes a plan's money, count or dates, so those will be operations
+ * with their own records), and a purchase whose currency differs from the card's billing currency (24C2: a plan is
+ * same-currency here). Since 24T2 a new plan's calendar is the card's effective calendar at creation (its usual days and
+ * its exact statement dates, card-cycles.ts); once written, the schedule never follows a later change. */
 export type StatementPlacement = 'current' | 'next';
 
 /** The four components of a plan, in a fixed order. Each one's per-instalment share is `<component>Minor` on an
@@ -45,9 +47,11 @@ export interface Installment {
   /** 1-based position in the plan. */
   number: number;
   /** The statement closing the instalment belongs to: its recognition date (its shares count in this month). Contractual and
-   * date-only: computed once from the card's closing day at purchase time; a later change of the card's days rewrites nothing. */
+   * date-only: computed once from the card's calendar at purchase time (its closing day, and since 24T2 its exact statement
+   * dates); a later change of the card's days or dates rewrites nothing. */
   billingDateISO: string;
-  /** The payment due date of that statement, from the card's due day. Informative: paying stays a transfer the person records. */
+  /** The payment due date of that statement (the card's due day after its closing, or the statement's exact due date).
+   * Informative: paying stays a transfer the person records. */
   dueDateISO: string;
   /** Principal recognised by this instalment, > 0. The principal shares sum exactly to the plan's principal. */
   principalMinor: number;

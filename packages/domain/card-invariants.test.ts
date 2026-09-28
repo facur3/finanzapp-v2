@@ -11,6 +11,7 @@ import { CARD_PLAN_MESSAGE, INSTALLMENT_ENTRY_MESSAGE, PLAN_CARD_MESSAGE, PLAN_C
 import { deleteRecurringRule, materializeRecurringRule, pauseRecurringRule, recurringEntryId, recurringOccurrenceOf, type RecurringRule } from './recurring';
 import { initialRecord, type EntryRecord } from './recovery';
 import { cardAvailableLimitMinor } from './liabilities';
+import { CYCLE_HISTORY_MESSAGE, assertCardCycleChange, cardCycleView, planCardCycle } from './card-cycles';
 
 /** The financial semantics of a credit card, recorded at the close of Producto 25B2 (decision 003,
  * «Invariantes contables de tarjetas»). Each block is one invariant; a change that breaks one is a
@@ -249,6 +250,31 @@ describe('7b. instalments (Producto 24T1)', () => {
     expect(() => assertIncomeAccount(cardAccount.id, [card], [debt])).toThrow('Un ingreso se registra en una cuenta normal, no en una tarjeta.');
   });
   it.todo('a foreign-currency plan keeps purchase, billing and paying currencies, the exact debited and credited amounts, and the rate/fees with provenance (24C2; a 24T1 plan is same-currency: PLAN_CURRENCY_MESSAGE)');
+});
+
+describe('7c. the statement cycle (Producto 24T2)', () => {
+  const cycle = { closingDay: 28, dueDay: 5 };
+  it('a statement is one closing and the due date of THAT closing; the next due date may belong to the statement that already closed', () => {
+    const view = cardCycleView(cycle, [], '2026-10-01');
+    expect([view.previous.closingISO, view.previous.dueISO]).toEqual(['2026-09-28', '2026-10-05']);
+    expect([view.open.closingISO, view.open.dueISO]).toEqual(['2026-10-28', '2026-11-05']);
+    expect(view.nextDue.dueISO).toBe('2026-10-05');
+    expect(view.nextDue.dueISO < view.open.closingISO).toBe(true);
+    // due > closing holds inside each statement, never between two.
+    for (const statement of [view.previous, view.open]) expect(statement.dueISO > statement.closingISO).toBe(true);
+  });
+  it('an exact date never rewrites a statement that closed, nor a plan already created; a new plan uses the calendar known at its creation', () => {
+    const plan = newInstallmentPlan({ id: 'before', card: { ...card, ...cycle }, cardAccount, merchant: 'Electro', category: 'Hogar', purchaseDateISO: '2026-10-10',
+      principalMinor: 3000, count: 3, placement: 'current', createdAt });
+    const change = planCardCycle({ cardId: card.id, days: cycle, rows: [], todayISO: '2026-10-01', nowISO: now,
+      intent: { open: { statementClosingISO: '2026-10-28', closingISO: '2026-10-26', dueISO: '2026-11-04' }, days: { closingDay: 15, dueDay: 25 } } });
+    expect(cardCycleView(change.days, change.rows, '2026-10-01').previous).toMatchObject({ closingISO: '2026-09-28', dueISO: '2026-10-05' });
+    expect(plan.schedule[0].billingDateISO).toBe('2026-10-28');
+    const after = newInstallmentPlan({ id: 'after', card: { ...card, ...change.days }, cardAccount, merchant: 'Electro', category: 'Hogar', purchaseDateISO: '2026-10-10',
+      principalMinor: 3000, count: 3, placement: 'current', createdAt, cycleDates: change.rows });
+    expect(after.schedule[0].billingDateISO).toBe('2026-10-26');
+    expect(() => assertCardCycleChange({ days: cycle, rows: [] }, { days: { closingDay: 15, dueDay: 25 }, rows: [] }, '2026-10-01')).toThrow(CYCLE_HISTORY_MESSAGE);
+  });
 });
 
 describe('8. visible copy', () => {
