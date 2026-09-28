@@ -88,7 +88,7 @@ function harness(file: string, props: any = {}, options: { data?: domain.LedgerA
     './budget-presentation': budgetPresentation, '../../src/ui/budget-presentation': budgetPresentation,
     './money-input': moneyInput, '../../src/ui/money-input': moneyInput, '../src/ui/money-input': moneyInput,
     './liability-presentation': liabilityPresentation,
-    '../../src/ui/theme': { space: { xs: 4, s: 8, m: 12, l: 16, xl: 20, xxl: 24, xxxl: 32 },
+    '../../src/ui/theme': { space: { xs: 4, s: 8, m: 12, l: 16, xl: 20, xxl: 24, xxxl: 32 }, useCurrentDay: () => '2026-09-20',
       usePalette: () => ({ text: '#000', positive: '#070', income: '#070', expense: '#700', primary: '#2557D6', warning: '#a60', secondary: '#666', tertiary: '#999' }) },
     './theme': { space: { xs: 4, s: 8, m: 12, l: 16, xl: 20, xxl: 24, xxxl: 32 }, usePalette: () => ({ background: '#fff' }) },
     './entry-form': { EntryForm: 'EntryForm' }, './transfer-form': { TransferForm: 'TransferForm' },
@@ -102,8 +102,11 @@ function harness(file: string, props: any = {}, options: { data?: domain.LedgerA
     if (!Object.hasOwn(modules, name)) throw new Error('Unexpected recovery dependency: ' + name);
     return modules[name];
   };
-  // 24UX4: the recurring detail's management runs for real (Alert, saveRecurring, router and haptics are the mocks above).
+  // 24UX4: the recurring management runs for real (Alert, saveRecurring, router and haptics are the mocks above). 25B3: the
+  // rule's detail (app/recurring/[id].tsx) uses it while the account screens keep their mock; its history runs for real too.
   modules['./commitment-actions'] = realModule('src/ui/commitment-actions.ts', require);
+  modules['../../src/ui/commitment-actions'] = { ...(modules['./commitment-actions'] as object), useAccountManagement: accountManagement.useAccountManagement };
+  modules['../../src/ui/recurring-history'] = realModule('src/ui/recurring-history.tsx', require);
   const module = { exports: {} as Record<string, (props: any) => Node> };
   runInNewContext(code, { module, exports: module.exports, Date, Error, require });
   return {
@@ -1178,7 +1181,7 @@ test('24UX2: a rule\'s detail lists only the movements it recorded, newest first
   const manual: domain.Entry = { ...occurrence('2026-09-05'), id: 'manual-netflix' };
   const data: domain.LedgerArchive = { ...archive, recurring: [streaming],
     records: [...archive.records, ...['2026-07-05', '2026-08-05', '2026-09-05'].map(date => domain.initialRecord(occurrence(date))), domain.initialRecord(manual)] };
-  const history = historyOf(harness('src/ui/recurring-form.tsx', { original: streaming }, { data }).render());
+  const history = historyOf(harness('app/recurring/[id].tsx', {}, { data, params: { id: 'netflix' } }).render());
   assert.equal(find(history, 'SectionTitle').props.children, 'Registrados');
   assert.match(find(history, 'SectionTitle').props.caption, /estimación/);
   const rows = nodes(history).filter(node => node.type === 'EntryRow');
@@ -1186,16 +1189,19 @@ test('24UX2: a rule\'s detail lists only the movements it recorded, newest first
   assert.equal(rows.every(node => node.props.showAccount === false), true);
   assert.equal(rows.some(node => node.props.entry.dateISO === streaming.nextDateISO), false, 'the next date is not a payment');
   // A rule that has not recorded anything says so; a new rule shows no history at all.
-  const fresh = historyOf(harness('src/ui/recurring-form.tsx', { original: streaming }, { data: { ...archive, recurring: [streaming] } }).render());
+  const fresh = historyOf(harness('app/recurring/[id].tsx', {}, { data: { ...archive, recurring: [streaming] }, params: { id: 'netflix' } }).render());
   assert.equal(nodes(fresh).filter(node => node.type === 'AppText').map(node => node.props.children).join('|'), 'Todavía no registró ningún movimiento.');
-  assert.equal(nodes(harness('src/ui/recurring-form.tsx', {}, { data: archive }).render()).some(node => typeof node.type === 'function' && node.type.name === 'RecurringHistory'), false);
+  // 25B3: the form is only the form, new or editing; the history is the detail's.
+  for (const props of [{}, { original: streaming }]) {
+    assert.equal(nodes(harness('src/ui/recurring-form.tsx', props, { data: { ...archive, recurring: [streaming] } }).render()).some(node => typeof node.type === 'function' && node.type.name === 'RecurringHistory'), false);
+  }
 });
 
 test('24UX2: a long history shows the latest twelve and counts the rest; an undone occurrence is not listed', () => {
   const dates = Array.from({ length: 15 }, (_, index) => `2025-${String((index % 12) + 1).padStart(2, '0')}-${index < 12 ? '05' : '06'}`);
   const records = dates.map(date => domain.initialRecord(occurrence(date)));
   records[0] = { ...records[0], voided: true };
-  const history = historyOf(harness('src/ui/recurring-form.tsx', { original: streaming }, { data: { ...archive, recurring: [streaming], records } }).render());
+  const history = historyOf(harness('app/recurring/[id].tsx', {}, { data: { ...archive, recurring: [streaming], records }, params: { id: 'netflix' } }).render());
   assert.equal(nodes(history).filter(node => node.type === 'EntryRow').length, 12);
   assert.ok(nodes(history).some(node => node.type === 'AppText' && node.props.children === 'Y 2 registros anteriores en Movimientos.'));
 });
@@ -1207,7 +1213,7 @@ test('24UX2: a movement a rule recorded links back to its rule from the detail; 
   const row = find(view.render(), 'DetailRow', 'Recurrente');
   assert.equal(row.props.value, 'Mensual');
   row.props.onPress();
-  assert.equal(JSON.stringify(view.pushed.at(-1)), JSON.stringify({ pathname: '/edit-recurring/[id]', params: { id: 'netflix' } }));
+  assert.equal(JSON.stringify(view.pushed.at(-1)), JSON.stringify({ pathname: '/recurring/[id]', params: { id: 'netflix' } }), '25B3: the rule\'s detail, never its form');
   const badge = find(view.render(), 'MerchantBadge');
   assert.equal(JSON.stringify([badge.props.merchant, badge.props.category, badge.props.large]), JSON.stringify(['Netflix', 'Suscripciones', true]));
   assert.equal(nodes(harness('app/entry/[id].tsx', {}, { params: { id: entry.id } }).render()).some(node => node.type === 'DetailRow' && node.props.label === 'Recurrente'), false);
@@ -1220,7 +1226,7 @@ test('24UX2 review: the history names each row\'s own account when the rule move
   const dates = ['2026-07-05', '2026-08-05', '2026-09-05'];
   const rowsOf = (rule: domain.RecurringRule, entries: domain.Entry[]) => {
     const data: domain.LedgerArchive = { ...archive, accounts: [...archive.accounts, second], recurring: [rule], records: entries.map(domain.initialRecord) };
-    return nodes(historyOf(harness('src/ui/recurring-form.tsx', { original: rule }, { data }).render())).filter(node => node.type === 'EntryRow');
+    return nodes(historyOf(harness('app/recurring/[id].tsx', {}, { data, params: { id: rule.id } }).render())).filter(node => node.type === 'EntryRow');
   };
   const owned = (rows: Node[]) => rows.map(node => node.props.entry.dateISO + '@' + node.props.account.id + (node.props.showAccount ? '+name' : '')).join(',');
   // Every occurrence in the rule's current account: the name would repeat the form above.
@@ -1235,30 +1241,31 @@ test('24UX2 review: the history names each row\'s own account when the rule move
 // ---- Producto 24UX4: pause, resume and delete from a rule's detail --------------------------------------------
 const settleAsync = async () => { await new Promise(resolve => setImmediate(resolve)); };
 
-test('24UX4: a rule\'s detail ends with Pausar recurrente and a red Eliminar recurrente; pausing saves the stored rule, not the draft, then closes', async () => {
+test('24UX4 / 25B3: a rule\'s detail ends with Pausar recurrente and a red Eliminar recurrente, the form keeps only Guardar cambios; pausing saves the stored rule and keeps the detail open', async () => {
   const data: domain.LedgerArchive = { ...archive, recurring: [streaming] };
-  const view = harness('src/ui/recurring-form.tsx', { original: streaming }, { data });
+  const form = harness('src/ui/recurring-form.tsx', { original: streaming }, { data }).render();
+  assert.equal(nodes(form).filter(node => node.type === 'ActionButton').map(node => node.props.label).join(','), 'Guardar cambios', '25B3: the lifecycle left the form for the detail');
+  const view = harness('app/recurring/[id].tsx', {}, { data, params: { id: 'netflix' } });
   const root = view.render();
   const labels = nodes(root).filter(node => node.type === 'ActionButton').map(node => node.props.label).join(',');
-  assert.equal(labels, 'Guardar cambios,Pausar recurrente,Eliminar recurrente');
+  assert.equal(labels, 'Pausar recurrente,Eliminar recurrente');
   assert.equal(find(root, 'ActionButton', 'Eliminar recurrente').props.tone, 'expense');
-  // An edited, unsaved draft is not what Pausar writes.
-  find(root, 'Field', 'Comercio o concepto').props.onChangeText?.('Otro nombre');
-  await find(view.render(), 'ActionButton', 'Pausar recurrente').props.onPress();
+  await find(root, 'ActionButton', 'Pausar recurrente').props.onPress();
   await settleAsync();
   assert.equal(view.rules.length, 1);
   assert.equal(JSON.stringify({ ...view.rules[0], updatedAt: '' }), JSON.stringify({ ...streaming, active: false, revision: 4, updatedAt: '' }));
-  assert.equal(view.backs(), 1, 'the detail closes after a durable save');
-  // Paused: the detail says what pausing means and offers Reanudar.
-  const paused = { ...streaming, active: false, revision: 4 };
-  const pausedRoot = harness('src/ui/recurring-form.tsx', { original: paused }, { data: { ...archive, recurring: [paused] } }).render();
+  assert.equal(view.backs(), 0, '25B3: the detail stays open and shows the new state, as a debt\'s does after Cerrar');
+  // Paused: the detail says so under the amount, says what pausing means and offers Reanudar.
+  view.setData({ ...data, recurring: [view.rules[0]] });
+  const pausedRoot = view.render();
+  assert.ok(nodes(pausedRoot).some(node => node.type === 'AppText' && node.props.children === 'Pausado'));
   assert.ok(nodes(pausedRoot).some(node => node.type === 'AppText' && String(node.props.children).startsWith('Pausado: no registra nada')));
   find(pausedRoot, 'ActionButton', 'Reanudar recurrente');
 });
 
 test('24UX4: Eliminar recurrente asks first, names the recorded movements, and on confirmation writes the deletion record and closes', async () => {
   const data: domain.LedgerArchive = { ...archive, recurring: [streaming], records: [...archive.records, domain.initialRecord(occurrence('2026-09-05'))] };
-  const view = harness('src/ui/recurring-form.tsx', { original: streaming }, { data });
+  const view = harness('app/recurring/[id].tsx', {}, { data, params: { id: 'netflix' } });
   find(view.render(), 'ActionButton', 'Eliminar recurrente').props.onPress();
   assert.equal(view.rules.length, 0);
   const alert = view.alerts[0];
@@ -1268,15 +1275,18 @@ test('24UX4: Eliminar recurrente asks first, names the recorded movements, and o
   await settleAsync();
   assert.equal(JSON.stringify({ ...view.rules[0], updatedAt: '' }), JSON.stringify({ ...streaming, active: false, deleted: true, revision: 4, updatedAt: '' }));
   assert.equal(view.backs(), 1);
-  // While the screen closes on a rule just deleted, the form stays drawn without its actions (no «not found» flash).
-  const closing = harness('app/edit-recurring/[id].tsx', {}, { data, params: { id: 'netflix' } });
-  assert.equal(closing.render().type, 'RecurringForm', 'opened on the live rule');
+  // While the screen closes on a rule just deleted, the detail stays drawn without Editar or actions (no «not found» flash).
+  const closing = harness('app/recurring/[id].tsx', {}, { data, params: { id: 'netflix' } });
+  find(closing.render(), 'ActionButton', 'Eliminar recurrente');
   closing.setData({ ...data, recurring: [view.rules[0]] });
   const kept = closing.render();
   assert.equal(nodes(kept).some(node => node.type === 'EmptyState'), false);
-  assert.equal(kept.type, 'RecurringForm');
-  // A deep link to a deleted rule finds nothing; the movement it recorded is a plain movement.
+  assert.equal(nodes(kept).some(node => node.type === 'ActionButton'), false, 'nothing to pause, resume or delete again');
+  assert.equal(find(kept, 'Stack.Screen').props.options.headerRight, undefined, 'no Editar on a deleted rule');
+  assert.equal(find(kept, 'Stack.Screen').props.options.title, 'Netflix');
+  // A deep link to a deleted rule finds nothing (its detail and its form); the movement it recorded is a plain movement.
   const deletedData = { ...data, recurring: [view.rules[0]] };
+  assert.equal(find(harness('app/recurring/[id].tsx', {}, { data: deletedData, params: { id: 'netflix' } }).render(), 'EmptyState').props.title, 'No encontramos este recurrente');
   assert.equal(find(harness('app/edit-recurring/[id].tsx', {}, { data: deletedData, params: { id: 'netflix' } }).render(), 'EmptyState').props.title, 'No encontramos este recurrente');
   const movement = harness('app/entry/[id].tsx', {}, { data: deletedData, params: { id: occurrence('2026-09-05').id } }).render();
   assert.equal(nodes(movement).some(node => node.type === 'DetailRow' && node.props.label === 'Recurrente'), false);
@@ -1298,6 +1308,19 @@ test('24UX4 review: a rule detail opened before the ledger hydrates shows the fo
   cold.render();
   cold.setData({ ...data, recurring: [deleted] });
   assert.equal(find(cold.render(), 'EmptyState').props.title, 'No encontramos este recurrente');
+  // 25B3: the rule's detail hydrates, closes and refuses a cold link the same way.
+  const detail = harness('app/recurring/[id].tsx', {}, { data: null, params: { id: 'netflix' } });
+  assert.equal(find(detail.render(), 'EmptyState').props.title, 'No encontramos este recurrente', 'nothing to show before the ledger loads');
+  detail.setData(data);
+  assert.equal(find(detail.render(), 'Stack.Screen').props.options.title, 'Netflix', 'the rule appears when the ledger arrives');
+  detail.setData({ ...data, recurring: [deleted] });
+  const closingDetail = detail.render();
+  assert.equal(nodes(closingDetail).some(node => node.type === 'EmptyState'), false, 'deleted from this screen: no «not found» flash while it closes');
+  assert.equal(nodes(closingDetail).some(node => node.type === 'ActionButton'), false);
+  const coldDetail = harness('app/recurring/[id].tsx', {}, { data: null, params: { id: 'netflix' } });
+  coldDetail.render();
+  coldDetail.setData({ ...data, recurring: [deleted] });
+  assert.equal(find(coldDetail.render(), 'EmptyState').props.title, 'No encontramos este recurrente');
   // The form of a deleted rule cannot be saved, paused, resumed or deleted again.
   const form = harness('src/ui/recurring-form.tsx', { original: deleted }, { data: { ...data, recurring: [deleted] } });
   const root = form.render();

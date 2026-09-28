@@ -3,22 +3,23 @@ import { Keyboard, View } from 'react-native';
 import { router, Stack } from 'expo-router';
 import { randomUUID } from 'expo-crypto';
 import * as Haptics from 'expo-haptics';
-import { accountKind, editedDraftFits, keepsHistoricalCardIncome, minorFromEditedDraft, postingAccountsFor, recurringHistory, recurringNeedsReview, sameRecurringRule, todayKey, validateRecurringRule, type StoredDraft,
+import { accountKind, editedDraftFits, keepsHistoricalCardIncome, minorFromEditedDraft, postingAccountsFor, sameRecurringRule, todayKey, validateRecurringRule, type StoredDraft,
   type EntryKind, type RecurringFrequency, type RecurringRule } from '@finanzapp/domain';
 import { useLedger } from '../storage/LedgerProvider';
-import { ActionButton, AmountField, AppText, Choices, EmptyState, EntryRow, ErrorMessage, Field, IconButton, Screen, SectionTitle, Surface } from './components';
+import { ActionButton, AmountField, AppText, Choices, EmptyState, ErrorMessage, Field, IconButton, Screen, Surface } from './components';
 import { draftFromMinor } from './money-input';
 import { AccountField, CategoryField, DateField } from './form-controls';
 import { accountKindLabel, postingAccounts } from './liability-presentation';
-import { historyNamesAccount, initialAccountId } from './presentation';
-import { space, usePalette } from './theme';
+import { initialAccountId } from './presentation';
+import { space } from './theme';
 import { useI18n } from '../i18n/provider';
-import { useRecurringManagement } from './commitment-actions';
 
+/** The rule's form only (25B3): what it records, where, how often and from when. Its history («Registrados»)
+ * and its lifecycle (Pausar/Reanudar, Eliminar) live on the rule's detail screen, `app/recurring/[id].tsx`,
+ * like a movement's undo or a debt's close live on theirs. */
 export function RecurringForm({ original, accountId: requestedAccount }: { original?: RecurringRule; accountId?: string }) {
   const { snapshot, archive, saveRecurring } = useLedger();
-  const p = usePalette();
-  const { t, formatDate } = useI18n();
+  const { t } = useI18n();
   const [before] = useState(original);
   const accounts = postingAccounts(snapshot?.accounts ?? [], archive?.debts, before?.accountId);
   const [operation] = useState(() => ({ id: randomUUID(), createdAt: new Date().toISOString() }));
@@ -38,7 +39,6 @@ export function RecurringForm({ original, accountId: requestedAccount }: { origi
   const [pending, setPending] = useState<RecurringRule | null>(null);
   const saving = useRef(false);
   const [error, setError] = useState<string | null>(null);
-  const manage = useRecurringManagement();
 
   // The accounts this kind may use (24B6): an expense to cash or a card, an income to cash only; a rule already paying an
   // income into a card keeps that card offered while it is edited. A card carried from Gasto gives way to cash for an income.
@@ -56,9 +56,8 @@ export function RecurringForm({ original, accountId: requestedAccount }: { origi
   // currency cannot hold exactly blocks Save (the field says why).
   const ruleCurrency = () => { if (!account) throw new Error('errors.recurring.account'); return account.currency; }; // A catalogue key, translated when shown.
   const fit = account ? editedDraftFits(amount, account.currency, stored) : { ok: true as const };
-  const managing = !!original && manage.busyId === original.id;
   // A rule deleted while its form is still on screen (it is closing) is never edited again.
-  const locked = busy || pending !== null || managing || !!original?.deleted;
+  const locked = busy || pending !== null || !!original?.deleted;
   const close = () => { if (!saving.current) { if (router.canGoBack()) router.back(); else router.replace('/recurring'); } };
 
   async function save() {
@@ -123,8 +122,8 @@ export function RecurringForm({ original, accountId: requestedAccount }: { origi
   }
 
   return <Screen gap={space.l}>
-    <Stack.Screen options={{ title: t(before ? 'nav.titles.editRecurring' : 'nav.titles.newRecurring'), gestureEnabled: !busy && !managing,
-      headerLeft: () => <IconButton name="close" label={t('common.close')} onPress={close} disabled={busy || managing} /> }} />
+    <Stack.Screen options={{ title: t(before ? 'nav.titles.editRecurring' : 'nav.titles.newRecurring'), gestureEnabled: !busy,
+      headerLeft: () => <IconButton name="close" label={t('common.close')} onPress={close} disabled={busy} /> }} />
     {/* The switch stays above the empty state of one kind, so Gasto is one tap away when Ingreso has no account. */}
     {accounts.length > 0 && <Choices value={kind} onChange={setKind} disabled={locked}
       options={[{ value: 'expense', label: t('movement.expense') }, { value: 'income', label: t('movement.income') }]} />}
@@ -158,50 +157,8 @@ export function RecurringForm({ original, accountId: requestedAccount }: { origi
       </AppText>}
       <ActionButton label={pending && error ? t('common.retrySave') : before ? t('common.saveChanges') : t('recurring.form.create')}
         onPress={save} busy={busy} disabled={!amount.trim() || !merchant.trim() || !category.trim() || !account || !fit.ok || !!original?.deleted} />
-      {before && <RecurringHistory ruleId={before.id} ruleAccountId={before.accountId} />}
-      {/* 24UX4: the same actions as the row's swipe, on the stored rule (not the draft above), then the screen closes.
-          Unsaved edits are not applied by these buttons; pending ones lock them. */}
-      {original && !original.deleted && <View style={{ gap: space.m, marginTop: space.l }}>
-        <ErrorMessage message={manage.error} />
-        {!original.active && <AppText secondary variant="footnote">{t('recurring.manage.pausedNote')}</AppText>}
-        {/* 24UX5: a rule the catch-up set aside. Continuing is resume from today: the backlog is never recorded. */}
-        {recurringNeedsReview(original, todayKey()) && <>
-          <AppText variant="footnote" style={{ color: p.warning, fontWeight: '500' }}>{t('recurring.manage.reviewNote', { date: formatDate(original.nextDateISO, 'long') })}</AppText>
-          <ActionButton label={t('recurring.manage.continueFromToday')} icon="play-forward-outline" busy={managing} disabled={busy || pending !== null}
-            onPress={() => { void manage.resume(original, close); }} />
-        </>}
-        <ActionButton secondary label={t(original.active ? 'recurring.manage.pauseRule' : 'recurring.manage.resumeRule')}
-          icon={original.active ? 'pause-outline' : 'play-outline'} busy={managing} disabled={busy || pending !== null}
-          onPress={() => { void (original.active ? manage.pause : manage.resume)(original, close); }} />
-        <ActionButton secondary tone="expense" label={t('recurring.manage.deleteRule')} icon="trash-outline" disabled={busy || pending !== null || managing}
-          onPress={() => manage.remove(original, close)} />
-      </View>}
     </>}
   </Screen>;
-}
-
-/** How many recorded movements the detail lists before pointing to Movimientos. */
-export const RECURRING_HISTORY_LIMIT = 12;
-
-/** What a rule actually recorded (24UX2), newest first: real movements from the ledger, read by their
- * deterministic occurrence id, never the scheduled dates. Each row opens the movement itself; nothing here writes,
- * merges or infers a payment. */
-function RecurringHistory({ ruleId, ruleAccountId }: { ruleId: string; ruleAccountId: string }) {
-  const { snapshot } = useLedger();
-  const { t } = useI18n();
-  const accounts = snapshot?.accounts ?? [];
-  const history = recurringHistory({ id: ruleId }, snapshot?.entries ?? []).filter(entry => accounts.some(item => item.id === entry.accountId));
-  const shown = history.slice(0, RECURRING_HISTORY_LIMIT);
-  const older = history.length - shown.length;
-  // The form above shows the rule's current account; a row may leave its account out only when that says it truly.
-  const showAccount = historyNamesAccount(shown, ruleAccountId);
-  return <View style={{ marginTop: space.l }}>
-    <SectionTitle caption={t('recurring.history.caption')}>{t('recurring.history.title')}</SectionTitle>
-    {shown.length ? <Surface grouped>{shown.map((entry, index) => <EntryRow key={entry.id} entry={entry} showAccount={showAccount}
-      account={accounts.find(item => item.id === entry.accountId)!} last={index === shown.length - 1} />)}</Surface>
-      : <AppText secondary variant="subhead">{t('recurring.history.empty')}</AppText>}
-    {!!older && <AppText secondary variant="footnote" style={{ marginTop: space.s }}>{t('recurring.history.older', { count: older })}</AppText>}
-  </View>;
 }
 
 function ViewFrequency({ value, onChange, disabled }: {

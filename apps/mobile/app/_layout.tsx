@@ -107,6 +107,7 @@ function Navigation() {
       <Stack.Screen name="report-day" options={{ title: t('nav.titles.reportDay') }} />
       <Stack.Screen name="report-comparison" options={{ title: t('nav.titles.reportComparison') }} />
       <Stack.Screen name="recurring" options={{ title: t('nav.titles.recurring') }} />
+      <Stack.Screen name="recurring/[id]" options={{ title: t('nav.titles.recurringRule') }} />
       <Stack.Screen name="budgets" options={{ title: t('nav.titles.budgets') }} />
       <Stack.Screen name="card/[id]" options={{ title: t('nav.titles.card') }} />
       <Stack.Screen name="debts" options={{ title: t('nav.titles.debts') }} />

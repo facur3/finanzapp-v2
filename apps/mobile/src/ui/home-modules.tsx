@@ -181,11 +181,12 @@ export function UpcomingRecurringRow({ rule, account, day, last, showAccount = f
   const urgent = due.kind === 'today' || due.kind === 'tomorrow' || due.kind === 'due';
   const detail = [showCategory ? category : null, showAccount ? account.name : null].filter(Boolean).join(' · ');
   // VoiceOver hears merchant, category, amount, the estimated day and the account in one sentence, whatever the
-  // caption shows (24UX5 review: the account used to be spoken only when it was drawn).
-  return <PressFeedback feedback="opacity" accessibilityRole="button"
+  // caption shows (24UX5 review: the account used to be spoken only when it was drawn). 25B3: the row opens the
+  // rule's detail (read first, Editar from there), and its hint says so.
+  return <PressFeedback feedback="opacity" accessibilityRole="button" accessibilityHint={t('recurring.row.hint')}
     accessibilityLabel={t('home.upcomingRow.label', { merchant: rule.merchant, category, amount: spokenAmount(rule.amountMinor, account.currency), date: relativeDate(rule.nextDateISO, day, true) })
       + ', ' + account.name}
-    onPress={() => router.push({ pathname: '/edit-recurring/[id]', params: { id: rule.id } })}
+    onPress={() => router.push({ pathname: '/recurring/[id]', params: { id: rule.id } })}
     style={styles.agendaRow}>
     <MerchantBadge merchant={rule.merchant} category={rule.category} kind={rule.kind} />
     <View style={{ flex: 1, minWidth: 0, alignSelf: 'stretch', paddingVertical: 8, gap: 8, flexDirection: stacked ? 'column' : 'row', alignItems: stacked ? 'flex-start' : 'center',

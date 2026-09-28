@@ -1,5 +1,39 @@
 # Physical iPhone acceptance checklist
 
+## Producto 25B3 — detail hierarchy polish
+
+**Not done in 25B3: no EAS build was made and the iPhone was not touched.** Metro from this branch
+(`npm run start:dev-client -- --clear`) on the installed FinanzApp Dev build; JavaScript only, no native change, no
+schema change, no data change. Use your own small test data; never seed movements.
+
+**Brief test (≈6 minutes).**
+
+1. **Account detail.** Más → Cuentas → an account: the hero «Saldo registrado» shows the same number as before
+   this branch; under the quick actions the group holds only Recurrentes (no «Saldo inicial»); Gastos / Ingresos del
+   mes, the three actions and the movements are unchanged. A deleted account's detail (25B2) shows its balance and
+   history with no group at all. Editar cuenta and Nueva cuenta still show the opening balance where they did.
+   - [ ] The Más footer reads «FinanzApp 0.1.0 (25B3)».
+2. **Recurring detail.** Inicio → Próximos compromisos → a row: the rule's detail opens (pushed, back swipe works),
+   not the edit form: mark, «Gasto recurrente · ARS», the signed amount, «Activo», then Próxima fecha, Frecuencia,
+   Categoría, Cuenta (tap: the account's detail), «Registrados» (each recorded movement opens itself), Pausar
+   recurrente and Eliminar recurrente (red). Más → Recurrentes → a row opens the same detail; a recorded movement's
+   «Recurrente» row too. Editar (pencil, header) opens the modal form, which no longer lists Registrados or the
+   lifecycle buttons; Guardar cambios returns to the detail with the change visible.
+   - [ ] Pausar recurrente: the state under the amount reads «Pausado», Próxima fecha disappears, the note explains,
+     Reanudar recurrente appears; the screen stays. Reanudar: «Activo» again with the next date on its own day.
+   - [ ] Eliminar recurrente: the same «¿Eliminar «…»?» alert as the row's swipe; Cancelar changes nothing; Eliminar
+     goes back to Recurrentes and the rule is gone; its recorded movements stay in Movimientos.
+   - [ ] A rule whose account was deleted (25B2): the detail offers Eliminar only and says why.
+   - [ ] A rule with a next date already past (force-quit the app across a due day with the rule paused, resume it on
+     its due day, or set the iPhone date forward): «Revisar» in amber, the note with the date, «Continuar desde hoy».
+3. **Accessibility.** VoiceOver on a Recurrentes row and on an Inicio commitment row reads the rule (merchant,
+   frequency, category, amount, next date) and the hint «Abre el detalle del recurrente» / «Opens the details of
+   this recurring item», never «Editar»; the Actions rotor still lists Pausar/Eliminar on the Recurrentes row. On the
+   detail, the state is announced when it changes; the Cuenta row reads as a button. The largest Dynamic Type: the
+   hero fits, the rows stack, the buttons stay reachable. Reduce Motion; light and dark; both languages.
+
+Record: which screen each row opened from, whether the account balance matched, and any row still landing on the form.
+
 ## Producto 25B2 — currency defaults and the account/card lifecycle
 
 **Not done in 25B2: no EAS build was made and the iPhone was not touched.** Metro from this branch

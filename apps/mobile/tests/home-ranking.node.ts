@@ -24,7 +24,7 @@ function harness() {
   const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText;
   const jsx = (type: any, props: any) => ({ type, props });
   // Hooks persist by call order across renders, like React's, so a re-render keeps its refs and shared values.
-  const env = { reduced: false, shared: [] as (Shared & { initial: unknown })[], refs: [] as { current: unknown }[], cursor: { shared: 0, ref: 0 }, alerts: [] as unknown[][] };
+  const env = { reduced: false, shared: [] as (Shared & { initial: unknown })[], refs: [] as { current: unknown }[], cursor: { shared: 0, ref: 0 }, alerts: [] as unknown[][], pushed: [] as unknown[] };
   const modules: Record<string, any> = {
     '../i18n/format': i18nFormat, '../src/i18n/format': i18nFormat, '../../src/i18n/format': i18nFormat, '../i18n/provider': i18nProvider, '../src/i18n/provider': i18nProvider, '../../src/i18n/provider': i18nProvider,
     react: { useEffect: (fn: () => any) => { fn(); }, useRef: (value: unknown) => {
@@ -32,7 +32,7 @@ function harness() {
       return env.refs[index] ??= { current: value }; } },
     'react/jsx-runtime': { jsx, jsxs: jsx, Fragment: 'Fragment' },
     'react-native': { Alert: { alert: (...args: unknown[]) => { env.alerts.push(args); } }, StyleSheet: { create: (styles: unknown) => styles, hairlineWidth: 0.5 }, View: 'View', useWindowDimensions: () => ({ fontScale: 1 }) },
-    'expo-router': { router: { push: () => {} } },
+    'expo-router': { router: { push: (to: unknown) => { env.pushed.push(to); } } },
     '@expo/vector-icons/Ionicons': 'Ionicons',
     'react-native-reanimated': { __esModule: true, default: { View: 'Animated.View' },
       useSharedValue: (value: unknown) => { const index = env.cursor.shared++; return env.shared[index] ??= { value, initial: value }; },
@@ -270,4 +270,20 @@ test('24UX3: the category summary is compact and the commitments are an agenda o
   assert.equal(content.props.style.paddingVertical, 8);
   assert.equal(content.props.style.borderBottomWidth, 0.5, 'the hairline starts under the text, not under the mark');
   assert.equal(exports.UpcomingRecurringRow({ rule, account, day: '2026-09-22', last: true }).props.children[1].props.style.borderBottomWidth, 0);
+});
+
+test('25B3: an upcoming commitment opens the rule\'s detail, never its form, and VoiceOver hears the rule and that the row opens details', () => {
+  const { exports, env } = harness();
+  const rule = { id: 'r', merchant: 'Netflix', category: 'Suscripciones', kind: 'expense', amountMinor: 100, nextDateISO: '2026-09-23', accountId: 'a' };
+  const account = { id: 'a', name: 'Banco', currency: 'ARS' };
+  try {
+    const row = exports.UpcomingRecurringRow({ rule, account, day: '2026-09-22', last: true });
+    assert.equal(row.props.accessibilityRole, 'button');
+    assert.equal(row.props.accessibilityHint, 'Abre el detalle del recurrente');
+    assert.doesNotMatch(row.props.accessibilityLabel, /Editar|Edit/);
+    row.props.onPress();
+    assert.equal(JSON.stringify(env.pushed), JSON.stringify([{ pathname: '/recurring/[id]', params: { id: 'r' } }]));
+    current = 'en-US';
+    assert.equal(exports.UpcomingRecurringRow({ rule, account, day: '2026-09-22', last: true }).props.accessibilityHint, 'Opens the details of this recurring item');
+  } finally { current = 'es-AR'; }
 });

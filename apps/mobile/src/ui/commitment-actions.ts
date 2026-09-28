@@ -49,7 +49,8 @@ export function useRecurringManagement() {
           onPress: () => { void commit(deleteRecurringRule(rule, now()), 'recurring.manage.deleteFailed', 'success', done); } },
       ]);
   }
-  /** 25B2: a rule whose account or card was deleted can only be deleted itself; resuming it would post to a closed row. */
+  /** 25B2: a rule whose account or card was deleted can only be deleted itself; resuming it would post to a closed row.
+   * The row's swipe and the rule's detail (25B3) both read it, so they offer the same actions. */
   function closed(rule: RecurringRule): boolean {
     try { assertOpenAccount(rule.accountId, snapshot?.accounts ?? [], archive?.cards, archive?.debts); return false; } catch { return true; }
   }
@@ -63,7 +64,7 @@ export function useRecurringManagement() {
       remove_,
     ];
   }
-  return { busyId, error, pause, resume, remove, actions };
+  return { busyId, error, pause, resume, remove, actions, closed };
 }
 
 export function useDebtManagement() {

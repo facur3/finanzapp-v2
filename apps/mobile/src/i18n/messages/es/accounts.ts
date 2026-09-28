@@ -17,7 +17,6 @@ export const accounts = {
       activeRecurring: { one: '{count} activo', other: '{count} activos' },
       /** Value of the Recurrentes row when the account has none: an invitation to schedule one. */
       schedule: 'Programar',
-      openingBalance: 'Saldo inicial',
       movements: 'Movimientos',
       empty: 'Todavía no hay movimientos en esta cuenta.',
     },

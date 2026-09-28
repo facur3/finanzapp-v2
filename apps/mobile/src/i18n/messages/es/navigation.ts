@@ -28,6 +28,8 @@ export const navigation = {
       reportDay: 'Gastos del día',
       reportComparison: 'Comparar gastos',
       recurring: 'Recurrentes',
+      /** The detail of one rule (25B3); the screen replaces it with the merchant's name once it has the rule. */
+      recurringRule: 'Recurrente',
       budgets: 'Presupuestos',
       card: 'Tarjeta',
       debts: 'Deudas',

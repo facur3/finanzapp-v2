@@ -77,8 +77,8 @@ function EntryDetail({ record, account }: { record: EntryRecord; account: Accoun
       if (row) budget = { ratio: row.ratio, remainingMinor: row.remainingMinor, exceeded: row.exceeded };
     } catch { budget = null; }
   }
-  // A movement a recurring rule recorded links back to its rule (24UX2); a rule deleted since (24UX4: its deletion
-  // record stays in storage) leaves a plain movement, unchanged.
+  // A movement a recurring rule recorded links back to its rule's detail (24UX2, 25B3); a rule deleted since (24UX4:
+  // its deletion record stays in storage) leaves a plain movement, unchanged.
   const occurrence = recurringOccurrenceOf(entry.id);
   const rule = occurrence ? archive?.recurring?.find(item => item.id === occurrence.ruleId && !item.deleted) : undefined;
   const status = t(record.voided ? 'entryDetail.statusVoided' : record.revision > 0 ? 'entryDetail.statusCorrected' : 'entryDetail.statusRecorded');
@@ -108,7 +108,7 @@ function EntryDetail({ record, account }: { record: EntryRecord; account: Accoun
         value={budgetLine(budget, minor => formatMoneyAmount(minor, account.currency))} spokenValue={budgetLine(budget, minor => spokenMoney(minor, account.currency))}
         onPress={() => router.push({ pathname: '/budgets', params: { currency: account.currency, month: entry.dateISO.slice(0, 7) } })} />}
       {rule && <DetailRow label={t('entryDetail.recurring')} value={t(`recurring.frequency.${rule.frequency}`)} icon="repeat-outline" disabled={busy}
-        onPress={() => router.push({ pathname: '/edit-recurring/[id]', params: { id: rule.id } })} />}
+        onPress={() => router.push({ pathname: '/recurring/[id]', params: { id: rule.id } })} />}
       <DetailRow label={t('selection.currency')} value={currencyName(account.currency)} last />
     </Surface>
     <ErrorMessage message={error} />

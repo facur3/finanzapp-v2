@@ -381,6 +381,47 @@ importe, moneda y estado.
   muestra hasta que toda la app lo tenga (23.1): un iPhone en inglés sigue leyendo
   español antes que media app traducida.
 
+## Producto 25B3 — jerarquía de detalle (sin rediseño)
+
+Dos correcciones pequeñas de jerarquía antes de empezar cuotas (24T). Nada cambia en cómo se registra,
+se materializa o se guarda el dinero.
+
+- **Cuenta: sin fila de saldo inicial.** El saldo inicial forma parte del libro (se guarda, se respalda y es
+  el punto de partida de cada saldo) pero no es una métrica cotidiana. El detalle de una cuenta muestra el
+  saldo registrado como héroe, gastos e ingresos del mes, las acciones rápidas, la fila Recurrentes (única fila
+  del grupo, solo en una cuenta viva) y los movimientos; la fila «Saldo inicial» ya no está y nada la reemplaza.
+  `openingMinor` no se toca. Para una auditoría, el dato sigue legible en cada copia de seguridad y es la
+  diferencia entre el saldo registrado y los movimientos; si algún día hace falta verlo, va en Editar cuenta
+  junto a «Saldo registrado», como fila quieta, no en el detalle diario.
+- **Recurrentes: primero el detalle.** Una regla se lee antes de editarse, como un movimiento, una cuenta,
+  una tarjeta o una deuda: fila → detalle → Editar. El detalle (`app/recurring/[id].tsx`) reutiliza el
+  sistema: la marca del comercio en grande, «Gasto recurrente · ARS» (o «Ingreso recurrente»), el importe
+  con signo y tono como en su fila, y debajo el estado en una palabra: Activo, Pausado o Revisar (ámbar,
+  24UX5). Luego una tarjeta agrupada con Próxima fecha (solo si está activa: una regla pausada nunca anuncia
+  una fecha, 24UX2; en tono de aviso si hay que revisarla), Frecuencia, Categoría y Cuenta o Tarjeta (abre
+  su detalle). Después «Registrados» (el historial de 24UX2, que deja el formulario) y, al final, las mismas
+  acciones del deslizamiento de la fila, con nombre: Pausar/Reanudar recurrente y Eliminar recurrente, con
+  las mismas confirmaciones; una regla cuya cuenta o tarjeta fue eliminada solo ofrece Eliminar y lo dice.
+  Pausar o reanudar deja la pantalla abierta y cambia el estado (como Cerrar en una deuda); Eliminar pregunta
+  y vuelve a Recurrentes. Editar va en la cabecera y abre el formulario, que ahora es solo el formulario.
+  Inicio → Próximos compromisos, Más → Recurrentes y la fila «Recurrente» de un movimiento registrado abren
+  este detalle, nunca el formulario.
+- **VoiceOver.** La fila de Recurrentes lee la regla («Alquiler, mensual, Hogar, 400,00 ARS, próximo 1 oct»;
+  «…, pausado»; «…, para revisar: sin registrar desde …») con la pista «Abre el detalle del recurrente»; la
+  fila de Inicio conserva su frase y suma la misma pista. Ninguna fila dice «Editar». Inglés igual.
+- **Dirección para Tarjetas (24T2, solo documentación; nada cambia en esta entrega).**
+  - Apple Wallet puede usarse como referencia de jerarquía, tactilidad, profundidad y claridad, nunca como
+    copia visual.
+  - Cuando 24T2 diseñe Tarjetas, evaluar reemplazar el carrusel horizontal por un stack/deck vertical
+    seleccionable.
+  - Una tarjeta seleccionada prioriza, en este orden: el saldo pendiente actual, el próximo cierre/vencimiento,
+    la acción Pagar, las cuotas y compromisos futuros, los movimientos.
+  - Las cuotas se distinguen visualmente del saldo exigible ahora (las cinco cifras de 24T nunca se funden).
+  - Se conserva el minimalismo iOS, el cobalto/zafiro y los materiales de FinanzApp.
+  - Ningún gesto que compita con volver atrás (el borde izquierdo) ni con eliminar (el deslizamiento trasero
+    de las filas).
+  - Las tarjetas de débito siguen siendo metadatos futuros de una cuenta, no un libro independiente.
+
 ## Producto 25B2 — monedas iniciales lógicas y ciclo de vida de cuentas y tarjetas
 
 - **Sin controles vacíos.** Con cero o una moneda, Inicio y Reportes no muestran el chip de visualización: el
@@ -1278,6 +1319,12 @@ crédito, marca elegida) y los filetes de las píldoras, el chip y el compositor
 color propio.
 
 ## Pendiente de revisión en iPhone
+
+- Producto 25B3: el detalle de una cuenta sin la fila de saldo inicial (el mismo saldo registrado, el grupo
+  con solo Recurrentes); el detalle de un recurrente desde Inicio, desde Recurrentes y desde un movimiento
+  registrado (héroe, estado, filas, Registrados, acciones), Editar desde la cabecera, Pausar/Reanudar sin salir,
+  Eliminar volviendo a la lista, el estado Revisar; VoiceOver leyendo cada fila como la regla con la pista de
+  detalle en ambos idiomas; texto de accesibilidad máximo; Reduce Motion. Lista en docs/mobile-device-checklist.md.
 
 - Producto 24UX5: el azul pizarra de los enlaces en claro y oscuro (¿se lee como enlace y no como texto
   ni como el cobalto?), las marcas de 40 pt alineadas en las dos listas, la agenda más compacta, las
