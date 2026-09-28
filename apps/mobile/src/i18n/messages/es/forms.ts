@@ -36,6 +36,49 @@ export const forms = {
     saveUnverified: 'No pudimos verificar el guardado. Reintentá con este mismo movimiento.',
     notEditableTitle: 'Este movimiento no se puede editar',
     notEditableDetail: 'Volvé al detalle. Si está deshecho, primero podés recuperarlo.',
+    /** Producto 24T2: the «Pago» section of a new purchase on an active credit card. «Una vez» is a purchase as before
+     * (one expense); «En cuotas» saves one instalment plan and no expense: each instalment counts when its statement
+     * closes. An instalment is «registrada», never «pagada»: a card payment is not assigned to any instalment. */
+    plan: {
+      payment: 'Pago',
+      once: 'Una vez',
+      installments: 'En cuotas',
+      count: 'Cuotas',
+      /** The last segment after 3, 6, 12 and 18: reveals the field for any other count. */
+      countOther: 'Otra',
+      countField: 'Cantidad de cuotas',
+      countPlaceholder: 'De 2 a 120',
+      countInvalid: 'Elegí entre 2 y 120 cuotas. Para un solo pago, elegí «Una vez».',
+      /** What each instalment charges, from the exact schedule the plan is saved with: "12 cuotas de $ 100.000,00". */
+      perInstallment: { one: '{count} cuota de {amount}', other: '{count} cuotas de {amount}' },
+      /** A remainder makes the first instalments a few minor units larger: the largest one, said as approximate. */
+      perInstallmentApprox: { one: '{count} cuota de aprox. {amount}', other: '{count} cuotas de aprox. {amount}' },
+      /** The same line as VoiceOver reads it, with the word written out. */
+      perInstallmentApproxSpoken: { one: '{count} cuota de aproximadamente {amount}', other: '{count} cuotas de aproximadamente {amount}' },
+      /** Above two segments named by their closing dates: the statement the purchase belongs to, or the next one. */
+      first: 'Primera cuota',
+      /** The chosen statement: "Cierra el 28 oct y vence el 5 nov." (VoiceOver hears the dates written out). */
+      statement: 'Cierra el {closing} y vence el {due}.',
+      /** A purchase recorded on or after its statement's closing day: those instalments are recorded at once. «Llegó a su
+       * cierre», not «cerró»: on its closing day a statement is still open, and a purchase that day belongs to it. */
+      closed: { one: 'Ese resumen ya llegó a su cierre: la primera cuota se registra al guardar.', other: 'Esos resúmenes ya llegaron a su cierre: las primeras {count} cuotas se registran al guardar.' },
+      /** Off is «Sin interés», with no financing field at all; on shows «Total financiado». */
+      withInterest: 'Con interés',
+      totalFinanced: 'Total financiado',
+      /** Read only, under the field: the total financed minus the price. */
+      interestTotal: 'Interés total: {amount}',
+      totalMissing: 'Ingresá el total financiado o apagá «Con interés».',
+      /** Replaces cardNote while «En cuotas» is chosen. */
+      note: 'La compra no cuenta toda hoy: cada cuota cuenta como gasto cuando cierra su resumen y suma al saldo pendiente. Las cuotas futuras se ven en Tarjetas.',
+      save: 'Guardar en cuotas',
+    },
+    /** Producto 24T2: the movement of an instalment is corrected in its merchant and category only; the plan owns the
+     * amount, the date and the card. */
+    installmentEdit: {
+      title: 'Editar cuota',
+      amount: 'Importe de la cuota',
+      note: 'El importe, la fecha y la tarjeta los define el plan de cuotas. Podés corregir el comercio y la categoría.',
+    },
   },
   transferForm: {
     title: 'Entre mis cuentas',

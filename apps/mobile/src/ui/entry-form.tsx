@@ -3,25 +3,35 @@ import { Keyboard, View } from 'react-native';
 import { router, Stack } from 'expo-router';
 import { randomUUID } from 'expo-crypto';
 import * as Haptics from 'expo-haptics';
-import { accountBalanceMinor, accountKind, categoryKey, editedDraftFits, keepsHistoricalCardIncome, makeEntryChange, minorFromEditedDraft, postingAccountsFor, sameEntry, summarizeMonthlyBudgets, todayKey, validateEntry, validateEntryChange, type Account, type Entry, type EntryChange, type EntryKind, type EntryRecord, type StoredDraft } from '@finanzapp/domain';
+import { accountBalanceMinor, accountKind, categoryKey, editedDraftFits, installmentOccurrenceOf, interestCategoryLabel, keepsHistoricalCardIncome, makeEntryChange, minorFromEditedDraft, postingAccountsFor, sameEntry, summarizeMonthlyBudgets, todayKey, validateEntry, validateEntryChange, type Account, type Entry, type EntryChange, type EntryKind, type EntryRecord, type InstallmentPlan, type StoredDraft } from '@finanzapp/domain';
 import { useLedger } from '../storage/LedgerProvider';
 import { budgetTone } from './budget-presentation';
-import { ActionButton, AmountField, AppText, Choices, EmptyState, ErrorMessage, Field, IconButton, Screen, Surface } from './components';
+import { ActionButton, AmountField, AppText, Choices, DetailRow, EmptyState, ErrorMessage, Field, IconButton, Money, Screen, Surface } from './components';
 import { draftFromMinor } from './money-input';
 import { prefillDraft, type EntryPrefill } from './entry-prefill';
 export type { EntryPrefill } from './entry-prefill';
 import { AccountField, CategoryField, DateField } from './form-controls';
+import { InstallmentPurchase } from './installment-purchase';
 import { accountKindLabel, postingAccounts } from './liability-presentation';
 import { initialAccountId } from './presentation';
+import { INITIAL_PURCHASE, buildPurchasePlan, purchaseState, type PurchaseDraft } from './purchase-plan';
+import { withCurrencyCode } from '../i18n/format';
 import { useI18n } from '../i18n/provider';
 import { space } from './theme';
+
+/** What a Save sends, frozen once built so a retry resends it unchanged: a movement (new or corrected), or (24T2) the
+ * plan of a purchase in instalments, which records no movement of its own. */
+type Submission = { entry: Entry; change?: EntryChange; plan?: undefined } | { plan: InstallmentPlan; entry?: undefined; change?: undefined };
 
 type FormKind = EntryKind | 'transfer';
 
 /** One form for creating and correcting a posting. The amount, the kind, the
  * category and the account or card are the four things a user must see; a
  * submitted command stays frozen across retries, including a failed refresh
- * after SQLite committed. */
+ * after SQLite committed. Producto 24T2: a new expense on an active credit card
+ * adds the «Pago» section (`InstallmentPurchase`): «En cuotas» saves one plan
+ * and no movement. The movement of an instalment is corrected in its merchant
+ * and category only; its amount, date and card are the plan's. */
 export function EntryForm({ original, accountId: requestedAccount, currency, kind: requestedKind, onKindChange, onAccountChange, prefill }: {
   original?: EntryRecord; accountId?: string; currency?: string; kind?: string; prefill?: EntryPrefill;
   /** When a host owns the Gasto / Ingreso / Transferencia switch it passes `kind` and this callback; the form then renders no switch of its own. */
@@ -29,10 +39,12 @@ export function EntryForm({ original, accountId: requestedAccount, currency, kin
   /** Lets the host carry the chosen account over when the mode changes. */
   onAccountChange?: (accountId: string) => void;
 }) {
-  const { snapshot, archive, addEntry, updateEntry } = useLedger();
-  const { t, moneyText, formatMoneyAmount, spokenMoney } = useI18n();
+  const { snapshot, archive, addEntry, updateEntry, addInstallmentPlan } = useLedger();
+  const { t, moneyText, formatMoneyAmount, spokenMoney, formatDate } = useI18n();
   // Cash accounts and cards can carry an expense or income; a personal debt only changes through payments.
   const [before] = useState(original);
+  // 24T2: an instalment's movement (its id names the plan): the plan fixes its amount, date, card and kind.
+  const restricted = !!before && installmentOccurrenceOf(before.entry.id) !== null;
   const accounts = postingAccounts(snapshot?.accounts ?? [], archive?.debts, before?.entry.accountId);
   const [operation] = useState(() => ({ id: randomUUID(), createdAt: new Date().toISOString() }));
   const [ownKind, setKind] = useState<EntryKind>(before?.entry.kind ?? (requestedKind === 'income' ? 'income' : 'expense'));
@@ -50,9 +62,11 @@ export function EntryForm({ original, accountId: requestedAccount, currency, kin
   const [category, setCategory] = useState(before?.entry.category ?? prefill?.category ?? '');
   const [date, setDate] = useState(() => before ? new Date(before.entry.dateISO + 'T12:00:00') : prefill?.dateISO ? new Date(prefill.dateISO + 'T12:00:00') : new Date());
   const [busy, setBusy] = useState(false);
-  const [pending, setPending] = useState<{ entry: Entry; change?: EntryChange } | null>(null);
+  const [pending, setPending] = useState<Submission | null>(null);
   const saving = useRef(false);
   const [error, setError] = useState<string | null>(null);
+  // 24T2: the «Pago» choices, kept while the section is hidden (another account, Ingreso) so coming back restores them.
+  const [purchase, setPurchase] = useState<PurchaseDraft>(INITIAL_PURCHASE);
   const cards = archive?.cards ?? [], debts = archive?.debts ?? [];
   const originalCurrency = accounts.find(item => item.id === before?.entry.accountId)?.currency;
   // The accounts this kind may post to (24B6): an expense to cash or a card, an income to cash only. A historical income
@@ -111,6 +125,13 @@ export function EntryForm({ original, accountId: requestedAccount, currency, kin
   try { parsed = account ? minorFromEditedDraft(amount, account.currency, stored) : null; } catch { parsed = null; }
   // A draft kept across an account change that the new currency cannot hold exactly blocks Save; the field says why.
   const fit = account ? editedDraftFits(amount, account.currency, stored) : { ok: true as const };
+  // 24T2: «Pago» belongs to a new expense on an active credit card. An archived or deleted card takes no new purchase at
+  // all (postingAccountsFor never offers it), and an edit never turns a movement into a plan.
+  const purchaseCard = !before && kind === 'expense' && account ? cards.find(card => card.accountId === account.id && card.active && !card.deleted) : undefined;
+  const today = todayKey();
+  const planState = purchaseCard && account ? purchaseState({ draft: purchase, card: purchaseCard, currency: account.currency, cycleDates: archive?.cardCycleDates ?? [],
+    purchaseDateISO: todayKey(date), principalMinor: parsed, todayISO: today }) : null;
+  const inInstallments = !!planState && purchase.mode === 'installments';
 
   async function save() {
     if (saving.current) return;
@@ -121,20 +142,39 @@ export function EntryForm({ original, accountId: requestedAccount, currency, kin
     try {
       let submission = pending;
       if (!submission) {
-        const dateISO = todayKey(date);
-        // Messages are stored as catalogue keys and translated when shown (ErrorMessage), so they follow a language change.
-        if (dateISO > todayKey()) throw new Error('entryForm.futureDate');
-        if (!account) throw new Error('errors.domain.existingAccount'); // A catalogue key, translated when shown (ErrorMessage).
-        const entry: Entry = { ...(before?.entry ?? operation), kind, accountId, amountMinor: minorFromEditedDraft(amount, account.currency, stored),
-          merchant: merchant.trim(), category: category.trim(), dateISO };
-        validateEntry(entry, accounts);
-        if (before && sameEntry(before.entry, entry)) { saving.current = false; close(); return; }
-        const change = before ? makeEntryChange(operation.id, before, 'edit', new Date().toISOString(), entry) : undefined;
-        if (change) validateEntryChange(change, accounts);
-        submission = { entry, change };
+        if (restricted && before) {
+          // The merchant and the category are all that moves: storage refuses any other change to an instalment's movement.
+          const entry: Entry = { ...before.entry, merchant: merchant.trim(), category: category.trim() };
+          validateEntry(entry, accounts);
+          if (sameEntry(before.entry, entry)) { saving.current = false; close(); return; }
+          const change = makeEntryChange(operation.id, before, 'edit', new Date().toISOString(), entry);
+          validateEntryChange(change, accounts);
+          submission = { entry, change };
+        } else {
+          const dateISO = todayKey(date);
+          // Messages are stored as catalogue keys and translated when shown (ErrorMessage), so they follow a language change.
+          if (dateISO > todayKey()) throw new Error('entryForm.futureDate');
+          if (!account) throw new Error('errors.domain.existingAccount'); // A catalogue key, translated when shown (ErrorMessage).
+          if (inInstallments && purchaseCard) {
+            // 24T2: one plan from exactly what the section previewed, and no movement: each instalment is recognised when
+            // its statement closes (one already closed is recognised right after the save, by the provider).
+            submission = { plan: buildPurchasePlan({ id: operation.id, createdAt: operation.createdAt, card: purchaseCard, cardAccount: account,
+              merchant, category, draft: purchase, currency: account.currency, cycleDates: archive?.cardCycleDates ?? [], purchaseDateISO: dateISO,
+              principalMinor: minorFromEditedDraft(amount, account.currency, stored), todayISO: todayKey(), interestCategory: interestCategoryLabel(archive?.categories ?? []) }) };
+          } else {
+            const entry: Entry = { ...(before?.entry ?? operation), kind, accountId, amountMinor: minorFromEditedDraft(amount, account.currency, stored),
+              merchant: merchant.trim(), category: category.trim(), dateISO };
+            validateEntry(entry, accounts);
+            if (before && sameEntry(before.entry, entry)) { saving.current = false; close(); return; }
+            const change = before ? makeEntryChange(operation.id, before, 'edit', new Date().toISOString(), entry) : undefined;
+            if (change) validateEntryChange(change, accounts);
+            submission = { entry, change };
+          }
+        }
         setPending(submission);
       }
-      if (submission.change) await updateEntry(submission.change);
+      if (submission.plan) await addInstallmentPlan(submission.plan);
+      else if (submission.change) await updateEntry(submission.change);
       else await addEntry(submission.entry);
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       saving.current = false;
@@ -147,15 +187,48 @@ export function EntryForm({ original, accountId: requestedAccount, currency, kin
     }
   }
 
-  const title = t(before ? 'entryForm.editTitle' : kind === 'expense' ? (isCard ? 'entryForm.cardPurchaseTitle' : 'entryForm.expenseTitle') : 'entryForm.incomeTitle');
+  const title = t(restricted ? 'entryForm.installmentEdit.title' : before ? 'entryForm.editTitle'
+    : kind === 'expense' ? (isCard ? 'entryForm.cardPurchaseTitle' : 'entryForm.expenseTitle') : 'entryForm.incomeTitle');
   // A new movement's Save echoes the amount it records; VoiceOver hears the echo in the spoken form ("Guardar gasto, 1234,50 pesos").
-  const saveWord = t(kind === 'expense' ? 'entryForm.saveExpense' : 'entryForm.saveIncome');
+  // In instalments it echoes the price of the purchase, the amount typed ("Guardar en cuotas · $ 1.200.000,00").
+  const saveWord = t(inInstallments ? 'entryForm.plan.save' : kind === 'expense' ? 'entryForm.saveExpense' : 'entryForm.saveIncome');
   const submit: { text: string; spoken?: string } = pending && error ? { text: t('common.retrySave') } : before ? { text: t('common.saveChanges') }
     : parsed && parsed > 0 && account ? { text: saveWord + '\u00A0·\u00A0' + moneyText(parsed, account.currency), spoken: saveWord + ', ' + spokenMoney(parsed, account.currency) }
       : { text: saveWord };
+  const header = <Stack.Screen options={{ title, gestureEnabled: !busy,
+    headerLeft: () => <IconButton name="close" label={t('common.close')} onPress={close} disabled={busy} /> }} />;
+
+  if (restricted && before) {
+    // 24T2: the amount, the date and the card are the plan's: shown as facts, never as inputs; there is no Gasto/Ingreso
+    // switch. The merchant and the category stay editable, and the category's budget still reads live.
+    const fixed = accounts.find(item => item.id === before.entry.accountId);
+    return <Screen gap={space.l}>
+      {header}
+      <View style={{ gap: 6, paddingVertical: 8 }}>
+        <AppText secondary variant="footnote" style={{ fontWeight: '500' }}>
+          {fixed ? withCurrencyCode(t('entryForm.installmentEdit.amount'), fixed.currency) : t('entryForm.installmentEdit.amount')}
+        </AppText>
+        {fixed && <Money minor={before.entry.amountMinor} currency={fixed.currency} large size={40} />}
+      </View>
+      <Surface grouped>
+        <DetailRow label={t('entryDetail.card')} value={fixed?.name ?? ''} icon="card-outline" />
+        <DetailRow label={t('selection.date')} value={formatDate(before.entry.dateISO, 'dayYear')} spokenValue={formatDate(before.entry.dateISO, 'long')}
+          icon="calendar-outline" last />
+      </Surface>
+      <AppText secondary variant="footnote">{t('entryForm.installmentEdit.note')}</AppText>
+      <CategoryField entries={snapshot?.entries ?? []} kind={before.entry.kind} value={category} onChange={setCategory} disabled={locked}
+        prominent detail={budget?.text} spokenDetail={budget?.spoken} detailTone={budget?.tone} />
+      <Field label={t('entryForm.merchantExpense')} value={merchant} placeholder={t('entryForm.merchantExpensePlaceholder')}
+        onChangeText={setMerchant} maxLength={120} autoCapitalize="sentences" editable={!locked} />
+      <ErrorMessage message={error} />
+      {pending && !busy && error && <AppText secondary variant="footnote">{t('entryForm.retryNote')}</AppText>}
+      <ActionButton label={pending && error ? t('common.retrySave') : t('common.saveChanges')} onPress={save} busy={busy}
+        disabled={!merchant.trim() || !category.trim()} />
+    </Screen>;
+  }
+
   return <Screen gap={space.l}>
-    <Stack.Screen options={{ title, gestureEnabled: !busy,
-      headerLeft: () => <IconButton name="close" label={t('common.close')} onPress={close} disabled={busy} /> }} />
+    {header}
     {/* The form's own switch stays above the empty state of one kind, so Gasto is one tap away when Ingreso has no account. */}
     {!onKindChange && accounts.length > 0 && <Choices<EntryKind> value={kind} onChange={setKind} disabled={locked}
       options={[{ value: 'expense', label: t('movement.expense') }, { value: 'income', label: t('movement.income') }]} />}
@@ -178,14 +251,18 @@ export function EntryForm({ original, accountId: requestedAccount, currency, kin
         placeholder={t(kind === 'expense' ? 'entryForm.merchantExpensePlaceholder' : 'entryForm.merchantIncomePlaceholder')}
         onChangeText={setMerchant} maxLength={120} autoCapitalize="sentences" editable={!locked} />
       <Surface grouped><DateField value={date} onChange={setDate} disabled={locked} /></Surface>
+      {/* 24T2: after the date (the statement the first instalment goes to follows from it), and after every field the
+          other form tests find first. Hidden, it keeps its choices. */}
+      {planState && account && <InstallmentPurchase draft={purchase} onChange={patch => { setPurchase(current => ({ ...current, ...patch })); setError(null); }}
+        state={planState} currency={account.currency} todayISO={today} disabled={locked} />}
       {isCard && kind === 'expense' && !before && <AppText secondary variant="footnote" style={{ textAlign: 'center' }}>
-        {t('entryForm.cardNote')}
+        {t(inInstallments ? 'entryForm.plan.note' : 'entryForm.cardNote')}
       </AppText>}
       {before && <AppText secondary variant="footnote" style={{ textAlign: 'center' }}>{t('entryForm.correctionNote')}</AppText>}
       <ErrorMessage message={error} />
       {pending && !busy && error && <AppText secondary variant="footnote">{t('entryForm.retryNote')}</AppText>}
       <ActionButton label={submit.text} spokenLabel={submit.spoken}
-        onPress={save} busy={busy} disabled={!amount.trim() || !merchant.trim() || !category.trim() || !account || !fit.ok} />
+        onPress={save} busy={busy} disabled={!amount.trim() || !merchant.trim() || !category.trim() || !account || !fit.ok || (inInstallments && planState.blocked)} />
     </>}
   </Screen>;
 }

@@ -74,19 +74,29 @@ export const cards = {
       issuerPlaceholder: 'Banco o billetera',
       last4: 'Últimos 4 dígitos (opcional)',
       limit: 'Límite de crédito (opcional)',
-      closingDay: 'Día de cierre',
-      dueDay: 'Día de vencimiento',
-      daysNote: 'Están en tu resumen. Con ellos FinanzApp calcula el próximo cierre y vencimiento; no consulta al banco.',
+      /** Producto 24T2: the statement dates, chosen on a full calendar (day, month and year). A new card asks its next
+       * closing and the due date of that closing; an existing card shows its open statement. */
+      nextClosing: 'Próximo cierre',
+      /** The due date of that same closing (it may fall in the next month); always after the closing. */
+      due: 'Vencimiento',
+      /** The statement that already closed and is still to pay: only its due date can be corrected ("Vence el resumen del 28 sep"). */
+      toPayDue: 'Vence el resumen del {date}',
+      datesNote: 'Están en tu resumen. FinanzApp repite esos días cada mes y no consulta al banco.',
+      /** The usual days after the save: "Los meses siguientes: cierre el día 28 y vencimiento el día 5." */
+      usualDays: 'Los meses siguientes: cierre el día {closing} y vencimiento el día {due}.',
+      /** Off: the dates correct this statement only. On: their days become the card's usual days. */
+      everyMonth: 'Usar estos días todos los meses',
+      /** Why the switch above is on and fixed: a closing that far away is not a one-off shift. */
+      calendarChange: 'Esa fecha está a más de medio mes del cierre esperado: cambia los días de la tarjeta.',
       frozenNote: 'El envío quedó congelado para que Reintentar no cree otra tarjeta ni aplique cambios dos veces.',
       create: 'Crear tarjeta',
       retry: 'Reintentar',
       archive: 'Archivar tarjeta',
       reactivate: 'Reactivar tarjeta',
       archiveTitle: '¿Archivar esta tarjeta?',
-      archiveDetail: 'Las compras y pagos anteriores siguen en tus registros y reportes. La tarjeta deja de aparecer en Tarjetas.',
+      /** 24T2: an archived card stays reachable under «Archivadas» in Tarjetas, where it takes payments and is reactivated. */
+      archiveDetail: 'Las compras y pagos anteriores siguen en tus registros y reportes. La tarjeta pasa a Archivadas en Tarjetas: podés pagarla y reactivarla.',
       archiveConfirm: 'Archivar',
-      closingDayInvalid: 'Ingresá el día de cierre entre 1 y 31.',
-      dueDayInvalid: 'Ingresá el día de vencimiento entre 1 y 31.',
       negativeDebt: 'El saldo pendiente no puede ser negativo. Si la tarjeta tiene saldo a favor, registralo después como devolución.',
       saveFailed: 'No pudimos guardar la tarjeta. Reintentá el mismo envío.',
       archiveFailed: 'No pudimos archivar la tarjeta. Reintentá el mismo cambio.',
@@ -96,10 +106,11 @@ export const cards = {
       deleteDetail: 'Deja de aparecer en Tarjetas y de aceptar compras y pagos. Las compras y los pagos anteriores siguen en tus registros y reportes; ningún saldo cambia.',
       /** 25B2 review: a card with a balance due is paid or archived, never deleted (a deleted card takes no payment). */
       blockedTitle: 'Todavía no se puede eliminar',
-      blockedDetail: 'Esta tarjeta tiene un saldo pendiente de {amount}. Pagalo primero, o archivala: deja de aparecer y conserva el saldo para pagarlo cuando quieras.',
+      blockedDetail: 'Esta tarjeta tiene un saldo pendiente de {amount}. Pagalo primero, o archivala: pasa a Archivadas en Tarjetas, donde podés pagarla cuando quieras.',
       blockedPay: 'Pagar',
-      /** 24T1: a card with a pending instalment plan (the same rule storage enforces). Archiving keeps every instalment payable. */
-      blockedPlanDetail: 'Esta tarjeta tiene cuotas pendientes. Archivala: deja de aparecer y sus cuotas siguen registrándose y pagándose cuando corresponde.',
+      /** 24T1: a card with a pending instalment plan (the same rule storage enforces). Archiving keeps every instalment
+       * recorded as its statement closes (24T2: under «Archivadas», where the card takes payments and is reactivated). */
+      blockedPlanDetail: 'Esta tarjeta tiene cuotas pendientes. Archivala: pasa a Archivadas en Tarjetas, sus cuotas se siguen registrando y podés pagarla y reactivarla.',
       blockedArchive: 'Archivar',
       deleteConfirm: 'Eliminar',
       deleteFailed: 'No pudimos eliminar la tarjeta. Sigue como estaba; probá nuevamente.',
