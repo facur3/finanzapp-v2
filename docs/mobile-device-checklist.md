@@ -11,6 +11,13 @@ older build refuses the file unchanged: keep a backup first** (Más → Copia de
 - [ ] Record a card purchase and a card payment as before: one expense, the balance due up then down, no cash account
   touched by the purchase (decision 003, rules 2 and 3).
 - [ ] Más → Copia de seguridad → export: the file is still the version it was (v8–v11); import it back: «identical».
+- [ ] Archive a card (Tarjetas → card → Editar → Archivar): Nuevo gasto, Nuevo recurrente and the Assistant's confirm
+  no longer take it (the forms do not offer it; a confirm is refused with «Esta tarjeta está archivada…»); an existing
+  purchase on it still opens and is corrected in place; Pagar tarjeta still accepts a payment to it; a recurring rule
+  already on it keeps its own dates. Reactivate it: it is offered again.
+- [ ] With Airplane mode or a full disk you cannot easily force a write failure on the iPhone; the banner «No pudimos
+  registrar las cuotas vencidas…» with «Verificar de nuevo» is covered by the real-SQLite tests and is checked on the
+  device in 24T2, once a plan can be created.
 
 The device gates of instalments come with their screens: 24T2 (the purchase form, the five figures, the commitments on
 the card) and 24T3 (refunds, payoff, the deletion block, Tarjetas and Deudas on the iPhone).

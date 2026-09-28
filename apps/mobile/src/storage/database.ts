@@ -16,7 +16,7 @@ import {
   OBLIGATION_ACCOUNT_MESSAGE, assertOpenAccount, deleteAccount as deleteAccountRecord, hiddenLiabilityAccountIds, isLiveAccount, pauseRecurringRule,
   CARD_DELETE_PATH_MESSAGE, assertCardDeletable, deleteCreditCard as deleteCreditCardRecord,
   DEBT_DELETE_PATH_MESSAGE, assertDebtDeletable, deletePersonalDebt as deletePersonalDebtRecord,
-  PLAN_DELETE_PATH_MESSAGE, PLAN_EXISTS_MESSAGE, PLAN_MISSING_MESSAGE, assertInstallmentEntryChange, assertInstallmentPlanDeletable, assertNewEntryId,
+  assertAcceptsNewObligation, PLAN_DELETE_PATH_MESSAGE, PLAN_EXISTS_MESSAGE, PLAN_MISSING_MESSAGE, assertInstallmentEntryChange, assertInstallmentPlanDeletable, assertNewEntryId,
   cancelInstallmentPlan as cancelInstallmentPlanRecord, deleteInstallmentPlan as deleteInstallmentPlanRecord, materializeInstallmentPlan, sameInstallmentPlan,
   validateInstallmentPlan, validateInstallmentPlanChange, type Installment, type InstallmentPlan,
 } from '@finanzapp/domain';
@@ -50,8 +50,8 @@ const DEBT_COLUMNS = 'id, accountId, direction, counterparty, dueDateISO, note, 
 const APPEARANCE_COLUMNS = 'accountId, icon, color, createdAt, revision, updatedAt';
 const CATEGORY_COLUMNS = 'kind, key, storedLabel, label, icon, color, archived, createdAt, revision, updatedAt';
 const UNIT_COLUMNS = 'currency, minorUnitExponent, source, catalogVersion, createdAt';
-const PLAN_COLUMNS = 'id, cardId, merchant, category, currency, purchaseDateISO, principalMinor, count, interestMinor, feeMinor, taxMinor, financingCategory, cancelledAt, deleted, createdAt, revision, updatedAt';
-const INSTALLMENT_COLUMNS = 'planId, number, billingDateISO, dueDateISO, principalMinor, financingMinor';
+const PLAN_COLUMNS = 'id, cardId, merchant, category, currency, purchaseDateISO, principalMinor, count, interestMinor, interestCategory, feeMinor, feeCategory, taxMinor, taxCategory, cancelledAt, deleted, createdAt, revision, updatedAt';
+const INSTALLMENT_COLUMNS = 'planId, number, billingDateISO, dueDateISO, principalMinor, interestMinor, feeMinor, taxMinor';
 
 const SCHEMA = `
   CREATE TABLE accounts (
@@ -326,7 +326,8 @@ const MIGRATE_V11 = `
 `;
 
 // Producto 24T1: purchases in instalments. Two additive tables, nothing else touched: a plan (one row per financed
-// purchase, owned by its card) and its exact schedule (one row per instalment, written once). No existing row is read
+// purchase, owned by its card, with its principal and each financing component, interest, fee and tax, with its own
+// category) and its exact schedule (one row per instalment with each component's share, written once). No existing row is read
 // differently and no plan is fabricated for old data: a schema 11 file opens with empty tables. The movements a plan
 // recognises are ordinary `entries` rows whose ids name the plan and the instalment. Rows are never DELETEd (a plan
 // created by mistake is a `deleted` flag, a plan with history is `cancelledAt`). Guarded by user_version, in the
@@ -342,9 +343,11 @@ const MIGRATE_V12 = `
     principalMinor INTEGER NOT NULL CHECK(principalMinor > 0 AND principalMinor <= 9007199254740991),
     count INTEGER NOT NULL CHECK(count BETWEEN 1 AND 120),
     interestMinor INTEGER NOT NULL CHECK(interestMinor >= 0 AND interestMinor <= 9007199254740991),
+    interestCategory TEXT NOT NULL CHECK(length(interestCategory) <= 60 AND (interestMinor > 0) = (length(trim(interestCategory)) > 0)),
     feeMinor INTEGER NOT NULL CHECK(feeMinor >= 0 AND feeMinor <= 9007199254740991),
+    feeCategory TEXT NOT NULL CHECK(length(feeCategory) <= 60 AND (feeMinor > 0) = (length(trim(feeCategory)) > 0)),
     taxMinor INTEGER NOT NULL CHECK(taxMinor >= 0 AND taxMinor <= 9007199254740991),
-    financingCategory TEXT NOT NULL CHECK(length(financingCategory) <= 60),
+    taxCategory TEXT NOT NULL CHECK(length(taxCategory) <= 60 AND (taxMinor > 0) = (length(trim(taxCategory)) > 0)),
     cancelledAt TEXT CHECK(cancelledAt IS NULL OR length(cancelledAt) BETWEEN 10 AND 40),
     deleted INTEGER NOT NULL DEFAULT 0 CHECK(deleted IN (0, 1) AND (deleted = 0 OR cancelledAt IS NULL)),
     createdAt TEXT NOT NULL,
@@ -358,7 +361,9 @@ const MIGRATE_V12 = `
     billingDateISO TEXT NOT NULL,
     dueDateISO TEXT NOT NULL,
     principalMinor INTEGER NOT NULL CHECK(principalMinor > 0 AND principalMinor <= 9007199254740991),
-    financingMinor INTEGER NOT NULL CHECK(financingMinor >= 0 AND financingMinor <= 9007199254740991),
+    interestMinor INTEGER NOT NULL CHECK(interestMinor >= 0 AND interestMinor <= 9007199254740991),
+    feeMinor INTEGER NOT NULL CHECK(feeMinor >= 0 AND feeMinor <= 9007199254740991),
+    taxMinor INTEGER NOT NULL CHECK(taxMinor >= 0 AND taxMinor <= 9007199254740991),
     PRIMARY KEY (planId, number)
   ) STRICT;
   CREATE INDEX IF NOT EXISTS installments_billing ON installments(billingDateISO);
@@ -657,8 +662,9 @@ export async function createEntry(db: LedgerDatabase, input: Entry): Promise<voi
       if (existing.revision !== 0 || !sameEntry(existing.entry, entry)) {
         throw new Error('Esta operación ya existe con otros datos. Revisá tus movimientos.');
       }
-      return;
+      return; // Committed already (the card may have been archived since): a retry never fails.
     }
+    assertAcceptsNewObligation(entry.accountId, archive.cards); // 24T1 review: an archived card takes no new purchase.
     totalsByCurrency({ ...snapshot, entries: [...snapshot.entries, entry] });
     await insertRecord(tx, initialRecord(entry));
   });
@@ -678,7 +684,10 @@ export async function changeEntry(db: LedgerDatabase, change: EntryChange): Prom
     validateEntryChange(change, archive.accounts);
     assertInstallmentEntryChange(change.before.entry, change.after.entry); // 24T1: an instalment keeps its amount, date, card and kind; undo/restore and labels are fine.
     // 25B2: a movement may be corrected where it is (history of a deleted account stays editable), never moved onto a deleted account or card.
-    if (change.after.entry.accountId !== change.before.entry.accountId) assertOpenAccount(change.after.entry.accountId, archive.accounts, archive.cards, archive.debts);
+    if (change.after.entry.accountId !== change.before.entry.accountId) {
+      assertOpenAccount(change.after.entry.accountId, archive.accounts, archive.cards, archive.debts);
+      assertAcceptsNewObligation(change.after.entry.accountId, archive.cards); // 24T1 review: nor onto an archived card; edits in place stay allowed.
+    }
     assertPostingAccount(change.after.entry.accountId, archive.debts);
     // A historical income on a card is corrected or restored in place; an income moved onto a card, or an expense turned into one, is refused.
     if (change.after.entry.kind === 'income' && !keepsHistoricalCardIncome(change.before.entry, change.after.entry)) assertIncomeAccount(change.after.entry.accountId, archive.cards, archive.debts);
@@ -832,6 +841,9 @@ export async function saveRecurringRule(db: LedgerDatabase, input: RecurringRule
     const existing = archive.recurring?.find(item => item.id === rule.id);
     // 24B6: a recurring income posts to cash; a rule already paying an income into a card keeps doing so until it is moved or paused.
     if (rule.kind === 'income' && !(existing && keepsHistoricalCardIncome(existing, rule))) assertIncomeAccount(rule.accountId, archive.cards, archive.debts);
+    // 24T1 review: a brand-new rule, or a rule moved to another account, never lands on an archived card; a rule already
+    // there keeps its own semantics (pause, resume, edit in place) until the person moves or deletes it.
+    if (!existing || existing.accountId !== rule.accountId) assertAcceptsNewObligation(rule.accountId, archive.cards);
     if (!existing) {
       if (rule.revision !== 0 || rule.updatedAt !== rule.createdAt || rule.deleted) throw new Error('Un recurrente nuevo no puede tener cambios previos.');
       validateArchive({ ...archive, recurring: [...archive.recurring ?? [], rule] });
@@ -1155,32 +1167,35 @@ export async function deletePersonalDebt(db: LedgerDatabase, debtId: string, now
 // ---- Producto 24T1: purchases in instalments ---------------------------------------------------------------------------
 
 async function insertInstallmentPlan(tx: SqlExecutor, plan: InstallmentPlan): Promise<void> {
-  await tx.runAsync(`INSERT INTO installment_plans (${PLAN_COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  await tx.runAsync(`INSERT INTO installment_plans (${PLAN_COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     plan.id, plan.cardId, plan.merchant, plan.category, plan.currency, plan.purchaseDateISO, plan.principalMinor, plan.count,
-    plan.interestMinor, plan.feeMinor, plan.taxMinor, plan.financingCategory, plan.cancelledAt, plan.deleted ? 1 : 0, plan.createdAt, plan.revision, plan.updatedAt);
+    plan.interestMinor, plan.interestCategory, plan.feeMinor, plan.feeCategory, plan.taxMinor, plan.taxCategory,
+    plan.cancelledAt, plan.deleted ? 1 : 0, plan.createdAt, plan.revision, plan.updatedAt);
   for (const row of plan.schedule) {
-    await tx.runAsync(`INSERT INTO installments (${INSTALLMENT_COLUMNS}) VALUES (?, ?, ?, ?, ?, ?)`,
-      plan.id, row.number, row.billingDateISO, row.dueDateISO, row.principalMinor, row.financingMinor);
+    await tx.runAsync(`INSERT INTO installments (${INSTALLMENT_COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      plan.id, row.number, row.billingDateISO, row.dueDateISO, row.principalMinor, row.interestMinor, row.feeMinor, row.taxMinor);
   }
 }
 
-/** A financed purchase: one plan with its exact schedule, on an existing card that is not deleted (an archived card takes
- * no new purchase in the UI, as today; storage keeps the same rule as a plain purchase). Nothing moves in any account
+/** A financed purchase: one plan with its exact schedule, on an existing active card (an archived or deleted card takes
+ * no new plan: `assertAcceptsNewObligation`). Nothing moves in any account
  * and no movement is recorded here: the instalments are recognised by `catchUpInstallments` when their statements close.
  * Retrying the same plan is a no-op; the same id with other data is refused. */
 export async function createInstallmentPlan(db: LedgerDatabase, input: InstallmentPlan): Promise<void> {
-  const plan = { ...input, merchant: input.merchant.trim(), category: input.category.trim(), financingCategory: input.financingCategory.trim() };
+  const plan = { ...input, merchant: input.merchant.trim(), category: input.category.trim(),
+    interestCategory: input.interestCategory.trim(), feeCategory: input.feeCategory.trim(), taxCategory: input.taxCategory.trim() };
   if (plan.revision !== 0 || plan.updatedAt !== plan.createdAt || plan.deleted || plan.cancelledAt !== null) throw new Error('Un plan de cuotas nuevo no puede tener cambios previos.');
   await db.withExclusiveTransactionAsync(async tx => {
     const archive = await readArchive(tx);
     validateInstallmentPlan(plan, archive.cards ?? [], archive.accounts);
     const card = archive.cards!.find(item => item.id === plan.cardId)!;
-    assertOpenAccount(card.accountId, archive.accounts, archive.cards, archive.debts);
     const existing = archive.installmentPlans?.find(item => item.id === plan.id);
     if (existing) {
       if (sameInstallmentPlan(existing, plan)) return; // Committed already; a refresh failed.
       throw new Error(PLAN_EXISTS_MESSAGE);
     }
+    assertOpenAccount(card.accountId, archive.accounts, archive.cards, archive.debts);
+    assertAcceptsNewObligation(card.accountId, archive.cards); // 24T1 review: an archived card takes no new plan.
     validateArchive({ ...archive, installmentPlans: [...archive.installmentPlans ?? [], plan] });
     await insertInstallmentPlan(tx, plan);
   });

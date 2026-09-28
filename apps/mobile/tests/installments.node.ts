@@ -59,7 +59,7 @@ const transfer = (id: string, fromAccountId: string, toAccountId: string, amount
 /** 120.000,00 in 12 × 10.000,00, bought 2026-09-10, first instalment on the statement closing 2026-09-20. */
 const tv = newInstallmentPlan({ id: 'tv', card, cardAccount, merchant: 'Electro', category: 'Hogar', purchaseDateISO: '2026-09-10', principalMinor: 120000, count: 12, placement: 'current', createdAt });
 const financed = newInstallmentPlan({ id: 'fin', card, cardAccount, merchant: 'Notebook', category: 'Tecnología', purchaseDateISO: '2026-09-10', principalMinor: 30000, count: 3, placement: 'next',
-  interestMinor: 300, financingCategory: 'Intereses', createdAt });
+  interestMinor: 300, interestCategory: 'Intereses', createdAt });
 
 async function seeded() {
   const { db, path } = setup();
@@ -95,7 +95,7 @@ test('schema 12 is reached from a real schema 11 file by an additive migration: 
   await db.execAsync('PRAGMA user_version = 13');
   await assert.rejects(initializeDatabase(db), /versión más nueva/);
   // The foreign keys hold: an instalment row needs its plan, a plan its card.
-  await assert.rejects(db.withExclusiveTransactionAsync(async tx => { await tx.runAsync("INSERT INTO installments (planId, number, billingDateISO, dueDateISO, principalMinor, financingMinor) VALUES ('nope', 1, '2026-09-20', '2026-10-05', 1, 0)"); }), /FOREIGN KEY/);
+  await assert.rejects(db.withExclusiveTransactionAsync(async tx => { await tx.runAsync("INSERT INTO installments (planId, number, billingDateISO, dueDateISO, principalMinor, interestMinor, feeMinor, taxMinor) VALUES ('nope', 1, '2026-09-20', '2026-10-05', 1, 0, 0, 0)"); }), /FOREIGN KEY/);
 });
 
 test('a plan is created without moving any account or recording anything; the catch-up recognises each instalment on its statement, exactly once, through restarts, retries and duplicated invocations', async () => {
@@ -217,7 +217,7 @@ test('a card payment lowers the balance due and assigns no instalment; the movem
   archive = await readArchive(db);
   assert.equal(installmentPlanFigures(archive.installmentPlans![0], archive.records).recognisedMinor, 20000);
   await assert.rejects(createEntry(db, { ...expense('inst_tv_003', 'card-account', 10000, '2026-11-20') }), new RegExp(INSTALLMENT_ID_MESSAGE));
-  await assert.rejects(createEntry(db, { ...expense('instc_tv_003', 'card-account', 10000, '2026-11-20') }), new RegExp(INSTALLMENT_ID_MESSAGE));
+  await assert.rejects(createEntry(db, { ...expense('insti_tv_003', 'card-account', 10000, '2026-11-20') }), new RegExp(INSTALLMENT_ID_MESSAGE));
   // Drift is refused at the door: a row rewritten behind the app's back makes the archive unreadable rather than wrong.
   await db.withExclusiveTransactionAsync(async tx => { await tx.runAsync("UPDATE entries SET amountMinor = 1 WHERE id = 'inst_tv_001'"); });
   await assert.rejects(readArchive(db), new RegExp(INSTALLMENT_DRIFT_MESSAGE));
@@ -357,4 +357,166 @@ test('backup v12: export, restore into a fresh device (nothing recorded twice, t
   await createAccount(plainDb, bank);
   await createCreditCard(plainDb, cardAccount, card);
   assert.equal(createRecoveryBackup(await readArchive(plainDb), new Date(now)).schema, 'finanzapp.native-pilot.v8');
+});
+
+// ---- 24T1 review: a failed instalment catch-up is visible, retried and never duplicated ------------------------------
+
+/** The same database with one write refused the way SQLite refuses it (full, locked, any I/O error), only while `failing`
+ * matches the statement: every transaction still runs through the real helper, so a failure rolls back its whole batch. */
+function failingOn(db: LedgerDatabase, test: (sql: string, params: (string | number | null)[]) => boolean, message: string) {
+  let armed = true;
+  const wrapped = { ...db, withExclusiveTransactionAsync: (work: Parameters<LedgerDatabase['withExclusiveTransactionAsync']>[0]) =>
+    db.withExclusiveTransactionAsync(tx => work({ ...tx, runAsync: async (sql: string, ...params: (string | number | null)[]) => {
+      if (armed && test(sql, params)) throw new Error(message);
+      return tx.runAsync(sql, ...params);
+    } })) } as LedgerDatabase;
+  return { db: wrapped, heal: () => { armed = false; } };
+}
+const insertOf = (prefix: string) => (sql: string, params: (string | number | null)[]) => sql.startsWith('INSERT INTO entries') && String(params[0]).startsWith(prefix);
+
+test('a failed instalment catch-up (disk full, database locked) still opens the ledger, fabricates nothing, is reported apart from the recurring one, and the retry clears it without recording anything twice', async () => {
+  const { sessionWarning } = await import('../src/storage/ledger-session.ts');
+  for (const message of ['database or disk is full', 'database is locked']) {
+    const { db } = await seeded();
+    await catchUpInstallments(db, '2026-09-25'); // Instalment 1 already durable.
+    const broken = failingOn(db, insertOf('inst_'), message);
+    const session = await refreshLedger(broken.db, '2026-11-25');
+    assert.deepEqual([session.recurringError, session.installmentError], [false, true], message);
+    assert.deepEqual(session.archive.records.map(record => record.entry.id).filter(id => id.startsWith('inst')), ['inst_tv_001'], message + ': the durable write kept, nothing fabricated, nothing half-written');
+    assert.equal(cardDebtMinor(card, await readSnapshot(db)), 23100 + 10000, 'the archive is readable as it truly is');
+    assert.match(sessionWarning(session)!, /No pudimos registrar las cuotas vencidas de tus tarjetas/);
+    // The retry (a foreground or the banner's «Verificar de nuevo») succeeds and clears the warning; each instalment once.
+    broken.heal();
+    const retried = await refreshLedger(broken.db, '2026-11-25');
+    assert.deepEqual([retried.recurringError, retried.installmentError, sessionWarning(retried)], [false, false, null]);
+    assert.deepEqual(await instalmentIds(db), ['inst_tv_001', 'inst_tv_002', 'inst_tv_003']);
+    await refreshLedger(broken.db, '2026-11-25');
+    assert.deepEqual(await instalmentIds(db), ['inst_tv_001', 'inst_tv_002', 'inst_tv_003'], 'no duplicate after a retry');
+  }
+});
+
+test('the recurring and the instalment errors are independent: either one alone, both together, each cleared by its own success', async () => {
+  const { sessionWarning } = await import('../src/storage/ledger-session.ts');
+  const { db } = await seeded();
+  const rule: RecurringRule = { id: 'gym', accountId: 'bank', kind: 'expense', amountMinor: 700, merchant: 'Gimnasio', category: 'Salud', frequency: 'monthly',
+    anchorDateISO: '2026-09-15', nextDateISO: '2026-09-15', active: true, deleted: false, createdAt, revision: 0, updatedAt: createdAt };
+  await saveRecurringRule(db, rule);
+  const recurringOnly = failingOn(db, (sql, params) => sql.startsWith('INSERT INTO entries') && String(params[0]).startsWith('rec_'), 'disk I/O error');
+  const onlyRecurring = await refreshLedger(recurringOnly.db, '2026-09-25');
+  assert.deepEqual([onlyRecurring.recurringError, onlyRecurring.installmentError], [true, false]);
+  assert.deepEqual(await instalmentIds(db), ['inst_tv_001'], 'the instalment pass ran although the recurring one failed');
+  assert.match(sessionWarning(onlyRecurring)!, /vencimientos recurrentes/);
+  const both = failingOn(db, (sql, params) => sql.startsWith('INSERT INTO entries') && /^(rec|inst)_/.test(String(params[0])), 'database is locked');
+  const bothFailed = await refreshLedger(both.db, '2026-10-25');
+  assert.deepEqual([bothFailed.recurringError, bothFailed.installmentError], [true, true]);
+  assert.match(sessionWarning(bothFailed)!, /ni registrar las cuotas vencidas/);
+  both.heal();
+  const healed = await refreshLedger(both.db, '2026-10-25');
+  assert.deepEqual([healed.recurringError, healed.installmentError, sessionWarning(healed)], [false, false, null]);
+  const ids = (await readArchive(db)).records.map(record => record.entry.id).filter(id => /^(rec|inst)_/.test(id)).sort();
+  assert.deepEqual(ids, ['inst_tv_001', 'inst_tv_002', 'rec_gym_20260915', 'rec_gym_20261015'], 'each once');
+  assert.equal(sessionWarning({ recurringError: false, installmentError: false }), null);
+});
+
+test('a real lock held by another connection fails both passes (each reported), keeps the ledger readable, and the next open records everything once', async () => {
+  const { db, path } = await seeded();
+  const holder = new DatabaseSync(path);
+  holder.exec('PRAGMA journal_mode = WAL; BEGIN EXCLUSIVE;');
+  try {
+    const session = await refreshLedger(db, '2026-10-25');
+    assert.deepEqual([session.recurringError, session.installmentError], [true, true], 'both passes need their own write transaction: both reported, independently');
+    assert.deepEqual(session.archive.records.map(record => record.entry.id).filter(id => id.startsWith('inst')), []);
+  } finally { holder.exec('ROLLBACK'); holder.close(); }
+  const session = await refreshLedger(db, '2026-10-25');
+  assert.deepEqual([session.recurringError, session.installmentError], [false, false]);
+  assert.deepEqual(await instalmentIds(db), ['inst_tv_001', 'inst_tv_002']);
+});
+
+// ---- 24T1 review: interest, fee and financing tax as independent components on real SQLite ---------------------------
+
+test('a plan with interest, fee and financing tax stores each component with its category, recognises each share as its own movement, undoes and restores each on its own, and round-trips through backup v12 with its identity', async () => {
+  const { db } = await seeded();
+  const full = newInstallmentPlan({ id: 'nb', card, cardAccount, merchant: 'Notebook', category: 'Tecnología', purchaseDateISO: '2026-09-10', principalMinor: 30000, count: 3, placement: 'current',
+    interestMinor: 10000, interestCategory: 'Intereses', feeMinor: 1000, feeCategory: 'Comisiones', taxMinor: 501, taxCategory: 'Impuestos', createdAt });
+  await createInstallmentPlan(db, full);
+  assert.deepEqual(await planOf(db, 'nb'), full, 'every component and category read back exactly');
+  assert.equal(await catchUpInstallments(db, '2026-09-25'), 5, 'tv 1, and nb 1 as four movements');
+  const report = spendingReport(await readSnapshot(db), 'ARS', '2026-09', '2026-09-30');
+  assert.deepEqual(report.status === 'ready' && report.categories.map(group => [group.category, group.amountMinor]),
+    [['Comida', 23100], ['Hogar', 10000], ['Tecnología', 10000], ['Intereses', 3334], ['Comisiones', 334], ['Impuestos', 167]]);
+  // Undo the principal only: its interest, fee and tax keep counting, in the ledger, the card balance and the plan figures.
+  let archive = await readArchive(db);
+  const principal = archive.records.find(record => record.entry.id === 'inst_nb_001')!;
+  await changeEntry(db, makeEntryChange('undo-p', principal, 'void', now));
+  archive = await readArchive(db);
+  let figures = installmentPlanFigures(archive.installmentPlans!.find(plan => plan.id === 'nb')!, archive.records);
+  assert.deepEqual([figures.recognisedMinor, figures.undoneMinor, figures.financingRecognisedMinor], [0, 10000, 3334 + 334 + 167]);
+  assert.equal(cardDebtMinor(card, await readSnapshot(db)), 23100 + 10000 + 3334 + 334 + 167);
+  // Undo the fee only, then restore both: each part comes back on its own; the catch-up never recreates an undone share.
+  const fee = archive.records.find(record => record.entry.id === 'instf_nb_001')!;
+  await changeEntry(db, makeEntryChange('undo-f', fee, 'void', now));
+  assert.equal(await catchUpInstallments(db, '2026-09-25'), 0);
+  archive = await readArchive(db);
+  figures = installmentPlanFigures(archive.installmentPlans!.find(plan => plan.id === 'nb')!, archive.records);
+  assert.deepEqual([figures.components.fee.undoneMinor, figures.components.interest.recognisedMinor], [334, 3334]);
+  await changeEntry(db, makeEntryChange('restore-f', archive.records.find(record => record.entry.id === 'instf_nb_001')!, 'restore', now));
+  await changeEntry(db, makeEntryChange('restore-p', (await readArchive(db)).records.find(record => record.entry.id === 'inst_nb_001')!, 'restore', now));
+  archive = await readArchive(db);
+  figures = installmentPlanFigures(archive.installmentPlans!.find(plan => plan.id === 'nb')!, archive.records);
+  assert.deepEqual([figures.recognisedMinor, figures.financingRecognisedMinor], [10000, 3835]);
+  // Backup v12: each component's identity and category survive; the restored ids keep the catch-up from repeating.
+  const backup = createRecoveryBackup(archive, new Date(now));
+  const fresh = setup().db;
+  await initializeDatabase(fresh);
+  const parsed = parsePilotBackup(JSON.stringify(backup));
+  const preview = previewBackupImport(await readArchive(fresh), parsed.archive);
+  await importArchive(fresh, parsed.archive, preview.baseline);
+  const restored = await readArchive(fresh);
+  assert.deepEqual(restored.installmentPlans!.find(plan => plan.id === 'nb'), full);
+  assert.deepEqual(restored.records.filter(record => record.entry.id.endsWith('nb_001')).map(record => [record.entry.id, record.entry.category, record.revision]).sort(),
+    [['inst_nb_001', 'Tecnología', 2], ['instf_nb_001', 'Comisiones', 2], ['insti_nb_001', 'Intereses', 0], ['instt_nb_001', 'Impuestos', 0]]);
+  assert.equal(await catchUpInstallments(fresh, '2026-09-25'), 0);
+  // The schema keeps a component and its category together.
+  await assert.rejects(fresh.withExclusiveTransactionAsync(async tx => { await tx.runAsync("UPDATE installment_plans SET feeCategory = '' WHERE id = 'nb'"); }), /CHECK/);
+});
+
+// ---- 24T1 review: an archived card takes no new obligation ---------------------------------------------------------
+
+test('an archived card refuses a new purchase, a new plan, a new recurring rule and a movement or rule moved onto it; it keeps its history editable, its stored rules and plans running, and its payments; reactivating lifts the refusal', async () => {
+  const { CARD_ARCHIVED_MESSAGE } = await import('@finanzapp/domain');
+  const { db } = await seeded();
+  const cardRule: RecurringRule = { id: 'stream', accountId: 'card-account', kind: 'expense', amountMinor: 1200, merchant: 'Streaming', category: 'Ocio', frequency: 'monthly',
+    anchorDateISO: '2026-10-01', nextDateISO: '2026-10-01', active: true, deleted: false, createdAt, revision: 0, updatedAt: createdAt };
+  const cashRule: RecurringRule = { ...cardRule, id: 'gym', accountId: 'bank', merchant: 'Gimnasio' };
+  await saveRecurringRule(db, cardRule);
+  await saveRecurringRule(db, cashRule);
+  await createEntry(db, expense('bank-1', 'bank', 500, '2026-09-12'));
+  await saveCreditCard(db, { ...card, active: false, revision: 1, updatedAt: now });
+  // Refused: a typed purchase, a new plan, a brand-new rule, a rule or a movement moved onto the archived card.
+  await assert.rejects(createEntry(db, expense('late', 'card-account', 100, '2026-09-28')), new RegExp(CARD_ARCHIVED_MESSAGE));
+  await assert.rejects(createInstallmentPlan(db, { ...financed, id: 'late-plan' }), new RegExp(CARD_ARCHIVED_MESSAGE));
+  await assert.rejects(saveRecurringRule(db, { ...cardRule, id: 'new-rule' }), new RegExp(CARD_ARCHIVED_MESSAGE));
+  const stored = (await readArchive(db)).recurring!;
+  const gym = stored.find(item => item.id === 'gym')!;
+  await assert.rejects(saveRecurringRule(db, { ...gym, accountId: 'card-account', revision: gym.revision + 1, updatedAt: now }), new RegExp(CARD_ARCHIVED_MESSAGE));
+  const bankEntry = (await readArchive(db)).records.find(record => record.entry.id === 'bank-1')!;
+  await assert.rejects(changeEntry(db, makeEntryChange('move', bankEntry, 'edit', now, { ...bankEntry.entry, accountId: 'card-account' })), new RegExp(CARD_ARCHIVED_MESSAGE));
+  // Kept: the stored rule on the card keeps its semantics (recorded when due, edited in place, paused); the plan keeps
+  // being recognised; history on the card is corrected in place; a retry of a purchase committed before archiving is a no-op;
+  // a payment lands.
+  assert.equal(await processRecurring(db, '2026-10-25', now), 2, 'stream and gym, their own October dates');
+  assert.equal(await catchUpInstallments(db, '2026-10-25'), 2);
+  const stream = (await readArchive(db)).recurring!.find(item => item.id === 'stream')!;
+  await saveRecurringRule(db, { ...stream, merchant: 'Streaming HD', revision: stream.revision + 1, updatedAt: now });
+  const purchase = (await readArchive(db)).records.find(record => record.entry.id === 'p1')!;
+  await changeEntry(db, makeEntryChange('fix', purchase, 'edit', now, { ...purchase.entry, amountMinor: 23000, merchant: 'Súper corregido' }));
+  await createEntry(db, expense('p1', 'card-account', 23100, '2026-09-10')).catch(error => assert.match(String(error), /ya existe con otros datos/));
+  await createTransfer(db, transfer('pay', 'bank', 'card-account', 10000, '2026-10-26'));
+  const archive = await readArchive(db);
+  assert.equal(archive.records.find(record => record.entry.id === 'p1')!.entry.merchant, 'Súper corregido');
+  assert.equal(archive.transfers!.some(record => record.transfer.id === 'pay'), true);
+  // Reactivated: the refusal lifts.
+  await saveCreditCard(db, { ...card, active: true, revision: 2, updatedAt: now });
+  await createEntry(db, expense('after', 'card-account', 100, '2026-10-27'));
+  await createInstallmentPlan(db, { ...financed, id: 'after-plan' });
 });

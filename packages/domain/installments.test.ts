@@ -2,12 +2,12 @@ import { describe, expect, it } from 'vitest';
 import { CARD_PLAN_MESSAGE, INSTALLMENT_DRIFT_MESSAGE, INSTALLMENT_ENTRY_MESSAGE, INSTALLMENT_ID_MESSAGE, MAX_INSTALLMENTS, PLAN_CANCELLED_MESSAGE, PLAN_CHANGE_MESSAGE,
   PLAN_COUNT_MESSAGE, PLAN_CURRENCY_MESSAGE, PLAN_DELETED_MESSAGE, PLAN_FINANCING_MESSAGE, PLAN_HISTORY_MESSAGE, PLAN_PRINCIPAL_MESSAGE, PLAN_SCHEDULE_MESSAGE, PLAN_STATE_MESSAGE,
   PLAN_TOO_SMALL_MESSAGE, assertInstallmentEntryChange, assertInstallmentPlanDeletable, assertNewEntryId, cancelInstallmentPlan, cardCommittedMinor, cardHasPendingInstallments,
-  deleteInstallmentPlan, distributeMinor, installmentChargeEntryId, installmentEntries, installmentEntryId, installmentOccurrenceOf, installmentPlanFigures, installmentPlanStatus,
+  deleteInstallmentPlan, distributeMinor, installmentEntries, installmentEntryId, installmentOccurrenceOf, installmentPlanFigures, installmentPlanStatus,
   installmentSchedule, installmentState, materializeInstallmentPlan, newInstallmentPlan, pendingInstallmentPlans, sameInstallmentPlan, statementClosingAfter, statementClosingOnOrAfter,
   statementDueDate, validateInstallmentPlan, validateInstallmentPlanChange, validateInstallmentPlans, type InstallmentPlan } from './installments';
 import { MAX_ENTRY_MINOR } from './money';
 import { accountBalanceMinor, type Account, type Entry, type LedgerSnapshot, type Transfer } from './ledger';
-import { CARD_DEBT_MESSAGE, assertCardDeletable, cardAvailableLimitMinor, cardDebtMinor, debtTotalsByCurrency, deleteCreditCard, liquidTotalsByCurrency, validateLiabilityProfiles,
+import { CARD_ARCHIVED_MESSAGE, CARD_DEBT_MESSAGE, assertAcceptsNewObligation, assertCardDeletable, postingAccountsFor, cardAvailableLimitMinor, cardDebtMinor, debtTotalsByCurrency, deleteCreditCard, liquidTotalsByCurrency, validateLiabilityProfiles,
   type CreditCardProfile, type PersonalDebtProfile } from './liabilities';
 import { materializeRecurringRule, pauseRecurringRule, recurringEntryId, recurringOccurrenceOf, type RecurringRule } from './recurring';
 import { BACKUP_SCHEMA_V11, BACKUP_SCHEMA_V12, BACKUP_SCHEMA_V8, createRecoveryBackup, initialRecord, makeEntryChange, parsePilotBackup, previewBackupImport, snapshotFromArchive,
@@ -104,13 +104,14 @@ describe('the statement calendar', () => {
     expect(current.map(row => row.billingDateISO)).toEqual(['2026-09-20', '2026-10-20', '2026-11-20', '2026-12-20', '2027-01-20', '2027-02-20', '2027-03-20', '2027-04-20', '2027-05-20', '2027-06-20', '2027-07-20', '2027-08-20']);
     expect(current.map(row => row.dueDateISO).slice(0, 5)).toEqual(['2026-10-05', '2026-11-05', '2026-12-05', '2027-01-05', '2027-02-05']);
     expect(current.map(row => row.number)).toEqual(Array.from({ length: 12 }, (_, i) => i + 1));
-    expect(current.every(row => row.principalMinor === 10000 && row.financingMinor === 0)).toBe(true);
+    expect(current.every(row => row.principalMinor === 10000 && row.interestMinor === 0 && row.feeMinor === 0 && row.taxMinor === 0)).toBe(true);
     const next = installmentSchedule(card, '2026-09-10', 'next', 120000, 12);
     expect(next[0].billingDateISO).toBe('2026-10-20');
     expect(installmentSchedule(card, '2026-09-20', 'current', 100, 1)[0].billingDateISO).toBe('2026-09-20');
     expect(installmentSchedule(card, '2026-09-21', 'current', 100, 1)[0].billingDateISO).toBe('2026-10-20');
-    const financed = installmentSchedule(card, '2026-09-10', 'current', 10000, 3, 100);
-    expect(financed.map(row => [row.principalMinor, row.financingMinor])).toEqual([[3334, 34], [3333, 33], [3333, 33]]);
+    const financed = installmentSchedule(card, '2026-09-10', 'current', 10000, 3, { interestMinor: 100, feeMinor: 5, taxMinor: 2 });
+    expect(financed.map(row => [row.principalMinor, row.interestMinor, row.feeMinor, row.taxMinor])).toEqual([[3334, 34, 2, 1], [3333, 33, 2, 1], [3333, 33, 1, 0]],
+      'each component is split on its own, remainder on the first instalments');
     expect(() => installmentSchedule(card, '2026-09-10', 'later' as never, 100, 1)).toThrow(PLAN_SCHEDULE_MESSAGE);
     expect(() => installmentSchedule(card, '2026-13-10', 'current', 100, 1)).toThrow('Elegí una fecha válida.');
   });
@@ -123,19 +124,21 @@ describe('a plan', () => {
     expect(tv.schedule.length).toBe(12);
     expect(tv.principalMinor).toBe(120000);
     expect(tv.interestMinor + tv.feeMinor + tv.taxMinor).toBe(0);
-    expect(tv.financingCategory).toBe('');
+    expect([tv.interestCategory, tv.feeCategory, tv.taxCategory]).toEqual(['', '', '']);
     expect(() => validateInstallmentPlan(tv, cards, accounts)).not.toThrow();
     const twin = plan({ id: 'tv-2' });
     expect(sameInstallmentPlan(tv, twin)).toBe(false);
     expect(sameInstallmentPlan(tv, { ...tv })).toBe(true);
     expect(installmentEntryId('tv', 1)).not.toBe(installmentEntryId('tv-2', 1));
     // Financing: explicit, never principal; a category is required exactly when there is a charge.
-    const financed = plan({ id: 'fin', interestMinor: 600, feeMinor: 300, taxMinor: 300, financingCategory: 'Intereses' });
-    expect(financed.schedule.map(row => row.financingMinor)).toEqual(Array(12).fill(100));
+    const financed = plan({ id: 'fin', interestMinor: 600, interestCategory: 'Intereses', feeMinor: 300, feeCategory: 'Comisiones', taxMinor: 300, taxCategory: 'Impuestos' });
+    expect(financed.schedule.map(row => [row.interestMinor, row.feeMinor, row.taxMinor])).toEqual(Array(12).fill([50, 25, 25]));
     expect(financed.principalMinor).toBe(120000);
     expect(() => plan({ id: 'x', interestMinor: 100 })).toThrow(PLAN_FINANCING_MESSAGE);
-    expect(() => plan({ id: 'x', financingCategory: 'Intereses' })).toThrow(PLAN_FINANCING_MESSAGE);
-    expect(() => plan({ id: 'x', interestMinor: -1, financingCategory: 'Intereses' })).toThrow(PLAN_FINANCING_MESSAGE);
+    expect(() => plan({ id: 'x', interestCategory: 'Intereses' })).toThrow(PLAN_FINANCING_MESSAGE);
+    expect(() => plan({ id: 'x', feeMinor: 100 })).toThrow(PLAN_FINANCING_MESSAGE, 'each component needs its own category');
+    expect(() => plan({ id: 'x', interestMinor: 100, interestCategory: 'Intereses', taxMinor: 100 })).toThrow(PLAN_FINANCING_MESSAGE);
+    expect(() => plan({ id: 'x', interestMinor: -1, interestCategory: 'Intereses' })).toThrow(PLAN_FINANCING_MESSAGE);
     // Refusals: the card must exist and hold the plan's currency; the money and count rules of the distribution apply.
     expect(() => validateInstallmentPlan({ ...tv, cardId: 'nope' }, cards, accounts)).toThrow('Una compra en cuotas se registra en una tarjeta de crédito existente.');
     expect(() => validateInstallmentPlan({ ...tv, currency: 'USD' }, cards, accounts)).toThrow(PLAN_CURRENCY_MESSAGE);
@@ -182,16 +185,19 @@ describe('recognition: the movements a plan records', () => {
     const after: LedgerSnapshot = { accounts, entries: first, transfers: [] };
     expect(cardDebtMinor(card, after)).toBe(10000);
     expect(accountBalanceMinor(bank, after.entries, after.transfers)).toBe(500000, 'no cash account moved');
-    const financed = plan({ id: 'fin', interestMinor: 1200, financingCategory: 'Intereses' });
+    const financed = plan({ id: 'fin', interestMinor: 1200, interestCategory: 'Intereses' });
     const entries = materializeInstallmentPlan(financed, card, '2026-09-20', new Set());
-    expect(entries.map(entry => [entry.id, entry.amountMinor, entry.category])).toEqual([['inst_fin_001', 10000, 'Hogar'], ['instc_fin_001', 100, 'Intereses']]);
-    expect(installmentOccurrenceOf('inst_fin_001')).toEqual({ planId: 'fin', number: 1, part: 'principal' });
-    expect(installmentOccurrenceOf('instc_fin_001')).toEqual({ planId: 'fin', number: 1, part: 'financing' });
+    expect(entries.map(entry => [entry.id, entry.amountMinor, entry.category])).toEqual([['inst_fin_001', 10000, 'Hogar'], ['insti_fin_001', 100, 'Intereses']], 'no movement for a zero fee or tax');
+    expect(installmentOccurrenceOf('inst_fin_001')).toEqual({ planId: 'fin', number: 1, component: 'principal' });
+    expect(installmentOccurrenceOf('insti_fin_001')).toEqual({ planId: 'fin', number: 1, component: 'interest' });
+    expect(installmentOccurrenceOf('instf_fin_001')).toEqual({ planId: 'fin', number: 1, component: 'fee' });
+    expect(installmentOccurrenceOf('instt_fin_001')).toEqual({ planId: 'fin', number: 1, component: 'tax' });
+    expect(installmentOccurrenceOf('instx_fin_001')).toBeNull();
     expect(installmentOccurrenceOf('inst_fin_000')).toBeNull();
     expect(installmentOccurrenceOf('inst_fin_1')).toBeNull();
     expect(installmentOccurrenceOf(recurringEntryId('fin', '2026-09-20'))).toBeNull();
     expect(() => assertNewEntryId('inst_tv_001')).toThrow(INSTALLMENT_ID_MESSAGE);
-    expect(() => assertNewEntryId('instc_tv_001')).toThrow(INSTALLMENT_ID_MESSAGE);
+    for (const id of ['insti_tv_001', 'instf_tv_001', 'instt_tv_001']) expect(() => assertNewEntryId(id)).toThrow(INSTALLMENT_ID_MESSAGE);
     expect(() => assertNewEntryId('e-typed')).not.toThrow();
   });
 
@@ -224,7 +230,7 @@ describe('recognition: the movements a plan records', () => {
     // The undone instalment is not recreated by the catch-up (its id is known), and it counts nowhere.
     expect(materializeInstallmentPlan(tv, card, '2026-11-25', new Set(stored.map(record => record.entry.id)))).toEqual([]);
     const figures = installmentPlanFigures(tv, stored);
-    expect(figures).toEqual({ principalMinor: 120000, recognisedMinor: 20000, undoneMinor: 10000, scheduledMinor: 90000, cancelledMinor: 0, remainingMinor: 100000,
+    expect(figures).toMatchObject({ principalMinor: 120000, recognisedMinor: 20000, undoneMinor: 10000, scheduledMinor: 90000, cancelledMinor: 0, remainingMinor: 100000,
       financingRecognisedMinor: 0, recognisedCount: 2, count: 12, status: 'active' });
     // The card's balance due holds only the recognised instalments; the future ones are a commitment beside it.
     const snapshot: LedgerSnapshot = { accounts, entries: snapshotFromArchive({ accounts, records: stored }).entries, transfers: [] };
@@ -248,7 +254,7 @@ describe('recognition: the movements a plan records', () => {
   });
 
   it('counts each recognised instalment exactly once, in its statement’s month and its original category, in reports, the month summary and budgets; a future instalment counts nowhere', () => {
-    const tv = plan({ id: 'fin', interestMinor: 1200, financingCategory: 'Intereses' });
+    const tv = plan({ id: 'fin', interestMinor: 1200, interestCategory: 'Intereses' });
     const purchase: Entry = { id: 'p1', accountId: 'card-acc', kind: 'expense', amountMinor: 23100, merchant: 'Súper', category: 'Comida', dateISO: '2026-09-10', createdAt };
     const entries = [purchase, ...recognise(tv, '2026-10-25')];
     const snapshot: LedgerSnapshot = { accounts, entries, transfers: [] };
@@ -409,7 +415,7 @@ describe('what a plan is not', () => {
 });
 
 describe('backup v12', () => {
-  const tv = plan({ id: 'fin', interestMinor: 1200, financingCategory: 'Intereses' });
+  const tv = plan({ id: 'fin', interestMinor: 1200, interestCategory: 'Intereses', feeMinor: 36, feeCategory: 'Comisiones', taxMinor: 25, taxCategory: 'Impuestos' });
   const archive: LedgerArchive = { accounts, records: records(recognise(tv, '2026-10-25')), cards, debts: [debt], installmentPlans: [tv] };
 
   it('is written as soon as a plan exists, round-trips every plan with its schedule, and stays v11 or older without plans', () => {
@@ -419,8 +425,12 @@ describe('backup v12', () => {
     expect(backup.cards.every(item => 'deleted' in item)).toBe(true);
     const parsed = parsePilotBackup(JSON.stringify(backup));
     expect(parsed.archive.installmentPlans).toEqual([tv]);
-    expect(parsed.archive.records.length).toBe(4);
-    expect(installmentPlanFigures(parsed.archive.installmentPlans![0], parsed.archive.records)).toMatchObject({ recognisedMinor: 20000, financingRecognisedMinor: 200 });
+    expect(parsed.archive.records.length).toBe(8, 'two instalments × principal, interest, fee and tax');
+    const restored = installmentPlanFigures(parsed.archive.installmentPlans![0], parsed.archive.records);
+    expect([restored.recognisedMinor, restored.components.interest.recognisedMinor, restored.components.fee.recognisedMinor, restored.components.tax.recognisedMinor]).toEqual([20000, 200, 6, 5]);
+    expect(parsed.archive.installmentPlans![0]).toMatchObject({ interestCategory: 'Intereses', feeCategory: 'Comisiones', taxCategory: 'Impuestos' });
+    expect(parsed.archive.records.map(record => record.entry.id).filter(id => id.endsWith('_001')).sort()).toEqual(['inst_fin_001', 'instf_fin_001', 'insti_fin_001', 'instt_fin_001']);
+    expect(parsed.archive.records.find(record => record.entry.id === 'instf_fin_001')!.entry.category).toBe('Comisiones');
     // Without a plan: nothing new in the file.
     expect(createRecoveryBackup({ accounts: [bank], records: [] }, new Date(now)).schema).toBe(BACKUP_SCHEMA_V8);
     const v11 = createRecoveryBackup({ accounts: [bank, cardAccount], records: [], cards: [deleteCreditCard(card, now)] }, new Date(now));
@@ -434,7 +444,7 @@ describe('backup v12', () => {
     expect(changed.conflicts).toBe(1);
     const fresh = previewBackupImport({ accounts, records: [], cards }, parsed.archive);
     expect(fresh.installmentPlans.map(item => item.id)).toEqual(['fin']);
-    expect(fresh.records.length).toBe(4);
+    expect(fresh.records.length).toBe(8);
     expect(fresh.conflicts).toBe(0);
   });
 
@@ -450,5 +460,123 @@ describe('backup v12', () => {
     expect(() => parsePilotBackup(JSON.stringify({ ...backup, installmentPlans: [{ ...tv, extra: 1 }] }))).toThrow('campos faltantes');
     expect(() => parsePilotBackup(JSON.stringify({ ...backup, installmentPlans: [{ ...tv, deleted: true, cancelledAt: now, revision: 1, updatedAt: now }] }))).toThrow(PLAN_STATE_MESSAGE);
     expect(() => parsePilotBackup(JSON.stringify({ ...backup, installmentPlans: 'no' }))).toThrow('demasiados planes de cuotas');
+  });
+});
+
+describe('24T1 review: four independent components (principal, interest, fee, tax)', () => {
+  // 30.000,00 in 3 instalments with interest 100,00, fee 10,00 and financing tax 5,01: every component split on its own
+  // (uneven remainders independently), each share its own movement, category, id and state.
+  const full = plan({ id: 'nb', principalMinor: 30000, count: 3, interestMinor: 10000, interestCategory: 'Intereses', feeMinor: 1000, feeCategory: 'Comisiones', taxMinor: 501, taxCategory: 'Impuestos' });
+  const through = (item: InstallmentPlan, date: string, voided: string[] = []) => records(recognise(item, date), voided);
+  const snapshotOf = (stored: EntryRecord[]): LedgerSnapshot => ({ accounts, entries: snapshotFromArchive({ accounts, records: stored }).entries, transfers: [] });
+  const reportOf = (stored: EntryRecord[], monthISO = '2026-09') => { const r = spendingReport(snapshotOf(stored), 'ARS', monthISO, monthISO + '-30'); return r.status === 'ready' ? r : null; };
+
+  it('splits each component exactly and on its own, with its remainder on the first instalments, and records one movement per non-zero share', () => {
+    expect(full.schedule.map(row => [row.principalMinor, row.interestMinor, row.feeMinor, row.taxMinor])).toEqual([[10000, 3334, 334, 167], [10000, 3333, 333, 167], [10000, 3333, 333, 167]]);
+    for (const component of ['principal', 'interest', 'fee', 'tax'] as const) {
+      expect(full.schedule.reduce((sum, row) => sum + row[`${component}Minor`], 0)).toBe(full[`${component}Minor`]);
+    }
+    const first = materializeInstallmentPlan(full, card, '2026-09-20', new Set());
+    expect(first.map(entry => [entry.id, entry.amountMinor, entry.category])).toEqual([['inst_nb_001', 10000, 'Hogar'], ['insti_nb_001', 3334, 'Intereses'], ['instf_nb_001', 334, 'Comisiones'], ['instt_nb_001', 167, 'Impuestos']]);
+    expect(first.every(entry => entry.dateISO === '2026-09-20' && entry.accountId === 'card-acc' && entry.kind === 'expense')).toBe(true);
+    // Only one component: no movement for the others. Zero components: principal only.
+    const onlyFee = plan({ id: 'of', principalMinor: 900, count: 3, feeMinor: 30, feeCategory: 'Comisiones' });
+    expect(materializeInstallmentPlan(onlyFee, card, '2026-09-20', new Set()).map(entry => entry.id)).toEqual(['inst_of_001', 'instf_of_001']);
+    expect(materializeInstallmentPlan(plan({ id: 'zero', principalMinor: 900, count: 3 }), card, '2026-09-20', new Set()).map(entry => entry.id)).toEqual(['inst_zero_001']);
+    // A tax smaller than the count: shares of 1, 1 and 0; the zero share records nothing.
+    const tiny = plan({ id: 'tiny', principalMinor: 900, count: 3, taxMinor: 2, taxCategory: 'Impuestos' });
+    expect(tiny.schedule.map(row => row.taxMinor)).toEqual([1, 1, 0]);
+    expect(recognise(tiny, '2026-12-01').filter(entry => entry.id.startsWith('instt_')).map(entry => entry.id)).toEqual(['instt_tiny_001', 'instt_tiny_002']);
+    // Idempotent per component.
+    const known = new Set(first.map(entry => entry.id));
+    expect(materializeInstallmentPlan(full, card, '2026-09-20', known)).toEqual([]);
+    expect(materializeInstallmentPlan(full, card, '2026-09-20', new Set(['inst_nb_001', 'instf_nb_001'])).map(entry => entry.id)).toEqual(['insti_nb_001', 'instt_nb_001']);
+  });
+
+  it('reports each component under its own category, and the card balance is the principal plus every active financing share', () => {
+    const stored = through(full, '2026-09-25');
+    const report = reportOf(stored)!;
+    expect(report.categories.map(group => [group.category, group.amountMinor])).toEqual([['Hogar', 10000], ['Intereses', 3334], ['Comisiones', 334], ['Impuestos', 167]]);
+    expect(report.expenseMinor).toBe(10000 + 3334 + 334 + 167);
+    expect(cardDebtMinor(card, snapshotOf(stored))).toBe(report.expenseMinor);
+    const budget: MonthlyBudget = { id: 'b', scope: 'category', category: 'Intereses', currency: 'ARS', monthISO: '2026-09', amountMinor: 5000, active: true, createdAt, revision: 0, updatedAt: createdAt };
+    expect(summarizeMonthlyBudgets(snapshotOf(stored), [budget], 'ARS', '2026-09').rows[0].spentMinor).toBe(3334, 'interest budgeted on its own, never mixed with the principal');
+    const figures = installmentPlanFigures(full, stored);
+    expect([figures.components.principal.recognisedMinor, figures.components.interest.recognisedMinor, figures.components.fee.recognisedMinor, figures.components.tax.recognisedMinor])
+      .toEqual([10000, 3334, 334, 167]);
+    expect(figures.financingRecognisedMinor).toBe(3334 + 334 + 167);
+    expect(figures.components.interest).toEqual({ totalMinor: 10000, recognisedMinor: 3334, undoneMinor: 0, scheduledMinor: 6666, cancelledMinor: 0, remainingMinor: 6666 });
+  });
+
+  it('derives each component’s state from its own movement: principal and financing are undone and restored independently, and the ledger, reports, the card balance and the figures always agree', () => {
+    const cases: [string, string[]][] = [
+      ['principal active + financing active', []],
+      ['principal undone + financing active', ['inst_nb_001']],
+      ['principal active + financing undone', ['insti_nb_001', 'instf_nb_001', 'instt_nb_001']],
+      ['both undone', ['inst_nb_001', 'insti_nb_001', 'instf_nb_001', 'instt_nb_001']],
+      ['only the fee undone', ['instf_nb_001']],
+    ];
+    for (const [name, voided] of cases) {
+      const stored = through(full, '2026-09-25', voided);
+      const figures = installmentPlanFigures(full, stored);
+      const counted = snapshotOf(stored).entries.reduce((sum, entry) => sum + entry.amountMinor, 0);
+      expect(figures.recognisedMinor + figures.financingRecognisedMinor, name).toBe(counted);
+      expect(cardDebtMinor(card, snapshotOf(stored)), name).toBe(counted);
+      expect(reportOf(stored)!.expenseMinor, name).toBe(counted);
+      expect(installmentState(full, full.schedule[0], stored, 'principal'), name).toBe(voided.includes('inst_nb_001') ? 'undone' : 'recognised');
+      expect(installmentState(full, full.schedule[0], stored, 'interest'), name).toBe(voided.includes('insti_nb_001') ? 'undone' : 'recognised');
+      expect(installmentState(full, full.schedule[0], stored, 'fee'), name).toBe(voided.includes('instf_nb_001') ? 'undone' : 'recognised');
+      // An undone share is never recreated, whatever the other components did.
+      expect(materializeInstallmentPlan(full, card, '2026-09-25', new Set(stored.map(record => record.entry.id))), name).toEqual([]);
+      // Any undone share keeps the plan pending (its obligation is open); every share recognised completes it.
+      expect(cardHasPendingInstallments(card, [full], through(full, '2026-11-25', voided)), name).toBe(voided.length > 0);
+    }
+    // The P2 case exactly: the principal undone, its interest still counting.
+    const principalUndone = installmentPlanFigures(full, through(full, '2026-09-25', ['inst_nb_001']));
+    expect([principalUndone.recognisedMinor, principalUndone.undoneMinor, principalUndone.components.interest.recognisedMinor, principalUndone.financingRecognisedMinor]).toEqual([0, 10000, 3334, 3835]);
+    // Restoring each part brings exactly that part back.
+    const both = through(full, '2026-09-25', ['inst_nb_001', 'insti_nb_001']);
+    const restorePart = (stored: EntryRecord[], id: string) => stored.map(record => record.entry.id === id ? { ...record, voided: false, revision: 2 } : record);
+    const principalBack = installmentPlanFigures(full, restorePart(both, 'inst_nb_001'));
+    expect([principalBack.recognisedMinor, principalBack.components.interest.recognisedMinor]).toEqual([10000, 0]);
+    const interestBack = installmentPlanFigures(full, restorePart(both, 'insti_nb_001'));
+    expect([interestBack.recognisedMinor, interestBack.components.interest.recognisedMinor]).toEqual([0, 3334]);
+    // Completed only when every share of every component is recognised.
+    expect(installmentPlanStatus(full, through(full, '2026-11-25'))).toBe('completed');
+    expect(installmentPlanStatus(full, through(full, '2026-11-25', ['instt_nb_003']))).toBe('active');
+    expect(() => assertInstallmentPlanDeletable(full, through(full, '2026-09-25', ['inst_nb_001', 'insti_nb_001', 'instf_nb_001']))).toThrow(PLAN_HISTORY_MESSAGE, 'a tax share recorded is history');
+  });
+
+  it('refuses a financing movement that drifts from its component, or one recorded for a zero share', () => {
+    const [, interest] = materializeInstallmentPlan(full, card, '2026-09-20', new Set());
+    expect(() => validateInstallmentPlans([full], cards, accounts, [initialRecord(interest)])).not.toThrow();
+    expect(() => validateInstallmentPlans([full], cards, accounts, [initialRecord({ ...interest, amountMinor: 3333 })])).toThrow(INSTALLMENT_DRIFT_MESSAGE);
+    expect(() => validateInstallmentPlans([full], cards, accounts, [initialRecord({ ...interest, id: 'instf_nb_001' })])).toThrow(INSTALLMENT_DRIFT_MESSAGE, 'the fee share is 334, not 3334');
+    const tiny = plan({ id: 'tiny', principalMinor: 900, count: 3, taxMinor: 2, taxCategory: 'Impuestos' });
+    const zeroShare: Entry = { ...interest, id: 'instt_tiny_003', amountMinor: 0 + 1, dateISO: tiny.schedule[2].billingDateISO };
+    expect(() => validateInstallmentPlans([tiny], cards, accounts, [initialRecord(zeroShare)])).toThrow(INSTALLMENT_DRIFT_MESSAGE);
+    // Categories and component totals are frozen like the principal.
+    for (const change of [{ interestCategory: 'Otro' }, { feeMinor: 999 }, { taxCategory: '' }]) {
+      expect(() => validateInstallmentPlanChange(full, { ...full, ...change, revision: 1, updatedAt: now })).toThrow(PLAN_CHANGE_MESSAGE);
+    }
+  });
+});
+
+describe('24T1 review: an archived card takes no new obligation, and keeps everything it has', () => {
+  const archived: CreditCardProfile = { ...card, active: false, revision: 1, updatedAt: now };
+  it('refuses a new plan, is not offered for a new expense, and keeps recognising and taking payments for what it already has', () => {
+    expect(() => newInstallmentPlan({ id: 'late', card: archived, cardAccount, merchant: 'E', category: 'H', purchaseDateISO: '2026-09-10', principalMinor: 100, count: 1, placement: 'current', createdAt }))
+      .toThrow(CARD_ARCHIVED_MESSAGE);
+    expect(() => newInstallmentPlan({ id: 'late', card: deleteCreditCard(card, now), cardAccount, merchant: 'E', category: 'H', purchaseDateISO: '2026-09-10', principalMinor: 100, count: 1, placement: 'current', createdAt }))
+      .toThrow('Esta tarjeta fue eliminada.');
+    expect(() => assertAcceptsNewObligation('card-acc', [archived])).toThrow(CARD_ARCHIVED_MESSAGE);
+    expect(() => assertAcceptsNewObligation('card-acc', [deleteCreditCard(card, now)])).toThrow('Esta tarjeta fue eliminada.');
+    expect(() => assertAcceptsNewObligation('card-acc', [card])).not.toThrow();
+    expect(() => assertAcceptsNewObligation('bank', [archived])).not.toThrow();
+    expect(postingAccountsFor('expense', accounts, [archived], [debt]).map(item => item.id)).not.toContain('card-acc');
+    expect(postingAccountsFor('expense', accounts, [card], [debt]).map(item => item.id)).toContain('card-acc');
+    // An existing plan keeps running on the archived card.
+    const tv = plan();
+    expect(materializeInstallmentPlan(tv, archived, '2026-10-25', new Set()).length).toBe(2);
   });
 });

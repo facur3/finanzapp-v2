@@ -183,10 +183,10 @@ describe('7b. instalments (Producto 24T1)', () => {
   });
   it('interest, fees and financing taxes are recorded separately, never as principal', () => {
     const financed = newInstallmentPlan({ id: 'fin', card, cardAccount, merchant: 'Electro', category: 'Hogar', purchaseDateISO: '2026-09-10', principalMinor: 120000, count: 12,
-      placement: 'current', interestMinor: 600, feeMinor: 300, taxMinor: 300, financingCategory: 'Intereses', createdAt });
+      placement: 'current', interestMinor: 600, interestCategory: 'Intereses', feeMinor: 300, feeCategory: 'Comisiones', taxMinor: 300, taxCategory: 'Impuestos', createdAt });
     expect(financed.principalMinor).toBe(120000);
     const entries = materializeInstallmentPlan(financed, card, '2026-09-20', new Set());
-    expect(entries.map(entry => [entry.category, entry.amountMinor])).toEqual([['Hogar', 10000], ['Intereses', 100]]);
+    expect(entries.map(entry => [entry.category, entry.amountMinor])).toEqual([['Hogar', 10000], ['Intereses', 50], ['Comisiones', 25], ['Impuestos', 25]]);
     expect(() => newInstallmentPlan({ id: 'x', card, cardAccount, merchant: 'E', category: 'H', purchaseDateISO: '2026-09-10', principalMinor: 100, count: 1, placement: 'current', interestMinor: 5, createdAt })).toThrow(PLAN_FINANCING_MESSAGE);
   });
   it('the card balance due holds only the instalments already on a statement; future instalments are separate commitments', () => {

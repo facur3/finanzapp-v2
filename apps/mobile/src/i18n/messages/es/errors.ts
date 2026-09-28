@@ -58,6 +58,9 @@ export const errors = {
       transferChanged: 'La transferencia cambió. Cerrá el formulario y volvé a abrirla.',
       openFailed: 'No pudimos abrir tus datos. No se borró ni reemplazó nada. Probá nuevamente o conservá la app para recuperar la base.',
       verifyFailed: 'No pudimos verificar tus datos locales ni los vencimientos recurrentes. No se modificó nada fuera de una transacción completa.',
+      /** 24T1: the instalment catch-up failed; the data is open but may lack instalments that are due. The banner retries. */
+      installmentsFailed: 'No pudimos registrar las cuotas vencidas de tus tarjetas. El saldo de tus tarjetas, Reportes y Presupuestos pueden no incluirlas todavía. No se modificó nada fuera de una transacción completa.',
+      catchUpsFailed: 'No pudimos verificar los vencimientos recurrentes ni registrar las cuotas vencidas de tus tarjetas. El saldo de tus tarjetas, Reportes y Presupuestos pueden estar incompletos. No se modificó nada fuera de una transacción completa.',
       stillOpening: 'Todavía estamos abriendo tus datos.',
       refreshFailed: 'El guardado terminó, pero no pudimos actualizar la vista. Verificá de nuevo antes de registrar otro movimiento; no lo cargues otra vez.',
     },
@@ -247,7 +250,7 @@ export const errors = {
       principal: 'El precio de la compra en cuotas debe ser mayor que cero.',
       count: 'Elegí entre 1 y 120 cuotas.',
       tooSmall: 'Cada cuota debe ser de al menos una unidad menor de la moneda.',
-      financing: 'Los intereses, cargos e impuestos de financiación deben ser cero o positivos, con su propia categoría.',
+      financing: 'Los intereses, las comisiones y los impuestos de financiación deben ser cero o positivos, cada uno con su propia categoría.',
       card: 'Una compra en cuotas se registra en una tarjeta de crédito existente.',
       currency: 'El plan de cuotas usa la moneda de su tarjeta.',
       state: 'Estado de plan de cuotas inválido.',
@@ -264,6 +267,8 @@ export const errors = {
       drift: 'Una cuota registrada no coincide con su plan. No se modificó nada.',
       /** A card with a pending plan is archived, never deleted. */
       cardPlan: 'Esta tarjeta tiene cuotas pendientes. Archivala; no se puede eliminar.',
+      /** 24T1 review: an archived card takes no new purchase, plan or recurring rule; payments and history stay. */
+      cardArchived: 'Esta tarjeta está archivada. Reactivala para registrar compras nuevas.',
       id: 'Identificador de plan de cuotas inválido.',
       changed: 'El plan de cuotas cambió desde que lo abriste. Volvé a revisarlo.',
       newPlan: 'Un plan de cuotas nuevo no puede tener cambios previos.',

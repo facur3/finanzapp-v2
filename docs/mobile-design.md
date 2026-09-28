@@ -394,7 +394,14 @@ usa todavía. Las palabras que 24T2 dibujará y que ninguna pantalla mezcla:
   el principal futuro, al lado del saldo pendiente y nunca dentro. **Principal restante**: lo no reconocido.
 - **Pago**: una transferencia a la tarjeta. Nunca «paga» una cuota concreta: no existe «3/12 pagadas»; existe «3/12
   facturadas». La palabra «pagada» no aparece salvo que el sistema lo sepa de verdad.
-- **Financiación** (intereses, cargos, impuestos): un gasto aparte, en su propia categoría; nunca principal.
+- **Financiación**: tres componentes independientes, **Intereses**, **Comisiones** e **Impuestos de financiación**, cada
+  uno un gasto aparte en su propia categoría; nunca principal ni mezclados entre sí. Reportes los muestra por separado
+  de la **Compra** (el principal).
+- **Cinco cifras** para 24T2: precio / principal original; saldo de la tarjeta facturado/exigible hoy; principal futuro
+  comprometido; principal restante; principal ya reconocido/facturado. Los pagos generales de la tarjeta se pueden
+  mostrar aparte, sin asignarlos a ninguna cuota.
+- **Tarjeta archivada**: conserva historial, planes y pagos; no se ofrece para una compra, un plan o un recurrente
+  nuevos; reactivarla la devuelve a los formularios.
 - **Disponible de la tarjeta** con un plan pendiente: desconocido hasta que la decisión 003 registre cómo reserva el
   emisor; 24T2 decide cómo se muestra (no un cero, no un número inventado).
 
