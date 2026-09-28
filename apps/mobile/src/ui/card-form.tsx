@@ -10,6 +10,8 @@ import type { MessageKey } from '../i18n/messages';
 import { useLedger } from '../storage/LedgerProvider';
 import { ActionButton, AmountField, AppText, DetailRow, ErrorMessage, Field, IconButton, Screen, Surface, useStacked } from './components';
 import { CurrencySwitch } from './currency-switch';
+import { useDefaultCurrency } from './use-default-currency';
+import { useCardManagement } from './commitment-actions';
 import { offeredCurrencies } from './currencies';
 import { draftFromMinor } from './money-input';
 import { space } from './theme';
@@ -30,7 +32,9 @@ export function CardForm({ original }: { original?: CreditCardProfile }) {
   const [name, setName] = useState(account?.name ?? '');
   const [issuer, setIssuer] = useState(before?.issuer ?? '');
   const [last4, setLast4] = useState(before?.last4 ?? '');
-  const [currency, setCurrency] = useState<Currency>(account?.currency ?? 'ARS');
+  // 25B2: a new card starts in the currency the one rule proposes (`useDefaultCurrency`); an existing card keeps its account's.
+  const suggested = useDefaultCurrency({ accountCurrency: account?.currency });
+  const [currency, setCurrency] = useState<Currency>(suggested);
   const [debt, setDebt] = useState('');
   // An untouched limit prefill keeps the stored minor units (a stored amount may exceed the entry bound); an edited text is a new entry.
   const [storedLimit] = useState<StoredDraft | null>(() => before?.creditLimitMinor && account
@@ -45,6 +49,7 @@ export function CardForm({ original }: { original?: CreditCardProfile }) {
   const [error, setError] = useState<string | null>(null);
   const saving = useRef(false);
   const locked = busy || !!pendingCreate || !!pendingEdit || !!pendingArchive;
+  const manage = useCardManagement();
   // Drafts survive a currency switch untouched; one the new currency cannot hold exactly blocks Save (the field says why).
   const fitsCurrency = draftFitsCurrency(debt, currency).ok && editedDraftFits(limit, currency, storedLimit).ok;
   const close = () => { if (!saving.current) { if (router.canGoBack()) router.back(); else router.replace('/cards'); } };
@@ -58,6 +63,7 @@ export function CardForm({ original }: { original?: CreditCardProfile }) {
   function profileBase(): Omit<CreditCardProfile, 'revision' | 'updatedAt' | 'active'> {
     return {
       id: before?.id ?? identity.id,
+      deleted: before?.deleted ?? false,
       accountId: before?.accountId ?? identity.accountId,
       issuer: issuer.trim(),
       last4: last4.trim(),
@@ -171,5 +177,11 @@ export function CardForm({ original }: { original?: CreditCardProfile }) {
       onPress={save} busy={busy} disabled={(before ? !closingDay || !dueDay : !name.trim() || !closingDay || !dueDay) || !fitsCurrency} />
     {before && <ActionButton label={t(pendingArchive && error ? 'cards.form.retry' : before.active ? 'cards.form.archive' : 'cards.form.reactivate')}
       onPress={archive} secondary disabled={busy || !!pendingEdit} />}
+    {/* 25B2: deleting is the last, clearly destructive action; the confirmation names the recorded debt and what stays. */}
+    {before && <>
+      <ErrorMessage message={manage.error} />
+      <ActionButton label={t('cards.form.delete')} icon="trash-outline" secondary tone="expense" disabled={locked || manage.busyId === before.id}
+        onPress={() => manage.remove(before, () => { (router as { dismissAll?: () => void }).dismissAll?.(); router.replace('/cards'); })} />
+    </>}
   </Screen>;
 }

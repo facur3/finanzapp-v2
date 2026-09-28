@@ -16,11 +16,12 @@
  *     it) and the person decides; the account created seeds the display currency of the totals
  *     (docs/currency.md §2.9). Language, region, an account's currency and the display currency
  *     stay four independent preferences. */
-import { LEDGER_CURRENCIES, type Currency, type CurrencyGate } from '@finanzapp/domain';
 import type { PreferenceStore } from '../i18n/preference.ts';
 import { DISPLAY_CURRENCY_KEY } from './display-currency.ts';
 import { LANGUAGE_PREFERENCE_KEY, REGION_PREFERENCE_KEY } from '../i18n/preference.ts';
-import { regionRecord, type CatalogueRegionCode } from '../i18n/regions.ts';
+
+/** The region's suggestion lives with the other currency defaults since 25B2 (`currency-defaults.ts`, rule 4). */
+export { suggestedCurrency } from './currency-defaults.ts';
 
 export const ONBOARDING_KEY = 'finanzapp.onboarding';
 export const ONBOARDING_DONE = 'done';
@@ -56,11 +57,4 @@ export function onboardingDecision(store: () => PreferenceStore, hasAccounts: bo
  * store could not be written: the app goes on regardless, and the next launch decides again. */
 export function markOnboardingDone(store: () => PreferenceStore): boolean {
   try { store().setItemSync(ONBOARDING_KEY, ONBOARDING_DONE); return true; } catch { return false; }
-}
-
-/** The currency the region suggests for the first account: its legal tender when the build offers it (the first one
- * CLDR lists that the gate holds), else the app's default. Only a suggestion: the person chooses in the form. */
-export function suggestedCurrency(region: CatalogueRegionCode | null, gate: CurrencyGate = LEDGER_CURRENCIES): Currency {
-  const tender = region ? regionRecord(region).currencies : [];
-  return (tender as readonly string[]).find((code): code is Currency => (gate as readonly string[]).includes(code)) ?? 'ARS';
 }

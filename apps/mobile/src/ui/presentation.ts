@@ -1,4 +1,4 @@
-import { currenciesPresent, labelFromISO, type Account, type Currency, type Entry, type EntryKind, type Transfer } from '@finanzapp/domain';
+import { currenciesPresent, liveAccounts, labelFromISO, type Account, type Currency, type Entry, type EntryKind, type Transfer } from '@finanzapp/domain';
 import { dateFromISO, daysAgo, formatDate, relativeDayName } from '../i18n/format.ts';
 import { DEFAULT_LOCALE, type AppLocale } from '../i18n/locale.ts';
 
@@ -77,6 +77,14 @@ export function initialAccountId(accounts: Account[], accountId?: string, curren
  * Home, Reportes, Presupuestos and the Assistant let the person switch between. Never a
  * fixed pair, so an account in any stored currency is always reachable. */
 export function availableCurrencies(accounts: Account[]): Currency[] {
+  // 25B2: the currencies the live accounts hold: what a new record, Disponible and the default rule work with.
+  return currenciesPresent(liveAccounts(accounts));
+}
+
+/** Every currency the ledger ever held, deleted accounts included (25B2 review): the scope of Inicio's and Reportes'
+ * view and of its chip, so the history of a currency whose last account was deleted stays counted (converted at its
+ * dates in the consolidated total, filterable with "Solo …"), never dropped with the account. */
+export function historyCurrencies(accounts: Account[]): Currency[] {
   return currenciesPresent(accounts);
 }
 

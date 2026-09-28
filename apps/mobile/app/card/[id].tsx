@@ -35,14 +35,14 @@ export default function CardDetailScreen() {
 
   return <>
     <Stack.Screen options={{ title: account.name,
-      headerRight: () => <IconButton name="create-outline" label={t('cards.panel.editCard')}
+      headerRight: card.deleted ? undefined : () => <IconButton name="create-outline" label={t('cards.panel.editCard')}
         onPress={() => router.push({ pathname: '/edit-card/[id]', params: { id: card.id } })} /> }} />
     <EntryList entries={activity.entries} transfers={activity.transfers} accountId={account.id} accounts={snapshot.accounts} context="card"
       header={<View style={{ gap: space.xl, paddingBottom: 4 }}>
         <CardFace id={card.id} name={account.name} issuer={card.issuer} last4={card.last4} currency={account.currency} width={Math.min(width - space.xl * 2, 420)} />
         {/* Identity (the card) → state (the debt) → three facts → primary → secondary → activity. Issuer and currency already live on the card face. */}
         <View style={{ gap: 6 }}>
-          <AppText secondary variant="subhead" style={{ fontWeight: '500' }}>{t(card.active ? 'cards.panel.recordedDebt' : 'cards.panel.archivedDebt')}</AppText>
+          <AppText secondary variant="subhead" style={{ fontWeight: '500' }}>{t(card.deleted ? 'cards.panel.deletedDebt' : card.active ? 'cards.panel.recordedDebt' : 'cards.panel.archivedDebt')}</AppText>
           <Money minor={debtMinor} currency={account.currency} large />
           {credit > 0 && <AppText variant="subhead" style={{ color: p.income, fontWeight: '600' }}>{t('cards.panel.credit', { amount: money(credit) })}</AppText>}
         </View>
@@ -64,7 +64,7 @@ export default function CardDetailScreen() {
         <View style={{ gap: 10 }}>
           <ActionButton label={t('cards.panel.recordPurchase')} icon="cart-outline" disabled={!card.active}
             onPress={() => router.push({ pathname: '/new-entry', params: { accountId: account.id, kind: 'expense' } })} />
-          <ActionButton label={t('cards.panel.pay')} icon="arrow-forward-outline" secondary tone="transfer" disabled={debtMinor === 0}
+          <ActionButton label={t('cards.panel.pay')} icon="arrow-forward-outline" secondary tone="transfer" disabled={debtMinor === 0 || card.deleted}
             onPress={() => router.push({ pathname: '/new-transfer', params: { toAccountId: account.id, maxAmountMinor: String(debtMinor) } })} />
         </View>
 

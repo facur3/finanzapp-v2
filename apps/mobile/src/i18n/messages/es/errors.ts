@@ -155,7 +155,7 @@ export const errors = {
       fileSize: 'Elegí una copia JSON de hasta 5 MB.',
       notJson: 'El archivo no es una copia JSON válida.',
       notFinanzApp: 'El archivo no es una copia de FinanzApp.',
-      version: 'Solo se pueden restaurar copias de FinanzApp de las versiones 1 a 10. Este archivo no es una de ellas; conservalo.',
+      version: 'Solo se pueden restaurar copias de FinanzApp de las versiones 1 a 11. Este archivo no es una de ellas; conservalo.',
       money: 'Formato o unidad monetaria no compatibles.',
       /** A v1–v8 file naming a currency other than ARS or USD: it cannot be read as cents, whatever currencies the app offers (24B1). */
       legacyImport: 'Las copias v1 a v8 solo pueden contener cuentas y presupuestos en ARS o USD. No se importó nada; conservá el archivo.',
@@ -232,6 +232,15 @@ export const errors = {
       /** 24UX4: a change to a rule or debt tracker that was deleted (on another screen, or by a restored copy). */
       recurringDeleted: 'Este recurrente fue eliminado.',
       debtDeleted: 'Esta deuda fue eliminada.',
+      debtOutstanding: 'Esta deuda tiene saldo pendiente y pagos o cobros registrados. Saldala o cerrala; no se puede eliminar.',
+      debtDeletePath: 'Una deuda se elimina con su propia acción, no con un cambio de datos.',
+      /** Producto 25B2: a deleted account or card keeps its history and takes nothing new. */
+      accountDeleted: 'Esta cuenta fue eliminada.',
+      cardDeleted: 'Esta tarjeta fue eliminada.',
+      cardDebt: 'Esta tarjeta tiene saldo pendiente. Pagalo o archivala; no se puede eliminar.',
+      cardDeletePath: 'Una tarjeta se elimina con su propia acción, no con un cambio de datos.',
+      obligationAccount: 'Una tarjeta o deuda se elimina desde su propia pantalla.',
+      accountState: 'Estado de cuenta inválido.',
     },
   },
 } as const;

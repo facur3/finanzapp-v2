@@ -1,5 +1,5 @@
 import { accountKind, cardAvailableLimitMinor, cardCycle, cardDebtMinor, type Account, type CreditCardProfile,
-  type LedgerSnapshot, type PersonalDebtProfile } from '@finanzapp/domain';
+  type LedgerSnapshot, type PersonalDebtProfile, isLiveAccount } from '@finanzapp/domain';
 import { relativeDate } from '../i18n/format.ts';
 import { DEFAULT_LOCALE, type AppLocale } from '../i18n/locale.ts';
 import { translator, type Translate } from '../i18n/messages.ts';
@@ -51,9 +51,11 @@ export function daysUntil(dateISO: string, todayISO: string): number {
 }
 
 /** Accounts a spending/income form may post to: cash accounts and cards, never a personal debt. */
-export function postingAccounts(accounts: Account[], debts: PersonalDebtProfile[] = []): Account[] {
+export function postingAccounts(accounts: Account[], debts: PersonalDebtProfile[] = [], keepId?: string): Account[] {
   const excluded = new Set(debts.map(debt => debt.accountId));
-  return accounts.filter(account => !excluded.has(account.id));
+  // 25B2: a deleted account is history, never a choice for a new movement or rule; the one a stored movement or rule
+  // already sits on (`keepId`) stays listed while it is edited, so the correction happens in place.
+  return accounts.filter(account => !excluded.has(account.id) && (isLiveAccount(account) || account.id === keepId));
 }
 
 /** Accounts that hold liquid money: no cards, debts or receivables. */

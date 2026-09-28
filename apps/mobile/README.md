@@ -28,9 +28,9 @@ live in [docs/mobile-roadmap-history.md](../../docs/mobile-roadmap-history.md).
 | Where | What it owns |
 | --- | --- |
 | `app/` | Expo Router routes: the five tabs in `app/(tabs)/` (Inicio, Movimientos, Asistente, Reportes, Más), the first opening (`onboarding.tsx`, Producto 25B: a welcome with the detected language and region and an optional first account with the region's suggested currency; Omitir skips the rest and keeps what was saved; shown once, to a new installation only, and refused to anyone else even through a link), pushed detail screens, native modal forms, Idioma and Región, backup and recovery. Routes compose; they hold no financial rules. |
-| `src/ui/` | The visual system: palette and theme, typography, accessible rows and controls, the amount field (`money-input.ts`), form controls and sheets, the motion language (`motion.tsx`), the material adapter (`material.tsx`, the only door to `expo-glass-effect`), charts, the Home modules, the merchant tile (`merchant-mark.ts`, `MerchantBadge`: the category glyph; brand marks deferred to Producto 25C2), the searchable chooser and the first opening's rules (`onboarding-flow.ts`: when it is shown, what the region suggests, the two stages). |
+| `src/ui/` | The visual system: palette and theme, typography, accessible rows and controls, the amount field (`money-input.ts`), form controls and sheets, the motion language (`motion.tsx`), the material adapter (`material.tsx`, the only door to `expo-glass-effect`), charts, the Home modules, the merchant tile (`merchant-mark.ts`, `MerchantBadge`: the category glyph; brand marks deferred to Producto 25C2), the searchable chooser, the first opening's rules (`onboarding-flow.ts`) and the one rule for the currency a form starts with (`currency-defaults.ts`, `use-default-currency.tsx`, Producto 25B2). |
 | `src/i18n/` | Language and region: the registries and release gates (`locale.ts`), table-based formats (`format.ts`), typed es/en catalogues (`messages/`), the device adapter, the preference store, the provider (`useI18n()`), the generated region catalogue (`regions/`) and its API, the Intl probe. |
-| `src/storage/` | The SQLite repository (`database.ts`, schema `DATABASE_VERSION = 10`, atomic migrations, operation IDs, deletion records for recurring rules and debts), the exchange-rate cache in its own file (`rates-database.ts`, `finanzapp-rates-v1.sqlite`, 24C1), the native driver binding, transactions, the currency gate (`currency-gate.ts`), the open/foreground session (`ledger-session.ts`: the recurring catch-up per rule, never a precondition for opening the data) and `LedgerProvider`. Writes are durable before the UI confirms; a failed write keeps the draft; no error resets storage. |
+| `src/storage/` | The SQLite repository (`database.ts`, schema `DATABASE_VERSION = 11`, atomic migrations, operation IDs, deletion records for recurring rules, debts, cards and normal accounts), the exchange-rate cache in its own file (`rates-database.ts`, `finanzapp-rates-v1.sqlite`, 24C1), the native driver binding, transactions, the currency gate (`currency-gate.ts`), the open/foreground session (`ledger-session.ts`: the recurring catch-up per rule, never a precondition for opening the data) and `LedgerProvider`. Writes are durable before the UI confirms; a failed write keeps the draft; no error resets storage. |
 | `src/fx/` | Consolidated views (Producto 24C1): the Frankfurter adapter (`frankfurter.ts`, no key), the rate store and its request policy (`rates-store.ts`), the provider and `useFinanceView` (`rates-provider.tsx`), the pure view and its figures (`finance-view.ts`) and their words (`fx-copy.ts`). Nothing here writes to the ledger. |
 | `src/assistant/` | The Assistant's pure conversation model, the event-based client boundary, runtime selection and scripted fixtures. The only ledger write is an explicit Confirmar on a draft, validated by the domain. |
 | `src/integrations/` | The HTTPS client for the mobile API and the on-device evidence builder. |
@@ -40,7 +40,11 @@ live in [docs/mobile-roadmap-history.md](../../docs/mobile-roadmap-history.md).
 | `app.config.ts`, `eas.json` | App identities per variant, plugins, the EAS project link and the build profiles. No credentials. |
 
 Local first: the ledger, the language, region and display preferences (currency and mode), the
-first-opening mark (`finanzapp.onboarding`), the exchange-rate cache and the backups are on the device. The only network call without the owner's
+first-opening mark (`finanzapp.onboarding`), the exchange-rate cache and the backups are on the device.
+Backups export as JSON v8 while the ledger holds only ARS and USD, v9 once another currency is stored,
+v10 once a recurring rule or a debt is deleted, and v11 once an account or a card is deleted (Producto
+25B2); v1–v11 files import after a review that never overwrites, and an older build refuses a v11 file
+or a schema 11 database unchanged. The only network call without the owner's
 backend is the reference-rate download from Frankfurter (24C1): a date window and currency codes, no
 key, no amount, no account, only when a consolidated view needs a month it lacks. Backups export as JSON v8 while the ledger holds only ARS and
 USD, as v9 (adds `currencyUnits`) once another currency is stored and as v10 (adds each recurring
@@ -188,15 +192,20 @@ is distributed to people. Today:
 
 | | What |
 | --- | --- |
-| Implemented | Everything in the roadmap's §1, up to Producto 25B (the version line at the end of Más reads «FinanzApp 0.1.0 (25B)»; a development build adds the material and locale diagnostics under it). |
+| Implemented | Everything in the roadmap's §1, up to Producto 25B2 (the version line at the end of Más reads «FinanzApp 0.1.0 (25B2)»; a development build adds the material and locale diagnostics under it). |
 | Device-tested | The first Expo Go flow (2026-09-12), the Interfaz 15 motion direction, the per-app Language row on build `1d69d2d4`, and the owner's 24B5/24B6 sessions that produced the 24B6 and 24UX1 corrections. Every later section of the [device checklist](../../docs/mobile-device-checklist.md) is still pending, and no per-item 24B5/24B6 result is recorded. |
 | Released | Nothing. No store build, no TestFlight, no production identity. |
 
 ## Rules that never bend
 
 - Money is integer minor units per currency; currencies are never mixed without a dated,
-  sourced rate, and only in a view (24C1): stored amounts are never converted; cards, debts and receivables are hidden accounts; a purchase, a
-  transfer and a card payment are each counted once.
+  sourced rate, and only in a view (24C1): stored amounts are never converted; a form's starting
+  currency comes from one rule (`defaultCurrency`, 25B2) and never changes anything already saved;
+- Deleting a normal account or a card writes a deletion record (25B2): the row, every movement and
+  every transfer stay, readable as that account's; nothing new lands on it; history is never erased; cards, debts and receivables are hidden accounts; a purchase, a
+  transfer and a card payment are each counted once. A debt or receivable with a balance and a recorded
+  payment or collection is settled or closed, never deleted (`assertDebtDeletable`, 25B2 close); a card is
+  deleted only with no balance due (and, from 24T, no pending instalment plan).
 - Save locally before confirming; a failed write keeps the draft and its exact command
   for retry; no error resets storage; a newer database is refused intact.
 - User data starts empty. No seeded balances, movements or sample history, ever.

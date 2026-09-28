@@ -395,7 +395,7 @@ const ledger: LedgerSnapshot = {
     spend('y1', 'yen', 1500, '2026-09-12'), spend('c1', 'card', 60000, '2026-09-12'), spend('in', 'usd', 5000, '2026-09-15', 'income')],
   transfers: [{ id: 'pay', fromAccountId: 'ars', toAccountId: 'card', amountMinor: 60000, note: 'Pago', dateISO: '2026-09-20', createdAt } as Transfer],
 };
-const cards = [{ id: 'card-p', accountId: 'card', issuer: 'V', last4: '0000', creditLimitMinor: null, closingDay: 20, dueDay: 5, active: true, createdAt, revision: 0, updatedAt: createdAt }] as never[];
+const cards = [{ id: 'card-p', accountId: 'card', issuer: 'V', last4: '0000', creditLimitMinor: null, closingDay: 20, dueDay: 5, active: true, deleted: false, createdAt, revision: 0, updatedAt: createdAt }] as never[];
 const rates = [
   rate('ARS', '2026-09-04', '1500'), rate('EUR', '2026-09-04', '0.9'), rate('JPY', '2026-09-04', '150'),
   rate('ARS', '2026-09-11', '1600'), rate('EUR', '2026-09-11', '0.8'), rate('JPY', '2026-09-11', '160'),

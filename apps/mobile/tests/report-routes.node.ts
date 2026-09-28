@@ -49,9 +49,10 @@ function routeHarness(file: string, params: Record<string, unknown>, data = snap
     preferred: display.getState(), mode: display.getMode(), setCurrency: (currency: domain.Currency) => { display.set(currency); }, setMode: (mode: displayCurrency.DisplayMode) => { display.setMode(mode); } }) };
   // 24C1: the finance view over a fixed rate book (no network); `ensured` records what the screen asked the provider for.
   const ratesProvider = { useFinanceView: (months: readonly string[], currency?: domain.Currency) => {
-    const held = presentation.availableCurrencies(data.accounts);
-    const mode = display.getMode();
-    const target = currency ?? displayCurrency.resolveDisplayCurrency(display.getState(), held, mode);
+    const held = presentation.historyCurrencies(data.accounts);
+    // 25B2: with one currency in the whole history the view is that currency's own ledger, whatever the preference says (rates-provider.tsx).
+    const mode = held.length <= 1 ? 'single' : display.getMode();
+    const target = currency ?? (held.length <= 1 ? held[0] ?? displayCurrency.resolveDisplayCurrency(display.getState(), held, mode) : displayCurrency.resolveDisplayCurrency(display.getState(), held, mode));
     const built = financeView.financeView(data, mode, target, book);
     if (built.quotes.length) ensured.push({ months: [...months], quotes: built.quotes });
     return { ...built, activity, loaded: true, lastFetchedAt: null, book, held };
@@ -541,4 +542,37 @@ test('24C1 review: Reportes keeps budgets in their own currency on the real ledg
   assert.equal(JSON.stringify([find(root, 'Money').props.minor, rows(root)[0].props.spent]), JSON.stringify([300, 300]));
   // Single EUR: no EUR budget, no section.
   assert.equal(rows(harness('single', 'EUR').render()).length, 0);
+});
+
+// ---- 25B2 review: a deleted account's currency stays in the reports -------------------------------------------
+
+test('25B2 review: a past month keeps the movements of a deleted USD account: consolidated at their dates, filterable as "Solo USD", the previous month reachable, no partial sum without a rate', () => {
+  const deletedAt = '2026-09-20T10:00:00.000Z';
+  const data: domain.LedgerSnapshot = { ...snapshot, accounts: snapshot.accounts.map(account => account.id === 'u' ? { ...account, revision: 1, updatedAt: deletedAt, deletedAt } : account),
+    entries: [...snapshot.entries, { id: 'july', accountId: 'u', kind: 'expense', amountMinor: 250, merchant: 'Prueba', category: 'Salud', dateISO: '2026-07-15', createdAt }] };
+  const book = domain.rateBook([
+    { base: 'USD', quote: 'ARS', rate: '1000', effectiveDate: '2026-07-15', source: 'Frankfurter', fetchedAt: '2026-09-01T00:00:00.000Z' },
+    { base: 'USD', quote: 'ARS', rate: '1000', effectiveDate: '2026-08-10', source: 'Frankfurter', fetchedAt: '2026-09-01T00:00:00.000Z' },
+    { base: 'USD', quote: 'ARS', rate: '1000', effectiveDate: '2026-08-31', source: 'Frankfurter', fetchedAt: '2026-09-01T00:00:00.000Z' },
+  ]);
+  // Consolidated in ARS: August's USD 9,99 at 1000 → ARS 9.990,00 joins the pesos, though no USD account is live.
+  const consolidated = displayCurrency.createDisplayCurrencyStore(memoryPreferences({ [displayCurrency.DISPLAY_MODE_KEY]: 'consolidated', [displayCurrency.DISPLAY_CURRENCY_KEY]: 'ARS' }).store);
+  const root = routeHarness('(tabs)/reports.tsx', { month: '2026-08' }, data, { display: consolidated, book }).render();
+  assert.deepEqual([find(root, 'Money').props.minor, find(root, 'Money').props.currency], [101 + 202 + 303 + 999000, 'ARS']);
+  assert.deepEqual([find(root, 'DisplayCurrencyButton').props.mode, find(root, 'DisplayCurrencyButton').props.currency], ['consolidated', 'ARS'], 'the chip stays: the history holds two currencies');
+  // "Solo USD": the deleted account's own month, and the previous one too (the comparison reads July's USD 2,50).
+  const single = displayCurrency.createDisplayCurrencyStore(memoryPreferences({ [displayCurrency.DISPLAY_MODE_KEY]: 'single', [displayCurrency.DISPLAY_CURRENCY_KEY]: 'USD' }).store);
+  const usd = routeHarness('(tabs)/reports.tsx', { month: '2026-08' }, data, { display: single, book }).render();
+  assert.deepEqual([find(usd, 'Money').props.minor, find(usd, 'Money').props.currency], [999, 'USD']);
+  assert.equal(JSON.stringify(usd.props.data.map((row: domain.CategorySpending) => [row.key, row.amountMinor])), JSON.stringify([['salud', 999]]));
+  const july = routeHarness('(tabs)/reports.tsx', { month: '2026-07' }, data, { display: single, book }).render();
+  assert.deepEqual([find(july, 'Money').props.minor, find(july, 'Money').props.currency], [250, 'USD'], 'the previous period is still there');
+  const comparison = routeHarness('report-comparison.tsx', { currency: 'USD', month: '2026-08' }, data, { display: single, book }).render();
+  assert.equal(nodes(comparison).some(n => n.type === 'EmptyState'), false, 'August against July compares the deleted account\'s own months');
+  const detail = routeHarness('report-category.tsx', { currency: 'USD', month: '2026-08', category: 'salud' }, data, { display: single, book }).render();
+  assert.equal(JSON.stringify(detail.props.entries.map((entry: domain.Entry) => entry.id)), JSON.stringify(['u']), 'the drill-down reaches the movement');
+  // Without a rate, consolidated: per-currency parts, never a sum that silently drops the deleted account.
+  const missing = routeHarness('(tabs)/reports.tsx', { month: '2026-08' }, data, { display: consolidated, book: domain.rateBook([]) }).render();
+  assert.equal(nodes(missing).some(n => n.type === 'Money'), false);
+  assert.equal(JSON.stringify(find(missing, 'CurrencyParts').props.parts), JSON.stringify([{ currency: 'ARS', minor: 606 }, { currency: 'USD', minor: 999 }]));
 });

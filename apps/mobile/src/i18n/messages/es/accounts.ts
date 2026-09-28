@@ -32,6 +32,24 @@ export const accounts = {
       save: 'Guardar cuenta',
       saveFailed: 'No se pudo guardar. Conservamos lo que escribiste para que puedas reintentar.',
     },
+    /** Producto 25B2: the lifecycle of a normal account. Deleting keeps every movement and transfer; the row only
+     * leaves the lists, the totals and the forms. */
+    manage: {
+      delete: 'Eliminar',
+      deleteAccount: 'Eliminar cuenta',
+      deleteTitle: '¿Eliminar {name}?',
+      deleteDetail: 'Deja de aparecer en tus cuentas, en Disponible y en los formularios. No borra nada: {movements} y {transfers} siguen en Movimientos con su nombre y su moneda.',
+      deleteDetailEmpty: 'Deja de aparecer en tus cuentas y en los formularios. No tiene movimientos.',
+      movements: { one: '{count} movimiento', other: '{count} movimientos' },
+      transfers: { one: '{count} transferencia', other: '{count} transferencias' },
+      /** Appended when active recurring rules post to the account. */
+      deleteRecurring: { one: ' Su {count} recurrente activo se detendrá; lo ya registrado no cambia.', other: ' Sus {count} recurrentes activos se detendrán; lo ya registrado no cambia.' },
+      deleteConfirm: 'Eliminar',
+      deleteFailed: 'No pudimos eliminar la cuenta. Sigue como estaba; probá nuevamente.',
+      /** The detail of a deleted account: its history stays readable. */
+      deletedTitle: 'Cuenta eliminada',
+      deletedNote: 'Sus movimientos y transferencias siguen aquí y en tus reportes. No acepta nuevos.',
+    },
     edit: {
       notFoundDetail: 'Volvé a tus cuentas para revisar los datos guardados.',
       recordedBalance: 'Saldo registrado',

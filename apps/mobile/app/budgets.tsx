@@ -9,6 +9,7 @@ import { budgetCategoriesCaption, budgetTone, percentUsed } from '../src/ui/budg
 import { useCategoryLabel } from '../src/ui/category-hues';
 import { ActionButton, AppText, CategoryBadge, EmptyState, IconButton, Money, PressFeedback, Screen, SectionTitle, Stat, StatRow, Surface } from '../src/ui/components';
 import { CurrencySwitch } from '../src/ui/currency-switch';
+import { useDefaultCurrency } from '../src/ui/use-default-currency';
 import { useI18n } from '../src/i18n/provider';
 import { availableCurrencies } from '../src/ui/presentation';
 import { heldCurrency } from '../src/ui/report-presentation';
@@ -28,8 +29,10 @@ export default function BudgetsScreen() {
   const p = usePalette();
   const { t, formatMonthTitle, moneyText, spokenMoney } = useI18n();
   const currencies = availableCurrencies(snapshot?.accounts ?? []);
-  // The route's currency is honoured when an account holds it; an unknown code is never coerced (ARS is the empty-ledger fallback, decision 7.6.4).
-  const initialCurrency: Currency = heldCurrency(snapshot?.accounts ?? [], params.currency) ?? 'ARS';
+  // The route's currency is honoured when an account holds it; otherwise the one default rule (25B2): the currency held,
+  // the display currency among several, the region's tender, ARS last. An unknown code is never coerced.
+  const suggested = useDefaultCurrency();
+  const initialCurrency: Currency = heldCurrency(snapshot?.accounts ?? [], params.currency) ?? suggested;
   const [selectedCurrency, setSelectedCurrency] = useState<Currency>(initialCurrency);
   const [monthISO, setMonthISO] = useState(() => params.month && /^\d{4}-\d{2}$/.test(params.month) ? params.month : currentMonthISO(day));
   const currency = currencies.includes(selectedCurrency) ? selectedCurrency : currencies[0] ?? initialCurrency;

@@ -1,6 +1,6 @@
 # FinanzApp mobile: currencies and the multi-currency engine
 
-Updated 2026-09-26 (Producto 25B: the first opening suggests a display currency by region, §2.9). Applies to the Expo app in
+Updated 2026-09-27 (Producto 25B2: one rule for the currency a form starts with, §2.10; the display control only with two or more currencies in the history). Applies to the Expo app in
 `apps/mobile` and the shared `packages/domain`. Read with [decision 002](decisions/002-spending-first.md)
 (ARS/USD kept apart, no invented rates), [docs/i18n.md](i18n.md) §9 and the roadmap's
 Producto 24 entries.
@@ -259,6 +259,40 @@ for the totals**: the display currency (§2.8) is written with it, in consolidat
 as usual. Skipping the account writes no display currency, so the 24C1 defaults stand. Language, region, an
 account's currency and the display currency remain four independent preferences; a region never implies an
 account's currency, it only suggests the first one (§1).
+
+### 2.10 What Producto 25B2 delivers (the currency a form starts with; the chip only when there is a choice)
+
+**One rule, `defaultCurrency` (`apps/mobile/src/ui/currency-defaults.ts`, consulted through `useDefaultCurrency`).**
+The currency a new account, card, debt or budget form starts with, first match wins:
+
+1. the form belongs to an existing account (an edit, a card's or debt's own account), or a route names a currency the
+   gate offers: that currency (an unknown or ungated code is never coerced);
+2. the live accounts hold exactly one currency: that one;
+3. they hold several: the display currency (§2.8) when an account holds it, otherwise the first currency held in
+   grouping order (ARS, USD, then by code), never a currency no account holds;
+4. no account yet: the legal tender of the region in use, when the build offers it (`suggestedCurrency`, the first
+   opening's rule; a held three-decimal or unoffered tender falls to 5);
+5. the technical fallback, ARS.
+
+The rule proposes; the person may change the field, and nothing already saved ever changes currency. Recurring
+rules and movements take their account's currency and consult nothing here. Decision 7.6.4 ("the default when
+nothing implies a currency") is thereby closed: the region suggests only before any account exists, and only as a
+proposal. Tests: `tests/currency-defaults.node.ts` (every branch: Spain → EUR, the United States → USD, Argentina →
+ARS with no account; one currency; several with and without a valid display currency; the account context and the
+route winning; deleted accounts not counting) and the form harnesses (each form starts with what the hook answers).
+
+**The display control only when there is a choice.** With zero or one currency held, Inicio and Reportes show no
+chip: the number is that currency's own total, the view is the single one whatever the stored preference says (kept,
+never applied, never asking the provider for anything), and a second currency brings the chip back with the stored
+choice. With two or more, the 24C1 chip ("Total · USD" / "Solo USD") and its sheet are unchanged.
+
+**Deleted accounts and cards** (docs/mobile-roadmap.md, 25B2) keep their currency on every stored row. Two sets
+tell them apart (25B2 review): `availableCurrencies` is the live accounts' set (Disponible, the forms, rule 2 above,
+the quick actions' preselection), `historyCurrencies` is every account's, deleted included (`useFinanceView`,
+Inicio's and Reportes' chip, `reportSelection`). Deleting the last account of a currency removes it from the first
+set and never from the second: the chip stays while the history holds two currencies, «Solo USD» still shows that
+account's months, the consolidated total converts its movements at their dates, and a missing rate gives
+per-currency parts, never a partial sum. The view is forced single only when the whole history holds one currency.
 
 ### Availability status
 

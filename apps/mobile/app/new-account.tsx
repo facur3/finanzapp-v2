@@ -3,12 +3,13 @@ import { Keyboard } from 'react-native';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { randomUUID } from 'expo-crypto';
 import * as Haptics from 'expo-haptics';
-import { LEDGER_CURRENCIES, draftFitsCurrency, isLedgerCurrency, makeAccountAppearance, minorFromLedgerDraft, validateAccount, validateAccountAppearance, type AccountAppearance, type Currency, type Account } from '@finanzapp/domain';
+import { LEDGER_CURRENCIES, draftFitsCurrency, makeAccountAppearance, minorFromLedgerDraft, validateAccount, validateAccountAppearance, type AccountAppearance, type Currency, type Account } from '@finanzapp/domain';
 import { useLedger } from '../src/storage/LedgerProvider';
 import { ACCOUNT_ICON_CHOICES, COLOR_CHOICES, DEFAULT_LOOK } from '../src/ui/appearance';
 import { IconColorPicker } from '../src/ui/appearance-picker';
 import { ActionButton, AmountField, AppText, ErrorMessage, Field, FieldNote, IconButton, Screen } from '../src/ui/components';
 import { CurrencyField } from '../src/ui/form-controls';
+import { useDefaultCurrency } from '../src/ui/use-default-currency';
 import { useI18n } from '../src/i18n/provider';
 
 /** Nombre, icono, color, moneda, saldo inicial. The look is saved in the same
@@ -24,8 +25,10 @@ export default function NewAccountScreen() {
   const [name, setName] = useState('');
   const [icon, setIcon] = useState<string>(DEFAULT_LOOK.icon);
   const [color, setColor] = useState<string>(DEFAULT_LOOK.color);
-  // The route's currency is honoured only when the gate offers it (never coerced from an unknown code); ARS otherwise (decision 7.6.4).
-  const [currency, setCurrency] = useState<Currency>(isLedgerCurrency(params.currency, gate) ? params.currency : 'ARS');
+  // 25B2: one rule for the first currency shown (docs/currency.md §2.10): the route's currency when the gate offers it,
+  // else the currency held, the display currency among several, the region's tender before any account, ARS last.
+  const suggested = useDefaultCurrency({ requested: params.currency });
+  const [currency, setCurrency] = useState<Currency>(suggested);
   const [opening, setOpening] = useState('');
   const [busy, setBusy] = useState(false);
   const [pending, setPending] = useState<{ account: Account; appearance: AccountAppearance } | null>(null);

@@ -1,5 +1,53 @@
 # Physical iPhone acceptance checklist
 
+## Producto 25B2 — currency defaults and the account/card lifecycle
+
+**Not done in 25B2: no EAS build was made and the iPhone was not touched.** Metro from this branch
+(`npm run start:dev-client -- --clear`) on the installed FinanzApp Dev build; JavaScript only. **The ledger moves to
+schema 11 (additive: a tombstone date on accounts, a `deleted` flag on cards) and an older build refuses the file
+unchanged: keep a backup first** (Más → Copia de seguridad). Use your own small test data; never seed movements.
+
+**Brief test (≈10 minutes).**
+
+1. **Defaults.** With accounts in one currency only: Más → Cuentas → +, Tarjetas → +, Deudas → +, Presupuestos → +
+   all start in that currency. Add a second-currency account: with the chip on "Total · USD" the forms start in USD;
+   choose "Solo ARS" and they start in ARS. Delete every account (step 2) and open Cuentas → +: the region's
+   currency (Región on España → EUR, on Estados Unidos → USD, on Argentina → ARS).
+2. **Chip.** With one currency held Inicio and Reportes show no chip and the number is simply the total; add a
+   second currency: the chip appears with the previous choice; delete that account: the chip goes away again.
+3. **Delete an account** (one with movements, a transfer and an active recurring rule): a short swipe on its row
+   reveals Eliminar; a full swipe opens the confirmation without deleting; Cancelar leaves everything. Confirm: the
+   row leaves Cuentas and Disponible; Movimientos still lists its movements and transfers with the account's name;
+   Reportes for that month keeps them; Recurrentes shows the rule paused; the account's detail (from a movement)
+   reads "Cuenta eliminada" without Editar or actions; Nuevo gasto and Transferir no longer offer it. VoiceOver on a
+   row: the Actions rotor lists Eliminar. Also from Editar cuenta → «Eliminar cuenta».
+4. **Delete a card** with a purchase, a payment and an active recurring rule on it. Leave some debt first: Tarjetas →
+   card → Editar → «Eliminar tarjeta» opens "Todavía no se puede eliminar" naming the debt, with Pagar and Archivar;
+   Cancelar changes nothing; Pagar opens the payment capped at the debt. Pay it to zero, then delete: the confirmation
+   says purchases and payments stay; confirm: the card leaves the carousel; its purchases and payments stay in
+   Movimientos; Recurrentes shows its rule paused, offering Eliminar only; force-quit, reopen and background/foreground
+   the app past the rule's next date: no new purchase on the card; the detail reads "Tarjeta eliminada" without
+   Registrar compra ni Pagar. No swipe on the carousel.
+   **History.** Delete the only account in a second currency (with a movement in a previous month): Inicio keeps the
+   chip; "Total · ARS" still counts that movement and "Solo USD" shows it; Reportes reaches its month; Disponible and
+   Nuevo gasto no longer offer the currency. Open one of its movements → Editar: the account and amount are prefilled;
+   correct the amount and save; it stays on that account.
+4b. **Delete a debt or receivable** (Más → Deudas y cobros; debt lifecycle round, 2026-09-28). Create «Debo · Juan»
+   and record one partial payment: swipe → Eliminar (and from its detail, «Eliminar deuda») opens «Todavía no se puede
+   eliminar» naming the rest, with Cancelar, Saldar and Cerrar; opening it and Cancelar change nothing; Saldar opens the
+   payment prefilled with the rest; Cerrar moves it to Cerradas with its balance and history and the detail stays open;
+   Reabrir brings it back. Pay the rest, then Eliminar: the usual confirmation; confirm: it leaves Deudas and both
+   payments stay in Movimientos. A receivable with a partial collection offers Cobrar instead of Saldar. A tracker just
+   created with no payment: Eliminar says the balance is not settled and no payment is recorded, and deletes it.
+   VoiceOver reads the dialog's buttons in both languages.
+5. **Backup.** Export (it is v11 once something was deleted), reinstall or use a second device, import: the deleted
+   account and card come back deleted; the older backup from step 0 is refused as contradicting local changes.
+6. **Accessibility.** The largest Dynamic Type on Cuentas rows with the swipe open; VoiceOver through the
+   confirmations in both languages; Reduce Motion; light and dark.
+
+Record: the schema upgrade (the app opened, the data intact), each form's starting currency, and any deleted row that
+still accepted a movement or disappeared from Movimientos.
+
 ## Producto 25B — the first opening (a fresh install and an upgrade)
 
 **Not done in 25B: no EAS build was made and the iPhone was not touched.** Metro from this branch
@@ -525,8 +573,8 @@ the language it was checked in.
   back to Gasto: the card is selected again. Save a purchase: one expense on the card, the card
   debt rises, Inicio's month spending rises once.
 - [ ] Tarjetas → Pagar tarjeta: the card is the fixed destination, "Desde" lists cash accounts in
-  the card's currency only, "Pagar total" fills the recorded debt; saving lowers the cash balance
-  and the card debt and adds no expense.
+  the card's currency only, "Pagar total" fills the outstanding balance; saving lowers the cash balance
+  and the card's balance due and adds no expense.
 - [ ] Inicio "+" → Transferencia: neither "Desde" nor "Hacia" lists a card or a debt.
 - [ ] Deudas → a debt's Registrar pago and a receivable's Registrar cobro still work as before.
 - [ ] If the test ledger holds an income on a card from before (a refund recorded through Ingreso
@@ -706,9 +754,9 @@ warning in the Metro console.
 
 **G. Every screen in English and in es-US** (category names, errors, budgets, cards,
 reports, forms): Inicio, Movimientos, a detail, Nuevo gasto/transferencia (a card payment
-reads "Owed ARS 50.00", not "ARS Owed"; paying it all shows "Visa después: Sin deuda"), Reportes (the largest-expense insight shows the
+reads "Outstanding ARS 50.00", not "ARS Outstanding"; paying it all shows "Visa después: Sin saldo pendiente"), Reportes (the largest-expense insight shows the
 day as 9/22 in the US and 22/09 in Argentina; "Compare with previous month"), Tarjetas
-("Recorded debt", "Statement open since yesterday"), Deudas ("Due today"), Presupuestos,
+("Outstanding balance", "Statement open since yesterday"), Deudas ("Due today"), Presupuestos,
 Recurrentes ("Create recurring item"), Cuentas, Categorías (Transportation,
 Entertainment), backup import, Asistente. Trigger a budget duplicate (a second general
 budget for the same month and currency): the error is in English. Largest Dynamic Type on
@@ -949,7 +997,7 @@ identifier `com.facur3.finanzapp.dev`; FinanzApp Preview is not rebuilt or touch
   −US$ 999.999.999,99 transfer inside an account does the same. No amount is ever
   shrunk below its neighbours' size or cut.
 - [ ] Large text: every row above stacks (amount under the name), whatever the amount.
-- [ ] Reportes: the eyebrow "Gastado · ARS", Tarjetas "Deuda registrada · ARS",
+- [ ] Reportes: the eyebrow "Gastado · ARS", Tarjetas "Saldo pendiente · ARS",
   Recurrentes "Pagos · ARS" and the day header net amount never break between the words
   and the code or number.
 - [ ] Reportes budget rows: name over "spent de limit", the percentage on the right; a
@@ -1041,10 +1089,10 @@ identifier `com.facur3.finanzapp.dev`; FinanzApp Preview is not rebuilt or touch
 - [ ] Más shows two groups, Finanzas (Cuentas, Presupuestos, Recurrentes, Deudas y cobros, Categorías) and App y datos (Asistente "Vista previa", Copia de seguridad, Movimientos deshechos), each row opening its screen; counts match your data; Tarjetas is not a row.
 - [ ] Copia de seguridad: Compartir copia opens the share sheet as before and Importar copia opens the review flow; cancelling the sheet reports nothing.
 - [ ] Categorías lists the defaults and every category you typed yourself (e.g. your test ones) with their usage; nothing can be renamed or deleted; the ledger is unchanged afterwards.
-- [ ] Tarjetas shows only cards: carousel, Deuda registrada, Disponible / Cierre / Vencimiento, Registrar compra, Pagar tarjeta, Recientes; no "Deudas y cobros" section. Your debts are intact under Más → Deudas y cobros with the same balances.
+- [ ] Tarjetas shows only cards: carousel, Saldo pendiente, Disponible / Cierre / Vencimiento, Registrar compra, Pagar tarjeta, Recientes; no "Deudas y cobros" section. Your debts are intact under Más → Deudas y cobros with the same balances.
 - [ ] Home header shows only the accounts button; no sparkles. Home keeps the existing budget card and upcoming commitments only when there is data.
 - [ ] Transfer: pick Desde; under the amount read "Saldo registrado: ARS …" with Usar todo; tap it: the field shows the whole balance formatted (e.g. 190.162, or 190.162,50 with cents) with the caret at the end, nothing is saved, Hacia still has to be chosen; change Desde to another account (and to USD): the figure and the fill follow; an account at $ 0 or negative shows the figure and no Usar todo; the saved transfer equals the filled value and the source ends at exactly zero.
-- [ ] Pagar tarjeta: "Deuda registrada: ARS …" with Pagar total; tap fills the debt; editing above it is still refused on Registrar pago; editing below it is saved as one payment; no new expense appears in Movimientos or Reportes; a card without debt shows no Pagar total.
+- [ ] Pagar tarjeta: "Saldo pendiente: ARS …" with Pagar total; tap fills the balance due; editing above it is still refused on Registrar pago; editing below it is saved as one payment; no new expense appears in Movimientos or Reportes; a card without debt shows no Pagar total.
 - [ ] Deuda (Debo): "Pendiente" with Saldar total fills the pending amount; Me deben: Cobrar total fills it; each save records one payment/collection, the pending amount reaches zero, and nothing appears as income or expense.
 - [ ] VoiceOver reads the shortcut as "Usar todo, Saldo registrado: …" (and the equivalents); large text keeps the footnote and action on one or two lines without clipping; Reduce Motion unchanged; both themes; Expo Go.
 
@@ -1156,7 +1204,7 @@ Save a private backup first and use small test amounts. Do not uninstall the onl
 - [ ] Tarjetas → + creates a card with name, currency, optional current debt, limit and closing/due days; it appears as a card face in the carousel.
 - [ ] With two cards, the carousel snaps one card at a time and the panel below changes to the selected card.
 - [ ] Registrar compra posts one expense on the card: Movimientos, Reportes and Presupuestos count it once; the card debt rises by the same amount; Disponible does not change.
-- [ ] Pagar tarjeta only offers cash accounts in the card's currency, caps at the recorded debt, lowers the cash balance and the card debt, and adds no expense or income.
+- [ ] Pagar tarjeta only offers cash accounts in the card's currency, caps at the outstanding balance, lowers the cash balance and the card's balance due, and adds no expense or income.
 - [ ] Card detail lists purchases and payments with "Pago de tarjeta · desde …" and links each purchase to its normal detail.
 - [ ] A card purchase detail's Tarjeta row opens the card, not a generic account screen; Cuentas never lists card or debt accounts.
 - [ ] Deudas → + creates "Debo" and "Me deben"; Registrar pago/cobro is capped at the pending amount and never appears as a gasto/ingreso.

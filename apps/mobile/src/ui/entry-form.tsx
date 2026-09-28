@@ -32,8 +32,8 @@ export function EntryForm({ original, accountId: requestedAccount, currency, kin
   const { snapshot, archive, addEntry, updateEntry } = useLedger();
   const { t, moneyText, formatMoneyAmount, spokenMoney } = useI18n();
   // Cash accounts and cards can carry an expense or income; a personal debt only changes through payments.
-  const accounts = postingAccounts(snapshot?.accounts ?? [], archive?.debts);
   const [before] = useState(original);
+  const accounts = postingAccounts(snapshot?.accounts ?? [], archive?.debts, before?.entry.accountId);
   const [operation] = useState(() => ({ id: randomUUID(), createdAt: new Date().toISOString() }));
   const [ownKind, setKind] = useState<EntryKind>(before?.entry.kind ?? (requestedKind === 'income' ? 'income' : 'expense'));
   const kind: EntryKind = onKindChange ? (requestedKind === 'income' ? 'income' : 'expense') : ownKind;
@@ -58,9 +58,11 @@ export function EntryForm({ original, accountId: requestedAccount, currency, kin
   // The accounts this kind may post to (24B6): an expense to cash or a card, an income to cash only. A historical income
   // stored on a card keeps that card offered while it is edited, so it can be corrected in place without moving it.
   const cashAndCards = postingAccountsFor(kind, accounts, cards, debts);
-  const historicalCard = before && kind === 'income' && keepsHistoricalCardIncome(before.entry, { kind, accountId: before.entry.accountId })
+  // 25B2: the same for a movement recorded on an account or a card since deleted: its own row stays offered while it is
+  // edited (amount, date, merchant, category are corrected in place), and only that row; nothing new is offered on it.
+  const historical = before && (keepsHistoricalCardIncome(before.entry, { kind, accountId: before.entry.accountId }) || kind === before.entry.kind)
     ? accounts.filter(item => item.id === before.entry.accountId && !cashAndCards.some(offered => offered.id === item.id)) : [];
-  const offered = historicalCard.length ? cashAndCards.concat(historicalCard) : cashAndCards;
+  const offered = historical.length ? cashAndCards.concat(historical) : cashAndCards;
   const eligibleAccounts = before ? offered.filter(item => item.currency === originalCurrency) : offered;
   // A card carried over from Gasto is no place for an income: the form shows a cash account in the same currency instead and
   // keeps the carried choice, so switching back to Gasto finds the card again.

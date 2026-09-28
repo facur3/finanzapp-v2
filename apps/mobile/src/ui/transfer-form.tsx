@@ -3,7 +3,7 @@ import { Keyboard, View } from 'react-native';
 import { router, Stack } from 'expo-router';
 import { randomUUID } from 'expo-crypto';
 import * as Haptics from 'expo-haptics';
-import { accountBalanceMinor, accountKind, editedDraftFits, hiddenLiabilityAccountIds, makeTransferChange, minorFromEditedDraft, sameTransfer, todayKey, type StoredDraft,
+import { accountBalanceMinor, accountKind, editedDraftFits, hiddenLiabilityAccountIds, isLiveAccount, makeTransferChange, minorFromEditedDraft, sameTransfer, todayKey, type StoredDraft,
   totalsByCurrency, validateTransfer, validateTransferChange, type Account, type Transfer, type TransferChange, type TransferRecord } from '@finanzapp/domain';
 import { useLedger } from '../storage/LedgerProvider';
 import { ActionButton, AmountField, AmountShortcut, AppText, DetailRow, EmptyState, ErrorMessage, Field, IconButton, Screen, Surface } from './components';
@@ -37,13 +37,16 @@ export function TransferForm({ original, accountId, fromAccountId: requestedFrom
   const hidden = hiddenLiabilityAccountIds(cards, debts);
   const [before] = useState(original);
   const [operation] = useState(() => ({ id: randomUUID(), createdAt: new Date().toISOString() }));
-  const requestedTarget = accounts.find(a => a.id === requestedTo);
+  // 25B2: a link naming a deleted account or card opens a plain transfer instead; the sides of a stored transfer stay selectable while it is edited.
+  const open = (a: Account) => isLiveAccount(a) && !cards.some(card => card.deleted && card.accountId === a.id) && !debts.some(debt => debt.deleted && debt.accountId === a.id);
+  const requestedTarget = accounts.find(a => a.id === requestedTo && open(a));
   // A card is never a source (24B6): a link asking to transfer out of one opens a plain transfer instead.
-  const requestedSource = accounts.find(a => a.id === requestedFrom && accountKind(a.id, cards, debts) !== 'card');
+  const requestedSource = accounts.find(a => a.id === requestedFrom && accountKind(a.id, cards, debts) !== 'card' && open(a));
   // A card payment or debt settlement fixes the obligation side of the transfer.
   const lockedTo = !before && requestedTarget && hidden.has(requestedTarget.id) ? requestedTarget : null;
   const lockedFrom = !before && requestedSource && hidden.has(requestedSource.id) ? requestedSource : null;
-  const cash = accounts.filter(a => !hidden.has(a.id));
+  // 25B2: a deleted account is never a side of a new transfer.
+  const cash = accounts.filter(a => !hidden.has(a.id) && isLiveAccount(a));
   const [fromId, setFromId] = useState(() => before?.transfer.fromAccountId ?? lockedFrom?.id ?? requestedSource?.id
     ?? (lockedTo ? cash.find(a => a.currency === lockedTo.currency)?.id : undefined) ?? initialAccountId(cash, accountId));
   const [toId, setToId] = useState(() => before?.transfer.toAccountId ?? lockedTo?.id ?? requestedTarget?.id
@@ -83,7 +86,7 @@ export function TransferForm({ original, accountId, fromAccountId: requestedFrom
   const originalCurrency = accounts.find(a => a.id === before?.transfer.fromAccountId)?.currency;
   // Editing keeps the original obligation accounts selectable; a new plain transfer only lists cash accounts.
   const allowed = new Set([before?.transfer.fromAccountId, before?.transfer.toAccountId].filter(Boolean));
-  const selectable = accounts.filter(a => !hidden.has(a.id) || allowed.has(a.id));
+  const selectable = accounts.filter(a => (!hidden.has(a.id) && isLiveAccount(a)) || allowed.has(a.id));
   const sources = before ? selectable.filter(a => a.currency === originalCurrency) : selectable;
   const targets = selectable.filter(a => a.id !== fromId && a.currency === from?.currency);
   const locked = busy || pending !== null;

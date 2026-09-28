@@ -3,11 +3,12 @@ import { Alert, Keyboard, View } from 'react-native';
 import { router, Stack } from 'expo-router';
 import { randomUUID } from 'expo-crypto';
 import * as Haptics from 'expo-haptics';
-import { LEDGER_CURRENCIES, editedDraftFits, isLedgerCurrency, minorFromEditedDraft, sameMonthlyBudget, validateMonthlyBudget, type StoredDraft,
+import { LEDGER_CURRENCIES, editedDraftFits, minorFromEditedDraft, sameMonthlyBudget, validateMonthlyBudget, type StoredDraft,
   type BudgetScope, type Currency, type MonthlyBudget } from '@finanzapp/domain';
 import { useLedger } from '../storage/LedgerProvider';
 import { ActionButton, AmountField, AppText, Choices, ErrorMessage, IconButton, Screen } from './components';
 import { CurrencySwitch } from './currency-switch';
+import { useDefaultCurrency } from './use-default-currency';
 import { offeredCurrencies } from './currencies';
 import { draftFromMinor } from './money-input';
 import { CategoryField } from './form-controls';
@@ -28,8 +29,10 @@ export function BudgetForm({ original, monthISO, currency: requestedCurrency, sc
   const [before] = useState(original);
   const [operation] = useState(() => ({ id: randomUUID(), createdAt: new Date().toISOString() }));
   const [scope, setScope] = useState<BudgetScope>(before?.scope ?? (requestedScope === 'total' ? 'total' : 'category'));
-  // A new budget's currency comes from the route only when the gate offers it (never coerced from an unknown code); ARS otherwise (decision 7.6.4).
-  const [currency, setCurrency] = useState<Currency>(before?.currency ?? (isLedgerCurrency(requestedCurrency, gate) ? requestedCurrency : 'ARS'));
+  // 25B2: a new budget starts in the currency the one rule proposes (the route's currency when the gate offers it, then
+  // the currency held, the display currency, the region's tender, ARS last); an existing budget keeps its own.
+  const suggested = useDefaultCurrency({ accountCurrency: before?.currency, requested: requestedCurrency });
+  const [currency, setCurrency] = useState<Currency>(suggested);
   // An untouched prefill keeps the stored minor units (a stored amount may exceed the entry bound); an edited text is a new entry.
   const [stored] = useState<StoredDraft | null>(() => before ? { minor: before.amountMinor, currency: before.currency, draft: draftFromMinor(before.amountMinor, before.currency) } : null);
   const [amount, setAmount] = useState(stored?.draft ?? '');

@@ -126,7 +126,7 @@ describe('consolidated views', () => {
   // ARS cash, USD cash, a EUR card, a JPY account; deterministic rates for three days.
   const accounts = [account('ars', 'ARS', 1000000), account('usd', 'USD', 50000), account('card', 'EUR'), account('yen', 'JPY', 100000)];
   const card: CreditCardProfile = { id: 'card-profile', accountId: 'card', issuer: 'Visa', last4: '1234', creditLimitMinor: null, closingDay: 20, dueDay: 5,
-    active: true, createdAt, revision: 0, updatedAt: createdAt } as unknown as CreditCardProfile;
+    active: true, deleted: false, createdAt, revision: 0, updatedAt: createdAt } as unknown as CreditCardProfile;
   const rows = [
     rate('ARS', '2026-08-31', '1400'), rate('EUR', '2026-08-31', '0.95'), rate('JPY', '2026-08-31', '140'),
     rate('ARS', '2026-09-10', '1500'), rate('EUR', '2026-09-10', '0.9'), rate('JPY', '2026-09-10', '150'),

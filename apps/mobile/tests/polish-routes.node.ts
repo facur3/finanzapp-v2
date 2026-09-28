@@ -20,7 +20,7 @@ const cash: domain.Account = { id: 'cash', name: 'Banco', currency: 'ARS', openi
 const wallet: domain.Account = { id: 'wallet', name: 'Efectivo', currency: 'ARS', openingMinor: 5000, createdAt };
 const usd: domain.Account = { id: 'usd', name: 'Dólares', currency: 'USD', openingMinor: 300, createdAt };
 const cardAccount: domain.Account = { id: 'card-acc', name: 'Visa', currency: 'ARS', openingMinor: -20000, createdAt };
-const card: domain.CreditCardProfile = { id: 'card', accountId: cardAccount.id, issuer: '', last4: '', creditLimitMinor: null, closingDay: 28, dueDay: 5, active: true, createdAt, revision: 0, updatedAt: createdAt };
+const card: domain.CreditCardProfile = { id: 'card', accountId: cardAccount.id, issuer: '', last4: '', creditLimitMinor: null, closingDay: 28, dueDay: 5, active: true, deleted: false, createdAt, revision: 0, updatedAt: createdAt };
 const entries: domain.Entry[] = [
   { id: 'e1', accountId: cash.id, kind: 'expense', amountMinor: 3000, merchant: 'Café', category: 'Café', dateISO: '2026-09-10', createdAt },
   { id: 'e2', accountId: cash.id, kind: 'expense', amountMinor: 9000, merchant: 'Super', category: 'Supermercado', dateISO: '2026-09-12', createdAt },
@@ -43,10 +43,11 @@ function harness(file: string, params: Record<string, unknown> = {}, data: domai
   const state: unknown[] = [];
   const pushed: any[] = [];
   const saved: domain.RecurringRule[] = [];
+  const removedIds: string[] = [];
   const alerts: { title: string; message: string; buttons: any[] }[] = [];
   const refs: any[] = [];
   let cursor = 0, refCursor = 0, failNext: Error | null = null;
-  const ledger = { useLedger: () => ({ archive: data, snapshot: domain.snapshotFromArchive(data), saveRecurring: async (next: domain.RecurringRule) => {
+  const ledger = { useLedger: () => ({ archive: data, snapshot: domain.snapshotFromArchive(data), removeAccount: async (id: string) => { if (failNext) { const cause = failNext; failNext = null; throw cause; } removedIds.push(id); }, saveRecurring: async (next: domain.RecurringRule) => {
     if (failNext) { const cause = failNext; failNext = null; throw cause; }
     saved.push(next);
   } }) };
@@ -80,6 +81,7 @@ function harness(file: string, params: Record<string, unknown> = {}, data: domai
     '../src/ui/presentation': presentation, '../../src/ui/presentation': presentation, '../src/ui/report-presentation': reportPresentation,
     '../src/ui/budget-presentation': budgetPresentation, '../../src/ui/budget-presentation': budgetPresentation,
     '../src/ui/theme': theme, '../../src/ui/theme': theme,
+    '../src/ui/use-default-currency': { useDefaultCurrency: () => 'ARS' },
     '../src/ui/category-hues': { useCategoryColor: () => '#3E6FB0', useCategoryLabel: (s: string) => s, useCategoryDefinitions: () => [], useCategoryLook: (s: string) => ({ label: s, storedLabel: s, key: String(s).toLowerCase(), hex: '#3E6FB0', glyph: 'pricetag-outline' }), useCategoryLookOf: () => (s: string) => ({ label: s, storedLabel: s, key: String(s).toLowerCase(), hex: '#3E6FB0', glyph: 'pricetag-outline' }), useAccountLook: () => ({ icon: 'wallet', color: 'cobalt', glyph: 'wallet-outline', hex: '#2557D6' }), useAccountNameOf: () => (account: any) => account.name, useAccountLookOf: () => () => ({ icon: 'wallet', color: 'cobalt', glyph: 'wallet-outline', hex: '#2557D6' }) }, '../../src/ui/category-hues': { useCategoryColor: () => '#3E6FB0', useCategoryLabel: (s: string) => s, useCategoryDefinitions: () => [], useCategoryLook: (s: string) => ({ label: s, storedLabel: s, key: String(s).toLowerCase(), hex: '#3E6FB0', glyph: 'pricetag-outline' }), useCategoryLookOf: () => (s: string) => ({ label: s, storedLabel: s, key: String(s).toLowerCase(), hex: '#3E6FB0', glyph: 'pricetag-outline' }), useAccountLook: () => ({ icon: 'wallet', color: 'cobalt', glyph: 'wallet-outline', hex: '#2557D6' }), useAccountNameOf: () => (account: any) => account.name, useAccountLookOf: () => () => ({ icon: 'wallet', color: 'cobalt', glyph: 'wallet-outline', hex: '#2557D6' }) },
   };
   const require = (name: string) => {
@@ -90,7 +92,7 @@ function harness(file: string, params: Record<string, unknown> = {}, data: domai
   modules['../src/ui/commitment-actions'] = realModule('src/ui/commitment-actions.ts', require);
   const module = { exports: {} as { default?: () => Node } };
   runInNewContext(code, { module, exports: module.exports, require, Error });
-  return { render: () => { cursor = 0; refCursor = 0; return module.exports.default!(); }, pushed, saved, alerts, failSave: (cause: Error) => { failNext = cause; } };
+  return { render: () => { cursor = 0; refCursor = 0; return module.exports.default!(); }, pushed, saved, alerts, removedIds, failSave: (cause: Error) => { failNext = cause; } };
 }
 function nodes(value: any): Node[] {
   if (!value || typeof value !== 'object') return [];
@@ -416,4 +418,54 @@ test('24UX4: a failed pause keeps the rule as it was and says so; a retry writes
   assert.equal(view.saved.length, 1);
   assert.equal(view.saved[0].active, false);
   assert.equal(find(view.render(), 'ErrorMessage').props.message, null);
+});
+
+
+// ---- Producto 25B2: deleting a normal account from Cuentas; a deleted account's detail -----------------------------
+
+test('25B2: every Cuentas row swipes to one destructive Eliminar (the same action in VoiceOver\'s rotor); the action only asks, Eliminar writes the record once, a deleted account leaves the list', async () => {
+  const view = harness('accounts.tsx');
+  const root = view.render();
+  // A SectionList's rows are drawn by `renderItem`: rendered here per section item, like the header test above. The swipe
+  // container is whatever the harness stands in for SwipeRow: found by its `actions`, the row inside it by its type.
+  const list = find(root, 'SectionList');
+  const rendered = list.props.sections.flatMap((section: { data: domain.Account[] }) => section.data.map((item: domain.Account, index: number) => list.props.renderItem({ item, index, section })));
+  const rows = nodes(rendered).filter(node => Array.isArray(node.props?.actions) && nodes(node.props.children).some(child => child.type === 'AccountRow'));
+  assert.equal(rows.length, 3, 'the three liquid accounts; the card\'s account is not here');
+  for (const row of rows) {
+    assert.equal(JSON.stringify(row.props.actions.map((action: any) => [action.key, action.tone, action.label])), JSON.stringify([['delete', 'destructive', 'Eliminar']]));
+    const account = nodes(row.props.children).find(node => node.type === 'AccountRow')!;
+    assert.equal(account.props.accessibility.accessibilityActions[0].label, 'Eliminar');
+  }
+  // The action (a tap on the revealed button, or the rotor) opens the confirmation; nothing is written yet.
+  rows[0].props.actions[0].onPress();
+  assert.equal(view.alerts.length, 1);
+  assert.equal(view.alerts[0].title, '¿Eliminar Banco?');
+  assert.match(view.alerts[0].message, /^Deja de aparecer en tus cuentas, en Disponible y en los formularios\. No borra nada: \d+ movimientos y \d+ transferencias? siguen en Movimientos/);
+  assert.equal(view.removedIds.length, 0);
+  view.alerts[0].buttons[0].onPress?.();
+  assert.equal(view.removedIds.length, 0, 'Cancelar writes nothing');
+  view.alerts[0].buttons[1].onPress();
+  await new Promise(resolve => setTimeout(resolve, 0));
+  assert.equal(JSON.stringify(view.removedIds), JSON.stringify(['cash']), 'Eliminar writes the record once');
+  // Deleted: gone from the list; the other rows stay.
+  const at = '2026-09-27T10:00:00.000Z';
+  const data = { ...archive, accounts: archive.accounts.map(item => item.id === 'cash' ? { ...item, revision: 1, updatedAt: at, deletedAt: at } : item) };
+  const after = harness('accounts.tsx', {}, data).render();
+  const sections = find(after, 'SectionList').props.sections.map((section: { currency: string; data: domain.Account[] }) => [section.currency, section.data.map(account => account.id)]);
+  assert.equal(JSON.stringify(sections), JSON.stringify([['ARS', ['wallet']], ['USD', ['usd']]]));
+});
+
+test('25B2: a deleted account\'s detail reads its history and balance, with no edit button, no actions and no recurring row', () => {
+  const at = '2026-09-27T10:00:00.000Z';
+  const data = { ...archive, accounts: archive.accounts.map(item => item.id === 'cash' ? { ...item, revision: 1, updatedAt: at, deletedAt: at } : item) };
+  const root = harness('account/[id].tsx', { id: 'cash' }, data).render();
+  const texts = nodes(root).filter(node => node.type === 'AppText').map(node => String(node.props.children));
+  assert.ok(texts.includes('Cuenta eliminada'));
+  assert.ok(texts.some(text => text.startsWith('Sus movimientos y transferencias siguen aquí')));
+  assert.equal(nodes(root).some(node => node.type === 'QuickActions'), false);
+  assert.equal(nodes(root).find(node => node.type === 'Stack.Screen')!.props.options.headerRight, undefined);
+  assert.equal(nodes(root).some(node => node.type === 'DetailRow' && node.props.label === 'Recurrentes'), false);
+  assert.ok(nodes(root).some(node => node.type === 'Money'), 'the recorded balance, as history');
+  assert.ok(find(root, 'EntryList').props.entries.length >= 1, 'its movements still list');
 });

@@ -1,5 +1,5 @@
 import { categoryKey, isStorableCurrency, validDateISO, type Currency, type Entry, type LedgerSnapshot, type MerchantSpending, type ReportPeriod, type SpendingInsight } from '@finanzapp/domain';
-import { availableCurrencies } from './presentation.ts';
+import { historyCurrencies } from './presentation.ts';
 import { formatMonth, formatPercent } from '../i18n/format.ts';
 import { DEFAULT_LOCALE, type AppLocale } from '../i18n/locale.ts';
 import { translator, type Translate } from '../i18n/messages.ts';
@@ -14,9 +14,10 @@ export function heldCurrency(accounts: readonly { currency: Currency }[], param:
 
 /** The Reportes tab's own selection: the route's currency when held, otherwise the first
  * currency of the ledger (ARS in an empty ledger, decision 7.6.4). Drill-downs use
- * `strictReportSelection`, which refuses instead of falling back. */
+ * `strictReportSelection`, which refuses instead of falling back. The currencies are the
+ * whole history's (25B2 review): a month keeps a deleted account's movements. */
 export function reportSelection(snapshot: LedgerSnapshot, currencyParam: unknown, monthParam: unknown, day: string) {
-  const currencies = availableCurrencies(snapshot.accounts);
+  const currencies = historyCurrencies(snapshot.accounts);
   const currency = heldCurrency(snapshot.accounts, currencyParam) ?? currencies[0] ?? 'ARS';
   const currentMonth = day.slice(0, 7);
   const monthISO = requestedReportMonth(monthParam, day);

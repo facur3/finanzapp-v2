@@ -21,11 +21,19 @@ const createdAt = '2026-09-01T12:00:00.000Z';
 const cash: domain.Account = { id: 'cash', name: 'Cocos', currency: 'ARS', openingMinor: 100000, createdAt };
 const usd: domain.Account = { id: 'usd', name: 'Dólares', currency: 'USD', openingMinor: 300, createdAt };
 const cardAccount: domain.Account = { id: 'card-acc', name: 'Visa', currency: 'ARS', openingMinor: -20000, createdAt };
-const card: domain.CreditCardProfile = { id: 'card', accountId: cardAccount.id, issuer: '', last4: '', creditLimitMinor: null, closingDay: 28, dueDay: 5, active: true, createdAt, revision: 0, updatedAt: createdAt };
+const card: domain.CreditCardProfile = { id: 'card', accountId: cardAccount.id, issuer: '', last4: '', creditLimitMinor: null, closingDay: 28, dueDay: 5, active: true, deleted: false, createdAt, revision: 0, updatedAt: createdAt };
 const bankLook = domain.makeAccountAppearance(cash.id, 'bank', 'azure', createdAt);
 const entry: domain.Entry = { id: 'e1', accountId: cash.id, kind: 'expense', amountMinor: 3000, merchant: 'Kiosco', category: 'sjsjn', dateISO: '2026-09-10', createdAt };
 const archive: domain.LedgerArchive = { accounts: [cash, usd, cardAccount], records: [domain.initialRecord(entry)], cards: [card], appearances: [bankLook] };
 
+/** 25B2: the account lifecycle hook as the screens see it (its own confirmation flow is tested in lifecycle-actions.node.ts). */
+const removed: domain.Account[] = [];
+const accountManagement = { useAccountManagement: () => ({ busyId: null, error: null,
+  remove: (account: domain.Account, done?: () => void) => { removed.push(account); done?.(); },
+  actions: (account: domain.Account, done?: () => void) => [{ key: 'delete', label: 'Eliminar', icon: 'trash', tone: 'destructive', onPress: () => { removed.push(account); done?.(); } }],
+  consequences: () => ({ movements: 0, transfers: 0, recurring: 0 }) }) };
+const swipe = { SwipeRow: 'SwipeRow', swipeAccessibility: (actions: { key: string; label: string; onPress: () => void }[]) => ({ accessibilityActions: actions.map(action => ({ name: action.key, label: action.label })),
+  onAccessibilityAction: (event: { nativeEvent: { actionName: string } }) => actions.find(action => action.key === event.nativeEvent.actionName)?.onPress() }) };
 function harness(file: string, props: any = {}, options: { data?: domain.LedgerArchive; params?: any; fail?: () => void; locale?: AppLocale; gate?: domain.CurrencyGate } = {}) {
   // Read on every render, like the live provider: switching it re-labels the next render and keeps the form state.
   let locale: AppLocale = options.locale ?? 'es-AR';
@@ -53,6 +61,8 @@ function harness(file: string, props: any = {}, options: { data?: domain.LedgerA
   const components = Object.fromEntries(['Screen', 'ActionButton', 'AmountField', 'AppText', 'Choices', 'DetailRow', 'SelectionRow', 'EmptyState', 'ErrorMessage', 'Field', 'FieldNote', 'IconButton', 'InfoButton', 'NavigationRow', 'Surface',
     'CategoryBadge', 'AccountBadge', 'GlyphTile', 'PressFeedback', 'SectionTitle'].map(name => [name, name]));
   (components as any).surfaceShadow = () => ({});
+  const GATE = options.gate ?? domain.LEDGER_CURRENCIES;
+  const defaults = { useDefaultCurrency: ({ accountCurrency, requested }: { accountCurrency?: string | null; requested?: unknown } = {}) => accountCurrency ?? (domain.isLedgerCurrency(requested, GATE) ? requested : 'ARS') };
   const modules: Record<string, unknown> = {
     '../i18n/format': i18nFormat, '../src/i18n/format': i18nFormat, '../../src/i18n/format': i18nFormat, '../i18n/provider': i18nProvider, '../src/i18n/provider': i18nProvider, '../../src/i18n/provider': i18nProvider,
     react: { useState: (initial: any) => { const i = cursor++; if (!(i in state)) state[i] = typeof initial === 'function' ? initial() : initial;
@@ -80,6 +90,10 @@ function harness(file: string, props: any = {}, options: { data?: domain.LedgerA
     './categories': categories, '../src/ui/category-form': { CategoryForm: 'CategoryForm' },
     './currencies': currencies, '../src/ui/currencies': currencies, '../../src/ui/currencies': currencies,
     '../src/ui/form-controls': { CurrencyField: 'CurrencyField' }, '../../src/ui/form-controls': { CurrencyField: 'CurrencyField' },
+    // 25B2: the one default-currency rule (its branches are tested in currency-defaults.node.ts; here it answers ARS) and the account lifecycle hook.
+    '../src/ui/use-default-currency': defaults, '../../src/ui/use-default-currency': defaults,
+    '../../src/ui/commitment-actions': accountManagement, '../src/ui/commitment-actions': accountManagement,
+    '../src/ui/swipe-actions': swipe, '../../src/ui/swipe-actions': swipe,
     './motion': { selectionHaptic: () => {}, timing: () => ({ duration: 0 }) },
     './theme': { space: { xs: 4, s: 8, m: 12, l: 16, xl: 20, xxl: 24, xxxl: 32 }, radius: { group: 16, sheet: 24 }, usePalette: () => p, useReduceMotion: () => true },
   };
@@ -91,7 +105,7 @@ function harness(file: string, props: any = {}, options: { data?: domain.LedgerA
   return {
     render: (component?: string) => { cursor = 0; refCursor = 0; let node = (component ? module.exports[component] : module.exports.default ?? module.exports.CategoryForm)(props);
       while (typeof node.type === 'function') node = node.type(node.props); return node; },
-    pushed, alerts, added, changed, looks, definitions, backs: () => backs, setLocale: (next: AppLocale) => { locale = next; },
+    pushed, alerts, added, changed, looks, definitions, removed, backs: () => backs, setLocale: (next: AppLocale) => { locale = next; },
   };
 }
 function nodes(value: any): Node[] {
@@ -563,4 +577,27 @@ test('24B5: a new account chooses its currency before the opening balance over t
   find(yen.render(), 'AmountField').props.onChangeText('1500');
   await find(yen.render(), 'ActionButton', 'Guardar cuenta').props.onPress();
   assert.deepEqual([yen.added[0].account.currency, yen.added[0].account.openingMinor], ['JPY', 1500], '1500 yen, never 15.00');
+});
+
+
+// ---- Producto 25B2: Editar cuenta and the deletion record ----------------------------------------------------
+
+test('25B2: Editar cuenta offers «Eliminar cuenta» last, in the destructive tone, for a cash account only; a deleted account is not edited again', () => {
+  const live = harness('app/edit-account/[id].tsx', {}, { params: { id: 'cash' } }).render();
+  const labels = nodes(live).filter(node => node.type === 'ActionButton').map(node => node.props.label);
+  assert.deepEqual(labels.slice(-2), ['Guardar cambios', 'Eliminar cuenta']);
+  const button = nodes(live).find(node => node.type === 'ActionButton' && node.props.label === 'Eliminar cuenta')!;
+  assert.deepEqual([button.props.tone, button.props.secondary, button.props.icon], ['expense', true, 'trash-outline']);
+  removed.length = 0;
+  button.props.onPress();
+  assert.equal(removed.length, 1, 'the button hands the account to the confirmation flow (tested in lifecycle-actions.node.ts)');
+  assert.equal(removed[0].id, 'cash');
+  const cardEdit = harness('app/edit-account/[id].tsx', {}, { params: { id: cardAccount.id } }).render();
+  assert.equal(nodes(cardEdit).some(node => node.type === 'ActionButton' && node.props.label === 'Eliminar cuenta'), false, 'a card\'s internal account is deleted from its own screen');
+  const at = '2026-09-27T10:00:00.000Z';
+  const deleted = { ...cash, revision: 1, updatedAt: at, deletedAt: at };
+  const data = { ...archive, accounts: archive.accounts.map(item => item.id === 'cash' ? deleted : item) };
+  const gone = harness('app/edit-account/[id].tsx', {}, { data, params: { id: 'cash' } }).render();
+  assert.equal(nodes(gone).find(node => node.type === 'EmptyState')!.props.title, 'Cuenta eliminada');
+  assert.equal(nodes(gone).some(node => node.type === 'Field'), false, 'no form for a deleted account');
 });

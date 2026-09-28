@@ -119,6 +119,17 @@ export const debts = {
         other: 'Deja de seguirse. Los {count} cobros registrados siguen en Movimientos.',
       },
       deleteDetailEmpty: 'Deja de seguirse. No borra ningún movimiento.',
+      /** 25B2 close: a debt with a balance left and recorded payments or collections is settled or closed, not deleted. */
+      collect: 'Cobrar',
+      blockedTitle: 'Todavía no se puede eliminar',
+      /** `{amount}` is the outstanding balance, formatted. Closing keeps the balance and the history; it is not a payment. */
+      blockedDetailOwed: 'Todavía le debés {amount} a {name} y ya hay pagos registrados. Saldá el resto, o cerrá la deuda: deja de aparecer en pendientes y conserva el saldo y el historial; podés reabrirla. Cerrar no registra ningún pago.',
+      blockedDetailReceivable: '{name} todavía te debe {amount} y ya hay cobros registrados. Cobrá el resto, o cerrá el cobro: deja de aparecer en pendientes y conserva el saldo y el historial; podés reabrirlo. Cerrar no registra ningún cobro.',
+      blockedDetailClosedOwed: 'Todavía le debés {amount} a {name} y ya hay pagos registrados. Saldá el resto primero; mientras tanto sigue en Cerradas con su saldo y su historial.',
+      blockedDetailClosedReceivable: '{name} todavía te debe {amount} y ya hay cobros registrados. Cobrá el resto primero; mientras tanto sigue en Cerradas con su saldo y su historial.',
+      /** A tracker with a balance and no payment or collection yet (created by mistake): deleting records nothing. */
+      deleteDetailUnpaidOwed: 'Deja de seguirse sin registrar ningún pago: los {amount} no se saldan. No tiene pagos registrados.',
+      deleteDetailUnpaidReceivable: 'Deja de seguirse sin registrar ningún cobro: los {amount} no se cobran. No tiene cobros registrados.',
       deleteConfirm: 'Eliminar',
       failed: 'No pudimos cambiar la deuda. Sigue como estaba; probá nuevamente.',
       deleteFailed: 'No pudimos eliminar la deuda. Sigue como estaba; probá nuevamente.',

@@ -9,6 +9,7 @@ import { useI18n } from '../i18n/provider';
 import { useLedger } from '../storage/LedgerProvider';
 import { ActionButton, AmountField, AppText, Choices, DetailRow, ErrorMessage, Field, IconButton, Screen, Surface } from './components';
 import { CurrencySwitch } from './currency-switch';
+import { useDefaultCurrency } from './use-default-currency';
 import { offeredCurrencies } from './currencies';
 import { DateField } from './form-controls';
 import { space } from './theme';
@@ -29,7 +30,9 @@ export function DebtForm({ original }: { original?: PersonalDebtProfile }) {
   const [identity] = useState(() => ({ id: randomUUID(), accountId: randomUUID(), createdAt: new Date().toISOString() }));
   const [direction, setDirection] = useState<DebtDirection>(before?.direction ?? 'owed_by_me');
   const [counterparty, setCounterparty] = useState(before?.counterparty ?? '');
-  const [currency, setCurrency] = useState<Currency>(account?.currency ?? 'ARS');
+  // 25B2: a new debt starts in the currency the one rule proposes (`useDefaultCurrency`); an existing debt keeps its account's.
+  const suggested = useDefaultCurrency({ accountCurrency: account?.currency });
+  const [currency, setCurrency] = useState<Currency>(suggested);
   const [amount, setAmount] = useState('');
   const [dueMode, setDueMode] = useState<DueMode>(before?.dueDateISO ? 'dated' : 'none');
   const [dueDate, setDueDate] = useState(() => new Date((before?.dueDateISO ?? todayKey()) + 'T12:00:00'));

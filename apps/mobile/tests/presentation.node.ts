@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import type { Account, Entry, Transfer } from '@finanzapp/domain';
-import { availableCurrencies, groupEntries, initialAccountId, selectEntries, selectTransfers, mergeActivity, groupActivity, activityDateLabel, dayNetMinor, homeNamesCategory, sharedGlyphs, visibleNamesAccount } from '../src/ui/presentation.ts';
+import { availableCurrencies, historyCurrencies, groupEntries, initialAccountId, selectEntries, selectTransfers, mergeActivity, groupActivity, activityDateLabel, dayNetMinor, homeNamesCategory, sharedGlyphs, visibleNamesAccount } from '../src/ui/presentation.ts';
 
 // Synthetic fixtures only; never loaded by the app or stored in a user database.
 const accounts: Account[] = [
@@ -60,6 +60,11 @@ test('currency choices include only currencies with an account, even when balanc
   assert.deepEqual(availableCurrencies([]), []);
   assert.deepEqual(availableCurrencies([accounts[1]]), ['USD']);
   assert.deepEqual(availableCurrencies([...accounts, accounts[0]]), ['ARS', 'USD']);
+  // 25B2 review: a deleted account's currency leaves the choices but stays in the history's set.
+  const gone = { ...accounts[1], revision: 1, updatedAt: '2026-09-27T10:00:00.000Z', deletedAt: '2026-09-27T10:00:00.000Z' };
+  assert.deepEqual(availableCurrencies([accounts[0], gone]), ['ARS']);
+  assert.deepEqual(historyCurrencies([accounts[0], gone]), ['ARS', 'USD']);
+  assert.deepEqual(historyCurrencies([]), []);
 });
 test('equal dates and instants have deterministic order, including timezone offsets', () => {
   const tied = [{ ...base, id: 'x', createdAt: '2026-09-11T09:00:00-03:00' }, { ...base, id: 'y', createdAt: '2026-09-11T12:00:00Z' }];

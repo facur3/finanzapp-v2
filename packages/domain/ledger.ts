@@ -24,6 +24,33 @@ export interface Account {
   createdAt: string;
   revision?: number;
   updatedAt?: string;
+  /** Producto 25B2: a deletion record. The account leaves every list, total and form; every movement and
+   * transfer it took stays exactly as recorded and is still read as this account's (name and currency
+   * included). A deleted account takes nothing new and never changes again. Absent while the account lives. */
+  deletedAt?: string;
+}
+
+export const ACCOUNT_DELETED_MESSAGE = 'Esta cuenta fue eliminada.';
+/** A card or a debt is deleted from its own screen, so its obligation is closed with its own rules. */
+export const OBLIGATION_ACCOUNT_MESSAGE = 'Una tarjeta o deuda se elimina desde su propia pantalla.';
+
+export function isLiveAccount(account: Pick<Account, 'deletedAt'>): boolean {
+  return account.deletedAt === undefined;
+}
+/** The accounts that take movements and count in totals: the ones without a deletion record. */
+export function liveAccounts<T extends Pick<Account, 'deletedAt'>>(accounts: readonly T[]): T[] {
+  return accounts.filter(isLiveAccount);
+}
+/** Refuses a posting, a transfer side or a rule on a deleted account. */
+export function assertLiveAccount(accountId: string, accounts: readonly Account[]): void {
+  const account = accounts.find(item => item.id === accountId);
+  if (account && !isLiveAccount(account)) throw new Error(ACCOUNT_DELETED_MESSAGE);
+}
+/** The deletion record: the same row one revision on, dated. Never twice. */
+export function deleteAccount(account: Account, nowISO: string): Account {
+  if (!isLiveAccount(account)) throw new Error(ACCOUNT_DELETED_MESSAGE);
+  if (!validTimestamp(nowISO)) throw new Error('Fecha de actualización inválida.');
+  return { ...account, revision: (account.revision ?? 0) + 1, updatedAt: nowISO, deletedAt: nowISO };
 }
 
 export interface Entry {
@@ -115,6 +142,8 @@ export function validateAccount(account: Account): void {
     if (!Number.isSafeInteger(account.revision) || account.revision! < 0 || !validTimestamp(account.updatedAt!)
       || (account.revision === 0 && account.updatedAt !== account.createdAt)) throw new Error('Versión de cuenta inválida.');
   }
+  // A deletion record is always a revision (25B2): a dated tombstone on a row that was saved at least once more.
+  if (account.deletedAt !== undefined && (!validTimestamp(account.deletedAt) || !account.revision)) throw new Error('Estado de cuenta inválido.');
 }
 
 /** The creation gate on top of read acceptance: a new account, card or debt may only hold a

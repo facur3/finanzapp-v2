@@ -260,7 +260,7 @@ importe, moneda y estado.
   su pantalla; Categorías es una lista de solo lectura por ahora.
 - **Tarjetas** solo muestra tarjetas de crédito. Deudas y cobros vive en Más.
 - **Atajo de importe.** Bajo el campo de importe de una transferencia, una nota al pie
-  con la cifra registrada ("Saldo registrado: ARS 190.162,00", "Deuda registrada",
+  con la cifra registrada ("Saldo registrado: ARS 190.162,00", "Saldo pendiente",
   "Pendiente") y una acción de texto en el primario cobalto: Usar todo, Pagar total,
   Saldar total o Cobrar total. Solo rellena el campo con el modelo canónico de
   visualización; guardar sigue siendo el botón principal. Sin cifra positiva no hay
@@ -373,13 +373,46 @@ importe, moneda y estado.
   que ponga un nombre junto a un importe; `StatRow` pone dos o tres estadísticas lado a
   lado y una debajo de otra con texto grande; los segmentados limitan su escala a 1,3× y
   ajustan la etiqueta al segmento; los nombres tienen dos líneas y la columna del importe
-  ocupa como máximo la mitad; "Deuda registrada · ARS" y "ARS 1.234,56" se unen con
+  ocupa como máximo la mitad; "Saldo pendiente · ARS" y "ARS 1.234,56" se unen con
   espacios duros para que el código o el número nunca queden solos.
 - **Localización.** Idioma, región, moneda de la cuenta y valor almacenado son cuatro
   cosas distintas. Las fechas y los porcentajes salen de tablas (el mismo "22 sep" en toda
   la app, no el "sept" del ICU del dispositivo). El inglés existe como catálogo y no se
   muestra hasta que toda la app lo tenga (23.1): un iPhone en inglés sigue leyendo
   español antes que media app traducida.
+
+## Producto 25B2 — monedas iniciales lógicas y ciclo de vida de cuentas y tarjetas
+
+- **Sin controles vacíos.** Con cero o una moneda, Inicio y Reportes no muestran el chip de visualización: el
+  número es el total de esa moneda y no hay nada que decidir. Con dos o más, el chip de 24C1 y su hoja siguen
+  iguales. Ningún selector de cuentas en Inicio: las cuentas viven en Cuentas.
+- **Eliminar una cuenta.** En Cuentas, el deslizamiento trasero corto revela una sola acción, Eliminar (roja, en
+  el borde); un deslizamiento completo solo abre la misma confirmación: nunca se elimina por alcanzar el umbral,
+  siempre hay un diálogo destructivo antes de escribir, una sola fila abierta a la vez (`SwipeRow`, el mismo
+  componente de Recurrentes y Deudas), y la acción llega a VoiceOver como acción personalizada de la fila. En
+  Editar cuenta, «Eliminar cuenta» es el último botón, secundario en tono `expense`, separado de Guardar. El detalle
+  de una cuenta eliminada se lee (saldo e historial), con «Cuenta eliminada» donde iba «Saldo registrado», sin
+  botón de edición ni acciones rápidas.
+- **Eliminar una tarjeta.** Solo desde Editar tarjeta, como último botón, tras Archivar/Reactivar; **nunca por
+  deslizamiento en el carrusel**, que ya usa el gesto horizontal para cambiar de tarjeta. Sin saldo pendiente, la
+  confirmación dice que compras y pagos quedan. Con saldo pendiente no se elimina: un diálogo («Todavía no se puede
+  eliminar») nombra el saldo y ofrece **Pagar** (abre el pago revisado, con tope en el saldo, como desde el detalle) y
+  **Archivar** (solo si está activa); Cancelar no escribe nada. Nada se cancela ni se escribe en silencio. El
+  detalle de una tarjeta eliminada se lee («Tarjeta eliminada · saldo pendiente»), sin edición, sin Registrar
+  compra ni Pagar. En Recurrentes, una regla cuya cuenta o tarjeta fue eliminada ofrece solo Eliminar.
+- **«Saldo pendiente», nunca «Deuda», para una tarjeta** (cierre de 25B2). Lo que se debe en una tarjeta
+  (compras menos pagos) se llama «Saldo pendiente» en Tarjetas, en el detalle, en el formulario de compra
+  («Tarjeta de crédito · saldo pendiente $ 50,00», «sin saldo pendiente»), en Pagar tarjeta («Saldo
+  pendiente: ARS 50,00», «Sin saldo pendiente») y en los rechazos; en inglés, «Outstanding balance» /
+  «outstanding». «Deuda» y «Pendiente» quedan para Deudas y cobros, que son obligaciones personales y nunca
+  se mezclan con el saldo de una tarjeta (decisión 003, «Invariantes contables de tarjetas»). Los nombres
+  internos de claves y funciones no cambian por copy.
+- **Historial de una cuenta eliminada.** Editar uno de sus movimientos o reglas muestra su propia cuenta (la
+  eliminada) seleccionada, con el importe, la fecha y la moneda guardados; se corrige en el lugar. Un movimiento o
+  regla nuevos nunca la ofrecen. Inicio y Reportes conservan su moneda en el chip y en «Solo …» mientras el
+  historial tenga dos monedas; Disponible y los formularios ya no.
+- **Formularios.** La fila de moneda de cuenta, tarjeta, deuda y presupuesto arranca en la moneda que propone la
+  regla (docs/currency.md §2.10); el control no cambia. Paleta, hápticos, Dynamic Type y Reduce Motion como siempre.
 
 ## Producto 25B — primera apertura nativa
 

@@ -21,7 +21,7 @@ import type { Translate } from '../../src/i18n/messages';
 import { useCategoryColor, useCategoryLookOf } from '../../src/ui/category-hues';
 import { DonutChart, MonthBars, OTHERS_KEY, donutSlices } from '../../src/ui/charts';
 import { ValueTransition, selectionHaptic } from '../../src/ui/motion';
-import { activityDateLabel, availableCurrencies } from '../../src/ui/presentation';
+import { activityDateLabel, historyCurrencies } from '../../src/ui/presentation';
 import { changePercent, earliestRecordedMonth, insightsBesideRanking, reportPeriodLabel, reportSelection, requestedReportMonth, shiftReportMonth } from '../../src/ui/report-presentation';
 import { CategoryLegendRow } from '../../src/ui/spending-chart';
 import { space, useCurrentDay, usePalette } from '../../src/ui/theme';
@@ -52,7 +52,8 @@ export default function ReportsScreen() {
   const [tab, setTab] = useState<'categories' | 'days'>('categories');
   // The display currency Reportes shares with Inicio (24B6). A route that names a currency an account holds shows it and
   // makes it the shared choice (once, when the parameter arrives); an unknown or unheld one is ignored and the choice stands.
-  const held = useMemo(() => availableCurrencies(snapshot?.accounts ?? []), [snapshot?.accounts]);
+  // Every currency the ledger ever held (25B2 review): a month's report keeps a deleted account's movements.
+  const held = useMemo(() => historyCurrencies(snapshot?.accounts ?? []), [snapshot?.accounts]);
   const { currency: shared, preferred, mode, setCurrency, setMode } = useDisplayCurrency(held);
   const route = displayCurrencyForRoute(snapshot?.accounts ?? [], params.currency, preferred, mode);
   // `applied` remembers which parameter value was applied. A parameter is applied exactly once: when it arrives held, or
@@ -141,7 +142,7 @@ export default function ReportsScreen() {
     initialNumToRender={10} maxToRenderPerBatch={10} windowSize={7}
     ListHeaderComponent={<View style={{ gap: space.xxl, paddingBottom: space.m }}>
       <View style={{ gap: space.m }}>
-        {snapshot.accounts.length > 0 && <DisplayCurrencyButton compact={false} mode={view.mode} currency={currency} held={held} gate={gate} onMode={setMode} onCurrency={setCurrency} />}
+        {held.length > 1 && <DisplayCurrencyButton compact={false} mode={view.mode} currency={currency} held={held} gate={gate} onMode={setMode} onCurrency={setCurrency} />}
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
           <IconButton name="chevron-back" label={t('reports.previousMonth')} disabled={!canPrevious}
             onPress={() => { if (canPrevious) goToMonth(shiftReportMonth(monthISO, -1)); }} />

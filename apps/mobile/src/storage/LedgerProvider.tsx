@@ -5,9 +5,9 @@ import { snapshotFromArchive, todayKey, type Account, type Entry, type EntryChan
   type CreditCardProfile, type PersonalDebtProfile, type AccountAppearance, type CategoryDefinition } from '@finanzapp/domain';
 import type { CurrencyGate } from '@finanzapp/domain';
 import { currencyGateForBuild } from './currency-gate';
-import { changeEntry, createAccount, createEntry, importArchive, readArchive, changeAccount,
+import { changeEntry, createAccount, createEntry, deleteAccount, deleteCreditCard, importArchive, readArchive, changeAccount,
   createTransfer, changeTransfer, saveRecurringRule, processRecurring, saveMonthlyBudget,
-  createCreditCard, saveCreditCard, createPersonalDebt, savePersonalDebt, saveAccountAppearance, saveCategoryDefinition,
+  createCreditCard, saveCreditCard, createPersonalDebt, savePersonalDebt, deletePersonalDebt, saveAccountAppearance, saveCategoryDefinition,
   type LedgerDatabase } from './database';
 import { openLedger, refreshLedger } from './ledger-session';
 import { openLedgerDatabase } from './nativeDatabase';
@@ -28,6 +28,8 @@ type LedgerContextValue = {
   addEntry: (entry: Entry) => Promise<void>;
   updateEntry: (change: EntryChange) => Promise<void>;
   updateAccount: (change: AccountChange, appearance?: AccountAppearance) => Promise<void>;
+  /** Producto 25B2: the deletion record of a normal account (its movements stay; its active rules stop). */
+  removeAccount: (accountId: string) => Promise<void>;
   saveAppearance: (appearance: AccountAppearance) => Promise<void>;
   saveCategory: (definition: CategoryDefinition) => Promise<void>;
   addTransfer: (transfer: Transfer) => Promise<void>;
@@ -36,8 +38,12 @@ type LedgerContextValue = {
   saveBudget: (budget: MonthlyBudget) => Promise<void>;
   addCard: (account: Account, card: CreditCardProfile) => Promise<void>;
   saveCard: (card: CreditCardProfile) => Promise<void>;
+  /** Producto 25B2: the deletion record of a card (refused with a recorded debt; its active rules stop). */
+  removeCard: (cardId: string) => Promise<void>;
   addDebt: (account: Account, debt: PersonalDebtProfile) => Promise<void>;
   saveDebt: (debt: PersonalDebtProfile) => Promise<void>;
+  /** 25B2 close: the deletion record of a debt tracker; refused with a balance left and recorded payments or collections. */
+  removeDebt: (debtId: string) => Promise<void>;
   restoreBackup: (incoming: LedgerArchive, baseline: string) => Promise<void>;
 };
 const LedgerContext = createContext<LedgerContextValue | null>(null);
@@ -115,6 +121,7 @@ export function LedgerProvider({ children }: { children: ReactNode }) {
     addEntry: entry => mutate(db => createEntry(db, entry)),
     updateEntry: change => mutate(db => changeEntry(db, change)),
     updateAccount: (change, appearance) => mutate(db => changeAccount(db, change, appearance)),
+    removeAccount: accountId => mutate(db => deleteAccount(db, accountId, new Date().toISOString())),
     saveAppearance: appearance => mutate(db => saveAccountAppearance(db, appearance)),
     saveCategory: definition => mutate(db => saveCategoryDefinition(db, definition)),
     addTransfer: transfer => mutate(db => createTransfer(db, transfer)),
@@ -126,8 +133,10 @@ export function LedgerProvider({ children }: { children: ReactNode }) {
     saveBudget: budget => mutate(db => saveMonthlyBudget(db, budget, BUILD_CURRENCY_GATE)),
     addCard: (account, card) => mutate(db => createCreditCard(db, account, card, BUILD_CURRENCY_GATE)),
     saveCard: card => mutate(db => saveCreditCard(db, card)),
+    removeCard: cardId => mutate(db => deleteCreditCard(db, cardId, new Date().toISOString())),
     addDebt: (account, debt) => mutate(db => createPersonalDebt(db, account, debt, BUILD_CURRENCY_GATE)),
     saveDebt: debt => mutate(db => savePersonalDebt(db, debt)),
+    removeDebt: debtId => mutate(db => deletePersonalDebt(db, debtId, new Date().toISOString())),
     restoreBackup: (incoming, baseline) => mutate(async db => {
       await importArchive(db, incoming, baseline);
       await processRecurring(db, todayKey());

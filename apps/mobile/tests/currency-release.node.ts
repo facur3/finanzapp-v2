@@ -89,7 +89,7 @@ for (const { code, gate } of CASES) {
     // A card in the currency: a purchase is one expense, the payment a transfer that is never a second expense.
     const cardAccount: Account = { id: id('card'), name: 'Tarjeta ' + code, currency: code, openingMinor: 0, createdAt };
     const card: CreditCardProfile = { id: id('card-profile'), accountId: cardAccount.id, issuer: 'Banco', last4: '4242', creditLimitMinor: 500000, closingDay: 28, dueDay: 5,
-      active: true, createdAt, revision: 0, updatedAt: createdAt };
+      active: true, deleted: false, createdAt, revision: 0, updatedAt: createdAt };
     await createCreditCard(db, cardAccount, card, gate);
     await createEntry(db, { ...expense, id: id('purchase'), accountId: cardAccount.id, amountMinor: 2310, dateISO: '2026-09-12' });
     await createTransfer(db, { id: id('card-payment'), fromAccountId: cash.id, toAccountId: cardAccount.id, amountMinor: 2000, note: '', dateISO: '2026-09-15', createdAt });

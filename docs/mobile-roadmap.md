@@ -1,6 +1,6 @@
 # FinanzApp mobile: living roadmap
 
-Updated: 2026-09-26 (Producto 25B). Read [decision 001](decisions/001-native-mobile.md),
+Updated: 2026-09-28 (Producto 25B2, debt lifecycle and instalment-contract round). Read [decision 001](decisions/001-native-mobile.md),
 [decision 002](decisions/002-spending-first.md),
 [decision 003](decisions/003-five-tabs-and-cards.md) and
 [decision 004](decisions/004-native-first-and-web-retirement.md). Decision 002 supersedes
@@ -49,13 +49,28 @@ history file keeps the evidence of when and why.
   22): Inicio, Movimientos, Asistente, Reportes, Más (Tarjetas as the second row of Más →
   Finanzas). The mounted-tab mitigation stays; no fade/detach/freeze; native stack and sheets
   own every screen transition. Tabs never slide.
-- **Cards and debts are internal accounts** (decision 003): a purchase is one expense on the
-  card, a payment is a transfer that lowers cash and debt and is never a second expense; a debt
-  or receivable moves only by transfers; Disponible excludes cards, debts and receivables; a
-  card never carries a plain income and is never a transfer's source (24B6).
-- **Instalments are finite obligations tied to one purchase**, never several expenses and never
-  an unlimited recurring rule; refunds tie to the purchase (Producto 24T, design reviewed before
-  code).
+- **Cards and debts are internal accounts** (decision 003): a purchase without instalments is one
+  expense on the card for its full price, a payment is a transfer that lowers cash and the card's balance due and is never a second
+  expense; a debt or receivable moves only by transfers; Disponible excludes cards, debts and
+  receivables; a card never carries a plain income and is never a transfer's source (24B6). The
+  eight card invariants (no per-purchase bank link, one expense per purchase without instalments, a payment is a
+  transfer, a preferred payment account would be a preselection only, personal debts never mix with
+  a card's balance, no debit-card ledger, the 24T instalment rules, «Saldo pendiente» never «Deuda»
+  in copy) are recorded in decision 003 and pinned by `packages/domain/card-invariants.test.ts`.
+- **A purchase in instalments is one purchase and one finite plan** (decision 003, rule 7, revised
+  2026-09-28), never a recurring rule and never the full price as an expense up front: each principal
+  instalment is recognised in its own period (their exact sum is the principal; the parent purchase
+  never adds it again); interest, fees and financing taxes are separate; the card's balance due holds
+  only the instalments already on a statement, the future ones are separate commitments; paying the
+  statement stays a transfer. Refunds and early payments tie to the purchase/plan and never duplicate
+  an expense. Archiving a card keeps every plan payable; deleting it is refused with a balance due
+  **or** any pending plan. How plans affect the issuer's available credit is an open gate, decided
+  before that calculation exists. Design and delivery: Producto 24T below.
+- **Deleting a personal debt or receivable never strands a balance** (25B2 close, 2026-09-28): with a
+  balance left and a payment or collection already recorded it is settled or closed, not deleted;
+  closing hides it from pending and keeps balance, history and Reabrir (it is not a payment or a
+  pardon); a tracker with no history may be deleted; every delete keeps the internal account and
+  every transfer.
 - **Money is integer minor units** per currency (ISO 4217 exponent, CLDR display digits), no
   floating point anywhere near an amount, no `10 **`, sums in BigInt; each account keeps its
   own currency for ever; storage never converts; the amount field and the formatters go through
@@ -115,13 +130,26 @@ history file keeps the evidence of when and why.
 
 ## 1. Implemented (current state)
 
-What exists in code on `master` as of Producto 24C1 (PR #63), plus Producto 25B on its branch
+What exists in code on `master` as of Producto 25B (PR #64), plus Producto 25B2 on its branch
 (marked). Per area, without test inventories (those are in apps/mobile/README.md and the history
 file). "Released" below names an in-app gate (`RELEASED_LANGUAGES`, `RELEASED_REGIONS`,
 `LEDGER_CURRENCIES`): what a build offers, verified on Linux; nothing is distributed to people yet
 (§4).
 
-- **First opening (25B, on its branch).** A new installation opens on a two-stage native setup: a
+- **Currency defaults and the account/card lifecycle (25B2, on its branch).** One rule for the
+  currency a new account, card, debt or budget starts with (`defaultCurrency`: the account's, a gated
+  route currency, the one currency held, the display currency among several, the region's tender
+  before any account, ARS last; docs/currency.md §2.10); Inicio and Reportes show the display chip
+  only with two or more currencies held; a normal account can be deleted (a dated tombstone, schema
+  11: every movement and transfer stays readable as its own, it leaves Disponible, the lists and the
+  forms, its active rules stop; a trailing swipe on its row and «Eliminar cuenta» on its edit screen,
+  both with a destructive confirmation); a card without a balance due can be deleted (a `deleted` flag:
+  purchases, payments and the internal account stay, its rules stop in the same commit; with a balance due
+  the dialog offers Pagar or Archivar instead; no swipe on the carousel, «Eliminar tarjeta» last on its edit
+  screen, the balance named in the confirmation). Backups v11 carry both records; v1–v10 still import. The
+  card copy says «Saldo pendiente», never «Deuda» (the Deudas y cobros section); decision 003 records the
+  eight card invariants audited at the close of 25B2.
+- **First opening (25B).** A new installation opens on a two-stage native setup: a
   welcome with the language and region detected from the device (two quiet rows that open the Más
   choosers), then an optional first account (name, the currency the region suggests through the
   forms' searchable field, an optional opening balance) whose currency seeds the display currency of
@@ -318,6 +346,13 @@ item unless a section says a new native build is needed. The checklist sections 
   TestFlight.
 
 ## 3. Next deliveries
+
+**Recommended next (2026-09-28):** after 25B2 merges, the next implementation is **Producto 24T**, in
+three focused PRs rather than one: 24T1 (domain, schema, backup and instalment mathematics), 24T2 (the
+card purchase, UI, statements and current-versus-future balances), 24T3 (refunds, early payments,
+lifecycle and the final device QA). 24C2 stays a separate currency delivery, but its contracts must be
+compatible with 24T's (recorded in both entries). The sections below keep their historical order; this
+paragraph is the order that binds. Nothing of 24T starts before 25B2 is merged.
 
 In order. Each is one focused PR, CI green, merged before the next starts; each records its
 checks here and its device evidence in the checklist. The names from Producto 25A on are a
@@ -896,6 +931,11 @@ the owner authorises it; no EAS build or store submission without the owner.
   information, pending (estimated with 24C1's rates) and confirmed (the bank's figure) kept apart, fees and
   taxes once, the manual adjustment only in the detail.
 - **Out of scope.** Bank debits read from any source; instalment plans (24T); trading; changing 24C1's views.
+- **Compatible with 24T (recorded 2026-09-28).** The purchase record distinguishes the purchase's original
+  currency, the currency the card bills in, the currency of the account that pays, the exact amount debited
+  and the exact amount credited, and the rate and fees with their provenance; a cross-currency transfer is
+  never modelled as a same-currency one. 24T's foreign instalment plans reuse this record rather than a
+  second one.
 - **Gates.** The owner decides whether it is needed; schema and backup changes reviewed first; no paid
   service.
 - **Depends on.** 24C1 (rates, cache and views).
@@ -941,30 +981,64 @@ the owner authorises it; no EAS build or store submission without the owner.
 
 ### Producto 24T — instalments and complete cards
 
-- **Goal.** A financed purchase is one expense and one finite obligation plan.
-- **Scope** (design reviewed before code): the plan records the number of instalments, the
-  total, principal, interest and fees (each with its own category, so interest is never
-  consumption); distributes the cents exactly at the currency's precision (integer minor units,
-  the remainder on named instalments, the sum proven equal to the total); ties each instalment
-  to the statement it closes in and the due date it is paid on; real closing and due dates per
-  statement; short months, leap years and the issuer's rules (last-day closings, a due day
-  before the closing day, weekend and holiday shifts as stated); per-period summaries, pending
-  balance and partial payments; early payments, cancellations, refunds and adjustments without a
-  second expense; refunds of any purchase (card or cash) linked to the original movement (lowering
-  the category for the refund's month, and the card's debt when paid by card, never an income;
-  a partial refund keeps the rest; the link survives edits, undo and backups); international instalment purchases with the rate
-  of each debit (24C2's record, provenance on every converted figure); optional reminders for
-  closings, due dates and instalments that never claim a bank did not receive a payment; a
-  clearer card form with a real calendar for closing and due days.
-- **Rules.** Never duplicate an expense through a recurring rule; scheduled is not paid; the
-  purchase is counted once in reports and budgets.
+**Recommended next after 25B2** (see the head of this section), split into 24T1, 24T2 and 24T3. The
+accounting contract below is decided (decision 003, rule 7, revised 2026-09-28); nothing of it is
+implemented yet.
+
+- **Goal.** A financed purchase is **one purchase and one finite `InstallmentPlan`**. If the person chose
+  instalments, FinanzApp does **not** also count the full price as an immediate expense.
+- **Accounting contract (exact).** Example: USD 1.200 in 12 × USD 100.
+  - *At purchase:* no bank account loses USD 1.200; the plan is created for USD 1.200; USD 1.200 is shown
+    as the total committed; the card's balance due (billed, payable now) holds only the instalments that
+    already belong to a statement; future instalments appear separately as future commitments.
+  - *Recognition (Reportes, Presupuestos, the month summary):* each principal instalment counts as an
+    expense in the period it belongs to; the parent purchase never adds USD 1.200 again; the exact sum of
+    the principal instalments (integer minor units, the remainder on named instalments) equals the total
+    principal. Interest, fees and financing taxes are recorded separately, with their own category, and
+    never presented as principal. Paying the statement stays a transfer, never a second expense.
+  - *A purchase without instalments* keeps today's behaviour: the full expense once and the full balance
+    due (decision 003, rule 2).
+  - *Five distinct figures* the design shows and never merges: purchase price; balance due billed/payable
+    now; future committed instalments; plan remaining; already paid.
+  - *Available credit — gate.* How pending instalments affect the issuer's available credit is not assumed
+    (issuers differ: some reserve the whole plan, some only the billed part). The owner decides it and it
+    is recorded in decision 003 before `cardAvailableLimitMinor` handles plans; until then the available
+    limit of a card with plans is not computed.
+- **Lifecycle.** Archiving a card keeps and lets the person keep paying every instalment. Deleting a card
+  is blocked while it has a balance due **or** any pending `InstallmentPlan` (`assertCardDeletable`). A
+  deleted card keeps all its history and its finished plans. A plan is not a `RecurringRule`: pausing or
+  deleting a recurring rule never affects a plan.
+- **Refunds and early payoff.** Never duplicate an expense; always linked to the original purchase/plan; a
+  partial refund keeps the rest; an early payment reduces the obligation and creates no new expense.
+  Refunds of any purchase (card or cash) lower the category in the refund's month, and the card's balance
+  when paid by card, never an income; the link survives edits, undo and backups.
+- **Foreign currency (24T + 24C2).** The model distinguishes the purchase's original currency, the
+  currency the card bills in, the paying account's currency, the exact amount debited and the exact amount
+  credited, and the rate and fees with provenance. A cross-currency transfer is never modelled as a
+  same-currency transfer. A same-currency plan may land before 24C2 if the owner prefers.
+- **Deliveries.**
+  - **24T1 — domain, schema, backup and instalment mathematics.** `InstallmentPlan` and its instalments,
+    the recognition rule above as pure functions, exact cent distribution for exponents 0, 2 and 3, cycle
+    assignment across year ends, short months and leap years (last-day closings, a due day before the
+    closing day, weekend and holiday shifts as stated by the issuer), schema and backup versions with a
+    rollback test; the `it.todo` lines of `card-invariants.test.ts` (7b) become tests.
+  - **24T2 — the card purchase, UI, statements and current-vs-future balances.** The purchase form with
+    instalments, per-statement summaries, the five figures above, pending balance and partial payments, a
+    clearer card form with a real calendar for closing and due days; the available-credit gate decided
+    first if the UI shows a limit.
+  - **24T3 — refunds, early payments, lifecycle and final device QA.** Refunds and early payoff as above,
+    cancellations and adjustments without a second expense, the deletion block for pending plans, Tarjetas
+    and Deudas on the iPhone. Optional reminders for closings, due dates and instalments belong to 25D's
+    local notifications and never claim a bank did or did not receive a payment.
+- **Rules.** Never duplicate an expense through a recurring rule; scheduled is not paid; the principal is
+  recognised once in total, instalment by instalment.
 - **Out of scope.** Bank statements, disputes, freezing a card, FCI redemptions.
-- **Gates.** Domain tests first: cent distribution for exponents 0, 2 and 3, cycle assignment
-  across year ends and February, early payment against later instalments, refund against a
-  partly paid plan; schema and backup versions with a rollback test; Tarjetas and Deudas on the
-  iPhone.
-- **Depends on.** 24C1 for the rates of international instalments (a same-currency plan could
-  land first if the owner prefers).
+- **Gates.** Domain tests first (24T1): cent distribution, cycle assignment, early payment against later
+  instalments, refund against a partly paid plan, the sum of recognised principal equal to the total;
+  schema and backup versions with a rollback test; the available-credit decision; Tarjetas and Deudas on
+  the iPhone (24T3).
+- **Depends on.** 25B2 merged; 24C1 for the rates of international instalments and 24C2's purchase record
+  for them.
 
 ### Producto 25B — native onboarding and repository cleanup (this PR)
 
@@ -1017,23 +1091,147 @@ the owner authorises it; no EAS build or store submission without the owner.
     into the setup with data, both languages, VoiceOver and the largest text through both stages).
 - **Depends on.** 24R2B (regions), 24M (currencies), 24C1 (the display currency).
 
-### Producto 25B2 — currency defaults and the account lifecycle (next, recorded from the PR #64 review)
+### Producto 25B2 — smart currency defaults and the account/card lifecycle (this PR)
 
-- **Goal.** Outside the first opening, the app still defaults to ARS where a better default exists,
-  and Inicio shows a display control that has nothing to choose with one currency held. One coherent
-  delivery, with the account and card lifecycle work, never a silent reinterpretation of an existing
-  account's currency.
-- **Scope.** New account, card, debt and budget forms default their currency to a relevant one: the
-  first account's from the region's legal tender (as the first opening does), and once accounts
-  exist, the selected ledger currency or the account the form is for, instead of ARS on a Spanish
-  device; Inicio and Reportes hide the consolidated/single control while exactly one currency is
-  held (the conversion settings stay reachable from Más); the rest of the account lifecycle
-  (archive, reorder, the card and debt profiles' edits) reviewed together.
-- **Out of scope.** Any migration that rewrites an existing account's or movement's currency; a
-  global budget; the onboarding itself (25B).
-- **Gates.** The existing forms' tests per currency; nothing stored changes; the owner decides the
-  default rule for a ledger with several currencies before code.
-- **Depends on.** 25B (the suggestion rule), 24C1 (the chip and the display preference).
+- **Goal.** Close what the onboarding, 24M and 24C1 left open: forms that start in a logical currency,
+  no display control without a choice, normal accounts that can be deleted, cards with a complete
+  lifecycle, and a financial history that is never lost.
+- **Defaults (exact).** `defaultCurrency` (`src/ui/currency-defaults.ts`, `useDefaultCurrency`): 1) the
+  account the form belongs to, or a route currency the gate offers; 2) the one currency the live accounts
+  hold; 3) with several, the display currency when an account holds it, else the first currency held
+  (grouping order); 4) with no account, the region's legal tender when the build offers it (the first
+  opening's rule); 5) ARS. Applied to New account (a route currency wins), New card, New debt, New budget
+  (the route wins), Presupuestos' initial currency. Recurring rules and movements take their account's
+  currency. Nothing saved ever changes currency.
+- **Inicio and Reportes.** Two sets of currencies (review round): `availableCurrencies` (the live accounts':
+  Disponible, the forms, the default rule, the quick actions' preselection) and `historyCurrencies` (every
+  account's, deleted included: the view, its chip and `reportSelection`). The chip (`Total · USD` /
+  `Solo USD`, its sheet) only with two or more currencies **in the history**; with zero or one the view is
+  that currency's own ledger whatever the stored preference says (kept, never applied, no request to the
+  rate provider); no account selector on Inicio. Deleting the last account of a currency therefore keeps
+  that currency's movements in every period (consolidated at their dates, filterable as «Solo …», the
+  previous months reachable; a missing rate still gives per-currency parts, never a partial sum) while it
+  leaves Disponible and the forms.
+- **Account lifecycle (exact).** `deleteAccount` writes a dated tombstone (`deletedAt`, one revision on)
+  and pauses the account's active recurring rules in the same commit; the row and every movement and
+  transfer stay untouched, readable with the account's name and currency; the account leaves Cuentas,
+  Disponible, the currencies held, `postingAccountsFor`, the transfer sides and the forms; a new
+  movement, a transfer side or an active rule on it is refused («Esta cuenta fue eliminada.»); its history
+  stays editable in place (`postingAccounts(accounts, debts, keepId)`: the movement's or rule's own row
+  stays offered while it is edited, for its own kind, so amount, date, merchant and category are corrected
+  on the same account and currency; it may move to a live account of the currency, never onto a deleted
+  row; a new movement or rule never sees it) and still counts in every report; its detail reads «Cuenta eliminada» without
+  Editar or actions; the edit screen refuses it. UX: Cuentas rows swipe to Eliminar (`SwipeRow`: a short
+  swipe reveals, a full swipe only opens the confirmation, one row open at a time, the same action in
+  VoiceOver's rotor), «Eliminar cuenta» last on Editar cuenta; the confirmation names the movements and
+  transfers that stay and the rules that stop. Deleting again is a no-op (a retry after a failed refresh).
+  A card's or a debt's internal account is refused («… se elimina desde su propia pantalla.»).
+- **Card lifecycle (exact).** Create, edit, archive and reactivate stay; the storage `deleteCreditCard`
+  (review round; `LedgerProvider.removeCard`) writes the deletion record (`deleted`, inactive, one
+  revision on) **and pauses the card's active recurring rules in the same commit**, and is **refused while
+  the card has a balance due** (`assertCardDeletable`, «Esta tarjeta tiene saldo pendiente. Pagalo o
+  archivala; no se puede eliminar.»): a deleted card takes no payment, so a balance would be stranded. A plain
+  `saveCreditCard` never flips `deleted` («Una tarjeta se elimina con su propia acción…»). A deleted card
+  leaves Tarjetas and the forms, takes no purchase and no payment («Esta tarjeta fue eliminada.»), is
+  never reactivated or edited, keeps its internal account, purchases and payments; its detail reads
+  «Tarjeta eliminada · saldo pendiente» (the record of a card deleted by an older copy that still carried
+  a balance, or paid to zero and later corrected). «Eliminar tarjeta» is the last action of Editar tarjeta; no
+  swipe on the carousel. With a balance due, the dialog («Todavía no se puede eliminar») names it and offers
+  **Pagar** (the reviewed payment form, capped at the balance, as the card detail does) and **Archivar** (an
+  active card only); without one, the confirmation says purchases and payments stay. Archiving keeps the
+  balance payable and, once 24T exists, every pending instalment (recorded above); nothing is cancelled or
+  written silently. The recurring catch-up (`processRecurring`, on opening and on returning to the
+  foreground) is the second net: a rule whose account, card or debt is deleted records nothing whatever
+  its flag says, and Recurrentes offers such a rule Eliminar only (no Reanudar onto a closed row).
+- **Debts and recurring.** Recurring audited, not redesigned: pause/resume/delete and their history are
+  unchanged; deleting an account pauses its rules through `pauseRecurringRule`. Debts: close/reopen
+  unchanged; deletion changed in the debt lifecycle round below.
+- **Debt lifecycle (exact, 2026-09-28 round).** *Cerrar* hides the obligation from Pendientes and keeps its
+  balance, its history and Reabrir; it is not a payment and not a pardon. *Eliminar* always keeps the
+  internal account, the opening amount and every payment or collection. `debtDeletion` (domain) classifies
+  a tracker: **settled** (nothing outstanding) → the usual confirmation, deleted; **untouched** (a balance,
+  no payment or collection recorded: created by mistake) → a confirmation that says the balance is not
+  settled and no payment is recorded, deleted; **blocked** (a balance and recorded history) → not deleted:
+  the dialog «Todavía no se puede eliminar» names the balance and offers **Saldar** (owed) / **Cobrar**
+  (receivable), the reviewed transfer form prefilled with the rest, **Cerrar** (an open tracker only;
+  closes without a second question and keeps the detail on screen) and **Cancelar**; opening the dialog
+  writes nothing. Storage enforces it: `deletePersonalDebt` (`LedgerProvider.removeDebt`) re-checks with
+  `assertDebtDeletable` («Esta deuda tiene saldo pendiente y pagos o cobros registrados. Saldala o
+  cerrala; no se puede eliminar.»), writes the deletion record only, and is a no-op on a tracker already
+  deleted (a retry after a failed refresh); a plain `savePersonalDebt` never flips `deleted` («Una deuda se
+  elimina con su propia acción…»). A deleted tracker never accepts a new transfer; a closed one can be
+  reopened. Backups are unchanged (no new field); an older copy holding a tracker deleted with a balance
+  (24UX4 allowed it) still imports as it was. Balance means `debtOutstandingMinor`: an overpaid tracker
+  (balance past zero) counts as settled.
+- **Schema and backups.** SQLite 11 (`MIGRATE_V11`, additive and column-aware: `accounts.deletedAt`,
+  `credit_cards.deleted`; rows never DELETEd; an older build refuses a schema 11 file unchanged). Backup
+  **v11** as soon as an account or a card is deleted (cards carry `deleted`, a deleted account
+  `deletedAt`); without one the file stays v8/v9/v10 byte for byte; v1–v10 import (cards read as live);
+  a v11 file is refused by older builds («versiones 1 a 11»); an older copy that contradicts a tombstone
+  is a conflict, never applied. `sameAccount` compares the tombstone.
+- **Edge cases.** Deleting the only account of a currency removes that currency from the held set (no
+  chip, rule 2/4 for the next form) while its movements still convert and count; a deleted account with a
+  negative balance keeps it as history and leaves Disponible; a stored display currency whose last account
+  was deleted is kept and not applied; the same operation retried after a failed refresh writes nothing
+  twice; a card with debt is not deleted (paid or archived first); a movement on a deleted account can be
+  corrected but not moved to another deleted row; a payment link (`/new-transfer?toAccountId=…`) naming a
+  deleted card or account opens a plain transfer instead of preselecting it; the instalment invariant for
+  24T is recorded above.
+- **Not changed.** Home's, Reportes' and the onboarding's design; the financial models (money, FX,
+  budgets); `vercel.json`, `api/mobile`, `server/mobile`.
+- **Status.** Delivered on this branch (2026-09-27, review round the same day; card invariants round and debt lifecycle round
+  2026-09-28), not device-verified.
+  - **Debt lifecycle and instalment-contract round (2026-09-28).** Found: `deletePersonalDebt` could
+    tombstone a tracker with a balance after payments (a partly settled obligation left inoperable), and the
+    24T wording («un único gasto», «never several expenses», «counted once») read as recognising the whole
+    principal on the purchase date. Changed: the debt lifecycle above (domain `debtHasHistory`,
+    `debtDeletion`, `assertDebtDeletable`; storage `deletePersonalDebt`; the dialog; 10 catalogue keys in
+    es/en, the English lock accepted for those 10); decision 003 rules 2 and 7, decision 002's card line,
+    AGENTS.md rule 8, the binding decisions and 24T here (contract, available-credit gate, 24T1–24T3), 24C2's
+    compatibility, 25D's Apple scope (documentation only). Tests: `liabilities.test.ts` (+3: both
+    directions × blocked/settled/untouched, close → reopen, history of another account), `card-invariants.test.ts`
+    (13 `it.todo` for 24T, test 2 renamed to a purchase without instalments), `database.node.ts` (the 24UX4
+    debt test now settles before deleting and checks the refusal and the plain-save path; +1 real-SQLite test:
+    both directions, refused/closed/reopened/settled/deleted, every row unchanged, retry no-op, no new transfer,
+    the untouched tracker, the backup), `lifecycle-actions.node.ts` (+5: the blocked dialog for each direction
+    and in English, Cerrar from it, settled deletion through `removeDebt` and its retry, the untouched
+    confirmation, close → reopen from the row), `liabilities-routes.node.ts` (+1: the detail's blocked dialog;
+    the receivable-without-collections copy; the harness gains `removeDebt`). Checked on Linux: root `npm test`
+    338/338 (+13 todo), `check:repo`; mobile `typecheck`, `test:storage` 769/769, `currency:verify`,
+    `regions:verify`, `i18n:check -- --strict`, `i18n:extract`, `check`, `export:ios`. No EAS build; the
+    iPhone was not touched.
+  - **Card invariants round (2026-09-28).** The eight card invariants (decision 003, «Invariantes contables
+    de tarjetas») were audited against the domain, the storage and the forms: no contradiction found, so
+    nothing was redesigned. Added `packages/domain/card-invariants.test.ts` (8 tests, one per invariant,
+    including type-level checks that the profile has no payment-account link and that the account kinds are
+    exactly cash/card/debt). Copy only: a card's balance is «Saldo pendiente» / «Outstanding balance», never
+    «Deuda» (Tarjetas, the card detail, the purchase and payment forms, the deletion dialog, the domain
+    refusal `CARD_DEBT_MESSAGE` and its catalogue entry); internal names unchanged; the glossary gains «saldo
+    pendiente»; the English lock accepted (19 keys). Root `npm test` 335/335, mobile `test:storage` 762/762
+    (the route tests that pin the copy updated), `typecheck`, `currency:verify`, `regions:verify`,
+    `i18n:check -- --strict`, `check`, `export:ios`, root `check:repo`.
+  - **Checked on Linux:** root `npm test` 327/327 (+7 `packages/domain/lifecycle.test.ts`: the account tombstone,
+    the card flag, the posting and transfer guards, Disponible, backup v11 round trip, legacy files, an older copy
+    as a conflict); mobile `npm run typecheck`, `npm run test:storage` 762/762 (+5 `tests/currency-defaults.node.ts`,
+    +9 `tests/lifecycle.node.ts` on real SQLite: schema 10 → 11 on a real file, deleting an account with entries,
+    transfers and an active rule, restart, export and restore, the older copy refused, deleting a card with purchases
+    and payments, idempotent retries, the newer-schema refusal, and the review round: a card's rules paused in the
+    same commit and silent through a restart, a foreground catch-up and a rule forced active; a card with debt
+    refused, then archived, paid and deleted; a movement on a deleted account corrected in place, moved to a live
+    account, never onto a deleted one; the last account of a currency deleted with Disponible, «Solo USD», the
+    previous month, the consolidated total and the missing rate; +5 `tests/lifecycle-actions.node.ts`: the
+    confirmations and their writes, the debt dialog's Pagar/Archivar, Eliminar only for a rule on a deleted account;
+    route tests: Inicio and Reportes with a deleted USD account (total, chip, filter, parts, comparison, drill-down,
+    live account count), entry-form and recurring-form editing on a deleted account, the deleted-card payment link;
+    the harnesses' chip and default-currency expectations updated), `currency:verify`, `regions:verify`,
+    `i18n:check -- --strict`, `i18n:extract`, `check`, `export:ios`. No EAS build; the iPhone was not touched.
+  - **Pending:** the checklist section Producto 25B2 (the schema 11 upgrade of FinanzApp Dev's data with a backup
+    first, the defaults per region, the chip with one and two currencies, deleting an account and a card, the
+    debt dialog, the debt/receivable deletion dialog (blocked with Saldar/Cobrar/Cerrar, the untouched
+    confirmation, VoiceOver reading the buttons), the paused card rules through a restart and a foreground return, the v11 backup round trip,
+    VoiceOver and the largest text on the swipe rows).
+- **Depends on.** 25B (the suggestion rule), 24C1 (the chip and the display preference), 24UX4 (the deletion
+  records of rules and debts).
 
 ### Producto 25C — budgets with rollover, goals, CSV and productivity
 
@@ -1083,20 +1281,49 @@ docs/merchant-identity.md.
 
 ### Producto 25D — Face ID, notifications and Apple integrations
 
-- **Scope.** Face ID with the device-passcode fallback, background privacy and Apple file
-  protection reviewed (a Face ID prompt does not encrypt SQLite); local reminders opt-in with
-  time zone, deduplication and no amounts by default (card closings and due dates, upcoming
-  recurring payments, instalments); the Apple Pay/Wallet transaction trigger through a
-  Shortcut/App Intent producing drafts only (available fields, missing amount, duplicates,
-  offline catch-up and cancellation verified on the iPhone without bank execution); App Intents
-  and Apple Shortcuts ("registrar un gasto", "¿cuánto gasté este mes?", each a draft or a read);
-  widgets of upcoming payments and of the month's spending that hide amounts by default and read
-  the 25C2 commitments; Apple sign-in; each permission requested only when its
-  feature is enabled.
-- **Out of scope.** FinanceKit (not available for Argentine cards), any bank credential.
-- **Gates.** Signed development build evidence per integration; denied-permission paths; the
-  private-content default checked on the lock screen.
-- **Depends on.** 25A for the capture path (tray and pairing token).
+Documentation only until it starts (scope revised 2026-09-28); nothing here is implemented. Every
+permission is requested only when the person enables the feature that needs it, never at launch.
+
+- **Security and privacy.**
+  - Face ID / Touch ID lock through LocalAuthentication, with the **device-passcode fallback**; the lock
+    is opt-in and a failed or cancelled prompt never resets or reveals data.
+  - **Privacy in the background and the app switcher:** the snapshot iOS takes when the app leaves the
+    foreground shows a neutral cover, not amounts.
+  - **Apple file/data protection reviewed separately from LocalAuthentication:** a Face ID prompt does not
+    encrypt SQLite; the data-protection class of the database, the backups and any exported file is
+    decided and verified on its own.
+- **Local notifications** (opt-in, configurable, time-zone aware, deduplicated): card closing and due
+  dates, upcoming recurring payments, instalments (24T), and reminders the person sets. They are
+  scheduled on the device and work without any server. **Sensitive content hidden by default on the Lock
+  Screen** (no amount, no merchant unless the person turns it on). A reminder never claims a bank did or
+  did not receive a payment.
+- **Remote push (APNs)** is a separate capability, added only when a backend event exists that justifies
+  it (for example an Assistant capture or a sync conflict from 25A/25E); local reminders never depend on
+  push.
+- **App Intents, App Shortcuts, Siri and Spotlight:** "registrar un gasto" (a draft) and "¿cuánto gasté
+  este mes?" (a read), each ending in a draft or a read, never a silent write; **Action Button** where it
+  is useful (the quick capture).
+- **Apple Pay / Wallet transaction automation:** a Shortcuts personal automation on a Wallet transaction
+  → an App Intent → a FinanzApp **draft**. It uses only the merchant, amount, currency and payment method
+  the trigger actually supplies; missing fields stay missing (never guessed); repeated deliveries are
+  deduplicated; offline catch-up and cancellation are verified; no claim to read Wallet history and no
+  bank execution. **Tested separately on iPhone and on Apple Watch** (a payment made with the Watch):
+  the two triggers are never assumed to behave the same.
+- **Widgets:** iPhone Home Screen and **Lock Screen widgets** of upcoming payments and the month's
+  spending, amounts hidden by default, reading 25C2's commitments.
+- **Apple Watch (explicit future surface):** a focused capture and read experience, a WidgetKit
+  complication / Smart Stack widget and App Intents; **not** a full replica of the iPhone app.
+- **Sign in with Apple** when an account exists (25A/25E); never required for the local core.
+- **FinanceKit:** a future research gate (entitlement, Apple's approval, the institutions and regions it
+  actually covers, what data it gives), not a dependency of the core and not a categorical claim about any
+  region or card; any use is read-only, consented and produces drafts.
+- **Out of scope.** Any bank credential; bank execution; reading arbitrary Wallet history.
+- **Gates.** Signed development build evidence per integration (a JS bundle is not device evidence);
+  denied-permission paths; the private-content default checked on the Lock Screen and the app switcher;
+  the Wallet trigger on iPhone and Watch separately; notifications across a time-zone change and a
+  restart.
+- **Depends on.** 25A for the capture path (tray and pairing token); 24T for instalment reminders; 25C2
+  for the widgets' commitments; 25E for remote push and Sign in with Apple.
 
 ### Producto 25E — optional sync and privacy
 

@@ -5,7 +5,7 @@ Actualizado: 21 de septiembre de 2026 (encuadre revisado el 25 de septiembre de 
 > **La app nativa es el producto** ([decisión 004](decisions/004-native-first-and-web-retirement.md)).
 > Esta guía se escribió cuando la app todavía se llamaba "piloto"; donde diga "piloto", leé "la
 > app". Los pasos de instalación y prueba siguen vigentes; el pie de Más dice hoy
-> **FinanzApp 0.1.0 (25B)** y las comprobaciones de cada entrega están en
+> **FinanzApp 0.1.0 (25B2)** y las comprobaciones de cada entrega están en
 > [mobile-device-checklist.md](mobile-device-checklist.md). Configuración y comandos al día:
 > [apps/mobile/README.md](../apps/mobile/README.md).
 
@@ -491,11 +491,11 @@ y tus cuentas, movimientos, presupuestos y recurrentes deben seguir iguales.
 2. En Tarjetas, tocá **+** y cargá una tarjeta con nombre, moneda, la deuda que ya
    tenés (opcional), el límite y los días de cierre y vencimiento del resumen.
 3. Registrá una compra desde la tarjeta con un importe chico. Aparece una sola vez
-   en Movimientos y en Reportes, y sube la deuda de la tarjeta. El Disponible de
+   en Movimientos y en Reportes, y sube el saldo pendiente de la tarjeta. El Disponible de
    Inicio no cambia.
 4. Tocá **Pagar tarjeta**, elegí la cuenta desde la que pagás y registrá el pago.
-   Baja el saldo de esa cuenta y la deuda de la tarjeta; no aparece ningún gasto
-   nuevo. Si intentás pagar más que la deuda registrada, la app lo rechaza.
+   Baja el saldo de esa cuenta y el saldo pendiente de la tarjeta; no aparece ningún
+   gasto nuevo. Si intentás pagar más que el saldo pendiente, la app lo rechaza.
 5. En Deudas y cobros registrá algo que debés o que te deben, y un pago o cobro
    parcial. El pendiente baja y tampoco aparece como gasto o ingreso.
 6. Revisá claro/oscuro, texto grande y Reducir movimiento en Tarjetas.

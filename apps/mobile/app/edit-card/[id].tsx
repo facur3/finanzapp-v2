@@ -11,5 +11,7 @@ export default function EditCardScreen() {
   const card = archive?.cards?.find(item => item.id === id);
   if (!card) return <Screen><EmptyState title={t('cards.panel.notFoundTitle')}
     detail={t('cards.panel.notFoundDetail')} icon="card-outline" /></Screen>;
+  // 25B2: a deleted card is never edited again; its detail and its history stay readable.
+  if (card.deleted) return <Screen><EmptyState title={t('cards.panel.deletedTitle')} detail={t('cards.panel.deletedDetail')} icon="card-outline" /></Screen>;
   return <CardForm key={id} original={card} />;
 }

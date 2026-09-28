@@ -118,7 +118,7 @@ test('Más groups permanent navigation into Finanzas and App y datos, with live 
   assert.deepEqual(rows(root).filter(row => row.props.last).map(row => row.props.title), ['Categorías', 'Región']);
   assert.equal(nodes(root).some(node => node.type === 'ActionButton'), false);
   const texts = nodes(root).filter(node => node.type === 'AppText').map(node => String(node.props.children)).join(' ');
-  assert.match(texts, /FinanzApp 0\.1\.0 \(25B\)/, 'the version line, like the About line of an iOS app');
+  assert.match(texts, /FinanzApp 0\.1\.0 \(25B2\)/, 'the version line, like the About line of an iOS app');
   assert.match(texts, /Material opaco \(Expo Go\)/, 'a development build says which control material this session draws, so a tester can confirm the mode');
   assert.doesNotMatch(texts, /Piloto nativo|Producto 24/, '24UX5: no project vocabulary on the settings screen');
   assert.equal(value('Categorías'), 'Gastos e ingresos');
@@ -158,7 +158,7 @@ test('Más → App y datos (23.1C2): Idioma and Región say what is in use and w
 });
 
 test('Más → Tarjetas counts active credit cards and opens the pushed Tarjetas screen', () => {
-  const card: domain.CreditCardProfile = { id: 'card', accountId: cash.id, issuer: 'Visa', last4: '4009', creditLimitMinor: null, closingDay: 28, dueDay: 5, active: true, createdAt, revision: 0, updatedAt: createdAt };
+  const card: domain.CreditCardProfile = { id: 'card', accountId: cash.id, issuer: 'Visa', last4: '4009', creditLimitMinor: null, closingDay: 28, dueDay: 5, active: true, deleted: false, createdAt, revision: 0, updatedAt: createdAt };
   const view = harness('(tabs)/settings.tsx', { ...archive, cards: [card, { ...card, id: 'old', active: false }] });
   const root = view.render();
   const row = rows(root).find(item => item.props.title === 'Tarjetas')!;
@@ -243,11 +243,11 @@ test('23.1B2 English Más: every row, count, note and the diagnostic footer are 
   for (const row of rows(root)) row.props.onPress();
   assert.equal(view.pushed.join(','), '/accounts,/cards,/budgets,/recurring,/debts,/categories,/backup,/undone-entries,/language,/region');
   const texts = nodes(root).filter(node => node.type === 'AppText').map(node => String(node.props.children)).join(' ');
-  assert.match(texts, /FinanzApp 0\.1\.0 \(25B\)/);
+  assert.match(texts, /FinanzApp 0\.1\.0 \(25B2\)/);
   assert.match(texts, /Opaque material \(Expo Go\) · Language: default/);
   assert.match(texts, /saved only on this device and work offline/);
   assert.doesNotMatch(texts, /Material opaco|Idioma|Región|sincronización/);
-  const card: domain.CreditCardProfile = { id: 'card', accountId: cash.id, issuer: 'Visa', last4: '4009', creditLimitMinor: null, closingDay: 28, dueDay: 5, active: true, createdAt, revision: 0, updatedAt: createdAt };
+  const card: domain.CreditCardProfile = { id: 'card', accountId: cash.id, issuer: 'Visa', last4: '4009', creditLimitMinor: null, closingDay: 28, dueDay: 5, active: true, deleted: false, createdAt, revision: 0, updatedAt: createdAt };
   const cards = harness('(tabs)/settings.tsx', { ...archive, cards: [card, { ...card, id: 'two' }] }, undefined, 'en-AR').render();
   assert.equal(rows(cards).find(row => row.props.title === 'Cards')!.props.subtitle, '2 credit cards');
 });
@@ -291,7 +291,7 @@ test('24UX5: a preview or store build shows the version and the local-storage no
   for (const locale of [null, 'en-AR'] as const) {
     const root = harness('(tabs)/settings.tsx', archive, undefined, locale, undefined, false).render();
     const texts = nodes(root).filter(node => node.type === 'AppText').map(node => String(node.props.children)).join(' ');
-    assert.match(texts, /FinanzApp 0\.1\.0 \(25B\)/);
+    assert.match(texts, /FinanzApp 0\.1\.0 \(25B2\)/);
     assert.doesNotMatch(texts, /Material|material|Idioma:|Language:/, 'no material or locale diagnostics outside a development build');
     assert.match(texts, locale ? /saved only on this device/ : /se guardan solo en este dispositivo/, 'privacy and storage information stays');
   }
