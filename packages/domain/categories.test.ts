@@ -184,5 +184,9 @@ describe('Producto 24T2: the Intereses preset', () => {
     expect(() => assertCategoryName(editedCategoryDefinition(resolveCategory('expense', 'Otros'), { label: 'Varios' }, now))).not.toThrow();
     expect(() => validateCategoryDefinitions([editedCategoryDefinition(resolveCategory('expense', 'Otros'), { label: 'Comida' }, now)])).toThrow('ya es el nombre de otra categoría');
     expect(categoryNameTaken('expense', 'intereses')).toBe(true);
+    // Restyling the preset itself (its first definition) stays possible beside the older category of that name.
+    const restyled = editedCategoryDefinition(resolveCategory('expense', 'Intereses'), { color: 'rose' }, now);
+    expect(() => validateCategoryDefinitions([otros, restyled])).not.toThrow();
+    expect(() => assertCategoryName(restyled, [otros])).not.toThrow();
   });
 });

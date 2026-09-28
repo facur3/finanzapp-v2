@@ -167,10 +167,14 @@ export function validateCategoryDefinitions(definitions: CategoryDefinition[]): 
     const names = new Set<string>();
     for (const definition of own) {
       const name = categoryKey(definition.label);
-      if (names.has(name)) throw new Error(`Ya existe una categoría llamada «${definition.label}».`);
+      // Two definitions may show a late preset's name only as that legacy case (the preset's own and an older one).
+      if (names.has(name) && !LATE_PRESETS.has(kind + '|' + name)) throw new Error(`Ya existe una categoría llamada «${definition.label}».`);
       names.add(name);
       if (name === definition.key) continue;
-      if (own.some(other => other !== definition && other.key === name) || (categoryPreset(kind, name) && !LATE_PRESETS.has(kind + '|' + name))) {
+      // A definition saved before a late preset existed may carry its name: tolerated on read, against the preset and
+      // against the preset's own definition once the person restyles it (a new name never takes it: assertCategoryName).
+      if (LATE_PRESETS.has(kind + '|' + name)) continue;
+      if (own.some(other => other !== definition && other.key === name) || categoryPreset(kind, name)) {
         throw new Error(`«${definition.label}» ya es el nombre de otra categoría.`);
       }
     }

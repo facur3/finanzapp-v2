@@ -19,7 +19,7 @@ import {
   assertAcceptsNewObligation, PLAN_DELETE_PATH_MESSAGE, PLAN_EXISTS_MESSAGE, PLAN_MISSING_MESSAGE, assertInstallmentEntryChange, assertInstallmentPlanDeletable, assertNewEntryId,
   cancelInstallmentPlan as cancelInstallmentPlanRecord, deleteInstallmentPlan as deleteInstallmentPlanRecord, materializeInstallmentPlan, sameInstallmentPlan,
   validateInstallmentPlan, validateInstallmentPlanChange, type Installment, type InstallmentPlan,
-  cardCycleDatesOf, planCardCycle, sameCardCycleDate, todayKey, type CardCycleDates, type CardCycleIntent,
+  cardCycleDatesOf, cardCycleShows, planCardCycle, sameCardCycleDate, todayKey, type CardCycleDates, type CardCycleIntent, PLAN_CALENDAR_MESSAGE, planFollowsCalendar,
 } from '@finanzapp/domain';
 
 type SqlValue = string | number | null;
@@ -53,7 +53,7 @@ const CATEGORY_COLUMNS = 'kind, key, storedLabel, label, icon, color, archived, 
 const UNIT_COLUMNS = 'currency, minorUnitExponent, source, catalogVersion, createdAt';
 const PLAN_COLUMNS = 'id, cardId, merchant, category, currency, purchaseDateISO, principalMinor, count, interestMinor, interestCategory, feeMinor, feeCategory, taxMinor, taxCategory, cancelledAt, deleted, createdAt, revision, updatedAt';
 const INSTALLMENT_COLUMNS = 'planId, number, billingDateISO, dueDateISO, principalMinor, interestMinor, feeMinor, taxMinor';
-const CARD_CYCLE_COLUMNS = 'cardId, sequence, closingISO, dueISO, createdAt, revision, updatedAt';
+const CARD_CYCLE_COLUMNS = 'cardId, sequence, closingISO, dueISO, closingDay, dueDay, createdAt, revision, updatedAt';
 
 const SCHEMA = `
   CREATE TABLE accounts (
@@ -373,9 +373,10 @@ const MIGRATE_V12 = `
 `;
 
 // Producto 24T2: the exact statement dates of a card. One additive table, nothing else touched: each row is one statement
-// of one card (a closing and the due date of THAT closing, `dueISO > closingISO`), and a card's rows form one chain of
-// consecutive statements ordered by `sequence` (packages/domain/card-cycles.ts). The card's usual closing and due days stay
-// on `credit_cards` as the grid of the months without a row. No row is fabricated for old data: a schema 12 file opens with
+// of one card (a closing and the due date of THAT closing, `dueISO > closingISO`, with the usual days of the calendar it
+// belongs to), and a card's rows form one chain of consecutive statements ordered by `sequence`
+// (packages/domain/card-cycles.ts). The card's usual closing and due days stay on `credit_cards` as the grid of the months
+// after the chain; the first row's days are the grid before it. No row is fabricated for old data: a schema 12 file opens with
 // an empty table and every card reads exactly as before. Rows are never DELETEd (a correction updates its row, one revision
 // on). Guarded by user_version, in the ordinary exclusive transaction; earlier builds refuse a schema 13 file, unchanged.
 const MIGRATE_V13 = `
@@ -384,6 +385,8 @@ const MIGRATE_V13 = `
     sequence INTEGER NOT NULL CHECK(sequence BETWEEN -100000 AND 100000),
     closingISO TEXT NOT NULL CHECK(length(closingISO) = 10),
     dueISO TEXT NOT NULL CHECK(length(dueISO) = 10 AND dueISO > closingISO),
+    closingDay INTEGER NOT NULL CHECK(closingDay BETWEEN 1 AND 31),
+    dueDay INTEGER NOT NULL CHECK(dueDay BETWEEN 1 AND 31),
     createdAt TEXT NOT NULL,
     revision INTEGER NOT NULL DEFAULT 0 CHECK(revision >= 0 AND revision <= 9007199254740991),
     updatedAt TEXT NOT NULL,
@@ -1023,8 +1026,8 @@ async function insertCreditCard(tx: SqlExecutor, card: CreditCardProfile): Promi
   card.active ? 1 : 0, card.deleted ? 1 : 0, card.createdAt, card.revision, card.updatedAt);
 }
 async function insertCardCycleDate(tx: SqlExecutor, row: CardCycleDates): Promise<void> {
-  await tx.runAsync(`INSERT INTO card_cycle_dates (${CARD_CYCLE_COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-    row.cardId, row.sequence, row.closingISO, row.dueISO, row.createdAt, row.revision, row.updatedAt);
+  await tx.runAsync(`INSERT INTO card_cycle_dates (${CARD_CYCLE_COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    row.cardId, row.sequence, row.closingISO, row.dueISO, row.closingDay, row.dueDay, row.createdAt, row.revision, row.updatedAt);
 }
 async function insertPersonalDebt(tx: SqlExecutor, debt: PersonalDebtProfile): Promise<void> {
   await tx.runAsync(`INSERT INTO personal_debts (id, accountId, direction, counterparty, dueDateISO, note,
@@ -1110,11 +1113,16 @@ export async function saveCreditCard(db: LedgerDatabase, input: CreditCardProfil
     validateCreditCardProfile(card, archive.accounts);
     const existing = archive.cards?.find(item => item.id === card.id);
     if (!existing) throw new Error('No encontramos esta tarjeta.');
-    if (sameCreditCardProfile(existing, card)) return; // Committed already; a refresh failed.
+    const stored = cardCycleDatesOf(card.id, archive.cardCycleDates);
+    if (sameCreditCardProfile(existing, card)) {
+      // Committed already (a refresh failed): the calendar shows what was asked. A calendar change always moves the card
+      // one revision on, so an unchanged card whose calendar does not show the change yet is refused, never "saved".
+      if (cardCycleShows(existing, stored, cycle)) return;
+      throw new Error('La tarjeta cambió desde que la abriste. Volvé a revisarla.');
+    }
     validateCreditCardChange(existing, card);
     // 25B2 review: the deletion record has its own path (`deleteCreditCard`, which checks the debt and stops the rules).
     if (card.deleted) throw new Error(CARD_DELETE_PATH_MESSAGE);
-    const stored = cardCycleDatesOf(card.id, archive.cardCycleDates);
     const plan = planCardCycle({ cardId: card.id, days: { closingDay: existing.closingDay, dueDay: existing.dueDay }, rows: stored, todayISO, nowISO: card.updatedAt,
       intent: { ...cycle, days: { closingDay: card.closingDay, dueDay: card.dueDay } } });
     const others = (archive.cardCycleDates ?? []).filter(row => row.cardId !== card.id);
@@ -1255,6 +1263,9 @@ export async function createInstallmentPlan(db: LedgerDatabase, input: Installme
     }
     assertOpenAccount(card.accountId, archive.accounts, archive.cards, archive.debts);
     assertAcceptsNewObligation(card.accountId, archive.cards); // 24T1 review: an archived card takes no new plan.
+    // 24T2: a new plan bills on the card's calendar as it is now (usual days and exact dates); a purchase form left open
+    // across a change of that calendar is refused instead of recognising instalments on dates the card no longer has.
+    if (!planFollowsCalendar(plan, card, archive.cardCycleDates)) throw new Error(PLAN_CALENDAR_MESSAGE);
     validateArchive({ ...archive, installmentPlans: [...archive.installmentPlans ?? [], plan] });
     await insertInstallmentPlan(tx, plan);
   });

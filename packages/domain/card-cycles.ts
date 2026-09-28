@@ -10,9 +10,10 @@ import { validDateISO } from './ledger.ts';
  * closing day of that month (31 → the month's last day) and is due on the first due day after the closing. That grid is
  * exactly 24T1's calendar. A card may also hold **exact cycle dates** (`CardCycleDates`, schema 13): stored statements,
  * each a closing and its due, entered by the person or frozen by FinanzApp before a calendar change. Per card they form
- * one chain of consecutive statements ordered by `sequence`; before the first and after the last, statements are
- * generated from the usual days, anchored on that row (the grid closing nearest to one month before / after it), so an
- * exact date never leaves a duplicated or a missing statement next to it. Weekend or holiday shifts are never simulated:
+ * one chain of consecutive statements ordered by `sequence`; after the last, statements are generated from the card's
+ * usual days, and before the first from the days that were in effect when the chain began (the first row records them:
+ * the history before a change of days keeps the calendar it had), each anchored on the neighbouring row (the grid
+ * closing nearest to one month after / before it), so an exact date never leaves a duplicated or a missing statement. Weekend or holiday shifts are never simulated:
  * a statement moves only because the person entered its date.
  *
  * Nothing here rewrites history: a plan's schedule is written once (24T1), movements keep their dates, and the planner
@@ -31,11 +32,15 @@ export interface CardCycleDates {
   sequence: number;
   closingISO: string;
   dueISO: string;
+  /** The usual days of the calendar this statement belongs to: the card's days when FinanzApp froze it, or when the
+   * person entered it. The first row's days generate the statements before the chain, so history keeps its calendar. */
+  closingDay: number;
+  dueDay: number;
   createdAt: string;
   revision: number;
   updatedAt: string;
 }
-export const CARD_CYCLE_DATE_KEYS = ['cardId', 'sequence', 'closingISO', 'dueISO', 'createdAt', 'revision', 'updatedAt'] as const;
+export const CARD_CYCLE_DATE_KEYS = ['cardId', 'sequence', 'closingISO', 'dueISO', 'closingDay', 'dueDay', 'createdAt', 'revision', 'updatedAt'] as const;
 export const MAX_CARD_CYCLE_SEQUENCE = 100000;
 
 export const CYCLE_CLOSING_MESSAGE = 'Fecha de cierre inválida.';
@@ -150,30 +155,39 @@ export function cardCycleDatesOf(cardId: string, rows: readonly CardCycleDates[]
 }
 
 /** A position in the card's sequence of statements: the month itself without rows; with rows, 0..k-1 are the rows,
- * k.. the statements generated after the last row and ..-1 the ones generated before the first. */
-interface Calendar { days: CardCycleDays; rows: readonly CardCycleDates[]; after: number; before: number }
+ * k.. the statements generated after the last row (the card's days) and ..-1 the ones generated before the first (the
+ * first row's days). */
+interface Calendar { days: CardCycleDays; beforeDays: CardCycleDays; rows: readonly CardCycleDates[]; after: number; before: number }
 
 function calendarOf(days: CardCycleDays, rows: readonly CardCycleDates[]): Calendar {
   assertDays(days);
   const chain = [...rows].sort((a, b) => a.sequence - b.sequence);
-  if (!chain.length) return { days, rows: chain, after: 0, before: 0 };
-  return { days, rows: chain,
+  if (!chain.length) return { days, beforeDays: days, rows: chain, after: 0, before: 0 };
+  const beforeDays = { closingDay: chain[0].closingDay, dueDay: chain[0].dueDay };
+  assertDays(beforeDays);
+  return { days, beforeDays, rows: chain,
     after: nearestGridMonth(addMonthsClamped(chain[chain.length - 1].closingISO, 1), days.closingDay),
-    before: nearestGridMonth(addMonthsClamped(chain[0].closingISO, -1), days.closingDay) };
+    before: nearestGridMonth(addMonthsClamped(chain[0].closingISO, -1), beforeDays.closingDay) };
 }
 function statementAt(calendar: Calendar, position: number): CardStatement {
   const { rows, days } = calendar;
   if (!rows.length) return gridStatement(days, position);
   if (position >= 0 && position < rows.length) return { closingISO: rows[position].closingISO, dueISO: rows[position].dueISO, exact: true };
-  return position >= rows.length ? gridStatement(days, calendar.after + position - rows.length) : gridStatement(days, calendar.before + position + 1);
+  return position >= rows.length ? gridStatement(days, calendar.after + position - rows.length) : gridStatement(calendar.beforeDays, calendar.before + position + 1);
 }
 function positionOnOrAfter(calendar: Calendar, dateISO: string): number {
   const { rows, days } = calendar;
-  const grid = gridMonthOnOrAfter(dateISO, days.closingDay);
-  if (!rows.length) return grid;
-  if (dateISO <= rows[0].closingISO) return grid <= calendar.before ? grid - calendar.before - 1 : 0;
-  if (dateISO > rows[rows.length - 1].closingISO) return rows.length + Math.max(grid, calendar.after) - calendar.after;
+  if (!rows.length) return gridMonthOnOrAfter(dateISO, days.closingDay);
+  if (dateISO <= rows[0].closingISO) {
+    const grid = gridMonthOnOrAfter(dateISO, calendar.beforeDays.closingDay);
+    return grid <= calendar.before ? grid - calendar.before - 1 : 0;
+  }
+  if (dateISO > rows[rows.length - 1].closingISO) return rows.length + Math.max(gridMonthOnOrAfter(dateISO, days.closingDay), calendar.after) - calendar.after;
   return rows.findIndex(row => row.closingISO >= dateISO);
+}
+/** The days of the calendar that generates the statement at `position`. */
+function daysAt(calendar: Calendar, position: number): CardCycleDays {
+  return position < 0 && calendar.rows.length ? calendar.beforeDays : calendar.days;
 }
 function assertDate(dateISO: string): void {
   if (!validDateISO(dateISO)) throw new Error('Elegí una fecha válida.');
@@ -235,6 +249,7 @@ function validTimestamp(value: unknown): boolean {
 export function validateCardCycleDate(row: CardCycleDates, cardIds: ReadonlySet<string>): void {
   if (!row || typeof row !== 'object' || typeof row.cardId !== 'string' || !cardIds.has(row.cardId)) throw new Error(CYCLE_INVALID_MESSAGE);
   if (!Number.isSafeInteger(row.sequence) || Math.abs(row.sequence) > MAX_CARD_CYCLE_SEQUENCE) throw new Error(CYCLE_INVALID_MESSAGE);
+  if (!validDay(row.closingDay) || !validDay(row.dueDay)) throw new Error(CYCLE_INVALID_MESSAGE);
   if (typeof row.closingISO !== 'string' || !validDateISO(row.closingISO)) throw new Error(CYCLE_CLOSING_MESSAGE);
   if (typeof row.dueISO !== 'string' || !validDateISO(row.dueISO)) throw new Error(CYCLE_DUE_MESSAGE);
   if (row.dueISO <= row.closingISO) throw new Error(CYCLE_DUE_ORDER_MESSAGE);
@@ -319,8 +334,9 @@ export function planCardCycle(input: { cardId: string; days: CardCycleDays; rows
   // this change touches) through the previous statement. Without rows a position is a month; with rows, 0..k-1 are the rows.
   const byPosition = new Map<number, CardCycleDates>(chain.map((row, index) => [index, { ...row }]));
   const frozen = (position: number, sequence: number): CardCycleDates => {
-    const statement = statementAt(calendar, position);
-    return { cardId, sequence, closingISO: statement.closingISO, dueISO: statement.dueISO, createdAt: nowISO, revision: 0, updatedAt: nowISO };
+    const statement = statementAt(calendar, position), generator = daysAt(calendar, position);
+    return { cardId, sequence, closingISO: statement.closingISO, dueISO: statement.dueISO, closingDay: generator.closingDay, dueDay: generator.dueDay,
+      createdAt: nowISO, revision: 0, updatedAt: nowISO };
   };
   const low = Math.min(previousPosition, toPayPosition);
   if (!chain.length) {
@@ -349,13 +365,29 @@ export function planCardCycle(input: { cardId: string; days: CardCycleDays; rows
       const generated = cardStatementOnOrAfter(days, rows, addDaysISO(view.previous.closingISO, 1));
       if (generated.closingISO !== closingISO || generated.dueISO !== dueISO) {
         const sequence = rows.length ? rows[rows.length - 1].sequence + 1 : 0;
-        rows = [...rows, { cardId, sequence, closingISO, dueISO, createdAt: nowISO, revision: 0, updatedAt: nowISO }];
+        rows = [...rows, { cardId, sequence, closingISO, dueISO, closingDay: days.closingDay, dueDay: days.dueDay, createdAt: nowISO, revision: 0, updatedAt: nowISO }];
       }
     }
   }
   validateCardCycleDates(rows, [{ id: cardId }]);
   assertCardCycleChange({ days: input.days, rows: chain }, { days, rows }, todayISO);
   return { days, rows, changed: true };
+}
+
+/** Whether the calendar already shows what an intent asks (a retry of a change that committed): the open statement's
+ * dates as a statement, the statement to pay with its due. Storage uses it when the card profile itself is unchanged,
+ * so a calendar change is never reported as saved without being stored. */
+export function cardCycleShows(days: CardCycleDays, rows: readonly CardCycleDates[], intent: Omit<CardCycleIntent, 'days'>): boolean {
+  const at = (closingISO: string) => cardStatementOnOrAfter(days, rows, closingISO);
+  if (intent.open) {
+    const statement = at(intent.open.closingISO);
+    if (statement.closingISO !== intent.open.closingISO || statement.dueISO !== intent.open.dueISO) return false;
+  }
+  if (intent.toPay) {
+    const statement = at(intent.toPay.statementClosingISO);
+    if (statement.closingISO !== intent.toPay.statementClosingISO || statement.dueISO !== intent.toPay.dueISO) return false;
+  }
+  return true;
 }
 
 /** A new card's calendar from the two dates its form asks: the next closing (today or later) and its due date. The usual

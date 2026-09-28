@@ -4,7 +4,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { CYCLE_HISTORY_MESSAGE, CYCLE_STALE_MESSAGE, LEDGER_CURRENCIES, cardCycleView, cardCycleDatesOf, createRecoveryBackup, newCardCycle, newInstallmentPlan,
+import { CYCLE_HISTORY_MESSAGE, CYCLE_STALE_MESSAGE, LEDGER_CURRENCIES, PLAN_CALENDAR_MESSAGE, cardCycleView, cardCycleDatesOf, createRecoveryBackup, newCardCycle, newInstallmentPlan,
   parsePilotBackup, previewBackupImport, type Account, type CardCycleDates, type CreditCardProfile, type Entry } from '@finanzapp/domain';
 import { DATABASE_VERSION, SCHEMA_SCRIPTS, catchUpInstallments, createAccount, createCreditCard, createEntry, createInstallmentPlan, deleteCreditCard, importArchive,
   initializeDatabase, readArchive, saveCreditCard, type LedgerDatabase } from '../src/storage/database.ts';
@@ -96,8 +96,8 @@ test('schema 13 is reached from a real schema 12 file by an additive migration: 
   assert.equal(await version(db), 14, 'refused unchanged');
   await db.execAsync('PRAGMA user_version = 13');
   // The row needs its card, and a due on or before its closing is refused by the schema itself.
-  await assert.rejects(db.withExclusiveTransactionAsync(async tx => { await tx.runAsync(`INSERT INTO card_cycle_dates (cardId, sequence, closingISO, dueISO, createdAt, revision, updatedAt) VALUES ('nope', 0, '2026-10-28', '2026-11-05', '${createdAt}', 0, '${createdAt}')`); }), /FOREIGN KEY/);
-  await assert.rejects(db.withExclusiveTransactionAsync(async tx => { await tx.runAsync(`INSERT INTO card_cycle_dates (cardId, sequence, closingISO, dueISO, createdAt, revision, updatedAt) VALUES ('card', 0, '2026-10-28', '2026-10-28', '${createdAt}', 0, '${createdAt}')`); }), /CHECK/);
+  await assert.rejects(db.withExclusiveTransactionAsync(async tx => { await tx.runAsync(`INSERT INTO card_cycle_dates (cardId, sequence, closingISO, dueISO, closingDay, dueDay, createdAt, revision, updatedAt) VALUES ('nope', 0, '2026-10-28', '2026-11-05', 28, 5, '${createdAt}', 0, '${createdAt}')`); }), /FOREIGN KEY/);
+  await assert.rejects(db.withExclusiveTransactionAsync(async tx => { await tx.runAsync(`INSERT INTO card_cycle_dates (cardId, sequence, closingISO, dueISO, closingDay, dueDay, createdAt, revision, updatedAt) VALUES ('card', 0, '2026-10-28', '2026-10-28', 28, 5, '${createdAt}', 0, '${createdAt}')`); }), /CHECK/);
 });
 
 test('a new card stores its first statement exactly only when its usual days cannot produce it, in the card’s own commit; a retry is a no-op and other dates are refused', async () => {
@@ -164,6 +164,10 @@ test('a plan created after exact dates uses them; one created before keeps its c
   assert.deepEqual(plans.find(plan => plan.id === 'before')!.schedule.map(row => row.billingDateISO), ['2026-10-28', '2026-11-28', '2026-12-28'], 'written once, never realigned');
   assert.deepEqual(plans.find(plan => plan.id === 'after')!.schedule.map(row => [row.billingDateISO, row.dueDateISO].join('/')),
     ['2026-10-26/2026-11-04', '2026-11-28/2026-12-05', '2026-12-28/2027-01-05']);
+  // A purchase form opened before the change (its plan built on the old calendar) is refused, never billed on dates the card no longer has.
+  const stale = newInstallmentPlan({ id: 'stale', card, cardAccount, merchant: 'Heladera', category: 'Hogar', purchaseDateISO: '2026-10-10', principalMinor: 3000, count: 3, placement: 'current', createdAt: at('2026-10-11') });
+  await assert.rejects(createInstallmentPlan(db, stale), new RegExp(PLAN_CALENDAR_MESSAGE));
+  await createInstallmentPlan(db, after); // A retry of the committed plan is still a no-op.
   assert.equal(await catchUpInstallments(db, '2026-10-27'), 1, 'the exact closing already passed: that instalment only');
   const recorded = (await readArchive(db)).records.map(record => record.entry.id).filter(id => id.startsWith('inst')).sort();
   assert.deepEqual(recorded, ['inst_after_001']);
@@ -224,4 +228,27 @@ test('storage plans the change itself: a card saved with other days never skips 
     new RegExp(CYCLE_STALE_MESSAGE), 'its due passed: nothing left to correct');
   assert.deepEqual(await rowsOf(db), ['0 2026-09-28 2026-10-05 0', '1 2026-10-26 2026-11-04 0']);
   void CYCLE_HISTORY_MESSAGE;
+});
+
+test('review round: a calendar change never succeeds silently: an unchanged card with a change it does not show is refused; a committed one retries as a no-op', async () => {
+  const { db } = await seeded();
+  await assert.rejects(saveCreditCard(db, card, { open: { statementClosingISO: '2026-10-28', closingISO: '2026-10-26', dueISO: '2026-11-04' } }, '2026-10-01'), /cambió desde que la abriste/);
+  assert.equal((await readArchive(db)).cardCycleDates, undefined, 'nothing written');
+  const moved = edit(card, 1, '2026-10-01');
+  const intent = { open: { statementClosingISO: '2026-10-28', closingISO: '2026-10-26', dueISO: '2026-11-04' } };
+  await saveCreditCard(db, moved, intent, '2026-10-01');
+  await saveCreditCard(db, moved, intent, '2026-10-02'); // The retry after a failed refresh, even the next day.
+  assert.deepEqual(await rowsOf(db), ['0 2026-09-28 2026-10-05 0', '1 2026-10-26 2026-11-04 0']);
+});
+
+test('review round: after new usual days the history before the chain keeps its calendar: no phantom statement to pay', async () => {
+  const { db } = setup();
+  await initializeDatabase(db);
+  await createAccount(db, bank);
+  await createCreditCard(db, cardAccount, { ...card, closingDay: 1, dueDay: 8 });
+  await saveCreditCard(db, edit({ ...card, closingDay: 1, dueDay: 8 }, 1, '2026-10-02', { closingDay: 13, dueDay: 2 }), {}, '2026-10-02');
+  assert.deepEqual(await rowsOf(db), ['0 2026-10-01 2026-10-08 0']);
+  const archive = await readArchive(db);
+  assert.deepEqual(archive.cardCycleDates!.map(row => [row.closingDay, row.dueDay]), [[1, 8]], 'the frozen statement records the calendar it belonged to');
+  assert.deepEqual(await viewOn(db, '2026-10-02'), { open: '2026-11-13', openDue: '2026-12-02', previous: '2026-10-01', nextDue: '2026-10-08', toPay: '2026-10-01' });
 });

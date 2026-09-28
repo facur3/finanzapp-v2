@@ -38,6 +38,7 @@ export const backup: Pick<Messages, 'backup'> = {
         transfers: 'New transfers',
         recurring: 'New recurring items',
         budgets: 'New budgets',
+        plans: 'New installment plans',
         voided: 'Undone records to keep',
         present: 'Records already here',
       },

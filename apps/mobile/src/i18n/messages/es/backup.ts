@@ -40,6 +40,8 @@ export const backup = {
         transfers: 'Transferencias nuevas',
         recurring: 'Recurrentes nuevos',
         budgets: 'Presupuestos nuevos',
+        /** 24T2: purchases in instalments the copy adds (each with its schedule). */
+        plans: 'Planes de cuotas nuevos',
         voided: 'Deshechos a conservar',
         present: 'Registros ya presentes',
       },

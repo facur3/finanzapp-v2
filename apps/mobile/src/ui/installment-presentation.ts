@@ -1,6 +1,6 @@
-import { MAX_INSTALLMENTS, assertInstallmentPlanDeletable, cardStatementsFrom, installmentAmounts, installmentEntryId, installmentOccurrenceOf, installmentPlanFigures,
-  installmentSchedule, installmentState, type CardCycleDates, type CardStatement, type CreditCardProfile, type Installment, type InstallmentComponent,
-  type InstallmentPlan, type InstallmentPlanFigures, type InstallmentPlanStatus, type RecordedEntry, type StatementPlacement } from '@finanzapp/domain';
+import { INSTALLMENT_COMPONENTS, MAX_INSTALLMENTS, assertInstallmentPlanDeletable, cardStatementsFrom, installmentAmounts, installmentEntryId, installmentOccurrenceOf,
+  installmentPlanFigures, installmentSchedule, installmentState, type CardCycleDates, type CardStatement, type CreditCardProfile, type Installment,
+  type InstallmentComponent, type InstallmentPlan, type InstallmentPlanFigures, type InstallmentPlanStatus, type RecordedEntry, type StatementPlacement } from '@finanzapp/domain';
 
 /** Producto 24T2: what the screens show of a purchase in instalments, derived from the plan and the ledger (never stored
  * twice). Pure: no React, so Node tests load it directly. Words are chosen by the screens; this module names states. */
@@ -17,10 +17,12 @@ export function parseInstallmentCount(text: string): number | null {
   return count >= MIN_PLAN_COUNT && count <= MAX_INSTALLMENTS ? count : null;
 }
 
-/** The state of one row of a plan's schedule, read from its principal's movement: `recognised` (in the ledger, it counts),
- * `undone` (the person undid it: it counts nowhere and is never recreated), `next` (the first one still to come), `future`,
- * or `cancelled` (the plan stopped before it). «Pagada» is never a state: a card payment is not assigned to an instalment. */
-export type ScheduleRowState = 'recognised' | 'next' | 'future' | 'undone' | 'cancelled';
+/** The state of one row of a plan's schedule, read from the movements of its components (each share has its own):
+ * `recognised` (every share is in the ledger and counts), `undone` (the person undid every share: none counts, none is
+ * recreated), `partial` (some shares count and some were undone: `recognisedMinor` says what counts), `next` (the first
+ * one still to come), `future`, or `cancelled` (the plan stopped before it). «Pagada» is never a state: a card payment is
+ * not assigned to an instalment. */
+export type ScheduleRowState = 'recognised' | 'partial' | 'next' | 'future' | 'undone' | 'cancelled';
 export interface PlanScheduleRow {
   number: number;
   billingDateISO: string;
@@ -29,8 +31,11 @@ export interface PlanScheduleRow {
   totalMinor: number;
   principalMinor: number;
   financingMinor: number;
+  /** The shares of this instalment whose movements count now, and the ones the person undid. */
+  recognisedMinor: number;
+  undoneMinor: number;
   state: ScheduleRowState;
-  /** The movement that recognises this instalment's principal (a recognised or undone row opens it). */
+  /** The movement that recognises this instalment's principal (a recognised, partial or undone row opens it). */
   entryId: string;
 }
 
@@ -38,16 +43,21 @@ export function planScheduleRows(plan: InstallmentPlan, records: readonly Record
   const stopped = plan.cancelledAt !== null || plan.deleted;
   let nextGiven = false;
   return plan.schedule.map(row => {
-    const principal = installmentState(plan, row, records, 'principal');
+    const shares = INSTALLMENT_COMPONENTS.map(component => ({ amount: row[`${component}Minor`], state: installmentState(plan, row, records, component) }))
+      .filter(share => share.amount > 0);
+    const recognisedMinor = shares.filter(share => share.state === 'recognised').reduce((sum, share) => sum + share.amount, 0);
+    const undoneMinor = shares.filter(share => share.state === 'undone').reduce((sum, share) => sum + share.amount, 0);
+    const scheduled = shares.every(share => share.state === 'scheduled');
     let state: ScheduleRowState;
-    if (principal === 'recognised') state = 'recognised';
-    else if (principal === 'undone') state = 'undone';
+    if (shares.every(share => share.state === 'recognised')) state = 'recognised';
+    else if (shares.every(share => share.state === 'undone')) state = 'undone';
+    else if (!scheduled) state = 'partial';
     else if (stopped) state = 'cancelled';
     else if (!nextGiven) { state = 'next'; nextGiven = true; }
     else state = 'future';
     const financingMinor = row.interestMinor + row.feeMinor + row.taxMinor;
     return { number: row.number, billingDateISO: row.billingDateISO, dueDateISO: row.dueDateISO, totalMinor: row.principalMinor + financingMinor,
-      principalMinor: row.principalMinor, financingMinor, state, entryId: installmentEntryId(plan.id, row.number, 'principal') };
+      principalMinor: row.principalMinor, financingMinor, recognisedMinor, undoneMinor, state, entryId: installmentEntryId(plan.id, row.number, 'principal') };
   });
 }
 
@@ -62,7 +72,8 @@ export interface PlanSummary {
   financingMinor: number;
   /** Price plus financing: «Total financiado». Equal to the price without financing. */
   totalFinancedMinor: number;
-  /** Nothing recorded yet (a plan created by mistake): the one lifecycle action 24T2 offers is deleting it. */
+  /** A live plan with nothing recorded yet (created by mistake): the one lifecycle action 24T2 offers is deleting it.
+   * Never for a cancelled or deleted plan (storage refuses both). */
   deletable: boolean;
 }
 
@@ -70,18 +81,19 @@ export function planSummary(plan: InstallmentPlan, records: readonly RecordedEnt
   const figures = installmentPlanFigures(plan, records);
   const rows = planScheduleRows(plan, records);
   const financingMinor = plan.interestMinor + plan.feeMinor + plan.taxMinor;
-  let deletable = true;
-  try { assertInstallmentPlanDeletable(plan, records); } catch { deletable = false; }
+  let deletable = !plan.deleted && plan.cancelledAt === null;
+  if (deletable) { try { assertInstallmentPlanDeletable(plan, records); } catch { deletable = false; } }
   return { plan, figures, status: figures.status, next: rows.find(row => row.state === 'next') ?? null, financingMinor,
     totalFinancedMinor: plan.principalMinor + financingMinor, deletable };
 }
 
-/** A card's plans for its detail: live ones first (by their next instalment), then completed, then cancelled. Deleted
- * plans (created by mistake, nothing recorded) are gone. */
+/** A card's plans for its detail: live ones first (by their next instalment; a live plan with nothing left to come, only
+ * undone shares, after them), then completed, then cancelled. Deleted plans (created by mistake, nothing recorded) are gone. */
 export function cardPlanSummaries(cardId: string, plans: readonly InstallmentPlan[] = [], records: readonly RecordedEntry[] = []): PlanSummary[] {
   const rank: Record<InstallmentPlanStatus, number> = { active: 0, completed: 1, cancelled: 2, deleted: 3 };
+  const nextOf = (summary: PlanSummary) => summary.next?.billingDateISO ?? '9999-12-31';
   return plans.filter(plan => plan.cardId === cardId && !plan.deleted).map(plan => planSummary(plan, records))
-    .sort((a, b) => rank[a.status] - rank[b.status] || (a.next?.billingDateISO ?? '').localeCompare(b.next?.billingDateISO ?? '')
+    .sort((a, b) => rank[a.status] - rank[b.status] || nextOf(a).localeCompare(nextOf(b))
       || b.plan.purchaseDateISO.localeCompare(a.plan.purchaseDateISO) || a.plan.id.localeCompare(b.plan.id));
 }
 
@@ -110,8 +122,11 @@ export interface PurchasePreview {
   maxMinor: number;
   minMinor: number;
   even: boolean;
-  /** The first statement already closed (a purchase recorded late): that instalment is recognised when the plan is saved. */
+  /** The first statement already closed (a purchase recorded late: its closing is before today). */
   firstAlreadyClosed: boolean;
+  /** The first instalment is recognised as soon as the plan is saved: its statement closed, or closes today (on its
+   * closing day a statement is still open, and its instalment is recorded that day). */
+  firstRecordedAtSave: boolean;
 }
 
 export function purchasePreview(input: { card: Pick<CreditCardProfile, 'id' | 'closingDay' | 'dueDay'>; cycleDates: readonly CardCycleDates[]; purchaseDateISO: string;
@@ -121,6 +136,6 @@ export function purchasePreview(input: { card: Pick<CreditCardProfile, 'id' | 'c
       { interestMinor: input.interestMinor, feeMinor: 0, taxMinor: 0 }, input.cycleDates.filter(row => row.cardId === input.card.id));
     const amounts = installmentAmounts(schedule);
     return { schedule, firstBillingISO: schedule[0].billingDateISO, firstDueISO: schedule[0].dueDateISO, maxMinor: amounts.maxMinor, minMinor: amounts.minMinor,
-      even: amounts.even, firstAlreadyClosed: schedule[0].billingDateISO <= input.todayISO };
+      even: amounts.even, firstAlreadyClosed: schedule[0].billingDateISO < input.todayISO, firstRecordedAtSave: schedule[0].billingDateISO <= input.todayISO };
   } catch { return null; }
 }

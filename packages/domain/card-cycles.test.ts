@@ -11,8 +11,8 @@ import type { Account, Entry } from './ledger';
 const now = '2026-10-01T12:00:00.000Z';
 const later = '2026-10-27T12:00:00.000Z';
 const days = (closingDay: number, dueDay: number): CardCycleDays => ({ closingDay, dueDay });
-const row = (sequence: number, closingISO: string, dueISO: string, createdAt = now): CardCycleDates =>
-  ({ cardId: 'card', sequence, closingISO, dueISO, createdAt, revision: 0, updatedAt: createdAt });
+const row = (sequence: number, closingISO: string, dueISO: string, createdAt = now, generator: CardCycleDays = { closingDay: 28, dueDay: 5 }): CardCycleDates =>
+  ({ cardId: 'card', sequence, closingISO, dueISO, ...generator, createdAt, revision: 0, updatedAt: createdAt });
 const view = (cycle: CardCycleDays, todayISO: string, rows: CardCycleDates[] = []) => {
   const result = cardCycleView(cycle, rows, todayISO);
   return { previous: [result.previous.closingISO, result.previous.dueISO], open: [result.open.closingISO, result.open.dueISO], start: result.openStartISO,
@@ -73,7 +73,7 @@ describe('exact cycle dates', () => {
 
   it('a closing moved across a month boundary never duplicates nor drops a statement', () => {
     // Closing day 1: the 1 nov statement closes on 31 oct this time.
-    const moved = [row(0, '2026-10-01', '2026-10-10'), row(1, '2026-10-31', '2026-11-10')];
+    const moved = [row(0, '2026-10-01', '2026-10-10', now, days(1, 10)), row(1, '2026-10-31', '2026-11-10', now, days(1, 10))];
     const closings = cardStatementsFrom(days(1, 10), moved, '2026-08-15', 0, 6).map(item => item.closingISO);
     expect(closings).toEqual(['2026-09-01', '2026-10-01', '2026-10-31', '2026-12-01', '2027-01-01', '2027-02-01']);
   });
@@ -111,11 +111,28 @@ describe('planning a change never moves a statement that closed', () => {
   });
 
   it('a calendar moving from the 1st to the 30th keeps one statement per cycle', () => {
-    const start = { ...base, days: days(1, 10), rows: [row(0, '2026-10-01', '2026-10-10'), row(1, '2026-10-31', '2026-11-10')], todayISO: '2026-11-05' };
+    const start = { ...base, days: days(1, 10), rows: [row(0, '2026-10-01', '2026-10-10', now, days(1, 10)), row(1, '2026-10-31', '2026-11-10', now, days(1, 10))], todayISO: '2026-11-05' };
     const plan = planCardCycle({ ...start, nowISO: later, intent: { days: days(30, 10), open: { statementClosingISO: '2026-12-01', closingISO: '2026-11-30', dueISO: '2026-12-10' } } });
     const closings = cardStatementsFrom(plan.days, plan.rows, '2026-09-15', 0, 6).map(item => item.closingISO);
     expect(closings).toEqual(['2026-10-01', '2026-10-31', '2026-11-30', '2026-12-30', '2027-01-30', '2027-02-28']);
     expect(plan.rows.slice(0, 2)).toEqual(start.rows);
+  });
+
+  it('review round: new usual days never invent a statement before the chain; history keeps the calendar it had', () => {
+    // Closing 1, due 8, changed to 13/2 on 2026-10-02: the statement to pay is still the 1 oct one (due 8 oct).
+    const first = planCardCycle({ ...base, days: days(1, 8), todayISO: '2026-10-02', intent: { days: days(13, 2) } });
+    expect(first.rows).toEqual([row(0, '2026-10-01', '2026-10-08', now, days(1, 8))]);
+    expect(view(first.days, '2026-10-02', first.rows)).toMatchObject({ previous: ['2026-10-01', '2026-10-08'], nextDue: '2026-10-08', toPay: '2026-10-01' });
+    expect(cardStatementsFrom(first.days, first.rows, '2026-08-15', 0, 3).map(item => item.closingISO)).toEqual(['2026-09-01', '2026-10-01', '2026-11-13']);
+    // Closing 28, due 5, changed to 12/11: no «12 sep» statement appears, and a purchase of 10 sep stays in the 28 sep one.
+    const second = planCardCycle({ ...base, todayISO: '2026-10-02', intent: { days: days(12, 11) } });
+    expect(cardStatementOnOrAfter(second.days, second.rows, '2026-09-10').closingISO).toBe('2026-09-28');
+    expect(cardStatementsFrom(second.days, second.rows, '2026-08-15', 0, 2).map(item => item.closingISO)).toEqual(['2026-08-28', '2026-09-28']);
+    for (const day of ['2026-10-06', '2026-10-09', '2026-10-11']) expect(view(second.days, day, second.rows).nextDue).not.toBe('2026-10-11');
+    // Closing 28, due 31 in March: two closed statements share the 31 mar due; after new days, the older one is still the one to pay.
+    const march = planCardCycle({ ...base, days: days(28, 31), todayISO: '2027-03-30', intent: { days: days(10, 20) } });
+    expect(view(march.days, '2027-03-30', march.rows)).toMatchObject({ toPay: '2027-02-28', nextDue: '2027-03-31' });
+    expect(cardStatementOnOrAfter(march.days, march.rows, '2027-02-20').closingISO).toBe('2027-02-28');
   });
 
   it('corrects the due date of the statement still to pay; its closing stays', () => {
@@ -245,7 +262,7 @@ describe('validation', () => {
           for (const shift of [-9, -3, 0, 4, 10]) {
             const base = statementClosingOnOrAfter(anchor, closingDay);
             const exactClosing = addDaysISO(base, shift);
-            const rows = [row(0, exactClosing, addDaysISO(exactClosing, 7))];
+            const rows = [row(0, exactClosing, addDaysISO(exactClosing, 7), now, days(closingDay, dueDay))];
             const list = cardStatementsFrom(days(closingDay, dueDay), rows, addDaysISO(exactClosing, -80), 0, 7);
             for (let index = 0; index < list.length; index++) {
               expect(list[index].dueISO > list[index].closingISO).toBe(true);

@@ -251,6 +251,7 @@ export const errors: Pick<Messages, 'errors'> = {
       closingDate: 'Invalid closing date.',
       dueDate: 'Invalid due date.',
       totalBelowPrice: 'The total financed can’t be less than the price.',
+      calendarChanged: 'The card’s calendar changed since you opened this purchase. Review it again.',
     },
     cycles: {
       dueOrder: 'A statement’s due date must come after its closing date.',

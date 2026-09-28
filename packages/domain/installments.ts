@@ -100,6 +100,8 @@ export const PLAN_TOO_SMALL_MESSAGE = 'Cada cuota debe ser de al menos una unida
 export const PLAN_FINANCING_MESSAGE = 'Los intereses, las comisiones y los impuestos de financiación deben ser cero o positivos, cada uno con su propia categoría.';
 /** 24T2: the one financing field of the purchase form («Total financiado») never goes below the price. */
 export const PLAN_TOTAL_BELOW_PRICE_MESSAGE = 'El total financiado no puede ser menor que el precio.';
+/** 24T2: a purchase form left open while the card's calendar changed: its preview no longer says when the plan bills. */
+export const PLAN_CALENDAR_MESSAGE = 'El calendario de la tarjeta cambió desde que abriste la compra. Volvé a revisarla.';
 export const PLAN_CARD_MESSAGE = 'Una compra en cuotas se registra en una tarjeta de crédito existente.';
 export const PLAN_CURRENCY_MESSAGE = 'El plan de cuotas usa la moneda de su tarjeta.';
 export const PLAN_STATE_MESSAGE = 'Estado de plan de cuotas inválido.';
@@ -165,9 +167,18 @@ export { statementClosingAfter, statementClosingOnOrAfter, statementDueDate } fr
  * the engine keeps them. */
 export function interestFromTotalFinanced(principalMinor: number, totalFinancedMinor: number): number {
   if (!Number.isSafeInteger(principalMinor) || principalMinor <= 0 || principalMinor > MAX_ENTRY_MINOR) throw new Error(PLAN_PRINCIPAL_MESSAGE);
-  if (!Number.isSafeInteger(totalFinancedMinor) || totalFinancedMinor <= 0 || totalFinancedMinor > MAX_ENTRY_MINOR) throw new Error(PLAN_FINANCING_MESSAGE);
+  if (!Number.isSafeInteger(totalFinancedMinor)) throw new Error(PLAN_FINANCING_MESSAGE);
+  if (totalFinancedMinor > MAX_ENTRY_MINOR) throw new Error('El monto es demasiado grande.');
   if (totalFinancedMinor < principalMinor) throw new Error(PLAN_TOTAL_BELOW_PRICE_MESSAGE);
   return totalFinancedMinor - principalMinor;
+}
+
+/** The financing a purchase form sends to `newInstallmentPlan`: «Sin interés» (`totalFinancedMinor` null) or a total
+ * financed equal to the price is no interest and no interest category (a zero component never carries one); a larger
+ * total is the difference, in `interestCategory` (the Intereses identity, `interestCategoryLabel`). */
+export function planFinancing(principalMinor: number, totalFinancedMinor: number | null, interestCategory: string): { interestMinor: number; interestCategory: string } {
+  const interestMinor = totalFinancedMinor === null ? 0 : interestFromTotalFinanced(principalMinor, totalFinancedMinor);
+  return { interestMinor, interestCategory: interestMinor > 0 ? interestCategory : '' };
 }
 
 /** What each instalment of a schedule charges in total (principal and every financing share), and whether they are all
@@ -292,6 +303,16 @@ export function validateInstallmentPlanChange(before: InstallmentPlan, after: In
 
 function sameSchedule(a: readonly Installment[], b: readonly Installment[]): boolean {
   return a.length === b.length && a.every((row, index) => INSTALLMENT_KEYS.every(key => row[key] === b[index][key]));
+}
+/** 24T2: whether a new plan's schedule is exactly the one the card's calendar gives now (its usual days and its exact
+ * statement dates), for either placement. Storage checks it when a plan is created, never on an existing or imported plan
+ * (their schedules are contractual). */
+export function planFollowsCalendar(plan: InstallmentPlan, card: Pick<CreditCardProfile, 'id' | 'closingDay' | 'dueDay'>, cycleDates: readonly CardCycleDates[] = []): boolean {
+  const rows = cycleDates.filter(row => row.cardId === card.id);
+  const financing = { interestMinor: plan.interestMinor, feeMinor: plan.feeMinor, taxMinor: plan.taxMinor };
+  return (['current', 'next'] as const).some(placement => {
+    try { return sameSchedule(installmentSchedule(card, plan.purchaseDateISO, placement, plan.principalMinor, plan.count, financing, rows), plan.schedule); } catch { return false; }
+  });
 }
 export function sameInstallmentPlan(a: InstallmentPlan, b: InstallmentPlan): boolean {
   return [...PLAN_SCALAR_KEYS, ...PLAN_STATE_KEYS].every(key => a[key] === b[key]) && sameSchedule(a.schedule, b.schedule);

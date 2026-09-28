@@ -5,7 +5,7 @@ import { CARD_PLAN_MESSAGE, INSTALLMENT_DRIFT_MESSAGE, INSTALLMENT_ENTRY_MESSAGE
   deleteInstallmentPlan, distributeMinor, installmentEntries, installmentEntryId, installmentOccurrenceOf, installmentPlanFigures, installmentPlanStatus,
   installmentSchedule, installmentState, materializeInstallmentPlan, newInstallmentPlan, pendingInstallmentPlans, sameInstallmentPlan, statementClosingAfter, statementClosingOnOrAfter,
   statementDueDate, validateInstallmentPlan, validateInstallmentPlanChange, validateInstallmentPlans, type InstallmentPlan,
-  PLAN_TOTAL_BELOW_PRICE_MESSAGE, installmentAmounts, interestFromTotalFinanced } from './installments';
+  PLAN_TOTAL_BELOW_PRICE_MESSAGE, installmentAmounts, interestFromTotalFinanced, planFinancing } from './installments';
 import { MAX_ENTRY_MINOR } from './money';
 import { accountBalanceMinor, type Account, type Entry, type LedgerSnapshot, type Transfer } from './ledger';
 import { CARD_ARCHIVED_MESSAGE, CARD_DEBT_MESSAGE, assertAcceptsNewObligation, assertCardDeletable, postingAccountsFor, cardAvailableLimitMinor, cardDebtMinor, debtTotalsByCurrency, deleteCreditCard, liquidTotalsByCurrency, validateLiabilityProfiles,
@@ -589,7 +589,12 @@ describe('Producto 24T2: the simple financing of the purchase form', () => {
     expect(() => interestFromTotalFinanced(100000000, 99999999)).toThrow(PLAN_TOTAL_BELOW_PRICE_MESSAGE);
     expect(() => interestFromTotalFinanced(0, 100)).toThrow(PLAN_PRINCIPAL_MESSAGE);
     expect(() => interestFromTotalFinanced(100, 1.5)).toThrow(PLAN_FINANCING_MESSAGE);
-    expect(() => interestFromTotalFinanced(100, MAX_ENTRY_MINOR + 1)).toThrow(PLAN_FINANCING_MESSAGE);
+    expect(() => interestFromTotalFinanced(100, MAX_ENTRY_MINOR + 1)).toThrow('El monto es demasiado grande.');
+    expect(() => interestFromTotalFinanced(100, 0)).toThrow(PLAN_TOTAL_BELOW_PRICE_MESSAGE, 'a total of zero is below the price');
+    expect(planFinancing(100000000, null, 'Intereses')).toEqual({ interestMinor: 0, interestCategory: '' });
+    expect(planFinancing(100000000, 100000000, 'Intereses')).toEqual({ interestMinor: 0, interestCategory: '' }, 'equal to the price: «Sin interés», never a charge');
+    expect(planFinancing(100000000, 120000000, 'Intereses')).toEqual({ interestMinor: 20000000, interestCategory: 'Intereses' });
+    expect(plan({ id: 'even', ...planFinancing(120000, 120000, 'Intereses') }).interestMinor).toBe(0);
   });
 
   it('reports each instalment\'s total and whether they are all equal; an uneven remainder is never shown as equal', () => {
