@@ -92,9 +92,13 @@ must remain a draft, not a guessed debit. Match a selected card to a local accou
 deduplicate repeated deliveries and offer undo. Prefer App Intents over sensitive
 data in URLs. Do not put bank tokens in a Shortcut or URL.
 
-FinanceKit currently documents supported US products and UK banks, not general
-Argentine card history. It requires Apple approval and user authorization.
-Writing Swift does not bypass entitlements or regional restrictions.
+FinanceKit is a research gate, not a dependency of the core: an entitlement that
+needs Apple's approval and the person's authorization, whose covered institutions,
+regions and data are checked against Apple's current documentation when that work
+starts, never assumed from an earlier reading and never stated as a categorical
+claim about a country or a card (revised 2026-09-28, Producto 24T1C; the scope is
+in the roadmap's 25D). Writing Swift does not bypass entitlements or regional
+restrictions.
 
 ## Acceptance / reconsideration gate
 

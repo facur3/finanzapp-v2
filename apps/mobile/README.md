@@ -46,10 +46,7 @@ v10 once a recurring rule or a debt is deleted, v11 once an account or a card is
 25B2), and v12 once a purchase in instalments exists (Producto 24T1); v1–v12 files import after a review that never
 overwrites, and an older build refuses a v12 file or a schema 12 database unchanged. The only network call without the owner's
 backend is the reference-rate download from Frankfurter (24C1): a date window and currency codes, no
-key, no amount, no account, only when a consolidated view needs a month it lacks. Backups export as JSON v8 while the ledger holds only ARS and
-USD, as v9 (adds `currencyUnits`) once another currency is stored and as v10 (adds each recurring
-rule's and debt's `deleted` flag) once one is deleted; v1–v10 files import
-after a review that never overwrites. Cloud is opt-in: the Assistant's remote runtime,
+key, no amount, no account, only when a consolidated view needs a month it lacks. Cloud is opt-in: the Assistant's remote runtime,
 future sync and any AI provider need the owner's setup and consent; nothing leaves the
 device otherwise.
 
@@ -192,7 +189,7 @@ is distributed to people. Today:
 
 | | What |
 | --- | --- |
-| Implemented | Everything in the roadmap's §1, up to Producto 25B3 (the version line at the end of Más reads «FinanzApp 0.1.0 (25B3)»; a development build adds the material and locale diagnostics under it). |
+| Implemented | Everything in the roadmap's §1, up to Producto 24T1 (PR #67: the instalment engine, schema 12, backup v12, no UI). The version line at the end of Más still reads «FinanzApp 0.1.0 (25B3)», the last delivery that changed a screen; a development build adds the material and locale diagnostics under it. |
 | Device-tested | The first Expo Go flow (2026-09-12), the Interfaz 15 motion direction, the per-app Language row on build `1d69d2d4`, and the owner's 24B5/24B6 sessions that produced the 24B6 and 24UX1 corrections. Every later section of the [device checklist](../../docs/mobile-device-checklist.md) is still pending, and no per-item 24B5/24B6 result is recorded. |
 | Released | Nothing. No store build, no TestFlight, no production identity. |
 

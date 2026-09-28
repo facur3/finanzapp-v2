@@ -49,8 +49,9 @@ personal o un cobro pendiente también es una cuenta interna con perfil
 
 Ventajas frente a un modelo separado: reutiliza saldos exactos en centavos,
 auditoría de ediciones, deshacer/recuperar, copias v1–v6 y las mismas pruebas.
-Límite conocido: las cuotas todavía no se modelan; requieren semántica de
-calendario y compromisos futuros, no gastos recurrentes duplicados.
+Límite conocido al decidirlo: las cuotas todavía no se modelaban; requerían semántica
+de calendario y compromisos futuros, no gastos recurrentes duplicados. Superado por la
+regla 7 (motor, esquema 12 y copia v12 de 24T1, PR #67, 2026-09-28).
 
 ## Invariantes contables de tarjetas (2026-09-28, cierre de Producto 25B2)
 
@@ -59,8 +60,9 @@ fijaron en `packages/domain/card-invariants.test.ts` (una prueba por regla) y en
 el copy. Un cambio que rompa una de ellas es una regresión, no un rediseño. El
 2026-09-28 se corrigió la redacción de las reglas 2 y 7: «un único gasto» para una
 compra en cuotas podía leerse como reconocer todo el principal el día de la compra,
-y la decisión es la contraria (regla 7). Las partes de 24T quedan como `it.todo` en
-esa prueba hasta que 24T1 las implemente.
+y la decisión es la contraria (regla 7). 24T1 (PR #67) convirtió en pruebas 12 de los
+13 `it.todo` de 24T; el que queda, el registro de un plan en moneda extranjera, es de
+24C2.
 
 1. **Una tarjeta de crédito no está vinculada contablemente a una cuenta bancaria
    por cada compra.** `CreditCardProfile` tiene un solo vínculo, `accountId`: su
@@ -227,6 +229,21 @@ esa prueba hasta que 24T1 las implemente.
    - **Moneda:** en 24T1 un plan es de la moneda de su tarjeta (`PLAN_CURRENCY_MESSAGE`).
      24C2 agregará al lado el registro de la compra en moneda original (importe,
      tasa, cargos y procedencia); no se agregan columnas vacías hoy.
+   - **Financiación en la interfaz (decidido el 2026-09-28, Producto 24T1C, para
+     24T2):** el camino principal es «Sin interés» y la financiación es una sección
+     secundaria plegable (principal, cantidad de cuotas, interés total, comisiones y
+     impuestos de financiación opcionales, todo en cero por defecto). El interés se
+     escribe como importe total o, solo como ayuda, como **porcentaje total** sobre el
+     principal, que se convierte al crear el plan en un importe exacto en unidades
+     menores; ningún porcentaje ni tasa en coma flotante se guarda como fuente de
+     verdad. Sin «tasa mensual» mientras su fórmula no esté definida; sin CFT, TNA ni
+     TEA salvo que se implemente su definición correctamente. Los cuatro componentes
+     conservan sus identidades separadas.
+   - **Fecha real del ciclo (requisito de 24T2):** los días de cierre y vencimiento
+     son un valor por defecto; la persona podrá corregir la fecha exacta del ciclo
+     actual (próximo cierre y próximo vencimiento, o un ajuste equivalente por ciclo)
+     sin reescribir resúmenes, movimientos ni calendarios de planes ya creados. Sin
+     feriados ni corrimientos a días hábiles simulados.
    - **Antes de 24T1:** archivar conservaba el saldo pendiente y seguía aceptando el
      pago; eliminar se rechazaba con saldo pendiente y se permitía en cero; una
      tarjeta eliminada no aceptaba pagos. Todo eso sigue igual.

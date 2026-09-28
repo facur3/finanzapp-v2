@@ -381,6 +381,35 @@ importe, moneda y estado.
   muestra hasta que toda la app lo tenga (23.1): un iPhone en inglés sigue leyendo
   español antes que media app traducida.
 
+## Producto 24T1C — dirección para 24T2 (solo documentación)
+
+Nada cambia en pantalla. Refina la dirección de Tarjetas de 25B3 y fija cómo 24T2 presenta la financiación y las
+fechas del ciclo. El contrato exacto está en el roadmap («Producto 24T1C») y en la decisión 003, regla 7.
+
+- **Compra en cuotas: lo simple primero.** El caso normal es «12 cuotas sin interés» y debe sentirse tan liviano
+  como una compra común: el valor por defecto es **«Sin interés»** y la financiación va en una sección secundaria
+  plegable. Abierta muestra principal/precio, cantidad de cuotas, interés total, comisiones o cargos opcionales e
+  impuestos de financiación opcionales, todos en cero. El interés se escribe como importe total o, como ayuda, como
+  porcentaje total sobre el principal; el porcentaje se convierte en el momento a un importe exacto y es ese importe
+  el que se guarda. Sin «tasa mensual», sin CFT/TNA/TEA. Intereses, Comisiones e Impuestos siguen siendo tres
+  componentes separados de la Compra.
+- **Próximo cierre y próximo vencimiento, por separado.** Los días habituales son un valor por defecto; la fecha real
+  del ciclo actual se puede corregir sin tocar resúmenes, movimientos ni calendarios de planes ya creados. La
+  interfaz nunca funde las dos fechas en una línea ambigua y nunca inventa feriados ni corrimientos a días hábiles.
+- **Tarjetas: deck vertical seleccionable (a evaluar).** Un stack compacto en lugar del carrusel horizontal. Las caras
+  de las tarjetas son de identidad (emisor, nombre, últimos cuatro, color) y sin cifras amontonadas. La tarjeta
+  seleccionada revela debajo un resumen financiero, en este orden: saldo pendiente/facturado actual, próximo cierre,
+  próximo vencimiento, Pagar, cuotas futuras comprometidas, últimos movimientos. El detalle financiero profundo
+  conserva su propia ruta.
+- **Detalle de tarjeta.** Resumen y compromisos completos, planes de cuotas, compras y pagos, historial de movimientos,
+  edición y ciclo de vida (archivar, reactivar, eliminar cuando se puede).
+- **Detalle de movimiento.** Puede inspirarse en el héroe de importe primero del detalle de una transacción de Wallet,
+  pero conserva lo que FinanzApp sabe: categoría, cuenta o tarjeta, comercio, relación con un plan de cuotas o un
+  recurrente, notas, y Editar/Deshacer cuando corresponde.
+- **Apple Wallet es solo referencia** de jerarquía, tactilidad, profundidad, espaciado, selección de tarjeta y detalle
+  con el importe primero. No se copian recursos, marcas, dimensiones ni la identidad visual de Apple; siguen el
+  minimalismo iOS, el cobalto/zafiro, los materiales de FinanzApp y las reglas de gestos de 25B3.
+
 ## Producto 24T1 — vocabulario de cuotas (sin cambios visuales)
 
 El motor de compras en cuotas existe en el dominio y el almacenamiento (decisión 003, regla 7); ninguna pantalla lo
