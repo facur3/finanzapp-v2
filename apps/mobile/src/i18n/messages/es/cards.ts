@@ -120,8 +120,6 @@ export const cards = {
       usualDays: 'Los meses siguientes: cierre el día {closing} y vencimiento el día {due}.',
       /** Off: the dates correct this statement only. On: their days become the card's usual days. */
       everyMonth: 'Usar estos días todos los meses',
-      /** Why the switch above is on and fixed: a closing that far away is not a one-off shift. */
-      calendarChange: 'Esa fecha está a más de medio mes del cierre esperado: cambia los días de la tarjeta.',
       frozenNote: 'El envío quedó congelado para que Reintentar no cree otra tarjeta ni aplique cambios dos veces.',
       create: 'Crear tarjeta',
       retry: 'Reintentar',

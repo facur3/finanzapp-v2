@@ -36,8 +36,8 @@ const atStart = (dateISO: string) => new Date(dateISO + 'T00:00:00');
  * exact dates when those days alone would not produce them. Both start unchosen: a guessed date that a person confirms
  * without reading their statement would silently misplace every instalment scheduled later. An existing card shows its
  * open statement (and, while one is still to pay, the closed statement's due date, whose closing never moves); a change
- * corrects that statement only, unless «Usar estos días todos los meses» makes its days the usual ones (forced when the
- * closing moved more than half a month: that is a new calendar, not a one-off shift). The save names the statement the
+ * corrects that statement only, unless the person turns «Usar estos días todos los meses» on to make its days the usual
+ * ones, however far the dates moved. The save names the statement the
  * form showed and is planned locally first (`planCardCycle`, the same plan storage computes again), so a form left open
  * past a closing, or an impossible date, is refused before anything is sent. */
 export function CardForm({ original }: { original?: CreditCardProfile }) {
@@ -77,7 +77,7 @@ export function CardForm({ original }: { original?: CreditCardProfile }) {
   // Drafts survive a currency switch untouched; one the new currency cannot hold exactly blocks Save (the field says why).
   const fitsCurrency = draftFitsCurrency(debt, currency).ok && editedDraftFits(limit, currency, storedLimit).ok;
   const close = () => { if (!saving.current) { if (router.canGoBack()) router.back(); else router.replace('/cards'); } };
-  // What the dates mean for the card: an edit's result (the usual days after the save, whether they are forced), or a
+  // What the dates mean for the card: an edit's result (the usual days after the save), or a
   // new card's usual days, once both dates are chosen.
   const edit = before && shown && closing && due ? cycleEditResult(before, shown, { closingISO: closing, dueISO: due, toPayDueISO: toPayDue, everyMonth }) : null;
   const days: CardCycleDays | null = edit ? edit.days : !before && closing && due ? daysOfDates(closing, due) : null;
@@ -205,7 +205,7 @@ export function CardForm({ original }: { original?: CreditCardProfile }) {
         <DateField label={t('cards.form.due')} value={due ? atNoon(due) : null} onChange={pick(setDue)} disabled={locked} allowFuture last={!edit}
           minimumDate={atStart(addDaysISO(closing ?? today, 1))} />
         {edit && <SwitchRow label={t('cards.form.everyMonth')} value={edit.repeats} onValueChange={value => { setEveryMonth(value); setError(null); }}
-          disabled={locked || edit.forced} detail={edit.forced ? t('cards.form.calendarChange') : undefined} last />}
+          disabled={locked} last />}
       </Surface>
       <AppText secondary variant="footnote">
         {/* Which days repeat is said once, by the usual days line: a one-off correction says it corrects this statement only. */}

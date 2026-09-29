@@ -5,7 +5,7 @@ import { CARD_PLAN_MESSAGE, INSTALLMENT_DRIFT_MESSAGE, INSTALLMENT_ENTRY_MESSAGE
   deleteInstallmentPlan, distributeMinor, installmentEntries, installmentEntryId, installmentOccurrenceOf, installmentPlanFigures, installmentPlanStatus,
   installmentSchedule, installmentState, materializeInstallmentPlan, newInstallmentPlan, pendingInstallmentPlans, sameInstallmentPlan, statementClosingAfter, statementClosingOnOrAfter,
   statementDueDate, validateInstallmentPlan, validateInstallmentPlanChange, validateInstallmentPlans, type InstallmentPlan,
-  PLAN_TOTAL_BELOW_PRICE_MESSAGE, installmentAmounts, interestFromTotalFinanced, planFinancing } from './installments';
+  PLAN_TOTAL_BELOW_PRICE_MESSAGE, installmentAmounts, interestFromTotalFinanced, planFinancing, planFinancingCategories } from './installments';
 import { MAX_ENTRY_MINOR } from './money';
 import { accountBalanceMinor, type Account, type Entry, type LedgerSnapshot, type Transfer } from './ledger';
 import { CARD_ARCHIVED_MESSAGE, CARD_DEBT_MESSAGE, assertAcceptsNewObligation, assertCardDeletable, postingAccountsFor, cardAvailableLimitMinor, cardDebtMinor, debtTotalsByCurrency, deleteCreditCard, liquidTotalsByCurrency, validateLiabilityProfiles,
@@ -280,6 +280,10 @@ describe('recognition: the movements a plan records', () => {
     expect(cardCommittedFinancingMinor(card, [tv], records(entries, ['insti_fin_002']))).toBe(1000, 'an undone share is not a future one');
     expect(cardCommittedFinancingMinor(card, [cancelInstallmentPlan(tv, '2026-10-26T12:00:00.000Z')], stored)).toBe(0, 'a stopped plan commits nothing');
     expect(cardCommittedFinancingMinor(card, [plan()], [])).toBe(0);
+    // 24T2: a plan with interest needs its category (a latent preset is listed from then on); one without, or a deleted one, needs none.
+    expect(planFinancingCategories([plan()])).toEqual([]);
+    expect(planFinancingCategories([tv, plan()])).toEqual(['Intereses']);
+    expect(planFinancingCategories([deleteInstallmentPlan(tv, '2026-09-11T12:00:00.000Z')])).toEqual([]);
   });
 });
 

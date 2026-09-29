@@ -16,9 +16,9 @@ export function categoryIcon(label: string, kind: EntryKind = 'expense', definit
  * Labels are in the interface language, and the search matches the name shown, the Spanish name and the
  * identity key, so "food" and "comida" both find the built-in Comida whatever the language. */
 export function categoryChoices(entries: Entry[], kind: EntryKind, query = '', selected = '', definitions: CategoryDefinition[] = [],
-  language: LanguageCode = DEFAULT_LANGUAGE): CategoryIdentity[] {
+  language: LanguageCode = DEFAULT_LANGUAGE, inUse: readonly string[] = []): CategoryIdentity[] {
   const terms = categoryKey(query).split(' ').filter(Boolean);
-  return categoryOptions(kind, definitions, entries, '', selected).flatMap(identity => {
+  return categoryOptions(kind, definitions, entries, '', selected, inUse).flatMap(identity => {
     const shown = localizeCategory(identity, language);
     const names = [categoryKey(shown.label), categoryKey(identity.label), identity.key];
     return terms.every(term => names.some(name => name.includes(term))) ? [shown] : [];

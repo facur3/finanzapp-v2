@@ -16,6 +16,8 @@ const history: Entry[] = [entry('h1', 'sjsjn', '2026-09-15'), entry('h2', 'JD', 
   entry('h4', 'Comida', '2026-09-18'), entry('h5', 'EDUCACION', '2026-09-12'), entry('h6', 'Sueldo', '2026-09-01', 'income')];
 const expensePresets = ['Comida', 'Supermercado', 'Restaurantes', 'Transporte', 'Combustible', 'Hogar', 'Alquiler', 'Servicios', 'Suscripciones', 'Salud',
   'Farmacia', 'Educación', 'Ropa', 'Tecnología', 'Ocio', 'Viajes', 'Mascotas', 'Regalos', 'Impuestos', 'Seguros', 'Intereses', 'Otros'];
+// 24T2: Intereses is a latent preset: its identity always resolves, but a ledger that never needed it does not list it.
+const visibleExpense = expensePresets.filter(label => label !== 'Intereses');
 const incomePresets = ['Sueldo', 'Trabajo', 'Ventas', 'Inversiones', 'Regalos', 'Reembolsos', 'Préstamos', 'Otros'];
 
 describe('presets', () => {
@@ -49,8 +51,8 @@ describe('historical and unknown strings', () => {
   });
   it('appear in the catalogue after the presets, most used first, with counts', () => {
     const rows = categoryCatalog('expense', [], history);
-    expect(rows.slice(0, 22).map(row => row.identity.label)).toEqual(expensePresets);
-    expect(rows.slice(22).map(row => [row.identity.label, row.identity.source, row.count])).toEqual([['JD', 'historical', 2], ['sjsjn', 'historical', 1]]);
+    expect(rows.slice(0, 21).map(row => row.identity.label)).toEqual(visibleExpense);
+    expect(rows.slice(21).map(row => [row.identity.label, row.identity.source, row.count])).toEqual([['JD', 'historical', 2], ['sjsjn', 'historical', 1]]);
     expect(rows.find(row => row.identity.key === 'comida')?.count).toBe(1);
     expect(rows.find(row => row.identity.key === 'educacion')?.count).toBe(1);
     expect(categoryCatalog('income', [], history).filter(row => row.count)).toEqual([{ identity: resolveCategory('income', 'Sueldo'), count: 1 }]);
@@ -155,9 +157,9 @@ describe('picker options', () => {
     const before = JSON.stringify(history);
     const labels = categoryOptions('expense', [], history).map(i => i.label);
     expect(labels.slice(0, 4)).toEqual(['Comida', 'JD', 'sjsjn', 'Educación']);
-    expect(labels).toHaveLength(expensePresets.length + 2);
+    expect(labels).toHaveLength(visibleExpense.length + 2);
     expect(categoryOptions('income', [], history).map(i => i.label)).toEqual(incomePresets);
-    expect(categoryOptions('expense', [], []).map(i => i.label)).toEqual(expensePresets);
+    expect(categoryOptions('expense', [], []).map(i => i.label)).toEqual(visibleExpense);
     expect(JSON.stringify(history)).toBe(before);
   });
   it('search matches accents, all words and the stored key', () => {
@@ -188,5 +190,34 @@ describe('Producto 24T2: the Intereses preset', () => {
     const restyled = editedCategoryDefinition(resolveCategory('expense', 'Intereses'), { color: 'rose' }, now);
     expect(() => validateCategoryDefinitions([otros, restyled])).not.toThrow();
     expect(() => assertCategoryName(restyled, [otros])).not.toThrow();
+  });
+});
+
+describe('24T2 owner decision: Intereses is latent until something uses it', () => {
+  const labels = (rows: ({ identity: { label: string } } | { label: string })[]) => rows.map(row => 'identity' in row ? row.identity.label : row.label);
+  it('a brand-new ledger offers exactly the restrained defaults: no Intereses, and never a string from a device\'s history', () => {
+    for (const kind of ['expense', 'income'] as const) {
+      const shown = [...labels(categoryCatalog(kind)), ...labels(categoryOptions(kind))];
+      expect(shown).not.toContain('Intereses');
+      for (const stray of ['JD', 'sjsjn']) expect(shown).not.toContain(stray);
+    }
+    expect(labels(categoryCatalog('expense'))).toEqual(visibleExpense);
+    expect(labels(categoryCatalog('income'))).toEqual(incomePresets);
+    // The identity is there all along: an interest movement resolves to it wherever it is shown.
+    expect(resolveCategory('expense', 'Intereses')).toMatchObject({ key: 'intereses', label: 'Intereses', icon: 'bank', color: 'ochre', source: 'preset' });
+  });
+  it('appears with the first movement recorded in it, a stored definition of it, or a label a saved plan needs', () => {
+    const interest = entry('insti_nb_001', 'Intereses', '2026-09-28');
+    expect(labels(categoryCatalog('expense', [], [interest]))).toContain('Intereses');
+    expect(categoryCatalog('expense', [], [interest]).find(row => row.identity.key === 'intereses')).toMatchObject({ count: 1, identity: { source: 'preset', icon: 'bank' } });
+    expect(labels(categoryOptions('expense', [], [interest]))).toContain('Intereses');
+    // A plan with interest saved before its first instalment is recorded.
+    expect(labels(categoryCatalog('expense', [], [], ['Intereses']))).toContain('Intereses');
+    expect(labels(categoryOptions('expense', [], [], '', '', ['Intereses']))).toContain('Intereses');
+    // A renamed or restyled definition keeps its identity and its place.
+    const renamed = editedCategoryDefinition(resolveCategory('expense', 'Intereses'), { label: 'Financiación', color: 'rose' }, now);
+    const row = categoryCatalog('expense', [renamed]).find(item => item.identity.key === 'intereses');
+    expect(row?.identity).toMatchObject({ label: 'Financiación', storedLabel: 'Intereses', color: 'rose', source: 'preset' });
+    expect(labels(categoryCatalog('expense', [renamed]))).toEqual([...visibleExpense.slice(0, 20), 'Financiación', 'Otros']);
   });
 });

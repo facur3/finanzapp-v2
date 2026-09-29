@@ -8,7 +8,7 @@ import { todayKey, type Account, type AccountKind, type Currency, type Entry, ty
 import { AccountBadge, AppText, CategoryBadge, DetailRow, Field, GlyphTile, PressFeedback, SelectionRow, Surface, surfaceShadow, type IconName, type Tone } from './components';
 import { SEARCHABLE_FROM, currencyChoices, currencyOption, offeredCurrencies, searchChoices, type CurrencyChoice } from './currencies';
 import { useI18n } from '../i18n/provider';
-import { useAccountLookOf, useCategoryDefinitions, useCategoryLook } from './category-hues';
+import { useAccountLookOf, useCategoriesInUse, useCategoryDefinitions, useCategoryLook } from './category-hues';
 import { selectionHaptic, sheetTiming } from './motion';
 import { radius, space, usePalette, useReduceMotion } from './theme';
 import { categoryChoices, categoryKey, customCategory } from './categories';
@@ -372,11 +372,12 @@ export function CategoryField({ entries, kind, value, onChange, disabled = false
   const p = usePalette();
   const { t, language } = useI18n();
   const definitions = useCategoryDefinitions();
+  const inUse = useCategoriesInUse();
   const look = useCategoryLook(value, kind);
   const [visible, setVisible] = useState(false);
   const [query, setQuery] = useState('');
   // Choices are identities: the display name (a built-in one in the interface language) is shown, the stored spelling is what the movement records.
-  const choices = useMemo(() => categoryChoices(entries, kind, query, value, definitions, language), [entries, kind, query, value, definitions, language]);
+  const choices = useMemo(() => categoryChoices(entries, kind, query, value, definitions, language, inUse), [entries, kind, query, value, definitions, language, inUse]);
   const custom = customCategory(query, choices, kind, definitions);
   const choose = (category: string) => { Keyboard.dismiss(); if (categoryKey(category) !== categoryKey(value)) selectionHaptic(); onChange(category); setVisible(false); };
   const open = () => { Keyboard.dismiss(); setQuery(''); setVisible(true); };

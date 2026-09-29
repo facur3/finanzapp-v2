@@ -55,7 +55,7 @@ function harness(file: string, props: any = {}, options: { data?: domain.LedgerA
     saveCategory: async (definition: domain.CategoryDefinition) => { definitions.push(definition); options.fail?.(); } }) };
   const identity = { definitions: data.categories ?? [], appearances: data.appearances ?? [], hues: new Map<string, number>() };
   const p = { isDark: false, surface: '#fff', text: '#000', primary: '#2557D6', primarySoft: '#E5ECFB', secondary: '#666', tertiary: '#999', background: '#fff', inset: '#eee' };
-  const hues = { useCategoryDefinitions: () => identity.definitions, useCategoryLook: (s: string, kind = 'expense') => appearance.resolveCategoryLook(kind as domain.EntryKind, s, identity, p),
+  const hues = { useCategoriesInUse: () => [], useCategoryDefinitions: () => identity.definitions, useCategoryLook: (s: string, kind = 'expense') => appearance.resolveCategoryLook(kind as domain.EntryKind, s, identity, p),
     useCategoryLabel: (s: string, kind = 'expense') => appearance.resolveCategoryLook(kind as domain.EntryKind, s, identity, p).label,
     useAccountLook: (id: string) => appearance.resolveAccountLook(id, identity.appearances, p), useAccountLookOf: () => (id: string) => appearance.resolveAccountLook(id, identity.appearances, p) };
   const components = Object.fromEntries(['Screen', 'ActionButton', 'AmountField', 'AppText', 'Choices', 'DetailRow', 'SelectionRow', 'EmptyState', 'ErrorMessage', 'Field', 'FieldNote', 'IconButton', 'InfoButton', 'NavigationRow', 'Surface',

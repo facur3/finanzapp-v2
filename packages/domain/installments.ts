@@ -176,6 +176,20 @@ export function interestFromTotalFinanced(principalMinor: number, totalFinancedM
 /** The financing a purchase form sends to `newInstallmentPlan`: «Sin interés» (`totalFinancedMinor` null) or a total
  * financed equal to the price is no interest and no interest category (a zero component never carries one); a larger
  * total is the difference, in `interestCategory` (the Intereses identity, `interestCategoryLabel`). */
+/** Producto 24T2: the categories the financing of saved plans records in (interest, and fee or tax in older plans), so a
+ * latent category such as Intereses is listed from the moment a plan needs it, before its first instalment is recorded.
+ * A deleted plan (created by mistake, nothing recorded) needs nothing. */
+export function planFinancingCategories(plans: readonly InstallmentPlan[] = []): string[] {
+  const categories = new Set<string>();
+  for (const plan of plans) {
+    if (plan.deleted) continue;
+    if (plan.interestMinor > 0 && plan.interestCategory) categories.add(plan.interestCategory);
+    if (plan.feeMinor > 0 && plan.feeCategory) categories.add(plan.feeCategory);
+    if (plan.taxMinor > 0 && plan.taxCategory) categories.add(plan.taxCategory);
+  }
+  return [...categories];
+}
+
 export function planFinancing(principalMinor: number, totalFinancedMinor: number | null, interestCategory: string): { interestMinor: number; interestCategory: string } {
   const interestMinor = totalFinancedMinor === null ? 0 : interestFromTotalFinanced(principalMinor, totalFinancedMinor);
   return { interestMinor, interestCategory: interestMinor > 0 ? interestCategory : '' };

@@ -38,10 +38,15 @@ export interface CategoryDefinition {
 
 export const CATEGORY_DEFINITION_KEYS = ['kind', 'key', 'storedLabel', 'label', 'icon', 'color', 'archived', 'createdAt', 'revision', 'updatedAt'] as const;
 
-export interface CategoryPreset { kind: EntryKind; key: string; label: string; icon: CategoryIconId; color: AppearanceColorId }
+export interface CategoryPreset {
+  kind: EntryKind; key: string; label: string; icon: CategoryIconId; color: AppearanceColorId;
+  /** A latent preset (24T2: Intereses) keeps its identity, look and stored spelling everywhere it resolves, but the
+   * catalogue and the pickers list it only once something uses it (`categoryInUse`), never on a fresh installation. */
+  latent?: boolean;
+}
 
-const preset = (kind: EntryKind, label: string, icon: CategoryIconId, color: AppearanceColorId): CategoryPreset =>
-  ({ kind, key: categoryKey(label), label, icon, color });
+const preset = (kind: EntryKind, label: string, icon: CategoryIconId, color: AppearanceColorId, latent = false): CategoryPreset =>
+  ({ kind, key: categoryKey(label), label, icon, color, ...(latent ? { latent } : {}) });
 
 /** The restrained default catalogue. Order is the order shown. */
 export const CATEGORY_PRESETS: readonly CategoryPreset[] = [
@@ -67,7 +72,8 @@ export const CATEGORY_PRESETS: readonly CategoryPreset[] = [
   preset('expense', 'Seguros', 'insurance', 'teal'),
   // Producto 24T2: the interest of a purchase in instalments is its own expense in its own category (decision 003, rule 7).
   // It reuses an icon id every build already knows, so a definition that decorates it stays readable by older builds.
-  preset('expense', 'Intereses', 'bank', 'ochre'),
+  // Latent: listed only once an interest movement, a plan with interest or a definition of it exists.
+  preset('expense', 'Intereses', 'bank', 'ochre', true),
   preset('expense', 'Otros', 'other', 'graphite'),
   preset('income', 'Sueldo', 'work', 'green'),
   preset('income', 'Trabajo', 'tech', 'teal'),
@@ -227,7 +233,14 @@ export function categoryNameTaken(kind: EntryKind, label: string, definitions: C
  * with its usage count. Nothing here edits an entry. */
 export interface CategoryCatalogRow { identity: CategoryIdentity; count: number }
 
-export function categoryCatalog(kind: EntryKind, definitions: CategoryDefinition[] = [], entries: Entry[] = []): CategoryCatalogRow[] {
+/** Whether a latent preset is in use: a movement recorded in it, a stored definition of it (renamed or restyled), or a
+ * stored label that needs it (`inUse`: the categories a plan with interest will record, before its first instalment). */
+function categoryInUse(key: string, definitions: CategoryDefinition[], counts: ReadonlyMap<string, number>, inUse: readonly string[], kind: EntryKind): boolean {
+  return (counts.get(key) ?? 0) > 0 || !!findCategoryDefinition(kind, key, definitions) || inUse.some(stored => categoryKey(stored) === key);
+}
+
+/** `inUse` (24T2): stored labels something other than a movement needs, e.g. the interest category of a saved plan. */
+export function categoryCatalog(kind: EntryKind, definitions: CategoryDefinition[] = [], entries: Entry[] = [], inUse: readonly string[] = []): CategoryCatalogRow[] {
   const counts = new Map<string, number>();
   const spellings = new Map<string, string>();
   const recent = new Map<string, string>();
@@ -247,7 +260,7 @@ export function categoryCatalog(kind: EntryKind, definitions: CategoryDefinition
     seen.add(identity.key);
     rows.push({ identity, count: counts.get(identity.key) ?? 0 });
   };
-  for (const item of CATEGORY_PRESETS) if (item.kind === kind) push(item.label);
+  for (const item of CATEGORY_PRESETS) if (item.kind === kind && (!item.latent || categoryInUse(item.key, definitions, counts, inUse, kind))) push(item.label);
   definitions.filter(definition => definition.kind === kind && !seen.has(definition.key))
     .sort((a, b) => a.label.localeCompare(b.label, 'es')).forEach(definition => push(definition.storedLabel));
   [...spellings.entries()].filter(([key]) => !seen.has(key))
@@ -258,7 +271,8 @@ export function categoryCatalog(kind: EntryKind, definitions: CategoryDefinition
 /** Choices for a picker: the current value first (even if archived, so an old
  * movement stays valid), then recorded categories most recent first, then the
  * rest of the catalogue. Archived identities are otherwise excluded. */
-export function categoryOptions(kind: EntryKind, definitions: CategoryDefinition[] = [], entries: Entry[] = [], query = '', selected = ''): CategoryIdentity[] {
+export function categoryOptions(kind: EntryKind, definitions: CategoryDefinition[] = [], entries: Entry[] = [], query = '', selected = '',
+  inUse: readonly string[] = []): CategoryIdentity[] {
   const options = new Map<string, CategoryIdentity>();
   const add = (stored: string, force = false) => {
     const identity = resolveCategory(kind, stored, definitions);
@@ -268,7 +282,7 @@ export function categoryOptions(kind: EntryKind, definitions: CategoryDefinition
   if (selected.trim()) add(selected, true);
   entries.filter(entry => entry.kind === kind).slice()
     .sort((a, b) => b.dateISO.localeCompare(a.dateISO) || b.createdAt.localeCompare(a.createdAt)).forEach(entry => add(entry.category));
-  for (const row of categoryCatalog(kind, definitions)) add(row.identity.storedLabel);
+  for (const row of categoryCatalog(kind, definitions, [], inUse)) add(row.identity.storedLabel);
   const terms = categoryKey(query).split(' ').filter(Boolean);
   return [...options.values()].filter(identity => terms.every(term => categoryKey(identity.label).includes(term) || identity.key.includes(term)));
 }

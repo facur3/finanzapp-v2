@@ -20,7 +20,7 @@ from its detail).
    - [ ] Editar tarjeta: «Próximo cierre» and «Vencimiento» open the full calendar (day, month, year); a due date on or
      before the closing is refused with its sentence; «Vence el resumen del 28 sep» corrects only that due date;
      «Usar estos días todos los meses» off corrects this statement only (the note says so), on repeats the days; a
-     closing more than half a month away turns the switch on and fixes it, with its reason. Save and reopen: the dates
+     closing moved 20 days or more leaves the switch off and free (one-off unless you turn it on). Save and reopen: the dates
      are the ones saved; movements, earlier statements and existing plans did not move; the month after the new
      closing has its statement (none skipped, none duplicated).
    - [ ] Nueva tarjeta: the two dates first, the line «Los meses siguientes: cierre el día … y vencimiento el día …»,
@@ -32,6 +32,8 @@ from its detail).
    - [ ] Con interés on: «Total financiado» below the price is refused with its sentence; equal to the price reads
      «Interés total: $ 0»; above it, the difference. After saving: the plan detail shows Total financiado, Interés total
      and Principal futuro / Interés futuro; Tarjetas shows «Cuotas futuras» with «+ interés $ …» beside it.
+   - [ ] Before any purchase «Con interés», the category picker and Más → Categorías show no «Intereses» (and never a
+     category you did not create or record); right after saving one, «Intereses» is listed with its icon and colour.
    - [ ] A purchase dated before the last closing (a late one): the note says the first instalment is recorded at once;
      after the save, Movimientos holds «Cuota de tarjeta» for it and the card's balance rose by exactly that share.
    - [ ] Ingreso, another account, or an archived card: no «Pago» section; back on the card, the choices are as left.

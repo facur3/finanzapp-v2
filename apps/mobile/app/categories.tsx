@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { View } from 'react-native';
 import { router, Stack } from 'expo-router';
-import { categoryCatalog, type CategoryCatalogRow, type EntryKind } from '@finanzapp/domain';
+import { categoryCatalog, planFinancingCategories, type CategoryCatalogRow, type EntryKind } from '@finanzapp/domain';
 import { useLedger } from '../src/storage/LedgerProvider';
 import { AppText, CategoryBadge, IconButton, PressFeedback, Screen, SectionTitle, Surface } from '../src/ui/components';
 import { usePalette } from '../src/ui/theme';
@@ -18,7 +18,9 @@ export default function CategoriesScreen() {
   const { snapshot, archive } = useLedger();
   const { t } = useI18n();
   const definitions = archive?.categories ?? [];
-  const expense = useMemo(() => snapshot ? categoryCatalog('expense', definitions, snapshot.entries) : [], [snapshot, definitions]);
+  // 24T2: a latent preset (Intereses) is listed once a movement, a definition or a saved plan with interest uses it.
+  const inUse = useMemo(() => planFinancingCategories(archive?.installmentPlans), [archive?.installmentPlans]);
+  const expense = useMemo(() => snapshot ? categoryCatalog('expense', definitions, snapshot.entries, inUse) : [], [snapshot, definitions, inUse]);
   const income = useMemo(() => snapshot ? categoryCatalog('income', definitions, snapshot.entries) : [], [snapshot, definitions]);
   if (!snapshot) return null;
   const archived = [...expense, ...income].filter(row => row.identity.archived);

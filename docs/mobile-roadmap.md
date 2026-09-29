@@ -1636,8 +1636,8 @@ nothing of it is on a screen yet.
   row; a form left open past a closing is refused. Alternatives rejected: two fields on the card (after the next closing
   nobody knows which cycle they belonged to), month-keyed overrides (a calendar change that crosses a month boundary
   re-keys every override), nearest-month mapping without a stored slot (a shift of 13 days or more maps two statements
-  to one month or skips one). One product rule: a next closing more than 15 days from the expected one is a change of
-  calendar, so its days become the usual days (decision 003); closer ones are the person's choice.
+  to one month or skips one). Which days follow is the person's choice (owner's decision, 2026-09-29): any exact
+  correction may be one-off, however far it moved; only «Usar estos días todos los meses» makes its days usual.
 - **Schema and backup.** SQLite **13** (`card_cycle_dates`, `CREATE TABLE IF NOT EXISTS`, FK to `credit_cards`, `dueISO >
   closingISO` CHECK, rows never DELETEd); a schema 12 file opens with an empty table and no fabricated date; an interrupted
   step rolls back and reaches 13 once; a schema 14 file is refused intact. Backup **v13** once a card holds an exact date
@@ -1648,8 +1648,8 @@ nothing of it is on a screen yet.
   meses siguientes: cierre el día 28 y vencimiento el día 5.») and `newCardCycle` stores the exact statement only when
   the grid would not produce it. An existing card shows its open statement's two dates and, while the closed statement
   still to pay is ahead, «Vence el resumen del 28 sep» (only that due date moves). «Usar estos días todos los meses» off
-  corrects this statement only («Estas fechas corrigen solo este resumen.»); on, the dates' days become the usual days; a
-  closing more than 15 days from the expected one turns it on and fixes it, with its reason. The form plans locally with
+  corrects this statement only («Estas fechas corrigen solo este resumen.»), whatever the distance; on, the dates' days
+  become the usual days; no distance turns it on by itself. The form plans locally with
   `planCardCycle` and freezes `{card, intent}` for Reintentar; storage plans again and refuses a stale form. Name,
   issuer, last four, currency, opening balance, limit, archive, reactivate and delete behave as before.
 - **Purchase in cuotas.** Under the date, «Pago» [Una vez][En cuotas], only for a new expense on an active credit card
@@ -1670,6 +1670,9 @@ nothing of it is on a screen yet.
   the difference (`interestFromTotalFinanced`, integer minor units). Fee and tax are zero from this flow. The interest
   share is recorded in the preset category «Intereses» (`expense|intereses`, a late preset exempt from the duplicate
   checks of older data; its stored spelling is `interestCategoryLabel`, never a translation, so a rename keeps working).
+  It is **latent** (owner's decision, 2026-09-29): it always resolves with its name, icon and colour, but the pickers and
+  Más → Categorías list it only once an interest movement, a saved plan with interest (`planFinancingCategories`) or a
+  definition of it exists; a fresh installation and a plan without interest never show it.
 - **Tarjetas.** A vertical deck of the active cards (`CardDeck`, replacing the horizontal carousel): the others stay
   stacked above the selected one in their stored order, each showing its top strip (name and «•••• 4009», 50 pt at
   least, the face text capped at 1.3× so the strip holds it); the selected card sits in front, whole, above its
@@ -1726,7 +1729,7 @@ nothing of it is on a screen yet.
   (3), `plan-presentation.node.ts` (4), `installments.node.ts` (`savePurchasePlan` with a failing recognition), and the
   updated `date-field`, `liabilities-routes`, `recovery-routes`, `motion` and `lifecycle` suites.
 - **Review round (2026-09-28).** A five-lens review with an adversarial verifier per lens and a completeness check
-  against the brief. Fixed: a next closing moved more than half a month (the forced new usual days) dropped the next
+  against the brief. Fixed: a next closing moved with new usual days (then forced past half a month) dropped the next
   month's statement, and a later one-off correction could bring back a one-day statement (the written row's slot; now
   its own month on its grid; storage writes the corrected row's days and slot; 1.4 million form-driven single and double
   edits checked with no missing or duplicated statement); the switch alone skipped the stale-form refusal; principal-only
@@ -1737,15 +1740,18 @@ nothing of it is on a screen yet.
   were instant under Reduce Motion; SwitchRow's reason was only a hint; a date below a moved minimum; «Este ciclo» was
   missing; stale docs and comments; and the test gaps of the edge-case matrix. Codex (PR #69): a card whose plans'
   future interest added up beyond the exact range made Tarjetas and the card detail throw while rendering; the sums are
-  now unknown there («Total fuera de rango», never rounded) and every plan still reads on its own. Kept on purpose: a
+  now unknown there («Total fuera de rango», never rounded) and every plan still reads on its own. Owner's decisions
+  (2026-09-29): the half-month rule that forced new usual days was removed (any correction may be one-off; the toggle is
+  always the person's), and Intereses became latent. Kept on purpose: a
   deleted card's detail still shows its dates and limit (history as it was entered, 25B2), and the usual day a new card
   takes is the entered date's (the edit form corrects it in a longer month).
-- **Status.** On its branch (2026-09-28), not device-verified. Checked on Linux on the final tree: root `npm test` (413
-  passed, 1 todo) and `npm run check:repo` (OK, 367 tracked files); mobile `typecheck` (clean), `test:storage` (872/872),
+- **Status.** On its branch (2026-09-29), not device-verified. Checked on Linux on the final tree: root `npm test` (415
+  passed, 1 todo) and `npm run check:repo` (OK, 367 tracked files); mobile `typecheck` (clean), `test:storage` (875/875),
   `currency:verify` and `regions:verify` (catalogues verified offline), `i18n:check -- --strict` (0 errors, 0 stale),
-  `i18n:extract` (no copy outside the catalogue), `check` (dependencies up to date) and `export:ios` (iOS bundle
-  exported, 1979 modules). The `mobile_api` PostgreSQL job runs in CI. No EAS build; the iPhone was not
-  touched (checklist section Producto 24T2).
+  `i18n:extract` (no copy outside the catalogue) and `export:ios` (iOS bundle exported, 1979 modules). `check` reports
+  three SDK 57 patch releases published on 2026-09-29, after this branch was cut (`expo` 57.0.26, `expo-constants`
+  57.0.20, `expo-router` 57.0.24); this PR changes no dependency, and the bump is left to its own decision. The
+  `mobile_api` PostgreSQL job runs in CI. No EAS build; the iPhone was not touched (checklist section Producto 24T2).
 
 ### Producto 25C — budgets with rollover, goals, CSV and productivity
 

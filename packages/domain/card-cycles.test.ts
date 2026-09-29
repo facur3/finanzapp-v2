@@ -213,9 +213,9 @@ describe('planning a change never moves a statement that closed', () => {
     expect(closings(february, '2027-01-15')).toEqual(['2027-02-01', '2027-02-14', '2027-03-14', '2027-04-14']);
   });
 
-  it('property: after dates become the usual days, and after a second correction, every month keeps exactly one statement', () => {
-    // The card form's rule: a closing more than half a month away (or «Usar estos días todos los meses») makes the entered
-    // days the usual ones; the last day of a short month keeps a later usual day.
+  it('property: after a one-off correction of any size, or dates made the usual days, and after a second correction, every month keeps exactly one statement', () => {
+    // The card form's rule: only «Usar estos días todos los meses» makes the entered days the usual ones, however far the
+    // closing moved; the last day of a short month keeps a later usual day.
     const usualDay = (dateISO: string, previous: number) => {
       const day = Number(dateISO.slice(8)), last = new Date(Date.UTC(Number(dateISO.slice(0, 4)), Number(dateISO.slice(5, 7)), 0)).getUTCDate();
       return day === last && previous > last ? previous : day;
@@ -229,13 +229,20 @@ describe('planning a change never moves a statement that closed', () => {
       const shown = cardCycleView(plan.days, plan.rows, todayISO);
       const closingISO = addDaysISO(shown.open.closingISO, shift), dueISO = addDaysISO(closingISO, 9);
       if (closingISO <= shown.previous.closingISO) return null;
-      const next = repeat || Math.abs(shift) > 15 ? days(usualDay(closingISO, plan.days.closingDay), usualDay(dueISO, plan.days.dueDay)) : plan.days;
-      const after = cardStatementsFrom(plan.days, plan.rows, shown.open.closingISO, 1, 3).map(item => item.closingISO);
+      const next = repeat ? days(usualDay(closingISO, plan.days.closingDay), usualDay(dueISO, plan.days.dueDay)) : plan.days;
       const result = planCardCycle({ cardId: 'card', days: plan.days, rows: plan.rows, todayISO, nowISO,
         intent: { days: next, open: { statementClosingISO: shown.open.closingISO, closingISO, dueISO } } });
-      // With the usual days following the entered date, the next statement is the next month's; a one-off shift keeps
-      // the statement that followed the one it replaced.
-      const expected = repeat || Math.abs(shift) > 15 ? monthAfter(closingISO, result.days.closingDay) : after.find(item => item > closingISO);
+      // With the usual days following the entered date, the next statement is the next month's. A one-off date on the grid
+      // names that month's statement, so the next month follows; off the grid it still stands for the month it replaced,
+      // so the next is the first usual closing after it from the month after that one.
+      const monthOf = (iso: string) => Number(iso.slice(0, 4)) * 12 + Number(iso.slice(5, 7)) - 1;
+      const grid = (month: number) => monthAfter(`${Math.floor((month - 1) / 12)}-${String((month - 1) % 12 + 1).padStart(2, '0')}-01`, plan.days.closingDay);
+      const own = plan.rows.find(item => item.closingISO === shown.open.closingISO);
+      const slot = own ? monthOf(own.monthISO + '-01') : monthOf(shown.open.closingISO);
+      let expected: string;
+      if (repeat) expected = monthAfter(closingISO, result.days.closingDay);
+      else if (grid(monthOf(closingISO)) === closingISO) expected = grid(monthOf(closingISO) + 1);
+      else { let month = slot + 1; while (grid(month) <= closingISO) month++; expected = grid(month); }
       const list = cardStatementsFrom(result.days, result.rows, closingISO, 0, 6).map(item => item.closingISO);
       expect(list[0]).toBe(closingISO);
       expect(list[1]).toBe(expected);
@@ -246,10 +253,11 @@ describe('planning a change never moves a statement that closed', () => {
     for (const closingDay of [1, 5, 12, 15, 28, 29, 30, 31]) {
       for (const todayISO of ['2026-01-30', '2026-02-27', '2026-10-01', '2026-12-20', '2028-02-10']) {
         const start = { days: days(closingDay, closingDay > 20 ? 5 : closingDay + 10), rows: [] as CardCycleDates[] };
-        for (const [shift, repeat] of [[-31, false], [-20, false], [-16, false], [-3, true], [3, true], [16, false], [20, false], [31, false]] as const) {
+        for (const [shift, repeat] of [[-31, false], [-20, false], [-20, true], [-16, false], [-14, false], [-3, true], [1, false], [3, true], [14, false],
+          [16, false], [16, true], [20, false], [20, true], [31, false], [31, true], [45, false]] as const) {
           const first = change(start, todayISO, shift, repeat, now);
           if (!first) continue;
-          for (const [wait, shift2, repeat2] of [[0, -1, false], [3, 2, false], [5, -20, false], [9, 31, false], [2, 1, true]] as const) {
+          for (const [wait, shift2, repeat2] of [[0, -1, false], [3, 2, false], [5, -20, false], [5, -20, true], [9, 31, false], [2, 1, true], [4, 18, false]] as const) {
             change(first, addDaysISO(todayISO, wait), shift2, repeat2, later);
           }
         }

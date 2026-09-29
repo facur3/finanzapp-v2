@@ -4,7 +4,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { CYCLE_HISTORY_MESSAGE, CYCLE_STALE_MESSAGE, LEDGER_CURRENCIES, PLAN_CALENDAR_MESSAGE, cardCycleView, cardCycleDatesOf, createRecoveryBackup, newCardCycle, newInstallmentPlan,
+import { CYCLE_HISTORY_MESSAGE, CYCLE_STALE_MESSAGE, LEDGER_CURRENCIES, PLAN_CALENDAR_MESSAGE, cardCycleView, cardCycleDatesOf, categoryCatalog, planFinancingCategories, snapshotFromArchive, createRecoveryBackup, newCardCycle, newInstallmentPlan,
   parsePilotBackup, previewBackupImport, type Account, type CardCycleDates, type CreditCardProfile, type Entry } from '@finanzapp/domain';
 import { DATABASE_VERSION, SCHEMA_SCRIPTS, catchUpInstallments, createAccount, createCreditCard, createEntry, createInstallmentPlan, deleteCreditCard, importArchive,
   initializeDatabase, readArchive, saveCreditCard, type LedgerDatabase } from '../src/storage/database.ts';
@@ -263,7 +263,7 @@ test('review round 2: an open statement moved into new usual days and then moved
   await createAccount(db, bank);
   const fifth: CreditCardProfile = { ...card, closingDay: 5, dueDay: 15 };
   await createCreditCard(db, cardAccount, fifth);
-  // On 6 oct the open statement (5 nov) closes on 28 nov instead: more than half a month away, so 28/5 become the usual days.
+  // On 6 oct the open statement (5 nov) closes on 28 nov instead, and the person makes 28/5 the usual days.
   await saveCreditCard(db, edit(fifth, 1, '2026-10-06', { closingDay: 28, dueDay: 5 }),
     { open: { statementClosingISO: '2026-11-05', closingISO: '2026-11-28', dueISO: '2026-12-05' } }, '2026-10-06');
   assert.deepEqual(await viewOn(db, '2026-10-06'), { open: '2026-11-28', openDue: '2026-12-05', previous: '2026-10-05', nextDue: '2026-10-15', toPay: '2026-10-05' });
@@ -308,4 +308,26 @@ test('24T2 review: a recorded instalment keeps its link to its plan («Cuota 1 d
   assert.deepEqual([link(restored, 'inst_tv_001'), link(restored, 'insti_tv_001')], [expected.principal, expected.interest]);
   assert.equal(await catchUpInstallments(fresh, '2026-10-27'), 0, 'nothing recorded twice after the restore');
   assert.deepEqual(restored.installmentPlans, afterRestart.installmentPlans);
+  // 24T2: the latent Intereses category is listed on the restored device as on the original: its movement and its plan need it.
+  const listed = (archive: Awaited<ReturnType<typeof readArchive>>) => categoryCatalog('expense', archive.categories ?? [], snapshotFromArchive(archive).entries,
+    planFinancingCategories(archive.installmentPlans)).map(row => row.identity.label);
+  assert.ok(listed(afterRestart).includes('Intereses'));
+  assert.ok(listed(restored).includes('Intereses'));
+});
+
+test('24T2 owner decision: a ledger whose plans carry no interest never lists Intereses, before or after a backup restored on a fresh device', async () => {
+  const listed = (archive: Awaited<ReturnType<typeof readArchive>>) => categoryCatalog('expense', archive.categories ?? [], snapshotFromArchive(archive).entries,
+    planFinancingCategories(archive.installmentPlans)).map(row => row.identity.label);
+  const { db } = await seeded();
+  assert.equal(listed(await readArchive(db)).includes('Intereses'), false, 'a brand-new ledger');
+  await createInstallmentPlan(db, newInstallmentPlan({ id: 'plain', card, cardAccount, merchant: 'Electro', category: 'Hogar', purchaseDateISO: '2026-09-10',
+    principalMinor: 3000, count: 3, placement: 'current', createdAt }));
+  await catchUpInstallments(db, '2026-10-27');
+  const source = await readArchive(db);
+  assert.equal(listed(source).includes('Intereses'), false, 'a plan without interest');
+  const fresh = setup().db;
+  await initializeDatabase(fresh);
+  const parsed = parsePilotBackup(JSON.stringify(createRecoveryBackup(source, new Date(at('2026-10-27')))));
+  await importArchive(fresh, parsed.archive, previewBackupImport(await readArchive(fresh), parsed.archive).baseline);
+  assert.equal(listed(await readArchive(fresh)).includes('Intereses'), false, 'restored');
 });

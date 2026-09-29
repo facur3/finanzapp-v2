@@ -1,5 +1,5 @@
 import { createContext, createElement, useContext, useMemo, type ReactNode } from 'react';
-import type { Account, AccountAppearance, CategoryDefinition, EntryKind, PersonalDebtProfile } from '@finanzapp/domain';
+import { planFinancingCategories, type Account, type AccountAppearance, type CategoryDefinition, type EntryKind, type PersonalDebtProfile } from '@finanzapp/domain';
 import { useLedger } from '../storage/LedgerProvider';
 import { resolveAccountLook, resolveCategoryLook, type AccountLook, type CategoryLook } from './appearance';
 import { assignCategoryHues } from './category-color';
@@ -14,8 +14,10 @@ export type { AccountLook, CategoryLook } from './appearance';
  * its detail, every selector and every detail row. The resolution itself is
  * pure (appearance.ts); this file only provides the data. It keeps its
  * historical name. */
-type Identity = { definitions: CategoryDefinition[]; appearances: AccountAppearance[]; hues: Map<string, number>; debts: PersonalDebtProfile[] };
-const IdentityContext = createContext<Identity>({ definitions: [], appearances: [], hues: new Map(), debts: [] });
+type Identity = { definitions: CategoryDefinition[]; appearances: AccountAppearance[]; hues: Map<string, number>; debts: PersonalDebtProfile[];
+  /** 24T2: stored categories saved plans need (their interest), so a latent category is listed from then on. */
+  inUse: string[] };
+const IdentityContext = createContext<Identity>({ definitions: [], appearances: [], hues: new Map(), debts: [], inUse: [] });
 
 export function CategoryHuesProvider({ children }: { children: ReactNode }) {
   const { snapshot, archive } = useLedger();
@@ -24,12 +26,15 @@ export function CategoryHuesProvider({ children }: { children: ReactNode }) {
     appearances: archive?.appearances ?? [],
     hues: assignCategoryHues(snapshot?.entries ?? []),
     debts: archive?.debts ?? [],
-  }), [archive?.categories, archive?.appearances, snapshot?.entries, archive?.debts]);
+    inUse: planFinancingCategories(archive?.installmentPlans),
+  }), [archive?.categories, archive?.appearances, snapshot?.entries, archive?.debts, archive?.installmentPlans]);
   return createElement(IdentityContext.Provider, { value }, children);
 }
 
 export const useCategoryHues = () => useContext(IdentityContext).hues;
 export const useCategoryDefinitions = () => useContext(IdentityContext).definitions;
+/** 24T2: stored categories in use beyond the movements (a plan's interest), for the catalogue and the pickers. */
+export const useCategoriesInUse = () => useContext(IdentityContext).inUse;
 
 /** A built-in category's name follows the interface language; see `localizedCategoryLabel`. */
 export function useCategoryLook(stored: string, kind: EntryKind = 'expense'): CategoryLook {

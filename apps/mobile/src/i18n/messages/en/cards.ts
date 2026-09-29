@@ -87,7 +87,6 @@ export const cards: Pick<Messages, 'cards'> = {
       oneOff: 'These dates correct this statement only.',
       usualDays: 'Following months: closing on day {closing}, due on day {due}.',
       everyMonth: 'Use these days every month',
-      calendarChange: 'That date is more than half a month from the expected closing, so it changes the card’s usual days.',
       frozenNote: 'The submission is locked so Retry won’t create another card or apply changes twice.',
       create: 'Create card',
       retry: 'Retry',

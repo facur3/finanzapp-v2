@@ -428,14 +428,16 @@ pruebas están en el roadmap («Producto 24T2»).
 - **Compra en cuotas.** «Pago» [Una vez][En cuotas] bajo la fecha, solo en un gasto nuevo con una tarjeta activa, tan
   liviano como una compra común: 3 · 6 · 12 · 18 · Otra (12 por defecto), «12 cuotas de $ …» («aprox.» cuando el resto
   agranda las primeras), «Primera cuota» con los dos cierres posibles y «Cierra el … y vence el …», «Con interés»
-  apagado. Encendido, un solo campo, «Total financiado», con «Interés total» debajo, solo lectura.
+  apagado. Encendido, un solo campo, «Total financiado», con «Interés total» debajo, solo lectura. La categoría
+  «Intereses» es latente: no aparece en los selectores ni en Categorías hasta que un movimiento de interés, un plan con
+  interés o una definición suya la usa, así el catálogo por defecto sigue sobrio.
 - **Movimiento de una cuota.** Conserva el héroe del importe; «Cuota de tarjeta» (o «Interés de cuota») y la fila «Cuota
   · 3 de 12» que abre el plan. Editar muestra importe, fecha y tarjeta como datos y deja cambiar solo el comercio y la
   categoría; Deshacer dice que no se vuelve a registrar sola.
 - **Formulario de tarjeta.** Las fechas primero, en el calendario completo: «Próximo cierre» y «Vencimiento», y una frase
   con los días que siguen («Los meses siguientes: cierre el día 28 y vencimiento el día 5.»). Al editar, el resumen
   abierto y, si falta pagar uno cerrado, «Vence el resumen del 28 sep»; «Usar estos días todos los meses» decide si las
-  fechas corrigen solo este resumen, y queda fijo, con su motivo, cuando el cierre se movió más de medio mes.
+  fechas corrigen solo este resumen o se repiten; lo decide siempre la persona, sin importar cuánto se movió el cierre.
 - **Movimiento y accesibilidad.** Las reglas del deck están en «Motion y accesibilidad» (arriba). VoiceOver lee cada
   tarjeta una vez, en el orden en que se dibuja, con su posición y «seleccionada»; las fechas y los importes compuestos
   tienen su versión hablada; el interruptor dice su motivo en su etiqueta. Con el texto más grande, las filas de planes,

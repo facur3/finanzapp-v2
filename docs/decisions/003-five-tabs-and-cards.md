@@ -236,7 +236,10 @@ y la decisión es la contraria (regla 7). 24T1 (PR #67) convirtió en pruebas 12
      tasa, cargos y procedencia); no se agregan columnas vacías hoy.
    - **Financiación en la interfaz (decidido el 2026-09-28, Producto 24T1C, para
      24T2; implementado en 24T2 con la categoría predefinida «Intereses», cuya etiqueta
-     guardada es la de su identidad, nunca una traducción):** el motor no cambia (principal, intereses, comisiones e impuestos siguen
+     guardada es la de su identidad, nunca una traducción; es **latente**: se resuelve
+     siempre con su nombre, ícono y color, pero el catálogo y los selectores la muestran
+     solo cuando algo la usa —un movimiento de interés, un plan con interés guardado o una
+     definición suya—, nunca en una instalación nueva):** el motor no cambia (principal, intereses, comisiones e impuestos siguen
      siendo cuatro componentes separados). La interfaz es simple: por defecto «Sin
      interés», sin ningún campo de financiación; un único interruptor secundario «Con
      interés» muestra un solo campo, «Total financiado», y FinanzApp deriva
@@ -260,14 +263,14 @@ y la decisión es la contraria (regla 7). 24T1 (PR #67) convirtió en pruebas 12
      fecha inválida o un vencimiento igual o anterior al cierre no se guarda. Cambiarlas
      no reescribe movimientos, resúmenes ni calendarios de planes ya creados; puede
      cambiar cómo se presenta o programa el próximo ciclo aún no materializado. Sin
-     feriados ni corrimientos a días hábiles simulados. **Una regla de producto (24T2),
-     sobre el cierre y no sobre su vencimiento:** un próximo cierre a más de medio mes
-     (15 días) del que el calendario esperaba no es un corrimiento puntual (feriados y
-     fines de semana mueven un cierre pocos días) sino un cambio de calendario: sus días
-     pasan a ser los habituales («Usar estos días todos los meses» queda activado y fijo,
-     con el motivo en pantalla). A 15 días o menos, la persona elige si la fecha corrige
-     solo ese resumen o si esos días se repiten. La fecha se guarda igual en los dos
-     casos; lo que cambia es qué días siguen.
+     feriados ni corrimientos a días hábiles simulados. **Qué días siguen lo decide la
+     persona (decisión del dueño, 2026-09-29):** en una tarjeta existente, cualquier
+     corrección de cierre o vencimiento puede ser puntual, se haya movido 1, 15 o 20
+     días o más: con «Usar estos días todos los meses» apagado corrige solo ese resumen;
+     encendido, sus días pasan a ser los habituales desde ese resumen. Ninguna distancia
+     lo activa sola: no hay evidencia del emisor para suponer que un cierre movido cambió
+     el calendario. En una tarjeta nueva, las fechas de su primer resumen dan sus días
+     habituales.
    - **Ciclo del resumen (implementado en 24T2, vinculante).** Un **resumen** es un
      cierre y el vencimiento **de ese cierre**, siempre juntos: `vencimiento > cierre`
      vale dentro de un resumen y nunca entre dos. El **próximo vencimiento** es el
