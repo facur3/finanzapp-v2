@@ -396,6 +396,26 @@ test('a failed instalment catch-up (disk full, database locked) still opens the 
   }
 });
 
+test('24T2: a purchase in instalments saved from the form stays saved when recognising its closed first instalment fails; the banner says so, the frozen retry adds no second plan, and the instalment is recorded once', async () => {
+  const { savePurchasePlan, sessionWarning } = await import('../src/storage/ledger-session.ts');
+  const { db } = await seeded();
+  // Recorded late: the purchase of 5 sep belongs to the statement that closed on 20 sep, so instalment 1 is due at once.
+  const late = newInstallmentPlan({ id: 'late', card, cardAccount, merchant: 'Heladera', category: 'Hogar', purchaseDateISO: '2026-09-05', principalMinor: 30000, count: 3,
+    placement: 'current', createdAt });
+  const broken = failingOn(db, insertOf('inst_late_'), 'database or disk is full');
+  assert.equal(await savePurchasePlan(broken.db, late, '2026-09-25'), sessionWarning({ recurringError: false, installmentError: true }), 'reported, never a failed save');
+  const plansOf = async () => (await readArchive(db)).installmentPlans!.filter(plan => plan.id === 'late');
+  assert.equal((await plansOf()).length, 1, 'the plan is durable');
+  assert.deepEqual((await instalmentIds(db)).filter(id => id.startsWith('inst_late_')), [], 'nothing half-written');
+  // The form resends the same frozen plan (its Reintentar): storage treats it as done; the recognition now succeeds.
+  broken.heal();
+  assert.equal(await savePurchasePlan(broken.db, late, '2026-09-25'), null);
+  assert.equal((await plansOf()).length, 1, 'no second plan');
+  assert.deepEqual((await instalmentIds(db)).filter(id => id.startsWith('inst_late_')), ['inst_late_001']);
+  await refreshLedger(db, '2026-09-25');
+  assert.deepEqual((await instalmentIds(db)).filter(id => id.startsWith('inst_late_')), ['inst_late_001'], 'recorded once');
+});
+
 test('the recurring and the instalment errors are independent: either one alone, both together, each cleared by its own success', async () => {
   const { sessionWarning } = await import('../src/storage/ledger-session.ts');
   const { db } = await seeded();

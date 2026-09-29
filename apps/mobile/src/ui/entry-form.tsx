@@ -3,7 +3,7 @@ import { Keyboard, View } from 'react-native';
 import { router, Stack } from 'expo-router';
 import { randomUUID } from 'expo-crypto';
 import * as Haptics from 'expo-haptics';
-import { accountBalanceMinor, accountKind, categoryKey, editedDraftFits, installmentOccurrenceOf, interestCategoryLabel, keepsHistoricalCardIncome, makeEntryChange, minorFromEditedDraft, postingAccountsFor, sameEntry, summarizeMonthlyBudgets, todayKey, validateEntry, validateEntryChange, type Account, type Entry, type EntryChange, type EntryKind, type EntryRecord, type InstallmentPlan, type StoredDraft } from '@finanzapp/domain';
+import { PLAN_CALENDAR_MESSAGE, accountBalanceMinor, accountKind, categoryKey, editedDraftFits, installmentOccurrenceOf, interestCategoryLabel, keepsHistoricalCardIncome, makeEntryChange, minorFromEditedDraft, postingAccountsFor, sameEntry, summarizeMonthlyBudgets, todayKey, validateEntry, validateEntryChange, type Account, type Entry, type EntryChange, type EntryKind, type EntryRecord, type InstallmentPlan, type StoredDraft } from '@finanzapp/domain';
 import { useLedger } from '../storage/LedgerProvider';
 import { budgetTone } from './budget-presentation';
 import { ActionButton, AmountField, AppText, Choices, DetailRow, EmptyState, ErrorMessage, Field, IconButton, Money, Screen, Surface } from './components';
@@ -14,6 +14,7 @@ import { AccountField, CategoryField, DateField } from './form-controls';
 import { InstallmentPurchase } from './installment-purchase';
 import { accountKindLabel, postingAccounts } from './liability-presentation';
 import { initialAccountId } from './presentation';
+import { installmentOfEntry } from './installment-presentation';
 import { INITIAL_PURCHASE, buildPurchasePlan, purchaseState, type PurchaseDraft } from './purchase-plan';
 import { withCurrencyCode } from '../i18n/format';
 import { useI18n } from '../i18n/provider';
@@ -181,6 +182,9 @@ export function EntryForm({ original, accountId: requestedAccount, currency, kin
       close();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'entryForm.saveUnverified');
+      // A plan built from a calendar the card no longer has is refused before anything is written: the submission is released
+      // so the section shows the card's current statements again, and saving builds the plan anew (with the same id).
+      if (cause instanceof Error && cause.message === PLAN_CALENDAR_MESSAGE) setPending(null);
     } finally {
       saving.current = false;
       setBusy(false);
@@ -200,13 +204,16 @@ export function EntryForm({ original, accountId: requestedAccount, currency, kin
 
   if (restricted && before) {
     // 24T2: the amount, the date and the card are the plan's: shown as facts, never as inputs; there is no Gasto/Ingreso
-    // switch. The merchant and the category stay editable, and the category's budget still reads live.
+    // switch. The merchant and the category stay editable, and the category's budget still reads live. An instalment
+    // recorded as two movements (principal and interest) names the part this one holds, never «the instalment».
     const fixed = accounts.find(item => item.id === before.entry.accountId);
+    const share = installmentOfEntry(before.entry.id, archive?.installmentPlans);
+    const amountLabel = t(share && (share.shared || share.component !== 'principal') ? `entryForm.installmentEdit.amountShare.${share.component}` : 'entryForm.installmentEdit.amount');
     return <Screen gap={space.l}>
       {header}
       <View style={{ gap: 6, paddingVertical: 8 }}>
         <AppText secondary variant="footnote" style={{ fontWeight: '500' }}>
-          {fixed ? withCurrencyCode(t('entryForm.installmentEdit.amount'), fixed.currency) : t('entryForm.installmentEdit.amount')}
+          {fixed ? withCurrencyCode(amountLabel, fixed.currency) : amountLabel}
         </AppText>
         {fixed && <Money minor={before.entry.amountMinor} currency={fixed.currency} large size={40} />}
       </View>
@@ -260,7 +267,7 @@ export function EntryForm({ original, accountId: requestedAccount, currency, kin
       </AppText>}
       {before && <AppText secondary variant="footnote" style={{ textAlign: 'center' }}>{t('entryForm.correctionNote')}</AppText>}
       <ErrorMessage message={error} />
-      {pending && !busy && error && <AppText secondary variant="footnote">{t('entryForm.retryNote')}</AppText>}
+      {pending && !busy && error && <AppText secondary variant="footnote">{t(pending?.plan ? 'entryForm.plan.retryNote' : 'entryForm.retryNote')}</AppText>}
       <ActionButton label={submit.text} spokenLabel={submit.spoken}
         onPress={save} busy={busy} disabled={!amount.trim() || !merchant.trim() || !category.trim() || !account || !fit.ok || (inInstallments && planState.blocked)} />
     </>}

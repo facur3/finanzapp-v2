@@ -7,8 +7,9 @@ import { usePalette } from './theme';
 
 /** Producto 24T2: one iOS switch row inside a grouped surface, for a secondary choice that reveals fields (the purchase
  * form's «Con interés», the card form's «Usar estos días todos los meses»). The native switch is the one control VoiceOver
- * focuses (its label is the row's text, its hint the optional detail), with a selection haptic on each change; the text
- * scales and wraps at every size, and the row keeps the 54 pt height of a DetailRow. */
+ * focuses; its label is the row's text and, when there is one, its detail (why the switch is fixed, for example), read
+ * every time rather than as a hint a person may have turned off. A selection haptic on each change; the text scales and
+ * wraps at every size, and the row keeps the 54 pt height of a DetailRow. */
 export function SwitchRow({ label, value, onValueChange, detail, icon, disabled = false, last = false }: {
   label: string; value: boolean; onValueChange: (value: boolean) => void; detail?: string; icon?: IconName; disabled?: boolean; last?: boolean;
 }) {
@@ -20,7 +21,7 @@ export function SwitchRow({ label, value, onValueChange, detail, icon, disabled 
       <AppText>{label}</AppText>
       {detail ? <AppText secondary variant="footnote">{detail}</AppText> : null}
     </View>
-    <Switch value={value} disabled={disabled} accessibilityLabel={label} accessibilityHint={detail} accessibilityLanguage={speechLanguage}
+    <Switch value={value} disabled={disabled} accessibilityLabel={detail ? label + ', ' + detail : label} accessibilityLanguage={speechLanguage}
       trackColor={{ false: p.inset, true: p.primaryFill }}
       onValueChange={next => { selectionHaptic(); onValueChange(next); }} />
   </View>;

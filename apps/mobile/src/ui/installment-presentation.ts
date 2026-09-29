@@ -5,9 +5,10 @@ import { INSTALLMENT_COMPONENTS, MAX_INSTALLMENTS, assertInstallmentPlanDeletabl
 /** Producto 24T2: what the screens show of a purchase in instalments, derived from the plan and the ledger (never stored
  * twice). Pure: no React, so Node tests load it directly. Words are chosen by the screens; this module names states. */
 
-/** The counts the purchase form offers as one tap; any other count from 2 to 120 is typed. One instalment is a normal
- * purchase («Una vez»), so the form never offers it as financing. */
-export const INSTALLMENT_COUNT_CHOICES = [3, 6, 12, 18, 24] as const;
+/** The counts the purchase form offers as one tap, before «Otra»; 24 and every other count from 2 to 120 are typed (five
+ * segments are the most that fit the narrowest iPhone, see `QUICK_COUNTS`). One instalment is a normal purchase («Una
+ * vez»), so the form never offers it as financing. */
+export const INSTALLMENT_COUNT_CHOICES = [3, 6, 12, 18] as const;
 export const MIN_PLAN_COUNT = 2;
 
 /** A typed count, or null when it is not a whole number from 2 to 120. */
@@ -98,11 +99,21 @@ export function cardPlanSummaries(cardId: string, plans: readonly InstallmentPla
 }
 
 /** The plan, the instalment and the component behind a movement, or null for any other movement. */
-export function installmentOfEntry(entryId: string, plans: readonly InstallmentPlan[] = []): { plan: InstallmentPlan; number: number; count: number; component: InstallmentComponent } | null {
+export function installmentOfEntry(entryId: string, plans: readonly InstallmentPlan[] = []): {
+  plan: InstallmentPlan; number: number; count: number; component: InstallmentComponent;
+  /** The instalment has another share besides this movement's (its principal and its interest are two movements), so
+   * undoing or correcting this one leaves the other as it is. */
+  shared: boolean;
+} | null {
   const occurrence = installmentOccurrenceOf(entryId);
   if (!occurrence) return null;
   const plan = plans.find(item => item.id === occurrence.planId);
-  return plan ? { plan, number: occurrence.number, count: plan.count, component: occurrence.component } : null;
+  if (!plan) return null;
+  const row = plan.schedule[occurrence.number - 1];
+  const shares: Record<InstallmentComponent, number> = row
+    ? { principal: row.principalMinor, interest: row.interestMinor, fee: row.feeMinor, tax: row.taxMinor } : { principal: 0, interest: 0, fee: 0, tax: 0 };
+  const shared = (Object.keys(shares) as InstallmentComponent[]).some(component => component !== occurrence.component && shares[component] > 0);
+  return { plan, number: occurrence.number, count: plan.count, component: occurrence.component, shared };
 }
 
 /** The two statements the first instalment may go to: the one the purchase belongs to, and the one after it. */

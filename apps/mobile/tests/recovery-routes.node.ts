@@ -102,6 +102,7 @@ function harness(file: string, props: any = {}, options: { data?: domain.LedgerA
     '../src/ui/appearance-picker': { IconColorPicker: 'IconColorPicker' }, '../../src/ui/appearance-picker': { IconColorPicker: 'IconColorPicker' },
     // 24T2 (stream B): the entry form's «Pago» section: its derivation is real, the section itself a descriptor (tests/installment-purchase.node.ts renders it).
     './purchase-plan': purchasePlan, './installment-purchase': { InstallmentPurchase: 'InstallmentPurchase' },
+    './installment-presentation': installmentPresentation,
   };
   const require = (name: string) => {
     if (!Object.hasOwn(modules, name)) throw new Error('Unexpected recovery dependency: ' + name);

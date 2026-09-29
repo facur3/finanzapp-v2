@@ -49,8 +49,10 @@ export function InstallmentPurchase({ draft, onChange, state, currency, todayISO
       {each && <AppText variant="headline" accessibilityLabel={each.spoken}>{each.text}</AppText>}
       {options && <View style={{ gap: space.s }}>
         <AppText secondary variant="footnote" style={{ fontWeight: '500' }}>{t('entryForm.plan.first')}</AppText>
+        {/* Each segment is named by its closing on screen; VoiceOver hears the whole statement, both dates written out. */}
         <Choices<StatementPlacement> compact value={draft.placement} onChange={placement => onChange({ placement })} disabled={disabled}
-          options={[{ value: 'current', label: shortDate(options.current.closingISO) }, { value: 'next', label: shortDate(options.next.closingISO) }]} />
+          options={(['current', 'next'] as const).map(value => ({ value, label: shortDate(options[value].closingISO),
+            spokenLabel: t('entryForm.plan.statement', { closing: formatDate(options[value].closingISO, 'long'), due: formatDate(options[value].dueISO, 'long') }) }))} />
         {first && <AppText secondary variant="footnote"
           accessibilityLabel={t('entryForm.plan.statement', { closing: formatDate(first.closingISO, 'long'), due: formatDate(first.dueISO, 'long') })}>
           {t('entryForm.plan.statement', { closing: shortDate(first.closingISO), due: shortDate(first.dueISO) })}

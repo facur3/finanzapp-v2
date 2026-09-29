@@ -256,3 +256,56 @@ test('review round: after new usual days the history before the chain keeps its 
     'the frozen statements record the calendar and the slot they belong to');
   assert.deepEqual(await viewOn(db, '2026-10-02'), { open: '2026-11-01', openDue: '2026-11-08', previous: '2026-10-01', nextDue: '2026-10-08', toPay: '2026-10-01' });
 });
+
+test('review round 2: an open statement moved into new usual days and then moved back keeps every month; the corrected row stores its new days and slot', async () => {
+  const { db } = setup();
+  await initializeDatabase(db);
+  await createAccount(db, bank);
+  const fifth: CreditCardProfile = { ...card, closingDay: 5, dueDay: 15 };
+  await createCreditCard(db, cardAccount, fifth);
+  // On 6 oct the open statement (5 nov) closes on 28 nov instead: more than half a month away, so 28/5 become the usual days.
+  await saveCreditCard(db, edit(fifth, 1, '2026-10-06', { closingDay: 28, dueDay: 5 }),
+    { open: { statementClosingISO: '2026-11-05', closingISO: '2026-11-28', dueISO: '2026-12-05' } }, '2026-10-06');
+  assert.deepEqual(await viewOn(db, '2026-10-06'), { open: '2026-11-28', openDue: '2026-12-05', previous: '2026-10-05', nextDue: '2026-10-15', toPay: '2026-10-05' });
+  // On 10 oct that same statement is corrected to 28 oct (the usual days stay 28/5): November keeps its statement.
+  await saveCreditCard(db, edit(fifth, 2, '2026-10-10', { closingDay: 28, dueDay: 5 }),
+    { open: { statementClosingISO: '2026-11-28', closingISO: '2026-10-28', dueISO: '2026-11-05' } }, '2026-10-10');
+  const archive = await readArchive(db);
+  assert.deepEqual(archive.cardCycleDates!.map(row => [row.sequence, row.closingISO, row.dueISO, row.closingDay, row.dueDay, row.monthISO, row.revision]),
+    [[0, '2026-10-05', '2026-10-15', 5, 15, '2026-10', 0], [1, '2026-10-28', '2026-11-05', 28, 5, '2026-10', 1]]);
+  assert.deepEqual(await viewOn(db, '2026-10-29'), { open: '2026-11-28', openDue: '2026-12-05', previous: '2026-10-28', nextDue: '2026-11-05', toPay: '2026-10-28' });
+});
+
+test('24T2 review: a recorded instalment keeps its link to its plan («Cuota 1 de 3», the plan detail) after a restart and after a backup restored on another device', async () => {
+  const { installmentOfEntry } = await import('../src/ui/installment-presentation.ts');
+  const { db, path } = await seeded();
+  await saveCreditCard(db, edit(card, 1, '2026-10-01'), { open: { statementClosingISO: '2026-10-28', closingISO: '2026-10-26', dueISO: '2026-11-04' } }, '2026-10-01');
+  const stored = await readArchive(db);
+  const plan = newInstallmentPlan({ id: 'tv', card: stored.cards![0], cardAccount, merchant: 'Electro', category: 'Hogar', purchaseDateISO: '2026-10-10', principalMinor: 3000,
+    count: 3, placement: 'current', interestMinor: 300, interestCategory: 'Intereses', createdAt: at('2026-10-11'), cycleDates: stored.cardCycleDates });
+  await createInstallmentPlan(db, plan);
+  assert.equal(await catchUpInstallments(db, '2026-10-27'), 2, 'the first instalment: its principal and its interest');
+  const link = (archive: Awaited<ReturnType<typeof readArchive>>, id: string) => {
+    const found = installmentOfEntry(id, archive.installmentPlans);
+    return found ? [found.plan.id, found.number, found.count, found.component, found.shared, found.plan.schedule[0].billingDateISO] : null;
+  };
+  const expected = { principal: ['tv', 1, 3, 'principal', true, '2026-10-26'], interest: ['tv', 1, 3, 'interest', true, '2026-10-26'] };
+  assert.deepEqual([link(await readArchive(db), 'inst_tv_001'), link(await readArchive(db), 'insti_tv_001')], [expected.principal, expected.interest]);
+  // A restart: the same file opened again.
+  await db.closeAsync();
+  const reopened = databaseAt(path);
+  await initializeDatabase(reopened);
+  const afterRestart = await readArchive(reopened);
+  assert.deepEqual([link(afterRestart, 'inst_tv_001'), link(afterRestart, 'insti_tv_001')], [expected.principal, expected.interest]);
+  // A backup (v13: the card's exact dates and the plan travel together), restored on a fresh device.
+  const backup = createRecoveryBackup(afterRestart, new Date(at('2026-10-27')));
+  assert.equal(backup.schema, 'finanzapp.native-pilot.v13');
+  const fresh = setup().db;
+  await initializeDatabase(fresh);
+  const parsed = parsePilotBackup(JSON.stringify(backup));
+  await importArchive(fresh, parsed.archive, previewBackupImport(await readArchive(fresh), parsed.archive).baseline);
+  const restored = await readArchive(fresh);
+  assert.deepEqual([link(restored, 'inst_tv_001'), link(restored, 'insti_tv_001')], [expected.principal, expected.interest]);
+  assert.equal(await catchUpInstallments(fresh, '2026-10-27'), 0, 'nothing recorded twice after the restore');
+  assert.deepEqual(restored.installmentPlans, afterRestart.installmentPlans);
+});

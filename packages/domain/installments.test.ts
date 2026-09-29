@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { CARD_PLAN_MESSAGE, INSTALLMENT_DRIFT_MESSAGE, INSTALLMENT_ENTRY_MESSAGE, INSTALLMENT_ID_MESSAGE, MAX_INSTALLMENTS, PLAN_CANCELLED_MESSAGE, PLAN_CHANGE_MESSAGE,
   PLAN_COUNT_MESSAGE, PLAN_CURRENCY_MESSAGE, PLAN_DELETED_MESSAGE, PLAN_FINANCING_MESSAGE, PLAN_HISTORY_MESSAGE, PLAN_PRINCIPAL_MESSAGE, PLAN_SCHEDULE_MESSAGE, PLAN_STATE_MESSAGE,
-  PLAN_TOO_SMALL_MESSAGE, assertInstallmentEntryChange, assertInstallmentPlanDeletable, assertNewEntryId, cancelInstallmentPlan, cardCommittedMinor, cardHasPendingInstallments,
+  PLAN_TOO_SMALL_MESSAGE, assertInstallmentEntryChange, assertInstallmentPlanDeletable, assertNewEntryId, cancelInstallmentPlan, cardCommittedFinancingMinor, cardCommittedMinor, cardHasPendingInstallments,
   deleteInstallmentPlan, distributeMinor, installmentEntries, installmentEntryId, installmentOccurrenceOf, installmentPlanFigures, installmentPlanStatus,
   installmentSchedule, installmentState, materializeInstallmentPlan, newInstallmentPlan, pendingInstallmentPlans, sameInstallmentPlan, statementClosingAfter, statementClosingOnOrAfter,
   statementDueDate, validateInstallmentPlan, validateInstallmentPlanChange, validateInstallmentPlans, type InstallmentPlan,
@@ -274,6 +274,12 @@ describe('recognition: the movements a plan records', () => {
     // The parent purchase never adds the full price: the plan's total is a figure of the plan, not a movement.
     expect(entries.filter(entry => entry.amountMinor === 120000)).toEqual([]);
     expect(entries.filter(entry => installmentOccurrenceOf(entry.id)).reduce((sum, entry) => sum + entry.amountMinor, 0)).toBe(20200);
+    // 24T2: the future commitment of the card is its principal, with the future interest beside it, never inside it.
+    const stored = records(entries);
+    expect([cardCommittedMinor(card, [tv], stored), cardCommittedFinancingMinor(card, [tv], stored)]).toEqual([100000, 1000]);
+    expect(cardCommittedFinancingMinor(card, [tv], records(entries, ['insti_fin_002']))).toBe(1000, 'an undone share is not a future one');
+    expect(cardCommittedFinancingMinor(card, [cancelInstallmentPlan(tv, '2026-10-26T12:00:00.000Z')], stored)).toBe(0, 'a stopped plan commits nothing');
+    expect(cardCommittedFinancingMinor(card, [plan()], [])).toBe(0);
   });
 });
 

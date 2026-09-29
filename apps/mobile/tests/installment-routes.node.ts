@@ -6,6 +6,7 @@ import ts from 'typescript';
 import * as domain from '@finanzapp/domain';
 import * as presentation from '../src/ui/presentation.ts';
 import * as liabilityPresentation from '../src/ui/liability-presentation.ts';
+import * as geometry from '../src/ui/geometry.ts';
 import * as installmentPresentation from '../src/ui/installment-presentation.ts';
 import * as budgetPresentation from '../src/ui/budget-presentation.ts';
 import * as cardFaces from '../src/ui/card-faces.ts';
@@ -40,7 +41,7 @@ const archive: domain.LedgerArchive = { accounts: [cash, cardAccount, amexAccoun
   cards: [card, amex], installmentPlans: [tv] };
 
 function harness(file: string, options: { params?: Record<string, string>; data?: domain.LedgerArchive | null; day?: string; locale?: AppLocale;
-  remove?: (id: string) => Promise<void> } = {}) {
+  remove?: (id: string) => Promise<void>; stacked?: boolean } = {}) {
   const source = readFileSync(new URL('../app/' + file, import.meta.url), 'utf8');
   const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText;
   let data = (options.data === undefined ? archive : options.data) as domain.LedgerArchive;
@@ -56,13 +57,14 @@ function harness(file: string, options: { params?: Record<string, string>; data?
     removeInstallmentPlan: async (id: string) => { removals.push(id); await options.remove?.(id); } }) };
   const componentNames = ['AccountBadge', 'ActionButton', 'AppText', 'DetailRow', 'EmptyState', 'ErrorMessage', 'GlyphTile', 'IconButton', 'MerchantBadge', 'Money',
     'MovementRow', 'PressFeedback', 'Screen', 'SectionTitle', 'Stat', 'StatRow', 'Surface'];
-  const components = { ...Object.fromEntries(componentNames.map(name => [name, name])), toneColors: () => ({ color: '#c00', soft: '#fee' }), useStacked: () => false };
+  // `stacked`: the largest text sizes or an amount too wide for its row (the real rule is in components.tsx).
+  const components = { ...Object.fromEntries(componentNames.map(name => [name, name])), toneColors: () => ({ color: '#c00', soft: '#fee' }), useStacked: () => options.stacked ?? false };
   const palette = { isDark: false, text: '#000', secondary: '#666', tertiary: '#999', line: '#ddd', inset: '#eee', expense: '#c00', income: '#080', warning: '#a60', transfer: '#03c', primary: '#2557D6' };
   const theme = { space: { xs: 4, s: 8, m: 12, l: 16, xl: 20, xxl: 24, xxxl: 32 }, radius: { tile: 12, group: 16, creditCard: 18 },
     useCurrentDay: () => day, useReduceMotion: () => true, usePalette: () => palette };
-  const motion = { ValueTransition: 'ValueTransition', timing: (kind: string, reduced: boolean) => ({ duration: reduced ? 0 : 260 }), successHaptic: () => { haptics++; }, selectionHaptic: () => {} };
+  const motion = { ValueTransition: 'ValueTransition', Reflow: 'Reflow', timing: (kind: string, reduced: boolean) => ({ duration: reduced ? 0 : 260 }), successHaptic: () => { haptics++; }, selectionHaptic: () => {} };
   const hues = { useCategoryLabel: (stored: string) => stored };
-  const cardVisual = { CardDeck: 'CardDeck', CardFace: 'CardFace', cardFaceWidth: (width: number) => Math.min(width - 40, 420) };
+  const cardVisual = { CardDeck: 'CardDeck', CardFace: 'CardFace', cardFaceWidth: (width: number) => Math.min(width - 40, 420), cardFaceHeight: (width: number) => Math.round(width / 1.586) };
   const both = (path: string, value: unknown) => ({ ['../src/' + path]: value, ['../../src/' + path]: value });
   const modules: Record<string, unknown> = {
     react: {
@@ -86,6 +88,7 @@ function harness(file: string, options: { params?: Record<string, string>; data?
     'expo-haptics': { NotificationFeedbackType: { Success: 'Success' }, notificationAsync: async () => {}, selectionAsync: async () => {} },
     '@finanzapp/domain': domain,
     ...both('storage/LedgerProvider', ledger), ...both('ui/components', components), ...both('ui/card-visual', cardVisual), ...both('ui/entry-list', { EntryList: 'EntryList' }),
+    ...both('ui/geometry', geometry),
     ...both('ui/liability-presentation', liabilityPresentation), ...both('ui/installment-presentation', installmentPresentation), ...both('ui/presentation', presentation),
     ...both('ui/budget-presentation', budgetPresentation), ...both('ui/motion', motion), ...both('ui/theme', theme), ...both('ui/category-hues', hues),
     ...both('i18n/format', i18nFormat), ...both('i18n/provider', i18nProvider),
@@ -158,7 +161,7 @@ test('Tarjetas with a pending plan: the balance, «Vence» of the statement that
   futureRow.props.onPress();
   assert.equal(JSON.stringify(view.pushed.at(-1)), JSON.stringify({ pathname: '/card/[id]', params: { id: 'card' } }));
   // The open cycle began on Sep 29 («anteayer»): nothing recorded in it yet (the Sep 28 instalment belongs to the statement that closed).
-  assert.equal(nodes(root).find(node => node.type === 'SectionTitle' && node.props.action === 'Ver todo')!.props.caption, 'Ciclo abierto desde anteayer · 0 compras · 0 pagos');
+  assert.equal(nodes(root).find(node => node.type === 'SectionTitle' && node.props.action === 'Ver todo')!.props.caption, 'Este ciclo, desde anteayer · 0 compras · 0 pagos');
   find(root, 'ActionButton', 'Pagar tarjeta').props.onPress();
   assert.equal(JSON.stringify(view.pushed.at(-1)), JSON.stringify({ pathname: '/new-transfer', params: { toAccountId: 'card-acc', maxAmountMinor: '10000000' } }));
   // The card in front opens its detail; a colour chosen for its account in Editar cuenta reaches its face.
@@ -256,7 +259,7 @@ test('Tarjetas in English: Due, Closes and Available; availability not calculate
   assert.deepEqual(statsOf(root), ['Due: Oct 5 (October 5, 2026)', 'Closes: Oct 28 (October 28, 2026)', 'Available: Not calculated with installments']);
   assert.ok(texts(root).includes('Outstanding balance' + NBSP + '·' + NBSP + 'ARS'));
   assert.equal(byName(root, 'FutureInstallmentsRow')[0].rendered!.props.accessibilityLabel, 'Future installments, 1000000.00 pesos, in 1 plan');
-  assert.equal(nodes(root).find(node => node.type === 'SectionTitle' && node.props.action === 'See all')!.props.caption, 'Cycle open since Sep 29 · 0 purchases · 0 payments');
+  assert.equal(nodes(root).find(node => node.type === 'SectionTitle' && node.props.action === 'See all')!.props.caption, 'This cycle, since Sep 29 · 0 purchases · 0 payments');
   assert.equal(nodes(root).find(node => node.type === 'SectionTitle' && node.props.children === 'Archived')!.props.caption, 'They still take payments and record their installments.');
   assert.equal(byName(root, 'ArchivedCardRow')[0].rendered!.props.accessibilityLabel, 'Visa Vieja, Outstanding balance 131.00 pesos');
 });
@@ -278,16 +281,19 @@ test('card detail: its face, the same balance and facts with the limit, then Cuo
   assert.ok(texts(root).includes('de $' + NBSP + '3.000.000,00'), 'the limit under Disponible');
   const sections = nodes(root).filter(node => node.type === 'SectionTitle');
   assert.equal(sections.map(node => node.props.children).join(','), 'Cuotas,Movimientos');
-  // tv: $ 1.000.000,00 to come; nb: $ 900.000,00 (principal only: the interest is its own figure).
-  assert.equal(sections[0].props.caption, 'Cuotas futuras $' + NBSP + '1.900.000,00');
-  assert.equal(sections[1].props.caption, 'Ciclo abierto desde anteayer · 0 compras · 0 pagos');
+  // tv: $ 1.000.000,00 to come; nb: $ 900.000,00 (principal only: the interest still to come is named beside it, never added in).
+  assert.equal(sections[0].props.caption, 'Cuotas futuras $' + NBSP + '1.900.000,00 · + interés $' + NBSP + '90.000,00');
+  assert.equal(sections[0].props.captionLabel, 'Cuotas futuras 1900000,00 pesos · + interés 90000,00 pesos');
+  assert.equal(sections[1].props.caption, 'Este ciclo, desde anteayer · 0 compras · 0 pagos');
   const plans = byName(root, 'PlanRow');
   assert.equal(plans.map(row => row.props.summary.plan.id).join(','), 'nb,tv,ph', 'live plans by their next instalment (the newer purchase first on a tie), then completed');
   const [notebook, electro, telephone] = plans.map(row => row.rendered!);
   assert.equal(electro.props.accessibilityLabel, 'Electro, 12 cuotas, 2 de 12 registradas, 1000000,00 pesos restantes, próxima cuota el 28 de octubre de 2026');
   assert.deepEqual(texts(electro), ['Electro', '12 cuotas · 2/12 registradas', 'Próxima cuota · 28 oct', 'restantes']);
   assert.equal(nodes(electro).find(node => node.type === 'Money')!.props.minor, 100000000);
-  assert.equal(notebook.props.accessibilityLabel, 'Notebook, 3 cuotas, 0 de 3 registradas, 900000,00 pesos restantes, próxima cuota el 28 de octubre de 2026');
+  // A plan with interest: its remaining figure is the principal, and says so.
+  assert.equal(notebook.props.accessibilityLabel, 'Notebook, 3 cuotas, 0 de 3 registradas, 900000,00 pesos de principal restante, próxima cuota el 28 de octubre de 2026');
+  assert.ok(texts(notebook).includes('principal restante'));
   assert.equal(telephone.props.accessibilityLabel, 'Teléfono, 2 cuotas, 2 de 2 registradas, Completo');
   assert.equal(nodes(telephone).some(node => node.type === 'Money'), false, 'a completed plan shows no amount left');
   assert.equal(JSON.stringify([...texts(root)]).includes('pagada'), false);
@@ -321,8 +327,8 @@ test('card detail in English: Installments and its caption, plan rows recorded (
   const root = harness('card/[id].tsx', { params: { id: 'card' }, data: withPlans, locale: 'en-US' }).render();
   const sections = nodes(root).filter(node => node.type === 'SectionTitle');
   assert.equal(sections.map(node => node.props.children).join(','), 'Installments,Transactions');
-  assert.equal(sections[0].props.caption, 'Future installments AR$' + NBSP + '1,900,000.00');
-  assert.equal(sections[1].props.caption, 'Cycle open since Sep 29 · 0 purchases · 0 payments');
+  assert.equal(sections[0].props.caption, 'Future installments AR$' + NBSP + '1,900,000.00 · + interest AR$' + NBSP + '90,000.00');
+  assert.equal(sections[1].props.caption, 'This cycle, since Sep 29 · 0 purchases · 0 payments');
   const electro = byName(root, 'PlanRow')[1].rendered!;
   assert.equal(electro.props.accessibilityLabel, 'Electro, 12 installments, 2 of 12 recorded, 1000000.00 pesos left, next installment on October 28, 2026');
   assert.deepEqual(texts(electro), ['Electro', '12 installments · 2/12 recorded', 'Next installment · Oct 28', 'left']);
@@ -399,7 +405,12 @@ test('plan detail with interest: the total financed and the interest are their o
   const rows = rowsOf(root);
   assert.ok(rows.includes('Total financiado=$' + NBSP + '990.000,00 (990000,00 pesos)'));
   assert.ok(rows.includes('Interés total=$' + NBSP + '90.000,00 (90000,00 pesos)'));
-  assert.ok(rows.includes('Cuotas futuras=$' + NBSP + '900.000,00 (900000,00 pesos)'), 'the future principal, interest apart');
+  // With interest, the figures are named as principal and the interest still to come has its own row, never added in.
+  assert.ok(rows.includes('Principal futuro=$' + NBSP + '900.000,00 (900000,00 pesos)'), 'the future principal, interest apart');
+  assert.ok(rows.includes('Interés futuro=$' + NBSP + '90.000,00 (90000,00 pesos)'));
+  assert.ok(rows.includes('Principal registrado=$' + NBSP + '0,00 (0,00 pesos)'));
+  assert.ok(rows.includes('Principal restante=$' + NBSP + '900.000,00 (900000,00 pesos)'));
+  assert.equal(rows.some(row => row.startsWith('Cuotas futuras=') || row.startsWith('Ya registrado=')), false);
   const first = byName(root, 'ScheduleRow')[0].rendered!;
   assert.deepEqual(texts(first), ['Cuota 1 de 3', 'Cierra 28 oct · vence 5 nov', 'Incluye interés $' + NBSP + '30.000,00', 'Próxima']);
   assert.equal(first.props.accessibilityLabel, 'Cuota 1 de 3, 330000,00 pesos, Próxima, cierra 28 de octubre de 2026, vence 5 de noviembre de 2026, Incluye interés 30000,00 pesos');
@@ -509,12 +520,21 @@ test('movement detail: a financing share says which component it is; a plain car
     count: 3, placement: 'current', interestMinor: 3000000, interestCategory: 'Intereses', createdAt: '2026-08-12T12:00:00.000Z' });
   const purchase: domain.Entry = { id: 'purchase', accountId: cardAccount.id, kind: 'expense', amountMinor: 23100, merchant: 'Starbucks', category: 'Café', dateISO: '2026-09-30', createdAt };
   const data = { ...withPlans, records: [...withPlans.records, ...recognised(fin, [1]), domain.initialRecord(purchase)], installmentPlans: [...withPlans.installmentPlans!, fin] };
-  const interest = harness('entry/[id].tsx', { params: { id: 'insti_fin_001' }, data }).render();
+  const interestView = harness('entry/[id].tsx', { params: { id: 'insti_fin_001' }, data });
+  const interest = interestView.render();
+  assert.equal(nodes(interest).find(node => node.type === 'Stack.Screen')!.props.options.title, 'Interés de cuota');
   assert.ok(rowsOf(interest).includes('Cuota=1 de 3 · interés'));
   assert.ok(rowsOf(interest).includes('Categoría=Intereses'), 'the interest keeps its own category');
   assert.equal(find(interest, 'Money').props.minor, -1000000);
-  const principal = harness('entry/[id].tsx', { params: { id: 'inst_fin_001' }, data }).render();
+  // Undoing one share of an instalment that has another says only that part is undone (its principal keeps counting).
+  find(interest, 'ActionButton', 'Deshacer movimiento').props.onPress();
+  assert.match(interestView.alerts[0].message, / Solo esta parte de la cuota queda deshecha: no se vuelve a registrar sola y sigue pendiente en su plan\. La otra parte de la cuota no cambia\.$/);
+  const principalView = harness('entry/[id].tsx', { params: { id: 'inst_fin_001' }, data });
+  const principal = principalView.render();
+  assert.equal(nodes(principal).find(node => node.type === 'Stack.Screen')!.props.options.title, 'Cuota de tarjeta');
   assert.ok(rowsOf(principal).includes('Cuota=1 de 3'));
+  find(principal, 'ActionButton', 'Deshacer movimiento').props.onPress();
+  assert.match(principalView.alerts[0].message, /La otra parte de la cuota no cambia\.$/, 'the principal of an instalment with interest is one part too');
   const plain = harness('entry/[id].tsx', { params: { id: 'purchase' }, data }).render();
   assert.equal(nodes(plain).find(node => node.type === 'Stack.Screen')!.props.options.title, 'Compra con tarjeta');
   assert.deepEqual(rowsOf(plain), ['Categoría=Café', 'Tarjeta=Visa Gold', 'Moneda=Pesos argentinos']);
@@ -525,4 +545,44 @@ test('movement detail: a financing share says which component it is; a plain car
   assert.ok(rowsOf(harness('entry/[id].tsx', { params: { id: 'insti_fin_001' }, data, locale: 'en-US' }).render()).includes('Installment=1 of 3 · interest'));
   find(englishRoot, 'ActionButton', 'Undo transaction').props.onPress();
   assert.match(english.alerts[0].message, / The installment stays undone: it isn’t recorded again on its own and stays pending in its plan\.$/);
+});
+
+test('24T2 review: at the largest text sizes the plan, schedule and future rows stack; a long merchant and a large amount keep every word and figure', () => {
+  const merchant = 'Electrodomésticos del Centro Comercial Norte, Sucursal 14';
+  const big = domain.newInstallmentPlan({ id: 'big', card, cardAccount, merchant, category: 'Hogar', purchaseDateISO: '2026-09-10', principalMinor: 99999999999900,
+    count: 12, placement: 'current', createdAt: '2026-09-10T15:00:00.000Z' });
+  const data: domain.LedgerArchive = { ...archive, records: [...archive.records, ...recognised(big, [1])], installmentPlans: [big, tv] };
+  const detail = harness('card/[id].tsx', { params: { id: 'card' }, data, stacked: true }).render();
+  const row = byName(detail, 'PlanRow').find(item => item.props.summary.plan.id === 'big')!.rendered!;
+  const body = nodes(row).find(node => node.type === 'View' && [node.props.style].flat().some((style: any) => style?.flexDirection === 'column'));
+  assert.ok(body, 'the row stacks its text over its amount');
+  const name = nodes(row).find(node => node.type === 'AppText' && node.props.children === merchant)!;
+  assert.equal(name.props.numberOfLines, undefined, 'a stacked row never truncates the merchant');
+  assert.equal(nodes(row).find(node => node.type === 'Money')!.props.minor, 99999999999900 - big.schedule[0].principalMinor);
+  assert.match(row.props.accessibilityLabel, new RegExp('^' + merchant + ', 12 cuotas, 1 de 12 registrada, 916666666665,75 pesos restantes, '));
+  const plan = harness('installment/[id].tsx', { params: { id: 'big' }, data, stacked: true }).render();
+  const first = byName(plan, 'ScheduleRow')[0].rendered!;
+  assert.ok(nodes(first).some(node => node.type === 'View' && [node.props.style].flat().some((style: any) => style?.flexDirection === 'column')));
+  assert.equal(nodes(first).find(node => node.type === 'Money')!.props.minor, big.schedule[0].principalMinor);
+  const cards = harness('cards.tsx', { data, stacked: true }).render();
+  const future = byName(cards, 'FutureInstallmentsRow')[0].rendered!;
+  assert.ok(nodes(future).some(node => node.type === 'View' && [node.props.style].flat().some((style: any) => style?.flexDirection === 'column')));
+});
+
+test('24T2 review: a plan in a currency without decimals (JPY) and one with three (KWD) show exact amounts on the plan detail', () => {
+  for (const [currency, principalMinor] of [['JPY', 120000], ['KWD', 1234567]] as const) {
+    const account: domain.Account = { id: 'fx-acc', name: 'Tarjeta ' + currency, currency, openingMinor: 0, createdAt };
+    const fxCard: domain.CreditCardProfile = { ...card, id: 'fx', accountId: account.id, creditLimitMinor: null };
+    const plan = domain.newInstallmentPlan({ id: 'fx-plan', card: fxCard, cardAccount: account, merchant: 'Tienda', category: 'Hogar', purchaseDateISO: '2026-09-10',
+      principalMinor, count: 3, placement: 'current', createdAt: '2026-09-10T15:00:00.000Z' });
+    const data: domain.LedgerArchive = { ...archive, accounts: [...archive.accounts, account], cards: [...archive.cards!, fxCard], installmentPlans: [plan],
+      records: recognised(plan, [1], account.id) };
+    const root = harness('installment/[id].tsx', { params: { id: 'fx-plan' }, data }).render();
+    const i18n = bindLocale('es-AR');
+    assert.equal(find(root, 'Money').props.minor, principalMinor);
+    assert.ok(rowsOf(root).includes('Precio=' + i18n.moneyText(principalMinor, currency) + ' (' + i18n.spokenMoney(principalMinor, currency) + ')'), currency);
+    const amounts = byName(root, 'ScheduleRow').map(row => nodes(row.rendered!).find(node => node.type === 'Money')!.props.minor);
+    assert.equal(amounts.reduce((sum: number, minor: number) => sum + minor, 0), principalMinor, currency + ': the instalments add up to the price exactly');
+    assert.ok(rowsOf(root).includes('Ya registrado=' + i18n.moneyText(plan.schedule[0].principalMinor, currency) + ' (' + i18n.spokenMoney(plan.schedule[0].principalMinor, currency) + ')'));
+  }
 });

@@ -62,7 +62,13 @@ export const activity: Pick<Messages, 'activity' | 'rows' | 'entryDetail' | 'tra
       fee: '{number} of {count} · fee',
       tax: '{number} of {count} · tax',
     },
+    installmentShareTitle: {
+      interest: 'Installment interest',
+      fee: 'Installment fee',
+      tax: 'Installment tax',
+    },
     installmentVoidNote: 'The installment stays undone: it isn’t recorded again on its own and stays pending in its plan.',
+    installmentShareVoidNote: 'Only this part of the installment is undone: it isn’t recorded again on its own and stays pending in its plan. The other part of the installment doesn’t change.',
   },
   transferDetail: {
     notFoundTitle: 'We could not find this transfer',

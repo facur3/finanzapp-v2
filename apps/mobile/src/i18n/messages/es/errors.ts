@@ -279,7 +279,7 @@ export const errors = {
       /** 24T2: «Total financiado» below the price. */
       totalBelowPrice: 'El total financiado no puede ser menor que el precio.',
       /** 24T2: the card's calendar changed while the purchase form was open. */
-      calendarChanged: 'El calendario de la tarjeta cambió desde que abriste la compra. Volvé a revisarla.',
+      calendarChanged: 'El calendario de la tarjeta cambió desde que abriste la compra. Revisá la primera cuota y guardá de nuevo.',
     },
     /** Producto 24T2: the card's statement calendar (`packages/domain/card-cycles.ts`): a closing and its due date. */
     cycles: {

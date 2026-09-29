@@ -182,6 +182,81 @@ describe('planning a change never moves a statement that closed', () => {
     }
   });
 
+  it('review round 2: dates that become the usual days (a forced or chosen calendar change) never drop or bring back a statement', () => {
+    const closings = (plan: { days: CardCycleDays; rows: CardCycleDates[] }, fromISO: string, count = 4) =>
+      cardStatementsFrom(plan.days, plan.rows, fromISO, 0, count).map(item => item.closingISO);
+    // 28/5 on 1 oct, next closing 12 oct due 20 oct as the new usual days: November keeps its statement (it went missing).
+    const earlier = planCardCycle({ ...base, intent: { days: days(12, 20), open: { statementClosingISO: '2026-10-28', closingISO: '2026-10-12', dueISO: '2026-10-20' } } });
+    expect(closings(earlier, '2026-09-01', 5)).toEqual(['2026-09-28', '2026-10-12', '2026-11-12', '2026-12-12', '2027-01-12']);
+    expect(view(earlier.days, '2026-10-13', earlier.rows)).toMatchObject({ open: ['2026-11-12', '2026-11-20'], nextDue: '2026-10-20' });
+    expect(installmentDates(earlier, '2026-10-15', 3)).toEqual(['2026-11-12', '2026-12-12', '2027-01-12']);
+    // The same shape with the 5th: 28 sep, 5 oct, 5 nov, 5 dic.
+    const fifth = planCardCycle({ ...base, intent: { days: days(5, 15), open: { statementClosingISO: '2026-10-28', closingISO: '2026-10-05', dueISO: '2026-10-15' } } });
+    expect(closings(fifth, '2026-09-01')).toEqual(['2026-09-28', '2026-10-05', '2026-11-05', '2026-12-05']);
+    // Later new days (15 nov), then a one-off correction of that statement to 14 nov: no one-day statement on 15 nov.
+    const later15 = planCardCycle({ ...base, intent: { days: days(15, 25), open: { statementClosingISO: '2026-10-28', closingISO: '2026-11-15', dueISO: '2026-11-25' } } });
+    expect(closings(later15, '2026-09-01')).toEqual(['2026-09-28', '2026-11-15', '2026-12-15', '2027-01-15']);
+    const corrected = planCardCycle({ ...base, days: later15.days, rows: later15.rows, todayISO: '2026-10-20', nowISO: later,
+      intent: { open: { statementClosingISO: '2026-11-15', closingISO: '2026-11-14', dueISO: '2026-11-24' } } });
+    expect(closings(corrected, '2026-09-01')).toEqual(['2026-09-28', '2026-11-14', '2026-12-15', '2027-01-15']);
+    expect(view(corrected.days, '2026-11-15', corrected.rows).open[0]).toBe('2026-12-15');
+    // A statement moved by whole months keeps the months after it: 5/15 moved to 28 nov (days 28/5), then that same
+    // statement moved back to 28 oct: 5 oct, 28 oct, 28 nov (no month skipped).
+    const moved = planCardCycle({ ...base, days: days(5, 15), todayISO: '2026-10-06', intent: { days: days(28, 5), open: { statementClosingISO: '2026-11-05', closingISO: '2026-11-28', dueISO: '2026-12-05' } } });
+    expect(closings(moved, '2026-10-01')).toEqual(['2026-10-05', '2026-11-28', '2026-12-28', '2027-01-28']);
+    const back = planCardCycle({ ...base, days: moved.days, rows: moved.rows, todayISO: '2026-10-10', nowISO: later,
+      intent: { days: days(28, 5), open: { statementClosingISO: '2026-11-28', closingISO: '2026-10-28', dueISO: '2026-11-05' } } });
+    expect(closings(back, '2026-10-01')).toEqual(['2026-10-05', '2026-10-28', '2026-11-28', '2026-12-28']);
+    expect(back.rows.at(-1)).toMatchObject({ closingISO: '2026-10-28', monthISO: '2026-10', revision: 1 });
+    // 1/10 with the new days chosen at exactly 15 days (14 feb): 14 feb, then 14 mar.
+    const february = planCardCycle({ ...base, days: days(1, 10), todayISO: '2027-02-02', intent: { days: days(14, 24), open: { statementClosingISO: '2027-03-01', closingISO: '2027-02-14', dueISO: '2027-02-24' } } });
+    expect(closings(february, '2027-01-15')).toEqual(['2027-02-01', '2027-02-14', '2027-03-14', '2027-04-14']);
+  });
+
+  it('property: after dates become the usual days, and after a second correction, every month keeps exactly one statement', () => {
+    // The card form's rule: a closing more than half a month away (or «Usar estos días todos los meses») makes the entered
+    // days the usual ones; the last day of a short month keeps a later usual day.
+    const usualDay = (dateISO: string, previous: number) => {
+      const day = Number(dateISO.slice(8)), last = new Date(Date.UTC(Number(dateISO.slice(0, 4)), Number(dateISO.slice(5, 7)), 0)).getUTCDate();
+      return day === last && previous > last ? previous : day;
+    };
+    const monthAfter = (dateISO: string, closingDay: number) => {
+      const month = Number(dateISO.slice(0, 4)) * 12 + Number(dateISO.slice(5, 7));
+      const last = new Date(Date.UTC(Math.floor(month / 12), month % 12 + 1, 0)).getUTCDate();
+      return `${Math.floor(month / 12)}-${String(month % 12 + 1).padStart(2, '0')}-${String(Math.min(closingDay, last)).padStart(2, '0')}`;
+    };
+    const change = (plan: { days: CardCycleDays; rows: CardCycleDates[] }, todayISO: string, shift: number, repeat: boolean, nowISO: string) => {
+      const shown = cardCycleView(plan.days, plan.rows, todayISO);
+      const closingISO = addDaysISO(shown.open.closingISO, shift), dueISO = addDaysISO(closingISO, 9);
+      if (closingISO <= shown.previous.closingISO) return null;
+      const next = repeat || Math.abs(shift) > 15 ? days(usualDay(closingISO, plan.days.closingDay), usualDay(dueISO, plan.days.dueDay)) : plan.days;
+      const after = cardStatementsFrom(plan.days, plan.rows, shown.open.closingISO, 1, 3).map(item => item.closingISO);
+      const result = planCardCycle({ cardId: 'card', days: plan.days, rows: plan.rows, todayISO, nowISO,
+        intent: { days: next, open: { statementClosingISO: shown.open.closingISO, closingISO, dueISO } } });
+      // With the usual days following the entered date, the next statement is the next month's; a one-off shift keeps
+      // the statement that followed the one it replaced.
+      const expected = repeat || Math.abs(shift) > 15 ? monthAfter(closingISO, result.days.closingDay) : after.find(item => item > closingISO);
+      const list = cardStatementsFrom(result.days, result.rows, closingISO, 0, 6).map(item => item.closingISO);
+      expect(list[0]).toBe(closingISO);
+      expect(list[1]).toBe(expected);
+      for (let index = 1; index < 5; index++) expect(daysBetweenISO(list[index], list[index + 1])).toBeGreaterThanOrEqual(28);
+      for (let index = 1; index < 5; index++) expect(daysBetweenISO(list[index], list[index + 1])).toBeLessThanOrEqual(31);
+      return result;
+    };
+    for (const closingDay of [1, 5, 12, 15, 28, 29, 30, 31]) {
+      for (const todayISO of ['2026-01-30', '2026-02-27', '2026-10-01', '2026-12-20', '2028-02-10']) {
+        const start = { days: days(closingDay, closingDay > 20 ? 5 : closingDay + 10), rows: [] as CardCycleDates[] };
+        for (const [shift, repeat] of [[-31, false], [-20, false], [-16, false], [-3, true], [3, true], [16, false], [20, false], [31, false]] as const) {
+          const first = change(start, todayISO, shift, repeat, now);
+          if (!first) continue;
+          for (const [wait, shift2, repeat2] of [[0, -1, false], [3, 2, false], [5, -20, false], [9, 31, false], [2, 1, true]] as const) {
+            change(first, addDaysISO(todayISO, wait), shift2, repeat2, later);
+          }
+        }
+      }
+    }
+  });
+
   it('corrects the due date of the statement still to pay; its closing stays', () => {
     const plan = planCardCycle({ ...base, intent: { toPay: { statementClosingISO: '2026-09-28', dueISO: '2026-10-06' } } });
     expect(plan.rows).toEqual([row(0, '2026-09-28', '2026-10-06')]);
@@ -284,6 +359,17 @@ describe('instalment schedules read the calendar known at creation', () => {
     ];
     const activity = cardStatementActivity(card, { accounts: [account], entries, transfers: [] }, '2026-10-28', exact);
     expect(activity).toMatchObject({ startISO: '2026-10-27', closingISO: '2026-11-28', purchasesMinor: 100, purchaseCount: 1 });
+  });
+
+  it('review round 2: an instalment with interest is one purchase in the cycle; its interest is counted apart', () => {
+    // Instalment 1 of a plan with interest, recorded on its closing day (still inside the open cycle): principal and interest.
+    const entries: Entry[] = [
+      { id: 'inst_nb_001', accountId: account.id, kind: 'expense', amountMinor: 30000, merchant: 'Notebook', category: 'Tecnología', dateISO: '2026-09-28', createdAt: now },
+      { id: 'insti_nb_001', accountId: account.id, kind: 'expense', amountMinor: 3000, merchant: 'Notebook', category: 'Intereses', dateISO: '2026-09-28', createdAt: now },
+      { id: 'once', accountId: account.id, kind: 'expense', amountMinor: 500, merchant: 'Café', category: 'Comida', dateISO: '2026-09-20', createdAt: now },
+    ];
+    const activity = cardStatementActivity(card, { accounts: [account], entries, transfers: [] }, '2026-09-28');
+    expect(activity).toMatchObject({ closingISO: '2026-09-28', purchasesMinor: 30500, financingMinor: 3000, purchaseCount: 2 });
   });
 });
 

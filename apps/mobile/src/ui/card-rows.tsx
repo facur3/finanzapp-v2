@@ -11,22 +11,27 @@ import { radius, useCurrentDay, usePalette, type Palette } from './theme';
 /** Producto 24T2: the rows of the card surfaces (Tarjetas, a card's detail, a plan's detail). Each row is one VoiceOver
  * element whose sentence is built with the spoken formatters; the screen shows the region's formats. */
 
-/** «Cuotas futuras» under a card's actions: the principal of its plans not recognised yet, and in how many plans. It
- * opens the card's detail, where the plans are listed. */
-export function FutureInstallmentsRow({ committedMinor, planCount, currency, onPress }: {
-  committedMinor: number; planCount: number; currency: Currency; onPress: () => void;
+/** «Cuotas futuras» under a card's actions: the principal of its plans not recognised yet, and in how many plans; the
+ * interest those instalments still carry is named beside it («+ interés $ …»), never added in. It opens the card's
+ * detail, where the plans are listed. */
+export function FutureInstallmentsRow({ committedMinor, financingMinor = 0, financingKind = 'interest', planCount, currency, onPress }: {
+  committedMinor: number; financingMinor?: number; financingKind?: 'interest' | 'financing'; planCount: number; currency: Currency; onPress: () => void;
 }) {
   const p = usePalette();
-  const { t, spokenMoney } = useI18n();
+  const { t, moneyText, spokenMoney } = useI18n();
   const stacked = useStacked({ minor: committedMinor, currency });
   const title = t('cards.panel.future'), plans = t('cards.panel.futurePlans', { count: planCount });
-  return <PressFeedback feedback="highlight" accessibilityRole="button" accessibilityLabel={[title, spokenMoney(committedMinor, currency), plans].join(', ')}
+  const extra = (format: (minor: number) => string) => financingMinor > 0
+    ? t(financingKind === 'financing' ? 'cards.panel.futureFinancing' : 'cards.panel.futureInterest', { amount: format(financingMinor) }) : null;
+  const detail = [plans, extra(minor => moneyText(minor, currency))].filter(Boolean).join(' · ');
+  return <PressFeedback feedback="highlight" accessibilityRole="button"
+    accessibilityLabel={[title, spokenMoney(committedMinor, currency), plans, extra(minor => spokenMoney(minor, currency))].filter(Boolean).join(', ')}
     accessibilityHint={t('cards.list.openHint')} onPress={onPress} style={styles.row}>
     <GlyphTile icon="calendar-outline" />
     <View style={[styles.body, stacked ? styles.stacked : null]}>
       <View style={[styles.text, stacked ? null : { flex: 1 }]}>
         <AppText style={{ fontWeight: '600' }}>{title}</AppText>
-        <AppText secondary variant="footnote">{plans}</AppText>
+        <AppText secondary variant="footnote">{detail}</AppText>
       </View>
       <Money minor={committedMinor} currency={currency} />
     </View>
@@ -53,7 +58,8 @@ export function ArchivedCardRow({ summary, color, onPress, last = false }: { sum
 }
 
 /** One plan in a card's detail: the merchant, «12 cuotas · 3/12 registradas», the principal still to come
- * («$ 900.000,00 restantes») and the next instalment's statement, or the plan's end state. Never «pagadas». */
+ * («$ 900.000,00 restantes»; «principal restante» when the plan carries interest, which its detail lists apart) and the
+ * next instalment's statement, or the plan's end state. Never «pagadas». */
 export function PlanRow({ summary, onPress, last = false }: { summary: PlanSummary; onPress: () => void; last?: boolean }) {
   const p = usePalette();
   const day = useCurrentDay();
@@ -62,13 +68,15 @@ export function PlanRow({ summary, onPress, last = false }: { summary: PlanSumma
   const live = status === 'active';
   const stacked = useStacked({ minor: figures.remainingMinor, currency: plan.currency });
   const count = t('installments.row.count', { count: plan.count });
+  const financed = plan.interestMinor + plan.feeMinor + plan.taxMinor > 0;
   const recorded = t('installments.row.recorded', { count: figures.recognisedCount, total: plan.count });
   const state = status === 'completed' ? t('installments.row.completed') : status === 'cancelled' ? t('installments.row.cancelled')
     : next ? t('installments.row.next', { date: relativeDate(next.billingDateISO, day) }) : null;
   const spokenState = status === 'completed' ? t('installments.row.completed') : status === 'cancelled' ? t('installments.row.cancelled')
     : next ? t('installments.row.nextSpoken', { date: formatDate(next.billingDateISO, 'long') }) : null;
   const label = [plan.merchant, count, t('installments.row.recordedSpoken', { count: figures.recognisedCount, total: plan.count }),
-    live ? t('installments.row.remaining', { amount: spokenMoney(figures.remainingMinor, plan.currency) }) : null, spokenState].filter(Boolean).join(', ');
+    live ? t(financed ? 'installments.row.remainingPrincipal' : 'installments.row.remaining', { amount: spokenMoney(figures.remainingMinor, plan.currency) }) : null,
+    spokenState].filter(Boolean).join(', ');
   return <PressFeedback feedback="highlight" accessibilityRole="button" accessibilityLabel={label} accessibilityHint={t('installments.row.openHint')}
     onPress={onPress} style={[styles.row, separator(p, last)]}>
     <MerchantBadge merchant={plan.merchant} category={plan.category} />
@@ -80,7 +88,7 @@ export function PlanRow({ summary, onPress, last = false }: { summary: PlanSumma
       </View>
       {live && <View style={{ alignItems: stacked ? 'flex-start' : 'flex-end', maxWidth: stacked ? '100%' : '56%' }}>
         <Money minor={figures.remainingMinor} currency={plan.currency} />
-        <AppText secondary variant="caption">{t('installments.row.remainingCaption')}</AppText>
+        <AppText secondary variant="caption">{t(financed ? 'installments.row.remainingPrincipalCaption' : 'installments.row.remainingCaption')}</AppText>
       </View>}
     </View>
     <Ionicons name="chevron-forward" size={16} color={p.tertiary} accessible={false} />

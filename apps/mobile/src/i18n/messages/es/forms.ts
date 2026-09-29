@@ -71,12 +71,22 @@ export const forms = {
       /** Replaces cardNote while «En cuotas» is chosen. */
       note: 'La compra no cuenta toda hoy: cada cuota cuenta como gasto cuando cierra su resumen y suma al saldo pendiente. Las cuotas futuras se ven en Tarjetas.',
       save: 'Guardar en cuotas',
+      /** After a failed «Guardar en cuotas»: a plan records no movement until a statement closes, so Movimientos cannot show
+       * whether it was saved; the card's Cuotas can, and Reintentar never saves it twice. */
+      retryNote: 'Conservamos el envío: Reintentar nunca guarda la compra dos veces. Para cambiarla, cerrá y revisá primero las cuotas de la tarjeta en Tarjetas.',
     },
     /** Producto 24T2: the movement of an instalment is corrected in its merchant and category only; the plan owns the
      * amount, the date and the card. */
     installmentEdit: {
       title: 'Editar cuota',
       amount: 'Importe de la cuota',
+      /** An instalment recorded as two movements (its principal and its interest): the part this movement holds. */
+      amountShare: {
+        principal: 'Principal de la cuota',
+        interest: 'Interés de la cuota',
+        fee: 'Comisión de la cuota',
+        tax: 'Impuesto de la cuota',
+      },
       note: 'El importe, la fecha y la tarjeta los define el plan de cuotas. Podés corregir el comercio y la categoría.',
     },
   },

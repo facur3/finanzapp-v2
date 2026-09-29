@@ -72,6 +72,14 @@ export default function InstallmentPlanScreen() {
   const stopped = status === 'cancelled';
   const state = status === 'active' ? t('installments.detail.active') : status === 'completed' ? t('installments.detail.completed')
     : stopped ? t('installments.detail.cancelled') : null;
+  // Interest only, or a mix with fees or taxes (an older plan): how the financing rows and each instalment name it.
+  const financing = plan.feeMinor + plan.taxMinor > 0 ? 'financing' : 'interest';
+  // With financing, the plan's figures are its principal and say so; the financing still to come has its own row.
+  const financed = summary.financingMinor > 0;
+  const futureFinancingMinor = figures.components.interest.scheduledMinor + figures.components.fee.scheduledMinor + figures.components.tax.scheduledMinor;
+  const principalLabel = (plain: 'recorded' | 'future' | 'remaining' | 'undone') => t(financed
+    ? ({ recorded: 'installments.detail.recordedPrincipal', future: 'installments.detail.futurePrincipal', remaining: 'installments.detail.remainingPrincipal',
+      undone: 'installments.detail.undonePrincipal' } as const)[plain] : (`installments.detail.${plain}` as const));
   // Only what the plan and the ledger say; each figure its own row, never merged (decision 003, rule 7).
   const facts: { key: string; label: string; value: string; spokenValue?: string; icon?: IconName; onPress?: () => void }[] = [
     { key: 'card', label: t('installments.detail.card'), value: account.name, icon: 'card-outline', onPress: () => router.push({ pathname: '/card/[id]', params: { id: card.id } }) },
@@ -83,13 +91,14 @@ export default function InstallmentPlanScreen() {
     ...(plan.feeMinor > 0 ? [{ key: 'fees', label: t('installments.detail.fees'), value: money(plan.feeMinor), spokenValue: spoken(plan.feeMinor) }] : []),
     ...(plan.taxMinor > 0 ? [{ key: 'taxes', label: t('installments.detail.taxes'), value: money(plan.taxMinor), spokenValue: spoken(plan.taxMinor) }] : []),
     { key: 'count', label: t('installments.detail.recordedCount'), value: t('installments.detail.recordedCountValue', { count: figures.recognisedCount, total: plan.count }) },
-    { key: 'recorded', label: t('installments.detail.recorded'), value: money(figures.recognisedMinor), spokenValue: spoken(figures.recognisedMinor) },
+    { key: 'recorded', label: principalLabel('recorded'), value: money(figures.recognisedMinor), spokenValue: spoken(figures.recognisedMinor) },
     ...(stopped ? [{ key: 'cancelled', label: t('installments.detail.cancelledAmount'), value: money(figures.cancelledMinor), spokenValue: spoken(figures.cancelledMinor) }]
-      : [{ key: 'future', label: t('installments.detail.future'), value: money(figures.scheduledMinor), spokenValue: spoken(figures.scheduledMinor) }]),
-    { key: 'remaining', label: t('installments.detail.remaining'), value: money(figures.remainingMinor), spokenValue: spoken(figures.remainingMinor) },
-    ...(figures.undoneMinor > 0 ? [{ key: 'undone', label: t('installments.detail.undone'), value: money(figures.undoneMinor), spokenValue: spoken(figures.undoneMinor) }] : []),
+      : [{ key: 'future', label: principalLabel('future'), value: money(figures.scheduledMinor), spokenValue: spoken(figures.scheduledMinor) }]),
+    ...(!stopped && futureFinancingMinor > 0 ? [{ key: 'futureFinancing', label: t(financing === 'financing' ? 'installments.detail.futureFinancing' : 'installments.detail.futureInterest'),
+      value: money(futureFinancingMinor), spokenValue: spoken(futureFinancingMinor) }] : []),
+    { key: 'remaining', label: principalLabel('remaining'), value: money(figures.remainingMinor), spokenValue: spoken(figures.remainingMinor) },
+    ...(figures.undoneMinor > 0 ? [{ key: 'undone', label: principalLabel('undone'), value: money(figures.undoneMinor), spokenValue: spoken(figures.undoneMinor) }] : []),
   ];
-  const financing = plan.feeMinor + plan.taxMinor > 0 ? 'financing' : 'interest';
 
   return <Screen gap={space.xl}>
     {/* A deletion in flight holds the screen, as the movement detail does: no native back, no back swipe. */}

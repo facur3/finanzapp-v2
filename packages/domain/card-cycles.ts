@@ -12,9 +12,11 @@ import { validDateISO } from './ledger.ts';
  * each a closing and its due, entered by the person or frozen by FinanzApp before a calendar change. Per card they form
  * one chain of consecutive statements ordered by `sequence`; after the last, statements are generated from the card's
  * usual days, and before the first from the days that were in effect when the chain began (the first row records them:
- * the history before a change of days keeps the calendar it had), each anchored on the neighbouring row (the grid
- * closing nearest to one month after / before it), so an exact date never leaves a duplicated or a missing statement. Weekend or holiday shifts are never simulated:
- * a statement moves only because the person entered its date.
+ * the history before a change of days keeps the calendar it had). Each row also records the usual statement it stands
+ * for (its slot, `monthISO`), and the generated statements continue from the slots next to the chain (across a change
+ * of usual days, from the new grid closing nearest to one month after the last row), so an exact date never leaves a
+ * duplicated or a missing statement. Weekend or holiday shifts are never simulated: a statement moves only because the
+ * person entered its date.
  *
  * Nothing here rewrites history: a plan's schedule is written once (24T1), movements keep their dates, and the planner
  * below freezes every statement that already closed before it applies a change. */
@@ -36,9 +38,10 @@ export interface CardCycleDates {
    * person entered it. The first row's days generate the statements before the chain, so history keeps its calendar. */
   closingDay: number;
   dueDay: number;
-  /** The usual statement this one stands for: the month of its slot in its own calendar (the statement it replaced).
-   * The statements next to the chain continue from the slots next to it, so a date moved by any number of days never
-   * brings back the statement it replaced nor drops the next one. */
+  /** The usual statement this one stands for, as the month of its slot in its own calendar: its own month when it closes
+   * on that calendar's grid, the statement it replaced when it is a one-off shift off the grid. The statements next to
+   * the chain continue from the slots next to it, so a date moved by any number of days never brings back the statement
+   * it replaced nor drops the next one. */
   monthISO: string;
   createdAt: string;
   revision: number;
@@ -384,7 +387,7 @@ export function planCardCycle(input: { cardId: string; days: CardCycleDays; rows
     for (let position = -1; position >= low; position--) byPosition.set(position, frozen(position, first + position));
     for (let position = chain.length; position <= high; position++) byPosition.set(position, frozen(position, last + position - chain.length + 1));
   }
-  const touch = (row: CardCycleDates, change: Partial<Pick<CardCycleDates, 'closingISO' | 'dueISO'>>) => {
+  const touch = (row: CardCycleDates, change: Partial<Pick<CardCycleDates, 'closingISO' | 'dueISO' | 'closingDay' | 'dueDay' | 'monthISO'>>) => {
     Object.assign(row, change);
     // A row written by this same change stays a first version; an older row moves one revision on.
     if (row.revision !== 0 || row.createdAt !== nowISO) { row.revision += 1; row.updatedAt = nowISO; }
@@ -393,19 +396,30 @@ export function planCardCycle(input: { cardId: string; days: CardCycleDays; rows
   if (toPayChanged) touch(byPosition.get(toPayPosition)!, { dueISO: intent.toPay!.dueISO });
   let rows = [...byPosition.entries()].sort((a, b) => a[0] - b[0]).map(([, row]) => row);
   // (4) The open statement: its own row when it has one (an existing row, or one frozen before a chain that began later),
-  // else a new row after the previous statement, written only when the NEW calendar would not produce these dates anyway;
-  // the new row stands for the slot of the statement it replaces.
+  // else a new row after the previous statement, written only when the NEW calendar would not produce these dates anyway.
   if (intent.open && (openChanged || daysChanged)) {
     const { closingISO, dueISO } = intent.open;
     if (closingISO <= view.previous.closingISO) throw new Error(CYCLE_CLOSING_ORDER_MESSAGE);
+    // The usual statement the entered dates stand for (their slot). With new usual days, the month of the new calendar
+    // nearest to the closing (the days come from these dates: their own month). In the same calendar, the closing's own
+    // month when it falls exactly on the grid (a move by whole months names that month's statement), else the statement
+    // it replaces (a one-off shift off the grid keeps standing for it). A slot that disagrees with its closing would
+    // drop the next statement, or bring back the replaced one after a later correction.
+    const slotOf = (generator: CardCycleDays, replaced: number) => daysChanged ? nearestGridMonth(closingISO, days.closingDay)
+      : clamped(monthIndexOf(closingISO), generator.closingDay) === closingISO ? monthIndexOf(closingISO) : replaced;
     const own = byPosition.get(openPosition);
-    if (own) { if (own.closingISO !== closingISO || own.dueISO !== dueISO) touch(own, { closingISO, dueISO }); }
-    else {
+    if (own) {
+      if (own.closingISO !== closingISO || own.dueISO !== dueISO) {
+        // Moved into new usual days, the statement belongs to the new calendar; in the same one it keeps its own days.
+        const generator = daysChanged ? days : { closingDay: own.closingDay, dueDay: own.dueDay };
+        touch(own, { closingISO, dueISO, ...generator, monthISO: monthISOOf(slotOf(generator, monthOfMonthISO(own.monthISO))) });
+      }
+    } else {
       const next = calendarOf(days, rows);
       const generated = statementAt(next, rows.length);
       if (generated.closingISO !== closingISO || generated.dueISO !== dueISO) {
         const sequence = rows.length ? rows[rows.length - 1].sequence + 1 : 0;
-        rows = [...rows, { cardId, sequence, closingISO, dueISO, closingDay: days.closingDay, dueDay: days.dueDay, monthISO: monthISOOf(slotAt(next, rows.length)),
+        rows = [...rows, { cardId, sequence, closingISO, dueISO, closingDay: days.closingDay, dueDay: days.dueDay, monthISO: monthISOOf(slotOf(days, slotAt(next, rows.length))),
           createdAt: nowISO, revision: 0, updatedAt: nowISO }];
       }
     }

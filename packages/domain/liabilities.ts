@@ -1,6 +1,6 @@
 import { ACCOUNT_DELETED_MESSAGE, accountBalanceMinor, isLiveAccount, validDateISO, type Account, type Currency, type Entry, type EntryKind, type LedgerSnapshot, type Transfer } from './ledger.ts';
 import { assertStorableCurrency, sortCurrencies } from './currency.ts';
-import { CARD_PLAN_MESSAGE, cardHasPendingInstallments, type InstallmentPlan, type RecordedEntry } from './installments.ts';
+import { CARD_PLAN_MESSAGE, cardHasPendingInstallments, installmentOccurrenceOf, type InstallmentPlan, type RecordedEntry } from './installments.ts';
 import { cardCycleView, type CardCycleDates } from './card-cycles.ts';
 
 /** A credit card is a hidden internal ledger account. A purchase (without
@@ -405,28 +405,34 @@ export function cardCycle(card: Pick<CreditCardProfile, 'closingDay' | 'dueDay'>
 
 export interface CardStatementActivity extends CardCycle {
   purchasesMinor: number;
+  /** 24T2: the financing shares of instalments (interest, fee, tax) recorded in the window: never a purchase. */
+  financingMinor: number;
   refundsMinor: number;
   paymentsMinor: number;
   purchaseCount: number;
   paymentCount: number;
 }
 
-/** Recorded purchases (expenses, instalments included), refunds (income) and payments (transfers into the card) inside
- * the open statement window: «Este ciclo», the activity the ledger holds, never a statement amount. Exact minor units. */
+/** Recorded purchases (an expense: a purchase paid once, or the principal of an instalment), refunds (income) and payments
+ * (transfers into the card) inside the open statement window: the open cycle's activity (Tarjetas' «Este ciclo»), what the
+ * ledger holds, never a statement amount. An instalment's financing shares are recorded as their own movements and
+ * counted apart (`financingMinor`), so one instalment with interest is one purchase, not two. Exact minor units. */
 export function cardStatementActivity(card: CreditCardProfile, snapshot: LedgerSnapshot, todayISO: string, cycleDates: readonly CardCycleDates[] = []): CardStatementActivity {
   const cycle = cardCycle(card, todayISO, cycleDates.filter(row => row.cardId === card.id));
   const inWindow = (dateISO: string) => dateISO >= cycle.startISO && dateISO <= cycle.closingISO;
-  let purchases = 0n, refunds = 0n, payments = 0n, purchaseCount = 0, paymentCount = 0;
+  let purchases = 0n, financing = 0n, refunds = 0n, payments = 0n, purchaseCount = 0, paymentCount = 0;
   for (const entry of snapshot.entries) {
     if (entry.accountId !== card.accountId || !inWindow(entry.dateISO)) continue;
-    if (entry.kind === 'expense') { purchases += BigInt(entry.amountMinor); purchaseCount++; }
-    else refunds += BigInt(entry.amountMinor);
+    if (entry.kind !== 'expense') { refunds += BigInt(entry.amountMinor); continue; }
+    const share = installmentOccurrenceOf(entry.id);
+    if (share && share.component !== 'principal') financing += BigInt(entry.amountMinor);
+    else { purchases += BigInt(entry.amountMinor); purchaseCount++; }
   }
   for (const transfer of snapshot.transfers ?? []) {
     if (transfer.toAccountId !== card.accountId || !inWindow(transfer.dateISO)) continue;
     payments += BigInt(transfer.amountMinor); paymentCount++;
   }
-  return { ...cycle, purchasesMinor: safeBigInt(purchases), refundsMinor: safeBigInt(refunds),
+  return { ...cycle, purchasesMinor: safeBigInt(purchases), financingMinor: safeBigInt(financing), refundsMinor: safeBigInt(refunds),
     paymentsMinor: safeBigInt(payments), purchaseCount, paymentCount };
 }
 

@@ -208,7 +208,9 @@ export function CardForm({ original }: { original?: CreditCardProfile }) {
           disabled={locked || edit.forced} detail={edit.forced ? t('cards.form.calendarChange') : undefined} last />}
       </Surface>
       <AppText secondary variant="footnote">
-        {days ? t('cards.form.datesNote') + ' ' + t('cards.form.usualDays', { closing: days.closingDay, due: days.dueDay }) : t('cards.form.datesNote')}
+        {/* Which days repeat is said once, by the usual days line: a one-off correction says it corrects this statement only. */}
+        {[t('cards.form.datesNote'), edit && !edit.repeats && edit.intent.open ? t('cards.form.oneOff') : null,
+          days ? t('cards.form.usualDays', { closing: days.closingDay, due: days.dueDay }) : null].filter(Boolean).join(' ')}
       </AppText>
     </View>
 

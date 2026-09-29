@@ -10,6 +10,7 @@ import * as moneyInput from '../src/ui/money-input.ts';
 import { PREVIEW_CURRENCIES } from '../src/storage/currency-gate.ts';
 import * as currencies from '../src/ui/currencies.ts';
 import * as liabilityPresentation from '../src/ui/liability-presentation.ts';
+import * as geometry from '../src/ui/geometry.ts';
 import * as installmentPresentation from '../src/ui/installment-presentation.ts';
 import * as i18nFormat from '../src/i18n/format.ts';
 import { bindLocale } from '../src/i18n/bind.ts';
@@ -69,7 +70,7 @@ function harness(file: string, params: Record<string, unknown> = {}, initial: do
   const theme = { space: { xs: 4, s: 8, m: 12, l: 16, xl: 20, xxl: 24, xxxl: 32 }, useCurrentDay: () => '2026-09-20', useReduceMotion: () => true,
     usePalette: () => ({ text: '#000', secondary: '#666', tertiary: '#999', line: '#ddd', inset: '#eee', expense: '#c00', income: '#080', warning: '#a60', transfer: '#03c', primary: '#2557D6' }) };
   // 24T2 (stream A): the deck replaces the carousel; the face keeps its width rule.
-  const cardVisual = { CardDeck: 'CardDeck', CardFace: 'CardFace', cardFaceWidth: (windowWidth: number) => Math.min(windowWidth - 40, 420) };
+  const cardVisual = { CardDeck: 'CardDeck', CardFace: 'CardFace', cardFaceWidth: (windowWidth: number) => Math.min(windowWidth - 40, 420), cardFaceHeight: (width: number) => Math.round(width / 1.586) };
   const GATE = (typeof gate !== 'undefined' && gate) || domain.LEDGER_CURRENCIES;
   const defaults = { useDefaultCurrency: ({ accountCurrency, requested }: { accountCurrency?: string | null; requested?: unknown } = {}) => accountCurrency ?? (domain.isLedgerCurrency(requested, GATE) ? requested : 'ARS') };
   const modules: Record<string, unknown> = {
@@ -96,7 +97,7 @@ function harness(file: string, params: Record<string, unknown> = {}, initial: do
     '../src/storage/LedgerProvider': ledger, '../../src/storage/LedgerProvider': ledger, '../storage/LedgerProvider': ledger,
     '../src/ui/components': components, '../../src/ui/components': components, './components': components,
     './currencies': currencies, './currency-switch': { CurrencySwitch: 'CurrencySwitch' }, '../src/ui/currency-switch': { CurrencySwitch: 'CurrencySwitch' }, '../../src/ui/currency-switch': { CurrencySwitch: 'CurrencySwitch' },
-    '../src/ui/card-visual': cardVisual, '../../src/ui/card-visual': cardVisual,
+    '../src/ui/card-visual': cardVisual, '../../src/ui/card-visual': cardVisual, '../src/ui/geometry': geometry,
     '../src/ui/entry-list': { EntryList: 'EntryList' }, '../../src/ui/entry-list': { EntryList: 'EntryList' },
     '../src/ui/liability-presentation': liabilityPresentation, '../../src/ui/liability-presentation': liabilityPresentation,
     '../src/ui/presentation': presentation, '../../src/ui/presentation': presentation,
@@ -182,7 +183,7 @@ test('Tarjetas summarizes the selected card from recorded purchases and payments
   const purchases = nodes(root).filter(node => node.type === 'Money').map(node => node.props.minor);
   assert.ok(purchases.includes(500000 - 13100), 'available limit is limit minus recorded debt');
   const caption = nodes(root).find(node => node.type === 'SectionTitle' && node.props.action === 'Ver todo')!.props.caption;
-  assert.match(caption, /^Ciclo abierto desde .* · 1 compra · 1 pago$/, 'the open cycle\'s facts live in one caption line');
+  assert.match(caption, /^Este ciclo, desde .* · 1 compra · 1 pago$/, 'the open cycle\'s facts live in one caption line');
   assert.equal(nodes(root).filter(node => node.type === 'Surface').length >= 1, true);
   find(root, 'ActionButton', 'Registrar compra').props.onPress();
   assert.equal(JSON.stringify(view.pushed.at(-1)), JSON.stringify({ pathname: '/new-entry', params: { accountId: 'card-acc', kind: 'expense' } }));
@@ -208,6 +209,32 @@ test('choosing another card in the deck changes the snapshot, and a card without
   assert.equal(panel.props.summary.availableMinor, null);
   assert.ok(nodes(root).some(node => node.type === 'AppText' && node.props.children === 'Sin límite cargado'));
   assert.equal(find(root, 'ActionButton', 'Pagar tarjeta').props.disabled, true, 'nothing to pay on a card without debt');
+  // 24T2 review: the snapshot's height follows the card, so the blocks under the balance slide into place (Reflow) instead of jumping.
+  assert.ok(nodes(root).filter(node => node.type === 'Reflow').length >= 3);
+});
+
+test('24T2 review: choosing a card whose front place is below the fold scrolls it into view; one in view leaves the page still', () => {
+  const view = harness('cards.tsx');
+  const scrolls: { y: number; animated: boolean }[] = [];
+  const wire = (deckTop: number, viewportHeight: number) => {
+    const root = view.render();
+    const box = nodes(root).find(node => node.type === 'View' && node.props.ref)!;
+    box.props.onLayout({ nativeEvent: { layout: { y: 20 } } });
+    box.props.ref.current = { measureInWindow: (callback: (x: number, y: number) => void) => callback(0, deckTop) };
+    const screen = nodes(root).find(node => node.type === 'Screen')!;
+    screen.props.scrollRef.current = { scrollTo: (to: { y: number; animated: boolean }) => scrolls.push(to),
+      getNativeScrollRef: () => ({ measureInWindow: (callback: (x: number, y: number, width: number, height: number) => void) => callback(0, 0, 393, viewportHeight) }) };
+    return find(root, 'CardDeck');
+  };
+  // At rest under a 103 pt header (the deck 20 pt into the content, at 123 on screen): the front card of two is in view.
+  wire(123, 852).props.onSelect('usd-card');
+  assert.equal(scrolls.length, 0);
+  assert.equal(find(view.render(), 'CardDeck').props.selectedId, 'usd-card');
+  // A viewport too short for the front card (its top at 173, a 223 pt face, 200 pt visible): the page scrolls it to a
+  // quarter of the viewport. The offset comes from the two measurements: −(123 − 20) now, 173 − 50 further.
+  wire(123, 200).props.onSelect('card');
+  assert.equal(scrolls.length, 1);
+  assert.deepEqual([scrolls[0].y, scrolls[0].animated], [-103 + 173 - 50, false], 'Reduce Motion: no animation');
 });
 
 test('card detail lists only that card account with card context and links purchase/payment actions', () => {
@@ -229,7 +256,7 @@ test('card detail lists only that card account with card context and links purch
   assert.deepEqual(buttons.map(button => button.label), ['Registrar compra', 'Pagar tarjeta']);
   assert.equal(buttons[1].secondary, true);
   assert.ok(buttons.every(button => button.containerStyle === undefined), 'both actions span the full width');
-  assert.match(find(root, 'SectionTitle').props.caption, /^Ciclo abierto desde .* · 1 compra · 1 pago$/);
+  assert.match(find(root, 'SectionTitle').props.caption, /^Este ciclo, desde .* · 1 compra · 1 pago$/);
   assert.equal(find(harness('card/[id].tsx', { id: 'missing' }).render(), 'EmptyState').props.title, 'No encontramos esta tarjeta');
 });
 
@@ -264,7 +291,7 @@ test('Tarjetas and Deudas read English labels, keep user names as typed and send
     const header = nodes(cardsRoot).find(node => node.type === 'Stack.Screen')!.props.options;
     assert.equal(header.title, 'Cards');
     assert.equal(nodes(cardsRoot).filter(node => node.type === 'Stat').map(node => node.props.label).join(','), 'Due,Closes,Available');
-    assert.match(find(cardsRoot, 'SectionTitle').props.caption, /^Cycle open since .* · 1 purchase · 1 payment$/);
+    assert.match(find(cardsRoot, 'SectionTitle').props.caption, /^This cycle, since .* · 1 purchase · 1 payment$/);
     find(cardsRoot, 'ActionButton', 'Pay card').props.onPress();
     assert.equal(JSON.stringify(cardsView.pushed.at(-1)), JSON.stringify({ pathname: '/new-transfer', params: { toAccountId: 'card-acc', maxAmountMinor: '13100' } }));
     // The deck's hints and labels are spoken by card-visual itself (cards-deck.node.ts).
@@ -292,10 +319,10 @@ test('Tarjetas and Deudas read English labels, keep user names as typed and send
 test('statement caption and due label keep the Spanish wording and follow a translator', () => {
   const statement = { startISO: '2026-08-29', purchaseCount: 2, paymentCount: 1 };
   const relative = (iso: string) => i18nFormat.relativeDate(iso, '2026-09-20');
-  assert.equal(liabilityPresentation.statementCaption(statement, relative), 'Ciclo abierto desde 29 ago · 2 compras · 1 pago');
-  assert.equal(liabilityPresentation.statementCaption({ ...statement, purchaseCount: 1, paymentCount: 0 }, relative), 'Ciclo abierto desde 29 ago · 1 compra · 0 pagos');
+  assert.equal(liabilityPresentation.statementCaption(statement, relative), 'Este ciclo, desde 29 ago · 2 compras · 1 pago');
+  assert.equal(liabilityPresentation.statementCaption({ ...statement, purchaseCount: 1, paymentCount: 0 }, relative), 'Este ciclo, desde 29 ago · 1 compra · 0 pagos');
   assert.equal(liabilityPresentation.statementCaption(statement, iso => i18nFormat.relativeDate(iso, '2026-09-20', 'en-AR'), bindLocale('en-AR').t),
-    'Cycle open since Aug 29 · 2 purchases · 1 payment');
+    'This cycle, since Aug 29 · 2 purchases · 1 payment');
   assert.equal(liabilityPresentation.dueLabel('2026-09-19', '2026-09-20'), domain.labelFromISO('2026-09-19', new Date('2026-09-20T12:00:00')));
   assert.equal(liabilityPresentation.dueLabel('2026-10-01', '2026-09-20', 'en-US'), 'Oct 1');
 });
@@ -323,19 +350,19 @@ test('23.1C2: a day inside a sentence starts in lower case; a day on its own kee
   const closedYesterday: domain.CreditCardProfile = { ...card, closingDay: 18 };
   const caption = (file: string) => nodes(harness(file, { id: 'card' }, { ...archive, cards: [closedYesterday, usdCard] }).render())
     .find(node => node.type === 'SectionTitle' && node.props.caption)!.props.caption;
-  assert.match(caption('cards.tsx'), /^Ciclo abierto desde ayer · /);
-  assert.match(caption('card/[id].tsx'), /^Ciclo abierto desde ayer · /);
+  assert.match(caption('cards.tsx'), /^Este ciclo, desde ayer · /);
+  assert.match(caption('card/[id].tsx'), /^Este ciclo, desde ayer · /);
   activeLocale = 'en-US';
   try {
     assert.deepEqual(detailOf(dueToday), { status: 'Due today', rows: 'Type=I owe,Due date=Today,Status=Due today' });
     assert.deepEqual(rowOf(dueToday), { label: 'I owe Juan, 300.00 ARS, Due today', caption: 'I owe · Due today' });
     assert.equal(detailOf(debt).status, 'Due Oct 1', 'an English short date keeps its capital month');
-    assert.match(caption('cards.tsx'), /^Cycle open since yesterday · /);
+    assert.match(caption('cards.tsx'), /^This cycle, since yesterday · /);
   } finally { activeLocale = 'es-AR'; }
   const inline = (locale: AppLocale) => (iso: string) => i18nFormat.relativeDate(iso, '2026-09-20', locale, true);
   const statement = { startISO: '2026-09-19', purchaseCount: 2, paymentCount: 1 };
-  assert.equal(liabilityPresentation.statementCaption(statement, inline('es-AR')), 'Ciclo abierto desde ayer · 2 compras · 1 pago');
-  assert.equal(liabilityPresentation.statementCaption(statement, inline('en-AR'), bindLocale('en-AR').t), 'Cycle open since yesterday · 2 purchases · 1 payment');
+  assert.equal(liabilityPresentation.statementCaption(statement, inline('es-AR')), 'Este ciclo, desde ayer · 2 compras · 1 pago');
+  assert.equal(liabilityPresentation.statementCaption(statement, inline('en-AR'), bindLocale('en-AR').t), 'This cycle, since yesterday · 2 purchases · 1 payment');
 });
 
 test('23.1C2: the card usage caption is shown in the region\'s format and spoken in the language\'s numbers', () => {

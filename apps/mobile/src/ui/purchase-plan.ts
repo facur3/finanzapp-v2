@@ -12,10 +12,10 @@ export type PurchaseMode = 'once' | 'installments';
 /** A count as the segmented control holds it: one of `QUICK_COUNTS` written as text, or «Otra» (a typed count). */
 export type CountChoice = `${number}` | 'other';
 
-/** The counts offered as one tap, before «Otra»: the first four of `INSTALLMENT_COUNT_CHOICES`. A compact segment is at
- * least 64 pt wide, so five segments are the most that fit the content width of the narrowest iPhone (375 − 40 = 335 pt;
- * six need 398 pt and would overflow every iPhone under 440 pt); 24 and every other count from 2 to 120 are typed. */
-export const QUICK_COUNTS: readonly number[] = INSTALLMENT_COUNT_CHOICES.slice(0, 4);
+/** The counts offered as one tap, before «Otra»: `INSTALLMENT_COUNT_CHOICES`. A compact segment is at least 64 pt wide,
+ * so five segments are the most that fit the content width of the narrowest iPhone (375 − 40 = 335 pt; six need 398 pt
+ * and would overflow every iPhone under 440 pt); 24 and every other count from 2 to 120 are typed. */
+export const QUICK_COUNTS: readonly number[] = INSTALLMENT_COUNT_CHOICES;
 /** «El caso normal es 12 cuotas» (docs/mobile-design.md, 24T1C): the count a new plan starts on, shown in the
  * per-instalment line and on the Save button before anything is saved. */
 export const DEFAULT_COUNT: CountChoice = '12';

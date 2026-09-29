@@ -9,6 +9,7 @@ import * as moneyInput from '../src/ui/money-input.ts';
 import * as cardCycleForm from '../src/ui/card-cycle-form.ts';
 import { bindLocale } from '../src/i18n/bind.ts';
 import type { AppLocale } from '../src/i18n/locale.ts';
+import { realModule } from './real-module.ts';
 
 // Producto 24T2 (stream B): the card form's statement dates. The real CardForm (src/ui/card-form.tsx) runs with the real
 // date model (src/ui/card-cycle-form.ts and the domain's planner) on a harness day (`useCurrentDay`) a test can move, so a
@@ -114,6 +115,21 @@ test('24T2: a closing more than half a month from the expected one is a calendar
   assert.deepEqual([same.changed, JSON.stringify(same.intent)], [false, '{}'], 'the usual days repeated every month change nothing');
 });
 
+test('24T2 review: the switch alone (an exact statement on another day, its dates kept) names the statement the form showed, so a form left open past its closing is refused', () => {
+  // 28/5 with the open statement corrected once to 26 oct / 4 nov; the form opens on 25 oct and turns the switch on.
+  const corrected = domain.planCardCycle({ cardId: card.id, days: card, rows: [], todayISO: '2026-10-20', nowISO: '2026-10-20T12:00:00.000Z',
+    intent: { open: { statementClosingISO: '2026-10-28', closingISO: '2026-10-26', dueISO: '2026-11-04' } } });
+  const shown = domain.cardCycleView(card, corrected.rows, '2026-10-25');
+  const result = cardCycleForm.cycleEditResult(card, shown, { closingISO: '2026-10-26', dueISO: '2026-11-04', toPayDueISO: null, everyMonth: true });
+  assert.deepEqual([result.changed, result.days.closingDay, result.days.dueDay], [true, 26, 4]);
+  assert.equal(JSON.stringify(result.intent), JSON.stringify({ open: { statementClosingISO: '2026-10-26', closingISO: '2026-10-26', dueISO: '2026-11-04' } }));
+  const plan = (todayISO: string) => domain.planCardCycle({ cardId: card.id, days: card, rows: corrected.rows, todayISO, nowISO: '2026-10-27T12:00:00.000Z',
+    intent: { ...result.intent, days: result.days } });
+  const closings = plan('2026-10-25');
+  assert.deepEqual(domain.cardStatementsFrom(closings.days, closings.rows, '2026-10-20', 0, 3).map(item => item.closingISO), ['2026-10-26', '2026-11-26', '2026-12-26']);
+  assert.throws(() => plan('2026-10-27'), new RegExp(domain.CYCLE_STALE_MESSAGE), 'saved after the 26 oct closing it showed');
+});
+
 // ---- a new card ----------------------------------------------------------------------------------------------------
 
 test('24T2: a new card asks its next closing and the due of that closing, both unchosen; the usual days are their days and no row is written when those days produce them', async () => {
@@ -125,7 +141,7 @@ test('24T2: a new card asks its next closing and the due of that closing, both u
   assert.equal(keyOf(closing.props.minimumDate), '2026-09-20', 'the next closing is today or later');
   assert.equal(has(root, 'SwitchRow'), false, 'a new card has no usual days to keep');
   assert.equal(has(root, 'Field') && nodes(root).some(node => node.type === 'Field' && /Día/.test(node.props.label)), false, 'the day numbers are gone');
-  assert.ok(texts(root).includes('Están en tu resumen. FinanzApp repite esos días cada mes y no consulta al banco.'));
+  assert.ok(texts(root).includes('Están en tu resumen. FinanzApp no consulta al banco.'));
   find(root, 'Field', 'Nombre de la tarjeta').props.onChangeText('Visa Gold');
   assert.equal(saveButton(view.render()).props.disabled, true, 'Save waits for both dates');
   pick(view, 'Próximo cierre', '2026-09-28');
@@ -134,7 +150,7 @@ test('24T2: a new card asks its next closing and the due of that closing, both u
   assert.equal(saveButton(root).props.disabled, true);
   pick(view, 'Vencimiento', '2026-10-05');
   root = view.render();
-  assert.ok(texts(root).includes('Están en tu resumen. FinanzApp repite esos días cada mes y no consulta al banco. Los meses siguientes: cierre el día 28 y vencimiento el día 5.'));
+  assert.ok(texts(root).includes('Están en tu resumen. FinanzApp no consulta al banco. Los meses siguientes: cierre el día 28 y vencimiento el día 5.'));
   assert.equal(saveButton(root).props.disabled, false);
   await saveButton(root).props.onPress();
   assert.equal(view.added.length, 1);
@@ -199,7 +215,7 @@ test('24T2: editing shows the open statement; correcting it sends the card with 
   pick(view, 'Próximo cierre', '2026-09-29');
   pick(view, 'Vencimiento', '2026-10-06');
   root = view.render();
-  assert.ok(texts(root).includes('Están en tu resumen. FinanzApp repite esos días cada mes y no consulta al banco. Los meses siguientes: cierre el día 28 y vencimiento el día 5.'), 'a one-off shift keeps the usual days');
+  assert.ok(texts(root).includes('Están en tu resumen. FinanzApp no consulta al banco. Estas fechas corrigen solo este resumen. Los meses siguientes: cierre el día 28 y vencimiento el día 5.'), 'a one-off shift keeps the usual days, and says so');
   await saveButton(root).props.onPress();
   assert.equal(view.saved.length, 1);
   const { card: submitted, intent } = view.saved[0];
@@ -324,11 +340,39 @@ test('24T2: the card form\'s dates read in English, and the statement to pay is 
   const root = view.render();
   assert.deepEqual(nodes(root).filter(node => node.type === 'DateField').map(node => node.props.label), ['Due date of the Sep 28 statement', 'Next closing', 'Due date']);
   assert.equal(find(root, 'SwitchRow').props.label, 'Use these days every month');
-  assert.ok(texts(root).includes('They’re on your statement. FinanzApp repeats those days every month and doesn’t contact your bank. Following months: closing on day 28, due on day 5.'));
+  assert.ok(texts(root).includes('They’re on your statement. FinanzApp doesn’t contact your bank. Following months: closing on day 28, due on day 5.'));
   const created = harness({}, { locale: 'en-US' }).render();
   assert.deepEqual(nodes(created).filter(node => node.type === 'DateField').map(node => node.props.label), ['Next closing', 'Due date']);
-  assert.ok(texts(created).includes('They’re on your statement. FinanzApp repeats those days every month and doesn’t contact your bank.'));
+  assert.ok(texts(created).includes('They’re on your statement. FinanzApp doesn’t contact your bank.'));
   const moved = harness({ original: card }, { locale: 'en-US' });
   pick(moved, 'Next closing', '2026-10-20');
   assert.equal(find(moved.render(), 'SwitchRow').props.detail, 'That date is more than half a month from the expected closing, so it changes the card’s usual days.');
+});
+
+test('24T2 review: the switch row speaks its reason with its label (a hint may be turned off), and ticks once per change', () => {
+  let haptics = 0;
+  const jsx = (type: unknown, props: Record<string, unknown>) => ({ type, props });
+  const modules: Record<string, unknown> = {
+    'react/jsx-runtime': { jsx, jsxs: jsx, Fragment: 'Fragment' },
+    'react-native': { StyleSheet: { create: (styles: unknown) => styles, hairlineWidth: 0.5 }, Switch: 'Switch', View: 'View' },
+    '@expo/vector-icons/Ionicons': 'Ionicons',
+    '../i18n/provider': { useI18n: () => ({ speechLanguage: 'es-AR' }) },
+    './components': { AppText: 'AppText' },
+    './motion': { selectionHaptic: () => { haptics++; } },
+    './theme': { usePalette: () => ({ line: '#DDD', secondary: '#666', inset: '#EEE', primaryFill: '#2557D6' }) },
+  };
+  const { SwitchRow } = realModule('src/ui/switch-row.tsx', name => {
+    if (!Object.hasOwn(modules, name)) throw new Error('Unexpected switch-row dependency: ' + name);
+    return modules[name];
+  });
+  const changes: boolean[] = [];
+  const toggleOf = (row: { props: { children: unknown } }) => [row.props.children].flat(Infinity).find((node: any) => node?.type === 'Switch') as { props: Record<string, any> };
+  const forced = toggleOf(SwitchRow({ label: 'Usar estos días todos los meses', value: true, disabled: true, onValueChange: (value: boolean) => changes.push(value),
+    detail: 'Esa fecha está a más de medio mes del cierre esperado: cambia los días de la tarjeta.' }));
+  assert.equal(forced.props.accessibilityLabel, 'Usar estos días todos los meses, Esa fecha está a más de medio mes del cierre esperado: cambia los días de la tarjeta.');
+  assert.deepEqual([forced.props.accessibilityHint, forced.props.disabled, forced.props.accessibilityLanguage], [undefined, true, 'es-AR']);
+  const plain = toggleOf(SwitchRow({ label: 'Con interés', value: false, onValueChange: (value: boolean) => changes.push(value) }));
+  assert.equal(plain.props.accessibilityLabel, 'Con interés');
+  plain.props.onValueChange(true);
+  assert.deepEqual([changes, haptics], [[true], 1]);
 });

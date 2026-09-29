@@ -56,10 +56,17 @@ export const forms: Pick<Messages, 'entryForm' | 'transferForm'> = {
       totalMissing: 'Enter the total financed or turn off “With interest”.',
       note: 'The purchase doesn’t count all at once: each installment counts as an expense when its statement closes and adds to the outstanding balance. Future installments are shown in Cards.',
       save: 'Save in installments',
+      retryNote: 'We kept this submission: Retry never saves the purchase twice. To change it, close and check the card’s installments in Cards first.',
     },
     installmentEdit: {
       title: 'Edit installment',
       amount: 'Installment amount',
+      amountShare: {
+        principal: 'Installment principal',
+        interest: 'Installment interest',
+        fee: 'Installment fee',
+        tax: 'Installment tax',
+      },
       note: 'The installment plan sets the amount, the date and the card. You can correct the merchant and the category.',
     },
   },

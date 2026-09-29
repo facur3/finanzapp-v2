@@ -64,8 +64,16 @@ export const activity = {
       fee: '{number} de {count} · comisión',
       tax: '{number} de {count} · impuesto',
     },
+    /** The title of a financing share's movement (its principal is «Cuota de tarjeta»). */
+    installmentShareTitle: {
+      interest: 'Interés de cuota',
+      fee: 'Comisión de cuota',
+      tax: 'Impuesto de cuota',
+    },
     /** Appended to the undo confirmation of an instalment. */
     installmentVoidNote: 'La cuota queda deshecha: no se vuelve a registrar sola y sigue pendiente en su plan.',
+    /** The same, for one share of an instalment that has another (its principal, or its interest): the other stays as it is. */
+    installmentShareVoidNote: 'Solo esta parte de la cuota queda deshecha: no se vuelve a registrar sola y sigue pendiente en su plan. La otra parte de la cuota no cambia.',
   },
   transferDetail: {
     notFoundTitle: 'No encontramos esta transferencia',

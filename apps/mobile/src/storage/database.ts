@@ -1137,8 +1137,9 @@ export async function saveCreditCard(db: LedgerDatabase, input: CreditCardProfil
       const before = stored.find(item => item.sequence === row.sequence);
       if (!before) await insertCardCycleDate(tx, row);
       else if (!sameCardCycleDate(before, row)) {
-        await tx.runAsync('UPDATE card_cycle_dates SET closingISO = ?, dueISO = ?, revision = ?, updatedAt = ? WHERE cardId = ? AND sequence = ?',
-          row.closingISO, row.dueISO, row.revision, row.updatedAt, row.cardId, row.sequence);
+        // A corrected open statement may also move into new usual days and stand for another month (its slot).
+        await tx.runAsync(`UPDATE card_cycle_dates SET closingISO = ?, dueISO = ?, closingDay = ?, dueDay = ?, monthISO = ?, revision = ?, updatedAt = ?
+          WHERE cardId = ? AND sequence = ?`, row.closingISO, row.dueISO, row.closingDay, row.dueDay, row.monthISO, row.revision, row.updatedAt, row.cardId, row.sequence);
       }
     }
   });

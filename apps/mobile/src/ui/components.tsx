@@ -1,4 +1,4 @@
-import { Children, useEffect, useId, useRef, useState, type ReactNode } from 'react';
+import { Children, useEffect, useId, useRef, useState, type ReactNode, type Ref } from 'react';
 import { AccessibilityInfo, ActivityIndicator, Alert, InputAccessoryView, Keyboard, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View,
   useWindowDimensions, type PressableProps, type StyleProp, type TextInputProps, type TextProps, type ViewStyle } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
@@ -80,9 +80,10 @@ export function AppText({ children, style, secondary = false, tertiary = false, 
     style={[type[variant], { color: tertiary ? p.tertiary : secondary ? p.secondary : p.text }, style, fits]}>{children}</Text>;
 }
 
-export function Screen({ children, gap = space.xl }: { children: ReactNode; gap?: number }) {
+/** `scrollRef` lets a screen scroll its own content into view (Tarjetas brings a chosen card to the front). */
+export function Screen({ children, gap = space.xl, scrollRef }: { children: ReactNode; gap?: number; scrollRef?: Ref<ScrollView> }) {
   const p = usePalette();
-  return <ScrollView style={{ flex: 1, backgroundColor: p.background }}
+  return <ScrollView ref={scrollRef} style={{ flex: 1, backgroundColor: p.background }}
     contentContainerStyle={[styles.content, { gap }]} contentInsetAdjustmentBehavior="automatic"
     automaticallyAdjustKeyboardInsets keyboardShouldPersistTaps="handled"
     keyboardDismissMode="interactive">{children}</ScrollView>;
@@ -104,14 +105,15 @@ export function Surface({ children, style, grouped = false }: { children: ReactN
  * size with a small chevron in the `link` slate blue (24UX5; secondary ink before): a visible, 44 pt tappable link that
  * reads as navigation without becoming one more cobalt word competing with the hero, the Assistant and the tab bar.
  * Elsewhere the action stays the cobalt link. */
-export function SectionTitle({ children, action, onAction, caption, quiet = false }: {
-  children: ReactNode; action?: string; onAction?: () => void; caption?: string; quiet?: boolean;
+export function SectionTitle({ children, action, onAction, caption, captionLabel, quiet = false }: {
+  /** `captionLabel`: what VoiceOver reads for the caption when it holds an amount (its spoken twin). */
+  children: ReactNode; action?: string; onAction?: () => void; caption?: string; captionLabel?: string; quiet?: boolean;
 }) {
   const p = usePalette();
   return <View style={styles.sectionHeading}>
     <View style={{ flex: 1, gap: 2 }}>
       <AppText accessibilityRole="header" variant="headline">{children}</AppText>
-      {caption && <AppText secondary variant="footnote">{caption}</AppText>}
+      {caption && <AppText secondary variant="footnote" accessibilityLabel={captionLabel}>{caption}</AppText>}
     </View>
     {action && onAction && (quiet
       ? <PressFeedback feedback="opacity" accessibilityRole="button" accessibilityLabel={action} onPress={onAction} hitSlop={{ top: 4, bottom: 4 }}
@@ -361,12 +363,14 @@ export function AmountShortcut({ label, caption, spokenCaption, onPress, disable
   </View>;
 }
 
-function Choice({ label, selected, disabled, onPress, compact = false }: { label: string; selected: boolean; disabled?: boolean; onPress: () => void; compact?: boolean }) {
+function Choice({ label, spokenLabel, selected, disabled, onPress, compact = false }: {
+  label: string; spokenLabel?: string; selected: boolean; disabled?: boolean; onPress: () => void; compact?: boolean;
+}) {
   const p = usePalette();
   const reduced = useReduceMotion();
   const { speechLanguage } = useI18n();
   // Compact: 28 pt segments (32 pt with the track) and an 8 pt vertical slop, so the target stays 44 pt tall; none sideways, where the neighbour is.
-  return <Pressable accessibilityRole="button" accessibilityState={{ selected, disabled }} disabled={disabled} accessibilityLanguage={speechLanguage}
+  return <Pressable accessibilityRole="button" accessibilityLabel={spokenLabel} accessibilityState={{ selected, disabled }} disabled={disabled} accessibilityLanguage={speechLanguage}
     onPress={onPress} style={[styles.choice, compact && styles.choiceCompact]} hitSlop={compact ? { top: 8, bottom: 8 } : 4}>
     <Animated.Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8} maxFontSizeMultiplier={1.3}
       style={{ fontSize: 13, lineHeight: 18, textAlign: 'center', fontWeight: compact && !selected ? '500' : '600', color: selected ? (compact ? p.text : p.primary) : p.secondary,
@@ -385,7 +389,8 @@ function Choice({ label, selected, disabled, onPress, compact = false }: { label
  * above the black ground with a clearly brighter thumb (`thumb`), so the header
  * is quiet but its state is unmistakable, without cobalt. */
 export function Choices<T extends string>({ value, options, onChange, disabled, compact = false }: {
-  value: T; options: { value: T; label: string }[]; onChange: (value: T) => void; disabled?: boolean; compact?: boolean;
+  /** An option's `spokenLabel` is what VoiceOver reads when its short label is not a sentence (a date written out). */
+  value: T; options: { value: T; label: string; spokenLabel?: string }[]; onChange: (value: T) => void; disabled?: boolean; compact?: boolean;
 }) {
   const p = usePalette();
   const reduced = useReduceMotion();
@@ -407,7 +412,7 @@ export function Choices<T extends string>({ value, options, onChange, disabled, 
   return <View style={[styles.choices, { backgroundColor: track }]} onLayout={event => setTrackWidth(event.nativeEvent.layout.width)}>
     {width > 0 && <Animated.View pointerEvents="none" style={[styles.thumb, { width, backgroundColor: thumb }, thumbEdge,
       p.isDark ? {} : { shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 3, shadowOffset: { width: 0, height: 1 } }, thumbStyle]} />}
-    {options.map(option => <Choice key={option.value} label={option.label} selected={value === option.value} compact={compact}
+    {options.map(option => <Choice key={option.value} label={option.label} spokenLabel={option.spokenLabel} selected={value === option.value} compact={compact}
       disabled={disabled} onPress={() => { if (option.value !== value) { selectionHaptic(); onChange(option.value); } }} />)}
   </View>;
 }

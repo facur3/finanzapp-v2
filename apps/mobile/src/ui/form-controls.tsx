@@ -328,11 +328,15 @@ export function DateField({ value, onChange, disabled = false, allowFuture = fal
   const title = label ?? t('selection.date');
   const lowest = minimumDate ?? new Date(1900, 0, 1);
   const highest = maximumDate ?? (allowFuture ? new Date(2100, 11, 31) : new Date());
-  // Where an unchosen date's wheel starts: never outside the bounds, so Listo always saves a day the wheel allowed.
-  const start = () => { const from = initial ?? new Date(); return from < lowest ? new Date(lowest) : from > highest ? new Date(highest) : new Date(from); };
+  // Where the wheel starts: the chosen day, or `initial` (today) while none is chosen, never outside the bounds, so Listo
+  // always saves a day the wheel allowed and showed. A chosen day below a bound that moved since (the card form's due date
+  // after its closing moved past it) opens on the bound: iOS shows the bound without reporting a change, so a draft left
+  // on the old day would save a day the wheel never showed.
+  const within = (from: Date) => new Date(Math.min(Math.max(from.getTime(), lowest.getTime()), highest.getTime()));
+  const start = () => within(initial ?? new Date());
   const [visible, setVisible] = useState(false);
   const [draft, setDraft] = useState<Date>(value ?? start());
-  const open = () => { Keyboard.dismiss(); setDraft(value ? new Date(value) : start()); setVisible(true); };
+  const open = () => { Keyboard.dismiss(); setDraft(value ? within(value) : start()); setVisible(true); };
   const day = value ? todayKey(value) : null;
   const unset = placeholder ?? t('selection.chooseDate');
   // The wheel is a worded date: it follows the interface language with its home region (es_AR, en_US), like the row

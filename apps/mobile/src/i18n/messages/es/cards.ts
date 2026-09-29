@@ -42,6 +42,10 @@ export const cards = {
       /** 24T2: the principal of the card's plans not recognised yet, beside the balance and never inside it. */
       future: 'Cuotas futuras',
       futurePlans: { one: 'en {count} plan', other: 'en {count} planes' },
+      /** Beside «Cuotas futuras» when those plans carry interest (or, in an older plan, fees or taxes): "+ interés $ 60.000,00".
+       * Named apart and never added into the principal, so the figure never disagrees with the instalments a plan lists. */
+      futureInterest: '+ interés {amount}',
+      futureFinancing: '+ financiación {amount}',
       /** The card detail's section with its instalment plans; the caption is the future principal. */
       plans: 'Cuotas',
       plansCaption: 'Cuotas futuras {amount}',
@@ -55,10 +59,11 @@ export const cards = {
       notFoundTitle: 'No encontramos esta tarjeta',
       notFoundDetail: 'Volvé a Tarjetas para elegir una tarjeta guardada en este dispositivo.',
     },
-    /** One line of open-cycle facts under the activity title («Este ciclo»): what the ledger holds, never a statement amount. */
+    /** 24T2: the open cycle's activity («Este ciclo», the brief's word), one caption line under Recientes and Movimientos:
+     * what the ledger holds since the previous closing, never a statement amount. */
     statement: {
       /** `{date}` is the day inside the sentence: "desde ayer", "desde 29 ago". */
-      openSince: 'Ciclo abierto desde {date}',
+      openSince: 'Este ciclo, desde {date}',
       purchases: { one: '{count} compra', other: '{count} compras' },
       payments: { one: '{count} pago', other: '{count} pagos' },
     },
@@ -105,7 +110,9 @@ export const cards = {
       due: 'Vencimiento',
       /** The statement that already closed and is still to pay: only its due date can be corrected ("Vence el resumen del 28 sep"). */
       toPayDue: 'Vence el resumen del {date}',
-      datesNote: 'Están en tu resumen. FinanzApp repite esos días cada mes y no consulta al banco.',
+      datesNote: 'Están en tu resumen. FinanzApp no consulta al banco.',
+      /** An edit whose dates correct this statement only («Usar estos días todos los meses» off): the usual days stay. */
+      oneOff: 'Estas fechas corrigen solo este resumen.',
       /** The usual days after the save: "Los meses siguientes: cierre el día 28 y vencimiento el día 5." */
       usualDays: 'Los meses siguientes: cierre el día {closing} y vencimiento el día {due}.',
       /** Off: the dates correct this statement only. On: their days become the card's usual days. */

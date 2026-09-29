@@ -1,4 +1,4 @@
-import { accountKind, cardAvailableLimitMinor, cardCommittedMinor, cardCreditMinor, cardCycleDatesOf, cardCycleView, cardDebtMinor, installmentPlanFigures, pendingInstallmentPlans,
+import { accountKind, cardAvailableLimitMinor, cardCommittedFinancingMinor, cardCommittedMinor, cardCreditMinor, cardCycleDatesOf, cardCycleView, cardDebtMinor, installmentPlanFigures, pendingInstallmentPlans,
   type Account, type AccountAppearance, type CardCycleDates, type CardStatement, type CreditCardProfile, type InstallmentPlan, type LedgerSnapshot, type PersonalDebtProfile,
   type RecordedEntry, isLiveAccount } from '@finanzapp/domain';
 import { relativeDate } from '../i18n/format.ts';
@@ -24,7 +24,8 @@ export type CardSummary = {
   availability: CardAvailability;
   /** Share of the limit used, 0–1 (or above 1 when over the limit). Null without a limit or while the available credit is unknown. */
   usage: number | null;
-  /** The open statement: its closing (today at the latest), its own due date, and the day it began. */
+  /** The open statement: its closing (today at the earliest: on its closing day it is still open), its own due date, and
+   * the day it began. */
   closingISO: string;
   openDueISO: string;
   openStartISO: string;
@@ -37,6 +38,11 @@ export type CardSummary = {
   previousClosingISO: string;
   /** Future committed principal of the card's live plans (cuotas futuras): beside the balance, never inside it. */
   committedMinor: number;
+  /** The future financing of those plans (interest, and fee or tax in older plans): named beside the principal («+ interés
+   * $ …»), never added into it, so «Cuotas futuras» never disagrees with the instalments a plan lists. */
+  committedFinancingMinor: number;
+  /** How that financing is named: interest only, or a mix with fees or taxes. */
+  financingKind: 'interest' | 'financing';
   /** Plans with a share not yet recognised. */
   pendingPlans: InstallmentPlan[];
   /** How many of them still have principal to come: the plans `committedMinor` adds up («en 2 planes»). */
@@ -57,7 +63,8 @@ export function summarizeCard(card: CreditCardProfile, snapshot: LedgerSnapshot,
     usage: availability === 'known' && card.creditLimitMinor ? debtMinor / card.creditLimitMinor : null,
     closingISO: view.open.closingISO, openDueISO: view.open.dueISO, openStartISO: view.openStartISO,
     nextDueISO: view.nextDue.dueISO, nextDueOfISO: view.nextDue.closingISO, toPay: view.toPay, previousClosingISO: view.previous.closingISO,
-    committedMinor: cardCommittedMinor(card, plans, records), pendingPlans,
+    committedMinor: cardCommittedMinor(card, plans, records), committedFinancingMinor: cardCommittedFinancingMinor(card, plans, records),
+    financingKind: pendingPlans.some(plan => plan.feeMinor + plan.taxMinor > 0) ? 'financing' : 'interest', pendingPlans,
     futurePlanCount: pendingPlans.filter(plan => installmentPlanFigures(plan, records).scheduledMinor > 0).length };
 }
 
@@ -130,9 +137,9 @@ export function accountKindLabel(account: Account, cards: CreditCardProfile[] = 
   return t(kind === 'card' ? 'accountKinds.creditCard' : kind === 'debt' ? 'accountKinds.debt' : 'accountKinds.account');
 }
 
-/** One line of open-cycle facts under the activity title («Este ciclo»: what the ledger holds since the previous closing,
- * never a statement amount). `relative` names the start day inside the sentence, so it takes the inline form
- * (`relativeDate(…, true)`): "Ciclo abierto desde ayer", "Cycle open since yesterday". */
+/** The open cycle's activity in one caption line under Recientes and Movimientos («Este ciclo»: what the ledger holds
+ * since the previous closing, never a statement amount). `relative` names the start day inside the sentence, so it takes
+ * the inline form (`relativeDate(…, true)`): "Este ciclo, desde ayer", "This cycle, since yesterday". */
 export function statementCaption(statement: { startISO: string; purchaseCount: number; paymentCount: number }, relative: (iso: string) => string,
   t: Translate = translator('es')): string {
   return [t('cards.statement.openSince', { date: relative(statement.startISO) }), t('cards.statement.purchases', { count: statement.purchaseCount }),

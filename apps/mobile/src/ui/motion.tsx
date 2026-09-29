@@ -70,8 +70,11 @@ export function successHaptic() {
 }
 
 const rise = FadeInUp.duration(duration.enter).easing(easeOut).withInitialValues({ opacity: 0, transform: [{ translateY: 6 }] });
-const fadeIn = FadeIn.duration(duration.enter).easing(easeOut);
-const fadeOut = FadeOut.duration(duration.exit).easing(easeOut);
+// A fade is what Reduce Motion keeps (it explains a change without moving anything), so its policy is explicit, as for
+// the sheet (`sheetTiming`): without one, Reanimated follows the device setting and lands in one frame, and every
+// crossfade below would be an instant swap. The callers already drop the rise and the reflow from their own reading.
+const fadeIn = FadeIn.duration(duration.enter).easing(easeOut).reduceMotion(ReduceMotion.Never);
+const fadeOut = FadeOut.duration(duration.exit).easing(easeOut).reduceMotion(ReduceMotion.Never);
 const reflow = LinearTransition.duration(220).easing(easeOut);
 
 /** Crossfades its content whenever `id` changes: the old value fades out in

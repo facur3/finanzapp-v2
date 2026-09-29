@@ -63,8 +63,9 @@ function EntryDetail({ record, account }: { record: EntryRecord; account: Accoun
     Alert.alert(t(restore ? 'entryDetail.restoreQuestion' : 'entryDetail.voidQuestion'),
       t(adds ? 'entryDetail.willAdd' : 'entryDetail.willSubtract', { amount: formatMoneyAmount(entry.amountMinor, account.currency) + ' ' + account.currency, account: account.name }) + ' '
       + t(restore ? 'entryDetail.restoreEffect' : 'entryDetail.voidEffect')
-      // An undone instalment is never recreated by the catch-up and its obligation stays open in the plan (24T1).
-      + (instalment && !restore ? ' ' + t('entryDetail.installmentVoidNote') : ''), [
+      // An undone instalment is never recreated by the catch-up and its obligation stays open in the plan (24T1). A share of
+      // an instalment that has another (its principal and its interest) is undone alone: the note says so.
+      + (instalment && !restore ? ' ' + t(instalment.shared ? 'entryDetail.installmentShareVoidNote' : 'entryDetail.installmentVoidNote') : ''), [
         { text: t('common.cancel'), style: 'cancel', onPress: () => { confirming.current = false; } },
         { text: t(restore ? 'entryDetail.restore' : 'entryDetail.void'), style: restore ? 'default' : 'destructive', onPress: () => { confirming.current = false; void apply(change); } },
       ], { cancelable: true, onDismiss: () => { confirming.current = false; } });
@@ -92,7 +93,9 @@ function EntryDetail({ record, account }: { record: EntryRecord; account: Accoun
     : t('entryDetail.budgetUsed', { percent: Math.round(row.ratio * 100), amount: money(row.remainingMinor) });
 
   return <Screen gap={space.xl}>
-    <Stack.Screen options={{ title: t(record.voided ? 'entryDetail.voidedTitle' : income ? 'movement.income' : instalment ? 'entryDetail.installmentTitle' : card ? 'entryForm.cardPurchaseTitle' : 'movement.expense'),
+    <Stack.Screen options={{ title: t(record.voided ? 'entryDetail.voidedTitle' : income ? 'movement.income'
+      : instalment ? (instalment.component === 'principal' ? 'entryDetail.installmentTitle' : `entryDetail.installmentShareTitle.${instalment.component}`)
+      : card ? 'entryForm.cardPurchaseTitle' : 'movement.expense'),
       gestureEnabled: !busy, headerBackVisible: !busy }} />
     <View style={{ gap: 14, alignItems: 'center', paddingVertical: 12 }}>
       <MerchantBadge merchant={entry.merchant} category={entry.category} kind={entry.kind} large tone={income ? 'income' : 'neutral'} />

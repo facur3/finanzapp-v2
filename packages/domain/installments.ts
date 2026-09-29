@@ -101,7 +101,7 @@ export const PLAN_FINANCING_MESSAGE = 'Los intereses, las comisiones y los impue
 /** 24T2: the one financing field of the purchase form («Total financiado») never goes below the price. */
 export const PLAN_TOTAL_BELOW_PRICE_MESSAGE = 'El total financiado no puede ser menor que el precio.';
 /** 24T2: a purchase form left open while the card's calendar changed: its preview no longer says when the plan bills. */
-export const PLAN_CALENDAR_MESSAGE = 'El calendario de la tarjeta cambió desde que abriste la compra. Volvé a revisarla.';
+export const PLAN_CALENDAR_MESSAGE = 'El calendario de la tarjeta cambió desde que abriste la compra. Revisá la primera cuota y guardá de nuevo.';
 export const PLAN_CARD_MESSAGE = 'Una compra en cuotas se registra en una tarjeta de crédito existente.';
 export const PLAN_CURRENCY_MESSAGE = 'El plan de cuotas usa la moneda de su tarjeta.';
 export const PLAN_STATE_MESSAGE = 'Estado de plan de cuotas inválido.';
@@ -436,6 +436,18 @@ export function cardCommittedMinor(card: Pick<CreditCardProfile, 'id'>, plans: r
   for (const plan of plans) {
     if (plan.cardId !== card.id || plan.deleted || plan.cancelledAt !== null) continue;
     total += BigInt(installmentPlanFigures(plan, records).scheduledMinor);
+  }
+  if (total > BigInt(Number.MAX_SAFE_INTEGER)) throw new Error('El total supera el rango seguro.');
+  return Number(total);
+}
+/** Producto 24T2: the future financing (interest, fee and tax not recognised yet) of a card's live plans: what its future
+ * instalments add to the future committed principal, shown beside it and never inside it (decision 003, rule 7). */
+export function cardCommittedFinancingMinor(card: Pick<CreditCardProfile, 'id'>, plans: readonly InstallmentPlan[] = [], records: readonly RecordedEntry[] = []): number {
+  let total = 0n;
+  for (const plan of plans) {
+    if (plan.cardId !== card.id || plan.deleted || plan.cancelledAt !== null) continue;
+    const { components } = installmentPlanFigures(plan, records);
+    for (const component of FINANCING_COMPONENTS) total += BigInt(components[component].scheduledMinor);
   }
   if (total > BigInt(Number.MAX_SAFE_INTEGER)) throw new Error('El total supera el rango seguro.');
   return Number(total);

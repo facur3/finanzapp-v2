@@ -101,13 +101,14 @@ function harness(os: 'ios' | 'android' = 'ios', { reduced = true, systemReduceMo
 function realMotion(reduced: boolean): Record<string, unknown> {
   const source = readFileSync(new URL('../src/ui/motion.tsx', import.meta.url), 'utf8');
   const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText;
-  const builder: Record<string, unknown> = {};
-  for (const name of ['duration', 'easing', 'withInitialValues']) builder[name] = () => builder;
+  // Each layout builder records its chain (`steps`), so a test can read the policy a fade was given.
+  const chain = (steps: string[]): Record<string, unknown> => ({ steps,
+    ...Object.fromEntries(['duration', 'easing', 'withInitialValues', 'reduceMotion'].map(name => [name, (value?: unknown) => chain([...steps, name + '(' + (typeof value === 'object' ? 'config' : String(value)) + ')'])])) });
   const modules: Record<string, unknown> = {
     react: { useEffect() {}, useRef: (initial: unknown) => ({ current: initial }) },
     'react/jsx-runtime': { jsx: (type: unknown, props: unknown) => ({ type, props }), jsxs: (type: unknown, props: unknown) => ({ type, props }) },
     'react-native-reanimated': { __esModule: true, default: { View: 'Animated.View' }, Easing: { bezier: (...points: number[]) => 'bezier(' + points.join(',') + ')' },
-      FadeIn: builder, FadeInUp: builder, FadeOut: builder, LinearTransition: builder, ReduceMotion: REDUCE_MOTION },
+      FadeIn: chain(['FadeIn']), FadeInUp: chain(['FadeInUp']), FadeOut: chain(['FadeOut']), LinearTransition: chain(['LinearTransition']), ReduceMotion: REDUCE_MOTION },
     'expo-haptics': {},
     './theme': { useReduceMotion: () => reduced },
   };
@@ -426,6 +427,13 @@ test('24UX1: the runtime\'s policy: Reanimated 4 completes a timing without an e
   assert.deepEqual({ ...motion.sheetTiming('sheet', false) }, { duration: 300, easing: SHEET_CURVE, reduceMotion: 'never' }, 'the rise: the app decides from its own Reduce Motion reading, never the runtime behind its back');
   assert.deepEqual({ ...motion.sheetTiming('sheetExit', false) }, { duration: 200, easing: SHEET_CURVE, reduceMotion: 'never' });
   assert.deepEqual({ ...motion.timing('state', true) }, { duration: 0, easing: OUT_CURVE }, 'a state change still follows the system (zero-length), unchanged');
+  // 24T2 review: the crossfades Reduce Motion keeps (a value changing in place, a block arriving) carry the same explicit
+  // policy, so the device setting never turns them into an instant swap; the rise keeps following the app's own reading.
+  const appear = (motion as unknown as { Appear: (props: object) => { props: { entering: { steps: string[] }; exiting: { steps: string[] } } } }).Appear({ children: null });
+  assert.deepEqual([appear.props.entering.steps, appear.props.exiting.steps], [['FadeIn', 'duration(200)', 'easing(' + OUT_CURVE + ')', 'reduceMotion(never)'],
+    ['FadeOut', 'duration(100)', 'easing(' + OUT_CURVE + ')', 'reduceMotion(never)']]);
+  const lively = (realMotion(false) as unknown as { Appear: (props: object) => { props: { entering: { steps: string[] } } } }).Appear({ children: null });
+  assert.equal(lively.props.entering.steps.includes('reduceMotion(never)'), false, 'the rise is only used when motion is not reduced');
   // The same sheet, with the device setting on: what Reanimated would have done to a timing without the policy, and what it does now.
   const field = harness('ios', { reduced: true, systemReduceMotion: true });
   find(field.render(), 'DetailRow')!.props.onPress();
@@ -524,6 +532,16 @@ test('24T2: an unchosen date reads as a prompt, on screen and for VoiceOver; the
   assert.equal(todayKey(find(root, 'DateTimePicker')!.props.value), '2026-10-06');
   button(root, 'Listo').props.onPress();
   assert.deepEqual(saved, ['2026-10-06']);
+  // 24T2 review: a chosen day below a minimum that moved since (the due after its closing moved past it) opens on the
+  // minimum, and Listo saves the day the wheel shows, never the one outside the bounds.
+  const moved = harness();
+  const below = { value: new Date(2026, 10, 5, 12), onChange, allowFuture: true, ...bounds, minimumDate: new Date(2026, 10, 7) };
+  root = moved.render('DateField', below);
+  find(root, 'DetailRow')!.props.onPress();
+  root = moved.render('DateField', below);
+  assert.equal(todayKey(find(root, 'DateTimePicker')!.props.value), '2026-11-07');
+  button(root, 'Listo').props.onPress();
+  assert.deepEqual(saved, ['2026-10-06', '2026-11-07']);
   const english = harness();
   english.setLocale('en-US');
   assert.equal(find(english.render('DateField', { value: null, onChange }), 'DetailRow')!.props.value, 'Choose date');

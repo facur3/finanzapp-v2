@@ -73,6 +73,20 @@ function mix(base: string, over: string, alpha: number): string {
     .toString(16).padStart(2, '0')).join('');
 }
 
+test('24T2 review: with many cards the chosen one (always at the bottom of the deck) is scrolled into view; with a few, the page stays', () => {
+  const { deckScrollTarget } = geometry;
+  // An iPhone 15 (393 × 852): a 223 pt face, 50 pt strips, the deck 20 pt into the content and the page at rest under a
+  // 103 pt header (content offset −103).
+  const at = (count: number, contentOffset = -103, deckTop = 123) => deckScrollTarget({ count, exposure: 50, faceHeight: 223, deckTop, viewportTop: 0, viewportHeight: 852, contentOffset });
+  for (const count of [1, 2, 3, 8, 12]) assert.equal(at(count), null, count + ' cards: the front card is already in view');
+  // 20 cards: the front card's top would be at 123 + 19 × 50 = 1073, below the fold: scroll so it sits at a quarter of the viewport.
+  assert.equal(at(20), -103 + 1073 - 213);
+  // The same deck already scrolled so that its front card shows: nothing moves.
+  assert.equal(at(20, 600, 123 - 703), null);
+  // Never above the content's top.
+  assert.equal(deckScrollTarget({ count: 30, exposure: 57, faceHeight: 223, deckTop: -2000, viewportTop: 0, viewportHeight: 852, contentOffset: 0 }), 0);
+});
+
 test('every face tone holds white text at 7:1 (base, sheen and highlight), and the issuer\'s softer white stays AA', () => {
   const tones = [...cardFaces.HASH_FACES, ...Object.values(cardFaces.COLOR_FACES)];
   assert.equal(tones.length, 6 + 11);
@@ -169,16 +183,18 @@ test('the deck draws every card in the stored order, the selected one in front a
   assert.equal(height, 223);
   assert.equal(deck.props.style.height, 2 * 50 + height, 'two strips and one whole face');
   const cards = slots(deck);
-  assert.equal(cards.map(card => card.id).join(','), 'visa,amex,naranja', 'the view tree keeps the stored order (VoiceOver reads it)');
+  assert.equal(cards.map(card => card.id).join(','), 'visa,amex,naranja', 'the React tree keeps the stored order');
   assert.equal(cards.map(card => card.zIndex).join(','), '0,2,1');
   assert.equal(cards.map(card => card.top).join(','), '0,100,50');
   assert.equal(cards.map(card => card.hit.height).join(','), '50,223,50', 'a strip is touched only where it shows; the front card everywhere');
   assert.ok(cards.every(card => card.hit.position === 'absolute'), 'the target lies over the face, from its top edge');
   assert.ok(cards.every(card => card.scale === 1));
+  // iOS layers the slots by zIndex and VoiceOver reads them top to bottom: Visa, Naranja, then the selected Amex. The
+  // positions it hears follow that order, so the first card heard is «1 de 3» and the selected one «3 de 3».
   assert.deepEqual(cards.map(card => card.hit.accessibilityLabel), [
     'Tarjeta Visa Gold, Galicia, termina en 4009, pesos, Tarjeta 1 de 3',
-    'Tarjeta Amex, termina en 1001, dólares, Tarjeta 2 de 3',
-    'Tarjeta Naranja X, Naranja, pesos, Tarjeta 3 de 3',
+    'Tarjeta Amex, termina en 1001, dólares, Tarjeta 3 de 3',
+    'Tarjeta Naranja X, Naranja, pesos, Tarjeta 2 de 3',
   ]);
   assert.deepEqual(cards.map(card => card.hit.accessibilityHint), ['Selecciona esta tarjeta', 'Abre el detalle de la tarjeta', 'Selecciona esta tarjeta']);
   assert.deepEqual(cards.map(card => card.hit.accessibilityState.selected), [false, true, false]);
@@ -199,6 +215,19 @@ test('the deck draws every card in the stored order, the selected one in front a
   assert.equal(JSON.stringify([selected, view.haptics()]), JSON.stringify([['visa', 'naranja'], 2]));
   cards[1].hit.onPress();
   assert.equal(JSON.stringify([opened, view.haptics()]), JSON.stringify([['amex'], 2]), 'opening is not a selection');
+});
+
+test('24T2 review: in dark mode the deck separates its cards by the faces\' rims, without the light-mode shadow', () => {
+  const shadows = (deck: Node) => (deck.props.children as Node[]).map(slot => {
+    const view = slot.type(slot.props) as Node;
+    return (view.props.style as unknown[]).some(item => !!item && typeof item === 'object' && 'shadowOpacity' in (item as object));
+  });
+  const props = { cards: [visa, amex, naranja], selectedId: 'amex', onSelect() {}, onOpen() {} };
+  assert.deepEqual(shadows(visual().CardDeck(props)), [true, true, true]);
+  assert.deepEqual(shadows(visual({ dark: true }).CardDeck(props)), [false, false, false]);
+  // The same layout and the same sentences in both themes: only the material changes.
+  assert.equal(JSON.stringify(slots(visual({ dark: true }).CardDeck(props)).map(card => [card.top, card.hit.accessibilityLabel])),
+    JSON.stringify(slots(visual().CardDeck(props)).map(card => [card.top, card.hit.accessibilityLabel])));
 });
 
 test('the cards move to their places in 260 ms, press like any card, and jump without movement under Reduce Motion', () => {
@@ -235,7 +264,8 @@ test('one card is just its face; large text grows the strips with the capped fac
 
   const english = visual({ locale: bindLocale('en-US', 'native', 'es') });
   const read = slots(english.CardDeck({ cards: [visa, amex], selectedId: 'visa', onSelect: () => {}, onOpen: () => {} }));
-  assert.deepEqual(read.map(card => card.hit.accessibilityLabel), ['Card Visa Gold, Galicia, ending in 4009, Argentine pesos, Card 1 of 2', 'Card Amex, ending in 1001, US dollars, Card 2 of 2']);
+  // Visa is selected: in front, read last («2 of 2»); Amex is the strip above it, read first.
+  assert.deepEqual(read.map(card => card.hit.accessibilityLabel), ['Card Visa Gold, Galicia, ending in 4009, Argentine pesos, Card 2 of 2', 'Card Amex, ending in 1001, US dollars, Card 1 of 2']);
   assert.deepEqual(read.map(card => card.hit.accessibilityHint), ['Opens the card details', 'Selects this card']);
   assert.ok(read.every(card => card.hit.accessibilityLanguage === 'en'), 'the interface language, not the device\'s');
 });

@@ -49,10 +49,12 @@ export function cycleEditResult(usual: CardCycleDays, shown: Pick<CardCycleView,
   const days = repeats ? { closingDay: usualDayOf(edit.closingISO, usual.closingDay), dueDay: usualDayOf(edit.dueISO, usual.dueDay) } : usual;
   const openChanged = edit.closingISO !== shown.open.closingISO || edit.dueISO !== shown.open.dueISO;
   const toPayChanged = !!shown.toPay && edit.toPayDueISO !== null && edit.toPayDueISO !== shown.toPay.dueISO;
+  const daysChanged = days.closingDay !== usual.closingDay || days.dueDay !== usual.dueDay;
   const intent: Omit<CardCycleIntent, 'days'> = {
-    ...(openChanged ? { open: { statementClosingISO: shown.open.closingISO, closingISO: edit.closingISO, dueISO: edit.dueISO } } : {}),
+    // New usual days name the open statement too, even with its dates unchanged: they start from the statement the form
+    // showed, so a form left open past that closing is refused instead of moving the change one statement later.
+    ...(openChanged || daysChanged ? { open: { statementClosingISO: shown.open.closingISO, closingISO: edit.closingISO, dueISO: edit.dueISO } } : {}),
     ...(toPayChanged ? { toPay: { statementClosingISO: shown.toPay!.closingISO, dueISO: edit.toPayDueISO! } } : {}),
   };
-  const daysChanged = days.closingDay !== usual.closingDay || days.dueDay !== usual.dueDay;
   return { days, forced, repeats, intent, changed: openChanged || toPayChanged || daysChanged };
 }

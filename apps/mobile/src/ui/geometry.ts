@@ -36,6 +36,18 @@ export function deckLayout(count: number, selectedIndex: number, exposure: numbe
   return { tops: zIndex.map(position => position * exposure), zIndex, containerHeight: (count - 1) * exposure + faceHeight };
 }
 
+/** Where Tarjetas scrolls after a card is chosen, or null when it need not (24T2 review). The chosen card always moves to
+ * the front, at the bottom of the deck, so with many cards it lands below the visible area; the page then scrolls until
+ * its top sits a quarter of the way down the viewport, with the start of its snapshot under it. Window coordinates are
+ * measured before the move (the deck never moves or changes height); `contentOffset` is the current scroll offset. */
+export function deckScrollTarget(input: { count: number; exposure: number; faceHeight: number; deckTop: number; viewportTop: number; viewportHeight: number;
+  contentOffset: number }): number | null {
+  const frontTop = input.deckTop + Math.max(0, input.count - 1) * input.exposure;
+  // In view: its top below the top of the viewport and most of the face (name, last four, its middle) above the fold.
+  if (frontTop >= input.viewportTop && frontTop + input.faceHeight * 0.4 <= input.viewportTop + input.viewportHeight) return null;
+  return Math.max(0, input.contentOffset + frontTop - (input.viewportTop + input.viewportHeight * 0.25));
+}
+
 /** Advance widths, in em, of the glyphs an amount can contain, measured
  * generously for SF Pro bold tabular figures. Tabular digits share one width,
  * which is what makes the estimate reliable without measuring text natively. */

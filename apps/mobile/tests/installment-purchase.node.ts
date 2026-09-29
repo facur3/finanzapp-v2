@@ -10,6 +10,7 @@ import * as liabilityPresentation from '../src/ui/liability-presentation.ts';
 import * as moneyInput from '../src/ui/money-input.ts';
 import * as entryPrefill from '../src/ui/entry-prefill.ts';
 import * as purchasePlan from '../src/ui/purchase-plan.ts';
+import * as installmentPresentation from '../src/ui/installment-presentation.ts';
 import { INSTALLMENT_COUNT_CHOICES } from '../src/ui/installment-presentation.ts';
 import * as i18nFormat from '../src/i18n/format.ts';
 import { bindLocale } from '../src/i18n/bind.ts';
@@ -82,6 +83,7 @@ function harness(props: Record<string, unknown> = {}, options: Options = {}) {
     './form-controls': { AccountField: 'AccountField', CategoryField: 'CategoryField', DateField: 'DateField' },
     './budget-presentation': budgetPresentation, './money-input': moneyInput, './entry-prefill': entryPrefill,
     './liability-presentation': liabilityPresentation, './presentation': presentation, './purchase-plan': purchasePlan,
+    './installment-presentation': installmentPresentation,
     './switch-row': { SwitchRow: 'SwitchRow' },
     './theme': { space: { xs: 4, s: 8, m: 12, l: 16, xl: 20, xxl: 24, xxxl: 32 }, usePalette: () => ({ warning: '#B45309', secondary: '#66686F', text: '#0A0A0C' }) },
   };
@@ -157,13 +159,13 @@ async function save(view: View): Promise<void> {
 
 // ---- the pure derivation ----------------------------------------------------------------------------------
 
-test('24T2: the counts offered as one tap are the first four of the catalogue (five segments fit the narrowest iPhone), 12 by default, «Una vez» first', () => {
+test('24T2: the counts offered as one tap are 3, 6, 12 and 18 before «Otra» (five segments fit the narrowest iPhone), 12 by default, «Una vez» first', () => {
   assert.deepEqual([...purchasePlan.QUICK_COUNTS], [3, 6, 12, 18]);
-  assert.ok(purchasePlan.QUICK_COUNTS.every(value => (INSTALLMENT_COUNT_CHOICES as readonly number[]).includes(value)));
+  assert.deepEqual([...INSTALLMENT_COUNT_CHOICES], [...purchasePlan.QUICK_COUNTS], 'one list: 24 and every other count are typed');
   // A compact segment is at least 64 pt wide with 2 pt gaps inside a 2 pt padded track; the content of a 375 pt iPhone is 335 pt.
   const track = (segments: number) => segments * 64 + (segments - 1) * 2 + 2 * 2;
   assert.ok(track(purchasePlan.QUICK_COUNTS.length + 1) <= 375 - 40, 'the four counts and «Otra» fit an iPhone SE');
-  assert.ok(track(INSTALLMENT_COUNT_CHOICES.length + 1) > 393 - 40, 'six segments would overflow an iPhone 15');
+  assert.ok(track(purchasePlan.QUICK_COUNTS.length + 2) > 393 - 40, 'a sixth segment (24) would overflow an iPhone 15');
   assert.deepEqual({ ...purchasePlan.INITIAL_PURCHASE }, { mode: 'once', count: '12', typedCount: '', placement: 'current', financed: false, totalFinanced: '' });
 });
 
@@ -358,6 +360,9 @@ test('24T2: «Primera cuota» offers the purchase\'s statement and the next by t
   purchase(closingDay);
   root = inInstallments(closingDay);
   assert.equal(labelsOf(choices(root, 'current,next')), '28 sep|28 oct');
+  // VoiceOver hears each statement written out, not the abbreviated closing on the segment.
+  assert.deepEqual([...choices(root, 'current,next').props.options.map((option: { spokenLabel: string }) => option.spokenLabel)],
+    ['Cierra el 28 de septiembre de 2026 y vence el 5 de octubre de 2026.', 'Cierra el 28 de octubre de 2026 y vence el 5 de noviembre de 2026.']);
   assert.ok(texts(root).includes('Ese resumen ya llegó a su cierre: la primera cuota se registra al guardar.'));
   choices(root, 'current,next').props.onChange('next');
   assert.equal(texts(closingDay.render()).some(text => text.includes('llegó a su cierre')), false, 'the next statement is still open');
@@ -494,7 +499,9 @@ test('24T2: a failed save keeps the exact plan frozen and the retry resends it; 
   assert.equal(find(root, 'AmountField').props.editable, false, 'sent once: the draft is locked');
   assert.equal(section(root)!.props.disabled, true, 'and so is the section');
   assert.equal(saveButton(root).props.label, 'Reintentar guardado');
-  assert.ok(texts(root).includes(translate('es', 'entryForm.retryNote')));
+  // A plan records no movement until a statement closes: the note points to the card's instalments, never to Movimientos.
+  assert.ok(texts(root).includes(translate('es', 'entryForm.plan.retryNote')));
+  assert.equal(texts(root).includes(translate('es', 'entryForm.retryNote')), false);
   // Even a change of the underlying data (the commit did land) resends the identical plan: storage treats it as done.
   view.setData({ ...base, installmentPlans: [view.plans[0]] });
   await save(view);
@@ -516,6 +523,29 @@ test('24T2: a failed save keeps the exact plan frozen and the retry resends it; 
   await saving;
   await flush();
   assert.equal(slow.backs(), 1);
+});
+
+test('24T2 review: a plan the card\'s calendar no longer produces is refused before anything is written; the section unlocks and the next save builds it from the current statements', async () => {
+  let attempts = 0;
+  const view = harness({ accountId: 'card-acc', kind: 'expense' }, { addPlan: async () => { if (++attempts === 1) throw new Error(domain.PLAN_CALENDAR_MESSAGE); } });
+  purchase(view);
+  inInstallments(view);
+  await save(view);
+  let root = view.render();
+  assert.deepEqual([view.backs(), view.plans[0].schedule[0].billingDateISO], [0, '2026-09-28']);
+  assert.equal(find(root, 'ErrorMessage').props.message, domain.PLAN_CALENDAR_MESSAGE);
+  assert.equal(section(root)!.props.disabled, false, 'released: nothing was stored, the person reviews the first instalment');
+  assert.equal(saveButton(root).props.label, 'Guardar en cuotas' + NBSP + '·' + NBSP + '$' + NBSP + '1.200.000,00', 'a new save, not a retry of the refused plan');
+  // The view now holds the card's current calendar (the open statement was corrected to 26 sep): the section and the save follow it.
+  const cardCycleDates = domain.planCardCycle({ cardId: card.id, days: card, rows: [], todayISO: '2026-09-20', nowISO: '2026-09-20T12:00:00.000Z',
+    intent: { open: { statementClosingISO: '2026-09-28', closingISO: '2026-09-26', dueISO: '2026-10-04' } } }).rows;
+  view.setData({ ...base, cardCycleDates });
+  root = view.render();
+  assert.ok(texts(root).includes('Cierra el 26 sep y vence el 4 oct.'));
+  await save(view);
+  assert.equal(view.plans.length, 2);
+  assert.deepEqual([view.plans[1].id, view.plans[1].schedule[0].billingDateISO], [view.plans[0].id, '2026-09-26'], 'the same operation id, the current statement');
+  assert.deepEqual([view.additions.length, view.backs()], [0, 1]);
 });
 
 test('24T2: switching to cash or to Ingreso hides «Pago» and the next save is a plain movement; coming back to the card restores every choice', async () => {
@@ -594,7 +624,8 @@ test('24T2: an instalment\'s movement opens a restricted form: the amount, the d
   for (const input of ['AmountField', 'DateField', 'AccountField', 'Choices']) assert.equal(has(root, input), false, 'no ' + input);
   assert.equal(section(root), undefined);
   assert.equal(find(root, 'Stack.Screen').props.options.title, 'Editar cuota');
-  assert.ok(texts(root).includes('Importe de la cuota' + NBSP + '·' + NBSP + 'ARS'));
+  // This instalment is two movements (its principal and its interest): the amount is named as the part it holds.
+  assert.ok(texts(root).includes('Principal de la cuota' + NBSP + '·' + NBSP + 'ARS'));
   assert.deepEqual([find(root, 'Money').props.minor, find(root, 'Money').props.currency], [10000000, 'ARS']);
   assert.equal(find(root, 'DetailRow', 'Tarjeta').props.value, 'Visa Gold');
   assert.equal(find(root, 'DetailRow', 'Tarjeta').props.onPress, undefined, 'a fact, not a selector');
@@ -625,10 +656,18 @@ test('24T2: an instalment\'s movement opens a restricted form: the amount, the d
   root = interest.render();
   assert.equal(interestShare.id, 'insti_tv_001');
   assert.deepEqual([find(root, 'Stack.Screen').props.options.title, find(root, 'Money').props.minor, find(root, 'CategoryField').props.value], ['Editar cuota', 200000, 'Intereses']);
+  assert.ok(texts(root).includes('Interés de la cuota' + NBSP + '·' + NBSP + 'ARS'));
   assert.equal(has(root, 'AmountField'), false);
+  // An instalment without interest is one movement: its amount is the instalment's.
+  const single = domain.newInstallmentPlan({ id: 'tv0', card, cardAccount, merchant: 'Electro', category: 'Hogar', purchaseDateISO: '2026-08-10', principalMinor: 120000000, count: 12,
+    placement: 'current', createdAt });
+  const [only] = domain.installmentEntries(single, cardAccount.id, single.schedule[0]);
+  root = harness({ original: domain.initialRecord(only) }, { data: { ...planData, records: [domain.initialRecord(only)], installmentPlans: [single] } }).render();
+  assert.ok(texts(root).includes('Importe de la cuota' + NBSP + '·' + NBSP + 'ARS'));
   // English.
   const english = harness({ original: planData.records[0] }, { data: planData, locale: 'en-US' }).render();
   assert.equal(find(english, 'Stack.Screen').props.options.title, 'Edit installment');
+  assert.ok(texts(english).includes('Installment principal' + NBSP + '·' + NBSP + 'ARS'));
   assert.ok(texts(english).includes('The installment plan sets the amount, the date and the card. You can correct the merchant and the category.'));
   assert.equal(find(english, 'DetailRow', 'Card').props.value, 'Visa Gold');
 });

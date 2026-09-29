@@ -71,9 +71,10 @@ export function CardFace({ id, name, issuer, last4, currency, color, width, show
  * at the bottom, whole, right above the snapshot that describes it. Tapping a strip selects that card (one selection
  * haptic); tapping the card in front opens its detail. No horizontal or drag gesture, so nothing competes with the back
  * swipe. Each card moves to its place on the UI thread (`timing('data')`, 260 ms ease-out, interruptible); with Reduce
- * Motion the cards jump there and only the snapshot below crossfades. The cards stay in their stored order in the view
- * tree, one VoiceOver element each (a button with the face's sentence, its position and whether it is the selected
- * one), and each touch target is only what shows of it: the strip (50 pt at least) or the whole front face. */
+ * Motion the cards jump there and only the snapshot below crossfades. VoiceOver reads the cards as they are drawn, top to
+ * bottom (the strips in their stored order, the selected card last, where iOS also layers it): one element each, a
+ * button with the face's sentence, its position in that reading order and whether it is the selected one. Each touch
+ * target is only what shows of it: the strip (50 pt at least) or the whole front face. */
 export function CardDeck({ cards, selectedId, onSelect, onOpen, showCurrency = true }: {
   cards: readonly CardFaceData[]; selectedId: string | null; onSelect: (id: string) => void; onOpen: (id: string) => void; showCurrency?: boolean;
 }) {
@@ -88,7 +89,8 @@ export function CardDeck({ cards, selectedId, onSelect, onOpen, showCurrency = t
   return <View style={{ width, height: layout.containerHeight, alignSelf: 'center' }}>
     {cards.map((card, index) => {
       const front = index === selectedIndex;
-      const position = cards.length > 1 ? ', ' + i18n.t('cards.face.position', { index: index + 1, count: cards.length }) : '';
+      // The position VoiceOver hears follows the order it reads the cards in (their layer: the strips, then the front card).
+      const position = cards.length > 1 ? ', ' + i18n.t('cards.face.position', { index: layout.zIndex[index] + 1, count: cards.length }) : '';
       return <DeckSlot key={card.id} top={layout.tops[index]} zIndex={layout.zIndex[index]} reduced={reduced} tone={cardFaceTone(card.id, card.color).base}
         hitHeight={front ? faceHeight : exposure} selected={front} label={cardFaceLabel(i18n, card) + position}
         hint={i18n.t(front ? 'cards.list.openHint' : 'cards.list.selectHint')}

@@ -21,7 +21,7 @@ export default function CardDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { archive, snapshot } = useLedger();
   const day = useCurrentDay();
-  const { t, relativeDate, moneyText } = useI18n();
+  const { t, relativeDate, moneyText, spokenMoney } = useI18n();
   const { width } = useWindowDimensions();
   const card = archive?.cards?.find(item => item.id === id);
   const summary = useMemo(() => card && snapshot ? summarizeCard(card, snapshot, day, archive?.installmentPlans, archive?.records, archive?.cardCycleDates) : null,
@@ -34,9 +34,13 @@ export default function CardDetailScreen() {
     <EmptyState title={t('cards.panel.notFoundTitle')} detail={t('cards.panel.notFoundDetail')} icon="card-outline" />
   </Screen>;
   const { account, debtMinor, committedMinor } = summary;
-  // A day inside the cycle sentence starts in lower case: "Ciclo abierto desde ayer".
+  // A day inside the cycle sentence starts in lower case: "Este ciclo, desde ayer".
   const inline = (iso: string) => relativeDate(iso, day, true);
   const money = (minor: number) => moneyText(minor, account.currency);
+  // «Cuotas futuras $ …» over the plans, with the interest those instalments still carry named beside it, never added in.
+  const plansCaption = (format: (minor: number) => string) => committedMinor > 0 ? [t('cards.panel.plansCaption', { amount: format(committedMinor) }),
+    summary.committedFinancingMinor > 0 ? t(summary.financingKind === 'financing' ? 'cards.panel.futureFinancing' : 'cards.panel.futureInterest',
+      { amount: format(summary.committedFinancingMinor) }) : null].filter(Boolean).join(' · ') : undefined;
   const state = card.deleted ? t('cards.panel.deletedTitle') : !card.active ? t('cards.panel.archivedTitle') : null;
   // An active card takes purchases and payments; an archived one still takes payments while something is owed; a deleted one, nothing.
   const pay = !card.deleted && (card.active || debtMinor > 0);
@@ -64,7 +68,7 @@ export default function CardDetailScreen() {
         </View>}
 
         {plans.length > 0 && <View>
-          <SectionTitle caption={committedMinor > 0 ? t('cards.panel.plansCaption', { amount: money(committedMinor) }) : undefined}>{t('cards.panel.plans')}</SectionTitle>
+          <SectionTitle caption={plansCaption(money)} captionLabel={plansCaption(minor => spokenMoney(minor, account.currency))}>{t('cards.panel.plans')}</SectionTitle>
           <Surface grouped>
             {plans.map((plan, index) => <PlanRow key={plan.plan.id} summary={plan} last={index === plans.length - 1}
               onPress={() => router.push({ pathname: '/installment/[id]', params: { id: plan.plan.id } })} />)}

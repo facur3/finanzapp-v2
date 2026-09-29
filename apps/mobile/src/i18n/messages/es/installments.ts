@@ -14,6 +14,9 @@ export const installments = {
       remaining: '{amount} restantes',
       /** Under the amount on screen: "$ 900.000,00" over "restantes". */
       remainingCaption: 'restantes',
+      /** A plan with interest: the figure is its principal still to come (the future interest is in the plan's detail). */
+      remainingPrincipal: '{amount} de principal restante',
+      remainingPrincipalCaption: 'principal restante',
       next: 'Próxima cuota · {date}',
       /** VoiceOver: "próxima cuota el 28 de octubre de 2026". */
       nextSpoken: 'próxima cuota el {date}',
@@ -47,6 +50,14 @@ export const installments = {
       /** The principal not recognised (future, undone or stopped). */
       remaining: 'Restante',
       undone: 'Deshecho',
+      /** A plan with interest: the same figures named as principal, since each instalment also carries its interest, and
+       * the interest still to come on its own row. Never added together. */
+      recordedPrincipal: 'Principal registrado',
+      futurePrincipal: 'Principal futuro',
+      remainingPrincipal: 'Principal restante',
+      undonePrincipal: 'Principal deshecho',
+      futureInterest: 'Interés futuro',
+      futureFinancing: 'Financiación futura',
       cancelledAmount: 'Cancelado',
       schedule: 'Calendario',
       scheduleCaption: 'Cada cuota cuenta como gasto cuando cierra su resumen.',
