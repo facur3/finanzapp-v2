@@ -586,3 +586,20 @@ test('24T2 review: a plan in a currency without decimals (JPY) and one with thre
     assert.ok(rowsOf(root).includes('Ya registrado=' + i18n.moneyText(plan.schedule[0].principalMinor, currency) + ' (' + i18n.spokenMoney(plan.schedule[0].principalMinor, currency) + ')'));
   }
 });
+
+test('Codex review: when a card\'s plans add up beyond the exact range, Tarjetas and the card detail still open and say «Total fuera de rango»', () => {
+  const plans = Array.from({ length: 10 }, (_, index) => domain.newInstallmentPlan({ id: 'big' + index, card, cardAccount, merchant: 'Big ' + index, category: 'Hogar',
+    purchaseDateISO: '2026-10-10', principalMinor: 2, count: 2, placement: 'current', interestMinor: 999999999999998, interestCategory: 'Intereses', createdAt: '2026-10-10T12:00:00.000Z' }));
+  const data: domain.LedgerArchive = { ...archive, installmentPlans: [tv, ...plans] };
+  const cards = harness('cards.tsx', { data }).render();
+  const future = byName(cards, 'FutureInstallmentsRow')[0].rendered!;
+  assert.ok(texts(future).includes('Total fuera de rango'));
+  assert.equal(nodes(future).some(node => node.type === 'Money'), false, 'no rounded figure');
+  assert.equal(future.props.accessibilityLabel, 'Cuotas futuras, Total fuera de rango, en 11 planes');
+  const detail = harness('card/[id].tsx', { params: { id: 'card' }, data }).render();
+  const sections = nodes(detail).filter(node => node.type === 'SectionTitle');
+  assert.deepEqual([sections[0].props.children, sections[0].props.caption], ['Cuotas', 'Cuotas futuras: total fuera de rango']);
+  assert.equal(byName(detail, 'PlanRow').length, 11, 'every plan still listed, each with its own exact figures');
+  const english = harness('card/[id].tsx', { params: { id: 'card' }, data, locale: 'en-US' }).render();
+  assert.equal(nodes(english).filter(node => node.type === 'SectionTitle')[0].props.caption, 'Future installments: total out of range');
+});

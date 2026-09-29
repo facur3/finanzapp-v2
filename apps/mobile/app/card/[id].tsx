@@ -37,10 +37,13 @@ export default function CardDetailScreen() {
   // A day inside the cycle sentence starts in lower case: "Este ciclo, desde ayer".
   const inline = (iso: string) => relativeDate(iso, day, true);
   const money = (minor: number) => moneyText(minor, account.currency);
-  // «Cuotas futuras $ …» over the plans, with the interest those instalments still carry named beside it, never added in.
-  const plansCaption = (format: (minor: number) => string) => committedMinor > 0 ? [t('cards.panel.plansCaption', { amount: format(committedMinor) }),
-    summary.committedFinancingMinor > 0 ? t(summary.financingKind === 'financing' ? 'cards.panel.futureFinancing' : 'cards.panel.futureInterest',
-      { amount: format(summary.committedFinancingMinor) }) : null].filter(Boolean).join(' · ') : undefined;
+  // «Cuotas futuras $ …» over the plans, with the interest those instalments still carry named beside it, never added in;
+  // a sum out of the exact range says so instead of a rounded figure.
+  const financing = summary.committedFinancingMinor;
+  const plansCaption = (format: (minor: number) => string) => committedMinor === null || financing === null ? t('cards.panel.plansCaptionOutOfRange')
+    : committedMinor > 0 ? [t('cards.panel.plansCaption', { amount: format(committedMinor) }),
+      financing > 0 ? t(summary.financingKind === 'financing' ? 'cards.panel.futureFinancing' : 'cards.panel.futureInterest', { amount: format(financing) }) : null]
+      .filter(Boolean).join(' · ') : undefined;
   const state = card.deleted ? t('cards.panel.deletedTitle') : !card.active ? t('cards.panel.archivedTitle') : null;
   // An active card takes purchases and payments; an archived one still takes payments while something is owed; a deleted one, nothing.
   const pay = !card.deleted && (card.active || debtMinor > 0);

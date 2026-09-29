@@ -67,3 +67,16 @@ test('the purchase preview is the schedule the plan is written with', () => {
   const late = purchasePreview({ card, cycleDates: [], purchaseDateISO: plan.purchaseDateISO, placement: 'current', principalMinor: 100000001, count: 3, interestMinor: 0, todayISO: today })!;
   assert.deepEqual([late.even, late.maxMinor, late.minMinor, late.firstAlreadyClosed], [false, 33333334, 33333333, true], 'an uneven remainder is «aprox.»; a closed statement is recognised at save');
 });
+
+test('Codex review: a card whose plans add up beyond the exact range still opens; that sum is unknown, never a throw or a rounded figure', () => {
+  // Ten valid plans, each near the ledger's bound in interest: every stored amount is exact, their future interest together is not.
+  const plans = Array.from({ length: 10 }, (_, index) => newInstallmentPlan({ id: 'big' + index, card, cardAccount, merchant: 'Big ' + index, category: 'Hogar',
+    purchaseDateISO: '2026-10-10', principalMinor: 2, count: 2, placement: 'current', interestMinor: 999999999999998, interestCategory: interestCategoryLabel(), createdAt }));
+  const summary = summarizeCard(card, snapshot, today, plans, [], []);
+  assert.ok(summary);
+  assert.deepEqual([summary.committedMinor, summary.committedFinancingMinor], [20, null], 'the principal is exact; the interest sum is out of range');
+  assert.equal(summary.futurePlanCount, 10);
+  // One plan alone stays exact.
+  assert.deepEqual([summarizeCard(card, snapshot, today, plans.slice(0, 1), [], [])!.committedMinor, summarizeCard(card, snapshot, today, plans.slice(0, 1), [], [])!.committedFinancingMinor],
+    [2, 999999999999998]);
+});

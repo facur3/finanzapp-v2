@@ -1735,11 +1735,13 @@ nothing of it is on a screen yet.
   changed calendar left the form in a retry loop; the retry note sent a plan to Movimientos; VoiceOver positions did not
   follow the reading order; the snapshot jumped when blocks differed; many cards left the chosen one off-screen; fades
   were instant under Reduce Motion; SwitchRow's reason was only a hint; a date below a moved minimum; «Este ciclo» was
-  missing; stale docs and comments; and the test gaps of the edge-case matrix. Kept on purpose: a deleted card's detail
-  still shows its dates and limit (history as it was entered, 25B2), and the usual day a new card takes is the entered
-  date's (the edit form corrects it in a longer month).
+  missing; stale docs and comments; and the test gaps of the edge-case matrix. Codex (PR #69): a card whose plans'
+  future interest added up beyond the exact range made Tarjetas and the card detail throw while rendering; the sums are
+  now unknown there («Total fuera de rango», never rounded) and every plan still reads on its own. Kept on purpose: a
+  deleted card's detail still shows its dates and limit (history as it was entered, 25B2), and the usual day a new card
+  takes is the entered date's (the edit form corrects it in a longer month).
 - **Status.** On its branch (2026-09-28), not device-verified. Checked on Linux on the final tree: root `npm test` (413
-  passed, 1 todo) and `npm run check:repo` (OK, 367 tracked files); mobile `typecheck` (clean), `test:storage` (870/870),
+  passed, 1 todo) and `npm run check:repo` (OK, 367 tracked files); mobile `typecheck` (clean), `test:storage` (872/872),
   `currency:verify` and `regions:verify` (catalogues verified offline), `i18n:check -- --strict` (0 errors, 0 stale),
   `i18n:extract` (no copy outside the catalogue), `check` (dependencies up to date) and `export:ios` (iOS bundle
   exported, 1979 modules). The `mobile_api` PostgreSQL job runs in CI. No EAS build; the iPhone was not

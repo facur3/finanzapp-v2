@@ -46,9 +46,12 @@ export const cards = {
        * Named apart and never added into the principal, so the figure never disagrees with the instalments a plan lists. */
       futureInterest: '+ interés {amount}',
       futureFinancing: '+ financiación {amount}',
+      /** In place of that figure when the plans' sum leaves the exact range (never rounded, never hidden). */
+      futureOutOfRange: 'Total fuera de rango',
       /** The card detail's section with its instalment plans; the caption is the future principal. */
       plans: 'Cuotas',
       plansCaption: 'Cuotas futuras {amount}',
+      plansCaptionOutOfRange: 'Cuotas futuras: total fuera de rango',
       seeAll: 'Ver todo',
       recent: 'Recientes',
       movements: 'Movimientos',

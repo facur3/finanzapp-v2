@@ -109,7 +109,7 @@ function CardSnapshot({ summary, day, onOpen }: { summary: CardSummary; day: str
         onPress={() => router.push({ pathname: '/new-transfer', params: { toAccountId: account.id, maxAmountMinor: String(debtMinor) } })} />
     </Reflow>
 
-    {committedMinor > 0 && <Reflow fade={mounted.current}><ValueTransition id={card.id} variant="fade"><Surface grouped>
+    {(committedMinor === null || summary.committedFinancingMinor === null || committedMinor > 0) && <Reflow fade={mounted.current}><ValueTransition id={card.id} variant="fade"><Surface grouped>
       <FutureInstallmentsRow committedMinor={committedMinor} financingMinor={summary.committedFinancingMinor} financingKind={summary.financingKind}
         planCount={summary.futurePlanCount} currency={account.currency} onPress={() => onOpen(card.id)} />
     </Surface></ValueTransition></Reflow>}

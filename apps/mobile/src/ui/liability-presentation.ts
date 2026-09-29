@@ -36,11 +36,13 @@ export type CardSummary = {
   /** The closed statement still due, if any (its due may be corrected in the card form). */
   toPay: CardStatement | null;
   previousClosingISO: string;
-  /** Future committed principal of the card's live plans (cuotas futuras): beside the balance, never inside it. */
-  committedMinor: number;
+  /** Future committed principal of the card's live plans (cuotas futuras): beside the balance, never inside it. Null
+   * when the sum leaves the exact range (plans with amounts near the ledger's bound): the screens say «Total fuera de
+   * rango» instead of a rounded figure, and still open (each plan stays valid and readable on its own). */
+  committedMinor: number | null;
   /** The future financing of those plans (interest, and fee or tax in older plans): named beside the principal («+ interés
-   * $ …»), never added into it, so «Cuotas futuras» never disagrees with the instalments a plan lists. */
-  committedFinancingMinor: number;
+   * $ …»), never added into it, so «Cuotas futuras» never disagrees with the instalments a plan lists. Null out of range. */
+  committedFinancingMinor: number | null;
   /** How that financing is named: interest only, or a mix with fees or taxes. */
   financingKind: 'interest' | 'financing';
   /** Plans with a share not yet recognised. */
@@ -59,11 +61,14 @@ export function summarizeCard(card: CreditCardProfile, snapshot: LedgerSnapshot,
   const availability: CardAvailability = card.creditLimitMinor === null ? 'noLimit' : availableMinor === null ? 'unknownWithPlans' : 'known';
   const view = cardCycleView(card, cardCycleDatesOf(card.id, cycleDates), todayISO);
   const pendingPlans = pendingInstallmentPlans(card, plans, records);
+  // Sums over every live plan of the card: exact, or null when they leave the safe range (never a throw while rendering).
+  const exactly = (sum: () => number) => { try { return sum(); } catch { return null; } };
   return { id: card.id, card, account, debtMinor, creditMinor: cardCreditMinor(card, snapshot), availableMinor, availability,
     usage: availability === 'known' && card.creditLimitMinor ? debtMinor / card.creditLimitMinor : null,
     closingISO: view.open.closingISO, openDueISO: view.open.dueISO, openStartISO: view.openStartISO,
     nextDueISO: view.nextDue.dueISO, nextDueOfISO: view.nextDue.closingISO, toPay: view.toPay, previousClosingISO: view.previous.closingISO,
-    committedMinor: cardCommittedMinor(card, plans, records), committedFinancingMinor: cardCommittedFinancingMinor(card, plans, records),
+    committedMinor: exactly(() => cardCommittedMinor(card, plans, records)),
+    committedFinancingMinor: exactly(() => cardCommittedFinancingMinor(card, plans, records)),
     financingKind: pendingPlans.some(plan => plan.feeMinor + plan.taxMinor > 0) ? 'financing' : 'interest', pendingPlans,
     futurePlanCount: pendingPlans.filter(plan => installmentPlanFigures(plan, records).scheduledMinor > 0).length };
 }
