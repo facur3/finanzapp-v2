@@ -1748,9 +1748,10 @@ nothing of it is on a screen yet.
 - **Status.** On its branch (2026-09-29), not device-verified. Checked on Linux on the final tree: root `npm test` (415
   passed, 1 todo) and `npm run check:repo` (OK, 367 tracked files); mobile `typecheck` (clean), `test:storage` (875/875),
   `currency:verify` and `regions:verify` (catalogues verified offline), `i18n:check -- --strict` (0 errors, 0 stale),
-  `i18n:extract` (no copy outside the catalogue) and `export:ios` (iOS bundle exported, 1979 modules). `check` reports
-  three SDK 57 patch releases published on 2026-09-29, after this branch was cut (`expo` 57.0.26, `expo-constants`
-  57.0.20, `expo-router` 57.0.24); this PR changes no dependency, and the bump is left to its own decision. The
+  `i18n:extract` (no copy outside the catalogue), `check` (dependencies up to date) and `export:ios` (iOS bundle
+  exported, 1979 modules). The three SDK 57 patch releases published on 2026-09-29 were aligned (`expo` 57.0.25 →
+  57.0.26, `expo-constants` 57.0.19 → 57.0.20, `expo-router` 57.0.23 → 57.0.24; the lockfile also moves their pinned
+  `expo-modules-core` 57.0.20 and `@expo/ui` 57.0.21); no other dependency changed. The
   `mobile_api` PostgreSQL job runs in CI. No EAS build; the iPhone was not touched (checklist section Producto 24T2).
 
 ### Producto 25C — budgets with rollover, goals, CSV and productivity
