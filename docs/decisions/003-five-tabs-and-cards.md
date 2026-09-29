@@ -245,17 +245,29 @@ y la decisión es la contraria (regla 7). 24T1 (PR #67) convirtió en pruebas 12
      menor que el precio no se guarda. No se agregan porcentaje editable, tasa mensual,
      TNA, TEA, CFT ni campos visibles de comisión o impuesto; comisiones e impuestos
      quedan en cero desde este flujo y el dominio los conserva. Una financiación
-     avanzada sería una entrega propia.
+     avanzada sería una entrega propia. **Presentación (24T2):** las cifras de un plan
+     son de principal; en un plan con interés se nombran así («Principal registrado»,
+     «Principal futuro», «Principal restante») y el interés que falta registrar tiene su
+     propia fila («Interés futuro»). En Tarjetas, «Cuotas futuras» suma solo principal y
+     nombra el interés al lado («+ interés $ …»), nunca sumado; en el ciclo abierto, la
+     parte de interés de una cuota no cuenta como otra compra.
    - **Fechas exactas del ciclo (decidido para 24T2):** la tarjeta conserva los días
      habituales de cierre y vencimiento como valor por defecto y puede tener, para el
      próximo ciclo, una **fecha exacta de cierre** y una **fecha exacta de vencimiento**
      elegidas con un calendario completo (día, mes y año). No tienen que caer en el
      mismo mes (cierre 2026-10-28 y vencimiento 2026-11-05 es válido). La única regla
-     es **vencimiento > cierre**; sin límites artificiales de días. Una fecha inválida o
-     un vencimiento igual o anterior al cierre no se guarda. Cambiarlas no reescribe
-     movimientos, resúmenes ni calendarios de planes ya creados; puede cambiar cómo se
-     presenta o programa el próximo ciclo aún no materializado. Sin feriados ni
-     corrimientos a días hábiles simulados.
+     entre las dos es **vencimiento > cierre**; sin límites artificiales de días. Una
+     fecha inválida o un vencimiento igual o anterior al cierre no se guarda. Cambiarlas
+     no reescribe movimientos, resúmenes ni calendarios de planes ya creados; puede
+     cambiar cómo se presenta o programa el próximo ciclo aún no materializado. Sin
+     feriados ni corrimientos a días hábiles simulados. **Una regla de producto (24T2),
+     sobre el cierre y no sobre su vencimiento:** un próximo cierre a más de medio mes
+     (15 días) del que el calendario esperaba no es un corrimiento puntual (feriados y
+     fines de semana mueven un cierre pocos días) sino un cambio de calendario: sus días
+     pasan a ser los habituales («Usar estos días todos los meses» queda activado y fijo,
+     con el motivo en pantalla). A 15 días o menos, la persona elige si la fecha corrige
+     solo ese resumen o si esos días se repiten. La fecha se guarda igual en los dos
+     casos; lo que cambia es qué días siguen.
    - **Ciclo del resumen (implementado en 24T2, vinculante).** Un **resumen** es un
      cierre y el vencimiento **de ese cierre**, siempre juntos: `vencimiento > cierre`
      vale dentro de un resumen y nunca entre dos. El **próximo vencimiento** es el
@@ -267,18 +279,26 @@ y la decisión es la contraria (regla 7). 24T1 (PR #67) convirtió en pruebas 12
      (`packages/domain/card-cycles.ts`, esquema 13, copia v13): los días habituales son
      la grilla (las fórmulas de 24T1, sin cambios); las fechas exactas son resúmenes
      guardados (`card_cycle_dates`: cierre y su vencimiento), una **cadena de resúmenes
-     consecutivos** por tarjeta; antes y después de la cadena los resúmenes se generan
-     con los días habituales, anclados en la fila vecina (el cierre habitual más cercano
-     a un mes antes o después), así una fecha movida nunca duplica ni saltea un resumen,
-     aunque cruce de mes. **Todo cambio congela primero lo que ya cerró:** corregir el
-     próximo cierre o vencimiento, corregir el vencimiento del resumen cerrado que falta
-     pagar o cambiar los días habituales guarda antes, a sus fechas vigentes, cada
-     resumen desde el final de la cadena hasta el último cerrado; nunca se borra ni se
-     renumera una fila y el cierre de un resumen cerrado no cambia. Un formulario abierto
-     sobre un resumen que ya cerró se rechaza («Las fechas del ciclo cambiaron…»). Los
-     resúmenes anteriores a la primera fila guardada siguen siendo una estimación con
-     los días habituales actuales, como antes de 24T2. Un plan nuevo usa el calendario
-     vigente al crearse (fechas exactas incluidas); su calendario queda contractual.
+     consecutivos** por tarjeta. Cada fila guarda también los días habituales del
+     calendario al que pertenece y el resumen habitual que representa (su mes,
+     `monthISO`: el propio cuando cierra justo en la grilla de sus días; el del resumen
+     que reemplaza cuando es un corrimiento puntual fuera de la grilla). Después de la
+     cadena, los resúmenes se generan con los días habituales de la tarjeta desde el mes
+     siguiente al de la última fila (si los días cambiaron después de ella, desde el
+     cierre de la grilla nueva más cercano a un mes después); antes de la cadena, con los
+     días de la primera fila (los vigentes cuando empezó la cadena), desde el mes anterior
+     al suyo. Así una fecha movida, por pocos días o por meses, nunca duplica ni saltea un
+     resumen, aunque cruce de mes. **Todo cambio congela primero lo que ya cerró:**
+     corregir el próximo cierre o vencimiento, corregir el vencimiento del resumen cerrado
+     que falta pagar o cambiar los días habituales guarda antes, a sus fechas vigentes,
+     cada resumen desde el final de la cadena hasta el último cerrado (cuando solo cambian
+     los días habituales, también el abierto: los días nuevos rigen desde el siguiente);
+     nunca se borra ni se renumera una fila y el cierre de un resumen cerrado no cambia.
+     Un formulario abierto sobre un resumen que ya cerró se rechaza («Las fechas del ciclo
+     cambiaron…»), también cuando solo cambia los días. Los resúmenes anteriores a la
+     primera fila guardada siguen siendo una estimación, con los días de esa fila: un
+     cambio de días nunca reescribe la historia. Un plan nuevo usa el calendario vigente
+     al crearse (fechas exactas incluidas); su calendario queda contractual.
    - **Antes de 24T1:** archivar conservaba el saldo pendiente y seguía aceptando el
      pago; eliminar se rechazaba con saldo pendiente y se permitía en cero; una
      tarjeta eliminada no aceptaba pagos. Todo eso sigue igual.
