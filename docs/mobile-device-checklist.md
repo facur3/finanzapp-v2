@@ -2,6 +2,9 @@
 
 ## Producto 24T2 — installment purchase and complete Cards experience
 
+**Result (2026-09-29): completed by the owner on an iPhone 14 Pro with a fresh development build, after the schema 13
+upgrade of their data. PR #69 merged (merge commit 8951f6c).**
+
 **Not done in 24T2: no EAS build was made and the iPhone was not touched.** Metro from this branch
 (`npm run start:dev-client -- --clear`) on the installed FinanzApp Dev build; JavaScript only, no native change.
 **The ledger moves to schema 13 (one new empty table for exact statement dates) and an older build refuses the file

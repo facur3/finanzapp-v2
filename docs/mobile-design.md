@@ -1441,11 +1441,8 @@ color propio.
 
 ## Pendiente de revisión en iPhone
 
-- Producto 24T2: el deck con una, tres y más de doce tarjetas (franjas, selección con háptico, la tarjeta elegida traída a
-  la vista, el gesto atrás intacto), el resumen al cambiar de tarjeta (fundidos y deslizamientos, sin saltos) y con
-  Reduce Motion (fundidos que duran); la compra en cuotas con y sin interés; el formulario de tarjeta con fechas; los
-  detalles de tarjeta, de plan y de una cuota; VoiceOver (orden, posiciones, pistas) en ambos idiomas; el texto de
-  accesibilidad más grande; ambos temas. Lista en docs/mobile-device-checklist.md.
+- Producto 24T2: **verificado** por el dueño en un iPhone 14 Pro con un build de desarrollo nuevo (2026-09-29; PR #69,
+  merge 8951f6c).
 
 - Producto 25B3: el detalle de una cuenta sin la fila de saldo inicial (el mismo saldo registrado, el grupo
   con solo Recurrentes); el detalle de un recurrente desde Inicio, desde Recurrentes y desde un movimiento

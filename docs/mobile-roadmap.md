@@ -1,7 +1,8 @@
 # FinanzApp mobile: living roadmap
 
-Updated: 2026-09-28 (Producto 24T2, on its branch as PR #69: the purchase in cuotas, the card's statement calendar with
-exact dates, schema 13 and backup v13, and the Tarjetas deck; 24T1C merged as PR #68). Read [decision 001](decisions/001-native-mobile.md),
+Updated: 2026-09-29 (Producto 24T2 merged as PR #69, merge commit 8951f6c: schema 13, backup v13, the purchase in cuotas,
+the card's statement calendar and the Tarjetas deck, verified by the owner on an iPhone 14 Pro with a fresh development
+build; Producto 24UX6A, Home hierarchy, app shell and Appearance, on its branch). Read [decision 001](decisions/001-native-mobile.md),
 [decision 002](decisions/002-spending-first.md),
 [decision 003](decisions/003-five-tabs-and-cards.md) and
 [decision 004](decisions/004-native-first-and-web-retirement.md). Decision 002 supersedes
@@ -133,13 +134,13 @@ history file keeps the evidence of when and why.
 
 ## 1. Implemented (current state)
 
-What exists in code on `master` as of Producto 24T1C (PR #68, merged 2026-09-28), after 24T1 (PR #67) and 25B3 (PR #66), plus
-Producto 24T2 on its branch. Per area, without test inventories (those are in apps/mobile/README.md and the history
+What exists in code on `master` as of Producto 24T2 (PR #69, merged 2026-09-29, merge commit 8951f6c), after 24T1C (PR #68),
+24T1 (PR #67) and 25B3 (PR #66), plus Producto 24UX6A on its branch. Per area, without test inventories (those are in apps/mobile/README.md and the history
 file). "Released" below names an in-app gate (`RELEASED_LANGUAGES`, `RELEASED_REGIONS`,
 `LEDGER_CURRENCIES`): what a build offers, verified on Linux; nothing is distributed to people yet
 (§4).
 
-- **Purchases in instalments and complete Tarjetas (24T2, on its branch, PR #69).** The purchase form's «Pago» [Una vez][En
+- **Purchases in instalments and complete Tarjetas (24T2, PR #69, merged 2026-09-29; device-verified by the owner).** The purchase form's «Pago» [Una vez][En
   cuotas] for a new expense on an active card (counts 3/6/12/18 or any from 2 to 120, «Primera cuota» by closing date,
   «Sin interés» or «Con interés» with one «Total financiado» field; one plan and no expense, frozen for retries); the
   card's statement calendar with exact dates (`packages/domain/card-cycles.ts`, `card_cycle_dates`, schema 13, backup
@@ -328,11 +329,8 @@ it was checked in). Metro from the branch on the installed FinanzApp Dev build s
 item unless a section says a new native build is needed. The checklist sections are in
 [mobile-device-checklist.md](mobile-device-checklist.md).
 
-- **24T2 — installment purchase and complete Tarjetas:** the checklist section Producto 24T2 (a backup before the schema
-  13 upgrade; the cycle dates; the card form's calendar; the purchase in cuotas with and without interest; the deck with
-  one, three and more than twelve cards, its haptic, the snapshot's fades and slides, the back swipe; the card and plan
-  details; an instalment's movement, its edit and undo; VoiceOver order and positions, the largest Dynamic Type, Reduce
-  Motion, both themes and both languages).
+- **24T2 — installment purchase and complete Tarjetas: verified.** The owner completed the checklist section Producto
+  24T2 on an iPhone 14 Pro with a fresh development build (2026-09-29), after the schema 13 upgrade of their data.
 - **24T1 — the instalment engine:** nothing visible; the checklist section Producto 24T1 (a backup before the schema 12
   upgrade of FinanzApp Dev's data, the app opening on the same figures, a regression spot-check of a card purchase and
   payment). The device gates of instalments belong to 24T2 (the purchase form, the figures) and 24T3 (Tarjetas and
@@ -406,16 +404,18 @@ item unless a section says a new native build is needed. The checklist sections 
 
 ## 3. Next deliveries
 
-**Recommended next (2026-09-28):** 25B3 (PR #66), 24T1 (PR #67) and 24T1C (PR #68) merged. **24T2 is on its branch
-(PR #69, not merged)**: SQLite schema 13, backup v13, the purchase in cuotas and the complete Tarjetas. After its merge
-and its device QA, **the next implementation is 24T3** (refunds, early payoff, cancellation adjustments and the final
-device QA of instalments). The earlier plan, as reconciled by 24T1C: 24T1 left 12 of the 13 card-invariant `it.todo`
+**Recommended next (2026-09-29):** 25B3 (PR #66), 24T1 (PR #67), 24T1C (PR #68) and **24T2 (PR #69, merge commit
+8951f6c)** merged: SQLite schema 13, backup v13, the purchase in cuotas and the complete Tarjetas, verified by the owner on
+an iPhone 14 Pro with a fresh development build. The immediate path is visual first: **24UX6A** (Home hierarchy, app
+shell and Appearance; on its branch), then **24UX6B** (Reportes' visual hierarchy), then **24T3** (refunds, early
+payoff, cancellation adjustments and the final device QA of instalments), then the later roadmap below. The earlier
+plan, as reconciled by 24T1C: 24T1 left 12 of the 13 card-invariant `it.todo`
 as tests (the remaining one, the foreign-currency plan record, belongs to 24C2); then 24T2 and **24T3**: **Producto 24T** ships in three focused PRs: 24T1 (domain, schema, backup and instalment
 mathematics; merged), 24T2 (the card purchase with the simple financing UX, the exact current-cycle dates, statements,
 current-versus-future balances and the Tarjetas direction, all recorded under 24T below and in «Producto 24T1C»),
 24T3 (refunds, early payments, lifecycle and the final device QA).
 
-The binding order is **24T2 → 24T3 → 25A → 25C → 25C2 → 25D → 25E → 25F → 26** (launch). Every dependency points
+The binding order is **24UX6A → 24UX6B → 24T3 → 25A → 25C → 25C2 → 25D → 25E → 25F → 26** (launch; 24T2 merged as PR #69). Every dependency points
 backwards in it; the scope that would need a later or optional delivery is split out explicitly (24T1C, 2026-09-28):
 
 - **24C2 is optional** and blocks nothing in this order. 25A's core works on what the ledger already represents; only
@@ -1106,8 +1106,8 @@ nothing of it is on a screen yet.
     closing day, weekend and holiday shifts as stated by the issuer), schema and backup versions with a
     rollback test; the `it.todo` lines of `card-invariants.test.ts` (7b) become tests. **Delivered (PR #67); see
     «Producto 24T1» below.** One invariant stays `it.todo` on purpose: the foreign-currency plan record (24C2).
-  - **24T2 — the card purchase, UI, statements and current-vs-future balances.** **Delivered on its branch (PR #69,
-    not merged); see «Producto 24T2» below.** The purchase form with
+  - **24T2 — the card purchase, UI, statements and current-vs-future balances.** **Delivered (PR #69, merged
+    2026-09-29, merge commit 8951f6c; device-verified by the owner); see «Producto 24T2» below.** The purchase form with
     instalments, per-statement summaries, the five figures above, pending balance and partial payments, a
     clearer card form with a real calendar for closing and due days; the available-credit gate decided
     first if the UI shows a limit.
@@ -1745,7 +1745,8 @@ nothing of it is on a screen yet.
   always the person's), and Intereses became latent. Kept on purpose: a
   deleted card's detail still shows its dates and limit (history as it was entered, 25B2), and the usual day a new card
   takes is the entered date's (the edit form corrects it in a longer month).
-- **Status.** On its branch (2026-09-29), not device-verified. Checked on Linux on the final tree: root `npm test` (415
+- **Status.** Merged (PR #69, 2026-09-29, merge commit 8951f6c); **device-verified**: the owner completed the checklist
+  section Producto 24T2 on an iPhone 14 Pro with a fresh development build. Checked on Linux on the final tree: root `npm test` (415
   passed, 1 todo) and `npm run check:repo` (OK, 367 tracked files); mobile `typecheck` (clean), `test:storage` (875/875),
   `currency:verify` and `regions:verify` (catalogues verified offline), `i18n:check -- --strict` (0 errors, 0 stale),
   `i18n:extract` (no copy outside the catalogue), `check` (dependencies up to date) and `export:ios` (iOS bundle
