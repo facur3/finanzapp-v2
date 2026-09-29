@@ -54,6 +54,26 @@ export const activity = {
     edit: 'Editar movimiento',
     restoreAction: 'Recuperar movimiento',
     voidAction: 'Deshacer movimiento',
+    /** 24T2: a movement an instalment plan recorded: its title, and the row that opens its plan ("3 de 12"). */
+    installmentTitle: 'Cuota de tarjeta',
+    installment: 'Cuota',
+    installmentOf: '{number} de {count}',
+    /** A financing share of the instalment, recorded as its own movement in its own category. */
+    installmentShare: {
+      interest: '{number} de {count} · interés',
+      fee: '{number} de {count} · comisión',
+      tax: '{number} de {count} · impuesto',
+    },
+    /** The title of a financing share's movement (its principal is «Cuota de tarjeta»). */
+    installmentShareTitle: {
+      interest: 'Interés de cuota',
+      fee: 'Comisión de cuota',
+      tax: 'Impuesto de cuota',
+    },
+    /** Appended to the undo confirmation of an instalment. */
+    installmentVoidNote: 'La cuota queda deshecha: no se vuelve a registrar sola y sigue pendiente en su plan.',
+    /** The same, for one share of an instalment that has another (its principal, or its interest): the other stays as it is. */
+    installmentShareVoidNote: 'Solo esta parte de la cuota queda deshecha: no se vuelve a registrar sola y sigue pendiente en su plan. La otra parte de la cuota no cambia.',
   },
   transferDetail: {
     notFoundTitle: 'No encontramos esta transferencia',

@@ -1,6 +1,7 @@
 import { validDateISO, type Account, type Currency, type Entry } from './ledger.ts';
 import { assertStorableCurrency } from './currency.ts';
 import { MAX_ENTRY_MINOR } from './money.ts';
+import { cardStatementsFrom, type CardCycleDates } from './card-cycles.ts';
 import type { CreditCardProfile } from './liabilities.ts';
 
 /** Producto 24T1: a purchase in instalments is **one purchase and one finite plan** (decision 003, rule 7). The plan
@@ -25,10 +26,12 @@ import type { CreditCardProfile } from './liabilities.ts';
  * paid: «pagada» is never derived, because a card mixes purchases, plans, charges and refunds and a general payment says
  * nothing about which share it covers.
  *
- * Gates for later deliveries: how pending instalments consume the issuer's available credit (24T2, decided in decision
- * 003 first; until then `cardAvailableLimitMinor` answers null for a card with a pending plan), refunds and early payoff
- * (24T3: no save changes a plan's money, count or dates, so those will be operations with their own records), and a
- * purchase whose currency differs from the card's billing currency (24C2: a plan is same-currency here). */
+ * Gates for later deliveries: how pending instalments consume the issuer's available credit stays open (decision 003:
+ * `cardAvailableLimitMinor` answers null for a card with a pending plan, and 24T2 shows «No calculado con cuotas», never a
+ * formula), refunds and early payoff (24T3: no save changes a plan's money, count or dates, so those will be operations
+ * with their own records), and a purchase whose currency differs from the card's billing currency (24C2: a plan is
+ * same-currency here). Since 24T2 a new plan's calendar is the card's effective calendar at creation (its usual days and
+ * its exact statement dates, card-cycles.ts); once written, the schedule never follows a later change. */
 export type StatementPlacement = 'current' | 'next';
 
 /** The four components of a plan, in a fixed order. Each one's per-instalment share is `<component>Minor` on an
@@ -44,9 +47,11 @@ export interface Installment {
   /** 1-based position in the plan. */
   number: number;
   /** The statement closing the instalment belongs to: its recognition date (its shares count in this month). Contractual and
-   * date-only: computed once from the card's closing day at purchase time; a later change of the card's days rewrites nothing. */
+   * date-only: computed once from the card's calendar at purchase time (its closing day, and since 24T2 its exact statement
+   * dates); a later change of the card's days or dates rewrites nothing. */
   billingDateISO: string;
-  /** The payment due date of that statement, from the card's due day. Informative: paying stays a transfer the person records. */
+  /** The payment due date of that statement (the card's due day after its closing, or the statement's exact due date).
+   * Informative: paying stays a transfer the person records. */
   dueDateISO: string;
   /** Principal recognised by this instalment, > 0. The principal shares sum exactly to the plan's principal. */
   principalMinor: number;
@@ -93,6 +98,10 @@ export const PLAN_PRINCIPAL_MESSAGE = 'El precio de la compra en cuotas debe ser
 export const PLAN_COUNT_MESSAGE = 'Elegí entre 1 y 120 cuotas.';
 export const PLAN_TOO_SMALL_MESSAGE = 'Cada cuota debe ser de al menos una unidad menor de la moneda.';
 export const PLAN_FINANCING_MESSAGE = 'Los intereses, las comisiones y los impuestos de financiación deben ser cero o positivos, cada uno con su propia categoría.';
+/** 24T2: the one financing field of the purchase form («Total financiado») never goes below the price. */
+export const PLAN_TOTAL_BELOW_PRICE_MESSAGE = 'El total financiado no puede ser menor que el precio.';
+/** 24T2: a purchase form left open while the card's calendar changed: its preview no longer says when the plan bills. */
+export const PLAN_CALENDAR_MESSAGE = 'El calendario de la tarjeta cambió desde que abriste la compra. Revisá la primera cuota y guardá de nuevo.';
 export const PLAN_CARD_MESSAGE = 'Una compra en cuotas se registra en una tarjeta de crédito existente.';
 export const PLAN_CURRENCY_MESSAGE = 'El plan de cuotas usa la moneda de su tarjeta.';
 export const PLAN_STATE_MESSAGE = 'Estado de plan de cuotas inválido.';
@@ -148,53 +157,51 @@ export function distributeMinor(totalMinor: number, count: number, { allowZero =
 
 // ---- calendar -------------------------------------------------------------------------------------------------------
 
-function daysInMonth(year: number, monthIndex: number): number {
-  return new Date(year, monthIndex + 1, 0, 12).getDate();
-}
-function iso(year: number, monthIndex: number, day: number): string {
-  return [year, String(monthIndex + 1).padStart(2, '0'), String(day).padStart(2, '0')].join('-');
-}
-function clampedDay(year: number, monthIndex: number, requestedDay: number): string {
-  return iso(year, monthIndex, Math.min(requestedDay, daysInMonth(year, monthIndex)));
-}
-function parts(dateISO: string): [number, number] {
-  const [year, month] = dateISO.split('-').map(Number);
-  return [year, month - 1];
-}
-function addDays(dateISO: string, days: number): string {
-  const [year, month, day] = dateISO.split('-').map(Number);
-  const date = new Date(year, month - 1, day + days, 12);
-  return iso(date.getFullYear(), date.getMonth(), date.getDate());
-}
-function validDay(day: number): boolean {
-  return Number.isInteger(day) && day >= 1 && day <= 31;
+/** The grid of the usual days lives in card-cycles.ts since 24T2 (with the card's exact cycle dates); the three 24T1 names
+ * stay exported from here, unchanged. */
+export { statementClosingAfter, statementClosingOnOrAfter, statementDueDate } from './card-cycles.ts';
+
+/** Producto 24T2's financing UI: by default «Sin interés» (no field at all); «Con interés» shows one field, «Total
+ * financiado». The interest is that total minus the price, exact in minor units (decision 003, rule 7). A total equal to
+ * the price is no interest (never an invented charge); below the price it is refused. Fee and tax stay zero from this flow;
+ * the engine keeps them. */
+export function interestFromTotalFinanced(principalMinor: number, totalFinancedMinor: number): number {
+  if (!Number.isSafeInteger(principalMinor) || principalMinor <= 0 || principalMinor > MAX_ENTRY_MINOR) throw new Error(PLAN_PRINCIPAL_MESSAGE);
+  if (!Number.isSafeInteger(totalFinancedMinor)) throw new Error(PLAN_FINANCING_MESSAGE);
+  if (totalFinancedMinor > MAX_ENTRY_MINOR) throw new Error('El monto es demasiado grande.');
+  if (totalFinancedMinor < principalMinor) throw new Error(PLAN_TOTAL_BELOW_PRICE_MESSAGE);
+  return totalFinancedMinor - principalMinor;
 }
 
-/** The first statement closing on or after `dateISO` for a card closing on `closingDay` (a purchase on the closing day
- * itself belongs to that statement). Day 31 lands on the month's last day; the requested day is kept for the next months. */
-export function statementClosingOnOrAfter(dateISO: string, closingDay: number): string {
-  if (!validDateISO(dateISO) || !validDay(closingDay)) throw new Error('Fecha de cierre inválida.');
-  const [year, monthIndex] = parts(dateISO);
-  const candidate = clampedDay(year, monthIndex, closingDay);
-  if (candidate >= dateISO) return candidate;
-  return clampedDay(year + Math.floor((monthIndex + 1) / 12), (monthIndex + 1) % 12, closingDay);
+/** The financing a purchase form sends to `newInstallmentPlan`: «Sin interés» (`totalFinancedMinor` null) or a total
+ * financed equal to the price is no interest and no interest category (a zero component never carries one); a larger
+ * total is the difference, in `interestCategory` (the Intereses identity, `interestCategoryLabel`). */
+/** Producto 24T2: the categories the financing of saved plans records in (interest, and fee or tax in older plans), so a
+ * latent category such as Intereses is listed from the moment a plan needs it, before its first instalment is recorded.
+ * A deleted plan (created by mistake, nothing recorded) needs nothing. */
+export function planFinancingCategories(plans: readonly InstallmentPlan[] = []): string[] {
+  const categories = new Set<string>();
+  for (const plan of plans) {
+    if (plan.deleted) continue;
+    if (plan.interestMinor > 0 && plan.interestCategory) categories.add(plan.interestCategory);
+    if (plan.feeMinor > 0 && plan.feeCategory) categories.add(plan.feeCategory);
+    if (plan.taxMinor > 0 && plan.taxCategory) categories.add(plan.taxCategory);
+  }
+  return [...categories];
 }
 
-/** The closing `months` statements after `closingISO`, on the card's closing day: the anchor is the configured day, so
- * a January 31 closing gives February 28 (29 in a leap year) and March 31, never a drift to the 28th for good. */
-export function statementClosingAfter(closingISO: string, closingDay: number, months: number): string {
-  if (!validDateISO(closingISO) || !validDay(closingDay) || !Number.isInteger(months) || months < 0) throw new Error('Fecha de cierre inválida.');
-  const [year, monthIndex] = parts(closingISO);
-  const total = monthIndex + months;
-  return clampedDay(year + Math.floor(total / 12), total % 12, closingDay);
+export function planFinancing(principalMinor: number, totalFinancedMinor: number | null, interestCategory: string): { interestMinor: number; interestCategory: string } {
+  const interestMinor = totalFinancedMinor === null ? 0 : interestFromTotalFinanced(principalMinor, totalFinancedMinor);
+  return { interestMinor, interestCategory: interestMinor > 0 ? interestCategory : '' };
 }
 
-/** The due date of a statement: the card's due day after the closing (the day after the closing at the earliest, so a
- * due day before the closing day falls in the following month). Contractual; weekend or holiday shifts the issuer may
- * apply are not known here and are never simulated. */
-export function statementDueDate(closingISO: string, dueDay: number): string {
-  if (!validDateISO(closingISO) || !validDay(dueDay)) throw new Error('Fecha de vencimiento inválida.');
-  return statementClosingOnOrAfter(addDays(closingISO, 1), dueDay);
+/** What each instalment of a schedule charges in total (principal and every financing share), and whether they are all
+ * the same. Each component places its remainder on the first instalments on its own, so two instalments may differ by a
+ * few minor units: a form says «aprox.» then, never that they are equal. */
+export function installmentAmounts(schedule: readonly Installment[]): { amounts: number[]; maxMinor: number; minMinor: number; even: boolean } {
+  const amounts = schedule.map(row => row.principalMinor + row.interestMinor + row.feeMinor + row.taxMinor);
+  const maxMinor = Math.max(...amounts), minMinor = Math.min(...amounts);
+  return { amounts, maxMinor, minMinor, even: maxMinor === minMinor };
 }
 
 /** The financing totals of a plan, each component on its own. */
@@ -202,23 +209,22 @@ export type FinancingTotals = { interestMinor: number; feeMinor: number; taxMino
 const NO_FINANCING: FinancingTotals = { interestMinor: 0, feeMinor: 0, taxMinor: 0 };
 
 /** The exact calendar of a plan: instalment 1 on the purchase's current statement (the first closing on or after the
- * purchase date) or on the next one, then one statement per instalment on the card's closing day, each with its due
- * date. Every component (principal, interest, fee, tax) is split on its own with the same rule. Dates only. Fixed at
- * purchase time: the card's days may change later without rewriting it. */
+ * purchase date) or on the next one, then one statement per instalment, each with its due date. The statements are the
+ * card's effective calendar when the plan is created (24T2): its exact cycle dates (`cycleDates`, the card's own rows)
+ * where it has them, the usual days elsewhere; without exact dates this is 24T1's grid on the card's closing day, date
+ * for date. Every component (principal, interest, fee, tax) is split on its own with the same rule. Dates only. Fixed at
+ * purchase time: the card's days or exact dates may change later without rewriting it. */
 export function installmentSchedule(card: Pick<CreditCardProfile, 'closingDay' | 'dueDay'>, purchaseDateISO: string, placement: StatementPlacement,
-  principalMinor: number, count: number, financing: FinancingTotals = NO_FINANCING): Installment[] {
+  principalMinor: number, count: number, financing: FinancingTotals = NO_FINANCING, cycleDates: readonly CardCycleDates[] = []): Installment[] {
   if (placement !== 'current' && placement !== 'next') throw new Error(PLAN_SCHEDULE_MESSAGE);
   if (!validDateISO(purchaseDateISO)) throw new Error('Elegí una fecha válida.');
   const principal = distributeMinor(principalMinor, count);
   const interest = distributeMinor(financing.interestMinor, count, { allowZero: true });
   const fee = distributeMinor(financing.feeMinor, count, { allowZero: true });
   const tax = distributeMinor(financing.taxMinor, count, { allowZero: true });
-  const first = statementClosingAfter(statementClosingOnOrAfter(purchaseDateISO, card.closingDay), card.closingDay, placement === 'next' ? 1 : 0);
-  return principal.map((share, index) => {
-    const billingDateISO = statementClosingAfter(first, card.closingDay, index);
-    return { number: index + 1, billingDateISO, dueDateISO: statementDueDate(billingDateISO, card.dueDay),
-      principalMinor: share, interestMinor: interest[index], feeMinor: fee[index], taxMinor: tax[index] };
-  });
+  const statements = cardStatementsFrom(card, cycleDates, purchaseDateISO, placement === 'next' ? 1 : 0, count);
+  return principal.map((share, index) => ({ number: index + 1, billingDateISO: statements[index].closingISO, dueDateISO: statements[index].dueISO,
+    principalMinor: share, interestMinor: interest[index], feeMinor: fee[index], taxMinor: tax[index] }));
 }
 
 // ---- identity of the movements a plan records ---------------------------------------------------------------------
@@ -312,16 +318,27 @@ export function validateInstallmentPlanChange(before: InstallmentPlan, after: In
 function sameSchedule(a: readonly Installment[], b: readonly Installment[]): boolean {
   return a.length === b.length && a.every((row, index) => INSTALLMENT_KEYS.every(key => row[key] === b[index][key]));
 }
+/** 24T2: whether a new plan's schedule is exactly the one the card's calendar gives now (its usual days and its exact
+ * statement dates), for either placement. Storage checks it when a plan is created, never on an existing or imported plan
+ * (their schedules are contractual). */
+export function planFollowsCalendar(plan: InstallmentPlan, card: Pick<CreditCardProfile, 'id' | 'closingDay' | 'dueDay'>, cycleDates: readonly CardCycleDates[] = []): boolean {
+  const rows = cycleDates.filter(row => row.cardId === card.id);
+  const financing = { interestMinor: plan.interestMinor, feeMinor: plan.feeMinor, taxMinor: plan.taxMinor };
+  return (['current', 'next'] as const).some(placement => {
+    try { return sameSchedule(installmentSchedule(card, plan.purchaseDateISO, placement, plan.principalMinor, plan.count, financing, rows), plan.schedule); } catch { return false; }
+  });
+}
 export function sameInstallmentPlan(a: InstallmentPlan, b: InstallmentPlan): boolean {
   return [...PLAN_SCALAR_KEYS, ...PLAN_STATE_KEYS].every(key => a[key] === b[key]) && sameSchedule(a.schedule, b.schedule);
 }
 
-/** A new plan for a purchase on `card`: the schedule from the card's days, the plan's currency from the card's account,
- * revision 0. Each financing component is optional and explicit, with its own category. An archived or deleted card
- * takes no new plan (it keeps the ones it has). */
+/** A new plan for a purchase on `card`: the schedule from the card's calendar as known now (its usual days and its exact
+ * cycle dates, `cycleDates`), the plan's currency from the card's account, revision 0. Each financing component is
+ * optional and explicit, with its own category. An archived or deleted card takes no new plan (it keeps the ones it has). */
 export function newInstallmentPlan(input: {
   id: string; card: CreditCardProfile; cardAccount: Account; merchant: string; category: string; purchaseDateISO: string; principalMinor: number; count: number;
   placement: StatementPlacement; interestMinor?: number; interestCategory?: string; feeMinor?: number; feeCategory?: string; taxMinor?: number; taxCategory?: string; createdAt: string;
+  cycleDates?: readonly CardCycleDates[];
 }): InstallmentPlan {
   if (input.card.accountId !== input.cardAccount.id) throw new Error(PLAN_CARD_MESSAGE);
   if (input.card.deleted) throw new Error('Esta tarjeta fue eliminada.');
@@ -334,7 +351,8 @@ export function newInstallmentPlan(input: {
     interestMinor: financing.interestMinor, interestCategory: (input.interestCategory ?? '').trim(),
     feeMinor: financing.feeMinor, feeCategory: (input.feeCategory ?? '').trim(),
     taxMinor: financing.taxMinor, taxCategory: (input.taxCategory ?? '').trim(),
-    schedule: installmentSchedule(input.card, input.purchaseDateISO, input.placement, input.principalMinor, input.count, financing),
+    schedule: installmentSchedule(input.card, input.purchaseDateISO, input.placement, input.principalMinor, input.count, financing,
+      (input.cycleDates ?? []).filter(row => row.cardId === input.card.id)),
     cancelledAt: null, deleted: false, createdAt: input.createdAt, revision: 0, updatedAt: input.createdAt,
   };
   validateInstallmentPlan(plan, [input.card], [input.cardAccount]);
@@ -432,6 +450,18 @@ export function cardCommittedMinor(card: Pick<CreditCardProfile, 'id'>, plans: r
   for (const plan of plans) {
     if (plan.cardId !== card.id || plan.deleted || plan.cancelledAt !== null) continue;
     total += BigInt(installmentPlanFigures(plan, records).scheduledMinor);
+  }
+  if (total > BigInt(Number.MAX_SAFE_INTEGER)) throw new Error('El total supera el rango seguro.');
+  return Number(total);
+}
+/** Producto 24T2: the future financing (interest, fee and tax not recognised yet) of a card's live plans: what its future
+ * instalments add to the future committed principal, shown beside it and never inside it (decision 003, rule 7). */
+export function cardCommittedFinancingMinor(card: Pick<CreditCardProfile, 'id'>, plans: readonly InstallmentPlan[] = [], records: readonly RecordedEntry[] = []): number {
+  let total = 0n;
+  for (const plan of plans) {
+    if (plan.cardId !== card.id || plan.deleted || plan.cancelledAt !== null) continue;
+    const { components } = installmentPlanFigures(plan, records);
+    for (const component of FINANCING_COMPONENTS) total += BigInt(components[component].scheduledMinor);
   }
   if (total > BigInt(Number.MAX_SAFE_INTEGER)) throw new Error('El total supera el rango seguro.');
   return Number(total);

@@ -34,7 +34,8 @@ test('the provider reads the flag by its literal name beside __DEV__, and no con
   assert.match(provider, /currencyGateForBuild\(process\.env\.EXPO_PUBLIC_CURRENCY_PREVIEW, typeof __DEV__ !== 'undefined' && __DEV__\)/, 'by its literal name, so a release bundle inlines it');
   assert.match(provider, /createAccount\(db, account, appearance, BUILD_CURRENCY_GATE\)/);
   assert.match(provider, /saveMonthlyBudget\(db, budget, BUILD_CURRENCY_GATE\)/);
-  assert.match(provider, /createCreditCard\(db, account, card, BUILD_CURRENCY_GATE\)/);
+  assert.match(provider, /createCreditCard\(db, account, card, BUILD_CURRENCY_GATE, cycleDates\)/);
+  assert.match(provider, /saveCreditCard\(db, card, cycle, todayKey\(\)\)/, '24T2: the card form\'s calendar change and today reach storage');
   assert.match(provider, /createPersonalDebt\(db, account, debt, BUILD_CURRENCY_GATE\)/);
   for (const file of ['app.config.ts', 'eas.json', 'metro.config.js', 'package.json']) assert.equal(readFileSync(join(root, file), 'utf8').includes(CURRENCY_PREVIEW_FLAG), false, file);
   const eas = JSON.parse(readFileSync(join(root, 'eas.json'), 'utf8')) as { build: Record<string, { env?: Record<string, string> }> };

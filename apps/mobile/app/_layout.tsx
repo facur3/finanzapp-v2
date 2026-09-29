@@ -110,6 +110,7 @@ function Navigation() {
       <Stack.Screen name="recurring/[id]" options={{ title: t('nav.titles.recurringRule') }} />
       <Stack.Screen name="budgets" options={{ title: t('nav.titles.budgets') }} />
       <Stack.Screen name="card/[id]" options={{ title: t('nav.titles.card') }} />
+      <Stack.Screen name="installment/[id]" options={{ title: t('nav.titles.installment') }} />
       <Stack.Screen name="debts" options={{ title: t('nav.titles.debts') }} />
       <Stack.Screen name="debt/[id]" options={{ title: t('nav.titles.debt') }} />
       <Stack.Screen name="cards" options={{ title: t('nav.titles.cards') }} />

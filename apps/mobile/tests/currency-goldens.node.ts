@@ -7,6 +7,8 @@ import * as domain from '@finanzapp/domain';
 import * as i18nFormat from '../src/i18n/format.ts';
 import * as locale from '../src/i18n/locale.ts';
 import * as presentation from '../src/ui/presentation.ts';
+import * as cardFaces from '../src/ui/card-faces.ts';
+import * as geometry from '../src/ui/geometry.ts';
 import { bindLocale } from '../src/i18n/bind.ts';
 
 // Producto 24B1, stage 1: ARS/USD goldens for the visible and spoken money texts that had none
@@ -37,8 +39,8 @@ test('the card face speaks its currency word for word: pesos for ARS, dólares/d
     const { CardFace } = load('card-visual.tsx', {
       react: {}, 'react/jsx-runtime': { jsx, jsxs: jsx }, 'react-native-reanimated': reanimated, '@expo/vector-icons/Ionicons': 'Ionicons', '@finanzapp/domain': domain,
       'react-native': { StyleSheet: { create: (s: unknown) => s, hairlineWidth: 0.5 }, Text: 'Text', View: 'View', useWindowDimensions: () => ({ width: 393, fontScale: 1 }) },
-      '../i18n/provider': { useI18n: () => i18n }, './components': { PressFeedback: 'PressFeedback' }, './geometry': { carouselIndex: () => 0 },
-      './motion': { duration: { state: 200 }, selectionHaptic: () => {} }, './theme': theme,
+      '../i18n/provider': { useI18n: () => i18n }, './card-faces': cardFaces, './geometry': geometry,
+      './motion': { duration: { press: 100, release: 160 }, easeOut: 'easeOut', timing: () => ({ duration: 0 }), selectionHaptic: () => {} }, './theme': theme,
     });
     const face = CardFace({ id: 'card', name: 'Visa Gold', issuer: 'Galicia', last4: '4009', currency, width: 300 });
     return { label: face.props.accessibilityLabel, language: face.props.accessibilityLanguage, chip: flat(face).find(node => node.type === 'Text' && node.props.children === currency)?.props.children };
@@ -111,8 +113,8 @@ test('24B3: the card face names any currency by CLDR, and a peso beside a Chilea
     const { CardFace } = load('card-visual.tsx', {
       react: {}, 'react/jsx-runtime': { jsx, jsxs: jsx }, 'react-native-reanimated': reanimated, '@expo/vector-icons/Ionicons': 'Ionicons', '@finanzapp/domain': domain,
       'react-native': { StyleSheet: { create: (s: unknown) => s, hairlineWidth: 0.5 }, Text: 'Text', View: 'View', useWindowDimensions: () => ({ width: 393, fontScale: 1 }) },
-      '../i18n/provider': { useI18n: () => i18n }, '../i18n/messages': {}, './components': { PressFeedback: 'PressFeedback' }, './geometry': { carouselIndex: () => 0 },
-      './motion': { duration: { state: 200 }, selectionHaptic: () => {} }, './theme': theme,
+      '../i18n/provider': { useI18n: () => i18n }, '../i18n/messages': {}, './card-faces': cardFaces, './geometry': geometry,
+      './motion': { duration: { press: 100, release: 160 }, easeOut: 'easeOut', timing: () => ({ duration: 0 }), selectionHaptic: () => {} }, './theme': theme,
     });
     const face = CardFace({ id: 'card', name: 'Visa Gold', issuer: 'Galicia', last4: '4009', currency, width: 300 });
     return { label: face.props.accessibilityLabel, chip: flat(face).find(node => node.type === 'Text' && node.props.children === currency)?.props.children };

@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { CARD_PLAN_MESSAGE, INSTALLMENT_DRIFT_MESSAGE, INSTALLMENT_ENTRY_MESSAGE, INSTALLMENT_ID_MESSAGE, MAX_INSTALLMENTS, PLAN_CANCELLED_MESSAGE, PLAN_CHANGE_MESSAGE,
   PLAN_COUNT_MESSAGE, PLAN_CURRENCY_MESSAGE, PLAN_DELETED_MESSAGE, PLAN_FINANCING_MESSAGE, PLAN_HISTORY_MESSAGE, PLAN_PRINCIPAL_MESSAGE, PLAN_SCHEDULE_MESSAGE, PLAN_STATE_MESSAGE,
-  PLAN_TOO_SMALL_MESSAGE, assertInstallmentEntryChange, assertInstallmentPlanDeletable, assertNewEntryId, cancelInstallmentPlan, cardCommittedMinor, cardHasPendingInstallments,
+  PLAN_TOO_SMALL_MESSAGE, assertInstallmentEntryChange, assertInstallmentPlanDeletable, assertNewEntryId, cancelInstallmentPlan, cardCommittedFinancingMinor, cardCommittedMinor, cardHasPendingInstallments,
   deleteInstallmentPlan, distributeMinor, installmentEntries, installmentEntryId, installmentOccurrenceOf, installmentPlanFigures, installmentPlanStatus,
   installmentSchedule, installmentState, materializeInstallmentPlan, newInstallmentPlan, pendingInstallmentPlans, sameInstallmentPlan, statementClosingAfter, statementClosingOnOrAfter,
-  statementDueDate, validateInstallmentPlan, validateInstallmentPlanChange, validateInstallmentPlans, type InstallmentPlan } from './installments';
+  statementDueDate, validateInstallmentPlan, validateInstallmentPlanChange, validateInstallmentPlans, type InstallmentPlan,
+  PLAN_TOTAL_BELOW_PRICE_MESSAGE, installmentAmounts, interestFromTotalFinanced, planFinancing, planFinancingCategories } from './installments';
 import { MAX_ENTRY_MINOR } from './money';
 import { accountBalanceMinor, type Account, type Entry, type LedgerSnapshot, type Transfer } from './ledger';
 import { CARD_ARCHIVED_MESSAGE, CARD_DEBT_MESSAGE, assertAcceptsNewObligation, assertCardDeletable, postingAccountsFor, cardAvailableLimitMinor, cardDebtMinor, debtTotalsByCurrency, deleteCreditCard, liquidTotalsByCurrency, validateLiabilityProfiles,
@@ -273,6 +274,16 @@ describe('recognition: the movements a plan records', () => {
     // The parent purchase never adds the full price: the plan's total is a figure of the plan, not a movement.
     expect(entries.filter(entry => entry.amountMinor === 120000)).toEqual([]);
     expect(entries.filter(entry => installmentOccurrenceOf(entry.id)).reduce((sum, entry) => sum + entry.amountMinor, 0)).toBe(20200);
+    // 24T2: the future commitment of the card is its principal, with the future interest beside it, never inside it.
+    const stored = records(entries);
+    expect([cardCommittedMinor(card, [tv], stored), cardCommittedFinancingMinor(card, [tv], stored)]).toEqual([100000, 1000]);
+    expect(cardCommittedFinancingMinor(card, [tv], records(entries, ['insti_fin_002']))).toBe(1000, 'an undone share is not a future one');
+    expect(cardCommittedFinancingMinor(card, [cancelInstallmentPlan(tv, '2026-10-26T12:00:00.000Z')], stored)).toBe(0, 'a stopped plan commits nothing');
+    expect(cardCommittedFinancingMinor(card, [plan()], [])).toBe(0);
+    // 24T2: a plan with interest needs its category (a latent preset is listed from then on); one without, or a deleted one, needs none.
+    expect(planFinancingCategories([plan()])).toEqual([]);
+    expect(planFinancingCategories([tv, plan()])).toEqual(['Intereses']);
+    expect(planFinancingCategories([deleteInstallmentPlan(tv, '2026-09-11T12:00:00.000Z')])).toEqual([]);
   });
 });
 
@@ -450,7 +461,7 @@ describe('backup v12', () => {
 
   it('refuses a file that is not v1–v12, a v12 file without its plans key, a plan whose schedule disagrees, an instalment movement without its plan, and a v11 file carrying plans', () => {
     const backup = createRecoveryBackup(archive, new Date(now));
-    expect(() => parsePilotBackup(JSON.stringify({ ...backup, schema: 'finanzapp.native-pilot.v13' }))).toThrow('versiones 1 a 12');
+    expect(() => parsePilotBackup(JSON.stringify({ ...backup, schema: 'finanzapp.native-pilot.v14' }))).toThrow('versiones 1 a 13');
     const { installmentPlans: _plans, ...withoutPlans } = backup;
     expect(() => parsePilotBackup(JSON.stringify(withoutPlans))).toThrow('campos faltantes');
     expect(() => parsePilotBackup(JSON.stringify({ ...backup, schema: BACKUP_SCHEMA_V11 }))).toThrow('campos faltantes');
@@ -578,5 +589,30 @@ describe('24T1 review: an archived card takes no new obligation, and keeps every
     // An existing plan keeps running on the archived card.
     const tv = plan();
     expect(materializeInstallmentPlan(tv, archived, '2026-10-25', new Set()).length).toBe(2);
+  });
+});
+
+describe('Producto 24T2: the simple financing of the purchase form', () => {
+  it('derives the interest from «Total financiado» exactly; equal to the price is no interest; below the price is refused', () => {
+    expect(interestFromTotalFinanced(100000000, 120000000)).toBe(20000000);
+    expect(interestFromTotalFinanced(100000000, 100000000)).toBe(0);
+    expect(() => interestFromTotalFinanced(100000000, 99999999)).toThrow(PLAN_TOTAL_BELOW_PRICE_MESSAGE);
+    expect(() => interestFromTotalFinanced(0, 100)).toThrow(PLAN_PRINCIPAL_MESSAGE);
+    expect(() => interestFromTotalFinanced(100, 1.5)).toThrow(PLAN_FINANCING_MESSAGE);
+    expect(() => interestFromTotalFinanced(100, MAX_ENTRY_MINOR + 1)).toThrow('El monto es demasiado grande.');
+    expect(() => interestFromTotalFinanced(100, 0)).toThrow(PLAN_TOTAL_BELOW_PRICE_MESSAGE, 'a total of zero is below the price');
+    expect(planFinancing(100000000, null, 'Intereses')).toEqual({ interestMinor: 0, interestCategory: '' });
+    expect(planFinancing(100000000, 100000000, 'Intereses')).toEqual({ interestMinor: 0, interestCategory: '' }, 'equal to the price: «Sin interés», never a charge');
+    expect(planFinancing(100000000, 120000000, 'Intereses')).toEqual({ interestMinor: 20000000, interestCategory: 'Intereses' });
+    expect(plan({ id: 'even', ...planFinancing(120000, 120000, 'Intereses') }).interestMinor).toBe(0);
+  });
+
+  it('reports each instalment\'s total and whether they are all equal; an uneven remainder is never shown as equal', () => {
+    expect(installmentAmounts(installmentSchedule(card, '2026-09-10', 'current', 120000, 12))).toMatchObject({ maxMinor: 10000, minMinor: 10000, even: true });
+    const uneven = installmentAmounts(installmentSchedule(card, '2026-09-10', 'current', 100000001, 12, { interestMinor: 20000001, feeMinor: 0, taxMinor: 0 }));
+    expect(uneven.even).toBe(false);
+    expect(uneven.amounts.reduce((sum, value) => sum + value, 0)).toBe(120000002);
+    expect(uneven.maxMinor - uneven.minMinor).toBeLessThanOrEqual(2);
+    expect(installmentAmounts(installmentSchedule(card, '2026-09-10', 'current', 100, 3)).amounts).toEqual([34, 33, 33]);
   });
 });

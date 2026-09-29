@@ -168,17 +168,19 @@ nombre, emisor, moneda, últimos cuatro dígitos y un tono estable por tarjeta.
   estado; categoría, cuenta o tarjeta, contexto de presupuesto solo si existe uno
   activo para ese mes, moneda; editar y deshacer. Nada inventado: sin referencias
   bancarias, mapas ni estados de autorización.
-- **Tarjetas.** Identidad → estado → hechos → acción principal → acción
-  secundaria → actividad. Carrusel horizontal con ajuste al soltar, deuda
-  registrada como número principal, una fila de tres hechos (Disponible, Cierre,
-  Vencimiento) con barra de uso (ámbar desde 85 %, coral sobre el límite),
-  Registrar compra a ancho completo sobre Pagar tarjeta (mismo tamaño, tinte
-  azul), y Recientes con los hechos del resumen abierto en su leyenda. Deudas debajo.
-- **Detalle de tarjeta.** Tarjeta grande, deuda, tres hechos (Disponible con el
-  límite como leyenda, Cierre, Vencimiento), las dos acciones apiladas y todos sus
-  movimientos con el resumen abierto en la leyenda. Emisor y moneda ya están en la
-  tarjeta; no hay tabla de detalle. Pagos se leen como "Pago de tarjeta · desde
-  Cuenta", sin signo ambiguo.
+- **Tarjetas (desde 24T2; ver «Producto 24T2»).** Identidad → estado → hechos → acción
+  principal → acción secundaria → cuotas futuras → actividad. Un deck vertical de las
+  tarjetas activas (reemplazó al carrusel horizontal), «Saldo pendiente» como número
+  principal, una fila de tres hechos (Vence, Cierra, Disponible) con barra de uso solo
+  con una cifra conocida (ámbar desde 85 %, coral sobre el límite), Registrar compra a
+  ancho completo sobre Pagar tarjeta (mismo tamaño, tinte azul), «Cuotas futuras» y
+  Recientes con «Este ciclo, desde…» en su leyenda. Las archivadas al final, en
+  Archivadas; las deudas personales viven en Más → Deudas y cobros.
+- **Detalle de tarjeta.** La cara, «Saldo pendiente», los tres hechos (Disponible con
+  el límite como leyenda), las acciones que le quedan, Cuotas con un plan por fila y
+  todos sus movimientos con «Este ciclo» en la leyenda. Emisor y últimos cuatro ya
+  están en la cara; no hay tabla de detalle. Pagos se leen como "Pago de tarjeta ·
+  desde Cuenta", sin signo ambiguo.
 - **Deudas y cobros.** Totales por moneda, Debo / Me deben, detalle con estado,
   vencimiento y registro de pagos o cobros limitados al saldo pendiente.
 - **Formularios.** Pagar tarjeta y saldar deudas fijan la obligación y solo eligen
@@ -238,12 +240,21 @@ siguen montadas, así un revelado al montar no se vería).
   Nunca responde al scroll.
 - **Formularios.** Gasto / Ingreso / Transferencia es un solo control sobre un
   solo modal: cambiar es estado, no navegación, y el formulario de abajo se funde.
-- **Carrusel de tarjetas.** La posición vive en el hilo de UI; las tarjetas vecinas
-  retroceden (0,94 / 0,7). Al asentarse en otra tarjeta suena un háptico; el panel
-  queda montado y solo sus valores se funden, así lo de abajo no salta. Reduce
-  Motion deja todas las tarjetas planas.
+- **Deck de tarjetas (24T2; reemplaza al carrusel horizontal).** Las tarjetas no elegidas
+  quedan apiladas arriba en su orden guardado, cada una mostrando solo su franja superior
+  (nombre y «•••• 4009», 50 pt como mínimo); la elegida queda al frente, abajo y entera, junto
+  a su resumen. Tocar una franja la elige (un háptico de selección); tocar la del frente abre
+  su detalle. Cada tarjeta viaja a su lugar en el hilo de UI (`timing('data')`, 260 ms,
+  ease-out, interrumpible) y se presiona como una tarjeta (0,97); ningún gesto horizontal ni de
+  arrastre compite con volver atrás. El resumen queda montado y sus valores se funden; un
+  bloque que no todas las tarjetas tienen (sus cuotas futuras) aparece o se va fundiéndose y
+  lo de abajo se desliza a su lugar (`Reflow`), así nada salta. Con muchas tarjetas, si la
+  elegida queda debajo del borde, la página la trae a la vista. Con Reduce Motion las
+  tarjetas y los bloques llegan a su lugar sin movimiento y quedan solo los fundidos (su
+  política es explícita, `ReduceMotion.Never`, como la de la hoja: sin ella Reanimated los
+  volvía un cambio instantáneo).
 - **Hápticos.** Uno por acción del usuario (selección en segmentos, cambio de
-  pestaña, flechas de mes, categoría o cuenta elegida, tarjeta asentada; éxito al
+  pestaña, flechas de mes, categoría o cuenta elegida, tarjeta elegida en el deck; éxito al
   guardar) y siempre con una señal visual. Las pestañas cambian al instante, sin
   deslizamiento ni fundido.
 
@@ -380,6 +391,57 @@ importe, moneda y estado.
   la app, no el "sept" del ICU del dispositivo). El inglés existe como catálogo y no se
   muestra hasta que toda la app lo tenga (23.1): un iPhone en inglés sigue leyendo
   español antes que media app traducida.
+
+## Producto 24T2 — compra en cuotas y Tarjetas completo
+
+Implementa la dirección de 24T1C. Apple Wallet fue solo referencia de jerarquía, tactilidad, profundidad, selección de
+tarjeta, espaciado y detalle con el importe primero: no se copió ningún recurso, marca, dimensión ni la identidad
+visual de Apple, y siguen el minimalismo iOS, el cobalto/zafiro y los materiales de FinanzApp. El contrato exacto y las
+pruebas están en el roadmap («Producto 24T2»).
+
+- **Por qué un deck vertical.** El carrusel horizontal mostraba una tarjeta por vez, pedía pasar una por una para
+  encontrar otra y ocupaba el gesto horizontal, el mismo eje que volver atrás. El deck muestra todas las activas a la
+  vez por su franja superior (nombre y «•••• 4009», lo que identifica una tarjeta), elige con un toque, sin arrastre ni
+  gesto horizontal, y deja la elegida entera abajo, justo encima de su resumen: la cara y sus cifras quedan juntas y el
+  alto de la página no depende de cuál se eligió. Una sola tarjeta es solo su cara, sin apilar. Con muchas, cada franja
+  conserva 50 pt de toque y la página trae la elegida a la vista. Tocar la del frente abre su detalle.
+- **Caras.** Identidad y nada más: nombre, «•••• 4009», emisor, el color elegido para su cuenta y el código de moneda
+  solo si hay tarjetas en más de una moneda. Sin cifras, logos de banco o de red ni chip sin contacto. El texto se
+  limita a 1,3× para que la franja siempre lo muestre; el nombre cede antes que los últimos cuatro, nunca se pisan.
+- **El resumen de la elegida**, en el orden del brief: «Saldo pendiente · ARS» como héroe (toda la deuda registrada;
+  nunca «Resumen», «Facturado» ni «Deuda»); Vence · Cierra · Disponible, tres datos separados (con cierre 28 y
+  vencimiento 5, el 1 oct: Vence 5 oct —del resumen que cerró el 28 sep— y Cierra 28 oct), Vence en ámbar a tres días o
+  menos si hay saldo; Disponible con la cifra, «Sin límite cargado» o, con un plan pendiente, «No calculado con cuotas»
+  con su explicación a un toque, nunca un cero; Registrar compra sobre Pagar tarjeta; «Cuotas futuras» (el principal,
+  «en 2 planes» y «+ interés $ …» si esos planes tienen interés, nunca sumado); Recientes con «Este ciclo, desde … · N
+  compras · N pagos» (la parte de interés de una cuota no es otra compra). Las archivadas siguen al final, en
+  Archivadas, todavía pagables.
+- **Detalle de tarjeta.** La cara y su estado (archivada, eliminada), el saldo, los tres datos con «de $ límite», las
+  acciones que le quedan (Registrar compra solo si está activa; Pagar tarjeta si no está eliminada y está activa o
+  debe algo), Cuotas con una fila
+  por plan («MacBook Pro · 12 cuotas · 3/12 registradas», «$ 900.000,00 restantes» —«principal restante» si el plan
+  tiene interés—, «Próxima cuota · 28 oct») y Movimientos con «Este ciclo». Sin tarjetas dentro de tarjetas.
+- **Detalle del plan.** Como un movimiento: la marca, «Compra en cuotas · ARS», el precio como héroe, «12 cuotas · Sin
+  interés» y el estado; después solo lo que el plan y el libro saben, una cifra por fila (con interés, las cifras dicen
+  que son principal y el interés que falta tiene su fila); el Calendario con Registrada, Registrada en parte, Próxima,
+  Futura y Deshecha. Nunca «pagada». La única acción es Eliminar plan, si todavía no registró nada.
+- **Compra en cuotas.** «Pago» [Una vez][En cuotas] bajo la fecha, solo en un gasto nuevo con una tarjeta activa, tan
+  liviano como una compra común: 3 · 6 · 12 · 18 · Otra (12 por defecto), «12 cuotas de $ …» («aprox.» cuando el resto
+  agranda las primeras), «Primera cuota» con los dos cierres posibles y «Cierra el … y vence el …», «Con interés»
+  apagado. Encendido, un solo campo, «Total financiado», con «Interés total» debajo, solo lectura. La categoría
+  «Intereses» es latente: no aparece en los selectores ni en Categorías hasta que un movimiento de interés, un plan con
+  interés o una definición suya la usa, así el catálogo por defecto sigue sobrio.
+- **Movimiento de una cuota.** Conserva el héroe del importe; «Cuota de tarjeta» (o «Interés de cuota») y la fila «Cuota
+  · 3 de 12» que abre el plan. Editar muestra importe, fecha y tarjeta como datos y deja cambiar solo el comercio y la
+  categoría; Deshacer dice que no se vuelve a registrar sola.
+- **Formulario de tarjeta.** Las fechas primero, en el calendario completo: «Próximo cierre» y «Vencimiento», y una frase
+  con los días que siguen («Los meses siguientes: cierre el día 28 y vencimiento el día 5.»). Al editar, el resumen
+  abierto y, si falta pagar uno cerrado, «Vence el resumen del 28 sep»; «Usar estos días todos los meses» decide si las
+  fechas corrigen solo este resumen o se repiten; lo decide siempre la persona, sin importar cuánto se movió el cierre.
+- **Movimiento y accesibilidad.** Las reglas del deck están en «Motion y accesibilidad» (arriba). VoiceOver lee cada
+  tarjeta una vez, en el orden en que se dibuja, con su posición y «seleccionada»; las fechas y los importes compuestos
+  tienen su versión hablada; el interruptor dice su motivo en su etiqueta. Con el texto más grande, las filas de planes,
+  del calendario y de cuotas futuras se apilan sin cortar el comercio ni el importe.
 
 ## Producto 24T1C — dirección para 24T2 (solo documentación)
 
@@ -1378,6 +1440,12 @@ crédito, marca elegida) y los filetes de las píldoras, el chip y el compositor
 color propio.
 
 ## Pendiente de revisión en iPhone
+
+- Producto 24T2: el deck con una, tres y más de doce tarjetas (franjas, selección con háptico, la tarjeta elegida traída a
+  la vista, el gesto atrás intacto), el resumen al cambiar de tarjeta (fundidos y deslizamientos, sin saltos) y con
+  Reduce Motion (fundidos que duran); la compra en cuotas con y sin interés; el formulario de tarjeta con fechas; los
+  detalles de tarjeta, de plan y de una cuota; VoiceOver (orden, posiciones, pistas) en ambos idiomas; el texto de
+  accesibilidad más grande; ambos temas. Lista en docs/mobile-device-checklist.md.
 
 - Producto 25B3: el detalle de una cuenta sin la fila de saldo inicial (el mismo saldo registrado, el grupo
   con solo Recurrentes); el detalle de un recurrente desde Inicio, desde Recurrentes y desde un movimiento

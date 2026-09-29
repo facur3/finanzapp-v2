@@ -10,7 +10,7 @@ import {
   validateCreditCardChange, validatePersonalDebtChange,
   type CreditCardProfile, type PersonalDebtProfile,
   sameAccountAppearance, validateAccountAppearance, type AccountAppearance,
-  sameCategoryDefinition, validateCategoryDefinition, type CategoryDefinition,
+  sameCategoryDefinition, validateCategoryDefinition, assertCategoryName, type CategoryDefinition,
   LEDGER_CURRENCIES, archiveExponents, catalogueUnit, currenciesNeedingUnits, isLegacyCurrency, storedExponent, validateCurrencyUnit,
   type Currency, type CurrencyGate, type CurrencyUnit,
   OBLIGATION_ACCOUNT_MESSAGE, assertOpenAccount, deleteAccount as deleteAccountRecord, hiddenLiabilityAccountIds, isLiveAccount, pauseRecurringRule,
@@ -19,6 +19,7 @@ import {
   assertAcceptsNewObligation, PLAN_DELETE_PATH_MESSAGE, PLAN_EXISTS_MESSAGE, PLAN_MISSING_MESSAGE, assertInstallmentEntryChange, assertInstallmentPlanDeletable, assertNewEntryId,
   cancelInstallmentPlan as cancelInstallmentPlanRecord, deleteInstallmentPlan as deleteInstallmentPlanRecord, materializeInstallmentPlan, sameInstallmentPlan,
   validateInstallmentPlan, validateInstallmentPlanChange, type Installment, type InstallmentPlan,
+  cardCycleDatesOf, cardCycleShows, planCardCycle, sameCardCycleDate, todayKey, type CardCycleDates, type CardCycleIntent, PLAN_CALENDAR_MESSAGE, planFollowsCalendar,
 } from '@finanzapp/domain';
 
 type SqlValue = string | number | null;
@@ -36,7 +37,7 @@ export interface LedgerDatabase extends SqlExecutor {
 }
 
 export const DATABASE_NAME = 'finanzapp-native-pilot-v1.sqlite';
-export const DATABASE_VERSION = 12;
+export const DATABASE_VERSION = 13;
 
 /** Every column of each table, named: a row is read by these lists, never by `SELECT *`, so a
  * column added later cannot leak into a strict-key object, a backup or an audit receipt. */
@@ -52,6 +53,7 @@ const CATEGORY_COLUMNS = 'kind, key, storedLabel, label, icon, color, archived, 
 const UNIT_COLUMNS = 'currency, minorUnitExponent, source, catalogVersion, createdAt';
 const PLAN_COLUMNS = 'id, cardId, merchant, category, currency, purchaseDateISO, principalMinor, count, interestMinor, interestCategory, feeMinor, feeCategory, taxMinor, taxCategory, cancelledAt, deleted, createdAt, revision, updatedAt';
 const INSTALLMENT_COLUMNS = 'planId, number, billingDateISO, dueDateISO, principalMinor, interestMinor, feeMinor, taxMinor';
+const CARD_CYCLE_COLUMNS = 'cardId, sequence, closingISO, dueISO, closingDay, dueDay, monthISO, createdAt, revision, updatedAt';
 
 const SCHEMA = `
   CREATE TABLE accounts (
@@ -370,6 +372,31 @@ const MIGRATE_V12 = `
   PRAGMA user_version = 12;
 `;
 
+// Producto 24T2: the exact statement dates of a card. One additive table, nothing else touched: each row is one statement
+// of one card (a closing and the due date of THAT closing, `dueISO > closingISO`, with the usual days of the calendar it
+// belongs to and the usual statement, `monthISO`, it stands for), and a card's rows form one chain of consecutive
+// statements ordered by `sequence`
+// (packages/domain/card-cycles.ts). The card's usual closing and due days stay on `credit_cards` as the grid of the months
+// after the chain; the first row's days are the grid before it. No row is fabricated for old data: a schema 12 file opens with
+// an empty table and every card reads exactly as before. Rows are never DELETEd (a correction updates its row, one revision
+// on). Guarded by user_version, in the ordinary exclusive transaction; earlier builds refuse a schema 13 file, unchanged.
+const MIGRATE_V13 = `
+  CREATE TABLE IF NOT EXISTS card_cycle_dates (
+    cardId TEXT NOT NULL REFERENCES credit_cards(id) ON DELETE RESTRICT,
+    sequence INTEGER NOT NULL CHECK(sequence BETWEEN -100000 AND 100000),
+    closingISO TEXT NOT NULL CHECK(length(closingISO) = 10),
+    dueISO TEXT NOT NULL CHECK(length(dueISO) = 10 AND dueISO > closingISO),
+    closingDay INTEGER NOT NULL CHECK(closingDay BETWEEN 1 AND 31),
+    dueDay INTEGER NOT NULL CHECK(dueDay BETWEEN 1 AND 31),
+    monthISO TEXT NOT NULL CHECK(length(monthISO) = 7),
+    createdAt TEXT NOT NULL,
+    revision INTEGER NOT NULL DEFAULT 0 CHECK(revision >= 0 AND revision <= 9007199254740991),
+    updatedAt TEXT NOT NULL,
+    PRIMARY KEY (cardId, sequence)
+  ) STRICT;
+  PRAGMA user_version = 13;
+`;
+
 /** The v11 step, column by column: each ALTER runs only when its column is missing, so a file that already carries one
  * (an interrupted step, a fixture rebuilt from a later table) reaches 11 without an error and without a second column. */
 async function migrateV11(tx: SqlExecutor): Promise<void> {
@@ -380,7 +407,7 @@ async function migrateV11(tx: SqlExecutor): Promise<void> {
 }
 
 /** Every schema script in order, for tests that build a real file at an earlier version (never run by the app outside `initializeDatabase`). */
-export const SCHEMA_SCRIPTS: readonly string[] = [SCHEMA, MIGRATE_V2, MIGRATE_V3, MIGRATE_V4, MIGRATE_V5, MIGRATE_V6, MIGRATE_V7, MIGRATE_V8, MIGRATE_V9, MIGRATE_V10, MIGRATE_V11, MIGRATE_V12];
+export const SCHEMA_SCRIPTS: readonly string[] = [SCHEMA, MIGRATE_V2, MIGRATE_V3, MIGRATE_V4, MIGRATE_V5, MIGRATE_V6, MIGRATE_V7, MIGRATE_V8, MIGRATE_V9, MIGRATE_V10, MIGRATE_V11, MIGRATE_V12, MIGRATE_V13];
 
 export async function initializeDatabase(db: LedgerDatabase): Promise<void> {
   // Set before opening a transaction; foreign_keys is connection-local.
@@ -410,6 +437,7 @@ export async function initializeDatabase(db: LedgerDatabase): Promise<void> {
     if (await readVersion(tx) < 10) await tx.execAsync(MIGRATE_V10);
     if (await readVersion(tx) < 11) await migrateV11(tx);
     if (await readVersion(tx) < 12) await tx.execAsync(MIGRATE_V12); // IF NOT EXISTS: an interrupted step reaches 12 without a second table.
+    if (await readVersion(tx) < 13) await tx.execAsync(MIGRATE_V13); // The same for 13.
   });
   await readSnapshot(db); // Validate before showing a balance, not after a render.
 }
@@ -504,6 +532,8 @@ export async function readArchive(db: SqlExecutor): Promise<LedgerArchive> {
     validateInstallmentPlan(plan, cards, accounts);
     return plan;
   });
+  // 24T2: every card's exact statement dates, in chain order. Validated as a collection by validateArchive below.
+  const cardCycleDates = await db.getAllAsync<CardCycleDates>(`SELECT ${CARD_CYCLE_COLUMNS} FROM card_cycle_dates ORDER BY cardId, sequence`);
   const archive: LedgerArchive = {
     accounts,
     records,
@@ -516,6 +546,7 @@ export async function readArchive(db: SqlExecutor): Promise<LedgerArchive> {
     ...(categories.length ? { categories } : {}),
     currencyUnits,
     ...(installmentPlans.length ? { installmentPlans } : {}),
+    ...(cardCycleDates.length ? { cardCycleDates: cardCycleDates.map(row => ({ ...row })) } : {}),
   };
   validateArchive(archive); // Including tombstones, safe integer totals and the pinned scales.
   archiveExponents(archive); // The precision check: every currency present reads at its pinned scale, never as cents by default.
@@ -628,6 +659,8 @@ export async function saveCategoryDefinition(db: LedgerDatabase, input: Category
     const archive = await readArchive(tx);
     validateCategoryDefinition(definition);
     const existing = archive.categories?.find(item => item.kind === definition.kind && item.key === definition.key);
+    // 24T2: a new name never takes another identity's, a late preset's included (reading tolerates an older one).
+    if (!existing || existing.label !== definition.label) assertCategoryName(definition, archive.categories);
     if (!existing) {
       if (definition.revision !== 0 || definition.updatedAt !== definition.createdAt) throw new Error('Una categoría nueva no puede tener cambios previos.');
       validateArchive({ ...archive, categories: [...archive.categories ?? [], definition] });
@@ -720,7 +753,8 @@ export async function importArchive(db: LedgerDatabase, incoming: LedgerArchive,
     if (plan.scaleConflicts.length) throw new Error('La copia registra otra escala para una moneda ya guardada. No se importó nada.');
     if (plan.conflicts) throw new Error('La copia contradice cambios locales. No se importó nada. Conservá ambas versiones.');
     if (!plan.accounts.length && !plan.records.length && !plan.transfers.length && !plan.recurring.length
-      && !plan.budgets.length && !plan.cards.length && !plan.debts.length && !plan.appearances.length && !plan.categories.length && !plan.installmentPlans.length) return;
+      && !plan.budgets.length && !plan.cards.length && !plan.debts.length && !plan.appearances.length && !plan.categories.length && !plan.installmentPlans.length
+      && !plan.cardCycleDates.length) return;
     if (plan.baseline !== baseline) throw new Error('Tus datos cambiaron. Volvé a revisar la copia antes de importar.');
     // Scales first, in the same transaction as the rows that need them: the copy's own units, then
     // any currency the new rows use that neither side pinned (a v1–v8 file can only hold ARS/USD).
@@ -736,6 +770,7 @@ export async function importArchive(db: LedgerDatabase, incoming: LedgerArchive,
     for (const debt of plan.debts) await insertPersonalDebt(tx, debt);
     for (const look of plan.appearances) await insertAppearance(tx, look);
     for (const item of plan.installmentPlans) await insertInstallmentPlan(tx, item);
+    for (const row of plan.cardCycleDates) await insertCardCycleDate(tx, row);
     for (const definition of plan.categories) {
       await tx.runAsync(`INSERT INTO category_definitions (kind, key, storedLabel, label, icon, color, archived, createdAt, revision, updatedAt)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, definition.kind, definition.key, definition.storedLabel, definition.label, definition.icon,
@@ -992,6 +1027,10 @@ async function insertCreditCard(tx: SqlExecutor, card: CreditCardProfile): Promi
   card.id, card.accountId, card.issuer, card.last4, card.creditLimitMinor, card.closingDay, card.dueDay,
   card.active ? 1 : 0, card.deleted ? 1 : 0, card.createdAt, card.revision, card.updatedAt);
 }
+async function insertCardCycleDate(tx: SqlExecutor, row: CardCycleDates): Promise<void> {
+  await tx.runAsync(`INSERT INTO card_cycle_dates (${CARD_CYCLE_COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    row.cardId, row.sequence, row.closingISO, row.dueISO, row.closingDay, row.dueDay, row.monthISO, row.createdAt, row.revision, row.updatedAt);
+}
 async function insertPersonalDebt(tx: SqlExecutor, debt: PersonalDebtProfile): Promise<void> {
   await tx.runAsync(`INSERT INTO personal_debts (id, accountId, direction, counterparty, dueDateISO, note,
     active, deleted, createdAt, revision, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -1031,8 +1070,10 @@ export async function deleteAccount(db: LedgerDatabase, accountId: string, nowIS
 
 /** A card and its hidden account are created in one commit. The opening
  * balance is the debt already owed (negative) or zero; a card never starts
- * with money in the holder's favour. */
-export async function createCreditCard(db: LedgerDatabase, accountInput: Account, cardInput: CreditCardProfile, gate: CurrencyGate = LEDGER_CURRENCIES): Promise<void> {
+ * with money in the holder's favour. 24T2: with the exact dates of its first statement when its usual days cannot
+ * produce them (`newCardCycle`), in the same commit. */
+export async function createCreditCard(db: LedgerDatabase, accountInput: Account, cardInput: CreditCardProfile, gate: CurrencyGate = LEDGER_CURRENCIES,
+  cycleDates: readonly CardCycleDates[] = []): Promise<void> {
   const account = { ...accountInput, name: accountInput.name.trim() };
   const card = { ...cardInput, issuer: cardInput.issuer.trim(), last4: cardInput.last4.trim() };
   validateNewAccount(account, gate);
@@ -1041,37 +1082,66 @@ export async function createCreditCard(db: LedgerDatabase, accountInput: Account
   }
   if (card.accountId !== account.id) throw new Error('La tarjeta no coincide con su cuenta interna.');
   if (card.revision !== 0 || card.updatedAt !== card.createdAt || !card.active || card.deleted) throw new Error('Una tarjeta nueva no puede tener cambios previos.');
+  if (cycleDates.some(row => row.cardId !== card.id || row.revision !== 0 || row.createdAt !== card.createdAt)) throw new Error('Una tarjeta nueva no puede tener cambios previos.');
   await db.withExclusiveTransactionAsync(async tx => {
     const archive = await readArchive(tx);
     validateCreditCardProfile(card, [...archive.accounts, account]);
     const existingAccount = archive.accounts.find(item => item.id === account.id);
     const existingCard = archive.cards?.find(item => item.id === card.id);
     if (existingAccount || existingCard) {
-      if (existingAccount && existingCard && sameAccount(existingAccount, account) && sameCreditCardProfile(existingCard, card)) return;
+      const stored = cardCycleDatesOf(card.id, archive.cardCycleDates), given = cardCycleDatesOf(card.id, cycleDates);
+      if (existingAccount && existingCard && sameAccount(existingAccount, account) && sameCreditCardProfile(existingCard, card)
+        && stored.length === given.length && stored.every((row, index) => sameCardCycleDate(row, given[index]))) return;
       throw new Error('Esta tarjeta ya existe con otros datos. Volvé a abrir el formulario.');
     }
     await ensureCurrencyUnit(tx, account.currency, account.createdAt);
-    validateArchive({ ...archive, accounts: [...archive.accounts, account], cards: [...archive.cards ?? [], card], currencyUnits: unitsWith(archive.currencyUnits, account.currency) });
+    validateArchive({ ...archive, accounts: [...archive.accounts, account], cards: [...archive.cards ?? [], card], currencyUnits: unitsWith(archive.currencyUnits, account.currency),
+      ...(archive.cardCycleDates?.length || cycleDates.length ? { cardCycleDates: [...archive.cardCycleDates ?? [], ...cycleDates] } : {}) });
     await insertInternalAccount(tx, account);
     await insertCreditCard(tx, card);
+    for (const row of cycleDates) await insertCardCycleDate(tx, row);
   });
 }
 
-export async function saveCreditCard(db: LedgerDatabase, input: CreditCardProfile): Promise<void> {
+/** A card's profile change, and (24T2) its calendar change in the same commit: the new usual days are the card's own
+ * `closingDay`/`dueDay`, and `cycle` carries the exact dates the form asked for (the open statement, the due date of the
+ * statement still to pay). The plan is computed again here with `planCardCycle` from what is stored, on `todayISO`, with the
+ * card's `updatedAt` as the time of the rows, so a retry plans the same rows; every statement that already closed is
+ * frozen before the change, so no change of days or dates ever moves one (a stale form is refused). */
+export async function saveCreditCard(db: LedgerDatabase, input: CreditCardProfile, cycle: Omit<CardCycleIntent, 'days'> = {}, todayISO = todayKey()): Promise<void> {
   const card = { ...input, issuer: input.issuer.trim(), last4: input.last4.trim() };
   await db.withExclusiveTransactionAsync(async tx => {
     const archive = await readArchive(tx);
     validateCreditCardProfile(card, archive.accounts);
     const existing = archive.cards?.find(item => item.id === card.id);
     if (!existing) throw new Error('No encontramos esta tarjeta.');
-    if (sameCreditCardProfile(existing, card)) return; // Committed already; a refresh failed.
+    const stored = cardCycleDatesOf(card.id, archive.cardCycleDates);
+    if (sameCreditCardProfile(existing, card)) {
+      // Committed already (a refresh failed): the calendar shows what was asked. A calendar change always moves the card
+      // one revision on, so an unchanged card whose calendar does not show the change yet is refused, never "saved".
+      if (cardCycleShows(existing, stored, cycle)) return;
+      throw new Error('La tarjeta cambió desde que la abriste. Volvé a revisarla.');
+    }
     validateCreditCardChange(existing, card);
     // 25B2 review: the deletion record has its own path (`deleteCreditCard`, which checks the debt and stops the rules).
     if (card.deleted) throw new Error(CARD_DELETE_PATH_MESSAGE);
-    validateArchive({ ...archive, cards: archive.cards!.map(item => item.id === card.id ? card : item) });
+    const plan = planCardCycle({ cardId: card.id, days: { closingDay: existing.closingDay, dueDay: existing.dueDay }, rows: stored, todayISO, nowISO: card.updatedAt,
+      intent: { ...cycle, days: { closingDay: card.closingDay, dueDay: card.dueDay } } });
+    const others = (archive.cardCycleDates ?? []).filter(row => row.cardId !== card.id);
+    validateArchive({ ...archive, cards: archive.cards!.map(item => item.id === card.id ? card : item),
+      ...(others.length || plan.rows.length ? { cardCycleDates: [...others, ...plan.rows] } : {}) });
     await tx.runAsync(`UPDATE credit_cards SET issuer = ?, last4 = ?, creditLimitMinor = ?, closingDay = ?, dueDay = ?,
       active = ?, deleted = ?, revision = ?, updatedAt = ? WHERE id = ?`, card.issuer, card.last4, card.creditLimitMinor,
     card.closingDay, card.dueDay, card.active ? 1 : 0, card.deleted ? 1 : 0, card.revision, card.updatedAt, card.id);
+    for (const row of plan.rows) {
+      const before = stored.find(item => item.sequence === row.sequence);
+      if (!before) await insertCardCycleDate(tx, row);
+      else if (!sameCardCycleDate(before, row)) {
+        // A corrected open statement may also move into new usual days and stand for another month (its slot).
+        await tx.runAsync(`UPDATE card_cycle_dates SET closingISO = ?, dueISO = ?, closingDay = ?, dueDay = ?, monthISO = ?, revision = ?, updatedAt = ?
+          WHERE cardId = ? AND sequence = ?`, row.closingISO, row.dueISO, row.closingDay, row.dueDay, row.monthISO, row.revision, row.updatedAt, row.cardId, row.sequence);
+      }
+    }
   });
 }
 
@@ -1196,6 +1266,9 @@ export async function createInstallmentPlan(db: LedgerDatabase, input: Installme
     }
     assertOpenAccount(card.accountId, archive.accounts, archive.cards, archive.debts);
     assertAcceptsNewObligation(card.accountId, archive.cards); // 24T1 review: an archived card takes no new plan.
+    // 24T2: a new plan bills on the card's calendar as it is now (usual days and exact dates); a purchase form left open
+    // across a change of that calendar is refused instead of recognising instalments on dates the card no longer has.
+    if (!planFollowsCalendar(plan, card, archive.cardCycleDates)) throw new Error(PLAN_CALENDAR_MESSAGE);
     validateArchive({ ...archive, installmentPlans: [...archive.installmentPlans ?? [], plan] });
     await insertInstallmentPlan(tx, plan);
   });

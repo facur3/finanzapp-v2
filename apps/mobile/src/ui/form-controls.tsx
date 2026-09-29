@@ -8,7 +8,7 @@ import { todayKey, type Account, type AccountKind, type Currency, type Entry, ty
 import { AccountBadge, AppText, CategoryBadge, DetailRow, Field, GlyphTile, PressFeedback, SelectionRow, Surface, surfaceShadow, type IconName, type Tone } from './components';
 import { SEARCHABLE_FROM, currencyChoices, currencyOption, offeredCurrencies, searchChoices, type CurrencyChoice } from './currencies';
 import { useI18n } from '../i18n/provider';
-import { useAccountLookOf, useCategoryDefinitions, useCategoryLook } from './category-hues';
+import { useAccountLookOf, useCategoriesInUse, useCategoryDefinitions, useCategoryLook } from './category-hues';
 import { selectionHaptic, sheetTiming } from './motion';
 import { radius, space, usePalette, useReduceMotion } from './theme';
 import { categoryChoices, categoryKey, customCategory } from './categories';
@@ -312,31 +312,48 @@ function BottomSheet({ visible, title, onClose, onDone, children }: {
   </Modal>;
 }
 
-export function DateField({ value, onChange, disabled = false, allowFuture = false, label }: {
-  value: Date; onChange: (date: Date) => void; disabled?: boolean; allowFuture?: boolean; label?: string;
+export function DateField({ value, onChange, disabled = false, allowFuture = false, label, last = true, minimumDate, maximumDate, placeholder, initial }: {
+  /** The chosen day, or null (24T2) while the person has not chosen one yet: the row then shows `placeholder`. */
+  value: Date | null; onChange: (date: Date) => void; disabled?: boolean; allowFuture?: boolean; label?: string;
+  /** 24T2: false when another row follows in the same grouped surface, so a hairline separates the two. */
+  last?: boolean;
+  /** 24T2: the wheel's bounds; by default 1900-01-01 to today (to 2100-12-31 with `allowFuture`). */
+  minimumDate?: Date; maximumDate?: Date;
+  /** 24T2: the row's value while `value` is null (default «Elegir fecha»), and the day the wheel opens on then (default
+   * today, kept within the bounds). */
+  placeholder?: string; initial?: Date;
 }) {
   const p = usePalette();
   const { t, formatDate, pickerLocale } = useI18n();
   const title = label ?? t('selection.date');
+  const lowest = minimumDate ?? new Date(1900, 0, 1);
+  const highest = maximumDate ?? (allowFuture ? new Date(2100, 11, 31) : new Date());
+  // Where the wheel starts: the chosen day, or `initial` (today) while none is chosen, never outside the bounds, so Listo
+  // always saves a day the wheel allowed and showed. A chosen day below a bound that moved since (the card form's due date
+  // after its closing moved past it) opens on the bound: iOS shows the bound without reporting a change, so a draft left
+  // on the old day would save a day the wheel never showed.
+  const within = (from: Date) => new Date(Math.min(Math.max(from.getTime(), lowest.getTime()), highest.getTime()));
+  const start = () => within(initial ?? new Date());
   const [visible, setVisible] = useState(false);
-  const [draft, setDraft] = useState(value);
-  const open = () => { Keyboard.dismiss(); setDraft(new Date(value)); setVisible(true); };
-  const day = todayKey(value);
+  const [draft, setDraft] = useState<Date>(value ?? start());
+  const open = () => { Keyboard.dismiss(); setDraft(value ? within(value) : start()); setVisible(true); };
+  const day = value ? todayKey(value) : null;
+  const unset = placeholder ?? t('selection.chooseDate');
   // The wheel is a worded date: it follows the interface language with its home region (es_AR, en_US), like the row
   // above it; the region never reorders it. Keep the spinner: inline and compact draw system text that ignores the locale.
   // onValueChange/onDismiss, not the deprecated onChange: iOS spins the draft, which Listo saves; Android's dialog
   // saves on a chosen value and closes either way.
   const picker = <DateTimePicker value={draft} mode="date" display={Platform.OS === 'ios' ? 'spinner' : 'default'} locale={pickerLocale}
-    themeVariant={p.isDark ? 'dark' : 'light'} minimumDate={new Date(1900, 0, 1)}
-    maximumDate={allowFuture ? new Date(2100, 11, 31) : new Date()}
+    themeVariant={p.isDark ? 'dark' : 'light'} minimumDate={lowest}
+    maximumDate={highest}
     style={{ width: '100%' }} onValueChange={(_event, next) => {
       if (Platform.OS === 'ios') setDraft(next);
       else { setVisible(false); onChange(next); }
     }} onDismiss={() => setVisible(false)} />;
   return <>
     {/* VoiceOver hears the date written out ("22 de septiembre de 2026"), not the abbreviated month on screen. */}
-    <DetailRow label={title} icon="calendar-outline" last disabled={disabled} onPress={open} layout="inline"
-      value={formatDate(day, 'dayYear')} spokenValue={formatDate(day, 'long')} />
+    <DetailRow label={title} icon="calendar-outline" last={last} disabled={disabled} onPress={open} layout="inline"
+      value={day ? formatDate(day, 'dayYear') : unset} spokenValue={day ? formatDate(day, 'long') : unset} />
     {/* iOS: the compact bottom sheet (24B6); the list sheets of the other fields keep their page-sheet geometry. */}
     {Platform.OS === 'ios' ? <BottomSheet visible={visible} title={label === undefined ? t('selection.chooseDate') : label} onClose={() => setVisible(false)}
       onDone={() => { onChange(draft); setVisible(false); }}>
@@ -355,11 +372,12 @@ export function CategoryField({ entries, kind, value, onChange, disabled = false
   const p = usePalette();
   const { t, language } = useI18n();
   const definitions = useCategoryDefinitions();
+  const inUse = useCategoriesInUse();
   const look = useCategoryLook(value, kind);
   const [visible, setVisible] = useState(false);
   const [query, setQuery] = useState('');
   // Choices are identities: the display name (a built-in one in the interface language) is shown, the stored spelling is what the movement records.
-  const choices = useMemo(() => categoryChoices(entries, kind, query, value, definitions, language), [entries, kind, query, value, definitions, language]);
+  const choices = useMemo(() => categoryChoices(entries, kind, query, value, definitions, language, inUse), [entries, kind, query, value, definitions, language, inUse]);
   const custom = customCategory(query, choices, kind, definitions);
   const choose = (category: string) => { Keyboard.dismiss(); if (categoryKey(category) !== categoryKey(value)) selectionHaptic(); onChange(category); setVisible(false); };
   const open = () => { Keyboard.dismiss(); setQuery(''); setVisible(true); };

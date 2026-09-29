@@ -114,7 +114,7 @@ test('25B2 review: a card with a recorded debt is not deleted: the dialog names 
   view.render('useCardManagement').remove(card, () => done++);
   assert.equal(view.alerts[0].title, 'Todavía no se puede eliminar');
   // e3 is 12.000 cents: $ 120,00 in Argentina (a bare $ is the peso there; the space is the formatter's no-break space).
-  assert.equal(view.alerts[0].message.replace(/\u00a0/g, ' '), 'Esta tarjeta tiene un saldo pendiente de $ 120,00. Pagalo primero, o archivala: deja de aparecer y conserva el saldo para pagarlo cuando quieras.');
+  assert.equal(view.alerts[0].message.replace(/\u00a0/g, ' '), 'Esta tarjeta tiene un saldo pendiente de $ 120,00. Pagalo primero, o archivala: pasa a Archivadas en Tarjetas, donde podés pagarla cuando quieras.');
   assert.equal(JSON.stringify(view.alerts[0].buttons.map(button => [button.text, button.style ?? null])), JSON.stringify([['Cancelar', 'cancel'], ['Pagar', null], ['Archivar', null]]));
   assert.equal(view.removedCards.length + view.savedCards.length, 0, 'nothing written by the dialog itself');
   view.alerts[0].buttons[1].onPress!();
@@ -273,7 +273,7 @@ test('24T1: a card with a pending instalment plan and no balance due is not dele
   let done = 0;
   view.render('useCardManagement').remove(card, () => done++);
   assert.equal(view.alerts[0].title, 'Todavía no se puede eliminar');
-  assert.equal(view.alerts[0].message, 'Esta tarjeta tiene cuotas pendientes. Archivala: deja de aparecer y sus cuotas siguen registrándose y pagándose cuando corresponde.');
+  assert.equal(view.alerts[0].message, 'Esta tarjeta tiene cuotas pendientes. Archivala: pasa a Archivadas en Tarjetas, sus cuotas se siguen registrando y podés pagarla y reactivarla.');
   assert.equal(buttons(view.alerts[0]), JSON.stringify([['Cancelar', 'cancel'], ['Archivar', null]]));
   assert.equal(view.removedCards.length + view.savedCards.length + view.pushed.length, 0, 'the dialog writes nothing');
   view.alerts[0].buttons[1].onPress!();
@@ -288,5 +288,5 @@ test('24T1: a card with a pending instalment plan and no balance due is not dele
   assert.equal(buttons(archived.alerts[0]), JSON.stringify([['Cancelar', 'cancel']]));
   const english = harness({ paid: true, plans: [plan], language: 'en-US' as never });
   english.render('useCardManagement').remove(card);
-  assert.equal(english.alerts[0].message, 'This card has pending instalments. Archive it: it leaves Cards and its instalments keep being recorded and paid when they come due.');
+  assert.equal(english.alerts[0].message, 'This card has pending installments. Archive it: it moves to Archived in Cards, its installments keep being recorded, and you can pay it and reactivate it.');
 });

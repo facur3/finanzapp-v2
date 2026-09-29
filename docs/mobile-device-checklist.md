@@ -1,5 +1,71 @@
 # Physical iPhone acceptance checklist
 
+## Producto 24T2 — installment purchase and complete Cards experience
+
+**Not done in 24T2: no EAS build was made and the iPhone was not touched.** Metro from this branch
+(`npm run start:dev-client -- --clear`) on the installed FinanzApp Dev build; JavaScript only, no native change.
+**The ledger moves to schema 13 (one new empty table for exact statement dates) and an older build refuses the file
+unchanged: export a backup first** (Más → Copia de seguridad). Use your own small test data (one test card, two or
+three purchases); never seed movements, and delete the test plans afterwards (a plan that recorded nothing is deleted
+from its detail).
+
+**Brief test (≈15 minutes).**
+
+1. **Upgrade.** Open the app over your data: Inicio, Movimientos, Tarjetas, Recurrentes and Reportes show the same
+   figures as before; force-quit and reopen: nothing migrates twice.
+   - [ ] The Más footer reads «FinanzApp 0.1.0 (24T2)».
+2. **Cycle dates.** On a card with closing 28 and due 5 (or your real days), Tarjetas shows «Vence» with the due date of
+   the statement that already closed while it is still ahead, and «Cierra» with the next closing (with closing 28 and
+   due 5 on 1 October: Vence 5 oct, Cierra 28 oct).
+   - [ ] Editar tarjeta: «Próximo cierre» and «Vencimiento» open the full calendar (day, month, year); a due date on or
+     before the closing is refused with its sentence; «Vence el resumen del 28 sep» corrects only that due date;
+     «Usar estos días todos los meses» off corrects this statement only (the note says so), on repeats the days; a
+     closing moved 20 days or more leaves the switch off and free (one-off unless you turn it on). Save and reopen: the dates
+     are the ones saved; movements, earlier statements and existing plans did not move; the month after the new
+     closing has its statement (none skipped, none duplicated).
+   - [ ] Nueva tarjeta: the two dates first, the line «Los meses siguientes: cierre el día … y vencimiento el día …»,
+     then the rest of the form as before.
+3. **Purchase in cuotas.** Tarjetas → Registrar compra (an active card): «Pago» under the date with Una vez / En cuotas.
+   En cuotas: 3 · 6 · 12 · 18 · Otra (Otra takes 2 to 120), «12 cuotas de $ …» (with «aprox.» when the price does not
+   divide evenly), «Primera cuota» with the two closing dates and «Cierra el … y vence el …», «Con interés» off.
+   Guardar en cuotas: the form closes; no expense appears in Movimientos today; the card shows «Cuotas futuras».
+   - [ ] Con interés on: «Total financiado» below the price is refused with its sentence; equal to the price reads
+     «Interés total: $ 0»; above it, the difference. After saving: the plan detail shows Total financiado, Interés total
+     and Principal futuro / Interés futuro; Tarjetas shows «Cuotas futuras» with «+ interés $ …» beside it.
+   - [ ] Before any purchase «Con interés», the category picker and Más → Categorías show no «Intereses» (and never a
+     category you did not create or record); right after saving one, «Intereses» is listed with its icon and colour.
+   - [ ] A purchase dated before the last closing (a late one): the note says the first instalment is recorded at once;
+     after the save, Movimientos holds «Cuota de tarjeta» for it and the card's balance rose by exactly that share.
+   - [ ] Ingreso, another account, or an archived card: no «Pago» section; back on the card, the choices are as left.
+   - [ ] Double-tap Guardar: one plan only (a forced write failure is covered by the SQLite tests).
+4. **Tarjetas deck.** With two or more cards: the others are strips above the selected one; tapping a strip brings it
+   to the front with one light haptic and the snapshot below changes without jumping (values fade, a block that only one
+   card has fades and what is below slides); tapping the front card opens its detail; the back swipe from the edge
+   still works everywhere. One card is shown alone, not stacked. With more than twelve cards (test cards, deleted
+   afterwards), a strip near the top brings its card into view. Archived cards are listed under «Archivadas» at the end
+   and open their detail (Pagar tarjeta still there while owed).
+   - [ ] «Disponible» of a card with a limit and a pending plan reads «No calculado con cuotas»; tapping it explains
+     why; without a limit, «Sin límite cargado»; never a zero.
+5. **Card detail and plan.** The face, «Saldo pendiente», Vence · Cierra · Disponible (with «de $ límite»), Registrar
+   compra (active cards only) and Pagar tarjeta, «Cuotas» with one row per plan («12 cuotas · 3/12 registradas», the
+   amount «restantes», «Próxima cuota · 28 oct»), Movimientos with «Este ciclo, desde …». A plan opens its detail:
+   price, «12 cuotas · Sin interés», Registradas «3 de 12», Ya registrado, Cuotas futuras, Restante, and «Calendario»
+   with Registrada / Próxima / Futura (Deshecha after an undo). Never «pagadas», never «Deuda».
+   - [ ] A recorded instalment opens «Cuota de tarjeta» with the row «Cuota · 3 de 12» that opens its plan; Editar
+     offers only the merchant and the category (amount, date and card as facts); Deshacer says it is not recorded again
+     by itself, and its plan row reads Deshecha; Recuperar brings it back. On a plan with interest, undoing only the
+     interest share says only that part is undone, and the row reads «Registrada en parte».
+6. **Accessibility.** VoiceOver on the deck reads each card once, top to bottom, the positions in that order and the
+   front card last and selected («Tarjeta Visa Gold, Galicia, termina en 4009, pesos, Tarjeta 3 de 3, seleccionado»),
+   with the hints «Selecciona esta tarjeta» / «Abre el detalle de la tarjeta»; the purchase section reads the count,
+   the per-instalment line with the amount in words, each «Primera cuota» segment as its whole statement and the switch
+   with its reason. The largest Dynamic Type: the strips grow up to their cap and name and last four never overlap; the
+   plan, schedule and future rows stack without cutting a word or a figure. Reduce Motion: the cards jump into place
+   and the snapshot's values still fade (not an instant swap). Light and dark; both languages.
+
+Record: date, iPhone model, iOS version, build, language, and every result above (a failure with a screenshot of your
+own test data only, never of real financial data).
+
 ## Producto 24T1 — the instalment engine (nothing visible; a regression spot-check)
 
 **Not done in 24T1: no EAS build was made and the iPhone was not touched.** Metro from this branch on the installed

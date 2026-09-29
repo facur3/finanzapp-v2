@@ -1,11 +1,12 @@
 import { ACCOUNT_DELETED_MESSAGE, accountBalanceMinor, isLiveAccount, validDateISO, type Account, type Currency, type Entry, type EntryKind, type LedgerSnapshot, type Transfer } from './ledger.ts';
 import { assertStorableCurrency, sortCurrencies } from './currency.ts';
-import { CARD_PLAN_MESSAGE, cardHasPendingInstallments, type InstallmentPlan, type RecordedEntry } from './installments.ts';
+import { CARD_PLAN_MESSAGE, cardHasPendingInstallments, installmentOccurrenceOf, type InstallmentPlan, type RecordedEntry } from './installments.ts';
+import { cardCycleView, type CardCycleDates } from './card-cycles.ts';
 
 /** A credit card is a hidden internal ledger account. A purchase (without
  * instalments) is an expense posted to that account exactly once for its full price
  * (it counts in reports and budgets and increases the card's negative balance); a
- * purchase in instalments (24T, not modelled yet) recognises its principal
+ * purchase in instalments (an `InstallmentPlan`, installments.ts) recognises its principal
  * instalment by instalment instead, decision 003 rule 7. A payment is an internal transfer from
  * a cash account into the card account: it lowers liquid money and lowers the
  * card's balance due without ever creating a second expense. The card is tied to
@@ -21,6 +22,8 @@ export interface CreditCardProfile {
   issuer: string;
   last4: string;
   creditLimitMinor: number | null;
+  /** The usual days (24T2: «días habituales»): the grid of the card's statements. Exact dates of particular statements
+   * live apart, in `CardCycleDates` (card-cycles.ts), and win over the grid where they exist. */
   closingDay: number;
   dueDay: number;
   active: boolean;
@@ -38,9 +41,9 @@ export const CARD_DELETED_MESSAGE = 'Esta tarjeta fue eliminada.';
  * purchase, a new plan, a new recurring rule or a movement or rule moved onto it). Reactivating it lifts this. */
 export const CARD_ARCHIVED_MESSAGE = 'Esta tarjeta está archivada. Reactivala para registrar compras nuevas.';
 /** A card with a balance due is paid or archived, never deleted: deleting would leave money owed with no card to pay
- * it from (a deleted card takes no payment). When Producto 24T exists, a pending instalment plan blocks deletion the
- * same way (`assertCardDeletable` is where that check goes); archiving never erases a plan either. The copy says
- * «saldo pendiente», never «deuda»: that word names the Deudas y cobros section (personal debts). */
+ * it from (a deleted card takes no payment). A pending instalment plan blocks deletion the same way (24T1,
+ * `assertCardDeletable`); archiving never erases a plan either. The copy says «saldo pendiente», never «deuda»: that
+ * word names the Deudas y cobros section (personal debts). */
 export const CARD_DEBT_MESSAGE = 'Esta tarjeta tiene saldo pendiente. Pagalo o archivala; no se puede eliminar.';
 /** The deletion record is written by `deleteCreditCard` in storage (it also stops the card's rules); a plain save never flips it. */
 export const CARD_DELETE_PATH_MESSAGE = 'Una tarjeta se elimina con su propia acción, no con un cambio de datos.';
@@ -332,9 +335,10 @@ export function cardCreditMinor(card: CreditCardProfile, snapshot: LedgerSnapsho
   const account = accountFor(card.accountId, snapshot.accounts);
   return Math.max(0, accountBalanceMinor(account, snapshot.entries, snapshot.transfers));
 }
-/** The limit left, or null without a limit. 24T1 gate: how the issuer reserves credit for pending instalments (the whole
- * plan, or only the billed part) is not assumed, so a card with a pending plan answers null (unknown) until decision 003
- * records the rule; 24T2 decides how that is shown. */
+/** The limit left, or null without a limit. Gate (decision 003, rule 7): how the issuer reserves credit for pending
+ * instalments (the whole plan, or only the billed part) is not assumed, so a card with a pending plan answers null
+ * (unknown). 24T2 shows that state as «No calculado con cuotas», never as zero or an invented figure; the caller tells
+ * «no limit» (`creditLimitMinor === null`) from «unknown» (a limit and a pending plan). */
 export function cardAvailableLimitMinor(card: CreditCardProfile, snapshot: LedgerSnapshot, plans: readonly InstallmentPlan[] = [], records: readonly RecordedEntry[] = []): number | null {
   if (card.creditLimitMinor === null) return null;
   if (cardHasPendingInstallments(card, plans, records)) return null;
@@ -385,51 +389,50 @@ export function previousDayOfMonthISO(referenceISO: string, requestedDay: number
 export interface CardCycle {
   /** First day of the open statement (the day after the previous closing). */
   startISO: string;
-  /** Next closing date, on or after today. */
+  /** The open statement's closing, on or after today (on the closing day the statement is still open). */
   closingISO: string;
-  /** Payment due date for that closing; falls in the following month when the due day precedes the closing day. */
+  /** The due date of THAT closing (the open statement's own due). It is not always the next due date: the statement that
+   * closed last may still be due first. The next due date is `cardCycleView(...).nextDue` (24T2). */
   dueISO: string;
 }
 
-/** The open statement window is derived only from the configured closing and
- * due days; it is a calendar estimate, not a statement received from the bank. */
-function addDays(dateISO: string, days: number): string {
-  const [year, month, day] = dateISO.split('-').map(Number);
-  const date = new Date(year, month - 1, day + days, 12);
-  return iso(date.getFullYear(), date.getMonth(), date.getDate());
-}
-
-export function cardCycle(card: Pick<CreditCardProfile, 'closingDay' | 'dueDay'>, todayISO: string): CardCycle {
-  const closingISO = nextDayOfMonthISO(todayISO, card.closingDay);
-  const startISO = addDays(previousDayOfMonthISO(closingISO, card.closingDay), 1);
-  const dueISO = nextDayOfMonthISO(addDays(closingISO, 1), card.dueDay);
-  return { startISO, closingISO, dueISO };
+/** The open statement of a card on `todayISO`, from its usual days and (24T2) its exact cycle dates (`cycleDates`, the
+ * card's own rows). A calendar estimate, not a statement received from the bank. */
+export function cardCycle(card: Pick<CreditCardProfile, 'closingDay' | 'dueDay'>, todayISO: string, cycleDates: readonly CardCycleDates[] = []): CardCycle {
+  const view = cardCycleView(card, cycleDates, todayISO);
+  return { startISO: view.openStartISO, closingISO: view.open.closingISO, dueISO: view.open.dueISO };
 }
 
 export interface CardStatementActivity extends CardCycle {
   purchasesMinor: number;
+  /** 24T2: the financing shares of instalments (interest, fee, tax) recorded in the window: never a purchase. */
+  financingMinor: number;
   refundsMinor: number;
   paymentsMinor: number;
   purchaseCount: number;
   paymentCount: number;
 }
 
-/** Recorded purchases (expenses), refunds (income) and payments (transfers into
- * the card) inside the open statement window. Exact integer cents. */
-export function cardStatementActivity(card: CreditCardProfile, snapshot: LedgerSnapshot, todayISO: string): CardStatementActivity {
-  const cycle = cardCycle(card, todayISO);
+/** Recorded purchases (an expense: a purchase paid once, or the principal of an instalment), refunds (income) and payments
+ * (transfers into the card) inside the open statement window: the open cycle's activity (Tarjetas' «Este ciclo»), what the
+ * ledger holds, never a statement amount. An instalment's financing shares are recorded as their own movements and
+ * counted apart (`financingMinor`), so one instalment with interest is one purchase, not two. Exact minor units. */
+export function cardStatementActivity(card: CreditCardProfile, snapshot: LedgerSnapshot, todayISO: string, cycleDates: readonly CardCycleDates[] = []): CardStatementActivity {
+  const cycle = cardCycle(card, todayISO, cycleDates.filter(row => row.cardId === card.id));
   const inWindow = (dateISO: string) => dateISO >= cycle.startISO && dateISO <= cycle.closingISO;
-  let purchases = 0n, refunds = 0n, payments = 0n, purchaseCount = 0, paymentCount = 0;
+  let purchases = 0n, financing = 0n, refunds = 0n, payments = 0n, purchaseCount = 0, paymentCount = 0;
   for (const entry of snapshot.entries) {
     if (entry.accountId !== card.accountId || !inWindow(entry.dateISO)) continue;
-    if (entry.kind === 'expense') { purchases += BigInt(entry.amountMinor); purchaseCount++; }
-    else refunds += BigInt(entry.amountMinor);
+    if (entry.kind !== 'expense') { refunds += BigInt(entry.amountMinor); continue; }
+    const share = installmentOccurrenceOf(entry.id);
+    if (share && share.component !== 'principal') financing += BigInt(entry.amountMinor);
+    else { purchases += BigInt(entry.amountMinor); purchaseCount++; }
   }
   for (const transfer of snapshot.transfers ?? []) {
     if (transfer.toAccountId !== card.accountId || !inWindow(transfer.dateISO)) continue;
     payments += BigInt(transfer.amountMinor); paymentCount++;
   }
-  return { ...cycle, purchasesMinor: safeBigInt(purchases), refundsMinor: safeBigInt(refunds),
+  return { ...cycle, purchasesMinor: safeBigInt(purchases), financingMinor: safeBigInt(financing), refundsMinor: safeBigInt(refunds),
     paymentsMinor: safeBigInt(payments), purchaseCount, paymentCount };
 }
 

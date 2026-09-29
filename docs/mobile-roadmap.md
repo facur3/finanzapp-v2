@@ -1,7 +1,7 @@
 # FinanzApp mobile: living roadmap
 
-Updated: 2026-09-28 (Producto 24T1C, documentation only: the state after 24T1 merged as PR #67, schema 12 and
-backup v12, and the product decisions 24T2, 25C2 and 25D read). Read [decision 001](decisions/001-native-mobile.md),
+Updated: 2026-09-28 (Producto 24T2, on its branch as PR #69: the purchase in cuotas, the card's statement calendar with
+exact dates, schema 13 and backup v13, and the Tarjetas deck; 24T1C merged as PR #68). Read [decision 001](decisions/001-native-mobile.md),
 [decision 002](decisions/002-spending-first.md),
 [decision 003](decisions/003-five-tabs-and-cards.md) and
 [decision 004](decisions/004-native-first-and-web-retirement.md). Decision 002 supersedes
@@ -99,7 +99,7 @@ history file keeps the evidence of when and why.
   synthetic fixtures live only in tests; the repository is public and carries no financial
   backups, screenshots with real data, tokens, signing keys or bank credentials.
 - **Durable local writes, drafts kept on failure, never a reset on error.** SQLite is the ledger
-  (schema 12; a backup takes the lowest version its content needs, up to v12, and v1–v12 import); a
+  (schema 13; a backup takes the lowest version its content needs, up to v13, and v1–v13 import); a
   write is confirmed only after it landed; deleting a recurring rule, a debt tracker, an account or a
   card keeps its row as a deletion record and never touches the movements it produced (24UX4, 25B2);
   edits are audited and undoable; future sync needs operation IDs, revisions, tombstones,
@@ -133,12 +133,23 @@ history file keeps the evidence of when and why.
 
 ## 1. Implemented (current state)
 
-What exists in code on `master` as of Producto 24T1 (PR #67, merged 2026-09-28), after 25B3 (PR #66). Per area, without test inventories (those are in apps/mobile/README.md and the history
+What exists in code on `master` as of Producto 24T1C (PR #68, merged 2026-09-28), after 24T1 (PR #67) and 25B3 (PR #66), plus
+Producto 24T2 on its branch. Per area, without test inventories (those are in apps/mobile/README.md and the history
 file). "Released" below names an in-app gate (`RELEASED_LANGUAGES`, `RELEASED_REGIONS`,
 `LEDGER_CURRENCIES`): what a build offers, verified on Linux; nothing is distributed to people yet
 (§4).
 
-- **Instalment engine (24T1, PR #67; no UI yet).** `packages/domain/installments.ts`: an `InstallmentPlan` per
+- **Purchases in instalments and complete Tarjetas (24T2, on its branch, PR #69).** The purchase form's «Pago» [Una vez][En
+  cuotas] for a new expense on an active card (counts 3/6/12/18 or any from 2 to 120, «Primera cuota» by closing date,
+  «Sin interés» or «Con interés» with one «Total financiado» field; one plan and no expense, frozen for retries); the
+  card's statement calendar with exact dates (`packages/domain/card-cycles.ts`, `card_cycle_dates`, schema 13, backup
+  v13; a statement is a closing and its own due date, so on 1 oct a card closing 28 / due 5 reads «Vence 5 oct · Cierra 28
+  oct»); a card form with dates first; Tarjetas as a vertical deck with the selected card's snapshot (Saldo pendiente,
+  Vence, Cierra, Disponible or «No calculado con cuotas», Registrar compra, Pagar tarjeta, Cuotas futuras, Recientes with
+  «Este ciclo») and the archived cards under Archivadas; the card detail with its plans; the plan detail with its
+  calendar; instalment movements with «Cuota 3 de 12», a link to the plan and an edit limited to merchant and category.
+  Details and checks in «Producto 24T2» (§3).
+- **Instalment engine (24T1, PR #67; its screens since 24T2, above).** `packages/domain/installments.ts`: an `InstallmentPlan` per
   financed purchase (one purchase, one finite plan, never a `RecurringRule`), owned by a card, in the card's currency, with
   explicit financing components and an exact schedule written once (statement closing and due date per instalment,
   principals summing exactly to the price, the remainder on the first instalments). Buying records nothing and moves no
@@ -152,7 +163,7 @@ file). "Released" below names an in-app gate (`RELEASED_LANGUAGES`, `RELEASED_RE
   refused with a pending plan (`assertCardDeletable`, storage and the dialog); archiving keeps everything running; a plan
   is deleted only without history, cancelled otherwise; no save changes price, count or dates. SQLite 12 (two additive
   tables), backup v12 as soon as a plan exists (v1–v12 import). `LedgerProvider` exposes `addInstallmentPlan`,
-  `cancelInstallmentPlan`, `removeInstallmentPlan`; no screen creates a plan yet (24T2).
+  `cancelInstallmentPlan`, `removeInstallmentPlan`; since 24T2 the purchase form creates plans (above).
 - **Detail hierarchy (25B3).** Two corrections of hierarchy before instalments, no redesign: the
   account detail no longer prints «Saldo inicial / Opening balance» as a row (`openingMinor` is unchanged in storage,
   backups, migrations and every balance; the recorded balance still starts from it; nothing replaced the row), and a
@@ -172,7 +183,7 @@ file). "Released" below names an in-app gate (`RELEASED_LANGUAGES`, `RELEASED_RE
   forms, its active rules stop; a trailing swipe on its row and «Eliminar cuenta» on its edit screen,
   both with a destructive confirmation); a card without a balance due can be deleted (a `deleted` flag:
   purchases, payments and the internal account stay, its rules stop in the same commit; with a balance due
-  the dialog offers Pagar or Archivar instead; no swipe on the carousel, «Eliminar tarjeta» last on its edit
+  the dialog offers Pagar or Archivar instead; no swipe on a card (the carousel then, the deck since 24T2), «Eliminar tarjeta» last on its edit
   screen, the balance named in the confirmation). Backups v11 carry both records (v12 too since 24T1); every older version still imports. The
   card copy says «Saldo pendiente», never «Deuda» (the Deudas y cobros section); decision 003 records the
   eight card invariants audited at the close of 25B2.
@@ -188,7 +199,7 @@ file). "Released" below names an in-app gate (`RELEASED_LANGUAGES`, `RELEASED_RE
 - **Product shape.** Five native tabs with the Assistant in the centre and Más as the grouped
   hub (Finanzas / App y datos: Cuentas, Tarjetas, Presupuestos, Recurrentes, Deudas y cobros,
   Categorías, Idioma, Región, Apariencia, backup, the Assistant's data note); a Más version line
-  («FinanzApp 0.1.0 (25B3)»; the material and locale diagnostics only in a development build). Liquid Glass on
+  («FinanzApp 0.1.0 (24T2)»; the material and locale diagnostics only in a development build). Liquid Glass on
   Inicio's movement pills, its Assistant entry and the Assistant composer only in a development build on iOS 26 with
   the API present and without Reduce Transparency; opaque material otherwise.
 - **Inicio.** One main number (gasto registrado of the month, or Disponible: cash in normal
@@ -213,7 +224,8 @@ file). "Released" below names an in-app gate (`RELEASED_LANGUAGES`, `RELEASED_RE
   Ingresa en as stacked selection rows; the date wheel in a compact bottom sheet on iOS (24B6;
   its entrance is corrected in 24UX1); edit, undo, contextual account correction and recovery;
   a draft kept when a save fails; historical card incomes still editable.
-- **Ledger and storage.** SQLite schema 12 (24T1: `installment_plans` and `installments`; 11 (25B2): the account
+- **Ledger and storage.** SQLite schema 13 (24T2: `card_cycle_dates`, a card's exact statement dates; 12 (24T1):
+  `installment_plans` and `installments`; 11 (25B2): the account
   tombstone and the card flag; 10 (24UX4): a `deleted` flag on recurring rules
   and debt profiles; schema 9 added `currency_units`), durable writes, audited
   edits, same-currency internal transfers, balance corrections, accounts with identity
@@ -222,12 +234,13 @@ file). "Released" below names an in-app gate (`RELEASED_LANGUAGES`, `RELEASED_RE
   four digits, limit, closing and due days; counterparty, direction, due date), card rules
   (24B6). A backup takes the lowest version its content needs: v8 (ARS/USD only), v9 (another currency),
   v10 (24UX4: a deleted rule or debt), v11 (25B2: a deleted account or card), v12 (24T1: an instalment
-  plan); v1–v12 import; an older build refuses a newer file unchanged; a failed restore rolls back.
-- **Commitments.** Purchases in instalments since 24T1 (the engine above; the purchase form and the card's figures are
-  24T2). Weekly/monthly/yearly recurring rules with next occurrence, pause, edit,
+  plan), v13 (24T2: an exact statement date); v1–v13 import; an older build refuses a newer file unchanged; a failed
+  restore rolls back.
+- **Commitments.** Purchases in instalments since 24T1 (the engine above; since 24T2 the purchase form, the plan detail
+  and the card's figures). Weekly/monthly/yearly recurring rules with next occurrence, pause, edit,
   per-occurrence identity (scheduled is not paid; retries cannot duplicate); debts and
   receivables with partial payments; card purchases and payments; closing and due dates from
-  the user's days. 24UX2: a rule's detail lists the movements it recorded (read by their
+  the user's days and, since 24T2, the exact statement dates they entered. 24UX2: a rule's detail lists the movements it recorded (read by their
   deterministic id, never the scheduled dates), a recorded movement links back to its rule, a paused
   rule reads "Pausado" at full contrast. 24UX4: a rule pauses, resumes (never
   recording what fell due while paused) or is deleted, and a debt is settled (the reviewed payment
@@ -300,7 +313,7 @@ file). "Released" below names an in-app gate (`RELEASED_LANGUAGES`, `RELEASED_RE
   nothing stored converts; purchases paid from an account in another currency are 24C2.
 - **Motion and material.** `src/ui/motion.tsx` (strong ease-out, named durations, value
   crossfades, reflow, haptic helpers), press feedback, segmented control, category washes,
-  the card carousel on the UI thread, Reduce Motion everywhere (rules in §6).
+  the card deck on the UI thread (24T2; the carousel before it), Reduce Motion everywhere (rules in §6).
 - **Builds and tooling.** Expo SDK 57 / React Native 0.86 / Reanimated 4 with an independent
   lockfile; EAS project `@facur3/finanzapp-mobile` linked; development builds installed on the
   owner's iPhone (FinanzApp Dev, `com.facur3.finanzapp.dev`); Metro from the branch for QA. CI:
@@ -315,6 +328,11 @@ it was checked in). Metro from the branch on the installed FinanzApp Dev build s
 item unless a section says a new native build is needed. The checklist sections are in
 [mobile-device-checklist.md](mobile-device-checklist.md).
 
+- **24T2 — installment purchase and complete Tarjetas:** the checklist section Producto 24T2 (a backup before the schema
+  13 upgrade; the cycle dates; the card form's calendar; the purchase in cuotas with and without interest; the deck with
+  one, three and more than twelve cards, its haptic, the snapshot's fades and slides, the back swipe; the card and plan
+  details; an instalment's movement, its edit and undo; VoiceOver order and positions, the largest Dynamic Type, Reduce
+  Motion, both themes and both languages).
 - **24T1 — the instalment engine:** nothing visible; the checklist section Producto 24T1 (a backup before the schema 12
   upgrade of FinanzApp Dev's data, the app opening on the same figures, a regression spot-check of a card purchase and
   payment). The device gates of instalments belong to 24T2 (the purchase form, the figures) and 24T3 (Tarjetas and
@@ -388,10 +406,11 @@ item unless a section says a new native build is needed. The checklist sections 
 
 ## 3. Next deliveries
 
-**Recommended next (2026-09-28, reconciled by 24T1C):** 25B3 merged (PR #66) and 24T1 merged (PR #67): SQLite
-schema 12, backup v12, the instalment engine and 12 of the 13 card-invariant `it.todo` as tests (the remaining one,
-the foreign-currency plan record, belongs to 24C2). 24T1C (this PR) is documentation only. **The next implementation
-is 24T2**, then **24T3**: **Producto 24T** ships in three focused PRs: 24T1 (domain, schema, backup and instalment
+**Recommended next (2026-09-28):** 25B3 (PR #66), 24T1 (PR #67) and 24T1C (PR #68) merged. **24T2 is on its branch
+(PR #69, not merged)**: SQLite schema 13, backup v13, the purchase in cuotas and the complete Tarjetas. After its merge
+and its device QA, **the next implementation is 24T3** (refunds, early payoff, cancellation adjustments and the final
+device QA of instalments). The earlier plan, as reconciled by 24T1C: 24T1 left 12 of the 13 card-invariant `it.todo`
+as tests (the remaining one, the foreign-currency plan record, belongs to 24C2); then 24T2 and **24T3**: **Producto 24T** ships in three focused PRs: 24T1 (domain, schema, backup and instalment
 mathematics; merged), 24T2 (the card purchase with the simple financing UX, the exact current-cycle dates, statements,
 current-versus-future balances and the Tarjetas direction, all recorded under 24T below and in «Producto 24T1C»),
 24T3 (refunds, early payments, lifecycle and the final device QA).
@@ -1087,7 +1106,8 @@ nothing of it is on a screen yet.
     closing day, weekend and holiday shifts as stated by the issuer), schema and backup versions with a
     rollback test; the `it.todo` lines of `card-invariants.test.ts` (7b) become tests. **Delivered (PR #67); see
     «Producto 24T1» below.** One invariant stays `it.todo` on purpose: the foreign-currency plan record (24C2).
-  - **24T2 — the card purchase, UI, statements and current-vs-future balances.** The purchase form with
+  - **24T2 — the card purchase, UI, statements and current-vs-future balances.** **Delivered on its branch (PR #69,
+    not merged); see «Producto 24T2» below.** The purchase form with
     instalments, per-statement summaries, the five figures above, pending balance and partial payments, a
     clearer card form with a real calendar for closing and due days; the available-credit gate decided
     first if the UI shows a limit.
@@ -1517,13 +1537,13 @@ nothing of it is on a screen yet.
   Review round: the detail holds navigation while a pause, a resume or a confirmed deletion is written (`gestureEnabled`
   and `headerBackVisible` from `busy`, as the movement detail), gives it back on success or failure, and a deletion pops
   exactly once (`polish-routes.node.ts` +1, the harness holding a save mid-write).
-- **Status.** Delivered on this branch (2026-09-28), not device-verified. Checked on Linux: root `npm test`,
+- **Status.** Delivered and merged (PR #66, 2026-09-28), not device-verified. Checked on Linux: root `npm test`,
   `check:repo`; mobile `typecheck`, `test:storage`, `currency:verify`, `regions:verify`, `i18n:check -- --strict`,
   `i18n:extract`, `check`, `export:ios` (the counts are in the PR). No EAS build; the iPhone was not touched.
   Pending: the checklist section Producto 25B3.
 - **Depends on.** 25B2 (the deleted-account rule states), 24UX4 (the lifecycle), 24UX2 (the history).
 
-### Producto 24T1C — roadmap reconciliation before 24T2 (this PR)
+### Producto 24T1C — roadmap reconciliation before 24T2 (PR #68)
 
 - **Goal.** Documentation only: the roadmap, the decisions, the READMEs and the design direction agree with
   `master` after 25B3 (PR #66) and 24T1 (PR #67) before 24T2 reads them, and the product decisions that 24T2, 25C2
@@ -1581,12 +1601,158 @@ nothing of it is on a screen yet.
   simplified to «Sin interés» plus one «Con interés» toggle with a single «Total financiado» field (the engine keeps
   its four components). The closing/due contract became full exact dates for the next cycle, due after closing, not
   necessarily in the same month; 25D records that a date change replaces the old date's reminders.
-- **Status.** Documentation only, on this branch (2026-09-28). The full handoff suite, checked on Linux on the
+- **Status.** Documentation only, merged (PR #68, 2026-09-28). The full handoff suite, checked on Linux on the
   review-round tree: root `npm test` (373 passed, 1 todo) and `npm run check:repo` (OK, 347 tracked files); mobile
   `typecheck` (clean), `test:storage` (794/794; it reads this file for the recurring-rules decision),
   `currency:verify` and `regions:verify` (catalogues verified offline), `i18n:check -- --strict` (0 errors, 0
   stale), `i18n:extract` (no copy outside the catalogue), `check` (dependencies up to date) and `export:ios` (iOS
   bundle exported, 1967 modules). No blocker. The `mobile_api` PostgreSQL job runs in CI. No EAS build.
+
+### Producto 24T2 — installment purchase and complete Cards experience (PR #69)
+
+- **Goal.** The first screens of purchases in instalments and a complete Tarjetas: the purchase in cuotas with the simple
+  financing UX of 24T1C, the card's statement calendar with exact dates, the vertical card deck with the selected card's
+  snapshot, the card detail with its plans, the plan detail, and instalment-aware movements. Not in it (24T3 or later):
+  refunds, partial refunds, early payoff, cancellation adjustments, 24C2, automatic card payment, notifications,
+  «Registrar ahora», Wallet/Apple Pay, App Intents, FinanceKit, Watch, EAS.
+- **Audit first (what was wrong).** `cardCycle` returned the open statement and ITS due; both card screens printed that
+  due as «Vencimiento», so with closing 28 and due 5 on 1 oct they said 5 nov instead of 5 oct (the statement that closed
+  on 28 sep). `cardDebtMinor` is the whole recorded liability, not a statement amount; the screens never called it
+  otherwise, but the cycle caption said «Resumen abierto». With a pending plan the available credit was null and the
+  screens printed «Sin límite cargado» for a card that has a limit. Archived cards disappeared from Tarjetas (reachable
+  only from a movement). The empty-state and card-note copy claimed every purchase is one expense.
+- **Cycle model (why).** A statement is one closing and the due date of THAT closing (decision 003, «Ciclo del
+  resumen»). `packages/domain/card-cycles.ts`: the usual days are the grid (24T1's formulas moved unchanged, proven equal
+  over every day pair); exact dates are stored statements (`card_cycle_dates`: closing, due, the usual days of the
+  calendar they belong to and the month, the slot, they stand for), one consecutive chain per card. After the chain the
+  statements follow the card's days from the slot after the last row (across a change of usual days, from the new grid
+  closing nearest to one month after it); before it, the first row's days from the slot before it. A row's slot is its
+  own month when it closes on its calendar's grid, and the replaced statement's for a one-off shift off the grid, so an
+  exact date moved by days or by months never duplicates or drops a statement. `cardCycleView` answers the open
+  statement, the previous one, the closed statement still to pay and the next due date (the earliest due from today on).
+  `planCardCycle` is the only writer: it freezes every statement from the end of the chain through the last closed one
+  (through the open one when only the usual days change) at its current dates, then applies the open statement's exact
+  dates (compared with the NEW calendar), the due still to pay, and/or new usual days; it never removes or renumbers a
+  row; a form left open past a closing is refused. Alternatives rejected: two fields on the card (after the next closing
+  nobody knows which cycle they belonged to), month-keyed overrides (a calendar change that crosses a month boundary
+  re-keys every override), nearest-month mapping without a stored slot (a shift of 13 days or more maps two statements
+  to one month or skips one). Which days follow is the person's choice (owner's decision, 2026-09-29): any exact
+  correction may be one-off, however far it moved; only «Usar estos días todos los meses» makes its days usual.
+- **Schema and backup.** SQLite **13** (`card_cycle_dates`, `CREATE TABLE IF NOT EXISTS`, FK to `credit_cards`, `dueISO >
+  closingISO` CHECK, rows never DELETEd); a schema 12 file opens with an empty table and no fabricated date; an interrupted
+  step rolls back and reaches 13 once; a schema 14 file is refused intact. Backup **v13** once a card holds an exact date
+  (always with `installmentPlans`, possibly empty); without one the file is v8–v12 byte for byte; v1–v13 import; rows
+  travel only with a card the import adds; any other row is a conflict and nothing is imported.
+- **Card form.** Dates first. A new card asks «Próximo cierre» (today or later) and «Vencimiento» (after that closing,
+  any month, no maximum distance, no business-day shift) on the full calendar; their days become the usual days («Los
+  meses siguientes: cierre el día 28 y vencimiento el día 5.») and `newCardCycle` stores the exact statement only when
+  the grid would not produce it. An existing card shows its open statement's two dates and, while the closed statement
+  still to pay is ahead, «Vence el resumen del 28 sep» (only that due date moves). «Usar estos días todos los meses» off
+  corrects this statement only («Estas fechas corrigen solo este resumen.»), whatever the distance; on, the dates' days
+  become the usual days; no distance turns it on by itself. The form plans locally with
+  `planCardCycle` and freezes `{card, intent}` for Reintentar; storage plans again and refuses a stale form. Name,
+  issuer, last four, currency, opening balance, limit, archive, reactivate and delete behave as before.
+- **Purchase in cuotas.** Under the date, «Pago» [Una vez][En cuotas], only for a new expense on an active credit card
+  (not an edit, an income, an archived or deleted card, or an ordinary account; hidden choices are kept and never leak
+  into a plain save). En cuotas: «Cuotas» 3 · 6 · 12 · 18 · «Otra» (2 to 120 typed; default 12); «12 cuotas de $
+  100.000,00», or «de aprox.» with the largest instalment when the remainder makes the first ones larger; «Primera
+  cuota» as two segments named by their closing dates (the statement the purchase belongs to, or the next; VoiceOver
+  hears each whole statement) with «Cierra el 28 oct y vence el 5 nov.»; a note when that statement already reached its
+  closing (those instalments are recorded at save); «Con interés» off. «Guardar en cuotas · $ precio» writes one
+  `InstallmentPlan` built from exactly the previewed schedule (`buildPurchasePlan`) and no expense; the submission is
+  frozen (Reintentar resends the same plan; storage treats a committed one as done); a failed save keeps every field and
+  its retry note points to the card's instalments, never to Movimientos; a recognition failure after the plan is saved
+  is the existing banner, never a failed save (`savePurchasePlan`). A plan whose schedule no longer follows the card's
+  calendar is refused before anything is written («El calendario de la tarjeta cambió…»); the form releases it and the
+  view is read again, so the next save follows the current statements.
+- **Financing.** «Con interés» on shows one field, «Total financiado» (card currency), and «Interés total: $ …» read
+  only. Below the price: refused («El total financiado no puede ser menor que el precio.»); equal: zero interest; above:
+  the difference (`interestFromTotalFinanced`, integer minor units). Fee and tax are zero from this flow. The interest
+  share is recorded in the preset category «Intereses» (`expense|intereses`, a late preset exempt from the duplicate
+  checks of older data; its stored spelling is `interestCategoryLabel`, never a translation, so a rename keeps working).
+  It is **latent** (owner's decision, 2026-09-29): it always resolves with its name, icon and colour, but the pickers and
+  Más → Categorías list it only once an interest movement, a saved plan with interest (`planFinancingCategories`) or a
+  definition of it exists; a fresh installation and a plan without interest never show it.
+- **Tarjetas.** A vertical deck of the active cards (`CardDeck`, replacing the horizontal carousel): the others stay
+  stacked above the selected one in their stored order, each showing its top strip (name and «•••• 4009», 50 pt at
+  least, the face text capped at 1.3× so the strip holds it); the selected card sits in front, whole, above its
+  snapshot. Tapping a strip selects it (one selection haptic); tapping the front card opens its detail; no horizontal or
+  drag gesture. Each card moves on the UI thread (`timing('data')`, 260 ms ease-out, interruptible); with many cards the
+  page scrolls the chosen one into view; Reduce Motion jumps and keeps only the fades (their policy is now explicit, so
+  the device setting no longer turns them into an instant swap). One card is shown alone. VoiceOver reads each card once,
+  in the order it is drawn, with its position in that order and its selected state. The snapshot, in the brief's
+  priority: «Saldo pendiente · ARS» (the whole recorded liability); Vence (the next due date, amber within three days
+  while owed) · Cierra (the next closing) · Disponible (the figure with a known limit and no pending plan; «Sin límite
+  cargado»; «No calculado con cuotas» with its explanation while a plan is pending; never zero); Registrar compra over
+  Pagar tarjeta; «Cuotas futuras» with the principal, «en N planes» and «+ interés $ …» when those plans carry interest;
+  Recientes with «Este ciclo, desde … · N compras · N pagos» (an instalment's interest is never counted as another
+  purchase). Blocks only some cards have fade in or out and the ones below slide (`Reflow`). Archived cards follow under
+  «Archivadas» (still payable, reactivated from their form); only archived cards show «Ninguna tarjeta activa».
+- **Card detail.** Identity (the face; «Tarjeta archivada» / «Tarjeta eliminada» under it), the balance hero, the same
+  three facts with «de $ límite», Registrar compra (active only) and Pagar tarjeta (not deleted, and active or owed),
+  «Cuotas» (caption «Cuotas futuras $ …», plus «+ interés $ …») with one row per plan («MacBook Pro · 12 cuotas · 3/12
+  registradas», the principal «restantes» or «principal restante» for a plan with interest, «Próxima cuota · 28 oct»,
+  or Completo/Cancelado), then Movimientos with «Este ciclo» (plus «devoluciones» when there are any). No card within a
+  card, no detail table.
+- **Plan detail** (`app/installment/[id].tsx`). Merchant mark, «Compra en cuotas · ARS», the price as the hero, «12 cuotas
+  · Sin interés» or «Con interés», the state (Activo, Completo, Cancelado); rows: Tarjeta (opens it), Categoría, Fecha de
+  compra, Precio, Total financiado and Interés total only with interest (Comisiones and Impuestos de financiación only
+  when an older plan holds them), Registradas «3 de 12», then Ya registrado, Cuotas futuras and Restante (with interest:
+  Principal registrado, Principal futuro, Interés futuro and Principal restante), Deshecho when something was undone;
+  «Calendario» («Cada cuota cuenta como gasto cuando cierra su resumen.») with one row per instalment: «Cuota 3 de 12»,
+  «Cierra 28 oct · vence 5 nov», the amount, and Registrada, Registrada en parte («Cuenta … · deshecho …»), Próxima,
+  Futura, Deshecha or Cancelada; a row with a movement opens it. The one action is «Eliminar plan» for a plan that
+  recorded nothing yet. Never «pagada».
+- **Instalment movements.** The movement detail keeps its amount-first hero; an instalment reads «Cuota de tarjeta» (its
+  interest share «Interés de cuota») and gains the row «Cuota · 3 de 12» («3 de 12 · interés» for a financing share)
+  that opens the plan; Deshacer adds that the instalment is not recorded again by itself and stays pending in its plan
+  (only that part, when the instalment has another share); Editar opens «Editar cuota», where only the merchant and the
+  category change (the amount, named as the share it is, the date and the card are facts; storage refuses anything else).
+- **Reports and budgets.** Unchanged facts: each recognised principal share is one expense in its statement's month and
+  category; the interest share its own expense in Intereses; future shares are no spending; a payment is a transfer.
+  Tarjetas, the card detail and the plan detail read the same snapshot, the same `cardCycleView` and the same plan
+  figures (`installmentPlanFigures`, `cardCommittedMinor`, `cardCommittedFinancingMinor`), with the card's exact dates on
+  every screen (`card-figures.node.ts` checks the card figures against Reportes and Presupuestos).
+- **Labels.** Saldo pendiente; Vence; Cierra; Disponible, Sin límite cargado, No calculado con cuotas; Cuotas futuras,
+  «+ interés»; Este ciclo, desde …; Pago, Una vez, En cuotas; Cuotas, Otra, Cantidad de cuotas; «12 cuotas de (aprox.)
+  …»; Primera cuota; Con interés; Total financiado; Interés total; Guardar en cuotas; Próximo cierre; Vencimiento; Vence
+  el resumen del …; Usar estos días todos los meses; Cuotas; «3/12 registradas»; restantes, principal restante; Próxima
+  cuota; Registrada, Registrada en parte, Próxima, Futura, Deshecha, Cancelada; Cuota de tarjeta, Interés de cuota;
+  Cuota «3 de 12». Never «pagadas», «Deuda», «Resumen a pagar» or «Facturado». English uses "installment" (US).
+- **Tests.** Domain (vitest): `card-cycles.test.ts` (34: the required example, February, leap years, days 29–31, the
+  year boundary, exact rows, the planner, new cards, schedules with exact dates, validation, the reviewers' cases and two
+  property sweeps), `installments.test.ts` (financing from the total financed, the committed interest),
+  `categories.test.ts` (Intereses), `card-invariants.test.ts` (7c, the statement cycle). Mobile (Node, real SQLite where
+  it stores): `card-cycles.node.ts` (11: schema 13, the card form's writes, stale forms, plans created before and after
+  exact dates, backup v13, restart and restore of the movement-to-plan link), `card-form-cycle.node.ts` (12),
+  `installment-purchase.node.ts` (15), `installment-routes.node.ts` (18), `cards-deck.node.ts` (10), `card-figures.node.ts`
+  (3), `plan-presentation.node.ts` (4), `installments.node.ts` (`savePurchasePlan` with a failing recognition), and the
+  updated `date-field`, `liabilities-routes`, `recovery-routes`, `motion` and `lifecycle` suites.
+- **Review round (2026-09-28).** A five-lens review with an adversarial verifier per lens and a completeness check
+  against the brief. Fixed: a next closing moved with new usual days (then forced past half a month) dropped the next
+  month's statement, and a later one-off correction could bring back a one-day statement (the written row's slot; now
+  its own month on its grid; storage writes the corrected row's days and slot; 1.4 million form-driven single and double
+  edits checked with no missing or duplicated statement); the switch alone skipped the stale-form refusal; principal-only
+  figures were labelled as if they included interest; an instalment's interest counted as a second purchase in the cycle
+  caption; the undo note and the restricted edit spoke of the whole instalment for one share; a plan refused for a
+  changed calendar left the form in a retry loop; the retry note sent a plan to Movimientos; VoiceOver positions did not
+  follow the reading order; the snapshot jumped when blocks differed; many cards left the chosen one off-screen; fades
+  were instant under Reduce Motion; SwitchRow's reason was only a hint; a date below a moved minimum; «Este ciclo» was
+  missing; stale docs and comments; and the test gaps of the edge-case matrix. Codex (PR #69): a card whose plans'
+  future interest added up beyond the exact range made Tarjetas and the card detail throw while rendering; the sums are
+  now unknown there («Total fuera de rango», never rounded) and every plan still reads on its own. Owner's decisions
+  (2026-09-29): the half-month rule that forced new usual days was removed (any correction may be one-off; the toggle is
+  always the person's), and Intereses became latent. Kept on purpose: a
+  deleted card's detail still shows its dates and limit (history as it was entered, 25B2), and the usual day a new card
+  takes is the entered date's (the edit form corrects it in a longer month).
+- **Status.** On its branch (2026-09-29), not device-verified. Checked on Linux on the final tree: root `npm test` (415
+  passed, 1 todo) and `npm run check:repo` (OK, 367 tracked files); mobile `typecheck` (clean), `test:storage` (875/875),
+  `currency:verify` and `regions:verify` (catalogues verified offline), `i18n:check -- --strict` (0 errors, 0 stale),
+  `i18n:extract` (no copy outside the catalogue), `check` (dependencies up to date) and `export:ios` (iOS bundle
+  exported, 1979 modules). The three SDK 57 patch releases published on 2026-09-29 were aligned (`expo` 57.0.25 →
+  57.0.26, `expo-constants` 57.0.19 → 57.0.20, `expo-router` 57.0.23 → 57.0.24; the lockfile also moves their pinned
+  `expo-modules-core` 57.0.20 and `@expo/ui` 57.0.21); no other dependency changed. The
+  `mobile_api` PostgreSQL job runs in CI. No EAS build; the iPhone was not touched (checklist section Producto 24T2).
 
 ### Producto 25C — budgets with rollover, goals, CSV and productivity
 

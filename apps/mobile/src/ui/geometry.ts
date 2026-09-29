@@ -12,10 +12,40 @@ export function segmentLayout(trackWidth: number, count: number, index: number):
   return { width, offset: SEGMENT_PADDING + clamped * (width + SEGMENT_GAP) };
 }
 
-/** Which carousel page a horizontal offset has settled on. */
-export function carouselIndex(offsetX: number, step: number, count: number): number {
-  if (!(step > 0) || !(count > 0)) return 0;
-  return Math.max(0, Math.min(count - 1, Math.round(offsetX / step)));
+/** Producto 24T2, Tarjetas: a vertical deck of card faces, like a wallet. The cards not selected stay stacked above the
+ * selected one in their stored order, each showing only its top strip (the row with the card's name and its last four
+ * digits); the selected card sits in front at the bottom of the deck, whole, right above its snapshot. The face text is
+ * capped at this Dynamic Type scale, so the strip that has to show its first row is capped too. */
+export const DECK_MAX_TEXT_SCALE = 1.3;
+
+/** The height of a strip: the face's top padding (16), its first row (22 pt of text at the capped scale) and a 10 pt margin.
+ * Never below 50 pt, so a strip is always a comfortable touch target (44 pt at least), at every text size. */
+export function deckExposure(fontScale: number): number {
+  const scale = Math.min(Math.max(Number.isFinite(fontScale) ? fontScale : 1, 1), DECK_MAX_TEXT_SCALE);
+  return Math.round(28 + 22 * scale);
+}
+
+/** Where each card of the deck sits (`tops`, in the stored order of `count` cards) and how the cards layer (`zIndex`):
+ * the others keep their relative order above, one strip each; the selected card is last, at `(count − 1) · exposure`,
+ * above every strip. The container always measures `(count − 1) · exposure + faceHeight`, whichever card is selected, so
+ * choosing a card never changes the height of the page. An index outside the deck falls back to the first card. */
+export function deckLayout(count: number, selectedIndex: number, exposure: number, faceHeight: number): { tops: number[]; zIndex: number[]; containerHeight: number } {
+  if (!(count > 0) || !Number.isInteger(count)) return { tops: [], zIndex: [], containerHeight: 0 };
+  const selected = Number.isInteger(selectedIndex) && selectedIndex >= 0 && selectedIndex < count ? selectedIndex : 0;
+  const zIndex = Array.from({ length: count }, (_, index) => index === selected ? count - 1 : index < selected ? index : index - 1);
+  return { tops: zIndex.map(position => position * exposure), zIndex, containerHeight: (count - 1) * exposure + faceHeight };
+}
+
+/** Where Tarjetas scrolls after a card is chosen, or null when it need not (24T2 review). The chosen card always moves to
+ * the front, at the bottom of the deck, so with many cards it lands below the visible area; the page then scrolls until
+ * its top sits a quarter of the way down the viewport, with the start of its snapshot under it. Window coordinates are
+ * measured before the move (the deck never moves or changes height); `contentOffset` is the current scroll offset. */
+export function deckScrollTarget(input: { count: number; exposure: number; faceHeight: number; deckTop: number; viewportTop: number; viewportHeight: number;
+  contentOffset: number }): number | null {
+  const frontTop = input.deckTop + Math.max(0, input.count - 1) * input.exposure;
+  // In view: its top below the top of the viewport and most of the face (name, last four, its middle) above the fold.
+  if (frontTop >= input.viewportTop && frontTop + input.faceHeight * 0.4 <= input.viewportTop + input.viewportHeight) return null;
+  return Math.max(0, input.contentOffset + frontTop - (input.viewportTop + input.viewportHeight * 0.25));
 }
 
 /** Advance widths, in em, of the glyphs an amount can contain, measured

@@ -1,39 +1,112 @@
-import { accountKind, cardAvailableLimitMinor, cardCycle, cardDebtMinor, type Account, type CreditCardProfile,
-  type InstallmentPlan, type LedgerSnapshot, type PersonalDebtProfile, type RecordedEntry, isLiveAccount } from '@finanzapp/domain';
+import { accountKind, cardAvailableLimitMinor, cardCommittedFinancingMinor, cardCommittedMinor, cardCreditMinor, cardCycleDatesOf, cardCycleView, cardDebtMinor, installmentPlanFigures, pendingInstallmentPlans,
+  type Account, type AccountAppearance, type CardCycleDates, type CardStatement, type CreditCardProfile, type InstallmentPlan, type LedgerSnapshot, type PersonalDebtProfile,
+  type RecordedEntry, isLiveAccount } from '@finanzapp/domain';
 import { relativeDate } from '../i18n/format.ts';
 import { DEFAULT_LOCALE, type AppLocale } from '../i18n/locale.ts';
 import { translator, type Translate } from '../i18n/messages.ts';
 
+/** How the available credit of a card reads (24T2): no limit set; a known figure; or unknown because a plan is pending
+ * and how the issuer reserves credit for instalments is not assumed (decision 003, rule 7): «No calculado con cuotas»,
+ * never zero and never an invented figure. */
+export type CardAvailability = 'noLimit' | 'known' | 'unknownWithPlans';
+
 export type CardSummary = {
-  /** Same as card.id; lets the carousel key items. */
+  /** Same as card.id; lets lists key items. */
   id: string;
   card: CreditCardProfile;
   account: Account;
+  /** «Saldo pendiente»: the whole recorded card liability (purchases and recognised instalments minus payments). Not a
+   * statement amount: FinanzApp does not know what the bank billed. */
   debtMinor: number;
+  /** Balance in the holder's favour (overpayment or a refund). */
+  creditMinor: number;
   availableMinor: number | null;
-  /** Share of the limit already used, 0–1 (or above 1 when over the limit). Null without a limit. */
+  availability: CardAvailability;
+  /** Share of the limit used, 0–1 (or above 1 when over the limit). Null without a limit or while the available credit is unknown. */
   usage: number | null;
+  /** The open statement: its closing (today at the earliest: on its closing day it is still open), its own due date, and
+   * the day it began. */
   closingISO: string;
-  dueISO: string;
+  openDueISO: string;
+  openStartISO: string;
+  /** The next due date (today or later): the statement closed last when its due is still ahead, else the open one. */
+  nextDueISO: string;
+  /** The closing of the statement `nextDueISO` belongs to. */
+  nextDueOfISO: string;
+  /** The closed statement still due, if any (its due may be corrected in the card form). */
+  toPay: CardStatement | null;
+  previousClosingISO: string;
+  /** Future committed principal of the card's live plans (cuotas futuras): beside the balance, never inside it. Null
+   * when the sum leaves the exact range (plans with amounts near the ledger's bound): the screens say «Total fuera de
+   * rango» instead of a rounded figure, and still open (each plan stays valid and readable on its own). */
+  committedMinor: number | null;
+  /** The future financing of those plans (interest, and fee or tax in older plans): named beside the principal («+ interés
+   * $ …»), never added into it, so «Cuotas futuras» never disagrees with the instalments a plan lists. Null out of range. */
+  committedFinancingMinor: number | null;
+  /** How that financing is named: interest only, or a mix with fees or taxes. */
+  financingKind: 'interest' | 'financing';
+  /** Plans with a share not yet recognised. */
+  pendingPlans: InstallmentPlan[];
+  /** How many of them still have principal to come: the plans `committedMinor` adds up («en 2 planes»). */
+  futurePlanCount: number;
 };
 
-/** Everything the Cards tab needs for one card, computed once from the snapshot. 24T1: with a pending instalment plan the
- * available limit is unknown (null) until the issuer-reservation gate is decided; 24T2 draws that state. */
-export function summarizeCard(card: CreditCardProfile, snapshot: LedgerSnapshot, todayISO: string, plans: readonly InstallmentPlan[] = [], records: readonly RecordedEntry[] = []): CardSummary | null {
+/** Everything Tarjetas needs for one card, computed once from the snapshot, the plans and the card's exact cycle dates. */
+export function summarizeCard(card: CreditCardProfile, snapshot: LedgerSnapshot, todayISO: string, plans: readonly InstallmentPlan[] = [], records: readonly RecordedEntry[] = [],
+  cycleDates: readonly CardCycleDates[] = []): CardSummary | null {
   const account = snapshot.accounts.find(item => item.id === card.accountId);
   if (!account) return null;
   const debtMinor = cardDebtMinor(card, snapshot);
   const availableMinor = cardAvailableLimitMinor(card, snapshot, plans, records);
-  const cycle = cardCycle(card, todayISO);
-  return { id: card.id, card, account, debtMinor, availableMinor,
-    usage: card.creditLimitMinor ? debtMinor / card.creditLimitMinor : null,
-    closingISO: cycle.closingISO, dueISO: cycle.dueISO };
+  const availability: CardAvailability = card.creditLimitMinor === null ? 'noLimit' : availableMinor === null ? 'unknownWithPlans' : 'known';
+  const view = cardCycleView(card, cardCycleDatesOf(card.id, cycleDates), todayISO);
+  const pendingPlans = pendingInstallmentPlans(card, plans, records);
+  // Sums over every live plan of the card: exact, or null when they leave the safe range (never a throw while rendering).
+  const exactly = (sum: () => number) => { try { return sum(); } catch { return null; } };
+  return { id: card.id, card, account, debtMinor, creditMinor: cardCreditMinor(card, snapshot), availableMinor, availability,
+    usage: availability === 'known' && card.creditLimitMinor ? debtMinor / card.creditLimitMinor : null,
+    closingISO: view.open.closingISO, openDueISO: view.open.dueISO, openStartISO: view.openStartISO,
+    nextDueISO: view.nextDue.dueISO, nextDueOfISO: view.nextDue.closingISO, toPay: view.toPay, previousClosingISO: view.previous.closingISO,
+    committedMinor: exactly(() => cardCommittedMinor(card, plans, records)),
+    committedFinancingMinor: exactly(() => cardCommittedFinancingMinor(card, plans, records)),
+    financingKind: pendingPlans.some(plan => plan.feeMinor + plan.taxMinor > 0) ? 'financing' : 'interest', pendingPlans,
+    futurePlanCount: pendingPlans.filter(plan => installmentPlanFigures(plan, records).scheduledMinor > 0).length };
 }
 
-export function activeCards(cards: CreditCardProfile[] | undefined, snapshot: LedgerSnapshot, todayISO: string, plans: readonly InstallmentPlan[] = [], records: readonly RecordedEntry[] = []): CardSummary[] {
+/** The cards Tarjetas shows in its deck, in their stored order (active first, then by creation). */
+export function activeCards(cards: CreditCardProfile[] | undefined, snapshot: LedgerSnapshot, todayISO: string, plans: readonly InstallmentPlan[] = [], records: readonly RecordedEntry[] = [],
+  cycleDates: readonly CardCycleDates[] = []): CardSummary[] {
   return (cards ?? []).filter(card => card.active)
-    .map(card => summarizeCard(card, snapshot, todayISO, plans, records))
+    .map(card => summarizeCard(card, snapshot, todayISO, plans, records, cycleDates))
     .filter((summary): summary is CardSummary => summary !== null);
+}
+
+/** 24T2: archived cards (not deleted) stay reachable from Tarjetas, under Archivadas: their plans keep being recognised
+ * and they still take payments. */
+export function archivedCards(cards: CreditCardProfile[] | undefined, snapshot: LedgerSnapshot, todayISO: string, plans: readonly InstallmentPlan[] = [], records: readonly RecordedEntry[] = [],
+  cycleDates: readonly CardCycleDates[] = []): CardSummary[] {
+  return (cards ?? []).filter(card => !card.active && !card.deleted)
+    .map(card => summarizeCard(card, snapshot, todayISO, plans, records, cycleDates))
+    .filter((summary): summary is CardSummary => summary !== null);
+}
+
+/** 24T2: the colour a card's face takes: the one chosen for its hidden account in Editar cuenta, or null when none was
+ * chosen (the face keeps its hash tone). `accountLook` cannot tell «never chose» from «chose cobalt», so the row itself
+ * is read. */
+export function cardFaceColor(card: Pick<CreditCardProfile, 'accountId'>, appearances: readonly AccountAppearance[] = []): string | null {
+  return appearances.find(item => item.accountId === card.accountId)?.color ?? null;
+}
+
+/** 24T2: a face prints its currency code only when the person holds cards in more than one currency: the live cards
+ * (active or archived; a deleted card shown in its own detail, `keepId`, counts too). */
+export function cardCurrenciesDiffer(cards: readonly CreditCardProfile[] = [], accounts: readonly Account[] = [], keepId?: string): boolean {
+  const currencies = new Set<string>();
+  for (const card of cards) {
+    if (card.deleted && card.id !== keepId) continue;
+    const account = accounts.find(item => item.id === card.accountId);
+    if (account) currencies.add(account.currency);
+  }
+  return currencies.size > 1;
 }
 
 export function usageTone(usage: number | null): 'neutral' | 'warning' | 'expense' {
@@ -69,9 +142,9 @@ export function accountKindLabel(account: Account, cards: CreditCardProfile[] = 
   return t(kind === 'card' ? 'accountKinds.creditCard' : kind === 'debt' ? 'accountKinds.debt' : 'accountKinds.account');
 }
 
-/** One line of statement facts under the activity title, instead of two cards. `relative`
- * names the start day inside the sentence, so it takes the inline form (`relativeDate(…, true)`):
- * "Resumen abierto desde ayer", "Statement open since yesterday". */
+/** The open cycle's activity in one caption line under Recientes and Movimientos («Este ciclo»: what the ledger holds
+ * since the previous closing, never a statement amount). `relative` names the start day inside the sentence, so it takes
+ * the inline form (`relativeDate(…, true)`): "Este ciclo, desde ayer", "This cycle, since yesterday". */
 export function statementCaption(statement: { startISO: string; purchaseCount: number; paymentCount: number }, relative: (iso: string) => string,
   t: Translate = translator('es')): string {
   return [t('cards.statement.openSince', { date: relative(statement.startISO) }), t('cards.statement.purchases', { count: statement.purchaseCount }),

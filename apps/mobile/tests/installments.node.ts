@@ -81,8 +81,8 @@ test('schema 12 is reached from a real schema 11 file by an additive migration: 
     INSERT INTO entries (id, accountId, kind, amountMinor, merchant, category, dateISO, createdAt, revision, voided, updatedAt) VALUES ('p1', 'c', 'expense', 100, 'Súper', 'Comida', '2026-09-10', '${createdAt}', 0, 0, '${createdAt}');`);
   assert.equal((await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))?.user_version, 11);
   await initializeDatabase(db);
-  assert.equal((await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))?.user_version, 12);
-  assert.equal(DATABASE_VERSION, 12);
+  assert.equal((await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))?.user_version, 13, '24T2: the file continues to schema 13 (an empty card_cycle_dates table)');
+  assert.equal(DATABASE_VERSION, 13);
   const archive = await readArchive(db);
   assert.equal(archive.installmentPlans, undefined, 'old data gets no plan');
   assert.deepEqual(archive.cards?.[0], { ...card, accountId: 'c', creditLimitMinor: null });
@@ -91,8 +91,8 @@ test('schema 12 is reached from a real schema 11 file by an additive migration: 
   // Idempotent: the step runs again on a file that already has the tables (an interrupted step), and reaches 12 once more.
   await db.execAsync('PRAGMA user_version = 11');
   await initializeDatabase(db);
-  assert.equal((await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))?.user_version, 12);
-  await db.execAsync('PRAGMA user_version = 13');
+  assert.equal((await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))?.user_version, 13);
+  await db.execAsync('PRAGMA user_version = 14');
   await assert.rejects(initializeDatabase(db), /versión más nueva/);
   // The foreign keys hold: an instalment row needs its plan, a plan its card.
   await assert.rejects(db.withExclusiveTransactionAsync(async tx => { await tx.runAsync("INSERT INTO installments (planId, number, billingDateISO, dueDateISO, principalMinor, interestMinor, feeMinor, taxMinor) VALUES ('nope', 1, '2026-09-20', '2026-10-05', 1, 0, 0, 0)"); }), /FOREIGN KEY/);
@@ -348,9 +348,10 @@ test('backup v12: export, restore into a fresh device (nothing recorded twice, t
   assert.equal(older.conflicts, 1);
   await assert.rejects(importArchive(fresh, olderArchive, older.baseline), /contradice cambios locales/);
   assert.equal((await planOf(fresh, 'fin')).cancelledAt, now, 'the local cancellation stands');
-  // The refusal contract: a v12 file read by a build that knows up to v11 (its parser told the file is v11) refuses the extra key; a v13 file is refused by name.
+  // The refusal contract: a v12 file read by a build that knows up to v11 (its parser told the file is v11) refuses the extra key; a v14 file is refused by name.
   assert.throws(() => parsePilotBackup(JSON.stringify({ ...backup, schema: 'finanzapp.native-pilot.v11' })), /campos faltantes/);
-  assert.throws(() => parsePilotBackup(JSON.stringify({ ...backup, schema: 'finanzapp.native-pilot.v13' })), /versiones 1 a 12/);
+  assert.throws(() => parsePilotBackup(JSON.stringify({ ...backup, schema: 'finanzapp.native-pilot.v13' })), /campos faltantes/, 'a v12 file told v13 lacks cardCycleDates');
+  assert.throws(() => parsePilotBackup(JSON.stringify({ ...backup, schema: 'finanzapp.native-pilot.v14' })), /versiones 1 a 13/);
   // Without a plan the file stays as before (v11 here: the seeded card is live, so v8 with no plan).
   const plainDb = setup().db;
   await initializeDatabase(plainDb);
@@ -393,6 +394,26 @@ test('a failed instalment catch-up (disk full, database locked) still opens the 
     await refreshLedger(broken.db, '2026-11-25');
     assert.deepEqual(await instalmentIds(db), ['inst_tv_001', 'inst_tv_002', 'inst_tv_003'], 'no duplicate after a retry');
   }
+});
+
+test('24T2: a purchase in instalments saved from the form stays saved when recognising its closed first instalment fails; the banner says so, the frozen retry adds no second plan, and the instalment is recorded once', async () => {
+  const { savePurchasePlan, sessionWarning } = await import('../src/storage/ledger-session.ts');
+  const { db } = await seeded();
+  // Recorded late: the purchase of 5 sep belongs to the statement that closed on 20 sep, so instalment 1 is due at once.
+  const late = newInstallmentPlan({ id: 'late', card, cardAccount, merchant: 'Heladera', category: 'Hogar', purchaseDateISO: '2026-09-05', principalMinor: 30000, count: 3,
+    placement: 'current', createdAt });
+  const broken = failingOn(db, insertOf('inst_late_'), 'database or disk is full');
+  assert.equal(await savePurchasePlan(broken.db, late, '2026-09-25'), sessionWarning({ recurringError: false, installmentError: true }), 'reported, never a failed save');
+  const plansOf = async () => (await readArchive(db)).installmentPlans!.filter(plan => plan.id === 'late');
+  assert.equal((await plansOf()).length, 1, 'the plan is durable');
+  assert.deepEqual((await instalmentIds(db)).filter(id => id.startsWith('inst_late_')), [], 'nothing half-written');
+  // The form resends the same frozen plan (its Reintentar): storage treats it as done; the recognition now succeeds.
+  broken.heal();
+  assert.equal(await savePurchasePlan(broken.db, late, '2026-09-25'), null);
+  assert.equal((await plansOf()).length, 1, 'no second plan');
+  assert.deepEqual((await instalmentIds(db)).filter(id => id.startsWith('inst_late_')), ['inst_late_001']);
+  await refreshLedger(db, '2026-09-25');
+  assert.deepEqual((await instalmentIds(db)).filter(id => id.startsWith('inst_late_')), ['inst_late_001'], 'recorded once');
 });
 
 test('the recurring and the instalment errors are independent: either one alone, both together, each cleared by its own success', async () => {

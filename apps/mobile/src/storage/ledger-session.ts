@@ -1,5 +1,5 @@
-import type { LedgerArchive } from '@finanzapp/domain';
-import { catchUpInstallments, catchUpRecurring, initializeDatabase, readArchive, type LedgerDatabase } from './database.ts';
+import type { InstallmentPlan, LedgerArchive } from '@finanzapp/domain';
+import { catchUpInstallments, catchUpRecurring, createInstallmentPlan, initializeDatabase, readArchive, type LedgerDatabase } from './database.ts';
 
 /** What LedgerProvider shows after opening or returning to the foreground: the archive as stored, the recurring rules
  * set aside for review (their ids), and whether each catch-up could not run. `recurringError` and `installmentError`
@@ -43,4 +43,14 @@ export function sessionWarning(session: Pick<LedgerSession, 'recurringError' | '
     return 'No pudimos registrar las cuotas vencidas de tus tarjetas. El saldo de tus tarjetas, Reportes y Presupuestos pueden no incluirlas todavía. No se modificó nada fuera de una transacción completa.';
   }
   return null;
+}
+
+/** Producto 24T2: a purchase in instalments saved from the form. The plan is created in its own commit (a retry of the
+ * same plan is a no-op there); then a first instalment whose statement already closed is recognised at once. A failing
+ * recognition never fails the save: the plan is durable, and a failed save would invite the person to create it again.
+ * It returns the banner instead (the next pass, or the banner's retry, records the instalment once: deterministic ids). */
+export async function savePurchasePlan(db: LedgerDatabase, plan: InstallmentPlan, todayISO: string): Promise<string | null> {
+  await createInstallmentPlan(db, plan);
+  try { await catchUpInstallments(db, todayISO); return null; }
+  catch { return sessionWarning({ recurringError: false, installmentError: true }); }
 }

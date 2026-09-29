@@ -92,11 +92,14 @@ const history: Entry[] = [
   { ...entry, id: 'h5', kind: 'income', category: 'Sueldo', dateISO: '2026-09-01' },
 ];
 const expensePresets = ['Comida', 'Supermercado', 'Restaurantes', 'Transporte', 'Combustible', 'Hogar', 'Alquiler', 'Servicios', 'Suscripciones', 'Salud',
-  'Farmacia', 'Educación', 'Ropa', 'Tecnología', 'Ocio', 'Viajes', 'Mascotas', 'Regalos', 'Impuestos', 'Seguros', 'Otros'];
+  'Farmacia', 'Educación', 'Ropa', 'Tecnología', 'Ocio', 'Viajes', 'Mascotas', 'Regalos', 'Impuestos', 'Seguros', 'Intereses', 'Otros'];
 const incomePresets = ['Sueldo', 'Trabajo', 'Ventas', 'Inversiones', 'Regalos', 'Reembolsos', 'Préstamos', 'Otros'];
+// 24T2: Intereses is latent: listed once a movement, a definition or a saved plan with interest needs it.
+const visibleExpensePresets = expensePresets.filter(label => label !== 'Intereses');
 
 test('test-looking categories are not presets: an empty ledger offers exactly the defaults', () => {
-  assert.deepEqual(categoryChoices([], 'expense').map(item => item.label), expensePresets);
+  assert.deepEqual(categoryChoices([], 'expense').map(item => item.label), visibleExpensePresets);
+  for (const stray of ['JD', 'sjsjn', 'Intereses']) assert.equal(categoryChoices([], 'expense').some(item => item.label === stray), false, stray + ' is never offered on a new ledger');
   assert.deepEqual(categoryChoices([], 'income').map(item => item.label), incomePresets);
   assert.ok(categoryChoices([], 'expense').every(item => item.source === 'preset' && item.icon && item.color));
 });
@@ -105,8 +108,8 @@ test('historical custom categories stay selectable and unrenamed next to the int
   const choices = categoryChoices(history, 'expense');
   assert.deepEqual(choices.slice(0, 3).map(item => item.label), ['Comida', 'JD', 'sjsjn'], 'recorded first, most recent first');
   assert.deepEqual(choices.slice(1, 3).map(item => item.source), ['historical', 'historical']);
-  for (const label of expensePresets) assert.ok(choices.some(item => item.label === label), label + ' preset intact');
-  assert.equal(choices.length, expensePresets.length + 2);
+  for (const label of visibleExpensePresets) assert.ok(choices.some(item => item.label === label), label + ' preset intact');
+  assert.equal(choices.length, visibleExpensePresets.length + 2);
   assert.deepEqual(categoryChoices(history, 'income').map(item => item.label), incomePresets, 'expense-only history never leaks into income');
   assert.equal(JSON.stringify(history), before, 'nothing in the ledger was renamed or deleted');
   assert.equal(categoryKey('  JD '), 'jd');
@@ -136,4 +139,12 @@ test('23.1C2: hue tie-breaks order the same under Spanish and English collation,
   // The collations do differ on a raw ñ; the key never carries one.
   assert.ok(new Intl.Collator('es').compare('ña', 'nz') > 0 && new Intl.Collator('en').compare('ña', 'nz') < 0);
   assert.equal(categoryKey('Ñandú'), 'nandu');
+});
+
+test('24T2: the picker offers Intereses once a saved plan with interest needs it (before its first instalment) or a movement used it, in the interface language', () => {
+  assert.equal(categoryChoices([], 'expense', '', '', [], 'es', ['Intereses']).some(item => item.label === 'Intereses' && item.icon === 'bank'), true);
+  const interest: Entry = { ...entry, id: 'insti_nb_001', category: 'Intereses', dateISO: '2026-09-28' };
+  assert.equal(categoryChoices([interest], 'expense')[0].label, 'Intereses', 'recorded first, as its preset identity');
+  assert.equal(categoryChoices([interest], 'expense', '', '', [], 'en')[0].label, 'Interest', 'shown in English, stored as «Intereses»');
+  assert.equal(categoryChoices([interest], 'expense', '', '', [], 'en')[0].storedLabel, 'Intereses');
 });

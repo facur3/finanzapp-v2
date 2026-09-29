@@ -1,16 +1,17 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { AppState } from 'react-native';
-import { snapshotFromArchive, todayKey, type Account, type Entry, type EntryChange, type LedgerArchive, type LedgerSnapshot,
+import { PLAN_CALENDAR_MESSAGE, snapshotFromArchive, todayKey, type Account, type Entry, type EntryChange, type LedgerArchive, type LedgerSnapshot,
   type AccountChange, type Transfer, type TransferChange, type RecurringRule, type MonthlyBudget,
-  type CreditCardProfile, type PersonalDebtProfile, type AccountAppearance, type CategoryDefinition, type InstallmentPlan } from '@finanzapp/domain';
+  type CreditCardProfile, type PersonalDebtProfile, type AccountAppearance, type CategoryDefinition, type InstallmentPlan,
+  type CardCycleDates, type CardCycleIntent } from '@finanzapp/domain';
 import type { CurrencyGate } from '@finanzapp/domain';
 import { currencyGateForBuild } from './currency-gate';
 import { changeEntry, createAccount, createEntry, deleteAccount, deleteCreditCard, importArchive, readArchive, changeAccount,
   createTransfer, changeTransfer, saveRecurringRule, processRecurring, saveMonthlyBudget,
   createCreditCard, saveCreditCard, createPersonalDebt, savePersonalDebt, deletePersonalDebt, saveAccountAppearance, saveCategoryDefinition,
-  createInstallmentPlan, cancelInstallmentPlan, deleteInstallmentPlan, catchUpInstallments,
+  cancelInstallmentPlan, deleteInstallmentPlan, catchUpInstallments,
   type LedgerDatabase } from './database';
-import { openLedger, refreshLedger, sessionWarning } from './ledger-session';
+import { openLedger, refreshLedger, savePurchasePlan, sessionWarning } from './ledger-session';
 import { openLedgerDatabase } from './nativeDatabase';
 
 declare const __DEV__: boolean | undefined;
@@ -37,8 +38,11 @@ type LedgerContextValue = {
   updateTransfer: (change: TransferChange) => Promise<void>;
   saveRecurring: (rule: RecurringRule) => Promise<void>;
   saveBudget: (budget: MonthlyBudget) => Promise<void>;
-  addCard: (account: Account, card: CreditCardProfile) => Promise<void>;
-  saveCard: (card: CreditCardProfile) => Promise<void>;
+  /** 24T2: with the exact dates of its first statement when the usual days cannot produce them (`newCardCycle`). */
+  addCard: (account: Account, card: CreditCardProfile, cycleDates?: readonly CardCycleDates[]) => Promise<void>;
+  /** 24T2: the card's own `closingDay`/`dueDay` are its usual days; `cycle` names the exact dates the form asked for.
+   * Storage plans the calendar again on today's date, freezing every statement that already closed. */
+  saveCard: (card: CreditCardProfile, cycle?: Omit<CardCycleIntent, 'days'>) => Promise<void>;
   /** Producto 25B2: the deletion record of a card (refused with a recorded debt; its active rules stop). */
   removeCard: (cardId: string) => Promise<void>;
   addDebt: (account: Account, debt: PersonalDebtProfile) => Promise<void>;
@@ -141,17 +145,23 @@ export function LedgerProvider({ children }: { children: ReactNode }) {
       await processRecurring(db, todayKey());
     }),
     saveBudget: budget => mutate(db => saveMonthlyBudget(db, budget, BUILD_CURRENCY_GATE)),
-    addCard: (account, card) => mutate(db => createCreditCard(db, account, card, BUILD_CURRENCY_GATE)),
-    saveCard: card => mutate(db => saveCreditCard(db, card)),
+    addCard: (account, card, cycleDates = []) => mutate(db => createCreditCard(db, account, card, BUILD_CURRENCY_GATE, cycleDates)),
+    saveCard: (card, cycle = {}) => mutate(db => saveCreditCard(db, card, cycle, todayKey())),
     removeCard: cardId => mutate(db => deleteCreditCard(db, cardId, new Date().toISOString())),
     addDebt: (account, debt) => mutate(db => createPersonalDebt(db, account, debt, BUILD_CURRENCY_GATE)),
     saveDebt: debt => mutate(db => savePersonalDebt(db, debt)),
     removeDebt: debtId => mutate(db => deletePersonalDebt(db, debtId, new Date().toISOString())),
     addInstallmentPlan: plan => mutate(async db => {
-      await createInstallmentPlan(db, plan);
       // A first instalment on a statement already closed is recognised at once. The plan is saved either way: a failing
       // recognition is reported in the banner (never as a failed save that would invite a duplicate) and retried.
-      try { await catchUpInstallments(db, todayKey()); } catch { pendingWarning.current = sessionWarning({ recurringError: false, installmentError: true }); }
+      try { pendingWarning.current = await savePurchasePlan(db, plan, todayKey()); } catch (cause) {
+        // 24T2: a plan built from a calendar this view no longer holds (a card change whose refresh failed) is refused before
+        // anything is written; the view is read again so the form rebuilds the plan from the card's current statements.
+        if (cause instanceof Error && cause.message === PLAN_CALENDAR_MESSAGE) {
+          try { const fresh = await readArchive(db); if (mounted.current) setArchive(fresh); } catch { /* The refusal stands either way. */ }
+        }
+        throw cause;
+      }
     }),
     cancelInstallmentPlan: planId => mutate(db => cancelInstallmentPlan(db, planId, new Date().toISOString())),
     removeInstallmentPlan: planId => mutate(db => deleteInstallmentPlan(db, planId, new Date().toISOString())),

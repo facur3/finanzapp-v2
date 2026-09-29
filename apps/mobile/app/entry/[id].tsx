@@ -9,6 +9,7 @@ import { budgetTone } from '../../src/ui/budget-presentation';
 import { AccountBadge, ActionButton, AppText, DetailRow, EmptyState, ErrorMessage, MerchantBadge, Money, Screen, Surface } from '../../src/ui/components';
 import { useI18n } from '../../src/i18n/provider';
 import { useCategoryLabel } from '../../src/ui/category-hues';
+import { installmentOfEntry } from '../../src/ui/installment-presentation';
 import { space, usePalette } from '../../src/ui/theme';
 
 export default function EntryScreen() {
@@ -30,6 +31,8 @@ function EntryDetail({ record, account }: { record: EntryRecord; account: Accoun
   const { t, formatDate, currencyName, formatMoneyAmount, spokenMoney } = useI18n();
   const { entry } = record;
   const card = archive?.cards?.find(item => item.accountId === account.id);
+  // 24T2: a movement an instalment plan recorded (a share of one instalment: its principal, or its interest, fee or tax).
+  const instalment = installmentOfEntry(entry.id, archive?.installmentPlans);
   const categoryLabel = useCategoryLabel(entry.category, entry.kind);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -59,7 +62,10 @@ function EntryDetail({ record, account }: { record: EntryRecord; account: Accoun
     const adds = restore ? entry.kind === 'income' : entry.kind === 'expense';
     Alert.alert(t(restore ? 'entryDetail.restoreQuestion' : 'entryDetail.voidQuestion'),
       t(adds ? 'entryDetail.willAdd' : 'entryDetail.willSubtract', { amount: formatMoneyAmount(entry.amountMinor, account.currency) + ' ' + account.currency, account: account.name }) + ' '
-      + t(restore ? 'entryDetail.restoreEffect' : 'entryDetail.voidEffect'), [
+      + t(restore ? 'entryDetail.restoreEffect' : 'entryDetail.voidEffect')
+      // An undone instalment is never recreated by the catch-up and its obligation stays open in the plan (24T1). A share of
+      // an instalment that has another (its principal and its interest) is undone alone: the note says so.
+      + (instalment && !restore ? ' ' + t(instalment.shared ? 'entryDetail.installmentShareVoidNote' : 'entryDetail.installmentVoidNote') : ''), [
         { text: t('common.cancel'), style: 'cancel', onPress: () => { confirming.current = false; } },
         { text: t(restore ? 'entryDetail.restore' : 'entryDetail.void'), style: restore ? 'default' : 'destructive', onPress: () => { confirming.current = false; void apply(change); } },
       ], { cancelable: true, onDismiss: () => { confirming.current = false; } });
@@ -87,7 +93,10 @@ function EntryDetail({ record, account }: { record: EntryRecord; account: Accoun
     : t('entryDetail.budgetUsed', { percent: Math.round(row.ratio * 100), amount: money(row.remainingMinor) });
 
   return <Screen gap={space.xl}>
-    <Stack.Screen options={{ title: t(record.voided ? 'entryDetail.voidedTitle' : income ? 'movement.income' : card ? 'entryForm.cardPurchaseTitle' : 'movement.expense'), gestureEnabled: !busy, headerBackVisible: !busy }} />
+    <Stack.Screen options={{ title: t(record.voided ? 'entryDetail.voidedTitle' : income ? 'movement.income'
+      : instalment ? (instalment.component === 'principal' ? 'entryDetail.installmentTitle' : `entryDetail.installmentShareTitle.${instalment.component}`)
+      : card ? 'entryForm.cardPurchaseTitle' : 'movement.expense'),
+      gestureEnabled: !busy, headerBackVisible: !busy }} />
     <View style={{ gap: 14, alignItems: 'center', paddingVertical: 12 }}>
       <MerchantBadge merchant={entry.merchant} category={entry.category} kind={entry.kind} large tone={income ? 'income' : 'neutral'} />
       <View style={{ alignItems: 'center', gap: 4, width: '100%' }}>
@@ -104,6 +113,10 @@ function EntryDetail({ record, account }: { record: EntryRecord; account: Accoun
         leading={card ? undefined : <AccountBadge accountId={account.id} size={28} />}
         disabled={busy}
         onPress={() => router.push(card ? { pathname: '/card/[id]', params: { id: card.id } } : { pathname: '/account/[id]', params: { id: account.id } })} />
+      {/* 24T2: which instalment of which plan recorded it: "3 de 12" (a financing share says so: "3 de 12 · interés"). */}
+      {instalment && <DetailRow label={t('entryDetail.installment')} icon="layers-outline" disabled={busy}
+        value={t(instalment.component === 'principal' ? 'entryDetail.installmentOf' : `entryDetail.installmentShare.${instalment.component}`, { number: instalment.number, count: instalment.count })}
+        onPress={() => router.push({ pathname: '/installment/[id]', params: { id: instalment.plan.id } })} />}
       {budget && <DetailRow label={t('entryDetail.budget')} icon="speedometer-outline" tone={budgetTone(budget)}
         value={budgetLine(budget, minor => formatMoneyAmount(minor, account.currency))} spokenValue={budgetLine(budget, minor => spokenMoney(minor, account.currency))}
         onPress={() => router.push({ pathname: '/budgets', params: { currency: account.currency, month: entry.dateISO.slice(0, 7) } })} />}

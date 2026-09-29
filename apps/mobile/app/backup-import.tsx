@@ -72,8 +72,11 @@ export default function BackupImportScreen() {
   }
 
   const plan = review?.preview;
+  // Everything the import would write (as importArchive decides it): a copy whose only news is an instalment plan, a look
+  // or a category still offers the import (24T2 review).
   const additions = (plan?.accounts.length ?? 0) + (plan?.records.length ?? 0) + (plan?.transfers.length ?? 0)
-    + (plan?.recurring.length ?? 0) + (plan?.budgets.length ?? 0) + (plan?.cards.length ?? 0) + (plan?.debts.length ?? 0);
+    + (plan?.recurring.length ?? 0) + (plan?.budgets.length ?? 0) + (plan?.cards.length ?? 0) + (plan?.debts.length ?? 0)
+    + (plan?.installmentPlans.length ?? 0) + (plan?.appearances.length ?? 0) + (plan?.categories.length ?? 0) + (plan?.cardCycleDates.length ?? 0);
   const hiddenIncoming = new Set([...plan?.cards ?? [], ...plan?.debts ?? []].map(item => item.accountId));
   // A count is grouped on screen ("1.234", "1,234"); VoiceOver gets the plain digits, which every voice reads as one number.
   const count = (value: number) => ({ value: formatCount(value), spokenValue: String(value) });
@@ -97,6 +100,7 @@ export default function BackupImportScreen() {
           <DetailRow label={t('backup.import.rows.transfers')} {...count(plan.transfers.filter(record => !record.voided).length)} />
           <DetailRow label={t('backup.import.rows.recurring')} {...count(plan.recurring.length)} />
           <DetailRow label={t('backup.import.rows.budgets')} {...count(plan.budgets.length)} />
+          {plan.installmentPlans.length > 0 && <DetailRow label={t('backup.import.rows.plans')} {...count(plan.installmentPlans.length)} />}
           {plan.currencyUnits.length > 0 && <DetailRow label={t('backup.import.units')} {...count(plan.currencyUnits.length)} />}
           <DetailRow label={t('backup.import.rows.voided')} {...count(plan.records.filter(record => record.voided).length + plan.transfers.filter(record => record.voided).length)} />
           <DetailRow label={t('backup.import.rows.present')} {...count(plan.identical)} last />
