@@ -1,6 +1,6 @@
 # FinanzApp mobile: living roadmap
 
-Updated: 2026-09-29 (Producto 24UX6A, Home hierarchy, app shell and Appearance, implemented on its branch: one number
+Updated: 2026-09-29 (Producto 24UX6A, Home hierarchy, app shell and Appearance, implemented on its branch (PR #70): one number
 and one «＋ Registrar» sheet on Inicio, the floating tab bar, Más → Apariencia; device QA pending. Producto 24T2 merged as
 PR #69, merge commit 8951f6c: schema 13, backup v13, the purchase in cuotas, the card's statement calendar and the
 Tarjetas deck, verified by the owner on an iPhone 14 Pro with a fresh development build). Read [decision 001](decisions/001-native-mobile.md),
@@ -141,7 +141,7 @@ file). "Released" below names an in-app gate (`RELEASED_LANGUAGES`, `RELEASED_RE
 `LEDGER_CURRENCIES`): what a build offers, verified on Linux; nothing is distributed to people yet
 (§4).
 
-- **Inicio, the app shell and Apariencia (24UX6A, on its branch).** Inicio answers three questions (how am I, what
+- **Inicio, the app shell and Apariencia (24UX6A, PR #70, on its branch).** Inicio answers three questions (how am I, what
   needs my attention, how do I record something) with one number, one «＋ Registrar» sheet, the commitments due this
   week and at most one computed line; the tab bar is a floating capsule over the same five destinations; Más →
   Apariencia chooses Sistema, Claro or Oscuro, stored outside the ledger and its backups. No schema, backup or
@@ -413,7 +413,7 @@ item unless a section says a new native build is needed. The checklist sections 
 **Recommended next (2026-09-29):** 25B3 (PR #66), 24T1 (PR #67), 24T1C (PR #68) and **24T2 (PR #69, merge commit
 8951f6c)** merged: SQLite schema 13, backup v13, the purchase in cuotas and the complete Tarjetas, verified by the owner on
 an iPhone 14 Pro with a fresh development build. The immediate path is visual first: **24UX6A** (Home hierarchy, app
-shell and Appearance; on its branch), then **24UX6B** (Reportes' visual hierarchy), then **24T3** (refunds, early
+shell and Appearance; PR #70, on its branch), then **24UX6B** (Reportes' visual hierarchy), then **24T3** (refunds, early
 payoff, cancellation adjustments and the final device QA of instalments), then the later roadmap below. The earlier
 plan, as reconciled by 24T1C: 24T1 left 12 of the 13 card-invariant `it.todo`
 as tests (the remaining one, the foreign-currency plan record, belongs to 24C2); then 24T2 and **24T3**: **Producto 24T** ships in three focused PRs: 24T1 (domain, schema, backup and instalment
@@ -1761,7 +1761,7 @@ nothing of it is on a screen yet.
   `expo-modules-core` 57.0.20 and `@expo/ui` 57.0.21); no other dependency changed. The
   `mobile_api` PostgreSQL job runs in CI. No EAS build; the iPhone was not touched (checklist section Producto 24T2).
 
-### Producto 24UX6A — Home hierarchy, app shell and Appearance (branch `feat/producto-24ux6a-home-shell`)
+### Producto 24UX6A — Home hierarchy, app shell and Appearance (PR #70)
 
 - **Goal.** Inicio answers three questions and stops: how am I, what needs my attention, how do I record something.
   The shell gets the same restraint: a calmer tab bar and an Appearance setting. Visual only: no financial semantics,
@@ -1838,7 +1838,7 @@ nothing of it is on a screen yet.
   bar's reading, localized); the Large Content Viewer of the stock tab items was missing (restored); a stale style
   comment. Checked and sound: the tab events against the stock bar, the sheet's dismissal (once, never stale), the
   Appearance override on RN 0.86, the insight's priorities and thresholds.
-- **Status.** Implemented on the branch; device QA pending (checklist, Producto 24UX6A). Checked on Linux on the final
+- **Status.** Implemented on the branch, PR #70 open (not merged); device QA pending (checklist, Producto 24UX6A). Checked on Linux on the final
   tree: root `npm test` (415 passed, 1 todo) and `npm run check:repo` (OK, 376 tracked files); mobile `typecheck`
   (clean), `test:storage` (889/889), `currency:verify` and `regions:verify` (catalogues verified offline),
   `i18n:check -- --strict` (0 errors, 0 stale; the English lock accepted for the new keys), `i18n:extract` (no copy
