@@ -2,6 +2,7 @@ import { router, Tabs } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { usePalette } from '../../src/ui/theme';
 import { IconButton } from '../../src/ui/components';
+import { FloatingTabBar } from '../../src/ui/floating-tab-bar';
 import { selectionHaptic } from '../../src/ui/motion';
 import { tabHostOptions, tabScreenOptions } from '../../src/ui/navigation';
 import { useI18n } from '../../src/i18n/provider';
@@ -21,20 +22,18 @@ export default function TabsLayout() {
   // an interrupted opacity animation or a native detach/reattach.
   // Stack pushes and modal gestures still use the native navigator above us.
   // Sections switch instantly (no slide, no fade: the mounted-tab mitigation); a selection tick confirms the change without delaying it.
-  return <Tabs {...tabHostOptions} screenListeners={({ navigation }) => ({ tabPress: () => { if (!navigation.isFocused()) selectionHaptic(); } })}
+  // 24UX6A: the bar is a floating capsule (`FloatingTabBar`: the app's glass or opaque material, a cobalt selected tab over
+  // a neutral lens, labels always shown); the five destinations and their order are unchanged.
+  return <Tabs {...tabHostOptions} tabBar={props => <FloatingTabBar {...props} />}
+    screenListeners={({ navigation }) => ({ tabPress: () => { if (!navigation.isFocused()) selectionHaptic(); } })}
     screenOptions={{ ...tabScreenOptions,
     headerStyle: { backgroundColor: p.background },
     headerTitleStyle: { color: p.text, fontWeight: '600' }, headerShadowVisible: false,
-    // The selected tab is the brand primary; the rest stay neutral. Switching is still instant. Inactive labels are
-    // 10 pt text, so they take the secondary ink (5.6:1 light, 6.6:1 dark on the bar), not the tertiary (3.6:1 / 4.1:1,
-    // below AA; 24UX1 finding 9, fixed in 24UX2).
-    tabBarActiveTintColor: p.primary, tabBarInactiveTintColor: p.secondary,
-    tabBarStyle: { backgroundColor: p.surface, borderTopColor: p.line },
-    tabBarLabelStyle: { fontSize: 10, fontWeight: '500' },
     sceneStyle: { backgroundColor: p.background } }}>
-    {/* The Assistant also keeps its Home quick action for discoverability; this tab is the persistent entry. */}
-    <Tabs.Screen name="index" options={{ title: t('nav.tabs.home'),
-      headerRight: () => <IconButton name="wallet-outline" label={t('nav.seeAccounts')} onPress={() => router.push('/accounts')} />, tabBarIcon: ({ color, size, focused }) => <Ionicons name={focused ? 'home' : 'home-outline'} size={size} color={color} /> }} />
+    {/* 24UX6A: Inicio has no root title (the selected tab already names it; the number is the screen's title) and draws its
+        accounts shortcut beside its own controls. Its capture button also reaches the Assistant; this tab is its home. */}
+    <Tabs.Screen name="index" options={{ title: t('nav.tabs.home'), headerShown: false,
+      tabBarIcon: ({ color, size, focused }) => <Ionicons name={focused ? 'home' : 'home-outline'} size={size} color={color} /> }} />
     <Tabs.Screen name="activity" options={{ title: t('nav.tabs.activity'),
       headerRight: () => <IconButton name="add" label={t('nav.recordMovement')} onPress={() => router.push('/new-entry')} />,
       tabBarIcon: ({ color, size, focused }) => <Ionicons name={focused ? 'receipt' : 'receipt-outline'} size={size} color={color} /> }} />

@@ -18,6 +18,7 @@ export const navigation = {
       undoneEntries: 'Movimientos deshechos',
       language: 'Idioma',
       region: 'Región',
+      appearance: 'Apariencia',
       backup: 'Copia de seguridad',
       backupImport: 'Importar copia',
       categories: 'Categorías',

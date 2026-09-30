@@ -25,5 +25,15 @@ export const preferences = {
     previewNote: 'Vista previa de desarrollo: incluye regiones que todavía no se verificaron en un iPhone.',
     /** Example of the region's conventions under its name. */
     regionSample: '{date} · {amount}',
+    /** Producto 24UX6A: Más → Apariencia. Sistema follows the device; Claro and Oscuro fix the scheme on this device. */
+    appearance: 'Apariencia',
+    appearanceSystem: 'Sistema',
+    appearanceLight: 'Claro',
+    appearanceDark: 'Oscuro',
+    /** Subtitle of Sistema: what the device draws right now (only while Sistema is the choice). */
+    appearanceSystemNowLight: 'Según el dispositivo · ahora claro',
+    appearanceSystemNowDark: 'Según el dispositivo · ahora oscuro',
+    appearanceSystemDetail: 'Según el dispositivo',
+    appearanceNote: 'Cambia solo cómo se ve FinanzApp en este dispositivo. No modifica tus movimientos, tus cuentas ni tus copias de seguridad.',
   },
 } as const;

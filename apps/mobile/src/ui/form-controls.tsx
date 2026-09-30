@@ -248,9 +248,14 @@ export function DisplaySheet({ visible, mode, currency, consolidatedOptions, sin
  * stays mounted while it leaves (200 ms), so nothing snaps away, and unmounts once the
  * exit ends; an exit interrupted by a reopening never unmounts. Cancel, the scrim and
  * the system back gesture leave without saving; only Listo commits. Nothing here
- * captures a screen or replays a navigation. */
-function BottomSheet({ visible, title, onClose, onDone, children }: {
-  visible: boolean; title: string; onClose: () => void; onDone: () => void; children: ReactNode;
+ * captures a screen or replays a navigation.
+ *
+ * 24UX6A: Inicio's capture sheet uses the same card. Without `onDone` the header has no Listo (a sheet of actions
+ * commits by its rows); `onDismissed` runs once the card has left and iOS dismissed the modal, so a row can open the
+ * next screen only then (presenting a screen while this modal is still leaving would be refused). A dismissal event
+ * that never arrives is covered by a short timer; the callback runs once either way. */
+export function BottomSheet({ visible, title, onClose, onDone, onDismissed, children }: {
+  visible: boolean; title: string; onClose: () => void; onDone?: () => void; onDismissed?: () => void; children: ReactNode;
 }) {
   const p = usePalette();
   const reduced = useReduceMotion();
@@ -269,7 +274,16 @@ function BottomSheet({ visible, title, onClose, onDone, children }: {
     const state = ready.current;
     if (state.wanted && state.presented && state.measured) progress.value = withTiming(1, sheetTiming('sheet', reduced));
   };
-  const unmount = () => { ready.current.presented = false; ready.current.measured = false; setShown(false); };
+  // After the exit: the dismissal is reported once, by iOS's event or, if that never comes, by the timer.
+  const dismissed = useRef<{ fire: () => void } | null>(null);
+  const unmount = () => {
+    ready.current.presented = false; ready.current.measured = false; setShown(false);
+    if (!onDismissed) return;
+    let done = false;
+    const fire = () => { if (done) return; done = true; dismissed.current = null; onDismissed(); };
+    dismissed.current = { fire };
+    setTimeout(fire, Platform.OS === 'ios' ? 400 : 0);
+  };
   useEffect(() => {
     ready.current.wanted = visible;
     if (visible) {
@@ -288,7 +302,7 @@ function BottomSheet({ visible, title, onClose, onDone, children }: {
     transform: [{ translateY: reduced ? 0 : (1 - progress.value) * height.value }],
   }));
   return <Modal visible={shown} transparent animationType="none" statusBarTranslucent onRequestClose={onClose}
-    onShow={() => { ready.current.presented = true; rise(); }}>
+    onShow={() => { ready.current.presented = true; rise(); }} onDismiss={() => dismissed.current?.fire()}>
     <View style={{ flex: 1, justifyContent: 'flex-end' }}>
       <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: p.scrim }, scrimStyle]}>
         {/* The scrim cancels; VoiceOver never lands on it (the card below is modal). */}
@@ -303,7 +317,9 @@ function BottomSheet({ visible, title, onClose, onDone, children }: {
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: space.l, paddingVertical: space.m, minHeight: 52 }}>
           <PressFeedback feedback="opacity" accessibilityRole="button" onPress={onClose} hitSlop={8}><AppText style={{ color: p.primary, fontSize: 16 }}>{t('common.cancel')}</AppText></PressFeedback>
           <AppText accessibilityRole="header" numberOfLines={2} style={{ flex: 1, textAlign: 'center', fontWeight: '600' }}>{title}</AppText>
-          <PressFeedback feedback="opacity" accessibilityRole="button" onPress={onDone} hitSlop={8}><AppText style={{ color: p.primary, fontSize: 16, fontWeight: '600' }}>{t('common.done')}</AppText></PressFeedback>
+          {onDone ? <PressFeedback feedback="opacity" accessibilityRole="button" onPress={onDone} hitSlop={8}><AppText style={{ color: p.primary, fontSize: 16, fontWeight: '600' }}>{t('common.done')}</AppText></PressFeedback>
+            // Without Listo the title stays centred: the right side keeps Cancelar's width, empty.
+            : <View accessible={false} importantForAccessibility="no-hide-descendants" style={{ opacity: 0 }}><AppText style={{ fontSize: 16 }}>{t('common.cancel')}</AppText></View>}
         </View>
         {/* The wheel sits centred in the card: as wide as the card's content, its columns centred by UIKit. */}
         <View style={{ alignSelf: 'stretch', alignItems: 'center', paddingHorizontal: space.l, paddingBottom: space.s }}>{children}</View>

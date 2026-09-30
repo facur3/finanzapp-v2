@@ -113,12 +113,12 @@ test('donut sweeps in from twelve o\'clock only the first time, then crossfades,
   assert.deepEqual(still.paths.map((path: any) => path.props.animatedProps().d), still.paths.map((path: any) => path.props.d));
 });
 
-test('24UX3: three compact movement pills (Inicio and account detail) and one wide Assistant entry; glass or opaque by material', () => {
+test('24UX3: three compact movement pills on the account detail; glass or opaque by material (24UX6A: Inicio records through its capture sheet)', () => {
   const source = readFileSync(new URL('../src/ui/quick-actions.tsx', import.meta.url), 'utf8');
   const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText;
   const jsx = (type: any, props: any) => ({ type, props });
   const pushed: any[] = [];
-  const dark = { text: '#F5F5F7', secondary: '#666', tertiary: '#7C7C84', inset: '#2C2C2E', surface: '#1C1C1E', primary: '#5B87FF', primarySoft: '#122048', primaryWash: '#151B2C', isDark: true };
+  const dark = { text: '#F5F5F7', secondary: '#666', tertiary: '#7C7C84', inset: '#2C2C2E', surface: '#1C1C1E', primary: '#5B87FF', primarySoft: '#122048', isDark: true };
   let palette: any = dark;
   let material: 'opaque' | 'glass' = 'opaque';
   let stacked = false;
@@ -164,7 +164,7 @@ test('24UX3: three compact movement pills (Inicio and account detail) and one wi
   assert.equal(JSON.stringify(home.map((action: any) => pill(action).backgroundColor)), JSON.stringify(['#1C1C1E', '#1C1C1E', '#1C1C1E']));
   assert.equal(JSON.stringify(home.map((action: any) => glyph(action).props.color)), JSON.stringify(['expense', 'income', 'transfer']));
   assert.equal(home.every((action: any) => pill(action).borderWidth === 0.5 && pill(action).shadowOpacity === undefined), true);
-  palette = { ...dark, isDark: false, surface: '#FFFFFF', primary: '#2557D6', primarySoft: '#E5ECFB', primaryWash: '#F5F8FF' };
+  palette = { ...dark, isDark: false, surface: '#FFFFFF', primary: '#2557D6', primarySoft: '#E5ECFB' };
   assert.equal(pill(render({ currency: 'ARS' })[0]).backgroundColor, '#FFFFFF');
   palette = dark;
   // Accessibility sizes: the pills stack at full width and the label may wrap.
@@ -175,40 +175,14 @@ test('24UX3: three compact movement pills (Inicio and account detail) and one wi
   assert.equal(label(tall[0]).props.numberOfLines, undefined);
   stacked = false;
 
-  // The Assistant: one wide capsule, a button with its own spoken name and hint, landing on the centre tab.
-  const entry = module.exports.AssistantEntry({ currency: 'USD' });
-  assert.equal(entry.props.accessibilityRole, 'button');
-  assert.equal(entry.props.accessibilityLabel, 'Contale al Asistente');
-  assert.match(entry.props.accessibilityHint, /Asistente/);
-  pushed.length = 0;
-  entry.props.onPress();
-  assert.equal(JSON.stringify(pushed[0]), JSON.stringify({ navigate: { pathname: '/assistant', params: { currency: 'USD' } } }), 'the Assistant is a tab: navigate to it, never push a copy');
-  const capsule = entry.props.children;
-  const capsuleStyle = { ...capsule.props.style, ...capsule.props.opaque };
-  assert.equal(capsule.type, 'ControlSurface');
-  assert.equal(capsuleStyle.minHeight, 52);
-  assert.equal(capsuleStyle.borderRadius, 26);
-  assert.equal(capsuleStyle.backgroundColor, '#151B2C', 'the surface barely cooled by the brand, not a blue block');
-  assert.equal(capsuleStyle.borderWidth, 0.5);
-  assert.ok(String(capsuleStyle.borderColor).startsWith('#5B87FF'), 'a hairline cobalt edge');
-  const [disc, text, chevron] = capsule.props.children;
-  assert.equal(disc.props.children.props.name, 'sparkles');
-  assert.equal(disc.props.children.props.color, '#5B87FF', 'cobalt lives in the glyph');
-  assert.equal(text.props.children, 'Contale al Asistente');
-  assert.equal(text.props.style.color, undefined, 'the words are ink, never placeholder grey: it must not read as a search field');
-  assert.equal(chevron.props.name, 'chevron-forward');
-  current = 'en-US';
-  try { assert.equal(module.exports.AssistantEntry({}).props.accessibilityLabel, 'Ask the Assistant'); } finally { current = 'es-AR'; }
+  assert.equal(module.exports.AssistantEntry, undefined, '24UX6A: the wide Assistant entry left Inicio; the capture sheet and the centre tab reach it');
 
-  // Native glass on iOS 26: same geometry, the opaque style handed over untouched as the fallback, a cobalt wash only on the Assistant.
+  // Native glass on iOS 26: same geometry, the opaque style handed over untouched as the fallback.
   material = 'glass';
   const glass = render({ currency: 'ARS' });
   assert.equal(JSON.stringify(glass.map((action: any) => surface(action).props.material)), JSON.stringify(['glass', 'glass', 'glass']));
   assert.equal(glass.every((action: any) => surface(action).props.tint === undefined), true);
   assert.equal(surface(glass[0]).props.opaque.borderWidth, 0.5, 'the opaque fallback is still the edged version');
-  const glassEntry = module.exports.AssistantEntry({ currency: 'ARS' }).props.children;
-  assert.equal(glassEntry.props.material, 'glass');
-  assert.equal(glassEntry.props.tint, '#5B87FF26');
   material = 'opaque';
 
   // Account detail: the same three movements, with the account carried over.

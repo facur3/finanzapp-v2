@@ -2,9 +2,10 @@
  * geometry, free of React Native so they run in Node.
  *
  * Liquid Glass is a control layer, not a content layer: it is drawn only on
- * the four Home actions and the Assistant composer, and only when every
- * condition holds. Everything else, and every other case, gets the opaque
- * material from Producto 21, which is a designed state, not a fallback error.
+ * the floating tab bar (24UX6A), the account detail's movement pills and the
+ * Assistant composer, and only when every condition holds. Everything else,
+ * and every other case, gets the opaque material from Producto 21, which is a
+ * designed state, not a fallback error.
  *
  * A decorative material must never be able to close the app. Mounting a
  * native view whose definition the running binary does not have ends in a

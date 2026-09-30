@@ -1,17 +1,13 @@
-import { useEffect, useRef } from 'react';
 import { Alert, StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import Animated, { useAnimatedStyle, useSharedValue, withDelay, withTiming } from 'react-native-reanimated';
-import { type Account, type CategorySpending, type Currency, type MonthlyBudgetSummary, type RecurringRule } from '@finanzapp/domain';
-import { AppText, CategoryBadge, MerchantBadge, Money, PressFeedback, Surface, useStacked } from './components';
-import { budgetHomeHeadline, budgetTone, categoriesStatus, percentUsed } from './budget-presentation';
+import { type Account, type Currency, type RecurringRule } from '@finanzapp/domain';
+import { AppText, MerchantBadge, Money, PressFeedback, Surface, useStacked, type IconName } from './components';
 import { washOf } from './category-color';
 import { useCategoryLook } from './category-hues';
-import { easeOut, timing } from './motion';
+import type { HomeInsight } from './home-focus';
 import { dueWhen } from './presentation';
-import { spendingShare } from './report-presentation';
-import { usePalette, useReduceMotion } from './theme';
+import { usePalette } from './theme';
 import { useI18n } from '../i18n/provider';
 
 /** Contextual help for a metric: one native alert with the definition, so the
@@ -42,117 +38,41 @@ export function CurrencyParts({ parts, line, detail }: { parts: readonly { curre
   </View>;
 }
 
-/** How the row fill reveals: from zero on the first data, 300 ms ease-out with
- * a 50 ms stagger per row; later changes interpolate from the previous share
- * with no delay. Reduce Motion removes the width motion and keeps a 200 ms
- * fade of the fill, so the state is still explained without movement. Widths
- * are honest: a 0,1 % category gets a hairline, never an invented minimum. */
-export const RANKING_REVEAL = { duration: 300, stagger: 50, fade: 200 } as const;
-
-/** The biggest categories this month as one quiet distribution. Each row sits
- * on the grouped surface; behind its content a rounded wash of its own hue,
- * inset from the row's edges, runs from the left for exactly its share of the
- * month. The wash is faint (a tenth of the hue) so three rows read as three
- * rows, not a block of colour, and the largest category is a soft highlight
- * rather than a filled bar. The category is one object (glyph on its hue), the
- * amount sits right; no percentages, no bar under the row. Reportes has the
- * full picture. Washes are absolute, childless and behind the content, so
- * the animation costs no layout and never blocks a tap. On Inicio it is the
- * compact summary of the three sections (24UX3): 52 pt rows, 32 pt glyphs,
- * name and amount at 15 pt, so it reads as a glance, not as a ledger. */
-export function CategoryRanking({ categories, totalMinor, currency, limit = 3, onPressCategory }: {
-  categories: CategorySpending[]; totalMinor: number; currency: Currency; limit?: number; onPressCategory: (category: CategorySpending) => void;
-}) {
-  const head = categories.slice(0, limit);
-  return <Surface grouped>
-    {head.map((category, index) => <RankedRow key={category.key} category={category} totalMinor={totalMinor} currency={currency} index={index}
-      last={index === head.length - 1} onPress={() => onPressCategory(category)} />)}
-  </Surface>;
-}
-
-function RankedRow({ category, totalMinor, currency, index, last, onPress }: {
-  category: CategorySpending; totalMinor: number; currency: Currency; index: number; last: boolean; onPress: () => void;
-}) {
+/** Inicio's one contextual line (24UX6A, `homeInsight`): a budget exceeded or nearly spent, or one category
+ * concentrating the month's spending. Computed facts only, one sentence, never a cause or advice. A single quiet card
+ * (the only one on Inicio): a glyph in the fact's tone (amber near a limit, coral over it, the category's hue for a
+ * concentration), the sentence, a chevron; tapping opens Presupuestos or Reportes. VoiceOver hears the same sentence
+ * with the amount and the share in words. `labelsCurrency` writes the amount with its code when the budget is in
+ * another currency than the one Inicio shows. */
+export function HomeInsightRow({ insight, labelsCurrency = false, onPress }: { insight: NonNullable<HomeInsight>; labelsCurrency?: boolean; onPress: () => void }) {
   const p = usePalette();
-  const reduced = useReduceMotion();
-  const { t, locale, spokenAmount, spokenPercent } = useI18n();
-  const { hex: color, label: name } = useCategoryLook(category.category);
-  const { fraction, label } = spendingShare(category.amountMinor, totalMinor, locale);
-  // First data: the fill grows from zero (or, under Reduce Motion, fades in already sized). Later data: the fill moves to the new share.
-  const progress = useSharedValue(reduced ? fraction : 0);
-  const opacity = useSharedValue(reduced ? 0 : 1);
-  const revealed = useRef(false);
-  useEffect(() => {
-    if (!revealed.current) {
-      revealed.current = true;
-      if (reduced) { opacity.value = withTiming(1, { duration: RANKING_REVEAL.fade, easing: easeOut }); return; }
-      progress.value = withDelay(index * RANKING_REVEAL.stagger, withTiming(fraction, { duration: RANKING_REVEAL.duration, easing: easeOut }));
-      return;
-    }
-    opacity.value = 1;
-    progress.value = withTiming(fraction, timing('data', reduced));
-  }, [fraction, reduced, index, progress, opacity]);
-  const fill = useAnimatedStyle(() => ({ width: `${progress.value * 100}%` as `${number}%`, opacity: opacity.value }));
-  const stacked = useStacked({ minor: category.amountMinor, currency });
-  return <PressFeedback feedback="highlight" accessibilityRole="button" accessibilityHint={t('home.rankingHint')}
-    accessibilityLabel={t('home.rankingLabel', { name, amount: spokenAmount(category.amountMinor, currency), share: spokenPercent(fraction) })}
-    onPress={onPress} style={[styles.summaryRow, last && styles.summaryRowLast]}
-    backdrop={<View pointerEvents="none" accessible={false} style={styles.fillTrack}>
-      <Animated.View style={[styles.fill, { backgroundColor: washOf(color, p) }, fill]} />
-    </View>}>
-    <CategoryBadge category={category.category} size={32} />
-    <View style={{ flex: 1, minWidth: 0, flexDirection: stacked ? 'column' : 'row', gap: stacked ? 2 : 12, alignItems: stacked ? 'flex-start' : 'center' }}>
-      <AppText variant="subhead" numberOfLines={stacked ? undefined : 2} style={{ flex: stacked ? undefined : 1, minWidth: 0, fontWeight: '500' }}>{name}</AppText>
-      <Money minor={category.amountMinor} currency={currency} size={15} />
-    </View>
-  </PressFeedback>;
-}
-
-/** One line of budget truth for the current month. With a total budget it
- * answers "how much of my month have I used": what is left of the ceiling,
- * the share used, and whether any sublimit is over. Without one, the tightest
- * category sublimit stands in, with the count of sublimits beside it. Sublimits
- * are never added up into a monthly total. Tapping opens Presupuestos. */
-export function BudgetHomeCard({ summary }: { summary: MonthlyBudgetSummary }) {
-  const p = usePalette();
-  const reduced = useReduceMotion();
-  const { t, moneyText, spokenAmount, spokenMinor } = useI18n();
-  const headline = budgetHomeHeadline(summary);
-  const { currency } = summary;
-  const progressValue = headline ? Math.min(1, headline.progress.ratio) : 0;
-  const progress = useSharedValue(progressValue);
-  useEffect(() => { progress.value = withTiming(progressValue, timing('data', reduced)); }, [progressValue, reduced, progress]);
-  const bar = useAnimatedStyle(() => ({ width: `${progress.value === 0 ? 0 : Math.max(1.5, progress.value * 100)}%` as `${number}%` }));
-  // Resolved before the early return so the hook order is stable while the card appears and disappears.
-  const categoryLabel = useCategoryLook(headline?.kind === 'category' ? headline.progress.budget.category ?? '' : '').label;
-  if (!headline) return null;
-  const { remainingMinor: remaining, budget } = headline.progress;
-  const tone = budgetTone(headline.progress);
-  const color = tone === 'expense' ? p.expense : tone === 'warning' ? p.warning : p.text;
-  const title = headline.kind === 'total' ? t('home.budget.general') : categoryLabel;
-  const percent = percentUsed(headline.progress);
-  const status = headline.kind === 'total' ? categoriesStatus(headline.categories, headline.exceededCategories, t)
-    : headline.categories > 1 ? t('home.budget.categories', { count: headline.categories })
-      + (headline.exceededCategories ? ' · ' + t('home.budget.exceededCount', { count: headline.exceededCategories }) : '') : t('home.budget.perCategory');
-  const spoken = t(remaining < 0 ? 'home.budget.labelExceeded' : 'home.budget.labelLeft',
-    { title, amount: spokenAmount(Math.abs(remaining), currency), total: spokenMinor(budget.amountMinor, currency), percent });
-  return <PressFeedback accessibilityRole="button"
-    accessibilityLabel={spoken + (status ? ' ' + status : '')}
-    onPress={() => router.push({ pathname: '/budgets', params: { currency } })}>
-    <Surface style={{ gap: 12 }}>
-      <View style={{ flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', gap: 12 }}>
-        <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
-          <AppText secondary variant="caption" numberOfLines={2} style={{ fontWeight: '500' }}>{title} · {remaining < 0 ? t('home.budget.exceeded') : t('home.budget.left')}</AppText>
-          <Money minor={Math.abs(remaining)} currency={currency} size={24} weight="700" color={color} />
-        </View>
-        <View style={{ alignItems: 'flex-end', gap: 2, flexShrink: 1, maxWidth: '50%' }}>
-          <AppText secondary variant="caption" style={{ textAlign: 'right' }}>{t('home.budget.of', { amount: moneyText(budget.amountMinor, currency), percent })}</AppText>
-          {!!status && <AppText variant="footnote" style={{ color: headline.exceededCategories ? p.expense : p.secondary, fontWeight: headline.exceededCategories ? '600' : '400' }}>{status}</AppText>}
-        </View>
+  const { t, moneyText, codedAmount, spokenAmount, formatPercent, spokenPercent } = useI18n();
+  const look = useCategoryLook(insight.kind === 'concentration' ? insight.category : insight.category ?? '');
+  const amount = (minor: number, currency: Currency) => labelsCurrency ? codedAmount(minor, currency) : moneyText(minor, currency);
+  let text: string, spoken: string, icon: IconName, color: string, soft: string;
+  if (insight.kind === 'budgetExceeded') {
+    const key = insight.scope === 'total' ? 'home.insight.budgetExceededTotal' : 'home.insight.budgetExceededCategory';
+    text = t(key, { name: look.label, amount: amount(insight.overMinor, insight.currency) });
+    spoken = t(key, { name: look.label, amount: spokenAmount(insight.overMinor, insight.currency) });
+    icon = 'speedometer-outline'; color = p.expense; soft = p.expenseSoft;
+  } else if (insight.kind === 'budgetLow') {
+    const key = insight.scope === 'total' ? 'home.insight.budgetLowTotal' : 'home.insight.budgetLowCategory';
+    text = t(key, { name: look.label, percent: formatPercent(insight.leftShare) });
+    spoken = t(key, { name: look.label, percent: spokenPercent(insight.leftShare) });
+    icon = 'speedometer-outline'; color = p.warning; soft = p.warningSoft;
+  } else {
+    text = t('home.insight.concentration', { name: look.label, percent: formatPercent(insight.share) });
+    spoken = t('home.insight.concentration', { name: look.label, percent: spokenPercent(insight.share) });
+    icon = look.glyph; color = look.hex; soft = washOf(look.hex, p);
+  }
+  return <PressFeedback accessibilityRole="button" accessibilityLabel={spoken}
+    accessibilityHint={t(insight.kind === 'concentration' ? 'home.insight.reportsHint' : 'home.insight.budgetsHint')} onPress={onPress}>
+    <Surface style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 14 }}>
+      <View accessible={false} style={{ width: 34, height: 34, borderRadius: 17, backgroundColor: soft, alignItems: 'center', justifyContent: 'center' }}>
+        <Ionicons name={icon} size={18} color={color} accessible={false} />
       </View>
-      <View accessible={false} style={{ height: 6, borderRadius: 3, overflow: 'hidden', backgroundColor: p.inset }}>
-        <Animated.View style={[{ height: 6, borderRadius: 3, backgroundColor: color }, bar]} />
-      </View>
+      <AppText accessible={false} variant="subhead" style={{ flex: 1, minWidth: 0, fontWeight: '500' }}>{text}</AppText>
+      <Ionicons name="chevron-forward" size={15} color={p.tertiary} accessible={false} />
     </Surface>
   </PressFeedback>;
 }
@@ -163,7 +83,7 @@ export function BudgetHomeCard({ summary }: { summary: MonthlyBudgetSummary }) {
  *
  * 24UX3: the commitments are a light agenda, not a third card. Rows sit on the screen's ground with no surface and a
  * hairline that starts under the text, like a plain list; the press answer is a dim, since there is no cell to tint.
- * 24UX5: the mark is 40 pt, the same container as the latest transactions, so the two lists line up; the agenda stays
+ * 24UX5: the mark is 40 pt, the same container as the ledger rows elsewhere; the agenda stays
  * tighter (56 pt rows, 8 pt of padding) and its caption under the name appears only when it adds something: the
  * category when the name and the glyph do not already say it (`showCategory`, see `homeNamesCategory`), the account
  * when another could be meant. The day stays under the amount, amber only today and tomorrow. VoiceOver always hears
@@ -204,10 +124,5 @@ export function UpcomingRecurringRow({ rule, account, day, last, showAccount = f
 }
 
 const styles = StyleSheet.create({
-  summaryRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 8, paddingHorizontal: 14, minHeight: 52 },
-  summaryRowLast: { paddingBottom: 10 },
   agendaRow: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 56 },
-  // The wash lives in a track inset from the row, so it is a rounded shape of its own, never cut by the surface's edges or a separator.
-  fillTrack: { position: 'absolute', left: 5, right: 5, top: 4, bottom: 4 },
-  fill: { position: 'absolute', left: 0, top: 0, bottom: 0, borderRadius: 10 },
 });

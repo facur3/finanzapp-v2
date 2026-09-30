@@ -19,12 +19,9 @@ export const lightPalette = {
   primaryFill: '#2557D6', onPrimary: '#FFFFFF',
   /** A whisper of the primary for a tinted row or tile. */
   primarySoft: '#E5ECFB',
-  /** The Assistant's entry on Inicio (24UX3): a surface barely cooled by the primary, so the one wide control reads as
-   * part of the brand without becoming a blue block. Ink and the cobalt glyph both stay AA on it. */
-  primaryWash: '#F5F8FF',
   /** The chosen segment of a compact segmented control (24UX3 review): white on the light inset track. */
   thumb: '#FFFFFF',
-  /** A secondary navigation link (24UX5): Inicio's section links (Reportes, Ver todos, Ver). A desaturated slate blue,
+  /** A secondary navigation link (24UX5): a quiet section link (on Inicio since 24UX6A, «Ver todos»). A desaturated slate blue,
    * so it reads as something to tap without becoming one more cobalt accent beside the Assistant and the tab bar; never
    * a control, a selection or a meaning. 5.4:1 on the background, 6.0:1 on white. */
   link: '#4A6390',
@@ -47,7 +44,6 @@ export const darkPalette: typeof lightPalette = {
   /** A deeper cobalt under white button text (5:1), so the button is a solid object rather than a glow. */
   primaryFill: '#3565EA', onPrimary: '#FFFFFF',
   primarySoft: '#122048',
-  primaryWash: '#151B2C',
   /** Dark: a clear step above the #1C1C1E track (systemGray4-like), so the state reads without colour. */
   thumb: '#3A3A3E',
   /** The owner's reference slate blue: 8.7:1 on black, 7.0:1 on the #1C1C1E surface. */

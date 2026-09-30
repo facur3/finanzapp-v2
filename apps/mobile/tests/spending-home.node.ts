@@ -12,6 +12,7 @@ import * as fxCopy from '../src/fx/fx-copy.ts';
 import * as ratesStore from '../src/fx/rates-store.ts';
 import * as budgetPresentation from '../src/ui/budget-presentation.ts';
 import * as categoryColor from '../src/ui/category-color.ts';
+import * as homeFocus from '../src/ui/home-focus.ts';
 import { monthlyEvidence } from '../src/integrations/evidence.ts';
 import { integrationClient } from '../src/integrations/client.ts';
 import * as i18nFormat from '../src/i18n/format.ts';
@@ -98,10 +99,12 @@ function routeHarness(file: string, params: Record<string, unknown>, initialData
       donutSlices: (items: { key: string; label: string; value: number }[]) => items.slice(0, 5).map((item, index) => ({ ...item, color: 'c' + index })) },
     '../src/ui/budget-presentation': budgetPresentation,
     '@expo/vector-icons/Ionicons': 'Ionicons',
-    '../src/ui/home-modules': { BudgetHomeCard: 'BudgetHomeCard', CategoryRanking: 'CategoryRanking', CurrencyParts: 'CurrencyParts', MetricHelp: 'MetricHelp', UpcomingRecurringRow: 'UpcomingRecurringRow' },
+    '../src/ui/home-modules': { CurrencyParts: 'CurrencyParts', HomeInsightRow: 'HomeInsightRow', MetricHelp: 'MetricHelp', UpcomingRecurringRow: 'UpcomingRecurringRow' },
+    '../src/ui/home-capture': { CaptureButton: 'CaptureButton' },
+    '../src/ui/home-focus': homeFocus,
     '../src/ui/category-color': categoryColor,
     '../src/ui/category-hues': { useCategoryColor: () => '#3E6FB0', useCategoryLabel: (s: string) => s, useCategoryDefinitions: () => [], useCategoryLook: (s: string) => ({ label: s, storedLabel: s, key: String(s).toLowerCase(), hex: '#3E6FB0', glyph: 'pricetag-outline' }), useCategoryLookOf: () => (s: string) => ({ label: s, storedLabel: s, key: String(s).toLowerCase(), hex: '#3E6FB0', glyph: glyphAliases.get(s) ?? 'glyph-' + String(s).toLowerCase() }), useAccountLook: () => ({ icon: 'wallet', color: 'cobalt', glyph: 'wallet-outline', hex: '#2557D6' }), useAccountNameOf: () => (account: any) => account.name, useAccountLookOf: () => () => ({ icon: 'wallet', color: 'cobalt', glyph: 'wallet-outline', hex: '#2557D6' }) },
-    '../src/ui/quick-actions': { QuickActions: 'QuickActions', AssistantEntry: 'AssistantEntry' },
+    '../src/ui/quick-actions': { QuickActions: 'QuickActions' },
     '../src/ui/motion': { ValueTransition: 'ValueTransition', Reflow: 'Reflow', selectionHaptic: () => {}, impactHaptic: () => {}, duration: { press: 100, release: 160, state: 200, data: 260, enter: 200, exit: 100, reveal: 480 }, timing: (kind: string, reduced: boolean) => ({ duration: reduced ? 0 : 260 }) },
     '../src/ui/theme': { useCurrentDay: () => '2026-09-12', useReduceMotion: () => false, space: { xs: 4, s: 8, m: 12, l: 16, xl: 20, xxl: 24, xxxl: 32 },
       usePalette: () => ({ background: '#F5F6F8', surface: '#FFFFFF', primary: '#2557D6', primaryFill: '#2557D6', onPrimary: '#fff', expense: '#C42F39',
@@ -137,58 +140,54 @@ const homeData = { ...snapshot, entries: [...snapshot.entries,
   { ...snapshot.entries[0], id: 'income', kind: 'income' as const, dateISO: '2026-09-12', amountMinor: 500 },
   { ...snapshot.entries[0], id: 'usd', accountId: 'u', dateISO: '2026-09-11', amountMinor: 1000 },
 ] };
-test('Home shows the current month only, scoped to the currency, with quick actions and ranked categories', () => {
+test('24UX6A: Inicio shows the current month only, scoped to the currency, with one capture button and no movement list', () => {
   const view = routeHarness('(tabs)/index.tsx', {}, homeData);
   let root = view.render();
   assert.equal(find(root, 'Money').props.minor, 300, 'September expenses in ARS');
   assert.equal(nodes(root).some(n => n.type === 'Choices' && (n.props.value === 'month' || n.props.value === 'week')), false, 'no period control: Home is the month');
-  assert.deepEqual(nodes(root).filter(n => n.type === 'EntryRow').map(n => n.props.entry.id), ['income', 'now', 'early']);
+  assert.equal(nodes(root).some(n => n.type === 'EntryRow' || n.type === 'EntryList'), false, '24UX6A: the movements live in Movimientos');
   const texts = nodes(root).filter(n => n.type === 'AppText').map(n => String(n.props.children));
   assert.equal(texts.some(text => /gastos? registrados?|–|Gastado ·/.test(text)), false, 'no count or date-range copy near the hero');
   assert.ok(texts.includes('Septiembre'), 'the month names the number');
+  assert.deepEqual([find(root, 'CaptureButton').props.movementCurrency, find(root, 'CaptureButton').props.assistantCurrency], ['ARS', 'ARS']);
   find(root, 'DisplayCurrencyButton').props.onCurrency('USD');
   root = view.render();
   assert.equal(find(root, 'Money').props.minor, 1000);
-  assert.equal(find(root, 'QuickActions').props.currency, 'USD');
-  const ranking = find(root, 'CategoryRanking');
-  assert.equal(ranking.props.totalMinor, 1000);
-  assert.deepEqual(ranking.props.categories.map((c: domain.CategorySpending) => c.key), ['salud']);
+  assert.deepEqual([find(root, 'CaptureButton').props.movementCurrency, find(root, 'CaptureButton').props.assistantCurrency], ['USD', 'USD'], 'a new movement starts in the currency shown');
+  assert.equal(nodes(root).some(n => n.type === 'HomeInsightRow'), false, 'one category is not a concentration: nothing to say');
 });
-test('a ranked category opens this month\'s matching expenses in the selected currency', () => {
-  const view = routeHarness('(tabs)/index.tsx', {}, homeData);
-  const ranking = find(view.render(), 'CategoryRanking');
-  ranking.props.onPressCategory(ranking.props.categories[0]);
-  assert.equal(view.pushed[0].pathname, '/spending-detail');
-  assert.equal(view.pushed[0].params.startISO, '2026-09-01');
-  const detail = routeHarness('spending-detail.tsx', view.pushed[0].params, homeData).render();
+test('the spending detail opens this month\'s matching expenses in the chosen currency', () => {
+  const params = { currency: 'ARS', startISO: '2026-09-01', endISO: '2026-09-12', category: 'salud' };
+  const detail = routeHarness('spending-detail.tsx', params, homeData).render();
   assert.deepEqual(detail.props.entries.map((e: domain.Entry) => e.id), ['now', 'early']);
   assert.equal(find(detail, 'Money').props.minor, 300);
 });
-test('empty and overflow Home never invent a chart, budget or partial total', () => {
+test('empty and overflow Home never invent a chart, budget line or partial total', () => {
   const empty = routeHarness('(tabs)/index.tsx', {}).render();
   assert.equal(find(empty, 'Money').props.minor, 0);
-  assert.equal(nodes(empty).some(n => n.type === 'SpendingTimeline' || n.type === 'CategoryRanking' || n.type === 'BudgetHomeCard' || n.type === 'UpcomingRecurringRow'), false);
-  assert.equal(nodes(empty).some(n => n.type === 'SectionTitle' && n.props.children === 'Próximos compromisos'), false, 'no empty commitments block');
+  assert.equal(nodes(empty).some(n => n.type === 'SpendingTimeline' || n.type === 'HomeInsightRow' || n.type === 'UpcomingRecurringRow'), false);
+  assert.equal(nodes(empty).some(n => n.type === 'SectionTitle'), false, 'no empty commitments block');
   const huge = { ...homeData, entries: homeData.entries.filter(e => e.id === 'early' || e.id === 'now').map(e => ({ ...e, amountMinor: Number.MAX_SAFE_INTEGER })) };
   assert.equal(nodes(routeHarness('(tabs)/index.tsx', {}, huge).render()).some(n => n.type === 'Money'), false);
 });
-test('Home keeps analysis in Reportes: no timeline bars, a Reportes link on categories and commitments only with stored rules', () => {
+test('Home keeps analysis in Reportes: no timeline bars, commitments only with a rule due this week, Disponible without cards', () => {
   const view = routeHarness('(tabs)/index.tsx', {}, homeData);
   const root = view.render();
   assert.equal(nodes(root).some(n => n.type === 'SpendingTimeline'), false);
-  find(root, 'SectionTitle', 'Reportes');
-  nodes(root).find(n => n.type === 'SectionTitle' && n.props.action === 'Reportes')!.props.onAction();
-  assert.equal(view.pushed.at(-1).pathname, '/reports');
-  assert.equal(nodes(root).some(n => n.type === 'UpcomingRecurringRow' || (n.type === 'SectionTitle' && n.props.action === 'Programar')), false, 'no commitments block without rules');
+  assert.equal(nodes(root).some(n => n.type === 'SectionTitle'), false, '24UX6A: no section links without something to show');
+  assert.equal(nodes(root).some(n => n.type === 'UpcomingRecurringRow'), false, 'no commitments block without rules');
   // No disclaimer copy on screen: the definition lives behind contextual help.
   const texts = nodes(root).filter(n => n.type === 'AppText').map(n => String(n.props.children));
   assert.equal(texts.some(text => /saldo bancario|patrimonio/.test(text)), false);
   const rule = { id: 'r', kind: 'expense' as const, accountId: 'a', amountMinor: 700, merchant: 'Alquiler', category: 'Hogar', frequency: 'monthly' as const,
-    nextDateISO: '2026-09-20', active: true, createdAt, revision: 0, updatedAt: createdAt };
+    anchorDateISO: '2026-09-15', nextDateISO: '2026-09-15', active: true, deleted: false, createdAt, revision: 0, updatedAt: createdAt };
   const withRule = routeHarness('(tabs)/index.tsx', {}, homeData, { recurring: [rule] as domain.RecurringRule[] });
   assert.equal(find(withRule.render(), 'UpcomingRecurringRow').props.rule.id, 'r');
   nodes(withRule.render()).find(n => n.type === 'SectionTitle' && n.props.action === 'Ver todos' && n.props.children === 'Próximos compromisos')!.props.onAction();
   assert.equal(withRule.pushed.at(-1), '/recurring');
+  // 24UX6A: a rule due after this week waits in Recurrentes.
+  const later = routeHarness('(tabs)/index.tsx', {}, homeData, { recurring: [{ ...rule, anchorDateISO: '2026-09-19', nextDateISO: '2026-09-19' }] as domain.RecurringRule[] }).render();
+  assert.equal(nodes(later).some(n => n.type === 'UpcomingRecurringRow' || n.type === 'SectionTitle'), false);
   // Disponible excludes a card account's negative balance.
   const withCard = { ...homeData, accounts: [...homeData.accounts, { id: 'card-acc', name: 'Visa', currency: 'ARS' as const, openingMinor: -5000, createdAt }] };
   const cardView = routeHarness('(tabs)/index.tsx', {}, withCard, { cards: [{ id: 'card', accountId: 'card-acc', issuer: '', last4: '', creditLimitMinor: null,
@@ -249,25 +248,27 @@ test('cloud client requires HTTPS/session and returns an inbox receipt, never a 
   assert.equal(calls, 1);
 });
 
-test('Home shows the budget module for a general budget alone, for sublimits alone, and never for archived budgets', () => {
+test('24UX6A: a budget reaches Inicio only when it needs attention, general or sublimit, and never when archived or calm', () => {
   const createdAt = '2026-09-01T12:00:00.000Z';
   const total: domain.MonthlyBudget = { id: 'total', scope: 'total', currency: 'ARS', monthISO: '2026-09', amountMinor: 100000, active: true, createdAt, revision: 0, updatedAt: createdAt };
-  const sublimit: domain.MonthlyBudget = { id: 'salud', scope: 'category', category: 'Salud', currency: 'ARS', monthISO: '2026-09', amountMinor: 1000, active: true, createdAt, revision: 0, updatedAt: createdAt };
-  const withTotal = routeHarness('(tabs)/index.tsx', {}, homeData, { budgets: [total] }).render();
-  const card = nodes(withTotal).find(n => n.type === 'BudgetHomeCard')!;
-  assert.ok(card, 'a general budget alone is enough for the module');
-  assert.equal(card.props.summary.total.budget.id, 'total');
-  assert.equal(card.props.summary.total.spentMinor, 300, 'all September ARS expenses');
-  assert.deepEqual(card.props.summary.rows, []);
-  const withSublimit = routeHarness('(tabs)/index.tsx', {}, homeData, { budgets: [sublimit] }).render();
-  assert.equal(nodes(withSublimit).find(n => n.type === 'BudgetHomeCard')!.props.summary.total, null);
-  const archived = routeHarness('(tabs)/index.tsx', {}, homeData, { budgets: [{ ...total, active: false, revision: 1, updatedAt: '2026-09-02T12:00:00.000Z' }] }).render();
-  assert.equal(nodes(archived).some(n => n.type === 'BudgetHomeCard'), false);
-  assert.equal(nodes(archived).some(n => n.type === 'SectionTitle' && n.props.children === 'Presupuesto del mes'), false);
+  const sublimit: domain.MonthlyBudget = { id: 'salud', scope: 'category', category: 'Salud', currency: 'ARS', monthISO: '2026-09', amountMinor: 250, active: true, createdAt, revision: 0, updatedAt: createdAt };
+  const insightOf = (budgets: domain.MonthlyBudget[]) => nodes(routeHarness('(tabs)/index.tsx', {}, homeData, { budgets }).render()).find(n => n.type === 'HomeInsightRow');
+  assert.equal(insightOf([total]), undefined, 'a calm general budget (300 of 1000,00) says nothing on Inicio');
+  // All September ARS expenses are 300: a general budget of 330 is 91 % used, one of 250 in Salud is 50 over.
+  const low = insightOf([{ ...total, amountMinor: 330 }])!;
+  assert.equal(low.props.insight.kind, 'budgetLow');
+  assert.ok(Math.abs(low.props.insight.leftShare - 30 / 330) < 1e-9);
+  assert.deepEqual({ ...insightOf([sublimit])!.props.insight }, { kind: 'budgetExceeded', scope: 'category', category: 'Salud', currency: 'ARS', overMinor: 50 });
+  const view = routeHarness('(tabs)/index.tsx', {}, homeData, { budgets: [sublimit] });
+  find(view.render(), 'HomeInsightRow').props.onPress();
+  assert.equal(JSON.stringify(view.pushed.at(-1)), JSON.stringify({ pathname: '/budgets', params: { currency: 'ARS' } }), 'the line opens Presupuestos in the budget\'s currency');
+  assert.equal(insightOf([{ ...sublimit, active: false, revision: 1, updatedAt: '2026-09-02T12:00:00.000Z' }]), undefined, 'an archived budget is gone');
+  assert.equal(nodes(routeHarness('(tabs)/index.tsx', {}, homeData, { budgets: [sublimit] }).render()).some(n => n.type === 'SectionTitle'), false, 'no budget section, one line');
 });
-
 test('23.1B1: Home in English keeps the same numbers and routes; only words change, and the language can switch in place', () => {
-  const view = routeHarness('(tabs)/index.tsx', {}, homeData);
+  const rule: domain.RecurringRule = { id: 'r', accountId: 'a', kind: 'expense', amountMinor: 100, merchant: 'Netflix', category: 'Suscripciones', frequency: 'monthly',
+    anchorDateISO: '2026-09-15', nextDateISO: '2026-09-15', active: true, deleted: false, createdAt, revision: 0, updatedAt: createdAt };
+  const view = routeHarness('(tabs)/index.tsx', {}, homeData, { recurring: [rule] });
   const spanish = view.render();
   locale = 'en-AR';
   try {
@@ -278,8 +279,8 @@ test('23.1B1: Home in English keeps the same numbers and routes; only words chan
     const texts = nodes(root).filter(n => n.type === 'AppText').map(n => String(n.props.children));
     assert.ok(texts.includes('September'), 'the month is named in English');
     const titles = nodes(root).filter(n => n.type === 'SectionTitle').map(n => String(n.props.children) + '|' + n.props.action);
-    assert.ok(titles.includes('By category|Reports'), titles.join(' / '));
-    assert.ok(titles.includes('Latest transactions|See all'), titles.join(' / '));
+    assert.equal(titles.join(' / '), 'Coming up|See all');
+    assert.equal(find(root, 'IconButton').props.label, 'View my accounts');
     metric.props.onChange('available');
     const available = view.render();
     const help = find(available, 'MetricHelp');
@@ -291,7 +292,6 @@ test('23.1B1: Home in English keeps the same numbers and routes; only words chan
     assert.equal(find(back, 'MetricHelp').props.title, 'Disponible', 'the chosen metric survives the switch');
   } finally { locale = 'es-AR'; }
 });
-
 test('24B3: Home with three currencies lists them in the switch and shows each currency\'s own figures, converting nothing', () => {
   // A stored JPY account is read acceptance (no gate opens in production): the ledger holds ARS, USD and JPY.
   const yen: domain.Account = { id: 'y', name: 'Yenes', currency: 'JPY', openingMinor: 0, createdAt };
@@ -307,10 +307,11 @@ test('24B3: Home with three currencies lists them in the switch and shows each c
   control.props.onCurrency('JPY');
   root = view.render();
   assert.deepEqual({ minor: find(root, 'Money').props.minor, currency: find(root, 'Money').props.currency }, { minor: 2200, currency: 'JPY' }, 'yen are summed as yen, never as cents');
-  assert.equal(find(root, 'QuickActions').props.currency, 'JPY');
-  assert.deepEqual(nodes(root).filter(n => n.type === 'EntryRow').map(n => n.props.entry.id), ['yen-2', 'yen-1'], 'only the yen movements');
-  assert.deepEqual(find(root, 'CategoryRanking').props.categories.map((c: domain.CategorySpending) => [c.key, c.amountMinor]), [['comida', 1500], ['salud', 700]]);
-  assert.equal(find(root, 'CategoryRanking').props.currency, 'JPY');
+  assert.equal(find(root, 'CaptureButton').props.movementCurrency, 'JPY');
+  // 24UX6A: yen 1500 of 2200 in Comida is the month's one line, measured in yen alone.
+  const insight = find(root, 'HomeInsightRow').props.insight;
+  assert.deepEqual([insight.kind, insight.category, insight.currency], ['concentration', 'Comida', 'JPY']);
+  assert.ok(Math.abs(insight.share - 1500 / 2200) < 1e-9);
 });
 
 // ---- Producto 24B6: one display currency shared by Inicio and Reportes ------------------------------------
@@ -379,11 +380,14 @@ test('24B6: a link into Reportes with a held currency shows it and makes it the 
     assert.equal(shared.getState(), 'ARS', 'invalid ' + JSON.stringify(currency) + ': not overwritten');
     assert.equal(rows.get(displayCurrency.DISPLAY_CURRENCY_KEY), 'ARS');
   }
-  // Inicio's own link to Reportes carries the currency it shows, so the two agree even on a phone that never stored a choice.
+  // Inicio's own link to Reportes (24UX6A: the concentration line) carries the currency it shows, so the two agree even on a phone that never stored a choice.
   const fresh = displayCurrency.createDisplayCurrencyStore(() => ({ getItemSync: () => null, setItemSync: () => {}, removeItemSync: () => false }));
-  const origin = routeHarness('(tabs)/index.tsx', {}, homeData, {}, fresh);
+  const concentrated = { ...homeData, entries: [...homeData.entries, { ...homeData.entries[0], id: 'usd-food', accountId: 'u', dateISO: '2026-09-11', amountMinor: 100, category: 'Comida' }] };
+  const origin = routeHarness('(tabs)/index.tsx', {}, concentrated, {}, fresh);
+  // Only the dollars (a new phone reads the consolidated total, whose shares need a rate this harness does not have).
+  find(origin.render(), 'DisplayCurrencyButton').props.onMode('single');
   find(origin.render(), 'DisplayCurrencyButton').props.onCurrency('USD');
-  nodes(origin.render()).find(n => n.type === 'SectionTitle' && n.props.action === 'Reportes')!.props.onAction();
+  find(origin.render(), 'HomeInsightRow').props.onPress();
   assert.equal(JSON.stringify(origin.pushed.at(-1)), JSON.stringify({ pathname: '/reports', params: { currency: 'USD' } }));
 });
 
@@ -448,179 +452,134 @@ test('24B6 review: a Reportes link naming a currency nobody holds yet is applied
 const homeTexts = (root: Node) => nodes(root).filter(node => node.type === 'AppText').map(node => [node.props.children].flat().join(''));
 const sectionTitles = (root: Node) => nodes(root).filter(node => node.type === 'SectionTitle').map(node => node.props.children);
 
-test('24UX2: a month with nothing recorded in the currency says so once, under Últimos movimientos, with the currency when several are held', () => {
+test('24UX6A: a quiet month is the number and the button: no empty section, no filler sentence', () => {
   // The fixture's movements are all in August; the harness day is 2026-09-12.
   const root = routeHarness('(tabs)/index.tsx', {}, snapshot).render();
-  assert.equal(sectionTitles(root).join('|'), 'Últimos movimientos', 'no second empty section');
-  const shown = homeTexts(root);
-  assert.ok(shown.includes('Todavía no hay movimientos en ARS este mes.'));
-  assert.equal(shown.some(text => /Tus categorías aparecerán/.test(text)), false, 'the near-identical sentence is gone');
-  // One currency: the plain sentence.
+  assert.equal(find(root, 'Money').props.minor, 0, 'a true zero for the month');
+  assert.equal(sectionTitles(root).length, 0, 'no section to say that nothing happened');
+  assert.equal(nodes(root).some(n => n.type === 'HomeInsightRow' || n.type === 'EmptyState'), false);
+  assert.equal(homeTexts(root).some(text => /Todavía no hay movimientos|Tus categorías aparecerán/.test(text)), false);
+  assert.equal(nodes(root).filter(n => n.type === 'CaptureButton').length, 1, 'recording stays one tap away');
+  // Only an income this month: still the number (no spending) and the button, nothing else.
   const single = { ...snapshot, accounts: [snapshot.accounts[0]], entries: snapshot.entries.filter(entry => entry.accountId === 'a') };
-  assert.ok(homeTexts(routeHarness('(tabs)/index.tsx', {}, single).render()).includes('Todavía no hay movimientos este mes.'));
-  // Only an income this month: the categories block stays, with its own sentence, because there is a movement to list.
   const incomeOnly = { ...single, entries: [...single.entries, { ...snapshot.entries[0], id: 'pay', kind: 'income' as const, category: 'Sueldo', dateISO: '2026-09-10' }] };
   const withIncome = routeHarness('(tabs)/index.tsx', {}, incomeOnly).render();
-  assert.equal(sectionTitles(withIncome).join('|'), 'En qué gastaste|Últimos movimientos');
-  assert.ok(homeTexts(withIncome).includes('Tus categorías aparecerán cuando registres un gasto este mes.'));
+  assert.equal(sectionTitles(withIncome).length, 0);
+  assert.equal(find(withIncome, 'Money').props.minor, 0);
 });
-
-test('24UX5 review: Home rows name the account only when the visible rows of that list come from more than one account', () => {
+test('24UX5 review: a commitment names its account only when the visible rules come from more than one account', () => {
   const at = '2026-09-10T12:00:00Z';
   const accounts: domain.Account[] = [{ id: 'a', name: 'a', currency: 'ARS', openingMinor: 0, createdAt: at }, { id: 'b', name: 'Banco', currency: 'ARS', openingMinor: 0, createdAt: at }];
-  const entry = (id: string, accountId: string, merchant: string, category: string): domain.Entry => ({ id, accountId, kind: 'expense', amountMinor: 100, merchant, category, dateISO: '2026-09-10', createdAt: at });
-  const shown = (root: Node, type: string) => nodes(root).filter(node => node.type === type).map(node => node.props.showAccount);
-  // The owner's screenshot: two ARS accounts owned, every visible movement in «a» → «Restaurantes · a · Hoy» on each row. No more.
-  const oneVisible = { accounts, entries: [entry('1', 'a', 'Parrilla', 'Restaurantes'), entry('2', 'a', 'Coto', 'Supermercado')] };
-  assert.equal(shown(routeHarness('(tabs)/index.tsx', {}, oneVisible).render(), 'EntryRow').join(), 'false,false');
-  // Two accounts among the visible rows: each row names its own.
-  const twoVisible = { accounts, entries: [...oneVisible.entries, entry('3', 'b', 'Farmacia', 'Salud')] };
-  assert.equal(shown(routeHarness('(tabs)/index.tsx', {}, twoVisible).render(), 'EntryRow').join(), 'true,true,true');
-  // Ambiguous names keep their category either way ("f", "aa").
-  const ambiguous = { accounts, entries: [entry('4', 'a', 'f', 'Comida'), entry('5', 'a', 'aa', 'Hogar'), entry('6', 'a', 'Carrefour', 'Supermercado')] };
-  const rows = nodes(routeHarness('(tabs)/index.tsx', {}, ambiguous).render()).filter(node => node.type === 'EntryRow');
-  assert.equal(rows.map(row => row.props.entry.merchant + ':' + row.props.showCategory + ':' + row.props.showAccount).sort().join(), 'Carrefour:false:false,aa:true:false,f:true:false');
-  // Próximos compromisos decides on its own rows, independently of the movements; amounts and dates are untouched.
+  const entries: domain.Entry[] = [{ id: '1', accountId: 'a', kind: 'expense', amountMinor: 100, merchant: 'Parrilla', category: 'Restaurantes', dateISO: '2026-09-10', createdAt: at },
+    { id: '3', accountId: 'b', kind: 'expense', amountMinor: 100, merchant: 'Farmacia', category: 'Salud', dateISO: '2026-09-10', createdAt: at }];
+  const shown = (root: Node) => nodes(root).filter(node => node.type === 'UpcomingRecurringRow').map(node => node.props.showAccount);
   const rule = (id: string, accountId: string, merchant = 'Netflix'): domain.RecurringRule => ({ id, accountId, kind: 'expense', amountMinor: 4321, merchant, category: 'Suscripciones',
-    frequency: 'monthly', anchorDateISO: '2026-09-20', nextDateISO: '2026-09-20', active: true, deleted: false, createdAt: at, revision: 0, updatedAt: at });
-  let root = routeHarness('(tabs)/index.tsx', {}, twoVisible, { recurring: [rule('r1', 'a'), rule('r2', 'a', 'aa')] }).render();
-  assert.equal(shown(root, 'UpcomingRecurringRow').join(), 'false,false', 'both rules in one account, even though the movements span two');
-  assert.equal(shown(root, 'EntryRow').join(), 'true,true,true');
+    frequency: 'monthly', anchorDateISO: '2026-09-16', nextDateISO: '2026-09-16', active: true, deleted: false, createdAt: at, revision: 0, updatedAt: at });
+  let root = routeHarness('(tabs)/index.tsx', {}, { accounts, entries }, { recurring: [rule('r1', 'a'), rule('r2', 'a', 'aa')] }).render();
+  assert.equal(shown(root).join(), 'false,false', 'both rules in one account, even though the month\'s movements span two');
   const upcoming = nodes(root).filter(node => node.type === 'UpcomingRecurringRow');
-  assert.equal(upcoming.map(node => node.props.rule.merchant + ':' + node.props.showCategory).join(), 'aa:true,Netflix:false', '"aa" keeps its category in the agenda too');
-  assert.equal(upcoming.map(node => node.props.rule.amountMinor + '@' + node.props.rule.nextDateISO).join(), '4321@2026-09-20,4321@2026-09-20');
-  root = routeHarness('(tabs)/index.tsx', {}, oneVisible, { recurring: [rule('r1', 'a'), rule('r2', 'b')] }).render();
-  assert.equal(shown(root, 'UpcomingRecurringRow').join(), 'true,true');
-  assert.equal(shown(root, 'EntryRow').join(), 'false,false');
+  assert.equal(upcoming.map(node => node.props.rule.merchant + ':' + node.props.showCategory).join(), 'aa:true,Netflix:false', '"aa" keeps its category in the agenda');
+  assert.equal(upcoming.map(node => node.props.rule.amountMinor + '@' + node.props.rule.nextDateISO).join(), '4321@2026-09-16,4321@2026-09-16');
+  root = routeHarness('(tabs)/index.tsx', {}, { accounts, entries }, { recurring: [rule('r1', 'a'), rule('r2', 'b')] }).render();
+  assert.equal(shown(root).join(), 'true,true');
 });
-
-test('24UX2: Home keeps its modules and adds none', () => {
+test('24UX6A: Inicio keeps one number, one capture button and nothing that is not about now', () => {
   const rule: domain.RecurringRule = { id: 'r', accountId: 'a', kind: 'expense', amountMinor: 100, merchant: 'Netflix', category: 'Suscripciones', frequency: 'monthly',
-    anchorDateISO: '2026-09-20', nextDateISO: '2026-09-20', active: true, deleted: false, createdAt, revision: 0, updatedAt: createdAt };
+    anchorDateISO: '2026-09-15', nextDateISO: '2026-09-15', active: true, deleted: false, createdAt, revision: 0, updatedAt: createdAt };
   const root = routeHarness('(tabs)/index.tsx', {}, homeData, { recurring: [rule] }).render();
-  assert.equal(sectionTitles(root).join('|'), 'En qué gastaste|Próximos compromisos|Últimos movimientos');
-  assert.equal(nodes(root).filter(node => node.type === 'QuickActions').length, 1);
-  assert.equal(find(root, 'QuickActions').props.assistant, undefined, '24UX3: the movements are three pills; the Assistant has its own entry');
-  assert.equal(nodes(root).filter(node => node.type === 'AssistantEntry').length, 1, 'the Assistant keeps its prominent entry');
-  assert.equal(find(root, 'AssistantEntry').props.currency, 'ARS', 'it carries the currency Inicio shows');
+  assert.equal(sectionTitles(root).join('|'), 'Próximos compromisos', 'no «En qué gastaste», no «Últimos movimientos»');
+  assert.equal(nodes(root).filter(node => node.type === 'CaptureButton').length, 1, 'one way to record');
+  for (const gone of ['QuickActions', 'AssistantEntry', 'EntryRow', 'CategoryRanking', 'BudgetHomeCard']) assert.equal(nodes(root).some(node => node.type === gone), false, gone + ' left Inicio');
   assert.equal(nodes(root).filter(node => node.type === 'Choices').length, 1, 'Gastos / Disponible');
   assert.equal(nodes(root).filter(node => node.type === 'DisplayCurrencyButton').length, 1);
+  assert.equal(nodes(root).filter(node => node.type === 'Money').length, 1, 'one hero; the commitments draw their own amounts');
 });
-
 // ---- 24UX3: Home hierarchy ---------------------------------------------------------------------------------------
 
-test('24UX3: a quiet header, a larger number, movements then the Assistant, quiet section links and three section shapes', () => {
+test('24UX6A: no root title, the accounts beside the metric, a larger number, the capture button under it and quiet commitments on the ground', () => {
   const rule: domain.RecurringRule = { id: 'r', accountId: 'a', kind: 'expense', amountMinor: 100, merchant: 'Netflix', category: 'Suscripciones', frequency: 'monthly',
-    anchorDateISO: '2026-09-20', nextDateISO: '2026-09-20', active: true, deleted: false, createdAt, revision: 0, updatedAt: createdAt };
-  const root = routeHarness('(tabs)/index.tsx', {}, homeData, { recurring: [rule] }).render();
-  // The header is the compact variant: the metric and the currency chip no longer weigh like the number.
+    anchorDateISO: '2026-09-15', nextDateISO: '2026-09-15', active: true, deleted: false, createdAt, revision: 0, updatedAt: createdAt };
+  const view = routeHarness('(tabs)/index.tsx', {}, homeData, { recurring: [rule] });
+  const root = view.render();
+  assert.equal(homeTexts(root).includes('Inicio'), false, 'the selected tab names the screen');
+  // The metric and the currency chip are compact: they do not weigh like the number.
   assert.equal(find(root, 'Choices').props.compact, true);
   assert.equal(find(root, 'DisplayCurrencyButton').props.compact, true);
-  // The number is Inicio's own size, a step above the 44 pt hero elsewhere.
+  const wallet = find(root, 'IconButton');
+  assert.deepEqual([wallet.props.name, wallet.props.label], ['wallet-outline', 'Ver mis cuentas'], 'the accounts stay one tap away, where the title was');
+  wallet.props.onPress();
+  assert.equal(view.pushed.at(-1), '/accounts');
   const hero = find(root, 'Money');
   assert.equal(hero.props.large, true);
   assert.equal(hero.props.size, 48);
-  // Movements, then the Assistant below them (nearer the thumb), in that order.
-  const order = nodes(root).map(node => node.type).filter(type => type === 'QuickActions' || type === 'AssistantEntry');
-  assert.equal(order.join('|'), 'QuickActions|AssistantEntry');
-  // Every section link stays (same targets) but is quiet: no row of cobalt words competing with the Assistant.
+  const order = nodes(root).map(node => node.type).filter(type => ['Choices', 'IconButton', 'Money', 'DisplayCurrencyButton', 'CaptureButton', 'SectionTitle', 'UpcomingRecurringRow'].includes(type));
+  assert.equal(order.join('|'), 'Choices|IconButton|Money|DisplayCurrencyButton|CaptureButton|SectionTitle|UpcomingRecurringRow', 'what the number covers sits under it; the button follows');
   const titles = nodes(root).filter(node => node.type === 'SectionTitle');
-  assert.equal(titles.map(node => node.props.action).join('|'), 'Reportes|Ver todos|Ver todos');
-  assert.equal(titles.every(node => node.props.quiet === true && typeof node.props.onAction === 'function'), true);
-  // One card (CategoryRanking draws its own surface), then two open lists on the ground: never card → list → card (24UX3 review).
+  assert.equal(titles.every(node => node.props.quiet === true && typeof node.props.onAction === 'function'), true, 'a quiet link, no cobalt word competing with the button');
   const surfaces = nodes(root).filter(node => node.type === 'Surface');
   assert.equal(surfaces.some(surface => nodes(surface).some(node => node.type === 'UpcomingRecurringRow')), false, 'commitments are an open agenda, not a card');
-  assert.equal(surfaces.some(surface => nodes(surface).some(node => node.type === 'EntryRow')), false, 'the latest transactions are an open ledger, not a second slab');
-  const ledger = nodes(root).filter(node => node.type === 'EntryRow');
-  assert.ok(ledger.length > 0);
-  assert.equal(ledger.every(row => row.props.variant === 'home'), true, '24UX5: the explicit Home variant, not a global change of EntryRow');
+  assert.equal(nodes(root).filter(node => node.type === 'Reflow').length, 1, 'a module that appears or leaves moves the layout calmly (Reflow honours Reduce Motion)');
 });
-
 // 24UX5: glyphs per category in the harness (the default mock gave every category one glyph); a test may alias two.
-test('24UX5: Home rows name the category only when it adds something, and both lists share one rule', () => {
+test('24UX5: a commitment names its category only when it adds something', () => {
   const at = '2026-09-12T12:00:00Z';
   const cash: domain.Account = { id: 'a', name: 'Efectivo', currency: 'ARS', openingMinor: 0, createdAt: at };
-  const entry = (id: string, merchant: string, category: string, kind: 'expense' | 'income' = 'expense'): domain.Entry =>
-    ({ id, accountId: 'a', kind, amountMinor: 100, merchant, category, dateISO: '2026-09-10', createdAt: at });
-  const data = { accounts: [cash], entries: [entry('named', 'Carrefour', 'Supermercado'), entry('short', 'f', 'Comida'), entry('generic', 'Varios', 'Hogar'),
-    entry('same', 'Transporte', 'Transporte')] };
-  const rule: domain.RecurringRule = { id: 'r', accountId: 'a', kind: 'expense', amountMinor: 100, merchant: 'Netflix', category: 'Suscripciones', frequency: 'monthly',
-    anchorDateISO: '2026-09-20', nextDateISO: '2026-09-20', active: true, deleted: false, createdAt: at, revision: 0, updatedAt: at };
-  const shows = (root: Node) => Object.fromEntries(nodes(root).filter(n => n.type === 'EntryRow' || n.type === 'UpcomingRecurringRow')
-    .map(n => [(n.props.entry ?? n.props.rule).id, n.props.showCategory]));
-  let root = routeHarness('(tabs)/index.tsx', {}, data, { recurring: [rule] }).render();
-  assert.deepEqual(shows(root), { r: false, named: false, short: true, generic: true, same: false },
-    'a clear name keeps the date alone; "f" and "Varios" keep their category; a name that is the category never repeats it');
-  // Two categories that draw the same glyph on one screen (across both lists) each say which they are.
-  glyphAliases.set('Supermercado', 'glyph-suscripciones');
+  const rule = (id: string, merchant: string, category: string): domain.RecurringRule => ({ id, accountId: 'a', kind: 'expense', amountMinor: 100, merchant, category, frequency: 'monthly',
+    anchorDateISO: '2026-09-15', nextDateISO: '2026-09-15', active: true, deleted: false, createdAt: at, revision: 0, updatedAt: at });
+  const shows = (root: Node) => Object.fromEntries(nodes(root).filter(n => n.type === 'UpcomingRecurringRow').map(n => [n.props.rule.id, n.props.showCategory]));
+  const data = { accounts: [cash], entries: [] };
+  let root = routeHarness('(tabs)/index.tsx', {}, data, { recurring: [rule('named', 'Netflix', 'Suscripciones'), rule('short', 'f', 'Comida')] }).render();
+  assert.deepEqual(shows(root), { named: false, short: true }, 'a clear name keeps the date alone; "f" keeps its category');
+  root = routeHarness('(tabs)/index.tsx', {}, data, { recurring: [rule('generic', 'Varios', 'Hogar'), rule('same', 'Transporte', 'Transporte')] }).render();
+  assert.deepEqual(shows(root), { generic: true, same: false }, '"Varios" keeps its category; a name that is the category never repeats it');
+  // Two categories that draw the same glyph each say which they are.
+  glyphAliases.set('Comida', 'glyph-suscripciones');
   try {
-    root = routeHarness('(tabs)/index.tsx', {}, data, { recurring: [rule] }).render();
-    assert.deepEqual(shows(root), { r: true, named: true, short: true, generic: true, same: false });
+    root = routeHarness('(tabs)/index.tsx', {}, data, { recurring: [rule('named', 'Netflix', 'Suscripciones'), rule('short', 'f', 'Comida')] }).render();
+    assert.deepEqual(shows(root), { named: true, short: true });
   } finally { glyphAliases.clear(); }
 });
-
-test('24UX5: Home keeps the account in a row only when another account of the currency could be meant, and its links keep their targets', () => {
-  const at = '2026-09-12T12:00:00Z';
-  const accounts: domain.Account[] = [{ id: 'a', name: 'Efectivo', currency: 'ARS', openingMinor: 0, createdAt: at },
-    { id: 'b', name: 'Banco', currency: 'ARS', openingMinor: 0, createdAt: at }, { id: 'u', name: 'Dólares', currency: 'USD', openingMinor: 0, createdAt: at }];
-  const entries: domain.Entry[] = [{ id: 'e', accountId: 'a', kind: 'expense', amountMinor: 100, merchant: 'Café', category: 'Comida', dateISO: '2026-09-10', createdAt: at }];
-  const oneArs = routeHarness('(tabs)/index.tsx', {}, { accounts: [accounts[0], accounts[2]], entries }).render();
-  assert.equal(find(oneArs, 'EntryRow').props.showAccount, false, 'one ARS account (a USD one does not make it ambiguous)');
-  const view = routeHarness('(tabs)/index.tsx', {}, { accounts, entries });
-  const twoArs = view.render();
-  assert.equal(find(twoArs, 'EntryRow').props.showAccount, false, '24UX5 review: two accounts owned, one visible: no name');
-  const links = nodes(twoArs).filter(node => node.type === 'SectionTitle');
-  for (const link of links) link.props.onAction();
-  assert.equal(JSON.stringify(view.pushed), JSON.stringify([{ pathname: '/reports', params: { currency: 'ARS' } }, '/activity']), 'Reportes keeps the currency; Ver todos opens Movimientos');
-});
-
-// 24UX5 §8: the composition with more data. Whatever the ledger holds, Inicio keeps one order (header, number,
-// movements, the Assistant, then the sections) and each section its own shape; nothing new appears to show a feature.
-test('24UX5: Inicio keeps its hierarchy with no account, one or several accounts and currencies, categories, budgets, rules and huge amounts', () => {
+// 24UX5 §8, 24UX6A: the composition with more data. Whatever the ledger holds, Inicio keeps one order (the controls,
+// the number, the button, then only what needs attention); nothing appears to show a feature.
+test('24UX6A: Inicio keeps its hierarchy with no account, one or several accounts and currencies, budgets, rules and huge amounts', () => {
   const at = '2026-09-01T12:00:00.000Z';
   const account = (id: string, currency: domain.Currency, name = id): domain.Account => ({ id, name, currency, openingMinor: 0, createdAt: at });
   const spend = (id: string, accountId: string, category: string, amountMinor: number, kind: 'expense' | 'income' = 'expense'): domain.Entry =>
     ({ id, accountId, kind, amountMinor, merchant: 'Comercio ' + id, category, dateISO: '2026-09-10', createdAt: at });
   const rule = (id: string, overrides: Partial<domain.RecurringRule> = {}): domain.RecurringRule => ({ id, accountId: 'a', kind: 'expense', amountMinor: 100, merchant: 'Regla ' + id,
-    category: 'Servicios', frequency: 'monthly', anchorDateISO: '2026-09-20', nextDateISO: '2026-09-20', active: true, deleted: false, createdAt: at, revision: 0, updatedAt: at, ...overrides });
+    category: 'Servicios', frequency: 'monthly', anchorDateISO: '2026-09-15', nextDateISO: '2026-09-15', active: true, deleted: false, createdAt: at, revision: 0, updatedAt: at, ...overrides });
   const total = (amountMinor: number): domain.MonthlyBudget => ({ id: 'total', scope: 'total', currency: 'ARS', monthISO: '2026-09', amountMinor, active: true, createdAt: at, revision: 0, updatedAt: at });
   const order = (root: Node) => nodes(root).map(node => node.type === 'SectionTitle' ? 'title:' + node.props.children : node.type)
-    .filter(type => ['Choices', 'DisplayCurrencyButton', 'Money', 'QuickActions', 'AssistantEntry', 'BudgetHomeCard', 'CategoryRanking', 'UpcomingRecurringRow', 'EntryRow', 'EmptyState'].includes(type) || type.startsWith('title:'))
+    .filter(type => ['Choices', 'IconButton', 'DisplayCurrencyButton', 'Money', 'CaptureButton', 'UpcomingRecurringRow', 'HomeInsightRow', 'EmptyState', 'EntryRow', 'QuickActions'].includes(type) || type.startsWith('title:'))
     .filter((type, index, all) => type !== all[index - 1]);
-  // 24C1 / 25B2: the chip is part of the header only while two or more currencies are held.
-  const expected = (sections: string[], chip = false) => ['Choices', ...(chip ? ['DisplayCurrencyButton'] : []), 'Money', 'QuickActions', 'AssistantEntry', ...sections];
+  // 24C1 / 25B2: the chip is part of the hero only while two or more currencies are held.
+  const expected = (modules: string[], chip = false) => ['Choices', 'IconButton', 'Money', ...(chip ? ['DisplayCurrencyButton'] : []), 'CaptureButton', ...modules];
 
-  // No account: one calm empty state, nothing else.
-  assert.deepEqual(order(routeHarness('(tabs)/index.tsx', {}, { accounts: [], entries: [] }).render()), ['EmptyState']);
-  // One account, nothing recorded: the month says so once, under Últimos movimientos; no category card.
-  assert.deepEqual(order(routeHarness('(tabs)/index.tsx', {}, { accounts: [account('a', 'ARS')], entries: [] }).render()), expected(['title:Últimos movimientos']));
-  // Three or more categories, incomes and expenses, several accounts of one currency, a second currency, an overall
-  // budget already exceeded, one active rule, one paused and one deleted (neither shown), and an amount of 13 digits.
+  // No account: the accounts shortcut and one calm empty state, nothing else.
+  assert.deepEqual(order(routeHarness('(tabs)/index.tsx', {}, { accounts: [], entries: [] }).render()), ['IconButton', 'EmptyState']);
+  // One account, nothing recorded: the number and the button.
+  assert.deepEqual(order(routeHarness('(tabs)/index.tsx', {}, { accounts: [account('a', 'ARS')], entries: [] }).render()), expected([]));
+  // Several categories, incomes and expenses, several accounts of one currency, a second currency, an overall budget
+  // already exceeded, one active rule this week, one paused and one deleted (neither shown), and an amount of 13 digits.
   const data = { accounts: [account('a', 'ARS', 'Efectivo'), account('b', 'ARS', 'Banco'), account('u', 'USD', 'Dólares')],
     entries: [spend('1', 'a', 'Comida', 9_999_999_999_999), spend('2', 'b', 'Transporte', 500), spend('3', 'a', 'Salud', 300), spend('4', 'a', 'Ocio', 200),
       spend('5', 'b', 'Sueldo', 900_000, 'income'), spend('6', 'u', 'Viajes', 4_000)] };
   const extra = { budgets: [total(1000)], recurring: [rule('on'), rule('paused', { active: false }), rule('gone', { active: false, deleted: true })] };
   const view = routeHarness('(tabs)/index.tsx', {}, data, extra);
   let root = view.render();
-  const full = expected(['title:Presupuesto del mes', 'BudgetHomeCard', 'title:En qué gastaste', 'CategoryRanking', 'title:Próximos compromisos', 'UpcomingRecurringRow',
-    'title:Últimos movimientos', 'EntryRow'], true);
-  assert.deepEqual(order(root), full);
+  assert.deepEqual(order(root), expected(['title:Próximos compromisos', 'UpcomingRecurringRow', 'HomeInsightRow'], true));
   assert.equal(find(root, 'Money').props.minor, 9_999_999_999_999 + 500 + 300 + 200, 'the huge amount reaches the hero exactly (Money fits it to the width)');
-  assert.equal(find(root, 'CategoryRanking').props.categories.length, 4, 'every category is handed over; the card shows its three');
   assert.equal(nodes(root).filter(node => node.type === 'UpcomingRecurringRow').map(node => node.props.rule.id).join(), 'on', 'paused and deleted rules are not upcoming');
-  assert.equal(nodes(root).filter(node => node.type === 'EntryRow').every(node => node.props.showAccount), true, 'two ARS accounts: rows name theirs');
-  assert.ok(find(root, 'BudgetHomeCard').props.summary.total.exceeded, 'the exceeded budget keeps its place and its own card');
-  // Switching the currency keeps the same order; sections with nothing in USD simply stay out.
+  const insight = find(root, 'HomeInsightRow').props.insight;
+  assert.deepEqual([insight.kind, insight.scope, insight.overMinor], ['budgetExceeded', 'total', 9_999_999_999_999 + 500 + 300 + 200 - 1000], 'the exceeded budget, before the concentrated category, exactly');
+  // Switching the currency keeps the same order; what has nothing in USD simply stays out.
   find(root, 'DisplayCurrencyButton').props.onCurrency('USD');
   root = view.render();
-  const usd = expected(['title:En qué gastaste', 'CategoryRanking', 'title:Últimos movimientos', 'EntryRow'], true);
-  assert.deepEqual(order(root), usd);
-  assert.equal(nodes(root).filter(node => node.type === 'EntryRow').every(node => node.props.showAccount === false), true, 'one USD account: no account name');
-  // Several upcoming rules: at most three, soonest first.
-  const many = routeHarness('(tabs)/index.tsx', {}, data, { recurring: ['d', 'b', 'a', 'c'].map((id, index) => rule(id, { nextDateISO: '2026-09-2' + index, anchorDateISO: '2026-09-2' + index })) }).render();
-  assert.equal(nodes(many).filter(node => node.type === 'UpcomingRecurringRow').map(node => node.props.rule.id).join(), 'd,b,a');
+  assert.deepEqual(order(root), expected([], true));
+  // Several rules this week: two at most, soonest first.
+  const many = routeHarness('(tabs)/index.tsx', {}, data, { recurring: ['d', 'b', 'a', 'c'].map((id, index) => rule(id, { nextDateISO: '2026-09-1' + (3 + index), anchorDateISO: '2026-09-1' + (3 + index) })) }).render();
+  assert.equal(nodes(many).filter(node => node.type === 'UpcomingRecurringRow').map(node => node.props.rule.id).join(), 'd,b');
 });
-
 // ---- Producto 24C1: the consolidated total ------------------------------------------------------------------
 // Synthetic rates from a fixed book (no network): 1 USD = 1000 ARS from the 1st, 2000 ARS from the 10th.
 
@@ -639,9 +598,8 @@ test('24C1: a new installation opens Inicio on the consolidated total: every acc
   assert.equal(nodes(root).filter(n => n.type === 'Money').length, 1, 'one number: no equivalent under it');
   assert.equal(find(root, 'DisplayCurrencyButton').props.mode, 'consolidated');
   assert.match(find(root, 'MetricHelp').props.detail, /^Gastos de todas tus cuentas en Pesos argentinos\. .*Frankfurter.*10\/9\/2026/);
-  assert.deepEqual(nodes(root).filter(n => n.type === 'EntryRow').map(n => [n.props.entry.id, n.props.entry.amountMinor, n.props.account.currency]),
-    [['income', 500, 'ARS'], ['usd', 1000, 'USD'], ['now', 200, 'ARS'], ['early', 100, 'ARS']], 'rows keep their own amount and currency');
-  assert.deepEqual(find(root, 'CategoryRanking').props.categories.map((c: domain.CategorySpending) => [c.key, c.amountMinor]), [['salud', 2000300]], 'categories add up to the total');
+  assert.equal(nodes(root).some(n => n.type === 'HomeInsightRow'), false, 'one category, converted: no concentration line');
+  assert.deepEqual([find(root, 'CaptureButton').props.movementCurrency, find(root, 'CaptureButton').props.assistantCurrency], ['ARS', 'ARS']);
   assert.equal(JSON.stringify(ensured.at(-1)), JSON.stringify({ months: ['2026-09'], quotes: ['ARS'] }), 'only the month shown and the one quote it needs');
   // Disponible: ARS 95,94 and USD 80,01 at today's rate (the 10th's, 2000) → ARS 160.020,00.
   nodes(root).find(n => n.type === 'Choices' && n.props.value === 'spending')!.props.onChange('available');
@@ -664,10 +622,10 @@ test('24C1: without a rate Inicio shows each currency\'s own figure and why, nev
   assert.equal(JSON.stringify(parts.props.parts), JSON.stringify([{ currency: 'ARS', minor: 300 }, { currency: 'USD', minor: 1000 }]));
   assert.equal(parts.props.line, 'Sin cotización para sumarlo en EUR');
   assert.match(parts.props.detail, /^Sin conexión: no pudimos obtener la cotización USD → EUR del 1\/9\/2026/);
-  assert.equal(nodes(root).some(n => n.type === 'CategoryRanking'), false, 'no category shares of a partial month');
-  assert.equal(nodes(root).some(n => n.type === 'BudgetHomeCard'), false);
+  assert.equal(nodes(root).some(n => n.type === 'HomeInsightRow'), false, 'no category shares of a partial month');
   assert.equal(ensured.at(-1)?.quotes.join(), 'ARS,EUR');
-  assert.equal(find(root, 'QuickActions').props.currency, undefined, 'no EUR account to preselect');
+  assert.equal(find(root, 'CaptureButton').props.movementCurrency, undefined, 'no EUR account to preselect');
+  assert.equal(find(root, 'CaptureButton').props.assistantCurrency, 'EUR', 'the Assistant hears the currency shown');
 });
 
 test('24C1: a ledger in one currency shown in that currency asks the provider nothing and reads as before', () => {
@@ -681,7 +639,8 @@ test('24C1: a ledger in one currency shown in that currency asks the provider no
 
 // ---- 24C1 review: a budget keeps its currency whatever Inicio shows ---------------------------------------------
 
-/** ARS and EUR accounts, one expense each this month, and a general budget in each currency. Rates: 1 USD = 1000 ARS, 1 USD = 0.5 EUR. */
+/** ARS and EUR accounts, one expense each this month, and a general budget in each currency, both nearly spent (300 of
+ * 320, 500 of 520: a converted figure would exceed either). Rates: 1 USD = 1000 ARS, 1 USD = 0.5 EUR. */
 const budgetLedger = (): { data: domain.LedgerSnapshot; extra: Partial<domain.LedgerArchive>; book: domain.RateBook } => {
   const accounts: domain.Account[] = [{ id: 'a', name: 'Pesos', currency: 'ARS', openingMinor: 100000, createdAt }, { id: 'e', name: 'Euros', currency: 'EUR', openingMinor: 100000, createdAt }];
   const entries: domain.Entry[] = [
@@ -694,7 +653,7 @@ const budgetLedger = (): { data: domain.LedgerSnapshot; extra: Partial<domain.Le
     { base: 'USD', quote: 'ARS', rate: '1000', effectiveDate: '2026-09-10', source: 'Frankfurter', fetchedAt: '2026-09-12T12:00:00.000Z' },
     { base: 'USD', quote: 'EUR', rate: '0.5', effectiveDate: '2026-09-10', source: 'Frankfurter', fetchedAt: '2026-09-12T12:00:00.000Z' },
   ]);
-  return { data: { accounts, entries }, extra: { budgets: [budget('b-ars', 'ARS', 1000), budget('b-eur', 'EUR', 2000)] }, book };
+  return { data: { accounts, entries }, extra: { budgets: [budget('b-ars', 'ARS', 320), budget('b-eur', 'EUR', 520)] }, book };
 };
 const sectionText = (node: Node) => Array.isArray(node.props.children) ? node.props.children.join('') : String(node.props.children);
 
@@ -703,35 +662,33 @@ test('24C1 review: an existing ARS budget tracks ARS spending only, in single an
   const display = displayStore({ [displayCurrency.DISPLAY_MODE_KEY]: 'single', [displayCurrency.DISPLAY_CURRENCY_KEY]: 'ARS' });
   const view = routeHarness('(tabs)/index.tsx', {}, data, extra, display, { book });
   let root = view.render();
-  const card = () => find(root, 'BudgetHomeCard').props.summary;
-  const title = () => sectionText(nodes(root).find(n => n.type === 'SectionTitle' && sectionText(n).startsWith('Presupuesto del mes'))!);
-  assert.deepEqual([card().currency, card().total.spentMinor, title()], ['ARS', 300, 'Presupuesto del mes'], 'single ARS: as before 24C1');
+  const line = () => find(root, 'HomeInsightRow');
+  const facts = () => [line().props.insight.kind, line().props.insight.currency, Math.round(line().props.insight.leftShare * 10000), line().props.labelsCurrency];
+  assert.deepEqual(facts(), ['budgetLow', 'ARS', 625, false], 'single ARS: 300 of 320, 6,25 % left');
   // Consolidated, total read in ARS: the number converts the euros (€5 → US$10 → ARS 10.000), the budget does not.
   find(root, 'DisplayCurrencyButton').props.onMode('consolidated');
   root = view.render();
   assert.equal(find(root, 'Money').props.minor, 300 + 1000000, 'the total is every account');
-  assert.deepEqual([card().currency, card().total.spentMinor, card().total.remainingMinor, title()], ['ARS', 300, 700, 'Presupuesto del mes'], 'the ARS budget still counts ARS spending only');
-  // Total read in USD, a currency with no budget: the ARS budget stays on Inicio and the section names its currency.
+  assert.deepEqual(facts(), ['budgetLow', 'ARS', 625, false], 'the ARS budget still counts ARS spending only (converted, it would be exceeded)');
+  // Total read in USD, a currency with no budget: the ARS budget stays on Inicio and its amount names its currency.
   find(root, 'DisplayCurrencyButton').props.onCurrency('USD');
   root = view.render();
-  assert.deepEqual([card().currency, card().total.spentMinor], ['ARS', 300]);
-  assert.equal(title().replace(/\u00a0/g, ' '), 'Presupuesto del mes · ARS', 'labelled with its currency');
-  find(root, 'SectionTitle', 'Ver').props.onAction();
-  assert.equal(JSON.stringify(view.pushed.at(-1)), JSON.stringify({ pathname: '/budgets', params: { currency: 'ARS' } }), 'Ver opens the budget\'s own currency');
-  // Total read in EUR: the EUR budget takes the card, measured in euros only.
+  assert.deepEqual(facts(), ['budgetLow', 'ARS', 625, true], 'labelled with its currency');
+  line().props.onPress();
+  assert.equal(JSON.stringify(view.pushed.at(-1)), JSON.stringify({ pathname: '/budgets', params: { currency: 'ARS' } }), 'the line opens the budget\'s own currency');
+  // Total read in EUR: the EUR budget takes the line, measured in euros only.
   find(root, 'DisplayCurrencyButton').props.onCurrency('EUR');
   root = view.render();
-  assert.deepEqual([card().currency, card().total.spentMinor, card().total.remainingMinor, title()], ['EUR', 500, 1500, 'Presupuesto del mes']);
+  assert.deepEqual(facts(), ['budgetLow', 'EUR', Math.round((1 - 500 / 520) * 10000), false]);
   // Back to single mode in EUR: identical.
   find(root, 'DisplayCurrencyButton').props.onMode('single');
   root = view.render();
-  assert.deepEqual([card().currency, card().total.spentMinor], ['EUR', 500]);
+  assert.deepEqual(facts().slice(0, 2), ['budgetLow', 'EUR']);
   // A missing rate hides the consolidated total, never the budget (it needs no rate).
   const offline = routeHarness('(tabs)/index.tsx', {}, data, extra, displayStore({ [displayCurrency.DISPLAY_MODE_KEY]: 'consolidated', [displayCurrency.DISPLAY_CURRENCY_KEY]: 'USD' }), { book: domain.rateBook([]), activity: 'offline' }).render();
   assert.equal(nodes(offline).some(n => n.type === 'Money'), false);
-  assert.deepEqual([find(offline, 'BudgetHomeCard').props.summary.currency, find(offline, 'BudgetHomeCard').props.summary.total.spentMinor], ['ARS', 300]);
+  assert.deepEqual([find(offline, 'HomeInsightRow').props.insight.kind, find(offline, 'HomeInsightRow').props.insight.currency], ['budgetLow', 'ARS']);
 });
-
 test('24C1 review: the chip says what the number covers: "Total · USD" for every account converted, "Solo USD" for that currency alone', () => {
   const { data, extra, book } = budgetLedger();
   const display = displayStore({ [displayCurrency.DISPLAY_MODE_KEY]: 'consolidated', [displayCurrency.DISPLAY_CURRENCY_KEY]: 'USD' });
@@ -760,7 +717,6 @@ test('25B2 review: deleting the last USD account keeps its movements on Inicio: 
   assert.deepEqual([find(root, 'Money').props.minor, find(root, 'Money').props.currency], [100 + 200 + 2000000, 'ARS'], 'the USD expense of the 11th still converts at its date');
   const chip = find(root, 'DisplayCurrencyButton');
   assert.deepEqual([chip.props.mode, chip.props.currency], ['consolidated', 'ARS'], 'two currencies in the history: the chip stays');
-  assert.deepEqual(nodes(root).filter(n => n.type === 'EntryRow').map(n => [n.props.entry.id, n.props.account.currency]), [['income', 'ARS'], ['usd', 'USD'], ['now', 'ARS'], ['early', 'ARS']], 'the deleted account\'s row keeps its currency');
   assert.equal(JSON.stringify(ensured.at(-1)), JSON.stringify({ months: ['2026-09'], quotes: ['ARS'] }), 'the provider is still asked for the USD → ARS rate');
   // Disponible counts live accounts only: the deleted USD balance is history.
   nodes(root).find(n => n.type === 'Choices' && n.props.value === 'spending')!.props.onChange('available');
@@ -775,7 +731,7 @@ test('25B2 review: deleting the last USD account keeps its movements on Inicio: 
   root = view.render();
   assert.deepEqual([find(root, 'Money').props.minor, find(root, 'Money').props.currency], [1000, 'USD']);
   assert.deepEqual([find(root, 'DisplayCurrencyButton').props.mode, find(root, 'DisplayCurrencyButton').props.currency], ['single', 'USD']);
-  assert.equal(find(root, 'QuickActions').props.currency, undefined, 'no live USD account to preselect for a new movement');
+  assert.equal(find(root, 'CaptureButton').props.movementCurrency, undefined, 'no live USD account to preselect for a new movement');
   // Without the rate, consolidated: the parts name both currencies, never a partial ARS sum.
   const offline = routeHarness('(tabs)/index.tsx', {}, data, {}, displayStore({ [displayCurrency.DISPLAY_MODE_KEY]: 'consolidated', [displayCurrency.DISPLAY_CURRENCY_KEY]: 'ARS' }), { book: domain.rateBook([]), activity: 'offline' }).render();
   assert.equal(nodes(offline).some(n => n.type === 'Money'), false);

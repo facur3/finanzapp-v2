@@ -28,6 +28,7 @@ function renderLayout(background: string) {
     'expo-router': { Tabs, router: { push: (to: unknown) => pushed.push(to) } },
     '@expo/vector-icons/Ionicons': 'Ionicons',
     '../../src/ui/components': { IconButton: 'IconButton' },
+    '../../src/ui/floating-tab-bar': { FloatingTabBar: 'FloatingTabBar' },
     '../../src/ui/navigation': { tabHostOptions, tabScreenOptions },
     '../../src/ui/motion': { selectionHaptic: () => {} },
     '../../src/ui/theme': { usePalette: () => ({ background, primary: '#5B87FF', text: '#FFFFFF', tertiary: '#7C7C84', secondary: '#A6B0C0', surface: '#151A22', line: '#2B3544' }) },
@@ -55,13 +56,16 @@ for (const [theme, background] of [['light', '#F5F6F8'], ['dark', '#080B10']]) {
       assert.equal(options.sceneStyle.backgroundColor, background);
       assert.equal(options.sceneStyle.opacity, undefined);
     }
-    // 24UX2: the 10 pt inactive labels are text, so they take the secondary ink (AA), never the tertiary.
-    assert.equal(props.screenOptions.tabBarInactiveTintColor, '#A6B0C0');
-    assert.equal(props.screenOptions.tabBarActiveTintColor, '#5B87FF');
+    // 24UX6A: the bar is the app's own floating capsule, handed the navigator's props untouched; its colours are its own
+    // (tests/floating-tab-bar.node.ts), so no stock tint or style is left to disagree with it.
+    const bar = props.tabBar({ state: 'state', descriptors: 'descriptors', navigation: 'navigation', insets: 'insets' });
+    assert.equal(bar.type, 'FloatingTabBar');
+    assert.deepEqual({ ...bar.props }, { state: 'state', descriptors: 'descriptors', navigation: 'navigation', insets: 'insets' });
+    for (const key of ['tabBarActiveTintColor', 'tabBarInactiveTintColor', 'tabBarStyle', 'tabBarLabelStyle', 'tabBarBackground']) assert.equal(props.screenOptions[key], undefined, key);
   });
 }
 
-test('the Assistant is the centre tab, Tarjetas left the bar for Más, and Home keeps one header action', () => {
+test('the Assistant is the centre tab, Tarjetas left the bar for Más, and Inicio has no header of its own', () => {
   const { props } = renderLayout('#F5F6F8');
   const screens = props.children;
   const byName = Object.fromEntries(screens.map((screen: any) => [screen.props.name, screen.props.options]));
@@ -72,15 +76,18 @@ test('the Assistant is the centre tab, Tarjetas left the bar for Más, and Home 
   assert.equal(byName.assistant.headerRight, undefined, 'New chat is set by the screen itself, only once a conversation exists');
   assert.equal(byName.cards, undefined, 'Tarjetas is no longer a tab');
   assert.equal(JSON.stringify(screens).includes('Agregar tarjeta'), false, 'the card header action moved with the screen');
-  assert.equal(JSON.stringify(screens).includes('tabBarBackground'), false, 'the JS tab bar keeps its opaque surface; no forced custom glass over the bar');
+  assert.equal(JSON.stringify(screens).includes('tabBarBackground'), false, 'no stock bar background: the capsule draws its own material');
   assert.equal(byName.settings.tabBarIcon({ color: '#000', size: 24, focused: true }).props.name, 'ellipsis-horizontal-circle');
   assert.equal(byName.settings.tabBarIcon({ color: '#000', size: 24, focused: false }).props.name, 'ellipsis-horizontal-circle-outline');
-  // Home keeps one header action (accounts); the sparkles button is gone until the Assistant is a real capability.
-  const home = byName.index.headerRight();
-  assert.equal(home.type, 'IconButton');
-  assert.equal(home.props.name, 'wallet-outline');
-  home.props.onPress();
-  assert.deepEqual(pushed.at(-1), '/accounts');
+  // 24UX6A: Inicio draws no root title (the selected tab names it) and keeps its accounts shortcut in its own controls
+  // (tests/spending-home.node.ts); the other roots keep their headers, and Movimientos its «+».
+  assert.equal(byName.index.headerShown, false);
+  assert.equal(byName.index.headerRight, undefined);
+  for (const name of ['activity', 'assistant', 'reports', 'settings']) assert.notEqual(byName[name].headerShown, false, name + ' keeps its title');
+  const record = byName.activity.headerRight();
+  assert.deepEqual([record.type, record.props.name], ['IconButton', 'add']);
+  record.props.onPress();
+  assert.deepEqual(pushed.at(-1), '/new-entry');
   assert.equal(JSON.stringify(screens).includes('assistant-preview'), false);
 });
 
@@ -94,7 +101,6 @@ test('23.1B1: tab labels and the header actions follow the language; routes and 
   try {
     assert.equal(labels(), 'index=Home,activity=Activity,assistant=Assistant,reports=Reports,settings=More');
     const { props } = renderLayout('#F5F6F8');
-    assert.equal(props.children[0].props.options.headerRight().props.label, 'View my accounts');
     assert.equal(props.children[1].props.options.headerRight().props.label, 'Record a transaction');
   } finally { locale = 'es-AR'; }
 });

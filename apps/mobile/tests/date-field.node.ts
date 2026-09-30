@@ -74,7 +74,9 @@ function harness(os: 'ios' | 'android' = 'ios', { reduced = true, systemReduceMo
       usePalette: () => ({ isDark: false, primary: '#2557D6', background: '#F2F2F6', surface: '#FFFFFF', line: '#E6E6EC', scrim: 'rgba(10, 10, 12, 0.32)' }), useReduceMotion: () => reduced },
   };
   const module = { exports: {} as Record<string, (props: any) => Node> };
-  runInNewContext(code, { module, exports: module.exports, require: (name: string) => {
+  // The timers a sheet schedules (24UX6A: the dismissal fallback), run by the test when it says so.
+  const timers: { fn: () => void; ms: number }[] = [];
+  runInNewContext(code, { module, exports: module.exports, setTimeout: (fn: () => void, ms: number) => { timers.push({ fn, ms }); }, require: (name: string) => {
     if (!Object.hasOwn(modules, name)) throw new Error('Unexpected form-controls dependency: ' + name);
     return modules[name];
   } });
@@ -93,7 +95,7 @@ function harness(os: 'ios' | 'android' = 'ios', { reduced = true, systemReduceMo
   };
   /** Ends the oldest unfinished timing, as Reanimated would: finished, or interrupted by a newer one. */
   const settle = (finished: boolean) => { const callback = pending.shift(); if (!callback) throw new Error('no timing to settle'); callback(finished); };
-  return { render, saved, timings, settle, pendingCount: () => pending.length, setLocale: (next: AppLocale) => { locale = next; } };
+  return { render, saved, timings, settle, timers, pendingCount: () => pending.length, setLocale: (next: AppLocale) => { locale = next; } };
 }
 
 /** `src/ui/motion.tsx` as compiled, over a Reanimated whose curves and enum are inspectable: a bezier is named by its
@@ -472,6 +474,52 @@ test('24UX1: the runtime\'s policy: Reanimated 4 completes a timing without an e
   root = quick.render();
   assert.equal(find(root, 'Modal')!.props.visible, false, 'a finished fade out unmounts: no invisible modal');
   assert.deepEqual(quick.saved, ['2026-09-22'], 'Listo saves');
+});
+
+test('24UX6A: a sheet of actions has no Listo and keeps its title centred; onDismissed runs once, after the exit, by iOS\'s dismissal or the timer', () => {
+  for (const os of ['ios', 'android'] as const) {
+    const field = harness(os, { reduced: false, manual: true });
+    let dismissed = 0, closed = 0;
+    const props = { visible: true, title: 'Registrar', onClose: () => { closed++; }, onDismissed: () => { dismissed++; }, children: 'rows' };
+    let root = field.render('BottomSheet', props);
+    present(root, 320);
+    root = field.render('BottomSheet', props);
+    assert.equal(bar(root).join('|'), 'Cancelar|Registrar|Cancelar', os + ': Cancelar, the title, and an invisible twin of Cancelar that keeps the title centred');
+    assert.equal(nodes(find(root, 'Modal')).filter(node => node.type === 'PressFeedback').length, 1, 'no Listo: the rows commit');
+    const twin = nodes(find(root, 'Modal')).find(node => node.type === 'View' && node.props.style?.opacity === 0)!;
+    assert.deepEqual([twin.props.accessible, twin.props.importantForAccessibility], [false, 'no-hide-descendants'], 'VoiceOver never finds the twin');
+    button(root, 'Cancelar').props.onPress();
+    assert.equal(closed, 1);
+    // An exit interrupted by a reopening dismisses nothing.
+    root = field.render('BottomSheet', { ...props, visible: false });
+    root = field.render('BottomSheet', props);
+    field.settle(false);
+    root = field.render('BottomSheet', props);
+    assert.equal(dismissed, 0);
+    assert.equal(field.timers.length, 0, 'no fallback scheduled for a sheet that stayed');
+    // A finished exit unmounts, then reports the dismissal once: iOS's onDismiss or the timer, whichever comes first.
+    root = field.render('BottomSheet', { ...props, visible: false });
+    assert.equal(dismissed, 0, 'not while the card is leaving');
+    field.settle(true);
+    root = field.render('BottomSheet', { ...props, visible: false });
+    assert.equal(find(root, 'Modal')!.props.visible, false);
+    assert.equal(dismissed, 0, 'not before the modal is gone');
+    assert.deepEqual(field.timers.map(timer => timer.ms), [os === 'ios' ? 400 : 0], 'a fallback for a dismissal event that never comes (Android has none)');
+    if (os === 'ios') { find(root, 'Modal')!.props.onDismiss(); assert.equal(dismissed, 1, 'iOS reports the modal gone'); }
+    field.timers[0].fn();
+    assert.equal(dismissed, 1, 'once, never twice');
+    find(root, 'Modal')!.props.onDismiss();
+    assert.equal(dismissed, 1, 'a late event of the gone modal changes nothing');
+  }
+  // The date wheel passes no onDismissed and schedules nothing.
+  const field = harness('ios', { reduced: false, manual: true });
+  find(field.render(), 'DetailRow')!.props.onPress();
+  present(field.render(), 400);
+  button(field.render(), 'Cancelar').props.onPress();
+  field.render();
+  field.settle(true);
+  field.render();
+  assert.equal(field.timers.length, 0);
 });
 
 test('24B6: the list sheets keep their page-sheet geometry: only the date field changed', () => {

@@ -694,31 +694,25 @@ export function AccountBadge({ accountId, large = false, size }: { accountId: st
   return <GlyphTile icon={look.glyph} large={large} size={size} color={look.hex} />;
 }
 
-/** One transaction line: merchant, then category · account · date; amount on the right. The `home` variant (Inicio's
- * latest transactions, 24UX3 as `plain`, named in 24UX5) draws the row as an open ledger line on the screen's ground:
- * no cell padding, the hairline starting under the text, a dim instead of a cell tint when pressed, and a caption that is
- * the date alone unless the category (`showCategory`, see `homeNamesCategory`) or the account (`showAccount`) is needed
- * to tell the row apart. Every other list keeps the full caption. VoiceOver hears the same full sentence in both. */
-export function EntryRow({ entry, account, last = false, showDate = true, showAccount = true, variant = 'list', showCategory = true }: {
-  entry: Entry; account: Account; last?: boolean; showDate?: boolean; showAccount?: boolean; variant?: 'list' | 'home'; showCategory?: boolean;
+/** One transaction line: merchant, then category · account · date; amount on the right. VoiceOver hears the full
+ * sentence. (24UX6A: Inicio no longer lists movements, so the open `home` variant of 24UX3/24UX5 is gone.) */
+export function EntryRow({ entry, account, last = false, showDate = true, showAccount = true }: {
+  entry: Entry; account: Account; last?: boolean; showDate?: boolean; showAccount?: boolean;
 }) {
   const p = usePalette();
   const day = useCurrentDay();
   const { t, relativeDate, spokenAmount } = useI18n();
   const dateLabel = relativeDate(entry.dateISO, day);
   const income = entry.kind === 'income';
-  const home = variant === 'home';
   const stacked = useStacked({ minor: entry.amountMinor, currency: account.currency, signed: true });
   const category = useCategoryLook(entry.category, entry.kind).label;
-  const detail = [!home || showCategory ? category : null, showAccount ? account.name : null, showDate ? dateLabel : null].filter(Boolean).join(' · ');
-  const separator = { borderBottomColor: p.line, borderBottomWidth: last ? 0 : StyleSheet.hairlineWidth };
-  return <PressFeedback feedback={home ? 'opacity' : 'highlight'} accessibilityRole="button"
+  const detail = [category, showAccount ? account.name : null, showDate ? dateLabel : null].filter(Boolean).join(' · ');
+  return <PressFeedback feedback="highlight" accessibilityRole="button"
     accessibilityLabel={[entry.merchant, t(income ? 'movement.incomeWord' : 'movement.expenseWord'), spokenAmount(entry.amountMinor, account.currency), category, account.name, dateLabel].join(', ')}
     onPress={() => router.push({ pathname: '/entry/[id]', params: { id: entry.id } })}
-    style={home ? styles.plainRow : [styles.row, separator]}>
+    style={[styles.row, { borderBottomColor: p.line, borderBottomWidth: last ? 0 : StyleSheet.hairlineWidth }]}>
     <MerchantBadge merchant={entry.merchant} category={entry.category} kind={entry.kind} tone={income ? 'income' : 'neutral'} />
-    <View style={{ flex: 1, minWidth: 0, gap: 8, flexDirection: stacked ? 'column' : 'row', alignItems: stacked ? 'flex-start' : 'center',
-      ...(home ? { alignSelf: 'stretch', paddingVertical: 12, ...separator } : {}) }}>
+    <View style={{ flex: 1, minWidth: 0, gap: 8, flexDirection: stacked ? 'column' : 'row', alignItems: stacked ? 'flex-start' : 'center' }}>
       <View style={{ flex: stacked ? undefined : 1, minWidth: 0, gap: 3 }}>
         <AppText numberOfLines={stacked ? undefined : 2} style={{ fontWeight: '500' }}>{entry.merchant}</AppText>
         {!!detail && <AppText secondary variant="footnote" numberOfLines={stacked ? undefined : 2}>{detail}</AppText>}
@@ -819,7 +813,6 @@ const styles = StyleSheet.create({
   choiceCompact: { minWidth: 64, minHeight: 28, paddingVertical: 4 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, paddingHorizontal: 16, minHeight: 64 },
   /** A row on the screen's ground (EntryRow home): the vertical padding and the hairline live on the text column. */
-  plainRow: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 64 },
   detailRow: { minHeight: 54, flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 14 },
   navigationRow: { minHeight: 60, flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 16, paddingVertical: 11 },
   navigationGlyph: { width: 30, alignItems: 'center' },

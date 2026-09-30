@@ -44,6 +44,8 @@ const undone = domain.initialRecord({ id: 'e4', accountId: cash.id, kind: 'expen
 const archive: domain.LedgerArchive = { accounts: [cash, debtAccount], records: [...entries.map(domain.initialRecord), { ...undone, voided: true }],
   debts: [debt], recurring: [rule], budgets: [] };
 
+/** The appearance preference the harness hands the screens (24UX6A); reset by every harness. */
+const appearanceState = { preference: 'system', system: 'light', saved: [] as string[], refuse: false };
 function harness(file: string, data: domain.LedgerArchive = archive, released?: ReleasedSets, locale: AppLocale | null = null, gate?: domain.CurrencyGate, dev = true) {
   currentLocaleStore = localeStore(released);
   forcedLocale = locale;
@@ -56,7 +58,11 @@ function harness(file: string, data: domain.LedgerArchive = archive, released?: 
   const ledger = { useLedger: () => ({ ...(gate ? { gate } : {}), archive: data, snapshot: domain.snapshotFromArchive(data) }) };
   const names = ['ActionButton', 'AppText', 'CategoryBadge', 'DetailRow', 'ErrorMessage', 'GlyphTile', 'IconButton', 'NavigationRow', 'PressFeedback', 'Screen', 'SectionTitle', 'Surface'];
   const components = Object.fromEntries(names.map(name => [name, name]));
-  const theme = { usePalette: () => ({ text: '#000', secondary: '#666', line: '#ddd', isDark: false }) };
+  appearanceState.preference = 'system'; appearanceState.system = 'light'; appearanceState.saved = []; appearanceState.refuse = false;
+  const theme = { usePalette: () => ({ text: '#000', secondary: '#666', line: '#ddd', isDark: false }),
+    // 24UX6A: the appearance preference as `useThemePreference` hands it (the store itself: tests/theme-preference.node.ts).
+    useThemePreference: () => ({ preference: appearanceState.preference, system: appearanceState.system,
+      setPreference: (value: string) => { if (appearanceState.refuse) return false; appearanceState.preference = value; appearanceState.saved.push(value); return true; } }) };
   const modules: Record<string, unknown> = {
     '../i18n/format': i18nFormat, '../src/i18n/format': i18nFormat, '../../src/i18n/format': i18nFormat, '../i18n/provider': i18nProvider, '../src/i18n/provider': i18nProvider, '../../src/i18n/provider': i18nProvider,
     react: { useMemo: (fn: () => unknown) => fn(), useRef: (initial: unknown) => ({ current: initial }), useState: (initial: unknown) => {
@@ -80,6 +86,7 @@ function harness(file: string, data: domain.LedgerArchive = archive, released?: 
     '../src/ui/material': { useMaterialDecision: () => ({ material: 'opaque', reason: 'expo-go' }) }, '../../src/ui/material': { useMaterialDecision: () => ({ material: 'opaque', reason: 'expo-go' }) },
     '../../src/ui/locale-options': localeOptions,
     '../src/ui/material-policy': materialPolicy, '../../src/ui/material-policy': materialPolicy,
+    '../src/ui/choice-screen': { ChoiceScreen: 'ChoiceScreen' },
   };
   const module = { exports: {} as { default?: () => Node } };
   // A development build unless a test says otherwise (24UX5: the diagnostics line exists only there).
@@ -104,7 +111,7 @@ test('Más groups permanent navigation into Finanzas and App y datos, with live 
   const root = view.render();
   assert.deepEqual(nodes(root).filter(node => node.type === 'SectionTitle').map(node => node.props.children), ['Finanzas', 'App y datos']);
   const labels = rows(root).map(row => row.props.title);
-  assert.deepEqual(labels, ['Cuentas', 'Tarjetas', 'Presupuestos', 'Recurrentes', 'Deudas y cobros', 'Categorías', 'Copia de seguridad', 'Movimientos deshechos', 'Idioma', 'Región']);
+  assert.deepEqual(labels, ['Cuentas', 'Tarjetas', 'Presupuestos', 'Recurrentes', 'Deudas y cobros', 'Categorías', 'Copia de seguridad', 'Movimientos deshechos', 'Idioma', 'Región', 'Apariencia']);
   assert.equal(labels.includes('Asistente'), false, 'the Assistant is the centre tab, not a Más row');
   const value = (label: string) => rows(root).find(row => row.props.title === label)!.props.subtitle;
   assert.equal(value('Tarjetas'), 'Compras y resúmenes', 'no cards recorded: an honest placeholder');
@@ -113,20 +120,21 @@ test('Más groups permanent navigation into Finanzas and App y datos, with live 
   assert.equal(value('Presupuestos'), 'Plan mensual');
   assert.equal(value('Movimientos deshechos'), '1 recuperable');
   for (const row of rows(root)) row.props.onPress();
-  assert.deepEqual(view.pushed, ['/accounts', '/cards', '/budgets', '/recurring', '/debts', '/categories', '/backup', '/undone-entries', '/language', '/region']);
+  assert.deepEqual(view.pushed, ['/accounts', '/cards', '/budgets', '/recurring', '/debts', '/categories', '/backup', '/undone-entries', '/language', '/region', '/appearance']);
   // Each group closes its last row; no export button or sharing lives on the hub any more.
-  assert.deepEqual(rows(root).filter(row => row.props.last).map(row => row.props.title), ['Categorías', 'Región']);
+  assert.deepEqual(rows(root).filter(row => row.props.last).map(row => row.props.title), ['Categorías', 'Apariencia']);
+  assert.equal(value('Apariencia'), 'Sistema', '24UX6A: the default follows the device');
   assert.equal(nodes(root).some(node => node.type === 'ActionButton'), false);
   const texts = nodes(root).filter(node => node.type === 'AppText').map(node => String(node.props.children)).join(' ');
-  assert.match(texts, /FinanzApp 0\.1\.0 \(24T2\)/, 'the version line, like the About line of an iOS app');
+  assert.match(texts, /FinanzApp 0\.1\.0 \(24UX6A\)/, 'the version line, like the About line of an iOS app');
   assert.match(texts, /Material opaco \(Expo Go\)/, 'a development build says which control material this session draws, so a tester can confirm the mode');
   assert.doesNotMatch(texts, /Piloto nativo|Producto 24/, '24UX5: no project vocabulary on the settings screen');
   assert.equal(value('Categorías'), 'Gastos e ingresos');
   // Finanzas rows carry a soft identity tile from the shared palette; App y datos rows stay neutral glyphs.
   const leading = rows(root).map(row => row.props.leading?.type ?? null);
-  assert.deepEqual(leading, ['GlyphTile', 'GlyphTile', 'GlyphTile', 'GlyphTile', 'GlyphTile', 'GlyphTile', null, null, null, null]);
+  assert.deepEqual(leading, ['GlyphTile', 'GlyphTile', 'GlyphTile', 'GlyphTile', 'GlyphTile', 'GlyphTile', null, null, null, null, null]);
   assert.equal(new Set(rows(root).slice(0, 6).map(row => row.props.leading.props.color)).size, 6, 'six distinct restrained colours, no row painted');
-  assert.deepEqual(rows(root).slice(6).map(row => row.props.icon), ['save-outline', 'arrow-undo-outline', 'language-outline', 'globe-outline'], 'App y datos keeps neutral glyphs');
+  assert.deepEqual(rows(root).slice(6).map(row => row.props.icon), ['save-outline', 'arrow-undo-outline', 'language-outline', 'globe-outline', 'contrast-outline'], 'App y datos keeps neutral glyphs');
   assert.equal(rows(root).some(row => 'value' in row.props || 'label' in row.props), false, 'no leftover label/value props');
   assert.match(texts, /se guardan solo en este dispositivo y funcionan sin conexión/);
 });
@@ -135,12 +143,12 @@ test('Más → App y datos (23.1C2): Idioma and Región say what is in use and w
   // The default harness store uses the release gate itself (RELEASED), as the app does.
   const view = harness('(tabs)/settings.tsx');
   const root = view.render();
-  assert.deepEqual(rows(root).slice(6).map(row => row.props.title), ['Copia de seguridad', 'Movimientos deshechos', 'Idioma', 'Región']);
+  assert.deepEqual(rows(root).slice(6).map(row => row.props.title), ['Copia de seguridad', 'Movimientos deshechos', 'Idioma', 'Región', 'Apariencia']);
   assert.equal(rows(root).find(row => row.props.title === 'Idioma')!.props.subtitle, 'Español · según el dispositivo');
   const region = rows(root).find(row => row.props.title === 'Región')!;
   assert.equal(region.props.subtitle, 'Argentina · según el dispositivo');
   assert.equal(region.props.icon, 'globe-outline');
-  assert.equal(region.props.last, true, 'Región closes App y datos');
+  assert.equal(region.props.last, undefined, '24UX6A: Apariencia closes App y datos');
   region.props.onPress();
   assert.deepEqual(view.pushed, ['/region']);
   assert.equal(currentLocaleStore.setLanguage('es'), true);
@@ -151,10 +159,10 @@ test('Más → App y datos (23.1C2): Idioma and Región say what is in use and w
   const english = rows(view.render());
   assert.equal(english.find(row => row.props.title === 'Language')!.props.subtitle, 'English', 'the hub re-renders in English');
   assert.equal(english.find(row => row.props.title === 'Region')!.props.subtitle, 'United States');
-  // A build with a single released region (a narrower gate) hides Región and closes the group with Idioma.
+  // A build with a single released region (a narrower gate) hides Región; Apariencia still closes the group.
   const single = rows(harness('(tabs)/settings.tsx', archive, { languages: ['es'], regions: ['AR'] }).render());
   assert.equal(single.some(row => row.props.title === 'Región'), false);
-  assert.deepEqual(single.filter(row => row.props.last).map(row => row.props.title), ['Categorías', 'Idioma']);
+  assert.deepEqual(single.filter(row => row.props.last).map(row => row.props.title), ['Categorías', 'Apariencia']);
 });
 
 test('Más → Tarjetas counts active credit cards and opens the pushed Tarjetas screen', () => {
@@ -233,7 +241,7 @@ test('23.1B2 English Más: every row, count, note and the diagnostic footer are 
   const view = harness('(tabs)/settings.tsx', archive, undefined, 'en-AR');
   const root = view.render();
   assert.equal(nodes(root).filter(node => node.type === 'SectionTitle').map(node => node.props.children).join(','), 'Finances,App and data');
-  assert.equal(rows(root).map(row => row.props.title).join(','), 'Accounts,Cards,Budgets,Recurring,Debts and IOUs,Categories,Backup,Undone transactions,Language,Region');
+  assert.equal(rows(root).map(row => row.props.title).join(','), 'Accounts,Cards,Budgets,Recurring,Debts and IOUs,Categories,Backup,Undone transactions,Language,Region,Appearance');
   const value = (label: string) => rows(root).find(row => row.props.title === label)!.props.subtitle;
   assert.equal(value('Recurring'), '1 active');
   assert.equal(value('Debts and IOUs'), '1 pending');
@@ -241,10 +249,11 @@ test('23.1B2 English Más: every row, count, note and the diagnostic footer are 
   assert.equal(value('Cards'), 'Purchases and statements');
   assert.equal(value('Language'), 'Español · same as device', 'a language is named in its own language');
   assert.equal(value('Region'), 'Argentina · same as device', 'a region is named in the interface language');
+  assert.equal(value('Appearance'), 'System');
   for (const row of rows(root)) row.props.onPress();
-  assert.equal(view.pushed.join(','), '/accounts,/cards,/budgets,/recurring,/debts,/categories,/backup,/undone-entries,/language,/region');
+  assert.equal(view.pushed.join(','), '/accounts,/cards,/budgets,/recurring,/debts,/categories,/backup,/undone-entries,/language,/region,/appearance');
   const texts = nodes(root).filter(node => node.type === 'AppText').map(node => String(node.props.children)).join(' ');
-  assert.match(texts, /FinanzApp 0\.1\.0 \(24T2\)/);
+  assert.match(texts, /FinanzApp 0\.1\.0 \(24UX6A\)/);
   assert.match(texts, /Opaque material \(Expo Go\) · Language: default/);
   assert.match(texts, /saved only on this device and work offline/);
   assert.doesNotMatch(texts, /Material opaco|Idioma|Región|sincronización/);
@@ -292,8 +301,36 @@ test('24UX5: a preview or store build shows the version and the local-storage no
   for (const locale of [null, 'en-AR'] as const) {
     const root = harness('(tabs)/settings.tsx', archive, undefined, locale, undefined, false).render();
     const texts = nodes(root).filter(node => node.type === 'AppText').map(node => String(node.props.children)).join(' ');
-    assert.match(texts, /FinanzApp 0\.1\.0 \(24T2\)/);
+    assert.match(texts, /FinanzApp 0\.1\.0 \(24UX6A\)/);
     assert.doesNotMatch(texts, /Material|material|Idioma:|Language:/, 'no material or locale diagnostics outside a development build');
     assert.match(texts, locale ? /saved only on this device/ : /se guardan solo en este dispositivo/, 'privacy and storage information stays');
   }
+});
+
+test('24UX6A: Más → Apariencia names the choice in use and opens the chooser: Sistema (what the device shows now), Claro, Oscuro', () => {
+  const view = harness('(tabs)/settings.tsx');
+  appearanceState.preference = 'dark';
+  assert.equal(rows(view.render()).find(row => row.props.title === 'Apariencia')!.props.subtitle, 'Oscuro');
+  appearanceState.preference = 'light';
+  assert.equal(rows(view.render()).find(row => row.props.title === 'Apariencia')!.props.subtitle, 'Claro');
+  const screen = harness('appearance.tsx');
+  let chooser = screen.render() as any;
+  assert.equal(chooser.type, 'ChoiceScreen');
+  assert.equal(chooser.props.title, 'Apariencia');
+  assert.equal(chooser.props.selected, 'system', 'a new installation follows the device');
+  assert.equal(JSON.stringify([chooser.props.pinned.value, chooser.props.pinned.title, chooser.props.pinned.subtitle]), JSON.stringify(['system', 'Sistema', 'Según el dispositivo · ahora claro']));
+  assert.equal(JSON.stringify(chooser.props.options), JSON.stringify([{ value: 'light', title: 'Claro' }, { value: 'dark', title: 'Oscuro' }]));
+  assert.match(chooser.props.note, /^Cambia solo cómo se ve FinanzApp en este dispositivo\. No modifica tus movimientos, tus cuentas ni tus copias de seguridad\.$/);
+  appearanceState.system = 'dark';
+  assert.equal(screen.render().props.pinned.subtitle, 'Según el dispositivo · ahora oscuro', 'the device\'s current look, read live');
+  assert.equal(chooser.props.onChoose('dark'), true);
+  assert.deepEqual(appearanceState.saved, ['dark'], 'the store saves; the chooser only asks');
+  chooser = screen.render();
+  assert.equal(chooser.props.selected, 'dark');
+  assert.equal(chooser.props.pinned.subtitle, 'Según el dispositivo', 'not selected: what Sistema would do');
+  appearanceState.refuse = true;
+  assert.equal(chooser.props.onChoose('light'), false, 'a refused save is reported, so the checkmark stays where it was');
+  assert.equal(appearanceState.preference, 'dark');
+  const english = harness('appearance.tsx', archive, undefined, 'en-AR').render() as any;
+  assert.equal(JSON.stringify([english.props.title, english.props.pinned.title, english.props.options.map((option: any) => option.title)]), JSON.stringify(['Appearance', 'System', ['Light', 'Dark']]));
 });

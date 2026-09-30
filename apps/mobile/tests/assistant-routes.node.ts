@@ -462,7 +462,7 @@ test('New chat aborts any request and returns to the empty conversation; leaving
   assert.equal(pushed.length, 0);
 });
 
-test('the Assistant is the centre tab and the Home Assistant entry lands on it; the old preview and the stack route are gone', () => {
+test('the Assistant is the centre tab and Inicio\'s capture sheet lands on it; the old preview and the stack route are gone', () => {
   const layout = readFileSync(new URL('../app/_layout.tsx', import.meta.url), 'utf8');
   assert.equal(layout.includes('name="assistant"'), false, 'no duplicate stack screen: one conversation, one route');
   assert.match(layout, /name="cards"/);
@@ -470,9 +470,10 @@ test('the Assistant is the centre tab and the Home Assistant entry lands on it; 
   const tabs = readFileSync(new URL('../app/(tabs)/_layout.tsx', import.meta.url), 'utf8');
   assert.match(tabs, /name="assistant"/);
   const home = readFileSync(new URL('../app/(tabs)/index.tsx', import.meta.url), 'utf8');
-  assert.match(home, /<AssistantEntry currency=\{currency\} \/>/);
-  const actions = readFileSync(new URL('../src/ui/quick-actions.tsx', import.meta.url), 'utf8');
-  assert.match(actions, /router\.navigate\(\{ pathname: '\/assistant'/, 'navigate, not push: switching to the tab, never stacking a copy');
+  assert.match(home, /<CaptureButton movementCurrency=\{actionCurrency\} assistantCurrency=\{currency\} \/>/, 'the Assistant hears the currency Inicio shows');
+  const capture = readFileSync(new URL('../src/ui/home-capture.tsx', import.meta.url), 'utf8');
+  assert.match(capture, /return \{ method: 'navigate', pathname: '\/assistant'/, 'navigate, not push: switching to the tab, never stacking a copy');
+  assert.match(capture, /if \(method === 'navigate'\) router\.navigate\(/);
   assert.throws(() => readFileSync(new URL('../app/assistant-preview.tsx', import.meta.url)));
   assert.throws(() => readFileSync(new URL('../app/assistant.tsx', import.meta.url)));
 });

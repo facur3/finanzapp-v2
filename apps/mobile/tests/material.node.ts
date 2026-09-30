@@ -192,10 +192,14 @@ test('glass stays on the control layer and behind the adapter: only material.tsx
   const uses = ['components.tsx', 'entry-list.tsx', 'home-modules.tsx', 'spending-chart.tsx', 'charts.tsx', 'card-visual.tsx', 'form-controls.tsx', 'liability-rows.tsx', 'assistant-messages.tsx']
     .filter(file => /expo-glass-effect|from '\.\/material'/.test(read(file)));
   assert.deepEqual(uses, []);
+  // 24UX6A: the tab bar is the app's floating capsule, drawn with the same control material; the layout only hands it over.
   const tabs = readFileSync(new URL('../app/(tabs)/_layout.tsx', import.meta.url), 'utf8');
-  assert.equal(/expo-glass-effect|tabBarBackground|position: 'absolute'/.test(tabs), false, 'the JS tab bar is not dressed as glass; native tabs are a later phase');
-  assert.deepEqual(['quick-actions.tsx', 'assistant-composer.tsx'].filter(file => /from '\.\/material'/.test(read(file))), ['quick-actions.tsx', 'assistant-composer.tsx']);
-  assert.deepEqual(['quick-actions.tsx', 'assistant-composer.tsx'].filter(file => /expo-glass-effect/.test(read(file))), [], 'only material.tsx talks to expo-glass-effect');
+  assert.equal(/expo-glass-effect|tabBarBackground|position: 'absolute'/.test(tabs), false, 'no stock bar background and nothing absolute over the scenes');
+  assert.equal(/position: 'absolute'/.test(read('floating-tab-bar.tsx')), false, 'the capsule stays in the layout: every screen ends above it');
+  const controls = ['quick-actions.tsx', 'assistant-composer.tsx', 'floating-tab-bar.tsx'];
+  assert.deepEqual(controls.filter(file => /from '\.\/material'/.test(read(file))), controls);
+  assert.deepEqual(controls.filter(file => /expo-glass-effect/.test(read(file))), [], 'only material.tsx talks to expo-glass-effect');
+  assert.equal(/from '\.\/material'/.test(read('home-capture.tsx')), false, 'the capture button is a filled control, not glass');
   const adapter = read('material.tsx');
   assert.equal(/^import .* from 'expo-glass-effect'/m.test(adapter), false, 'no static import: the module binds its native view at evaluation time');
   assert.match(adapter, /require\('expo-glass-effect'\)/);

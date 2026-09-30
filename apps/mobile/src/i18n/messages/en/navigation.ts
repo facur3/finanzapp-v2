@@ -19,6 +19,7 @@ export const navigation: Pick<Messages, 'nav' | 'boot'> = {
       undoneEntries: 'Undone transactions',
       language: 'Language',
       region: 'Region',
+      appearance: 'Appearance',
       backup: 'Backup',
       backupImport: 'Import backup',
       categories: 'Categories',
