@@ -1838,8 +1838,13 @@ nothing of it is on a screen yet.
   bar's reading, localized); the Large Content Viewer of the stock tab items was missing (restored); a stale style
   comment. Checked and sound: the tab events against the stock bar, the sheet's dismissal (once, never stale), the
   Appearance override on RN 0.86, the insight's priorities and thresholds.
-- **Status.** Implemented on the branch; device QA pending (checklist, Producto 24UX6A). No EAS build; the iPhone was
-  not touched; no schema or backup change (schema 13, backup v13).
+- **Status.** Implemented on the branch; device QA pending (checklist, Producto 24UX6A). Checked on Linux on the final
+  tree: root `npm test` (415 passed, 1 todo) and `npm run check:repo` (OK, 376 tracked files); mobile `typecheck`
+  (clean), `test:storage` (889/889), `currency:verify` and `regions:verify` (catalogues verified offline),
+  `i18n:check -- --strict` (0 errors, 0 stale; the English lock accepted for the new keys), `i18n:extract` (no copy
+  outside the catalogue), `check` (dependencies up to date) and `export:ios` (iOS bundle exported, 1984 modules). The
+  `mobile_api` PostgreSQL job runs in CI. No EAS build; the iPhone was not touched; no schema or backup change (schema
+  13, backup v13); `app.config.ts` untouched.
 
 ### Producto 24UX6B — Reports visual hierarchy (planned, not implemented)
 
