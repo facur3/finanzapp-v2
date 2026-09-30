@@ -146,21 +146,15 @@ nombre, emisor, moneda, últimos cuatro dígitos y un tono estable por tarjeta.
   Guardar repite el importe. Sin controles decorativos de dividir, comprobante o
   etiquetas mientras no existan sus datos. Jerarquía de color: categoría en su
   tono, cuenta en el primario, fecha neutra, botón de guardar en el primario.
-- **Inicio.** El mes en curso, nada más. Una fila con Gastos / Disponible y la
-  moneda; el nombre del mes (o "Saldo registrado" con el botón de información) y el
-  número principal, sin cantidad de registros ni rango de fechas ni selector de
-  período. Tres acciones redondas: Gasto, Ingreso, Transferir. Una línea de
-  presupuesto solo si hay presupuestos. Las tres acciones redondas son círculos
-  neutros (escalón de superficie en oscuro, blanco con sombra suave en claro) con
-  solo el glifo en su color semántico: el color vive en el trazo, no en un tile
-  relleno. "En qué gastaste": un bloque agrupado con hasta tres categorías; detrás
-  del contenido de cada fila, un lavado redondeado de su propio tono (11 % en
-  oscuro, 8 % en claro), con margen respecto de los bordes de la fila, corre desde
-  la izquierda exactamente en su proporción del mes (sin mínimo inventado: 0,1 %
-  es un filo y la fila sigue siendo tocable). Sin separadores que corten el
-  lavado. Tile, nombre e importe; sin porcentajes ni barra debajo. "Reportes"
-  abre la pestaña. Compromisos próximos solo cuando existen; los últimos cuatro
-  movimientos. Los períodos y el análisis viven en Reportes.
+- **Inicio (desde 24UX6A; ver «Producto 24UX6A»).** Responde tres preguntas y termina: cómo estoy
+  (un número), qué necesita mi atención (los compromisos de esta semana y, a lo sumo, una línea
+  calculada) y cómo registro algo (un botón). Arriba, Gastos / Disponible compacto y el atajo a
+  Cuentas a la derecha, sin título de pantalla; el mes (o «Saldo registrado» con su botón de
+  información) y el número de 48 pt; debajo, lo que cubre (el chip de moneda solo con más de una,
+  la cantidad de cuentas en Disponible); «＋ Registrar», el único control relleno; después, solo si
+  hay algo que decir, hasta dos compromisos que vencen en los próximos siete días con «Ver todos»
+  y una línea: un presupuesto excedido, uno casi agotado o una categoría que concentra el mes. Los
+  movimientos viven en Movimientos, el análisis en Reportes, los presupuestos en Presupuestos.
 - **Movimientos.** Buscador, filtro Todos / Gastos / Ingresos / Transf., secciones
   "Hoy · 20 sep", "Ayer", día de la semana en los últimos siete días y luego la fecha,
   con el neto del día cuando hay una sola moneda.
@@ -227,17 +221,16 @@ siguen montadas, así un revelado al montar no se vería).
   el conjunto de categorías, el bloque se funde en lugar de transformar una
   categoría en otra.
 - **Una acción, pocas cosas.** Un toque mueve como máximo el pulgar del
-  segmentado, el número principal y una visualización. En Inicio la fila de
-  período conserva su lugar bajo Disponible y solo se atenúa; la lista reciente se
-  funde como un bloque.
+  segmentado, el número principal y una visualización. En Inicio, Gastos /
+  Disponible cruza el número; los compromisos y la línea de atención aparecen o se
+  van fundiéndose (`Reflow`).
 - **Bloques.** Una sección que aparece o desaparece se funde y los vecinos se
   deslizan en lugar de saltar; con Reduce Motion, solo el fundido.
-- **Lavados de categoría (Inicio).** Con los primeros datos, cada lavado crece
-  desde cero hasta su proporción real en 300 ms ease-out, con 50 ms de escalonado
-  entre filas; un cambio de datos interpola desde la proporción anterior en 260 ms.
-  Es una vista absoluta sin hijos detrás del contenido: no cuesta layout ni bloquea
-  el toque. Con Reduce Motion no hay movimiento de ancho, solo un fundido de 200 ms.
-  Nunca responde al scroll.
+- **Hoja de Registrar (24UX6A).** La misma tarjeta que la hoja de fecha: sube desde el
+  borde en unos 300 ms con la curva de hoja de iOS, baja en 200 ms y, con Reduce Motion,
+  aparece y se va con un fundido sin desplazamiento. La pantalla elegida se abre recién
+  cuando la hoja se fue (nunca dos presentaciones a la vez). (El lavado animado de «En qué
+  gastaste» se retiró con la lista de categorías de Inicio.)
 - **Formularios.** Gasto / Ingreso / Transferencia es un solo control sobre un
   solo modal: cambiar es estado, no navegación, y el formulario de abajo se funde.
 - **Deck de tarjetas (24T2; reemplaza al carrusel horizontal).** Las tarjetas no elegidas
@@ -256,7 +249,8 @@ siguen montadas, así un revelado al montar no se vería).
 - **Hápticos.** Uno por acción del usuario (selección en segmentos, cambio de
   pestaña, flechas de mes, categoría o cuenta elegida, tarjeta elegida en el deck; éxito al
   guardar) y siempre con una señal visual. Las pestañas cambian al instante, sin
-  deslizamiento ni fundido.
+  deslizamiento ni fundido; la cápsula flotante de 24UX6A no agrega movimiento: la
+  pestaña elegida cambia de tinta y de lente en el mismo cuadro.
 
 La pila y las hojas nativas siguen siendo la única transición de pantalla; las
 cinco pestañas permanecen montadas sin fade/detach/freeze. Objetivos de 44 pt,
@@ -391,6 +385,85 @@ importe, moneda y estado.
   la app, no el "sept" del ICU del dispositivo). El inglés existe como catálogo y no se
   muestra hasta que toda la app lo tenga (23.1): un iPhone en inglés sigue leyendo
   español antes que media app traducida.
+
+## Producto 24UX6A — jerarquía de Inicio, estructura de la app y Apariencia
+
+Las capturas del dueño (un Inicio anterior, una app de finanzas premium, una barra flotante con «+», una IA de dinero)
+fueron solo referencia de jerarquía: no se copió marca, paleta, recurso, medida ni arquitectura de información. La
+identidad sigue: minimalismo iOS, tinta neutra, cobalto solo para interacción, selección, la acción principal y la
+pestaña activa; sin violeta; menos superficies. El contrato y las pruebas están en el roadmap («Producto 24UX6A»).
+
+### Antes → después
+
+- **Antes (24UX3–24UX5).** Título «Inicio» con el atajo a Cuentas; Gastos / Disponible con el chip de moneda; el
+  número; tres píldoras (Gasto, Ingreso, Transferir) y la entrada ancha «Contale al Asistente»; la tarjeta
+  «Presupuesto del mes»; «En qué gastaste» con tres categorías y el enlace a Reportes; «Próximos compromisos» (hasta
+  tres, cualquier fecha); «Últimos movimientos» con «Ver todos». Siete bloques que competían con el número.
+- **Después.** Gastos / Disponible compacto y el atajo a Cuentas en la misma fila (donde estaba el título: la pestaña
+  elegida ya nombra la pantalla); el mes y el número de 48 pt; debajo lo que cubre; «＋ Registrar»; después, solo si
+  existen, hasta dos compromisos de los próximos siete días y una línea de atención. Un mes tranquilo es el número y el
+  botón. El título raíz se quitó solo en Inicio: Movimientos, Asistente, Reportes y Más conservan el suyo (su título
+  sí orienta: son listas, una conversación y un hub), y ninguna pantalla de detalle o formulario perdió su cabecera.
+
+### Qué salió de Inicio (y dónde sigue)
+
+- «Últimos movimientos» → la pestaña Movimientos. «En qué gastaste» → Reportes (dona, leyenda, detalle por
+  categoría). La tarjeta de presupuesto → Presupuestos, y en Inicio solo la línea cuando pide atención. Las tres
+  píldoras y la entrada del Asistente → la hoja de Registrar (las píldoras siguen en el detalle de una cuenta).
+- Se eliminaron los componentes que ya no tenían otro uso (`CategoryRanking`, `BudgetHomeCard`, `AssistantEntry`, la
+  variante `home` de `EntryRow`, `budgetHomeHeadline`, `categoriesStatus`) y sus textos.
+
+### Registrar: un botón, una hoja
+
+- **Por qué una hoja y no cuatro controles.** Cuatro botones grandes eran la mitad de la pantalla y pesaban como el
+  número. Un «+» flotante persistente sobre la barra competiría con la pestaña central del Asistente y taparía
+  contenido; un menú contextual de iOS esconde el Asistente detrás de una pulsación larga. Una cápsula cobalto
+  «＋ Registrar» bajo el número (la única acción rellena de Inicio, a lo ancho con texto de accesibilidad) abre la hoja
+  compacta de la fecha con cuatro filas: Registrar gasto (coral), Registrar ingreso (verde), Transferir entre cuentas
+  (azul) y Hablar con el Asistente (cobalto, con «Contale qué pasó: te propone el movimiento y vos lo confirmás»).
+  Cancelar, el velo o el gesto atrás cierran sin abrir nada. Cada fila abre exactamente lo que abría el control
+  anterior, con la misma moneda, después de que la hoja se fue. Nada se escribe desde la hoja; el Asistente sigue
+  proponiendo borradores que la persona confirma, y sigue siendo la pestaña central.
+
+### Lo que necesita atención
+
+- **Compromisos.** Solo los gastos recurrentes activos que vencen hoy o en los próximos seis días, los dos más
+  próximos, con «Ver todos» (Recurrentes). Sin nada esta semana, la sección no existe (antes mostraba el mes
+  siguiente). Las filas son las de 24UX5 (marca de 40 pt, la fecha bajo el importe).
+- **Una línea, a lo sumo.** En este orden: un presupuesto del mes excedido (el general antes que una categoría:
+  «Superaste tu presupuesto de Ocio por $ 9.000,00.»), uno al 85 % o más («Te queda 12 % de tu presupuesto de
+  Comida.»), o una categoría con el 40 % o más del gasto del mes, con al menos dos categorías («Comida concentra 46 %
+  de tus gastos de este mes.»). Hechos calculados, nunca una causa ni un consejo, nunca de un mes incompleto o sin
+  cotización. Un glifo en su tono (ámbar cerca del límite, coral pasado, el tono de la categoría) y una flecha: abre
+  Presupuestos en la moneda del presupuesto o Reportes en la moneda de Inicio. Un presupuesto en otra moneda que la
+  mostrada escribe su código.
+
+### Barra de pestañas
+
+- Cinco destinos, los mismos y en el mismo orden (Inicio, Movimientos, Asistente, Reportes, Más), sin cambio de rutas.
+  La barra es una cápsula flotante de 62 pt, separada 16 pt de los bordes y apoyada en la parte alta del área del
+  indicador de inicio, sobre el fondo de la pantalla. Se dibuja con el material de control de la app: Liquid Glass
+  donde iOS lo dibuja y Reducir transparencia está apagado; si no, la superficie opaca con un filo fino (y una sombra
+  suave en claro), el estado diseñado en iOS anteriores, Android y con Reducir transparencia.
+- La pestaña elegida: glifo relleno y etiqueta en cobalto sobre una lente neutra (un estado, no un color); las otras
+  en tinta secundaria (AA). Las etiquetas siempre visibles, hasta 1,3× con Dynamic Type; cada pestaña es un blanco de
+  48 pt; VoiceOver lee una barra de pestañas con cinco pestañas y cuál está elegida.
+- **Por qué sigue en el layout y no flota encima.** Una barra absoluta sobre el contenido obligaría a cada lista a
+  reservar su alto, rompería el cálculo del compositor del Asistente y el teclado, y taparía la última fila con texto
+  grande. La cápsula queda en el flujo: cada pantalla termina arriba de ella, y el compositor, el teclado y las áreas
+  seguras funcionan como antes. No hay «+» flotante adicional.
+
+### Apariencia
+
+- Más → App y datos → Apariencia: Sistema (por defecto: decide el iPhone), Claro u Oscuro, con el selector de Idioma y
+  Región. Es una preferencia del dispositivo, como el idioma: se guarda en el almacén de preferencias, fuera de la
+  base financiera y de las copias de seguridad (restaurar una copia no cambia cómo se ve este iPhone), sin migración.
+- Se guarda antes de aplicarse (una escritura rechazada no cambia nada y la pantalla lo dice). Se aplica en toda la app
+  al instante y también a iOS (`Appearance.setColorScheme`), así el teclado, las alertas, la rueda de fecha y el vidrio
+  coinciden con la paleta; Sistema le devuelve la decisión al dispositivo. Se lee y se aplica antes del primer cuadro:
+  sin parpadeo del otro tema. La pantalla de lanzamiento nativa, anterior a todo JavaScript, sigue al dispositivo; el
+  primer cuadro después ya es el elegido.
+- Las paletas, los contrastes y los tokens no cambiaron: solo quién decide el tema.
 
 ## Producto 24T2 — compra en cuotas y Tarjetas completo
 
@@ -1440,6 +1513,14 @@ crédito, marca elegida) y los filetes de las píldoras, el chip y el compositor
 color propio.
 
 ## Pendiente de revisión en iPhone
+
+- Producto 24UX6A: Inicio a primer vistazo en claro y oscuro, con vidrio y opaco (¿el número manda?, ¿«＋ Registrar» se
+  lee como la acción principal sin gritar?); la hoja de Registrar (subida, las cuatro filas, abrir cada destino después
+  de que se va, Cancelar, el velo, Reduce Motion, VoiceOver); los compromisos de la semana y la línea de atención en
+  sus casos; la barra flotante (separación del indicador de inicio, lente, etiquetas con texto de accesibilidad,
+  VoiceOver, el teclado en el Asistente y en Movimientos, un iPhone angosto, Reducir transparencia); Apariencia
+  (Sistema, Claro, Oscuro, cambiar con la app abierta, cerrar a la fuerza y reabrir, el teclado y las alertas en el
+  tema elegido, sin parpadeo al abrir). Lista en docs/mobile-device-checklist.md.
 
 - Producto 24T2: **verificado** por el dueño en un iPhone 14 Pro con un build de desarrollo nuevo (2026-09-29; PR #69,
   merge 8951f6c).

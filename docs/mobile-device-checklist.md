@@ -1,5 +1,44 @@
 # Physical iPhone acceptance checklist
 
+## Producto 24UX6A — Home hierarchy, app shell and Appearance
+
+**Not done in 24UX6A: no EAS build was made and the iPhone was not touched.** Metro from this branch
+(`npm run start:dev-client -- --clear`) on the installed FinanzApp Dev build; JavaScript only, no native change and no
+schema change (the ledger stays at schema 13, backups at v13; the Appearance choice lives outside both). Use your own
+data; never seed movements.
+
+**Brief test (≈10 minutes).**
+
+1. **Inicio at a glance.** Open the app: the Gastos / Disponible control and the accounts button on one row (no
+   «Inicio» title), the month and the number, and «＋ Registrar» under it. No «Últimos movimientos», no «En qué
+   gastaste», no three movement pills, no «Contale al Asistente».
+   - [ ] The number is the first thing read; «＋ Registrar» reads as the one action without shouting, in light and dark,
+     with glass and with Reducir transparencia on.
+   - [ ] The Más footer reads «FinanzApp 0.1.0 (24UX6A)».
+2. **Registrar.** Tap «＋ Registrar»: a compact sheet rises from the bottom edge with Registrar gasto, Registrar ingreso,
+   Transferir entre cuentas and Hablar con el Asistente. Each row opens its screen only after the sheet has gone
+   (expense and income in the shown currency; Transferir; the Asistente tab, not a copy). Cancelar, the scrim and the
+   back gesture open nothing. Nothing is saved from the sheet.
+   - [ ] Reduce Motion: the sheet fades in and out without sliding. VoiceOver: the button is «Registrar un movimiento»
+     with its hint; inside the sheet the focus stays in it and each row is read once.
+3. **What needs attention.** With a recurring expense due within the next seven days: «Próximos compromisos» with at
+   most two rows and «Ver todos» (Recurrentes); with none this week, the section is absent. With a budget exceeded, or
+   at 85 % or more, one line says so and opens Presupuestos; otherwise, with one category at 40 % or more of the month,
+   one line says so and opens Reportes; otherwise nothing.
+4. **The tab bar.** A floating capsule above the home indicator, clear of it, with five tabs; the selected one cobalt
+   over a neutral lens. Switching is instant with the selection tick.
+   - [ ] The largest accessibility text size: the labels stay readable (capped) and nothing overlaps. VoiceOver: «tab
+     bar», five tabs, the selected one announced. A narrow iPhone (or Zoomed display): five labels fit.
+   - [ ] The keyboard in the Assistant composer and in the Movimientos search: the composer and the last rows stay
+     reachable; nothing hides under the capsule; the last row of a long list scrolls clear of it.
+   - [ ] Glass (iOS 26, Reducir transparencia off) and opaque (on): both look designed, in light and dark.
+5. **Appearance.** Más → App y datos → Apariencia: Sistema (with «ahora claro/oscuro»), Claro, Oscuro. Choose Oscuro
+   with the iPhone in light: the whole app, the keyboard, an alert and the date wheel turn dark at once. Force-quit and
+   reopen: the app opens dark with no light flash after the launch screen (the launch screen itself follows the
+   iPhone). Back to Sistema: the app follows the iPhone again, also when Control Center switches it.
+6. **Empty and edge states.** No account: the accounts button and the calm empty state only. One account, nothing this
+   month: the number (0) and the button only. Several currencies: the chip under the number; a huge amount still fits.
+
 ## Producto 24T2 — installment purchase and complete Cards experience
 
 **Result (2026-09-29): completed by the owner on an iPhone 14 Pro with a fresh development build, after the schema 13
