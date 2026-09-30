@@ -16,13 +16,13 @@ const i18nProvider = { useI18n: () => bindLocale(locale, 'none', device) };
 const light = { isDark: false, background: '#F5F6F8', surface: '#FFFFFF', primary: '#2557D6', secondary: '#5E6470', tertiary: '#8A8F99' };
 const dark = { ...light, isDark: true, background: '#000000', surface: '#15171C', primary: '#6E93FF', secondary: '#A0A0A8' };
 
-function harness(palette = light, material: 'glass' | 'opaque' = 'opaque') {
+function harness(palette = light, material: 'glass' | 'opaque' = 'opaque', os: 'ios' | 'android' = 'ios') {
   const source = readFileSync(new URL('../src/ui/floating-tab-bar.tsx', import.meta.url), 'utf8');
   const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText;
   const jsx = (type: any, props: any) => ({ type, props });
   const modules: Record<string, any> = {
     'react/jsx-runtime': { jsx, jsxs: jsx, Fragment: 'Fragment' },
-    'react-native': { StyleSheet: { create: (styles: unknown) => styles, hairlineWidth: 0.5 }, View: 'View' },
+    'react-native': { Platform: { OS: os }, StyleSheet: { create: (styles: unknown) => styles, hairlineWidth: 0.5 }, View: 'View' },
     '../i18n/provider': i18nProvider,
     './components': { AppText: 'AppText', PressFeedback: 'PressFeedback' },
     './material': { ControlSurface: 'ControlSurface', useMaterial: () => material },
@@ -59,17 +59,24 @@ function tabsOf(bar: any) {
 const flatten = (value: any): any[] => !value || typeof value !== 'object' ? [] : Array.isArray(value) ? value.flatMap(flatten)
   : value.props ? [value, ...flatten(value.props.children)] : [];
 
-test('24UX6A: one tab bar with the five destinations in order, each a tab that says whether it is selected', () => {
+test('24UX6A: one tab list with the five destinations in order, each read as the stock bar reads it and saying whether it is selected', () => {
   const { FloatingTabBar } = harness();
   const nav = navigator(0);
   const { row, items } = tabsOf(FloatingTabBar(nav.props));
-  assert.equal(row.props.accessibilityRole, 'tabbar', 'VoiceOver reads one tab bar');
+  assert.equal(row.props.accessibilityRole, 'tablist', 'the stock bar\'s container role');
   assert.equal(items.length, 5, 'exactly five destinations');
-  assert.equal(items.map((item: any) => item.rendered.props.accessibilityLabel).join(','), titles.join(','));
+  // iOS: React Native's `tab` role maps to no trait, so the tab is a button whose name says it is a tab and where it sits.
+  assert.equal(items.map((item: any) => item.rendered.props.accessibilityLabel).join(' | '),
+    'Inicio, pestaña, 1 de 5 | Movimientos, pestaña, 2 de 5 | Asistente, pestaña, 3 de 5 | Reportes, pestaña, 4 de 5 | Más, pestaña, 5 de 5');
+  const android = tabsOf(harness(light, 'opaque', 'android').FloatingTabBar(navigator(0).props)).items;
+  assert.equal(android.map((item: any) => item.rendered.props.accessibilityRole + ':' + item.rendered.props.accessibilityLabel).join(','),
+    titles.map(title => 'tab:' + title).join(','), 'elsewhere the tab role and the plain name');
   for (const [index, { rendered }] of items.entries()) {
     assert.equal(rendered.type, 'PressFeedback');
-    assert.equal(rendered.props.accessibilityRole, 'tab');
+    assert.equal(rendered.props.accessibilityRole, 'button');
     assert.equal(rendered.props.accessibilityState.selected, index === 0);
+    assert.deepEqual([rendered.props.accessibilityShowsLargeContentViewer, rendered.props.accessibilityLargeContentTitle], [true, titles[index]],
+      'a long press shows the label large, as the system tab bar does (the label itself is capped)');
     assert.equal(rendered.props.accessibilityLanguage, 'es', 'the labels are read in the interface language, not the device\'s');
     assert.ok(rendered.props.style.minHeight >= 44, 'a full target');
     assert.equal(rendered.props.containerStyle.flex, 1, 'five equal slots');
@@ -80,8 +87,11 @@ test('24UX6A: one tab bar with the five destinations in order, each a tab that s
     assert.equal(label.props.accessible, false, 'the tab speaks once, through its label');
   }
   locale = 'en-US';
-  try { assert.equal(tabsOf(FloatingTabBar(nav.props)).items[0].rendered.props.accessibilityLanguage, undefined, 'same language as the device: nothing to switch'); }
-  finally { locale = 'es-AR'; }
+  try {
+    const english = tabsOf(FloatingTabBar(nav.props)).items[0].rendered.props;
+    assert.equal(english.accessibilityLanguage, undefined, 'same language as the device: nothing to switch');
+    assert.equal(english.accessibilityLabel, 'Inicio, tab, 1 of 5', 'the position in the interface language');
+  } finally { locale = 'es-AR'; }
 });
 
 test('24UX6A: the selected tab is cobalt over a neutral lens; the others keep the secondary ink, in light and dark', () => {

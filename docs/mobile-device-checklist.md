@@ -27,8 +27,11 @@ data; never seed movements.
    one line says so and opens Reportes; otherwise nothing.
 4. **The tab bar.** A floating capsule above the home indicator, clear of it, with five tabs; the selected one cobalt
    over a neutral lens. Switching is instant with the selection tick.
-   - [ ] The largest accessibility text size: the labels stay readable (capped) and nothing overlaps. VoiceOver: «tab
-     bar», five tabs, the selected one announced. A narrow iPhone (or Zoomed display): five labels fit.
+   - [ ] The largest accessibility text size: the labels stay readable (capped) and nothing overlaps; a long press on a
+     tab shows its label large (Large Content Viewer). VoiceOver: «Inicio, pestaña, 1 de 5» … «Más, pestaña, 5 de 5»,
+     «Seleccionado» on the current one. A narrow iPhone (or Zoomed display): five labels fit.
+   - [ ] On Inicio with two currencies: open the chip, choose «Solo una moneda» or another currency: the sheet stays
+     open with the checkmark moved, and the number changes behind it.
    - [ ] The keyboard in the Assistant composer and in the Movimientos search: the composer and the last rows stay
      reachable; nothing hides under the capsule; the last row of a long list scrolls clear of it.
    - [ ] Glass (iOS 26, Reducir transparencia off) and opaque (on): both look designed, in light and dark.

@@ -812,7 +812,6 @@ const styles = StyleSheet.create({
   choice: { flex: 1, minWidth: 72, minHeight: 32, paddingHorizontal: 8, paddingVertical: 6, alignItems: 'center', justifyContent: 'center' },
   choiceCompact: { minWidth: 64, minHeight: 28, paddingVertical: 4 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, paddingHorizontal: 16, minHeight: 64 },
-  /** A row on the screen's ground (EntryRow home): the vertical padding and the hairline live on the text column. */
   detailRow: { minHeight: 54, flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 14 },
   navigationRow: { minHeight: 60, flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 16, paddingVertical: 11 },
   navigationGlyph: { width: 30, alignItems: 'center' },

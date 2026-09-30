@@ -10,6 +10,7 @@ export const navigation: Pick<Messages, 'nav' | 'boot'> = {
       reports: 'Reports',
       more: 'More',
     },
+    tabPosition: '{name}, tab, {index} of {count}',
     seeAccounts: 'View my accounts',
     recordMovement: 'Record a transaction',
     titles: {

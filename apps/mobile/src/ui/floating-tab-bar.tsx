@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { StyleSheet, View, type ViewStyle } from 'react-native';
+import { Platform, StyleSheet, View, type ViewStyle } from 'react-native';
 import type { BottomTabBarProps } from 'expo-router/tabs';
 import { useI18n } from '../i18n/provider';
 import { AppText, PressFeedback } from './components';
@@ -16,8 +16,10 @@ import { usePalette, type Palette } from './theme';
  * off, else the opaque surface with a hairline edge (and a soft shadow in light mode), the designed state everywhere
  * else. The selected section is a cobalt glyph and label over a neutral lens, the others stay in the secondary ink;
  * cobalt is left to interaction. Labels stay visible (a tab is never an icon to guess), capped at 1.3× the text size
- * like the other compact controls, and every tab is a 48 pt target. VoiceOver reads one tab bar with five tabs and
- * which one is selected. Switching stays instant, with the selection tick the layout already plays. */
+ * like the other compact controls, with iOS's Large Content Viewer (a long press shows the label large, as the system
+ * tab bar does), and every tab is a 48 pt target. VoiceOver hears each tab as the stock bar reads it: on iOS a button
+ * named «Inicio, pestaña, 1 de 5» (React Native's `tab` role gives iOS no trait), elsewhere the `tab` role; «Seleccionado»
+ * for the current one. Switching stays instant, with the selection tick the layout already plays. */
 
 /** The capsule's geometry: its height, its distance from the screen's sides and the air above it. */
 export const TAB_BAR = { height: 62, side: 16, top: 6 } as const;
@@ -46,7 +48,7 @@ export function FloatingTabBar({ state, descriptors, navigation, insets }: Botto
   return <View style={{ backgroundColor: p.background, paddingTop: TAB_BAR.top, paddingBottom: tabBarBottomGap(insets.bottom),
     paddingHorizontal: TAB_BAR.side + Math.max(insets.left, insets.right) }}>
     <ControlSurface material={material} opaque={tabBarMaterial(p)} style={styles.capsule}>
-      <View accessibilityRole="tabbar" style={styles.row}>
+      <View accessibilityRole="tablist" style={styles.row}>
         {state.routes.map((route, index) => {
           const { options } = descriptors[route.key];
           const focused = index === state.index;
@@ -56,7 +58,7 @@ export function FloatingTabBar({ state, descriptors, navigation, insets }: Botto
             const event = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
             if (!focused && !event.defaultPrevented) navigation.navigate(route.name, route.params);
           };
-          return <TabItem key={route.key} label={label} focused={focused} onPress={press}
+          return <TabItem key={route.key} label={label} index={index} count={state.routes.length} focused={focused} onPress={press}
             onLongPress={() => navigation.emit({ type: 'tabLongPress', target: route.key })}
             icon={options.tabBarIcon?.({ focused, color: focused ? p.primary : p.secondary, size: 24 })} />;
         })}
@@ -65,10 +67,14 @@ export function FloatingTabBar({ state, descriptors, navigation, insets }: Botto
   </View>;
 }
 
-function TabItem({ label, focused, icon, onPress, onLongPress }: { label: string; focused: boolean; icon: ReactNode; onPress: () => void; onLongPress: () => void }) {
+function TabItem({ label, index, count, focused, icon, onPress, onLongPress }: {
+  label: string; index: number; count: number; focused: boolean; icon: ReactNode; onPress: () => void; onLongPress: () => void;
+}) {
   const p = usePalette();
-  const { speechLanguage } = useI18n();
-  return <PressFeedback accessibilityRole="tab" accessibilityLabel={label} accessibilityState={{ selected: focused }} accessibilityLanguage={speechLanguage}
+  const { t, speechLanguage } = useI18n();
+  const ios = Platform.OS === 'ios';
+  return <PressFeedback accessibilityRole={ios ? 'button' : 'tab'} accessibilityLabel={ios ? t('nav.tabPosition', { name: label, index: index + 1, count }) : label}
+    accessibilityState={{ selected: focused }} accessibilityLanguage={speechLanguage} accessibilityShowsLargeContentViewer accessibilityLargeContentTitle={label}
     onPress={onPress} onLongPress={onLongPress} containerStyle={styles.itemContainer} style={styles.item}>
     <View style={[styles.lens, focused ? { backgroundColor: tabLensColor(p) } : null]}>
       <View accessible={false} importantForAccessibility="no-hide-descendants">{icon}</View>

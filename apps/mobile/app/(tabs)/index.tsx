@@ -127,23 +127,26 @@ export default function HomeScreen() {
         {accounts}
       </View>
 
-      <ValueTransition id={heroId} style={{ gap: 6 }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
-          <AppText secondary variant="subhead" style={{ fontWeight: '500' }}>{spending ? capitalized(formatDate(day, 'month')) : t('home.recordedBalance')}</AppText>
-          {info ? <MetricHelp title={t('fx.infoTitle')} detail={info} />
-            : !spending && <MetricHelp title={t('home.available')} detail={t('home.availableHelp')} />}
-        </View>
-        {hero.status === 'ready'
-          ? <Money minor={hero.minor} currency={currency} large size={HERO_SIZE} color={!spending && hero.minor < 0 ? p.expense : undefined} />
-          : hero.status === 'unavailable'
-            ? <CurrencyParts parts={hero.parts} line={hero.reason === 'fetching' ? t('fx.fetching') : t('fx.unavailable', { currency })} detail={shortfallDetail(hero, words)} />
-            : <AppText secondary variant="subhead">{t(spending ? 'home.spendingOutOfRange' : 'home.balanceOutOfRange')}</AppText>}
-        {/* What the number covers: the currency (25B2: only when there is more than one to choose), the accounts in Disponible. */}
+      <View style={{ gap: 6 }}>
+        <ValueTransition id={heroId} style={{ gap: 6 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
+            <AppText secondary variant="subhead" style={{ fontWeight: '500' }}>{spending ? capitalized(formatDate(day, 'month')) : t('home.recordedBalance')}</AppText>
+            {info ? <MetricHelp title={t('fx.infoTitle')} detail={info} />
+              : !spending && <MetricHelp title={t('home.available')} detail={t('home.availableHelp')} />}
+          </View>
+          {hero.status === 'ready'
+            ? <Money minor={hero.minor} currency={currency} large size={HERO_SIZE} color={!spending && hero.minor < 0 ? p.expense : undefined} />
+            : hero.status === 'unavailable'
+              ? <CurrencyParts parts={hero.parts} line={hero.reason === 'fetching' ? t('fx.fetching') : t('fx.unavailable', { currency })} detail={shortfallDetail(hero, words)} />
+              : <AppText secondary variant="subhead">{t(spending ? 'home.spendingOutOfRange' : 'home.balanceOutOfRange')}</AppText>}
+        </ValueTransition>
+        {/* What the number covers: the currency (25B2: only when there is more than one to choose), the accounts in Disponible.
+            Outside the keyed crossfade: the chip's sheet changes the key, and must never remount the chip that shows it. */}
         {(currencies.length > 1 || !spending) && <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: space.s, paddingTop: 2 }}>
           {currencies.length > 1 && <DisplayCurrencyButton compact mode={mode} currency={currency} held={currencies} gate={gate} onMode={setMode} onCurrency={setCurrency} />}
           {!spending && <AppText secondary variant="footnote">{t('home.accounts', { count: accountCount })}</AppText>}
         </View>}
-      </ValueTransition>
+      </View>
 
       <CaptureButton movementCurrency={actionCurrency} assistantCurrency={currency} />
     </View>

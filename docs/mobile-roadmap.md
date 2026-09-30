@@ -1804,8 +1804,10 @@ nothing of it is on a screen yet.
   selection tick still fires). A 62 pt capsule 16 pt from the sides, resting in the upper part of the home indicator's
   safe area, on the screen's ground; the app's control material (Liquid Glass where iOS draws it, else the opaque
   surface with a hairline edge and, in light mode, a soft shadow); the selected tab a cobalt glyph and label over a
-  neutral lens, the others in the secondary ink; labels always shown, capped at 1.3×; 48 pt targets; VoiceOver hears
-  one tab bar with five tabs and the selected one. It stays in the layout instead of floating over the content: an
+  neutral lens, the others in the secondary ink; labels always shown, capped at 1.3×, with iOS's Large Content Viewer
+  (a long press shows the label large); 48 pt targets; VoiceOver hears each tab as the stock bar reads it (on iOS a
+  button named «Inicio, pestaña, 1 de 5», because React Native's `tab` role gives iOS no trait; the `tab` role
+  elsewhere) and «Seleccionado» on the current one. It stays in the layout instead of floating over the content: an
   absolute bar would need every list to reserve its height, break the Assistant composer's measurement and the
   keyboard, and hide the last row at large text. No extra floating «+».
 - **Appearance (architecture).** `src/ui/theme-preference.ts` (pure): Sistema (the default, the absence of the key),
@@ -1829,6 +1831,13 @@ nothing of it is on a screen yet.
   `home-ranking` (the insight row), `navigation`, `more-routes` (Apariencia, the chooser), `date-field`
   (`onDismissed`, the sheet without Listo), `material`, `motion`, `assistant-routes`, `ui-rows`, `translation`,
   `budget-presentation`. The English lock was re-accepted for the new and changed keys.
+- **Review round.** An independent review against the installed React Native 0.86 and expo-router 57 sources found:
+  the display chip, moved under the number, sat inside the hero's keyed crossfade, so choosing a mode or a currency in
+  its sheet remounted the chip and closed the sheet (the chip now sits outside the key, pinned in `spending-home`);
+  the tab items used the `tab` role, which iOS ignores, and a `tabbar` container that Fabric flattens (now the stock
+  bar's reading, localized); the Large Content Viewer of the stock tab items was missing (restored); a stale style
+  comment. Checked and sound: the tab events against the stock bar, the sheet's dismissal (once, never stale), the
+  Appearance override on RN 0.86, the insight's priorities and thresholds.
 - **Status.** Implemented on the branch; device QA pending (checklist, Producto 24UX6A). No EAS build; the iPhone was
   not touched; no schema or backup change (schema 13, backup v13).
 

@@ -514,6 +514,11 @@ test('24UX6A: no root title, the accounts beside the metric, a larger number, th
   assert.equal(hero.props.size, 48);
   const order = nodes(root).map(node => node.type).filter(type => ['Choices', 'IconButton', 'Money', 'DisplayCurrencyButton', 'CaptureButton', 'SectionTitle', 'UpcomingRecurringRow'].includes(type));
   assert.equal(order.join('|'), 'Choices|IconButton|Money|DisplayCurrencyButton|CaptureButton|SectionTitle|UpcomingRecurringRow', 'what the number covers sits under it; the button follows');
+  // Review of 24UX6A: the chip's sheet changes the crossfade's key (mode, currency), so the chip lives outside it and is never remounted with its sheet open.
+  const crossfade = find(root, 'ValueTransition');
+  assert.equal(crossfade.props.id, 'spending|single|ARS');
+  assert.ok(nodes(crossfade).some(node => node.type === 'Money'));
+  assert.equal(nodes(crossfade).some(node => node.type === 'DisplayCurrencyButton'), false);
   const titles = nodes(root).filter(node => node.type === 'SectionTitle');
   assert.equal(titles.every(node => node.props.quiet === true && typeof node.props.onAction === 'function'), true, 'a quiet link, no cobalt word competing with the button');
   const surfaces = nodes(root).filter(node => node.type === 'Surface');
