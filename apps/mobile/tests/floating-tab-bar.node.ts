@@ -84,6 +84,9 @@ test('24UX6A: one tab list with the five destinations in order, each read as the
     assert.equal(label.props.children, titles[index], 'the label is always drawn: no icon to guess');
     assert.equal(label.props.maxFontSizeMultiplier, 1.3, 'grows with Dynamic Type up to the compact-control cap');
     assert.equal(label.props.numberOfLines, 1);
+    assert.deepEqual([label.props.adjustsFontSizeToFit, label.props.minimumFontScale, label.props.style.fontSize], [true, 0.6, 10],
+      'Codex (PR #70): the system bar\'s 10 pt, shrunk to fit a narrow slot at large text rather than cut with an ellipsis');
+    assert.equal(rendered.props.children.props.style[0].alignSelf, 'stretch', 'the lens spans its slot: the label gets the whole width');
     assert.equal(label.props.accessible, false, 'the tab speaks once, through its label');
   }
   locale = 'en-US';

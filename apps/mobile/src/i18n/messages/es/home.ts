@@ -40,6 +40,9 @@ export const home = {
       budgetExceededCategory: 'Superaste tu presupuesto de {name} por {amount}.',
       budgetLowTotal: 'Te queda {percent} de tu presupuesto del mes.',
       budgetLowCategory: 'Te queda {percent} de tu presupuesto de {name}.',
+      /** The same, for a budget in another currency than the one Inicio shows: {code} is its ISO code («en ARS»). */
+      budgetLowTotalIn: 'Te queda {percent} de tu presupuesto del mes en {code}.',
+      budgetLowCategoryIn: 'Te queda {percent} de tu presupuesto de {name} en {code}.',
       /** {name} is a category label and {percent} its share of the month: «Comida concentra 46 % de tus gastos de este mes». */
       concentration: '{name} concentra {percent} de tus gastos de este mes.',
       budgetsHint: 'Abre Presupuestos',

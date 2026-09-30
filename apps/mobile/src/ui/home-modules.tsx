@@ -42,8 +42,8 @@ export function CurrencyParts({ parts, line, detail }: { parts: readonly { curre
  * concentrating the month's spending. Computed facts only, one sentence, never a cause or advice. A single quiet card
  * (the only one on Inicio): a glyph in the fact's tone (amber near a limit, coral over it, the category's hue for a
  * concentration), the sentence, a chevron; tapping opens Presupuestos or Reportes. VoiceOver hears the same sentence
- * with the amount and the share in words. `labelsCurrency` writes the amount with its code when the budget is in
- * another currency than the one Inicio shows. */
+ * with the amount and the share in words. `labelsCurrency` names the budget's currency when it is another than the one
+ * Inicio shows: the amount with its code, the share «en ARS». */
 export function HomeInsightRow({ insight, labelsCurrency = false, onPress }: { insight: NonNullable<HomeInsight>; labelsCurrency?: boolean; onPress: () => void }) {
   const p = usePalette();
   const { t, moneyText, codedAmount, spokenAmount, formatPercent, spokenPercent } = useI18n();
@@ -56,9 +56,11 @@ export function HomeInsightRow({ insight, labelsCurrency = false, onPress }: { i
     spoken = t(key, { name: look.label, amount: spokenAmount(insight.overMinor, insight.currency) });
     icon = 'speedometer-outline'; color = p.expense; soft = p.expenseSoft;
   } else if (insight.kind === 'budgetLow') {
-    const key = insight.scope === 'total' ? 'home.insight.budgetLowTotal' : 'home.insight.budgetLowCategory';
-    text = t(key, { name: look.label, percent: formatPercent(insight.leftShare) });
-    spoken = t(key, { name: look.label, percent: spokenPercent(insight.leftShare) });
+    // A share carries no currency, so a budget in another currency than Inicio's says which it is (Codex, PR #70).
+    const key = insight.scope === 'total' ? (labelsCurrency ? 'home.insight.budgetLowTotalIn' : 'home.insight.budgetLowTotal')
+      : labelsCurrency ? 'home.insight.budgetLowCategoryIn' : 'home.insight.budgetLowCategory';
+    text = t(key, { name: look.label, percent: formatPercent(insight.leftShare), code: insight.currency });
+    spoken = t(key, { name: look.label, percent: spokenPercent(insight.leftShare), code: insight.currency });
     icon = 'speedometer-outline'; color = p.warning; soft = p.warningSoft;
   } else {
     text = t('home.insight.concentration', { name: look.label, percent: formatPercent(insight.share) });

@@ -80,10 +80,17 @@ test('24UX6A: a budget nearly spent says what share is left, in amber; the Engli
     assert.equal(flatten(row).find(node => node.type === 'Ionicons').props.color, palette.warning);
     const total = exports.HomeInsightRow({ insight: { ...low, scope: 'total', category: null }, onPress: () => {} });
     assert.equal(total.props.accessibilityLabel, 'Te queda 12\u00A0% de tu presupuesto del mes.');
+    // Codex (PR #70): under a total in another currency, a share says whose budget it is.
+    const other = exports.HomeInsightRow({ insight: { ...low, scope: 'total', category: null }, labelsCurrency: true, onPress: () => {} });
+    assert.equal(textOf(flatten(other).find(node => node.type === 'AppText')), 'Te queda 12\u00A0% de tu presupuesto del mes en ARS.');
+    assert.equal(other.props.accessibilityLabel, 'Te queda 12\u00A0% de tu presupuesto del mes en ARS.');
+    assert.equal(exports.HomeInsightRow({ insight: low, labelsCurrency: true, onPress: () => {} }).props.accessibilityLabel, 'Te queda 12\u00A0% de tu presupuesto de Comida en ARS.');
     current = 'en-US';
     const english = exports.HomeInsightRow({ insight: low, onPress: () => {} });
     assert.equal(textOf(flatten(english).find(node => node.type === 'AppText')), '12% of your Comida budget is left.');
     assert.equal(english.props.accessibilityHint, 'Opens Budgets');
+    assert.equal(exports.HomeInsightRow({ insight: { ...low, scope: 'total', category: null }, labelsCurrency: true, onPress: () => {} }).props.accessibilityLabel,
+      '12% of this month\u2019s ARS budget is left.');
     assert.equal(exports.HomeInsightRow({ insight: { kind: 'budgetExceeded', scope: 'total', category: null, currency: 'ARS', overMinor: 100000 }, onPress: () => {} }).props.accessibilityLabel,
       'You’re 1000.00 ARS over this month’s budget.');
   } finally { current = 'es-AR'; }

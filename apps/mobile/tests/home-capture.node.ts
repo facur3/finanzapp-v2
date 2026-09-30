@@ -126,6 +126,15 @@ test('24UX6A: a row opens its screen only once the sheet has left, exactly where
   assert.equal(sheet.props.visible, false);
   sheet.props.onDismissed();
   assert.equal(routes.length, 0, 'Cancelar, the scrim or the back gesture open nothing');
+  // Codex (PR #70): the rows stay touchable while the sheet leaves; the first choice holds.
+  const held = harness();
+  held.render().button.props.onPress();
+  held.render().rows[0].rendered.props.onPress();
+  held.render().rows[3].rendered.props.onPress();
+  held.render().sheet.props.onClose();
+  held.render().sheet.props.onDismissed();
+  assert.equal(json(held.routes), json([{ method: 'push', to: { pathname: '/new-entry', params: { kind: 'expense', currency: 'ARS' } } }]),
+    'a second row, the scrim or the back gesture during the exit change nothing');
 });
 
 test('24UX6A: while a chosen screen is on its way the button does not reopen the sheet, and the module never writes', () => {

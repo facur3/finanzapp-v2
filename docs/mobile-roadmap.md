@@ -1797,14 +1797,16 @@ nothing of it is on a screen yet.
   first that applies: a month budget exceeded (the total before a category, then the furthest over), one at 85 % or
   more (`budgetState` warning; the share left), or one category at 40 % or more of the month's spending with two
   categories or more (only when the month's figures are complete and exact). Computed facts, never a cause or advice;
-  a budget keeps its own currency (24C1 review) and writes its code when Inicio shows another; the line opens
+  a budget keeps its own currency (24C1 review) and names it when Inicio shows another (the amount with its code, the
+  share «en ARS»); the line opens
   Presupuestos in the budget's currency or Reportes in Inicio's.
 - **Tab bar (why a floating capsule kept in the layout).** `src/ui/floating-tab-bar.tsx`, the navigator's `tabBar`: the
   five destinations, order and routes are the navigator's; it sends the stock `tabPress` / `tabLongPress` (the
   selection tick still fires). A 62 pt capsule 16 pt from the sides, resting in the upper part of the home indicator's
   safe area, on the screen's ground; the app's control material (Liquid Glass where iOS draws it, else the opaque
   surface with a hairline edge and, in light mode, a soft shadow); the selected tab a cobalt glyph and label over a
-  neutral lens, the others in the secondary ink; labels always shown, capped at 1.3×, with iOS's Large Content Viewer
+  lens spanning its slot, the others in the secondary ink; labels always shown at the system bar's 10 pt, capped at 1.3×
+  and shrunk to fit a narrow slot rather than cut, with iOS's Large Content Viewer
   (a long press shows the label large); 48 pt targets; VoiceOver hears each tab as the stock bar reads it (on iOS a
   button named «Inicio, pestaña, 1 de 5», because React Native's `tab` role gives iOS no trait; the `tab` role
   elsewhere) and «Seleccionado» on the current one. It stays in the layout instead of floating over the content: an
@@ -1837,7 +1839,11 @@ nothing of it is on a screen yet.
   the tab items used the `tab` role, which iOS ignores, and a `tabbar` container that Fabric flattens (now the stock
   bar's reading, localized); the Large Content Viewer of the stock tab items was missing (restored); a stale style
   comment. Checked and sound: the tab events against the stock bar, the sheet's dismissal (once, never stale), the
-  Appearance override on RN 0.86, the insight's priorities and thresholds.
+  Appearance override on RN 0.86, the insight's priorities and thresholds. Codex (PR #70): a share line for a budget
+  in another currency than Inicio's did not say whose budget it was (now «… de tu presupuesto del mes en ARS»); a
+  second row, the scrim or the back gesture during the sheet's 200 ms exit could replace or clear the first choice (it
+  now holds); «Movimientos» truncated in a 67 pt slot at 11 pt behind the lens's fixed inset (now 10 pt, the lens spans
+  the slot, and the label shrinks to fit at large text).
 - **Status.** Implemented on the branch, PR #70 open (not merged); device QA pending (checklist, Producto 24UX6A). Checked on Linux on the final
   tree: root `npm test` (415 passed, 1 todo) and `npm run check:repo` (OK, 376 tracked files); mobile `typecheck`
   (clean), `test:storage` (889/889), `currency:verify` and `regions:verify` (catalogues verified offline),

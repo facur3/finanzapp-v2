@@ -37,6 +37,8 @@ export const home: Pick<Messages, 'home' | 'quickActions'> = {
       budgetExceededCategory: 'You’re {amount} over your {name} budget.',
       budgetLowTotal: '{percent} of this month’s budget is left.',
       budgetLowCategory: '{percent} of your {name} budget is left.',
+      budgetLowTotalIn: '{percent} of this month’s {code} budget is left.',
+      budgetLowCategoryIn: '{percent} of your {name} budget in {code} is left.',
       concentration: '{name} is {percent} of your spending this month.',
       budgetsHint: 'Opens Budgets',
       reportsHint: 'Opens Reports',

@@ -436,7 +436,7 @@ pestaña activa; sin violeta; menos superficies. El contrato y las pruebas está
   de tus gastos de este mes.»). Hechos calculados, nunca una causa ni un consejo, nunca de un mes incompleto o sin
   cotización. Un glifo en su tono (ámbar cerca del límite, coral pasado, el tono de la categoría) y una flecha: abre
   Presupuestos en la moneda del presupuesto o Reportes en la moneda de Inicio. Un presupuesto en otra moneda que la
-  mostrada escribe su código.
+  mostrada la nombra: el importe con su código, la proporción «… en ARS».
 
 ### Barra de pestañas
 
@@ -446,7 +446,8 @@ pestaña activa; sin violeta; menos superficies. El contrato y las pruebas está
   donde iOS lo dibuja y Reducir transparencia está apagado; si no, la superficie opaca con un filo fino (y una sombra
   suave en claro), el estado diseñado en iOS anteriores, Android y con Reducir transparencia.
 - La pestaña elegida: glifo relleno y etiqueta en cobalto sobre una lente neutra (un estado, no un color); las otras
-  en tinta secundaria (AA). Las etiquetas siempre visibles, hasta 1,3× con Dynamic Type y con el visor de contenido
+  en tinta secundaria (AA). Las etiquetas siempre visibles, a 10 pt como en la barra del sistema, hasta 1,3× con Dynamic
+  Type y achicándose para caber en un iPhone angosto antes que cortarse («Movimientos» nunca termina en «…»), con el visor de contenido
   grande de iOS (una pulsación larga muestra la etiqueta grande, como en la barra del sistema); cada pestaña es un
   blanco de 48 pt; VoiceOver la lee como la barra de siempre: «Inicio, pestaña, 1 de 5» y «Seleccionado» en la actual.
 - **Por qué sigue en el layout y no flota encima.** Una barra absoluta sobre el contenido obligaría a cada lista a

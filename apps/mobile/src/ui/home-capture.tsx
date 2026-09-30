@@ -52,8 +52,10 @@ export function CaptureButton({ movementCurrency, assistantCurrency }: { movemen
   // The row chosen while the sheet leaves; opened once it is gone. A cancel clears it. While a choice waits, the button does
   // not reopen the sheet: the chosen screen is on its way.
   const chosen = useRef<CaptureChoice | null>(null);
-  const choose = (choice: CaptureChoice) => { chosen.current = choice; setOpen(false); };
-  const cancel = () => { chosen.current = null; setOpen(false); };
+  // The first choice holds while the sheet leaves (its rows stay touchable for those 200 ms): a second row, the scrim or
+  // the back gesture changes nothing then (Codex, PR #70).
+  const choose = (choice: CaptureChoice) => { if (chosen.current) return; chosen.current = choice; setOpen(false); };
+  const cancel = () => { if (chosen.current) return; setOpen(false); };
   const openChosen = () => {
     const choice = chosen.current;
     chosen.current = null;

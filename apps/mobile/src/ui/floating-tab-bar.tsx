@@ -15,8 +15,9 @@ import { usePalette, type Palette } from './theme';
  * drawn with the app's one control material: Liquid Glass where the running iOS draws it and Reduce Transparency is
  * off, else the opaque surface with a hairline edge (and a soft shadow in light mode), the designed state everywhere
  * else. The selected section is a cobalt glyph and label over a neutral lens, the others stay in the secondary ink;
- * cobalt is left to interaction. Labels stay visible (a tab is never an icon to guess), capped at 1.3× the text size
- * like the other compact controls, with iOS's Large Content Viewer (a long press shows the label large, as the system
+ * cobalt is left to interaction. Labels stay visible (a tab is never an icon to guess), 10 pt like the system bar's,
+ * capped at 1.3× the text size like the other compact controls and shrunk to fit their slot rather than cut (the
+ * narrowest iPhone leaves each tab about 67 pt; «Movimientos» must never end in an ellipsis), with iOS's Large Content Viewer (a long press shows the label large, as the system
  * tab bar does), and every tab is a 48 pt target. VoiceOver hears each tab as the stock bar reads it: on iOS a button
  * named «Inicio, pestaña, 1 de 5» (React Native's `tab` role gives iOS no trait), elsewhere the `tab` role; «Seleccionado»
  * for the current one. Switching stays instant, with the selection tick the layout already plays. */
@@ -78,16 +79,17 @@ function TabItem({ label, index, count, focused, icon, onPress, onLongPress }: {
     onPress={onPress} onLongPress={onLongPress} containerStyle={styles.itemContainer} style={styles.item}>
     <View style={[styles.lens, focused ? { backgroundColor: tabLensColor(p) } : null]}>
       <View accessible={false} importantForAccessibility="no-hide-descendants">{icon}</View>
-      <AppText accessible={false} numberOfLines={1} maxFontSizeMultiplier={1.3}
-        style={{ fontSize: 11, lineHeight: 13, fontWeight: focused ? '600' : '500', color: focused ? p.primary : p.secondary }}>{label}</AppText>
+      <AppText accessible={false} numberOfLines={1} maxFontSizeMultiplier={1.3} adjustsFontSizeToFit minimumFontScale={0.6}
+        style={{ fontSize: 10, lineHeight: 12, fontWeight: focused ? '600' : '500', color: focused ? p.primary : p.secondary, textAlign: 'center' }}>{label}</AppText>
     </View>
   </PressFeedback>;
 }
 
 const styles = StyleSheet.create({
-  capsule: { minHeight: TAB_BAR.height, borderRadius: TAB_BAR.height / 2, paddingHorizontal: 6, justifyContent: 'center' },
+  capsule: { minHeight: TAB_BAR.height, borderRadius: TAB_BAR.height / 2, paddingHorizontal: 4, justifyContent: 'center' },
   row: { flexDirection: 'row', alignItems: 'center' },
   itemContainer: { flex: 1, minWidth: 0 },
   item: { minHeight: 48, alignItems: 'center', justifyContent: 'center' },
-  lens: { alignItems: 'center', justifyContent: 'center', gap: 2, paddingVertical: 5, paddingHorizontal: 10, borderRadius: 22, minWidth: 56 },
+  // The lens spans its slot, so the label gets the slot's whole width (less a hair) instead of a fixed inset.
+  lens: { alignSelf: 'stretch', alignItems: 'center', justifyContent: 'center', gap: 2, paddingVertical: 5, paddingHorizontal: 3, borderRadius: 22 },
 });
