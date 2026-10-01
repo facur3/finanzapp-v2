@@ -6,7 +6,8 @@ import ts from 'typescript';
 import * as domain from '@finanzapp/domain';
 import * as uiPresentation from '../src/ui/presentation.ts';
 import { homeBudgetAttention } from '../src/ui/home-focus.ts';
-import { percentUsed } from '../src/ui/budget-presentation.ts';
+import * as budgetPresentation from '../src/ui/budget-presentation.ts';
+import * as geometry from '../src/ui/geometry.ts';
 import { bindLocale } from '../src/i18n/bind.ts';
 import type { AppLocale } from '../src/i18n/locale.ts';
 // Read on every render, like the live provider; a test may switch it and must restore it.
@@ -15,9 +16,11 @@ const i18nProvider = { useI18n: () => bindLocale(current) };
 
 // A source/behaviour guard over Inicio's row modules (home-modules.tsx): the metric help, the field's controls (24UX6A:
 // the accounts button and the per-currency parts on the pine field) and the upcoming commitments. The insight line
-// (HomeInsightRow) was removed by owner decision (24UX6A). 24UX6C2 adds the general budget's attention row (BudgetAttentionRow). The look of the rows on an iPhone remains a device acceptance item.
+// (HomeInsightRow) was removed by owner decision (24UX6A). 24UX6C2 adds the general budget's attention row (BudgetAttentionRow),
+// drawn since 24UX6D as a compact progress row (name and percent, a bar, one quiet line). The look of the rows on an iPhone,
+// the bar's motion and the row at the largest text sizes remain device acceptance items.
 const palette = {
-  line: '#ddd', isDark: true, secondary: '#A0A0A8', tertiary: '#7C7C84', expense: '#FF6B5E', warning: '#F5B342',
+  line: '#ddd', isDark: true, secondary: '#A0A0A8', tertiary: '#7C7C84', expense: '#FF6B5E', warning: '#F5B342', inset: '#171E1B',
   hero: '#14362D', heroInk: '#EEF5F1', heroSecondary: '#A8C4B9', heroControl: '#26493F',
 };
 
@@ -25,17 +28,35 @@ function harness() {
   const source = readFileSync(new URL('../src/ui/home-modules.tsx', import.meta.url), 'utf8');
   const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText;
   const jsx = (type: any, props: any) => ({ type, props });
-  const env = { alerts: [] as unknown[][], pushed: [] as unknown[], required: new Set<string>() };
+  // 24UX6D: the window the budget row measures (`useWindowDimensions`), the Reduce Motion setting its bar reads, and every
+  // `withTiming` the bar asks for, so a test can drive the row at large text and check the motion without React.
+  const env = { alerts: [] as unknown[][], pushed: [] as unknown[], required: new Set<string>(), window: { width: 393, height: 852, fontScale: 1 }, reduced: false,
+    timings: [] as { to: number; config: any }[],
+    // A minimal hook runtime for the bar (24UX6D review): shared values keep their slot across renders, and effects are
+    // queued with their deps and run only by `flush()`, after the render, as React does. `begin()` starts a render.
+    slots: [] as { value: number }[], deps: [] as (unknown[] | undefined)[], queued: [] as (() => void)[], cursor: 0, effectCursor: 0,
+    begin() { this.cursor = 0; this.effectCursor = 0; }, flush() { const run = this.queued.splice(0); for (const effect of run) effect(); } };
   const modules: Record<string, any> = {
     '../i18n/provider': i18nProvider,
+    'react': { useEffect: (effect: () => void, deps?: unknown[]) => {
+      const index = env.effectCursor++, previous = env.deps[index];
+      if (!previous || !deps || deps.length !== previous.length || deps.some((item, i) => item !== previous[i])) { env.deps[index] = deps; env.queued.push(effect); }
+    } },
     'react/jsx-runtime': { jsx, jsxs: jsx, Fragment: 'Fragment' },
-    'react-native': { Alert: { alert: (...args: unknown[]) => { env.alerts.push(args); } }, StyleSheet: { create: (styles: unknown) => styles, hairlineWidth: 0.5 }, View: 'View' },
+    'react-native': { Alert: { alert: (...args: unknown[]) => { env.alerts.push(args); } }, StyleSheet: { create: (styles: unknown) => styles, hairlineWidth: 0.5 }, View: 'View',
+      useWindowDimensions: () => env.window },
+    'react-native-reanimated': { __esModule: true, default: { View: 'Animated.View' }, useSharedValue: (value: number) => { const index = env.cursor++; if (!(index in env.slots)) env.slots[index] = { value }; return env.slots[index]; }, useAnimatedStyle: (style: () => unknown) => style(),
+      withTiming: (to: number, config: unknown) => { env.timings.push({ to, config }); return to; } },
     'expo-router': { router: { push: (to: unknown) => { env.pushed.push(to); } } },
     '@expo/vector-icons/Ionicons': 'Ionicons',
-    './components': { AppText: 'AppText', GlyphTile: 'GlyphTile', MerchantBadge: 'MerchantBadge', Money: 'Money', PressFeedback: 'PressFeedback', useStacked: () => false },
+    './budget-presentation': budgetPresentation,
+    './components': { AppText: 'AppText', MerchantBadge: 'MerchantBadge', Money: 'Money', PressFeedback: 'PressFeedback', useStacked: () => false },
     './category-hues': { useCategoryLook: (label: string) => ({ label, hex: '#' + label.length.toString().padStart(6, 'A'), glyph: 'restaurant-outline' }) },
+    './geometry': geometry,
+    // motion.tsx's own rule (`timing`: the kind's duration, zero under Reduce Motion), without loading Reanimated.
+    './motion': { timing: (kind: string, reduced: boolean) => ({ kind, duration: reduced ? 0 : kind === 'data' ? 260 : -1 }) },
     './presentation': uiPresentation,
-    './theme': { usePalette: () => palette },
+    './theme': { usePalette: () => palette, useReduceMotion: () => env.reduced },
   };
   const module = { exports: {} as Record<string, any> };
   runInNewContext(code, { module, exports: module.exports, require: (name: string) => {
@@ -148,7 +169,7 @@ test('25B3: an upcoming commitment opens the rule\'s detail, never its form, and
 
 test('24UX6A: home-modules imports exactly what the harness mocks, and the insight row is gone', () => {
   const { env, exports, mocked } = harness();
-  assert.equal([...env.required].sort().join(','), [...mocked].sort().join(','), 'no stale mock (Surface, washOf, home-focus are no longer imported) and no missing one');
+  assert.equal([...env.required].sort().join(','), [...mocked].sort().join(','), 'no stale mock (Surface, washOf, home-focus, GlyphTile are no longer imported) and no missing one');
   assert.equal(env.required.has('./home-focus'), false, '24UX6C2: only the BudgetAttention type comes from home-focus; nothing at runtime');
   assert.equal(env.required.has('./category-color'), false);
   assert.equal('HomeInsightRow' in exports, false, 'owner decision: Inicio carries no insight line');
@@ -212,27 +233,36 @@ test('24C1/24UX6A: each currency\'s own figure stands in for a missing total; on
   assert.equal(canvas.find(node => node.type === exports.MetricHelp).props.color, undefined);
 });
 
-// ---- 24UX6C2: the general budget's attention row ---------------------------------------------------------------
-// Synthetic fixtures: one ARS account, one general budget of $ 100.000,00 for September, measured by the domain itself.
+// ---- 24UX6C2, 24UX6D: the general budget's attention row as a compact progress row -----------------------------------
+// Synthetic fixtures: one account, one general budget for September (by default $ 100.000,00), measured by the domain itself.
 const budgetAt = '2026-09-01T12:00:00.000Z';
-/** The attention the screen would hand the row: the domain's summary of `spentMinor` against a $ 100.000,00 general budget. */
-function attentionFor(spentMinor: number, currency: domain.Currency = 'ARS') {
+/** The attention the screen would hand the row: the domain's summary of `spentMinor` against a general budget of `limitMinor`. */
+function attentionFor(spentMinor: number, currency: domain.Currency = 'ARS', limitMinor = 10_000_000) {
   const snapshot: domain.LedgerSnapshot = { accounts: [{ id: 'a', name: 'Banco', currency, openingMinor: 0, createdAt: budgetAt }],
     entries: [{ id: 'e', accountId: 'a', kind: 'expense', amountMinor: spentMinor, merchant: 'Comercio', category: 'Comida', dateISO: '2026-09-10', createdAt: budgetAt }] };
-  const budget: domain.MonthlyBudget = { id: 'total', scope: 'total', currency, monthISO: '2026-09', amountMinor: 10_000_000, active: true, createdAt: budgetAt, revision: 0, updatedAt: budgetAt };
+  const budget: domain.MonthlyBudget = { id: 'total', scope: 'total', currency, monthISO: '2026-09', amountMinor: limitMinor, active: true, createdAt: budgetAt, revision: 0, updatedAt: budgetAt };
   const attention = homeBudgetAttention(domain.summarizeMonthlyBudgets(snapshot, [budget], currency, '2026-09'));
   assert.ok(attention, 'the fixture needs attention');
   return attention;
 }
 const NBSP = ' ';
-/** The row's parts: the glyph tile, the title and the detail (two AppTexts), the chevron. */
+const es = bindLocale('es-AR');
+const budgetRow = (exports: Record<string, any>, spent: number, labelsCurrency = false, onPress = () => {}) =>
+  exports.BudgetAttentionRow({ attention: attentionFor(spent), currency: 'ARS', labelsCurrency, onPress });
+/** The row's parts (24UX6D): the name, the percent (with the alert glyph only when exceeded), the bar, the quiet detail, the chevron. */
 function budgetParts(row: any) {
-  const texts = flatten(row).filter(node => node.type === 'AppText');
-  assert.equal(texts.length, 2, 'a title and a detail, nothing else');
-  return { tile: flatten(row).find(node => node.type === 'GlyphTile'), title: texts[0], detail: texts[1], chevron: flatten(row).find(node => node.type === 'Ionicons') };
+  const all = flatten(row);
+  const texts = all.filter(node => node.type === 'AppText');
+  assert.equal(texts.length, 3, 'the name, the percent and the detail, nothing else');
+  const [content, chevron] = row.props.children;
+  const [header] = content.props.children;
+  return { all, header, title: texts[0], percent: texts[1], detail: texts[2], chevron,
+    meter: all.find(node => typeof node.type === 'function' && node.type.name === 'BudgetMeter'),
+    alert: all.find(node => node.type === 'Ionicons' && node.props.name === 'alert-circle'),
+    tile: all.find(node => node.type === 'GlyphTile') };
 }
 
-test('24UX6C2: a general budget at 87 % is a warning row: the speedometer in the warning tone, «Usaste 87 % del presupuesto del mes», what is left in amber', () => {
+test('24UX6D: a general budget at 87 % is a warning progress row: «Presupuesto», «87 %» in amber, an amber bar at 0.87, «Quedan $ 13.000,00» quiet', () => {
   const { exports } = harness();
   const attention = attentionFor(8_700_000);
   assert.equal(attention.state, 'warning');
@@ -241,101 +271,168 @@ test('24UX6C2: a general budget at 87 % is a warning row: the speedometer in the
   assert.equal(row.type, 'PressFeedback');
   assert.equal(row.props.feedback, 'highlight', 'a cell in a grouped surface: the press tints it');
   assert.equal(row.props.accessibilityRole, 'button');
-  assert.equal(row.props.style.minHeight, 60);
-  const { tile, title, detail, chevron } = budgetParts(row);
-  assert.equal(JSON.stringify([tile.props.icon, tile.props.tone, tile.props.size]), JSON.stringify(['speedometer-outline', 'warning', 36]));
-  assert.equal(textOf(title), 'Usaste 87' + NBSP + '% del presupuesto del mes', 'formatPercent, with its no-break space');
+  assert.ok(row.props.style.minHeight >= 44, 'a 44 pt target at least');
+  assert.equal(row.props.style.minHeight, 64);
+  const { all, header, title, percent, detail, chevron, meter, alert, tile } = budgetParts(row);
+  assert.equal(textOf(title), 'Presupuesto', 'one word: Inicio is already the month');
   assert.equal(title.props.style.fontWeight, '600');
-  assert.equal(title.props.style.color, undefined, 'the title is the ink');
-  assert.equal(textOf(detail), 'Quedan $' + NBSP + '13.000,00 de $' + NBSP + '100.000,00');
-  assert.equal(detail.props.variant, 'footnote');
-  assert.equal(JSON.stringify([detail.props.style.color, detail.props.style.fontWeight]), JSON.stringify([palette.warning, '500']), 'amber, never the alert tone before the limit is passed');
-  assert.equal(JSON.stringify([title.props.accessible, detail.props.accessible]), JSON.stringify([false, false]), 'one element for VoiceOver: the row');
-  assert.equal(JSON.stringify([chevron.props.name, chevron.props.color, chevron.props.accessible]), JSON.stringify(['chevron-forward', palette.tertiary, false]));
+  assert.equal(title.props.style.color, undefined, 'the name is the ink');
+  assert.equal(textOf(percent), '87' + NBSP + '%', 'formatPercent, with its no-break space');
+  assert.equal(JSON.stringify([percent.props.style.color, percent.props.style.fontWeight, percent.props.style.fontVariant]), JSON.stringify([palette.warning, '600', ['tabular-nums']]));
+  assert.equal(alert, undefined, 'the alert glyph is the exceeded state\'s only');
+  assert.equal(JSON.stringify([header.props.style.flexDirection, header.props.style.justifyContent]), JSON.stringify(['row', 'space-between']), 'the name left, the percent right');
+  assert.equal(JSON.stringify([meter.props.fraction, meter.props.color]), JSON.stringify([0.87, palette.warning]));
+  assert.equal(textOf(detail), 'Quedan $' + NBSP + '13.000,00', 'no «de {limit}», no «Usaste … del presupuesto del mes»');
+  assert.equal(JSON.stringify([detail.props.variant, detail.props.secondary, detail.props.style]), JSON.stringify(['footnote', true, undefined]), 'quiet: secondary ink, no tone of its own');
+  assert.equal(all.filter(node => node.type === 'AppText').every(node => node.props.accessible === false), true, 'one element for VoiceOver: the row');
+  assert.equal(all.some(node => node.props.numberOfLines !== undefined), false, 'nothing truncated: the name and the detail wrap');
+  assert.equal(JSON.stringify([chevron.type, chevron.props.name, chevron.props.color, chevron.props.size, chevron.props.accessible]), JSON.stringify(['Ionicons', 'chevron-forward', palette.tertiary, 13, false]));
+  assert.equal(tile, undefined, '24UX6D: no glyph tile; the bar carries the state');
 });
 
-
-test('24UX6C2 review: the row shows the whole percent Presupuestos and Reportes show (percentUsed), never a decimal', () => {
+test('24UX6C2 review, 24UX6D: the row shows the whole percent Presupuestos and Reportes show (percentUsed), never a decimal', () => {
   const { exports } = harness();
-  for (const [spent, percent] of [[8_750_000, 88], [8_740_000, 87], [8_500_000, 85], [9_949_000, 99]] as const) {
+  for (const [spent, whole] of [[8_750_000, 88], [8_740_000, 87], [8_500_000, 85], [9_949_000, 99], [10_049_000, 100], [12_345_678, 123]] as const) {
     const attention = attentionFor(spent);
     const row = exports.BudgetAttentionRow({ attention, currency: 'ARS', labelsCurrency: false, onPress: () => {} });
-    assert.equal(textOf(budgetParts(row).title), 'Usaste ' + percent + NBSP + '% del presupuesto del mes', String(spent));
-    assert.equal(percentUsed(attention.progress), percent, 'the same number Presupuestos shows');
+    assert.equal(textOf(budgetParts(row).percent), whole + NBSP + '%', String(spent));
+    assert.equal(budgetPresentation.percentUsed(attention.progress), whole, 'the same number Presupuestos shows');
   }
 });
-test('24UX6C2: the warning holds from 85 % through exactly 100 %; above the limit it is exceeded', () => {
+
+test('24UX6C2, 24UX6D: the warning holds from exactly 85 % through exactly 100 % («Límite alcanzado», still amber); one minor unit over is exceeded', () => {
   const { exports } = harness();
   const at = (spent: number) => homeBudgetAttention(domain.summarizeMonthlyBudgets({ accounts: [{ id: 'a', name: 'Banco', currency: 'ARS', openingMinor: 0, createdAt: budgetAt }],
     entries: [{ id: 'e', accountId: 'a', kind: 'expense', amountMinor: spent, merchant: 'Comercio', category: 'Comida', dateISO: '2026-09-10', createdAt: budgetAt }] },
   [{ id: 'total', scope: 'total', currency: 'ARS', monthISO: '2026-09', amountMinor: 10_000_000, active: true, createdAt: budgetAt, revision: 0, updatedAt: budgetAt }], 'ARS', '2026-09'));
   assert.equal(at(8_499_999), null, 'calm below 85 %: no row');
+  const edge = budgetParts(budgetRow(exports, 8_500_000));
   assert.equal(at(8_500_000)?.state, 'warning');
+  assert.equal(JSON.stringify([textOf(edge.percent), textOf(edge.detail), edge.meter.props.fraction, edge.meter.props.color]),
+    JSON.stringify(['85' + NBSP + '%', 'Quedan $' + NBSP + '15.000,00', 0.85, palette.warning]));
   const full = at(10_000_000)!;
   assert.equal(full.state, 'warning', 'exactly the limit is still a warning');
-  assert.equal(textOf(budgetParts(exports.BudgetAttentionRow({ attention: full, currency: 'ARS', labelsCurrency: false, onPress: () => {} })).detail), 'Quedan $' + NBSP + '0,00 de $' + NBSP + '100.000,00');
+  const reached = exports.BudgetAttentionRow({ attention: full, currency: 'ARS', labelsCurrency: false, onPress: () => {} });
+  const parts = budgetParts(reached);
+  assert.equal(JSON.stringify([textOf(parts.percent), parts.percent.props.style.color, textOf(parts.detail), parts.meter.props.fraction, parts.meter.props.color, parts.alert]),
+    JSON.stringify(['100' + NBSP + '%', palette.warning, 'Límite alcanzado', 1, palette.warning, undefined]), 'a full amber bar, never the alert tone before the limit is passed');
+  assert.equal(reached.props.accessibilityLabel, 'Presupuesto del mes, límite alcanzado, ' + es.spokenPercent(1) + ' usado');
   assert.equal(at(10_000_001)?.state, 'exceeded', 'one minor unit over');
 });
 
-test('24UX6C2: an exceeded general budget is the alert row: the alert glyph in the expense tone, «Superaste el presupuesto del mes», how much over in the expense colour', () => {
+test('24UX6D: an exceeded general budget at 120 %: the text says 120 %, the bar stops at the full track, the alert tone, the alert glyph and «por encima»', () => {
   const { exports } = harness();
-  const attention = attentionFor(10_400_000);
+  const attention = attentionFor(12_000_000);
   assert.equal(attention.state, 'exceeded');
-  assert.equal(attention.progress.remainingMinor, -400_000);
+  assert.equal(attention.progress.remainingMinor, -2_000_000);
   const row = exports.BudgetAttentionRow({ attention, currency: 'ARS', labelsCurrency: false, onPress: () => {} });
-  const { tile, title, detail } = budgetParts(row);
-  assert.equal(JSON.stringify([tile.props.icon, tile.props.tone, tile.props.size]), JSON.stringify(['alert-circle-outline', 'expense', 36]));
-  assert.equal(textOf(title), 'Superaste el presupuesto del mes', 'no percentage once the limit is passed');
-  assert.equal(textOf(detail), '$' + NBSP + '4.000,00 por encima de $' + NBSP + '100.000,00', 'the amount over, unsigned');
-  assert.equal(JSON.stringify([detail.props.style.color, detail.props.style.fontWeight]), JSON.stringify([palette.expense, '500']));
-  assert.equal(row.props.accessibilityLabel, 'Superaste el presupuesto del mes, ' + bindLocale('es-AR').spokenMoney(400_000, 'ARS') + ' por encima de ' + bindLocale('es-AR').spokenMoney(10_000_000, 'ARS'));
-  assert.equal(row.props.accessibilityLabel, 'Superaste el presupuesto del mes, 4000,00 pesos por encima de 100000,00 pesos', 'spoken money: ungrouped, the unit in words');
+  const { header, percent, detail, meter, alert } = budgetParts(row);
+  assert.equal(textOf(percent), '120' + NBSP + '%', 'the real share, past 100 %');
+  assert.equal(percent.props.style.color, palette.expense);
+  assert.equal(JSON.stringify([meter.props.fraction, meter.props.color]), JSON.stringify([1, palette.expense]), 'visually clamped at the full track');
+  assert.ok(alert, 'more than colour: an alert glyph beside the percent');
+  assert.equal(JSON.stringify([alert.props.color, alert.props.size, alert.props.accessible]), JSON.stringify([palette.expense, 15, false]));
+  const group = header.props.children[1];
+  assert.equal(JSON.stringify([group.props.children[0].props.name, group.props.children[1].type]), JSON.stringify(['alert-circle', 'AppText']), 'the glyph before the percent');
+  assert.equal(textOf(detail), '$' + NBSP + '20.000,00 por encima', 'the amount over, unsigned, without the limit');
+  assert.equal(row.props.accessibilityLabel, 'Presupuesto del mes superado, ' + es.spokenPercent(1.2) + ' usado, ' + es.spokenMoney(2_000_000, 'ARS') + ' por encima');
+  assert.equal(row.props.accessibilityLabel, 'Presupuesto del mes superado, 120' + NBSP + '% usado, 20000,00 pesos por encima', 'spoken money: ungrouped, the unit in words');
 });
 
-test('24UX6C2: when Inicio shows another currency the row names the budget\'s («del mes en ARS») and codes its amounts', () => {
+test('24UX6D: when Inicio shows another currency the row names the budget\'s («Presupuesto · ARS»), codes its amounts and VoiceOver says the currency', () => {
   const { exports } = harness();
-  const warning = budgetParts(exports.BudgetAttentionRow({ attention: attentionFor(8_700_000), currency: 'ARS', labelsCurrency: true, onPress: () => {} }));
-  assert.equal(textOf(warning.title), 'Usaste 87' + NBSP + '% del presupuesto del mes en ARS');
-  assert.equal(textOf(warning.detail), 'Quedan ' + bindLocale('es-AR').codedAmount(1_300_000, 'ARS') + ' de ' + bindLocale('es-AR').codedAmount(10_000_000, 'ARS'));
-  assert.equal(textOf(warning.detail), 'Quedan ARS' + NBSP + '13.000,00 de ARS' + NBSP + '100.000,00', 'coded, never the bare $ another currency could share');
-  const exceeded = budgetParts(exports.BudgetAttentionRow({ attention: attentionFor(10_400_000), currency: 'ARS', labelsCurrency: true, onPress: () => {} }));
-  assert.equal(textOf(exceeded.title), 'Superaste el presupuesto del mes en ARS');
-  assert.equal(textOf(exceeded.detail), 'ARS' + NBSP + '4.000,00 por encima de ARS' + NBSP + '100.000,00');
+  const warningRow = budgetRow(exports, 8_700_000, true);
+  const warning = budgetParts(warningRow);
+  assert.equal(textOf(warning.title), 'Presupuesto · ARS');
+  assert.equal(textOf(warning.detail), 'Quedan ' + es.codedAmount(1_300_000, 'ARS'));
+  assert.equal(textOf(warning.detail), 'Quedan ARS' + NBSP + '13.000,00', 'coded, never the bare $ another currency could share');
+  assert.equal(warningRow.props.accessibilityLabel, 'Presupuesto del mes en ARS, cerca del límite, ' + es.spokenPercent(0.87) + ' usado, quedan 13000,00 pesos',
+    'spoken money even when the screen codes the amounts');
+  const exceededRow = budgetRow(exports, 12_000_000, true);
+  const exceeded = budgetParts(exceededRow);
+  assert.equal(textOf(exceeded.title), 'Presupuesto · ARS');
+  assert.equal(textOf(exceeded.detail), 'ARS' + NBSP + '20.000,00 por encima');
+  assert.equal(exceededRow.props.accessibilityLabel, 'Presupuesto del mes en ARS superado, ' + es.spokenPercent(1.2) + ' usado, 20000,00 pesos por encima');
 });
 
-test('24UX6C2: VoiceOver hears the spoken percent and spoken money, the hint says the row opens Presupuestos, and a tap is the caller\'s', () => {
+test('24UX6D: VoiceOver hears one button: the state, the spoken percent and the spoken amount; the hint says it opens Presupuestos; a tap is the caller\'s', () => {
   const { exports } = harness();
   let pressed = 0;
-  const es = bindLocale('es-AR');
-  const row = exports.BudgetAttentionRow({ attention: attentionFor(8_700_000), currency: 'ARS', labelsCurrency: false, onPress: () => { pressed++; } });
-  assert.equal(row.props.accessibilityLabel, 'Usaste ' + es.spokenPercent(0.87) + ' del presupuesto del mes, Quedan ' + es.spokenMoney(1_300_000, 'ARS') + ' de ' + es.spokenMoney(10_000_000, 'ARS'));
+  const row = budgetRow(exports, 8_700_000, false, () => { pressed++; });
+  assert.equal(row.props.accessibilityLabel, 'Presupuesto del mes, cerca del límite, ' + es.spokenPercent(0.87) + ' usado, quedan ' + es.spokenMoney(1_300_000, 'ARS'));
+  assert.equal(row.props.accessibilityLabel, 'Presupuesto del mes, cerca del límite, 87' + NBSP + '% usado, quedan 13000,00 pesos');
   assert.equal(row.props.accessibilityLabel.includes('$'), false, 'no visible money formatter reaches the label');
-  assert.match(row.props.accessibilityLabel, /13000,00 pesos de 100000,00 pesos$/);
   assert.equal(row.props.accessibilityHint, 'Abre Presupuestos');
-  const coded = exports.BudgetAttentionRow({ attention: attentionFor(8_700_000), currency: 'ARS', labelsCurrency: true, onPress: () => {} });
-  assert.equal(coded.props.accessibilityLabel, 'Usaste ' + es.spokenPercent(0.87) + ' del presupuesto del mes en ARS, Quedan 13000,00 pesos de 100000,00 pesos', 'spoken money even when the screen codes the amounts');
+  assert.equal(flatten(row).filter(node => node.props.accessible === false && node.type !== 'Ionicons').length, 3, 'the three texts are hidden; the row is the element');
   row.props.onPress();
   assert.equal(pressed, 1, 'onPress is wired to the row');
 });
 
-test('24UX6C2: the budget row in English', () => {
+test('24UX6D: the budget row in English', () => {
   const { exports } = harness();
   try {
     current = 'en-US';
     const en = bindLocale('en-US');
-    const warning = exports.BudgetAttentionRow({ attention: attentionFor(8_700_000), currency: 'ARS', labelsCurrency: false, onPress: () => {} });
-    assert.equal(textOf(budgetParts(warning).title), 'You used ' + en.formatPercent(0.87) + ' of this month’s budget');
-    assert.equal(textOf(budgetParts(warning).detail), en.moneyText(1_300_000, 'ARS') + ' left of ' + en.moneyText(10_000_000, 'ARS'));
-    assert.equal(textOf(budgetParts(warning).detail), 'AR$' + NBSP + '13,000.00 left of AR$' + NBSP + '100,000.00');
+    const warning = budgetRow(exports, 8_700_000);
+    const parts = budgetParts(warning);
+    assert.equal(JSON.stringify([textOf(parts.title), textOf(parts.percent), textOf(parts.detail)]), JSON.stringify(['Budget', en.formatPercent(0.87), en.moneyText(1_300_000, 'ARS') + ' left']));
+    assert.equal(textOf(parts.detail), 'AR$' + NBSP + '13,000.00 left');
+    assert.equal(textOf(parts.percent), '87%');
     assert.equal(warning.props.accessibilityHint, 'Opens Budgets');
-    assert.equal(warning.props.accessibilityLabel, 'You used ' + en.spokenPercent(0.87) + ' of this month’s budget, ' + en.spokenMoney(1_300_000, 'ARS') + ' left of ' + en.spokenMoney(10_000_000, 'ARS'));
-    const coded = budgetParts(exports.BudgetAttentionRow({ attention: attentionFor(8_700_000), currency: 'ARS', labelsCurrency: true, onPress: () => {} }));
-    assert.equal(textOf(coded.title), 'You used ' + en.formatPercent(0.87) + ' of this month’s ARS budget');
-    assert.equal(textOf(coded.detail), en.codedAmount(1_300_000, 'ARS') + ' left of ' + en.codedAmount(10_000_000, 'ARS'));
-    const exceeded = exports.BudgetAttentionRow({ attention: attentionFor(10_400_000), currency: 'ARS', labelsCurrency: false, onPress: () => {} });
-    assert.equal(textOf(budgetParts(exceeded).title), 'You went over this month’s budget');
-    assert.equal(textOf(budgetParts(exceeded).detail), en.moneyText(400_000, 'ARS') + ' over ' + en.moneyText(10_000_000, 'ARS'));
-    assert.equal(exceeded.props.accessibilityLabel, 'You went over this month’s budget, ' + en.spokenMoney(400_000, 'ARS') + ' over ' + en.spokenMoney(10_000_000, 'ARS'));
-    assert.equal(textOf(budgetParts(exports.BudgetAttentionRow({ attention: attentionFor(10_400_000), currency: 'ARS', labelsCurrency: true, onPress: () => {} })).title), 'You went over this month’s ARS budget');
+    assert.equal(warning.props.accessibilityLabel, 'This month’s budget, close to the limit, ' + en.spokenPercent(0.87) + ' used, ' + en.spokenMoney(1_300_000, 'ARS') + ' left');
+    const coded = budgetParts(budgetRow(exports, 8_700_000, true));
+    assert.equal(textOf(coded.title), 'Budget · ARS');
+    assert.equal(textOf(coded.detail), en.codedAmount(1_300_000, 'ARS') + ' left');
+    const exceeded = budgetRow(exports, 12_000_000);
+    assert.equal(JSON.stringify([textOf(budgetParts(exceeded).percent), textOf(budgetParts(exceeded).detail)]), JSON.stringify(['120%', en.moneyText(2_000_000, 'ARS') + ' over']));
+    assert.equal(exceeded.props.accessibilityLabel, 'This month’s budget, over the limit, 120% used, 20000.00 pesos over');
+    assert.equal(budgetRow(exports, 12_000_000, true).props.accessibilityLabel, 'This month’s ARS budget, over the limit, 120% used, 20000.00 pesos over');
+    assert.equal(textOf(budgetParts(budgetRow(exports, 10_000_000)).detail), 'Limit reached');
   } finally { current = 'es-AR'; }
+});
+
+test('24UX6D: the bar starts at its value and moves with the data timing; Reduce Motion makes the change instant; it is a 6 pt capsule on the inset track', () => {
+  for (const reduced of [false, true]) {
+    const { exports, env } = harness();
+    env.reduced = reduced;
+    const meterOf = (spent: number) => budgetParts(budgetRow(exports, spent)).meter;
+    const render = (spent: number) => { const meter = meterOf(spent); env.begin(); const track = meter.type(meter.props); return track; };
+    const width = (track: any) => track.props.children.props.style[1].width;
+    // Mount: the fill is already at the share BEFORE any effect runs (a bar that grew from empty would read 0 % here).
+    const track = render(8_700_000);
+    assert.equal(JSON.stringify([track.type, track.props.accessible, track.props.importantForAccessibility]), JSON.stringify(['View', false, 'no-hide-descendants']), 'the row says it');
+    assert.equal(JSON.stringify([track.props.style.height, track.props.style.borderRadius, track.props.style.backgroundColor, track.props.style.overflow]),
+      JSON.stringify([6, 3, palette.inset, 'hidden']));
+    const fill = track.props.children;
+    assert.equal(fill.type, 'Animated.View');
+    assert.equal(JSON.stringify([fill.props.style[0].backgroundColor, fill.props.style[0].height, width(track)]), JSON.stringify([palette.warning, 6, '87%']),
+      'the shared value starts at the share: nothing plays on mount');
+    env.flush();
+    env.timings.length = 0;
+    // A re-render with the same share asks for nothing.
+    render(8_700_000); env.flush();
+    assert.equal(env.timings.length, 0, 'no new timing without a change');
+    // A new share: the bar is still where it was when the render reads it, then the effect moves it with the data timing.
+    const moved = render(9_500_000);
+    assert.equal(width(moved), '87%', 'the change animates from the old value, it does not jump during render');
+    env.flush();
+    assert.equal(JSON.stringify(env.timings), JSON.stringify([{ to: 0.95, config: { kind: 'data', duration: reduced ? 0 : 260 } }]),
+      reduced ? 'Reduce Motion: zero-length, the bar jumps' : 'a value change runs the data timing');
+    assert.equal(width(render(9_500_000)), '95%');
+  }
+});
+
+test('24UX6D: the name and the percent share a line only when both fit; large text and a long percent stack them, and nothing is ever cut', () => {
+  const { exports, env } = harness();
+  const header = (spent = 8_700_000, labelsCurrency = false, limit?: number) =>
+    budgetParts(exports.BudgetAttentionRow({ attention: attentionFor(spent, 'ARS', limit), currency: 'ARS', labelsCurrency, onPress: () => {} })).header.props.style;
+  assert.equal(JSON.stringify([header().flexDirection, header().alignItems, header().gap]), JSON.stringify(['row', 'center', 8]));
+  assert.equal(header(12_000_000, true).flexDirection, 'row', '«Presupuesto · ARS», the glyph and «120 %» fit a 393 pt iPhone');
+  env.window = { width: 393, height: 852, fontScale: 1.35 };
+  assert.equal(JSON.stringify([header().flexDirection, header().alignItems, header().gap]), JSON.stringify(['column', 'flex-start', 2]), 'large text always stacks');
+  env.window = { width: 375, height: 667, fontScale: 1 };
+  // A tiny limit and a large overspend: a percent too long to sit beside the name on a 375 pt iPhone.
+  assert.equal(header(1_000_000_000_000, true, 100).flexDirection, 'column', 'a percent that does not fit moves under the name');
+  assert.equal(header(1_000_000_000_000, true, 100).flexDirection === 'column',
+    geometry.labelAmountStacks(375, 1, 'Presupuesto · ARS', es.formatPercent(budgetPresentation.percentUsed(attentionFor(1_000_000_000_000, 'ARS', 100).progress) * 0.01), 116), 'the shared rule (labelAmountStacks)');
 });

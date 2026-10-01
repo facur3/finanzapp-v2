@@ -1,12 +1,17 @@
-import { Alert, StyleSheet, View } from 'react-native';
+import { useEffect } from 'react';
+import { Alert, StyleSheet, View, useWindowDimensions } from 'react-native';
+import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { router } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { type Account, type Currency, type RecurringRule } from '@finanzapp/domain';
 import type { BudgetAttention } from './home-focus';
-import { AppText, GlyphTile, MerchantBadge, Money, PressFeedback, useStacked, type IconName } from './components';
+import { percentUsed } from './budget-presentation';
+import { AppText, MerchantBadge, Money, PressFeedback, useStacked, type IconName } from './components';
 import { useCategoryLook } from './category-hues';
+import { labelAmountStacks } from './geometry';
+import { timing } from './motion';
 import { dueWhen } from './presentation';
-import { usePalette } from './theme';
+import { usePalette, useReduceMotion } from './theme';
 import { useI18n } from '../i18n/provider';
 
 /** Contextual help for a metric: one native alert with the definition, so the
@@ -103,40 +108,77 @@ const styles = StyleSheet.create({
   agendaRow: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 56 },
 });
 
+/** Points the budget row spends around its first line on a phone (24UX6D): screen padding (20 + 20), row padding (16 + 16),
+ * the chevron (13) and its gap (10), and the alert glyph beside the percent (15) with its gap (4): 114, rounded up. */
+const BUDGET_ROW_CHROME = 116;
+/** The bar's thickness and corner (24UX6D): a 6 pt capsule, Presupuestos' general bar. */
+const METER = { height: 6, radius: 3 } as const;
+
 /** The month's general budget when it needs attention (24UX6C2): one compact row between the financial field and the
- * commitments, never a card or a dashboard. Warning (85 % through 100 %, `budgetState`) is amber: «Usaste 87 % del
- * presupuesto del mes» and what is left; exceeded is the alert tone, used only once the limit is passed: «Superaste el
- * presupuesto del mes» and by how much. Amounts are the budget's own currency, measured on the real ledger (24C1); the
- * currency is named («en ARS», coded amounts) when it is not the one Inicio shows. Tapping opens Presupuestos. */
+ * commitments, never a card or a dashboard. Amounts are the budget's own currency, measured on the real ledger (24C1);
+ * `homeBudget` chose which budget and whether its currency must be named. Tapping opens Presupuestos.
+ *
+ * 24UX6D, a Forest progress row instead of the sentence: the name («Presupuesto», «Presupuesto · USD» when the budget is
+ * not in the currency Inicio shows) with the whole percent Presupuestos and Reportes show (`percentUsed`, «91 %», past
+ * 100 % when exceeded: «120 %»); under them a 6 pt bar of spent over limit, visually clamped at the full track; then one
+ * quiet line: «Quedan $ 89.000,00», «Límite alcanzado» at exactly 100 %, «$ 120.000,00 por encima» once over (coded
+ * amounts when the currency is named). Warning (85 % through 100 %) is amber; exceeded is the alert tone AND an alert glyph
+ * beside the percent AND the words «por encima», so the two states differ by more than colour. The name and the percent
+ * share a line only when both fit (`labelAmountStacks`, so always stacked above 1.2× text); the detail wraps, never
+ * truncated. VoiceOver hears one button: the state, the spoken percent and the spoken amount, never a visible string. */
 export function BudgetAttentionRow({ attention, currency, labelsCurrency, onPress }: {
   attention: BudgetAttention; currency: Currency; labelsCurrency: boolean; onPress: () => void;
 }) {
   const p = usePalette();
   const { t, moneyText, codedAmount, spokenMoney, formatPercent, spokenPercent } = useI18n();
+  const { width, fontScale } = useWindowDimensions();
   const { state, progress } = attention;
   const exceeded = state === 'exceeded';
+  const reached = !exceeded && progress.remainingMinor === 0;
+  const tone = exceeded ? p.expense : p.warning;
   const money = (minor: number) => labelsCurrency ? codedAmount(minor, currency) : moneyText(minor, currency);
-  const limit = progress.budget.amountMinor;
-  // The whole percent Presupuestos and Reportes show (`percentUsed`: Math.round), so the row and the screen it opens agree;
-  // formatPercent rounds on the decimal value, so the product's binary tail never shows.
-  const shown = Math.round(progress.ratio * 100) * 0.01;
-  const title = exceeded
-    ? t(labelsCurrency ? 'home.budget.exceededIn' : 'home.budget.exceeded', { code: currency })
-    : t(labelsCurrency ? 'home.budget.warningIn' : 'home.budget.warning', { percent: formatPercent(shown), code: currency });
-  const spokenTitle = exceeded ? t(labelsCurrency ? 'home.budget.exceededIn' : 'home.budget.exceeded', { code: currency })
-    : t(labelsCurrency ? 'home.budget.warningIn' : 'home.budget.warning', { percent: spokenPercent(shown), code: currency });
-  const detail = exceeded ? t('home.budget.over', { amount: money(-progress.remainingMinor), limit: money(limit) })
-    : t('home.budget.left', { amount: money(progress.remainingMinor), limit: money(limit) });
-  const spokenDetail = exceeded ? t('home.budget.over', { amount: spokenMoney(-progress.remainingMinor, currency), limit: spokenMoney(limit, currency) })
-    : t('home.budget.left', { amount: spokenMoney(progress.remainingMinor, currency), limit: spokenMoney(limit, currency) });
-  return <PressFeedback feedback="highlight" accessibilityRole="button" accessibilityLabel={spokenTitle + ', ' + spokenDetail}
+  // The whole percent Presupuestos shows (`percentUsed`: Math.round), as a fraction for the formatters, so the row and the
+  // screen it opens agree; formatPercent rounds on the decimal value, so the product's binary tail never shows.
+  const shown = percentUsed(progress) * 0.01;
+  const percent = formatPercent(shown);
+  const title = labelsCurrency ? t('home.budget.titleIn', { code: currency }) : t('home.budget.title');
+  const detail = exceeded ? t('home.budget.over', { amount: money(-progress.remainingMinor) })
+    : reached ? t('home.budget.reached') : t('home.budget.left', { amount: money(progress.remainingMinor) });
+  const name = labelsCurrency ? t('home.budget.spokenNameIn', { code: currency }) : t('home.budget.spokenName');
+  const label = exceeded ? t('home.budget.exceededLabel', { name, percent: spokenPercent(shown), amount: spokenMoney(-progress.remainingMinor, currency) })
+    : reached ? t('home.budget.reachedLabel', { name, percent: spokenPercent(shown) })
+    : t('home.budget.warningLabel', { name, percent: spokenPercent(shown), amount: spokenMoney(progress.remainingMinor, currency) });
+  const stacked = labelAmountStacks(width, fontScale, title, percent, BUDGET_ROW_CHROME);
+  return <PressFeedback feedback="highlight" accessibilityRole="button" accessibilityLabel={label}
     accessibilityHint={t('home.budget.hint')} onPress={onPress}
-    style={{ flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 60, paddingHorizontal: 16, paddingVertical: 10 }}>
-    <GlyphTile icon={exceeded ? 'alert-circle-outline' : 'speedometer-outline'} tone={exceeded ? 'expense' : 'warning'} size={36} />
-    <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
-      <AppText accessible={false} style={{ fontWeight: '600' }}>{title}</AppText>
-      <AppText accessible={false} variant="footnote" style={{ color: exceeded ? p.expense : p.warning, fontWeight: '500' }}>{detail}</AppText>
+    style={{ flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 64, paddingHorizontal: 16, paddingVertical: 12 }}>
+    <View style={{ flex: 1, minWidth: 0, gap: 8 }}>
+      <View style={{ flexDirection: stacked ? 'column' : 'row', alignItems: stacked ? 'flex-start' : 'center', justifyContent: 'space-between', gap: stacked ? 2 : 8 }}>
+        <AppText accessible={false} style={{ flexShrink: 1, fontWeight: '600' }}>{title}</AppText>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+          {exceeded && <Ionicons name="alert-circle" size={15} color={p.expense} accessible={false} />}
+          <AppText accessible={false} style={{ fontWeight: '600', fontVariant: ['tabular-nums'], color: tone }}>{percent}</AppText>
+        </View>
+      </View>
+      <BudgetMeter fraction={Math.min(1, Math.max(0, progress.ratio || 0))} color={tone} />
+      <AppText accessible={false} secondary variant="footnote">{detail}</AppText>
     </View>
-    <Ionicons name="chevron-forward" size={15} color={p.tertiary} accessible={false} />
+    <Ionicons name="chevron-forward" size={13} color={p.tertiary} accessible={false} />
   </PressFeedback>;
+}
+
+/** The budget row's bar (24UX6D): the share of the limit already spent, on the inset track, filled in the row's tone. It
+ * starts at its value (nothing plays when Inicio mounts or a tab returns) and moves only when the value changes, with the
+ * data timing (260 ms ease-out, interruptible; instant under Reduce Motion). Hidden from VoiceOver: the row says it. */
+function BudgetMeter({ fraction, color }: { fraction: number; color: string }) {
+  const p = usePalette();
+  const reduced = useReduceMotion();
+  const progress = useSharedValue(fraction);
+  useEffect(() => { progress.value = withTiming(fraction, timing('data', reduced)); }, [fraction, reduced, progress]);
+  // A sliver stays visible however small the share (never at 85 % or more here, but the meter does not assume it).
+  const fill = useAnimatedStyle(() => ({ width: `${progress.value === 0 ? 0 : Math.max(1.5, progress.value * 100)}%` as `${number}%` }));
+  return <View accessible={false} importantForAccessibility="no-hide-descendants"
+    style={{ height: METER.height, borderRadius: METER.radius, overflow: 'hidden', backgroundColor: p.inset }}>
+    <Animated.View style={[{ height: METER.height, borderRadius: METER.radius, backgroundColor: color }, fill]} />
+  </View>;
 }
