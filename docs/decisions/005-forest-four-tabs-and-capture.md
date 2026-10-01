@@ -12,7 +12,10 @@ Asistente en el centro» y el rechazo de un «+» flotante de la primera iteraci
 Producto 24UX6C» al final; las frases reemplazadas están marcadas en su lugar.* *Enmendada otra vez el 2026-10-01 por
 Producto 24UX6C2 (la actividad de Inicio incluye transferencias; los compromisos en una ventana de 30 días; una fila
 contextual del presupuesto general cuando pide atención; la dona no repite el total): ver «Enmienda 2026-10-01 —
-Producto 24UX6C2» al final.*
+Producto 24UX6C2» al final.* *Enmendada otra vez el 2026-10-01 por Producto 24UX6D (Reportes Categorías sin total
+externo, con el total del período en el centro de la dona; la fila del presupuesto general como fila de progreso;
+Tarjetas con el saldo y los datos planos y la regla de franjas del mazo): ver «Enmienda 2026-10-01 — Producto 24UX6D» al
+final.*
 
 ## Decisión
 
@@ -212,13 +215,14 @@ La línea **24UX6A → 24UX6B → 24UX6C → 24UX6D** se suma al roadmap de prod
   adopta la regla del 3 % en esta generación. No se inventa una ruta de detalle por comercio: el
   resumen de comercios sigue sin interacción salvo que se agregue una ruta real a propósito.
 - **24UX6C, Movimientos y Más.** *(Implementada en parte el 2026-10-01: ver «Enmienda 2026-10-01 — Producto
-  24UX6C»; los filtros por período, cuenta y categoría siguen aprobados y pendientes.)* Filas, búsqueda y filtros en Forest; filtros por período,
+  24UX6C»; los filtros por período, cuenta y categoría siguen aprobados y pendientes; desde 24UX6D pertenecen al
+  alcance de búsqueda y productividad de Producto 25C, con sus búsquedas guardadas.)* Filas, búsqueda y filtros en Forest; filtros por período,
   cuenta y categoría con datos del repositorio; los totales del día conservan su semántica
   actual (neto donde el repositorio define neto). No se inventa nota, origen Apple Pay ni hora
   del movimiento. Se conservan Deshacer/Recuperar (sin un borrado definitivo falso) y
   Movimientos deshechos. Idioma y Región siguen siendo rutas separadas, agrupadas a la vista; se
   omite «Ajustes» (no hay ruta).
-- **24UX6D, Tarjetas.** Se conserva la funcionalidad real: la presentación del Disponible de
+- **24UX6D, Tarjetas.** *(Implementada el 2026-10-01: ver «Enmienda 2026-10-01 — Producto 24UX6D».)* Se conserva la funcionalidad real: la presentación del Disponible de
   crédito, Registrar compra y Recientes. Se permite un mazo/slivers y el reestilo Forest. El
   progreso de cuotas es registradas/facturadas según el dominio, nunca «pagadas» inferidas; los
   importes de cuota son los programados reales. Ninguna fórmula contable ni de crédito
@@ -315,7 +319,7 @@ pestañas; la regla de presentación de 24UX6C y la paleta Forest no cambian.
 | «gastos e ingresos de este mes (sin transferencias)» | §Inicio, Actividad reciente | Gastos, ingresos **y transferencias** de este mes en la vista, del más nuevo; una transferencia es un registro y aparece **una sola vez** (origen → destino, sin signo, en el tono `transfer`; abre su detalle). El límite de cuatro o seis se aplica después de unir. Gastado y Disponible no leen la lista: una transferencia sigue sin ser gasto |
 | «solo reglas recurrentes de gasto que vencen hoy o en los próximos seis días» | §Inicio, Próximos compromisos | Reglas recurrentes de gasto activas y no borradas, en la vista, cuya próxima fecha cae en una **ventana móvil de 30 días**: de hoy a hoy + 30 días, **los dos extremos incluidos** (el 2026-10-01, del 2026-10-01 al 2026-10-31); el mismo límite que el pronóstico «próximos 30 días» de Recurrentes; nunca «el mes calendario». Por fecha, comercio e id, después dos como máximo; sin ninguna, la sección no existe |
 | «tarjetas de presupuesto» fuera de Inicio | §Inicio, Fuera de Inicio | Sigue sin haber **tarjeta permanente** de presupuesto ni presupuestos por categoría. Se agrega **una fila contextual** del presupuesto **general** del mes solo cuando `budgetState` del dominio dice aviso (85 % a 100 % inclusive) o excedido (más de 100 %); detalle abajo |
-| El centro de la dona con «Total del período» y el total del mes | Reportes (24UX6B, sin texto propio en esta decisión) | La dona no repite el total del KPI de arriba, que sigue en Categorías y Día a día; sirve para **elegir una categoría** (solo selección visual dentro del reporte, como se aprobó): sin elección, «Tocá una categoría»; con una, su nombre, su importe y su parte del gasto; VoiceOver la recorre como un control ajustable |
+| El centro de la dona con «Total del período» y el total del mes | Reportes (24UX6B, sin texto propio en esta decisión) | La dona no repite el total del KPI de arriba, que sigue en Categorías y Día a día; sirve para **elegir una categoría** (solo selección visual dentro del reporte, como se aprobó): sin elección, «Tocá una categoría»; con una, su nombre, su importe y su parte del gasto; VoiceOver la recorre como un control ajustable *(Reemplazado el 2026-10-01 por 24UX6D: sin KPI externo; el centro lleva el total del período por defecto. Ver «Enmienda 2026-10-01 — Producto 24UX6D».)* |
 
 **Inicio sigue mínimo.** Inicio muestra el campo financiero, la fila del presupuesto general cuando pide atención, los
 compromisos cercanos cuando existen y la actividad reciente. «Próximos compromisos» sigue condicional: solo reglas
@@ -329,7 +333,9 @@ Inicio; ver más adelante es trabajo del calendario y las notificaciones futuras
 **La fila de atención del presupuesto general.** No es una tarjeta: es una sola fila, solo mientras el presupuesto
 general del mes pide atención según el dominio (`budgetState`, `BUDGET_WARNING_RATIO` 0,85): por debajo del 85 % no hay
 nada; del 85 % al 100 % inclusive, aviso en ámbar («Usaste 87 % del presupuesto del mes», «Quedan … de …»); por encima
-del 100 %, el tono de alerta («Superaste el presupuesto del mes», «… por encima de …»). Un sublímite por categoría nunca
+del 100 %, el tono de alerta («Superaste el presupuesto del mes», «… por encima de …») *(los textos citados, reemplazados
+el 2026-10-01 por 24UX6D: una fila de progreso compacta con la misma semántica; ver «Enmienda 2026-10-01 — Producto
+24UX6D»)*. Un sublímite por categoría nunca
 la muestra ni elige la moneda. Qué presupuesto (`homeBudget`, con la regla de 24C1 de que cada presupuesto conserva su
 moneda): con «Solo …», el general de esa moneda; en consolidado, el general de la moneda de visualización y después el de
 cada moneda del historial, y la fila es el primero que pide atención (un presupuesto tranquilo nunca esconde el
@@ -341,3 +347,27 @@ moneda y el mes del presupuesto. Un aviso local opcional del mismo cambio de est
 **Estado.** Implementado en `apps/mobile`; **nada se revisó en un iPhone** y no hubo build de EAS. La verificación en
 Linux y la lista del dispositivo están en `docs/mobile-roadmap.md` («Producto 24UX6C2») y
 `docs/mobile-device-checklist.md` («Producto 24UX6C2»).
+
+## Enmienda 2026-10-01 — Producto 24UX6D (Tarjetas en Forest y pulido final de Inicio y Reportes)
+
+Fecha: 2026-10-01. Producto 24UX6D, rama `feat/producto-24ux6d-cards-forest` desde master 5c73813 (24UX6C2 mergeada
+como PR #73). Enmienda solo de **presentación**: no cambia ninguna regla contable de tarjetas (pagos, ciclos y fechas,
+reconocimiento de cuotas, principal comprometido, la compuerta del disponible, el ciclo de vida), el libro, las reglas
+de presupuesto, el esquema (13), la copia (v13) ni cotizaciones; sin dependencias nativas ni animaciones entre
+pestañas. Las invariantes de tarjetas de la decisión 003 siguen vinculantes. Solo se registran aquí las reglas visuales
+vinculantes que cambiaron; el resto del detalle está en `docs/mobile-design.md` («Producto 24UX6D»).
+
+| Antes (texto de esta decisión) | Dónde | Ahora |
+| --- | --- | --- |
+| «La dona no repite el total del KPI de arriba, que sigue en Categorías y Día a día … sin elección, «Tocá una categoría»» (Enmienda 24UX6C2) | Reportes, Categorías | **Sin total externo:** no hay KPI «Gastado», importe grande ni promedio arriba del análisis. El centro de la dona lleva **por defecto el total del período** («Total del período» y el importe exacto); una categoría elegida lo reemplaza ahí (nombre, importe, parte del gasto) y la elección se limpia con la misma porción, el agujero, el espacio neutro de la fila de la dona (sin interceptor global), un cambio de mes, moneda o modo y Categorías ↔ Día a día. El dinero exacto nunca se corta: si no entra, la lectura baja debajo de la dona. Día a día lleva una línea compacta «Total  $ …», sin héroe ni promedio |
+| «aviso en ámbar («Usaste 87 % del presupuesto del mes», «Quedan … de …») … («Superaste el presupuesto del mes», «… por encima de …»)» (Enmienda 24UX6C2) | Inicio, la fila del presupuesto general | **Misma semántica** (solo el presupuesto general, ausente por debajo del 85 %, aviso del 85 % al 100 % inclusive, excedido por encima, en su moneda, la elección de `homeBudget`, antes de los compromisos, abre Presupuestos en su moneda y mes), presentada como **fila de progreso compacta**: «Presupuesto» y el porcentaje entero; una barra visualmente limitada al 100 %; «Quedan $ …», «Límite alcanzado» o «$ … por encima». Aviso en ámbar, excedido en el tono de alerta y con un glifo de alerta, distinguibles por más que el color |
+| «Se permite un mazo/slivers y el reestilo Forest» (§Próximas entregas, 24UX6D) | Tarjetas, el detalle de tarjeta | **El saldo y los datos van planos sobre el lienzo** (sin superficie propia), en el orden identidad → Saldo pendiente → Vence · Cierra → Disponible → acción → cuotas → actividad; **sin superficies anidadas del mismo peso** (las que quedan son listas agrupadas). **Regla de franjas del mazo:** con cualquier tarjeta activa hay una al frente; hasta cuatro tarjetas cada franja mide 50 pt, desde la quinta todas miden 44 pt, nunca menos de 44 pt, con la primera fila entera; la misma regla para cualquier cantidad (sin carrusel ni tarjetas ocultas). El progreso de un plan se dice como registradas y futuras según el dominio («reconocida» y «facturada» son sinónimos en `packages/domain/installments.ts`), nunca «pagadas» |
+
+**Fuera de esta enmienda.** Los filtros aprobados de Movimientos (cuenta, categoría, período y período a medida junto al
+filtro por tipo y la búsqueda) pertenecen al alcance de búsqueda y productividad de Producto 25C; no se envía un botón de
+filtro a medias. La consolidación de Cuentas, Recurrentes y Deudas en Forest es Producto 24UX6E (planificada). El orden
+de producto no cambia: después del carril UX, 24T3 sigue antes de 25A.
+
+**Estado.** Implementado en `apps/mobile`; **nada se revisó en un iPhone** y no hubo build de EAS. La verificación en
+Linux y la lista del dispositivo están en `docs/mobile-roadmap.md` («Producto 24UX6D») y
+`docs/mobile-device-checklist.md` («Producto 24UX6D»).

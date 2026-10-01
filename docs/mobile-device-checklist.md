@@ -1,5 +1,115 @@
 # Physical iPhone acceptance checklist
 
+## Producto 24UX6D — Cards in Forest and final Home/Reports polish
+
+**Not done in 24UX6D: no EAS build was made and the iPhone was not touched. Every item below is pending.**
+Metro from this branch (`npm run start:dev-client -- --clear`) on the installed FinanzApp Dev build; JavaScript only
+(Reportes Categorías and Día a día, Inicio's general-budget row, Tarjetas, the card detail and the plan detail), no
+native dependency, no card accounting, ledger, budget-rule, schema (13), backup (v13) or FX change, no tab animation.
+Use your own data; never seed movements (add test cards for the deck and delete them afterwards). Record each result
+with the iPhone model, iOS version, theme, language and text size. The design is in [mobile-design.md](mobile-design.md)
+(«Producto 24UX6D — Tarjetas en Forest y pulido final de Inicio y Reportes»); the rule is in
+[decision 005](decisions/005-forest-four-tabs-and-capture.md) («Enmienda 2026-10-01 — Producto 24UX6D»). This section
+supersedes the 24UX6C2 items for the Reportes KPI, the quiet «Tocá una categoría» centre and the budget row's copy
+(marked below), and 24T2's wording of the facts («Vence · Cierra · Disponible» in three columns) and of the plan
+detail («12 cuotas · Sin interés», the «Registradas 3 de 12» row).
+
+- [ ] The Más footer reads «FinanzApp 0.1.0 (24UX6D)».
+
+**Reportes: Categorías.**
+
+- [ ] No «Gastado · ARS» eyebrow, big amount, average per day or change line above the analysis; the order reads the
+  currency chip and the month → Categorías | Día a día → the donut → «Por categoría» → Evolución → budgets, merchants,
+  insights, income, net flow, the change row and Comparar.
+- [ ] On a 393 pt iPhone (iPhone 14 Pro / 15 / 16) the donut is about 247 pt wide; on a 375 pt one (iPhone SE / 13
+  mini) about 234 pt; it never touches the screen edges and its ring stays thin.
+- [ ] With nothing chosen the centre reads «Total del período» (quiet) over the exact period total, the same figure as
+  before this change (compare with Comparar or the category rows' sum); a seven-digit ARS total («$ 4.029.727,00») fits
+  the hole whole, never cut or ellipsized.
+- [ ] Tapping a slice: the centre shows its name, exact amount and «NN % del gasto» instead of the total; the slice
+  thicker, the others dimmed; the matching row marked by more than colour (bold, outline, a light tint).
+- [ ] Clearing: the same slice again, the hole, and a tap on the empty space left or right of the ring each bring the
+  total back. A vertical scroll that starts beside the ring scrolls the list and does not clear; the segmented control,
+  the month arrows, «Este mes» and the currency chip work as before with a category chosen.
+- [ ] A month change (arrows, «Este mes», a bar), a currency or display-mode change and Categorías → Día a día →
+  Categorías each clear the choice; back on Categorías the centre shows the total and no row is marked.
+- [ ] Larger text (beyond 1.2×, and AX1–AX5), a 13-digit amount or a long custom category name: the readout (the total
+  or the chosen category) moves under the donut, whole, and the hole stays clear; nothing overlaps the rows below.
+- [ ] VoiceOver: the donut is one adjustable element; with nothing chosen its value is «Total del período, … pesos»;
+  swiping up and down announces category, amount and percentage; the centre text is not a separate stop; the empty
+  space beside the ring is not a VoiceOver element.
+- [ ] Reduce Motion: the donut appears finished; the centre switches between the total and a category without motion;
+  the choice still works.
+
+**Reportes: Día a día and the moved pieces.**
+
+- [ ] Día a día shows one compact line, «Total» and the exact amount (20 pt), no big hero and no average;
+  with a long amount at 375 pt or at AX sizes the amount wraps under the label, whole. VoiceOver reads it once. An empty
+  month shows only the empty card.
+- [ ] The change against last month is a row of the lower facts between «Flujo neto» and «Comparar con el mes
+  anterior» («Frente a los mismos días del mes anterior» or «Frente al mes anterior», «… % menos» / «… % más» / «Sin
+  cambio», a trend glyph); VoiceOver says the percentage in words; Comparar still opens the full comparison.
+- [ ] The «Qué cuenta este reporte» button sits beside the period line in every ready state (an empty month and the
+  consolidated view included) and opens its explanation; with one currency the period line reads «Hasta hoy · ARS».
+
+**Inicio: the budget progress row.**
+
+Set a general budget for this month in Presupuestos (your own data; adjust the limit, never seed movements).
+
+- [ ] Below 85 %: no row. At 85–99 %: one row before «Próximos compromisos»: «Presupuesto» and «91 %» (the percent in amber)
+  on one line, a thin amber bar at that share, «Quedan $ …» quiet below, a chevron.
+- [ ] At exactly 100 %: «100 %» still amber, the bar full, «Límite alcanzado»; never the alert tone yet.
+- [ ] Over the limit: the alert glyph before «120 %» in the alert colour, the bar full and not overflowing, «$ … por
+  encima»; the state is readable without colour (glyph and words).
+- [ ] A general budget in another currency than Inicio's: «Presupuesto · USD» and coded amounts, never converted; a
+  category-only budget never shows a row.
+- [ ] Tapping opens Presupuestos on the budget's currency and month; back returns to Inicio.
+- [ ] Spend or undo so the percent changes while Inicio is open: the bar moves (about 260 ms, no bounce); with Reduce
+  Motion it jumps; nothing animates when Inicio first appears or a tab returns.
+- [ ] VoiceOver: one button, «Presupuesto del mes, cerca del límite, 87 % usado, quedan … pesos» / «…, límite
+  alcanzado, 100 % usado» / «Presupuesto del mes superado, 120 % usado, … pesos por encima», hint «Abre Presupuestos»;
+  «%» read as «por ciento»; English «This month’s budget, close to the limit, 87% used, … left».
+- [ ] Large text and AX sizes at 375 pt: the name and the percent stack, the detail wraps, nothing is cut; light and
+  dark (the amber and alert percent and fill readable; the inset track visible in dark).
+
+**Tarjetas.**
+
+- [ ] One card: shown alone, in front, its snapshot below. Two and three cards: 50 pt strips above the front card; a
+  strip tap brings its card forward with one light haptic; tapping the front card opens its detail; only the front
+  card's figures show below.
+- [ ] Four cards: still 50 pt strips. Five and six cards (test cards, deleted afterwards): every strip 44 pt, each still
+  easy to hit, its first row (name and «•••• 4009») whole; choosing a strip near the top scrolls its card into view.
+- [ ] Archive or delete the front card: another card comes to the front; the snapshot is never empty.
+- [ ] Long names (for example «Visa Signature Banco Galicia Internacional»): two lines on the front face and on the
+  detail face, one line on a strip, never a half-hidden second line; «•••• 4009» never shrinks; VoiceOver reads the
+  whole name.
+- [ ] The snapshot reads face → «Saldo pendiente» → Vence · Cierra (one row) → Disponible (its own row, with the
+  usage bar) → Registrar compra / Pagar tarjeta → «Cuotas futuras» → Recientes with a quiet «Ver todos»; the balance
+  and facts sit flat on the canvas, not in a white box; no white card nested inside another.
+- [ ] A seven-digit ARS Disponible at 375 pt keeps the row size (not shrunk); «No calculado con cuotas» on one line and
+  its explanation one tap away; «Sin límite cargado» without a limit; never a zero.
+- [ ] Light and dark: the flat block, the usage bar and the grouped lists readable in both.
+- [ ] Card detail: the same order and words, «de $ límite» under Disponible, Cuotas and Movimientos; an archived card
+  shows the archive glyph, «Tarjeta archivada» and «Sigue recibiendo pagos y registrando sus cuotas. Para usarla de
+  nuevo, reactivala en Editar tarjeta.», Pagar tarjeta while owed and no Registrar compra; a deleted card shows the
+  trash glyph and its note and only reads.
+- [ ] Plan detail: «12 cuotas sin interés» (or «con interés») under the price; the segmented bar (one segment per
+  instalment up to 24, a continuous bar beyond) with recognised segments in ink, an undone one amber-outlined, future
+  ones an empty tertiary outline and cancelled ones a dashed one, all visible on the canvas in light and dark; «3 de 12 registradas», «Próxima cuota · …» and the principal still to come while active;
+  never «pagadas»; interest, fees and taxes rows only when real; the Calendario unchanged. VoiceOver reads the progress
+  block once.
+- [ ] Card movements: a purchase and a recorded instalment unsigned in ink; a card payment «Pago de tarjeta» in the
+  transfer tone with no sign.
+- [ ] Dynamic Type up to AX5 at 375 pt: the dates stack, the plan's amount moves under its count, nothing is cut;
+  VoiceOver order follows the visual order; Reduce Motion: the cards jump into place and the values still fade.
+
+**Regression.**
+
+- [ ] The last content of Reportes, Tarjetas, the card detail and the plan detail clears the dock and the bottom safe
+  area.
+- [ ] Reduce Transparency: the dock turns solid pine; nothing in these screens depends on glass.
+- [ ] 30 rapid tab switches without black screens.
+
 ## Producto 24UX6C2 — Home activity and Reports interaction polish
 
 **Not done in 24UX6C2: no EAS build was made and the iPhone was not touched. Every item below is pending.**
@@ -15,7 +125,7 @@ Producto 24UX6C2»). This section supersedes the 24UX6A items «this month's exp
 «no … budgets … on Inicio» (still no permanent budget card, but one contextual general-budget row when it needs
 attention).
 
-- [ ] The Más footer reads «FinanzApp 0.1.0 (24UX6C2)».
+- [ ] The Más footer reads «FinanzApp 0.1.0 (24UX6C2)». *(Superseded by 24UX6D: «FinanzApp 0.1.0 (24UX6D)».)*
 
 **Inicio: recent activity.**
 
@@ -47,9 +157,13 @@ Inicio as the month's spending crosses each threshold.
 - [ ] Below 85 % of the general budget: no budget row and no budget card on Inicio.
 - [ ] At 85 %: one row appears after the financial field and before «Próximos compromisos» and «Actividad reciente»,
   amber: the speedometer tile, «Usaste 85 % del presupuesto del mes» and «Quedan $ … de $ …» in amber; a chevron.
+  *(Copy and anatomy superseded by 24UX6D's progress row: «Presupuesto», «85 %», a bar, «Quedan $ …»; the threshold and
+  placement stand.)*
 - [ ] At exactly 100 %: still amber (warning), «Usaste 100 % …» and what is left ($ 0); never the alert tone yet.
+  *(Copy superseded by 24UX6D: «Límite alcanzado».)*
 - [ ] Over the limit: the alert tone (the alert-circle tile in the expense colour), «Superaste el presupuesto del mes»
-  and «$ … por encima de $ …» with the amount over in the alert colour.
+  and «$ … por encima de $ …» with the amount over in the alert colour. *(Copy and anatomy superseded by 24UX6D: the
+  alert glyph before «120 %», a full bar and «$ … por encima».)*
 - [ ] Category-only budgets (no general budget), even exceeded: never a row on Inicio.
 - [ ] Tapping the row opens Presupuestos on the budget's currency and month; back returns to Inicio.
 - [ ] Consolidated view with the general budget in another currency than the display currency: the row names it
@@ -61,21 +175,23 @@ Inicio as the month's spending crosses each threshold.
 - [ ] Undo or edit expenses (or raise the limit) until the month falls below 85 %: the row disappears.
 - [ ] VoiceOver reads the row once: the spoken percent or «Superaste…», then the spoken amounts, and the hint «Abre
   Presupuestos»; English: «You used 87% of this month’s budget», «… left of …», «You went over this month’s budget»,
-  «… over …», «Opens Budgets».
+  «… over …», «Opens Budgets». *(Wording superseded by 24UX6D: «Presupuesto del mes, cerca del límite, 87 % usado,
+  quedan …».)*
 - [ ] Large text and AX sizes: the title and detail wrap, nothing is cut; light and dark both readable.
 
 **Reportes: the donut.**
 
-- [ ] The top total («GASTADO · ARS», the amount and its line) shows in both Categorías and Día a día.
+- [ ] The top total («GASTADO · ARS», the amount and its line) shows in both Categorías and Día a día. *(Superseded by 24UX6D: see «Producto 24UX6D» above.)*
 - [ ] With nothing chosen the donut's centre reads only the quiet «Tocá una categoría» («Tap a category»); it never
-  repeats the month's total.
+  repeats the month's total. *(Superseded by 24UX6D: with nothing chosen the centre shows «Total del período» and the
+  exact total.)*
 - [ ] Tapping a slice: the centre shows the category's name, its exact amount and «NN % del gasto» (the same
   percentage as its row); that slice is drawn thicker and the others dimmed, at once, without a new animation; the
   matching row is marked (bold name, an outline and a light tint in the category hue).
 - [ ] Tapping the chosen slice again, or the hole, clears the choice; tapping just beside the ring or in the thin gap
   between slices behaves sensibly (the gap picks the next slice).
 - [ ] VoiceOver: the donut is announced as adjustable («Gasto por categoría», its slices, «Ninguna categoría
-  elegida»); swiping up and down steps through the categories, announcing name, amount and percentage, and past either
+  elegida» *(24UX6D: «Total del período, …»)*); swiping up and down steps through the categories, announcing name, amount and percentage, and past either
   end returns to none (down from none starts at the last). The centre's text is not a separate VoiceOver stop; the
   Actions rotor shows «Categoría siguiente» / «Categoría anterior»; a double tap does not clear the choice.
 - [ ] Larger text (beyond the default, and AX sizes), a very long amount or a long custom category name: the chosen
