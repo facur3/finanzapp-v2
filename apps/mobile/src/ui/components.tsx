@@ -461,6 +461,22 @@ export function EmptyState({ title, detail, action, icon = 'wallet-outline' }: {
   </Surface>;
 }
 
+/** 24UX6E: an object's lifecycle state said once, calmly, under its identity (the shape of Tarjetas'
+ * `CardLifecycleNote`, 24UX6D): a secondary glyph, an optional subhead title and one footnote line saying what it
+ * still does. No surface, no banner and no alarm colour; `tone="warning"` only for a state that asks for review
+ * (a recurring rule set aside), and then on the words, never on the glyph. The glyph is hidden from VoiceOver: the
+ * words say the state. Used by an account, a recurring rule, a debt and a category. */
+export function LifecycleNote({ icon, title, detail, tone = 'neutral' }: { icon: IconName; title?: string; detail: string; tone?: 'neutral' | 'warning' }) {
+  const p = usePalette();
+  return <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 10 }}>
+    <Ionicons name={icon} size={18} color={p.secondary} accessible={false} style={{ marginTop: 1 }} />
+    <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+      {!!title && <AppText variant="subhead" style={{ fontWeight: '600' }}>{title}</AppText>}
+      <AppText secondary={tone === 'neutral'} variant="footnote" style={tone === 'warning' ? { color: p.warning, fontWeight: '500' } : undefined}>{detail}</AppText>
+    </View>
+  </View>;
+}
+
 /** Contextual help behind an information glyph: the full explanation lives in
  * a native alert, so a form keeps one short line next to the field. The alert
  * names its button from the catalogue: without one, React Native takes UIKit's

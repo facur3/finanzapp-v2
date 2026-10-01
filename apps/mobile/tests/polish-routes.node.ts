@@ -12,6 +12,7 @@ import { bindLocale } from '../src/i18n/bind.ts';
 import type { AppLocale } from '../src/i18n/locale.ts';
 import { realModule, swipeActionsMock } from './real-module.ts';
 import * as movementAmount from '../src/ui/movement-amount.ts';
+import * as geometry from '../src/ui/geometry.ts';
 
 // Budgets, Recurrentes, Cuentas and account detail handlers with native hosts
 // replaced by descriptors. Not a rendered iOS screen or gesture test.
@@ -36,6 +37,13 @@ const rule: domain.RecurringRule = { id: 'rent', accountId: cash.id, kind: 'expe
   anchorDateISO: '2026-10-01', nextDateISO: '2026-10-01', active: true, deleted: false, createdAt, revision: 0, updatedAt: createdAt };
 const archive: domain.LedgerArchive = { accounts: [cash, wallet, usd, cardAccount], records: entries.map(domain.initialRecord), cards: [card], budgets, recurring: [rule] };
 
+/** 24UX6E: the window the screens read (`useWindowDimensions`); a test sets it and restores it. */
+let windowSize = { width: 390, height: 844, scale: 3, fontScale: 1 };
+function withWindow<T>(size: Partial<typeof windowSize>, run: () => T): T {
+  const before = windowSize;
+  windowSize = { ...before, ...size };
+  try { return run(); } finally { windowSize = before; }
+}
 function harness(file: string, params: Record<string, unknown> = {}, data: domain.LedgerArchive = archive, locale: AppLocale = 'es-AR') {
   const i18nProvider = { useI18n: () => bindLocale(locale) };
   const source = readFileSync(new URL('../app/' + file, import.meta.url), 'utf8');
@@ -54,7 +62,7 @@ function harness(file: string, params: Record<string, unknown> = {}, data: domai
     saved.push(next);
   } }) };
   const names = ['ActionButton', 'AppText', 'CategoryBadge', 'MerchantBadge', 'Choices', 'DetailRow', 'EmptyState', 'EntryRow', 'ErrorMessage', 'IconButton', 'Money', 'PressFeedback',
-    'Screen', 'SectionTitle', 'Stat', 'Surface', 'AccountRow', 'AccountBadge'];
+    'Screen', 'SectionTitle', 'Stat', 'StatRow', 'Surface', 'AccountRow', 'AccountBadge', 'LifecycleNote'];
   let backs = 0;
   const theme = { space: { xs: 4, s: 8, m: 12, l: 16, xl: 20, xxl: 24, xxxl: 32 }, useCurrentDay: () => '2026-09-20', useReduceMotion: () => true,
     usePalette: () => ({ text: '#000', secondary: '#666', tertiary: '#999', line: '#ddd', inset: '#eee', expense: '#c00', income: '#080', warning: '#a60', primary: '#2557D6', background: '#fff', surface: '#fff' }) };
@@ -69,7 +77,7 @@ function harness(file: string, params: Record<string, unknown> = {}, data: domai
       return [state[index], (value: unknown) => { state[index] = typeof value === 'function' ? (value as (current: unknown) => unknown)(state[index]) : value; }];
     } },
     'react/jsx-runtime': { jsx, jsxs: jsx, Fragment: 'Fragment' },
-    'react-native': { View: 'View', SectionList: 'SectionList', Switch: 'Switch', StyleSheet: { hairlineWidth: 0.5 },
+    'react-native': { View: 'View', SectionList: 'SectionList', Switch: 'Switch', StyleSheet: { hairlineWidth: 0.5 }, useWindowDimensions: () => windowSize,
       Alert: { alert: (title: string, message: string, buttons: any[]) => alerts.push({ title, message, buttons }) } },
     'react-native-reanimated': { __esModule: true, default: { View: 'Animated.View' }, useSharedValue: (value: number) => ({ value }),
       withTiming: (value: number) => value, useAnimatedStyle: (fn: () => unknown) => fn() },
@@ -77,6 +85,8 @@ function harness(file: string, params: Record<string, unknown> = {}, data: domai
     'expo-router': { Stack: { Screen: 'Stack.Screen' }, Redirect: 'Redirect', useLocalSearchParams: () => params,
       router: { push: (to: unknown) => pushed.push(to), replace: (to: unknown) => pushed.push(to), canGoBack: () => true, back: () => { backs++; } } },
     '@finanzapp/domain': domain,
+    '@expo/vector-icons/Ionicons': 'Ionicons',
+    '../src/ui/geometry': geometry, '../../src/ui/geometry': geometry,
     '../src/storage/LedgerProvider': ledger, '../../src/storage/LedgerProvider': ledger, '../storage/LedgerProvider': ledger,
     '../src/ui/swipe-actions': swipeActionsMock, '../../src/ui/swipe-actions': swipeActionsMock,
     './components': { ...Object.fromEntries(names.map(name => [name, name])), useStacked: () => false },
