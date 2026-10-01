@@ -2,7 +2,8 @@ import { Alert, StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { type Account, type Currency, type RecurringRule } from '@finanzapp/domain';
-import { AppText, MerchantBadge, Money, PressFeedback, useStacked, type IconName } from './components';
+import type { BudgetAttention } from './home-focus';
+import { AppText, GlyphTile, MerchantBadge, Money, PressFeedback, useStacked, type IconName } from './components';
 import { useCategoryLook } from './category-hues';
 import { dueWhen } from './presentation';
 import { usePalette } from './theme';
@@ -101,3 +102,41 @@ export function UpcomingRecurringRow({ rule, account, day, last, showAccount = f
 const styles = StyleSheet.create({
   agendaRow: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 56 },
 });
+
+/** The month's general budget when it needs attention (24UX6C2): one compact row between the financial field and the
+ * commitments, never a card or a dashboard. Warning (85 % through 100 %, `budgetState`) is amber: «Usaste 87 % del
+ * presupuesto del mes» and what is left; exceeded is the alert tone, used only once the limit is passed: «Superaste el
+ * presupuesto del mes» and by how much. Amounts are the budget's own currency, measured on the real ledger (24C1); the
+ * currency is named («en ARS», coded amounts) when it is not the one Inicio shows. Tapping opens Presupuestos. */
+export function BudgetAttentionRow({ attention, currency, labelsCurrency, onPress }: {
+  attention: BudgetAttention; currency: Currency; labelsCurrency: boolean; onPress: () => void;
+}) {
+  const p = usePalette();
+  const { t, moneyText, codedAmount, spokenMoney, formatPercent, spokenPercent } = useI18n();
+  const { state, progress } = attention;
+  const exceeded = state === 'exceeded';
+  const money = (minor: number) => labelsCurrency ? codedAmount(minor, currency) : moneyText(minor, currency);
+  const limit = progress.budget.amountMinor;
+  // The whole percent Presupuestos and Reportes show (`percentUsed`: Math.round), so the row and the screen it opens agree;
+  // formatPercent rounds on the decimal value, so the product's binary tail never shows.
+  const shown = Math.round(progress.ratio * 100) * 0.01;
+  const title = exceeded
+    ? t(labelsCurrency ? 'home.budget.exceededIn' : 'home.budget.exceeded', { code: currency })
+    : t(labelsCurrency ? 'home.budget.warningIn' : 'home.budget.warning', { percent: formatPercent(shown), code: currency });
+  const spokenTitle = exceeded ? t(labelsCurrency ? 'home.budget.exceededIn' : 'home.budget.exceeded', { code: currency })
+    : t(labelsCurrency ? 'home.budget.warningIn' : 'home.budget.warning', { percent: spokenPercent(shown), code: currency });
+  const detail = exceeded ? t('home.budget.over', { amount: money(-progress.remainingMinor), limit: money(limit) })
+    : t('home.budget.left', { amount: money(progress.remainingMinor), limit: money(limit) });
+  const spokenDetail = exceeded ? t('home.budget.over', { amount: spokenMoney(-progress.remainingMinor, currency), limit: spokenMoney(limit, currency) })
+    : t('home.budget.left', { amount: spokenMoney(progress.remainingMinor, currency), limit: spokenMoney(limit, currency) });
+  return <PressFeedback feedback="highlight" accessibilityRole="button" accessibilityLabel={spokenTitle + ', ' + spokenDetail}
+    accessibilityHint={t('home.budget.hint')} onPress={onPress}
+    style={{ flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 60, paddingHorizontal: 16, paddingVertical: 10 }}>
+    <GlyphTile icon={exceeded ? 'alert-circle-outline' : 'speedometer-outline'} tone={exceeded ? 'expense' : 'warning'} size={36} />
+    <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+      <AppText accessible={false} style={{ fontWeight: '600' }}>{title}</AppText>
+      <AppText accessible={false} variant="footnote" style={{ color: exceeded ? p.expense : p.warning, fontWeight: '500' }}>{detail}</AppText>
+    </View>
+    <Ionicons name="chevron-forward" size={15} color={p.tertiary} accessible={false} />
+  </PressFeedback>;
+}

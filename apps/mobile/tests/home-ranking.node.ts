@@ -3,7 +3,10 @@ import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { runInNewContext } from 'node:vm';
 import ts from 'typescript';
+import * as domain from '@finanzapp/domain';
 import * as uiPresentation from '../src/ui/presentation.ts';
+import { homeBudgetAttention } from '../src/ui/home-focus.ts';
+import { percentUsed } from '../src/ui/budget-presentation.ts';
 import { bindLocale } from '../src/i18n/bind.ts';
 import type { AppLocale } from '../src/i18n/locale.ts';
 // Read on every render, like the live provider; a test may switch it and must restore it.
@@ -12,7 +15,7 @@ const i18nProvider = { useI18n: () => bindLocale(current) };
 
 // A source/behaviour guard over Inicio's row modules (home-modules.tsx): the metric help, the field's controls (24UX6A:
 // the accounts button and the per-currency parts on the pine field) and the upcoming commitments. The insight line
-// (HomeInsightRow) was removed by owner decision (24UX6A). The look of the rows on an iPhone remains a device acceptance item.
+// (HomeInsightRow) was removed by owner decision (24UX6A). 24UX6C2 adds the general budget's attention row (BudgetAttentionRow). The look of the rows on an iPhone remains a device acceptance item.
 const palette = {
   line: '#ddd', isDark: true, secondary: '#A0A0A8', tertiary: '#7C7C84', expense: '#FF6B5E', warning: '#F5B342',
   hero: '#14362D', heroInk: '#EEF5F1', heroSecondary: '#A8C4B9', heroControl: '#26493F',
@@ -29,7 +32,7 @@ function harness() {
     'react-native': { Alert: { alert: (...args: unknown[]) => { env.alerts.push(args); } }, StyleSheet: { create: (styles: unknown) => styles, hairlineWidth: 0.5 }, View: 'View' },
     'expo-router': { router: { push: (to: unknown) => { env.pushed.push(to); } } },
     '@expo/vector-icons/Ionicons': 'Ionicons',
-    './components': { AppText: 'AppText', MerchantBadge: 'MerchantBadge', Money: 'Money', PressFeedback: 'PressFeedback', useStacked: () => false },
+    './components': { AppText: 'AppText', GlyphTile: 'GlyphTile', MerchantBadge: 'MerchantBadge', Money: 'Money', PressFeedback: 'PressFeedback', useStacked: () => false },
     './category-hues': { useCategoryLook: (label: string) => ({ label, hex: '#' + label.length.toString().padStart(6, 'A'), glyph: 'restaurant-outline' }) },
     './presentation': uiPresentation,
     './theme': { usePalette: () => palette },
@@ -146,10 +149,11 @@ test('25B3: an upcoming commitment opens the rule\'s detail, never its form, and
 test('24UX6A: home-modules imports exactly what the harness mocks, and the insight row is gone', () => {
   const { env, exports, mocked } = harness();
   assert.equal([...env.required].sort().join(','), [...mocked].sort().join(','), 'no stale mock (Surface, washOf, home-focus are no longer imported) and no missing one');
-  assert.equal(env.required.has('./home-focus'), false);
+  assert.equal(env.required.has('./home-focus'), false, '24UX6C2: only the BudgetAttention type comes from home-focus; nothing at runtime');
   assert.equal(env.required.has('./category-color'), false);
   assert.equal('HomeInsightRow' in exports, false, 'owner decision: Inicio carries no insight line');
-  assert.equal(JSON.stringify(Object.keys(exports).sort()), JSON.stringify(['CurrencyParts', 'FieldButton', 'MetricHelp', 'UpcomingRecurringRow']));
+  assert.equal(JSON.stringify(Object.keys(exports).sort()), JSON.stringify(['BudgetAttentionRow', 'CurrencyParts', 'FieldButton', 'MetricHelp', 'UpcomingRecurringRow']),
+    '24UX6C2: the one budget row joins the modules; still no insight row');
 });
 
 test('24UX6A: the metric help takes the pine field\'s colour and keeps its «Qué significa» name and 44 pt target', () => {
@@ -206,4 +210,132 @@ test('24C1/24UX6A: each currency\'s own figure stands in for a missing total; on
   assert.equal(canvas.filter(node => node.type === 'Money').every(node => node.props.color === undefined), true, 'off the field: the canvas\'s own ink');
   assert.equal([canvas.find(node => node.type === 'AppText').props.style].flat().some((style: any) => style && style.color), false);
   assert.equal(canvas.find(node => node.type === exports.MetricHelp).props.color, undefined);
+});
+
+// ---- 24UX6C2: the general budget's attention row ---------------------------------------------------------------
+// Synthetic fixtures: one ARS account, one general budget of $ 100.000,00 for September, measured by the domain itself.
+const budgetAt = '2026-09-01T12:00:00.000Z';
+/** The attention the screen would hand the row: the domain's summary of `spentMinor` against a $ 100.000,00 general budget. */
+function attentionFor(spentMinor: number, currency: domain.Currency = 'ARS') {
+  const snapshot: domain.LedgerSnapshot = { accounts: [{ id: 'a', name: 'Banco', currency, openingMinor: 0, createdAt: budgetAt }],
+    entries: [{ id: 'e', accountId: 'a', kind: 'expense', amountMinor: spentMinor, merchant: 'Comercio', category: 'Comida', dateISO: '2026-09-10', createdAt: budgetAt }] };
+  const budget: domain.MonthlyBudget = { id: 'total', scope: 'total', currency, monthISO: '2026-09', amountMinor: 10_000_000, active: true, createdAt: budgetAt, revision: 0, updatedAt: budgetAt };
+  const attention = homeBudgetAttention(domain.summarizeMonthlyBudgets(snapshot, [budget], currency, '2026-09'));
+  assert.ok(attention, 'the fixture needs attention');
+  return attention;
+}
+const NBSP = ' ';
+/** The row's parts: the glyph tile, the title and the detail (two AppTexts), the chevron. */
+function budgetParts(row: any) {
+  const texts = flatten(row).filter(node => node.type === 'AppText');
+  assert.equal(texts.length, 2, 'a title and a detail, nothing else');
+  return { tile: flatten(row).find(node => node.type === 'GlyphTile'), title: texts[0], detail: texts[1], chevron: flatten(row).find(node => node.type === 'Ionicons') };
+}
+
+test('24UX6C2: a general budget at 87 % is a warning row: the speedometer in the warning tone, «Usaste 87 % del presupuesto del mes», what is left in amber', () => {
+  const { exports } = harness();
+  const attention = attentionFor(8_700_000);
+  assert.equal(attention.state, 'warning');
+  assert.equal(JSON.stringify([attention.progress.spentMinor, attention.progress.remainingMinor, attention.progress.ratio]), JSON.stringify([8_700_000, 1_300_000, 0.87]));
+  const row = exports.BudgetAttentionRow({ attention, currency: 'ARS', labelsCurrency: false, onPress: () => {} });
+  assert.equal(row.type, 'PressFeedback');
+  assert.equal(row.props.feedback, 'highlight', 'a cell in a grouped surface: the press tints it');
+  assert.equal(row.props.accessibilityRole, 'button');
+  assert.equal(row.props.style.minHeight, 60);
+  const { tile, title, detail, chevron } = budgetParts(row);
+  assert.equal(JSON.stringify([tile.props.icon, tile.props.tone, tile.props.size]), JSON.stringify(['speedometer-outline', 'warning', 36]));
+  assert.equal(textOf(title), 'Usaste 87' + NBSP + '% del presupuesto del mes', 'formatPercent, with its no-break space');
+  assert.equal(title.props.style.fontWeight, '600');
+  assert.equal(title.props.style.color, undefined, 'the title is the ink');
+  assert.equal(textOf(detail), 'Quedan $' + NBSP + '13.000,00 de $' + NBSP + '100.000,00');
+  assert.equal(detail.props.variant, 'footnote');
+  assert.equal(JSON.stringify([detail.props.style.color, detail.props.style.fontWeight]), JSON.stringify([palette.warning, '500']), 'amber, never the alert tone before the limit is passed');
+  assert.equal(JSON.stringify([title.props.accessible, detail.props.accessible]), JSON.stringify([false, false]), 'one element for VoiceOver: the row');
+  assert.equal(JSON.stringify([chevron.props.name, chevron.props.color, chevron.props.accessible]), JSON.stringify(['chevron-forward', palette.tertiary, false]));
+});
+
+
+test('24UX6C2 review: the row shows the whole percent Presupuestos and Reportes show (percentUsed), never a decimal', () => {
+  const { exports } = harness();
+  for (const [spent, percent] of [[8_750_000, 88], [8_740_000, 87], [8_500_000, 85], [9_949_000, 99]] as const) {
+    const attention = attentionFor(spent);
+    const row = exports.BudgetAttentionRow({ attention, currency: 'ARS', labelsCurrency: false, onPress: () => {} });
+    assert.equal(textOf(budgetParts(row).title), 'Usaste ' + percent + NBSP + '% del presupuesto del mes', String(spent));
+    assert.equal(percentUsed(attention.progress), percent, 'the same number Presupuestos shows');
+  }
+});
+test('24UX6C2: the warning holds from 85 % through exactly 100 %; above the limit it is exceeded', () => {
+  const { exports } = harness();
+  const at = (spent: number) => homeBudgetAttention(domain.summarizeMonthlyBudgets({ accounts: [{ id: 'a', name: 'Banco', currency: 'ARS', openingMinor: 0, createdAt: budgetAt }],
+    entries: [{ id: 'e', accountId: 'a', kind: 'expense', amountMinor: spent, merchant: 'Comercio', category: 'Comida', dateISO: '2026-09-10', createdAt: budgetAt }] },
+  [{ id: 'total', scope: 'total', currency: 'ARS', monthISO: '2026-09', amountMinor: 10_000_000, active: true, createdAt: budgetAt, revision: 0, updatedAt: budgetAt }], 'ARS', '2026-09'));
+  assert.equal(at(8_499_999), null, 'calm below 85 %: no row');
+  assert.equal(at(8_500_000)?.state, 'warning');
+  const full = at(10_000_000)!;
+  assert.equal(full.state, 'warning', 'exactly the limit is still a warning');
+  assert.equal(textOf(budgetParts(exports.BudgetAttentionRow({ attention: full, currency: 'ARS', labelsCurrency: false, onPress: () => {} })).detail), 'Quedan $' + NBSP + '0,00 de $' + NBSP + '100.000,00');
+  assert.equal(at(10_000_001)?.state, 'exceeded', 'one minor unit over');
+});
+
+test('24UX6C2: an exceeded general budget is the alert row: the alert glyph in the expense tone, «Superaste el presupuesto del mes», how much over in the expense colour', () => {
+  const { exports } = harness();
+  const attention = attentionFor(10_400_000);
+  assert.equal(attention.state, 'exceeded');
+  assert.equal(attention.progress.remainingMinor, -400_000);
+  const row = exports.BudgetAttentionRow({ attention, currency: 'ARS', labelsCurrency: false, onPress: () => {} });
+  const { tile, title, detail } = budgetParts(row);
+  assert.equal(JSON.stringify([tile.props.icon, tile.props.tone, tile.props.size]), JSON.stringify(['alert-circle-outline', 'expense', 36]));
+  assert.equal(textOf(title), 'Superaste el presupuesto del mes', 'no percentage once the limit is passed');
+  assert.equal(textOf(detail), '$' + NBSP + '4.000,00 por encima de $' + NBSP + '100.000,00', 'the amount over, unsigned');
+  assert.equal(JSON.stringify([detail.props.style.color, detail.props.style.fontWeight]), JSON.stringify([palette.expense, '500']));
+  assert.equal(row.props.accessibilityLabel, 'Superaste el presupuesto del mes, ' + bindLocale('es-AR').spokenMoney(400_000, 'ARS') + ' por encima de ' + bindLocale('es-AR').spokenMoney(10_000_000, 'ARS'));
+  assert.equal(row.props.accessibilityLabel, 'Superaste el presupuesto del mes, 4000,00 pesos por encima de 100000,00 pesos', 'spoken money: ungrouped, the unit in words');
+});
+
+test('24UX6C2: when Inicio shows another currency the row names the budget\'s («del mes en ARS») and codes its amounts', () => {
+  const { exports } = harness();
+  const warning = budgetParts(exports.BudgetAttentionRow({ attention: attentionFor(8_700_000), currency: 'ARS', labelsCurrency: true, onPress: () => {} }));
+  assert.equal(textOf(warning.title), 'Usaste 87' + NBSP + '% del presupuesto del mes en ARS');
+  assert.equal(textOf(warning.detail), 'Quedan ' + bindLocale('es-AR').codedAmount(1_300_000, 'ARS') + ' de ' + bindLocale('es-AR').codedAmount(10_000_000, 'ARS'));
+  assert.equal(textOf(warning.detail), 'Quedan ARS' + NBSP + '13.000,00 de ARS' + NBSP + '100.000,00', 'coded, never the bare $ another currency could share');
+  const exceeded = budgetParts(exports.BudgetAttentionRow({ attention: attentionFor(10_400_000), currency: 'ARS', labelsCurrency: true, onPress: () => {} }));
+  assert.equal(textOf(exceeded.title), 'Superaste el presupuesto del mes en ARS');
+  assert.equal(textOf(exceeded.detail), 'ARS' + NBSP + '4.000,00 por encima de ARS' + NBSP + '100.000,00');
+});
+
+test('24UX6C2: VoiceOver hears the spoken percent and spoken money, the hint says the row opens Presupuestos, and a tap is the caller\'s', () => {
+  const { exports } = harness();
+  let pressed = 0;
+  const es = bindLocale('es-AR');
+  const row = exports.BudgetAttentionRow({ attention: attentionFor(8_700_000), currency: 'ARS', labelsCurrency: false, onPress: () => { pressed++; } });
+  assert.equal(row.props.accessibilityLabel, 'Usaste ' + es.spokenPercent(0.87) + ' del presupuesto del mes, Quedan ' + es.spokenMoney(1_300_000, 'ARS') + ' de ' + es.spokenMoney(10_000_000, 'ARS'));
+  assert.equal(row.props.accessibilityLabel.includes('$'), false, 'no visible money formatter reaches the label');
+  assert.match(row.props.accessibilityLabel, /13000,00 pesos de 100000,00 pesos$/);
+  assert.equal(row.props.accessibilityHint, 'Abre Presupuestos');
+  const coded = exports.BudgetAttentionRow({ attention: attentionFor(8_700_000), currency: 'ARS', labelsCurrency: true, onPress: () => {} });
+  assert.equal(coded.props.accessibilityLabel, 'Usaste ' + es.spokenPercent(0.87) + ' del presupuesto del mes en ARS, Quedan 13000,00 pesos de 100000,00 pesos', 'spoken money even when the screen codes the amounts');
+  row.props.onPress();
+  assert.equal(pressed, 1, 'onPress is wired to the row');
+});
+
+test('24UX6C2: the budget row in English', () => {
+  const { exports } = harness();
+  try {
+    current = 'en-US';
+    const en = bindLocale('en-US');
+    const warning = exports.BudgetAttentionRow({ attention: attentionFor(8_700_000), currency: 'ARS', labelsCurrency: false, onPress: () => {} });
+    assert.equal(textOf(budgetParts(warning).title), 'You used ' + en.formatPercent(0.87) + ' of this month’s budget');
+    assert.equal(textOf(budgetParts(warning).detail), en.moneyText(1_300_000, 'ARS') + ' left of ' + en.moneyText(10_000_000, 'ARS'));
+    assert.equal(textOf(budgetParts(warning).detail), 'AR$' + NBSP + '13,000.00 left of AR$' + NBSP + '100,000.00');
+    assert.equal(warning.props.accessibilityHint, 'Opens Budgets');
+    assert.equal(warning.props.accessibilityLabel, 'You used ' + en.spokenPercent(0.87) + ' of this month’s budget, ' + en.spokenMoney(1_300_000, 'ARS') + ' left of ' + en.spokenMoney(10_000_000, 'ARS'));
+    const coded = budgetParts(exports.BudgetAttentionRow({ attention: attentionFor(8_700_000), currency: 'ARS', labelsCurrency: true, onPress: () => {} }));
+    assert.equal(textOf(coded.title), 'You used ' + en.formatPercent(0.87) + ' of this month’s ARS budget');
+    assert.equal(textOf(coded.detail), en.codedAmount(1_300_000, 'ARS') + ' left of ' + en.codedAmount(10_000_000, 'ARS'));
+    const exceeded = exports.BudgetAttentionRow({ attention: attentionFor(10_400_000), currency: 'ARS', labelsCurrency: false, onPress: () => {} });
+    assert.equal(textOf(budgetParts(exceeded).title), 'You went over this month’s budget');
+    assert.equal(textOf(budgetParts(exceeded).detail), en.moneyText(400_000, 'ARS') + ' over ' + en.moneyText(10_000_000, 'ARS'));
+    assert.equal(exceeded.props.accessibilityLabel, 'You went over this month’s budget, ' + en.spokenMoney(400_000, 'ARS') + ' over ' + en.spokenMoney(10_000_000, 'ARS'));
+    assert.equal(textOf(budgetParts(exports.BudgetAttentionRow({ attention: attentionFor(10_400_000), currency: 'ARS', labelsCurrency: true, onPress: () => {} })).title), 'You went over this month’s ARS budget');
+  } finally { current = 'es-AR'; }
 });

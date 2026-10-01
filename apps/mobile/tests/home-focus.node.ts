@@ -1,9 +1,10 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { initialRecord, initialTransferRecord, snapshotFromArchive, validateTransfer, type Account, type Entry, type LedgerArchive, type RecurringRule, type Transfer } from '@finanzapp/domain';
+import { BUDGET_WARNING_RATIO, initialRecord, initialTransferRecord, recurringForecastByCurrency, snapshotFromArchive, summarizeMonthlyBudgets, validateTransfer, type Account, type Entry,
+  type LedgerArchive, type MonthlyBudget, type RecurringRule, type Transfer } from '@finanzapp/domain';
 import { mergeActivity, type ActivityItem } from '../src/ui/presentation.ts';
 import * as homeFocus from '../src/ui/home-focus.ts';
-import { COMMITMENT_HORIZON_DAYS, COMMITMENT_ROWS, RECENT_ROWS, homeCommitments, homeRecent, recentRowLimit } from '../src/ui/home-focus.ts';
+import { COMMITMENT_ROWS, COMMITMENT_WINDOW_DAYS, RECENT_ROWS, homeBudgetAttention, homeCommitments, homeRecent, recentRowLimit } from '../src/ui/home-focus.ts';
 
 // Producto 24UX6A: what Inicio shows under its number, as pure selections. Synthetic fixtures only.
 const at = '2026-09-01T12:00:00.000Z';
@@ -14,43 +15,84 @@ const rule = (id: string, nextDateISO: string, extra: Partial<RecurringRule> = {
 const everyAccount = () => true;
 const ids = (items: readonly { id: string }[]) => items.map(item => item.id).join(',');
 
-test('24UX6A: Inicio lists the expense commitments due within seven days, soonest first, two at most', () => {
-  assert.equal(COMMITMENT_HORIZON_DAYS, 7);
+test('24UX6C2: Inicio\'s commitments window is thirty days from today, two rows at most', () => {
+  assert.equal(COMMITMENT_WINDOW_DAYS, 30);
   assert.equal(COMMITMENT_ROWS, 2);
-  const today = '2026-09-28';
-  const rules = [rule('later', '2026-10-05'), rule('edge', '2026-10-04'), rule('today', '2026-09-28'), rule('mid', '2026-10-01')];
-  assert.equal(ids(homeCommitments(rules, today, everyAccount)), 'today,mid', 'the soonest two; the rest stay in Recurrentes');
-  assert.equal(ids(homeCommitments([rule('edge', '2026-10-04'), rule('later', '2026-10-05')], today, everyAccount)), 'edge',
-    'today plus six days is the last day inside the week; the eighth day waits');
-  // A tie on the day reads by merchant, so the order never depends on storage.
-  assert.equal(ids(homeCommitments([rule('b', '2026-09-29'), rule('a', '2026-09-29')], today, everyAccount)), 'a,b');
-  // Many due the same week never grow the section past two rows.
-  const week = ['2026-09-28', '2026-09-29', '2026-09-30', '2026-10-01', '2026-10-02'].map((day, index) => rule('r' + index, day));
-  assert.equal(homeCommitments(week, today, everyAccount).length, 2, 'two rows at most, whatever is due');
-  // The input is not reordered in place: the screen's archive stays as stored.
-  const stored = [rule('z', '2026-09-30'), rule('y', '2026-09-29')];
+  assert.equal(Object.keys(homeFocus).includes('COMMITMENT_HORIZON_DAYS'), false, 'the seven-day horizon is gone');
+});
+
+test('24UX6C2: the owner\'s examples: on October 1 everything due through October 31 counts, soonest two shown', () => {
+  const today = '2026-10-01';
+  assert.equal(ids(homeCommitments([rule('oct5', '2026-10-05'), rule('oct15', '2026-10-15')], today, everyAccount)), 'oct5,oct15', 'Oct 5 and Oct 15: both');
+  assert.equal(ids(homeCommitments([rule('oct10', '2026-10-10'), rule('oct30', '2026-10-30')], today, everyAccount)), 'oct10,oct30', 'Oct 10 and Oct 30: both');
+  assert.equal(ids(homeCommitments([rule('oct5', '2026-10-05'), rule('oct10', '2026-10-10'), rule('oct30', '2026-10-30')], today, everyAccount)), 'oct5,oct10',
+    'three in the window: the soonest two; Oct 30 is left to Recurrentes');
+  // The window rolls from today, never the calendar month: on October 15 it crosses into November.
+  assert.equal(ids(homeCommitments([rule('nov10', '2026-11-10'), rule('oct30', '2026-10-30')], '2026-10-15', everyAccount)), 'oct30,nov10',
+    'Oct 30 and Nov 10 from Oct 15: both, across the month');
+  // The input is not reordered in place: the screen\'s archive stays as stored.
+  const stored = [rule('z', '2026-10-20'), rule('y', '2026-10-02')];
   homeCommitments(stored, today, everyAccount);
   assert.equal(ids(stored), 'z,y');
 });
 
-test('24UX6A: nothing due this week means no commitments section, and paused, deleted, income, overdue and hidden rules never appear', () => {
-  const today = '2026-09-28';
-  assert.equal(homeCommitments([rule('next-month', '2026-10-20')], today, everyAccount).length, 0, 'no section listing next month');
+test('24UX6C2: the window is inclusive at both ends: today and today + 30 in, yesterday and today + 31 out', () => {
+  const today = '2026-10-01';
+  const one = (nextDateISO: string) => ids(homeCommitments([rule('r', nextDateISO)], today, everyAccount));
+  assert.equal(one('2026-10-01'), 'r', 'today is included');
+  assert.equal(one('2026-10-31'), 'r', 'today + 30 days (Oct 31 for Oct 1) is included');
+  assert.equal(one('2026-11-01'), '', 'today + 31 days (Nov 1) is outside');
+  assert.equal(one('2026-09-30'), '', 'yesterday (a rule still catching up) is outside');
+  // Thirty days, never "one month": from February 1 (a 28-day February) the window reaches March 3, not March 1.
+  assert.equal(ids(homeCommitments([rule('in', '2026-03-03'), rule('out', '2026-03-04')], '2026-02-01', everyAccount)), 'in');
+  // Nothing in the window means no section at all.
+  assert.equal(homeCommitments([rule('later', '2026-11-01'), rule('past', '2026-09-30')], today, everyAccount).length, 0);
   assert.equal(homeCommitments(undefined, today, everyAccount).length, 0);
   assert.equal(homeCommitments([], today, everyAccount).length, 0);
+});
+
+test('24UX6C2: Inicio\'s window is the same as Recurrentes\' «próximos 30 días» forecast', () => {
+  const today = '2026-10-01';
+  const accountsInView = [{ id: 'a', currency: 'ARS' as const }];
+  for (const [day, expected] of [['2026-10-01', 1], ['2026-10-31', 1], ['2026-11-01', 0]] as const) {
+    const rules = [rule('r', day)];
+    const forecast = recurringForecastByCurrency(rules, accountsInView, today);
+    const counted = forecast.reduce((sum, item) => sum + (item.status === 'ready' ? item.count : 0), 0);
+    assert.equal(counted, expected, day + ' in the forecast');
+    assert.equal(homeCommitments(rules, today, everyAccount).length, expected, day + ' on Inicio, the same answer');
+  }
+});
+
+test('24UX6C2: paused, deleted, income and out-of-view rules never appear, and never take a slot', () => {
+  const today = '2026-10-01';
   const excluded = [
-    rule('paused', '2026-09-29', { active: false }),
-    rule('deleted', '2026-09-29', { active: false, deleted: true }),
-    rule('salary', '2026-09-29', { kind: 'income' }),
-    rule('overdue', '2026-09-27'),
-    rule('usd', '2026-09-29', { accountId: 'u' }),
+    rule('paused', '2026-10-02', { active: false }),
+    rule('deleted', '2026-10-02', { active: false, deleted: true }),
+    rule('salary', '2026-10-02', { kind: 'income' }),
+    rule('overdue', '2026-09-30'),
+    rule('usd', '2026-10-02', { accountId: 'u' }),
   ];
   assert.equal(ids(homeCommitments(excluded, today, accountId => accountId === 'a')), '');
-  assert.equal(ids(homeCommitments([rule('usd', '2026-09-29', { accountId: 'u' })], today, accountId => accountId === 'u')), 'usd', 'the display decides which accounts count');
+  assert.equal(ids(homeCommitments([rule('usd', '2026-10-02', { accountId: 'u' })], today, accountId => accountId === 'u')), 'usd', 'the display decides which accounts count');
   // A deletion record wins even when the rule still reads as active (a deletion is never undone by a stale flag).
-  assert.equal(homeCommitments([rule('gone', '2026-09-29', { deleted: true })], today, everyAccount).length, 0);
-  // Excluded rules never take a slot from a visible one.
-  assert.equal(ids(homeCommitments([...excluded, rule('kept', '2026-10-02')], today, accountId => accountId === 'a')), 'kept');
+  assert.equal(homeCommitments([rule('gone', '2026-10-02', { deleted: true })], today, everyAccount).length, 0);
+  // Excluded rules due sooner never push a visible one out of the two rows.
+  assert.equal(ids(homeCommitments(excluded.concat([rule('kept', '2026-10-25'), rule('also', '2026-10-28')]), today, accountId => accountId === 'a')), 'kept,also');
+});
+
+test('24UX6C2: the order is deterministic (date, then merchant, then id) and the cut to two comes after the filter and the sort', () => {
+  const today = '2026-10-01';
+  // A tie on the day reads by merchant; a tie on day and merchant reads by id.
+  assert.equal(ids(homeCommitments([rule('b', '2026-10-03'), rule('a', '2026-10-03')], today, everyAccount)), 'a,b');
+  assert.equal(ids(homeCommitments([rule('x', '2026-10-03', { merchant: 'Zeta' }), rule('y', '2026-10-03', { merchant: 'Alfa' })], today, everyAccount)), 'y,x',
+    'merchant, not id, breaks a tie on the day');
+  assert.equal(ids(homeCommitments([rule('id-2', '2026-10-03', { merchant: 'Netflix' }), rule('id-1', '2026-10-03', { merchant: 'Netflix' })], today, everyAccount)), 'id-1,id-2',
+    'same day and merchant: by id');
+  // Five in the window given in a scrambled order, mixed with rules outside it: always the same two.
+  const five = [rule('r3', '2026-10-20'), rule('r5', '2026-10-31'), rule('r1', '2026-10-02'), rule('r4', '2026-10-25'), rule('r2', '2026-10-09')];
+  const noise = [rule('before', '2026-09-29'), rule('after', '2026-11-02'), rule('paused', '2026-10-01', { active: false })];
+  const orders = [five, five.slice().reverse(), [five[2], five[4], five[0], five[3], five[1]], noise.concat(five), five.concat(noise)];
+  for (const order of orders) assert.equal(ids(homeCommitments(order, today, everyAccount)), 'r1,r2', 'the soonest two, whatever the stored order');
 });
 
 test('24UX6A: the insight line is gone from Inicio (owner decision): home-focus no longer exports it', () => {
@@ -216,4 +258,76 @@ test('24UX6C2: an undone transfer is absent: the snapshot Inicio reads holds onl
 
 test('24UX6C: the line under Inicio\'s number is gone, and with it the per-day helper (the daily average lives in Reportes)', () => {
   assert.equal(Object.keys(homeFocus).includes('spendingPerDay'), false, 'spendingPerDay was removed with the Home subline');
+});
+
+// 24UX6C2 (owner refinement): the one budget fact Inicio may show, read from real domain summaries of a synthetic ledger.
+const budgetAt = '2026-10-01T12:00:00.000Z';
+const october = '2026-10';
+const totalBudget = (amountMinor: number, extra: Partial<MonthlyBudget> = {}): MonthlyBudget =>
+  ({ id: 'total', scope: 'total', currency: 'ARS', monthISO: october, amountMinor, active: true, createdAt: budgetAt, revision: 0, updatedAt: budgetAt, ...extra } as MonthlyBudget);
+const categoryBudget = (amountMinor: number, category = 'Comida'): MonthlyBudget =>
+  ({ id: 'cat', scope: 'category', category, currency: 'ARS', monthISO: october, amountMinor, active: true, createdAt: budgetAt, revision: 0, updatedAt: budgetAt });
+/** A synthetic ledger whose October ARS expenses add up to `spentMinor` (two entries), plus noise the budget never measures. */
+const ledgerSpending = (spentMinor: number) => {
+  const half = Math.floor(spentMinor / 2);
+  const entries = [
+    entry('a', '2026-10-02', { amountMinor: half }),
+    entry('b', '2026-10-05', { amountMinor: spentMinor - half, category: 'Transporte' }),
+    entry('income', '2026-10-03', { kind: 'income', amountMinor: 9000000 }),
+    entry('september', '2026-09-30', { amountMinor: 9000000 }),
+    entry('dollars', '2026-10-04', { accountId: 'usd', amountMinor: 9000000 }),
+  ].filter(item => item.amountMinor > 0);
+  return snapshotFromArchive({ accounts, records: entries.map(initialRecord), transfers: [] });
+};
+const attentionOf = (spentMinor: number, budgets: MonthlyBudget[]) => homeBudgetAttention(summarizeMonthlyBudgets(ledgerSpending(spentMinor), budgets, 'ARS', october));
+
+test('24UX6C2: no summary, or no general budget, means no budget row on Inicio', () => {
+  assert.equal(homeBudgetAttention(null), null);
+  assert.equal(attentionOf(5000000, []), null, 'no budget at all');
+  assert.equal(attentionOf(5000000, [totalBudget(100000, { active: false })]), null, 'an inactive general budget is no budget');
+  assert.equal(attentionOf(5000000, [totalBudget(100000, { monthISO: '2026-09' })]), null, 'last month\'s budget is not this month\'s');
+  assert.equal(attentionOf(5000000, [totalBudget(100000, { currency: 'USD' })]), null, 'another currency\'s budget is not measured in ARS');
+});
+
+test('24UX6C2: a category sublimit never reaches Inicio, even exceeded', () => {
+  const summary = summarizeMonthlyBudgets(ledgerSpending(200000), [categoryBudget(1000)], 'ARS', october);
+  assert.equal(summary.rows[0].exceeded, true, 'the sublimit is exceeded in the domain');
+  assert.equal(summary.total, null);
+  assert.equal(homeBudgetAttention(summary), null, 'Inicio shows only the general budget');
+  // Beside a calm general budget, an exceeded sublimit still shows nothing.
+  assert.equal(attentionOf(200000, [totalBudget(1000000), categoryBudget(1000)]), null);
+});
+
+test('24UX6C2: the thresholds are the domain\'s: calm below 85 %, warning from 85 % through 100 %, exceeded above', () => {
+  assert.equal(BUDGET_WARNING_RATIO, 0.85);
+  const limit = [totalBudget(10000000)];
+  assert.equal(attentionOf(0, limit), null, 'nothing spent: calm');
+  assert.equal(attentionOf(8400000, limit), null, '84 %: calm, no row');
+  assert.equal(attentionOf(8499999, limit), null, 'just under 85 %: calm');
+  assert.equal(attentionOf(8500000, limit)?.state, 'warning', 'exactly 85 %: warning');
+  assert.equal(attentionOf(9200000, limit)?.state, 'warning', '92 %: warning');
+  const full = attentionOf(10000000, limit);
+  assert.equal(full?.state, 'warning', 'exactly 100 %: still warning, never exceeded');
+  assert.equal(full?.progress.exceeded, false);
+  assert.equal(full?.progress.remainingMinor, 0);
+  assert.equal(attentionOf(10001000, limit)?.state, 'exceeded', '100.01 %: exceeded');
+  assert.equal(attentionOf(10000001, limit)?.state, 'exceeded', 'one minor unit over: exceeded');
+  assert.equal(attentionOf(25000000, limit)?.state, 'exceeded', 'far over: exceeded');
+});
+
+test('24UX6C2: the attention carries the general budget\'s progress untouched, measured on the real ledger', () => {
+  const budgets = [totalBudget(10000000), categoryBudget(100)];
+  const summary = summarizeMonthlyBudgets(ledgerSpending(9000000), budgets, 'ARS', october);
+  const warning = homeBudgetAttention(summary);
+  assert.equal(warning?.state, 'warning');
+  assert.equal(warning?.progress, summary.total, 'the summary\'s own total progress, not a copy or a recomputation');
+  assert.equal(warning?.progress.budget.scope, 'total');
+  assert.equal(warning?.progress.spentMinor, 9000000, 'only October\'s ARS expenses: no income, no other month, no other currency');
+  assert.equal(warning?.progress.remainingMinor, 1000000);
+  const overSummary = summarizeMonthlyBudgets(ledgerSpending(12500000), budgets, 'ARS', october);
+  const over = homeBudgetAttention(overSummary);
+  assert.equal(over?.state, 'exceeded');
+  assert.equal(over?.progress, overSummary.total);
+  assert.equal(over?.progress.remainingMinor, -2500000, 'the amount over is the negative remainder, never clamped to zero');
+  assert.equal(over?.progress.spentMinor, 12500000);
 });

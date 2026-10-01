@@ -1,7 +1,7 @@
 import type { Messages } from '../../messages.ts';
 
-/** Inicio (the current month's financial field, the commitments due this week, the month's latest movements) and the
- * capture hub the dock's «+» opens (Producto 24UX6A, decision 005). */
+/** Inicio (the current month's financial field, the general budget when it needs attention, the commitments due in the
+ * next 30 days, the month's latest movements) and the capture hub the dock's «+» opens (Producto 24UX6A, decision 005). */
 export const home: Pick<Messages, 'home' | 'quickActions'> = {
   home: {
     emptyTitle: 'Understand your spending.',
@@ -23,6 +23,15 @@ export const home: Pick<Messages, 'home' | 'quickActions'> = {
       tomorrow: 'Tomorrow',
       inDays: { one: 'In {count} day', other: 'In {count} days' },
       label: '{merchant}, {category}, {amount}, next payment {date}',
+    },
+    budget: {
+      warning: 'You used {percent} of this month’s budget',
+      warningIn: 'You used {percent} of this month’s {code} budget',
+      exceeded: 'You went over this month’s budget',
+      exceededIn: 'You went over this month’s {code} budget',
+      left: '{amount} left of {limit}',
+      over: '{amount} over {limit}',
+      hint: 'Opens Budgets',
     },
     capture: {
       label: 'Record',
