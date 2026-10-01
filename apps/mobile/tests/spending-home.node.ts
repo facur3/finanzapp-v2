@@ -37,7 +37,7 @@ const INSETS = { top: 47, bottom: 34, left: 0, right: 0 };
 
 // Exercise the actual routes' data/handlers with host components replaced by
 // descriptors. This is NOT a rendered iOS screen or gesture/animation test.
-type Node = { type: string; props: Record<string, any> };
+type Node = { type: string; props: Record<string, any>; key?: string };
 const createdAt = '2026-09-12T12:00:00Z';
 const snapshot: domain.LedgerSnapshot = { accounts: [
   { id: 'a', name: 'ARS de prueba', currency: 'ARS', openingMinor: 10000, createdAt },
@@ -74,7 +74,8 @@ function routeHarness(file: string, params: Record<string, unknown>, initialData
   } };
   const source = readFileSync(new URL('../app/' + file, import.meta.url), 'utf8');
   const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText;
-  const jsx = (type: string, props: Record<string, unknown>) => ({ type, props });
+  // The element's key is kept (the JSX runtime passes it apart from the props), so a test can read a row's key.
+  const jsx = (type: string, props: Record<string, unknown>, key?: string) => key === undefined ? { type, props } : { type, props, key };
   const state: unknown[] = [];
   const deps: unknown[][] = [];
   const refs: { current: unknown }[] = [];
@@ -86,7 +87,7 @@ function routeHarness(file: string, params: Record<string, unknown>, initialData
   // Inicio's focus effect: run once when the screen first renders focused (like React Navigation on mount), its cleanup on blur.
   let focusEffect: (() => void | (() => void)) | undefined, focusCleanup: void | (() => void), focusedOnce = false;
   let cursor = 0, effectCursor = 0, refCursor = 0;
-  const componentNames = ['AppText', 'Choices', 'DetailRow', 'EmptyState', 'IconButton', 'InfoButton', 'Money', 'PressFeedback', 'SectionTitle', 'Surface', 'CategoryBadge', 'Screen', 'EntryActions', 'EntryRow', 'ActionButton', 'GlyphTile', 'Stat', 'NavigationRow'];
+  const componentNames = ['AppText', 'Choices', 'DetailRow', 'EmptyState', 'IconButton', 'InfoButton', 'Money', 'PressFeedback', 'SectionTitle', 'Surface', 'CategoryBadge', 'Screen', 'EntryActions', 'EntryRow', 'TransferRow', 'ActionButton', 'GlyphTile', 'Stat', 'NavigationRow'];
   const modules: Record<string, unknown> = {
     '../i18n/format': i18nFormat, '../src/i18n/format': i18nFormat, '../../src/i18n/format': i18nFormat, '../i18n/provider': i18nProvider, '../src/i18n/provider': i18nProvider, '../../src/i18n/provider': i18nProvider,
     // Effects run in place, once per change of their dependencies (a route parameter arriving), like React's after commit.
@@ -432,7 +433,11 @@ test('24UX6A: the status bar is light over the field, the scheme\'s own after sc
   } finally { dark = false; }
 });
 
-test('24UX6A: the month\'s latest expenses and incomes, newest first, six alone and four under commitments; transfers stay in Movimientos; «Ver todos» selects Movimientos', () => {
+/** Inicio's recent rows in order, an entry or a transfer, by the stored record's id. */
+const recentRows = (root: Node) => nodes(root).filter(n => n.type === 'EntryRow' || n.type === 'TransferRow');
+const recentIds = (root: Node) => recentRows(root).map(n => n.type === 'EntryRow' ? n.props.entry.id : n.props.transfer.id).join();
+
+test('24UX6A, 24UX6C2: the month\'s latest expenses, incomes and transfers, newest first, six alone and four under commitments, counted after the merge; «Ver todos» selects Movimientos', () => {
   const at = '2026-09-01T12:00:00.000Z';
   const accounts: domain.Account[] = [{ id: 'a', name: 'Efectivo', currency: 'ARS', openingMinor: 0, createdAt: at }, { id: 'b', name: 'Banco', currency: 'ARS', openingMinor: 100000, createdAt: at },
     { id: 'u', name: 'Dólares', currency: 'USD', openingMinor: 0, createdAt: at }];
@@ -441,33 +446,176 @@ test('24UX6A: the month\'s latest expenses and incomes, newest first, six alone 
   const data: domain.LedgerSnapshot = { accounts, entries: [entry('aug', '2026-08-31'), entry('s1', '2026-09-01'), entry('s2', '2026-09-02', 'income', 'b'), entry('s3', '2026-09-03'),
     entry('s4', '2026-09-05'), entry('s5', '2026-09-07', 'income'), entry('s6', '2026-09-09', 'expense', 'b'), entry('s7', '2026-09-11'), entry('s8', '2026-09-12'), entry('usd', '2026-09-12', 'expense', 'u')],
   transfers: [{ id: 't1', fromAccountId: 'b', toAccountId: 'a', amountMinor: 5000, note: 'Retiro', dateISO: '2026-09-12', createdAt: '2026-09-12T11:00:00.000Z' }] };
-  const rows = (root: Node) => nodes(root).filter(n => n.type === 'EntryRow').map(n => n.props.entry.id).join();
   const alone = routeHarness('(tabs)/index.tsx', {}, data);
   let root = alone.render();
-  assert.equal(rows(root), 's8,s7,s6,s5,s4,s3', 'ARS shown: six, newest first; August, USD and the transfer stay out');
+  assert.equal(recentIds(root), 't1,s8,s7,s6,s5,s4', 'ARS shown: six rows, newest first, the transfer (recorded later the same day) among them; August and USD stay out');
   assert.equal(nodes(root).filter(n => n.type === 'EntryRow').every(n => n.props.entry.kind === 'expense' || n.props.entry.kind === 'income'), true);
-  assert.equal(JSON.stringify(nodes(root).filter(n => n.type === 'EntryRow').map(n => n.props.entry.amountMinor)), JSON.stringify([100, 100, 100, 100, 100, 100]), 'each row keeps its own amount');
+  assert.equal(JSON.stringify(nodes(root).filter(n => n.type === 'EntryRow').map(n => n.props.entry.amountMinor)), JSON.stringify([100, 100, 100, 100, 100]), 'each row keeps its own amount');
+  assert.equal(nodes(root).filter(n => n.type === 'TransferRow').length, 1, 'the transfer is one row');
+  assert.equal(find(root, 'TransferRow').props.transfer.amountMinor, 5000, 'at its own amount');
   const surface = nodes(root).find(n => n.type === 'Surface' && nodes(n).some(child => child.type === 'EntryRow'))!;
   assert.equal(surface.props.grouped, true, 'a grouped surface');
-  assert.equal(nodes(surface).filter(n => n.type === 'EntryRow').at(-1)!.props.last, true);
+  assert.equal(nodes(surface).some(n => n.type === 'TransferRow'), true, 'the transfer is in the same grouped list');
+  assert.equal(recentRows(surface).at(-1)!.props.last, true);
+  assert.equal(recentRows(surface).slice(0, -1).every(n => n.props.last === false), true, 'only the last row of the merged list is last');
   assert.equal(nodes(root).find(n => n.type === 'EntryRow')!.props.account.id, 'a', 'each row carries its own account');
   const title = nodes(root).find(n => n.type === 'SectionTitle' && n.props.children === 'Actividad reciente')!;
   assert.equal(title.props.action, 'Ver todos');
   title.props.onAction();
   assert.deepEqual([alone.navigated.at(-1), alone.pushed.length], ['/activity', 0], 'the tab root is selected, never pushed over Inicio');
-  // A commitment this week: four rows under it.
+  // A commitment this week: four rows under it, the transfer counted among the four.
   root = routeHarness('(tabs)/index.tsx', {}, data, { recurring: [dueRule()] }).render();
   assert.equal(sectionTitles(root).join('|'), 'Próximos compromisos|Actividad reciente');
-  assert.equal(rows(root), 's8,s7,s6,s5');
-  // Consolidated: every account, still six, still no transfer.
+  assert.equal(recentIds(root), 't1,s8,s7,s6');
+  // Consolidated: every account, still six rows in all, the transfer once.
   root = routeHarness('(tabs)/index.tsx', {}, data, {}, displayStore({ [displayCurrency.DISPLAY_MODE_KEY]: 'consolidated' }), { book: consolidatedRates() }).render();
-  assert.equal(rows(root).split(',').length, 6);
-  assert.equal(rows(root).split(',').includes('usd'), true);
-  assert.equal(/t1/.test(rows(root)), false);
+  assert.equal(recentIds(root), 't1,usd,s8,s7,s6,s5', 'equal times read by the record\'s key, so the order never shuffles');
+  assert.equal(recentIds(root).split(',').filter(id => id === 't1').length, 1);
   // A movement of last month alone: no section.
   root = routeHarness('(tabs)/index.tsx', {}, { accounts, entries: [entry('aug', '2026-08-31')] }).render();
   assert.equal(sectionTitles(root).includes('Actividad reciente'), false);
-  assert.equal(nodes(root).some(n => n.type === 'EntryRow'), false);
+  assert.equal(recentRows(root).length, 0);
+  // A transfer of last month alone: no section either.
+  root = routeHarness('(tabs)/index.tsx', {}, { accounts, entries: [], transfers: [{ ...data.transfers![0], dateISO: '2026-08-31', createdAt: '2026-08-31T10:00:00.000Z' }] }).render();
+  assert.equal(sectionTitles(root).includes('Actividad reciente'), false);
+  assert.equal(recentRows(root).length, 0);
+});
+
+test('24UX6C2: a recent transfer is a TransferRow with every account, no account or context of its own, keyed by its record; an entry stays an EntryRow', () => {
+  const at = '2026-09-01T12:00:00.000Z';
+  const accounts: domain.Account[] = [{ id: 'a', name: 'Efectivo', currency: 'ARS', openingMinor: 0, createdAt: at }, { id: 'b', name: 'Banco', currency: 'ARS', openingMinor: 100000, createdAt: at }];
+  const move: domain.Transfer = { id: 'm1', fromAccountId: 'b', toAccountId: 'a', amountMinor: 2500, note: '', dateISO: '2026-09-11', createdAt: '2026-09-11T09:00:00.000Z' };
+  const lunch: domain.Entry = { id: 'e1', accountId: 'a', kind: 'expense', amountMinor: 1200, merchant: 'Parrilla', category: 'Restaurantes', dateISO: '2026-09-12', createdAt: '2026-09-12T13:00:00.000Z' };
+  const pay: domain.Entry = { id: 'e2', accountId: 'b', kind: 'income', amountMinor: 90000, merchant: 'Sueldo', category: 'Sueldo', dateISO: '2026-09-10', createdAt: '2026-09-10T08:00:00.000Z' };
+  const data: domain.LedgerSnapshot = { accounts, entries: [pay, lunch], transfers: [move] };
+  const root = routeHarness('(tabs)/index.tsx', {}, data).render();
+  assert.equal(recentRows(root).map(n => n.type + ':' + n.key).join(), 'EntryRow:entry-e1,TransferRow:transfer-m1,EntryRow:entry-e2', 'merged order, each keyed by its type and record');
+  const row = find(root, 'TransferRow');
+  assert.equal(row.props.transfer, move, 'the stored transfer itself: its amount, note and accounts untouched');
+  assert.equal(row.props.accounts, data.accounts, 'every account, so the row names the origin and the destination');
+  // No account and no context: the row reads as a plain transfer (origin → destination, «Transferencia» for VoiceOver,
+  // unsigned in the transfer tone; tested on TransferRow in ui-rows), never as one side or as a card or debt payment.
+  assert.equal(row.props.accountId, undefined);
+  assert.equal(row.props.context, undefined);
+  assert.equal(row.props.showDate, undefined, 'the date shows, as on every recent row');
+  assert.equal(row.props.last, false);
+  assert.equal(Object.keys(row.props).sort().join(), 'accounts,last,transfer', 'nothing else is passed');
+  // The entries stay EntryRows with their own account; the rows span two accounts (the transfer by its origin), so each entry names its own.
+  const entries = nodes(root).filter(n => n.type === 'EntryRow');
+  assert.equal(entries.map(n => n.props.entry.id + ':' + n.props.account.id + ':' + n.props.showAccount).join(), 'e1:a:true,e2:b:true');
+  assert.equal(entries.every(n => n.props.entry === data.entries.find(item => item.id === n.props.entry.id)), true, 'the stored entries themselves');
+  assert.equal(entries.at(-1)!.props.last, true);
+  // A transfer from the same account as every entry adds no second account: no entry repeats the name.
+  const oneAccount = routeHarness('(tabs)/index.tsx', {}, { accounts, entries: [lunch], transfers: [{ ...move, fromAccountId: 'a', toAccountId: 'b' }] }).render();
+  assert.equal(nodes(oneAccount).filter(n => n.type === 'EntryRow').map(n => n.props.showAccount).join(), 'false');
+  // The screen's source passes no account or context to the transfer row.
+  assert.equal(/<TransferRow key=\{item\.key\} transfer=\{item\.value\} accounts=\{snapshot\.accounts\} last=\{[^}]+\} \/>/.test(homeSource), true);
+});
+
+test('24UX6C2 review: a recent transfer counts for the account rule by its real side: a debt collection by the account that received it, a card payment by the paying account', () => {
+  const at = '2026-09-01T12:00:00.000Z';
+  // Two real accounts and the hidden accounts of one card and one personal debt (synthetic fixtures).
+  const accounts: domain.Account[] = [{ id: 'cash', name: 'Efectivo', currency: 'ARS', openingMinor: 0, createdAt: at },
+    { id: 'bank', name: 'Banco', currency: 'ARS', openingMinor: 100000, createdAt: at },
+    { id: 'card-acc', name: 'Visa', currency: 'ARS', openingMinor: 0, createdAt: at },
+    { id: 'debt-acc', name: 'Juan', currency: 'ARS', openingMinor: 0, createdAt: at }];
+  const card: domain.CreditCardProfile = { id: 'card', accountId: 'card-acc', issuer: 'Visa', last4: '1234', creditLimitMinor: null,
+    closingDay: 1, dueDay: 10, active: true, deleted: false, createdAt: at, revision: 0, updatedAt: at };
+  const debt: domain.PersonalDebtProfile = { id: 'debt', accountId: 'debt-acc', direction: 'owed_to_me', counterparty: 'Juan', dueDateISO: null, note: '',
+    active: true, deleted: false, createdAt: at, revision: 0, updatedAt: at };
+  const groceries: domain.Entry = { id: 'e1', accountId: 'bank', kind: 'expense', amountMinor: 1200, merchant: 'Coto', category: 'Supermercado', dateISO: '2026-09-12', createdAt: '2026-09-12T13:00:00.000Z' };
+  const move = (id: string, fromAccountId: string, toAccountId: string): domain.Transfer => ({ id, fromAccountId, toAccountId, amountMinor: 2500, note: '', dateISO: '2026-09-11', createdAt: '2026-09-11T09:00:00.000Z' });
+  const extra = { cards: [card], debts: [debt] };
+  const render = (transfer: domain.Transfer, archive: Partial<domain.LedgerArchive> = extra) => routeHarness('(tabs)/index.tsx', {}, { accounts, entries: [groceries], transfers: [transfer] }, archive).render();
+  const names = (root: Node) => nodes(root).filter(n => n.type === 'EntryRow').map(n => n.props.entry.id + ':' + n.props.showAccount).join();
+  const listed = (root: Node) => recentRows(root).map(n => n.type + ':' + n.key).join();
+
+  // A debt collection: from the debt's hidden account into «Banco». It counts as «Banco», the expense's own account: names stay off.
+  const collection = render(move('t-debt', 'debt-acc', 'bank'));
+  assert.equal(listed(collection), 'EntryRow:entry-e1,TransferRow:transfer-t-debt', 'the collection is listed (its origin is in view)');
+  assert.equal(names(collection), 'e1:false', 'a debt collection into «Banco» beside a «Banco» expense is one account: no row repeats it');
+  // A card payment: from «Banco» into the card's hidden account. It counts as «Banco», the paying account: names stay off.
+  const payment = render(move('t-card', 'bank', 'card-acc'));
+  assert.equal(listed(payment), 'EntryRow:entry-e1,TransferRow:transfer-t-card');
+  assert.equal(names(payment), 'e1:false', 'a card payment from «Banco» beside a «Banco» expense is one account');
+  // An ordinary transfer from «Efectivo» into «Banco» counts as «Efectivo»: two real accounts, so the expense names its own.
+  const ordinary = render(move('t-cash', 'cash', 'bank'));
+  assert.equal(listed(ordinary), 'EntryRow:entry-e1,TransferRow:transfer-t-cash');
+  assert.equal(names(ordinary), 'e1:true', 'a transfer from «Efectivo» beside a «Banco» expense spans two accounts');
+  // The rule reads the archive's cards and debts: the same collection with no debt on record counts by its origin (another account).
+  assert.equal(names(render(move('t-debt', 'debt-acc', 'bank'), { cards: [card] })), 'e1:true', 'without the debt profile its account is an ordinary origin');
+  assert.equal(/hiddenLiabilityAccountIds\(archive\?\.cards, archive\?\.debts\)/.test(homeSource), true, 'Inicio reads the hidden accounts from the archive');
+});
+
+test('24UX6C2: a transfer never changes Gastado or Disponible: the figures with and without it are identical, in one currency or consolidated', () => {
+  const at = '2026-09-01T12:00:00.000Z';
+  const accounts: domain.Account[] = [{ id: 'a', name: 'Efectivo', currency: 'ARS', openingMinor: 20000, createdAt: at }, { id: 'b', name: 'Banco', currency: 'ARS', openingMinor: 300000, createdAt: at },
+    { id: 'u', name: 'Dólares', currency: 'USD', openingMinor: 5000, createdAt: at }];
+  const entries: domain.Entry[] = [
+    { id: 'e1', accountId: 'a', kind: 'expense', amountMinor: 1500, merchant: 'Café', category: 'Comida', dateISO: '2026-09-05', createdAt: '2026-09-05T09:00:00.000Z' },
+    { id: 'e2', accountId: 'b', kind: 'income', amountMinor: 80000, merchant: 'Sueldo', category: 'Sueldo', dateISO: '2026-09-02', createdAt: '2026-09-02T09:00:00.000Z' },
+    { id: 'e3', accountId: 'u', kind: 'expense', amountMinor: 700, merchant: 'App', category: 'Suscripciones', dateISO: '2026-09-08', createdAt: '2026-09-08T09:00:00.000Z' },
+  ];
+  const move: domain.Transfer = { id: 't1', fromAccountId: 'b', toAccountId: 'a', amountMinor: 45000, note: 'Retiro', dateISO: '2026-09-10', createdAt: '2026-09-10T09:00:00.000Z' };
+  const without: domain.LedgerSnapshot = { accounts, entries };
+  const withTransfer: domain.LedgerSnapshot = { accounts, entries, transfers: [move] };
+  const cases: { label: string; mode: displayCurrency.DisplayMode; currency: domain.Currency; book: domain.RateBook }[] = [
+    { label: 'single ARS', mode: 'single', currency: 'ARS', book: domain.rateBook([]) },
+    { label: 'consolidated ARS', mode: 'consolidated', currency: 'ARS', book: consolidatedRates() },
+  ];
+  const figures = (data: domain.LedgerSnapshot, item: typeof cases[number]) => {
+    const harness = routeHarness('(tabs)/index.tsx', {}, data, {}, displayStore({ [displayCurrency.DISPLAY_MODE_KEY]: item.mode, [displayCurrency.DISPLAY_CURRENCY_KEY]: item.currency }), { book: item.book });
+    let root = harness.render();
+    const spent = find(root, 'Money').props;
+    metricOf(root).props.onChange('available');
+    root = harness.render();
+    const available = find(root, 'Money').props;
+    return { spent: { minor: spent.minor, currency: spent.currency }, available: { minor: available.minor, currency: available.currency }, transfers: nodes(root).filter(n => n.type === 'TransferRow').length };
+  };
+  for (const item of cases) {
+    const before = figures(without, item), after = figures(withTransfer, item);
+    assert.equal(after.transfers, 1, item.label + ': the transfer is listed');
+    assert.equal(before.transfers, 0);
+    assert.equal(JSON.stringify(after.spent), JSON.stringify(before.spent), item.label + ': Gastado is the same with the transfer');
+    // Both accounts are liquid: the transfer moves money inside Disponible, so the total is the same to the minor unit.
+    assert.equal(JSON.stringify(after.available), JSON.stringify(before.available), item.label + ': Disponible is the same with the transfer');
+    assert.equal(Number.isInteger(after.spent.minor) && Number.isInteger(after.available.minor), true, 'integer minor units');
+    // And both are the domain's own figures.
+    const view = financeView.financeView(withTransfer, item.mode, item.currency, item.book);
+    const spent = financeView.spendingFigure(withTransfer, view, domain.spendingWindow(item.currency, 'month', '2026-09-12'), 'idle', true);
+    const available = financeView.availableFigure(withTransfer, view, item.book, '2026-09-12', 'idle', true, [], []);
+    assert.equal(spent.status === 'ready' && spent.minor === after.spent.minor, true, item.label + ': Gastado is spendingFigure');
+    assert.equal(available.status === 'ready' && available.minor === after.available.minor, true, item.label + ': Disponible is availableFigure');
+  }
+  // The single ARS figures, pinned: Gastado is the one ARS expense; Disponible the two liquid ARS balances.
+  const pinned = figures(withTransfer, cases[0]);
+  assert.equal(JSON.stringify([pinned.spent.minor, pinned.available.minor]), JSON.stringify([1500, 20000 + 300000 - 1500 + 80000]));
+});
+
+test('24UX6C2: with two currencies, «Solo USD» leaves an ARS transfer out; the consolidated view lists it once, at its own amount in its own accounts\' currency', () => {
+  const at = '2026-09-01T12:00:00.000Z';
+  const accounts: domain.Account[] = [{ id: 'a', name: 'Efectivo', currency: 'ARS', openingMinor: 0, createdAt: at }, { id: 'b', name: 'Banco', currency: 'ARS', openingMinor: 100000, createdAt: at },
+    { id: 'u', name: 'Dólares', currency: 'USD', openingMinor: 10000, createdAt: at }, { id: 'v', name: 'Ahorro USD', currency: 'USD', openingMinor: 0, createdAt: at }];
+  const pesos: domain.Transfer = { id: 'ars-move', fromAccountId: 'b', toAccountId: 'a', amountMinor: 45000, note: '', dateISO: '2026-09-10', createdAt: '2026-09-10T09:00:00.000Z' };
+  const dollars: domain.Transfer = { id: 'usd-move', fromAccountId: 'u', toAccountId: 'v', amountMinor: 3000, note: '', dateISO: '2026-09-09', createdAt: '2026-09-09T09:00:00.000Z' };
+  const usdExpense: domain.Entry = { id: 'usd-lunch', accountId: 'u', kind: 'expense', amountMinor: 1200, merchant: 'Lunch', category: 'Comida', dateISO: '2026-09-11', createdAt: '2026-09-11T09:00:00.000Z' };
+  const data: domain.LedgerSnapshot = { accounts, entries: [usdExpense], transfers: [pesos, dollars] };
+  const show = (mode: displayCurrency.DisplayMode, currency: domain.Currency) => routeHarness('(tabs)/index.tsx', {}, data, {},
+    displayStore({ [displayCurrency.DISPLAY_MODE_KEY]: mode, [displayCurrency.DISPLAY_CURRENCY_KEY]: currency }), { book: consolidatedRates() }).render();
+  let root = show('single', 'USD');
+  assert.equal(recentIds(root), 'usd-lunch,usd-move', '«Solo USD»: the USD expense and the USD transfer; the ARS transfer is not listed');
+  root = show('single', 'ARS');
+  assert.equal(recentIds(root), 'ars-move', '«Solo ARS»: only the ARS transfer');
+  root = show('consolidated', 'USD');
+  assert.equal(recentIds(root), 'usd-lunch,ars-move,usd-move', 'consolidated: every record once, newest first');
+  const listed = nodes(root).filter(n => n.type === 'TransferRow' && n.props.transfer.id === 'ars-move');
+  assert.equal(listed.length, 1, 'the ARS transfer once');
+  const row = listed[0];
+  assert.equal(row.props.transfer, pesos, 'at its own amount, never converted into the display currency');
+  assert.equal(row.props.transfer.amountMinor, 45000);
+  const currencyOf = (id: string) => (row.props.accounts as domain.Account[]).find(account => account.id === id)!.currency;
+  assert.equal(currencyOf(pesos.fromAccountId) + '→' + currencyOf(pesos.toAccountId), 'ARS→ARS', 'its accounts keep their real currency in the consolidated view');
+  assert.equal(row.props.accounts, data.accounts, 'the stored accounts themselves');
 });
 
 test('24UX6A: commitments without activity show only the commitments; with neither, one quiet line and no action; with no account, the start', () => {
