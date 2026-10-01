@@ -5,12 +5,14 @@ import Svg, { Circle, Path } from 'react-native-svg';
 import { AppText, Money, PressFeedback } from './components';
 import { useI18n } from '../i18n/provider';
 import { categoryColor, othersColor } from './category-color';
-import { ROW_STACK_SCALE, amountWidthEm } from './geometry';
+import { ROW_STACK_SCALE, amountWidthEm, labelWidthEm } from './geometry';
 import { ValueTransition, duration, timing } from './motion';
 import { usePalette, useReduceMotion, type Palette } from './theme';
 import type { Currency } from '@finanzapp/domain';
 
-export const OTHERS_KEY = '__others__';
+/** The grouped tail's key. It starts with a space, which no category key can (`categoryKey` trims), so the synthetic
+ * «Otras» slice can never share its identity with a real category, whatever the person names one (Codex, PR #73). */
+export const OTHERS_KEY = ' others';
 
 export type DonutSlice = { key: string; label: string; value: number };
 
@@ -137,8 +139,12 @@ export function DonutChart({ slices, currency, size = 176, thickness = 22, chose
   // the eye only: VoiceOver hears the same choice once, as the adjustable element's value.
   const amountSize = size >= 176 ? 18 : 16;
   const hole = size - 2 * (thickness + 10);
+  // The name must fit too, on at most two lines of the hole (Codex, PR #73: a custom category may be 60 characters long);
+  // 0.85 leaves room for where the line breaks fall.
+  const scale = Math.max(fontScale, 0.5);
   const centreFits = !selected || (fontScale <= ROW_STACK_SCALE
-    && amountWidthEm(moneyText(selected.value, currency)) * amountSize * Math.max(fontScale, 0.5) <= hole);
+    && amountWidthEm(moneyText(selected.value, currency)) * amountSize * scale <= hole
+    && labelWidthEm(selected.label) * 13 * scale <= hole * 2 * 0.85);
   const readout = selected ? <>
     <AppText numberOfLines={centreFits ? 2 : undefined} maxFontSizeMultiplier={centreFits ? ROW_STACK_SCALE : undefined} variant="footnote"
       style={{ fontWeight: '600', textAlign: 'center' }}>{selected.label}</AppText>

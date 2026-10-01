@@ -88,12 +88,12 @@ function routeHarness(file: string, params: Record<string, unknown>, data = snap
     '../src/ui/home-modules': { CurrencyParts: 'CurrencyParts', MetricHelp: 'MetricHelp' },
     '@finanzapp/domain': domain,
     '../src/storage/LedgerProvider': { useLedger: () => ({ snapshot: data, archive: { accounts: data.accounts, records: [], ...archive } }) },
-    '../src/ui/charts': { DonutChart: 'DonutChart', MonthBars: 'MonthBars', OTHERS_KEY: '__others__',
+    '../src/ui/charts': { DonutChart: 'DonutChart', MonthBars: 'MonthBars', OTHERS_KEY: ' others',
       // Like the real one: at most five slices, the tail grouped into one neutral «Otras» slice keyed OTHERS_KEY.
       donutSlices: (items: { key: string; label: string; value: number }[], _p: unknown, _hues: unknown, othersLabel: string) => {
         const head = items.slice(0, items.length > 5 ? 4 : 5).map((item, index) => ({ ...item, color: 'c' + index }));
         const tail = items.slice(head.length);
-        return tail.length ? head.concat([{ key: '__others__', label: othersLabel, value: tail.reduce((sum, item) => sum + item.value, 0), color: 'grey' }]) : head;
+        return tail.length ? head.concat([{ key: ' others', label: othersLabel, value: tail.reduce((sum, item) => sum + item.value, 0), color: 'grey' }]) : head;
       } },
     '../src/ui/components': Object.fromEntries(componentNames.map(name => [name, name])),
     '../src/ui/currency-switch': { CurrencySwitch: 'CurrencySwitch', DisplayCurrencyButton: 'DisplayCurrencyButton' },
@@ -834,12 +834,12 @@ test('24UX6C2: the «Otras» slice can be chosen without marking any category ro
   let root = view.render();
   const slices = find(root, 'DonutChart').props.slices as { key: string; value: number }[];
   assert.equal(slices.length, 5);
-  assert.equal(slices[4].key, '__others__');
+  assert.equal(slices[4].key, ' others');
   assert.equal(slices[4].value, 300, 'the two smallest categories, grouped');
   assert.equal(root.props.data.length, 6, 'every category keeps its own row');
-  find(root, 'DonutChart').props.onChoose('__others__');
+  find(root, 'DonutChart').props.onChoose(' others');
   root = view.render();
-  assert.equal(find(root, 'DonutChart').props.chosen, '__others__');
+  assert.equal(find(root, 'DonutChart').props.chosen, ' others');
   assert.equal(rowChoices(root), noneChosen(root), '«Otras» is not one category, so no row is marked');
   assert.equal(find(root, 'DonutChart').props.shareOf(300).label, reportPresentation.spendingShare(300, 2100, 'es-AR').label);
   assert.equal(find(root, 'Money').props.minor, 2100);

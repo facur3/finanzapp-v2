@@ -505,3 +505,32 @@ test('24UX6C2: donutArcs splits the ring clockwise from twelve with a 2 pt gap; 
   assert.equal(charts.sliceAt(arcs, 88, 88, 176, 22), null, 'the centre');
   assert.equal(charts.sliceAt([], 88 + radius, 88, 176, 22), null, 'no arcs: nothing to choose');
 });
+
+test('Codex (PR #73): a long category name moves the readout under the donut even at the default text size; a short one stays in the hole', () => {
+  chartFontScale = 1;
+  const long = 'Comidas fuera de casa con amigos y familia los fines de semana';
+  const slices = [{ key: 'long', label: long, value: 2900, color: '#111' }, { key: 'b', label: 'Hogar', value: 7100, color: '#222' }];
+  const chosen = donut({ slices, chosen: 'long' });
+  assertReadoutBelow(chosen, { name: long, minor: 2900, share: chosen.i18n.t('reports.chart.share', { percent: i18nFormat.formatPercent(0.29, 'es-AR') }) });
+  const short = donut({ slices, chosen: 'b' });
+  assert.equal(short.below, undefined, 'a short name and amount keep the readout in the hole');
+});
+
+test('Codex (PR #73): the «Otras» slice can never share its key with a category, whatever the person names one', async () => {
+  const { categoryKey } = await import('@finanzapp/domain');
+  const charts = chartsModule(bindLocale('es-AR'));
+  const OTHERS = (charts as any).OTHERS_KEY as string;
+  assert.equal(OTHERS.startsWith(' '), true, 'a leading space, which categoryKey always trims');
+  for (const label of ['__others__', ' others', 'Others', '  OTRAS  ', 'otras']) assert.notEqual(categoryKey(label), OTHERS, label);
+  // A real category literally named «__others__» among the leading slices and an aggregate tail: two distinct keys.
+  const items = ['__others__', 'a', 'b', 'c', 'd', 'e'].map((key, index) => ({ key: categoryKey(key), label: key, value: 600 - index * 10 }));
+  const slices = (charts as any).donutSlices(items, { isDark: false }, () => '#123', 'Otras') as { key: string; label: string; value: number }[];
+  assert.equal(new Set(slices.map(slice => slice.key)).size, slices.length, 'every slice key is unique');
+  const aggregate = slices.find(slice => slice.key === OTHERS)!;
+  assert.deepEqual([aggregate.label, aggregate.value], ['Otras', 560 + 550], 'the tail after the four named slices');
+  assert.ok(slices.some(slice => slice.key === '__others__' && slice.label === '__others__'), 'the real category keeps its own slice');
+  // Choosing the aggregate shows the aggregate, not the category with the look-alike name.
+  const view = donut({ slices: slices.map(slice => ({ ...slice, color: '#111' })), chosen: OTHERS, total: slices.reduce((sum, slice) => sum + slice.value, 0) });
+  const names = flat(view.centre).filter(node => node.type === 'AppText').map(textOf);
+  assert.equal(names[0], 'Otras');
+});

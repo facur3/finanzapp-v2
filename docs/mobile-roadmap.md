@@ -2254,9 +2254,12 @@ nothing of it is on a screen yet.
   the donut when it does not fit the hole (never truncated), localized names for the two adjustable actions and a
   VoiceOver double-tap that no longer clears the choice, the choice cleared on any change of month, currency or display
   mode (also from Inicio), wide scripts, emoji sequences and flags measured as such, and a hidden card or debt account
-  not counted as a second account on Inicio's rows.
+  not counted as a second account on Inicio's rows. Codex (PR #73) then found two more, fixed: the centre's fit also
+  measures the category's name (a long custom name moves the readout under the donut instead of being cut), and the
+  «Otras» slice's key starts with a space, which no category key can (`categoryKey` trims), so a category named
+  «__others__» can never share its identity.
   Linux gates (2026-10-01): root `npm test` 415 passed, 1 todo (25 files); `npm run check:repo` OK; in `apps/mobile`:
-  typecheck clean, `test:storage` 999/999, `currency:verify` and `regions:verify` OK, `i18n:check -- --strict` 0 errors
+  typecheck clean, `test:storage` 1001/1001, `currency:verify` and `regions:verify` OK, `i18n:check -- --strict` 0 errors
   and 0 stale (English lock re-accepted), `check` OK, `export:ios` bundle exported. The `mobile_api` job needs
   PostgreSQL and runs in CI. None of this is iPhone QA.
 

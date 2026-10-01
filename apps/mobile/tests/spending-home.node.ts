@@ -120,7 +120,7 @@ function routeHarness(file: string, params: Record<string, unknown>, initialData
     '../src/ui/presentation': presentation,
     '../src/ui/report-presentation': reportPresentation,
     '../src/ui/spending-chart': { CategorySpendingRow: 'CategorySpendingRow', CategoryLegendRow: 'CategoryLegendRow' },
-    '../src/ui/charts': { DonutChart: 'DonutChart', MonthBars: 'MonthBars', OTHERS_KEY: '__others__',
+    '../src/ui/charts': { DonutChart: 'DonutChart', MonthBars: 'MonthBars', OTHERS_KEY: ' others',
       donutSlices: (items: { key: string; label: string; value: number }[]) => items.slice(0, 5).map((item, index) => ({ ...item, color: 'c' + index })) },
     '../src/ui/budget-presentation': budgetPresentation,
     '@expo/vector-icons/Ionicons': 'Ionicons',

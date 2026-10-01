@@ -46,8 +46,8 @@ Producto 24UX6C2»). This section supersedes the 24UX6A item «this month's expe
   elegida»); swiping up and down steps through the categories, announcing name, amount and percentage, and past either
   end returns to none (down from none starts at the last). The centre's text is not a separate VoiceOver stop; the
   Actions rotor shows «Categoría siguiente» / «Categoría anterior»; a double tap does not clear the choice.
-- [ ] Larger text (beyond the default, and AX sizes) or a very long amount: the chosen readout moves under the donut,
-  whole, and the hole stays clear; the amount is never cut.
+- [ ] Larger text (beyond the default, and AX sizes), a very long amount or a long custom category name: the chosen
+  readout moves under the donut, whole, and the hole stays clear; neither the amount nor the name is cut.
 - [ ] Changing the month (arrows, «Este mes», a bar), the display currency or mode (also from Inicio's chip) resets the
   choice, and going back does not bring it back; the category rows still open their detail.
 - [ ] A Japanese or emoji category name (e.g. «食料品・日用品», «Mascotas 🐶») with a large amount stacks like a long
