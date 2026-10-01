@@ -32,7 +32,8 @@ Movimientos header «+» and the neutral hub tiles.
   at 375 pt); typing filters as before, the native clear button empties it; VoiceOver reads «Buscar movimientos»
   («Search transactions» in English).
 - [ ] The kind filter and the count line (secondary). With VoiceOver, changing the filter announces the new count at
-  once, and typing announces it after a short pause (iOS has no live regions, so the screen announces it); a search with no match shows
+  once, and typing announces it after a short pause (iOS has no live regions, so the screen announces it); switching tabs
+  or opening a row during that pause announces nothing over the next screen; a search with no match shows
   the empty state with its brand-tinted glyph tile and the clear action.
 - [ ] Undo / Recover and Movimientos deshechos behave as before.
 

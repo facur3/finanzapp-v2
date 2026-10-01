@@ -2075,7 +2075,8 @@ nothing of it is on a screen yet.
   pill on the surface with a hairline edge, the magnifier glyph, the native clear button, the label «Buscar
   movimientos» / «Search transactions» and the placeholder «Comercio, categoría o cuenta»; it reads
   `speechLanguage`. The count line is secondary footnote; VoiceOver announces the new count when the filter changes or
-  the search settles (`AccessibilityInfo.announceForAccessibility`, since iOS has no live regions); day headers are ink subhead
+  the search settles (`AccessibilityInfo.announceForAccessibility`, since iOS has no live regions; a pending announcement is cancelled
+  when Movimientos loses focus, so it never speaks over another tab or a pushed screen: Codex, PR #72); day headers are ink subhead
   semibold (were secondary footnote), the net kept secondary with its sign. The shared `EmptyState` glyph tile uses the
   pine brand tint (`GlyphTile` with `p.primary`) for contrast, which also lifts Inicio's empty state.
 - **What changed: Inicio.** No line under the number: no «Hasta hoy · … por día», «Sin gastos este mes» or «Saldo
@@ -2111,7 +2112,10 @@ nothing of it is on a screen yet.
 - **Deferred within the approved scope.** Movimientos' filters by period, account and category from repository data
   stay approved and are not in this PR; no note, Apple Pay origin or transaction time is invented.
 - **Tests.** New `tests/movement-amount.node.ts` (5: expense unsigned and as stored, income «+», transfer unsigned,
-  never an absolute value or a mutation). `tests/ui-rows.node.ts` (EntryRow expense unsigned in ink with the entry
+  never an absolute value or a mutation). New `tests/activity-route.node.ts` (3: Movimientos composes the search pill,
+  the kind filter and the count with no header «+»; the count is announced after a filter change at once and after a
+  pause while typing, never on the first render; a pending announcement is cancelled on blur and none starts while
+  another screen is in front). `tests/ui-rows.node.ts` (EntryRow expense unsigned in ink with the entry
   unchanged, income «+» in green, TransferRow unsigned in the transfer tone in every context with its VoiceOver kind,
   a negative AccountRow balance keeping its minus, the brand-tinted EmptyState tile). `tests/installment-routes.node.ts`
   and `tests/polish-routes.node.ts` (the movement and recurring detail heroes and the recurring rows as stored; the
@@ -2132,7 +2136,7 @@ nothing of it is on a screen yet.
   unchanged.
 
   Linux gates (2026-10-01): root `npm test` 415 passed, 1 todo (25 files); `npm run check:repo` OK; in `apps/mobile`:
-  typecheck clean, `test:storage` 952/952, `currency:verify` and `regions:verify` OK, `i18n:check -- --strict` 0 errors
+  typecheck clean, `test:storage` 955/955, `currency:verify` and `regions:verify` OK, `i18n:check -- --strict` 0 errors
   and 0 stale (English lock re-accepted), `check` OK, `export:ios` bundle exported. The `mobile_api` job needs
   PostgreSQL and runs in CI. None of this is iPhone QA.
 

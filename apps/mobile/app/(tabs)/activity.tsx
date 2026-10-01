@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AccessibilityInfo, View } from 'react-native';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { useLedger } from '../../src/storage/LedgerProvider';
 import { ActionButton, AppText, Choices, EmptyState, SearchField } from '../../src/ui/components';
 import { EntryList } from '../../src/ui/entry-list';
@@ -27,14 +27,31 @@ export default function ActivityScreen() {
     [snapshot, filter, query, transferWord]);
   const count = entries.length + transfers.length;
   // VoiceOver hears the new count once the search or the filter settles (iOS has no live regions): after a short pause
-  // while typing, at once for a filter; never on the first render or when only the ledger changes.
+  // while typing, at once for a filter; never on the first render or when only the ledger changes. The tab stays mounted
+  // under other tabs and pushed screens, so a pending announcement is cancelled when Movimientos loses focus (Codex,
+  // PR #72): it never speaks over another screen.
   const asked = useRef({ query, filter });
+  const focused = useRef(true);
+  const pending = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // What the announcement says is read when it fires: the count of that moment, in the language of that moment.
+  const latest = useRef({ count, t });
+  latest.current = { count, t };
+  const cancel = () => { if (pending.current) clearTimeout(pending.current); pending.current = null; };
+  useFocusEffect(useCallback(() => {
+    focused.current = true;
+    return () => { focused.current = false; cancel(); };
+  }, []));
   useEffect(() => {
     if (asked.current.query === query && asked.current.filter === filter) return;
     asked.current = { query, filter };
-    const timer = setTimeout(() => AccessibilityInfo.announceForAccessibility(t('count.movements', { count })), query ? 700 : 0);
-    return () => clearTimeout(timer);
-  }, [query, filter, count, t]);
+    cancel();
+    if (!focused.current) return;
+    pending.current = setTimeout(() => {
+      pending.current = null;
+      if (focused.current) AccessibilityInfo.announceForAccessibility(latest.current.t('count.movements', { count: latest.current.count }));
+    }, query ? 700 : 0);
+  }, [query, filter]);
+  useEffect(() => cancel, []);
   if (!snapshot) return null;
   const hasRecords = snapshot.entries.length + (snapshot.transfers?.length ?? 0) > 0;
   return <EntryList entries={entries} transfers={transfers} accounts={snapshot.accounts}
