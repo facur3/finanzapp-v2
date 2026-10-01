@@ -1,5 +1,69 @@
 # Physical iPhone acceptance checklist
 
+## Producto 24UX6B — Reportes hierarchy
+
+**Not done in 24UX6B: no EAS build was made and the iPhone was not touched. Every item below is pending.**
+Metro from this branch (`npm run start:dev-client -- --clear`) on the installed FinanzApp Dev build; JavaScript only
+(Reportes, the idle month-bar colour and its copy), no native dependency, no schema, backup, route or navigation
+change. Use your own data; never seed movements. Record each result with the iPhone model, iOS version, theme and text
+size. The design is in [mobile-design.md](mobile-design.md) («Producto 24UX6B — jerarquía de Reportes»).
+
+- [ ] The Más footer reads «FinanzApp 0.1.0 (24UX6B)».
+
+**Reading order.**
+
+- [ ] Light and dark, top to bottom: the display-currency chip (only with more than one currency held), the month with
+  its arrows and «Este mes»; «GASTADO · ARS» with its ⓘ, the amount, one line «… por día · …»; the Categorías | Día a
+  día control; the donut; «Por categoría» over the category rows; then «Evolución» («Tocá un mes para verlo») with
+  «Últimos seis meses»; then budgets, «Dónde más gastaste», «Para tener en cuenta», income and net flow, «Comparar con
+  el mes anterior». The six-month bars are no longer the first chart.
+- [ ] Switch Categorías ↔ Día a día: only the analysis block changes (Día a día: no donut, «Por día» with «Solo días
+  con gastos registrados.» over the day rows); «Evolución» and the details stay below, in the same order. A category
+  row opens its detail; a day row opens its day.
+- [ ] Scroll down to «Evolución» and tap a past month's bar: that month opens and the list scrolls back to the top
+  (its title, total and analysis in view; with Reduce Motion the jump is immediate). «Este mes» or the arrows lead
+  forward again.
+
+**History rule.**
+
+- [ ] A ledger with spending only in the current month: «Evolución» shows the quiet card «Con más meses de gastos
+  registrados vas a ver la evolución acá.» instead of a lone bar. The same card for a past month that is the only one
+  of its own six months with spending.
+- [ ] A month where none of the six months has spending, or a currency with a missing rate: no bars and no note.
+
+**Empty states.**
+
+- [ ] An empty month (an earlier month with nothing recorded, or a currency with nothing this month): the zero total
+  in its usual inks, no orphan «Por categoría» / «Por día» heading, and one card. Categorías: «Sin gastos en este
+  período» / «Los gastos que registres en esta moneda aparecen acá, por categoría.» with the pie glyph. Día a día: the
+  same title with «Cada día con gastos en esta moneda aparece acá, con su total.» with the calendar glyph. It reads as
+  intentional, not broken.
+
+**Accessibility.**
+
+- [ ] VoiceOver, swiping from the top: chip, month and arrows, the total, the summary line read once and in words
+  (the average as spoken money, the change as a spoken percent; no currency symbol or grouped digits spelled out), the
+  segmented control, the donut, the «Por categoría» heading and rows, then Evolución and its bars, budgets, merchants,
+  insights, income/net, Comparar. The headings are reachable with the rotor (Headings). Check in Spanish and English.
+- [ ] Dynamic Type from the default to the largest accessibility size on a 375 pt iPhone (or Zoomed display): the
+  headings, the summary line (wraps, never clips), the rows (stack without overlapping) and the Evolución card; the
+  last section scrolls clear of the dock.
+
+**Colour and motion.**
+
+- [ ] The unselected month bars are clearly visible in light and dark (the shown month stays the pine bar; the month in
+  progress stays outlined, also when it is not the shown one).
+- [ ] No red on ordinary spending (the total, the rows, the bars); the brick tone appears only for an exceeded budget
+  and its insight.
+- [ ] Reduce Motion off: the donut sweeps clockwise when it appears (opening Reportes, and back on Categorías after
+  Día a día), a month change is one fade, the bars glide between months, a bar tap scrolls up. Reduce Motion on: the donut appears complete, the bars jump, only the fade stays. Nothing
+  new moves.
+- [ ] Switch tabs into Reportes 30 times quickly (from Inicio, Movimientos and Más): no black screen, no blank frame,
+  no cross-fade.
+
+Record: date, iPhone model, iOS version, build, language, and every result above (a failure with a screenshot of your
+own test data only, never of real financial data).
+
 ## Producto 24UX6A — Forest foundation, four-tab shell, capture hub and Home
 
 **Not done in 24UX6A: no EAS build was made and the iPhone was not touched. Every item below is pending.**

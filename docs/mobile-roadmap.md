@@ -1,10 +1,11 @@
 # FinanzApp mobile: living roadmap
 
-Updated: 2026-09-30 (Producto 24UX6A, amended on its branch (PR #70) into the Forest foundation, the four-tab shell, the
-capture hub, Home and Appearance: the Forest palette, four icon-only tabs and a separate «+» in one dock, the hub with the
-Assistant first, the Assistant as a root-stack screen with an in-memory conversation, Inicio's financial field with the
-month's activity, Más → Apariencia; owner decisions recorded in decision 005 (2026-09-30); the UX lane 24UX6A → 24UX6B →
-24UX6C → 24UX6D is layered on the product order; device QA pending, no EAS build. Producto 24T2 merged as
+Updated: 2026-10-01 (Producto 24UX6B on its branch: Reportes' hierarchy and chart polish, the period, the month's total
+and the category analysis first and the six months' history below it, intentional empty states, one spoken summary line,
+idle month bars at 3:1 or more; device QA pending, no EAS build. Producto 24UX6A merged as PR #70, merge commit ef24bb6
+(2026-10-01): the Forest foundation, four icon-only tabs and a separate «+» in one dock, the capture hub, the Assistant as
+a root-stack screen, Inicio's financial field, Más → Apariencia; owner decisions in decision 005 (2026-09-30); device QA
+still pending. The UX lane 24UX6A → 24UX6B → 24UX6C → 24UX6D is layered on the product order. Producto 24T2 merged as
 PR #69, merge commit 8951f6c: schema 13, backup v13, the purchase in cuotas, the card's statement calendar and the
 Tarjetas deck, verified by the owner on an iPhone 14 Pro with a fresh development build). Read [decision 001](decisions/001-native-mobile.md),
 [decision 002](decisions/002-spending-first.md),
@@ -146,14 +147,24 @@ history file keeps the evidence of when and why.
 
 ## 1. Implemented (current state)
 
-What exists in code on `master` as of Producto 24T2 (PR #69, merged 2026-09-29, merge commit 8951f6c), after 24T1C (PR #68),
-24T1 (PR #67) and 25B3 (PR #66), plus Producto 24UX6A on its branch. Per area, without test inventories (those are in apps/mobile/README.md and the history
+What exists in code on `master` as of Producto 24UX6A (PR #70, merged 2026-10-01, merge commit ef24bb6), after 24T2 (PR
+#69, merge commit 8951f6c), 24T1C (PR #68), 24T1 (PR #67) and 25B3 (PR #66), plus Producto 24UX6B on its branch. Per area,
+without test inventories (those are in apps/mobile/README.md and the history
 file). "Released" below names an in-app gate (`RELEASED_LANGUAGES`, `RELEASED_REGIONS`,
 `LEDGER_CURRENCIES`): what a build offers, verified on Linux; nothing is distributed to people yet
 (§4).
 
-- **Forest foundation, four-tab shell, capture hub, Inicio and Apariencia (24UX6A, PR #70, on its branch; decision
-  005).** The Forest palette (pine brand, a deep pine field on Inicio, a sage-mint accent on the «+», OLED black in
+- **Reportes hierarchy and chart polish (24UX6B, on its branch).** Reportes reads top to bottom: the scope and the
+  month (the display-currency chip only with more than one currency, the month arrows and «Este mes»; past months live
+  here, Inicio stays the current month); the month's total («Gastado · ARS» with the method button, the amount, one line «… por día · …» that VoiceOver reads once in words); the analysis (Categorías | Día a día,
+  the donut and «Por categoría», or «Por día»); then «Evolución» with «Últimos seis meses» (a bar still opens its
+  month and scrolls back to its total; a quiet note instead of a lone bar when the shown month is the only one of its six
+  with spending); then budgets, «Dónde más gastaste», «Para tener en cuenta»,
+  income and net flow and «Comparar con el mes anterior». An empty month shows one intentional empty card per view; the
+  idle month bars hold at least 3:1 on their surface. Every figure, route and rule unchanged; the version line reads «FinanzApp
+  0.1.0 (24UX6B)». Details in «Producto 24UX6B» (§3).
+- **Forest foundation, four-tab shell, capture hub, Inicio and Apariencia (24UX6A, PR #70, merged 2026-10-01, merge
+  commit ef24bb6; decision 005; device QA pending).** The Forest palette (pine brand, a deep pine field on Inicio, a sage-mint accent on the «+», OLED black in
   dark mode; category colours unchanged); four icon-only tabs (Inicio, Movimientos, Reportes, Más) in a pine dock
   with a separate 60 pt «+» that opens the capture hub (Asistente first, then Gasto, Ingreso, Transferencia); the
   Assistant as a root-stack screen whose conversation lives in memory for the app's process; Inicio as a financial
@@ -221,7 +232,7 @@ file). "Released" below names an in-app gate (`RELEASED_LANGUAGES`, `RELEASED_RE
   24UX6A five, with the Assistant in the centre), icon-only in one dock with a separate «+» that opens the capture
   hub; the Assistant is a root-stack screen opened from the hub; Más is the grouped hub (Finanzas / App y datos:
   Cuentas, Tarjetas, Presupuestos, Recurrentes, Deudas y cobros, Categorías, Idioma, Región, Apariencia, backup, the
-  Assistant's data note); a Más version line («FinanzApp 0.1.0 (24UX6A)»; the material and locale diagnostics only in a
+  Assistant's data note); a Más version line («FinanzApp 0.1.0 (24UX6B)»; the material and locale diagnostics only in a
   development build). The dock stays in the layout (never absolute over the content). Liquid Glass (tinted pine on the
   dock's pill) on the dock, the account detail's movement pills and the Assistant composer only in a development build
   on iOS 26 with the API present and without Reduce Transparency; opaque material otherwise (solid pine with a hairline
@@ -280,8 +291,8 @@ file). "Released" below names an in-app gate (`RELEASED_LANGUAGES`, `RELEASED_RE
   brand marks are deferred to 25C2 (no logo API, bundled brand asset, upload or provider key); a
   development-only initial preview checks recognition (docs/merchant-identity.md).
 - **Budgets and reports.** A monthly total budget plus category sublimits (schema 7); explicit
-  remaining and exceeded states; Reportes with trend, donut and legend, day-by-day, budgets, top
-  merchants, insights, previous-month and category comparison with explicit ranges and
+  remaining and exceeded states; Reportes (in 24UX6B's order: the month's total, the donut and its legend or
+  day-by-day, then the six months' trend) with budgets, top merchants, insights, previous-month and category comparison with explicit ranges and
   missing-history guards; one display mode and currency shared by Inicio and Reportes
   (`finanzapp.displayMode`, `finanzapp.displayCurrency`, outside the ledger and backups): since 24C1 a
   consolidated total converted in the view (each movement at its own date's rate) or one currency on
@@ -352,7 +363,16 @@ it was checked in). Metro from the branch on the installed FinanzApp Dev build s
 item unless a section says a new native build is needed. The checklist sections are in
 [mobile-device-checklist.md](mobile-device-checklist.md).
 
-- **24UX6A — Forest foundation, four-tab shell, capture hub, Home and Appearance (none done; no EAS build):** the
+- **24UX6B — Reportes hierarchy and chart polish (none done; no EAS build):** the checklist section Producto 24UX6B:
+  the reading order top to bottom in light and dark; the VoiceOver order (the display chip, the month and its arrows,
+  the total, the summary line read once in words with the change, the segmented control, the donut, the «Por
+  categoría» rows, then Evolución, budgets, merchants, insights, income and net flow, Comparar); Dynamic Type up to the
+  AX sizes on a 375 pt iPhone (headings, rows stacking, the summary line wrapping); Categorías ↔ Día a día keeping the
+  order with the history below; a bar opening its month with the bars staying; the single-month note on a ledger with
+  only the current month; an empty month in both views; the idle bars visible in both themes; no red on ordinary
+  spending; Reduce Motion (the donut reveal, the bars); 30 rapid tab switches into Reportes without a black screen.
+  Metro on the installed development build; no native dependency added.
+- **24UX6A — Forest foundation, four-tab shell, capture hub, Home and Appearance (merged as PR #70; none done; no EAS build):** the
   checklist section Producto 24UX6A: the four-tab icon-only dock with VoiceOver «n de 4» and «Registrar» not a tab;
   the Large Content Viewer on long press at accessibility sizes; 30–40 rapid tab switches without black screens; glass
   vs solid pine (Reduce Transparency); the hub's open/close (×, scrim, VoiceOver escape), the first-choice hold, the
@@ -442,12 +462,13 @@ item unless a section says a new native build is needed. The checklist sections 
 
 ## 3. Next deliveries
 
-**Recommended next (2026-09-30):** 25B3 (PR #66), 24T1 (PR #67), 24T1C (PR #68) and **24T2 (PR #69, merge commit
+**Recommended next (2026-10-01):** 25B3 (PR #66), 24T1 (PR #67), 24T1C (PR #68) and **24T2 (PR #69, merge commit
 8951f6c)** merged: SQLite schema 13, backup v13, the purchase in cuotas and the complete Tarjetas, verified by the owner on
 an iPhone 14 Pro with a fresh development build. The immediate path is visual first: **24UX6A** (the Forest foundation,
-the four-tab shell, the capture hub, Home and Appearance; PR #70, on its branch, amended 2026-09-30 per decision 005;
-device QA pending), then **24UX6B** (Reportes in Forest, decisions recorded below), then **24T3** (refunds, early
-payoff, cancellation adjustments and the final device QA of instalments), then the later roadmap below. The earlier
+the four-tab shell, the capture hub, Home and Appearance; merged as PR #70, merge commit ef24bb6, 2026-10-01; device QA
+pending), then **24UX6B** (Reportes hierarchy and chart polish; the current delivery, on its branch; device QA
+pending), then **24T3** (refunds, early payoff, cancellation adjustments and the final device QA of instalments), the
+next delivery per the binding order, then the later roadmap below. The earlier
 plan, as reconciled by 24T1C: 24T1 left 12 of the 13 card-invariant `it.todo`
 as tests (the remaining one, the foreign-currency plan record, belongs to 24C2); then 24T2 and **24T3**: **Producto 24T** ships in three focused PRs: 24T1 (domain, schema, backup and instalment
 mathematics; merged), 24T2 (the card purchase with the simple financing UX, the exact current-cycle dates, statements,
@@ -1801,7 +1822,7 @@ nothing of it is on a screen yet.
   `expo-modules-core` 57.0.20 and `@expo/ui` 57.0.21); no other dependency changed. The
   `mobile_api` PostgreSQL job runs in CI. No EAS build; the iPhone was not touched (checklist section Producto 24T2).
 
-### Producto 24UX6A — Forest foundation, four-tab shell, capture hub and Home (PR #70)
+### Producto 24UX6A — Forest foundation, four-tab shell, capture hub and Home (PR #70, merged)
 
 - **Goal.** Amended on 2026-09-30 to the owner's final decisions (decision 005): the Forest identity as the app's
   foundation, a four-tab shell with a separate «+» that opens a capture hub, the Assistant as a root-stack screen, and
@@ -1921,8 +1942,8 @@ nothing of it is on a screen yet.
   its currency (the line is gone), the first choice holding during the sheet's exit (carried into the hub) and tab
   labels truncating (the labels are gone). The Linux gates recorded on that tree (root `npm test` 415 passed, 1 todo;
   `test:storage` 889/889; `export:ios` 1984 modules) do not apply to the amended tree.
-- **Status.** Implemented on the branch, PR #70 open (not merged), amended 2026-09-30. Device QA pending: nothing was
-  checked on an iPhone (checklist section Producto 24UX6A; the list in §2). No EAS build; no native dependency added;
+- **Status.** Merged (PR #70, 2026-10-01, merge commit ef24bb6), amended 2026-09-30 before the merge. Device QA
+  pending: nothing was checked on an iPhone (checklist section Producto 24UX6A; the list in §2). No EAS build; no native dependency added;
   schema 13 and backup v13 unchanged; `app.config.ts` untouched. Linux gates on the amended tree:
 
   root `npm test` 415 passed, 1 todo (25 files); `npm run check:repo` OK; in `apps/mobile`: typecheck clean,
@@ -1930,18 +1951,63 @@ nothing of it is on a screen yet.
   lock re-accepted), `check` (dependencies up to date), `export:ios` bundle exported. The `mobile_api` job needs PostgreSQL
   and is left to CI. None of this is iPhone QA.
 
-### Producto 24UX6B — Reportes in Forest (approved 2026-09-30, not implemented)
+### Producto 24UX6B — Reportes hierarchy and chart polish (this PR)
 
 - **Scope.** The restraint 24UX6A gave Inicio, applied to Reportes in the Forest identity: one focal figure per view
   and the category analysis Inicio no longer carries given the room it needs, with every fact still computed and
-  verifiable. No new data, no schema, backup, route or accounting change. The calendar (Later notes, below) is not
-  part of it.
+  verifiable. Branch `feat/producto-24ux6b-reports` from master ef24bb6 (24UX6A, PR #70). Inicio stays the current
+  month only; Reportes is where past months live. Reportes (`app/(tabs)/reports.tsx`) and the month bars
+  (`src/ui/charts.tsx`) only: no new data, no financial logic, domain, schema, backup, route, native or navigation
+  change. The calendar (Later notes, below) is not part of it.
 - **Approved decisions (owner, 2026-09-30, decision 005; not to be asked again).** Budgets, insights and net flow
   stay: restyled or reordered, never removed because the mock omits them. A selectable donut only as in-report visual
   selection. The Día a día chart is allowed. A solid sticky header is allowed. The Evolution bars keep the current
   month-navigation semantics (no second, comparison-only selection). The current «Otras» top-N grouping stays; the
   3 % rule is not adopted in this generation. No merchant drill-down route is invented: the merchant summary stays
   non-interactive unless a real route is added deliberately.
+- **What changed: the reading order.** (1) Scope and period: the display-currency chip (only with more than one
+  currency held) and the month with its arrows and «Este mes», unchanged. (2) The month's total: the eyebrow «GASTADO ·
+  ARS» with the method information button, the amount and
+  one line «{average} por día · {change}». (3) The month's analysis: Categorías | Día a día (Categorías by default);
+  in Categorías the donut (unchanged) and a «Por categoría» heading over the category rows (each still opens
+  /report-category); in Día a día no donut and a «Por día» heading with the existing note «Solo días con gastos
+  registrados.» over the day rows (each still opens /report-day). (4) The history, moved below the analysis: the
+  section «Evolución» (caption «Tocá un mes para verlo») with «Últimos seis meses»; tapping a bar opens that month and
+  scrolls the list back to its title and total (the bars now sit below the analysis); when the shown month is the
+  only one of its six with spending, a quiet card «Con más meses de gastos registrados vas a ver la evolución acá.»
+  instead of a lone bar (the six bars always end at the shown month, so they never led forward; the arrows and «Este
+  mes» do). The month in progress keeps its outline, in ink on an idle bar. (5) The lower-priority details in their previous order:
+  budgets, «Dónde más gastaste», «Para tener en cuenta», income and net flow, «Comparar con el mes anterior».
+- **What changed: empty states.** An empty month shows the zero total in its usual inks (tinting it pushed its cents below 3:1), no orphan «Por categoría» or «Por día»
+  heading and one `EmptyState` card: Categorías «Sin gastos en este período» / «Los gastos que registres en esta moneda
+  aparecen acá, por categoría.» (a pie-chart glyph); Día a día the same title with «Cada día con gastos en esta moneda
+  aparece acá, con su total.» (a calendar glyph). The out-of-range and missing-rate states are unchanged.
+- **What changed: the summary line for VoiceOver.** The line under the total is one VoiceOver element whose label
+  uses spoken numbers (`spokenMoney` for the average, `spokenPercent` for the change): no currency symbol or grouped
+  digits read aloud, read once.
+- **What changed: idle bars.** `idleBarColor(p)` is the tertiary ink at 70 % (light) or 60 % (dark): the months not
+  shown now hold at least 3:1 on their surface (the inset grey held 1.2:1); the shown month stays the brand bar.
+- **What changed: copy and marker.** New es/en keys `reports.history.title`, `.hint`, `.single`, `reports.byCategory`,
+  `reports.byDay` and `reports.emptyDaysDetail`; the English lock re-accepted. The release marker reads «FinanzApp
+  0.1.0 (24UX6B)».
+- **What stayed.** Every financial figure (the total, the per-day average, the change, categories, days, budgets,
+  merchants, insights, income and net flow) and its computation; 24C1's rules (consolidation at each movement's date,
+  per-currency subtotals and no bars, no comparison when a rate is missing; no bars and no note when no month of the
+  six has spending); the «Otras» top-N grouping (no 3 % rule); the bars' month navigation (a tap opens that month);
+  budgets in their own currency on the real ledger, the insights, the net flow, the non-interactive «Dónde más
+  gastaste» and «Comparar con el mes anterior»; red only for alerts (an exceeded budget and its insight; ordinary
+  spending is ink, checked with no change needed). No route, schema, backup or native change; the tab-shell
+  mitigation (no fade, detach or freeze, no tab cross-fade) untouched.
+- **Deferred within the approved scope.** In-report donut slice selection, the Día a día bar chart and a solid sticky
+  header stay approved (above) for a later pass; none is in this PR.
+- **Tests.** `tests/report-routes.node.ts` (+5: the order, the Día a día state, the empty states in both views, the
+  history note rule, the spoken summary line), `tests/spending-chart.node.ts` (+1: the idle bars at 3:1 or more in light
+  and dark, the shown month the brand), `tests/more-routes.node.ts` (the version marker 24UX6B).
+- **Status.** Implemented on its branch; not merged. Device QA pending: nothing was checked on an iPhone (checklist
+  section Producto 24UX6B; the list in §2). No EAS build; no native dependency added; schema 13 and backup v13
+  unchanged.
+
+  Linux gates (2026-10-01): root `npm test` 415 passed, 1 todo (25 files); `npm run check:repo` OK; in `apps/mobile`: typecheck clean, `test:storage` 942/942, `currency:verify` and `regions:verify` OK, `i18n:check -- --strict` 0 errors and 0 stale (English lock re-accepted), `check` OK, `export:ios` bundle exported. The `mobile_api` job needs PostgreSQL and runs in CI. None of this is iPhone QA.
 
 ### Producto 24UX6C — Movimientos and Más in Forest (approved 2026-09-30, not implemented)
 
