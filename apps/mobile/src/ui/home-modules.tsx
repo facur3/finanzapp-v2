@@ -2,10 +2,8 @@ import { Alert, StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { type Account, type Currency, type RecurringRule } from '@finanzapp/domain';
-import { AppText, MerchantBadge, Money, PressFeedback, Surface, useStacked, type IconName } from './components';
-import { washOf } from './category-color';
+import { AppText, MerchantBadge, Money, PressFeedback, useStacked, type IconName } from './components';
 import { useCategoryLook } from './category-hues';
-import type { HomeInsight } from './home-focus';
 import { dueWhen } from './presentation';
 import { usePalette } from './theme';
 import { useI18n } from '../i18n/provider';
@@ -15,76 +13,51 @@ import { useI18n } from '../i18n/provider';
  * catalogue, so it follows the interface language instead of the iPhone's (see InfoButton).
  * The glyph is a control, so it is drawn in secondary, not tertiary: it sits on the
  * background beside the hero's label and must read as something to tap (24UX1). */
-export function MetricHelp({ title, detail }: { title: string; detail: string }) {
+export function MetricHelp({ title, detail, color }: { title: string; detail: string; color?: string }) {
   const p = usePalette();
   const { t } = useI18n();
-  return <PressFeedback feedback="opacity" accessibilityRole="button" accessibilityLabel={t('common.whatIs', { title })} hitSlop={8}
+  // 24UX6A: a 44 pt target (the glyph is 18 pt; the slop makes up the rest), drawn in the field's secondary ink on Inicio.
+  return <PressFeedback feedback="opacity" accessibilityRole="button" accessibilityLabel={t('common.whatIs', { title })} hitSlop={10}
     onPress={() => Alert.alert(title, detail, [{ text: t('common.ok'), style: 'cancel' }])} style={{ minHeight: 24, paddingHorizontal: 4 }}>
-    <Ionicons name="information-circle-outline" size={18} color={p.secondary} accessible={false} />
+    <Ionicons name="information-circle-outline" size={18} color={color ?? p.secondary} accessible={false} />
+  </PressFeedback>;
+}
+
+/** A compact circular control on Inicio's financial field (24UX6A): the accounts shortcut. 44 pt, the field's control
+ * fill, the glyph in the field's ink. */
+export function FieldButton({ icon, label, onPress }: { icon: IconName; label: string; onPress: () => void }) {
+  const p = usePalette();
+  return <PressFeedback accessibilityRole="button" accessibilityLabel={label} onPress={onPress}
+    style={{ width: 44, height: 44, minHeight: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: p.heroControl }}>
+    <Ionicons name={icon} size={22} color={p.heroInk} accessible={false} />
   </PressFeedback>;
 }
 
 /** Each currency's own figure when a consolidated total cannot be given (24C1): a rate is missing, stale, not
  * fetched yet, or the phone is offline. The subtotals stand where the total would, one per line, a step below the
  * hero's size, followed by one quiet line and the info button with the reason. Never a partial sum, never a zero. */
-export function CurrencyParts({ parts, line, detail }: { parts: readonly { currency: Currency; minor: number }[]; line: string; detail: string }) {
+export function CurrencyParts({ parts, line, detail, onField = false }: {
+  parts: readonly { currency: Currency; minor: number }[]; line: string; detail: string;
+  /** On Inicio's pine field (24UX6A): the field's ink and secondary ink instead of the canvas's. */
+  onField?: boolean;
+}) {
+  const p = usePalette();
   const { t } = useI18n();
   return <View style={{ gap: 4 }}>
-    {parts.map(part => <Money key={part.currency} minor={part.minor} currency={part.currency} size={28} weight="700" />)}
+    {parts.map(part => <Money key={part.currency} minor={part.minor} currency={part.currency} size={28} weight="700" color={onField ? p.heroInk : undefined} />)}
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
-      <AppText secondary variant="footnote" style={{ flexShrink: 1 }}>{line}</AppText>
-      <MetricHelp title={t('fx.infoTitle')} detail={detail} />
+      <AppText secondary variant="footnote" style={[{ flexShrink: 1 }, onField ? { color: p.heroSecondary } : null]}>{line}</AppText>
+      <MetricHelp title={t('fx.infoTitle')} detail={detail} color={onField ? p.heroSecondary : undefined} />
     </View>
   </View>;
-}
-
-/** Inicio's one contextual line (24UX6A, `homeInsight`): a budget exceeded or nearly spent, or one category
- * concentrating the month's spending. Computed facts only, one sentence, never a cause or advice. A single quiet card
- * (the only one on Inicio): a glyph in the fact's tone (amber near a limit, coral over it, the category's hue for a
- * concentration), the sentence, a chevron; tapping opens Presupuestos or Reportes. VoiceOver hears the same sentence
- * with the amount and the share in words. `labelsCurrency` names the budget's currency when it is another than the one
- * Inicio shows: the amount with its code, the share «en ARS». */
-export function HomeInsightRow({ insight, labelsCurrency = false, onPress }: { insight: NonNullable<HomeInsight>; labelsCurrency?: boolean; onPress: () => void }) {
-  const p = usePalette();
-  const { t, moneyText, codedAmount, spokenAmount, formatPercent, spokenPercent } = useI18n();
-  const look = useCategoryLook(insight.kind === 'concentration' ? insight.category : insight.category ?? '');
-  const amount = (minor: number, currency: Currency) => labelsCurrency ? codedAmount(minor, currency) : moneyText(minor, currency);
-  let text: string, spoken: string, icon: IconName, color: string, soft: string;
-  if (insight.kind === 'budgetExceeded') {
-    const key = insight.scope === 'total' ? 'home.insight.budgetExceededTotal' : 'home.insight.budgetExceededCategory';
-    text = t(key, { name: look.label, amount: amount(insight.overMinor, insight.currency) });
-    spoken = t(key, { name: look.label, amount: spokenAmount(insight.overMinor, insight.currency) });
-    icon = 'speedometer-outline'; color = p.expense; soft = p.expenseSoft;
-  } else if (insight.kind === 'budgetLow') {
-    // A share carries no currency, so a budget in another currency than Inicio's says which it is (Codex, PR #70).
-    const key = insight.scope === 'total' ? (labelsCurrency ? 'home.insight.budgetLowTotalIn' : 'home.insight.budgetLowTotal')
-      : labelsCurrency ? 'home.insight.budgetLowCategoryIn' : 'home.insight.budgetLowCategory';
-    text = t(key, { name: look.label, percent: formatPercent(insight.leftShare), code: insight.currency });
-    spoken = t(key, { name: look.label, percent: spokenPercent(insight.leftShare), code: insight.currency });
-    icon = 'speedometer-outline'; color = p.warning; soft = p.warningSoft;
-  } else {
-    text = t('home.insight.concentration', { name: look.label, percent: formatPercent(insight.share) });
-    spoken = t('home.insight.concentration', { name: look.label, percent: spokenPercent(insight.share) });
-    icon = look.glyph; color = look.hex; soft = washOf(look.hex, p);
-  }
-  return <PressFeedback accessibilityRole="button" accessibilityLabel={spoken}
-    accessibilityHint={t(insight.kind === 'concentration' ? 'home.insight.reportsHint' : 'home.insight.budgetsHint')} onPress={onPress}>
-    <Surface style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 14 }}>
-      <View accessible={false} style={{ width: 34, height: 34, borderRadius: 17, backgroundColor: soft, alignItems: 'center', justifyContent: 'center' }}>
-        <Ionicons name={icon} size={18} color={color} accessible={false} />
-      </View>
-      <AppText accessible={false} variant="subhead" style={{ flex: 1, minWidth: 0, fontWeight: '500' }}>{text}</AppText>
-      <Ionicons name="chevron-forward" size={15} color={p.tertiary} accessible={false} />
-    </Surface>
-  </PressFeedback>;
 }
 
 /** One scheduled commitment on Inicio (24UX2): who is paid (the merchant as typed, with its mark), and on the right
  * the amount with when it falls due. A scheduled date is an estimate, not a payment: nothing here is registered, and
  * the date appears once (the caption under the amount).
  *
- * 24UX3: the commitments are a light agenda, not a third card. Rows sit on the screen's ground with no surface and a
- * hairline that starts under the text, like a plain list; the press answer is a dim, since there is no cell to tint.
+ * 24UX3: the commitments are a light agenda. Since 24UX6A (Forest) Inicio draws them in one grouped surface, the hairline
+ * starting under the text; the press answer stays a dim.
  * 24UX5: the mark is 40 pt, the same container as the ledger rows elsewhere; the agenda stays
  * tighter (56 pt rows, 8 pt of padding) and its caption under the name appears only when it adds something: the
  * category when the name and the glyph do not already say it (`showCategory`, see `homeNamesCategory`), the account

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { FlatList, Keyboard, Modal, Platform, Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { FlatList, Keyboard, Modal, Platform, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
 import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -10,6 +10,9 @@ import { SEARCHABLE_FROM, currencyChoices, currencyOption, offeredCurrencies, se
 import { useI18n } from '../i18n/provider';
 import { useAccountLookOf, useCategoriesInUse, useCategoryDefinitions, useCategoryLook } from './category-hues';
 import { selectionHaptic, sheetTiming } from './motion';
+
+/** The capture hub's corners: the hero's and the hub's 32 pt radius (Forest). */
+const HUB_RADIUS = 32;
 import { radius, space, usePalette, useReduceMotion } from './theme';
 import { categoryChoices, categoryKey, customCategory } from './categories';
 
@@ -250,12 +253,23 @@ export function DisplaySheet({ visible, mode, currency, consolidatedOptions, sin
  * the system back gesture leave without saving; only Listo commits. Nothing here
  * captures a screen or replays a navigation.
  *
- * 24UX6A: Inicio's capture sheet uses the same card. Without `onDone` the header has no Listo (a sheet of actions
+ * 24UX6A: the dock's capture hub (`floating`, below) uses the same card. Without `onDone` the header has no Listo (a sheet of actions
  * commits by its rows); `onDismissed` runs once the card has left and iOS dismissed the modal, so a row can open the
  * next screen only then (presenting a screen while this modal is still leaving would be refused). A dismissal event
- * that never arrives is covered by a short timer; the callback runs once either way. */
-export function BottomSheet({ visible, title, onClose, onDone, onDismissed, children }: {
-  visible: boolean; title: string; onClose: () => void; onDone?: () => void; onDismissed?: () => void; children: ReactNode;
+ * that never arrives is covered by a short timer; the callback runs once either way.
+ *
+ * `floating` (24UX6A, the capture hub opened by the dock's «+»): the card floats above the dock, 32 pt corners all
+ * round, its title a small caps label and no Cancelar/Listo row: the hub closes from its accessory (the × drawn where
+ * the «+» sits), the scrim, VoiceOver's escape gesture or the system back. It rises 12 pt as it fades in (a fade in
+ * place under Reduce Motion), and leaves the same way; the presentation and dismissal rules above are unchanged. */
+export function BottomSheet({ visible, title, onClose, onDone, onDismissed, floating, accessory, children }: {
+  visible: boolean; title: string; onClose: () => void; onDone?: () => void; onDismissed?: () => void;
+  /** 24UX6A, the capture hub: a card that floats above the dock (`bottom`, `side` from `hubInset`) instead of a sheet from
+   * the bottom edge; see below. */
+  floating?: { bottom: number; side: number };
+  /** Drawn over the scrim, fading with it, inside the modal's accessibility group (the hub's close control). */
+  accessory?: ReactNode;
+  children: ReactNode;
 }) {
   const p = usePalette();
   const reduced = useReduceMotion();
@@ -301,6 +315,28 @@ export function BottomSheet({ visible, title, onClose, onDone, onDismissed, chil
     opacity: reduced ? progress.value : 1,
     transform: [{ translateY: reduced ? 0 : (1 - progress.value) * height.value }],
   }));
+  // The floating card rises 12 pt as it fades in (in place under Reduce Motion), on the sheet's own timing.
+  const floatingStyle = useAnimatedStyle(() => ({ opacity: progress.value, transform: [{ translateY: reduced ? 0 : (1 - progress.value) * 12 }] }));
+  const measuredCard = (layoutHeight: number) => { height.value = layoutHeight; ready.current.measured = true; rise(); };
+  if (floating) return <Modal visible={shown} transparent animationType="none" statusBarTranslucent onRequestClose={onClose}
+    onShow={() => { ready.current.presented = true; rise(); }} onDismiss={() => dismissed.current?.fire()}>
+    {/* The card and the accessory are one modal group: VoiceOver stays inside it, and its escape gesture closes. */}
+    <View accessibilityViewIsModal onAccessibilityEscape={onClose} style={{ flex: 1, justifyContent: 'flex-end' }}>
+      <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: p.scrim }, scrimStyle]}>
+        <Pressable accessible={false} importantForAccessibility="no" style={{ flex: 1 }} onPress={onClose} />
+      </Animated.View>
+      {/* Bounded by the space above the dock: at accessibility text sizes the card scrolls instead of growing past the top edge. */}
+      <Animated.View onLayout={event => measuredCard(event.nativeEvent.layout.height)}
+        style={[{ backgroundColor: p.surface, borderRadius: HUB_RADIUS, marginHorizontal: floating.side, marginBottom: floating.bottom,
+          maxHeight: Math.max(windowHeight - insets.top - floating.bottom - space.l, 200), overflow: 'hidden' }, floatingStyle]}>
+        <ScrollView bounces={false} contentContainerStyle={{ padding: space.l, gap: space.m }}>
+          <AppText accessibilityRole="header" secondary variant="eyebrow">{title}</AppText>
+          {children}
+        </ScrollView>
+      </Animated.View>
+      {accessory && <Animated.View pointerEvents="box-none" style={[StyleSheet.absoluteFill, scrimStyle]}>{accessory}</Animated.View>}
+    </View>
+  </Modal>;
   return <Modal visible={shown} transparent animationType="none" statusBarTranslucent onRequestClose={onClose}
     onShow={() => { ready.current.presented = true; rise(); }} onDismiss={() => dismissed.current?.fire()}>
     <View style={{ flex: 1, justifyContent: 'flex-end' }}>
@@ -308,7 +344,7 @@ export function BottomSheet({ visible, title, onClose, onDone, onDismissed, chil
         {/* The scrim cancels; VoiceOver never lands on it (the card below is modal). */}
         <Pressable accessible={false} importantForAccessibility="no" style={{ flex: 1 }} onPress={onClose} />
       </Animated.View>
-      <Animated.View accessibilityViewIsModal onLayout={event => { height.value = event.nativeEvent.layout.height; ready.current.measured = true; rise(); }}
+      <Animated.View accessibilityViewIsModal onLayout={event => measuredCard(event.nativeEvent.layout.height)}
         style={[{ backgroundColor: p.surface, borderTopLeftRadius: radius.sheet, borderTopRightRadius: radius.sheet, overflow: 'hidden',
           paddingBottom: Math.max(insets.bottom, space.m) }, cardStyle]}>
         <View accessible={false} style={{ alignItems: 'center', paddingTop: 8 }}>

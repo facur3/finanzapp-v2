@@ -1,12 +1,13 @@
 import type { Messages } from '../../messages.ts';
 
-/** Inicio: the number, its controls, the capture sheet, the commitments due this week and the one contextual line. */
+/** Inicio (the current month's financial field, the commitments due this week, the month's latest movements) and the
+ * capture hub the dock's «+» opens (Producto 24UX6A, decision 005). */
 export const home: Pick<Messages, 'home' | 'quickActions'> = {
   home: {
     emptyTitle: 'Understand your spending.',
     emptyDetail: 'Choose an account to group your transactions. You can start without entering your bank balance.',
     start: 'Get started',
-    spending: 'Spending',
+    spending: 'Spent',
     available: 'Available',
     recordedBalance: 'Recorded balance',
     availableHelp: 'The money recorded in your accounts in this currency: opening balance plus income, minus expenses and transfers. '
@@ -14,6 +15,13 @@ export const home: Pick<Messages, 'home' | 'quickActions'> = {
     spendingOutOfRange: 'The total is beyond the range we can show precisely. Your transactions are still saved.',
     balanceOutOfRange: 'The total balance is beyond the range we can show precisely. Your accounts are still saved.',
     accounts: { one: '{count} account', other: '{count} accounts' },
+    perDay: 'So far · {amount} a day',
+    noSpending: 'No spending this month',
+    availableLine: '{label} · {accounts}',
+    recent: 'Recent activity',
+    quietTitle: 'No transactions this month yet',
+    quietTitleIn: 'No transactions in {currency} this month yet',
+    quietDetail: 'Record an expense with the Record (+) button, or tell the Assistant.',
     upcoming: 'Coming up',
     upcomingRow: {
       today: 'Today',
@@ -22,26 +30,19 @@ export const home: Pick<Messages, 'home' | 'quickActions'> = {
       label: '{merchant}, {category}, {amount}, next payment {date}',
     },
     capture: {
-      button: 'Record',
-      label: 'Record a transaction',
-      hint: 'Opens the ways to record: an expense, income, a transfer or the Assistant',
+      label: 'Record',
+      hint: 'Shows the ways to record',
       title: 'Record',
-      expense: 'Record an expense',
-      income: 'Record income',
-      transfer: 'Transfer between accounts',
-      assistant: 'Talk to the Assistant',
-      assistantDetail: 'Tell it what happened: it proposes the transaction and you confirm it',
-    },
-    insight: {
-      budgetExceededTotal: 'You’re {amount} over this month’s budget.',
-      budgetExceededCategory: 'You’re {amount} over your {name} budget.',
-      budgetLowTotal: '{percent} of this month’s budget is left.',
-      budgetLowCategory: '{percent} of your {name} budget is left.',
-      budgetLowTotalIn: '{percent} of this month’s {code} budget is left.',
-      budgetLowCategoryIn: '{percent} of your {name} budget in {code} is left.',
-      concentration: '{name} is {percent} of your spending this month.',
-      budgetsHint: 'Opens Budgets',
-      reportsHint: 'Opens Reports',
+      close: 'Close',
+      assistant: 'Assistant',
+      assistantDetail: 'Say it in your own words or ask anything',
+      continue: 'Continue: “{text}”',
+      expense: 'Expense',
+      expenseDetail: 'A purchase or a payment',
+      income: 'Income',
+      incomeDetail: 'Salary, a payment received or other income',
+      transfer: 'Transfer',
+      transferDetail: 'Between accounts or a card payment',
     },
   },
   quickActions: {

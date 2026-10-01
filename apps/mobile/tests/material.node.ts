@@ -189,17 +189,20 @@ test('a development build on iOS 26 with the view registered loads the module on
 
 test('glass stays on the control layer and behind the adapter: only material.tsx names expo-glass-effect, and only lazily', () => {
   const read = (file: string) => readFileSync(new URL('../src/ui/' + file, import.meta.url), 'utf8');
+  // Rows, cards, balances, charts, sheets (the capture hub's card included) and Inicio's field stay solid.
   const uses = ['components.tsx', 'entry-list.tsx', 'home-modules.tsx', 'spending-chart.tsx', 'charts.tsx', 'card-visual.tsx', 'form-controls.tsx', 'liability-rows.tsx', 'assistant-messages.tsx']
     .filter(file => /expo-glass-effect|from '\.\/material'/.test(read(file)));
-  assert.deepEqual(uses, []);
-  // 24UX6A: the tab bar is the app's floating capsule, drawn with the same control material; the layout only hands it over.
+  assert.equal(uses.length, 0, uses.join(', '));
+  // 24UX6A: the tab bar is the app's floating dock, drawn with the same control material; the layout only hands it over.
   const tabs = readFileSync(new URL('../app/(tabs)/_layout.tsx', import.meta.url), 'utf8');
   assert.equal(/expo-glass-effect|tabBarBackground|position: 'absolute'/.test(tabs), false, 'no stock bar background and nothing absolute over the scenes');
-  assert.equal(/position: 'absolute'/.test(read('floating-tab-bar.tsx')), false, 'the capsule stays in the layout: every screen ends above it');
+  assert.equal(/position: 'absolute'/.test(read('floating-tab-bar.tsx')), false, 'the dock stays in the layout: every screen ends above it');
+  // Glass draws on the dock's pill, the account screen's movement pills and the Assistant's composer.
   const controls = ['quick-actions.tsx', 'assistant-composer.tsx', 'floating-tab-bar.tsx'];
-  assert.deepEqual(controls.filter(file => /from '\.\/material'/.test(read(file))), controls);
-  assert.deepEqual(controls.filter(file => /expo-glass-effect/.test(read(file))), [], 'only material.tsx talks to expo-glass-effect');
-  assert.equal(/from '\.\/material'/.test(read('home-capture.tsx')), false, 'the capture button is a filled control, not glass');
+  assert.equal(controls.filter(file => /from '\.\/material'/.test(read(file))).join(','), controls.join(','));
+  assert.equal(controls.filter(file => /expo-glass-effect/.test(read(file))).length, 0, 'only material.tsx talks to expo-glass-effect');
+  // The dock's «+» and the capture hub's card are solid: an accent-filled circle and a floating sheet.
+  assert.equal(/from '\.\/material'|expo-glass-effect/.test(read('capture-hub.tsx')), false, 'the «+» and the hub are solid controls, not glass');
   const adapter = read('material.tsx');
   assert.equal(/^import .* from 'expo-glass-effect'/m.test(adapter), false, 'no static import: the module binds its native view at evaluation time');
   assert.match(adapter, /require\('expo-glass-effect'\)/);

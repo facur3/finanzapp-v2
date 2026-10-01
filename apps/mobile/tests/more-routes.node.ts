@@ -112,7 +112,7 @@ test('Más groups permanent navigation into Finanzas and App y datos, with live 
   assert.deepEqual(nodes(root).filter(node => node.type === 'SectionTitle').map(node => node.props.children), ['Finanzas', 'App y datos']);
   const labels = rows(root).map(row => row.props.title);
   assert.deepEqual(labels, ['Cuentas', 'Tarjetas', 'Presupuestos', 'Recurrentes', 'Deudas y cobros', 'Categorías', 'Copia de seguridad', 'Movimientos deshechos', 'Idioma', 'Región', 'Apariencia']);
-  assert.equal(labels.includes('Asistente'), false, 'the Assistant is the centre tab, not a Más row');
+  assert.equal(labels.includes('Asistente'), false, 'the Assistant is a root-stack screen opened from the dock\'s «+» capture hub, not a Más row');
   const value = (label: string) => rows(root).find(row => row.props.title === label)!.props.subtitle;
   assert.equal(value('Tarjetas'), 'Compras y resúmenes', 'no cards recorded: an honest placeholder');
   assert.equal(value('Recurrentes'), '1 activo');

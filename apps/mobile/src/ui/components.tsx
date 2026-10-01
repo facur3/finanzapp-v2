@@ -102,9 +102,8 @@ export function Surface({ children, style, grouped = false }: { children: ReactN
 }
 
 /** A section heading with an optional text action on the right. `quiet` (Inicio, 24UX3) draws the action at footnote
- * size with a small chevron in the `link` slate blue (24UX5; secondary ink before): a visible, 44 pt tappable link that
- * reads as navigation without becoming one more cobalt word competing with the hero, the Assistant and the tab bar.
- * Elsewhere the action stays the cobalt link. */
+ * size with a small chevron in the `link` ink (the Forest brand text since 24UX6A): a visible, 44 pt tappable link
+ * that reads as navigation without competing with the financial field. Elsewhere the action is the brand primary. */
 export function SectionTitle({ children, action, onAction, caption, captionLabel, quiet = false }: {
   /** `captionLabel`: what VoiceOver reads for the caption when it holds an amount (its spoken twin). */
   children: ReactNode; action?: string; onAction?: () => void; caption?: string; captionLabel?: string; quiet?: boolean;
@@ -363,17 +362,18 @@ export function AmountShortcut({ label, caption, spokenCaption, onPress, disable
   </View>;
 }
 
-function Choice({ label, spokenLabel, selected, disabled, onPress, compact = false }: {
-  label: string; spokenLabel?: string; selected: boolean; disabled?: boolean; onPress: () => void; compact?: boolean;
+function Choice({ label, spokenLabel, selected, disabled, onPress, compact = false, onField = false }: {
+  label: string; spokenLabel?: string; selected: boolean; disabled?: boolean; onPress: () => void; compact?: boolean; onField?: boolean;
 }) {
   const p = usePalette();
   const reduced = useReduceMotion();
   const { speechLanguage } = useI18n();
   // Compact: 28 pt segments (32 pt with the track) and an 8 pt vertical slop, so the target stays 44 pt tall; none sideways, where the neighbour is.
   return <Pressable accessibilityRole="button" accessibilityLabel={spokenLabel} accessibilityState={{ selected, disabled }} disabled={disabled} accessibilityLanguage={speechLanguage}
-    onPress={onPress} style={[styles.choice, compact && styles.choiceCompact]} hitSlop={compact ? { top: 8, bottom: 8 } : 4}>
+    onPress={onPress} style={[styles.choice, compact && styles.choiceCompact, onField && styles.choiceField]} hitSlop={compact ? { top: 8, bottom: 8 } : 4}>
     <Animated.Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8} maxFontSizeMultiplier={1.3}
-      style={{ fontSize: 13, lineHeight: 18, textAlign: 'center', fontWeight: compact && !selected ? '500' : '600', color: selected ? (compact ? p.text : p.primary) : p.secondary,
+      style={{ fontSize: onField ? 15 : 13, lineHeight: onField ? 20 : 18, textAlign: 'center', fontWeight: (compact || onField) && !selected ? '500' : '600',
+        color: onField ? (selected ? p.heroThumbInk : p.heroSecondary) : selected ? (compact ? p.text : p.primary) : p.secondary,
         transitionProperty: 'color', transitionDuration: reduced ? 0 : duration.state }}>{label}</Animated.Text>
   </Pressable>;
 }
@@ -388,9 +388,12 @@ function Choice({ label, spokenLabel, selected, disabled, onPress, compact = fal
  * edge (the way UISegmentedControl draws it), and in dark mode a track one step
  * above the black ground with a clearly brighter thumb (`thumb`), so the header
  * is quiet but its state is unmistakable, without cobalt. */
-export function Choices<T extends string>({ value, options, onChange, disabled, compact = false }: {
+export function Choices<T extends string>({ value, options, onChange, disabled, compact = false, onField = false }: {
   /** An option's `spokenLabel` is what VoiceOver reads when its short label is not a sentence (a date written out). */
   value: T; options: { value: T; label: string; spokenLabel?: string }[]; onChange: (value: T) => void; disabled?: boolean; compact?: boolean;
+  /** 24UX6A, Inicio's Gastado | Disponible on the pine field: a capsule track in the field's control fill, a near-white
+   * capsule thumb with pine text for the chosen value and the field's secondary ink for the other. Same slide and haptic. */
+  onField?: boolean;
 }) {
   const p = usePalette();
   const reduced = useReduceMotion();
@@ -405,15 +408,15 @@ export function Choices<T extends string>({ value, options, onChange, disabled, 
     x.value = withTiming(offset, timing('state', reduced));
   }, [offset, reduced, trackWidth, x]);
   const thumbStyle = useAnimatedStyle(() => ({ transform: [{ translateX: x.value }] }));
-  const track = compact && p.isDark ? p.surface : p.inset;
-  const thumb = p.isDark ? (compact ? p.thumb : p.elevated) : p.surface;
+  const track = onField ? p.heroControl : compact && p.isDark ? p.surface : p.inset;
+  const thumb = onField ? p.heroThumb : p.isDark ? (compact ? p.thumb : p.elevated) : p.surface;
   // The compact thumb carries a hairline edge in both themes, so the chosen segment reads as a state, not a tint.
-  const thumbEdge = compact ? { borderWidth: StyleSheet.hairlineWidth, borderColor: p.isDark ? 'rgba(255,255,255,0.10)' : 'rgba(10,10,12,0.08)' } : {};
-  return <View style={[styles.choices, { backgroundColor: track }]} onLayout={event => setTrackWidth(event.nativeEvent.layout.width)}>
-    {width > 0 && <Animated.View pointerEvents="none" style={[styles.thumb, { width, backgroundColor: thumb }, thumbEdge,
-      p.isDark ? {} : { shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 3, shadowOffset: { width: 0, height: 1 } }, thumbStyle]} />}
+  const thumbEdge = compact && !onField ? { borderWidth: StyleSheet.hairlineWidth, borderColor: p.isDark ? 'rgba(255,255,255,0.10)' : 'rgba(10,10,12,0.08)' } : {};
+  return <View style={[styles.choices, onField && styles.choicesField, { backgroundColor: track }]} onLayout={event => setTrackWidth(event.nativeEvent.layout.width)}>
+    {width > 0 && <Animated.View pointerEvents="none" style={[styles.thumb, onField && styles.thumbField, { width, backgroundColor: thumb }, thumbEdge,
+      p.isDark || onField ? {} : { shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 3, shadowOffset: { width: 0, height: 1 } }, thumbStyle]} />}
     {options.map(option => <Choice key={option.value} label={option.label} spokenLabel={option.spokenLabel} selected={value === option.value} compact={compact}
-      disabled={disabled} onPress={() => { if (option.value !== value) { selectionHaptic(); onChange(option.value); } }} />)}
+      onField={onField} disabled={disabled} onPress={() => { if (option.value !== value) { selectionHaptic(); onChange(option.value); } }} />)}
   </View>;
 }
 
@@ -695,7 +698,8 @@ export function AccountBadge({ accountId, large = false, size }: { accountId: st
 }
 
 /** One transaction line: merchant, then category · account · date; amount on the right. VoiceOver hears the full
- * sentence. (24UX6A: Inicio no longer lists movements, so the open `home` variant of 24UX3/24UX5 is gone.) */
+ * sentence. (24UX6A: Inicio's «Actividad reciente» uses this same row in a grouped surface, so the open `home` variant
+ * of 24UX3/24UX5 is gone.) */
 export function EntryRow({ entry, account, last = false, showDate = true, showAccount = true }: {
   entry: Entry; account: Account; last?: boolean; showDate?: boolean; showAccount?: boolean;
 }) {
@@ -811,6 +815,10 @@ const styles = StyleSheet.create({
   thumb: { position: 'absolute', top: SEGMENT_PADDING, bottom: SEGMENT_PADDING, left: 0, borderRadius: 8 },
   choice: { flex: 1, minWidth: 72, minHeight: 32, paddingHorizontal: 8, paddingVertical: 6, alignItems: 'center', justifyContent: 'center' },
   choiceCompact: { minWidth: 64, minHeight: 28, paddingVertical: 4 },
+  /** Inicio's field segmented control: a capsule, a 40 pt track and a 44 pt target with the slop. */
+  choicesField: { borderRadius: 22 },
+  thumbField: { borderRadius: 18 },
+  choiceField: { minHeight: 36 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, paddingHorizontal: 16, minHeight: 64 },
   detailRow: { minHeight: 54, flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 14 },
   navigationRow: { minHeight: 60, flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 16, paddingVertical: 11 },

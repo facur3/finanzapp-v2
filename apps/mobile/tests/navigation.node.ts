@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { runInNewContext } from 'node:vm';
 import ts from 'typescript';
@@ -40,23 +40,26 @@ function renderLayout(background: string) {
   return module.exports.default!();
 }
 
+const ROOTS = 'index,activity,reports,settings';
+
 for (const [theme, background] of [['light', '#F5F6F8'], ['dark', '#080B10']]) {
-  test('tab layout keeps scenes opaque, mounted and unfrozen in ' + theme, () => {
+  test('tab layout keeps all four scenes opaque, mounted and unfrozen in ' + theme, () => {
     const { props } = renderLayout(background);
     assert.equal(props.detachInactiveScreens, false);
     const screens = props.children;
-    assert.equal(screens.map((screen: any) => screen.props.name).join(','), 'index,activity,assistant,reports,settings');
+    assert.equal(screens.map((screen: any) => screen.props.name).join(','), ROOTS);
+    assert.equal(screens.length, 4);
     for (const screen of screens) {
       const options = { ...props.screenOptions, ...screen.props.options };
-      assert.equal(options.animation, 'none');
-      assert.equal(options.lazy, false);
-      assert.equal(options.freezeOnBlur, false);
-      assert.equal(options.transitionSpec, undefined);
-      assert.equal(options.sceneStyleInterpolator, undefined);
-      assert.equal(options.sceneStyle.backgroundColor, background);
-      assert.equal(options.sceneStyle.opacity, undefined);
+      assert.equal(options.animation, 'none', screen.props.name);
+      assert.equal(options.lazy, false, screen.props.name);
+      assert.equal(options.freezeOnBlur, false, screen.props.name);
+      assert.equal(options.transitionSpec, undefined, screen.props.name);
+      assert.equal(options.sceneStyleInterpolator, undefined, screen.props.name);
+      assert.equal(options.sceneStyle.backgroundColor, background, screen.props.name);
+      assert.equal(options.sceneStyle.opacity, undefined, screen.props.name);
     }
-    // 24UX6A: the bar is the app's own floating capsule, handed the navigator's props untouched; its colours are its own
+    // 24UX6A: the bar is the app's own dock, handed the navigator's props untouched; its colours are its own
     // (tests/floating-tab-bar.node.ts), so no stock tint or style is left to disagree with it.
     const bar = props.tabBar({ state: 'state', descriptors: 'descriptors', navigation: 'navigation', insets: 'insets' });
     assert.equal(bar.type, 'FloatingTabBar');
@@ -65,30 +68,46 @@ for (const [theme, background] of [['light', '#F5F6F8'], ['dark', '#080B10']]) {
   });
 }
 
-test('the Assistant is the centre tab, Tarjetas left the bar for Más, and Inicio has no header of its own', () => {
+test('24UX6A: four sections, no Assistant tab, Tarjetas stays in Más, and Inicio has no header of its own', () => {
   const { props } = renderLayout('#F5F6F8');
   const screens = props.children;
   const byName = Object.fromEntries(screens.map((screen: any) => [screen.props.name, screen.props.options]));
-  assert.equal(screens.map((screen: any) => screen.props.options.title).join(','), 'Inicio,Movimientos,Asistente,Reportes,Más');
-  assert.equal(screens[2].props.name, 'assistant', 'the third of five slots: reachable by either thumb');
-  assert.equal(byName.assistant.tabBarIcon({ color: '#000', size: 24, focused: true }).props.name, 'sparkles');
-  assert.equal(byName.assistant.tabBarIcon({ color: '#000', size: 24, focused: false }).props.name, 'sparkles-outline');
-  assert.equal(byName.assistant.headerRight, undefined, 'New chat is set by the screen itself, only once a conversation exists');
+  assert.equal(screens.map((screen: any) => screen.props.options.title).join(','), 'Inicio,Movimientos,Reportes,Más');
+  assert.equal(byName.assistant, undefined, 'the Assistant is a root-stack screen opened from the capture hub, never a tab');
+  assert.equal(screens.some((screen: any) => screen.props.name === 'assistant'), false);
   assert.equal(byName.cards, undefined, 'Tarjetas is no longer a tab');
   assert.equal(JSON.stringify(screens).includes('Agregar tarjeta'), false, 'the card header action moved with the screen');
-  assert.equal(JSON.stringify(screens).includes('tabBarBackground'), false, 'no stock bar background: the capsule draws its own material');
-  assert.equal(byName.settings.tabBarIcon({ color: '#000', size: 24, focused: true }).props.name, 'ellipsis-horizontal-circle');
-  assert.equal(byName.settings.tabBarIcon({ color: '#000', size: 24, focused: false }).props.name, 'ellipsis-horizontal-circle-outline');
-  // 24UX6A: Inicio draws no root title (the selected tab names it) and keeps its accounts shortcut in its own controls
+  assert.equal(JSON.stringify(screens).includes('tabBarBackground'), false, 'no stock bar background: the dock draws its own material');
+  assert.equal(JSON.stringify(screens).includes('assistant-preview'), false);
+  // Each root has a filled glyph when focused and an outline otherwise (the dock is icon-only, so the glyph carries it).
+  const glyphs: Record<string, [string, string]> = {
+    index: ['home', 'home-outline'], activity: ['receipt', 'receipt-outline'], reports: ['pie-chart', 'pie-chart-outline'],
+    settings: ['ellipsis-horizontal-circle', 'ellipsis-horizontal-circle-outline'],
+  };
+  for (const [name, [filled, outline]] of Object.entries(glyphs)) {
+    assert.equal(byName[name].tabBarIcon({ color: '#000', size: 24, focused: true }).props.name, filled, name);
+    assert.equal(byName[name].tabBarIcon({ color: '#000', size: 24, focused: false }).props.name, outline, name);
+  }
+  // Inicio draws no root title (the selected tab names it) and keeps its accounts shortcut in its own field
   // (tests/spending-home.node.ts); the other roots keep their headers, and Movimientos its «+».
   assert.equal(byName.index.headerShown, false);
   assert.equal(byName.index.headerRight, undefined);
-  for (const name of ['activity', 'assistant', 'reports', 'settings']) assert.notEqual(byName[name].headerShown, false, name + ' keeps its title');
+  for (const name of ['activity', 'reports', 'settings']) assert.notEqual(byName[name].headerShown, false, name + ' keeps its title');
   const record = byName.activity.headerRight();
   assert.deepEqual([record.type, record.props.name], ['IconButton', 'add']);
   record.props.onPress();
   assert.deepEqual(pushed.at(-1), '/new-entry');
-  assert.equal(JSON.stringify(screens).includes('assistant-preview'), false);
+});
+
+test('24UX6A: the Assistant moved to the root stack, pushed like any detail screen', () => {
+  assert.equal(existsSync(new URL('../app/(tabs)/assistant.tsx', import.meta.url)), false, 'no tab route file left behind');
+  assert.equal(existsSync(new URL('../app/assistant.tsx', import.meta.url)), true);
+  const root = readFileSync(new URL('../app/_layout.tsx', import.meta.url), 'utf8');
+  const registrations = root.match(/<Stack\.Screen\s+name="assistant"[^>]*\/>/g) ?? [];
+  assert.equal(registrations.length, 1, 'the root stack registers the assistant screen exactly once');
+  assert.match(registrations[0], /title:\s*t\('assistant\.title'\)/);
+  assert.doesNotMatch(registrations[0], /presentation/, 'a push, not a modal: native back returns to the tab it came from');
+  assert.doesNotMatch(registrations[0], /headerShown:\s*false/);
 });
 
 test('23.1B1: tab labels and the header actions follow the language; routes and order never change', () => {
@@ -96,10 +115,10 @@ test('23.1B1: tab labels and the header actions follow the language; routes and 
     const { props } = renderLayout('#F5F6F8');
     return props.children.map((screen: any) => screen.props.name + '=' + screen.props.options.title).join(',');
   };
-  assert.equal(labels(), 'index=Inicio,activity=Movimientos,assistant=Asistente,reports=Reportes,settings=Más');
+  assert.equal(labels(), 'index=Inicio,activity=Movimientos,reports=Reportes,settings=Más');
   locale = 'en-AR';
   try {
-    assert.equal(labels(), 'index=Home,activity=Activity,assistant=Assistant,reports=Reports,settings=More');
+    assert.equal(labels(), 'index=Home,activity=Activity,reports=Reports,settings=More');
     const { props } = renderLayout('#F5F6F8');
     assert.equal(props.children[1].props.options.headerRight().props.label, 'Record a transaction');
   } finally { locale = 'es-AR'; }

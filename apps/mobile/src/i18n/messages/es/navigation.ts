@@ -5,11 +5,10 @@ export const navigation = {
     tabs: {
       home: 'Inicio',
       activity: 'Movimientos',
-      assistant: 'Asistente',
       reports: 'Reportes',
       more: 'Más',
     },
-    /** What VoiceOver hears for a tab of the floating bar (24UX6A): its name, that it is a tab, and where it sits («Inicio, pestaña, 1 de 5»). */
+    /** What VoiceOver hears for a tab of the floating bar (24UX6A): its name, that it is a tab, and where it sits («Inicio, pestaña, 1 de 4»; the «+» beside the tabs is not one). */
     tabPosition: '{name}, pestaña, {index} de {count}',
     seeAccounts: 'Ver mis cuentas',
     recordMovement: 'Registrar movimiento',

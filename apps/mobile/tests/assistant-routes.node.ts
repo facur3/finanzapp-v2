@@ -12,6 +12,8 @@ import * as moneyInput from '../src/ui/money-input.ts';
 import type { AssistantClient, AssistantEvent } from '../src/assistant/client.ts';
 import { disconnectedAssistant } from '../src/assistant/client.ts';
 import { FIXTURE_ANSWER, FIXTURE_DRAFT, FIXTURE_DRAFT_NO_ACCOUNT, FIXTURE_FACTS, fixtureAssistant } from '../src/assistant/fixtures.ts';
+import * as sessionModule from '../src/assistant/session.ts';
+import { createConversationSession, type ConversationSession } from '../src/assistant/session.ts';
 import * as i18nFormat from '../src/i18n/format.ts';
 import { bindLocale } from '../src/i18n/bind.ts';
 import type { AppLocale } from '../src/i18n/locale.ts';
@@ -20,6 +22,10 @@ const es = bindLocale('es-AR');
 // Producto 21: the Assistant screen's handlers, with React, native hosts and the
 // UI modules replaced by descriptors and a scripted client. Not a rendered
 // iOS screen: keyboard, VoiceOver order and gestures need the iPhone.
+// Producto 24UX6A: the screen is a root-stack route (app/assistant.tsx) and its
+// conversation lives in the in-memory app session (src/assistant/session.ts). Each
+// harness gets its own real session unless a test passes one, so a test can
+// unmount the screen and mount it again over the same conversation.
 type Node = { type: any; props: Record<string, any> };
 const createdAt = '2026-09-01T12:00:00.000Z';
 const visa: domain.Account = { id: 'visa', name: 'Visa Galicia', currency: 'ARS', openingMinor: 0, createdAt };
@@ -30,33 +36,48 @@ const entries: domain.Entry[] = [
   { id: 'e2', accountId: 'visa', kind: 'expense', amountMinor: 2000, merchant: 'Coto', category: 'Supermercado', dateISO: '2026-08-04', createdAt },
 ];
 
-/** A client the test drives by hand: it resolves whatever events the test queues, when the test says so. */
+/** A client the test drives by hand: it resolves whatever events the test queues, when the test says so.
+ * `reply(events)` ends the stream after those events; `reply(events, { more: true })` keeps it open for the next reply,
+ * like an answer still streaming. */
 function scriptedClient(mode: AssistantClient['mode'] = 'remote') {
   const asks: any[] = [];
   const signals: (AbortSignal | undefined)[] = [];
   let queue: AssistantEvent[] = [];
+  let open = false;
   let release: (() => void) | null = null;
   const client: AssistantClient = { mode, async *ask(input, signal) {
     asks.push(input);
     signals.push(signal);
-    await new Promise<void>(resolve => { release = resolve; });
-    for (const event of queue) { if (signal?.aborted) return; yield event; }
+    for (;;) {
+      await new Promise<void>(resolve => { release = resolve; });
+      const batch = queue;
+      const more = open;
+      for (const event of batch) { if (signal?.aborted) return; yield event; }
+      if (!more) return;
+    }
   } };
-  return { client, asks, signals, reply(events: AssistantEvent[]) { queue = events; release?.(); release = null; }, get waiting() { return release !== null; } };
+  return { client, asks, signals, reply(events: AssistantEvent[], { more = false }: { more?: boolean } = {}) { queue = events; open = more; release?.(); release = null; },
+    get waiting() { return release !== null; } };
 }
 
-function harness({ client, accounts = [visa, cash, usd], data = entries, params = {}, reduced = false, addEntry, locale = 'es-AR', deviceLanguage = null }: {
+function harness({ client, accounts = [visa, cash, usd], data = entries, params = {}, reduced = false, addEntry, locale = 'es-AR', deviceLanguage = null, session = createConversationSession() }: {
   client: AssistantClient; accounts?: domain.Account[]; data?: domain.Entry[]; params?: Record<string, string>; reduced?: boolean; addEntry?: (entry: domain.Entry) => Promise<void>; locale?: AppLocale;
   /** The device's first language, for `speechLanguage` (null: nothing read, so it is never set). */
   deviceLanguage?: string | null;
+  /** The app session the screen reads (`conversationSession()`): a fresh real one by default, so tests are isolated. */
+  session?: ConversationSession;
 }) {
   let i18n = bindLocale(locale, 'none', deviceLanguage);
   const i18nProvider = { useI18n: () => i18n };
-  const source = readFileSync(new URL('../app/(tabs)/assistant.tsx', import.meta.url), 'utf8');
+  const source = readFileSync(new URL('../app/assistant.tsx', import.meta.url), 'utf8');
   const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText;
   const jsx = (type: unknown, props: Record<string, unknown>) => ({ type, props });
   const state: unknown[] = [];
   const pushed: any[] = [];
+  const navigated: any[] = [];
+  const dismissed: any[] = [];
+  let uuids = 0;
+  const subscriptions: unknown[] = [];
   const written: domain.Entry[] = [];
   const scrolled: any[] = [];
   const haptics: string[] = [];
@@ -71,6 +92,8 @@ function harness({ client, accounts = [visa, cash, usd], data = entries, params 
       useReducer: (reducer: (s: unknown, a: unknown) => unknown, initial: unknown) => { const index = slot(() => initial); return [state[index], (action: unknown) => { state[index] = reducer(state[index], action); }]; },
       useRef: (initial: unknown) => { const index = slot(() => ({ current: initial })); return state[index]; },
       useMemo: (fn: () => unknown) => fn(), useCallback: (fn: unknown) => fn,
+      // The screen reads the app session through useSyncExternalStore: every render reads its current state.
+      useSyncExternalStore: (subscribe: unknown, getSnapshot: () => unknown) => { subscriptions.push(subscribe); return getSnapshot(); },
       // Like React: an effect runs on mount and again only when a dependency changed, after its previous
       // cleanup. So an effect that aborted the request on a language change (deps [t]) would really abort here.
       useEffect: (fn: () => unknown, deps?: unknown[]) => {
@@ -85,11 +108,15 @@ function harness({ client, accounts = [visa, cash, usd], data = entries, params 
     },
     'react/jsx-runtime': { jsx, jsxs: jsx, Fragment: 'Fragment' },
     'react-native': { View: 'View', FlatList: 'FlatList' },
-    'expo-router': { Tabs: { Screen: 'Tabs.Screen' }, useLocalSearchParams: () => params, router: { push: (to: unknown) => pushed.push(to) } },
-    'expo-crypto': { randomUUID: () => 'uuid-' + (written.length + 1) },
+    'expo-router': { Stack: { Screen: 'Stack.Screen' }, useLocalSearchParams: () => params,
+      router: { push: (to: unknown) => pushed.push(to), navigate: (to: unknown) => navigated.push(to), dismissTo: (to: unknown) => dismissed.push(to) } },
+    // A fresh id on every call, independent of how many entries were written: a retry that called randomUUID again
+    // would get a different id, so only the session's cached Entry (session.writes) keeps the retry idempotent.
+    'expo-crypto': { randomUUID: () => 'uuid-' + (++uuids) },
     '@finanzapp/domain': domain,
     '../src/assistant/runtime': { assistantForBuild: () => client },
     '../src/assistant/conversation': conversation,
+    '../src/assistant/session': { ...sessionModule, conversationSession: () => session },
     '../src/integrations/evidence': evidence,
     '../src/storage/LedgerProvider': { useLedger: () => ({ snapshot, archive: { accounts, records: [], debts: [] }, addEntry: addEntry ?? (async (entry: domain.Entry) => { written.push(entry); }) }) },
     '../src/ui/assistant-composer': { AssistantComposer: 'AssistantComposer' },
@@ -102,8 +129,6 @@ function harness({ client, accounts = [visa, cash, usd], data = entries, params 
     '../src/ui/theme': { space: { xs: 4, s: 8, m: 12, l: 16, xl: 20, xxl: 24, xxxl: 32 }, useCurrentDay: () => '2026-09-21', useReduceMotion: () => reduced,
       usePalette: () => ({ background: '#F2F2F6', warning: '#B45309', warningSoft: '#FCF1E0', isDark: false }) },
   };
-  // The screen is a tab root now, one level deeper than the stack routes.
-  for (const name of Object.keys(modules)) if (name.startsWith('../src/')) modules['../' + name] = modules[name];
   const module = { exports: {} as { default?: () => Node } };
   runInNewContext(code, { module, exports: module.exports, Error, AbortController, Promise, Map, Date, require: (name: string) => {
     if (!Object.hasOwn(modules, name)) throw new Error('Unexpected assistant dependency: ' + name);
@@ -117,10 +142,12 @@ function harness({ client, accounts = [visa, cash, usd], data = entries, params 
     list.props.ref.current = { scrollToEnd: (options: unknown) => scrolled.push(options) };
     const items: Node[] = list.props.data.map((item: unknown) => list.props.renderItem({ item }));
     const composer = nodes(root).find(node => node.type === 'AssistantComposer')!;
-    const screen = nodes(root).find(node => node.type === 'Tabs.Screen')!;
+    const screen = nodes(root).find(node => node.type === 'Stack.Screen')!;
     return { root, list, items, composer, screen, empty: list.props.ListEmptyComponent as Node, messages: list.props.data as conversation.Message[] };
   };
-  return { render, pushed, written, scrolled, haptics, effects, setLocale: (next: AppLocale) => { i18n = bindLocale(next, 'none', deviceLanguage); } };
+  /** Leave the screen: React runs the effects' cleanups and drops the component's state; the app session stays. */
+  const unmount = () => { for (const cleanup of effects.splice(0)) cleanup(); state.length = 0; };
+  return { render, unmount, session, subscriptions, pushed, navigated, dismissed, written, scrolled, haptics, effects, setLocale: (next: AppLocale) => { i18n = bindLocale(next, 'none', deviceLanguage); } };
 }
 function nodes(value: any): Node[] {
   if (!value || typeof value !== 'object') return [];
@@ -135,6 +162,7 @@ const find = (items: Node[], type: string) => items.flatMap(nodes).filter(node =
 test('a new conversation is quiet: no messages, four suggestions, an empty composer and no New chat button', () => {
   const view = harness({ client: disconnectedAssistant() });
   const { messages, empty, composer, screen, list } = view.render();
+  assert.ok(view.subscriptions.length > 0 && view.subscriptions.every(subscribe => subscribe === view.session.subscribe), 'the screen reads the app session, not state of its own');
   assert.equal(messages.length, 0);
   assert.equal(empty.type, 'Suggestions');
   assert.deepEqual([...empty.props.items], conversation.SUGGESTIONS.map(key => es.t(key)));
@@ -198,7 +226,7 @@ test('the composer is busy while a request is in flight, streaming grows one mes
   assert.equal(scripted.asks[0].text, '¿Por qué gasté más este mes?');
   assert.equal(screen.empty.props.disabled, true, 'suggestions cannot start a second request');
   assert.equal(typeof screen.screen.props.options.headerRight, 'function', 'New chat appears once there is a conversation');
-  scripted.reply([{ type: 'delta', text: 'Gastaste ' }, { type: 'delta', text: 'más ' }]);
+  scripted.reply([{ type: 'delta', text: 'Gastaste ' }, { type: 'delta', text: 'más ' }], { more: true });
   await settle();
   screen = view.render();
   const streaming = screen.items[1];
@@ -207,7 +235,10 @@ test('the composer is busy while a request is in flight, streaming grows one mes
   assert.equal(text.props.text, 'Gastaste más ');
   assert.equal(screen.composer.props.busy, true);
   // Stop: the request is aborted, the partial answer stays and is marked as interrupted, the composer is free again.
+  assert.ok(view.session.request.current, 'the answer is still streaming');
   screen.composer.props.onStop();
+  assert.equal(scripted.signals[0]?.aborted, true, 'Stop aborts the request');
+  assert.equal(view.session.request.current, null);
   screen = view.render();
   assert.equal(screen.composer.props.busy, false);
   assert.equal(find([screen.items[1]], 'AssistantText')[0].props.status, 'stopped');
@@ -215,7 +246,7 @@ test('the composer is busy while a request is in flight, streaming grows one mes
   assert.equal(screen.messages.length, 2);
 });
 
-test('an answer renders its text and evidence rows/links from the cited facts, and a link opens the FinanzApp screen', async () => {
+test('an answer renders its text and evidence rows/links from the cited facts, and a link opens the FinanzApp screen (a tab root by dismissTo, anything else by push)', async () => {
   const scripted = scriptedClient();
   const view = harness({ client: scripted.client });
   let screen = view.render();
@@ -234,7 +265,16 @@ test('an answer renders its text and evidence rows/links from the cited facts, a
   assert.equal(proof.props.content.currency, 'ARS', 'the rows keep the currency the facts were computed in');
   assert.deepEqual(proof.props.content.links.map((link: any) => link.id), ['movements']);
   proof.props.onOpen(proof.props.content.links[0].href);
-  assert.deepEqual(view.pushed, ['/activity']);
+  // Movimientos is a tab root: the link pops back to the existing tabs and selects it (dismissTo), never stacking a
+  // second copy of the tabs over the Assistant (navigate from this root-stack screen would push one).
+  assert.equal(JSON.stringify(view.dismissed), JSON.stringify(['/activity']));
+  assert.equal(view.pushed.length, 0);
+  for (const root of ['/', '/reports', '/settings']) proof.props.onOpen({ pathname: root });
+  assert.equal(JSON.stringify(view.dismissed), JSON.stringify(['/activity', '/', '/reports', '/settings']));
+  proof.props.onOpen({ pathname: '/budgets', params: { currency: 'ARS' } });
+  assert.equal(JSON.stringify(view.pushed), JSON.stringify([{ pathname: '/budgets', params: { currency: 'ARS' } }]), 'a screen of the stack is pushed over the Assistant, so back returns to it');
+  assert.equal(view.dismissed.length, 4, 'a non-tab screen is never reached by dismissTo');
+  assert.equal(view.navigated.length, 0, 'router.navigate is never used for a link');
   assert.equal(screen.composer.props.busy, false);
   // A single-category answer links the category's dated expenses.
   const single = scriptedClient();
@@ -247,6 +287,8 @@ test('an answer renders its text and evidence rows/links from the cited facts, a
   assert.deepEqual(links.map((link: any) => link.id), ['category', 'movements']);
   find([view2.render().items[1]], 'AnswerEvidence')[0].props.onOpen(links[0].href);
   assert.equal(JSON.stringify(view2.pushed.at(-1)), JSON.stringify({ pathname: '/spending-detail', params: { currency: 'ARS', startISO: '2026-09-01', endISO: '2026-09-21', category: 'Supermercado' } }));
+  assert.equal(view2.dismissed.length, 0);
+  assert.equal(view2.navigated.length, 0);
 });
 
 test('a structured draft renders as a card and writes nothing until Confirmar; confirming validates with the domain and writes exactly once', async () => {
@@ -440,42 +482,175 @@ test('autoscroll follows only a reader who is near the end, and Reduce Motion sc
   assert.equal(JSON.stringify(still.scrolled.at(-1)), JSON.stringify({ animated: false }));
 });
 
-test('New chat aborts any request and returns to the empty conversation; leaving the screen aborts too', async () => {
+test('New chat (session.reset) aborts the request in flight and empties the conversation; a late event from it is ignored', async () => {
   const scripted = scriptedClient();
   const view = harness({ client: scripted.client });
   view.render().empty.props.onPick('¿Por qué gasté más este mes?');
   await tick();
   let screen = view.render();
-  screen.screen.props.options.headerRight().props.onPress();
+  assert.ok(view.session.request.current, 'the request in flight lives in the session');
+  const newChat = screen.screen.props.options.headerRight();
+  assert.equal(newChat.type, 'IconButton');
+  assert.equal(newChat.props.label, 'Nuevo chat');
+  assert.equal(newChat.props.label, es.t('assistant.newChat'));
+  assert.equal(newChat.props.onPress, view.session.reset, 'New chat is the session\'s reset');
+  newChat.props.onPress();
+  assert.equal(scripted.signals[0]?.aborted, true, 'New chat aborts the request');
+  assert.equal(view.session.request.current, null);
   screen = view.render();
   assert.equal(screen.messages.length, 0);
   assert.equal(screen.composer.props.busy, false);
+  assert.equal(screen.composer.props.value, '');
   assert.equal(screen.screen.props.options.headerRight, undefined);
   scripted.reply([{ type: 'delta', text: 'late' }]);
   await settle();
   assert.equal(view.render().messages.length, 0, 'events from the aborted request are ignored');
-  const header = screen.screen.props.options.headerRight;
-  assert.equal(header, undefined);
-  // The unmount effect aborts an in-flight request.
-  assert.ok(view.effects.length >= 1);
-  const { pushed } = view;
-  assert.equal(pushed.length, 0);
+  assert.equal(view.session.getState().conversation.messages.length, 0);
+  assert.equal(view.render().screen.props.options.headerRight, undefined);
+  assert.equal(view.pushed.length, 0);
+  assert.equal(view.navigated.length + view.dismissed.length, 0);
+  // The next question starts a new exchange; message ids keep increasing, so nothing of the old one is reused.
+  view.render().composer.props.onChange('¿Cuánto gasté en comida?');
+  view.render().composer.props.onSend();
+  await tick();
+  assert.equal(scripted.asks.length, 2);
+  assert.equal(view.render().messages.map(message => message.id).join(), 'u-2');
 });
 
-test('the Assistant is the centre tab and Inicio\'s capture sheet lands on it; the old preview and the stack route are gone', () => {
+test('leaving the screen does not lose the conversation: mounted again over the same session it shows the thread and the draft words, and opens at the last exchange once', async () => {
+  const scripted = scriptedClient();
+  const view = harness({ client: scripted.client });
+  view.render().empty.props.onPick('¿Por qué gasté más este mes?');
+  await tick();
+  scripted.reply([{ type: 'result', result: FIXTURE_ANSWER, facts: FIXTURE_FACTS }]);
+  await settle();
+  view.render().composer.props.onChange('Y en comida');
+  view.unmount();
+  // Back to the tabs and «+» → Asistente again: a new mount of the screen over the same app session.
+  const again = harness({ client: scripted.client, session: view.session });
+  const screen = again.render();
+  assert.equal(screen.messages.map(message => message.id).join(), 'u-1,a-2');
+  assert.equal(screen.messages[0].text, '¿Por qué gasté más este mes?');
+  assert.equal(find([screen.items[1]], 'AssistantText')[0].props.text, FIXTURE_ANSWER.message);
+  assert.equal(find([screen.items[1]], 'AnswerEvidence')[0].props.content.rows[1].amountMinor, 4250000);
+  assert.equal(screen.composer.props.value, 'Y en comida', 'the unsent words are still in the composer');
+  assert.equal(screen.composer.props.busy, false);
+  assert.equal(typeof screen.screen.props.options.headerRight, 'function', 'New chat is offered for the conversation that is there');
+  assert.equal(screen.list.props.contentContainerStyle.justifyContent, 'flex-start');
+  // Returning to an existing conversation opens at its last exchange, without animation, once; afterwards the usual rule.
+  screen.list.props.onContentSizeChange(0, 2000);
+  assert.equal(again.scrolled.length, 0, 'the viewport is not measured yet: no jump and no animated follow of a long thread');
+  screen.list.props.onLayout({ nativeEvent: { layout: { height: 600 } } });
+  assert.equal(JSON.stringify(again.scrolled), JSON.stringify([{ animated: false }]), 'one jump to the last exchange, not an animated scroll');
+  screen.list.props.onScroll({ nativeEvent: { contentOffset: { y: 200 } } });
+  screen.list.props.onContentSizeChange(0, 2100);
+  assert.equal(again.scrolled.length, 1, 'the jump happens once: a reader who scrolled up is not pulled down again');
+  // Measured the other way round (layout first, over a list whose content is not measured yet), the jump is still the one non-animated scroll of the long thread.
+  const other = harness({ client: scripted.client, session: view.session });
+  const otherList = other.render().list;
+  otherList.props.onLayout({ nativeEvent: { layout: { height: 600 } } });
+  otherList.props.onContentSizeChange(0, 2000);
+  assert.equal(JSON.stringify(other.scrolled.at(-1)), JSON.stringify({ animated: false }));
+  otherList.props.onContentSizeChange(0, 2100);
+  assert.equal(JSON.stringify(other.scrolled.at(-1)), JSON.stringify({ animated: false }), 'no further scroll after the jump for a reader at the top');
+  assert.equal(other.scrolled.filter(options => JSON.stringify(options) === JSON.stringify({ animated: false })).length, 1);
+  // A first visit never jumps: the list starts empty.
+  const first = harness({ client: disconnectedAssistant() });
+  const list = first.render().list;
+  list.props.onLayout({ nativeEvent: { layout: { height: 600 } } });
+  list.props.onContentSizeChange(0, 2000);
+  assert.equal(first.scrolled.length, 1);
+  assert.equal(JSON.stringify(first.scrolled[0]), JSON.stringify({ animated: true }), 'the short empty content followed as usual, not the returning jump');
+});
+
+test('an answer streaming while the screen is closed still lands in the session, and a confirm that finishes while it is closed is recorded once', async () => {
+  const scripted = scriptedClient();
+  const view = harness({ client: scripted.client });
+  view.render().empty.props.onPick('¿Por qué gasté más este mes?');
+  await tick();
+  scripted.reply([{ type: 'delta', text: 'Gastaste ' }], { more: true });
+  await settle();
+  view.unmount();
+  assert.equal(scripted.signals[0]?.aborted, false, 'leaving the screen does not abort the request');
+  assert.ok(view.session.request.current, 'the request stays in the session');
+  assert.equal(view.session.getState().conversation.phase, 'streaming');
+  const again = harness({ client: scripted.client, session: view.session });
+  let screen = again.render();
+  assert.equal(screen.composer.props.busy, true, 'still answering when the person comes back');
+  assert.equal(find([screen.items[1]], 'AssistantText')[0].props.text, 'Gastaste ');
+  // A second send while that request is in flight is refused: one request at a time, across mounts.
+  screen.composer.props.onChange('otra');
+  again.render().composer.props.onSend();
+  await tick();
+  assert.equal(scripted.asks.length, 1);
+  assert.equal(again.render().messages.length, 2);
+  // The rest of the answer arrives while the screen is closed again.
+  again.unmount();
+  scripted.reply([{ type: 'delta', text: 'más ' }, { type: 'result', result: FIXTURE_ANSWER, facts: FIXTURE_FACTS }]);
+  await settle();
+  const state = view.session.getState().conversation;
+  assert.equal(state.phase, 'idle');
+  assert.equal(view.session.request.current, null);
+  screen = harness({ client: scripted.client, session: view.session }).render();
+  assert.equal(screen.messages.length, 2);
+  assert.equal(find([screen.items[1]], 'AssistantText')[0].props.status, 'done');
+  assert.equal(find([screen.items[1]], 'AssistantText')[0].props.text, FIXTURE_ANSWER.message);
+  assert.equal(find([screen.items[1]], 'AnswerEvidence')[0].props.content.links[0].id, 'movements');
+  assert.equal(screen.composer.props.busy, false);
+
+  // A confirm that is still writing when the person leaves: the session holds the write, the remounted card shows it busy,
+  // a second tap from the new mount writes nothing, and the result lands in the session.
+  const drafts = scriptedClient();
+  let finish: (() => void) | null = null;
+  const attempts: domain.Entry[] = [];
+  const slow = async (entry: domain.Entry) => { attempts.push(entry); await new Promise<void>(resolve => { finish = resolve; }); };
+  const writer = harness({ client: drafts.client, addEntry: slow });
+  writer.render().empty.props.onPick('Gasté 18.500 en Carrefour con la Visa');
+  await tick();
+  drafts.reply([{ type: 'result', result: FIXTURE_DRAFT, facts: [] }]);
+  await settle();
+  find([writer.render().items[1]], 'DraftCard')[0].props.onConfirm();
+  await tick();
+  assert.equal(attempts.length, 1);
+  assert.equal(writer.session.getState().writing, 'a-2');
+  writer.unmount();
+  const back = harness({ client: drafts.client, session: writer.session, addEntry: slow });
+  const busyCard = find([back.render().items[1]], 'DraftCard')[0];
+  assert.equal(busyCard.props.busy, true, 'the write in progress shows on the card after coming back');
+  busyCard.props.onConfirm();
+  await settle();
+  assert.equal(attempts.length, 1, 'one write at a time, whether or not the screen is open');
+  finish!();
+  await settle();
+  assert.equal(writer.session.getState().writing, null);
+  const done = find([back.render().items[1]], 'DraftCard')[0];
+  assert.equal(done.props.content.status, 'confirmed');
+  assert.equal(done.props.content.entryId, attempts[0].id);
+  assert.equal(done.props.busy, false);
+  assert.equal(writer.session.writes.size, 0, 'a finished write leaves nothing to retry');
+});
+
+test('the Assistant is a root stack route reached from the capture hub; there is no Assistant tab and no tab route file', () => {
   const layout = readFileSync(new URL('../app/_layout.tsx', import.meta.url), 'utf8');
-  assert.equal(layout.includes('name="assistant"'), false, 'no duplicate stack screen: one conversation, one route');
+  assert.equal(layout.match(/<Stack\.Screen name="assistant"/g)?.length, 1, 'one stack screen: one conversation, one route');
+  assert.match(layout, /<Stack\.Screen name="assistant" options=\{\{ title: t\('assistant\.title'\) \}\} \/>/);
   assert.match(layout, /name="cards"/);
   assert.equal(layout.includes('assistant-preview'), false);
   const tabs = readFileSync(new URL('../app/(tabs)/_layout.tsx', import.meta.url), 'utf8');
-  assert.match(tabs, /name="assistant"/);
-  const home = readFileSync(new URL('../app/(tabs)/index.tsx', import.meta.url), 'utf8');
-  assert.match(home, /<CaptureButton movementCurrency=\{actionCurrency\} assistantCurrency=\{currency\} \/>/, 'the Assistant hears the currency Inicio shows');
-  const capture = readFileSync(new URL('../src/ui/home-capture.tsx', import.meta.url), 'utf8');
-  assert.match(capture, /return \{ method: 'navigate', pathname: '\/assistant'/, 'navigate, not push: switching to the tab, never stacking a copy');
-  assert.match(capture, /if \(method === 'navigate'\) router\.navigate\(/);
+  assert.equal(tabs.includes('name="assistant"'), false, 'the Assistant is not a tab');
+  assert.equal([...tabs.matchAll(/<Tabs\.Screen name="([^"]+)"/g)].map(match => match[1]).join(), 'index,activity,reports,settings');
+  assert.throws(() => readFileSync(new URL('../app/(tabs)/assistant.tsx', import.meta.url)), 'the tab route file is gone');
   assert.throws(() => readFileSync(new URL('../app/assistant-preview.tsx', import.meta.url)));
-  assert.throws(() => readFileSync(new URL('../app/assistant.tsx', import.meta.url)));
+  assert.ok(readFileSync(new URL('../app/assistant.tsx', import.meta.url), 'utf8').includes('export default function AssistantScreen'));
+  // The capture hub pushes /assistant over the tabs (back returns where «+» was tapped), with the currency on display.
+  const capture = readFileSync(new URL('../src/ui/capture-hub.tsx', import.meta.url), 'utf8');
+  assert.match(capture, /return \{ pathname: '\/assistant', params: assistantCurrency \? \{ currency: assistantCurrency \} : \{\} \};/);
+  assert.match(capture, /router\.push\(captureDestination\(choice, movementCurrency, currency\)\)/);
+  assert.equal(capture.includes('router.navigate'), false, 'pushed, never a tab switch');
+  assert.throws(() => readFileSync(new URL('../src/ui/home-capture.tsx', import.meta.url)));
+  // Inicio no longer carries its own capture button: the dock's «+» is the one way in.
+  const home = readFileSync(new URL('../app/(tabs)/index.tsx', import.meta.url), 'utf8');
+  assert.equal(/CaptureButton|home-capture/.test(home), false);
 });
 
 test('English: the screen\'s own words are English, the model\'s answer and the user\'s words are untouched, and a confirmed draft writes the same Entry', async () => {

@@ -6,7 +6,6 @@ export const navigation: Pick<Messages, 'nav' | 'boot'> = {
     tabs: {
       home: 'Home',
       activity: 'Activity',
-      assistant: 'Assistant',
       reports: 'Reports',
       more: 'More',
     },

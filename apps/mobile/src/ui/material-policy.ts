@@ -2,7 +2,7 @@
  * geometry, free of React Native so they run in Node.
  *
  * Liquid Glass is a control layer, not a content layer: it is drawn only on
- * the floating tab bar (24UX6A), the account detail's movement pills and the
+ * the dock's pill (24UX6A, decision 005), the account detail's movement pills and the
  * Assistant composer, and only when every condition holds. Everything else,
  * and every other case, gets the opaque material from Producto 21, which is a
  * designed state, not a fallback error.

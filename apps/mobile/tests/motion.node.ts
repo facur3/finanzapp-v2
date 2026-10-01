@@ -113,7 +113,7 @@ test('donut sweeps in from twelve o\'clock only the first time, then crossfades,
   assert.deepEqual(still.paths.map((path: any) => path.props.animatedProps().d), still.paths.map((path: any) => path.props.d));
 });
 
-test('24UX3: three compact movement pills on the account detail; glass or opaque by material (24UX6A: Inicio records through its capture sheet)', () => {
+test('24UX3: three compact movement pills on the account detail; glass or opaque by material (24UX6A: elsewhere recording is the dock «+»; decision 005: an expense glyph is ink, never red)', () => {
   const source = readFileSync(new URL('../src/ui/quick-actions.tsx', import.meta.url), 'utf8');
   const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText;
   const jsx = (type: any, props: any) => ({ type, props });
@@ -162,7 +162,8 @@ test('24UX3: three compact movement pills on the account detail; glass or opaque
   }
   // Restraint: the surface step with a hairline edge, no shadow, the semantic colour only in the glyph.
   assert.equal(JSON.stringify(home.map((action: any) => pill(action).backgroundColor)), JSON.stringify(['#1C1C1E', '#1C1C1E', '#1C1C1E']));
-  assert.equal(JSON.stringify(home.map((action: any) => glyph(action).props.color)), JSON.stringify(['expense', 'income', 'transfer']));
+  assert.equal(JSON.stringify(home.map((action: any) => glyph(action).props.color)), JSON.stringify(['neutral', 'income', 'transfer']),
+    'decision 005: the expense glyph is ink (red is the negative tone, never "spent"); income keeps its positive tone, transfer the neutral secondary ink');
   assert.equal(home.every((action: any) => pill(action).borderWidth === 0.5 && pill(action).shadowOpacity === undefined), true);
   palette = { ...dark, isDark: false, surface: '#FFFFFF', primary: '#2557D6', primarySoft: '#E5ECFB' };
   assert.equal(pill(render({ currency: 'ARS' })[0]).backgroundColor, '#FFFFFF');
@@ -175,7 +176,7 @@ test('24UX3: three compact movement pills on the account detail; glass or opaque
   assert.equal(label(tall[0]).props.numberOfLines, undefined);
   stacked = false;
 
-  assert.equal(module.exports.AssistantEntry, undefined, '24UX6A: the wide Assistant entry left Inicio; the capture sheet and the centre tab reach it');
+  assert.equal(module.exports.AssistantEntry, undefined, '24UX6A: the wide Assistant entry left Inicio; the Assistant is a root-stack screen opened from the dock\'s «+» capture hub');
 
   // Native glass on iOS 26: same geometry, the opaque style handed over untouched as the fallback.
   material = 'glass';

@@ -22,16 +22,17 @@ export function actionPillMaterial(p: Palette): ViewStyle {
 }
 
 /** The three ways to record money, as one row of compact pills (24UX3; they were four round actions with the
- * Assistant first). Equal widths, glyph in its semantic colour (expense coral, income green, transfer azure) and the
- * label in ink, so colour carries meaning and the row stays lighter than the hero. On a narrow iPhone the label
+ * Assistant first). Equal widths, the label in ink and the glyph in its meaning's colour where one exists (income
+ * positive green); an expense is ink and a transfer the neutral secondary ink (decision 005: red never means "spent"),
+ * so the glyph and the word carry the kind, never colour alone. On a narrow iPhone the label
  * shrinks a little rather than wrapping; with accessibility text sizes the pills stack at full width and the label
- * wraps. The account detail draws this row (24UX6A: Inicio records through its one capture button and sheet). */
+ * wraps. The account detail draws this row (24UX6A: everywhere else, recording is the dock's «+» and its capture hub). */
 export function QuickActions({ currency, accountId }: { currency?: Currency; accountId?: string }) {
   const { t } = useI18n();
   const stacked = useStacked();
   const params = { ...(accountId ? { accountId } : {}), ...(currency ? { currency } : {}) };
   const actions: Action[] = [
-    { kind: 'expense', label: t('quickActions.expense'), accessibilityLabel: t('quickActions.recordExpense'), icon: 'remove', tone: 'expense', onPress: () => router.push({ pathname: '/new-entry', params: { kind: 'expense', ...params } }) },
+    { kind: 'expense', label: t('quickActions.expense'), accessibilityLabel: t('quickActions.recordExpense'), icon: 'remove', tone: 'neutral', onPress: () => router.push({ pathname: '/new-entry', params: { kind: 'expense', ...params } }) },
     { kind: 'income', label: t('quickActions.income'), accessibilityLabel: t('quickActions.recordIncome'), icon: 'add', tone: 'income', onPress: () => router.push({ pathname: '/new-entry', params: { kind: 'income', ...params } }) },
     { kind: 'transfer', label: t('quickActions.transfer'), accessibilityLabel: t('quickActions.transferBetween'), icon: 'swap-horizontal', tone: 'transfer', onPress: () => router.push({ pathname: '/new-transfer', params: accountId ? { accountId } : {} }) },
   ];

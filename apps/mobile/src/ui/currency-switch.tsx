@@ -53,9 +53,11 @@ export function CurrencySwitch({ value, currencies, onChange, disabled = false, 
  * accounts alone). It
  * opens the display sheet (consolidated total, one currency only, the display currency); nothing about the display
  * lives on the screen itself. Choosing never converts or rewrites an account. */
-export function DisplayCurrencyButton({ mode, currency, held, gate, onMode, onCurrency, compact = true }: {
+export function DisplayCurrencyButton({ mode, currency, held, gate, onMode, onCurrency, compact = true, onField = false }: {
   mode: DisplayMode; currency: Currency; held: readonly Currency[]; gate: CurrencyGate;
   onMode: (mode: DisplayMode) => void; onCurrency: (currency: Currency) => void; compact?: boolean;
+  /** 24UX6A, on Inicio's pine field: the field's control fill and ink, a 44 pt target. */
+  onField?: boolean;
 }) {
   const p = usePalette();
   const { t, locale, currencyName } = useI18n();
@@ -65,14 +67,18 @@ export function DisplayCurrencyButton({ mode, currency, held, gate, onMode, onCu
   // What the number covers, in two words: "Total · USD" (every account, converted) or "Solo USD" (that currency alone).
   const label = mode === 'consolidated' ? t('display.total', { code: currency }) : t('display.only', { code: currency });
   return <>
-    <PressFeedback feedback="highlight" accessibilityRole="button" onPress={() => setVisible(true)} hitSlop={compact ? 6 : undefined}
+    <PressFeedback feedback={onField ? 'scale' : 'highlight'} accessibilityRole="button" onPress={() => setVisible(true)} hitSlop={onField ? 4 : compact ? 6 : undefined}
       accessibilityLabel={t(mode === 'consolidated' ? 'display.chipConsolidated' : 'display.chipSingle', { name: currencyName(currency) })}
       accessibilityHint={t('display.chipHint')}
-      style={{ flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: compact ? 32 : 36, paddingVertical: compact ? 4 : 6, paddingHorizontal: 12,
-        borderRadius: compact ? 16 : radius.button, backgroundColor: compact && p.isDark ? p.surface : p.inset, alignSelf: 'flex-start', maxWidth: '100%',
-        ...(compact ? { borderWidth: StyleSheet.hairlineWidth, borderColor: p.isDark ? 'rgba(255,255,255,0.12)' : 'rgba(10,10,12,0.10)' } : {}) }}>
-      <AppText accessible={false} numberOfLines={1} variant={compact ? 'footnote' : 'subhead'} style={{ fontWeight: '600', color: compact ? p.text : p.primary, flexShrink: 1 }}>{label}</AppText>
-      <Ionicons name="chevron-down" size={compact ? 12 : 14} color={compact ? p.secondary : p.primary} accessible={false} />
+      style={onField
+        ? { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 40, paddingVertical: 6, paddingHorizontal: 14, borderRadius: 20,
+          backgroundColor: p.heroControl, alignSelf: 'flex-start', maxWidth: '100%' }
+        : { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: compact ? 32 : 36, paddingVertical: compact ? 4 : 6, paddingHorizontal: 12,
+          borderRadius: compact ? 16 : radius.button, backgroundColor: compact && p.isDark ? p.surface : p.inset, alignSelf: 'flex-start', maxWidth: '100%',
+          ...(compact ? { borderWidth: StyleSheet.hairlineWidth, borderColor: p.isDark ? 'rgba(255,255,255,0.12)' : 'rgba(10,10,12,0.10)' } : {}) }}>
+      <AppText accessible={false} numberOfLines={1} variant={onField ? 'subhead' : compact ? 'footnote' : 'subhead'}
+        style={{ fontWeight: '600', color: onField ? p.heroInk : compact ? p.text : p.primary, flexShrink: 1 }}>{label}</AppText>
+      <Ionicons name="chevron-down" size={compact ? 12 : 14} color={onField ? p.heroSecondary : compact ? p.secondary : p.primary} accessible={false} />
     </PressFeedback>
     <DisplaySheet visible={visible} mode={mode} currency={currency} consolidatedOptions={consolidatedOptions} singleOptions={singleOptions}
       onClose={() => setVisible(false)} onMode={onMode} onCurrency={onCurrency} />

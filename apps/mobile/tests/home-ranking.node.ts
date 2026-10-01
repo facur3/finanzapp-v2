@@ -4,31 +4,32 @@ import { test } from 'node:test';
 import { runInNewContext } from 'node:vm';
 import ts from 'typescript';
 import * as uiPresentation from '../src/ui/presentation.ts';
-import { washOf } from '../src/ui/category-color.ts';
 import { bindLocale } from '../src/i18n/bind.ts';
 import type { AppLocale } from '../src/i18n/locale.ts';
 // Read on every render, like the live provider; a test may switch it and must restore it.
 let current: AppLocale = 'es-AR';
 const i18nProvider = { useI18n: () => bindLocale(current) };
 
-// A source/behaviour guard over Inicio's row modules (home-modules.tsx): the metric help, the one contextual line
-// (24UX6A, it replaced the category ranking and the budget card) and the upcoming commitments. The look of the rows on
-// an iPhone remains a device acceptance item.
-const palette = { line: '#ddd', isDark: true, secondary: '#A0A0A8', tertiary: '#7C7C84', expense: '#FF6B5E', expenseSoft: '#FF6B5E22', warning: '#F5B342', warningSoft: '#F5B34222' };
+// A source/behaviour guard over Inicio's row modules (home-modules.tsx): the metric help, the field's controls (24UX6A:
+// the accounts button and the per-currency parts on the pine field) and the upcoming commitments. The insight line
+// (HomeInsightRow) was removed by owner decision (24UX6A). The look of the rows on an iPhone remains a device acceptance item.
+const palette = {
+  line: '#ddd', isDark: true, secondary: '#A0A0A8', tertiary: '#7C7C84', expense: '#FF6B5E', warning: '#F5B342',
+  hero: '#14362D', heroInk: '#EEF5F1', heroSecondary: '#A8C4B9', heroControl: '#26493F',
+};
 
 function harness() {
   const source = readFileSync(new URL('../src/ui/home-modules.tsx', import.meta.url), 'utf8');
   const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText;
   const jsx = (type: any, props: any) => ({ type, props });
-  const env = { alerts: [] as unknown[][], pushed: [] as unknown[] };
+  const env = { alerts: [] as unknown[][], pushed: [] as unknown[], required: new Set<string>() };
   const modules: Record<string, any> = {
     '../i18n/provider': i18nProvider,
     'react/jsx-runtime': { jsx, jsxs: jsx, Fragment: 'Fragment' },
     'react-native': { Alert: { alert: (...args: unknown[]) => { env.alerts.push(args); } }, StyleSheet: { create: (styles: unknown) => styles, hairlineWidth: 0.5 }, View: 'View' },
     'expo-router': { router: { push: (to: unknown) => { env.pushed.push(to); } } },
     '@expo/vector-icons/Ionicons': 'Ionicons',
-    './components': { AppText: 'AppText', MerchantBadge: 'MerchantBadge', Money: 'Money', PressFeedback: 'PressFeedback', Surface: 'Surface', useStacked: () => false },
-    './category-color': { washOf },
+    './components': { AppText: 'AppText', MerchantBadge: 'MerchantBadge', Money: 'Money', PressFeedback: 'PressFeedback', useStacked: () => false },
     './category-hues': { useCategoryLook: (label: string) => ({ label, hex: '#' + label.length.toString().padStart(6, 'A'), glyph: 'restaurant-outline' }) },
     './presentation': uiPresentation,
     './theme': { usePalette: () => palette },
@@ -36,9 +37,10 @@ function harness() {
   const module = { exports: {} as Record<string, any> };
   runInNewContext(code, { module, exports: module.exports, require: (name: string) => {
     if (!Object.hasOwn(modules, name)) throw new Error('Unexpected home-modules dependency: ' + name);
+    env.required.add(name);
     return modules[name];
   } });
-  return { env, exports: module.exports };
+  return { env, exports: module.exports, mocked: Object.keys(modules) };
 }
 function flatten(value: any): any[] {
   if (!value || typeof value !== 'object') return [];
@@ -47,66 +49,6 @@ function flatten(value: any): any[] {
   return [value, ...flatten(value.props.children)];
 }
 const textOf = (node: any) => [node.props.children].flat().join('');
-
-test('24UX6A: an exceeded budget is one sentence with the amount over, in coral, and opens Presupuestos', () => {
-  const { exports } = harness();
-  let pressed = 0;
-  const row = exports.HomeInsightRow({ insight: { kind: 'budgetExceeded', scope: 'total', category: null, currency: 'ARS', overMinor: 100000 }, onPress: () => { pressed++; } });
-  assert.equal(row.type, 'PressFeedback');
-  assert.equal(row.props.accessibilityRole, 'button');
-  assert.equal(row.props.accessibilityLabel, 'Superaste tu presupuesto del mes por 1000,00 ARS.', 'VoiceOver hears the amount in words, ungrouped');
-  assert.equal(row.props.accessibilityHint, 'Abre Presupuestos');
-  const nodes = flatten(row);
-  assert.equal(textOf(nodes.find(node => node.type === 'AppText')), 'Superaste tu presupuesto del mes por $ 1.000,00.');
-  const glyph = nodes.find(node => node.type === 'Ionicons');
-  assert.deepEqual([glyph.props.name, glyph.props.color], ['speedometer-outline', palette.expense]);
-  assert.equal(nodes.find(node => node.type === 'View').props.style.backgroundColor, palette.expenseSoft);
-  assert.equal(nodes.filter(node => node.type === 'Surface').length, 1, 'one quiet card, nothing else');
-  assert.ok(nodes.filter(node => node.type !== 'PressFeedback').every(node => node.props.accessible === false || node.type === 'Surface' || node.type === 'View'), 'one element for VoiceOver');
-  row.props.onPress();
-  assert.equal(pressed, 1);
-  const category = exports.HomeInsightRow({ insight: { kind: 'budgetExceeded', scope: 'category', category: 'Ocio', currency: 'USD', overMinor: 1250 }, labelsCurrency: true, onPress: () => {} });
-  assert.equal(category.props.accessibilityLabel, 'Superaste tu presupuesto de Ocio por 12,50 USD.');
-  assert.match(textOf(flatten(category).find(node => node.type === 'AppText')), /^Superaste tu presupuesto de Ocio por USD 12,50\.$/, 'another currency than the display: the amount carries its code');
-});
-
-test('24UX6A: a budget nearly spent says what share is left, in amber; the English reads the same facts', () => {
-  const { exports } = harness();
-  try {
-    const low = { kind: 'budgetLow', scope: 'category', category: 'Comida', currency: 'ARS', leftShare: 0.12 };
-    const row = exports.HomeInsightRow({ insight: low, onPress: () => {} });
-    assert.equal(textOf(flatten(row).find(node => node.type === 'AppText')), 'Te queda 12 % de tu presupuesto de Comida.');
-    assert.equal(row.props.accessibilityLabel, 'Te queda 12\u00A0% de tu presupuesto de Comida.', 'the share in the speech locale, ungrouped (VoiceOver says «por ciento»)');
-    assert.equal(flatten(row).find(node => node.type === 'Ionicons').props.color, palette.warning);
-    const total = exports.HomeInsightRow({ insight: { ...low, scope: 'total', category: null }, onPress: () => {} });
-    assert.equal(total.props.accessibilityLabel, 'Te queda 12\u00A0% de tu presupuesto del mes.');
-    // Codex (PR #70): under a total in another currency, a share says whose budget it is.
-    const other = exports.HomeInsightRow({ insight: { ...low, scope: 'total', category: null }, labelsCurrency: true, onPress: () => {} });
-    assert.equal(textOf(flatten(other).find(node => node.type === 'AppText')), 'Te queda 12\u00A0% de tu presupuesto del mes en ARS.');
-    assert.equal(other.props.accessibilityLabel, 'Te queda 12\u00A0% de tu presupuesto del mes en ARS.');
-    assert.equal(exports.HomeInsightRow({ insight: low, labelsCurrency: true, onPress: () => {} }).props.accessibilityLabel, 'Te queda 12\u00A0% de tu presupuesto de Comida en ARS.');
-    current = 'en-US';
-    const english = exports.HomeInsightRow({ insight: low, onPress: () => {} });
-    assert.equal(textOf(flatten(english).find(node => node.type === 'AppText')), '12% of your Comida budget is left.');
-    assert.equal(english.props.accessibilityHint, 'Opens Budgets');
-    assert.equal(exports.HomeInsightRow({ insight: { ...low, scope: 'total', category: null }, labelsCurrency: true, onPress: () => {} }).props.accessibilityLabel,
-      '12% of this month\u2019s ARS budget is left.');
-    assert.equal(exports.HomeInsightRow({ insight: { kind: 'budgetExceeded', scope: 'total', category: null, currency: 'ARS', overMinor: 100000 }, onPress: () => {} }).props.accessibilityLabel,
-      'You’re 1000.00 ARS over this month’s budget.');
-  } finally { current = 'es-AR'; }
-});
-
-test('24UX6A: a concentrated month names the category with its own glyph and hue, and opens Reportes', () => {
-  const { exports } = harness();
-  const row = exports.HomeInsightRow({ insight: { kind: 'concentration', category: 'Comida', key: 'comida', currency: 'ARS', share: 0.46 }, onPress: () => {} });
-  assert.equal(textOf(flatten(row).find(node => node.type === 'AppText')), 'Comida concentra 46 % de tus gastos de este mes.');
-  assert.equal(row.props.accessibilityLabel, 'Comida concentra 46\u00A0% de tus gastos de este mes.');
-  assert.equal(row.props.accessibilityHint, 'Abre Reportes');
-  const glyph = flatten(row).find(node => node.type === 'Ionicons');
-  assert.deepEqual([glyph.props.name, glyph.props.color], ['restaurant-outline', '#AAAAA6']);
-  assert.equal(flatten(row).find(node => node.type === 'View').props.style.backgroundColor, washOf('#AAAAA6', palette), 'the category\'s faint wash, never a new colour');
-  assert.doesNotMatch(JSON.stringify(row), /porque|because|deberías|should/i, 'a computed fact, never a cause or advice');
-});
 
 test('the metric help opens a native alert whose button is named in the interface language, never left to iOS', () => {
   const { env, exports } = harness();
@@ -199,4 +141,69 @@ test('25B3: an upcoming commitment opens the rule\'s detail, never its form, and
     current = 'en-US';
     assert.equal(exports.UpcomingRecurringRow({ rule, account, day: '2026-09-22', last: true }).props.accessibilityHint, 'Opens the details of this recurring item');
   } finally { current = 'es-AR'; }
+});
+
+test('24UX6A: home-modules imports exactly what the harness mocks, and the insight row is gone', () => {
+  const { env, exports, mocked } = harness();
+  assert.equal([...env.required].sort().join(','), [...mocked].sort().join(','), 'no stale mock (Surface, washOf, home-focus are no longer imported) and no missing one');
+  assert.equal(env.required.has('./home-focus'), false);
+  assert.equal(env.required.has('./category-color'), false);
+  assert.equal('HomeInsightRow' in exports, false, 'owner decision: Inicio carries no insight line');
+  assert.equal(JSON.stringify(Object.keys(exports).sort()), JSON.stringify(['CurrencyParts', 'FieldButton', 'MetricHelp', 'UpcomingRecurringRow']));
+});
+
+test('24UX6A: the metric help takes the pine field\'s colour and keeps its «Qué significa» name and 44 pt target', () => {
+  const { exports, env } = harness();
+  const help = exports.MetricHelp({ title: 'Disponible', detail: 'Es el dinero registrado.', color: palette.heroSecondary });
+  assert.equal(help.type, 'PressFeedback');
+  assert.equal(help.props.accessibilityRole, 'button');
+  assert.equal(help.props.accessibilityLabel, 'Qué significa Disponible', 'common.whatIs, whatever the colour');
+  assert.equal(help.props.hitSlop, 10, 'an 18 pt glyph with the slop that makes a 44 pt target');
+  assert.deepEqual([help.props.children.type, help.props.children.props.name, help.props.children.props.color, help.props.children.props.size, help.props.children.props.accessible],
+    ['Ionicons', 'information-circle-outline', palette.heroSecondary, 18, false], 'drawn in the field\'s secondary ink on Inicio');
+  help.props.onPress();
+  assert.equal(JSON.stringify(env.alerts), JSON.stringify([['Disponible', 'Es el dinero registrado.', [{ text: 'OK', style: 'cancel' }]]]));
+  assert.equal(exports.MetricHelp({ title: 'Gastado', detail: 'x' }).props.children.props.color, palette.secondary, 'off the field it stays the canvas\'s secondary ink');
+});
+
+test('24UX6A: the field button is a 44 pt circle with its label, the field\'s control fill and its ink', () => {
+  const { exports } = harness();
+  let pressed = 0;
+  try {
+    const button = exports.FieldButton({ icon: 'wallet-outline', label: 'Cuentas', onPress: () => { pressed++; } });
+    assert.equal(button.type, 'PressFeedback');
+    assert.equal(button.props.accessibilityRole, 'button');
+    assert.equal(button.props.accessibilityLabel, 'Cuentas', 'named by the caller, so it follows the interface language');
+    const style = button.props.style;
+    assert.deepEqual([style.width, style.height, style.minHeight, style.borderRadius], [44, 44, 44, 22], 'a 44 pt circle');
+    assert.equal(style.backgroundColor, palette.heroControl);
+    const glyph = button.props.children;
+    assert.deepEqual([glyph.type, glyph.props.name, glyph.props.color, glyph.props.accessible], ['Ionicons', 'wallet-outline', palette.heroInk, false], 'one element for VoiceOver');
+    button.props.onPress();
+    assert.equal(pressed, 1);
+    current = 'en-US';
+    assert.equal(exports.FieldButton({ icon: 'wallet-outline', label: 'Accounts', onPress: () => {} }).props.accessibilityLabel, 'Accounts');
+  } finally { current = 'es-AR'; }
+});
+
+test('24C1/24UX6A: each currency\'s own figure stands in for a missing total; on the field it uses the field\'s ink and secondary ink', () => {
+  const { exports } = harness();
+  const parts = [{ currency: 'ARS', minor: 150000 }, { currency: 'USD', minor: 2500 }];
+  const props = { parts, line: 'Falta la cotización', detail: 'Sin cotización del día.' };
+  const onField = exports.CurrencyParts({ ...props, onField: true });
+  const nodes = flatten(onField);
+  const money = nodes.filter(node => node.type === 'Money');
+  assert.equal(JSON.stringify(money.map(node => [node.props.currency, node.props.minor, node.props.color])),
+    JSON.stringify([['ARS', 150000, palette.heroInk], ['USD', 2500, palette.heroInk]]), 'one figure per currency, never a partial sum');
+  const line = nodes.find(node => node.type === 'AppText');
+  assert.equal(textOf(line), 'Falta la cotización');
+  assert.equal([line.props.style].flat().find((style: any) => style && style.color)?.color, palette.heroSecondary);
+  const help = nodes.find(node => node.type === exports.MetricHelp);
+  assert.ok(help, 'the reason sits behind the info button');
+  assert.deepEqual([help.props.title, help.props.detail, help.props.color], ['Cotizaciones', 'Sin cotización del día.', palette.heroSecondary]);
+
+  const canvas = flatten(exports.CurrencyParts(props));
+  assert.equal(canvas.filter(node => node.type === 'Money').every(node => node.props.color === undefined), true, 'off the field: the canvas\'s own ink');
+  assert.equal([canvas.find(node => node.type === 'AppText').props.style].flat().some((style: any) => style && style.color), false);
+  assert.equal(canvas.find(node => node.type === exports.MetricHelp).props.color, undefined);
 });

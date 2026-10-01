@@ -1,9 +1,10 @@
-import { addDaysISO, budgetState, type BudgetProgress, type CategorySpending, type Currency, type MonthlyBudgetSummary, type RecurringRule } from '@finanzapp/domain';
+import { addDaysISO, dailyAverageMinor, type Account, type Entry, type RecurringRule } from '@finanzapp/domain';
+import { selectEntries } from './presentation.ts';
 
-/** Producto 24UX6A: what Inicio shows under its number besides the capture button, as pure selections, so the screen and
- * the tests read one rule. Inicio answers three questions (how am I, what needs my attention, how do I record something)
- * and stops there: every list and every analysis keeps its own screen (Movimientos, Reportes, Presupuestos, Recurrentes).
- * No React, so Node tests load it directly. */
+/** Producto 24UX6A (decision 005): what Inicio shows under its financial field, as pure selections, so the screen and the
+ * tests read one rule. Inicio is the current month's dashboard: one number (Gastado or Disponible), what is due soon,
+ * and what was recorded this month; nothing else. No rankings, charts, budget cards, insight lines, Registrar button or
+ * Assistant banner: the analysis lives in Reportes, recording in the dock's «+». No React, so Node tests load it. */
 
 /** The commitments Inicio lists: the ones due within this many days (today included). Later ones live in Recurrentes. */
 export const COMMITMENT_HORIZON_DAYS = 7;
@@ -12,7 +13,11 @@ export const COMMITMENT_ROWS = 2;
 
 /** The active expense rules shown on Inicio: due from today to the horizon, soonest first (a tie by merchant), at most two;
  * none when nothing falls due that soon, so the section disappears instead of listing next month. `inView` keeps the
- * rules whose account the display shows (one currency, or every account when consolidated). */
+ * rules whose account the display shows (one currency, or every account when consolidated).
+ *
+ * Only recurring rules: they are the one upcoming commitment the ledger can state with its amount and date. A card's
+ * statement has no recorded amount (its balance due is not a statement amount) and its future instalments are already
+ * part of that card, so neither is listed here (decision 005). */
 export function homeCommitments(rules: readonly RecurringRule[] = [], todayISO: string, inView: (accountId: string) => boolean): RecurringRule[] {
   const horizon = addDaysISO(todayISO, COMMITMENT_HORIZON_DAYS - 1);
   return rules.filter(rule => rule.active && !rule.deleted && rule.kind === 'expense' && rule.nextDateISO >= todayISO && rule.nextDateISO <= horizon && inView(rule.accountId))
@@ -20,39 +25,27 @@ export function homeCommitments(rules: readonly RecurringRule[] = [], todayISO: 
     .slice(0, COMMITMENT_ROWS);
 }
 
-/** A single category this large a share of the month's spending is worth one line; below it, nothing is said. */
-export const CONCENTRATION_SHARE = 0.4;
+/** How many of the month's latest movements Inicio lists: four under the commitments, six when there are none (the
+ * activity then takes the commitments' place). A count, not a height: larger text scrolls, it never drops rows. */
+export const RECENT_ROWS = { withCommitments: 4, alone: 6 } as const;
+export function recentRowLimit(hasCommitments: boolean): number {
+  return hasCommitments ? RECENT_ROWS.withCommitments : RECENT_ROWS.alone;
+}
 
-/** The one contextual line Inicio may show, from computed facts only (never a cause, never advice), in priority order:
- *   1. a budget of the month that is exceeded, the total before a category, then the worst category;
- *   2. a budget at 85 % or more (`budgetState` warning), the tightest first: what share is left;
- *   3. one category concentrating at least 40 % of the month's spending (with two categories or more);
- *   4. nothing.
- * `category` is the stored category of a category budget or of the concentrated spending (the screen shows its label). */
-export type HomeInsight =
-  | { kind: 'budgetExceeded'; scope: 'total' | 'category'; category: string | null; currency: Currency; overMinor: number }
-  | { kind: 'budgetLow'; scope: 'total' | 'category'; category: string | null; currency: Currency; leftShare: number }
-  | { kind: 'concentration'; category: string; key: string; currency: Currency; share: number }
-  | null;
+/** The month's latest recorded expenses and incomes (24UX3's rule, restored): the movements of `period` in the accounts
+ * the display shows (`inView`), newest first (the day, then when it was recorded), at most `limit`. Each row keeps its
+ * own amount and currency; transfers are not activity here (they stay in Movimientos). */
+export function homeRecent(entries: readonly Entry[], accounts: Account[], period: { startISO: string; endISO: string }, inView: (account: Account) => boolean, limit: number): Entry[] {
+  const shown = new Set(accounts.filter(inView).map(account => account.id));
+  return selectEntries(entries.filter(entry => shown.has(entry.accountId) && entry.dateISO >= period.startISO && entry.dateISO <= period.endISO), accounts)
+    .slice(0, limit);
+}
 
-export function homeInsight(budget: MonthlyBudgetSummary | null, categories: readonly CategorySpending[] | null, expenseMinor: number, currency: Currency): HomeInsight {
-  if (budget) {
-    const candidates: { progress: BudgetProgress; scope: 'total' | 'category'; category: string | null }[] = [
-      ...(budget.total ? [{ progress: budget.total as BudgetProgress, scope: 'total' as const, category: null }] : []),
-      ...budget.rows.map(row => ({ progress: row as BudgetProgress, scope: 'category' as const, category: row.budget.category ?? null })),
-    ];
-    // Exceeded before near the limit; among the exceeded, the month's total before a category; then the highest ratio.
-    const order = (item: { state: string; scope: 'total' | 'category'; progress: BudgetProgress }) =>
-      [item.state === 'exceeded' ? 0 : 1, item.state === 'exceeded' && item.scope === 'category' ? 1 : 0, -item.progress.ratio];
-    const worst = candidates.map(item => ({ ...item, state: budgetState(item.progress) })).filter(item => item.state !== 'calm')
-      .sort((a, b) => { const x = order(a), y = order(b); return x[0] - y[0] || x[1] - y[1] || x[2] - y[2]; })[0];
-    if (worst?.state === 'exceeded') return { kind: 'budgetExceeded', scope: worst.scope, category: worst.category, currency: budget.currency, overMinor: -worst.progress.remainingMinor };
-    if (worst) return { kind: 'budgetLow', scope: worst.scope, category: worst.category, currency: budget.currency, leftShare: Math.max(0, 1 - worst.progress.ratio) };
-  }
-  if (categories && categories.length >= 2 && expenseMinor > 0) {
-    const top = [...categories].sort((a, b) => b.amountMinor - a.amountMinor)[0];
-    const share = top.amountMinor / expenseMinor;
-    if (share >= CONCENTRATION_SHARE) return { kind: 'concentration', category: top.category, key: top.key, currency, share };
-  }
-  return null;
+/** The line under Gastado: the month's spending so far divided by the days elapsed (the same daily average as Reportes,
+ * `dailyAverageMinor`). Null when there is nothing to divide (no spending yet, or the figure is not a ready total), so the
+ * screen says "no spending this month" instead of "0 a day". Disponible never has a per-day figure: it is a balance, not
+ * an allowance. */
+export function spendingPerDay(hero: { status: string; minor?: number }, period: { currency: string; startISO: string; endISO: string }): number | null {
+  if (hero.status !== 'ready' || typeof hero.minor !== 'number' || hero.minor <= 0) return null;
+  try { return dailyAverageMinor(hero.minor, period as Parameters<typeof dailyAverageMinor>[1]); } catch { return null; }
 }

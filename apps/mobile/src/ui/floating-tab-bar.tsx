@@ -2,53 +2,44 @@ import type { ReactNode } from 'react';
 import { Platform, StyleSheet, View, type ViewStyle } from 'react-native';
 import type { BottomTabBarProps } from 'expo-router/tabs';
 import { useI18n } from '../i18n/provider';
-import { AppText, PressFeedback } from './components';
+import { CaptureAction } from './capture-hub';
+import { PressFeedback } from './components';
+import { DOCK, dockSide, tabBarBottomGap } from './dock-geometry';
 import { ControlSurface, useMaterial } from './material';
 import { usePalette, type Palette } from './theme';
 
-/** Producto 24UX6A: the five sections on one floating capsule instead of a full-width footer. The destinations, their
- * order and their meaning are the navigator's (Inicio, Movimientos, Asistente, Reportes, Más); only the shell changes.
+export { DOCK, tabBarBottomGap } from './dock-geometry';
+
+/** The dock (Producto 24UX6A, decision 005): the four sections on a pine pill and, beside it, the «+» that opens the
+ * capture hub. The destinations, their order and their meaning are the navigator's (Inicio, Movimientos, Reportes,
+ * Más); the «+» is an action, not a fifth tab.
  *
- * The capsule floats on the screen's own ground, inset from the edges and lifted above the home indicator, but the bar
- * stays in the layout (never absolutely positioned over the content): every screen still ends above it, so scrolling,
- * keyboard avoidance and the Assistant composer (which measures what lies below it) keep working as they did. It is
- * drawn with the app's one control material: Liquid Glass where the running iOS draws it and Reduce Transparency is
- * off, else the opaque surface with a hairline edge (and a soft shadow in light mode), the designed state everywhere
- * else. The selected section is a cobalt glyph and label over a neutral lens, the others stay in the secondary ink;
- * cobalt is left to interaction. Labels stay visible (a tab is never an icon to guess), 10 pt like the system bar's,
- * capped at 1.3× the text size like the other compact controls and shrunk to fit their slot rather than cut (the
- * narrowest iPhone leaves each tab about 67 pt; «Movimientos» must never end in an ellipsis), with iOS's Large Content Viewer (a long press shows the label large, as the system
- * tab bar does), and every tab is a 48 pt target. VoiceOver hears each tab as the stock bar reads it: on iOS a button
- * named «Inicio, pestaña, 1 de 5» (React Native's `tab` role gives iOS no trait), elsewhere the `tab` role; «Seleccionado»
- * for the current one. Switching stays instant, with the selection tick the layout already plays. */
+ * The dock floats on the screen's own ground, inset from the edges and lifted above the home indicator, but it stays in
+ * the layout (never absolutely positioned over the content): every screen still ends above it, so scrolling, keyboard
+ * avoidance, safe areas and the last row's clearance keep working as they did, and the tab roots stay the mounted,
+ * unanimated scenes of the black-screen mitigation. The pill is drawn with the app's one control material, tinted pine:
+ * Liquid Glass where the running iOS draws it and Reduce Transparency is off, else the solid pine pill with a hairline.
+ *
+ * The tabs are icon-only to the eye (the owner's decision), never to assistive technology: each is a 48 pt-plus target
+ * (48 pt tall and a quarter of the pill's inner width, about 65 pt at 375 pt) that VoiceOver hears as the stock bar reads it, on iOS a button
+ * named «Inicio, pestaña, 1 de 4» (React Native's `tab` role gives iOS no trait), elsewhere the `tab` role with its name;
+ * «Seleccionado» for the current one. A long press shows the tab's name large in iOS's Large Content Viewer, as the
+ * system bar does. The selected tab is marked twice, never by colour alone: its glyph turns filled and it sits on a
+ * lighter capsule. Switching stays instant (no cross-fade until a device proves one safe), with the selection tick the
+ * layout plays. */
 
-/** The capsule's geometry: its height, its distance from the screen's sides and the air above it. */
-export const TAB_BAR = { height: 62, side: 16, top: 6 } as const;
-
-/** The air under the capsule: it rests in the upper part of the home indicator's safe area (clear of the indicator),
- * and keeps a margin on an iPhone without one. */
-export function tabBarBottomGap(bottomInset: number): number {
-  return bottomInset > 0 ? Math.max(bottomInset - 14, 10) : 10;
-}
-
-/** The capsule's opaque material: the surface step, a hairline edge, a soft shadow on the light ground (none on black,
- * where the edge separates it). */
-export function tabBarMaterial(p: Palette): ViewStyle {
-  return { backgroundColor: p.surface, borderWidth: StyleSheet.hairlineWidth, borderColor: p.isDark ? 'rgba(255,255,255,0.10)' : 'rgba(10,10,12,0.08)',
-    ...(p.isDark ? {} : { shadowColor: '#0A0A0C', shadowOpacity: 0.08, shadowRadius: 16, shadowOffset: { width: 0, height: 6 } }) };
-}
-
-/** The neutral lens behind the selected tab: a state, not a colour. */
-export function tabLensColor(p: Palette): string {
-  return p.isDark ? 'rgba(255,255,255,0.10)' : 'rgba(10,10,12,0.06)';
+/** The pill's solid material: the pine fill, a hairline edge, and a soft lift on the light ground (none on black). */
+export function dockMaterial(p: Palette): ViewStyle {
+  return { backgroundColor: p.dock, borderWidth: StyleSheet.hairlineWidth, borderColor: p.isDark ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.10)',
+    ...(p.isDark ? {} : { shadowColor: '#0F1A16', shadowOpacity: 0.14, shadowRadius: 16, shadowOffset: { width: 0, height: 6 } }) };
 }
 
 export function FloatingTabBar({ state, descriptors, navigation, insets }: BottomTabBarProps) {
   const p = usePalette();
   const material = useMaterial();
-  return <View style={{ backgroundColor: p.background, paddingTop: TAB_BAR.top, paddingBottom: tabBarBottomGap(insets.bottom),
-    paddingHorizontal: TAB_BAR.side + Math.max(insets.left, insets.right) }}>
-    <ControlSurface material={material} opaque={tabBarMaterial(p)} style={styles.capsule}>
+  return <View style={{ backgroundColor: p.background, paddingTop: DOCK.top, paddingBottom: tabBarBottomGap(insets.bottom),
+    paddingHorizontal: dockSide(insets), flexDirection: 'row', alignItems: 'center', gap: DOCK.gap }}>
+    <ControlSurface material={material} tint={p.dock} opaque={dockMaterial(p)} style={styles.pill}>
       <View accessibilityRole="tablist" style={styles.row}>
         {state.routes.map((route, index) => {
           const { options } = descriptors[route.key];
@@ -61,10 +52,12 @@ export function FloatingTabBar({ state, descriptors, navigation, insets }: Botto
           };
           return <TabItem key={route.key} label={label} index={index} count={state.routes.length} focused={focused} onPress={press}
             onLongPress={() => navigation.emit({ type: 'tabLongPress', target: route.key })}
-            icon={options.tabBarIcon?.({ focused, color: focused ? p.primary : p.secondary, size: 24 })} />;
+            icon={options.tabBarIcon?.({ focused, color: focused ? p.dockActiveInk : p.dockInk, size: 24 })} />;
         })}
       </View>
     </ControlSurface>
+    {/* The «+»: outside the tab list, never selected, never counted as a tab. */}
+    <CaptureAction />
   </View>;
 }
 
@@ -77,19 +70,15 @@ function TabItem({ label, index, count, focused, icon, onPress, onLongPress }: {
   return <PressFeedback accessibilityRole={ios ? 'button' : 'tab'} accessibilityLabel={ios ? t('nav.tabPosition', { name: label, index: index + 1, count }) : label}
     accessibilityState={{ selected: focused }} accessibilityLanguage={speechLanguage} accessibilityShowsLargeContentViewer accessibilityLargeContentTitle={label}
     onPress={onPress} onLongPress={onLongPress} containerStyle={styles.itemContainer} style={styles.item}>
-    <View style={[styles.lens, focused ? { backgroundColor: tabLensColor(p) } : null]}>
-      <View accessible={false} importantForAccessibility="no-hide-descendants">{icon}</View>
-      <AppText accessible={false} numberOfLines={1} maxFontSizeMultiplier={1.3} adjustsFontSizeToFit minimumFontScale={0.6}
-        style={{ fontSize: 10, lineHeight: 12, fontWeight: focused ? '600' : '500', color: focused ? p.primary : p.secondary, textAlign: 'center' }}>{label}</AppText>
-    </View>
+    <View accessible={false} importantForAccessibility="no-hide-descendants" style={[styles.capsule, focused ? { backgroundColor: p.dockActive } : null]}>{icon}</View>
   </PressFeedback>;
 }
 
 const styles = StyleSheet.create({
-  capsule: { minHeight: TAB_BAR.height, borderRadius: TAB_BAR.height / 2, paddingHorizontal: 4, justifyContent: 'center' },
+  pill: { flex: 1, minWidth: 0, minHeight: DOCK.height, borderRadius: DOCK.height / 2, paddingHorizontal: 6, justifyContent: 'center' },
   row: { flexDirection: 'row', alignItems: 'center' },
   itemContainer: { flex: 1, minWidth: 0 },
   item: { minHeight: 48, alignItems: 'center', justifyContent: 'center' },
-  // The lens spans its slot, so the label gets the slot's whole width (less a hair) instead of a fixed inset.
-  lens: { alignSelf: 'stretch', alignItems: 'center', justifyContent: 'center', gap: 2, paddingVertical: 5, paddingHorizontal: 3, borderRadius: 22 },
+  // The selected capsule: a lighter pine step behind the filled glyph, inside the item's full target.
+  capsule: { minWidth: 56, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 12 },
 });
