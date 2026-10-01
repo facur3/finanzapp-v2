@@ -5,7 +5,6 @@ export const assistant: Pick<Messages, 'assistant'> = {
   assistant: {
     title: 'Assistant',
     newChat: 'New chat',
-    disconnectedNote: 'Not connected in this version. What you type stays on your iPhone.',
     fixtureBanner: 'Test view: sample replies, nothing is saved.',
     fixtureConfirmRefused: 'Test view: this draft is a sample and isn’t saved.',
     saveFailed: 'We couldn’t save the transaction. The draft is still here so you can retry.',
@@ -27,11 +26,8 @@ export const assistant: Pick<Messages, 'assistant'> = {
       placeholder: 'Ask or record something…',
       label: 'Message for the Assistant',
       hint: 'Type a question about your money or an expense to record',
-      dictate: 'Dictate',
-      dictateHint: 'Not available in this version yet',
       stop: 'Stop response',
       send: 'Send',
-      dictationNote: 'Dictation comes with the installable version: speech transcription needs the development build, not Expo Go.',
     },
     message: {
       user: 'You: {text}',

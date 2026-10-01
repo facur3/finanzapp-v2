@@ -1,4 +1,4 @@
-import { addDaysISO, dailyAverageMinor, type Account, type Entry, type RecurringRule } from '@finanzapp/domain';
+import { addDaysISO, type Account, type Entry, type RecurringRule } from '@finanzapp/domain';
 import { selectEntries } from './presentation.ts';
 
 /** Producto 24UX6A (decision 005): what Inicio shows under its financial field, as pure selections, so the screen and the
@@ -39,13 +39,4 @@ export function homeRecent(entries: readonly Entry[], accounts: Account[], perio
   const shown = new Set(accounts.filter(inView).map(account => account.id));
   return selectEntries(entries.filter(entry => shown.has(entry.accountId) && entry.dateISO >= period.startISO && entry.dateISO <= period.endISO), accounts)
     .slice(0, limit);
-}
-
-/** The line under Gastado: the month's spending so far divided by the days elapsed (the same daily average as Reportes,
- * `dailyAverageMinor`). Null when there is nothing to divide (no spending yet, or the figure is not a ready total), so the
- * screen says "no spending this month" instead of "0 a day". Disponible never has a per-day figure: it is a balance, not
- * an allowance. */
-export function spendingPerDay(hero: { status: string; minor?: number }, period: { currency: string; startISO: string; endISO: string }): number | null {
-  if (hero.status !== 'ready' || typeof hero.minor !== 'number' || hero.minor <= 0) return null;
-  try { return dailyAverageMinor(hero.minor, period as Parameters<typeof dailyAverageMinor>[1]); } catch { return null; }
 }

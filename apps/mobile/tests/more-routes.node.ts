@@ -105,11 +105,21 @@ function nodes(value: any): Node[] {
 }
 // Más and backup rows lead somewhere: title over subtitle, never a label/value pair competing for one line.
 const rows = (root: Node) => nodes(root).filter(node => node.type === 'NavigationRow');
+/** 24UX6C: Más heads its two groups with a small caps label: an AppText with the header role (the VoiceOver rotor reaches it)
+ * in the eyebrow variant, never a SectionTitle. */
+const groupLabels = (root: Node) => nodes(root).filter(node => node.type === 'AppText' && node.props.accessibilityRole === 'header' && node.props.variant === 'eyebrow')
+  .map(node => node.props.children);
+/** Every Más destination, in order (Región only while two regions are released). */
+const MORE_ROUTES = ['/accounts', '/cards', '/budgets', '/recurring', '/debts', '/categories', '/backup', '/undone-entries', '/language', '/region', '/appearance'];
 
 test('Más groups permanent navigation into Finanzas and App y datos, with live counts', () => {
   const view = harness('(tabs)/settings.tsx');
   const root = view.render();
-  assert.deepEqual(nodes(root).filter(node => node.type === 'SectionTitle').map(node => node.props.children), ['Finanzas', 'App y datos']);
+  assert.equal(groupLabels(root).join(','), 'Finanzas,App y datos');
+  assert.equal(nodes(root).some(node => node.type === 'SectionTitle'), false, '24UX6C: small caps group labels replace the section titles');
+  assert.equal([root.type, root.props.gap].join(','), 'Screen,28', '24UX6C: one 28 pt spacing between groups');
+  const groups = (root.props.children as Node[]).filter(child => child && child.type === 'View' && nodes(child).some(node => node.type === 'Surface'));
+  assert.equal(groups.map(group => group.props.style.gap).join(','), '8,8', '8 pt between a label and its rows');
   const labels = rows(root).map(row => row.props.title);
   assert.deepEqual(labels, ['Cuentas', 'Tarjetas', 'Presupuestos', 'Recurrentes', 'Deudas y cobros', 'Categorías', 'Copia de seguridad', 'Movimientos deshechos', 'Idioma', 'Región', 'Apariencia']);
   assert.equal(labels.includes('Asistente'), false, 'the Assistant is a root-stack screen opened from the dock\'s «+» capture hub, not a Más row');
@@ -126,15 +136,20 @@ test('Más groups permanent navigation into Finanzas and App y datos, with live 
   assert.equal(value('Apariencia'), 'Sistema', '24UX6A: the default follows the device');
   assert.equal(nodes(root).some(node => node.type === 'ActionButton'), false);
   const texts = nodes(root).filter(node => node.type === 'AppText').map(node => String(node.props.children)).join(' ');
-  assert.match(texts, /FinanzApp 0\.1\.0 \(24UX6B\)/, 'the version line, like the About line of an iOS app');
+  assert.match(texts, /FinanzApp 0\.1\.0 \(24UX6C\)/, 'the version line, like the About line of an iOS app');
   assert.match(texts, /Material opaco \(Expo Go\)/, 'a development build says which control material this session draws, so a tester can confirm the mode');
   assert.doesNotMatch(texts, /Piloto nativo|Producto 24/, '24UX5: no project vocabulary on the settings screen');
   assert.equal(value('Categorías'), 'Gastos e ingresos');
-  // Finanzas rows carry a soft identity tile from the shared palette; App y datos rows stay neutral glyphs.
+  // Finanzas rows carry a soft identity tile from the shared palette. 24UX6C: App y datos rows lead with neutral 34 pt tiles
+  // (no colour: the component's own neutral fill), so both groups align on one leading edge; no row keeps a bare icon prop.
   const leading = rows(root).map(row => row.props.leading?.type ?? null);
-  assert.deepEqual(leading, ['GlyphTile', 'GlyphTile', 'GlyphTile', 'GlyphTile', 'GlyphTile', 'GlyphTile', null, null, null, null, null]);
+  assert.equal(leading.join(','), Array(11).fill('GlyphTile').join(','));
+  assert.equal(rows(root).every(row => row.props.leading.props.size === 34), true, 'one tile size in both groups');
   assert.equal(new Set(rows(root).slice(0, 6).map(row => row.props.leading.props.color)).size, 6, 'six distinct restrained colours, no row painted');
-  assert.deepEqual(rows(root).slice(6).map(row => row.props.icon), ['save-outline', 'arrow-undo-outline', 'language-outline', 'globe-outline', 'contrast-outline'], 'App y datos keeps neutral glyphs');
+  assert.equal(rows(root).slice(0, 6).every(row => typeof row.props.leading.props.color === 'string'), true, 'Finanzas keeps its tinted identities');
+  assert.equal(rows(root).slice(6).map(row => row.props.leading.props.icon).join(','), 'save-outline,arrow-undo-outline,language-outline,globe-outline,contrast-outline', 'App y datos keeps its glyphs, now in tiles');
+  assert.equal(rows(root).slice(6).every(row => row.props.leading.props.color === undefined), true, 'App y datos tiles stay neutral');
+  assert.equal(rows(root).some(row => 'icon' in row.props), false, 'no row keeps the old icon prop');
   assert.equal(rows(root).some(row => 'value' in row.props || 'label' in row.props), false, 'no leftover label/value props');
   assert.match(texts, /se guardan solo en este dispositivo y funcionan sin conexión/);
 });
@@ -147,7 +162,8 @@ test('Más → App y datos (23.1C2): Idioma and Región say what is in use and w
   assert.equal(rows(root).find(row => row.props.title === 'Idioma')!.props.subtitle, 'Español · según el dispositivo');
   const region = rows(root).find(row => row.props.title === 'Región')!;
   assert.equal(region.props.subtitle, 'Argentina · según el dispositivo');
-  assert.equal(region.props.icon, 'globe-outline');
+  assert.equal(region.props.leading.type, 'GlyphTile');
+  assert.equal(region.props.leading.props.icon, 'globe-outline', '24UX6C: the glyph sits in a neutral tile');
   assert.equal(region.props.last, undefined, '24UX6A: Apariencia closes App y datos');
   region.props.onPress();
   assert.deepEqual(view.pushed, ['/region']);
@@ -163,6 +179,25 @@ test('Más → App y datos (23.1C2): Idioma and Región say what is in use and w
   const single = rows(harness('(tabs)/settings.tsx', archive, { languages: ['es'], regions: ['AR'] }).render());
   assert.equal(single.some(row => row.props.title === 'Región'), false);
   assert.deepEqual(single.filter(row => row.props.last).map(row => row.props.title), ['Categorías', 'Apariencia']);
+});
+
+test('24UX6C: the Más polish preserves every route, in the same order, in both languages; no «Ajustes» destination', () => {
+  for (const locale of [null, 'en-AR'] as const) {
+    const view = harness('(tabs)/settings.tsx', archive, undefined, locale);
+    const root = view.render();
+    const all = rows(root);
+    assert.equal(all.length, MORE_ROUTES.length, 'no row added or removed');
+    for (const row of all) row.props.onPress();
+    assert.equal(view.pushed.join(','), MORE_ROUTES.join(','), 'every row opens the same screen as before');
+    assert.equal(all.filter(row => row.props.last).length, 2, 'two groups, each closed by its last row');
+    const titles = all.map(row => row.props.title).join(',');
+    assert.doesNotMatch(titles, /Ajustes|Settings/, 'Más is the hub itself; there is no Ajustes row');
+    assert.equal(groupLabels(root).length, 2, 'exactly two group labels');
+  }
+  // A single-region build drops only Región; every other route stays in place.
+  const single = harness('(tabs)/settings.tsx', archive, { languages: ['es'], regions: ['AR'] });
+  for (const row of rows(single.render())) row.props.onPress();
+  assert.equal(single.pushed.join(','), MORE_ROUTES.filter(route => route !== '/region').join(','));
 });
 
 test('Más → Tarjetas counts active credit cards and opens the pushed Tarjetas screen', () => {
@@ -240,7 +275,7 @@ test('an archived definition moves its category to a quiet Archivadas group and 
 test('23.1B2 English Más: every row, count, note and the diagnostic footer are translated; routes and order are the same', () => {
   const view = harness('(tabs)/settings.tsx', archive, undefined, 'en-AR');
   const root = view.render();
-  assert.equal(nodes(root).filter(node => node.type === 'SectionTitle').map(node => node.props.children).join(','), 'Finances,App and data');
+  assert.equal(groupLabels(root).join(','), 'Finances,App and data');
   assert.equal(rows(root).map(row => row.props.title).join(','), 'Accounts,Cards,Budgets,Recurring,Debts and IOUs,Categories,Backup,Undone transactions,Language,Region,Appearance');
   const value = (label: string) => rows(root).find(row => row.props.title === label)!.props.subtitle;
   assert.equal(value('Recurring'), '1 active');
@@ -253,7 +288,7 @@ test('23.1B2 English Más: every row, count, note and the diagnostic footer are 
   for (const row of rows(root)) row.props.onPress();
   assert.equal(view.pushed.join(','), '/accounts,/cards,/budgets,/recurring,/debts,/categories,/backup,/undone-entries,/language,/region,/appearance');
   const texts = nodes(root).filter(node => node.type === 'AppText').map(node => String(node.props.children)).join(' ');
-  assert.match(texts, /FinanzApp 0\.1\.0 \(24UX6B\)/);
+  assert.match(texts, /FinanzApp 0\.1\.0 \(24UX6C\)/);
   assert.match(texts, /Opaque material \(Expo Go\) · Language: default/);
   assert.match(texts, /saved only on this device and work offline/);
   assert.doesNotMatch(texts, /Material opaco|Idioma|Región|sincronización/);
@@ -301,7 +336,7 @@ test('24UX5: a preview or store build shows the version and the local-storage no
   for (const locale of [null, 'en-AR'] as const) {
     const root = harness('(tabs)/settings.tsx', archive, undefined, locale, undefined, false).render();
     const texts = nodes(root).filter(node => node.type === 'AppText').map(node => String(node.props.children)).join(' ');
-    assert.match(texts, /FinanzApp 0\.1\.0 \(24UX6B\)/);
+    assert.match(texts, /FinanzApp 0\.1\.0 \(24UX6C\)/);
     assert.doesNotMatch(texts, /Material|material|Idioma:|Language:/, 'no material or locale diagnostics outside a development build');
     assert.match(texts, locale ? /saved only on this device/ : /se guardan solo en este dispositivo/, 'privacy and storage information stays');
   }

@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { dailyAverageMinor, spendingWindow, type Account, type Entry, type RecurringRule } from '@finanzapp/domain';
+import type { Account, Entry, RecurringRule } from '@finanzapp/domain';
 import * as homeFocus from '../src/ui/home-focus.ts';
-import { COMMITMENT_HORIZON_DAYS, COMMITMENT_ROWS, RECENT_ROWS, homeCommitments, homeRecent, recentRowLimit, spendingPerDay } from '../src/ui/home-focus.ts';
+import { COMMITMENT_HORIZON_DAYS, COMMITMENT_ROWS, RECENT_ROWS, homeCommitments, homeRecent, recentRowLimit } from '../src/ui/home-focus.ts';
 
 // Producto 24UX6A: what Inicio shows under its number, as pure selections. Synthetic fixtures only.
 const at = '2026-09-01T12:00:00.000Z';
@@ -107,29 +107,6 @@ test('24UX6A: the recent activity leaves out the accounts the display does not s
   assert.equal(homeRecent(entries, accounts, september, () => false, 6).length, 0);
 });
 
-test('24UX6A: Gastado\'s per-day line is the month so far divided by the days elapsed, the same daily average as Reportes', () => {
-  const period = spendingWindow('ARS', 'month', '2026-09-10');
-  assert.equal(period.startISO, '2026-09-01');
-  assert.equal(period.endISO, '2026-09-10', 'until today, not the whole month');
-  assert.equal(spendingPerDay({ status: 'ready', minor: 100000 }, period), 10000, 'ten days elapsed');
-  assert.equal(spendingPerDay({ status: 'ready', minor: 100000 }, period), dailyAverageMinor(100000, period));
-  assert.equal(spendingPerDay({ status: 'ready', minor: 1001 }, period), dailyAverageMinor(1001, period), 'rounded the way Reportes rounds');
-  const first = spendingWindow('USD', 'month', '2026-09-01');
-  assert.equal(spendingPerDay({ status: 'ready', minor: 2500 }, first), 2500, 'the first day of the month divides by one');
-});
-
-test('24UX6A: no per-day figure without a ready positive total; it never throws', () => {
-  const period = spendingWindow('ARS', 'month', '2026-09-10');
-  assert.equal(spendingPerDay({ status: 'ready', minor: 0 }, period), null, 'no spending says «Sin gastos este mes», never «0 por día»');
-  assert.equal(spendingPerDay({ status: 'ready' }, period), null);
-  assert.equal(spendingPerDay({ status: 'ready', minor: -500 }, period), null);
-  assert.equal(spendingPerDay({ status: 'unavailable' }, period), null, 'a missing rate gives the currencies\' parts, never a partial per-day');
-  assert.equal(spendingPerDay({ status: 'unavailable', minor: 9000 }, period), null);
-  assert.equal(spendingPerDay({ status: 'out-of-range' }, period), null);
-  // Malformed inputs fall back to no line instead of breaking Inicio.
-  assert.doesNotThrow(() => spendingPerDay({ status: 'ready', minor: 1000 }, { currency: 'ARS', startISO: '2026-09-10', endISO: '2026-09-01' }));
-  assert.equal(spendingPerDay({ status: 'ready', minor: 1000 }, { currency: 'ARS', startISO: '2026-09-10', endISO: '2026-09-01' }), null, 'an inverted period');
-  assert.equal(spendingPerDay({ status: 'ready', minor: 1000 }, { currency: 'ARS', startISO: 'nope', endISO: '2026-09-01' }), null, 'an invalid date');
-  assert.equal(spendingPerDay({ status: 'ready', minor: 0.5 }, period), null, 'a non-integer amount is not minor units');
-  assert.equal(spendingPerDay({ status: 'ready', minor: Number.MAX_SAFE_INTEGER + 2 }, period), null, 'beyond safe integers');
+test('24UX6C: the line under Inicio\'s number is gone, and with it the per-day helper (the daily average lives in Reportes)', () => {
+  assert.equal(Object.keys(homeFocus).includes('spendingPerDay'), false, 'spendingPerDay was removed with the Home subline');
 });

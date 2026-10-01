@@ -38,7 +38,9 @@ export function captureDestination(choice: CaptureChoice, movementCurrency?: Cur
   return { pathname: '/assistant', params: assistantCurrency ? { currency: assistantCurrency } : {} };
 }
 
-/** The three movement rows: a neutral glyph on the inset tile (the choice is the word, not a colour), title and what it covers. */
+/** The three movement rows, title and what it covers. 24UX6C: a restrained hint of each kind's tone on its tile (an
+ * expense neutral ink on the inset, an income its soft green, a transfer its soft blue-teal); the word carries the
+ * choice, the tint only separates them. */
 const ROWS: Record<Exclude<CaptureChoice, 'assistant'>, { icon: IconName; title: MessageKey; detail: MessageKey }> = {
   expense: { icon: 'arrow-up', title: 'home.capture.expense', detail: 'home.capture.expenseDetail' },
   income: { icon: 'arrow-down', title: 'home.capture.income', detail: 'home.capture.incomeDetail' },
@@ -126,9 +128,10 @@ function CaptureRow({ choice, last, onPress }: { choice: Exclude<CaptureChoice, 
   const { t } = useI18n();
   const look = ROWS[choice];
   const title = t(look.title), detail = t(look.detail);
+  const tint = choice === 'income' ? { color: p.income, soft: p.incomeSoft } : choice === 'transfer' ? { color: p.transfer, soft: p.transferSoft } : { color: p.text, soft: p.inset };
   return <PressFeedback feedback="highlight" accessibilityRole="button" accessibilityLabel={title + ', ' + detail} onPress={onPress}
     style={[styles.row, { borderBottomColor: p.line, borderBottomWidth: last ? 0 : StyleSheet.hairlineWidth }]}>
-    <View accessible={false} style={[styles.rowTile, { backgroundColor: p.inset }]}><Ionicons name={look.icon} size={19} color={p.primary} accessible={false} /></View>
+    <View accessible={false} style={[styles.rowTile, { backgroundColor: tint.soft }]}><Ionicons name={look.icon} size={19} color={tint.color} accessible={false} /></View>
     <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
       <AppText accessible={false} style={{ fontWeight: '600' }}>{title}</AppText>
       <AppText accessible={false} secondary variant="footnote">{detail}</AppText>

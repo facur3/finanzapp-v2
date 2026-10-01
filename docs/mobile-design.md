@@ -55,7 +55,9 @@ gasto van en tinta con signo menos; solo el ingreso se pinta de verde. Nunca col
 signo o etiqueta. `tests/theme.node.ts` verifica estos contrastes en ambos temas.
 *(Reemplazado por la decisión 005: la transferencia ya no es azul celeste sino la tinta secundaria neutra, y el tono
 `expense` es el negativo —destructivo, vencido, sobre el límite—, nunca el color del gasto común. Sigue vigente que el
-gasto va en tinta con signo menos y que nada depende solo del color.)*
+gasto va en tinta con signo menos y que nada depende solo del color.)* *(→ reemplazado en 24UX6C: en una fila con tipo
+conocido el gasto va en tinta sin signo, el ingreso con «+» y la transferencia en su azul verdoso sin signo; ver
+«Producto 24UX6C». Los signos calculados —saldos negativos, netos, variaciones— no cambian.)*
 
 **Color de categoría.** Ocho tonos apagados de una misma familia (terracota, azul
 acero, oliva, rosa, verde azulado, ocre, índigo, pizarra), con variante clara y
@@ -164,15 +166,15 @@ que leen son ahora los de Forest. Su restyle por pantalla queda para 24UX6B–6D
   Transferencia arriba (cambiar de modo es estado, no navegación), importe grande (verde
   para ingresos, azul para transferencias) y dos tarjetas de selección a ancho
   completo que no se pueden pasar por alto *(el azul de transferencia y el cobalto de cuenta y botón: reemplazados por
-  la decisión 005; la transferencia lee la tinta secundaria neutra y el primario es el pino)*: Categoría (con la línea de presupuesto
+  la decisión 005; el primario es el pino; desde 24UX6C la transferencia tiene su azul verdoso propio, `transfer`)*: Categoría (con la línea de presupuesto
   del mes si existe) y Pagado con / Ingresa en (con saldo registrado o deuda de
   tarjeta, y el tipo de cada opción en la hoja). Comercio y fecha después. El botón
   Guardar repite el importe. Sin controles decorativos de dividir, comprobante o
   etiquetas mientras no existan sus datos. Jerarquía de color: categoría en su
   tono, cuenta en el primario, fecha neutra, botón de guardar en el primario.
 - **Inicio (desde 24UX6A con Forest, decisión 005; ver «Producto 24UX6A → Inicio»).** Un campo financiero pino
-  arriba (el mes, el atajo a Cuentas, el alcance de moneda solo con dos o más, el número de 46 pt, su subrenglón y
-  Gastado / Disponible); debajo, solo si existen, «Próximos compromisos» (hasta dos de los próximos siete días) y
+  arriba (el mes, el atajo a Cuentas, el alcance de moneda solo con dos o más, el número de 46 pt —sin subrenglón desde 24UX6C,
+  con su ⓘ al lado cuando hay una sola moneda— y Gastado / Disponible); debajo, solo si existen, «Próximos compromisos» (hasta dos de los próximos siete días) y
   «Actividad reciente» (cuatro filas con compromisos, seis sin ellos); si no hay ninguno, un estado vacío tranquilo.
   Registrar vive en el «+» del dock, no en Inicio. Los movimientos completos siguen en Movimientos, el análisis en
   Reportes, los presupuestos en Presupuestos.
@@ -381,10 +383,10 @@ conversación, el borrador, la confirmación y la evidencia siguen como se descr
 - **Estado vacío.** Un tile sparkles de 44 pt, "¿En qué te ayudo?" y cuatro sugerencias
   como chips; desaparecen al empezar la conversación.
 - **Compositor.** Una píldora de superficie con borde hairline: campo multilínea (hasta
-  unas cinco líneas, luego desplaza dentro), micrófono en secundario y un botón redondo
+  unas cinco líneas, luego desplaza dentro), micrófono en secundario *(→ reemplazado en 24UX6C, ver «Producto 24UX6C — presentación de movimientos, Inicio y Más»)* y un botón redondo
   de enviar relleno de cobalto (gris e inactivo sin texto; se convierte en Detener
   mientras responde). Sigue el teclado en el hilo de UI y respeta el indicador de inicio.
-  El micrófono existe y explica su límite: el dictado necesita el development build.
+  El micrófono existe y explica su límite: el dictado necesita el development build. *(→ reemplazado en 24UX6C, ver «Producto 24UX6C — presentación de movimientos, Inicio y Más»)*
 - **Tarjeta de borrador.** Una Surface: eyebrow "Borrador · Gasto", importe grande en
   coral (verde para ingreso), filas Comercio / Categoría (tile) / Pagado con (tile de
   cuenta) / Fecha ("Hoy · 21 sep"), Confirmar (primario) y Editar (secundario) a igual
@@ -398,7 +400,7 @@ conversación, el borrador, la confirmación y la evidencia siguen como se descr
 - **Evidencia.** Filas discretas entre hairlines (etiqueta secundaria, importe con Money,
   con signo cuando es diferencia) y enlaces de texto en cobalto con chevron: Ver
   movimientos, Ver categoría, Ver presupuesto. Nunca un tablero.
-- **No conectado.** Una leyenda terciaria bajo el compositor antes del primer envío; al
+- **No conectado.** Una leyenda terciaria bajo el compositor antes del primer envío *(→ reemplazado en 24UX6C, ver «Producto 24UX6C — presentación de movimientos, Inicio y Más»)*; al
   enviar, el texto vuelve intacto al campo y una nota con ícono lo explica. Sin respuesta
   inventada, sin envío remoto.
 
@@ -460,7 +462,7 @@ Interfaz 17 (sección «Sistema», marcada). Los tokens viven en `src/ui/palette
 | `primary` · `link` | #1D5647 | #94D2BB | Marca como texto: enlaces, la opción elegida, glifos activos |
 | `primaryFill` · `onPrimary` · `primarySoft` | #1D4F42 · #FFFFFF · #E1ECE7 | #86C9B0 · #05211A · #14261F | El único botón relleno y su tinta; un tinte de marca |
 | `thumb` | #FFFFFF | #323D39 | Pulgar del segmentado compacto sobre el lienzo |
-| `expense` · `income` · `transfer` · `warning` | #B3432E · #1F7A4F · #45564E · #9A5B00 | #EE8A72 · #5CCB93 · #A2B1A9 · #E8A94A | Negativo · positivo · neutro · vence pronto |
+| `expense` · `income` · `transfer` · `warning` | #B3432E · #1F7A4F · #45564E · #9A5B00 | #EE8A72 · #5CCB93 · #A2B1A9 · #E8A94A | Negativo · positivo · neutro · vence pronto. *(→ 24UX6C: `transfer` es azul petróleo, #2D6476 / #8FC3D2; ver «Producto 24UX6C»)* |
 | `scrim` | rgba(0,0,0,0.40) | rgba(0,0,0,0.60) | Velo de las hojas y de la hoja de Registrar |
 | `hero` · `heroInk` · `heroSecondary` | #14362D · #EEF5F1 · #A8C4B9 | #0F2A22 · #EDF5F0 · #A1BDB2 | El campo financiero de Inicio y su tinta |
 | `heroControl` · `heroThumb` · `heroThumbInk` | #26493F · #F4F8F6 · #14362D | #1E3D34 · #E4EEE9 · #0F2A22 | Controles sobre el campo: pista, pulgar y su texto |
@@ -472,8 +474,8 @@ siguen la misma familia (valores en `palette.ts`).
 
 - **Marca.** `primary` y `primaryFill` marcan interacción y selección, y nada más. Donde una regla anterior decía
   «cobalto», hoy rige el pino. El texto normal sigue en tinta; los botones secundarios, en tinta sobre relleno.
-- **Significado.** El rojo nunca quiere decir «gastado»: un gasto es tinta con signo menos; `income` (positivo) va
-  con signo más; `transfer` es la tinta secundaria neutra (ya no azul); `expense` es el tono negativo, reservado para
+- **Significado.** El rojo nunca quiere decir «gastado»: un gasto es tinta con signo menos *(→ reemplazado en 24UX6C, ver «Producto 24UX6C — presentación de movimientos, Inicio y Más»)*; `income` (positivo) va
+  con signo más; `transfer` es la tinta secundaria neutra (ya no azul) *(→ reemplazado en 24UX6C, ver «Producto 24UX6C — presentación de movimientos, Inicio y Más»)*; `expense` es el tono negativo, reservado para
   lo destructivo, lo vencido y lo que pasa un límite; `warning` es lo que vence pronto. Nunca color sin signo o
   etiqueta.
 - **Campo y acento.** `hero*` es el campo financiero de Inicio y el tile del Asistente en la hoja de Registrar. El
@@ -501,7 +503,7 @@ siguen la misma familia (valores en `palette.ts`).
 ### El dock: cuatro pestañas y el «+»
 
 - **Cuatro raíces**, en este orden: Inicio (sin cabecera), Movimientos (conserva el «+» de su cabecera, que abre un
-  movimiento nuevo), Reportes y Más. No hay pestaña del Asistente. La mitigación de pantallas negras de
+  movimiento nuevo *(→ reemplazado en 24UX6C, ver «Producto 24UX6C — presentación de movimientos, Inicio y Más»)*), Reportes y Más. No hay pestaña del Asistente. La mitigación de pantallas negras de
   `src/ui/navigation.ts` no cambió (sin detach, sin animación, sin carga perezosa, sin congelar, escena opaca):
   cambiar de pestaña es instantáneo, sin fundido.
 - **Geometría** (`src/ui/dock-geometry.ts`, pura): 60 pt de alto, 16 pt de los lados (más el inset lateral en
@@ -534,7 +536,7 @@ siguen la misma familia (valores en `palette.ts`).
 - **Primero y más grande, el Asistente**: un tile pino (`hero`) con el círculo de acento y sparkles, «Asistente» y
   «Decilo con tus palabras o preguntá lo que quieras». Solo si esta sesión de la app ya tiene una conversación,
   un chip «Continuar: «…»» con las últimas palabras reales de la persona; nunca una línea inventada.
-- **Debajo, tres filas neutras** (tile `inset` con el glifo en el primario): Gasto «Una compra o un pago», Ingreso
+- **Debajo, tres filas neutras** (tile `inset` con el glifo en el primario) *(→ reemplazado en 24UX6C, ver «Producto 24UX6C — presentación de movimientos, Inicio y Más»)*: Gasto «Una compra o un pago», Ingreso
   «Sueldo, cobro u otro ingreso», Transferencia «Entre cuentas o pago de tarjeta». La elección es la palabra, no un
   color.
 - **Sin micrófono.** Un micrófono que no puede dictar sería un callejón sin salida; el dictado es trabajo posterior
@@ -564,10 +566,10 @@ abajo), que empieza detrás de la barra de estado (relleno superior: el área se
 
 1. El mes en curso como encabezado (no se toca, sin chevron) y, a la derecha, el botón de billetera a Cuentas.
 2. Solo con dos o más monedas: el chip de moneda y el botón de información. Con una sola moneda la fila no existe y
-   la información pasa junto al subrenglón.
+   la información pasa junto al subrenglón *(→ reemplazado en 24UX6C, ver «Producto 24UX6C — presentación de movimientos, Inicio y Más»)*.
 3. El número a 46 pt en `heroInk` (en `heroSecondary` si es exactamente cero); con una cotización faltante, sus partes
    por moneda; fuera de rango, su texto.
-4. El subrenglón. Gastado: «Hasta hoy · $ X por día» o «Sin gastos este mes». Disponible: «Saldo registrado · N
+4. El subrenglón *(→ reemplazado en 24UX6C, ver «Producto 24UX6C — presentación de movimientos, Inicio y Más»)*. Gastado: «Hasta hoy · $ X por día» o «Sin gastos este mes». Disponible: «Saldo registrado · N
    cuentas», nunca una cifra por día.
 5. Gastado / Disponible, un segmentado sobre el campo (pista `heroControl`, pulgar `heroThumb`, elegido
    `heroThumbInk`, el otro `heroSecondary`): solo cambia el número.
@@ -608,7 +610,8 @@ Las reglas de «Motion y accesibilidad» siguen vigentes: la curva de `src/ui/mo
   es solo selección visual dentro del reporte; se permiten el gráfico Día a día y una cabecera fija sólida. Las barras
   de evolución conservan la navegación por mes actual (sin una segunda selección solo para comparar); «Otras» sigue
   agrupando por los primeros N (no se adopta la regla del 3 %); sin ruta inventada de detalle por comercio.
-- **24UX6C Movimientos y Más.** Filas, búsqueda y filtros en Forest; filtros por período, cuenta y categoría desde los
+- **24UX6C Movimientos y Más** *(implementado en parte: ver «Producto 24UX6C — presentación de movimientos, Inicio y
+  Más»; los filtros por período, cuenta y categoría siguen pendientes)*. Filas, búsqueda y filtros en Forest; filtros por período, cuenta y categoría desde los
   datos del repositorio; el total del día como hoy. Sin nota, origen Apple Pay ni hora inventados; Deshacer y
   Recuperar se quedan (sin borrado definitivo falso), igual que Movimientos deshechos. Idioma y Región siguen siendo
   rutas separadas, agrupadas a la vista; no hay fila «Ajustes» (no tiene ruta).
@@ -799,6 +802,119 @@ La selección de porciones dentro de la dona (solo visual, dentro del reporte), 
 cabecera fija sólida. Siguen permitidos para una pasada siguiente; no hay ruta de detalle por comercio. El orden
 vinculante del roadmap no cambia: la próxima entrega de producto es 24T3; 24UX6C (Movimientos y Más) y 24UX6D
 (Tarjetas) siguen a 24UX6B en el carril UX, y su lugar frente a 24T3 lo decide el dueño (ver `docs/mobile-roadmap.md`).
+
+## Producto 24UX6C — presentación de movimientos, Inicio y Más
+
+Tercera entrega del carril UX de la decisión 005 (enmendada el 2026-10-01: «Enmienda 2026-10-01 — Producto 24UX6C»), en
+su rama `feat/producto-24ux6c-movements-more-polish` desde master ecfd1dc (24UX6B mergeada como PR #71). Implementado en
+código; **la revisión en iPhone está pendiente** (no hubo build de EAS) y su lista está en
+docs/mobile-device-checklist.md («Producto 24UX6C»). Solo presentación: no cambió nada de contabilidad, del signo del
+libro, de los importes guardados, del esquema (13), de las copias (v13), de cotizaciones, tarjetas, cuotas, deudas ni de
+la materialización de recurrentes; ninguna dependencia nativa; ninguna animación entre pestañas (la mitigación de
+pantallas negras del dock quedó intacta). Reemplaza, marcadas en su lugar, estas reglas de 24UX6A: «un gasto es tinta
+con signo menos», la transferencia en tinta secundaria neutra, el subrenglón de Inicio bajo el número, las tres filas
+neutras de la hoja de Registrar, el «+» de la cabecera de Movimientos; y de Producto 21, el micrófono del compositor y
+la leyenda «No conectado».
+
+### Cómo se muestra el importe de un movimiento
+
+El signo de presentación no es el signo contable. El libro guarda magnitudes positivas más un tipo; una fila cuyo tipo
+ya se dice (glifo, leyenda y, para VoiceOver, «Gasto», «Ingreso» o «Transferencia») no lo repite con un signo.
+`presentedAmount(kind, storedMinor)` (`src/ui/movement-amount.ts`, puro) devuelve el importe guardado sin tocar (sin
+valor absoluto), un signo solo para el ingreso y el tono del tipo:
+
+| Tipo | Importe | Signo | Tinta |
+| --- | --- | --- | --- |
+| Gasto | El guardado | Ninguno | Tinta (`Money` con tono `expense` dibuja `text`): un gasto es el caso normal, nunca una alarma |
+| Ingreso | El guardado | «+» | `income`, el verde de ingreso |
+| Transferencia | El guardado | Ninguno | `transfer`, el azul petróleo |
+
+- **Dónde.** `EntryRow` y `TransferRow` (`src/ui/components.tsx`) en todo contexto: antes una transferencia llevaba
+  ± en el contexto de una cuenta y tinta forzada fuera de él; ahora siempre el importe guardado, sin signo, en
+  `transfer`. El héroe del detalle de un movimiento (`app/entry/[id].tsx`), las filas de Recurrentes
+  (`app/recurring.tsx`) y el héroe del detalle de una regla (`app/recurring/[id].tsx`) siguen la misma regla («+» solo
+  para un ingreso), y la tarjeta de borrador del Asistente muestra «+» en un borrador de ingreso.
+- **VoiceOver.** Cuando una nota titula una transferencia, la etiqueta empieza con la palabra «Transferencia» y ya no
+  repite la nota.
+- **Lo que conserva su signo.** Todo signo calculado: un saldo negativo de cuenta, el neto del día en las cabeceras de
+  Movimientos («−» / «+»), el flujo neto, las diferencias, los saldos de tarjeta y de deuda, el exceso de un
+  presupuesto y las filas de evidencia del Asistente. Una cuenta, una tarjeta o una deuda muestran las filas con la
+  regla nueva y su saldo negativo con su menos.
+
+### El tono de transferencia
+
+`transfer` deja de ser la tinta secundaria (con la que una transferencia se confundía con un texto apagado) y pasa a un
+azul petróleo sobrio, bien separado del pino de la marca:
+
+| Token | Claro | Oscuro |
+| --- | --- | --- |
+| `transfer` | #2D6476 (6,6:1 sobre blanco) | #8FC3D2 |
+| `transferSoft` | #E2EDF1 | #132830 |
+
+Unos 194°, saturación ≤ 0,45. Queda fuera de la ventana de Forest a propósito: esa ventana rige la marca, no la
+semántica. `tests/theme.node.ts` exige 185–210°, saturación ≤ 0,5 y que sea distinto de `secondary`.
+
+### Movimientos
+
+- **Sin «+» en la cabecera.** Registra el «+» del dock, el mismo desde cada pestaña; no hay un segundo botón de
+  registro en ninguna raíz.
+- **Búsqueda.** Un `SearchField` compartido (`components.tsx`): una píldora de 44 pt sobre `surface` con hairline, la
+  lupa, el botón nativo de borrar, la etiqueta «Buscar movimientos» y el marcador «Comercio, categoría o cuenta» (entero a
+  375 pt); lee `speechLanguage`. La búsqueda busca lo mismo que antes.
+- **Ritmo.** La línea del conteo en secundario, tamaño footnote; con VoiceOver, al cambiar el filtro se anuncia el nuevo
+  conteo, y al escribir después de una pausa breve (`AccessibilityInfo.announceForAccessibility`: iOS no tiene regiones
+  vivas); las cabeceras de día en
+  tinta, subhead seminegrita (antes secundario footnote), con el neto del día en secundario y su signo.
+- **Sin cambio.** Los filtros (el filtro por tipo y la búsqueda), la agrupación por día, los totales del día, las rutas
+  de detalle, Deshacer y Recuperar.
+- **Estado vacío.** El tile del glifo de `EmptyState` usa el tinte de la marca (`GlyphTile` con `p.primary`) para que
+  se vea; también mejora el vacío de Inicio.
+
+### Inicio
+
+- **Sin subrenglón.** Ya no hay «Hasta hoy · … por día», «Sin gastos este mes» ni «Saldo registrado · N cuentas» bajo
+  el número: el número y Gastado | Disponible bastan; el promedio diario vive en Reportes.
+- **La ayuda junto al número.** Con una moneda, el ⓘ va al lado del número: Disponible siempre tiene su explicación;
+  Gastado, solo la de la conversión cuando hay conversión. Con dos monedas o más, el chip y su ayuda siguen en la fila
+  de alcance, en el mismo lugar y con la misma semántica.
+- **Un chip más callado.** La etiqueta del chip de moneda pesa 500 en lugar de 600, con el mismo blanco de 44 pt.
+- **Sin cambio.** El total en cero sigue atenuado (≥ 3,2:1 medido) y ninguna cifra cambió.
+
+### La hoja de Registrar
+
+El orden (Asistente como tile principal, Gasto, Ingreso, Transferencia) y los destinos no cambian. Las filas llevan un
+tile teñido y sobrio: Gasto `inset` con el glifo en tinta, Ingreso `incomeSoft` con el glifo `income`, Transferencia
+`transferSoft` con el glifo `transfer`. La elección sigue siendo la palabra; el color acompaña. Ningún cambio de
+comportamiento ni de escritura.
+
+### El Asistente
+
+- **Sin leyenda permanente.** Salió «No conectado en esta versión…» de debajo del compositor. En el build desconectado,
+  un mensaje enviado recibe en el hilo la nota «El Asistente todavía no está conectado en esta versión. Tu mensaje
+  quedó escrito para cuando lo esté.»: el límite, dicho donde se usa.
+- **Sin micrófono.** El micrófono del compositor y su nota salieron hasta que exista el dictado (Producto 25A): un
+  micrófono que no dicta es un callejón sin salida, como en la hoja de Registrar.
+- **El glifo del vacío** es el círculo de acento con los sparkles en `onAccent`, como en la hoja. Las sugerencias, la
+  memoria de la sesión y la confirmación explícita no cambian.
+
+### Más
+
+- Los mismos dos grupos (Finanzas; App y datos) y todas las rutas en el mismo orden: Cuentas, Tarjetas, Presupuestos,
+  Recurrentes, Deudas y cobros, Categorías; Copia de seguridad, Movimientos deshechos, Idioma, Región (cuando se
+  muestra), Apariencia. Sin fila «Ajustes».
+- Cada grupo lleva un `GroupLabel` pequeño en versalitas (eyebrow, rol de encabezado, navegable con el rotor) en lugar
+  de `SectionTitle`; 28 pt entre grupos y 8 pt bajo cada rótulo.
+- Las filas de App y datos empiezan con un `GlyphTile` neutro de 34 pt; Finanzas conserva sus tiles teñidos.
+- La nota local y la versión, como un pie tranquilo: «FinanzApp 0.1.0 (24UX6C)».
+
+### Motion
+
+Nada nuevo. Las pestañas siguen cambiando al instante, sin fundido.
+
+### Lo que queda para después (aprobado para 24UX6C, sin implementar)
+
+Los filtros de Movimientos por período, cuenta y categoría con datos del repositorio. Siguen sin inventarse nota, origen
+Apple Pay ni hora de un movimiento.
 
 ## Producto 24T2 — compra en cuotas y Tarjetas completo
 
@@ -1867,6 +1983,17 @@ crédito, marca elegida) y los filetes de las píldoras, el chip y el compositor
 color propio.
 
 ## Pendiente de revisión en iPhone
+
+- Producto 24UX6C (sin build de EAS, nada revisado todavía): las filas de Movimientos en claro y oscuro (el gasto sin
+  menos y en tinta, el ingreso con «+» en verde, la transferencia en azul petróleo y sin signo); las cabeceras de día y
+  sus netos; la píldora de búsqueda (escribir, borrar, VoiceOver «Buscar movimientos»), los filtros y el conteo; la
+  búsqueda vacía; Movimientos sin «+» en la cabecera; cuentas, tarjetas, deudas y recurrentes con la misma regla de
+  filas y los saldos negativos con su menos; el héroe del detalle de un movimiento; Inicio sin subrenglón en Gastado y
+  Disponible, el ⓘ junto al número con una moneda, el chip más callado con dos, el tile del vacío visible; la hoja de
+  Registrar con tiles teñidos pero tranquilos; el Asistente sin leyenda permanente ni micrófono, la nota al enviar, el
+  glifo del vacío visible; el ritmo de Más y sus rótulos como encabezados (rotor), cada fila abre su pantalla;
+  VoiceOver leyendo Gasto / Ingreso / Transferencia con su importe; Dynamic Type en tamaños de accesibilidad a 375 pt;
+  Reduce Motion; 30 cambios rápidos de pestaña sin pantallas negras. Lista en docs/mobile-device-checklist.md.
 
 - Producto 24UX6B (sin build de EAS, nada revisado todavía): el orden de lectura de Reportes de arriba abajo en claro y
   oscuro (alcance y mes, el total, Categorías con la dona y «Por categoría» o Día a día con «Por día», «Evolución»

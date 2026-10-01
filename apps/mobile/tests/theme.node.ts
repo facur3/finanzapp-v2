@@ -42,13 +42,20 @@ for (const [name, p] of [['light', lightPalette], ['dark', darkPalette]] as cons
     // Inicio's «Ver todos» sits on the background; the token also holds on a surface should a link ever sit on a card.
     for (const ground of [p.background, p.surface]) assert.ok(contrast(p.link, ground) >= 4.5, `link on ${ground}: ${ratio(p.link, ground)}`);
   });
-  test(`${name}: semantic colours stay readable, and a transfer is the neutral secondary ink (decision 005)`, () => {
+  test(`${name}: semantic colours stay readable, and a transfer is a restrained blue-teal apart from the brand (24UX6C)`, () => {
     for (const semantic of [p.expense, p.income, p.transfer, p.warning]) {
       assert.ok(contrast(semantic, p.surface) >= 4.5, `${semantic} on surface: ${ratio(semantic, p.surface)}`);
       assert.notEqual(semantic, p.primary, 'meaning and interaction never share one colour');
     }
-    // A transfer moves money between the person's own accounts: neither spending nor income, so it reads in the secondary ink.
-    assert.equal(p.transfer, p.secondary, 'transfer is the neutral secondary ink, not a hue of its own');
+    // A transfer moves money between the person's own accounts: neither spending nor income. 24UX6C gives it its own
+    // restrained blue-teal: clearly apart from the pine brand (158–168°), never teal-cyan neon or a saturated blue.
+    const [r, g, b] = [1, 3, 5].map(index => parseInt(p.transfer.slice(index, index + 2), 16) / 255);
+    const max = Math.max(r, g, b), min = Math.min(r, g, b), light = (max + min) / 2, d = max - min;
+    const sat = d === 0 ? 0 : d / (1 - Math.abs(2 * light - 1));
+    const angle = d === 0 ? 0 : ((max === r ? ((g - b) / d) % 6 : max === g ? (b - r) / d + 2 : (r - g) / d + 4) * 60 + 360) % 360;
+    assert.ok(angle >= 185 && angle <= 210, `transfer hue ${angle.toFixed(0)}° is a blue-teal`);
+    assert.ok(sat <= 0.5, `restrained, not saturated: ${sat.toFixed(2)}`);
+    assert.notEqual(p.transfer, p.secondary, 'its own tone, not body text');
     assert.ok(contrast(p.transfer, p.transferSoft) >= 4.5, `transfer text on its soft tile: ${ratio(p.transfer, p.transferSoft)}`);
     // Red never means "spent": the negative tone and the positive tone are apart from each other and from the brand.
     assert.notEqual(p.expense, p.income);

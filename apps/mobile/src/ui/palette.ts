@@ -14,11 +14,11 @@
  * and the hub card solid. Rows, cards, balances, charts and sticky content
  * stay solid.
  *
- * Meaning never rides on colour alone and red never means "spent": an
- * expense amount is ink with a minus, income is `income` (positive) with a
- * plus, a transfer is the neutral secondary ink, and `expense` (negative) is
- * kept for what is destructive, overdue or over a limit. `warning` is due
- * soon. The category hues (category-color.ts, @finanzapp/domain appearance)
+ * Meaning never rides on colour alone and red never means "spent": on a typed
+ * row an expense amount is ink without a sign, income is `income` (positive)
+ * with a plus, a transfer a restrained blue-teal (`transfer`, 24UX6C) without a
+ * sign (movement-amount.ts), and `expense` (negative) is kept for what is
+ * destructive, overdue or over a limit. `warning` is due soon. The category hues (category-color.ts, @finanzapp/domain appearance)
  * are a separate family and are not changed by this palette: a stored colour
  * id and a historical category's derived hue keep their identity. */
 export const lightPalette = {
@@ -38,8 +38,9 @@ export const lightPalette = {
   /** A quiet section link («Ver todos»): the brand text. */
   link: '#1D5647',
   /** Semantics. `expense` is the negative tone (destructive, overdue, over a limit), not ordinary spending. */
-  expense: '#B3432E', income: '#1F7A4F', transfer: '#45564E', warning: '#9A5B00',
-  expenseSoft: '#F7E6E1', incomeSoft: '#E2F1E8', transferSoft: '#E6EBE8', warningSoft: '#F7ECDB',
+  /** `transfer` (24UX6C): a restrained blue-teal (≈195°, well apart from the pine brand), 6.6:1 on white, 5.5:1 on its tile. */
+  expense: '#B3432E', income: '#1F7A4F', transfer: '#2D6476', warning: '#9A5B00',
+  expenseSoft: '#F7E6E1', incomeSoft: '#E2F1E8', transferSoft: '#E2EDF1', warningSoft: '#F7ECDB',
   /** Trailing swipe actions (24UX4): solid fills under a white label, each 4.5:1 or more. Destructive is the negative
    * tone, the reversible action a quiet grey, the forward action (pay, resume) the brand. */
   swipeDestructive: '#B3432E', swipeNeutral: '#5E6B65', swipeAccent: '#1D4F42',
@@ -69,8 +70,8 @@ export const darkPalette: typeof lightPalette = {
   /** Dark: a clear step above the surface track, so the state reads without colour. */
   thumb: '#323D39',
   link: '#94D2BB',
-  expense: '#EE8A72', income: '#5CCB93', transfer: '#A2B1A9', warning: '#E8A94A',
-  expenseSoft: '#34201A', incomeSoft: '#13291D', transferSoft: '#171E1B', warningSoft: '#2F2413',
+  expense: '#EE8A72', income: '#5CCB93', transfer: '#8FC3D2', warning: '#E8A94A',
+  expenseSoft: '#34201A', incomeSoft: '#13291D', transferSoft: '#132830', warningSoft: '#2F2413',
   /** Dark: deeper than the text tones so white holds 4.5:1 or more. */
   swipeDestructive: '#B8412D', swipeNeutral: '#4E5A55', swipeAccent: '#2A6553',
   shadow: 'rgba(0, 0, 0, 0)',

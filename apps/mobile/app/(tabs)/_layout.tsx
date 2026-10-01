@@ -1,7 +1,6 @@
-import { router, Tabs } from 'expo-router';
+import { Tabs } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { usePalette } from '../../src/ui/theme';
-import { IconButton } from '../../src/ui/components';
 import { FloatingTabBar } from '../../src/ui/floating-tab-bar';
 import { selectionHaptic } from '../../src/ui/motion';
 import { tabHostOptions, tabScreenOptions } from '../../src/ui/navigation';
@@ -33,8 +32,8 @@ export default function TabsLayout() {
         draws its accounts shortcut in its own financial field. */}
     <Tabs.Screen name="index" options={{ title: t('nav.tabs.home'), headerShown: false,
       tabBarIcon: ({ color, size, focused }) => <Ionicons name={focused ? 'home' : 'home-outline'} size={size} color={color} /> }} />
+    {/* 24UX6C: no «+» in Movimientos' header: the dock's «+» records from every tab. */}
     <Tabs.Screen name="activity" options={{ title: t('nav.tabs.activity'),
-      headerRight: () => <IconButton name="add" label={t('nav.recordMovement')} onPress={() => router.push('/new-entry')} />,
       tabBarIcon: ({ color, size, focused }) => <Ionicons name={focused ? 'receipt' : 'receipt-outline'} size={size} color={color} /> }} />
     <Tabs.Screen name="reports" options={{ title: t('nav.tabs.reports'),
       tabBarIcon: ({ color, size, focused }) => <Ionicons name={focused ? 'pie-chart' : 'pie-chart-outline'} size={size} color={color} /> }} />

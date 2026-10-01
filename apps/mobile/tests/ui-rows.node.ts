@@ -13,6 +13,7 @@ import * as i18nFormat from '../src/i18n/format.ts';
 import * as i18nLocale from '../src/i18n/locale.ts';
 import * as moneyInput from '../src/ui/money-input.ts';
 import type { AppLocale } from '../src/i18n/locale.ts';
+import * as movementAmount from '../src/ui/movement-amount.ts';
 
 // Producto 22.1: the row and field components at source level (React Native
 // replaced by descriptors). Structure, hierarchy and labels are checked here;
@@ -26,7 +27,8 @@ function load(file: string, extra: Record<string, unknown> = {}, fontScale = 1) 
   const alerts: { title: string; message: string; buttons?: { text: string }[] }[] = [];
   const haptics: string[] = [];
   let cursor = 0;
-  const p = { isDark: false, surface: '#FFFFFF', inset: '#EEEEF3', text: '#0A0A0C', secondary: '#6E7078', tertiary: '#8E9098', line: '#E6E6EC', primary: '#2557D6', primaryFill: '#2557D6', onPrimary: '#FFF', primarySoft: '#E5ECFB', background: '#F2F2F6' };
+  const p = { isDark: false, surface: '#FFFFFF', inset: '#EEEEF3', text: '#0A0A0C', secondary: '#6E7078', tertiary: '#8E9098', line: '#E6E6EC', primary: '#2557D6', primaryFill: '#2557D6', onPrimary: '#FFF', primarySoft: '#E5ECFB', background: '#F2F2F6',
+    income: '#1F7A4D', expense: '#C0392B', transfer: '#2D6476', transferSoft: '#E2EDF1', incomeSoft: '#E3F1E8' };
   const modules: Record<string, unknown> = {
     react: { useState: (initial: unknown) => { const index = cursor++; if (!(index in state)) state[index] = initial; return [state[index], (value: unknown) => { state[index] = typeof value === 'function' ? (value as (c: unknown) => unknown)(state[index]) : value; }]; },
       useEffect: () => {}, useId: () => 'id', useRef: (initial: unknown) => ({ current: initial }), useMemo: (fn: () => unknown) => fn(),
@@ -46,7 +48,7 @@ function load(file: string, extra: Record<string, unknown> = {}, fontScale = 1) 
       type: { body: { fontSize: 17 }, subhead: { fontSize: 15 }, footnote: { fontSize: 13 }, caption: { fontSize: 12 }, title2: { fontSize: 22 }, title3: { fontSize: 20 }, headline: { fontSize: 17 }, eyebrow: {} },
       usePalette: () => p, useReduceMotion: () => true, useCurrentDay: () => '2026-09-22' },
     './categories': {}, './category-color': { tintOf: () => '#EEE' }, './category-hues': { useAccountLook: () => ({ glyph: 'wallet-outline', hex: '#2557D6' }), useCategoryLook: () => ({ glyph: 'pricetag-outline', hex: '#3E6FB0', label: 'x' }), useAccountNameOf: () => (account: any) => account.name, useAccountLookOf: () => () => ({ glyph: 'wallet-outline', hex: '#2557D6' }), useCategoriesInUse: () => [], useCategoryDefinitions: () => [] },
-    './geometry': geometry, './merchant-mark': merchantMark,
+    './geometry': geometry, './merchant-mark': merchantMark, './movement-amount': movementAmount,
     './motion': { duration: { press: 100, release: 160 }, easeOut: 'ease', selectionHaptic: () => haptics.push('selection'), timing: () => ({}) },
     './money-input': moneyInput,
     './presentation': {}, './currencies': currencies,
@@ -121,12 +123,15 @@ test('FieldNote keeps one short line under a field and opens the full explanatio
   assert.equal(nodes(bare).some(node => is(node, 'PressFeedback')), false);
 });
 
-test('EmptyState is one calm card: a 44 pt glyph, a title3 headline and one line, never a full-screen illustration', () => {
+test('EmptyState is one calm card: a 44 pt glyph on the brand tint, a title3 headline and one line, never a full-screen illustration', () => {
   const ui = load('components.tsx');
   const empty = ui.render('EmptyState', { title: 'Nada recurrente todavía', detail: 'Programá un pago.', icon: 'repeat-outline', action: { type: 'ActionButton', props: {} } });
   const glyph = nodes(empty).find(node => is(node, 'GlyphTile'))!;
   assert.equal(glyph.props.size, 44);
   assert.equal(glyph.props.large, undefined);
+  // 24UX6C: the glyph tile takes the pine brand tint (the neutral inset tile nearly vanished on the surface).
+  assert.equal(glyph.props.color, '#2557D6', 'the tile is tinted with palette.primary');
+  assert.equal(glyph.props.icon, 'repeat-outline');
   const [title, detail] = texts(empty);
   assert.equal(title.props.variant, 'title3');
   assert.equal(title.props.accessibilityRole, 'header');
@@ -282,8 +287,10 @@ test('EntryRow gives the merchant two lines beside a bounded amount column at no
   assert.equal(rowOf(balance).props.style.flexDirection, 'row');
   const usd = { ...account, id: 'b', name: 'Caja de ahorro en dólares', currency: 'USD' };
   const transfer = { id: 't', fromAccountId: 'a', toAccountId: 'b', amountMinor: 99999999999, dateISO: '2026-09-22', createdAt: 't', note: '' };
-  const wide = ui.render('TransferRow', { transfer, accounts: [account, usd], accountId: 'a' });
-  assert.equal(rowOf(wide).props.style.flexDirection, 'column', 'a nine-digit signed transfer on a 390 pt screen stacks');
+  // 24UX6C: a transfer is shown unsigned in every context, so a nine-digit one now fits beside the name; a ten-digit one stacks.
+  assert.equal(rowOf(ui.render('TransferRow', { transfer, accounts: [account, usd], accountId: 'a' })).props.style.flexDirection, 'row', 'a nine-digit unsigned transfer fits beside the name');
+  const wide = ui.render('TransferRow', { transfer: { ...transfer, amountMinor: 999999999999 }, accounts: [account, usd], accountId: 'a' });
+  assert.equal(rowOf(wide).props.style.flexDirection, 'column', 'a ten-digit transfer on a 390 pt screen stacks');
   assert.equal(texts(ui.render('TransferRow', { transfer: { ...transfer, amountMinor: 150000 }, accounts: [account, usd] }))[0].props.numberOfLines, 2);
 });
 
@@ -540,4 +547,93 @@ test('24UX2: a movement row shows the name as typed beside its merchant mark, ke
   const spoken = (props: any) => nodes(ui.render('EntryRow', props)).find(node => is(node, 'PressFeedback'))!.props.accessibilityLabel;
   assert.equal(spoken({ entry, account, showAccount: false }), 'netflix.com, gasto, 8999,00 ARS, x, Banco, Hoy');
   assert.equal(spoken({ entry: { ...entry, accountId: 'b' }, account: { ...account, id: 'b', name: 'Efectivo' }, showAccount: true }), 'netflix.com, gasto, 8999,00 ARS, x, Efectivo, Hoy');
+});
+
+// ---- 24UX6C: a typed movement is shown as stored; its kind says what it is ------------------------------------
+
+// A real PressFeedback re-emits its children, so the same Money node can be met twice: count each once.
+const moneyOf = (root: Node) => [...new Set(nodes(root).filter(node => node.type?.name === 'Money'))];
+/** Every string the row draws (AppText children, Money's Text), to prove no minus reaches the screen. */
+const drawn = (root: Node) => nodes(root).filter(node => is(node, 'AppText') || node.type === 'Text')
+  .flatMap(node => [node.props.children].flat(Infinity)).filter(child => typeof child === 'string' || typeof child === 'number').map(String);
+const pressOf = (root: Node) => nodes(root).find(node => is(node, 'PressFeedback'))!;
+
+test('24UX6C: an expense row shows the stored magnitude unsigned in ink, an income row a «+» in the income green; the entry is never changed', () => {
+  const ui = load('components.tsx');
+  const account = { id: 'a', name: 'Banco', currency: 'ARS', openingMinor: 0, createdAt: 't' };
+  const expense = Object.freeze({ id: 'e', accountId: 'a', kind: 'expense', merchant: 'Café', category: 'Comida', amountMinor: 123450, dateISO: '2026-09-22', createdAt: 't' });
+  const before = JSON.stringify(expense);
+  const row = ui.render('EntryRow', { entry: expense, account });
+  const [money] = moneyOf(row);
+  assert.equal(moneyOf(row).length, 1);
+  assert.equal(money.props.minor, 123450, 'the stored amount, positive: never negated for display');
+  assert.equal(money.props.signed, false, 'no sign on an expense');
+  assert.equal(money.props.tone, 'expense');
+  const ink = nodes(row).find(node => node.type === 'Text' && typeof node.props.accessibilityLabel === 'string' && node.props.style?.fontVariant)!;
+  assert.equal(ink.props.style.color, '#0A0A0C', 'the expense tone is ink (palette.text), never the alarm red');
+  assert.ok(drawn(row).length > 0);
+  assert.equal(drawn(row).some(text => /[-−]/.test(text)), false, 'no minus anywhere in the row: ' + drawn(row).join(' | '));
+  assert.ok(drawn(row).includes('$ 1.234,50'), 'the amount reads as stored: ' + drawn(row).join(' | '));
+  assert.equal(JSON.stringify(expense), before, 'rendering never changes the entry');
+  // VoiceOver still names the kind and the magnitude.
+  assert.equal(pressOf(row).props.accessibilityLabel, 'Café, gasto, 1234,50 ARS, x, Banco, Hoy');
+
+  const income = { ...expense, id: 'i', kind: 'income', merchant: 'Sueldo', category: 'Sueldo', amountMinor: 500000 };
+  const incomeRow = ui.render('EntryRow', { entry: income, account });
+  const [plus] = moneyOf(incomeRow);
+  assert.equal(plus.props.minor, 500000);
+  assert.equal(plus.props.signed, true, 'an income carries its «+»');
+  assert.equal(plus.props.tone, 'income');
+  assert.ok(drawn(incomeRow).some(text => text.startsWith('+')), 'the «+» is drawn: ' + drawn(incomeRow).join(' | '));
+  assert.equal(nodes(incomeRow).find(node => node.type === 'Text' && node.props.style?.fontVariant)!.props.style.color, '#1F7A4D', 'in the income green');
+  assert.equal(pressOf(incomeRow).props.accessibilityLabel, 'Sueldo, ingreso, 5000,00 ARS, x, Banco, Hoy');
+  assert.equal(income.amountMinor, 500000);
+});
+
+test('24UX6C: a transfer row shows the stored amount unsigned in the transfer tone in every context, and VoiceOver names the kind', () => {
+  const ui = load('components.tsx');
+  const bank = { id: 'a', name: 'Banco', currency: 'ARS', openingMinor: 0, createdAt: 't' };
+  const cash = { id: 'b', name: 'Efectivo', currency: 'ARS', openingMinor: 0, createdAt: 't' };
+  const transfer = Object.freeze({ id: 't', fromAccountId: 'a', toAccountId: 'b', amountMinor: 250000, dateISO: '2026-09-22', createdAt: 't', note: '' });
+  const before = JSON.stringify(transfer);
+  const contexts: [string, Record<string, unknown>][] = [
+    ['no account', {}], ['account context, outgoing', { accountId: 'a' }], ['account context, incoming', { accountId: 'b' }],
+    ['card context, payment', { accountId: 'b', context: 'card' }], ['card context, outgoing', { accountId: 'a', context: 'card' }],
+    ['debt context, payment', { accountId: 'b', context: 'debt' }], ['debt context, collection', { accountId: 'a', context: 'debt' }],
+  ];
+  for (const [name, props] of contexts) {
+    const row = ui.render('TransferRow', { transfer, accounts: [bank, cash], ...props });
+    const money = moneyOf(row);
+    assert.equal(money.length, 1, name);
+    assert.equal(money[0].props.minor, 250000, name + ': the stored amount, never negated');
+    assert.equal(money[0].props.signed, false, name + ': no sign');
+    assert.equal(money[0].props.tone, 'transfer', name + ': the transfer tone');
+    assert.equal(money[0].props.color, undefined, name + ': no forced ink');
+    assert.equal(nodes(row).find(node => node.type === 'Text' && node.props.style?.fontVariant)!.props.style.color, '#2D6476', name + ': drawn in palette.transfer');
+    assert.equal(drawn(row).some(text => /[-−+]/.test(text)), false, name + ': no sign drawn: ' + drawn(row).join(' | '));
+  }
+  assert.equal(JSON.stringify(transfer), before, 'rendering never changes the transfer');
+  const spoken = (props: Record<string, unknown>) => pressOf(ui.render('TransferRow', { accounts: [bank, cash], ...props })).props.accessibilityLabel;
+  assert.equal(spoken({ transfer }), 'Transferencia, de Banco a Efectivo, 2500,00 ARS, Hoy', 'an untitled transfer says its kind once');
+  assert.equal(spoken({ transfer: { ...transfer, note: 'Alquiler' } }), 'Transferencia, Alquiler, de Banco a Efectivo, 2500,00 ARS, Hoy',
+    'a note titles the row: the kind leads and the note is not repeated');
+  assert.equal(spoken({ transfer: { ...transfer, note: 'Alquiler' }, accountId: 'a' }), 'Transferencia, Alquiler, de Banco a Efectivo, 2500,00 ARS, Hoy');
+  // Card and debt contexts keep their own titles.
+  assert.equal(spoken({ transfer, accountId: 'b', context: 'card' }), 'Pago de tarjeta, de Banco a Efectivo, 2500,00 ARS, Hoy');
+  assert.equal(spoken({ transfer, accountId: 'a', context: 'card' }), 'Transferencia, de Banco a Efectivo, 2500,00 ARS, Hoy');
+  assert.equal(spoken({ transfer, accountId: 'b', context: 'debt' }), 'Pago, de Banco a Efectivo, 2500,00 ARS, Hoy');
+  assert.equal(spoken({ transfer, accountId: 'a', context: 'debt' }), 'Cobro, de Banco a Efectivo, 2500,00 ARS, Hoy');
+  assert.equal(spoken({ transfer: { ...transfer, note: 'Cuota' }, accountId: 'b', context: 'card' }), 'Pago de tarjeta, de Banco a Efectivo, 2500,00 ARS, Hoy, Cuota',
+    'in a card context the note is still read after the facts');
+});
+
+test('24UX6C: a computed sign is kept: a negative account balance still renders with its minus', () => {
+  const ui = load('components.tsx', { '@finanzapp/domain': { accountBalanceMinor: () => -45000, formatMinorUnits, labelFromISO: (d: string) => d, categoryKey: (s: string) => s.toLowerCase(), todayKey: (d: Date) => d.toISOString().slice(0, 10) } });
+  const account = { id: 'a', name: 'Banco', currency: 'ARS', openingMinor: 0, createdAt: 't' };
+  const row = ui.render('AccountRow', { account, entries: [], transfers: [] });
+  const [money] = moneyOf(row);
+  assert.ok(money.props.minor < 0, 'the balance is passed negative');
+  assert.equal(money.props.minor, -45000);
+  assert.equal(money.props.color, '#C0392B', 'a negative balance keeps its warning colour');
+  assert.ok(drawn(row).some(text => /^[-−]/.test(text)), 'the minus is drawn: ' + drawn(row).join(' | '));
 });

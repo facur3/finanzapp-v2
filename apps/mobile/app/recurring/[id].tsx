@@ -4,6 +4,7 @@ import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { recurringNeedsReview } from '@finanzapp/domain';
 import { useLedger } from '../../src/storage/LedgerProvider';
 import { AccountBadge, ActionButton, AppText, DetailRow, EmptyState, ErrorMessage, IconButton, MerchantBadge, Money, Screen, Surface } from '../../src/ui/components';
+import { presentedAmount } from '../../src/ui/movement-amount';
 import { useRecurringManagement } from '../../src/ui/commitment-actions';
 import { useCategoryLook } from '../../src/ui/category-hues';
 import { RecurringHistory } from '../../src/ui/recurring-history';
@@ -53,11 +54,11 @@ export default function RecurringDetailScreen() {
     <Stack.Screen options={{ title: rule.merchant, gestureEnabled: !busy, headerBackVisible: !busy,
       headerRight: rule.deleted ? undefined : () => <IconButton name="create-outline" label={t('recurring.detail.edit')} disabled={busy}
         onPress={() => router.push({ pathname: '/edit-recurring/[id]', params: { id: rule.id } })} /> }} />
-    {/* Identity (the mark) → the amount, signed like its row → the state. The merchant is the header's title. */}
+    {/* Identity (the mark) → the amount, shown like its row (24UX6C: «+» on an income, no sign on an expense) → the state. The merchant is the header's title. */}
     <View style={{ gap: 12, alignItems: 'center', paddingTop: 8 }}>
       <MerchantBadge merchant={rule.merchant} category={rule.category} kind={rule.kind} large tone={income ? 'income' : 'neutral'} />
       <AppText secondary variant="footnote" style={{ fontWeight: '500', textAlign: 'center' }}>{withCurrencyCode(t(income ? 'recurring.form.incomeAmount' : 'recurring.form.expenseAmount'), account.currency)}</AppText>
-      <Money minor={income ? rule.amountMinor : -rule.amountMinor} currency={account.currency} large size={40} align="center" signed tone={income ? 'income' : 'expense'} />
+      <Money minor={rule.amountMinor} currency={account.currency} large size={40} align="center" signed={presentedAmount(rule.kind, rule.amountMinor).signed} tone={rule.kind} />
       <AppText accessibilityLiveRegion="polite" variant="subhead" style={{ color: review ? p.warning : p.secondary, fontWeight: review ? '600' : '400', textAlign: 'center' }}>{state}</AppText>
     </View>
     <Surface grouped>

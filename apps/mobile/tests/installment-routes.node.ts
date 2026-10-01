@@ -14,6 +14,7 @@ import * as i18nFormat from '../src/i18n/format.ts';
 import { bindLocale } from '../src/i18n/bind.ts';
 import type { AppLocale } from '../src/i18n/locale.ts';
 import { realModule } from './real-module.ts';
+import * as movementAmount from '../src/ui/movement-amount.ts';
 
 // Producto 24T2: the card surfaces with instalment plans (Tarjetas, a card's detail, a plan's detail and the movement an
 // instalment recorded), their real handlers against descriptor hosts. The snapshot pieces (card-panel) and the rows
@@ -88,7 +89,7 @@ function harness(file: string, options: { params?: Record<string, string>; data?
     'expo-haptics': { NotificationFeedbackType: { Success: 'Success' }, notificationAsync: async () => {}, selectionAsync: async () => {} },
     '@finanzapp/domain': domain,
     ...both('storage/LedgerProvider', ledger), ...both('ui/components', components), ...both('ui/card-visual', cardVisual), ...both('ui/entry-list', { EntryList: 'EntryList' }),
-    ...both('ui/geometry', geometry),
+    ...both('ui/geometry', geometry), ...both('ui/movement-amount', movementAmount),
     ...both('ui/liability-presentation', liabilityPresentation), ...both('ui/installment-presentation', installmentPresentation), ...both('ui/presentation', presentation),
     ...both('ui/budget-presentation', budgetPresentation), ...both('ui/motion', motion), ...both('ui/theme', theme), ...both('ui/category-hues', hues),
     ...both('i18n/format', i18nFormat), ...both('i18n/provider', i18nProvider),
@@ -495,6 +496,12 @@ test('movement detail of an instalment: «Cuota de tarjeta», a «Cuota 2 de 12�
   const root = view.render();
   assert.equal(nodes(root).find(node => node.type === 'Stack.Screen')!.props.options.title, 'Cuota de tarjeta');
   assert.deepEqual(rowsOf(root), ['Categoría=Hogar', 'Tarjeta=Visa Gold', 'Cuota=2 de 12', 'Moneda=Pesos argentinos']);
+  // 24UX6C: the hero is the instalment's stored magnitude (one 1/12 share, never the full price), unsigned, in ink.
+  const hero = find(root, 'Money').props;
+  assert.equal(hero.minor, 10000000, 'the recognised share as stored');
+  assert.equal(hero.signed, false, 'no minus on an expense: the title says what it is');
+  assert.equal(hero.tone, 'expense');
+  assert.equal(withPlans.records.find(record => record.entry.id === 'inst_tv_002')!.entry.amountMinor, 10000000, 'the stored amount is unchanged by the render');
   find(root, 'DetailRow', 'Cuota').props.onPress();
   assert.equal(JSON.stringify(view.pushed.at(-1)), JSON.stringify({ pathname: '/installment/[id]', params: { id: 'tv' } }));
   // Editar still opens the movement form (it only lets merchant and category change for an instalment).
@@ -525,7 +532,11 @@ test('movement detail: a financing share says which component it is; a plain car
   assert.equal(nodes(interest).find(node => node.type === 'Stack.Screen')!.props.options.title, 'Interés de cuota');
   assert.ok(rowsOf(interest).includes('Cuota=1 de 3 · interés'));
   assert.ok(rowsOf(interest).includes('Categoría=Intereses'), 'the interest keeps its own category');
-  assert.equal(find(interest, 'Money').props.minor, -1000000);
+  // 24UX6C: the hero shows the stored magnitude, unsigned in ink: the title already says it is a charge.
+  const interestHero = find(interest, 'Money').props;
+  assert.equal(interestHero.minor, 1000000, 'the interest share as stored, never negated');
+  assert.equal(interestHero.signed, false);
+  assert.equal(interestHero.tone, 'expense');
   // Undoing one share of an instalment that has another says only that part is undone (its principal keeps counting).
   find(interest, 'ActionButton', 'Deshacer movimiento').props.onPress();
   assert.match(interestView.alerts[0].message, / Solo esta parte de la cuota queda deshecha: no se vuelve a registrar sola y sigue pendiente en su plan\. La otra parte de la cuota no cambia\.$/);
@@ -538,6 +549,8 @@ test('movement detail: a financing share says which component it is; a plain car
   const plain = harness('entry/[id].tsx', { params: { id: 'purchase' }, data }).render();
   assert.equal(nodes(plain).find(node => node.type === 'Stack.Screen')!.props.options.title, 'Compra con tarjeta');
   assert.deepEqual(rowsOf(plain), ['Categoría=Café', 'Tarjeta=Visa Gold', 'Moneda=Pesos argentinos']);
+  assert.equal(JSON.stringify((({ minor, signed, tone }) => ({ minor, signed, tone }))(find(plain, 'Money').props)), JSON.stringify({ minor: 23100, signed: false, tone: 'expense' }),
+    'a plain card purchase: the stored amount, no sign (24UX6C)');
   const english = harness('entry/[id].tsx', { params: { id: 'inst_tv_002' }, data: withPlans, locale: 'en-US' });
   const englishRoot = english.render();
   assert.equal(nodes(englishRoot).find(node => node.type === 'Stack.Screen')!.props.options.title, 'Card installment');

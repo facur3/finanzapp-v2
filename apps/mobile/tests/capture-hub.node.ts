@@ -19,7 +19,7 @@ const i18nProvider = { useI18n: () => bindLocale(locale) };
 // the hub and the first-choice hold feel on an iPhone remain device acceptance items.
 const palette = { isDark: false, background: '#F0F3F1', surface: '#FFFFFF', inset: '#E6EBE8', text: '#0F1A16', secondary: '#45564E', tertiary: '#586961',
   line: '#DCE3DF', primary: '#1D5647', primaryFill: '#1D4F42', onPrimary: '#FFFFFF', primarySoft: '#E1ECE7', expense: '#B3432E', income: '#1F7A4F',
-  transfer: '#45564E', warning: '#9A5B00', hero: '#14362D', heroInk: '#EEF5F1', heroSecondary: '#A8C4B9', heroControl: '#26493F', heroThumb: '#F4F8F6',
+  transfer: '#2D6476', incomeSoft: '#E2F1E8', transferSoft: '#E2EDF1', warning: '#9A5B00', hero: '#14362D', heroInk: '#EEF5F1', heroSecondary: '#A8C4B9', heroControl: '#26493F', heroThumb: '#F4F8F6',
   heroThumbInk: '#14362D', accent: '#9FD8C1', onAccent: '#0F2A22', dock: '#1B3C33', dockInk: '#B5C9C1', dockActive: '#3C6356', dockActiveInk: '#FFFFFF' };
 
 // Synthetic fixtures only: a live ARS and USD account and a deleted EUR one (its history stays in the view's scope,
@@ -171,8 +171,12 @@ test('24UX6A: the Assistant first and largest on the pine field, then Gasto, Ing
     'Gasto / Una compra o un pago | Ingreso / Sueldo, cobro u otro ingreso | Transferencia / Entre cuentas o pago de tarjeta');
   const looks = rows.map((row: any) => { const tileView = flatten(row.rendered).find(node => node.type === 'View' && node.props.style?.[1]?.backgroundColor);
     const glyph = tileView.props.children; return [glyph.props.name, glyph.props.color, tileView.props.style[1].backgroundColor]; });
-  assert.equal(json(looks), json([['arrow-up', palette.primary, palette.inset], ['arrow-down', palette.primary, palette.inset],
-    ['swap-horizontal', palette.primary, palette.inset]]), 'neutral inset tiles: the choice is the word, not a colour');
+  // 24UX6C: a restrained hint of each kind's tone on its tile (the light palette's real tokens, src/ui/palette.ts): an expense
+  // ink on the inset (never alarm red), an income its soft green, a transfer its soft blue-teal. The word still names the choice.
+  assert.equal(json(looks), json([['arrow-up', palette.text, palette.inset], ['arrow-down', palette.income, palette.incomeSoft],
+    ['swap-horizontal', palette.transfer, palette.transferSoft]]), 'tinted but calm tiles, one per kind');
+  assert.equal(looks.some((look: string[]) => look.includes(palette.expense)), false, 'an expense is not painted red in the hub');
+  assert.equal(new Set(looks.map((look: string[]) => look[2])).size, 3, 'the three tiles are told apart');
   for (const [index, { rendered }] of rows.entries()) {
     assert.equal(rendered.type, 'PressFeedback');
     assert.equal(rendered.props.accessibilityRole, 'button');

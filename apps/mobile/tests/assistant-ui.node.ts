@@ -35,8 +35,8 @@ function load(file: string, { reduced = false, fontScale = 1, dark = false, bott
   const haptics: string[] = [];
   let cursor = 0;
   const palette = dark
-    ? { isDark: true, background: '#000', surface: '#1C1C1E', inset: '#2C2C2E', text: '#F5F5F7', secondary: '#A0A0A8', tertiary: '#7C7C84', line: '#2C2C30', primary: '#5B87FF', primaryFill: '#3565EA', onPrimary: '#FFF', primarySoft: '#122048', income: '#3DBE86', warning: '#E8A030' }
-    : { isDark: false, background: '#F2F2F6', surface: '#FFFFFF', inset: '#EEEEF3', text: '#0A0A0C', secondary: '#6E7078', tertiary: '#8E9098', line: '#E6E6EC', primary: '#2557D6', primaryFill: '#2557D6', onPrimary: '#FFF', primarySoft: '#E5ECFB', income: '#15804F', warning: '#B45309' };
+    ? { isDark: true, background: '#000', surface: '#1C1C1E', inset: '#2C2C2E', text: '#F5F5F7', secondary: '#A0A0A8', tertiary: '#7C7C84', line: '#2C2C30', primary: '#5B87FF', primaryFill: '#3565EA', onPrimary: '#FFF', primarySoft: '#122048', accent: '#86C9B0', onAccent: '#05211A', income: '#3DBE86', warning: '#E8A030' }
+    : { isDark: false, background: '#F2F2F6', surface: '#FFFFFF', inset: '#EEEEF3', text: '#0A0A0C', secondary: '#6E7078', tertiary: '#8E9098', line: '#E6E6EC', primary: '#2557D6', primaryFill: '#2557D6', onPrimary: '#FFF', primarySoft: '#E5ECFB', accent: '#9FD8C1', onAccent: '#0F2A22', income: '#15804F', warning: '#B45309' };
   const modules: Record<string, any> = {
     '../i18n/format': i18nFormat, '../src/i18n/format': i18nFormat, '../../src/i18n/format': i18nFormat, '../i18n/provider': i18nProvider, '../src/i18n/provider': i18nProvider, '../../src/i18n/provider': i18nProvider,
     react: { useState: (initial: unknown) => { const index = cursor++; if (!(index in state)) state[index] = initial; return [state[index], (value: unknown) => { state[index] = typeof value === 'function' ? (value as (c: unknown) => unknown)(state[index]) : value; }]; },
@@ -79,7 +79,7 @@ const byLabel = (root: Node, label: string) => nodes(root).find(node => node.pro
 const flat = (style: any) => Object.assign({}, ...(Array.isArray(style) ? style.flat(Infinity).filter(Boolean) : [style]));
 const textOf = (node: Node) => Array.isArray(node.props.children) ? node.props.children.map((child: unknown) => typeof child === 'string' ? child : '').join('') : String(node.props.children);
 
-test('the composer labels its field, microphone and send; send is disabled when empty and becomes Stop while busy', () => {
+test('the composer labels its field and send (no microphone until dictation exists); send is disabled when empty and becomes Stop while busy', () => {
   const ui = load('assistant-composer.tsx');
   const events: string[] = [];
   const props = { value: '', onChange: () => {}, onSend: () => events.push('send'), onStop: () => events.push('stop'), busy: false };
@@ -90,8 +90,11 @@ test('the composer labels its field, microphone and send; send is disabled when 
   assert.equal(input.props.placeholder, 'Preguntá o registrá algo…');
   assert.equal(input.props.multiline, true);
   assert.equal(flat(input.props.style).maxHeight, 22 * 5, 'about five lines, then the field scrolls inside');
-  const mic = byLabel(root, 'Dictar')!;
-  assert.equal(mic.props.accessibilityHint, 'Todavía no disponible en esta versión');
+  // 24UX6C: no microphone (it only opened a note) until dictation exists in Producto 25A.
+  assert.equal(byLabel(root, 'Dictar'), undefined);
+  assert.equal(nodes(root).some(node => node.type === 'Ionicons' && /^mic/.test(String(node.props.name))), false, 'no mic glyph');
+  // (nodes() walks a local function component's children twice, so compare the distinct labels.)
+  assert.equal([...new Set(nodes(root).filter(node => node.type === 'PressFeedback').map(node => String(node.props.accessibilityLabel)))].join(','), 'Enviar', 'send is the only control');
   const send = byLabel(root, 'Enviar')!;
   assert.equal(send.props.disabled, true);
   assert.equal(send.props.accessibilityState.disabled, true);
@@ -109,12 +112,10 @@ test('the composer labels its field, microphone and send; send is disabled when 
   assert.equal(byLabel(root, 'Enviar'), undefined);
   byLabel(root, 'Detener respuesta')!.props.onPress();
   assert.deepEqual(events, ['send', 'stop']);
-  // The microphone opens the boundary note instead of a recorder; nothing native is touched.
+  // No dictation note either, and no line under the bar when no note is passed (the disconnected caption is gone).
   root = ui.render('AssistantComposer', props);
-  assert.equal(nodes(root).some(node => node.type === 'AppText' && /development build/.test(String(node.props.children))), false);
-  byLabel(root, 'Dictar')!.props.onPress();
-  root = ui.render('AssistantComposer', props);
-  assert.ok(nodes(root).some(node => node.type === 'AppText' && /development build/.test(String(node.props.children))));
+  assert.equal(nodes(root).some(node => node.type === 'AppText'), false);
+  assert.equal(byLabel(ui.render('AssistantComposer', { ...props, busy: true }), 'Dictar'), undefined);
   // Large text: the field may grow more before it scrolls, capped so the thread stays visible.
   const large = load('assistant-composer.tsx', { fontScale: 2 });
   assert.equal(flat(nodes(large.render('AssistantComposer', props)).find(node => node.type === 'TextInput')!.props.style).maxHeight, Math.round(22 * 1.6 * 5));
@@ -170,6 +171,7 @@ test('a draft card lists kind, amount, merchant, category, account and date, con
   assert.deepEqual(labels.filter(label => label.includes(': ')), ['Comercio: Carrefour', 'Categoría: Supermercado', 'Pagado con: Visa Galicia', 'Fecha: Hoy · 21 sep']);
   assert.equal(all.find(node => node.type === 'Money')!.props.minor, 1850000);
   assert.equal(all.find(node => node.type === 'Money')!.props.tone, 'expense');
+  assert.equal(all.find(node => node.type === 'Money')!.props.signed, false, 'an expense draft shows the stored amount with no sign');
   assert.ok(all.some(node => node.type === 'CategoryBadge' && node.props.category === 'Supermercado'));
   assert.ok(all.some(node => node.type === 'AccountBadge' && node.props.accountId === 'visa'));
   assert.equal(all.some(node => node.type === 'AppText' && /Borrador · Gasto/.test(textOf(node))), true);
@@ -190,6 +192,10 @@ test('a draft card lists kind, amount, merchant, category, account and date, con
   const income = ui.render('DraftCard', { content: { kind: 'draft', draft: { ...draft, kind: 'income', merchant: 'Sueldo' }, status: 'pending', entryId: null }, ...handlers });
   assert.ok(nodes(income).some(node => node.props.accessibilityLabel === 'Ingresa en: Visa Galicia'));
   assert.ok(nodes(income).some(node => node.props.accessibilityLabel === 'Origen: Sueldo'));
+  const incomeMoney = nodes(income).find(node => node.type === 'Money')!;
+  assert.equal(incomeMoney.props.minor, 1850000, 'the stored magnitude, untouched');
+  assert.equal(incomeMoney.props.tone, 'income');
+  assert.equal(incomeMoney.props.signed, true, 'an income draft shows «+»');
   // Confirmed: a receipt with the link to the movement, no more Confirmar.
   const confirmed = ui.render('DraftCard', { content: { kind: 'draft', draft, status: 'confirmed', entryId: 'e-1' }, ...handlers });
   assert.deepEqual(nodes(confirmed).filter(node => node.type === 'ActionButton').map(node => node.props.label), ['Ver movimiento']);
@@ -211,6 +217,15 @@ test('suggestions cap at four with VoiceOver names; clarification chips tick onc
   const chips = nodes(suggestions).filter(node => node.props.accessibilityRole === 'button');
   assert.equal(chips.length, 4);
   assert.ok(nodes(suggestions).some(node => node.props.accessibilityRole === 'header' && node.props.children === '¿En qué te ayudo?'));
+  // 24UX6C: the empty conversation's mark is the accent circle with the onAccent sparkles, as in the capture hub.
+  const sparkles = nodes(suggestions).find(node => node.type === 'Ionicons')!;
+  assert.equal(sparkles.props.name, 'sparkles');
+  assert.equal(sparkles.props.color, '#0F2A22');
+  const glyphTile = nodes(suggestions).find(node => node.type === 'View' && node.props.children === sparkles)!;
+  assert.equal(flat(glyphTile.props.style).backgroundColor, '#9FD8C1');
+  const darkSparkles = nodes(load('assistant-messages.tsx', { dark: true }).render('Suggestions', { items: ['a'], onPick: () => {} }));
+  assert.equal(darkSparkles.find(node => node.type === 'Ionicons')!.props.color, '#05211A');
+  assert.ok(darkSparkles.some(node => node.type === 'View' && flat(node.props.style).backgroundColor === '#86C9B0'));
   chips[0].props.onPress();
   assert.deepEqual(picked, ['a']);
   const chosen: string[] = [];
@@ -350,12 +365,11 @@ test('English: every word the Assistant UI says is English; account names, merch
   const input = nodes(bar).find(node => node.type === 'TextInput')!;
   assert.equal(input.props.placeholder, 'Ask or record something…');
   assert.equal(input.props.accessibilityLabel, 'Message for the Assistant');
-  assert.equal(byLabel(bar, 'Dictate')!.props.accessibilityHint, 'Not available in this version yet');
+  assert.equal(byLabel(bar, 'Dictate'), undefined, 'no microphone in English either');
   assert.ok(byLabel(bar, 'Send'));
-  byLabel(bar, 'Dictate')!.props.onPress();
   bar = composer.render('AssistantComposer', { value: 'x', onChange: () => {}, onSend: () => {}, onStop: () => {}, busy: true });
   assert.ok(byLabel(bar, 'Stop response'));
-  assert.ok(nodes(bar).some(node => node.type === 'AppText' && /^Dictation comes with the installable version/.test(String(node.props.children))));
+  assert.equal(nodes(bar).some(node => node.type === 'AppText'), false, 'no dictation note');
 });
 
 test('VoiceOver: with an interface language that differs from the device\'s, every element the Assistant builds speaks it; amounts are said in spoken form', () => {

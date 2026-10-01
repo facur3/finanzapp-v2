@@ -7,8 +7,6 @@ export const assistant = {
     title: 'Asistente',
     /** VoiceOver name of the header button that starts an empty conversation. */
     newChat: 'Nuevo chat',
-    /** Caption under the composer while this build has no server connection. */
-    disconnectedNote: 'No conectado en esta versión. Lo que escribas queda en tu iPhone.',
     /** Banner of the development-only scripted replies. */
     fixtureBanner: 'Vista de prueba: respuestas de ejemplo, nada se guarda.',
     /** Note after Confirmar on a scripted (development) draft. */
@@ -37,13 +35,8 @@ export const assistant = {
       /** VoiceOver name of the message field. */
       label: 'Mensaje para el Asistente',
       hint: 'Escribí una pregunta sobre tu dinero o un gasto para registrar',
-      /** VoiceOver name of the microphone button. */
-      dictate: 'Dictar',
-      dictateHint: 'Todavía no disponible en esta versión',
       stop: 'Detener respuesta',
       send: 'Enviar',
-      /** Shown when the microphone is tapped: speech input is not in this build. */
-      dictationNote: 'El dictado llega con la versión instalable: la transcripción de voz necesita el development build, no Expo Go.',
     },
     message: {
       /** VoiceOver reading of the user's own message: "Vos: Gasté 500". */

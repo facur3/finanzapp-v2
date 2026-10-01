@@ -14,6 +14,7 @@ import { AMOUNT_FIELD, ROW_STACK_SCALE, SEGMENT_GAP, SEGMENT_PADDING, amountFiel
 import { duration, easeOut, selectionHaptic, timing } from './motion';
 import { AmountInput, displayAmount, precisionOf, splitAmount, type AmountNotice, type PasteRejection } from './money-input';
 import { BUILD_MERCHANT_MARK_PREVIEW, merchantMark } from './merchant-mark';
+import { presentedAmount } from './movement-amount';
 import { useI18n } from '../i18n/provider';
 import { moneyText } from '../i18n/format';
 import { DEFAULT_LOCALE, type AppLocale } from '../i18n/locale';
@@ -188,6 +189,20 @@ export function IconButton({ name, label, onPress, disabled = false, color }: { 
   return <PressFeedback feedback="opacity" accessibilityRole="button" accessibilityLabel={label} onPress={onPress}
     disabled={disabled} accessibilityState={{ disabled }}
     style={{ width: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center', opacity: disabled ? 0.35 : 1 }}><Ionicons name={name} size={24} color={color ?? p.text} /></PressFeedback>;
+}
+
+/** The Forest search pill (24UX6C): a magnifier, the field and the native clear button in one 44 pt capsule on the
+ * surface, with a hairline edge. `label` is what VoiceOver calls the field («Buscar movimientos»); the placeholder says
+ * what it searches. */
+export function SearchField({ label, ...props }: TextInputProps & { label: string }) {
+  const p = usePalette();
+  const { speechLanguage } = useI18n();
+  return <View style={[styles.search, { backgroundColor: p.surface, borderColor: p.line }]}>
+    <Ionicons name="search" size={18} color={p.tertiary} accessible={false} />
+    <TextInput returnKeyType="search" autoCapitalize="none" autoCorrect={false} clearButtonMode="while-editing" {...props}
+      accessibilityLabel={label} accessibilityLanguage={props.accessibilityLanguage ?? speechLanguage} placeholderTextColor={p.tertiary}
+      selectionColor={p.primary} keyboardAppearance={p.isDark ? 'dark' : 'light'} style={[styles.searchInput, { color: p.text }, props.style]} />
+  </View>;
 }
 
 export function Field({ label, ...props }: TextInputProps & { label: string }) {
@@ -436,8 +451,10 @@ export function GlyphTile({ icon, tone = 'neutral', large = false, size, color }
 /** An empty or missing state as one calm card: a 44 pt glyph, a headline and
  * one line of guidance, never a full-screen illustration. */
 export function EmptyState({ title, detail, action, icon = 'wallet-outline' }: { title: string; detail: string; action?: ReactNode; icon?: IconName }) {
+  const p = usePalette();
+  // 24UX6C: the glyph on a tint of the pine brand (the neutral inset tile nearly vanished on the surface, in dark above all).
   return <Surface style={{ gap: 12, paddingVertical: 22 }}>
-    <GlyphTile icon={icon} size={44} />
+    <GlyphTile icon={icon} size={44} color={p.primary} />
     <AppText accessibilityRole="header" variant="title3">{title}</AppText>
     <AppText secondary variant="subhead">{detail}</AppText>
     {action && <View style={{ marginTop: 4 }}>{action}</View>}
@@ -708,7 +725,10 @@ export function EntryRow({ entry, account, last = false, showDate = true, showAc
   const { t, relativeDate, spokenAmount } = useI18n();
   const dateLabel = relativeDate(entry.dateISO, day);
   const income = entry.kind === 'income';
-  const stacked = useStacked({ minor: entry.amountMinor, currency: account.currency, signed: true });
+  // 24UX6C: the row already says it is an expense or an income; the amount is shown as stored (no minus on an expense,
+  // «+» on an income), see movement-amount.ts. The ledger amount is untouched.
+  const amount = presentedAmount(entry.kind, entry.amountMinor);
+  const stacked = useStacked({ minor: amount.minor, currency: account.currency, signed: amount.signed });
   const category = useCategoryLook(entry.category, entry.kind).label;
   const detail = [category, showAccount ? account.name : null, showDate ? dateLabel : null].filter(Boolean).join(' · ');
   return <PressFeedback feedback="highlight" accessibilityRole="button"
@@ -722,7 +742,7 @@ export function EntryRow({ entry, account, last = false, showDate = true, showAc
         {!!detail && <AppText secondary variant="footnote" numberOfLines={stacked ? undefined : 2}>{detail}</AppText>}
       </View>
       <View style={{ maxWidth: stacked ? '100%' : AMOUNT_COLUMN, alignItems: 'flex-end' }}>
-        <Money minor={income ? entry.amountMinor : -entry.amountMinor} currency={account.currency} signed tone={income ? 'income' : 'expense'} />
+        <Money minor={amount.minor} currency={account.currency} signed={amount.signed} tone={amount.tone} />
       </View>
     </View>
   </PressFeedback>;
@@ -776,15 +796,19 @@ export function TransferRow({ transfer: t, accounts, accountId, last = false, sh
   const nameOf = useAccountNameOf();
   const fromName = nameOf(from), toName = nameOf(to);
   const date = relativeDate(t.dateISO, day);
-  const outgoing = accountId === from.id;
   const incoming = accountId === to.id;
   const title = context === 'card' ? tr(incoming ? 'rows.cardPayment' : 'rows.transfer') : context === 'debt' ? tr(incoming ? 'rows.payment' : 'rows.collection') : t.note || tr('rows.transfer');
   const detail = context ? [t.note && t.note !== title ? t.note : null, incoming ? tr('rows.fromAccount', { name: fromName }) : tr('rows.toAccount', { name: toName }), showDate ? date : null].filter(Boolean).join(' · ')
     : `${fromName} → ${toName}${showDate ? ' · ' + date : ''}`;
-  const signed = !!accountId && !context;
-  const stacked = useStacked({ minor: signed && outgoing ? -t.amountMinor : t.amountMinor, currency: from.currency, signed });
+  // 24UX6C: a transfer moves money between the person's own accounts: the amount as stored, no sign, in the transfer
+  // tone, on every list (the direction is the caption's «origen → destino»); see movement-amount.ts.
+  const amount = presentedAmount('transfer', t.amountMinor);
+  const stacked = useStacked({ minor: amount.minor, currency: from.currency, signed: amount.signed });
+  // VoiceOver hears the kind even when a note names the row («Transferencia, Alquiler, de … a …»).
+  const kindWord = tr('rows.transfer');
+  const spokenTitle = context || title === kindWord ? title : kindWord + ', ' + title;
   return <PressFeedback feedback="highlight" accessibilityRole="button"
-    accessibilityLabel={tr('rows.transferLabel', { title, from: fromName, to: toName, amount: spokenAmount(t.amountMinor, from.currency), date }) + (t.note ? ', ' + t.note : '')}
+    accessibilityLabel={tr('rows.transferLabel', { title: spokenTitle, from: fromName, to: toName, amount: spokenAmount(t.amountMinor, from.currency), date }) + (t.note && t.note !== title ? ', ' + t.note : '')}
     onPress={() => router.push({ pathname: '/transfer/[id]', params: { id: t.id } })}
     style={[styles.row, { borderBottomColor: p.line, borderBottomWidth: last ? 0 : StyleSheet.hairlineWidth }]}>
     <GlyphTile icon={context === 'card' ? 'card-outline' : context === 'debt' ? 'people-outline' : 'swap-horizontal-outline'} tone="transfer" />
@@ -794,8 +818,7 @@ export function TransferRow({ transfer: t, accounts, accountId, last = false, sh
         <AppText secondary variant="footnote" numberOfLines={stacked ? undefined : 2}>{detail}</AppText>
       </View>
       <View style={{ maxWidth: stacked ? '100%' : AMOUNT_COLUMN, alignItems: 'flex-end' }}>
-        <Money minor={signed && outgoing ? -t.amountMinor : t.amountMinor} currency={from.currency} signed={signed} tone="transfer"
-          color={accountId ? undefined : p.text} />
+        <Money minor={amount.minor} currency={from.currency} signed={amount.signed} tone={amount.tone} />
       </View>
     </View>
   </PressFeedback>;
@@ -809,6 +832,8 @@ const styles = StyleSheet.create({
   buttonCompact: { minHeight: 44, paddingVertical: 10, paddingHorizontal: 14 },
   buttonText: { fontSize: 17, fontWeight: '600', textAlign: 'center', flexShrink: 1 },
   input: { borderRadius: radius.button, paddingHorizontal: 16, paddingVertical: 14, fontSize: 17, minHeight: 52 },
+  search: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 44, borderRadius: 22, paddingLeft: 14, paddingRight: 6, borderWidth: StyleSheet.hairlineWidth },
+  searchInput: { flex: 1, minWidth: 0, fontSize: 17, paddingVertical: 10, minHeight: 44 },
   amountRow: { flexDirection: 'row', alignItems: 'center', gap: AMOUNT_GAP, width: '100%' },
   amountInput: { flex: 1, minWidth: 0, minHeight: 60, fontWeight: '700', letterSpacing: 0, fontVariant: ['tabular-nums'], paddingVertical: 6, paddingLeft: 0, textAlign: 'left' },
   choices: { flexDirection: 'row', borderRadius: 10, padding: SEGMENT_PADDING, gap: SEGMENT_GAP },

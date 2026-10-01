@@ -175,9 +175,11 @@ test('a new conversation is quiet: no messages, four suggestions, an empty compo
   assert.equal(list.props.contentContainerStyle.justifyContent, 'center', 'the empty composition sits in the middle, not at the top');
   assert.equal(list.props.keyboardDismissMode, 'interactive');
   assert.equal(list.props.contentInsetAdjustmentBehavior, 'automatic');
-  // The disconnected build says so under the composer, in one caption, before anyone sends.
-  const note = nodes(composer.props.note).find(node => node.type === 'AppText')!;
-  assert.match(String(note.props.children), /No conectado en esta versión/);
+  // 24UX6C: no permanent «No conectado en esta versión…» caption under the composer; the limitation is said where it
+  // matters, when a message is sent (next test).
+  assert.equal(composer.props.note, undefined, 'the composer carries no note');
+  const words = nodes(view.render().root).filter(node => node.type === 'AppText').map(node => [node.props.children].flat().join(''));
+  assert.ok(!words.some(text => /No conectado en esta versión/.test(text)), 'no permanent disconnected caption on screen');
 });
 
 test('in the disconnected build a suggestion or a typed message never leaves the device: the words return to the composer and one note explains', async () => {
@@ -191,7 +193,13 @@ test('in the disconnected build a suggestion or a typed message never leaves the
   assert.equal(screen.messages[0].role === 'system' && screen.messages[0].reason, 'unavailable');
   assert.equal(screen.composer.props.value, '¿Cuánto gasté en comida?', 'the suggestion is kept as the draft');
   assert.equal(screen.items[0].props.children.type, 'SystemNote');
-  assert.equal(screen.composer.props.note, null, 'the caption under the composer is not repeated once the note is in the thread');
+  // The limitation is explained at the point of use: the in-thread note says the Assistant is not connected and the
+  // words stay written.
+  const unavailable = screen.messages[0];
+  assert.equal(unavailable.text, conversation.REASON_TEXT.unavailable);
+  assert.equal(es.errorText(unavailable.text), 'El Asistente todavía no está conectado en esta versión. Tu mensaje quedó escrito para cuando lo esté.');
+  assert.equal(screen.items[0].props.children.props.message.reason, 'unavailable');
+  assert.equal(screen.composer.props.note, undefined, 'no caption under the composer either');
   assert.deepEqual(view.haptics, ['impact'], 'one subtle haptic on send');
   // Typing keeps the exact text, spaces included, and the send is again refused without a request.
   screen.composer.props.onChange('  Gasté 500 en el kiosco ');
@@ -721,10 +729,15 @@ test('English: the screen\'s own words are English, the model\'s answer and the 
   const note = noted.render().messages[1];
   assert.equal(note.text, 'assistant.reasons.offline');
   assert.equal(bindLocale('en-AR').errorText(note.text), 'No connection. Your transactions didn’t change; you can retry.');
-  // The disconnected caption and the test banner.
+  // The disconnected build has no permanent caption (24UX6C); a sent message explains it in English, and the test banner.
   const quiet = harness({ client: disconnectedAssistant(), locale: 'en-AR' });
-  const caption = nodes(quiet.render().composer.props.note).find(node => node.type === 'AppText')!;
-  assert.equal(caption.props.children, 'Not connected in this version. What you type stays on your iPhone.');
+  assert.equal(quiet.render().composer.props.note, undefined);
+  quiet.render().empty.props.onPick('How much did I spend on food?');
+  await settle();
+  const unavailable = quiet.render();
+  assert.equal(unavailable.messages[0].text, conversation.REASON_TEXT.unavailable);
+  assert.equal(bindLocale('en-AR').errorText(unavailable.messages[0].text), 'The Assistant isn’t connected in this version yet. Your message stays in the text field until it is.');
+  assert.equal(unavailable.composer.props.value, 'How much did I spend on food?');
   const banner = nodes(harness({ client: fixtureAssistant(0), locale: 'en-AR' }).render().root).filter(node => node.type === 'AppText').map(node => String(node.props.children));
   assert.ok(banner.includes('Test view: sample replies, nothing is saved.'));
 });

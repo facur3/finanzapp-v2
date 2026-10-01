@@ -29,12 +29,12 @@ export const recurring: Pick<Messages, 'recurring'> = {
       pausedCaption: 'Not recorded until you resume them',
     },
     row: {
-      label: '{merchant}, {frequency}, {category}, {amount} {currency}, next {date}',
-      labelPaused: '{merchant}, {frequency}, {category}, {amount} {currency}, paused',
+      label: '{merchant}, {kind}, {frequency}, {category}, {amount} {currency}, next {date}',
+      labelPaused: '{merchant}, {kind}, {frequency}, {category}, {amount} {currency}, paused',
       hint: 'Opens the details of this recurring item',
       paused: 'Paused',
       review: 'Review',
-      labelReview: '{merchant}, {frequency}, {category}, {amount} {currency}, needs review: not recorded since {date}',
+      labelReview: '{merchant}, {kind}, {frequency}, {category}, {amount} {currency}, needs review: not recorded since {date}',
     },
     detail: {
       edit: 'Edit recurring item',

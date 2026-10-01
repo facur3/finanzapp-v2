@@ -158,8 +158,8 @@ export default function AssistantScreen() {
     </View>;
   };
 
-  const note = client.mode === 'disconnected' && !state.messages.some(message => message.role === 'system')
-    ? <AppText tertiary variant="caption" style={{ textAlign: 'center' }}>{t('assistant.disconnectedNote')}</AppText> : null;
+  // 24UX6C: no permanent «not connected» line. In a disconnected build the limitation is said where it matters: a sent
+  // message (typed or a suggestion) gets the `unavailable` note in the thread and its words go back to the composer.
 
   return <View style={{ flex: 1, backgroundColor: p.background }}>
     <Stack.Screen options={{ title: t('assistant.title'),
@@ -174,6 +174,6 @@ export default function AssistantScreen() {
       onContentSizeChange={(_width, height) => { scroll.current.content = height; follow(); }}
       contentContainerStyle={{ padding: space.xl, gap: space.l, flexGrow: 1, justifyContent: state.messages.length ? 'flex-start' : 'center' }}
       ListEmptyComponent={<Suggestions items={SUGGESTIONS.map(key => t(key))} onPick={text => void send(text)} disabled={busy} />} />
-    <AssistantComposer value={state.composer} onChange={text => dispatch({ type: 'compose', text })} onSend={() => void send(state.composer)} onStop={stop} busy={busy} note={note} />
+    <AssistantComposer value={state.composer} onChange={text => dispatch({ type: 'compose', text })} onSend={() => void send(state.composer)} onStop={stop} busy={busy} />
   </View>;
 }

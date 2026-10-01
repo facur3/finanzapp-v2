@@ -11,6 +11,7 @@ import * as i18nFormat from '../src/i18n/format.ts';
 import { bindLocale } from '../src/i18n/bind.ts';
 import type { AppLocale } from '../src/i18n/locale.ts';
 import { realModule, swipeActionsMock } from './real-module.ts';
+import * as movementAmount from '../src/ui/movement-amount.ts';
 
 // Budgets, Recurrentes, Cuentas and account detail handlers with native hosts
 // replaced by descriptors. Not a rendered iOS screen or gesture test.
@@ -58,6 +59,8 @@ function harness(file: string, params: Record<string, unknown> = {}, data: domai
   const theme = { space: { xs: 4, s: 8, m: 12, l: 16, xl: 20, xxl: 24, xxxl: 32 }, useCurrentDay: () => '2026-09-20', useReduceMotion: () => true,
     usePalette: () => ({ text: '#000', secondary: '#666', tertiary: '#999', line: '#ddd', inset: '#eee', expense: '#c00', income: '#080', warning: '#a60', primary: '#2557D6', background: '#fff', surface: '#fff' }) };
   const modules: Record<string, unknown> = {
+    // 24UX6C: the transaction presentation rule, a pure module.
+    '../src/ui/movement-amount': movementAmount, '../../src/ui/movement-amount': movementAmount,
     '../i18n/format': i18nFormat, '../src/i18n/format': i18nFormat, '../../src/i18n/format': i18nFormat, '../i18n/provider': i18nProvider, '../src/i18n/provider': i18nProvider, '../../src/i18n/provider': i18nProvider,
     react: { useEffect: (fn: () => unknown) => { fn(); }, useMemo: (fn: () => unknown) => fn(),
       useRef: (initial: unknown) => { const i = refCursor++; return refs[i] ??= { current: initial }; }, useState: (initial: unknown) => {
@@ -255,7 +258,7 @@ test('in English Recurrentes reads in English, keeps merchant and account names,
   assert.equal(sections.join(','), 'Next 30 days,Active');
   const press = nodes(root).find(node => node.type === 'PressFeedback')!;
   // 25B3: the row is the rule, not an action: VoiceOver hears what it is and that it opens details; a tap opens the detail, never the form.
-  assert.equal(press.props.accessibilityLabel, 'Alquiler, monthly, Hogar, 400.00 ARS, next Oct 1');
+  assert.equal(press.props.accessibilityLabel, 'Alquiler, expense, monthly, Hogar, 400.00 ARS, next Oct 1');
   assert.equal(press.props.accessibilityHint, 'Opens the details of this recurring item');
   press.props.onPress();
   assert.equal(JSON.stringify(english.pushed.at(-1)), JSON.stringify({ pathname: '/recurring/[id]', params: { id: 'rent' } }));
@@ -278,7 +281,7 @@ test('in English Recurrentes reads in English, keeps merchant and account names,
   const paused = harness('recurring.tsx', {}, { ...archive, recurring: [{ ...rule, active: false }] }, 'en-AR').render();
   assert.ok(texts(paused).includes('Paused'));
   // 24UX2: a paused rule keeps full-contrast ink and never announces a next date.
-  assert.equal(nodes(paused).find(node => node.type === 'PressFeedback')!.props.accessibilityLabel, 'Alquiler, monthly, Hogar, 400.00 ARS, paused');
+  assert.equal(nodes(paused).find(node => node.type === 'PressFeedback')!.props.accessibilityLabel, 'Alquiler, expense, monthly, Hogar, 400.00 ARS, paused');
   assert.equal(nodes(paused).some(node => node.type === 'View' && node.props.style?.opacity !== undefined && node.props.style.opacity < 1), false);
   assert.equal(find(paused, 'SectionTitle', undefined).props.caption, 'Not recorded until you resume them');
   assert.equal(swipeLabels(paused), 'Resume,Delete');
@@ -288,10 +291,10 @@ test('23.1C2: a Recurrentes row due today says the day inside its VoiceOver sent
   // The harness day is 2026-09-20. The amount is spoken with the language's decimal mark, whatever the region writes.
   const due = { ...archive, recurring: [{ ...rule, nextDateISO: '2026-09-20' }] };
   const cases = [
-    ['es-AR', 'Alquiler, mensual, Hogar, 400,00 ARS, próximo hoy', 'Hoy'],
-    ['es-US', 'Alquiler, mensual, Hogar, 400,00 ARS, próximo hoy', 'Hoy'],
-    ['en-AR', 'Alquiler, monthly, Hogar, 400.00 ARS, next today', 'Today'],
-    ['en-US', 'Alquiler, monthly, Hogar, 400.00 ARS, next today', 'Today'],
+    ['es-AR', 'Alquiler, gasto, mensual, Hogar, 400,00 ARS, próximo hoy', 'Hoy'],
+    ['es-US', 'Alquiler, gasto, mensual, Hogar, 400,00 ARS, próximo hoy', 'Hoy'],
+    ['en-AR', 'Alquiler, expense, monthly, Hogar, 400.00 ARS, next today', 'Today'],
+    ['en-US', 'Alquiler, expense, monthly, Hogar, 400.00 ARS, next today', 'Today'],
   ] as const;
   for (const [locale, label, caption] of cases) {
     const root = harness('recurring.tsx', {}, due, locale).render();
@@ -300,7 +303,7 @@ test('23.1C2: a Recurrentes row due today says the day inside its VoiceOver sent
   }
   // A day that is not today or yesterday reads the same inline and on its own.
   const later = nodes(harness('recurring.tsx', {}, archive, 'es-AR').render()).find(node => node.type === 'PressFeedback')!;
-  assert.equal(later.props.accessibilityLabel, 'Alquiler, mensual, Hogar, 400,00 ARS, próximo 1 oct');
+  assert.equal(later.props.accessibilityLabel, 'Alquiler, gasto, mensual, Hogar, 400,00 ARS, próximo 1 oct');
 });
 
 test('in English Presupuestos names the month, the states and the VoiceOver sentences in English; category names are untouched', () => {
@@ -385,6 +388,30 @@ test('24B3: Presupuestos with three currencies switches among the currencies pre
 // ---- Producto 24UX4: pause, resume and delete from the Recurrentes list -----------------------
 const recorded = (dateISO: string): domain.Entry => ({ id: domain.recurringEntryId(rule.id, dateISO), accountId: cash.id, kind: 'expense', amountMinor: 40000,
   merchant: 'Alquiler', category: 'Hogar', dateISO, createdAt });
+
+test('24UX6C: a rule row shows its amount as stored: no sign on an expense, «+» on an income; the stored rule is untouched', () => {
+  const rowMoney = (root: Node, id: string) => {
+    const row = nodes(root).find(node => typeof node.type === 'function' && node.props.rule?.id === id)!;
+    assert.ok(row, 'the row of ' + id);
+    return nodes(row).find(node => node.type === 'Money')!.props;
+  };
+  const salary: domain.RecurringRule = { ...rule, id: 'pay', kind: 'income', merchant: 'Sueldo', category: 'Sueldo', amountMinor: 150000 };
+  const before = JSON.stringify([rule, salary]);
+  for (const locale of ['es-AR', 'en-AR'] as AppLocale[]) {
+    const root = harness('recurring.tsx', {}, { ...archive, recurring: [rule, salary] }, locale).render();
+    const rent = rowMoney(root, 'rent');
+    assert.equal(JSON.stringify([rent.minor, rent.currency, rent.signed, rent.tone]), JSON.stringify([40000, 'ARS', false, 'expense']), locale + ': the expense as stored, unsigned, in ink');
+    const pay = rowMoney(root, 'pay');
+    assert.equal(JSON.stringify([pay.minor, pay.currency, pay.signed, pay.tone]), JSON.stringify([150000, 'ARS', true, 'income']), locale + ': the income with its «+»');
+    // Without the minus the kind must still reach VoiceOver: the row's sentence names it, right after the merchant.
+    const label = (id: string) => nodes(nodes(root).find(node => typeof node.type === 'function' && node.props.rule?.id === id)!)
+      .find(node => node.type === 'PressFeedback')!.props.accessibilityLabel as string;
+    const [expenseWord, incomeWord] = locale === 'es-AR' ? ['gasto', 'ingreso'] : ['expense', 'income'];
+    assert.ok(label('rent').startsWith('Alquiler, ' + expenseWord + ', '), locale + ': ' + label('rent'));
+    assert.ok(label('pay').startsWith('Sueldo, ' + incomeWord + ', '), locale + ': ' + label('pay'));
+  }
+  assert.equal(JSON.stringify([rule, salary]), before, 'rendering never changes a stored rule');
+});
 
 test('24UX4: each rule row swipes to Pausar/Reanudar and Eliminar, the same actions VoiceOver lists on the row', () => {
   const root = harness('recurring.tsx').render();
@@ -506,7 +533,7 @@ const settle = () => new Promise(resolve => setImmediate(resolve));
 const detailRows = (root: Node) => nodes(root).filter(node => node.type === 'DetailRow').map(node => node.props.label + '=' + node.props.value).join(',');
 const buttons = (root: Node) => nodes(root).filter(node => node.type === 'ActionButton').map(node => node.props.label).join(',');
 
-test('25B3: a rule\'s detail is its mark, its signed amount and its state, then only the facts it stores, Registrados and the row\'s own lifecycle; Editar in the header opens the form', () => {
+test('25B3: a rule\'s detail is its mark, its amount as stored (24UX6C: no sign on an expense) and its state, then only the facts it stores, Registrados and the row\'s own lifecycle; Editar in the header opens the form', () => {
   const view = harness('recurring/[id].tsx', { id: 'rent' });
   const root = view.render();
   const screen = find(root, 'Stack.Screen').props.options;
@@ -518,8 +545,9 @@ test('25B3: a rule\'s detail is its mark, its signed amount and its state, then 
   const badge = find(root, 'MerchantBadge');
   assert.equal(JSON.stringify([badge.props.merchant, badge.props.category, badge.props.kind, badge.props.large]), JSON.stringify(['Alquiler', 'Hogar', 'expense', true]));
   const hero = find(root, 'Money');
-  assert.equal(JSON.stringify([hero.props.minor, hero.props.currency, hero.props.large, hero.props.signed, hero.props.tone, hero.props.align]), JSON.stringify([-40000, 'ARS', true, true, 'expense', 'center']),
-    'the amount reads as its row does: signed, in the expense tone');
+  assert.equal(JSON.stringify([hero.props.minor, hero.props.currency, hero.props.large, hero.props.signed, hero.props.tone, hero.props.align]), JSON.stringify([40000, 'ARS', true, false, 'expense', 'center']),
+    'the amount reads as its row does (24UX6C): the stored magnitude, no minus, in the expense (ink) tone');
+  assert.equal(rule.amountMinor, 40000, 'the stored rule is unchanged by the render');
   const shown = texts(root);
   assert.ok(shown.includes('Gasto recurrente · ARS'), shown.join(' | '));
   assert.ok(shown.includes('Activo'));
@@ -640,10 +668,10 @@ test('25B3: in English the detail reads in English and keeps the merchant, categ
   cardRow.props.onPress();
   assert.equal(JSON.stringify(cardView.pushed.at(-1)), JSON.stringify({ pathname: '/card/[id]', params: { id: 'card' } }));
   assert.equal(nodes(harness('recurring/[id].tsx', { id: 'sub' }, { ...archive, recurring: [onCard] }).render()).find(node => node.type === 'DetailRow' && node.props.label === 'Tarjeta')!.props.value, 'Visa');
-  // An income rule: the amount is positive in the income tone, under «Ingreso recurrente».
+  // An income rule: the amount is positive with its «+» in the income tone, under «Ingreso recurrente».
   const salary: domain.RecurringRule = { ...rule, id: 'pay', kind: 'income', merchant: 'Sueldo', category: 'Sueldo', amountMinor: 150000 };
   const income = harness('recurring/[id].tsx', { id: 'pay' }, { ...archive, recurring: [salary] }).render();
-  assert.equal(JSON.stringify([find(income, 'Money').props.minor, find(income, 'Money').props.tone]), JSON.stringify([150000, 'income']));
+  assert.equal(JSON.stringify([find(income, 'Money').props.minor, find(income, 'Money').props.signed, find(income, 'Money').props.tone]), JSON.stringify([150000, true, 'income']));
   assert.ok(texts(income).includes('Ingreso recurrente · ARS'));
   assert.equal(find(income, 'MerchantBadge').props.tone, 'income');
 });

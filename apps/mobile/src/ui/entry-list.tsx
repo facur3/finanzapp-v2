@@ -27,8 +27,9 @@ export function EntryList({ entries, transfers, accounts, accountId, header, emp
     ListFooterComponent={footer ? <View style={{ paddingTop: 32 }}>{footer}</View> : null}
     renderSectionHeader={({ section }) => {
       const net = context ? null : dayNetMinor(section.data.filter(item => item.type === 'entry').map(item => item.value as Entry), accounts);
-      return <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', gap: 12, paddingTop: 20, paddingBottom: 8, paddingHorizontal: 4 }}>
-        <AppText accessibilityRole="header" secondary variant="footnote" style={{ fontWeight: '600', flexShrink: 1 }}>
+      // 24UX6C: the day reads as the section's heading (ink, subhead weight); its net stays secondary and keeps its sign.
+      return <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', gap: 12, paddingTop: 24, paddingBottom: 8, paddingHorizontal: 4 }}>
+        <AppText accessibilityRole="header" variant="subhead" style={{ fontWeight: '600', flexShrink: 1 }}>
           {activityDateLabel(section.dateISO, day, locale)}
         </AppText>
         {net && net.minor !== 0 && <AppText secondary variant="footnote" style={{ fontVariant: ['tabular-nums'] }}
