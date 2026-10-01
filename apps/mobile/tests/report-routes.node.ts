@@ -68,7 +68,12 @@ function routeHarness(file: string, params: Record<string, unknown>, data = snap
   const modules: Record<string, unknown> = {
     '../i18n/format': i18nFormat, '../src/i18n/format': i18nFormat, '../../src/i18n/format': i18nFormat, '../i18n/provider': i18nProvider, '../src/i18n/provider': i18nProvider, '../../src/i18n/provider': i18nProvider,
     // Effects run in place, once per change of their dependencies (a route parameter arriving), like React's after commit.
-    react: { useMemo: (fn: () => unknown) => fn(), useState: (initial?: unknown) => {
+    react: { useMemo: (fn: () => unknown) => fn(), useRef: (initial?: unknown) => {
+      // Refs persist by call order, like React's; a test hands the list a fake `scrollToOffset` through `current`.
+      const index = cursor++;
+      if (!(index in state)) state[index] = { current: initial };
+      return state[index];
+    }, useState: (initial?: unknown) => {
       const index = cursor++;
       if (!(index in state)) state[index] = initial;
       return [state[index], (value: unknown) => { state[index] = value; }];
@@ -97,7 +102,7 @@ function routeHarness(file: string, params: Record<string, unknown>, data = snap
     '../src/ui/category-hues': { useCategoryColor: () => '#3E6FB0', useCategoryLabel: (s: string) => s, useCategoryDefinitions: () => [], useCategoryLook: (s: string) => ({ label: s, storedLabel: s, key: String(s).toLowerCase(), hex: '#3E6FB0', glyph: 'pricetag-outline' }), useCategoryLookOf: () => (s: string) => ({ label: s, storedLabel: s, key: String(s).toLowerCase(), hex: '#3E6FB0', glyph: 'pricetag-outline' }), useAccountLook: () => ({ icon: 'wallet', color: 'cobalt', glyph: 'wallet-outline', hex: '#2557D6' }), useAccountNameOf: () => (account: any) => account.name, useAccountLookOf: () => () => ({ icon: 'wallet', color: 'cobalt', glyph: 'wallet-outline', hex: '#2557D6' }) },
     '../src/ui/quick-actions': { QuickActions: 'QuickActions', AssistantEntry: 'AssistantEntry' },
     '../src/ui/motion': { ValueTransition: 'ValueTransition', Reflow: 'Reflow', selectionHaptic: () => {}, impactHaptic: () => {}, timing: (kind: string, reduced: boolean) => ({ duration: reduced ? 0 : 260 }) },
-    '../src/ui/theme': { useCurrentDay: () => '2026-09-12', space: { xs: 4, s: 8, m: 12, l: 16, xl: 20, xxl: 24, xxxl: 32 },
+    '../src/ui/theme': { useCurrentDay: () => '2026-09-12', useReduceMotion: () => false, space: { xs: 4, s: 8, m: 12, l: 16, xl: 20, xxl: 24, xxxl: 32 },
       usePalette: () => ({ background: '#F5F6F8', surface: '#FFFFFF', primary: '#2557D6', primaryFill: '#2557D6', onPrimary: '#fff', text: '#000', secondary: '#666', tertiary: '#999', line: '#ddd', inset: '#eee', expense: '#c00', warning: '#a60', isDark: false }) },
   };
   // Tab routes live one level deeper than stack routes.
@@ -215,15 +220,19 @@ test('comparison never presents an invented change when history is absent', () =
 });
 
 test('reports show a six-month trend that selects months, a donut for categories and factual footers', () => {
-  const data = { ...snapshot, entries: [...snapshot.entries, { ...snapshot.entries[0], id: 'now', dateISO: '2026-09-10', amountMinor: 400 }] };
+  const data = { ...snapshot, entries: [...snapshot.entries, { ...snapshot.entries[0], id: 'now', dateISO: '2026-09-10', amountMinor: 400 },
+    { ...snapshot.entries[0], id: 'july', dateISO: '2026-07-20', amountMinor: 50 }] };
   const view = routeHarness('(tabs)/reports.tsx', { currency: 'ARS' }, data);
   let root = view.render();
+  const scrolls: unknown[] = [];
+  root.props.ref.current = { scrollToOffset: (options: unknown) => scrolls.push(options) };
   const bars = find(root, 'MonthBars');
   assert.deepEqual(bars.props.points.map((point: { monthISO: string; amountMinor: number }) => [point.monthISO, point.amountMinor]).slice(-2), [['2026-08', 606], ['2026-09', 400]]);
   assert.equal(bars.props.selected, '2026-09');
   assert.equal(find(root, 'DonutChart').props.total, 400);
   assert.equal(find(root, 'DonutChart').props.slices[0].key, 'salud');
   bars.props.onSelect('2026-08');
+  assert.equal(JSON.stringify(scrolls), JSON.stringify([{ offset: 0, animated: true }]), '24UX6B: the bars sit under the analysis, so opening a month brings its title and total into view');
   root = view.render();
   assert.equal(find(root, 'Money').props.minor, 606);
   assert.equal(find(root, 'MonthBars').props.selected, '2026-08');
@@ -575,4 +584,99 @@ test('25B2 review: a past month keeps the movements of a deleted USD account: co
   const missing = routeHarness('(tabs)/reports.tsx', { month: '2026-08' }, data, { display: consolidated, book: domain.rateBook([]) }).render();
   assert.equal(nodes(missing).some(n => n.type === 'Money'), false);
   assert.equal(JSON.stringify(find(missing, 'CurrencyParts').props.parts), JSON.stringify([{ currency: 'ARS', minor: 606 }, { currency: 'USD', minor: 999 }]));
+});
+
+// Producto 24UX6B: the Forest reading order of Reportes. Scope and period, the month's total, the month's analysis
+// (categories first, or day by day), then the six-month history, then the details. A descriptor-level guard of the order
+// and the copy; how the screen reads on an iPhone (VoiceOver order, Dynamic Type, scrolling) stays a device item.
+const withSeptember = { ...snapshot, entries: [...snapshot.entries, { ...snapshot.entries[0], id: 'now', dateISO: '2026-09-10', amountMinor: 400 }] };
+const sectionTitles = (value: any) => nodes(value).filter(n => n.type === 'SectionTitle').map(n => [n.props.children].flat().join(''));
+
+test('24UX6B: the total, then the analysis with categories first, then the history, then the details', () => {
+  const root = routeHarness('(tabs)/reports.tsx', { currency: 'ARS' }, withSeptember).render();
+  const header = nodes(root.props.ListHeaderComponent);
+  const at = (predicate: (n: Node) => boolean) => header.findIndex(predicate);
+  const period = at(n => n.type === 'IconButton' && n.props.label === 'Mes anterior');
+  const total = at(n => n.type === 'Money');
+  const analysis = at(n => n.type === 'Choices');
+  const donut = at(n => n.type === 'DonutChart');
+  const byCategory = at(n => n.type === 'SectionTitle' && n.props.children === 'Por categoría');
+  assert.ok(period >= 0 && period < total && total < analysis && analysis < donut && donut < byCategory,
+    'period → total → Categorías | Día a día → donut → «Por categoría»: ' + [period, total, analysis, donut, byCategory].join(','));
+  assert.equal(header.some(n => n.type === 'MonthBars'), false, 'the six months are no longer the first chart');
+  assert.equal(find(root, 'Choices').props.value, 'categories', 'categories are the default reading');
+  assert.equal(root.props.data.length, 1, 'every category of the month is a row under the donut');
+  // The footer opens with the history, before the lower-priority details.
+  const footer = root.props.ListFooterComponent;
+  assert.deepEqual(sectionTitles(footer), ['Evolución', 'Dónde más gastaste', 'Para tener en cuenta']);
+  assert.ok(nodes(footer).some(n => n.type === 'MonthBars'), 'the history sits under the analysis');
+  assert.equal(nodes(footer).find(n => n.type === 'SectionTitle' && n.props.children === 'Evolución')!.props.caption, 'Tocá un mes para verlo');
+  const lastBlock = nodes(footer).filter(n => n.type === 'DetailRow').map(n => n.props.label);
+  assert.deepEqual(lastBlock, ['Ingresos registrados', 'Flujo neto'], 'income and net flow stay, last');
+  // With a budget of the month, the history still opens the footer, and the budgets follow it.
+  const budget: domain.MonthlyBudget = { id: 'b', scope: 'total', currency: 'ARS', monthISO: '2026-09', amountMinor: 1000, active: true, createdAt, revision: 0, updatedAt: createdAt };
+  const withBudget = routeHarness('(tabs)/reports.tsx', { currency: 'ARS' }, withSeptember, { archive: { budgets: [budget] } }).render();
+  assert.deepEqual(sectionTitles(withBudget.props.ListFooterComponent).slice(0, 2), ['Evolución', 'Presupuestos']);
+});
+
+test('24UX6B: the day-by-day state keeps the order: no donut, «Por día» with its note over the day rows', () => {
+  const view = routeHarness('(tabs)/reports.tsx', { currency: 'ARS', month: '2026-08' });
+  find(view.render(), 'Choices').props.onChange('days');
+  const root = view.render();
+  assert.equal(nodes(root).some(n => n.type === 'DonutChart'), false);
+  const title = nodes(root.props.ListHeaderComponent).find(n => n.type === 'SectionTitle')!;
+  assert.deepEqual([title.props.children, title.props.caption], ['Por día', 'Solo días con gastos registrados.']);
+  assert.equal(root.props.data.length, 2, 'the two days of August with expenses');
+  assert.equal(sectionTitles(root.props.ListFooterComponent)[0], 'Evolución', 'the history stays under the analysis in either state');
+});
+
+test('24UX6B: an empty month is an intentional state in both views: one card, no orphan headings', () => {
+  const view = routeHarness('(tabs)/reports.tsx', { currency: 'ARS' });
+  let root = view.render();
+  assert.equal(find(root, 'Money').props.minor, 0);
+  assert.equal(find(root, 'Money').props.color, undefined, 'the zero keeps the total\'s own inks (re-tinting it dropped its cents below 3:1)');
+  assert.equal(sectionTitles(root.props.ListHeaderComponent).length, 0, 'no «Por categoría» over nothing');
+  let empty = root.props.ListEmptyComponent;
+  assert.deepEqual([empty.props.title, empty.props.icon, empty.props.detail],
+    ['Sin gastos en este período', 'pie-chart-outline', 'Los gastos que registres en esta moneda aparecen acá, por categoría.']);
+  find(root, 'Choices').props.onChange('days');
+  root = view.render();
+  empty = root.props.ListEmptyComponent;
+  assert.deepEqual([empty.props.icon, empty.props.detail], ['calendar-outline', 'Cada día con gastos en esta moneda aparece acá, con su total.'],
+    'the day view says what it would list, not «por categoría»');
+});
+
+test('24UX6B: when the shown month is the only one of its six with spending the history is one quiet line, never a lone bar', () => {
+  const onlyNow = { ...snapshot, entries: [{ ...snapshot.entries[0], id: 'now', dateISO: '2026-09-10', amountMinor: 400 }] };
+  const root = routeHarness('(tabs)/reports.tsx', { currency: 'ARS' }, onlyNow).render();
+  assert.equal(nodes(root).some(n => n.type === 'MonthBars'), false);
+  assert.deepEqual(sectionTitles(root.props.ListFooterComponent).slice(0, 1), ['Evolución']);
+  assert.ok(texts(root.props.ListFooterComponent).includes('Con más meses de gastos registrados vas a ver la evolución acá.'));
+  // A past month alone in its own window (March–August holds only August) gets the same line: its six bars end at it,
+  // so they never led forward; the arrows and «Este mes» do.
+  const pastAlone = routeHarness('(tabs)/reports.tsx', { currency: 'ARS', month: '2026-08' }, withSeptember).render();
+  assert.equal(nodes(pastAlone).some(n => n.type === 'MonthBars'), false);
+  assert.ok(texts(pastAlone.props.ListFooterComponent).includes('Con más meses de gastos registrados vas a ver la evolución acá.'));
+  // An empty current month with August recorded keeps the bars: another month is there to open.
+  assert.ok(nodes(routeHarness('(tabs)/reports.tsx', { currency: 'ARS' }).render()).some(n => n.type === 'MonthBars'));
+  // No month of the six with spending: neither bars nor the note.
+  const none = routeHarness('(tabs)/reports.tsx', { currency: 'ARS' }, { ...snapshot, entries: [] }).render();
+  assert.equal(nodes(none).some(n => n.type === 'MonthBars'), false);
+  assert.equal(texts(none).some(text => text.includes('evolución acá')), false);
+});
+
+test('24UX6B: VoiceOver hears the line under the total once, in spoken numbers, with the change against last month', () => {
+  const root = routeHarness('(tabs)/reports.tsx', { currency: 'ARS' }, withSeptember).render();
+  const line = nodes(root.props.ListHeaderComponent).find(n => n.type === 'View' && n.props.accessible === true && typeof n.props.accessibilityLabel === 'string')!;
+  const es = bindLocale('es-AR');
+  const average = domain.dailyAverageMinor(400, { currency: 'ARS', startISO: '2026-09-01', endISO: '2026-09-12' });
+  // September 1–12 against August 1–12 (matching days, ARS): 400 against 202 + 303 = 505, 105 less.
+  const change = es.t('reports.delta.less', { percent: es.spokenPercent(105 / 505), reference: es.t('reports.delta.matchingDays') });
+  assert.equal(line.props.accessibilityLabel, es.t('reports.perDay', { amount: es.spokenMoney(average, 'ARS') }) + ', ' + change);
+  assert.doesNotMatch(line.props.accessibilityLabel, /\$/, 'no currency symbol read aloud');
+  // English in Argentina shows «20,8%» but speaks «20.8%»: the line must carry the spoken one.
+  const english = routeHarness('(tabs)/reports.tsx', { currency: 'ARS' }, withSeptember, { locale: 'en-AR' }).render();
+  const spokenLine = nodes(english.props.ListHeaderComponent).find(n => n.type === 'View' && n.props.accessible === true && typeof n.props.accessibilityLabel === 'string')!;
+  assert.match(spokenLine.props.accessibilityLabel, /20\.8%/);
+  assert.doesNotMatch(spokenLine.props.accessibilityLabel, /20,8/, 'never the visible, region-formatted percent');
 });

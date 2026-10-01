@@ -82,7 +82,7 @@ function chartsModule(i18n: ReturnType<typeof bindLocale>) {
     './components': { AppText: 'AppText', Money: 'Money', PressFeedback: 'PressFeedback' },
     './category-color': { categoryColor: () => '#111', othersColor: () => '#ccc' },
     './motion': { ValueTransition: 'ValueTransition', duration: { state: 200, data: 260, reveal: 480 }, timing: () => ({ duration: 0 }) },
-    './theme': { useReduceMotion: () => true, usePalette: () => ({ inset: '#eee', text: '#000', secondary: '#666', primary: '#2557D6' }) },
+    './theme': { useReduceMotion: () => true, usePalette: () => ({ inset: '#eee', text: '#000', secondary: '#666', tertiary: '#586961', primary: '#2557D6', isDark: false }) },
   };
   const module = { exports: {} as Record<string, (props: any) => any> };
   runInNewContext(code, { module, exports: module.exports, require: (name: string) => {
@@ -170,4 +170,41 @@ test('24B3: a category row speaks its amount with the currency\'s own decimals a
   const en = rows('en-US');
   assert.equal(en.CategoryLegendRow({ category, totalMinor: 2469134, currency: 'KWD', onPress: () => {} }).props.accessibilityLabel, 'Comida, 1234.567 KWD, 50% of the month’s spending, 2 expenses');
   assert.equal(en.CategorySpendingRow({ category: { ...category, amountMinor: 123456 }, totalMinor: 246912, currency: 'ARS', onPress: () => {} }).props.accessibilityLabel, 'Comida, 1234.56 ARS, 50% of the month’s spending, 2 expenses', 'ARS unchanged');
+});
+
+// 24UX6B: the months that are not shown read as marks: 3:1 or more against the chart's surface in both themes (the inset
+// grey they had held 1.2:1), while the shown month's brand bar stays the one strong mark.
+function luminance(hex: string): number {
+  const channel = (value: number) => { const c = value / 255; return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; };
+  return 0.2126 * channel(parseInt(hex.slice(1, 3), 16)) + 0.7152 * channel(parseInt(hex.slice(3, 5), 16)) + 0.0722 * channel(parseInt(hex.slice(5, 7), 16));
+}
+const ratio = (a: string, b: string) => { const [x, y] = [luminance(a), luminance(b)].sort((m, n) => n - m); return (x + 0.05) / (y + 0.05); };
+/** An #RRGGBBAA colour composited over an opaque ground. */
+const over = (color: string, ground: string) => {
+  const alpha = parseInt(color.slice(7, 9), 16) / 255;
+  const channel = (hex: string, i: number) => parseInt(hex.slice(i, i + 2), 16);
+  return '#' + [1, 3, 5].map(i => Math.round(channel(color, i) * alpha + channel(ground, i) * (1 - alpha)).toString(16).padStart(2, '0')).join('');
+};
+
+test('24UX6B: idle month bars hold 3:1 on their surface in light and dark; the shown month keeps the brand', async () => {
+  const { lightPalette, darkPalette } = await import('../src/ui/palette.ts');
+  const charts = chartsModule(bindLocale('es-AR'));
+  for (const [base, isDark] of [[lightPalette, false], [darkPalette, true]] as const) {
+    const p = { ...base, isDark };
+    const idle = charts.idleBarColor(p as never) as unknown as string;
+    assert.match(idle, /^#[0-9A-F]{8}$/i, 'the tertiary ink with an alpha: no new colour');
+    assert.equal(idle.slice(0, 7), p.tertiary);
+    const shown = over(idle, p.surface);
+    assert.ok(ratio(shown, p.surface) >= 3, `idle bar on the surface: ${ratio(shown, p.surface).toFixed(2)}`);
+    assert.ok(ratio(shown, p.surface) < ratio(p.primary, p.surface), 'the shown month stays the strongest mark');
+  }
+  const points = [{ monthISO: '2026-08', amountMinor: 100, partial: false }, { monthISO: '2026-09', amountMinor: 50, partial: true }];
+  const chart = charts.MonthBars({ points, selected: '2026-09', onSelect: () => {}, currency: 'ARS' });
+  const bars = flat(chart).filter(node => typeof node.type === 'function').map(node => node.type(node.props));
+  const fills = bars.map(bar => bar.props.children.props.style[0].backgroundColor);
+  assert.deepEqual(fills, ['#586961B3', '#2557D6'], 'the other month in the idle ink, the shown one in the brand');
+  // The month in progress keeps its outline when it is not the shown one: ink on the idle fill (the secondary edge vanished on it).
+  const past = charts.MonthBars({ points, selected: '2026-08', onSelect: () => {}, currency: 'ARS' });
+  const outline = flat(past).filter(node => typeof node.type === 'function').map(node => node.type(node.props))[1].props.children.props.style[0];
+  assert.deepEqual([outline.backgroundColor, outline.borderColor, outline.borderWidth > 0], ['#586961B3', '#000', true]);
 });

@@ -145,9 +145,13 @@ que leen son ahora los de Forest. Su restyle por pantalla queda para 24UX6B–6D
 - **Cuentas.** Solo cuentas de dinero, agrupadas por moneda con el total de cada una;
   el detalle muestra saldo, gastos e ingresos del mes, Gasto / Ingreso / Transferir y
   sus movimientos. Tarjetas y deudas viven en su pestaña.
-- **Reportes.** Título del mes con flechas, total registrado, promedio por día y
-  variación contra los mismos días del mes anterior; barras de seis meses en una
-  sola escala (el mes en curso, delineado); dona por categoría en tonos de categoría
+- **Reportes (desde 24UX6B; ver «Producto 24UX6B — jerarquía de Reportes»).** Alcance y mes; el total con su línea
+  de promedio y variación; Categorías | Día a día con la dona y «Por categoría» o «Por día»; debajo, «Evolución» con
+  los seis meses (o una nota con un solo mes); después presupuestos, comercios, hechos, ingresos y flujo neto, y la
+  comparación. Las barras inactivas en la tinta terciaria al 70 % / 60 % (≥ 3:1), ya no en el gris `inset`.
+- **Reportes (hasta 24UX6A; el orden y el grafito de las barras quedaron reemplazados por 24UX6B).** Título del mes
+  con flechas, total registrado, promedio por día y variación contra los mismos días del mes anterior; barras de seis
+  meses en una sola escala (el mes en curso, delineado); dona por categoría en tonos de categoría
   (cinco con nombre, el resto como Otras en gris) y leyenda con importe y participación; Día a
   día; presupuestos con porcentaje; comercios principales; hechos (no consejos);
   ingresos, flujo neto y comparación. Sin "ahorro": no tenemos su definición.
@@ -598,7 +602,9 @@ Las reglas de «Motion y accesibilidad» siguen vigentes: la curva de `src/ui/mo
 
 ### Lo que sigue en el carril UX (aprobado, sin implementar)
 
-- **24UX6B Reportes.** Se reordena y se viste en Forest sin quitar presupuestos, hechos ni flujo neto. La dona elegible
+- **24UX6B Reportes** *(el reordenamiento está implementado: ver «Producto 24UX6B — jerarquía de Reportes»; la dona
+  elegible, el gráfico Día a día y la cabecera fija siguen pendientes)*. Se reordena y se viste en Forest sin quitar
+  presupuestos, hechos ni flujo neto. La dona elegible
   es solo selección visual dentro del reporte; se permiten el gráfico Día a día y una cabecera fija sólida. Las barras
   de evolución conservan la navegación por mes actual (sin una segunda selección solo para comparar); «Otras» sigue
   agrupando por los primeros N (no se adopta la regla del 3 %); sin ruta inventada de detalle por comercio.
@@ -697,6 +703,102 @@ pestaña activa; sin violeta; menos superficies. El contrato y las pruebas está
   reservar su alto, rompería el cálculo del compositor del Asistente y el teclado, y taparía la última fila con texto
   grande. La cápsula queda en el flujo: cada pantalla termina arriba de ella, y el compositor, el teclado y las áreas
   seguras funcionan como antes. No hay «+» flotante adicional.
+
+## Producto 24UX6B — jerarquía de Reportes
+
+Segunda entrega del carril UX de la decisión 005, en su rama desde master ef24bb6 (la PR #70, 24UX6A, ya mergeada).
+Implementado en código; **la revisión en iPhone está pendiente** (no hubo build de EAS) y su lista está en
+docs/mobile-device-checklist.md («Producto 24UX6B»). Solo cambian `app/(tabs)/reports.tsx`, el color de las barras
+inactivas en `src/ui/charts.tsx` y sus textos. No cambió nada de contabilidad, cotizaciones, unidades menores,
+presupuestos, el dominio, el esquema, las copias, las rutas, la navegación ni lo nativo; la mitigación de pantallas
+negras del dock (sin fade/detach/freeze, sin fundido entre pestañas) quedó intacta. Inicio sigue mostrando solo el mes
+en curso: los meses pasados viven en Reportes.
+
+### El orden de lectura
+
+Antes (hasta 24UX6A): el total, las barras de «Últimos seis meses» como primer gráfico, después Categorías | Día a
+día, la dona y las filas. La historia tapaba el análisis del mes que la persona eligió. Ahora, de arriba abajo:
+
+1. **Alcance y período.** El chip de moneda de visualización (solo con más de una moneda) y el mes con sus flechas y
+   «Este mes». Sin cambios.
+2. **El total del mes.** El eyebrow «GASTADO · ARS» con el botón de información de la metodología, el importe y una sola
+   línea «{promedio} por día · {variación}».
+3. **El análisis del mes.** El segmentado Categorías | Día a día (Categorías por defecto). En Categorías, la dona (sin
+   cambios: «Otras» sigue agrupando por los primeros N, sin la regla del 3 %, sin selección de porciones) y debajo el
+   encabezado **«Por categoría»** sobre las filas, que siguen abriendo el detalle de la categoría. En Día a día no hay
+   dona: el encabezado **«Por día»** con la nota de siempre, «Solo días con gastos registrados.», sobre las filas de
+   cada día, que siguen abriendo su detalle.
+4. **La historia, debajo del análisis.** La sección **«Evolución»** (leyenda «Tocá un mes para verlo») con la tarjeta
+   «Últimos seis meses». Las barras conservan su semántica: tocar una abre ese mes; no hay una segunda selección para
+   comparar. Como ahora están debajo del análisis, al abrir un mes la lista vuelve arriba, a su título y su total
+   (animado, o directo con Reduce Motion).
+5. **Los detalles**, en el orden de antes: presupuestos (en su moneda, del libro real), «Dónde más gastaste» (sin
+   toque), «Para tener en cuenta», ingresos y flujo neto, «Comparar con el mes anterior».
+
+Cambiar entre Categorías y Día a día solo cambia el bloque 3; la historia y los detalles quedan debajo, en su lugar.
+
+### La historia con un solo mes
+
+Seis barras con una sola llena (un libro nuevo) no cuentan una evolución. Por eso:
+
+- **Cuando el mes mostrado es el único de sus seis con gastos** (las seis barras siempre terminan en el mes mostrado),
+  «Evolución» muestra en lugar de las barras una tarjeta tranquila con un glifo de barras: «Con más meses de gastos
+  registrados vas a ver la evolución acá.» Hacia meses siguientes llevan las flechas y «Este mes», no las barras.
+- **Sin barras ni nota** cuando ningún mes de los seis tiene gastos, o cuando falta una cotización (la regla de 24C1,
+  sin cambios).
+
+### Estados vacíos
+
+Un mes sin gastos muestra el total cero en sus tintas de siempre (atenuarlo dejaba los centavos por debajo de 3:1), ningún encabezado huérfano («Por categoría» o «Por día» existen solo
+con filas) y una sola tarjeta `EmptyState`:
+
+- Categorías: «Sin gastos en este período» / «Los gastos que registres en esta moneda aparecen acá, por categoría.»,
+  con el glifo de dona.
+- Día a día: el mismo título con «Cada día con gastos en esta moneda aparece acá, con su total.», con el glifo de
+  calendario.
+
+Fuera de rango y sin cotización: los estados de siempre.
+
+### VoiceOver y Dynamic Type
+
+- **La línea del total es un solo elemento.** Antes VoiceOver la leía por partes (el promedio, el «·», la variación),
+  con el símbolo y los dígitos agrupados de la región. Ahora la línea es un elemento cuya etiqueta usa
+  números hablados: `spokenMoney` para el promedio y `spokenPercent` para la variación, en el idioma de la app; sin
+  símbolo de moneda ni separadores leídos en voz alta. A la vista, el texto no cambió.
+- Orden de VoiceOver: chip, mes y flechas, el total, la línea, el segmentado, la dona, las filas, Evolución, y después
+  los detalles; es el mismo orden que la vista.
+- «Por categoría», «Por día» y «Evolución» son `SectionTitle` (rol de encabezado, navegables con el rotor, como el
+  resto de la app). La línea del total envuelve en lugar de cortarse; las filas son las mismas de antes.
+
+### Contraste de las barras
+
+Las barras de los meses no mostrados usaban el gris `inset`: 1,2:1 sobre su superficie en claro y 1,1:1 en oscuro, por
+debajo del 3:1 que necesita la marca de un gráfico. Ahora `idleBarColor(p)` es la tinta terciaria al 70 % en claro y al
+60 % en oscuro: 3,1:1 y 3,0:1 sobre `surface`, con prueba (≥ 3:1 en ambos temas). La barra del mes mostrado sigue siendo
+la marca (`primary`), la única señal fuerte; el mes en curso sigue delineado, en tinta sobre una barra inactiva (el
+borde secundario se perdía sobre el relleno nuevo) y en la tinta secundaria sobre la barra mostrada.
+
+### El rojo, solo para alertas
+
+En Reportes `expense` (el ladrillo) aparece solo en un presupuesto excedido y en su hecho de «Para tener en cuenta».
+El gasto común (el total, las filas, las barras, la dona) es tinta o el tono de su categoría. Se verificó en el código;
+no hizo falta cambiar nada.
+
+### Motion
+
+La dona se revela en sentido horario en 480 ms cada vez que aparece (al abrir Reportes y al volver a Categorías desde
+Día a día; no es nuevo); un cambio
+de mes o de moneda es un único fundido, del total (`ValueTransition`) y de la dona con sus porciones ya finales; las
+barras interpolan en 260 ms (`data`), nunca desde cero. Lo único nuevo: tocar una barra desplaza la lista hacia
+arriba, animado. Con Reduce Motion el desplazamiento es directo, la dona aparece terminada, las barras llegan
+sin interpolar y queda solo el fundido. Las pestañas siguen cambiando al instante.
+
+### Lo que queda para después (aprobado para 24UX6B, sin implementar)
+
+La selección de porciones dentro de la dona (solo visual, dentro del reporte), el gráfico de barras de Día a día y una
+cabecera fija sólida. Siguen permitidos para una pasada siguiente; no hay ruta de detalle por comercio. El orden
+vinculante del roadmap no cambia: la próxima entrega de producto es 24T3; 24UX6C (Movimientos y Más) y 24UX6D
+(Tarjetas) siguen a 24UX6B en el carril UX, y su lugar frente a 24T3 lo decide el dueño (ver `docs/mobile-roadmap.md`).
 
 ## Producto 24T2 — compra en cuotas y Tarjetas completo
 
@@ -1765,6 +1867,14 @@ crédito, marca elegida) y los filetes de las píldoras, el chip y el compositor
 color propio.
 
 ## Pendiente de revisión en iPhone
+
+- Producto 24UX6B (sin build de EAS, nada revisado todavía): el orden de lectura de Reportes de arriba abajo en claro y
+  oscuro (alcance y mes, el total, Categorías con la dona y «Por categoría» o Día a día con «Por día», «Evolución»
+  debajo, después los detalles); VoiceOver en ese orden, con la línea del total leída una vez y en palabras; Dynamic
+  Type hasta los tamaños de accesibilidad a 375 pt; cambiar Categorías ↔ Día a día sin que la historia suba; tocar una
+  barra abre su mes; la nota de un solo mes en un libro con solo el mes en curso; el mes vacío en las dos vistas; las
+  barras inactivas visibles en ambos temas; ningún rojo en el gasto común; Reduce Motion; 30 cambios rápidos de
+  pestaña hacia Reportes sin pantalla negra. Lista en docs/mobile-device-checklist.md.
 
 - Producto 24UX6A con Forest (decisión 005; sin build de EAS, nada revisado todavía): el dock de cuatro pestañas solo
   con íconos (VoiceOver «n de 4», «Registrar» que no es una pestaña, el visor de contenido grande con pulsación larga

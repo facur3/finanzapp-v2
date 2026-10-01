@@ -111,8 +111,15 @@ export function shortMonth(monthISO: string, formatDate: (dateISO: string, style
   return formatDate(monthISO.slice(0, 7) + '-01', 'day').replace(/(^1\s+|\s+1$)/, '');
 }
 
+/** The bars of the months that are not shown: the tertiary ink at 70 % in light and 60 % in dark, so each bar holds 3:1
+ * against its surface (a chart's marks must read, 24UX6B; the inset grey it replaced held 1.2:1) while the shown
+ * month's brand bar stays the one strong mark. */
+export function idleBarColor(p: Palette): string {
+  return p.tertiary + (p.isDark ? '99' : 'B3');
+}
+
 /** Six monthly bars on a common zero-to-max scale. The selected month is the
- * brand primary, the rest are graphite; a partial (current) month is outlined.
+ * brand primary, the rest the idle ink (`idleBarColor`); a partial (current) month is outlined.
  * Tapping a bar selects that month. Bars animate between data sets, never from zero. */
 export function MonthBars({ points, selected, onSelect, currency, height = 120 }: {
   points: { monthISO: string; amountMinor: number; partial: boolean }[]; selected: string; onSelect: (monthISO: string) => void; currency: Currency; height?: number;
@@ -153,7 +160,9 @@ function Bar({ point, fraction, selected, onPress, currency, height }: {
     accessibilityLabel={t(point.partial ? 'reports.chart.barPartial' : 'reports.chart.bar',
       { month: formatDate(point.monthISO.slice(0, 7) + '-01', 'month'), year: point.monthISO.slice(0, 4), amount: spokenMoney(point.amountMinor, currency) })}
     onPress={onPress} containerStyle={{ flex: 1 }} style={{ height, justifyContent: 'flex-end', minHeight: undefined }}>
-    <Animated.View style={[{ borderRadius: 6, backgroundColor: selected ? p.primary : p.inset, borderWidth: point.partial ? StyleSheet.hairlineWidth * 2 : 0, borderColor: p.secondary,
+    <Animated.View style={[{ borderRadius: 6, backgroundColor: selected ? p.primary : idleBarColor(p), borderWidth: point.partial ? StyleSheet.hairlineWidth * 2 : 0,
+      // The month in progress stays outlined: ink on an idle bar (the idle fill is too close to the secondary ink), secondary on the shown one.
+      borderColor: selected ? p.secondary : p.text,
       transitionProperty: 'backgroundColor', transitionDuration: reduced ? 0 : duration.state }, style]} />
   </PressFeedback>;
 }
