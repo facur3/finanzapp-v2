@@ -22,15 +22,22 @@ movimientos y cambios como borradores, pide la aclaración mínima y responde pr
 verificables del libro; nunca escribe sin confirmación. La IA en la nube es opcional, acotada y
 con clave en el servidor; el registro manual y los datos locales funcionan sin conexión.
 
+La app tiene cuatro pestañas (Inicio, Movimientos, Reportes y Más, con Tarjetas dentro de Más) y,
+al lado y fuera de ellas, una acción «+» que abre Registrar: Asistente, Gasto, Ingreso y
+Transferencia. El Asistente es una pantalla que se abre sobre la app, con la conversación en
+memoria mientras la app está abierta. La identidad visual es Forest, un verde pino sobrio
+([decisión 005](docs/decisions/005-forest-four-tabs-and-capture.md)).
+
 - [Decisión 002: gastos primero, alternativas y alcance](docs/decisions/002-spending-first.md)
 - [Decisión 004: la app nativa es el producto](docs/decisions/004-native-first-and-web-retirement.md)
+- [Decisión 005: Forest, cuatro pestañas y una acción de registro](docs/decisions/005-forest-four-tabs-and-capture.md)
 - [Base de IA en nube y Atajos: qué funciona y qué falta](docs/mobile-integrations.md)
 
 ## Repository structure
 
 | Path | What it is |
 | --- | --- |
-| `apps/mobile/` | The app: Expo Router screens (`app/`, the five tabs, the first opening, detail and form screens), UI, i18n, storage (SQLite, backups, the rate cache), the consolidated views (`src/fx`) and the Assistant client (`src/`), Node tests (`tests/`), catalogue generators (`scripts/`), `app.config.ts`, `eas.json`. Own `package-lock.json`. |
+| `apps/mobile/` | The app: Expo Router screens (`app/`, the four tabs, the Assistant screen, the first opening, detail and form screens), UI, i18n, storage (SQLite, backups, the rate cache), the consolidated views (`src/fx`) and the Assistant client (`src/`), Node tests (`tests/`), catalogue generators (`scripts/`), `app.config.ts`, `eas.json`. Own `package-lock.json`. |
 | `packages/domain/` | `@finanzapp/domain`: the typed, side-effect-free financial rules (integer minor units per currency, calendar days, ledger, transfers, budgets, liabilities, reports, recovery, merchant identity, exact FX for views). Imports nothing outside the package. Tested at the root with vitest. |
 | `packages/integrations/` | The Assistant and capture contracts shared by the app and the backend. |
 | `server/mobile/`, `api/mobile/` | The mobile backend: authenticated handlers, quotas, the capture inbox, the AI responder, the PostgreSQL schema and its tests; the two Vercel function entry points (`/api/mobile/assistant`, `/api/mobile/captures`). Off until the owner configures it. |
@@ -97,8 +104,10 @@ npm run check:repo    # repository hygiene (below)
   currencies, the multi-currency engine and the consolidated views.
 - Decisions: [001 native mobile](docs/decisions/001-native-mobile.md),
   [002 spending-first](docs/decisions/002-spending-first.md),
-  [003 five tabs and cards](docs/decisions/003-five-tabs-and-cards.md),
-  [004 native-first](docs/decisions/004-native-first-and-web-retirement.md).
+  [003 cards as accounts](docs/decisions/003-five-tabs-and-cards.md) (its five tabs and visual
+  system superseded by 005),
+  [004 native-first](docs/decisions/004-native-first-and-web-retirement.md),
+  [005 Forest, four tabs and the «+» capture action](docs/decisions/005-forest-four-tabs-and-capture.md).
 
 User data starts empty: the app never seeds balances, movements or market history. Money is
 stored in integer minor units per currency; currencies are never mixed without a dated, sourced

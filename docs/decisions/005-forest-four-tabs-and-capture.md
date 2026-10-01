@@ -1,0 +1,237 @@
+# Decisión 005: Forest, cuatro pestañas y una acción de registro aparte
+
+Fecha: 2026-09-30. Aceptada: decisión del dueño, definitiva, para la app nativa (Producto
+24UX6A, PR #70, rama `feat/producto-24ux6a-home-shell`). Complementa las decisiones 001, 002
+y 004. **Reemplaza** la navegación y el sistema visual de la
+[decisión 003](003-five-tabs-and-cards.md), la regla de Producto 22 «cinco pestañas con el
+Asistente en el centro» y el rechazo de un «+» flotante de la primera iteración de 24UX6A
+(detalle abajo, «Qué reemplaza»). No cambia ninguna regla contable: las invariantes de tarjetas
+1–8 de la decisión 003 siguen vinculantes y fijadas por `packages/domain/card-invariants.test.ts`.
+
+## Decisión
+
+1. **Cuatro pestañas:** Inicio, Movimientos, Reportes y Más. Tarjetas sigue en Más → Finanzas.
+   El Asistente deja de ser pestaña.
+2. **Una acción de registro separada, el «+»**, al lado de las pestañas y fuera de la lista de
+   pestañas. Abre el hub Registrar con cuatro opciones, en este orden: **Asistente, Gasto,
+   Ingreso, Transferencia**.
+3. **El Asistente es una pantalla de la pila raíz** (`app/assistant.tsx`), con una conversación
+   que vive en memoria durante la sesión de la app: no se guarda, cerrar la app la borra.
+4. **Identidad Forest:** una paleta de pino en la ventana de tono 158–168° con una regla
+   semántica nueva para gasto, ingreso y transferencia. Las categorías no cambian.
+5. **Inicio** es un campo financiero (derivado de la propuesta B del dueño, no de B2) con el
+   mes, el número y su alcance, y debajo solo próximos compromisos y actividad reciente.
+
+## Qué reemplaza
+
+| Antes | Dónde | Ahora |
+| --- | --- | --- |
+| La tabla de cinco pestañas (Inicio, Movimientos, Reportes, Tarjetas, Ajustes) y «no hay pestaña central de "acción" ni de IA» | Decisión 003, §Navegación (ya desactualizada frente al código desde Producto 22) | Cuatro pestañas y el «+» aparte (§Navegación, abajo) |
+| «Cinco pestañas, cada una con un significado, el Asistente en el centro» (Inicio, Movimientos, Asistente, Reportes, Más) | Producto 22; principios de `docs/mobile-roadmap.md`; `docs/mobile-design.md`, «Producto 22» | El Asistente es la primera opción del hub y una pantalla de la pila raíz |
+| Un «+» flotante persistente rechazado (competía con la pestaña central del Asistente) y la cápsula «＋ Registrar» bajo el número con su hoja de cuatro filas; la barra con etiquetas visibles y la pestaña elegida en cobalto | Primera iteración de 24UX6A (roadmap y `docs/mobile-design.md`, «Producto 24UX6A») | El «+» del dock y el hub Registrar; Inicio ya no tiene botón Registrar; el dock es solo íconos |
+| Primario cobalto/zafiro; gasto coral, ingreso verde, transferencia azul, alerta ámbar | Decisión 003, §Sistema visual; `docs/mobile-design.md`, «Primario FinanzApp» y «Semántica aparte» | Forest y su regla semántica (§Sistema visual, abajo) |
+
+Las secciones reemplazadas quedan escritas como registro histórico, marcadas en su lugar; no se
+borra ninguna entrega pasada.
+
+## Navegación
+
+- **Raíces.** `app/(tabs)/_layout.tsx` declara cuatro raíces: `index` (Inicio, sin encabezado),
+  `activity` (Movimientos, conserva el «+» de su encabezado hacia `/new-entry`), `reports`
+  (Reportes) y `settings` (Más). No hay pestaña de Asistente.
+- **Mitigación de pantallas negras, sin cambio.** `src/ui/navigation.ts` sigue igual:
+  `detachInactiveScreens: false`; cada pestaña `animation: 'none'`, `lazy: false`,
+  `freezeOnBlur: false`; fondo de escena opaco. Las cuatro raíces quedan montadas, sin
+  fade/detach/freeze. **No hay fundido entre pestañas** hasta que exista evidencia en un iPhone.
+  La pila nativa y las hojas siguen siendo dueñas de cada transición.
+- **El dock** (`src/ui/floating-tab-bar.tsx`, geometría pura en `src/ui/dock-geometry.ts`) es un
+  objeto en dos partes: una píldora de pino con las cuatro pestañas y, 10 pt a su derecha, el «+»
+  de 60 pt. Ambos miden 60 pt de alto, a 16 pt de los bordes (más el inset lateral en
+  horizontal), apoyados en la parte alta del área del indicador de inicio
+  (`tabBarBottomGap`: inset − 14, mínimo 10; 10 sin indicador). **Queda en el layout, nunca
+  encima del contenido:** cada pantalla termina arriba de él, y el compositor del Asistente, el
+  teclado y las áreas seguras funcionan como antes (la razón de 24UX6A sigue valiendo).
+- **Pestañas solo con íconos a la vista, nombradas por completo para la tecnología de apoyo.**
+  Sin texto visible. VoiceOver oye cada pestaña como la barra del sistema: en iOS un botón
+  «Inicio, pestaña, 1 de 4» (`nav.tabPosition`; el rol `tab` de React Native no da rasgo en
+  iOS), el rol `tab` en otras plataformas, y el estado seleccionado. El visor de contenido grande
+  de iOS muestra el nombre al mantener presionado con tamaños de accesibilidad. Cada pestaña es un
+  blanco de 48 pt de alto y de unos 65 pt de ancho a 375 pt (unos 70 a 393 pt).
+- **El estado elegido nunca es solo color:** glifo relleno más una cápsula `dockActive` detrás
+  del glifo; las demás pestañas, glifo de contorno en `dockInk`.
+- **Eventos.** Tocar emite `tabPress` (prevenible) y navega solo a una pestaña no elegida y no
+  prevenida; mantener presionado emite `tabLongPress`.
+- **El «+» no es una pestaña.** Un botón «Registrar» («Abre las opciones para registrar»), fuera
+  de la lista de pestañas, sin estado elegido, con un toque háptico liviano. **Solo toque:** sin
+  pulsación larga en esta versión.
+
+## Registrar: el hub
+
+- `src/ui/capture-hub.tsx`. El «+» abre una hoja flotante sobre el dock (`BottomSheet` con
+  `floating`: tarjeta de 32 pt de radio, título pequeño «Registrar», sin fila Cancelar/Listo; sube
+  12 pt con fundido y, con Reducir movimiento, solo funde en el lugar; los mismos tiempos de
+  300/200 ms y las mismas reglas de cierre que la hoja normal, que no cambia). La tarjeta nunca
+  pasa del alto de la ventana menos el área segura superior y el espacio del dock (mínimo
+  200 pt): cuando su contenido no entra (tamaños de texto de accesibilidad), se desplaza dentro
+  de la tarjeta, sin rebote. Un botón «Cerrar»
+  se dibuja exactamente donde está el «+», sobre el velo, dentro del grupo modal de VoiceOver
+  (el gesto de escape también cierra).
+- **Orden fijo:** el tile del Asistente (fondo de pino, destello sobre un círculo de acento,
+  «Asistente» y «Decilo con tus palabras o preguntá lo que quieras»), luego Gasto («Una compra o
+  un pago»), Ingreso («Sueldo, cobro u otro ingreso») y Transferencia («Entre cuentas o pago de
+  tarjeta»).
+- **«Continuar: «…»»** aparece en el tile del Asistente **solo** cuando la conversación de esta
+  sesión tiene un mensaje de la persona, y muestra sus últimas palabras reales
+  (`lastUserWords`). Nunca un texto de ejemplo.
+- **Sin micrófono en el hub.** Un micrófono que todavía no puede dictar sería un callejón sin
+  salida. El dictado es trabajo posterior del Asistente (25A); no hay dictado automático.
+- **Destinos:** Gasto → `/new-entry` (`kind: 'expense'`), Ingreso → `/new-entry`
+  (`kind: 'income'`), Transferencia → `/new-transfer`, Asistente → `/assistant`; siempre con
+  `router.push`, una sola vez, después de que el hub se fue. **La primera elección se sostiene:**
+  mientras el hub se va, una segunda fila, el velo o el «+» no hacen nada. La moneda de un
+  movimiento es la moneda de la vista solo mientras una cuenta viva la tiene; el Asistente recibe
+  la moneda de la vista. Nada se escribe desde el hub.
+
+## Asistente
+
+- Pantalla de la pila raíz (`app/assistant.tsx`, registrada en `app/_layout.tsx` con el título
+  `assistant.title`). Se abre desde el hub y vuelve con el gesto atrás nativo.
+- **Conversación de la sesión, solo en memoria** (`src/assistant/session.ts`, puro): una única
+  instancia por proceso con el reductor real de la conversación. Salir de la pantalla ya no
+  aborta una respuesta: llega a la sesión. Volver muestra la conversación y la desplaza una vez
+  a su último intercambio. «Nuevo chat» (en el encabezado, solo con mensajes) la reinicia y
+  aborta una respuesta en curso. **Nada se persiste**; cerrar la app la borra.
+- Sin cambio en su autoridad: escribe solo cuando la persona confirma un borrador (cero
+  escrituras autónomas); un reintento reutiliza el mismo id de movimiento. Los enlaces de
+  evidencia a una raíz (`/`, `/activity`, `/reports`, `/settings`) usan `router.dismissTo`:
+  vuelven a las pestañas que ya existen debajo del Asistente y eligen esa pestaña (un
+  `navigate` desde esta pantalla de la pila apilaría un segundo juego de pestañas); los demás,
+  `push`.
+
+## Sistema visual: Forest
+
+- **Ventana de tono 158–168°**, pino sobrio: nunca turquesa, cian, esmeralda ni azul. Sin
+  reescritura global de tipografía ni radios. La ventana vinculante de 158–168° rige el campo
+  (`hero`) y la marca clara (`primary`, `primaryFill`). Los hex exactos de la entrega para el
+  acento salvia (#9FD8C1 / #86C9B0) y la marca oscura (#94D2BB / #86C9B0) miden 155,8–157,7°:
+  las cifras HSL de la entrega están redondeadas. Se conservan esos hex; las pruebas
+  (`tests/theme.node.ts`) exigen 155–168° para todos los tokens de marca y 158–168° para el
+  campo y la marca clara.
+- **Tokens** (`src/ui/palette.ts`, claro / oscuro): fondo #F0F3F1 / #000000 (OLED); superficie
+  #FFFFFF / #0F1513; inset #E6EBE8 / #171E1B; tinta #0F1A16 / #EDF3EF; secundario #45564E /
+  #A2B1A9; terciario #586961 / #899A91; marca como texto (`primary`) #1D5647 / #94D2BB y como
+  relleno (`primaryFill`) #1D4F42 / #86C9B0 con `onPrimary` #FFFFFF / #05211A; campo financiero
+  `hero` #14362D / #0F2A22 con su tinta #EEF5F1 / #EDF5F0 y secundario #A8C4B9 / #A1BDB2;
+  acento del «+» #9FD8C1 / #86C9B0 con `onAccent` #0F2A22 / #05211A; dock #1B3C33 / #133029,
+  `dockInk` #B5C9C1 / #A9BFB6, `dockActive` #3C6356 / #335A4E. Los valores restantes están en
+  `palette.ts` y en `docs/mobile-design.md`.
+- **Regla semántica:** un gasto común es **tinta con signo menos**; el ingreso es positivo
+  (`income` #1F7A4F / #5CCB93); una transferencia es neutra, en tinta secundaria (`transfer` =
+  secundario); el tono negativo (`expense` #B3432E / #EE8A72) queda **solo** para lo destructivo,
+  lo vencido y lo pasado de límite; alerta ámbar (`warning` #9A5B00 / #E8A94A). Nunca color sin
+  signo o etiqueta.
+- **Vidrio solo** en el dock, el «+», el hub, los controles circulares compactos, los menús, el
+  compositor y las píldoras de movimiento del detalle de una cuenta (una superficie existente,
+  desde 24UX3). Filas, tarjetas, gráficos y encabezados fijos son **sólidos**. En esta entrega
+  el código dibuja Liquid Glass (donde iOS lo ofrece y Reducir transparencia está apagado) en
+  tres superficies: la píldora del dock, las píldoras de movimiento del detalle de una cuenta y
+  el compositor del Asistente; el «+» y la tarjeta del hub son sólidos. Sin vidrio (Expo Go, iOS
+  anterior, Reducir transparencia, `EXPO_PUBLIC_DISABLE_GLASS`), el dock es pino sólido con un
+  filo fino y, en claro, una sombra suave.
+- **Identidad de categorías sin cambio.** Los ids de color guardados (`packages/domain`), los
+  presets, el hash y el orden de asignación y los tonos (`src/ui/category-color.ts`, `HUES`)
+  quedan intactos, también los que están fuera de la ventana de Forest: esa ventana rige la
+  marca y la interfaz, no las categorías. Cualquier recoloreo de categorías necesita su propia
+  decisión.
+- Apariencia (Sistema, Claro, Oscuro; guardar y después aplicar, sin parpadeo) sigue como en la
+  primera iteración de 24UX6A.
+
+## Inicio
+
+- **Campo financiero** (`hero`, radio inferior de 32 pt, bajo la barra de estado, con
+  contenido claro en la barra mientras el campo está debajo y la de cada tema al pasarlo o al
+  salir de Inicio):
+  - fila 1: el mes actual (texto, **no interactivo**, sin chevron) y el atajo a Cuentas;
+  - fila 2, **solo con dos monedas o más en el historial** (la regla del chip de 25B2): la
+    moneda de la vista y la ayuda; con una sola moneda la fila no existe y la ayuda pasa al lado
+    de la línea inferior;
+  - el número (tinta del campo; secundario cuando es exactamente cero; las cifras por moneda
+    cuando falta una cotización; el texto de fuera de rango);
+  - la línea inferior: con **Gastado**, «Hasta hoy · {promedio} por día» (`dailyAverageMinor`,
+    la misma cifra que Reportes) o «Sin gastos este mes»; con **Disponible**, «Saldo registrado
+    · N cuentas» y **nunca** una cifra por día;
+  - Gastado | Disponible, que solo cambia el número.
+- **Semántica sin cambio.** Gastado = el gasto del mes en la moneda de la vista (solo gastos;
+  transferencias y pagos de tarjeta nunca; cuotas en el mes de su resumen; consolidado por la
+  fecha de cada movimiento o una moneda sola). Disponible = dinero registrado en cuentas
+  normales (sin tarjetas, deudas ni cobros); no es ingresos menos gastos ni lo que queda del
+  presupuesto.
+- **Próximos compromisos:** solo reglas recurrentes de gasto que vencen hoy o en los próximos
+  seis días, en la vista, dos como máximo, «Ver todos» → Recurrentes; sin ninguno, la sección no
+  existe. **Por qué solo recurrentes:** un resumen de tarjeta no tiene un importe conocido
+  (FinanzApp no lee el resumen del banco) y las cuotas ya son parte de la tarjeta; listarlas
+  aparte las contaría dos veces.
+- **Actividad reciente:** gastos e ingresos de este mes (sin transferencias), en la vista, los
+  más nuevos primero; cuatro con compromisos, seis sin ellos; «Ver todos» → Movimientos.
+- **Vacíos:** sin compromisos ni actividad, «Todavía no hay movimientos este mes» / «Registrá un
+  gasto con el botón Registrar (+) o contáselo al Asistente.» (el «+» nombrado como lo lee
+  VoiceOver), sin acción. Con una moneda de varias mostrada sola («Solo X»), el título nombra la
+  moneda: «Todavía no hay movimientos en X este mes» (la regla de 24UX2, restituida). Sin
+  cuentas, el estado vacío con «Empezar» → nueva cuenta.
+- **Fuera de Inicio:** el botón «＋ Registrar», la línea de atención, rankings, gráficos,
+  tarjetas de presupuesto y la entrada del Asistente. Sus rutas siguen donde estaban.
+
+## Qué no cambia
+
+Toda regla contable, de moneda y de tipo de cambio: unidades menores enteras por moneda,
+monedas nunca mezcladas sin una tasa fechada y solo en la vista, transferencias, tarjetas
+(invariantes 1–8 de la decisión 003), cuotas, deudas y cobros; el esquema SQLite 13 y la copia
+v13; la versión «FinanzApp 0.1.0 (24UX6A)». No se agrega ninguna dependencia nativa ni se hace
+un build de EAS.
+
+## Próximas entregas de la línea UX (aprobadas, no implementadas)
+
+La línea **24UX6A → 24UX6B → 24UX6C → 24UX6D** se suma al roadmap de producto; no lo reemplaza:
+24T3, 25A, 25C/25C2, 25D, 25E/25F y Producto 26 siguen como están.
+
+- **24UX6B, Reportes.** Se conservan presupuestos, observaciones y flujo neto (se reordenan o
+  reestilan; nunca se quitan porque una maqueta los omita). La dona seleccionable solo como
+  selección visual dentro del reporte. Se permite el gráfico Día a día y un encabezado fijo
+  sólido. Las barras de Evolución conservan la navegación por mes actual (sin una segunda
+  selección solo para comparar). Se conserva la agrupación «Otras» por top N actual: **no** se
+  adopta la regla del 3 % en esta generación. No se inventa una ruta de detalle por comercio: el
+  resumen de comercios sigue sin interacción salvo que se agregue una ruta real a propósito.
+- **24UX6C, Movimientos y Más.** Filas, búsqueda y filtros en Forest; filtros por período,
+  cuenta y categoría con datos del repositorio; los totales del día conservan su semántica
+  actual (neto donde el repositorio define neto). No se inventa nota, origen Apple Pay ni hora
+  del movimiento. Se conservan Deshacer/Recuperar (sin un borrado definitivo falso) y
+  Movimientos deshechos. Idioma y Región siguen siendo rutas separadas, agrupadas a la vista; se
+  omite «Ajustes» (no hay ruta).
+- **24UX6D, Tarjetas.** Se conserva la funcionalidad real: la presentación del Disponible de
+  crédito, Registrar compra y Recientes. Se permite un mazo/slivers y el reestilo Forest. El
+  progreso de cuotas es registradas/facturadas según el dominio, nunca «pagadas» inferidas; los
+  importes de cuota son los programados reales. Ninguna fórmula contable ni de crédito
+  disponible cambia.
+
+## Estado y verificación
+
+Implementado en `apps/mobile` y probado en Linux; **la verificación en iPhone está pendiente**
+y no hay build de EAS. Pendiente en el dispositivo: el dock de cuatro íconos con VoiceOver
+«n de 4» y «Registrar» que no es pestaña; el visor de contenido grande; 30–40 cambios rápidos
+de pestaña sin pantallas negras; vidrio frente a pino sólido (Reducir transparencia); abrir y
+cerrar el hub (×, velo, escape de VoiceOver), la primera elección sostenida, el fundido con
+Reducir movimiento y la tarjeta que se desplaza con texto de accesibilidad (AX5 a 375 pt); el
+Asistente apilado (ida y vuelta, la conversación durante la sesión, Continuar solo después de
+un intercambio real, borrada por Nuevo chat y al cerrar la app, el teclado del compositor, el
+enlace de evidencia que vuelve a las pestañas existentes en Movimientos); el campo de Inicio bajo la barra
+de estado en claro y oscuro, el mes no tocable, la fila de alcance solo con dos monedas, el
+promedio diario solo en Gastado, compromisos ≤ 2 u omitidos, actividad 4/6, vacíos (con la
+moneda nombrada en «Solo X»), importes
+largos a 375 pt, tamaños de accesibilidad y Dynamic Type; el contraste de Forest; categorías sin
+cambio; Apariencia sin parpadeo; el mapeo de glifos SF Symbols/Ionicons. Ver
+`docs/mobile-device-checklist.md`.
+
+Verificación en Linux del árbol enmendado (2026-10-01): `npm test` en la raíz 415 pasan y 1 pendiente;
+`npm run check:repo` OK; en `apps/mobile`, typecheck sin errores, `test:storage` 936/936, `currency:verify` y
+`regions:verify` OK, `i18n:check -- --strict` sin errores ni inglés desactualizado, `check` y `export:ios` OK. El job
+`mobile_api` necesita PostgreSQL y corre en CI. Nada de esto es una prueba en el iPhone.

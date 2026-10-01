@@ -4,7 +4,10 @@ Date: 2026-09-25. Status: accepted (Producto 24UX1) and **executed** (Producto 2
 day: the retirement PR removed the web/Capacitor trees; the tag `web-frontend-final` marks their
 last commit). Supersedes in part [decision 001](001-native-mobile.md): its "keep the web
 operational until migration" clause. Decisions 002 (spending-first) and 003 (five tabs and
-cards) are unchanged.
+cards) are unchanged. *(Note, 2026-09-30: decision 003's navigation and visual system were later
+superseded by [decision 005](005-forest-four-tabs-and-capture.md): four tabs, a separate «+»
+capture action, the Assistant as a root-stack screen instead of a tab, and the Forest palette.
+Nothing in this decision depends on them; decision 003's card accounting stays binding.)*
 
 ## Decision
 
@@ -111,4 +114,5 @@ and the same Vercel project deploys both the static web and the mobile API funct
 
 - `docs/web-retirement-inventory.md` (removed in 25B; in Git history): the commands and results.
 - [Decision 001](001-native-mobile.md): why Expo, the no-Mac workflow, the Apple integrations.
-- [Decision 002](002-spending-first.md), [Decision 003](003-five-tabs-and-cards.md).
+- [Decision 002](002-spending-first.md), [Decision 003](003-five-tabs-and-cards.md),
+  [Decision 005](005-forest-four-tabs-and-capture.md) (2026-09-30, after this decision).

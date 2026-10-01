@@ -1140,7 +1140,7 @@ the person's own dated rate) and must not be modelled with one.
   note says it will be available later. Saving never blocks on a rate.
 - The adjustment (the real debit, a different rate, fees) lives in the movement's detail as
   a secondary action, not in the form. Existing components, the discreet micro-animations,
-  the cobalt/sapphire palette and the native patterns are reused; no new surface.
+  the Forest palette (decision 005) and the native patterns are reused; no new surface.
 
 ### 9.3 Storage, Assistant and later automation
 
