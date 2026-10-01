@@ -9,7 +9,9 @@ Asistente en el centro» y el rechazo de un «+» flotante de la primera iteraci
 1–8 de la decisión 003 siguen vinculantes y fijadas por `packages/domain/card-invariants.test.ts`.
 
 *Enmendada el 2026-10-01 por Producto 24UX6C (presentación de movimientos, Inicio y Más): ver «Enmienda 2026-10-01 —
-Producto 24UX6C» al final; las frases reemplazadas están marcadas en su lugar.*
+Producto 24UX6C» al final; las frases reemplazadas están marcadas en su lugar.* *Enmendada otra vez el 2026-10-01 por
+Producto 24UX6C2 (la actividad de Inicio incluye transferencias; la dona no repite el total): ver «Enmienda 2026-10-01 —
+Producto 24UX6C2» al final.*
 
 ## Decisión
 
@@ -174,7 +176,8 @@ borra ninguna entrega pasada.
   existe. **Por qué solo recurrentes:** un resumen de tarjeta no tiene un importe conocido
   (FinanzApp no lee el resumen del banco) y las cuotas ya son parte de la tarjeta; listarlas
   aparte las contaría dos veces.
-- **Actividad reciente:** gastos e ingresos de este mes (sin transferencias), en la vista, los
+- **Actividad reciente:** gastos e ingresos de este mes (sin transferencias) *(Reemplazado el 2026-10-01 por 24UX6C2:
+  ver «Enmienda 2026-10-01 — Producto 24UX6C2», abajo.)*, en la vista, los
   más nuevos primero; cuatro con compromisos, seis sin ellos; «Ver todos» → Movimientos.
 - **Vacíos:** sin compromisos ni actividad, «Todavía no hay movimientos este mes» / «Registrá un
   gasto con el botón Registrar (+) o contáselo al Asistente.» (el «+» nombrado como lo lee
@@ -199,7 +202,7 @@ La línea **24UX6A → 24UX6B → 24UX6C → 24UX6D** se suma al roadmap de prod
 
 - **24UX6B, Reportes.** Se conservan presupuestos, observaciones y flujo neto (se reordenan o
   reestilan; nunca se quitan porque una maqueta los omita). La dona seleccionable solo como
-  selección visual dentro del reporte. Se permite el gráfico Día a día y un encabezado fijo
+  selección visual dentro del reporte *(implementada el 2026-10-01 por 24UX6C2)*. Se permite el gráfico Día a día y un encabezado fijo
   sólido. Las barras de Evolución conservan la navegación por mes actual (sin una segunda
   selección solo para comparar). Se conserva la agrupación «Otras» por top N actual: **no** se
   adopta la regla del 3 % en esta generación. No se inventa una ruta de detalle por comercio: el
@@ -295,3 +298,24 @@ en esta entrega: Movimientos conserva su filtro por tipo y su búsqueda.
 Implementado en `apps/mobile`; **nada se revisó en un iPhone** y no hubo build de EAS. La verificación en Linux y la
 lista del dispositivo están en `docs/mobile-roadmap.md` («Producto 24UX6C») y `docs/mobile-device-checklist.md`
 («Producto 24UX6C»).
+
+## Enmienda 2026-10-01 — Producto 24UX6C2 (actividad de Inicio y la dona de Reportes)
+
+Fecha: 2026-10-01. Producto 24UX6C2, rama `feat/producto-24ux6c2-home-activity-reports-polish` desde master c673be6
+(24UX6C mergeada como PR #72). Un pulido chico de **presentación**: no cambia ninguna regla contable, el libro, el
+esquema (13), la copia (v13), cotizaciones, tarjetas ni cuotas; sin dependencias nativas ni animaciones entre
+pestañas; la regla de presentación de 24UX6C y la paleta Forest no cambian.
+
+| Antes (texto de esta decisión) | Dónde | Ahora |
+| --- | --- | --- |
+| «gastos e ingresos de este mes (sin transferencias)» | §Inicio, Actividad reciente | Gastos, ingresos **y transferencias** de este mes en la vista, del más nuevo; una transferencia es un registro y aparece **una sola vez** (origen → destino, sin signo, en el tono `transfer`; abre su detalle). El límite de cuatro o seis se aplica después de unir. Gastado y Disponible no leen la lista: una transferencia sigue sin ser gasto |
+| El centro de la dona con «Total del período» y el total del mes | Reportes (24UX6B, sin texto propio en esta decisión) | La dona no repite el total del KPI de arriba, que sigue en Categorías y Día a día; sirve para **elegir una categoría** (solo selección visual dentro del reporte, como se aprobó): sin elección, «Tocá una categoría»; con una, su nombre, su importe y su parte del gasto; VoiceOver la recorre como un control ajustable |
+
+**Inicio sigue mínimo.** «Próximos compromisos» sigue condicional: solo reglas recurrentes de gasto activas que vencen
+desde hoy hasta los próximos seis días, en la vista, dos como máximo, ausente sin ninguna; lo posterior en Recurrentes;
+un ingreso recurrente nunca es un compromiso. Rankings, tarjetas de presupuesto y un módulo permanente de recurrentes
+siguen fuera de Inicio; ver más adelante es trabajo del calendario y las notificaciones futuras.
+
+**Estado.** Implementado en `apps/mobile`; **nada se revisó en un iPhone** y no hubo build de EAS. La verificación en
+Linux y la lista del dispositivo están en `docs/mobile-roadmap.md` («Producto 24UX6C2») y
+`docs/mobile-device-checklist.md` («Producto 24UX6C2»).

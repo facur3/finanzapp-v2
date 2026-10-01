@@ -1,5 +1,73 @@
 # Physical iPhone acceptance checklist
 
+## Producto 24UX6C2 — Home activity and Reports interaction polish
+
+**Not done in 24UX6C2: no EAS build was made and the iPhone was not touched. Every item below is pending.**
+Metro from this branch (`npm run start:dev-client -- --clear`) on the installed FinanzApp Dev build; JavaScript only
+(Inicio's recent activity, the Reportes donut and the category rows), no native dependency, no ledger, accounting,
+schema (13), backup (v13), FX, card or instalment change, no tab animation, the Forest palette unchanged. Use your own
+data; never seed movements. Record each result with the iPhone model, iOS version, theme, language and text size. The
+design is in [mobile-design.md](mobile-design.md) («Producto 24UX6C2 — actividad de Inicio e interacción de
+Reportes»); the rule is in [decision 005](decisions/005-forest-four-tabs-and-capture.md) («Enmienda 2026-10-01 —
+Producto 24UX6C2»). This section supersedes the 24UX6A item «this month's expenses and incomes (no transfers)» in
+«Actividad reciente».
+
+- [ ] The Más footer reads «FinanzApp 0.1.0 (24UX6C2)».
+
+**Inicio: recent activity.**
+
+- [ ] «Actividad reciente» mixes this month's expenses, incomes and transfers, newest first (same day: the later
+  recorded first), at most 4 under the commitments and 6 without them.
+- [ ] A transfer appears once (not as an outflow and an inflow), its caption «Origen → Destino · fecha», its amount
+  with no sign in the blue-teal transfer tone; an expense stays unsigned in ink and an income «+» in green.
+- [ ] VoiceOver on a transfer row says «Transferencia, de X a Y, <amount>, <date>» (with a note: «Transferencia,
+  <note>, de X a Y…»); tapping it opens the transfer detail, and back returns to Inicio.
+- [ ] Record a transfer between two cash accounts: Gastado does not change, and Disponible does not change either
+  (money moved between two accounts it counts).
+- [ ] A debt collection or a card payment in the list does not make the expense rows name their account when every
+  real account shown is the same.
+- [ ] An undone transfer does not appear; with one currency of several shown alone, a transfer in another currency
+  does not appear.
+- [ ] The amount size and alignment, «Total · ARS», the month label and «Ver todos» → Movimientos are unchanged.
+- [ ] «Próximos compromisos» is still conditional: only active recurring expense rules due today through the next six
+  days, at most two, absent when none; a recurring income never appears there.
+
+**Reportes: the donut.**
+
+- [ ] The top total («GASTADO · ARS», the amount and its line) shows in both Categorías and Día a día.
+- [ ] With nothing chosen the donut's centre reads only the quiet «Tocá una categoría» («Tap a category»); it never
+  repeats the month's total.
+- [ ] Tapping a slice: the centre shows the category's name, its exact amount and «NN % del gasto» (the same
+  percentage as its row); that slice is drawn thicker and the others dimmed, at once, without a new animation; the
+  matching row is marked (bold name, an outline and a light tint in the category hue).
+- [ ] Tapping the chosen slice again, or the hole, clears the choice; tapping just beside the ring or in the thin gap
+  between slices behaves sensibly (the gap picks the next slice).
+- [ ] VoiceOver: the donut is announced as adjustable («Gasto por categoría», its slices, «Ninguna categoría
+  elegida»); swiping up and down steps through the categories, announcing name, amount and percentage, and past either
+  end returns to none (down from none starts at the last). The centre's text is not a separate VoiceOver stop; the
+  Actions rotor shows «Categoría siguiente» / «Categoría anterior»; a double tap does not clear the choice.
+- [ ] Larger text (beyond the default, and AX sizes) or a very long amount: the chosen readout moves under the donut,
+  whole, and the hole stays clear; the amount is never cut.
+- [ ] Changing the month (arrows, «Este mes», a bar), the display currency or mode (also from Inicio's chip) resets the
+  choice, and going back does not bring it back; the category rows still open their detail.
+- [ ] A Japanese or emoji category name (e.g. «食料品・日用品», «Mascotas 🐶») with a large amount stacks like a long
+  Latin name.
+- [ ] Reduce Motion: the donut appears finished and the choice still works; the first sweep and the month crossfade
+  are unchanged with it off.
+
+**Category rows.**
+
+- [ ] A long name (for example «Supermercado») with a large amount at 375 pt: the row stacks cleanly (the name on its
+  own lines, the amount and its percentage together under it), no stray last letter and no shrunken amount; short names
+  stay on one line.
+- [ ] The same at the accessibility text sizes (AX1–AX5): every row stacks; in Reportes and in a category's spending
+  rows.
+
+**Regression.**
+
+- [ ] Month navigation, the six-month bars and «Este mes» still work; Día a día unchanged.
+- [ ] 30 rapid tab switches without black screens.
+
 ## Producto 24UX6C — Movement presentation, Home polish and Más
 
 **Not done in 24UX6C: no EAS build was made and the iPhone was not touched. Every item below is pending.**
@@ -224,7 +292,7 @@ iPhone model, iOS version, theme, material (glass or Reducir transparencia) and 
   number and its line.
 - [ ] «Próximos compromisos»: at most two rules due within seven days, «Ver todos» → Recurrentes; with none, the
   section is absent.
-- [ ] «Actividad reciente»: this month's expenses and incomes (no transfers), newest first, at most 4 with
+- [ ] *(Superseded by 24UX6C2: transfers are part of «Actividad reciente», once each.)* «Actividad reciente»: this month's expenses and incomes (no transfers), newest first, at most 4 with
   commitments and 6 without; «Ver todos» → the Movimientos tab.
 - [ ] Empty states: accounts but nothing this month and nothing due → «Todavía no hay movimientos este mes» /
   «Registrá un gasto con el botón Registrar (+) o contáselo al Asistente.» with no button. With two or more
