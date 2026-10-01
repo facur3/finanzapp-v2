@@ -1,12 +1,13 @@
 import type { Messages } from '../../messages.ts';
 
-/** Inicio: the hero, the budget card, upcoming commitments, the category ranking and the quick actions. */
-export const home: Pick<Messages, 'home' | 'budgetStatus' | 'quickActions'> = {
+/** Inicio (the current month's financial field, the commitments due this week, the month's latest movements) and the
+ * capture hub the dock's «+» opens (Producto 24UX6A, decision 005). */
+export const home: Pick<Messages, 'home' | 'quickActions'> = {
   home: {
     emptyTitle: 'Understand your spending.',
     emptyDetail: 'Choose an account to group your transactions. You can start without entering your bank balance.',
     start: 'Get started',
-    spending: 'Spending',
+    spending: 'Spent',
     available: 'Available',
     recordedBalance: 'Recorded balance',
     availableHelp: 'The money recorded in your accounts in this currency: opening balance plus income, minus expenses and transfers. '
@@ -14,42 +15,37 @@ export const home: Pick<Messages, 'home' | 'budgetStatus' | 'quickActions'> = {
     spendingOutOfRange: 'The total is beyond the range we can show precisely. Your transactions are still saved.',
     balanceOutOfRange: 'The total balance is beyond the range we can show precisely. Your accounts are still saved.',
     accounts: { one: '{count} account', other: '{count} accounts' },
-    monthBudget: 'Budget this month',
-    whereSpent: 'By category',
-    reports: 'Reports',
-    categoriesEmpty: 'Your categories appear once you record an expense this month.',
-    categoriesInActivity: 'The breakdown is available in your transactions.',
+    perDay: 'So far · {amount} a day',
+    noSpending: 'No spending this month',
+    availableLine: '{label} · {accounts}',
+    recent: 'Recent activity',
+    quietTitle: 'No transactions this month yet',
+    quietTitleIn: 'No transactions in {currency} this month yet',
+    quietDetail: 'Record an expense with the Record (+) button, or tell the Assistant.',
     upcoming: 'Coming up',
-    recent: 'Latest transactions',
-    recentEmpty: 'No transactions this month yet.',
-    recentEmptyIn: 'No {currency} transactions this month yet.',
-    rankingLabel: '{name}, {amount}, {share} of this month’s spending',
-    rankingHint: 'Opens this category’s transactions this month',
-    budget: {
-      general: 'Overall budget',
-      exceeded: 'over',
-      left: 'remaining',
-      of: 'of {amount} · {percent}%',
-      categories: { one: '{count} category', other: '{count} categories' },
-      exceededCount: { one: '{count} over', other: '{count} over' },
-      perCategory: 'Category limit',
-      labelLeft: '{title}: {amount} left of {total}, {percent} percent used.',
-      labelExceeded: '{title}: over by {amount} of {total}, {percent} percent used.',
-    },
     upcomingRow: {
       today: 'Today',
       tomorrow: 'Tomorrow',
       inDays: { one: 'In {count} day', other: 'In {count} days' },
       label: '{merchant}, {category}, {amount}, next payment {date}',
     },
-  },
-  budgetStatus: {
-    inOrder: { one: '{count} category on track', other: '{count} categories on track' },
-    exceeded: { one: '{count} category over', other: '{count} categories over' },
+    capture: {
+      label: 'Record',
+      hint: 'Shows the ways to record',
+      title: 'Record',
+      close: 'Close',
+      assistant: 'Assistant',
+      assistantDetail: 'Say it in your own words or ask anything',
+      continue: 'Continue: “{text}”',
+      expense: 'Expense',
+      expenseDetail: 'A purchase or a payment',
+      income: 'Income',
+      incomeDetail: 'Salary, a payment received or other income',
+      transfer: 'Transfer',
+      transferDetail: 'Between accounts or a card payment',
+    },
   },
   quickActions: {
-    askAssistant: 'Ask the Assistant',
-    askAssistantHint: 'Opens the Assistant to record a transaction or ask about your spending',
     expense: 'Expense',
     recordExpense: 'Record an expense',
     income: 'Income',

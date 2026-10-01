@@ -2,17 +2,17 @@ import { router, Tabs } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { usePalette } from '../../src/ui/theme';
 import { IconButton } from '../../src/ui/components';
+import { FloatingTabBar } from '../../src/ui/floating-tab-bar';
 import { selectionHaptic } from '../../src/ui/motion';
 import { tabHostOptions, tabScreenOptions } from '../../src/ui/navigation';
 import { useI18n } from '../../src/i18n/provider';
 
-// Five sections, each with one meaning: Inicio (what matters now), Movimientos
-// (everything recorded), Asistente (talking about your money, in the centre so
-// either thumb reaches it from anywhere), Reportes (where the money went) and
-// Más, the secondary hub for everything else (accounts, cards, budgets,
-// recurring, personal debts, categories, data). The Assistant is a
-// product-defining interaction mode, so it holds the most reachable slot;
-// Tarjetas is a first-class Finanzas row under Más. Nothing else becomes a tab.
+// Four sections, each with one meaning (decision 005, Producto 24UX6A): Inicio (the current month, what is due and
+// what was recorded), Movimientos (everything recorded), Reportes (where the money went) and Más, the secondary hub
+// (accounts, cards, budgets, recurring, personal debts, categories, preferences and data). Recording is not a section:
+// the dock's «+», beside the four tabs and never one of them, opens the capture hub (Asistente, Gasto, Ingreso,
+// Transferencia), and the Assistant is a screen of the root stack reached from there. Tarjetas stays a row of Más.
+// Nothing else becomes a tab.
 export default function TabsLayout() {
   const p = usePalette();
   // Tab labels and headers come from the catalogue: a language change re-labels the mounted tabs in place.
@@ -20,26 +20,22 @@ export default function TabsLayout() {
   // These lightweight roots stay mounted. Their visibility must not depend on
   // an interrupted opacity animation or a native detach/reattach.
   // Stack pushes and modal gestures still use the native navigator above us.
-  // Sections switch instantly (no slide, no fade: the mounted-tab mitigation); a selection tick confirms the change without delaying it.
-  return <Tabs {...tabHostOptions} screenListeners={({ navigation }) => ({ tabPress: () => { if (!navigation.isFocused()) selectionHaptic(); } })}
+  // Sections switch instantly (no slide, no fade: the mounted-tab mitigation); a selection tick confirms the change
+  // without delaying it. The dock (`FloatingTabBar`) draws the four tabs icon-only on a pine pill and the «+» beside it;
+  // it stays in the layout, never an overlay.
+  return <Tabs {...tabHostOptions} tabBar={props => <FloatingTabBar {...props} />}
+    screenListeners={({ navigation }) => ({ tabPress: () => { if (!navigation.isFocused()) selectionHaptic(); } })}
     screenOptions={{ ...tabScreenOptions,
     headerStyle: { backgroundColor: p.background },
     headerTitleStyle: { color: p.text, fontWeight: '600' }, headerShadowVisible: false,
-    // The selected tab is the brand primary; the rest stay neutral. Switching is still instant. Inactive labels are
-    // 10 pt text, so they take the secondary ink (5.6:1 light, 6.6:1 dark on the bar), not the tertiary (3.6:1 / 4.1:1,
-    // below AA; 24UX1 finding 9, fixed in 24UX2).
-    tabBarActiveTintColor: p.primary, tabBarInactiveTintColor: p.secondary,
-    tabBarStyle: { backgroundColor: p.surface, borderTopColor: p.line },
-    tabBarLabelStyle: { fontSize: 10, fontWeight: '500' },
     sceneStyle: { backgroundColor: p.background } }}>
-    {/* The Assistant also keeps its Home quick action for discoverability; this tab is the persistent entry. */}
-    <Tabs.Screen name="index" options={{ title: t('nav.tabs.home'),
-      headerRight: () => <IconButton name="wallet-outline" label={t('nav.seeAccounts')} onPress={() => router.push('/accounts')} />, tabBarIcon: ({ color, size, focused }) => <Ionicons name={focused ? 'home' : 'home-outline'} size={size} color={color} /> }} />
+    {/* Inicio has no root title (the selected tab already names it; its month and number are the screen's title) and
+        draws its accounts shortcut in its own financial field. */}
+    <Tabs.Screen name="index" options={{ title: t('nav.tabs.home'), headerShown: false,
+      tabBarIcon: ({ color, size, focused }) => <Ionicons name={focused ? 'home' : 'home-outline'} size={size} color={color} /> }} />
     <Tabs.Screen name="activity" options={{ title: t('nav.tabs.activity'),
       headerRight: () => <IconButton name="add" label={t('nav.recordMovement')} onPress={() => router.push('/new-entry')} />,
       tabBarIcon: ({ color, size, focused }) => <Ionicons name={focused ? 'receipt' : 'receipt-outline'} size={size} color={color} /> }} />
-    <Tabs.Screen name="assistant" options={{ title: t('nav.tabs.assistant'),
-      tabBarIcon: ({ color, size, focused }) => <Ionicons name={focused ? 'sparkles' : 'sparkles-outline'} size={size} color={color} /> }} />
     <Tabs.Screen name="reports" options={{ title: t('nav.tabs.reports'),
       tabBarIcon: ({ color, size, focused }) => <Ionicons name={focused ? 'pie-chart' : 'pie-chart-outline'} size={size} color={color} /> }} />
     <Tabs.Screen name="settings" options={{ title: t('nav.tabs.more'), tabBarIcon: ({ color, size, focused }) => <Ionicons name={focused ? 'ellipsis-horizontal-circle' : 'ellipsis-horizontal-circle-outline'} size={size} color={color} /> }} />

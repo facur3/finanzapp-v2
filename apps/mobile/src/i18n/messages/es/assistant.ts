@@ -3,7 +3,7 @@
  * server) and the development fixtures are content, never catalogue entries. */
 export const assistant = {
   assistant: {
-    /** Header title of the Assistant tab. */
+    /** Header title of the Assistant screen (a screen of the root stack opened from the capture hub, not a tab). */
     title: 'Asistente',
     /** VoiceOver name of the header button that starts an empty conversation. */
     newChat: 'Nuevo chat',

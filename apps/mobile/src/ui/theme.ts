@@ -1,9 +1,11 @@
-import { createContext, createElement, useContext, useEffect, useState, type ReactNode } from 'react';
-import { AccessibilityInfo, AppState, useColorScheme, type TextStyle } from 'react-native';
+import { createContext, createElement, useContext, useEffect, useState, useSyncExternalStore, type ReactNode } from 'react';
+import { AccessibilityInfo, AppState, Appearance, useColorScheme, type TextStyle } from 'react-native';
 import { todayKey } from '@finanzapp/domain';
 
+import { defaultPreferenceStore } from '../i18n/preference';
 import { subscribeReduceTransparency } from './material-policy';
 import { darkPalette, lightPalette, type PaletteColors } from './palette';
+import { createThemePreferenceStore, effectiveScheme, type ThemePreference, type ThemePreferenceStore } from './theme-preference';
 
 export type Palette = PaletteColors & {
   isDark: boolean;
@@ -11,8 +13,26 @@ export type Palette = PaletteColors & {
   positive: string; negative: string; positiveSoft: string; negativeSoft: string;
 };
 
+let themeStore: ThemePreferenceStore | null = null;
+/** The app's one Apariencia preference (24UX6A), created on first use and applied to iOS then: the root layout creates
+ * it before its first render, so the first frame is already in the chosen scheme. */
+export function themePreferenceStore(): ThemePreferenceStore {
+  return themeStore ??= createThemePreferenceStore(defaultPreferenceStore, scheme => Appearance.setColorScheme(scheme));
+}
+
+/** The Apariencia choice and its setter (Más → Apariencia). `system` is the device's scheme, meaningful while the
+ * choice is Sistema (a fixed choice overrides what iOS reports). */
+export function useThemePreference(): { preference: ThemePreference; setPreference: (preference: ThemePreference) => boolean; system: 'light' | 'dark' } {
+  const store = themePreferenceStore();
+  const preference = useSyncExternalStore(store.subscribe, store.getState, store.getState);
+  return { preference, setPreference: store.set, system: useColorScheme() === 'dark' ? 'dark' : 'light' };
+}
+
+/** Every screen's colours: the scheme is the Apariencia choice, or the device's while it follows the system. */
 export function usePalette(): Palette {
-  const isDark = useColorScheme() === 'dark';
+  const store = themePreferenceStore();
+  const preference = useSyncExternalStore(store.subscribe, store.getState, store.getState);
+  const isDark = effectiveScheme(preference, useColorScheme()) === 'dark';
   const base = isDark ? darkPalette : lightPalette;
   return { ...base, isDark, positive: base.income, negative: base.expense, positiveSoft: base.incomeSoft, negativeSoft: base.expenseSoft };
 }

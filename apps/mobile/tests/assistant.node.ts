@@ -292,8 +292,11 @@ test('fixtures are scripted, stream word by word and stay out of the production 
   // Runtime separation: the production client module never imports the fixtures; only runtime.ts does, behind the development flag.
   const clientSource = readFileSync(new URL('../src/assistant/client.ts', import.meta.url), 'utf8');
   assert.equal(/from '\.\/fixtures/.test(clientSource), false);
-  const route = readFileSync(new URL('../app/(tabs)/assistant.tsx', import.meta.url), 'utf8');
+  // 24UX6A: the Assistant is a root-stack screen opened from the capture hub, no longer a tab.
+  const route = readFileSync(new URL('../app/assistant.tsx', import.meta.url), 'utf8');
   assert.equal(/fixtures/.test(route), false, 'the screen asks the runtime for a client and never touches fixtures');
+  const session = readFileSync(new URL('../src/assistant/session.ts', import.meta.url), 'utf8');
+  assert.equal(/fixtures/.test(session), false, 'the in-memory conversation session never touches fixtures');
 });
 
 test('English: the app\'s own words translate, the model\'s words, the user\'s data and the protocol stay as they are', async () => {

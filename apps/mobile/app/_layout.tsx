@@ -15,12 +15,14 @@ import { CategoryHuesProvider } from '../src/ui/category-hues';
 import { DisplayCurrencyProvider } from '../src/ui/display-currency-provider';
 import { RatesProvider } from '../src/fx/rates-provider';
 import { ActionButton, AppText, ErrorMessage } from '../src/ui/components';
-import { UIProvider, usePalette, useReduceMotion } from '../src/ui/theme';
+import { UIProvider, themePreferenceStore, usePalette, useReduceMotion } from '../src/ui/theme';
 import { HeldCurrenciesProvider, I18nProvider, useI18n } from '../src/i18n/provider';
 import { defaultPreferenceStore } from '../src/i18n/preference';
 import { markOnboardingDone, onboardingDecision } from '../src/ui/onboarding-flow';
 
 void SplashScreen.preventAutoHideAsync().catch(() => {});
+// 24UX6A: the Apariencia choice is read and handed to iOS before the first render, so no frame is drawn in the other scheme.
+themePreferenceStore();
 
 export const unstable_settings = { initialRouteName: '(tabs)' };
 
@@ -91,12 +93,15 @@ function Navigation() {
       headerBackButtonDisplayMode: 'minimal', gestureEnabled: true }}>
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       <Stack.Screen name="onboarding" options={{ headerShown: false, gestureEnabled: false, animation: 'fade' }} />
+      {/* 24UX6A (decision 005): the Assistant is a screen of this stack, opened from the capture hub, not a tab. */}
+      <Stack.Screen name="assistant" options={{ title: t('assistant.title') }} />
       <Stack.Screen name="account/[id]" options={{ title: t('nav.titles.account') }} />
       <Stack.Screen name="accounts" options={{ title: t('nav.titles.accounts') }} />
       <Stack.Screen name="entry/[id]" options={{ title: t('nav.titles.entry') }} />
       <Stack.Screen name="undone-entries" options={{ title: t('nav.titles.undoneEntries') }} />
       <Stack.Screen name="language" options={{ title: t('nav.titles.language') }} />
       <Stack.Screen name="region" options={{ title: t('nav.titles.region') }} />
+      <Stack.Screen name="appearance" options={{ title: t('nav.titles.appearance') }} />
       <Stack.Screen name="backup" options={{ title: t('nav.titles.backup') }} />
       <Stack.Screen name="backup-import" options={{ title: t('nav.titles.backupImport') }} />
       <Stack.Screen name="categories" options={{ title: t('nav.titles.categories') }} />

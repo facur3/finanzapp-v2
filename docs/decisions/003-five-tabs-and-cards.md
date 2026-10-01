@@ -2,9 +2,22 @@
 
 Fecha: 2026-09-20. Aceptada para la app nativa (Interfaz 10). Complementa las
 decisiones 001 y 002; no cambia el producto "gastos primero" ni las garantías de
-almacenamiento.
+almacenamiento. **§Navegación y §Sistema visual están reemplazadas por la
+[decisión 005](005-forest-four-tabs-and-capture.md) (2026-09-30);** la contabilidad de
+tarjetas y deudas y las invariantes 1–8 siguen vigentes y vinculantes.
 
 ## Navegación
+
+> **Reemplazado por la decisión 005 (2026-09-30).** Esta sección queda como registro
+> histórico. La tabla de abajo ya no coincidía con el código desde Producto 22 (Tarjetas
+> pasó a Más → Finanzas y el Asistente fue la pestaña central), y la frase «no hay pestaña
+> central de "acción" ni de IA» tampoco rige. Ahora: **cuatro pestañas** (Inicio,
+> Movimientos, Reportes, Más; Tarjetas sigue en Más); una **acción «+» aparte**, fuera de la
+> lista de pestañas y solo de toque, que abre el hub Registrar (Asistente, Gasto, Ingreso,
+> Transferencia); el **Asistente es una pantalla de la pila raíz** con la conversación en
+> memoria durante la sesión; el dock muestra solo íconos y VoiceOver oye «n de 4»; queda en el
+> layout. La mitigación de pestañas montadas sin fade/detach/freeze sigue igual para las
+> cuatro raíces, sin fundido entre pestañas.
 
 Hasta Interfaz 09 la app tenía tres pestañas (Inicio, Movimientos, Ajustes) y
 escondía Reportes detrás de un enlace de Inicio, y Presupuestos, Recurrentes y
@@ -313,6 +326,15 @@ y la decisión es la contraria (regla 7). 24T1 (PR #67) convirtió en pruebas 12
    pendiente».
 
 ## Sistema visual
+
+> **Reemplazado por la decisión 005 (2026-09-30).** Esta sección y la identidad cobalto que
+> la siguió (`docs/mobile-design.md`) quedan como registro histórico. Ahora rige **Forest**:
+> pino en la ventana de tono 158–168° (nunca turquesa, cian, esmeralda ni azul). Un gasto
+> común es tinta con signo menos, no coral; el ingreso es positivo en verde; la transferencia
+> es neutra, en tinta secundaria, ya no azul; el tono negativo queda solo para lo destructivo,
+> lo vencido y lo pasado de límite; la alerta sigue ámbar. Vidrio solo en el dock, el «+», el
+> hub, los controles circulares compactos, los menús y el compositor. Los colores de categoría
+> no cambian.
 
 Se retira el violeta como acento dominante. Base neutra (tinta sobre fondo
 gris/negro, superficies elevadas) y cuatro colores con significado: gasto coral,

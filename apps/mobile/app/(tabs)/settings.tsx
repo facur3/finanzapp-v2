@@ -6,7 +6,7 @@ import { FINANCE_ROW_LOOKS, appearanceHex } from '../../src/ui/appearance';
 import { AppText, GlyphTile, NavigationRow, Screen, SectionTitle, Surface } from '../../src/ui/components';
 import { useMaterialDecision } from '../../src/ui/material';
 import { MATERIAL_LABELS } from '../../src/ui/material-policy';
-import { usePalette } from '../../src/ui/theme';
+import { usePalette, useThemePreference } from '../../src/ui/theme';
 import { useI18n, useLocalePreferences } from '../../src/i18n/provider';
 import { previewOnlyCurrencies } from '../../src/storage/currency-gate';
 import { preferenceSummary, showsPreference } from '../../src/ui/locale-options';
@@ -15,7 +15,7 @@ declare const __DEV__: boolean | undefined;
 // Diagnostic: where this launch read the device languages. "módulo nativo" proves the build links expo-localization.
 const LOCALE_SOURCE_LABELS = { native: 'settings.localeSource.native', intl: 'settings.localeSource.intl', none: 'settings.localeSource.none' } as const;
 /** The pilot's version and the internal release name; neither is translated. */
-const VERSION = '0.1.0', RELEASE = '24T2';
+const VERSION = '0.1.0', RELEASE = '24UX6A';
 /** 24UX5: the material and locale diagnostics are for a tester on a development build; everyone else sees the version,
  * like the About line of an iOS app. `__DEV__` is false in a preview or store bundle, so the line is compiled away. */
 const DIAGNOSTICS = typeof __DEV__ !== 'undefined' && __DEV__;
@@ -39,6 +39,8 @@ export default function MoreScreen() {
   // A development bundle started with EXPO_PUBLIC_CURRENCY_PREVIEW=1 names its extra currencies here, so a tester never mistakes it for a release.
   const previewCurrencies = previewOnlyCurrencies(gate);
   const locale = useLocalePreferences();
+  const { preference: appearance } = useThemePreference();
+  const appearanceLabel = t(appearance === 'light' ? 'preferences.appearanceLight' : appearance === 'dark' ? 'preferences.appearanceDark' : 'preferences.appearanceSystem');
   const showsRegion = !!locale && showsPreference('region', locale.state);
   const activeRecurring = archive?.recurring?.filter(rule => rule.active).length ?? 0;
   const activeDebts = archive?.debts?.filter(debt => debt.active).length ?? 0;
@@ -64,9 +66,11 @@ export default function MoreScreen() {
       <SectionTitle>{t('settings.sections.appData')}</SectionTitle>
       <Surface grouped>
         <NavigationRow title={t('settings.rows.backup')} subtitle={t('settings.rows.backupSubtitle')} icon="save-outline" onPress={() => router.push('/backup')} />
-        <NavigationRow title={t('settings.rows.undone')} subtitle={undone ? t('settings.rows.undoneCount', { count: undone }) : t('settings.rows.undoneNone')} icon="arrow-undo-outline" last={!locale} onPress={() => router.push('/undone-entries')} />
-        {locale && <NavigationRow title={t('preferences.language')} subtitle={preferenceSummary('language', locale.state, t)} icon="language-outline" last={!showsRegion} onPress={() => router.push('/language')} />}
-        {locale && showsRegion && <NavigationRow title={t('preferences.region')} subtitle={preferenceSummary('region', locale.state, t)} icon="globe-outline" last onPress={() => router.push('/region')} />}
+        <NavigationRow title={t('settings.rows.undone')} subtitle={undone ? t('settings.rows.undoneCount', { count: undone }) : t('settings.rows.undoneNone')} icon="arrow-undo-outline" onPress={() => router.push('/undone-entries')} />
+        {locale && <NavigationRow title={t('preferences.language')} subtitle={preferenceSummary('language', locale.state, t)} icon="language-outline" onPress={() => router.push('/language')} />}
+        {locale && showsRegion && <NavigationRow title={t('preferences.region')} subtitle={preferenceSummary('region', locale.state, t)} icon="globe-outline" onPress={() => router.push('/region')} />}
+        {/* 24UX6A: Sistema, Claro or Oscuro; a device setting like the language and the region. */}
+        <NavigationRow title={t('preferences.appearance')} subtitle={appearanceLabel} icon="contrast-outline" last onPress={() => router.push('/appearance')} />
       </Surface>
       <AppText secondary variant="footnote" style={{ paddingHorizontal: 4 }}>
         {t('settings.localNote')}

@@ -4,6 +4,14 @@ Interfaz 17 · 21 de septiembre de 2026. Implementado en código; revisión visu
 gestual en iPhone pendiente. [Alcance del producto](decisions/002-spending-first.md) ·
 [Navegación y tarjetas](decisions/003-five-tabs-and-cards.md).
 
+> **Desde 24UX6A (decisión 005, 2026-09-30).** La paleta es **Forest** (pino, no cobalto), la app tiene **cuatro
+> pestañas** (Inicio, Movimientos, Reportes, Más) con un **«+» de registro** al lado, y el Asistente es una pantalla de
+> la pila, no una pestaña. Lo vigente está en «Producto 24UX6A». Las reglas de abajo que dicen otra cosa (cinco
+> pestañas, el Asistente en la pestaña central, ningún «+» flotante, el cobalto como primario, la transferencia azul,
+> el coral como color del gasto común, las etiquetas visibles de la barra) quedan como registro y llevan la marca
+> «Reemplazado por la decisión 005». La parte de navegación de la decisión 003 (cinco pestañas) también queda
+> reemplazada por la 005; sus reglas de tarjetas siguen.
+
 ## Referencias y criterio propio
 
 Apple Wallet aporta la jerarquía de una tarjeta y de una fila de transacción:
@@ -14,6 +22,10 @@ grande, controles compactos y color solo con significado. No copiamos marcas,
 mapas de comercios, estados bancarios ni acciones que la app no ejecuta.
 
 ## Sistema
+
+> **Reemplazado por la decisión 005 (2026-09-30):** los valores de color, el primario cobalto y la semántica de los
+> tres párrafos siguientes dejaron de regir; los tokens vigentes son los de Forest («Producto 24UX6A → Forest: la
+> paleta»). Se conservan como registro de Interfaz 17 a 24UX5.
 
 **Color.** Tinta sobre fondo. Claro: fondo #F2F2F6, superficie #FFFFFF, tinta
 #0A0A0C, secundario #66686F, terciario #84868D, relleno #EEEEF3 (24UX1: secundario y
@@ -31,6 +43,8 @@ los enlaces y acciones de sección, el único botón relleno de cada pantalla, e
 selector de cuenta y las marcas de elección en las hojas, la barra del mes elegido y
 "Este mes". El texto normal nunca es azul; los botones secundarios siguen en tinta
 sobre relleno. No es violeta ni verde neón: es un azul financiero, sobrio.
+*(Reemplazado por la decisión 005: el primario es el pino de Forest, #1D5647 / #94D2BB como texto y #1D4F42 /
+#86C9B0 como relleno; ya no hay ninguna regla «cobalto».)*
 
 **Semántica aparte.** Cuatro colores con significado, intactos: gasto coral (#C42F39 /
 #F0555C), ingreso verde (#15804F / #3DBE86), transferencia azul celeste (#0B6BB3 /
@@ -39,6 +53,9 @@ muestra), alerta ámbar (#B45309 / #E8A030), cada uno con un tinte suave para ti
 chips. Todos los textos semánticos superan 4,5:1 sobre la superficie. Los importes de
 gasto van en tinta con signo menos; solo el ingreso se pinta de verde. Nunca color sin
 signo o etiqueta. `tests/theme.node.ts` verifica estos contrastes en ambos temas.
+*(Reemplazado por la decisión 005: la transferencia ya no es azul celeste sino la tinta secundaria neutra, y el tono
+`expense` es el negativo —destructivo, vencido, sobre el límite—, nunca el color del gasto común. Sigue vigente que el
+gasto va en tinta con signo menos y que nada depende solo del color.)*
 
 **Color de categoría.** Ocho tonos apagados de una misma familia (terracota, azul
 acero, oliva, rosa, verde azulado, ocre, índigo, pizarra), con variante clara y
@@ -114,6 +131,8 @@ cuenta · fecha · importe), control segmentado nativo, botones de 52 pt, accion
 rápidas redondas (tile suave semántico de 56 pt con glifo y leyenda: Gasto coral,
 Ingreso verde, Transferir azul), estadísticas compactas, tarjeta de crédito con
 nombre, emisor, moneda, últimos cuatro dígitos y un tono estable por tarjeta.
+*(Los tonos coral y azul de las acciones rápidas: reemplazados por la decisión 005; los tokens `expense` y `transfer`
+que leen son ahora los de Forest. Su restyle por pantalla queda para 24UX6B–6D.)*
 
 ## Pantallas de esta entrega
 
@@ -140,27 +159,28 @@ nombre, emisor, moneda, últimos cuatro dígitos y un tono estable por tarjeta.
 - **Formularios.** Un solo modal de movimiento con el selector Gasto / Ingreso /
   Transferencia arriba (cambiar de modo es estado, no navegación), importe grande (verde
   para ingresos, azul para transferencias) y dos tarjetas de selección a ancho
-  completo que no se pueden pasar por alto: Categoría (con la línea de presupuesto
+  completo que no se pueden pasar por alto *(el azul de transferencia y el cobalto de cuenta y botón: reemplazados por
+  la decisión 005; la transferencia lee la tinta secundaria neutra y el primario es el pino)*: Categoría (con la línea de presupuesto
   del mes si existe) y Pagado con / Ingresa en (con saldo registrado o deuda de
   tarjeta, y el tipo de cada opción en la hoja). Comercio y fecha después. El botón
   Guardar repite el importe. Sin controles decorativos de dividir, comprobante o
   etiquetas mientras no existan sus datos. Jerarquía de color: categoría en su
   tono, cuenta en el primario, fecha neutra, botón de guardar en el primario.
-- **Inicio.** El mes en curso, nada más. Una fila con Gastos / Disponible y la
-  moneda; el nombre del mes (o "Saldo registrado" con el botón de información) y el
-  número principal, sin cantidad de registros ni rango de fechas ni selector de
-  período. Tres acciones redondas: Gasto, Ingreso, Transferir. Una línea de
-  presupuesto solo si hay presupuestos. Las tres acciones redondas son círculos
-  neutros (escalón de superficie en oscuro, blanco con sombra suave en claro) con
-  solo el glifo en su color semántico: el color vive en el trazo, no en un tile
-  relleno. "En qué gastaste": un bloque agrupado con hasta tres categorías; detrás
-  del contenido de cada fila, un lavado redondeado de su propio tono (11 % en
-  oscuro, 8 % en claro), con margen respecto de los bordes de la fila, corre desde
-  la izquierda exactamente en su proporción del mes (sin mínimo inventado: 0,1 %
-  es un filo y la fila sigue siendo tocable). Sin separadores que corten el
-  lavado. Tile, nombre e importe; sin porcentajes ni barra debajo. "Reportes"
-  abre la pestaña. Compromisos próximos solo cuando existen; los últimos cuatro
-  movimientos. Los períodos y el análisis viven en Reportes.
+- **Inicio (desde 24UX6A con Forest, decisión 005; ver «Producto 24UX6A → Inicio»).** Un campo financiero pino
+  arriba (el mes, el atajo a Cuentas, el alcance de moneda solo con dos o más, el número de 46 pt, su subrenglón y
+  Gastado / Disponible); debajo, solo si existen, «Próximos compromisos» (hasta dos de los próximos siete días) y
+  «Actividad reciente» (cuatro filas con compromisos, seis sin ellos); si no hay ninguno, un estado vacío tranquilo.
+  Registrar vive en el «+» del dock, no en Inicio. Los movimientos completos siguen en Movimientos, el análisis en
+  Reportes, los presupuestos en Presupuestos.
+- **Inicio (primera iteración de 24UX6A, reemplazada por la decisión 005, 2026-09-30).** Responde tres preguntas y termina: cómo estoy
+  (un número), qué necesita mi atención (los compromisos de esta semana y, a lo sumo, una línea
+  calculada) y cómo registro algo (un botón). Arriba, Gastos / Disponible compacto y el atajo a
+  Cuentas a la derecha, sin título de pantalla; el mes (o «Saldo registrado» con su botón de
+  información) y el número de 48 pt; debajo, lo que cubre (el chip de moneda solo con más de una,
+  la cantidad de cuentas en Disponible); «＋ Registrar», el único control relleno; después, solo si
+  hay algo que decir, hasta dos compromisos que vencen en los próximos siete días con «Ver todos»
+  y una línea: un presupuesto excedido, uno casi agotado o una categoría que concentra el mes. Los
+  movimientos viven en Movimientos, el análisis en Reportes, los presupuestos en Presupuestos.
 - **Movimientos.** Buscador, filtro Todos / Gastos / Ingresos / Transf., secciones
   "Hoy · 20 sep", "Ayer", día de la semana en los últimos siete días y luego la fecha,
   con el neto del día cuando hay una sola moneda.
@@ -227,17 +247,20 @@ siguen montadas, así un revelado al montar no se vería).
   el conjunto de categorías, el bloque se funde en lugar de transformar una
   categoría en otra.
 - **Una acción, pocas cosas.** Un toque mueve como máximo el pulgar del
-  segmentado, el número principal y una visualización. En Inicio la fila de
-  período conserva su lugar bajo Disponible y solo se atenúa; la lista reciente se
-  funde como un bloque.
+  segmentado, el número principal y una visualización. En Inicio, Gastado /
+  Disponible cruza el número (`ValueTransition`) y no mueve nada más; «Próximos compromisos» y
+  «Actividad reciente» aparecen o se van fundiéndose (`Reflow`). (La línea de atención que
+  también se fundía salió de Inicio con la decisión 005.)
 - **Bloques.** Una sección que aparece o desaparece se funde y los vecinos se
   deslizan en lugar de saltar; con Reduce Motion, solo el fundido.
-- **Lavados de categoría (Inicio).** Con los primeros datos, cada lavado crece
-  desde cero hasta su proporción real en 300 ms ease-out, con 50 ms de escalonado
-  entre filas; un cambio de datos interpola desde la proporción anterior en 260 ms.
-  Es una vista absoluta sin hijos detrás del contenido: no cuesta layout ni bloquea
-  el toque. Con Reduce Motion no hay movimiento de ancho, solo un fundido de 200 ms.
-  Nunca responde al scroll.
+- **Hoja de Registrar (24UX6A, decisión 005).** La tarjeta flota sobre el dock: entra
+  subiendo 12 pt con un fundido y sale con el fundido inverso, con los mismos tiempos de la
+  hoja (unos 300 ms al entrar, 200 ms al salir) y sin resortes; el velo y el «×» dibujado
+  sobre el «+» se funden con ella. Con Reduce Motion, solo el fundido en su lugar. La
+  pantalla elegida se abre recién cuando la hoja se fue (nunca dos presentaciones a la vez) y
+  la primera elección manda mientras se va. *(La primera iteración de 24UX6A usaba la hoja
+  de fecha que sube desde el borde: reemplazada por la decisión 005.)* (El lavado animado de
+  «En qué gastaste» se retiró con la lista de categorías de Inicio.)
 - **Formularios.** Gasto / Ingreso / Transferencia es un solo control sobre un
   solo modal: cambiar es estado, no navegación, y el formulario de abajo se funde.
 - **Deck de tarjetas (24T2; reemplaza al carrusel horizontal).** Las tarjetas no elegidas
@@ -254,16 +277,24 @@ siguen montadas, así un revelado al montar no se vería).
   política es explícita, `ReduceMotion.Never`, como la de la hoja: sin ella Reanimated los
   volvía un cambio instantáneo).
 - **Hápticos.** Uno por acción del usuario (selección en segmentos, cambio de
-  pestaña, flechas de mes, categoría o cuenta elegida, tarjeta elegida en el deck; éxito al
-  guardar) y siempre con una señal visual. Las pestañas cambian al instante, sin
-  deslizamiento ni fundido.
+  pestaña, flechas de mes, categoría o cuenta elegida, tarjeta elegida en el deck; un
+  impacto leve al tocar el «+» del dock; éxito al guardar) y siempre con una señal visual. Las
+  pestañas cambian al instante, sin deslizamiento ni fundido; el dock de 24UX6A no agrega
+  movimiento: la pestaña elegida cambia a su glifo relleno sobre la cápsula clara en el mismo
+  cuadro. *(Antes: «la cápsula flotante… cambia de tinta y de lente»; reemplazado por la
+  decisión 005.)*
 
-La pila y las hojas nativas siguen siendo la única transición de pantalla; las
-cinco pestañas permanecen montadas sin fade/detach/freeze. Objetivos de 44 pt,
+La pila y las hojas nativas siguen siendo la única transición de pantalla (el
+Asistente entra y sale con el empuje de la pila); las cuatro raíces de pestaña (Inicio,
+Movimientos, Reportes, Más) permanecen montadas sin fade/detach/freeze. *(Antes «las cinco
+pestañas»: reemplazado por la decisión 005, 2026-09-30.)* Objetivos de 44 pt,
 texto escalable con filas apiladas en tamaños grandes, etiquetas de VoiceOver con
 importe, moneda y estado.
 
 ## Producto 18 — navegación y acciones rápidas (sin rediseño)
+
+*Registro. Desde la decisión 005 (2026-09-30) Más es la cuarta pestaña de cuatro y el «primario cobalto» es el pino de
+Forest; ver «Producto 24UX6A».*
 
 - **Más.** La quinta pestaña deja de llamarse Ajustes: es el hub secundario, dos
   listas agrupadas nativas (Finanzas / App y datos) con una nota al pie sobre datos
@@ -324,6 +355,10 @@ importe, moneda y estado.
   ocre, pizarra) sobre la superficie neutra; App y datos sigue neutro.
 
 ## Producto 21 — el Asistente como capacidad principal
+
+*Registro. Desde la decisión 005 (2026-09-30) el Asistente es una pantalla de la pila que se abre desde la hoja del
+«+» (ya no una pestaña ni cuatro acciones en Inicio) y todo lo que aquí es «cobalto» lee el primario pino de Forest; la
+conversación, el borrador, la confirmación y la evidencia siguen como se describen. Ver «Producto 24UX6A».*
 
 - **Inicio.** Cuatro acciones de igual ancho: Asistente, Gasto, Ingreso, Transferir. Las
   columnas flexionan (nada de separaciones fijas que desbordan un iPhone angosto) y la
@@ -391,6 +426,277 @@ importe, moneda y estado.
   la app, no el "sept" del ICU del dispositivo). El inglés existe como catálogo y no se
   muestra hasta que toda la app lo tenga (23.1): un iPhone en inglés sigue leyendo
   español antes que media app traducida.
+
+## Producto 24UX6A — Forest, cuatro pestañas, el «+» de registro e Inicio (decisión 005)
+
+Decisiones finales del dueño del 2026-09-30, registradas en la decisión 005; la PR #70 se rehízo sobre ellas.
+Implementado en código; **la revisión en iPhone está pendiente** (no hubo build de EAS) y su lista está en
+docs/mobile-device-checklist.md. El contrato y las pruebas están en el roadmap («Producto 24UX6A»). No cambió nada
+de contabilidad, cotizaciones, unidades menores, transferencias, tarjetas, cuotas ni deudas; tampoco el esquema, la
+versión de las copias ni las dependencias nativas. 24UX6A abre el carril UX (24UX6A → 6B Reportes → 6C Movimientos y
+Más → 6D Tarjetas), que se apoya sobre el roadmap de producto (24T3, 25A, 25C/C2, 25D, 25E/F, Producto 26) sin
+reemplazarlo.
+
+### Forest: la paleta
+
+Un fondo mineral gris verdoso (negro OLED en oscuro), tinta para el texto y el dinero, y una sola marca pino en la
+ventana de tono 158–168°: nunca verde azulado, cian, esmeralda ni azul. Reemplaza al cobalto y a los neutros de
+Interfaz 17 (sección «Sistema», marcada). Los tokens viven en `src/ui/palette.ts`, sin React Native, y
+`tests/theme.node.ts` mide sus contrastes en Node.
+
+**La ventana de tono, exacta.** La ventana vinculante de 158–168° rige el campo (`hero`) y la marca clara (`primary`,
+`primaryFill`). Los hex exactos de la entrega para el acento salvia (#9FD8C1 / #86C9B0) y la marca oscura (#94D2BB /
+#86C9B0) miden 155,8–157,7°: las cifras HSL de la entrega están redondeadas, y se conservan los hex. Las pruebas exigen
+155–168° para todos los tokens de marca y 158–168° para el campo y la marca clara (decisión 005).
+
+| Token | Claro | Oscuro | Uso |
+| --- | --- | --- | --- |
+| `background` · `surface` · `inset` · `elevated` | #F0F3F1 · #FFFFFF · #E6EBE8 · #FFFFFF | #000000 · #0F1513 · #171E1B · #252D2A | Lienzo; grupos, hojas y campos; chips y campos sobre una superficie; segmento elegido y popovers |
+| `text` · `secondary` · `tertiary` · `line` | #0F1A16 · #45564E · #586961 · #DCE3DF | #EDF3EF · #A2B1A9 · #899A91 · #1F2825 | Tinta y dinero; etiquetas; decimales y marcadores; hairline |
+| `primary` · `link` | #1D5647 | #94D2BB | Marca como texto: enlaces, la opción elegida, glifos activos |
+| `primaryFill` · `onPrimary` · `primarySoft` | #1D4F42 · #FFFFFF · #E1ECE7 | #86C9B0 · #05211A · #14261F | El único botón relleno y su tinta; un tinte de marca |
+| `thumb` | #FFFFFF | #323D39 | Pulgar del segmentado compacto sobre el lienzo |
+| `expense` · `income` · `transfer` · `warning` | #B3432E · #1F7A4F · #45564E · #9A5B00 | #EE8A72 · #5CCB93 · #A2B1A9 · #E8A94A | Negativo · positivo · neutro · vence pronto |
+| `scrim` | rgba(0,0,0,0.40) | rgba(0,0,0,0.60) | Velo de las hojas y de la hoja de Registrar |
+| `hero` · `heroInk` · `heroSecondary` | #14362D · #EEF5F1 · #A8C4B9 | #0F2A22 · #EDF5F0 · #A1BDB2 | El campo financiero de Inicio y su tinta |
+| `heroControl` · `heroThumb` · `heroThumbInk` | #26493F · #F4F8F6 · #14362D | #1E3D34 · #E4EEE9 · #0F2A22 | Controles sobre el campo: pista, pulgar y su texto |
+| `accent` · `onAccent` | #9FD8C1 · #0F2A22 | #86C9B0 · #05211A | El acento salvia: el «+» del dock y el círculo del Asistente en la hoja |
+| `dock` · `dockInk` · `dockActive` · `dockActiveInk` | #1B3C33 · #B5C9C1 · #3C6356 · #FFFFFF | #133029 · #A9BFB6 · #335A4E · #FFFFFF | La píldora pino, los glifos inactivos, la cápsula de la pestaña elegida y su glifo |
+
+Los rellenos de deslizar (`swipeDestructive`, `swipeNeutral`, `swipeAccent`) y los tintes suaves de cada semántica
+siguen la misma familia (valores en `palette.ts`).
+
+- **Marca.** `primary` y `primaryFill` marcan interacción y selección, y nada más. Donde una regla anterior decía
+  «cobalto», hoy rige el pino. El texto normal sigue en tinta; los botones secundarios, en tinta sobre relleno.
+- **Significado.** El rojo nunca quiere decir «gastado»: un gasto es tinta con signo menos; `income` (positivo) va
+  con signo más; `transfer` es la tinta secundaria neutra (ya no azul); `expense` es el tono negativo, reservado para
+  lo destructivo, lo vencido y lo que pasa un límite; `warning` es lo que vence pronto. Nunca color sin signo o
+  etiqueta.
+- **Campo y acento.** `hero*` es el campo financiero de Inicio y el tile del Asistente en la hoja de Registrar. El
+  acento salvia es solo del «+» (y del círculo del Asistente dentro de la hoja que el «+» abre).
+- **Lo que no cambió.** Los colores de categoría: los ids de apariencia de `packages/domain`, los presets, el hash, el
+  orden de asignación y los tonos de `src/ui/category-color.ts`; un color guardado y el tono derivado de una categoría
+  histórica conservan su identidad. Tampoco hubo reescritura global de tipografía ni de radios.
+- **Alcance.** Todas las pantallas leen los tokens, así que toman Forest desde ya; el restyle propio de Reportes, de
+  Movimientos y Más, y de Tarjetas es 24UX6B, 6C y 6D.
+
+### Superficies y vidrio
+
+- Lienzo `background`; grupos, hojas y campos en `surface`; chips y campos sobre una superficie en `inset`; pulgar y
+  popovers en `elevated`; hairline `line`. En oscuro el lienzo es negro puro y las superficies suben por escalones,
+  sin sombra.
+- El vidrio es una capa de control, nunca de contenido: solo el dock, el «+», la hoja de Registrar, los controles
+  circulares compactos, los menús y el compositor pueden llevarlo; filas, tarjetas, saldos, gráficos y contenido fijo
+  quedan sólidos. Las píldoras de movimiento del detalle de una cuenta (desde 24UX3) son una superficie de control ya
+  existente y también pueden llevarlo. En esta entrega el código dibuja Liquid Glass, donde iOS lo ofrece y Reducir
+  transparencia está apagado, en tres superficies: la píldora del dock (teñida de pino, `dock`), las píldoras de
+  movimiento del detalle de una cuenta y el compositor del Asistente. Sin vidrio, el dock es el pino sólido con
+  hairline y una sombra suave en claro (`dockMaterial`), que es el estado diseñado y no uno roto. El «+» es un material
+  opaco (acento, hairline, sombra leve en claro) y la tarjeta de la hoja es `surface`: ambos sólidos.
+
+### El dock: cuatro pestañas y el «+»
+
+- **Cuatro raíces**, en este orden: Inicio (sin cabecera), Movimientos (conserva el «+» de su cabecera, que abre un
+  movimiento nuevo), Reportes y Más. No hay pestaña del Asistente. La mitigación de pantallas negras de
+  `src/ui/navigation.ts` no cambió (sin detach, sin animación, sin carga perezosa, sin congelar, escena opaca):
+  cambiar de pestaña es instantáneo, sin fundido.
+- **Geometría** (`src/ui/dock-geometry.ts`, pura): 60 pt de alto, 16 pt de los lados (más el inset lateral en
+  horizontal), 8 pt arriba y 10 pt entre la píldora y el «+» de 60 pt. Debajo, el inset inferior menos 14 pt (nunca
+  menos de 10): descansa en la parte alta del área del indicador de inicio, sin tocarlo; 10 pt en un iPhone sin
+  indicador. A 375 pt cada pestaña tiene unos 65 pt de ancho; a 393 pt, unos 70.
+- **En el layout, nunca encima.** El dock es una fila sobre el lienzo de la pantalla: cada pantalla termina arriba de
+  él, y el desplazamiento, el teclado, las áreas seguras y la última fila funcionan como antes.
+- **Solo íconos a la vista, nunca para la accesibilidad.** Glifo de 24 pt en `dockInk`; la pestaña elegida lleva el
+  glifo relleno en `dockActiveInk` sobre una cápsula `dockActive`: dos señales, nunca solo el color. Cada pestaña es un
+  blanco de 48 pt de alto y de unos 65 pt de ancho a 375 pt (unos 70 a 393 pt). En iOS, VoiceOver dice «Inicio, pestaña, 1 de
+  4» (un botón que nombra su posición, porque el rol `tab` de React Native no le da rasgo a iOS) y «Seleccionado» en la
+  actual; en otras plataformas, el rol `tab` con su nombre. Una pulsación larga muestra el nombre en el visor de
+  contenido grande de iOS. Se emiten `tabPress` y `tabLongPress` como en la barra del sistema, y tocar la pestaña
+  actual no navega.
+- **El «+» es una acción, no una quinta pestaña.** Queda fuera de la lista de pestañas, sin estado elegido y fuera del
+  «n de 4». VoiceOver: «Registrar», con la pista «Abre las opciones para registrar». Un círculo de 60 pt con relleno
+  `accent` y el glifo `add` en `onAccent`, hairline y sombra leve en claro; un impacto háptico leve; solo toque (no
+  hay atajo de pulsación larga en v1).
+
+### La hoja de Registrar
+
+- El «+» abre una tarjeta que flota sobre el dock (`BottomSheet` con `floating`): 12 pt por encima del dock y de los
+  lados, 32 pt de radio, el título «Registrar» como eyebrow, sin fila Cancelar / Listo; el dock sigue visible bajo el
+  velo. Se cierra con «Cerrar» (un «×» dibujado exactamente donde está el «+», sobre el velo y dentro del mismo grupo
+  modal de VoiceOver), con el velo, con el gesto de escape de VoiceOver o con atrás. La tarjeta nunca pasa del alto de
+  la ventana menos el área segura superior y el espacio del dock (mínimo 200 pt); cuando no entra (tamaños de texto de
+  accesibilidad), el título y las opciones se desplazan dentro de la tarjeta, sin rebote. La hoja por defecto (fecha y
+  las demás) no cambió.
+- **Primero y más grande, el Asistente**: un tile pino (`hero`) con el círculo de acento y sparkles, «Asistente» y
+  «Decilo con tus palabras o preguntá lo que quieras». Solo si esta sesión de la app ya tiene una conversación,
+  un chip «Continuar: «…»» con las últimas palabras reales de la persona; nunca una línea inventada.
+- **Debajo, tres filas neutras** (tile `inset` con el glifo en el primario): Gasto «Una compra o un pago», Ingreso
+  «Sueldo, cobro u otro ingreso», Transferencia «Entre cuentas o pago de tarjeta». La elección es la palabra, no un
+  color.
+- **Sin micrófono.** Un micrófono que no puede dictar sería un callejón sin salida; el dictado es trabajo posterior
+  del Asistente.
+- **Una elección, una pantalla.** Gasto e Ingreso abren el formulario de movimiento con su tipo, Transferencia la
+  transferencia, el Asistente su pantalla; con `router.push`, una sola vez y recién cuando la hoja se fue. La primera
+  elección manda mientras la hoja se va: otra fila, el velo o el «+» no cambian nada. Un movimiento se preselecciona
+  en la moneda mostrada solo si una cuenta viva la tiene; el Asistente recibe la moneda mostrada. Nada se escribe
+  desde la hoja.
+
+### El Asistente, una pantalla de la pila
+
+- `app/assistant.tsx` es una pantalla del stack raíz con el título «Asistente»: entra y sale con el empuje nativo, y
+  atrás vuelve a la pantalla donde se tocó el «+». «Nuevo chat» aparece en la cabecera cuando hay mensajes.
+- La conversación vive en una sesión en memoria (`src/assistant/session.ts`), una por proceso de la app: salir de la
+  pantalla no la borra ni corta una respuesta en curso (la respuesta llega a la sesión); volver la muestra con su
+  último intercambio a la vista. Nuevo chat la reinicia y cerrar la app la borra. Nada se guarda.
+- Los enlaces de evidencia a una raíz (Inicio, Movimientos, Reportes, Más) usan `router.dismissTo`: vuelven a las
+  pestañas que ya están debajo del Asistente y eligen esa pestaña (un solo dock; atrás no descubre un segundo juego de
+  pestañas, que es lo que apilaría `navigate` desde esta pantalla). Los demás se apilan. Sigue sin escribir nada sin
+  un borrador confirmado, y reintentar reutiliza el mismo id de movimiento.
+
+### Inicio: el campo financiero
+
+Inicio tiene su propio desplazamiento y ningún título. Arriba, el campo financiero pino (`hero`, 32 pt de radio
+abajo), que empieza detrás de la barra de estado (relleno superior: el área segura más 12 pt):
+
+1. El mes en curso como encabezado (no se toca, sin chevron) y, a la derecha, el botón de billetera a Cuentas.
+2. Solo con dos o más monedas: el chip de moneda y el botón de información. Con una sola moneda la fila no existe y
+   la información pasa junto al subrenglón.
+3. El número a 46 pt en `heroInk` (en `heroSecondary` si es exactamente cero); con una cotización faltante, sus partes
+   por moneda; fuera de rango, su texto.
+4. El subrenglón. Gastado: «Hasta hoy · $ X por día» o «Sin gastos este mes». Disponible: «Saldo registrado · N
+   cuentas», nunca una cifra por día.
+5. Gastado / Disponible, un segmentado sobre el campo (pista `heroControl`, pulgar `heroThumb`, elegido
+   `heroThumbInk`, el otro `heroSecondary`): solo cambia el número.
+
+- **Debajo, solo lo que existe.** «Próximos compromisos»: los gastos recurrentes que vencen en los próximos siete
+  días, a lo sumo dos, con «Ver todos» → Recurrentes. «Actividad reciente»: gastos e ingresos de este mes (sin
+  transferencias), del más nuevo, cuatro filas si hay compromisos y seis si no, con «Ver todos» que selecciona
+  Movimientos. Cada uno en un grupo; sin datos, la sección no existe.
+- **Vacíos.** Sin ninguno de los dos: «Todavía no hay movimientos este mes» / «Registrá un gasto con el botón
+  Registrar (+) o contáselo al Asistente.» (el «+» por el nombre que le da VoiceOver), sin botón. Con una moneda de
+  varias mostrada sola («Solo X»), el título nombra la moneda: «Todavía no hay movimientos en X este mes» (la regla de
+  24UX2, restituida). Sin cuentas: el estado vacío con «Empezar» → nueva cuenta.
+- **Salieron de Inicio** «＋ Registrar» (ahora es el «+» del dock), la línea de atención, los rankings, las tarjetas de
+  presupuesto, los gráficos y el banner del Asistente. Siguen en Presupuestos, Reportes y la hoja de Registrar.
+- **Barra de estado.** Contenido claro mientras Inicio tiene foco y el campo está debajo de la barra; vuelve al
+  estilo del tema al pasar el campo o al salir de Inicio.
+- **La semántica no cambió.** Gastado son solo los gastos del mes (nunca transferencias ni pagos de tarjeta; las
+  cuotas en el mes de su resumen; consolidado con la cotización de la fecha de cada movimiento). Disponible es el
+  saldo registrado de las cuentas de dinero (sin tarjetas, deudas ni cobros): no es ingresos menos gastos ni lo que
+  queda de un presupuesto.
+
+### Motion
+
+Las reglas de «Motion y accesibilidad» siguen vigentes: la curva de `src/ui/motion.tsx`, sin resortes, y nada supera
+300 ms salvo el revelado de un gráfico.
+
+- **La hoja de Registrar** sube 12 pt con un fundido sobre los tiempos que ya tenían las hojas (unos 300 ms al entrar,
+  200 ms al salir); con Reduce Motion, solo el fundido en su lugar.
+- **Las pestañas** cambian al instante; la cápsula y el glifo relleno cambian en el mismo cuadro.
+- **Inicio.** Gastado / Disponible mueve el pulgar y cruza el número; los grupos aparecen o se van con `Reflow`.
+- **El Asistente** entra con el empuje de la pila; no hay transición propia.
+
+### Lo que sigue en el carril UX (aprobado, sin implementar)
+
+- **24UX6B Reportes.** Se reordena y se viste en Forest sin quitar presupuestos, hechos ni flujo neto. La dona elegible
+  es solo selección visual dentro del reporte; se permiten el gráfico Día a día y una cabecera fija sólida. Las barras
+  de evolución conservan la navegación por mes actual (sin una segunda selección solo para comparar); «Otras» sigue
+  agrupando por los primeros N (no se adopta la regla del 3 %); sin ruta inventada de detalle por comercio.
+- **24UX6C Movimientos y Más.** Filas, búsqueda y filtros en Forest; filtros por período, cuenta y categoría desde los
+  datos del repositorio; el total del día como hoy. Sin nota, origen Apple Pay ni hora inventados; Deshacer y
+  Recuperar se quedan (sin borrado definitivo falso), igual que Movimientos deshechos. Idioma y Región siguen siendo
+  rutas separadas, agrupadas a la vista; no hay fila «Ajustes» (no tiene ruta).
+- **24UX6D Tarjetas.** Conserva todo lo que hace (Disponible de crédito, Registrar compra, Recientes); se permiten la
+  interacción de mazo y el restyle Forest. El progreso de cuotas es registradas / facturadas según el dominio, nunca
+  «pagadas» inferidas, con los importes programados reales; ninguna fórmula contable ni de disponible cambia.
+
+### Apariencia
+
+- Más → App y datos → Apariencia: Sistema (por defecto: decide el iPhone), Claro u Oscuro, con el selector de Idioma y
+  Región. Es una preferencia del dispositivo, como el idioma: se guarda en el almacén de preferencias, fuera de la
+  base financiera y de las copias de seguridad (restaurar una copia no cambia cómo se ve este iPhone), sin migración.
+- Se guarda antes de aplicarse (una escritura rechazada no cambia nada y la pantalla lo dice). Se aplica en toda la app
+  al instante y también a iOS (`Appearance.setColorScheme`), así el teclado, las alertas, la rueda de fecha y el vidrio
+  coinciden con la paleta; Sistema le devuelve la decisión al dispositivo. Se lee y se aplica antes del primer cuadro:
+  sin parpadeo del otro tema. La pantalla de lanzamiento nativa, anterior a todo JavaScript, sigue al dispositivo; el
+  primer cuadro después ya es el elegido.
+- Apariencia no toca los tokens: solo decide quién elige el tema (Sistema, Claro u Oscuro). Los valores de cada tema
+  son los de Forest (arriba); en la primera iteración eran los de Interfaz 17.
+
+### Primera iteración de esta PR (reemplazada por la decisión 005, 2026-09-30)
+
+> **Reemplazado por la decisión 005.** Registro de la primera versión de 24UX6A, que no llegó a publicarse: cinco
+> pestañas con etiquetas visibles y el Asistente al centro, cobalto como primario, «＋ Registrar» dentro de Inicio, la
+> línea de atención y el rechazo explícito de un «+» flotante. Lo vigente es lo de arriba: Forest, cuatro pestañas
+> solo con íconos, el «+» en el dock, el Asistente como pantalla de la pila y el Inicio de campo financiero. Siguen
+> valiendo de aquí los compromisos de la semana (dos como máximo), Apariencia y la lista de componentes retirados.
+
+Las capturas del dueño (un Inicio anterior, una app de finanzas premium, una barra flotante con «+», una IA de dinero)
+fueron solo referencia de jerarquía: no se copió marca, paleta, recurso, medida ni arquitectura de información. La
+identidad sigue: minimalismo iOS, tinta neutra, cobalto solo para interacción, selección, la acción principal y la
+pestaña activa; sin violeta; menos superficies. El contrato y las pruebas están en el roadmap («Producto 24UX6A»).
+
+#### Antes → después
+
+- **Antes (24UX3–24UX5).** Título «Inicio» con el atajo a Cuentas; Gastos / Disponible con el chip de moneda; el
+  número; tres píldoras (Gasto, Ingreso, Transferir) y la entrada ancha «Contale al Asistente»; la tarjeta
+  «Presupuesto del mes»; «En qué gastaste» con tres categorías y el enlace a Reportes; «Próximos compromisos» (hasta
+  tres, cualquier fecha); «Últimos movimientos» con «Ver todos». Siete bloques que competían con el número.
+- **Después.** Gastos / Disponible compacto y el atajo a Cuentas en la misma fila (donde estaba el título: la pestaña
+  elegida ya nombra la pantalla); el mes y el número de 48 pt; debajo lo que cubre; «＋ Registrar»; después, solo si
+  existen, hasta dos compromisos de los próximos siete días y una línea de atención. Un mes tranquilo es el número y el
+  botón. El título raíz se quitó solo en Inicio: Movimientos, Asistente, Reportes y Más conservan el suyo (su título
+  sí orienta: son listas, una conversación y un hub), y ninguna pantalla de detalle o formulario perdió su cabecera.
+
+#### Qué salió de Inicio (y dónde sigue)
+
+- «Últimos movimientos» → la pestaña Movimientos. «En qué gastaste» → Reportes (dona, leyenda, detalle por
+  categoría). La tarjeta de presupuesto → Presupuestos, y en Inicio solo la línea cuando pide atención. Las tres
+  píldoras y la entrada del Asistente → la hoja de Registrar (las píldoras siguen en el detalle de una cuenta).
+- Se eliminaron los componentes que ya no tenían otro uso (`CategoryRanking`, `BudgetHomeCard`, `AssistantEntry`, la
+  variante `home` de `EntryRow`, `budgetHomeHeadline`, `categoriesStatus`) y sus textos.
+
+#### Registrar: un botón, una hoja
+
+- **Por qué una hoja y no cuatro controles.** Cuatro botones grandes eran la mitad de la pantalla y pesaban como el
+  número. Un «+» flotante persistente sobre la barra competiría con la pestaña central del Asistente y taparía
+  contenido; un menú contextual de iOS esconde el Asistente detrás de una pulsación larga. Una cápsula cobalto
+  «＋ Registrar» bajo el número (la única acción rellena de Inicio, a lo ancho con texto de accesibilidad) abre la hoja
+  compacta de la fecha con cuatro filas: Registrar gasto (coral), Registrar ingreso (verde), Transferir entre cuentas
+  (azul) y Hablar con el Asistente (cobalto, con «Contale qué pasó: te propone el movimiento y vos lo confirmás»).
+  Cancelar, el velo o el gesto atrás cierran sin abrir nada. Cada fila abre exactamente lo que abría el control
+  anterior, con la misma moneda, después de que la hoja se fue. Nada se escribe desde la hoja; el Asistente sigue
+  proponiendo borradores que la persona confirma, y sigue siendo la pestaña central.
+
+#### Lo que necesita atención
+
+- **Compromisos.** Solo los gastos recurrentes activos que vencen hoy o en los próximos seis días, los dos más
+  próximos, con «Ver todos» (Recurrentes). Sin nada esta semana, la sección no existe (antes mostraba el mes
+  siguiente). Las filas son las de 24UX5 (marca de 40 pt, la fecha bajo el importe).
+- **Una línea, a lo sumo.** En este orden: un presupuesto del mes excedido (el general antes que una categoría:
+  «Superaste tu presupuesto de Ocio por $ 9.000,00.»), uno al 85 % o más («Te queda 12 % de tu presupuesto de
+  Comida.»), o una categoría con el 40 % o más del gasto del mes, con al menos dos categorías («Comida concentra 46 %
+  de tus gastos de este mes.»). Hechos calculados, nunca una causa ni un consejo, nunca de un mes incompleto o sin
+  cotización. Un glifo en su tono (ámbar cerca del límite, coral pasado, el tono de la categoría) y una flecha: abre
+  Presupuestos en la moneda del presupuesto o Reportes en la moneda de Inicio. Un presupuesto en otra moneda que la
+  mostrada la nombra: el importe con su código, la proporción «… en ARS».
+
+#### Barra de pestañas
+
+- Cinco destinos, los mismos y en el mismo orden (Inicio, Movimientos, Asistente, Reportes, Más), sin cambio de rutas.
+  La barra es una cápsula flotante de 62 pt, separada 16 pt de los bordes y apoyada en la parte alta del área del
+  indicador de inicio, sobre el fondo de la pantalla. Se dibuja con el material de control de la app: Liquid Glass
+  donde iOS lo dibuja y Reducir transparencia está apagado; si no, la superficie opaca con un filo fino (y una sombra
+  suave en claro), el estado diseñado en iOS anteriores, Android y con Reducir transparencia.
+- La pestaña elegida: glifo relleno y etiqueta en cobalto sobre una lente neutra (un estado, no un color); las otras
+  en tinta secundaria (AA). Las etiquetas siempre visibles, a 10 pt como en la barra del sistema, hasta 1,3× con Dynamic
+  Type y achicándose para caber en un iPhone angosto antes que cortarse («Movimientos» nunca termina en «…»), con el visor de contenido
+  grande de iOS (una pulsación larga muestra la etiqueta grande, como en la barra del sistema); cada pestaña es un
+  blanco de 48 pt; VoiceOver la lee como la barra de siempre: «Inicio, pestaña, 1 de 5» y «Seleccionado» en la actual.
+- **Por qué sigue en el layout y no flota encima.** Una barra absoluta sobre el contenido obligaría a cada lista a
+  reservar su alto, rompería el cálculo del compositor del Asistente y el teclado, y taparía la última fila con texto
+  grande. La cápsula queda en el flujo: cada pantalla termina arriba de ella, y el compositor, el teclado y las áreas
+  seguras funcionan como antes. No hay «+» flotante adicional.
 
 ## Producto 24T2 — compra en cuotas y Tarjetas completo
 
@@ -926,6 +1232,10 @@ Detalle en docs/currency.md §8–§10.
 
 ## Producto 22 — alcance con el pulgar y material nativo
 
+*Registro. Reemplazado por la decisión 005 (2026-09-30) en tres puntos: el Asistente ya no es la pestaña central (hay
+cuatro pestañas y el Asistente se abre desde el «+»), el cobalto pasó a ser el pino de Forest, y la barra de pestañas
+sí es una superficie de control (el dock, vidrio teñido de pino donde iOS lo dibuja). Ver «Producto 24UX6A».*
+
 - **Pestañas.** Inicio, Movimientos, **Asistente**, Reportes, Más. El centro inferior
   es el punto equidistante para el pulgar derecho y el izquierdo y queda dentro de la
   zona cómoda en un iPhone chico y en uno grande; la fila de acciones de Inicio vive en
@@ -953,6 +1263,10 @@ Detalle en docs/currency.md §8–§10.
   fase de development build, no una capa de vidrio forzada encima).
 
 ## Producto 24UX1 — la entrada de la hoja de fecha, auditoría de Inicio y dirección nativa
+
+*Registro. Reemplazado por la decisión 005 (2026-09-30) en la barra de pestañas (el Asistente al centro), el cobalto y
+los neutros de Interfaz 17 que se citan aquí: hoy rigen cuatro pestañas, el «+» y Forest. La entrada de la hoja de
+fecha sigue vigente. Ver «Producto 24UX6A».*
 
 ### La hoja de fecha: por qué aparecía de golpe y cómo entra ahora
 
@@ -1081,6 +1395,10 @@ de texto por defecto y al mayor de accesibilidad:
 
 ## Producto 24UX2 — identidad de comercios y refinamiento de Inicio
 
+*Registro. Reemplazado por la decisión 005 (2026-09-30) en las cuatro acciones de Inicio, la pestaña central del
+Asistente y el cobalto: hoy rigen el «+» y su hoja, cuatro pestañas y Forest. Siguen la identidad de comercios, la fecha
+una vez en las filas de compromisos y el título vacío que nombra la moneda. Ver «Producto 24UX6A».*
+
 Sin rediseño general: Inicio conserva Gastos / Disponible, el importe grande, la moneda discreta
 cuando hay varias, las cuatro acciones, las categorías, los próximos compromisos y los últimos
 movimientos. No se agregó ningún módulo. Todo lo que sigue es cálculo sobre el código y los
@@ -1176,6 +1494,11 @@ persona; la categoría sigue en la leyenda de la fila. Solo en desarrollo,
 8. El pie de Más dice Producto 24UX2.
 
 ## Producto 24UX3 — jerarquía de Inicio
+
+*Registro. Reemplazado por la decisión 005 (2026-09-30) en Inicio: salieron «En qué gastaste» con sus lavados de
+categoría, las píldoras y la entrada del Asistente (que llevaba a una pestaña central que ya no existe); el número es de
+46 pt y el cobalto es el pino de Forest. Siguen «Próximos compromisos», «Actividad reciente» (antes «Últimos
+movimientos») y las píldoras del detalle de una cuenta. Ver «Producto 24UX6A».*
 
 Sin rediseño desde cero y sin módulos nuevos: la misma estructura (título, Gastos / Disponible,
 la moneda a la derecha, el número, las acciones, las secciones), con un solo punto focal y menos
@@ -1342,6 +1665,8 @@ verifica el contraste, el tono y que quede lejos del primario, del azul de trans
 secundaria. No se usa para controles, selección ni significado: los segmentados y el chip de moneda
 siguen neutros, los colores de categoría, gasto, ingreso y transferencia no cambian. El resto de la app
 conserva el enlace cobalto de `SectionTitle`.
+*(Valores reemplazados por la decisión 005, 2026-09-30: en Forest `link` es el texto de marca pino, #1D5647 en claro
+y #94D2BB en oscuro; ya no hay enlace cobalto ni azul pizarra.)*
 
 ### Filas de Inicio: una marca, dos densidades
 
@@ -1441,11 +1766,30 @@ color propio.
 
 ## Pendiente de revisión en iPhone
 
-- Producto 24T2: el deck con una, tres y más de doce tarjetas (franjas, selección con háptico, la tarjeta elegida traída a
-  la vista, el gesto atrás intacto), el resumen al cambiar de tarjeta (fundidos y deslizamientos, sin saltos) y con
-  Reduce Motion (fundidos que duran); la compra en cuotas con y sin interés; el formulario de tarjeta con fechas; los
-  detalles de tarjeta, de plan y de una cuota; VoiceOver (orden, posiciones, pistas) en ambos idiomas; el texto de
-  accesibilidad más grande; ambos temas. Lista en docs/mobile-device-checklist.md.
+- Producto 24UX6A con Forest (decisión 005; sin build de EAS, nada revisado todavía): el dock de cuatro pestañas solo
+  con íconos (VoiceOver «n de 4», «Registrar» que no es una pestaña, el visor de contenido grande con pulsación larga
+  a tamaños de accesibilidad, 30–40 cambios rápidos de pestaña sin pantallas negras, vidrio contra pino sólido con
+  Reducir transparencia); la hoja de Registrar (abrir y cerrar con el «×», el velo y el escape de VoiceOver, la primera
+  elección que manda, el fundido con Reduce Motion); el Asistente (empuje y atrás, la conversación que sobrevive en la
+  sesión, «Continuar» solo después de un intercambio real, borrada por Nuevo chat y al cerrar la app, el teclado del
+  compositor como pantalla de la pila, el enlace de evidencia de vuelta a Movimientos); Inicio (el campo bajo la barra
+  de estado en claro y oscuro, contenido claro y de vuelta a texto oscuro al desplazarse en claro, el mes que no se
+  toca, la fila de alcance solo con dos o más monedas, el por día solo en Gastado, compromisos hasta dos u omitidos,
+  actividad de cuatro o seis, los estados vacíos, importes largos a 375 pt, texto de accesibilidad y Dynamic Type); el
+  contraste de Forest en el dispositivo; los colores de categoría sin cambios; Apariencia Sistema / Claro / Oscuro sin
+  parpadeo; el mapeo de glifos SF Symbols / Ionicons. Lista en docs/mobile-device-checklist.md.
+
+- Producto 24UX6A, primera iteración (reemplazada por la decisión 005; lo que sigue vigente está en el punto de
+  arriba): Inicio a primer vistazo en claro y oscuro, con vidrio y opaco (¿el número manda?, ¿«＋ Registrar» se
+  lee como la acción principal sin gritar?); la hoja de Registrar (subida, las cuatro filas, abrir cada destino después
+  de que se va, Cancelar, el velo, Reduce Motion, VoiceOver); los compromisos de la semana y la línea de atención en
+  sus casos; la barra flotante (separación del indicador de inicio, lente, etiquetas con texto de accesibilidad,
+  VoiceOver, el teclado en el Asistente y en Movimientos, un iPhone angosto, Reducir transparencia); Apariencia
+  (Sistema, Claro, Oscuro, cambiar con la app abierta, cerrar a la fuerza y reabrir, el teclado y las alertas en el
+  tema elegido, sin parpadeo al abrir). Lista en docs/mobile-device-checklist.md.
+
+- Producto 24T2: **verificado** por el dueño en un iPhone 14 Pro con un build de desarrollo nuevo (2026-09-29; PR #69,
+  merge 8951f6c).
 
 - Producto 25B3: el detalle de una cuenta sin la fila de saldo inicial (el mismo saldo registrado, el grupo
   con solo Recurrentes); el detalle de un recurrente desde Inicio, desde Recurrentes y desde un movimiento

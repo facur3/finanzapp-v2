@@ -1,10 +1,16 @@
 # FinanzApp mobile: living roadmap
 
-Updated: 2026-09-28 (Producto 24T2, on its branch as PR #69: the purchase in cuotas, the card's statement calendar with
-exact dates, schema 13 and backup v13, and the Tarjetas deck; 24T1C merged as PR #68). Read [decision 001](decisions/001-native-mobile.md),
+Updated: 2026-09-30 (Producto 24UX6A, amended on its branch (PR #70) into the Forest foundation, the four-tab shell, the
+capture hub, Home and Appearance: the Forest palette, four icon-only tabs and a separate «+» in one dock, the hub with the
+Assistant first, the Assistant as a root-stack screen with an in-memory conversation, Inicio's financial field with the
+month's activity, Más → Apariencia; owner decisions recorded in decision 005 (2026-09-30); the UX lane 24UX6A → 24UX6B →
+24UX6C → 24UX6D is layered on the product order; device QA pending, no EAS build. Producto 24T2 merged as
+PR #69, merge commit 8951f6c: schema 13, backup v13, the purchase in cuotas, the card's statement calendar and the
+Tarjetas deck, verified by the owner on an iPhone 14 Pro with a fresh development build). Read [decision 001](decisions/001-native-mobile.md),
 [decision 002](decisions/002-spending-first.md),
-[decision 003](decisions/003-five-tabs-and-cards.md) and
-[decision 004](decisions/004-native-first-and-web-retirement.md). Decision 002 supersedes
+[decision 003](decisions/003-five-tabs-and-cards.md),
+[decision 004](decisions/004-native-first-and-web-retirement.md) and [decision 005](decisions/005-forest-four-tabs-and-capture.md) (the Forest identity, four tabs
+and the capture hub, 2026-09-30; its navigation rule supersedes decision 003's five tabs). Decision 002 supersedes
 earlier full-finance migration phases and the local-only AI preference; decision 004 makes
 the native app the product; the web/Capacitor frontend was retired on 2026-09-25 (Producto
 24REP; its last version is the tag `web-frontend-final`). This file
@@ -46,10 +52,14 @@ history file keeps the evidence of when and why.
   ingreso, saldo manual, presupuesto restante and deuda are distinct concepts; internal
   transfers and balance corrections are neither expense nor income; no investment portfolio,
   quotes, FCI, broker or bank execution in the native scope.
-- **Five tabs, each with one meaning, the Assistant in the centre** (decision 003 and Producto
-  22): Inicio, Movimientos, Asistente, Reportes, Más (Tarjetas as the second row of Más →
-  Finanzas). The mounted-tab mitigation stays; no fade/detach/freeze; native stack and sheets
-  own every screen transition. Tabs never slide.
+- **Four tabs and a separate «+», the Assistant opened from the capture hub** ([decision 005](decisions/005-forest-four-tabs-and-capture.md), 2026-09-30; it
+  supersedes the Producto 22 / decision 003 rule «five tabs, each with one meaning, the Assistant in the centre»):
+  Inicio, Movimientos, Reportes, Más, icon-only in one dock with the «+» beside the tab list, never inside it and
+  never a tab; the «+» opens the capture hub (Asistente first, then Gasto, Ingreso, Transferencia); the Assistant is
+  a root-stack screen pushed from the hub, not a tab; Tarjetas stays under Más → Finanzas. The mounted-tab mitigation
+  stays unchanged for the four roots (`detachInactiveScreens: false`, `animation: 'none'`, `lazy: false`,
+  `freezeOnBlur: false`, an opaque scene); no fade/detach/freeze and no tab cross-fade until device evidence says
+  otherwise; native stack and sheets own every screen transition. Tabs never slide.
 - **Cards and debts are internal accounts** (decision 003): a purchase without instalments is one
   expense on the card for its full price, a payment is a transfer that lowers cash and the card's balance due and is never a second
   expense; a debt or receivable moves only by transfers; Disponible excludes cards, debts and
@@ -122,10 +132,13 @@ history file keeps the evidence of when and why.
   frame rate and VoiceOver order require a physical iPhone; a typecheck or an iOS export is not
   an Xcode build; no frame-rate or App Store claim before verification.
 - **Interface rules.** Native navigation gestures, safe areas, Dynamic Type, Reduce Motion and
-  Reduce Transparency honoured everywhere; Liquid Glass only on the two control surfaces with
-  the opaque fallback; the cobalt/sapphire primary marks interaction only and keeps 4.5:1;
-  semantic colours carry meaning; 44 pt targets; no decorative glassmorphism, no large currency
-  selector beside the main amount, no new navigation without a decision.
+  Reduce Transparency honoured everywhere; Liquid Glass only on the control surfaces with
+  the opaque fallback (the dock's pill falls back to solid pine); the Forest identity of decision 005 (pine
+  primary, hue window 158–168°, never teal, cyan, emerald or blue; it supersedes the earlier cobalt/sapphire
+  primary) marks interaction and the brand only and keeps 4.5:1; `expense` is the negative colour
+  (destructive, overdue, over a limit), never ordinary spending; category colours unchanged; semantic colours
+  carry meaning; 44 pt targets; no decorative glassmorphism, no large currency selector beside the main amount,
+  no new navigation without a decision (the current navigation is decision 005's).
 - **Legacy import stays optional backlog.** Never require JSON or a full portfolio re-entry;
   data was never shared between the retired web app and the native app.
 - **Never merge all branches indiscriminately, never enable costs by accident**; one focused
@@ -133,13 +146,21 @@ history file keeps the evidence of when and why.
 
 ## 1. Implemented (current state)
 
-What exists in code on `master` as of Producto 24T1C (PR #68, merged 2026-09-28), after 24T1 (PR #67) and 25B3 (PR #66), plus
-Producto 24T2 on its branch. Per area, without test inventories (those are in apps/mobile/README.md and the history
+What exists in code on `master` as of Producto 24T2 (PR #69, merged 2026-09-29, merge commit 8951f6c), after 24T1C (PR #68),
+24T1 (PR #67) and 25B3 (PR #66), plus Producto 24UX6A on its branch. Per area, without test inventories (those are in apps/mobile/README.md and the history
 file). "Released" below names an in-app gate (`RELEASED_LANGUAGES`, `RELEASED_REGIONS`,
 `LEDGER_CURRENCIES`): what a build offers, verified on Linux; nothing is distributed to people yet
 (§4).
 
-- **Purchases in instalments and complete Tarjetas (24T2, on its branch, PR #69).** The purchase form's «Pago» [Una vez][En
+- **Forest foundation, four-tab shell, capture hub, Inicio and Apariencia (24UX6A, PR #70, on its branch; decision
+  005).** The Forest palette (pine brand, a deep pine field on Inicio, a sage-mint accent on the «+», OLED black in
+  dark mode; category colours unchanged); four icon-only tabs (Inicio, Movimientos, Reportes, Más) in a pine dock
+  with a separate 60 pt «+» that opens the capture hub (Asistente first, then Gasto, Ingreso, Transferencia); the
+  Assistant as a root-stack screen whose conversation lives in memory for the app's process; Inicio as a financial
+  field (Gastado or Disponible) with the week's commitments and the month's recent activity; Más → Apariencia
+  chooses Sistema, Claro or Oscuro, stored outside the ledger and its backups. No schema, backup or financial
+  change. Details in «Producto 24UX6A» (§3).
+- **Purchases in instalments and complete Tarjetas (24T2, PR #69, merged 2026-09-29; device-verified by the owner).** The purchase form's «Pago» [Una vez][En
   cuotas] for a new expense on an active card (counts 3/6/12/18 or any from 2 to 120, «Primera cuota» by closing date,
   «Sin interés» or «Con interés» with one «Total financiado» field; one plan and no expense, frozen for retries); the
   card's statement calendar with exact dates (`packages/domain/card-cycles.ts`, `card_cycle_dates`, schema 13, backup
@@ -196,27 +217,26 @@ file). "Released" below names an in-app gate (`RELEASED_LANGUAGES`, `RELEASED_RE
   done silently and nothing of theirs changes, and the route refuses them even through a link. No
   connection, account, bank or subscription required. Both stages scroll at the largest text sizes.
   Hardware back on Android steps back (`BackHandler`, the one platform adapter it needs).
-- **Product shape.** Five native tabs with the Assistant in the centre and Más as the grouped
-  hub (Finanzas / App y datos: Cuentas, Tarjetas, Presupuestos, Recurrentes, Deudas y cobros,
-  Categorías, Idioma, Región, Apariencia, backup, the Assistant's data note); a Más version line
-  («FinanzApp 0.1.0 (24T2)»; the material and locale diagnostics only in a development build). Liquid Glass on
-  Inicio's movement pills, its Assistant entry and the Assistant composer only in a development build on iOS 26 with
-  the API present and without Reduce Transparency; opaque material otherwise.
-- **Inicio.** One main number (gasto registrado of the month, or Disponible: cash in normal
-  accounts only), the Gastos / Disponible segment, the period, a discreet currency switch only
-  when more than one currency is held (segment with two, compact row with three or more), and
-  (24UX3) a hierarchy of one focal point: a compact header, a 48 pt number with room around it,
-  three compact movement pills (Gasto, Ingreso, Transferir) and one wide Assistant entry below
-  them, then three sections with their own shape: ranked category washes as a compact summary
-  card, then two open lists on the ground that differ by density: the upcoming payments (only
-  with real recurring data; category as the caption, the due day once) as a tight agenda, recent
-  movements as a full-height open ledger (the account named only when another of the currency
-  exists; an empty month says so once). Section links
-  (Reportes keeps the currency, Ver todos) are quiet. 24UX5 (PR #59): the links take the slate `link`
-  token; both lists draw the same 40 pt mark (the agenda stays tighter); the Home rows (`EntryRow
-  variant="home"`) caption the date alone and add the category or the account only when needed to tell a row
-  apart (`homeNamesCategory`; the account only when the visible rows of that list come from more than one
-  account, `visibleNamesAccount`); VoiceOver keeps every field.
+- **Product shape.** Four native tabs, Inicio, Movimientos, Reportes and Más (decision 005, 2026-09-30; until
+  24UX6A five, with the Assistant in the centre), icon-only in one dock with a separate «+» that opens the capture
+  hub; the Assistant is a root-stack screen opened from the hub; Más is the grouped hub (Finanzas / App y datos:
+  Cuentas, Tarjetas, Presupuestos, Recurrentes, Deudas y cobros, Categorías, Idioma, Región, Apariencia, backup, the
+  Assistant's data note); a Más version line («FinanzApp 0.1.0 (24UX6A)»; the material and locale diagnostics only in a
+  development build). The dock stays in the layout (never absolute over the content). Liquid Glass (tinted pine on the
+  dock's pill) on the dock, the account detail's movement pills and the Assistant composer only in a development build
+  on iOS 26 with the API present and without Reduce Transparency; opaque material otherwise (solid pine with a hairline
+  on the dock). Más → Apariencia: Sistema
+  (default), Claro or Oscuro.
+- **Inicio (24UX6A).** Its own scroll view under a deep pine financial field that reaches under the status bar: the
+  current month (not interactive) and the accounts shortcut; the display-currency control and its help only when the
+  history holds two or more currencies; one number (Gastado: the month's spending so far, with «Hasta hoy · … por día»
+  or «Sin gastos este mes»; Disponible: cash in normal accounts only, with «Saldo registrado · N cuentas» and never a
+  per-day figure) and the Gastado | Disponible switch. Below it «Próximos compromisos» (expense rules due within seven
+  days, at most two, omitted when none; «Ver todos» → Recurrentes) and «Actividad reciente» (this month's expenses and
+  incomes, no transfers, newest first, four rows under the commitments or six alone; «Ver todos» → Movimientos); a quiet
+  empty state when neither exists, «Empezar» → a new account when there is no account. Gastado and Disponible keep their
+  semantics (24C1, 24B6, 25B2). The «＋ Registrar» button, the computed insight line, the ranking, the budget card, the
+  charts and the Assistant banner are not on Inicio (the dock's «+», Reportes and Presupuestos hold them).
 - **Recording.** Gasto / Ingreso / Transferencia on one control; kind and amount first; the
   amount field anchored with tabular digits, typing and pasting in the region's separators,
   per-currency exponent (0, 2, 3), 15-digit bound, paste markers, shortcuts (Usar todo, Pagar
@@ -274,7 +294,11 @@ file). "Released" below names an in-app gate (`RELEASED_LANGUAGES`, `RELEASED_RE
   authenticated endpoints, the durable `needs_review` inbox for Shortcut captures, quota
   reservations (30 AI queries per user per day, 300 global; 120/2 000 captures), an OpenAI
   Responses adapter prepared (`gpt-5-mini`, strict JSON, `store:false`), the PostgreSQL schema
-  tests; request contract v1 without a language. No paid call has ever been made.
+  tests; request contract v1 without a language. No paid call has ever been made. Since 24UX6A the screen is a
+  root-stack screen (`app/assistant.tsx`) pushed from the capture hub, not a tab; its conversation lives in one
+  in-memory session per app process (`src/assistant/session.ts`: leaving the screen keeps it and lets a running answer
+  land, New chat or closing the app clears it, nothing is persisted), and the hub offers «Continuar» only with the
+  person's real last words. It still writes only a confirmed draft.
 - **Internationalization.** Spanish and English released; 234 of the 257 catalogue regions
   released (Argentina and the United States since 23.1C2, the rest in 24R2B); language and region chosen independently ("Según el dispositivo" or one value), both
   reactive without restart; every screen through modular catalogues with `i18n:check`,
@@ -328,11 +352,22 @@ it was checked in). Metro from the branch on the installed FinanzApp Dev build s
 item unless a section says a new native build is needed. The checklist sections are in
 [mobile-device-checklist.md](mobile-device-checklist.md).
 
-- **24T2 — installment purchase and complete Tarjetas:** the checklist section Producto 24T2 (a backup before the schema
-  13 upgrade; the cycle dates; the card form's calendar; the purchase in cuotas with and without interest; the deck with
-  one, three and more than twelve cards, its haptic, the snapshot's fades and slides, the back swipe; the card and plan
-  details; an instalment's movement, its edit and undo; VoiceOver order and positions, the largest Dynamic Type, Reduce
-  Motion, both themes and both languages).
+- **24UX6A — Forest foundation, four-tab shell, capture hub, Home and Appearance (none done; no EAS build):** the
+  checklist section Producto 24UX6A: the four-tab icon-only dock with VoiceOver «n de 4» and «Registrar» not a tab;
+  the Large Content Viewer on long press at accessibility sizes; 30–40 rapid tab switches without black screens; glass
+  vs solid pine (Reduce Transparency); the hub's open/close (×, scrim, VoiceOver escape), the first-choice hold, the
+  Reduce Motion fade, the hub card scrolling at AX5 on a 375 pt iPhone; the Assistant's push/back, the conversation
+  surviving within the session, «Continuar» only after a real exchange, cleared by New chat and by closing the app, the
+  composer's keyboard padding as a stack screen, an evidence link («Ver movimientos») returning to the existing tabs on
+  Movimientos (one dock; back does not reveal a second tab set); the Home field under the status bar in light and dark (light status content, back
+  to dark text when scrolled in light), the month label not tappable, the scope row only with ≥2 currencies, the
+  per-day figure only for Gastado, commitments ≤2 or omitted, activity 4/6, the empty states (the currency named under
+  «Solo X»), long amounts at 375 pt,
+  AX text sizes, Dynamic Type; the Forest contrast on the device; category colours unchanged; Apariencia's Sistema /
+  Claro / Oscuro without a flash; the SF Symbols/Ionicons glyph mapping. Metro on the installed development build;
+  no native dependency added.
+- **24T2 — installment purchase and complete Tarjetas: verified.** The owner completed the checklist section Producto
+  24T2 on an iPhone 14 Pro with a fresh development build (2026-09-29), after the schema 13 upgrade of their data.
 - **24T1 — the instalment engine:** nothing visible; the checklist section Producto 24T1 (a backup before the schema 12
   upgrade of FinanzApp Dev's data, the app opening on the same figures, a regression spot-check of a card purchase and
   payment). The device gates of instalments belong to 24T2 (the purchase form, the figures) and 24T3 (Tarjetas and
@@ -346,7 +381,8 @@ item unless a section says a new native build is needed. The checklist sections 
   the info buttons; single mode; VoiceOver and the largest text on the subtotals). Required before the first
   TestFlight, not before the merge.
 - **24UX5 — visual consistency, copy and the recurring audit:** the slate links in both themes, the
-  40 pt marks on both Home lists, the date-only captions and the cases that bring the category or the account
+  40 pt marks on the Home rows («Próximos compromisos» and «Actividad reciente» remain on Inicio after 24UX6A, so these
+  row checks still apply there), the date-only captions and the cases that bring the category or the account
   back, «By category», Reportes' information button and the insight no longer repeating the ranking, the
   Más version line, the recurring catch-up on open and foreground with a due date passed while closed,
   VoiceOver in both languages, the largest text size, a currency switch without flicker (checklist,
@@ -356,10 +392,10 @@ item unless a section says a new native build is needed. The checklist sections 
   themes, the confirmations, VoiceOver's Actions rotor on the rows, Dynamic Type on the action
   labels, Reduce Motion, the detail buttons, Saldar's prefilled payment, Cerradas, and the schema 10
   upgrade of FinanzApp Dev's data with a backup first (checklist, Producto 24UX4).
-- **24UX3 — Home hierarchy:** first-glance clarity, the compact header, the 48 pt number, the
-  three pills and the Assistant entry (prominence, reach, not read as search), the three section
-  shapes, the cobalt balance, Dynamic Type, VoiceOver and Reduce Motion, in both themes and both
-  materials (checklist, Producto 24UX3).
+- **24UX3 — Home hierarchy:** superseded on Inicio by 24UX6A, where only the category washes, the pills, the
+  Assistant entry, the insight and the Registrar button left Inicio; «Próximos compromisos» and «Actividad reciente»
+  remain (the 24UX5 row checks still apply). The number is now 46 pt; it, Dynamic Type, VoiceOver and Reduce Motion are
+  checked in the 24UX6A section.
 - **24UX2 — the Home refinement and the merchant mark:** the lighter actions in both themes and
   materials, the upcoming and Recurrentes rows with the date once, the single empty sentence, the
   Registrados history and the Recurrente row, paused rules at full contrast, the tab bar's
@@ -406,16 +442,19 @@ item unless a section says a new native build is needed. The checklist sections 
 
 ## 3. Next deliveries
 
-**Recommended next (2026-09-28):** 25B3 (PR #66), 24T1 (PR #67) and 24T1C (PR #68) merged. **24T2 is on its branch
-(PR #69, not merged)**: SQLite schema 13, backup v13, the purchase in cuotas and the complete Tarjetas. After its merge
-and its device QA, **the next implementation is 24T3** (refunds, early payoff, cancellation adjustments and the final
-device QA of instalments). The earlier plan, as reconciled by 24T1C: 24T1 left 12 of the 13 card-invariant `it.todo`
+**Recommended next (2026-09-30):** 25B3 (PR #66), 24T1 (PR #67), 24T1C (PR #68) and **24T2 (PR #69, merge commit
+8951f6c)** merged: SQLite schema 13, backup v13, the purchase in cuotas and the complete Tarjetas, verified by the owner on
+an iPhone 14 Pro with a fresh development build. The immediate path is visual first: **24UX6A** (the Forest foundation,
+the four-tab shell, the capture hub, Home and Appearance; PR #70, on its branch, amended 2026-09-30 per decision 005;
+device QA pending), then **24UX6B** (Reportes in Forest, decisions recorded below), then **24T3** (refunds, early
+payoff, cancellation adjustments and the final device QA of instalments), then the later roadmap below. The earlier
+plan, as reconciled by 24T1C: 24T1 left 12 of the 13 card-invariant `it.todo`
 as tests (the remaining one, the foreign-currency plan record, belongs to 24C2); then 24T2 and **24T3**: **Producto 24T** ships in three focused PRs: 24T1 (domain, schema, backup and instalment
 mathematics; merged), 24T2 (the card purchase with the simple financing UX, the exact current-cycle dates, statements,
 current-versus-future balances and the Tarjetas direction, all recorded under 24T below and in «Producto 24T1C»),
 24T3 (refunds, early payments, lifecycle and the final device QA).
 
-The binding order is **24T2 → 24T3 → 25A → 25C → 25C2 → 25D → 25E → 25F → 26** (launch). Every dependency points
+The binding order is **24UX6A → 24UX6B → 24T3 → 25A → 25C → 25C2 → 25D → 25E → 25F → 26** (launch; 24T2 merged as PR #69). Every dependency points
 backwards in it; the scope that would need a later or optional delivery is split out explicitly (24T1C, 2026-09-28):
 
 - **24C2 is optional** and blocks nothing in this order. 25A's core works on what the ledger already represents; only
@@ -428,6 +467,12 @@ backwards in it; the scope that would need a later or optional delivery is split
   25E's account/sync, are **deferred to 25E** or a follow-up after it; 25D neither implements them nor depends on 25E.
 - **24R3** is required only before a launch in the regions that need it (the native-digit regions); it blocks no
   delivery in this order and the owner places it.
+- **The UX lane (decision 005, 2026-09-30) is layered on this order, never replacing it.** Its own order is fixed:
+  **24UX6A → 24UX6B → 24UX6C → 24UX6D**, each one focused PR that brings real, existing functionality to Forest and changes
+  no accounting, FX, schema or backup. 24UX6A and 24UX6B keep their places above (before 24T3). 24UX6C (Movimientos + Más)
+  and 24UX6D (Tarjetas) come after 24UX6B; where they fall relative to 24T3 and the later product items is the owner's
+  call (24UX6D restyles the Tarjetas screens that 24T3 also touches). None of them removes, reorders or re-scopes 24T3, 25A, 25C/25C2, 25D, 25E/25F, 26 or any other planned item; the approved decisions of each are in
+  «Producto 24UX6B», «Producto 24UX6C» and «Producto 24UX6D» below, so they are not asked again.
 
 The sections below keep their historical order; this paragraph is the order that binds.
 
@@ -747,7 +792,7 @@ the owner authorises it; no EAS build or store submission without the owner.
   note and the Registrados caption now say so; nothing claims a local rule pays money or runs on time with
   the app closed.
 - **Decisions.** Link token `link` #4A6390 / #8EA7D8 (measured contrast, desaturated, apart from the cobalt
-  and the transfer azure) on Inicio's quiet links only. Home rows via an explicit `variant="home"`; the
+  and the transfer azure) on Inicio's quiet links only (superseded: `link` is pine #1D5647 since decision 005, 2026-09-30). Home rows via an explicit `variant="home"`; the
   category returns to a caption for short, letterless or generic names and for glyphs shared on screen
   (`homeNamesCategory`, `sharedGlyphs`), the account only when a list's visible rows come from two accounts
   (`visibleNamesAccount`, review of PR #59). «Where your money
@@ -1106,8 +1151,8 @@ nothing of it is on a screen yet.
     closing day, weekend and holiday shifts as stated by the issuer), schema and backup versions with a
     rollback test; the `it.todo` lines of `card-invariants.test.ts` (7b) become tests. **Delivered (PR #67); see
     «Producto 24T1» below.** One invariant stays `it.todo` on purpose: the foreign-currency plan record (24C2).
-  - **24T2 — the card purchase, UI, statements and current-vs-future balances.** **Delivered on its branch (PR #69,
-    not merged); see «Producto 24T2» below.** The purchase form with
+  - **24T2 — the card purchase, UI, statements and current-vs-future balances.** **Delivered (PR #69, merged
+    2026-09-29, merge commit 8951f6c; device-verified by the owner); see «Producto 24T2» below.** The purchase form with
     instalments, per-statement summaries, the five figures above, pending balance and partial payments, a
     clearer card form with a real calendar for closing and due days; the available-credit gate decided
     first if the UI shows a limit.
@@ -1116,7 +1161,8 @@ nothing of it is on a screen yet.
     clarity, never a visual copy; evaluate replacing the horizontal carousel with a selectable vertical stack/deck
     when 24T2 designs Tarjetas; a selected card puts first its balance due now, then the next closing/due date, the
     Pagar action, the future instalments/commitments and the movements; instalments are visually distinct from the
-    balance payable now; iOS minimalism, cobalt/sapphire and the FinanzApp materials stay; no gesture that competes
+    balance payable now; iOS minimalism, cobalt/sapphire (superseded by the Forest identity, decision 005, 2026-09-30; the
+    Tarjetas restyle is 24UX6D) and the FinanzApp materials stay; no gesture that competes
     with back navigation or delete; a debit card remains future metadata of an account, never a ledger of its own.
     *Financing UX, closing/due dates and the refined card direction (decided 2026-09-28 in Producto 24T1C,
     documentation only):* the purchase form defaults to «Sin interés» with one secondary «Con interés» toggle and a
@@ -1745,7 +1791,8 @@ nothing of it is on a screen yet.
   always the person's), and Intereses became latent. Kept on purpose: a
   deleted card's detail still shows its dates and limit (history as it was entered, 25B2), and the usual day a new card
   takes is the entered date's (the edit form corrects it in a longer month).
-- **Status.** On its branch (2026-09-29), not device-verified. Checked on Linux on the final tree: root `npm test` (415
+- **Status.** Merged (PR #69, 2026-09-29, merge commit 8951f6c); **device-verified**: the owner completed the checklist
+  section Producto 24T2 on an iPhone 14 Pro with a fresh development build. Checked on Linux on the final tree: root `npm test` (415
   passed, 1 todo) and `npm run check:repo` (OK, 367 tracked files); mobile `typecheck` (clean), `test:storage` (875/875),
   `currency:verify` and `regions:verify` (catalogues verified offline), `i18n:check -- --strict` (0 errors, 0 stale),
   `i18n:extract` (no copy outside the catalogue), `check` (dependencies up to date) and `export:ios` (iOS bundle
@@ -1753,6 +1800,186 @@ nothing of it is on a screen yet.
   57.0.26, `expo-constants` 57.0.19 → 57.0.20, `expo-router` 57.0.23 → 57.0.24; the lockfile also moves their pinned
   `expo-modules-core` 57.0.20 and `@expo/ui` 57.0.21); no other dependency changed. The
   `mobile_api` PostgreSQL job runs in CI. No EAS build; the iPhone was not touched (checklist section Producto 24T2).
+
+### Producto 24UX6A — Forest foundation, four-tab shell, capture hub and Home (PR #70)
+
+- **Goal.** Amended on 2026-09-30 to the owner's final decisions (decision 005): the Forest identity as the app's
+  foundation, a four-tab shell with a separate «+» that opens a capture hub, the Assistant as a root-stack screen, and
+  Inicio as a financial field with the month's activity; Appearance (Sistema / Claro / Oscuro) as in the first
+  iteration. Visual and navigational only: no accounting, FX, minor-unit, transfer, card, instalment or debt rule
+  changed; schema 13 and backup v13 unchanged; no native dependency added; no EAS build. Movimientos, Reportes, Más
+  and Tarjetas keep their content; only the palette and the shell reach them (their own passes are 24UX6B–24UX6D).
+  The owner's mocks were references for hierarchy; no brand, asset or information architecture was copied.
+- **Forest palette (`src/ui/palette.ts`).** Light: background #F0F3F1, surface #FFFFFF, inset #E6EBE8, elevated
+  #FFFFFF, text #0F1A16, secondary #45564E, tertiary #586961, line #DCE3DF, primary (brand text) #1D5647, primaryFill
+  (brand) #1D4F42, onPrimary #FFFFFF, primarySoft #E1ECE7, thumb #FFFFFF, link #1D5647, expense #B3432E, income
+  #1F7A4F, transfer #45564E, warning #9A5B00, the swipe fills, scrim rgba(0,0,0,0.40); new: hero #14362D, heroInk
+  #EEF5F1, heroSecondary #A8C4B9, heroControl #26493F, heroThumb #F4F8F6, heroThumbInk #14362D, accent #9FD8C1,
+  onAccent #0F2A22, dock #1B3C33, dockInk #B5C9C1, dockActive #3C6356, dockActiveInk #FFFFFF. Dark: background
+  #000000 (OLED), surface #0F1513, inset #171E1B, elevated #252D2A, text #EDF3EF, secondary #A2B1A9, tertiary #899A91,
+  primary #94D2BB, primaryFill #86C9B0, onPrimary #05211A, thumb #323D39, expense #EE8A72, income #5CCB93, transfer
+  #A2B1A9, warning #E8A94A, hero #0F2A22, heroInk #EDF5F0, heroSecondary #A1BDB2, heroControl #1E3D34, heroThumb
+  #E4EEE9, heroThumbInk #0F2A22, accent #86C9B0, onAccent #05211A, dock #133029, dockInk #A9BFB6, dockActive #335A4E,
+  dockActiveInk #FFFFFF. Hue window 158–168°, never teal, cyan, emerald or blue. `expense` is the negative colour
+  (destructive, overdue, over a limit), not ordinary spending; `income` the positive one; `transfer` the neutral
+  secondary ink. Category colours are unchanged (`packages/domain` appearance ids, the presets, and
+  `src/ui/category-color.ts`'s hash, assignment order and hues); no global typography or radius rewrite. Contrast
+  pinned in `tests/theme.node.ts` (the field, the dock and the «+» included).
+- **Shell (`app/(tabs)/_layout.tsx`, `src/ui/floating-tab-bar.tsx`, `src/ui/dock-geometry.ts`).** Four tab roots:
+  `index` (Inicio, no header), `activity` (Movimientos, which keeps its header «+» → /new-entry), `reports` (Reportes)
+  and `settings` (Más); no Assistant tab. `src/ui/navigation.ts` is unchanged (`detachInactiveScreens: false`;
+  `animation: 'none'`, `lazy: false`, `freezeOnBlur: false`; an opaque scene); no tab cross-fade. One dock kept in the
+  layout, never absolute over the content: the screen's ground behind it, 8 pt above, the bottom gap from the safe
+  area (`tabBarBottomGap`: the inset minus 14, at least 10; 10 without an inset), 16 pt sides plus the side inset, a
+  row with 10 pt between (1) the pill, the control material tinted `dock` (Liquid Glass where iOS draws it, otherwise
+  `dockMaterial`: solid pine, a hairline and a light-mode shadow), 30 pt radius, holding the one tab list, and (2) the
+  «+», a sibling outside the tab list. The tabs are icon-only, with no visible text: a 24 pt glyph in `dockInk`; the
+  selected one filled, in `dockActiveInk`, over a `dockActive` capsule (marked twice, never by colour alone); 48 pt
+  minimum height. VoiceOver hears «Inicio, pestaña, 1 de 4» as a button on iOS (the plain name with the tab role
+  elsewhere) and the selected state; a long press at accessibility sizes shows the name in the Large Content Viewer.
+  A tap sends the stock `tabPress` and navigates only to an unfocused tab nobody prevented; a long press sends
+  `tabLongPress`. The geometry is pure numbers shared by the dock and the hub (`DOCK`: height 60, side 16, top 8, gap
+  10, «+» 60; `plusFrame`, `hubInset`).
+- **Capture hub (`src/ui/capture-hub.tsx`, renamed from `home-capture.tsx`).** The «+» is «Registrar» («Abre las
+  opciones para registrar»): a 60 pt circle in `accent` with the `onAccent` glyph, a hairline and a light shadow, a
+  light impact haptic, tap only, no selected state, never a tab. It opens `BottomSheet` floating above the dock
+  (`hubInset`), titled «Registrar» as an eyebrow, with «Cerrar» (a close glyph) drawn where the «+» sits. The
+  Assistant comes first and largest (a pine tile with the accent sparkle, «Asistente» · «Decilo con tus palabras o
+  preguntá lo que quieras»; «Continuar: «…»» only when the session holds the person's real last words), then Gasto
+  «Una compra o un pago», Ingreso «Sueldo, cobro u otro ingreso» and Transferencia «Entre cuentas o pago de tarjeta»
+  on neutral inset tiles. `captureDestination` is the one table: expense and income → /new-entry with the kind (and
+  the display currency only while a live account holds it), transfer → /new-transfer, assistant → /assistant with the
+  display currency; each is pushed once the hub has left. The first choice holds while it leaves (a second row, the
+  tile, the scrim, «Cerrar» or the «+» change nothing; exactly one push). No microphone in the hub: a microphone that
+  cannot dictate would be a dead end; dictation is later Assistant work. Nothing in the hub writes.
+- **The floating sheet (`src/ui/form-controls.tsx`).** `BottomSheet` gained optional `floating` (the card floats above
+  the dock with a 32 pt radius and an eyebrow title, no Cancelar/Listo row, rises 12 pt with a fade, fades in place
+  under Reduce Motion, same 300/200 ms timing and dismissal rules; its height is capped at the window minus the top
+  inset and the dock's space, at least 200 pt, and the eyebrow and content scroll inside a non-bouncing `ScrollView`
+  when they cannot fit, as at accessibility text sizes) and `accessory` (drawn over the scrim and fading with it, inside
+  the modal accessibility group, where the VoiceOver escape closes). The default sheet is unchanged.
+- **Assistant (`app/assistant.tsx`, `src/assistant/session.ts`).** Moved from the tabs to the root stack (registered
+  in `app/_layout.tsx` with its title). `session.ts` is pure: `createConversationSession()` holds the conversation and
+  the words being written (through the real `conversationReducer`), the request in flight, the writes per draft and
+  `reset` (aborts and empties); `conversationSession()` is one shared in-memory instance per app process;
+  `lastUserWords` is the last user message or null. The screen reads it with `useSyncExternalStore`; New chat appears
+  in the header once there are messages; leaving no longer aborts a request (the answer lands in the session);
+  returning to a conversation scrolls once to its last exchange; evidence links to a tab root (`/`, `/activity`,
+  `/reports`, `/settings`) call `router.dismissTo` (pop back to the existing tabs and select that tab; `navigate` from
+  this stack screen would stack a second tab set), the rest push.
+  Nothing is persisted; closing the app clears it. It still writes only a confirmed draft (zero autonomous writes), and
+  a retry reuses the same Entry id.
+- **Inicio (`app/(tabs)/index.tsx`; derived from mock B, not B2).** Its own scroll view under a financial field
+  (`hero`, a 32 pt bottom radius, its top at the safe area plus 12): the current month (capitalised, not interactive,
+  no chevron) and the wallet button → /accounts; a second row only when the history holds more than one currency
+  (`historyCurrencies`), with the display-currency control and its help (with one currency the row is absent and the
+  help sits beside the subline); the number (46 pt in `heroInk`, `heroSecondary` when exactly zero, per-currency parts
+  when a rate is missing, the out-of-range copy); the subline, Gastado «Hasta hoy · … por día» (`spendingPerDay`, the
+  month so far over the days elapsed, Reportes' daily average) or «Sin gastos este mes», Disponible «Saldo registrado ·
+  N cuentas» and never a per-day figure; then Gastado | Disponible on the field (it switches the number only). Below:
+  «Próximos compromisos» (`homeCommitments`, the unchanged rule: expense rules due within seven days, in view, two at
+  most; omitted when none; Ver todos → Recurrentes) and «Actividad reciente» (`homeRecent`: this month's expenses and
+  incomes in view, no transfers, newest first, four rows under the commitments and six alone, `RECENT_ROWS`; omitted
+  when none; Ver todos → Movimientos), each in a grouped surface; neither → «Todavía no hay movimientos este mes» (or,
+  with one currency of several shown alone, «Todavía no hay movimientos en {currency} este mes», 24UX2's rule restored)
+  / «Registrá un gasto con el botón Registrar (+) o contáselo al Asistente.» (the «+» by its VoiceOver name) without an
+  action; no account → «Empezar» → a new
+  account. The status bar has light content while Inicio is focused and the field is under it, and the scheme's own
+  after scrolling past the field or on blur. Semantics unchanged: Gastado is `spendingFigure` over
+  `spendingWindow(currency, 'month', today)` (expenses only, never transfers or card payments, instalments in their
+  statement month, consolidated at each movement's date or one currency); Disponible is `availableFigure` /
+  `liquidTotalsByCurrency` (cards, debts and receivables excluded; not income minus spending; not a budget remainder).
+  Removed from Inicio: the «＋ Registrar» button, the insight line (`homeInsight`, `CONCENTRATION_SHARE`,
+  `HomeInsightRow`), rankings, budget cards, charts and the Assistant banner. `Choices` and `DisplayCurrencyButton`
+  gained `onField`.
+- **Appearance.** Unchanged from the first iteration: `src/ui/theme-preference.ts`, Sistema (default), Claro or Oscuro
+  under `finanzapp.appearance`, outside the ledger and its backups, saved before it is applied, no flash on launch;
+  Más → App y datos → Apariencia.
+- **Copy (es/en).** `home.spending` «Gastado» / «Spent»; new `home.perDay`, `noSpending`, `availableLine`, `recent`
+  («Actividad reciente»), `quietTitle`, `quietTitleIn` (the currency named under «Solo X»), `quietDetail`;
+  `home.capture.*` rewritten (label, hint, title, close, the Assistant, «Continuar», the three rows and their details;
+  no separate «Continuar» accessibility label: the Assistant tile reads its title and then the «Continuar» text or its
+  detail); the insight keys, `capture.button` and
+  `nav.tabs.assistant` removed; `nav.tabPosition` keeps its pattern. The English lock was re-accepted. The release
+  marker stays «FinanzApp 0.1.0 (24UX6A)».
+- **Tests.** Rewritten or new for the amendment: `capture-hub.node.ts` (renamed from `home-capture.node.ts`: the «+»,
+  the hub, «Continuar», each destination after the dismissal, the first-choice hold, nothing written),
+  `floating-tab-bar.node.ts` (the four tabs, icon-only, the double selection mark, the «+» outside the tab list, the
+  events, the dock and its geometry), `home-focus.node.ts` (commitments, the recent activity and its limits, the
+  per-day figure), `assistant-session.node.ts`, `assistant-routes.node.ts` (New chat, the conversation surviving the
+  screen, the root-stack route and no Assistant tab), `theme.node.ts` (the Forest contrasts), `navigation.node.ts`,
+  `home-ranking.node.ts` and `translation.node.ts`.
+- **Superseded within this PR.** The first iteration (2026-09-29, up to commit c29066b) shipped, and the amendment
+  replaced: Inicio's cobalt «＋ Registrar» capsule under the number opening a compact sheet (Registrar gasto,
+  Registrar ingreso, Transferir entre cuentas, Hablar con el Asistente, the last navigating to the Assistant tab); the
+  one computed insight line (a budget exceeded, a budget at 85 % or more, a category at 40 % or more of the month);
+  the Gastos / Disponible control and the accounts button on the top row over a 48 pt number on the plain ground; a
+  floating capsule tab bar over five tabs with the Assistant in the centre («Inicio, pestaña, 1 de 5»), the selected
+  tab a cobalt glyph and label over a lens, labels at 10 pt, and no floating «+». Its review round (an independent
+  review and Codex on PR #70) fixed the display chip remounting inside the hero's keyed crossfade, the iOS reading of
+  the tab items and their Large Content Viewer (both carried into the icon-only items), a budget share line without
+  its currency (the line is gone), the first choice holding during the sheet's exit (carried into the hub) and tab
+  labels truncating (the labels are gone). The Linux gates recorded on that tree (root `npm test` 415 passed, 1 todo;
+  `test:storage` 889/889; `export:ios` 1984 modules) do not apply to the amended tree.
+- **Status.** Implemented on the branch, PR #70 open (not merged), amended 2026-09-30. Device QA pending: nothing was
+  checked on an iPhone (checklist section Producto 24UX6A; the list in §2). No EAS build; no native dependency added;
+  schema 13 and backup v13 unchanged; `app.config.ts` untouched. Linux gates on the amended tree:
+
+  root `npm test` 415 passed, 1 todo (25 files); `npm run check:repo` OK; in `apps/mobile`: typecheck clean,
+  `test:storage` 936/936, `currency:verify` and `regions:verify` OK, `i18n:check -- --strict` 0 errors and 0 stale (English
+  lock re-accepted), `check` (dependencies up to date), `export:ios` bundle exported. The `mobile_api` job needs PostgreSQL
+  and is left to CI. None of this is iPhone QA.
+
+### Producto 24UX6B — Reportes in Forest (approved 2026-09-30, not implemented)
+
+- **Scope.** The restraint 24UX6A gave Inicio, applied to Reportes in the Forest identity: one focal figure per view
+  and the category analysis Inicio no longer carries given the room it needs, with every fact still computed and
+  verifiable. No new data, no schema, backup, route or accounting change. The calendar (Later notes, below) is not
+  part of it.
+- **Approved decisions (owner, 2026-09-30, decision 005; not to be asked again).** Budgets, insights and net flow
+  stay: restyled or reordered, never removed because the mock omits them. A selectable donut only as in-report visual
+  selection. The Día a día chart is allowed. A solid sticky header is allowed. The Evolution bars keep the current
+  month-navigation semantics (no second, comparison-only selection). The current «Otras» top-N grouping stays; the
+  3 % rule is not adopted in this generation. No merchant drill-down route is invented: the merchant summary stays
+  non-interactive unless a real route is added deliberately.
+
+### Producto 24UX6C — Movimientos and Más in Forest (approved 2026-09-30, not implemented)
+
+- **Scope.** Movimientos and Más in the Forest identity on their existing data and routes; no schema, backup or
+  accounting change.
+- **Approved decisions (owner, 2026-09-30, decision 005; not to be asked again).** The Forest row, search and filter
+  treatment. Filtering by period, account and category from repository data. Day totals keep their current semantics
+  (net where the repository defines net). No invented Note, Apple Pay origin or transaction time on a movement (a note
+  on expenses and incomes is 25C's schema work). Deshacer and Recuperar stay (no fake hard delete), and so does
+  Movimientos deshechos. Idioma and Región stay separate existing routes, visually grouped in Más; no «Ajustes» row
+  (there is no such route).
+
+### Producto 24UX6D — Tarjetas in Forest (approved 2026-09-30, not implemented)
+
+- **Scope.** Tarjetas, the card detail and the plan detail in the Forest identity, keeping all of 24T2's
+  functionality; its place relative to 24T3 is the owner's call (§3, the binding order).
+- **Approved decisions (owner, 2026-09-30, decision 005; not to be asked again).** Real functionality stays,
+  including the credit Disponible presentation, Registrar compra and Recientes. The deck/sliver interaction and the
+  Forest restyle are allowed. Instalment progress is registered/facturadas as the domain defines it, never inferred as
+  paid, with the real scheduled instalment amounts. No accounting or available-credit formula changes.
+
+### Later notes recorded in 24UX6A (future; document only, not scheduled)
+
+- **Investments.** When the owner schedules them: cash leaves an account by a **transfer** into an investment (asset)
+  account, never as an «Inversiones» expense category, so spending stays spending. An asset account may be excluded
+  from the liquid Disponible while counting in net worth. No portfolio, prices, market data or simulated returns now
+  (decision 002; native scope stays spending and commitments).
+- **Recurring transfers.** A future rule kind for money moved on a schedule (for example bank → broker every month):
+  a transfer between the person's own accounts, never counted as spending, with the same catch-up, idempotency and
+  deletion records as recurring expenses. Not implemented; it needs its own domain and storage design.
+- **Calendar.** A future view in Reportes (or 25C2's commitments calendar): the registered past movements and the
+  future commitments on one calendar, always distinguishing what occurred from what is planned, per currency, never
+  summed across currencies. No Calendar tab.
+- **Native config cleanup.** `ITSAppUsesNonExemptEncryption=false` is not explicit in the dynamic `app.config.ts`
+  (`ios.infoPlist`), so EAS asked about export compliance during the last development build. Not changed in this
+  UI-only PR; handled in the next native/config delivery (the next change to `app.config.ts` or the next EAS build
+  the owner authorises, at the latest before the first TestFlight in 26), with the owner confirming the app uses
+  only exempt encryption (HTTPS, the system's).
 
 ### Producto 25C — budgets with rollover, goals, CSV and productivity
 
@@ -1787,7 +2014,8 @@ docs/merchant-identity.md.
   editable in Categorías, never rewrites a stored movement. Suggested recurring detection: the same
   merchant key, account, currency and amount repeating at a regular interval proposes a rule the
   person confirms; nothing is created silently. A calendar of commitments read from the rules and the
-  movements they already recorded, per currency, never summed across currencies. **Recurring rules stay
+  movements they already recorded, per currency, never summed across currencies (24UX6A note: it may live in Reportes,
+  distinguishing what occurred from what is planned; never a Calendar tab). **Recurring rules stay
   automatic** (owner's decision, review of PR #59): expenses and incomes are recorded on their date (on
   launch or foreground when the app was closed); managing a rule is pause, resume and delete only. No
   per-rule confirmation mode, expected-occurrence state or reconciliation screen is planned. Reviewing
@@ -1966,8 +2194,9 @@ with clearly marked fixture data, testimonials only from real, consenting users.
 ## 6. Motion and design rules
 
 One main number, real chart values, calm hierarchy and contextual actions. Native
-stack/sheets own transitions. Preserve the mounted-tab mitigation; do not reintroduce
-focus fades, detach/freeze combinations or redirect-based back handling. Motion is
+stack/sheets own transitions. Preserve the mounted-tab mitigation (for the four tab roots of
+decision 005); do not reintroduce focus fades, a tab cross-fade (not before device evidence),
+detach/freeze combinations or redirect-based back handling. Motion is
 driven by data or touch, never by a screen gaining focus: use `src/ui/motion.tsx`
 (ease-out, named durations, `ValueTransition`, `Reflow`, haptic helpers) instead of
 ad-hoc timings. Brief press, selection and data-change animations respect Reduce
@@ -1976,9 +2205,13 @@ amount field does not animate layout at all: its symbol is anchored and its digi
 grow from a fixed origin. One
 haptic per user action, always paired with a visual. Category hues come from
 `src/ui/category-color.ts` and never replace a name. Colour tokens live in
-`src/ui/palette.ts`: the cobalt primary marks interaction and selection only, the
-semantic colours carry meaning, normal text stays neutral, and any new use of the
-primary must keep 4.5:1 (see `tests/theme.node.ts`). Money input goes through
+`src/ui/palette.ts`: the Forest pine primary (decision 005, 2026-09-30; it supersedes
+the cobalt primary that this rule named until then) marks interaction, selection and the
+brand only, inside the 158–168° hue window (never teal, cyan, emerald or blue); the hero,
+accent and dock tokens belong to Inicio's field, the «+» and the dock; `expense` is the
+negative colour (destructive, overdue, over a limit), not ordinary spending; the
+semantic colours carry meaning, normal text stays neutral, category colours are
+unchanged, and any new use of the primary must keep 4.5:1 (see `tests/theme.node.ts`). Money input goes through
 `src/ui/money-input.ts` and the domain parser; never format with floats. Dates,
 percentages and prose amounts go through `src/i18n/format.ts` (tables, non-breaking
 joins), labels through the `src/i18n` catalogues; a row that puts a name beside an

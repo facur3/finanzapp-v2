@@ -6,10 +6,10 @@ export const navigation: Pick<Messages, 'nav' | 'boot'> = {
     tabs: {
       home: 'Home',
       activity: 'Activity',
-      assistant: 'Assistant',
       reports: 'Reports',
       more: 'More',
     },
+    tabPosition: '{name}, tab, {index} of {count}',
     seeAccounts: 'View my accounts',
     recordMovement: 'Record a transaction',
     titles: {
@@ -19,6 +19,7 @@ export const navigation: Pick<Messages, 'nav' | 'boot'> = {
       undoneEntries: 'Undone transactions',
       language: 'Language',
       region: 'Region',
+      appearance: 'Appearance',
       backup: 'Backup',
       backupImport: 'Import backup',
       categories: 'Categories',

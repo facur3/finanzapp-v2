@@ -1,58 +1,67 @@
-import { useMemo, useState } from 'react';
-import { View } from 'react-native';
-import { router } from 'expo-router';
-import { currentMonthISO, hiddenLiabilityAccountIds, isLiveAccount, spendingOverview, spendingWindow, summarizeMonthlyBudgets } from '@finanzapp/domain';
+import { useCallback, useMemo, useRef, useState } from 'react';
+import { ScrollView, View, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native';
+import { router, useFocusEffect } from 'expo-router';
+import { setStatusBarStyle } from 'expo-status-bar';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { currentMonthISO, hiddenLiabilityAccountIds, isLiveAccount, spendingWindow } from '@finanzapp/domain';
 import { useLedger } from '../../src/storage/LedgerProvider';
-import { ActionButton, AppText, Choices, EmptyState, EntryRow, Money, Screen, SectionTitle, useStacked } from '../../src/ui/components';
+import { ActionButton, AppText, Choices, EmptyState, EntryRow, Money, SectionTitle, Surface } from '../../src/ui/components';
 import { DisplayCurrencyButton } from '../../src/ui/currency-switch';
 import { useDisplayCurrency } from '../../src/ui/display-currency-provider';
 import { useFinanceView } from '../../src/fx/rates-provider';
 import { availableFigure, inView, spendingFigure } from '../../src/fx/finance-view';
 import { figureInfo, shortfallDetail } from '../../src/fx/fx-copy';
 import { useI18n } from '../../src/i18n/provider';
-import { BudgetHomeCard, CategoryRanking, CurrencyParts, MetricHelp, UpcomingRecurringRow } from '../../src/ui/home-modules';
-import { budgetScope } from '../../src/ui/budget-presentation';
-import { withCurrencyCode } from '../../src/i18n/format';
+import { CurrencyParts, FieldButton, MetricHelp, UpcomingRecurringRow } from '../../src/ui/home-modules';
+import { homeCommitments, homeRecent, recentRowLimit, spendingPerDay } from '../../src/ui/home-focus';
 import { Reflow, ValueTransition } from '../../src/ui/motion';
-import { availableCurrencies, historyCurrencies, homeNamesCategory, selectEntries, sharedGlyphs, visibleNamesAccount } from '../../src/ui/presentation';
+import { historyCurrencies, homeNamesCategory, sharedGlyphs, visibleNamesAccount } from '../../src/ui/presentation';
 import { useCategoryLookOf } from '../../src/ui/category-hues';
-import { AssistantEntry, QuickActions } from '../../src/ui/quick-actions';
 import { space, useCurrentDay, usePalette } from '../../src/ui/theme';
 
 type HomeMetric = 'spending' | 'available';
 
 const capitalized = (label: string) => label.charAt(0).toUpperCase() + label.slice(1);
-/** Inicio's number (24UX3): 48 pt, a step above the 44 pt hero of the other screens, because on Inicio it is the
- * one figure the screen exists for. `Money` still fits a long amount to the width and caps Dynamic Type. */
-const HERO_SIZE = 48;
+/** Inicio's number (Forest): 46 pt bold, the screen's one large element. `Money` fits a long amount to the width
+ * (nine digits shrink, never truncate) and caps Dynamic Type. */
+const HERO_SIZE = 46;
+/** The field's bottom corners and the air between the field and the first section. */
+const FIELD_RADIUS = 32;
 
-/** Home answers one question at a time: how much did I spend this month, or
- * how much recorded money do I have. One number, its month, and nothing else
- * competing with it. Periods and analysis live in Reportes; cards in Tarjetas.
+/** Inicio, the current month's dashboard (Producto 24UX6A, decision 005). It answers what the month looks like now and
+ * stops: the financial field, then what is due soon, then what was recorded this month. Every other list and every
+ * analysis keeps its own place (Movimientos, Reportes, Presupuestos, Más); recording is the dock's «+».
  *
- * Hierarchy (24UX3), top to bottom: a quiet header (compact segments, the
- * currency chip), the number with room around it, three compact movement
- * pills, the Assistant as the one wide control, then the one card (the
- * categories, a compact summary) followed by two open lists on the ground that
- * differ by density: the commitments as a tight agenda (the due day under the
- * amount), the latest transactions as a full-height ledger (signed amounts, the
- * date as the caption); both draw the same 40 pt mark (24UX5). One heavy block,
- * then lighter content, never card → list → card. Section links are quiet (the
- * slate `link` ink and a chevron, 24UX5), so cobalt is left to the Assistant and
- * the active tab.
+ * The financial field is one pine object that meets the top edge (B of the Forest handoff, owner-refined):
+ *   1. the current month on the left, a label (not a control: it opens nothing; past months are Reportes'), and the
+ *      accounts shortcut on the right;
+ *   2. only when the ledger holds more than one currency (the 25B2 rule), the display scope chip («Total · ARS» / «Solo
+ *      USD») and its explanation; with one currency the row is absent and leaves no gap;
+ *   3. the number, the screen's one large element;
+ *   4. what it covers: for Gastado the month so far and its daily average (Reportes' `dailyAverageMinor`), or "no
+ *      spending this month"; for Disponible «Saldo registrado» and the number of accounts, never a per-day figure;
+ *   5. Gastado | Disponible, which switches the number only.
+ * Under it: the commitments due within seven days (two at most, the section absent without one), then the month's
+ * latest movements (four under commitments, six without; «Ver todos» selects Movimientos). With neither, one quiet
+ * line points at «+» and the Assistant. Nothing is drawn to fill space: no rankings, charts, budget cards, insight
+ * lines, Registrar button or Assistant banner.
  *
- * 24C1: the number is, by default, a consolidated total: every account's spending (or liquid money) in the display
- * currency, each movement converted with its own day's reference rate, each balance with today's. The currency chip
- * opens the display sheet (consolidated, one currency only, the currency); nothing else was added to the screen. A
- * converted figure carries an info button with the rates' source and date; when a rate is missing the figure is each
- * currency's own subtotal with one line saying why, never a partial sum. Rows keep their original amounts. */
+ * The figures are the repository's, unchanged: Gastado is `spendingFigure` over the calendar month to today (expenses
+ * only; transfers and card payments are never spending; an instalment counts in the month its statement closes),
+ * Disponible is `availableFigure` (recorded liquid money; cards, debts and receivables excluded; not income minus
+ * spending, not a budget). 24C1 stands: by default a consolidated total in the display currency, each movement at its
+ * own day's reference rate, each balance at today's, with an info button naming the rates; without a rate, each
+ * currency's own subtotal with one line saying why, never a partial sum. Rows keep their original amounts.
+ *
+ * The status bar is light while the field is under it (both themes), and returns to the scheme's own when the field has
+ * scrolled away or another screen is in front. */
 export default function HomeScreen() {
   const { snapshot, archive, gate } = useLedger();
   const day = useCurrentDay();
   const p = usePalette();
-  const stacked = useStacked();
-  const { t, formatDate, formatNumericDate, currencyName } = useI18n();
-  const expenseLook = useCategoryLookOf('expense'), incomeLook = useCategoryLookOf('income');
+  const insets = useSafeAreaInsets();
+  const { t, formatDate, formatNumericDate, currencyName, moneyText, spokenMoney } = useI18n();
+  const expenseLook = useCategoryLookOf('expense');
   const [metric, setMetric] = useState<HomeMetric>('spending');
   // Every currency the ledger ever held (25B2 review): a deleted account's history keeps its currency in the view and the chip.
   const currencies = historyCurrencies(snapshot?.accounts ?? []);
@@ -64,128 +73,116 @@ export default function HomeScreen() {
   const view = useFinanceView(months);
   const currency = view?.currency ?? 'ARS', mode = view?.mode ?? 'single';
   const period = useMemo(() => spendingWindow(currency, 'month', day), [currency, day]);
-  const complete = view ? view.complete(period.startISO, period.endISO, 'expense') : true;
-  // A stored currency is always a storable code (read acceptance), so this only guards a
-  // programming error; Home must degrade to its empty state rather than crash the tab.
-  const summary = useMemo(() => { try { return view ? spendingOverview(view.snapshot, period) : null; } catch { return null; } }, [view?.snapshot, period]);
   const spendingHero = useMemo(() => snapshot && view ? spendingFigure(snapshot, view, period, view.activity, view.loaded) : null,
     [snapshot, view, period]);
   // Disponible is recorded liquid money: cards, debts and receivables are never netted into it.
   const availableHero = useMemo(() => snapshot && view ? availableFigure(snapshot, view, view.book, day, view.activity, view.loaded, archive?.cards, archive?.debts) : null,
     [snapshot, view, day, archive?.cards, archive?.debts]);
-  // A budget keeps its currency whatever the display shows (24C1 review): it is measured on the real ledger against the
-  // accounts in its own currency, never against a converted total. Consolidated, the card shows the display currency's
-  // budget when there is one, else the first held currency's, named in the section title.
-  const scope = budgetScope(archive?.budgets ?? [], currencies, mode, currency, month);
-  const monthBudget = useMemo(() => {
-    if (!snapshot || !scope) return null;
-    try { return summarizeMonthlyBudgets(snapshot, archive?.budgets ?? [], scope.currency, month); }
-    catch { return null; }
-  }, [snapshot, archive?.budgets, scope?.currency, month]);
-  // The lists keep each movement's and rule's own amount and currency; consolidated mode lists every account.
-  const recent = useMemo(() => snapshot && view ? selectEntries(snapshot.entries.filter(entry =>
-    snapshot.accounts.some(a => a.id === entry.accountId && inView(view, a))
-      && entry.dateISO >= period.startISO && entry.dateISO <= period.endISO), snapshot.accounts).slice(0, 4) : [], [snapshot, view?.mode, currency, period]);
-  const upcoming = useMemo(() => (archive?.recurring ?? [])
-    .filter(rule => rule.active && rule.kind === 'expense' && rule.nextDateISO >= day
-      && snapshot?.accounts.some(account => account.id === rule.accountId && inView({ mode, currency }, account)))
-    .sort((a, b) => a.nextDateISO.localeCompare(b.nextDateISO) || a.merchant.localeCompare(b.merchant))
-    .slice(0, 3), [archive?.recurring, snapshot?.accounts, mode, currency, day]);
+  // The commitments due this week in the accounts the display shows; each keeps its own amount and currency.
+  const upcoming = useMemo(() => homeCommitments(archive?.recurring, day,
+    accountId => !!snapshot?.accounts.some(account => account.id === accountId && inView({ mode, currency }, account))), [archive?.recurring, snapshot?.accounts, mode, currency, day]);
+  // The month's latest movements in the accounts the display shows; each keeps its own amount and currency.
+  const recent = useMemo(() => snapshot ? homeRecent(snapshot.entries, snapshot.accounts, period, account => inView({ mode, currency }, account),
+    recentRowLimit(upcoming.length > 0)) : [], [snapshot, period, mode, currency, upcoming.length]);
 
-  if (!snapshot || !summary || !view || !spendingHero || !availableHero) return null;
+  // The status bar over the field: light while the field is under it, the scheme's own otherwise.
+  const fieldHeight = useRef(0);
+  const scrolled = useRef(false);
+  const focused = useRef(false);
+  const barStyle = useCallback(() => setStatusBarStyle(focused.current && !scrolled.current ? 'light' : p.isDark ? 'light' : 'dark', true), [p.isDark]);
+  useFocusEffect(useCallback(() => {
+    focused.current = true;
+    barStyle();
+    return () => { focused.current = false; barStyle(); };
+  }, [barStyle]));
+  const onScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const past = event.nativeEvent.contentOffset.y > Math.max(fieldHeight.current - insets.top, 0);
+    if (past !== scrolled.current) { scrolled.current = past; barStyle(); }
+  };
+
+  if (!snapshot || !view || !spendingHero || !availableHero) return null;
   const hidden = hiddenLiabilityAccountIds(archive?.cards, archive?.debts);
   const accountCount = snapshot.accounts.filter(account => inView(view, account) && !hidden.has(account.id) && isLiveAccount(account)).length;
-  const openReport = () => router.navigate({ pathname: '/reports', params: { currency } });
   const spending = metric === 'spending';
-  // 24UX5 review: each list names accounts only when its visible rows come from more than one (two owned accounts with
-  // every visible row in one of them printed «· a ·» on each row). VoiceOver still says the account on every row.
-  const recentAccount = visibleNamesAccount(recent), upcomingAccount = visibleNamesAccount(upcoming);
-  // A month with nothing recorded in this currency says so once, under Últimos movimientos, instead of two
-  // near-identical sentences 24 pt apart (24UX1 finding 5). Categories return with the first expense.
-  const quietMonth = complete && summary.status === 'ready' && !summary.categories.length && !recent.length;
-  // 24UX5: a Home row names its category only when the name and the glyph do not already say it, or when another
-  // category on this screen draws the same glyph (the two lists are read together).
-  const lookOf = (kind: 'expense' | 'income', category: string) => (kind === 'income' ? incomeLook : expenseLook)(category);
-  const shared = sharedGlyphs([...upcoming, ...recent].map(row => { const look = lookOf(row.kind, row.category); return { category: look.label, glyph: look.glyph }; }));
-  const namesCategory = (row: { kind: 'expense' | 'income'; category: string; merchant: string }) => {
-    const look = lookOf(row.kind, row.category);
+  // 24UX5: a row names its account only when the visible rows come from more than one; VoiceOver always says it.
+  const upcomingAccount = visibleNamesAccount(upcoming), recentAccount = visibleNamesAccount(recent);
+  // 24UX5: a commitment names its category only when the name and the glyph do not already say it, or when another row draws the same glyph.
+  const shared = sharedGlyphs(upcoming.map(row => { const look = expenseLook(row.category); return { category: look.label, glyph: look.glyph }; }));
+  const namesCategory = (row: { category: string; merchant: string }) => {
+    const look = expenseLook(row.category);
     return homeNamesCategory(row.merchant, look.label, shared.has(look.glyph));
   };
-  // Keyed by the choice, not the dates: a day boundary must not animate the hero on its own.
+  // Keyed by the choice, not the dates: a day boundary must not animate the number on its own.
   const heroId = `${metric}|${mode}|${currency}`;
   const hero = spending ? spendingHero : availableHero;
   const words = { t, date: formatNumericDate, currencyName };
   const info = figureInfo(hero, spending ? 'spending' : 'available', words);
-  // The quick actions preselect an account in the shown currency only when one exists (a consolidated total may be in a
-  // currency no account holds). The Assistant receives the shown currency exactly as before 24C1 (it is not changed here).
-  // A new movement is preselected in the shown currency only while a live account holds it (a history-only currency has no account to post to).
-  const actionCurrency = availableCurrencies(snapshot?.accounts ?? []).includes(currency) ? currency : undefined;
+  const help = info ? <MetricHelp title={t('fx.infoTitle')} detail={info} color={p.heroSecondary} />
+    : !spending ? <MetricHelp title={t('home.available')} detail={t('home.availableHelp')} color={p.heroSecondary} /> : null;
+  // The line under the number: what it covers. Gastado: the month so far with its daily average; Disponible: a balance.
+  const perDay = spending ? spendingPerDay(spendingHero, period) : null;
+  const subline = spending
+    ? (perDay !== null ? t('home.perDay', { amount: moneyText(perDay, currency) }) : spendingHero.status === 'ready' ? t('home.noSpending') : null)
+    : t('home.availableLine', { label: t('home.recordedBalance'), accounts: t('home.accounts', { count: accountCount }) });
+  // VoiceOver hears the daily average in words (the region's grouped digits and «$» misread aloud).
+  const spokenSubline = perDay !== null ? t('home.perDay', { amount: spokenMoney(perDay, currency) }) : undefined;
+  const quiet = hero.status === 'ready' && hero.minor === 0;
+  const scope = currencies.length > 1;
 
-  return <Screen gap={space.xxxl}>
-    {!snapshot.accounts.length ? <EmptyState title={t('home.emptyTitle')}
-      detail={t('home.emptyDetail')}
-      icon="receipt-outline" action={<ActionButton label={t('home.start')} icon="add-outline" onPress={() => router.push('/new-account')} />} /> : <>
-      <View style={{ gap: 28 }}>
-        <View style={{ flexDirection: stacked ? 'column' : 'row', alignItems: stacked ? 'stretch' : 'center', justifyContent: 'space-between', gap: 12 }}>
-          <View style={{ flex: stacked ? undefined : 1, maxWidth: stacked ? undefined : 208 }}>
-            <Choices compact value={metric} onChange={setMetric}
-              options={[{ value: 'spending', label: t('home.spending') }, { value: 'available', label: t('home.available') }]} />
-          </View>
-          {/* 25B2: with one currency held there is nothing to choose; the number is simply that currency's total. */}
-          {currencies.length > 1 && <DisplayCurrencyButton compact mode={mode} currency={currency} held={currencies} gate={gate} onMode={setMode} onCurrency={setCurrency} />}
-        </View>
-
-        <ValueTransition id={heroId} style={{ gap: 4, paddingBottom: space.xs }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
-            <AppText secondary variant="subhead" style={{ fontWeight: '500' }}>{spending ? capitalized(formatDate(day, 'month')) : t('home.recordedBalance')}</AppText>
-            {info ? <MetricHelp title={t('fx.infoTitle')} detail={info} />
-              : !spending && <MetricHelp title={t('home.available')} detail={t('home.availableHelp')} />}
-          </View>
-          {hero.status === 'ready'
-            ? <Money minor={hero.minor} currency={currency} large size={HERO_SIZE} color={!spending && hero.minor < 0 ? p.expense : undefined} />
-            : hero.status === 'unavailable'
-              ? <CurrencyParts parts={hero.parts} line={hero.reason === 'fetching' ? t('fx.fetching') : t('fx.unavailable', { currency })} detail={shortfallDetail(hero, words)} />
-              : <AppText secondary variant="subhead">{t(spending ? 'home.spendingOutOfRange' : 'home.balanceOutOfRange')}</AppText>}
-          {!spending && <AppText secondary variant="footnote">{t('home.accounts', { count: accountCount })}</AppText>}
-        </ValueTransition>
+  return <ScrollView style={{ flex: 1, backgroundColor: p.background }} contentInsetAdjustmentBehavior="never" onScroll={onScroll} scrollEventThrottle={32}
+    contentContainerStyle={{ paddingBottom: 48, flexGrow: 1 }}>
+    {/* The field's colour under the top overscroll, so a pull never shows the canvas above it. */}
+    <View pointerEvents="none" style={{ position: 'absolute', top: -1000, left: 0, right: 0, height: 1000, backgroundColor: p.hero }} />
+    <View onLayout={event => { fieldHeight.current = event.nativeEvent.layout.height; }}
+      style={{ backgroundColor: p.hero, paddingTop: insets.top + space.m, paddingBottom: space.xxl, paddingHorizontal: space.xl,
+        borderBottomLeftRadius: FIELD_RADIUS, borderBottomRightRadius: FIELD_RADIUS, gap: space.l }}>
+      {/* 1. The current month (not a control) and the accounts behind the number. */}
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.m }}>
+        <AppText accessibilityRole="header" variant="title2" style={{ flex: 1, color: p.heroInk }}>{capitalized(formatDate(day, 'month'))}</AppText>
+        <FieldButton icon="wallet-outline" label={t('nav.seeAccounts')} onPress={() => router.push('/accounts')} />
       </View>
+      {/* 2. The scope, only when there is more than one currency to choose (25B2). Outside the keyed crossfade: the chip's
+          sheet changes the key, and must never remount the chip that shows it. */}
+      {scope && <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: space.s }}>
+        <DisplayCurrencyButton onField mode={mode} currency={currency} held={currencies} gate={gate} onMode={setMode} onCurrency={setCurrency} />
+        {help}
+      </View>}
+      {/* 3–4. The number and what it covers. */}
+      <ValueTransition id={heroId} style={{ gap: 6 }}>
+        {hero.status === 'ready'
+          ? <Money minor={hero.minor} currency={currency} large size={HERO_SIZE} color={quiet ? p.heroSecondary : p.heroInk} />
+          : hero.status === 'unavailable'
+            ? <CurrencyParts onField parts={hero.parts} line={hero.reason === 'fetching' ? t('fx.fetching') : t('fx.unavailable', { currency })} detail={shortfallDetail(hero, words)} />
+            : <AppText variant="subhead" style={{ color: p.heroSecondary }}>{t(spending ? 'home.spendingOutOfRange' : 'home.balanceOutOfRange')}</AppText>}
+        {(subline || (!scope && help)) && <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
+          {subline && <AppText variant="subhead" accessibilityLabel={spokenSubline} style={{ color: p.heroSecondary, flexShrink: 1 }}>{subline}</AppText>}
+          {!scope && help}
+        </View>}
+      </ValueTransition>
+      {/* 5. What the number counts: it switches the number only. */}
+      <Choices onField value={metric} onChange={setMetric}
+        options={[{ value: 'spending', label: t('home.spending') }, { value: 'available', label: t('home.available') }]} />
+    </View>
 
-      <View style={{ gap: space.m }}>
-        <QuickActions currency={actionCurrency} />
-        <AssistantEntry currency={currency} />
-      </View>
-
-      {monthBudget !== null && scope && (monthBudget.total !== null || monthBudget.rows.length > 0) && <Reflow fade>
-        <SectionTitle quiet action={t('common.see')} onAction={() => router.push({ pathname: '/budgets', params: { currency: scope.currency } })}>
-          {scope.labelsCurrency ? withCurrencyCode(t('home.monthBudget'), scope.currency) : t('home.monthBudget')}</SectionTitle>
-        <BudgetHomeCard summary={monthBudget} />
-      </Reflow>}
-
-      {!quietMonth && <Reflow fade>
-        <SectionTitle quiet action={t('home.reports')} onAction={openReport}>{t('home.whereSpent')}</SectionTitle>
-        <ValueTransition id={currency} variant="fade">
-          {complete && summary.categories.length && summary.status === 'ready' ? <CategoryRanking categories={summary.categories} totalMinor={summary.expenseMinor} currency={currency}
-            onPressCategory={category => router.push({ pathname: '/spending-detail', params: { ...period, category: category.key } })} />
-            : <AppText secondary variant="subhead">
-              {complete && summary.status === 'ready' ? t('home.categoriesEmpty') : t('home.categoriesInActivity')}
-            </AppText>}
-        </ValueTransition>
-      </Reflow>}
-
-      {upcoming.length > 0 && <Reflow fade>
-        <SectionTitle quiet action={t('common.seeAll')} onAction={() => router.push('/recurring')}>{t('home.upcoming')}</SectionTitle>
-        <View>{upcoming.map((rule, index) => <UpcomingRecurringRow key={rule.id} rule={rule} showAccount={upcomingAccount} showCategory={namesCategory(rule)}
-          account={snapshot.accounts.find(account => account.id === rule.accountId)!} day={day} last={index === upcoming.length - 1} />)}</View>
-      </Reflow>}
-
-      <Reflow>
-        <SectionTitle quiet action={t('common.seeAll')} onAction={() => router.navigate('/activity')}>{t('home.recent')}</SectionTitle>
-        <ValueTransition id={currency} variant="fade">
-          {recent.length ? <View>{recent.map((entry, index) => <EntryRow key={entry.id} entry={entry} showAccount={recentAccount} variant="home" showCategory={namesCategory(entry)}
-            account={snapshot.accounts.find(a => a.id === entry.accountId)!} last={index === recent.length - 1} />)}</View>
-            : <AppText secondary variant="subhead">{mode === 'single' && currencies.length > 1 ? t('home.recentEmptyIn', { currency }) : t('home.recentEmpty')}</AppText>}
-        </ValueTransition>
-      </Reflow>
-    </>}
-  </Screen>;
+    <View style={{ paddingHorizontal: space.xl, paddingTop: 28, gap: 28 }}>
+      {!snapshot.accounts.length
+        ? <EmptyState title={t('home.emptyTitle')} detail={t('home.emptyDetail')} icon="receipt-outline"
+          action={<ActionButton label={t('home.start')} icon="add-outline" onPress={() => router.push('/new-account')} />} />
+        : <>
+          {upcoming.length > 0 && <Reflow fade>
+            <SectionTitle quiet action={t('common.seeAll')} onAction={() => router.push('/recurring')}>{t('home.upcoming')}</SectionTitle>
+            <Surface grouped style={{ paddingHorizontal: space.l }}>{upcoming.map((rule, index) => <UpcomingRecurringRow key={rule.id} rule={rule} showAccount={upcomingAccount}
+              showCategory={namesCategory(rule)} account={snapshot.accounts.find(account => account.id === rule.accountId)!} day={day} last={index === upcoming.length - 1} />)}</Surface>
+          </Reflow>}
+          {recent.length > 0 && <Reflow fade>
+            <SectionTitle quiet action={t('common.seeAll')} onAction={() => router.navigate('/activity')}>{t('home.recent')}</SectionTitle>
+            <Surface grouped>{recent.map((entry, index) => <EntryRow key={entry.id} entry={entry} showAccount={recentAccount}
+              account={snapshot.accounts.find(account => account.id === entry.accountId)!} last={index === recent.length - 1} />)}</Surface>
+          </Reflow>}
+          {/* One currency of several shown alone: the month may have movements in another, so the line names the currency (24UX2). */}
+          {!upcoming.length && !recent.length && <EmptyState title={mode === 'single' && scope ? t('home.quietTitleIn', { currency }) : t('home.quietTitle')}
+            detail={t('home.quietDetail')} icon="receipt-outline" />}
+        </>}
+    </View>
+  </ScrollView>;
 }

@@ -1,4 +1,4 @@
-import { budgetState, sortCurrencies, type BudgetProgress, type CategoryMonthlyBudget, type Currency, type MonthlyBudget, type MonthlyBudgetSummary, type TotalMonthlyBudget } from '@finanzapp/domain';
+import { budgetState, sortCurrencies, type BudgetProgress, type Currency, type MonthlyBudget } from '@finanzapp/domain';
 import { translator, type Translate } from '../i18n/messages.ts';
 
 /** Budget states map onto the existing semantic tones, and nothing else:
@@ -11,30 +11,6 @@ export function budgetTone(progress: Pick<BudgetProgress, 'ratio' | 'exceeded'>)
 }
 export function percentUsed(progress: Pick<BudgetProgress, 'ratio'>): number {
   return Math.round(progress.ratio * 100);
-}
-
-/** What Home leads with. A total budget answers "how much of my month have I
- * used" directly. Without one, the tightest category sublimit stands in, with
- * the count of sublimits beside it; sublimits are never added up into a fake
- * monthly total. Nothing when there is no active budget. */
-export type BudgetHomeHeadline =
-  | { kind: 'total'; progress: BudgetProgress<TotalMonthlyBudget>; categories: number; exceededCategories: number }
-  | { kind: 'category'; progress: BudgetProgress<CategoryMonthlyBudget>; categories: number; exceededCategories: number }
-  | null;
-export function budgetHomeHeadline(summary: MonthlyBudgetSummary): BudgetHomeHeadline {
-  const categories = summary.rows.length;
-  const exceededCategories = summary.rows.filter(row => row.exceeded).length;
-  if (summary.total) return { kind: 'total', progress: summary.total, categories, exceededCategories };
-  // Rows come worst first from the domain: exceeded, then highest ratio.
-  if (summary.rows.length) return { kind: 'category', progress: summary.rows[0], categories, exceededCategories };
-  return null;
-}
-
-/** "2 categorías en orden", "1 categoría excedida", or nothing without sublimits. */
-export function categoriesStatus(categories: number, exceeded: number, t: Translate = translator('es')): string {
-  if (!categories) return '';
-  if (exceeded) return t('budgetStatus.exceeded', { count: exceeded });
-  return t('budgetStatus.inOrder', { count: categories });
 }
 
 /** The caption of Presupuestos' "Por categoría" section: "3 categorías · 1

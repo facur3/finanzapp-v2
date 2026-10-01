@@ -13,7 +13,6 @@ import { bindLocale } from '../src/i18n/bind.ts';
 import { RELEASED_LANGUAGES } from '../src/i18n/locale.ts';
 import { localizeCategory, localizedCategoryLabel } from '../src/ui/appearance.ts';
 import { categoryChoices, categorySearchText, customCategory } from '../src/ui/categories.ts';
-import { categoriesStatus } from '../src/ui/budget-presentation.ts';
 import { accountKindLabel } from '../src/ui/liability-presentation.ts';
 import { selectEntries, selectTransfers } from '../src/ui/presentation.ts';
 import { isPluralEntry, pluralCategory, translator } from '../src/i18n/messages.ts';
@@ -102,16 +101,15 @@ test('plurals pick one for exactly one and other for everything else, in both la
   assert.equal(translate('es', 'count.movements', { count: 1 }), '1 movimiento');
   assert.equal(translate('en', 'count.movements', { count: 0 }), '0 transactions');
   assert.equal(translate('en', 'home.upcomingRow.inDays', { count: 1 }), 'In 1 day');
-  assert.equal(categoriesStatus(2, 0), '2 categorías en orden', 'Spanish output unchanged');
-  assert.equal(categoriesStatus(3, 1), '1 categoría excedida');
-  assert.equal(categoriesStatus(1, 0, translator('en')), '1 category on track');
-  assert.equal(categoriesStatus(0, 0, translator('en')), '');
 });
 
 test('placeholders are filled with the values given; a missing value stays visible instead of blank', () => {
   assert.equal(translate('en', 'transferForm.after', { name: 'Caja' }), 'Caja afterwards');
-  assert.equal(translate('es', 'home.budget.of', { amount: '$ 100,00', percent: 42 }), 'de $ 100,00 · 42 %');
-  assert.equal(translate('en', 'home.budget.of', { amount: '$ 100,00', percent: 42 }), 'of $ 100,00 · 42%');
+  assert.equal(translate('es', 'home.perDay', { amount: '$ 100,00' }), 'Hasta hoy · $ 100,00 por día');
+  assert.equal(translate('en', 'home.perDay', { amount: '$100.00' }), 'So far · $100.00 a day');
+  assert.equal(translate('es', 'home.availableLine', { label: 'Saldo registrado', accounts: '2 cuentas' }), 'Saldo registrado · 2 cuentas');
+  assert.equal(translate('es', 'home.capture.continue', { text: 'gasté 500 en el súper' }), 'Continuar: «gasté 500 en el súper»');
+  assert.equal(translate('en', 'home.capture.continue', { text: 'I spent 500' }), 'Continue: “I spent 500”');
   assert.equal(translate('en', 'rows.transferLabel', { title: 'Transfer', from: 'A' }), 'Transfer, from A to {to}, {amount}, {date}');
 });
 
@@ -224,17 +222,19 @@ test('account kinds are named in the interface language; the Spanish default is 
 });
 
 test('English fits where Spanish fits: segment, tab, quick-action, button and header labels stay within their room', () => {
-  // Segments share a row (Choices shrinks to 80 % at most); tab and quick-action captions sit under a glyph;
-  // buttons and headers are one line on a 320 pt iPhone SE at the default text size.
+  // Segments share a row (Choices shrinks to 80 % at most); quick-action captions sit under a glyph, and the dock's
+  // icon-only tabs show their names in the Large Content Viewer; buttons, the capture hub's titles and rows, and
+  // headers are one line on a 320 pt iPhone SE at the default text size.
   const budgets: [string[], number][] = [
     [['activity.all', 'activity.expenses', 'activity.incomes', 'activity.transfers', 'movement.expense', 'movement.income', 'movement.transfer',
       'home.spending', 'home.available'], 13],
-    [['nav.tabs.home', 'nav.tabs.activity', 'nav.tabs.assistant', 'nav.tabs.reports', 'nav.tabs.more',
+    [['nav.tabs.home', 'nav.tabs.activity', 'nav.tabs.reports', 'nav.tabs.more',
       'quickActions.expense', 'quickActions.income', 'quickActions.transfer'], 11],
     [['common.addAccount', 'common.retrySave', 'common.retryChange', 'common.saveChanges', 'entryForm.saveExpense', 'entryForm.saveIncome',
       'transferForm.recordPayment', 'transferForm.recordCollection', 'transferForm.recordTransfer', 'entryDetail.edit', 'entryDetail.restoreAction',
       'entryDetail.voidAction', 'transferDetail.edit', 'transferDetail.restoreAction', 'transferDetail.voidAction', 'activity.clearFilters', 'home.start',
-      'transferForm.payTotal', 'transferForm.settleTotal', 'transferForm.collectTotal', 'transferForm.useAll', 'quickActions.askAssistant'], 24],
+      'transferForm.payTotal', 'transferForm.settleTotal', 'transferForm.collectTotal', 'transferForm.useAll', 'home.capture.label', 'home.capture.title',
+      'home.capture.close', 'home.capture.assistant', 'home.capture.expense', 'home.capture.income', 'home.capture.transfer'], 24],
     [Object.keys(es.nav.titles).map(key => 'nav.titles.' + key).concat(['entryForm.editTitle', 'entryForm.cardPurchaseTitle', 'entryForm.expenseTitle',
       'entryForm.incomeTitle', 'transferForm.title', 'transferForm.editTitle', 'entryDetail.voidedTitle', 'transferDetail.voidedTitle',
       'transferDetail.cardPayment', 'transferDetail.debtPayment']), 24],
@@ -276,8 +276,9 @@ test('the translation brief for a new language carries source, English reference
   assert.equal(accounts.english.other, '{count} accounts');
   const help = brief.entries.find((entry: any) => entry.key === 'home.availableHelp');
   assert.ok(help.glossary.some((term: any) => term.es === 'saldo registrado' || term.es === 'cuenta'), 'glossary terms are attached');
-  const ranking = brief.entries.find((entry: any) => entry.key === 'home.rankingLabel');
-  assert.match(ranking.context, /Comida/, 'the comment above the key is its context');
+  const availableLine = brief.entries.find((entry: any) => entry.key === 'home.availableLine');
+  assert.match(availableLine.context, /Saldo registrado · 2 cuentas/, 'the comment above the key is its context');
+  assert.deepEqual(availableLine.placeholders, ['accounts', 'label'], 'sorted');
 });
 
 test('pseudo-locales for layout testing keep every placeholder: long text grows about 40 %, RTL is wrapped in embedding marks', () => {

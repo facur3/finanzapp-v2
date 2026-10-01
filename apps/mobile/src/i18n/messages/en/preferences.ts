@@ -19,5 +19,13 @@ export const preferences: Pick<Messages, 'preferences'> = {
     pendingSummary: '{value} · {fallback} formats',
     previewNote: 'Development preview: includes regions not yet verified on an iPhone.',
     regionSample: '{date} · {amount}',
+    appearance: 'Appearance',
+    appearanceSystem: 'System',
+    appearanceLight: 'Light',
+    appearanceDark: 'Dark',
+    appearanceSystemNowLight: 'Follows the device · now light',
+    appearanceSystemNowDark: 'Follows the device · now dark',
+    appearanceSystemDetail: 'Follows the device',
+    appearanceNote: 'Only changes how FinanzApp looks on this device. It doesn’t change your transactions, your accounts or your backups.',
   },
 };

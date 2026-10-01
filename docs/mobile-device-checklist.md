@@ -1,8 +1,128 @@
 # Physical iPhone acceptance checklist
 
+## Producto 24UX6A — Forest foundation, four-tab shell, capture hub and Home
+
+**Not done in 24UX6A: no EAS build was made and the iPhone was not touched. Every item below is pending.**
+This section replaces the one written for the first iteration of this PR (five tabs with «Inicio, pestaña, 1 de 5»,
+the «＋ Registrar» capsule under the number, the cobalt selected tab): those checks no longer describe the code
+([decision 005](decisions/005-forest-four-tabs-and-capture.md), 2026-09-30). Metro from this branch
+(`npm run start:dev-client -- --clear`) on the installed FinanzApp Dev build; JavaScript only, no native dependency
+added and no schema change (the ledger stays at schema 13, backups at v13; the Appearance choice lives outside both;
+the Assistant's conversation is memory only). Use your own data; never seed movements. Record each result with the
+iPhone model, iOS version, theme, material (glass or Reducir transparencia) and text size.
+
+- [ ] The Más footer reads «FinanzApp 0.1.0 (24UX6A)».
+
+**Shell — four tabs and the «+».**
+
+- [ ] A floating pine dock above the home indicator, clear of it, with four tabs (Inicio, Movimientos, Reportes, Más)
+  shown as icons only (no visible labels); the current one has a filled glyph inside a lighter pine capsule. The
+  round «+» sits beside the dock, outside it. No Asistente tab.
+- [ ] VoiceOver: «Inicio, pestaña, 1 de 4», «Movimientos, pestaña, 2 de 4», «Reportes, pestaña, 3 de 4», «Más,
+  pestaña, 4 de 4», with «Seleccionado» on the current one. The «+» reads «Registrar, botón» with the hint «Abre las
+  opciones para registrar»: never a tab, never selected, and not counted in «de 4».
+- [ ] At the accessibility text sizes, a long press on each tab shows its name large (Large Content Viewer).
+- [ ] Switch tabs 30–40 times quickly (including Más and Reportes, and back to Inicio): no black screen, no blank frame,
+  no cross-fade (the switch is instant).
+- [ ] Tapping the tab already selected does nothing harmful (no reload, no jump, no blank screen). Movimientos keeps its
+  header «+» to Registrar gasto.
+- [ ] Glass (iOS 26, Reducir transparencia off) and solid pine (on), in light and dark: both read as designed; the
+  «+» keeps its mint fill with the dark glyph clearly legible in both. Glass appears only on the dock pill, an account
+  detail's movement pills and the Assistant composer; the «+» and the hub card stay solid.
+- [ ] On a 375 pt iPhone (or Zoomed display): the four icons and the «+» fit with even spacing; nothing overlaps; the
+  last row of a long list (Movimientos, Reportes, Más) scrolls clear of the dock.
+- [ ] Landscape inset: the app is portrait-only, so confirm it does not rotate; the left/right inset term of the dock
+  geometry is covered by tests only.
+
+**Hub — Registrar.**
+
+- [ ] Tap «+» on every tab (Inicio, Movimientos, Reportes, Más): one light haptic, the card «Registrar» rises a little
+  above the dock with a fade, the scrim darkens behind it, and a «×» («Cerrar») appears exactly where the «+» was.
+  Order: the Asistente tile first (pine, «Decilo con tus palabras o preguntá lo que quieras»), then Gasto, Ingreso,
+  Transferencia with their sublines. No microphone.
+- [ ] Each closes it and opens nothing: «×», a tap on the scrim, the VoiceOver escape gesture (two-finger Z). (The
+  Android back button closes it too; not checkable on iPhone.)
+- [ ] First choice holds: tap a row and, while the card is leaving, tap another row, the scrim or the «×»: only the first
+  choice opens, once.
+- [ ] Each row opens its form after the card has gone: Gasto → Registrar gasto, Ingreso → Registrar ingreso (in the
+  shown currency when an account holds it), Transferencia → Transferir, Asistente → the Assistant screen. Nothing is
+  saved from the hub.
+- [ ] Reduce Motion: the card and the «×» fade in place without rising. A long press on «+» does nothing extra.
+- [ ] VoiceOver inside the hub: focus stays in it; title, the Asistente tile, the three rows and «Cerrar» are each read
+  once.
+- [ ] AX5 (the largest accessibility text size) on a 375 pt iPhone (or Zoomed display): the hub card stays below the
+  status bar and above the dock, and its title and four options scroll inside the card (no bounce) so every option
+  can be reached; «Cerrar» stays where the «+» is.
+
+**Assistant — a stack screen.**
+
+- [ ] From the hub, the Assistant pushes over the tabs with its title and the native back button; back (button or edge
+  swipe) returns to the tab where the «+» was tapped, with the dock as it was.
+- [ ] Write a message and get an answer, go back, open the Assistant again from the hub: the conversation is still
+  there and scrolls to its last exchange once. An answer still streaming when you leave lands in the conversation.
+- [ ] The hub shows «Continuar: «…»» with your own last words only after you wrote something in this session; never
+  before. «Nuevo chat» (in the header once there are messages) clears the conversation, and the chip disappears.
+- [ ] Force-quit and reopen: the conversation is gone and the hub shows no «Continuar».
+- [ ] The composer as a stack screen: with the keyboard down it rests above the home indicator with no empty strip
+  (no dock below it); tapping the field raises it to the keyboard's top edge exactly; interactive dismiss follows the
+  drag.
+- [ ] Tapping «Ver movimientos» in an Assistant answer returns to the existing tabs on Movimientos (the Assistant is
+  popped, the Movimientos tab selected): one dock, and back does not reveal a second tab set. The dock is usable from
+  there.
+- [ ] A proposed movement is written only after Confirmar; nothing is written on its own.
+
+**Home — the financial field.**
+
+- [ ] The pine field reaches under the status bar in light and dark, with light status-bar content over it. In light
+  mode, scroll past the field: the status bar returns to dark text; it is also dark text on every other screen
+  (Movimientos, Más, a pushed detail) and back to light when Inicio is focused at the top.
+- [ ] The month label (the current month) is plain text: not tappable, no chevron. The wallet button opens Cuentas.
+- [ ] With one currency held: no scope row (the ⓘ help sits beside the subline). With two or more: the display
+  currency chip and ⓘ on their own row; the chip still opens its sheet and the number changes behind it.
+- [ ] Gastado: «Hasta hoy · $ … por día», or «Sin gastos este mes» with nothing spent (the number then in the softer
+  ink). Disponible: «Saldo registrado · N cuentas», never a per-day figure. Gastado | Disponible switches only the
+  number and its line.
+- [ ] «Próximos compromisos»: at most two rules due within seven days, «Ver todos» → Recurrentes; with none, the
+  section is absent.
+- [ ] «Actividad reciente»: this month's expenses and incomes (no transfers), newest first, at most 4 with
+  commitments and 6 without; «Ver todos» → the Movimientos tab.
+- [ ] Empty states: accounts but nothing this month and nothing due → «Todavía no hay movimientos este mes» /
+  «Registrá un gasto con el botón Registrar (+) o contáselo al Asistente.» with no button. With two or more
+  currencies held and one shown alone («Solo X») with nothing this month in it, the title names the currency:
+  «Todavía no hay movimientos en X este mes». No account → the empty state with
+  «Empezar» → Nueva cuenta. No «＋ Registrar», no insight line, no rankings, budgets, charts or Assistant banner on
+  Inicio.
+- [ ] The 46 pt number with a 9-digit amount (e.g. $ 123.456.789) on a 375 pt iPhone: one line, shrinks, never clips;
+  a missing rate shows the per-currency parts instead.
+- [ ] Dynamic Type from the default to the largest accessibility size: the field, the subline, the Gastado |
+  Disponible control and the rows grow and wrap without clipping or overlapping the dock.
+
+**Forest.**
+
+- [ ] Light and dark (OLED black in dark): the field, the dock and the «+» read with enough contrast; pine, never
+  teal, cyan, emerald or blue. Ordinary spending is not drawn red; the brick tone appears only for over-limit,
+  overdue or destructive states.
+- [ ] Category colours are unchanged versus master: the same category keeps the same tile colour in Movimientos,
+  Reportes and a movement's detail.
+
+**Appearance.**
+
+- [ ] Más → App y datos → Apariencia: Sistema (with «ahora claro/oscuro»), Claro, Oscuro still apply at once, the
+  keyboard, an alert and the date wheel included. Force-quit and reopen on Oscuro with the iPhone in light: no light
+  flash after the launch screen. Back to Sistema: the app follows the iPhone again.
+
+Record: date, iPhone model, iOS version, build, language, and every result above (a failure with a screenshot of your
+own test data only, never of real financial data).
+
 ## Producto 24T2 — installment purchase and complete Cards experience
 
-**Not done in 24T2: no EAS build was made and the iPhone was not touched.** Metro from this branch
+**Result (2026-09-29): completed by the owner on an iPhone 14 Pro with a fresh development build, after the schema 13
+upgrade of their data. PR #69 merged (merge commit 8951f6c).**
+
+The owner reported on 2026-09-29 that this section passed; no per-item results were recorded here, so the items
+below stay unticked as written.
+
+**Before the merge (2026-09-28): no EAS build had been made and the iPhone had not been touched.** Metro from this branch
 (`npm run start:dev-client -- --clear`) on the installed FinanzApp Dev build; JavaScript only, no native change.
 **The ledger moves to schema 13 (one new empty table for exact statement dates) and an older build refuses the file
 unchanged: export a backup first** (Más → Copia de seguridad). Use your own small test data (one test card, two or
@@ -416,7 +536,8 @@ own small real data (a few expenses, one recurring rule, ideally two currencies)
 - [ ] **Pills.** Gasto, Ingreso, Transferir: equal width, one line each on the narrowest iPhone at
   hand (on a 375 pt phone "Transferir" may shrink slightly, never truncate); glyphs coral/green/azure;
   press scales to 0,97; each opens its form with the currency carried over. They do not read as filters.
-- [ ] **Assistant entry — prominence and ergonomics.** Reads as the most important control after the
+- [ ] (Superseded by decision 005, 2026-09-30: the Assistant is no longer a tab; it is the first choice of the dock's «+» hub and a
+  stack screen — see 24UX6A.) **Assistant entry — prominence and ergonomics.** Reads as the most important control after the
   number without looking like a banner or an ad; the wash is subtle in both themes; it does not read
   as a search field. One-handed on a 6,1″ iPhone: reach it with the thumb without regripping (note
   whether it is easier than the old first disc). Tapping switches to the centre tab (no stacked
@@ -431,7 +552,7 @@ own small real data (a few expenses, one recurring rule, ideally two currencies)
   read as two different things, not one long list.
 - [ ] **Links.** Reportes / Ver / Ver todo are grey with a grey chevron, clearly tappable, open the same
   screens as before (Reportes keeps the currency).
-- [ ] **Cobalt balance.** Count the cobalt on screen: the Assistant's glyph and edge, the active tab.
+- [ ] (Superseded by decision 005, 2026-09-30: Forest replaces cobalt.) **Cobalt balance.** Count the cobalt on screen: the Assistant's glyph and edge, the active tab.
   Nothing else competes.
 - [ ] **Dynamic Type** at the default, the largest standard and the largest accessibility size: the
   pills stack at full width with wrapping labels; the Assistant entry grows in height and its label
@@ -480,7 +601,7 @@ your own small real data; never seed movements.
   recorded anything says so.
 - [ ] A movement recorded by a rule: its detail shows "Recurrente · Mensual"; tapping opens the rule.
   A typed movement does not show it.
-- [ ] The tab bar's inactive labels (secondary ink) in both themes: legible without competing with
+- [ ] (Superseded by decision 005, 2026-09-30: the dock is icon-only, no cobalt.) The tab bar's inactive labels (secondary ink) in both themes: legible without competing with
   the selected cobalt tab.
 - [ ] Development bundle with `EXPO_PUBLIC_MERCHANT_MARK_PREVIEW=1`: rows named "Netflix",
   "spotify", "Mercado Pago", "Disney+", "App Store" show the brand's initial on a neutral tile;
@@ -1002,7 +1123,7 @@ Expo Go works too. English is **not** released, so on the iPhone this PR must lo
 exactly like 23.1A in Spanish; the English layout is checked by tests only until 23.1C.
 
 - [ ] Más footer reads "Producto 23.1B1".
-- [ ] Tab bar: Inicio, Movimientos, Asistente (centre), Reportes, Más; header buttons
+- [ ] (Tab list superseded by decision 005, 2026-09-30: four tabs, no Asistente tab — see 24UX6A.) Tab bar: Inicio, Movimientos, Asistente (centre), Reportes, Más; header buttons
   "Ver mis cuentas" (Inicio) and "+" (Movimientos) read the same with VoiceOver.
 - [ ] Inicio: Gastos / Disponible switch, month name, "Saldo registrado" with its ⓘ help
   alert, "N cuentas", Presupuesto del mes card ("te queda" / "excedido", "de $ … · N %",
@@ -1150,6 +1271,10 @@ identifier `com.facur3.finanzapp.dev`; FinanzApp Preview is not rebuilt or touch
 
 ## Producto 22 — AI reachability and native material (pending device review)
 
+> Superseded by decision 005, 2026-09-30: the five tabs with the Asistente in the centre, the Asistente tab and its composer resting on
+> the tab bar no longer exist. The current shell, hub and Assistant checks are in the 24UX6A section at the top; the
+> items below stay as the historical record of Producto 22.
+
 - [ ] Before updating, share a private copy. After updating, Más footer reads Producto 22; no account, card, movement, budget or rule changed.
 - [ ] The tab bar reads Inicio, Movimientos, Asistente, Reportes, Más; the centre sparkles icon fills when active; 30–40 tab changes through Asistente do not reproduce the black-tab issue.
 - [ ] Hold the phone in one hand, right thumb then left thumb: the Asistente tab is reached without shifting the grip; compare with the leftmost Home action.
@@ -1212,7 +1337,7 @@ identifier `com.facur3.finanzapp.dev`; FinanzApp Preview is not rebuilt or touch
 
 ## Producto 18 — navigation and smart actions (pending device review)
 
-- [ ] Más footer reads Producto 18; no data changes after updating; the tab bar reads Inicio · Movimientos · Reportes · Tarjetas · Más with the ellipsis-circle glyph; no sixth tab.
+- [ ] Más footer reads Producto 18; no data changes after updating; the tab bar reads Inicio · Movimientos · Reportes · Tarjetas · Más with the ellipsis-circle glyph; no sixth tab. (Tab list superseded by Producto 22, then by decision 005, 2026-09-30: four tabs, see 24UX6A.)
 - [ ] Más shows two groups, Finanzas (Cuentas, Presupuestos, Recurrentes, Deudas y cobros, Categorías) and App y datos (Asistente "Vista previa", Copia de seguridad, Movimientos deshechos), each row opening its screen; counts match your data; Tarjetas is not a row.
 - [ ] Copia de seguridad: Compartir copia opens the share sheet as before and Importar copia opens the review flow; cancelling the sheet reports nothing.
 - [ ] Categorías lists the defaults and every category you typed yourself (e.g. your test ones) with their usage; nothing can be renamed or deleted; the ledger is unchanged afterwards.
@@ -1226,7 +1351,7 @@ identifier `com.facur3.finanzapp.dev`; FinanzApp Preview is not rebuilt or touch
 ## Interfaz 17 — visual identity and monetary experience (pending device review)
 
 - [ ] Ajustes footer reads Interfaz 17; no data changes after updating.
-- [ ] The selected tab, the selected label of every segmented control, section links, "Este mes", the account selector and the picker checkmarks are the same cobalt blue in both themes; unselected tabs, other bars, dates and normal text stay neutral. Nothing reads as purple or neon.
+- [ ] (Colour superseded by decision 005, 2026-09-30: Forest replaces cobalt.) The selected tab, the selected label of every segmented control, section links, "Este mes", the account selector and the picker checkmarks are the same cobalt blue in both themes; unselected tabs, other bars, dates and normal text stay neutral. Nothing reads as purple or neon.
 - [ ] One filled blue button per screen (Guardar gasto, Guardar cambios, Crear, Registrar compra, Empezar); secondary actions stay grey; Pagar tarjeta and Transferir keep the azure transfer tint, distinguishable from the cobalt.
 - [ ] Home "En qué gastaste": one grouped block of up to three rows; behind each row a faint, rounded, inset wash of its hue matches its share (a 99,8 / 0,1 / 0,1 % month shows one nearly full wash and two hairlines that are still tappable); the wash is never cut square by the surface edge and no separator crosses it; the section reads lighter than the recent-movements list; text stays readable over the wash in both themes; on first data the washes grow in with a slight stagger, on a currency change the block crossfades; with Reduce Motion the washes appear without growing; scrolling never moves them.
 - [ ] Home quick actions: three neutral circles (surface step in dark, white with a soft shadow in light) with only the glyph coloured (Gasto coral, Ingreso green, Transferir azure); they no longer read as three coloured buttons.
@@ -1325,7 +1450,7 @@ identifier `com.facur3.finanzapp.dev`; FinanzApp Preview is not rebuilt or touch
 Save a private backup first and use small test amounts. Do not uninstall the only copy.
 
 - [ ] Ajustes footer reads Interfaz 10; accounts, movements, recurrentes and budgets are unchanged after the schema 5 → 6 upgrade.
-- [ ] Five tabs (Inicio, Movimientos, Reportes, Tarjetas, Ajustes) switch 30–40 times without a black frame; Reportes opens from Inicio → Reporte mensual on the tab.
+- [ ] (Tab list superseded; current shell: decision 005, 2026-09-30, see 24UX6A.) Five tabs (Inicio, Movimientos, Reportes, Tarjetas, Ajustes) switch 30–40 times without a black frame; Reportes opens from Inicio → Reporte mensual on the tab.
 - [ ] Inicio → Próximos compromisos → Programar opens the recurring form even with no rules; Ajustes → Recurrentes still works.
 - [ ] The purple accent is gone: ink tab bar and buttons, blue links, coral/green only on semantic amounts and tiles, amber only for warnings.
 - [ ] Tarjetas → + creates a card with name, currency, optional current debt, limit and closing/due days; it appears as a card face in the carousel.
