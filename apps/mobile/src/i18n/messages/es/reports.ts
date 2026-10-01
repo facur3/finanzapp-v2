@@ -20,6 +20,16 @@ export const reports = {
       previousMonth: 'el mes anterior',
     },
     lastSixMonths: 'Últimos seis meses',
+    /** 24UX6B: the history section, after the month's analysis. Its bars still open a month. */
+    history: {
+      title: 'Evolución',
+      hint: 'Tocá un mes para verlo',
+      /** Instead of a lone bar when only the month shown has spending among the last six. */
+      single: 'Con más meses de gastos registrados vas a ver la evolución acá.',
+    },
+    /** 24UX6B: headings over the rows of the month's analysis. */
+    byCategory: 'Por categoría',
+    byDay: 'Por día',
     /** Segmented control: category breakdown or day-by-day list. */
     viewCategories: 'Categorías',
     viewDays: 'Día a día',
@@ -36,6 +46,8 @@ export const reports = {
     dayRow: '{date} · {count}',
     emptyTitle: 'Sin gastos en este período',
     emptyDetail: 'Los gastos que registres en esta moneda aparecen acá, por categoría.',
+    /** The same empty month, on the day-by-day view. */
+    emptyDaysDetail: 'Cada día con gastos en esta moneda aparece acá, con su total.',
     budgets: {
       title: 'Presupuestos',
       manage: 'Administrar',

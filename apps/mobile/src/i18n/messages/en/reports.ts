@@ -18,6 +18,13 @@ export const reports: Pick<Messages, 'reports'> = {
       previousMonth: 'the previous month',
     },
     lastSixMonths: 'Last six months',
+    history: {
+      title: 'Trend',
+      hint: 'Tap a month to open it',
+      single: 'Once more months have recorded spending, the trend appears here.',
+    },
+    byCategory: 'By category',
+    byDay: 'By day',
     viewCategories: 'Categories',
     viewDays: 'Day by day',
     periodTotal: 'Period total',
@@ -29,6 +36,7 @@ export const reports: Pick<Messages, 'reports'> = {
     dayRow: '{date} · {count}',
     emptyTitle: 'No expenses in this period',
     emptyDetail: 'Expenses you record in this currency appear here, by category.',
+    emptyDaysDetail: 'Each day with expenses in this currency appears here with its total.',
     budgets: {
       title: 'Budgets',
       manage: 'Manage',

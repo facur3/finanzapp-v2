@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { FlatList, StyleSheet, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -24,12 +24,18 @@ import { ValueTransition, selectionHaptic } from '../../src/ui/motion';
 import { activityDateLabel, historyCurrencies } from '../../src/ui/presentation';
 import { changePercent, earliestRecordedMonth, insightsBesideRanking, reportPeriodLabel, reportSelection, requestedReportMonth, shiftReportMonth } from '../../src/ui/report-presentation';
 import { CategoryLegendRow } from '../../src/ui/spending-chart';
-import { space, useCurrentDay, usePalette } from '../../src/ui/theme';
+import { space, useCurrentDay, usePalette, useReduceMotion } from '../../src/ui/theme';
 
-/** Reportes answers "¿a dónde fue mi plata?" for one month and one currency:
- * total and daily average, six-month trend, category donut with legend, day by
- * day, budgets, top merchants and factual insights. Every number is recorded
- * spending in that currency; nothing is estimated or converted.
+/** Reportes answers "¿a dónde fue mi plata?" for one month and one currency. Every number is recorded spending in that
+ * currency; nothing is estimated.
+ *
+ * Reading order (Producto 24UX6B, the Forest hierarchy of decision 005): the scope and the period (the currency chip with
+ * more than one currency, the month and its arrows: Reportes is where past months live, Inicio shows only the current
+ * one); the month's total with its daily average and change; then the analysis of that month, categories first (the
+ * donut, then «Por categoría» with every category) or day by day («Por día»), switched by one segmented control; then the
+ * history («Evolución», the last six months, whose bars still open a month); and last the details: budgets, the top
+ * merchants, the factual insights, income and net flow, and the comparison. With a single month of history the trend is
+ * one quiet line instead of a lone bar. Red stays an alert (a budget exceeded); ordinary spending is ink.
  *
  * 24UX5: what the report counts (one currency, no opening balances, transfers or card payments; a month without
  * records is not a month without spending) is one tap away beside the total instead of a permanent paragraph at the
@@ -46,10 +52,13 @@ export default function ReportsScreen() {
   const params = useLocalSearchParams<{ currency?: string | string[]; month?: string | string[] }>();
   const { snapshot, archive, gate } = useLedger();
   const p = usePalette();
-  const { t, locale, formatMonthTitle, formatDayMonth, formatNumericDate, currencyName, moneyText, spokenMoney } = useI18n();
+  const { t, locale, formatMonthTitle, formatDayMonth, formatNumericDate, currencyName, moneyText, spokenMoney, spokenPercent, speechLanguage } = useI18n();
   const day = useCurrentDay();
   const [monthOverride, setMonth] = useState<string>();
   const [tab, setTab] = useState<'categories' | 'days'>('categories');
+  const reduced = useReduceMotion();
+  // The history sits under the analysis (24UX6B): a bar that opens another month brings that month's title and total into view.
+  const list = useRef<FlatList<CategorySpending | DailySpending>>(null);
   // The display currency Reportes shares with Inicio (24B6). A route that names a currency an account holds shows it and
   // makes it the shared choice (once, when the parameter arrives); an unknown or unheld one is ignored and the choice stands.
   // Every currency the ledger ever held (25B2 review): a month's report keeps a deleted account's movements.
@@ -129,13 +138,27 @@ export default function ReportsScreen() {
   const average = ready ? dailyAverageMinor(report.expenseMinor, report) : 0;
   const delta = comparison && comparison.status === 'ready' && comparison.previous?.status === 'ready' && comparison.deltaMinor !== null
     ? { minor: comparison.deltaMinor, percent: changePercent(comparison.deltaMinor, comparison.previous.expenseMinor, locale), mode: comparison.mode } : null;
-  const deltaText = delta && (() => {
+  const deltaWords = (percent: string) => {
+    if (!delta) return null;
     const reference = t(delta.mode === 'matching-days' ? 'reports.delta.matchingDays' : 'reports.delta.previousMonth');
     return delta.minor === 0 ? t('reports.delta.same', { reference })
-      : t(delta.minor > 0 ? 'reports.delta.more' : 'reports.delta.less', { percent: delta.percent, reference });
-  })();
+      : t(delta.minor > 0 ? 'reports.delta.more' : 'reports.delta.less', { percent, reference });
+  };
+  const deltaText = delta && deltaWords(delta.percent);
+  // The same change for VoiceOver, its share in the language's spoken numbers.
+  const previousSpent = comparison?.status === 'ready' && comparison.previous?.status === 'ready' ? comparison.previous.expenseMinor : 0;
+  const spokenDelta = delta && previousSpent > 0 ? deltaWords(spokenPercent(Math.abs(delta.minor) / previousSpent)) : null;
+  // The line under the total, once for VoiceOver: the average in words (never the region's grouped digits) and the change.
+  const summaryLine = report.status !== 'ready' ? '' : [report.count === 0 ? t('reports.noRecords') : t('reports.perDay', { amount: spoken(average) }), spokenDelta].filter(Boolean).join(', ');
+  // The history: the six months ending at the shown one, as bars once another of them has spending. When the shown month
+  // is the only one of its six with spending, one quiet line instead of a lone bar beside five empty ones (the arrows and
+  // «Este mes» above lead to later months). Absent when no month of the six has spending, or a month lacks a rate.
+  const recordedMonths = trend.filter(point => point.amountMinor > 0);
+  const onlyThisMonth = recordedMonths.length === 1 && recordedMonths[0].monthISO === monthISO;
+  const showTrend = ready && recordedMonths.length > 0 && !onlyThisMonth;
+  const days = tab === 'days';
 
-  return <FlatList<CategorySpending | DailySpending> data={rows} keyExtractor={item => 'key' in item ? item.key : item.dateISO}
+  return <FlatList<CategorySpending | DailySpending> ref={list} data={rows} keyExtractor={item => 'key' in item ? item.key : item.dateISO}
     style={{ flex: 1, backgroundColor: p.background }}
     contentContainerStyle={{ padding: space.xl, paddingBottom: 48, flexGrow: 1 }}
     contentInsetAdjustmentBehavior="automatic" removeClippedSubviews={false}
@@ -161,13 +184,14 @@ export default function ReportsScreen() {
       </View>
 
       {ready ? <>
+        {/* The month's total and what it covers. */}
         <ValueTransition id={monthISO + '|' + currency} style={{ gap: 8 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
             <AppText secondary variant="eyebrow">{withCurrencyCode(t('reports.spent'), currency)}</AppText>
             <InfoButton title={t('reports.method.title')} detail={method ?? t('reports.method.detail', { currency })} />
           </View>
           <Money minor={report.expenseMinor} currency={currency} large />
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6 }}>
+          <View accessible accessibilityLabel={summaryLine} accessibilityLanguage={speechLanguage} style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6 }}>
             <AppText secondary variant="subhead">{report.count === 0 ? t('reports.noRecords') : t('reports.perDay', { amount: money(average) })}</AppText>
             {delta && <>
               <AppText secondary variant="subhead">·</AppText>
@@ -179,18 +203,15 @@ export default function ReportsScreen() {
           </View>
         </ValueTransition>
 
-        {trend.length > 0 && trend.some(point => point.amountMinor > 0) && <Surface style={{ gap: 12 }}>
-          <AppText secondary variant="caption" style={{ fontWeight: '500' }}>{t('reports.lastSixMonths')}</AppText>
-          <MonthBars points={trend} selected={monthISO} onSelect={month => { if (month !== monthISO) goToMonth(month === currentMonth ? undefined : month); }} currency={currency} />
-        </Surface>}
-
-        <Choices value={tab} onChange={setTab} options={[{ value: 'categories', label: t('reports.viewCategories') }, { value: 'days', label: t('reports.viewDays') }]} />
-
-        {tab === 'categories' && report.categories.length > 0 && <View style={{ alignItems: 'center', gap: space.m }}>
-          <DonutChart slices={slices} total={report.expenseMinor} currency={currency} caption={t('reports.periodTotal')} />
-          {slices.some(slice => slice.key === OTHERS_KEY) && <AppText tertiary variant="caption">{t('reports.othersNote')}</AppText>}
-        </View>}
-        {tab === 'days' && rows.length > 0 && <AppText secondary variant="footnote" style={{ paddingHorizontal: 4 }}>{t('reports.daysNote')}</AppText>}
+        {/* The month's analysis: categories first, or day by day. */}
+        <View style={{ gap: space.l }}>
+          <Choices value={tab} onChange={setTab} options={[{ value: 'categories', label: t('reports.viewCategories') }, { value: 'days', label: t('reports.viewDays') }]} />
+          {!days && report.categories.length > 0 && <View style={{ alignItems: 'center', gap: space.m, paddingTop: space.s }}>
+            <DonutChart slices={slices} total={report.expenseMinor} currency={currency} caption={t('reports.periodTotal')} />
+            {slices.some(slice => slice.key === OTHERS_KEY) && <AppText tertiary variant="caption" style={{ textAlign: 'center' }}>{t('reports.othersNote')}</AppText>}
+          </View>}
+        </View>
+        {rows.length > 0 && <SectionTitle caption={days ? t('reports.daysNote') : undefined}>{t(days ? 'reports.byDay' : 'reports.byCategory')}</SectionTitle>}
       </> : shortfall?.status === 'unavailable'
         ? <CurrencyParts parts={shortfall.parts} line={shortfall.reason === 'fetching' ? t('fx.fetching') : t('fx.unavailable', { currency })} detail={shortfallDetail(shortfall, words)} />
         : <EmptyState title={t('reports.outOfRangeTitle')} icon="calculator-outline" detail={t('reports.outOfRangeDetail')} />}
@@ -205,9 +226,28 @@ export default function ReportsScreen() {
           value={money(item.amountMinor)} spokenValue={spoken(item.amountMinor)} last={index === rows.length - 1}
           onPress={() => router.push({ pathname: '/report-day', params: { currency, date: item.dateISO } })} />}
     </View>}
-    ListEmptyComponent={ready ? <EmptyState title={t('reports.emptyTitle')} icon="pie-chart-outline"
-      detail={t('reports.emptyDetail')} /> : null}
+    ListEmptyComponent={ready ? <EmptyState title={t('reports.emptyTitle')} icon={days ? 'calendar-outline' : 'pie-chart-outline'}
+      detail={t(days ? 'reports.emptyDaysDetail' : 'reports.emptyDetail')} /> : null}
     ListFooterComponent={<View style={{ gap: space.xxl, paddingTop: space.xxl }}>
+      {/* The history, after the month's own analysis: six months on one scale; a bar opens its month. */}
+      {showTrend && <View>
+        <SectionTitle caption={t('reports.history.hint')}>{t('reports.history.title')}</SectionTitle>
+        <Surface style={{ gap: 12 }}>
+          <AppText secondary variant="caption" style={{ fontWeight: '500' }}>{t('reports.lastSixMonths')}</AppText>
+          <MonthBars points={trend} selected={monthISO} currency={currency} onSelect={month => {
+            if (month === monthISO) return;
+            goToMonth(month === currentMonth ? undefined : month);
+            list.current?.scrollToOffset({ offset: 0, animated: !reduced });
+          }} />
+        </Surface>
+      </View>}
+      {ready && onlyThisMonth && <View>
+        <SectionTitle>{t('reports.history.title')}</SectionTitle>
+        <Surface style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+          <GlyphTile icon="bar-chart-outline" />
+          <AppText secondary variant="subhead" style={{ flex: 1, minWidth: 0 }}>{t('reports.history.single')}</AppText>
+        </Surface>
+      </View>}
       {ready && budgets && scope && (budgets.total || budgets.rows.length > 0) && <View>
         <SectionTitle action={t('reports.budgets.manage')} onAction={() => router.push({ pathname: '/budgets', params: { currency: scope.currency, month: monthISO } })}>
           {scope.labelsCurrency ? withCurrencyCode(t('reports.budgets.title'), scope.currency) : t('reports.budgets.title')}</SectionTitle>
