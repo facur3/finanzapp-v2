@@ -9,6 +9,7 @@ import { assignCategoryHues, categoryColor, hueColor, othersColor, CATEGORY_HUES
 import type { Entry } from '@finanzapp/domain';
 import * as i18nFormat from '../src/i18n/format.ts';
 import { bindLocale } from '../src/i18n/bind.ts';
+import * as geometry from '../src/ui/geometry.ts';
 // Read on every render, so a test may switch it (and must restore it).
 let current: 'es-AR' | 'en-US' = 'es-AR';
 const i18nProvider = { useI18n: () => bindLocale(current) };
@@ -53,6 +54,9 @@ test('category hues are stable, distinct while they can be, and independent of s
   assert.equal(hueColor(CATEGORY_HUES + 1, p), hueColor(1, p));
 });
 
+/** Every element of a tree, without rendering function components. */
+const flat = (value: any): any[] => !value || typeof value !== 'object' ? [] : Array.isArray(value) ? value.flatMap(flat) : [value, ...flat(value.props?.children)];
+
 test('donut sweeps in from twelve o\'clock only the first time, then crossfades, and skips motion when reduced', () => {
   const source = readFileSync(new URL('../src/ui/charts.tsx', import.meta.url), 'utf8');
   const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText;
@@ -63,8 +67,9 @@ test('donut sweeps in from twelve o\'clock only the first time, then crossfades,
   const modules: Record<string, any> = {
     '../i18n/format': i18nFormat, '../src/i18n/format': i18nFormat, '../../src/i18n/format': i18nFormat, '../i18n/provider': i18nProvider, '../src/i18n/provider': i18nProvider, '../../src/i18n/provider': i18nProvider,
     react: { useEffect: (fn: () => any) => { fn(); }, useMemo: (fn: () => any) => fn(), useRef: (value: any) => ({ current: value }) },
-    'react/jsx-runtime': { jsx, jsxs: jsx },
-    'react-native': { View: 'View', StyleSheet: { absoluteFill: {}, hairlineWidth: 0.5 } },
+    'react/jsx-runtime': { jsx, jsxs: jsx, Fragment: 'Fragment' },
+    'react-native': { View: 'View', Pressable: 'Pressable', StyleSheet: { absoluteFill: {}, hairlineWidth: 0.5 }, useWindowDimensions: () => ({ width: 393, height: 852, fontScale: 1 }) },
+    './geometry': geometry,
     'react-native-reanimated': { __esModule: true, default: { View: 'AnimatedView', Text: 'AnimatedText', createAnimatedComponent: (c: any) => 'Animated(' + c + ')' },
       useSharedValue: (value: number) => { const item = { value }; shared.push(item); return item; }, useAnimatedStyle: (fn: () => any) => fn,
       useAnimatedProps: (fn: () => any) => fn,
@@ -81,16 +86,26 @@ test('donut sweeps in from twelve o\'clock only the first time, then crossfades,
     return modules[name];
   } });
   const slices = [{ key: 'a', label: 'A', value: 300, color: '#1' }, { key: 'b', label: 'B', value: 100, color: '#2' }];
-  const render = (revealed = false) => {
+  // 24UX6C2: no `total` prop (the KPI above the donut owns the period's total); the share is the report's own formatter.
+  const shareOf = (value: number) => ({ label: i18nFormat.formatPercent(value / 400, 'es-AR'), spoken: Math.round((value / 400) * 100) + ' por ciento' });
+  const render = (revealed = false, chosen: string | null = null) => {
     modules.react.useRef = () => ({ current: revealed });
-    const chart = module.exports.DonutChart!({ slices, total: 400, currency: 'ARS', caption: 'Total' });
-    const sweep = chart.props.children[0].props.children;
+    const tree = module.exports.DonutChart!({ slices, currency: 'ARS', caption: 'Gasto por categoría', shareOf, chosen, onChoose: () => {} });
+    // 24UX6C2: the root is an outer View (the chosen readout can move under the donut); the chart's square is the
+    // ValueTransition keyed by the data, and the Sweep is the adjustable Pressable's child, found by type.
+    const nodes = flat(tree);
+    const chart = nodes.find(node => node.type === 'ValueTransition');
+    const press = nodes.find(node => node.type === 'Pressable');
+    const sweep = flat(press.props.children).find(node => typeof node.type === 'function' && node.type.name === 'Sweep');
     const svg = sweep.type(sweep.props);
-    return { chart, paths: svg.props.children[1].filter(Boolean).map((slice: any) => slice.type(slice.props)) };
+    return { tree, chart, press, paths: svg.props.children[1].filter(Boolean).map((slice: any) => slice.type(slice.props)) };
   };
-  const { chart, paths } = render();
+  const { tree, chart, press, paths } = render();
+  assert.equal(tree.type, 'View');
   assert.equal(chart.type, 'ValueTransition', 'new data crossfades instead of flashing to empty');
-  assert.match(chart.props.children[0].props.accessibilityLabel, /A 75 %, B 25 %/);
+  assert.equal(chart.props.id, 'a:300|b:100', 'the crossfade is keyed by the data, not by the choice');
+  assert.equal(chart.props.variant, 'fade');
+  assert.match(press.props.accessibilityLabel, /^Gasto por categoría: A 75 %, B 25 %$/);
   assert.equal(shared.at(-1)!.value, 1, 'a finished chart is the animation target');
   assert.equal(timings.at(-1), 480);
   const progress = shared.at(-1)!;
@@ -107,6 +122,15 @@ test('donut sweeps in from twelve o\'clock only the first time, then crossfades,
   const again = render(true);
   assert.equal(shared.at(-1)!.value, 1, 'a later month change crossfades with the slices already final');
   assert.equal(again.chart.type, 'ValueTransition');
+  // 24UX6C2: choosing a slice adds no animation: the chosen slice is thicker and the others step back to 30 % at once,
+  // with no new timing and the sweep clock left finished.
+  const before = timings.length;
+  const picked = render(true, 'a');
+  assert.equal(timings.length, before, 'a choice starts no timing');
+  assert.equal(shared.at(-1)!.value, 1, 'a choice never replays the sweep');
+  assert.equal(picked.chart.props.id, chart.props.id, 'a choice never crossfades the whole chart');
+  assert.deepEqual(picked.paths.map((path: any) => [path.props.strokeWidth, path.props.strokeOpacity]), [[22 + 6, 1], [22, 0.3]]);
+  assert.deepEqual(again.paths.map((path: any) => [path.props.strokeWidth, path.props.strokeOpacity]), [[22, 1], [22, 1]], 'with none chosen every slice is drawn alike');
   reduced = true;
   const still = render();
   assert.equal(shared.at(-1)!.value, 1, 'reduced motion shows the finished chart at once');

@@ -89,7 +89,12 @@ function routeHarness(file: string, params: Record<string, unknown>, data = snap
     '@finanzapp/domain': domain,
     '../src/storage/LedgerProvider': { useLedger: () => ({ snapshot: data, archive: { accounts: data.accounts, records: [], ...archive } }) },
     '../src/ui/charts': { DonutChart: 'DonutChart', MonthBars: 'MonthBars', OTHERS_KEY: '__others__',
-      donutSlices: (items: { key: string; label: string; value: number }[]) => items.slice(0, 5).map((item, index) => ({ ...item, color: 'c' + index })) },
+      // Like the real one: at most five slices, the tail grouped into one neutral «Otras» slice keyed OTHERS_KEY.
+      donutSlices: (items: { key: string; label: string; value: number }[], _p: unknown, _hues: unknown, othersLabel: string) => {
+        const head = items.slice(0, items.length > 5 ? 4 : 5).map((item, index) => ({ ...item, color: 'c' + index }));
+        const tail = items.slice(head.length);
+        return tail.length ? head.concat([{ key: '__others__', label: othersLabel, value: tail.reduce((sum, item) => sum + item.value, 0), color: 'grey' }]) : head;
+      } },
     '../src/ui/components': Object.fromEntries(componentNames.map(name => [name, name])),
     '../src/ui/currency-switch': { CurrencySwitch: 'CurrencySwitch', DisplayCurrencyButton: 'DisplayCurrencyButton' },
     '../src/ui/entry-list': { EntryList: 'EntryList' },
@@ -229,7 +234,11 @@ test('reports show a six-month trend that selects months, a donut for categories
   const bars = find(root, 'MonthBars');
   assert.deepEqual(bars.props.points.map((point: { monthISO: string; amountMinor: number }) => [point.monthISO, point.amountMinor]).slice(-2), [['2026-08', 606], ['2026-09', 400]]);
   assert.equal(bars.props.selected, '2026-09');
-  assert.equal(find(root, 'DonutChart').props.total, 400);
+  // 24UX6C2: the donut no longer carries the period's total; the KPI above it does.
+  assert.equal('total' in find(root, 'DonutChart').props, false, 'the donut\'s centre never repeats the period total');
+  assert.equal(find(root, 'Money').props.minor, 400, 'the month\'s total is the KPI');
+  assert.equal(find(root, 'DonutChart').props.caption, 'Gasto por categoría');
+  assert.equal(find(root, 'DonutChart').props.chosen, null, 'no category is chosen until one is tapped');
   assert.equal(find(root, 'DonutChart').props.slices[0].key, 'salud');
   bars.props.onSelect('2026-08');
   assert.equal(JSON.stringify(scrolls), JSON.stringify([{ offset: 0, animated: true }]), '24UX6B: the bars sit under the analysis, so opening a month brings its title and total into view');
@@ -270,7 +279,7 @@ test('23.1B2: Reportes in English changes only words; amounts, user data and rou
   assert.ok(words.includes('August 2026'));
   assert.ok(words.includes('Full month'), '24UX5 review: no «· ARS» beside the period; the eyebrow names it');
   assert.ok(words.includes('Spent\u00A0·\u00A0ARS'));
-  assert.equal(find(root, 'DonutChart').props.caption, 'Period total');
+  assert.equal(find(root, 'DonutChart').props.caption, 'Spending by category');
   assert.ok(words.includes('Your largest expense was Prueba'), 'the merchant is the person\'s own words');
   assert.ok(words.includes('Recorded income') && words.includes('Net flow'));
   assert.ok(words.includes('Compare with previous month'), 'the row opens the month before the selected one, which may be a past month');
@@ -679,4 +688,249 @@ test('24UX6B: VoiceOver hears the line under the total once, in spoken numbers, 
   const spokenLine = nodes(english.props.ListHeaderComponent).find(n => n.type === 'View' && n.props.accessible === true && typeof n.props.accessibilityLabel === 'string')!;
   assert.match(spokenLine.props.accessibilityLabel, /20\.8%/);
   assert.doesNotMatch(spokenLine.props.accessibilityLabel, /20,8/, 'never the visible, region-formatted percent');
+});
+
+// Producto 24UX6C2: the donut's centre is for a chosen category; the month's total stays the KPI above the analysis.
+// Descriptor-level checks of the choice's state and scope; how the tap, the outline and VoiceOver's adjustable swipe
+// feel on an iPhone stays a device item.
+const keysOf = (root: any): string[] => root.props.data.map((item: domain.CategorySpending) => item.key);
+/** Each category row's key with the `chosen` flag the screen hands its CategoryLegendRow. */
+function rowChoices(root: any): string {
+  return root.props.data.map((item: domain.CategorySpending, index: number) =>
+    item.key + ':' + find(root.props.renderItem({ item, index }), 'CategoryLegendRow').props.chosen).join(',');
+}
+const noneChosen = (root: any) => keysOf(root).map(key => key + ':false').join(',');
+
+test('24UX6C2: the KPI «Gastado · ARS» and its amount stay above the analysis in Categorías and in Día a día', () => {
+  const view = routeHarness('(tabs)/reports.tsx', { currency: 'ARS', month: '2026-08' });
+  for (const tab of ['categories', 'days'] as const) {
+    find(view.render(), 'Choices').props.onChange(tab);
+    const root = view.render();
+    const header = nodes(root.props.ListHeaderComponent);
+    const eyebrow = header.findIndex(n => n.type === 'AppText' && [n.props.children].flat().join('') === 'Gastado · ARS');
+    const money = header.findIndex(n => n.type === 'Money');
+    const analysis = header.findIndex(n => n.type === 'Choices');
+    assert.ok(eyebrow >= 0 && eyebrow < money && money < analysis, tab + ': eyebrow → amount → Categorías | Día a día: ' + [eyebrow, money, analysis].join(','));
+    assert.equal(header[money].props.minor, 606, tab + ': the month\'s exact total in minor units');
+    assert.equal(header[money].props.currency, 'ARS');
+    assert.equal(header.some(n => n.type === 'DonutChart'), tab === 'categories', 'the donut belongs to Categorías only');
+  }
+});
+
+test('24UX6C2: a chosen slice marks the donut and its row only; choosing none, or a key that is not a slice, clears both', () => {
+  const view = routeHarness('(tabs)/reports.tsx', { currency: 'ARS', month: '2026-08' });
+  let root = view.render();
+  assert.ok(keysOf(root).includes('salud') && keysOf(root).length > 1);
+  assert.equal(find(root, 'DonutChart').props.chosen, null);
+  assert.equal(rowChoices(root), noneChosen(root));
+  find(root, 'DonutChart').props.onChoose('salud');
+  root = view.render();
+  assert.equal(find(root, 'DonutChart').props.chosen, 'salud');
+  assert.equal(rowChoices(root), keysOf(root).map(key => key + ':' + (key === 'salud')).join(','), 'only the matching row is chosen');
+  assert.equal(find(root, 'Money').props.minor, 606, 'a choice never changes the month\'s total');
+  // The row still opens its category, choice or not.
+  const salud = root.props.data.find((item: domain.CategorySpending) => item.key === 'salud');
+  find(root.props.renderItem({ item: salud, index: 0 }), 'CategoryLegendRow').props.onPress();
+  assert.equal(JSON.stringify(view.pushed[0]), JSON.stringify({ pathname: '/report-category', params: { currency: 'ARS', month: '2026-08', category: 'salud' } }));
+  find(root, 'DonutChart').props.onChoose(null);
+  root = view.render();
+  assert.equal(find(root, 'DonutChart').props.chosen, null, 'tapping the chosen slice or the hole clears the choice');
+  assert.equal(rowChoices(root), noneChosen(root));
+  find(root, 'DonutChart').props.onChoose('missing');
+  root = view.render();
+  assert.equal(find(root, 'DonutChart').props.chosen, null, 'a key that is not one of this month\'s slices is never shown as chosen');
+  assert.equal(rowChoices(root), noneChosen(root));
+});
+
+test('24UX6C2: the choice resets when the month changes, by the arrows, a bar or «Este mes», and the month navigation still works', () => {
+  // September and August both have «Salud», so a reset cannot come from the key merely being absent.
+  const view = routeHarness('(tabs)/reports.tsx', { currency: 'ARS' }, withSeptember);
+  const title = (root: any) => texts(root.props.ListHeaderComponent).find(text => /^(Agosto|Septiembre) de 2026$/.test(text));
+  let root = view.render();
+  find(root, 'DonutChart').props.onChoose('salud');
+  root = view.render();
+  assert.equal(find(root, 'DonutChart').props.chosen, 'salud');
+  // The arrow opens the previous month.
+  find(root, 'IconButton', 'Mes anterior').props.onPress();
+  root = view.render();
+  assert.equal(title(root), 'Agosto de 2026');
+  assert.equal(find(root, 'Money').props.minor, 606);
+  assert.ok(keysOf(root).includes('salud'));
+  assert.equal(find(root, 'DonutChart').props.chosen, null, 'a new month starts with no category chosen');
+  assert.equal(rowChoices(root), noneChosen(root));
+  // Chosen in August, «Este mes» returns to September with none chosen.
+  find(root, 'DonutChart').props.onChoose('salud');
+  assert.equal(find(view.render(), 'DonutChart').props.chosen, 'salud');
+  find(view.render(), 'PressFeedback', 'Volver al mes actual').props.onPress();
+  root = view.render();
+  assert.equal(title(root), 'Septiembre de 2026');
+  assert.equal(find(root, 'IconButton', 'Mes siguiente').props.disabled, true);
+  assert.equal(find(root, 'Money').props.minor, 400);
+  assert.equal(find(root, 'DonutChart').props.chosen, null);
+  assert.equal(rowChoices(root), noneChosen(root));
+  // Chosen in September, a bar opens August with none chosen.
+  find(root, 'DonutChart').props.onChoose('salud');
+  root = view.render();
+  assert.equal(find(root, 'DonutChart').props.chosen, 'salud');
+  find(root, 'MonthBars').props.onSelect('2026-08');
+  root = view.render();
+  assert.equal(title(root), 'Agosto de 2026', 'a bar opens its month');
+  assert.equal(find(root, 'Money').props.minor, 606);
+  assert.equal(find(root, 'DonutChart').props.chosen, null);
+  assert.equal(rowChoices(root), noneChosen(root));
+  // Coming back to the month it was chosen in does not bring the choice back: a month change cleared it.
+  find(root, 'PressFeedback', 'Volver al mes actual').props.onPress();
+  root = view.render();
+  assert.equal(title(root), 'Septiembre de 2026');
+  assert.equal(find(root, 'DonutChart').props.chosen, null, 'cleared, not merely hidden');
+});
+
+test('24UX6C2: the choice resets when the currency changes, even to a currency with the same category', () => {
+  const view = routeHarness('(tabs)/reports.tsx', { month: '2026-08' });
+  let root = view.render();
+  assert.equal(find(root, 'Money').props.currency, 'ARS');
+  find(root, 'DonutChart').props.onChoose('salud');
+  root = view.render();
+  assert.equal(find(root, 'DonutChart').props.chosen, 'salud');
+  find(root, 'DisplayCurrencyButton').props.onCurrency('USD');
+  root = view.render();
+  assert.equal(find(root, 'Money').props.currency, 'USD');
+  assert.equal(find(root, 'Money').props.minor, 999);
+  assert.ok(keysOf(root).includes('salud'), 'USD in August has «Salud» too');
+  assert.equal(find(root, 'DonutChart').props.chosen, null, 'another currency starts with no category chosen');
+  assert.equal(rowChoices(root), noneChosen(root));
+  find(root, 'DisplayCurrencyButton').props.onCurrency('ARS');
+  root = view.render();
+  assert.equal(find(root, 'Money').props.currency, 'ARS');
+  assert.equal(find(root, 'DonutChart').props.chosen, null, 'back in ARS the earlier choice stays cleared');
+});
+
+test('24UX6C2: the donut\'s share is the rows\' own formatter over the report\'s exact total, with its spoken twin', () => {
+  for (const locale of ['es-AR', 'en-AR', 'en-US'] as AppLocale[]) {
+    const root = routeHarness('(tabs)/reports.tsx', { currency: 'ARS', month: '2026-08' }, snapshot, { locale }).render();
+    const donut = find(root, 'DonutChart');
+    const bound = bindLocale(locale);
+    for (const value of [101, 303, 606]) {
+      const expected = reportPresentation.spendingShare(value, 606, locale);
+      const share = donut.props.shareOf(value);
+      assert.equal(share.label, expected.label, locale + ': the centre\'s percentage is the rows\' label for ' + value);
+      assert.equal(share.spoken, bound.spokenPercent(expected.fraction), locale + ': VoiceOver hears the spoken twin');
+    }
+    // The rows divide by the same total.
+    for (const [index, item] of root.props.data.entries()) {
+      assert.equal(find(root.props.renderItem({ item, index }), 'CategoryLegendRow').props.totalMinor, 606);
+    }
+  }
+  // English in Argentina shows «16,7%» but speaks «16.7%».
+  const english = find(routeHarness('(tabs)/reports.tsx', { currency: 'ARS', month: '2026-08' }, snapshot, { locale: 'en-AR' }).render(), 'DonutChart');
+  assert.doesNotMatch(english.props.shareOf(101).spoken, /,/, 'never the visible, region-formatted percent');
+});
+
+test('24UX6C2: the «Otras» slice can be chosen without marking any category row', () => {
+  const amounts = [600, 500, 400, 300, 200, 100];
+  const sixCategories = { ...snapshot, entries: amounts.map((amountMinor, index) =>
+    ({ ...snapshot.entries[0], id: 'six-' + index, category: 'Categoría ' + index, dateISO: '2026-09-0' + (index + 1), amountMinor })) };
+  const view = routeHarness('(tabs)/reports.tsx', { currency: 'ARS' }, sixCategories);
+  let root = view.render();
+  const slices = find(root, 'DonutChart').props.slices as { key: string; value: number }[];
+  assert.equal(slices.length, 5);
+  assert.equal(slices[4].key, '__others__');
+  assert.equal(slices[4].value, 300, 'the two smallest categories, grouped');
+  assert.equal(root.props.data.length, 6, 'every category keeps its own row');
+  find(root, 'DonutChart').props.onChoose('__others__');
+  root = view.render();
+  assert.equal(find(root, 'DonutChart').props.chosen, '__others__');
+  assert.equal(rowChoices(root), noneChosen(root), '«Otras» is not one category, so no row is marked');
+  assert.equal(find(root, 'DonutChart').props.shareOf(300).label, reportPresentation.spendingShare(300, 2100, 'es-AR').label);
+  assert.equal(find(root, 'Money').props.minor, 2100);
+});
+
+test('24UX6C2 review: the choice resets when the display mode changes, through the chip or on Inicio, and stays cleared on the way back', () => {
+  // A synthetic rate book for August, so the consolidated month is complete and keeps its donut.
+  const book = domain.rateBook([
+    { base: 'USD', quote: 'ARS', rate: '1000', effectiveDate: '2026-08-10', source: 'Frankfurter', fetchedAt: '2026-09-01T00:00:00.000Z' },
+    { base: 'USD', quote: 'ARS', rate: '1000', effectiveDate: '2026-08-31', source: 'Frankfurter', fetchedAt: '2026-09-01T00:00:00.000Z' },
+  ]);
+  const display = displayCurrency.createDisplayCurrencyStore(memoryPreferences({ [displayCurrency.DISPLAY_CURRENCY_KEY]: 'ARS' }).store);
+  const view = routeHarness('(tabs)/reports.tsx', { month: '2026-08' }, snapshot, { display, book });
+  // The consolidated August is complete (every rate known), so its donut is drawn in both modes.
+  const chosenIn = (root: any) => find(root, 'DonutChart').props.chosen;
+  let root = view.render();
+  assert.equal(find(root, 'DisplayCurrencyButton').props.mode, 'single');
+  find(root, 'DonutChart').props.onChoose('salud');
+  root = view.render();
+  assert.equal(find(root, 'DonutChart').props.chosen, 'salud');
+  // The chip: «Total · ARS» (every account converted), then back to «Solo ARS».
+  find(root, 'DisplayCurrencyButton').props.onMode('consolidated');
+  root = view.render();
+  assert.equal(find(root, 'DisplayCurrencyButton').props.mode, 'consolidated');
+  assert.equal(find(root, 'Money').props.currency, 'ARS', 'the same currency: only the mode changed');
+  assert.equal(chosenIn(root), null, 'the consolidated view starts with no category chosen');
+  find(root, 'DisplayCurrencyButton').props.onMode('single');
+  root = view.render();
+  assert.equal(find(root, 'DisplayCurrencyButton').props.mode, 'single');
+  assert.equal(find(root, 'Money').props.minor, 606, 'back in «Solo ARS», the month\'s own total');
+  assert.equal(find(root, 'DonutChart').props.chosen, null, 'back in the mode it was chosen in, the choice stays cleared');
+  assert.equal(rowChoices(root), noneChosen(root));
+  // The same mode change made on Inicio through the shared preference (Reportes stays mounted and only re-renders).
+  find(root, 'DonutChart').props.onChoose('salud');
+  root = view.render();
+  assert.equal(find(root, 'DonutChart').props.chosen, 'salud');
+  display.setMode('consolidated');
+  root = view.render();
+  assert.equal(find(root, 'DisplayCurrencyButton').props.mode, 'consolidated');
+  assert.equal(chosenIn(root), null);
+  display.setMode('single');
+  root = view.render();
+  assert.equal(find(root, 'DisplayCurrencyButton').props.mode, 'single');
+  assert.equal(find(root, 'DonutChart').props.chosen, null, 'cleared by the mode change itself, not merely hidden while it lasted');
+  assert.equal(rowChoices(root), noneChosen(root));
+});
+
+test('24UX6C2 review: a display currency chosen on Inicio clears the choice on Reportes, and switching back does not restore it', () => {
+  const display = displayCurrency.createDisplayCurrencyStore(memoryPreferences({ [displayCurrency.DISPLAY_CURRENCY_KEY]: 'ARS' }).store);
+  const view = routeHarness('(tabs)/reports.tsx', { month: '2026-08' }, snapshot, { display });
+  let root = view.render();
+  assert.equal(find(root, 'Money').props.currency, 'ARS');
+  find(root, 'DonutChart').props.onChoose('salud');
+  root = view.render();
+  assert.equal(find(root, 'DonutChart').props.chosen, 'salud');
+  // Inicio writes the shared preference directly (its own chip); Reportes never sees its onCurrency handler run.
+  display.set('USD');
+  root = view.render();
+  assert.equal(find(root, 'Money').props.currency, 'USD');
+  assert.equal(find(root, 'Money').props.minor, 999);
+  assert.ok(keysOf(root).includes('salud'), 'USD in August has «Salud» too');
+  assert.equal(find(root, 'DonutChart').props.chosen, null, 'another currency starts with no category chosen');
+  assert.equal(rowChoices(root), noneChosen(root));
+  display.set('ARS');
+  root = view.render();
+  assert.equal(find(root, 'Money').props.currency, 'ARS');
+  assert.equal(find(root, 'Money').props.minor, 606);
+  assert.equal(find(root, 'DonutChart').props.chosen, null, 'back in ARS the earlier choice stays cleared');
+  assert.equal(rowChoices(root), noneChosen(root));
+});
+
+test('24UX6C2 review: a route parameter that changes the month clears the choice, and returning to the month does not restore it', () => {
+  // The route parameters as expo-router hands them to a mounted screen: the same object, a new month.
+  const params: Record<string, unknown> = { currency: 'ARS', month: '2026-08' };
+  const view = routeHarness('(tabs)/reports.tsx', params, withSeptember);
+  const title = (root: any) => texts(root.props.ListHeaderComponent).find(text => /^(Agosto|Septiembre) de 2026$/.test(text));
+  let root = view.render();
+  assert.equal(title(root), 'Agosto de 2026');
+  find(root, 'DonutChart').props.onChoose('salud');
+  root = view.render();
+  assert.equal(find(root, 'DonutChart').props.chosen, 'salud');
+  params.month = '2026-09';
+  root = view.render();
+  assert.equal(title(root), 'Septiembre de 2026');
+  assert.equal(find(root, 'Money').props.minor, 400);
+  assert.ok(keysOf(root).includes('salud'), 'September has «Salud» too');
+  assert.equal(find(root, 'DonutChart').props.chosen, null, 'a linked month starts with no category chosen');
+  assert.equal(rowChoices(root), noneChosen(root));
+  params.month = '2026-08';
+  root = view.render();
+  assert.equal(title(root), 'Agosto de 2026');
+  assert.equal(find(root, 'DonutChart').props.chosen, null, 'cleared, not merely hidden');
+  assert.equal(rowChoices(root), noneChosen(root));
 });
