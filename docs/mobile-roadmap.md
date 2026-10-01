@@ -1,7 +1,9 @@
 # FinanzApp mobile: living roadmap
 
 Updated: 2026-10-01 (Producto 24UX6C2 on its branch: a small Home activity and Reportes interaction polish; Inicio's
-recent activity includes this month's transfers, each once, and Reportes' donut no longer repeats the total and chooses
+recent activity includes this month's transfers, each once, «Próximos compromisos» reads a rolling 30-day window
+(today through today + 30, both inclusive) and one contextual general-budget attention row appears when the month's
+general budget needs attention (no permanent budget card), and Reportes' donut no longer repeats the total and chooses
 a category, with category rows stacking when a long name and a large amount do not fit; no ledger, schema, backup or
 native change; device QA pending, no EAS build. Producto 24UX6C merged as PR #72, merge commit c673be6: movement
 presentation, Home polish and Más, presentation only; a
@@ -20,8 +22,8 @@ Tarjetas deck, verified by the owner on an iPhone 14 Pro with a fresh developmen
 [decision 002](decisions/002-spending-first.md),
 [decision 003](decisions/003-five-tabs-and-cards.md),
 [decision 004](decisions/004-native-first-and-web-retirement.md) and [decision 005](decisions/005-forest-four-tabs-and-capture.md) (the Forest identity, four tabs
-and the capture hub, 2026-09-30, amended 2026-10-01 by 24UX6C for the movement presentation and by 24UX6C2 for Inicio's activity with transfers and
-the donut without the total; its navigation rule
+and the capture hub, 2026-09-30, amended 2026-10-01 by 24UX6C for the movement presentation and by 24UX6C2 for Inicio's activity with transfers, the 30-day
+commitments window, the contextual general-budget row and the donut without the total; its navigation rule
 supersedes decision 003's five tabs). Decision 002 supersedes
 earlier full-finance migration phases and the local-only AI preference; decision 004 makes
 the native app the product; the web/Capacitor frontend was retired on 2026-09-25 (Producto
@@ -170,7 +172,12 @@ file). "Released" below names an in-app gate (`RELEASED_LANGUAGES`, `RELEASED_RE
   ledger, schema, backup or native change. Inicio's «Actividad reciente» lists this month's expenses, incomes **and
   transfers** in view, newest first, merged before the four/six limit (`homeRecent` with `mergeActivity`); a transfer
   is one record and one `TransferRow` (origin → destination, unsigned in the transfer tone, «Transferencia» for
-  VoiceOver, opens `/transfer/[id]`); Gastado and Disponible do not read the list. Reportes keeps the top total in both
+  VoiceOver, opens `/transfer/[id]`); Gastado and Disponible do not read the list. «Próximos compromisos» reads a
+  rolling 30-day window, today through today + 30 days, both ends inclusive (`COMMITMENT_WINDOW_DAYS`, Recurrentes'
+  «próximos 30 días» boundary), at most two. No permanent budget card; one contextual row for the month's **general**
+  budget only when the domain's `budgetState` is warning (85 % through 100 %) or exceeded (`homeBudgetAttention`,
+  `BudgetAttentionRow`), before the commitments, measured in the budget's own currency and opening Presupuestos on
+  that currency and month. Reportes keeps the top total in both
   views; the donut's centre no longer repeats it («Tocá una categoría» until a slice is chosen, then its name, exact
   amount and «NN % del gasto»), the chosen slice thicker and the others dimmed, the legend row marked, VoiceOver
   adjustable, the choice reset on a month or currency change. Category rows stack when a long name and a large amount
@@ -276,13 +283,16 @@ file). "Released" below names an in-app gate (`RELEASED_LANGUAGES`, `RELEASED_RE
   current month (not interactive) and the accounts shortcut; the display-currency control and its help only when the
   history holds two or more currencies; one number (Gastado: the month's spending so far; Disponible: cash in normal
   accounts only; since 24UX6C no line under it, and with one currency its ⓘ beside it) and the Gastado | Disponible
-  switch. Below it «Próximos compromisos» (expense rules due within seven
-  days, at most two, omitted when none; «Ver todos» → Recurrentes) and «Actividad reciente» (this month's expenses,
+  switch. Below it, since 24UX6C2, one contextual general-budget attention row only when the month's general budget is
+  at 85 % or more (`budgetState` warning or exceeded; never a category budget; opens Presupuestos), then «Próximos
+  compromisos» (expense rules due within seven days until 24UX6C2; since 24UX6C2 a rolling 30-day window, today through
+  today + 30, both inclusive; at most two, omitted when none; «Ver todos» → Recurrentes) and «Actividad reciente» (this month's expenses,
   incomes and, since 24UX6C2, transfers, each once, newest first, four rows under the commitments or six alone; «Ver
   todos» → Movimientos; the minimal-Home rule is in «Producto 24UX6C2», §3); a quiet
   empty state when neither exists, «Empezar» → a new account when there is no account. Gastado and Disponible keep their
-  semantics (24C1, 24B6, 25B2). The «＋ Registrar» button, the computed insight line, the ranking, the budget card, the
-  charts and the Assistant banner are not on Inicio (the dock's «+», Reportes and Presupuestos hold them).
+  semantics (24C1, 24B6, 25B2). The «＋ Registrar» button, the computed insight line, the ranking, a permanent budget
+  card, the charts and the Assistant banner are not on Inicio (the dock's «+», Reportes and Presupuestos hold them);
+  the general-budget attention row above is contextual, not a card.
 - **Recording.** Gasto / Ingreso / Transferencia on one control; kind and amount first; the
   amount field anchored with tabular digits, typing and pasting in the region's separators,
   per-currency exponent (0, 2, 3), 15-digit bound, paste markers, shortcuts (Usar todo, Pagar
@@ -401,7 +411,11 @@ item unless a section says a new native build is needed. The checklist sections 
 - **24UX6C2 — Home activity and Reports interaction polish (none done; no EAS build):** the checklist section
   Producto 24UX6C2: Inicio's recent activity mixing expenses, incomes and transfers newest first, a transfer once with
   its origin → destination caption in the transfer tone, VoiceOver «Transferencia» with the direction, a tap opening
-  the transfer detail, Gastado unchanged after a transfer; the commitments still conditional; Reportes' total in both
+  the transfer detail, Gastado unchanged after a transfer; the commitments still conditional, now over the 30-day
+  window (a rule due on today + 30 shown, one on today + 31 not); the general-budget attention row (appearing at 85 %
+  in amber, still amber at exactly 100 %, the alert tone with the amount over once past the limit, never for a
+  category-only budget, opening Presupuestos on the budget's currency and month, naming the budget currency without
+  converting it in the consolidated view, gone below 85 %, VoiceOver one element with its hint); Reportes' total in both
   views, the donut's quiet centre and then the chosen category's name, amount and share, the chosen slice thicker and
   the others dimmed, the row marked (bold and outline), a second tap or the hole clearing it, VoiceOver adjustable
   (swipe up/down announcing category, amount and percentage), the choice reset on a month or currency change; long
@@ -1959,7 +1973,8 @@ nothing of it is on a screen yet.
   when a rate is missing, the out-of-range copy); the subline, Gastado «Hasta hoy · … por día» (`spendingPerDay`, the
   month so far over the days elapsed, Reportes' daily average) or «Sin gastos este mes», Disponible «Saldo registrado ·
   N cuentas» and never a per-day figure; then Gastado | Disponible on the field (it switches the number only). Below:
-  «Próximos compromisos» (`homeCommitments`, the unchanged rule: expense rules due within seven days, in view, two at
+  «Próximos compromisos» (`homeCommitments`, the unchanged rule: expense rules due within seven days (a 30-day window,
+  today through today + 30 inclusive, since 24UX6C2), in view, two at
   most; omitted when none; Ver todos → Recurrentes) and «Actividad reciente» (`homeRecent`: this month's expenses and
   incomes in view, no transfers (transfers included since 24UX6C2), newest first, four rows under the commitments and
   six alone, `RECENT_ROWS`; omitted
@@ -1973,7 +1988,8 @@ nothing of it is on a screen yet.
   statement month, consolidated at each movement's date or one currency); Disponible is `availableFigure` /
   `liquidTotalsByCurrency` (cards, debts and receivables excluded; not income minus spending; not a budget remainder).
   Removed from Inicio: the «＋ Registrar» button, the insight line (`homeInsight`, `CONCENTRATION_SHARE`,
-  `HomeInsightRow`), rankings, budget cards, charts and the Assistant banner. `Choices` and `DisplayCurrencyButton`
+  `HomeInsightRow`), rankings, budget cards (since 24UX6C2 still no permanent card, but one contextual general-budget
+  attention row when it needs attention), charts and the Assistant banner. `Choices` and `DisplayCurrencyButton`
   gained `onField`.
 - **Appearance.** Unchanged from the first iteration: `src/ui/theme-preference.ts`, Sistema (default), Claro or Oscuro
   under `finanzapp.appearance`, outside the ledger and its backups, saved before it is applied, no flash on launch;
@@ -2174,8 +2190,9 @@ nothing of it is on a screen yet.
 
 - **Scope.** Branch `feat/producto-24ux6c2-home-activity-reports-polish` from master c673be6 (24UX6C merged as PR #72,
   merge commit c673be6). A small polish after 24UX6C (decision 005, amended 2026-10-01: «Enmienda 2026-10-01 — Producto
-  24UX6C2»): Inicio's recent activity, the Reportes donut and the category rows' overflow. **No ledger or accounting
-  change**, no schema (13) or backup (v13) change, no FX, card or instalment change, no native dependency, no tab
+  24UX6C2»): Inicio's recent activity, Inicio's commitments window and general-budget attention row (owner
+  refinements), the Reportes donut and the category rows' overflow. **No ledger or accounting change** (the budget
+  domain and its computations are read, not changed), no schema (13) or backup (v13) change, no FX, card or instalment change, no native dependency, no tab
   animation (the black-screen mitigation intact: no fade, detach or freeze), the Forest palette unchanged. 24UX6C's
   movement presentation rule is frozen: an expense row shows the stored magnitude with no minus, in ink; an income
   «+» in green; a transfer no sign, in the transfer tone; computed negatives keep their minus.
@@ -2192,6 +2209,40 @@ nothing of it is on a screen yet.
   a Y, <amount>, <date>» or «Transferencia, <note>, de X a Y…»; a tap opens `/transfer/[id]`); keys `entry-<id>` /
   `transfer-<id>`. Gastado and Disponible are their own figures (`spendingFigure`, `availableFigure`) and never read
   the list, so a transfer is still never spending.
+- **What changed: Inicio's commitments window (owner refinement).** `COMMITMENT_WINDOW_DAYS = 30` replaces
+  `COMMITMENT_HORIZON_DAYS = 7`. `homeCommitments(rules, todayISO, inView)` keeps the rules that are active, not
+  deleted, kind `'expense'`, in view (their account), with `nextDateISO >= today` **and** `nextDateISO <=
+  addDaysISO(today, 30)`: a rolling window, **both ends inclusive**, never "this calendar month" (on 2026-10-01 it is
+  2026-10-01 … 2026-10-31; on 2026-10-15 it is 2026-10-15 … 2026-11-14). It is the same boundary as Recurrentes'
+  «próximos 30 días» forecast (`recurringForecastByCurrency`, today through today + 30 days), so the two screens agree.
+  Sorted by `nextDateISO`, then merchant (`localeCompare`), then id (deterministic), and only then cut to
+  `COMMITMENT_ROWS` (2). None in the window → no section; «Ver todos» → /recurring (unchanged). A recurring income is
+  never shown; no card statements, instalments or debt payments.
+- **What changed: the general-budget attention row (owner refinement).** Not a budget card: one contextual row,
+  present only while the month's general budget needs attention. `homeBudgetAttention(summary: MonthlyBudgetSummary |
+  null)` (`src/ui/home-focus.ts`, pure) returns `{ state: 'warning' | 'exceeded'; progress: BudgetProgress<TotalMonthlyBudget> }`
+  or null: only `summary.total` (the general budget), with the domain's `budgetState` (`BUDGET_WARNING_RATIO` 0.85:
+  calm below 85 %, warning from 85 % through 100 % inclusive, exceeded above 100 %); null with no general budget or a
+  calm one; category sublimits never, even exceeded. `homeBudget(snapshot, budgets, historyCurrencies, mode, display
+  currency, current month)` (`src/ui/home-focus.ts`, pure; review fix) chooses whose: only **general** budgets are
+  candidates (a category sublimit never makes a currency the candidate); single mode → only the shown currency's;
+  consolidated → the display currency's, then each held currency in grouping order, and the row is the first whose
+  `homeBudgetAttention(summarizeMonthlyBudgets(real snapshot, budgets, currency, month))` is warning or exceeded, with
+  `labelsCurrency` true when it is not the display currency. So a calm general budget (or a sublimit) never hides
+  another currency's exceeded one; one row at most. Measured on the real ledger in the budget's own currency, never
+  converted. Rendered as `<Surface grouped>` with `BudgetAttentionRow` after the financial field and **before**
+  «Próximos compromisos» and «Actividad reciente»; a tap → `router.push({ pathname: '/budgets', params: { currency:
+  budget.currency, month } })`. The percent is the whole percent Presupuestos and Reportes show (`percentUsed`'s
+  rounding), never a decimal. `BudgetAttentionRow`
+  (`src/ui/home-modules.tsx`): `PressFeedback` highlight, role button, min height 60, a 36 pt `GlyphTile` (warning
+  `speedometer-outline` in `warning`; exceeded `alert-circle-outline` in `expense`), a chevron; title (ink, 600):
+  «Usaste {percent} del presupuesto del mes» / «… del mes en {code}» or «Superaste el presupuesto del mes» / «… del
+  mes en {code}» (English «You used {percent} of this month’s budget» / «… {code} budget», «You went over this month’s
+  budget» / «… {code} budget»); detail (footnote 500, `p.warning` or `p.expense`): «Quedan {amount} de {limit}» or
+  «{amount} por encima de {limit}» («{amount} left of {limit}», «{amount} over {limit}»), `moneyText`, or
+  `codedAmount` when the row names the currency; accessibility label = spoken title (`spokenPercent`) + «, » + spoken
+  detail (`spokenMoney`), hint «Abre Presupuestos» («Opens Budgets»). New es/en keys `home.budget.*`. No
+  `HomeInsightRow`, no category budgets, no permanent card.
 - **What changed: the Reportes donut.** The top KPI («GASTADO · ARS», the amount and its line) stays in Categorías and
   Día a día. `DonutChart` (`src/ui/charts.tsx`) has a new API (`slices`, `currency`, `size`, `thickness`, `chosen`,
   `onChoose`, `shareOf`, `caption`) and no `total` prop: the centre never repeats the period total (before: «Total del
@@ -2215,25 +2266,51 @@ nothing of it is on a screen yet.
   lines, the amount and its percentage together under it. The chosen legend row: `accessibilityState.selected`, the
   name in 700, a 1.5 pt outline in the category hue (radius 14) and an 8 % tint of the hue.
 - **What changed: copy and marker.** New es/en keys `reports.chart.byCategory`, `pick`, `pickHint`, `noneChosen`,
-  `chosen`, `share`; `reports.periodTotal` removed; the English lock re-accepted. The release marker reads «FinanzApp
+  `chosen`, `share`; `reports.periodTotal` removed; new `home.budget.warning`, `warningIn`, `exceeded`, `exceededIn`,
+  `left`, `over`, `hint`; the English lock re-accepted. The release marker reads «FinanzApp
   0.1.0 (24UX6C2)».
 - **What stayed.** Every financial figure and its computation; Gastado and Disponible; 24UX6C's presentation rule;
   Inicio's amount size and alignment, «Total · ARS», the month label, «Ver todos» and the empty states; Próximos
-  compromisos (below); the «Otras» top-N grouping; the category and day routes; the month bars' navigation and «Este
+  compromisos' conditional shape and two-row limit (its window is now 30 days, above and below); the budget domain
+  (`budgetState`, `summarizeMonthlyBudgets`, 24C1's per-currency budgets); the «Otras» top-N grouping; the category and day routes; the month bars' navigation and «Este
   mes»; the tab-shell mitigation and the Forest palette.
 - **The minimal-Home rule (binding for future agents; owner direction, not to be asked again).** Inicio shows the
-  financial field, the near commitments when they exist and the recent activity, nothing more:
-  - **«Próximos compromisos» is conditional:** only **active recurring EXPENSE rules** due **today through the
-    seven-day horizon** (today to today + 6), in view, **at most two**, and the section is **hidden when there are
-    none**. Later items live in Recurrentes («Ver todos»). **A recurring income is never shown as a commitment.**
-  - **Not on Inicio:** no rankings, no budget card and no permanent recurring module.
+  financial field, the general-budget attention row when the budget needs attention, the near commitments when they
+  exist and the recent activity, nothing more:
+  - **«Próximos compromisos» is conditional:** only **active, not deleted recurring EXPENSE rules** in view whose next
+    date falls in the **rolling 30-day window: today through today + 30 days, both ends inclusive**
+    (`nextDateISO >= today` and `nextDateISO <= addDaysISO(today, 30)`; on 2026-10-01, 2026-10-01 … 2026-10-31; the
+    same boundary as Recurrentes' «próximos 30 días»; never "this calendar month"), sorted by date, merchant and id,
+    then **at most two**, and the section is **hidden when there are none**. Later items live in Recurrentes («Ver
+    todos»). **A recurring income is never shown as a commitment**; nor are card statements, instalments or debt
+    payments.
+  - **No permanent budget card; one contextual general-budget attention row.** Inicio never carries a permanent
+    budget card (neither the old «Presupuesto del mes» card nor category sublimits). It shows **one** row for the
+    month's **general** budget only while the domain's `budgetState` says warning (85 % through 100 %) or exceeded
+    (above 100 %), placed after the financial field and before «Próximos compromisos» and «Actividad reciente»,
+    measured in the budget's own currency (`homeBudget`: general budgets only, the first needing attention,
+    display currency first; never converted; named when it is not the display currency) and opening Presupuestos on that currency and month. Calm, absent or category-only → nothing.
+  - **Not on Inicio:** no rankings, no permanent budget card, no category budgets, no computed insight line
+    (`HomeInsightRow`) and no permanent recurring module.
   - **Broader upcoming visibility** (what is due later, statements, instalments ahead) belongs to the future calendar
     («Later notes recorded in 24UX6A») and notifications (25D) work, not to Inicio.
 - **Tests.** `tests/home-focus.node.ts` (the merged activity: expenses, incomes and transfers newest first and typed,
   the deterministic tie-break, a transfer once, the limit after the merge, a transfer outside the period or the view
-  left out, an undone transfer absent); `tests/spending-home.node.ts` (four/six counted after the merge, a recent
+  left out, an undone transfer absent; the commitments window: 30 days, `COMMITMENT_HORIZON_DAYS` gone, the owner's
+  October examples, both ends inclusive (today and today + 30 in, yesterday and today + 31 out), the same boundary as
+  `recurringForecastByCurrency`, paused, deleted, income and out-of-view rules never taking a slot, the order by date,
+  merchant and id with the cut after it; the budget selector `homeBudgetAttention`: no summary or no general budget →
+  null, a category sublimit never (even exceeded), the domain's thresholds below 85 %, at 85 %, at exactly 100 % and
+  above, the general budget's progress carried untouched from the real ledger); `tests/spending-home.node.ts` (four/six counted after the merge, a recent
   transfer as a `TransferRow` keyed by its record, Gastado and Disponible identical with and without a transfer, «Solo
-  USD» leaving an ARS transfer out and the consolidated view listing it once); `tests/report-routes.node.ts` (the KPI
+  USD» leaving an ARS transfer out and the consolidated view listing it once; the Home route's budget row: present
+  only when the general budget needs attention, placed before «Próximos compromisos», chosen by `homeBudget` (a sublimit or a calm
+  general budget never hides another currency's exceeded general budget; both needing attention → the display
+  currency's, one row), its tap pushing /budgets with the budget's currency and month); `tests/home-ranking.node.ts` (`BudgetAttentionRow`: the whole percent `percentUsed` gives, as in Presupuestos; the
+  warning row at 87 % with the speedometer in the warning tone and what is left in amber, the warning through exactly
+  100 % and exceeded above, the exceeded row with the alert glyph in the expense tone and the amount over, «del mes en
+  ARS» and coded amounts when the currency is named, VoiceOver's spoken percent and money and the «Abre Presupuestos»
+  hint, the English copy); `tests/report-routes.node.ts` (the KPI
   in both views, a chosen slice marking the donut and its row only, the reset on a month change by the arrows, a bar
   or «Este mes» and on a currency change, the share from the rows' own formatter, «Otras» choosable without marking a
   row); `tests/spending-chart.node.ts` (the quiet centre that never repeats the total, the chosen name, amount and
@@ -2258,10 +2335,18 @@ nothing of it is on a screen yet.
   measures the category's name (a long custom name moves the readout under the donut instead of being cut), and the
   «Otras» slice's key starts with a space, which no category key can (`categoryKey` trims), so a category named
   «__others__» can never share its identity.
-  Linux gates (2026-10-01): root `npm test` 415 passed, 1 todo (25 files); `npm run check:repo` OK; in `apps/mobile`:
-  typecheck clean, `test:storage` 1001/1001, `currency:verify` and `regions:verify` OK, `i18n:check -- --strict` 0 errors
-  and 0 stale (English lock re-accepted), `check` OK, `export:ios` bundle exported. The `mobile_api` job needs
-  PostgreSQL and runs in CI. None of this is iPhone QA.
+  The owner refinements (the 30-day window, the general-budget row) had their own adversarial review, with skeptic
+  verification. It found, and this change fixed: Home's budget choice reused Reportes' `budgetScope`, so a category
+  sublimit or a calm general budget in the display currency could hide another currency's exceeded general budget
+  (now `homeBudget`: general budgets only, the first needing attention); the row's percent kept one decimal where
+  Presupuestos and Reportes show a whole percent (now the same rounding); and some code comments still said «seven
+  days», while one doc showed the English percent with a space.
+- **Gates (owner refinements, 2026-10-01, local).** `apps/mobile`: typecheck OK; `node --experimental-strip-types --test
+  tests/*.node.ts` 1024 passed, 0 failed (real SQLite included); `i18n:check -- --strict` 0 errors, 0 stale (English
+  lock accepted for the `home.budget` keys); `currency:verify` OK; `regions:verify` OK; `check` OK; `export:ios` OK
+  (a JS bundle, not an Xcode build). Root `npm test` 415 passed, 1 todo; `npm run check:repo` OK (384 files). No EAS,
+  no device run: the device items (budget row colours and VoiceOver, the 30-day list) stay open in
+  `docs/mobile-device-checklist.md`.
 
 ### Producto 24UX6D — Tarjetas in Forest (approved 2026-09-30, not implemented)
 
@@ -2414,6 +2499,23 @@ tied to 25E's account are deferred to 25E or a follow-up after it (24T1C, 2026-0
   closing or due date, every future local notification tied to the previous date is cancelled or replaced in the
   same step; notifications stay deduplicated (one per card, kind and cycle), and no reminder for the old date may
   remain scheduled after the change.
+- **Budget state notification (future; document only, recorded 2026-10-01 in 24UX6C2; not implemented, not
+  scheduled).** The notification counterpart of Inicio's general-budget attention row. When it is designed:
+  - **Opt-in and local.** Off until the person turns it on; a **local** notification scheduled or posted on the device,
+    not APNs by default (remote push stays deferred, below).
+  - **What triggers it.** Only a **change of state** of the month's **general** budget into **warning** or
+    **exceeded**, by the same domain rule as Inicio (`budgetState`, `BUDGET_WARNING_RATIO` 0.85: warning from 85 %
+    through 100 %, exceeded above 100 %); never a category sublimit unless a later decision adds it, never a calm
+    budget, measured in the budget's own currency (24C1), never converted.
+  - **Deduplicated.** At most one notification per budget, month and state (warning once, exceeded once); no repeated
+    alert on every launch or foreground, and a state already notified is not notified again in that month.
+  - **Honest about when it knows.** The state is evaluated only when FinanzApp has an event or data that lets it know:
+    when the ledger changes (a movement recorded, edited or undone, a recurring occurrence materialised) or when the
+    app runs (launch or return to the foreground). It never claims a budget was crossed at a moment the app had no
+    event or data to know it (no background inference), and its copy says what was recorded, not when the spending
+    happened.
+  - **Private by default.** Sensitive amounts hidden on the Lock Screen by default, per 25D's privacy rules (no amount
+    unless the person turns full content on). It changes nothing in the product order.
 - **Remote push (APNs) — deferred to 25E or later, not part of 25D.** A separate capability, added only when a backend event exists that justifies
   it (for example an Assistant capture or a sync conflict from 25A/25E); local reminders never depend on
   push.

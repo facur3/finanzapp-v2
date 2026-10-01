@@ -174,7 +174,9 @@ que leen son ahora los de Forest. Su restyle por pantalla queda para 24UX6B–6D
   tono, cuenta en el primario, fecha neutra, botón de guardar en el primario.
 - **Inicio (desde 24UX6A con Forest, decisión 005; ver «Producto 24UX6A → Inicio»).** Un campo financiero pino
   arriba (el mes, el atajo a Cuentas, el alcance de moneda solo con dos o más, el número de 46 pt —sin subrenglón desde 24UX6C,
-  con su ⓘ al lado cuando hay una sola moneda— y Gastado / Disponible); debajo, solo si existen, «Próximos compromisos» (hasta dos de los próximos siete días) y
+  con su ⓘ al lado cuando hay una sola moneda— y Gastado / Disponible); debajo, solo si existen, «Próximos compromisos» (hasta dos de los próximos siete días
+  *(→ desde 24UX6C2, hasta dos de la ventana de 30 días, de hoy a hoy + 30 inclusive; antes de ellos, una sola fila del
+  presupuesto general cuando pide atención; ver «Producto 24UX6C2 — actividad de Inicio e interacción de Reportes»)*) y
   «Actividad reciente» (cuatro filas con compromisos, seis sin ellos); si no hay ninguno, un estado vacío tranquilo.
   Registrar vive en el «+» del dock, no en Inicio. Los movimientos completos siguen en Movimientos, el análisis en
   Reportes, los presupuestos en Presupuestos.
@@ -579,7 +581,8 @@ abajo), que empieza detrás de la barra de estado (relleno superior: el área se
    `heroThumbInk`, el otro `heroSecondary`): solo cambia el número.
 
 - **Debajo, solo lo que existe.** «Próximos compromisos»: los gastos recurrentes que vencen en los próximos siete
-  días, a lo sumo dos, con «Ver todos» → Recurrentes. «Actividad reciente»: gastos e ingresos de este mes (sin
+  días *(→ reemplazado en 24UX6C2 por la ventana de 30 días, de hoy a hoy + 30 inclusive, ver «Producto 24UX6C2 —
+  actividad de Inicio e interacción de Reportes»)*, a lo sumo dos, con «Ver todos» → Recurrentes. «Actividad reciente»: gastos e ingresos de este mes (sin
   transferencias) *(→ reemplazado en 24UX6C2, ver «Producto 24UX6C2 — actividad de Inicio e interacción de Reportes»)*, del más nuevo, cuatro filas si hay compromisos y seis si no, con «Ver todos» que selecciona
   Movimientos. Cada uno en un grupo; sin datos, la sección no existe.
 - **Vacíos.** Sin ninguno de los dos: «Todavía no hay movimientos este mes» / «Registrá un gasto con el botón
@@ -588,6 +591,9 @@ abajo), que empieza detrás de la barra de estado (relleno superior: el área se
   24UX2, restituida). Sin cuentas: el estado vacío con «Empezar» → nueva cuenta.
 - **Salieron de Inicio** «＋ Registrar» (ahora es el «+» del dock), la línea de atención, los rankings, las tarjetas de
   presupuesto, los gráficos y el banner del Asistente. Siguen en Presupuestos, Reportes y la hoja de Registrar.
+  *(→ Desde 24UX6C2 vuelve una sola fila contextual del presupuesto general, solo cuando pide atención; la tarjeta
+  permanente de presupuesto y la línea de atención siguen fuera. Ver «Producto 24UX6C2 — actividad de Inicio e
+  interacción de Reportes».)*
 - **Barra de estado.** Contenido claro mientras Inicio tiene foco y el campo está debajo de la barra; vuelve al
   estilo del tema al pasar el campo o al salir de Inicio.
 - **La semántica no cambió.** Gastado son solo los gastos del mes (nunca transferencias ni pagos de tarjeta; las
@@ -643,6 +649,8 @@ Las reglas de «Motion y accesibilidad» siguen vigentes: la curva de `src/ui/mo
 > línea de atención y el rechazo explícito de un «+» flotante. Lo vigente es lo de arriba: Forest, cuatro pestañas
 > solo con íconos, el «+» en el dock, el Asistente como pantalla de la pila y el Inicio de campo financiero. Siguen
 > valiendo de aquí los compromisos de la semana (dos como máximo), Apariencia y la lista de componentes retirados.
+> *(La ventana de una semana fue reemplazada en 24UX6C2 por la de 30 días, de hoy a hoy + 30 inclusive; ver «Producto
+> 24UX6C2 — actividad de Inicio e interacción de Reportes».)*
 
 Las capturas del dueño (un Inicio anterior, una app de finanzas premium, una barra flotante con «+», una IA de dinero)
 fueron solo referencia de jerarquía: no se copió marca, paleta, recurso, medida ni arquitectura de información. La
@@ -819,7 +827,10 @@ deudas; ninguna dependencia nativa; ninguna animación entre pestañas (la mitig
 intacta); la paleta Forest no cambia. La regla de presentación de 24UX6C queda congelada: el gasto con el importe
 guardado, sin menos y en tinta; el ingreso con «+» en verde; la transferencia sin signo en su tono; todo negativo
 calculado conserva su menos. Reemplaza, marcadas en su lugar: «Actividad reciente» sin transferencias (24UX6A), el
-centro de la dona con «Total del período» y el total, y el umbral de apilado solo por escala en las filas de categoría.
+horizonte de siete días de «Próximos compromisos» (24UX6A; ahora 30 días), el centro de la dona con «Total del período»
+y el total, y el umbral de apilado solo por escala en las filas de categoría; y precisa «sin tarjetas de presupuesto en
+Inicio» (24UX6A): sigue sin haber tarjeta permanente, pero existe una fila contextual del presupuesto general cuando
+pide atención (abajo).
 
 ### Inicio: la actividad reciente incluye transferencias
 
@@ -842,16 +853,67 @@ centro de la dona con «Total del período» y el total, y el umbral de apilado 
   lista: una transferencia nunca suma a Gastado. El tamaño y la alineación del importe, el lugar de «Total · ARS», el
   mes, «Ver todos» → Movimientos y los vacíos quedan como estaban.
 
+### Inicio: la fila de atención del presupuesto general
+
+Un refinamiento del dueño dentro de esta entrega. No es una tarjeta de presupuesto: es **una sola fila contextual**
+que aparece solo cuando el presupuesto general del mes pide atención, y desaparece sola cuando no.
+
+- **Cuándo.** `homeBudgetAttention(summary)` (`src/ui/home-focus.ts`, puro) mira **solo el presupuesto general**
+  (`summary.total`) con la regla del dominio, `budgetState` (`BUDGET_WARNING_RATIO` 0,85): tranquilo por debajo del
+  85 % (no hay fila), **aviso** desde el 85 % hasta el 100 % inclusive, **excedido** por encima del 100 %. Sin
+  presupuesto general activo para el mes, o tranquilo, devuelve `null` y la fila no existe. Un sublímite por categoría
+  nunca la muestra, ni excedido.
+- **Qué presupuesto.** `homeBudget(libro, presupuestos, monedas del historial, modo, moneda de la vista, mes)`
+  (`src/ui/home-focus.ts`, puro), con la regla de 24C1 de que un presupuesto conserva su moneda. Solo cuentan los
+  presupuestos **generales**: un sublímite por categoría nunca convierte a una moneda en candidata. Con «Solo …», solo
+  el presupuesto general de esa moneda; en consolidado, primero el de la moneda de visualización y después el de cada
+  moneda del historial en el orden de agrupación: la fila es **el primero que está en aviso o excedido**, y **nombra su
+  moneda** cuando no es la de visualización. Así un presupuesto tranquilo (o un sublímite) nunca esconde el excedido de
+  otra moneda, y con dos que piden atención se ve uno solo, el de la moneda de visualización primero. Se mide con
+  `summarizeMonthlyBudgets` sobre el **libro real** en la moneda propia del presupuesto: nunca se convierte ni se suma a
+  otra moneda.
+- **Dónde.** En un grupo propio (`Surface grouped`) después del campo financiero y **antes** de «Próximos compromisos»
+  y «Actividad reciente»: lo accionable primero. Entra y sale con `Reflow` como los demás grupos.
+- **La fila.** `BudgetAttentionRow` (`src/ui/home-modules.tsx`): `PressFeedback` con resaltado, rol botón, 60 pt de
+  alto mínimo; un `GlyphTile` de 36 pt (aviso: `speedometer-outline` en el tono `warning`, ámbar; excedido:
+  `alert-circle-outline` en el tono `expense`, el de alerta) y un chevron. Título en tinta, 600: aviso «Usaste 87 % del
+  presupuesto del mes» («You used 87% of this month’s budget»; el porcentaje entero que muestran Presupuestos y
+  Reportes, `percentUsed`, nunca con decimales); excedido «Superaste el presupuesto del mes» («You went
+  over this month’s budget»); cuando nombra la moneda, «… del mes en USD» («… this month’s USD budget»). Detalle en
+  footnote 500, ámbar (`p.warning`) en aviso y el tono de alerta (`p.expense`) en excedido: «Quedan $ 15.000,00 de
+  $ 100.000,00» («… left of …») o «$ 4.000,00 por encima de $ 100.000,00» («… over …»); los importes con
+  `moneyText`, o con su código (`codedAmount`) cuando la fila nombra la moneda. El ámbar sigue en el 100 % justo; el
+  tono de alerta es solo para lo que pasó el límite.
+- **VoiceOver.** Un solo elemento: el título hablado (`spokenPercent`) más «, » y el detalle hablado (`spokenMoney`);
+  pista «Abre Presupuestos» («Opens Budgets»).
+- **Tocar.** Abre Presupuestos en la moneda y el mes del presupuesto (`/budgets` con `currency` y `month`).
+- **Textos.** Nuevas claves `home.budget.warning`, `warningIn`, `exceeded`, `exceededIn`, `left`, `over` y `hint`, en
+  español y en inglés; el candado del inglés se volvió a aceptar.
+- **Lo que no es.** Ni tarjeta permanente, ni presupuestos por categoría, ni la línea de atención de la primera
+  iteración (`HomeInsightRow` no vuelve), ni una cifra nueva: no cambia el dominio de presupuestos ni cómo se calculan.
+
 ### Inicio: la regla mínima (para entregas futuras)
 
-Inicio muestra solo el campo financiero, los compromisos cercanos cuando existen y la actividad reciente.
+Inicio muestra solo el campo financiero, la fila de atención del presupuesto general cuando la hay, los compromisos
+cercanos cuando existen y la actividad reciente.
 
-- **«Próximos compromisos» es condicional:** solo reglas recurrentes **de gasto** activas, que vencen desde hoy hasta
-  el horizonte de siete días (hoy a hoy + 6), en la vista, dos como máximo; sin ninguna, la sección no existe. Lo
-  posterior vive en Recurrentes («Ver todos»). Un ingreso recurrente nunca se muestra como compromiso.
-- **No van en Inicio:** rankings, la tarjeta de presupuesto ni un módulo permanente de recurrentes. Una visibilidad
-  más amplia de lo que viene es trabajo del calendario y de las notificaciones futuras (las notas de 24UX6A y 25D),
-  no de Inicio.
+- **«Próximos compromisos» es condicional:** solo reglas recurrentes **de gasto** activas y no borradas, en la vista,
+  cuya próxima fecha cae en una **ventana móvil de 30 días** desde hoy (`COMMITMENT_WINDOW_DAYS`, reemplazó al
+  horizonte de siete días): desde hoy hasta hoy + 30 días, **los dos extremos incluidos** (`nextDateISO >= hoy` y
+  `nextDateISO <= addDaysISO(hoy, 30)`; el 2026-10-01 la ventana va del 2026-10-01 al 2026-10-31). Es el mismo límite que
+  el pronóstico «próximos 30 días» de Recurrentes (`recurringForecastByCurrency`). Una diferencia es deliberada: una
+  regla cuya próxima fecha ya pasó espera revisión en Recurrentes y no se lista en Inicio (el pronóstico sí cuenta su
+  próxima ocurrencia).
+  Nunca es «el mes calendario». Se ordenan por fecha, después por comercio (`localeCompare`) y después por id, y recién
+  entonces se cortan a dos (`COMMITMENT_ROWS`); sin ninguna en la ventana, la sección no existe. Lo demás vive en
+  Recurrentes («Ver todos»). Un ingreso recurrente nunca se muestra como compromiso; tampoco resúmenes de tarjeta,
+  cuotas ni pagos de deudas.
+- **Presupuesto: sin tarjeta permanente, con una fila contextual.** Inicio **no** tiene una tarjeta de presupuesto
+  permanente (ni la «Presupuesto del mes» de antes ni sublímites). Sí puede tener **una** fila del presupuesto general
+  cuando `budgetState` pide atención (aviso o excedido), con las reglas de arriba; tranquilo, no hay nada.
+- **No van en Inicio:** rankings, una tarjeta permanente de presupuesto, presupuestos por categoría, una línea de
+  atención calculada ni un módulo permanente de recurrentes. Una visibilidad más amplia de lo que viene es trabajo del
+  calendario y de las notificaciones futuras (las notas de 24UX6A y 25D), no de Inicio.
 
 ### Reportes: el total arriba y la dona para elegir
 
@@ -2088,7 +2150,11 @@ color propio.
 - Producto 24UX6C2 (sin build de EAS, nada revisado todavía): la actividad reciente de Inicio mezcla gastos, ingresos
   y transferencias del más nuevo, una transferencia una sola vez con «Origen → Destino» en el tono de transferencia,
   VoiceOver diciendo «Transferencia» con la dirección, tocarla abre su detalle y Gastado no cambia después de una
-  transferencia; los compromisos siguen condicionales; en Reportes el total arriba en las dos vistas, el centro de la
+  transferencia; los compromisos siguen condicionales, ahora con la ventana de 30 días (de hoy a hoy + 30 inclusive);
+  la fila del presupuesto general (aparece al 85 % en ámbar, sigue ámbar en el 100 %, pasado el límite en el tono de
+  alerta con lo excedido, nunca por un presupuesto por categoría, abre Presupuestos en su moneda y su mes, en
+  consolidado con el presupuesto en otra moneda que la de visualización nombra esa moneda sin convertir, desaparece por
+  debajo del 85 %); en Reportes el total arriba en las dos vistas, el centro de la
   dona callado y después el nombre, el importe y el porcentaje de la categoría elegida, la porción elegida más gruesa
   y las demás atenuadas, la fila marcada, tocar de nuevo o el agujero la quita, VoiceOver ajustable (deslizar arriba y
   abajo) anuncia categoría, importe y porcentaje, la elección vuelve a ninguna al cambiar de mes o de moneda; nombres

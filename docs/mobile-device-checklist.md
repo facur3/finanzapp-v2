@@ -4,13 +4,16 @@
 
 **Not done in 24UX6C2: no EAS build was made and the iPhone was not touched. Every item below is pending.**
 Metro from this branch (`npm run start:dev-client -- --clear`) on the installed FinanzApp Dev build; JavaScript only
-(Inicio's recent activity, the Reportes donut and the category rows), no native dependency, no ledger, accounting,
+(Inicio's recent activity, its commitments window and general-budget attention row, the Reportes donut and the
+category rows), no native dependency, no ledger, accounting, budget-rule,
 schema (13), backup (v13), FX, card or instalment change, no tab animation, the Forest palette unchanged. Use your own
 data; never seed movements. Record each result with the iPhone model, iOS version, theme, language and text size. The
 design is in [mobile-design.md](mobile-design.md) («Producto 24UX6C2 — actividad de Inicio e interacción de
 Reportes»); the rule is in [decision 005](decisions/005-forest-four-tabs-and-capture.md) («Enmienda 2026-10-01 —
-Producto 24UX6C2»). This section supersedes the 24UX6A item «this month's expenses and incomes (no transfers)» in
-«Actividad reciente».
+Producto 24UX6C2»). This section supersedes the 24UX6A items «this month's expenses and incomes (no transfers)» in
+«Actividad reciente», «at most two rules due within seven days» in «Próximos compromisos» (now a 30-day window) and
+«no … budgets … on Inicio» (still no permanent budget card, but one contextual general-budget row when it needs
+attention).
 
 - [ ] The Más footer reads «FinanzApp 0.1.0 (24UX6C2)».
 
@@ -29,8 +32,37 @@ Producto 24UX6C2»). This section supersedes the 24UX6A item «this month's expe
 - [ ] An undone transfer does not appear; with one currency of several shown alone, a transfer in another currency
   does not appear.
 - [ ] The amount size and alignment, «Total · ARS», the month label and «Ver todos» → Movimientos are unchanged.
-- [ ] «Próximos compromisos» is still conditional: only active recurring expense rules due today through the next six
-  days, at most two, absent when none; a recurring income never appears there.
+- [ ] «Próximos compromisos» is still conditional, now over a rolling 30-day window: only active recurring expense
+  rules due from today through today + 30 days, both ends inclusive (on 2026-10-01: 2026-10-01 … 2026-10-31), soonest
+  first, at most two, absent when none falls in the window; a recurring income, a paused or deleted rule, a card
+  statement, an instalment or a debt payment never appears there; «Ver todos» → Recurrentes.
+- [ ] Window boundary: a rule whose next date is today + 30 days appears (when it is among the two soonest); one on
+  today + 31 does not; the same rule counts in Recurrentes' «próximos 30 días» figure.
+
+**Inicio: the general-budget attention row.**
+
+Set a general budget for this month in Presupuestos (your own data; adjust the limit, never seed movements) and watch
+Inicio as the month's spending crosses each threshold.
+
+- [ ] Below 85 % of the general budget: no budget row and no budget card on Inicio.
+- [ ] At 85 %: one row appears after the financial field and before «Próximos compromisos» and «Actividad reciente»,
+  amber: the speedometer tile, «Usaste 85 % del presupuesto del mes» and «Quedan $ … de $ …» in amber; a chevron.
+- [ ] At exactly 100 %: still amber (warning), «Usaste 100 % …» and what is left ($ 0); never the alert tone yet.
+- [ ] Over the limit: the alert tone (the alert-circle tile in the expense colour), «Superaste el presupuesto del mes»
+  and «$ … por encima de $ …» with the amount over in the alert colour.
+- [ ] Category-only budgets (no general budget), even exceeded: never a row on Inicio.
+- [ ] Tapping the row opens Presupuestos on the budget's currency and month; back returns to Inicio.
+- [ ] Consolidated view with the general budget in another currency than the display currency: the row names it
+  («… del mes en USD», amounts with their code) and its amounts are that currency's, never converted; in a single
+  currency view only that currency's budget can show.
+- [ ] Consolidated view with a calm general budget (or only a category sublimit) in the display currency and an
+  exceeded general budget in another held currency: the row shows the exceeded one, naming its currency; «Solo …» the
+  calm currency shows nothing.
+- [ ] Undo or edit expenses (or raise the limit) until the month falls below 85 %: the row disappears.
+- [ ] VoiceOver reads the row once: the spoken percent or «Superaste…», then the spoken amounts, and the hint «Abre
+  Presupuestos»; English: «You used 87% of this month’s budget», «… left of …», «You went over this month’s budget»,
+  «… over …», «Opens Budgets».
+- [ ] Large text and AX sizes: the title and detail wrap, nothing is cut; light and dark both readable.
 
 **Reportes: the donut.**
 
@@ -290,7 +322,7 @@ iPhone model, iOS version, theme, material (glass or Reducir transparencia) and 
 - [ ] Gastado: «Hasta hoy · $ … por día», or «Sin gastos este mes» with nothing spent (the number then in the softer
   ink). Disponible: «Saldo registrado · N cuentas», never a per-day figure. Gastado | Disponible switches only the
   number and its line.
-- [ ] «Próximos compromisos»: at most two rules due within seven days, «Ver todos» → Recurrentes; with none, the
+- [ ] *(Window superseded by 24UX6C2: 30 days, today through today + 30 inclusive.)* «Próximos compromisos»: at most two rules due within seven days, «Ver todos» → Recurrentes; with none, the
   section is absent.
 - [ ] *(Superseded by 24UX6C2: transfers are part of «Actividad reciente», once each.)* «Actividad reciente»: this month's expenses and incomes (no transfers), newest first, at most 4 with
   commitments and 6 without; «Ver todos» → the Movimientos tab.
@@ -299,7 +331,8 @@ iPhone model, iOS version, theme, material (glass or Reducir transparencia) and 
   currencies held and one shown alone («Solo X») with nothing this month in it, the title names the currency:
   «Todavía no hay movimientos en X este mes». No account → the empty state with
   «Empezar» → Nueva cuenta. No «＋ Registrar», no insight line, no rankings, budgets, charts or Assistant banner on
-  Inicio.
+  Inicio. *(Refined by 24UX6C2: still no permanent budget card, but one contextual general-budget row when it needs
+  attention.)*
 - [ ] The 46 pt number with a 9-digit amount (e.g. $ 123.456.789) on a 375 pt iPhone: one line, shrinks, never clips;
   a missing rate shows the per-currency parts instead.
 - [ ] Dynamic Type from the default to the largest accessibility size: the field, the subline, the Gastado |
