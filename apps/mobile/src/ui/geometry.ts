@@ -18,17 +18,28 @@ export function segmentLayout(trackWidth: number, count: number, index: number):
  * capped at this Dynamic Type scale, so the strip that has to show its first row is capped too. */
 export const DECK_MAX_TEXT_SCALE = 1.3;
 
-/** The height of a strip: the face's top padding (16), its first row (22 pt of text at the capped scale) and a 10 pt margin.
- * Never below 50 pt, so a strip is always a comfortable touch target (44 pt at least), at every text size. */
-export function deckExposure(fontScale: number): number {
+/** Producto 24UX6D: the most cards whose strips keep the full 50 pt. A deck of up to four cards (three strips over the
+ * front face, 373 pt on a 393 pt iPhone, 361 pt at 375 pt) leaves the start of the snapshot in the first screen; from the
+ * fifth card on, every strip tightens to its compact height, so six cards take 30 pt less and twelve 66 pt less, and the
+ * rule stays the same for any number of cards (no second geometry, no hidden cards, no horizontal carousel). */
+export const DECK_FULL_STRIP_CARDS = 4;
+
+/** The height of a strip: the face's top padding (16), its first row (22 pt of text at the capped scale) and a margin
+ * under it, 12 pt with up to `DECK_FULL_STRIP_CARDS` cards (50 pt at the default size, 57 at the cap) and 6 pt beyond
+ * (24UX6D: 44 pt, 51 at the cap). The first row always shows whole, and a strip is never under 44 pt, the touch target
+ * iOS asks for, at every text size and for any number of cards. `count` is the number of cards in the deck (one by
+ * default: the full strip). */
+export function deckExposure(fontScale: number, count = 1): number {
   const scale = Math.min(Math.max(Number.isFinite(fontScale) ? fontScale : 1, 1), DECK_MAX_TEXT_SCALE);
-  return Math.round(28 + 22 * scale);
+  const margin = count > DECK_FULL_STRIP_CARDS ? 22 : 28;
+  return Math.max(44, Math.round(margin + 22 * scale));
 }
 
 /** Where each card of the deck sits (`tops`, in the stored order of `count` cards) and how the cards layer (`zIndex`):
  * the others keep their relative order above, one strip each; the selected card is last, at `(count − 1) · exposure`,
  * above every strip. The container always measures `(count − 1) · exposure + faceHeight`, whichever card is selected, so
- * choosing a card never changes the height of the page. An index outside the deck falls back to the first card. */
+ * choosing a card never changes the height of the page. An index outside the deck falls back to the first card, so with
+ * any active card one card is always in front (24UX6D: there is no «choose a card first» state). */
 export function deckLayout(count: number, selectedIndex: number, exposure: number, faceHeight: number): { tops: number[]; zIndex: number[]; containerHeight: number } {
   if (!(count > 0) || !Number.isInteger(count)) return { tops: [], zIndex: [], containerHeight: 0 };
   const selected = Number.isInteger(selectedIndex) && selectedIndex >= 0 && selectedIndex < count ? selectedIndex : 0;

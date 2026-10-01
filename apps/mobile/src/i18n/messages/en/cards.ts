@@ -15,6 +15,7 @@ export const cards: Pick<Messages, 'cards'> = {
     panel: {
       recordedDebt: 'Outstanding balance',
       archivedTitle: 'Archived card',
+      archivedDetail: 'It still takes payments and records its installments. To use it again, reactivate it in Edit card.',
       deletedTitle: 'Deleted card',
       deletedDetail: 'Its purchases and payments stay in Transactions and in its reports. It cannot be edited and takes no new transactions.',
       noDebt: 'No outstanding balance on this card.',
@@ -38,7 +39,6 @@ export const cards: Pick<Messages, 'cards'> = {
       plans: 'Installments',
       plansCaption: 'Future installments {amount}',
       plansCaptionOutOfRange: 'Future installments: total out of range',
-      seeAll: 'See all',
       recent: 'Recent',
       movements: 'Transactions',
       noActivity: 'You haven’t recorded any purchases or payments on this card yet.',

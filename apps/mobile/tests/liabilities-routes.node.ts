@@ -182,7 +182,10 @@ test('Tarjetas summarizes the selected card from recorded purchases and payments
   assert.equal(find(root, 'Money').props.minor, 13100);
   const purchases = nodes(root).filter(node => node.type === 'Money').map(node => node.props.minor);
   assert.ok(purchases.includes(500000 - 13100), 'available limit is limit minus recorded debt');
-  const caption = nodes(root).find(node => node.type === 'SectionTitle' && node.props.action === 'Ver todo')!.props.caption;
+  // 24UX6D: Recientes reads like Inicio's sections: a quiet «Ver todos» that opens the card's detail.
+  const recentTitle = nodes(root).find(node => node.type === 'SectionTitle' && node.props.action === 'Ver todos')!;
+  assert.equal(recentTitle.props.quiet, true);
+  const caption = recentTitle.props.caption;
   assert.match(caption, /^Este ciclo, desde .* · 1 compra · 1 pago$/, 'the open cycle\'s facts live in one caption line');
   assert.equal(nodes(root).filter(node => node.type === 'Surface').length >= 1, true);
   find(root, 'ActionButton', 'Registrar compra').props.onPress();

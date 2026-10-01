@@ -43,9 +43,14 @@ export function cardFaceLabel(i18n: Pick<I18n, 't' | 'currencyUnit'>, face: Pick
  * below. No figures, no network or bank logo, no contactless glyph: FinanzApp does not operate the card. Its text is
  * capped at the deck's scale (the strip's height depends on it) and the name gives way before the last four digits,
  * never overlapping them. Hook-free but for the locale. `decorative` hides it from VoiceOver where the element around it
- * already speaks for the card (the deck). */
-export function CardFace({ id, name, issuer, last4, currency, color, width, showCurrency = true, decorative = false }: CardFaceData & {
-  width: number; showCurrency?: boolean; decorative?: boolean;
+ * already speaks for the card (the deck).
+ *
+ * 24UX6D: a whole face (the card in front, a card's detail) gives a long name a second line (`nameLines`, two by default)
+ * instead of cutting it after a dozen letters; the last four digits stay on the first line, top-aligned with it. A strip
+ * of the deck shows only its first row, so the deck passes one line for the cards behind: a half-hidden second line is
+ * never drawn under the next card. VoiceOver always hears the whole name. */
+export function CardFace({ id, name, issuer, last4, currency, color, width, showCurrency = true, decorative = false, nameLines = 2 }: CardFaceData & {
+  width: number; showCurrency?: boolean; decorative?: boolean; nameLines?: 1 | 2;
 }) {
   const i18n = useI18n();
   const tone = cardFaceTone(id, color);
@@ -55,8 +60,8 @@ export function CardFace({ id, name, issuer, last4, currency, color, width, show
     style={[styles.face, { width, height, backgroundColor: tone.base }]}>
     <View pointerEvents="none" style={[styles.sheen, { backgroundColor: tone.highlight, width: height * 1.5, height: height * 1.5, borderRadius: height, right: -height * 0.55, top: -height * 0.75 }]} />
     <View pointerEvents="none" style={[styles.sheen, { backgroundColor: '#FFFFFF', opacity: 0.05, width: height, height, borderRadius: height, left: -height * 0.35, bottom: -height * 0.5 }]} />
-    <View style={styles.faceRow}>
-      <Text numberOfLines={1} maxFontSizeMultiplier={DECK_MAX_TEXT_SCALE} style={styles.name}>{name}</Text>
+    <View style={[styles.faceRow, { alignItems: 'flex-start' }]}>
+      <Text numberOfLines={nameLines} maxFontSizeMultiplier={DECK_MAX_TEXT_SCALE} style={styles.name}>{name}</Text>
       {!!last4 && <Text numberOfLines={1} maxFontSizeMultiplier={DECK_MAX_TEXT_SCALE} style={styles.last4}>{'•••• ' + last4}</Text>}
     </View>
     <View style={[styles.faceRow, { alignItems: 'flex-end' }]}>
@@ -74,7 +79,9 @@ export function CardFace({ id, name, issuer, last4, currency, color, width, show
  * Motion the cards jump there and only the snapshot below crossfades. VoiceOver reads the cards as they are drawn, top to
  * bottom (the strips in their stored order, the selected card last, where iOS also layers it): one element each, a
  * button with the face's sentence, its position in that reading order and whether it is the selected one. Each touch
- * target is only what shows of it: the strip (50 pt at least) or the whole front face. */
+ * target is only what shows of it: the strip (50 pt at least; 44 pt from the fifth card on, 24UX6D, `deckExposure`) or
+ * the whole front face. With any card at all one is always in front: a selection that no longer exists (a card archived
+ * or deleted) hands the front to the first card, so the snapshot under the deck is never empty. */
 export function CardDeck({ cards, selectedId, onSelect, onOpen, showCurrency = true }: {
   cards: readonly CardFaceData[]; selectedId: string | null; onSelect: (id: string) => void; onOpen: (id: string) => void; showCurrency?: boolean;
 }) {
@@ -83,7 +90,7 @@ export function CardDeck({ cards, selectedId, onSelect, onOpen, showCurrency = t
   const { width: windowWidth, fontScale } = useWindowDimensions();
   const width = cardFaceWidth(windowWidth);
   const faceHeight = cardFaceHeight(width);
-  const exposure = deckExposure(fontScale);
+  const exposure = deckExposure(fontScale, cards.length);
   const selectedIndex = Math.max(0, cards.findIndex(card => card.id === selectedId));
   const layout = deckLayout(cards.length, selectedIndex, exposure, faceHeight);
   return <View style={{ width, height: layout.containerHeight, alignSelf: 'center' }}>
@@ -95,7 +102,7 @@ export function CardDeck({ cards, selectedId, onSelect, onOpen, showCurrency = t
         hitHeight={front ? faceHeight : exposure} selected={front} label={cardFaceLabel(i18n, card) + position}
         hint={i18n.t(front ? 'cards.list.openHint' : 'cards.list.selectHint')}
         onPress={() => { if (front) onOpen(card.id); else { selectionHaptic(); onSelect(card.id); } }}>
-        <CardFace {...card} width={width} showCurrency={showCurrency} decorative />
+        <CardFace {...card} width={width} showCurrency={showCurrency} decorative nameLines={front ? 2 : 1} />
       </DeckSlot>;
     })}
   </View>;

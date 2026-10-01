@@ -6,7 +6,7 @@ import { withCurrencyCode } from '../i18n/format';
 import { useI18n } from '../i18n/provider';
 import { AppText, Money, PressFeedback, Stat, StatRow, toneColors } from './components';
 import { daysUntil, usageTone, type CardSummary } from './liability-presentation';
-import { timing } from './motion';
+import { Reflow, timing, ValueTransition } from './motion';
 import { usePalette, useReduceMotion } from './theme';
 
 /** Producto 24T2: what Tarjetas' snapshot and a card's detail both show, in the same words and the same order. */
@@ -30,7 +30,12 @@ export function CardBalance({ summary }: { summary: CardSummary }) {
 /** Three facts, never merged: «Vence» (the next due date, which may belong to the statement that already closed; amber
  * when it is three days away or less and something is owed), «Cierra» (the next closing) and «Disponible» (the figure
  * when it is known; «Sin límite cargado»; or «No calculado con cuotas» while a plan is pending, with the reason one tap
- * away). The usage bar only with a known figure. `limitCaption` adds «de $ límite» under Disponible (the card detail). */
+ * away). The usage bar only with a known figure. `limitCaption` adds «de $ límite» under Disponible (the card detail).
+ *
+ * 24UX6D: the two dates share a row and Disponible has the full width under them, with its bar. In three equal columns
+ * an available credit of seven digits (an everyday ARS limit) did not fit its third at 375 pt and was drawn smaller to
+ * fit; on its own row an exact amount keeps the row size, and «No calculado con cuotas» reads on one line. The dates
+ * still stack at large text (`StatRow`). Flat on the canvas with the balance, as one calm block: no surface of its own. */
 export function CardFacts({ summary, day, limitCaption = false }: { summary: CardSummary; day: string; limitCaption?: boolean }) {
   const p = usePalette();
   const { t, relativeDate, formatDate, moneyText, spokenMoney } = useI18n();
@@ -49,6 +54,8 @@ export function CardFacts({ summary, day, limitCaption = false }: { summary: Car
       <Stat label={t('cards.panel.closing')}>
         <AppText accessibilityLabel={spoken(closingISO)} style={{ fontWeight: '600' }}>{shown(closingISO)}</AppText>
       </Stat>
+    </StatRow>
+    <View style={{ gap: 8 }}>
       <Stat label={t('cards.panel.available')}>
         {availability === 'known' && availableMinor !== null
           ? <Money minor={availableMinor} currency={account.currency} size={17} color={availableMinor < 0 ? p.expense : tone === 'warning' ? p.warning : undefined} />
@@ -58,10 +65,36 @@ export function CardFacts({ summary, day, limitCaption = false }: { summary: Car
           accessibilityLabel={t('cards.panel.ofLimit', { amount: spokenMoney(card.creditLimitMinor, account.currency) })}>
           {t('cards.panel.ofLimit', { amount: moneyText(card.creditLimitMinor, account.currency) })}</AppText>}
       </Stat>
-    </StatRow>
-    {availability === 'known' && usage !== null && card.creditLimitMinor !== null && <UsageBar usage={usage} tone={tone}
-      label={t('cards.panel.usage', { percent, limit: moneyText(card.creditLimitMinor, account.currency) })}
-      spokenLabel={t('cards.panel.usage', { percent, limit: spokenMoney(card.creditLimitMinor, account.currency) })} />}
+      {availability === 'known' && usage !== null && card.creditLimitMinor !== null && <UsageBar usage={usage} tone={tone}
+        label={t('cards.panel.usage', { percent, limit: moneyText(card.creditLimitMinor, account.currency) })}
+        spokenLabel={t('cards.panel.usage', { percent, limit: spokenMoney(card.creditLimitMinor, account.currency) })} />}
+    </View>
+  </View>;
+}
+
+/** 24UX6D: the balance and the three facts as one calm block on the canvas, the order every card surface reads in:
+ * «Saldo pendiente» (the hero), then Vence · Cierra, then Disponible. `animated` keys the block by the card (Tarjetas: the
+ * values crossfade when another card comes forward, and the facts slide when their height changes). */
+export function CardStatusBlock({ summary, day, limitCaption = false, animated = false }: { summary: CardSummary; day: string; limitCaption?: boolean; animated?: boolean }) {
+  const facts = <CardFacts summary={summary} day={day} limitCaption={limitCaption} />;
+  return <View style={{ gap: 20 }}>
+    {animated ? <ValueTransition id={summary.card.id}><CardBalance summary={summary} /></ValueTransition> : <CardBalance summary={summary} />}
+    {animated ? <Reflow><ValueTransition id={summary.card.id} variant="fade">{facts}</ValueTransition></Reflow> : facts}
+  </View>;
+}
+
+/** 24UX6D: an archived or deleted card says so right under its face, legible and calm (no alarm colour): a glyph, the
+ * state and what it still does. Archived: it still takes payments and records its instalments, and Editar tarjeta
+ * reactivates it. Deleted: it only reads. An active card shows nothing. */
+export function CardLifecycleNote({ state }: { state: 'archived' | 'deleted' }) {
+  const p = usePalette();
+  const { t } = useI18n();
+  return <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 10 }}>
+    <Ionicons name={state === 'deleted' ? 'trash-outline' : 'archive-outline'} size={18} color={p.secondary} accessible={false} style={{ marginTop: 1 }} />
+    <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+      <AppText variant="subhead" style={{ fontWeight: '600' }}>{t(state === 'deleted' ? 'cards.panel.deletedTitle' : 'cards.panel.archivedTitle')}</AppText>
+      <AppText secondary variant="footnote">{t(state === 'deleted' ? 'cards.panel.deletedDetail' : 'cards.panel.archivedDetail')}</AppText>
+    </View>
   </View>;
 }
 

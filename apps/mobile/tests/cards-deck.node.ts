@@ -12,7 +12,7 @@ import { bindLocale } from '../src/i18n/bind.ts';
 // face run for real against descriptor hosts (no UIKit, no frames, no touches): the order of the cards, the layers, the
 // touch targets, what VoiceOver hears and which callback a tap reaches. Motion feel and hit testing need the iPhone.
 
-const { deckExposure, deckLayout, DECK_MAX_TEXT_SCALE } = geometry;
+const { deckExposure, deckLayout, DECK_MAX_TEXT_SCALE, DECK_FULL_STRIP_CARDS } = geometry;
 
 test('a strip shows the face\'s first row at every text size, capped with the face text and never under 50 pt', () => {
   assert.equal(deckExposure(1), 50, '16 pt of padding, a 22 pt row and 10 pt of margin');
@@ -56,6 +56,42 @@ test('the deck keeps the stored order above the selected card, which is in front
   }
   assert.equal(JSON.stringify(deckLayout(3, 7, strip, face).tops), '[100,0,50]', 'an index outside the deck falls back to the first card');
   assert.equal(JSON.stringify(deckLayout(3, -1, strip, face).tops), '[100,0,50]');
+});
+
+test('24UX6D: up to four cards keep the full 50 pt strips; from the fifth, every strip tightens to 44 pt (51 at the cap), never under 44', () => {
+  assert.equal(DECK_FULL_STRIP_CARDS, 4);
+  // 1, 2, 3 and 4 cards: the 24T2 strip, unchanged.
+  for (const count of [1, 2, 3, 4]) {
+    assert.equal(deckExposure(1, count), 50, count + ' cards');
+    assert.equal(deckExposure(DECK_MAX_TEXT_SCALE, count), 57);
+  }
+  // 5, 6 and 12 cards: one compact strip for all of them (16 pt of padding, the 22 pt row, 6 pt of margin).
+  for (const count of [5, 6, 12, 40]) {
+    assert.equal(deckExposure(1, count), 44, count + ' cards');
+    assert.equal(deckExposure(1.15, count), 47);
+    assert.equal(deckExposure(DECK_MAX_TEXT_SCALE, count), 51, 'the face text stops growing at 1.3, so does the strip');
+    assert.equal(deckExposure(3.12, count), 51);
+  }
+  assert.equal(deckExposure(1), 50, 'no count: the full strip');
+  for (const count of [1, 4, 5, 6, 12]) for (const scale of [0.5, 0.82, 1, 1.3, 2, Number.NaN]) {
+    const strip = deckExposure(scale, count);
+    assert.ok(strip >= 44, 'always a 44 pt target at least');
+    assert.ok(strip >= 16 + 22 * Math.min(Math.max(Number.isFinite(scale) ? scale : 1, 1), DECK_MAX_TEXT_SCALE), 'the first row always shows whole');
+  }
+  // Heights on a 375 pt iPhone (a 335 pt face, 211 pt tall) and a 393 pt one (223 pt): 1/2/3/6 cards.
+  const height = (count: number, face: number) => deckLayout(count, 0, deckExposure(1, count), face).containerHeight;
+  assert.deepEqual([1, 2, 3, 4, 6].map(count => height(count, 211)), [211, 261, 311, 361, 431]);
+  assert.deepEqual([1, 2, 3, 4, 6].map(count => height(count, 223)), [223, 273, 323, 373, 443]);
+  assert.equal(height(6, 223), 5 * 50 + 223 - 30, 'six cards take 30 pt less than full strips');
+  assert.equal(height(12, 223), 11 * 50 + 223 - 66);
+  // Whatever the count, one card is always in front, at the bottom, above every strip; the others keep the stored order.
+  for (const count of [1, 2, 3, 6]) for (let selected = 0; selected < count; selected++) {
+    const strip = deckExposure(1, count);
+    const { tops, zIndex } = deckLayout(count, selected, strip, 223);
+    assert.equal(zIndex.filter(layer => layer === count - 1).length, 1);
+    assert.equal(zIndex[selected], count - 1);
+    assert.equal(tops[selected], (count - 1) * strip);
+  }
 });
 
 // WCAG 2 contrast, as tests/theme.node.ts measures the palette (kept local so the theme tests do not run twice more).
@@ -279,7 +315,7 @@ test('the face is identity only: name and «•••• 4009» on the strip row
   assert.deepEqual(texts.map(node => node.props.children), ['Visa Gold', '•••• 4009', 'GALICIA', 'ARS']);
   for (const text of texts) assert.equal(text.props.maxFontSizeMultiplier, DECK_MAX_TEXT_SCALE, 'the face text is capped with the strip');
   const [name, last4] = texts;
-  assert.equal(name.props.numberOfLines, 1);
+  assert.equal(name.props.numberOfLines, 2, '24UX6D: a whole face gives a long name a second line');
   assert.equal(name.props.style.flexShrink, 1, 'the name gives way first');
   assert.equal(last4.props.style.flexShrink, 0, 'the last four digits are never cut or overlapped');
   assert.equal(face.props.style[1].backgroundColor, cardFaces.HASH_FACES[cardFaces.cardFaceIndex('visa')].base);
@@ -290,4 +326,30 @@ test('the face is identity only: name and «•••• 4009» on the strip row
   assert.equal(quiet.props.style[1].backgroundColor, cardFaces.COLOR_FACES.terracotta.base);
   const source = readFileSync(new URL('../src/ui/card-visual.tsx', import.meta.url), 'utf8');
   assert.equal(/wifi|Ionicons/.test(source), false, 'no fake contactless mark or network logo');
+});
+
+test('24UX6D: six cards render as five 44 pt strips and one whole face; a strip shows one line of its name, the face in front two; VoiceOver hears every whole name', () => {
+  const view = visual();
+  const long = 'Visa Signature Banco de la Provincia de Buenos Aires';
+  const six = [visa, amex, naranja, ...['a', 'b', 'c'].map(id => ({ ...visa, id, name: id === 'c' ? long : 'Tarjeta ' + id.toUpperCase(), last4: '000' + id.length }))];
+  const selected: string[] = [], opened: string[] = [];
+  const deck = view.CardDeck({ cards: six, selectedId: 'c', onSelect: (id: string) => selected.push(id), onOpen: (id: string) => opened.push(id) });
+  assert.equal(deck.props.style.height, 5 * 44 + 223);
+  const cards = slots(deck);
+  assert.equal(cards.map(card => card.hit.height).join(','), '44,44,44,44,44,223', 'every strip keeps a 44 pt target');
+  assert.equal(cards.map(card => card.top).join(','), '0,44,88,132,176,220');
+  assert.deepEqual(cards.map(card => card.face.props.nameLines), [1, 1, 1, 1, 1, 2], 'no half-hidden second line under the next card');
+  // The long name in front is never truncated after a dozen letters: two lines on the face, and the whole name spoken.
+  const front = cards[5].face.type(cards[5].face.props) as Node;
+  const name = flat(front).find(node => node.type === 'Text' && node.props.children === long)!;
+  assert.equal(name.props.numberOfLines, 2);
+  assert.equal(cards[5].hit.accessibilityLabel, 'Tarjeta ' + long + ', Galicia, termina en 0001, pesos, Tarjeta 6 de 6');
+  assert.equal(cards.filter(card => card.hit.accessibilityState.selected).length, 1, 'one card is always the selected one');
+  cards[2].hit.onPress();
+  cards[5].hit.onPress();
+  assert.equal(JSON.stringify([selected, opened, view.haptics()]), JSON.stringify([['naranja'], ['c'], 1]), 'a strip selects; the face in front opens its detail');
+  // Without a selection (or with one that left the deck), the first card is in front: never an empty «choose a card» state.
+  const fallback = slots(view.CardDeck({ cards: six, selectedId: null, onSelect() {}, onOpen() {} }));
+  assert.equal(fallback.findIndex(card => card.hit.accessibilityState.selected), 0);
+  assert.equal(fallback[0].top, 5 * 44);
 });

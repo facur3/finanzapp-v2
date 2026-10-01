@@ -6,7 +6,7 @@ import { useI18n } from '../../src/i18n/provider';
 import { useLedger } from '../../src/storage/LedgerProvider';
 import { ActionButton, AppText, EmptyState, IconButton, Screen, SectionTitle, Surface } from '../../src/ui/components';
 import { CardFace, cardFaceWidth } from '../../src/ui/card-visual';
-import { CardBalance, CardFacts } from '../../src/ui/card-panel';
+import { CardLifecycleNote, CardStatusBlock } from '../../src/ui/card-panel';
 import { PlanRow } from '../../src/ui/card-rows';
 import { EntryList } from '../../src/ui/entry-list';
 import { cardPlanSummaries } from '../../src/ui/installment-presentation';
@@ -16,7 +16,11 @@ import { space, useCurrentDay } from '../../src/ui/theme';
 /** One card, in the language of Tarjetas (24T2): its face, its state when it is archived or deleted, the balance, the
  * next due and closing dates and what is available (with the limit), the actions it still takes, its instalment plans
  * and every movement with the open cycle's facts. No card within a card, no detail table: the issuer and the last four
- * digits are on the face. An archived card is still paid; a deleted one only reads. */
+ * digits are on the face. An archived card is still paid; a deleted one only reads.
+ *
+ * 24UX6D (Forest): the same hierarchy and words as Tarjetas' snapshot. The balance and the facts are one block flat on
+ * the canvas (`CardStatusBlock`, no surface of their own); an archived or deleted card says what it still does right under
+ * its face (`CardLifecycleNote`); the plans are one grouped list and the movements another. */
 export default function CardDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { archive, snapshot } = useLedger();
@@ -44,7 +48,7 @@ export default function CardDetailScreen() {
     : committedMinor > 0 ? [t('cards.panel.plansCaption', { amount: format(committedMinor) }),
       financing > 0 ? t(summary.financingKind === 'financing' ? 'cards.panel.futureFinancing' : 'cards.panel.futureInterest', { amount: format(financing) }) : null]
       .filter(Boolean).join(' · ') : undefined;
-  const state = card.deleted ? t('cards.panel.deletedTitle') : !card.active ? t('cards.panel.archivedTitle') : null;
+  const state = card.deleted ? 'deleted' : !card.active ? 'archived' : null;
   // An active card takes purchases and payments; an archived one still takes payments while something is owed; a deleted one, nothing.
   const pay = !card.deleted && (card.active || debtMinor > 0);
 
@@ -57,11 +61,10 @@ export default function CardDetailScreen() {
         <View style={{ gap: space.m }}>
           <CardFace id={card.id} name={account.name} issuer={card.issuer} last4={card.last4} currency={account.currency}
             color={cardFaceColor(card, archive.appearances)} width={cardFaceWidth(width)} showCurrency={cardCurrenciesDiffer(archive.cards, snapshot.accounts, card.id)} />
-          {state && <AppText secondary variant="subhead" style={{ fontWeight: '600' }}>{state}</AppText>}
+          {state && <CardLifecycleNote state={state} />}
         </View>
         {/* Identity (the face) → state (the balance) → the facts → primary → secondary → plans → activity. */}
-        <CardBalance summary={summary} />
-        <Surface><CardFacts summary={summary} day={day} limitCaption /></Surface>
+        <CardStatusBlock summary={summary} day={day} limitCaption />
 
         {pay && <View style={{ gap: 10 }}>
           {card.active && <ActionButton label={t('cards.panel.recordPurchase')} icon="cart-outline"

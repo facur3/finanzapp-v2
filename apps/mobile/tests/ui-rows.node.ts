@@ -637,3 +637,28 @@ test('24UX6C: a computed sign is kept: a negative account balance still renders 
   assert.equal(money.props.color, '#C0392B', 'a negative balance keeps its warning colour');
   assert.ok(drawn(row).some(text => /^[-−]/.test(text)), 'the minus is drawn: ' + drawn(row).join(' | '));
 });
+
+test('24UX6D: in a card\'s lists a purchase and a recorded instalment are unsigned ink, a payment is a transfer («Pago de tarjeta», the transfer tone, no sign)', () => {
+  const ui = load('components.tsx');
+  const bank = { id: 'bank', name: 'Banco', currency: 'ARS', openingMinor: 0, createdAt: 't' };
+  const card = { id: 'card-acc', name: 'Visa Gold', currency: 'ARS', openingMinor: 0, createdAt: 't' };
+  const accounts = [bank, card];
+  const purchase = Object.freeze({ id: 'p', accountId: 'card-acc', kind: 'expense', merchant: 'Starbucks', category: 'Café', amountMinor: 23100, dateISO: '2026-09-22', createdAt: 't' });
+  // An instalment's principal share is an ordinary expense on the card's hidden account (domain `installmentEntries`).
+  const instalment = Object.freeze({ id: 'inst_tv_002', accountId: 'card-acc', kind: 'expense', merchant: 'Electro', category: 'Hogar', amountMinor: 10000000, dateISO: '2026-09-22', createdAt: 't' });
+  for (const entry of [purchase, instalment]) {
+    const row = ui.render('MovementRow', { item: { type: 'entry', key: entry.id, value: entry }, accounts, accountId: 'card-acc', context: 'card' });
+    const [money] = moneyOf(row);
+    assert.equal(JSON.stringify([money.props.minor, money.props.signed, money.props.tone]), JSON.stringify([entry.amountMinor, false, 'expense']), entry.id);
+    assert.equal(nodes(row).find(node => node.type === 'Text' && node.props.style?.fontVariant)!.props.style.color, '#0A0A0C', entry.id + ': ink, never the alarm red');
+    assert.equal(drawn(row).some(text => /[-−+]/.test(text)), false, entry.id + ': no sign: ' + drawn(row).join(' | '));
+    assert.equal(drawn(row).some(text => text.includes('Visa Gold')), false, entry.id + ': inside the card the row does not repeat the card\'s name');
+  }
+  const payment = Object.freeze({ id: 'pay', fromAccountId: 'bank', toAccountId: 'card-acc', amountMinor: 30000, dateISO: '2026-09-22', createdAt: 't', note: 'Pago Visa Gold' });
+  const row = ui.render('MovementRow', { item: { type: 'transfer', key: 'pay', value: payment }, accounts, accountId: 'card-acc', context: 'card' });
+  const [money] = moneyOf(row);
+  assert.equal(JSON.stringify([money.props.minor, money.props.signed, money.props.tone]), JSON.stringify([30000, false, 'transfer']), 'a payment is a transfer, never an expense');
+  assert.equal(nodes(row).find(node => node.type === 'Text' && node.props.style?.fontVariant)!.props.style.color, '#2D6476');
+  assert.ok(drawn(row).includes('Pago de tarjeta'), drawn(row).join(' | '));
+  assert.match(pressOf(row).props.accessibilityLabel, /^Pago de tarjeta, de Banco a Visa Gold, 300,00 ARS, /);
+});

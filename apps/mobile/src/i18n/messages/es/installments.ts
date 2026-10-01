@@ -27,8 +27,9 @@ export const installments = {
     detail: {
       /** Above the price: "Compra en cuotas · ARS". */
       eyebrow: 'Compra en cuotas',
-      noInterest: { one: '{count} cuota · Sin interés', other: '{count} cuotas · Sin interés' },
-      withInterest: { one: '{count} cuota · Con interés', other: '{count} cuotas · Con interés' },
+      /** 24UX6D: one phrase under the price, «12 cuotas sin interés». */
+      noInterest: { one: '{count} cuota sin interés', other: '{count} cuotas sin interés' },
+      withInterest: { one: '{count} cuota con interés', other: '{count} cuotas con interés' },
       /** The plan's state, one word (el plan). */
       active: 'Activo',
       completed: 'Completo',
@@ -40,9 +41,8 @@ export const installments = {
       interest: 'Interés total',
       fees: 'Comisiones',
       taxes: 'Impuestos de financiación',
-      recordedCount: 'Registradas',
-      /** "3 de 12". */
-      recordedCountValue: '{count} de {total}',
+      /** 24UX6D: the progress under the hero, by the instalments the ledger recognised (never «pagadas»): "3 de 12 registradas". */
+      progress: { one: '{count} de {total} registrada', other: '{count} de {total} registradas' },
       /** The principal already recognised. */
       recorded: 'Ya registrado',
       /** The principal still to come. */

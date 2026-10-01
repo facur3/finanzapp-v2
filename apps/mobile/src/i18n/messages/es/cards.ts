@@ -19,6 +19,8 @@ export const cards = {
       recordedDebt: 'Saldo pendiente',
       /** The state line under an archived card's face in its detail. */
       archivedTitle: 'Tarjeta archivada',
+      /** 24UX6D: under an archived card's state line, what it still does. */
+      archivedDetail: 'Sigue recibiendo pagos y registrando sus cuotas. Para usarla de nuevo, reactivala en Editar tarjeta.',
       deletedTitle: 'Tarjeta eliminada',
       deletedDetail: 'Sus compras y pagos siguen en Movimientos y en sus reportes. No se edita ni acepta movimientos nuevos.',
       noDebt: 'Sin saldo pendiente en esta tarjeta.',
@@ -52,7 +54,6 @@ export const cards = {
       plans: 'Cuotas',
       plansCaption: 'Cuotas futuras {amount}',
       plansCaptionOutOfRange: 'Cuotas futuras: total fuera de rango',
-      seeAll: 'Ver todo',
       recent: 'Recientes',
       movements: 'Movimientos',
       noActivity: 'Todavía no registraste compras ni pagos en esta tarjeta.',

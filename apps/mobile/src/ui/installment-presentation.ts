@@ -88,6 +88,31 @@ export function planSummary(plan: InstallmentPlan, records: readonly RecordedEnt
     totalFinancedMinor: plan.principalMinor + financingMinor, deletable };
 }
 
+/** 24UX6D: a plan detail draws one segment per instalment up to this count (a 24-instalment plan keeps segments about
+ * 12 pt wide on a 375 pt iPhone); a longer plan (up to 120) draws one continuous bar instead of slivers too thin to read. */
+export const PLAN_SEGMENT_MAX = 24;
+
+export interface PlanProgress {
+  /** Instalments whose principal the ledger recognised (the domain's `recognisedCount`), of `total`. Never «pagadas». */
+  recognisedCount: number;
+  total: number;
+  /** One state per instalment, in schedule order, when the plan has `PLAN_SEGMENT_MAX` instalments or fewer; else null. */
+  segments: ScheduleRowState[] | null;
+  /** `recognisedCount / total`, 0–1, for the continuous bar. */
+  fraction: number;
+}
+
+/** The compact progress of a plan's schedule (24UX6D): the count comes from the domain's figures, never from the card's
+ * payments (a payment is not assigned to an instalment), and each segment is its row's state as the Calendario names it,
+ * so an undone or partly undone instalment is not drawn as recognised. Pure presentation: no figure is computed here. */
+export function planProgress(summary: Pick<PlanSummary, 'figures' | 'plan'>, rows: readonly PlanScheduleRow[]): PlanProgress {
+  const total = summary.plan.count;
+  const recognisedCount = summary.figures.recognisedCount;
+  const segmented = rows.length !== 0 && rows.length <= PLAN_SEGMENT_MAX;
+  return { recognisedCount, total, segments: segmented ? rows.map(row => row.state) : null,
+    fraction: total > 0 ? Math.min(1, Math.max(0, recognisedCount / total)) : 0 };
+}
+
 /** A card's plans for its detail: live ones first (by their next instalment; a live plan with nothing left to come, only
  * undone shares, after them), then completed, then cancelled. Deleted plans (created by mistake, nothing recorded) are gone. */
 export function cardPlanSummaries(cardId: string, plans: readonly InstallmentPlan[] = [], records: readonly RecordedEntry[] = []): PlanSummary[] {
