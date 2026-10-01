@@ -8,6 +8,9 @@ Asistente en el centro» y el rechazo de un «+» flotante de la primera iteraci
 (detalle abajo, «Qué reemplaza»). No cambia ninguna regla contable: las invariantes de tarjetas
 1–8 de la decisión 003 siguen vinculantes y fijadas por `packages/domain/card-invariants.test.ts`.
 
+*Enmendada el 2026-10-01 por Producto 24UX6C (presentación de movimientos, Inicio y Más): ver «Enmienda 2026-10-01 —
+Producto 24UX6C» al final; las frases reemplazadas están marcadas en su lugar.*
+
 ## Decisión
 
 1. **Cuatro pestañas:** Inicio, Movimientos, Reportes y Más. Tarjetas sigue en Más → Finanzas.
@@ -37,7 +40,7 @@ borra ninguna entrega pasada.
 ## Navegación
 
 - **Raíces.** `app/(tabs)/_layout.tsx` declara cuatro raíces: `index` (Inicio, sin encabezado),
-  `activity` (Movimientos, conserva el «+» de su encabezado hacia `/new-entry`), `reports`
+  `activity` (Movimientos, conserva el «+» de su encabezado hacia `/new-entry`) *(Reemplazado el 2026-10-01 por 24UX6C: ver «Enmienda 2026-10-01 — Producto 24UX6C», abajo.)*, `reports`
   (Reportes) y `settings` (Más). No hay pestaña de Asistente.
 - **Mitigación de pantallas negras, sin cambio.** `src/ui/navigation.ts` sigue igual:
   `detachInactiveScreens: false`; cada pestaña `animation: 'none'`, `lazy: false`,
@@ -125,9 +128,9 @@ borra ninguna entrega pasada.
   acento del «+» #9FD8C1 / #86C9B0 con `onAccent` #0F2A22 / #05211A; dock #1B3C33 / #133029,
   `dockInk` #B5C9C1 / #A9BFB6, `dockActive` #3C6356 / #335A4E. Los valores restantes están en
   `palette.ts` y en `docs/mobile-design.md`.
-- **Regla semántica:** un gasto común es **tinta con signo menos**; el ingreso es positivo
+- **Regla semántica:** un gasto común es **tinta con signo menos** *(Reemplazado en las filas de movimientos el 2026-10-01 por 24UX6C: ver «Enmienda 2026-10-01 — Producto 24UX6C», abajo.)*; el ingreso es positivo
   (`income` #1F7A4F / #5CCB93); una transferencia es neutra, en tinta secundaria (`transfer` =
-  secundario); el tono negativo (`expense` #B3432E / #EE8A72) queda **solo** para lo destructivo,
+  secundario) *(Reemplazado el 2026-10-01 por 24UX6C: ver «Enmienda 2026-10-01 — Producto 24UX6C», abajo.)*; el tono negativo (`expense` #B3432E / #EE8A72) queda **solo** para lo destructivo,
   lo vencido y lo pasado de límite; alerta ámbar (`warning` #9A5B00 / #E8A94A). Nunca color sin
   signo o etiqueta.
 - **Vidrio solo** en el dock, el «+», el hub, los controles circulares compactos, los menús, el
@@ -154,10 +157,10 @@ borra ninguna entrega pasada.
   - fila 1: el mes actual (texto, **no interactivo**, sin chevron) y el atajo a Cuentas;
   - fila 2, **solo con dos monedas o más en el historial** (la regla del chip de 25B2): la
     moneda de la vista y la ayuda; con una sola moneda la fila no existe y la ayuda pasa al lado
-    de la línea inferior;
+    de la línea inferior *(Reemplazado el 2026-10-01 por 24UX6C: ver «Enmienda 2026-10-01 — Producto 24UX6C», abajo.)*;
   - el número (tinta del campo; secundario cuando es exactamente cero; las cifras por moneda
     cuando falta una cotización; el texto de fuera de rango);
-  - la línea inferior: con **Gastado**, «Hasta hoy · {promedio} por día» (`dailyAverageMinor`,
+  - la línea inferior *(Reemplazado el 2026-10-01 por 24UX6C: ver «Enmienda 2026-10-01 — Producto 24UX6C», abajo.)*: con **Gastado**, «Hasta hoy · {promedio} por día» (`dailyAverageMinor`,
     la misma cifra que Reportes) o «Sin gastos este mes»; con **Disponible**, «Saldo registrado
     · N cuentas» y **nunca** una cifra por día;
   - Gastado | Disponible, que solo cambia el número.
@@ -201,7 +204,8 @@ La línea **24UX6A → 24UX6B → 24UX6C → 24UX6D** se suma al roadmap de prod
   selección solo para comparar). Se conserva la agrupación «Otras» por top N actual: **no** se
   adopta la regla del 3 % en esta generación. No se inventa una ruta de detalle por comercio: el
   resumen de comercios sigue sin interacción salvo que se agregue una ruta real a propósito.
-- **24UX6C, Movimientos y Más.** Filas, búsqueda y filtros en Forest; filtros por período,
+- **24UX6C, Movimientos y Más.** *(Implementada en parte el 2026-10-01: ver «Enmienda 2026-10-01 — Producto
+  24UX6C»; los filtros por período, cuenta y categoría siguen aprobados y pendientes.)* Filas, búsqueda y filtros en Forest; filtros por período,
   cuenta y categoría con datos del repositorio; los totales del día conservan su semántica
   actual (neto donde el repositorio define neto). No se inventa nota, origen Apple Pay ni hora
   del movimiento. Se conservan Deshacer/Recuperar (sin un borrado definitivo falso) y
@@ -235,3 +239,59 @@ Verificación en Linux del árbol enmendado (2026-10-01): `npm test` en la raíz
 `npm run check:repo` OK; en `apps/mobile`, typecheck sin errores, `test:storage` 936/936, `currency:verify` y
 `regions:verify` OK, `i18n:check -- --strict` sin errores ni inglés desactualizado, `check` y `export:ios` OK. El job
 `mobile_api` necesita PostgreSQL y corre en CI. Nada de esto es una prueba en el iPhone.
+
+## Enmienda 2026-10-01 — Producto 24UX6C (presentación de movimientos, Inicio y Más)
+
+Fecha: 2026-10-01. Producto 24UX6C, rama `feat/producto-24ux6c-movements-more-polish` desde master ecfd1dc (24UX6B
+mergeada como PR #71). Enmienda solo de **presentación**: no cambia ninguna regla contable, signo del libro, importe
+guardado, esquema (13), copia (v13), cotización, tarjeta, cuota, deuda ni la materialización de recurrentes; no agrega
+dependencias nativas ni animaciones entre pestañas (la mitigación de pantallas negras de §Navegación sigue intacta).
+El texto original de arriba queda como registro; las frases reemplazadas llevan su marca en el lugar.
+
+### Qué reemplaza
+
+| Antes (texto de esta decisión) | Dónde | Ahora |
+| --- | --- | --- |
+| «un gasto común es **tinta con signo menos**» | §Sistema visual, regla semántica | En una fila o un detalle de un movimiento con tipo, el gasto muestra el importe guardado **sin signo**, en tinta; el ingreso lleva «+» en el verde de ingreso; la transferencia, el importe guardado sin signo en el tono `transfer` |
+| «una transferencia es neutra, en tinta secundaria (`transfer` = secundario)» | §Sistema visual, regla semántica | `transfer` es un azul petróleo sobrio, distinto del secundario: claro #2D6476 sobre `transferSoft` #E2EDF1, oscuro #8FC3D2 sobre #132830 (unos 194°, saturación ≤ 0,45; 6,6:1 sobre blanco) |
+| Movimientos «conserva el «+» de su encabezado hacia `/new-entry`» | §Navegación, raíces | Movimientos no tiene «+» en el encabezado: registra el «+» del dock, el mismo desde cada pestaña |
+| La línea inferior de Inicio («Hasta hoy · … por día», «Sin gastos este mes», «Saldo registrado · N cuentas») y la ayuda «al lado de la línea inferior» | §Inicio, campo financiero | Sin línea bajo el número. Con una moneda, la ayuda (ⓘ) va al lado del número (Disponible siempre la tiene; Gastado solo cuando hay conversión). Con dos monedas o más, el chip y su ayuda siguen en la fila de alcance |
+
+### La regla: el signo de presentación no es el signo contable
+
+El libro guarda magnitudes positivas en unidades menores enteras más un tipo (gasto, ingreso, transferencia); lo que
+un movimiento le hace a un saldo sale del tipo, nunca de un signo guardado. En una fila cuyo tipo ya se dice (glifo,
+leyenda y, para VoiceOver, las palabras «Gasto», «Ingreso», «Transferencia»), el importe no lo repite con un signo:
+`presentedAmount(kind, storedMinor)` (`src/ui/movement-amount.ts`, puro) devuelve el importe tal como está guardado
+(sin valor absoluto), un signo solo para el ingreso y el tono del tipo. Se aplica a las filas de movimiento y de
+transferencia en todo contexto, al detalle de un movimiento, a las filas y al detalle de Recurrentes y a la tarjeta de
+borrador del Asistente. **Todo signo calculado se conserva:** un saldo negativo, el neto del día, el flujo neto, las
+diferencias entre períodos, los saldos de tarjeta y de deuda, el exceso de un presupuesto y las filas de evidencia del
+Asistente. «Nunca color sin signo o etiqueta» sigue valiendo: la fila lleva la etiqueta.
+
+El tono `transfer` queda fuera de la ventana de Forest (158–168°) a propósito: esa ventana rige la marca y la
+interfaz, no la semántica, y un azul petróleo bien separado del pino evita que una transferencia se lea como
+interacción. `tests/theme.node.ts` exige 185–210°, saturación ≤ 0,5 y que no sea el secundario.
+
+### Lo que agrega sin reemplazar texto de esta decisión
+
+- **Hub Registrar.** El orden (Asistente, Gasto, Ingreso, Transferencia) y los destinos no cambian. Las filas llevan
+  un tile teñido sobrio: gasto `inset` con el glifo en tinta, ingreso `incomeSoft` con el glifo de ingreso,
+  transferencia `transferSoft` con el glifo de transferencia (antes, tres tiles neutros con el glifo en el primario).
+- **Asistente.** Sin la leyenda permanente «No conectado en esta versión…»: en el build desconectado, un mensaje
+  enviado recibe en el hilo la nota «El Asistente todavía no está conectado en esta versión. Tu mensaje quedó escrito
+  para cuando lo esté.», el límite dicho donde importa. Sin el micrófono del compositor ni su nota hasta que exista el
+  dictado (Producto 25A). Su autoridad no cambia: escribe solo con un borrador confirmado.
+- **Más.** Los mismos dos grupos y las mismas rutas en el mismo orden; cada grupo con un rótulo pequeño en versalitas
+  con rol de encabezado; sin fila «Ajustes».
+
+### Qué queda pendiente del alcance aprobado de 24UX6C
+
+Los filtros por período, cuenta y categoría con datos del repositorio (§Próximas entregas) siguen aprobados y no están
+en esta entrega: Movimientos conserva su filtro por tipo y su búsqueda.
+
+### Estado
+
+Implementado en `apps/mobile`; **nada se revisó en un iPhone** y no hubo build de EAS. La verificación en Linux y la
+lista del dispositivo están en `docs/mobile-roadmap.md` («Producto 24UX6C») y `docs/mobile-device-checklist.md`
+(«Producto 24UX6C»).

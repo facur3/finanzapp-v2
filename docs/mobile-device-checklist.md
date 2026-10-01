@@ -1,5 +1,80 @@
 # Physical iPhone acceptance checklist
 
+## Producto 24UX6C — Movement presentation, Home polish and Más
+
+**Not done in 24UX6C: no EAS build was made and the iPhone was not touched. Every item below is pending.**
+Metro from this branch (`npm run start:dev-client -- --clear`) on the installed FinanzApp Dev build; JavaScript only
+(presentation of movements, Movimientos, Inicio, the capture hub, the Assistant screen and Más), no native dependency,
+no accounting, ledger-sign, stored-amount, schema (13), backup (v13), FX, card, instalment or recurring change, and no
+tab animation. Use your own data; never seed movements. Record each result with the iPhone model, iOS version, theme,
+language and text size. The design is in [mobile-design.md](mobile-design.md) («Producto 24UX6C — presentación de
+movimientos, Inicio y Más»); the rule is in [decision 005](decisions/005-forest-four-tabs-and-capture.md) («Enmienda
+2026-10-01 — Producto 24UX6C»). This section supersedes the 24UX6A items about the line under the Home number, the
+Movimientos header «+» and the neutral hub tiles.
+
+- [ ] The Más footer reads «FinanzApp 0.1.0 (24UX6C)».
+
+**Movement rows.**
+
+- [ ] Movimientos in light and dark: an expense shows its amount with no minus, in ink; an income shows «+» in the
+  income green; a transfer shows its amount with no sign in the blue-teal transfer tone (clearly apart from the pine
+  brand and from grey secondary text).
+- [ ] Day headers read as headings in ink (subhead, semibold); each day's net stays secondary with its «−» / «+».
+- [ ] An account, a card, a debt and Recurrentes show their rows with the same rule, while a negative balance keeps its
+  minus. A transfer row inside an account no longer carries ±.
+- [ ] The movement detail hero (expense, income, transfer) and the recurring rule detail hero: the stored amount, «+»
+  only for an income.
+
+**Search, filters and the header.**
+
+- [ ] Movimientos has no «+» in its header; the dock «+» records from it as from every tab.
+- [ ] The search pill: 44 pt, a hairline edge, the magnifier, the placeholder «Comercio, categoría o cuenta» (whole
+  at 375 pt); typing filters as before, the native clear button empties it; VoiceOver reads «Buscar movimientos»
+  («Search transactions» in English).
+- [ ] The kind filter and the count line (secondary). With VoiceOver, changing the filter announces the new count at
+  once, and typing announces it after a short pause (iOS has no live regions, so the screen announces it); a search with no match shows
+  the empty state with its brand-tinted glyph tile and the clear action.
+- [ ] Undo / Recover and Movimientos deshechos behave as before.
+
+**Inicio.**
+
+- [ ] Gastado and Disponible show no line under the number (no «Hasta hoy · … por día», «Sin gastos este mes» or
+  «Saldo registrado · N cuentas»).
+- [ ] With one currency the ⓘ sits beside the number: Disponible always offers its explanation; Gastado only when a
+  conversion is shown. With two currencies or more the chip and its help stay in the scope row; the chip label reads
+  quieter (weight 500) and still has a 44 pt target.
+- [ ] A $0 total stays dimmed but legible; the empty state's glyph tile is visible in both themes.
+
+**Capture hub and Assistant.**
+
+- [ ] The hub keeps Asistente, Gasto, Ingreso, Transferencia; the row tiles are tinted but calm (expense grey with an
+  ink glyph, income soft green, transfer soft blue-teal); each still opens its screen once.
+- [ ] The Assistant shows no permanent «No conectado en esta versión…» caption and no microphone in the composer;
+  sending a message adds the in-thread note «El Asistente todavía no está conectado en esta versión. Tu mensaje quedó
+  escrito para cuando lo esté.» and keeps the words; the empty conversation's glyph (accent circle, sparkles) is
+  visible in light and dark; the suggestion chips still work.
+
+**Más.**
+
+- [ ] Two groups, Finanzas and App y datos, each under a small caps label; the labels are reachable with the VoiceOver
+  rotor (Headings); the spacing between groups reads even.
+- [ ] Every row in the same order opens its screen: Cuentas, Tarjetas, Presupuestos, Recurrentes, Deudas y cobros,
+  Categorías; Copia de seguridad, Movimientos deshechos, Idioma, Región (when shown), Apariencia. App y datos rows lead
+  with neutral glyph tiles; there is no «Ajustes» row.
+
+**Accessibility and stability.**
+
+- [ ] VoiceOver reads each row as Gasto / Ingreso / Transferencia with its amount (a transfer titled by a note starts
+  with «Transferencia» and does not repeat the note; in a card or debt context a transfer reads as «Pago de tarjeta»,
+  «Pago» or «Cobro», as before). A Recurrentes row says «gasto» or «ingreso» right after the merchant. Check in Spanish and English.
+- [ ] Dynamic Type at the accessibility sizes on a 375 pt iPhone (or Zoomed display): rows, day headers, the search
+  pill, the Home number with its ⓘ, the Más labels; nothing clips or overlaps.
+- [ ] Reduce Motion on and off: nothing new moves.
+- [ ] Switch tabs 30 times quickly: no black screen, no blank frame, no cross-fade.
+
+Record: date, iPhone model, iOS version, build, language, and every result above (a failure with a screenshot of your
+own test data only, never of real financial data).
+
 ## Producto 24UX6B — Reportes hierarchy
 
 **Not done in 24UX6B: no EAS build was made and the iPhone was not touched. Every item below is pending.**
