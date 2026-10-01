@@ -75,6 +75,8 @@ test('bars retain real proportions, animate data changes only, and honor reduced
 // month; VoiceOver hears the full name ("mar" or "may" alone reads as a word).
 /** The system text scale the charts harness reports (24UX6C2: the donut's centre readout depends on it). */
 let chartFontScale = 1;
+/** The window width the charts harness reports (24UX6D: the donut's default size comes from it). */
+let chartWidth = 393;
 function chartsModule(i18n: ReturnType<typeof bindLocale>) {
   const source = readFileSync(new URL('../src/ui/charts.tsx', import.meta.url), 'utf8');
   const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText;
@@ -83,7 +85,7 @@ function chartsModule(i18n: ReturnType<typeof bindLocale>) {
     '../i18n/provider': { useI18n: () => i18n },
     react: { useEffect: () => {}, useMemo: (fn: () => any) => fn(), useRef: (value: any) => ({ current: value }) },
     'react/jsx-runtime': { jsx, jsxs: jsx, Fragment: 'Fragment' },
-    'react-native': { View: 'View', Pressable: 'Pressable', StyleSheet: { absoluteFill: {}, hairlineWidth: 0.5 }, useWindowDimensions: () => ({ width: 393, height: 852, fontScale: chartFontScale }) },
+    'react-native': { View: 'View', Pressable: 'Pressable', StyleSheet: { absoluteFill: {}, hairlineWidth: 0.5 }, useWindowDimensions: () => ({ width: chartWidth, height: 852, fontScale: chartFontScale }) },
     './geometry': geometry,
     'react-native-reanimated': { __esModule: true, default: { View: 'AnimatedView', Text: 'AnimatedText', createAnimatedComponent: (c: any) => 'Animated(' + c + ')' },
       useSharedValue: (value: number) => ({ value }), useAnimatedStyle: (fn: () => any) => fn, useAnimatedProps: (fn: () => any) => fn, withTiming: (value: number) => value },
@@ -221,9 +223,11 @@ test('24UX6B: idle month bars hold 3:1 on their surface in light and dark; the s
   assert.deepEqual([outline.backgroundColor, outline.borderColor, outline.borderWidth > 0], ['#586961B3', '#000', true]);
 });
 
-// 24UX6C2: the category donut. The month's total is the KPI above it, so the centre never repeats it: a quiet «Tocá una
-// categoría» until a slice is chosen, then that category's name, exact amount and share. A chosen slice is drawn thicker
-// and the others step back to 30 %. VoiceOver reaches the same choice as one adjustable element.
+// 24UX6C2, recomposed in 24UX6D: the category donut. It is the head of Categorías and its centre carries the period's total
+// («Total del período» over the exact amount: the «Gastado» KPI above it and 24UX6C2's quiet «Tocá una categoría» are both
+// superseded) until a slice is chosen, then that category's name, exact amount and share. A chosen slice is drawn thicker
+// and the others step back to 30 %. VoiceOver reaches the same choice as one adjustable element whose value, with none
+// chosen, is the total.
 const DONUT_SLICES = [
   { key: 'a', label: 'Supermercado', value: 2900, color: '#3E6FB0' },
   { key: 'b', label: 'Hogar', value: 5000, color: '#B0573E' },
@@ -239,14 +243,15 @@ const shareOfFor = (i18n: ReturnType<typeof bindLocale>, total = DONUT_TOTAL) =>
 const expand = (value: any): any[] => !value || typeof value !== 'object' ? [] : Array.isArray(value) ? value.flatMap(expand)
   : typeof value.type === 'function' ? [value, ...expand(value.type(value.props))] : [value, ...expand(value.props?.children)];
 const textOf = (node: any): string => [node.props?.children].flat(Infinity).map(part => typeof part === 'string' || typeof part === 'number' ? String(part) : '').join('');
-/** The donut's parts, found by type through the tree (24UX6C2: the root is an outer View holding the chart's square and,
- * when the chosen readout does not fit the hole, a View under it): the adjustable Pressable, the centre overlay (the View
- * with pointerEvents none inside the square) and the readout under the donut (absent unless it moved there). */
+/** The donut's parts, found by type through the tree (the root is an outer View, 24UX6D: the full-width neutral row,
+ * holding the chart's square and, when the readout does not fit the hole, a View under it): the adjustable Pressable, the
+ * centre overlay (the View with pointerEvents none inside the square) and the readout under the donut (absent unless it
+ * moved there). `total` is the report's figure the screen hands the chart (the slices' sum by default). */
 function donut(options: { chosen?: string | null; size?: number; locale?: Parameters<typeof bindLocale>[0]; onChoose?: (key: string | null) => void;
   slices?: typeof DONUT_SLICES; total?: number } = {}) {
   const i18n = bindLocale(options.locale ?? 'es-AR');
-  const tree = chartsModule(i18n).DonutChart({ slices: options.slices ?? DONUT_SLICES, currency: 'ARS', size: options.size, chosen: options.chosen ?? null,
-    onChoose: options.onChoose ?? (() => {}), shareOf: shareOfFor(i18n, options.total), caption: i18n.t('reports.chart.byCategory') });
+  const tree = chartsModule(i18n).DonutChart({ slices: options.slices ?? DONUT_SLICES, currency: 'ARS', total: options.total ?? DONUT_TOTAL, size: options.size,
+    chosen: options.chosen ?? null, onChoose: options.onChoose ?? (() => {}), shareOf: shareOfFor(i18n, options.total), caption: i18n.t('reports.chart.byCategory') });
   const nodes = flat(tree);
   const press = nodes.find(node => node.type === 'Pressable');
   const square = nodes.find(node => node.type === 'ValueTransition');
@@ -255,23 +260,66 @@ function donut(options: { chosen?: string | null; size?: number; locale?: Parame
   return { tree, press, square, centre, below, i18n };
 }
 const pressAt = (press: any, x: number, y: number) => press.props.onPress({ nativeEvent: { locationX: x, locationY: y } });
+type ChartGeometry = {
+  donutGeometry: (width: number) => { size: number; thickness: number }; donutRoom: (size: number, thickness: number) => number;
+  centreAmountSize: (text: string, room: number, fontScale: number) => number | null; CENTRE_AMOUNT_STEPS: readonly number[]; DONUT_RING: number;
+};
+const FOUR_MILLION = 402972700;
 
-test('24UX6C2: the donut centre is quiet until a category is chosen and never repeats the period total', () => {
-  const { centre, tree } = donut();
-  const texts = flat(centre).filter(node => node.type === 'AppText');
-  assert.deepEqual(texts.map(textOf), ['Tocá una categoría']);
-  assert.equal(texts[0].props.secondary, true, 'a quiet footnote');
-  assert.equal(texts[0].props.variant, 'footnote');
-  assert.equal(flat(centre).filter(node => node.type === 'Money').length, 0, 'no amount in the centre until a category is chosen');
-  // The whole chart (centre, ring and slices) shows no figure equal to the period total, in any form.
-  const total = i18nFormat.moneyText(DONUT_TOTAL, 'ARS', 'es-AR');
-  const everything = expand(tree);
-  assert.equal(everything.filter(node => node.type === 'Money').length, 0);
-  for (const node of everything.filter(node => node.type === 'AppText')) {
-    assert.notEqual(textOf(node), total);
-    assert.ok(!textOf(node).includes('100,00') && !textOf(node).includes('10000'), 'the total is the KPI above, not the centre: ' + textOf(node));
+test('24UX6D: the donut takes 70 % of the content width (200–260 pt) with a 22 pt ring, so the hole is the focal point at 393 and 375 pt', () => {
+  const charts = chartsModule(bindLocale('es-AR')) as unknown as ChartGeometry;
+  assert.equal(charts.DONUT_RING, 22);
+  assert.deepEqual({ ...charts.donutGeometry(393) }, { size: 247, thickness: 22 }, 'iPhone 15/16: content 353 pt');
+  assert.deepEqual({ ...charts.donutGeometry(375) }, { size: 234, thickness: 22 }, 'iPhone SE/13 mini: content 335 pt');
+  assert.deepEqual({ ...charts.donutGeometry(320) }, { size: 200, thickness: 22 }, 'never under 200 pt');
+  assert.deepEqual({ ...charts.donutGeometry(430) }, { size: 260, thickness: 22 }, 'never over 260 pt');
+  assert.deepEqual({ ...charts.donutGeometry(0) }, { size: 200, thickness: 22 }, 'before layout, the smallest');
+  assert.deepEqual({ ...charts.donutGeometry(Number.NaN) }, { size: 200, thickness: 22 });
+  // The ring is relatively thinner than the 176 pt donut's (22 of 176 = 12.5 %), so the hole grows from 112 pt to 183 / 170 pt.
+  assert.ok(22 / 247 < 0.09 && 22 / 234 < 0.095);
+  assert.equal(charts.donutRoom(247, 22), 183);
+  assert.equal(charts.donutRoom(234, 22), 170);
+  assert.equal(charts.donutRoom(176, 22), 112);
+  // The centre amount steps 26 → 18 pt until it fits; an ARS total in the millions is 24 pt at 393 and 22 pt at 375.
+  assert.deepEqual([...charts.CENTRE_AMOUNT_STEPS], [26, 24, 22, 20, 18]);
+  const millions = i18nFormat.moneyText(FOUR_MILLION, 'ARS', 'es-AR');
+  assert.equal(millions, '$ 4.029.727,00');
+  assert.equal(charts.centreAmountSize(millions, 183, 1), 24);
+  assert.equal(charts.centreAmountSize(millions, 170, 1), 22);
+  assert.equal(charts.centreAmountSize(millions, 183, 1.2), 20, 'at 1.2× the same amount steps down');
+  assert.equal(charts.centreAmountSize(i18nFormat.moneyText(2900, 'ARS', 'es-AR'), 183, 1), 26, 'a short amount at the largest step');
+  assert.equal(charts.centreAmountSize(i18nFormat.moneyText(1234567890123, 'ARS', 'es-AR'), 183, 1), null, 'thirteen digits never fit at 18 pt: under the donut');
+  // The chart itself is sized from the window: 247 pt at 393, 234 pt at 375.
+  for (const [width, size] of [[393, 247], [375, 234]]) {
+    chartWidth = width;
+    try {
+      const { press, square } = donut();
+      assert.deepEqual([press.props.style.width, press.props.style.height, square.props.style.width], [size, size, size], width + ' pt');
+    } finally { chartWidth = 393; }
   }
-  assert.deepEqual(flat(donut({ locale: 'en-US' }).centre).filter(node => node.type === 'AppText').map(textOf), ['Tap a category']);
+});
+
+test('24UX6D: with nothing chosen the centre is «Total del período» over the exact period total, never «Tocá una categoría»', () => {
+  const { centre, below, tree } = donut();
+  assert.equal(below, undefined, 'the total sits in the hole');
+  const texts = flat(centre).filter(node => node.type === 'AppText');
+  assert.deepEqual(texts.map(textOf), ['Total del período']);
+  assert.equal(texts[0].props.secondary, true, 'a quiet label');
+  assert.equal(texts[0].props.variant, 'footnote');
+  assert.equal(texts[0].props.maxFontSizeMultiplier, geometry.ROW_STACK_SCALE);
+  const money = flat(centre).filter(node => node.type === 'Money');
+  assert.equal(money.length, 1);
+  assert.deepEqual({ ...money[0].props }, { minor: DONUT_TOTAL, currency: 'ARS', size: 26, weight: '700', align: 'center' }, 'the exact total in minor units');
+  assert.equal(expand(tree).some(node => /Tocá una categoría|Tap a category/.test(textOf(node))), false, 'the 24UX6C2 hint is gone');
+  // The total is the report's own figure as handed in, not a sum the chart makes up.
+  assert.equal(flat(donut({ total: 12345 }).centre).find(node => node.type === 'Money').props.minor, 12345);
+  // An ARS total in the millions steps down to fit: 24 pt at 393, 22 pt at 375; never shortened.
+  const millions = [{ key: 'a', label: 'Supermercado', value: FOUR_MILLION, color: '#111' }];
+  assert.equal(flat(donut({ slices: millions, total: FOUR_MILLION }).centre).find(node => node.type === 'Money').props.size, 24);
+  chartWidth = 375;
+  try { assert.equal(flat(donut({ slices: millions, total: FOUR_MILLION }).centre).find(node => node.type === 'Money').props.size, 22); } finally { chartWidth = 393; }
+  // English.
+  assert.deepEqual(flat(donut({ locale: 'en-US' }).centre).filter(node => node.type === 'AppText').map(textOf), ['Period total']);
 });
 
 test('24UX6C2: a chosen slice puts its name, its exact amount and its share of the spending in the centre', () => {
@@ -283,10 +331,10 @@ test('24UX6C2: a chosen slice puts its name, its exact amount and its share of t
   assert.equal(texts[0].props.variant, 'footnote');
   const money = nodes.filter(node => node.type === 'Money');
   assert.equal(money.length, 1);
-  assert.deepEqual({ ...money[0].props }, { minor: 2900, currency: 'ARS', size: 18, weight: '700', align: 'center' }, 'the slice\'s exact value, in minor units');
-  assert.equal(textOf(texts[1]), '29 % del gasto', 'the share from shareOf, the rows\' formatter');
-  assert.ok(!nodes.some(node => textOf(node) === 'Tocá una categoría'), 'the hint gives way to the choice');
-  assert.equal(flat(donut({ chosen: 'a', size: 160 }).centre).find(node => node.type === 'Money').props.size, 16, 'a smaller donut: a smaller amount');
+  assert.deepEqual({ ...money[0].props }, { minor: 2900, currency: 'ARS', size: 26, weight: '700', align: 'center' }, 'the slice\'s exact value, in minor units');
+  assert.equal(textOf(texts[1]), '29\u00A0% del gasto', 'the share from shareOf, the rows\' formatter');
+  assert.ok(!nodes.some(node => textOf(node) === 'Total del período'), '24UX6D: the choice replaces the total in the centre');
+  assert.equal(flat(donut({ chosen: 'a', size: 160 }).centre).find(node => node.type === 'Money').props.size, 24, 'a smaller hole (96 pt): one step down');
   // A share is the rows' own: an odd total keeps the same rounding as the legend row.
   const i18n = bindLocale('es-AR');
   assert.equal(shareOfFor(i18n, 3)(1).label, presentation.spendingShare(1, 3, 'es-AR').label);
@@ -305,28 +353,29 @@ test('24UX6C2: the chosen slice is drawn thicker and the others step back to 30 
   ]));
   assert.equal(JSON.stringify(paths('c').map(path => path.width)), JSON.stringify([22, 22, 28]));
   assert.equal(JSON.stringify(paths('zz').map(path => path.opacity)), JSON.stringify([1, 1, 1]), 'a key that is not a slice chooses nothing');
-  // The ring leaves room for the thicker slice inside the chart's square.
+  // The ring leaves room for the thicker slice inside the chart's square (24UX6D: 247 pt at 393 pt).
   const circle = expand(donut().press).find(node => node.type === 'Circle');
-  assert.equal(circle.props.r, (176 - 22 - extra) / 2);
-  assert.ok(circle.props.r + (22 + extra) / 2 <= 176 / 2, 'the chosen slice\'s outer edge stays inside the square');
+  assert.equal(circle.props.r, (247 - 22 - extra) / 2);
+  assert.ok(circle.props.r + (22 + extra) / 2 <= 247 / 2, 'the chosen slice\'s outer edge stays inside the square');
 });
 
-test('24UX6C2: the donut is one adjustable VoiceOver element that names the choice, amount and share', () => {
+test('24UX6C2: the donut is one adjustable VoiceOver element that names the choice, amount and share (24UX6D: the total with none chosen)', () => {
   const { press } = donut();
   assert.equal(press.type, 'Pressable');
   assert.equal(press.props.accessible, true);
   assert.equal(press.props.accessibilityRole, 'adjustable');
   assert.equal(press.props.accessibilityLabel, 'Gasto por categoría: Supermercado 29 %, Hogar 50 %, Salud 21 %');
-  assert.deepEqual({ ...press.props.accessibilityValue }, { text: 'Ninguna categoría elegida' });
+  assert.deepEqual({ ...press.props.accessibilityValue }, { text: 'Total del período, 100,00 pesos' }, 'none chosen: the period total, spoken');
   assert.equal(press.props.accessibilityHint, 'Deslizá hacia arriba o hacia abajo para elegir una categoría');
   assert.equal(press.props.accessibilityActions.map((action: { name: string }) => action.name).join(','), 'increment,decrement');
-  assert.deepEqual({ ...donut({ chosen: 'a' }).press.props.accessibilityValue }, { text: 'Supermercado, 29,00 pesos, 29 % del gasto' });
-  assert.deepEqual({ ...donut({ chosen: 'b' }).press.props.accessibilityValue }, { text: 'Hogar, 50,00 pesos, 50 % del gasto' });
-  // The spoken value never carries a visible formatter's grouped money.
+  assert.deepEqual({ ...donut({ chosen: 'a' }).press.props.accessibilityValue }, { text: 'Supermercado, 29,00 pesos, 29\u00A0% del gasto' });
+  assert.deepEqual({ ...donut({ chosen: 'b' }).press.props.accessibilityValue }, { text: 'Hogar, 50,00 pesos, 50\u00A0% del gasto' });
+  // The spoken value never carries a visible formatter's grouped money, with or without a choice.
   assert.ok(!donut({ chosen: 'a' }).press.props.accessibilityValue.text.includes('$'));
+  assert.equal(donut({ total: FOUR_MILLION }).press.props.accessibilityValue.text, 'Total del período, 4029727,00 pesos', 'no grouping, no symbol');
   const english = donut({ chosen: 'a', locale: 'en-US' }).press;
   assert.equal(english.props.accessibilityValue.text, 'Supermercado, 29.00 pesos, 29% of spending');
-  assert.equal(donut({ locale: 'en-US' }).press.props.accessibilityValue.text, 'No category chosen');
+  assert.equal(donut({ locale: 'en-US' }).press.props.accessibilityValue.text, 'Period total, 100.00 pesos');
   // Labelled actions: iOS lists every declared action in its Actions rotor, so neither reads as a raw «increment».
   const actions = (locale: Parameters<typeof bindLocale>[0]) => JSON.stringify(donut({ locale }).press.props.accessibilityActions);
   assert.equal(actions('es-AR'), JSON.stringify([{ name: 'increment', label: 'Categoría siguiente' }, { name: 'decrement', label: 'Categoría anterior' }]));
@@ -336,7 +385,7 @@ test('24UX6C2: the donut is one adjustable VoiceOver element that names the choi
 test('24UX6C2: a VoiceOver double-tap activates the donut without a synthetic centre tap that would clear the choice', () => {
   for (const chosen of [null, 'a', 'c']) {
     const calls: (string | null)[] = [];
-    const { press } = donut({ chosen, onChoose: key => calls.push(key) });
+    const { press } = donut({ chosen, size: 176, onChoose: key => calls.push(key) });
     assert.equal(typeof press.props.onAccessibilityTap, 'function', 'onAccessibilityTap is declared, so UIKit does not synthesize a tap');
     press.props.onAccessibilityTap();
     assert.equal(calls.length, 0, `double-tap with ${chosen ?? 'none'} chosen: no choice changes`);
@@ -350,18 +399,20 @@ test('24UX6C2: the centre overlay and the readout under the donut are for the ey
   for (const chartFont of [1, 1.353]) {
     chartFontScale = chartFont;
     try {
-      const { centre, below, press } = donut({ chosen: 'a' });
-      assert.equal(centre.props.pointerEvents, 'none', 'touches pass through the centre to the Pressable');
-      assert.equal(centre.props.accessibilityElementsHidden, true);
-      assert.equal(centre.props.importantForAccessibility, 'no-hide-descendants');
-      if (chartFont > 1.2) {
-        assert.ok(below, 'at large text the readout moves under the donut');
-        assert.equal(below.props.accessibilityElementsHidden, true);
-        assert.equal(below.props.importantForAccessibility, 'no-hide-descendants');
-      } else assert.equal(below, undefined);
-      // The same choice reaches VoiceOver once, through the adjustable element's value, at every text size.
-      assert.equal(press.props.accessibilityValue.text, 'Supermercado, 29,00 pesos, 29\u00A0% del gasto');
-      for (const node of flat(below ?? null).concat(flat(centre))) assert.notEqual(node.props.accessible, true, 'no readout node is its own element');
+      for (const [chosen, spoken] of [['a', 'Supermercado, 29,00 pesos, 29 % del gasto'], [null, 'Total del período, 100,00 pesos']] as [string | null, string][]) {
+        const { centre, below, press } = donut({ chosen });
+        assert.equal(centre.props.pointerEvents, 'none', 'touches pass through the centre to the Pressable');
+        assert.equal(centre.props.accessibilityElementsHidden, true);
+        assert.equal(centre.props.importantForAccessibility, 'no-hide-descendants');
+        if (chartFont > 1.2) {
+          assert.ok(below, 'at large text the readout moves under the donut, the total too (24UX6D)');
+          assert.equal(below.props.accessibilityElementsHidden, true);
+          assert.equal(below.props.importantForAccessibility, 'no-hide-descendants');
+        } else assert.equal(below, undefined);
+        // The same readout reaches VoiceOver once, through the adjustable element's value, at every text size.
+        assert.equal(press.props.accessibilityValue.text, spoken);
+        for (const node of flat(below ?? null).concat(flat(centre))) assert.notEqual(node.props.accessible, true, 'no readout node is its own element');
+      }
     } finally { chartFontScale = 1; }
   }
 });
@@ -370,57 +421,71 @@ test('24UX6C2: at the default text size a short amount stays in the hole, its te
   const { centre, below } = donut({ chosen: 'a' });
   assert.equal(below, undefined, 'no readout under the donut');
   const texts = flat(centre).filter(node => node.type === 'AppText');
-  assert.equal(texts.map(textOf).join('|'), 'Supermercado|29\u00A0% del gasto');
+  assert.equal(texts.map(textOf).join('|'), 'Supermercado|29 % del gasto');
   for (const text of texts) assert.equal(text.props.maxFontSizeMultiplier, geometry.ROW_STACK_SCALE, textOf(text));
   assert.equal(geometry.ROW_STACK_SCALE, 1.2);
   assert.equal(texts[0].props.numberOfLines, 2, 'the name keeps to two lines in the hole');
   assert.equal(flat(centre).filter(node => node.type === 'Money').length, 1);
-  // The quiet hint is capped too, and nothing moves under the donut while none is chosen, at any text size.
-  const hint = flat(donut().centre).find(node => node.type === 'AppText');
-  assert.equal(hint.props.maxFontSizeMultiplier, 1.2);
-  chartFontScale = 2.353;
-  try { assert.equal(donut().below, undefined, 'none chosen: the hint stays in the hole'); } finally { chartFontScale = 1; }
+  // The total's label is capped too.
+  const label = flat(donut().centre).find(node => node.type === 'AppText');
+  assert.equal(label.props.maxFontSizeMultiplier, 1.2);
 });
 
-/** The readout moved under the donut: the hole shows nothing for the chosen slice, the View under it holds the name, the
- * exact Money and the share, uncapped and untruncated, and the Money is never inside the hole. */
-function assertReadoutBelow(view: ReturnType<typeof donut>, expected: { name: string; minor: number; share: string; size?: number }) {
+/** The readout moved under the donut: the hole shows nothing, the View under it holds the heading (the total's label or
+ * the category's name), the exact Money and, for a category, the share, uncapped and untruncated, and the Money is never
+ * inside the hole. Under the donut the amount takes the row's width at the centre's largest step that fits it. */
+function assertReadoutBelow(view: ReturnType<typeof donut>, expected: { texts: string[]; minor: number; size?: number }) {
   assert.ok(view.below, 'a View under the donut');
-  assert.equal(flat(view.centre).filter(node => node.type === 'AppText' || node.type === 'Money').length, 0, 'the hole shows nothing for the chosen slice');
+  assert.equal(flat(view.centre).filter(node => node.type === 'AppText' || node.type === 'Money').length, 0, 'the hole shows nothing');
   assert.equal(flat(view.square).filter(node => node.type === 'Money').length, 0, 'the amount is never inside the chart\'s square');
   const texts = flat(view.below).filter(node => node.type === 'AppText');
-  assert.equal(texts.map(textOf).join('|'), expected.name + '|' + expected.share);
+  assert.equal(texts.map(textOf).join('|'), expected.texts.join('|'));
   for (const text of texts) {
     assert.equal(text.props.maxFontSizeMultiplier, undefined, 'under the donut the text follows Dynamic Type');
     assert.equal(text.props.numberOfLines, undefined, 'never truncated');
   }
   const money = flat(view.below).filter(node => node.type === 'Money');
   assert.equal(money.length, 1);
-  assert.deepEqual({ ...money[0].props }, { minor: expected.minor, currency: 'ARS', size: expected.size ?? 18, weight: '700', align: 'center' }, 'the exact value');
+  assert.deepEqual({ ...money[0].props }, { minor: expected.minor, currency: 'ARS', size: expected.size ?? 26, weight: '700', align: 'center' }, 'the exact value');
   assert.equal(view.below.props.style.alignSelf, 'stretch', 'the readout takes the card\'s width, not the hole\'s');
 }
 
-test('24UX6C2: at large text (1.353) the chosen readout moves under the donut', () => {
+test('24UX6C2: at large text (1.353) the chosen readout moves under the donut; 24UX6D: the total\'s too', () => {
   chartFontScale = 1.353;
   try {
-    assertReadoutBelow(donut({ chosen: 'a' }), { name: 'Supermercado', minor: 2900, share: '29\u00A0% del gasto' });
-    assertReadoutBelow(donut({ chosen: 'b', locale: 'en-US' }), { name: 'Hogar', minor: 5000, share: '50% of spending' });
-    assertReadoutBelow(donut({ chosen: 'c', size: 160 }), { name: 'Salud', minor: 2100, share: '21\u00A0% del gasto', size: 16 });
+    assertReadoutBelow(donut({ chosen: 'a' }), { texts: ['Supermercado', '29 % del gasto'], minor: 2900 });
+    assertReadoutBelow(donut({ chosen: 'b', locale: 'en-US' }), { texts: ['Hogar', '50% of spending'], minor: 5000 });
+    assertReadoutBelow(donut({ chosen: 'c', size: 160 }), { texts: ['Salud', '21 % del gasto'], minor: 2100 });
+    assertReadoutBelow(donut(), { texts: ['Total del período'], minor: DONUT_TOTAL });
+    assertReadoutBelow(donut({ locale: 'en-US' }), { texts: ['Period total'], minor: DONUT_TOTAL });
   } finally { chartFontScale = 1; }
-  // Exactly 1.2 still measures: a short amount stays in the hole.
+  // At the AX sizes a long total under the donut steps down to keep to the row (Money caps its own scale at 1.8×).
+  chartFontScale = 3.1;
+  try {
+    const millions = [{ key: 'a', label: 'Supermercado', value: FOUR_MILLION, color: '#111' }];
+    assertReadoutBelow(donut({ slices: millions, total: FOUR_MILLION }), { texts: ['Total del período'], minor: FOUR_MILLION, size: 26 });
+    const huge = 1234567890123;
+    assertReadoutBelow(donut({ slices: [{ key: 'a', label: 'Supermercado', value: huge, color: '#111' }], total: huge }), { texts: ['Total del período'], minor: huge, size: 18 });
+  } finally { chartFontScale = 1; }
+  // Exactly 1.2 still measures: a short amount stays in the hole, chosen or not.
   chartFontScale = 1.2;
-  try { assert.equal(donut({ chosen: 'a' }).below, undefined); } finally { chartFontScale = 1; }
+  try {
+    assert.equal(donut({ chosen: 'a' }).below, undefined);
+    assert.equal(donut().below, undefined);
+  } finally { chartFontScale = 1; }
 });
 
-test('24UX6C2: a 13-digit ARS amount at the default text size moves under the donut instead of overflowing the hole', () => {
+test('24UX6C2: a 13-digit ARS amount at the default text size moves under the donut instead of overflowing the hole (24UX6D: the total too)', () => {
   const huge = 1234567890123;
   const slices = [{ key: 'a', label: 'Supermercado', value: huge, color: '#3E6FB0' }, { key: 'b', label: 'Hogar', value: 5000, color: '#B0573E' }];
   const total = huge + 5000;
-  // The estimate: '$ 12.345.678.901,23' at 18 pt needs about 185 pt; the hole of a 176 pt donut is 112 pt.
-  const hole = 176 - 2 * (22 + 10);
+  // The estimate: '$ 12.345.678.901,23' at 18 pt (the smallest step) needs about 191 pt; the hole of the 247 pt donut is 183 pt.
+  const hole = 247 - 2 * (22 + 10);
   assert.ok(geometry.amountWidthEm(i18nFormat.moneyText(huge, 'ARS', 'es-AR')) * 18 > hole);
   const view = donut({ chosen: 'a', slices, total });
-  assertReadoutBelow(view, { name: 'Supermercado', minor: huge, share: shareOfFor(view.i18n, total)(huge).label + ' del gasto' });
+  assertReadoutBelow(view, { texts: ['Supermercado', shareOfFor(view.i18n, total)(huge).label + ' del gasto'], minor: huge });
+  // The total, with nothing chosen, moves under the donut the same way.
+  assertReadoutBelow(donut({ slices, total }), { texts: ['Total del período'], minor: total });
   // The other slice's everyday amount, in the same chart, stays in the hole.
   const small = donut({ chosen: 'b', slices, total });
   assert.equal(small.below, undefined);
@@ -448,7 +513,7 @@ test('24UX6C2: tapping a slice chooses it; tapping it again or the hole clears t
   // Default size 176, thickness 22: the ring's radius is 74 around (88, 88).
   const tap = (chosen: string | null, x: number, y: number) => {
     const calls: (string | null)[] = [];
-    pressAt(donut({ chosen, onChoose: key => calls.push(key) }).press, x, y);
+    pressAt(donut({ chosen, size: 176, onChoose: key => calls.push(key) }).press, x, y);
     assert.equal(calls.length, 1);
     return calls[0];
   };
@@ -511,7 +576,7 @@ test('Codex (PR #73): a long category name moves the readout under the donut eve
   const long = 'Comidas fuera de casa con amigos y familia los fines de semana';
   const slices = [{ key: 'long', label: long, value: 2900, color: '#111' }, { key: 'b', label: 'Hogar', value: 7100, color: '#222' }];
   const chosen = donut({ slices, chosen: 'long' });
-  assertReadoutBelow(chosen, { name: long, minor: 2900, share: chosen.i18n.t('reports.chart.share', { percent: i18nFormat.formatPercent(0.29, 'es-AR') }) });
+  assertReadoutBelow(chosen, { texts: [long, chosen.i18n.t('reports.chart.share', { percent: i18nFormat.formatPercent(0.29, 'es-AR') })], minor: 2900 });
   const short = donut({ slices, chosen: 'b' });
   assert.equal(short.below, undefined, 'a short name and amount keep the readout in the hole');
 });
@@ -533,4 +598,43 @@ test('Codex (PR #73): the «Otras» slice can never share its key with a categor
   const view = donut({ slices: slices.map(slice => ({ ...slice, color: '#111' })), chosen: OTHERS, total: slices.reduce((sum, slice) => sum + slice.value, 0) });
   const names = flat(view.centre).filter(node => node.type === 'AppText').map(textOf);
   assert.equal(names[0], 'Otras');
+});
+
+test('24UX6D: a tap on the neutral space around the ring clears the choice; a drag, a scroll or nothing chosen never does', () => {
+  const touch = (x: number, y: number) => ({ nativeEvent: { pageX: x, pageY: y } });
+  const root = (chosen: string | null, calls: (string | null)[]) => donut({ chosen, onChoose: key => calls.push(key) });
+  // The neutral space is the chart's own full-width row: the root View, never an accessibility element and never a Pressable
+  // (the adjustable ring is the only one, and it claims its own touches first).
+  const calls: (string | null)[] = [];
+  const { tree, press } = root('a', calls);
+  assert.equal(tree.type, 'View');
+  assert.equal(tree.props.style.alignSelf, 'stretch', 'the whole row around the ring, not just the square');
+  assert.notEqual(tree.props.accessible, true);
+  assert.equal(flat(tree).filter(node => node.type === 'Pressable').length, 1, 'the ring is the only pressable');
+  assert.equal(press.props.accessibilityRole, 'adjustable');
+  // A tap (under 10 pt of travel) clears.
+  assert.equal(tree.props.onStartShouldSetResponder(), true, 'with a choice, the row answers a touch');
+  tree.props.onResponderGrant(touch(40, 120));
+  tree.props.onResponderRelease(touch(44, 123));
+  assert.equal(JSON.stringify(calls), JSON.stringify([null]));
+  // A drag of 30 pt is not a tap.
+  tree.props.onResponderGrant(touch(40, 120));
+  tree.props.onResponderRelease(touch(40, 150));
+  assert.equal(calls.length, 1, 'a drag keeps the choice');
+  // The list taking the touch to scroll ends it: the release that may follow clears nothing.
+  assert.equal(tree.props.onResponderTerminationRequest(), true, 'it never holds a touch the list wants for scrolling');
+  tree.props.onResponderGrant(touch(40, 120));
+  tree.props.onResponderTerminate();
+  tree.props.onResponderRelease(touch(40, 120));
+  assert.equal(calls.length, 1, 'a scroll keeps the choice');
+  // With nothing chosen (the total in the centre) the row does not even take the touch.
+  const idle: (string | null)[] = [];
+  assert.equal(root(null, idle).tree.props.onStartShouldSetResponder(), false);
+  // The ring: the chosen slice again, or the hole, clears; another slice moves the choice (24UX6C2, unchanged).
+  const ring: (string | null)[] = [];
+  const small = donut({ chosen: 'a', size: 176, onChoose: key => ring.push(key) }).press;
+  pressAt(small, 88 + 74, 88);
+  pressAt(small, 88, 88);
+  pressAt(small, 88, 88 + 74);
+  assert.equal(JSON.stringify(ring), JSON.stringify([null, null, 'b']));
 });

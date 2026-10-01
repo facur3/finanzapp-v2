@@ -6,7 +6,7 @@ import { useLedger } from '../src/storage/LedgerProvider';
 import { ActionButton, AppText, EmptyState, IconButton, MovementRow, Screen, SectionTitle, Surface } from '../src/ui/components';
 import { useI18n } from '../src/i18n/provider';
 import { CardDeck, cardFaceHeight, cardFaceWidth } from '../src/ui/card-visual';
-import { CardBalance, CardFacts } from '../src/ui/card-panel';
+import { CardStatusBlock } from '../src/ui/card-panel';
 import { ArchivedCardRow, FutureInstallmentsRow } from '../src/ui/card-rows';
 import { activeCards, archivedCards, cardCurrenciesDiffer, cardFaceColor, statementCaption, type CardSummary } from '../src/ui/liability-presentation';
 import { Reflow, ValueTransition } from '../src/ui/motion';
@@ -45,7 +45,7 @@ export default function CardsScreen() {
     if (!view || !deck || !frame) return;
     deck.measureInWindow((_x, deckTop) => frame.measureInWindow((_fx, viewportTop, _width, viewportHeight) => {
       // The content's top on screen is the deck's minus the deck's place in it; the offset is how far that is above the viewport.
-      const target = deckScrollTarget({ count: cards.length, exposure: deckExposure(fontScale), faceHeight: cardFaceHeight(cardFaceWidth(windowWidth)),
+      const target = deckScrollTarget({ count: cards.length, exposure: deckExposure(fontScale, cards.length), faceHeight: cardFaceHeight(cardFaceWidth(windowWidth)),
         deckTop, viewportTop, viewportHeight, contentOffset: viewportTop - (deckTop - deckY.current) });
       if (target !== null) view.scrollTo({ y: target, animated: !reduced });
     }));
@@ -79,7 +79,11 @@ export default function CardsScreen() {
  * latest movements with the open cycle's facts. The structure stays mounted across cards and the values crossfade
  * (ValueTransition keyed by the card); a block only some cards have (their future instalments, a balance in credit, the
  * usage bar) changes the height, so each block under it slides into place (Reflow) and the future instalments fade in or
- * out, after the screen's first render. With Reduce Motion the blocks move at once and only the fades remain. */
+ * out, after the screen's first render. With Reduce Motion the blocks move at once and only the fades remain.
+ *
+ * 24UX6D (Forest): one weight per level. The balance and the facts are one calm block flat on the canvas (no surface:
+ * the card face above is the object); the actions; one grouped surface for the future instalments; the latest movements
+ * in their grouped list under a quiet «Ver todos», as Inicio's sections read. Only the selected card feeds it. */
 function CardSnapshot({ summary, day, onOpen }: { summary: CardSummary; day: string; onOpen: (id: string) => void }) {
   const { snapshot, archive } = useLedger();
   const { t, relativeDate } = useI18n();
@@ -97,9 +101,7 @@ function CardSnapshot({ summary, day, onOpen }: { summary: CardSummary; day: str
   // A day inside the cycle sentence starts in lower case: "Este ciclo, desde ayer".
   const inline = (iso: string) => relativeDate(iso, day, true);
   return <View style={{ gap: space.xl }}>
-    <ValueTransition id={card.id}><CardBalance summary={summary} /></ValueTransition>
-
-    <Reflow><ValueTransition id={card.id} variant="fade"><Surface><CardFacts summary={summary} day={day} /></Surface></ValueTransition></Reflow>
+    <CardStatusBlock summary={summary} day={day} animated />
 
     {/* Primary above secondary, same width and height: hierarchy by fill, not by geometry. */}
     <Reflow style={{ gap: 10 }}>
@@ -115,7 +117,7 @@ function CardSnapshot({ summary, day, onOpen }: { summary: CardSummary; day: str
     </Surface></ValueTransition></Reflow>}
 
     <Reflow><ValueTransition id={card.id} variant="fade">
-      <SectionTitle action={t('cards.panel.seeAll')} onAction={() => onOpen(card.id)}
+      <SectionTitle quiet action={t('common.seeAll')} onAction={() => onOpen(card.id)}
         caption={statement ? statementCaption(statement, inline, t) : undefined}>{t('cards.panel.recent')}</SectionTitle>
       {recent.length ? <Surface grouped>
         {recent.map((item, index) => <MovementRow key={item.key} item={item} accounts={snapshot.accounts} accountId={account.id} context="card" last={index === recent.length - 1} />)}

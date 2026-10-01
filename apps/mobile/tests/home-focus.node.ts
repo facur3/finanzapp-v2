@@ -1,10 +1,11 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { BUDGET_WARNING_RATIO, initialRecord, initialTransferRecord, recurringForecastByCurrency, snapshotFromArchive, summarizeMonthlyBudgets, validateTransfer, type Account, type Entry,
+import { BUDGET_WARNING_RATIO, budgetState, categoryKey, initialRecord, initialTransferRecord, recurringForecastByCurrency, snapshotFromArchive, summarizeMonthlyBudgets, validateTransfer, type Account, type Entry,
   type LedgerArchive, type MonthlyBudget, type RecurringRule, type Transfer } from '@finanzapp/domain';
 import { mergeActivity, type ActivityItem } from '../src/ui/presentation.ts';
 import * as homeFocus from '../src/ui/home-focus.ts';
-import { COMMITMENT_ROWS, COMMITMENT_WINDOW_DAYS, RECENT_ROWS, homeBudgetAttention, homeCommitments, homeRecent, recentRowLimit } from '../src/ui/home-focus.ts';
+import { BUDGET_ATTENTION_ROWS, COMMITMENT_ROWS, COMMITMENT_WINDOW_DAYS, RECENT_ROWS, budgetAttentions, homeBudgetAttention, homeBudgets, homeCommitments, homeRecent, recentRowLimit,
+  type HomeBudget } from '../src/ui/home-focus.ts';
 
 // Producto 24UX6A: what Inicio shows under its number, as pure selections. Synthetic fixtures only.
 const at = '2026-09-01T12:00:00.000Z';
@@ -289,13 +290,17 @@ test('24UX6C2: no summary, or no general budget, means no budget row on Inicio',
   assert.equal(attentionOf(5000000, [totalBudget(100000, { currency: 'USD' })]), null, 'another currency\'s budget is not measured in ARS');
 });
 
-test('24UX6C2: a category sublimit never reaches Inicio, even exceeded', () => {
+// 24UX6C2 pinned «a category sublimit never reaches Inicio». The 24UX6D refinement supersedes it: category budgets now
+// reach Inicio through `homeBudgets` (below); `homeBudgetAttention` itself still reads only the GENERAL budget.
+test('24UX6C2, superseded by the 24UX6D refinement: homeBudgetAttention reads only the general budget; a category budget, even exceeded, is not its answer', () => {
   const summary = summarizeMonthlyBudgets(ledgerSpending(200000), [categoryBudget(1000)], 'ARS', october);
   assert.equal(summary.rows[0].exceeded, true, 'the sublimit is exceeded in the domain');
   assert.equal(summary.total, null);
-  assert.equal(homeBudgetAttention(summary), null, 'Inicio shows only the general budget');
-  // Beside a calm general budget, an exceeded sublimit still shows nothing.
+  assert.equal(homeBudgetAttention(summary), null, 'the general budget\'s attention only');
+  // Beside a calm general budget, an exceeded sublimit is not the general budget's attention either.
   assert.equal(attentionOf(200000, [totalBudget(1000000), categoryBudget(1000)]), null);
+  // ...but it is one of the summary's attentions now, and Inicio shows it (24UX6D refinement).
+  assert.equal(budgetAttentions(summarizeMonthlyBudgets(ledgerSpending(200000), [totalBudget(1000000), categoryBudget(1000)], 'ARS', october)).map(item => item.progress.budget.id).join(), 'cat');
 });
 
 test('24UX6C2: the thresholds are the domain\'s: calm below 85 %, warning from 85 % through 100 %, exceeded above', () => {
@@ -330,4 +335,194 @@ test('24UX6C2: the attention carries the general budget\'s progress untouched, m
   assert.equal(over?.progress, overSummary.total);
   assert.equal(over?.progress.remainingMinor, -2500000, 'the amount over is the negative remainder, never clamped to zero');
   assert.equal(over?.progress.spentMinor, 12500000);
+});
+
+// ---- 24UX6D refinement (owner): the general budget AND category budgets that need attention, two rows at most ----------
+// Synthetic fixtures only: four accounts (two ARS, two USD), October expenses per category, budgets sized to the ratio a
+// test names. Every figure is the domain's own (`summarizeMonthlyBudgets`); nothing is converted.
+type Spend = [category: string, amountMinor: number, accountId?: string];
+let spendSeq = 0;
+/** A ledger whose October expenses are `spends` (ARS account by default), plus noise no October budget measures. */
+const ledgerOf = (spends: Spend[]) => snapshotFromArchive({ accounts, transfers: [], records: [
+  ...spends.map(([category, amountMinor, accountId = 'ars']) => entry('s' + spendSeq++, '2026-10-0' + (1 + (spendSeq % 9)), { category, amountMinor, accountId })),
+  entry('income-' + spendSeq, '2026-10-03', { kind: 'income', amountMinor: 9000000 }),
+  entry('september-' + spendSeq, '2026-09-30', { amountMinor: 9000000, category: 'Supermercado' }),
+].map(initialRecord) });
+const general = (id: string, amountMinor: number, extra: Partial<MonthlyBudget> = {}): MonthlyBudget =>
+  ({ id, scope: 'total', currency: 'ARS', monthISO: october, amountMinor, active: true, createdAt: budgetAt, revision: 0, updatedAt: budgetAt, ...extra } as MonthlyBudget);
+const sublimit = (id: string, category: string, amountMinor: number, extra: Partial<MonthlyBudget> = {}): MonthlyBudget =>
+  ({ id, scope: 'category', category, currency: 'ARS', monthISO: october, amountMinor, active: true, createdAt: budgetAt, revision: 0, updatedAt: budgetAt, ...extra } as MonthlyBudget);
+/** homeBudgets as Inicio calls it: by default «Solo ARS» while ARS and USD are held. */
+const shown = (snapshot: ReturnType<typeof ledgerOf>, budgets: MonthlyBudget[], mode: 'single' | 'consolidated' = 'single', display: 'ARS' | 'USD' | 'EUR' = 'ARS', held = ['ARS', 'USD'] as const) =>
+  homeBudgets(snapshot, budgets, [...held], mode, display, october);
+/** «state:currency:id» per row, in order. */
+const rowsOf = (items: readonly HomeBudget[]) => items.map(item => item.state + ':' + item.currency + ':' + item.progress.budget.id).join(',');
+/** Every permutation of a short list (the input order must never matter). */
+const permutations = <T,>(items: T[]): T[][] => items.length <= 1 ? [items] : items.flatMap((item, i) => permutations([...items.slice(0, i), ...items.slice(i + 1)]).map(rest => [item, ...rest]));
+
+test('24UX6D refinement: Inicio shows at most two budget rows; the old single-general selector is gone', () => {
+  assert.equal(BUDGET_ATTENTION_ROWS, 2);
+  assert.equal(Object.hasOwn(homeFocus, 'homeBudget'), false, 'homeBudget (one general budget) was replaced by homeBudgets');
+  assert.equal(typeof homeFocus.homeBudgets, 'function');
+});
+
+test('24UX6D refinement: budgetAttentions is every budget of one summary in warning or exceeded, the general first, the domain\'s progress untouched', () => {
+  assert.deepEqual(budgetAttentions(null), []);
+  const data = ledgerOf([['Supermercado', 9700], ['Transporte', 5000], ['Ocio', 3300]]);
+  const summary = summarizeMonthlyBudgets(data, [general('g', 20000), sublimit('s', 'Supermercado', 10000), sublimit('t', 'Transporte', 10000)], 'ARS', october);
+  const items = budgetAttentions(summary);
+  assert.equal(items.map(item => item.state + ':' + item.progress.budget.id).join(), 'warning:g,warning:s', 'Transporte at 50 % is calm');
+  assert.equal(items[0].progress, summary.total, 'the summary\'s own general progress');
+  assert.equal(items[1].progress, summary.rows.find(row => row.budget.id === 's'), 'the summary\'s own category progress');
+  for (const item of items) assert.equal(item.state, budgetState(item.progress), 'the state is the domain\'s budgetState');
+  assert.deepEqual(budgetAttentions(summarizeMonthlyBudgets(data, [], 'ARS', october)), [], 'no budget: nothing');
+});
+
+test('24UX6D refinement: nothing needs attention means an empty list (no budget UI): no budgets, calm general and calm categories, archived or another month\'s', () => {
+  const data = ledgerOf([['Supermercado', 8400], ['Transporte', 5000]]);
+  assert.deepEqual(shown(data, []), [], 'no budgets');
+  assert.deepEqual(shown(data, [general('g', 100000), sublimit('s', 'Supermercado', 10000), sublimit('t', 'Transporte', 10000)]), [], 'general 13 %, Supermercado 84 %, Transporte 50 %: all calm');
+  // An archived (inactive) or other-month budget never appears, even far over its limit.
+  assert.deepEqual(shown(data, [sublimit('s', 'Supermercado', 100, { active: false, revision: 1, updatedAt: '2026-10-02T12:00:00.000Z' })]), [], 'an archived category budget');
+  assert.deepEqual(shown(data, [general('g', 100, { active: false, revision: 1, updatedAt: '2026-10-02T12:00:00.000Z' })]), [], 'an archived general budget');
+  assert.deepEqual(shown(data, [sublimit('s', 'Supermercado', 100, { monthISO: '2026-09' })]), [], 'September\'s category budget (September spending exists)');
+  assert.deepEqual(shown(data, [general('g', 100, { monthISO: '2026-11' })]), [], 'November\'s general budget');
+});
+
+test('24UX6D refinement: a general warning alone; a category warning beside a calm general; category-only budgets now appear', () => {
+  const data = ledgerOf([['Supermercado', 9000], ['Transporte', 1000]]);
+  const alone = shown(data, [general('g', 11000)]);
+  assert.equal(rowsOf(alone), 'warning:ARS:g', 'general at 91 %');
+  assert.equal(JSON.stringify([alone[0].labelsCurrency, alone[0].progress.spentMinor, alone[0].progress.budget.scope]), JSON.stringify([false, 10000, 'total']));
+  const category = shown(data, [general('g', 100000), sublimit('s', 'Supermercado', 10000)]);
+  assert.equal(rowsOf(category), 'warning:ARS:s', 'Supermercado at 90 % beside a calm general (10 %)');
+  assert.equal(JSON.stringify([category[0].progress.spentMinor, category[0].progress.remainingMinor, category[0].progress.ratio]), JSON.stringify([9000, 1000, 0.9]));
+  assert.equal(rowsOf(shown(data, [sublimit('s', 'Supermercado', 1000)])), 'exceeded:ARS:s', 'a category budget with no general budget at all');
+});
+
+test('24UX6D refinement: two category warnings come by ratio; more than two eligible budgets give exactly two', () => {
+  const data = ledgerOf([['Supermercado', 8800], ['Transporte', 9600], ['Ocio', 9000], ['Salud', 9300]]);
+  assert.equal(rowsOf(shown(data, [sublimit('s', 'Supermercado', 10000), sublimit('t', 'Transporte', 10000)])), 'warning:ARS:t,warning:ARS:s', '96 % before 88 %');
+  const four = shown(data, [sublimit('s', 'Supermercado', 10000), sublimit('t', 'Transporte', 10000), sublimit('o', 'Ocio', 10000), sublimit('h', 'Salud', 10000)]);
+  assert.equal(four.length, BUDGET_ATTENTION_ROWS);
+  assert.equal(rowsOf(four), 'warning:ARS:t,warning:ARS:h', 'the two highest: 96 % and 93 %');
+});
+
+test('24UX6D refinement: five categories needing attention: the top two only, the exceeded one first', () => {
+  const data = ledgerOf([['A', 8600], ['B', 9900], ['C', 9100], ['D', 9500], ['E', 11000]]);
+  const budgets = ['A', 'B', 'C', 'D', 'E'].map(name => sublimit('c' + name, name, 10000));
+  const summary = summarizeMonthlyBudgets(data, budgets, 'ARS', october);
+  assert.equal(budgetAttentions(summary).length, 5, 'all five need attention in the domain');
+  assert.equal(rowsOf(shown(data, budgets)), 'exceeded:ARS:cE,warning:ARS:cB');
+});
+
+test('24UX6D refinement: exceeded before warning, even a category exceeded before a general warning', () => {
+  const data = ledgerOf([['Supermercado', 11000], ['Ocio', 7000]]);
+  // General 18000 of 20000 (90 %, warning); Supermercado 11000 of 10000 (110 %, exceeded).
+  assert.equal(rowsOf(shown(data, [general('g', 20000), sublimit('s', 'Supermercado', 10000)])), 'exceeded:ARS:s,warning:ARS:g');
+  // Many warnings with a higher ratio do not pass an exceeded one at 100.01 %.
+  const edge = ledgerOf([['Supermercado', 10001], ['Ocio', 9999], ['Salud', 9998]]);
+  assert.equal(rowsOf(shown(edge, [sublimit('s', 'Supermercado', 10000), sublimit('o', 'Ocio', 10000), sublimit('h', 'Salud', 10000)])), 'exceeded:ARS:s,warning:ARS:o');
+});
+
+test('24UX6D refinement: within a state the general budget comes before category budgets, even when a category\'s ratio is higher', () => {
+  const data = ledgerOf([['Supermercado', 9900], ['Ocio', 7000]]);
+  // Warning: general 16900 of 19800 (85.4 %) before Supermercado at 99 %.
+  assert.equal(rowsOf(shown(data, [general('g', 19800), sublimit('s', 'Supermercado', 10000)])), 'warning:ARS:g,warning:ARS:s');
+  // Exceeded: general 16900 of 16800 (100.6 %) before Supermercado at 990 %.
+  assert.equal(rowsOf(shown(data, [general('g', 16800), sublimit('s', 'Supermercado', 1000)])), 'exceeded:ARS:g,exceeded:ARS:s');
+});
+
+test('24UX6D refinement: equal ratios fall back to the category\'s key (accents and case folded), then the order never depends on the input', () => {
+  const data = ledgerOf([['Árboles', 9000], ['bares', 9000], ['Ópera', 9000], ['Cafetería', 9000]]);
+  const accented = [sublimit('z1', 'Ópera', 10000), sublimit('z2', 'bares', 10000), sublimit('z3', 'Árboles', 10000)];
+  // Raw code units would put «bares» (b) before «Árboles» (Á) and «Ópera»; the key folds them: arboles < bares < opera.
+  assert.equal(categoryKey('Árboles') < categoryKey('bares') && 'bares' < 'Árboles', true, 'the fixture tells folded from raw order');
+  assert.equal(rowsOf(shown(data, accented)), 'warning:ARS:z3,warning:ARS:z2');
+  // Case: raw «Cafetería» (C) would come before «bares» (b); folded, bares < cafeteria.
+  assert.equal(rowsOf(shown(data, [sublimit('a1', 'Cafetería', 10000), sublimit('a2', 'bares', 10000)])), 'warning:ARS:a2,warning:ARS:a1');
+  // The same answer for every input order of the budgets (a general, three categories, one calm).
+  const mixed = [general('g', 40000), sublimit('k1', 'Ópera', 10000), sublimit('k2', 'bares', 10000), sublimit('k3', 'Árboles', 10000), sublimit('k4', 'Cafetería', 100000)];
+  const expected = rowsOf(shown(data, mixed));
+  assert.equal(expected, 'warning:ARS:g,warning:ARS:k3', 'general 36000 of 40000 (90 %) first, then the first category by key');
+  for (const order of permutations(mixed)) assert.equal(rowsOf(shown(data, order)), expected, order.map(budget => budget.id).join());
+  // The input is never reordered in place.
+  const stored = [...mixed];
+  shown(data, stored);
+  assert.equal(stored.map(budget => budget.id).join(), mixed.map(budget => budget.id).join());
+});
+
+test('24UX6D refinement: equal ratios across currencies: the display currency first, then the currency code', () => {
+  const data = ledgerOf([['Supermercado', 9000, 'ars'], ['Supermercado', 900, 'usd']]);
+  const ars = general('g-ars', 10000), usd = general('g-usd', 1000, { currency: 'USD' });
+  assert.equal(rowsOf(shown(data, [ars, usd], 'consolidated', 'USD')), 'warning:USD:g-usd,warning:ARS:g-ars', 'both 90 %: the display currency\'s first');
+  assert.equal(rowsOf(shown(data, [usd, ars], 'consolidated', 'ARS')), 'warning:ARS:g-ars,warning:USD:g-usd');
+  // Neither is the display currency (EUR shown, nothing held in it): the code decides, ARS before USD.
+  for (const order of permutations([usd, ars])) assert.equal(rowsOf(shown(data, order, 'consolidated', 'EUR')), 'warning:ARS:g-ars,warning:USD:g-usd');
+  // A higher ratio still wins over the display currency: the tie-break is only for equal ratios.
+  const higher = ledgerOf([['Supermercado', 9500, 'ars'], ['Supermercado', 900, 'usd']]);
+  assert.equal(rowsOf(shown(higher, [ars, usd], 'consolidated', 'USD')), 'warning:ARS:g-ars,warning:USD:g-usd', 'ARS 95 % before USD 90 %');
+});
+
+test('24UX6D refinement: the owner\'s three examples', () => {
+  // 1. General 90 %, Supermercado 97 %, Transporte 50 %: the general and Supermercado, both warnings, the general first (rule 2).
+  const one = ledgerOf([['Supermercado', 9700], ['Transporte', 5000], ['Ocio', 3300]]);
+  const first = shown(one, [general('g', 20000), sublimit('s', 'Supermercado', 10000), sublimit('t', 'Transporte', 10000)]);
+  assert.equal(JSON.stringify(first.map(item => [item.state, item.progress.budget.id, item.progress.ratio])), JSON.stringify([['warning', 'g', 0.9], ['warning', 's', 0.97]]));
+  // 2. General 50 %, Supermercado 95 %, Transporte 88 %: Supermercado then Transporte.
+  const two = ledgerOf([['Supermercado', 9500], ['Transporte', 8800]]);
+  const second = shown(two, [general('g', 36600), sublimit('s', 'Supermercado', 10000), sublimit('t', 'Transporte', 10000)]);
+  assert.equal(JSON.stringify(second.map(item => [item.state, item.progress.budget.id, item.progress.ratio])), JSON.stringify([['warning', 's', 0.95], ['warning', 't', 0.88]]));
+  // 3. General exceeded, one category exceeded, several warnings: the general exceeded, then the category exceeded.
+  const three = ledgerOf([['Supermercado', 12000], ['Transporte', 9000], ['Ocio', 9500], ['Salud', 8600]]);
+  const third = shown(three, [general('g', 20000), sublimit('s', 'Supermercado', 10000), sublimit('t', 'Transporte', 10000), sublimit('o', 'Ocio', 10000), sublimit('h', 'Salud', 10000)]);
+  assert.equal(rowsOf(third), 'exceeded:ARS:g,exceeded:ARS:s');
+});
+
+test('24UX6D refinement: the thresholds for a category budget are the domain\'s: 84 % absent, exactly 85 % warning, exactly 100 % warning, one minor unit over exceeded', () => {
+  const at = (spent: number, limit = 10000) => shown(ledgerOf([['Supermercado', spent]]), [sublimit('s', 'Supermercado', limit)]);
+  assert.deepEqual(at(8400), [], '84 %');
+  assert.deepEqual(at(8499), [], 'one minor unit under 85 %');
+  assert.equal(rowsOf(at(8500)), 'warning:ARS:s', 'exactly 85 %');
+  const full = at(10000);
+  assert.equal(rowsOf(full), 'warning:ARS:s', 'exactly 100 %: still a warning');
+  assert.equal(JSON.stringify([full[0].progress.remainingMinor, full[0].progress.exceeded]), JSON.stringify([0, false]));
+  const over = at(10001);
+  assert.equal(rowsOf(over), 'exceeded:ARS:s', 'one minor unit over');
+  assert.equal(over[0].progress.remainingMinor, -1, 'the amount over, never clamped');
+  // The same edges for the general budget, through homeBudgets.
+  const gen = (spent: number) => rowsOf(shown(ledgerOf([['Ocio', spent]]), [general('g', 10000)]));
+  assert.equal([gen(8400), gen(8500), gen(10000), gen(10001)].join('|'), '|warning:ARS:g|warning:ARS:g|exceeded:ARS:g');
+});
+
+test('24UX6D refinement: a budget keeps its own currency: an ARS budget reads only ARS accounts, never a converted USD expense; consolidated USD names it', () => {
+  // Supermercado: ARS 90,00 on two ARS accounts and USD 90.000,00 on a USD account (that would dwarf any ARS limit if added).
+  const data = ledgerOf([['Supermercado', 5000, 'ars'], ['Supermercado', 4000, 'ars2'], ['Supermercado', 9000000, 'usd']]);
+  const budgets = [sublimit('s', 'Supermercado', 10000)];
+  const domainRow = summarizeMonthlyBudgets(data, budgets, 'ARS', october).rows[0];
+  const single = shown(data, budgets);
+  assert.equal(JSON.stringify([single[0].state, single[0].currency, single[0].labelsCurrency, single[0].progress.spentMinor]), JSON.stringify(['warning', 'ARS', false, 9000]));
+  const consolidated = shown(data, budgets, 'consolidated', 'USD');
+  assert.equal(consolidated.length, 1);
+  assert.equal(JSON.stringify([consolidated[0].currency, consolidated[0].labelsCurrency]), JSON.stringify(['ARS', true]), 'named: Inicio shows USD');
+  assert.equal(consolidated[0].progress.spentMinor, domainRow.spentMinor, 'exactly summarizeMonthlyBudgets\' ARS row');
+  assert.equal(consolidated[0].progress.spentMinor, 9000, 'the USD expense neither added nor converted');
+  assert.equal(JSON.stringify(consolidated[0].progress), JSON.stringify(domainRow));
+  // A USD category budget measured on USD accounts only.
+  const usd = shown(data, [sublimit('u', 'Supermercado', 10000000, { currency: 'USD' })], 'consolidated', 'ARS');
+  assert.equal(JSON.stringify([usd[0].currency, usd[0].labelsCurrency, usd[0].progress.spentMinor, usd[0].state]), JSON.stringify(['USD', true, 9000000, 'warning']));
+});
+
+test('24UX6D refinement: single mode reads only the shown currency; consolidated reads the display currency and every held one, nothing else', () => {
+  const data = ledgerOf([['Supermercado', 9000, 'ars'], ['Supermercado', 2000, 'usd']]);
+  const arsOver = sublimit('s-ars', 'Supermercado', 1000), usdOver = sublimit('s-usd', 'Supermercado', 1000, { currency: 'USD' });
+  assert.equal(rowsOf(shown(data, [arsOver, usdOver], 'single', 'ARS')), 'exceeded:ARS:s-ars', '«Solo ARS»: the USD budget is not considered');
+  assert.equal(rowsOf(shown(data, [arsOver], 'single', 'USD')), '', '«Solo USD» with only an ARS budget: nothing');
+  assert.equal(shown(data, [arsOver, usdOver], 'single', 'USD').every(item => !item.labelsCurrency), true, 'single mode never names a currency');
+  // Consolidated in USD: both, the ARS one named; within «exceeded» the higher ratio comes first, whatever the display currency.
+  const both = shown(data, [arsOver, usdOver], 'consolidated', 'USD');
+  assert.equal(rowsOf(both), 'exceeded:ARS:s-ars,exceeded:USD:s-usd', 'both exceeded categories: 900 % before 200 %');
+  assert.equal(JSON.stringify(both.map(item => item.labelsCurrency)), JSON.stringify([true, false]));
+  // A budget in a currency neither held nor shown is never measured.
+  assert.deepEqual(shown(data, [sublimit('e', 'Supermercado', 1, { currency: 'EUR' })], 'consolidated', 'ARS'), []);
 });

@@ -60,7 +60,8 @@ function harness(file: string, options: { params?: Record<string, string>; data?
     'MovementRow', 'PressFeedback', 'Screen', 'SectionTitle', 'Stat', 'StatRow', 'Surface'];
   // `stacked`: the largest text sizes or an amount too wide for its row (the real rule is in components.tsx).
   const components = { ...Object.fromEntries(componentNames.map(name => [name, name])), toneColors: () => ({ color: '#c00', soft: '#fee' }), useStacked: () => options.stacked ?? false };
-  const palette = { isDark: false, text: '#000', secondary: '#666', tertiary: '#999', line: '#ddd', inset: '#eee', expense: '#c00', income: '#080', warning: '#a60', transfer: '#03c', primary: '#2557D6' };
+  const palette = { isDark: false, text: '#000', secondary: '#666', tertiary: '#999', line: '#ddd', inset: '#eee', expense: '#c00', income: '#080', warning: '#a60', warningSoft: '#fec',
+    transfer: '#03c', primary: '#2557D6' };
   const theme = { space: { xs: 4, s: 8, m: 12, l: 16, xl: 20, xxl: 24, xxxl: 32 }, radius: { tile: 12, group: 16, creditCard: 18 },
     useCurrentDay: () => day, useReduceMotion: () => true, usePalette: () => palette };
   const motion = { ValueTransition: 'ValueTransition', Reflow: 'Reflow', timing: (kind: string, reduced: boolean) => ({ duration: reduced ? 0 : 260 }), successHaptic: () => { haptics++; }, selectionHaptic: () => {} };
@@ -95,6 +96,8 @@ function harness(file: string, options: { params?: Record<string, string>; data?
     ...both('i18n/format', i18nFormat), ...both('i18n/provider', i18nProvider),
     // What the real card-panel.tsx and card-rows.tsx import from src/ui.
     './components': components, './theme': theme, './card-faces': cardFaces, './liability-presentation': liabilityPresentation, './motion': motion,
+    // 24UX6D: the plan detail's progress reads the pure `planProgress` (card-rows.tsx).
+    './installment-presentation': installmentPresentation,
     '../i18n/format': i18nFormat, '../i18n/provider': i18nProvider,
   };
   const require = function require(name: string) {
@@ -162,7 +165,7 @@ test('Tarjetas with a pending plan: the balance, «Vence» of the statement that
   futureRow.props.onPress();
   assert.equal(JSON.stringify(view.pushed.at(-1)), JSON.stringify({ pathname: '/card/[id]', params: { id: 'card' } }));
   // The open cycle began on Sep 29 («anteayer»): nothing recorded in it yet (the Sep 28 instalment belongs to the statement that closed).
-  assert.equal(nodes(root).find(node => node.type === 'SectionTitle' && node.props.action === 'Ver todo')!.props.caption, 'Este ciclo, desde anteayer · 0 compras · 0 pagos');
+  assert.equal(nodes(root).find(node => node.type === 'SectionTitle' && node.props.action === 'Ver todos')!.props.caption, 'Este ciclo, desde anteayer · 0 compras · 0 pagos');
   find(root, 'ActionButton', 'Pagar tarjeta').props.onPress();
   assert.equal(JSON.stringify(view.pushed.at(-1)), JSON.stringify({ pathname: '/new-transfer', params: { toAccountId: 'card-acc', maxAmountMinor: '10000000' } }));
   // The card in front opens its detail; a colour chosen for its account in Editar cuenta reaches its face.
@@ -345,13 +348,27 @@ test('plan detail: the price first, then only its figures (recorded, future, rem
   assert.equal(JSON.stringify(find(root, 'MerchantBadge').props), JSON.stringify({ merchant: 'Electro', category: 'Hogar', large: true }));
   assert.ok(texts(root).includes('Compra en cuotas' + NBSP + '·' + NBSP + 'ARS'));
   assert.equal(find(root, 'Money').props.minor, 120000000, 'the price is the hero');
-  assert.ok(texts(root).includes('12 cuotas · Sin interés'));
+  assert.ok(texts(root).includes('12 cuotas sin interés'), '24UX6D: one phrase under the price');
   const status = nodes(root).find(node => node.type === 'AppText' && text(node) === 'Activo')!;
   assert.equal(status.props.accessibilityLiveRegion, 'polite');
+  // 24UX6D: the progress under the hero: «2 de 12 registradas» (the domain's recognised count), the next instalment and
+  // the principal still to come, one VoiceOver element; the facts list no longer repeats the count or the live remaining.
+  const progress = byName(root, 'PlanProgressSummary')[0].rendered!;
+  assert.equal(progress.props.accessible, true);
+  assert.equal(progress.props.accessibilityLabel, '2 de 12 registradas, 1000000,00 pesos restantes, próxima cuota el 28 de octubre de 2026');
+  assert.deepEqual(texts(progress), ['2 de 12 registradas', 'Próxima cuota · 28 oct', 'restantes']);
+  const liveSegments = [byName(root, 'PlanBar')[0].rendered!.props.children].flat().map((segment: Node) => Object.assign({}, ...[segment.props.style].flat()));
+  assert.equal(liveSegments.map(style => style.backgroundColor === '#000' ? 'ink' : style.borderColor === '#999' && !style.borderStyle ? 'outline' : '?').join(','),
+    'ink,ink' + ',outline'.repeat(10), '24UX6D review: still to come is a solid tertiary outline, distinct from recorded and from cancelled');
+  assert.equal(nodes(progress).find(node => node.type === 'Money')!.props.minor, installmentPresentation.planSummary(tv, withPlans.records).figures.remainingMinor);
   assert.deepEqual(rowsOf(root), [
     'Tarjeta=Visa Gold', 'Categoría=Hogar', 'Fecha de compra=10 ago 2026 (10 de agosto de 2026)', 'Precio=$ 1.200.000,00 (1200000,00 pesos)',
-    'Registradas=2 de 12', 'Ya registrado=$ 200.000,00 (200000,00 pesos)', 'Cuotas futuras=$ 1.000.000,00 (1000000,00 pesos)', 'Restante=$ 1.000.000,00 (1000000,00 pesos)',
+    'Ya registrado=$ 200.000,00 (200000,00 pesos)', 'Cuotas futuras=$ 1.000.000,00 (1000000,00 pesos)',
   ].map(row => row.replace(/\$ /g, '$' + NBSP)));
+  // The hero, then the progress, then the facts, then the Calendario.
+  const order = nodes(root).map(node => node.type === 'Money' && node.props.minor === 120000000 ? 'hero' : typeof node.type === 'function' && node.type.name === 'PlanProgressSummary' ? 'progress'
+    : node.type === 'DetailRow' ? 'facts' : node.type === 'SectionTitle' ? 'schedule' : null).filter((item, index, all) => item && all.indexOf(item) === index);
+  assert.deepEqual(order, ['hero', 'progress', 'facts', 'schedule'])
   find(root, 'DetailRow', 'Tarjeta').props.onPress();
   assert.equal(JSON.stringify(view.pushed.at(-1)), JSON.stringify({ pathname: '/card/[id]', params: { id: 'card' } }));
   // The calendar: one row per instalment, its statement's closing and due, its state.
@@ -381,8 +398,12 @@ test('plan detail: an undone instalment counts nowhere, stays pending and opens 
   const view = harness('installment/[id].tsx', { params: { id: 'tv' }, data: { ...withPlans, records: [one, undone] } });
   const root = view.render();
   assert.equal(byName(root, 'ScheduleRow').slice(0, 3).map(row => row.props.row.state).join(','), 'recognised,undone,next');
-  assert.deepEqual(rowsOf(root).slice(4), ['Registradas=1 de 12', 'Ya registrado=$ 100.000,00 (100000,00 pesos)', 'Cuotas futuras=$ 1.000.000,00 (1000000,00 pesos)',
-    'Restante=$ 1.100.000,00 (1100000,00 pesos)', 'Deshecho=$ 100.000,00 (100000,00 pesos)'].map(row => row.replace(/\$ /g, '$' + NBSP)));
+  assert.deepEqual(rowsOf(root).slice(4), ['Ya registrado=$ 100.000,00 (100000,00 pesos)', 'Cuotas futuras=$ 1.000.000,00 (1000000,00 pesos)',
+    'Deshecho=$ 100.000,00 (100000,00 pesos)'].map(row => row.replace(/\$ /g, '$' + NBSP)));
+  // The undone instalment never counts as recorded: «1 de 12», its segment drawn as undone, the principal left $ 1.100.000,00.
+  const undoneProgress = byName(root, 'PlanProgressSummary')[0].rendered!;
+  assert.equal(undoneProgress.props.accessibilityLabel, '1 de 12 registrada, 1100000,00 pesos restantes, próxima cuota el 28 de octubre de 2026');
+  assert.equal(nodes(undoneProgress).find(node => node.type === 'Money')!.props.minor, 110000000);
   const second = byName(root, 'ScheduleRow')[1].rendered!;
   assert.ok(texts(second).includes('Deshecha'));
   second.props.onPress();
@@ -394,6 +415,17 @@ test('plan detail: an undone instalment counts nowhere, stays pending and opens 
   assert.equal(byName(stopped, 'ScheduleRow').map(row => row.props.row.state).join(','), 'recognised,recognised' + ',cancelled'.repeat(10));
   const labels = rowsOf(stopped).map(row => row.split('=')[0]);
   assert.equal(labels.includes('Cuotas futuras'), false);
+  // A stopped plan has nothing still to come: its progress says what was recorded, and its remaining figure stays a fact row.
+  const stoppedProgress = byName(stopped, 'PlanProgressSummary')[0].rendered!;
+  assert.equal(stoppedProgress.props.accessibilityLabel, '2 de 12 registradas');
+  // 24UX6D review: the segments stand out from the canvas: recorded ones are ink, cancelled ones a dashed tertiary outline,
+  // so a stopped plan never reads like a live one with the same count.
+  const segmentsOf = (bar: Node) => [bar.props.children].flat().map((segment: Node) => Object.assign({}, ...[segment.props.style].flat()));
+  const stoppedSegments = segmentsOf(byName(stopped, 'PlanBar')[0].rendered!);
+  assert.equal(stoppedSegments.map(style => style.borderStyle === 'dashed' ? 'dashed' : style.backgroundColor === '#000' ? 'ink' : '?').join(','), 'ink,ink' + ',dashed'.repeat(10));
+  assert.equal(stoppedSegments.slice(2).every(style => style.borderColor === '#999' && style.backgroundColor === 'transparent'), true, 'the tertiary ink, never the faint line colour');
+  assert.equal(nodes(stoppedProgress).some(node => node.type === 'Money'), false);
+  assert.ok(rowsOf(stopped).includes('Restante=$' + NBSP + '1.000.000,00 (1000000,00 pesos)'));
   assert.ok(rowsOf(stopped).includes('Cancelado=$' + NBSP + '1.000.000,00 (1000000,00 pesos)'));
   assert.ok(texts(byName(stopped, 'ScheduleRow')[5].rendered!).includes('Cancelada'));
   assert.equal(nodes(stopped).some(node => node.type === 'ActionButton'), false);
@@ -401,7 +433,9 @@ test('plan detail: an undone instalment counts nowhere, stays pending and opens 
 
 test('plan detail with interest: the total financed and the interest are their own figures, each instalment says what interest it includes', () => {
   const root = harness('installment/[id].tsx', { params: { id: 'nb' }, data: withPlans }).render();
-  assert.ok(texts(root).includes('3 cuotas · Con interés'));
+  assert.ok(texts(root).includes('3 cuotas con interés'));
+  // With interest, the progress names its figure as principal, like the plan's row in the card detail.
+  assert.equal(byName(root, 'PlanProgressSummary')[0].rendered!.props.accessibilityLabel, '0 de 3 registradas, 900000,00 pesos de principal restante, próxima cuota el 28 de octubre de 2026');
   assert.equal(find(root, 'Money').props.minor, 90000000, 'the price, never the price plus interest');
   const rows = rowsOf(root);
   assert.ok(rows.includes('Total financiado=$' + NBSP + '990.000,00 (990000,00 pesos)'));
@@ -410,7 +444,7 @@ test('plan detail with interest: the total financed and the interest are their o
   assert.ok(rows.includes('Principal futuro=$' + NBSP + '900.000,00 (900000,00 pesos)'), 'the future principal, interest apart');
   assert.ok(rows.includes('Interés futuro=$' + NBSP + '90.000,00 (90000,00 pesos)'));
   assert.ok(rows.includes('Principal registrado=$' + NBSP + '0,00 (0,00 pesos)'));
-  assert.ok(rows.includes('Principal restante=$' + NBSP + '900.000,00 (900000,00 pesos)'));
+  assert.equal(rows.some(row => row.startsWith('Principal restante=')), false, 'a live plan\'s remaining principal is in its progress summary');
   assert.equal(rows.some(row => row.startsWith('Cuotas futuras=') || row.startsWith('Ya registrado=')), false);
   const first = byName(root, 'ScheduleRow')[0].rendered!;
   assert.deepEqual(texts(first), ['Cuota 1 de 3', 'Cierra 28 oct · vence 5 nov', 'Incluye interés $' + NBSP + '30.000,00', 'Próxima']);
@@ -476,10 +510,13 @@ test('plan detail: a failed deletion keeps the plan and the error; Reintentar se
 test('plan detail in English: the same figures and calendar words', () => {
   const root = harness('installment/[id].tsx', { params: { id: 'tv' }, data: withPlans, locale: 'en-US' }).render();
   assert.ok(texts(root).includes('Purchase in installments' + NBSP + '·' + NBSP + 'ARS'));
-  assert.ok(texts(root).includes('12 installments · No interest'));
+  assert.ok(texts(root).includes('12 installments, interest-free'));
   assert.ok(texts(root).includes('Active'));
-  assert.deepEqual(rowsOf(root).map(row => row.split('=')[0]), ['Card', 'Category', 'Purchase date', 'Price', 'Recorded installments', 'Already recorded', 'Future installments', 'Remaining']);
-  assert.ok(rowsOf(root).includes('Recorded installments=2 of 12'));
+  assert.deepEqual(rowsOf(root).map(row => row.split('=')[0]), ['Card', 'Category', 'Purchase date', 'Price', 'Already recorded', 'Future installments']);
+  const progress = byName(root, 'PlanProgressSummary')[0].rendered!;
+  assert.deepEqual(texts(progress), ['2 of 12 recorded', 'Next installment · Oct 28', 'left']);
+  assert.equal(progress.props.accessibilityLabel, '2 of 12 recorded, 1000000.00 pesos left, next installment on October 28, 2026');
+  assert.ok(Object.hasOwn(progress.props, 'accessibilityLanguage'), 'a raw accessible View names the interface language (none when it is the device\'s)');
   const rows = byName(root, 'ScheduleRow').map(row => row.rendered!);
   assert.deepEqual(texts(rows[0]), ['Installment 1 of 12', 'Closes Aug 28 · due Sep 5', 'Recorded']);
   assert.equal(rows[2].props.accessibilityLabel, 'Installment 3 of 12, 100000.00 pesos, Next, closes October 28, 2026, due November 5, 2026');
@@ -615,4 +652,109 @@ test('Codex review: when a card\'s plans add up beyond the exact range, Tarjetas
   assert.equal(byName(detail, 'PlanRow').length, 11, 'every plan still listed, each with its own exact figures');
   const english = harness('card/[id].tsx', { params: { id: 'card' }, data, locale: 'en-US' }).render();
   assert.equal(nodes(english).filter(node => node.type === 'SectionTitle')[0].props.caption, 'Future installments: total out of range');
+});
+
+// ---- 24UX6D: Tarjetas in Forest ---------------------------------------------------------------------------------------
+
+/** Six active cards (1 and 2 are the fixture's; four more with balances 1–4 × $ 1.000,00), for the deck and the snapshot. */
+function sixCards(): domain.LedgerArchive {
+  const extra = [1, 2, 3, 4].map(index => ({
+    account: { id: 'c' + index + '-acc', name: index === 4 ? 'Visa Signature Banco de la Provincia de Buenos Aires' : 'Tarjeta ' + index, currency: 'ARS' as const,
+      openingMinor: -100000 * index, createdAt },
+    card: { ...card, id: 'c' + index, accountId: 'c' + index + '-acc', last4: '000' + index, creditLimitMinor: null } as domain.CreditCardProfile }));
+  return { ...archive, accounts: [...archive.accounts, ...extra.map(item => item.account)], cards: [card, amex, ...extra.map(item => item.card)] };
+}
+
+test('24UX6D: with six cards one is always in front, a strip brings its card forward, only the selected card feeds the snapshot, and the front card opens its detail', () => {
+  const view = harness('cards.tsx', { data: sixCards() });
+  const snapshots = (root: Node) => byName(root, 'CardSnapshot');
+  let root = view.render();
+  const deck = find(root, 'CardDeck');
+  assert.equal(deck.props.cards.map((item: { id: string }) => item.id).join(','), 'card,amex,c1,c2,c3,c4', 'every active card, in the stored order');
+  assert.equal(deck.props.selectedId, 'card', 'no «choose a card first» state: the first card is in front');
+  assert.equal(snapshots(root).length, 1);
+  assert.equal(snapshots(root)[0].props.summary.id, 'card');
+  deck.props.onSelect('c3');
+  root = view.render();
+  assert.equal(find(root, 'CardDeck').props.selectedId, 'c3');
+  assert.equal(JSON.stringify(snapshots(root).map(node => node.props.summary.id)), JSON.stringify(['c3']), 'only the selected card drives the snapshot');
+  assert.equal(nodes(snapshots(root)[0]).find(node => node.type === 'Money')!.props.minor, 300000, 'its own balance');
+  find(root, 'ActionButton', 'Pagar tarjeta').props.onPress();
+  assert.equal(JSON.stringify(view.pushed.at(-1)), JSON.stringify({ pathname: '/new-transfer', params: { toAccountId: 'c3-acc', maxAmountMinor: '300000' } }));
+  find(root, 'CardDeck').props.onOpen('c3');
+  assert.equal(JSON.stringify(view.pushed.at(-1)), JSON.stringify({ pathname: '/card/[id]', params: { id: 'c3' } }));
+  // The long name reaches the deck whole (the face gives it two lines in front; VoiceOver hears all of it).
+  assert.equal(find(root, 'CardDeck').props.cards[5].name, 'Visa Signature Banco de la Provincia de Buenos Aires');
+});
+
+test('24UX6D: choosing a card in a six-card deck scrolls with the compact 44 pt strips', () => {
+  const view = harness('cards.tsx', { data: sixCards() });
+  const scrolls: { y: number; animated: boolean }[] = [];
+  const root = view.render();
+  const box = nodes(root).find(node => node.type === 'View' && node.props.ref)!;
+  box.props.onLayout({ nativeEvent: { layout: { y: 20 } } });
+  box.props.ref.current = { measureInWindow: (callback: (x: number, y: number) => void) => callback(0, 123) };
+  find(root, 'Screen').props.scrollRef.current = { scrollTo: (to: { y: number; animated: boolean }) => scrolls.push(to),
+    getNativeScrollRef: () => ({ measureInWindow: (callback: (x: number, y: number, width: number, height: number) => void) => callback(0, 0, 393, 300) }) };
+  find(root, 'CardDeck').props.onSelect('c2');
+  // The front card's top: 123 + 5 × 44 = 343, below a 300 pt viewport: scrolled to a quarter of it (offset −103 + 343 − 75).
+  assert.equal(geometry.deckExposure(1, 6), 44);
+  assert.deepEqual(scrolls.map(item => [item.y, item.animated]), [[165, false]]);
+});
+
+test('24UX6D: the snapshot reads identity → Saldo pendiente → Vence · Cierra → Disponible → actions → Cuotas futuras → Recientes, with the balance and facts flat on the canvas', () => {
+  const root = harness('cards.tsx').render();
+  const snapshot = byName(root, 'CardSnapshot')[0];
+  const order = nodes(snapshot).map(node => node.type === 'Money' && node.props.minor === 10000000 ? 'balance'
+    : node.type === 'Stat' ? 'fact:' + node.props.label : node.type === 'ActionButton' ? 'action:' + node.props.label
+    : typeof node.type === 'function' && node.type.name === 'FutureInstallmentsRow' ? 'future' : node.type === 'SectionTitle' ? 'recent:' + node.props.children : null)
+    .filter((item, index, all) => item && all.indexOf(item) === index);
+  assert.deepEqual(order, ['balance', 'fact:Vence', 'fact:Cierra', 'fact:Disponible', 'action:Registrar compra', 'action:Pagar tarjeta', 'future', 'recent:Recientes']);
+  // No surface around the balance or the facts: the only surfaces are the grouped lists (future instalments, recent).
+  const surfaces = nodes(snapshot).filter(node => node.type === 'Surface');
+  assert.ok(surfaces.length >= 1);
+  assert.ok(surfaces.every(node => node.props.grouped === true), 'no padded white card of equal weight');
+  assert.equal(surfaces.some(node => nodes(node).some(inner => inner.type === 'Stat' || (inner.type === 'Money' && inner.props.minor === 10000000))), false);
+  // The two dates share a row; Disponible has its own, full width (a seven-digit amount keeps its row size).
+  const row = find(snapshot, 'StatRow');
+  assert.deepEqual(nodes(row).filter(node => node.type === 'Stat').map(node => node.props.label), ['Vence', 'Cierra']);
+  assert.equal(nodes(snapshot).filter(node => node.type === 'Stat' && node.props.label === 'Disponible').length, 1);
+  const recent = nodes(snapshot).find(node => node.type === 'SectionTitle')!;
+  assert.deepEqual([recent.props.quiet, recent.props.action], [true, 'Ver todos']);
+  // English reads the same order.
+  const english = byName(harness('cards.tsx', { locale: 'en-US' }).render(), 'CardSnapshot')[0];
+  assert.deepEqual(nodes(find(english, 'StatRow')).filter(node => node.type === 'Stat').map(node => node.props.label), ['Due', 'Closes']);
+  assert.deepEqual([nodes(english).find(node => node.type === 'SectionTitle')!.props.action], ['See all']);
+});
+
+test('24UX6D: an archived card says what it still does under its face (still paid, no new purchase); a deleted one only reads', () => {
+  const archivedRoot = harness('card/[id].tsx', { params: { id: 'card' }, data: { ...withPlans, cards: [{ ...card, active: false, revision: 1 }, amex] } }).render();
+  const note = byName(archivedRoot, 'CardLifecycleNote')[0];
+  assert.equal(note.props.state, 'archived');
+  assert.deepEqual(texts(note.rendered!), ['Tarjeta archivada', 'Sigue recibiendo pagos y registrando sus cuotas. Para usarla de nuevo, reactivala en Editar tarjeta.']);
+  // Right under the face, before the balance.
+  const balance = find(archivedRoot, 'Money').props.minor;
+  const kinds = nodes(archivedRoot).map(node => node.type === 'CardFace' ? 'face' : typeof node.type === 'function' && node.type.name === 'CardLifecycleNote' ? 'note'
+    : node.type === 'Money' && node.props.minor === balance && node.props.large ? 'balance' : null).filter((item, index, all) => item && all.indexOf(item) === index);
+  assert.deepEqual(kinds, ['face', 'note', 'balance']);
+  assert.equal(nodes(archivedRoot).filter(node => node.type === 'ActionButton').map(node => node.props.label).join(','), 'Pagar tarjeta', 'paid, no Registrar compra');
+  const deletedRoot = harness('card/[id].tsx', { params: { id: 'card' }, data: { ...archive, cards: [{ ...card, active: false, deleted: true, revision: 1 }, amex] } }).render();
+  assert.deepEqual(texts(byName(deletedRoot, 'CardLifecycleNote')[0].rendered!), ['Tarjeta eliminada',
+    'Sus compras y pagos siguen en Movimientos y en sus reportes. No se edita ni acepta movimientos nuevos.']);
+  assert.equal(nodes(deletedRoot).some(node => node.type === 'ActionButton'), false);
+  assert.equal(byName(harness('card/[id].tsx', { params: { id: 'card' } }).render(), 'CardLifecycleNote').length, 0, 'an active card shows no state line');
+  const english = harness('card/[id].tsx', { params: { id: 'card' }, locale: 'en-US', data: { ...withPlans, cards: [{ ...card, active: false, revision: 1 }, amex] } }).render();
+  assert.deepEqual(texts(byName(english, 'CardLifecycleNote')[0].rendered!), ['Archived card',
+    'It still takes payments and records its installments. To use it again, reactivate it in Edit card.']);
+});
+
+test('24UX6D: the card detail keeps the snapshot\'s words and order (balance, Vence · Cierra, Disponible with its limit, actions, Cuotas, Movimientos) and never «pagadas»', () => {
+  const root = harness('card/[id].tsx', { params: { id: 'card' }, data: withPlans }).render();
+  const order = nodes(root).map(node => node.type === 'CardFace' ? 'face' : node.type === 'Money' && node.props.large ? 'balance'
+    : node.type === 'Stat' ? 'fact:' + node.props.label : node.type === 'ActionButton' ? 'action:' + node.props.label
+    : node.type === 'SectionTitle' ? 'section:' + node.props.children : null).filter((item, index, all) => item && all.indexOf(item) === index);
+  assert.deepEqual(order, ['face', 'balance', 'fact:Vence', 'fact:Cierra', 'fact:Disponible', 'action:Registrar compra', 'action:Pagar tarjeta', 'section:Cuotas', 'section:Movimientos']);
+  assert.equal(nodes(root).filter(node => node.type === 'Surface').every(node => node.props.grouped === true), true, 'the facts are flat; the plans one grouped list');
+  assert.equal(find(root, 'CardFace').props.nameLines, undefined, 'the detail face takes the default two lines for a long name');
+  assert.equal(/pagad/i.test(JSON.stringify(texts(root))), false);
 });

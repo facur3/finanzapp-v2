@@ -3,7 +3,7 @@ import { Alert, View } from 'react-native';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useLedger } from '../../src/storage/LedgerProvider';
 import { ActionButton, AppText, DetailRow, EmptyState, ErrorMessage, MerchantBadge, Money, Screen, SectionTitle, Surface, type IconName } from '../../src/ui/components';
-import { ScheduleRow } from '../../src/ui/card-rows';
+import { PlanProgressSummary, ScheduleRow } from '../../src/ui/card-rows';
 import { useCategoryLabel } from '../../src/ui/category-hues';
 import { planScheduleRows, planSummary } from '../../src/ui/installment-presentation';
 import { successHaptic } from '../../src/ui/motion';
@@ -14,7 +14,12 @@ import { space, usePalette } from '../../src/ui/theme';
 /** A purchase in instalments (24T2), read before anything is done with it, like a movement or a recurring rule: the
  * merchant and the price first, then only what the plan stores and what the ledger says of it (never «pagada»: a card
  * payment is not assigned to an instalment), then its calendar, one row per instalment. The one action here is deleting
- * a plan that recorded nothing yet (created by mistake); cancelling, refunds and early payoff are 24T3. */
+ * a plan that recorded nothing yet (created by mistake); cancelling, refunds and early payoff are 24T3.
+ *
+ * 24UX6D (Forest): a calm hero (the merchant, «Compra en cuotas · ARS», the price, «12 cuotas sin interés», the state),
+ * then the schedule's progress flat on the canvas (`PlanProgressSummary`: a bar, «3 de 12 registradas» by the domain's
+ * recognised count, the next instalment and, while the plan is live, the principal still to come), then one grouped list
+ * with the purchase and the figures not already in that summary, then the Calendario. No figure changed. */
 export default function InstallmentPlanScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { archive, snapshot, removeInstallmentPlan } = useLedger();
@@ -80,7 +85,8 @@ export default function InstallmentPlanScreen() {
   const principalLabel = (plain: 'recorded' | 'future' | 'remaining' | 'undone') => t(financed
     ? ({ recorded: 'installments.detail.recordedPrincipal', future: 'installments.detail.futurePrincipal', remaining: 'installments.detail.remainingPrincipal',
       undone: 'installments.detail.undonePrincipal' } as const)[plain] : (`installments.detail.${plain}` as const));
-  // Only what the plan and the ledger say; each figure its own row, never merged (decision 003, rule 7).
+  // Only what the plan and the ledger say; each figure its own row, never merged (decision 003, rule 7). The recognised
+  // count (and a live plan's remaining principal) are the progress summary's (24UX6D), so they are not repeated here.
   const facts: { key: string; label: string; value: string; spokenValue?: string; icon?: IconName; onPress?: () => void }[] = [
     { key: 'card', label: t('installments.detail.card'), value: account.name, icon: 'card-outline', onPress: () => router.push({ pathname: '/card/[id]', params: { id: card.id } }) },
     { key: 'category', label: t('selection.category'), value: category, icon: 'pricetag-outline' },
@@ -90,13 +96,13 @@ export default function InstallmentPlanScreen() {
     ...(plan.interestMinor > 0 ? [{ key: 'interest', label: t('installments.detail.interest'), value: money(plan.interestMinor), spokenValue: spoken(plan.interestMinor) }] : []),
     ...(plan.feeMinor > 0 ? [{ key: 'fees', label: t('installments.detail.fees'), value: money(plan.feeMinor), spokenValue: spoken(plan.feeMinor) }] : []),
     ...(plan.taxMinor > 0 ? [{ key: 'taxes', label: t('installments.detail.taxes'), value: money(plan.taxMinor), spokenValue: spoken(plan.taxMinor) }] : []),
-    { key: 'count', label: t('installments.detail.recordedCount'), value: t('installments.detail.recordedCountValue', { count: figures.recognisedCount, total: plan.count }) },
     { key: 'recorded', label: principalLabel('recorded'), value: money(figures.recognisedMinor), spokenValue: spoken(figures.recognisedMinor) },
     ...(stopped ? [{ key: 'cancelled', label: t('installments.detail.cancelledAmount'), value: money(figures.cancelledMinor), spokenValue: spoken(figures.cancelledMinor) }]
       : [{ key: 'future', label: principalLabel('future'), value: money(figures.scheduledMinor), spokenValue: spoken(figures.scheduledMinor) }]),
     ...(!stopped && futureFinancingMinor > 0 ? [{ key: 'futureFinancing', label: t(financing === 'financing' ? 'installments.detail.futureFinancing' : 'installments.detail.futureInterest'),
       value: money(futureFinancingMinor), spokenValue: spoken(futureFinancingMinor) }] : []),
-    { key: 'remaining', label: principalLabel('remaining'), value: money(figures.remainingMinor), spokenValue: spoken(figures.remainingMinor) },
+    // A live plan's remaining principal is in the progress summary above; a completed or cancelled one lists it here.
+    ...(status !== 'active' ? [{ key: 'remaining', label: principalLabel('remaining'), value: money(figures.remainingMinor), spokenValue: spoken(figures.remainingMinor) }] : []),
     ...(figures.undoneMinor > 0 ? [{ key: 'undone', label: principalLabel('undone'), value: money(figures.undoneMinor), spokenValue: spoken(figures.undoneMinor) }] : []),
   ];
 
@@ -111,6 +117,7 @@ export default function InstallmentPlanScreen() {
         {t(summary.financingMinor > 0 ? 'installments.detail.withInterest' : 'installments.detail.noInterest', { count: plan.count })}</AppText>
       {state && <AppText accessibilityLiveRegion="polite" variant="subhead" style={{ color: status === 'active' ? p.text : p.secondary, fontWeight: '600', textAlign: 'center' }}>{state}</AppText>}
     </View>
+    <PlanProgressSummary summary={summary} rows={rows} />
     <Surface grouped>
       {facts.map((fact, index) => <DetailRow key={fact.key} label={fact.label} value={fact.value} spokenValue={fact.spokenValue} icon={fact.icon}
         onPress={fact.onPress} disabled={busy} last={index === facts.length - 1} />)}

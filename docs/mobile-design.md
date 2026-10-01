@@ -176,7 +176,9 @@ que leen son ahora los de Forest. Su restyle por pantalla queda para 24UX6B–6D
   arriba (el mes, el atajo a Cuentas, el alcance de moneda solo con dos o más, el número de 46 pt —sin subrenglón desde 24UX6C,
   con su ⓘ al lado cuando hay una sola moneda— y Gastado / Disponible); debajo, solo si existen, «Próximos compromisos» (hasta dos de los próximos siete días
   *(→ desde 24UX6C2, hasta dos de la ventana de 30 días, de hoy a hoy + 30 inclusive; antes de ellos, una sola fila del
-  presupuesto general cuando pide atención; ver «Producto 24UX6C2 — actividad de Inicio e interacción de Reportes»)*) y
+  presupuesto general cuando pide atención; ver «Producto 24UX6C2 — actividad de Inicio e interacción de Reportes»;
+  desde el refinamiento de 24UX6D, el general y los presupuestos por categoría que piden atención, dos filas como
+  máximo: ver «Inicio: atención de presupuestos (refinamiento)»)*) y
   «Actividad reciente» (cuatro filas con compromisos, seis sin ellos); si no hay ninguno, un estado vacío tranquilo.
   Registrar vive en el «+» del dock, no en Inicio. Los movimientos completos siguen en Movimientos, el análisis en
   Reportes, los presupuestos en Presupuestos.
@@ -228,7 +230,8 @@ Go); no se agrega una librería de gráficos completa ni una WebView. Las porcio
 usan el tono de su categoría (hasta cinco con nombre, el resto como Otras en gris);
 los nombres van en la leyenda, nunca solo en el color. En el centro, «Total del período» sobre el total del mes
 *(→ reemplazado en 24UX6C2: el centro ya no repite el total, que está arriba; sirve para elegir una categoría. Ver
-«Producto 24UX6C2 — actividad de Inicio e interacción de Reportes»)*. Con datos nuevos la dona se
+«Producto 24UX6C2 — actividad de Inicio e interacción de Reportes»)* *(→ 24UX6D: el total vuelve al centro y el KPI de
+arriba se va; ver «Producto 24UX6D — Tarjetas en Forest y pulido final de Inicio y Reportes»)*. Con datos nuevos la dona se
 dibuja en sentido horario desde las doce (480 ms) solo la primera vez; un cambio de
 mes o moneda es un único fundido con las porciones ya finales, junto con el título
 del mes y el total. El trazo estático es el arco terminado, así el gráfico está
@@ -593,7 +596,8 @@ abajo), que empieza detrás de la barra de estado (relleno superior: el área se
   presupuesto, los gráficos y el banner del Asistente. Siguen en Presupuestos, Reportes y la hoja de Registrar.
   *(→ Desde 24UX6C2 vuelve una sola fila contextual del presupuesto general, solo cuando pide atención; la tarjeta
   permanente de presupuesto y la línea de atención siguen fuera. Ver «Producto 24UX6C2 — actividad de Inicio e
-  interacción de Reportes».)*
+  interacción de Reportes».)* *(→ Refinamiento de 24UX6D: también los presupuestos por categoría, hasta dos filas; ver
+  «Inicio: atención de presupuestos (refinamiento)».)*
 - **Barra de estado.** Contenido claro mientras Inicio tiene foco y el campo está debajo de la barra; vuelve al
   estilo del tema al pasar el campo o al salir de Inicio.
 - **La semántica no cambió.** Gastado son solo los gastos del mes (nunca transferencias ni pagos de tarjeta; las
@@ -621,13 +625,21 @@ Las reglas de «Motion y accesibilidad» siguen vigentes: la curva de `src/ui/mo
   de evolución conservan la navegación por mes actual (sin una segunda selección solo para comparar); «Otras» sigue
   agrupando por los primeros N (no se adopta la regla del 3 %); sin ruta inventada de detalle por comercio.
 - **24UX6C Movimientos y Más** *(implementado en parte: ver «Producto 24UX6C — presentación de movimientos, Inicio y
-  Más»; los filtros por período, cuenta y categoría siguen pendientes)*. Filas, búsqueda y filtros en Forest; filtros por período, cuenta y categoría desde los
+  Más»; los filtros por período, cuenta y categoría siguen pendientes; desde 24UX6D pertenecen al alcance de búsqueda
+  de 25C)*. Filas, búsqueda y filtros en Forest; filtros por período, cuenta y categoría desde los
   datos del repositorio; el total del día como hoy. Sin nota, origen Apple Pay ni hora inventados; Deshacer y
   Recuperar se quedan (sin borrado definitivo falso), igual que Movimientos deshechos. Idioma y Región siguen siendo
   rutas separadas, agrupadas a la vista; no hay fila «Ajustes» (no tiene ruta).
-- **24UX6D Tarjetas.** Conserva todo lo que hace (Disponible de crédito, Registrar compra, Recientes); se permiten la
+- **24UX6D Tarjetas** *(implementada: ver «Producto 24UX6D — Tarjetas en Forest y pulido final de Inicio y Reportes»)*. Conserva todo lo que hace (Disponible de crédito, Registrar compra, Recientes); se permiten la
   interacción de mazo y el restyle Forest. El progreso de cuotas es registradas / facturadas según el dominio, nunca
   «pagadas» inferidas, con los importes programados reales; ninguna fórmula contable ni de disponible cambia.
+- **24UX6E Más destinos financieros en Forest** *(planificada, sin implementar; redefinida por el dueño el 2026-10-01)*.
+  Cuentas (lista y detalle), Presupuestos (lista, detalle y sus flujos actuales), Recurrentes (lista y detalle),
+  Deudas y cobros (lista y detalle) y Categorías, llevados a la jerarquía y la calidad de Inicio, Reportes y Tarjetas.
+  Solo presentación y ciclo de vida, salvo que aparezca un error real; ningún cambio contable, de almacenamiento ni de
+  esquema por diseño. Copia de seguridad, Movimientos deshechos, Idioma, Región, Apariencia y las demás utilidades de
+  Más se auditan sin rediseñarse: las coherentes quedan como están y lo demás se anota como un pulido chico posterior.
+  Detalle en `docs/mobile-roadmap.md` («Producto 24UX6E»).
 
 ### Apariencia
 
@@ -817,6 +829,232 @@ barras de Día a día y una cabecera fija sólida. Siguen permitidos para una pa
 vinculante del roadmap no cambia: la próxima entrega de producto es 24T3; 24UX6C (Movimientos y Más) y 24UX6D
 (Tarjetas) siguen a 24UX6B en el carril UX, y su lugar frente a 24T3 lo decide el dueño (ver `docs/mobile-roadmap.md`).
 
+## Producto 24UX6D — Tarjetas en Forest y pulido final de Inicio y Reportes
+
+La pasada de Tarjetas del carril UX, en su rama `feat/producto-24ux6d-cards-forest` desde master 5c73813 (24UX6C2
+mergeada como PR #73), con dos micro pulidos aprobados que viajan con ella: la composición de Categorías en Reportes y
+la fila del presupuesto general de Inicio como fila de progreso. Implementado en código; **la revisión en iPhone está
+pendiente** (no hubo build de EAS) y su lista está en docs/mobile-device-checklist.md («Producto 24UX6D»). Solo
+presentación: no cambia la contabilidad de tarjetas, los pagos, los ciclos ni sus fechas, el reconocimiento de cuotas,
+el principal comprometido, la compuerta del disponible, el ciclo de vida, el libro, las reglas de presupuesto, el
+esquema (13), las copias (v13), las cotizaciones ni nada nativo; ninguna animación entre pestañas. Reemplaza, marcados
+en su lugar: el KPI «Gastado · ARS» de arriba de Reportes con su promedio, el centro callado «Tocá una categoría» y la
+fila textual del presupuesto («Usaste 87 % del presupuesto del mes») de 24UX6C2, y en Tarjetas los tres datos en
+columnas dentro de una superficie (24T2). La regla vinculante está en la decisión 005 («Enmienda 2026-10-01 — Producto
+24UX6D»).
+
+*Refinamiento del dueño (2026-10-01), dentro de esta entrega:* la atención de presupuestos de Inicio cubre también los
+presupuestos por categoría, hasta dos filas (ver «Inicio: atención de presupuestos (refinamiento)», que reemplaza la
+semántica «solo el presupuesto general» de la fila de progreso); la selección de Tarjetas no cambia y queda razonada
+(«Tarjetas: el mazo»); la composición de Reportes queda congelada («Reportes: congelado»).
+
+### Reportes: Categorías con el total en el centro de la dona
+
+- **Sin KPI externo.** Categorías ya no tiene «Gastado · ARS», el importe grande, el promedio por día ni la línea de
+  variación arriba del análisis. El orden: la moneda y el mes → Categorías | Día a día → la dona → «Por categoría» →
+  Evolución → presupuestos, comercios, observaciones, ingresos, flujo neto, la variación y Comparar. Todo lo de abajo
+  y las rutas de detalle siguen.
+- **El centro.** Sin elección, «Total del período» («Period total», footnote secundaria) sobre el total exacto del
+  informe (`Money`, 700; `total={report.expenseMinor}`, la misma cifra de antes). Con una categoría elegida, el
+  centro la muestra en lugar del total: su nombre, su importe exacto y «29 % del gasto» (la regla de 24UX6C2); la
+  porción 6 pt más gruesa, las demás al 30 % y la fila marcada (más que color: negrita, contorno, estado seleccionado).
+- **Geometría.** `donutGeometry(ancho)`: el 70 % de (ventana − 40 pt), entre 200 y 260 pt y nunca más ancho que el
+  contenido, con el anillo fijo de 22 pt (`DONUT_RING`). A 393 pt la dona mide 247 pt; a 375 pt, 234 pt; a 320 pt,
+  200 pt; desde 412 pt, 260 pt (antes 176 pt). El espacio para texto del agujero (`donutRoom`, tamaño − 2 × (anillo +
+  10)) es 183 pt y 170 pt (antes 112 pt). El importe del centro baja de 26 a 24, 22, 20 y 18 pt hasta que el texto
+  exacto entra (`centreAmountSize`): «$ 4.029.727,00» queda en 24 pt a 393 pt y en 22 pt a 375 pt (anchos estimados,
+  no medidos).
+- **Debajo de la dona.** Con texto mayor que 1,2×, un importe que no entra ni en 18 pt o un nombre que pide más de dos
+  líneas, la lectura (el total o la categoría) baja debajo de la dona, sin tope y entera, en el paso más grande que
+  entra en el ancho de la fila (escala hasta 1,8×); el agujero queda libre. El dinero exacto nunca se corta.
+- **Cómo se limpia la elección.** Tocar la misma porción o el agujero; cambiar de mes, de moneda o de modo (como
+  antes); y, nuevo, cambiar entre Categorías y Día a día, o tocar el espacio neutro alrededor del anillo. Ese espacio
+  es la propia fila de ancho completo de la dona (una `View` con manejadores de toque, no un `Pressable` ni un elemento
+  de accesibilidad): solo toma el toque mientras hay algo elegido, limpia solo con un toque que se mueve menos de
+  10 pt y suelta el toque en cuanto la lista se desplaza. No hay interceptor global: ni el desplazamiento, ni el
+  segmentado, ni los controles de mes y moneda quedan tapados.
+- **VoiceOver.** Sigue siendo un elemento ajustable; sin elección su valor es «Total del período, 4029727,00 pesos»
+  («Period total, …»), con una, la categoría, el importe y el porcentaje.
+
+### Reportes: Día a día y lo que se movió
+
+- **Día a día.** Una línea compacta, sin héroe ni promedio: «Total» en subhead secundario (la intención del dueño,
+  «Total · $ …»; el período ya está nombrado arriba) y el importe exacto en 20 pt seminegrita al lado; si no entran
+  juntos, el importe baja a su propia línea, entero. Cuando ni en su línea entra a 20 pt (13 dígitos, 320 pt, texto de
+  accesibilidad), se dibuja como héroe que se ajusta a su línea: nunca se corta (revisión 24UX6D). Un solo
+  elemento de VoiceOver («Total del período, 6,06 pesos»). En un mes sin gastos no aparece: queda solo el vacío.
+- **La variación mensual.** Pasó a una fila de los hechos de abajo (`DetailRow`), entre «Flujo neto» y «Comparar con el
+  mes anterior» (que sigue abriendo la comparación completa): «Frente a los mismos días del mes anterior» o «Frente al
+  mes anterior», con «20,8 % menos», «12 % más» o «Sin cambio» y un glifo de tendencia; VoiceOver la oye con
+  `spokenPercent`.
+- **El botón de método** («Qué cuenta este reporte») está junto a la línea del período, en todo estado listo, con meses
+  vacíos y en consolidado. La línea del período nombra la moneda («Hasta hoy · ARS») solo cuando no hay chip que la
+  nombre (una sola moneda).
+- **Textos.** Nuevas `reports.periodTotal` y `periodTotalSpoken`; `reports.delta.*` reescritas para la fila; salieron
+  `reports.spent`, `noRecords`, `chart.pick` y `chart.noneChosen` (`reports.perDay` queda solo como ejemplo de
+  `tests/translation.node.ts`).
+
+### Reportes: congelado
+
+Decisión del dueño (2026-10-01): la composición de Reportes de esta entrega (PR #74) es **vinculante** y no se reabre
+sin una nueva decisión registrada en la decisión 005.
+
+- **Categorías:** período y alcance → Categorías | Día a día → la dona grande → en el centro, por defecto, el total
+  exacto del período → con una categoría elegida, su nombre, su importe y su porcentaje en el centro → su fila marcada
+  → Evolución → los hechos de abajo.
+- **Día a día:** el total exacto compacto → el análisis por día → los hechos de abajo.
+- **No vuelven:** el héroe «Gastado», un titular por día ni «Tocá una categoría».
+
+### Inicio: la fila de progreso del presupuesto
+
+- *(→ Refinamiento: desde el refinamiento del dueño, también los presupuestos por categoría, hasta dos filas, con
+  `homeBudgets`, y `home-focus.ts` cambió; ver «Inicio: atención de presupuestos (refinamiento)», abajo. La anatomía de
+  esta fila sigue vigente.)*
+- **Semántica sin cambios** (24UX6C2): solo el presupuesto general; ausente por debajo del 85 %; aviso del 85 % al
+  100 % inclusive; excedido por encima; en su propia moneda, elegido por `homeBudget`, que nombra la moneda cuando no
+  es la de la vista; antes de «Próximos compromisos»; tocar abre `/budgets` con `currency` y
+  `month`. Ni `app/(tabs)/index.tsx` ni `home-focus.ts` cambiaron.
+- **Anatomía** (`BudgetAttentionRow`, `src/ui/home-modules.tsx`): `PressFeedback` con resaltado, rol botón, 64 pt de
+  alto mínimo, 16 × 12 pt de relleno, chevron de 13 pt.
+  1. «Presupuesto» (600, tinta; «Presupuesto · USD» cuando nombra la moneda) y, a la derecha, el porcentaje entero
+     (`percentUsed`: «91 %», «120 %»; 600, cifras tabulares; ámbar en aviso, el tono de alerta excedido, con un
+     `alert-circle` de 15 pt delante solo cuando excedido). Comparten línea solo si entran (`labelAmountStacks` con
+     116 pt de cromo); con texto mayor que 1,2× siempre se apilan.
+  2. Una barra de 6 pt (radio 3) sobre la pista `inset`, llena hasta `min(1, ratio)` en el mismo tono: a 120 % se ve
+     llena, no desborda. Empieza en su valor (nada se anima al montar Inicio) y se mueve solo cuando cambia, con
+     `timing('data')`, 260 ms; con Reduce Motion, al instante. Oculta para VoiceOver.
+  3. Una línea callada (footnote secundaria): «Quedan $ 13.000,00», «Límite alcanzado» en el 100 % justo (sigue siendo
+     aviso, ámbar) o «$ 20.000,00 por encima»; importes con código cuando la fila nombra la moneda. Nada se corta: el
+     nombre y el detalle envuelven.
+- **Más que color.** El aviso y el excedido se distinguen por las palabras («Quedan» / «por encima») y el glifo de
+  alerta, no solo por el tono.
+- **Copia.** es: «Presupuesto», «Presupuesto · {code}», «Quedan {amount}», «Límite alcanzado», «{amount} por encima».
+  en: «Budget», «Budget · {code}», «{amount} left», «Limit reached», «{amount} over».
+- **VoiceOver.** Un botón, armado solo con `spokenPercent` y `spokenMoney`: «Presupuesto del mes, cerca del límite,
+  87 % usado, quedan 13000,00 pesos»; «Presupuesto del mes, límite alcanzado, 100 % usado»; «Presupuesto del mes
+  superado, 120 % usado, 20000,00 pesos por encima» («Presupuesto del mes en ARS» cuando nombra la moneda). En inglés:
+  «This month’s budget, close to the limit, 87% used, 13000.00 pesos left», «…, limit reached, …», «…, over the limit,
+  120% used, 20000.00 pesos over». Pista «Abre Presupuestos» («Opens Budgets»).
+- **Claves.** Salieron `home.budget.warning`, `warningIn`, `exceeded`, `exceededIn` (y las formas «de {limit}»);
+  entraron `title`, `titleIn`, `reached`, `spokenName`, `spokenNameIn`, `warningLabel`, `reachedLabel` y
+  `exceededLabel`.
+
+### Inicio: atención de presupuestos (refinamiento)
+
+Refinamiento del dueño (2026-10-01) dentro de 24UX6D; vinculante. Reemplaza «solo el presupuesto general» y «una sola
+fila» (24UX6C2 y la fila de progreso de arriba). Inicio sigue **sin tarjeta permanente ni tablero de presupuestos**: lo
+que tiene son, **como máximo, dos filas contextuales de atención**; todo lo demás vive en Presupuestos.
+
+- **Qué presupuestos.** El presupuesto **general** del mes y los presupuestos **por categoría** activos del mes, solo
+  con la regla del dominio `budgetState` (`BUDGET_WARNING_RATIO` 0,85): **tranquilo** por debajo del 85 %, nunca se
+  muestra; **aviso** del 85 % al 100 % inclusive; **excedido** por encima del 100 %. `budgetAttentions(resumen)` aplica
+  la regla a `summary.total` y a cada `summary.rows`; `homeBudgets(libro, presupuestos, monedas del historial, modo,
+  moneda de la vista, mes)` (`src/ui/home-focus.ts`, puro) reemplaza a `homeBudget`.
+- **Monedas.** Cada presupuesto conserva su moneda (24C1) y se mide con `summarizeMonthlyBudgets` sobre el **libro
+  real** en esa moneda; nunca se convierte ni se suma a otra. Con «Solo …», solo la moneda mostrada; en consolidado, la
+  moneda de visualización y cada moneda del historial. Una fila nombra su moneda (`labelsCurrency`) cuando no es la de
+  visualización.
+- **Cuántas.** Como máximo dos (`BUDGET_ATTENTION_ROWS = 2`), cortadas **después** de ordenar.
+- **Orden (determinista).**
+  1. Excedido antes que aviso.
+  2. Dentro de un estado, el presupuesto general antes que los por categoría.
+  3. Después, la proporción mayor primero (gastado / límite, la del dominio).
+  4. Desempate estable: la moneda de visualización primero, después el código de moneda, después
+     `categoryKey(categoría)` (sin acentos ni mayúsculas) y por último el id del presupuesto.
+- **Ejemplos del dueño.**
+  - General 90 %, Supermercado 97 %, Transporte 50 % → el general y Supermercado (los dos en aviso; el general primero
+    por la regla 2; Transporte está tranquilo).
+  - General 50 %, Supermercado 95 %, Transporte 88 % → Supermercado y después Transporte.
+  - General excedido, una categoría excedida y varias en aviso → el general excedido y la categoría excedida.
+  - Cinco categorías que piden atención → solo las dos primeras según el orden.
+  - Ninguno pide atención → no hay nada de presupuesto en Inicio (ni superficie, ni título, ni vacío).
+- **La fila.** La misma `BudgetAttentionRow` compacta de arriba. Título: el general, «Presupuesto» («Presupuesto ·
+  USD»); una categoría, su nombre localizado (`useCategoryLabel`: «Supermercado», «Supermercado · USD» con
+  `labelsCurrency`; clave `home.budget.categoryIn`), en tinta 600 como el general. El porcentaje entero (puede pasar de
+  100 %), la barra limitada al 100 %, «Quedan $ …» / «Límite alcanzado» / «$ … por encima». **Solo los colores de
+  estado** (aviso en ámbar; excedido en el tono de alerta con el glifo de alerta): el tono de la categoría **no** se
+  usa, para que nunca compita con el estado.
+- **VoiceOver.** Un botón por fila, armado solo con `spokenPercent` y `spokenMoney`: «Presupuesto de Supermercado,
+  cerca del límite, 97 % usado, quedan … pesos»; «Presupuesto de Supermercado, límite alcanzado, 100 % usado»;
+  «Presupuesto de Supermercado superado, 120 % usado, … pesos por encima»; con la moneda nombrada, «Presupuesto de
+  Supermercado en USD, …» (claves `spokenCategory`, `spokenCategoryIn`). En inglés «Groceries budget, close to the
+  limit, …». El general sigue diciendo «Presupuesto del mes». Pista «Abre Presupuestos».
+- **Agrupadas.** Dos filas comparten **una** `Surface grouped`, con un filete fino entre ellas (la prop `last`: la
+  última no lo lleva). Cada una abre `/budgets` con `{ currency, month }` del presupuesto; no hay ruta nueva.
+- **Dónde.** Sin cambios: después del campo financiero y antes de «Próximos compromisos» y «Actividad reciente».
+- **Lo que no es.** Ni tarjeta permanente, ni tablero, ni la lista de los sublímites, ni el color de la categoría, ni
+  una cifra nueva: el dominio de presupuestos y sus cálculos no cambian.
+
+### Tarjetas: el mazo
+
+- **Siempre una al frente.** Con cualquier tarjeta activa hay una al frente; una selección que ya no existe (archivada
+  o eliminada) le pasa el frente a la primera. Tocar una franja la elige (háptica de selección); tocar la del frente
+  abre su detalle. Solo la elegida alimenta el resumen.
+- **Por qué (vinculante; refinamiento del dueño, 2026-10-01).** Tarjetas es una pantalla de estado financiero: con una
+  sola tarjeta, un toque más para ver su resumen sería pura fricción; con varias, la del frente ya comunica cuál está
+  elegida. Si el resumen se siente denso, se refina su jerarquía; no se esconde información detrás de un toque.
+- **La regla de franjas** (`deckExposure(escala, cantidad)`, `DECK_FULL_STRIP_CARDS = 4`): hasta cuatro tarjetas las
+  franjas conservan 50 pt (57 en el tope de 1,3×); desde la quinta, todas miden 44 pt (16 de relleno + 22 de la
+  primera fila + 6 de margen; 47 a 1,15×, 51 en el tope), nunca menos de 44 pt y con la primera fila siempre entera.
+  Alto del mazo con 1/2/3/4/6 tarjetas: 211 / 261 / 311 / 361 / 431 pt a 375 pt y 223 / 273 / 323 / 373 / 443 pt a
+  393 pt; seis tarjetas ahorran 30 pt y doce 66 pt. La misma regla para cualquier cantidad: sin segunda geometría,
+  sin tarjetas ocultas, sin carrusel. El desplazamiento al elegir (`deckScrollTarget`) usa la franja según la
+  cantidad.
+- **Nombres largos.** `CardFace` recibe `nameLines`: la del frente y la del detalle muestran hasta dos líneas; una
+  franja, una (nunca una segunda línea a medias bajo la tarjeta siguiente). La primera fila se alinea arriba y «••••
+  4009» nunca se achica. VoiceOver siempre oye el nombre entero.
+
+### Tarjetas: la jerarquía del resumen y del detalle
+
+- **Un peso por nivel:** identidad (la cara) → «Saldo pendiente» → Vence · Cierra → Disponible → Registrar compra /
+  Pagar tarjeta → «Cuotas futuras» → Recientes. Sin tarjetas blancas anidadas del mismo peso.
+- **Bloque plano.** `CardStatusBlock` (`src/ui/card-panel.tsx`): el saldo y los datos sobre el lienzo, sin superficie
+  propia (separación 20 pt; en Tarjetas los valores se funden y los datos se reacomodan al cambiar de tarjeta). La
+  cara de arriba es el objeto; el bloque, su lectura.
+- **Los datos.** Vence y Cierra comparten un `StatRow`; Disponible tiene su propia fila de ancho completo con la barra
+  de uso. En tres columnas, un disponible de siete cifras en ARS no entraba en su tercio a 375 pt y se dibujaba más
+  chico; ahora conserva el tamaño de fila y «No calculado con cuotas» se lee en una línea. Las fechas se siguen
+  apilando con texto grande.
+- **Superficies.** Las que quedan son listas agrupadas: «Cuotas futuras» y los movimientos. Recientes lleva un
+  `SectionTitle` callado con «Ver todos» (`common.seeAll`, como en Inicio; salió `cards.panel.seeAll`).
+- **Ciclo de vida.** En el detalle, bajo la cara, `CardLifecycleNote`: un glifo de archivo o papelera, el estado y lo
+  que todavía hace, legible y tranquilo (sin color de alarma). Archivada: «Sigue recibiendo pagos y registrando sus
+  cuotas. Para usarla de nuevo, reactivala en Editar tarjeta.» («It still takes payments and records its installments.
+  To use it again, reactivate it in Edit card.»); eliminada: «Sus compras y pagos siguen en Movimientos…». Una
+  archivada se sigue pagando y no tiene Registrar compra; una eliminada solo se lee (la lógica no cambió).
+
+### Tarjetas: el detalle del plan
+
+- **Héroe.** La marca, «Compra en cuotas · ARS», el precio, «12 cuotas sin interés» / «12 cuotas con interés» («12
+  installments, interest-free» / «… with interest»), el estado.
+- **La barra de progreso** (`PlanProgressSummary`, plana bajo el héroe, desde el puro `planProgress`): un segmento de
+  8 pt por cuota hasta `PLAN_SEGMENT_MAX = 24` (4 pt entre segmentos hasta 12, 2 pt más allá); un plan más largo (hasta
+  120) dibuja una barra continua. Los segmentos siguen los estados del Calendario: registrada en tinta, en parte en
+  ámbar, deshecha `warningSoft` con contorno ámbar, próxima y futura con contorno terciario vacío, cancelada con contorno terciario punteado (revisión: el color de línea casi no se veía sobre el lienzo); lleno frente a contorno distingue registrada de pendiente sin depender del color. Es
+  dibujo: el sentido está en las palabras.
+- **Vocabulario.** «3 de 12 registradas» («3 of 12 recorded»), del `figures.recognisedCount` del dominio; «Próxima
+  cuota · fecha» y el principal que falta («restantes»; «principal restante» con interés) solo mientras el plan está
+  activo, apilado bajo el conteo antes que achicarse. El dominio usa «reconocida» y «facturada» como sinónimos
+  (`packages/domain/installments.ts`): nada separa lo facturado de lo reconocido, así que la pantalla dice solo
+  registradas y futuras; nunca «X/Y pagadas», porque un pago de tarjeta no se asigna a una cuota. Importes exactos;
+  interés, comisiones e impuestos solo cuando existen. Un solo elemento de VoiceOver.
+- **Lista de datos.** Sale la fila del conteo (`recordedCount`, `recordedCountValue`); «Restante» aparece solo en un
+  plan completo o cancelado (uno activo lo muestra en el progreso). El Calendario, `ScheduleRow` y la regla de
+  eliminar (solo `summary.deletable`) no cambian.
+
+### Tarjetas: movimientos
+
+Revisado sin cambiar código: en las listas de una tarjeta una compra o una cuota registrada se ve sin signo en tinta y
+un pago es «Pago de tarjeta» en el tono de transferencia, sin signo (la regla de 24UX6C). «Cuota X de Y» sigue en el
+detalle del movimiento, no en la fila.
+
+### Lo que no entra
+
+Ni los demás destinos financieros en Forest (24UX6E: Cuentas, Presupuestos, Recurrentes, Deudas y cobros y
+Categorías), ni los filtros de Movimientos (cuenta, categoría, período y
+período a medida junto al filtro por tipo y la búsqueda: pertenecen al alcance de búsqueda y productividad de 25C, con
+sus búsquedas guardadas; no se envía un botón de filtro a medias), ni 24T3, notificaciones o el Asistente.
+
 ## Producto 24UX6C2 — actividad de Inicio e interacción de Reportes
 
 Un pulido chico después de 24UX6C, en su rama `feat/producto-24ux6c2-home-activity-reports-polish` desde master c673be6
@@ -830,7 +1068,7 @@ calculado conserva su menos. Reemplaza, marcadas en su lugar: «Actividad recien
 horizonte de siete días de «Próximos compromisos» (24UX6A; ahora 30 días), el centro de la dona con «Total del período»
 y el total, y el umbral de apilado solo por escala en las filas de categoría; y precisa «sin tarjetas de presupuesto en
 Inicio» (24UX6A): sigue sin haber tarjeta permanente, pero existe una fila contextual del presupuesto general cuando
-pide atención (abajo).
+pide atención (abajo) *(→ refinamiento de 24UX6D: también presupuestos por categoría, hasta dos filas)*.
 
 ### Inicio: la actividad reciente incluye transferencias
 
@@ -856,25 +1094,29 @@ pide atención (abajo).
 ### Inicio: la fila de atención del presupuesto general
 
 Un refinamiento del dueño dentro de esta entrega. No es una tarjeta de presupuesto: es **una sola fila contextual**
-que aparece solo cuando el presupuesto general del mes pide atención, y desaparece sola cuando no.
+que aparece solo cuando el presupuesto general del mes pide atención, y desaparece sola cuando no. *(→ Refinamiento de
+24UX6D: también los presupuestos por categoría, hasta dos filas, con `homeBudgets`; «un sublímite nunca la muestra» y
+«uno solo» quedan reemplazados; ver «Inicio: atención de presupuestos (refinamiento)».)*
 
 - **Cuándo.** `homeBudgetAttention(summary)` (`src/ui/home-focus.ts`, puro) mira **solo el presupuesto general**
   (`summary.total`) con la regla del dominio, `budgetState` (`BUDGET_WARNING_RATIO` 0,85): tranquilo por debajo del
   85 % (no hay fila), **aviso** desde el 85 % hasta el 100 % inclusive, **excedido** por encima del 100 %. Sin
   presupuesto general activo para el mes, o tranquilo, devuelve `null` y la fila no existe. Un sublímite por categoría
-  nunca la muestra, ni excedido.
+  nunca la muestra, ni excedido. *(→ refinamiento de 24UX6D: ahora sí, en aviso o excedido)*
 - **Qué presupuesto.** `homeBudget(libro, presupuestos, monedas del historial, modo, moneda de la vista, mes)`
   (`src/ui/home-focus.ts`, puro), con la regla de 24C1 de que un presupuesto conserva su moneda. Solo cuentan los
   presupuestos **generales**: un sublímite por categoría nunca convierte a una moneda en candidata. Con «Solo …», solo
   el presupuesto general de esa moneda; en consolidado, primero el de la moneda de visualización y después el de cada
   moneda del historial en el orden de agrupación: la fila es **el primero que está en aviso o excedido**, y **nombra su
   moneda** cuando no es la de visualización. Así un presupuesto tranquilo (o un sublímite) nunca esconde el excedido de
-  otra moneda, y con dos que piden atención se ve uno solo, el de la moneda de visualización primero. Se mide con
+  otra moneda, y con dos que piden atención se ve uno solo, el de la moneda de visualización primero *(→ refinamiento
+  de 24UX6D: hasta dos filas, con el orden de «Inicio: atención de presupuestos (refinamiento)»)*. Se mide con
   `summarizeMonthlyBudgets` sobre el **libro real** en la moneda propia del presupuesto: nunca se convierte ni se suma a
   otra moneda.
 - **Dónde.** En un grupo propio (`Surface grouped`) después del campo financiero y **antes** de «Próximos compromisos»
   y «Actividad reciente»: lo accionable primero. Entra y sale con `Reflow` como los demás grupos.
-- **La fila.** `BudgetAttentionRow` (`src/ui/home-modules.tsx`): `PressFeedback` con resaltado, rol botón, 60 pt de
+- **La fila.** *(→ 24UX6D: ahora es una fila de progreso compacta, «Presupuesto» y «91 %», una barra y «Quedan $ …»;
+  la semántica no cambia; ver «Producto 24UX6D — Tarjetas en Forest y pulido final de Inicio y Reportes»)* `BudgetAttentionRow` (`src/ui/home-modules.tsx`): `PressFeedback` con resaltado, rol botón, 60 pt de
   alto mínimo; un `GlyphTile` de 36 pt (aviso: `speedometer-outline` en el tono `warning`, ámbar; excedido:
   `alert-circle-outline` en el tono `expense`, el de alerta) y un chevron. Título en tinta, 600: aviso «Usaste 87 % del
   presupuesto del mes» («You used 87% of this month’s budget»; el porcentaje entero que muestran Presupuestos y
@@ -885,17 +1127,19 @@ que aparece solo cuando el presupuesto general del mes pide atención, y desapar
   `moneyText`, o con su código (`codedAmount`) cuando la fila nombra la moneda. El ámbar sigue en el 100 % justo; el
   tono de alerta es solo para lo que pasó el límite.
 - **VoiceOver.** Un solo elemento: el título hablado (`spokenPercent`) más «, » y el detalle hablado (`spokenMoney`);
-  pista «Abre Presupuestos» («Opens Budgets»).
+  pista «Abre Presupuestos» («Opens Budgets»). *(→ 24UX6D: «Presupuesto del mes, cerca del límite, 87 % usado, quedan
+  …»; ver «Producto 24UX6D — Tarjetas en Forest y pulido final de Inicio y Reportes»)*
 - **Tocar.** Abre Presupuestos en la moneda y el mes del presupuesto (`/budgets` con `currency` y `month`).
 - **Textos.** Nuevas claves `home.budget.warning`, `warningIn`, `exceeded`, `exceededIn`, `left`, `over` y `hint`, en
-  español y en inglés; el candado del inglés se volvió a aceptar.
-- **Lo que no es.** Ni tarjeta permanente, ni presupuestos por categoría, ni la línea de atención de la primera
+  español y en inglés *(→ 24UX6D: las cuatro primeras salieron; `left` y `over` ya no dicen «de {limit}»)*; el candado del inglés se volvió a aceptar.
+- **Lo que no es.** Ni tarjeta permanente, ni presupuestos por categoría *(→ refinamiento de 24UX6D: un presupuesto
+  por categoría puede ser una de las dos filas de atención)*, ni la línea de atención de la primera
   iteración (`HomeInsightRow` no vuelve), ni una cifra nueva: no cambia el dominio de presupuestos ni cómo se calculan.
 
 ### Inicio: la regla mínima (para entregas futuras)
 
-Inicio muestra solo el campo financiero, la fila de atención del presupuesto general cuando la hay, los compromisos
-cercanos cuando existen y la actividad reciente.
+Inicio muestra solo el campo financiero, la atención de presupuestos cuando la hay (hasta dos filas: el general y los
+por categoría, desde el refinamiento de 24UX6D), los compromisos cercanos cuando existen y la actividad reciente.
 
 - **«Próximos compromisos» es condicional:** solo reglas recurrentes **de gasto** activas y no borradas, en la vista,
   cuya próxima fecha cae en una **ventana móvil de 30 días** desde hoy (`COMMITMENT_WINDOW_DAYS`, reemplazó al
@@ -908,18 +1152,26 @@ cercanos cuando existen y la actividad reciente.
   entonces se cortan a dos (`COMMITMENT_ROWS`); sin ninguna en la ventana, la sección no existe. Lo demás vive en
   Recurrentes («Ver todos»). Un ingreso recurrente nunca se muestra como compromiso; tampoco resúmenes de tarjeta,
   cuotas ni pagos de deudas.
-- **Presupuesto: sin tarjeta permanente, con una fila contextual.** Inicio **no** tiene una tarjeta de presupuesto
-  permanente (ni la «Presupuesto del mes» de antes ni sublímites). Sí puede tener **una** fila del presupuesto general
-  cuando `budgetState` pide atención (aviso o excedido), con las reglas de arriba; tranquilo, no hay nada.
-- **No van en Inicio:** rankings, una tarjeta permanente de presupuesto, presupuestos por categoría, una línea de
+- **Presupuesto: sin tarjeta permanente ni tablero, con hasta dos filas contextuales.** Inicio **no** tiene una tarjeta
+  de presupuesto permanente (ni la «Presupuesto del mes» de antes ni una lista de sublímites) ni un tablero de
+  presupuestos. Sí puede tener **hasta dos** filas de atención: el presupuesto general y los presupuestos por categoría
+  cuando `budgetState` dice aviso o excedido, con el orden, las monedas, el título y la tinta de «Inicio: atención de
+  presupuestos (refinamiento)» (24UX6D); tranquilos, no hay nada. *(Antes del refinamiento de 24UX6D: una sola fila, solo
+  del presupuesto general.)*
+- **No van en Inicio:** rankings, una tarjeta permanente de presupuesto, un tablero o una lista de presupuestos por
+  categoría (un presupuesto por categoría aparece solo como una de las dos filas de atención), una línea de
   atención calculada ni un módulo permanente de recurrentes. Una visibilidad más amplia de lo que viene es trabajo del
   calendario y de las notificaciones futuras (las notas de 24UX6A y 25D), no de Inicio.
 
 ### Reportes: el total arriba y la dona para elegir
 
 - **El total, una vez.** El KPI de arriba («GASTADO · ARS», el importe y su línea) sigue en Categorías y en Día a día.
-  El centro de la dona ya no repite el total del período (antes «Total del período» y el mismo importe).
-- **El centro.** Sin elección, una nota callada en footnote: «Tocá una categoría» («Tap a category»). Con una
+  El centro de la dona ya no repite el total del período (antes «Total del período» y el mismo importe). *(→ 24UX6D:
+  el KPI y su promedio salieron; el total vive en el centro de la dona en Categorías y en una línea compacta en Día a
+  día; ver «Producto 24UX6D — Tarjetas en Forest y pulido final de Inicio y Reportes»)*
+- **El centro.** Sin elección, una nota callada en footnote: «Tocá una categoría» («Tap a category») *(→ 24UX6D:
+  sin elección el centro muestra «Total del período» y el total exacto; la dona creció a 200–260 pt y el importe
+  baja de 26 a 18 pt hasta entrar)*. Con una
   categoría elegida: su nombre (footnote seminegrita), su importe exacto (`Money`, 18 pt desde 176 pt de dona, si no
   16 pt; peso 700; centrado) y «29 % del gasto», con el mismo porcentaje que su fila (`spendingShare` sobre el gasto
   del informe). Los textos del centro se limitan a 1,2× de Dynamic Type; cuando el importe elegido no entra en el
@@ -933,7 +1185,7 @@ cercanos cuando existen y la actividad reciente.
   (`sliceAt`, puro, exportado con `donutArcs`): el anillo con 10 pt de margen, el ángulo desde las doce en sentido
   horario; un hueco entre porciones cuenta como la porción siguiente; el agujero o afuera, ninguna.
 - **VoiceOver.** La dona es un elemento ajustable: nombre «Gasto por categoría: Comida 40 %, …», valor «Ninguna
-  categoría elegida» o «Supermercado, 412760,40 pesos, 29 % del gasto» (importe y porcentaje hablados), pista
+  categoría elegida» *(→ 24UX6D: «Total del período, …»)* o «Supermercado, 412760,40 pesos, 29 % del gasto» (importe y porcentaje hablados), pista
   «Deslizá hacia arriba o hacia abajo para elegir una categoría»; deslizar recorre las porciones en orden (hacia abajo
   desde ninguna empieza por la última) y, pasado cualquiera de los extremos, vuelve a ninguna. Las dos acciones llevan
   nombres traducidos («Categoría siguiente», «Categoría anterior») para el rotor de Acciones, y un doble toque de
@@ -964,7 +1216,9 @@ como «Supermercado» junto a un importe grande podía partirse dejando una letr
 
 ### Lo que sigue
 
-24UX6D (Tarjetas en Forest) sigue en el carril UX; el orden de producto (24T3, 25A, …) no cambia.
+24UX6D (Tarjetas en Forest) sigue en el carril UX; el orden de producto (24T3, 25A, …) no cambia. *(→ implementada:
+ver «Producto 24UX6D — Tarjetas en Forest y pulido final de Inicio y Reportes»; después viene 24UX6E, más destinos
+financieros en Forest: Cuentas, Presupuestos, Recurrentes, Deudas y cobros y Categorías.)*
 
 ## Producto 24UX6C — presentación de movimientos, Inicio y Más
 
@@ -1076,8 +1330,9 @@ Nada nuevo. Las pestañas siguen cambiando al instante, sin fundido.
 
 ### Lo que queda para después (aprobado para 24UX6C, sin implementar)
 
-Los filtros de Movimientos por período, cuenta y categoría con datos del repositorio. Siguen sin inventarse nota, origen
-Apple Pay ni hora de un movimiento.
+Los filtros de Movimientos por período, cuenta y categoría con datos del repositorio *(→ desde 24UX6D, parte del alcance
+de búsqueda y productividad de 25C, con sus búsquedas guardadas; no hay un botón de filtro a medias)*. Siguen sin
+inventarse nota, origen Apple Pay ni hora de un movimiento.
 
 ## Producto 24T2 — compra en cuotas y Tarjetas completo
 
@@ -1091,12 +1346,13 @@ pruebas están en el roadmap («Producto 24T2»).
   vez por su franja superior (nombre y «•••• 4009», lo que identifica una tarjeta), elige con un toque, sin arrastre ni
   gesto horizontal, y deja la elegida entera abajo, justo encima de su resumen: la cara y sus cifras quedan juntas y el
   alto de la página no depende de cuál se eligió. Una sola tarjeta es solo su cara, sin apilar. Con muchas, cada franja
-  conserva 50 pt de toque y la página trae la elegida a la vista. Tocar la del frente abre su detalle.
+  conserva 50 pt de toque *(→ 24UX6D: 50 pt hasta cuatro tarjetas, 44 pt desde la quinta)* y la página trae la elegida a la vista. Tocar la del frente abre su detalle.
 - **Caras.** Identidad y nada más: nombre, «•••• 4009», emisor, el color elegido para su cuenta y el código de moneda
   solo si hay tarjetas en más de una moneda. Sin cifras, logos de banco o de red ni chip sin contacto. El texto se
   limita a 1,3× para que la franja siempre lo muestre; el nombre cede antes que los últimos cuatro, nunca se pisan.
 - **El resumen de la elegida**, en el orden del brief: «Saldo pendiente · ARS» como héroe (toda la deuda registrada;
-  nunca «Resumen», «Facturado» ni «Deuda»); Vence · Cierra · Disponible, tres datos separados (con cierre 28 y
+  nunca «Resumen», «Facturado» ni «Deuda»); Vence · Cierra · Disponible, tres datos separados *(→ 24UX6D: planos sobre el
+  lienzo con el saldo, Vence · Cierra en una fila y Disponible en la suya)* (con cierre 28 y
   vencimiento 5, el 1 oct: Vence 5 oct —del resumen que cerró el 28 sep— y Cierra 28 oct), Vence en ámbar a tres días o
   menos si hay saldo; Disponible con la cifra, «Sin límite cargado» o, con un plan pendiente, «No calculado con cuotas»
   con su explicación a un toque, nunca un cero; Registrar compra sobre Pagar tarjeta; «Cuotas futuras» (el principal,
@@ -1109,7 +1365,7 @@ pruebas están en el roadmap («Producto 24T2»).
   por plan («MacBook Pro · 12 cuotas · 3/12 registradas», «$ 900.000,00 restantes» —«principal restante» si el plan
   tiene interés—, «Próxima cuota · 28 oct») y Movimientos con «Este ciclo». Sin tarjetas dentro de tarjetas.
 - **Detalle del plan.** Como un movimiento: la marca, «Compra en cuotas · ARS», el precio como héroe, «12 cuotas · Sin
-  interés» y el estado; después solo lo que el plan y el libro saben, una cifra por fila (con interés, las cifras dicen
+  interés» y el estado *(→ 24UX6D: «12 cuotas sin interés» y la barra de progreso con «3 de 12 registradas»)*; después solo lo que el plan y el libro saben, una cifra por fila (con interés, las cifras dicen
   que son principal y el interés que falta tiene su fila); el Calendario con Registrada, Registrada en parte, Próxima,
   Futura y Deshecha. Nunca «pagada». La única acción es Eliminar plan, si todavía no registró nada.
 - **Compra en cuotas.** «Pago» [Una vez][En cuotas] bajo la fecha, solo en un gasto nuevo con una tarjeta activa, tan
@@ -2147,15 +2403,31 @@ color propio.
 
 ## Pendiente de revisión en iPhone
 
+- Producto 24UX6D (sin build de EAS, nada revisado todavía): en Reportes la dona a 393 y 375 pt (247 y 234 pt), «Total
+  del período» y el total exacto en el centro, la categoría elegida en su lugar, la lectura debajo de la dona en tamaños
+  de accesibilidad o con un importe enorme, nunca cortada; limpiar con la misma porción, el agujero, el espacio neutro
+  alrededor del anillo (sin robar el desplazamiento ni el segmentado), el mes, la moneda y Categorías ↔ Día a día; la
+  línea compacta de Día a día y la fila de variación abajo; en Inicio la fila de progreso del presupuesto en aviso, en
+  el 100 % justo («Límite alcanzado», ámbar) y excedida (glifo de alerta, «por encima», barra llena), su movimiento de
+  260 ms y al instante con Reduce Motion, VoiceOver con estado, porcentaje e importe; con el refinamiento, hasta dos
+  filas (general y por categoría) en una superficie agrupada, excedido primero, el general antes que una categoría,
+  cinco categorías → dos filas, el nombre de la categoría en tinta sin su color, un presupuesto por categoría en USD
+  con «· USD» que abre Presupuestos en USD, nombres largos e importes grandes a 375 pt y en tamaños de accesibilidad,
+  VoiceOver por fila; en Tarjetas mazos de 1, 2, 3, 4, 5
+  y 6 tarjetas (franjas de 50 pt y de 44 pt desde la quinta), nombres largos, claro y oscuro con el bloque plano, las
+  notas de archivada y eliminada, la barra del plan con «3 de 12 registradas», los movimientos de la tarjeta; el
+  espacio sobre el dock; Reducir transparencia. Lista en docs/mobile-device-checklist.md.
+
 - Producto 24UX6C2 (sin build de EAS, nada revisado todavía): la actividad reciente de Inicio mezcla gastos, ingresos
   y transferencias del más nuevo, una transferencia una sola vez con «Origen → Destino» en el tono de transferencia,
   VoiceOver diciendo «Transferencia» con la dirección, tocarla abre su detalle y Gastado no cambia después de una
   transferencia; los compromisos siguen condicionales, ahora con la ventana de 30 días (de hoy a hoy + 30 inclusive);
   la fila del presupuesto general (aparece al 85 % en ámbar, sigue ámbar en el 100 %, pasado el límite en el tono de
-  alerta con lo excedido, nunca por un presupuesto por categoría, abre Presupuestos en su moneda y su mes, en
+  alerta con lo excedido, nunca por un presupuesto por categoría *(→ refinamiento de 24UX6D: también por categoría,
+  hasta dos filas)*, abre Presupuestos en su moneda y su mes, en
   consolidado con el presupuesto en otra moneda que la de visualización nombra esa moneda sin convertir, desaparece por
-  debajo del 85 %); en Reportes el total arriba en las dos vistas, el centro de la
-  dona callado y después el nombre, el importe y el porcentaje de la categoría elegida, la porción elegida más gruesa
+  debajo del 85 %) *(→ 24UX6D: ahora una fila de progreso, misma semántica)*; en Reportes el total arriba en las dos
+  vistas, el centro de la dona callado *(→ 24UX6D: el total pasó al centro de la dona y el KPI salió)* y después el nombre, el importe y el porcentaje de la categoría elegida, la porción elegida más gruesa
   y las demás atenuadas, la fila marcada, tocar de nuevo o el agujero la quita, VoiceOver ajustable (deslizar arriba y
   abajo) anuncia categoría, importe y porcentaje, la elección vuelve a ninguna al cambiar de mes o de moneda; nombres
   largos con importes grandes apilados a 375 pt y en tamaños de accesibilidad; la navegación de meses, las barras y

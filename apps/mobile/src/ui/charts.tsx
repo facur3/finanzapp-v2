@@ -96,17 +96,62 @@ export function sliceAt(arcs: readonly DonutArc[], x: number, y: number, size: n
   return (arcs.find(arc => arc.start > angle) ?? arcs[0]).key;
 }
 
-/** Category donut (24UX6C2). The month's total is the report's own figure above it, so the centre never repeats it:
- * until a category is chosen it says, quietly, that a category can be tapped; a tapped slice is chosen (drawn thicker,
- * the others at 30 %), and the centre shows its name, its exact amount and its share. Tapping the chosen slice again, or
- * the hole, clears it. VoiceOver reaches the same choice without aiming at a slice: the chart is one adjustable element
- * (swipe up or down steps through the categories, and back to none) whose value says the chosen category, amount and
- * share. The colour is never the only sign of the choice: the centre names it and its row is marked too.
+/** Reportes' screen padding, both sides (`space.xl` each): the width the donut's row actually has is the window's less this. */
+export const DONUT_GUTTER = 40;
+/** The ring's stroke. It keeps its 22 pt while the square grows, so the ring is relatively thinner (8.9 % of a 247 pt
+ * square, 12.5 % of the old 176 pt one) and the hole, where the total now lives, is bigger. */
+export const DONUT_RING = 22;
+/** 24UX6D: the donut is the focal point of Categorías, so it takes 70 % of the content width, never under 200 pt nor over
+ * 260 pt (nor wider than the content): 247 pt at 393 pt (content 353), 234 pt at 375 pt (content 335), 200 pt at 320 pt,
+ * 260 pt from 412 pt up. Pure, for the tests. */
+export function donutGeometry(windowWidth: number): { size: number; thickness: number } {
+  const content = Number.isFinite(windowWidth) && windowWidth > DONUT_GUTTER ? windowWidth - DONUT_GUTTER : 0;
+  const size = content > 0 ? Math.min(content, Math.max(200, Math.min(260, Math.round(content * 0.7)))) : 200;
+  return { size, thickness: DONUT_RING };
+}
+
+/** The width the centre's text may take on one line: the square less the ring and a 10 pt margin on each side (183 pt in
+ * the 247 pt donut, 170 pt in the 234 pt one; the old 176 pt donut had 112 pt). */
+export function donutRoom(size: number, thickness: number): number {
+  return size - 2 * (thickness + 10);
+}
+
+/** The centre amount's sizes, largest first: it steps down 2 pt at a time until the exact amount fits the hole, and
+ * never below 18 pt. An amount that does not fit at 18 pt moves under the donut instead (never shrunk further, never
+ * truncated, never approximated). */
+export const CENTRE_AMOUNT_STEPS = [26, 24, 22, 20, 18] as const;
+/** Money's own cap on Dynamic Type for an amount that is not a hero (`ROW_MAX_SCALE` in components.tsx). */
+export const MONEY_MAX_SCALE = 1.8;
+
+/** The largest step of `CENTRE_AMOUNT_STEPS` at which `amountText` fits `room` at this text scale, or null when not even
+ * the smallest does. */
+export function centreAmountSize(amountText: string, room: number, fontScale: number): number | null {
+  const scale = Math.max(Number.isFinite(fontScale) ? fontScale : 1, 0.5);
+  return CENTRE_AMOUNT_STEPS.find(step => amountWidthEm(amountText) * step * scale <= room) ?? null;
+}
+
+/** Category donut (24UX6C2, recomposed in 24UX6D). It is the head of Categorías: the period's total lives in its centre
+ * (the «Gastado» KPI above it is gone), so with nothing chosen the centre says «Total del período» quietly over the exact
+ * total, the report's own figure (`total`, minor units). A tapped slice is chosen (drawn thicker, the others at 30 %) and
+ * the centre shows its name, its exact amount and its share instead. Tapping the chosen slice again, the hole, or the
+ * neutral space around the ring (the chart's own full-width row) clears it; the screen clears it too on a month, currency,
+ * display mode or Categorías | Día a día change. VoiceOver reaches the same choice without aiming at a slice: the chart is
+ * one adjustable element (swipe up or down steps through the categories, and back to none) whose value is the total with
+ * none chosen and the category, amount and share with one. The colour is never the only sign of the choice: the centre
+ * names it and its row is marked too.
+ *
+ * The amount in the centre steps from 26 pt down to 18 pt until it fits the hole (`centreAmountSize`). When it cannot, or
+ * the text is larger than 1.2× (the centre's own cap), or a name does not fit two lines, the whole readout (the total, or
+ * the chosen category's) moves under the donut, uncapped and whole, and the hole stays clear.
  *
  * The first chart sweeps in clockwise (480 ms); after that a month or currency change is one crossfade with the slices
  * already final, and a choice changes the opacity at once. Reduce Motion shows the finished chart at once. */
-export function DonutChart({ slices, currency, size = 176, thickness = 22, chosen = null, onChoose, shareOf, caption }: {
-  slices: (DonutSlice & { color: string })[]; currency: Currency; size?: number; thickness?: number;
+export function DonutChart({ slices, currency, total, size: sizeProp, thickness: thicknessProp, chosen = null, onChoose, shareOf, caption }: {
+  slices: (DonutSlice & { color: string })[]; currency: Currency;
+  /** The period's total in minor units, the report's own figure (the slices' sum when absent). */
+  total?: number;
+  /** The square and the ring; by default from the window's width (`donutGeometry`). */
+  size?: number; thickness?: number;
   /** The chosen slice's key (null: none). */
   chosen?: string | null; onChoose?: (key: string | null) => void;
   /** A slice's share of the report's total, as the rows show it («29 %»): one formatter for both, so they always agree. */
@@ -116,13 +161,19 @@ export function DonutChart({ slices, currency, size = 176, thickness = 22, chose
 }) {
   const p = usePalette();
   const { t, speechLanguage, spokenMoney, moneyText } = useI18n();
-  const { fontScale } = useWindowDimensions();
+  const { fontScale, width } = useWindowDimensions();
+  const geometry = donutGeometry(width);
+  const size = sizeProp ?? geometry.size;
+  const thickness = thicknessProp ?? geometry.thickness;
   const signature = slices.map(slice => slice.key + ':' + slice.value).join('|');
   const revealed = useRef(false);
   const reveal = !revealed.current;
   useEffect(() => { revealed.current = true; }, []);
+  // Where a touch on the neutral space around the ring started: only a tap (under 10 pt of travel) clears the choice.
+  const touch = useRef<{ x: number; y: number } | null>(null);
   const arcs = useMemo(() => donutArcs(slices, size, thickness), [slices, size, thickness]);
   const selected = slices.find(slice => slice.key === chosen) ?? null;
+  const totalMinor = total ?? slices.reduce((sum, slice) => sum + slice.value, 0);
   const label = slices.map(slice => t('reports.chart.slice', { label: slice.label, percent: shareOf(slice.value).label.replace(/\s?%$/, '') })).join(', ');
   // VoiceOver steps through the slices in order; past either end it returns to none.
   const step = (direction: 1 | -1) => {
@@ -133,26 +184,42 @@ export function DonutChart({ slices, currency, size = 176, thickness = 22, chose
     onChoose(next < 0 || next >= slices.length ? null : slices[next].key);
   };
   const value = selected ? t('reports.chart.chosen', { name: selected.label, amount: spokenMoney(selected.value, currency), percent: shareOf(selected.value).spoken })
-    : t('reports.chart.noneChosen');
-  // The chosen readout fits the hole only at ordinary text sizes and when its amount fits the hole's width at the centre's
-  // size; otherwise it moves under the donut (whole, never truncated) and the hole stays clear. The readout is drawn for
-  // the eye only: VoiceOver hears the same choice once, as the adjustable element's value.
-  const amountSize = size >= 176 ? 18 : 16;
-  const hole = size - 2 * (thickness + 10);
-  // The name must fit too, on at most two lines of the hole (Codex, PR #73: a custom category may be 60 characters long);
-  // 0.85 leaves room for where the line breaks fall.
+    : t('reports.periodTotalSpoken', { amount: spokenMoney(totalMinor, currency) });
+  // The readout (the total, or the chosen category) fits the hole only at ordinary text sizes, when its exact amount fits
+  // the hole's width at one of the centre's steps, and when its heading fits two lines (Codex, PR #73: a custom category
+  // may be 60 characters long; 0.85 leaves room for where the line breaks fall). Otherwise it moves under the donut
+  // (whole, never truncated) and the hole stays clear. The readout is drawn for the eye only: VoiceOver hears it once, as
+  // the adjustable element's value.
+  const room = donutRoom(size, thickness);
+  const shownMinor = selected ? selected.value : totalMinor;
+  const amountText = moneyText(shownMinor, currency);
+  const heading = selected ? selected.label : t('reports.periodTotal');
   const scale = Math.max(fontScale, 0.5);
-  const centreFits = !selected || (fontScale <= ROW_STACK_SCALE
-    && amountWidthEm(moneyText(selected.value, currency)) * amountSize * scale <= hole
-    && labelWidthEm(selected.label) * 13 * scale <= hole * 2 * 0.85);
-  const readout = selected ? <>
-    <AppText numberOfLines={centreFits ? 2 : undefined} maxFontSizeMultiplier={centreFits ? ROW_STACK_SCALE : undefined} variant="footnote"
-      style={{ fontWeight: '600', textAlign: 'center' }}>{selected.label}</AppText>
-    <Money minor={selected.value} currency={currency} size={amountSize} weight="700" align="center" />
-    <AppText secondary maxFontSizeMultiplier={centreFits ? ROW_STACK_SCALE : undefined} variant="caption" style={{ textAlign: 'center' }}>
-      {t('reports.chart.share', { percent: shareOf(selected.value).label })}</AppText>
-  </> : null;
-  return <View style={{ alignItems: 'center', gap: 10 }}>
+  const fitted = fontScale <= ROW_STACK_SCALE ? centreAmountSize(amountText, room, fontScale) : null;
+  const centreFits = fitted !== null && labelWidthEm(heading) * 13 * scale <= room * 2 * 0.85;
+  // Under the donut the amount has the row's whole width and follows Dynamic Type (up to Money's own cap).
+  const belowSize = centreAmountSize(amountText, Math.max(0, width - DONUT_GUTTER), Math.min(fontScale, MONEY_MAX_SCALE)) ?? CENTRE_AMOUNT_STEPS[CENTRE_AMOUNT_STEPS.length - 1];
+  const readout = <>
+    <AppText numberOfLines={centreFits ? 2 : undefined} maxFontSizeMultiplier={centreFits ? ROW_STACK_SCALE : undefined} variant="footnote" secondary={!selected}
+      style={selected ? { fontWeight: '600', textAlign: 'center' } : { textAlign: 'center' }}>{heading}</AppText>
+    <Money minor={shownMinor} currency={currency} size={centreFits ? fitted : belowSize} weight="700" align="center" />
+    {selected && <AppText secondary maxFontSizeMultiplier={centreFits ? ROW_STACK_SCALE : undefined} variant="caption" style={{ textAlign: 'center' }}>
+      {t('reports.chart.share', { percent: shareOf(selected.value).label })}</AppText>}
+  </>;
+  const clears = !!selected && !!onChoose;
+  // 24UX6D: the chart's own full-width row is neutral space. A tap there (not on the ring, which is the Pressable below and
+  // claims its own touches first) clears the choice; it is not an accessibility element and answers only while something
+  // is chosen, and it lets go of the touch the moment the list starts scrolling.
+  return <View style={{ alignSelf: 'stretch', alignItems: 'center', gap: 10 }}
+    onStartShouldSetResponder={() => clears}
+    onResponderGrant={event => { touch.current = { x: event.nativeEvent.pageX, y: event.nativeEvent.pageY }; }}
+    onResponderTerminationRequest={() => true}
+    onResponderTerminate={() => { touch.current = null; }}
+    onResponderRelease={event => {
+      const start = touch.current;
+      touch.current = null;
+      if (clears && start && Math.hypot(event.nativeEvent.pageX - start.x, event.nativeEvent.pageY - start.y) < 10) onChoose!(null);
+    }}>
     <ValueTransition id={signature} variant="fade" style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
       <Pressable accessible accessibilityRole="adjustable" accessibilityLabel={t('reports.chart.donutLabel', { caption, slices: label })}
         accessibilityValue={{ text: value }} accessibilityHint={t('reports.chart.pickHint')} accessibilityLanguage={speechLanguage}
@@ -172,13 +239,12 @@ export function DonutChart({ slices, currency, size = 176, thickness = 22, chose
       </Pressable>
       <View pointerEvents="none" accessibilityElementsHidden importantForAccessibility="no-hide-descendants"
         style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center', gap: 2, paddingHorizontal: thickness + 10 }]}>
-        <ValueTransition id={(selected?.key ?? 'none') + (centreFits ? '' : '|below')} variant="fade" style={{ alignItems: 'center', gap: 2 }}>
-          {!selected ? <AppText secondary maxFontSizeMultiplier={ROW_STACK_SCALE} variant="footnote" style={{ textAlign: 'center' }}>{t('reports.chart.pick')}</AppText>
-            : centreFits ? readout : null}
+        <ValueTransition id={(selected?.key ?? 'total') + (centreFits ? '' : '|below')} variant="fade" style={{ alignItems: 'center', gap: 2 }}>
+          {centreFits ? readout : null}
         </ValueTransition>
       </View>
     </ValueTransition>
-    {selected && !centreFits && <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={{ alignItems: 'center', gap: 2, alignSelf: 'stretch' }}>
+    {!centreFits && <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={{ alignItems: 'center', gap: 2, alignSelf: 'stretch' }}>
       {readout}
     </View>}
   </View>;

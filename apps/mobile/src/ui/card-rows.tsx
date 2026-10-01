@@ -4,7 +4,7 @@ import type { Currency } from '@finanzapp/domain';
 import { useI18n } from '../i18n/provider';
 import { cardFaceTone } from './card-faces';
 import { AppText, GlyphTile, MerchantBadge, Money, PressFeedback, useStacked, type IconName } from './components';
-import type { PlanScheduleRow, PlanSummary, ScheduleRowState } from './installment-presentation';
+import { planProgress, type PlanProgress, type PlanScheduleRow, type PlanSummary, type ScheduleRowState } from './installment-presentation';
 import type { CardSummary } from './liability-presentation';
 import { radius, useCurrentDay, usePalette, type Palette } from './theme';
 
@@ -98,6 +98,64 @@ export function PlanRow({ summary, onPress, last = false }: { summary: PlanSumma
   </PressFeedback>;
 }
 
+/** 24UX6D: the plan detail's progress, flat on the canvas under the hero: a bar of its schedule, «3 de 12 registradas»
+ * (the domain's recognised count, never «pagadas»: a card payment is not assigned to an instalment), the next instalment's
+ * statement and, while the plan is live, the principal still to come («restantes»; «principal restante» with interest),
+ * as PlanRow names them. The amount moves under the count when it would not fit beside it (never smaller, never cut).
+ * One VoiceOver element: the count, the spoken amount and the date written out; the bar is drawing only. */
+export function PlanProgressSummary({ summary, rows }: { summary: PlanSummary; rows: readonly PlanScheduleRow[] }) {
+  const p = usePalette();
+  const day = useCurrentDay();
+  const { t, spokenMoney, relativeDate, formatDate, speechLanguage } = useI18n();
+  const { plan, figures, status, next } = summary;
+  const progress = planProgress(summary, rows);
+  const live = status === 'active';
+  const financed = plan.interestMinor + plan.feeMinor + plan.taxMinor > 0;
+  const stacked = useStacked({ minor: figures.remainingMinor, currency: plan.currency });
+  const count = t('installments.detail.progress', { count: progress.recognisedCount, total: progress.total });
+  const nextLine = live && next ? t('installments.row.next', { date: relativeDate(next.billingDateISO, day) }) : null;
+  const label = [count, live ? t(financed ? 'installments.row.remainingPrincipal' : 'installments.row.remaining', { amount: spokenMoney(figures.remainingMinor, plan.currency) }) : null,
+    live && next ? t('installments.row.nextSpoken', { date: formatDate(next.billingDateISO, 'long') }) : null].filter(Boolean).join(', ');
+  return <View accessible accessibilityLabel={label} accessibilityLanguage={speechLanguage} style={{ gap: 12 }}>
+    <PlanBar progress={progress} />
+    <View style={[styles.body, { alignItems: 'flex-start' }, stacked ? styles.stacked : null]}>
+      <View style={[styles.text, stacked ? null : { flex: 1 }]}>
+        <AppText style={{ fontWeight: '600' }}>{count}</AppText>
+        {!!nextLine && <AppText secondary variant="footnote">{nextLine}</AppText>}
+      </View>
+      {live && <View style={{ alignItems: stacked ? 'flex-start' : 'flex-end', maxWidth: stacked ? '100%' : '56%' }}>
+        <Money minor={figures.remainingMinor} currency={plan.currency} />
+        <AppText secondary variant="caption">{t(financed ? 'installments.row.remainingPrincipalCaption' : 'installments.row.remainingCaption')}</AppText>
+      </View>}
+    </View>
+  </View>;
+}
+
+/** The fill of one instalment's segment: ink for a recognised one, amber for a partly undone one, an amber outline for
+ * an undone one, a solid tertiary outline (empty) for one still to come and a dashed one for a cancelled one. Outlines
+ * use the tertiary ink, which stands out from the canvas in both themes (24UX6D review: the line colour did not), and
+ * filled versus outlined tells recorded from still to come without colour. Meaning is in the words; the drawing only
+ * follows the Calendario's states. */
+function segmentStyle(p: Palette, state: ScheduleRowState) {
+  return state === 'recognised' ? { backgroundColor: p.text } : state === 'partial' ? { backgroundColor: p.warning }
+    : state === 'undone' ? { backgroundColor: p.warningSoft, borderWidth: 1.5, borderColor: p.warning }
+    : state === 'cancelled' ? { backgroundColor: 'transparent', borderWidth: 1.5, borderColor: p.tertiary, borderStyle: 'dashed' as const }
+    : { backgroundColor: 'transparent', borderWidth: 1.5, borderColor: p.tertiary };
+}
+
+/** One segment per instalment up to `PLAN_SEGMENT_MAX` (4 pt apart up to 12, 2 pt beyond), else one continuous bar on a
+ * tertiary outline; 8 pt tall. Static: the plan detail opens on its values (no fill animation to sit through). */
+function PlanBar({ progress }: { progress: PlanProgress }) {
+  const p = usePalette();
+  const { segments, fraction } = progress;
+  if (!segments) return <View style={[styles.bar, { backgroundColor: 'transparent', borderWidth: 1.5, borderColor: p.tertiary }]}>
+    <View style={{ height: '100%', width: `${fraction * 100}%`, borderRadius: 4, backgroundColor: p.text }} />
+  </View>;
+  return <View style={{ flexDirection: 'row', gap: segments.length > 12 ? 2 : 4 }}>
+    {segments.map((state, index) => <View key={index} style={[styles.segment, segmentStyle(p, state)]} />)}
+  </View>;
+}
+
 const STATE_GLYPH: Record<ScheduleRowState, IconName> = {
   recognised: 'checkmark-circle', partial: 'checkmark-circle-outline', next: 'radio-button-on', future: 'ellipse-outline', undone: 'arrow-undo-circle-outline',
   cancelled: 'remove-circle-outline',
@@ -160,5 +218,7 @@ const styles = StyleSheet.create({
   stacked: { flexDirection: 'column', alignItems: 'flex-start' },
   text: { minWidth: 0, gap: 3 },
   glyph: { width: 28, alignItems: 'center' },
+  bar: { height: 8, borderRadius: 4, overflow: 'hidden' },
+  segment: { flex: 1, height: 8, borderRadius: 3 },
   swatch: { width: 40, height: 26, borderRadius: radius.tile / 2, borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(255,255,255,0.18)' },
 });

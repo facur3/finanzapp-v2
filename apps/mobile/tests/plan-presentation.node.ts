@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { cancelInstallmentPlan, initialRecord, installmentEntryId, materializeInstallmentPlan, newInstallmentPlan, type Account, type CreditCardProfile, type Entry,
   type EntryRecord } from '@finanzapp/domain';
-import { cardPlanSummaries, planScheduleRows, planSummary, purchasePreview } from '../src/ui/installment-presentation.ts';
+import { PLAN_SEGMENT_MAX, cardPlanSummaries, planProgress, planScheduleRows, planSummary, purchasePreview } from '../src/ui/installment-presentation.ts';
 
 // Producto 24T2 review round: a plan's rows are read component by component (each share has its own movement), a
 // cancelled plan is never offered as deletable, the plan list keeps plans with nothing left to come last, and the closing
@@ -54,4 +54,30 @@ test('on the closing day the first instalment is recorded at save, but its state
   assert.deepEqual([preview('2026-09-28').firstRecordedAtSave, preview('2026-09-28').firstAlreadyClosed], [true, false]);
   assert.deepEqual([preview('2026-09-29').firstRecordedAtSave, preview('2026-09-29').firstAlreadyClosed], [true, true]);
   assert.deepEqual([preview('2026-09-27').firstRecordedAtSave, preview('2026-09-27').firstAlreadyClosed], [false, false]);
+});
+
+test('24UX6D: a plan\'s progress is the domain\'s recognised count, one segment per instalment up to 24 and a continuous bar beyond; an undone share never counts', () => {
+  assert.equal(PLAN_SEGMENT_MAX, 24);
+  const progress = (plan: typeof financed, records: EntryRecord[]) => planProgress(planSummary(plan, records), planScheduleRows(plan, records));
+  assert.equal(JSON.stringify(progress(financed, [])), JSON.stringify({ recognisedCount: 0, total: 3, segments: ['next', 'future', 'future'], fraction: 0 }));
+  const [principal, interest] = materializeInstallmentPlan(financed, card, '2026-09-30', new Set());
+  const one = progress(financed, [initialRecord(principal), initialRecord(interest)]);
+  assert.equal(JSON.stringify([one.recognisedCount, one.segments, one.fraction]), JSON.stringify([1, ['recognised', 'next', 'future'], 1 / 3]));
+  assert.equal(one.recognisedCount, planSummary(financed, [initialRecord(principal), initialRecord(interest)]).figures.recognisedCount, 'the count is the domain figure, never re-derived');
+  // The interest undone, the principal kept: the principal counts (1 of 3) and the segment says «partial».
+  const partial = progress(financed, [initialRecord(principal), voided(interest)]);
+  assert.equal(JSON.stringify([partial.recognisedCount, partial.segments![0]]), JSON.stringify([1, 'partial']));
+  // Every share undone: nothing is recorded, and the segment says so.
+  const undone = progress(financed, [voided(principal), voided(interest)]);
+  assert.equal(JSON.stringify([undone.recognisedCount, undone.segments![0], undone.fraction]), JSON.stringify([0, 'undone', 0]));
+  // A cancelled plan: the rest is cancelled, never future.
+  assert.deepEqual(progress(cancelInstallmentPlan(financed, now), []).segments, ['cancelled', 'cancelled', 'cancelled']);
+  // 24 instalments: segments; 25 or 120: one bar.
+  const long = (count: number) => newInstallmentPlan({ id: 'long' + count, card, cardAccount, merchant: 'Auto', category: 'Transporte', purchaseDateISO: '2026-09-10',
+    principalMinor: 1200000, count, placement: 'current', createdAt });
+  assert.equal(progress(long(24), []).segments!.length, 24);
+  for (const count of [25, 120]) {
+    const bar = progress(long(count), []);
+    assert.equal(JSON.stringify([bar.segments, bar.total, bar.fraction]), JSON.stringify([null, count, 0]));
+  }
 });
