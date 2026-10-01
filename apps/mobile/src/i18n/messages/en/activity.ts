@@ -3,7 +3,7 @@ import type { Messages } from '../../messages.ts';
 /** Movimientos: the list, the rows, and the movement, transfer and spending-period details. */
 export const activity: Pick<Messages, 'activity' | 'rows' | 'entryDetail' | 'transferDetail' | 'spendingDetail'> = {
   activity: {
-    search: 'Search',
+    search: 'Search transactions',
     searchPlaceholder: 'Merchant, category or account',
     all: 'All',
     expenses: 'Expenses',

@@ -3,7 +3,7 @@ import { ScrollView, View, type NativeScrollEvent, type NativeSyntheticEvent } f
 import { router, useFocusEffect } from 'expo-router';
 import { setStatusBarStyle } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { currentMonthISO, hiddenLiabilityAccountIds, isLiveAccount, spendingWindow } from '@finanzapp/domain';
+import { currentMonthISO, spendingWindow } from '@finanzapp/domain';
 import { useLedger } from '../../src/storage/LedgerProvider';
 import { ActionButton, AppText, Choices, EmptyState, EntryRow, Money, SectionTitle, Surface } from '../../src/ui/components';
 import { DisplayCurrencyButton } from '../../src/ui/currency-switch';
@@ -13,7 +13,7 @@ import { availableFigure, inView, spendingFigure } from '../../src/fx/finance-vi
 import { figureInfo, shortfallDetail } from '../../src/fx/fx-copy';
 import { useI18n } from '../../src/i18n/provider';
 import { CurrencyParts, FieldButton, MetricHelp, UpcomingRecurringRow } from '../../src/ui/home-modules';
-import { homeCommitments, homeRecent, recentRowLimit, spendingPerDay } from '../../src/ui/home-focus';
+import { homeCommitments, homeRecent, recentRowLimit } from '../../src/ui/home-focus';
 import { Reflow, ValueTransition } from '../../src/ui/motion';
 import { historyCurrencies, homeNamesCategory, sharedGlyphs, visibleNamesAccount } from '../../src/ui/presentation';
 import { useCategoryLookOf } from '../../src/ui/category-hues';
@@ -37,10 +37,9 @@ const FIELD_RADIUS = 32;
  *      accounts shortcut on the right;
  *   2. only when the ledger holds more than one currency (the 25B2 rule), the display scope chip («Total · ARS» / «Solo
  *      USD») and its explanation; with one currency the row is absent and leaves no gap;
- *   3. the number, the screen's one large element;
- *   4. what it covers: for Gastado the month so far and its daily average (Reportes' `dailyAverageMinor`), or "no
- *      spending this month"; for Disponible «Saldo registrado» and the number of accounts, never a per-day figure;
- *   5. Gastado | Disponible, which switches the number only.
+ *   3. the number, the screen's one large element, with its explanation (ⓘ) beside it when there is no scope row
+ *      (24UX6C: no line under it; the daily average and the account count live in Reportes and Cuentas);
+ *   4. Gastado | Disponible, which switches the number only.
  * Under it: the commitments due within seven days (two at most, the section absent without one), then the month's
  * latest movements (four under commitments, six without; «Ver todos» selects Movimientos). With neither, one quiet
  * line points at «+» and the Assistant. Nothing is drawn to fill space: no rankings, charts, budget cards, insight
@@ -60,7 +59,7 @@ export default function HomeScreen() {
   const day = useCurrentDay();
   const p = usePalette();
   const insets = useSafeAreaInsets();
-  const { t, formatDate, formatNumericDate, currencyName, moneyText, spokenMoney } = useI18n();
+  const { t, formatDate, formatNumericDate, currencyName } = useI18n();
   const expenseLook = useCategoryLookOf('expense');
   const [metric, setMetric] = useState<HomeMetric>('spending');
   // Every currency the ledger ever held (25B2 review): a deleted account's history keeps its currency in the view and the chip.
@@ -101,8 +100,6 @@ export default function HomeScreen() {
   };
 
   if (!snapshot || !view || !spendingHero || !availableHero) return null;
-  const hidden = hiddenLiabilityAccountIds(archive?.cards, archive?.debts);
-  const accountCount = snapshot.accounts.filter(account => inView(view, account) && !hidden.has(account.id) && isLiveAccount(account)).length;
   const spending = metric === 'spending';
   // 24UX5: a row names its account only when the visible rows come from more than one; VoiceOver always says it.
   const upcomingAccount = visibleNamesAccount(upcoming), recentAccount = visibleNamesAccount(recent);
@@ -119,13 +116,6 @@ export default function HomeScreen() {
   const info = figureInfo(hero, spending ? 'spending' : 'available', words);
   const help = info ? <MetricHelp title={t('fx.infoTitle')} detail={info} color={p.heroSecondary} />
     : !spending ? <MetricHelp title={t('home.available')} detail={t('home.availableHelp')} color={p.heroSecondary} /> : null;
-  // The line under the number: what it covers. Gastado: the month so far with its daily average; Disponible: a balance.
-  const perDay = spending ? spendingPerDay(spendingHero, period) : null;
-  const subline = spending
-    ? (perDay !== null ? t('home.perDay', { amount: moneyText(perDay, currency) }) : spendingHero.status === 'ready' ? t('home.noSpending') : null)
-    : t('home.availableLine', { label: t('home.recordedBalance'), accounts: t('home.accounts', { count: accountCount }) });
-  // VoiceOver hears the daily average in words (the region's grouped digits and «$» misread aloud).
-  const spokenSubline = perDay !== null ? t('home.perDay', { amount: spokenMoney(perDay, currency) }) : undefined;
   const quiet = hero.status === 'ready' && hero.minor === 0;
   const scope = currencies.length > 1;
 
@@ -147,17 +137,17 @@ export default function HomeScreen() {
         <DisplayCurrencyButton onField mode={mode} currency={currency} held={currencies} gate={gate} onMode={setMode} onCurrency={setCurrency} />
         {help}
       </View>}
-      {/* 3–4. The number and what it covers. */}
-      <ValueTransition id={heroId} style={{ gap: 6 }}>
-        {hero.status === 'ready'
-          ? <Money minor={hero.minor} currency={currency} large size={HERO_SIZE} color={quiet ? p.heroSecondary : p.heroInk} />
-          : hero.status === 'unavailable'
-            ? <CurrencyParts onField parts={hero.parts} line={hero.reason === 'fetching' ? t('fx.fetching') : t('fx.unavailable', { currency })} detail={shortfallDetail(hero, words)} />
-            : <AppText variant="subhead" style={{ color: p.heroSecondary }}>{t(spending ? 'home.spendingOutOfRange' : 'home.balanceOutOfRange')}</AppText>}
-        {(subline || (!scope && help)) && <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
-          {subline && <AppText variant="subhead" accessibilityLabel={spokenSubline} style={{ color: p.heroSecondary, flexShrink: 1 }}>{subline}</AppText>}
-          {!scope && help}
-        </View>}
+      {/* 3. The number (24UX6C: no line under it; the daily average lives in Reportes). With one currency its explanation
+          sits beside it; with more, in the scope row above. */}
+      <ValueTransition id={heroId} style={{ flexDirection: 'row', alignItems: 'center', gap: space.s }}>
+        <View style={{ flex: 1, minWidth: 0 }}>
+          {hero.status === 'ready'
+            ? <Money minor={hero.minor} currency={currency} large size={HERO_SIZE} color={quiet ? p.heroSecondary : p.heroInk} />
+            : hero.status === 'unavailable'
+              ? <CurrencyParts onField parts={hero.parts} line={hero.reason === 'fetching' ? t('fx.fetching') : t('fx.unavailable', { currency })} detail={shortfallDetail(hero, words)} />
+              : <AppText variant="subhead" style={{ color: p.heroSecondary }}>{t(spending ? 'home.spendingOutOfRange' : 'home.balanceOutOfRange')}</AppText>}
+        </View>
+        {!scope && help}
       </ValueTransition>
       {/* 5. What the number counts: it switches the number only. */}
       <Choices onField value={metric} onChange={setMetric}

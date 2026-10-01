@@ -4,6 +4,7 @@ import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { recurringForecastByCurrency, recurringNeedsReview, type Currency, type RecurringRule } from '@finanzapp/domain';
 import { useLedger } from '../src/storage/LedgerProvider';
 import { ActionButton, AppText, EmptyState, ErrorMessage, IconButton, MerchantBadge, Money, PressFeedback, Screen, SectionTitle, Stat, StatRow, Surface, useStacked } from '../src/ui/components';
+import { presentedAmount } from '../src/ui/movement-amount';
 import { useCategoryLook } from '../src/ui/category-hues';
 import { useRecurringManagement } from '../src/ui/commitment-actions';
 import { SwipeRow, swipeAccessibility, type SwipeAction } from '../src/ui/swipe-actions';
@@ -99,8 +100,9 @@ function RecurringRow({ rule, accounts, day, last, actions }: {
       : relativeDate(rule.nextDateISO, day);
   const urgent = rule.active && (review || due.kind === 'today' || due.kind === 'tomorrow');
   const income = rule.kind === 'income';
-  const stacked = useStacked(account ? { minor: income ? rule.amountMinor : -rule.amountMinor, currency: account.currency, signed: true } : undefined);
-  const spoken = { merchant: rule.merchant, frequency: t(`recurring.frequencySpoken.${rule.frequency}`), category,
+  const stacked = useStacked(account ? { minor: rule.amountMinor, currency: account.currency, signed: presentedAmount(rule.kind, rule.amountMinor).signed } : undefined);
+  // 24UX6C: the row shows no sign on an expense, so VoiceOver names the kind («gasto», «ingreso»), as a movement row does.
+  const spoken = { merchant: rule.merchant, kind: t(income ? 'movement.incomeWord' : 'movement.expenseWord'), frequency: t(`recurring.frequencySpoken.${rule.frequency}`), category,
     amount: account ? spokenMinor(rule.amountMinor, account.currency) : '', currency: account?.currency ?? '', date: relativeDate(rule.nextDateISO, day, true) };
   return <SwipeRow actions={actions}><View style={{ borderBottomColor: p.line, borderBottomWidth: last ? 0 : StyleSheet.hairlineWidth }}>
     <PressFeedback feedback="highlight" accessibilityRole="button" accessibilityLabel={t(!rule.active ? 'recurring.row.labelPaused' : review ? 'recurring.row.labelReview' : 'recurring.row.label', spoken)}
@@ -114,7 +116,8 @@ function RecurringRow({ rule, accounts, day, last, actions }: {
           <AppText secondary variant="footnote" numberOfLines={stacked ? undefined : 2}>{t(`recurring.frequency.${rule.frequency}`)} · {category}{account ? ' · ' + account.name : ''}</AppText>
         </View>
         <View style={{ alignItems: stacked ? 'flex-start' : 'flex-end', gap: 3, maxWidth: stacked ? '100%' : '56%' }}>
-          {account && <Money minor={income ? rule.amountMinor : -rule.amountMinor} currency={account.currency} signed tone={income ? 'income' : 'expense'} />}
+          {/* 24UX6C: the rule's kind is explicit, so the amount is shown as stored: «+» on an income, no sign on an expense. */}
+          {account && <Money minor={rule.amountMinor} currency={account.currency} signed={presentedAmount(rule.kind, rule.amountMinor).signed} tone={rule.kind} />}
           <AppText variant="caption" style={{ color: urgent ? p.warning : p.secondary, fontWeight: urgent ? '600' : '400' }}>{when}</AppText>
         </View>
       </View>

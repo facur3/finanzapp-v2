@@ -11,6 +11,7 @@ import { bindLocale } from '../src/i18n/bind.ts';
 import type { AppLocale } from '../src/i18n/locale.ts';
 import * as i18nFormat from '../src/i18n/format.ts';
 import * as i18nLocale from '../src/i18n/locale.ts';
+import * as movementAmount from '../src/ui/movement-amount.ts';
 
 const { AMOUNT_FIELD, amountFieldLayout, amountWidthEm, fitFontSize } = geometry;
 const { displayAmount } = moneyInput;
@@ -159,6 +160,8 @@ function loadComponents(locale: AppLocale = 'es-AR', deviceLanguage: string | nu
   const state: unknown[] = [];
   let cursor = 0;
   const modules: Record<string, any> = {
+    // 24UX6C: the transaction presentation rule, a pure module.
+    './movement-amount': movementAmount,
     react: { useEffect: () => {}, useId: () => 'id', useRef: (value: unknown) => ({ current: value }),
       useState: (initial: unknown) => { const index = cursor++; if (!(index in state)) state[index] = initial;
         return [state[index], (value: unknown) => { state[index] = value; }]; } },

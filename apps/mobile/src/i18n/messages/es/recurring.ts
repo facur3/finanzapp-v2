@@ -33,15 +33,15 @@ export const recurring = {
     row: {
       /** VoiceOver label of a rule: merchant (user data), frequency, amount, currency code and next date (inside the sentence:
        * "próximo hoy"). 25B3: the row opens the rule's detail, so it names the rule itself, never an action («Editar»). */
-      label: '{merchant}, {frequency}, {category}, {amount} {currency}, próximo {date}',
+      label: '{merchant}, {kind}, {frequency}, {category}, {amount} {currency}, próximo {date}',
       /** 24UX2: a paused rule never announces a next date. */
-      labelPaused: '{merchant}, {frequency}, {category}, {amount} {currency}, pausado',
+      labelPaused: '{merchant}, {kind}, {frequency}, {category}, {amount} {currency}, pausado',
       /** 25B3: the VoiceOver hint of a rule's row, in Recurrentes and in Inicio's Próximos compromisos. */
       hint: 'Abre el detalle del recurrente',
       paused: 'Pausado',
       /** 24UX5: an active rule FinanzApp could not bring up to date (its next date is already past). */
       review: 'Revisar',
-      labelReview: '{merchant}, {frequency}, {category}, {amount} {currency}, para revisar: sin registrar desde {date}',
+      labelReview: '{merchant}, {kind}, {frequency}, {category}, {amount} {currency}, para revisar: sin registrar desde {date}',
     },
     /** 25B3: the rule's own screen (read first; Editar in the header opens the form). Its rows reuse the form's
      * labels (Próxima fecha, Frecuencia) and the shared ones (Categoría, Cuenta, Tarjeta). */

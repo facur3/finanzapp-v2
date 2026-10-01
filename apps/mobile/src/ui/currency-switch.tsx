@@ -77,7 +77,7 @@ export function DisplayCurrencyButton({ mode, currency, held, gate, onMode, onCu
           borderRadius: compact ? 16 : radius.button, backgroundColor: compact && p.isDark ? p.surface : p.inset, alignSelf: 'flex-start', maxWidth: '100%',
           ...(compact ? { borderWidth: StyleSheet.hairlineWidth, borderColor: p.isDark ? 'rgba(255,255,255,0.12)' : 'rgba(10,10,12,0.10)' } : {}) }}>
       <AppText accessible={false} numberOfLines={1} variant={onField ? 'subhead' : compact ? 'footnote' : 'subhead'}
-        style={{ fontWeight: '600', color: onField ? p.heroInk : compact ? p.text : p.primary, flexShrink: 1 }}>{label}</AppText>
+        style={{ fontWeight: onField ? '500' : '600', color: onField ? p.heroInk : compact ? p.text : p.primary, flexShrink: 1 }}>{label}</AppText>
       <Ionicons name="chevron-down" size={compact ? 12 : 14} color={onField ? p.heroSecondary : compact ? p.secondary : p.primary} accessible={false} />
     </PressFeedback>
     <DisplaySheet visible={visible} mode={mode} currency={currency} consolidatedOptions={consolidatedOptions} singleOptions={singleOptions}

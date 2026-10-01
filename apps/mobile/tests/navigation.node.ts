@@ -27,7 +27,7 @@ function renderLayout(background: string) {
     'react/jsx-runtime': { jsx, jsxs: jsx },
     'expo-router': { Tabs, router: { push: (to: unknown) => pushed.push(to) } },
     '@expo/vector-icons/Ionicons': 'Ionicons',
-    '../../src/ui/components': { IconButton: 'IconButton' },
+    // 24UX6C: the layout draws no header buttons any more, so it needs no component module: an IconButton coming back fails here.
     '../../src/ui/floating-tab-bar': { FloatingTabBar: 'FloatingTabBar' },
     '../../src/ui/navigation': { tabHostOptions, tabScreenOptions },
     '../../src/ui/motion': { selectionHaptic: () => {} },
@@ -89,14 +89,14 @@ test('24UX6A: four sections, no Assistant tab, Tarjetas stays in Más, and Inici
     assert.equal(byName[name].tabBarIcon({ color: '#000', size: 24, focused: false }).props.name, outline, name);
   }
   // Inicio draws no root title (the selected tab names it) and keeps its accounts shortcut in its own field
-  // (tests/spending-home.node.ts); the other roots keep their headers, and Movimientos its «+».
+  // (tests/spending-home.node.ts); the other roots keep their headers. 24UX6C: Movimientos lost its header «+»:
+  // the dock's «+» records from every tab (tests/floating-tab-bar.node.ts), so no root carries a second record button.
   assert.equal(byName.index.headerShown, false);
   assert.equal(byName.index.headerRight, undefined);
   for (const name of ['activity', 'reports', 'settings']) assert.notEqual(byName[name].headerShown, false, name + ' keeps its title');
-  const record = byName.activity.headerRight();
-  assert.deepEqual([record.type, record.props.name], ['IconButton', 'add']);
-  record.props.onPress();
-  assert.deepEqual(pushed.at(-1), '/new-entry');
+  for (const name of ['index', 'activity', 'reports', 'settings']) assert.equal(byName[name].headerRight, undefined, name + ' has no header action');
+  assert.equal(JSON.stringify(screens).includes('/new-entry'), false);
+  assert.equal(pushed.length, 0, 'rendering the layout navigates nowhere');
 });
 
 test('24UX6A: the Assistant moved to the root stack, pushed like any detail screen', () => {
@@ -110,7 +110,7 @@ test('24UX6A: the Assistant moved to the root stack, pushed like any detail scre
   assert.doesNotMatch(registrations[0], /headerShown:\s*false/);
 });
 
-test('23.1B1: tab labels and the header actions follow the language; routes and order never change', () => {
+test('23.1B1: tab labels follow the language; routes and order never change', () => {
   const labels = () => {
     const { props } = renderLayout('#F5F6F8');
     return props.children.map((screen: any) => screen.props.name + '=' + screen.props.options.title).join(',');
@@ -119,7 +119,8 @@ test('23.1B1: tab labels and the header actions follow the language; routes and 
   locale = 'en-AR';
   try {
     assert.equal(labels(), 'index=Home,activity=Activity,reports=Reports,settings=More');
+    // 24UX6C: no header button left to translate (the dock «+» carries its own label, tests/floating-tab-bar.node.ts).
     const { props } = renderLayout('#F5F6F8');
-    assert.equal(props.children[1].props.options.headerRight().props.label, 'Record a transaction');
+    for (const screen of props.children) assert.equal(screen.props.options.headerRight, undefined, screen.props.name);
   } finally { locale = 'es-AR'; }
 });

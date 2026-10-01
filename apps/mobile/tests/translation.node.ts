@@ -105,9 +105,8 @@ test('plurals pick one for exactly one and other for everything else, in both la
 
 test('placeholders are filled with the values given; a missing value stays visible instead of blank', () => {
   assert.equal(translate('en', 'transferForm.after', { name: 'Caja' }), 'Caja afterwards');
-  assert.equal(translate('es', 'home.perDay', { amount: '$ 100,00' }), 'Hasta hoy · $ 100,00 por día');
-  assert.equal(translate('en', 'home.perDay', { amount: '$100.00' }), 'So far · $100.00 a day');
-  assert.equal(translate('es', 'home.availableLine', { label: 'Saldo registrado', accounts: '2 cuentas' }), 'Saldo registrado · 2 cuentas');
+  assert.equal(translate('es', 'reports.perDay', { amount: '$ 100,00' }), '$ 100,00 por día');
+  assert.equal(translate('es', 'home.quietTitleIn', { currency: 'USD' }), 'Todavía no hay movimientos en USD este mes');
   assert.equal(translate('es', 'home.capture.continue', { text: 'gasté 500 en el súper' }), 'Continuar: «gasté 500 en el súper»');
   assert.equal(translate('en', 'home.capture.continue', { text: 'I spent 500' }), 'Continue: “I spent 500”');
   assert.equal(translate('en', 'rows.transferLabel', { title: 'Transfer', from: 'A' }), 'Transfer, from A to {to}, {amount}, {date}');
@@ -270,15 +269,17 @@ test('the translation brief for a new language carries source, English reference
   const { file, count } = await exportLanguage('ar', { all: true });
   const brief = JSON.parse(readFileSync(file, 'utf8'));
   assert.equal(count, messageKeys(es).length);
-  const accounts = brief.entries.find((entry: any) => entry.key === 'home.accounts');
-  assert.deepEqual(accounts.plural, ['few', 'many', 'one', 'other', 'two', 'zero']);
-  assert.deepEqual(accounts.placeholders, ['count']);
-  assert.equal(accounts.english.other, '{count} accounts');
+  // 24UX6C removed Inicio's «N cuentas» line; the movements count is the same kind of plural.
+  const movements = brief.entries.find((entry: any) => entry.key === 'count.movements');
+  assert.deepEqual(movements.plural, ['few', 'many', 'one', 'other', 'two', 'zero']);
+  assert.deepEqual(movements.placeholders, ['count']);
+  assert.equal(movements.english.other, '{count} transactions');
   const help = brief.entries.find((entry: any) => entry.key === 'home.availableHelp');
   assert.ok(help.glossary.some((term: any) => term.es === 'saldo registrado' || term.es === 'cuenta'), 'glossary terms are attached');
-  const availableLine = brief.entries.find((entry: any) => entry.key === 'home.availableLine');
-  assert.match(availableLine.context, /Saldo registrado · 2 cuentas/, 'the comment above the key is its context');
-  assert.deepEqual(availableLine.placeholders, ['accounts', 'label'], 'sorted');
+  const quietIn = brief.entries.find((entry: any) => entry.key === 'home.quietTitleIn');
+  assert.match(quietIn.context, /Solo USD/, 'the comment above the key is its context');
+  const transfer = brief.entries.find((entry: any) => entry.key === 'rows.transferLabel');
+  assert.deepEqual(transfer.placeholders, ['amount', 'date', 'from', 'title', 'to'], 'sorted');
 });
 
 test('pseudo-locales for layout testing keep every placeholder: long text grows about 40 %, RTL is wrapped in embedding marks', () => {

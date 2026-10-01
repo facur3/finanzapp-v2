@@ -18,6 +18,7 @@ import type { AppLocale } from '../src/i18n/locale.ts';
 import { realModule } from './real-module.ts';
 // 24T2 (stream B): the entry form's «Pago» section derivation (pure, real in the harness).
 import * as purchasePlan from '../src/ui/purchase-plan.ts';
+import * as movementAmount from '../src/ui/movement-amount.ts';
 
 // Actual screen/form handlers with native hosts replaced by descriptors.
 // This does not render UIKit, the Files picker, animation frames or gestures.
@@ -67,6 +68,8 @@ function harness(file: string, props: any = {}, options: { data?: domain.LedgerA
   const swipe = { SwipeRow: 'SwipeRow', swipeAccessibility: (actions: { key: string; label: string; onPress: () => void }[]) => ({ accessibilityActions: actions.map(action => ({ name: action.key, label: action.label })),
     onAccessibilityAction: (event: { nativeEvent: { actionName: string } }) => actions.find(action => action.key === event.nativeEvent.actionName)?.onPress() }) };
   const modules: Record<string, unknown> = {
+    // 24UX6C: the transaction presentation rule, a pure module.
+    '../src/ui/movement-amount': movementAmount, '../../src/ui/movement-amount': movementAmount,
     '../src/ui/use-default-currency': defaults, '../../src/ui/use-default-currency': defaults, '../../src/ui/commitment-actions': accountManagement, '../src/ui/commitment-actions': accountManagement,
     '../src/ui/swipe-actions': swipe, '../../src/ui/swipe-actions': swipe,
     '../i18n/format': i18nFormat, '../src/i18n/format': i18nFormat, '../../src/i18n/format': i18nFormat, '../i18n/provider': i18nProvider, '../src/i18n/provider': i18nProvider, '../../src/i18n/provider': i18nProvider,

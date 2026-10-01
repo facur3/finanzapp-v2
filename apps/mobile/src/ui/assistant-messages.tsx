@@ -98,7 +98,8 @@ export function Suggestions({ items, onPick, disabled = false }: { items: readon
   const p = usePalette();
   const { t } = useI18n();
   return <View style={styles.empty}>
-    <View style={[styles.emptyGlyph, { backgroundColor: p.primarySoft }]}><Ionicons name="sparkles" size={22} color={p.primary} accessible={false} /></View>
+    {/* 24UX6C: the Assistant's mark as the hub draws it (sage-mint circle, pine glyph, 9.5:1): it reads on both grounds. */}
+    <View style={[styles.emptyGlyph, { backgroundColor: p.accent }]}><Ionicons name="sparkles" size={22} color={p.onAccent} accessible={false} /></View>
     <AppText accessibilityRole="header" variant="title2" style={{ textAlign: 'center' }}>{t('assistant.emptyTitle')}</AppText>
     <View style={styles.chips}>
       {items.slice(0, 4).map(item => <Chip key={item} label={item} onPress={() => onPick(item)} disabled={disabled} />)}
@@ -198,7 +199,8 @@ export function DraftCard({ content, accounts, onConfirm, onEdit, onCancel, onOp
           {confirmed && <Ionicons name="checkmark-circle" size={16} color={p.income} accessible={false} />}
           <AppText secondary variant="eyebrow">{t('assistant.draft.eyebrow', { status: t(confirmed ? 'assistant.draft.saved' : 'assistant.draft.pending'), kind: t(expense ? 'movement.expense' : 'movement.income') })}</AppText>
         </View>
-        <Money minor={draft.amountMinor} currency={draft.currency} size={30} tone={expense ? 'expense' : 'income'} />
+        {/* 24UX6C: the draft's kind is known: no sign on an expense, «+» on an income (movement-amount.ts). */}
+        <Money minor={draft.amountMinor} currency={draft.currency} size={30} tone={expense ? 'expense' : 'income'} signed={!expense} />
       </View>
       <View style={{ gap: 0 }}>
         <DraftRow label={t(expense ? 'assistant.draft.merchant' : 'assistant.draft.source')} value={draft.merchant.trim() || t('assistant.draft.missingText')} missing={!draft.merchant.trim()} />

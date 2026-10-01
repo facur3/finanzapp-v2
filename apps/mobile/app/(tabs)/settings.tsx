@@ -3,7 +3,7 @@ import { router } from 'expo-router';
 import { currentMonthISO, todayKey, LEDGER_CURRENCIES } from '@finanzapp/domain';
 import { useLedger } from '../../src/storage/LedgerProvider';
 import { FINANCE_ROW_LOOKS, appearanceHex } from '../../src/ui/appearance';
-import { AppText, GlyphTile, NavigationRow, Screen, SectionTitle, Surface } from '../../src/ui/components';
+import { AppText, GlyphTile, NavigationRow, Screen, Surface, type IconName } from '../../src/ui/components';
 import { useMaterialDecision } from '../../src/ui/material';
 import { MATERIAL_LABELS } from '../../src/ui/material-policy';
 import { usePalette, useThemePreference } from '../../src/ui/theme';
@@ -15,7 +15,7 @@ declare const __DEV__: boolean | undefined;
 // Diagnostic: where this launch read the device languages. "módulo nativo" proves the build links expo-localization.
 const LOCALE_SOURCE_LABELS = { native: 'settings.localeSource.native', intl: 'settings.localeSource.intl', none: 'settings.localeSource.none' } as const;
 /** The pilot's version and the internal release name; neither is translated. */
-const VERSION = '0.1.0', RELEASE = '24UX6B';
+const VERSION = '0.1.0', RELEASE = '24UX6C';
 /** 24UX5: the material and locale diagnostics are for a tester on a development build; everyone else sees the version,
  * like the About line of an iOS app. `__DEV__` is false in a preview or store bundle, so the line is compiled away. */
 const DIAGNOSTICS = typeof __DEV__ !== 'undefined' && __DEV__;
@@ -29,7 +29,12 @@ const DIAGNOSTICS = typeof __DEV__ !== 'undefined' && __DEV__;
  * navigation lives here. Idioma and Región sit in App y datos: device
  * settings, not ledger data. Región shows because two regions are released
  * (Producto 23.1C2) and hides itself in a build with a single one
- * (`showsPreference`). The route file keeps its historical name (settings). */
+ * (`showsPreference`). The route file keeps its historical name (settings).
+ *
+ * 24UX6C (Forest): the same two groups and every route, in a calmer rhythm: each group under a small caps label, one
+ * spacing scale between groups, every row led by a 34 pt tile (Finanzas keeps its tinted identities; App y datos takes
+ * neutral tiles, so the two groups align on one edge), and the local-storage note and the version as a quiet footer.
+ * No row was added, removed or renamed; there is no «Ajustes» destination. */
 export default function MoreScreen() {
   const { archive, gate = LEDGER_CURRENCIES } = useLedger();
   const p = usePalette();
@@ -49,10 +54,11 @@ export default function MoreScreen() {
   const activeCards = archive?.cards?.filter(card => card.active).length ?? 0;
   const undone = (archive?.records.filter(record => record.voided).length ?? 0) + (archive?.transfers?.filter(record => record.voided).length ?? 0);
   const tile = (key: keyof typeof FINANCE_ROW_LOOKS) => <GlyphTile icon={FINANCE_ROW_LOOKS[key].glyph} color={appearanceHex(FINANCE_ROW_LOOKS[key].color, p)} size={34} />;
+  const neutral = (icon: IconName) => <GlyphTile icon={icon} size={34} />;
 
-  return <Screen>
-    <View>
-      <SectionTitle>{t('settings.sections.finance')}</SectionTitle>
+  return <Screen gap={28}>
+    <View style={{ gap: 8 }}>
+      <GroupLabel>{t('settings.sections.finance')}</GroupLabel>
       <Surface grouped>
         <NavigationRow title={t('settings.rows.accounts')} subtitle={t('settings.rows.accountsSubtitle')} leading={tile('accounts')} onPress={() => router.push('/accounts')} />
         <NavigationRow title={t('settings.rows.cards')} subtitle={activeCards ? t('settings.rows.cardsCount', { count: activeCards }) : t('settings.rows.cardsSubtitle')} leading={tile('cards')} onPress={() => router.push('/cards')} />
@@ -62,17 +68,17 @@ export default function MoreScreen() {
         <NavigationRow title={t('settings.rows.categories')} subtitle={customCategories ? t('settings.rows.categoriesCount', { count: customCategories }) : t('settings.rows.categoriesSubtitle')} leading={tile('categories')} last onPress={() => router.push('/categories')} />
       </Surface>
     </View>
-    <View style={{ gap: 10 }}>
-      <SectionTitle>{t('settings.sections.appData')}</SectionTitle>
+    <View style={{ gap: 8 }}>
+      <GroupLabel>{t('settings.sections.appData')}</GroupLabel>
       <Surface grouped>
-        <NavigationRow title={t('settings.rows.backup')} subtitle={t('settings.rows.backupSubtitle')} icon="save-outline" onPress={() => router.push('/backup')} />
-        <NavigationRow title={t('settings.rows.undone')} subtitle={undone ? t('settings.rows.undoneCount', { count: undone }) : t('settings.rows.undoneNone')} icon="arrow-undo-outline" onPress={() => router.push('/undone-entries')} />
-        {locale && <NavigationRow title={t('preferences.language')} subtitle={preferenceSummary('language', locale.state, t)} icon="language-outline" onPress={() => router.push('/language')} />}
-        {locale && showsRegion && <NavigationRow title={t('preferences.region')} subtitle={preferenceSummary('region', locale.state, t)} icon="globe-outline" onPress={() => router.push('/region')} />}
+        <NavigationRow title={t('settings.rows.backup')} subtitle={t('settings.rows.backupSubtitle')} leading={neutral('save-outline')} onPress={() => router.push('/backup')} />
+        <NavigationRow title={t('settings.rows.undone')} subtitle={undone ? t('settings.rows.undoneCount', { count: undone }) : t('settings.rows.undoneNone')} leading={neutral('arrow-undo-outline')} onPress={() => router.push('/undone-entries')} />
+        {locale && <NavigationRow title={t('preferences.language')} subtitle={preferenceSummary('language', locale.state, t)} leading={neutral('language-outline')} onPress={() => router.push('/language')} />}
+        {locale && showsRegion && <NavigationRow title={t('preferences.region')} subtitle={preferenceSummary('region', locale.state, t)} leading={neutral('globe-outline')} onPress={() => router.push('/region')} />}
         {/* 24UX6A: Sistema, Claro or Oscuro; a device setting like the language and the region. */}
-        <NavigationRow title={t('preferences.appearance')} subtitle={appearanceLabel} icon="contrast-outline" last onPress={() => router.push('/appearance')} />
+        <NavigationRow title={t('preferences.appearance')} subtitle={appearanceLabel} leading={neutral('contrast-outline')} last onPress={() => router.push('/appearance')} />
       </Surface>
-      <AppText secondary variant="footnote" style={{ paddingHorizontal: 4 }}>
+      <AppText secondary variant="footnote" style={{ paddingHorizontal: 4, paddingTop: 4 }}>
         {t('settings.localNote')}
       </AppText>
     </View>
@@ -82,4 +88,9 @@ export default function MoreScreen() {
     </View>
     {previewCurrencies.length > 0 && <AppText secondary style={{ textAlign: 'center', fontSize: 13 }}>{t('settings.currencyPreview', { codes: previewCurrencies.join(', ') })}</AppText>}
   </Screen>;
+}
+
+/** A group's small caps label (Forest «label.caps»): a heading for VoiceOver, quiet to the eye. */
+function GroupLabel({ children }: { children: string }) {
+  return <AppText accessibilityRole="header" secondary variant="eyebrow" style={{ paddingHorizontal: 4 }}>{children}</AppText>;
 }

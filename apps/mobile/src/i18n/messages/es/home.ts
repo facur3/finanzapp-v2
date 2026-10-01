@@ -7,18 +7,10 @@ export const home = {
     start: 'Empezar',
     spending: 'Gastado',
     available: 'Disponible',
-    recordedBalance: 'Saldo registrado',
     availableHelp: 'Es el dinero registrado en tus cuentas de esta moneda: saldo inicial más ingresos, menos gastos y transferencias. '
       + 'No incluye tarjetas ni deudas, y no es un saldo bancario ni tu patrimonio.',
     spendingOutOfRange: 'El total supera el rango que podemos mostrar con precisión. Tus movimientos siguen guardados.',
     balanceOutOfRange: 'El saldo total supera el rango que podemos mostrar con precisión. Tus cuentas siguen guardadas.',
-    accounts: { one: '{count} cuenta', other: '{count} cuentas' },
-    /** Under Gastado: the month so far and its daily average (the same figure as Reportes). */
-    perDay: 'Hasta hoy · {amount} por día',
-    /** Under Gastado when nothing was spent this month yet. */
-    noSpending: 'Sin gastos este mes',
-    /** Under Disponible: what the number is and how many accounts it covers («Saldo registrado · 2 cuentas»). Never a per-day figure. */
-    availableLine: '{label} · {accounts}',
     /** The month's latest expenses and incomes. */
     recent: 'Actividad reciente',
     /** With accounts but nothing due and nothing recorded this month: the actions are the dock's «+» and the Assistant. */

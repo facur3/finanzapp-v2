@@ -4,7 +4,7 @@ import Animated, { useAnimatedKeyboard, useAnimatedStyle } from 'react-native-re
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useI18n } from '../i18n/provider';
-import { AppText, PressFeedback } from './components';
+import { PressFeedback } from './components';
 import { ControlSurface, useMaterial } from './material';
 import { composerBottomPadding } from './material-policy';
 import { space, usePalette } from './theme';
@@ -15,10 +15,10 @@ export const COMPOSER_PLACEHOLDER = 'assistant.composer.placeholder' as const;
 export const COMPOSER_MAX_LINES = 5;
 const LINE_HEIGHT = 22;
 
-/** The bar that will stay when the model is connected: one field, a
- * microphone and a send control. Typing is the only input this build can
- * accept; the microphone is a visible promise that opens a note instead of a
- * recorder, because speech recognition needs the development build.
+/** The bar that will stay when the model is connected: one field and a send
+ * control. Typing is the only input this build can accept; 24UX6C removed the
+ * microphone, which only opened a note, until dictation exists (Producto 25A)
+ * rather than show a control that does nothing.
  *
  * Send is disabled on an empty message and becomes Stop while the Assistant is
  * answering. The whole bar rides the keyboard through Reanimated's keyboard
@@ -33,7 +33,7 @@ const LINE_HEIGHT = 22;
  * Elsewhere, and with Reduce Transparency, it is the opaque surface pill. */
 export function AssistantComposer({ value, onChange, onSend, onStop, busy, disabled = false, note }: {
   value: string; onChange: (text: string) => void; onSend: () => void; onStop: () => void; busy: boolean; disabled?: boolean;
-  /** A line under the bar: the disconnected note, the microphone boundary. */
+  /** A line under the bar, when a screen needs one (none since 24UX6C). */
   note?: ReactNode;
 }) {
   const p = usePalette();
@@ -41,7 +41,6 @@ export function AssistantComposer({ value, onChange, onSend, onStop, busy, disab
   const material = useMaterial();
   const insets = useSafeAreaInsets();
   const { fontScale } = useWindowDimensions();
-  const [micNote, setMicNote] = useState(false);
   const canSend = value.trim().length > 0 && !busy && !disabled;
   const maxHeight = Math.round(LINE_HEIGHT * Math.min(fontScale, 1.6) * COMPOSER_MAX_LINES);
   const opaque = { backgroundColor: p.surface, borderWidth: StyleSheet.hairlineWidth, borderColor: p.isDark ? 'rgba(255,255,255,0.10)' : 'rgba(10,10,12,0.08)',
@@ -52,10 +51,6 @@ export function AssistantComposer({ value, onChange, onSend, onStop, busy, disab
         accessibilityLabel={t('assistant.composer.label')} accessibilityHint={t('assistant.composer.hint')} accessibilityLanguage={speechLanguage}
         selectionColor={p.primary} keyboardAppearance={p.isDark ? 'dark' : 'light'} textAlignVertical="center"
         style={[styles.input, { color: p.text, maxHeight, lineHeight: LINE_HEIGHT }]} />
-      <PressFeedback feedback="opacity" accessibilityRole="button" accessibilityLabel={t('assistant.composer.dictate')} accessibilityHint={t('assistant.composer.dictateHint')}
-        onPress={() => setMicNote(current => !current)} style={styles.round}>
-        <Ionicons name="mic-outline" size={22} color={p.secondary} accessible={false} />
-      </PressFeedback>
       {busy
         ? <PressFeedback accessibilityRole="button" accessibilityLabel={t('assistant.composer.stop')} onPress={onStop} style={styles.round}>
           <View style={[styles.send, { backgroundColor: p.inset }]}><Ionicons name="stop" size={14} color={p.text} accessible={false} /></View>
@@ -67,9 +62,6 @@ export function AssistantComposer({ value, onChange, onSend, onStop, busy, disab
           </View>
         </PressFeedback>}
     </ControlSurface>
-    {micNote && <AppText secondary variant="footnote" style={styles.note} accessibilityLiveRegion="polite">
-      {t('assistant.composer.dictationNote')}
-    </AppText>}
     {note}
   </KeyboardSpace>;
 }
@@ -99,5 +91,4 @@ const styles = StyleSheet.create({
   input: { flex: 1, fontSize: 17, paddingTop: Platform.OS === 'ios' ? 9 : 6, paddingBottom: Platform.OS === 'ios' ? 9 : 6, minHeight: 40 },
   round: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center', minHeight: 40 },
   send: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
-  note: { paddingHorizontal: space.xs },
 });

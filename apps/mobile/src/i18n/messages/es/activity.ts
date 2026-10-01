@@ -1,7 +1,7 @@
 /** Movimientos: the list, the rows, and the movement, transfer and spending-period details. */
 export const activity = {
   activity: {
-    search: 'Buscar',
+    search: 'Buscar movimientos',
     searchPlaceholder: 'Comercio, categoría o cuenta',
     all: 'Todos',
     expenses: 'Gastos',

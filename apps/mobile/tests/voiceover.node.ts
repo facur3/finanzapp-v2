@@ -34,7 +34,7 @@ import ts from 'typescript';
 //     no inherited language, and UIKit reads an element without one in the
 //     device's language.
 // (c) The wrappers in components.tsx (AppText, PressFeedback, Money, Field,
-//     AmountField, Choice, ErrorMessage, SelectionRow) do that themselves and
+//     SearchField, AmountField, Choice, ErrorMessage, SelectionRow) do that themselves and
 //     are the only raw focusable elements there; the ones that forward props
 //     let a caller's explicit language (an autonym) win.
 //
@@ -81,11 +81,14 @@ const LABEL_PROPS: Record<string, string[]> = {
   SectionTitle: ['action'], IconButton: ['label'], Field: ['label'], AmountField: ['label'], AmountShortcut: ['label'],
   InfoButton: ['title', 'label'], DetailRow: ['label'], NavigationRow: ['title', 'subtitle'], CheckRow: ['title', 'subtitle'],
   SelectorCard: ['label', 'value', 'placeholder'], SelectionRow: ['label', 'value'], AccountField: ['label'], CategoryField: ['label'],
+  // 24UX6C: Movimientos' search pill; its `label` becomes the TextInput's accessibilityLabel.
+  SearchField: ['label'],
 };
 /** The wrappers in components.tsx that own a raw focusable element and give it speechLanguage. */
-const WRAPPERS = ['AppText', 'PressFeedback', 'Field', 'AmountField', 'Choice', 'ErrorMessage', 'Money', 'SelectionRow'];
-/** Of those, the ones that spread the caller's props and let an explicit accessibilityLanguage win. */
-const FORWARDING = ['AppText', 'PressFeedback', 'Field', 'AmountField'];
+const WRAPPERS = ['AppText', 'PressFeedback', 'Field', 'SearchField', 'AmountField', 'Choice', 'ErrorMessage', 'Money', 'SelectionRow'];
+/** Of those, the ones that spread the caller's props and let an explicit accessibilityLanguage win (24UX6C: SearchField,
+ * the search pill's TextInput, forwards like Field). */
+const FORWARDING = ['AppText', 'PressFeedback', 'Field', 'SearchField', 'AmountField'];
 
 type Env = ReadonlyMap<ts.Symbol, boolean>;
 type Fn = ts.ArrowFunction | ts.FunctionExpression | ts.FunctionDeclaration;
@@ -520,7 +523,8 @@ test('(c) the wrappers in components.tsx are its only raw focusable elements, re
     const name = scan.where(item.node) + ' <' + item.tag + '> in ' + item.owner;
     const expression = scan.expressionOf(item.language);
     assert.ok(expression && scan.readsSpeechLanguage(expression), name + ' reads speechLanguage from useI18n()');
-    // AppText, PressFeedback and the two fields spread the caller's props: an explicit language (an autonym) wins over the interface one.
+    // AppText, PressFeedback and the three text inputs (Field, SearchField, AmountField) spread the caller's props: an explicit
+    // language (an autonym) wins over the interface one.
     if (FORWARDING.includes(item.owner)) assert.equal(expression.getText(), 'props.accessibilityLanguage ?? speechLanguage', name);
     else assert.equal(expression.getText(), 'speechLanguage', name);
   }

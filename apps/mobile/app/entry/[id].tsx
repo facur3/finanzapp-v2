@@ -7,6 +7,7 @@ import { categoryKey, makeEntryChange, recurringOccurrenceOf, summarizeMonthlyBu
 import { useLedger } from '../../src/storage/LedgerProvider';
 import { budgetTone } from '../../src/ui/budget-presentation';
 import { AccountBadge, ActionButton, AppText, DetailRow, EmptyState, ErrorMessage, MerchantBadge, Money, Screen, Surface } from '../../src/ui/components';
+import { presentedAmount } from '../../src/ui/movement-amount';
 import { useI18n } from '../../src/i18n/provider';
 import { useCategoryLabel } from '../../src/ui/category-hues';
 import { installmentOfEntry } from '../../src/ui/installment-presentation';
@@ -92,6 +93,7 @@ function EntryDetail({ record, account }: { record: EntryRecord; account: Accoun
   const budgetLine = (row: NonNullable<typeof budget>, money: (minor: number) => string) => row.exceeded ? t('entryDetail.budgetExceeded', { amount: money(-row.remainingMinor) })
     : t('entryDetail.budgetUsed', { percent: Math.round(row.ratio * 100), amount: money(row.remainingMinor) });
 
+  const shown = presentedAmount(entry.kind, entry.amountMinor);
   return <Screen gap={space.xl}>
     <Stack.Screen options={{ title: t(record.voided ? 'entryDetail.voidedTitle' : income ? 'movement.income'
       : instalment ? (instalment.component === 'principal' ? 'entryDetail.installmentTitle' : `entryDetail.installmentShareTitle.${instalment.component}`)
@@ -100,8 +102,9 @@ function EntryDetail({ record, account }: { record: EntryRecord; account: Accoun
     <View style={{ gap: 14, alignItems: 'center', paddingVertical: 12 }}>
       <MerchantBadge merchant={entry.merchant} category={entry.category} kind={entry.kind} large tone={income ? 'income' : 'neutral'} />
       <View style={{ alignItems: 'center', gap: 4, width: '100%' }}>
-        <Money minor={income ? entry.amountMinor : -entry.amountMinor} currency={account.currency} large signed align="center"
-          tone={income ? 'income' : 'expense'} color={record.voided ? p.tertiary : undefined} />
+        {/* 24UX6C: shown as stored, the kind in the title (no minus on an expense, «+» on an income; movement-amount.ts). */}
+        <Money minor={shown.minor} currency={account.currency} large signed={shown.signed} align="center"
+          tone={shown.tone} color={record.voided ? p.tertiary : undefined} />
         <AppText variant="title3" style={{ textAlign: 'center' }}>{entry.merchant}</AppText>
         <AppText secondary variant="subhead" style={{ textAlign: 'center' }}>{date}</AppText>
       </View>

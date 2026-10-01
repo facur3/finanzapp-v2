@@ -19,6 +19,8 @@ import { integrationClient } from '../src/integrations/client.ts';
 import * as i18nFormat from '../src/i18n/format.ts';
 import { bindLocale } from '../src/i18n/bind.ts';
 import type { AppLocale } from '../src/i18n/locale.ts';
+import { home as esHome } from '../src/i18n/messages/es/home.ts';
+import { home as enHome } from '../src/i18n/messages/en/home.ts';
 // Read on every render, like the live provider; a test may switch it and must restore it.
 let locale: AppLocale = 'es-AR';
 const i18nProvider = { useI18n: () => bindLocale(locale) };
@@ -178,8 +180,17 @@ const sectionTitles = (root: Node) => nodes(root).filter(node => node.type === '
 const fieldOf = (root: Node) => { const field = nodes(root).find(node => node.type === 'View' && typeof node.props.onLayout === 'function'); assert.ok(field, 'Missing the financial field'); return field; };
 const monthOf = (root: Node) => { const month = nodes(fieldOf(root)).find(node => node.type === 'AppText' && node.props.accessibilityRole === 'header'); assert.ok(month, 'Missing the month'); return month; };
 const fieldChildren = (root: Node) => [fieldOf(root).props.children].flat().filter(Boolean) as Node[];
-const SUBLINE = /por día|Sin gastos este mes|Saldo registrado|a day|No spending this month|Recorded balance/;
+/** The line 24UX6A drew under the number (24UX6C removed it): any of its forms, in Spanish or English. */
+const SUBLINE = /por día|Hasta hoy|Sin gastos este mes|Saldo registrado|cuentas? *$|a day|So far|No spending this month|Recorded balance|accounts? *$/;
 const sublineOf = (root: Node) => homeTexts(fieldOf(root)).find(text => SUBLINE.test(text));
+/** 24UX6C: no line under the number, anywhere on Inicio (the field's only text is the month, unless the number is out of range). */
+const assertNoSubline = (root: Node, label: string) => {
+  assert.equal(sublineOf(root), undefined, label + ': no line under the number');
+  assert.equal(homeTexts(root).some(text => SUBLINE.test(text)), false, label + ': no per-day, «Sin gastos» or «Saldo registrado» text on Inicio');
+  // The number's block holds the number (or the currencies' parts, or the out-of-range notice) and its help; never a caption.
+  const outOfRange = [esHome.home.spendingOutOfRange, esHome.home.balanceOutOfRange, enHome.home.spendingOutOfRange, enHome.home.balanceOutOfRange];
+  assert.equal(nodes(find(root, 'ValueTransition')).filter(n => n.type === 'AppText').every(n => outOfRange.includes(textOf(n))), true, label + ': the number\'s block holds no caption');
+};
 const metricOf = (root: Node) => nodes(root).find(n => n.type === 'Choices' && (n.props.value === 'spending' || n.props.value === 'available'))!;
 /** A synthetic rule due in this harness week (the harness day is 2026-09-12). */
 const dueRule = (id = 'r', overrides: Partial<domain.RecurringRule> = {}): domain.RecurringRule => ({ id, accountId: 'a', kind: 'expense', amountMinor: 100, merchant: 'Netflix',
@@ -203,7 +214,7 @@ test('24UX6A: Inicio shows the current month only, scoped to the currency, with 
   assert.deepEqual(nodes(root).filter(n => n.type === 'EntryRow').map(n => n.props.entry.id).join(), 'usd', 'the month\'s activity follows the currency shown');
 });
 
-test('24UX6A: the pine field comes first: the month and the accounts, the scope (two currencies), the number, what it covers, Gastado | Disponible; then the sections', () => {
+test('24UX6A, 24UX6C: the pine field comes first: the month and the accounts, the scope (two currencies), the number, Gastado | Disponible; then the sections', () => {
   const view = routeHarness('(tabs)/index.tsx', {}, homeData, { recurring: [dueRule()] });
   const root = view.render();
   assert.equal(root.type, 'ScrollView', 'Inicio scrolls on its own, with no navigation header');
@@ -215,8 +226,9 @@ test('24UX6A: the pine field comes first: the month and the accounts, the scope 
   // The field's own order.
   const inField = nodes(field).map(n => n.type === 'AppText' && n.props.accessibilityRole === 'header' ? 'month' : n.type === 'AppText' && SUBLINE.test(textOf(n)) ? 'subline' : n.type)
     .filter(type => ['month', 'FieldButton', 'DisplayCurrencyButton', 'MetricHelp', 'Money', 'CurrencyParts', 'subline', 'Choices'].includes(type));
-  assert.equal(inField.join('|'), 'month|FieldButton|DisplayCurrencyButton|Money|subline|Choices');
-  assert.equal(fieldChildren(root).map(n => n.type).join('|'), 'View|View|ValueTransition|Choices', 'row 1, the scope row, the number with its line, the metric');
+  assert.equal(inField.join('|'), 'month|FieldButton|DisplayCurrencyButton|Money|Choices', '24UX6C: no line under the number');
+  assert.equal(fieldChildren(root).map(n => n.type).join('|'), 'View|View|ValueTransition|Choices', 'row 1, the scope row, the number, the metric');
+  assertNoSubline(root, 'two currencies, Gastado');
   // Everything outside the field follows it.
   const all = nodes(root);
   const afterField = all.slice(all.indexOf(field) + nodes(field).length);
@@ -261,20 +273,31 @@ test('24UX6A: the month is the current one, a header label, never a control: no 
   assert.equal(view.pushed.length + view.navigated.length, 0, 'rendering opens nothing');
 });
 
-test('24UX6A: with one currency the scope row is absent (no empty row) and the help sits beside the line; with two the chip is on the field with its help', () => {
+test('24UX6C: with one currency the scope row is absent (no empty row) and the help sits beside the number; with two the chip is on the field with its help', () => {
   const onlyPesos: domain.LedgerSnapshot = { accounts: [homeData.accounts[0]], entries: homeData.entries.filter(entry => entry.accountId === 'a') };
   const single = routeHarness('(tabs)/index.tsx', {}, onlyPesos);
   let root = single.render();
   assert.equal(nodes(root).some(n => n.type === 'DisplayCurrencyButton'), false, 'one currency: nothing to choose');
   assert.equal(fieldChildren(root).map(n => n.type).join('|'), 'View|ValueTransition|Choices', 'no scope row, not even an empty one');
+  // Gastado in its own currency: nothing converted, so nothing to explain: the number alone in its row.
+  const numberRow = (at: Node) => [find(at, 'ValueTransition').props.children].flat().filter(Boolean) as Node[];
+  assert.equal(numberRow(root).map(n => n.type).join('|'), 'View', 'Gastado unconverted: no help');
+  assert.equal(nodes(root).some(n => n.type === 'MetricHelp'), false);
+  assert.ok(nodes(numberRow(root)[0]).some(n => n.type === 'Money'), 'the number fills the row');
+  assertNoSubline(root, 'one currency, Gastado');
   metricOf(root).props.onChange('available');
   root = single.render();
   assert.equal(fieldChildren(root).map(n => n.type).join('|'), 'View|ValueTransition|Choices');
   const help = find(root, 'MetricHelp');
-  assert.deepEqual([help.props.title, help.props.color], ['Disponible', lightPalette.heroSecondary]);
-  const sublineRow = nodes(find(root, 'ValueTransition')).find(n => n.type === 'View' && [n.props.children].flat().includes(help));
-  assert.ok(sublineRow, 'the help moves into the number\'s block, beside the line');
-  assert.ok(nodes(sublineRow).some(n => n.type === 'AppText' && textOf(n) === 'Saldo registrado · 1 cuenta'));
+  assert.deepEqual([help.props.title, help.props.detail, help.props.color], ['Disponible', bindLocale('es-AR').t('home.availableHelp'), lightPalette.heroSecondary]);
+  // The help is a direct child of the number's row (the keyed ValueTransition), beside the number's own view.
+  const transition = find(root, 'ValueTransition');
+  assert.equal(transition.props.style.flexDirection, 'row', 'the number and its help share one row');
+  assert.equal(numberRow(root).map(n => n.type).join('|'), 'View|MetricHelp', 'the help beside the number, after it');
+  assert.equal(numberRow(root)[1], help);
+  assert.ok(nodes(numberRow(root)[0]).some(n => n.type === 'Money'));
+  assert.equal(nodes(root).filter(n => n.type === 'MetricHelp').length, 1, 'one help');
+  assertNoSubline(root, 'one currency, Disponible');
 
   const two = routeHarness('(tabs)/index.tsx', {}, homeData);
   root = two.render();
@@ -294,39 +317,73 @@ test('24UX6A: with one currency the scope row is absent (no empty row) and the h
   assert.equal([fieldChildren(consolidated)[1].props.children].flat().filter(Boolean).map((n: Node) => n.type).join('|'), 'DisplayCurrencyButton|MetricHelp');
 });
 
-test('24UX6A: the line under Gastado is the month so far and Reportes\' daily average, or «Sin gastos este mes»; Disponible never has a per-day figure', () => {
-  const es = bindLocale('es-AR');
-  const period = domain.spendingWindow('ARS', 'month', '2026-09-12');
-  const view = routeHarness('(tabs)/index.tsx', {}, homeData);
-  let root = view.render();
-  const average = domain.dailyAverageMinor(300, period);
-  assert.equal(average, Math.floor(300 / 12), 'twelve days of September so far');
-  assert.equal(homeFocus.spendingPerDay({ status: 'ready', minor: 300 }, period), average, 'the screen\'s rule is Reportes\' figure');
-  assert.equal(sublineOf(root), `Hasta hoy · ${es.moneyText(average, 'ARS')} por día`);
-  // Consolidated: the same rule over the converted total, in the display currency.
-  const consolidated = routeHarness('(tabs)/index.tsx', {}, homeData, {}, displayStore({ [displayCurrency.DISPLAY_MODE_KEY]: 'consolidated' }), { book: consolidatedRates() });
-  assert.equal(sublineOf(consolidated.render()), `Hasta hoy · ${es.moneyText(domain.dailyAverageMinor(100 + 200 + 2000000, period), 'ARS')} por día`);
-  // Nothing spent this month: no «0 por día».
-  const quiet = routeHarness('(tabs)/index.tsx', {}, snapshot).render();
-  assert.equal(sublineOf(quiet), 'Sin gastos este mes');
-  assert.equal(homeTexts(quiet).some(text => /por día/.test(text)), false);
-  // Disponible: a balance and how many accounts, never a daily figure, whatever the amount or the mode.
-  for (const [label, harness] of [['single', view], ['consolidated', consolidated], ['quiet', routeHarness('(tabs)/index.tsx', {}, snapshot)],
+test('24UX6C: no line under the number in Gastado or Disponible, in Spanish or English, with one or several currencies, in any mode or amount', () => {
+  const onlyPesos: domain.LedgerSnapshot = { accounts: [homeData.accounts[0]], entries: homeData.entries.filter(entry => entry.accountId === 'a') };
+  const consolidatedStore = () => displayStore({ [displayCurrency.DISPLAY_MODE_KEY]: 'consolidated' });
+  const cases = () => [
+    ['one currency', routeHarness('(tabs)/index.tsx', {}, onlyPesos)],
+    ['two currencies, single', routeHarness('(tabs)/index.tsx', {}, homeData)],
+    ['two currencies, consolidated', routeHarness('(tabs)/index.tsx', {}, homeData, {}, consolidatedStore(), { book: consolidatedRates() })],
+    ['quiet month', routeHarness('(tabs)/index.tsx', {}, snapshot)],
     ['zero balance', routeHarness('(tabs)/index.tsx', {}, { accounts: [{ ...snapshot.accounts[0], openingMinor: 0 }], entries: [] })],
-    ['huge balance', routeHarness('(tabs)/index.tsx', {}, { accounts: [{ ...snapshot.accounts[0], openingMinor: 9_999_999_999_999 }], entries: [] })]] as const) {
-    metricOf(harness.render()).props.onChange('available');
-    const available = harness.render();
-    assert.equal(homeTexts(available).some(text => /por día|Hasta hoy|Sin gastos/.test(text)), false, label + ': no per-day figure under Disponible');
-    assert.match(sublineOf(available) ?? '', /^Saldo registrado · \d+ cuentas?$/, label);
+    ['huge balance', routeHarness('(tabs)/index.tsx', {}, { accounts: [{ ...snapshot.accounts[0], openingMinor: 9_999_999_999_999 }], entries: [] })],
+    ['missing rate', routeHarness('(tabs)/index.tsx', {}, homeData, {}, displayStore({ [displayCurrency.DISPLAY_MODE_KEY]: 'consolidated', [displayCurrency.DISPLAY_CURRENCY_KEY]: 'EUR' }),
+      { book: consolidatedRates(), activity: 'offline' })],
+  ] as const;
+  for (const language of ['es-AR', 'en-AR'] as const) {
+    locale = language;
+    try {
+      for (const [label, harness] of cases()) {
+        assertNoSubline(harness.render(), language + ', ' + label + ', Gastado');
+        metricOf(harness.render()).props.onChange('available');
+        assertNoSubline(harness.render(), language + ', ' + label + ', Disponible');
+      }
+    } finally { locale = 'es-AR'; }
   }
-  metricOf(view.render()).props.onChange('available');
-  assert.equal(sublineOf(view.render()), 'Saldo registrado · 1 cuenta', 'single ARS: the one ARS account');
-  metricOf(consolidated.render()).props.onChange('available');
-  assert.equal(sublineOf(consolidated.render()), 'Saldo registrado · 2 cuentas', 'consolidated: every live account');
-  // Without a rate there is no total, so no average of a partial sum either.
-  const offline = routeHarness('(tabs)/index.tsx', {}, homeData, {}, displayStore({ [displayCurrency.DISPLAY_MODE_KEY]: 'consolidated', [displayCurrency.DISPLAY_CURRENCY_KEY]: 'EUR' }),
-    { book: consolidatedRates(), activity: 'offline' }).render();
-  assert.equal(homeTexts(offline).some(text => /por día/.test(text)), false);
+  // With a ready number the field's only words are the month: the number, the scope chip, the help and the metric speak for themselves.
+  assert.equal(JSON.stringify(homeTexts(fieldOf(routeHarness('(tabs)/index.tsx', {}, homeData).render()))), JSON.stringify(['Septiembre']));
+  // The copy and the helper are gone, not merely hidden.
+  for (const key of ['perDay', 'noSpending', 'availableLine', 'recordedBalance', 'accounts']) {
+    assert.equal(Object.hasOwn(esHome.home, key), false, 'es home.' + key + ' removed');
+    assert.equal(Object.hasOwn(enHome.home, key), false, 'en home.' + key + ' removed');
+    assert.equal(homeSource.includes("'home." + key), false, 'Inicio does not read home.' + key);
+  }
+  assert.equal(Object.hasOwn(homeFocus, 'spendingPerDay'), false, 'the per-day helper left with the line');
+  assert.equal(/spendingPerDay|dailyAverageMinor|accountCount/.test(homeSource), false, 'Inicio computes no per-day figure or account count');
+});
+
+test('24UX6C: the hero numbers are byte-identical to the domain figures: Gastado the month to date, Disponible liquid accounts without cards or debts, consolidated per date', () => {
+  const today = '2026-09-12';
+  const card: domain.CreditCardProfile = { id: 'card', accountId: 'card-acc', issuer: '', last4: '', creditLimitMinor: null, closingDay: 1, dueDay: 10, active: true, deleted: false, createdAt, revision: 0, updatedAt: createdAt };
+  const withCard: domain.LedgerSnapshot = { ...homeData, accounts: [...homeData.accounts, { id: 'card-acc', name: 'Visa', currency: 'ARS', openingMinor: -5000, createdAt }] };
+  const deletedAt = '2026-09-20T10:00:00.000Z';
+  const deletedUsd: domain.LedgerSnapshot = { ...homeData, accounts: homeData.accounts.map(account => account.id === 'u' ? { ...account, revision: 1, updatedAt: deletedAt, deletedAt } : account) };
+  // Each case: the ledger, the mode and currency shown, the rate book and the cards; then the figures the domain gives and the values pinned before 24UX6C.
+  const cases: { label: string; data: domain.LedgerSnapshot; mode: displayCurrency.DisplayMode; currency: domain.Currency; book: domain.RateBook; cards?: domain.CreditCardProfile[];
+    spent: number; available: number }[] = [
+    { label: 'single ARS', data: homeData, mode: 'single', currency: 'ARS', book: domain.rateBook([]), spent: 300, available: 9594 },
+    { label: 'single USD', data: homeData, mode: 'single', currency: 'USD', book: domain.rateBook([]), spent: 1000, available: 10000 - 999 - 1000 },
+    { label: 'consolidated ARS', data: homeData, mode: 'consolidated', currency: 'ARS', book: consolidatedRates(), spent: 100 + 200 + 2000000, available: 9594 + 16002000 },
+    { label: 'card excluded', data: withCard, mode: 'single', currency: 'ARS', book: domain.rateBook([]), cards: [card], spent: 300, available: 10000 - 101 - 202 - 303 - 100 - 200 + 500 },
+    { label: 'deleted USD account', data: deletedUsd, mode: 'consolidated', currency: 'ARS', book: consolidatedRates(), spent: 100 + 200 + 2000000, available: 9594 },
+  ];
+  for (const item of cases) {
+    const view = financeView.financeView(item.data, item.mode, item.currency, item.book);
+    const period = domain.spendingWindow(item.currency, 'month', today);
+    const spent = financeView.spendingFigure(item.data, view, period, 'idle', true);
+    const available = financeView.availableFigure(item.data, view, item.book, today, 'idle', true, item.cards ?? [], []);
+    assert.equal(spent.status, 'ready', item.label);
+    assert.equal(available.status, 'ready', item.label);
+    if (spent.status !== 'ready' || available.status !== 'ready') continue;
+    assert.deepEqual([spent.minor, available.minor], [item.spent, item.available], item.label + ': the domain figures as pinned before the change');
+    const harness = routeHarness('(tabs)/index.tsx', {}, item.data, item.cards ? { cards: item.cards } : {},
+      displayStore({ [displayCurrency.DISPLAY_MODE_KEY]: item.mode, [displayCurrency.DISPLAY_CURRENCY_KEY]: item.currency }), { book: item.book });
+    const shown = (root: Node) => { const money = find(root, 'Money'); return JSON.stringify({ minor: money.props.minor, currency: money.props.currency }); };
+    assert.equal(shown(harness.render()), JSON.stringify({ minor: spent.minor, currency: item.currency }), item.label + ': Gastado is spendingFigure, byte for byte');
+    metricOf(harness.render()).props.onChange('available');
+    assert.equal(shown(harness.render()), JSON.stringify({ minor: available.minor, currency: item.currency }), item.label + ': Disponible is availableFigure, byte for byte');
+    assert.equal(Number.isInteger(spent.minor) && Number.isInteger(available.minor), true, 'integer minor units');
+  }
 });
 
 test('24UX6A: the number is the field\'s ink at 46 pt, and the secondary ink when it is exactly zero; dark keeps the dark field', () => {
@@ -504,7 +561,7 @@ test('Home keeps analysis in Reportes: no timeline bars, commitments only with a
   // Account "a": opening 10000, expenses 101 + 202 + 303 + 100 + 200, income 500. The card's −5000 is excluded.
   assert.equal(find(cardView.render(), 'Money').props.minor, 10000 - 101 - 202 - 303 - 100 - 200 + 500);
   assert.equal(homeTexts(cardView.render()).some(text => /saldo bancario|patrimonio/.test(text)), false);
-  assert.equal(sublineOf(cardView.render()), 'Saldo registrado · 1 cuenta', 'the card is not an account of Disponible');
+  assertNoSubline(cardView.render(), 'Disponible with a card');
   assert.equal(find(cardView.render(), 'MetricHelp').props.title, 'Disponible');
 });
 test('24B1: Disponible for a currency held only by a card is a true US$ 0,00, never a dropped total', () => {
@@ -585,13 +642,13 @@ test('23.1B1: Home in English keeps the same numbers and routes; only words chan
     const titles = nodes(root).filter(n => n.type === 'SectionTitle').map(n => String(n.props.children) + '|' + n.props.action);
     assert.equal(titles.join(' / '), 'Coming up|See all / Recent activity|See all');
     assert.equal(find(root, 'FieldButton').props.label, 'View my accounts');
-    assert.equal(sublineOf(root), `So far · ${bindLocale('en-AR').moneyText(25, 'ARS')} a day`, 'the same daily average, in English words');
+    assertNoSubline(root, 'English, Spent');
     metric.props.onChange('available');
     const available = view.render();
     const help = find(available, 'MetricHelp');
     assert.equal(help.props.title, 'Available');
     assert.match(help.props.detail, /^The money recorded in your accounts/);
-    assert.equal(sublineOf(available), 'Recorded balance · 1 account', 'plural of the account count; no per-day figure');
+    assertNoSubline(available, 'English, Available');
     locale = 'es-AR';
     const back = view.render();
     assert.equal(find(back, 'MetricHelp').props.title, 'Disponible', 'the chosen metric survives the switch');
@@ -615,7 +672,7 @@ test('24B3: Home with three currencies lists them in the switch and shows each c
   assert.equal(nodes(root).filter(n => n.type === 'EntryRow').map(n => n.props.entry.id).join(), 'yen-2,yen-1', 'the activity is the yen movements alone');
   // 24UX6A: a concentrated category (yen 1500 of 2200 in Comida) no longer makes a line on Inicio; Reportes has the ranking.
   assert.equal(nodes(root).some(n => RETIRED.includes(n.type)), false);
-  assert.equal(sublineOf(root), `Hasta hoy · ${bindLocale('es-AR').moneyText(domain.dailyAverageMinor(2200, domain.spendingWindow('JPY', 'month', '2026-09-12')), 'JPY')} por día`, 'the daily average in yen');
+  assertNoSubline(root, 'three currencies, yen');
 });
 
 // ---- Producto 24B6: one display currency shared by Inicio and Reportes ------------------------------------
@@ -763,7 +820,8 @@ test('24UX6A: a quiet month is the number and one quiet line: no empty section, 
   assert.equal(sectionTitles(withIncome).join(), 'Actividad reciente');
   assert.equal(nodes(withIncome).filter(n => n.type === 'EntryRow').map(n => n.props.entry.id).join(), 'pay');
   assert.equal(nodes(withIncome).some(n => n.type === 'EmptyState'), false);
-  assert.deepEqual([find(withIncome, 'Money').props.minor, find(withIncome, 'Money').props.color, sublineOf(withIncome)], [0, lightPalette.heroSecondary, 'Sin gastos este mes']);
+  assert.deepEqual([find(withIncome, 'Money').props.minor, find(withIncome, 'Money').props.color], [0, lightPalette.heroSecondary], 'a true zero reads quieter');
+  assertNoSubline(withIncome, '24UX6C: no «Sin gastos este mes» under a zero');
 });
 test('24UX6A review: the quiet line names the currency shown when another one is held, and its detail names the dock\'s Registrar (+) button', () => {
   const at = '2026-09-01T12:00:00.000Z';
@@ -799,29 +857,26 @@ test('24UX6A review: the quiet line names the currency shown when another one is
     assert.equal(quietOf(root).map(n => n.props.title).join(), 'No transactions in ARS this month yet');
   } finally { locale = 'es-AR'; }
 });
-test('24UX6A review: VoiceOver hears the Gastado line\'s daily average in words; the Disponible line carries no per-day label', () => {
-  const es = bindLocale('es-AR');
-  const period = domain.spendingWindow('ARS', 'month', '2026-09-12');
-  const average = domain.dailyAverageMinor(300, period);
-  const view = routeHarness('(tabs)/index.tsx', {}, homeData);
-  const sublineNode = (root: Node) => { const node = nodes(fieldOf(root)).find(n => n.type === 'AppText' && SUBLINE.test(textOf(n))); assert.ok(node, 'Missing the subline'); return node; };
-  let line = sublineNode(view.render());
-  assert.equal(textOf(line), `Hasta hoy · ${es.moneyText(average, 'ARS')} por día`, 'the visible line keeps the region\'s digits');
-  assert.equal(line.props.accessibilityLabel, `Hasta hoy · ${es.spokenMoney(average, 'ARS')} por día`, 'the same average, spoken');
-  assert.notEqual(line.props.accessibilityLabel, textOf(line), 'never the visible formatter read aloud');
-  // Nothing spent this month: no per-day figure, so no spoken twin either.
-  const quietLine = sublineNode(routeHarness('(tabs)/index.tsx', {}, snapshot).render());
-  assert.deepEqual([textOf(quietLine), quietLine.props.accessibilityLabel], ['Sin gastos este mes', undefined]);
-  // Disponible: a balance and how many accounts, read as written.
-  metricOf(view.render()).props.onChange('available');
-  line = sublineNode(view.render());
-  assert.deepEqual([textOf(line), line.props.accessibilityLabel], ['Saldo registrado · 1 cuenta', undefined]);
-  // English: the spoken twin follows the language.
-  locale = 'en-AR';
-  try {
-    const english = routeHarness('(tabs)/index.tsx', {}, homeData);
-    assert.equal(sublineNode(english.render()).props.accessibilityLabel, `So far · ${bindLocale('en-AR').spokenMoney(average, 'ARS')} a day`);
-  } finally { locale = 'es-AR'; }
+test('24UX6C: with two or more currencies the chip and its help stay in the scope row; Gastado shows a help only when converted, Disponible always', () => {
+  const rowOf = (root: Node) => [fieldChildren(root)[1].props.children].flat().filter(Boolean).map((n: Node) => n.type).join('|');
+  const inNumber = (root: Node) => nodes(find(root, 'ValueTransition')).some(n => n.type === 'MetricHelp');
+  // Single mode on ARS with USD held: Gastado is unconverted, so no help; Disponible explains itself in the scope row.
+  const single = routeHarness('(tabs)/index.tsx', {}, homeData);
+  assert.deepEqual([rowOf(single.render()), inNumber(single.render())], ['DisplayCurrencyButton', false], 'Gastado unconverted: the chip alone');
+  metricOf(single.render()).props.onChange('available');
+  assert.deepEqual([rowOf(single.render()), inNumber(single.render())], ['DisplayCurrencyButton|MetricHelp', false]);
+  assert.equal(find(single.render(), 'MetricHelp').props.title, 'Disponible');
+  // Consolidated: Gastado converted, so the rate's help, in the scope row, never beside the number.
+  const consolidated = routeHarness('(tabs)/index.tsx', {}, homeData, {}, displayStore({ [displayCurrency.DISPLAY_MODE_KEY]: 'consolidated' }), { book: consolidatedRates() });
+  assert.deepEqual([rowOf(consolidated.render()), inNumber(consolidated.render())], ['DisplayCurrencyButton|MetricHelp', false]);
+  assert.equal(find(consolidated.render(), 'MetricHelp').props.title, bindLocale('es-AR').t('fx.infoTitle'));
+  metricOf(consolidated.render()).props.onChange('available');
+  assert.deepEqual([rowOf(consolidated.render()), inNumber(consolidated.render())], ['DisplayCurrencyButton|MetricHelp', false]);
+  // The number's row carries no help with a scope row: the number alone.
+  assert.equal([find(consolidated.render(), 'ValueTransition').props.children].flat().filter(Boolean).map((n: Node) => n.type).join('|'), 'View');
+  // The chip is quieter in 24UX6C (weight 500) but keeps its place and props on the field.
+  const chip = find(consolidated.render(), 'DisplayCurrencyButton');
+  assert.deepEqual([chip.props.onField, chip.props.mode, chip.props.currency], [true, 'consolidated', 'ARS']);
 });
 test('24UX5 review, 24UX6A: Inicio\'s recent rows name their account only when the visible rows come from more than one account', () => {
   const at = '2026-09-10T12:00:00Z';
@@ -907,7 +962,7 @@ test('24UX5: a commitment names its category only when it adds something', () =>
   } finally { glyphAliases.clear(); }
 });
 // 24UX5 §8, 24UX6A: the composition with more data. Whatever the ledger holds, Inicio keeps one order (the field: the
-// month and the accounts, the scope, the number, its line, the metric; then what is due, then the month's activity);
+// month and the accounts, the scope, the number (24UX6C: no line under it), the metric; then what is due, then the month's activity);
 // nothing appears to show a feature.
 test('24UX6A: Inicio keeps its hierarchy with no account, one or several accounts and currencies, budgets, rules and huge amounts', () => {
   const at = '2026-09-01T12:00:00.000Z';
@@ -923,7 +978,8 @@ test('24UX6A: Inicio keeps its hierarchy with no account, one or several account
     .filter(type => ['month', 'FieldButton', 'DisplayCurrencyButton', 'Money', 'subline', 'Choices', 'UpcomingRecurringRow', 'EntryRow'].concat(RETIRED).includes(type) || /^(title|empty):/.test(type))
     .filter((type, index, all) => type !== all[index - 1]);
   // 24C1 / 25B2: the chip is part of the field only while two or more currencies are held.
-  const expected = (modules: string[], chip = false) => ['month', 'FieldButton', ...(chip ? ['DisplayCurrencyButton'] : []), 'Money', 'subline', 'Choices', ...modules];
+  // 24UX6C: no line under the number; a «subline» in the order would fail here.
+  const expected = (modules: string[], chip = false) => ['month', 'FieldButton', ...(chip ? ['DisplayCurrencyButton'] : []), 'Money', 'Choices', ...modules];
 
   // No account: the field and the start, nothing else.
   assert.deepEqual(order(routeHarness('(tabs)/index.tsx', {}, { accounts: [], entries: [] }).render()), expected(['empty:Entendé tus gastos.']));
@@ -1088,7 +1144,7 @@ test('25B2 review: deleting the last USD account keeps its movements on Inicio: 
   nodes(root).find(n => n.type === 'Choices' && n.props.value === 'spending')!.props.onChange('available');
   root = view.render();
   assert.equal(find(root, 'Money').props.minor, 9594, 'ARS 95,94 alone: no USD balance converted');
-  assert.equal(sublineOf(root), 'Saldo registrado · 1 cuenta', 'one live account counted');
+  assertNoSubline(root, 'deleted USD account, Disponible');
   // "Solo USD" is still a view of the history: the USD expense alone, in its own currency.
   chip.props.onMode('single');
   chip.props.onCurrency?.('USD');
