@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { runInNewContext } from 'node:vm';
 import ts from 'typescript';
+import * as geometry from '../src/ui/geometry.ts';
 import * as domain from '@finanzapp/domain';
 import * as presentation from '../src/ui/presentation.ts';
 import * as reportPresentation from '../src/ui/report-presentation.ts';
@@ -104,7 +105,7 @@ function routeHarness(file: string, params: Record<string, unknown>, initialData
       return [state[index], (value: unknown) => { state[index] = typeof value === 'function' ? (value as (current: unknown) => unknown)(state[index]) : value; }];
     } },
     'react/jsx-runtime': { jsx, jsxs: jsx, Fragment: 'Fragment' },
-    'react-native': { View: 'View', ScrollView: 'ScrollView', FlatList: 'FlatList', StyleSheet: { hairlineWidth: 1, create: <T,>(styles: T) => styles, absoluteFill: {} } },
+    'react-native': { View: 'View', ScrollView: 'ScrollView', FlatList: 'FlatList', StyleSheet: { hairlineWidth: 1, create: <T,>(styles: T) => styles, absoluteFill: {} }, useWindowDimensions: () => ({ width: 393, height: 852, fontScale: 1, scale: 3 }) },
     'react-native-reanimated': { __esModule: true, default: { View: 'Animated.View' },
       useSharedValue: (value: number) => ({ value }), withTiming: (value: number) => value,
       useAnimatedStyle: (fn: () => unknown) => fn() },
@@ -122,7 +123,8 @@ function routeHarness(file: string, params: Record<string, unknown>, initialData
     '../src/ui/presentation': presentation,
     '../src/ui/report-presentation': reportPresentation,
     '../src/ui/spending-chart': { CategorySpendingRow: 'CategorySpendingRow', CategoryLegendRow: 'CategoryLegendRow' },
-    '../src/ui/charts': { DonutChart: 'DonutChart', MonthBars: 'MonthBars', OTHERS_KEY: ' others',
+    '../src/ui/geometry': geometry,
+    '../src/ui/charts': { DonutChart: 'DonutChart', MonthBars: 'MonthBars', OTHERS_KEY: ' others', MONEY_MAX_SCALE: 1.8,
       donutSlices: (items: { key: string; label: string; value: number }[]) => items.slice(0, 5).map((item, index) => ({ ...item, color: 'c' + index })) },
     '../src/ui/budget-presentation': budgetPresentation,
     '@expo/vector-icons/Ionicons': 'Ionicons',
@@ -163,6 +165,8 @@ function find(root: Node, type: string, label?: string) {
   assert.ok(node, 'Missing ' + type + ' ' + (label ?? ''));
   return node;
 }
+/** 24UX6D: Reportes has no KPI amount any more; its currency is the donut's (Categorías) or, without one, the chip's. */
+const reportsCurrency = (root: Node) => (nodes(root).find(n => n.type === 'DonutChart') ?? find(root, 'DisplayCurrencyButton')).props.currency;
 
 
 const homeData = { ...snapshot, entries: [...snapshot.entries,
@@ -852,7 +856,7 @@ test('24B6: choosing a currency on Inicio changes Reportes and choosing on Repor
   find(home.render(), 'DisplayCurrencyButton').props.onCurrency('USD');
   assert.equal(find(home.render(), 'Money').props.currency, 'USD');
   assert.equal(find(reports.render(), 'DisplayCurrencyButton').props.currency, 'USD', 'Reportes follows Inicio without being told');
-  assert.equal(find(reports.render(), 'Money').props.currency, 'USD');
+  assert.equal(reportsCurrency(reports.render()), 'USD');
   assert.equal(rows.get(displayCurrency.DISPLAY_CURRENCY_KEY), 'USD', 'persisted outside the ledger, under its own key');
   find(reports.render(), 'DisplayCurrencyButton').props.onCurrency('ARS');
   assert.equal(find(home.render(), 'DisplayCurrencyButton').props.currency, 'ARS', 'and Inicio follows Reportes');
@@ -881,7 +885,7 @@ test('24B6: a stored preference survives a relaunch; one no account holds any mo
   assert.equal(nodes(root).some(n => n.type === 'DisplayCurrencyButton'), false, 'one currency: no chip');
   assert.equal(rows.get(displayCurrency.DISPLAY_CURRENCY_KEY), 'USD', 'the preference is not rewritten; nothing else is touched');
   const reports = routeHarness('(tabs)/reports.tsx', {}, onlyPesos, {}, displayCurrency.createDisplayCurrencyStore(preferences));
-  assert.equal(find(reports.render(), 'Money').props.currency, 'ARS');
+  assert.equal(reportsCurrency(reports.render()), 'ARS');
   assert.equal(nodes(reports.render()).some(n => n.type === 'DisplayCurrencyButton'), false, 'one currency: no chip on Reportes either');
 });
 
@@ -890,19 +894,19 @@ test('24B6: a link into Reportes with a held currency shows it and makes it the 
   const preferences = () => ({ getItemSync: (key: string) => rows.get(key) ?? null, setItemSync: (key: string, value: string) => { rows.set(key, value); }, removeItemSync: (key: string) => rows.delete(key) });
   const shared = displayCurrency.createDisplayCurrencyStore(preferences);
   const linked = routeHarness('(tabs)/reports.tsx', { currency: 'USD', month: '2026-08' }, homeData, {}, shared);
-  assert.equal(find(linked.render(), 'Money').props.currency, 'USD', 'the frame the link arrives already shows its currency');
+  assert.equal(reportsCurrency(linked.render()), 'USD', 'the frame the link arrives already shows its currency');
   assert.equal(shared.getState(), 'USD', 'the explicit currency became the shared choice');
   assert.equal(rows.get(displayCurrency.DISPLAY_CURRENCY_KEY), 'USD');
   const home = routeHarness('(tabs)/index.tsx', {}, homeData, {}, shared);
   assert.equal(find(home.render(), 'DisplayCurrencyButton').props.currency, 'USD', 'Inicio agrees');
   // The switch on the linked screen still wins afterwards: the parameter is applied once, not on every render.
   find(linked.render(), 'DisplayCurrencyButton').props.onCurrency('ARS');
-  assert.equal(find(linked.render(), 'Money').props.currency, 'ARS');
-  assert.equal(find(linked.render(), 'Money').props.currency, 'ARS', 'a re-render does not re-apply the link');
+  assert.equal(reportsCurrency(linked.render()), 'ARS');
+  assert.equal(reportsCurrency(linked.render()), 'ARS', 'a re-render does not re-apply the link');
   assert.equal(shared.getState(), 'ARS');
   for (const currency of ['usd', 'XAU', 'ZZZ', 'EUR', 'KWD', '', ['USD'], 42]) {
     const bad = routeHarness('(tabs)/reports.tsx', { currency, month: '2026-08' }, homeData, {}, shared);
-    assert.equal(find(bad.render(), 'Money').props.currency, 'ARS', 'invalid ' + JSON.stringify(currency) + ': the shared choice');
+    assert.equal(reportsCurrency(bad.render()), 'ARS', 'invalid ' + JSON.stringify(currency) + ': the shared choice');
     assert.equal(shared.getState(), 'ARS', 'invalid ' + JSON.stringify(currency) + ': not overwritten');
     assert.equal(rows.get(displayCurrency.DISPLAY_CURRENCY_KEY), 'ARS');
   }
@@ -916,7 +920,7 @@ test('24B6 review: a Reportes link naming a currency nobody holds yet is applied
   const shared = displayCurrency.createDisplayCurrencyStore(() => ({ getItemSync: (key: string) => rows.get(key) ?? null, setItemSync: (key: string, value: string) => { rows.set(key, value); }, removeItemSync: (key: string) => rows.delete(key) }));
   const reports = routeHarness('(tabs)/reports.tsx', { currency: 'EUR', month: '2026-08' }, homeData, {}, shared);
   let root = reports.render();
-  assert.equal(find(root, 'Money').props.currency, 'ARS', 'no euro account: the shared choice shows');
+  assert.equal(reportsCurrency(root), 'ARS', 'no euro account: the shared choice shows');
   assert.equal(shared.getState(), 'ARS', 'nothing applied');
   reports.render(); reports.render();
   assert.equal(shared.getState(), 'ARS', 'and nothing applied on later renders either');
@@ -925,7 +929,7 @@ test('24B6 review: a Reportes link naming a currency nobody holds yet is applied
   const withEuro: domain.LedgerSnapshot = { ...homeData, accounts: [...homeData.accounts, euro] };
   reports.setData(withEuro);
   root = reports.render();
-  assert.equal(find(root, 'Money').props.currency, 'EUR', 'the link is honoured the moment its currency is held');
+  assert.equal(reportsCurrency(root), 'EUR', 'the link is honoured the moment its currency is held');
   assert.equal(shared.getState(), 'EUR', 'and applied to the shared choice');
   assert.equal(rows.get(displayCurrency.DISPLAY_CURRENCY_KEY), 'EUR');
   assert.deepEqual(find(root, 'DisplayCurrencyButton').props.held, ['ARS', 'USD', 'EUR']);
@@ -933,37 +937,37 @@ test('24B6 review: a Reportes link naming a currency nobody holds yet is applied
   assert.equal(find(home.render(), 'DisplayCurrencyButton').props.currency, 'EUR', 'Inicio follows');
   // The switch on Reportes wins from now on, and an unrelated ledger change does not re-impose the link.
   find(reports.render(), 'DisplayCurrencyButton').props.onCurrency('USD');
-  assert.equal(find(reports.render(), 'Money').props.currency, 'USD');
+  assert.equal(reportsCurrency(reports.render()), 'USD');
   assert.equal(shared.getState(), 'USD');
   const more: domain.LedgerSnapshot = { ...withEuro, accounts: [...withEuro.accounts, { ...euro, id: 'e2', name: 'Más euros' }], entries: [...withEuro.entries, { ...withEuro.entries[0], id: 'e-1', accountId: 'e', amountMinor: 900 }] };
   reports.setData(more);
-  assert.equal(find(reports.render(), 'Money').props.currency, 'USD', 'a new euro account and a euro movement do not bring the link back');
+  assert.equal(reportsCurrency(reports.render()), 'USD', 'a new euro account and a euro movement do not bring the link back');
   assert.equal(shared.getState(), 'USD');
   // The euro accounts disappear (a restored older copy) and come back: still applied only once.
   reports.setData(homeData);
-  assert.equal(find(reports.render(), 'Money').props.currency, 'USD');
+  assert.equal(reportsCurrency(reports.render()), 'USD');
   reports.setData(withEuro);
-  assert.equal(find(reports.render(), 'Money').props.currency, 'USD', 'the link was already applied: the person\'s later choice stands');
+  assert.equal(reportsCurrency(reports.render()), 'USD', 'the link was already applied: the person\'s later choice stands');
   assert.equal(shared.getState(), 'USD');
   // Inicio, mounted or not, changes the choice and Reportes follows; the link still does not return.
   home.setData(withEuro);
   find(home.render(), 'DisplayCurrencyButton').props.onCurrency('ARS');
-  assert.equal(find(reports.render(), 'Money').props.currency, 'ARS');
+  assert.equal(reportsCurrency(reports.render()), 'ARS');
   const later = routeHarness('(tabs)/reports.tsx', {}, withEuro, {}, shared);
   assert.equal(find(later.render(), 'DisplayCurrencyButton').props.currency, 'ARS', 'a Reportes mounted later reads the same choice');
   // A link that can never be held (a malformed or unknown code) applies nothing, before or after the ledger grows.
   const bad = routeHarness('(tabs)/reports.tsx', { currency: 'ZZZ', month: '2026-08' }, homeData, {}, shared);
-  assert.equal(find(bad.render(), 'Money').props.currency, 'ARS');
+  assert.equal(reportsCurrency(bad.render()), 'ARS');
   bad.setData(more);
-  assert.equal(find(bad.render(), 'Money').props.currency, 'ARS');
+  assert.equal(reportsCurrency(bad.render()), 'ARS');
   assert.equal(shared.getState(), 'ARS');
   // A held link applied at once is not applied again when the ledger changes afterwards.
   const direct = routeHarness('(tabs)/reports.tsx', { currency: 'USD', month: '2026-08' }, withEuro, {}, shared);
-  assert.equal(find(direct.render(), 'Money').props.currency, 'USD');
+  assert.equal(reportsCurrency(direct.render()), 'USD');
   assert.equal(shared.getState(), 'USD');
   find(direct.render(), 'DisplayCurrencyButton').props.onCurrency('EUR');
   direct.setData(more);
-  assert.equal(find(direct.render(), 'Money').props.currency, 'EUR');
+  assert.equal(reportsCurrency(direct.render()), 'EUR');
   assert.equal(shared.getState(), 'EUR');
 });
 
@@ -1571,4 +1575,35 @@ test('24UX6C2: the budget row opens Presupuestos on the current month, whatever 
     row.props.onPress();
     assert.equal(JSON.stringify(view.pushed.at(-1)), JSON.stringify({ pathname: '/budgets', params: { currency: 'ARS', month: '2026-10' } }));
   } finally { today = '2026-09-12'; }
+});
+
+test('24UX6D: the progress row changed the budget row\'s look only: Inicio hands it the same four props, the same homeBudget choice and the same domain progress as 24UX6C2', () => {
+  // The 24UX6C2 fixtures and what they produced then, pinned: [state, currency, labelsCurrency, spent, remaining, ratio, budget id].
+  const { data, total, category } = budgetHome();
+  const cases: [string, domain.MonthlyBudget[], unknown[] | null][] = [
+    ['calm (84 %)', [total(10120)], null],
+    ['exactly 85 %', [total(10000)], ['warning', 'ARS', false, 8500, 1500, 0.85, 'total-ARS-2026-09']],
+    ['exactly 100 %', [total(8500)], ['warning', 'ARS', false, 8500, 0, 1, 'total-ARS-2026-09']],
+    ['one minor unit over', [total(8499)], ['exceeded', 'ARS', false, 8500, -1, 8500 / 8499, 'total-ARS-2026-09']],
+    ['a category over its limit only', [category('Supermercado', 1000)], null],
+  ];
+  for (const [label, budgets, expected] of cases) {
+    const view = routeHarness('(tabs)/index.tsx', {}, data, { budgets });
+    const rows = budgetRows(view.render());
+    const chosen = homeFocus.homeBudget(data, budgets, ['ARS'], 'single', 'ARS', '2026-09');
+    if (!expected) { assert.equal(rows.length, 0, label); assert.equal(chosen, null, label); continue; }
+    assert.equal(rows.length, 1, label);
+    const row = rows[0];
+    assert.equal(Object.keys(row.props).sort().join(), 'attention,currency,labelsCurrency,onPress', label + ': no new prop; the row derives its look itself');
+    const { progress } = row.props.attention;
+    assert.equal(JSON.stringify([row.props.attention.state, row.props.currency, row.props.labelsCurrency, progress.spentMinor, progress.remainingMinor, progress.ratio, progress.budget.id]),
+      JSON.stringify(expected), label);
+    assert.equal(JSON.stringify(row.props.attention), JSON.stringify(chosen), label + ': exactly homeBudget\'s choice (the route hands the whole HomeBudget as `attention`)');
+    assert.equal(JSON.stringify([row.props.currency, row.props.labelsCurrency]), JSON.stringify([chosen!.currency, chosen!.labelsCurrency]), label);
+    row.props.onPress();
+    assert.equal(JSON.stringify(view.pushed.at(-1)), JSON.stringify({ pathname: '/budgets', params: { currency: 'ARS', month: '2026-09' } }), label);
+  }
+  // The call site in the route is the 24UX6C2 one, word for word.
+  const route = readFileSync(new URL('../app/(tabs)/index.tsx', import.meta.url), 'utf8');
+  assert.match(route, /<Surface grouped><BudgetAttentionRow attention=\{budget\} currency=\{budget\.currency\} labelsCurrency=\{budget\.labelsCurrency\}\s+onPress=\{\(\) => router\.push\(\{ pathname: '\/budgets', params: \{ currency: budget\.currency, month \} \}\)\} \/><\/Surface>/);
 });

@@ -1,8 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { FlatList, StyleSheet, View } from 'react-native';
+import { FlatList, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
-import Ionicons from '@expo/vector-icons/Ionicons';
-import { dailyAverageMinor, dailySpending, monthlySpendingTrend, shiftMonthISO, spendingComparison, spendingInsights, spendingReport,
+import { dailySpending, monthlySpendingTrend, shiftMonthISO, spendingComparison, spendingInsights, spendingReport,
   summarizeMonthlyBudgets, topMerchants, type CategorySpending, type Currency, type DailySpending, type Entry, type SpendingInsight } from '@finanzapp/domain';
 import { useLedger } from '../../src/storage/LedgerProvider';
 import { budgetScope, budgetTone, percentUsed } from '../../src/ui/budget-presentation';
@@ -19,7 +18,8 @@ import { displayCurrencyForRoute } from '../../src/ui/display-currency';
 import { useI18n } from '../../src/i18n/provider';
 import type { Translate } from '../../src/i18n/messages';
 import { useCategoryColor, useCategoryLookOf } from '../../src/ui/category-hues';
-import { DonutChart, MonthBars, OTHERS_KEY, donutSlices } from '../../src/ui/charts';
+import { DonutChart, MONEY_MAX_SCALE, MonthBars, OTHERS_KEY, donutSlices } from '../../src/ui/charts';
+import { amountWidthEm } from '../../src/ui/geometry';
 import { ValueTransition, selectionHaptic } from '../../src/ui/motion';
 import { activityDateLabel, historyCurrencies } from '../../src/ui/presentation';
 import { changePercent, earliestRecordedMonth, insightsBesideRanking, reportPeriodLabel, reportSelection, requestedReportMonth, shiftReportMonth, spendingShare } from '../../src/ui/report-presentation';
@@ -29,17 +29,25 @@ import { space, useCurrentDay, usePalette, useReduceMotion } from '../../src/ui/
 /** Reportes answers "¿a dónde fue mi plata?" for one month and one currency. Every number is recorded spending in that
  * currency; nothing is estimated.
  *
- * Reading order (Producto 24UX6B, the Forest hierarchy of decision 005): the scope and the period (the currency chip with
- * more than one currency, the month and its arrows: Reportes is where past months live, Inicio shows only the current
- * one); the month's total with its daily average and change; then the analysis of that month, categories first (the
- * donut, then «Por categoría» with every category) or day by day («Por día»), switched by one segmented control; then the
- * history («Evolución», the last six months, whose bars still open a month); and last the details: budgets, the top
- * merchants, the factual insights, income and net flow, and the comparison. With a single month of history the trend is
- * one quiet line instead of a lone bar. Red stays an alert (a budget exceeded); ordinary spending is ink.
+ * Reading order (Producto 24UX6B, the Forest hierarchy of decision 005, recomposed in 24UX6D): the scope and the period
+ * (the currency chip with more than one currency, the month and its arrows: Reportes is where past months live, Inicio
+ * shows only the current one); then the analysis of that month, categories first or day by day, switched by one segmented
+ * control; then the history («Evolución», the last six months, whose bars still open a month); and last the details:
+ * budgets, the top merchants, the factual insights, income, net flow and the change against last month, and the
+ * comparison. With a single month of history the trend is one quiet line instead of a lone bar. Red stays an alert (a
+ * budget exceeded); ordinary spending is ink.
+ *
+ * 24UX6D: there is no «Gastado · ARS» KPI above the analysis any more, nor its daily average. In Categorías the period's
+ * total is the donut's centre («Total del período» over the exact amount, the report's own figure) and the donut is the
+ * head of the screen, right under the segmented control, then the category rows. In Día a día, which has no donut, the
+ * total is one compact line under the control. The change against last month moved from the KPI's line to a row of the
+ * lower facts, beside «Comparar con el mes anterior», which still opens the full comparison. The currency is named on the
+ * period line when no chip names it.
  *
  * 24UX5: what the report counts (one currency, no opening balances, transfers or card payments; a month without
- * records is not a month without spending) is one tap away beside the total instead of a permanent paragraph at the
- * end, and an insight that repeats a ranking row right above it is left out (`insightsBesideRanking`).
+ * records is not a month without spending) is one tap away (since 24UX6D beside the period line, in every ready state,
+ * empty months included) instead of a permanent paragraph at the end, and an insight that repeats a ranking row right
+ * above it is left out (`insightsBesideRanking`).
  *
  * 24C1: Reportes reads the same display mode and currency as Inicio. Consolidated, every figure (total, average,
  * trend, donut, categories, days, budgets, merchants, insights, comparison) comes from one ledger in which each
@@ -54,6 +62,7 @@ export default function ReportsScreen() {
   const p = usePalette();
   const { t, locale, formatMonthTitle, formatDayMonth, formatNumericDate, currencyName, moneyText, spokenMoney, spokenPercent, speechLanguage } = useI18n();
   const day = useCurrentDay();
+  const { width: windowWidth, fontScale } = useWindowDimensions();
   const [monthOverride, setMonth] = useState<string>();
   const [tab, setTab] = useState<'categories' | 'days'>('categories');
   // 24UX6C2: the category chosen on the donut, for the month and currency it was chosen in (a new month starts with none).
@@ -150,21 +159,16 @@ export default function ReportsScreen() {
   };
   // A month or currency change clears the donut's choice (24UX6C2): coming back starts with none, like any new view.
   const goToMonth = (month: string | undefined) => { selectionHaptic(); setChosen(null); setMonth(month); };
-  const average = ready ? dailyAverageMinor(report.expenseMinor, report) : 0;
+  // Categorías | Día a día clears the choice too (24UX6D): coming back to the donut starts with the total in its centre.
+  const goToTab = (next: 'categories' | 'days') => { setChosen(null); setTab(next); };
+  // The change against last month (24UX6D: a row of the lower facts, since the KPI line that carried it is gone).
   const delta = comparison && comparison.status === 'ready' && comparison.previous?.status === 'ready' && comparison.deltaMinor !== null
     ? { minor: comparison.deltaMinor, percent: changePercent(comparison.deltaMinor, comparison.previous.expenseMinor, locale), mode: comparison.mode } : null;
-  const deltaWords = (percent: string) => {
-    if (!delta) return null;
-    const reference = t(delta.mode === 'matching-days' ? 'reports.delta.matchingDays' : 'reports.delta.previousMonth');
-    return delta.minor === 0 ? t('reports.delta.same', { reference })
-      : t(delta.minor > 0 ? 'reports.delta.more' : 'reports.delta.less', { percent, reference });
-  };
-  const deltaText = delta && deltaWords(delta.percent);
+  const deltaWords = (percent: string) => !delta ? '' : delta.minor === 0 ? t('reports.delta.same')
+    : t(delta.minor > 0 ? 'reports.delta.more' : 'reports.delta.less', { percent });
   // The same change for VoiceOver, its share in the language's spoken numbers.
   const previousSpent = comparison?.status === 'ready' && comparison.previous?.status === 'ready' ? comparison.previous.expenseMinor : 0;
-  const spokenDelta = delta && previousSpent > 0 ? deltaWords(spokenPercent(Math.abs(delta.minor) / previousSpent)) : null;
-  // The line under the total, once for VoiceOver: the average in words (never the region's grouped digits) and the change.
-  const summaryLine = report.status !== 'ready' ? '' : [report.count === 0 ? t('reports.noRecords') : t('reports.perDay', { amount: spoken(average) }), spokenDelta].filter(Boolean).join(', ');
+  const spokenDelta = delta && previousSpent > 0 ? deltaWords(spokenPercent(Math.abs(delta.minor) / previousSpent)) : undefined;
   // The history: the six months ending at the shown one, as bars once another of them has spending. When the shown month
   // is the only one of its six with spending, one quiet line instead of a lone bar beside five empty ones (the arrows and
   // «Este mes» above lead to later months). Absent when no month of the six has spending, or a month lacks a rate.
@@ -172,6 +176,8 @@ export default function ReportsScreen() {
   const onlyThisMonth = recordedMonths.length === 1 && recordedMonths[0].monthISO === monthISO;
   const showTrend = ready && recordedMonths.length > 0 && !onlyThisMonth;
   const days = tab === 'days';
+  // Día a día's total at 20 pt fits the content width (Money caps a row amount's text scale at 1.8), or it takes its own line.
+  const dayTotalFits = !ready || !Number.isSafeInteger(report.expenseMinor) || amountWidthEm(moneyText(report.expenseMinor, currency)) * 20 * Math.min(Math.max(fontScale, 0.5), MONEY_MAX_SCALE) <= windowWidth - 2 * space.xl;
 
   return <FlatList<CategorySpending | DailySpending> ref={list} data={rows} keyExtractor={item => 'key' in item ? item.key : item.dateISO}
     style={{ flex: 1, backgroundColor: p.background }}
@@ -186,8 +192,15 @@ export default function ReportsScreen() {
             onPress={() => { if (canPrevious) goToMonth(shiftReportMonth(monthISO, -1)); }} />
           <ValueTransition id={monthISO + '|' + currency} variant="fade" style={{ flex: 1, alignItems: 'center', gap: 2 }}>
             <AppText accessibilityRole="header" variant="title3" style={{ textAlign: 'center' }}>{formatMonthTitle(monthISO)}</AppText>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-              <AppText secondary variant="caption">{reportPeriodLabel(report, day, t, false)}</AppText>
+            {/* 24UX6D review: the caption gives way and the row wraps, centred, so at larger text «Este mes» moves under the
+                period instead of spilling over the forward chevron, and the info button stays reachable. */}
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', alignItems: 'center', columnGap: 10, rowGap: 2, maxWidth: '100%' }}>
+              {/* 24UX6D: the period names the currency when no chip does («Hasta hoy · ARS»: the «Gastado · ARS» eyebrow that
+                  named it is gone), and what the report counts sits beside it, reachable in every ready state. */}
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2, flexShrink: 1, maxWidth: '100%' }}>
+                <AppText secondary variant="caption" style={{ flexShrink: 1, textAlign: 'center' }}>{reportPeriodLabel(report, day, t, held.length <= 1)}</AppText>
+                {ready && <InfoButton title={t('reports.method.title')} detail={method ?? t('reports.method.detail', { currency })} />}
+              </View>
               {canNext && <PressFeedback feedback="opacity" accessibilityRole="button" onPress={() => goToMonth(currentMonth)} accessibilityLabel={t('reports.backToCurrentMonth')} hitSlop={8} style={{ minHeight: 28, justifyContent: 'center' }}>
                 <AppText variant="caption" style={{ fontWeight: '600', color: p.primary }}>{t('reports.thisMonth')}</AppText>
               </PressFeedback>}
@@ -199,31 +212,27 @@ export default function ReportsScreen() {
       </View>
 
       {ready ? <>
-        {/* The month's total and what it covers. */}
-        <ValueTransition id={monthISO + '|' + currency} style={{ gap: 8 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
-            <AppText secondary variant="eyebrow">{withCurrencyCode(t('reports.spent'), currency)}</AppText>
-            <InfoButton title={t('reports.method.title')} detail={method ?? t('reports.method.detail', { currency })} />
-          </View>
-          <Money minor={report.expenseMinor} currency={currency} large />
-          <View accessible accessibilityLabel={summaryLine} accessibilityLanguage={speechLanguage} style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6 }}>
-            <AppText secondary variant="subhead">{report.count === 0 ? t('reports.noRecords') : t('reports.perDay', { amount: money(average) })}</AppText>
-            {delta && <>
-              <AppText secondary variant="subhead">·</AppText>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
-                <Ionicons name={delta.minor > 0 ? 'trending-up-outline' : delta.minor < 0 ? 'trending-down-outline' : 'remove-outline'} size={15} color={p.secondary} accessible={false} />
-                <AppText secondary variant="subhead">{deltaText}</AppText>
-              </View>
-            </>}
-          </View>
-        </ValueTransition>
-
-        {/* The month's analysis: categories first, or day by day. */}
+        {/* The month's analysis: categories first, or day by day. 24UX6D: no KPI above it; the total is the donut's centre
+            in Categorías and one compact line in Día a día. */}
         <View style={{ gap: space.l }}>
-          <Choices value={tab} onChange={setTab} options={[{ value: 'categories', label: t('reports.viewCategories') }, { value: 'days', label: t('reports.viewDays') }]} />
-          {!days && report.categories.length > 0 && <View style={{ alignItems: 'center', gap: space.m, paddingTop: space.s }}>
-            {/* 24UX6C2: the total is the KPI above; the donut's centre is for the chosen category. */}
-            <DonutChart slices={slices} currency={currency} caption={t('reports.chart.byCategory')} chosen={chosenKey} shareOf={shareOf}
+          <Choices value={tab} onChange={goToTab} options={[{ value: 'categories', label: t('reports.viewCategories') }, { value: 'days', label: t('reports.viewDays') }]} />
+          {/* Día a día has no donut: the period's total as a compact analytical line, never the old hero. The label is
+              secondary and the exact amount 20 pt semibold beside it; when the two do not share the line the amount wraps
+              under the label (whole, never truncated). VoiceOver hears it once, in spoken numbers. */}
+          {days && rows.length > 0 && <ValueTransition id={monthISO + '|' + currency}>
+            <View accessible accessibilityLabel={t('reports.periodTotalSpoken', { amount: spoken(report.expenseMinor) })} accessibilityLanguage={speechLanguage}
+              style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'baseline', columnGap: 8, rowGap: 2 }}>
+              <AppText secondary variant="subhead">{t('reports.dayTotal')}</AppText>
+              {/* 24UX6D review: a row amount shrinks at most to 75 % and then truncates; when the exact amount would not fit
+                  the content width at 20 pt it renders as a hero that fits its own line (never truncated). */}
+              {dayTotalFits ? <Money minor={report.expenseMinor} currency={currency} size={20} weight="600" />
+                : <View style={{ flexBasis: '100%' }}><Money minor={report.expenseMinor} currency={currency} large size={28} weight="600" /></View>}
+            </View>
+          </ValueTransition>}
+          {!days && report.categories.length > 0 && <View style={{ alignSelf: 'stretch', alignItems: 'center', gap: space.m, paddingTop: space.s }}>
+            {/* 24UX6D: the donut is the head of Categorías and carries the period's total in its centre (the report's own
+                figure); a chosen category replaces it there. */}
+            <DonutChart slices={slices} currency={currency} total={report.expenseMinor} caption={t('reports.chart.byCategory')} chosen={chosenKey} shareOf={shareOf}
               onChoose={key => setChosen(key ? { scope: scopeKey, key } : null)} />
             {slices.some(slice => slice.key === OTHERS_KEY) && <AppText tertiary variant="caption" style={{ textAlign: 'center' }}>{t('reports.othersNote')}</AppText>}
           </View>}
@@ -313,6 +322,9 @@ export default function ReportsScreen() {
         {/* Income is converted like spending; a month whose income lacks a rate shows no income or net figure rather than a partial one. */}
         {incomeComplete && <DetailRow label={t('reports.incomeRecorded')} value={money(report.incomeMinor)} spokenValue={spoken(report.incomeMinor)} icon="add-circle-outline" />}
         {incomeComplete && <DetailRow label={t('reports.netFlow')} value={money(report.incomeMinor - report.expenseMinor)} spokenValue={spoken(report.incomeMinor - report.expenseMinor)} icon="swap-vertical-outline" />}
+        {/* 24UX6D: the change against last month (the same days, or the full month), only when both months are complete. */}
+        {delta && <DetailRow label={t(delta.mode === 'matching-days' ? 'reports.delta.matchingDays' : 'reports.delta.previousMonth')}
+          value={deltaWords(delta.percent)} spokenValue={spokenDelta} icon={delta.minor > 0 ? 'trending-up-outline' : delta.minor < 0 ? 'trending-down-outline' : 'remove-outline'} />}
         <NavigationRow title={t('reports.compare')} subtitle={t('reports.compareSubtitle')} icon="git-compare-outline" last
           onPress={() => router.push({ pathname: '/report-comparison', params: { currency, month: monthISO } })} />
       </Surface>}

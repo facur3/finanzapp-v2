@@ -6,18 +6,26 @@ export const reports = {
     backToCurrentMonth: 'Volver al mes actual',
     /** Short link beside the period that jumps back to the current month. */
     thisMonth: 'Este mes',
-    /** Eyebrow over the month's total, followed by the currency code. */
-    spent: 'Gastado',
-    noRecords: 'Sin registros',
-    /** "$ 1.234,56 por día": the daily average. */
+    /** 24UX6D: the period's total. In Categorías it is the donut's quiet centre label over the exact amount; in Día a día
+     * the label of the compact line «Total del período  $ 4.029.727,00». The «Gastado · ARS» KPI it replaces is gone. */
+    periodTotal: 'Total del período',
+    /** 24UX6D review: the short label of Día a día's compact line, «Total  $ 4.029.727,00» (the owner's «Total · $…»); the
+     * period is already named above it. VoiceOver still hears `periodTotalSpoken`. */
+    dayTotal: 'Total',
+    /** What VoiceOver hears for that total (the donut's value with no category chosen, the Día a día line): "Total del
+     * período, 4029727 pesos", the amount from the spoken formatter. */
+    periodTotalSpoken: 'Total del período, {amount}',
+    /** "$ 1.234,56 por día": the daily average. 24UX6D: Reportes no longer shows it; kept while tests/translation.node.ts
+     * uses it as its placeholder example. */
     perDay: '{amount} por día',
-    /** Change against the previous month: "12 % más que el mes anterior". */
+    /** 24UX6D: the change against the previous month, a row of the lower facts (beside «Comparar con el mes anterior»)
+     * since the KPI line that carried it left: label «Frente al mes anterior», value «12 % más». */
     delta: {
-      same: 'igual que {reference}',
-      more: '{percent} más que {reference}',
-      less: '{percent} menos que {reference}',
-      matchingDays: 'los mismos días del mes anterior',
-      previousMonth: 'el mes anterior',
+      same: 'Sin cambio',
+      more: '{percent} más',
+      less: '{percent} menos',
+      matchingDays: 'Frente a los mismos días del mes anterior',
+      previousMonth: 'Frente al mes anterior',
     },
     lastSixMonths: 'Últimos seis meses',
     /** 24UX6B: the history section, after the month's analysis. Its bars still open a month. */
@@ -98,12 +106,10 @@ export const reports = {
       /** VoiceOver for the donut: "Gasto por categoría: Comida 40 %, Salud 60 %". */
       donutLabel: '{caption}: {slices}',
       slice: '{label} {percent} %',
-      /** 24UX6C2: the donut no longer repeats the period total. Its VoiceOver name, the quiet line in its centre before a
-       * category is chosen, how VoiceOver chooses one, and what it says once one is chosen. */
+      /** The donut's VoiceOver name, how VoiceOver chooses a category, and what it says once one is chosen (24UX6C2). With
+       * none chosen its centre and its value are the period total (`periodTotal`, 24UX6D; «Tocá una categoría» is gone). */
       byCategory: 'Gasto por categoría',
-      pick: 'Tocá una categoría',
       pickHint: 'Deslizá hacia arriba o hacia abajo para elegir una categoría',
-      noneChosen: 'Ninguna categoría elegida',
       /** "Supermercado, 412760,40 pesos, 29 % del gasto". */
       chosen: '{name}, {amount}, {percent} del gasto',
       /** Under the amount in the donut's centre: "29 % del gasto". */

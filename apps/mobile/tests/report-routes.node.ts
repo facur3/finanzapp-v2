@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { runInNewContext } from 'node:vm';
 import ts from 'typescript';
+import * as geometry from '../src/ui/geometry.ts';
 import * as domain from '@finanzapp/domain';
 import * as presentation from '../src/ui/presentation.ts';
 import * as reportPresentation from '../src/ui/report-presentation.ts';
@@ -42,7 +43,7 @@ function memoryPreferences(initial: Record<string, string> = {}) {
 
 function routeHarness(file: string, params: Record<string, unknown>, data = snapshot, { locale = 'es-AR' as AppLocale, display = displayCurrency.createDisplayCurrencyStore(memoryPreferences().store),
   book = domain.rateBook([]), activity = 'idle' as ratesStore.RatesActivity, ensured = [] as { months: readonly string[]; quotes: readonly string[] }[],
-  archive = {} as Partial<domain.LedgerArchive> } = {}) {
+  archive = {} as Partial<domain.LedgerArchive>, window = { width: 393, height: 852, fontScale: 1, scale: 3 } } = {}) {
   const i18nProvider = { useI18n: () => bindLocale(locale) };
   // The shared display currency, as the provider's hook gives it: the real store and resolution, no React context.
   const displayProvider = { useDisplayCurrency: (held: readonly domain.Currency[]) => ({ currency: displayCurrency.resolveDisplayCurrency(display.getState(), held, display.getMode()),
@@ -64,7 +65,7 @@ function routeHarness(file: string, params: Record<string, unknown>, data = snap
   const deps: unknown[][] = [];
   const pushed: any[] = [];
   let cursor = 0, effectCursor = 0;
-  const componentNames = ['AppText', 'Choices', 'DetailRow', 'EmptyState', 'IconButton', 'Money', 'PressFeedback', 'SectionTitle', 'Surface', 'CategoryBadge', 'Screen', 'GlyphTile', 'InfoButton'];
+  const componentNames = ['AppText', 'Choices', 'DetailRow', 'EmptyState', 'IconButton', 'Money', 'PressFeedback', 'SectionTitle', 'Surface', 'CategoryBadge', 'Screen', 'GlyphTile', 'InfoButton', 'NavigationRow'];
   const modules: Record<string, unknown> = {
     '../i18n/format': i18nFormat, '../src/i18n/format': i18nFormat, '../../src/i18n/format': i18nFormat, '../i18n/provider': i18nProvider, '../src/i18n/provider': i18nProvider, '../../src/i18n/provider': i18nProvider,
     // Effects run in place, once per change of their dependencies (a route parameter arriving), like React's after commit.
@@ -80,7 +81,7 @@ function routeHarness(file: string, params: Record<string, unknown>, data = snap
     }, useEffect: (fn: () => void, next?: unknown[]) => { const index = effectCursor++; const previous = deps[index];
       if (!previous || !next || next.length !== previous.length || next.some((item, i) => item !== previous[i])) { deps[index] = next ?? []; fn(); } } },
     'react/jsx-runtime': { jsx, jsxs: jsx, Fragment: 'Fragment' },
-    'react-native': { View: 'View', FlatList: 'FlatList', StyleSheet: { hairlineWidth: 0.5 } },
+    'react-native': { View: 'View', FlatList: 'FlatList', StyleSheet: { hairlineWidth: 0.5 }, useWindowDimensions: () => window },
     '@expo/vector-icons/Ionicons': 'Ionicons',
     'expo-router': { useLocalSearchParams: () => params, router: { push: (to: unknown) => pushed.push(to) } },
     '../src/ui/display-currency-provider': displayProvider, '../src/ui/display-currency': displayCurrency,
@@ -88,7 +89,8 @@ function routeHarness(file: string, params: Record<string, unknown>, data = snap
     '../src/ui/home-modules': { CurrencyParts: 'CurrencyParts', MetricHelp: 'MetricHelp' },
     '@finanzapp/domain': domain,
     '../src/storage/LedgerProvider': { useLedger: () => ({ snapshot: data, archive: { accounts: data.accounts, records: [], ...archive } }) },
-    '../src/ui/charts': { DonutChart: 'DonutChart', MonthBars: 'MonthBars', OTHERS_KEY: ' others',
+    '../src/ui/geometry': geometry,
+    '../src/ui/charts': { DonutChart: 'DonutChart', MonthBars: 'MonthBars', OTHERS_KEY: ' others', MONEY_MAX_SCALE: 1.8,
       // Like the real one: at most five slices, the tail grouped into one neutral «Otras» slice keyed OTHERS_KEY.
       donutSlices: (items: { key: string; label: string; value: number }[], _p: unknown, _hues: unknown, othersLabel: string) => {
         const head = items.slice(0, items.length > 5 ? 4 : 5).map((item, index) => ({ ...item, color: 'c' + index }));
@@ -132,6 +134,14 @@ function find(root: Node, type: string, label?: string) {
   assert.ok(node, 'Missing ' + type + ' ' + (label ?? ''));
   return node;
 }
+/** 24UX6D: the period total Reportes shows. There is no KPI above the analysis any more: in Categorías the total is the
+ * donut's `total` (its centre, the report's own figure), in Día a día the compact line's Money. */
+function shownTotal(root: Node): { minor: number; currency: string } {
+  const donut = nodes(root).find(item => item.type === 'DonutChart');
+  if (donut) return { minor: donut.props.total, currency: donut.props.currency };
+  const money = find(root, 'Money');
+  return { minor: money.props.minor, currency: money.props.currency };
+}
 
 test('report row pushes a scoped category detail; underlying period and currency stay selected', () => {
   const view = routeHarness('(tabs)/reports.tsx', { currency: 'ARS', month: '2026-08' });
@@ -147,25 +157,27 @@ test('report row pushes a scoped category detail; underlying period and currency
   assert.deepEqual(detail.props.entries.map((e: domain.Entry) => e.id), ['a', 'b']);
   assert.equal(find(detail, 'Money').props.minor, category.amountMinor);
   assert.equal(find(view.render(), 'DisplayCurrencyButton').props.currency, 'ARS');
-  assert.equal(find(view.render(), 'Money').props.minor, 606);
+  assert.equal(shownTotal(view.render()).minor, 606);
 });
 test('return-to-current-month works even when opened with a historical route parameter', () => {
   const view = routeHarness('(tabs)/reports.tsx', { month: '2026-08', currency: 'ARS' });
   find(view.render(), 'PressFeedback', 'Volver al mes actual').props.onPress();
   const current = view.render();
   assert.equal(find(current, 'IconButton', 'Mes siguiente').props.disabled, true);
-  assert.equal(find(current, 'Money').props.minor, 0);
+  // September has no spending: no donut (24UX6D: its total lived in the KPI, now gone), the empty card says so.
+  assert.equal(nodes(current).some(n => n.type === 'DonutChart' || n.type === 'Money'), false);
+  assert.equal(current.props.ListEmptyComponent.props.title, 'Sin gastos en este período');
 });
 test('month and currency controls update report data and enforce the available bounds', () => {
   const view = routeHarness('(tabs)/reports.tsx', {});
   find(view.render(), 'IconButton', 'Mes anterior').props.onPress();
   let report = view.render();
-  assert.equal(find(report, 'Money').props.minor, 606);
+  assert.equal(shownTotal(report).minor, 606);
   assert.equal(find(report, 'IconButton', 'Mes anterior').props.disabled, true);
   find(report, 'DisplayCurrencyButton').props.onCurrency('USD');
   report = view.render();
-  assert.equal(find(report, 'Money').props.currency, 'USD');
-  assert.equal(find(report, 'Money').props.minor, 999);
+  assert.equal(shownTotal(report).currency, 'USD');
+  assert.equal(shownTotal(report).minor, 999);
   find(report, 'IconButton', 'Mes siguiente').props.onPress();
   assert.equal(find(view.render(), 'IconButton', 'Mes siguiente').props.disabled, true);
 });
@@ -234,16 +246,16 @@ test('reports show a six-month trend that selects months, a donut for categories
   const bars = find(root, 'MonthBars');
   assert.deepEqual(bars.props.points.map((point: { monthISO: string; amountMinor: number }) => [point.monthISO, point.amountMinor]).slice(-2), [['2026-08', 606], ['2026-09', 400]]);
   assert.equal(bars.props.selected, '2026-09');
-  // 24UX6C2: the donut no longer carries the period's total; the KPI above it does.
-  assert.equal('total' in find(root, 'DonutChart').props, false, 'the donut\'s centre never repeats the period total');
-  assert.equal(find(root, 'Money').props.minor, 400, 'the month\'s total is the KPI');
+  // 24UX6D (supersedes 24UX6C2's «the KPI owns the total»): the donut's centre carries the period's total, the report's own figure.
+  assert.equal(find(root, 'DonutChart').props.total, 400, 'the month\'s total is the donut\'s centre');
+  assert.equal(nodes(root.props.ListHeaderComponent).some(n => n.type === 'Money'), false, 'no KPI amount above the analysis');
   assert.equal(find(root, 'DonutChart').props.caption, 'Gasto por categoría');
   assert.equal(find(root, 'DonutChart').props.chosen, null, 'no category is chosen until one is tapped');
   assert.equal(find(root, 'DonutChart').props.slices[0].key, 'salud');
   bars.props.onSelect('2026-08');
   assert.equal(JSON.stringify(scrolls), JSON.stringify([{ offset: 0, animated: true }]), '24UX6B: the bars sit under the analysis, so opening a month brings its title and total into view');
   root = view.render();
-  assert.equal(find(root, 'Money').props.minor, 606);
+  assert.equal(shownTotal(root).minor, 606);
   assert.equal(find(root, 'MonthBars').props.selected, '2026-08');
   assert.equal(nodes(root).some(node => node.type === 'DetailRow' && node.props.label === 'Flujo neto'), true);
   // History keeps the trend visible for an empty current month; no history at all shows neither chart.
@@ -278,19 +290,21 @@ test('23.1B2: Reportes in English changes only words; amounts, user data and rou
   find(root, 'IconButton', 'Next month');
   assert.ok(words.includes('August 2026'));
   assert.ok(words.includes('Full month'), '24UX5 review: no «· ARS» beside the period; the eyebrow names it');
-  assert.ok(words.includes('Spent\u00A0·\u00A0ARS'));
+  assert.equal(words.some(text => /^Spent/.test(text)), false, '24UX6D: no «Spent · ARS» KPI; the total is the donut\'s centre');
+  assert.equal(find(root, 'DonutChart').props.total, 606);
   assert.equal(find(root, 'DonutChart').props.caption, 'Spending by category');
   assert.ok(words.includes('Your largest expense was Prueba'), 'the merchant is the person\'s own words');
   assert.ok(words.includes('Recorded income') && words.includes('Net flow'));
   assert.ok(words.includes('Compare with previous month'), 'the row opens the month before the selected one, which may be a past month');
   assert.equal(words.some(text => /Gastado|Mes anterior|Flujo neto|Tu mayor gasto|Solo movimientos/.test(text)), false, 'no Spanish copy left: ' + words.join(' | '));
   // Same numbers and the same data behind the words.
-  assert.equal(find(root, 'Money').props.minor, find(es.render(), 'Money').props.minor);
+  assert.equal(shownTotal(root).minor, shownTotal(es.render()).minor);
   assert.equal(root.props.data.map((item: domain.CategorySpending) => item.key + ':' + item.amountMinor).join(','),
     es.render().props.data.map((item: domain.CategorySpending) => item.key + ':' + item.amountMinor).join(','));
   // Day by day: a plural count and the same drill-down route.
   nodes(root).find(n => n.type === 'Choices' && n.props.value === 'categories')!.props.onChange('days');
   const days = en.render();
+  assert.ok(texts(days).includes('Total'), '24UX6D: Day by day keeps the total as one compact line');
   const row = days.props.renderItem({ item: days.props.data[1], index: 1 });
   assert.equal(find(row, 'DetailRow').props.label, 'Aug 10 · 2 expenses');
   const first = days.props.renderItem({ item: days.props.data[0], index: 0 });
@@ -363,7 +377,7 @@ test('24UX5: "your largest expense" is left out when the ranking right above sho
   assert.equal(reportPresentation.insightsBesideRanking(facts, [{ key: 'carrefour', count: 2 }], single.entries).length, 2);
 });
 
-test('24UX5: what the report counts is behind an information button beside the total, not a permanent paragraph', () => {
+test('24UX5: what the report counts is behind an information button (24UX6D: beside the period line), not a permanent paragraph', () => {
   const data = { ...snapshot, entries: [...snapshot.entries, { ...snapshot.entries[0], id: 'big', amountMinor: 5000, dateISO: '2026-09-05' }] };
   for (const [locale, title] of [['es-AR', 'Qué cuenta este reporte'], ['en-US', 'What this report counts']] as [AppLocale, string][]) {
     const root = routeHarness('(tabs)/reports.tsx', { currency: 'ARS', month: '2026-09' }, data, { locale }).render();
@@ -431,14 +445,14 @@ test('24B3: Reportes with three currencies offers the switch over the currencies
   const control = find(root, 'DisplayCurrencyButton');
   assert.deepEqual(control.props.held, ['ARS', 'USD', 'JPY']);
   assert.equal(control.props.currency, 'ARS');
-  assert.equal(find(root, 'Money').props.minor, 606, 'the ARS report is unchanged');
+  assert.equal(shownTotal(root).minor, 606, 'the ARS report is unchanged');
   control.props.onCurrency('JPY');
   root = view.render();
-  assert.deepEqual({ minor: find(root, 'Money').props.minor, currency: find(root, 'Money').props.currency }, { minor: 1500, currency: 'JPY' });
+  assert.deepEqual({ minor: shownTotal(root).minor, currency: shownTotal(root).currency }, { minor: 1500, currency: 'JPY' });
   assert.equal(find(root, 'DisplayCurrencyButton').props.currency, 'JPY');
   const link = routeHarness('(tabs)/reports.tsx', { month: '2026-08', currency: 'JPY' }, data).render();
-  assert.equal(find(link, 'Money').props.currency, 'JPY', 'a link naming a held currency opens it');
-  assert.equal(find(routeHarness('(tabs)/reports.tsx', { month: '2026-08', currency: 'KWD' }, data).render(), 'Money').props.currency, 'ARS', 'a currency no account holds is not offered: the tab opens its first one');
+  assert.equal(shownTotal(link).currency, 'JPY', 'a link naming a held currency opens it');
+  assert.equal(shownTotal(routeHarness('(tabs)/reports.tsx', { month: '2026-08', currency: 'KWD' }, data).render()).currency, 'ARS', 'a currency no account holds is not offered: the tab opens its first one');
 });
 
 test('24UX3 review: Dónde más gastaste is an open ranked list on the ground, not a second grouped slab', () => {
@@ -456,7 +470,7 @@ test('24UX3 review: Dónde más gastaste is an open ranked list on the ground, n
   assert.equal(badges.every(badge => badge.props.size === 32), true, 'compact marks, lighter than the category card');
 });
 
-test('24UX5 review: the month heading raises only its first letter, and the period line does not repeat the currency', () => {
+test('24UX5 review: the month heading raises only its first letter, and the period line does not repeat the currency the chip names', () => {
   const data = { ...snapshot, entries: [...snapshot.entries, { ...snapshot.entries[0], id: 'sep', amountMinor: 500, dateISO: '2026-09-05' }] };
   for (const [locale, heading, period] of [['es-AR', 'Septiembre de 2026', 'Hasta hoy'], ['en-US', 'September 2026', 'Through today']] as [AppLocale, string, string][]) {
     const root = routeHarness('(tabs)/reports.tsx', { currency: 'ARS', month: '2026-09' }, data, { locale }).render();
@@ -466,9 +480,16 @@ test('24UX5 review: the month heading raises only its first letter, and the peri
     const words = texts(root);
     assert.ok(words.includes(period), locale + ': the period alone');
     assert.equal(words.some(text => text.startsWith(period + ' · ')), false, 'no «· ARS» after the period');
-    assert.ok(words.some(text => /ARS/.test(text) && /Gastado|Spent/.test(text)), 'the currency stays named beside the total');
+    // 24UX6D: the «Gastado · ARS» eyebrow is gone; with two currencies the chip names the one shown.
+    assert.equal(words.some(text => /Gastado|Spent/.test(text)), false);
+    assert.equal(find(root, 'DisplayCurrencyButton').props.currency, 'ARS', 'the chip names the currency');
     assert.ok(nodes(root).some(node => node.type === 'InfoButton'), 'the method button stays');
   }
+  // 24UX6D: with one currency there is no chip, so the period line names it.
+  const pesos = { accounts: [snapshot.accounts[0]], entries: data.entries.filter(entry => entry.accountId === 'a') };
+  const single = routeHarness('(tabs)/reports.tsx', { month: '2026-09' }, pesos).render();
+  assert.equal(nodes(single).some(node => node.type === 'DisplayCurrencyButton'), false);
+  assert.ok(texts(single).includes('Hasta hoy · ARS'), texts(single).join(' | '));
 });
 
 // ---- Producto 24C1: consolidated reports use each expense's own date ----------------------------------------
@@ -485,12 +506,12 @@ test('24C1: a consolidated past month converts each expense at the rate of its d
   const root = view.render();
   // August in USD: ARS 1,01 + 2,02 + 3,03 at 1000 (not today's 1500) → 0,00101… each: 0 + 0 + 0; USD 9,99.
   // (Tiny ARS amounts round to zero cents each: every movement is rounded once and the parts add up.)
-  assert.deepEqual([find(root, 'Money').props.minor, find(root, 'Money').props.currency], [999, 'USD']);
+  assert.deepEqual([shownTotal(root).minor, shownTotal(root).currency], [999, 'USD']);
   assert.match(find(root, 'InfoButton').props.detail, /del 7\/8\/2026 al 28\/8\/2026, nunca la de hoy para un mes pasado/);
   assert.equal(ensured.at(-1)!.months.join(), '2026-03,2026-04,2026-05,2026-06,2026-07,2026-08', 'the month and the five before it, for the trend');
   const bigger: domain.LedgerSnapshot = { ...snapshot, entries: snapshot.entries.map(entry => entry.accountId === 'a' ? { ...entry, amountMinor: entry.amountMinor * 1000 } : entry) };
   const scaled = routeHarness('(tabs)/reports.tsx', { month: '2026-08' }, bigger, { display, book }).render();
-  assert.equal(find(scaled, 'Money').props.minor, 101 + 202 + 303 + 999, 'ARS 1.010 + 2.020 + 3.030 at 1000 → USD 6,06, plus USD 9,99');
+  assert.equal(shownTotal(scaled).minor, 101 + 202 + 303 + 999, 'ARS 1.010 + 2.020 + 3.030 at 1000 → USD 6,06, plus USD 9,99');
   assert.equal(JSON.stringify(scaled.props.data.map((row: domain.CategorySpending) => [row.key, row.amountMinor])), JSON.stringify([['salud', 101 + 202 + 999], ['salud extra', 303]]));
   const detail = routeHarness('report-category.tsx', { currency: 'USD', month: '2026-08', category: 'salud' }, bigger, { display, book }).render();
   assert.equal(find(detail, 'Money').props.minor, 101 + 202 + 999);
@@ -541,7 +562,7 @@ test('24C1 review: Reportes keeps budgets in their own currency on the real ledg
   // Consolidated in USD: the total converts both accounts (ARS 3,00 → 0,00 USD; EUR 5,00 → 10,00 USD); the ARS budget counts ARS 3,00 only.
   const usd = harness('consolidated', 'USD');
   let root = usd.render();
-  assert.equal(find(root, 'Money').props.minor, 0 + 1000);
+  assert.equal(shownTotal(root).minor, 0 + 1000);
   assert.equal(rows(root).length, 1);
   assert.equal(JSON.stringify([rows(root)[0].props.spent, rows(root)[0].props.limit, rows(root)[0].props.money(300).replace(/\u00a0/g, ' ')]), JSON.stringify([300, 400, '$ 3,00']), 'ARS 3,00 of 4,00, written in pesos');
   const title = nodes(root).find(n => n.type === 'SectionTitle' && String(n.props.children).startsWith('Presupuestos'))!;
@@ -553,11 +574,11 @@ test('24C1 review: Reportes keeps budgets in their own currency on the real ledg
   assert.ok(!insightTitles.some(text => /Superaste/.test(text)), 'ARS 3,00 of 4,00 is not exceeded');
   // Consolidated in ARS: the budget is the display currency's; the section keeps its plain title; spent stays 3,00 (not 3,00 + converted euros).
   root = harness('consolidated', 'ARS').render();
-  assert.equal(find(root, 'Money').props.minor, 300 + 1000000);
+  assert.equal(shownTotal(root).minor, 300 + 1000000);
   assert.equal(JSON.stringify([rows(root)[0].props.spent, String(nodes(root).find(n => n.type === 'SectionTitle' && String(n.props.children).startsWith('Presupuestos'))!.props.children)]), JSON.stringify([300, 'Presupuestos']));
   // Single ARS: exactly as before 24C1.
   root = harness('single', 'ARS').render();
-  assert.equal(JSON.stringify([find(root, 'Money').props.minor, rows(root)[0].props.spent]), JSON.stringify([300, 300]));
+  assert.equal(JSON.stringify([shownTotal(root).minor, rows(root)[0].props.spent]), JSON.stringify([300, 300]));
   // Single EUR: no EUR budget, no section.
   assert.equal(rows(harness('single', 'EUR').render()).length, 0);
 });
@@ -576,15 +597,15 @@ test('25B2 review: a past month keeps the movements of a deleted USD account: co
   // Consolidated in ARS: August's USD 9,99 at 1000 → ARS 9.990,00 joins the pesos, though no USD account is live.
   const consolidated = displayCurrency.createDisplayCurrencyStore(memoryPreferences({ [displayCurrency.DISPLAY_MODE_KEY]: 'consolidated', [displayCurrency.DISPLAY_CURRENCY_KEY]: 'ARS' }).store);
   const root = routeHarness('(tabs)/reports.tsx', { month: '2026-08' }, data, { display: consolidated, book }).render();
-  assert.deepEqual([find(root, 'Money').props.minor, find(root, 'Money').props.currency], [101 + 202 + 303 + 999000, 'ARS']);
+  assert.deepEqual([shownTotal(root).minor, shownTotal(root).currency], [101 + 202 + 303 + 999000, 'ARS']);
   assert.deepEqual([find(root, 'DisplayCurrencyButton').props.mode, find(root, 'DisplayCurrencyButton').props.currency], ['consolidated', 'ARS'], 'the chip stays: the history holds two currencies');
   // "Solo USD": the deleted account's own month, and the previous one too (the comparison reads July's USD 2,50).
   const single = displayCurrency.createDisplayCurrencyStore(memoryPreferences({ [displayCurrency.DISPLAY_MODE_KEY]: 'single', [displayCurrency.DISPLAY_CURRENCY_KEY]: 'USD' }).store);
   const usd = routeHarness('(tabs)/reports.tsx', { month: '2026-08' }, data, { display: single, book }).render();
-  assert.deepEqual([find(usd, 'Money').props.minor, find(usd, 'Money').props.currency], [999, 'USD']);
+  assert.deepEqual([shownTotal(usd).minor, shownTotal(usd).currency], [999, 'USD']);
   assert.equal(JSON.stringify(usd.props.data.map((row: domain.CategorySpending) => [row.key, row.amountMinor])), JSON.stringify([['salud', 999]]));
   const july = routeHarness('(tabs)/reports.tsx', { month: '2026-07' }, data, { display: single, book }).render();
-  assert.deepEqual([find(july, 'Money').props.minor, find(july, 'Money').props.currency], [250, 'USD'], 'the previous period is still there');
+  assert.deepEqual([shownTotal(july).minor, shownTotal(july).currency], [250, 'USD'], 'the previous period is still there');
   const comparison = routeHarness('report-comparison.tsx', { currency: 'USD', month: '2026-08' }, data, { display: single, book }).render();
   assert.equal(nodes(comparison).some(n => n.type === 'EmptyState'), false, 'August against July compares the deleted account\'s own months');
   const detail = routeHarness('report-category.tsx', { currency: 'USD', month: '2026-08', category: 'salud' }, data, { display: single, book }).render();
@@ -595,23 +616,24 @@ test('25B2 review: a past month keeps the movements of a deleted USD account: co
   assert.equal(JSON.stringify(find(missing, 'CurrencyParts').props.parts), JSON.stringify([{ currency: 'ARS', minor: 606 }, { currency: 'USD', minor: 999 }]));
 });
 
-// Producto 24UX6B: the Forest reading order of Reportes. Scope and period, the month's total, the month's analysis
-// (categories first, or day by day), then the six-month history, then the details. A descriptor-level guard of the order
+// Producto 24UX6B: the Forest reading order of Reportes. Scope and period, the month's analysis (categories first, or
+// day by day; 24UX6D: the month's total is no longer a KPI between them but the donut's centre or Día a día's line), then the six-month history, then the details. A descriptor-level guard of the order
 // and the copy; how the screen reads on an iPhone (VoiceOver order, Dynamic Type, scrolling) stays a device item.
 const withSeptember = { ...snapshot, entries: [...snapshot.entries, { ...snapshot.entries[0], id: 'now', dateISO: '2026-09-10', amountMinor: 400 }] };
 const sectionTitles = (value: any) => nodes(value).filter(n => n.type === 'SectionTitle').map(n => [n.props.children].flat().join(''));
 
-test('24UX6B: the total, then the analysis with categories first, then the history, then the details', () => {
+test('24UX6B, recomposed in 24UX6D: the period, then the analysis with categories first (the donut carries the total), then the history, then the details', () => {
   const root = routeHarness('(tabs)/reports.tsx', { currency: 'ARS' }, withSeptember).render();
   const header = nodes(root.props.ListHeaderComponent);
   const at = (predicate: (n: Node) => boolean) => header.findIndex(predicate);
   const period = at(n => n.type === 'IconButton' && n.props.label === 'Mes anterior');
-  const total = at(n => n.type === 'Money');
   const analysis = at(n => n.type === 'Choices');
   const donut = at(n => n.type === 'DonutChart');
   const byCategory = at(n => n.type === 'SectionTitle' && n.props.children === 'Por categoría');
-  assert.ok(period >= 0 && period < total && total < analysis && analysis < donut && donut < byCategory,
-    'period → total → Categorías | Día a día → donut → «Por categoría»: ' + [period, total, analysis, donut, byCategory].join(','));
+  assert.ok(period >= 0 && period < analysis && analysis < donut && donut < byCategory,
+    'period → Categorías | Día a día → donut → «Por categoría»: ' + [period, analysis, donut, byCategory].join(','));
+  assert.equal(at(n => n.type === 'Money'), -1, '24UX6D: no KPI between the period and the analysis');
+  assert.equal(header[donut].props.total, 400, 'the donut carries the month\'s total');
   assert.equal(header.some(n => n.type === 'MonthBars'), false, 'the six months are no longer the first chart');
   assert.equal(find(root, 'Choices').props.value, 'categories', 'categories are the default reading');
   assert.equal(root.props.data.length, 1, 'every category of the month is a row under the donut');
@@ -621,7 +643,8 @@ test('24UX6B: the total, then the analysis with categories first, then the histo
   assert.ok(nodes(footer).some(n => n.type === 'MonthBars'), 'the history sits under the analysis');
   assert.equal(nodes(footer).find(n => n.type === 'SectionTitle' && n.props.children === 'Evolución')!.props.caption, 'Tocá un mes para verlo');
   const lastBlock = nodes(footer).filter(n => n.type === 'DetailRow').map(n => n.props.label);
-  assert.deepEqual(lastBlock, ['Ingresos registrados', 'Flujo neto'], 'income and net flow stay, last');
+  assert.deepEqual(lastBlock, ['Ingresos registrados', 'Flujo neto', 'Frente a los mismos días del mes anterior'],
+    'income and net flow stay, last; 24UX6D: the change against last month joins them');
   // With a budget of the month, the history still opens the footer, and the budgets follow it.
   const budget: domain.MonthlyBudget = { id: 'b', scope: 'total', currency: 'ARS', monthISO: '2026-09', amountMinor: 1000, active: true, createdAt, revision: 0, updatedAt: createdAt };
   const withBudget = routeHarness('(tabs)/reports.tsx', { currency: 'ARS' }, withSeptember, { archive: { budgets: [budget] } }).render();
@@ -642,14 +665,16 @@ test('24UX6B: the day-by-day state keeps the order: no donut, «Por día» with 
 test('24UX6B: an empty month is an intentional state in both views: one card, no orphan headings', () => {
   const view = routeHarness('(tabs)/reports.tsx', { currency: 'ARS' });
   let root = view.render();
-  assert.equal(find(root, 'Money').props.minor, 0);
-  assert.equal(find(root, 'Money').props.color, undefined, 'the zero keeps the total\'s own inks (re-tinting it dropped its cents below 3:1)');
+  // 24UX6D: no KPI with a zero and no donut: the one card says there is no spending; what the report counts stays reachable.
+  assert.equal(nodes(root.props.ListHeaderComponent).some(n => n.type === 'Money' || n.type === 'DonutChart'), false);
+  assert.ok(nodes(root.props.ListHeaderComponent).some(n => n.type === 'InfoButton'), 'the method stays beside the period line');
   assert.equal(sectionTitles(root.props.ListHeaderComponent).length, 0, 'no «Por categoría» over nothing');
   let empty = root.props.ListEmptyComponent;
   assert.deepEqual([empty.props.title, empty.props.icon, empty.props.detail],
     ['Sin gastos en este período', 'pie-chart-outline', 'Los gastos que registres en esta moneda aparecen acá, por categoría.']);
   find(root, 'Choices').props.onChange('days');
   root = view.render();
+  assert.equal(nodes(root.props.ListHeaderComponent).some(n => n.type === 'Money'), false, 'no compact total over an empty month either');
   empty = root.props.ListEmptyComponent;
   assert.deepEqual([empty.props.icon, empty.props.detail], ['calendar-outline', 'Cada día con gastos en esta moneda aparece acá, con su total.'],
     'the day view says what it would list, not «por categoría»');
@@ -674,23 +699,37 @@ test('24UX6B: when the shown month is the only one of its six with spending the 
   assert.equal(texts(none).some(text => text.includes('evolución acá')), false);
 });
 
-test('24UX6B: VoiceOver hears the line under the total once, in spoken numbers, with the change against last month', () => {
+test('24UX6D: the change against last month is a row of the lower facts (it left the KPI line), spoken in the language\'s numbers', () => {
   const root = routeHarness('(tabs)/reports.tsx', { currency: 'ARS' }, withSeptember).render();
-  const line = nodes(root.props.ListHeaderComponent).find(n => n.type === 'View' && n.props.accessible === true && typeof n.props.accessibilityLabel === 'string')!;
   const es = bindLocale('es-AR');
-  const average = domain.dailyAverageMinor(400, { currency: 'ARS', startISO: '2026-09-01', endISO: '2026-09-12' });
   // September 1–12 against August 1–12 (matching days, ARS): 400 against 202 + 303 = 505, 105 less.
-  const change = es.t('reports.delta.less', { percent: es.spokenPercent(105 / 505), reference: es.t('reports.delta.matchingDays') });
-  assert.equal(line.props.accessibilityLabel, es.t('reports.perDay', { amount: es.spokenMoney(average, 'ARS') }) + ', ' + change);
-  assert.doesNotMatch(line.props.accessibilityLabel, /\$/, 'no currency symbol read aloud');
-  // English in Argentina shows «20,8%» but speaks «20.8%»: the line must carry the spoken one.
+  const row = nodes(root.props.ListFooterComponent).find(n => n.type === 'DetailRow' && n.props.label === 'Frente a los mismos días del mes anterior')!;
+  assert.ok(row, 'the row is in the lower facts');
+  assert.equal(row.props.value, es.t('reports.delta.less', { percent: reportPresentation.changePercent(105, 505, 'es-AR') }));
+  assert.equal(row.props.value, '20,8\u00A0% menos');
+  assert.equal(row.props.spokenValue, es.t('reports.delta.less', { percent: es.spokenPercent(105 / 505) }));
+  assert.equal(row.props.icon, 'trending-down-outline');
+  assert.equal(row.props.onPress, undefined, 'a fact, not a second way into the comparison');
+  // It sits right above «Comparar con el mes anterior», which still opens the full comparison.
+  const surface = nodes(root.props.ListFooterComponent).filter(n => n.type === 'Surface' && n.props.grouped).at(-1)!;
+  const children = [surface.props.children].flat(Infinity).filter(Boolean) as Node[];
+  assert.deepEqual(children.map(child => child.type), ['DetailRow', 'DetailRow', 'DetailRow', 'NavigationRow']);
+  assert.equal(children[3].props.title, 'Comparar con el mes anterior');
+  // Nothing about the change is left at the top.
+  assert.equal(texts(root.props.ListHeaderComponent).some(text => /menos que|más que|por día/.test(text)), false);
+  // English in Argentina shows «20,8%» but speaks «20.8%».
   const english = routeHarness('(tabs)/reports.tsx', { currency: 'ARS' }, withSeptember, { locale: 'en-AR' }).render();
-  const spokenLine = nodes(english.props.ListHeaderComponent).find(n => n.type === 'View' && n.props.accessible === true && typeof n.props.accessibilityLabel === 'string')!;
-  assert.match(spokenLine.props.accessibilityLabel, /20\.8%/);
-  assert.doesNotMatch(spokenLine.props.accessibilityLabel, /20,8/, 'never the visible, region-formatted percent');
+  const spokenRow = nodes(english.props.ListFooterComponent).find(n => n.type === 'DetailRow' && n.props.label === 'Compared with the same days last month')!;
+  assert.equal(spokenRow.props.value, '20,8% less');
+  assert.match(spokenRow.props.spokenValue, /20\.8%/);
+  assert.doesNotMatch(spokenRow.props.spokenValue, /20,8/, 'never the visible, region-formatted percent');
+  // A full previous month (a past month) names it so; without a complete previous month there is no row.
+  const august = routeHarness('(tabs)/reports.tsx', { currency: 'ARS', month: '2026-08' }, withSeptember).render();
+  assert.equal(nodes(august).some(n => n.type === 'DetailRow' && /^Frente a/.test(n.props.label)), false, 'July has no spending: nothing to compare');
 });
 
-// Producto 24UX6C2: the donut's centre is for a chosen category; the month's total stays the KPI above the analysis.
+// Producto 24UX6C2: a chosen category on the donut. (24UX6C2's «the month's total stays the KPI above the analysis» is
+// deliberately superseded by 24UX6D: the total is the donut's centre while nothing is chosen.)
 // Descriptor-level checks of the choice's state and scope; how the tap, the outline and VoiceOver's adjustable swipe
 // feel on an iPhone stays a device item.
 const keysOf = (root: any): string[] => root.props.data.map((item: domain.CategorySpending) => item.key);
@@ -701,20 +740,76 @@ function rowChoices(root: any): string {
 }
 const noneChosen = (root: any) => keysOf(root).map(key => key + ':false').join(',');
 
-test('24UX6C2: the KPI «Gastado · ARS» and its amount stay above the analysis in Categorías and in Día a día', () => {
+test('24UX6D (supersedes 24UX6C2\'s KPI): no «Gastado» KPI, amount or average above the analysis; the donut carries the exact total', () => {
   const view = routeHarness('(tabs)/reports.tsx', { currency: 'ARS', month: '2026-08' });
+  const report = domain.spendingReport(snapshot, 'ARS', '2026-08', '2026-09-12');
+  assert.equal(report.status, 'ready');
   for (const tab of ['categories', 'days'] as const) {
     find(view.render(), 'Choices').props.onChange(tab);
     const root = view.render();
     const header = nodes(root.props.ListHeaderComponent);
-    const eyebrow = header.findIndex(n => n.type === 'AppText' && [n.props.children].flat().join('') === 'Gastado · ARS');
-    const money = header.findIndex(n => n.type === 'Money');
+    const words = texts(root.props.ListHeaderComponent);
+    assert.equal(words.some(text => /Gastado/.test(text)), false, tab + ': no «Gastado · ARS» eyebrow');
+    assert.equal(words.some(text => /por día/.test(text)), false, tab + ': no average per day');
+    assert.equal(header.some(n => n.type === 'Money' && n.props.large), false, tab + ': no large amount');
     const analysis = header.findIndex(n => n.type === 'Choices');
-    assert.ok(eyebrow >= 0 && eyebrow < money && money < analysis, tab + ': eyebrow → amount → Categorías | Día a día: ' + [eyebrow, money, analysis].join(','));
-    assert.equal(header[money].props.minor, 606, tab + ': the month\'s exact total in minor units');
-    assert.equal(header[money].props.currency, 'ARS');
-    assert.equal(header.some(n => n.type === 'DonutChart'), tab === 'categories', 'the donut belongs to Categorías only');
+    const period = header.findIndex(n => n.type === 'IconButton' && n.props.label === 'Mes siguiente');
+    assert.ok(period < analysis, tab + ': the controls, then Categorías | Día a día');
+    if (tab === 'categories') {
+      const donut = header.findIndex(n => n.type === 'DonutChart');
+      assert.ok(analysis < donut, 'the donut right under the control');
+      assert.equal(header.slice(0, donut).some(n => n.type === 'Money'), false, 'no total before the donut');
+      assert.equal(header[donut].props.total, report.status === 'ready' ? report.expenseMinor : NaN, 'the report\'s own figure, in minor units');
+      assert.equal(header[donut].props.total, 606);
+      assert.equal(header[donut].props.currency, 'ARS');
+    } else assert.equal(header.some(n => n.type === 'DonutChart'), false, 'the donut belongs to Categorías only');
   }
+});
+
+test('24UX6D: Día a día keeps the period total as one compact line: «Total» secondary, the exact amount at 20 pt semibold, spoken once', () => {
+  for (const [locale, label, spoken] of [['es-AR', 'Total', 'Total del período, 6,06 pesos'], ['en-US', 'Total', 'Period total, 6.06 pesos']] as [AppLocale, string, string][]) {
+    const view = routeHarness('(tabs)/reports.tsx', { currency: 'ARS', month: '2026-08' }, snapshot, { locale });
+    find(view.render(), 'Choices').props.onChange('days');
+    const header = nodes(view.render().props.ListHeaderComponent);
+    const line = header.find(n => n.type === 'View' && n.props.accessible === true)!;
+    assert.ok(line, locale + ': one accessible line');
+    assert.equal(line.props.accessibilityLabel, spoken, locale + ': the spoken total, never the grouped visible one');
+    assert.equal(line.props.style.flexDirection, 'row');
+    assert.equal(line.props.style.flexWrap, 'wrap', 'the amount wraps under the label when the two do not share the line, whole');
+    const parts = [line.props.children].flat();
+    assert.equal(parts[0].type, 'AppText');
+    assert.equal(parts[0].props.secondary, true);
+    assert.equal(parts[0].props.children, label);
+    assert.deepEqual({ ...parts[1].props }, { minor: 606, currency: 'ARS', size: 20, weight: '600' }, 'the exact total, no hero');
+    const analysis = header.findIndex(n => n.type === 'Choices');
+    assert.ok(analysis < header.indexOf(line), 'under Categorías | Día a día');
+  }
+});
+
+test('24UX6D review: a 13-digit total that would not fit at 20 pt (320 pt, AX text) takes its own line as a fitted hero, never truncated', () => {
+  const at = '2026-08-01T12:00:00.000Z';
+  const huge: domain.LedgerSnapshot = { accounts: [{ id: 'a', name: 'Banco', currency: 'ARS', openingMinor: 0, createdAt: at }],
+    entries: [{ id: 'h', accountId: 'a', kind: 'expense', amountMinor: 123_456_789_012_345, merchant: 'Casa', category: 'Hogar', dateISO: '2026-08-03', createdAt: at }], transfers: [] };
+  const line = (window: { width: number; height: number; fontScale: number; scale: number }) => {
+    const view = routeHarness('(tabs)/reports.tsx', { currency: 'ARS', month: '2026-08' }, huge, { window });
+    find(view.render(), 'Choices').props.onChange('days');
+    return nodes(view.render().props.ListHeaderComponent).find(n => n.type === 'View' && n.props.accessible === true)!;
+  };
+  const amounts = (row: Node) => nodes(row).filter(n => n.type === 'Money').map(n => JSON.stringify({ size: n.props.size, large: !!n.props.large }));
+  assert.deepEqual(amounts(line({ width: 393, height: 852, fontScale: 1, scale: 3 })), [JSON.stringify({ size: 20, large: false })], 'fits at 20 pt on a 393 pt phone');
+  const tight = line({ width: 320, height: 568, fontScale: 3.1, scale: 2 });
+  assert.deepEqual(amounts(tight), [JSON.stringify({ size: 28, large: true })], 'a hero sizes itself to its line instead of truncating');
+  assert.equal(nodes(tight).find(n => n.type === 'View' && n.props.style?.flexBasis === '100%') !== undefined, true, 'on its own line, under «Total»');
+});
+
+test('24UX6D review: the period line wraps and centres, and the caption gives way, so «Este mes» never spills over the forward arrow at larger text', () => {
+  const header = nodes(routeHarness('(tabs)/reports.tsx', { currency: 'ARS', month: '2026-07' }).render().props.ListHeaderComponent);
+  const thisMonth = header.find(n => n.type === 'PressFeedback' && n.props.accessibilityLabel === 'Volver al mes actual')!;
+  assert.ok(thisMonth, 'a past month offers «Este mes»');
+  const row = header.find(n => n.type === 'View' && [n.props.children].flat().includes(thisMonth))!;
+  assert.equal(JSON.stringify([row.props.style.flexWrap, row.props.style.justifyContent]), JSON.stringify(['wrap', 'center']));
+  const caption = header.find(n => n.type === 'AppText' && n.props.variant === 'caption' && n.props.secondary)!;
+  assert.equal(caption.props.style.flexShrink, 1);
 });
 
 test('24UX6C2: a chosen slice marks the donut and its row only; choosing none, or a key that is not a slice, clears both', () => {
@@ -727,7 +822,7 @@ test('24UX6C2: a chosen slice marks the donut and its row only; choosing none, o
   root = view.render();
   assert.equal(find(root, 'DonutChart').props.chosen, 'salud');
   assert.equal(rowChoices(root), keysOf(root).map(key => key + ':' + (key === 'salud')).join(','), 'only the matching row is chosen');
-  assert.equal(find(root, 'Money').props.minor, 606, 'a choice never changes the month\'s total');
+  assert.equal(shownTotal(root).minor, 606, 'a choice never changes the month\'s total');
   // The row still opens its category, choice or not.
   const salud = root.props.data.find((item: domain.CategorySpending) => item.key === 'salud');
   find(root.props.renderItem({ item: salud, index: 0 }), 'CategoryLegendRow').props.onPress();
@@ -754,7 +849,7 @@ test('24UX6C2: the choice resets when the month changes, by the arrows, a bar or
   find(root, 'IconButton', 'Mes anterior').props.onPress();
   root = view.render();
   assert.equal(title(root), 'Agosto de 2026');
-  assert.equal(find(root, 'Money').props.minor, 606);
+  assert.equal(shownTotal(root).minor, 606);
   assert.ok(keysOf(root).includes('salud'));
   assert.equal(find(root, 'DonutChart').props.chosen, null, 'a new month starts with no category chosen');
   assert.equal(rowChoices(root), noneChosen(root));
@@ -765,7 +860,7 @@ test('24UX6C2: the choice resets when the month changes, by the arrows, a bar or
   root = view.render();
   assert.equal(title(root), 'Septiembre de 2026');
   assert.equal(find(root, 'IconButton', 'Mes siguiente').props.disabled, true);
-  assert.equal(find(root, 'Money').props.minor, 400);
+  assert.equal(shownTotal(root).minor, 400);
   assert.equal(find(root, 'DonutChart').props.chosen, null);
   assert.equal(rowChoices(root), noneChosen(root));
   // Chosen in September, a bar opens August with none chosen.
@@ -775,7 +870,7 @@ test('24UX6C2: the choice resets when the month changes, by the arrows, a bar or
   find(root, 'MonthBars').props.onSelect('2026-08');
   root = view.render();
   assert.equal(title(root), 'Agosto de 2026', 'a bar opens its month');
-  assert.equal(find(root, 'Money').props.minor, 606);
+  assert.equal(shownTotal(root).minor, 606);
   assert.equal(find(root, 'DonutChart').props.chosen, null);
   assert.equal(rowChoices(root), noneChosen(root));
   // Coming back to the month it was chosen in does not bring the choice back: a month change cleared it.
@@ -788,20 +883,20 @@ test('24UX6C2: the choice resets when the month changes, by the arrows, a bar or
 test('24UX6C2: the choice resets when the currency changes, even to a currency with the same category', () => {
   const view = routeHarness('(tabs)/reports.tsx', { month: '2026-08' });
   let root = view.render();
-  assert.equal(find(root, 'Money').props.currency, 'ARS');
+  assert.equal(shownTotal(root).currency, 'ARS');
   find(root, 'DonutChart').props.onChoose('salud');
   root = view.render();
   assert.equal(find(root, 'DonutChart').props.chosen, 'salud');
   find(root, 'DisplayCurrencyButton').props.onCurrency('USD');
   root = view.render();
-  assert.equal(find(root, 'Money').props.currency, 'USD');
-  assert.equal(find(root, 'Money').props.minor, 999);
+  assert.equal(shownTotal(root).currency, 'USD');
+  assert.equal(shownTotal(root).minor, 999);
   assert.ok(keysOf(root).includes('salud'), 'USD in August has «Salud» too');
   assert.equal(find(root, 'DonutChart').props.chosen, null, 'another currency starts with no category chosen');
   assert.equal(rowChoices(root), noneChosen(root));
   find(root, 'DisplayCurrencyButton').props.onCurrency('ARS');
   root = view.render();
-  assert.equal(find(root, 'Money').props.currency, 'ARS');
+  assert.equal(shownTotal(root).currency, 'ARS');
   assert.equal(find(root, 'DonutChart').props.chosen, null, 'back in ARS the earlier choice stays cleared');
 });
 
@@ -842,7 +937,7 @@ test('24UX6C2: the «Otras» slice can be chosen without marking any category ro
   assert.equal(find(root, 'DonutChart').props.chosen, ' others');
   assert.equal(rowChoices(root), noneChosen(root), '«Otras» is not one category, so no row is marked');
   assert.equal(find(root, 'DonutChart').props.shareOf(300).label, reportPresentation.spendingShare(300, 2100, 'es-AR').label);
-  assert.equal(find(root, 'Money').props.minor, 2100);
+  assert.equal(shownTotal(root).minor, 2100);
 });
 
 test('24UX6C2 review: the choice resets when the display mode changes, through the chip or on Inicio, and stays cleared on the way back', () => {
@@ -864,12 +959,12 @@ test('24UX6C2 review: the choice resets when the display mode changes, through t
   find(root, 'DisplayCurrencyButton').props.onMode('consolidated');
   root = view.render();
   assert.equal(find(root, 'DisplayCurrencyButton').props.mode, 'consolidated');
-  assert.equal(find(root, 'Money').props.currency, 'ARS', 'the same currency: only the mode changed');
+  assert.equal(shownTotal(root).currency, 'ARS', 'the same currency: only the mode changed');
   assert.equal(chosenIn(root), null, 'the consolidated view starts with no category chosen');
   find(root, 'DisplayCurrencyButton').props.onMode('single');
   root = view.render();
   assert.equal(find(root, 'DisplayCurrencyButton').props.mode, 'single');
-  assert.equal(find(root, 'Money').props.minor, 606, 'back in «Solo ARS», the month\'s own total');
+  assert.equal(shownTotal(root).minor, 606, 'back in «Solo ARS», the month\'s own total');
   assert.equal(find(root, 'DonutChart').props.chosen, null, 'back in the mode it was chosen in, the choice stays cleared');
   assert.equal(rowChoices(root), noneChosen(root));
   // The same mode change made on Inicio through the shared preference (Reportes stays mounted and only re-renders).
@@ -891,22 +986,22 @@ test('24UX6C2 review: a display currency chosen on Inicio clears the choice on R
   const display = displayCurrency.createDisplayCurrencyStore(memoryPreferences({ [displayCurrency.DISPLAY_CURRENCY_KEY]: 'ARS' }).store);
   const view = routeHarness('(tabs)/reports.tsx', { month: '2026-08' }, snapshot, { display });
   let root = view.render();
-  assert.equal(find(root, 'Money').props.currency, 'ARS');
+  assert.equal(shownTotal(root).currency, 'ARS');
   find(root, 'DonutChart').props.onChoose('salud');
   root = view.render();
   assert.equal(find(root, 'DonutChart').props.chosen, 'salud');
   // Inicio writes the shared preference directly (its own chip); Reportes never sees its onCurrency handler run.
   display.set('USD');
   root = view.render();
-  assert.equal(find(root, 'Money').props.currency, 'USD');
-  assert.equal(find(root, 'Money').props.minor, 999);
+  assert.equal(shownTotal(root).currency, 'USD');
+  assert.equal(shownTotal(root).minor, 999);
   assert.ok(keysOf(root).includes('salud'), 'USD in August has «Salud» too');
   assert.equal(find(root, 'DonutChart').props.chosen, null, 'another currency starts with no category chosen');
   assert.equal(rowChoices(root), noneChosen(root));
   display.set('ARS');
   root = view.render();
-  assert.equal(find(root, 'Money').props.currency, 'ARS');
-  assert.equal(find(root, 'Money').props.minor, 606);
+  assert.equal(shownTotal(root).currency, 'ARS');
+  assert.equal(shownTotal(root).minor, 606);
   assert.equal(find(root, 'DonutChart').props.chosen, null, 'back in ARS the earlier choice stays cleared');
   assert.equal(rowChoices(root), noneChosen(root));
 });
@@ -924,7 +1019,7 @@ test('24UX6C2 review: a route parameter that changes the month clears the choice
   params.month = '2026-09';
   root = view.render();
   assert.equal(title(root), 'Septiembre de 2026');
-  assert.equal(find(root, 'Money').props.minor, 400);
+  assert.equal(shownTotal(root).minor, 400);
   assert.ok(keysOf(root).includes('salud'), 'September has «Salud» too');
   assert.equal(find(root, 'DonutChart').props.chosen, null, 'a linked month starts with no category chosen');
   assert.equal(rowChoices(root), noneChosen(root));
@@ -932,5 +1027,22 @@ test('24UX6C2 review: a route parameter that changes the month clears the choice
   root = view.render();
   assert.equal(title(root), 'Agosto de 2026');
   assert.equal(find(root, 'DonutChart').props.chosen, null, 'cleared, not merely hidden');
+  assert.equal(rowChoices(root), noneChosen(root));
+});
+
+test('24UX6D: Categorías ↔ Día a día clears the choice; coming back, the donut shows the total again and no row is marked', () => {
+  const view = routeHarness('(tabs)/reports.tsx', { currency: 'ARS', month: '2026-08' });
+  let root = view.render();
+  find(root, 'DonutChart').props.onChoose('salud');
+  root = view.render();
+  assert.equal(find(root, 'DonutChart').props.chosen, 'salud');
+  assert.equal(rowChoices(root), keysOf(root).map(key => key + ':' + (key === 'salud')).join(','));
+  find(root, 'Choices').props.onChange('days');
+  root = view.render();
+  assert.equal(nodes(root).some(n => n.type === 'DonutChart'), false);
+  find(root, 'Choices').props.onChange('categories');
+  root = view.render();
+  assert.equal(find(root, 'DonutChart').props.chosen, null, 'cleared by the mode change itself, not merely hidden while it lasted');
+  assert.equal(find(root, 'DonutChart').props.total, 606, 'the centre is the period total again');
   assert.equal(rowChoices(root), noneChosen(root));
 });
