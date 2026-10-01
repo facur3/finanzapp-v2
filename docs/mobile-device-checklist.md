@@ -4,7 +4,7 @@
 
 **Not done in 24UX6D: no EAS build was made and the iPhone was not touched. Every item below is pending.**
 Metro from this branch (`npm run start:dev-client -- --clear`) on the installed FinanzApp Dev build; JavaScript only
-(Reportes Categorías and Día a día, Inicio's general-budget row, Tarjetas, the card detail and the plan detail), no
+(Reportes Categorías and Día a día, Inicio's budget attention rows, Tarjetas, the card detail and the plan detail), no
 native dependency, no card accounting, ledger, budget-rule, schema (13), backup (v13) or FX change, no tab animation.
 Use your own data; never seed movements (add test cards for the deck and delete them afterwards). Record each result
 with the iPhone model, iOS version, theme, language and text size. The design is in [mobile-design.md](mobile-design.md)
@@ -62,7 +62,8 @@ Set a general budget for this month in Presupuestos (your own data; adjust the l
 - [ ] Over the limit: the alert glyph before «120 %» in the alert colour, the bar full and not overflowing, «$ … por
   encima»; the state is readable without colour (glyph and words).
 - [ ] A general budget in another currency than Inicio's: «Presupuesto · USD» and coded amounts, never converted; a
-  category-only budget never shows a row.
+  category-only budget never shows a row. *(The category half is superseded by the owner's refinement below: a category
+  budget at 85 % or more now shows.)*
 - [ ] Tapping opens Presupuestos on the budget's currency and month; back returns to Inicio.
 - [ ] Spend or undo so the percent changes while Inicio is open: the bar moves (about 260 ms, no bounce); with Reduce
   Motion it jumps; nothing animates when Inicio first appears or a tab returns.
@@ -71,6 +72,35 @@ Set a general budget for this month in Presupuestos (your own data; adjust the l
   «%» read as «por ciento»; English «This month’s budget, close to the limit, 87% used, … left».
 - [ ] Large text and AX sizes at 375 pt: the name and the percent stack, the detail wraps, nothing is cut; light and
   dark (the amber and alert percent and fill readable; the inset track visible in dark).
+
+**Inicio: budget attention, general and category budgets (owner refinement, 2026-10-01).**
+
+Set a general budget and category budgets for this month in Presupuestos (your own data; adjust the limits, never seed
+movements; delete test budgets afterwards). The rule is in mobile-design.md («Inicio: atención de presupuestos
+(refinamiento)»).
+
+- [ ] General at 90 %, Supermercado at 97 %, Transporte at 50 %: two rows in **one** grouped surface with a hairline
+  between them, «Presupuesto» first, then «Supermercado»; Transporte absent; no separator under the last row.
+- [ ] General calm (below 85 %) and two category budgets in warning (for example Supermercado 95 %, Transporte 88 %):
+  no general row; «Supermercado», then «Transporte».
+- [ ] Five category budgets needing attention: exactly two rows (exceeded ones first, then the highest percents); the
+  others only in Presupuestos.
+- [ ] Exceeded first: a category at 110 % comes before a general budget at 95 %; the general exceeded plus a category
+  exceeded plus several warnings → the general exceeded, then the category exceeded.
+- [ ] A category row is titled by its name («Supermercado»; «Groceries» in English) in ink like «Presupuesto»; the
+  percent and the bar in amber (warning) or the alert tone with the alert glyph (exceeded); no category colour
+  anywhere in the row (title, glyph or bar).
+- [ ] A USD category budget while Inicio shows ARS (consolidated): the row reads «Supermercado · USD» with coded USD
+  amounts, never converted; tapping it opens Presupuestos in USD on this month; «Solo ARS» hides it.
+- [ ] Each row opens Presupuestos on its own currency and month; back returns to Inicio.
+- [ ] No budget needs attention (all calm): no budget surface at all, no header, no empty card.
+- [ ] Long category names (a custom «Supermercado y almacén del barrio») with a large ARS amount at 375 pt and at AX
+  sizes: the name wraps, the percent stacks under it, the detail wraps, nothing is cut, the hairline stays between the
+  rows; light and dark.
+- [ ] VoiceOver: each row is its own button: «Presupuesto de Supermercado, cerca del límite, 97 % usado, quedan …
+  pesos», «Presupuesto de Supermercado superado, … % usado, … pesos por encima», «Presupuesto de Supermercado en USD,
+  …» when the currency is named, the general still «Presupuesto del mes, …»; hint «Abre Presupuestos»; English
+  «Groceries budget, close to the limit, …».
 
 **Tarjetas.**
 
@@ -123,7 +153,7 @@ Reportes»); the rule is in [decision 005](decisions/005-forest-four-tabs-and-ca
 Producto 24UX6C2»). This section supersedes the 24UX6A items «this month's expenses and incomes (no transfers)» in
 «Actividad reciente», «at most two rules due within seven days» in «Próximos compromisos» (now a 30-day window) and
 «no … budgets … on Inicio» (still no permanent budget card, but one contextual general-budget row when it needs
-attention).
+attention; *refined by 24UX6D: general and category budgets, at most two rows*).
 
 - [ ] The Más footer reads «FinanzApp 0.1.0 (24UX6C2)». *(Superseded by 24UX6D: «FinanzApp 0.1.0 (24UX6D)».)*
 
@@ -164,14 +194,16 @@ Inicio as the month's spending crosses each threshold.
 - [ ] Over the limit: the alert tone (the alert-circle tile in the expense colour), «Superaste el presupuesto del mes»
   and «$ … por encima de $ …» with the amount over in the alert colour. *(Copy and anatomy superseded by 24UX6D: the
   alert glyph before «120 %», a full bar and «$ … por encima».)*
-- [ ] Category-only budgets (no general budget), even exceeded: never a row on Inicio.
+- [ ] Category-only budgets (no general budget), even exceeded: never a row on Inicio. *(Superseded by the 24UX6D
+  refinement: a category budget in warning or exceeded now shows, at most two rows; see Producto 24UX6D.)*
 - [ ] Tapping the row opens Presupuestos on the budget's currency and month; back returns to Inicio.
 - [ ] Consolidated view with the general budget in another currency than the display currency: the row names it
   («… del mes en USD», amounts with their code) and its amounts are that currency's, never converted; in a single
   currency view only that currency's budget can show.
 - [ ] Consolidated view with a calm general budget (or only a category sublimit) in the display currency and an
   exceeded general budget in another held currency: the row shows the exceeded one, naming its currency; «Solo …» the
-  calm currency shows nothing.
+  calm currency shows nothing. *(Since the 24UX6D refinement a category budget needing attention also shows; see
+  Producto 24UX6D.)*
 - [ ] Undo or edit expenses (or raise the limit) until the month falls below 85 %: the row disappears.
 - [ ] VoiceOver reads the row once: the spoken percent or «Superaste…», then the spoken amounts, and the hint «Abre
   Presupuestos»; English: «You used 87% of this month’s budget», «… left of …», «You went over this month’s budget»,
@@ -448,7 +480,7 @@ iPhone model, iOS version, theme, material (glass or Reducir transparencia) and 
   «Todavía no hay movimientos en X este mes». No account → the empty state with
   «Empezar» → Nueva cuenta. No «＋ Registrar», no insight line, no rankings, budgets, charts or Assistant banner on
   Inicio. *(Refined by 24UX6C2: still no permanent budget card, but one contextual general-budget row when it needs
-  attention.)*
+  attention; refined again by 24UX6D: general and category budgets, at most two rows.)*
 - [ ] The 46 pt number with a 9-digit amount (e.g. $ 123.456.789) on a 375 pt iPhone: one line, shrinks, never clips;
   a missing rate shows the per-currency parts instead.
 - [ ] Dynamic Type from the default to the largest accessibility size: the field, the subline, the Gastado |
