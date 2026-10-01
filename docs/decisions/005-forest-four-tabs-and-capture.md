@@ -9,7 +9,10 @@ Asistente en el centro» y el rechazo de un «+» flotante de la primera iteraci
 1–8 de la decisión 003 siguen vinculantes y fijadas por `packages/domain/card-invariants.test.ts`.
 
 *Enmendada el 2026-10-01 por Producto 24UX6C (presentación de movimientos, Inicio y Más): ver «Enmienda 2026-10-01 —
-Producto 24UX6C» al final; las frases reemplazadas están marcadas en su lugar.*
+Producto 24UX6C» al final; las frases reemplazadas están marcadas en su lugar.* *Enmendada otra vez el 2026-10-01 por
+Producto 24UX6C2 (la actividad de Inicio incluye transferencias; los compromisos en una ventana de 30 días; una fila
+contextual del presupuesto general cuando pide atención; la dona no repite el total): ver «Enmienda 2026-10-01 —
+Producto 24UX6C2» al final.*
 
 ## Decisión
 
@@ -170,11 +173,13 @@ borra ninguna entrega pasada.
   normales (sin tarjetas, deudas ni cobros); no es ingresos menos gastos ni lo que queda del
   presupuesto.
 - **Próximos compromisos:** solo reglas recurrentes de gasto que vencen hoy o en los próximos
-  seis días, en la vista, dos como máximo, «Ver todos» → Recurrentes; sin ninguno, la sección no
+  seis días *(Reemplazado el 2026-10-01 por 24UX6C2: ventana de 30 días, de hoy a hoy + 30 inclusive; ver «Enmienda
+  2026-10-01 — Producto 24UX6C2», abajo.)*, en la vista, dos como máximo, «Ver todos» → Recurrentes; sin ninguno, la sección no
   existe. **Por qué solo recurrentes:** un resumen de tarjeta no tiene un importe conocido
   (FinanzApp no lee el resumen del banco) y las cuotas ya son parte de la tarjeta; listarlas
   aparte las contaría dos veces.
-- **Actividad reciente:** gastos e ingresos de este mes (sin transferencias), en la vista, los
+- **Actividad reciente:** gastos e ingresos de este mes (sin transferencias) *(Reemplazado el 2026-10-01 por 24UX6C2:
+  ver «Enmienda 2026-10-01 — Producto 24UX6C2», abajo.)*, en la vista, los
   más nuevos primero; cuatro con compromisos, seis sin ellos; «Ver todos» → Movimientos.
 - **Vacíos:** sin compromisos ni actividad, «Todavía no hay movimientos este mes» / «Registrá un
   gasto con el botón Registrar (+) o contáselo al Asistente.» (el «+» nombrado como lo lee
@@ -182,7 +187,9 @@ borra ninguna entrega pasada.
   moneda: «Todavía no hay movimientos en X este mes» (la regla de 24UX2, restituida). Sin
   cuentas, el estado vacío con «Empezar» → nueva cuenta.
 - **Fuera de Inicio:** el botón «＋ Registrar», la línea de atención, rankings, gráficos,
-  tarjetas de presupuesto y la entrada del Asistente. Sus rutas siguen donde estaban.
+  tarjetas de presupuesto y la entrada del Asistente. Sus rutas siguen donde estaban. *(Precisado el 2026-10-01 por
+  24UX6C2: sigue sin haber tarjeta permanente de presupuesto, pero aparece una fila contextual del presupuesto general
+  cuando pide atención; ver «Enmienda 2026-10-01 — Producto 24UX6C2», abajo.)*
 
 ## Qué no cambia
 
@@ -199,7 +206,7 @@ La línea **24UX6A → 24UX6B → 24UX6C → 24UX6D** se suma al roadmap de prod
 
 - **24UX6B, Reportes.** Se conservan presupuestos, observaciones y flujo neto (se reordenan o
   reestilan; nunca se quitan porque una maqueta los omita). La dona seleccionable solo como
-  selección visual dentro del reporte. Se permite el gráfico Día a día y un encabezado fijo
+  selección visual dentro del reporte *(implementada el 2026-10-01 por 24UX6C2)*. Se permite el gráfico Día a día y un encabezado fijo
   sólido. Las barras de Evolución conservan la navegación por mes actual (sin una segunda
   selección solo para comparar). Se conserva la agrupación «Otras» por top N actual: **no** se
   adopta la regla del 3 % en esta generación. No se inventa una ruta de detalle por comercio: el
@@ -295,3 +302,42 @@ en esta entrega: Movimientos conserva su filtro por tipo y su búsqueda.
 Implementado en `apps/mobile`; **nada se revisó en un iPhone** y no hubo build de EAS. La verificación en Linux y la
 lista del dispositivo están en `docs/mobile-roadmap.md` («Producto 24UX6C») y `docs/mobile-device-checklist.md`
 («Producto 24UX6C»).
+
+## Enmienda 2026-10-01 — Producto 24UX6C2 (actividad de Inicio y la dona de Reportes)
+
+Fecha: 2026-10-01. Producto 24UX6C2, rama `feat/producto-24ux6c2-home-activity-reports-polish` desde master c673be6
+(24UX6C mergeada como PR #72). Un pulido chico de **presentación**: no cambia ninguna regla contable, el libro, el
+esquema (13), la copia (v13), cotizaciones, tarjetas ni cuotas; sin dependencias nativas ni animaciones entre
+pestañas; la regla de presentación de 24UX6C y la paleta Forest no cambian.
+
+| Antes (texto de esta decisión) | Dónde | Ahora |
+| --- | --- | --- |
+| «gastos e ingresos de este mes (sin transferencias)» | §Inicio, Actividad reciente | Gastos, ingresos **y transferencias** de este mes en la vista, del más nuevo; una transferencia es un registro y aparece **una sola vez** (origen → destino, sin signo, en el tono `transfer`; abre su detalle). El límite de cuatro o seis se aplica después de unir. Gastado y Disponible no leen la lista: una transferencia sigue sin ser gasto |
+| «solo reglas recurrentes de gasto que vencen hoy o en los próximos seis días» | §Inicio, Próximos compromisos | Reglas recurrentes de gasto activas y no borradas, en la vista, cuya próxima fecha cae en una **ventana móvil de 30 días**: de hoy a hoy + 30 días, **los dos extremos incluidos** (el 2026-10-01, del 2026-10-01 al 2026-10-31); el mismo límite que el pronóstico «próximos 30 días» de Recurrentes; nunca «el mes calendario». Por fecha, comercio e id, después dos como máximo; sin ninguna, la sección no existe |
+| «tarjetas de presupuesto» fuera de Inicio | §Inicio, Fuera de Inicio | Sigue sin haber **tarjeta permanente** de presupuesto ni presupuestos por categoría. Se agrega **una fila contextual** del presupuesto **general** del mes solo cuando `budgetState` del dominio dice aviso (85 % a 100 % inclusive) o excedido (más de 100 %); detalle abajo |
+| El centro de la dona con «Total del período» y el total del mes | Reportes (24UX6B, sin texto propio en esta decisión) | La dona no repite el total del KPI de arriba, que sigue en Categorías y Día a día; sirve para **elegir una categoría** (solo selección visual dentro del reporte, como se aprobó): sin elección, «Tocá una categoría»; con una, su nombre, su importe y su parte del gasto; VoiceOver la recorre como un control ajustable |
+
+**Inicio sigue mínimo.** Inicio muestra el campo financiero, la fila del presupuesto general cuando pide atención, los
+compromisos cercanos cuando existen y la actividad reciente. «Próximos compromisos» sigue condicional: solo reglas
+recurrentes de gasto activas y no borradas, en la vista, cuya próxima fecha cae **desde hoy hasta hoy + 30 días, los
+dos extremos incluidos** (`COMMITMENT_WINDOW_DAYS`, reemplazó al horizonte de siete días; el mismo límite que
+Recurrentes), dos como máximo, ausente sin ninguna; lo posterior en Recurrentes; un ingreso recurrente nunca es un
+compromiso, y tampoco resúmenes de tarjeta, cuotas ni pagos de deudas. Rankings, una tarjeta permanente de presupuesto,
+los presupuestos por categoría, la línea de atención calculada y un módulo permanente de recurrentes siguen fuera de
+Inicio; ver más adelante es trabajo del calendario y las notificaciones futuras.
+
+**La fila de atención del presupuesto general.** No es una tarjeta: es una sola fila, solo mientras el presupuesto
+general del mes pide atención según el dominio (`budgetState`, `BUDGET_WARNING_RATIO` 0,85): por debajo del 85 % no hay
+nada; del 85 % al 100 % inclusive, aviso en ámbar («Usaste 87 % del presupuesto del mes», «Quedan … de …»); por encima
+del 100 %, el tono de alerta («Superaste el presupuesto del mes», «… por encima de …»). Un sublímite por categoría nunca
+la muestra ni elige la moneda. Qué presupuesto (`homeBudget`, con la regla de 24C1 de que cada presupuesto conserva su
+moneda): con «Solo …», el general de esa moneda; en consolidado, el general de la moneda de visualización y después el de
+cada moneda del historial, y la fila es el primero que pide atención (un presupuesto tranquilo nunca esconde el
+excedido de otra moneda), nombrando su moneda cuando no es la de visualización. Una sola fila, nunca dos. Se mide sobre el libro real en la moneda propia del presupuesto y nunca se convierte. Va
+después del campo financiero y antes de «Próximos compromisos» y «Actividad reciente»; tocarla abre Presupuestos en la
+moneda y el mes del presupuesto. Un aviso local opcional del mismo cambio de estado queda solo documentado para 25D
+(`docs/mobile-roadmap.md`, «Producto 25D»); no cambia el orden del producto.
+
+**Estado.** Implementado en `apps/mobile`; **nada se revisó en un iPhone** y no hubo build de EAS. La verificación en
+Linux y la lista del dispositivo están en `docs/mobile-roadmap.md` («Producto 24UX6C2») y
+`docs/mobile-device-checklist.md` («Producto 24UX6C2»).

@@ -174,7 +174,9 @@ que leen son ahora los de Forest. Su restyle por pantalla queda para 24UX6B–6D
   tono, cuenta en el primario, fecha neutra, botón de guardar en el primario.
 - **Inicio (desde 24UX6A con Forest, decisión 005; ver «Producto 24UX6A → Inicio»).** Un campo financiero pino
   arriba (el mes, el atajo a Cuentas, el alcance de moneda solo con dos o más, el número de 46 pt —sin subrenglón desde 24UX6C,
-  con su ⓘ al lado cuando hay una sola moneda— y Gastado / Disponible); debajo, solo si existen, «Próximos compromisos» (hasta dos de los próximos siete días) y
+  con su ⓘ al lado cuando hay una sola moneda— y Gastado / Disponible); debajo, solo si existen, «Próximos compromisos» (hasta dos de los próximos siete días
+  *(→ desde 24UX6C2, hasta dos de la ventana de 30 días, de hoy a hoy + 30 inclusive; antes de ellos, una sola fila del
+  presupuesto general cuando pide atención; ver «Producto 24UX6C2 — actividad de Inicio e interacción de Reportes»)*) y
   «Actividad reciente» (cuatro filas con compromisos, seis sin ellos); si no hay ninguno, un estado vacío tranquilo.
   Registrar vive en el «+» del dock, no en Inicio. Los movimientos completos siguen en Movimientos, el análisis en
   Reportes, los presupuestos en Presupuestos.
@@ -224,7 +226,9 @@ Las barras y las barras de progreso usan vistas nativas y **Reanimated**. La don
 usa **react-native-svg** en la versión incluida por Expo SDK 57 (funciona en Expo
 Go); no se agrega una librería de gráficos completa ni una WebView. Las porciones
 usan el tono de su categoría (hasta cinco con nombre, el resto como Otras en gris);
-los nombres van en la leyenda, nunca solo en el color. Con datos nuevos la dona se
+los nombres van en la leyenda, nunca solo en el color. En el centro, «Total del período» sobre el total del mes
+*(→ reemplazado en 24UX6C2: el centro ya no repite el total, que está arriba; sirve para elegir una categoría. Ver
+«Producto 24UX6C2 — actividad de Inicio e interacción de Reportes»)*. Con datos nuevos la dona se
 dibuja en sentido horario desde las doce (480 ms) solo la primera vez; un cambio de
 mes o moneda es un único fundido con las porciones ya finales, junto con el título
 del mes y el total. El trazo estático es el arco terminado, así el gráfico está
@@ -422,7 +426,9 @@ conversación, el borrador, la confirmación y la evidencia siguen como se descr
   Se descartó el centrado: centrar obliga a mover todo el par en cada tecla, y una
   posición estimada nunca coincide exactamente con los glifos reales.
 - **Apilado compartido.** Un solo umbral (`useStacked`, escala mayor a 1,2) para toda fila
-  que ponga un nombre junto a un importe; `StatRow` pone dos o tres estadísticas lado a
+  que ponga un nombre junto a un importe *(en las filas de categoría de Reportes, ampliado en 24UX6C2: también se
+  apilan cuando el nombre y el importe no entran juntos en el ancho; ver «Producto 24UX6C2 — actividad de Inicio e
+  interacción de Reportes»)*; `StatRow` pone dos o tres estadísticas lado a
   lado y una debajo de otra con texto grande; los segmentados limitan su escala a 1,3× y
   ajustan la etiqueta al segmento; los nombres tienen dos líneas y la columna del importe
   ocupa como máximo la mitad; "Saldo pendiente · ARS" y "ARS 1.234,56" se unen con
@@ -575,8 +581,9 @@ abajo), que empieza detrás de la barra de estado (relleno superior: el área se
    `heroThumbInk`, el otro `heroSecondary`): solo cambia el número.
 
 - **Debajo, solo lo que existe.** «Próximos compromisos»: los gastos recurrentes que vencen en los próximos siete
-  días, a lo sumo dos, con «Ver todos» → Recurrentes. «Actividad reciente»: gastos e ingresos de este mes (sin
-  transferencias), del más nuevo, cuatro filas si hay compromisos y seis si no, con «Ver todos» que selecciona
+  días *(→ reemplazado en 24UX6C2 por la ventana de 30 días, de hoy a hoy + 30 inclusive, ver «Producto 24UX6C2 —
+  actividad de Inicio e interacción de Reportes»)*, a lo sumo dos, con «Ver todos» → Recurrentes. «Actividad reciente»: gastos e ingresos de este mes (sin
+  transferencias) *(→ reemplazado en 24UX6C2, ver «Producto 24UX6C2 — actividad de Inicio e interacción de Reportes»)*, del más nuevo, cuatro filas si hay compromisos y seis si no, con «Ver todos» que selecciona
   Movimientos. Cada uno en un grupo; sin datos, la sección no existe.
 - **Vacíos.** Sin ninguno de los dos: «Todavía no hay movimientos este mes» / «Registrá un gasto con el botón
   Registrar (+) o contáselo al Asistente.» (el «+» por el nombre que le da VoiceOver), sin botón. Con una moneda de
@@ -584,6 +591,9 @@ abajo), que empieza detrás de la barra de estado (relleno superior: el área se
   24UX2, restituida). Sin cuentas: el estado vacío con «Empezar» → nueva cuenta.
 - **Salieron de Inicio** «＋ Registrar» (ahora es el «+» del dock), la línea de atención, los rankings, las tarjetas de
   presupuesto, los gráficos y el banner del Asistente. Siguen en Presupuestos, Reportes y la hoja de Registrar.
+  *(→ Desde 24UX6C2 vuelve una sola fila contextual del presupuesto general, solo cuando pide atención; la tarjeta
+  permanente de presupuesto y la línea de atención siguen fuera. Ver «Producto 24UX6C2 — actividad de Inicio e
+  interacción de Reportes».)*
 - **Barra de estado.** Contenido claro mientras Inicio tiene foco y el campo está debajo de la barra; vuelve al
   estilo del tema al pasar el campo o al salir de Inicio.
 - **La semántica no cambió.** Gastado son solo los gastos del mes (nunca transferencias ni pagos de tarjeta; las
@@ -605,7 +615,7 @@ Las reglas de «Motion y accesibilidad» siguen vigentes: la curva de `src/ui/mo
 ### Lo que sigue en el carril UX (aprobado, sin implementar)
 
 - **24UX6B Reportes** *(el reordenamiento está implementado: ver «Producto 24UX6B — jerarquía de Reportes»; la dona
-  elegible, el gráfico Día a día y la cabecera fija siguen pendientes)*. Se reordena y se viste en Forest sin quitar
+  elegible llegó en 24UX6C2; el gráfico Día a día y la cabecera fija siguen pendientes)*. Se reordena y se viste en Forest sin quitar
   presupuestos, hechos ni flujo neto. La dona elegible
   es solo selección visual dentro del reporte; se permiten el gráfico Día a día y una cabecera fija sólida. Las barras
   de evolución conservan la navegación por mes actual (sin una segunda selección solo para comparar); «Otras» sigue
@@ -639,6 +649,8 @@ Las reglas de «Motion y accesibilidad» siguen vigentes: la curva de `src/ui/mo
 > línea de atención y el rechazo explícito de un «+» flotante. Lo vigente es lo de arriba: Forest, cuatro pestañas
 > solo con íconos, el «+» en el dock, el Asistente como pantalla de la pila y el Inicio de campo financiero. Siguen
 > valiendo de aquí los compromisos de la semana (dos como máximo), Apariencia y la lista de componentes retirados.
+> *(La ventana de una semana fue reemplazada en 24UX6C2 por la de 30 días, de hoy a hoy + 30 inclusive; ver «Producto
+> 24UX6C2 — actividad de Inicio e interacción de Reportes».)*
 
 Las capturas del dueño (un Inicio anterior, una app de finanzas premium, una barra flotante con «+», una IA de dinero)
 fueron solo referencia de jerarquía: no se copió marca, paleta, recurso, medida ni arquitectura de información. La
@@ -727,7 +739,9 @@ día, la dona y las filas. La historia tapaba el análisis del mes que la person
 2. **El total del mes.** El eyebrow «GASTADO · ARS» con el botón de información de la metodología, el importe y una sola
    línea «{promedio} por día · {variación}».
 3. **El análisis del mes.** El segmentado Categorías | Día a día (Categorías por defecto). En Categorías, la dona (sin
-   cambios: «Otras» sigue agrupando por los primeros N, sin la regla del 3 %, sin selección de porciones) y debajo el
+   cambios: «Otras» sigue agrupando por los primeros N, sin la regla del 3 %, sin selección de porciones
+   *(→ la selección de porciones llegó en 24UX6C2, ver «Producto 24UX6C2 — actividad de Inicio e interacción de
+   Reportes»)*) y debajo el
    encabezado **«Por categoría»** sobre las filas, que siguen abriendo el detalle de la categoría. En Día a día no hay
    dona: el encabezado **«Por día»** con la nota de siempre, «Solo días con gastos registrados.», sobre las filas de
    cada día, que siguen abriendo su detalle.
@@ -798,10 +812,159 @@ sin interpolar y queda solo el fundido. Las pestañas siguen cambiando al instan
 
 ### Lo que queda para después (aprobado para 24UX6B, sin implementar)
 
-La selección de porciones dentro de la dona (solo visual, dentro del reporte), el gráfico de barras de Día a día y una
-cabecera fija sólida. Siguen permitidos para una pasada siguiente; no hay ruta de detalle por comercio. El orden
+La selección de porciones dentro de la dona (solo visual, dentro del reporte) *(implementada en 24UX6C2)*, el gráfico de
+barras de Día a día y una cabecera fija sólida. Siguen permitidos para una pasada siguiente; no hay ruta de detalle por comercio. El orden
 vinculante del roadmap no cambia: la próxima entrega de producto es 24T3; 24UX6C (Movimientos y Más) y 24UX6D
 (Tarjetas) siguen a 24UX6B en el carril UX, y su lugar frente a 24T3 lo decide el dueño (ver `docs/mobile-roadmap.md`).
+
+## Producto 24UX6C2 — actividad de Inicio e interacción de Reportes
+
+Un pulido chico después de 24UX6C, en su rama `feat/producto-24ux6c2-home-activity-reports-polish` desde master c673be6
+(24UX6C mergeada como PR #72, commit de merge c673be6). Implementado en código; **la revisión en iPhone está
+pendiente** (no hubo build de EAS) y su lista está en docs/mobile-device-checklist.md («Producto 24UX6C2»). No cambió
+nada del libro ni de la contabilidad, del esquema (13), de las copias (v13), de cotizaciones, tarjetas, cuotas ni
+deudas; ninguna dependencia nativa; ninguna animación entre pestañas (la mitigación de pantallas negras del dock quedó
+intacta); la paleta Forest no cambia. La regla de presentación de 24UX6C queda congelada: el gasto con el importe
+guardado, sin menos y en tinta; el ingreso con «+» en verde; la transferencia sin signo en su tono; todo negativo
+calculado conserva su menos. Reemplaza, marcadas en su lugar: «Actividad reciente» sin transferencias (24UX6A), el
+horizonte de siete días de «Próximos compromisos» (24UX6A; ahora 30 días), el centro de la dona con «Total del período»
+y el total, y el umbral de apilado solo por escala en las filas de categoría; y precisa «sin tarjetas de presupuesto en
+Inicio» (24UX6A): sigue sin haber tarjeta permanente, pero existe una fila contextual del presupuesto general cuando
+pide atención (abajo).
+
+### Inicio: la actividad reciente incluye transferencias
+
+- **Qué muestra.** «Actividad reciente» lista los gastos, los ingresos **y las transferencias** de este mes (del
+  primero al último día del período) en la vista, del más nuevo: `homeRecent(entries, transfers, accounts, period,
+  inView, limit)` (`src/ui/home-focus.ts`) filtra los dos y los une con `mergeActivity` (`src/ui/presentation.ts`):
+  fecha descendente, después `createdAt` descendente, después la clave descendente, así el orden es siempre el mismo.
+  El corte (`RECENT_ROWS`: cuatro con compromisos, seis sin ellos) se aplica **después** de unir, nunca por tipo.
+- **Una transferencia, una fila.** Una transferencia es un solo registro y aparece una sola vez (no una salida y una
+  entrada). Entra en la vista por su cuenta de origen: el dominio rechaza transferencias entre monedas distintas
+  («Las dos cuentas deben tener la misma moneda»), así que los dos lados comparten moneda y la vista muestra los dos o
+  ninguno. Las transferencias deshechas no llegan (el snapshot ya las excluye).
+- **La fila.** `TransferRow` como en Movimientos: la leyenda «Origen → Destino · fecha», el importe sin signo en el
+  tono `transfer`; VoiceOver «Transferencia, de X a Y, importe, fecha» (o «Transferencia, nota, de X a Y…» cuando una
+  nota la titula); tocarla abre `/transfer/[id]`. Gastos e ingresos siguen siendo `EntryRow`; el nombre de la cuenta
+  aparece con la regla de 24UX5 (solo cuando las filas visibles vienen de más de una cuenta; una transferencia cuenta
+  por su lado real: el origen, o el destino cuando el origen es la cuenta oculta de una tarjeta o una deuda, como el
+  cobro de una deuda).
+- **Lo que no cambia.** Gastado y Disponible son sus propias cifras (`spendingFigure`, `availableFigure`) y no leen la
+  lista: una transferencia nunca suma a Gastado. El tamaño y la alineación del importe, el lugar de «Total · ARS», el
+  mes, «Ver todos» → Movimientos y los vacíos quedan como estaban.
+
+### Inicio: la fila de atención del presupuesto general
+
+Un refinamiento del dueño dentro de esta entrega. No es una tarjeta de presupuesto: es **una sola fila contextual**
+que aparece solo cuando el presupuesto general del mes pide atención, y desaparece sola cuando no.
+
+- **Cuándo.** `homeBudgetAttention(summary)` (`src/ui/home-focus.ts`, puro) mira **solo el presupuesto general**
+  (`summary.total`) con la regla del dominio, `budgetState` (`BUDGET_WARNING_RATIO` 0,85): tranquilo por debajo del
+  85 % (no hay fila), **aviso** desde el 85 % hasta el 100 % inclusive, **excedido** por encima del 100 %. Sin
+  presupuesto general activo para el mes, o tranquilo, devuelve `null` y la fila no existe. Un sublímite por categoría
+  nunca la muestra, ni excedido.
+- **Qué presupuesto.** `homeBudget(libro, presupuestos, monedas del historial, modo, moneda de la vista, mes)`
+  (`src/ui/home-focus.ts`, puro), con la regla de 24C1 de que un presupuesto conserva su moneda. Solo cuentan los
+  presupuestos **generales**: un sublímite por categoría nunca convierte a una moneda en candidata. Con «Solo …», solo
+  el presupuesto general de esa moneda; en consolidado, primero el de la moneda de visualización y después el de cada
+  moneda del historial en el orden de agrupación: la fila es **el primero que está en aviso o excedido**, y **nombra su
+  moneda** cuando no es la de visualización. Así un presupuesto tranquilo (o un sublímite) nunca esconde el excedido de
+  otra moneda, y con dos que piden atención se ve uno solo, el de la moneda de visualización primero. Se mide con
+  `summarizeMonthlyBudgets` sobre el **libro real** en la moneda propia del presupuesto: nunca se convierte ni se suma a
+  otra moneda.
+- **Dónde.** En un grupo propio (`Surface grouped`) después del campo financiero y **antes** de «Próximos compromisos»
+  y «Actividad reciente»: lo accionable primero. Entra y sale con `Reflow` como los demás grupos.
+- **La fila.** `BudgetAttentionRow` (`src/ui/home-modules.tsx`): `PressFeedback` con resaltado, rol botón, 60 pt de
+  alto mínimo; un `GlyphTile` de 36 pt (aviso: `speedometer-outline` en el tono `warning`, ámbar; excedido:
+  `alert-circle-outline` en el tono `expense`, el de alerta) y un chevron. Título en tinta, 600: aviso «Usaste 87 % del
+  presupuesto del mes» («You used 87% of this month’s budget»; el porcentaje entero que muestran Presupuestos y
+  Reportes, `percentUsed`, nunca con decimales); excedido «Superaste el presupuesto del mes» («You went
+  over this month’s budget»); cuando nombra la moneda, «… del mes en USD» («… this month’s USD budget»). Detalle en
+  footnote 500, ámbar (`p.warning`) en aviso y el tono de alerta (`p.expense`) en excedido: «Quedan $ 15.000,00 de
+  $ 100.000,00» («… left of …») o «$ 4.000,00 por encima de $ 100.000,00» («… over …»); los importes con
+  `moneyText`, o con su código (`codedAmount`) cuando la fila nombra la moneda. El ámbar sigue en el 100 % justo; el
+  tono de alerta es solo para lo que pasó el límite.
+- **VoiceOver.** Un solo elemento: el título hablado (`spokenPercent`) más «, » y el detalle hablado (`spokenMoney`);
+  pista «Abre Presupuestos» («Opens Budgets»).
+- **Tocar.** Abre Presupuestos en la moneda y el mes del presupuesto (`/budgets` con `currency` y `month`).
+- **Textos.** Nuevas claves `home.budget.warning`, `warningIn`, `exceeded`, `exceededIn`, `left`, `over` y `hint`, en
+  español y en inglés; el candado del inglés se volvió a aceptar.
+- **Lo que no es.** Ni tarjeta permanente, ni presupuestos por categoría, ni la línea de atención de la primera
+  iteración (`HomeInsightRow` no vuelve), ni una cifra nueva: no cambia el dominio de presupuestos ni cómo se calculan.
+
+### Inicio: la regla mínima (para entregas futuras)
+
+Inicio muestra solo el campo financiero, la fila de atención del presupuesto general cuando la hay, los compromisos
+cercanos cuando existen y la actividad reciente.
+
+- **«Próximos compromisos» es condicional:** solo reglas recurrentes **de gasto** activas y no borradas, en la vista,
+  cuya próxima fecha cae en una **ventana móvil de 30 días** desde hoy (`COMMITMENT_WINDOW_DAYS`, reemplazó al
+  horizonte de siete días): desde hoy hasta hoy + 30 días, **los dos extremos incluidos** (`nextDateISO >= hoy` y
+  `nextDateISO <= addDaysISO(hoy, 30)`; el 2026-10-01 la ventana va del 2026-10-01 al 2026-10-31). Es el mismo límite que
+  el pronóstico «próximos 30 días» de Recurrentes (`recurringForecastByCurrency`). Una diferencia es deliberada: una
+  regla cuya próxima fecha ya pasó espera revisión en Recurrentes y no se lista en Inicio (el pronóstico sí cuenta su
+  próxima ocurrencia).
+  Nunca es «el mes calendario». Se ordenan por fecha, después por comercio (`localeCompare`) y después por id, y recién
+  entonces se cortan a dos (`COMMITMENT_ROWS`); sin ninguna en la ventana, la sección no existe. Lo demás vive en
+  Recurrentes («Ver todos»). Un ingreso recurrente nunca se muestra como compromiso; tampoco resúmenes de tarjeta,
+  cuotas ni pagos de deudas.
+- **Presupuesto: sin tarjeta permanente, con una fila contextual.** Inicio **no** tiene una tarjeta de presupuesto
+  permanente (ni la «Presupuesto del mes» de antes ni sublímites). Sí puede tener **una** fila del presupuesto general
+  cuando `budgetState` pide atención (aviso o excedido), con las reglas de arriba; tranquilo, no hay nada.
+- **No van en Inicio:** rankings, una tarjeta permanente de presupuesto, presupuestos por categoría, una línea de
+  atención calculada ni un módulo permanente de recurrentes. Una visibilidad más amplia de lo que viene es trabajo del
+  calendario y de las notificaciones futuras (las notas de 24UX6A y 25D), no de Inicio.
+
+### Reportes: el total arriba y la dona para elegir
+
+- **El total, una vez.** El KPI de arriba («GASTADO · ARS», el importe y su línea) sigue en Categorías y en Día a día.
+  El centro de la dona ya no repite el total del período (antes «Total del período» y el mismo importe).
+- **El centro.** Sin elección, una nota callada en footnote: «Tocá una categoría» («Tap a category»). Con una
+  categoría elegida: su nombre (footnote seminegrita), su importe exacto (`Money`, 18 pt desde 176 pt de dona, si no
+  16 pt; peso 700; centrado) y «29 % del gasto», con el mismo porcentaje que su fila (`spendingShare` sobre el gasto
+  del informe). Los textos del centro se limitan a 1,2× de Dynamic Type; cuando el importe elegido no entra en el
+  agujero (texto más grande que 1,2× o un importe muy largo), la lectura (nombre, importe, porcentaje) baja debajo de la
+  dona, entera, y el agujero queda libre: el importe nunca se corta. El centro y esa lectura son solo para la vista;
+  VoiceOver los oye una vez, como valor del elemento ajustable.
+- **La porción elegida.** Se dibuja 6 pt más gruesa (`CHOSEN_EXTRA`) y las demás al 30 % de opacidad; el radio del
+  anillo deja lugar para el trazo más grueso. La fila de la leyenda queda marcada: nombre en 700, un contorno de 1,5 pt
+  en el tono de la categoría con 14 pt de radio, un tinte del 8 % de ese tono y `accessibilityState.selected`.
+- **Tocar.** Una porción la elige; tocar la porción elegida o el agujero la quita. El toque se resuelve por geometría
+  (`sliceAt`, puro, exportado con `donutArcs`): el anillo con 10 pt de margen, el ángulo desde las doce en sentido
+  horario; un hueco entre porciones cuenta como la porción siguiente; el agujero o afuera, ninguna.
+- **VoiceOver.** La dona es un elemento ajustable: nombre «Gasto por categoría: Comida 40 %, …», valor «Ninguna
+  categoría elegida» o «Supermercado, 412760,40 pesos, 29 % del gasto» (importe y porcentaje hablados), pista
+  «Deslizá hacia arriba o hacia abajo para elegir una categoría»; deslizar recorre las porciones en orden (hacia abajo
+  desde ninguna empieza por la última) y, pasado cualquiera de los extremos, vuelve a ninguna. Las dos acciones llevan
+  nombres traducidos («Categoría siguiente», «Categoría anterior») para el rotor de Acciones, y un doble toque de
+  VoiceOver no borra la elección.
+- **El alcance de la elección.** La elección vale para un mes, una moneda y un modo de visualización: cualquier cambio
+  de ellos la borra, venga de Reportes, de un enlace o de la moneda elegida en Inicio (que Reportes comparte), y volver
+  después no la trae de vuelta; si la categoría ya no es una porción, tampoco se muestra. Las filas siguen abriendo `/report-category`.
+- **Motion.** Nada nuevo: el grosor y la opacidad cambian de una vez; el barrido inicial de la dona y el fundido de
+  datos siguen igual, y Reduce Motion también.
+- **Textos.** Nuevas claves `reports.chart.byCategory`, `pick`, `pickHint`, `noneChosen`, `chosen` y `share`; salió
+  `reports.periodTotal`. El candado del inglés se volvió a aceptar.
+
+### Filas de categoría: nombres largos con importes grandes
+
+Antes una fila de categoría se apilaba solo con texto grande (escala mayor a 1,2) o con un importe largo; un nombre
+como «Supermercado» junto a un importe grande podía partirse dejando una letra suelta. Ahora:
+
+- `labelWidthEm(text)` (`src/ui/geometry.ts`) estima por exceso el ancho de un nombre en ems (espacio 0,28;
+  puntuación fina, «i», «l» 0,3; mayúsculas, dígitos, «m», «w» 0,68; ideogramas, kana, hangul y formas de ancho completo
+  1; emoji 1,25, contando una secuencia con unión una sola vez; marcas combinantes 0; el resto 0,54; × 1,04 de margen) y
+  `labelAmountStacks(ancho, escala, nombre, importe)` decide si el nombre y el importe entran juntos en la columna de
+  texto.
+- `useCategoryRowStacks` (`src/ui/spending-chart.tsx`) = la regla del importe de siempre (`useStacked`) **o**
+  `labelAmountStacks`, descontando el chevron (15 pt) y su separación (12 pt). La usan `CategoryLegendRow` (Reportes)
+  y `CategorySpendingRow`.
+- **Apilada:** columna; el nombre sin límite de líneas y, debajo, el importe y su porcentaje juntos, alineados al
+  inicio. Con texto grande se apila siempre, como antes.
+
+### Lo que sigue
+
+24UX6D (Tarjetas en Forest) sigue en el carril UX; el orden de producto (24T3, 25A, …) no cambia.
 
 ## Producto 24UX6C — presentación de movimientos, Inicio y Más
 
@@ -1983,6 +2146,21 @@ crédito, marca elegida) y los filetes de las píldoras, el chip y el compositor
 color propio.
 
 ## Pendiente de revisión en iPhone
+
+- Producto 24UX6C2 (sin build de EAS, nada revisado todavía): la actividad reciente de Inicio mezcla gastos, ingresos
+  y transferencias del más nuevo, una transferencia una sola vez con «Origen → Destino» en el tono de transferencia,
+  VoiceOver diciendo «Transferencia» con la dirección, tocarla abre su detalle y Gastado no cambia después de una
+  transferencia; los compromisos siguen condicionales, ahora con la ventana de 30 días (de hoy a hoy + 30 inclusive);
+  la fila del presupuesto general (aparece al 85 % en ámbar, sigue ámbar en el 100 %, pasado el límite en el tono de
+  alerta con lo excedido, nunca por un presupuesto por categoría, abre Presupuestos en su moneda y su mes, en
+  consolidado con el presupuesto en otra moneda que la de visualización nombra esa moneda sin convertir, desaparece por
+  debajo del 85 %); en Reportes el total arriba en las dos vistas, el centro de la
+  dona callado y después el nombre, el importe y el porcentaje de la categoría elegida, la porción elegida más gruesa
+  y las demás atenuadas, la fila marcada, tocar de nuevo o el agujero la quita, VoiceOver ajustable (deslizar arriba y
+  abajo) anuncia categoría, importe y porcentaje, la elección vuelve a ninguna al cambiar de mes o de moneda; nombres
+  largos con importes grandes apilados a 375 pt y en tamaños de accesibilidad; la navegación de meses, las barras y
+  «Este mes»; Reduce Motion; 30 cambios rápidos de pestaña sin pantallas negras. Lista en
+  docs/mobile-device-checklist.md.
 
 - Producto 24UX6C (sin build de EAS, nada revisado todavía): las filas de Movimientos en claro y oscuro (el gasto sin
   menos y en tinta, el ingreso con «+» en verde, la transferencia en azul petróleo y sin signo); las cabeceras de día y

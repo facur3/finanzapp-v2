@@ -22,7 +22,7 @@ import { useCategoryColor, useCategoryLookOf } from '../../src/ui/category-hues'
 import { DonutChart, MonthBars, OTHERS_KEY, donutSlices } from '../../src/ui/charts';
 import { ValueTransition, selectionHaptic } from '../../src/ui/motion';
 import { activityDateLabel, historyCurrencies } from '../../src/ui/presentation';
-import { changePercent, earliestRecordedMonth, insightsBesideRanking, reportPeriodLabel, reportSelection, requestedReportMonth, shiftReportMonth } from '../../src/ui/report-presentation';
+import { changePercent, earliestRecordedMonth, insightsBesideRanking, reportPeriodLabel, reportSelection, requestedReportMonth, shiftReportMonth, spendingShare } from '../../src/ui/report-presentation';
 import { CategoryLegendRow } from '../../src/ui/spending-chart';
 import { space, useCurrentDay, usePalette, useReduceMotion } from '../../src/ui/theme';
 
@@ -56,6 +56,8 @@ export default function ReportsScreen() {
   const day = useCurrentDay();
   const [monthOverride, setMonth] = useState<string>();
   const [tab, setTab] = useState<'categories' | 'days'>('categories');
+  // 24UX6C2: the category chosen on the donut, for the month and currency it was chosen in (a new month starts with none).
+  const [chosen, setChosen] = useState<{ scope: string; key: string } | null>(null);
   const reduced = useReduceMotion();
   // The history sits under the analysis (24UX6B): a bar that opens another month brings that month's title and total into view.
   const list = useRef<FlatList<CategorySpending | DailySpending>>(null);
@@ -122,6 +124,10 @@ export default function ReportsScreen() {
     const facts = spendingInsights(ledger, [], selection.currency, selection.monthISO, day, money).filter(insight => previousComplete || !insight.id.startsWith('growth:'));
     return insightsBesideRanking([...budgetFacts, ...facts].slice(0, 4), merchants, ledger.entries);
   }, [snapshot, ledger, archive?.budgets, scope?.currency, selection, report, day, money, budgetMoney, merchants, previousComplete]);
+  // The donut's choice belongs to one month, currency and display mode: any change of them clears it, whatever caused it
+  // (Reportes' own controls, a link, or the display currency chosen on Inicio, which Reportes shares while it stays mounted).
+  const choiceScope = selection && view ? selection.monthISO + '|' + selection.currency + '|' + view.mode : '';
+  useEffect(() => { if (chosen && chosen.scope !== choiceScope) setChosen(null); }, [choiceScope]);
   if (!snapshot || !ledger || !view || !report || !selection) return null;
   const insightText = (insight: SpendingInsight) => localizedInsight(insight, { t, money, budgetMoney, dayMonth: formatDayMonth, label: key => lookOf(key).label, budgets, comparison, entries: ledger.entries });
 
@@ -134,7 +140,16 @@ export default function ReportsScreen() {
   const canPrevious = monthISO > earliestMonth;
   const canNext = monthISO < currentMonth;
   const slices = donutSlices(report.categories.map(category => ({ key: category.key, label: lookOf(category.category).label, value: category.amountMinor })), p, key => lookOf(key).hex, t('reports.others'));
-  const goToMonth = (month: string | undefined) => { selectionHaptic(); setMonth(month); };
+  // The donut's chosen slice, only within the month and currency it was chosen in. Its share is the rows' own formatter
+  // over the report's total in exact minor units, so the centre and the rows always say the same percentage.
+  const scopeKey = choiceScope;
+  const chosenKey = chosen?.scope === scopeKey && slices.some(slice => slice.key === chosen.key) ? chosen.key : null;
+  const shareOf = (value: number) => {
+    const { fraction, label } = spendingShare(value, report.status === 'ready' ? report.expenseMinor : 0, locale);
+    return { label, spoken: spokenPercent(fraction) };
+  };
+  // A month or currency change clears the donut's choice (24UX6C2): coming back starts with none, like any new view.
+  const goToMonth = (month: string | undefined) => { selectionHaptic(); setChosen(null); setMonth(month); };
   const average = ready ? dailyAverageMinor(report.expenseMinor, report) : 0;
   const delta = comparison && comparison.status === 'ready' && comparison.previous?.status === 'ready' && comparison.deltaMinor !== null
     ? { minor: comparison.deltaMinor, percent: changePercent(comparison.deltaMinor, comparison.previous.expenseMinor, locale), mode: comparison.mode } : null;
@@ -165,7 +180,7 @@ export default function ReportsScreen() {
     initialNumToRender={10} maxToRenderPerBatch={10} windowSize={7}
     ListHeaderComponent={<View style={{ gap: space.xxl, paddingBottom: space.m }}>
       <View style={{ gap: space.m }}>
-        {held.length > 1 && <DisplayCurrencyButton compact={false} mode={view.mode} currency={currency} held={held} gate={gate} onMode={setMode} onCurrency={setCurrency} />}
+        {held.length > 1 && <DisplayCurrencyButton compact={false} mode={view.mode} currency={currency} held={held} gate={gate} onMode={mode => { setChosen(null); setMode(mode); }} onCurrency={code => { setChosen(null); setCurrency(code); }} />}
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
           <IconButton name="chevron-back" label={t('reports.previousMonth')} disabled={!canPrevious}
             onPress={() => { if (canPrevious) goToMonth(shiftReportMonth(monthISO, -1)); }} />
@@ -207,7 +222,9 @@ export default function ReportsScreen() {
         <View style={{ gap: space.l }}>
           <Choices value={tab} onChange={setTab} options={[{ value: 'categories', label: t('reports.viewCategories') }, { value: 'days', label: t('reports.viewDays') }]} />
           {!days && report.categories.length > 0 && <View style={{ alignItems: 'center', gap: space.m, paddingTop: space.s }}>
-            <DonutChart slices={slices} total={report.expenseMinor} currency={currency} caption={t('reports.periodTotal')} />
+            {/* 24UX6C2: the total is the KPI above; the donut's centre is for the chosen category. */}
+            <DonutChart slices={slices} currency={currency} caption={t('reports.chart.byCategory')} chosen={chosenKey} shareOf={shareOf}
+              onChoose={key => setChosen(key ? { scope: scopeKey, key } : null)} />
             {slices.some(slice => slice.key === OTHERS_KEY) && <AppText tertiary variant="caption" style={{ textAlign: 'center' }}>{t('reports.othersNote')}</AppText>}
           </View>}
         </View>
@@ -219,7 +236,7 @@ export default function ReportsScreen() {
     renderItem={({ item, index }) => <View style={{ backgroundColor: p.surface, overflow: 'hidden',
       borderTopLeftRadius: index === 0 ? 16 : 0, borderTopRightRadius: index === 0 ? 16 : 0,
       borderBottomLeftRadius: index === rows.length - 1 ? 16 : 0, borderBottomRightRadius: index === rows.length - 1 ? 16 : 0 }}>
-      {'key' in item ? <CategoryLegendRow category={item} totalMinor={ready ? report.expenseMinor : 0}
+      {'key' in item ? <CategoryLegendRow category={item} totalMinor={ready ? report.expenseMinor : 0} chosen={chosenKey === item.key}
         currency={currency} last={index === report.categories.length - 1}
         onPress={() => router.push({ pathname: '/report-category', params: { currency, month: monthISO, category: item.key } })} />
         : <DetailRow label={t('reports.dayRow', { date: activityDateLabel(item.dateISO, day, locale), count: t('count.expenses', { count: item.count }) })}

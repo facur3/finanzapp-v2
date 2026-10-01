@@ -1,9 +1,10 @@
 import { useEffect } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, View, useWindowDimensions } from 'react-native';
 import Animated, { cancelAnimation, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { type CategorySpending, type Currency } from '@finanzapp/domain';
-import { AppText, CategoryBadge, Money, PressFeedback, useStacked } from './components';
+import { AppText, CategoryBadge, Money, PressFeedback, rowAmountText, useStacked } from './components';
+import { ROW_CHROME, labelAmountStacks } from './geometry';
 import { useCategoryLook } from './category-hues';
 import { spendingShare } from './report-presentation';
 import { timing } from './motion';
@@ -37,7 +38,8 @@ export function CategorySpendingRow({ category, totalMinor, currency, onPress, l
   const { hex: color, label: name } = useCategoryLook(category.category);
   const { fraction, label } = spendingShare(category.amountMinor, totalMinor, locale);
   const count = t('count.expenses', { count: category.count });
-  const stacked = useStacked({ minor: category.amountMinor, currency });
+  // 24UX6C2: the same name-and-amount rule as the legend rows (this row has its chevron unless compact).
+  const stacked = useCategoryRowStacks(name, category.amountMinor, currency, ROW_CHROME + (compact ? 0 : LEGEND_CHEVRON));
   return <PressFeedback feedback="highlight" accessibilityRole="button"
     accessibilityLabel={t('reports.chart.categoryLabel', { name, amount: spokenMinor(category.amountMinor, currency), currency, share: spokenPercent(fraction), count })}
     accessibilityHint={t('reports.chart.categoryHint')}
@@ -56,25 +58,42 @@ export function CategorySpendingRow({ category, totalMinor, currency, onPress, l
   </PressFeedback>;
 }
 
-/** Legend row for the donut: the category tile carries the slice's hue, so the row needs no swatch. */
-export function CategoryLegendRow({ category, totalMinor, currency, onPress, last = false }: {
-  category: CategorySpending; totalMinor: number; currency: Currency; onPress: () => void; last?: boolean;
+/** The fixed parts of a legend row beyond a list row's (ROW_CHROME): its chevron and the gap before it. */
+const LEGEND_CHEVRON = 15 + 12;
+
+/** Whether a category row puts its amount (and share) under the name (24UX6C2): at large text, when the amount alone is
+ * too wide for its column, or when the name and the amount cannot share one line on this screen. Stacking is preferred
+ * to wrapping the name into a stray last letter («Supermercad / o») or shrinking the money. */
+export function useCategoryRowStacks(name: string, minor: number, currency: Currency, chrome = ROW_CHROME + LEGEND_CHEVRON): boolean {
+  const { fontScale, width } = useWindowDimensions();
+  const { locale } = useI18n();
+  const amountStacks = useStacked({ minor, currency });
+  return amountStacks || labelAmountStacks(width, fontScale, name, rowAmountText(minor, currency, false, locale), chrome);
+}
+
+/** Legend row for the donut: the category tile carries the slice's hue, so the row needs no swatch. 24UX6C2: a category
+ * chosen on the donut is marked here too, never by colour alone: a bold name, a 1.5 pt outline in the category's hue
+ * and the selected state for VoiceOver. */
+export function CategoryLegendRow({ category, totalMinor, currency, onPress, last = false, chosen = false }: {
+  category: CategorySpending; totalMinor: number; currency: Currency; onPress: () => void; last?: boolean; chosen?: boolean;
 }) {
   const p = usePalette();
   const { t, locale, spokenMinor, spokenPercent } = useI18n();
-  const name = useCategoryLook(category.category).label;
+  const look = useCategoryLook(category.category);
+  const name = look.label;
   const { fraction, label } = spendingShare(category.amountMinor, totalMinor, locale);
   const count = t('count.expenses', { count: category.count });
-  const stacked = useStacked({ minor: category.amountMinor, currency });
-  return <PressFeedback feedback="highlight" accessibilityRole="button"
+  const stacked = useCategoryRowStacks(name, category.amountMinor, currency);
+  return <PressFeedback feedback="highlight" accessibilityRole="button" accessibilityState={{ selected: chosen }}
     accessibilityLabel={t('reports.chart.categoryLabel', { name, amount: spokenMinor(category.amountMinor, currency), currency, share: spokenPercent(fraction), count })}
     accessibilityHint={t('reports.chart.categoryHint')}
-    onPress={onPress} style={{ paddingHorizontal: 16, paddingVertical: 12, minHeight: 60, flexDirection: 'row', gap: 12, alignItems: 'center',
-      borderBottomWidth: last ? 0 : StyleSheet.hairlineWidth, borderBottomColor: p.line }}>
+    onPress={onPress} style={[{ paddingHorizontal: 16, paddingVertical: 12, minHeight: 60, flexDirection: 'row', gap: 12, alignItems: 'center',
+      borderBottomWidth: last ? 0 : StyleSheet.hairlineWidth, borderBottomColor: p.line },
+      chosen ? { borderWidth: 1.5, borderColor: look.hex, borderBottomWidth: 1.5, borderBottomColor: look.hex, borderRadius: 14, backgroundColor: look.hex + '14' } : null]}>
     <CategoryBadge category={category.category} />
     <View style={{ flex: 1, minWidth: 0, gap: 8, flexDirection: stacked ? 'column' : 'row', alignItems: stacked ? 'flex-start' : 'center' }}>
       <View style={{ flex: stacked ? undefined : 1, minWidth: 0, gap: 3 }}>
-        <AppText numberOfLines={stacked ? undefined : 2} style={{ fontWeight: '500' }}>{name}</AppText>
+        <AppText numberOfLines={stacked ? undefined : 2} style={{ fontWeight: chosen ? '700' : '500' }}>{name}</AppText>
         <AppText secondary variant="footnote">{count}</AppText>
       </View>
       <View style={{ alignItems: stacked ? 'flex-start' : 'flex-end', gap: 3 }}>

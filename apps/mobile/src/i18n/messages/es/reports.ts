@@ -33,8 +33,6 @@ export const reports = {
     /** Segmented control: category breakdown or day-by-day list. */
     viewCategories: 'Categorías',
     viewDays: 'Día a día',
-    /** Caption in the middle of the donut, above the total. */
-    periodTotal: 'Total del período',
     /** Name of the donut slice that groups the smaller categories. */
     others: 'Otras',
     /** Under the donut when the smaller categories are grouped: the donut names four categories and groups the rest (`donutSlices`). */
@@ -97,9 +95,22 @@ export const reports = {
       range: '1–{day} de {month} de {year}',
     },
     chart: {
-      /** VoiceOver for the donut: "Total del período: Comida 40 %, Salud 60 %". */
+      /** VoiceOver for the donut: "Gasto por categoría: Comida 40 %, Salud 60 %". */
       donutLabel: '{caption}: {slices}',
       slice: '{label} {percent} %',
+      /** 24UX6C2: the donut no longer repeats the period total. Its VoiceOver name, the quiet line in its centre before a
+       * category is chosen, how VoiceOver chooses one, and what it says once one is chosen. */
+      byCategory: 'Gasto por categoría',
+      pick: 'Tocá una categoría',
+      pickHint: 'Deslizá hacia arriba o hacia abajo para elegir una categoría',
+      noneChosen: 'Ninguna categoría elegida',
+      /** "Supermercado, 412760,40 pesos, 29 % del gasto". */
+      chosen: '{name}, {amount}, {percent} del gasto',
+      /** Under the amount in the donut's centre: "29 % del gasto". */
+      share: '{percent} del gasto',
+      /** VoiceOver's names for the donut's two adjustable actions (iOS lists them in its Actions rotor). */
+      next: 'Categoría siguiente',
+      previous: 'Categoría anterior',
       /** VoiceOver for one month bar: "septiembre 2026, 1234,56 pesos". `{month}` is the full month name (the axis under the bars keeps the short one). */
       bar: '{month} {year}, {amount}',
       barPartial: '{month} {year}, {amount}, mes en curso',

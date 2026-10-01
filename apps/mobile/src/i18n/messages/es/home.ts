@@ -1,5 +1,5 @@
-/** Inicio (the current month's financial field, the commitments due this week, the month's latest movements) and the
- * capture hub the dock's «+» opens (Producto 24UX6A, decision 005). */
+/** Inicio (the current month's financial field, the general budget when it needs attention, the commitments due in the
+ * next 30 days, the month's latest movements) and the capture hub the dock's «+» opens (Producto 24UX6A, decision 005). */
 export const home = {
   home: {
     emptyTitle: 'Entendé tus gastos.',
@@ -19,13 +19,25 @@ export const home = {
     quietTitleIn: 'Todavía no hay movimientos en {currency} este mes',
     /** Names the dock's «+» by what VoiceOver calls it (Registrar), with the glyph for sighted readers. */
     quietDetail: 'Registrá un gasto con el botón Registrar (+) o contáselo al Asistente.',
-    /** 24UX6A: only the commitments due in the next seven days. */
+    /** 24UX6C2: only the commitments due from today through today + 30 days, both ends inclusive. */
     upcoming: 'Próximos compromisos',
     upcomingRow: {
       today: 'Hoy',
       tomorrow: 'Mañana',
       inDays: { one: 'En {count} día', other: 'En {count} días' },
       label: '{merchant}, {category}, {amount}, próximo pago {date}',
+    },
+    /** 24UX6C2: the month's general budget when it needs attention (85 % or more, `budgetState`); one compact row. */
+    budget: {
+      warning: 'Usaste {percent} del presupuesto del mes',
+      warningIn: 'Usaste {percent} del presupuesto del mes en {code}',
+      exceeded: 'Superaste el presupuesto del mes',
+      exceededIn: 'Superaste el presupuesto del mes en {code}',
+      /** «Quedan $ 15.000,00 de $ 100.000,00». */
+      left: 'Quedan {amount} de {limit}',
+      /** «$ 4.000,00 por encima de $ 100.000,00». */
+      over: '{amount} por encima de {limit}',
+      hint: 'Abre Presupuestos',
     },
     /** 24UX6A (decision 005): the dock's «+» and the capture hub it opens. The Assistant proposes; the person confirms. */
     capture: {

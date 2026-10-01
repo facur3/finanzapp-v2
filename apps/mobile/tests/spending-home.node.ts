@@ -32,12 +32,14 @@ const harnessPalette = () => {
   const base = dark ? darkPalette : lightPalette;
   return { ...base, isDark: dark, positive: base.income, negative: base.expense, positiveSoft: base.incomeSoft, negativeSoft: base.expenseSoft };
 };
+/** The day the harness's `useCurrentDay` answers; a test may move it and must restore it. */
+let today = '2026-09-12';
 /** The safe area of an iPhone with a Dynamic Island, portrait. */
 const INSETS = { top: 47, bottom: 34, left: 0, right: 0 };
 
 // Exercise the actual routes' data/handlers with host components replaced by
 // descriptors. This is NOT a rendered iOS screen or gesture/animation test.
-type Node = { type: string; props: Record<string, any> };
+type Node = { type: string; props: Record<string, any>; key?: string };
 const createdAt = '2026-09-12T12:00:00Z';
 const snapshot: domain.LedgerSnapshot = { accounts: [
   { id: 'a', name: 'ARS de prueba', currency: 'ARS', openingMinor: 10000, createdAt },
@@ -74,7 +76,8 @@ function routeHarness(file: string, params: Record<string, unknown>, initialData
   } };
   const source = readFileSync(new URL('../app/' + file, import.meta.url), 'utf8');
   const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText;
-  const jsx = (type: string, props: Record<string, unknown>) => ({ type, props });
+  // The element's key is kept (the JSX runtime passes it apart from the props), so a test can read a row's key.
+  const jsx = (type: string, props: Record<string, unknown>, key?: string) => key === undefined ? { type, props } : { type, props, key };
   const state: unknown[] = [];
   const deps: unknown[][] = [];
   const refs: { current: unknown }[] = [];
@@ -86,7 +89,7 @@ function routeHarness(file: string, params: Record<string, unknown>, initialData
   // Inicio's focus effect: run once when the screen first renders focused (like React Navigation on mount), its cleanup on blur.
   let focusEffect: (() => void | (() => void)) | undefined, focusCleanup: void | (() => void), focusedOnce = false;
   let cursor = 0, effectCursor = 0, refCursor = 0;
-  const componentNames = ['AppText', 'Choices', 'DetailRow', 'EmptyState', 'IconButton', 'InfoButton', 'Money', 'PressFeedback', 'SectionTitle', 'Surface', 'CategoryBadge', 'Screen', 'EntryActions', 'EntryRow', 'ActionButton', 'GlyphTile', 'Stat', 'NavigationRow'];
+  const componentNames = ['AppText', 'Choices', 'DetailRow', 'EmptyState', 'IconButton', 'InfoButton', 'Money', 'PressFeedback', 'SectionTitle', 'Surface', 'CategoryBadge', 'Screen', 'EntryActions', 'EntryRow', 'TransferRow', 'ActionButton', 'GlyphTile', 'Stat', 'NavigationRow'];
   const modules: Record<string, unknown> = {
     '../i18n/format': i18nFormat, '../src/i18n/format': i18nFormat, '../../src/i18n/format': i18nFormat, '../i18n/provider': i18nProvider, '../src/i18n/provider': i18nProvider, '../../src/i18n/provider': i18nProvider,
     // Effects run in place, once per change of their dependencies (a route parameter arriving), like React's after commit.
@@ -119,17 +122,18 @@ function routeHarness(file: string, params: Record<string, unknown>, initialData
     '../src/ui/presentation': presentation,
     '../src/ui/report-presentation': reportPresentation,
     '../src/ui/spending-chart': { CategorySpendingRow: 'CategorySpendingRow', CategoryLegendRow: 'CategoryLegendRow' },
-    '../src/ui/charts': { DonutChart: 'DonutChart', MonthBars: 'MonthBars', OTHERS_KEY: '__others__',
+    '../src/ui/charts': { DonutChart: 'DonutChart', MonthBars: 'MonthBars', OTHERS_KEY: ' others',
       donutSlices: (items: { key: string; label: string; value: number }[]) => items.slice(0, 5).map((item, index) => ({ ...item, color: 'c' + index })) },
     '../src/ui/budget-presentation': budgetPresentation,
     '@expo/vector-icons/Ionicons': 'Ionicons',
     // 24UX6A: no insight row, no capture module and no quick actions are mapped: Inicio importing one fails loudly here.
-    '../src/ui/home-modules': { CurrencyParts: 'CurrencyParts', FieldButton: 'FieldButton', MetricHelp: 'MetricHelp', UpcomingRecurringRow: 'UpcomingRecurringRow' },
+    // 24UX6C2: the general budget's attention row is the one budget module Inicio may draw.
+    '../src/ui/home-modules': { BudgetAttentionRow: 'BudgetAttentionRow', CurrencyParts: 'CurrencyParts', FieldButton: 'FieldButton', MetricHelp: 'MetricHelp', UpcomingRecurringRow: 'UpcomingRecurringRow' },
     '../src/ui/home-focus': homeFocus,
     '../src/ui/category-color': categoryColor,
     '../src/ui/category-hues': { useCategoryColor: () => '#3E6FB0', useCategoryLabel: (s: string) => s, useCategoryDefinitions: () => [], useCategoryLook: (s: string) => ({ label: s, storedLabel: s, key: String(s).toLowerCase(), hex: '#3E6FB0', glyph: 'pricetag-outline' }), useCategoryLookOf: () => (s: string) => ({ label: s, storedLabel: s, key: String(s).toLowerCase(), hex: '#3E6FB0', glyph: glyphAliases.get(s) ?? 'glyph-' + String(s).toLowerCase() }), useAccountLook: () => ({ icon: 'wallet', color: 'cobalt', glyph: 'wallet-outline', hex: '#2557D6' }), useAccountNameOf: () => (account: any) => account.name, useAccountLookOf: () => () => ({ icon: 'wallet', color: 'cobalt', glyph: 'wallet-outline', hex: '#2557D6' }) },
     '../src/ui/motion': { ValueTransition: 'ValueTransition', Reflow: 'Reflow', selectionHaptic: () => {}, impactHaptic: () => {}, duration: { press: 100, release: 160, state: 200, data: 260, enter: 200, exit: 100, reveal: 480 }, timing: (kind: string, reduced: boolean) => ({ duration: reduced ? 0 : 260 }) },
-    '../src/ui/theme': { useCurrentDay: () => '2026-09-12', useReduceMotion: () => false, space: { xs: 4, s: 8, m: 12, l: 16, xl: 20, xxl: 24, xxxl: 32 },
+    '../src/ui/theme': { useCurrentDay: () => today, useReduceMotion: () => false, space: { xs: 4, s: 8, m: 12, l: 16, xl: 20, xxl: 24, xxxl: 32 },
       usePalette: harnessPalette },
   };
   modules['../src/ui/spending-timeline'] = { SpendingTimeline: 'SpendingTimeline', periodLabel: (p: any) => p.startISO + '–' + p.endISO };
@@ -192,7 +196,7 @@ const assertNoSubline = (root: Node, label: string) => {
   assert.equal(nodes(find(root, 'ValueTransition')).filter(n => n.type === 'AppText').every(n => outOfRange.includes(textOf(n))), true, label + ': the number\'s block holds no caption');
 };
 const metricOf = (root: Node) => nodes(root).find(n => n.type === 'Choices' && (n.props.value === 'spending' || n.props.value === 'available'))!;
-/** A synthetic rule due in this harness week (the harness day is 2026-09-12). */
+/** A synthetic rule due three days after the harness day (2026-09-12), inside the 30-day commitment window. */
 const dueRule = (id = 'r', overrides: Partial<domain.RecurringRule> = {}): domain.RecurringRule => ({ id, accountId: 'a', kind: 'expense', amountMinor: 100, merchant: 'Netflix',
   category: 'Suscripciones', frequency: 'monthly', anchorDateISO: '2026-09-15', nextDateISO: '2026-09-15', active: true, deleted: false, createdAt, revision: 0, updatedAt: createdAt, ...overrides });
 /** Every type on Inicio that would be a retired module: capture, insight, ranking, budget, chart, Assistant banner. */
@@ -432,7 +436,11 @@ test('24UX6A: the status bar is light over the field, the scheme\'s own after sc
   } finally { dark = false; }
 });
 
-test('24UX6A: the month\'s latest expenses and incomes, newest first, six alone and four under commitments; transfers stay in Movimientos; «Ver todos» selects Movimientos', () => {
+/** Inicio's recent rows in order, an entry or a transfer, by the stored record's id. */
+const recentRows = (root: Node) => nodes(root).filter(n => n.type === 'EntryRow' || n.type === 'TransferRow');
+const recentIds = (root: Node) => recentRows(root).map(n => n.type === 'EntryRow' ? n.props.entry.id : n.props.transfer.id).join();
+
+test('24UX6A, 24UX6C2: the month\'s latest expenses, incomes and transfers, newest first, six alone and four under commitments, counted after the merge; «Ver todos» selects Movimientos', () => {
   const at = '2026-09-01T12:00:00.000Z';
   const accounts: domain.Account[] = [{ id: 'a', name: 'Efectivo', currency: 'ARS', openingMinor: 0, createdAt: at }, { id: 'b', name: 'Banco', currency: 'ARS', openingMinor: 100000, createdAt: at },
     { id: 'u', name: 'Dólares', currency: 'USD', openingMinor: 0, createdAt: at }];
@@ -441,33 +449,176 @@ test('24UX6A: the month\'s latest expenses and incomes, newest first, six alone 
   const data: domain.LedgerSnapshot = { accounts, entries: [entry('aug', '2026-08-31'), entry('s1', '2026-09-01'), entry('s2', '2026-09-02', 'income', 'b'), entry('s3', '2026-09-03'),
     entry('s4', '2026-09-05'), entry('s5', '2026-09-07', 'income'), entry('s6', '2026-09-09', 'expense', 'b'), entry('s7', '2026-09-11'), entry('s8', '2026-09-12'), entry('usd', '2026-09-12', 'expense', 'u')],
   transfers: [{ id: 't1', fromAccountId: 'b', toAccountId: 'a', amountMinor: 5000, note: 'Retiro', dateISO: '2026-09-12', createdAt: '2026-09-12T11:00:00.000Z' }] };
-  const rows = (root: Node) => nodes(root).filter(n => n.type === 'EntryRow').map(n => n.props.entry.id).join();
   const alone = routeHarness('(tabs)/index.tsx', {}, data);
   let root = alone.render();
-  assert.equal(rows(root), 's8,s7,s6,s5,s4,s3', 'ARS shown: six, newest first; August, USD and the transfer stay out');
+  assert.equal(recentIds(root), 't1,s8,s7,s6,s5,s4', 'ARS shown: six rows, newest first, the transfer (recorded later the same day) among them; August and USD stay out');
   assert.equal(nodes(root).filter(n => n.type === 'EntryRow').every(n => n.props.entry.kind === 'expense' || n.props.entry.kind === 'income'), true);
-  assert.equal(JSON.stringify(nodes(root).filter(n => n.type === 'EntryRow').map(n => n.props.entry.amountMinor)), JSON.stringify([100, 100, 100, 100, 100, 100]), 'each row keeps its own amount');
+  assert.equal(JSON.stringify(nodes(root).filter(n => n.type === 'EntryRow').map(n => n.props.entry.amountMinor)), JSON.stringify([100, 100, 100, 100, 100]), 'each row keeps its own amount');
+  assert.equal(nodes(root).filter(n => n.type === 'TransferRow').length, 1, 'the transfer is one row');
+  assert.equal(find(root, 'TransferRow').props.transfer.amountMinor, 5000, 'at its own amount');
   const surface = nodes(root).find(n => n.type === 'Surface' && nodes(n).some(child => child.type === 'EntryRow'))!;
   assert.equal(surface.props.grouped, true, 'a grouped surface');
-  assert.equal(nodes(surface).filter(n => n.type === 'EntryRow').at(-1)!.props.last, true);
+  assert.equal(nodes(surface).some(n => n.type === 'TransferRow'), true, 'the transfer is in the same grouped list');
+  assert.equal(recentRows(surface).at(-1)!.props.last, true);
+  assert.equal(recentRows(surface).slice(0, -1).every(n => n.props.last === false), true, 'only the last row of the merged list is last');
   assert.equal(nodes(root).find(n => n.type === 'EntryRow')!.props.account.id, 'a', 'each row carries its own account');
   const title = nodes(root).find(n => n.type === 'SectionTitle' && n.props.children === 'Actividad reciente')!;
   assert.equal(title.props.action, 'Ver todos');
   title.props.onAction();
   assert.deepEqual([alone.navigated.at(-1), alone.pushed.length], ['/activity', 0], 'the tab root is selected, never pushed over Inicio');
-  // A commitment this week: four rows under it.
+  // A commitment this week: four rows under it, the transfer counted among the four.
   root = routeHarness('(tabs)/index.tsx', {}, data, { recurring: [dueRule()] }).render();
   assert.equal(sectionTitles(root).join('|'), 'Próximos compromisos|Actividad reciente');
-  assert.equal(rows(root), 's8,s7,s6,s5');
-  // Consolidated: every account, still six, still no transfer.
+  assert.equal(recentIds(root), 't1,s8,s7,s6');
+  // Consolidated: every account, still six rows in all, the transfer once.
   root = routeHarness('(tabs)/index.tsx', {}, data, {}, displayStore({ [displayCurrency.DISPLAY_MODE_KEY]: 'consolidated' }), { book: consolidatedRates() }).render();
-  assert.equal(rows(root).split(',').length, 6);
-  assert.equal(rows(root).split(',').includes('usd'), true);
-  assert.equal(/t1/.test(rows(root)), false);
+  assert.equal(recentIds(root), 't1,usd,s8,s7,s6,s5', 'equal times read by the record\'s key, so the order never shuffles');
+  assert.equal(recentIds(root).split(',').filter(id => id === 't1').length, 1);
   // A movement of last month alone: no section.
   root = routeHarness('(tabs)/index.tsx', {}, { accounts, entries: [entry('aug', '2026-08-31')] }).render();
   assert.equal(sectionTitles(root).includes('Actividad reciente'), false);
-  assert.equal(nodes(root).some(n => n.type === 'EntryRow'), false);
+  assert.equal(recentRows(root).length, 0);
+  // A transfer of last month alone: no section either.
+  root = routeHarness('(tabs)/index.tsx', {}, { accounts, entries: [], transfers: [{ ...data.transfers![0], dateISO: '2026-08-31', createdAt: '2026-08-31T10:00:00.000Z' }] }).render();
+  assert.equal(sectionTitles(root).includes('Actividad reciente'), false);
+  assert.equal(recentRows(root).length, 0);
+});
+
+test('24UX6C2: a recent transfer is a TransferRow with every account, no account or context of its own, keyed by its record; an entry stays an EntryRow', () => {
+  const at = '2026-09-01T12:00:00.000Z';
+  const accounts: domain.Account[] = [{ id: 'a', name: 'Efectivo', currency: 'ARS', openingMinor: 0, createdAt: at }, { id: 'b', name: 'Banco', currency: 'ARS', openingMinor: 100000, createdAt: at }];
+  const move: domain.Transfer = { id: 'm1', fromAccountId: 'b', toAccountId: 'a', amountMinor: 2500, note: '', dateISO: '2026-09-11', createdAt: '2026-09-11T09:00:00.000Z' };
+  const lunch: domain.Entry = { id: 'e1', accountId: 'a', kind: 'expense', amountMinor: 1200, merchant: 'Parrilla', category: 'Restaurantes', dateISO: '2026-09-12', createdAt: '2026-09-12T13:00:00.000Z' };
+  const pay: domain.Entry = { id: 'e2', accountId: 'b', kind: 'income', amountMinor: 90000, merchant: 'Sueldo', category: 'Sueldo', dateISO: '2026-09-10', createdAt: '2026-09-10T08:00:00.000Z' };
+  const data: domain.LedgerSnapshot = { accounts, entries: [pay, lunch], transfers: [move] };
+  const root = routeHarness('(tabs)/index.tsx', {}, data).render();
+  assert.equal(recentRows(root).map(n => n.type + ':' + n.key).join(), 'EntryRow:entry-e1,TransferRow:transfer-m1,EntryRow:entry-e2', 'merged order, each keyed by its type and record');
+  const row = find(root, 'TransferRow');
+  assert.equal(row.props.transfer, move, 'the stored transfer itself: its amount, note and accounts untouched');
+  assert.equal(row.props.accounts, data.accounts, 'every account, so the row names the origin and the destination');
+  // No account and no context: the row reads as a plain transfer (origin → destination, «Transferencia» for VoiceOver,
+  // unsigned in the transfer tone; tested on TransferRow in ui-rows), never as one side or as a card or debt payment.
+  assert.equal(row.props.accountId, undefined);
+  assert.equal(row.props.context, undefined);
+  assert.equal(row.props.showDate, undefined, 'the date shows, as on every recent row');
+  assert.equal(row.props.last, false);
+  assert.equal(Object.keys(row.props).sort().join(), 'accounts,last,transfer', 'nothing else is passed');
+  // The entries stay EntryRows with their own account; the rows span two accounts (the transfer by its origin), so each entry names its own.
+  const entries = nodes(root).filter(n => n.type === 'EntryRow');
+  assert.equal(entries.map(n => n.props.entry.id + ':' + n.props.account.id + ':' + n.props.showAccount).join(), 'e1:a:true,e2:b:true');
+  assert.equal(entries.every(n => n.props.entry === data.entries.find(item => item.id === n.props.entry.id)), true, 'the stored entries themselves');
+  assert.equal(entries.at(-1)!.props.last, true);
+  // A transfer from the same account as every entry adds no second account: no entry repeats the name.
+  const oneAccount = routeHarness('(tabs)/index.tsx', {}, { accounts, entries: [lunch], transfers: [{ ...move, fromAccountId: 'a', toAccountId: 'b' }] }).render();
+  assert.equal(nodes(oneAccount).filter(n => n.type === 'EntryRow').map(n => n.props.showAccount).join(), 'false');
+  // The screen's source passes no account or context to the transfer row.
+  assert.equal(/<TransferRow key=\{item\.key\} transfer=\{item\.value\} accounts=\{snapshot\.accounts\} last=\{[^}]+\} \/>/.test(homeSource), true);
+});
+
+test('24UX6C2 review: a recent transfer counts for the account rule by its real side: a debt collection by the account that received it, a card payment by the paying account', () => {
+  const at = '2026-09-01T12:00:00.000Z';
+  // Two real accounts and the hidden accounts of one card and one personal debt (synthetic fixtures).
+  const accounts: domain.Account[] = [{ id: 'cash', name: 'Efectivo', currency: 'ARS', openingMinor: 0, createdAt: at },
+    { id: 'bank', name: 'Banco', currency: 'ARS', openingMinor: 100000, createdAt: at },
+    { id: 'card-acc', name: 'Visa', currency: 'ARS', openingMinor: 0, createdAt: at },
+    { id: 'debt-acc', name: 'Juan', currency: 'ARS', openingMinor: 0, createdAt: at }];
+  const card: domain.CreditCardProfile = { id: 'card', accountId: 'card-acc', issuer: 'Visa', last4: '1234', creditLimitMinor: null,
+    closingDay: 1, dueDay: 10, active: true, deleted: false, createdAt: at, revision: 0, updatedAt: at };
+  const debt: domain.PersonalDebtProfile = { id: 'debt', accountId: 'debt-acc', direction: 'owed_to_me', counterparty: 'Juan', dueDateISO: null, note: '',
+    active: true, deleted: false, createdAt: at, revision: 0, updatedAt: at };
+  const groceries: domain.Entry = { id: 'e1', accountId: 'bank', kind: 'expense', amountMinor: 1200, merchant: 'Coto', category: 'Supermercado', dateISO: '2026-09-12', createdAt: '2026-09-12T13:00:00.000Z' };
+  const move = (id: string, fromAccountId: string, toAccountId: string): domain.Transfer => ({ id, fromAccountId, toAccountId, amountMinor: 2500, note: '', dateISO: '2026-09-11', createdAt: '2026-09-11T09:00:00.000Z' });
+  const extra = { cards: [card], debts: [debt] };
+  const render = (transfer: domain.Transfer, archive: Partial<domain.LedgerArchive> = extra) => routeHarness('(tabs)/index.tsx', {}, { accounts, entries: [groceries], transfers: [transfer] }, archive).render();
+  const names = (root: Node) => nodes(root).filter(n => n.type === 'EntryRow').map(n => n.props.entry.id + ':' + n.props.showAccount).join();
+  const listed = (root: Node) => recentRows(root).map(n => n.type + ':' + n.key).join();
+
+  // A debt collection: from the debt's hidden account into «Banco». It counts as «Banco», the expense's own account: names stay off.
+  const collection = render(move('t-debt', 'debt-acc', 'bank'));
+  assert.equal(listed(collection), 'EntryRow:entry-e1,TransferRow:transfer-t-debt', 'the collection is listed (its origin is in view)');
+  assert.equal(names(collection), 'e1:false', 'a debt collection into «Banco» beside a «Banco» expense is one account: no row repeats it');
+  // A card payment: from «Banco» into the card's hidden account. It counts as «Banco», the paying account: names stay off.
+  const payment = render(move('t-card', 'bank', 'card-acc'));
+  assert.equal(listed(payment), 'EntryRow:entry-e1,TransferRow:transfer-t-card');
+  assert.equal(names(payment), 'e1:false', 'a card payment from «Banco» beside a «Banco» expense is one account');
+  // An ordinary transfer from «Efectivo» into «Banco» counts as «Efectivo»: two real accounts, so the expense names its own.
+  const ordinary = render(move('t-cash', 'cash', 'bank'));
+  assert.equal(listed(ordinary), 'EntryRow:entry-e1,TransferRow:transfer-t-cash');
+  assert.equal(names(ordinary), 'e1:true', 'a transfer from «Efectivo» beside a «Banco» expense spans two accounts');
+  // The rule reads the archive's cards and debts: the same collection with no debt on record counts by its origin (another account).
+  assert.equal(names(render(move('t-debt', 'debt-acc', 'bank'), { cards: [card] })), 'e1:true', 'without the debt profile its account is an ordinary origin');
+  assert.equal(/hiddenLiabilityAccountIds\(archive\?\.cards, archive\?\.debts\)/.test(homeSource), true, 'Inicio reads the hidden accounts from the archive');
+});
+
+test('24UX6C2: a transfer never changes Gastado or Disponible: the figures with and without it are identical, in one currency or consolidated', () => {
+  const at = '2026-09-01T12:00:00.000Z';
+  const accounts: domain.Account[] = [{ id: 'a', name: 'Efectivo', currency: 'ARS', openingMinor: 20000, createdAt: at }, { id: 'b', name: 'Banco', currency: 'ARS', openingMinor: 300000, createdAt: at },
+    { id: 'u', name: 'Dólares', currency: 'USD', openingMinor: 5000, createdAt: at }];
+  const entries: domain.Entry[] = [
+    { id: 'e1', accountId: 'a', kind: 'expense', amountMinor: 1500, merchant: 'Café', category: 'Comida', dateISO: '2026-09-05', createdAt: '2026-09-05T09:00:00.000Z' },
+    { id: 'e2', accountId: 'b', kind: 'income', amountMinor: 80000, merchant: 'Sueldo', category: 'Sueldo', dateISO: '2026-09-02', createdAt: '2026-09-02T09:00:00.000Z' },
+    { id: 'e3', accountId: 'u', kind: 'expense', amountMinor: 700, merchant: 'App', category: 'Suscripciones', dateISO: '2026-09-08', createdAt: '2026-09-08T09:00:00.000Z' },
+  ];
+  const move: domain.Transfer = { id: 't1', fromAccountId: 'b', toAccountId: 'a', amountMinor: 45000, note: 'Retiro', dateISO: '2026-09-10', createdAt: '2026-09-10T09:00:00.000Z' };
+  const without: domain.LedgerSnapshot = { accounts, entries };
+  const withTransfer: domain.LedgerSnapshot = { accounts, entries, transfers: [move] };
+  const cases: { label: string; mode: displayCurrency.DisplayMode; currency: domain.Currency; book: domain.RateBook }[] = [
+    { label: 'single ARS', mode: 'single', currency: 'ARS', book: domain.rateBook([]) },
+    { label: 'consolidated ARS', mode: 'consolidated', currency: 'ARS', book: consolidatedRates() },
+  ];
+  const figures = (data: domain.LedgerSnapshot, item: typeof cases[number]) => {
+    const harness = routeHarness('(tabs)/index.tsx', {}, data, {}, displayStore({ [displayCurrency.DISPLAY_MODE_KEY]: item.mode, [displayCurrency.DISPLAY_CURRENCY_KEY]: item.currency }), { book: item.book });
+    let root = harness.render();
+    const spent = find(root, 'Money').props;
+    metricOf(root).props.onChange('available');
+    root = harness.render();
+    const available = find(root, 'Money').props;
+    return { spent: { minor: spent.minor, currency: spent.currency }, available: { minor: available.minor, currency: available.currency }, transfers: nodes(root).filter(n => n.type === 'TransferRow').length };
+  };
+  for (const item of cases) {
+    const before = figures(without, item), after = figures(withTransfer, item);
+    assert.equal(after.transfers, 1, item.label + ': the transfer is listed');
+    assert.equal(before.transfers, 0);
+    assert.equal(JSON.stringify(after.spent), JSON.stringify(before.spent), item.label + ': Gastado is the same with the transfer');
+    // Both accounts are liquid: the transfer moves money inside Disponible, so the total is the same to the minor unit.
+    assert.equal(JSON.stringify(after.available), JSON.stringify(before.available), item.label + ': Disponible is the same with the transfer');
+    assert.equal(Number.isInteger(after.spent.minor) && Number.isInteger(after.available.minor), true, 'integer minor units');
+    // And both are the domain's own figures.
+    const view = financeView.financeView(withTransfer, item.mode, item.currency, item.book);
+    const spent = financeView.spendingFigure(withTransfer, view, domain.spendingWindow(item.currency, 'month', '2026-09-12'), 'idle', true);
+    const available = financeView.availableFigure(withTransfer, view, item.book, '2026-09-12', 'idle', true, [], []);
+    assert.equal(spent.status === 'ready' && spent.minor === after.spent.minor, true, item.label + ': Gastado is spendingFigure');
+    assert.equal(available.status === 'ready' && available.minor === after.available.minor, true, item.label + ': Disponible is availableFigure');
+  }
+  // The single ARS figures, pinned: Gastado is the one ARS expense; Disponible the two liquid ARS balances.
+  const pinned = figures(withTransfer, cases[0]);
+  assert.equal(JSON.stringify([pinned.spent.minor, pinned.available.minor]), JSON.stringify([1500, 20000 + 300000 - 1500 + 80000]));
+});
+
+test('24UX6C2: with two currencies, «Solo USD» leaves an ARS transfer out; the consolidated view lists it once, at its own amount in its own accounts\' currency', () => {
+  const at = '2026-09-01T12:00:00.000Z';
+  const accounts: domain.Account[] = [{ id: 'a', name: 'Efectivo', currency: 'ARS', openingMinor: 0, createdAt: at }, { id: 'b', name: 'Banco', currency: 'ARS', openingMinor: 100000, createdAt: at },
+    { id: 'u', name: 'Dólares', currency: 'USD', openingMinor: 10000, createdAt: at }, { id: 'v', name: 'Ahorro USD', currency: 'USD', openingMinor: 0, createdAt: at }];
+  const pesos: domain.Transfer = { id: 'ars-move', fromAccountId: 'b', toAccountId: 'a', amountMinor: 45000, note: '', dateISO: '2026-09-10', createdAt: '2026-09-10T09:00:00.000Z' };
+  const dollars: domain.Transfer = { id: 'usd-move', fromAccountId: 'u', toAccountId: 'v', amountMinor: 3000, note: '', dateISO: '2026-09-09', createdAt: '2026-09-09T09:00:00.000Z' };
+  const usdExpense: domain.Entry = { id: 'usd-lunch', accountId: 'u', kind: 'expense', amountMinor: 1200, merchant: 'Lunch', category: 'Comida', dateISO: '2026-09-11', createdAt: '2026-09-11T09:00:00.000Z' };
+  const data: domain.LedgerSnapshot = { accounts, entries: [usdExpense], transfers: [pesos, dollars] };
+  const show = (mode: displayCurrency.DisplayMode, currency: domain.Currency) => routeHarness('(tabs)/index.tsx', {}, data, {},
+    displayStore({ [displayCurrency.DISPLAY_MODE_KEY]: mode, [displayCurrency.DISPLAY_CURRENCY_KEY]: currency }), { book: consolidatedRates() }).render();
+  let root = show('single', 'USD');
+  assert.equal(recentIds(root), 'usd-lunch,usd-move', '«Solo USD»: the USD expense and the USD transfer; the ARS transfer is not listed');
+  root = show('single', 'ARS');
+  assert.equal(recentIds(root), 'ars-move', '«Solo ARS»: only the ARS transfer');
+  root = show('consolidated', 'USD');
+  assert.equal(recentIds(root), 'usd-lunch,ars-move,usd-move', 'consolidated: every record once, newest first');
+  const listed = nodes(root).filter(n => n.type === 'TransferRow' && n.props.transfer.id === 'ars-move');
+  assert.equal(listed.length, 1, 'the ARS transfer once');
+  const row = listed[0];
+  assert.equal(row.props.transfer, pesos, 'at its own amount, never converted into the display currency');
+  assert.equal(row.props.transfer.amountMinor, 45000);
+  const currencyOf = (id: string) => (row.props.accounts as domain.Account[]).find(account => account.id === id)!.currency;
+  assert.equal(currencyOf(pesos.fromAccountId) + '→' + currencyOf(pesos.toAccountId), 'ARS→ARS', 'its accounts keep their real currency in the consolidated view');
+  assert.equal(row.props.accounts, data.accounts, 'the stored accounts themselves');
 });
 
 test('24UX6A: commitments without activity show only the commitments; with neither, one quiet line and no action; with no account, the start', () => {
@@ -503,20 +654,25 @@ test('24UX6A: commitments without activity show only the commitments; with neith
   assert.equal(sectionTitles(root).length, 0);
 });
 
-test('24UX6A: no Registrar button, insight line, ranking, budget card, chart or Assistant banner on Inicio, in the tree or the source', () => {
+test('24UX6A: no Registrar button, insight line, ranking, budget card, chart or Assistant banner on Inicio, in the tree or the source (24UX6C2: one budget row at most)', () => {
   const at = '2026-09-01T12:00:00.000Z';
   // A ledger that once produced each retired module: a concentrated category, an exceeded general budget and sublimit, rules.
   const budgets: domain.MonthlyBudget[] = [{ id: 'total', scope: 'total', currency: 'ARS', monthISO: '2026-09', amountMinor: 100, active: true, createdAt: at, revision: 0, updatedAt: at },
     { id: 'salud', scope: 'category', category: 'Salud', currency: 'ARS', monthISO: '2026-09', amountMinor: 50, active: true, createdAt: at, revision: 0, updatedAt: at }];
-  for (const root of [routeHarness('(tabs)/index.tsx', {}, homeData, { budgets, recurring: [dueRule()] }).render(), routeHarness('(tabs)/index.tsx', {}, snapshot).render(),
-    routeHarness('(tabs)/index.tsx', {}, { accounts: [], entries: [] }).render()]) {
+  const roots = [routeHarness('(tabs)/index.tsx', {}, homeData, { budgets, recurring: [dueRule()] }).render(), routeHarness('(tabs)/index.tsx', {}, snapshot).render(),
+    routeHarness('(tabs)/index.tsx', {}, { accounts: [], entries: [] }).render()];
+  // 24UX6C2: the exceeded general budget is one compact row, never a card; the sublimit adds nothing.
+  assert.equal(JSON.stringify(roots.map(root => nodes(root).filter(n => n.type === 'BudgetAttentionRow').map(n => n.props.attention.state))), JSON.stringify([['exceeded'], [], []]));
+  for (const root of roots) {
     assert.equal(nodes(root).filter(n => RETIRED.includes(n.type)).map(n => n.type).join(), '');
     assert.equal(homeTexts(root).some(text => /presupuesto|Registrar|Asistente|concentr/i.test(text) && !/Asistente\.$/.test(text)), false);
     assert.equal(nodes(root).filter(n => n.type === 'Money').length, 1, 'one hero; the rows draw their own amounts');
   }
   const imports = homeSource.match(/^import .*$/gm)!.join('\n');
-  for (const gone of ['home-capture', 'capture-hub', 'quick-actions', 'charts', 'spending-chart', 'spending-timeline', 'budget', 'insight', 'assistant', 'Insight', 'Capture', 'QuickActions', 'AssistantEntry'])
+  for (const gone of ['home-capture', 'capture-hub', 'quick-actions', 'charts', 'spending-chart', 'spending-timeline', 'BudgetHomeCard', 'budget-card', 'BudgetCard', 'BudgetRow', 'insight', 'assistant', 'Insight', 'Capture', 'QuickActions', 'AssistantEntry'])
     assert.equal(imports.includes(gone), false, 'Inicio does not import ' + gone);
+  // 24UX6C2: the only budget imports are the attention row and its rule (`homeBudget`: whose general budget, named when needed).
+  assert.equal(imports.match(/[\w-]*[Bb]udget[\w-]*/g)!.sort().join(), 'BudgetAttentionRow,homeBudget');
   assert.equal(/homeInsight|HomeInsightRow|CaptureButton|CaptureAction/.test(homeSource.replace(/\/\*[\s\S]*?\*\/|\/\/.*$/gm, '')), false, 'nor uses them');
   assert.equal(Object.hasOwn(homeFocus, 'homeInsight') || Object.hasOwn(homeFocus, 'CONCENTRATION_SHARE'), false, 'the insight rule is gone');
 });
@@ -534,7 +690,7 @@ test('empty and overflow Home never invent a chart, budget line or partial total
   const huge = { ...homeData, entries: homeData.entries.filter(e => e.id === 'early' || e.id === 'now').map(e => ({ ...e, amountMinor: Number.MAX_SAFE_INTEGER })) };
   assert.equal(nodes(routeHarness('(tabs)/index.tsx', {}, huge).render()).some(n => n.type === 'Money'), false);
 });
-test('Home keeps analysis in Reportes: no timeline bars, commitments only with a rule due this week, Disponible without cards', () => {
+test('Home keeps analysis in Reportes: no timeline bars, commitments only with a rule due within 30 days, Disponible without cards', () => {
   const view = routeHarness('(tabs)/index.tsx', {}, homeData);
   const root = view.render();
   assert.equal(nodes(root).some(n => n.type === 'SpendingTimeline'), false);
@@ -549,8 +705,12 @@ test('Home keeps analysis in Reportes: no timeline bars, commitments only with a
   assert.equal(find(withRule.render(), 'UpcomingRecurringRow').props.rule.id, 'r');
   nodes(withRule.render()).find(n => n.type === 'SectionTitle' && n.props.action === 'Ver todos' && n.props.children === 'Próximos compromisos')!.props.onAction();
   assert.equal(withRule.pushed.at(-1), '/recurring');
-  // 24UX6A: a rule due after this week waits in Recurrentes.
-  const later = routeHarness('(tabs)/index.tsx', {}, homeData, { recurring: [{ ...rule, anchorDateISO: '2026-09-19', nextDateISO: '2026-09-19' }] as domain.RecurringRule[] }).render();
+  // 24UX6C2: the window is today through today + 30 days (2026-09-12 … 2026-10-12): a rule a week away is listed; one a day past the window waits in Recurrentes.
+  const nextWeek = routeHarness('(tabs)/index.tsx', {}, homeData, { recurring: [{ ...rule, anchorDateISO: '2026-09-19', nextDateISO: '2026-09-19' }] as domain.RecurringRule[] }).render();
+  assert.equal(find(nextWeek, 'UpcomingRecurringRow').props.rule.nextDateISO, '2026-09-19', 'no longer cut at seven days');
+  const lastDay = routeHarness('(tabs)/index.tsx', {}, homeData, { recurring: [{ ...rule, anchorDateISO: '2026-10-12', nextDateISO: '2026-10-12' }] as domain.RecurringRule[] }).render();
+  assert.equal(find(lastDay, 'UpcomingRecurringRow').props.rule.nextDateISO, '2026-10-12', 'today + 30 is inside');
+  const later = routeHarness('(tabs)/index.tsx', {}, homeData, { recurring: [{ ...rule, anchorDateISO: '2026-10-13', nextDateISO: '2026-10-13' }] as domain.RecurringRule[] }).render();
   assert.equal(nodes(later).some(n => n.type === 'UpcomingRecurringRow'), false);
   assert.equal(sectionTitles(later).includes('Próximos compromisos'), false, 'no header, no placeholder');
   // Disponible excludes a card account's negative balance.
@@ -614,18 +774,23 @@ test('cloud client requires HTTPS/session and returns an inbox receipt, never a 
   assert.equal(calls, 1);
 });
 
-test('24UX6A: a budget, calm, nearly spent, exceeded or archived, never reaches Inicio: budgets live in Presupuestos and Reportes', () => {
+test('24UX6A, 24UX6C2: a calm, category-only or archived budget never reaches Inicio; a general budget that needs attention is one row, never a card or a section', () => {
   const createdAt = '2026-09-01T12:00:00.000Z';
   const total: domain.MonthlyBudget = { id: 'total', scope: 'total', currency: 'ARS', monthISO: '2026-09', amountMinor: 100000, active: true, createdAt, revision: 0, updatedAt: createdAt };
   const sublimit: domain.MonthlyBudget = { id: 'salud', scope: 'category', category: 'Salud', currency: 'ARS', monthISO: '2026-09', amountMinor: 250, active: true, createdAt, revision: 0, updatedAt: createdAt };
+  const archived = { revision: 1, updatedAt: '2026-09-02T12:00:00.000Z', active: false };
   const plain = routeHarness('(tabs)/index.tsx', {}, homeData).render();
   // All September ARS expenses are 300: a general budget of 330 is 91 % used, one of 250 in Salud is 50 over.
-  for (const budgets of [[total], [{ ...total, amountMinor: 330 }], [sublimit], [{ ...sublimit, active: false, revision: 1, updatedAt: '2026-09-02T12:00:00.000Z' }]]) {
+  const cases: [string, domain.MonthlyBudget[], string][] = [['calm general', [total], ''], ['91 % general', [{ ...total, amountMinor: 330 }], 'warning'],
+    ['exceeded sublimit alone', [sublimit], ''], ['archived sublimit', [{ ...sublimit, ...archived }], ''], ['archived exceeded general', [{ ...total, amountMinor: 200, ...archived }], ''],
+    ['calm general and an exceeded sublimit', [total, sublimit], '']];
+  for (const [label, budgets, state] of cases) {
     const root = routeHarness('(tabs)/index.tsx', {}, homeData, { budgets }).render();
-    assert.equal(nodes(root).some(n => RETIRED.includes(n.type)), false);
-    assert.equal(find(root, 'Money').props.minor, 300, 'a budget never changes Gastado');
-    assert.equal(JSON.stringify(homeTexts(root)), JSON.stringify(homeTexts(plain)), 'nothing on Inicio speaks of the budget');
-    assert.equal(sectionTitles(root).join('|'), 'Actividad reciente', 'no budget section');
+    assert.equal(nodes(root).some(n => RETIRED.includes(n.type)), false, label);
+    assert.equal(find(root, 'Money').props.minor, 300, label + ': a budget never changes Gastado');
+    assert.equal(nodes(root).filter(n => n.type === 'BudgetAttentionRow').map(n => n.props.attention.state).join(), state, label);
+    assert.equal(JSON.stringify(homeTexts(root)), JSON.stringify(homeTexts(plain)), label + ': nothing else on Inicio speaks of the budget');
+    assert.equal(sectionTitles(root).join('|'), 'Actividad reciente', label + ': no budget section');
   }
 });
 test('23.1B1: Home in English keeps the same numbers and routes; only words change, and the language can switch in place', () => {
@@ -975,7 +1140,7 @@ test('24UX6A: Inicio keeps its hierarchy with no account, one or several account
   const order = (root: Node) => nodes(root).map(node => node.type === 'SectionTitle' ? 'title:' + node.props.children
     : node.type === 'AppText' && node.props.accessibilityRole === 'header' ? 'month' : node.type === 'AppText' && SUBLINE.test(textOf(node)) ? 'subline'
       : node.type === 'EmptyState' ? 'empty:' + node.props.title : node.type)
-    .filter(type => ['month', 'FieldButton', 'DisplayCurrencyButton', 'Money', 'subline', 'Choices', 'UpcomingRecurringRow', 'EntryRow'].concat(RETIRED).includes(type) || /^(title|empty):/.test(type))
+    .filter(type => ['month', 'FieldButton', 'DisplayCurrencyButton', 'Money', 'subline', 'Choices', 'BudgetAttentionRow', 'UpcomingRecurringRow', 'EntryRow'].concat(RETIRED).includes(type) || /^(title|empty):/.test(type))
     .filter((type, index, all) => type !== all[index - 1]);
   // 24C1 / 25B2: the chip is part of the field only while two or more currencies are held.
   // 24UX6C: no line under the number; a «subline» in the order would fail here.
@@ -993,16 +1158,18 @@ test('24UX6A: Inicio keeps its hierarchy with no account, one or several account
   const extra = { budgets: [total(1000)], recurring: [rule('on'), rule('paused', { active: false }), rule('gone', { active: false, deleted: true })] };
   const view = routeHarness('(tabs)/index.tsx', {}, data, extra);
   let root = view.render();
-  assert.deepEqual(order(root), expected(['title:Próximos compromisos', 'UpcomingRecurringRow', 'title:Actividad reciente', 'EntryRow'], true));
+  // 24UX6C2: the exceeded general budget is one row before what is due.
+  assert.deepEqual(order(root), expected(['BudgetAttentionRow', 'title:Próximos compromisos', 'UpcomingRecurringRow', 'title:Actividad reciente', 'EntryRow'], true));
+  assert.equal(find(root, 'BudgetAttentionRow').props.attention.state, 'exceeded');
   assert.equal(find(root, 'Money').props.minor, 9_999_999_999_999 + 500 + 300 + 200, 'the huge amount reaches the hero exactly (Money fits it to the width)');
   assert.equal(nodes(root).filter(node => node.type === 'UpcomingRecurringRow').map(node => node.props.rule.id).join(), 'on', 'paused and deleted rules are not upcoming');
   assert.equal(nodes(root).filter(node => node.type === 'EntryRow').length, 4, 'four rows under a commitment (five ARS movements this month)');
-  // Switching the currency keeps the same order; what has nothing in USD simply stays out (the rule is an ARS account's).
+  // Switching the currency keeps the same order; what has nothing in USD simply stays out (the rule is an ARS account's, the budget an ARS one).
   find(root, 'DisplayCurrencyButton').props.onCurrency('USD');
   root = view.render();
   assert.deepEqual(order(root), expected(['title:Actividad reciente', 'EntryRow'], true));
   assert.equal(nodes(root).filter(node => node.type === 'EntryRow').map(node => node.props.entry.id).join(), '6');
-  // Several rules this week: two at most, soonest first.
+  // Several rules in the window: two at most, soonest first.
   const many = routeHarness('(tabs)/index.tsx', {}, data, { recurring: ['d', 'b', 'a', 'c'].map((id, index) => rule(id, { nextDateISO: '2026-09-1' + (3 + index), anchorDateISO: '2026-09-1' + (3 + index) })) }).render();
   assert.equal(nodes(many).filter(node => node.type === 'UpcomingRecurringRow').map(node => node.props.rule.id).join(), 'd,b');
 });
@@ -1079,31 +1246,39 @@ const budgetLedger = (): { data: domain.LedgerSnapshot; extra: Partial<domain.Le
 };
 const sectionText = (node: Node) => Array.isArray(node.props.children) ? node.props.children.join('') : String(node.props.children);
 
-test('24C1 review: with ARS and EUR budgets in the ledger, Inicio converts the total, never a budget, and shows no budget line in any mode', () => {
+test('24C1 review, 24UX6C2: with ARS and EUR budgets in the ledger, Inicio converts the total, never a budget: the one budget row is measured in its own currency in every mode', () => {
   const { data, extra, book } = budgetLedger();
   const display = displayStore({ [displayCurrency.DISPLAY_MODE_KEY]: 'single', [displayCurrency.DISPLAY_CURRENCY_KEY]: 'ARS' });
   const view = routeHarness('(tabs)/index.tsx', {}, data, extra, display, { book });
   let root = view.render();
-  const noBudget = () => assert.equal(nodes(root).some(n => RETIRED.includes(n.type)) || homeTexts(root).some(text => /presupuesto/i.test(text)), false);
+  // ARS 3,00 of 3,20 (94 %) and EUR 5,00 of 5,20 (96 %): both warnings. The row is the budget's own ledger, never a converted total.
+  const budgetRow = (label: string, currency: domain.Currency, labelsCurrency: boolean, spentMinor: number, limitMinor: number) => {
+    assert.equal(nodes(root).some(n => RETIRED.includes(n.type)) || homeTexts(root).some(text => /presupuesto/i.test(text)), false, label + ': no budget card or line');
+    const rows = nodes(root).filter(n => n.type === 'BudgetAttentionRow');
+    assert.equal(rows.length, 1, label + ': one row');
+    const { attention } = rows[0].props;
+    assert.equal(JSON.stringify([rows[0].props.currency, rows[0].props.labelsCurrency, attention.state, attention.progress.budget.currency, attention.progress.spentMinor, attention.progress.budget.amountMinor]),
+      JSON.stringify([currency, labelsCurrency, 'warning', currency, spentMinor, limitMinor]), label);
+  };
   assert.equal(find(root, 'Money').props.minor, 300, 'single ARS: the ARS expense alone');
-  noBudget();
-  // Consolidated, total read in ARS: the number converts the euros (€5 → US$10 → ARS 10.000).
+  budgetRow('single ARS', 'ARS', false, 300, 320);
+  // Consolidated, total read in ARS: the number converts the euros (€5 → US$10 → ARS 10.000); the ARS budget still reads the ARS 3,00 alone.
   find(root, 'DisplayCurrencyButton').props.onMode('consolidated');
   root = view.render();
   assert.equal(find(root, 'Money').props.minor, 300 + 1000000, 'the total is every account');
-  noBudget();
-  // Total read in USD and in EUR: still no budget line, the rows keep their own currencies.
+  budgetRow('consolidated ARS', 'ARS', false, 300, 320);
+  // Total read in USD: no USD budget, so the first held currency with one, named; the rows keep their own currencies.
   find(root, 'DisplayCurrencyButton').props.onCurrency('USD');
   root = view.render();
-  noBudget();
+  budgetRow('consolidated USD', 'ARS', true, 300, 320);
   assert.equal(nodes(root).filter(n => n.type === 'EntryRow').map(n => n.props.entry.id + ':' + n.props.entry.amountMinor).sort().join(), 'ars:300,eur:500');
   find(root, 'DisplayCurrencyButton').props.onCurrency('EUR');
   root = view.render();
-  noBudget();
-  // A missing rate hides the consolidated total and still shows no budget.
+  budgetRow('consolidated EUR', 'EUR', false, 500, 520);
+  // A missing rate hides the consolidated total; the budget needs no rate, so its row stays, unconverted.
   root = routeHarness('(tabs)/index.tsx', {}, data, extra, displayStore({ [displayCurrency.DISPLAY_MODE_KEY]: 'consolidated', [displayCurrency.DISPLAY_CURRENCY_KEY]: 'USD' }), { book: domain.rateBook([]), activity: 'offline' }).render();
   assert.equal(nodes(root).some(n => n.type === 'Money'), false);
-  noBudget();
+  budgetRow('consolidated USD offline', 'ARS', true, 300, 320);
 });
 test('24C1 review: the chip says what the number covers: "Total · USD" for every account converted, "Solo USD" for that currency alone', () => {
   const { data, extra, book } = budgetLedger();
@@ -1163,4 +1338,237 @@ test('25B2 review: deleting the last USD account keeps its movements on Inicio: 
   const plain = routeHarness('(tabs)/index.tsx', {}, arsOnly, {}, displayStore({ [displayCurrency.DISPLAY_MODE_KEY]: 'consolidated', [displayCurrency.DISPLAY_CURRENCY_KEY]: 'USD' })).render();
   assert.equal(nodes(plain).some(n => n.type === 'DisplayCurrencyButton'), false);
   assert.deepEqual([find(plain, 'Money').props.minor, find(plain, 'Money').props.currency], [300, 'ARS']);
+});
+
+// ---- 24UX6C2: commitments in a 30-day window ---------------------------------------------------------------------
+
+test('24UX6C2: from 2026-10-01 the commitments are the rules due 2026-10-01 … 2026-10-31, both ends inclusive, the same window as Recurrentes\' forecast; two at most, soonest first', () => {
+  const at = '2026-09-20T12:00:00.000Z';
+  const account: domain.Account = { id: 'a', name: 'Efectivo', currency: 'ARS', openingMinor: 0, createdAt: at };
+  const entries: domain.Entry[] = ['1', '2', '3', '4', '5', '6', '7'].map(id => ({ id: 'oct' + id, accountId: 'a', kind: 'expense', amountMinor: 100, merchant: 'Comercio ' + id,
+    category: 'Comida', dateISO: '2026-10-01', createdAt: '2026-10-01T0' + id + ':00:00.000Z' }));
+  const due = (id: string, nextDateISO: string, overrides: Partial<domain.RecurringRule> = {}) => dueRule(id, { merchant: 'Regla ' + id, nextDateISO, anchorDateISO: nextDateISO, ...overrides });
+  const data: domain.LedgerSnapshot = { accounts: [account], entries };
+  today = '2026-10-01';
+  try {
+    const render = (recurring: domain.RecurringRule[]) => routeHarness('(tabs)/index.tsx', {}, data, { recurring }).render();
+    const listed = (root: Node) => nodes(root).filter(n => n.type === 'UpcomingRecurringRow').map(n => n.props.rule.id).join();
+    // Due on the 10th and on the 30th: both are listed, the 10th first; the activity is four rows under them.
+    let root = render([due('oct30', '2026-10-30'), due('oct10', '2026-10-10')]);
+    assert.equal(listed(root), 'oct10,oct30', 'nine and twenty-nine days away: both inside the window');
+    assert.equal(sectionTitles(root).join('|'), 'Próximos compromisos|Actividad reciente');
+    assert.equal(recentRows(root).length, 4, 'four recent rows under the commitments');
+    assert.equal(nodes(root).filter(n => n.type === 'UpcomingRecurringRow').every(n => n.props.day === '2026-10-01'), true, 'each row reads its day from today');
+    // The edges: today and today + 30 are in; a rule overdue since yesterday and one due the day after the window are not.
+    assert.equal(listed(render([due('today', '2026-10-01')])), 'today', 'today is inside');
+    assert.equal(listed(render([due('last', '2026-10-31')])), 'last', 'today + 30 days is inside');
+    for (const outside of [due('next', '2026-11-01'), due('yesterday', '2026-09-30'), due('december', '2026-12-01')]) {
+      root = render([outside]);
+      assert.equal(listed(root), '', outside.nextDateISO + ' is outside the window');
+      assert.equal(sectionTitles(root).join('|'), 'Actividad reciente', 'no commitments section, no placeholder');
+      assert.equal(recentRows(root).length, 6, 'without commitments the activity has six rows');
+    }
+    // The same boundary as Recurrentes' «próximos 30 días» (recurringForecastByCurrency over today … today + 30).
+    for (const rule of [due('today', '2026-10-01'), due('oct10', '2026-10-10'), due('last', '2026-10-31'), due('next', '2026-11-01')]) {
+      const forecast = domain.recurringForecastByCurrency([rule], [account], today).length > 0;
+      assert.equal(listed(render([rule])) === rule.id, forecast, rule.nextDateISO + ': Inicio and Recurrentes agree');
+    }
+    // Two at most, soonest first, cut only after sorting; a same-day tie by merchant.
+    root = render([due('d', '2026-10-31'), due('c', '2026-10-20', { merchant: 'Zeta' }), due('b', '2026-10-20', { merchant: 'Alfa' }), due('far', '2026-11-02'), due('a', '2026-10-25')]);
+    assert.equal(listed(root), 'b,c', 'the two soonest of four in the window; the tie on the 20th by merchant');
+    // Never a recurring income, a paused or a deleted rule, however close.
+    root = render([due('income', '2026-10-02', { kind: 'income', category: 'Sueldo' }), due('paused', '2026-10-02', { active: false }), due('gone', '2026-10-02', { deleted: true })]);
+    assert.equal(listed(root), '');
+    assert.equal(sectionTitles(root).includes('Próximos compromisos'), false);
+    // «Ver todos» still opens Recurrentes.
+    const view = routeHarness('(tabs)/index.tsx', {}, data, { recurring: [due('oct10', '2026-10-10')] });
+    nodes(view.render()).find(n => n.type === 'SectionTitle' && n.props.children === 'Próximos compromisos')!.props.onAction();
+    assert.equal(view.pushed.at(-1), '/recurring');
+  } finally { today = '2026-09-12'; }
+  assert.equal(homeFocus.COMMITMENT_WINDOW_DAYS, 30);
+  assert.equal(homeFocus.COMMITMENT_ROWS, 2);
+  assert.equal('COMMITMENT_HORIZON_DAYS' in homeFocus, false, 'the seven-day horizon is gone');
+});
+
+// ---- 24UX6C2: the general budget when it needs attention ---------------------------------------------------------
+
+/** One ARS account with ARS 85,00 spent in September (two expenses), a rule due on the 15th and the synthetic budgets a test passes. */
+const budgetHome = () => {
+  const at = '2026-09-01T12:00:00.000Z';
+  const data: domain.LedgerSnapshot = { accounts: [{ id: 'a', name: 'Banco', currency: 'ARS', openingMinor: 100000, createdAt: at }],
+    entries: [{ id: 'super', accountId: 'a', kind: 'expense', amountMinor: 6000, merchant: 'Coto', category: 'Supermercado', dateISO: '2026-09-05', createdAt: at },
+      { id: 'cine', accountId: 'a', kind: 'expense', amountMinor: 2500, merchant: 'Cine', category: 'Ocio', dateISO: '2026-09-10', createdAt: at }] };
+  const total = (amountMinor: number, currency: domain.Currency = 'ARS', monthISO = '2026-09'): domain.MonthlyBudget =>
+    ({ id: 'total-' + currency + '-' + monthISO, scope: 'total', currency, monthISO, amountMinor, active: true, createdAt: at, revision: 0, updatedAt: at });
+  const category = (name: string, amountMinor: number): domain.MonthlyBudget =>
+    ({ id: 'cat-' + name, scope: 'category', category: name, currency: 'ARS', monthISO: '2026-09', amountMinor, active: true, createdAt: at, revision: 0, updatedAt: at });
+  return { data, total, category };
+};
+const budgetRows = (root: Node) => nodes(root).filter(n => n.type === 'BudgetAttentionRow');
+
+test('24UX6C2: no budget, a calm general budget or category budgets alone (near or over their limits) draw no budget row', () => {
+  const { data, total, category } = budgetHome();
+  const cases: [string, domain.MonthlyBudget[]][] = [['no budget', []], ['calm general (84 %)', [total(10120)]], ['a category at 100 %', [category('Supermercado', 6000)]],
+    ['a category at 85 %', [category('Ocio', 2941)]], ['categories over their limits', [category('Supermercado', 1000), category('Ocio', 100)]],
+    ['a calm general budget beside an exceeded category', [total(20000), category('Supermercado', 1000)]], ['last month\'s exceeded general budget', [total(100, 'ARS', '2026-08')]]];
+  for (const [label, budgets] of cases) {
+    const root = routeHarness('(tabs)/index.tsx', {}, data, { budgets, recurring: [dueRule()] }).render();
+    assert.equal(budgetRows(root).length, 0, label);
+    assert.equal(nodes(root).filter(n => n.type === 'Surface').length, 2, label + ': only the commitments and the activity');
+    assert.equal(sectionTitles(root).join('|'), 'Próximos compromisos|Actividad reciente', label);
+  }
+  assert.equal(domain.budgetState(domain.summarizeMonthlyBudgets(data, [total(10120)], 'ARS', '2026-09').total!), 'calm', 'the calm case is calm by the domain\'s own rule');
+});
+
+test('24UX6C2: a general budget at exactly 85 % is one warning row in a grouped surface after the field and before the commitments and the activity; tapping opens Presupuestos on its currency and month', () => {
+  const { data, total } = budgetHome();
+  const view = routeHarness('(tabs)/index.tsx', {}, data, { budgets: [total(10000)], recurring: [dueRule()] });
+  const root = view.render();
+  const rows = budgetRows(root);
+  assert.equal(rows.length, 1);
+  const row = rows[0];
+  assert.equal(row.props.attention.state, 'warning', 'ARS 85,00 of ARS 100,00: the warning starts at 85 %');
+  assert.equal(JSON.stringify([row.props.attention.progress.spentMinor, row.props.attention.progress.remainingMinor, row.props.attention.progress.ratio, row.props.attention.progress.budget.id]),
+    JSON.stringify([8500, 1500, 0.85, 'total-ARS-2026-09']), 'the domain\'s own progress, in minor units');
+  assert.equal(JSON.stringify([row.props.currency, row.props.labelsCurrency]), JSON.stringify(['ARS', false]), 'one currency held: nothing to name');
+  // A grouped surface of its own, holding only the row.
+  const surface = nodes(root).find(n => n.type === 'Surface' && nodes(n).includes(row))!;
+  assert.equal(surface.props.grouped, true);
+  assert.equal([surface.props.children].flat().filter(Boolean).length, 1, 'the row alone');
+  assert.equal(nodes(fieldOf(root)).includes(row), false, 'outside the financial field');
+  // The order: the field, the budget row, «Próximos compromisos», «Actividad reciente».
+  const all = nodes(root);
+  const position = (node: Node | undefined) => { assert.ok(node); return all.indexOf(node); };
+  const titled = (title: string) => all.find(n => n.type === 'SectionTitle' && n.props.children === title);
+  const order = [fieldOf(root), surface, titled('Próximos compromisos'), titled('Actividad reciente')].map(position);
+  assert.equal(order.every((index, i) => i === 0 || index > order[i - 1]), true, 'field < budget < commitments < activity: ' + order.join());
+  assert.equal(nodes(fieldOf(root)).length + position(fieldOf(root)) <= position(surface), true, 'after the whole field');
+  assert.equal(sectionTitles(root).join('|'), 'Próximos compromisos|Actividad reciente', 'the row has no section title');
+  assert.equal(nodes(root).filter(n => n.type === 'Surface').length, 3);
+  // Tapping opens Presupuestos on the budget's currency and the current month.
+  row.props.onPress();
+  assert.equal(JSON.stringify(view.pushed.at(-1)), JSON.stringify({ pathname: '/budgets', params: { currency: 'ARS', month: '2026-09' } }));
+  assert.equal(view.navigated.length, 0);
+});
+
+test('24UX6C2: a general budget at exactly 100 % is still a warning; one minor unit over is exceeded', () => {
+  const { data, total } = budgetHome();
+  const state = (limit: number) => budgetRows(routeHarness('(tabs)/index.tsx', {}, data, { budgets: [total(limit)] }).render()).map(n => n.props.attention.state).join();
+  assert.equal(state(8500), 'warning', 'exactly the limit');
+  assert.equal(state(8499), 'exceeded', 'one cent over');
+  assert.equal(state(1000), 'exceeded');
+  const over = budgetRows(routeHarness('(tabs)/index.tsx', {}, data, { budgets: [total(8000)] }).render())[0];
+  assert.equal(JSON.stringify([over.props.attention.progress.spentMinor, over.props.attention.progress.remainingMinor, over.props.attention.progress.exceeded]), JSON.stringify([8500, -500, true]));
+  // A future expense of this month counts in the budget as in Presupuestos (the whole month), never in Gastado to date.
+  const later: domain.LedgerSnapshot = { ...data, entries: [...data.entries, { ...data.entries[0], id: 'later', amountMinor: 100, dateISO: '2026-09-25' }] };
+  const root = routeHarness('(tabs)/index.tsx', {}, later, { budgets: [total(8500)] }).render();
+  assert.equal(budgetRows(root)[0].props.attention.progress.spentMinor, domain.summarizeMonthlyBudgets(later, [total(8500)], 'ARS', '2026-09').total!.spentMinor);
+  assert.equal(budgetRows(root)[0].props.attention.state, 'exceeded');
+});
+
+test('24UX6C2: the budget row\'s currency: consolidated in USD with only an ARS general budget names ARS and reads the ARS ledger unconverted; «Solo USD» shows none', () => {
+  const at = '2026-09-01T12:00:00.000Z';
+  const data: domain.LedgerSnapshot = { accounts: [{ id: 'a', name: 'Pesos', currency: 'ARS', openingMinor: 100000, createdAt: at }, { id: 'u', name: 'Dólares', currency: 'USD', openingMinor: 10000, createdAt: at }],
+    entries: [{ id: 'ars', accountId: 'a', kind: 'expense', amountMinor: 9000, merchant: 'Coto', category: 'Supermercado', dateISO: '2026-09-05', createdAt: at },
+      { id: 'usd', accountId: 'u', kind: 'expense', amountMinor: 700, merchant: 'App', category: 'Suscripciones', dateISO: '2026-09-11', createdAt: at }] };
+  const arsBudget: domain.MonthlyBudget = { id: 'b-ars', scope: 'total', currency: 'ARS', monthISO: '2026-09', amountMinor: 10000, active: true, createdAt: at, revision: 0, updatedAt: at };
+  const show = (mode: displayCurrency.DisplayMode, currency: domain.Currency, budgets: domain.MonthlyBudget[] = [arsBudget]) => routeHarness('(tabs)/index.tsx', {}, data, { budgets },
+    displayStore({ [displayCurrency.DISPLAY_MODE_KEY]: mode, [displayCurrency.DISPLAY_CURRENCY_KEY]: currency }), { book: consolidatedRates() });
+  const view = show('consolidated', 'USD');
+  const root = view.render();
+  assert.equal(find(root, 'DisplayCurrencyButton').props.currency, 'USD');
+  const row = find(root, 'BudgetAttentionRow');
+  assert.equal(JSON.stringify([row.props.currency, row.props.labelsCurrency, row.props.attention.state]), JSON.stringify(['ARS', true, 'warning']), 'the ARS budget, named, beside a USD total');
+  // Measured on the real ARS ledger: the ARS expense alone, in ARS minor units; the USD expense neither added nor converted.
+  assert.equal(row.props.attention.progress.spentMinor, 9000);
+  assert.equal(row.props.attention.progress.spentMinor, domain.summarizeMonthlyBudgets(data, [arsBudget], 'ARS', '2026-09').total!.spentMinor);
+  assert.equal(JSON.stringify([row.props.attention.progress.budget.currency, row.props.attention.progress.budget.amountMinor, row.props.attention.progress.remainingMinor]), JSON.stringify(['ARS', 10000, 1000]));
+  row.props.onPress();
+  assert.equal(JSON.stringify(view.pushed.at(-1)), JSON.stringify({ pathname: '/budgets', params: { currency: 'ARS', month: '2026-09' } }), 'Presupuestos opens on the budget\'s currency, not the display\'s');
+  // «Solo USD» with only an ARS budget: no row. «Solo ARS»: the row, nothing to name.
+  assert.equal(budgetRows(show('single', 'USD').render()).length, 0, 'single mode shows the shown currency\'s budget only');
+  const pesos = find(show('single', 'ARS').render(), 'BudgetAttentionRow');
+  assert.equal(JSON.stringify([pesos.props.currency, pesos.props.labelsCurrency, pesos.props.attention.progress.spentMinor]), JSON.stringify(['ARS', false, 9000]));
+  // Consolidated in ARS: the display currency's own budget, unnamed.
+  const inPesos = find(show('consolidated', 'ARS').render(), 'BudgetAttentionRow');
+  assert.equal(JSON.stringify([inPesos.props.currency, inPesos.props.labelsCurrency]), JSON.stringify(['ARS', false]));
+  // A USD general budget too: consolidated in USD prefers the display currency's own (USD 7,00 of 8,00, 87.5 %).
+  const usdBudget: domain.MonthlyBudget = { ...arsBudget, id: 'b-usd', currency: 'USD', amountMinor: 800 };
+  const dollars = find(show('consolidated', 'USD', [arsBudget, usdBudget]).render(), 'BudgetAttentionRow');
+  assert.equal(JSON.stringify([dollars.props.currency, dollars.props.labelsCurrency, dollars.props.attention.progress.spentMinor]), JSON.stringify(['USD', false, 700]));
+});
+
+test('24UX6C2 review: only general budgets choose the currency; a sublimit or a calm general budget never hides another currency\'s general budget that needs attention', () => {
+  const at = '2026-09-01T12:00:00.000Z';
+  const data: domain.LedgerSnapshot = { accounts: [{ id: 'a', name: 'Pesos', currency: 'ARS', openingMinor: 100000, createdAt: at }, { id: 'u', name: 'Dólares', currency: 'USD', openingMinor: 10000, createdAt: at }],
+    entries: [{ id: 'ars', accountId: 'a', kind: 'expense', amountMinor: 9000, merchant: 'Coto', category: 'Comida', dateISO: '2026-09-05', createdAt: at },
+      { id: 'usd', accountId: 'u', kind: 'expense', amountMinor: 1200, merchant: 'App', category: 'Suscripciones', dateISO: '2026-09-11', createdAt: at }] };
+  const budget = (id: string, currency: domain.Currency, amountMinor: number, category?: string): domain.MonthlyBudget => category
+    ? { id, scope: 'category', category, currency, monthISO: '2026-09', amountMinor, active: true, createdAt: at, revision: 0, updatedAt: at }
+    : { id, scope: 'total', currency, monthISO: '2026-09', amountMinor, active: true, createdAt: at, revision: 0, updatedAt: at };
+  const usdOver = budget('b-usd', 'USD', 1000); // USD 12,00 of 10,00: 120 %
+  const show = (mode: displayCurrency.DisplayMode, currency: domain.Currency, budgets: domain.MonthlyBudget[]) => routeHarness('(tabs)/index.tsx', {}, data, { budgets },
+    displayStore({ [displayCurrency.DISPLAY_MODE_KEY]: mode, [displayCurrency.DISPLAY_CURRENCY_KEY]: currency }), { book: consolidatedRates() });
+  const summary = (row: Node) => JSON.stringify([row.props.currency, row.props.labelsCurrency, row.props.attention.state, row.props.attention.progress.budget.id]);
+  // An ARS category sublimit alone does not make ARS the candidate: the exceeded USD general budget is the row, named.
+  const viaCategory = show('consolidated', 'ARS', [budget('c-ars', 'ARS', 100000, 'Comida'), usdOver]);
+  const row = find(viaCategory.render(), 'BudgetAttentionRow');
+  assert.equal(summary(row), JSON.stringify(['USD', true, 'exceeded', 'b-usd']));
+  assert.equal(row.props.attention.progress.spentMinor, 1200, 'the USD ledger alone, unconverted');
+  row.props.onPress();
+  assert.equal(JSON.stringify(viaCategory.pushed.at(-1)), JSON.stringify({ pathname: '/budgets', params: { currency: 'USD', month: '2026-09' } }));
+  // A calm ARS general budget (9,00 of 1000,00) does not hide it either.
+  assert.equal(summary(find(show('consolidated', 'ARS', [budget('b-ars', 'ARS', 100000), usdOver]).render(), 'BudgetAttentionRow')), JSON.stringify(['USD', true, 'exceeded', 'b-usd']));
+  // When both need attention the display currency's own comes first, unnamed: one row, never two.
+  const both = show('consolidated', 'ARS', [budget('b-ars', 'ARS', 10000), usdOver]).render();
+  assert.equal(budgetRows(both).length, 1);
+  assert.equal(summary(budgetRows(both)[0]), JSON.stringify(['ARS', false, 'warning', 'b-ars']));
+  // «Solo ARS» considers ARS only: a calm ARS budget and an exceeded USD one draw nothing.
+  assert.equal(budgetRows(show('single', 'ARS', [budget('b-ars', 'ARS', 100000), usdOver]).render()).length, 0);
+  // Every general budget calm: nothing.
+  assert.equal(budgetRows(show('consolidated', 'ARS', [budget('b-ars', 'ARS', 100000), budget('b-usd', 'USD', 100000)]).render()).length, 0);
+});
+
+test('24UX6C2: the hero numbers are the same with or without the budget row, in Gastado and Disponible, single or consolidated', () => {
+  const { data: pesos, total } = budgetHome();
+  const cases: { label: string; data: domain.LedgerSnapshot; mode: displayCurrency.DisplayMode; currency: domain.Currency; budgets: domain.MonthlyBudget[] }[] = [
+    { label: 'single ARS, warning', data: pesos, mode: 'single', currency: 'ARS', budgets: [total(10000)] },
+    { label: 'single ARS, exceeded', data: pesos, mode: 'single', currency: 'ARS', budgets: [total(100)] },
+    { label: 'consolidated USD, ARS exceeded', data: homeData, mode: 'consolidated', currency: 'USD', budgets: [total(100)] },
+  ];
+  for (const item of cases) {
+    const figures = (budgets: domain.MonthlyBudget[]) => {
+      const harness = routeHarness('(tabs)/index.tsx', {}, item.data, { budgets }, displayStore({ [displayCurrency.DISPLAY_MODE_KEY]: item.mode, [displayCurrency.DISPLAY_CURRENCY_KEY]: item.currency }), { book: consolidatedRates() });
+      let root = harness.render();
+      const rows = budgetRows(root).length;
+      const spent = find(root, 'Money').props;
+      metricOf(root).props.onChange('available');
+      root = harness.render();
+      const available = find(root, 'Money').props;
+      assert.equal(budgetRows(root).length, rows, item.label + ': the row does not depend on the metric');
+      return { rows, numbers: JSON.stringify([spent.minor, spent.currency, available.minor, available.currency]) };
+    };
+    const without = figures([]), withBudget = figures(item.budgets);
+    assert.equal(without.rows, 0);
+    assert.equal(withBudget.rows, 1, item.label + ': the row is shown');
+    assert.equal(withBudget.numbers, without.numbers, item.label + ': Gastado and Disponible unchanged');
+  }
+});
+
+test('24UX6C2: the budget row opens Presupuestos on the current month, whatever month the budget was created in', () => {
+  const at = '2026-09-20T12:00:00.000Z';
+  const data: domain.LedgerSnapshot = { accounts: [{ id: 'a', name: 'Banco', currency: 'ARS', openingMinor: 0, createdAt: at }],
+    entries: [{ id: 'oct', accountId: 'a', kind: 'expense', amountMinor: 900, merchant: 'Coto', category: 'Supermercado', dateISO: '2026-10-01', createdAt: '2026-10-01T10:00:00.000Z' },
+      { id: 'sep', accountId: 'a', kind: 'expense', amountMinor: 5000, merchant: 'Coto', category: 'Supermercado', dateISO: '2026-09-20', createdAt: at }] };
+  const budget = (monthISO: string): domain.MonthlyBudget => ({ id: 'b-' + monthISO, scope: 'total', currency: 'ARS', monthISO, amountMinor: 1000, active: true, createdAt: at, revision: 0, updatedAt: at });
+  today = '2026-10-01';
+  try {
+    assert.equal(budgetRows(routeHarness('(tabs)/index.tsx', {}, data, { budgets: [budget('2026-09')] }).render()).length, 0, 'September\'s exceeded budget is not this month\'s');
+    const view = routeHarness('(tabs)/index.tsx', {}, data, { budgets: [budget('2026-09'), budget('2026-10')] });
+    const row = find(view.render(), 'BudgetAttentionRow');
+    assert.equal(JSON.stringify([row.props.attention.state, row.props.attention.progress.spentMinor, row.props.attention.progress.budget.monthISO]), JSON.stringify(['warning', 900, '2026-10']),
+      'October\'s budget reads October\'s expenses only');
+    row.props.onPress();
+    assert.equal(JSON.stringify(view.pushed.at(-1)), JSON.stringify({ pathname: '/budgets', params: { currency: 'ARS', month: '2026-10' } }));
+  } finally { today = '2026-09-12'; }
 });

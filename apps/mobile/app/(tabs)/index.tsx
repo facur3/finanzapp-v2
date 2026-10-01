@@ -3,17 +3,17 @@ import { ScrollView, View, type NativeScrollEvent, type NativeSyntheticEvent } f
 import { router, useFocusEffect } from 'expo-router';
 import { setStatusBarStyle } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { currentMonthISO, spendingWindow } from '@finanzapp/domain';
+import { currentMonthISO, hiddenLiabilityAccountIds, spendingWindow } from '@finanzapp/domain';
 import { useLedger } from '../../src/storage/LedgerProvider';
-import { ActionButton, AppText, Choices, EmptyState, EntryRow, Money, SectionTitle, Surface } from '../../src/ui/components';
+import { ActionButton, AppText, Choices, EmptyState, EntryRow, Money, SectionTitle, Surface, TransferRow } from '../../src/ui/components';
 import { DisplayCurrencyButton } from '../../src/ui/currency-switch';
 import { useDisplayCurrency } from '../../src/ui/display-currency-provider';
 import { useFinanceView } from '../../src/fx/rates-provider';
 import { availableFigure, inView, spendingFigure } from '../../src/fx/finance-view';
 import { figureInfo, shortfallDetail } from '../../src/fx/fx-copy';
 import { useI18n } from '../../src/i18n/provider';
-import { CurrencyParts, FieldButton, MetricHelp, UpcomingRecurringRow } from '../../src/ui/home-modules';
-import { homeCommitments, homeRecent, recentRowLimit } from '../../src/ui/home-focus';
+import { BudgetAttentionRow, CurrencyParts, FieldButton, MetricHelp, UpcomingRecurringRow } from '../../src/ui/home-modules';
+import { homeBudget, homeCommitments, homeRecent, recentRowLimit } from '../../src/ui/home-focus';
 import { Reflow, ValueTransition } from '../../src/ui/motion';
 import { historyCurrencies, homeNamesCategory, sharedGlyphs, visibleNamesAccount } from '../../src/ui/presentation';
 import { useCategoryLookOf } from '../../src/ui/category-hues';
@@ -40,9 +40,12 @@ const FIELD_RADIUS = 32;
  *   3. the number, the screen's one large element, with its explanation (ⓘ) beside it when there is no scope row
  *      (24UX6C: no line under it; the daily average and the account count live in Reportes and Cuentas);
  *   4. Gastado | Disponible, which switches the number only.
- * Under it: the commitments due within seven days (two at most, the section absent without one), then the month's
- * latest movements (four under commitments, six without; «Ver todos» selects Movimientos). With neither, one quiet
- * line points at «+» and the Assistant. Nothing is drawn to fill space: no rankings, charts, budget cards, insight
+ * Under it: the month's general budget, one contextual row only while it is in warning (85 % to 100 %) or exceeded
+ * (`homeBudget`; never a permanent card, never a category sublimit); then the commitments due from today through today
+ * + 30 days, both ends inclusive (`COMMITMENT_WINDOW_DAYS`; two at most, the section absent without one), then the month's
+ * latest activity, expenses, incomes and transfers (24UX6C2), each record once (four under commitments, six without;
+ * «Ver todos» selects Movimientos). With neither, one quiet
+ * line points at «+» and the Assistant. Nothing is drawn to fill space: no rankings, charts, permanent budget card, insight
  * lines, Registrar button or Assistant banner.
  *
  * The figures are the repository's, unchanged: Gastado is `spendingFigure` over the calendar month to today (expenses
@@ -77,12 +80,18 @@ export default function HomeScreen() {
   // Disponible is recorded liquid money: cards, debts and receivables are never netted into it.
   const availableHero = useMemo(() => snapshot && view ? availableFigure(snapshot, view, view.book, day, view.activity, view.loaded, archive?.cards, archive?.debts) : null,
     [snapshot, view, day, archive?.cards, archive?.debts]);
-  // The commitments due this week in the accounts the display shows; each keeps its own amount and currency.
+  // The commitments due from today through today + 30 days (inclusive) in the accounts the display shows; each keeps its
+  // own amount and currency.
   const upcoming = useMemo(() => homeCommitments(archive?.recurring, day,
     accountId => !!snapshot?.accounts.some(account => account.id === accountId && inView({ mode, currency }, account))), [archive?.recurring, snapshot?.accounts, mode, currency, day]);
-  // The month's latest movements in the accounts the display shows; each keeps its own amount and currency.
-  const recent = useMemo(() => snapshot ? homeRecent(snapshot.entries, snapshot.accounts, period, account => inView({ mode, currency }, account),
-    recentRowLimit(upcoming.length > 0)) : [], [snapshot, period, mode, currency, upcoming.length]);
+  // The month's general budget when it needs attention (24UX6C2). A budget keeps its own currency (24C1): it is measured
+  // on the real ledger against that currency's accounts, never a converted total; `homeBudget` picks whose general budget
+  // the display shows and whether its currency must be named.
+  const budget = useMemo(() => snapshot ? homeBudget(snapshot, archive?.budgets ?? [], currencies, mode, currency, month) : null,
+    [snapshot, archive?.budgets, currencies.join(), mode, currency, month]);
+  // The month's latest activity (24UX6C2): expenses, incomes and transfers, each once, newest first, then the limit.
+  const recent = useMemo(() => snapshot ? homeRecent(snapshot.entries, snapshot.transfers ?? [], snapshot.accounts, period,
+    account => inView({ mode, currency }, account), recentRowLimit(upcoming.length > 0)) : [], [snapshot, period, mode, currency, upcoming.length]);
 
   // The status bar over the field: light while the field is under it, the scheme's own otherwise.
   const fieldHeight = useRef(0);
@@ -102,7 +111,12 @@ export default function HomeScreen() {
   if (!snapshot || !view || !spendingHero || !availableHero) return null;
   const spending = metric === 'spending';
   // 24UX5: a row names its account only when the visible rows come from more than one; VoiceOver always says it.
-  const upcomingAccount = visibleNamesAccount(upcoming), recentAccount = visibleNamesAccount(recent);
+  const upcomingAccount = visibleNamesAccount(upcoming);
+  // A transfer counts by its side that is a real account: a card payment by the paying account, a debt's collection by
+  // the account that received it (a hidden card or debt account is never "another account" for this rule).
+  const hiddenAccounts = hiddenLiabilityAccountIds(archive?.cards, archive?.debts);
+  const recentAccount = visibleNamesAccount(recent.map(item => ({ accountId: item.type === 'entry' ? item.value.accountId
+    : hiddenAccounts.has(item.value.fromAccountId) ? item.value.toAccountId : item.value.fromAccountId })));
   // 24UX5: a commitment names its category only when the name and the glyph do not already say it, or when another row draws the same glyph.
   const shared = sharedGlyphs(upcoming.map(row => { const look = expenseLook(row.category); return { category: look.label, glyph: look.glyph }; }));
   const namesCategory = (row: { category: string; merchant: string }) => {
@@ -159,6 +173,11 @@ export default function HomeScreen() {
         ? <EmptyState title={t('home.emptyTitle')} detail={t('home.emptyDetail')} icon="receipt-outline"
           action={<ActionButton label={t('home.start')} icon="add-outline" onPress={() => router.push('/new-account')} />} />
         : <>
+          {/* Actionable context first: the general budget when it needs attention, then what is due soon. */}
+          {budget && <Reflow fade>
+            <Surface grouped><BudgetAttentionRow attention={budget} currency={budget.currency} labelsCurrency={budget.labelsCurrency}
+              onPress={() => router.push({ pathname: '/budgets', params: { currency: budget.currency, month } })} /></Surface>
+          </Reflow>}
           {upcoming.length > 0 && <Reflow fade>
             <SectionTitle quiet action={t('common.seeAll')} onAction={() => router.push('/recurring')}>{t('home.upcoming')}</SectionTitle>
             <Surface grouped style={{ paddingHorizontal: space.l }}>{upcoming.map((rule, index) => <UpcomingRecurringRow key={rule.id} rule={rule} showAccount={upcomingAccount}
@@ -166,8 +185,12 @@ export default function HomeScreen() {
           </Reflow>}
           {recent.length > 0 && <Reflow fade>
             <SectionTitle quiet action={t('common.seeAll')} onAction={() => router.navigate('/activity')}>{t('home.recent')}</SectionTitle>
-            <Surface grouped>{recent.map((entry, index) => <EntryRow key={entry.id} entry={entry} showAccount={recentAccount}
-              account={snapshot.accounts.find(account => account.id === entry.accountId)!} last={index === recent.length - 1} />)}</Surface>
+            {/* A transfer is its own row (origin → destination, its own tone, «Transferencia» for VoiceOver) and opens its
+                detail; it is never spending or income. */}
+            <Surface grouped>{recent.map((item, index) => item.type === 'entry'
+              ? <EntryRow key={item.key} entry={item.value} showAccount={recentAccount}
+                account={snapshot.accounts.find(account => account.id === item.value.accountId)!} last={index === recent.length - 1} />
+              : <TransferRow key={item.key} transfer={item.value} accounts={snapshot.accounts} last={index === recent.length - 1} />)}</Surface>
           </Reflow>}
           {/* One currency of several shown alone: the month may have movements in another, so the line names the currency (24UX2). */}
           {!upcoming.length && !recent.length && <EmptyState title={mode === 'single' && scope ? t('home.quietTitleIn', { currency }) : t('home.quietTitle')}

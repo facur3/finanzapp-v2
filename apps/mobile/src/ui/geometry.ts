@@ -123,6 +123,49 @@ export function rowStacks(windowWidth: number, fontScale: number, amountText?: s
   return amountWidthEm(amountText) * ROW_AMOUNT_SIZE * Math.max(fontScale, 0.5) > room;
 }
 
+/** An upper estimate of a label's width in ems of the system font (SF Pro Text, regular to medium): narrow lowercase,
+ * wider capitals and digits, thin spaces and punctuation. A line-fit estimate for deciding a layout, not a measurement:
+ * it errs wide, so a row that "fits" never wraps its last letters. */
+export function labelWidthEm(text: string): number {
+  let em = 0;
+  // Grapheme-aware without Intl.Segmenter (not every Hermes has it): a pictograph joined to the previous one by U+200D
+  // belongs to the same glyph (a family, a rainbow flag), and two regional indicators are one flag.
+  let joined = false, openFlag = false;
+  for (const char of text) {
+    if (char === '\u200D') { joined = true; continue; }
+    const wasJoined = joined;
+    joined = false;
+    // Variation selectors, skin-tone modifiers and combining marks add no width of their own.
+    if (/[\uFE0E\uFE0F]|\p{Emoji_Modifier}|\p{Mark}/u.test(char)) continue;
+    if (/\p{Regional_Indicator}/u.test(char)) {
+      if (openFlag) { openFlag = false; continue; }
+      openFlag = true;
+      em += 1.25;
+      continue;
+    }
+    openFlag = false;
+    if (/\p{Extended_Pictographic}/u.test(char)) { if (!wasJoined) em += 1.25; continue; }
+    em += char === ' ' ? 0.28
+      // Full-width scripts and forms: an ideograph, kana (with the katakana middle dot) or hangul is about one em.
+      : /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}\u3000-\u303F\u30A0-\u30FF\uFF00-\uFFEF]/u.test(char) ? 1
+      : /[.,:;·'’!|il]/.test(char) ? 0.3 : /[A-ZÁÉÍÓÚÑÜ0-9mwMW]/.test(char) ? 0.68 : 0.54;
+  }
+  return em * SAFETY;
+}
+
+/** A name beside an amount on one line (24UX6C2): whether the name, at the body size, and the amount, at the row amount
+ * size, fit together in the text column of a row whose fixed parts take `chrome` points (screen padding, row padding, the
+ * identity tile and its gap, a chevron). When they do not, the row stacks (the amount and its share under the name)
+ * instead of wrapping the name into a stray last letter or shrinking the money. Large text always stacks. */
+export function labelAmountStacks(windowWidth: number, fontScale: number, label: string, amountText: string, chrome = ROW_CHROME): boolean {
+  if (fontScale > ROW_STACK_SCALE) return true;
+  if (!(windowWidth > 0)) return false;
+  const scale = Math.max(fontScale, 0.5);
+  const room = Math.max(0, windowWidth - chrome);
+  const gap = 8;
+  return labelWidthEm(label) * ROW_AMOUNT_SIZE * scale + gap + amountWidthEm(amountText) * ROW_AMOUNT_SIZE * scale > room;
+}
+
 /** The largest font size, at most `base` and at least `min`, at which `text`
  * fits `width` on one line once the system text scale is applied. Scaling only
  * happens when needed, so a short amount stays at `base`; a long one shrinks
