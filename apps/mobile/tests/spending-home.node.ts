@@ -658,15 +658,17 @@ test('24UX6A: commitments without activity show only the commitments; with neith
   assert.equal(sectionTitles(root).length, 0);
 });
 
-test('24UX6A: no Registrar button, insight line, ranking, budget card, chart or Assistant banner on Inicio, in the tree or the source (24UX6C2: one budget row at most)', () => {
+test('24UX6A: no Registrar button, insight line, ranking, budget card, chart or Assistant banner on Inicio, in the tree or the source (24UX6C2\'s «one budget row at most» superseded by the 24UX6D refinement: two compact rows at most)', () => {
   const at = '2026-09-01T12:00:00.000Z';
   // A ledger that once produced each retired module: a concentrated category, an exceeded general budget and sublimit, rules.
   const budgets: domain.MonthlyBudget[] = [{ id: 'total', scope: 'total', currency: 'ARS', monthISO: '2026-09', amountMinor: 100, active: true, createdAt: at, revision: 0, updatedAt: at },
     { id: 'salud', scope: 'category', category: 'Salud', currency: 'ARS', monthISO: '2026-09', amountMinor: 50, active: true, createdAt: at, revision: 0, updatedAt: at }];
   const roots = [routeHarness('(tabs)/index.tsx', {}, homeData, { budgets, recurring: [dueRule()] }).render(), routeHarness('(tabs)/index.tsx', {}, snapshot).render(),
     routeHarness('(tabs)/index.tsx', {}, { accounts: [], entries: [] }).render()];
-  // 24UX6C2: the exceeded general budget is one compact row, never a card; the sublimit adds nothing.
-  assert.equal(JSON.stringify(roots.map(root => nodes(root).filter(n => n.type === 'BudgetAttentionRow').map(n => n.props.attention.state))), JSON.stringify([['exceeded'], [], []]));
+  // 24UX6C2 drew the exceeded general budget alone; since the 24UX6D refinement the exceeded sublimit is a second compact
+  // row (the general first within «exceeded»), still never a card.
+  assert.equal(JSON.stringify(roots.map(root => nodes(root).filter(n => n.type === 'BudgetAttentionRow').map(n => n.props.attention.state + ':' + n.props.attention.progress.budget.id))),
+    JSON.stringify([['exceeded:total', 'exceeded:salud'], [], []]));
   for (const root of roots) {
     assert.equal(nodes(root).filter(n => RETIRED.includes(n.type)).map(n => n.type).join(), '');
     assert.equal(homeTexts(root).some(text => /presupuesto|Registrar|Asistente|concentr/i.test(text) && !/Asistente\.$/.test(text)), false);
@@ -675,8 +677,9 @@ test('24UX6A: no Registrar button, insight line, ranking, budget card, chart or 
   const imports = homeSource.match(/^import .*$/gm)!.join('\n');
   for (const gone of ['home-capture', 'capture-hub', 'quick-actions', 'charts', 'spending-chart', 'spending-timeline', 'BudgetHomeCard', 'budget-card', 'BudgetCard', 'BudgetRow', 'insight', 'assistant', 'Insight', 'Capture', 'QuickActions', 'AssistantEntry'])
     assert.equal(imports.includes(gone), false, 'Inicio does not import ' + gone);
-  // 24UX6C2: the only budget imports are the attention row and its rule (`homeBudget`: whose general budget, named when needed).
-  assert.equal(imports.match(/[\w-]*[Bb]udget[\w-]*/g)!.sort().join(), 'BudgetAttentionRow,homeBudget');
+  // The only budget imports are the attention row and its rule: 24UX6C2's `homeBudget` (one general budget) became
+  // `homeBudgets` with the 24UX6D refinement (the general and category budgets that need attention, two at most).
+  assert.equal(imports.match(/[\w-]*[Bb]udget[\w-]*/g)!.sort().join(), 'BudgetAttentionRow,homeBudgets');
   assert.equal(/homeInsight|HomeInsightRow|CaptureButton|CaptureAction/.test(homeSource.replace(/\/\*[\s\S]*?\*\/|\/\/.*$/gm, '')), false, 'nor uses them');
   assert.equal(Object.hasOwn(homeFocus, 'homeInsight') || Object.hasOwn(homeFocus, 'CONCENTRATION_SHARE'), false, 'the insight rule is gone');
 });
@@ -778,7 +781,7 @@ test('cloud client requires HTTPS/session and returns an inbox receipt, never a 
   assert.equal(calls, 1);
 });
 
-test('24UX6A, 24UX6C2: a calm, category-only or archived budget never reaches Inicio; a general budget that needs attention is one row, never a card or a section', () => {
+test('24UX6A, 24UX6C2 (its «category-only never reaches Inicio» superseded by the 24UX6D refinement): a calm or archived budget never reaches Inicio; a general or category budget that needs attention is a row, never a card or a section', () => {
   const createdAt = '2026-09-01T12:00:00.000Z';
   const total: domain.MonthlyBudget = { id: 'total', scope: 'total', currency: 'ARS', monthISO: '2026-09', amountMinor: 100000, active: true, createdAt, revision: 0, updatedAt: createdAt };
   const sublimit: domain.MonthlyBudget = { id: 'salud', scope: 'category', category: 'Salud', currency: 'ARS', monthISO: '2026-09', amountMinor: 250, active: true, createdAt, revision: 0, updatedAt: createdAt };
@@ -786,8 +789,9 @@ test('24UX6A, 24UX6C2: a calm, category-only or archived budget never reaches In
   const plain = routeHarness('(tabs)/index.tsx', {}, homeData).render();
   // All September ARS expenses are 300: a general budget of 330 is 91 % used, one of 250 in Salud is 50 over.
   const cases: [string, domain.MonthlyBudget[], string][] = [['calm general', [total], ''], ['91 % general', [{ ...total, amountMinor: 330 }], 'warning'],
-    ['exceeded sublimit alone', [sublimit], ''], ['archived sublimit', [{ ...sublimit, ...archived }], ''], ['archived exceeded general', [{ ...total, amountMinor: 200, ...archived }], ''],
-    ['calm general and an exceeded sublimit', [total, sublimit], '']];
+    // 24UX6D refinement: an exceeded sublimit is a row now, alone or beside a calm general budget.
+    ['exceeded sublimit alone', [sublimit], 'exceeded'], ['archived sublimit', [{ ...sublimit, ...archived }], ''], ['archived exceeded general', [{ ...total, amountMinor: 200, ...archived }], ''],
+    ['calm general and an exceeded sublimit', [total, sublimit], 'exceeded']];
   for (const [label, budgets, state] of cases) {
     const root = routeHarness('(tabs)/index.tsx', {}, homeData, { budgets }).render();
     assert.equal(nodes(root).some(n => RETIRED.includes(n.type)), false, label);
@@ -1250,39 +1254,42 @@ const budgetLedger = (): { data: domain.LedgerSnapshot; extra: Partial<domain.Le
 };
 const sectionText = (node: Node) => Array.isArray(node.props.children) ? node.props.children.join('') : String(node.props.children);
 
-test('24C1 review, 24UX6C2: with ARS and EUR budgets in the ledger, Inicio converts the total, never a budget: the one budget row is measured in its own currency in every mode', () => {
+test('24C1 review, 24UX6C2, 24UX6D refinement: with ARS and EUR budgets in the ledger, Inicio converts the total, never a budget: each budget row is measured in its own currency in every mode', () => {
   const { data, extra, book } = budgetLedger();
   const display = displayStore({ [displayCurrency.DISPLAY_MODE_KEY]: 'single', [displayCurrency.DISPLAY_CURRENCY_KEY]: 'ARS' });
   const view = routeHarness('(tabs)/index.tsx', {}, data, extra, display, { book });
   let root = view.render();
-  // ARS 3,00 of 3,20 (94 %) and EUR 5,00 of 5,20 (96 %): both warnings. The row is the budget's own ledger, never a converted total.
-  const budgetRow = (label: string, currency: domain.Currency, labelsCurrency: boolean, spentMinor: number, limitMinor: number) => {
+  // ARS 3,00 of 3,20 (94 %) and EUR 5,00 of 5,20 (96 %): both warnings. Each row is its budget's own ledger, never a
+  // converted total. 24UX6C2 showed one of them; since the 24UX6D refinement both, the higher ratio (EUR) first.
+  type Expected = [currency: domain.Currency, labelsCurrency: boolean, spentMinor: number, limitMinor: number];
+  const ars = (labelsCurrency: boolean): Expected => ['ARS', labelsCurrency, 300, 320];
+  const eur = (labelsCurrency: boolean): Expected => ['EUR', labelsCurrency, 500, 520];
+  const budgetRow = (label: string, ...expected: Expected[]) => {
     assert.equal(nodes(root).some(n => RETIRED.includes(n.type)) || homeTexts(root).some(text => /presupuesto/i.test(text)), false, label + ': no budget card or line');
     const rows = nodes(root).filter(n => n.type === 'BudgetAttentionRow');
-    assert.equal(rows.length, 1, label + ': one row');
-    const { attention } = rows[0].props;
-    assert.equal(JSON.stringify([rows[0].props.currency, rows[0].props.labelsCurrency, attention.state, attention.progress.budget.currency, attention.progress.spentMinor, attention.progress.budget.amountMinor]),
-      JSON.stringify([currency, labelsCurrency, 'warning', currency, spentMinor, limitMinor]), label);
+    assert.equal(JSON.stringify(rows.map(row => [row.props.currency, row.props.labelsCurrency, row.props.attention.state, row.props.attention.progress.budget.currency,
+      row.props.attention.progress.spentMinor, row.props.attention.progress.budget.amountMinor])),
+    JSON.stringify(expected.map(([currency, labelsCurrency, spentMinor, limitMinor]) => [currency, labelsCurrency, 'warning', currency, spentMinor, limitMinor])), label);
   };
   assert.equal(find(root, 'Money').props.minor, 300, 'single ARS: the ARS expense alone');
-  budgetRow('single ARS', 'ARS', false, 300, 320);
+  budgetRow('single ARS', ars(false));
   // Consolidated, total read in ARS: the number converts the euros (€5 → US$10 → ARS 10.000); the ARS budget still reads the ARS 3,00 alone.
   find(root, 'DisplayCurrencyButton').props.onMode('consolidated');
   root = view.render();
   assert.equal(find(root, 'Money').props.minor, 300 + 1000000, 'the total is every account');
-  budgetRow('consolidated ARS', 'ARS', false, 300, 320);
-  // Total read in USD: no USD budget, so the first held currency with one, named; the rows keep their own currencies.
+  budgetRow('consolidated ARS', eur(true), ars(false));
+  // Total read in USD: no USD budget; both held currencies' budgets, named; the rows keep their own currencies.
   find(root, 'DisplayCurrencyButton').props.onCurrency('USD');
   root = view.render();
-  budgetRow('consolidated USD', 'ARS', true, 300, 320);
+  budgetRow('consolidated USD', eur(true), ars(true));
   assert.equal(nodes(root).filter(n => n.type === 'EntryRow').map(n => n.props.entry.id + ':' + n.props.entry.amountMinor).sort().join(), 'ars:300,eur:500');
   find(root, 'DisplayCurrencyButton').props.onCurrency('EUR');
   root = view.render();
-  budgetRow('consolidated EUR', 'EUR', false, 500, 520);
+  budgetRow('consolidated EUR', eur(false), ars(true));
   // A missing rate hides the consolidated total; the budget needs no rate, so its row stays, unconverted.
   root = routeHarness('(tabs)/index.tsx', {}, data, extra, displayStore({ [displayCurrency.DISPLAY_MODE_KEY]: 'consolidated', [displayCurrency.DISPLAY_CURRENCY_KEY]: 'USD' }), { book: domain.rateBook([]), activity: 'offline' }).render();
   assert.equal(nodes(root).some(n => n.type === 'Money'), false);
-  budgetRow('consolidated USD offline', 'ARS', true, 300, 320);
+  budgetRow('consolidated USD offline', eur(true), ars(true));
 });
 test('24C1 review: the chip says what the number covers: "Total · USD" for every account converted, "Solo USD" for that currency alone', () => {
   const { data, extra, book } = budgetLedger();
@@ -1410,18 +1417,41 @@ const budgetHome = () => {
 };
 const budgetRows = (root: Node) => nodes(root).filter(n => n.type === 'BudgetAttentionRow');
 
-test('24UX6C2: no budget, a calm general budget or category budgets alone (near or over their limits) draw no budget row', () => {
+test('24UX6C2, 24UX6D refinement: no budget, calm general and category budgets, or archived and last month\'s ones draw no budget UI at all (no row, no surface)', () => {
   const { data, total, category } = budgetHome();
-  const cases: [string, domain.MonthlyBudget[]][] = [['no budget', []], ['calm general (84 %)', [total(10120)]], ['a category at 100 %', [category('Supermercado', 6000)]],
-    ['a category at 85 %', [category('Ocio', 2941)]], ['categories over their limits', [category('Supermercado', 1000), category('Ocio', 100)]],
-    ['a calm general budget beside an exceeded category', [total(20000), category('Supermercado', 1000)]], ['last month\'s exceeded general budget', [total(100, 'ARS', '2026-08')]]];
+  const archived = (budget: domain.MonthlyBudget): domain.MonthlyBudget => ({ ...budget, active: false, revision: 1, updatedAt: '2026-09-02T12:00:00.000Z' });
+  const cases: [string, domain.MonthlyBudget[]][] = [['no budget', []], ['calm general (84 %)', [total(10120)]], ['a calm category (84 %)', [category('Ocio', 2977)]],
+    ['calm general and calm categories', [total(20000), category('Supermercado', 7200), category('Ocio', 5000)]],
+    ['an archived exceeded category', [archived(category('Supermercado', 1000))]], ['last month\'s exceeded general budget', [total(100, 'ARS', '2026-08')]]];
   for (const [label, budgets] of cases) {
     const root = routeHarness('(tabs)/index.tsx', {}, data, { budgets, recurring: [dueRule()] }).render();
     assert.equal(budgetRows(root).length, 0, label);
-    assert.equal(nodes(root).filter(n => n.type === 'Surface').length, 2, label + ': only the commitments and the activity');
+    assert.equal(nodes(root).filter(n => n.type === 'Surface').length, 2, label + ': only the commitments and the activity, no budget surface');
+    assert.equal(nodes(root).some(n => n.type === 'Surface' && [n.props.children].flat().length === 0), false, label + ': no empty surface');
     assert.equal(sectionTitles(root).join('|'), 'Próximos compromisos|Actividad reciente', label);
   }
   assert.equal(domain.budgetState(domain.summarizeMonthlyBudgets(data, [total(10120)], 'ARS', '2026-09').total!), 'calm', 'the calm case is calm by the domain\'s own rule');
+  assert.equal(domain.budgetState(domain.summarizeMonthlyBudgets(data, [category('Ocio', 2977)], 'ARS', '2026-09').rows[0]), 'calm');
+});
+
+test('24UX6D refinement (supersedes 24UX6C2\'s «category budgets alone draw no row»): a category budget in warning or exceeded is a row, its attention carrying the category budget', () => {
+  const { data, total, category } = budgetHome();
+  const cases: [string, domain.MonthlyBudget[], string][] = [['a category at 100 %', [category('Supermercado', 6000)], 'warning:cat-Supermercado'],
+    ['a category at 85 %', [category('Ocio', 2941)], 'warning:cat-Ocio'], ['categories over their limits', [category('Supermercado', 1000), category('Ocio', 100)], 'exceeded:cat-Ocio,exceeded:cat-Supermercado'],
+    ['a calm general budget beside an exceeded category', [total(20000), category('Supermercado', 1000)], 'exceeded:cat-Supermercado']];
+  for (const [label, budgets, expected] of cases) {
+    const root = routeHarness('(tabs)/index.tsx', {}, data, { budgets, recurring: [dueRule()] }).render();
+    const rows = budgetRows(root);
+    assert.equal(rows.map(row => row.props.attention.state + ':' + row.props.attention.progress.budget.id).join(), expected, label);
+    for (const row of rows) {
+      const stored: domain.MonthlyBudget = row.props.attention.progress.budget;
+      assert.equal(stored.scope, 'category', label);
+      assert.equal(stored, budgets.find(item => item.id === stored.id), label + ': the stored category budget itself');
+      assert.equal(row.props.attention.progress.spentMinor, domain.summarizeMonthlyBudgets(data, budgets, 'ARS', '2026-09').rows.find(item => item.budget.id === stored.id)!.spentMinor, label);
+    }
+    assert.equal(nodes(root).filter(n => n.type === 'Surface').length, 3, label + ': one budget surface');
+    assert.equal(sectionTitles(root).join('|'), 'Próximos compromisos|Actividad reciente', label + ': no budget section title');
+  }
 });
 
 test('24UX6C2: a general budget at exactly 85 % is one warning row in a grouped surface after the field and before the commitments and the activity; tapping opens Presupuestos on its currency and month', () => {
@@ -1496,13 +1526,14 @@ test('24UX6C2: the budget row\'s currency: consolidated in USD with only an ARS 
   // Consolidated in ARS: the display currency's own budget, unnamed.
   const inPesos = find(show('consolidated', 'ARS').render(), 'BudgetAttentionRow');
   assert.equal(JSON.stringify([inPesos.props.currency, inPesos.props.labelsCurrency]), JSON.stringify(['ARS', false]));
-  // A USD general budget too: consolidated in USD prefers the display currency's own (USD 7,00 of 8,00, 87.5 %).
+  // A USD general budget too (USD 7,00 of 8,00, 87.5 %). 24UX6C2 showed the display currency's alone; since the 24UX6D
+  // refinement both are rows and the higher ratio comes first (ARS 90 %, named), the display currency only breaking ties.
   const usdBudget: domain.MonthlyBudget = { ...arsBudget, id: 'b-usd', currency: 'USD', amountMinor: 800 };
-  const dollars = find(show('consolidated', 'USD', [arsBudget, usdBudget]).render(), 'BudgetAttentionRow');
-  assert.equal(JSON.stringify([dollars.props.currency, dollars.props.labelsCurrency, dollars.props.attention.progress.spentMinor]), JSON.stringify(['USD', false, 700]));
+  const dollars = budgetRows(show('consolidated', 'USD', [arsBudget, usdBudget]).render());
+  assert.equal(JSON.stringify(dollars.map(row => [row.props.currency, row.props.labelsCurrency, row.props.attention.progress.spentMinor])), JSON.stringify([['ARS', true, 9000], ['USD', false, 700]]));
 });
 
-test('24UX6C2 review: only general budgets choose the currency; a sublimit or a calm general budget never hides another currency\'s general budget that needs attention', () => {
+test('24UX6C2 review (its «only general budgets» and «one row, never two» superseded by the 24UX6D refinement): a calm sublimit or a calm general budget never hides another currency\'s budget that needs attention', () => {
   const at = '2026-09-01T12:00:00.000Z';
   const data: domain.LedgerSnapshot = { accounts: [{ id: 'a', name: 'Pesos', currency: 'ARS', openingMinor: 100000, createdAt: at }, { id: 'u', name: 'Dólares', currency: 'USD', openingMinor: 10000, createdAt: at }],
     entries: [{ id: 'ars', accountId: 'a', kind: 'expense', amountMinor: 9000, merchant: 'Coto', category: 'Comida', dateISO: '2026-09-05', createdAt: at },
@@ -1523,10 +1554,10 @@ test('24UX6C2 review: only general budgets choose the currency; a sublimit or a 
   assert.equal(JSON.stringify(viaCategory.pushed.at(-1)), JSON.stringify({ pathname: '/budgets', params: { currency: 'USD', month: '2026-09' } }));
   // A calm ARS general budget (9,00 of 1000,00) does not hide it either.
   assert.equal(summary(find(show('consolidated', 'ARS', [budget('b-ars', 'ARS', 100000), usdOver]).render(), 'BudgetAttentionRow')), JSON.stringify(['USD', true, 'exceeded', 'b-usd']));
-  // When both need attention the display currency's own comes first, unnamed: one row, never two.
+  // When both need attention (24UX6D refinement): two rows, the exceeded USD one first, then the ARS warning, unnamed.
   const both = show('consolidated', 'ARS', [budget('b-ars', 'ARS', 10000), usdOver]).render();
-  assert.equal(budgetRows(both).length, 1);
-  assert.equal(summary(budgetRows(both)[0]), JSON.stringify(['ARS', false, 'warning', 'b-ars']));
+  assert.equal(budgetRows(both).length, 2);
+  assert.equal(JSON.stringify(budgetRows(both).map(summary)), JSON.stringify([summary(row), JSON.stringify(['ARS', false, 'warning', 'b-ars'])]));
   // «Solo ARS» considers ARS only: a calm ARS budget and an exceeded USD one draw nothing.
   assert.equal(budgetRows(show('single', 'ARS', [budget('b-ars', 'ARS', 100000), usdOver]).render()).length, 0);
   // Every general budget calm: nothing.
@@ -1577,33 +1608,91 @@ test('24UX6C2: the budget row opens Presupuestos on the current month, whatever 
   } finally { today = '2026-09-12'; }
 });
 
-test('24UX6D: the progress row changed the budget row\'s look only: Inicio hands it the same four props, the same homeBudget choice and the same domain progress as 24UX6C2', () => {
-  // The 24UX6C2 fixtures and what they produced then, pinned: [state, currency, labelsCurrency, spent, remaining, ratio, budget id].
+// 24UX6D pinned «the same four props, the same homeBudget choice»; the 24UX6D refinement supersedes it: five props (the
+// grouped surface's `last`), and the rows are exactly `homeBudgets`' choice, in its order.
+test('24UX6D, as refined: Inicio hands each budget row five props (attention, currency, labelsCurrency, last, onPress), exactly homeBudgets\' choice and the domain\'s progress', () => {
+  // [state, currency, labelsCurrency, spent, remaining, ratio, budget id] per row.
   const { data, total, category } = budgetHome();
-  const cases: [string, domain.MonthlyBudget[], unknown[] | null][] = [
-    ['calm (84 %)', [total(10120)], null],
-    ['exactly 85 %', [total(10000)], ['warning', 'ARS', false, 8500, 1500, 0.85, 'total-ARS-2026-09']],
-    ['exactly 100 %', [total(8500)], ['warning', 'ARS', false, 8500, 0, 1, 'total-ARS-2026-09']],
-    ['one minor unit over', [total(8499)], ['exceeded', 'ARS', false, 8500, -1, 8500 / 8499, 'total-ARS-2026-09']],
-    ['a category over its limit only', [category('Supermercado', 1000)], null],
+  const cases: [string, domain.MonthlyBudget[], unknown[][]][] = [
+    ['calm (84 %)', [total(10120)], []],
+    ['exactly 85 %', [total(10000)], [['warning', 'ARS', false, 8500, 1500, 0.85, 'total-ARS-2026-09']]],
+    ['exactly 100 %', [total(8500)], [['warning', 'ARS', false, 8500, 0, 1, 'total-ARS-2026-09']]],
+    ['one minor unit over', [total(8499)], [['exceeded', 'ARS', false, 8500, -1, 8500 / 8499, 'total-ARS-2026-09']]],
+    ['a category over its limit only (no row in 24UX6C2)', [category('Supermercado', 1000)], [['exceeded', 'ARS', false, 6000, -5000, 6, 'cat-Supermercado']]],
+    ['a general warning and an exceeded category', [total(9000), category('Supermercado', 5000)],
+      [['exceeded', 'ARS', false, 6000, -1000, 1.2, 'cat-Supermercado'], ['warning', 'ARS', false, 8500, 500, 8500 / 9000, 'total-ARS-2026-09']]],
   ];
   for (const [label, budgets, expected] of cases) {
     const view = routeHarness('(tabs)/index.tsx', {}, data, { budgets });
     const rows = budgetRows(view.render());
-    const chosen = homeFocus.homeBudget(data, budgets, ['ARS'], 'single', 'ARS', '2026-09');
-    if (!expected) { assert.equal(rows.length, 0, label); assert.equal(chosen, null, label); continue; }
-    assert.equal(rows.length, 1, label);
-    const row = rows[0];
-    assert.equal(Object.keys(row.props).sort().join(), 'attention,currency,labelsCurrency,onPress', label + ': no new prop; the row derives its look itself');
-    const { progress } = row.props.attention;
-    assert.equal(JSON.stringify([row.props.attention.state, row.props.currency, row.props.labelsCurrency, progress.spentMinor, progress.remainingMinor, progress.ratio, progress.budget.id]),
-      JSON.stringify(expected), label);
-    assert.equal(JSON.stringify(row.props.attention), JSON.stringify(chosen), label + ': exactly homeBudget\'s choice (the route hands the whole HomeBudget as `attention`)');
-    assert.equal(JSON.stringify([row.props.currency, row.props.labelsCurrency]), JSON.stringify([chosen!.currency, chosen!.labelsCurrency]), label);
-    row.props.onPress();
-    assert.equal(JSON.stringify(view.pushed.at(-1)), JSON.stringify({ pathname: '/budgets', params: { currency: 'ARS', month: '2026-09' } }), label);
+    const chosen = homeFocus.homeBudgets(data, budgets, ['ARS'], 'single', 'ARS', '2026-09');
+    assert.equal(rows.length, expected.length, label);
+    assert.equal(chosen.length, expected.length, label);
+    rows.forEach((row, index) => {
+      assert.equal(Object.keys(row.props).sort().join(), 'attention,currency,labelsCurrency,last,onPress', label + ': the row derives its look itself; `last` draws the separator');
+      assert.equal(row.props.last, index === rows.length - 1, label + ': only the last row has no hairline');
+      const { progress } = row.props.attention;
+      assert.equal(JSON.stringify([row.props.attention.state, row.props.currency, row.props.labelsCurrency, progress.spentMinor, progress.remainingMinor, progress.ratio, progress.budget.id]),
+        JSON.stringify(expected[index]), label);
+      assert.equal(JSON.stringify(row.props.attention), JSON.stringify(chosen[index]), label + ': exactly homeBudgets\' choice (the route hands the whole HomeBudget as `attention`)');
+      assert.equal(JSON.stringify([row.props.currency, row.props.labelsCurrency]), JSON.stringify([chosen[index].currency, chosen[index].labelsCurrency]), label);
+      row.props.onPress();
+      assert.equal(JSON.stringify(view.pushed.at(-1)), JSON.stringify({ pathname: '/budgets', params: { currency: 'ARS', month: '2026-09' } }), label);
+    });
   }
-  // The call site in the route is the 24UX6C2 one, word for word.
+  // The call site: one grouped surface mapping homeBudgets' rows, each with its own currency, `last` and Presupuestos link.
   const route = readFileSync(new URL('../app/(tabs)/index.tsx', import.meta.url), 'utf8');
-  assert.match(route, /<Surface grouped><BudgetAttentionRow attention=\{budget\} currency=\{budget\.currency\} labelsCurrency=\{budget\.labelsCurrency\}\s+onPress=\{\(\) => router\.push\(\{ pathname: '\/budgets', params: \{ currency: budget\.currency, month \} \}\)\} \/><\/Surface>/);
+  assert.match(route, /<Surface grouped>\{budgets\.map\(\(budget, index\) => <BudgetAttentionRow key=\{[^}]+\} attention=\{budget\}\s+currency=\{budget\.currency\} labelsCurrency=\{budget\.labelsCurrency\} last=\{index === budgets\.length - 1\}\s+onPress=\{\(\) => router\.push\(\{ pathname: '\/budgets', params: \{ currency: budget\.currency, month \} \}\)\} \/>\)\}<\/Surface>/);
+});
+
+test('24UX6D refinement: two budget rows share ONE grouped surface (the first with a hairline, the last without), after the field and before «Próximos compromisos» and «Actividad reciente»', () => {
+  const { data, total, category } = budgetHome();
+  // General 8500 of 9000 (94 %, warning); Supermercado 6000 of 5000 (120 %, exceeded); Ocio 2500 of 2600 (96 %, warning, third: left out).
+  const view = routeHarness('(tabs)/index.tsx', {}, data, { budgets: [total(9000), category('Supermercado', 5000), category('Ocio', 2600)], recurring: [dueRule()] });
+  const root = view.render();
+  const rows = budgetRows(root);
+  assert.equal(rows.map(row => row.props.attention.state + ':' + row.props.attention.progress.budget.id).join(), 'exceeded:cat-Supermercado,warning:total-ARS-2026-09', 'two rows at most');
+  const surfaces = nodes(root).filter(n => n.type === 'Surface' && rows.some(row => nodes(n).includes(row)));
+  assert.equal(surfaces.length, 1, 'one surface holds both rows');
+  const [surface] = surfaces;
+  assert.equal(surface.props.grouped, true);
+  const children = [surface.props.children].flat(2).filter(Boolean) as Node[];
+  assert.equal(JSON.stringify(children.map(child => child.type)), JSON.stringify(['BudgetAttentionRow', 'BudgetAttentionRow']), 'the two rows and nothing else');
+  assert.equal(JSON.stringify(children.map(child => child.props.last)), JSON.stringify([false, true]), 'a hairline between them, none under the last');
+  assert.equal(new Set(children.map(child => child.key)).size, 2, 'each row keyed apart');
+  assert.equal(nodes(root).filter(n => n.type === 'Surface').length, 3, 'the budgets, the commitments and the activity');
+  assert.equal(nodes(fieldOf(root)).includes(surface), false, 'outside the financial field');
+  const all = nodes(root);
+  const position = (node: Node | undefined) => { assert.ok(node); return all.indexOf(node); };
+  const titled = (title: string) => all.find(n => n.type === 'SectionTitle' && n.props.children === title);
+  const order = [fieldOf(root), surface, titled('Próximos compromisos'), titled('Actividad reciente')].map(position);
+  assert.equal(order.every((index, i) => i === 0 || index > order[i - 1]), true, 'field < budgets < commitments < activity: ' + order.join());
+  assert.equal(nodes(fieldOf(root)).length + position(fieldOf(root)) <= position(surface), true, 'after the whole field');
+  assert.equal(sectionTitles(root).join('|'), 'Próximos compromisos|Actividad reciente', 'the budgets have no section title');
+  // One row alone is still `last` (no hairline under a single row).
+  const single = budgetRows(routeHarness('(tabs)/index.tsx', {}, data, { budgets: [total(9000)] }).render());
+  assert.equal(JSON.stringify(single.map(row => row.props.last)), JSON.stringify([true]));
+});
+
+test('24UX6D refinement: each budget row opens Presupuestos on its own currency and the month, a USD category budget too while Inicio shows ARS consolidated', () => {
+  const at = '2026-09-01T12:00:00.000Z';
+  const data: domain.LedgerSnapshot = { accounts: [{ id: 'a', name: 'Pesos', currency: 'ARS', openingMinor: 100000, createdAt: at }, { id: 'u', name: 'Dólares', currency: 'USD', openingMinor: 10000, createdAt: at }],
+    entries: [{ id: 'ars', accountId: 'a', kind: 'expense', amountMinor: 9000, merchant: 'Coto', category: 'Supermercado', dateISO: '2026-09-05', createdAt: at },
+      { id: 'usd', accountId: 'u', kind: 'expense', amountMinor: 700, merchant: 'App', category: 'Suscripciones', dateISO: '2026-09-11', createdAt: at }] };
+  const arsTotal: domain.MonthlyBudget = { id: 'b-ars', scope: 'total', currency: 'ARS', monthISO: '2026-09', amountMinor: 10000, active: true, createdAt: at, revision: 0, updatedAt: at };
+  const usdCategory: domain.MonthlyBudget = { id: 'c-usd', scope: 'category', category: 'Suscripciones', currency: 'USD', monthISO: '2026-09', amountMinor: 600, active: true, createdAt: at, revision: 0, updatedAt: at };
+  const view = routeHarness('(tabs)/index.tsx', {}, data, { budgets: [arsTotal, usdCategory] },
+    displayStore({ [displayCurrency.DISPLAY_MODE_KEY]: 'consolidated', [displayCurrency.DISPLAY_CURRENCY_KEY]: 'ARS' }), { book: consolidatedRates() });
+  const rows = budgetRows(view.render());
+  // USD 7,00 of 6,00 (117 %, exceeded) first, named; then ARS 90,00 of 100,00 (90 %, warning), unnamed.
+  assert.equal(JSON.stringify(rows.map(row => [row.props.attention.progress.budget.id, row.props.attention.progress.budget.scope, row.props.currency, row.props.labelsCurrency, row.props.attention.state,
+    row.props.attention.progress.spentMinor])), JSON.stringify([['c-usd', 'category', 'USD', true, 'exceeded', 700], ['b-ars', 'total', 'ARS', false, 'warning', 9000]]));
+  assert.equal(rows[0].props.attention.progress.budget, usdCategory, 'the category row carries the category budget itself');
+  assert.equal(rows[0].props.attention.progress.spentMinor, domain.summarizeMonthlyBudgets(data, [arsTotal, usdCategory], 'USD', '2026-09').rows[0].spentMinor, 'the USD ledger alone, unconverted');
+  rows[0].props.onPress();
+  assert.equal(JSON.stringify(view.pushed.at(-1)), JSON.stringify({ pathname: '/budgets', params: { currency: 'USD', month: '2026-09' } }), 'the USD row opens USD');
+  rows[1].props.onPress();
+  assert.equal(JSON.stringify(view.pushed.at(-1)), JSON.stringify({ pathname: '/budgets', params: { currency: 'ARS', month: '2026-09' } }), 'the ARS row opens ARS');
+  assert.equal(view.pushed.length, 2);
+  assert.equal(view.navigated.length, 0, 'pushed, never a tab switch');
 });

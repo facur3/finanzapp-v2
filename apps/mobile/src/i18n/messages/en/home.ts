@@ -1,7 +1,8 @@
 import type { Messages } from '../../messages.ts';
 
-/** Inicio (the current month's financial field, the general budget when it needs attention, the commitments due in the
- * next 30 days, the month's latest movements) and the capture hub the dock's «+» opens (Producto 24UX6A, decision 005). */
+/** Inicio (the current month's financial field, the month's budgets that need attention (general and category, at most
+ * two rows), the commitments due in the next 30 days, the month's latest movements) and the capture hub the dock's «+»
+ * opens (Producto 24UX6A, decision 005). */
 export const home: Pick<Messages, 'home' | 'quickActions'> = {
   home: {
     emptyTitle: 'Understand your spending.',
@@ -27,11 +28,14 @@ export const home: Pick<Messages, 'home' | 'quickActions'> = {
     budget: {
       title: 'Budget',
       titleIn: 'Budget · {code}',
+      categoryIn: '{category} · {code}',
       left: '{amount} left',
       reached: 'Limit reached',
       over: '{amount} over',
       spokenName: 'This month’s budget',
       spokenNameIn: 'This month’s {code} budget',
+      spokenCategory: '{category} budget',
+      spokenCategoryIn: '{category} {code} budget',
       warningLabel: '{name}, close to the limit, {percent} used, {amount} left',
       reachedLabel: '{name}, limit reached, {percent} used',
       exceededLabel: '{name}, over the limit, {percent} used, {amount} over',

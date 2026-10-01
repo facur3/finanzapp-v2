@@ -1,10 +1,11 @@
-import { addDaysISO, budgetState, sortCurrencies, summarizeMonthlyBudgets, type Account, type BudgetProgress, type Currency, type Entry, type LedgerSnapshot, type MonthlyBudget,
+import { addDaysISO, budgetState, categoryKey, sortCurrencies, summarizeMonthlyBudgets, type Account, type BudgetProgress, type Currency, type Entry, type LedgerSnapshot, type MonthlyBudget,
   type MonthlyBudgetSummary, type RecurringRule, type TotalMonthlyBudget, type Transfer } from '@finanzapp/domain';
 import { mergeActivity, type ActivityItem } from './presentation.ts';
 
 /** Producto 24UX6A (decision 005): what Inicio shows under its financial field, as pure selections, so the screen and the
- * tests read one rule. Inicio is the current month's dashboard: one number (Gastado or Disponible), the month's general
- * budget only while it needs attention (one contextual row, 24UX6C2), what is due soon, and what was recorded this
+ * tests read one rule. Inicio is the current month's dashboard: one number (Gastado or Disponible), the month's budgets
+ * only while they need attention (at most two compact rows: the general budget and category budgets, 24UX6C2/24UX6D),
+ * what is due soon, and what was recorded this
  * month; nothing else. No rankings, charts, permanent budget card, insight lines, Registrar button or Assistant banner:
  * the analysis lives in Reportes, recording in the dock's «+». No React, so Node tests load it. */
 
@@ -58,34 +59,59 @@ export function homeRecent(entries: readonly Entry[], transfers: readonly Transf
     transfers.filter(transfer => shown.has(transfer.fromAccountId) && inPeriod(transfer.dateISO))).slice(0, limit);
 }
 
-/** The one budget fact Inicio may show (24UX6C2, owner refinement): the month's GENERAL budget when it needs attention,
- * by the domain's own rule (`budgetState`: calm below BUDGET_WARNING_RATIO, 85 %; warning from 85 % through 100 %;
- * exceeded above 100 %). Never a category sublimit, never a calm budget, never a permanent card: null when there is no
- * active general budget or it is calm. The summary is measured on the real ledger in the budget's own currency (24C1). */
-export type BudgetAttention = { state: 'warning' | 'exceeded'; progress: BudgetProgress<TotalMonthlyBudget> };
-export function homeBudgetAttention(summary: MonthlyBudgetSummary | null): BudgetAttention | null {
+/** One budget that needs attention (24UX6C2; category budgets since the 24UX6D refinement): its domain state, `warning`
+ * or `exceeded` (`budgetState`: 85 % through 100 % inclusive is warning, above 100 % exceeded; calm never appears) and
+ * the domain's own progress, untouched. */
+export type BudgetAttention = { state: 'warning' | 'exceeded'; progress: BudgetProgress<MonthlyBudget> };
+/** The month's GENERAL budget when it needs attention, or null (no summary, no general budget, or calm). */
+export function homeBudgetAttention(summary: MonthlyBudgetSummary | null): (BudgetAttention & { progress: BudgetProgress<TotalMonthlyBudget> }) | null {
   const total = summary?.total;
   if (!total) return null;
   const state = budgetState(total);
   return state === 'calm' ? null : { state, progress: total };
 }
-
-/** Whose general budget Inicio shows (24UX6C2 review). Only a month's GENERAL budget counts; a category sublimit never
- * makes a currency the candidate. A budget keeps its own currency (24C1) and is measured on the real ledger of that
- * currency's accounts, never a converted total. In `single` mode only the currency shown is considered. Consolidated,
- * the display currency first, then each held currency in grouping order: the first whose general budget is in warning
- * or exceeded is the one row, its currency named whenever it is not the display currency (`labelsCurrency`). So a
- * calm budget never hides another currency's exceeded one, and nothing is drawn when every general budget is calm. */
-export type HomeBudget = BudgetAttention & { currency: Currency; labelsCurrency: boolean };
-export function homeBudget(snapshot: LedgerSnapshot, budgets: readonly MonthlyBudget[], held: readonly Currency[], mode: 'consolidated' | 'single',
-  display: Currency, monthISO: string): HomeBudget | null {
-  const general = budgets.filter(budget => budget.active && budget.scope === 'total' && budget.monthISO === monthISO);
-  const candidates = mode === 'single' ? [display] : [display, ...sortCurrencies(new Set(held)).filter(currency => currency !== display)];
-  for (const currency of candidates) {
-    if (!general.some(budget => budget.currency === currency)) continue;
-    let attention: BudgetAttention | null;
-    try { attention = homeBudgetAttention(summarizeMonthlyBudgets(snapshot, [...budgets], currency, monthISO)); } catch { continue; }
-    if (attention) return { ...attention, currency, labelsCurrency: currency !== display };
+/** Every budget of one summary that needs attention: the general budget and each category budget, by the same rule. */
+export function budgetAttentions(summary: MonthlyBudgetSummary | null): BudgetAttention[] {
+  if (!summary) return [];
+  const items: BudgetAttention[] = [];
+  for (const progress of [...(summary.total ? [summary.total] : []), ...summary.rows]) {
+    const state = budgetState(progress);
+    if (state !== 'calm') items.push({ state, progress });
   }
-  return null;
+  return items;
+}
+
+/** Inicio shows at most this many budget rows (24UX6D refinement): Home is never a budget dashboard; the rest stay in
+ * Presupuestos. */
+export const BUDGET_ATTENTION_ROWS = 2;
+
+/** The budgets Inicio shows (24UX6D refinement, owner): the month's general budget AND its category budgets, only those
+ * in warning or exceeded (`budgetState`), at most `BUDGET_ATTENTION_ROWS`, the limit applied after the order:
+ *   1. exceeded before warning;
+ *   2. within a state, a general budget before category budgets;
+ *   3. then the higher ratio first (spent / limit, the domain's own ratio);
+ *   4. then, stable: the display currency's before another currency's, the currency code, the category's key
+ *      (`categoryKey`: accents and case folded) and the budget id.
+ * Which currencies: in `single` mode only the currency shown; consolidated, every held currency (and the display one).
+ * A budget keeps its own currency (24C1) and is measured with `summarizeMonthlyBudgets` on the real ledger of that
+ * currency's accounts, never converted; a row names its currency whenever it is not the display currency
+ * (`labelsCurrency`). Nothing needs attention: an empty list, and Inicio draws no budget UI at all. */
+export type HomeBudget = BudgetAttention & { currency: Currency; labelsCurrency: boolean };
+export function homeBudgets(snapshot: LedgerSnapshot, budgets: readonly MonthlyBudget[], held: readonly Currency[], mode: 'consolidated' | 'single',
+  display: Currency, monthISO: string): HomeBudget[] {
+  const active = budgets.filter(budget => budget.active && budget.monthISO === monthISO);
+  const candidates = mode === 'single' ? [display] : [display, ...sortCurrencies(new Set(held)).filter(currency => currency !== display)];
+  const items: HomeBudget[] = [];
+  for (const currency of candidates) {
+    if (!active.some(budget => budget.currency === currency)) continue;
+    let summary: MonthlyBudgetSummary;
+    try { summary = summarizeMonthlyBudgets(snapshot, [...budgets], currency, monthISO); } catch { continue; }
+    for (const attention of budgetAttentions(summary)) items.push({ ...attention, currency, labelsCurrency: currency !== display });
+  }
+  const rank = (item: HomeBudget) => [item.state === 'exceeded' ? 0 : 1, item.progress.budget.scope === 'total' ? 0 : 1] as const;
+  const key = (item: HomeBudget) => item.progress.budget.scope === 'category' ? categoryKey(item.progress.budget.category) : '';
+  const text = (a: string, b: string) => a < b ? -1 : a > b ? 1 : 0;
+  return items.sort((a, b) => rank(a)[0] - rank(b)[0] || rank(a)[1] - rank(b)[1] || b.progress.ratio - a.progress.ratio
+    || Number(a.currency !== display) - Number(b.currency !== display) || text(a.currency, b.currency) || text(key(a), key(b))
+    || text(a.progress.budget.id, b.progress.budget.id)).slice(0, BUDGET_ATTENTION_ROWS);
 }

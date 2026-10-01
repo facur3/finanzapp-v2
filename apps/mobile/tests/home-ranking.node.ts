@@ -5,7 +5,7 @@ import { runInNewContext } from 'node:vm';
 import ts from 'typescript';
 import * as domain from '@finanzapp/domain';
 import * as uiPresentation from '../src/ui/presentation.ts';
-import { homeBudgetAttention } from '../src/ui/home-focus.ts';
+import { budgetAttentions, homeBudgetAttention } from '../src/ui/home-focus.ts';
 import * as budgetPresentation from '../src/ui/budget-presentation.ts';
 import * as geometry from '../src/ui/geometry.ts';
 import { bindLocale } from '../src/i18n/bind.ts';
@@ -18,11 +18,15 @@ const i18nProvider = { useI18n: () => bindLocale(current) };
 // the accounts button and the per-currency parts on the pine field) and the upcoming commitments. The insight line
 // (HomeInsightRow) was removed by owner decision (24UX6A). 24UX6C2 adds the general budget's attention row (BudgetAttentionRow),
 // drawn since 24UX6D as a compact progress row (name and percent, a bar, one quiet line). The look of the rows on an iPhone,
-// the bar's motion and the row at the largest text sizes remain device acceptance items.
+// the bar's motion and the row at the largest text sizes remain device acceptance items. Since the 24UX6D refinement the
+// same row draws a category budget, named by its localized category (`useCategoryLabel`), never in the category's hue.
 const palette = {
   line: '#ddd', isDark: true, secondary: '#A0A0A8', tertiary: '#7C7C84', expense: '#FF6B5E', warning: '#F5B342', inset: '#171E1B',
   hero: '#14362D', heroInk: '#EEF5F1', heroSecondary: '#A8C4B9', heroControl: '#26493F',
 };
+
+/** The harness's English names for stored default categories (the real hook resolves them from the catalogue). */
+const CATEGORY_EN: Record<string, string> = { Supermercado: 'Groceries' };
 
 function harness() {
   const source = readFileSync(new URL('../src/ui/home-modules.tsx', import.meta.url), 'utf8');
@@ -32,6 +36,8 @@ function harness() {
   // `withTiming` the bar asks for, so a test can drive the row at large text and check the motion without React.
   const env = { alerts: [] as unknown[][], pushed: [] as unknown[], required: new Set<string>(), window: { width: 393, height: 852, fontScale: 1 }, reduced: false,
     timings: [] as { to: number; config: any }[],
+    /** Every stored category the row asked `useCategoryLabel` to localize, in order. */
+    labels: [] as string[],
     // A minimal hook runtime for the bar (24UX6D review): shared values keep their slot across renders, and effects are
     // queued with their deps and run only by `flush()`, after the render, as React does. `begin()` starts a render.
     slots: [] as { value: number }[], deps: [] as (unknown[] | undefined)[], queued: [] as (() => void)[], cursor: 0, effectCursor: 0,
@@ -51,7 +57,9 @@ function harness() {
     '@expo/vector-icons/Ionicons': 'Ionicons',
     './budget-presentation': budgetPresentation,
     './components': { AppText: 'AppText', MerchantBadge: 'MerchantBadge', Money: 'Money', PressFeedback: 'PressFeedback', useStacked: () => false },
-    './category-hues': { useCategoryLook: (label: string) => ({ label, hex: '#' + label.length.toString().padStart(6, 'A'), glyph: 'restaurant-outline' }) },
+    './category-hues': { useCategoryLook: (label: string) => ({ label, hex: '#' + label.length.toString().padStart(6, 'A'), glyph: 'restaurant-outline' }),
+      // Localizes like the real hook: a stored default category reads in the interface language («Supermercado» → «Groceries»).
+      useCategoryLabel: (stored: string) => { env.labels.push(stored); return current === 'en-US' ? CATEGORY_EN[stored] ?? stored : stored; } },
     './geometry': geometry,
     // motion.tsx's own rule (`timing`: the kind's duration, zero under Reduce Motion), without loading Reanimated.
     './motion': { timing: (kind: string, reduced: boolean) => ({ kind, duration: reduced ? 0 : kind === 'data' ? 260 : -1 }) },
@@ -435,4 +443,168 @@ test('24UX6D: the name and the percent share a line only when both fit; large te
   assert.equal(header(1_000_000_000_000, true, 100).flexDirection, 'column', 'a percent that does not fit moves under the name');
   assert.equal(header(1_000_000_000_000, true, 100).flexDirection === 'column',
     geometry.labelAmountStacks(375, 1, 'Presupuesto · ARS', es.formatPercent(budgetPresentation.percentUsed(attentionFor(1_000_000_000_000, 'ARS', 100).progress) * 0.01), 116), 'the shared rule (labelAmountStacks)');
+});
+
+// ---- 24UX6D refinement: a category budget's attention row -------------------------------------------------------------
+/** The attention the screen would hand the row for a CATEGORY budget: the domain's summary of `spentMinor` in `category`
+ * against a sublimit of `limitMinor` (by default $ 100.000,00), through `budgetAttentions` as `homeBudgets` reads it. */
+function categoryAttentionFor(spentMinor: number, category = 'Supermercado', currency: domain.Currency = 'ARS', limitMinor = 10_000_000) {
+  const snapshot: domain.LedgerSnapshot = { accounts: [{ id: 'a', name: 'Banco', currency, openingMinor: 0, createdAt: budgetAt }],
+    entries: [{ id: 'e', accountId: 'a', kind: 'expense', amountMinor: spentMinor, merchant: 'Comercio', category, dateISO: '2026-09-10', createdAt: budgetAt }] };
+  const budget: domain.MonthlyBudget = { id: 'cat', scope: 'category', category, currency, monthISO: '2026-09', amountMinor: limitMinor, active: true, createdAt: budgetAt, revision: 0, updatedAt: budgetAt };
+  const [attention] = budgetAttentions(domain.summarizeMonthlyBudgets(snapshot, [budget], currency, '2026-09'));
+  assert.ok(attention && attention.progress.budget.scope === 'category', 'the fixture needs attention');
+  return attention;
+}
+const categoryRow = (exports: Record<string, any>, spent: number, extra: { labelsCurrency?: boolean; currency?: domain.Currency; last?: boolean; category?: string } = {}) =>
+  exports.BudgetAttentionRow({ attention: categoryAttentionFor(spent, extra.category, extra.currency ?? 'ARS'), currency: extra.currency ?? 'ARS', labelsCurrency: extra.labelsCurrency ?? false,
+    onPress: () => {}, ...(extra.last === undefined ? {} : { last: extra.last }) });
+/** Every colour the row draws with: `color` props and every style key that names a colour. */
+function coloursOf(row: any): string[] {
+  const found: string[] = [];
+  for (const node of flatten(row)) {
+    if (typeof node.props.color === 'string') found.push(node.props.color);
+    for (const style of [node.props.style].flat(Infinity)) if (style && typeof style === 'object')
+      for (const [key, value] of Object.entries(style)) if (/color$/i.test(key) && typeof value === 'string') found.push(value);
+  }
+  return found;
+}
+/** The look the harness would give a category (`useCategoryLook`'s mock): the hue the row must never use. */
+const categoryHex = (label: string) => '#' + label.length.toString().padStart(6, 'A');
+
+test('24UX6D refinement: a category budget at 97 % is the same warning progress row, named by its localized category in ink: «Supermercado», «97 %», «Quedan $ 3.000,00»', () => {
+  const { exports, env } = harness();
+  const attention = categoryAttentionFor(9_700_000);
+  assert.equal(JSON.stringify([attention.state, attention.progress.ratio, attention.progress.remainingMinor]), JSON.stringify(['warning', 0.97, 300_000]));
+  env.labels.length = 0;
+  const row = exports.BudgetAttentionRow({ attention, currency: 'ARS', labelsCurrency: false, onPress: () => {} });
+  assert.ok(env.labels.includes('Supermercado'), 'the stored category goes through useCategoryLabel');
+  const { all, title, percent, detail, meter, alert, tile } = budgetParts(row);
+  assert.equal(textOf(title), 'Supermercado', 'the category\'s name, not «Presupuesto»');
+  assert.equal(JSON.stringify([title.props.style.color, title.props.style.fontWeight, title.props.style.flexShrink]), JSON.stringify([undefined, '600', 1]), 'ink, like the general row');
+  assert.equal(textOf(percent), '97' + NBSP + '%');
+  assert.equal(percent.props.style.color, palette.warning);
+  assert.equal(JSON.stringify([meter.props.fraction, meter.props.color]), JSON.stringify([0.97, palette.warning]));
+  assert.equal(alert, undefined);
+  assert.equal(tile, undefined, 'no category glyph tile');
+  assert.equal(textOf(detail), 'Quedan $' + NBSP + '3.000,00');
+  assert.equal(all.some(node => node.type === 'CategoryBadge' || node.type === 'MerchantBadge'), false, 'no category badge');
+  // No category hue anywhere: every colour is the state's or the row's chrome.
+  const colours = coloursOf(row);
+  assert.equal(colours.includes(categoryHex('Supermercado')), false, 'never the category\'s hue');
+  assert.deepEqual([...new Set(colours)].sort(), [palette.line, palette.tertiary, palette.warning].sort(), 'warning amber, the hairline\'s and the chevron\'s chrome only');
+  // VoiceOver: one button naming the category budget, spoken percent and spoken money.
+  assert.equal(row.props.accessibilityLabel, 'Presupuesto de Supermercado, cerca del límite, ' + es.spokenPercent(0.97) + ' usado, quedan ' + es.spokenMoney(300_000, 'ARS'));
+  assert.equal(row.props.accessibilityLabel, 'Presupuesto de Supermercado, cerca del límite, 97' + NBSP + '% usado, quedan 3000,00 pesos');
+  assert.equal(row.props.accessibilityLabel.includes('$'), false);
+  assert.equal(row.props.accessibilityHint, 'Abre Presupuestos');
+  assert.equal(all.filter(node => node.type === 'AppText').every(node => node.props.accessible === false), true);
+});
+
+test('24UX6D refinement: a category row looks exactly like the general row in the same state; only the name and the spoken name differ', () => {
+  const { exports } = harness();
+  for (const spent of [8_500_000, 9_700_000, 10_000_000, 12_000_000]) {
+    const general = exports.BudgetAttentionRow({ attention: attentionFor(spent), currency: 'ARS', labelsCurrency: false, onPress: () => {} });
+    const category = categoryRow(exports, spent);
+    const look = (row: any) => { const parts = budgetParts(row);
+      return JSON.stringify([textOf(parts.percent), parts.percent.props.style, parts.meter.props, textOf(parts.detail), parts.alert?.props, row.props.style, parts.header.props.style, coloursOf(row)]); };
+    assert.equal(look(category), look(general), String(spent));
+    assert.equal(textOf(budgetParts(general).title), 'Presupuesto');
+    assert.equal(textOf(budgetParts(category).title), 'Supermercado');
+  }
+});
+
+test('24UX6D refinement: an exceeded category budget: the alert tone and glyph, «por encima», and VoiceOver «Presupuesto de Supermercado superado, …»', () => {
+  const { exports } = harness();
+  const row = categoryRow(exports, 12_000_000);
+  const { title, percent, detail, meter, alert } = budgetParts(row);
+  assert.equal(textOf(title), 'Supermercado');
+  assert.equal(JSON.stringify([textOf(percent), percent.props.style.color, meter.props.fraction, meter.props.color]), JSON.stringify(['120' + NBSP + '%', palette.expense, 1, palette.expense]));
+  assert.ok(alert, 'the alert glyph');
+  assert.equal(alert.props.color, palette.expense);
+  assert.equal(textOf(detail), '$' + NBSP + '20.000,00 por encima');
+  assert.equal(coloursOf(row).includes(categoryHex('Supermercado')), false);
+  assert.deepEqual([...new Set(coloursOf(row))].sort(), [palette.expense, palette.line, palette.tertiary].sort());
+  assert.equal(row.props.accessibilityLabel, 'Presupuesto de Supermercado superado, ' + es.spokenPercent(1.2) + ' usado, ' + es.spokenMoney(2_000_000, 'ARS') + ' por encima');
+  assert.equal(row.props.accessibilityLabel, 'Presupuesto de Supermercado superado, 120' + NBSP + '% usado, 20000,00 pesos por encima');
+  // Exactly at the limit: still amber, «Límite alcanzado».
+  const reached = categoryRow(exports, 10_000_000);
+  assert.equal(JSON.stringify([textOf(budgetParts(reached).detail), budgetParts(reached).percent.props.style.color]), JSON.stringify(['Límite alcanzado', palette.warning]));
+  assert.equal(reached.props.accessibilityLabel, 'Presupuesto de Supermercado, límite alcanzado, ' + es.spokenPercent(1) + ' usado');
+});
+
+test('24UX6D refinement: a category budget in another currency than Inicio\'s is «Supermercado · USD», its amounts coded, VoiceOver naming the currency', () => {
+  const { exports } = harness();
+  const row = categoryRow(exports, 9_700_000, { currency: 'USD', labelsCurrency: true });
+  const { title, detail } = budgetParts(row);
+  assert.equal(textOf(title), 'Supermercado · USD');
+  assert.equal(textOf(detail), 'Quedan ' + es.codedAmount(300_000, 'USD'));
+  assert.equal(row.props.accessibilityLabel, 'Presupuesto de Supermercado en USD, cerca del límite, ' + es.spokenPercent(0.97) + ' usado, quedan ' + es.spokenMoney(300_000, 'USD'));
+  const over = categoryRow(exports, 12_000_000, { currency: 'USD', labelsCurrency: true });
+  assert.equal(textOf(budgetParts(over).title), 'Supermercado · USD');
+  assert.equal(over.props.accessibilityLabel, 'Presupuesto de Supermercado en USD superado, ' + es.spokenPercent(1.2) + ' usado, ' + es.spokenMoney(2_000_000, 'USD') + ' por encima');
+  // Not named: the bare category.
+  assert.equal(textOf(budgetParts(categoryRow(exports, 9_700_000, { currency: 'USD' })).title), 'Supermercado');
+});
+
+test('24UX6D refinement: a category budget row in English uses the localized category («Groceries»)', () => {
+  const { exports } = harness();
+  try {
+    current = 'en-US';
+    const en = bindLocale('en-US');
+    const warning = categoryRow(exports, 9_700_000);
+    const parts = budgetParts(warning);
+    assert.equal(JSON.stringify([textOf(parts.title), textOf(parts.percent), textOf(parts.detail)]), JSON.stringify(['Groceries', '97%', en.moneyText(300_000, 'ARS') + ' left']),
+      'the stored «Supermercado» reads in English: the row uses the hook\'s label, never the stored string');
+    assert.equal(warning.props.accessibilityLabel, 'Groceries budget, close to the limit, ' + en.spokenPercent(0.97) + ' used, ' + en.spokenMoney(300_000, 'ARS') + ' left');
+    assert.equal(warning.props.accessibilityLabel, 'Groceries budget, close to the limit, 97% used, 3000.00 pesos left');
+    assert.equal(warning.props.accessibilityHint, 'Opens Budgets');
+    const exceeded = categoryRow(exports, 12_000_000);
+    assert.equal(exceeded.props.accessibilityLabel, 'Groceries budget, over the limit, 120% used, 20000.00 pesos over');
+    const coded = categoryRow(exports, 9_700_000, { currency: 'USD', labelsCurrency: true });
+    assert.equal(textOf(budgetParts(coded).title), 'Groceries · USD');
+    assert.equal(coded.props.accessibilityLabel, 'Groceries USD budget, close to the limit, 97% used, ' + en.spokenMoney(300_000, 'USD') + ' left');
+    assert.equal(textOf(budgetParts(categoryRow(exports, 10_000_000)).detail), 'Limit reached');
+  } finally { current = 'es-AR'; }
+});
+
+test('24UX6D refinement: in the grouped surface a row that is not last draws a hairline under it; the last (the default) draws none', () => {
+  const { exports } = harness();
+  const general = (last?: boolean) => exports.BudgetAttentionRow({ attention: attentionFor(9_000_000), currency: 'ARS', labelsCurrency: false, onPress: () => {}, ...(last === undefined ? {} : { last }) });
+  for (const [label, make] of [['general', general], ['category', (last?: boolean) => categoryRow(exports, 9_000_000, { last })]] as const) {
+    const first = make(false).props.style;
+    assert.equal(JSON.stringify([first.borderBottomWidth, first.borderBottomColor]), JSON.stringify([0.5, palette.line]), label + ': StyleSheet.hairlineWidth in the separator colour');
+    assert.equal(make(true).props.style.borderBottomWidth, 0, label + ': the last row has no hairline');
+    assert.equal(make(undefined).props.style.borderBottomWidth, 0, label + ': `last` defaults to true (a single row)');
+    assert.equal(JSON.stringify([first.minHeight, first.paddingHorizontal, first.paddingVertical]), JSON.stringify([64, 16, 12]), label + ': the separator changes nothing else');
+  }
+});
+
+test('24UX6D refinement: a 60-character category with a 13-digit ARS amount stacks at 375 pt and at 1.35× text, and nothing is cut', () => {
+  const { exports, env } = harness();
+  const name = 'Supermercados mayoristas, almacenes y verdulerías del barrio';
+  assert.equal(name.length, 60, 'the longest category the domain accepts');
+  // A limit of $ 10.000.000.000,00 (13 digits) and $ 12.345.678.901,23 over it.
+  const limit = 1_000_000_000_000, spent = 2_234_567_890_123;
+  const make = (labelsCurrency: boolean) => exports.BudgetAttentionRow({ attention: categoryAttentionFor(spent, name, 'ARS', limit), currency: 'ARS', labelsCurrency, onPress: () => {} });
+  try {
+    for (const window of [{ width: 375, height: 667, fontScale: 1 }, { width: 393, height: 852, fontScale: 1.35 }, { width: 375, height: 667, fontScale: 1.35 }]) {
+      env.window = window;
+      for (const labelsCurrency of [false, true]) {
+        const label = window.width + ' pt × ' + window.fontScale + (labelsCurrency ? ', named' : '');
+        const row = make(labelsCurrency);
+        const { all, header, title, percent, detail } = budgetParts(row);
+        assert.equal(JSON.stringify([header.props.style.flexDirection, header.props.style.alignItems]), JSON.stringify(['column', 'flex-start']), label + ': the percent goes under the name');
+        assert.equal(textOf(title), labelsCurrency ? name + ' · ARS' : name, label + ': the whole name');
+        assert.equal(textOf(percent), es.formatPercent(budgetPresentation.percentUsed(categoryAttentionFor(spent, name, 'ARS', limit).progress) * 0.01), label);
+        const amount = labelsCurrency ? es.codedAmount(1_234_567_890_123, 'ARS') : es.moneyText(1_234_567_890_123, 'ARS');
+        assert.equal(textOf(detail), amount + ' por encima', label + ': the whole 13-digit amount');
+        assert.match(textOf(detail), /12\.345\.678\.901,23/);
+        assert.equal(all.some(node => node.props.numberOfLines !== undefined || node.props.adjustsFontSizeToFit), false, label + ': no numberOfLines, no shrinking: it wraps');
+        assert.equal(title.props.style.flexShrink, 1, label + ': the name may wrap inside the row');
+        assert.equal(row.props.accessibilityLabel, 'Presupuesto de ' + name + (labelsCurrency ? ' en ARS' : '') + ' superado, ' + es.spokenPercent(budgetPresentation.percentUsed(categoryAttentionFor(spent, name, 'ARS', limit).progress) * 0.01)
+          + ' usado, ' + es.spokenMoney(1_234_567_890_123, 'ARS') + ' por encima', label);
+      }
+    }
+  } finally { env.window = { width: 393, height: 852, fontScale: 1 }; }
 });

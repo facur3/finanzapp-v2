@@ -7,7 +7,7 @@ import { type Account, type Currency, type RecurringRule } from '@finanzapp/doma
 import type { BudgetAttention } from './home-focus';
 import { percentUsed } from './budget-presentation';
 import { AppText, MerchantBadge, Money, PressFeedback, useStacked, type IconName } from './components';
-import { useCategoryLook } from './category-hues';
+import { useCategoryLabel, useCategoryLook } from './category-hues';
 import { labelAmountStacks } from './geometry';
 import { timing } from './motion';
 import { dueWhen } from './presentation';
@@ -114,9 +114,12 @@ const BUDGET_ROW_CHROME = 116;
 /** The bar's thickness and corner (24UX6D): a 6 pt capsule, Presupuestos' general bar. */
 const METER = { height: 6, radius: 3 } as const;
 
-/** The month's general budget when it needs attention (24UX6C2): one compact row between the financial field and the
- * commitments, never a card or a dashboard. Amounts are the budget's own currency, measured on the real ledger (24C1);
- * `homeBudget` chose which budget and whether its currency must be named. Tapping opens Presupuestos.
+/** A month's budget that needs attention (24UX6C2; category budgets since the 24UX6D refinement): one compact row
+ * between the financial field and the commitments, at most two of them in one grouped surface, never a card or a
+ * dashboard. Amounts are the budget's own currency, measured on the real ledger (24C1); `homeBudgets` chose which budgets
+ * and whether a row must name its currency. Tapping opens Presupuestos. The general budget is «Presupuesto»; a category
+ * budget is named by its category («Supermercado»), in ink like the general one: the state (amber or the alert tone)
+ * stays the only colour, so a category's hue never competes with it.
  *
  * 24UX6D, a Forest progress row instead of the sentence: the name («Presupuesto», «Presupuesto · USD» when the budget is
  * not in the currency Inicio shows) with the whole percent Presupuestos and Reportes show (`percentUsed`, «91 %», past
@@ -126,13 +129,15 @@ const METER = { height: 6, radius: 3 } as const;
  * beside the percent AND the words «por encima», so the two states differ by more than colour. The name and the percent
  * share a line only when both fit (`labelAmountStacks`, so always stacked above 1.2× text); the detail wraps, never
  * truncated. VoiceOver hears one button: the state, the spoken percent and the spoken amount, never a visible string. */
-export function BudgetAttentionRow({ attention, currency, labelsCurrency, onPress }: {
-  attention: BudgetAttention; currency: Currency; labelsCurrency: boolean; onPress: () => void;
+export function BudgetAttentionRow({ attention, currency, labelsCurrency, onPress, last = true }: {
+  attention: BudgetAttention; currency: Currency; labelsCurrency: boolean; onPress: () => void; last?: boolean;
 }) {
   const p = usePalette();
   const { t, moneyText, codedAmount, spokenMoney, formatPercent, spokenPercent } = useI18n();
   const { width, fontScale } = useWindowDimensions();
   const { state, progress } = attention;
+  const budget = progress.budget;
+  const category = useCategoryLabel(budget.scope === 'category' ? budget.category : '');
   const exceeded = state === 'exceeded';
   const reached = !exceeded && progress.remainingMinor === 0;
   const tone = exceeded ? p.expense : p.warning;
@@ -141,17 +146,21 @@ export function BudgetAttentionRow({ attention, currency, labelsCurrency, onPres
   // screen it opens agree; formatPercent rounds on the decimal value, so the product's binary tail never shows.
   const shown = percentUsed(progress) * 0.01;
   const percent = formatPercent(shown);
-  const title = labelsCurrency ? t('home.budget.titleIn', { code: currency }) : t('home.budget.title');
+  const general = budget.scope === 'total';
+  const title = general ? (labelsCurrency ? t('home.budget.titleIn', { code: currency }) : t('home.budget.title'))
+    : labelsCurrency ? t('home.budget.categoryIn', { category, code: currency }) : category;
   const detail = exceeded ? t('home.budget.over', { amount: money(-progress.remainingMinor) })
     : reached ? t('home.budget.reached') : t('home.budget.left', { amount: money(progress.remainingMinor) });
-  const name = labelsCurrency ? t('home.budget.spokenNameIn', { code: currency }) : t('home.budget.spokenName');
+  const name = general ? (labelsCurrency ? t('home.budget.spokenNameIn', { code: currency }) : t('home.budget.spokenName'))
+    : t(labelsCurrency ? 'home.budget.spokenCategoryIn' : 'home.budget.spokenCategory', { category, code: currency });
   const label = exceeded ? t('home.budget.exceededLabel', { name, percent: spokenPercent(shown), amount: spokenMoney(-progress.remainingMinor, currency) })
     : reached ? t('home.budget.reachedLabel', { name, percent: spokenPercent(shown) })
     : t('home.budget.warningLabel', { name, percent: spokenPercent(shown), amount: spokenMoney(progress.remainingMinor, currency) });
   const stacked = labelAmountStacks(width, fontScale, title, percent, BUDGET_ROW_CHROME);
   return <PressFeedback feedback="highlight" accessibilityRole="button" accessibilityLabel={label}
     accessibilityHint={t('home.budget.hint')} onPress={onPress}
-    style={{ flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 64, paddingHorizontal: 16, paddingVertical: 12 }}>
+    style={{ flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 64, paddingHorizontal: 16, paddingVertical: 12,
+      borderBottomWidth: last ? 0 : StyleSheet.hairlineWidth, borderBottomColor: p.line }}>
     <View style={{ flex: 1, minWidth: 0, gap: 8 }}>
       <View style={{ flexDirection: stacked ? 'column' : 'row', alignItems: stacked ? 'flex-start' : 'center', justifyContent: 'space-between', gap: stacked ? 2 : 8 }}>
         <AppText accessible={false} style={{ flexShrink: 1, fontWeight: '600' }}>{title}</AppText>
