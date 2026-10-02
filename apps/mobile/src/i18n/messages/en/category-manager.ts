@@ -16,8 +16,9 @@ export const categoryManager: Pick<Messages, 'categoryManager'> = {
         historical: 'From history',
       },
       rowLabel: '{name}, {usage}',
-      rowLabelArchived: '{name}, {usage}, archived',
+      rowLabelArchived: '{name}, {kind}, {usage}, archived',
       rowHint: 'Edits the name, icon and color',
+      rowHintArchived: 'Edits the name, icon and color, or unarchives it',
     },
     notFound: {
       title: 'We couldn’t find this category',
@@ -26,7 +27,8 @@ export const categoryManager: Pick<Messages, 'categoryManager'> = {
     form: {
       name: 'Name',
       namePlaceholder: 'e.g. Snacks',
-      archivedNote: 'Archived: not offered when recording; your past transactions keep it.',
+      archivedTitle: 'Archived',
+      archivedDetail: 'Not offered when recording. Your transactions, budgets and recurring items keep it; unarchive it to offer it again.',
       editNote: 'Changing the name, icon or color doesn’t modify any transaction, budget or recurring item.',
       renamedNote: 'Transactions are still recorded as “{stored}” and shown as “{shown}”.',
       availableExpense: 'It will be available right away when recording expenses.',

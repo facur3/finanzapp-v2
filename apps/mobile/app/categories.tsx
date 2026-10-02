@@ -1,9 +1,9 @@
 import { useMemo } from 'react';
-import { View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { router, Stack } from 'expo-router';
 import { categoryCatalog, planFinancingCategories, type CategoryCatalogRow, type EntryKind } from '@finanzapp/domain';
 import { useLedger } from '../src/storage/LedgerProvider';
-import { AppText, CategoryBadge, IconButton, PressFeedback, Screen, SectionTitle, Surface } from '../src/ui/components';
+import { AppText, CategoryBadge, IconButton, PressFeedback, Screen, SectionTitle, Surface, useStacked } from '../src/ui/components';
 import { usePalette } from '../src/ui/theme';
 import { localizedCategoryLabel } from '../src/ui/appearance';
 import { useI18n } from '../src/i18n/provider';
@@ -42,24 +42,33 @@ function usage(row: CategoryCatalogRow, t: Translate): string {
   return [count, source].filter(Boolean).join(' · ');
 }
 
+/** 24UX6E: a row on the Forest row geometry (16 × 12, 64 pt minimum, hairline). It opens a modal editor, so it carries
+ * no chevron (a chevron promises a push). An archived row is never dimmed: its group, its caption and the spoken
+ * «archivada» carry the state; it leads with its kind, which the Archivadas group mixes. At accessibility text sizes a
+ * name wraps instead of being cut. */
 function CatalogSection({ title, caption, kind, rows }: { title: string; caption?: string; kind?: EntryKind; rows: CategoryCatalogRow[] }) {
   const p = usePalette();
   const { t, language } = useI18n();
+  const stacked = useStacked();
   if (!rows.length) return null;
   return <View>
     <SectionTitle caption={caption}>{title}</SectionTitle>
     <Surface grouped>
-      {rows.map((row, index) => { const name = localizedCategoryLabel(row.identity, language), used = usage(row, t);
+      {rows.map((row, index) => { const name = localizedCategoryLabel(row.identity, language), used = usage(row, t), archived = row.identity.archived;
+        const income = row.identity.kind === 'income';
+        // Only the Archivadas group (no `kind`) names the kind: visibly capitalised first, spoken as a word in the sentence.
+        const detail = kind ? used : [t(income ? 'movement.income' : 'movement.expense'), used].filter(Boolean).join(' · ');
         return <PressFeedback key={row.identity.kind + '|' + row.identity.key} feedback="highlight" accessibilityRole="button"
-        accessibilityLabel={t(row.identity.archived ? 'categoryManager.list.rowLabelArchived' : 'categoryManager.list.rowLabel', { name, usage: used })}
-        accessibilityHint={t('categoryManager.list.rowHint')}
+        accessibilityLabel={archived ? t('categoryManager.list.rowLabelArchived', { name, kind: t(income ? 'movement.incomeWord' : 'movement.expenseWord'), usage: used })
+          : t('categoryManager.list.rowLabel', { name, usage: used })}
+        accessibilityHint={t(archived ? 'categoryManager.list.rowHintArchived' : 'categoryManager.list.rowHint')}
         onPress={() => router.push({ pathname: '/edit-category', params: { kind: row.identity.kind, key: row.identity.key } })}
-        style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 14, paddingVertical: 10,
-          borderBottomColor: p.line, borderBottomWidth: index === rows.length - 1 ? 0 : 0.5, opacity: row.identity.archived ? 0.6 : 1 }}>
+        style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 12, minHeight: 64,
+          borderBottomColor: p.line, borderBottomWidth: index === rows.length - 1 ? 0 : StyleSheet.hairlineWidth }}>
         <CategoryBadge category={row.identity.storedLabel} kind={kind ?? row.identity.kind} />
         <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
-          <AppText numberOfLines={2} style={{ fontWeight: '500' }}>{name}</AppText>
-          <AppText secondary variant="footnote">{used}{kind ? '' : ' · ' + t(row.identity.kind === 'income' ? 'movement.income' : 'movement.expense')}</AppText>
+          <AppText numberOfLines={stacked ? undefined : 2} style={{ fontWeight: '500' }}>{name}</AppText>
+          <AppText secondary variant="footnote">{detail}</AppText>
         </View>
       </PressFeedback>; })}
     </Surface>

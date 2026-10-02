@@ -29,7 +29,8 @@ function harness(props: { original?: domain.CreditCardProfile } = {}, options: O
   let day = options.day ?? '2026-09-20';
   let locale: AppLocale = options.locale ?? 'es-AR';
   const state: unknown[] = [], refs: { current: unknown }[] = [];
-  let cursor = 0, refCursor = 0, uuid = 0, backs = 0;
+  let cursor = 0, refCursor = 0, uuid = 0, backs = 0, removed = 0;
+  const dismissed: unknown[] = [], replaced: unknown[] = [];
   const added: { account: domain.Account; card: domain.CreditCardProfile; rows: readonly domain.CardCycleDates[] | undefined }[] = [];
   const saved: { card: domain.CreditCardProfile; intent: unknown }[] = [];
   const alerts: { title: string; message: string; buttons: { text: string; onPress?: () => void }[] }[] = [];
@@ -44,7 +45,8 @@ function harness(props: { original?: domain.CreditCardProfile } = {}, options: O
     useRef: (initial: unknown) => { const index = refCursor++; return refs[index] ??= { current: initial }; }, useMemo: (fn: () => unknown) => fn() },
     'react/jsx-runtime': { jsx, jsxs: jsx, Fragment: 'Fragment' },
     'react-native': { View: 'View', Keyboard: { dismiss() {} }, Alert: { alert: (title: string, message: string, buttons: any[]) => alerts.push({ title, message, buttons }) } },
-    'expo-router': { Stack: { Screen: 'Stack.Screen' }, router: { canGoBack: () => true, back: () => { backs++; }, push: () => {}, replace: () => {} } },
+    'expo-router': { Stack: { Screen: 'Stack.Screen' }, router: { canGoBack: () => true, back: () => { backs++; }, push: () => {}, replace: (to: unknown) => { replaced.push(to); },
+      dismissTo: (to: unknown) => { dismissed.push(to); } } },
     'expo-crypto': { randomUUID: () => 'id-' + (++uuid) },
     'expo-haptics': { NotificationFeedbackType: { Success: 'Success' }, notificationAsync: async () => {} },
     '@finanzapp/domain': domain,
@@ -54,7 +56,8 @@ function harness(props: { original?: domain.CreditCardProfile } = {}, options: O
     './card-cycle-form': cardCycleForm,
     './currency-switch': { CurrencySwitch: 'CurrencySwitch' },
     './use-default-currency': { useDefaultCurrency: ({ accountCurrency }: { accountCurrency?: domain.Currency }) => accountCurrency ?? 'ARS' },
-    './commitment-actions': { useCardManagement: () => ({ busyId: null, error: null, remove: () => {} }) },
+    // 24UX6E: «Eliminar tarjeta» hands the card to the confirmation flow (tests/lifecycle-actions.node.ts); here it confirms at once.
+    './commitment-actions': { useCardManagement: () => ({ busyId: null, error: null, remove: (_card: unknown, done?: () => void) => { removed++; done?.(); } }) },
     './currencies': currencies,
     './form-controls': { DateField: 'DateField' },
     './money-input': moneyInput,
@@ -71,7 +74,7 @@ function harness(props: { original?: domain.CreditCardProfile } = {}, options: O
   return {
     render: () => { cursor = 0; refCursor = 0; return module.exports.CardForm(props); },
     setData: (next: domain.LedgerArchive) => { data = next; }, setDay: (next: string) => { day = next; }, setLocale: (next: AppLocale) => { locale = next; },
-    added, saved, alerts, backs: () => backs,
+    added, saved, alerts, backs: () => backs, dismissed, replaced, removed: () => removed,
   };
 }
 
@@ -403,4 +406,13 @@ test('24T2 owner decision: any exact correction may be one-off (+1, +14, +16, +2
   assert.deepEqual(closings(repeated.plan), ['2026-09-28', '2026-11-17', '2026-12-17', '2027-01-17']);
   // History never moves: the statement that closed on 28 sep keeps its dates either way.
   assert.deepEqual(domain.cardCycleView(repeated.plan.days, repeated.plan.rows, '2026-10-01').previous, { closingISO: '2026-09-28', dueISO: '2026-10-05', exact: true });
+});
+
+// 24UX6E (bug fix): after deleting a card the form dismisses to Tarjetas in one step (expo-router `dismissTo`: pops to it when it
+// is in the stack, else replaces the modal with it), never a pop-to-top followed by a replace on top of the stack.
+test('24UX6E: «Eliminar tarjeta» dismisses to Tarjetas once the deletion is confirmed', () => {
+  const view = harness({ original: card });
+  find(view.render(), 'ActionButton', 'Eliminar tarjeta').props.onPress();
+  assert.equal(view.removed(), 1);
+  assert.deepEqual([view.dismissed, view.replaced, view.backs()], [['/cards'], [], 0]);
 });

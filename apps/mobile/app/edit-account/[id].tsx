@@ -20,10 +20,18 @@ export default function EditAccountScreen() {
   const account = snapshot?.accounts.find(a => a.id === id);
   const current = archive?.appearances?.find(item => item.accountId === id);
   const { t } = useI18n();
+  // 24UX6E: the modal keeps its close button when there is nothing to edit (the same close as the form's).
+  const closeButton = <Stack.Screen options={{ headerLeft: () => <IconButton name="close" label={t('common.close')} onPress={closeEditor} /> }} />;
   // 25B2: a deleted account is never edited again; its detail stays readable.
-  if (account && !isLiveAccount(account)) return <Screen><EmptyState title={t('accounts.manage.deletedTitle')} detail={t('accounts.manage.deletedNote')} /></Screen>;
+  if (account && !isLiveAccount(account)) return <Screen>{closeButton}<EmptyState title={t('accounts.manage.deletedTitle')} detail={t('accounts.manage.deletedNote')} /></Screen>;
   return account && snapshot ? <AccountEditor key={id} account={account} snapshot={snapshot} current={current} />
-    : <Screen><EmptyState title={t('accounts.detail.notFoundTitle')} detail={t('accounts.edit.notFoundDetail')} /></Screen>;
+    : <Screen>{closeButton}<EmptyState title={t('accounts.detail.notFoundTitle')} detail={t('accounts.edit.notFoundDetail')} /></Screen>;
+}
+
+/** Leave the editor: back to whatever opened it, else to Cuentas (24UX6E: `dismissTo` pops to it when it is in the stack and
+ * otherwise replaces this modal with it). */
+function closeEditor() {
+  if (router.canGoBack()) router.back(); else router.dismissTo('/accounts');
 }
 
 type Submission = { change: AccountChange | null; appearance: AccountAppearance | null };
@@ -50,7 +58,7 @@ function AccountEditor({ account, snapshot, current }: { account: Account; snaps
   const [pending, setPending] = useState<Submission | null>(null);
   const [error, setError] = useState<string | null>(null);
   const working = useRef(false), confirming = useRef(false);
-  const close = () => { if (!working.current) { if (router.canGoBack()) router.back(); else router.replace('/accounts'); } };
+  const close = () => { if (!working.current) closeEditor(); };
   async function apply(submission: Submission) {
     if (working.current) return;
     working.current = true; setBusy(true); setPending(submission); setError(null);
@@ -104,7 +112,7 @@ function AccountEditor({ account, snapshot, current }: { account: Account; snaps
     {deletable && <>
       <ErrorMessage message={manage.error} />
       <ActionButton secondary tone="expense" label={t('accounts.manage.deleteAccount')} icon="trash-outline" disabled={locked || manage.busyId === account.id}
-        onPress={() => manage.remove(original.account, () => { (router as { dismissAll?: () => void }).dismissAll?.(); router.replace('/accounts'); })} />
+        onPress={() => manage.remove(original.account, () => router.dismissTo('/accounts'))} />
     </>}
   </Screen>;
 }
