@@ -8,8 +8,11 @@ import { liquidTotalsByCurrency, sameCreditCardProfile, samePersonalDebtProfile,
   validatePersonalDebtProfile, type CreditCardProfile, type PersonalDebtProfile } from './liabilities.ts';
 import { APPEARANCE_KEYS, sameAccountAppearance, validateAccountAppearance, validateAccountAppearances, type AccountAppearance } from './appearance.ts';
 import { CATEGORY_DEFINITION_KEYS, sameCategoryDefinition, validateCategoryDefinition, validateCategoryDefinitions, type CategoryDefinition } from './categories.ts';
-import { INSTALLMENT_KEYS, INSTALLMENT_PLAN_KEYS, sameInstallmentPlan, validateInstallmentPlans, type Installment, type InstallmentPlan } from './installments.ts';
+import { INSTALLMENT_KEYS, INSTALLMENT_PLAN_KEYS, planCatchUpInserts, sameInstallmentPlan, validateInstallmentPlans, type Installment, type InstallmentPlan } from './installments.ts';
 import { CARD_CYCLE_DATE_KEYS, sameCardCycleDate, validateCardCycleDates, type CardCycleDates } from './card-cycles.ts';
+import { OPERATION_CHANGED_MESSAGE, OPERATION_EXISTS_MESSAGE, OPERATION_INVALID_MESSAGE, OPERATION_STATE_MESSAGE, assertOperationApplicable, operationPlanId, parsePurchaseOperation, projectOperationLines,
+  samePurchaseOperation, validateOperationChange, validatePurchaseOperation, validatePurchaseOperationLinks, withOperation, type OperationChange,
+  type OperationContext, type PurchaseOperation } from './operations.ts';
 
 /** The current version of every entry, including reversible tombstones.
  * Reports consume snapshotFromArchive, never the tombstones themselves. */
@@ -39,6 +42,9 @@ export interface LedgerArchive {
   installmentPlans?: InstallmentPlan[];
   /** Producto 24T2: the exact statement dates of cards (each a closing and its due), one chain per card (card-cycles.ts). */
   cardCycleDates?: CardCycleDates[];
+  /** Producto 24T3: devoluciones and adelantos de cuotas (operations.ts), undone ones included. Absent (read as []) in an
+   * archive from before 24T3. Their money effect is projected by `snapshotFromArchive`, never stored as movements. */
+  purchaseOperations?: PurchaseOperation[];
 }
 export interface EntryChange {
   id: string;
@@ -59,6 +65,12 @@ export const BACKUP_SCHEMA_V12 = 'finanzapp.native-pilot.v12';
 /** v13 = v12 plus `cardCycleDates` (Producto 24T2: a card's exact statement dates), written as soon as one exists; a v13
  * file always carries `installmentPlans` too (possibly empty). */
 export const BACKUP_SCHEMA_V13 = 'finanzapp.native-pilot.v13';
+/** v14 = v13 plus `purchaseOperations` (Producto 24T3: devoluciones and adelantos de cuotas, undone ones included), written as
+ * soon as one exists; a v14 file always carries `installmentPlans` and `cardCycleDates` too (possibly empty). */
+export const BACKUP_SCHEMA_V14 = 'finanzapp.native-pilot.v14';
+/** 24T3: at most this many operations in a copy; each also counts toward the 25.000-movement budget (an adelanto as four,
+ * one per line it can project). */
+export const MAX_BACKUP_OPERATIONS = 25000;
 export const MAX_BACKUP_CURRENCY_UNITS = 200;
 /** Backups v1–v8 record one money unit and no scale per currency: they can only ever name
  * ARS and USD cents, whatever the creation gate offers when the file is read. A file naming
@@ -179,11 +191,17 @@ export function validateRecord(record: EntryRecord, accounts: Account[]): void {
     throw new Error('Estado inicial de movimiento inválido.');
   }
 }
+/** The ledger every reader uses: live movements, then (24T3) the lines live devoluciones and adelantos project
+ * (`projectOperationLines`, deterministic order), and live transfers. */
 export function snapshotFromArchive(archive: LedgerArchive): LedgerSnapshot {
-  return { accounts: archive.accounts, entries: archive.records.filter(record => !record.voided).map(record => record.entry),
+  const entries = archive.records.filter(record => !record.voided).map(record => record.entry);
+  if (archive.purchaseOperations?.length) entries.push(...projectOperationLines(archive));
+  return { accounts: archive.accounts, entries,
     ...(archive.transfers?.length ? { transfers: archive.transfers.filter(record => !record.voided).map(record => record.transfer) } : {}) };
 }
-export function validateArchive(archive: LedgerArchive): void {
+/** Every invariant of an archive. `context` (24T3, A22) only chooses how a guard involving a devolución or an adelanto is
+ * worded (an undo, a restore, an import…); it never changes what is accepted. */
+export function validateArchive(archive: LedgerArchive, context?: OperationContext): void {
   const accounts = new Set<string>();
   for (const account of archive.accounts) {
     validateAccount(account);
@@ -212,11 +230,17 @@ export function validateArchive(archive: LedgerArchive): void {
   validateLiabilityProfiles(archive.cards ?? [], archive.debts ?? [], archive.accounts);
   validateAccountAppearances(archive.appearances ?? [], archive.accounts);
   validateCategoryDefinitions(archive.categories ?? []);
-  // 24T1: each plan against its card, and the ledger against every plan (an instalment movement matches its schedule).
-  validateInstallmentPlans(archive.installmentPlans ?? [], archive.cards ?? [], archive.accounts, archive.records);
+  // 24T3: every operation's shape first (the plan checks below read their rows).
+  const operations = archive.purchaseOperations ?? [];
+  operations.forEach(validatePurchaseOperation);
+  // 24T1: each plan against its card, and the ledger against every plan (an instalment movement matches its schedule;
+  // since 24T3 its effective share, after live reductions, with the operation-aware refusals first).
+  validateInstallmentPlans(archive.installmentPlans ?? [], archive.cards ?? [], archive.accounts, archive.records, operations, context);
   // 24T2: each card's exact statement dates, one ordered chain per card. A plan's schedule is contractual and is never
   // compared with them (it was written with the calendar known when the plan was created).
   validateCardCycleDates(archive.cardCycleDates ?? [], archive.cards ?? []);
+  // 24T3: every link between the operations and the ledger (ids, targets, caps, A4, A5, A10, A11), maps built once.
+  validatePurchaseOperationLinks(archive, context);
   // An archive that knows its scales pins every currency its rows use beyond ARS/USD; each pinned
   // scale must be the catalogue's. Storage tolerates a pinned code no row uses (append-only rows).
   if (archive.currencyUnits) validateCurrencyUnits(archive.currencyUnits, currenciesNeedingUnits(archive));
@@ -269,6 +293,8 @@ function canonicalArchive(archive: LedgerArchive): LedgerArchive {
       .sort((a, b) => a.id.localeCompare(b.id)) } : {}),
     ...(archive.cardCycleDates?.length ? { cardCycleDates: archive.cardCycleDates.map(row => cycleDateValue(row))
       .sort((a, b) => a.cardId.localeCompare(b.cardId) || a.sequence - b.sequence) } : {}),
+    ...(archive.purchaseOperations?.length ? { purchaseOperations: archive.purchaseOperations.map(operation => parsePurchaseOperation(operation))
+      .sort((a, b) => a.id.localeCompare(b.id)) } : {}),
   };
 }
 function unitValue(value: unknown): CurrencyUnit {
@@ -324,6 +350,8 @@ export interface RecoveryBackup {
   installmentPlans?: InstallmentPlan[];
   /** v13 (24T2): every card's exact statement dates. Older files have no such key. */
   cardCycleDates?: CardCycleDates[];
+  /** v14 (24T3): every devolución and adelanto de cuotas, undone ones included. Older files have no such key. */
+  purchaseOperations?: PurchaseOperation[];
 }
 function withoutDeleted<T extends { deleted: boolean }>(row: T): Omit<T, 'deleted'> {
   const { deleted: _deleted, ...rest } = row;
@@ -333,7 +361,7 @@ export function createRecoveryBackup(archive: LedgerArchive, now = new Date()): 
   validateArchive(archive);
   const needed = currenciesNeedingUnits(archive);
   const canonical = canonicalArchive(archive);
-  const { currencyUnits: _units, installmentPlans, cardCycleDates, ...rows } = canonical;
+  const { currencyUnits: _units, installmentPlans, cardCycleDates, purchaseOperations, ...rows } = canonical;
   // 25B2: a deleted account or card makes the file v11; without one, cards carry no `deleted` key (a v10 or older
   // file, byte for byte) and no account carries `deletedAt`.
   const lifecycle = canonical.accounts.some(account => account.deletedAt !== undefined) || (canonical.cards ?? []).some(card => card.deleted);
@@ -344,16 +372,20 @@ export function createRecoveryBackup(archive: LedgerArchive, now = new Date()): 
   const cards = lifecycle ? canonical.cards ?? [] : (canonical.cards ?? []).map(withoutDeleted) as CreditCardProfile[];
   // 24T1: a plan makes the file v12 (it carries `installmentPlans` and every lifecycle key); without one the file is v11 or older, byte for byte.
   // 24T2: an exact statement date makes it v13 (every v12 key, `installmentPlans` even when empty, and `cardCycleDates`).
-  const cycles = !!cardCycleDates?.length;
+  // 24T3: an operation makes it v14 (every v13 key, `installmentPlans` and `cardCycleDates` even when empty, and
+  // `purchaseOperations`, undone ones included): the lowest version that holds the archive is written.
+  const operations = !!purchaseOperations?.length;
+  const cycles = !!cardCycleDates?.length || operations;
   const plans = !!installmentPlans?.length || cycles;
-  const schema = cycles ? BACKUP_SCHEMA_V13 : plans ? BACKUP_SCHEMA_V12 : lifecycle ? BACKUP_SCHEMA_V11 : tombstones ? BACKUP_SCHEMA_V10 : needed.length ? BACKUP_SCHEMA_V9 : BACKUP_SCHEMA_V8;
+  const schema = operations ? BACKUP_SCHEMA_V14 : cycles ? BACKUP_SCHEMA_V13 : plans ? BACKUP_SCHEMA_V12 : lifecycle ? BACKUP_SCHEMA_V11 : tombstones ? BACKUP_SCHEMA_V10 : needed.length ? BACKUP_SCHEMA_V9 : BACKUP_SCHEMA_V8;
   const base: RecoveryBackup = { app: 'FinanzApp', schema, exportedAt: now.toISOString(),
     moneyUnit: 'integer-minor-units', ...rows, transfers: canonical.transfers ?? [],
     recurring: plans ? canonical.recurring ?? [] : recurring, budgets: canonical.budgets ?? [],
     cards: plans ? canonical.cards ?? [] : cards, debts: plans ? canonical.debts ?? [] : debts,
     appearances: canonical.appearances ?? [], categories: canonical.categories ?? [] };
   const withPlans = (backup: RecoveryBackup): RecoveryBackup => !plans ? backup
-    : cycles ? { ...backup, installmentPlans: installmentPlans ?? [], cardCycleDates } : { ...backup, installmentPlans };
+    : cycles ? { ...backup, installmentPlans: installmentPlans ?? [], cardCycleDates: cardCycleDates ?? [], ...(operations ? { purchaseOperations } : {}) }
+      : { ...backup, installmentPlans };
   if (!needed.length) return withPlans(tombstones || plans ? { ...base, currencyUnits: [] } : base);
   const known = new Map((canonical.currencyUnits ?? []).map(unit => [unit.currency, unit]));
   const currencyUnits = needed.map(code => known.get(code) ?? catalogueUnit(code));
@@ -380,23 +412,26 @@ export function parsePilotBackup(raw: string): ParsedBackup {
   const v11 = header.schema === BACKUP_SCHEMA_V11;
   const v12 = header.schema === BACKUP_SCHEMA_V12;
   const v13 = header.schema === BACKUP_SCHEMA_V13;
-  if (!v1 && !v2 && !v3 && !v4 && !v5 && !v6 && !v7 && !v8 && !v9 && !v10 && !v11 && !v12 && !v13) {
-    throw new Error('Solo se pueden restaurar copias de FinanzApp de las versiones 1 a 13. Este archivo no es una de ellas; conservalo.');
+  const v14 = header.schema === BACKUP_SCHEMA_V14;
+  if (!v1 && !v2 && !v3 && !v4 && !v5 && !v6 && !v7 && !v8 && !v9 && !v10 && !v11 && !v12 && !v13 && !v14) {
+    throw new Error('Solo se pueden restaurar copias de FinanzApp de las versiones 1 a 14. Este archivo no es una de ellas; conservalo.');
   }
   const hasTransfers = !v1 && !v2, hasRecurring = hasTransfers && !v3, hasBudgets = hasRecurring && !v4;
-  const hasLiabilities = hasBudgets && !v5, hasScopedBudgets = hasLiabilities && !v6, hasIdentity = v8 || v9 || v10 || v11 || v12 || v13, hasUnits = v9 || v10 || v11 || v12 || v13;
-  const hasDeletions = v10 || v11 || v12 || v13;
+  const hasLiabilities = hasBudgets && !v5, hasScopedBudgets = hasLiabilities && !v6, hasIdentity = v8 || v9 || v10 || v11 || v12 || v13 || v14, hasUnits = v9 || v10 || v11 || v12 || v13 || v14;
+  const hasDeletions = v10 || v11 || v12 || v13 || v14;
   // v11 (25B2): cards carry `deleted`; a deleted account carries `deletedAt`. Older files carry neither.
-  const hasLifecycle = v11 || v12 || v13;
+  const hasLifecycle = v11 || v12 || v13 || v14;
   // v12 (24T1): instalment plans with their schedules. Older files carry none, and a v1–v11 file never holds an instalment movement.
-  const hasPlans = v12 || v13;
+  const hasPlans = v12 || v13 || v14;
   // v13 (24T2): the cards' exact statement dates. Older files carry none: their cards follow their usual days.
-  const hasCycles = v13;
+  const hasCycles = v13 || v14;
+  // v14 (24T3): devoluciones and adelantos de cuotas. Older files carry none.
+  const hasOperations = v14;
   object(value, ['app', 'schema', 'exportedAt', 'moneyUnit', 'accounts', v1 ? 'entries' : 'records',
     ...(hasTransfers ? ['transfers'] : []), ...(hasRecurring ? ['recurring'] : []),
     ...(hasBudgets ? ['budgets'] : []), ...(hasLiabilities ? ['cards', 'debts'] : []),
     ...(hasIdentity ? ['appearances', 'categories'] : []), ...(hasUnits ? ['currencyUnits'] : []), ...(hasPlans ? ['installmentPlans'] : []),
-    ...(hasCycles ? ['cardCycleDates'] : [])]);
+    ...(hasCycles ? ['cardCycleDates'] : []), ...(hasOperations ? ['purchaseOperations'] : [])]);
   if (header.app !== 'FinanzApp' || header.moneyUnit !== 'integer-minor-units') throw new Error('Formato o unidad monetaria no compatibles.');
   timestamp(header.exportedAt);
   const rows = v1 ? header.entries : header.records;
@@ -428,6 +463,12 @@ export function parsePilotBackup(raw: string): ParsedBackup {
   if (hasCycles && (!Array.isArray(header.cardCycleDates) || header.cardCycleDates.length > 20000)) {
     throw new Error('La copia contiene demasiadas fechas de ciclo de tarjetas o un formato inválido.');
   }
+  if (hasOperations) {
+    const operations = header.purchaseOperations;
+    if (!Array.isArray(operations) || operations.length > MAX_BACKUP_OPERATIONS) throw new Error('La copia contiene demasiadas devoluciones o adelantos o un formato inválido.');
+    const weight = operations.reduce((sum: number, item) => sum + ((item as { kind?: unknown })?.kind === 'payoff' ? 4 : 1), 0);
+    if (rows.length + (header.transfers as unknown[]).length + weight > 25000) throw new Error('La copia supera el límite de movimientos o contiene transferencias inválidas.');
+  }
   const accounts = header.accounts.map(a => accountValue(a, hasTransfers, hasLifecycle));
   const records = rows.map((value): EntryRecord => {
     if (v1) return initialRecord(entryValue(value, accounts));
@@ -449,12 +490,13 @@ export function parsePilotBackup(raw: string): ParsedBackup {
   const currencyUnits = hasUnits ? (header.currencyUnits as unknown[]).map(unit => unitValue(unit)) : [];
   const installmentPlans = hasPlans ? (header.installmentPlans as unknown[]).map(plan => installmentPlanValue(plan)) : [];
   const cardCycleDates = hasCycles ? (header.cardCycleDates as unknown[]).map(row => cycleDateValue(row)) : [];
+  const purchaseOperations = hasOperations ? (header.purchaseOperations as unknown[]).map(row => parsePurchaseOperation(row)) : [];
   const archive: LedgerArchive = { accounts, records, ...(transfers.length ? { transfers } : {}),
     ...(recurring.length ? { recurring } : {}), ...(budgets.length ? { budgets } : {}),
     ...(cards.length ? { cards } : {}), ...(debts.length ? { debts } : {}),
     ...(appearances.length ? { appearances } : {}), ...(categories.length ? { categories } : {}),
     ...(hasUnits ? { currencyUnits } : {}), ...(installmentPlans.length ? { installmentPlans } : {}),
-    ...(cardCycleDates.length ? { cardCycleDates } : {}) };
+    ...(cardCycleDates.length ? { cardCycleDates } : {}), ...(purchaseOperations.length ? { purchaseOperations } : {}) };
   if (!hasUnits) assertLegacyCurrencies(archive, LEGACY_IMPORT_MESSAGE);
   else validateCurrencyUnits(currencyUnits, currenciesNeedingUnits(archive), true);
   validateArchive(archive);
@@ -480,6 +522,8 @@ export interface ImportPreview {
   installmentPlans: InstallmentPlan[];
   /** 24T2: the exact statement dates of the cards this copy adds (a card already on this device keeps its own). */
   cardCycleDates: CardCycleDates[];
+  /** 24T3: devoluciones and adelantos the copy holds and this device lacks (inserted after records and plans). */
+  purchaseOperations: PurchaseOperation[];
   identical: number;
   conflicts: number;
   /** Recorded liquid money by currency (cards and personal debts excluded). */
@@ -594,6 +638,15 @@ export function previewBackupImport(current: LedgerArchive, incoming: LedgerArch
     else if (!existing && addedCards.has(row.cardId)) cardCycleDates.push(row);
     else conflicts++;
   }
+  // 24T3: operations are additive by id; the same id with another revision or undone state is a conflict, like a movement.
+  const operationMap = new Map((current.purchaseOperations ?? []).map(operation => [operation.id, operation]));
+  const purchaseOperations: PurchaseOperation[] = [];
+  for (const operation of incoming.purchaseOperations ?? []) {
+    const existing = operationMap.get(operation.id);
+    if (!existing) purchaseOperations.push(operation);
+    else if (samePurchaseOperation(existing, operation)) identical++;
+    else conflicts++;
+  }
   const combined: LedgerArchive = { accounts: [...current.accounts, ...accounts], records: [...current.records, ...records],
     transfers: [...current.transfers ?? [], ...transfers], recurring: [...current.recurring ?? [], ...recurring],
     budgets: [...current.budgets ?? [], ...budgets], cards: [...current.cards ?? [], ...cards],
@@ -601,9 +654,49 @@ export function previewBackupImport(current: LedgerArchive, incoming: LedgerArch
     categories: [...current.categories ?? [], ...categories],
     ...(current.currencyUnits || incoming.currencyUnits ? { currencyUnits: [...current.currencyUnits ?? [], ...currencyUnits] } : {}),
     ...(current.installmentPlans?.length || installmentPlans.length ? { installmentPlans: [...current.installmentPlans ?? [], ...installmentPlans] } : {}),
-    ...(current.cardCycleDates?.length || cardCycleDates.length ? { cardCycleDates: [...current.cardCycleDates ?? [], ...cardCycleDates] } : {}) };
-  if (!conflicts) validateArchive(combined);
-  return { baseline: archiveKey(current), accounts, records, transfers, recurring, budgets, cards, debts, appearances, categories, currencyUnits, scaleConflicts, installmentPlans, cardCycleDates, identical, conflicts,
+    ...(current.cardCycleDates?.length || cardCycleDates.length ? { cardCycleDates: [...current.cardCycleDates ?? [], ...cardCycleDates] } : {}),
+    ...(current.purchaseOperations?.length || purchaseOperations.length ? { purchaseOperations: [...current.purchaseOperations ?? [], ...purchaseOperations] } : {}) };
+  // A guard that involves a devolución or an adelanto reads as the one import refusal (A20).
+  if (!conflicts) validateArchive(combined, 'import');
+  return { baseline: archiveKey(current), accounts, records, transfers, recurring, budgets, cards, debts, appearances, categories, currencyUnits, scaleConflicts, installmentPlans, cardCycleDates,
+    purchaseOperations, identical, conflicts,
     before: liquidTotalsByCurrency(snapshotFromArchive(current), current.cards, current.debts),
     after: conflicts ? null : liquidTotalsByCurrency(snapshotFromArchive(combined), combined.cards, combined.debts) };
+}
+
+// ---- 24T3: purchase operations, written as one pure step (storage runs it inside one exclusive transaction) ----------
+
+/** A new devolución or adelanto (A8): `archive` is the ledger after the plan's catch-up through `todayISO` (the creation
+ * helpers allocated against it); the id must be new (a retry with the same inputs is answered by storage before this,
+ * `sameOperationInputs`); the creation-only checks run, then `validateArchive` once on the result. */
+export function applyNewOperation(archive: LedgerArchive, operation: PurchaseOperation, todayISO: string): LedgerArchive {
+  if ((archive.purchaseOperations ?? []).some(item => item.id === operation.id)) throw new Error(OPERATION_EXISTS_MESSAGE);
+  // A new operation is live at its first revision (an undo or a restore is `applyOperationChange`).
+  if (operation.revision !== 0 || operation.voided) throw new Error(OPERATION_INVALID_MESSAGE);
+  assertOperationApplicable(archive, operation, 'create', todayISO);
+  // A8: a plan operation is allocated on the plan caught up through today. A share whose statement closed and is still
+  // unrecorded would otherwise be reduced or brought forward as future (a past statement rewritten): the allocation was
+  // computed on a stale ledger, so the person reviews it again.
+  const planId = operationPlanId(operation);
+  if (planId !== null && planCatchUpInserts(archive, planId, todayISO).length) throw new Error(OPERATION_CHANGED_MESSAGE);
+  const next = withOperation(archive, operation);
+  validateArchive(next, 'create');
+  return next;
+}
+
+/** An undo or a restore (A8): the creation-only checks for the action (A7, A9), the change applied, the plan's catch-up
+ * through `todayISO` appended (shares whose closing passed are recorded on their own closing dates, once), and
+ * `validateArchive` once on the result, worded for the action. Returns the next archive and the movements storage inserts
+ * beside the operation row. The same call is the UI's canUndo/canRestore dry run. */
+export function applyOperationChange(archive: LedgerArchive, change: OperationChange, todayISO: string): { archive: LedgerArchive; inserts: EntryRecord[] } {
+  validateOperationChange(change);
+  const stored = (archive.purchaseOperations ?? []).find(item => item.id === change.before.id);
+  if (!stored || !samePurchaseOperation(stored, change.before)) throw new Error(OPERATION_STATE_MESSAGE);
+  assertOperationApplicable(archive, change.after, change.action, todayISO);
+  const next = withOperation(archive, change.after);
+  const planId = operationPlanId(change.after);
+  const inserts = planId === null ? [] : planCatchUpInserts(next, planId, todayISO);
+  const result = inserts.length ? { ...next, records: [...next.records, ...inserts] } : next;
+  validateArchive(result, change.action);
+  return { archive: result, inserts };
 }

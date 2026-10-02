@@ -12,6 +12,10 @@ import { deleteRecurringRule, materializeRecurringRule, pauseRecurringRule, recu
 import { initialRecord, type EntryRecord } from './recovery';
 import { cardAvailableLimitMinor } from './liabilities';
 import { CYCLE_HISTORY_MESSAGE, assertCardCycleChange, cardCycleView, planCardCycle } from './card-cycles';
+import { CARD_CREDIT_MESSAGE, cardCreditMinor } from './liabilities';
+import { planCatchUpInserts } from './installments';
+import { applyNewOperation, snapshotFromArchive, type LedgerArchive } from './recovery';
+import { isPurchaseLine, newEntryRefund, newPlanPayoff, newPlanRefund } from './operations';
 
 /** The financial semantics of a credit card, recorded at the close of Producto 25B2 (decision 003,
  * «Invariantes contables de tarjetas»). Each block is one invariant; a change that breaks one is a
@@ -129,9 +133,9 @@ describe('7. lifecycle (what exists before 24T)', () => {
     expect(() => validateCreditCardProfile(archived, accounts)).not.toThrow();
     expect(cardDebtMinor(archived, bought)).toBe(23100);
     expect(() => assertTransferSides(payment, [archived], [debt], accounts)).not.toThrow();
-    expect(() => assertCardDeletable(card, bought)).toThrow(CARD_DEBT_MESSAGE);
-    expect(() => assertCardDeletable(archived, bought)).toThrow(CARD_DEBT_MESSAGE);
-    expect(() => assertCardDeletable(card, paid)).not.toThrow();
+    expect(() => assertCardDeletable(card, bought, [], [], [])).toThrow(CARD_DEBT_MESSAGE);
+    expect(() => assertCardDeletable(archived, bought, [], [], [])).toThrow(CARD_DEBT_MESSAGE);
+    expect(() => assertCardDeletable(card, paid, [], [], [])).not.toThrow();
     const gone = deleteCreditCard(card, now);
     expect(() => assertTransferSides(payment, [gone], [debt], accounts)).toThrow(CARD_DELETED_MESSAGE);
     expect(postingAccountsFor('expense', accounts, [gone], [debt]).map(account => account.id)).toEqual(['bank', 'wallet']);
@@ -146,7 +150,7 @@ describe('7. lifecycle (what exists before 24T)', () => {
 // model proves it cannot drift into the states those deliveries will fill.
 describe('7b. instalments (Producto 24T1)', () => {
   const tv = newInstallmentPlan({ id: 'tv', card, cardAccount, merchant: 'Electro', category: 'Hogar', purchaseDateISO: '2026-09-10', principalMinor: 120000, count: 12, placement: 'current', createdAt });
-  const recognised = (throughISO: string) => materializeInstallmentPlan(tv, card, throughISO, new Set()).map(initialRecord);
+  const recognised = (throughISO: string) => materializeInstallmentPlan(tv, card, throughISO, new Set(), []).map(initialRecord);
   const withPlan = (records: EntryRecord[], transfers: Transfer[] = []): LedgerSnapshot => ({ accounts, entries: records.map(record => record.entry), transfers });
 
   it('a purchase in instalments is one purchase and one InstallmentPlan, never a RecurringRule', () => {
@@ -173,7 +177,7 @@ describe('7b. instalments (Producto 24T1)', () => {
     const october = spendingReport(snapshot, 'ARS', '2026-10', '2026-10-31');
     expect(october.status === 'ready' && october.expenseMinor).toBe(10000);
     expect(snapshot.entries.some(entry => entry.amountMinor === 120000)).toBe(false);
-    expect(installmentPlanFigures(tv, records).recognisedMinor).toBe(20000);
+    expect(installmentPlanFigures(tv, records, []).recognisedMinor).toBe(20000);
   });
   it('the principal instalments sum exactly to the total principal in minor units (exponents 0, 2 and 3)', () => {
     expect(tv.schedule.reduce((sum, row) => sum + row.principalMinor, 0)).toBe(120000);
@@ -186,23 +190,23 @@ describe('7b. instalments (Producto 24T1)', () => {
     const financed = newInstallmentPlan({ id: 'fin', card, cardAccount, merchant: 'Electro', category: 'Hogar', purchaseDateISO: '2026-09-10', principalMinor: 120000, count: 12,
       placement: 'current', interestMinor: 600, interestCategory: 'Intereses', feeMinor: 300, feeCategory: 'Comisiones', taxMinor: 300, taxCategory: 'Impuestos', createdAt });
     expect(financed.principalMinor).toBe(120000);
-    const entries = materializeInstallmentPlan(financed, card, '2026-09-20', new Set());
+    const entries = materializeInstallmentPlan(financed, card, '2026-09-20', new Set(), []);
     expect(entries.map(entry => [entry.category, entry.amountMinor])).toEqual([['Hogar', 10000], ['Intereses', 50], ['Comisiones', 25], ['Impuestos', 25]]);
     expect(() => newInstallmentPlan({ id: 'x', card, cardAccount, merchant: 'E', category: 'H', purchaseDateISO: '2026-09-10', principalMinor: 100, count: 1, placement: 'current', interestMinor: 5, createdAt })).toThrow(PLAN_FINANCING_MESSAGE);
   });
   it('the card balance due holds only the instalments already on a statement; future instalments are separate commitments', () => {
     const records = recognised('2026-10-25');
     expect(cardDebtMinor(card, withPlan(records))).toBe(20000);
-    expect(cardCommittedMinor(card, [tv], records)).toBe(100000);
-    expect(installmentPlanFigures(tv, records).scheduledMinor).toBe(100000);
+    expect(cardCommittedMinor(card, [tv], records, [])).toBe(100000);
+    expect(installmentPlanFigures(tv, records, []).scheduledMinor).toBe(100000);
   });
   it('purchase price, billed balance due, future committed instalments, plan remaining and already recognised are distinct figures; nothing is «paid» from a general payment', () => {
     const records = recognised('2026-11-25');
     const payment: Transfer = { id: 't', fromAccountId: bank.id, toAccountId: cardAccount.id, amountMinor: 25000, note: 'Pago', dateISO: '2026-11-26', createdAt };
-    const figures = installmentPlanFigures(tv, records);
+    const figures = installmentPlanFigures(tv, records, []);
     expect([figures.principalMinor, cardDebtMinor(card, withPlan(records, [payment])), figures.scheduledMinor, figures.remainingMinor, figures.recognisedMinor]).toEqual([120000, 5000, 90000, 90000, 30000]);
     expect(Object.keys(figures)).not.toContain('paidMinor');
-    expect(installmentPlanFigures(tv, records)).toEqual(figures);
+    expect(installmentPlanFigures(tv, records, [])).toEqual(figures);
   });
   it('paying the statement stays a transfer and never a second expense', () => {
     const records = recognised('2026-09-25');
@@ -213,39 +217,39 @@ describe('7b. instalments (Producto 24T1)', () => {
     expect(balance(bank, withPlan(records, [payment]))).toBe(100000 - 10000);
   });
   it('available credit with pending plans is not computed until the issuer-reservation gate is decided', () => {
-    expect(cardAvailableLimitMinor(card, empty)).toBe(500000);
-    expect(cardAvailableLimitMinor(card, empty, [tv], [])).toBeNull();
+    expect(cardAvailableLimitMinor(card, empty, [], [], [])).toBe(500000);
+    expect(cardAvailableLimitMinor(card, empty, [tv], [], [])).toBeNull();
   });
   it('archiving keeps every plan payable; deleting is refused with a balance due or any pending plan; a deleted card keeps its finished plans', () => {
     const records = recognised('2026-09-25');
     const paid: Transfer = { id: 't', fromAccountId: bank.id, toAccountId: cardAccount.id, amountMinor: 10000, note: 'Pago', dateISO: '2026-09-26', createdAt };
     const archived = { ...card, active: false, revision: 1, updatedAt: now };
-    expect(materializeInstallmentPlan(tv, archived, '2026-10-25', new Set(records.map(record => record.entry.id))).length).toBe(1);
+    expect(materializeInstallmentPlan(tv, archived, '2026-10-25', new Set(records.map(record => record.entry.id)), []).length).toBe(1);
     expect(() => assertTransferSides(paid, [archived], [debt], accounts)).not.toThrow();
-    expect(() => assertCardDeletable(card, withPlan(records), [tv], records)).toThrow(CARD_DEBT_MESSAGE);
-    expect(() => assertCardDeletable(card, withPlan(records, [paid]), [tv], records)).toThrow(CARD_PLAN_MESSAGE);
+    expect(() => assertCardDeletable(card, withPlan(records), [tv], records, [])).toThrow(CARD_DEBT_MESSAGE);
+    expect(() => assertCardDeletable(card, withPlan(records, [paid]), [tv], records, [])).toThrow(CARD_PLAN_MESSAGE);
     const done = recognised('2027-08-20');
     const settled: Transfer = { ...paid, amountMinor: 120000 };
-    expect(() => assertCardDeletable(card, withPlan(done, [settled]), [tv], done)).not.toThrow();
+    expect(() => assertCardDeletable(card, withPlan(done, [settled]), [tv], done, [])).not.toThrow();
     const gone = deleteCreditCard(card, now);
-    expect(materializeInstallmentPlan(tv, gone, '2030-01-01', new Set())).toEqual([]);
-    expect(installmentPlanFigures(tv, done).status).toBe('completed');
+    expect(materializeInstallmentPlan(tv, gone, '2030-01-01', new Set(), [])).toEqual([]);
+    expect(installmentPlanFigures(tv, done, []).status).toBe('completed');
   });
   it('pausing or deleting a recurring rule never touches an instalment plan', () => {
     const rule: RecurringRule = { id: 'tv', accountId: cardAccount.id, kind: 'expense', amountMinor: 10000, merchant: 'Electro', category: 'Hogar', frequency: 'monthly',
       anchorDateISO: '2026-09-20', nextDateISO: '2026-09-20', active: true, deleted: false, createdAt, revision: 0, updatedAt: createdAt };
     const known = new Set(materializeRecurringRule(rule, accounts, '2026-09-25', now).entries.map(entry => entry.id));
-    expect(materializeInstallmentPlan(tv, card, '2026-09-25', known).map(entry => entry.id)).toEqual(['inst_tv_001']);
+    expect(materializeInstallmentPlan(tv, card, '2026-09-25', known, []).map(entry => entry.id)).toEqual(['inst_tv_001']);
     for (const changed of [pauseRecurringRule(rule, now), deleteRecurringRule(rule, now)]) {
       expect(changed.id).toBe(tv.id);
-      expect(materializeInstallmentPlan(tv, card, '2026-09-25', new Set()).length).toBe(1);
+      expect(materializeInstallmentPlan(tv, card, '2026-09-25', new Set(), []).length).toBe(1);
     }
   });
   it('a refund or an early payment is tied to the original purchase/plan and never duplicates an expense; a partial refund keeps the rest (24T3 fills the operation; the model refuses any other path)', () => {
     for (const change of [{ principalMinor: 100000 }, { count: 10 }, { schedule: tv.schedule.slice(0, 11) }]) {
       expect(() => validateInstallmentPlanChange(tv, { ...tv, ...change, revision: 1, updatedAt: now })).toThrow(PLAN_CHANGE_MESSAGE);
     }
-    const [first] = materializeInstallmentPlan(tv, card, '2026-09-20', new Set());
+    const [first] = materializeInstallmentPlan(tv, card, '2026-09-20', new Set(), []);
     expect(() => assertInstallmentEntryChange(first, { ...first, amountMinor: 5000 })).toThrow(INSTALLMENT_ENTRY_MESSAGE);
     expect(() => assertIncomeAccount(cardAccount.id, [card], [debt])).toThrow('Un ingreso se registra en una cuenta normal, no en una tarjeta.');
   });
@@ -274,6 +278,60 @@ describe('7c. the statement cycle (Producto 24T2)', () => {
       principalMinor: 3000, count: 3, placement: 'current', createdAt, cycleDates: change.rows });
     expect(after.schedule[0].billingDateISO).toBe('2026-10-26');
     expect(() => assertCardCycleChange({ days: cycle, rows: [] }, { days: { closingDay: 15, dueDay: 25 }, rows: [] }, '2026-10-01')).toThrow(CYCLE_HISTORY_MESSAGE);
+  });
+});
+
+// Producto 24T3 (owner decisions B1–B3, decision 003 rule 7 as amended): the positive cases of the refund and early-payoff
+// lines of the contract. A devolución is a contra-expense tied to its purchase (never an income); a plan devolución reverses
+// recognised principal first, then lowers the last instalments; an adelanto recognises the remaining shares once, on its date,
+// and the payment stays a transfer; nothing is ever «pagada».
+describe('7d. devoluciones y adelantos de cuotas (Producto 24T3)', () => {
+  const at = (date: string) => `${date}T15:00:00.000Z`;
+  const tv = newInstallmentPlan({ id: 'tv', card, cardAccount, merchant: 'Electro', category: 'Hogar', purchaseDateISO: '2026-09-10', principalMinor: 120000, count: 12, placement: 'current', createdAt });
+  const ledger = (extra: Partial<LedgerArchive> = {}): LedgerArchive => ({ accounts, records: [], cards: [card], debts: [debt], installmentPlans: [tv], ...extra });
+  const caughtUp = (archive: LedgerArchive, todayISO: string): LedgerArchive => ({ ...archive, records: [...archive.records, ...planCatchUpInserts(archive, 'tv', todayISO)] });
+  const ofArchive = (archive: LedgerArchive) => snapshotFromArchive(archive);
+
+  it('a devolución of a card purchase without instalments lowers the balance due and that month’s spending, is never an income, and paying stays a transfer', () => {
+    const archive = ledger({ records: [initialRecord(purchase)] });
+    const refund = newEntryRefund(archive, { id: 'r-1', entryId: 'p1', amountMinor: 3100, dateISO: '2026-09-12', todayISO: '2026-09-12', createdAt: at('2026-09-12') });
+    const refunded = applyNewOperation(archive, refund, '2026-09-12');
+    expect(cardDebtMinor(card, ofArchive(refunded))).toBe(20000);
+    expect(expenseOf(ofArchive(refunded))).toMatchObject({ minor: 20000 }); // counts adopt isPurchaseLine with the readers (A23), not pinned here
+    expect(monthOf(ofArchive(refunded))).toMatchObject({ expense: 20000, income: 0 });
+    expect(ofArchive(refunded).entries.filter(isPurchaseLine).length).toBe(1);
+    const paid = { ...ofArchive(refunded), transfers: [{ ...payment, amountMinor: 20000 }] };
+    expect([cardDebtMinor(card, paid), balance(bank, paid), expenseOf(paid)]).toEqual([0, 100000 - 20000, expenseOf(ofArchive(refunded))]);
+  });
+  it('a devolución of an instalment plan reverses the recognised principal first, then lowers the last instalments; never the full price up front, never an income, financing untouched', () => {
+    const october = caughtUp(ledger(), '2026-10-25');
+    const refund = newPlanRefund(october, { id: 'r-2', planId: 'tv', amountMinor: 30000, dateISO: '2026-10-25', todayISO: '2026-10-25', createdAt: at('2026-10-25') });
+    expect([refund.creditMinor, refund.reductions]).toEqual([20000, [{ number: 12, minor: 10000 }]]);
+    const refunded = applyNewOperation(october, refund, '2026-10-25');
+    expect([cardDebtMinor(card, ofArchive(refunded)), cardCommittedMinor(card, [tv], refunded.records, [refund])]).toEqual([0, 90000]);
+    expect(monthOf(ofArchive(refunded))).toMatchObject({ income: 0 });
+    expect(installmentPlanFigures(tv, refunded.records, [refund])).toMatchObject({ recognisedMinor: 20000, refundedCreditMinor: 20000, refundedFutureMinor: 10000, scheduledMinor: 90000 });
+  });
+  it('an adelanto recognises every remaining instalment once, on its date, never as a second expense; the card payment is a separate transfer; nothing is «pagada»', () => {
+    const october = caughtUp(ledger(), '2026-10-25');
+    const payoff = newPlanPayoff(october, { id: 'p-1', planId: 'tv', financing: 'recognised', dateISO: '2026-10-25', todayISO: '2026-10-25', createdAt: at('2026-10-25') });
+    const brought = applyNewOperation(october, payoff, '2026-10-25');
+    expect([cardDebtMinor(card, ofArchive(brought)), cardCommittedMinor(card, [tv], brought.records, [payoff])]).toEqual([120000, 0]);
+    expect(planCatchUpInserts(brought, 'tv', '2030-01-01')).toEqual([]);
+    const total = ofArchive(brought).entries.reduce((sum, entry) => sum + entry.amountMinor, 0);
+    expect(total).toBe(120000);
+    const paid = { ...ofArchive(brought), transfers: [{ ...payment, amountMinor: 120000, dateISO: '2026-10-26' }] };
+    expect([cardDebtMinor(card, paid), balance(bank, paid)]).toEqual([0, 100000 - 120000]);
+    expect(installmentPlanFigures(tv, brought.records, [payoff])).toMatchObject({ settledMinor: 100000, status: 'completed' });
+    expect(Object.keys(installmentPlanFigures(tv, brought.records, [payoff]))).not.toContain('paidMinor');
+  });
+  it('a card holding a credit in the holder’s favour is archived, never deleted (B3)', () => {
+    const archive = ledger({ records: [initialRecord(purchase)], transfers: [{ transfer: payment, revision: 0, voided: false, updatedAt: payment.createdAt }] });
+    const refund = newEntryRefund(archive, { id: 'r-3', entryId: 'p1', amountMinor: 5000, dateISO: '2026-09-16', todayISO: '2026-09-16', createdAt: at('2026-09-16') });
+    const refunded = applyNewOperation(archive, refund, '2026-09-16');
+    expect(cardCreditMinor(card, ofArchive(refunded))).toBe(5000);
+    expect(() => assertCardDeletable(card, ofArchive(refunded), [tv], refunded.records, [refund])).toThrow(CARD_CREDIT_MESSAGE);
+    expect(CARD_CREDIT_MESSAGE).not.toMatch(/deuda/i);
   });
 });
 
