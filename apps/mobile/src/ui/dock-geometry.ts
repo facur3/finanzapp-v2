@@ -5,7 +5,7 @@
  * 60 pt tall, 16 pt from the screen's sides (plus the landscape sensor inset) and lifted into the upper part of the home
  * indicator's safe area. At 375 pt the pill's inner width leaves each tab about 65 pt; at 393 pt about 70 pt: every tab keeps a full
  * target. 25UX1 (owner, 2026-10-02): the dock floats over the tab roots with nothing painted behind it; the roots run to
- * the window's bottom and end their content above it through `dockClearance` (the shared bottom inset). */
+ * the window's bottom and end their content above it through `dockClearance` (the shared bottom clearance). */
 export const DOCK = { height: 60, side: 16, top: 8, gap: 10, plus: 60 } as const;
 
 /** The air under the dock: it rests in the upper part of the home indicator's safe area (clear of the indicator),
@@ -21,9 +21,27 @@ export function dockSide(insets: { left: number; right: number }): number {
 
 /** How far the dock's top edge is from the window's bottom: its air under it, its 60 pt and the 8 pt above it (88 pt with a
  * 34 pt home-indicator inset). A tab root ends its content this far up, on top of its own bottom padding, so its last row
- * clears the dock exactly as it did when the dock took layout space (25UX1). */
+ * clears the dock exactly as it did when the dock took layout space (25UX1). Since 25OPS1 that space is always content
+ * layout (bottom padding, `useDockInset`), never a native scroll inset: at the real end of the scroll, with no overscroll,
+ * the last row rests `basePadding + DOCK.top` above the pill (`dockRestGap`). */
 export function dockClearance(bottomInset: number): number {
   return tabBarBottomGap(bottomInset) + DOCK.height + DOCK.top;
+}
+
+/** Where a tab root's last content rests at the end of its scroll, measured up from the pill's top edge, given the
+ * root's own bottom padding: the air the person sees between the last row and the dock. Positive on every device (with
+ * and without a home indicator), because the clearance is the dock's whole height above the window's bottom. */
+export function dockRestGap(bottomInset: number, basePadding: number): number {
+  return basePadding + dockClearance(bottomInset) - (tabBarBottomGap(bottomInset) + DOCK.height);
+}
+
+/** The scroll indicator's bottom inset on a tab root (iOS): the clearance plus a sub-pixel step (at most a quarter of a
+ * point) that changes with every assertion. React Native hands an inset to the native scroll view only when the prop
+ * differs from the one it last saw, while its keyboard handling overwrites the native indicator inset and a recycled
+ * native view keeps its previous tenant's props; a value that is new each time is always applied. */
+export const DOCK_INDICATOR_STEPS = 256;
+export function dockIndicatorInset(clearance: number, assertion: number): number {
+  return clearance + (assertion % DOCK_INDICATOR_STEPS + 1) / (4 * DOCK_INDICATOR_STEPS);
 }
 
 /** Where the «+» sits, measured from the window's bottom-right corner: the hub's close control is drawn there. */

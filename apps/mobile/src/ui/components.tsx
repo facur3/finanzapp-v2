@@ -85,13 +85,13 @@ export function AppText({ children, style, secondary = false, tertiary = false, 
 /** `scrollRef` lets a screen scroll its own content into view (Tarjetas brings a chosen card to the front). */
 export function Screen({ children, gap = space.xl, scrollRef }: { children: ReactNode; gap?: number; scrollRef?: Ref<ScrollView> }) {
   const p = usePalette();
-  // 25UX1: a tab root (Más) runs under the floating dock; its content ends the dock's height higher, and the system adds
-  // nothing of its own there (`never`: the tab header sits above the scroller, so only the bottom could change). Off the
-  // tabs the clearance is 0 and the screen is exactly as before.
+  // 25UX1, 25OPS1: a tab root (Más) runs under the floating dock; its content ends the dock's height higher (bottom
+  // padding, `useDockInset`), and the system adds nothing of its own there (`never`: the tab header sits above the
+  // scroller, so only the bottom could change). Off the tabs the clearance is 0 and the screen is exactly as before.
   const dock = useDockInset();
   return <ScrollView ref={scrollRef} style={{ flex: 1, backgroundColor: p.background }}
     contentContainerStyle={[styles.content, { gap }, dock.extraPadding ? { paddingBottom: styles.content.paddingBottom + dock.extraPadding } : null]}
-    contentInset={dock.inset} scrollIndicatorInsets={dock.inset} contentInsetAdjustmentBehavior={dock.inset || dock.extraPadding ? 'never' : 'automatic'}
+    scrollIndicatorInsets={dock.indicator} contentInsetAdjustmentBehavior={dock.extraPadding ? 'never' : 'automatic'}
     automaticallyAdjustKeyboardInsets keyboardShouldPersistTaps="handled"
     keyboardDismissMode="interactive">{children}</ScrollView>;
 }

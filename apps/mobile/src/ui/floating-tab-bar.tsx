@@ -17,7 +17,7 @@ export { DOCK, tabBarBottomGap } from './dock-geometry';
  * 25UX1 (owner, 2026-10-02): the dock is the control and nothing else. It floats over the tab roots, pinned to the window's
  * bottom with no ground of its own: no band, no strip of canvas, only the pill and the «+» (the space around and between
  * them lets touches through to the content). The roots run to the window's bottom and keep their last row clear of the
- * dock through one shared inset (`useDockClearance`, `dockClearance`), so scrolling, the keyboard, safe areas and the last
+ * dock through one shared clearance (`useDockInset`: bottom padding, since 25OPS1), so scrolling, the keyboard, safe areas and the last
  * row's clearance behave as before; its geometry is unchanged (the capture hub still draws its «×» where the «+» is), and
  * the tab roots stay the mounted, unanimated scenes of the black-screen mitigation (nothing in the navigator changed). The pill is drawn with the app's one control material, tinted pine:
  * Liquid Glass where the running iOS draws it and Reduce Transparency is off, else the solid pine pill with a hairline.

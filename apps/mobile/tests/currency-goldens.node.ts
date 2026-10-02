@@ -88,7 +88,7 @@ test('the day-net header of the movement list: sign, visible amount and spoken t
     const { EntryList } = load('entry-list.tsx', {
       react: { useMemo: (fn: () => any) => fn() }, 'react/jsx-runtime': { jsx, jsxs: jsx }, 'react-native': { SectionList: 'SectionList', View: 'View' }, '@finanzapp/domain': domain,
       './components': { AppText: 'AppText', MovementRow: 'MovementRow' }, '../i18n/provider': { useI18n: () => i18n }, './presentation': presentation, './theme': theme,
-      './dock-clearance': { useDockInset: () => ({ extraPadding: 0, inset: undefined }) },
+      './dock-clearance': { useDockInset: () => ({ extraPadding: 0, indicator: undefined }) },
     });
     const list = EntryList({ entries, accounts, ...(dayNet === undefined ? {} : { dayNet }) });
     const header = list.props.renderSectionHeader({ section: list.props.sections[0] });
@@ -161,7 +161,7 @@ test('24B3: the spending timeline and the day-net header show and speak yen with
     const { EntryList } = load('entry-list.tsx', {
       react: { useMemo: (fn: () => any) => fn() }, 'react/jsx-runtime': { jsx, jsxs: jsx }, 'react-native': { SectionList: 'SectionList', View: 'View' }, '@finanzapp/domain': domain,
       './components': { AppText: 'AppText', MovementRow: 'MovementRow' }, '../i18n/provider': { useI18n: () => i18n }, './presentation': presentation, './theme': theme,
-      './dock-clearance': { useDockInset: () => ({ extraPadding: 0, inset: undefined }) },
+      './dock-clearance': { useDockInset: () => ({ extraPadding: 0, indicator: undefined }) },
     });
     const list = EntryList({ entries, accounts });
     const texts = flat(list.props.renderSectionHeader({ section: list.props.sections[0] })).filter(node => node.type === 'AppText');

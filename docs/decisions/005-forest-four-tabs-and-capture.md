@@ -476,6 +476,19 @@ Tres problemas que el dueño observó en el producto; no reabre la línea visual
   siendo los del dominio; la pista de VoiceOver de la fila elegida dice que se muestra primero por estar elegida, nunca
   que gastó más. El resto de la composición de Reportes sigue congelada.
 
-**Estado.** Implementado en `apps/mobile`; **nada se revisó en un iPhone** y no hubo build de EAS. La verificación en
-Linux y la lista del dispositivo están en `docs/mobile-roadmap.md` («Producto 25UX1») y
-`docs/mobile-device-checklist.md` («Producto 25UX1»).
+**Estado.** Implementado en `apps/mobile` y mergeado como PR #80; no hubo build de EAS. La pasada del dueño en el iPhone
+(2026-10-02, en términos generales) confirmó el dock sin franja, Tarjetas y Reportes, y encontró que la última fila no
+quedaba arriba del dock (corregido por 25OPS1, abajo). La verificación en Linux y la lista del dispositivo están en
+`docs/mobile-roadmap.md` («Producto 25UX1») y `docs/mobile-device-checklist.md` («Producto 25UX1»).
+
+## Enmienda 2026-10-02 — Producto 25OPS1 (la última fila sobre el dock)
+
+- **El espacio del dock es layout** *(precisa «un único inset compartido» de la enmienda de 25UX1)*. Las raíces terminan
+  su contenido arriba del dock con relleno inferior del contenido, en todas las plataformas: `useDockInset` devuelve
+  `dockClearance` como `extraPadding` y `Screen`, `EntryList`, Inicio y Reportes lo suman a su propio relleno. Ninguna
+  raíz pasa un `contentInset` nativo (en el iPhone no se sostuvo: la última fila volvía a quedar debajo de la píldora);
+  solo el inset del indicador de scroll es nativo. Sigue siendo un único invariante compartido, 0 fuera de las pestañas;
+  el dock, su geometría, el hub y todo lo demás de la enmienda de 25UX1 no cambian.
+
+**Estado.** Implementado en `apps/mobile`, en su rama; **sin revisar en un iPhone** (`docs/mobile-device-checklist.md`,
+«Producto 25OPS1»).

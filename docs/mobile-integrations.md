@@ -1,5 +1,13 @@
 # Base de IA en nube y captura de Atajos
 
+> **Nota 2026-10-02 (Producto 25OPS1).** Este documento describe el código base de la Interfaz 07 y sigue vigente como
+> contrato de los dos endpoints. El plan de producción (entornos, Vercel y Supabase, la frontera de capacidades del
+> Asistente, la evaluación de modelos, los límites monetarios, la captura de Wallet) está en
+> [production-plan.md](production-plan.md). Dos precisiones de ese plan sobre lo de abajo: `gpt-5-mini` es el valor por
+> defecto del adaptador, **no una elección de modelo** (el modelo se elige con una evaluación repetible y queda como
+> configuración detrás del adaptador), y la captura de Wallet de 25A2 es **local** (Atajo → App Intent → borrador en el
+> teléfono), sin pasar por `/api/mobile/captures`, que queda como base de una captura remota futura.
+
 Interfaz 07, 2026-09-19. Código base implementado, **integraciones no activadas**.
 No se hicieron llamadas pagas ni se modificó una base de datos remota.
 

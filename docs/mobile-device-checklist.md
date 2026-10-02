@@ -1,11 +1,63 @@
 # Physical iPhone acceptance checklist
 
-## Producto 25UX1 — Dock, Cards and Reports interaction (on its branch; none done)
+## Producto 25OPS1 — the last row above the dock (follow-up to 25UX1; on its branch; not tested)
 
-**Not done yet: no EAS build was made and the iPhone was not touched.** Metro from this branch (`npm run start:dev-client
--- --clear`) on the installed FinanzApp Dev build; JavaScript only, no native dependency. Record the iPhone model, iOS
+**Not tested yet: this correction has not been on an iPhone.** It is the one open item of 25UX1's dock checklist (the
+owner's pass of 2026-10-02, below). Metro from this branch (`npm run start:dev-client -- --clear`) on the installed
+FinanzApp Dev build; JavaScript only, no native dependency, no EAS build. Start from a cold launch (quit FinanzApp from
+the app switcher first). Record the iPhone model, iOS version, theme and text size with the result. Use your own test
+data; never seed movements. The rest of 25OPS1 is documentation (`docs/production-plan.md`, `docs/app-store-launch.md`)
+and has nothing to check on the iPhone.
+
+What changed: the space that keeps a root's last row clear of the dock is now part of the content's layout (bottom
+padding) on every platform, no longer an inset of the native scroll view; only the scroll indicator's inset is native.
+
+- [ ] **Inicio:** scroll to the very end and lift the finger: the last movement of the recent activity rests fully above
+      the pill, with air between it and the dock, and stays there (it does not spring back under the dock). Tap it: it
+      opens.
+- [ ] **Reportes:** at the end, «Comparar con el mes anterior» (or whatever the last element is that month) rests fully
+      above the pill and responds to a tap.
+- [ ] **Más:** at the end, the last row and the version line («FinanzApp 0.1.0 (25OPS1)», and the diagnostics line in a
+      development build) are fully readable above the pill.
+- [ ] **Movimientos:** at the end, the oldest movement rests fully above the pill and opens on a tap.
+- [ ] On each of the four: an overscroll at the end (pull up and release) returns to that same resting position, not
+      lower. The air above the dock is the same as on a pushed screen's end, not a long empty footer.
+- [ ] The scroll indicator ends above the dock on the four roots. Note where it stops: just above the pill, or about
+      34 pt higher (then iOS added the home-indicator inset on top of the clearance; cosmetic, recorded in the roadmap).
+- [ ] **Movimientos search:** open the search and type: the results stay reachable above the keyboard; dismiss the
+      keyboard: the dock is back, the list's end still rests above it, and the scroll indicator still ends above the
+      dock (scroll once to see it).
+- [ ] Open any form with a keyboard from the «+» (Gasto), save or cancel, return: the four roots still end above the
+      dock and their indicators still end above it.
+- [ ] After using the app for a while (open and close several pushed screens and modals, switch tabs 20 times, change
+      the month in Reportes): repeat the first four checks. The result is the same as after the cold launch.
+- [ ] Unchanged from 25UX1: no band behind the dock; taps in the empty margins beside and between the pill and the «+»
+      reach the content; the capture hub's «×» sits on the «+»; a pushed screen (Tarjetas, an account) shows no dock and
+      keeps its usual bottom padding; no black or blank root after fast tab switching.
+- [ ] **VoiceOver:** swipe right through a long list (Movimientos) to its end: every row can be focused and opened with
+      a double tap. Note separately whether a row that VoiceOver focuses while it sits **behind the pill** opens the row
+      or presses a tab: that is a recorded risk of a floating dock (roadmap, 25OPS1), not something this correction
+      claims to have settled.
+- [ ] **Large text** (Settings → Accessibility → Larger Text, one accessibility size) and an iPhone without a home
+      indicator, if one is at hand: the last row still rests above the dock.
+
+## Producto 25UX1 — Dock, Cards and Reports interaction (merged as PR #80; owner's pass 2026-10-02, one item failed)
+
+**No EAS build was made; the item-by-item pass is still open (see the owner's pass below).** Metro from `master`
+(`npm run start:dev-client -- --clear`) on the installed FinanzApp Dev build; JavaScript only, no native dependency. Record the iPhone model, iOS
 version, theme, language and text size with each result. Use your own small test data; never seed movements. Rules:
 decision 005, «Enmienda 2026-10-02 — Producto 25UX1»; design: mobile-design.md, «Producto 25UX1».
+
+**Owner's pass (2026-10-02, physical iPhone, FinanzApp Dev build; model, iOS version, theme and text size not
+recorded).** Confirmed by the owner: the dock draws no rectangular footer or background; only the pill and the separate
+«+» sit over the content, and the content visibly passes behind them; switching tabs works; the Tarjetas interaction
+(idle, first tap selects, second opens) works; the Reportes interaction (the chosen category listed first) works.
+**Failed:** at the end of the scroll the last content does not settle above the dock: on Inicio the last recent
+movement stays partly behind the pill, on Reportes lower content such as «Comparar con el mes anterior» stays behind
+it, on Más the diagnostics and version text stays behind it; an overscroll shows it, and on release it springs back
+under the dock. Corrected in Producto 25OPS1 (section above), not yet tested on the iPhone. The boxes below stay
+unticked: the pass was reported in these general terms, not item by item (Reduce Transparency, VoiceOver, landscape,
+the six-card deck and Reduce Motion were not reported), so no individual line is marked done from it.
 
 **Dock (no rectangle)**
 - [ ] On Inicio, Movimientos, Reportes and Más, scroll so content passes under the dock: no white (light) or black (dark)
@@ -14,7 +66,8 @@ decision 005, «Enmienda 2026-10-02 — Producto 25UX1»; design: mobile-design.
       Off again on an iOS that draws Liquid Glass: the pill blurs the content under it.
 - [ ] Scroll each root to its very end: the last row (Inicio's last section, Movimientos' oldest movement, Reportes'
       last fact, Más' last row) rests fully above the dock with the same air as before; the scroll indicator stops
-      above the dock.
+      above the dock. **Failed on the owner's pass (2026-10-02): the last content settled behind the pill.** Corrected
+      in 25OPS1; check it with the 25OPS1 section above.
 - [ ] Tap content right beside, between and just above the pill and the «+» (a row's edge): the row responds; the empty
       margins never swallow the tap. The four tabs and the «+» still respond across their whole targets.
 - [ ] Movimientos: open the search, type: the keyboard covers the dock, the results stay reachable above the keyboard,

@@ -1,10 +1,15 @@
 # FinanzApp mobile: living roadmap
 
-Updated: 2026-10-02 (Producto 25UX1 on its branch: dock, Cards and Reports interaction polish, three owner-observed
+Updated: 2026-10-02 (Producto 25OPS1 on its branch: the production and launch plan,
+[production-plan.md](production-plan.md) and [app-store-launch.md](app-store-launch.md), documentation only, plus one
+correction found on the owner's iPhone pass of 25UX1: a tab root's last row now rests above the floating dock, the
+clearance being content padding instead of a native scroll inset; no financial, schema (14), backup (v14), review-store,
+cloud or native change; the version line reads «FinanzApp 0.1.0 (25OPS1)». Producto 25UX1 merged as PR #80, merge
+commit d45eca6: dock, Cards and Reports interaction polish, three owner-observed
 problems and no financial change: the dock floats with no rectangle behind it (one shared bottom inset keeps every
 root's last row reachable), Tarjetas opens idle and shows a card's compact snapshot only after a first tap (a second
 tap opens the detail, where Movimientos now come before Cuotas), and Reportes lists the donut's chosen category first
-while chosen, its row travelling up and back; the version line reads «FinanzApp 0.1.0 (25UX1)». Producto 25A-02 merged
+while chosen, its row travelling up and back; the version line read «FinanzApp 0.1.0 (25UX1)». Producto 25A-02 merged
 as PR #78 (merge commit 4ebe89f), with its follow-up PR #79 (merge commit a1bd181: the basis checked inside the
 ledger's transaction): the durable local review store, infrastructure only. A separate SQLite
 file (`finanzapp-review-v1.sqlite`, its own version 1, never in a backup) keeps review items pending, confirmed or dismissed
@@ -221,22 +226,31 @@ commit 5c73813), 24UX6C (PR #72, merge
 commit c673be6), 24UX6B (PR #71, merge
 commit ecfd1dc), 24UX6A (PR #70, merged 2026-10-01, merge commit ef24bb6), 24T2 (PR #69, merge commit 8951f6c), 24T1C
 (PR #68), 24T1 (PR #67) and 25B3 (PR #66), then Producto 25A-01 (PR #77, merge commit a4202bc) and 25A-02 (PR #78 and its follow-up PR #79, merge commit
-a1bd181), plus Producto 25UX1 on its branch. Per area,
+a1bd181), 25UX1 (PR #80, merge commit d45eca6), plus Producto 25OPS1 on its branch. Per area,
 without test inventories (those are in apps/mobile/README.md and the history
 file). "Released" below names an in-app gate (`RELEASED_LANGUAGES`, `RELEASED_REGIONS`,
 `LEDGER_CURRENCIES`): what a build offers, verified on Linux; nothing is distributed to people yet
 (§4).
 
-- **Dock, Cards and Reports interaction (25UX1, on its branch; device QA pending).** Three owner-observed problems, no
+- **The last row above the dock, and the production plan (25OPS1, on its branch; device QA pending for the dock
+  correction).** §3, «Producto 25OPS1». The dock clearance of a tab root is now bottom padding of the scroller's content
+  on every platform (`useDockInset` → `extraPadding`, on top of each root's own padding), no longer the native scroll
+  view's `contentInset` (25UX1): on the owner's iPhone the last row rested partly behind the pill and sprang back under
+  it. Only the scroll indicator's inset stays native (`indicator`, iOS), asserted again after a keyboard hides. Nothing
+  else in the app changed. The production and launch architecture is written down, as plans and gates and nothing
+  implemented, in [production-plan.md](production-plan.md) and [app-store-launch.md](app-store-launch.md). The version
+  line reads «FinanzApp 0.1.0 (25OPS1)».
+- **Dock, Cards and Reports interaction (25UX1, PR #80, merge commit d45eca6; the owner's pass of 2026-10-02 confirmed
+  the dock, Tarjetas and Reportes interactions and found the last-row clearance failing, corrected by 25OPS1).** Three owner-observed problems, no
   financial change (decision 005, «Enmienda 2026-10-02 — Producto 25UX1»; §3, «Producto 25UX1»). The dock floats over
   the tab roots with no ground of its own (`floating-tab-bar.tsx`, pinned to the window's bottom, `box-none`); the roots
-  keep their last row clear of it through one shared inset (`dockClearance`, `useDockClearance`: the dock's height inside
-  a tab scene, 0 elsewhere) in `Screen`, `EntryList`, Inicio and Reportes. Tarjetas opens idle (the deck, no card's
+  keep their last row clear of it through one shared clearance (`dockClearance`, `useDockClearance`: the dock's height inside
+  a tab scene, 0 elsewhere) in `Screen`, `EntryList`, Inicio and Reportes (how it is applied changed in 25OPS1, above). Tarjetas opens idle (the deck, no card's
   figures); a first tap selects a card and shows Saldo pendiente → Vence · Cierra → Disponible → Pagar tarjeta →
   Recientes, a tap on the selected card opens its detail, and a change of card never shows stale figures; the detail
   lists Movimientos before Cuotas. Reportes lists the chosen category first while chosen (`promoteChosen`), its row
   travelling up and back (`rowReorder`, Reanimated's FlatList), at once under Reduce Motion or on a new month, currency
-  or mode. The version line reads «FinanzApp 0.1.0 (25UX1)».
+  or mode. The version line read «FinanzApp 0.1.0 (25UX1)» (25OPS1 since).
 - **Durable local review store (25A-02, PR #78 and PR #79, merge commit a1bd181; nothing on screen, so no device QA).** Infrastructure for the
   tray (§3, «Producto 25A-02»). `src/storage/review-database.ts`: a separate file `finanzapp-review-v1.sqlite` (review
   schema 1; never in the ledger, a backup or `importArchive`; a corrupt, unreadable or newer file is never reset or
@@ -249,7 +263,7 @@ file). "Released" below names an in-app gate (`RELEASED_LANGUAGES`, `RELEASED_RE
   conflict that writes nothing. A capture key makes a repeated delivery idempotent and refuses the same key with other
   data. The ledger's `createEntry`, `createInstallmentPlan` and `createTransfer` refuse an id another kind of write owns
   (`packages/domain/write-ids.ts`); reads and imports are unchanged. No screen opens the store yet (25A-03). The version
-  line read «FinanzApp 0.1.0 (25A-02)» (25UX1 since).
+  line read «FinanzApp 0.1.0 (25A-02)» (25UX1, then 25OPS1, since).
 - **Review drafts: the domain model (25A-01, PR #77, merge commit a4202bc; nothing on screen, so no device QA).** The first slice of the
   real Assistant (§3, «Producto 25A» and «Producto 25A-01»). `packages/domain/review-drafts.ts`: a `ReviewDraft` (version 1;
   source assistant, wallet, inbox or fixture; kind expense or income; amount, currency, merchant, category, date and
@@ -624,7 +638,14 @@ it was checked in). Metro from `master` (or a delivery's branch) on the installe
 item unless a section says a new native build is needed. The checklist sections are in
 [mobile-device-checklist.md](mobile-device-checklist.md).
 
-- **25UX1 — Dock, Cards and Reports interaction (on its branch; none done; no EAS build):** the checklist section Producto
+- **25OPS1 — the last row above the dock (on its branch; not tested; no EAS build):** the checklist section Producto
+  25OPS1: on Inicio, Reportes, Más and Movimientos, from a cold launch and again after some use, the last row rests
+  fully above the pill at the end of the scroll and stays there after an overscroll; the scroll indicator ends above the
+  dock, also after a keyboard; Movimientos' search; a pushed screen keeps its padding; VoiceOver through a long list;
+  large text. The documentation half of 25OPS1 has nothing to check on the iPhone.
+- **25UX1 — Dock, Cards and Reports interaction (merged as PR #80; the owner's pass of 2026-10-02 is recorded in the
+  checklist in general terms: the dock without a rectangle, tab switching, Tarjetas and Reportes confirmed; the last-row
+  clearance failed and is corrected by 25OPS1; the item-by-item pass stays open; no EAS build):** the checklist section Producto
   25UX1: the dock without a footer rectangle on every root, light and dark, with and without Reduce Transparency; the
   last row of each root reachable above the dock; the keyboard in Movimientos' search; the capture hub; 30–40 rapid tab
   switches without a black screen; Tarjetas idle, first and second tap, a change of card with no stale figure, one and
@@ -812,12 +833,25 @@ SQLite schema 14 and backup v14 are current, and the broad Forest visual lane (2
 phase is **25A — the real Assistant**, delivered as focused slices («Producto 25A» below, «Slices»): **25A-01** (the
 review-draft domain model) merged as PR #77 (merge commit a4202bc); **25A-02** (the durable local review store) merged as PR #78
 with its follow-up PR #79 (merge commit a1bd181); **25UX1** (dock, Cards and Reports interaction polish, three
-owner-observed problems, no financial change) is this PR; then 25A-03 (the «Para revisar» tray)
+owner-observed problems, no financial change) merged as PR #80 (merge commit d45eca6); **25OPS1** (the production and
+launch plan, documentation, plus the dock's last-row clearance found on the owner's iPhone pass) is this PR and changes
+no order; then 25A-03 (the «Para revisar» tray)
 and the rest of 25A, with no paid provider call before its own approved slice. **25A2** (Wallet Shortcut Capture) still
 follows the review-tray foundation: it may begin once 25A-03 has merged, without waiting for 25A's cloud, paid, live or
 voice slices. The targeted 24T3 device pass gates 25A-03, 25A-04, 25A-11 and 25A-12 (§2). After 25A: **25C** (with
 Movimientos' advanced filters), **25C2**, **25D**, **25E**, **25F** and **26**, unchanged; «Ocultar importes» stays future
 privacy work beside 25D, not scheduled.
+
+**Production and launch plan (25OPS1, 2026-10-02).** How the phases below become a product on TestFlight and the App
+Store is written in two documents, which hold the detail this roadmap only sequences:
+[production-plan.md](production-plan.md) (data ownership, environments, the Vercel mobile API and Supabase, the
+Assistant's capability boundary and model evaluation, AI monetary safety, Wallet capture, Dynamic Island / Live
+Activity, notifications, the financial calendar, privacy and Face ID, onboarding, the mapping of every item to these
+phases and a readiness table) and [app-store-launch.md](app-store-launch.md) (Free and Pro, StoreKit or RevenueCat, the
+paywall, subscriber identity and admin, App Store Server Notifications, proceeds and the banking and tax gate,
+analytics, ASO, market localization, the TestFlight and EAS pipeline, the App Review checklist, support, privacy and
+legal, the landing page). Both are plans: every future capability in them is labelled as a gate or a decision, and
+nothing in them is implemented. The binding decisions they record are listed under «Producto 25OPS1» below.
 
 **Earlier recommendation (2026-10-01, history):** 25B3 (PR #66), 24T1 (PR #67), 24T1C (PR #68) and **24T2 (PR #69, merge commit
 8951f6c)** merged: SQLite schema 13, backup v13, the purchase in cuotas and the complete Tarjetas, verified by the owner on
@@ -1476,6 +1510,9 @@ the owner authorises it; no EAS build or store submission without the owner.
 
 ### Producto 25A — the real Assistant: multilingual, voice, analytical questions, drafts and confirmation
 
+Production detail (25OPS1): [production-plan.md](production-plan.md) §2–§6 (environments, hosting, Supabase, the
+Assistant's capability boundary and model evaluation, monetary safety).
+
 - **Goal.** The Assistant becomes the central capability, not a decorative page: it proposes
   movements and edits as drafts, asks the minimum, answers analytical questions with verifiable
   figures from the ledger, in the released languages and by voice.
@@ -1518,7 +1555,7 @@ the owner authorises it; no EAS build or store submission without the owner.
   owner sets up. **Not a dependency:** 24C2 (optional). Its foreign-purchase subflow is enabled only if 24C2 has
   merged; otherwise 25A ships complete without it (24T1C, 2026-09-28). 24T3 (merged, PR #76) for devolución drafts.
 - **Slices (2026-10-02 reconciliation; one focused PR each, never a mega-PR).** Local lane: **25A-01** the review-draft
-  domain model (PR #77, merged); **25A-02** the durable local review store (this PR) (device-local, apart from the ledger; one fixed write
+  domain model (PR #77, merged); **25A-02** the durable local review store (PR #78 and #79, merged) (device-local, apart from the ledger; one fixed write
   id per item, confirm checks whether that write already exists before building it again, reconcile after a crash; a
   review item's write is frozen after an unknown outcome, as the purchase form freezes its submission, and storage refuses
   one id used as both a movement and a plan, which today `createEntry` and `createInstallmentPlan` do not cross-check);
@@ -1537,6 +1574,9 @@ the owner authorises it; no EAS build or store submission without the owner.
   durable review of financial writes.
 
 ### Producto 25A2 — Wallet Shortcut Capture
+
+Production detail (25OPS1): [production-plan.md](production-plan.md) §7–§8 (the capture flow and its edge cases, the
+Live Activity proof-of-concept gate and fallbacks).
 
 Planned (placed by the owner on 2026-10-02 after 25A's review tray; documentation only, nothing implemented). A focused
 delivery that pulls the Wallet capture forward from 25D: it needs 25A's draft model and local review tray (25A-01 to
@@ -3604,7 +3644,7 @@ nothing of it is on a screen yet.
   newer file not even switched to WAL. Recorded, not changed here: the instalment catch-up's derived `inst_` ids are not
   checked against other kinds (a plan id is a UUID, so a collision needs a hand-made id).
 
-### Producto 25UX1 — Dock, Cards and Reports interaction polish (this PR)
+### Producto 25UX1 — Dock, Cards and Reports interaction polish (PR #80, merged)
 
 - **Goal.** Three interaction problems the owner observed on the product, nothing more: not a redesign, the broad
   Forest lane stays closed. No financial rule, ledger semantics, review-store architecture, schema (14), backup (v14),
@@ -3618,7 +3658,8 @@ nothing of it is on a screen yet.
   pushed screen, a modal or the hub keep their padding. `Screen` and `EntryList` (Más, Movimientos) and Inicio and
   Reportes take it through `useDockInset`: on iOS as the scroller's `contentInset` and indicator inset (React Native
   restores it after any keyboard as max(keyboard, inset), and UIKit keeps a VoiceOver focus inside it), elsewhere as
-  bottom padding; inside the tabs the system adds nothing (`never`). Unchanged: the dock's geometry and accessibility, the capture hub, the navigator's options (the black-screen
+  bottom padding; inside the tabs the system adds nothing (`never`) *(→ replaced by 25OPS1 after the owner's iPhone
+  pass: the clearance is bottom padding on every platform; see «Producto 25OPS1»)*. Unchanged: the dock's geometry and accessibility, the capture hub, the navigator's options (the black-screen
   mitigation), Reduce Transparency, keyboard handling.
 - **Tarjetas.** Idle on entry, even with one card: the deck in its stored order with the last card whole, a quiet line,
   no card's figures. A first tap on any card selects it (the deck's 260 ms move; at once with Reduce Motion) and shows
@@ -3640,8 +3681,11 @@ nothing of it is on a screen yet.
   flow»). 25D's notifications separately cover recurring due reminders, credit-card closing, due and payment reminders,
   optional end-of-day expense-entry reminders and fallback review alerts, with financial values private by default on
   the lock screen («Producto 25D», «Notification families»).
-- **Device QA.** Pending: checklist section «Producto 25UX1». The version line reads «FinanzApp 0.1.0 (25UX1)».
-- **Status.** On its branch; not merged.
+- **Device QA.** The owner's pass of 2026-10-02 (a physical iPhone, reported in general terms) confirmed the dock without
+  a rectangle, tab switching and the Tarjetas and Reportes interactions, and found the last content settling behind the
+  pill at the end of the scroll (corrected by 25OPS1). The item-by-item checklist section «Producto 25UX1» stays open.
+  The version line read «FinanzApp 0.1.0 (25UX1)».
+- **Status.** Merged as PR #80 (merge commit d45eca6).
 - **Gates.** 2026-10-02, local, Linux. Root `npm test` 590 passed, 1 todo; `check:repo` OK. `apps/mobile`: `typecheck` OK;
   `test:storage` 1238 passed, 0 failed; `currency:verify`, `regions:verify` OK; `i18n:check -- --strict` 0/0 (English
   accepted for the new strings); `check` OK; `export:ios` OK. No EAS build, no iPhone. An adversarial review in eleven
@@ -3649,7 +3693,138 @@ nothing of it is on a screen yet.
   the fade plays); the scroll indicator of Movimientos and Más losing the dock clearance after any keyboard (the
   clearance is now the iOS `contentInset`, which React Native restores); a Reportes row travelling beneath the rows it
   passes (its cell is layered above, `CellRendererComponentStyle`); and the risk of a VoiceOver double-tap on a row under
-  the dock landing on the dock (mitigated by the same inset; to confirm on the iPhone).
+  the dock landing on the dock (mitigated by the same inset; to confirm on the iPhone). *(→ 25OPS1: the clearance is
+  content padding again; the native inset did not hold on the owner's iPhone and the VoiceOver risk stays open; see
+  «Producto 25OPS1».)*
+
+### Producto 25OPS1 — Production & Launch Plan + dock clearance follow-up (this PR)
+
+- **Goal.** Two scopes only. (A) One shared correction found on the owner's physical iPhone pass of 25UX1: at the end of
+  the scroll, a tab root's last content did not settle above the floating dock. (B) The production and launch
+  architecture and operations plan, from today's local native product to TestFlight and the App Store, as documentation:
+  no Assistant cloud, Wallet capture, Dynamic Island, notifications, Face ID, StoreKit, Supabase, sync, analytics SDK,
+  RevenueCat, push, submission or paid integration is implemented; no EAS build, no remote migration, no paid call; no
+  financial semantics, schema (14), backup (v14) or review-store change.
+- **Scope.** Branch `feat/producto-25ops1-production-launch-plan` from master d45eca6.
+- **A. The last row above the dock.** What the owner saw: on Inicio the last recent movement, on Reportes «Comparar con
+  el mes anterior», on Más the diagnostics and version text rested partly behind the pill; an overscroll lifted them and
+  the release sprang them back under the dock. Most probable cause, read in React Native 0.86.3's source and not reproduced on the device: 25UX1's review had moved the
+  clearance on iOS from bottom padding to the scroller's native `contentInset`. That inset is native state React Native
+  writes only when the prop changes (`RCTScrollViewComponentView updateProps`, compared with the view's own stored
+  props), while a recycled native scroll view comes back with its inset cleared and its previous props kept
+  (`prepareForRecycle`): a tab root mounted again on a recycled view with the same inset never gets it applied, and
+  nothing else kept the content clear. A root is mounted again, for example, after the first opening
+  (`router.replace('/onboarding')` and back), after a `router.replace('/')`, or on a Fast Refresh of the development
+  bundle. Which of these the owner's session hit was not determined; the correction does not depend on it.
+  **The correction:** `useDockInset` returns the clearance as `extraPadding` on every platform and the four scrollers add
+  it to the bottom padding of their content (`Screen`: 48 + clearance; Inicio and Reportes: 48 + clearance; `EntryList`:
+  40 + clearance). The end of the scroll is then a layout fact, recomputed on every mount: with no overscroll the last
+  row rests `base padding + 8 pt` above the pill (`dockRestGap`: 56 pt, 48 pt in Movimientos), the same air as when the
+  dock took layout space, with and without a home indicator (`dockClearance` = the dock's air under it + 60 + 8; the safe
+  area is counted once, through that air). No tab root passes a `contentInset`; the system adds none (`never`). The
+  scroll indicator's bottom inset stays native on iOS (`indicator`): React Native's keyboard handling overwrites it on
+  the scrollers that adjust for the keyboard (Más, Movimientos), so the hook hands over a value that differs by a
+  sub-pixel step on every mount and after every `keyboardDidHide` (`dockIndicatorInset`), which is always applied.
+  Unchanged: the dock (no background, `box-none`, its dimensions and position), the capture hub's geometry, the
+  navigator's options (the black-screen mitigation), Reduce Transparency, pushed screens and modals (clearance 0, their
+  padding and `automatic` insets as before), `automaticallyAdjustKeyboardInsets` and Movimientos' search.
+- **Known limits of A, not claimed as solved.** While a keyboard is open over Movimientos, the list's end rests the
+  dock's height above the keyboard (the padding and the keyboard inset add; the dock is behind the keyboard). VoiceOver:
+  at the end of the scroll nothing is under the dock, but a row focused mid-scroll while it sits behind the pill is
+  activated by a synthesized tap at its centre (React Native's `Pressable` sets no `onAccessibilityTap`), which the pill
+  can receive; 25UX1's inset was meant to mitigate that and did not hold on the owner's iPhone, so the risk is as it was on the iPhone. A
+  candidate mitigation (the shared press primitive activating directly under VoiceOver) changes every button's
+  activation path and is left for a device-verified delivery. The scroll indicator's inset is the full clearance while
+  `automaticallyAdjustsScrollIndicatorInsets` keeps React Native's default, so UIKit may add the home-indicator inset on
+  top and stop the indicator about 34 pt higher than the pill's top; cosmetic, device-only, and if the iPhone shows it the
+  four roots set that prop to false. All three are in the checklist.
+- **B. Documentation.** New: [production-plan.md](production-plan.md) and [app-store-launch.md](app-store-launch.md).
+  External facts (Apple, Expo, Supabase, Vercel, AI providers, RevenueCat) were read from primary documentation on
+  2026-10-02 and are cited there; whatever could not be verified is labelled, never asserted. Phase by phase:
+
+  | Phase | What the plan adds (detail in the documents) |
+  | --- | --- |
+  | 25A | The Assistant's capability boundary and allowlist, the one review path, provider port and model evaluation, session and consent, environments, the Vercel mobile API with Supabase staging, the monetary safety stack (production-plan §2–§6) |
+  | 25A2 | Wallet Transaction Automation → App Intent → review draft, the card/pass mapping, dedupe, and the Dynamic Island / Live Activity proof of concept and fallbacks (production-plan §7–§8) |
+  | 25C2 | The financial calendar's place and its four distinguishable states (production-plan §10) |
+  | 25D | Notification families and when push is justified, hide amounts, Face ID, data protection, the FinanceKit gate (production-plan §9, §11) |
+  | 25E | Optional account, sync and backup requirements; identity (production-plan §1, §4) |
+  | 25F | Free and Pro, StoreKit or RevenueCat, paywall, subscriber identity and admin, server notifications (app-store-launch §1–§5) |
+  | 26 | The brand, naming and identity gate before any public asset (app-store-launch §9.4); proceeds, banking and tax gate, analytics, ASO, market localization, the release pipeline, the App Review checklist, support, privacy and legal, the landing page (app-store-launch §6–§14) |
+
+- **Binding decisions recorded (owner's brief, 2026-10-02; nothing implemented).**
+  - **The Assistant is a constrained financial interface, never a general agent.** It never receives a shell, a
+    filesystem, code execution, repository or computer control, arbitrary HTTP or browsing, server administration, a SQL
+    console or installable tools. Security comes from capability boundaries and strict contracts, not from a prompt. No
+    model tool writes the ledger: every proposed write ends as the same typed `ReviewDraft` and goes through strict
+    parsing, domain validation, a durable review item and the person's confirmation. Calculations and invariants stay in
+    the deterministic domain. The model is chosen by a repeatable evaluation behind a provider adapter; no model is
+    blessed because existing code names it.
+  - **Request-count quotas are not enough.** Before any paid call: per-request limits, per-person and global monetary
+    ceilings enforced as an atomic pre-call reservation of each request's maximum cost, settled to the actual cost
+    afterwards and never released on failure (production-plan §6.3), a provider-side budget as the backstop, a kill
+    switch, no unlimited retries, a staging budget far below production, and the owner's approval to raise a cap. When a ceiling is reached, manual and offline FinanzApp
+    keeps working.
+  - **Vercel stays the host of the mobile API for 25A's staging** (`/api/mobile/assistant`, `/api/mobile/captures`; it
+    is not leftover web infrastructure). It is re-evaluated after staging against written exit criteria; no migration
+    merely to reduce the number of providers.
+  - **Supabase** is for identity and session, PostgreSQL with RLS where server state is needed, and quota and admin
+    state; staging and production are separate projects that never share a database, credentials, an AI budget or
+    admin data. It does not provide offline sync by itself. Financial writes stay local-first.
+  - **Wallet capture (25A2)** uses the person's own Wallet Transaction Automation; PassKit is not treated as access to
+    Apple Pay history. Unknown stays unknown: currency, account or card, category and instalments are never guessed; a
+    credit-card mapping proposes a purchase «Una vez»; repeated deliveries are deduplicated by a stable capture key,
+    never by a fuzzy match.
+  - **Dynamic Island / Live Activity is a product target of 25A2 and not a notification.** There is one confirmation
+    path: whether a Live Activity action can reach it while the app is not in the foreground is a proof-of-concept gate;
+    if it cannot, Confirmar opens the exact review item. No accounting rule is duplicated in Swift. The review tray
+    keeps the draft whatever the presentation does.
+  - **Notifications are local** for facts the device already knows; remote push only for server-originated state that
+    cannot be scheduled on the device.
+  - **The financial calendar (25C2)** lives in Reportes or beside it, not in a fifth tab, and always distinguishes
+    recorded, scheduled, due or closing, and future commitment.
+  - **A Face ID prompt does not encrypt SQLite**; file protection and, if needed, SQLCipher with key recovery are
+    evaluated separately before production.
+  - **Free and Pro:** the offline financial core stays useful without a subscription and data safety or recovery is
+    never behind a paywall; no price is final without evidence. StoreKit or RevenueCat is a recorded recommendation for
+    25F, not an installed SDK.
+  - **Launch markets** are chosen per storefront; a technically released region or currency is not a commercial launch
+    market, and the existing region and currency gates stay as written.
+  - **The public name is not assumed to be «FinanzApp»** (the working name; other products use it, one a personal-finance
+    app on the App Store). A brand, naming and identity gate (name availability per localization, domains and handles,
+    trademark screening, original icon and artwork, a visual system across the app, Live Activities, widgets, the
+    landing page and Android) precedes any public App Store metadata, landing page or marketing asset in 26; several
+    distinct directions are compared on Home, Reports, Cards, Más, the capture presentation and the landing hero, the
+    owner selects one, and only then is a broad palette change considered. The Forest palette is not changed because
+    another finance app uses green (app-store-launch §9.4).
+  - **The landing page** is a separate marketing surface, never the retired product web app; its support, privacy and
+    terms pages are needed to submit (26), and whether the marketing page ships with 1.0 is the owner's decision.
+  - **Apple and StoreKit are authoritative** for App Store transactions; a backend only mirrors the entitlement and is
+    corrected when they disagree. **No paywall in the first opening** (AGENTS rule 15; 25B): the offer is contextual and
+    later.
+- **Device QA.** Pending for A: checklist section «Producto 25OPS1». B has nothing to check on the iPhone. The version
+  line reads «FinanzApp 0.1.0 (25OPS1)».
+- **Status.** On its branch; not merged.
+- **Gates.** 2026-10-02, local, Linux. Root `npm test` 590 passed, 1 todo; `check:repo` OK. `apps/mobile`: `typecheck` OK;
+  `test:storage` 1247 passed, 0 failed (new: `tests/dock-clearance.node.ts`, the real hook over a minimal React, the
+  geometry, the four scrollers' props; and one rendered assertion each for Inicio, Reportes, `Screen` and `EntryList`);
+  `currency:verify`, `regions:verify` OK; `i18n:check -- --strict` 0 errors, 0 stale (no new string); `check` OK;
+  `export:ios` OK. No EAS build, no iPhone, no remote migration, no provider or network call from the app or the server.
+  An adversarial review in six lenses (dock, repository truth, external facts of each document, consistency, the
+  brief's failure modes; each finding checked by a second reader) and a completeness check against the brief ran on
+  2026-10-02: 52 findings, 33 confirmed and all applied (among them: the kill-switch flags described exactly, the
+  provider spend-limit facts narrowed to what was read, the Live Activity gate requiring the TypeScript draft before any
+  presentation, the money flow stating Apple's agency wording instead of a seller-of-record conclusion, the evaluation
+  set as the owner's real phrases, the retention event dropped from analytics, the per-user monetary ceiling no longer
+  optional, the landing page mapped to 26 with the marketing page an owner decision). Rejected findings are recorded in
+  the review's transcript only.
+- **Follow-up on PR #81 (owner, 2026-10-02).** A Codex P2 thread on the monetary ceiling was valid and is answered in
+  production-plan §6.3: a ceiling is an atomic pre-call reservation of the request's maximum cost (estimated on the
+  server, competing concurrent calls against one authoritative state, refused when capacity cannot be reserved, settled
+  to the actual provider usage afterwards, kept at the maximum when it cannot be reconciled, recovered as spent after a
+  timeout or crash, never released in a way that could double-spend; the provider's project limit stays the backstop).
+  And the brand, naming and identity gate (app-store-launch §9.4) was recorded: the working name is not the assumed
+  public brand. Documentation only; no app change.
 
 ### Later notes recorded in 24UX6A (future; document only, not scheduled)
 
@@ -3711,6 +3886,8 @@ nothing of it is on a screen yet.
 
 ### Producto 25C2 — merchants, categorisation rules and commitments history
 
+Production detail (25OPS1): [production-plan.md](production-plan.md) §10 (the financial calendar).
+
 Ordered after 25C and before 25D (its widgets read these records). Design in
 docs/merchant-identity.md.
 
@@ -3751,6 +3928,9 @@ docs/merchant-identity.md.
   questions above.
 
 ### Producto 25D — Face ID, notifications and Apple integrations
+
+Production detail (25OPS1): [production-plan.md](production-plan.md) §9 and §11 (notifications and push; hide amounts,
+Face ID and data protection).
 
 Documentation only until it starts (scope revised 2026-09-28); nothing here is implemented. Every
 permission is requested only when the person enables the feature that needs it, never at launch. **25D ships
@@ -3882,6 +4062,9 @@ tied to 25E's account are deferred to 25E or a follow-up after it (24T1C, 2026-0
 
 ### Producto 25E — optional sync and privacy
 
+Production detail (25OPS1): [production-plan.md](production-plan.md) §1 and §4 (data ownership; Supabase and the sync
+requirements).
+
 - **Scope.** Optional normalized Supabase sync: an outbox with durable operation IDs, revisions,
   tombstones, conflict handling, RLS and user/session isolation; data export, deletion and
   recovery; provider privacy and retention documented; no mandatory account for local use; the
@@ -3894,6 +4077,8 @@ tied to 25E's account are deferred to 25E or a follow-up after it (24T1C, 2026-0
 - **Depends on.** 25A's session provider; decision 001's data and security target.
 
 ### Producto 25F — monetisation, StoreKit and AI cost control
+
+Production detail (25OPS1): [app-store-launch.md](app-store-launch.md) §1–§5 and [production-plan.md](production-plan.md) §6.
 
 - **Scope.** Premium AI with per-user quotas, server-side cost ceilings (per request, per
   person, global), consumption telemetry (usage and cost, not content) and margins calculated
@@ -3910,6 +4095,11 @@ tied to 25E's account are deferred to 25E or a follow-up after it (24T1C, 2026-0
 ## 4. Launch
 
 ### Producto 26 — TestFlight, the definitive identity and publication
+
+Production detail (25OPS1): [app-store-launch.md](app-store-launch.md) §6–§14 (proceeds, analytics, ASO, markets, the
+release pipeline, the App Review checklist, support and legal, the landing page) and §9.4: the brand, naming and
+identity gate («FinanzApp» is the working name, not the assumed public brand) before any public metadata, landing page
+or marketing asset.
 
 - **Scope.** The definitive bundle identifier and app identity (the pilot id and deep-link
   scheme are distinct from Capacitor's; changing the production identifier is a release
@@ -3936,6 +4126,8 @@ tied to 25E's account are deferred to 25E or a follow-up after it (24T1C, 2026-0
   (the slowest supported device, a release build). Not started until its roadmap entry.
 
 ### Marketing, App Store Optimization, Instagram, advertising materials and conversion tests
+
+Production detail (25OPS1): [app-store-launch.md](app-store-launch.md) §7–§10 and §14.
 
 Only after real users exist (TestFlight or the App Store): demonstration videos from real screens
 with clearly marked fixture data, testimonials only from real, consenting users.

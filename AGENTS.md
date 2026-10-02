@@ -11,8 +11,11 @@ is no web version of the product ([decision 004](docs/decisions/004-native-first
    optional simple accounts; no portfolio, market data or investments.
 2. For mobile changes also read `apps/mobile/README.md` and `docs/mobile-device-checklist.md`;
    for UI changes read `docs/mobile-design.md`; for money, currencies or FX read
-   `docs/currency.md`; for language or region read `docs/i18n.md`. Keep their status and next
-   action current. Older handoffs live in `docs/mobile-roadmap-history.md`.
+   `docs/currency.md`; for language or region read `docs/i18n.md`; for environments, hosting, Supabase,
+   the Assistant's capabilities and cost limits, Wallet capture, Live Activities, notifications, privacy,
+   subscriptions or anything about TestFlight and the App Store read `docs/production-plan.md` and
+   `docs/app-store-launch.md` (plans and gates, nothing in them is implemented until the roadmap says so).
+   Keep their status and next action current. Older handoffs live in `docs/mobile-roadmap-history.md`.
 3. The native app is the product. Never change its bundle identifier, run a database
    migration remotely, make an EAS cloud build, a store submission or a paid subscription
    without an explicit release decision and the owner's authorization for any charge.
@@ -47,7 +50,10 @@ is no web version of the product ([decision 004](docs/decisions/004-native-first
 11. Face ID, notification delivery, Wallet/Shortcuts, animation feel and gesture quality require
     actual device evidence. A JS bundle/typecheck is not an Xcode build or iPhone QA. Never claim
     App Store approval or a fixed frame rate before verification.
-12. The Assistant is a central capability, not a decorative page: it proposes movements and
+12. The Assistant is a central capability, not a decorative page, and a constrained financial
+    interface, never a general agent: the model is never given a shell, a filesystem, code execution,
+    repository or computer control, arbitrary HTTP, a SQL console or installable tools, and no model tool
+    writes the ledger (`docs/production-plan.md`, §5). It proposes movements and
     changes as reviewed drafts, asks the minimum clarification, and answers analytical questions
     from verifiable ledger data. It never executes a financial write without the person's
     confirmation. Apple Pay capture records an expense; it does not execute bank payments or read

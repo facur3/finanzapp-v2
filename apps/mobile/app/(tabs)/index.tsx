@@ -137,7 +137,7 @@ export default function HomeScreen() {
   const scope = currencies.length > 1;
 
   return <ScrollView style={{ flex: 1, backgroundColor: p.background }} contentInsetAdjustmentBehavior="never" onScroll={onScroll} scrollEventThrottle={32}
-    contentContainerStyle={{ paddingBottom: 48 + dock.extraPadding, flexGrow: 1 }} contentInset={dock.inset} scrollIndicatorInsets={dock.inset}>
+    contentContainerStyle={{ paddingBottom: 48 + dock.extraPadding, flexGrow: 1 }} scrollIndicatorInsets={dock.indicator}>
     {/* The field's colour under the top overscroll, so a pull never shows the canvas above it. */}
     <View pointerEvents="none" style={{ position: 'absolute', top: -1000, left: 0, right: 0, height: 1000, backgroundColor: p.hero }} />
     <View onLayout={event => { fieldHeight.current = event.nativeEvent.layout.height; }}
