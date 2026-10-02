@@ -94,8 +94,8 @@ npm run check:repo    # repository hygiene (below)
 
 - [AGENTS.md](AGENTS.md): the rules for contributors and agents.
 - [docs/mobile-roadmap.md](docs/mobile-roadmap.md): status, device QA pending, next deliveries
-  (the real Assistant, instalments, international purchases, the remaining regions, Android,
-  TestFlight); [docs/mobile-roadmap-history.md](docs/mobile-roadmap-history.md): the detailed
+  (the real Assistant in focused 25A slices, Wallet Shortcut Capture, international purchases, the remaining regions,
+  Android, TestFlight); [docs/mobile-roadmap-history.md](docs/mobile-roadmap-history.md): the detailed
   history of every delivery.
 - [docs/mobile-design.md](docs/mobile-design.md): the visual and motion direction;
   [docs/merchant-identity.md](docs/merchant-identity.md): merchants, brand marks and recurring history.

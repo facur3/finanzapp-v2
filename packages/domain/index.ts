@@ -1,6 +1,6 @@
 // The typed, side-effect-free entry of the financial domain the native app imports.
 // Everything here lives under packages/domain: nothing is taken from outside the
-// package (scripts/check-repo.mjs fails the build if an import reaches out).
+// package (boundary.test.ts fails the tests if an import reaches out).
 // Money is integer minor units per currency (money.ts); there are no float helpers.
 export * from './dates.ts';
 export * from './ledger.ts';
@@ -24,3 +24,4 @@ export * from './fx.ts';
 export * from './installments.ts';
 export * from './card-cycles.ts';
 export * from './operations.ts';
+export * from './review-drafts.ts';

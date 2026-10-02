@@ -1,6 +1,7 @@
 # FinanzApp: dirección visual móvil
 
-Interfaz 17 · 21 de septiembre de 2026. Implementado en código; revisión visual y
+Interfaz 17 · 21 de septiembre de 2026; estado al 2 de octubre de 2026: el carril Forest (24UX6A–24UX6E) y 24T3
+mergeados, 25A-01 en su rama sin cambios visuales. Implementado en código; revisión visual y
 gestual en iPhone pendiente. [Alcance del producto](decisions/002-spending-first.md) ·
 [Navegación y tarjetas](decisions/003-five-tabs-and-cards.md).
 
@@ -845,13 +846,37 @@ barras de Día a día y una cabecera fija sólida. Siguen permitidos para una pa
 vinculante del roadmap no cambia: la próxima entrega de producto es 24T3; 24UX6C (Movimientos y Más) y 24UX6D
 (Tarjetas) siguen a 24UX6B en el carril UX, y su lugar frente a 24T3 lo decide el dueño (ver `docs/mobile-roadmap.md`).
 
+## Producto 25A-01 — modelo de borradores de revisión (sin cambios visuales)
+
+La primera entrega enfocada del Asistente real (25A), en su rama `feat/producto-25a-01-review-drafts` desde master
+399a1fa (24T3 mergeada como PR #76). Solo dominio: `packages/domain/review-drafts.ts` define el **borrador de revisión**,
+la propuesta tipada en la que va a terminar todo lo que proponga un movimiento (el Asistente, una captura de Wallet, una
+bandeja futura). Un borrador no es un registro: lo que falta queda como un hueco explícito (tipo, importe, moneda,
+destino, modo de compra, cantidad de cuotas, comercio, categoría, fecha), nunca se completa solo, y cuando está completo
+y vigente produce exactamente una escritura: un movimiento, o un plan de cuotas con la cantidad que eligió la persona.
+
+Para el diseño de las entregas siguientes (25A-03, la bandeja «Para revisar», y 25A2), esto ya queda fijado:
+
+- Una tarjeta empieza en «Una vez»; las cuotas nunca traen una cantidad que la persona no eligió (el 12 del formulario
+  de compra queda en el formulario).
+- Una moneda que falta o que no es la de la cuenta es un hueco: no se toma la moneda por defecto ni se convierte.
+- Una categoría que la persona no tiene (ni incorporada, ni definida, ni usada) es un hueco: un productor nunca crea
+  una categoría; un nombre nuevo lo escribe la persona en el formulario.
+- Si la cuenta, la tarjeta o la categoría cambiaron desde la propuesta, el borrador queda «para revisar de nuevo» y no
+  escribe.
+- En una tarjeta, el texto sigue diciendo «Saldo pendiente», nunca «Deuda».
+
+No cambia ninguna pantalla: el Asistente sigue igual y no hay bandeja todavía. La línea de versión de Más dice
+«FinanzApp 0.1.0 (25A-01)». Nada que revisar en el iPhone.
+
 ## Producto 24T3 — Devoluciones, adelanto de cuotas y ciclo de vida del plan
 
-La última entrega de 24T, en su rama `feat/producto-24t3-refunds-payoff-lifecycle` desde master d30b77f (24UX6E
-mergeada como PR #75): una compra devuelta (la **devolución**), las cuotas que faltaban adelantadas (el **adelanto de
+La última entrega de 24T, mergeada como PR #76 (merge commit 399a1fa) desde su rama
+`feat/producto-24t3-refunds-payoff-lifecycle` (desde master d30b77f, 24UX6E mergeada como PR #75): una compra devuelta (la **devolución**), las cuotas que faltaban adelantadas (el **adelanto de
 cuotas**), dejar de seguir un plan y reactivarlo, más un arrastre chico de Reportes. Implementado en código; **la
 revisión en iPhone está pendiente** (no hubo build de EAS) y su lista está en docs/mobile-device-checklist.md
-(«Producto 24T3», que debe pasar antes del merge). No es un rediseño: Tarjetas y el detalle de tarjeta quedan como los
+(«Producto 24T3»: el dueño mergeó después de un uso dirigido y postergó la pasada registrada, que debe hacerse antes de
+mergear 25A-03, 25A-04, 25A-11 o 25A-12). No es un rediseño: Tarjetas y el detalle de tarjeta quedan como los
 dejó 24UX6D; las pantallas nuevas usan las piezas de Forest que ya existen (modal de formulario, filas agrupadas,
 `LifecycleNote`, `CheckRow`, `DateField`, `AmountField`). La regla contable vinculante está en la decisión 003, regla 7
 («Devoluciones, adelanto de cuotas y ciclo de vida del plan», 2026-10-01); el detalle técnico, en el roadmap
@@ -2752,7 +2777,10 @@ color propio.
 
 ## Pendiente de revisión en iPhone
 
-- Producto 24T3 (sin build de EAS, nada revisado todavía; una pasada dirigida que debe pasar antes del merge): la
+- Producto 25A-01: nada que revisar en el iPhone (solo dominio, sin pantalla nueva); la línea de versión de Más dice
+  «FinanzApp 0.1.0 (25A-01)» en un build de su rama.
+- Producto 24T3 (mergeada como PR #76; sin build de EAS, nada revisado todavía; una pasada dirigida que el dueño
+  postergó y que debe hacerse antes de mergear 25A-03, 25A-04, 25A-11 o 25A-12): la
   actualización a esquema 14 con una copia antes; una devolución en efectivo parcial y total, una de una compra con
   tarjeta que baja el saldo pendiente y una de un plan antes y después de un cierre con las últimas cuotas reducidas; el
   tope que rechaza devolver de más; un adelanto con y sin interés (las dos opciones de financiación) y después Pagar

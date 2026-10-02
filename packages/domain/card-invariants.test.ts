@@ -16,6 +16,8 @@ import { CARD_CREDIT_MESSAGE, cardCreditMinor } from './liabilities';
 import { planCatchUpInserts } from './installments';
 import { applyNewOperation, snapshotFromArchive, type LedgerArchive } from './recovery';
 import { isPurchaseLine, newEntryRefund, newPlanPayoff, newPlanRefund } from './operations';
+import { REVIEW_INCOMPLETE_MESSAGE, REVIEW_STALE_MESSAGE, reviewBasis, reviewDestinations, reviewGaps, withDestination, writeForReviewDraft,
+  type ReviewArchive, type ReviewDraft } from './review-drafts';
 
 /** The financial semantics of a credit card, recorded at the close of Producto 25B2 (decision 003,
  * «Invariantes contables de tarjetas»). Each block is one invariant; a change that breaks one is a
@@ -332,6 +334,71 @@ describe('7d. devoluciones y adelantos de cuotas (Producto 24T3)', () => {
     expect(cardCreditMinor(card, ofArchive(refunded))).toBe(5000);
     expect(() => assertCardDeletable(card, ofArchive(refunded), [tv], refunded.records, [refund])).toThrow(CARD_CREDIT_MESSAGE);
     expect(CARD_CREDIT_MESSAGE).not.toMatch(/deuda/i);
+  });
+});
+
+// Producto 25A-01: a review draft (the Assistant's, a Wallet capture's) is a proposal, never a record. Once complete and
+// current it produces exactly one write through the same builders as the forms, so every invariant above holds for it:
+// «Una vez» is one expense on the card (2); cuotas are one plan and nothing on the purchase date (7b); no income on a card,
+// no debt as a destination, nothing new on an archived or deleted card (7); no currency invented or converted.
+describe('7e. review drafts (Producto 25A)', () => {
+  const book: ReviewArchive = { accounts, records: [], cards: [card], debts: [debt], categories: [], installmentPlans: [], cardCycleDates: [] };
+  const draft = (purchase: ReviewDraft['purchase']): ReviewDraft => {
+    const base: ReviewDraft = { version: 1, source: 'wallet', capturedAt: now, kind: 'expense', amountMinor: 23100, currency: 'ARS', merchant: 'Súper',
+      category: 'Comida', dateISO: '2026-09-10', destinationId: cardAccount.id, purchase, basis: [] };
+    return { ...base, basis: reviewBasis(base, book) };
+  };
+  const confirm = (value: ReviewDraft, base: ReviewArchive = book) => writeForReviewDraft(value, base, { writeId: 'rv-1', createdAt: now, todayISO: '2026-09-28' });
+
+  it('a card in «Una vez» is exactly one expense on the card: the full price, once, and no bank account moves', () => {
+    const result = confirm(draft({ mode: 'once' }));
+    if (result.type !== 'entry') throw new Error('expected one movement');
+    expect(result.entry).toEqual({ ...purchase, id: 'rv-1', createdAt: now });
+    const snapshot: LedgerSnapshot = { accounts, entries: [result.entry], transfers: [] };
+    expect(expenseOf(snapshot)).toEqual({ minor: 23100, count: 1 });
+    expect(balance(cardAccount, snapshot)).toBe(-23100);
+    expect(balance(bank, snapshot)).toBe(bank.openingMinor);
+  });
+  it('cuotas are exactly one plan whose principal shares sum to the price, and nothing is recorded on the purchase date', () => {
+    const result = confirm(draft({ mode: 'installments', count: 6, placement: 'current' }));
+    if (result.type !== 'plan') throw new Error('expected one plan');
+    expect(Object.keys(result)).toEqual(['type', 'plan']);
+    expect(result.plan.principalMinor).toBe(23100);
+    expect(result.plan.schedule).toHaveLength(6);
+    expect(result.plan.schedule.reduce((sum, row) => sum + row.principalMinor, 0)).toBe(23100);
+    expect(distributeMinor(23100, 6)).toEqual(result.plan.schedule.map(row => row.principalMinor));
+    expect(materializeInstallmentPlan(result.plan, card, '2026-09-10', new Set(), [])).toEqual([]);
+    expect(materializeInstallmentPlan(result.plan, card, '2026-09-20', new Set(), []).map(entry => entry.amountMinor)).toEqual([3850]);
+  });
+  it('no instalment count is ever assumed: a card starts as «Una vez», and cuotas without a count stay a gap', () => {
+    const open = { ...draft(null), destinationId: null, purchase: null, basis: [] };
+    expect(withDestination(open, cardAccount.id, book).purchase).toEqual({ mode: 'once' });
+    const cuotas = draft({ mode: 'installments', count: null, placement: 'current' });
+    expect(reviewGaps(cuotas, book, '2026-09-28')).toEqual(['installmentCount']);
+    expect(() => confirm(cuotas)).toThrow(REVIEW_INCOMPLETE_MESSAGE);
+  });
+  it('an archived or deleted card, a debt and (for an income) any card are never a destination', () => {
+    const archived = { ...card, active: false, revision: 1, updatedAt: now };
+    const deleted = { ...card, active: false, deleted: true, revision: 1, updatedAt: now };
+    for (const cards of [[archived], [deleted]]) {
+      expect(reviewDestinations('expense', { ...book, cards }).map(account => account.id)).not.toContain(cardAccount.id);
+      expect(reviewGaps(draft({ mode: 'once' }), { ...book, cards }, '2026-09-28')).toEqual(['destination']);
+    }
+    expect(reviewDestinations('expense', book).map(account => account.id)).not.toContain(debtAccount.id);
+    expect(reviewDestinations('income', book).map(account => account.id)).toEqual([bank.id, wallet.id]);
+    const salary: ReviewDraft = { ...draft(null), kind: 'income', category: 'Sueldo', purchase: null };
+    expect(reviewGaps(salary, book, '2026-09-28')).toEqual(['destination']);
+    expect(() => confirm(salary)).toThrow(REVIEW_INCOMPLETE_MESSAGE);
+  });
+  it('a draft in another currency than the card’s stays a gap: nothing is converted', () => {
+    expect(reviewGaps({ ...draft({ mode: 'once' }), currency: 'USD' }, book, '2026-09-28')).toEqual(['currency']);
+    expect(reviewGaps({ ...draft({ mode: 'once' }), currency: null }, book, '2026-09-28')).toEqual(['currency']);
+  });
+  it('the same draft and id give the same write, and a card that changed after the review refuses it', () => {
+    for (const purchaseMode of [{ mode: 'once' } as const, { mode: 'installments', count: 3, placement: 'next' } as const]) {
+      expect(confirm(draft(purchaseMode))).toEqual(confirm(draft(purchaseMode)));
+    }
+    expect(() => confirm(draft({ mode: 'once' }), { ...book, cards: [{ ...card, issuer: 'Galicia', revision: 1, updatedAt: now }] })).toThrow(REVIEW_STALE_MESSAGE);
   });
 });
 
