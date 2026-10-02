@@ -20,6 +20,10 @@ import {
   cancelInstallmentPlan as cancelInstallmentPlanRecord, deleteInstallmentPlan as deleteInstallmentPlanRecord, materializeInstallmentPlan, sameInstallmentPlan,
   validateInstallmentPlan, validateInstallmentPlanChange, type Installment, type InstallmentPlan,
   cardCycleDatesOf, cardCycleShows, planCardCycle, sameCardCycleDate, todayKey, type CardCycleDates, type CardCycleIntent, PLAN_CALENDAR_MESSAGE, planFollowsCalendar,
+  CARD_DELETED_MESSAGE, OPERATION_CHANGED_MESSAGE, OPERATION_EXISTS_MESSAGE, OPERATION_ID_MESSAGE, OPERATION_INVALID_MESSAGE, applyNewOperation, applyOperationChange, assertExpectedAllocation, assertInstallmentPlanCancellable,
+  isEntryRefund, isPlanPayoff, isPlanRefund, newEntryRefund, newPlanPayoff, newPlanRefund, operationFromRow, operationLineIds, operationPlanId, operationToRow,
+  planCatchUpInserts, reactivateInstallmentPlan as reactivateInstallmentPlanRecord, sameOperationInputs, samePurchaseOperation, validatePurchaseOperation,
+  type OperationChange, type PurchaseOperation, type PurchaseOperationRow,
 } from '@finanzapp/domain';
 
 type SqlValue = string | number | null;
@@ -37,7 +41,7 @@ export interface LedgerDatabase extends SqlExecutor {
 }
 
 export const DATABASE_NAME = 'finanzapp-native-pilot-v1.sqlite';
-export const DATABASE_VERSION = 13;
+export const DATABASE_VERSION = 14;
 
 /** Every column of each table, named: a row is read by these lists, never by `SELECT *`, so a
  * column added later cannot leak into a strict-key object, a backup or an audit receipt. */
@@ -54,6 +58,7 @@ const UNIT_COLUMNS = 'currency, minorUnitExponent, source, catalogVersion, creat
 const PLAN_COLUMNS = 'id, cardId, merchant, category, currency, purchaseDateISO, principalMinor, count, interestMinor, interestCategory, feeMinor, feeCategory, taxMinor, taxCategory, cancelledAt, deleted, createdAt, revision, updatedAt';
 const INSTALLMENT_COLUMNS = 'planId, number, billingDateISO, dueDateISO, principalMinor, interestMinor, feeMinor, taxMinor';
 const CARD_CYCLE_COLUMNS = 'cardId, sequence, closingISO, dueISO, closingDay, dueDay, monthISO, createdAt, revision, updatedAt';
+const OPERATION_COLUMNS = 'id, kind, targetEntryId, targetPlanId, accountId, currency, amountMinor, creditMinor, detailJSON, dateISO, voided, createdAt, revision, updatedAt';
 
 const SCHEMA = `
   CREATE TABLE accounts (
@@ -397,6 +402,49 @@ const MIGRATE_V13 = `
   PRAGMA user_version = 13;
 `;
 
+// Producto 24T3: devoluciones and adelantos de cuotas (packages/domain/operations.ts). Two additive tables, nothing else
+// touched: `purchase_operations`, one append-only row per operation, with exactly one target (an ordinary expense in
+// `entries`, or an instalment plan; an adelanto always targets a plan), the account it moves, its currency, its amount
+// (`creditMinor` only on a plan devolución: the recognised principal it reverses) and its frozen detail in `detailJSON`
+// (a plan devolución's reductions, an adelanto's financing choice and covered shares; strict keys, one parser shared with
+// the backup); and `operation_changes`, the receipts of undo and restore (idempotent by change id, like `entry_changes`).
+// No row of an earlier table is rewritten by an operation: its money effect is projected when the ledger is read. No
+// operation is fabricated for old data: a schema 13 file opens with empty tables. Rows are never DELETEd (an undo toggles
+// `voided`, one revision on). Guarded by user_version, in the ordinary exclusive transaction, IF NOT EXISTS so an
+// interrupted step reaches 14 without a second table; earlier builds refuse a schema 14 file, unchanged.
+const MIGRATE_V14 = `
+  CREATE TABLE IF NOT EXISTS purchase_operations (
+    id TEXT PRIMARY KEY NOT NULL CHECK(length(id) BETWEEN 1 AND 97),
+    kind TEXT NOT NULL CHECK(kind IN ('refund', 'payoff')),
+    targetEntryId TEXT REFERENCES entries(id) ON DELETE RESTRICT,
+    targetPlanId TEXT REFERENCES installment_plans(id) ON DELETE RESTRICT,
+    accountId TEXT NOT NULL REFERENCES accounts(id) ON DELETE RESTRICT,
+    currency TEXT NOT NULL CHECK(length(currency) = 3 AND currency NOT GLOB '*[^A-Z]*'),
+    amountMinor INTEGER NOT NULL CHECK(amountMinor > 0 AND amountMinor <= 9007199254740991),
+    creditMinor INTEGER CHECK(creditMinor IS NULL OR (creditMinor >= 0 AND creditMinor <= amountMinor)),
+    detailJSON TEXT NOT NULL CHECK(length(detailJSON) BETWEEN 2 AND 100000),
+    dateISO TEXT NOT NULL CHECK(length(dateISO) = 10),
+    voided INTEGER NOT NULL DEFAULT 0 CHECK(voided IN (0, 1)),
+    createdAt TEXT NOT NULL,
+    revision INTEGER NOT NULL DEFAULT 0 CHECK(revision >= 0 AND revision <= 9007199254740991),
+    updatedAt TEXT NOT NULL,
+    CHECK((targetEntryId IS NULL) <> (targetPlanId IS NULL)),
+    CHECK(kind = 'refund' OR targetPlanId IS NOT NULL),
+    CHECK((creditMinor IS NOT NULL) = (kind = 'refund' AND targetPlanId IS NOT NULL)),
+    CHECK(revision > 0 OR (voided = 0 AND updatedAt = createdAt))
+  ) STRICT;
+  CREATE INDEX IF NOT EXISTS purchase_operations_entry ON purchase_operations(targetEntryId);
+  CREATE INDEX IF NOT EXISTS purchase_operations_plan ON purchase_operations(targetPlanId);
+  CREATE TABLE IF NOT EXISTS operation_changes (
+    id TEXT PRIMARY KEY NOT NULL,
+    operationId TEXT NOT NULL REFERENCES purchase_operations(id) ON DELETE RESTRICT,
+    action TEXT NOT NULL CHECK(action IN ('void', 'restore')),
+    beforeJSON TEXT NOT NULL,
+    afterJSON TEXT NOT NULL
+  ) STRICT;
+  PRAGMA user_version = 14;
+`;
+
 /** The v11 step, column by column: each ALTER runs only when its column is missing, so a file that already carries one
  * (an interrupted step, a fixture rebuilt from a later table) reaches 11 without an error and without a second column. */
 async function migrateV11(tx: SqlExecutor): Promise<void> {
@@ -407,7 +455,7 @@ async function migrateV11(tx: SqlExecutor): Promise<void> {
 }
 
 /** Every schema script in order, for tests that build a real file at an earlier version (never run by the app outside `initializeDatabase`). */
-export const SCHEMA_SCRIPTS: readonly string[] = [SCHEMA, MIGRATE_V2, MIGRATE_V3, MIGRATE_V4, MIGRATE_V5, MIGRATE_V6, MIGRATE_V7, MIGRATE_V8, MIGRATE_V9, MIGRATE_V10, MIGRATE_V11, MIGRATE_V12, MIGRATE_V13];
+export const SCHEMA_SCRIPTS: readonly string[] = [SCHEMA, MIGRATE_V2, MIGRATE_V3, MIGRATE_V4, MIGRATE_V5, MIGRATE_V6, MIGRATE_V7, MIGRATE_V8, MIGRATE_V9, MIGRATE_V10, MIGRATE_V11, MIGRATE_V12, MIGRATE_V13, MIGRATE_V14];
 
 export async function initializeDatabase(db: LedgerDatabase): Promise<void> {
   // Set before opening a transaction; foreign_keys is connection-local.
@@ -438,6 +486,7 @@ export async function initializeDatabase(db: LedgerDatabase): Promise<void> {
     if (await readVersion(tx) < 11) await migrateV11(tx);
     if (await readVersion(tx) < 12) await tx.execAsync(MIGRATE_V12); // IF NOT EXISTS: an interrupted step reaches 12 without a second table.
     if (await readVersion(tx) < 13) await tx.execAsync(MIGRATE_V13); // The same for 13.
+    if (await readVersion(tx) < 14) await tx.execAsync(MIGRATE_V14); // And for 14 (24T3).
   });
   await readSnapshot(db); // Validate before showing a balance, not after a render.
 }
@@ -534,6 +583,14 @@ export async function readArchive(db: SqlExecutor): Promise<LedgerArchive> {
   });
   // 24T2: every card's exact statement dates, in chain order. Validated as a collection by validateArchive below.
   const cardCycleDates = await db.getAllAsync<CardCycleDates>(`SELECT ${CARD_CYCLE_COLUMNS} FROM card_cycle_dates ORDER BY cardId, sequence`);
+  // 24T3: devoluciones and adelantos, undone ones included, in creation order. SQLite stores `voided` as 0/1; the domain's one
+  // strict parser reads the rest (a malformed row or detail refuses the read with a recoverable message, never a reset).
+  const operationRows = await db.getAllAsync<Omit<PurchaseOperationRow, 'voided'> & { voided: number }>(
+    `SELECT ${OPERATION_COLUMNS} FROM purchase_operations ORDER BY createdAt, id`);
+  const purchaseOperations = operationRows.map(({ voided, ...row }) => {
+    if (voided !== 0 && voided !== 1) throw new Error(OPERATION_INVALID_MESSAGE);
+    return operationFromRow({ ...row, voided: voided === 1 });
+  });
   const archive: LedgerArchive = {
     accounts,
     records,
@@ -547,6 +604,7 @@ export async function readArchive(db: SqlExecutor): Promise<LedgerArchive> {
     currencyUnits,
     ...(installmentPlans.length ? { installmentPlans } : {}),
     ...(cardCycleDates.length ? { cardCycleDates: cardCycleDates.map(row => ({ ...row })) } : {}),
+    ...(purchaseOperations.length ? { purchaseOperations } : {}),
   };
   validateArchive(archive); // Including tombstones, safe integer totals and the pinned scales.
   archiveExponents(archive); // The precision check: every currency present reads at its pinned scale, never as cents by default.
@@ -687,6 +745,8 @@ export async function createEntry(db: LedgerDatabase, input: Entry): Promise<voi
     const snapshot = snapshotFromArchive(archive);
     validateEntry(entry, snapshot.accounts);
     assertNewEntryId(entry.id); // 24T1: an instalment's id is written by the instalment catch-up only.
+    // 24T3: nor an operation's id or one of the ids its projected lines take (this write does not run validateArchive).
+    if ((archive.purchaseOperations ?? []).some(operation => operation.id === entry.id || operationLineIds(operation).includes(entry.id))) throw new Error(OPERATION_ID_MESSAGE);
     assertPostingAccount(entry.accountId, archive.debts);
     assertOpenAccount(entry.accountId, archive.accounts, archive.cards, archive.debts); // 25B2: nothing new on a deleted account or card.
     if (entry.kind === 'income') assertIncomeAccount(entry.accountId, archive.cards, archive.debts); // 24B6: never a plain income on a card.
@@ -754,7 +814,7 @@ export async function importArchive(db: LedgerDatabase, incoming: LedgerArchive,
     if (plan.conflicts) throw new Error('La copia contradice cambios locales. No se importó nada. Conservá ambas versiones.');
     if (!plan.accounts.length && !plan.records.length && !plan.transfers.length && !plan.recurring.length
       && !plan.budgets.length && !plan.cards.length && !plan.debts.length && !plan.appearances.length && !plan.categories.length && !plan.installmentPlans.length
-      && !plan.cardCycleDates.length) return;
+      && !plan.cardCycleDates.length && !plan.purchaseOperations.length) return;
     if (plan.baseline !== baseline) throw new Error('Tus datos cambiaron. Volvé a revisar la copia antes de importar.');
     // Scales first, in the same transaction as the rows that need them: the copy's own units, then
     // any currency the new rows use that neither side pinned (a v1–v8 file can only hold ARS/USD).
@@ -771,6 +831,8 @@ export async function importArchive(db: LedgerDatabase, incoming: LedgerArchive,
     for (const look of plan.appearances) await insertAppearance(tx, look);
     for (const item of plan.installmentPlans) await insertInstallmentPlan(tx, item);
     for (const row of plan.cardCycleDates) await insertCardCycleDate(tx, row);
+    // 24T3: after the movements and the plans they reference (foreign keys are checked at once).
+    for (const operation of plan.purchaseOperations) await insertPurchaseOperation(tx, operation);
     for (const definition of plan.categories) {
       await tx.runAsync(`INSERT INTO category_definitions (kind, key, storedLabel, label, icon, color, archived, createdAt, revision, updatedAt)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, definition.kind, definition.key, definition.storedLabel, definition.label, definition.icon,
@@ -1156,7 +1218,8 @@ export async function deleteCreditCard(db: LedgerDatabase, cardId: string, nowIS
     const card = archive.cards?.find(item => item.id === cardId);
     if (!card) throw new Error('No encontramos esta tarjeta.');
     if (card.deleted) return; // Committed already; a refresh failed.
-    assertCardDeletable(card, snapshotFromArchive(archive), archive.installmentPlans, archive.records); // 25B2: no balance due; 24T1: no pending plan.
+    // 25B2: no balance due; 24T1: no pending plan; 24T3 (B3): no credit in the holder's favour.
+    assertCardDeletable(card, snapshotFromArchive(archive), archive.installmentPlans ?? [], archive.records, archive.purchaseOperations ?? []);
     const tombstone = deleteCreditCardRecord(card, nowISO);
     const stopped = (archive.recurring ?? []).filter(rule => rule.accountId === card.accountId && rule.active && !rule.deleted).map(rule => pauseRecurringRule(rule, nowISO));
     const recurring = (archive.recurring ?? []).map(rule => stopped.find(item => item.id === rule.id) ?? rule);
@@ -1279,18 +1342,63 @@ async function writePlanLifecycle(tx: SqlExecutor, plan: InstallmentPlan): Promi
     plan.cancelledAt, plan.deleted ? 1 : 0, plan.revision, plan.updatedAt, plan.id);
 }
 
-/** Cancelling a plan stops every future instalment and keeps the recognised ones exactly as recorded. A retry on a plan
- * already cancelled is a no-op. */
-export async function cancelInstallmentPlan(db: LedgerDatabase, planId: string, nowISO: string): Promise<void> {
+/** The movements of a plan whose statements closed by `todayISO` and are not in the ledger yet, appended to the archive (the
+ * pure `planCatchUpInserts`): every plan write runs it inside its own transaction (A8), because `catchUpInstallments` opens a
+ * transaction of its own and cannot run inside another. */
+function withPlanCatchUp(archive: LedgerArchive, planId: string, todayISO: string): { archive: LedgerArchive; inserts: EntryRecord[] } {
+  const inserts = planCatchUpInserts(archive, planId, todayISO);
+  return { archive: inserts.length ? { ...archive, records: [...archive.records, ...inserts] } : archive, inserts };
+}
+
+/** The lifecycle of a plan moves one revision at a time: the form or the detail names the revision it showed. A retry after
+ * a commit whose refresh failed finds the plan one revision on and already in the target state (a no-op, true); any other
+ * revision is a stale view and is refused. */
+function planLifecycleRetry(plan: InstallmentPlan, expectedRevision: number, done: (plan: InstallmentPlan) => boolean): boolean {
+  if (!Number.isSafeInteger(expectedRevision) || expectedRevision < 0) throw new Error('El plan de cuotas cambió desde que lo abriste. Volvé a revisarlo.');
+  if (plan.revision === expectedRevision + 1 && done(plan)) return true;
+  if (plan.revision !== expectedRevision) throw new Error('El plan de cuotas cambió desde que lo abriste. Volvé a revisarlo.');
+  return false;
+}
+
+/** Stops following a plan («Dejar de seguir el plan»; the domain state stays `cancelled`): every future instalment stops
+ * and the recognised ones stay exactly as recorded. 24T3 (bug M3): the plan's catch-up through `todayISO` (the device's
+ * day, `todayKey()`) runs first, in the same transaction, so an instalment whose statement already closed is recorded
+ * before the stop instead of being lost. Refused when nothing is left to record (A9). `expectedRevision` is the revision
+ * the person saw (A15): a retry of the committed stop is a no-op, any other revision is refused as stale. */
+export async function cancelInstallmentPlan(db: LedgerDatabase, planId: string, expectedRevision: number, todayISO: string, nowISO = new Date().toISOString()): Promise<void> {
   await db.withExclusiveTransactionAsync(async tx => {
     const archive = await readArchive(tx);
     const plan = archive.installmentPlans?.find(item => item.id === planId);
     if (!plan) throw new Error(PLAN_MISSING_MESSAGE);
-    if (plan.cancelledAt !== null) return; // Committed already; a refresh failed.
+    if (planLifecycleRetry(plan, expectedRevision, item => item.cancelledAt !== null && !item.deleted)) return; // Committed already; a refresh failed.
+    const { archive: caughtUp, inserts } = withPlanCatchUp(archive, planId, todayISO);
+    assertInstallmentPlanCancellable(plan, caughtUp.records, caughtUp.purchaseOperations ?? []);
     const cancelled = cancelInstallmentPlanRecord(plan, nowISO);
     validateInstallmentPlanChange(plan, cancelled);
-    validateArchive({ ...archive, installmentPlans: archive.installmentPlans!.map(item => item.id === planId ? cancelled : item) });
+    validateArchive({ ...caughtUp, installmentPlans: caughtUp.installmentPlans!.map(item => item.id === planId ? cancelled : item) }, 'cancel');
+    for (const record of inserts) await insertRecord(tx, record);
     await writePlanLifecycle(tx, cancelled);
+  });
+}
+
+/** «Reactivar plan» (24T3, A15): undoes a stop. The plan follows again (`cancelledAt` back to null, one revision on) and, in
+ * the same transaction, every instalment whose statement closed while it was stopped is recorded once, on its own
+ * closing date. Allowed on an archived card (an existing obligation); refused on a deleted card. `expectedRevision` as
+ * for the stop. */
+export async function reactivateInstallmentPlan(db: LedgerDatabase, planId: string, expectedRevision: number, todayISO: string, nowISO = new Date().toISOString()): Promise<void> {
+  await db.withExclusiveTransactionAsync(async tx => {
+    const archive = await readArchive(tx);
+    const plan = archive.installmentPlans?.find(item => item.id === planId);
+    if (!plan) throw new Error(PLAN_MISSING_MESSAGE);
+    if (planLifecycleRetry(plan, expectedRevision, item => item.cancelledAt === null && !item.deleted)) return; // Committed already; a refresh failed.
+    const card = archive.cards?.find(item => item.id === plan.cardId);
+    if (!card || card.deleted) throw new Error(CARD_DELETED_MESSAGE);
+    const reactivated = reactivateInstallmentPlanRecord(plan, nowISO);
+    validateInstallmentPlanChange(plan, reactivated);
+    const { archive: next, inserts } = withPlanCatchUp({ ...archive, installmentPlans: archive.installmentPlans!.map(item => item.id === planId ? reactivated : item) }, planId, todayISO);
+    validateArchive(next, 'reactivate');
+    await writePlanLifecycle(tx, reactivated);
+    for (const record of inserts) await insertRecord(tx, record);
   });
 }
 
@@ -1302,7 +1410,7 @@ export async function deleteInstallmentPlan(db: LedgerDatabase, planId: string, 
     const plan = archive.installmentPlans?.find(item => item.id === planId);
     if (!plan) throw new Error(PLAN_MISSING_MESSAGE);
     if (plan.deleted) return; // Committed already; a refresh failed.
-    assertInstallmentPlanDeletable(plan, archive.records);
+    assertInstallmentPlanDeletable(plan, archive.records, archive.purchaseOperations ?? []); // 24T3: any operation, undone included, is history too.
     const tombstone = deleteInstallmentPlanRecord(plan, nowISO);
     validateInstallmentPlanChange(plan, tombstone);
     validateArchive({ ...archive, installmentPlans: archive.installmentPlans!.map(item => item.id === planId ? tombstone : item) });
@@ -1327,26 +1435,102 @@ export async function saveInstallmentPlan(db: LedgerDatabase, input: Installment
  * transaction, the principal (and financing) movements inserted with their deterministic ids and their statement dates.
  * Idempotent and deterministic: an id already in the ledger (recorded, edited or undone) is skipped, so a duplicated
  * invocation, a foreground after a crash, a retry or a restore adds nothing; a plan cancelled or deleted, or on a deleted
- * card, records nothing. Apart from `catchUpRecurring`: neither calls the other. Returns the movements recorded. */
+ * card, records nothing; 24T3: a share an adelanto brought forward or a devolución reduced to zero is never recorded, and a
+ * reduced share is recorded at its effective amount (the pure `planCatchUpInserts`, which every plan write also runs inside
+ * its own transaction). Apart from `catchUpRecurring`: neither calls the other. Returns the movements recorded. */
 export async function catchUpInstallments(db: LedgerDatabase, throughDateISO: string): Promise<number> {
   let created = 0;
   await db.withExclusiveTransactionAsync(async tx => {
     const archive = await readArchive(tx);
     if (!archive.installmentPlans?.length) return;
-    const known = new Set(archive.records.map(record => record.entry.id));
     const inserts: EntryRecord[] = [];
-    for (const plan of archive.installmentPlans) {
-      const card = archive.cards?.find(item => item.id === plan.cardId);
-      if (!card) continue;
-      for (const entry of materializeInstallmentPlan(plan, card, throughDateISO, known)) {
-        known.add(entry.id);
-        inserts.push(initialRecord(entry));
-      }
-    }
+    for (const plan of archive.installmentPlans) inserts.push(...planCatchUpInserts(archive, plan.id, throughDateISO)); // Ids name their plan: never shared.
     if (!inserts.length) return;
     validateArchive({ ...archive, records: [...archive.records, ...inserts] });
     for (const record of inserts) await insertRecord(tx, record);
     created = inserts.length;
   });
   return created;
+}
+
+// ---- Producto 24T3: devoluciones and adelantos de cuotas (purchase operations) ------------------------------------------
+
+async function insertPurchaseOperation(tx: SqlExecutor, operation: PurchaseOperation): Promise<void> {
+  const row = operationToRow(operation);
+  await tx.runAsync(`INSERT INTO purchase_operations (${OPERATION_COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    row.id, row.kind, row.targetEntryId, row.targetPlanId, row.accountId, row.currency, row.amountMinor, row.creditMinor, row.detailJSON, row.dateISO,
+    row.voided ? 1 : 0, row.createdAt, row.revision, row.updatedAt);
+}
+
+/** The operation storage records for what the form submitted, recomputed on `archive` (the ledger after the plan's catch-up):
+ * the same person's inputs (target, amount or financing choice, date, id, createdAt), allocated by the domain now. */
+function recompute(archive: LedgerArchive, submitted: PurchaseOperation, todayISO: string): PurchaseOperation {
+  const base = { id: submitted.id, dateISO: submitted.dateISO, todayISO, createdAt: submitted.createdAt };
+  if (isEntryRefund(submitted)) return newEntryRefund(archive, { ...base, entryId: submitted.target.entryId, amountMinor: submitted.amountMinor });
+  if (isPlanRefund(submitted)) return newPlanRefund(archive, { ...base, planId: submitted.target.planId, amountMinor: submitted.amountMinor });
+  if (isPlanPayoff(submitted)) return newPlanPayoff(archive, { ...base, planId: submitted.target.planId, financing: submitted.financing });
+  throw new Error(OPERATION_INVALID_MESSAGE);
+}
+
+/** Records a devolución or an adelanto de cuotas, in one exclusive transaction (A8): read → the plan's catch-up through
+ * `todayISO` (the device's day, `todayKey()`) → the allocation recomputed by the domain → `validateArchive` once on the
+ * result → write (the caught-up movements and the operation row together; any failure rolls everything back).
+ * - `submitted` is the operation the form previewed and confirmed (built by `newEntryRefund`, `newPlanRefund` or
+ *   `newPlanPayoff` on the archive it showed), with its form UUID frozen in the draft.
+ * - A12: a retry with the same id is answered first, before any catch-up or allocation: the same inputs return success
+ *   (committed already; a refresh failed), other inputs are refused («Esta operación ya existe con otros datos»).
+ * - A13: storage recomputes the allocation after its catch-up; when it differs from the one previewed (a statement closed
+ *   meanwhile, another operation landed) it is refused («Las cuotas cambiaron desde que abriste el formulario; revisá.»)
+ *   and nothing is written: the form previews again. What is stored is always storage's own allocation. */
+export async function createPurchaseOperation(db: LedgerDatabase, submitted: PurchaseOperation, todayISO: string): Promise<void> {
+  validatePurchaseOperation(submitted);
+  await db.withExclusiveTransactionAsync(async tx => {
+    const archive = await readArchive(tx);
+    const existing = archive.purchaseOperations?.find(item => item.id === submitted.id);
+    if (existing) {
+      if (sameOperationInputs(existing, submitted)) return; // Committed already; a refresh failed.
+      throw new Error(OPERATION_EXISTS_MESSAGE);
+    }
+    const planId = operationPlanId(submitted);
+    const { archive: caughtUp, inserts } = planId === null ? { archive, inserts: [] as EntryRecord[] } : withPlanCatchUp(archive, planId, todayISO);
+    const operation = recompute(caughtUp, submitted, todayISO);
+    assertExpectedAllocation(operation, submitted);
+    // The account credited (and so its currency) is part of what the preview named («Se acreditan $ X en <cuenta>»): a
+    // purchase moved to another account since the form opened is previewed again, never credited elsewhere silently.
+    if (operation.accountId !== submitted.accountId || operation.currency !== submitted.currency) throw new Error(OPERATION_CHANGED_MESSAGE);
+    applyNewOperation(caughtUp, operation, todayISO); // The creation-only checks, then validateArchive once on the result.
+    for (const record of inserts) await insertRecord(tx, record);
+    await insertPurchaseOperation(tx, operation);
+  });
+}
+
+/** Undo («Deshacer devolución / adelanto») or restore of an operation, with its receipt in the same commit (AGENTS rule 9):
+ * - the change id is the idempotency key: a receipt with the same id and the same change returns (a refresh failed), the
+ *   same id with another change is refused;
+ * - `change.before` is the version the person saw: a stored row at another revision or state is refused as stale;
+ * - the domain's `applyOperationChange` runs the creation preconditions that still apply (A7, A9: nothing on a deleted
+ *   account or card; no adelanto or reduction undone or restored on a stopped plan), the plan's catch-up through
+ *   `todayISO` (instalments an undo puts back whose statements closed are recorded on their own closing dates, C9), and
+ *   `validateArchive` once with the action's wording (A22). */
+export async function changePurchaseOperation(db: LedgerDatabase, change: OperationChange, todayISO: string): Promise<void> {
+  await db.withExclusiveTransactionAsync(async tx => {
+    const archive = await readArchive(tx);
+    const receipt = await tx.getFirstAsync<{ operationId: string; action: string; beforeJSON: string; afterJSON: string }>(
+      'SELECT operationId, action, beforeJSON, afterJSON FROM operation_changes WHERE id = ?', change.id);
+    if (receipt) {
+      let same = false;
+      try {
+        same = receipt.operationId === change.before.id && receipt.action === change.action
+          && samePurchaseOperation(JSON.parse(receipt.beforeJSON), change.before) && samePurchaseOperation(JSON.parse(receipt.afterJSON), change.after);
+      } catch { same = false; }
+      if (!same) throw new Error(OPERATION_EXISTS_MESSAGE);
+      return; // Committed already; a refresh failed. Never toggle twice.
+    }
+    const { inserts } = applyOperationChange(archive, change, todayISO);
+    for (const record of inserts) await insertRecord(tx, record);
+    const { after } = change;
+    await tx.runAsync('UPDATE purchase_operations SET voided = ?, revision = ?, updatedAt = ? WHERE id = ?', after.voided ? 1 : 0, after.revision, after.updatedAt, after.id);
+    await tx.runAsync('INSERT INTO operation_changes (id, operationId, action, beforeJSON, afterJSON) VALUES (?, ?, ?, ?, ?)',
+      change.id, after.id, change.action, JSON.stringify(change.before), JSON.stringify(change.after));
+  });
 }

@@ -43,3 +43,26 @@ describe('spending-first overview', () => {
     }
   });
 });
+
+describe('24T3: devoluciones and adelantos in the overview (A23)', () => {
+  it('nets a devolución in its own week and category with no purchase count; an adelanto counts once', () => {
+    const at = (id: string, amountMinor: number, dateISO: string, category = 'Comida') =>
+      ({ id, accountId: 'a', kind: 'expense' as const, amountMinor, dateISO, merchant: 'Fixture', category, createdAt });
+    const data: LedgerSnapshot = { accounts: snapshot.accounts, entries: [
+      at('buy', 10000, '2026-09-02'), at('other', 2000, '2026-09-03', 'Ropa'),
+      { ...at('r', -10000, '2026-09-15'), refund: { operationId: 'r', targetEntryId: 'buy' } },
+      { ...at('p_p', 50000, '2026-09-16', 'Hogar'), payoff: { operationId: 'p', planId: 'tv', component: 'principal' } },
+      { ...at('p_f', 500, '2026-09-16', 'Cargos'), payoff: { operationId: 'p', planId: 'tv', component: 'fee' } },
+    ] };
+    const report = spendingOverview(data, spendingWindow('ARS', 'month', '2026-09-19'));
+    if (report.status !== 'ready') throw new Error('Expected a ready overview');
+    // 10.000 + 2.000 − 10.000 + 50.000 + 500 = 52.500; purchases: buy, other and the adelanto once.
+    expect([report.expenseMinor, report.expenseCount]).toEqual([52500, 3]);
+    expect(report.categories.map(c => [c.key, c.amountMinor, c.count])).toEqual([['hogar', 50000, 1], ['ropa', 2000, 1], ['cargos', 500, 0], ['comida', 0, 1]]);
+    // Weekly buckets: 1–7 (12.000, 2), 8–14 (0, 0), 15–19 (−10.000 + 50.500, 1).
+    expect(report.buckets.map(b => [b.startISO, b.amountMinor, b.count])).toEqual([['2026-09-01', 12000, 2], ['2026-09-08', 0, 0], ['2026-09-15', 40500, 1]]);
+    expect(report.buckets.reduce((sum, b) => sum + b.amountMinor, 0)).toBe(report.expenseMinor);
+    // A week of only the devolución: a negative net, nothing counted.
+    expect(spendingOverview(data, { currency: 'ARS', startISO: '2026-09-15', endISO: '2026-09-15' })).toMatchObject({ expenseMinor: -10000, expenseCount: 0 });
+  });
+});

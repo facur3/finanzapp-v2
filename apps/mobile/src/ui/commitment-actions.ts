@@ -251,7 +251,7 @@ export function useCardManagement() {
       return;
     }
     // 24T1: the same rule storage enforces (`assertCardDeletable`): a pending instalment plan is archived with the card, never deleted.
-    if (cardHasPendingInstallments(card, ledger?.installmentPlans, ledger?.records)) {
+    if (cardHasPendingInstallments(card, ledger?.installmentPlans ?? [], ledger?.records ?? [], ledger?.purchaseOperations ?? [])) {
       const buttons: Parameters<typeof Alert.alert>[2] = [{ text: t('common.cancel'), style: 'cancel' }];
       if (card.active) buttons.push({ text: t('cards.form.blockedArchive'), onPress: () => { void archive(card, done); } });
       Alert.alert(t('cards.form.blockedTitle'), t('cards.form.blockedPlanDetail'), buttons);

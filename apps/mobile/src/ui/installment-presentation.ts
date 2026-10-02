@@ -1,6 +1,7 @@
-import { INSTALLMENT_COMPONENTS, MAX_INSTALLMENTS, assertInstallmentPlanDeletable, cardStatementsFrom, installmentAmounts, installmentEntryId, installmentOccurrenceOf,
-  installmentPlanFigures, installmentSchedule, installmentState, type CardCycleDates, type CardStatement, type CreditCardProfile, type Installment,
-  type InstallmentComponent, type InstallmentPlan, type InstallmentPlanFigures, type InstallmentPlanStatus, type RecordedEntry, type StatementPlacement } from '@finanzapp/domain';
+import { MAX_INSTALLMENTS, assertInstallmentPlanCancellable, assertInstallmentPlanDeletable, cardStatementsFrom, effectiveShares, installmentAmounts, installmentEntryId,
+  installmentOccurrenceOf, installmentPlanFigures, installmentSchedule, isPlanRefund, type CardCycleDates, type CardStatement, type CreditCardProfile, type EffectiveShare,
+  type Installment, type InstallmentComponent, type InstallmentPlan, type InstallmentPlanFigures, type InstallmentPlanStatus, type PlanRefund, type PurchaseOperation,
+  type RecordedEntry, type StatementPlacement } from '@finanzapp/domain';
 
 /** Producto 24T2: what the screens show of a purchase in instalments, derived from the plan and the ledger (never stored
  * twice). Pure: no React, so Node tests load it directly. Words are chosen by the screens; this module names states. */
@@ -18,53 +19,93 @@ export function parseInstallmentCount(text: string): number | null {
   return count >= MIN_PLAN_COUNT && count <= MAX_INSTALLMENTS ? count : null;
 }
 
-/** The state of one row of a plan's schedule, read from the movements of its components (each share has its own):
- * `recognised` (every share is in the ledger and counts), `undone` (the person undid every share: none counts, none is
- * recreated), `partial` (some shares count and some were undone: `recognisedMinor` says what counts), `next` (the first
- * one still to come), `future`, or `cancelled` (the plan stopped before it). «Pagada» is never a state: a card payment is
- * not assigned to an instalment. */
-export type ScheduleRowState = 'recognised' | 'partial' | 'next' | 'future' | 'undone' | 'cancelled';
+/** The state of one row of a plan's schedule, read from the effective shares of its components (each share has its own
+ * movement and its own state, `effectiveShares`, 24T3 A2):
+ * - `recognised`: every share is in the ledger and counts;
+ * - `undone`: the person undid every share (none counts, none is recreated);
+ * - `settled` («Adelantada», never «pagada»): a live adelanto de cuotas brought its shares forward (financing it recorded as
+ *   not charged may sit beside it);
+ * - `waived` («No se cobró»): every share left is financing an adelanto recorded as not charged;
+ * - `refunded`: devoluciones reduced its principal to zero before it was recorded, and it has no other share left;
+ * - `partial`: shares in different states (`recognisedMinor` says what counts);
+ * - `next` (the first one still to come), `future`, or `cancelled` (the plan stopped before it).
+ * A share refunded to zero is neutral: the row reads as its other shares. «Pagada» is never a state: a card payment is not
+ * assigned to an instalment. */
+export type ScheduleRowState = 'recognised' | 'partial' | 'next' | 'future' | 'undone' | 'cancelled' | 'settled' | 'waived' | 'refunded';
 export interface PlanScheduleRow {
   number: number;
   billingDateISO: string;
   dueDateISO: string;
-  /** What the instalment charges: its principal share plus its financing shares. */
+  /** What the instalment charged by contract: its principal share plus its financing shares (before any devolución). */
   totalMinor: number;
   principalMinor: number;
   financingMinor: number;
-  /** The shares of this instalment whose movements count now, and the ones the person undid. */
+  /** What it charges after live devoluciones: `totalMinor − reducedMinor`. */
+  effectiveMinor: number;
+  /** The principal live devoluciones took off it («Reducida por devolución»); 0 when none did. */
+  reducedMinor: number;
+  /** The shares of this instalment whose movements count now, and the ones the person undid (effective amounts). */
   recognisedMinor: number;
   undoneMinor: number;
+  /** The shares a live adelanto brought forward (they count, on the adelanto's date), and the financing it recorded as not charged. */
+  settledMinor: number;
+  waivedMinor: number;
   state: ScheduleRowState;
   /** The movement that recognises this instalment's principal (a recognised, partial or undone row opens it). */
   entryId: string;
+  /** 24T3 (A26): the operation a settled or refunded row opens (`/operation/[id]`): the adelanto covering it, or the latest
+   * live devolución that reduced its principal; null otherwise. */
+  operationId: string | null;
 }
 
-export function planScheduleRows(plan: InstallmentPlan, records: readonly RecordedEntry[]): PlanScheduleRow[] {
-  const stopped = plan.cancelledAt !== null || plan.deleted;
+/** The latest live devolución of `plan` reducing each instalment (by date, then creation, then id). */
+function reducingRefunds(plan: InstallmentPlan, operations: readonly PurchaseOperation[]): Map<number, string> {
+  const result = new Map<number, string>();
+  const refunds = operations.filter((operation): operation is PlanRefund => !operation.voided && isPlanRefund(operation) && operation.target.planId === plan.id)
+    .sort((a, b) => a.dateISO.localeCompare(b.dateISO) || a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id));
+  for (const refund of refunds) for (const row of refund.reductions) result.set(row.number, refund.id);
+  return result;
+}
+
+export function planScheduleRows(plan: InstallmentPlan, records: readonly RecordedEntry[], operationsInput: readonly PurchaseOperation[]): PlanScheduleRow[] {
+  const operations = operationsInput ?? []; // Required (A3); tolerated missing at run time while a caller is being moved.
+  const byNumber = new Map<number, EffectiveShare[]>();
+  for (const share of effectiveShares(plan, records, operations)) {
+    const list = byNumber.get(share.number);
+    if (list) list.push(share); else byNumber.set(share.number, [share]);
+  }
+  const reducedBy = reducingRefunds(plan, operations);
   let nextGiven = false;
   return plan.schedule.map(row => {
-    const shares = INSTALLMENT_COMPONENTS.map(component => ({ amount: row[`${component}Minor`], state: installmentState(plan, row, records, component) }))
-      .filter(share => share.amount > 0);
-    const recognisedMinor = shares.filter(share => share.state === 'recognised').reduce((sum, share) => sum + share.amount, 0);
-    const undoneMinor = shares.filter(share => share.state === 'undone').reduce((sum, share) => sum + share.amount, 0);
-    const scheduled = shares.every(share => share.state === 'scheduled');
+    const shares = byNumber.get(row.number) ?? [];
+    const sum = (states: readonly EffectiveShare['state'][]) => shares.filter(share => states.includes(share.state)).reduce((total, share) => total + share.amountMinor, 0);
+    const counted = shares.filter(share => share.state !== 'refunded');
+    const every = (...states: EffectiveShare['state'][]) => counted.length > 0 && counted.every(share => states.includes(share.state));
     let state: ScheduleRowState;
-    if (shares.every(share => share.state === 'recognised')) state = 'recognised';
-    else if (shares.every(share => share.state === 'undone')) state = 'undone';
-    else if (!scheduled) state = 'partial';
-    else if (stopped) state = 'cancelled';
-    else if (!nextGiven) { state = 'next'; nextGiven = true; }
-    else state = 'future';
+    if (!counted.length) state = 'refunded';
+    else if (every('recognised')) state = 'recognised';
+    else if (every('undone')) state = 'undone';
+    else if (every('waived')) state = 'waived';
+    else if (every('settled', 'waived')) state = 'settled';
+    else if (every('cancelled')) state = 'cancelled';
+    else if (every('scheduled')) {
+      if (!nextGiven) { state = 'next'; nextGiven = true; } else state = 'future';
+    } else state = 'partial';
+    const reducedMinor = shares.reduce((total, share) => total + Math.min(share.reducedMinor, share.scheduleMinor), 0);
     const financingMinor = row.interestMinor + row.feeMinor + row.taxMinor;
-    return { number: row.number, billingDateISO: row.billingDateISO, dueDateISO: row.dueDateISO, totalMinor: row.principalMinor + financingMinor,
-      principalMinor: row.principalMinor, financingMinor, recognisedMinor, undoneMinor, state, entryId: installmentEntryId(plan.id, row.number, 'principal') };
+    const totalMinor = row.principalMinor + financingMinor;
+    const payoffId = shares.find(share => share.payoffId !== null)?.payoffId ?? null;
+    const operationId = state === 'settled' || state === 'waived' ? payoffId : state === 'refunded' || reducedMinor > 0 ? reducedBy.get(row.number) ?? null : null;
+    return { number: row.number, billingDateISO: row.billingDateISO, dueDateISO: row.dueDateISO, totalMinor, principalMinor: row.principalMinor, financingMinor,
+      effectiveMinor: totalMinor - reducedMinor, reducedMinor, recognisedMinor: sum(['recognised']), undoneMinor: sum(['undone']),
+      settledMinor: sum(['settled']), waivedMinor: sum(['waived']), state, entryId: installmentEntryId(plan.id, row.number, 'principal'), operationId };
   });
 }
 
 export interface PlanSummary {
   plan: InstallmentPlan;
-  /** The distinct figures (decision 003, rule 7): price, recognised, undone, future committed, cancelled, remaining. */
+  /** The distinct figures (decision 003, rule 7): price, recognised, undone, future committed, cancelled, remaining; since
+   * 24T3 also brought forward (`settledMinor`), returned (`refundedMinor`, credit and future) and waived financing. */
   figures: InstallmentPlanFigures;
   status: InstallmentPlanStatus;
   /** The first instalment still to come, when the plan is live. */
@@ -73,19 +114,24 @@ export interface PlanSummary {
   financingMinor: number;
   /** Price plus financing: «Total financiado». Equal to the price without financing. */
   totalFinancedMinor: number;
-  /** A live plan with nothing recorded yet (created by mistake): the one lifecycle action 24T2 offers is deleting it.
-   * Never for a cancelled or deleted plan (storage refuses both). */
+  /** A live plan with nothing recorded yet and no devolución or adelanto, undone ones included (created by mistake): it may be
+   * deleted. Never for a stopped or deleted plan (storage refuses both). */
   deletable: boolean;
+  /** 24T3: a live plan with a share still scheduled may stop being followed («Dejar de seguir el plan»); never offered together
+   * with `deletable` (A16: a plan created by mistake is deleted, not stopped). */
+  cancellable: boolean;
 }
 
-export function planSummary(plan: InstallmentPlan, records: readonly RecordedEntry[]): PlanSummary {
-  const figures = installmentPlanFigures(plan, records);
-  const rows = planScheduleRows(plan, records);
+export function planSummary(plan: InstallmentPlan, records: readonly RecordedEntry[], operationsInput: readonly PurchaseOperation[]): PlanSummary {
+  const operations = operationsInput ?? []; // Required (A3); tolerated missing at run time while a caller is being moved.
+  const figures = installmentPlanFigures(plan, records, operations);
+  const rows = planScheduleRows(plan, records, operations);
   const financingMinor = plan.interestMinor + plan.feeMinor + plan.taxMinor;
-  let deletable = !plan.deleted && plan.cancelledAt === null;
-  if (deletable) { try { assertInstallmentPlanDeletable(plan, records); } catch { deletable = false; } }
+  const passes = (check: () => void) => { try { check(); return true; } catch { return false; } };
+  const deletable = !plan.deleted && plan.cancelledAt === null && passes(() => assertInstallmentPlanDeletable(plan, records, operations));
+  const cancellable = !deletable && passes(() => assertInstallmentPlanCancellable(plan, records, operations));
   return { plan, figures, status: figures.status, next: rows.find(row => row.state === 'next') ?? null, financingMinor,
-    totalFinancedMinor: plan.principalMinor + financingMinor, deletable };
+    totalFinancedMinor: plan.principalMinor + financingMinor, deletable, cancellable };
 }
 
 /** 24UX6D: a plan detail draws one segment per instalment up to this count (a 24-instalment plan keeps segments about
@@ -115,10 +161,11 @@ export function planProgress(summary: Pick<PlanSummary, 'figures' | 'plan'>, row
 
 /** A card's plans for its detail: live ones first (by their next instalment; a live plan with nothing left to come, only
  * undone shares, after them), then completed, then cancelled. Deleted plans (created by mistake, nothing recorded) are gone. */
-export function cardPlanSummaries(cardId: string, plans: readonly InstallmentPlan[] = [], records: readonly RecordedEntry[] = []): PlanSummary[] {
+export function cardPlanSummaries(cardId: string, plans: readonly InstallmentPlan[] | undefined, records: readonly RecordedEntry[] | undefined,
+  operations: readonly PurchaseOperation[] | undefined): PlanSummary[] {
   const rank: Record<InstallmentPlanStatus, number> = { active: 0, completed: 1, cancelled: 2, deleted: 3 };
   const nextOf = (summary: PlanSummary) => summary.next?.billingDateISO ?? '9999-12-31';
-  return plans.filter(plan => plan.cardId === cardId && !plan.deleted).map(plan => planSummary(plan, records))
+  return (plans ?? []).filter(plan => plan.cardId === cardId && !plan.deleted).map(plan => planSummary(plan, records ?? [], operations ?? []))
     .sort((a, b) => rank[a.status] - rank[b.status] || nextOf(a).localeCompare(nextOf(b))
       || b.plan.purchaseDateISO.localeCompare(a.plan.purchaseDateISO) || a.plan.id.localeCompare(b.plan.id));
 }

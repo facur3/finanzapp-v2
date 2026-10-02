@@ -1,6 +1,6 @@
 import { accountKind, cardAvailableLimitMinor, cardCommittedFinancingMinor, cardCommittedMinor, cardCreditMinor, cardCycleDatesOf, cardCycleView, cardDebtMinor, installmentPlanFigures, pendingInstallmentPlans,
   type Account, type AccountAppearance, type CardCycleDates, type CardStatement, type CreditCardProfile, type InstallmentPlan, type LedgerSnapshot, type PersonalDebtProfile,
-  type RecordedEntry, isLiveAccount } from '@finanzapp/domain';
+  type PurchaseOperation, type RecordedEntry, isLiveAccount } from '@finanzapp/domain';
 import { formatDate, relativeDate } from '../i18n/format.ts';
 import { DEFAULT_LOCALE, type AppLocale } from '../i18n/locale.ts';
 import { translator, type Translate } from '../i18n/messages.ts';
@@ -52,41 +52,44 @@ export type CardSummary = {
 };
 
 /** Everything Tarjetas needs for one card, computed once from the snapshot, the plans and the card's exact cycle dates. */
-export function summarizeCard(card: CreditCardProfile, snapshot: LedgerSnapshot, todayISO: string, plans: readonly InstallmentPlan[] = [], records: readonly RecordedEntry[] = [],
-  cycleDates: readonly CardCycleDates[] = []): CardSummary | null {
+export function summarizeCard(card: CreditCardProfile, snapshot: LedgerSnapshot, todayISO: string, plansInput: readonly InstallmentPlan[] | undefined,
+  recordsInput: readonly RecordedEntry[] | undefined, operationsInput: readonly PurchaseOperation[] | undefined, cycleDates: readonly CardCycleDates[] = []): CardSummary | null {
+  // 24T3 (A3): the operations are a required argument (an archive before 24T3 passes none: `archive?.purchaseOperations`), so
+  // every caller says which devoluciones and adelantos it read; undefined reads as none.
+  const plans = plansInput ?? [], records = recordsInput ?? [], operations = operationsInput ?? [];
   const account = snapshot.accounts.find(item => item.id === card.accountId);
   if (!account) return null;
   const debtMinor = cardDebtMinor(card, snapshot);
-  const availableMinor = cardAvailableLimitMinor(card, snapshot, plans, records);
+  const availableMinor = cardAvailableLimitMinor(card, snapshot, plans, records, operations);
   const availability: CardAvailability = card.creditLimitMinor === null ? 'noLimit' : availableMinor === null ? 'unknownWithPlans' : 'known';
   const view = cardCycleView(card, cardCycleDatesOf(card.id, cycleDates), todayISO);
-  const pendingPlans = pendingInstallmentPlans(card, plans, records);
+  const pendingPlans = pendingInstallmentPlans(card, plans, records, operations);
   // Sums over every live plan of the card: exact, or null when they leave the safe range (never a throw while rendering).
   const exactly = (sum: () => number) => { try { return sum(); } catch { return null; } };
   return { id: card.id, card, account, debtMinor, creditMinor: cardCreditMinor(card, snapshot), availableMinor, availability,
     usage: availability === 'known' && card.creditLimitMinor ? debtMinor / card.creditLimitMinor : null,
     closingISO: view.open.closingISO, openDueISO: view.open.dueISO, openStartISO: view.openStartISO,
     nextDueISO: view.nextDue.dueISO, nextDueOfISO: view.nextDue.closingISO, toPay: view.toPay, previousClosingISO: view.previous.closingISO,
-    committedMinor: exactly(() => cardCommittedMinor(card, plans, records)),
-    committedFinancingMinor: exactly(() => cardCommittedFinancingMinor(card, plans, records)),
+    committedMinor: exactly(() => cardCommittedMinor(card, plans, records, operations)),
+    committedFinancingMinor: exactly(() => cardCommittedFinancingMinor(card, plans, records, operations)),
     financingKind: pendingPlans.some(plan => plan.feeMinor + plan.taxMinor > 0) ? 'financing' : 'interest', pendingPlans,
-    futurePlanCount: pendingPlans.filter(plan => installmentPlanFigures(plan, records).scheduledMinor > 0).length };
+    futurePlanCount: pendingPlans.filter(plan => installmentPlanFigures(plan, records, operations).scheduledMinor > 0).length };
 }
 
 /** The cards Tarjetas shows in its deck, in their stored order (active first, then by creation). */
-export function activeCards(cards: CreditCardProfile[] | undefined, snapshot: LedgerSnapshot, todayISO: string, plans: readonly InstallmentPlan[] = [], records: readonly RecordedEntry[] = [],
-  cycleDates: readonly CardCycleDates[] = []): CardSummary[] {
+export function activeCards(cards: CreditCardProfile[] | undefined, snapshot: LedgerSnapshot, todayISO: string, plans: readonly InstallmentPlan[] | undefined,
+  records: readonly RecordedEntry[] | undefined, operations: readonly PurchaseOperation[] | undefined, cycleDates: readonly CardCycleDates[] = []): CardSummary[] {
   return (cards ?? []).filter(card => card.active)
-    .map(card => summarizeCard(card, snapshot, todayISO, plans, records, cycleDates))
+    .map(card => summarizeCard(card, snapshot, todayISO, plans, records, operations, cycleDates))
     .filter((summary): summary is CardSummary => summary !== null);
 }
 
 /** 24T2: archived cards (not deleted) stay reachable from Tarjetas, under Archivadas: their plans keep being recognised
  * and they still take payments. */
-export function archivedCards(cards: CreditCardProfile[] | undefined, snapshot: LedgerSnapshot, todayISO: string, plans: readonly InstallmentPlan[] = [], records: readonly RecordedEntry[] = [],
-  cycleDates: readonly CardCycleDates[] = []): CardSummary[] {
+export function archivedCards(cards: CreditCardProfile[] | undefined, snapshot: LedgerSnapshot, todayISO: string, plans: readonly InstallmentPlan[] | undefined,
+  records: readonly RecordedEntry[] | undefined, operations: readonly PurchaseOperation[] | undefined, cycleDates: readonly CardCycleDates[] = []): CardSummary[] {
   return (cards ?? []).filter(card => !card.active && !card.deleted)
-    .map(card => summarizeCard(card, snapshot, todayISO, plans, records, cycleDates))
+    .map(card => summarizeCard(card, snapshot, todayISO, plans, records, operations, cycleDates))
     .filter((summary): summary is CardSummary => summary !== null);
 }
 

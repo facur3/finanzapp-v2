@@ -80,8 +80,8 @@ test('schema 13 is reached from a real schema 12 file by an additive migration: 
   assert.equal(await version(db), 12);
   assert.equal((await db.getAllAsync<{ name: string }>("SELECT name FROM sqlite_master WHERE name = 'card_cycle_dates'")).length, 0, 'the table rolled back with its step');
   await initializeDatabase(db);
-  assert.equal(await version(db), 13);
-  assert.equal(DATABASE_VERSION, 13);
+  assert.equal(await version(db), 14, '24T3: the file continues to schema 14 (empty operation tables)');
+  assert.equal(DATABASE_VERSION, 14);
   const archive = await readArchive(db);
   assert.equal(archive.cardCycleDates, undefined, 'old data gets no exact date');
   assert.deepEqual(archive.cards?.[0], card);
@@ -90,11 +90,11 @@ test('schema 13 is reached from a real schema 12 file by an additive migration: 
   // IF NOT EXISTS: a file that already has the table (an interrupted step after the CREATE) reaches 13 once more.
   await db.execAsync('PRAGMA user_version = 12');
   await initializeDatabase(db);
-  assert.equal(await version(db), 13);
-  await db.execAsync('PRAGMA user_version = 14');
+  assert.equal(await version(db), 14);
+  await db.execAsync('PRAGMA user_version = 15');
   await assert.rejects(initializeDatabase(db), /versión más nueva/);
-  assert.equal(await version(db), 14, 'refused unchanged');
-  await db.execAsync('PRAGMA user_version = 13');
+  assert.equal(await version(db), 15, 'refused unchanged');
+  await db.execAsync('PRAGMA user_version = 14');
   // The row needs its card, and a due on or before its closing is refused by the schema itself.
   await assert.rejects(db.withExclusiveTransactionAsync(async tx => { await tx.runAsync(`INSERT INTO card_cycle_dates (cardId, sequence, closingISO, dueISO, closingDay, dueDay, monthISO, createdAt, revision, updatedAt) VALUES ('nope', 0, '2026-10-28', '2026-11-05', 28, 5, '2026-10', '${createdAt}', 0, '${createdAt}')`); }), /FOREIGN KEY/);
   await assert.rejects(db.withExclusiveTransactionAsync(async tx => { await tx.runAsync(`INSERT INTO card_cycle_dates (cardId, sequence, closingISO, dueISO, closingDay, dueDay, monthISO, createdAt, revision, updatedAt) VALUES ('card', 0, '2026-10-28', '2026-10-28', 28, 5, '2026-10', '${createdAt}', 0, '${createdAt}')`); }), /CHECK/);
@@ -210,9 +210,11 @@ test('backup v13: written as soon as a card has exact dates, restored with its c
   const refused = previewBackupImport(await readArchive(fresh), contradicting);
   assert.equal(refused.conflicts, 1);
   await assert.rejects(importArchive(fresh, contradicting, refused.baseline), /contradice cambios locales/);
-  // The refusal contract of older builds: read as v12 the extra key refuses the file; a v14 file is refused by name.
+  // The refusal contract of older builds: read as v12 the extra key refuses the file; a v15 file is refused by name (24T3: a v13
+  // file told v14 lacks purchaseOperations).
   assert.throws(() => parsePilotBackup(JSON.stringify({ ...backup, schema: 'finanzapp.native-pilot.v12' })), /campos faltantes/);
-  assert.throws(() => parsePilotBackup(JSON.stringify({ ...backup, schema: 'finanzapp.native-pilot.v14' })), /versiones 1 a 13/);
+  assert.throws(() => parsePilotBackup(JSON.stringify({ ...backup, schema: 'finanzapp.native-pilot.v14' })), /campos faltantes/);
+  assert.throws(() => parsePilotBackup(JSON.stringify({ ...backup, schema: 'finanzapp.native-pilot.v15' })), /versiones 1 a 14/);
   // A v12-or-older copy still restores into schema 13; its cards follow their usual days.
   const older = setup().db;
   await initializeDatabase(older);

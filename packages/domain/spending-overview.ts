@@ -1,6 +1,7 @@
 import { accountIdsInCurrency, validDateISO, type Currency, type LedgerSnapshot } from './ledger.ts';
 import { assertStorableCurrency } from './currency.ts';
 import { categoryKey, type CategorySpending, type ReportPeriod } from './spending-report.ts';
+import { isPurchaseLine } from './operations.ts';
 
 export type SpendingWindow = 'month' | 'week';
 export interface SpendingBucket extends ReportPeriod { amountMinor: number; count: number }
@@ -18,7 +19,11 @@ export function spendingWindow(currency: Currency, window: SpendingWindow, today
   return { currency, startISO: date.toISOString().slice(0, 10), endISO: today };
 }
 
-/** Recorded flow only. No bank balance, portfolio, transfer or inferred spending. */
+/** Recorded flow only. No bank balance, portfolio, transfer or inferred spending.
+ *
+ * Producto 24T3: amounts are signed nets (a devolución is a negative expense line in its own period and category), so
+ * `expenseMinor`, a category or a bucket may be ≤ 0; counts (`expenseCount`, a category's, a bucket's) are purchase
+ * lines (`isPurchaseLine`, A23): a devolución adds none, an adelanto adds one. */
 export function spendingOverview(snapshot: LedgerSnapshot, period: ReportPeriod): SpendingOverview {
   // The currency is checked by its shape (a storable code, its own error), never by the gate.
   assertStorableCurrency(period.currency);
@@ -34,21 +39,24 @@ export function spendingOverview(snapshot: LedgerSnapshot, period: ReportPeriod)
   }
   const accountIds = accountIdsInCurrency(snapshot.accounts, period.currency);
   const groups = new Map<string, CategorySpending>();
-  let expenseMinor = 0, incomeMinor = 0, expenseCount = 0;
+  // `grossMinor` = Σ|expense line| bounds the net and every category or bucket, whatever the signs.
+  let expenseMinor = 0, incomeMinor = 0, expenseCount = 0, grossMinor = 0;
   for (const entry of snapshot.entries) {
     if (!accountIds.has(entry.accountId) || entry.dateISO < period.startISO || entry.dateISO > period.endISO) continue;
     if (entry.kind === 'income') incomeMinor += entry.amountMinor;
     else {
+      const purchase = isPurchaseLine(entry) ? 1 : 0;
       expenseMinor += entry.amountMinor;
-      expenseCount++;
+      grossMinor += Math.abs(entry.amountMinor);
+      expenseCount += purchase;
       const key = categoryKey(entry.category);
       const group = groups.get(key) ?? { key, category: entry.category.trim(), count: 0, amountMinor: 0 };
-      group.amountMinor += entry.amountMinor; group.count++;
+      group.amountMinor += entry.amountMinor; group.count += purchase;
       groups.set(key, group);
       const bucket = buckets.find(b => entry.dateISO >= b.startISO && entry.dateISO <= b.endISO)!;
-      bucket.amountMinor += entry.amountMinor; bucket.count++;
+      bucket.amountMinor += entry.amountMinor; bucket.count += purchase;
     }
-    if (!Number.isSafeInteger(expenseMinor) || !Number.isSafeInteger(incomeMinor)) {
+    if (!Number.isSafeInteger(grossMinor) || !Number.isSafeInteger(incomeMinor)) {
       return { ...period, status: 'out-of-range', categories: [], buckets: [] };
     }
   }

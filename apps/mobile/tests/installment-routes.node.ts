@@ -360,7 +360,7 @@ test('plan detail: the price first, then only its figures (recorded, future, rem
   const liveSegments = [byName(root, 'PlanBar')[0].rendered!.props.children].flat().map((segment: Node) => Object.assign({}, ...[segment.props.style].flat()));
   assert.equal(liveSegments.map(style => style.backgroundColor === '#000' ? 'ink' : style.borderColor === '#999' && !style.borderStyle ? 'outline' : '?').join(','),
     'ink,ink' + ',outline'.repeat(10), '24UX6D review: still to come is a solid tertiary outline, distinct from recorded and from cancelled');
-  assert.equal(nodes(progress).find(node => node.type === 'Money')!.props.minor, installmentPresentation.planSummary(tv, withPlans.records).figures.remainingMinor);
+  assert.equal(nodes(progress).find(node => node.type === 'Money')!.props.minor, installmentPresentation.planSummary(tv, withPlans.records, withPlans.purchaseOperations ?? []).figures.remainingMinor);
   assert.deepEqual(rowsOf(root), [
     'Tarjeta=Visa Gold', 'Categoría=Hogar', 'Fecha de compra=10 ago 2026 (10 de agosto de 2026)', 'Precio=$ 1.200.000,00 (1200000,00 pesos)',
     'Ya registrado=$ 200.000,00 (200000,00 pesos)', 'Cuotas futuras=$ 1.000.000,00 (1000000,00 pesos)',
@@ -487,8 +487,8 @@ test('plan detail: a plan that recorded nothing can be deleted after a confirmat
   assert.equal(find(harness('installment/[id].tsx', { params: { id: 'nb' }, data: deleted }).render(), 'EmptyState').props.title, 'No encontramos este plan de cuotas');
   assert.equal(find(harness('installment/[id].tsx', { params: { id: 'missing' } }).render(), 'EmptyState').props.title, 'No encontramos este plan de cuotas');
   // Nothing recorded yet is what makes it deletable: the card detail lists it until then.
-  assert.equal(installmentPresentation.planSummary(nb, withPlans.records).deletable, true);
-  assert.equal(installmentPresentation.planSummary(tv, withPlans.records).deletable, false);
+  assert.equal(installmentPresentation.planSummary(nb, withPlans.records, withPlans.purchaseOperations ?? []).deletable, true);
+  assert.equal(installmentPresentation.planSummary(tv, withPlans.records, withPlans.purchaseOperations ?? []).deletable, false);
 });
 
 test('plan detail: a failed deletion keeps the plan and the error; Reintentar sends the same deletion again without asking twice', async () => {

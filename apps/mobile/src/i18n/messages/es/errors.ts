@@ -158,7 +158,7 @@ export const errors = {
       fileSize: 'Elegí una copia JSON de hasta 5 MB.',
       notJson: 'El archivo no es una copia JSON válida.',
       notFinanzApp: 'El archivo no es una copia de FinanzApp.',
-      version: 'Solo se pueden restaurar copias de FinanzApp de las versiones 1 a 13. Este archivo no es una de ellas; conservalo.',
+      version: 'Solo se pueden restaurar copias de FinanzApp de las versiones 1 a 14. Este archivo no es una de ellas; conservalo.',
       money: 'Formato o unidad monetaria no compatibles.',
       /** A v1–v8 file naming a currency other than ARS or USD: it cannot be read as cents, whatever currencies the app offers (24B1). */
       legacyImport: 'Las copias v1 a v8 solo pueden contener cuentas y presupuestos en ARS o USD. No se importó nada; conservá el archivo.',
@@ -256,13 +256,15 @@ export const errors = {
       state: 'Estado de plan de cuotas inválido.',
       schedule: 'El calendario de cuotas no coincide con el plan.',
       deleted: 'Este plan de cuotas fue eliminado.',
-      cancelled: 'Este plan de cuotas fue cancelado.',
-      history: 'Este plan ya registró cuotas. Cancelalo; no se puede eliminar.',
-      change: 'Un plan de cuotas no cambia su precio, sus cuotas ni sus fechas. Un ajuste es una operación propia del plan.',
+      /** 24T3 (A28): a stopped plan is «sin seguimiento» («Dejar de seguir el plan»), never «cancelado». */
+      cancelled: 'Este plan de cuotas no se sigue.',
+      history: 'Este plan ya registró cuotas. Dejá de seguirlo; no se puede eliminar.',
+      /** 24T3 (A27): no «ajuste»: a devolución or an adelanto is an operation of the plan. */
+      change: 'Un plan de cuotas no cambia su precio, sus cuotas ni sus fechas. Una devolución o un adelanto de cuotas se registra desde el plan.',
       exists: 'Este plan de cuotas ya existe con otros datos. Volvé a abrir el formulario.',
       missing: 'No encontramos este plan de cuotas.',
-      deletePath: 'Un plan de cuotas se cancela o elimina con su propia acción, no con un cambio de datos.',
-      entry: 'Una cuota se corrige desde su plan: el importe, la fecha y la tarjeta no se editan en el movimiento.',
+      deletePath: 'Un plan de cuotas deja de seguirse o se elimina con su propia acción, no con un cambio de datos.',
+      entry: 'El importe, la fecha y la tarjeta de una cuota no se editan. Una devolución o un adelanto de cuotas se registra desde su plan.',
       entryId: 'Un movimiento nuevo no puede usar el identificador de una cuota.',
       drift: 'Una cuota registrada no coincide con su plan. No se modificó nada.',
       /** A card with a pending plan is archived, never deleted. */
@@ -280,6 +282,48 @@ export const errors = {
       totalBelowPrice: 'El total financiado no puede ser menor que el precio.',
       /** 24T2: the card's calendar changed while the purchase form was open. */
       calendarChanged: 'El calendario de la tarjeta cambió desde que abriste la compra. Revisá la primera cuota y guardá de nuevo.',
+    },
+    /** Producto 24T3: devoluciones and adelantos de cuotas (`packages/domain/operation-messages.ts`, the storage operation
+     * functions, the backup), the plan lifecycle they bring, and the card that holds a credit. */
+    operations: {
+      invalid: 'Una devolución o un adelanto de cuotas no es válido. No se modificó nada.',
+      target: 'Una devolución o un adelanto de cuotas no encuentra su compra. No se modificó nada.',
+      id: 'Una devolución o un adelanto de cuotas repite un identificador. No se modificó nada.',
+      /** A13: storage's allocation after its catch-up differs from the form's preview. */
+      changed: 'Las cuotas cambiaron desde que abriste el formulario; revisá.',
+      state: 'La devolución o el adelanto cambió desde que lo abriste. Volvé a abrirlo.',
+      import: 'La copia tiene devoluciones o adelantos que no encajan con las cuotas de este dispositivo. No se importó nada.',
+      tooMany: 'La copia contiene demasiadas devoluciones o adelantos o un formato inválido.',
+      over: 'La devolución supera lo que queda por devolver de esta compra.',
+      refundTarget: 'Una devolución se registra sobre un gasto guardado que no sea una cuota.',
+      refundDate: 'Elegí una fecha entre la de la compra y hoy.',
+      planDate: 'Elegí una fecha entre la última cuota registrada del plan y hoy.',
+      accountDeleted: 'La cuenta de esta compra fue eliminada.',
+      historyDeleted: 'La tarjeta o la cuenta fue eliminada; su historial no cambia.',
+      planStopped: 'Este plan no se sigue. Reactivalo primero.',
+      payoffNothing: 'No quedan cuotas por adelantar.',
+      payoffPrincipal: 'No queda precio por adelantar. Para dejar de registrar el interés, dejá de seguir el plan.',
+      payoffFinancing: 'Elegí si los intereses y cargos futuros se registran o no se cobran.',
+      payoffDate: 'La fecha del adelanto debe ser anterior al cierre de las cuotas que adelanta.',
+      planHistory: 'Este plan tiene devoluciones o adelantos registrados. Dejá de seguirlo; no se puede eliminar.',
+      nothingToStop: 'Este plan no tiene cuotas por registrar; no hay nada que dejar de seguir.',
+      notStopped: 'Este plan se sigue registrando; no hay nada que reactivar.',
+      projected: 'Una devolución o un adelanto de cuotas no se guarda como movimiento.',
+      /** B3: a card holding a credit is archived, never deleted (the money would leave every total). */
+      cardCredit: 'Tiene saldo a favor; archivala.',
+      /** The archive guards, worded by what the person is doing (A22): an edit or an undo, then a restore. */
+      purchaseRefunded: 'Esta compra tiene devoluciones registradas. Deshacelas primero.',
+      restorePurchase: 'La compra de esta devolución cambió o se deshizo; no se puede restaurar.',
+      restoreCap: 'Otra devolución ya usa lo que queda por devolver de esta compra; no se puede restaurar.',
+      creditInUse: 'Una devolución usa estas cuotas. Deshacé la devolución primero.',
+      restoreCredit: 'Las cuotas de esta devolución ya no están registradas; no se puede restaurar.',
+      reducedRecorded: 'Ya se registraron cuotas que esta devolución redujo; no se puede deshacer.',
+      restoreReduced: 'Ya se registraron cuotas que esta devolución reduce; no se puede restaurar.',
+      overlap: 'Otra devolución ya redujo esas cuotas.',
+      restoreOverlap: 'Otra devolución ya redujo esas cuotas; registrá la devolución de nuevo.',
+      payoffInUse: 'Un adelanto usa esas cuotas. Deshacé el adelanto primero.',
+      restorePayoff: 'Algunas cuotas ya se registraron o se adelantaron; registrá un adelanto nuevo.',
+      restoreShared: 'Una devolución y un adelanto usan las mismas cuotas; no se puede restaurar.',
     },
     /** Producto 24T2: the card's statement calendar (`packages/domain/card-cycles.ts`): a closing and its due date. */
     cycles: {

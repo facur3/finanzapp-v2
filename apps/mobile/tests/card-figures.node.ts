@@ -18,7 +18,7 @@ const payment: Transfer = { id: 'payment', fromAccountId: bank.id, toAccountId: 
 const plan = newInstallmentPlan({ id: 'notebook', card, cardAccount, merchant: 'Notebook', category: 'Tecnología', purchaseDateISO: '2026-09-10', principalMinor: 120000000,
   count: 12, placement: 'current', interestMinor: interestFromTotalFinanced(120000000, 144000000), interestCategory: interestCategoryLabel(), createdAt });
 const today = '2026-10-30';
-const instalments = materializeInstallmentPlan(plan, card, today, new Set());
+const instalments = materializeInstallmentPlan(plan, card, today, new Set(), []);
 const archive: LedgerArchive = { accounts: [bank, cardAccount], records: [purchase, ...instalments].map(initialRecord),
   transfers: [{ transfer: payment, revision: 0, voided: false, updatedAt: createdAt }], cards: [card], installmentPlans: [plan] };
 const snapshot = snapshotFromArchive(archive);
@@ -26,7 +26,7 @@ const snapshot = snapshotFromArchive(archive);
 test('the card balance, its future instalments and its dates are the ledger’s own facts', () => {
   assert.deepEqual(instalments.map(entry => entry.id), ['inst_notebook_001', 'insti_notebook_001', 'inst_notebook_002', 'insti_notebook_002'],
     'two statements closed: principal and interest of each, and nothing else');
-  const summary = summarizeCard(card, snapshot, today, archive.installmentPlans, archive.records)!;
+  const summary = summarizeCard(card, snapshot, today, archive.installmentPlans, archive.records, archive.purchaseOperations)!;
   const expected = 2310000 + 2 * (10000000 + 2000000) - 5000000;
   assert.equal(summary.debtMinor, expected, 'saldo pendiente = purchases and recognised instalments minus payments');
   assert.equal(summary.debtMinor, -accountBalanceMinor(cardAccount, snapshot.entries, snapshot.transfers));
@@ -37,11 +37,11 @@ test('the card balance, its future instalments and its dates are the ledger’s 
   assert.deepEqual([summary.previousClosingISO, summary.nextDueISO, summary.nextDueOfISO, summary.closingISO, summary.openDueISO],
     ['2026-10-28', '2026-11-05', '2026-10-28', '2026-11-28', '2026-12-05']);
   assert.equal(summary.pendingPlans.length, 1);
-  const [row] = cardPlanSummaries(card.id, archive.installmentPlans, archive.records);
+  const [row] = cardPlanSummaries(card.id, archive.installmentPlans, archive.records, archive.purchaseOperations);
   assert.deepEqual([row.figures.recognisedCount, row.figures.recognisedMinor, row.figures.scheduledMinor, row.figures.remainingMinor, row.totalFinancedMinor],
     [2, 20000000, 100000000, 100000000, 144000000]);
   assert.equal(row.next!.billingDateISO, '2026-11-28');
-  assert.deepEqual(planScheduleRows(plan, archive.records).slice(0, 4).map(item => item.state), ['recognised', 'recognised', 'next', 'future']);
+  assert.deepEqual(planScheduleRows(plan, archive.records, []).slice(0, 4).map(item => item.state), ['recognised', 'recognised', 'next', 'future']);
 });
 
 test('Reportes and Presupuestos count each recognised share once, in its statement month and its own category; a future share nowhere; a payment never', () => {
@@ -72,11 +72,11 @@ test('Codex review: a card whose plans add up beyond the exact range still opens
   // Ten valid plans, each near the ledger's bound in interest: every stored amount is exact, their future interest together is not.
   const plans = Array.from({ length: 10 }, (_, index) => newInstallmentPlan({ id: 'big' + index, card, cardAccount, merchant: 'Big ' + index, category: 'Hogar',
     purchaseDateISO: '2026-10-10', principalMinor: 2, count: 2, placement: 'current', interestMinor: 999999999999998, interestCategory: interestCategoryLabel(), createdAt }));
-  const summary = summarizeCard(card, snapshot, today, plans, [], []);
+  const summary = summarizeCard(card, snapshot, today, plans, [], [], []);
   assert.ok(summary);
   assert.deepEqual([summary.committedMinor, summary.committedFinancingMinor], [20, null], 'the principal is exact; the interest sum is out of range');
   assert.equal(summary.futurePlanCount, 10);
   // One plan alone stays exact.
-  assert.deepEqual([summarizeCard(card, snapshot, today, plans.slice(0, 1), [], [])!.committedMinor, summarizeCard(card, snapshot, today, plans.slice(0, 1), [], [])!.committedFinancingMinor],
+  assert.deepEqual([summarizeCard(card, snapshot, today, plans.slice(0, 1), [], [], [])!.committedMinor, summarizeCard(card, snapshot, today, plans.slice(0, 1), [], [], [])!.committedFinancingMinor],
     [2, 999999999999998]);
 });

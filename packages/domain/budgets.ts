@@ -38,6 +38,10 @@ export function budgetState(progress: Pick<BudgetProgress, 'ratio' | 'exceeded'>
   return progress.ratio >= BUDGET_WARNING_RATIO ? 'warning' : 'calm';
 }
 
+/** Producto 24T3: `spentMinor` is the signed net of the month's expense lines, so a devolución (a negative line in its
+ * own month and category) lowers it and may leave it below zero. `remainingMinor` stays exactly `limit − spent` (it may
+ * exceed the limit when devoluciones outweigh purchases; a screen clamps it for display and shows the devolución);
+ * `ratio` is clamped at 0, so a net ≤ 0 is calm, never a negative share. */
 export interface BudgetProgress<B extends MonthlyBudget = MonthlyBudget> {
   budget: B;
   spentMinor: number;
@@ -59,6 +63,8 @@ export interface MonthlyBudgetSummary {
   remainingMinor: number;
   /** Every recorded expense of the month in this currency, budgeted or not. */
   totalSpentMinor: number;
+  /** What the categories without a sublimit spent, net, clamped at 0 (24T3): devoluciones outside the budgeted
+   * categories never show as a negative «sin presupuesto». */
   unbudgetedSpentMinor: number;
 }
 
@@ -169,6 +175,8 @@ export function summarizeMonthlyBudgets(snapshot: LedgerSnapshot, budgets: Month
   const accountIds = accountIdsInCurrency(snapshot.accounts, currency);
   const spentByCategory = new Map<string, bigint>();
   let totalSpent = 0n;
+  // Every expense line of the month, the projected ones included: a devolución is negative and nets in its own month and
+  // category; an adelanto's components are spending of the month of its date (B1). BigInt, so signs never lose precision.
   for (const entry of snapshot.entries) {
     if (entry.kind !== 'expense' || !accountIds.has(entry.accountId) || entry.dateISO.slice(0, 7) !== monthISO) continue;
     const amount = BigInt(entry.amountMinor);
@@ -213,7 +221,7 @@ export function summarizeMonthlyBudgets(snapshot: LedgerSnapshot, budgets: Month
     spentBudgetedMinor,
     remainingMinor: safeNumber(budgeted - spentBudgeted),
     totalSpentMinor,
-    unbudgetedSpentMinor: safeNumber(totalSpent - spentBudgeted),
+    unbudgetedSpentMinor: safeNumber(totalSpent > spentBudgeted ? totalSpent - spentBudgeted : 0n),
     rows,
   };
 }

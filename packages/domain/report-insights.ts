@@ -1,17 +1,21 @@
 import { validDateISO, type Currency, type LedgerSnapshot } from './ledger.ts';
 import { expensesInPeriod, reportPeriod, spendingReport, type ReportPeriod, type SpendingReport } from './spending-report.ts';
+import { isPurchaseLine } from './operations.ts';
 
+/** A day's signed net (a devolución is a negative line, 24T3, so a day may be ≤ 0) and its purchase lines (A23). */
 export interface DailySpending { dateISO: string; amountMinor: number; count: number }
 export function dailySpending(snapshot: LedgerSnapshot, period: ReportPeriod): DailySpending[] {
   if (!validDateISO(period.startISO) || !validDateISO(period.endISO) || period.startISO > period.endISO) throw new Error('Período inválido.');
   const days = new Map<string, DailySpending>();
-  let total = 0;
+  // Σ|line| bounds every day's sum whatever the signs, so no day can overflow on its own.
+  let gross = 0;
   for (const entry of expensesInPeriod(snapshot, period)) {
-    total += entry.amountMinor;
-    if (!Number.isSafeInteger(total)) throw new Error('El total supera el rango seguro.');
+    gross += Math.abs(entry.amountMinor);
+    if (!Number.isSafeInteger(gross)) throw new Error('El total supera el rango seguro.');
+    const purchase = isPurchaseLine(entry) ? 1 : 0;
     const day = days.get(entry.dateISO);
-    if (day) { day.amountMinor += entry.amountMinor; day.count++; }
-    else days.set(entry.dateISO, { dateISO: entry.dateISO, amountMinor: entry.amountMinor, count: 1 });
+    if (day) { day.amountMinor += entry.amountMinor; day.count += purchase; }
+    else days.set(entry.dateISO, { dateISO: entry.dateISO, amountMinor: entry.amountMinor, count: purchase });
   }
   // Missing days mean no recorded expenses, not proof of zero actual spending.
   return [...days.values()].sort((a, b) => b.dateISO.localeCompare(a.dateISO));
@@ -44,9 +48,12 @@ export function spendingComparison(snapshot: LedgerSnapshot, currency: Currency,
     ? spendingReport(snapshot, currency, previousMonth, previousMonth + '-' + String(comparisonDays).padStart(2, '0')) : null;
   const base = { current, previous, mode, capped: currentEnd !== requested.endISO };
   if (current.status !== 'ready' || (previous && previous.status !== 'ready')) return { ...base, status: 'out-of-range', deltaMinor: null, categories: [] };
-  // With no recorded expenses on one side, never invent a percentage saving,
-  // an infinite increase, or a claim that tracking covers the whole period.
-  if (!previous || previous.status !== 'ready' || !current.categories.length || !previous.categories.length) {
+  // With no recorded purchases on one side, never invent a percentage saving,
+  // an infinite increase, or a claim that tracking covers the whole period. A
+  // side made only of devoluciones (24T3) has categories but no purchase line,
+  // so it is insufficient too (A23).
+  const purchases = (report: SpendingReport) => report.categories.reduce((count, category) => count + category.count, 0);
+  if (!previous || previous.status !== 'ready' || !purchases(current) || !purchases(previous)) {
     return { ...base, status: 'insufficient', deltaMinor: null, categories: [] };
   }
   const keys = new Set([...current.categories, ...previous.categories].map(c => c.key));

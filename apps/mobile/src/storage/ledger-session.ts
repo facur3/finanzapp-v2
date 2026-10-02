@@ -1,5 +1,5 @@
-import type { InstallmentPlan, LedgerArchive } from '@finanzapp/domain';
-import { catchUpInstallments, catchUpRecurring, createInstallmentPlan, initializeDatabase, readArchive, type LedgerDatabase } from './database.ts';
+import { OPERATION_CHANGED_MESSAGE, type InstallmentPlan, type LedgerArchive, type PurchaseOperation } from '@finanzapp/domain';
+import { catchUpInstallments, catchUpRecurring, createInstallmentPlan, createPurchaseOperation, initializeDatabase, readArchive, type LedgerDatabase } from './database.ts';
 
 /** What LedgerProvider shows after opening or returning to the foreground: the archive as stored, the recurring rules
  * set aside for review (their ids), and whether each catch-up could not run. `recurringError` and `installmentError`
@@ -53,4 +53,17 @@ export async function savePurchasePlan(db: LedgerDatabase, plan: InstallmentPlan
   await createInstallmentPlan(db, plan);
   try { await catchUpInstallments(db, todayISO); return null; }
   catch { return sessionWarning({ recurringError: false, installmentError: true }); }
+}
+
+/** Producto 24T3: a devolución or an adelanto de cuotas confirmed in its form. Storage runs the plan's catch-up, recomputes
+ * the allocation and records both in one commit (`createPurchaseOperation`). When the allocation changed since the preview
+ * («Las cuotas cambiaron…», A13) nothing was written; the whole instalment catch-up then runs (best effort: its failure keeps
+ * the refusal), so the view the form previews again holds the instalments whose statements closed meanwhile. The refusal
+ * always reaches the form, which releases its draft and previews again. */
+export async function savePurchaseOperation(db: LedgerDatabase, operation: PurchaseOperation, todayISO: string): Promise<void> {
+  try { await createPurchaseOperation(db, operation, todayISO); }
+  catch (cause) {
+    if (cause instanceof Error && cause.message === OPERATION_CHANGED_MESSAGE) { try { await catchUpInstallments(db, todayISO); } catch { /* The refusal stands either way. */ } }
+    throw cause;
+  }
 }
