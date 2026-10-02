@@ -1,5 +1,5 @@
 import { OPERATION_CHANGED_MESSAGE, type InstallmentPlan, type LedgerArchive, type PurchaseOperation } from '@finanzapp/domain';
-import { catchUpInstallments, catchUpRecurring, createInstallmentPlan, createPurchaseOperation, initializeDatabase, readArchive, type LedgerDatabase } from './database.ts';
+import { catchUpInstallments, catchUpRecurring, createInstallmentPlan, createPurchaseOperation, initializeDatabase, readArchive, type CreateGuard, type LedgerDatabase } from './database.ts';
 
 /** What LedgerProvider shows after opening or returning to the foreground: the archive as stored, the recurring rules
  * set aside for review (their ids), and whether each catch-up could not run. `recurringError` and `installmentError`
@@ -49,8 +49,8 @@ export function sessionWarning(session: Pick<LedgerSession, 'recurringError' | '
  * same plan is a no-op there); then a first instalment whose statement already closed is recognised at once. A failing
  * recognition never fails the save: the plan is durable, and a failed save would invite the person to create it again.
  * It returns the banner instead (the next pass, or the banner's retry, records the instalment once: deterministic ids). */
-export async function savePurchasePlan(db: LedgerDatabase, plan: InstallmentPlan, todayISO: string): Promise<string | null> {
-  await createInstallmentPlan(db, plan);
+export async function savePurchasePlan(db: LedgerDatabase, plan: InstallmentPlan, todayISO: string, guard?: CreateGuard): Promise<string | null> {
+  await createInstallmentPlan(db, plan, guard);
   try { await catchUpInstallments(db, todayISO); return null; }
   catch { return sessionWarning({ recurringError: false, installmentError: true }); }
 }

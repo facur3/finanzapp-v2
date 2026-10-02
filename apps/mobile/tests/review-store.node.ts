@@ -4,9 +4,10 @@ import { DatabaseSync } from 'node:sqlite';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { REVIEW_DRAFT_INVALID_MESSAGE, REVIEW_INCOMPLETE_MESSAGE, REVIEW_STALE_MESSAGE, WRITE_ID_TAKEN_MESSAGE, makeEntryChange, newInstallmentPlan, reviewBasis,
+import { REVIEW_DRAFT_INVALID_MESSAGE, REVIEW_INCOMPLETE_MESSAGE, REVIEW_STALE_MESSAGE, WRITE_ID_TAKEN_MESSAGE, makeAccountChange, makeEntryChange, newInstallmentPlan, reviewBasis,
+  snapshotFromArchive,
   type Account, type CreditCardProfile, type Entry, type ReviewArchive, type ReviewDraft, type Transfer } from '@finanzapp/domain';
-import { createAccount, createCreditCard, createEntry, createInstallmentPlan, createTransfer, changeEntry, initializeDatabase, readArchive,
+import { createAccount, createCreditCard, createEntry, createInstallmentPlan, createTransfer, changeAccount, changeEntry, initializeDatabase, readArchive,
   cancelInstallmentPlan, type LedgerDatabase, type SqlExecutor } from '../src/storage/database.ts';
 import { REVIEW_CAPTURE_CONFLICT_MESSAGE, REVIEW_DATABASE_VERSION, REVIEW_INPUT_MESSAGE, REVIEW_ITEM_CHANGED_MESSAGE, REVIEW_ITEM_CLOSED_MESSAGE, REVIEW_ITEM_MISSING_MESSAGE,
   REVIEW_ITEM_UNREADABLE_MESSAGE, REVIEW_READ_ONLY_MESSAGE, REVIEW_WRITE_CONFLICT_MESSAGE, initializeReviewDatabase, openReviewStore,
@@ -485,4 +486,66 @@ test('two stores over one file never race: a reconciliation waits for a confirma
   assert.deepEqual([confirmation.recorded, confirmation.item.status], [true, 'confirmed']);
   assert.deepEqual(report, { confirmed: [], released: [], conflicts: [], unreadable: [] });
   assert.deepEqual((await ledgerRows(ledger)).entries, ['write-1']);
+});
+
+// ---- Codex review of #78: the basis is checked inside the ledger's own transaction ------------------------------------
+
+/** A ledger whose first write transaction is preceded by `change`: something the person (or another screen) does after
+ * the confirmation read the ledger and before its write transaction starts. */
+function changedInBetween(ledger: LedgerDatabase, change: () => Promise<void>): LedgerDatabase {
+  let first = true;
+  return { ...ledger, withExclusiveTransactionAsync: async task => {
+    if (first) { first = false; await change(); }
+    return ledger.withExclusiveTransactionAsync(task);
+  } };
+}
+const renameBank = (ledger: LedgerDatabase) => async () => {
+  const archive = await readArchive(ledger);
+  const account = archive.accounts.find(row => row.id === bank.id)!;
+  const snapshot = snapshotFromArchive(archive);
+  await changeAccount(ledger, makeAccountChange('rename-bank', account, snapshot, 'Galicia', account.openingMinor, '2026-09-28T10:01:00.000Z'));
+};
+
+test('a change between the confirmation\'s read and the ledger\'s write transaction is refused inside that transaction', async () => {
+  const { ledger, db } = await setup();
+  const store = await openReviewStore(db, changedInBetween(ledger, renameBank(ledger)));
+  await capture(store, await drafted(ledger));
+  await assert.rejects(store.confirm('item-1', { expectedRevision: 0, todayISO: today, at: later }), { message: REVIEW_STALE_MESSAGE });
+  assert.deepEqual((await ledgerRows(ledger)).entries, [], 'nothing was written');
+  const item = await store.get('item-1');
+  assert.deepEqual([item?.status, item?.attempt], ['pending', null], 'the draft is kept and the frozen write released');
+});
+
+test('an interrupted attempt retried after the ledger changed is refused, never written against a basis nobody reviewed', async () => {
+  const { ledger, db, store } = await setup();
+  await capture(store, await drafted(ledger));
+  // Crash before the ledger write: the frozen write stays (the ledger cannot even be read after the failure).
+  let attempted = false;
+  const crashing: LedgerDatabase = { ...ledger,
+    withExclusiveTransactionAsync: async () => { attempted = true; throw new Error('disk I/O error'); },
+    getAllAsync: async <T>(sql: string, ...params: (string | number | null)[]) => {
+      if (attempted) throw new Error('database is locked');
+      return ledger.getAllAsync<T>(sql, ...params);
+    } };
+  await assert.rejects((await openReviewStore(db, crashing)).confirm('item-1', { expectedRevision: 0, todayISO: today, at: later }));
+  const frozen = (await store.get('item-1'))!;
+  assert.equal(frozen.attempt?.type, 'entry');
+  await renameBank(ledger)();
+  await assert.rejects(store.confirm('item-1', { expectedRevision: frozen.revision, todayISO: today, at: later }), { message: REVIEW_STALE_MESSAGE });
+  assert.deepEqual((await ledgerRows(ledger)).entries, []);
+  assert.equal((await store.get('item-1'))?.attempt, null);
+});
+
+test('the same guard protects cuotas: a card renamed in between is refused inside the plan\'s transaction', async () => {
+  const { ledger, db } = await setup();
+  const renameCard = async () => {
+    const { saveCreditCard } = await import('../src/storage/database.ts');
+    const current = (await readArchive(ledger)).cards!.find(row => row.id === card.id)!;
+    await saveCreditCard(ledger, { ...current, issuer: 'Galicia', revision: current.revision + 1, updatedAt: '2026-09-28T10:01:00.000Z' });
+  };
+  const store = await openReviewStore(db, changedInBetween(ledger, renameCard));
+  await capture(store, await drafted(ledger, { destinationId: cardAccount.id, purchase: { mode: 'installments', count: 3, placement: 'current' } }));
+  await assert.rejects(store.confirm('item-1', { expectedRevision: 0, todayISO: today, at: later }), { message: REVIEW_STALE_MESSAGE });
+  assert.deepEqual((await ledgerRows(ledger)).plans, [], 'no plan was written');
+  assert.equal((await store.get('item-1'))?.status, 'pending');
 });
