@@ -1,6 +1,11 @@
 # FinanzApp mobile: living roadmap
 
-Updated: 2026-10-02 (Producto 24T3 on its branch, PR #76, with two late review fixes: the devolución date wheel's
+Updated: 2026-10-02 (Producto 25A-01 on its branch: the review-draft domain model, the first focused slice of 25A and pure
+domain only. `packages/domain/review-drafts.ts` is the one typed proposal every later Assistant, Wallet or inbox producer
+ends in: strict parsing of untrusted input, explicit gaps (never a defaulted currency, destination or instalment count),
+destinations from the card invariants, stale-basis detection, and exactly one deterministic write (one movement, or one
+instalment plan) under an id the caller fixes; no UI, storage, schema (14), backup (v14), network or provider change; the
+version line reads «FinanzApp 0.1.0 (25A-01)». Producto 24T3 merged as PR #76, merge commit 399a1fa, with two late review fixes: the devolución date wheel's
 bounds before local noon, and a cash account's month reading «Devoluciones netas este mes» when devoluciones exceed its
 purchases; plus documentation-only notes on the dock, the Tarjetas root and 25D's FinanceKit rules; after the owner's
 review, the devolución-versus-bank-reintegro help, a card deletion dialog that archives right there, and 25A2 (Wallet
@@ -12,7 +17,8 @@ remaining instalment once on its own date with the card payment a separate trans
 what already closed first and «Reactivar plan» undoes it, and a card holding a credit is archived, never deleted (owner
 decisions B1–B3, 2026-10-01); SQLite schema 14 and backup v14; Reportes, Presupuestos, Inicio and the Assistant's
 evidence net devoluciones without negative slices or claims; plus the carry-in of Reportes' «Categorías | Día a día»
-switch at 15/20 with no shrink-to-fit; device QA pending, no EAS build. Producto 24UX6E merged as PR #75, merge commit d30b77f: more financial destinations in Forest, presentation and
+switch at 15/20 with no shrink-to-fit; no EAS build; the owner merged it after targeted use and deferred the recorded device
+pass, which now gates 25A-03, 25A-04, 25A-11 and 25A-12 (§2). Producto 24UX6E merged as PR #75, merge commit d30b77f: more financial destinations in Forest, presentation and
 lifecycle polish plus bug fixes; Cuentas, Presupuestos, Recurrentes, Deudas y cobros and Categorías with flat summaries
 on the canvas, one shared lifecycle note, colour marking state rather than direction or identity and no chevron on rows
 that open a modal editor; the Más utilities audited, with two bug fixes (the pinned chooser card, Movimientos deshechos
@@ -163,7 +169,7 @@ history file keeps the evidence of when and why.
   edits are audited and undoable; future sync needs operation IDs, revisions, tombstones,
   conflict handling and RLS (nothing in Supabase provides offline sync by itself).
 - **Every AI-generated movement is a draft until the person confirms it explicitly.**
-  Confirmar on the draft card is the only path that writes an Entry; Apple Pay captures,
+  Confirmar on the draft card is the only path that writes (one movement or one instalment plan, 25A-01); Apple Pay captures,
   Shortcut messages, transcriptions and inbox deliveries fill a review tray, never ledger rows;
   there is no auto-registration mode (withdrawn 2026-09-22). The Assistant has no authority over
   balances: its proposals pass the domain validators and its explanations cite checkable facts.
@@ -194,18 +200,31 @@ history file keeps the evidence of when and why.
 
 ## 1. Implemented (current state)
 
-What exists in code on `master` as of Producto 24UX6E (PR #75, merge commit d30b77f), after 24UX6D (PR #74, merge
+What exists in code on `master` as of Producto 24T3 (PR #76, merge commit 399a1fa), after 24UX6E (PR #75, merge commit
+d30b77f), 24UX6D (PR #74, merge
 commit 8f758ad), 24UX6C2 (PR #73, merge
 commit 5c73813), 24UX6C (PR #72, merge
 commit c673be6), 24UX6B (PR #71, merge
 commit ecfd1dc), 24UX6A (PR #70, merged 2026-10-01, merge commit ef24bb6), 24T2 (PR #69, merge commit 8951f6c), 24T1C
-(PR #68), 24T1 (PR #67) and 25B3 (PR #66), plus Producto 24T3 on its branch. Per area,
+(PR #68), 24T1 (PR #67) and 25B3 (PR #66), plus Producto 25A-01 on its branch. Per area,
 without test inventories (those are in apps/mobile/README.md and the history
 file). "Released" below names an in-app gate (`RELEASED_LANGUAGES`, `RELEASED_REGIONS`,
 `LEDGER_CURRENCIES`): what a build offers, verified on Linux; nothing is distributed to people yet
 (§4).
 
-- **Refunds, early payoff and the instalment lifecycle (24T3, on its branch; device QA pending).** Purchase operations
+- **Review drafts: the domain model (25A-01, on its branch; nothing on screen, so no device QA).** The first slice of the
+  real Assistant (§3, «Producto 25A» and «Producto 25A-01»). `packages/domain/review-drafts.ts`: a `ReviewDraft` (version 1;
+  source assistant, wallet, inbox or fixture; kind expense or income; amount, currency, merchant, category, date and
+  destination, each `null` until known; a card's purchase mode «Una vez» or cuotas with the person's count; a basis of
+  versions) is a proposal, never a record. `parseReviewDraft` reads untrusted input strictly; `reviewGaps` names what still
+  stops a write (kind, amount, currency, destination, purchase, installmentCount, merchant, category, date) and fills
+  nothing; `reviewDestinations` and `withDestination` offer only live cash accounts and active cards for an expense and
+  live cash accounts for an income; `reviewBasis` / `isStaleReviewDraft` detect a changed account, card or category;
+  `writeForReviewDraft` returns exactly one `Entry` or one `InstallmentPlan` (`newInstallmentPlan`, no movement on the
+  purchase date) under a caller-fixed id (`REVIEW_WRITE_ID`), deterministic for the same inputs. No persistence, UI,
+  schema (14), backup (v14), network or provider change; the Assistant screen is unchanged. `boundary.test.ts` now pins
+  that no domain module imports from outside the package. The version line reads «FinanzApp 0.1.0 (25A-01)».
+- **Refunds, early payoff and the instalment lifecycle (24T3, PR #76, merge commit 399a1fa; device QA deferred, see §2).** Purchase operations
   (`packages/domain/operations.ts`): a **devolución** (a purchase returned in whole or in part) and an **adelanto de
   cuotas** (the remaining instalments of a plan brought forward), each an append-only record with a form UUID, a
   revision and an undone flag, stored in their own table and **projected** by `snapshotFromArchive` into the ledger as
@@ -222,7 +241,7 @@ file). "Released" below names an in-app gate (`RELEASED_LANGUAGES`, `RELEASED_RE
   «Registrar adelanto de cuotas» on the plan detail, `/operation/[id]` with Deshacer, Movimientos deshechos with
   Restaurar. SQLite schema 14, backup v14. Reportes, Presupuestos, Inicio and the Assistant's evidence net devoluciones
   in their month without drawing a negative slice or bar or sending a negative fact. Carry-in: Reportes' «Categorías |
-  Día a día» switch at 15/20, no shrink-to-fit. The version line reads «FinanzApp 0.1.0 (24T3)». Details in «Producto
+  Día a día» switch at 15/20, no shrink-to-fit. The version line read «FinanzApp 0.1.0 (24T3)» (25A-01 since). Details in «Producto
   24T3» (§3).
 - **More financial destinations in Forest (24UX6E, PR #75, merge commit d30b77f; device QA pending).** Presentation and lifecycle
   polish plus the bugs found on the way; no domain, storage, schema (13), backup (v13), FX or native change; Inicio,
@@ -344,8 +363,8 @@ file). "Released" below names an in-app gate (`RELEASED_LANGUAGES`, `RELEASED_RE
   pending plan (gate). Instalment movements keep amount, date, card and kind (labels, undo and restore are fine); a new
   movement never takes an instalment id; every archive read checks the ledger against the schedules. Card deletion is
   refused with a pending plan (`assertCardDeletable`, storage and the dialog); archiving keeps everything running; a plan
-  is deleted only without history, cancelled otherwise; no save changes price, count or dates. SQLite 12 (two additive
-  tables), backup v12 as soon as a plan exists (v1–v12 import). `LedgerProvider` exposes `addInstallmentPlan`,
+  is deleted only without history, cancelled otherwise; no save changes price, count or dates. 24T1 added two tables
+  (SQLite 12) and backup v12, written as soon as a plan exists; current: schema 14, backup v14 (v1–v14 import). `LedgerProvider` exposes `addInstallmentPlan`,
   `cancelInstallmentPlan`, `removeInstallmentPlan`; since 24T2 the purchase form creates plans (above). Since 24T3 one
   `effectiveShares` reads every share with its devoluciones and adelantos (scheduled, recognised, undone, settled,
   waived, refunded, cancelled); a plan is pending while a share is scheduled or undone; every plan write runs the plan's
@@ -562,12 +581,16 @@ file). "Released" below names an in-app gate (`RELEASED_LANGUAGES`, `RELEASED_RE
 ## 2. Device QA pending
 
 Nothing below is verified until the owner records the result on the iPhone (with the language
-it was checked in). Metro from the branch on the installed FinanzApp Dev build serves every
+it was checked in). Metro from `master` (or a delivery's branch) on the installed FinanzApp Dev build serves every
 item unless a section says a new native build is needed. The checklist sections are in
 [mobile-device-checklist.md](mobile-device-checklist.md).
 
-- **24T3 — Refunds, early payoff and installment lifecycle (none done; no EAS build; a targeted pass that must pass
-  before this PR merges):** the checklist section Producto 24T3: the schema 14 upgrade over the owner's data with a
+- **25A-01 — Review draft domain model (on its branch): nothing to check on the iPhone.** Pure domain; no screen, storage,
+  schema or native change. The Más version line reads «FinanzApp 0.1.0 (25A-01)» on a build from this branch.
+- **24T3 — Refunds, early payoff and installment lifecycle (merged as PR #76, merge commit 399a1fa; none done; no EAS
+  build).** The owner merged #76 after targeted use and deliberately deferred the recorded pass; no item below is
+  checked. Binding (owner, 2026-10-02): 25A-01 and 25A-02 may proceed; **this targeted pass must be done before 25A-03,
+  25A-04, 25A-11 or 25A-12 merges**, since those begin to expose durable review of financial writes. The pass: the checklist section Producto 24T3: the schema 14 upgrade over the owner's data with a
   backup first; a cash devolución partial and full; a card purchase's devolución lowering the balance due; a plan
   devolución before and after a closing and the lowered last instalments; an over-refund refused; an adelanto with and
   without interest (both financing choices) and then Pagar tarjeta; «Dejar de seguir el plan» and «Reactivar plan»;
@@ -739,7 +762,17 @@ item unless a section says a new native build is needed. The checklist sections 
 
 ## 3. Next deliveries
 
-**Recommended next (2026-10-01):** 25B3 (PR #66), 24T1 (PR #67), 24T1C (PR #68) and **24T2 (PR #69, merge commit
+**Recommended next (2026-10-02):** **24T3 merged as PR #76** (merge commit 399a1fabaa673423b7a155ddb3cb900b5c0103fc):
+SQLite schema 14 and backup v14 are current, and the broad Forest visual lane (24UX6A–24UX6E) is complete. The active
+phase is **25A — the real Assistant**, delivered as focused slices («Producto 25A» below, «Slices»): **25A-01** (the
+review-draft domain model) is this PR; then 25A-02 (the durable local review store), 25A-03 (the «Para revisar» tray)
+and the rest of 25A, with no paid provider call before its own approved slice. **25A2** (Wallet Shortcut Capture) still
+follows the review-tray foundation: it may begin once 25A-03 has merged, without waiting for 25A's cloud, paid, live or
+voice slices. The targeted 24T3 device pass gates 25A-03, 25A-04, 25A-11 and 25A-12 (§2). After 25A: **25C** (with
+Movimientos' advanced filters), **25C2**, **25D**, **25E**, **25F** and **26**, unchanged; «Ocultar importes» stays future
+privacy work beside 25D, not scheduled.
+
+**Earlier recommendation (2026-10-01, history):** 25B3 (PR #66), 24T1 (PR #67), 24T1C (PR #68) and **24T2 (PR #69, merge commit
 8951f6c)** merged: SQLite schema 13, backup v13, the purchase in cuotas and the complete Tarjetas, verified by the owner on
 an iPhone 14 Pro with a fresh development build. The immediate path is visual first: **24UX6A** (the Forest foundation,
 the four-tab shell, the capture hub, Home and Appearance; merged as PR #70, merge commit ef24bb6, 2026-10-01; device QA
@@ -759,7 +792,7 @@ d30b77f25bcb38bff8f5593b82a95ccc20213c55; device QA pending), the last pass of t
 (24UX6A–24UX6E) is closed unless physical-device evidence finds a specific regression. **24T3 — Refunds, early payoff
 and installment lifecycle** (devoluciones, the adelanto de cuotas, «Dejar de seguir» / «Reactivar», the card deletion
 rules, schema 14 and backup v14, the readers that net devoluciones, and the targeted device QA of instalments; owner
-decisions B1–B3 of 2026-10-01; «Producto 24T3» below) is this PR. Then, in order: **25A** (the real Assistant,
+decisions B1–B3 of 2026-10-01; «Producto 24T3» below) was next (merged as PR #76). Then, in order: **25A** (the real Assistant,
 including devolución drafts), **25A2** (Wallet Shortcut Capture: the person's own Shortcuts Wallet automation → an
 explicit card mapping → a draft; no FinanceKit; placed by the owner on 2026-10-02), **25C** (budgets with rollover, goals, CSV and productivity, with Movimientos' advanced
 filters: account, category, period and custom period, type, search, clear/reset states and saved searches), **25C2**,
@@ -772,16 +805,17 @@ mathematics; merged), 24T2 (the card purchase with the simple financing UX, the 
 current-versus-future balances and the Tarjetas direction, all recorded under 24T below and in «Producto 24T1C»),
 24T3 (refunds, early payments, lifecycle and the final device QA).
 
-The binding order is **24UX6A → 24UX6B → 24UX6C → 24UX6C2 → 24UX6D → 24UX6E → 24T3 → 25A → 25A2 → 25C → 25C2 → 25D → 25E → 25F → 26** (launch; 25A2 placed by the owner on 2026-10-02; 24T2 merged as PR #69; 24UX6A–24UX6E merged as PRs #70–#75). Every dependency points
+The binding order is **24UX6A → 24UX6B → 24UX6C → 24UX6C2 → 24UX6D → 24UX6E → 24T3 → 25A → 25A2 → 25C → 25C2 → 25D → 25E → 25F → 26** (launch; 25A2 placed by the owner on 2026-10-02, and it may begin once 25A-03's review tray has merged; 24T2 merged as PR #69; 24UX6A–24UX6E merged as PRs #70–#75; 24T3 merged as PR #76). Every dependency points
 backwards in it; the scope that would need a later or optional delivery is split out explicitly (24T1C, 2026-09-28):
 
 - **24C2 is optional** and blocks nothing in this order. 25A's core works on what the ledger already represents; only
   its foreign-purchase subflow (original currency different from the billing or paying currency) stays gated and
   unavailable until 24C2 exists. If the owner schedules 24C2 before 25A, 25A consumes it; if not, 25A is a complete
   delivery without that subflow. The instalment `it.todo` for a foreign-currency plan waits for 24C2 the same way.
-- **25A2 right after 25A** (owner, 2026-10-02): Wallet / Shortcuts capture does not wait for FinanceKit. It needs only
-  25A's draft and review infrastructure (the capture path, the review tray, the pairing token) and the person's own
-  Shortcuts automation; FinanceKit stays a later, optional research gate under 25D.
+- **25A2 after 25A's review tray** (owner, 2026-10-02): Wallet / Shortcuts capture does not wait for FinanceKit. It needs
+  only 25A's draft model and local review tray (25A-01 to 25A-03) and the person's own Shortcuts automation; it never
+  depends on a paid AI provider, a login, the network, the remote capture inbox or its pairing token (a separate
+  foundation for a future remote capture, off 25A2's path). FinanceKit stays a later, optional research gate under 25D.
 - **25D before 25E** ships only what works on the device or over the existing capture path (Face ID and privacy,
   local notifications, the broader App Intents / Siri / Spotlight, widgets, Apple Watch, the FinanceKit research gate;
   the Wallet automation → draft path moved to 25A2). Remote push (APNs) that needs a backend or sync, and any Sign in with Apple tied to
@@ -798,7 +832,7 @@ backwards in it; the scope that would need a later or optional delivery is split
   destinations in Forest: Cuentas, Presupuestos, Recurrentes, Deudas y cobros and Categorías), the lane's last pass; the
   broad Forest visual lane is closed unless device evidence finds a specific regression (presentation and
   lifecycle polish only unless an actual bug is found, preserving their domain and storage semantics; the Más utility
-  destinations are audited, not redesigned). **24T3 is this PR** and **25A** follows it, and none of this moves anything in the product order above. None of them removes, reorders or re-scopes 24T3, 25A, 25C/25C2, 25D, 25E/25F, 26 or any other planned item; the approved decisions of each are in
+  destinations are audited, not redesigned). **24T3** merged as PR #76 and **25A** is the active phase, and none of this moves anything in the product order above. None of them removes, reorders or re-scopes 24T3, 25A, 25C/25C2, 25D, 25E/25F, 26 or any other planned item; the approved decisions of each are in
   «Producto 24UX6B», «Producto 24UX6C», «Producto 24UX6D» and «Producto 24UX6E» below, so they are not asked again.
   Movimientos' approved filters (account, category, period and custom period, beside the existing type filter and
   search, with clear/reset states for the new filters) belong to 25C's productivity and search scope with its saved
@@ -1410,7 +1444,9 @@ the owner authorises it; no EAS build or store submission without the owner.
   in any language and answering in the interface language, names and custom categories kept
   verbatim; a transcription provider with proven multilingual coverage before voice is offered,
   with explicit microphone permission, limits and deletion; edit-and-modify drafts (change an
-  existing movement through a draft, same confirmation); the cost and abuse controls before the
+  existing movement through a draft, same confirmation); drafts for every write the person can make by hand: an expense or
+  an income, a card purchase «Una vez» or in cuotas (the count always the person's, never inferred), a transfer or card
+  payment, and a devolución (24T3), each written by the same domain builders as its form; the cost and abuse controls before the
   first paid call (per-model cost evaluation with owned data, daily and monthly limits per user
   shown before they are hit, a token budget per request and conversation with a hard stop,
   provider quotas mapped to graceful states, per-user and per-device rate limits, request
@@ -1433,15 +1469,36 @@ the owner authorises it; no EAS build or store submission without the owner.
   quota states on the iPhone; the consent screen naming what travels.
 - **Depends on.** 24C1 for rates and consolidated facts; 24M for currencies in v2; a session provider (staging) the
   owner sets up. **Not a dependency:** 24C2 (optional). Its foreign-purchase subflow is enabled only if 24C2 has
-  merged; otherwise 25A ships complete without it (24T1C, 2026-09-28).
+  merged; otherwise 25A ships complete without it (24T1C, 2026-09-28). 24T3 (merged, PR #76) for devolución drafts.
+- **Slices (2026-10-02 reconciliation; one focused PR each, never a mega-PR).** Local lane: **25A-01** the review-draft
+  domain model (this PR); **25A-02** the durable local review store (device-local, apart from the ledger; one fixed write
+  id per item, confirm checks whether that write already exists before building it again, reconcile after a crash; a
+  review item's write is frozen after an unknown outcome, as the purchase form freezes its submission, and storage refuses
+  one id used as both a movement and a plan, which today `createEntry` and `createInstallmentPlan` do not cross-check);
+  **25A-03** the «Para revisar» tray (Confirmar / Editar / Descartar; Editar keeps the same write id and never presets a
+  count); **25A-04** the Assistant's drafts go into the tray; **25A-11** transfer, card payment and devolución drafts;
+  **25A-12** edits of an existing movement. Server lane, CI only, no paid call: literal env reads and a bundle secret scan;
+  a provider port with deterministic fakes (no provider chosen by familiarity); handler order, error codes and one timeout
+  budget; request contract v2 (server first); money-based cost, rate and token controls with a kill switch and a monthly
+  ceiling; analytical facts v2 computed on the device; the inbox lifecycle and the revocable capture-token foundation.
+  Then: the app sends v2 with an offline end-to-end loop and evaluation harness; cloud consent and failure states; the
+  staging session (the first network slice, owner setup and authorization required); the inbox consumer; **one** paid
+  slice, the live provider on staging, only after the owner configures and approves it; voice last, after the text path is
+  proven on the iPhone. Numbering beyond 25A-04 is indicative; each slice records its own section here.
+- **Device gate (owner, 2026-10-02).** 25A-01 and 25A-02 may proceed now. The targeted 24T3 device pass (checklist
+  section Producto 24T3, §2) must be done before 25A-03, 25A-04, 25A-11 or 25A-12 merges, because they begin to expose
+  durable review of financial writes.
 
 ### Producto 25A2 — Wallet Shortcut Capture
 
-Planned (placed by the owner on 2026-10-02, right after 25A; documentation only, nothing implemented). A focused
-delivery that pulls the Wallet capture forward from 25D: it needs 25A's drafts and review tray, not FinanceKit.
+Planned (placed by the owner on 2026-10-02 after 25A's review tray; documentation only, nothing implemented). A focused
+delivery that pulls the Wallet capture forward from 25D: it needs 25A's draft model and local review tray (25A-01 to
+25A-03), not FinanceKit, and may begin once 25A-03 has merged.
 
 - **Path.** The person's own iOS Shortcuts personal automation on a Wallet transaction («Transacción» / "Transaction")
-  → a FinanzApp App Intent → a **draft / review item**. No FinanceKit entitlement is needed for this path. The person
+  → a FinanzApp App Intent on the device (handing over through a small native spool) → a **draft in the local review
+  tray** → Confirm / Edit. No FinanceKit entitlement is needed for this path, and it depends on no paid AI provider, no
+  login, no network and no remote capture inbox: it works offline like manual entry. The person
   sets it up once (FinanzApp explains the steps; it cannot create the automation for them).
 - **Explicit mapping.** One Wallet payment card / pass → one FinanzApp destination, chosen by the person and editable:
   a FinanzApp **credit card**, or a FinanzApp **normal account** for a debit card. Preferred over any fuzzy match by
@@ -1457,23 +1514,31 @@ delivery that pulls the Wallet capture forward from 25D: it needs 25A's drafts a
 - **Debit / normal-account mapping.** An expense draft on the mapped account (no independent debit-card ledger).
 - **Merchant.** The Wallet-provided merchant is kept when present (normalised as in docs/merchant-identity.md); a
   missing or poor merchant stays editable.
-- **Category.** May be suggested from the merchant, the person's rules or the Assistant; the person can correct it
-  before confirming; FinanzApp never claims Wallet supplied a FinanzApp category.
+- **Category.** Suggested locally first (from the merchant and the person's own rules), never by sending the Wallet
+  merchant to a model on this path; the person can correct it before confirming; FinanzApp never claims Wallet supplied a FinanzApp category.
 - **Missing data.** Amount, merchant or card fields may occasionally be absent or unusable: the capture stays an
   incomplete draft in the review flow, never dropped and never filled with invented data.
 - **No claims.** Not that every Apple Pay / Wallet transaction is captured; not that Apple Watch behaves the same as
   the iPhone until verified on a device; not that online or non-contactless transactions are captured; not that every
   bank, card or region supports the trigger.
+- **Confirmation.** An actionable notification with Confirm / Edit is preferred over opening FinanzApp on its own. Whether
+  its Confirm may write from the notification (a complete draft only, shown in full, behind device authentication) or
+  only opens the review card is an owner decision taken before 25A2 ships, because the binding rule makes Confirmar on
+  the draft card the only write path; either way it is the review tray's one confirmation, never a second write path,
+  and an incomplete capture offers Edit only. Dynamic Island / Live Activity is optional polish once the notification
+  flow is proven.
 - **Manual capture stays the core**, offline and complete without any of this.
 - **Gates.** Device evidence on an iPhone and, separately, on an Apple Watch payment; a denied or missing automation;
   repeated and late deliveries; the mapping for a credit card and for a debit card; an incomplete capture.
-- **Depends on.** 25A (draft and review infrastructure, the capture path and the pairing token). **Not a dependency:**
+- **Depends on.** 25A-01 to 25A-03 (the review-draft model, the durable local review store and the review tray). **Not a
+  dependency:** a paid AI provider, a login or session, the network, the remote capture inbox and its pairing token (a
+  separate foundation for a future remote-capture use, off this path),
   FinanceKit (a later, optional research gate in 25D) and 25D itself.
 
 ### Producto 24T — instalments and complete cards
 
-Split into 24T1 (merged, PR #67: the engine, see its own section below), 24T2 (merged, PR #69) and 24T3 (this PR,
-«Producto 24T3» below). The accounting contract below is
+Split into 24T1 (merged, PR #67: the engine, see its own section below), 24T2 (merged, PR #69) and 24T3 (merged,
+PR #76, «Producto 24T3» below). The accounting contract below is
 decided (decision 003, rule 7, revised 2026-09-28) and implemented by 24T1 in the domain, the storage and the backup;
 nothing of it is on a screen yet.
 
@@ -1544,8 +1609,8 @@ nothing of it is on a screen yet.
   - **24T3 — refunds, early payments, lifecycle and final device QA.** Refunds and early payoff as above,
     cancellations and adjustments without a second expense, the deletion block for pending plans, Tarjetas
     and Deudas on the iPhone. Optional reminders for closings, due dates and instalments belong to 25D's
-    local notifications and never claim a bank did or did not receive a payment. **Implemented on its branch (this
-    PR); see «Producto 24T3» below.** Delivered as devoluciones, the full adelanto de cuotas and «Dejar de seguir» /
+    local notifications and never claim a bank did or did not receive a payment. **Merged as PR #76 (merge commit
+    399a1fa; device QA deferred, §2); see «Producto 24T3» below.** Delivered as devoluciones, the full adelanto de cuotas and «Dejar de seguir» /
     «Reactivar»; no «adjustment» operation exists (none was needed), and a partial advance of N instalments is
     deferred.
 - **Rules.** Never duplicate an expense through a recurring rule; scheduled is not paid; the principal is
@@ -3069,13 +3134,14 @@ nothing of it is on a screen yet.
   («Producto 24T3», below),
   then **25A**; Movimientos' advanced filters remain in **25C**; 25C2, 25D, 25E, 25F and 26 are unchanged.
 
-### Producto 24T3 — Refunds, early payoff and installment lifecycle (this PR)
+### Producto 24T3 — Refunds, early payoff and installment lifecycle (PR #76, merged)
 
 - **Goal.** The last delivery of Producto 24T: a purchase returned in whole or in part (a **devolución**), the
   remaining instalments of a plan brought forward (an **adelanto de cuotas**), what stopping a plan means and how it is
   undone, and the deletion rules of plans and cards, each without a second expense, an income or a «pagada»; plus the
   final device QA of instalments (Tarjetas and Deudas on the iPhone).
-- **Scope.** Branch `feat/producto-24t3-refunds-payoff-lifecycle` from master d30b77f (24UX6E merged as PR #75).
+- **Scope.** Branch `feat/producto-24t3-refunds-payoff-lifecycle` from master d30b77f (24UX6E merged as PR #75); merged as PR #76,
+  merge commit 399a1fabaa673423b7a155ddb3cb900b5c0103fc (2026-10-02).
   Planned from eight audits (entries, storage, cards, reports, docs, UI, the segmented control, gaps), a written data-flow
   design, six adversarial critiques (accounting, persistence, regressions, retry and undo, the state machine, UI and
   accessibility) and a synthesis of thirty binding amendments (A1–A30); three questions went to the owner (B1–B3).
@@ -3293,8 +3359,9 @@ nothing of it is on a screen yet.
   reactivation now accepted (`installments.test.ts`), the newer-version probe at v15 with «versiones 1 a 14», `dailyAverageMinor(-1)`
   returns 0, an active plan with history offers three actions and a stopped one reads «Sin seguimiento» / «No se
   registra», the instalment components' figures gain the new fields with their 24T1 values unchanged.
-- **Status.** Implemented on its branch; not merged. Device QA pending: nothing was checked on an iPhone (checklist
-  section Producto 24T3, which must pass before the merge; the list in §2). No EAS build; no native dependency added;
+- **Status.** Merged as PR #76 (merge commit 399a1fa) after the owner's targeted use; the recorded device pass was
+  deliberately deferred and nothing in the checklist section Producto 24T3 is checked. It must pass before 25A-03,
+  25A-04, 25A-11 or 25A-12 merges (owner, 2026-10-02; the list in §2). No EAS build; no native dependency added;
   SQLite schema 14 and backup v14.
 - **Gates.** 2026-10-02, local. `apps/mobile`: typecheck OK; `node --experimental-strip-types --test tests/*.node.ts`
   1200 passed, 0 failed (real SQLite included); `i18n:check -- --strict` 0 errors, 0 stale (English lock accepted);
@@ -3356,6 +3423,76 @@ nothing of it is on a screen yet.
   spending). A fully refunded $ 900 instalment is no longer named over an unrelated $ 400 purchase. B2 and the refund
   amounts are unchanged. Test: `report-trend.test.ts` (Codex's case, before the devolución's date, partial, a credit
   from an earlier month, an adelanto, another plan's credit), checked to fail without the fix.
+
+### Producto 25A-01 — Review draft domain model (this PR)
+
+- **Goal.** The first focused slice of 25A: the pure domain foundation every later producer of a financial write ends in
+  (the Assistant, a Wallet capture, a future inbox, a dev fixture). A review draft is a typed proposal, never a ledger
+  record: a producer only suggests fields, and the domain decides what is valid and builds the one write.
+- **Scope.** Branch `feat/producto-25a-01-review-drafts` from master 399a1fa (24T3 merged as PR #76). New
+  `packages/domain/review-drafts.ts`, exported from `index.ts`; tests in `review-drafts.test.ts`, a new `7e. review drafts`
+  block in `card-invariants.test.ts`, and `boundary.test.ts`. Out of scope, deliberately: persistence (25A-02), the tray UI
+  (25A-03), the Assistant's adoption (25A-04), transfer, devolución and edit drafts (25A-11, 25A-12), any provider,
+  Supabase, network, paid call, EAS build or Wallet work.
+- **The draft.** `ReviewDraft` = `{ version: 1, source: 'assistant' | 'wallet' | 'inbox' | 'fixture', capturedAt (ISO UTC),
+  kind: 'expense' | 'income' | null, amountMinor, currency, merchant, category, dateISO, destinationId, purchase, basis }`,
+  every field `null` until known. `destinationId` is an account id (a cash account or a card's hidden account), never a
+  name. `purchase` is `null` off a card, `{ mode: 'once' }` («Una vez») or `{ mode: 'installments', count, placement }` with
+  `count` `null` until the person chooses it. `basis` lists the versions the proposal was reviewed against: the destination
+  account, its card, and the category's stored definition.
+- **Strict parsing.** `parseReviewDraft` treats its input as untrusted: exact keys on plain objects (an unknown, missing,
+  symbol or prototype key is refused), a positive safe integer amount within the entry range, a storable ISO currency (any
+  released scale, not only ARS and USD; never a fund, a metal or XTS), real calendar dates and timestamps, known sources
+  and kinds, a well-formed purchase (2–120 instalments as in the purchase form, a single payment being «Una vez»; placement current
+  or next), no purchase on an income, a basis of at
+  most 16 distinct well-formed items; names trimmed, bounded and free of controls, the zero-width space and bidirectional overrides and isolates (joiners,
+  directional marks and emoji sequences pass).
+  One message for every refusal; nothing is trimmed, defaulted or converted.
+- **Gaps.** `reviewGaps(draft, archive, todayISO)` names, in order, what still stops a write: `kind`, `amount`, `currency`
+  (missing, or not the destination's: never the person's default and never converted), `destination` (missing or not
+  offered), `purchase` (a card without a mode, or a mode off a card), `installmentCount` (cuotas without the person's count,
+  or fewer minor units than instalments), `merchant`, `category` (missing, archived, or one the person has never had: a
+  producer never creates a category) and `date` (missing or after today).
+- **Destinations.** `reviewDestinations(kind, archive)` reuses `postingAccountsFor`: live cash accounts and active cards
+  for an expense, live cash accounts for an income; never a debt or receivable, a deleted account, or an archived or
+  deleted card. `withDestination` sets an offered destination and re-bases the draft; a card starts as «Una vez» (never in
+  cuotas), another account carries no purchase mode, and the currency is left as it is.
+- **Staleness.** `reviewBasis` computes the current basis; `isStaleReviewDraft` is true when an item of the draft's basis
+  changed revision, was deleted or is gone, or when the current destination, card or category definition was never
+  recorded in it. A stale draft never writes.
+- **Exactly one write.** `writeForReviewDraft(draft, archive, { writeId, createdAt, todayISO })` re-reads the draft,
+  refuses any gap or a stale basis, and returns exactly one write: one `Entry` (`id` = `writeId`) on a cash account or on a
+  card in «Una vez», with the category written as its identity's stored label and the guards `createEntry` runs on the movement itself
+  (whether the id is already taken stays storage's question); or one
+  `InstallmentPlan` from `newInstallmentPlan` for cuotas (principal = the amount, the person's count and placement, the
+  card's calendar and exact statement dates, no financing, no movement on the purchase date). `REVIEW_WRITE_ID`
+  (`^[A-Za-z0-9-]{1,70}$`) is valid as a movement, plan and operation id and can never be a derived id (`inst_…`,
+  `rec_…`, an operation's `…_p` lines). The caller fixes the id once (25A-02 freezes it per review item); the same draft,
+  archive and options give a deep-equal write, so a retry is an idempotent create.
+- **Domain boundary.** `boundary.test.ts` checks that every domain source imports only sibling modules by `./name.ts`
+  (no React Native, Expo, storage, server, UI, Node API or other package) and loads nothing at run time; the stale comment
+  in `index.ts` that credited `check-repo.mjs` with this now points to the test.
+- **Docs reconciled.** 24T3 relabelled as merged (PR #76, merge commit 399a1fa) in the header, §1, §2, §3, «Producto 24T»
+  and its own section; the targeted 24T3 device pass recorded as deferred by the owner and gating 25A-03, 25A-04, 25A-11 and
+  25A-12; §1's stale «SQLite 12 … v1–v12» line; «Recommended next» and the binding order with 25A active and 25A2 allowed
+  after 25A-03; 25A's scope (every write kind as a draft) and its slices; 25A2's on-device path without a paid provider,
+  login, network, FinanceKit or the remote inbox and its pairing token, local category suggestion first, and the
+  notification-Confirm question left to the owner; `docs/mobile-design.md`, `docs/mobile-device-checklist.md`,
+  `README.md` and `apps/mobile/README.md` status lines. Still to reconcile in the slice that introduces each: 25D/25E's
+  «Sign in with Apple deferred to 25E» against 25A's staging sign-in, and 25F's cost ceilings against the controls 25A
+  needs before its first paid call.
+- **Device QA.** None: nothing changes on screen. The version line reads «FinanzApp 0.1.0 (25A-01)».
+- **Status.** On its branch; not merged.
+- **Gates.** 2026-10-02, local, Linux. Root: `npm test` 29 files, 585 passed, 1 todo (the foreign-currency plan, 24C2);
+  `npm run check:repo` OK. `apps/mobile`: `typecheck` OK (and the new domain tests type-check strictly);
+  `test:storage` 1206 passed, 0 failed (real SQLite included); `currency:verify` and `regions:verify` OK (offline);
+  `i18n:check -- --strict` 0 errors, 0 stale (no copy changed); `check` dependencies up to date; `export:ios` OK. No EAS
+  build, no network or provider call, no Supabase, no iPhone. An adversarial review in eight lenses (double write,
+  instalments, destinations, currency, stale basis, untrusted parsing, determinism, purity), each finding checked by two
+  independent skeptics, confirmed three, all fixed with tests: a one-instalment plan (cuotas are now 2–120, as in the
+  form), a category key that Hangul decomposition lengthens past 60 (keys may be four times the label), and joiners or
+  directional marks in a person's names refused as hidden characters. Not adopted, recorded for 25A-02: one id reused as
+  a movement and a plan across a changed draft (storage's cross-check and the caller's freeze).
 
 ### Later notes recorded in 24UX6A (future; document only, not scheduled)
 

@@ -1,11 +1,22 @@
 # Physical iPhone acceptance checklist
 
-## Producto 24T3 — must pass before this PR merges
+## Producto 25A-01 — nothing to check on the iPhone
+
+The review-draft domain model (`packages/domain/review-drafts.ts`) is pure domain: no screen, storage, schema or native
+change, and no EAS build. The only visible difference is the version line at the end of Más: «FinanzApp 0.1.0 (25A-01)»
+on a build from this branch.
+
+## Producto 24T3 — merged as PR #76; must pass before 25A-03, 25A-04, 25A-11 or 25A-12 merges
+
+**Gate (owner, 2026-10-02).** The owner merged PR #76 (merge commit 399a1fa) after targeted use and deliberately deferred
+this recorded pass: nothing below is checked. 25A-01 and 25A-02 may proceed; this pass must be done before 25A-03,
+25A-04, 25A-11 or 25A-12 merges, because those begin to expose durable review of financial writes (transfers,
+devoluciones, cuotas).
 
 **Not done yet: no EAS build was made and the iPhone was not touched. Nothing below is device-verified.** This is a
 short, targeted pass for devoluciones, the adelanto de cuotas and the plan lifecycle, and the final device QA of
 instalments (Tarjetas and Deudas on the iPhone). The earlier sections 24UX6A–24UX6E stay unchecked as they are: they
-belong to the later full pass before the first TestFlight, not to this merge. Metro from this branch (`npm run
+belong to the later full pass before the first TestFlight, not to this gate. Metro from `master` (`npm run
 start:dev-client -- --clear`) on the installed FinanzApp Dev build; JavaScript only, no native dependency.
 **The ledger moves to schema 14 (two new empty tables) and an older build refuses the file unchanged: export a backup
 first** (Más → Copia de seguridad). Use your own small test data (a test cash account, a test card, two or three test
