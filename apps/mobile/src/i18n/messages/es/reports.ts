@@ -139,6 +139,7 @@ export const reports = {
       categoryNoNetLabel: '{name}, {amount} {currency}, sin gasto neto, {count}',
       noNet: 'Sin gasto neto',
       categoryHint: 'Abre los movimientos de esta categoría en el mes seleccionado',
+      chosenRowHint: 'Elegida en el gráfico: se muestra primero mientras está elegida. Abre los movimientos de esta categoría en el mes seleccionado',
       timelineMax: 'Gasto registrado · máximo {currency} {amount}',
       timelineBar: '{period}, {amount} {currency}, {count}',
       /** 24T3 (A24): a span whose net is zero or less (its bar is drawn at zero). */

@@ -90,6 +90,17 @@ export function dateRangeLabel(period: ReportPeriod, t: Translate = translator('
   return t('reports.period.range', { day: Number(period.endISO.slice(-2)), month: formatMonth(month, locale, 'month'), year: month.slice(0, 4) });
 }
 
+/** Producto 25UX1: the order Reportes lists its categories in while a donut slice is chosen. The chosen category comes
+ * first, so the highlighted row is always in view under the donut; every other row keeps its canonical place relative to
+ * the rest. Nothing is re-ranked: the canonical array (the domain's spending order, which the donut, its VoiceOver steps
+ * and every total read) is never mutated, and with no choice, or a key no row has (the «Otras» slice), the order is the
+ * canonical one. A display order only: the row says it is shown first because it is chosen, never that it spent most. */
+export function promoteChosen<T extends { key: string }>(rows: readonly T[], chosenKey: string | null): T[] {
+  const index = chosenKey === null ? -1 : rows.findIndex(row => row.key === chosenKey);
+  if (index <= 0) return [...rows];
+  return [rows[index], ...rows.slice(0, index), ...rows.slice(index + 1)];
+}
+
 export function spendingShare(amountMinor: number, totalMinor: number, locale: AppLocale = DEFAULT_LOCALE): { fraction: number; label: string } {
   if (!Number.isSafeInteger(amountMinor) || !Number.isSafeInteger(totalMinor)
     || amountMinor < 0 || totalMinor <= 0 || amountMinor > totalMinor) return { fraction: 0, label: '—' };

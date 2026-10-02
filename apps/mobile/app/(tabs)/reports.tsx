@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { FlatList, StyleSheet, View, useWindowDimensions } from 'react-native';
+import Animated from 'react-native-reanimated';
 import { router, useLocalSearchParams } from 'expo-router';
 import { categoryKey, dailySpending, expensesInPeriod, monthlySpendingTrend, shiftMonthISO, spendingComparison, spendingInsights, spendingReport,
   summarizeMonthlyBudgets, topMerchants, type CategorySpending, type Currency, type DailySpending, type Entry, type SpendingInsight } from '@finanzapp/domain';
@@ -20,11 +21,12 @@ import type { Translate } from '../../src/i18n/messages';
 import { useCategoryColor, useCategoryLookOf } from '../../src/ui/category-hues';
 import { DonutChart, MONEY_MAX_SCALE, MonthBars, OTHERS_KEY, donutSlices } from '../../src/ui/charts';
 import { amountWidthEm } from '../../src/ui/geometry';
-import { ValueTransition, selectionHaptic } from '../../src/ui/motion';
+import { ValueTransition, rowReorder, selectionHaptic } from '../../src/ui/motion';
 import { activityDateLabel, historyCurrencies } from '../../src/ui/presentation';
-import { changePercent, earliestRecordedMonth, insightsBesideRanking, reportPeriodLabel, reportSelection, requestedReportMonth, shiftReportMonth, spendingShare } from '../../src/ui/report-presentation';
+import { changePercent, earliestRecordedMonth, insightsBesideRanking, promoteChosen, reportPeriodLabel, reportSelection, requestedReportMonth, shiftReportMonth, spendingShare } from '../../src/ui/report-presentation';
 import { CategoryLegendRow } from '../../src/ui/spending-chart';
 import { space, useCurrentDay, usePalette, useReduceMotion } from '../../src/ui/theme';
+import { useDockClearance } from '../../src/ui/dock-clearance';
 
 /** Reportes answers "¿a dónde fue mi plata?" for one month and one currency. Every number is recorded spending in that
  * currency; nothing is estimated.
@@ -60,6 +62,7 @@ export default function ReportsScreen() {
   const params = useLocalSearchParams<{ currency?: string | string[]; month?: string | string[] }>();
   const { snapshot, archive, gate } = useLedger();
   const p = usePalette();
+  const clearance = useDockClearance();
   const { t, locale, formatMonthTitle, formatDayMonth, formatNumericDate, currencyName, moneyText, spokenMoney, spokenPercent, speechLanguage } = useI18n();
   const day = useCurrentDay();
   const { width: windowWidth, fontScale } = useWindowDimensions();
@@ -68,6 +71,11 @@ export default function ReportsScreen() {
   // 24UX6C2: the category chosen on the donut, for the month and currency it was chosen in (a new month starts with none).
   const [chosen, setChosen] = useState<{ scope: string; key: string } | null>(null);
   const reduced = useReduceMotion();
+  // 25UX1: the rows travel to their new places only when the choice changes within one month, currency and mode (the
+  // chosen row rises to the top, then returns); a new month, currency or mode reorders at once. `listSeen` is what the
+  // latest render drew; after each commit it becomes `listDrawn`, what the next render compares with.
+  const listSeen = useRef({ scope: '', chosen: null as string | null }), listDrawn = useRef({ scope: '', chosen: null as string | null });
+  useEffect(() => { listDrawn.current = listSeen.current; });
   // The history sits under the analysis (24UX6B): a bar that opens another month brings that month's title and total into view.
   const list = useRef<FlatList<CategorySpending | DailySpending>>(null);
   // The display currency Reportes shares with Inicio (24B6). A route that names a currency an account holds shows it and
@@ -159,6 +167,11 @@ export default function ReportsScreen() {
   // over the positive categories' sum in exact minor units, so the centre and the rows always say the same percentage.
   const scopeKey = choiceScope;
   const chosenKey = chosen?.scope === scopeKey && slices.some(slice => slice.key === chosen.key) ? chosen.key : null;
+  // 25UX1 (owner): while a slice is chosen its row is listed first, so the highlighted row is in view under the donut; the
+  // others keep their canonical order and the donut keeps reading `report.categories`. Clearing restores the order.
+  const shown: (CategorySpending | DailySpending)[] = tab === 'categories' ? promoteChosen(rows as CategorySpending[], chosenKey) : rows;
+  const reorder = !reduced && tab === 'categories' && listDrawn.current.scope === scopeKey && listDrawn.current.chosen !== chosenKey;
+  listSeen.current = { scope: scopeKey, chosen: chosenKey };
   const shareOf = (value: number) => {
     const { fraction, label } = spendingShare(value, positiveMinor, locale);
     return { label, spoken: spokenPercent(fraction) };
@@ -191,10 +204,12 @@ export default function ReportsScreen() {
   // Día a día's total at 20 pt fits the content width (Money caps a row amount's text scale at 1.8), or it takes its own line.
   const dayTotalFits = !ready || !Number.isSafeInteger(report.expenseMinor) || amountWidthEm(moneyText(report.expenseMinor, currency)) * 20 * Math.min(Math.max(fontScale, 0.5), MONEY_MAX_SCALE) <= windowWidth - 2 * space.xl;
 
-  return <FlatList<CategorySpending | DailySpending> ref={list} data={rows} keyExtractor={item => 'key' in item ? item.key : item.dateISO}
+  return <Animated.FlatList<CategorySpending | DailySpending> ref={list} data={shown} keyExtractor={item => 'key' in item ? item.key : item.dateISO}
+    itemLayoutAnimation={reorder ? rowReorder : undefined}
     style={{ flex: 1, backgroundColor: p.background }}
-    contentContainerStyle={{ padding: space.xl, paddingBottom: 48, flexGrow: 1 }}
-    contentInsetAdjustmentBehavior="automatic" removeClippedSubviews={false}
+    // 25UX1: the root runs under the floating dock; its last row ends the dock's height higher (`useDockClearance`).
+    contentContainerStyle={{ padding: space.xl, paddingBottom: 48 + clearance, flexGrow: 1 }} scrollIndicatorInsets={{ bottom: clearance }}
+    contentInsetAdjustmentBehavior="never" removeClippedSubviews={false}
     initialNumToRender={10} maxToRenderPerBatch={10} windowSize={7}
     ListHeaderComponent={<View style={{ gap: space.xxl, paddingBottom: space.m }}>
       <View style={{ gap: space.m }}>
@@ -269,13 +284,13 @@ export default function ReportsScreen() {
     </View>}
     renderItem={({ item, index }) => <View style={{ backgroundColor: p.surface, overflow: 'hidden',
       borderTopLeftRadius: index === 0 ? 16 : 0, borderTopRightRadius: index === 0 ? 16 : 0,
-      borderBottomLeftRadius: index === rows.length - 1 ? 16 : 0, borderBottomRightRadius: index === rows.length - 1 ? 16 : 0 }}>
+      borderBottomLeftRadius: index === shown.length - 1 ? 16 : 0, borderBottomRightRadius: index === shown.length - 1 ? 16 : 0 }}>
       {'key' in item ? <CategoryLegendRow category={item} totalMinor={positiveMinor} chosen={chosenKey === item.key}
         countLabel={countOf(entry => categoryKey(entry.category) === item.key)}
         currency={currency} last={index === report.categories.length - 1}
         onPress={() => router.push({ pathname: '/report-category', params: { currency, month: monthISO, category: item.key } })} />
         : <DetailRow label={t('reports.dayRow', { date: activityDateLabel(item.dateISO, day, locale), count: countOf(entry => entry.dateISO === item.dateISO) })}
-          value={money(item.amountMinor)} spokenValue={spoken(item.amountMinor)} last={index === rows.length - 1}
+          value={money(item.amountMinor)} spokenValue={spoken(item.amountMinor)} last={index === shown.length - 1}
           onPress={() => router.push({ pathname: '/report-day', params: { currency, date: item.dateISO } })} />}
     </View>}
     ListEmptyComponent={ready ? <EmptyState title={t('reports.emptyTitle')} icon={days ? 'calendar-outline' : 'pie-chart-outline'}

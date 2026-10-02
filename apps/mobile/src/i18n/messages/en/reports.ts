@@ -99,6 +99,7 @@ export const reports: Pick<Messages, 'reports'> = {
       categoryNoNetLabel: '{name}, {amount} {currency}, no net spending, {count}',
       noNet: 'No net spending',
       categoryHint: 'Opens this category’s transactions for the selected month',
+      chosenRowHint: 'Chosen on the chart: shown first while it is chosen. Opens this category’s transactions for the selected month',
       timelineMax: 'Recorded spending · max {currency} {amount}',
       timelineBar: '{period}, {amount} {currency}, {count}',
       timelineBarNoNet: '{period}, {amount} {currency}, no net spending, {count}',

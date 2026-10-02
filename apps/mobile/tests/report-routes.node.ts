@@ -43,7 +43,7 @@ function memoryPreferences(initial: Record<string, string> = {}) {
 
 function routeHarness(file: string, params: Record<string, unknown>, data = snapshot, { locale = 'es-AR' as AppLocale, display = displayCurrency.createDisplayCurrencyStore(memoryPreferences().store),
   book = domain.rateBook([]), activity = 'idle' as ratesStore.RatesActivity, ensured = [] as { months: readonly string[]; quotes: readonly string[] }[],
-  archive = {} as Partial<domain.LedgerArchive>, window = { width: 393, height: 852, fontScale: 1, scale: 3 } } = {}) {
+  archive = {} as Partial<domain.LedgerArchive>, window = { width: 393, height: 852, fontScale: 1, scale: 3 }, reduced = false } = {}) {
   const i18nProvider = { useI18n: () => bindLocale(locale) };
   // The shared display currency, as the provider's hook gives it: the real store and resolution, no React context.
   const displayProvider = { useDisplayCurrency: (held: readonly domain.Currency[]) => ({ currency: displayCurrency.resolveDisplayCurrency(display.getState(), held, display.getMode()),
@@ -108,8 +108,10 @@ function routeHarness(file: string, params: Record<string, unknown>, data = snap
     '../src/ui/category-color': categoryColor,
     '../src/ui/category-hues': { useCategoryColor: () => '#3E6FB0', useCategoryLabel: (s: string) => s, useCategoryDefinitions: () => [], useCategoryLook: (s: string) => ({ label: s, storedLabel: s, key: String(s).toLowerCase(), hex: '#3E6FB0', glyph: 'pricetag-outline' }), useCategoryLookOf: () => (s: string) => ({ label: s, storedLabel: s, key: String(s).toLowerCase(), hex: '#3E6FB0', glyph: 'pricetag-outline' }), useAccountLook: () => ({ icon: 'wallet', color: 'cobalt', glyph: 'wallet-outline', hex: '#2557D6' }), useAccountNameOf: () => (account: any) => account.name, useAccountLookOf: () => () => ({ icon: 'wallet', color: 'cobalt', glyph: 'wallet-outline', hex: '#2557D6' }) },
     '../src/ui/quick-actions': { QuickActions: 'QuickActions', AssistantEntry: 'AssistantEntry' },
-    '../src/ui/motion': { ValueTransition: 'ValueTransition', Reflow: 'Reflow', selectionHaptic: () => {}, impactHaptic: () => {}, timing: (kind: string, reduced: boolean) => ({ duration: reduced ? 0 : 260 }) },
-    '../src/ui/theme': { useCurrentDay: () => '2026-09-12', useReduceMotion: () => false, space: { xs: 4, s: 8, m: 12, l: 16, xl: 20, xxl: 24, xxxl: 32 },
+    'react-native-reanimated': { __esModule: true, default: { FlatList: 'FlatList' } },
+    '../src/ui/dock-clearance': { useDockClearance: () => 0 },
+    '../src/ui/motion': { ValueTransition: 'ValueTransition', Reflow: 'Reflow', rowReorder: 'rowReorder', selectionHaptic: () => {}, impactHaptic: () => {}, timing: (kind: string, reduced: boolean) => ({ duration: reduced ? 0 : 260 }) },
+    '../src/ui/theme': { useCurrentDay: () => '2026-09-12', useReduceMotion: () => reduced, space: { xs: 4, s: 8, m: 12, l: 16, xl: 20, xxl: 24, xxxl: 32 },
       usePalette: () => ({ background: '#F5F6F8', surface: '#FFFFFF', primary: '#2557D6', primaryFill: '#2557D6', onPrimary: '#fff', text: '#000', secondary: '#666', tertiary: '#999', line: '#ddd', inset: '#eee', expense: '#c00', warning: '#a60', isDark: false }) },
   };
   // Tab routes live one level deeper than stack routes.
@@ -1155,4 +1157,82 @@ test('24T3 (A24): «Tu mayor gasto» states the purchase net of its devoluciones
   const shown = texts(routeHarness('(tabs)/reports.tsx', { currency: 'ARS' }, data).render());
   assert.ok(shown.some(text => text.startsWith('$ 6,00 · Ropa')), 'the net 6,00, never the gross 9,00');
   assert.equal(shown.some(text => text.startsWith('$ 9,00 · Ropa')), false);
+});
+
+// ---- Producto 25UX1: the chosen category rises into view ----------------------------------------------------------------
+
+test('25UX1: a chosen category is listed first while chosen (its rank unchanged), travels back when cleared, and the rows animate only on a change of choice', () => {
+  // Five categories in September (Categoría 0 spends most), one in August (for the month change).
+  const amounts = [500, 400, 300, 200, 100];
+  const five = { ...snapshot, entries: [...amounts.map((amountMinor, index) =>
+    ({ ...snapshot.entries[0], id: 'five-' + index, category: 'Categoría ' + index, dateISO: '2026-09-0' + (index + 1), amountMinor })),
+  { ...snapshot.entries[0], id: 'aug', category: 'Categoría 4', dateISO: '2026-08-20', amountMinor: 50 }] };
+  const canonical = ['categoria 0', 'categoria 1', 'categoria 2', 'categoria 3', 'categoria 4'];
+  const view = routeHarness('(tabs)/reports.tsx', { currency: 'ARS' }, five);
+  const slicesOf = (root: any) => (find(root, 'DonutChart').props.slices as { key: string }[]).map(slice => slice.key).join(',');
+  let root = view.render();
+  assert.deepEqual(keysOf(root), canonical, 'nothing chosen: the domain\'s spending order');
+  assert.equal(root.props.itemLayoutAnimation, undefined, 'the first render moves nothing');
+  const donutOrder = slicesOf(root);
+  // Choose the fifth category on the donut: its row rises to the top, the others keep their order below it.
+  find(root, 'DonutChart').props.onChoose('categoria 4');
+  root = view.render();
+  assert.deepEqual(keysOf(root), ['categoria 4', 'categoria 0', 'categoria 1', 'categoria 2', 'categoria 3']);
+  assert.equal(rowChoices(root), 'categoria 4:true,categoria 0:false,categoria 1:false,categoria 2:false,categoria 3:false', 'still the one chosen row');
+  assert.equal(root.props.itemLayoutAnimation, 'rowReorder', 'the rows travel to their new places (the app\'s data move)');
+  assert.equal(slicesOf(root), donutOrder, 'the donut, its slices and its VoiceOver steps keep the canonical order');
+  const rising = find(root.props.renderItem({ item: root.props.data[0], index: 0 }), 'CategoryLegendRow');
+  assert.equal(rising.props.category.amountMinor, 100, 'its own exact amount: shown first, never re-ranked');
+  // A render with nothing changed moves nothing.
+  root = view.render();
+  assert.equal(root.props.itemLayoutAnimation, undefined);
+  // Another category: the previous one returns to its place, the new one rises.
+  find(root, 'DonutChart').props.onChoose('categoria 2');
+  root = view.render();
+  assert.deepEqual(keysOf(root), ['categoria 2', 'categoria 0', 'categoria 1', 'categoria 3', 'categoria 4']);
+  assert.equal(root.props.itemLayoutAnimation, 'rowReorder');
+  // Clearing restores the canonical order, animated back.
+  find(root, 'DonutChart').props.onChoose(null);
+  root = view.render();
+  assert.deepEqual(keysOf(root), canonical);
+  assert.equal(root.props.itemLayoutAnimation, 'rowReorder');
+  // The top category chosen: the order is already canonical.
+  find(root, 'DonutChart').props.onChoose('categoria 0');
+  assert.deepEqual(keysOf(view.render()), canonical);
+  // A new month clears the choice and shows its own canonical order at once (no travelling rows across months).
+  find(root, 'DonutChart').props.onChoose('categoria 3');
+  root = view.render();
+  find(root, 'IconButton', 'Mes anterior').props.onPress();
+  root = view.render();
+  assert.equal(find(root, 'DonutChart').props.chosen, null);
+  assert.deepEqual(keysOf(root), ['categoria 4']);
+  assert.equal(root.props.itemLayoutAnimation, undefined, 'a month change is not a reorder');
+});
+
+test('25UX1: under Reduce Motion the chosen row still comes first, without travelling; Día a día never reorders', () => {
+  const amounts = [500, 400, 300];
+  const three = { ...snapshot, entries: amounts.map((amountMinor, index) =>
+    ({ ...snapshot.entries[0], id: 'three-' + index, category: 'Categoría ' + index, dateISO: '2026-09-0' + (index + 1), amountMinor })) };
+  const view = routeHarness('(tabs)/reports.tsx', { currency: 'ARS' }, three, { reduced: true });
+  let root = view.render();
+  find(root, 'DonutChart').props.onChoose('categoria 2');
+  root = view.render();
+  assert.deepEqual(keysOf(root), ['categoria 2', 'categoria 0', 'categoria 1']);
+  assert.equal(root.props.itemLayoutAnimation, undefined, 'the order changes at once');
+  // Día a día clears the choice and lists days, never promoted.
+  find(root, 'Choices').props.onChange('days');
+  root = view.render();
+  assert.equal(root.props.itemLayoutAnimation, undefined);
+  assert.ok(root.props.data.every((item: { dateISO?: string }) => typeof item.dateISO === 'string'));
+});
+
+test('25UX1: promoteChosen puts the chosen row first and keeps every other row in canonical order, never mutating the canonical list', () => {
+  const rows = ['a', 'b', 'c', 'd'].map(key => ({ key }));
+  const frozen = Object.freeze([...rows]);
+  assert.deepEqual(reportPresentation.promoteChosen(frozen, 'c').map(row => row.key), ['c', 'a', 'b', 'd']);
+  assert.deepEqual(reportPresentation.promoteChosen(frozen, 'a').map(row => row.key), ['a', 'b', 'c', 'd']);
+  assert.deepEqual(reportPresentation.promoteChosen(frozen, null).map(row => row.key), ['a', 'b', 'c', 'd']);
+  assert.deepEqual(reportPresentation.promoteChosen(frozen, ' others').map(row => row.key), ['a', 'b', 'c', 'd'], '«Otras» is no row: nothing moves');
+  assert.notEqual(reportPresentation.promoteChosen(frozen, null), frozen, 'always a new array');
+  assert.deepEqual(frozen.map(row => row.key), ['a', 'b', 'c', 'd']);
 });
