@@ -26,7 +26,7 @@
  * - **One operation at a time.** Every store of the process shares one queue (`openReviewStore`), so two confirmations
  *   of one item, or a reconciliation and a confirmation in flight, never race. */
 import {
-  INSTALLMENT_KEYS, INSTALLMENT_PLAN_KEYS, REVIEW_SOURCES, REVIEW_WRITE_ID, isStorableCurrency, ledgerIdOwners, parseReviewDraft, sameEntry,
+  INSTALLMENT_KEYS, INSTALLMENT_PLAN_KEYS, REVIEW_SOURCES, REVIEW_STALE_MESSAGE, REVIEW_WRITE_ID, isStorableCurrency, ledgerIdOwners, parseReviewDraft, sameEntry,
   sameInstallmentPlan, writeForReviewDraft, type Entry, type EntryRecord, type InstallmentPlan, type LedgerArchive, type ReviewDraft,
   type ReviewSource, type ReviewWrite,
 } from '@finanzapp/domain';
@@ -361,7 +361,8 @@ export interface ReviewConfirmation {
  *    kind or other content under the id → `REVIEW_WRITE_CONFLICT_MESSAGE`, nothing changes.
  * 3. Otherwise the write is the frozen one (an interrupted attempt is retried exactly), or is built now by
  *    `writeForReviewDraft` (gaps, a stale basis or an invalid draft refuse here, nothing stored) and frozen on the item in
- *    its own commit before the ledger is asked.
+ *    its own commit before the ledger is asked. Inside the ledger's transaction the write is rebuilt from the draft on the
+ *    archive it inserts into and must equal the frozen one (`CreateGuard`): a change since is refused, nothing written.
  * 4. `createEntry`, or `savePurchasePlan` for cuotas. Success → the item is confirmed (`confirmed`). Failure → the ledger
  *    is read again: the write there → confirmed; not there → the frozen write is released and the error is thrown with
  *    the draft kept; the ledger unreadable → the error is thrown and the frozen write stays for reconciliation. */
@@ -381,10 +382,20 @@ export async function confirmReviewItem(db: ReviewDatabase, ledger: LedgerDataba
     item = await save(db, next(item, options.at, { attempt: write }), item);
   }
   const attempt = item.attempt!;
+  // Codex review of #78: the basis is checked again inside the ledger's own transaction, on the archive it inserts into:
+  // the write rebuilt from the draft there must be exactly the frozen one (no rename, archive or calendar change slipped in
+  // between, and an interrupted attempt retried later is checked as well), or nothing is written.
+  const createdAt = attempt.type === 'entry' ? attempt.entry.createdAt : attempt.plan.createdAt;
+  const guard = (current: LedgerArchive) => {
+    const rebuilt = writeForReviewDraft(item.draft, current, { writeId: item.writeId, createdAt, todayISO: options.todayISO });
+    const same = rebuilt.type === 'entry' ? attempt.type === 'entry' && sameEntry(rebuilt.entry, attempt.entry)
+      : attempt.type === 'plan' && sameInstallmentPlan(rebuilt.plan, attempt.plan);
+    if (!same) throw new Error(REVIEW_STALE_MESSAGE);
+  };
   let warning: string | null = null;
   try {
-    if (attempt.type === 'entry') await createEntry(ledger, attempt.entry);
-    else warning = await savePurchasePlan(ledger, attempt.plan, options.todayISO);
+    if (attempt.type === 'entry') await createEntry(ledger, attempt.entry, guard);
+    else warning = await savePurchasePlan(ledger, attempt.plan, options.todayISO, guard);
   } catch (cause) {
     let after: LedgerWriteState;
     try { after = await ledgerWriteState(ledger, await readArchive(ledger), item); }

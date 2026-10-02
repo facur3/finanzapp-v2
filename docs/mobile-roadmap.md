@@ -3518,7 +3518,7 @@ nothing of it is on a screen yet.
   directional marks in a person's names refused as hidden characters. Not adopted, recorded for 25A-02: one id reused as
   a movement and a plan across a changed draft (storage's cross-check and the caller's freeze).
 
-### Producto 25A-02 — Durable local review store (this PR)
+### Producto 25A-02 — Durable local review store (PR #78, merged)
 
 - **Goal.** The durable local foundation the tray (25A-03), the Assistant (25A-04) and Wallet capture (25A2) confirm through:
   review items that survive restarts and interruptions, and one confirmation that writes each item's one financial write
@@ -3556,7 +3556,12 @@ nothing of it is on a screen yet.
   another draft, an id or write id already used is refused. Identical drafts without a key, or with different keys, are
   separate items. Wallet's key is 25A2's decision.
 - **Device QA.** None: nothing changes on screen. The version line reads «FinanzApp 0.1.0 (25A-02)».
-- **Status.** On its branch; not merged.
+- **Status.** Merged as PR #78, merge commit 4ebe89f. Follow-up (Codex review of #78, P1): the basis is checked again inside
+  the ledger's own transaction. `createEntry` and `createInstallmentPlan` (through `savePurchasePlan`) take an optional
+  `CreateGuard` run on the archive they insert into, on the insert path only; the review store's guard rebuilds the write
+  from the draft there and refuses (`REVIEW_STALE_MESSAGE`, nothing written, the frozen write released) unless it equals
+  the frozen one, so a rename, archive or calendar change between the confirmation's read and the insert, or before an
+  interrupted attempt is retried, never reaches the ledger. Three real-SQLite tests, each checked to fail without it.
 - **Gates.** 2026-10-02, local, Linux. Root: `npm test` 30 files, 590 passed, 1 todo; `npm run check:repo` OK.
   `apps/mobile`: `typecheck` OK; `test:storage` 1230 passed, 0 failed (24 new review-store tests on real SQLite: creation,
   a newer and a corrupt file, round trip and restart, strict reading, every transition, capture keys, interrupted

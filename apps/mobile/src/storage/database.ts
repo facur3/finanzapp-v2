@@ -739,7 +739,13 @@ export async function saveCategoryDefinition(db: LedgerDatabase, input: Category
   });
 }
 
-export async function createEntry(db: LedgerDatabase, input: Entry): Promise<void> {
+/** A last check a caller runs inside a create function's own transaction, on the archive that transaction read, right
+ * before a new row is inserted (never on an idempotent retry of a write already there). It throws to refuse: the
+ * transaction rolls back and nothing is written. 25A-02's review store uses it so a confirmed write always reflects the
+ * ledger the person reviewed, with no window between that check and the insert. */
+export type CreateGuard = (archive: LedgerArchive) => void;
+
+export async function createEntry(db: LedgerDatabase, input: Entry, guard?: CreateGuard): Promise<void> {
   const entry = { ...input, merchant: input.merchant.trim(), category: input.category.trim() };
   await db.withExclusiveTransactionAsync(async tx => {
     const archive = await readArchive(tx);
@@ -760,6 +766,7 @@ export async function createEntry(db: LedgerDatabase, input: Entry): Promise<voi
       return; // Committed already (the card may have been archived since): a retry never fails.
     }
     assertAcceptsNewObligation(entry.accountId, archive.cards); // 24T1 review: an archived card takes no new purchase.
+    guard?.(archive);
     totalsByCurrency({ ...snapshot, entries: [...snapshot.entries, entry] });
     await insertRecord(tx, initialRecord(entry));
   });
@@ -1317,7 +1324,7 @@ async function insertInstallmentPlan(tx: SqlExecutor, plan: InstallmentPlan): Pr
  * no new plan: `assertAcceptsNewObligation`). Nothing moves in any account
  * and no movement is recorded here: the instalments are recognised by `catchUpInstallments` when their statements close.
  * Retrying the same plan is a no-op; the same id with other data is refused. */
-export async function createInstallmentPlan(db: LedgerDatabase, input: InstallmentPlan): Promise<void> {
+export async function createInstallmentPlan(db: LedgerDatabase, input: InstallmentPlan, guard?: CreateGuard): Promise<void> {
   const plan = { ...input, merchant: input.merchant.trim(), category: input.category.trim(),
     interestCategory: input.interestCategory.trim(), feeCategory: input.feeCategory.trim(), taxCategory: input.taxCategory.trim() };
   if (plan.revision !== 0 || plan.updatedAt !== plan.createdAt || plan.deleted || plan.cancelledAt !== null) throw new Error('Un plan de cuotas nuevo no puede tener cambios previos.');
@@ -1336,6 +1343,7 @@ export async function createInstallmentPlan(db: LedgerDatabase, input: Installme
     // 24T2: a new plan bills on the card's calendar as it is now (usual days and exact dates); a purchase form left open
     // across a change of that calendar is refused instead of recognising instalments on dates the card no longer has.
     if (!planFollowsCalendar(plan, card, archive.cardCycleDates)) throw new Error(PLAN_CALENDAR_MESSAGE);
+    guard?.(archive);
     validateArchive({ ...archive, installmentPlans: [...archive.installmentPlans ?? [], plan] });
     await insertInstallmentPlan(tx, plan);
   });
