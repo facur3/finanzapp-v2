@@ -1,10 +1,15 @@
 # Physical iPhone acceptance checklist
 
-## Producto 25A-01 — nothing to check on the iPhone
+## Producto 25A-02 — nothing to check on the iPhone
+
+The durable local review store (`apps/mobile/src/storage/review-database.ts`, its own file) is not opened by any screen
+yet: no UI, no native dependency, no ledger schema or backup change, no EAS build. The only visible difference is the
+version line at the end of Más: «FinanzApp 0.1.0 (25A-02)» on a build from this branch.
+
+## Producto 25A-01 — nothing to check on the iPhone (merged as PR #77)
 
 The review-draft domain model (`packages/domain/review-drafts.ts`) is pure domain: no screen, storage, schema or native
-change, and no EAS build. The only visible difference is the version line at the end of Más: «FinanzApp 0.1.0 (25A-01)»
-on a build from this branch.
+change, and no EAS build.
 
 ## Producto 24T3 — merged as PR #76; must pass before 25A-03, 25A-04, 25A-11 or 25A-12 merges
 

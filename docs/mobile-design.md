@@ -1,7 +1,7 @@
 # FinanzApp: dirección visual móvil
 
 Interfaz 17 · 21 de septiembre de 2026; estado al 2 de octubre de 2026: el carril Forest (24UX6A–24UX6E) y 24T3
-mergeados, 25A-01 en su rama sin cambios visuales. Implementado en código; revisión visual y
+mergeados, 25A-01 mergeada (PR #77) y 25A-02 en su rama, sin cambios visuales. Implementado en código; revisión visual y
 gestual en iPhone pendiente. [Alcance del producto](decisions/002-spending-first.md) ·
 [Navegación y tarjetas](decisions/003-five-tabs-and-cards.md).
 
@@ -848,8 +848,8 @@ vinculante del roadmap no cambia: la próxima entrega de producto es 24T3; 24UX6
 
 ## Producto 25A-01 — modelo de borradores de revisión (sin cambios visuales)
 
-La primera entrega enfocada del Asistente real (25A), en su rama `feat/producto-25a-01-review-drafts` desde master
-399a1fa (24T3 mergeada como PR #76). Solo dominio: `packages/domain/review-drafts.ts` define el **borrador de revisión**,
+La primera entrega enfocada del Asistente real (25A), mergeada como PR #77 (merge commit a4202bc) desde su rama
+`feat/producto-25a-01-review-drafts` (desde master 399a1fa, 24T3 mergeada como PR #76). Solo dominio: `packages/domain/review-drafts.ts` define el **borrador de revisión**,
 la propuesta tipada en la que va a terminar todo lo que proponga un movimiento (el Asistente, una captura de Wallet, una
 bandeja futura). Un borrador no es un registro: lo que falta queda como un hueco explícito (tipo, importe, moneda,
 destino, modo de compra, cantidad de cuotas, comercio, categoría, fecha), nunca se completa solo, y cuando está completo
@@ -2777,8 +2777,9 @@ color propio.
 
 ## Pendiente de revisión en iPhone
 
-- Producto 25A-01: nada que revisar en el iPhone (solo dominio, sin pantalla nueva); la línea de versión de Más dice
-  «FinanzApp 0.1.0 (25A-01)» en un build de su rama.
+- Producto 25A-02: nada que revisar en el iPhone (la base local de propuestas, en su propio archivo; ninguna pantalla la
+  abre todavía); la línea de versión de Más dice «FinanzApp 0.1.0 (25A-02)» en un build de su rama.
+- Producto 25A-01 (mergeada como PR #77): nada que revisar en el iPhone (solo dominio, sin pantalla nueva).
 - Producto 24T3 (mergeada como PR #76; sin build de EAS, nada revisado todavía; una pasada dirigida que el dueño
   postergó y que debe hacerse antes de mergear 25A-03, 25A-04, 25A-11 o 25A-12): la
   actualización a esquema 14 con una copia antes; una devolución en efectivo parcial y total, una de una compra con

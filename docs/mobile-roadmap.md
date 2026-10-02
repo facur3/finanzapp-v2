@@ -1,11 +1,16 @@
 # FinanzApp mobile: living roadmap
 
-Updated: 2026-10-02 (Producto 25A-01 on its branch: the review-draft domain model, the first focused slice of 25A and pure
+Updated: 2026-10-02 (Producto 25A-02 on its branch: the durable local review store, infrastructure only. A separate SQLite
+file (`finanzapp-review-v1.sqlite`, its own version 1, never in a backup) keeps review items pending, confirmed or dismissed
+with a frozen write id; a confirmation freezes its one write before the ledger is asked, so an interruption is reconciled
+from the ledger and never writes twice; the ledger now refuses one id as two kinds of write. No UI, schema (14), backup
+(v14), network or provider change; the version line reads «FinanzApp 0.1.0 (25A-02)». Producto 25A-01 merged as PR #77,
+merge commit a4202bc: the review-draft domain model, the first focused slice of 25A and pure
 domain only. `packages/domain/review-drafts.ts` is the one typed proposal every later Assistant, Wallet or inbox producer
 ends in: strict parsing of untrusted input, explicit gaps (never a defaulted currency, destination or instalment count),
 destinations from the card invariants, stale-basis detection, and exactly one deterministic write (one movement, or one
 instalment plan) under an id the caller fixes; no UI, storage, schema (14), backup (v14), network or provider change; the
-version line reads «FinanzApp 0.1.0 (25A-01)». Producto 24T3 merged as PR #76, merge commit 399a1fa, with two late review fixes: the devolución date wheel's
+version line read «FinanzApp 0.1.0 (25A-01)». Producto 24T3 merged as PR #76, merge commit 399a1fa, with two late review fixes: the devolución date wheel's
 bounds before local noon, and a cash account's month reading «Devoluciones netas este mes» when devoluciones exceed its
 purchases; plus documentation-only notes on the dock, the Tarjetas root and 25D's FinanceKit rules; after the owner's
 review, the devolución-versus-bank-reintegro help, a card deletion dialog that archives right there, and 25A2 (Wallet
@@ -167,7 +172,10 @@ history file keeps the evidence of when and why.
   write is confirmed only after it landed; deleting a recurring rule, a debt tracker, an account or a
   card keeps its row as a deletion record and never touches the movements it produced (24UX4, 25B2);
   edits are audited and undoable; future sync needs operation IDs, revisions, tombstones,
-  conflict handling and RLS (nothing in Supabase provides offline sync by itself).
+  conflict handling and RLS (nothing in Supabase provides offline sync by itself). One id is one kind of financial write
+  (25A-02): a movement, a transfer, a plan and an operation never share an id, refused by every create function. Review
+  items live in their own file (`finanzapp-review-v1.sqlite`), never in the ledger or a backup; a failure there never
+  touches the ledger, and a confirmation freezes its one write before the ledger is asked.
 - **Every AI-generated movement is a draft until the person confirms it explicitly.**
   Confirmar on the draft card is the only path that writes (one movement or one instalment plan, 25A-01); Apple Pay captures,
   Shortcut messages, transcriptions and inbox deliveries fill a review tray, never ledger rows;
@@ -206,13 +214,27 @@ commit 8f758ad), 24UX6C2 (PR #73, merge
 commit 5c73813), 24UX6C (PR #72, merge
 commit c673be6), 24UX6B (PR #71, merge
 commit ecfd1dc), 24UX6A (PR #70, merged 2026-10-01, merge commit ef24bb6), 24T2 (PR #69, merge commit 8951f6c), 24T1C
-(PR #68), 24T1 (PR #67) and 25B3 (PR #66), plus Producto 25A-01 on its branch. Per area,
+(PR #68), 24T1 (PR #67) and 25B3 (PR #66), then Producto 25A-01 (PR #77, merge commit a4202bc), plus Producto 25A-02
+on its branch. Per area,
 without test inventories (those are in apps/mobile/README.md and the history
 file). "Released" below names an in-app gate (`RELEASED_LANGUAGES`, `RELEASED_REGIONS`,
 `LEDGER_CURRENCIES`): what a build offers, verified on Linux; nothing is distributed to people yet
 (§4).
 
-- **Review drafts: the domain model (25A-01, on its branch; nothing on screen, so no device QA).** The first slice of the
+- **Durable local review store (25A-02, on its branch; nothing on screen, so no device QA).** Infrastructure for the
+  tray (§3, «Producto 25A-02»). `src/storage/review-database.ts`: a separate file `finanzapp-review-v1.sqlite` (review
+  schema 1; never in the ledger, a backup or `importArchive`; a corrupt, unreadable or newer file is never reset or
+  rewritten and never stops the ledger). A review item keeps its id, source, optional capture key, the 25A-01 draft
+  (parsed strictly on write and on read; an unreadable row is set apart, never written), a write id frozen at capture,
+  its state (pending → confirmed with a receipt, or pending → dismissed; never back), the frozen write while one is in
+  flight, timestamps and a revision. Confirming freezes the one write on the item, then asks `createEntry` or
+  `savePurchasePlan`; an interruption is reconciled from the ledger by id and content (an edited or stopped write
+  included), a ledger refusal releases the frozen write, and an id held as another kind or with other content is a
+  conflict that writes nothing. A capture key makes a repeated delivery idempotent and refuses the same key with other
+  data. The ledger's `createEntry`, `createInstallmentPlan` and `createTransfer` refuse an id another kind of write owns
+  (`packages/domain/write-ids.ts`); reads and imports are unchanged. No screen opens the store yet (25A-03). The version
+  line reads «FinanzApp 0.1.0 (25A-02)».
+- **Review drafts: the domain model (25A-01, PR #77, merge commit a4202bc; nothing on screen, so no device QA).** The first slice of the
   real Assistant (§3, «Producto 25A» and «Producto 25A-01»). `packages/domain/review-drafts.ts`: a `ReviewDraft` (version 1;
   source assistant, wallet, inbox or fixture; kind expense or income; amount, currency, merchant, category, date and
   destination, each `null` until known; a card's purchase mode «Una vez» or cuotas with the person's count; a basis of
@@ -223,7 +245,7 @@ file). "Released" below names an in-app gate (`RELEASED_LANGUAGES`, `RELEASED_RE
   `writeForReviewDraft` returns exactly one `Entry` or one `InstallmentPlan` (`newInstallmentPlan`, no movement on the
   purchase date) under a caller-fixed id (`REVIEW_WRITE_ID`), deterministic for the same inputs. No persistence, UI,
   schema (14), backup (v14), network or provider change; the Assistant screen is unchanged. `boundary.test.ts` now pins
-  that no domain module imports from outside the package. The version line reads «FinanzApp 0.1.0 (25A-01)».
+  that no domain module imports from outside the package. The version line read «FinanzApp 0.1.0 (25A-01)» (25A-02 since).
 - **Refunds, early payoff and the instalment lifecycle (24T3, PR #76, merge commit 399a1fa; device QA deferred, see §2).** Purchase operations
   (`packages/domain/operations.ts`): a **devolución** (a purchase returned in whole or in part) and an **adelanto de
   cuotas** (the remaining instalments of a plan brought forward), each an append-only record with a form UUID, a
@@ -585,8 +607,9 @@ it was checked in). Metro from `master` (or a delivery's branch) on the installe
 item unless a section says a new native build is needed. The checklist sections are in
 [mobile-device-checklist.md](mobile-device-checklist.md).
 
-- **25A-01 — Review draft domain model (on its branch): nothing to check on the iPhone.** Pure domain; no screen, storage,
-  schema or native change. The Más version line reads «FinanzApp 0.1.0 (25A-01)» on a build from this branch.
+- **25A-02 — Durable local review store (on its branch): nothing to check on the iPhone.** No screen opens it yet; no
+  native dependency; the ledger's schema and backups are unchanged. The Más version line reads «FinanzApp 0.1.0 (25A-02)».
+- **25A-01 — Review draft domain model (merged as PR #77): nothing to check on the iPhone.** Pure domain.
 - **24T3 — Refunds, early payoff and installment lifecycle (merged as PR #76, merge commit 399a1fa; none done; no EAS
   build).** The owner merged #76 after targeted use and deliberately deferred the recorded pass; no item below is
   checked. Binding (owner, 2026-10-02): 25A-01 and 25A-02 may proceed; **this targeted pass must be done before 25A-03,
@@ -765,7 +788,8 @@ item unless a section says a new native build is needed. The checklist sections 
 **Recommended next (2026-10-02):** **24T3 merged as PR #76** (merge commit 399a1fabaa673423b7a155ddb3cb900b5c0103fc):
 SQLite schema 14 and backup v14 are current, and the broad Forest visual lane (24UX6A–24UX6E) is complete. The active
 phase is **25A — the real Assistant**, delivered as focused slices («Producto 25A» below, «Slices»): **25A-01** (the
-review-draft domain model) is this PR; then 25A-02 (the durable local review store), 25A-03 (the «Para revisar» tray)
+review-draft domain model) merged as PR #77 (merge commit a4202bc); **25A-02** (the durable local review store) is this
+PR; then 25A-03 (the «Para revisar» tray)
 and the rest of 25A, with no paid provider call before its own approved slice. **25A2** (Wallet Shortcut Capture) still
 follows the review-tray foundation: it may begin once 25A-03 has merged, without waiting for 25A's cloud, paid, live or
 voice slices. The targeted 24T3 device pass gates 25A-03, 25A-04, 25A-11 and 25A-12 (§2). After 25A: **25C** (with
@@ -1471,7 +1495,7 @@ the owner authorises it; no EAS build or store submission without the owner.
   owner sets up. **Not a dependency:** 24C2 (optional). Its foreign-purchase subflow is enabled only if 24C2 has
   merged; otherwise 25A ships complete without it (24T1C, 2026-09-28). 24T3 (merged, PR #76) for devolución drafts.
 - **Slices (2026-10-02 reconciliation; one focused PR each, never a mega-PR).** Local lane: **25A-01** the review-draft
-  domain model (this PR); **25A-02** the durable local review store (device-local, apart from the ledger; one fixed write
+  domain model (PR #77, merged); **25A-02** the durable local review store (this PR) (device-local, apart from the ledger; one fixed write
   id per item, confirm checks whether that write already exists before building it again, reconcile after a crash; a
   review item's write is frozen after an unknown outcome, as the purchase form freezes its submission, and storage refuses
   one id used as both a movement and a plan, which today `createEntry` and `createInstallmentPlan` do not cross-check);
@@ -3424,7 +3448,7 @@ nothing of it is on a screen yet.
   amounts are unchanged. Test: `report-trend.test.ts` (Codex's case, before the devolución's date, partial, a credit
   from an earlier month, an adelanto, another plan's credit), checked to fail without the fix.
 
-### Producto 25A-01 — Review draft domain model (this PR)
+### Producto 25A-01 — Review draft domain model (PR #77, merged)
 
 - **Goal.** The first focused slice of 25A: the pure domain foundation every later producer of a financial write ends in
   (the Assistant, a Wallet capture, a future inbox, a dev fixture). A review draft is a typed proposal, never a ledger
@@ -3481,8 +3505,8 @@ nothing of it is on a screen yet.
   `README.md` and `apps/mobile/README.md` status lines. Still to reconcile in the slice that introduces each: 25D/25E's
   «Sign in with Apple deferred to 25E» against 25A's staging sign-in, and 25F's cost ceilings against the controls 25A
   needs before its first paid call.
-- **Device QA.** None: nothing changes on screen. The version line reads «FinanzApp 0.1.0 (25A-01)».
-- **Status.** On its branch; not merged.
+- **Device QA.** None: nothing changes on screen. The version line read «FinanzApp 0.1.0 (25A-01)».
+- **Status.** Merged as PR #77, merge commit a4202bce42478d03289d7627fbc4b2c2f3e8afd6.
 - **Gates.** 2026-10-02, local, Linux. Root: `npm test` 29 files, 585 passed, 1 todo (the foreign-currency plan, 24C2);
   `npm run check:repo` OK. `apps/mobile`: `typecheck` OK (and the new domain tests type-check strictly);
   `test:storage` 1206 passed, 0 failed (real SQLite included); `currency:verify` and `regions:verify` OK (offline);
@@ -3493,6 +3517,59 @@ nothing of it is on a screen yet.
   form), a category key that Hangul decomposition lengthens past 60 (keys may be four times the label), and joiners or
   directional marks in a person's names refused as hidden characters. Not adopted, recorded for 25A-02: one id reused as
   a movement and a plan across a changed draft (storage's cross-check and the caller's freeze).
+
+### Producto 25A-02 — Durable local review store (this PR)
+
+- **Goal.** The durable local foundation the tray (25A-03), the Assistant (25A-04) and Wallet capture (25A2) confirm through:
+  review items that survive restarts and interruptions, and one confirmation that writes each item's one financial write
+  once. Infrastructure only: no screen, Assistant, Wallet, notification, network, Supabase, provider, EAS or iPhone work.
+- **Scope.** Branch `feat/producto-25a-02-review-store` from master a4202bc (25A-01 merged as PR #77). New
+  `apps/mobile/src/storage/review-database.ts` (and `openReviewDatabase` in `nativeDatabase.ts`, not called by any screen
+  yet), `packages/domain/write-ids.ts`, the cross-kind guard in `createEntry`, `createInstallmentPlan` and `createTransfer`,
+  and the catalogued messages (`errors.review.*`, `errors.writes.idTaken`).
+- **The file.** `finanzapp-review-v1.sqlite`, `REVIEW_DATABASE_VERSION = 1` (`PRAGMA user_version`), WAL; one STRICT table
+  `review_items` (`id`, `source`, `captureKey` unique when present, `capturedJSON`, `draftVersion`, `draftJSON`, `writeId`
+  unique, `status`, `attemptJSON`, `receiptJSON`, `createdAt`, `updatedAt`, `revision`) with CHECKs tying the state to the
+  receipt and the frozen write. Independent of the ledger's schema 14 and backup v14, neither of which changes. A newer
+  file is read only; a file that cannot be opened throws and is left untouched; the ledger opens either way.
+- **The item.** `ReviewItem { id, source, captureKey, draft (ReviewDraft, 25A-01), writeId, status: 'pending' | 'confirmed' |
+  'dismissed', attempt: ReviewWrite | null, receipt: { type: 'entry' | 'plan', writeId, how: 'confirmed' | 'reconciled', at }
+  | null, createdAt, updatedAt, revision }`. Drafts are parsed by `parseReviewDraft` when stored and when read; a row whose
+  draft, version, source, frozen write or receipt does not read is reported apart (`unreadable`) and never written.
+- **Operations** (`openReviewStore`, one at a time in call order): `capture`, `get`, `listPending`, `updateDraft` (keeps id,
+  source and write id), `dismiss`, `confirm`, `reconcile`. Every change names the revision the person saw.
+- **States.** pending → confirmed and pending → dismissed only; a confirmed or dismissed item refuses every change. An update
+  or a dismissal first settles a frozen write: if the ledger has it, the item becomes confirmed and the change is refused.
+- **Frozen write id and confirmation.** The write id is fixed at capture and never re-minted. `confirm` reads the ledger:
+  its write already there by id and content → confirmed (`reconciled`); another kind or other content → a conflict, nothing
+  written; otherwise the write (`writeForReviewDraft`, or the frozen one of an interrupted attempt, retried exactly) is
+  frozen on the item in its own commit, then `createEntry` / `savePurchasePlan`. Success → confirmed. Failure → the ledger
+  is read again: there → confirmed; absent → the frozen write is released and the draft stays; unreadable → it stays for
+  `reconcile`. The ledger landing while the item cannot be marked is not a failure (`recorded: false`).
+- **Reconciliation.** `reconcile` (at launch, before anything is in flight) confirms the items whose frozen write the ledger
+  holds (a movement compared as first recorded, from its audit receipt when edited since; a plan by identity, money and
+  calendar whatever its later lifecycle), releases the ones it does not hold, and reports conflicts and unreadable rows.
+- **One id, one kind.** `ledgerIdOwners` / `assertWriteIdAvailable` (domain) and the three create functions refuse an id a
+  movement, transfer, plan or operation (its projected lines included) already owns; operations already refused that. Only
+  new writes are checked: reading, backups and imports are unchanged, so stored data stays readable.
+- **Capture keys.** A producer's key: the same key and draft again returns the item (`duplicate: true`); the same key with
+  another draft, an id or write id already used is refused. Identical drafts without a key, or with different keys, are
+  separate items. Wallet's key is 25A2's decision.
+- **Device QA.** None: nothing changes on screen. The version line reads «FinanzApp 0.1.0 (25A-02)».
+- **Status.** On its branch; not merged.
+- **Gates.** 2026-10-02, local, Linux. Root: `npm test` 30 files, 590 passed, 1 todo; `npm run check:repo` OK.
+  `apps/mobile`: `typecheck` OK; `test:storage` 1230 passed, 0 failed (24 new review-store tests on real SQLite: creation,
+  a newer and a corrupt file, round trip and restart, strict reading, every transition, capture keys, interrupted
+  confirmations, reconciliation, cross-kind refusals); `currency:verify`, `regions:verify` OK; `i18n:check -- --strict` 0
+  errors, 0 stale (English lock accepted for `errors.review.*` and `errors.writes.idTaken`); `check` up to date;
+  `export:ios` OK. No EAS build, no network, provider or Supabase, no iPhone. An adversarial review in nine lenses (ledger
+  coupling, data loss, cross-kind ids, crash and retry, the state machine, a corrupt file, migration, reconciliation,
+  boundaries), each finding checked by two skeptics, confirmed four, fixed with tests: timestamps now one ISO shape (the
+  pending order sorts by text), an already-committed confirmation that cannot mark its item reports `recorded: false`
+  instead of failing, a frozen plan type-checked on read, and the catalogue comments attached to their groups. Also
+  fixed though split: one queue for every store of the process (a second store never releases a write in flight), and a
+  newer file not even switched to WAL. Recorded, not changed here: the instalment catch-up's derived `inst_` ids are not
+  checked against other kinds (a plan id is a UUID, so a collision needs a hand-made id).
 
 ### Later notes recorded in 24UX6A (future; document only, not scheduled)
 
