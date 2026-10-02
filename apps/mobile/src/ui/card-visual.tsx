@@ -74,14 +74,15 @@ export function CardFace({ id, name, issuer, last4, currency, color, width, show
 /** Tarjetas' deck (24T2), in place of the horizontal carousel: every card is a whole face; the ones not selected stay
  * stacked above the selected one in their stored order, each showing only its top strip; the selected card sits in front
  * at the bottom, whole, right above the snapshot that describes it. Tapping a strip selects that card (one selection
- * haptic); tapping the card in front opens its detail. No horizontal or drag gesture, so nothing competes with the back
+ * haptic); tapping the selected card opens its detail. 25UX1 (owner): Tarjetas opens idle, with no card selected (every
+ * card's identity, nobody's figures): the deck reads in its stored order with the last card whole at the bottom, and a tap
+ * on any card, that one included, selects it (it moves to the front); only a tap on the selected card opens it. No horizontal or drag gesture, so nothing competes with the back
  * swipe. Each card moves to its place on the UI thread (`timing('data')`, 260 ms ease-out, interruptible); with Reduce
  * Motion the cards jump there and only the snapshot below crossfades. VoiceOver reads the cards as they are drawn, top to
  * bottom (the strips in their stored order, the selected card last, where iOS also layers it): one element each, a
  * button with the face's sentence, its position in that reading order and whether it is the selected one. Each touch
  * target is only what shows of it: the strip (50 pt at least; 44 pt from the fifth card on, 24UX6D, `deckExposure`) or
- * the whole front face. With any card at all one is always in front: a selection that no longer exists (a card archived
- * or deleted) hands the front to the first card, so the snapshot under the deck is never empty. */
+ * the whole bottom face. A selection that no longer exists (a card archived or deleted) returns the deck to idle. */
 export function CardDeck({ cards, selectedId, onSelect, onOpen, showCurrency = true }: {
   cards: readonly CardFaceData[]; selectedId: string | null; onSelect: (id: string) => void; onOpen: (id: string) => void; showCurrency?: boolean;
 }) {
@@ -91,18 +92,21 @@ export function CardDeck({ cards, selectedId, onSelect, onOpen, showCurrency = t
   const width = cardFaceWidth(windowWidth);
   const faceHeight = cardFaceHeight(width);
   const exposure = deckExposure(fontScale, cards.length);
-  const selectedIndex = Math.max(0, cards.findIndex(card => card.id === selectedId));
-  const layout = deckLayout(cards.length, selectedIndex, exposure, faceHeight);
+  const found = cards.findIndex(card => card.id === selectedId);
+  // Idle (no card selected, or one that left the deck): the stored order, drawn as if the last card were in front.
+  const layout = deckLayout(cards.length, found >= 0 ? found : cards.length - 1, exposure, faceHeight);
   return <View style={{ width, height: layout.containerHeight, alignSelf: 'center' }}>
     {cards.map((card, index) => {
-      const front = index === selectedIndex;
+      // `front`: the selected card (opens on tap); `whole`: the card drawn whole at the bottom (selected, or the last one idle).
+      const front = index === found;
+      const whole = layout.zIndex[index] === cards.length - 1;
       // The position VoiceOver hears follows the order it reads the cards in (their layer: the strips, then the front card).
       const position = cards.length > 1 ? ', ' + i18n.t('cards.face.position', { index: layout.zIndex[index] + 1, count: cards.length }) : '';
       return <DeckSlot key={card.id} top={layout.tops[index]} zIndex={layout.zIndex[index]} reduced={reduced} tone={cardFaceTone(card.id, card.color).base}
-        hitHeight={front ? faceHeight : exposure} selected={front} label={cardFaceLabel(i18n, card) + position}
+        hitHeight={whole ? faceHeight : exposure} selected={front} label={cardFaceLabel(i18n, card) + position}
         hint={i18n.t(front ? 'cards.list.openHint' : 'cards.list.selectHint')}
         onPress={() => { if (front) onOpen(card.id); else { selectionHaptic(); onSelect(card.id); } }}>
-        <CardFace {...card} width={width} showCurrency={showCurrency} decorative nameLines={front ? 2 : 1} />
+        <CardFace {...card} width={width} showCurrency={showCurrency} decorative nameLines={whole ? 2 : 1} />
       </DeckSlot>;
     })}
   </View>;

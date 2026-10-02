@@ -42,8 +42,9 @@ export function deckExposure(fontScale: number, count = 1): number {
 /** Where each card of the deck sits (`tops`, in the stored order of `count` cards) and how the cards layer (`zIndex`):
  * the others keep their relative order above, one strip each; the selected card is last, at `(count − 1) · exposure`,
  * above every strip. The container always measures `(count − 1) · exposure + faceHeight`, whichever card is selected, so
- * choosing a card never changes the height of the page. An index outside the deck falls back to the first card, so with
- * any active card one card is always in front (24UX6D: there is no «choose a card first» state). */
+ * choosing a card never changes the height of the page. An index outside the deck falls back to the first card. 25UX1: the
+ * deck's idle state (no card selected yet) is drawn as `count − 1`: the stored order, the last card whole at the bottom;
+ * `CardDeck` decides which card, if any, is selected. */
 export function deckLayout(count: number, selectedIndex: number, exposure: number, faceHeight: number): { tops: number[]; zIndex: number[]; containerHeight: number } {
   if (!(count > 0) || !Number.isInteger(count)) return { tops: [], zIndex: [], containerHeight: 0 };
   const selected = Number.isInteger(selectedIndex) && selectedIndex >= 0 && selectedIndex < count ? selectedIndex : 0;

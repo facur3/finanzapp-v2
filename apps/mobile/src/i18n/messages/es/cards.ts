@@ -9,7 +9,8 @@ export const cards = {
       /** VoiceOver hint of the card in front of the deck (and of a row that opens a card). */
       openHint: 'Abre el detalle de la tarjeta',
       /** VoiceOver hint of a card stacked in the deck: tapping it brings it to the front. */
-      selectHint: 'Selecciona esta tarjeta',
+      selectHint: 'Selecciona esta tarjeta y muestra su resumen',
+      chooseCaption: 'Tocá una tarjeta para ver su saldo y sus movimientos.',
       /** Only archived cards: shown in place of the deck, above the Archivadas section. */
       noActiveTitle: 'Ninguna tarjeta activa',
       noActiveDetail: 'Tus tarjetas archivadas están abajo. Agregá una tarjeta para registrar compras nuevas.',
@@ -41,15 +42,10 @@ export const cards = {
       usage: '{percent} % del límite de {limit}',
       recordPurchase: 'Registrar compra',
       pay: 'Pagar tarjeta',
-      /** 24T2: the principal of the card's plans not recognised yet, beside the balance and never inside it. */
-      future: 'Cuotas futuras',
-      futurePlans: { one: 'en {count} plan', other: 'en {count} planes' },
-      /** Beside «Cuotas futuras» when those plans carry interest (or, in an older plan, fees or taxes): "+ interés $ 60.000,00".
+      /** Beside «Cuotas futuras» (the detail's plans caption) when those plans carry interest (or, in an older plan, fees or taxes): "+ interés $ 60.000,00".
        * Named apart and never added into the principal, so the figure never disagrees with the instalments a plan lists. */
       futureInterest: '+ interés {amount}',
       futureFinancing: '+ financiación {amount}',
-      /** In place of that figure when the plans' sum leaves the exact range (never rounded, never hidden). */
-      futureOutOfRange: 'Total fuera de rango',
       /** The card detail's section with its instalment plans; the caption is the future principal. */
       plans: 'Cuotas',
       plansCaption: 'Cuotas futuras {amount}',

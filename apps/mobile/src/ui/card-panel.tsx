@@ -78,8 +78,10 @@ export function CardFacts({ summary, day, limitCaption = false }: { summary: Car
 export function CardStatusBlock({ summary, day, limitCaption = false, animated = false }: { summary: CardSummary; day: string; limitCaption?: boolean; animated?: boolean }) {
   const facts = <CardFacts summary={summary} day={day} limitCaption={limitCaption} />;
   return <View style={{ gap: 20 }}>
-    {animated ? <ValueTransition id={summary.card.id}><CardBalance summary={summary} /></ValueTransition> : <CardBalance summary={summary} />}
-    {animated ? <Reflow><ValueTransition id={summary.card.id} variant="fade">{facts}</ValueTransition></Reflow> : facts}
+    {/* 25UX1: when another card is selected, its figures replace the old ones at once and fade or rise in; another card's
+        balance, dates or available amount are never on screen beside them. */}
+    {animated ? <ValueTransition id={summary.card.id} exit={false}><CardBalance summary={summary} /></ValueTransition> : <CardBalance summary={summary} />}
+    {animated ? <Reflow><ValueTransition id={summary.card.id} variant="fade" exit={false}>{facts}</ValueTransition></Reflow> : facts}
   </View>;
 }
 

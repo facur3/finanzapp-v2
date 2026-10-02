@@ -113,7 +113,7 @@ function harness(file: string, params: Record<string, unknown> = {}, initial: do
   };
   // 24T2 (stream A): the rows of the card surfaces as descriptors, the plan presentation and the snapshot's own imports.
   Object.assign(components, { StatRow: 'StatRow' });
-  const cardRows = { FutureInstallmentsRow: 'FutureInstallmentsRow', ArchivedCardRow: 'ArchivedCardRow', PlanRow: 'PlanRow', ScheduleRow: 'ScheduleRow' };
+  const cardRows = { ArchivedCardRow: 'ArchivedCardRow', PlanRow: 'PlanRow', ScheduleRow: 'ScheduleRow' };
   Object.assign(modules, { '../src/ui/card-rows': cardRows, '../../src/ui/card-rows': cardRows, '../../src/ui/installment-presentation': installmentPresentation,
     './liability-presentation': liabilityPresentation, './motion': modules['../src/ui/motion'], '@expo/vector-icons/Ionicons': 'Ionicons' });
   const require = (name: string) => {
@@ -148,6 +148,11 @@ function find(root: Node, type: string, label?: string): Node {
   assert.ok(node, 'Missing ' + type + ' ' + (label ?? ''));
   return node;
 }
+/** 25UX1: Tarjetas opens idle; a test that reads a card's snapshot selects it first, as the person does. */
+function chosen(view: { render: () => Node }, id = 'card'): Node {
+  find(view.render(), 'CardDeck').props.onSelect(id);
+  return view.render();
+}
 /** 24UX6E: a text node's words with its nested text nodes flattened (a row caption's toned state segment). */
 function textOf(node: any): string {
   if (node === null || node === undefined || typeof node === 'boolean') return '';
@@ -176,10 +181,19 @@ test('Tarjetas summarizes the selected card from recorded purchases and payments
   assert.equal(add.props.label, 'Agregar tarjeta');
   add.props.onPress();
   assert.equal(view.pushed.at(-1), '/new-card');
-  // 24T2: a vertical deck in the stored order, the first card in front until another is chosen.
-  const deck = find(root, 'CardDeck');
-  assert.equal(deck.props.cards.map((item: { id: string }) => item.id).join(','), 'card,usd-card');
+  // 24T2: a vertical deck in the stored order. 25UX1 (owner): it opens idle, no card selected and nobody's figures shown:
+  // no balance, no dates or available amount, no action, no movement; one quiet line says what a tap does.
+  const idleDeck = find(root, 'CardDeck');
+  assert.equal(idleDeck.props.cards.map((item: { id: string }) => item.id).join(','), 'card,usd-card');
+  assert.equal(idleDeck.props.selectedId, null);
+  for (const type of ['Money', 'Stat', 'ActionButton', 'MovementRow', 'SectionTitle']) assert.equal(nodes(root).some(node => node.type === type), false, 'idle: no ' + type);
+  assert.ok(nodes(root).some(node => node.type === 'AppText' && node.props.children === 'Tocá una tarjeta para ver su saldo y sus movimientos.'));
+  // The first tap selects the card; only then its snapshot shows.
+  idleDeck.props.onSelect('card');
+  const selected = view.render();
+  const deck = find(selected, 'CardDeck');
   assert.equal(deck.props.selectedId, 'card');
+  assert.equal(nodes(selected).some(node => node.type === 'AppText' && node.props.children === 'Tocá una tarjeta para ver su saldo y sus movimientos.'), false);
   const face = deck.props.cards[0];
   assert.equal(face.name, 'Visa Gold');
   assert.equal(face.last4, '4009');
@@ -188,27 +202,27 @@ test('Tarjetas summarizes the selected card from recorded purchases and payments
   assert.equal(face.color, null, 'no colour chosen in Editar cuenta: the face keeps its hash tone');
   assert.equal(deck.props.showCurrency, true, 'cards in ARS and USD: each face prints its code');
   // 20.000 opening debt + 23.100 purchase − 30.000 payment.
-  assert.equal(find(root, 'Money').props.minor, 13100);
-  const purchases = nodes(root).filter(node => node.type === 'Money').map(node => node.props.minor);
+  assert.equal(find(selected, 'Money').props.minor, 13100);
+  const purchases = nodes(selected).filter(node => node.type === 'Money').map(node => node.props.minor);
   assert.ok(purchases.includes(500000 - 13100), 'available limit is limit minus recorded debt');
   // 24UX6D: Recientes reads like Inicio's sections: a quiet «Ver todos» that opens the card's detail.
-  const recentTitle = nodes(root).find(node => node.type === 'SectionTitle' && node.props.action === 'Ver todos')!;
+  const recentTitle = nodes(selected).find(node => node.type === 'SectionTitle' && node.props.action === 'Ver todos')!;
   assert.equal(recentTitle.props.quiet, true);
   const caption = recentTitle.props.caption;
   assert.match(caption, /^Este ciclo, desde .* · 1 compra · 1 pago$/, 'the open cycle\'s facts live in one caption line');
-  assert.equal(nodes(root).filter(node => node.type === 'Surface').length >= 1, true);
-  find(root, 'ActionButton', 'Registrar compra').props.onPress();
-  assert.equal(JSON.stringify(view.pushed.at(-1)), JSON.stringify({ pathname: '/new-entry', params: { accountId: 'card-acc', kind: 'expense' } }));
-  find(root, 'ActionButton', 'Pagar tarjeta').props.onPress();
+  assert.equal(nodes(selected).filter(node => node.type === 'Surface').length >= 1, true);
+  // 25UX1: one clear action, the payment; recording a purchase is the dock's «+» (and the card's detail keeps its own).
+  assert.deepEqual(nodes(selected).filter(node => node.type === 'ActionButton').map(node => node.props.label), ['Pagar tarjeta']);
+  find(selected, 'ActionButton', 'Pagar tarjeta').props.onPress();
   assert.equal(JSON.stringify(view.pushed.at(-1)), JSON.stringify({ pathname: '/new-transfer', params: { toAccountId: 'card-acc', maxAmountMinor: '13100' } }), 'no visible title or note travels in the URL: the transfer form names the payment itself');
-  const recent = nodes(root).filter(node => node.type === 'MovementRow');
+  const recent = nodes(selected).filter(node => node.type === 'MovementRow');
   assert.equal(recent.length, 2);
   assert.ok(recent.every(node => node.props.context === 'card' && node.props.accountId === 'card-acc'));
   // Personal debts are a different obligation: the tab never lists them or links to them, even with an active debt recorded.
-  assert.deepEqual(nodes(root).filter(node => node.type === 'DebtRow'), []);
-  assert.equal(nodes(root).some(node => node.type === 'SectionTitle' && node.props.children === 'Deudas y cobros'), false);
+  assert.deepEqual(nodes(selected).filter(node => node.type === 'DebtRow'), []);
+  assert.equal(nodes(selected).some(node => node.type === 'SectionTitle' && node.props.children === 'Deudas y cobros'), false);
   assert.equal(JSON.stringify(view.pushed).includes('/debts'), false);
-  assert.equal(nodes(root).filter(node => node.type === 'SectionTitle').map(node => node.props.children).join(','), 'Recientes');
+  assert.equal(nodes(selected).filter(node => node.type === 'SectionTitle').map(node => node.props.children).join(','), 'Recientes');
 });
 
 test('choosing another card in the deck changes the snapshot, and a card without limit says so instead of a figure', () => {
@@ -299,7 +313,7 @@ test('Tarjetas and Deudas read English labels, keep user names as typed and send
   activeLocale = 'en-AR';
   try {
     const cardsView = harness('cards.tsx');
-    const cardsRoot = cardsView.render();
+    const cardsRoot = chosen(cardsView);
     const header = nodes(cardsRoot).find(node => node.type === 'Stack.Screen')!.props.options;
     assert.equal(header.title, 'Cards');
     assert.equal(nodes(cardsRoot).filter(node => node.type === 'Stat').map(node => node.props.label).join(','), 'Due,Closes,Available');
@@ -362,8 +376,10 @@ test('23.1C2: a day inside a sentence starts in lower case; a day on its own kee
   assert.equal(rowOf(debt).caption, 'Debo · Vence 1 oct', 'a future date is never relative');
   // Closing day 18, today the 20th: the statement opened yesterday.
   const closedYesterday: domain.CreditCardProfile = { ...card, closingDay: 18 };
-  const caption = (file: string) => nodes(harness(file, { id: 'card' }, { ...archive, cards: [closedYesterday, usdCard] }).render())
-    .find(node => node.type === 'SectionTitle' && node.props.caption)!.props.caption;
+  const caption = (file: string) => {
+    const view = harness(file, { id: 'card' }, { ...archive, cards: [closedYesterday, usdCard] });
+    return nodes(file === 'cards.tsx' ? chosen(view) : view.render()).find(node => node.type === 'SectionTitle' && node.props.caption)!.props.caption;
+  };
   assert.match(caption('cards.tsx'), /^Este ciclo, desde ayer · /);
   assert.match(caption('card/[id].tsx'), /^Este ciclo, desde ayer · /);
   activeLocale = 'en-US';
@@ -382,7 +398,7 @@ test('23.1C2: a day inside a sentence starts in lower case; a day on its own kee
 test('23.1C2: the card usage caption is shown in the region\'s format and spoken in the language\'s numbers', () => {
   // 13.100 of 5.000.000 cents used: 3 % of the limit.
   // 24T2: the dates above it carry their spoken form too; the usage caption is the one under the bar (caption size).
-  const usage = () => nodes(harness('cards.tsx').render()).find(node => node.type === 'AppText' && node.props.variant === 'caption' && typeof node.props.accessibilityLabel === 'string')!;
+  const usage = () => nodes(chosen(harness('cards.tsx'))).find(node => node.type === 'AppText' && node.props.variant === 'caption' && typeof node.props.accessibilityLabel === 'string')!;
   const expected: [AppLocale, string, string][] = [
     ['es-AR', '3 % del límite de $\u00A05.000,00', '3 % del límite de 5000,00 pesos'],
     ['es-US', '3 % del límite de AR$\u00A05,000.00', '3 % del límite de 5000,00 pesos'],
