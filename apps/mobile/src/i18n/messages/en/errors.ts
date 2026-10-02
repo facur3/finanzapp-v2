@@ -253,6 +253,19 @@ export const errors: Pick<Messages, 'errors'> = {
       totalBelowPrice: 'The total financed can’t be less than the price.',
       calendarChanged: 'The card’s calendar changed since you opened this purchase. Check the first installment and save again.',
     },
+    review: {
+      missing: 'We couldn’t find this proposal.',
+      unreadable: 'This proposal can’t be read. Nothing was recorded.',
+      changed: 'This proposal changed since you opened it. Open it again.',
+      closed: 'This proposal was already confirmed or dismissed.',
+      captureConflict: 'This capture already exists with other data. Nothing was recorded.',
+      writeConflict: 'This proposal’s record already exists with other data. Nothing was recorded.',
+      readOnly: 'These proposals need a newer version of FinanzApp. They weren’t changed.',
+      input: 'Invalid proposal data. Nothing was recorded.',
+    },
+    writes: {
+      idTaken: 'This identifier already belongs to another kind of record. Nothing was changed.',
+    },
     operations: {
       invalid: 'A refund or an advance of installments is not valid. Nothing was changed.',
       target: 'A refund or an advance of installments can’t find its purchase. Nothing was changed.',

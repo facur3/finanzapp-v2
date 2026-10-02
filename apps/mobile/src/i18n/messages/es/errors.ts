@@ -283,6 +283,21 @@ export const errors = {
       /** 24T2: the card's calendar changed while the purchase form was open. */
       calendarChanged: 'El calendario de la tarjeta cambió desde que abriste la compra. Revisá la primera cuota y guardá de nuevo.',
     },
+    /** Producto 25A-02: the review store (`src/storage/review-database.ts`). */
+    review: {
+      missing: 'No encontramos esta propuesta.',
+      unreadable: 'Esta propuesta no se puede leer. No se registró nada.',
+      changed: 'Esta propuesta cambió desde que la abriste. Volvé a abrirla.',
+      closed: 'Esta propuesta ya se confirmó o se descartó.',
+      captureConflict: 'Esta captura ya existe con otros datos. No se registró nada.',
+      writeConflict: 'El registro de esta propuesta ya existe con otros datos. No se registró nada.',
+      readOnly: 'Estas propuestas requieren una versión más nueva de FinanzApp. No se modificaron.',
+      input: 'Datos de propuesta inválidos. No se registró nada.',
+    },
+    /** Producto 25A-02: one id is one kind of financial write (`packages/domain/write-ids.ts`). */
+    writes: {
+      idTaken: 'Este identificador ya corresponde a otro tipo de registro. No se modificó nada.',
+    },
     /** Producto 24T3: devoluciones and adelantos de cuotas (`packages/domain/operation-messages.ts`, the storage operation
      * functions, the backup), the plan lifecycle they bring, and the card that holds a credit. */
     operations: {
