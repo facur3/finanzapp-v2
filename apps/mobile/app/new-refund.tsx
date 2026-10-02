@@ -5,7 +5,7 @@ import { randomUUID } from 'expo-crypto';
 import * as Haptics from 'expo-haptics';
 import { REFUND_AMOUNT_MESSAGE, isPlanRefund, minorFromEditedDraft, todayKey, type Account, type LedgerArchive } from '@finanzapp/domain';
 import { useLedger } from '../src/storage/LedgerProvider';
-import { ActionButton, AmountField, AmountShortcut, AppText, DetailRow, EmptyState, ErrorMessage, IconButton, Money, Screen, SectionTitle, Surface } from '../src/ui/components';
+import { ActionButton, AmountField, AmountShortcut, AppText, DetailRow, EmptyState, ErrorMessage, FieldNote, IconButton, Money, Screen, SectionTitle, Surface } from '../src/ui/components';
 import { DateField } from '../src/ui/form-controls';
 import { amountFromMinor } from '../src/ui/money-input';
 import { previewRefund, refundBounds, type RefundPreview, type RefundTarget } from '../src/ui/operation-presentation';
@@ -17,8 +17,10 @@ import { space, useCurrentDay } from '../src/ui/theme';
 
 type Ready = Extract<RefundPreview, { status: 'ready' }>;
 
-/** Producto 24T3: «Registrar devolución», one modal form for a purchase (`?entryId=`, an ordinary expense) or an instalment
- * plan (`?planId=`, its price only). The purchase is shown as facts on top; the person types what was returned (or fills
+/** Producto 24T3: «Registrar devolución», one modal form for a purchase (`?entryId=`, an ordinary expense) or an
+ * instalment plan (`?planId=`, its price only). It is a devolución de compra (the merchant gives back all or part of the
+ * purchase); a bank reintegro, cashback or promoción is an income in the account that received it, as the note's help
+ * says. The purchase is shown as facts on top; the person types what was returned (or fills
  * «Total disponible»), chooses its date between the purchase (a plan: its last recorded instalment) and today, and reads
  * exactly what Save records, computed by the domain on the ledger storage will see (A8, A13). Save echoes the amount and
  * is the confirmation. The operation id is the form's, frozen with the submission: a retry sends the same devolución and
@@ -138,6 +140,9 @@ function RefundForm({ target }: { target: RefundTarget | null }) {
       <Money minor={priceMinor} currency={currency} large size={40} />
       <AppText variant="title3">{merchant}</AppText>
     </View>
+    {/* What this is, in one line, with the distinction one tap away: a devolución de compra, never a bank reintegro or
+        cashback (an income in the account that received it). */}
+    <FieldNote help={{ title: t('operations.refund.helpTitle'), detail: t('operations.refund.helpDetail') }}>{t('operations.refund.note')}</FieldNote>
     <Surface grouped>
       <DetailRow label={t(onCard ? 'operations.refund.card' : 'operations.refund.account')} value={accountName(account)} icon={onCard ? 'card-outline' : 'wallet-outline'} />
       <DetailRow label={t('operations.refund.purchaseDate')} value={formatDate(purchaseDateISO, 'dayYear')} spokenValue={formatDate(purchaseDateISO, 'long')}

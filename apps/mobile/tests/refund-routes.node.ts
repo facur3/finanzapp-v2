@@ -17,6 +17,8 @@ import * as i18nFormat from '../src/i18n/format.ts';
 import { bindLocale } from '../src/i18n/bind.ts';
 import type { AppLocale } from '../src/i18n/locale.ts';
 import { realModule } from './real-module.ts';
+import { operations as esOperations } from '../src/i18n/messages/es/operations.ts';
+import { operations as enOperations } from '../src/i18n/messages/en/operations.ts';
 
 // Producto 24T3: the refund form (`app/new-refund.tsx`), the operation's detail (`app/operation/[id].tsx`), the movement
 // detail of a purchase with devoluciones (`app/entry/[id].tsx`), the movement form editing one (`src/ui/entry-form.tsx`)
@@ -88,7 +90,7 @@ function harness(file: string, options: { data?: domain.LedgerArchive; params?: 
     updateEntry: async (value: domain.EntryChange) => { updates.push(value); await options.update?.(value); },
     addEntry: async () => {}, addInstallmentPlan: async () => {} }) };
   const components = Object.fromEntries(['Screen', 'EmptyState', 'ActionButton', 'AppText', 'AmountField', 'AmountShortcut', 'Choices', 'ErrorMessage', 'Field', 'IconButton',
-    'Surface', 'DetailRow', 'Money', 'SectionTitle', 'GlyphTile', 'AccountBadge', 'EntryRow', 'MerchantBadge', 'LifecycleNote'].map(name => [name, name]));
+    'Surface', 'DetailRow', 'Money', 'SectionTitle', 'GlyphTile', 'AccountBadge', 'EntryRow', 'MerchantBadge', 'LifecycleNote', 'FieldNote'].map(name => [name, name]));
   const look = (s: string) => ({ label: s, storedLabel: s, key: String(s).toLowerCase(), hex: '#3E6FB0', glyph: 'pricetag-outline' });
   const hues = { useCategoryLabel: (s: string) => s, useCategoryLook: look, useCategoryLookOf: () => look, useAccountNameOf: () => (account: domain.Account) => account.name,
     useAccountLook: () => ({ glyph: 'wallet-outline', hex: '#2557D6' }) };
@@ -478,11 +480,11 @@ test('24T3: editing a purchase with devoluciones: an expense on its account, not
   assert.equal(view.backs(), 1);
 });
 
-test('24T3: the income preset «Reembolsos» points to «Registrar devolución»; other categories say nothing', () => {
+test('24T3: the income preset «Reembolsos» points a store\'s devolución to «Registrar devolución» and keeps a bank reintegro here, as income; other categories say nothing', () => {
   const view = harness('src/ui/entry-form.tsx', { props: { kind: 'income' } });
   find(view.render(), 'CategoryField').props.onChange('Reembolsos');
   const field = find(view.render(), 'CategoryField');
-  assert.equal(field.props.detail, '¿Te devolvieron una compra? Registrala desde la compra con «Registrar devolución»: no es un ingreso.');
+  assert.equal(field.props.detail, '¿Un comercio te devolvió una compra? Registrala desde la compra con «Registrar devolución»: no es un ingreso. Un reintegro, cashback o promoción del banco sí se registra acá, como ingreso.');
   assert.equal(field.props.spokenDetail, field.props.detail);
   find(view.render(), 'CategoryField').props.onChange('Sueldo');
   assert.equal(find(view.render(), 'CategoryField').props.detail, undefined);
@@ -721,4 +723,46 @@ test('24T3 (review): an undo storage refuses before writing releases the change:
   assert.notEqual(view.updates[1].id, view.updates[0].id);
   assert.ok(has(root, 'ActionButton', 'Reintentar cambio'), 'an unknown outcome keeps the change for an exact retry');
   assert.equal(find(root, 'ActionButton', 'Editar movimiento').props.disabled, true);
+});
+
+// ---- 24T3 (owner review): a devolución de compra is not a bank reintegro -----------------------------------------------
+
+test('24T3 (owner review): «Registrar devolución» says it is a devolución de compra, and its help sends a bank reintegro or cashback to an income', () => {
+  for (const [locale, note, title, detail] of [
+    ['es-AR', 'Devolución de compra: el comercio te devuelve toda o parte de esta compra.', 'Devolución de compra',
+      'Usá esta opción cuando un comercio te devuelve total o parcialmente una compra. Si recibiste un reintegro, cashback o promoción bancaria en una cuenta, registralo como ingreso en esa cuenta.'],
+    ['en-US', 'Purchase refund: the store gives you back all or part of this purchase.', 'Purchase refund',
+      'Use this when a store gives you back all or part of a purchase. If you got a bank reimbursement, cashback or promotion in an account, record it as income in that account.'],
+  ] as const) {
+    for (const params of [{ entryId: buy.id }, { planId: tv.id }] as Record<string, string>[]) {
+      const root = harness('app/new-refund.tsx', { params, locale, data: withPlan() }).render();
+      const field = find(root, 'FieldNote');
+      assert.equal(field.props.children, note, locale + ' ' + JSON.stringify(params));
+      assert.equal(JSON.stringify(field.props.help), JSON.stringify({ title, detail }), 'the contextual help, one tap away');
+      // Right under the purchase it is about, before the amount.
+      const order = nodes(root).map(node => node.type).filter(type => type === 'FieldNote' || type === 'AmountField');
+      assert.equal(order.join(','), 'FieldNote,AmountField');
+    }
+  }
+  // What Save records is unchanged: the same refund, on the purchase's own account (the 24T3 contract).
+  const view = harness('app/new-refund.tsx', { params: { entryId: buy.id } });
+  find(view.render(), 'AmountField').props.onChangeText('50');
+  assert.match(texts(view.render()).join(' | '), /Se acreditan \$ 50,00 en Banco con fecha .* No es un ingreso\./);
+});
+
+test('24T3 (owner review): the 24T3 copy says «devolución» for the purchase operation; «reintegro», «reembolso» and «cashback» appear only where they are told apart from it', () => {
+  // Every string of the operations catalogue, keyed by its path.
+  const flatten = (value: unknown, path: string): [string, string][] => typeof value === 'string' ? [[path, value]]
+    : value && typeof value === 'object' ? Object.entries(value).flatMap(([key, child]) => flatten(child, path ? path + '.' + key : key)) : [];
+  const allowed = new Set(['operations.refund.helpDetail', 'operations.refundHint']);
+  for (const [language, catalogue, words] of [['es', esOperations, /reintegr|reembols|cashback/i], ['en', enOperations, /reimburs|cashback|rebate/i]] as const) {
+    const strings = flatten(catalogue, '');
+    const blurred = strings.filter(([path, text]) => words.test(text) && !allowed.has(path)).map(([path]) => path);
+    assert.equal(blurred.join(','), '', language + ': only the help and the income hint name a bank reintegro');
+    for (const path of allowed) assert.match(strings.find(([key]) => key === path)![1], words, language + ' ' + path + ' names it, to tell it apart');
+  }
+  const refundCopy = Object.entries(esOperations.operations.refund).filter(([, text]) => typeof text === 'string').map(([, text]) => text as string);
+  assert.ok(refundCopy.filter(text => /devoluci|devolver|devuelt/i.test(text)).length >= 10, 'the form speaks of devolución');
+  assert.equal(esOperations.operations.refund.title, 'Registrar devolución');
+  assert.equal(esOperations.operations.detail.refundTitle, 'Devolución');
 });

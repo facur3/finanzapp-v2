@@ -29,6 +29,9 @@ export const operations: Pick<Messages, 'operations'> = {
       title: 'Record refund',
       purchase: 'Purchase',
       planPurchase: 'Purchase in installments',
+      note: 'Purchase refund: the store gives you back all or part of this purchase.',
+      helpTitle: 'Purchase refund',
+      helpDetail: 'Use this when a store gives you back all or part of a purchase. If you got a bank reimbursement, cashback or promotion in an account, record it as income in that account.',
       amount: 'Refund',
       available: 'Full available',
       availableCaption: 'Available to refund: {currency} {amount}',
@@ -141,6 +144,6 @@ export const operations: Pick<Messages, 'operations'> = {
       kindLocked: 'A purchase with refunds stays an expense.',
       accountLocked: 'A purchase with refunds stays on its account.',
     },
-    refundHint: 'Got a purchase refunded? Record it from the purchase with "Record refund": it is not income.',
+    refundHint: 'Did a store refund a purchase? Record it from the purchase with "Record refund": it is not income. A bank reimbursement, cashback or promotion is recorded here, as income.',
   },
 };

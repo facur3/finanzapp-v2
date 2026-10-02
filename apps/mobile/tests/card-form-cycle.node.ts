@@ -23,13 +23,15 @@ const card: domain.CreditCardProfile = { id: 'card', accountId: cardAccount.id, 
   closingDay: 28, dueDay: 5, active: true, deleted: false, createdAt, revision: 0, updatedAt: createdAt };
 const base: domain.LedgerArchive = { accounts: [cash, cardAccount], records: [], cards: [card] };
 
-interface Options { data?: domain.LedgerArchive; day?: string; locale?: AppLocale; save?: () => Promise<void> }
+/** `realManagement`: «Eliminar tarjeta» runs the real deletion flow (`useCardManagement`, src/ui/commitment-actions.ts). */
+interface Options { data?: domain.LedgerArchive; day?: string; locale?: AppLocale; save?: () => Promise<void>; realManagement?: boolean }
 function harness(props: { original?: domain.CreditCardProfile } = {}, options: Options = {}) {
   let data = options.data ?? base;
   let day = options.day ?? '2026-09-20';
   let locale: AppLocale = options.locale ?? 'es-AR';
   const state: unknown[] = [], refs: { current: unknown }[] = [];
   let cursor = 0, refCursor = 0, uuid = 0, backs = 0, removed = 0;
+  const removedCards: string[] = [], pushed: unknown[] = [];
   const dismissed: unknown[] = [], replaced: unknown[] = [];
   const added: { account: domain.Account; card: domain.CreditCardProfile; rows: readonly domain.CardCycleDates[] | undefined }[] = [];
   const saved: { card: domain.CreditCardProfile; intent: unknown }[] = [];
@@ -37,6 +39,7 @@ function harness(props: { original?: domain.CreditCardProfile } = {}, options: O
   const jsx = (type: unknown, props: Record<string, unknown>) => ({ type, props });
   const ledger = { useLedger: () => ({ archive: data, snapshot: domain.snapshotFromArchive(data),
     addCard: async (account: domain.Account, profile: domain.CreditCardProfile, rows?: readonly domain.CardCycleDates[]) => { added.push({ account, card: profile, rows }); },
+    removeCard: async (id: string) => { removedCards.push(id); },
     saveCard: async (profile: domain.CreditCardProfile, intent?: unknown) => { saved.push({ card: profile, intent }); await options.save?.(); } }) };
   const components = Object.fromEntries(['ActionButton', 'AmountField', 'AppText', 'DetailRow', 'ErrorMessage', 'Field', 'IconButton', 'Screen', 'Surface'].map(name => [name, name]));
   const modules: Record<string, unknown> = {
@@ -45,7 +48,7 @@ function harness(props: { original?: domain.CreditCardProfile } = {}, options: O
     useRef: (initial: unknown) => { const index = refCursor++; return refs[index] ??= { current: initial }; }, useMemo: (fn: () => unknown) => fn() },
     'react/jsx-runtime': { jsx, jsxs: jsx, Fragment: 'Fragment' },
     'react-native': { View: 'View', Keyboard: { dismiss() {} }, Alert: { alert: (title: string, message: string, buttons: any[]) => alerts.push({ title, message, buttons }) } },
-    'expo-router': { Stack: { Screen: 'Stack.Screen' }, router: { canGoBack: () => true, back: () => { backs++; }, push: () => {}, replace: (to: unknown) => { replaced.push(to); },
+    'expo-router': { Stack: { Screen: 'Stack.Screen' }, router: { canGoBack: () => true, back: () => { backs++; }, push: (to: unknown) => { pushed.push(to); }, replace: (to: unknown) => { replaced.push(to); },
       dismissTo: (to: unknown) => { dismissed.push(to); } } },
     'expo-crypto': { randomUUID: () => 'id-' + (++uuid) },
     'expo-haptics': { NotificationFeedbackType: { Success: 'Success' }, notificationAsync: async () => {} },
@@ -67,14 +70,16 @@ function harness(props: { original?: domain.CreditCardProfile } = {}, options: O
   const source = readFileSync(new URL('../src/ui/card-form.tsx', import.meta.url), 'utf8');
   const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText;
   const module = { exports: {} as Record<string, (props: unknown) => Node> };
-  runInNewContext(code, { module, exports: module.exports, Error, Date, require: (name: string) => {
+  const require = function require(name: string) {
     if (!Object.hasOwn(modules, name)) throw new Error('Unexpected card form dependency: ' + name);
     return modules[name];
-  } });
+  };
+  if (options.realManagement) modules['./commitment-actions'] = realModule('src/ui/commitment-actions.ts', require);
+  runInNewContext(code, { module, exports: module.exports, Error, Date, require });
   return {
     render: () => { cursor = 0; refCursor = 0; return module.exports.CardForm(props); },
     setData: (next: domain.LedgerArchive) => { data = next; }, setDay: (next: string) => { day = next; }, setLocale: (next: AppLocale) => { locale = next; },
-    added, saved, alerts, backs: () => backs, dismissed, replaced, removed: () => removed,
+    added, saved, alerts, backs: () => backs, dismissed, replaced, removed: () => removed, removedCards, pushed,
   };
 }
 
@@ -415,4 +420,31 @@ test('24UX6E: «Eliminar tarjeta» dismisses to Tarjetas once the deletion is co
   find(view.render(), 'ActionButton', 'Eliminar tarjeta').props.onPress();
   assert.equal(view.removed(), 1);
   assert.deepEqual([view.dismissed, view.replaced, view.backs()], [['/cards'], [], 0]);
+});
+
+// 24T3 (owner review): the person whose goal is «I no longer use this card». Through the real deletion flow, a card a real
+// amount still holds is never deleted: one dialog names what holds it and archives it right there; a card created by
+// mistake is still deleted under the existing rule.
+test('24T3 (owner review): «Eliminar tarjeta» on a card with a credit offers «Archivar tarjeta» in the same dialog; a card with nothing recorded is deleted', async () => {
+  const overpaid = domain.initialTransferRecord({ id: 'over', fromAccountId: cash.id, toAccountId: cardAccount.id, amountMinor: 30000, note: '', dateISO: '2026-09-12', createdAt });
+  const view = harness({ original: card }, { data: { ...base, transfers: [overpaid] }, realManagement: true });
+  find(view.render(), 'ActionButton', 'Eliminar tarjeta').props.onPress();
+  assert.equal(view.alerts.length, 1);
+  const [alert] = view.alerts;
+  assert.equal(alert.title, 'Todavía no se puede eliminar');
+  assert.equal(alert.message.replace(/\u00a0/g, ' '), 'Esta tarjeta todavía tiene saldo a favor de $ 300,00. Podés archivarla para sacarla de tus tarjetas activas sin perder el saldo ni el historial.');
+  assert.equal(alert.buttons.map(button => button.text).join(','), 'Cancelar,Archivar tarjeta');
+  assert.equal(view.saved.length + view.removedCards.length, 0, 'the dialog itself writes nothing');
+  alert.buttons[1].onPress!();
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(JSON.stringify([view.saved.length, view.saved[0]?.card.active, view.saved[0]?.card.deleted, view.saved[0]?.card.revision, view.removedCards.length]),
+    JSON.stringify([1, false, false, 1, 0]), 'archived: off the active cards, nothing deleted, no balance touched');
+  assert.deepEqual(view.dismissed, ['/cards'], 'back to Tarjetas, where it is under «Archivadas»');
+  // A card created by mistake (nothing recorded on it): the existing destructive confirmation, then the deletion record.
+  const mistake = harness({ original: card }, { realManagement: true });
+  find(mistake.render(), 'ActionButton', 'Eliminar tarjeta').props.onPress();
+  assert.equal(mistake.alerts[0].title, '¿Eliminar esta tarjeta?');
+  mistake.alerts[0].buttons[1].onPress!();
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(JSON.stringify([mistake.removedCards, mistake.saved.length, mistake.dismissed]), JSON.stringify([['card'], 0, ['/cards']]));
 });

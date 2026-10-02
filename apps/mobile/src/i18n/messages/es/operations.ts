@@ -36,6 +36,11 @@ export const operations = {
       /** Above the purchase's price: "Compra · ARS" / "Compra en cuotas · ARS". */
       purchase: 'Compra',
       planPurchase: 'Compra en cuotas',
+      /** The one-line note under the purchase: what a devolución de compra is. A bank reintegro / cashback / promoción is
+       * not one; the help (its InfoButton) says it is an income in the account that received it. */
+      note: 'Devolución de compra: el comercio te devuelve toda o parte de esta compra.',
+      helpTitle: 'Devolución de compra',
+      helpDetail: 'Usá esta opción cuando un comercio te devuelve total o parcialmente una compra. Si recibiste un reintegro, cashback o promoción bancaria en una cuenta, registralo como ingreso en esa cuenta.',
       amount: 'Devolución',
       /** The shortcut that fills what can still be returned. */
       available: 'Total disponible',
@@ -165,7 +170,8 @@ export const operations = {
       kindLocked: 'Una compra con devoluciones sigue siendo un gasto.',
       accountLocked: 'Una compra con devoluciones queda en su cuenta.',
     },
-    /** The income preset «Reembolsos», when chosen: a purchase returned is not an income (A28). */
-    refundHint: '¿Te devolvieron una compra? Registrala desde la compra con «Registrar devolución»: no es un ingreso.',
+    /** The income preset «Reembolsos», when chosen: a purchase returned is not an income (A28); a bank reintegro, cashback
+     * or promoción that reached an account is, so it stays here. */
+    refundHint: '¿Un comercio te devolvió una compra? Registrala desde la compra con «Registrar devolución»: no es un ingreso. Un reintegro, cashback o promoción del banco sí se registra acá, como ingreso.',
   },
 } as const;
