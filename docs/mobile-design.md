@@ -1,8 +1,8 @@
 # FinanzApp: dirección visual móvil
 
 Interfaz 17 · 21 de septiembre de 2026; estado al 2 de octubre de 2026: el carril Forest (24UX6A–24UX6E) y 24T3
-mergeados, 25A-01 y 25A-02 mergeadas (PR #77, #78, #79) sin cambios visuales, y 25UX1 en su rama (dock, Tarjetas y
-Reportes: interacción). Implementado en código; revisión visual y
+mergeados, 25A-01 y 25A-02 mergeadas (PR #77, #78, #79) sin cambios visuales, 25UX1 mergeada (PR #80: dock, Tarjetas y
+Reportes: interacción) y 25OPS1 en su rama (la última fila sobre el dock; el resto es documentación). Implementado en código; revisión visual y
 gestual en iPhone pendiente. [Alcance del producto](decisions/002-spending-first.md) ·
 [Navegación y tarjetas](decisions/003-five-tabs-and-cards.md).
 
@@ -848,6 +848,24 @@ barras de Día a día y una cabecera fija sólida. Siguen permitidos para una pa
 vinculante del roadmap no cambia: la próxima entrega de producto es 24T3; 24UX6C (Movimientos y Más) y 24UX6D
 (Tarjetas) siguen a 24UX6B en el carril UX, y su lugar frente a 24T3 lo decide el dueño (ver `docs/mobile-roadmap.md`).
 
+## Producto 25OPS1 — la última fila sobre el dock
+
+Seguimiento de 25UX1, en su rama `feat/producto-25ops1-production-launch-plan`. Ningún cambio visual: el dock, su
+geometría, el hub y las pantallas son los mismos. En la pasada del dueño en el iPhone (2026-10-02) el dock sin franja,
+Tarjetas y Reportes quedaron bien, pero al final del scroll la última fila de Inicio, Reportes y Más quedaba en parte
+detrás de la píldora y, tras un rebote, volvía a meterse debajo.
+
+- **El final del scroll es layout.** El espacio que deja libre el dock es relleno inferior del contenido en todas las
+  plataformas (`useDockInset` → `extraPadding`, sumado al relleno propio de cada raíz), ya no un inset nativo del
+  scroller. Sin rebote, la última fila descansa arriba de la píldora con el aire de siempre: el relleno de la raíz más
+  los 8 pt del dock (56 pt; 48 en Movimientos), con y sin indicador de inicio. No es un pie vacío: es exactamente la
+  altura del dock sobre el borde de la ventana (`dockClearance`), contada una sola vez.
+- **Un único invariante.** Lo aplican `Screen` (Más), `EntryList` (Movimientos), Inicio y Reportes; ninguna pantalla
+  tiene un número propio, y una pantalla apilada, un modal o el hub siguen en 0.
+- **El indicador de scroll** termina arriba del dock (iOS); se vuelve a afirmar después de cada teclado.
+- **Pendiente en el iPhone:** todo lo anterior, VoiceOver en una lista larga y texto grande (lista en
+  docs/mobile-device-checklist.md, «Producto 25OPS1»).
+
 ## Producto 25UX1 — interacción del dock, Tarjetas y Reportes
 
 Tres problemas que el dueño observó en el producto, en su rama `feat/producto-25ux1-interaction-polish` desde master
@@ -863,7 +881,8 @@ a1bd181; no es un rediseño ni reabre la línea visual de Forest. Las reglas que
 - **La última fila sigue alcanzable.** Las raíces (Inicio, Movimientos, Reportes, Más) llegan al borde de la ventana y
   terminan su contenido la altura del dock más arriba (`dockClearance`, 88 pt con un indicador de 34), con el indicador
   de scroll arriba del dock: el mismo final que antes. Es un único inset (`useDockClearance`): una pantalla apilada, un
-  modal o el hub valen 0 y quedan igual. Geometría, hub, teclado, blancos y VoiceOver del dock no cambian.
+  modal o el hub valen 0 y quedan igual. *(Corregido el 2026-10-02 por 25OPS1: ese espacio es relleno del contenido, no
+  un inset nativo; ver «Producto 25OPS1».)* Geometría, hub, teclado, blancos y VoiceOver del dock no cambian.
 
 ### Tarjetas: elegir antes de ver
 
@@ -2826,7 +2845,13 @@ color propio.
 
 ## Pendiente de revisión en iPhone
 
-- Producto 25UX1 (en su rama; sin build de EAS, nada revisado): el dock sin franja (último renglón, teclado, hub,
+- Producto 25OPS1 (en su rama; sin build de EAS, nada revisado): la última fila de Inicio, Reportes, Más y Movimientos
+  descansa arriba de la píldora al final del scroll, también después de un rebote, de un teclado y de un rato de uso; el
+  indicador de scroll termina arriba del dock; VoiceOver en una lista larga; texto grande. La lista exacta está en
+  docs/mobile-device-checklist.md («Producto 25OPS1»).
+- Producto 25UX1 (mergeada como PR #80; pasada del dueño del 2026-10-02 en términos generales: dock sin franja, cambio de
+  pestañas, Tarjetas y Reportes bien; la última fila sobre el dock falló y la corrige 25OPS1; la lista ítem por ítem
+  sigue abierta): el dock sin franja (último renglón, teclado, hub,
   cambio rápido de pestañas, Reduce Transparency, claro y oscuro); Tarjetas en reposo, primer toque, segundo toque,
   cambio de tarjeta sin números viejos, una y seis tarjetas, VoiceOver y Reduce Motion; el detalle con Movimientos antes
   de Cuotas; Reportes con la quinta categoría elegida que sube, vuelve y cambia, con Reduce Motion y VoiceOver. La lista

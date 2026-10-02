@@ -135,6 +135,12 @@ owner's configuration (`server/mobile/runtime.js` reads `MOBILE_INTEGRATIONS_ENA
 once configured, a request without a session answers 401. The app's API origin is
 `EXPO_PUBLIC_MOBILE_API_ORIGIN` (apps/mobile/README.md).
 
+This project is the mobile API's host on purpose, not a leftover of the retired web frontend: the two functions are the
+only thing it serves. Why it stays for the Assistant's staging, how it relates to Supabase and the AI provider, and the
+criteria for reconsidering it are in [docs/production-plan.md](docs/production-plan.md) (§2 to §4); the path to
+TestFlight and the App Store is in [docs/app-store-launch.md](docs/app-store-launch.md). Both are plans: no production
+environment, cloud Assistant, subscription or store listing exists yet.
+
 ## Files that must never be committed
 
 - `node_modules/`
