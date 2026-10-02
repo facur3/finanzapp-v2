@@ -16,6 +16,9 @@ no store listing. No account was created, no agreement signed, no build made and
   26" (roadmap §3) binds everything below.
 - **Not legal, tax or accounting advice.** §6 and §13 say only what Apple's pages state and mark what needs a qualified
   professional.
+- **«FinanzApp» is the internal working name.** It is not assumed to be the final public App Store brand: other
+  products use the name, including a personal-finance app already on the App Store (owner's research, 2026-10-02). The
+  brand, naming and identity gate is §9.4; every mention of the name in these documents means the working name.
 
 **Labels.** Each statement that is more than a description carries one of these:
 
@@ -632,7 +635,7 @@ Limits as Apple states them (read 2026-10-02):
 
 | Field | Limit | Plan |
 | --- | --- | --- |
-| App name | 2 to 30 characters; changes need a new version | «FinanzApp» plus, if the availability check allows, a short descriptor. **OWNER DECISION**; the name must be available in App Store Connect and should be checked for trademark conflicts (professional review if in doubt). |
+| App name | 2 to 30 characters; changes need a new version | The final public name, decided in the brand gate (§9.4): «FinanzApp» is the working name and is already used by other products, including a personal-finance app on the App Store. **OWNER DECISION**; the name must be available in App Store Connect per localization and screened for trademark conflicts (professional review when warranted). |
 | Subtitle | 30 characters; new version | The plain benefit in the storefront's language (spending, cards, budgets). Indexed for search. |
 | Keyword field | Apple's reference says "up to 100 bytes", its marketing pages "100 characters": plan for **bytes**. Accented letters and ñ take two bytes in UTF-8, so Spanish fits fewer than 100 characters. Comma-separated, no spaces. | From the research process below. "Don't repeat any words… included in your app name, subtitle, or category"; "Names of other apps or companies aren't allowed". |
 | Primary / secondary category | One each | Primary **Finance** (Apple's definition includes "personal financial management… bill reminders, budgets, debt management"). Secondary: **OWNER DECISION** (Productivity is the natural candidate) or none. |
@@ -671,6 +674,39 @@ A repeatable process, run per language, before each metadata change:
 
 Whether keywords entered in one localization are indexed in other storefronts that list it ("cross-localization") is
 stated only by ASO vendors, not by Apple: *unverified*; do not build the plan on it.
+
+### 9.4 Brand, naming and identity gate
+
+**DECIDED** (owner, 2026-10-02, PR #81): the internal working name «FinanzApp» is **not** assumed to be the final public
+App Store brand. The owner's research found existing products using the name, including a personal-finance application
+already distributed in the App Store. Before any public launch asset is committed (final App Store metadata, the
+landing page, marketing assets), the product passes a deliberate naming and brand gate. **RESEARCH GATE, OWNER
+DECISION, LAUNCH BLOCKER** for those assets; **NOT IMPLEMENTED**; nothing in the app is redesigned by this record.
+
+What the gate covers:
+
+| Area | What is decided or produced |
+| --- | --- |
+| Name | The final public product name; App Store name availability per localization (the 30-character field, §9.2); domain availability; social and marketing handles where relevant. |
+| Screening | Trademark and confusing-similarity screening, with professional review when warranted; differentiation from Kesef and the other personal-finance apps found in the research. |
+| Originality | No copying of a competitor's logo, icon, illustrations, copy, distinctive screen compositions or brand identity. Common platform patterns (rounded cards, bottom navigation, charts, native iOS conventions) are not a competitor's property and are not, by themselves, a reason for change. |
+| Identity system | Visual palette review; a wordmark; an original symbol; vector master artwork; the App Store icon; light and dark variants; legibility at small sizes; the launch and splash identity; reusable brand and design tokens (`src/ui/palette.ts` is where the app's tokens live today). |
+| Surfaces | The landing-page identity (§14); the App Store screenshot and preview visual system (§9.2); marketing, social and press assets; consistency across the app, the Dynamic Island and Live Activities (production-plan.md §8), widgets (25D) and the future Android app (roadmap §5). |
+
+The design workflow, in this order:
+
+- **A.** Explore several genuinely distinct visual identity directions before any code.
+- **B.** Compare them on one small representative set: Home, Reports, Cards, Settings/More, the Wallet / Live Activity
+  capture presentation, and the landing-page hero.
+- **C.** The owner selects one.
+- **D.** Only then decide whether the current Forest palette (decision 005) needs a broad change.
+
+Rules: the Forest palette is **not** changed merely because another finance app uses green; the goal is an
+independently recognizable brand, not arbitrary difference; and no cosmetic churn is made in the app before step C.
+Sequencing: the gate sits in 26 before the public metadata (§9, §10), the landing page (§14) and the marketing assets,
+and must be passed before TestFlight builds carry a public name; it changes no earlier phase. The release marker, the
+bundle identifier decision (§11.3) and the working name in the repository are separate matters: a repository or an
+identifier does not have to carry the public name.
 
 ---
 
@@ -913,6 +949,7 @@ approval (roadmap, «Producto 26»).
 | Demo credentials / instructions | 2.1(a): a demo account only "if your app includes a login". The app starts empty by rule (AGENTS rule 6): the notes walk the reviewer through creating an account and an expense in a minute, instead of seeded data | Not needed while there is no login | 26 for the walkthrough; credentials only when accounts exist |
 | Screenshots | One 6.9-inch iPhone set, fictional data, per localization (§9) | **NOT IMPLEMENTED** | 26 |
 | Localized metadata | Per launch storefront (§10) | **NOT IMPLEMENTED** | 26, after the first-market decision |
+| Brand, naming and identity | The final public name and identity system (§9.4): name availability per localization, trademark screening, original icon and artwork | **RESEARCH GATE**, **OWNER DECISION**; the working name is not assumed final | 26, before any public metadata, landing page or marketing asset |
 | Notification purpose | Permission asked in context, never at launch; the app may not require notifications to function (5.1.2(i)); reminder copy never claims a payment happened | **NOT IMPLEMENTED** | 25D (production-plan.md §9) |
 | Live Activity purpose | Explained in the notes; `NSSupportsLiveActivities`; whether App Review accepts a Live Activity used as a one-shot confirmation is *unverified* | **NOT IMPLEMENTED**, **RESEARCH GATE** | 25A2 (production-plan.md §8) |
 | Wallet / Shortcut setup explanation | The reviewer cannot make an Apple Pay payment with the person's card: the notes explain the automation, and the feature must be demonstrable another way (running the Shortcut action by hand); no claim of reading Wallet history | **NOT IMPLEMENTED** | 25A2 (production-plan.md §7) |
@@ -1000,6 +1037,8 @@ submit (Producto 26); whether the marketing page ships with 1.0 or after it is a
   needed before the marketing page and can ship first as plain pages.
 - **Design references.** Refero or manually collected references may be used for inspiration; no paid Refero MCP or
   other paid tool is assumed.
+- **The brand gate first** (§9.4): the page carries the final public name and identity, never the working name or
+  placeholder artwork.
 - **The same honesty rules as the listing** (§9.1): real screens with clearly fictional data, no invented testimonials
   or numbers, no bank or Wallet-history claims. Any site analytics follows §7's principles and its own consent rules.
 
@@ -1022,6 +1061,7 @@ submit (Producto 26); whether the marketing page ships with 1.0 or after it is a
 | What product analytics do we collect? | None today; candidates and rules in §7 |
 | How do we avoid uploading financial details to analytics? | §7.1, §7.2 «Never sent», §7.4 |
 | What is our ASO process? | §9 |
+| Is «FinanzApp» the final name? | No, not assumed: §9.4 (the brand, naming and identity gate) |
 | Which markets and languages launch first? | §10 (the matrix; the first market is an owner decision) |
 | What is required for TestFlight? | §11.8, §11.3 |
 | What is required for App Review? | §12 |

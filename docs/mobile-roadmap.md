@@ -3750,7 +3750,7 @@ nothing of it is on a screen yet.
   | 25D | Notification families and when push is justified, hide amounts, Face ID, data protection, the FinanceKit gate (production-plan §9, §11) |
   | 25E | Optional account, sync and backup requirements; identity (production-plan §1, §4) |
   | 25F | Free and Pro, StoreKit or RevenueCat, paywall, subscriber identity and admin, server notifications (app-store-launch §1–§5) |
-  | 26 | Proceeds, banking and tax gate, analytics, ASO, market localization, the release pipeline, the App Review checklist, support, privacy and legal, the landing page (app-store-launch §6–§14) |
+  | 26 | The brand, naming and identity gate before any public asset (app-store-launch §9.4); proceeds, banking and tax gate, analytics, ASO, market localization, the release pipeline, the App Review checklist, support, privacy and legal, the landing page (app-store-launch §6–§14) |
 
 - **Binding decisions recorded (owner's brief, 2026-10-02; nothing implemented).**
   - **The Assistant is a constrained financial interface, never a general agent.** It never receives a shell, a
@@ -3761,8 +3761,9 @@ nothing of it is on a screen yet.
     the deterministic domain. The model is chosen by a repeatable evaluation behind a provider adapter; no model is
     blessed because existing code names it.
   - **Request-count quotas are not enough.** Before any paid call: per-request limits, per-person and global monetary
-    ceilings accounted on the server, a provider-side budget, a kill switch, no unlimited retries, a staging budget far
-    below production, and the owner's approval to raise a cap. When a ceiling is reached, manual and offline FinanzApp
+    ceilings enforced as an atomic pre-call reservation of each request's maximum cost, settled to the actual cost
+    afterwards and never released on failure (production-plan §6.3), a provider-side budget as the backstop, a kill
+    switch, no unlimited retries, a staging budget far below production, and the owner's approval to raise a cap. When a ceiling is reached, manual and offline FinanzApp
     keeps working.
   - **Vercel stays the host of the mobile API for 25A's staging** (`/api/mobile/assistant`, `/api/mobile/captures`; it
     is not leftover web infrastructure). It is re-evaluated after staging against written exit criteria; no migration
@@ -3789,6 +3790,13 @@ nothing of it is on a screen yet.
     25F, not an installed SDK.
   - **Launch markets** are chosen per storefront; a technically released region or currency is not a commercial launch
     market, and the existing region and currency gates stay as written.
+  - **The public name is not assumed to be «FinanzApp»** (the working name; other products use it, one a personal-finance
+    app on the App Store). A brand, naming and identity gate (name availability per localization, domains and handles,
+    trademark screening, original icon and artwork, a visual system across the app, Live Activities, widgets, the
+    landing page and Android) precedes any public App Store metadata, landing page or marketing asset in 26; several
+    distinct directions are compared on Home, Reports, Cards, Más, the capture presentation and the landing hero, the
+    owner selects one, and only then is a broad palette change considered. The Forest palette is not changed because
+    another finance app uses green (app-store-launch §9.4).
   - **The landing page** is a separate marketing surface, never the retired product web app; its support, privacy and
     terms pages are needed to submit (26), and whether the marketing page ships with 1.0 is the owner's decision.
   - **Apple and StoreKit are authoritative** for App Store transactions; a backend only mirrors the entitlement and is
@@ -3810,6 +3818,13 @@ nothing of it is on a screen yet.
   set as the owner's real phrases, the retention event dropped from analytics, the per-user monetary ceiling no longer
   optional, the landing page mapped to 26 with the marketing page an owner decision). Rejected findings are recorded in
   the review's transcript only.
+- **Follow-up on PR #81 (owner, 2026-10-02).** A Codex P2 thread on the monetary ceiling was valid and is answered in
+  production-plan §6.3: a ceiling is an atomic pre-call reservation of the request's maximum cost (estimated on the
+  server, competing concurrent calls against one authoritative state, refused when capacity cannot be reserved, settled
+  to the actual provider usage afterwards, kept at the maximum when it cannot be reconciled, recovered as spent after a
+  timeout or crash, never released in a way that could double-spend; the provider's project limit stays the backstop).
+  And the brand, naming and identity gate (app-store-launch §9.4) was recorded: the working name is not the assumed
+  public brand. Documentation only; no app change.
 
 ### Later notes recorded in 24UX6A (future; document only, not scheduled)
 
@@ -4082,7 +4097,9 @@ Production detail (25OPS1): [app-store-launch.md](app-store-launch.md) §1–§5
 ### Producto 26 — TestFlight, the definitive identity and publication
 
 Production detail (25OPS1): [app-store-launch.md](app-store-launch.md) §6–§14 (proceeds, analytics, ASO, markets, the
-release pipeline, the App Review checklist, support and legal, the landing page).
+release pipeline, the App Review checklist, support and legal, the landing page) and §9.4: the brand, naming and
+identity gate («FinanzApp» is the working name, not the assumed public brand) before any public metadata, landing page
+or marketing asset.
 
 - **Scope.** The definitive bundle identifier and app identity (the pilot id and deep-link
   scheme are distinct from Capacitor's; changing the production identifier is a release

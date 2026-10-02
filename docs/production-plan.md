@@ -649,8 +649,8 @@ convenience, but a modified client must not be able to spend more.
 | Per-request maximum input | Body, text and fact limits as today; an explicit input-token estimate before the call. | Size limits **EXIST TODAY**; token estimate **NOT IMPLEMENTED** |
 | Per-request maximum output | An explicit output cap per model and effort. On OpenAI the cap includes reasoning tokens, so a low cap with a reasoning model can end the response before any JSON appears; the cap and the effort are tested together (§5.8). | Cap **EXISTS TODAY**; the pairing is an **IMPLEMENTATION GATE** |
 | Per-user request quota | Daily, reserved before the call. | **EXISTS TODAY** |
-| Per-user monetary ceiling | Accumulated estimated cost per user per day and month, from recorded `usage` and a price table kept in server configuration. | **NOT IMPLEMENTED** |
-| Global daily and monthly monetary ceiling | Checked before every call; when reached, the route answers "not available" until the period ends or the owner raises it. | **NOT IMPLEMENTED** |
+| Per-user monetary ceiling | A budget per user per day and month in server configuration. Each request **reserves its maximum possible cost atomically** against it before the provider is called, and the reservation is settled to the actual cost afterwards (§6.3). | **NOT IMPLEMENTED** |
+| Global daily and monthly monetary ceiling | The same reservation against the app-wide budget, in the same transaction. When capacity for the request's maximum cost cannot be reserved, the route answers "not available" until the period ends or the owner raises the ceiling; it never admits a request that could cross it. | **NOT IMPLEMENTED** |
 | Provider-project hard budget and alert | A dedicated project or workspace and key for the Assistant only, with the provider's hard limit set **below** the owner's tolerated monthly amount and alerts at lower thresholds. | **OWNER ACTION, REMOTE SETUP** |
 | Server-side usage accounting | Per request: model, tier actually served, input, output and reasoning tokens, estimated cost, outcome. No content. | **NOT IMPLEMENTED** |
 | No unlimited automatic retries | None at all today; that stays. | **EXISTS TODAY** |
@@ -659,7 +659,55 @@ convenience, but a modified client must not be able to spend more.
 | Alerts | To the owner, at fractions of each ceiling, and on any spend-limit error from the provider. | **NOT IMPLEMENTED** |
 | Raising a cap | Only with the owner's recorded approval. No code path, script or agent raises a monetary cap. | **DECIDED** (AGENTS rules 3, 12) |
 
-### 6.3 Why the server's own accounting is the primary control
+### 6.3 Atomic reservation of a request's maximum cost
+
+**DECIDED** (owner, 2026-10-02, PR #81 review): a monetary ceiling is not a check of accumulated spend before the call.
+Checking "has the ceiling been reached" admits a request whose maximum charge crosses it when the remaining capacity is
+smaller than that maximum, and concurrent requests all pass the same check. The ceiling is enforced the way the request
+quota already is (`mobile_reserve_usage`: reserved before the call, serialised by a lock), but in money and for the
+request's worst case. **NOT IMPLEMENTED**; an **IMPLEMENTATION GATE** of the 25A server lane, tripped deliberately in
+staging before AI is enabled anywhere.
+
+1. **Estimate the maximum cost before the provider is invoked.** On the server, from the validated request: the
+   input-token estimate (or the hard input limit when no tokenizer is available), plus the model's output cap including
+   reasoning tokens, priced with the server's own price table for the pinned model and tier. The estimate is an upper
+   bound by construction; a request whose bound cannot be computed (an unknown model or tier) is refused.
+2. **Reserve atomically.** One database transaction, serialised per budget (an advisory lock or a row lock on the
+   per-user and the global budget rows), checks that `reserved + spent + maximum ≤ ceiling` for the user's day, the
+   user's month, the global day and the global month, writes a reservation row (`id`, user, maximum, period keys,
+   `created_at`, state `reserved`) and only then commits. Concurrent requests compete against that one authoritative
+   state: the second one either fits in what is left or is refused. No in-memory counter in a stateless function ever
+   stands in for it.
+3. **Refuse when capacity cannot be reserved.** The route answers the "not available" state of §6.5; nothing is sent to
+   the provider, no quota count is consumed for that request, and nothing queues it for later.
+4. **Call, then settle.** After the provider answers, the reservation is settled in a second transaction from the
+   reserved maximum to the actual cost computed from the provider's `usage` (input, output and reasoning tokens, the tier
+   actually served) with the same price table; the difference returns to the period's capacity and the usage row of
+   §6.2 is written in the same transaction. Settlement never raises a reservation above its maximum: if the actual usage
+   exceeds the estimate, the request is logged as an estimation defect, the maximum stands as spent, and the estimator
+   is corrected.
+5. **When usage cannot be reconciled immediately** (no `usage` in the response, a streamed response cut off, a parse
+   failure, a timeout after the request may have reached the provider), the reservation stays at its **maximum** and is
+   marked `unsettled`. It is never released on failure: an unknown cost is counted as the worst case, which is the only
+   direction that cannot double-spend. A later reconciliation job may settle it from the provider's cost report, and
+   only downwards.
+6. **Timeout and crash recovery.** A reservation left `reserved` past the handler's whole timeout budget plus a margin
+   (the function may have died after the provider call) is treated as spent at its maximum, never silently dropped. A
+   periodic sweep settles stale reservations against the provider's report where that is possible and marks the rest
+   spent; the sweep is idempotent (a reservation moves `reserved → settled | spent` exactly once, guarded by its state).
+7. **No release that could double-spend.** Capacity returns to the period only through a settlement that lowers a
+   reservation to an actual cost known from the provider, or through the period rolling over. Nothing releases a
+   reservation because a client disconnected, cancelled, retried or because an error was shown: the person's retry is a
+   new reservation.
+8. **The provider's project limit stays the backstop.** It is set below the owner's tolerated amount (§6.2) and catches
+   a bug in this machinery; it is not the primary control, because it is neither atomic per request nor instantaneous
+   (§6.4). The monthly reconciliation of settled costs against the provider's cost report catches drift in the price
+   table and the estimator.
+
+A reservation also fixes the per-request worst case the person sees: the app may show the remaining allowance, but the
+server's reservation is the only thing that decides.
+
+### 6.4 Why the server's own accounting is the primary control
 
 Read on 2026-10-02: the three model vendors checked each offer a hard spend limit. OpenAI's guide says enforcement
 "is not instantaneous" and spend can slightly exceed the limit; Google's project spend cap is described as experimental
@@ -669,20 +717,21 @@ cost report is daily (its usage report has minute, hour and day buckets); OpenAI
 daily-only but its reference page was not opened (*unverified*); nothing was read for Google. The plan therefore treats
 every provider report as a reconciliation tool, not a real-time cap.
 
-So the order is: the server's own counters stop the call first; the provider's hard limit is the backstop for a bug in
-those counters; the monthly reconciliation against the provider's cost report catches drift in the price table. The
+So the order is: the server's own reservation (§6.3) stops the call first; the provider's hard limit is the backstop for
+a bug in that machinery; the monthly reconciliation against the provider's cost report catches drift in the price table. The
 worst case per request is always bounded by input size plus the output cap, and the worst case per day by the global
 ceiling.
 
 A request should also pin the provider's service tier explicitly and log the tier actually used, because a project
 setting can otherwise move traffic to a premium tier without a code change.
 
-### 6.4 After a ceiling is reached
+### 6.5 After a ceiling is reached
 
 **DECIDED** (owner's 25OPS1 brief; AGENTS rule 12): manual, offline FinanzApp keeps working completely. The Assistant
 shows a plain state that says cloud assistance is unavailable for now, keeps what the person typed, and offers the
 manual forms. Nothing queues requests to be sent later, nothing retries in the background, and no path exists that
-opens unlimited consumption when a counter or the quota database fails: a failed quota check blocks the call.
+opens unlimited consumption when a counter or the quota database fails: a failed quota check or a failed reservation
+blocks the call.
 
 ---
 
@@ -1158,7 +1207,7 @@ is unchanged: 25A → 25A2 → 25C → 25C2 → 25D → 25E → 25F → 26. Sect
 | **25D** — Face ID, notifications, Apple integrations | Hide amounts; Face ID lock; the data-protection and SQLCipher evaluation; the app-switcher cover; the local notification families and the review alert; widgets; broader App Intents, Siri and Spotlight; Apple Watch; the FinanceKit research gate. | §9, §11 |
 | **25E** — optional sync and privacy | Only if still chosen: the account, the outbox and sync requirements, cloud backup, export and deletion of cloud data, remote push if a server event justifies it, Sign in with Apple if not already delivered. | §1.4, §4, §9.4 |
 | **25F** — monetisation | Free and Pro, StoreKit and subscriptions, the paywall, the subscriber backend and admin view, App Store Server Notifications, premium AI quotas tied to an entitlement. Its sandbox gate needs the Paid Apps Agreement, tax and banking (launch §6) and the app record, so the identity decision of 26 must be taken before 25F's sandbox purchases, or the owner records a different 25F/26 order. | launch §1 to §6; §6 here |
-| **26** — TestFlight and publication | The production identity and profile, TestFlight, App Review, privacy labels, support, privacy and legal pages, the store listing and its localization, analytics decisions, banking and tax readiness, the landing page as a launch asset (its privacy, terms and support pages are required to submit; the marketing page itself may follow), the launch itself. | launch §6 to §14 |
+| **26** — TestFlight and publication | The brand, naming and identity gate before any public asset (launch §9.4); the production identity and profile, TestFlight, App Review, privacy labels, support, privacy and legal pages, the store listing and its localization, analytics decisions, banking and tax readiness, the landing page as a launch asset (its privacy, terms and support pages are required to submit; the marketing page itself may follow), the launch itself. | launch §6 to §14 |
 | **After launch** (roadmap §5) | Conversion tests, advertising, iterations of the landing page, Android. | launch §9, §14 |
 
 Reconciliation notes:
@@ -1201,7 +1250,7 @@ Nothing below is complete unless it says **EXISTS TODAY**. "Launch §n" is a sec
 | Provider port, model as configuration | 25A | **NOT IMPLEMENTED**, **IMPLEMENTATION GATE** | The server lane |
 | Model evaluation and choice | 25A | **RESEARCH GATE**, **OWNER ACTION** (paid) | The evaluation harness, then the one paid slice |
 | Replacement of `gpt-5-mini` before 2026-12-11 | 25A | **IMPLEMENTATION GATE** | Model as configuration plus the evaluation |
-| Monetary ceilings, usage accounting, alerts, kill switch | 25A | **NOT IMPLEMENTED**, **IMPLEMENTATION GATE**, **LAUNCH BLOCKER** for enabling AI | Built and tripped deliberately in staging |
+| Monetary ceilings as atomic pre-call reservations, settlement, usage accounting, alerts, kill switch | 25A | **NOT IMPLEMENTED**, **IMPLEMENTATION GATE**, **LAUNCH BLOCKER** for enabling AI | Built and tripped deliberately in staging, including two concurrent requests against the last unit of capacity (§6.3) |
 | Provider hard budget | 25A | **OWNER ACTION**, **REMOTE SETUP** | Set by the owner below the tolerated amount |
 | Wallet trigger: fields, currency, timing, Watch | 25A2 | **RESEARCH GATE**, **DEVICE QA** | A raw-input capture on the owner's iPhone |
 | Shortcut App Intent in an Expo app | 25A2 | **RESEARCH GATE**, **NOT IMPLEMENTED** | A build-level spike |
@@ -1226,7 +1275,8 @@ Nothing below is complete unless it says **EXISTS TODAY**. "Launch §n" is a sec
 | Paid Apps Agreement, banking, tax forms | 25F (before its sandbox gate), 26 | **OWNER ACTION**, **LAUNCH BLOCKER** for paid features; needs qualified advice | Launch §6 |
 | Product analytics | 26 | **OWNER DECISION**; **NOT IMPLEMENTED** | Launch §7 |
 | App Store Connect analytics | 26 | **NOT IMPLEMENTED** (no app record), **REMOTE SETUP** | The app record and the first release; launch §8 |
-| ASO and store listing | 26 | **NOT IMPLEMENTED**, **OWNER DECISION** | Launch §9 |
+| Brand, naming and identity gate (the public name is not assumed to be «FinanzApp») | before 26's public assets | **RESEARCH GATE**, **OWNER DECISION**, **LAUNCH BLOCKER** for public metadata, the landing page and marketing assets | Launch §9.4 |
+| ASO and store listing | 26 | **NOT IMPLEMENTED**, **OWNER DECISION**; after the brand gate | Launch §9 |
 | Market launch matrix | 26 | **OWNER DECISION** | Launch §10 |
 | TestFlight and release pipeline | 26 | **NOT IMPLEMENTED**, **OWNER ACTION** | Launch §11 |
 | App Review checklist | 26 | **LAUNCH BLOCKER** items listed there | Launch §12 |
@@ -1246,7 +1296,7 @@ Nothing below is complete unless it says **EXISTS TODAY**. "Launch §n" is a sec
 | Which model do we use and how is it chosen? | §5.5, §5.8: none is chosen; the model in code is being retired; a recorded evaluation chooses. |
 | Can the Assistant execute code or server commands? | §5.1: no; it has no such capability. |
 | What prevents prompt injection from becoming an execution vulnerability? | §5.1 to §5.3, §5.7: no tools, one strict output, one confirmed write path. |
-| What is the AI spend ceiling? | §6: none exists in money yet; request counts only; the stack and who sets the amounts. |
+| What is the AI spend ceiling? | §6: none exists in money yet; request counts only; the stack, the atomic reservation that enforces it (§6.3) and who sets the amounts. |
 | How does Wallet capture work? | §7.1, §7.2. |
 | How does a credit-card Wallet pass map to a FinanzApp card? | §7.3. |
 | What happens when data is incomplete? | §7.4, §7.6, §8.3. |
