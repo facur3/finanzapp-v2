@@ -65,7 +65,7 @@ function harness(file: string, params: Record<string, unknown> = {}, initial: do
       removedDebts.push(id); savedDebts.push(domain.deletePersonalDebt(debt, new Date().toISOString()));
     } }) };
   const componentNames = ['ActionButton', 'AppText', 'DetailRow', 'EmptyState', 'GlyphTile', 'IconButton', 'Money', 'MovementRow', 'PressFeedback',
-    'Screen', 'SectionTitle', 'Stat', 'Surface', 'AmountField', 'Field', 'Choices', 'ErrorMessage'];
+    'Screen', 'SectionTitle', 'Stat', 'Surface', 'AmountField', 'Field', 'Choices', 'ErrorMessage', 'LifecycleNote'];
   const components = { ...Object.fromEntries(componentNames.map(name => [name, name])), toneColors: () => ({ color: '#000', soft: '#eee' }), useStacked: () => false };
   const theme = { space: { xs: 4, s: 8, m: 12, l: 16, xl: 20, xxl: 24, xxxl: 32 }, useCurrentDay: () => '2026-09-20', useReduceMotion: () => true,
     usePalette: () => ({ text: '#000', secondary: '#666', tertiary: '#999', line: '#ddd', inset: '#eee', expense: '#c00', income: '#080', warning: '#a60', transfer: '#03c', primary: '#2557D6' }) };
@@ -88,7 +88,9 @@ function harness(file: string, params: Record<string, unknown> = {}, initial: do
       return [state[index], (value: unknown) => { state[index] = typeof value === 'function' ? (value as (current: unknown) => unknown)(state[index]) : value; }];
     } },
     'react/jsx-runtime': { jsx, jsxs: jsx, Fragment: 'Fragment' },
-    'react-native': { View: 'View', Alert: { alert: (title: string, message: string, buttons: any[]) => alerts.push({ title, message, buttons }) }, Keyboard: { dismiss() {} }, useWindowDimensions: () => ({ width: 393, fontScale: 1 }) },
+    'react-native': { View: 'View', Alert: { alert: (title: string, message: string, buttons: any[]) => alerts.push({ title, message, buttons }) }, Keyboard: { dismiss() {} }, useWindowDimensions: () => ({ width: 393, fontScale: 1 }),
+      // 24UX6E: the debt row's hairline separator (a value no literal could fake).
+      StyleSheet: { hairlineWidth: 0.33, create: (styles: unknown) => styles } },
     'react-native-reanimated': { __esModule: true, default: { View: 'Animated.View' }, useSharedValue: (value: number) => ({ value }),
       withTiming: (value: number) => value, useAnimatedStyle: (fn: () => unknown) => fn() },
     'expo-router': { Stack: { Screen: 'Stack.Screen' }, useLocalSearchParams: () => params, router: { push: (to: unknown) => pushed.push(to), navigate: (to: unknown) => pushed.push(to),
@@ -145,6 +147,13 @@ function find(root: Node, type: string, label?: string): Node {
   const node = nodes(root).find(item => item.type === type && (!label || item.props.label === label || item.props.accessibilityLabel === label));
   assert.ok(node, 'Missing ' + type + ' ' + (label ?? ''));
   return node;
+}
+/** 24UX6E: a text node's words with its nested text nodes flattened (a row caption's toned state segment). */
+function textOf(node: any): string {
+  if (node === null || node === undefined || typeof node === 'boolean') return '';
+  if (typeof node !== 'object') return String(node);
+  if (Array.isArray(node)) return node.map(textOf).join('');
+  return textOf(node.props?.children);
 }
 
 test('Tarjetas shows an honest empty state and a debts invitation without any card', () => {
@@ -307,9 +316,10 @@ test('Tarjetas and Deudas read English labels, keep user names as typed and send
     const debtView = harness('debt/[id].tsx', { id: 'debt' });
     const debtRoot = debtView.render();
     assert.equal(nodes(debtRoot).find(node => node.type === 'Stack.Screen')!.props.options.title, 'Juan', 'the counterparty is user data');
-    assert.ok(nodes(debtRoot).some(node => node.type === 'AppText' && node.props.children === 'Due Oct 1'));
-    const rows = nodes(debtRoot).filter(node => node.type === 'DetailRow').map(node => [node.props.label, node.props.value].join('='));
-    assert.equal(rows.join(','), 'Type=I owe,Due date=Oct 1,Status=Due Oct 1');
+    const dueLine = nodes(debtRoot).find(node => node.type === 'AppText' && node.props.children === 'Due Oct 1')!;
+    assert.equal(dueLine.props.accessibilityLabel, 'Due October 1, 2026', '24UX6E: VoiceOver hears the day written out');
+    // 24UX6E: no detail table repeating the eyebrow (Type) and the state line (Due date, Status).
+    assert.deepEqual(nodes(debtRoot).filter(node => node.type === 'DetailRow'), []);
     find(debtRoot, 'ActionButton', 'Record payment').props.onPress();
     assert.equal(JSON.stringify(debtView.pushed[0]), JSON.stringify({ pathname: '/new-transfer', params: { toAccountId: 'debt-acc', maxAmountMinor: '30000' } }));
 
@@ -340,12 +350,13 @@ test('23.1C2: a day inside a sentence starts in lower case; a day on its own kee
   };
   const rowOf = (profile: domain.PersonalDebtProfile) => {
     const row = harness('src/ui/liability-rows.tsx', {}, { ...archive, debts: [profile] }).exports.DebtRow({ debt: profile, last: true });
-    const caption = nodes(row).find(node => node.type === 'AppText' && node.props.variant === 'footnote')!.props.children;
-    // 24UX4: the pressable row sits inside its SwipeRow.
-    return { label: find(row, 'PressFeedback').props.accessibilityLabel, caption: [caption].flat().join('') };
+    const caption = nodes(row).find(node => node.type === 'AppText' && node.props.variant === 'footnote')!;
+    // 24UX4: the pressable row sits inside its SwipeRow. 24UX6E: the state words are their own text inside the caption.
+    return { label: find(row, 'PressFeedback').props.accessibilityLabel, caption: textOf(caption) };
   };
-  assert.deepEqual(detailOf(dueToday), { status: 'Vence hoy', rows: 'Tipo=Yo debo,Vencimiento=Hoy,Estado=Vence hoy' });
-  assert.deepEqual(detailOf(overdue), { status: 'Vencida · Ayer', rows: 'Tipo=Yo debo,Vencimiento=Ayer,Estado=Vencida · Ayer' });
+  // 24UX6E: the state line carries the day while the debt is due, so there is no Vencimiento row (nor Tipo, nor Estado).
+  assert.deepEqual(detailOf(dueToday), { status: 'Vence hoy', rows: '' });
+  assert.deepEqual(detailOf(overdue), { status: 'Vencida · Ayer', rows: '' });
   assert.deepEqual(rowOf(dueToday), { label: 'Debo a Juan, 300,00 ARS, Vence hoy', caption: 'Debo · Vence hoy' });
   assert.equal(rowOf(overdue).caption, 'Debo · Vencida · Ayer');
   assert.equal(rowOf(debt).caption, 'Debo · Vence 1 oct', 'a future date is never relative');
@@ -357,7 +368,7 @@ test('23.1C2: a day inside a sentence starts in lower case; a day on its own kee
   assert.match(caption('card/[id].tsx'), /^Este ciclo, desde ayer · /);
   activeLocale = 'en-US';
   try {
-    assert.deepEqual(detailOf(dueToday), { status: 'Due today', rows: 'Type=I owe,Due date=Today,Status=Due today' });
+    assert.deepEqual(detailOf(dueToday), { status: 'Due today', rows: '' });
     assert.deepEqual(rowOf(dueToday), { label: 'I owe Juan, 300.00 ARS, Due today', caption: 'I owe · Due today' });
     assert.equal(detailOf(debt).status, 'Due Oct 1', 'an English short date keeps its capital month');
     assert.match(caption('cards.tsx'), /^This cycle, since yesterday · /);
@@ -490,9 +501,9 @@ test('24UX4: closing a debt with a balance left asks first and never records a p
   assert.equal(view.savedDebts[0].active, false);
   assert.equal(view.savedDebts[0].deleted, false);
   assert.equal(view.backs(), 0, 'closing keeps the detail open');
-  // Closed: the state says Cerrada, no payment can be recorded, the action reopens.
+  // Closed: 24UX6E: a note under the hero says so (it was an Estado row reading Cerrada), no payment can be recorded, the action reopens.
   const closed = harness('debt/[id].tsx', { id: 'debt' }, { ...archive, debts: [view.savedDebts[0]] }).render();
-  assert.ok(nodes(closed).some(node => node.type === 'DetailRow' && node.props.value === 'Cerrada'));
+  assert.equal(find(closed, 'LifecycleNote').props.title, 'Deuda cerrada');
   assert.equal(find(closed, 'ActionButton', 'Registrar pago').props.disabled, true);
   find(closed, 'ActionButton', 'Reabrir deuda');
 });
@@ -585,4 +596,170 @@ test('24UX4 review: a debt detail opened before the ledger hydrates shows the de
   cold.render();
   cold.setData({ ...archive, debts: [view.savedDebts[0]] });
   assert.equal(find(cold.render(), 'EmptyState').props.title, 'No encontramos esta deuda');
+});
+
+// ---- Producto 24UX6E: Deudas in the Forest design -------------------------------------------------
+const receivableAccount6E: domain.Account = { id: 'rec-acc', name: 'Me deben · Ana', currency: 'ARS', openingMinor: 4000, createdAt };
+const receivable6E: domain.PersonalDebtProfile = { ...debt, id: 'receivable', accountId: receivableAccount6E.id, direction: 'owed_to_me', counterparty: 'Ana', dueDateISO: '2026-09-22' };
+const rowParts = (profile: domain.PersonalDebtProfile, data: domain.LedgerArchive = { ...archive, debts: [profile] }) => {
+  const row = harness('src/ui/liability-rows.tsx', {}, data).exports.DebtRow({ debt: profile, last: false });
+  const caption = nodes(row).find(node => node.type === 'AppText' && node.props.variant === 'footnote')!;
+  const segment = nodes(caption.props.children).find(node => node.type === 'AppText')!;
+  return { row, press: find(row, 'PressFeedback'), caption, segment, tile: find(row, 'GlyphTile') };
+};
+const detailParts = (profile: domain.PersonalDebtProfile, data: domain.LedgerArchive = { ...archive, debts: [profile] }) => {
+  const root = harness('debt/[id].tsx', { id: profile.id }, data).render();
+  return { root, stateLine: nodes(root).find(node => node.type === 'AppText' && node.props.variant === 'subhead'),
+    rows: nodes(root).filter(node => node.type === 'DetailRow'), grouped: nodes(root).filter(node => node.type === 'Surface' && node.props.grouped),
+    note: nodes(root).find(node => node.type === 'LifecycleNote') };
+};
+
+test('24UX6E: one due-state rule for a debt\'s row and detail: closed first, then settled, undated, overdue, soon (≤ 3 days, a debt I owe) and due', () => {
+  const state = (profile: Partial<domain.PersonalDebtProfile>, outstanding = 30000) => liabilityPresentation.debtDueState({ ...debt, ...profile }, outstanding, '2026-09-20');
+  assert.equal(state({ active: false, dueDateISO: '2026-09-19' }), 'closed', 'a closed debt is never overdue, whatever its date');
+  assert.equal(state({ active: false }, 0), 'closed');
+  assert.equal(state({ dueDateISO: '2026-09-19' }, 0), 'settled');
+  assert.equal(state({ dueDateISO: null }), 'none');
+  assert.equal(state({ dueDateISO: '2026-09-19' }), 'overdue');
+  assert.equal(state({ dueDateISO: '2026-09-19', direction: 'owed_to_me' }), 'overdue', 'overdue in both directions');
+  assert.equal(state({ dueDateISO: '2026-09-20' }), 'soon');
+  assert.equal(state({ dueDateISO: '2026-09-23' }), 'soon', 'three days away: the card rule');
+  assert.equal(state({ dueDateISO: '2026-09-24' }), 'due');
+  assert.equal(state({ dueDateISO: '2026-09-22', direction: 'owed_to_me' }), 'due', 'what someone owes me is never amber');
+  // The spoken day: a relative word stays; a plain day is written out.
+  assert.equal(liabilityPresentation.spokenDueDay('2026-10-01', '2026-09-20', 'es-AR', true), '1 de octubre de 2026');
+  assert.equal(liabilityPresentation.spokenDueDay('2026-09-20', '2026-09-20', 'es-AR', true), 'hoy');
+  assert.equal(liabilityPresentation.spokenDueDay('2026-09-19', '2026-09-20', 'en-US'), 'Yesterday');
+  assert.equal(liabilityPresentation.spokenDueDay('2027-01-05', '2026-09-20', 'en-US'), 'January 5, 2027');
+});
+
+test('24UX6E: colour marks the due state, not the direction: neutral tiles, ink totals, and only the state words of a row take a tone', () => {
+  // A future debt and a receivable: calm everywhere.
+  const owed = rowParts(debt);
+  assert.equal(owed.tile.props.icon, 'arrow-up-outline');
+  assert.equal(owed.tile.props.tone, undefined, 'no amber for every debt I owe');
+  assert.equal(owed.caption.props.style, undefined);
+  assert.equal(owed.segment.props.style, undefined);
+  assert.equal(owed.segment.props.secondary, true);
+  const data = { ...archive, accounts: [...archive.accounts, receivableAccount6E], debts: [receivable6E] };
+  const receivable = rowParts(receivable6E, data);
+  assert.equal(receivable.tile.props.icon, 'arrow-down-outline');
+  assert.equal(receivable.tile.props.tone, undefined, 'no green for every receivable');
+  assert.equal(receivable.segment.props.style, undefined, 'a receivable two days away is not amber');
+  assert.equal(textOf(receivable.caption), 'Me deben · Vence 22 sep');
+  const hero = detailParts(debt);
+  assert.equal(find(hero.root, 'GlyphTile').props.tone, undefined);
+  assert.equal(find(hero.root, 'GlyphTile').props.large, true);
+  // Overdue: the state words in the alert colour, «Debo» stays secondary.
+  const overdue = rowParts({ ...debt, dueDateISO: '2026-09-19' });
+  assert.equal(overdue.caption.props.style, undefined, 'the direction word is not painted');
+  assert.equal(JSON.stringify(overdue.segment.props.style), JSON.stringify({ color: '#c00', fontWeight: '500' }));
+  assert.equal(textOf(overdue.caption), 'Debo · Vencida · Ayer');
+  // Due within three days, a debt I owe: amber on the row and on the detail's state line.
+  const soonDebt = { ...debt, dueDateISO: '2026-09-22' };
+  const soon = rowParts(soonDebt);
+  assert.equal(JSON.stringify(soon.segment.props.style), JSON.stringify({ color: '#a60', fontWeight: '500' }));
+  const soonDetail = detailParts(soonDebt);
+  assert.equal(soonDetail.stateLine!.props.children, 'Vence 22 sep');
+  assert.equal(JSON.stringify(soonDetail.stateLine!.props.style), JSON.stringify({ color: '#a60', fontWeight: '600' }));
+  assert.equal(JSON.stringify(detailParts({ ...debt, dueDateISO: '2026-09-19' }).stateLine!.props.style), JSON.stringify({ color: '#c00', fontWeight: '600' }));
+  assert.equal(JSON.stringify(hero.stateLine!.props.style), JSON.stringify({ color: '#666', fontWeight: '400' }), 'a debt due later reads calm');
+  // The totals: ink, flat on the canvas (no padded card per currency).
+  const list = harness('debts.tsx', {}, { ...archive, accounts: [...archive.accounts, receivableAccount6E], debts: [debt, receivable6E] }).render();
+  const totals = nodes(list).filter(node => node.type === 'Money');
+  assert.deepEqual(totals.map(node => [node.props.minor, node.props.color, node.props.tone]), [[30000, undefined, undefined], [4000, undefined, undefined]]);
+  assert.equal(nodes(list).filter(node => node.type === 'Surface' && !node.props.grouped).length, 0, 'only the grouped lists are containers');
+  assert.equal(nodes(list).filter(node => node.type === 'StatRow').length, 1);
+});
+
+test('24UX6E: a sum beyond the safe range is said for its currency as a plain line, without a card', () => {
+  const big = Number.MAX_SAFE_INTEGER - 1;
+  const a1: domain.Account = { id: 'big-1', name: 'Debo · A', currency: 'ARS', openingMinor: -big, createdAt };
+  const a2: domain.Account = { id: 'big-2', name: 'Debo · B', currency: 'ARS', openingMinor: -big, createdAt };
+  const debts = [{ ...debt, id: 'd1', accountId: a1.id, counterparty: 'A' }, { ...debt, id: 'd2', accountId: a2.id, counterparty: 'B' }];
+  const list = harness('debts.tsx', {}, { accounts: [cash, a1, a2], records: [], debts }).render();
+  const line = nodes(list).find(node => node.type === 'AppText' && node.props.children === 'Total fuera de rango · ARS')!;
+  assert.ok(line, 'the out-of-range line is shown');
+  assert.equal(line.props.secondary, true);
+  assert.equal(nodes(list).filter(node => node.type === 'Surface' && !node.props.grouped).length, 0);
+  assert.equal(nodes(list).some(node => node.type === 'StatRow'), false);
+});
+
+test('24UX6E: a closed debt is never drawn as overdue; a calm note under its hero says it is closed, and the Vencimiento fact returns', () => {
+  const closed = { ...debt, active: false, dueDateISO: '2026-09-19', revision: 1 };
+  const detail = detailParts(closed);
+  assert.equal(detail.stateLine, undefined, 'no state line: the note says it');
+  assert.equal(nodes(detail.root).some(node => node.type === 'AppText' && typeof node.props.children === 'string' && node.props.children.startsWith('Vencida')), false);
+  assert.equal(nodes(detail.root).some(node => node.props.style?.color === '#c00'), false, 'no alert colour on a closed debt');
+  assert.equal(JSON.stringify(detail.note!.props), JSON.stringify({ icon: 'archive-outline', title: 'Deuda cerrada',
+    detail: 'No cuenta como pendiente. Conserva su saldo y sus pagos; «Reabrir deuda» la vuelve a pendientes.' }));
+  assert.equal(find(detail.root, 'ActionButton', 'Registrar pago').props.disabled, true);
+  find(detail.root, 'ActionButton', 'Reabrir deuda');
+  assert.deepEqual(detail.rows.map(row => [row.props.label, row.props.value, row.props.spokenValue].join('=')), ['Vencimiento=Ayer=Ayer']);
+  assert.equal(textOf(rowParts(closed).caption), 'Debo · Cerrada');
+  assert.equal(rowParts(closed).segment.props.style, undefined);
+  // A receivable's note names collections; English reads the same.
+  const data = { ...archive, accounts: [...archive.accounts, receivableAccount6E], debts: [{ ...receivable6E, active: false }] };
+  assert.equal(detailParts({ ...receivable6E, active: false }, data).note!.props.detail,
+    'No cuenta como pendiente. Conserva su saldo y sus cobros; «Reabrir deuda» la vuelve a pendientes.');
+  activeLocale = 'en-AR';
+  try {
+    const english = detailParts(closed);
+    assert.equal(english.note!.props.title, 'Debt closed');
+    assert.equal(english.note!.props.detail, 'Not counted as pending. It keeps its balance and payments; Reopen debt brings it back to pending.');
+  } finally { activeLocale = 'es-AR'; }
+  // An active debt shows no note; neither does one deleted while its screen pops.
+  assert.equal(detailParts(debt).note, undefined);
+  const view = harness('debt/[id].tsx', { id: 'debt' });
+  view.render();
+  view.setData({ ...archive, debts: [{ ...debt, active: false, deleted: true, revision: 1 }] });
+  assert.equal(nodes(view.render()).some(node => node.type === 'LifecycleNote'), false);
+});
+
+test('24UX6E: the detail keeps only the facts the hero does not say: a settled debt\'s date (spoken written out) and the note', () => {
+  const settled = detailParts(debt, settledData);
+  assert.equal(settled.stateLine!.props.children, 'Saldada');
+  assert.deepEqual(settled.rows.map(row => [row.props.label, row.props.value, row.props.spokenValue].join('=')), ['Vencimiento=1 oct=1 de octubre de 2026']);
+  assert.equal(settled.rows[0].props.last, true);
+  // Undated, no note: no grouped facts at all; with a note, only the note.
+  const undated = { ...debt, dueDateISO: null };
+  const bare = detailParts(undated);
+  assert.equal(bare.stateLine!.props.children, 'Sin vencimiento');
+  assert.equal(bare.grouped.length, 0, 'no empty table');
+  const noted = detailParts({ ...undated, note: 'Préstamo del auto' });
+  assert.deepEqual(noted.rows.map(row => [row.props.label, row.props.value].join('=')), ['Nota=Préstamo del auto']);
+  assert.equal(noted.grouped.length, 1);
+  // The state line's spoken twin writes the day out; a relative word stays as it is.
+  assert.equal(detailParts(debt).stateLine!.props.accessibilityLabel, 'Vence 1 de octubre de 2026');
+  assert.equal(detailParts({ ...debt, dueDateISO: '2026-09-20' }).stateLine!.props.accessibilityLabel, 'Vence hoy');
+});
+
+test('24UX6E: a debt row reads its day written out, hints that it opens the detail and draws a hairline separator', () => {
+  const { press } = rowParts(debt);
+  assert.equal(press.props.accessibilityLabel, 'Debo a Juan, 300,00 ARS, Vence 1 de octubre de 2026');
+  assert.equal(press.props.accessibilityHint, 'Abre el detalle de la deuda');
+  assert.equal(press.props.style.borderBottomWidth, 0.33, 'StyleSheet.hairlineWidth, never 0.5');
+  const last = harness('src/ui/liability-rows.tsx').exports.DebtRow({ debt, last: true });
+  assert.equal(find(last, 'PressFeedback').props.style.borderBottomWidth, 0);
+  assert.equal(rowParts({ ...debt, dueDateISO: '2026-09-19' }).press.props.accessibilityLabel, 'Debo a Juan, 300,00 ARS, Vencida · Ayer');
+  activeLocale = 'en-US';
+  try {
+    const english = rowParts(debt).press;
+    assert.equal(english.props.accessibilityLabel, 'I owe Juan, 300.00 ARS, Due October 1, 2026');
+    assert.equal(english.props.accessibilityHint, 'Opens the debt details');
+  } finally { activeLocale = 'es-AR'; }
+});
+
+test('24UX6E: the edit form summarises what cannot change (the kind and the currency), never the name being edited', () => {
+  const view = harness('src/ui/debt-form.tsx');
+  const root = view.renderExport('DebtForm', { original: debt });
+  assert.equal(nodes(root).filter(node => node.type === 'DetailRow').map(node => [node.props.label, node.props.value].join('=')).join(','), 'Tipo=Yo debo,Moneda=ARS');
+  find(root, 'Field', 'Persona o entidad').props.onChangeText('Juan Pérez');
+  assert.equal(nodes(view.renderExport('DebtForm', { original: debt })).some(node => node.type === 'DetailRow' && node.props.value === 'Juan'), false);
+  activeLocale = 'en-AR';
+  try {
+    const data = { ...archive, accounts: [...archive.accounts, receivableAccount6E], debts: [receivable6E] };
+    const english = harness('src/ui/debt-form.tsx', {}, data).renderExport('DebtForm', { original: receivable6E });
+    assert.equal(nodes(english).filter(node => node.type === 'DetailRow').map(node => [node.props.label, node.props.value].join('=')).join(','), 'Type=Owed to me,Currency=ARS');
+  } finally { activeLocale = 'es-AR'; }
 });

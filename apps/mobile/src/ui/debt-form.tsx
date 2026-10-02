@@ -105,8 +105,10 @@ export function DebtForm({ original }: { original?: PersonalDebtProfile }) {
     <Stack.Screen options={{ title: t(before ? 'nav.titles.editDebt' : 'nav.titles.newDebt'), gestureEnabled: !busy,
       headerLeft: () => <IconButton name="close" label={t('common.close')} onPress={close} disabled={busy} /> }} />
 
+    {/* 24UX6E: what an edit cannot change (the direction and the currency), never the name typed in the field below,
+        which a rename would leave stale above it. */}
     {before && account ? <Surface grouped>
-      <DetailRow label={t(owed ? 'debts.form.owedTo' : 'debts.form.owedBy')} value={before.counterparty} />
+      <DetailRow label={t('debts.detail.type')} value={t(owed ? 'debts.detail.typeOwed' : 'debts.detail.typeReceivable')} />
       <DetailRow label={t('debts.form.currency')} value={account.currency} last />
     </Surface> : <>
       <Choices value={direction} onChange={setDirection} disabled={locked}
