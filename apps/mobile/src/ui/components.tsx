@@ -9,6 +9,7 @@ import { router } from 'expo-router';
 import { radius, space, type, useCurrentDay, usePalette, useReduceMotion, type Palette } from './theme';
 import type { IconName } from './categories';
 import { tintOf } from './category-color';
+import { useDockClearance } from './dock-clearance';
 import { useAccountLook, useAccountNameOf, useCategoryLook } from './category-hues';
 import { AMOUNT_FIELD, PROMINENT_SEGMENT, ROW_CHEVRON, ROW_STACK_SCALE, SEGMENT_GAP, SEGMENT_PADDING, amountFieldLayout, fitFontSize, rowStacks, segmentLayout } from './geometry';
 import { duration, easeOut, selectionHaptic, timing } from './motion';
@@ -84,8 +85,13 @@ export function AppText({ children, style, secondary = false, tertiary = false, 
 /** `scrollRef` lets a screen scroll its own content into view (Tarjetas brings a chosen card to the front). */
 export function Screen({ children, gap = space.xl, scrollRef }: { children: ReactNode; gap?: number; scrollRef?: Ref<ScrollView> }) {
   const p = usePalette();
+  // 25UX1: a tab root (Más) runs under the floating dock; its content ends the dock's height higher, and the system adds
+  // nothing of its own there (`never`: the tab header sits above the scroller, so only the bottom could change). Off the
+  // tabs the clearance is 0 and the screen is exactly as before.
+  const clearance = useDockClearance();
   return <ScrollView ref={scrollRef} style={{ flex: 1, backgroundColor: p.background }}
-    contentContainerStyle={[styles.content, { gap }]} contentInsetAdjustmentBehavior="automatic"
+    contentContainerStyle={[styles.content, { gap }, clearance ? { paddingBottom: styles.content.paddingBottom + clearance } : null]}
+    scrollIndicatorInsets={clearance ? { bottom: clearance } : undefined} contentInsetAdjustmentBehavior={clearance ? 'never' : 'automatic'}
     automaticallyAdjustKeyboardInsets keyboardShouldPersistTaps="handled"
     keyboardDismissMode="interactive">{children}</ScrollView>;
 }

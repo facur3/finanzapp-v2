@@ -162,7 +162,7 @@ test('24UX6A: a tap sends the stock tabPress, then navigates only to another tab
   assert.equal(blocked.navigated.length, 0, 'a prevented press stays where it is');
 });
 
-test('24UX6A: the dock floats inside the safe area on the screen\'s ground; the pill is the control material tinted pine', () => {
+test('24UX6A, 25UX1: the dock floats over the roots with no ground of its own, inside the safe area; the pill is the control material tinted pine', () => {
   const exports = harness(light, 'glass');
   const { DOCK, tabBarBottomGap, dockMaterial } = exports;
   assert.equal(DOCK, dockGeometry.DOCK, 'the geometry is the pure module\'s, re-exported');
@@ -170,8 +170,11 @@ test('24UX6A: the dock floats inside the safe area on the screen\'s ground; the 
   const nav = navigator(0);
   const bar = exports.FloatingTabBar(nav.props);
   assert.equal(bar.type, 'View');
-  assert.equal(bar.props.style.backgroundColor, light.background, 'the ground under the dock is the screen\'s own');
-  assert.equal(bar.props.style.position, undefined, 'in the layout, never absolute: every screen ends above it');
+  // 25UX1 (owner): no rectangle behind the dock. It is pinned to the window's bottom, out of the layout, paints nothing, and
+  // lets touches in its empty margins through; the roots keep their last row clear of it (`dockClearance`).
+  assert.equal(bar.props.style.backgroundColor, undefined, 'no strip of canvas behind the pill and the «+»');
+  assert.deepEqual([bar.props.style.position, bar.props.style.left, bar.props.style.right, bar.props.style.bottom], ['absolute', 0, 0, 0], 'pinned to the window\'s bottom edge, full width');
+  assert.equal(bar.props.pointerEvents, 'box-none', 'the margins around and between the controls never swallow a touch');
   assert.equal(bar.props.style.flexDirection, 'row', 'the pill and the «+» side by side');
   assert.equal(bar.props.style.gap, DOCK.gap);
   assert.equal(bar.props.style.paddingTop, DOCK.top);
@@ -218,4 +221,28 @@ test('24UX6A: the dock geometry is pure numbers shared by the dock and the captu
   assert.equal(JSON.stringify(hubInset({ bottom: 21, left: 47, right: 47 })), JSON.stringify({ bottom: 82, side: 59 }));
   // At 375 pt the pill (375 − 2·16 − 10 − 60 = 273 pt, less its 6 pt padding each side) leaves each of four tabs ≥ 64 pt.
   assert.ok((375 - 2 * DOCK.side - DOCK.gap - DOCK.plus - 12) / 4 >= 44, 'every tab keeps a full target at 375 pt');
+});
+
+test('25UX1: the roots clear the floating dock by its exact height, inside the tabs only', () => {
+  // The dock's top edge above the window's bottom: its air, its 60 pt and the 8 pt above it.
+  assert.equal(dockGeometry.dockClearance(34), 20 + 60 + 8, 'an iPhone with a home indicator');
+  assert.equal(dockGeometry.dockClearance(21), 10 + 60 + 8, 'landscape');
+  assert.equal(dockGeometry.dockClearance(0), 10 + 60 + 8, 'no home indicator');
+  for (const inset of [0, 21, 34, 48]) {
+    assert.equal(dockGeometry.dockClearance(inset), dockGeometry.DOCK.top + dockGeometry.DOCK.height + dockGeometry.tabBarBottomGap(inset));
+    // The hub floats 12 pt above the dock's pill: the clearance never reaches into it.
+    assert.ok(dockGeometry.hubInset({ bottom: inset, left: 0, right: 0 }).bottom > dockGeometry.dockClearance(inset) - dockGeometry.DOCK.top);
+  }
+  const source = readFileSync(new URL('../src/ui/dock-clearance.ts', import.meta.url), 'utf8');
+  assert.match(source, /BottomTabBarHeightContext/, 'a scene of the tab navigator is what has a clearance');
+  assert.match(source, /inTabs \? dockClearance\(insets\.bottom\) : 0/, 'a pushed screen, a modal or the hub keeps 0');
+  // Every tab root ends its content the clearance higher and shows its scroll indicator above the dock.
+  const read = (path: string) => readFileSync(new URL('../' + path, import.meta.url), 'utf8');
+  assert.match(read('app/(tabs)/index.tsx'), /paddingBottom: 48 \+ clearance/);
+  assert.match(read('app/(tabs)/reports.tsx'), /paddingBottom: 48 \+ clearance/);
+  assert.match(read('src/ui/entry-list.tsx'), /paddingBottom: 40 \+ clearance/, 'Movimientos (and every pushed list, with 0)');
+  assert.match(read('src/ui/components.tsx'), /paddingBottom: styles\.content\.paddingBottom \+ clearance/, 'Más (and every pushed Screen, with 0)');
+  for (const path of ['app/(tabs)/index.tsx', 'app/(tabs)/reports.tsx', 'src/ui/entry-list.tsx', 'src/ui/components.tsx']) {
+    assert.match(read(path), /scrollIndicatorInsets=\{(clearance \? )?\{ bottom: clearance \}/, path + ': the indicator stops above the dock');
+  }
 });

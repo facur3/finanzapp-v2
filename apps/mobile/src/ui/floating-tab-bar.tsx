@@ -14,10 +14,12 @@ export { DOCK, tabBarBottomGap } from './dock-geometry';
  * capture hub. The destinations, their order and their meaning are the navigator's (Inicio, Movimientos, Reportes,
  * Más); the «+» is an action, not a fifth tab.
  *
- * The dock floats on the screen's own ground, inset from the edges and lifted above the home indicator, but it stays in
- * the layout (never absolutely positioned over the content): every screen still ends above it, so scrolling, keyboard
- * avoidance, safe areas and the last row's clearance keep working as they did, and the tab roots stay the mounted,
- * unanimated scenes of the black-screen mitigation. The pill is drawn with the app's one control material, tinted pine:
+ * 25UX1 (owner, 2026-10-02): the dock is the control and nothing else. It floats over the tab roots, pinned to the window's
+ * bottom with no ground of its own: no band, no strip of canvas, only the pill and the «+» (the space around and between
+ * them lets touches through to the content). The roots run to the window's bottom and keep their last row clear of the
+ * dock through one shared inset (`useDockClearance`, `dockClearance`), so scrolling, the keyboard, safe areas and the last
+ * row's clearance behave as before; its geometry is unchanged (the capture hub still draws its «×» where the «+» is), and
+ * the tab roots stay the mounted, unanimated scenes of the black-screen mitigation (nothing in the navigator changed). The pill is drawn with the app's one control material, tinted pine:
  * Liquid Glass where the running iOS draws it and Reduce Transparency is off, else the solid pine pill with a hairline.
  *
  * The tabs are icon-only to the eye (the owner's decision), never to assistive technology: each is a 48 pt-plus target
@@ -37,8 +39,10 @@ export function dockMaterial(p: Palette): ViewStyle {
 export function FloatingTabBar({ state, descriptors, navigation, insets }: BottomTabBarProps) {
   const p = usePalette();
   const material = useMaterial();
-  return <View style={{ backgroundColor: p.background, paddingTop: DOCK.top, paddingBottom: tabBarBottomGap(insets.bottom),
-    paddingHorizontal: dockSide(insets), flexDirection: 'row', alignItems: 'center', gap: DOCK.gap }}>
+  // Pinned to the window's bottom, out of the layout, with no background: what shows around the pill and the «+» is the
+  // content scrolling under them. `box-none`: the empty margins never swallow a touch meant for the content.
+  return <View pointerEvents="box-none" style={{ position: 'absolute', left: 0, right: 0, bottom: 0, paddingTop: DOCK.top,
+    paddingBottom: tabBarBottomGap(insets.bottom), paddingHorizontal: dockSide(insets), flexDirection: 'row', alignItems: 'center', gap: DOCK.gap }}>
     <ControlSurface material={material} tint={p.dock} opaque={dockMaterial(p)} style={styles.pill}>
       <View accessibilityRole="tablist" style={styles.row}>
         {state.routes.map((route, index) => {
