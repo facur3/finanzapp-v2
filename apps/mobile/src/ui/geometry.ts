@@ -115,6 +115,11 @@ export function amountTextRoom(rowWidth: number, symbol: string, symbolSize: num
 export const ROW_STACK_SCALE = 1.2;
 /** Points a list row spends around its text on a phone: screen padding (20 + 20), row padding (16 + 16), the identity tile (40) and its gap (12). */
 export const ROW_CHROME = 124;
+/** 24UX6E: what a row's trailing chevron adds to `ROW_CHROME`: the 16 pt `chevron-forward` glyph and the row's 12 pt gap
+ * before it. A row that draws that chevron (today AccountRow) passes `width - ROW_CHEVRON` to `rowStacks`, so an amount
+ * that only fits once the chevron is ignored stacks under the name instead of being shrunk beside it. Rows without a
+ * chevron (DebtRow, RecurringRow) pass the plain width; Reportes' legend keeps its own `LEGEND_CHEVRON` (a 15 pt glyph). */
+export const ROW_CHEVRON = 28;
 /** The widest share of the remaining row an amount may take beside a name. */
 export const AMOUNT_SHARE = 0.56;
 /** Row amounts render at the body size. */

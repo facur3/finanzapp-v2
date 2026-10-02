@@ -10,7 +10,7 @@ import { radius, space, type, useCurrentDay, usePalette, useReduceMotion, type P
 import type { IconName } from './categories';
 import { tintOf } from './category-color';
 import { useAccountLook, useAccountNameOf, useCategoryLook } from './category-hues';
-import { AMOUNT_FIELD, ROW_STACK_SCALE, SEGMENT_GAP, SEGMENT_PADDING, amountFieldLayout, fitFontSize, rowStacks, segmentLayout } from './geometry';
+import { AMOUNT_FIELD, ROW_CHEVRON, ROW_STACK_SCALE, SEGMENT_GAP, SEGMENT_PADDING, amountFieldLayout, fitFontSize, rowStacks, segmentLayout } from './geometry';
 import { duration, easeOut, selectionHaptic, timing } from './motion';
 import { AmountInput, displayAmount, precisionOf, splitAmount, type AmountNotice, type PasteRejection } from './money-input';
 import { BUILD_MERCHANT_MARK_PREVIEW, merchantMark } from './merchant-mark';
@@ -764,23 +764,27 @@ export function EntryRow({ entry, account, last = false, showDate = true, showAc
   </PressFeedback>;
 }
 
-export function AccountRow({ account, entries, transfers, last = false, kindLabel, accessibility }: {
-  account: Account; entries: Entry[]; transfers?: Transfer[]; last?: boolean; kindLabel?: string;
+/** A liquid account on Cuentas: its badge, its name and its recorded balance (ink; a real negative balance keeps its minus
+ * and the expense tone), then a chevron to its detail. 24UX6E: no «Cuenta · ARS» line (every row on Cuentas is a cash
+ * account and the section already names the currency), and the stacking estimate counts the chevron (`ROW_CHEVRON`), so a
+ * seven-digit balance with cents at 375 pt goes under the name instead of being shrunk beside it. */
+export function AccountRow({ account, entries, transfers, last = false, accessibility }: {
+  account: Account; entries: Entry[]; transfers?: Transfer[]; last?: boolean;
   /** The row's VoiceOver custom actions (25B2: Eliminar), the accessible twin of its trailing swipe. */
   accessibility?: Pick<PressableProps, 'accessibilityActions' | 'onAccessibilityAction'>;
 }) {
   const p = usePalette();
-  const { t, spokenAmount } = useI18n();
+  const { t, spokenAmount, locale } = useI18n();
+  const { width, fontScale } = useWindowDimensions();
   const balance = accountBalanceMinor(account, entries, transfers);
-  const stacked = useStacked({ minor: balance, currency: account.currency });
+  const stacked = rowStacks(width - ROW_CHEVRON, fontScale, rowAmountText(balance, account.currency, false, locale));
   return <PressFeedback feedback="highlight" accessibilityRole="button" accessibilityLabel={t('rows.accountLabel', { name: account.name, amount: spokenAmount(balance, account.currency) })}
     {...accessibility} onPress={() => router.push({ pathname: '/account/[id]', params: { id: account.id } })}
     style={[styles.row, { borderBottomColor: p.line, borderBottomWidth: last ? 0 : StyleSheet.hairlineWidth }]}>
     <AccountBadge accountId={account.id} />
     <View style={{ flex: 1, minWidth: 0, gap: 8, flexDirection: stacked ? 'column' : 'row', alignItems: stacked ? 'flex-start' : 'center' }}>
-      <View style={{ flex: stacked ? undefined : 1, minWidth: 0, gap: 3 }}>
+      <View style={{ flex: stacked ? undefined : 1, minWidth: 0 }}>
         <AppText numberOfLines={stacked ? undefined : 2} style={{ fontWeight: '500' }}>{account.name}</AppText>
-        <AppText secondary variant="footnote">{kindLabel ?? t('accountKinds.account')} · {account.currency}</AppText>
       </View>
       <View style={{ maxWidth: stacked ? '100%' : AMOUNT_COLUMN, alignItems: 'flex-end' }}>
         <Money minor={balance} currency={account.currency} color={balance < 0 ? p.expense : undefined} />

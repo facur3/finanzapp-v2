@@ -44,6 +44,9 @@ const undone = domain.initialRecord({ id: 'e4', accountId: cash.id, kind: 'expen
 const archive: domain.LedgerArchive = { accounts: [cash, debtAccount], records: [...entries.map(domain.initialRecord), { ...undone, voided: true }],
   debts: [debt], recurring: [rule], budgets: [] };
 
+/** 24UX6E: what `useStacked` answers (Categorías rows) and the device hairline, a value no literal would match. */
+let stackedRows = false;
+const HAIRLINE = 0.33;
 /** The appearance preference the harness hands the screens (24UX6A); reset by every harness. */
 const appearanceState = { preference: 'system', system: 'light', saved: [] as string[], refuse: false };
 function harness(file: string, data: domain.LedgerArchive = archive, released?: ReleasedSets, locale: AppLocale | null = null, gate?: domain.CurrencyGate, dev = true) {
@@ -56,8 +59,10 @@ function harness(file: string, data: domain.LedgerArchive = archive, released?: 
   const pushed: any[] = [];
   let cursor = 0;
   const ledger = { useLedger: () => ({ ...(gate ? { gate } : {}), archive: data, snapshot: domain.snapshotFromArchive(data) }) };
-  const names = ['ActionButton', 'AppText', 'CategoryBadge', 'DetailRow', 'ErrorMessage', 'GlyphTile', 'IconButton', 'NavigationRow', 'PressFeedback', 'Screen', 'SectionTitle', 'Surface'];
+  const names = ['ActionButton', 'AppText', 'CategoryBadge', 'DetailRow', 'EmptyState', 'ErrorMessage', 'GlyphTile', 'IconButton', 'NavigationRow', 'PressFeedback', 'Screen', 'SectionTitle', 'Surface'];
   const components = Object.fromEntries(names.map(name => [name, name]));
+  // 24UX6E: Categorías wraps a name instead of cutting it when rows stack (accessibility text sizes).
+  (components as Record<string, unknown>).useStacked = () => stackedRows;
   appearanceState.preference = 'system'; appearanceState.system = 'light'; appearanceState.saved = []; appearanceState.refuse = false;
   const theme = { usePalette: () => ({ text: '#000', secondary: '#666', line: '#ddd', isDark: false }),
     // 24UX6A: the appearance preference as `useThemePreference` hands it (the store itself: tests/theme-preference.node.ts).
@@ -71,7 +76,7 @@ function harness(file: string, data: domain.LedgerArchive = archive, released?: 
       return [state[index], (value: unknown) => { state[index] = value; }];
     } },
     'react/jsx-runtime': { jsx, jsxs: jsx, Fragment: 'Fragment' },
-    'react-native': { View: 'View' },
+    'react-native': { View: 'View', StyleSheet: { hairlineWidth: HAIRLINE } },
     'expo-router': { Stack: { Screen: 'Stack.Screen' }, router: { push: (to: unknown) => pushed.push(to), navigate: (to: unknown) => pushed.push(to) } },
     'expo-file-system': { File: class {}, Paths: { cache: '/cache' } },
     'expo-sharing': { isAvailableAsync: async () => false, shareAsync: async () => {} },
@@ -87,6 +92,7 @@ function harness(file: string, data: domain.LedgerArchive = archive, released?: 
     '../../src/ui/locale-options': localeOptions,
     '../src/ui/material-policy': materialPolicy, '../../src/ui/material-policy': materialPolicy,
     '../src/ui/choice-screen': { ChoiceScreen: 'ChoiceScreen' },
+    '../src/ui/entry-list': { EntryList: 'EntryList' },
   };
   const module = { exports: {} as { default?: () => Node } };
   // A development build unless a test says otherwise (24UX5: the diagnostics line exists only there).
@@ -136,7 +142,7 @@ test('Más groups permanent navigation into Finanzas and App y datos, with live 
   assert.equal(value('Apariencia'), 'Sistema', '24UX6A: the default follows the device');
   assert.equal(nodes(root).some(node => node.type === 'ActionButton'), false);
   const texts = nodes(root).filter(node => node.type === 'AppText').map(node => String(node.props.children)).join(' ');
-  assert.match(texts, /FinanzApp 0\.1\.0 \(24UX6D\)/, 'the version line, like the About line of an iOS app');
+  assert.match(texts, /FinanzApp 0\.1\.0 \(24UX6E\)/, 'the version line, like the About line of an iOS app');
   assert.match(texts, /Material opaco \(Expo Go\)/, 'a development build says which control material this session draws, so a tester can confirm the mode');
   assert.doesNotMatch(texts, /Piloto nativo|Producto 24/, '24UX5: no project vocabulary on the settings screen');
   assert.equal(value('Categorías'), 'Gastos e ingresos');
@@ -266,7 +272,8 @@ test('an archived definition moves its category to a quiet Archivadas group and 
   assert.deepEqual(nodes(root).filter(node => node.type === 'SectionTitle').map(node => node.props.children), ['Gastos', 'Ingresos', 'Archivadas']);
   const labels = nodes(root).filter(node => node.type === 'PressFeedback').map(node => node.props.accessibilityLabel);
   assert.ok(labels.includes('Alimentación, Predeterminada · editada'), labels.join(' | '));
-  assert.ok(labels.includes('sjsjn, 1 movimiento · Propia, archivada'), 'an adopted historical string is now the user\'s own definition');
+  // 24UX6E: the archived row says its kind, spoken as a word in the sentence.
+  assert.ok(labels.includes('sjsjn, gasto, 1 movimiento · Propia, archivada'), 'an adopted historical string is now the user\'s own definition');
   assert.equal(labels.filter(label => label.startsWith('sjsjn')).length, 1, 'archived once, in its own group');
 });
 
@@ -288,7 +295,7 @@ test('23.1B2 English Más: every row, count, note and the diagnostic footer are 
   for (const row of rows(root)) row.props.onPress();
   assert.equal(view.pushed.join(','), '/accounts,/cards,/budgets,/recurring,/debts,/categories,/backup,/undone-entries,/language,/region,/appearance');
   const texts = nodes(root).filter(node => node.type === 'AppText').map(node => String(node.props.children)).join(' ');
-  assert.match(texts, /FinanzApp 0\.1\.0 \(24UX6D\)/);
+  assert.match(texts, /FinanzApp 0\.1\.0 \(24UX6E\)/);
   assert.match(texts, /Opaque material \(Expo Go\) · Language: default/);
   assert.match(texts, /saved only on this device and work offline/);
   assert.doesNotMatch(texts, /Material opaco|Idioma|Región|sincronización/);
@@ -336,7 +343,7 @@ test('24UX5: a preview or store build shows the version and the local-storage no
   for (const locale of [null, 'en-AR'] as const) {
     const root = harness('(tabs)/settings.tsx', archive, undefined, locale, undefined, false).render();
     const texts = nodes(root).filter(node => node.type === 'AppText').map(node => String(node.props.children)).join(' ');
-    assert.match(texts, /FinanzApp 0\.1\.0 \(24UX6D\)/);
+    assert.match(texts, /FinanzApp 0\.1\.0 \(24UX6E\)/);
     assert.doesNotMatch(texts, /Material|material|Idioma:|Language:/, 'no material or locale diagnostics outside a development build');
     assert.match(texts, locale ? /saved only on this device/ : /se guardan solo en este dispositivo/, 'privacy and storage information stays');
   }
@@ -368,4 +375,71 @@ test('24UX6A: Más → Apariencia names the choice in use and opens the chooser:
   assert.equal(appearanceState.preference, 'dark');
   const english = harness('appearance.tsx', archive, undefined, 'en-AR').render() as any;
   assert.equal(JSON.stringify([english.props.title, english.props.pinned.title, english.props.options.map((option: any) => option.title)]), JSON.stringify(['Appearance', 'System', ['Light', 'Dark']]));
+});
+
+// 24UX6E (bug fix): Movimientos deshechos lists records that count nowhere, so its day sections carry no net
+// (`dayNet: false`); the explanation is on the type scale (subhead, no raw size) and only over a list, never above the
+// «Nada para recuperar» empty state.
+test('24UX6E: Movimientos deshechos lists only undone records, with no day net, and explains them only when there is something to restore', () => {
+  const list = harness('undone-entries.tsx').render() as any;
+  assert.equal(list.type, 'EntryList');
+  // Arrays built inside the route's context: compared as JSON, like the other route tests here.
+  assert.equal(JSON.stringify([list.props.entries.map((entry: domain.Entry) => entry.id), list.props.transfers, list.props.dayNet]), JSON.stringify([['e4'], [], false]));
+  assert.equal(list.props.header.type, 'AppText');
+  assert.deepEqual([list.props.header.props.variant, list.props.header.props.secondary, list.props.header.props.style.fontSize], ['subhead', true, undefined]);
+  assert.equal(list.props.header.props.children, 'Estos movimientos no cuentan en tus saldos ni reportes. Abrí uno para recuperarlo.');
+  const nothing = harness('undone-entries.tsx', { ...archive, records: entries.map(domain.initialRecord) }).render() as any;
+  assert.equal(JSON.stringify([nothing.props.entries, nothing.props.dayNet, nothing.props.header ?? null]), JSON.stringify([[], false, null]), 'nothing undone: no sentence over the empty state');
+  assert.deepEqual([nothing.props.empty.type, nothing.props.empty.props.title, nothing.props.empty.props.icon], ['EmptyState', 'Nada para recuperar', 'arrow-undo-outline']);
+  // An undone transfer alone is something to restore too: the sentence stands over it.
+  const transfer: domain.Transfer = { id: 't1', fromAccountId: cash.id, toAccountId: debtAccount.id, amountMinor: 5000, note: 'Pago Juan', dateISO: '2026-09-15', createdAt };
+  const onlyTransfer = harness('undone-entries.tsx', { ...archive, records: entries.map(domain.initialRecord),
+    transfers: [{ transfer, revision: 1, voided: true, updatedAt: createdAt }] }).render() as any;
+  assert.equal(JSON.stringify([onlyTransfer.props.entries, onlyTransfer.props.transfers.map((t: domain.Transfer) => t.id), onlyTransfer.props.dayNet]), JSON.stringify([[], ['t1'], false]));
+  assert.equal(onlyTransfer.props.header.props.children, 'Estos movimientos no cuentan en tus saldos ni reportes. Abrí uno para recuperarlo.');
+  const english = harness('undone-entries.tsx', archive, undefined, 'en-US').render() as any;
+  assert.equal(english.props.header.props.children, 'These transactions do not count in your balances or reports. Open one to restore it.');
+});
+
+// 24UX6E: Categorías rows on the Forest row geometry; an archived row is never dimmed and names its kind.
+test('24UX6E: category rows use the Forest geometry with hairlines and no chevron (a modal editor), and wrap names when stacked', () => {
+  const root = harness('categories.tsx').render();
+  const rowsOf = nodes(root).filter(node => node.type === 'PressFeedback');
+  for (const row of rowsOf) {
+    const { minHeight, paddingHorizontal, paddingVertical, opacity } = row.props.style;
+    assert.deepEqual([minHeight, paddingHorizontal, paddingVertical, opacity], [64, 16, 12, undefined], row.props.accessibilityLabel);
+  }
+  const surfaces = nodes(root).filter(node => node.type === 'Surface');
+  for (const surface of surfaces) {
+    const own = nodes(surface).filter(node => node.type === 'PressFeedback');
+    assert.deepEqual(own.map(row => row.props.style.borderBottomWidth), [...own.slice(1).map(() => HAIRLINE), 0], 'a hairline between rows, none after the last');
+  }
+  assert.equal(nodes(root).some(node => node.type === 'Ionicons' || node.props?.name === 'chevron-forward'), false, 'no chevron: the row opens a modal');
+  const names = nodes(root).filter(node => node.type === 'AppText' && node.props.style?.fontWeight === '500');
+  assert.ok(names.length > 0 && names.every(node => node.props.numberOfLines === 2));
+  stackedRows = true;
+  try {
+    const stacked = harness('categories.tsx').render();
+    const wrapped = nodes(stacked).filter(node => node.type === 'AppText' && node.props.style?.fontWeight === '500');
+    assert.ok(wrapped.length > 0 && wrapped.every(node => node.props.numberOfLines === undefined), 'a long name is never cut at accessibility sizes');
+  } finally { stackedRows = false; }
+});
+
+test('24UX6E: archived rows are not dimmed, lead with their kind, and the same preset archived in both kinds reads differently', () => {
+  const expenseGifts = domain.editedCategoryDefinition(domain.resolveCategory('expense', 'Regalos'), { archived: true }, createdAt);
+  const incomeGifts = domain.editedCategoryDefinition(domain.resolveCategory('income', 'Regalos'), { archived: true }, createdAt);
+  const root = harness('categories.tsx', { ...archive, categories: [expenseGifts, incomeGifts] }).render();
+  const archivedSection = (root.props.children as any[]).filter(Boolean).at(-1);
+  const rows = nodes(archivedSection).filter(node => node.type === 'PressFeedback');
+  assert.deepEqual(rows.map(row => row.props.accessibilityLabel), ['Regalos, gasto, Predeterminada · editada, archivada', 'Regalos, ingreso, Predeterminada · editada, archivada']);
+  assert.ok(rows.every(row => row.props.style.opacity === undefined), 'never dimmed: the group and the spoken word carry the state');
+  assert.ok(rows.every(row => row.props.accessibilityHint === 'Edita el nombre, el ícono y el color, o la desarchiva'));
+  const details = nodes(archivedSection).filter(node => node.type === 'AppText' && node.props.variant === 'footnote').map(node => node.props.children);
+  assert.deepEqual(details, ['Gasto · Predeterminada · editada', 'Ingreso · Predeterminada · editada'], 'the visible line leads with the capitalised kind');
+  // The kind groups never repeat it; an active row keeps its plain hint.
+  const active = nodes(root).filter(node => node.type === 'PressFeedback' && node.props.accessibilityLabel.startsWith('Comida,'))[0];
+  assert.equal(active.props.accessibilityHint, 'Edita el nombre, el ícono y el color');
+  const english = harness('categories.tsx', { ...archive, categories: [expenseGifts, incomeGifts] }, undefined, 'en-AR').render();
+  const englishRows = nodes((english.props.children as any[]).filter(Boolean).at(-1)).filter(node => node.type === 'PressFeedback');
+  assert.deepEqual(englishRows.map(row => row.props.accessibilityLabel), ['Gifts, expense, Built-in · edited, archived', 'Gifts, income, Built-in · edited, archived']);
 });

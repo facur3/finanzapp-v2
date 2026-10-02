@@ -135,12 +135,15 @@ test('editing keeps the kind fixed: a total edits its amount only, a sublimit ke
   assert.equal(editFood.backs(), 1);
 });
 
-test('a duplicate general budget, a zero amount and a failed save keep the draft, and archiving asks first', async () => {
-  const duplicate = harness({ monthISO: '2026-09', currency: 'ARS', scope: 'total' }, archive, async () => { throw new Error('Ya existe un presupuesto general activo para esa moneda y mes.'); });
-  find(duplicate.render(), 'AmountField').props.onChangeText('1');
-  await find(duplicate.render(), 'ActionButton', 'Crear presupuesto').props.onPress();
-  let root = duplicate.render();
-  assert.match(find(root, 'ErrorMessage').props.message, /general activo/);
+test('a failed write, a zero amount and a negative one keep the draft, and archiving asks first', async () => {
+  // 24UX6E: a duplicate is now refused before the submission freezes (next test); the frozen retry is for a write that
+  // failed after the input was valid, here a storage error on a budget nothing else conflicts with.
+  const failed = harness({ monthISO: '2026-09', currency: 'ARS', scope: 'total' }, { ...archive, budgets: [food] }, async () => { throw new Error('database is locked'); });
+  find(failed.render(), 'AmountField').props.onChangeText('1');
+  await find(failed.render(), 'ActionButton', 'Crear presupuesto').props.onPress();
+  let root = failed.render();
+  assert.equal(failed.saved.length, 1, 'the write was attempted');
+  assert.match(find(root, 'ErrorMessage').props.message, /database is locked/);
   assert.equal(find(root, 'AmountField').props.editable, false, 'the same submission stays frozen for retry');
   assert.equal(find(root, 'ActionButton', 'Reintentar guardado').props.label, 'Reintentar guardado');
   const zero = harness({ monthISO: '2026-09', currency: 'ARS', scope: 'total' }, { ...archive, budgets: [] });
@@ -162,6 +165,76 @@ test('a duplicate general budget, a zero amount and a failed save keep the draft
   archiving.alerts[0].buttons[1].onPress();
   await new Promise(resolve => setImmediate(resolve));
   assert.deepEqual([archiving.saved[0].scope, archiving.saved[0].active, archiving.saved[0].revision], ['total', false, 1]);
+});
+
+test('24UX6E: a second general budget or a second limit for the same category, currency and month is an input error before anything freezes; the draft stays editable and a different choice saves once', async () => {
+  // archive: a general ARS budget and a «Comida» sublimit for 2026-09, the rule storage applies (validateBudgetCollection).
+  const view = harness({ monthISO: '2026-09', currency: 'ARS', scope: 'total' });
+  find(view.render(), 'AmountField').props.onChangeText('1');
+  await find(view.render(), 'ActionButton', 'Crear presupuesto').props.onPress();
+  let root = view.render();
+  assert.equal(view.saved.length, 0, 'nothing is written');
+  assert.equal(find(root, 'ErrorMessage').props.message, 'Ya existe un presupuesto general activo para esa moneda y mes.');
+  assert.equal(find(root, 'AmountField').props.editable, true, 'the draft is not frozen');
+  assert.equal(choice(root, 'total').props.disabled, false, 'the kind can still change');
+  assert.equal(nodes(root).some(node => node.type === 'ActionButton' && node.props.label === 'Reintentar guardado'), false, 'no retry that could never succeed');
+  assert.equal(texts(root).some(text => text.includes('congelado')), false);
+  choice(root, 'total').props.onChange('category');
+  find(view.render(), 'CategoryField').props.onChange(' comida ');
+  await find(view.render(), 'ActionButton', 'Crear presupuesto').props.onPress();
+  root = view.render();
+  assert.equal(view.saved.length, 0);
+  assert.equal(find(root, 'ErrorMessage').props.message, 'Ya existe un presupuesto activo para esa categoría, moneda y mes.', 'the normalised category is the same one');
+  assert.equal(find(root, 'AmountField').props.editable, true);
+  find(view.render(), 'CategoryField').props.onChange('Ocio');
+  await find(view.render(), 'ActionButton', 'Crear presupuesto').props.onPress();
+  assert.deepEqual([view.saved.length, view.saved[0].scope, view.saved[0].category, view.saved[0].amountMinor], [1, 'category', 'Ocio', 100]);
+  assert.equal(view.backs(), 1);
+  // Another currency, or an archived general budget, is no conflict.
+  const usd = harness({ monthISO: '2026-09', currency: 'USD', scope: 'total' });
+  find(usd.render(), 'AmountField').props.onChangeText('1');
+  await find(usd.render(), 'ActionButton', 'Crear presupuesto').props.onPress();
+  assert.equal(usd.saved.length, 1);
+  const archived = harness({ monthISO: '2026-09', currency: 'ARS', scope: 'total' }, { ...archive, budgets: [{ ...total, active: false, revision: 1, updatedAt: '2026-09-02T12:00:00.000Z' }, food] });
+  find(archived.render(), 'AmountField').props.onChangeText('1');
+  await find(archived.render(), 'ActionButton', 'Crear presupuesto').props.onPress();
+  assert.equal(archived.saved.length, 1);
+  // Editing a sublimit onto another sublimit's category is refused the same way; English reads the rule in English.
+  const leisure: domain.MonthlyBudget = { ...food, id: 'leisure', category: 'Ocio' };
+  const edit = harness({ original: leisure, monthISO: leisure.monthISO }, { ...archive, budgets: [total, food, leisure] }, undefined, 'en-AR');
+  find(edit.render(), 'CategoryField').props.onChange('Comida');
+  await find(edit.render(), 'ActionButton', 'Save changes').props.onPress();
+  root = edit.render();
+  assert.equal(edit.saved.length, 0);
+  assert.equal(bindLocale('en-AR').errorText(find(root, 'ErrorMessage').props.message), bindLocale('en-AR').errorText('Ya existe un presupuesto activo para esa categoría, moneda y mes.'));
+  assert.equal(find(root, 'AmountField').props.editable, true);
+  assert.notEqual(bindLocale('en-AR').errorText(find(root, 'ErrorMessage').props.message), find(root, 'ErrorMessage').props.message, 'the domain message has an English text');
+});
+
+test('24UX6E: «Eliminar presupuesto» is the app\'s destructive button (secondary, the alert tone, the trash glyph); the month title is on the type scale', () => {
+  const root = harness({ original: total, monthISO: total.monthISO }).render();
+  const remove = find(root, 'ActionButton', 'Eliminar presupuesto');
+  assert.deepEqual([remove.props.secondary, remove.props.tone, remove.props.icon], [true, 'expense', 'trash-outline']);
+  const month = nodes(root).find(node => node.type === 'AppText' && node.props.children === 'Septiembre de 2026')!;
+  assert.deepEqual([month.props.variant, month.props.style], ['subhead', undefined]);
+});
+
+test('24UX6E: /new-budget opens the current month for a month the domain does not accept, and keeps a valid one', () => {
+  const source = readFileSync(new URL('../app/new-budget.tsx', import.meta.url), 'utf8');
+  const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText;
+  const route = (params: Record<string, string>) => {
+    const module = { exports: {} as { default?: () => Node } };
+    const modules: Record<string, unknown> = { 'react/jsx-runtime': { jsx: (type: unknown, props: unknown) => ({ type, props }) },
+      'expo-router': { useLocalSearchParams: () => params }, '@finanzapp/domain': domain, '../src/ui/budget-form': { BudgetForm: 'BudgetForm' } };
+    runInNewContext(code, { module, exports: module.exports, require: (name: string) => {
+      if (!Object.hasOwn(modules, name)) throw new Error('Unexpected new-budget dependency: ' + name);
+      return modules[name];
+    } });
+    return module.exports.default!().props;
+  };
+  const current = domain.currentMonthISO(domain.todayKey());
+  for (const month of ['2026-13', '2026-00', '26-09', '']) assert.equal(route({ month }).monthISO, current, JSON.stringify(month));
+  assert.deepEqual({ ...route({ month: '2026-02', currency: 'USD', scope: 'total' }) }, { currency: 'USD', scope: 'total', monthISO: '2026-02' });
 });
 
 test('in English the budget form is labelled in English, keeps the category as stored and saves exactly what Spanish saves', async () => {

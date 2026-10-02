@@ -25,6 +25,9 @@ export const budgets = {
       byCategory: 'Por categoría',
       noSublimits: 'Sin límites por categoría este mes.',
       unbudgeted: 'Además gastaste {amount} en categorías sin límite propio.',
+      /** 24UX6E: the month's summary could not be computed (its recorded spending leaves the safe range). */
+      unavailableTitle: 'No pudimos calcular este mes',
+      unavailableDetail: 'Tus presupuestos y movimientos siguen guardados.',
     },
     /** Caption of "Por categoría", parts joined with " · ": "3 categorías · 1 excedida · 1 cerca del límite". */
     caption: {
@@ -43,8 +46,9 @@ export const budgets = {
       available: 'Disponible',
       spent: 'Gastado',
       limit: 'Límite',
-      used: '{percent} % utilizado',
-      /** Suffixes after "{percent} % utilizado", joined with " · ". */
+      /** {percent} is already formatted («60 %», 24UX6E: the string Inicio shows). */
+      used: '{percent} utilizado',
+      /** Suffixes after "{percent} utilizado", joined with " · ". */
       stateExceeded: 'excedido',
       stateReached: 'límite alcanzado',
       stateNear: 'cerca del límite',
@@ -55,8 +59,12 @@ export const budgets = {
       exceededBy: 'Excedido por {amount}',
       reached: 'Límite alcanzado',
       left: 'Quedan {amount}',
-      of: '{spent} de {limit}',
-      percent: '{percent} %',
+      /** 24UX6E: the row's one quiet line under its bar. */
+      leftOf: 'Quedan {amount} de {limit}',
+      overOf: '{amount} por encima de {limit}',
+      reachedOf: 'Límite alcanzado · {limit}',
+      /** VoiceOver hint: the row opens the budget's form. */
+      hint: 'Abre el presupuesto para editarlo',
     },
     form: {
       general: 'Presupuesto general',

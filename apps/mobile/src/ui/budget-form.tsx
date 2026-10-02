@@ -3,7 +3,7 @@ import { Alert, Keyboard, View } from 'react-native';
 import { router, Stack } from 'expo-router';
 import { randomUUID } from 'expo-crypto';
 import * as Haptics from 'expo-haptics';
-import { LEDGER_CURRENCIES, editedDraftFits, minorFromEditedDraft, sameMonthlyBudget, validateMonthlyBudget, type StoredDraft,
+import { LEDGER_CURRENCIES, editedDraftFits, minorFromEditedDraft, sameMonthlyBudget, validateBudgetCollection, validateMonthlyBudget, type StoredDraft,
   type BudgetScope, type Currency, type MonthlyBudget } from '@finanzapp/domain';
 import { useLedger } from '../storage/LedgerProvider';
 import { ActionButton, AmountField, AppText, Choices, ErrorMessage, IconButton, Screen } from './components';
@@ -22,7 +22,7 @@ import { useI18n } from '../i18n/provider';
 export function BudgetForm({ original, monthISO, currency: requestedCurrency, scope: requestedScope }: {
   original?: MonthlyBudget; monthISO: string; currency?: string; scope?: string;
 }) {
-  const { snapshot, saveBudget, gate = LEDGER_CURRENCIES } = useLedger();
+  const { archive: ledgerArchive, snapshot, saveBudget, gate = LEDGER_CURRENCIES } = useLedger();
   const { t, locale, formatMonthTitle } = useI18n();
   // 146 currencies since 24M: ordered and named once per gate and language, not on every keystroke.
   const offered = useMemo(() => offeredCurrencies(gate, locale), [gate, locale]);
@@ -68,6 +68,14 @@ export function BudgetForm({ original, monthISO, currency: requestedCurrency, sc
           submission = scope === 'total' ? { ...base, scope: 'total' } : { ...base, scope: 'category', category: category.trim() };
         }
         validateMonthlyBudget(submission);
+        // 24UX6E: the collection rule storage applies before writing (one active general budget per currency and month,
+        // one active sublimit per category, currency and month), on the budgets this device holds: a duplicate is an
+        // input error the person can fix (another month, kind or category), not a frozen submission whose retry can
+        // never succeed. Storage still checks it inside its transaction; the frozen retry stays for real write failures.
+        if (ledgerArchive) {
+          const held = ledgerArchive.budgets ?? [], next: MonthlyBudget = submission;
+          validateBudgetCollection(held.some(item => item.id === next.id) ? held.map(item => item.id === next.id ? next : item) : [...held, next]);
+        }
         setPending(submission);
       }
       await saveBudget(submission);
@@ -121,7 +129,7 @@ export function BudgetForm({ original, monthISO, currency: requestedCurrency, sc
     <Stack.Screen options={{ title: t(before ? 'nav.titles.editBudget' : 'nav.titles.newBudget'), gestureEnabled: !busy,
       headerLeft: () => <IconButton name="close" label={t('common.close')} onPress={close} disabled={busy} /> }} />
     <View style={{ gap: 4, alignItems: 'center', paddingTop: 8 }}>
-      <AppText secondary style={{ fontSize: 14 }}>{formatMonthTitle(before?.monthISO ?? monthISO)}</AppText>
+      <AppText secondary variant="subhead">{formatMonthTitle(before?.monthISO ?? monthISO)}</AppText>
       <AppText variant="title2">{t(general ? 'budgets.form.general' : 'budgets.form.perCategory')}</AppText>
     </View>
     {!before && <Choices<BudgetScope> value={scope} onChange={setScope} disabled={locked}
@@ -134,12 +142,12 @@ export function BudgetForm({ original, monthISO, currency: requestedCurrency, sc
       {t(general ? 'budgets.form.generalNote' : 'budgets.form.categoryNote')}
     </AppText>
     <ErrorMessage message={error} />
-    {pending && error && <AppText secondary style={{ fontSize: 13, textAlign: 'center' }}>
+    {pending && error && <AppText secondary variant="footnote" style={{ textAlign: 'center' }}>
       {t('budgets.form.retryNote')}
     </AppText>}
     <ActionButton label={pending && error ? t('common.retrySave') : before ? t('common.saveChanges') : t('budgets.form.create')}
       onPress={save} busy={busy} disabled={!amount.trim() || (!general && !category.trim()) || !editedDraftFits(amount, currency, stored).ok} />
     {before && <ActionButton label={t(archivePending && error ? 'budgets.form.retryDelete' : 'budgets.form.delete')}
-      onPress={archive} secondary disabled={busy || pending !== null} />}
+      onPress={archive} secondary tone="expense" icon="trash-outline" disabled={busy || pending !== null} />}
   </Screen>;
 }
