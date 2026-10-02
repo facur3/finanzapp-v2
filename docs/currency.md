@@ -1,6 +1,6 @@
 # FinanzApp mobile: currencies and the multi-currency engine
 
-Updated 2026-09-27 (Producto 25B2: one rule for the currency a form starts with, §2.10; the display control only with two or more currencies in the history). Applies to the Expo app in
+Updated 2026-10-01 (Producto 24T3: devoluciones and adelantos de cuotas convert in consolidated views at their own date and are never converted in storage, §2.11). Earlier: 2026-09-27 (Producto 25B2: one rule for the currency a form starts with, §2.10; the display control only with two or more currencies in the history). Applies to the Expo app in
 `apps/mobile` and the shared `packages/domain`. Read with [decision 002](decisions/002-spending-first.md)
 (ARS/USD kept apart, no invented rates), [docs/i18n.md](i18n.md) §9 and the roadmap's
 Producto 24 entries.
@@ -293,6 +293,24 @@ Inicio's and Reportes' chip, `reportSelection`). Deleting the last account of a 
 set and never from the second: the chip stays while the history holds two currencies, «Solo USD» still shows that
 account's months, the consolidated total converts its movements at their dates, and a missing rate gives
 per-currency parts, never a partial sum. The view is forced single only when the whole history holds one currency.
+
+### 2.11 What Producto 24T3 delivers (devoluciones and adelantos in consolidated views; nothing stored converts)
+
+A devolución and an adelanto de cuotas (docs/mobile-roadmap.md, «Producto 24T3») are stored in the currency of what
+they target (the purchase's account, or the plan's card, which is the plan's currency) and are **never converted in
+storage**. Their money effect reaches the views as projected lines of the ledger (a devolución is an expense line with a
+negative amount, an adelanto one positive line per component), so the consolidated view treats them like any
+movement: **each converts at the reference rate of its own date** (`consolidatedLedger`, §2.8), keeps its `refund` /
+`payoff` link, and counts toward the period's completeness (a missing rate on a devolución's date makes the period
+show per-currency subtotals, never a partial total; a currency whose period holds only devoluciones keeps its subtotal).
+Consequence, by design: **a full devolución dated on another day than its purchase may not net to exactly zero** in the
+display currency, because the purchase converts at its date's rate and the devolución at its own; in the account's
+own currency (single mode, the account, budgets) it always nets exactly. A same-day full devolución nets to zero
+(the rounding is symmetric). The info button of a consolidated Reportes says it («Las devoluciones se convierten con la
+cotización de su propia fecha y restan en su mes y su categoría.»). Budgets keep their own currency and need no rate,
+as before. Tests: `packages/domain/fx.test.ts` (a USD purchase of 100 at 1400 and a devolución of 40 at 1500 give
+14.000.000 − 6.000.000 ARS minor units; a same-day full devolución nets to 0; a missing rate on the devolución's date
+makes the expense period incomplete) and `apps/mobile/tests/spending-home.node.ts` (the missing-rate subtotals).
 
 ### Availability status
 
