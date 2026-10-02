@@ -30,6 +30,7 @@ export const debts: Pick<Messages, 'debts'> = {
     row: {
       owedLabel: 'I owe {name}, {amount} {currency}, {status}',
       receivableLabel: '{name} owes me, {amount} {currency}, {status}',
+      openHint: 'Opens the debt details',
     },
     detail: {
       edit: 'Edit debt',
@@ -43,8 +44,10 @@ export const debts: Pick<Messages, 'debts'> = {
       typeOwed: 'I owe',
       typeReceivable: 'Owed to me',
       due: 'Due date',
-      state: 'Status',
       note: 'Note',
+      closedTitle: 'Debt closed',
+      closedDetailOwed: 'Not counted as pending. It keeps its balance and payments; Reopen debt brings it back to pending.',
+      closedDetailReceivable: 'Not counted as pending. It keeps its balance and collections; Reopen debt brings it back to pending.',
       explain: 'Settling moves balance between records. It doesn’t create an expense or income.',
       payments: 'Recorded payments',
       collections: 'Recorded collections',
@@ -60,8 +63,6 @@ export const debts: Pick<Messages, 'debts'> = {
       note: 'Collection from {name}',
     },
     form: {
-      owedTo: 'I owe',
-      owedBy: 'Owes me',
       currency: 'Currency',
       owed: 'I owe',
       receivable: 'Owed to me',
@@ -104,7 +105,7 @@ export const debts: Pick<Messages, 'debts'> = {
         one: 'It stops being tracked. The recorded collection stays in Activity.',
         other: 'It stops being tracked. The {count} recorded collections stay in Activity.',
       },
-      deleteDetailEmpty: 'It stops being tracked. No movement is deleted.',
+      deleteDetailEmpty: 'It stops being tracked. No transaction is deleted.',
       collect: 'Collect',
       blockedTitle: 'Cannot be deleted yet',
       blockedDetailOwed: 'You still owe {name} {amount} and payments are already recorded. Settle the rest, or close the debt: it leaves pending and keeps its balance and history; you can reopen it. Closing records no payment.',

@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { useLocalSearchParams } from 'expo-router';
+import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useLedger } from '../../src/storage/LedgerProvider';
-import { EmptyState, Screen } from '../../src/ui/components';
+import { EmptyState, IconButton, Screen } from '../../src/ui/components';
 import { RecurringForm } from '../../src/ui/recurring-form';
 import { useI18n } from '../../src/i18n/provider';
 
@@ -15,7 +15,11 @@ export default function EditRecurringScreen() {
   // rule in the same screen starts over. Set during render, React's pattern for information from previous renders.
   const [seenLiveId, setSeenLiveId] = useState<string | null>(null);
   if (rule && !rule.deleted && seenLiveId !== rule.id) setSeenLiveId(rule.id);
-  if (!rule || (rule.deleted && seenLiveId !== rule.id)) return <Screen><EmptyState title={t('recurring.edit.notFoundTitle')}
-    detail={t('recurring.edit.notFoundDetail')} icon="repeat-outline" /></Screen>;
+  // 24UX6E: the modal keeps its close button when there is nothing to edit (the same close as the form's).
+  if (!rule || (rule.deleted && seenLiveId !== rule.id)) return <Screen>
+    <Stack.Screen options={{ headerLeft: () => <IconButton name="close" label={t('common.close')}
+      onPress={() => { if (router.canGoBack()) router.back(); else router.replace('/recurring'); }} /> }} />
+    <EmptyState title={t('recurring.edit.notFoundTitle')} detail={t('recurring.edit.notFoundDetail')} icon="repeat-outline" />
+  </Screen>;
   return <RecurringForm original={rule} />;
 }

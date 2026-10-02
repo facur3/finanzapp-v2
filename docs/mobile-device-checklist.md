@@ -1,5 +1,154 @@
 # Physical iPhone acceptance checklist
 
+## Producto 24UX6E — More financial destinations in Forest
+
+**Not done in 24UX6E: no EAS build was made and the iPhone was not touched. Every item below is pending.**
+Metro from this branch (`npm run start:dev-client -- --clear`) on the installed FinanzApp Dev build; JavaScript only
+(Cuentas, Presupuestos, Recurrentes, Deudas y cobros, Categorías, the edit modals, Idioma / Región / Apariencia and
+Movimientos deshechos), no native dependency, no domain, storage, schema (13), backup (v13) or FX change. Use your own
+data; never seed movements (add test accounts, budgets, rules, debts and categories and delete or archive them
+afterwards). Record each result with the iPhone model, iOS version, theme, language and text size. The design is in
+[mobile-design.md](mobile-design.md) («Producto 24UX6E — Más destinos financieros en Forest»); the rule is in
+[decision 005](decisions/005-forest-four-tabs-and-capture.md) («Enmienda 2026-10-01 — Producto 24UX6E»). This section
+supersedes older items that expect a signed or green/amber debt total, «Pausado: …» as the paused or closed rule's
+note, «Cuenta eliminada» in place of «Saldo registrado», a dimmed archived category, a day net on Movimientos
+deshechos or «Pagos · ARS» in Recurrentes.
+
+**For every destination below:** a 375 pt iPhone (SE / 13 mini) and a 393 pt one; AX text sizes (AX1–AX5) and the
+default; light and dark; VoiceOver; Reduce Motion (bars jump, nothing new animates); Reduce Transparency; the last row
+and the last button clear the home indicator and the dock where it shows, nothing under the notch.
+
+- [ ] The Más footer reads «FinanzApp 0.1.0 (24UX6E)».
+
+**Cuentas.**
+
+- [ ] One account, then several in one currency, then accounts in two or three currencies: each currency is its own
+  section; its header is the currency's name in ink (a heading, like a Movimientos day) with the recorded total
+  beside it in secondary; currencies are never added together.
+- [ ] A large positive balance (seven digits with cents, «$ 1.234.567,89») and a negative one: on a row at 375 pt the
+  balance goes under the name instead of being drawn smaller; the negative keeps its minus in the alert tone; a
+  negative section total too.
+- [ ] A row shows the badge, the name and the balance only (no «Cuenta · ARS» line) and a chevron; it opens the
+  detail.
+- [ ] A long account name (40+ characters): two lines beside the balance, whole when stacked; never overlapping the
+  chevron.
+- [ ] At AX sizes, or with a long currency name and a long total, the section total goes under the name; nothing is
+  shrunk or cut. VoiceOver stops once on the header and reads «Pesos argentinos, saldo registrado … pesos» as a
+  heading (rotor «Encabezados» finds it).
+- [ ] The account detail: the badge and «Saldo registrado · ARS» over the balance at 40 pt, then «Gastos este mes»
+  (no sign, ink) and «Ingresos este mes» («+», green) flat on the canvas, no white card behind them; then the quick
+  actions, Recurrentes and the movements. A negative balance in the alert tone with its minus.
+- [ ] A deleted account's detail (open it from a movement's «Cuenta» row): a calm note at the top (trash glyph,
+  «Cuenta eliminada», what still happens), the balance still labelled «Saldo registrado · ARS», the month facts and
+  the movements; no Editar, no quick actions; legible in light and dark.
+- [ ] Más → Cuentas → an account → Editar → «Eliminar cuenta» → confirm: you land on Cuentas in one step, the account
+  gone; Atrás goes back to Más; the tab bar and the dock are there.
+- [ ] Inicio → a recent movement → its «Cuenta» row → the account's detail → Editar → «Eliminar cuenta» → confirm
+  (Cuentas is not in the stack on this path): Cuentas replaces the editor (the deleted account's readable detail may remain beneath it); Atrás and the tab bar still work,
+  nothing is stuck and no blank screen appears.
+- [ ] Tarjetas → a card without a balance due → Editar tarjeta → «Eliminar tarjeta» → confirm: you land on Tarjetas
+  in one step, the card gone; Atrás and the tab bar intact. (Delete the test card.)
+
+**Presupuestos.**
+
+- [ ] No general budget, only category budgets: the general block is replaced by its compact «Agregar presupuesto
+  general» button; the sublimit rows follow.
+- [ ] A general budget plus several sublimits: the general block flat on the canvas (no white card): «Disponible» over
+  the 40 pt amount, the 6 pt bar, «60 % utilizado» right under the bar, then Gastado | Límite.
+- [ ] Calm (below 85 %): the amount and the bar in ink, the status line secondary. At 85–99 %: the amount still ink, the
+  bar and «… · cerca del límite» in amber. At exactly 100 %: «Disponible» $ 0, the bar full, «100 % utilizado ·
+  límite alcanzado» in amber. Exceeded: «Excedido» over the amount in the alert tone, the bar full and not
+  overflowing, the alert glyph before «… · excedido».
+- [ ] A sublimit row: the category tile in its own colour in every state (never repainted amber or red), the name, the
+  percent on the right («91 %» like Inicio; the alert glyph once exceeded), a 4 pt bar, one quiet line («Quedan $ X de
+  $ Y», «$ X por encima de $ Y», «Límite alcanzado · $ Y»); no chevron; tapping opens the budget's form as a modal.
+- [ ] Very large amounts (a limit of $ 100.000.000,00, spending over 1000 %): the hero is whole, the percent reads with
+  a thousands separator («1.235 %»), nothing is cut; at AX sizes the name and the percent stack.
+- [ ] A long category name (custom, 40+ characters): two lines beside the percent; stacked at AX sizes, whole.
+- [ ] A budget in another currency (USD while you mostly use ARS): the currency switch shows it; amounts in USD, never
+  converted.
+- [ ] A past month: «Este mes» appears beside the month state; it is easy to hit (44 pt reach) and returns to this
+  month; at AX sizes the state and «Este mes» wrap onto two centred lines.
+- [ ] A month with spending outside budgeted categories: «Además gastaste …» under the rows; VoiceOver reads the amount
+  in words.
+- [ ] Creating a second general budget for the same currency and month (or a second limit for the same category):
+  an error under the form, the fields still editable; changing the category or the kind saves once. «Reintentar
+  guardado» never appears for it.
+- [ ] A malformed link on the development build (`finanzapp-dev://budgets?month=2026-13`, and
+  `finanzapp-dev://new-budget?month=2026-13`): the screen and the form open on this month instead of failing.
+- [ ] «Eliminar presupuesto» in the edit form is the red destructive button with the trash glyph; it asks first.
+- [ ] VoiceOver: the general block is one element with the summary sentence; a sublimit row is one button with its
+  sentence and the hint «Abre el presupuesto para editarlo».
+
+**Recurrentes.**
+
+- [ ] Expense and income rules, active and paused: the 30-day block per currency flat on the canvas: «Gastos · ARS» on
+  its own full-width line, then «Ingresos» (only when something comes in, with «+» in green) and «Vencimientos».
+- [ ] At 375 pt with a projection of ≥ $ 1.000.000,00 (seven digits with cents): «Gastos · ARS» is whole, never
+  shrunk or cut; also at AX sizes.
+- [ ] An expense due today or tomorrow reads «Hoy» / «Mañana» in amber; an income due today or tomorrow reads it in
+  secondary, never amber; dates further out (in N days, a plain date) are secondary.
+- [ ] A rule whose account was deleted reads «Cuenta eliminada» (a card's, «Tarjeta eliminada») where the day goes,
+  calm, never amber and never «Revisar»; its swipe offers Eliminar only. VoiceOver ends the row's label with the same
+  word.
+- [ ] A rule under review (if you have one): «Revisar» in amber on its row; its detail shows the amber note right under
+  the hero, then «Continuar desde hoy»; a failed action says so once under that button.
+- [ ] A paused rule's detail: «Pausado» under the amount, then the note «No registra nada hasta que lo reanudes…» (no
+  «Pausado:» prefix), then the facts, Registrados, and Reanudar / Eliminar at the end.
+- [ ] A closed rule's detail: «Cuenta eliminada» / «Tarjeta eliminada» under the amount, the recovery note under it;
+  Editar → choose a live account of the same currency → save → the detail now reads «Pausado» and offers Reanudar.
+- [ ] A long merchant name and a large amount: the row stacks the amount under the name at AX sizes; nothing cut.
+- [ ] Opened from an account's «Recurrentes» row: the rows leave the account's name out of their caption; the empty
+  state says «Creá un gasto o ingreso recurrente para esta cuenta.»
+- [ ] VoiceOver reads the detail's next date written out («1 de octubre de 2026»), «Hoy» as «Hoy».
+
+**Deudas y cobros.**
+
+- [ ] A debt I owe and one owed to me: neutral tiles (arrow up / arrow down, no amber or green tile); the totals flat
+  on the canvas, both in ink; the amounts in ink.
+- [ ] A partly settled debt: the outstanding amount is what remains; the state words unchanged.
+- [ ] An overdue debt (either direction): only «Vencida · …» in the caption takes the alert tone, never «Debo» /
+  «Me deben»; the detail's state line in the alert tone.
+- [ ] A debt I owe due within three days: «Vence …» in amber on the row and the detail. One owed to me due within three
+  days: secondary, never amber. A debt four or more days away: secondary.
+- [ ] A closed debt (Cerrar from its swipe or detail): under Cerradas its row reads «Cerrada»; its detail has no state
+  line and shows the note «Deuda cerrada» with «Reabrir deuda» named; «Vencimiento» appears among the facts if it had a
+  date; never «Vencida» in red.
+- [ ] The detail facts: no Tipo or Estado row; «Nota» when there is one; no empty grouped card when there is neither a
+  note nor a date to show.
+- [ ] A deleted debt leaves the list; its payments stay in Movimientos.
+- [ ] A large amount and a long counterparty name: the row stacks at AX sizes; the detail's hero whole.
+- [ ] Editar deuda shows «Tipo» and «Moneda» above the fields, not the name being edited; renaming leaves nothing stale.
+- [ ] Dark mode: the neutral tiles on the grouped rows are visible; the amber and alert state words readable.
+- [ ] VoiceOver: a row reads the day written out («Vence 1 de octubre de 2026») with the hint «Abre el detalle de la
+  deuda»; the detail's state line the same.
+
+**Categorías.**
+
+- [ ] Active rows and Archivadas: the same contrast (archived rows are not dimmed); each archived row's caption starts
+  with its kind («Gasto · …» / «Ingreso · …»); rows are 64 pt with hairlines and no chevron.
+- [ ] A long custom name: two lines; at AX sizes the whole name wraps.
+- [ ] VoiceOver on an archived row: «…, gasto, …, archivada» (or «ingreso»); the same preset archived in both kinds
+  reads differently.
+- [ ] Rename a custom category to an existing name (a preset or another category): an error under the field, the
+  form still editable; a different name saves once; «Reintentar guardado» never appears for it.
+- [ ] Open a historical category (one that came from old movements, never edited) and tap «Guardar cambios» without
+  changing anything: it closes and the category keeps its glyph and colour everywhere (Movimientos, Reportes).
+- [ ] An archived category's editor opens with the note «Archivada» (what it keeps, how to unarchive); the rename note
+  appears under the name field while you type a new name.
+- [ ] A link to a category that does not exist (or an edit modal for a deleted budget, debt, rule or account): the
+  modal shows «No encontramos …» and a close button that works.
+
+**Idioma, Región, Apariencia and Movimientos deshechos.**
+
+- [ ] Más → Idioma, Región and Apariencia in light and in dark: the pinned card («Según el dispositivo»; «Sistema» in
+  Apariencia) stands apart from the options card below, clean rounded corners on both, no background showing at the
+  inner corners; the same at AX3.
+- [ ] Choosing still saves and applies as before; the note stays under the list.
+- [ ] Más → Movimientos deshechos with undone movements: the day headings have no «+$ …» / «−$ …» net; VoiceOver never
+  reads «Neto del día»; the explanation sits above the list.
+- [ ] With nothing undone: only «Nada para recuperar», no explanation line above it.
+
 ## Producto 24UX6D — Cards in Forest and final Home/Reports polish
 
 **Not done in 24UX6D: no EAS build was made and the iPhone was not touched. Every item below is pending.**
@@ -14,7 +163,7 @@ supersedes the 24UX6C2 items for the Reportes KPI, the quiet «Tocá una categor
 (marked below), and 24T2's wording of the facts («Vence · Cierra · Disponible» in three columns) and of the plan
 detail («12 cuotas · Sin interés», the «Registradas 3 de 12» row).
 
-- [ ] The Más footer reads «FinanzApp 0.1.0 (24UX6D)».
+- [ ] The Más footer reads «FinanzApp 0.1.0 (24UX6D)». *(Superseded by 24UX6E: «FinanzApp 0.1.0 (24UX6E)».)*
 
 **Reportes: Categorías.**
 
@@ -870,7 +1019,8 @@ monthly and «Prueba B» weekly, and delete them at the end).**
 - [ ] **Detail** (tap a rule): after Registrados, «Pausar recurrente» (or, when paused, the note
   «Pausado: …» and «Reanudar recurrente») and a red «Eliminar recurrente». Each writes and closes the
   form; with an unsaved edit in the form, pausing does not apply the edit. Eliminar asks first as
-  above; the screen closes without flashing «No encontramos este recurrente».
+  above; the screen closes without flashing «No encontramos este recurrente». *(Superseded by 24UX6E: the
+  paused note sits under the hero without the «Pausado:» prefix; see «Producto 24UX6E» above.)*
 
 **Deudas y cobros (Más → Deudas y cobros; a throwaway «Prueba» debt of a small amount).**
 
@@ -1636,7 +1786,7 @@ identifier `com.facur3.finanzapp.dev`; FinanzApp Preview is not rebuilt or touch
 - [ ] Large text: every row above stacks (amount under the name), whatever the amount.
 - [ ] Reportes: the eyebrow "Gastado · ARS", Tarjetas "Saldo pendiente · ARS",
   Recurrentes "Pagos · ARS" and the day header net amount never break between the words
-  and the code or number.
+  and the code or number. *(Superseded by 24UX6E: Recurrentes reads «Gastos · ARS».)*
 - [ ] Reportes budget rows: name over "spent de limit", the percentage on the right; a
   long category name wraps rather than truncates.
 - [ ] Transfer preview rows ("Banco después / ARS 1.234,56") stack when the name is long;

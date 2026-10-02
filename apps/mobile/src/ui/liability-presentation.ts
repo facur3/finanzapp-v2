@@ -1,7 +1,7 @@
 import { accountKind, cardAvailableLimitMinor, cardCommittedFinancingMinor, cardCommittedMinor, cardCreditMinor, cardCycleDatesOf, cardCycleView, cardDebtMinor, installmentPlanFigures, pendingInstallmentPlans,
   type Account, type AccountAppearance, type CardCycleDates, type CardStatement, type CreditCardProfile, type InstallmentPlan, type LedgerSnapshot, type PersonalDebtProfile,
   type RecordedEntry, isLiveAccount } from '@finanzapp/domain';
-import { relativeDate } from '../i18n/format.ts';
+import { formatDate, relativeDate } from '../i18n/format.ts';
 import { DEFAULT_LOCALE, type AppLocale } from '../i18n/locale.ts';
 import { translator, type Translate } from '../i18n/messages.ts';
 
@@ -122,6 +122,29 @@ export function dueLabel(dateISO: string, todayISO: string, locale: AppLocale = 
 
 export function daysUntil(dateISO: string, todayISO: string): number {
   return Math.round((Date.parse(dateISO + 'T12:00:00Z') - Date.parse(todayISO + 'T12:00:00Z')) / 86400000);
+}
+
+/** 24UX6E: where a personal debt stands, one rule for its row and its detail. Closed first (a closed debt is never
+ * shown as due or overdue, whatever its date says); then settled (nothing outstanding); then no date; then overdue;
+ * then «soon»: three days away or less, the window CardFacts uses for a card's «Vence», and only for a debt I owe (what
+ * someone owes me is not something I must act on in time); otherwise simply due. Colour follows the state: overdue in
+ * the alert tone (both directions), soon in amber, every other state calm. */
+export type DebtDueState = 'closed' | 'settled' | 'none' | 'overdue' | 'soon' | 'due';
+export function debtDueState(debt: Pick<PersonalDebtProfile, 'active' | 'direction' | 'dueDateISO'>, outstandingMinor: number, todayISO: string): DebtDueState {
+  if (!debt.active) return 'closed';
+  if (outstandingMinor === 0) return 'settled';
+  if (!debt.dueDateISO) return 'none';
+  const days = daysUntil(debt.dueDateISO, todayISO);
+  if (days < 0) return 'overdue';
+  return days <= 3 && debt.direction === 'owed_by_me' ? 'soon' : 'due';
+}
+
+/** 24UX6E: a due day as VoiceOver reads it, the CardFacts pattern: a relative word stays as it is («hoy», «Ayer»); a
+ * plain day is written out («1 de octubre de 2026», "October 1, 2026"), never the abbreviated «1 oct». `inline` as in
+ * `relativeDate` (the day inside a sentence). */
+export function spokenDueDay(dateISO: string, todayISO: string, locale: AppLocale = DEFAULT_LOCALE, inline = false): string {
+  const shown = relativeDate(dateISO, todayISO, locale, inline);
+  return shown === formatDate(dateISO, 'day', locale) || shown === formatDate(dateISO, 'dayYear', locale) ? formatDate(dateISO, 'long', locale) : shown;
 }
 
 /** Accounts a spending/income form may post to: cash accounts and cards, never a personal debt. */

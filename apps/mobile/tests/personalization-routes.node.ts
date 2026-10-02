@@ -34,7 +34,7 @@ const accountManagement = { useAccountManagement: () => ({ busyId: null, error: 
   consequences: () => ({ movements: 0, transfers: 0, recurring: 0 }) }) };
 const swipe = { SwipeRow: 'SwipeRow', swipeAccessibility: (actions: { key: string; label: string; onPress: () => void }[]) => ({ accessibilityActions: actions.map(action => ({ name: action.key, label: action.label })),
   onAccessibilityAction: (event: { nativeEvent: { actionName: string } }) => actions.find(action => action.key === event.nativeEvent.actionName)?.onPress() }) };
-function harness(file: string, props: any = {}, options: { data?: domain.LedgerArchive; params?: any; fail?: () => void; locale?: AppLocale; gate?: domain.CurrencyGate } = {}) {
+function harness(file: string, props: any = {}, options: { data?: domain.LedgerArchive; params?: any; fail?: () => void; locale?: AppLocale; gate?: domain.CurrencyGate; root?: boolean } = {}) {
   // Read on every render, like the live provider: switching it re-labels the next render and keeps the form state.
   let locale: AppLocale = options.locale ?? 'es-AR';
   const i18nProvider = { useI18n: () => bindLocale(locale) };
@@ -42,7 +42,7 @@ function harness(file: string, props: any = {}, options: { data?: domain.LedgerA
   const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText;
   const state: any[] = [], refs: any[] = [];
   let cursor = 0, refCursor = 0, uuid = 0, backs = 0;
-  const pushed: any[] = [], alerts: any[] = [];
+  const pushed: any[] = [], alerts: any[] = [], dismissed: any[] = [];
   const added: { account: domain.Account; appearance?: domain.AccountAppearance }[] = [];
   const changed: { change: domain.AccountChange; appearance?: domain.AccountAppearance }[] = [];
   const looks: domain.AccountAppearance[] = [], definitions: domain.CategoryDefinition[] = [];
@@ -59,7 +59,7 @@ function harness(file: string, props: any = {}, options: { data?: domain.LedgerA
     useCategoryLabel: (s: string, kind = 'expense') => appearance.resolveCategoryLook(kind as domain.EntryKind, s, identity, p).label,
     useAccountLook: (id: string) => appearance.resolveAccountLook(id, identity.appearances, p), useAccountLookOf: () => (id: string) => appearance.resolveAccountLook(id, identity.appearances, p) };
   const components = Object.fromEntries(['Screen', 'ActionButton', 'AmountField', 'AppText', 'Choices', 'DetailRow', 'SelectionRow', 'EmptyState', 'ErrorMessage', 'Field', 'FieldNote', 'IconButton', 'InfoButton', 'NavigationRow', 'Surface',
-    'CategoryBadge', 'AccountBadge', 'GlyphTile', 'PressFeedback', 'SectionTitle'].map(name => [name, name]));
+    'CategoryBadge', 'AccountBadge', 'GlyphTile', 'PressFeedback', 'SectionTitle', 'LifecycleNote'].map(name => [name, name]));
   (components as any).surfaceShadow = () => ({});
   const GATE = options.gate ?? domain.LEDGER_CURRENCIES;
   const defaults = { useDefaultCurrency: ({ accountCurrency, requested }: { accountCurrency?: string | null; requested?: unknown } = {}) => accountCurrency ?? (domain.isLedgerCurrency(requested, GATE) ? requested : 'ARS') };
@@ -77,7 +77,9 @@ function harness(file: string, props: any = {}, options: { data?: domain.LedgerA
     '@react-native-community/datetimepicker': 'DateTimePicker',
     '@expo/vector-icons/Ionicons': 'Ionicons',
     'expo-router': { Stack: { Screen: 'Stack.Screen' }, useLocalSearchParams: () => options.params ?? {},
-      router: { canGoBack: () => true, back: () => { backs++; }, push: (value: any) => pushed.push(value), replace: (value: any) => pushed.push(value) } },
+      // 24UX6E: `root` opens the modal with nothing behind it; `dismissTo` is recorded on its own.
+      router: { canGoBack: () => !options.root, back: () => { backs++; }, push: (value: any) => pushed.push(value), replace: (value: any) => pushed.push(value),
+        dismissTo: (value: any) => dismissed.push(value) } },
     'expo-crypto': { randomUUID: () => 'op-' + (++uuid) },
     'expo-haptics': { NotificationFeedbackType: { Success: 'Success' }, notificationAsync: async () => {} },
     '@finanzapp/domain': domain,
@@ -88,6 +90,8 @@ function harness(file: string, props: any = {}, options: { data?: domain.LedgerA
     './appearance-picker': { IconColorPicker: 'IconColorPicker' }, '../src/ui/appearance-picker': { IconColorPicker: 'IconColorPicker' }, '../../src/ui/appearance-picker': { IconColorPicker: 'IconColorPicker' },
     './category-hues': hues, '../src/ui/category-hues': hues, '../../src/ui/category-hues': hues,
     './categories': categories, '../src/ui/category-form': { CategoryForm: 'CategoryForm' },
+    // 24UX6E: the edit modals' not-found branches (their forms are tested in their own suites).
+    '../../src/ui/budget-form': { BudgetForm: 'BudgetForm' }, '../../src/ui/debt-form': { DebtForm: 'DebtForm' }, '../../src/ui/recurring-form': { RecurringForm: 'RecurringForm' },
     './currencies': currencies, '../src/ui/currencies': currencies, '../../src/ui/currencies': currencies,
     '../src/ui/form-controls': { CurrencyField: 'CurrencyField' }, '../../src/ui/form-controls': { CurrencyField: 'CurrencyField' },
     // 25B2: the one default-currency rule (its branches are tested in currency-defaults.node.ts; here it answers ARS) and the account lifecycle hook.
@@ -105,7 +109,7 @@ function harness(file: string, props: any = {}, options: { data?: domain.LedgerA
   return {
     render: (component?: string) => { cursor = 0; refCursor = 0; let node = (component ? module.exports[component] : module.exports.default ?? module.exports.CategoryForm)(props);
       while (typeof node.type === 'function') node = node.type(node.props); return node; },
-    pushed, alerts, added, changed, looks, definitions, removed, backs: () => backs, setLocale: (next: AppLocale) => { locale = next; },
+    pushed, alerts, added, changed, looks, definitions, removed, dismissed, backs: () => backs, setLocale: (next: AppLocale) => { locale = next; },
   };
 }
 function nodes(value: any): Node[] {
@@ -228,7 +232,7 @@ test('category form: renaming a preset keeps its stored spelling and identity; a
   find(root, 'Field').props.onChangeText('Alimentación');
   find(root, 'IconColorPicker').props.onColorChange('green');
   root = view.render();
-  const note = nodes(root).filter(node => node.type === 'AppText').map(node => [node.props.children].flat().join('')).join(' ');
+  const note = nodes(root).filter(node => node.type === 'AppText' || node.type === 'FieldNote').map(node => [node.props.children].flat().join('')).join(' ');
   assert.match(note, /se siguen registrando como «Comida»/);
   await find(root, 'ActionButton', 'Guardar cambios').props.onPress();
   assert.deepEqual(view.definitions[0], { kind: 'expense', key: 'comida', storedLabel: 'Comida', label: 'Alimentación', icon: 'food', color: 'green', archived: false,
@@ -384,7 +388,8 @@ test('Reduce Motion removes the picker transitions; disabled locks every option'
 // change: a built-in category shows its English name, but its identity, its
 // stored spelling and the definition's label stay the Spanish ones, so an
 // untouched English name is never saved as a rename.
-const texts = (root: Node) => nodes(root).filter(node => node.type === 'AppText').map(node => [node.props.children].flat().join('')).join(' ');
+// 24UX6E: the rename note is a FieldNote under the name field.
+const texts = (root: Node) => nodes(root).filter(node => node.type === 'AppText' || node.type === 'FieldNote').map(node => [node.props.children].flat().join('')).join(' ');
 test('23.1B2 English category form: a built-in category is prefilled in English, and saving it untouched never stores the English word', async () => {
   const original = domain.resolveCategory('expense', 'Comida');
   const view = harness('src/ui/category-form.tsx', { original }, { locale: 'en-AR' });
@@ -600,4 +605,153 @@ test('25B2: Editar cuenta offers «Eliminar cuenta» last, in the destructive to
   const gone = harness('app/edit-account/[id].tsx', {}, { data, params: { id: 'cash' } }).render();
   assert.equal(nodes(gone).find(node => node.type === 'EmptyState')!.props.title, 'Cuenta eliminada');
   assert.equal(nodes(gone).some(node => node.type === 'Field'), false, 'no form for a deleted account');
+});
+
+// ---- 24UX6E: Categorías, the edit modals' exits and the post-delete navigation ----------------------------------------
+
+test('24UX6E: an untouched save of a historical category closes without writing, so it is never adopted, recoloured or re-glyphed', async () => {
+  const view = harness('src/ui/category-form.tsx', { original: domain.resolveCategory('expense', 'sjsjn') });
+  await find(view.render(), 'ActionButton', 'Guardar cambios').props.onPress();
+  assert.equal(view.definitions.length, 0);
+  assert.equal(view.backs(), 1);
+  // A mapped synonym opens on the curated icon whose glyph the list already draws for it; the derived hue is no palette colour.
+  const nafta = harness('src/ui/category-form.tsx', { original: domain.resolveCategory('expense', 'nafta') });
+  const picker = find(nafta.render(), 'IconColorPicker');
+  assert.deepEqual([picker.props.icon, picker.props.color], ['fuel', 'graphite']);
+  assert.equal(appearance.categoryGlyph('fuel'), appearance.identityGlyph(domain.resolveCategory('expense', 'nafta')), 'the glyph it already shows');
+  await find(nafta.render(), 'ActionButton', 'Guardar cambios').props.onPress();
+  assert.equal(nafta.definitions.length, 0, 'untouched: no write');
+  assert.equal(find(harness('src/ui/category-form.tsx', { original: domain.resolveCategory('expense', 'sjsjn') }).render(), 'IconColorPicker').props.icon, 'other', 'an unmapped string opens on «other»');
+  // A real change still adopts it, keeping the glyph it opened on unless the person picked another.
+  const renamed = harness('src/ui/category-form.tsx', { original: domain.resolveCategory('expense', 'nafta') });
+  find(renamed.render(), 'Field').props.onChangeText('Combustible auto');
+  await find(renamed.render(), 'ActionButton', 'Guardar cambios').props.onPress();
+  assert.deepEqual([renamed.definitions[0].label, renamed.definitions[0].storedLabel, renamed.definitions[0].icon], ['Combustible auto', 'nafta', 'fuel']);
+  // Archiving a never-adopted synonym keeps its glyph too.
+  const archiving = harness('src/ui/category-form.tsx', { original: domain.resolveCategory('expense', 'nafta') });
+  find(archiving.render(), 'ActionButton', 'Archivar categoría').props.onPress();
+  archiving.alerts[0].buttons[1].onPress(); await flush();
+  assert.deepEqual([archiving.definitions[0].archived, archiving.definitions[0].icon, archiving.definitions[0].storedLabel], [true, 'fuel', 'nafta']);
+});
+
+test('24UX6E: a rename into another category\'s name is refused before any write and the form stays editable (both storage rules)', async () => {
+  const view = harness('src/ui/category-form.tsx', { original: domain.resolveCategory('expense', 'Comida') });
+  find(view.render(), 'Field').props.onChangeText('Supermercado');
+  await find(view.render(), 'ActionButton', 'Guardar cambios').props.onPress();
+  let root = view.render();
+  assert.equal(view.definitions.length, 0, 'nothing reached storage');
+  assert.equal(bindLocale('es-AR').errorText(find(root, 'ErrorMessage').props.message), '«Supermercado» ya es el nombre de otra categoría.');
+  assert.equal(find(root, 'Field').props.editable, true, 'an input error, never a frozen retry');
+  assert.equal(find(root, 'IconColorPicker').props.disabled, false);
+  assert.ok(find(root, 'ActionButton', 'Guardar cambios'), 'the button still saves the form, never «Reintentar guardado»');
+  assert.equal(nodes(root).some(node => node.type === 'AppText' && /Reintentá el mismo guardado/.test(String(node.props.children))), false);
+  // Fixing the name saves.
+  find(root, 'Field').props.onChangeText('Alimentación');
+  await find(view.render(), 'ActionButton', 'Guardar cambios').props.onPress();
+  assert.equal(view.definitions[0].label, 'Alimentación');
+  // The second rule: another definition already shows that name (Comida renamed «Alimentación», then Supermercado renamed the same).
+  const data = { ...archive, categories: [view.definitions[0]] };
+  const clash = harness('src/ui/category-form.tsx', { original: domain.resolveCategory('expense', 'Supermercado', data.categories) }, { data });
+  find(clash.render(), 'Field').props.onChangeText('Alimentación');
+  await find(clash.render(), 'ActionButton', 'Guardar cambios').props.onPress();
+  root = clash.render();
+  assert.equal(clash.definitions.length, 0);
+  assert.equal(bindLocale('es-AR').errorText(find(root, 'ErrorMessage').props.message), 'Ya existe una categoría llamada «Alimentación».');
+  assert.equal(find(root, 'Field').props.editable, true);
+  assert.equal(bindLocale('en-AR').errorText(find(root, 'ErrorMessage').props.message).includes('Alimentación'), true, 'translated with the name');
+  // A real storage failure still freezes the same write for an honest retry.
+  let attempts = 0;
+  const failing = harness('src/ui/category-form.tsx', { original: domain.resolveCategory('expense', 'Comida') }, { fail: () => { if (++attempts === 1) throw new Error('disk'); } });
+  find(failing.render(), 'Field').props.onChangeText('Comidas del mes');
+  find(failing.render(), 'ActionButton', 'Guardar cambios').props.onPress(); await flush();
+  assert.equal(find(failing.render(), 'Field').props.editable, false);
+  assert.ok(find(failing.render(), 'ActionButton', 'Reintentar guardado'));
+});
+
+test('24UX6E review: archiving runs the same storage name rules first, so a clash is an editable error, never a frozen retry', async () => {
+  // Combustible renamed «Nafta», while movements still carry the historical string «nafta»: archiving that string's row
+  // would write a second definition shown as «Nafta», which storage refuses (validateArchive).
+  const renamed = domain.editedCategoryDefinition(domain.resolveCategory('expense', 'Combustible'), { label: 'Nafta' }, '2026-09-20T10:00:00.000Z');
+  const data = { ...archive, categories: [renamed] };
+  const view = harness('src/ui/category-form.tsx', { original: domain.resolveCategory('expense', 'nafta', data.categories) }, { data });
+  find(view.render(), 'ActionButton', 'Archivar categoría').props.onPress();
+  await flush();
+  const root = view.render();
+  assert.equal(view.alerts.length, 0, 'no confirmation for a write storage would refuse');
+  assert.equal(view.definitions.length, 0, 'nothing reached storage');
+  assert.equal(bindLocale('es-AR').errorText(find(root, 'ErrorMessage').props.message), '«Nafta» ya es el nombre de otra categoría.');
+  assert.equal(find(root, 'Field').props.editable, true);
+  assert.ok(find(root, 'ActionButton', 'Guardar cambios'), 'never «Reintentar guardado»');
+  // Without the clash the same row archives as before.
+  const plain = harness('src/ui/category-form.tsx', { original: domain.resolveCategory('expense', 'nafta') });
+  find(plain.render(), 'ActionButton', 'Archivar categoría').props.onPress();
+  plain.alerts[0].buttons[1].onPress(); await flush();
+  assert.equal(plain.definitions[0].archived, true);
+});
+
+test('24UX6E: an archived category\'s editor opens with the lifecycle note; an active one has none; the rename note sits under the name field', () => {
+  const archived = domain.editedCategoryDefinition(domain.resolveCategory('expense', 'sjsjn'), { archived: true }, createdAt);
+  const data = { ...archive, categories: [archived] };
+  const root = harness('src/ui/category-form.tsx', { original: domain.resolveCategory('expense', 'sjsjn', [archived]) }, { data }).render();
+  const order = nodes(root).map(node => node.type);
+  const note = find(root, 'LifecycleNote');
+  assert.deepEqual([note.props.icon, note.props.title, note.props.tone], ['archive-outline', 'Archivada', undefined], 'calm: no alarm tone');
+  assert.match(note.props.detail, /^No se ofrece al registrar\. .*desarchivala para volver a ofrecerla\.$/);
+  assert.ok(order.indexOf('LifecycleNote') < order.indexOf('Field'), 'first, above the name');
+  assert.doesNotMatch(texts(root), /Archivada:/, 'the bottom paragraph no longer repeats the state');
+  assert.match(texts(root), /no modifica ningún movimiento/);
+  const english = harness('src/ui/category-form.tsx', { original: domain.resolveCategory('expense', 'sjsjn', [archived]) }, { data, locale: 'en-AR' }).render();
+  assert.equal(find(english, 'LifecycleNote').props.title, 'Archived');
+  const active = harness('src/ui/category-form.tsx', { original: domain.resolveCategory('expense', 'Comida') });
+  assert.equal(nodes(active.render()).some(node => node.type === 'LifecycleNote'), false);
+  assert.equal(nodes(active.render()).some(node => node.type === 'FieldNote'), false, 'no rename note before a rename');
+  find(active.render(), 'Field').props.onChangeText('Alimentación');
+  const renamed = active.render();
+  const types = nodes(renamed).map(node => node.type);
+  assert.equal(types.indexOf('FieldNote'), types.indexOf('Field') + 1, 'right under the field that causes it');
+  assert.ok(types.indexOf('FieldNote') < types.indexOf('IconColorPicker'));
+  assert.equal(find(renamed, 'FieldNote').props.children, 'Los movimientos se siguen registrando como «Comida» y se muestran como «Alimentación».');
+});
+
+test('24UX6E: every edit modal keeps a close button when there is nothing to edit, with its form\'s own fallback', () => {
+  const routes: [string, string][] = [['app/edit-category.tsx', '/categories'], ['app/edit-budget/[id].tsx', '/budgets'], ['app/edit-debt/[id].tsx', '/debts'],
+    ['app/edit-recurring/[id].tsx', '/recurring']];
+  for (const [file, fallback] of routes) {
+    const params = { id: 'nunca', kind: 'expense', key: 'nunca' };
+    const view = harness(file, {}, { params });
+    const root = view.render();
+    assert.ok(find(root, 'EmptyState'), file);
+    const close = nodes(root).find(node => node.type === 'Stack.Screen')!.props.options.headerLeft();
+    assert.deepEqual([close.type, close.props.name, close.props.label], ['IconButton', 'close', 'Cerrar'], file);
+    close.props.onPress();
+    assert.equal(view.backs(), 1, file);
+    const alone = harness(file, {}, { params, root: true });
+    nodes(alone.render()).find(node => node.type === 'Stack.Screen')!.props.options.headerLeft().props.onPress();
+    assert.deepEqual([alone.backs(), alone.pushed], [0, [fallback]], file + ': nothing behind it');
+  }
+  // Editar cuenta: an unknown and a deleted account both keep the close; with nothing behind, it goes to Cuentas.
+  const at = '2026-09-27T10:00:00.000Z';
+  const data = { ...archive, accounts: archive.accounts.map(item => item.id === 'cash' ? { ...cash, revision: 1, updatedAt: at, deletedAt: at } : item) };
+  for (const options of [{ params: { id: 'nunca' } }, { data, params: { id: 'cash' } }]) {
+    const view = harness('app/edit-account/[id].tsx', {}, options);
+    const close = nodes(view.render()).find(node => node.type === 'Stack.Screen')!.props.options.headerLeft();
+    assert.equal(close.props.label, 'Cerrar');
+    close.props.onPress();
+    assert.equal(view.backs(), 1);
+    const alone = harness('app/edit-account/[id].tsx', {}, { ...options, root: true });
+    nodes(alone.render()).find(node => node.type === 'Stack.Screen')!.props.options.headerLeft().props.onPress();
+    assert.deepEqual([alone.dismissed, alone.pushed], [['/accounts'], []]);
+  }
+});
+
+test('24UX6E: after «Eliminar cuenta» the editor dismisses to Cuentas in one step; its close falls back to Cuentas the same way', async () => {
+  const view = harness('app/edit-account/[id].tsx', {}, { params: { id: 'cash' } });
+  removed.length = 0;
+  find(view.render(), 'ActionButton', 'Eliminar cuenta').props.onPress();
+  assert.equal(removed.length, 1);
+  assert.deepEqual(view.dismissed, ['/accounts'], 'pops to Cuentas when it is in the stack (dismissTo)');
+  assert.deepEqual(view.pushed, [], 'never a replace on top of the stack');
+  const alone = harness('app/edit-account/[id].tsx', {}, { params: { id: 'cash' }, root: true });
+  await find(alone.render(), 'ActionButton', 'Guardar cambios').props.onPress();
+  assert.deepEqual([alone.backs(), alone.dismissed, alone.changed.length], [0, ['/accounts'], 0], 'an unchanged save closes to Cuentas');
 });

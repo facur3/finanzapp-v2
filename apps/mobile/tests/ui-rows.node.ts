@@ -19,7 +19,7 @@ import * as movementAmount from '../src/ui/movement-amount.ts';
 // replaced by descriptors). Structure, hierarchy and labels are checked here;
 // wrapping at Dynamic Type sizes and narrow widths needs the iPhone.
 type Node = { type: any; props: Record<string, any> };
-function load(file: string, extra: Record<string, unknown> = {}, fontScale = 1) {
+function load(file: string, extra: Record<string, unknown> = {}, fontScale = 1, width = 390) {
   const source = readFileSync(new URL('../src/ui/' + file, import.meta.url), 'utf8');
   const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText;
   const jsx = (type: any, props: any) => ({ type, props });
@@ -28,7 +28,7 @@ function load(file: string, extra: Record<string, unknown> = {}, fontScale = 1) 
   const haptics: string[] = [];
   let cursor = 0;
   const p = { isDark: false, surface: '#FFFFFF', inset: '#EEEEF3', text: '#0A0A0C', secondary: '#6E7078', tertiary: '#8E9098', line: '#E6E6EC', primary: '#2557D6', primaryFill: '#2557D6', onPrimary: '#FFF', primarySoft: '#E5ECFB', background: '#F2F2F6',
-    income: '#1F7A4D', expense: '#C0392B', transfer: '#2D6476', transferSoft: '#E2EDF1', incomeSoft: '#E3F1E8' };
+    income: '#1F7A4D', expense: '#C0392B', warning: '#B26A00', transfer: '#2D6476', transferSoft: '#E2EDF1', incomeSoft: '#E3F1E8' };
   const modules: Record<string, unknown> = {
     react: { useState: (initial: unknown) => { const index = cursor++; if (!(index in state)) state[index] = initial; return [state[index], (value: unknown) => { state[index] = typeof value === 'function' ? (value as (c: unknown) => unknown)(state[index]) : value; }]; },
       useEffect: () => {}, useId: () => 'id', useRef: (initial: unknown) => ({ current: initial }), useMemo: (fn: () => unknown) => fn(),
@@ -36,7 +36,7 @@ function load(file: string, extra: Record<string, unknown> = {}, fontScale = 1) 
     'react/jsx-runtime': { jsx, jsxs: jsx, Fragment: 'Fragment' },
     'react-native': { View: 'View', Text: 'Text', TextInput: 'TextInput', ScrollView: 'ScrollView', Pressable: 'Pressable', ActivityIndicator: 'ActivityIndicator', InputAccessoryView: 'InputAccessoryView',
       FlatList: 'FlatList', Modal: 'Modal', Platform: { OS: 'ios' }, Keyboard: { dismiss() {} }, StyleSheet: { hairlineWidth: 0.5, create: (styles: unknown) => styles, flatten: (style: any) => Object.assign({}, ...(Array.isArray(style) ? style.flat(Infinity).filter(Boolean) : [style])), absoluteFill: {} },
-      useWindowDimensions: () => ({ fontScale, width: 390, height: 844 }), Alert: { alert: (title: string, message: string, buttons?: { text: string }[]) => alerts.push({ title, message, buttons }) } },
+      useWindowDimensions: () => ({ fontScale, width, height: 844 }), Alert: { alert: (title: string, message: string, buttons?: { text: string }[]) => alerts.push({ title, message, buttons }) } },
     'react-native-reanimated': { __esModule: true, default: { View: 'Animated.View', Text: 'Animated.Text' }, useSharedValue: (value: number) => ({ value }), withTiming: (value: number) => value, useAnimatedStyle: (fn: () => unknown) => fn() },
     'react-native-safe-area-context': { SafeAreaView: 'SafeAreaView' },
     '@react-native-community/datetimepicker': 'DateTimePicker',
@@ -636,6 +636,56 @@ test('24UX6C: a computed sign is kept: a negative account balance still renders 
   assert.equal(money.props.minor, -45000);
   assert.equal(money.props.color, '#C0392B', 'a negative balance keeps its warning colour');
   assert.ok(drawn(row).some(text => /^[-−]/.test(text)), 'the minus is drawn: ' + drawn(row).join(' | '));
+});
+
+test('24UX6E: LifecycleNote says a state calmly: a secondary glyph hidden from VoiceOver, an optional subhead title and one footnote line; amber only on the words of a review', () => {
+  const ui = load('components.tsx');
+  const note = ui.render('LifecycleNote', { icon: 'trash-outline', title: 'Cuenta eliminada', detail: 'Sus movimientos siguen aquí.' });
+  const glyph = nodes(note).find(node => is(node, 'Ionicons'))!;
+  assert.equal(glyph.props.name, 'trash-outline');
+  assert.equal(glyph.props.accessible, false);
+  assert.equal(glyph.props.color, '#6E7078');
+  const [title, detail] = texts(note);
+  assert.equal(title.props.children, 'Cuenta eliminada');
+  assert.equal(title.props.variant, 'subhead');
+  assert.equal(flat(title.props.style).fontWeight, '600');
+  assert.equal(detail.props.children, 'Sus movimientos siguen aquí.');
+  assert.equal(detail.props.variant, 'footnote');
+  assert.equal(detail.props.secondary, true);
+  assert.equal(nodes(note).some(node => is(node, 'Surface')), false, 'no surface, no banner');
+  assert.equal(JSON.stringify(note).includes('#C0392B'), false, 'never the alarm colour');
+  const plain = ui.render('LifecycleNote', { icon: 'pause-outline', detail: 'Pausada.' });
+  assert.equal(texts(plain).length, 1, 'without a title, one line');
+  const review = ui.render('LifecycleNote', { icon: 'alert-circle-outline', detail: 'Revisala.', tone: 'warning' });
+  assert.equal(nodes(review).find(node => is(node, 'Ionicons'))!.props.color, '#6E7078', 'the glyph stays secondary');
+  assert.equal(flat(texts(review)[0].props.style).color, '#B26A00');
+});
+
+test('24UX6E: AccountRow draws the name and the balance only (no «Cuenta · ARS» line); VoiceOver still reads the name and the balance', () => {
+  const ui = load('components.tsx');
+  const account = { id: 'a', name: 'Banco', currency: 'ARS', openingMinor: 0, createdAt: 't' };
+  const row = ui.render('AccountRow', { account, entries: [], transfers: [] });
+  const shown = texts(row).map(node => String(node.props.children));
+  assert.deepEqual(shown, ['Banco'], 'only the name is an AppText: ' + shown.join(' | '));
+  assert.equal(drawn(row).some(text => /Cuenta|·/.test(text)), false, drawn(row).join(' | '));
+  assert.equal(nodes(row).find(node => is(node, 'PressFeedback'))!.props.accessibilityLabel, 'Ver cuenta Banco, saldo 0,00 ARS');
+  assert.ok(nodes(row).some(node => is(node, 'Ionicons') && node.props.name === 'chevron-forward'), 'it still pushes the detail');
+});
+
+test('24UX6E: AccountRow counts its chevron (ROW_CHEVRON) when it decides to stack: a seven-digit ARS balance with cents goes under the name at 375 pt, stays beside it at 430 pt, and any balance stacks at large text', () => {
+  assert.equal(geometry.ROW_CHEVRON, 28, 'the 16 pt chevron and the 12 pt gap before it');
+  const domainWith = (balance: number) => ({ '@finanzapp/domain': { accountBalanceMinor: () => balance, formatMinorUnits, labelFromISO: (d: string) => d, categoryKey: (s: string) => s.toLowerCase(), todayKey: (d: Date) => d.toISOString().slice(0, 10) } });
+  const account = { id: 'a', name: 'Banco', currency: 'ARS', openingMinor: 0, createdAt: 't' };
+  const direction = (balance: number, width: number, fontScale = 1) => {
+    const row = load('components.tsx', domainWith(balance), fontScale, width).render('AccountRow', { account, entries: [], transfers: [] });
+    return nodes(row).find(node => is(node, 'View') && node.props.style?.flex === 1 && 'flexDirection' in node.props.style)!.props.style.flexDirection;
+  };
+  // «$ 1.234.567,89» is about 127 pt at 17 pt: under the 141 pt the row had without the chevron, over the 125 pt it really has.
+  assert.equal(geometry.rowStacks(375, 1, '$ 1.234.567,89'), false, 'the old estimate (no chevron) kept it beside the name');
+  assert.equal(direction(123456789, 375), 'column', 'at 375 pt it stacks instead of shrinking');
+  assert.equal(direction(123456789, 430), 'row', 'at 430 pt it fits beside the name');
+  assert.equal(direction(150000, 375), 'row', 'an everyday balance stays beside the name');
+  assert.equal(direction(0, 430, 1.5), 'column', 'large text stacks every row');
 });
 
 test('24UX6D: in a card\'s lists a purchase and a recorded instalment are unsigned ink, a payment is a transfer («Pago de tarjeta», the transfer tone, no sign)', () => {

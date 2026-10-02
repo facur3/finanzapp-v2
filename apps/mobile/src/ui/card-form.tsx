@@ -226,7 +226,7 @@ export function CardForm({ original }: { original?: CreditCardProfile }) {
     {before && <>
       <ErrorMessage message={manage.error} />
       <ActionButton label={t('cards.form.delete')} icon="trash-outline" secondary tone="expense" disabled={locked || manage.busyId === before.id}
-        onPress={() => manage.remove(before, () => { (router as { dismissAll?: () => void }).dismissAll?.(); router.replace('/cards'); })} />
+        onPress={() => manage.remove(before, () => router.dismissTo('/cards'))} />
     </>}
   </Screen>;
 }

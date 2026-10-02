@@ -6,6 +6,8 @@ export const accounts: Pick<Messages, 'accounts'> = {
     list: {
       emptyTitle: 'Start with an account',
       emptyDetail: 'Choose an account to group your transactions. Entering an opening balance is optional.',
+      /** 24UX6E: what VoiceOver reads for a currency's section header: its name and its recorded total, spoken. */
+      sectionLabel: '{currency}, recorded balance {amount}',
     },
     detail: {
       notFoundTitle: 'We couldn’t find this account',
@@ -35,7 +37,7 @@ export const accounts: Pick<Messages, 'accounts'> = {
       delete: 'Delete',
       deleteAccount: 'Delete account',
       deleteTitle: 'Delete {name}?',
-      deleteDetail: 'It leaves your accounts, Available and the forms. Nothing is erased: {movements} and {transfers} stay in Transactions with its name and currency.',
+      deleteDetail: 'It leaves your accounts, Available and the forms. Nothing is erased: {movements} and {transfers} stay in Activity with its name and currency.',
       deleteDetailEmpty: 'It leaves your accounts and the forms. It has no transactions.',
       movements: { one: '{count} transaction', other: '{count} transactions' },
       transfers: { one: '{count} transfer', other: '{count} transfers' },

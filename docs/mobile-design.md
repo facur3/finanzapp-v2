@@ -140,13 +140,19 @@ que leen son ahora los de Forest. Su restyle por pantalla queda para 24UX6B–6D
 
 - **Presupuestos.** Un número principal (lo que queda o cuánto se excedió), barra
   total, gastado y límite, una línea de estado y filas densas con porcentaje, estado
-  y una barra fina por categoría. Nada de barras enormes repetidas.
+  y una barra fina por categoría. Nada de barras enormes repetidas. *(→ 24UX6E: el general plano sobre el lienzo, en el
+  orden héroe → barra → estado → Gastado / Límite, el héroe en tinta salvo excedido; el tile de un sublímite solo
+  identidad, sin chevron; ver «Producto 24UX6E — Más destinos financieros en Forest».)*
 - **Recurrentes.** Tres estadísticas compactas para los próximos 30 días por moneda,
   filas con frecuencia, próxima fecha, cuenta, importe con signo y "Hoy / Mañana /
-  En N días", y el switch nativo para pausar.
+  En N días", y el switch nativo para pausar. *(→ 24UX6C: el gasto sin signo, «+» solo en un ingreso; 24UX4: sin
+  interruptor, pausar es una acción del deslizamiento y del detalle; 24UX6E: el pronóstico plano con «Gastos» en su
+  propia línea, ámbar solo en un gasto de hoy o mañana, «Cuenta eliminada» / «Tarjeta eliminada» en una regla cerrada.)*
 - **Cuentas.** Solo cuentas de dinero, agrupadas por moneda con el total de cada una;
   el detalle muestra saldo, gastos e ingresos del mes, Gasto / Ingreso / Transferir y
-  sus movimientos. Tarjetas y deudas viven en su pestaña.
+  sus movimientos. Tarjetas y deudas viven en su pestaña. *(→ 24UX6E: la cabecera de cada moneda en tinta, un solo
+  encabezado para VoiceOver; la fila sin «Cuenta · ARS»; el saldo y los datos del mes en un bloque plano, el saldo en
+  40 pt y «Gastos este mes» sin signo.)*
 - **Reportes (desde 24UX6B; ver «Producto 24UX6B — jerarquía de Reportes»).** Alcance y mes; el total con su línea
   de promedio y variación; Categorías | Día a día con la dona y «Por categoría» o «Por día»; debajo, «Evolución» con
   los seis meses (o una nota con un solo mes); después presupuestos, comercios, hechos, ingresos y flujo neto, y la
@@ -212,7 +218,9 @@ que leen son ahora los de Forest. Su restyle por pantalla queda para 24UX6B–6D
   están en la cara; no hay tabla de detalle. Pagos se leen como "Pago de tarjeta ·
   desde Cuenta", sin signo ambiguo.
 - **Deudas y cobros.** Totales por moneda, Debo / Me deben, detalle con estado,
-  vencimiento y registro de pagos o cobros limitados al saldo pendiente.
+  vencimiento y registro de pagos o cobros limitados al saldo pendiente. *(→ 24UX6E: tiles neutros y totales en
+  tinta; el color marca el estado, no la dirección; el detalle sin Tipo ni Estado y «Vencimiento» solo cuando la línea
+  de estado ya no lleva la fecha.)*
 - **Formularios.** Pagar tarjeta y saldar deudas fijan la obligación y solo eligen
   la cuenta de dinero en la misma moneda. El selector de cuenta nombra el tipo
   (Cuenta, Tarjeta de crédito) y nunca ofrece una deuda para un gasto.
@@ -330,7 +338,8 @@ Forest; ver «Producto 24UX6A».*
   Mismo AmountField de Interfaz 17.
 - **Presupuestos.** Jerarquía: el presupuesto general es el resumen principal
   (Disponible o Excedido, barra, Gastado / Límite, "N % utilizado" en su color de
-  estado) y los límites por categoría son filas densas debajo. Sin general, un botón
+  estado) y los límites por categoría son filas densas debajo. *(→ 24UX6E: plano, sin tarjeta, en el orden Disponible
+  o Excedido → barra → «N % utilizado» → Gastado / Límite, el héroe en tinta salvo excedido; ver «Producto 24UX6E».)* Sin general, un botón
   secundario compacto "Agregar presupuesto general", nunca una tarjeta vacía enorme.
   Nunca se suman los sublímites.
 - **Estados.** Un solo criterio en el dominio: calmo por debajo del 85 %, aviso
@@ -363,7 +372,9 @@ Forest; ver «Producto 24UX6A».*
   selector, Inicio, Reportes (leyenda, dona, comercios), Presupuestos, Recurrentes y
   desgloses; la cadena guardada no cambia.
 - **Categorías.** Lista con Gastos, Ingresos y Archivadas; "+" abre Nueva categoría;
-  tocar una fila edita nombre, ícono y color o la archiva con confirmación. Sin borrado.
+  tocar una fila edita nombre, ícono y color o la archiva con confirmación. Sin borrado. *(→ 24UX6E: filas en la
+  geometría de Forest sin chevron; una archivada ya no se atenúa y en Archivadas dice su tipo; el editor de una
+  archivada abre con su nota de ciclo de vida.)*
 - **Más.** Solo el grupo Finanzas lleva tiles tintados (cobalto, verde azulado, índigo,
   ocre, pizarra) sobre la superficie neutra; App y datos sigue neutro.
 
@@ -625,15 +636,16 @@ Las reglas de «Motion y accesibilidad» siguen vigentes: la curva de `src/ui/mo
   de evolución conservan la navegación por mes actual (sin una segunda selección solo para comparar); «Otras» sigue
   agrupando por los primeros N (no se adopta la regla del 3 %); sin ruta inventada de detalle por comercio.
 - **24UX6C Movimientos y Más** *(implementado en parte: ver «Producto 24UX6C — presentación de movimientos, Inicio y
-  Más»; los filtros por período, cuenta y categoría siguen pendientes; desde 24UX6D pertenecen al alcance de búsqueda
-  de 25C)*. Filas, búsqueda y filtros en Forest; filtros por período, cuenta y categoría desde los
+  Más»; los filtros por cuenta, categoría, período y período a medida siguen pendientes; desde 24UX6D pertenecen al
+  alcance de búsqueda de 25C, con sus búsquedas guardadas; hoy existen la búsqueda y el filtro de tipo Todos / Gastos /
+  Ingresos / Transf.)*. Filas, búsqueda y filtros en Forest; filtros por período, cuenta y categoría desde los
   datos del repositorio; el total del día como hoy. Sin nota, origen Apple Pay ni hora inventados; Deshacer y
   Recuperar se quedan (sin borrado definitivo falso), igual que Movimientos deshechos. Idioma y Región siguen siendo
   rutas separadas, agrupadas a la vista; no hay fila «Ajustes» (no tiene ruta).
 - **24UX6D Tarjetas** *(implementada: ver «Producto 24UX6D — Tarjetas en Forest y pulido final de Inicio y Reportes»)*. Conserva todo lo que hace (Disponible de crédito, Registrar compra, Recientes); se permiten la
   interacción de mazo y el restyle Forest. El progreso de cuotas es registradas / facturadas según el dominio, nunca
   «pagadas» inferidas, con los importes programados reales; ninguna fórmula contable ni de disponible cambia.
-- **24UX6E Más destinos financieros en Forest** *(planificada, sin implementar; redefinida por el dueño el 2026-10-01)*.
+- **24UX6E Más destinos financieros en Forest** *(implementada: ver «Producto 24UX6E — Más destinos financieros en Forest»)*.
   Cuentas (lista y detalle), Presupuestos (lista, detalle y sus flujos actuales), Recurrentes (lista y detalle),
   Deudas y cobros (lista y detalle) y Categorías, llevados a la jerarquía y la calidad de Inicio, Reportes y Tarjetas.
   Solo presentación y ciclo de vida, salvo que aparezca un error real; ningún cambio contable, de almacenamiento ni de
@@ -828,6 +840,173 @@ La selección de porciones dentro de la dona (solo visual, dentro del reporte) *
 barras de Día a día y una cabecera fija sólida. Siguen permitidos para una pasada siguiente; no hay ruta de detalle por comercio. El orden
 vinculante del roadmap no cambia: la próxima entrega de producto es 24T3; 24UX6C (Movimientos y Más) y 24UX6D
 (Tarjetas) siguen a 24UX6B en el carril UX, y su lugar frente a 24T3 lo decide el dueño (ver `docs/mobile-roadmap.md`).
+
+## Producto 24UX6E — Más destinos financieros en Forest
+
+La última pasada del carril UX, en su rama `feat/producto-24ux6e-more-financial-forest` desde master 8f758ad (24UX6D
+mergeada como PR #74): Cuentas, Presupuestos, Recurrentes, Deudas y cobros y Categorías llevados a la jerarquía y la
+calidad de Inicio, Reportes y Tarjetas, y las utilidades de Más auditadas sin rediseñarse. Implementado en código; **la
+revisión en iPhone está pendiente** (no hubo build de EAS) y su lista está en docs/mobile-device-checklist.md
+(«Producto 24UX6E»). Solo presentación y ciclo de vida, más los errores reales que aparecieron: no cambia el dominio,
+el almacenamiento, el esquema (13), las copias (v13), las cotizaciones ni nada nativo; Inicio, Reportes y Tarjetas
+quedan como estaban (Tarjetas solo recibe la navegación después de eliminar). Reemplaza, marcadas en su lugar, las
+frases de este documento sobre el importe con signo y el interruptor de Recurrentes, el ámbar de cualquier recurrente
+de hoy o mañana, «Cuenta eliminada» en lugar de «Saldo registrado», el estado «Cerrada» del detalle de una deuda, el
+orden del presupuesto general (número → barra → gastado / límite → estado), las filas archivadas atenuadas de
+Categorías, el neto del día de Movimientos deshechos y las dos tarjetas pegadas de los selectores. La regla vinculante
+está en la decisión 005 («Enmienda 2026-10-01 — Producto 24UX6E»). Con esta entrega **la línea visual amplia de Forest
+queda cerrada**: otra pasada necesita evidencia del iPhone de una regresión concreta.
+
+### Reglas comunes
+
+- **El color marca el estado, nunca la dirección ni la identidad.** El tono de alerta (`expense`) solo para lo vencido,
+  lo que pasó un límite, un saldo de verdad negativo o una acción destructiva; el ámbar (`warning`) para lo que vence
+  pronto o un presupuesto del 85 % al 100 %; el color de una categoría solo en su tile de identidad.
+- **Una nota de ciclo de vida, la misma en todos lados.** `LifecycleNote` (`src/ui/components.tsx`, la forma de
+  `CardLifecycleNote` de Tarjetas, que no se tocó): un glifo secundario de 18 pt oculto para VoiceOver, un título
+  opcional (subhead 600) y una línea footnote que dice qué sigue haciendo; sin superficie, sin banner, sin color de
+  alarma. `tone="warning"` solo para un estado que pide revisión (un recurrente apartado), y entonces en las palabras,
+  nunca en el glifo. La usan una cuenta eliminada, un recurrente pausado, cerrado o para revisar, una deuda cerrada y
+  una categoría archivada.
+- **Sin chevron en una fila que abre un editor modal** (un sublímite, una categoría): el chevron promete un push. Lo
+  llevan las filas que empujan una pantalla (una cuenta); las filas de Recurrentes y Deudas siguen sin chevron (filas
+  hermanas con deslizamiento). `ROW_CHEVRON = 28` (`src/ui/geometry.ts`, el chevron de 16 pt y su separación de 12 pt)
+  es lo que una fila con chevron descuenta antes de decidir si apila.
+- **Resúmenes planos sobre el lienzo.** Los resúmenes por moneda dejan su tarjeta con relleno (el pronóstico de
+  Recurrentes, los totales de Deudas, el presupuesto general, los datos del mes de una cuenta); solo las listas
+  agrupadas (`Surface grouped`) siguen siendo contenedores. Los filetes son `StyleSheet.hairlineWidth`, nunca 0,5.
+- **Fechas dichas enteras.** Una fecha que VoiceOver lee sigue el patrón del panel de tarjeta: una palabra relativa
+  («Hoy», «Ayer») queda igual; un día suelto se lee escrito («1 de octubre de 2026»), nunca «1 oct».
+
+### Cuentas
+
+- **Lista.** La cabecera de cada moneda es su nombre como encabezado (subhead 600, tinta, se achica si hace falta) y su
+  total registrado al lado (15 pt, secundario; el tono de alerta y el menos solo si es negativo). Para VoiceOver es un
+  solo encabezado que dice qué es la cifra: «Pesos argentinos, saldo registrado 1423,00 pesos». Con texto mayor que
+  1,2× o cuando no entran juntos, el total baja bajo el nombre (`labelAmountStacks`); el dinero nunca se achica ni se
+  corta.
+- **Fila.** La marca, el nombre y el saldo, sin la línea «Cuenta · ARS» (toda fila de Cuentas es una cuenta de dinero y
+  la sección ya nombra la moneda); el chevron cuenta al decidir si apila, así un saldo de siete cifras con centavos a
+  375 pt baja bajo el nombre en lugar de achicarse.
+- **Detalle.** Un bloque de estado plano (la forma de `CardStatusBlock`): la marca de 32 pt y «Saldo registrado · ARS»
+  (footnote 500) sobre el saldo en 40 pt (en el tono de alerta solo si es negativo); después «Gastos este mes» (sin
+  signo, en tinta, como «Gastos» de Recurrentes: 24UX6C deja el signo a saldos, netos y diferencias) e «Ingresos este
+  mes» (con «+» en verde), sin superficie. Luego las acciones rápidas, la fila Recurrentes y los movimientos, como antes.
+- **Cuenta eliminada.** Arriba, una `LifecycleNote` (papelera, «Cuenta eliminada» y la nota de siempre); el saldo
+  conserva su rótulo «Saldo registrado · ARS» y los datos del mes siguen, como historia.
+
+### Presupuestos
+
+- **El presupuesto general**, plano sobre el lienzo con el ritmo de `CardStatusBlock` (20 pt entre grupos, 6 pt dentro
+  del héroe): «Disponible» o «Excedido» (footnote 500, sin código de moneda) sobre el héroe de 40 pt **en tinta** en
+  calma y en aviso, en el tono de alerta solo cuando se excedió; la barra de 6 pt con la proporción del dominio,
+  limitada a la pista; justo debajo la línea de estado («60 % utilizado», «… · cerca del límite», «… · límite
+  alcanzado», «… · excedido»; en el color de estado y 600 en aviso o excedido, con el glifo de alerta delante cuando
+  se excedió); al final Gastado | Límite. El orden queda héroe → barra → estado → Gastado / Límite. VoiceOver oye la
+  misma frase de resumen de antes.
+- **Un sublímite** es la fila de presupuesto de Inicio un nivel más callada: el tile de la categoría (solo identidad:
+  su tono nunca dice el estado), el nombre (500; sin tope de líneas cuando apila) junto al porcentaje como lo escribe
+  Inicio (`formatPercent`: «1.235 %», no «1235 %»; en el color de estado, con el glifo de alerta cuando se excedió), una
+  barra de 4 pt y una sola línea callada sin color: «Quedan $ X de $ Y», «$ X por encima de $ Y» o «Límite alcanzado ·
+  $ Y». 64 pt de alto mínimo, filete fino, **sin chevron** (abre el formulario como modal); la pista «Abre el
+  presupuesto para editarlo».
+- **El encabezado del mes.** El estado y «Este mes» envuelven en dos líneas centradas con texto grande; «Este mes» va en
+  el color `link` y llega a 44 pt con su margen de toque. «Además gastaste …» tiene su gemelo hablado.
+- **El formulario.** «Eliminar presupuesto» es el botón destructivo de la app (secundario, tono de alerta, papelera);
+  el título del mes y la nota de reintento en la escala tipográfica.
+
+### Recurrentes
+
+- **Próximos 30 días**, plano, un bloque por moneda, nunca sumadas: «Gastos · ARS» (antes «Pagos»: FinanzApp no paga
+  nada) en su propia línea a ancho completo, 22 pt 700, cifra de fila y no héroe (una proyección es una estimación);
+  después una fila con «Ingresos» (con «+» en verde; solo si algo entra) y «Vencimientos». Una proyección fuera del
+  rango seguro se dice en una línea secundaria.
+- **Filas.** El ámbar de «Hoy» / «Mañana» marca **solo un gasto**: un ingreso de mañana no es una obligación; «Revisar»
+  sigue en ámbar para los dos. Una regla cuya cuenta o tarjeta se eliminó dice «Cuenta eliminada» o «Tarjeta
+  eliminada» donde iría el día (tranquila, nunca ámbar; nunca «Revisar»), y VoiceOver oye la misma palabra. Abierta
+  para una cuenta, la leyenda no repite la cuenta (la cabecera ya la nombra).
+- **Detalle.** El estado del héroe nombra igual una regla cerrada. Justo debajo del héroe, una `LifecycleNote` sin
+  título (la palabra de estado está arriba): cerrada, la nota de recuperación; pausada, que no registra nada hasta
+  reanudarla; para revisar, desde cuándo no se registra, en ámbar. Las notas ya no empiezan con «Pausado: ». Para
+  revisar, «Continuar desde hoy» y su único error siguen a la nota, en la primera pantalla; después los datos,
+  «Registrados» y, al final, Pausar o Reanudar y Eliminar. VoiceOver lee la próxima fecha escrita entera.
+
+### Deudas y cobros
+
+- **El color marca el estado, no la dirección.** Los tiles son neutros (la flecha, la leyenda y la sección dicen quién
+  le debe a quién) y los totales van en tinta: lo que debo no es un aviso y lo que me deben no es un ingreso. En una
+  fila solo las palabras de estado toman tono: vencida en el tono de alerta (las dos direcciones); vence en tres días o
+  menos en ámbar, solo en una deuda que debo (la ventana de «Vence» en Tarjetas). Una regla pura, `debtDueState`, para
+  la fila y el detalle: cerrada → saldada → sin fecha → vencida → pronto → vence.
+- **Totales.** Un bloque plano por moneda, sin tarjeta; una suma fuera del rango seguro, una línea.
+- **Detalle.** La línea de estado con los mismos tonos; una deuda cerrada no la tiene: debajo del héroe, una
+  `LifecycleNote` (archivo, «Deuda cerrada», «No cuenta como pendiente. Conserva su saldo y sus pagos; «Reabrir deuda» la
+  vuelve a pendientes.»), que nunca dice que no se puede pagar. Los datos dejan Tipo y Estado (los dicen el rótulo y la
+  línea de estado): «Vencimiento» solo cuando la línea ya no lleva la fecha (saldada o cerrada), «Nota» si existe, y la
+  lista agrupada solo si tiene filas. La fila suma la pista «Abre el detalle de la deuda» y VoiceOver oye el día
+  escrito entero.
+- **Editar deuda** resume lo que no se puede cambiar (el tipo y la moneda), nunca el nombre que se está editando.
+
+### Categorías
+
+- **Filas** en la geometría de fila de Forest (16 × 12 pt, 64 pt de alto mínimo, filete fino), nombre en 500 que
+  envuelve en tamaños de accesibilidad, **sin chevron** (editor modal).
+- **Archivadas, sin atenuar.** La fila al 0,6 de opacidad bajaba su leyenda por debajo de AA: ahora el grupo, su leyenda
+  y el «archivada» dicho llevan el estado. En Archivadas la leyenda empieza por el tipo («Gasto · …»), y VoiceOver lo
+  dice («Regalos, ingreso, Predeterminada · editada, archivada»): el grupo mezcla los dos tipos.
+- **Editor.** Una categoría archivada abre con su `LifecycleNote` («Archivada», qué conserva y cómo desarchivarla); la
+  nota de cambio de nombre va bajo el campo Nombre (`FieldNote`). Una categoría histórica abre con el ícono que la app
+  ya le dibuja.
+- **Los editores modales sin nada que editar** (categoría, recurrente, presupuesto, deuda, cuenta) conservan su botón
+  de cerrar.
+
+### Utilidades de Más
+
+Auditadas sin rediseñarse. Copia de seguridad, Importar copia, Idioma, Región, Apariencia y el hub de Más quedan como
+estaban, salvo dos errores:
+
+- **La tarjeta fijada** («Según el dispositivo», «Sistema» en Apariencia) se separa 20 pt (`space.xl`) de la tarjeta
+  de opciones que la sigue: antes se tocaban y se veía el fondo en las esquinas interiores. Antes de un encabezado de
+  sección no cambia nada (el encabezado ya trae su espacio).
+- **Movimientos deshechos** no muestra el neto del día (ni lo dice VoiceOver): lo deshecho no cuenta en ningún saldo
+  ni reporte (`EntryList dayNet={false}`). La explicación va en subhead y solo sobre una lista, nunca encima de «Nada
+  para recuperar».
+
+Pulido chico posterior, anotado en el roadmap: el apilado de acciones y los tamaños sueltos de Importar copia (UT-3),
+la introducción de Copia de seguridad en la escala (UT-4) y el rótulo «Compartir copia» repetido en su tarjeta.
+
+### Errores corregidos
+
+- Presupuestos fallaba al abrir un mes mal formado («2026-13») o un mes cuya suma sale del rango seguro; ahora abre el
+  mes actual o dice «No pudimos calcular este mes» con el selector de mes usable.
+- Un presupuesto duplicado y un nombre de categoría tomado congelaban el formulario en un «Reintentar guardado» que
+  nunca podía funcionar; ahora son errores editables, comprobados con las mismas reglas que el almacenamiento.
+- Guardar sin cambios una categoría histórica la recoloreaba y le cambiaba el glifo en toda la app.
+- Una deuda cerrada con fecha y saldo se veía «Vencida» en rojo en su detalle; una fila vencida teñía toda su leyenda.
+- El pronóstico de Recurrentes se achicaba y se cortaba a 375 pt; el saldo de una cuenta se achicaba en lugar de apilar.
+- Revisión antes del envío: el pronóstico de 30 días ya no proyecta un recurrente que sigue activo sobre una cuenta o
+  tarjeta eliminada (datos viejos o importados; su fila dice «Cuenta eliminada» y la puesta al día lo saltea), y su
+  detalle ya no anuncia «Próxima fecha»; archivar una categoría pasa por las mismas reglas de nombre que Guardar, así un
+  choque es un error editable y nunca un «Reintentar guardado» sin salida.
+- Después de «Eliminar cuenta» y «Eliminar tarjeta», la navegación vuelve a la lista con `dismissTo` (antes
+  `dismissAll()` y `replace()`).
+
+### Lo que no cambia
+
+El dominio, el almacenamiento, el esquema (13), las copias (v13), las cotizaciones, cada saldo y cada regla de
+presupuesto, recurrente y deuda; Inicio, Reportes (congelado) y Tarjetas (congelado; `CardLifecycleNote` intacta); el
+texto de `debts.detail.explain`; ninguna animación nueva (las barras conservan el tiempo de datos, al instante con
+Reduce Motion); nada nativo.
+
+### Pendiente en iPhone
+
+Todo: Cuentas con una y varias cuentas, saldos grandes y negativos, varias monedas y nombres largos; Presupuestos en
+calma, 85 %, 100 % justo y excedido, con y sin general, importes muy grandes y otra moneda; Recurrentes con gastos e
+ingresos activos, pausados, cerrados y para revisar, y el pronóstico a 375 pt con ≥ $ 1.000.000,00; Deudas vencidas,
+a tres días, cerradas y los tiles neutros en oscuro; Categorías archivadas sin atenuar; la tarjeta fijada de Idioma,
+Región y Apariencia en claro, oscuro y AX3; Movimientos deshechos sin neto; la vuelta a la lista después de eliminar
+una cuenta o una tarjeta, también desde el detalle de una cuenta abierto desde un movimiento de Inicio. A 375 pt, con texto de accesibilidad, en claro
+y oscuro, con VoiceOver, Reduce Motion y Reducir transparencia. Lista en docs/mobile-device-checklist.md.
 
 ## Producto 24UX6D — Tarjetas en Forest y pulido final de Inicio y Reportes
 
@@ -1256,7 +1435,8 @@ valor absoluto), un signo solo para el ingreso y el tono del tipo:
 - **Lo que conserva su signo.** Todo signo calculado: un saldo negativo de cuenta, el neto del día en las cabeceras de
   Movimientos («−» / «+»), el flujo neto, las diferencias, los saldos de tarjeta y de deuda, el exceso de un
   presupuesto y las filas de evidencia del Asistente. Una cuenta, una tarjeta o una deuda muestran las filas con la
-  regla nueva y su saldo negativo con su menos.
+  regla nueva y su saldo negativo con su menos. *(→ 24UX6E: Movimientos deshechos no muestra el neto del día: lo
+  deshecho no cuenta en ningún saldo ni reporte.)*
 
 ### El tono de transferencia
 
@@ -1331,7 +1511,8 @@ Nada nuevo. Las pestañas siguen cambiando al instante, sin fundido.
 ### Lo que queda para después (aprobado para 24UX6C, sin implementar)
 
 Los filtros de Movimientos por período, cuenta y categoría con datos del repositorio *(→ desde 24UX6D, parte del alcance
-de búsqueda y productividad de 25C, con sus búsquedas guardadas; no hay un botón de filtro a medias)*. Siguen sin
+de búsqueda y productividad de 25C, con el período a medida y sus búsquedas guardadas; no hay un botón de filtro a
+medias; hoy existen la búsqueda y el filtro de tipo Todos / Gastos / Ingresos / Transf.)*. Siguen sin
 inventarse nota, origen Apple Pay ni hora de un movimiento.
 
 ## Producto 24T2 — compra en cuotas y Tarjetas completo
@@ -1451,7 +1632,9 @@ se materializa o se guarda el dinero.
   del grupo, solo en una cuenta viva) y los movimientos; la fila «Saldo inicial» ya no está y nada la reemplaza.
   `openingMinor` no se toca. Para una auditoría, el dato sigue legible en cada copia de seguridad y es la
   diferencia entre el saldo registrado y los movimientos; si algún día hace falta verlo, va en Editar cuenta
-  junto a «Saldo registrado», como fila quieta, no en el detalle diario.
+  junto a «Saldo registrado», como fila quieta, no en el detalle diario. *(→ 24UX6E: el saldo y los datos del mes
+  son un bloque plano sobre el lienzo, «Saldo registrado · ARS» sobre el saldo en 40 pt y «Gastos este mes» sin signo,
+  en tinta, como aplicación de 24UX6C.)*
 - **Recurrentes: primero el detalle.** Una regla se lee antes de editarse, como un movimiento, una cuenta,
   una tarjeta o una deuda: fila → detalle → Editar. El detalle (`app/recurring/[id].tsx`) reutiliza el
   sistema: la marca del comercio en grande, «Gasto recurrente · ARS» (o «Ingreso recurrente»), el importe
@@ -1465,6 +1648,9 @@ se materializa o se guarda el dinero.
   misma moneda (nunca otra eliminada, una deuda ni otra moneda; la próxima fecha debe ser hoy o posterior, como
   siempre); movida allí sigue pausada, vuelve al detalle y aparece
   Reanudar, que retoma desde hoy sin registrar lo vencido. Si se deja en la fila cerrada, sigue sin poder reanudarse.
+  *(→ 24UX6E: la explicación de una regla pausada, cerrada o para revisar va justo debajo del héroe como
+  `LifecycleNote`, no al final, y para revisar «Continuar desde hoy» la sigue; una regla cerrada dice «Cuenta
+  eliminada» o «Tarjeta eliminada» en lugar de «Pausado».)*
   Pausar o reanudar deja la pantalla abierta y cambia el estado (como Cerrar en una deuda); Eliminar pregunta
   y vuelve a Recurrentes. Editar va en la cabecera y abre el formulario, que ahora es solo el formulario.
   Inicio → Próximos compromisos, Más → Recurrentes y la fila «Recurrente» de un movimiento registrado abren
@@ -1496,7 +1682,8 @@ se materializa o se guarda el dinero.
   componente de Recurrentes y Deudas), y la acción llega a VoiceOver como acción personalizada de la fila. En
   Editar cuenta, «Eliminar cuenta» es el último botón, secundario en tono `expense`, separado de Guardar. El detalle
   de una cuenta eliminada se lee (saldo e historial), con «Cuenta eliminada» donde iba «Saldo registrado», sin
-  botón de edición ni acciones rápidas.
+  botón de edición ni acciones rápidas. *(→ 24UX6E: «Cuenta eliminada» es una `LifecycleNote` arriba del detalle y el
+  saldo conserva su rótulo «Saldo registrado · ARS».)*
 - **Eliminar una tarjeta.** Solo desde Editar tarjeta, como último botón, tras Archivar/Reactivar; **nunca por
   deslizamiento en el carrusel**, que ya usa el gesto horizontal para cambiar de tarjeta. Sin saldo pendiente, la
   confirmación dice que compras y pagos quedan. Con saldo pendiente no se elimina: un diálogo («Todavía no se puede
@@ -1615,7 +1802,8 @@ publicada. Lo que queda preparado para 24R2:
   virtualizada, sin altura fija por fila: el texto escala con Dynamic Type. Los encabezados tienen
   rol de encabezado; un idioma en su propio nombre lleva su idioma para VoiceOver. Un guardado
   rechazado deja la marca donde estaba y lo dice bajo la lista. La nota explicativa va debajo,
-  nunca dentro de la lista.
+  nunca dentro de la lista. *(→ 24UX6E: la tarjeta fijada se separa 20 pt de la tarjeta de opciones que la sigue
+  enseguida; antes se tocaban.)*
 - **La fila resumida en Más** sigue siendo `NavigationRow` («Región · Argentina · según el
   dispositivo»); en 24R2 nombra también la región del catálogo elegida.
 - Sin banderas, sin colores por país, sin lista interminable en Más: filas compactas que abren una
@@ -2104,7 +2292,7 @@ persona; la categoría sigue en la leyenda de la fila. Solo en desarrollo,
 ### Compromisos: estimado, registrado, pausado, historial
 
 - **Próximo pago estimado**: el importe con «Hoy», «Mañana», «En N días» o la fecha; ámbar solo
-  hoy y mañana. Nada registrado.
+  hoy y mañana. Nada registrado. *(→ 24UX6E: ámbar solo en un gasto, hoy y mañana; un ingreso no es una obligación.)*
 - **Pago registrado**: un movimiento normal. El detalle de la regla lista «Registrados» (los
   movimientos que la regla registró, los doce más recientes y un conteo del resto) con la nota de
   que la próxima fecha es una estimación; el detalle del movimiento muestra «Recurrente · Mensual»
@@ -2263,7 +2451,9 @@ botones al final del detalle. Nada nuevo en Inicio, Movimientos ni Reportes.
   «Eliminar recurrente» (secundario rojo). Actúan sobre la regla guardada, no sobre el borrador de
   arriba, y cierran el formulario; una regla pausada explica en una línea qué significa.
 - **Deuda**: al final de la lista de pagos, «Cerrar deuda» / «Reabrir deuda» y «Eliminar deuda».
-  Cerrar deja la pantalla abierta (el estado dice «Cerrada»); eliminar vuelve a Deudas.
+  Cerrar deja la pantalla abierta (el estado dice «Cerrada»); eliminar vuelve a Deudas. *(→ 24UX6E: el detalle ya no
+  tiene la fila Estado; una deuda cerrada muestra la nota «Deuda cerrada» bajo el héroe y ninguna línea de
+  vencimiento; «Cerrada» queda en la fila de la lista.)*
 
 ### Confirmaciones
 
@@ -2402,6 +2592,23 @@ crédito, marca elegida) y los filetes de las píldoras, el chip y el compositor
 color propio.
 
 ## Pendiente de revisión en iPhone
+
+- Producto 24UX6E (sin build de EAS, nada revisado todavía): Cuentas con una y varias cuentas, saldos grandes
+  positivos y negativos, varias monedas, la cabecera de moneda en tinta con su total (apilada con texto grande, un solo
+  encabezado para VoiceOver), nombres largos, el bloque plano del detalle en 40 pt y la nota de una cuenta eliminada;
+  «Eliminar cuenta» y «Eliminar tarjeta» vuelven a su lista con Atrás y la barra de pestañas intactos, también desde
+  el detalle de una cuenta abierto desde un movimiento de Inicio; Presupuestos sin general, con general y varios sublímites, en calma,
+  85 %, 100 % justo y excedido (el héroe en tinta hasta excederse, el tile nunca teñido, sin chevron), importes muy
+  grandes, categorías largas, otra moneda, el alcance de «Este mes», el error editable de un presupuesto duplicado y un
+  enlace con un mes mal formado; Recurrentes con gastos e ingresos activos, pausados, cerrados y para revisar, fechas
+  cercanas y lejanas, comercios largos, el pronóstico a 375 pt con ≥ $ 1.000.000,00 y el ámbar solo en un gasto de hoy
+  o mañana; Deudas que debo y que me deben, en parte saldadas, vencidas, a tres días o menos (ámbar solo si la debo),
+  cerradas (la nota, sin línea de estado), eliminadas, importes grandes, nombres largos y los tiles neutros en oscuro;
+  Categorías activas y archivadas (sin atenuar), nombres largos, el error editable de un nombre tomado, una categoría
+  histórica guardada sin cambios que conserva su aspecto y el botón de cerrar de una categoría que no existe; Idioma,
+  Región y Apariencia con la tarjeta fijada separada en claro, oscuro y AX3; Movimientos deshechos sin neto del día y
+  sin explicación sobre el vacío. En todo: 375 pt, texto de accesibilidad, claro y oscuro, VoiceOver, Reduce Motion,
+  Reducir transparencia y el espacio sobre el dock. Lista en docs/mobile-device-checklist.md.
 
 - Producto 24UX6D (sin build de EAS, nada revisado todavía): en Reportes la dona a 393 y 375 pt (247 y 234 pt), «Total
   del período» y el total exacto en el centro, la categoría elegida en su lugar, la lectura debajo de la dona en tamaños

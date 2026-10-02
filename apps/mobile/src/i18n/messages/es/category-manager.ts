@@ -16,8 +16,11 @@ export const categoryManager = {
       },
       /** VoiceOver name of a row: "Comida, 3 movimientos · Predeterminada". */
       rowLabel: '{name}, {usage}',
-      rowLabelArchived: '{name}, {usage}, archivada',
+      /** 24UX6E: an archived row also says its kind in a sentence («gasto»): the group mixes both kinds, and a preset such as
+       * Regalos exists in both. "Regalos, ingreso, Predeterminada · editada, archivada" (archiving stores a definition). */
+      rowLabelArchived: '{name}, {kind}, {usage}, archivada',
       rowHint: 'Edita el nombre, el ícono y el color',
+      rowHintArchived: 'Edita el nombre, el ícono y el color, o la desarchiva',
     },
     notFound: {
       title: 'No encontramos esta categoría',
@@ -26,7 +29,9 @@ export const categoryManager = {
     form: {
       name: 'Nombre',
       namePlaceholder: 'Ej. Kiosco',
-      archivedNote: 'Archivada: no se ofrece al registrar; tus movimientos anteriores la conservan.',
+      /** 24UX6E: the lifecycle note at the top of an archived category's editor. */
+      archivedTitle: 'Archivada',
+      archivedDetail: 'No se ofrece al registrar. Tus movimientos, presupuestos y recurrentes la conservan; desarchivala para volver a ofrecerla.',
       editNote: 'Cambiar el nombre, el ícono o el color no modifica ningún movimiento, presupuesto ni recurrente.',
       /** `stored` is the spelling movements carry; `shown` the new display name. */
       renamedNote: 'Los movimientos se siguen registrando como «{stored}» y se muestran como «{shown}».',

@@ -8,13 +8,11 @@ import { useDebtManagement } from '../src/ui/commitment-actions';
 import { withCurrencyCode } from '../src/i18n/format';
 import { useI18n } from '../src/i18n/provider';
 import { DebtRow } from '../src/ui/liability-rows';
-import { usePalette } from '../src/ui/theme';
 
 /** Open debts and receivables with their totals, then the closed ones (24UX4). Each row settles, closes, reopens
  * or deletes with a trailing swipe; a deleted tracker leaves the screen while its payments stay in Movimientos. */
 export default function DebtsScreen() {
   const { archive, snapshot } = useLedger();
-  const p = usePalette();
   const { t } = useI18n();
   const manage = useDebtManagement();
   const debts = useMemo(() => (archive?.debts ?? []).filter(debt => debt.active), [archive?.debts]);
@@ -32,12 +30,16 @@ export default function DebtsScreen() {
     {!debts.length && !closed.length ? <EmptyState title={t('debts.list.emptyTitle')} icon="people-outline"
       detail={t('debts.list.emptyDetail')}
       action={<ActionButton label={t('debts.list.add')} icon="add-outline" onPress={() => router.push('/new-debt')} />} /> : <>
-      {totals.map(item => item.status === 'ready' ? <Surface key={item.currency}><StatRow>
-        <Stat label={withCurrencyCode(t('debts.list.owed'), item.currency)}><Money minor={item.owedMinor} currency={item.currency} size={22} weight="700" color={item.owedMinor ? p.warning : undefined} /></Stat>
-        <Stat label={withCurrencyCode(t('debts.list.receivable'), item.currency)}><Money minor={item.receivableMinor} currency={item.currency} size={22} weight="700" tone={item.receivableMinor ? 'income' : 'neutral'} /></Stat>
-      </StatRow></Surface>
-        // A sum beyond the safe range is said for that currency, never rounded, dropped or shown as zero.
-        : <Surface key={item.currency}><AppText secondary>{withCurrencyCode(t('debts.list.outOfRange'), item.currency)}</AppText></Surface>)}
+      {/* 24UX6E: the totals as one calm block on the canvas (no padded card per currency), in ink: what I owe is not
+          a warning and what I am owed is not income; colour is kept for a row's due state. */}
+      {!!totals.length && <View style={{ gap: 14 }}>
+        {totals.map(item => item.status === 'ready' ? <StatRow key={item.currency}>
+          <Stat label={withCurrencyCode(t('debts.list.owed'), item.currency)}><Money minor={item.owedMinor} currency={item.currency} size={22} weight="700" /></Stat>
+          <Stat label={withCurrencyCode(t('debts.list.receivable'), item.currency)}><Money minor={item.receivableMinor} currency={item.currency} size={22} weight="700" /></Stat>
+        </StatRow>
+          // A sum beyond the safe range is said for that currency, never rounded, dropped or shown as zero.
+          : <AppText key={item.currency} secondary variant="subhead">{withCurrencyCode(t('debts.list.outOfRange'), item.currency)}</AppText>)}
+      </View>}
       {!!owedByMe.length && <View>
         <SectionTitle>{t('debts.list.owed')}</SectionTitle>
         <Surface grouped>{owedByMe.map((debt, index) => <DebtRow key={debt.id} debt={debt} last={index === owedByMe.length - 1} actions={manage.actions(debt)} />)}</Surface>

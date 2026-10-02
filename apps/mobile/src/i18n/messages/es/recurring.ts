@@ -16,11 +16,12 @@ export const recurring = {
     list: {
       add: 'Agregar recurrente',
       emptyTitle: 'Nada recurrente todavía',
-      emptyDetailAccount: 'Creá un pago o ingreso recurrente para esta cuenta.',
+      emptyDetailAccount: 'Creá un gasto o ingreso recurrente para esta cuenta.',
       emptyDetail: 'Alquiler, suscripciones, sueldo o cualquier movimiento que se repita. FinanzApp lo anota en tus movimientos cuando vence, una sola vez. No paga ni cobra nada.',
       create: 'Crear recurrente',
       next30: 'Próximos 30 días',
-      payments: 'Pagos',
+      /** 24UX6E: the 30-day projection of expenses (it was «Pagos»: FinanzApp never pays anything). */
+      payments: 'Gastos',
       /** Stat label: how many occurrences fall due in the next 30 days. */
       dueCount: 'Vencimientos',
       income: 'Ingresos',
@@ -42,6 +43,11 @@ export const recurring = {
       /** 24UX5: an active rule FinanzApp could not bring up to date (its next date is already past). */
       review: 'Revisar',
       labelReview: '{merchant}, {kind}, {frequency}, {category}, {amount} {currency}, para revisar: sin registrar desde {date}',
+      /** 24UX6E: a rule whose account or card was deleted (25B2), on its row and as its detail's state, instead of «Pausado». */
+      closed: 'Cuenta eliminada',
+      closedCard: 'Tarjeta eliminada',
+      /** 24UX6E: its VoiceOver label; `{state}` is the row's own word (closed or closedCard), so the voice names what the eye reads. */
+      labelClosed: '{merchant}, {kind}, {frequency}, {category}, {amount} {currency}, pausado: {state}',
     },
     /** 25B3: the rule's own screen (read first; Editar in the header opens the form). Its rows reuse the form's
      * labels (Próxima fecha, Frecuencia) and the shared ones (Categoría, Cuenta, Tarjeta). */
@@ -58,13 +64,13 @@ export const recurring = {
       pauseRule: 'Pausar recurrente',
       resumeRule: 'Reanudar recurrente',
       deleteRule: 'Eliminar recurrente',
-      /** Over the detail's actions of a paused rule. */
-      pausedNote: 'Pausado: no registra nada hasta que lo reanudes. Lo que venza mientras tanto no se registra.',
-      /** 25B2/25B3: over the detail's actions of a rule whose account or card was deleted: paused by the deletion, it records nothing
+      /** Under the detail's hero of a paused rule (24UX6E: the state word «Pausado» is right above, so the note does not repeat it). */
+      pausedNote: 'No registra nada hasta que lo reanudes. Lo que venza mientras tanto no se registra.',
+      /** 25B2/25B3: under the detail's hero (24UX6E) of a rule whose account or card was deleted: paused by the deletion, it records nothing
        * and cannot be resumed while it points at the closed row; Editar may move it to a live account or card of the same currency
        * (the recovery path), after which Reanudar comes back; Eliminar is the other way out. */
-      closedNote: 'Pausado: su cuenta o tarjeta fue eliminada, así que no vuelve a registrarse. Podés elegir otra compatible desde Editar y después reanudarlo, o eliminar este recurrente.',
-      /** 24UX5: over the detail's actions of an active rule the catch-up could not record (a real failure; a long backlog is recorded on its own, in batches). */
+      closedNote: 'Su cuenta o tarjeta fue eliminada, así que no vuelve a registrarse. Podés elegir otra compatible desde Editar y después reanudarlo, o eliminar este recurrente.',
+      /** 24UX5: under the detail's hero (24UX6E), over «Continuar desde hoy», of an active rule the catch-up could not record (a real failure; a long backlog is recorded on its own, in batches). */
       reviewNote: 'FinanzApp no pudo registrar este recurrente desde el {date}. Continuá desde hoy para retomarlo sin registrar los anteriores, o pausalo.',
       continueFromToday: 'Continuar desde hoy',
       /** The confirmation. `{merchant}` is the person's own text. */

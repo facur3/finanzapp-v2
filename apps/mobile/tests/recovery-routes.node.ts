@@ -59,7 +59,7 @@ function harness(file: string, props: any = {}, options: { data?: domain.LedgerA
     restoreBackup: async (value: domain.LedgerArchive, baseline: string) => { restores.push({ value, baseline }); await options.restore?.(value, baseline); },
   }) };
   const components = Object.fromEntries(['Screen', 'EmptyState', 'ActionButton', 'AppText', 'AmountField', 'AmountShortcut', 'Choices', 'ErrorMessage', 'Field', 'FieldNote', 'IconButton', 'Surface',
-    'CategoryBadge', 'DetailRow', 'Money', 'SectionTitle', 'GlyphTile', 'AccountBadge', 'EntryRow', 'MerchantBadge'].map(name => [name, name]));
+    'CategoryBadge', 'DetailRow', 'Money', 'SectionTitle', 'GlyphTile', 'AccountBadge', 'EntryRow', 'MerchantBadge', 'LifecycleNote'].map(name => [name, name]));
   const defaults = { useDefaultCurrency: ({ accountCurrency, requested }: { accountCurrency?: string | null; requested?: unknown } = {}) => accountCurrency ?? (domain.isLedgerCurrency(requested) ? requested : 'ARS') };
   const accountManagement = { useAccountManagement: () => ({ busyId: null, error: null,
     remove: (account: domain.Account, done?: () => void) => { removed.push(account); done?.(); },
@@ -1270,7 +1270,8 @@ test('24UX4 / 25B3: a rule\'s detail ends with Pausar recurrente and a red Elimi
   view.setData({ ...data, recurring: [view.rules[0]] });
   const pausedRoot = view.render();
   assert.ok(nodes(pausedRoot).some(node => node.type === 'AppText' && node.props.children === 'Pausado'));
-  assert.ok(nodes(pausedRoot).some(node => node.type === 'AppText' && String(node.props.children).startsWith('Pausado: no registra nada')));
+  // 24UX6E: the why sits under the state as the shared lifecycle note, without repeating «Pausado».
+  assert.ok(nodes(pausedRoot).some(node => node.type === 'LifecycleNote' && String(node.props.detail).startsWith('No registra nada')));
   find(pausedRoot, 'ActionButton', 'Reanudar recurrente');
 });
 
@@ -1402,7 +1403,8 @@ test('25B3: a rule on a deleted account or card is recovered through Editar: mov
   const before = harness('app/recurring/[id].tsx', {}, { data: data('a'), params: { id: 'gym' } });
   const beforeRoot = before.render();
   assert.equal(nodes(beforeRoot).filter(node => node.type === 'ActionButton').map(node => node.props.label).join(','), 'Eliminar recurrente');
-  assert.ok(nodes(beforeRoot).some(node => node.type === 'AppText' && String(node.props.children).includes('Podés elegir otra compatible desde Editar y después reanudarlo')));
+  assert.ok(nodes(beforeRoot).some(node => node.type === 'LifecycleNote' && String(node.props.detail).includes('Podés elegir otra compatible desde Editar y después reanudarlo')));
+  assert.ok(nodes(beforeRoot).some(node => node.type === 'AppText' && node.props.children === 'Cuenta eliminada'), '24UX6E: the state names what was deleted');
   assert.ok(find(beforeRoot, 'Stack.Screen').props.options.headerRight, 'Editar is the recovery path');
 
   // The form offers the closed row and the live same-currency cash accounts and cards only.
@@ -1430,7 +1432,8 @@ test('25B3: a rule on a deleted account or card is recovered through Editar: mov
   const moved = harness('app/recurring/[id].tsx', {}, { data: { ...data('a'), recurring: [editing.rules[0]] }, params: { id: 'gym' } });
   const movedRoot = moved.render();
   assert.equal(nodes(movedRoot).filter(node => node.type === 'ActionButton').map(node => node.props.label).join(','), 'Reanudar recurrente,Eliminar recurrente', 'no longer closed');
-  assert.ok(nodes(movedRoot).some(node => node.type === 'AppText' && String(node.props.children).startsWith('Pausado: no registra nada')));
+  assert.ok(nodes(movedRoot).some(node => node.type === 'LifecycleNote' && String(node.props.detail).startsWith('No registra nada')));
+  assert.ok(nodes(movedRoot).some(node => node.type === 'AppText' && node.props.children === 'Pausado'), 'no longer closed: plain «Pausado»');
   await find(movedRoot, 'ActionButton', 'Reanudar recurrente').props.onPress();
   await settled();
   const resumed = moved.rules[0];

@@ -34,9 +34,11 @@ export const debts = {
       closed: 'Cerrada',
     },
     row: {
-      /** VoiceOver: "Debo a Juan, 300,00 ARS, Vence 1 oct". */
+      /** VoiceOver: "Debo a Juan, 300,00 ARS, Vence 1 de octubre de 2026" (24UX6E: `{status}` with the day written out). */
       owedLabel: 'Debo a {name}, {amount} {currency}, {status}',
       receivableLabel: 'Me debe {name}, {amount} {currency}, {status}',
+      /** 24UX6E: VoiceOver hint of a debt row. */
+      openHint: 'Abre el detalle de la deuda',
     },
     detail: {
       edit: 'Editar deuda',
@@ -51,8 +53,11 @@ export const debts = {
       typeOwed: 'Yo debo',
       typeReceivable: 'Me deben',
       due: 'Vencimiento',
-      state: 'Estado',
       note: 'Nota',
+      /** 24UX6E: the note under a closed debt's hero. It only stops counting as pending; it never says it cannot be paid or collected (the delete dialog's «Saldar» still settles it). */
+      closedTitle: 'Deuda cerrada',
+      closedDetailOwed: 'No cuenta como pendiente. Conserva su saldo y sus pagos; «Reabrir deuda» la vuelve a pendientes.',
+      closedDetailReceivable: 'No cuenta como pendiente. Conserva su saldo y sus cobros; «Reabrir deuda» la vuelve a pendientes.',
       explain: 'Saldar la obligación mueve saldo entre registros. No crea un gasto ni un ingreso.',
       payments: 'Pagos registrados',
       collections: 'Cobros registrados',
@@ -71,8 +76,6 @@ export const debts = {
       note: 'Cobro de {name}',
     },
     form: {
-      owedTo: 'Debo a',
-      owedBy: 'Me debe',
       currency: 'Moneda',
       owed: 'Debo',
       receivable: 'Me deben',

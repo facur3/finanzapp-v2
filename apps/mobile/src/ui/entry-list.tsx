@@ -6,10 +6,13 @@ import { useI18n } from '../i18n/provider';
 import { activityDateLabel, dayNetMinor, groupActivity, mergeActivity, type ActivityItem } from './presentation';
 import { useCurrentDay, usePalette } from './theme';
 
-export function EntryList({ entries, transfers, accounts, accountId, header, empty, footer, context }: {
+export function EntryList({ entries, transfers, accounts, accountId, header, empty, footer, context, dayNet = true }: {
   entries: Entry[]; transfers?: Transfer[]; accounts: Account[]; accountId?: string; header?: ReactNode; empty?: ReactNode;
   /** After the last movement: a detail screen's own actions (24UX4: close or delete a debt), where iOS places them. */
   footer?: ReactNode; context?: RowContext;
+  /** 24UX6E: false on a list of movements that count nowhere (Movimientos deshechos): the day heading stands alone, with
+   * no signed net and no spoken «Neto del día» over records that are in no balance or report. */
+  dayNet?: boolean;
 }) {
   const p = usePalette();
   const day = useCurrentDay();
@@ -26,7 +29,7 @@ export function EntryList({ entries, transfers, accounts, accountId, header, emp
     ListEmptyComponent={empty ? <View style={{ paddingTop: 16 }}>{empty}</View> : null}
     ListFooterComponent={footer ? <View style={{ paddingTop: 32 }}>{footer}</View> : null}
     renderSectionHeader={({ section }) => {
-      const net = context ? null : dayNetMinor(section.data.filter(item => item.type === 'entry').map(item => item.value as Entry), accounts);
+      const net = context || !dayNet ? null : dayNetMinor(section.data.filter(item => item.type === 'entry').map(item => item.value as Entry), accounts);
       // 24UX6C: the day reads as the section's heading (ink, subhead weight); its net stays secondary and keeps its sign.
       return <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', gap: 12, paddingTop: 24, paddingBottom: 8, paddingHorizontal: 4 }}>
         <AppText accessibilityRole="header" variant="subhead" style={{ fontWeight: '600', flexShrink: 1 }}>

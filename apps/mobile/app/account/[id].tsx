@@ -3,7 +3,8 @@ import { View } from 'react-native';
 import { Redirect, router, Stack, useLocalSearchParams } from 'expo-router';
 import { accountBalanceMinor, currentMonthISO, isLiveAccount } from '@finanzapp/domain';
 import { useLedger } from '../../src/storage/LedgerProvider';
-import { AccountBadge, AppText, DetailRow, EmptyState, IconButton, Money, Screen, SectionTitle, Stat, Surface, StatRow } from '../../src/ui/components';
+import { AccountBadge, AppText, DetailRow, EmptyState, IconButton, LifecycleNote, Money, Screen, SectionTitle, Stat, Surface, StatRow } from '../../src/ui/components';
+import { withCurrencyCode } from '../../src/i18n/format';
 import { useI18n } from '../../src/i18n/provider';
 import { QuickActions } from '../../src/ui/quick-actions';
 import { EntryList } from '../../src/ui/entry-list';
@@ -15,7 +16,15 @@ import { space, useCurrentDay, usePalette } from '../../src/ui/theme';
  * Cards and debts redirect to their own screens. The opening balance (25B3) is
  * part of the ledger (`openingMinor`: stored, backed up, the start of every
  * balance) but not a daily figure, so it has no row here; the recorded balance
- * already carries it, and the backup file keeps it readable for an audit. */
+ * already carries it, and the backup file keeps it readable for an audit.
+ *
+ * 24UX6E: the balance and this month's facts are one flat status block on the canvas (the shape of a card's
+ * `CardStatusBlock`): «Saldo registrado · ARS» with the badge, the balance at 40 pt (the expense tone only when it is
+ * really negative), then Gastos · Ingresos este mes with no surface of their own. «Gastos este mes» is a labelled sum
+ * of expenses, unsigned in ink like Recurrentes' «Gastos» (24UX6C keeps signs for balances, nets and differences);
+ * «Ingresos este mes» keeps its «+» in green. A deleted account says so once, calmly, in a `LifecycleNote` at the top
+ * (the state, under the navigation title that names it); its balance keeps its label and its month facts stay, as
+ * history. */
 export default function AccountScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { snapshot, archive } = useLedger();
@@ -47,19 +56,21 @@ export default function AccountScreen() {
   return <>
     <Stack.Screen options={{ title: account.name, headerRight: live ? () => <IconButton name="create-outline" label={t('accounts.detail.edit')}
       onPress={() => router.push({ pathname: '/edit-account/[id]', params: { id } })} /> : undefined }} />
-    <EntryList entries={entries} transfers={transfers} accountId={id} accounts={snapshot.accounts} header={<View style={{ gap: space.xl, paddingBottom: 4 }}>
-      <View style={{ gap: 8, paddingTop: 8 }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-          <AccountBadge accountId={id} size={32} />
-          <AppText secondary variant="subhead" style={{ fontWeight: '500' }}>{t(live ? 'accounts.detail.recordedBalance' : 'accounts.manage.deletedTitle')}</AppText>
+    <EntryList entries={entries} transfers={transfers} accountId={id} accounts={snapshot.accounts} header={<View style={{ gap: space.xl, paddingTop: space.s, paddingBottom: 4 }}>
+      {!live && <LifecycleNote icon="trash-outline" title={t('accounts.manage.deletedTitle')} detail={t('accounts.manage.deletedNote')} />}
+      <View style={{ gap: space.xl }}>
+        <View style={{ gap: 6 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+            <AccountBadge accountId={id} size={32} />
+            <AppText secondary variant="footnote" style={{ flexShrink: 1, fontWeight: '500' }}>{withCurrencyCode(t('accounts.detail.recordedBalance'), account.currency)}</AppText>
+          </View>
+          <Money minor={balance} currency={account.currency} large size={40} color={balance < 0 ? p.expense : undefined} />
         </View>
-        <Money minor={balance} currency={account.currency} large color={balance < 0 ? p.expense : undefined} />
-        {!live && <AppText secondary variant="footnote">{t('accounts.manage.deletedNote')}</AppText>}
+        {month && <StatRow>
+          <Stat label={t('accounts.detail.monthExpenses')}><Money minor={month.expense} currency={account.currency} size={17} /></Stat>
+          <Stat label={t('accounts.detail.monthIncome')}><Money minor={month.income} currency={account.currency} size={17} tone={month.income ? 'income' : 'neutral'} signed={month.income > 0} /></Stat>
+        </StatRow>}
       </View>
-      {month && <Surface><StatRow>
-        <Stat label={t('accounts.detail.monthExpenses')}><Money minor={-month.expense} currency={account.currency} size={17} tone="expense" signed={month.expense > 0} /></Stat>
-        <Stat label={t('accounts.detail.monthIncome')}><Money minor={month.income} currency={account.currency} size={17} tone={month.income ? 'income' : 'neutral'} signed={month.income > 0} /></Stat>
-      </StatRow></Surface>}
       {live && <QuickActions accountId={id} currency={account.currency} />}
       {live && <Surface grouped>
         <DetailRow label={t('accounts.detail.recurring')} value={recurringCount ? t('accounts.detail.activeRecurring', { count: recurringCount }) : t('accounts.detail.schedule')} icon="repeat-outline"
