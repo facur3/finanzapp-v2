@@ -2,7 +2,7 @@ import { useRef, useState } from 'react';
 import { Alert } from 'react-native';
 import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
-import { assertOpenAccount, cardDebtMinor, cardHasPendingInstallments, closePersonalDebt, debtDeletion, debtOutstandingMinor, deleteRecurringRule, liabilityActivity, pauseRecurringRule, recurringHistory,
+import { assertCardDeletable, assertOpenAccount, cardCreditMinor, cardDebtMinor, cardHasPendingInstallments, closePersonalDebt, debtDeletion, debtOutstandingMinor, deleteRecurringRule, liabilityActivity, pauseRecurringRule, recurringHistory,
   reopenPersonalDebt, resumeRecurringRule, todayKey, type Account, type CreditCardProfile, type PersonalDebtProfile, type RecurringRule } from '@finanzapp/domain';
 import { useLedger } from '../storage/LedgerProvider';
 import { useI18n } from '../i18n/provider';
@@ -215,7 +215,7 @@ export function useAccountManagement() {
  * through `removeCard` (which also stops the card's active rules, in the same commit). */
 export function useCardManagement() {
   const { saveCard, removeCard, snapshot, archive: ledger } = useLedger();
-  const { t, moneyText } = useI18n();
+  const { t, moneyText, errorText } = useI18n();
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const writing = useRef(false);
@@ -247,15 +247,32 @@ export function useCardManagement() {
         { text: t('cards.form.blockedPay'), onPress: () => router.push({ pathname: '/new-transfer', params: { toAccountId: account.id, maxAmountMinor: String(debt) } }) },
       ];
       if (card.active) buttons.push({ text: t('cards.form.blockedArchive'), onPress: () => { void archive(card, done); } });
-      Alert.alert(t('cards.form.blockedTitle'), t('cards.form.blockedDetail', { amount: moneyText(debt, account.currency) }), buttons);
+      Alert.alert(t('cards.form.blockedTitle'), t(card.active ? 'cards.form.blockedDetail' : 'cards.form.blockedDetailArchived', { amount: moneyText(debt, account.currency) }), buttons);
+      return;
+    }
+    // 24T3 (B3): a credit in the holder's favour is the same storage rule; the card is archived (it keeps the credit, which a
+    // later purchase uses), never deleted. An archived card already is: the dialog says so and offers nothing more.
+    const credit = snapshot && account ? cardCreditMinor(card, snapshot) : 0;
+    if (credit > 0 && account) {
+      const buttons: Parameters<typeof Alert.alert>[2] = [{ text: t('common.cancel'), style: 'cancel' }];
+      if (card.active) buttons.push({ text: t('cards.form.blockedArchive'), onPress: () => { void archive(card, done); } });
+      Alert.alert(t('cards.form.blockedTitle'), t(card.active ? 'cards.form.blockedCreditDetail' : 'cards.form.blockedCreditDetailArchived', { amount: moneyText(credit, account.currency) }), buttons);
       return;
     }
     // 24T1: the same rule storage enforces (`assertCardDeletable`): a pending instalment plan is archived with the card, never deleted.
     if (cardHasPendingInstallments(card, ledger?.installmentPlans ?? [], ledger?.records ?? [], ledger?.purchaseOperations ?? [])) {
       const buttons: Parameters<typeof Alert.alert>[2] = [{ text: t('common.cancel'), style: 'cancel' }];
       if (card.active) buttons.push({ text: t('cards.form.blockedArchive'), onPress: () => { void archive(card, done); } });
-      Alert.alert(t('cards.form.blockedTitle'), t('cards.form.blockedPlanDetail'), buttons);
+      Alert.alert(t('cards.form.blockedTitle'), t(card.active ? 'cards.form.blockedPlanDetail' : 'cards.form.blockedPlanDetailArchived'), buttons);
       return;
+    }
+    // Every other reason storage refuses (`assertCardDeletable`, the one rule) is said before the destructive question,
+    // never after it.
+    if (snapshot) {
+      try { assertCardDeletable(card, snapshot, ledger?.installmentPlans ?? [], ledger?.records ?? [], ledger?.purchaseOperations ?? []); } catch (cause) {
+        Alert.alert(t('cards.form.blockedTitle'), errorText(cause instanceof Error ? cause.message : 'cards.form.deleteFailed'), [{ text: t('common.cancel'), style: 'cancel' }]);
+        return;
+      }
     }
     Alert.alert(t('cards.form.deleteTitle'), t('cards.form.deleteDetail'), [
       { text: t('common.cancel'), style: 'cancel' },

@@ -77,6 +77,14 @@ export const installments = {
        * instalments they lowered (never recorded, so never spending). */
       refundCredit: 'Devuelto a la tarjeta',
       refundFuture: 'Cuotas reducidas por devolución',
+      /** 24T3 (A26): every devolución and adelanto of the plan, live or undone, one row each opening its detail (newest
+       * first). A devolución made only of reductions has no line in Movimientos: this list is where it is reached. The row
+       * names the kind and its date (written out, so VoiceOver reads it as shown); the value is the amount. */
+      operations: 'Devoluciones y adelantos',
+      operationRefund: 'Devolución · {date}',
+      operationPayoff: 'Adelanto de cuotas · {date}',
+      operationRefundUndone: 'Devolución deshecha · {date}',
+      operationPayoffUndone: 'Adelanto deshecho · {date}',
       /** 24T3: under the hero of a plan without tracking (the hero's state word already says «Sin seguimiento»). */
       stoppedDetail: 'Las cuotas que faltaban no se registran. Las ya registradas siguen en Movimientos y en tus reportes.',
       schedule: 'Calendario',

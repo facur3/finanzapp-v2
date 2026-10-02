@@ -5,7 +5,7 @@ import { useLedger } from '../../src/storage/LedgerProvider';
 import { ActionButton, AppText, DetailRow, EmptyState, ErrorMessage, LifecycleNote, MerchantBadge, Money, Screen, SectionTitle, Surface, type IconName } from '../../src/ui/components';
 import { PlanProgressSummary, ScheduleRow } from '../../src/ui/card-rows';
 import { useCategoryLabel } from '../../src/ui/category-hues';
-import { isPlanWriteRefusal, planActions, planScheduleRows, planStateWord, planSummary, scheduleRowOpens, type PlanClosings } from '../../src/ui/installment-presentation';
+import { isPlanWriteRefusal, planActions, planOperationRows, planScheduleRows, planStateWord, planSummary, scheduleRowOpens, type PlanClosings } from '../../src/ui/installment-presentation';
 import { numberRanges } from '../../src/ui/operation-presentation';
 import { successHaptic } from '../../src/ui/motion';
 import { withCurrencyCode } from '../../src/i18n/format';
@@ -30,7 +30,9 @@ import { space, useCurrentDay, usePalette } from '../../src/ui/theme';
  *   still returnable, and «Reactivar plan» (an alert naming the past closings recorded now);
  * - a completed plan: «Registrar devolución» while something is returnable.
  * The figures add what devoluciones returned (to the card, and off future instalments), what an adelanto brought forward
- * and the financing it recorded as not charged, each its own row. A stop, a reactivation or a deletion asks first and is
+ * and the financing it recorded as not charged, each its own row. «Devoluciones y adelantos» lists every operation of the
+ * plan, live or undone, each opening its detail (A26): the only way to a devolución made only of reductions (it has no line
+ * in Movimientos) or to one whose instalments a later devolución also lowered. A stop, a reactivation or a deletion asks first and is
  * frozen once sent: Reintentar resends it without asking twice; a refusal storage gave before writing anything releases it
  * (A13) and the screen reads the plan again. */
 export default function InstallmentPlanScreen() {
@@ -68,6 +70,7 @@ export default function InstallmentPlanScreen() {
   const operations = archive.purchaseOperations ?? [];
   const summary = planSummary(plan, archive.records, operations);
   const rows = planScheduleRows(plan, archive.records, operations);
+  const planOperations = planOperationRows(plan.id, operations);
   const actions = planActions(archive, plan.id, day, new Date().toISOString());
   const { figures, status } = summary;
   const planId = plan.id;
@@ -198,12 +201,24 @@ export default function InstallmentPlanScreen() {
         {rows.map((row, index) => {
           // A row opens its movement while it has one, else the adelanto or the devolución behind its state (A26).
           const opens = scheduleRowOpens(row);
-          const onPress = opens === 'entry' ? () => router.push({ pathname: '/entry/[id]', params: { id: row.entryId } })
+          const onPress = opens === 'entry' ? () => router.push({ pathname: '/entry/[id]', params: { id: row.entryId! } })
             : opens ? () => router.push({ pathname: '/operation/[id]', params: { id: row.operationId! } }) : undefined;
           return <ScheduleRow key={row.number} row={row} count={plan.count} currency={plan.currency} financing={financing} last={index === rows.length - 1} onPress={onPress} />;
         })}
       </Surface>
     </View>
+    {planOperations.length > 0 && <View>
+      <SectionTitle>{t('installments.detail.operations')}</SectionTitle>
+      <Surface grouped>
+        {planOperations.map((operation, index) => {
+          const key = operation.kind === 'refund' ? (operation.voided ? 'installments.detail.operationRefundUndone' : 'installments.detail.operationRefund')
+            : operation.voided ? 'installments.detail.operationPayoffUndone' : 'installments.detail.operationPayoff';
+          return <DetailRow key={operation.id} label={t(key, { date: formatDate(operation.dateISO, 'long') })} layout="inline" value={money(operation.amountMinor)}
+            spokenValue={spoken(operation.amountMinor)} icon={operation.kind === 'refund' ? 'arrow-undo-outline' : 'play-forward-circle-outline'} disabled={busy}
+            last={index === planOperations.length - 1} onPress={() => router.push({ pathname: '/operation/[id]', params: { id: operation.id } })} />;
+        })}
+      </Surface>
+    </View>}
     {any && <View style={{ gap: space.m }}>
       <ErrorMessage message={error} />
       {actions.refund && <ActionButton secondary icon="return-down-back-outline" label={t('installments.detail.refund')} disabled={locked}

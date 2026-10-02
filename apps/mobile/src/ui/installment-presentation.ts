@@ -2,7 +2,7 @@ import { CARD_DELETED_MESSAGE, INSTALLMENT_DRIFT_MESSAGE, MAX_INSTALLMENTS, OPER
   OPERATION_ID_MESSAGE, OPERATION_INVALID_MESSAGE, OPERATION_PLAN_STOPPED_MESSAGE, OPERATION_STATE_MESSAGE, OPERATION_TARGET_MESSAGE, PAYOFF_DATE_MESSAGE,
   PAYOFF_FINANCING_MESSAGE, PAYOFF_NOTHING_MESSAGE, PAYOFF_PRINCIPAL_MESSAGE, PLAN_CANCELLED_MESSAGE, PLAN_CARD_MESSAGE, PLAN_DELETED_MESSAGE, PLAN_MISSING_MESSAGE,
   PLAN_NOT_CANCELLED_MESSAGE, PLAN_NOTHING_TO_STOP_MESSAGE, PLAN_OPERATION_DATE_MESSAGE, assertInstallmentPlanCancellable, assertInstallmentPlanDeletable, cardStatementsFrom,
-  effectiveShares, installmentAmounts, installmentEntryId, installmentOccurrenceOf, installmentPlanFigures, installmentSchedule, isPlanRefund, newPlanPayoff, newPlanRefund,
+  effectiveShares, installmentAmounts, installmentOccurrenceOf, installmentPlanFigures, installmentSchedule, isPlanRefund, newPlanPayoff, newPlanRefund,
   operationGuardMessages, planCatchUpInserts, planOperationFloorISO, planRefundAvailability, reactivateInstallmentPlan, validateArchive, type CardCycleDates,
   type CardStatement, type CreditCardProfile, type EffectiveShare, type EntryRecord, type Installment, type InstallmentComponent, type InstallmentPlan,
   type InstallmentPlanFigures, type InstallmentPlanStatus, type LedgerArchive, type PayoffFinancing, type PlanPayoff, type PlanRefund, type PurchaseOperation,
@@ -57,8 +57,10 @@ export interface PlanScheduleRow {
   settledMinor: number;
   waivedMinor: number;
   state: ScheduleRowState;
-  /** The movement that recognises this instalment's principal (a recognised, partial or undone row opens it). */
-  entryId: string;
+  /** The movement a recognised, partial or undone row opens: its principal's, or, when devoluciones took the principal
+   * to zero before it was recorded, the first of its other shares that has a movement (recorded or undone). Null while
+   * no share of it has one (a principal id never recorded is never opened: the movement screen would not find it). */
+  entryId: string | null;
   /** 24T3 (A26): the operation a settled or refunded row opens (`/operation/[id]`): the adelanto covering it, or the latest
    * live devolución that reduced its principal; null otherwise. */
   operationId: string | null;
@@ -102,19 +104,33 @@ export function planScheduleRows(plan: InstallmentPlan, records: readonly Record
     const totalMinor = row.principalMinor + financingMinor;
     const payoffId = shares.find(share => share.payoffId !== null)?.payoffId ?? null;
     const operationId = state === 'settled' || state === 'waived' ? payoffId : state === 'refunded' || reducedMinor > 0 ? reducedBy.get(row.number) ?? null : null;
+    // Only a share recorded (or recorded and undone) has a movement; the principal's first, else its financing's.
+    const withMovement = (share: EffectiveShare) => share.state === 'recognised' || share.state === 'undone';
+    const opened = shares.find(share => share.component === 'principal' && withMovement(share)) ?? shares.find(withMovement);
     return { number: row.number, billingDateISO: row.billingDateISO, dueDateISO: row.dueDateISO, totalMinor, principalMinor: row.principalMinor, financingMinor,
       effectiveMinor: totalMinor - reducedMinor, reducedMinor, recognisedMinor: sum(['recognised']), undoneMinor: sum(['undone']),
-      settledMinor: sum(['settled']), waivedMinor: sum(['waived']), state, entryId: installmentEntryId(plan.id, row.number, 'principal'), operationId };
+      settledMinor: sum(['settled']), waivedMinor: sum(['waived']), state, entryId: opened?.entryId ?? null, operationId };
   });
 }
 
-/** What a Calendario row opens (24T3, A26): its movement while it has one (recognised, partial or undone); the adelanto
- * that brought it forward (settled, waived); the devolución that lowered it (returned whole, or reduced and still to
- * come); nothing for an instalment still to come or not recorded with no operation on it. */
-export function scheduleRowOpens(row: Pick<PlanScheduleRow, 'state' | 'operationId'>): 'entry' | 'payoff' | 'refund' | null {
-  if (row.state === 'recognised' || row.state === 'undone' || row.state === 'partial') return 'entry';
+/** What a Calendario row opens (24T3, A26): its movement while it has one (recognised, partial or undone, `entryId`); the
+ * adelanto that brought it forward (settled, waived); the devolución that lowered it (returned whole, or reduced and still
+ * to come, or a row with no movement of its own); nothing for an instalment still to come or not recorded with no
+ * operation on it. */
+export function scheduleRowOpens(row: Pick<PlanScheduleRow, 'state' | 'operationId' | 'entryId'>): 'entry' | 'payoff' | 'refund' | null {
+  if ((row.state === 'recognised' || row.state === 'undone' || row.state === 'partial') && row.entryId) return 'entry';
   if (!row.operationId) return null;
   return row.state === 'settled' || row.state === 'waived' ? 'payoff' : 'refund';
+}
+
+/** 24T3 (A26): every devolución and adelanto of a plan, live or undone, as the plan detail lists them (newest first), each
+ * opening its own detail (`/operation/[id]`). The one place a devolución made only of reductions (no ledger line) or one
+ * whose instalments a later devolución also lowered is reached from; an undone one is listed too, to restore it. */
+export interface PlanOperationRow { id: string; kind: 'refund' | 'payoff'; dateISO: string; amountMinor: number; voided: boolean }
+export function planOperationRows(planId: string, operations: readonly PurchaseOperation[]): PlanOperationRow[] {
+  return operations.filter((operation): operation is PlanRefund | PlanPayoff => 'planId' in operation.target && operation.target.planId === planId)
+    .sort((a, b) => b.dateISO.localeCompare(a.dateISO) || b.createdAt.localeCompare(a.createdAt) || b.id.localeCompare(a.id))
+    .map(operation => ({ id: operation.id, kind: operation.kind, dateISO: operation.dateISO, amountMinor: operation.amountMinor, voided: operation.voided }));
 }
 
 export interface PlanSummary {

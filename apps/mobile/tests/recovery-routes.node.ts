@@ -92,7 +92,7 @@ function harness(file: string, props: any = {}, options: { data?: domain.LedgerA
     './form-controls': { AccountField: 'AccountField', CategoryField: 'CategoryField', CurrencyField: 'CurrencyField', DateField: 'DateField', SelectorCard: 'SelectorCard' },
     '../src/ui/form-controls': { CurrencyField: 'CurrencyField' }, '../../src/ui/form-controls': { CurrencyField: 'CurrencyField' },
     '../src/ui/currencies': currencies, '../../src/ui/currencies': currencies,
-    './presentation': presentation, './entry-prefill': entryPrefill,
+    './presentation': presentation, '../../src/ui/presentation': presentation, './entry-prefill': entryPrefill,
     './budget-presentation': budgetPresentation, '../../src/ui/budget-presentation': budgetPresentation,
     './money-input': moneyInput, '../../src/ui/money-input': moneyInput, '../src/ui/money-input': moneyInput,
     './liability-presentation': liabilityPresentation,
@@ -1468,4 +1468,36 @@ test('25B2 review: a payment link naming a deleted card opens a plain transfer i
   const root = view.render();
   assert.equal(nodes(root).some(node => node.type === 'SelectorCard'), false, 'the card is not locked in as destination');
   assert.equal(nodes(root).some(node => node.type === 'AccountField' && node.props.label === 'Hacia' && node.props.accounts.some((a: domain.Account) => a.id === 'card-acc')), false, 'and is not among the destinations');
+});
+
+// Producto 24T3 review: a copy whose only news is a devolución (or an adelanto) is offered, and the review names it; an
+// undone one counts among the «deshechos» to keep. Both devices hold the same ledger otherwise.
+test('24T3: a backup whose only new rows are purchase operations offers the import; the review counts live and undone operations', async () => {
+  const refund = domain.newEntryRefund(archive, { id: 'r1', entryId: entry.id, amountMinor: 3100, dateISO: '2026-01-02', todayISO: '2026-01-05', createdAt: '2026-01-02T12:00:00Z' });
+  const second = domain.newEntryRefund(domain.withOperation(archive, refund), { id: 'r2', entryId: entry.id, amountMinor: 1000, dateISO: '2026-01-03', todayISO: '2026-01-05', createdAt: '2026-01-03T12:00:00Z' });
+  const undone = domain.makeOperationChange('undo', second, 'void', '2026-01-04T12:00:00Z').after;
+  const copy: domain.LedgerArchive = { ...archive, purchaseOperations: [refund, undone] };
+  const json = JSON.stringify(domain.createRecoveryBackup(copy));
+  const picker = async () => ({ canceled: false, result: { size: json.length, name: 'copia.json', text: async () => json } });
+  const view = harness('app/backup-import.tsx', {}, { data: archive, picker });
+  await find(view.render(), 'ActionButton', 'Elegir copia').props.onPress();
+  let root = view.render();
+  const rows = Object.fromEntries(nodes(root).filter(node => node.type === 'DetailRow').map(node => [node.props.label, [node.props.value, node.props.spokenValue]]));
+  assert.deepEqual(rows['Devoluciones y adelantos nuevos'], ['1', '1'], 'the live devolución is named');
+  assert.deepEqual(rows['Deshechos a conservar'], ['1', '1'], 'the undone one is kept as undone');
+  assert.deepEqual(rows['Movimientos nuevos'], ['0', '0']);
+  assert.ok(nodes(root).some(node => node.type === 'AppText' && node.props.children === bindLocale('es-AR').t('backup.import.onlyMissing')), 'never «nothingNew»');
+  find(root, 'ActionButton', 'Confirmar importación').props.onPress();
+  view.alerts[0].buttons[1].onPress(); await flush();
+  assert.deepEqual(view.restores[0].value.purchaseOperations.map((operation: domain.PurchaseOperation) => operation.id), ['r1', 'r2']);
+  // In English the row reads in English; a copy with nothing new still offers nothing.
+  const english = harness('app/backup-import.tsx', {}, { data: archive, picker, locale: 'en-AR' });
+  await find(english.render(), 'ActionButton', 'Choose backup').props.onPress();
+  root = english.render();
+  assert.ok(nodes(root).some(node => node.type === 'DetailRow' && node.props.label === 'New refunds and installments brought forward' && node.props.value === '1'));
+  const same = harness('app/backup-import.tsx', {}, { data: copy, picker });
+  await find(same.render(), 'ActionButton', 'Elegir copia').props.onPress();
+  root = same.render();
+  assert.equal(nodes(root).some(node => node.props.label === 'Confirmar importación'), false);
+  assert.equal(nodes(root).some(node => node.type === 'DetailRow' && node.props.label === 'Devoluciones y adelantos nuevos'), false);
 });

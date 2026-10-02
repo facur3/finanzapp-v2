@@ -113,6 +113,8 @@ export function EntryForm({ original, accountId: requestedAccount, currency, kin
         .find(item => categoryKey(item.budget.category) === categoryKey(category));
       if (!row) return null;
       const line = (money: (minor: number) => string) => row.exceeded ? t('entryForm.budgetExceeded', { amount: money(-row.remainingMinor) })
+        // 24T3 (A24, as Presupuestos): devoluciones netting the category below zero leave the whole limit, never a negative «gastado».
+        : row.spentMinor < 0 ? t('entryForm.budgetRefunds', { total: money(row.budget.amountMinor) })
         : t('entryForm.budgetUsed', { spent: money(row.spentMinor), total: money(row.budget.amountMinor) });
       return { text: line(minor => moneyText(minor, account.currency)), spoken: line(minor => spokenMoney(minor, account.currency)), tone: budgetTone(row) };
     } catch { return null; }

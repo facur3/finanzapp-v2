@@ -42,6 +42,8 @@ export const backup = {
         budgets: 'Presupuestos nuevos',
         /** 24T2: purchases in instalments the copy adds (each with its schedule). */
         plans: 'Planes de cuotas nuevos',
+        /** 24T3: devoluciones and adelantos de cuotas the copy adds (live ones; undone ones count in «Deshechos a conservar»). */
+        operations: 'Devoluciones y adelantos nuevos',
         voided: 'Deshechos a conservar',
         present: 'Registros ya presentes',
       },

@@ -565,3 +565,122 @@ test('24T3 (verify): Movimientos deshechos draws an undone adelanto as its price
   assert.equal(has(header, 'ActionButton'), false);
   assert.equal(texts(header).some(line => line.length > 10 && line !== 'Devoluciones y adelantos'), true);
 });
+
+// ---- review fixes (COPY) -------------------------------------------------------------------------------------------
+
+test('24T3 (review): undoing one of several live devoluciones says only its amount counts again and the others stay; the last one says «entera»', () => {
+  const restore = 'Podés restaurarla después desde Movimientos deshechos.';
+  const alertOf = (data: domain.LedgerArchive, id: string, locale?: AppLocale) => {
+    const view = harness('app/operation/[id].tsx', { params: { id }, data, locale });
+    find(view.render(), 'ActionButton', locale === 'en-US' ? 'Undo refund' : 'Deshacer devolución').props.onPress();
+    return view.alerts[0].message;
+  };
+  // $ 500 in Ropa with A $ 100 and B $ 50 live: undoing A puts back $ 100, not the whole purchase (B still nets $ 50).
+  const two = refundOf(refundOf(base(), 'r1', 10000, '2026-09-18'), 'r2', 5000, '2026-09-25');
+  assert.equal(alertOf(two, 'r1'), `Deja de acreditar $${NB}100,00 en Banco y la compra vuelve a contar $${NB}100,00 más en Ropa. Su otra devolución sigue. ${restore}`);
+  assert.equal(alertOf(two, 'r1', 'en-US'), `AR$${NB}100.00 is no longer credited to Banco and the purchase counts AR$${NB}100.00 more in Ropa. Its other refund stays. `
+    + 'You can restore it later from Undone transactions.');
+  const three = refundOf(two, 'r3', 2000, '2026-09-28');
+  assert.equal(alertOf(three, 'r3'), `Deja de acreditar $${NB}20,00 en Banco y la compra vuelve a contar $${NB}20,00 más en Ropa. Sus otras 2 devoluciones siguen. ${restore}`);
+  // Once the other is undone, the one left is the last: the purchase counts in full again.
+  assert.equal(alertOf(undoOf(two, 'r2'), 'r1'), `Deja de acreditar $${NB}100,00 en Banco y la compra vuelve a contar entera en Ropa. ${restore}`);
+});
+
+test('24T3 (review): undoing a plan devolución that reduced a single instalment names it in the singular', () => {
+  // Bought 2026-09-25: nothing has closed yet, so a devolución is all reductions, from the last instalment backwards.
+  const fresh = domain.newInstallmentPlan({ id: 'fresh', card, cardAccount, merchant: 'Electro', category: 'Hogar', purchaseDateISO: '2026-09-25',
+    principalMinor: 120000, count: 12, placement: 'current', createdAt: at('2026-09-25') });
+  const archive = base({ installmentPlans: [fresh] });
+  const alertOf = (id: string, amountMinor: number, locale?: AppLocale) => {
+    const op = domain.newPlanRefund(archive, { id, planId: fresh.id, amountMinor, dateISO: '2026-09-28', todayISO: TODAY, createdAt: at('2026-09-28') });
+    const view = harness('app/operation/[id].tsx', { params: { id }, data: domain.applyNewOperation(archive, op, TODAY), locale });
+    find(view.render(), 'ActionButton', locale === 'en-US' ? 'Undo refund' : 'Deshacer devolución').props.onPress();
+    return [op.creditMinor, op.reductions.map(row => row.number), view.alerts[0].message];
+  };
+  assert.equal(JSON.stringify(alertOf('small', 5000)),
+    JSON.stringify([0, [12], 'La cuota 12 vuelve a su importe. Podés restaurarla después desde Movimientos deshechos.']));
+  assert.equal(JSON.stringify(alertOf('small', 5000, 'en-US')),
+    JSON.stringify([0, [12], 'Installment 12 goes back to its amount. You can restore it later from Undone transactions.']));
+  assert.equal(JSON.stringify(alertOf('two', 15000)),
+    JSON.stringify([0, [11, 12], 'Las cuotas 11–12 vuelven a su importe. Podés restaurarla después desde Movimientos deshechos.']));
+});
+
+// ---- review fixes (ENTRY) ------------------------------------------------------------------------------------------
+
+/** A Ropa budget of $ 1.000 for October; the $ 500 September purchase returned in full on Oct 1, and a $ 100 Ropa purchase on
+ * Oct 2: October's Ropa nets −$ 400, so the unclamped row would leave $ 1.400 of a $ 1.000 limit. */
+function refundedBudget(): { data: domain.LedgerArchive; shirt: domain.Entry } {
+  const budget: domain.MonthlyBudget = { id: 'ropa', scope: 'category', category: 'Ropa', currency: 'ARS', monthISO: '2026-10', amountMinor: 100000, active: true,
+    createdAt: T0, revision: 0, updatedAt: T0 };
+  const shirt: domain.Entry = { id: 'shirt', accountId: bank.id, kind: 'expense', amountMinor: 10000, merchant: 'Zara', category: 'Ropa', dateISO: TODAY, createdAt: at(TODAY) };
+  const refunded = refundOf(base(), 'r1', 50000, '2026-10-01');
+  return { data: { ...refunded, records: [...refunded.records, domain.initialRecord(shirt)], budgets: [budget] }, shirt };
+}
+
+test('24T3 (review): the movement detail\'s budget line never leaves more than the limit, and says devoluciones exceed what was spent', () => {
+  const { data, shirt } = refundedBudget();
+  const row = (locale?: AppLocale) => find(harness('app/entry/[id].tsx', { params: { id: shirt.id }, data, locale }).render(), 'DetailRow', locale === 'en-US' ? 'Budget' : 'Presupuesto');
+  const es = row();
+  assert.equal(es.props.value, 'Quedan 1.000,00 · las devoluciones superan lo gastado', 'as Presupuestos: the whole limit, never $ 1.400');
+  assert.equal(es.props.spokenValue, 'Quedan ' + bindLocale('es-AR').spokenMoney(100000, 'ARS') + ' · las devoluciones superan lo gastado');
+  assert.equal(es.props.tone, 'neutral');
+  const en = row('en-US');
+  assert.equal(en.props.value, '1,000.00 left · refunds exceed what was spent');
+  assert.equal(en.props.spokenValue, bindLocale('en-US').spokenMoney(100000, 'ARS') + ' left · refunds exceed what was spent');
+});
+
+test('24T3 (review): the expense form\'s category hint never formats a negative «gastado» when devoluciones net the month below zero', () => {
+  const { data } = refundedBudget();
+  const hint = (locale?: AppLocale) => {
+    const view = harness('src/ui/entry-form.tsx', { props: { kind: 'expense' }, data, locale });
+    find(view.render(), 'CategoryField').props.onChange('Ropa');
+    return find(view.render(), 'CategoryField').props;
+  };
+  const es = hint();
+  assert.equal(es.detail, `Quedan $${NB}1.000,00 este mes · las devoluciones superan lo gastado`);
+  assert.equal(es.spokenDetail, 'Quedan ' + bindLocale('es-AR').spokenMoney(100000, 'ARS') + ' este mes · las devoluciones superan lo gastado');
+  assert.ok(!/−|-\$|\$\s?-/.test(es.detail), es.detail);
+  const en = hint('en-US');
+  assert.equal(en.detail, `AR$${NB}1,000.00 left this month · refunds exceed what was spent`);
+  assert.equal(en.spokenDetail, bindLocale('en-US').spokenMoney(100000, 'ARS') + ' left this month · refunds exceed what was spent');
+});
+
+test('24T3 (review): undoing an instalment a plan devolución\'s credit stands on is refused before any confirmation, with the way to the devolución', () => {
+  // Instalments 1–9 recorded ($ 900); a devolución of $ 900 credits all of it to the card, so no recorded instalment can be undone.
+  const recorded = withPlan(TODAY);
+  const op = domain.newPlanRefund(recorded, { id: 'pr', planId: tv.id, amountMinor: 90000, dateISO: TODAY, todayISO: TODAY, createdAt: at(TODAY) });
+  assert.equal(op.creditMinor, 90000);
+  const data = domain.applyNewOperation(recorded, op, TODAY);
+  const view = harness('app/entry/[id].tsx', { params: { id: domain.installmentEntryId(tv.id, 9) }, data });
+  find(view.render(), 'ActionButton', 'Deshacer movimiento').props.onPress();
+  const es = bindLocale('es-AR');
+  assert.equal(JSON.stringify([view.alerts[0].title, view.alerts[0].message, view.alerts[0].buttons.map(button => button.text)]),
+    JSON.stringify(['No se puede deshacer ahora', es.errorText(domain.operationGuardMessage('refund-credit', 'void')), ['Cancelar', 'Ver devolución']]));
+  view.alerts[0].buttons[1].onPress?.();
+  assert.equal(JSON.stringify(view.pushed.pop()), JSON.stringify({ pathname: '/operation/[id]', params: { id: 'pr' } }));
+  assert.equal(view.updates.length, 0, 'nothing built or sent');
+  assert.equal(has(view.render(), 'ActionButton', 'Reintentar cambio'), false);
+});
+
+test('24T3 (review): an undo storage refuses before writing releases the change: Editar unlocks and the next tap asks again; an unknown outcome stays frozen', async () => {
+  let failure: Error | null = new Error(domain.operationGuardMessage('refund-credit'));
+  const view = harness('app/entry/[id].tsx', { params: { id: buy.id }, update: async () => { if (failure) throw failure; } });
+  find(view.render(), 'ActionButton', 'Deshacer movimiento').props.onPress();
+  view.alerts[0].buttons[1].onPress?.();
+  await flush();
+  let root = view.render();
+  assert.equal(view.updates.length, 1);
+  assert.equal(find(root, 'ErrorMessage').props.message, domain.operationGuardMessage('refund-credit'));
+  assert.equal(has(root, 'ActionButton', 'Reintentar cambio'), false, 'released: no retry of a change storage always refuses');
+  assert.equal(find(root, 'ActionButton', 'Editar movimiento').props.disabled, false);
+  // The next tap asks again, about the ledger as it is now, with a new change.
+  find(root, 'ActionButton', 'Deshacer movimiento').props.onPress();
+  assert.equal(JSON.stringify([view.alerts.length, view.alerts[1].title]), JSON.stringify([2, '¿Deshacer movimiento?']));
+  failure = new Error('database is locked');
+  view.alerts[1].buttons[1].onPress?.();
+  await flush();
+  root = view.render();
+  assert.notEqual(view.updates[1].id, view.updates[0].id);
+  assert.ok(has(root, 'ActionButton', 'Reintentar cambio'), 'an unknown outcome keeps the change for an exact retry');
+  assert.equal(find(root, 'ActionButton', 'Editar movimiento').props.disabled, true);
+});

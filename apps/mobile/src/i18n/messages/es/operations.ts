@@ -119,9 +119,15 @@ export const operations = {
       voidPayoffQuestion: '¿Deshacer adelanto?',
       restoreRefundQuestion: '¿Restaurar devolución?',
       restorePayoffQuestion: '¿Restaurar adelanto?',
+      /** The purchase's last live devolución: nothing stays returned. */
       voidEntryRefund: 'Deja de acreditar {amount} en {account} y la compra vuelve a contar entera en {category}.',
+      /** Other live devoluciones of the purchase stay: only this one's amount counts again ({count} = the others). */
+      voidEntryRefundOthers: {
+        one: 'Deja de acreditar {amount} en {account} y la compra vuelve a contar {amount} más en {category}. Su otra devolución sigue.',
+        other: 'Deja de acreditar {amount} en {account} y la compra vuelve a contar {amount} más en {category}. Sus otras {count} devoluciones siguen.',
+      },
       voidPlanCredit: 'Deja de acreditar {amount} en la tarjeta.',
-      voidPlanReductions: 'Las cuotas {range} vuelven a su importe.',
+      voidPlanReductions: { one: 'La cuota {range} vuelve a su importe.', other: 'Las cuotas {range} vuelven a su importe.' },
       voidPayoff: 'Las cuotas adelantadas ({amount} de precio) vuelven a quedar pendientes y dejan de contar con esta fecha.',
       /** The catch-up of the same commit (A8): instalments whose statement already closed are recorded on their own closings. */
       recordsShares: { one: 'Se registra la cuota {range} en su cierre ({amount}).', other: 'Se registran las cuotas {range} en sus cierres ({amount}).' },

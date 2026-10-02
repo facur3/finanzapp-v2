@@ -52,7 +52,9 @@ export default function MoreScreen() {
   const currentBudgets = archive?.budgets?.filter(budget => budget.active && budget.monthISO === currentMonthISO(todayKey())).length ?? 0;
   const customCategories = archive?.categories?.filter(definition => !definition.archived).length ?? 0;
   const activeCards = archive?.cards?.filter(card => card.active).length ?? 0;
-  const undone = (archive?.records.filter(record => record.voided).length ?? 0) + (archive?.transfers?.filter(record => record.voided).length ?? 0);
+  // 24T3: an undone devolución or adelanto is listed (and restored) in Movimientos deshechos too, so it counts here.
+  const undone = (archive?.records.filter(record => record.voided).length ?? 0) + (archive?.transfers?.filter(record => record.voided).length ?? 0)
+    + (archive?.purchaseOperations?.filter(operation => operation.voided).length ?? 0);
   const tile = (key: keyof typeof FINANCE_ROW_LOOKS) => <GlyphTile icon={FINANCE_ROW_LOOKS[key].glyph} color={appearanceHex(FINANCE_ROW_LOOKS[key].color, p)} size={34} />;
   const neutral = (icon: IconName) => <GlyphTile icon={icon} size={34} />;
 

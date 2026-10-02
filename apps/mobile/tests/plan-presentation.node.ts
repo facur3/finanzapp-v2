@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { OPERATION_CHANGED_MESSAGE, PLAN_NOTHING_TO_STOP_MESSAGE, cancelInstallmentPlan, initialRecord, installmentEntryId, materializeInstallmentPlan, newInstallmentPlan,
   newPlanPayoff, newPlanRefund, type Account, type CreditCardProfile, type Entry, type EntryRecord, type LedgerArchive } from '@finanzapp/domain';
-import { PLAN_SEGMENT_MAX, cardPlanSummaries, isPlanWriteRefusal, payoffPreview, planActions, planOperationDate, planProgress, planScheduleRows, planStateWord, planSummary, purchasePreview,
+import { PLAN_SEGMENT_MAX, cardPlanSummaries, isPlanWriteRefusal, payoffPreview, planActions, planOperationDate, planOperationRows, planProgress, planScheduleRows, planStateWord, planSummary, purchasePreview,
   scheduleRowOpens } from '../src/ui/installment-presentation.ts';
 
 // Producto 24T2 review round: a plan's rows are read component by component (each share has its own movement), a
@@ -154,8 +154,41 @@ test('24T3: a Calendario row opens its movement while it has one, else the opera
   const settled = planScheduleRows(financed, first, [payoff]);
   assert.deepEqual(settled.map(row => [row.state, row.settledMinor, row.waivedMinor, scheduleRowOpens(row)]),
     [['recognised', 0, 0, 'entry'], ['settled', 40000, 10000, 'payoff'], ['settled', 40000, 10000, 'payoff']]);
-  assert.equal(scheduleRowOpens({ state: 'future', operationId: null }), null);
-  assert.equal(scheduleRowOpens({ state: 'cancelled', operationId: null }), null);
+  assert.equal(scheduleRowOpens({ state: 'future', operationId: null, entryId: null }), null);
+  assert.equal(scheduleRowOpens({ state: 'cancelled', operationId: null, entryId: null }), null);
+});
+
+test('24T3 review: a row whose principal a devolución returned whole before it was recorded opens the financing movement it has, never the principal id', () => {
+  // Instalment 1 recorded; $ 800,00 on Oct 2: $ 400,00 back to the card and instalment 3's principal whole. Through Dec 1 the
+  // closings record instalment 2 and only the interest of instalment 3.
+  const first = shares('2026-09-30');
+  const refund = newPlanRefund(ledgerOf(first), { id: 'rf', planId: 'nb', amountMinor: 80000, dateISO: '2026-10-02', todayISO: '2026-10-02', createdAt: now });
+  assert.equal(JSON.stringify([refund.creditMinor, refund.reductions]), JSON.stringify([40000, [{ number: 3, minor: 40000 }]]));
+  const records = [...first, ...materializeInstallmentPlan(financed, card, '2026-12-01', new Set(first.map(record => record.entry.id)), [refund]).map(initialRecord)];
+  const exists = (id: string | null) => records.some(record => record.entry.id === id);
+  const third = planScheduleRows(financed, records, [refund])[2];
+  assert.deepEqual([third.state, third.entryId, third.operationId, scheduleRowOpens(third)], ['recognised', installmentEntryId('nb', 3, 'interest'), 'rf', 'entry']);
+  assert.equal(exists(third.entryId), true, 'the movement it opens exists');
+  assert.equal(exists(installmentEntryId('nb', 3, 'principal')), false);
+  const undone = planScheduleRows(financed, records.map(record => record.entry.id === third.entryId ? { ...record, voided: true, revision: 1 } : record), [refund])[2];
+  assert.deepEqual([undone.state, undone.entryId, scheduleRowOpens(undone)], ['undone', installmentEntryId('nb', 3, 'interest'), 'entry']);
+  // Recorded rows keep their principal's movement; a row with no movement of its own never opens one.
+  assert.equal(planScheduleRows(financed, records, [refund])[0].entryId, installmentEntryId('nb', 1, 'principal'));
+  assert.equal(scheduleRowOpens({ state: 'partial', operationId: 'rf', entryId: null }), 'refund');
+  assert.equal(scheduleRowOpens({ state: 'partial', operationId: null, entryId: null }), null);
+});
+
+test('24T3 review: a plan\'s devoluciones and adelantos, live and undone, newest first, and nobody else\'s (A26)', () => {
+  const first = shares('2026-09-30');
+  const a = newPlanRefund(ledgerOf(first), { id: 'rf-a', planId: 'nb', amountMinor: 1000, dateISO: '2026-10-01', todayISO: '2026-10-02', createdAt: now });
+  const b = { ...newPlanRefund(ledgerOf(first, financed, { purchaseOperations: [a] }), { id: 'rf-b', planId: 'nb', amountMinor: 2000, dateISO: '2026-10-02', todayISO: '2026-10-02',
+    createdAt: now }), voided: true };
+  const payoff = newPlanPayoff(ledgerOf(first, financed, { purchaseOperations: [a] }), { id: 'po', planId: 'nb', financing: 'waived', dateISO: '2026-10-02', todayISO: '2026-10-02',
+    createdAt: '2026-10-02T13:00:00.000Z' });
+  const other = { ...a, id: 'rf-x', target: { planId: 'other' } };
+  assert.deepEqual(planOperationRows('nb', [a, other, b, payoff]).map(row => [row.id, row.kind, row.dateISO, row.amountMinor, row.voided]),
+    [['po', 'payoff', '2026-10-02', payoff.amountMinor, false], ['rf-b', 'refund', '2026-10-02', 2000, true], ['rf-a', 'refund', '2026-10-01', 1000, false]]);
+  assert.deepEqual(planOperationRows('nb', []), []);
 });
 
 test('24T3: the adelanto preview is what Save sends, on the caught-up plan: per component, the choice it still needs, the date floor and the undone shares it leaves', () => {

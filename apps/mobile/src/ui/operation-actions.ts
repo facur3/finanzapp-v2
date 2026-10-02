@@ -2,7 +2,7 @@ import { useRef, useState } from 'react';
 import { Alert } from 'react-native';
 import { randomUUID } from 'expo-crypto';
 import * as Haptics from 'expo-haptics';
-import { isEntryRefund, isPlanPayoff, isPlanRefund, makeOperationChange, todayKey, type EntryRecord, type OperationChange, type PurchaseOperation } from '@finanzapp/domain';
+import { entryRefundSummary, isEntryRefund, isPlanPayoff, isPlanRefund, makeOperationChange, todayKey, type EntryRecord, type OperationChange, type PurchaseOperation } from '@finanzapp/domain';
 import { useLedger } from '../storage/LedgerProvider';
 import { useI18n } from '../i18n/provider';
 import { useAccountNameOf, useCategoryLookOf } from './category-hues';
@@ -12,7 +12,8 @@ import { releasesDraft } from './presentation';
 /** Producto 24T3: «Deshacer devolución / adelanto» and «Restaurar», shared by the operation's detail and Movimientos
  * deshechos. The action is offered only when the domain's dry run passes (`check`, the same `applyOperationChange` storage
  * runs, with the plan's catch-up); otherwise the screen shows the dry run's reason. The confirmation is a native alert that
- * names the outcome of that dry run: the money that stops (or starts again) counting, the instalments its catch-up records
+ * names the outcome of that dry run: the money that stops (or starts again) counting (a purchase's other live devoluciones
+ * stay, so it counts in full again only when the last one is undone), the instalments its catch-up records
  * on their own closings, and that an adelanto undone after one of its instalments is recorded cannot come back (A8).
  * The change is built once, when the person confirms, and kept while its outcome is unknown: «Reintentar cambio» sends
  * exactly it again without asking twice (a refresh that failed after the commit). A refusal storage decides before
@@ -39,14 +40,19 @@ export function useOperationChange() {
     const parts: string[] = [];
     if (isEntryRefund(operation)) {
       const purchase = archive?.records.find(record => record.entry.id === operation.target.entryId);
-      parts.push(restore ? t('operations.change.restoreEntryRefund', { amount: money(operation.amountMinor), account: account ? accountName(account) : '', date })
-        : t('operations.change.voidEntryRefund', { amount: money(operation.amountMinor), account: account ? accountName(account) : '',
-          category: purchase ? categoryLook(purchase.entry.category).label : '' }));
+      // The purchase counts in full again only when this is its last live devolución; otherwise the others stay and only
+      // this one's amount counts again.
+      const others = !restore && archive ? entryRefundSummary(archive, operation.target.entryId).refunds.filter(refund => refund.id !== operation.id).length : 0;
+      const values = { amount: money(operation.amountMinor), account: account ? accountName(account) : '' };
+      parts.push(restore ? t('operations.change.restoreEntryRefund', { ...values, date })
+        : others ? t('operations.change.voidEntryRefundOthers', { ...values, count: others, category: purchase ? categoryLook(purchase.entry.category).label : '' })
+        : t('operations.change.voidEntryRefund', { ...values, category: purchase ? categoryLook(purchase.entry.category).label : '' }));
     } else if (isPlanRefund(operation)) {
       if (restore) parts.push(t('operations.change.restorePlanRefund', { amount: money(operation.amountMinor), date }));
       else {
         if (operation.creditMinor > 0) parts.push(t('operations.change.voidPlanCredit', { amount: money(operation.creditMinor) }));
-        if (operation.reductions.length) parts.push(t('operations.change.voidPlanReductions', { range: numberRanges(operation.reductions.map(row => row.number)) }));
+        if (operation.reductions.length) parts.push(t('operations.change.voidPlanReductions',
+          { count: operation.reductions.length, range: numberRanges(operation.reductions.map(row => row.number)) }));
       }
     } else if (isPlanPayoff(operation)) {
       parts.push(restore ? t('operations.change.restorePayoff', { date, amount: money(operation.amountMinor) })

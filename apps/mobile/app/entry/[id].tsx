@@ -3,7 +3,7 @@ import { Alert, View } from 'react-native';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { randomUUID } from 'expo-crypto';
 import * as Haptics from 'expo-haptics';
-import { categoryKey, entryRefundSummary, makeEntryChange, recurringOccurrenceOf, summarizeMonthlyBudgets, todayKey, type EntryChange, type EntryRecord, type Account } from '@finanzapp/domain';
+import { categoryKey, entryRefundSummary, makeEntryChange, operationGuardMessage, recurringOccurrenceOf, summarizeMonthlyBudgets, todayKey, validateArchive, type EntryChange, type EntryRecord, type Account, type PurchaseOperation } from '@finanzapp/domain';
 import { useLedger } from '../../src/storage/LedgerProvider';
 import { budgetTone } from '../../src/ui/budget-presentation';
 import { AccountBadge, ActionButton, AppText, DetailRow, EmptyState, ErrorMessage, MerchantBadge, Money, Screen, SectionTitle, Surface } from '../../src/ui/components';
@@ -12,6 +12,7 @@ import { useI18n } from '../../src/i18n/provider';
 import { useCategoryLabel } from '../../src/ui/category-hues';
 import { installmentOfEntry } from '../../src/ui/installment-presentation';
 import { canRefundEntry } from '../../src/ui/operation-presentation';
+import { releasesDraft } from '../../src/ui/presentation';
 import { space, usePalette } from '../../src/ui/theme';
 
 export default function EntryScreen() {
@@ -30,7 +31,7 @@ export default function EntryScreen() {
 function EntryDetail({ record, account }: { record: EntryRecord; account: Account }) {
   const { updateEntry, archive, snapshot } = useLedger();
   const p = usePalette();
-  const { t, formatDate, currencyName, formatMoneyAmount, spokenMoney, moneyText } = useI18n();
+  const { t, formatDate, currencyName, formatMoneyAmount, spokenMoney, moneyText, errorText } = useI18n();
   const { entry } = record;
   const card = archive?.cards?.find(item => item.accountId === account.id);
   // 24T2: a movement an instalment plan recorded (a share of one instalment: its principal, or its interest, fee or tax).
@@ -58,6 +59,9 @@ function EntryDetail({ record, account }: { record: EntryRecord; account: Accoun
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'entryDetail.changeUnverified');
+      // A13: a refusal storage decided before writing (an instalment a devolución's credit stands on, …) releases the change:
+      // Editar unlocks and the next tap asks again from the current ledger. Only an unknown outcome stays frozen for a retry.
+      if (cause instanceof Error && releasesDraft(cause.message)) setPending(null);
     } finally { saving.current = false; setBusy(false); }
   }
   function confirm() {
@@ -75,8 +79,21 @@ function EntryDetail({ record, account }: { record: EntryRecord; account: Accoun
       ], { cancelable: true, onDismiss: () => { confirming.current = false; } });
       return;
     }
-    confirming.current = true;
     const change = makeEntryChange(randomUUID(), record, restore ? 'restore' : 'void', new Date().toISOString());
+    // 24T3 (A13, A26): an undo the domain would refuse (an instalment a plan devolución's credit stands on, one an adelanto
+    // uses) is said before any confirmation, with the domain's reason and the way to that operation; nothing is sent.
+    const refusal = !restore ? voidRefusal(change) : null;
+    if (refusal) {
+      confirming.current = true;
+      const view = blockingOperation(refusal);
+      Alert.alert(t('entryDetail.voidBlockedTitle'), errorText(refusal), [
+        { text: t('common.cancel'), style: 'cancel', onPress: () => { confirming.current = false; } },
+        ...(view ? [{ text: t(view.kind === 'payoff' ? 'entryDetail.viewPayoff' : 'entryDetail.viewRefund'),
+          onPress: () => { confirming.current = false; router.push({ pathname: '/operation/[id]', params: { id: view.id } }); } }] : []),
+      ], { cancelable: true, onDismiss: () => { confirming.current = false; } });
+      return;
+    }
+    confirming.current = true;
     const adds = restore ? entry.kind === 'income' : entry.kind === 'expense';
     Alert.alert(t(restore ? 'entryDetail.restoreQuestion' : 'entryDetail.voidQuestion'),
       t(adds ? 'entryDetail.willAdd' : 'entryDetail.willSubtract', { amount: formatMoneyAmount(entry.amountMinor, account.currency) + ' ' + account.currency, account: account.name }) + ' '
@@ -88,17 +105,36 @@ function EntryDetail({ record, account }: { record: EntryRecord; account: Accoun
         { text: t(restore ? 'entryDetail.restore' : 'entryDetail.void'), style: restore ? 'default' : 'destructive', onPress: () => { confirming.current = false; void apply(change); } },
       ], { cancelable: true, onDismiss: () => { confirming.current = false; } });
   }
+  /** The dry run of an undo: the domain's deterministic refusal, or null when storage would accept it (or the outcome is not
+   * the domain's to decide). The same archive check storage runs, on the ledger on screen. */
+  function voidRefusal(change: EntryChange): string | null {
+    if (!archive) return null;
+    try {
+      validateArchive({ ...archive, records: archive.records.map(item => item.entry.id === entry.id ? change.after : item) }, 'void');
+      return null;
+    } catch (cause) {
+      return cause instanceof Error && releasesDraft(cause.message) ? cause.message : null;
+    }
+  }
+  /** The newest live operation the refusal names on this movement's plan (or purchase): an adelanto for its guards, else a devolución. */
+  function blockingOperation(message: string): PurchaseOperation | undefined {
+    const kind = message === operationGuardMessage('payoff-overlap', 'void') || message === operationGuardMessage('payoff-refund', 'void') ? 'payoff' : 'refund';
+    return (archive?.purchaseOperations ?? [])
+      .filter(op => !op.voided && op.kind === kind && ('planId' in op.target ? op.target.planId === instalment?.plan.id : op.target.entryId === entry.id))
+      .sort((a, b) => b.dateISO.localeCompare(a.dateISO) || b.createdAt.localeCompare(a.createdAt))[0];
+  }
   const income = entry.kind === 'income';
   // First letter only (24UX5 review): a style-level capitalize drew «Martes, 22 De Septiembre De 2026».
   const long = formatDate(entry.dateISO, 'weekdayLong');
   const date = long.charAt(0).toLocaleUpperCase() + long.slice(1);
   // Budget context only when a matching active budget exists for this month, currency and category.
-  let budget: { ratio: number; remainingMinor: number; exceeded: boolean } | null = null;
+  // 24T3 (A24, as Presupuestos): devoluciones may net the category below zero; what is left never reads above the limit.
+  let budget: { ratio: number; remainingMinor: number; exceeded: boolean; refunded: boolean } | null = null;
   if (!income && !record.voided && snapshot) {
     try {
       const row = summarizeMonthlyBudgets(snapshot, archive?.budgets ?? [], account.currency, entry.dateISO.slice(0, 7)).rows
         .find(item => categoryKey(item.budget.category) === categoryKey(entry.category));
-      if (row) budget = { ratio: row.ratio, remainingMinor: row.remainingMinor, exceeded: row.exceeded };
+      if (row) budget = { ratio: row.ratio, remainingMinor: Math.min(row.remainingMinor, row.budget.amountMinor), exceeded: row.exceeded, refunded: row.spentMinor < 0 };
     } catch { budget = null; }
   }
   // A movement a recurring rule recorded links back to its rule's detail (24UX2, 25B3); a rule deleted since (24UX4:
@@ -108,6 +144,7 @@ function EntryDetail({ record, account }: { record: EntryRecord; account: Accoun
   const status = t(record.voided ? 'entryDetail.statusVoided' : record.revision > 0 ? 'entryDetail.statusCorrected' : 'entryDetail.statusRecorded');
   // The budget row on screen (the region's separators) and for VoiceOver (the amount in the language's words).
   const budgetLine = (row: NonNullable<typeof budget>, money: (minor: number) => string) => row.exceeded ? t('entryDetail.budgetExceeded', { amount: money(-row.remainingMinor) })
+    : row.refunded ? t('entryDetail.budgetRefunds', { amount: money(row.remainingMinor) })
     : t('entryDetail.budgetUsed', { percent: Math.round(row.ratio * 100), amount: money(row.remainingMinor) });
 
   const shown = presentedAmount(entry.kind, entry.amountMinor);

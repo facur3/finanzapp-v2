@@ -290,3 +290,50 @@ test('24T1: a card with a pending instalment plan and no balance due is not dele
   english.render('useCardManagement').remove(card);
   assert.equal(english.alerts[0].message, 'This card has pending installments. Archive it: it moves to Archived in Cards, its installments keep being recorded, and you can pay it and reactivate it.');
 });
+
+// ---- Producto 24T3 review: every reason storage refuses is said before the destructive question ----------------------
+
+test('24T3 (B3): a card holding a credit is not deleted: the dialog names the credit and offers Archivar; on an archived card it says it stays archived (never «archivala»); nothing is written', async () => {
+  // 240,00 paid into a card that owes 120,00: a credit of 120,00 in the holder's favour.
+  const overpaid: domain.Transfer = { id: 'over', fromAccountId: 'other', toAccountId: 'card-account', amountMinor: 24000, note: '', dateISO: '2026-09-12', createdAt };
+  const view = harness({ debtTransfers: [overpaid] });
+  let done = 0;
+  view.render('useCardManagement').remove(card, () => done++);
+  assert.equal(view.alerts.length, 1);
+  assert.equal(view.alerts[0].title, 'Todavía no se puede eliminar', 'never the destructive «¿Eliminar esta tarjeta?»');
+  assert.equal(view.alerts[0].message.replace(/ /g, ' '), 'Esta tarjeta tiene un saldo a favor de $ 120,00. Archivala: pasa a Archivadas en Tarjetas con su saldo a favor, y podés reactivarla cuando quieras.');
+  assert.equal(buttons(view.alerts[0]), JSON.stringify([['Cancelar', 'cancel'], ['Archivar', null]]));
+  assert.equal(view.removedCards.length + view.savedCards.length + view.pushed.length, 0, 'the dialog writes nothing');
+  view.alerts[0].buttons[1].onPress!();
+  await settle();
+  assert.deepEqual([view.savedCards[0].active, view.savedCards[0].deleted, view.removedCards.length, done], [false, false, 0, 1], 'Archivar archives: never a deletion');
+  const archived = harness({ debtTransfers: [overpaid] });
+  archived.render('useCardManagement').remove({ ...card, active: false });
+  assert.equal(archived.alerts[0].message.replace(/ /g, ' '), 'Esta tarjeta tiene un saldo a favor de $ 120,00, así que sigue archivada: queda en Archivadas en Tarjetas con su saldo a favor, y podés reactivarla cuando quieras.');
+  assert.doesNotMatch(archived.alerts[0].message, /rchivala/);
+  assert.equal(buttons(archived.alerts[0]), JSON.stringify([['Cancelar', 'cancel']]));
+  const english = harness({ debtTransfers: [overpaid], language: 'en-US' as never });
+  english.render('useCardManagement').remove({ ...card, active: false });
+  assert.equal(english.alerts[0].title, 'Cannot be deleted yet');
+  assert.equal(english.alerts[0].message.replace(/\u00a0/g, ' '), 'This card has a credit balance of AR$ 120.00, so it stays archived: it remains in Archived in Cards with its credit balance, and you can reactivate it whenever you want.');
+});
+
+test('24T3 review: an archived card with a balance due or a pending plan is not told to archive itself; any other refusal of `assertCardDeletable` is said before the destructive question', () => {
+  const owing = harness();
+  owing.render('useCardManagement').remove({ ...card, active: false });
+  assert.equal(owing.alerts[0].message.replace(/ /g, ' '), 'Esta tarjeta tiene un saldo pendiente de $ 120,00. Pagalo primero: sigue en Archivadas en Tarjetas, donde podés pagarla cuando quieras.');
+  const plan = domain.newInstallmentPlan({ id: 'tv', card, cardAccount, merchant: 'Electro', category: 'Hogar', purchaseDateISO: '2026-09-10', principalMinor: 120000, count: 12, placement: 'next', createdAt });
+  const pending = harness({ paid: true, plans: [plan] });
+  pending.render('useCardManagement').remove({ ...card, active: false });
+  assert.equal(pending.alerts[0].message, 'Esta tarjeta tiene cuotas pendientes, así que sigue archivada: sus cuotas se siguen registrando en Archivadas en Tarjetas, y podés pagarla y reactivarla.');
+  const english = harness({ paid: true, plans: [plan], language: 'en-US' as never });
+  english.render('useCardManagement').remove({ ...card, active: false });
+  assert.equal(english.alerts[0].message, 'This card has pending installments, so it stays archived: its installments keep being recorded in Archived in Cards, and you can pay it and reactivate it.');
+  // A card already deleted (a stale screen): the storage refusal, in the reader's language, with Cancelar only.
+  const stale = harness({ paid: true });
+  stale.render('useCardManagement').remove({ ...card, active: false, deleted: true });
+  assert.equal(stale.alerts[0].title, 'Todavía no se puede eliminar');
+  assert.equal(stale.alerts[0].message, domain.CARD_DELETED_MESSAGE);
+  assert.equal(buttons(stale.alerts[0]), JSON.stringify([['Cancelar', 'cancel']]));
+  assert.equal(stale.removedCards.length + stale.savedCards.length, 0);
+});

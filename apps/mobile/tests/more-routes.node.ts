@@ -230,6 +230,16 @@ test('Más empty ledger shows honest placeholders instead of zero counts', () =>
   assert.equal(value('Movimientos deshechos'), 'Ninguno');
 });
 
+test('24T3: Más counts an undone devolución among the undone movements (the screen it opens lists and restores it)', () => {
+  const ledger: domain.LedgerArchive = { accounts: [cash], records: entries.map(domain.initialRecord) };
+  const refund = domain.newEntryRefund(ledger, { id: 'r1', entryId: 'e1', amountMinor: 1000, dateISO: '2026-09-15', todayISO: '2026-09-20', createdAt: '2026-09-15T12:00:00.000Z' });
+  const undoneRefund = domain.makeOperationChange('undo', refund, 'void', '2026-09-16T12:00:00.000Z').after;
+  const value = (data: domain.LedgerArchive) => rows(harness('(tabs)/settings.tsx', data).render()).find(row => row.props.title === 'Movimientos deshechos')!.props.subtitle;
+  assert.equal(value({ ...ledger, purchaseOperations: [undoneRefund] }), '1 recuperable', 'never «Ninguno» over a list that holds it');
+  assert.equal(value({ ...ledger, purchaseOperations: [refund] }), 'Ninguno', 'a live devolución is not undone');
+  assert.equal(value({ ...archive, purchaseOperations: [undoneRefund] }), '2 recuperables');
+});
+
 test('the backup screen keeps export and import together and links the review flow', () => {
   const view = harness('backup.tsx');
   const root = view.render();

@@ -104,8 +104,12 @@ export const operations: Pick<Messages, 'operations'> = {
       restoreRefundQuestion: 'Restore refund?',
       restorePayoffQuestion: 'Restore installments brought forward?',
       voidEntryRefund: '{amount} is no longer credited to {account} and the purchase counts in full again in {category}.',
+      voidEntryRefundOthers: {
+        one: '{amount} is no longer credited to {account} and the purchase counts {amount} more in {category}. Its other refund stays.',
+        other: '{amount} is no longer credited to {account} and the purchase counts {amount} more in {category}. Its other {count} refunds stay.',
+      },
       voidPlanCredit: '{amount} is no longer credited to the card.',
-      voidPlanReductions: 'Installments {range} go back to their amount.',
+      voidPlanReductions: { one: 'Installment {range} goes back to its amount.', other: 'Installments {range} go back to their amount.' },
       voidPayoff: 'The installments brought forward ({amount} of price) are pending again and no longer count on this date.',
       recordsShares: { one: 'Installment {range} is recorded on its closing ({amount}).', other: 'Installments {range} are recorded on their closings ({amount}).' },
       payoffNotRestorable: 'This cannot be restored afterwards.',

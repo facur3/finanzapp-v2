@@ -582,7 +582,9 @@ test('24T3: an adelanto brings the rest forward: «Adelantado», 12 de 12 counte
   const segments = [byName(root, 'PlanBar')[0].rendered!.props.children].flat().map((segment: Node) => Object.assign({}, ...[segment.props.style].flat()));
   assert.equal(segments.every(style => style.backgroundColor === '#000'), true, 'brought forward is drawn as counted');
   assert.deepEqual(rowsOf(root).slice(4), ['Ya registrado=$ 1.200.000,00 (1200000,00 pesos)', 'Cuotas adelantadas=$ 1.000.000,00 (1000000,00 pesos)',
-    'Cuotas futuras=$ 0,00 (0,00 pesos)', 'Restante=$ 0,00 (0,00 pesos)'].map(money$));
+    'Cuotas futuras=$ 0,00 (0,00 pesos)', 'Restante=$ 0,00 (0,00 pesos)',
+    // A26: the adelanto is listed under «Devoluciones y adelantos» too.
+    'Adelanto de cuotas · 1 de octubre de 2026=$ 1.000.000,00 (1000000,00 pesos)'].map(money$));
   assert.deepEqual(actionsOf(root), ['Registrar devolución'], 'nothing left to bring forward or to stop');
   assert.equal(/pagad/i.test(JSON.stringify(texts(root))), false);
   // The card detail's row says the same word.
@@ -645,7 +647,8 @@ test('24T3: a devolución lowers the last instalments: the reduced row shows wha
   assert.equal(segments[11].borderStyle, 'dashed', 'returned whole: never recorded');
   // Two figures, never merged: the credit to the card and the future instalments lowered; the future principal is what is left.
   assert.deepEqual(rowsOf(root).slice(4), ['Ya registrado=$ 200.000,00 (200000,00 pesos)', 'Cuotas futuras=$ 850.000,00 (850000,00 pesos)',
-    'Devuelto a la tarjeta=$ 200.000,00 (200000,00 pesos)', 'Cuotas reducidas por devolución=$ 150.000,00 (150000,00 pesos)'].map(money$));
+    'Devuelto a la tarjeta=$ 200.000,00 (200000,00 pesos)', 'Cuotas reducidas por devolución=$ 150.000,00 (150000,00 pesos)',
+    'Devolución · 1 de octubre de 2026=$ 350.000,00 (350000,00 pesos)'].map(money$));
   assert.equal(byName(root, 'PlanProgressSummary')[0].rendered!.props.accessibilityLabel, '2 de 12 registradas, 850000,00 pesos restantes, próxima cuota el 28 de octubre de 2026');
   assert.deepEqual(actionsOf(root), ['Registrar devolución', 'Registrar adelanto de cuotas', 'Dejar de seguir el plan']);
   const english = harness('installment/[id].tsx', { params: { id: 'tv' }, data: { ...withPlans, purchaseOperations: [refund] }, locale: 'en-US' }).render();
@@ -653,6 +656,67 @@ test('24T3: a devolución lowers the last instalments: the reduced row shows wha
   assert.ok(texts(byName(english, 'ScheduleRow')[11].rendered!).includes('Refunded'));
   assert.ok(rowsOf(english).some(row => row.startsWith('Refunded to the card=')));
   assert.ok(rowsOf(english).some(row => row.startsWith('Installments reduced by refunds=')));
+});
+
+test('24T3 review: a row whose principal a devolución took to zero opens the interest movement it recorded (or undid), never a principal movement that does not exist', () => {
+  // Notebook, 3 × $ 300.000,00 + $ 30.000,00 interest: instalment 1 recorded; on Nov 1 $ 600.000,00 returned: $ 300.000,00 back
+  // to the card, the rest takes instalment 3's principal whole. Through Jan 2 the closings record only its interest.
+  const before: domain.LedgerArchive = { ...withPlans, records: [...withPlans.records, ...recognised(nb, [1])] };
+  const refund = domain.newPlanRefund(before, { id: 'rf-n', planId: 'nb', amountMinor: 60000000, dateISO: '2026-11-01', todayISO: '2026-11-01', createdAt: opNow });
+  assert.equal(JSON.stringify([refund.creditMinor, refund.reductions]), JSON.stringify([30000000, [{ number: 3, minor: 30000000 }]]));
+  const inserts = domain.planCatchUpInserts({ ...before, purchaseOperations: [refund] }, 'nb', '2027-01-02');
+  const data: domain.LedgerArchive = { ...before, records: [...before.records, ...inserts], purchaseOperations: [refund] };
+  const interest3 = domain.installmentEntryId('nb', 3, 'interest');
+  assert.equal(data.records.some(record => record.entry.id === domain.installmentEntryId('nb', 3, 'principal')), false, 'its principal was never recorded');
+  assert.equal(data.records.some(record => record.entry.id === interest3), true);
+  const view = harness('installment/[id].tsx', { params: { id: 'nb' }, data, day: '2027-01-02' });
+  const third = byName(view.render(), 'ScheduleRow')[2];
+  assert.equal(third.props.row.state, 'recognised');
+  assert.equal(third.rendered!.props.accessibilityHint, 'Abre el movimiento de la cuota');
+  third.rendered!.props.onPress();
+  assert.equal(JSON.stringify(view.pushed.at(-1)), JSON.stringify({ pathname: '/entry/[id]', params: { id: interest3 } }));
+  // Its interest undone: the row reads undone and still opens that movement (to restore it).
+  const undone = { ...data, records: data.records.map(record => record.entry.id === interest3 ? { ...record, voided: true, revision: 1, updatedAt: opNow } : record) };
+  const again = harness('installment/[id].tsx', { params: { id: 'nb' }, data: undone, day: '2027-01-02' });
+  const row = byName(again.render(), 'ScheduleRow')[2];
+  assert.equal(row.props.row.state, 'undone');
+  row.rendered!.props.onPress();
+  assert.equal(JSON.stringify(again.pushed.at(-1)), JSON.stringify({ pathname: '/entry/[id]', params: { id: interest3 } }));
+});
+
+test('24T3 review: «Devoluciones y adelantos» lists every operation of the plan, live and undone, newest first, each opening its own detail (A26)', () => {
+  // Nothing recorded yet: devolución A lowers instalment 3; B then lowers 3 (by the rest) and 2, so rows 2 and 3 open B and
+  // A is reached only from this list; C was undone and is listed to be restored.
+  const a = domain.newPlanRefund(withPlans, { id: 'rf-a', planId: 'nb', amountMinor: 15000000, dateISO: '2026-10-01', todayISO: '2026-10-01', createdAt: opNow });
+  const b = domain.newPlanRefund({ ...withPlans, purchaseOperations: [a] }, { id: 'rf-b', planId: 'nb', amountMinor: 45000000, dateISO: '2026-10-01', todayISO: '2026-10-01',
+    createdAt: '2026-10-01T13:00:00.000Z' });
+  const c = { ...domain.newPlanRefund({ ...withPlans, purchaseOperations: [a, b] }, { id: 'rf-c', planId: 'nb', amountMinor: 1000000, dateISO: '2026-10-01', todayISO: '2026-10-01',
+    createdAt: '2026-10-01T14:00:00.000Z' }), voided: true, revision: 1 };
+  assert.equal(JSON.stringify([a.creditMinor, a.reductions]), JSON.stringify([0, [{ number: 3, minor: 15000000 }]]), 'only reductions: no line in Movimientos');
+  const data = { ...withPlans, purchaseOperations: [a, b, c] };
+  const view = harness('installment/[id].tsx', { params: { id: 'nb' }, data });
+  const root = view.render();
+  assert.deepEqual(byName(root, 'ScheduleRow').slice(1).map(row => row.props.row.operationId), ['rf-b', 'rf-b']);
+  assert.ok(nodes(root).some(node => node.type === 'SectionTitle' && text(node) === 'Devoluciones y adelantos'));
+  const listed = nodes(root).filter(node => node.type === 'DetailRow' && node.props.icon === 'arrow-undo-outline');
+  assert.deepEqual(listed.map(node => node.props.label + '=' + node.props.value + ' (' + node.props.spokenValue + ')'), [
+    'Devolución deshecha · 1 de octubre de 2026=$ 10.000,00 (10000,00 pesos)', 'Devolución · 1 de octubre de 2026=$ 450.000,00 (450000,00 pesos)',
+    'Devolución · 1 de octubre de 2026=$ 150.000,00 (150000,00 pesos)'].map(money$));
+  listed[2].props.onPress();
+  assert.equal(JSON.stringify(view.pushed.at(-1)), JSON.stringify({ pathname: '/operation/[id]', params: { id: 'rf-a' } }));
+  listed[0].props.onPress();
+  assert.equal(JSON.stringify(view.pushed.at(-1)), JSON.stringify({ pathname: '/operation/[id]', params: { id: 'rf-c' } }));
+  // An undone adelanto too, with its own glyph.
+  const payoff = { ...payoffOf('tv', 'recognised', 'po-u'), voided: true, revision: 1 };
+  const tvRoot = harness('installment/[id].tsx', { params: { id: 'tv' }, data: { ...withPlans, purchaseOperations: [payoff] } }).render();
+  assert.ok(rowsOf(tvRoot).includes(money$('Adelanto deshecho · 1 de octubre de 2026=$ 1.000.000,00 (1000000,00 pesos)')));
+  assert.equal(nodes(tvRoot).find(node => node.type === 'DetailRow' && node.props.label.startsWith('Adelanto deshecho'))!.props.icon, 'play-forward-circle-outline');
+  // A plan with no operation has no such section; English reads the same list.
+  assert.equal(nodes(harness('installment/[id].tsx', { params: { id: 'tv' }, data: withPlans }).render()).some(node => node.type === 'SectionTitle' && text(node) === 'Devoluciones y adelantos'), false);
+  const english = harness('installment/[id].tsx', { params: { id: 'nb' }, data, locale: 'en-US' }).render();
+  assert.ok(nodes(english).some(node => node.type === 'SectionTitle' && text(node) === 'Refunds and installments brought forward'));
+  assert.deepEqual(nodes(english).filter(node => node.type === 'DetailRow' && node.props.icon === 'arrow-undo-outline').map(node => node.props.label),
+    ['Undone refund · October 1, 2026', 'Refund · October 1, 2026', 'Refund · October 1, 2026']);
 });
 
 test('24T3: a completed plan offers a devolución while something is returnable; returned whole it reads «Devuelto» and offers nothing; a deleted card offers nothing', () => {
