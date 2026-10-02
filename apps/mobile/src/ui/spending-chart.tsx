@@ -101,7 +101,8 @@ export function CategoryLegendRow({ category, totalMinor, currency, onPress, las
   const stacked = useCategoryRowStacks(name, category.amountMinor, currency);
   return <PressFeedback feedback="highlight" accessibilityRole="button" accessibilityState={{ selected: chosen }}
     accessibilityLabel={spoken}
-    accessibilityHint={t('reports.chart.categoryHint')}
+    // 25UX1: a chosen row is listed first while it is chosen; its hint says why, so VoiceOver never hears it as the top spender.
+    accessibilityHint={t(chosen ? 'reports.chart.chosenRowHint' : 'reports.chart.categoryHint')}
     onPress={onPress} style={[{ paddingHorizontal: 16, paddingVertical: 12, minHeight: 60, flexDirection: 'row', gap: 12, alignItems: 'center',
       borderBottomWidth: last ? 0 : StyleSheet.hairlineWidth, borderBottomColor: p.line },
       chosen ? { borderWidth: 1.5, borderColor: look.hex, borderBottomWidth: 1.5, borderBottomColor: look.hex, borderRadius: 14, backgroundColor: look.hex + '14' } : null]}>

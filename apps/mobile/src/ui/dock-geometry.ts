@@ -4,7 +4,8 @@
  * The dock is one object in two parts: the pine pill with the four tabs and, 10 pt to its right, the 60 pt «+». Both are
  * 60 pt tall, 16 pt from the screen's sides (plus the landscape sensor inset) and lifted into the upper part of the home
  * indicator's safe area. At 375 pt the pill's inner width leaves each tab about 65 pt; at 393 pt about 70 pt: every tab keeps a full
- * target. The dock stays in the layout (never an overlay), so every screen ends above it. */
+ * target. 25UX1 (owner, 2026-10-02): the dock floats over the tab roots with nothing painted behind it; the roots run to
+ * the window's bottom and end their content above it through `dockClearance` (the shared bottom inset). */
 export const DOCK = { height: 60, side: 16, top: 8, gap: 10, plus: 60 } as const;
 
 /** The air under the dock: it rests in the upper part of the home indicator's safe area (clear of the indicator),
@@ -16,6 +17,13 @@ export function tabBarBottomGap(bottomInset: number): number {
 /** The dock's side padding: its 16 pt, plus the sensor housing's inset in landscape. */
 export function dockSide(insets: { left: number; right: number }): number {
   return DOCK.side + Math.max(insets.left, insets.right);
+}
+
+/** How far the dock's top edge is from the window's bottom: its air under it, its 60 pt and the 8 pt above it (88 pt with a
+ * 34 pt home-indicator inset). A tab root ends its content this far up, on top of its own bottom padding, so its last row
+ * clears the dock exactly as it did when the dock took layout space (25UX1). */
+export function dockClearance(bottomInset: number): number {
+  return tabBarBottomGap(bottomInset) + DOCK.height + DOCK.top;
 }
 
 /** Where the «+» sits, measured from the window's bottom-right corner: the hub's close control is drawn there. */

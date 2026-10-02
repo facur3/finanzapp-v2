@@ -232,7 +232,7 @@ test('the deck draws every card in the stored order, the selected one in front a
     'Tarjeta Amex, termina en 1001, dólares, Tarjeta 3 de 3',
     'Tarjeta Naranja X, Naranja, pesos, Tarjeta 2 de 3',
   ]);
-  assert.deepEqual(cards.map(card => card.hit.accessibilityHint), ['Selecciona esta tarjeta', 'Abre el detalle de la tarjeta', 'Selecciona esta tarjeta']);
+  assert.deepEqual(cards.map(card => card.hit.accessibilityHint), ['Selecciona esta tarjeta y muestra su resumen', 'Abre el detalle de la tarjeta', 'Selecciona esta tarjeta y muestra su resumen']);
   assert.deepEqual(cards.map(card => card.hit.accessibilityState.selected), [false, true, false]);
   assert.ok(cards.every(card => card.hit.accessibilityRole === 'button'));
   // The faces inside are pictures only: the button around each speaks for its card.
@@ -295,14 +295,16 @@ test('one card is just its face; large text grows the strips with the capped fac
   const large = visual({ fontScale: 2 });
   const deck = large.CardDeck({ cards: [visa, amex], selectedId: 'missing', onSelect: () => {}, onOpen: () => {} });
   const cards = slots(deck);
-  assert.equal(cards.map(card => card.top).join(','), '57,0', 'a selection that no longer exists falls back to the first card');
+  // 25UX1: a selection that no longer exists returns the deck to idle: the stored order, the last card whole, nobody selected.
+  assert.equal(cards.map(card => card.top).join(','), '0,57');
+  assert.equal(cards.some(card => card.hit.accessibilityState.selected), false);
   assert.equal(deck.props.style.height, 57 + 223);
 
   const english = visual({ locale: bindLocale('en-US', 'native', 'es') });
   const read = slots(english.CardDeck({ cards: [visa, amex], selectedId: 'visa', onSelect: () => {}, onOpen: () => {} }));
   // Visa is selected: in front, read last («2 of 2»); Amex is the strip above it, read first.
   assert.deepEqual(read.map(card => card.hit.accessibilityLabel), ['Card Visa Gold, Galicia, ending in 4009, Argentine pesos, Card 2 of 2', 'Card Amex, ending in 1001, US dollars, Card 1 of 2']);
-  assert.deepEqual(read.map(card => card.hit.accessibilityHint), ['Opens the card details', 'Selects this card']);
+  assert.deepEqual(read.map(card => card.hit.accessibilityHint), ['Opens the card details', 'Selects this card and shows its summary']);
   assert.ok(read.every(card => card.hit.accessibilityLanguage === 'en'), 'the interface language, not the device\'s');
 });
 
@@ -348,8 +350,37 @@ test('24UX6D: six cards render as five 44 pt strips and one whole face; a strip 
   cards[2].hit.onPress();
   cards[5].hit.onPress();
   assert.equal(JSON.stringify([selected, opened, view.haptics()]), JSON.stringify([['naranja'], ['c'], 1]), 'a strip selects; the face in front opens its detail');
-  // Without a selection (or with one that left the deck), the first card is in front: never an empty «choose a card» state.
+  // 25UX1 (owner): without a selection the deck is idle: the stored order, the last card whole at the bottom, nobody selected.
   const fallback = slots(view.CardDeck({ cards: six, selectedId: null, onSelect() {}, onOpen() {} }));
-  assert.equal(fallback.findIndex(card => card.hit.accessibilityState.selected), 0);
-  assert.equal(fallback[0].top, 5 * 44);
+  assert.equal(fallback.findIndex(card => card.hit.accessibilityState.selected), -1);
+  assert.equal(fallback.map(card => card.top).join(','), '0,44,88,132,176,220');
+  assert.equal(fallback.map(card => card.hit.height).join(','), '44,44,44,44,44,223');
+});
+
+test('25UX1: the deck opens idle: every card\'s identity, nobody selected; the first tap on any card selects it, a tap on the selected card opens it', () => {
+  const view = visual();
+  const selected: string[] = [], opened: string[] = [];
+  const idle = slots(view.CardDeck({ cards: [visa, amex, naranja], selectedId: null, onSelect: (id: string) => selected.push(id), onOpen: (id: string) => opened.push(id) }));
+  // The stored order, the last card drawn whole at the bottom (as a stack reads), and no card selected.
+  assert.equal(idle.map(card => card.top).join(','), '0,50,100');
+  assert.equal(idle.map(card => card.hit.height).join(','), '50,50,223');
+  assert.deepEqual(idle.map(card => card.face.props.nameLines), [1, 1, 2]);
+  assert.deepEqual(idle.map(card => card.hit.accessibilityState.selected), [false, false, false], 'VoiceOver hears no card as selected');
+  assert.deepEqual(new Set(idle.map(card => card.hit.accessibilityHint)), new Set(['Selecciona esta tarjeta y muestra su resumen']), 'every card says a tap selects it and shows its summary');
+  // Even the whole card at the bottom selects first: nothing opens before the person chose a card.
+  idle[2].hit.onPress();
+  idle[0].hit.onPress();
+  assert.equal(JSON.stringify([selected, opened, view.haptics()]), JSON.stringify([['naranja', 'visa'], [], 2]), 'one selection haptic per tap');
+  // Once Naranja is selected it moves to the front (the slide is the deck's 260 ms data move) and a second tap opens it.
+  const chosen = slots(view.CardDeck({ cards: [visa, amex, naranja], selectedId: 'naranja', onSelect: (id: string) => selected.push(id), onOpen: (id: string) => opened.push(id) }));
+  assert.deepEqual(chosen.map(card => card.hit.accessibilityState.selected), [false, false, true]);
+  assert.equal(chosen[2].hit.accessibilityHint, 'Abre el detalle de la tarjeta');
+  chosen[2].hit.onPress();
+  assert.deepEqual(opened, ['naranja']);
+  // With one card the same holds: its face is whole, a first tap selects, never opens.
+  const [only] = slots(view.CardDeck({ cards: [visa], selectedId: null, onSelect: (id: string) => selected.push(id), onOpen: (id: string) => opened.push(id) }));
+  assert.equal(only.hit.accessibilityHint, 'Selecciona esta tarjeta y muestra su resumen');
+  only.hit.onPress();
+  assert.equal(selected.at(-1), 'visa');
+  assert.deepEqual(opened, ['naranja']);
 });

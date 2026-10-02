@@ -1,10 +1,16 @@
 # FinanzApp mobile: living roadmap
 
-Updated: 2026-10-02 (Producto 25A-02 on its branch: the durable local review store, infrastructure only. A separate SQLite
+Updated: 2026-10-02 (Producto 25UX1 on its branch: dock, Cards and Reports interaction polish, three owner-observed
+problems and no financial change: the dock floats with no rectangle behind it (one shared bottom inset keeps every
+root's last row reachable), Tarjetas opens idle and shows a card's compact snapshot only after a first tap (a second
+tap opens the detail, where Movimientos now come before Cuotas), and Reportes lists the donut's chosen category first
+while chosen, its row travelling up and back; the version line reads «FinanzApp 0.1.0 (25UX1)». Producto 25A-02 merged
+as PR #78 (merge commit 4ebe89f), with its follow-up PR #79 (merge commit a1bd181: the basis checked inside the
+ledger's transaction): the durable local review store, infrastructure only. A separate SQLite
 file (`finanzapp-review-v1.sqlite`, its own version 1, never in a backup) keeps review items pending, confirmed or dismissed
 with a frozen write id; a confirmation freezes its one write before the ledger is asked, so an interruption is reconciled
 from the ledger and never writes twice; the ledger now refuses one id as two kinds of write. No UI, schema (14), backup
-(v14), network or provider change; the version line reads «FinanzApp 0.1.0 (25A-02)». Producto 25A-01 merged as PR #77,
+(v14), network or provider change; the version line read «FinanzApp 0.1.0 (25A-02)». Producto 25A-01 merged as PR #77,
 merge commit a4202bc: the review-draft domain model, the first focused slice of 25A and pure
 domain only. `packages/domain/review-drafts.ts` is the one typed proposal every later Assistant, Wallet or inbox producer
 ends in: strict parsing of untrusted input, explicit gaps (never a defaulted currency, destination or instalment count),
@@ -214,14 +220,24 @@ commit 8f758ad), 24UX6C2 (PR #73, merge
 commit 5c73813), 24UX6C (PR #72, merge
 commit c673be6), 24UX6B (PR #71, merge
 commit ecfd1dc), 24UX6A (PR #70, merged 2026-10-01, merge commit ef24bb6), 24T2 (PR #69, merge commit 8951f6c), 24T1C
-(PR #68), 24T1 (PR #67) and 25B3 (PR #66), then Producto 25A-01 (PR #77, merge commit a4202bc), plus Producto 25A-02
-on its branch. Per area,
+(PR #68), 24T1 (PR #67) and 25B3 (PR #66), then Producto 25A-01 (PR #77, merge commit a4202bc) and 25A-02 (PR #78 and its follow-up PR #79, merge commit
+a1bd181), plus Producto 25UX1 on its branch. Per area,
 without test inventories (those are in apps/mobile/README.md and the history
 file). "Released" below names an in-app gate (`RELEASED_LANGUAGES`, `RELEASED_REGIONS`,
 `LEDGER_CURRENCIES`): what a build offers, verified on Linux; nothing is distributed to people yet
 (§4).
 
-- **Durable local review store (25A-02, on its branch; nothing on screen, so no device QA).** Infrastructure for the
+- **Dock, Cards and Reports interaction (25UX1, on its branch; device QA pending).** Three owner-observed problems, no
+  financial change (decision 005, «Enmienda 2026-10-02 — Producto 25UX1»; §3, «Producto 25UX1»). The dock floats over
+  the tab roots with no ground of its own (`floating-tab-bar.tsx`, pinned to the window's bottom, `box-none`); the roots
+  keep their last row clear of it through one shared inset (`dockClearance`, `useDockClearance`: the dock's height inside
+  a tab scene, 0 elsewhere) in `Screen`, `EntryList`, Inicio and Reportes. Tarjetas opens idle (the deck, no card's
+  figures); a first tap selects a card and shows Saldo pendiente → Vence · Cierra → Disponible → Pagar tarjeta →
+  Recientes, a tap on the selected card opens its detail, and a change of card never shows stale figures; the detail
+  lists Movimientos before Cuotas. Reportes lists the chosen category first while chosen (`promoteChosen`), its row
+  travelling up and back (`rowReorder`, Reanimated's FlatList), at once under Reduce Motion or on a new month, currency
+  or mode. The version line reads «FinanzApp 0.1.0 (25UX1)».
+- **Durable local review store (25A-02, PR #78 and PR #79, merge commit a1bd181; nothing on screen, so no device QA).** Infrastructure for the
   tray (§3, «Producto 25A-02»). `src/storage/review-database.ts`: a separate file `finanzapp-review-v1.sqlite` (review
   schema 1; never in the ledger, a backup or `importArchive`; a corrupt, unreadable or newer file is never reset or
   rewritten and never stops the ledger). A review item keeps its id, source, optional capture key, the 25A-01 draft
@@ -233,7 +249,7 @@ file). "Released" below names an in-app gate (`RELEASED_LANGUAGES`, `RELEASED_RE
   conflict that writes nothing. A capture key makes a repeated delivery idempotent and refuses the same key with other
   data. The ledger's `createEntry`, `createInstallmentPlan` and `createTransfer` refuse an id another kind of write owns
   (`packages/domain/write-ids.ts`); reads and imports are unchanged. No screen opens the store yet (25A-03). The version
-  line reads «FinanzApp 0.1.0 (25A-02)».
+  line read «FinanzApp 0.1.0 (25A-02)» (25UX1 since).
 - **Review drafts: the domain model (25A-01, PR #77, merge commit a4202bc; nothing on screen, so no device QA).** The first slice of the
   real Assistant (§3, «Producto 25A» and «Producto 25A-01»). `packages/domain/review-drafts.ts`: a `ReviewDraft` (version 1;
   source assistant, wallet, inbox or fixture; kind expense or income; amount, currency, merchant, category, date and
@@ -435,7 +451,8 @@ file). "Released" below names an in-app gate (`RELEASED_LANGUAGES`, `RELEASED_RE
   Cuentas, Tarjetas, Presupuestos, Recurrentes, Deudas y cobros, Categorías, Idioma, Región, Apariencia, backup, the
   Assistant's data note; since 24UX6C each group under a small caps label); a Más version line («FinanzApp 0.1.0
   (24T3)»; the material and locale diagnostics only in a
-  development build). The dock stays in the layout (never absolute over the content). Liquid Glass (tinted pine on the
+  development build). The dock stayed in the layout (never absolute over the content) until 25UX1, which makes it float with no
+  rectangle behind it (see «Dock, Cards and Reports interaction (25UX1)» above). Liquid Glass (tinted pine on the
   dock's pill) on the dock, the account detail's movement pills and the Assistant composer only in a development build
   on iOS 26 with the API present and without Reduce Transparency; opaque material otherwise (solid pine with a hairline
   on the dock). Más → Apariencia: Sistema
@@ -607,8 +624,13 @@ it was checked in). Metro from `master` (or a delivery's branch) on the installe
 item unless a section says a new native build is needed. The checklist sections are in
 [mobile-device-checklist.md](mobile-device-checklist.md).
 
-- **25A-02 — Durable local review store (on its branch): nothing to check on the iPhone.** No screen opens it yet; no
-  native dependency; the ledger's schema and backups are unchanged. The Más version line reads «FinanzApp 0.1.0 (25A-02)».
+- **25UX1 — Dock, Cards and Reports interaction (on its branch; none done; no EAS build):** the checklist section Producto
+  25UX1: the dock without a footer rectangle on every root, light and dark, with and without Reduce Transparency; the
+  last row of each root reachable above the dock; the keyboard in Movimientos' search; the capture hub; 30–40 rapid tab
+  switches without a black screen; Tarjetas idle, first and second tap, a change of card with no stale figure, one and
+  six cards, VoiceOver and Reduce Motion; the card detail's order; Reportes' fifth category rising, returning and
+  switching, with Reduce Motion and VoiceOver. Metro on the installed development build; no native dependency added.
+- **25A-02 — Durable local review store (merged as PR #78 and PR #79): nothing to check on the iPhone.**
 - **25A-01 — Review draft domain model (merged as PR #77): nothing to check on the iPhone.** Pure domain.
 - **24T3 — Refunds, early payoff and installment lifecycle (merged as PR #76, merge commit 399a1fa; none done; no EAS
   build).** The owner merged #76 after targeted use and deliberately deferred the recorded pass; no item below is
@@ -788,8 +810,9 @@ item unless a section says a new native build is needed. The checklist sections 
 **Recommended next (2026-10-02):** **24T3 merged as PR #76** (merge commit 399a1fabaa673423b7a155ddb3cb900b5c0103fc):
 SQLite schema 14 and backup v14 are current, and the broad Forest visual lane (24UX6A–24UX6E) is complete. The active
 phase is **25A — the real Assistant**, delivered as focused slices («Producto 25A» below, «Slices»): **25A-01** (the
-review-draft domain model) merged as PR #77 (merge commit a4202bc); **25A-02** (the durable local review store) is this
-PR; then 25A-03 (the «Para revisar» tray)
+review-draft domain model) merged as PR #77 (merge commit a4202bc); **25A-02** (the durable local review store) merged as PR #78
+with its follow-up PR #79 (merge commit a1bd181); **25UX1** (dock, Cards and Reports interaction polish, three
+owner-observed problems, no financial change) is this PR; then 25A-03 (the «Para revisar» tray)
 and the rest of 25A, with no paid provider call before its own approved slice. **25A2** (Wallet Shortcut Capture) still
 follows the review-tray foundation: it may begin once 25A-03 has merged, without waiting for 25A's cloud, paid, live or
 voice slices. The targeted 24T3 device pass gates 25A-03, 25A-04, 25A-11 and 25A-12 (§2). After 25A: **25C** (with
@@ -1550,7 +1573,12 @@ delivery that pulls the Wallet capture forward from 25D: it needs 25A's draft mo
   only opens the review card is an owner decision taken before 25A2 ships, because the binding rule makes Confirmar on
   the draft card the only write path; either way it is the review tray's one confirmation, never a second write path,
   and an incomplete capture offers Edit only. Dynamic Island / Live Activity is optional polish once the notification
-  flow is proven.
+  flow is proven. *(Revised by the owner on 2026-10-02, recorded in 25UX1, not implemented: see «Target flow» below.)*
+- **Target flow (owner, 2026-10-02; a future product decision, nothing implemented).** Wallet Transaction Automation →
+  a local review draft → a **Dynamic Island / Live Activity** with Confirmar / Editar. That path is **not a normal
+  notification**. When a complete, immediate confirmation cannot run there (an incomplete capture, a missing mapping,
+  a gap, a device or setting where the Live Activity is not available), it falls back safely: the draft stays in the
+  review tray, and a review alert (25D) may point to it; nothing is ever written without the person's Confirmar.
 - **Manual capture stays the core**, offline and complete without any of this.
 - **Gates.** Device evidence on an iPhone and, separately, on an Apple Watch payment; a denied or missing automation;
   repeated and late deliveries; the mapping for a credit card and for a debit card; an incomplete capture.
@@ -3576,6 +3604,53 @@ nothing of it is on a screen yet.
   newer file not even switched to WAL. Recorded, not changed here: the instalment catch-up's derived `inst_` ids are not
   checked against other kinds (a plan id is a UUID, so a collision needs a hand-made id).
 
+### Producto 25UX1 — Dock, Cards and Reports interaction polish (this PR)
+
+- **Goal.** Three interaction problems the owner observed on the product, nothing more: not a redesign, the broad
+  Forest lane stays closed. No financial rule, ledger semantics, review-store architecture, schema (14), backup (v14),
+  Assistant, cloud, Wallet, Supabase, provider, EAS or native dependency change. Rules: decision 005, «Enmienda
+  2026-10-02 — Producto 25UX1»; design: `docs/mobile-design.md`, «Producto 25UX1».
+- **Scope.** Branch `feat/producto-25ux1-interaction-polish` from master a1bd181.
+- **Dock.** `FloatingTabBar` is pinned to the window's bottom (absolute, full width, no background, `box-none`): no
+  rectangle behind the pill and the «+». The tab roots run to the window's bottom; one shared inset keeps their last row
+  reachable: `dockClearance(bottomInset)` = the air under the dock + 60 + 8 (88 pt with a 34 pt inset), and
+  `useDockClearance()` returns it inside a scene of the tab navigator (its bar-height context) and 0 anywhere else, so a
+  pushed screen, a modal or the hub keep their padding. `Screen` and `EntryList` (Más, Movimientos) and Inicio and
+  Reportes take it through `useDockInset`: on iOS as the scroller's `contentInset` and indicator inset (React Native
+  restores it after any keyboard as max(keyboard, inset), and UIKit keeps a VoiceOver focus inside it), elsewhere as
+  bottom padding; inside the tabs the system adds nothing (`never`). Unchanged: the dock's geometry and accessibility, the capture hub, the navigator's options (the black-screen
+  mitigation), Reduce Transparency, keyboard handling.
+- **Tarjetas.** Idle on entry, even with one card: the deck in its stored order with the last card whole, a quiet line,
+  no card's figures. A first tap on any card selects it (the deck's 260 ms move; at once with Reduce Motion) and shows
+  Saldo pendiente → Vence · Cierra → Disponible → Pagar tarjeta → Recientes (Registrar compra and the future instalments
+  left the snapshot: the dock's «+» and the detail carry them; `FutureInstallmentsRow` and its three strings were
+  removed). A tap on the selected card opens it. A change of card swaps the figures with no stale value beside a fresh
+  one (`ValueTransition exit={false}`). VoiceOver: an unselected card «Selecciona esta tarjeta y muestra su resumen»; the
+  selected one «Seleccionada», «Abre el detalle de la tarjeta». The card detail lists Movimientos, then Cuotas (the plans
+  moved to the list's footer); every action stays.
+- **Reportes.** `promoteChosen` lists the chosen category first while it is chosen, every other row in canonical order;
+  the donut, its shares and its VoiceOver steps keep reading the canonical categories. The list is Reanimated's
+  FlatList with `itemLayoutAnimation={rowReorder}` (`LinearTransition`, 260 ms, the app's curve, no spring) only on the
+  render where the choice changed within the same month, currency and mode: a new month, currency, mode or Día a día
+  reorders at once, and so does everything under Reduce Motion. The chosen row's VoiceOver hint says it is shown first
+  because it is chosen. No auto-scroll.
+- **Future decisions recorded (owner, 2026-10-02; nothing implemented here).** 25A2 targets Wallet Transaction
+  Automation → local review draft → Dynamic Island / Live Activity Confirmar / Editar, with a safe fallback when a
+  complete immediate confirmation cannot run, and that path is not a normal notification («Producto 25A2», «Target
+  flow»). 25D's notifications separately cover recurring due reminders, credit-card closing, due and payment reminders,
+  optional end-of-day expense-entry reminders and fallback review alerts, with financial values private by default on
+  the lock screen («Producto 25D», «Notification families»).
+- **Device QA.** Pending: checklist section «Producto 25UX1». The version line reads «FinanzApp 0.1.0 (25UX1)».
+- **Status.** On its branch; not merged.
+- **Gates.** 2026-10-02, local, Linux. Root `npm test` 590 passed, 1 todo; `check:repo` OK. `apps/mobile`: `typecheck` OK;
+  `test:storage` 1238 passed, 0 failed; `currency:verify`, `regions:verify` OK; `i18n:check -- --strict` 0/0 (English
+  accepted for the new strings); `check` OK; `export:ios` OK. No EAS build, no iPhone. An adversarial review in eleven
+  lenses (two skeptics per finding) confirmed four, all fixed: the snapshot and idle line sharing one Reflow (keyed, so
+  the fade plays); the scroll indicator of Movimientos and Más losing the dock clearance after any keyboard (the
+  clearance is now the iOS `contentInset`, which React Native restores); a Reportes row travelling beneath the rows it
+  passes (its cell is layered above, `CellRendererComponentStyle`); and the risk of a VoiceOver double-tap on a row under
+  the dock landing on the dock (mitigated by the same inset; to confirm on the iPhone).
+
 ### Later notes recorded in 24UX6A (future; document only, not scheduled)
 
 - **Investments.** When the owner schedules them: cash leaves an account by a **transfer** into an investment (asset)
@@ -3696,6 +3771,12 @@ tied to 25E's account are deferred to 25E or a follow-up after it (24T1C, 2026-0
   - **Apple file/data protection reviewed separately from LocalAuthentication:** a Face ID prompt does not
     encrypt SQLite; the data-protection class of the database, the backups and any exported file is
     decided and verified on its own.
+- **Notification families (owner, 2026-10-02; recorded in 25UX1, a future product decision, nothing implemented).** 25D's
+  notifications separately cover: recurring due reminders; credit-card closing, due and payment reminders; optional
+  end-of-day expense-entry reminders; and the fallback review alerts of 25A2 (a capture left for review when the Live
+  Activity path could not confirm it). The Wallet capture's Dynamic Island / Live Activity is 25A2's, not one of these.
+  **Financial values in lock-screen notifications stay private by default** (no amount or merchant unless the person
+  turns it on).
 - **Local notifications** (opt-in, configurable, time-zone aware, deduplicated): card closing and due
   dates, upcoming recurring payments, instalments (24T), and reminders the person sets. They are
   scheduled on the device and work without any server. **Sensitive content hidden by default on the Lock

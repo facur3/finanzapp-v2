@@ -257,6 +257,10 @@ test('a chosen legend row is marked beyond colour: selected for VoiceOver, a bol
   assert.equal(legend(plain).name.props.style.fontWeight, '500');
   assert.equal(plain.props.style[1], null, 'not chosen: no outline');
   assert.equal(plain.props.accessibilityLabel, chosen.props.accessibilityLabel, 'the label is the same; the state says the choice');
+  // 25UX1: a chosen row is listed first while it is chosen; its hint says so, so VoiceOver never hears it as the top spender.
+  assert.equal(chosen.props.accessibilityHint, 'Elegida en el gráfico: se muestra primero mientras está elegida. Abre los movimientos de esta categoría en el mes seleccionado');
+  assert.equal(plain.props.accessibilityHint, 'Abre los movimientos de esta categoría en el mes seleccionado');
+  assert.doesNotMatch(chosen.props.accessibilityHint + chosen.props.accessibilityLabel, /mayor|primera categor|más gast/i, 'no rank word');
   // A chosen row that stacks keeps both the mark and the stacked layout.
   const narrow = rows({ width: 375, fontScale: 1 }).CategoryLegendRow({ category: supermercado, totalMinor: 142331172, currency: 'ARS', onPress: () => {}, chosen: true });
   assert.equal(legend(narrow).column.props.style.flexDirection, 'column');

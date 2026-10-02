@@ -195,8 +195,11 @@ test('glass stays on the control layer and behind the adapter: only material.tsx
   assert.equal(uses.length, 0, uses.join(', '));
   // 24UX6A: the tab bar is the app's floating dock, drawn with the same control material; the layout only hands it over.
   const tabs = readFileSync(new URL('../app/(tabs)/_layout.tsx', import.meta.url), 'utf8');
-  assert.equal(/expo-glass-effect|tabBarBackground|position: 'absolute'/.test(tabs), false, 'no stock bar background and nothing absolute over the scenes');
-  assert.equal(/position: 'absolute'/.test(read('floating-tab-bar.tsx')), false, 'the dock stays in the layout: every screen ends above it');
+  assert.equal(/expo-glass-effect|tabBarBackground|position: 'absolute'/.test(tabs), false, 'no stock bar background; the layout positions nothing itself');
+  // 25UX1 (owner): the dock floats over the roots (it positions itself; the navigator's options are untouched), and the
+  // roots end their content above it through the shared clearance.
+  assert.equal(/position: 'absolute'/.test(read('floating-tab-bar.tsx')), true, 'the dock floats: pinned to the window\'s bottom, out of the layout');
+  assert.equal(/backgroundColor: p\.background/.test(read('floating-tab-bar.tsx')), false, 'and paints no ground of its own');
   // Glass draws on the dock's pill, the account screen's movement pills and the Assistant's composer.
   const controls = ['quick-actions.tsx', 'assistant-composer.tsx', 'floating-tab-bar.tsx'];
   assert.equal(controls.filter(file => /from '\.\/material'/.test(read(file))).join(','), controls.join(','));

@@ -628,7 +628,7 @@ function loadAmountField(provider: Record<string, any>, announcements: string[])
     '@finanzapp/domain': require('@finanzapp/domain'),
     './theme': { radius: {}, space: { s: 8 }, type: { body: {}, footnote: {} }, useCurrentDay: () => '2026-09-22', useReduceMotion: () => true,
       usePalette: () => ({ text: '#000', secondary: '#666', tertiary: '#999', primary: '#25D', surface: '#FFF', warning: '#A60', isDark: false }) },
-    './category-color': { tintOf: (color: string) => color }, './category-hues': { useAccountLook: () => ({}), useAccountNameOf: () => () => '', useCategoryLook: () => ({}) },
+    './dock-clearance': { useDockInset: () => ({ extraPadding: 0, inset: undefined }) }, './category-color': { tintOf: (color: string) => color }, './category-hues': { useAccountLook: () => ({}), useAccountNameOf: () => () => '', useCategoryLook: () => ({}) },
     './geometry': require('../src/ui/geometry.ts'), './motion': { duration: {}, easeOut: {}, selectionHaptic: () => {}, timing: () => ({}) },
     './money-input': require('../src/ui/money-input.ts'), './merchant-mark': require('../src/ui/merchant-mark.ts'), './movement-amount': require('../src/ui/movement-amount.ts'),
     '../i18n/provider': provider, '../i18n/format': i18nFormat, '../i18n/locale': locale,

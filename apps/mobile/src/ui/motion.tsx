@@ -76,21 +76,28 @@ const rise = FadeInUp.duration(duration.enter).easing(easeOut).withInitialValues
 const fadeIn = FadeIn.duration(duration.enter).easing(easeOut).reduceMotion(ReduceMotion.Never);
 const fadeOut = FadeOut.duration(duration.exit).easing(easeOut).reduceMotion(ReduceMotion.Never);
 const reflow = LinearTransition.duration(220).easing(easeOut);
+/** Producto 25UX1: a list row travelling to its new place when the list's order changes (Reportes' chosen category rising
+ * to the top and the rows around it making room, then returning): the data move of the app's one curve, no spring. The
+ * caller drops it under Reduce Motion, so the order changes at once. */
+export const rowReorder = LinearTransition.duration(duration.data).easing(easeOut);
 
 /** Crossfades its content whenever `id` changes: the old value fades out in
  * 100 ms while the new one fades in over 200 ms, rising 6 pt in the `rise`
  * variant. Nothing animates on first mount (the tab roots stay mounted, so a
  * mount reveal would play unseen). Reduce Motion keeps the crossfade and drops
  * the rise, so the state change is still explained without movement. */
-export function ValueTransition({ id, children, style, variant = 'rise' }: {
+export function ValueTransition({ id, children, style, variant = 'rise', exit = true }: {
   id: string; children: ReactNode; style?: StyleProp<ViewStyle>; variant?: 'rise' | 'fade';
+  /** 25UX1: false where the old value must never be seen beside the new one (Tarjetas' snapshot when another card is
+   * selected): the old value leaves at once and only the new one fades or rises in. */
+  exit?: boolean;
 }) {
   const reduced = useReduceMotion();
   const mounted = useRef(false);
   useEffect(() => { mounted.current = true; }, []);
   const animate = mounted.current;
   return <Animated.View key={id} style={style} entering={animate ? (variant === 'rise' && !reduced ? rise : fadeIn) : undefined}
-    exiting={animate ? fadeOut : undefined}>{children}</Animated.View>;
+    exiting={animate && exit ? fadeOut : undefined}>{children}</Animated.View>;
 }
 
 /** A block whose presence follows data (a budget line, a commitments list).

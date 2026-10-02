@@ -64,7 +64,8 @@ export default function CardDetailScreen() {
             color={cardFaceColor(card, archive.appearances)} width={cardFaceWidth(width)} showCurrency={cardCurrenciesDiffer(archive.cards, snapshot.accounts, card.id)} />
           {state && <CardLifecycleNote state={state} />}
         </View>
-        {/* Identity (the face) → state (the balance) → the facts → primary → secondary → plans → activity. */}
+        {/* Identity (the face) → state (the balance) → the facts → primary → secondary → activity; 25UX1 (owner): the
+            movements come before the plans, which follow the whole list (every plan and its actions stay one tap away). */}
         <CardStatusBlock summary={summary} day={day} limitCaption />
 
         {pay && <View style={{ gap: 10 }}>
@@ -74,16 +75,15 @@ export default function CardDetailScreen() {
             onPress={() => router.push({ pathname: '/new-transfer', params: { toAccountId: account.id, maxAmountMinor: String(debtMinor) } })} />}
         </View>}
 
-        {plans.length > 0 && <View>
-          <SectionTitle caption={plansCaption(money)} captionLabel={plansCaption(minor => spokenMoney(minor, account.currency))}>{t('cards.panel.plans')}</SectionTitle>
-          <Surface grouped>
-            {plans.map((plan, index) => <PlanRow key={plan.plan.id} summary={plan} last={index === plans.length - 1}
-              onPress={() => router.push({ pathname: '/installment/[id]', params: { id: plan.plan.id } })} />)}
-          </Surface>
-        </View>}
-
         <SectionTitle caption={statementCaption(statement, inline, t) + (statement.refundsMinor > 0 ? t('cards.panel.refunds', { amount: money(statement.refundsMinor) }) : '')}>{t('cards.panel.movements')}</SectionTitle>
       </View>}
-      empty={<AppText secondary variant="subhead">{t('cards.panel.noActivity')}</AppText>} />
+      empty={<AppText secondary variant="subhead">{t('cards.panel.noActivity')}</AppText>}
+      footer={plans.length > 0 ? <View>
+        <SectionTitle caption={plansCaption(money)} captionLabel={plansCaption(minor => spokenMoney(minor, account.currency))}>{t('cards.panel.plans')}</SectionTitle>
+        <Surface grouped>
+          {plans.map((plan, index) => <PlanRow key={plan.plan.id} summary={plan} last={index === plans.length - 1}
+            onPress={() => router.push({ pathname: '/installment/[id]', params: { id: plan.plan.id } })} />)}
+        </Surface>
+      </View> : undefined} />
   </>;
 }

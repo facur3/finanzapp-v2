@@ -7,16 +7,17 @@ import { ActionButton, AppText, EmptyState, IconButton, MovementRow, Screen, Sec
 import { useI18n } from '../src/i18n/provider';
 import { CardDeck, cardFaceHeight, cardFaceWidth } from '../src/ui/card-visual';
 import { CardStatusBlock } from '../src/ui/card-panel';
-import { ArchivedCardRow, FutureInstallmentsRow } from '../src/ui/card-rows';
+import { ArchivedCardRow } from '../src/ui/card-rows';
 import { activeCards, archivedCards, cardCurrenciesDiffer, cardFaceColor, statementCaption, type CardSummary } from '../src/ui/liability-presentation';
 import { Reflow, ValueTransition } from '../src/ui/motion';
 import { mergeActivity } from '../src/ui/presentation';
 import { deckExposure, deckScrollTarget } from '../src/ui/geometry';
 import { space, useCurrentDay, useReduceMotion } from '../src/ui/theme';
 
-/** Tarjetas is only credit cards (24T2): a deck of the active cards, the snapshot of the selected one right under it
- * (its balance, its next due and closing dates, what is available, the two actions, its future instalments and its
- * latest movements), and the archived cards at the end, still payable. Reached from Más → Finanzas → Tarjetas; the
+/** Tarjetas is only credit cards (24T2): a deck of the active cards, the snapshot of the selected one right under it,
+ * and the archived cards at the end, still payable. 25UX1 (owner): it opens idle, the deck as the protagonist and no
+ * card's figures until the person selects one (even with one card); the first tap on a card selects it and shows its
+ * snapshot, a tap on the selected card opens its detail. Reached from Más → Finanzas → Tarjetas; the
  * "+" stays in its header. Personal debts and receivables are a different obligation and live under Más → Deudas y cobros. */
 export default function CardsScreen() {
   const { archive, snapshot } = useLedger();
@@ -26,14 +27,18 @@ export default function CardsScreen() {
     [archive?.cards, archive?.installmentPlans, archive?.records, archive?.purchaseOperations, archive?.cardCycleDates, snapshot, day]);
   const archived = useMemo(() => snapshot ? archivedCards(archive?.cards, snapshot, day, archive?.installmentPlans, archive?.records, archive?.purchaseOperations, archive?.cardCycleDates) : [],
     [archive?.cards, archive?.installmentPlans, archive?.records, archive?.purchaseOperations, archive?.cardCycleDates, snapshot, day]);
-  // The selection is a card, not a position: a card that leaves the deck (archived, deleted) hands the front to the first one.
+  // The selection is a card, not a position, and starts empty (25UX1: idle); a card that leaves the deck (archived,
+  // deleted) returns it to idle.
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  // The first render animates nothing (the push already did); later, the snapshot and the idle line fade in and out.
+  const mounted = useRef(false);
+  useEffect(() => { mounted.current = true; }, []);
   // The deck's box, and its top inside the scrolled content (so the scroll offset follows from two window measurements).
   const scroll = useRef<ScrollView>(null), deckBox = useRef<View>(null), deckY = useRef(0);
   const reduced = useReduceMotion();
   const { width: windowWidth, fontScale } = useWindowDimensions();
   if (!snapshot || !archive) return null;
-  const selected = cards.find(card => card.id === selectedId) ?? cards[0];
+  const selected = cards.find(card => card.id === selectedId) ?? null;
   const showCurrency = cardCurrenciesDiffer(archive.cards, snapshot.accounts);
   const open = (id: string) => router.push({ pathname: '/card/[id]', params: { id } });
   const add = () => router.push('/new-card');
@@ -53,11 +58,12 @@ export default function CardsScreen() {
 
   return <Screen gap={space.xxl} scrollRef={scroll}>
     <Stack.Screen options={{ title: t('nav.titles.cards'), headerRight: () => <IconButton name="add" label={t('cards.list.add')} onPress={add} /> }} />
-    {selected ? <View ref={deckBox} onLayout={event => { deckY.current = event.nativeEvent.layout.y; }} style={{ gap: space.xl }}>
-      <CardDeck selectedId={selected.id} onSelect={choose} onOpen={open} showCurrency={showCurrency}
+    {cards.length > 0 ? <View ref={deckBox} onLayout={event => { deckY.current = event.nativeEvent.layout.y; }} style={{ gap: space.xl }}>
+      <CardDeck selectedId={selected?.id ?? null} onSelect={choose} onOpen={open} showCurrency={showCurrency}
         cards={cards.map(summary => ({ id: summary.id, name: summary.account.name, issuer: summary.card.issuer, last4: summary.card.last4,
           currency: summary.account.currency, color: cardFaceColor(summary.card, archive.appearances) }))} />
-      <CardSnapshot summary={selected} day={day} onOpen={open} />
+      {selected ? <Reflow key="snapshot" fade={mounted.current}><CardSnapshot summary={selected} day={day} onOpen={open} /></Reflow>
+        : <Reflow key="idle" fade={mounted.current}><AppText secondary variant="subhead" style={{ textAlign: 'center' }}>{t('cards.list.chooseCaption')}</AppText></Reflow>}
     </View>
       // Without an active card: the invitation, or (with archived cards only) a short one above them.
       : <EmptyState title={t(archived.length ? 'cards.list.noActiveTitle' : 'cards.list.emptyTitle')} icon="card-outline"
@@ -74,7 +80,11 @@ export default function CardsScreen() {
   </Screen>;
 }
 
-/** The selected card's snapshot, in the order of 24T1C: its balance; the next due and closing dates and what is
+/** The selected card's snapshot. 25UX1 (owner): a calm, compact hierarchy: «Saldo pendiente»; Vence · Cierra; Disponible
+ * (or its truthful unknown); one clear payment action (recording a purchase is the dock's «+»; the future instalments and
+ * every plan live in the card's detail); the latest movements with the open cycle's facts. When another card is selected
+ * the old figures leave at once and the new ones come in (`exit={false}`): no stale number is ever beside a fresh one.
+ * Before 25UX1, in the order of 24T1C: its balance; the next due and closing dates and what is
  * available; Registrar compra over Pagar tarjeta; the future instalments beside the balance, never inside it; the
  * latest movements with the open cycle's facts. The structure stays mounted across cards and the values crossfade
  * (ValueTransition keyed by the card); a block only some cards have (their future instalments, a balance in credit, the
@@ -87,10 +97,7 @@ export default function CardsScreen() {
 function CardSnapshot({ summary, day, onOpen }: { summary: CardSummary; day: string; onOpen: (id: string) => void }) {
   const { snapshot, archive } = useLedger();
   const { t, relativeDate } = useI18n();
-  const { card, account, debtMinor, committedMinor } = summary;
-  // The screen's first render animates nothing (the push already did); only a change of card does.
-  const mounted = useRef(false);
-  useEffect(() => { mounted.current = true; }, []);
+  const { card, account, debtMinor } = summary;
   const statement = useMemo(() => snapshot ? cardStatementActivity(card, snapshot, day, archive?.cardCycleDates) : null, [card, snapshot, day, archive?.cardCycleDates]);
   const recent = useMemo(() => {
     if (!snapshot) return [];
@@ -103,20 +110,13 @@ function CardSnapshot({ summary, day, onOpen }: { summary: CardSummary; day: str
   return <View style={{ gap: space.xl }}>
     <CardStatusBlock summary={summary} day={day} animated />
 
-    {/* Primary above secondary, same width and height: hierarchy by fill, not by geometry. */}
-    <Reflow style={{ gap: 10 }}>
-      <ActionButton label={t('cards.panel.recordPurchase')} icon="cart-outline"
-        onPress={() => router.push({ pathname: '/new-entry', params: { accountId: account.id, kind: 'expense' } })} />
-      <ActionButton label={t('cards.panel.pay')} icon="arrow-forward-outline" secondary tone="transfer" disabled={debtMinor === 0}
+    {/* 25UX1: one clear action, the payment (a transfer into the card), unavailable while nothing is owed. */}
+    <Reflow>
+      <ActionButton label={t('cards.panel.pay')} icon="arrow-forward-outline" tone="transfer" disabled={debtMinor === 0}
         onPress={() => router.push({ pathname: '/new-transfer', params: { toAccountId: account.id, maxAmountMinor: String(debtMinor) } })} />
     </Reflow>
 
-    {(committedMinor === null || summary.committedFinancingMinor === null || committedMinor > 0) && <Reflow fade={mounted.current}><ValueTransition id={card.id} variant="fade"><Surface grouped>
-      <FutureInstallmentsRow committedMinor={committedMinor} financingMinor={summary.committedFinancingMinor} financingKind={summary.financingKind}
-        planCount={summary.futurePlanCount} currency={account.currency} onPress={() => onOpen(card.id)} />
-    </Surface></ValueTransition></Reflow>}
-
-    <Reflow><ValueTransition id={card.id} variant="fade">
+    <Reflow><ValueTransition id={card.id} variant="fade" exit={false}>
       <SectionTitle quiet action={t('common.seeAll')} onAction={() => onOpen(card.id)}
         caption={statement ? statementCaption(statement, inline, t) : undefined}>{t('cards.panel.recent')}</SectionTitle>
       {recent.length ? <Surface grouped>

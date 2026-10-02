@@ -11,37 +11,6 @@ import { radius, useCurrentDay, usePalette, type Palette } from './theme';
 /** Producto 24T2: the rows of the card surfaces (Tarjetas, a card's detail, a plan's detail). Each row is one VoiceOver
  * element whose sentence is built with the spoken formatters; the screen shows the region's formats. */
 
-/** «Cuotas futuras» under a card's actions: the principal of its plans not recognised yet, and in how many plans; the
- * interest those instalments still carry is named beside it («+ interés $ …»), never added in. A figure whose sum left
- * the exact range (null) reads «Total fuera de rango», never a rounded amount. It opens the card's detail, where the plans
- * are listed. */
-export function FutureInstallmentsRow({ committedMinor, financingMinor = 0, financingKind = 'interest', planCount, currency, onPress }: {
-  committedMinor: number | null; financingMinor?: number | null; financingKind?: 'interest' | 'financing'; planCount: number; currency: Currency; onPress: () => void;
-}) {
-  const p = usePalette();
-  const { t, moneyText, spokenMoney } = useI18n();
-  const outOfRange = committedMinor === null || financingMinor === null;
-  const stacked = useStacked({ minor: committedMinor ?? 0, currency });
-  const title = t('cards.panel.future'), plans = t('cards.panel.futurePlans', { count: planCount });
-  const extra = (format: (minor: number) => string) => !outOfRange && financingMinor! > 0
-    ? t(financingKind === 'financing' ? 'cards.panel.futureFinancing' : 'cards.panel.futureInterest', { amount: format(financingMinor!) }) : null;
-  const detail = [plans, extra(minor => moneyText(minor, currency))].filter(Boolean).join(' · ');
-  const figure = outOfRange ? t('cards.panel.futureOutOfRange') : spokenMoney(committedMinor, currency);
-  return <PressFeedback feedback="highlight" accessibilityRole="button"
-    accessibilityLabel={[title, figure, plans, extra(minor => spokenMoney(minor, currency))].filter(Boolean).join(', ')}
-    accessibilityHint={t('cards.list.openHint')} onPress={onPress} style={styles.row}>
-    <GlyphTile icon="calendar-outline" />
-    <View style={[styles.body, stacked ? styles.stacked : null]}>
-      <View style={[styles.text, stacked ? null : { flex: 1 }]}>
-        <AppText style={{ fontWeight: '600' }}>{title}</AppText>
-        <AppText secondary variant="footnote">{detail}</AppText>
-      </View>
-      {outOfRange ? <AppText secondary variant="subhead">{t('cards.panel.futureOutOfRange')}</AppText> : <Money minor={committedMinor} currency={currency} />}
-    </View>
-    <Ionicons name="chevron-forward" size={16} color={p.tertiary} accessible={false} />
-  </PressFeedback>;
-}
-
 /** An archived card at the end of Tarjetas: a small swatch of its face, its name and its balance. */
 export function ArchivedCardRow({ summary, color, onPress, last = false }: { summary: CardSummary; color: string | null; onPress: () => void; last?: boolean }) {
   const p = usePalette();

@@ -18,6 +18,7 @@ import { Reflow, ValueTransition } from '../../src/ui/motion';
 import { historyCurrencies, homeNamesCategory, sharedGlyphs, visibleNamesAccount } from '../../src/ui/presentation';
 import { useCategoryLookOf } from '../../src/ui/category-hues';
 import { space, useCurrentDay, usePalette } from '../../src/ui/theme';
+import { useDockInset } from '../../src/ui/dock-clearance';
 
 type HomeMetric = 'spending' | 'available';
 
@@ -62,6 +63,7 @@ export default function HomeScreen() {
   const { snapshot, archive, gate } = useLedger();
   const day = useCurrentDay();
   const p = usePalette();
+  const dock = useDockInset();
   const insets = useSafeAreaInsets();
   const { t, formatDate, formatNumericDate, currencyName } = useI18n();
   const expenseLook = useCategoryLookOf('expense');
@@ -135,7 +137,7 @@ export default function HomeScreen() {
   const scope = currencies.length > 1;
 
   return <ScrollView style={{ flex: 1, backgroundColor: p.background }} contentInsetAdjustmentBehavior="never" onScroll={onScroll} scrollEventThrottle={32}
-    contentContainerStyle={{ paddingBottom: 48, flexGrow: 1 }}>
+    contentContainerStyle={{ paddingBottom: 48 + dock.extraPadding, flexGrow: 1 }} contentInset={dock.inset} scrollIndicatorInsets={dock.inset}>
     {/* The field's colour under the top overscroll, so a pull never shows the canvas above it. */}
     <View pointerEvents="none" style={{ position: 'absolute', top: -1000, left: 0, right: 0, height: 1000, backgroundColor: p.hero }} />
     <View onLayout={event => { fieldHeight.current = event.nativeEvent.layout.height; }}
