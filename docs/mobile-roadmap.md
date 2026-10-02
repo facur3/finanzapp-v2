@@ -2,7 +2,9 @@
 
 Updated: 2026-10-02 (Producto 24T3 on its branch, PR #76, with two late review fixes: the devolución date wheel's
 bounds before local noon, and a cash account's month reading «Devoluciones netas este mes» when devoluciones exceed its
-purchases; plus documentation-only notes on the dock, the Tarjetas root and 25D's FinanceKit rules. The delivery:
+purchases; plus documentation-only notes on the dock, the Tarjetas root and 25D's FinanceKit rules; after the owner's
+review, the devolución-versus-bank-reintegro help, a card deletion dialog that archives right there, and 25A2 (Wallet
+Shortcut Capture) placed after 25A. The delivery:
 refunds («devoluciones»), early payoff («adelanto de cuotas») and the instalment plan lifecycle, as purchase operations: append-only records projected into the ledger as derived lines,
 never an income and never a second expense; a devolución counts in its own month and the purchase's category, a plan
 devolución reverses recognised principal first and then lowers the last instalments, an adelanto recognises every
@@ -569,7 +571,10 @@ item unless a section says a new native build is needed. The checklist sections 
   backup first; a cash devolución partial and full; a card purchase's devolución lowering the balance due; a plan
   devolución before and after a closing and the lowered last instalments; an over-refund refused; an adelanto with and
   without interest (both financing choices) and then Pagar tarjeta; «Dejar de seguir el plan» and «Reactivar plan»;
-  deleting a card blocked by a credit and by a pending plan, then allowed; undo and restore of a devolución and an
+  deleting a card blocked by a credit, a balance due and a pending plan (one dialog naming each, «Archivar tarjeta»
+  right there; an archived card says it already is), then allowed; the «Devolución de compra» note and its help (a bank
+  reintegro is an income); a devolución dated today before noon; «Devoluciones netas este mes» on an account; undo and
+  restore of a devolución and an
   adelanto; the Movimientos rows and Movimientos deshechos; Reportes with a category below zero and the «Categorías | Día
   a día» labels at 375 pt in Spanish and English at the default, large and AX text sizes; Deudas unchanged (a devolución
   never appears as a payment or collection); VoiceOver on the new screens; light and dark. The earlier 24UX6A–24UX6E
@@ -755,7 +760,8 @@ d30b77f25bcb38bff8f5593b82a95ccc20213c55; device QA pending), the last pass of t
 and installment lifecycle** (devoluciones, the adelanto de cuotas, «Dejar de seguir» / «Reactivar», the card deletion
 rules, schema 14 and backup v14, the readers that net devoluciones, and the targeted device QA of instalments; owner
 decisions B1–B3 of 2026-10-01; «Producto 24T3» below) is this PR. Then, in order: **25A** (the real Assistant,
-including devolución drafts), **25C** (budgets with rollover, goals, CSV and productivity, with Movimientos' advanced
+including devolución drafts), **25A2** (Wallet Shortcut Capture: the person's own Shortcuts Wallet automation → an
+explicit card mapping → a draft; no FinanceKit; placed by the owner on 2026-10-02), **25C** (budgets with rollover, goals, CSV and productivity, with Movimientos' advanced
 filters: account, category, period and custom period, type, search, clear/reset states and saved searches), **25C2**,
 **25D**, **25E**, **25F** and **26**. The app-wide «Ocultar importes» control stays recorded for future privacy work
 beside 25D («Later note recorded in 24UX6C»), not scheduled. The first opening is implemented (25B) and is not
@@ -766,16 +772,19 @@ mathematics; merged), 24T2 (the card purchase with the simple financing UX, the 
 current-versus-future balances and the Tarjetas direction, all recorded under 24T below and in «Producto 24T1C»),
 24T3 (refunds, early payments, lifecycle and the final device QA).
 
-The binding order is **24UX6A → 24UX6B → 24UX6C → 24UX6C2 → 24UX6D → 24UX6E → 24T3 → 25A → 25C → 25C2 → 25D → 25E → 25F → 26** (launch; 24T2 merged as PR #69; 24UX6A–24UX6E merged as PRs #70–#75). Every dependency points
+The binding order is **24UX6A → 24UX6B → 24UX6C → 24UX6C2 → 24UX6D → 24UX6E → 24T3 → 25A → 25A2 → 25C → 25C2 → 25D → 25E → 25F → 26** (launch; 25A2 placed by the owner on 2026-10-02; 24T2 merged as PR #69; 24UX6A–24UX6E merged as PRs #70–#75). Every dependency points
 backwards in it; the scope that would need a later or optional delivery is split out explicitly (24T1C, 2026-09-28):
 
 - **24C2 is optional** and blocks nothing in this order. 25A's core works on what the ledger already represents; only
   its foreign-purchase subflow (original currency different from the billing or paying currency) stays gated and
   unavailable until 24C2 exists. If the owner schedules 24C2 before 25A, 25A consumes it; if not, 25A is a complete
   delivery without that subflow. The instalment `it.todo` for a foreign-currency plan waits for 24C2 the same way.
+- **25A2 right after 25A** (owner, 2026-10-02): Wallet / Shortcuts capture does not wait for FinanceKit. It needs only
+  25A's draft and review infrastructure (the capture path, the review tray, the pairing token) and the person's own
+  Shortcuts automation; FinanceKit stays a later, optional research gate under 25D.
 - **25D before 25E** ships only what works on the device or over the existing capture path (Face ID and privacy,
-  local notifications, App Intents / Shortcuts / Siri / Spotlight, Wallet automation → draft, widgets, Apple Watch,
-  the FinanceKit research gate). Remote push (APNs) that needs a backend or sync, and any Sign in with Apple tied to
+  local notifications, the broader App Intents / Siri / Spotlight, widgets, Apple Watch, the FinanceKit research gate;
+  the Wallet automation → draft path moved to 25A2). Remote push (APNs) that needs a backend or sync, and any Sign in with Apple tied to
   25E's account/sync, are **deferred to 25E** or a follow-up after it; 25D neither implements them nor depends on 25E.
 - **24R3** is required only before a launch in the regions that need it (the native-digit regions); it blocks no
   delivery in this order and the owner places it.
@@ -1425,6 +1434,41 @@ the owner authorises it; no EAS build or store submission without the owner.
 - **Depends on.** 24C1 for rates and consolidated facts; 24M for currencies in v2; a session provider (staging) the
   owner sets up. **Not a dependency:** 24C2 (optional). Its foreign-purchase subflow is enabled only if 24C2 has
   merged; otherwise 25A ships complete without it (24T1C, 2026-09-28).
+
+### Producto 25A2 — Wallet Shortcut Capture
+
+Planned (placed by the owner on 2026-10-02, right after 25A; documentation only, nothing implemented). A focused
+delivery that pulls the Wallet capture forward from 25D: it needs 25A's drafts and review tray, not FinanceKit.
+
+- **Path.** The person's own iOS Shortcuts personal automation on a Wallet transaction («Transacción» / "Transaction")
+  → a FinanzApp App Intent → a **draft / review item**. No FinanceKit entitlement is needed for this path. The person
+  sets it up once (FinanzApp explains the steps; it cannot create the automation for them).
+- **Explicit mapping.** One Wallet payment card / pass → one FinanzApp destination, chosen by the person and editable:
+  a FinanzApp **credit card**, or a FinanzApp **normal account** for a debit card. Preferred over any fuzzy match by
+  card name; a currency or a name never identifies the destination. Without a mapping the draft asks for it.
+- **Input.** Whatever Wallet supplies, when present: amount, merchant, the card / payment-method identity, currency
+  where available, and the capture date and time from the device as appropriate. Nothing absent is invented.
+- **Draft, never a silent write.** Every capture creates a draft the person reviews and confirms; the ledger is never
+  written on its own. Repeated deliveries are deduplicated.
+- **Credit-card mapping.** A purchase draft on that FinanzApp card, presented as «Una vez» by default; the person may
+  change it to cuotas before confirming. An instalment plan or count is **never inferred** from a Wallet transaction
+  unless exact instalment facts are actually supplied by a trusted source. The current card and instalment validators
+  bind (decision 003; `card-invariants.test.ts`).
+- **Debit / normal-account mapping.** An expense draft on the mapped account (no independent debit-card ledger).
+- **Merchant.** The Wallet-provided merchant is kept when present (normalised as in docs/merchant-identity.md); a
+  missing or poor merchant stays editable.
+- **Category.** May be suggested from the merchant, the person's rules or the Assistant; the person can correct it
+  before confirming; FinanzApp never claims Wallet supplied a FinanzApp category.
+- **Missing data.** Amount, merchant or card fields may occasionally be absent or unusable: the capture stays an
+  incomplete draft in the review flow, never dropped and never filled with invented data.
+- **No claims.** Not that every Apple Pay / Wallet transaction is captured; not that Apple Watch behaves the same as
+  the iPhone until verified on a device; not that online or non-contactless transactions are captured; not that every
+  bank, card or region supports the trigger.
+- **Manual capture stays the core**, offline and complete without any of this.
+- **Gates.** Device evidence on an iPhone and, separately, on an Apple Watch payment; a denied or missing automation;
+  repeated and late deliveries; the mapping for a credit card and for a debit card; an incomplete capture.
+- **Depends on.** 25A (draft and review infrastructure, the capture path and the pairing token). **Not a dependency:**
+  FinanceKit (a later, optional research gate in 25D) and 25D itself.
 
 ### Producto 24T — instalments and complete cards
 
@@ -3289,6 +3333,22 @@ nothing of it is on a screen yet.
   recorded, no code: the dock stays in the layout (not an overlay; mobile-design «El dock»), the Tarjetas root is not
   redesigned (a density-versus-deck evaluation is in the 24T3 checklist), and 25D's FinanceKit / external-transaction
   rules are reconciled below.
+- **Owner review (2026-10-02, product clarity; accounting unchanged).** (1) A devolución de compra is not a bank
+  reintegro: «Registrar devolución» shows one note under the purchase («Devolución de compra: el comercio te devuelve
+  toda o parte de esta compra.») with the contextual help (`FieldNote` + `InfoButton`): «Usá esta opción cuando un
+  comercio te devuelve total o parcialmente una compra. Si recibiste un reintegro, cashback o promoción bancaria en una
+  cuenta, registralo como ingreso en esa cuenta.» (English: "Purchase refund…"). The income preset «Reembolsos» hint
+  now also says a bank reintegro, cashback or promoción is recorded there, as income. A copy test pins that the
+  operations catalogue names «reintegro» / «reembolso» / «cashback» only in those two places. (2) Deleting a card a
+  real amount still holds: one dialog names every fact that holds it (saldo pendiente, saldo a favor, cuotas pendientes,
+  combined when more than one), says what archiving keeps, and offers «Archivar tarjeta» right there (preferred), plus
+  «Pagar» for a balance due; an archived card is told it already is. `assertCardDeletable` (B3) is unchanged, nothing is
+  zeroed, and a card with nothing recorded is still deleted after the usual confirmation. Tests: `refund-routes`,
+  `lifecycle-actions`, `card-form-cycle` (the real flow from Editar tarjeta). Gates re-run (2026-10-02, local):
+  typecheck OK; `test:storage` 1206 passed, 0 failed; `i18n:check -- --strict` 0 errors, 0 stale (English lock
+  accepted); `currency:verify`, `regions:verify`, `check`, `export:ios` OK; root `npm test` 506 passed, 1 todo;
+  `check:repo` OK. No EAS, no device run. (3) Roadmap: **25A2 — Wallet Shortcut
+  Capture** after 25A; the order is 24T3 → 25A → 25A2 → 25C → 25C2 → 25D → 25E → 25F → 26.
 
 ### Later notes recorded in 24UX6A (future; document only, not scheduled)
 
@@ -3394,8 +3454,9 @@ docs/merchant-identity.md.
 Documentation only until it starts (scope revised 2026-09-28); nothing here is implemented. Every
 permission is requested only when the person enables the feature that needs it, never at launch. **25D ships
 before 25E** and so contains only what works on the device or over the existing capture path: Face ID and
-privacy, local notifications, App Intents / Shortcuts / Siri / Spotlight, Wallet automation → draft, widgets,
-Apple Watch and the FinanceKit research gate. Remote push that needs a backend or sync and any Sign in with Apple
+privacy, local notifications, the broader App Intents / Shortcuts / Siri / Spotlight, widgets, Apple Watch and the
+FinanceKit research gate. The Wallet automation → draft path moved to **25A2** (owner, 2026-10-02); the two Wallet
+bullets below stay as its background and are bound by 25A2's contract. Remote push that needs a backend or sync and any Sign in with Apple
 tied to 25E's account are deferred to 25E or a follow-up after it (24T1C, 2026-09-28).
 
 - **Security and privacy.**
@@ -3459,7 +3520,7 @@ tied to 25E's account are deferred to 25E or a follow-up after it (24T1C, 2026-0
 - **App Intents, App Shortcuts, Siri and Spotlight:** "registrar un gasto" (a draft) and "¿cuánto gasté
   este mes?" (a read), each ending in a draft or a read, never a silent write; **Action Button** where it
   is useful (the quick capture).
-- **Apple Pay / Wallet transaction automation:** a Shortcuts personal automation on a Wallet transaction
+- **Apple Pay / Wallet transaction automation (→ moved to 25A2, 2026-10-02):** a Shortcuts personal automation on a Wallet transaction
   → an App Intent → a FinanzApp **draft**. It uses only the merchant, amount, currency and payment method
   the trigger actually supplies; missing fields stay missing (never guessed); repeated deliveries are
   deduplicated; offline catch-up and cancellation are verified; no claim to read Wallet history and no
@@ -3467,7 +3528,7 @@ tied to 25E's account are deferred to 25E or a follow-up after it (24T1C, 2026-0
   the two triggers are never assumed to behave the same. Ordinary Apple Pay / PassKit APIs let an app take or offer a
   payment; they do **not** let FinanzApp passively observe every Apple Pay purchase the person makes (reconciled
   2026-10-02 in 24T3).
-- **Wallet card → FinanzApp account mapping (recorded 2026-09-28 in 24T1C).** FinanzApp is never limited to
+- **Wallet card → FinanzApp account mapping (recorded 2026-09-28 in 24T1C; → delivered by 25A2).** FinanzApp is never limited to
   one account per currency, and a currency alone never identifies an account or a card. The design: a Wallet
   card's transaction automation → a mapping the person selected → a FinanzApp account or card id → a draft. A
   Shortcuts automation can be set up per concrete Wallet card, and its setup lets the person associate that
@@ -3506,9 +3567,9 @@ tied to 25E's account are deferred to 25E or a follow-up after it (24T1C, 2026-0
 - **Out of scope.** Any bank credential; bank execution; reading arbitrary Wallet history.
 - **Gates.** Signed development build evidence per integration (a JS bundle is not device evidence);
   denied-permission paths; the private-content default checked on the Lock Screen and the app switcher;
-  the Wallet trigger on iPhone and Watch separately; notifications across a time-zone change and a
-  restart.
-- **Depends on.** 25A for the capture path (tray and pairing token); 24T for instalment and card reminders; 25C2
+  notifications across a time-zone change and a restart. (The Wallet trigger on iPhone and Watch separately is a gate
+  of 25A2, which owns Wallet capture since 2026-10-02.)
+- **Depends on.** 25A for the capture path (tray and pairing token; Wallet capture itself is 25A2); 24T for instalment and card reminders; 25C2
   for the widgets' commitments. **Not a dependency:** 25E (remote push and Sign in with Apple move there) and 24C2
   (optional).
 

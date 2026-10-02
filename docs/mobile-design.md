@@ -905,6 +905,19 @@ plan y el estado «Cancelada».
   registra aparte). «Deshacer devolución» / «Deshacer adelanto» y sus «Restaurar» solo cuando la prueba en seco del
   dominio pasa; si no, una nota con la razón en lugar del botón. La confirmación dice qué cambia, las cuotas que se
   registran en sus cierres y «Este adelanto no podrá restaurarse» cuando corresponde.
+- **Devolución de compra, no reintegro** (revisión del dueño, 2026-10-02). Bajo la compra, una nota de una línea con
+  su ayuda contextual (`FieldNote` + `InfoButton`): «Devolución de compra: el comercio te devuelve toda o parte de esta
+  compra.»; la ayuda dice «Usá esta opción cuando un comercio te devuelve total o parcialmente una compra. Si recibiste un
+  reintegro, cashback o promoción bancaria en una cuenta, registralo como ingreso en esa cuenta.» Un reintegro, un
+  cashback o una promoción del banco no es una devolución: es un ingreso en la cuenta que lo recibió (la pista de la
+  categoría «Reembolsos» lo dice). La copia de 24T3 dice «devolución» para la operación; el código sigue con `refund`.
+  La contabilidad no cambia: la devolución vuelve a la cuenta o tarjeta de la compra.
+- **Eliminar una tarjeta que todavía tiene un monto** (revisión del dueño). Un saldo pendiente, un saldo a favor o
+  cuotas pendientes no se borran (B3): un solo diálogo, «Todavía no se puede eliminar», nombra cada hecho («Esta tarjeta
+  todavía tiene saldo a favor de $ X y cuotas pendientes.»), dice qué conserva archivar («Podés archivarla para sacarla
+  de tus tarjetas activas sin perder el saldo ni el historial.») y ofrece **Cancelar · Archivar tarjeta** (con «Pagar»
+  antes si hay saldo pendiente); archivar es la acción preferida y se hace ahí mismo. Una tarjeta ya archivada lo dice y
+  no ofrece archivar. Una tarjeta creada por error, sin nada que la retenga, se elimina como siempre.
 - **Detalle del plan.** Las acciones según el estado, cada una solo si el almacenamiento la aceptaría: activo,
   «Registrar devolución», «Registrar adelanto de cuotas» y «Dejar de seguir el plan» (o «Eliminar plan» si todavía no
   registró nada; nunca las dos); sin seguimiento, una `LifecycleNote` bajo el héroe («Las cuotas que faltaban no se
@@ -2748,7 +2761,8 @@ color propio.
   Movimientos deshechos; Reportes con una categoría debajo de cero y las etiquetas del selector «Categorías | Día a
   día» a 375 pt en español e inglés con texto chico, grande y XXXL; Deudas sin cambios (una devolución nunca aparece
   como pago o cobro); VoiceOver en las pantallas nuevas; claro y oscuro; la fecha de una devolución de una compra de
-  hoy antes de mediodía; «Devoluciones netas este mes» en el detalle de una cuenta; la densidad de la raíz de Tarjetas
+  hoy antes de mediodía; «Devoluciones netas este mes» en el detalle de una cuenta; la nota «Devolución de compra» con su
+  ayuda; el diálogo de eliminar una tarjeta que archiva ahí mismo; la densidad de la raíz de Tarjetas
   frente a una composición más de mazo, al estilo Wallet (solo evaluar, sin rediseño en 24T3). Lista en
   docs/mobile-device-checklist.md.
 

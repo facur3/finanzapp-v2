@@ -101,7 +101,9 @@ in the roadmap's 25D). Writing Swift does not bypass entitlements or regional
 restrictions. Reconciled 2026-10-02 (24T3, documentation only): ordinary Apple Pay /
 PassKit APIs do not let FinanzApp observe every Apple Pay purchase; any external
 transaction arrives as a draft, maps to a card only through a mapping the person
-approved, and never implies an instalment plan the person did not confirm (25D).
+approved, and never implies an instalment plan the person did not confirm (25D). The
+Wallet / Shortcuts capture does not wait for FinanceKit: it is planned as 25A2, right
+after 25A (owner, 2026-10-02), always to a draft.
 
 ## Acceptance / reconsideration gate
 

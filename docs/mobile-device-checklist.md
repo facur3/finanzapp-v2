@@ -53,10 +53,20 @@ rule 7.
   after it the plan reads «Sin seguimiento» with its note and «No se registra», and the recorded instalments stay.
   «Reactivar plan»: the plan is active again; if a closing passed while it was not tracked, the alert names those
   instalments and they are recorded once, on their own closing dates.
-- [ ] **Deleting a card.** A card with a credit («a favor»): Eliminar tarjeta is refused with «Tiene saldo a favor;
-  archivala.» before any destructive confirmation (an archived card says it stays archived). A card with a pending plan: blocked with «Archivar». After the
-  plan is completed, stopped, fully returned or brought forward and the balance is zero, the card can be deleted. A
-  plan with any devolución or adelanto never offers «Eliminar plan».
+- [ ] **Deleting a card (owner review).** On a test card with a credit («a favor»), Eliminar tarjeta shows, before any
+  destructive confirmation, «Todavía no se puede eliminar» with «Esta tarjeta todavía tiene saldo a favor de $ X. Podés
+  archivarla para sacarla de tus tarjetas activas sin perder el saldo ni el historial.» and **Cancelar · Archivar
+  tarjeta**; Archivar tarjeta archives it at once (it leaves the active cards, appears under Archivadas with the same
+  balance and history). The same with a balance due (plus «Pagar»), with a pending plan, and with two of them at once
+  (both named). An archived card says it already is and offers no archive. A test card created by mistake with nothing
+  recorded is deleted after «¿Eliminar esta tarjeta?». After the plan is completed, stopped, fully returned or brought
+  forward and the balance is zero, the card can be deleted. A plan with any devolución or adelanto never offers
+  «Eliminar plan».
+- [ ] **Devolución de compra versus a bank reintegro (owner review).** «Registrar devolución» shows the one-line note
+  «Devolución de compra: …» under the purchase; its ⓘ explains that a reintegro, cashback or bank promotion is an
+  income in the account that received it. In English: "Purchase refund: …". The note wraps at AX sizes; VoiceOver reads
+  the note and the ⓘ as «Más información sobre devolución de compra». Choosing the income category «Reembolsos» says a
+  bank reintegro is recorded there, as income.
 - [ ] **Undo and restore.** From a devolución's detail, «Deshacer devolución»: it leaves the balances, reports and the
   purchase's «Devuelto»; Movimientos deshechos lists it under «Devoluciones y adelantos» with Restaurar; restore it: it
   is back once. The same for an adelanto: its confirmation names the instalments recorded on their closings and says
