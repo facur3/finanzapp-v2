@@ -226,13 +226,13 @@ commit 5c73813), 24UX6C (PR #72, merge
 commit c673be6), 24UX6B (PR #71, merge
 commit ecfd1dc), 24UX6A (PR #70, merged 2026-10-01, merge commit ef24bb6), 24T2 (PR #69, merge commit 8951f6c), 24T1C
 (PR #68), 24T1 (PR #67) and 25B3 (PR #66), then Producto 25A-01 (PR #77, merge commit a4202bc) and 25A-02 (PR #78 and its follow-up PR #79, merge commit
-a1bd181), 25UX1 (PR #80, merge commit d45eca6), plus Producto 25OPS1 on its branch. Per area,
+a1bd181), 25UX1 (PR #80, merge commit d45eca6), and 25OPS1 (PR #81, merge commit d0a0be8); Producto 25DISC1 (documentation only) on its branch. Per area,
 without test inventories (those are in apps/mobile/README.md and the history
 file). "Released" below names an in-app gate (`RELEASED_LANGUAGES`, `RELEASED_REGIONS`,
 `LEDGER_CURRENCIES`): what a build offers, verified on Linux; nothing is distributed to people yet
 (§4).
 
-- **The last row above the dock, and the production plan (25OPS1, on its branch; device QA pending for the dock
+- **The last row above the dock, and the production plan (25OPS1, PR #81, merge commit d0a0be8; device QA pending for the dock
   correction).** §3, «Producto 25OPS1». The dock clearance of a tab root is now bottom padding of the scroller's content
   on every platform (`useDockInset` → `extraPadding`, on top of each root's own padding), no longer the native scroll
   view's `contentInset` (25UX1): on the owner's iPhone the last row rested partly behind the pill and sprang back under
@@ -638,7 +638,7 @@ it was checked in). Metro from `master` (or a delivery's branch) on the installe
 item unless a section says a new native build is needed. The checklist sections are in
 [mobile-device-checklist.md](mobile-device-checklist.md).
 
-- **25OPS1 — the last row above the dock (on its branch; not tested; no EAS build):** the checklist section Producto
+- **25OPS1 — the last row above the dock (merged as PR #81, merge commit d0a0be8; not tested; no EAS build):** the checklist section Producto
   25OPS1: on Inicio, Reportes, Más and Movimientos, from a cold launch and again after some use, the last row rests
   fully above the pill at the end of the scroll and stays there after an overscroll; the scroll indicator ends above the
   dock, also after a keyboard; Movimientos' search; a pushed screen keeps its padding; VoiceOver through a long list;
@@ -834,8 +834,11 @@ phase is **25A — the real Assistant**, delivered as focused slices («Producto
 review-draft domain model) merged as PR #77 (merge commit a4202bc); **25A-02** (the durable local review store) merged as PR #78
 with its follow-up PR #79 (merge commit a1bd181); **25UX1** (dock, Cards and Reports interaction polish, three
 owner-observed problems, no financial change) merged as PR #80 (merge commit d45eca6); **25OPS1** (the production and
-launch plan, documentation, plus the dock's last-row clearance found on the owner's iPhone pass) is this PR and changes
-no order; then 25A-03 (the «Para revisar» tray)
+launch plan, documentation, plus the dock's last-row clearance found on the owner's iPhone pass) merged as PR #81
+(merge commit d0a0be8) and changed no order; **25DISC1** (competitive capability and brand discovery,
+[competitive-landscape.md](competitive-landscape.md) and [brand-brief.md](brand-brief.md), documentation only) is this
+PR and changes no order either (its suggested priority changes are owner decisions listed under «Producto 25DISC1»
+below, none applied); then 25A-03 (the «Para revisar» tray)
 and the rest of 25A, with no paid provider call before its own approved slice. **25A2** (Wallet Shortcut Capture) still
 follows the review-tray foundation: it may begin once 25A-03 has merged, without waiting for 25A's cloud, paid, live or
 voice slices. The targeted 24T3 device pass gates 25A-03, 25A-04, 25A-11 and 25A-12 (§2). After 25A: **25C** (with
@@ -3697,7 +3700,7 @@ nothing of it is on a screen yet.
   content padding again; the native inset did not hold on the owner's iPhone and the VoiceOver risk stays open; see
   «Producto 25OPS1».)*
 
-### Producto 25OPS1 — Production & Launch Plan + dock clearance follow-up (this PR)
+### Producto 25OPS1 — Production & Launch Plan + dock clearance follow-up (PR #81)
 
 - **Goal.** Two scopes only. (A) One shared correction found on the owner's physical iPhone pass of 25UX1: at the end of
   the scroll, a tab root's last content did not settle above the floating dock. (B) The production and launch
@@ -3804,7 +3807,7 @@ nothing of it is on a screen yet.
     later.
 - **Device QA.** Pending for A: checklist section «Producto 25OPS1». B has nothing to check on the iPhone. The version
   line reads «FinanzApp 0.1.0 (25OPS1)».
-- **Status.** On its branch; not merged.
+- **Status.** Merged as PR #81 (merge commit d0a0be8, 2026-10-02).
 - **Gates.** 2026-10-02, local, Linux. Root `npm test` 590 passed, 1 todo; `check:repo` OK. `apps/mobile`: `typecheck` OK;
   `test:storage` 1247 passed, 0 failed (new: `tests/dock-clearance.node.ts`, the real hook over a minimal React, the
   geometry, the four scrollers' props; and one rendered assertion each for Inicio, Reportes, `Screen` and `EntryList`);
@@ -3825,6 +3828,27 @@ nothing of it is on a screen yet.
   timeout or crash, never released in a way that could double-spend; the provider's project limit stays the backstop).
   And the brand, naming and identity gate (app-store-launch §9.4) was recorded: the working name is not the assumed
   public brand. Documentation only; no app change.
+
+### Producto 25DISC1 — Competitive capability and brand discovery (this PR, in progress)
+
+- **Goal.** Discovery and documentation only: a current competitive capability map ([competitive-landscape.md](competitive-landscape.md)),
+  a feature-gap map with every capability classified (IMPLEMENTED, ACTIVE ROADMAP, LAUNCH CANDIDATE, RESEARCH GATE,
+  POST-LAUNCH, DELIBERATELY EXCLUDED), explicit decisions and research gates for capabilities not previously considered
+  (Mercado Pago consumer sync, WhatsApp capture, shared expenses, pay cycles, subscriptions view, multi-draft voice), and
+  the brand identity brief ([brand-brief.md](brand-brief.md): «FinanzApp» is the working name only; naming criteria and
+  workflow; the visual exploration brief with three or four distinct territories; no name chosen, no palette change).
+- **Scope.** Branch `feat/producto-25disc1-competitive-brand-discovery` from master d0a0be8. No app, UI, identifier,
+  integration, provider, EAS or schema change; the release marker is not bumped (no app change).
+- **Status (2026-10-02).** In progress: brand-brief.md complete; competitive-landscape.md holds the Mercado Pago gate
+  (§7), voice and messaging (§8), shared expenses (§9), bank connections and open finance (§11), the roadmap mapping
+  and suggested priority changes (§12) and the decisions for unconsidered capabilities (§6); the capability matrix
+  (§3), the Kesef and MonAi claim verification (§4), the gap map (§5) and the sources (§13) wait for the second half
+  of the research run (competitor audits of Monarch, YNAB, Wallet, Piggy, Splitwise and MoneyCoach and the adversarial
+  verification of all ten), which was paused with its finished results cached. Checks not yet run; no PR yet.
+- **Mercado Pago.** Research conclusion: a compliant consumer wallet movement feed cannot be confirmed from the
+  official documentation (OAuth is seller-scoped, no wallet-movement webhook topic, seller-side reports only); labelled
+  **Mercado Pago Consumer Sync — RESEARCH GATE** under 25E, with the person's own export through the 25C importer as
+  the compliant stand-in; never a token in the bundle or a Shortcut, never a silent ledger write.
 
 ### Later notes recorded in 24UX6A (future; document only, not scheduled)
 
