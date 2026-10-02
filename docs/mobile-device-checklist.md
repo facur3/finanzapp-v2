@@ -46,7 +46,7 @@ rule 7.
   «Reactivar plan»: the plan is active again; if a closing passed while it was not tracked, the alert names those
   instalments and they are recorded once, on their own closing dates.
 - [ ] **Deleting a card.** A card with a credit («a favor»): Eliminar tarjeta is refused with «Tiene saldo a favor;
-  archivala.» (today after the confirmation; note it). A card with a pending plan: blocked with «Archivar». After the
+  archivala.» before any destructive confirmation (an archived card says it stays archived). A card with a pending plan: blocked with «Archivar». After the
   plan is completed, stopped, fully returned or brought forward and the balance is zero, the card can be deleted. A
   plan with any devolución or adelanto never offers «Eliminar plan».
 - [ ] **Undo and restore.** From a devolución's detail, «Deshacer devolución»: it leaves the balances, reports and the

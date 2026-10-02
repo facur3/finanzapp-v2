@@ -3210,8 +3210,6 @@ nothing of it is on a screen yet.
   gate); devolución drafts from the Assistant (25A); the «Pagar tarjeta» amount prefill after an adelanto (the transfer
   form prefills an amount only for debts today, so the card is set and the amount capped, not filled).
 - **Open items from the lanes (not fixed here).**
-  - Deleting a card that holds a credit: the dialog has no pre-check, so the person confirms the destructive alert and
-    then storage refuses with «Tiene saldo a favor; archivala.».
   - «Tu mayor gasto» nets a purchase's own devoluciones but not a plan's credit against its instalment or adelanto
     lines (`topMerchants` does net it).
   - When a category's spelling differs across lines, the Assistant's label (latest line) and Reportes' (first line) can
