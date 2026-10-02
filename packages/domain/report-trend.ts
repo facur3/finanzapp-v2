@@ -4,6 +4,7 @@ import { budgetState, shiftMonthISO, summarizeMonthlyBudgets, type MonthlyBudget
 import { spendingComparison } from './report-insights.ts';
 import { addMoney, moneyAmount, sumMoney } from './money.ts';
 import { isPurchaseLine } from './operations.ts';
+import { installmentOccurrenceOf } from './installments.ts';
 
 export interface MonthlyTrendPoint {
   monthISO: string;
@@ -81,12 +82,24 @@ export interface SpendingInsight {
   amountMinor?: number;
 }
 
+/** The plan a principal line recognises: an instalment's principal record (`inst_<plan>_<n>`) or an adelanto's principal
+ * line. Undefined for anything else (financing, an ordinary purchase, a devolución). */
+function principalPlanOf(entry: Entry): string | undefined {
+  if (entry.payoff) return entry.payoff.component === 'principal' ? entry.payoff.planId : undefined;
+  const occurrence = installmentOccurrenceOf(entry.id);
+  return occurrence?.component === 'principal' ? occurrence.planId : undefined;
+}
+
 /** Facts, not advice: over-budget categories, the largest recorded expense and
  * the category that grew most against the same elapsed days of last month.
  * 24T3 (A24): «Tu mayor gasto» is the purchase line (`isPurchaseLine`: never a
  * devolución, an adelanto through its principal line) with the largest amount
  * net of its live devoluciones dated up to the period's end (the same lines the
- * period's figures net); a purchase whose net is ≤ 0 is never named. */
+ * period's figures net); a purchase whose net is ≤ 0 is never named. A plan
+ * devolución credits the plan, not one instalment (B2: it reverses principal
+ * already recognised), so a plan's principal line (an instalment's or an
+ * adelanto's) counts at most what is left of the plan's recognised principal
+ * net of its credits dated up to the period's end. */
 export function spendingInsights(snapshot: LedgerSnapshot, budgets: MonthlyBudget[], currency: Currency, monthISO: string, asOfISO: string,
   format: (minor: number) => string): SpendingInsight[] {
   const insights: SpendingInsight[] = [];
@@ -117,10 +130,17 @@ export function spendingInsights(snapshot: LedgerSnapshot, budgets: MonthlyBudge
     const target = entry.kind === 'expense' ? entry.refund?.targetEntryId : undefined;
     if (target !== undefined && entry.dateISO <= period.endISO) refunded.set(target, (refunded.get(target) ?? 0n) - BigInt(entry.amountMinor));
   }
+  const planLeft = new Map<string, bigint>();
+  for (const entry of snapshot.entries) {
+    const planId = entry.kind === 'expense' && entry.dateISO <= period.endISO ? entry.refund?.targetPlanId ?? principalPlanOf(entry) : undefined;
+    if (planId !== undefined) planLeft.set(planId, (planLeft.get(planId) ?? 0n) + BigInt(entry.amountMinor));
+  }
   let largest: { entry: Entry; netMinor: number } | null = null;
   for (const entry of expensesInPeriod(snapshot, period)) {
     if (!isPurchaseLine(entry)) continue;
-    const net = BigInt(entry.amountMinor) - (refunded.get(entry.id) ?? 0n);
+    let net = BigInt(entry.amountMinor) - (refunded.get(entry.id) ?? 0n);
+    const planId = principalPlanOf(entry);
+    if (planId !== undefined && (planLeft.get(planId) ?? 0n) < net) net = planLeft.get(planId) ?? 0n;
     if (net > 0n && (!largest || net > BigInt(largest.netMinor))) largest = { entry, netMinor: Number(net) };
   }
   if (largest) {

@@ -122,6 +122,34 @@ describe('24T3: devoluciones and adelantos in trend, merchants and insights (A23
     expect(largest(payoff)?.id).toBe('largest:p_p');
   });
 
+  it('«Tu mayor gasto» nets a plan devolución against the plan\'s principal lines (PR #76 Codex review)', () => {
+    const largest = (s: LedgerSnapshot, monthISO = '2026-09', asOf = '2026-09-30') =>
+      spendingInsights(s, [], 'ARS', monthISO, asOf, format).find(item => item.id.startsWith('largest:'));
+    // A plan devolución line credits the plan (`targetPlanId`), never one instalment.
+    const planRefund = (id: string, planId: string, dateISO: string, amountMinor: number): Entry =>
+      ({ ...entry(id, dateISO, -amountMinor, 'Electro', 'Hogar'), refund: { operationId: id, targetPlanId: planId } });
+    const instalment = (planId: string, n: number, dateISO: string, amountMinor: number): Entry =>
+      entry(`inst_${planId}_${String(n).padStart(3, '0')}`, dateISO, amountMinor, 'Electro', 'Hogar');
+    // Codex's case: a $ 900 instalment whose plan was refunded in full, and an unrelated $ 400 purchase.
+    const refunded = ledger(instalment('tv', 1, '2026-09-20', 90000), planRefund('pr', 'tv', '2026-09-22', 90000), entry('shoes', '2026-09-03', 40000, 'Zapatería', 'Ropa'));
+    expect(largest(refunded)).toMatchObject({ id: 'largest:shoes', amountMinor: 40000 });
+    // Before the devolución is dated (the period ends on the 21st) the instalment is still the largest, at its gross.
+    expect(largest(refunded, '2026-09', '2026-09-21')).toMatchObject({ id: 'largest:inst_tv_001', amountMinor: 90000 });
+    // A partial plan devolución: the instalment counts what is left of the plan.
+    const partial = ledger(instalment('tv', 1, '2026-09-20', 90000), planRefund('pr', 'tv', '2026-09-22', 30000), entry('shoes', '2026-09-03', 40000, 'Zapatería', 'Ropa'));
+    expect(largest(partial)).toMatchObject({ id: 'largest:inst_tv_001', amountMinor: 60000, detail: '$ 600.00 · Hogar · 20/09' });
+    // B2: the credit reversed principal recognised in earlier months, so a later instalment still recorded is real spending.
+    const later = ledger(instalment('tv', 1, '2026-08-20', 50000), instalment('tv', 2, '2026-09-20', 50000), planRefund('pr', 'tv', '2026-08-25', 50000),
+      entry('food', '2026-09-04', 10000));
+    expect(largest(later)).toMatchObject({ id: 'largest:inst_tv_002', amountMinor: 50000 });
+    // An adelanto's principal line is capped the same way; another plan's credit never touches it.
+    const payoff = ledger({ ...entry('p_p', '2026-09-20', 80000, 'Electro', 'Hogar'), payoff: { operationId: 'p', planId: 'tv', component: 'principal' } },
+      planRefund('pr', 'tv', '2026-09-21', 80000), planRefund('other', 'phone', '2026-09-21', 5000), entry('food', '2026-09-04', 10000));
+    expect(largest(payoff)).toMatchObject({ id: 'largest:food', amountMinor: 10000 });
+    const untouched = ledger(instalment('tv', 1, '2026-09-20', 90000), planRefund('other', 'phone', '2026-09-21', 5000), entry('food', '2026-09-04', 10000));
+    expect(largest(untouched)).toMatchObject({ id: 'largest:inst_tv_001', amountMinor: 90000 });
+  });
+
   it('the daily average of a negative net is 0', () => {
     const data = ledger(entry('aug', '2026-08-20', 50000), refund('r', 'aug', '2026-09-02', 50000, 'Carrefour', 'Supermercado'), entry('x', '2026-09-03', 1000));
     const report = spendingReport(data, 'ARS', '2026-09', '2026-09-12');

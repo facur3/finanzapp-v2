@@ -3256,8 +3256,8 @@ nothing of it is on a screen yet.
   gate); devolución drafts from the Assistant (25A); the «Pagar tarjeta» amount prefill after an adelanto (the transfer
   form prefills an amount only for debts today, so the card is set and the amount capped, not filled).
 - **Open items from the lanes (not fixed here).**
-  - «Tu mayor gasto» nets a purchase's own devoluciones but not a plan's credit against its instalment or adelanto
-    lines (`topMerchants` does net it).
+  - *(Fixed 2026-10-02 after a Codex review, below.)* «Tu mayor gasto» netted a purchase's own devoluciones but not a
+    plan's credit against its instalment or adelanto lines.
   - When a category's spelling differs across lines, the Assistant's label (latest line) and Reportes' (first line) can
     differ; an Assistant category row (gross) opens a drill-down whose header is net.
   - Reportes' frozen budget row reads «−$ X de $ Y · 0 %» for a negative spent; budgeted + unbudgeted no longer equals
@@ -3349,6 +3349,13 @@ nothing of it is on a screen yet.
   accepted); `currency:verify`, `regions:verify`, `check`, `export:ios` OK; root `npm test` 506 passed, 1 todo;
   `check:repo` OK. No EAS, no device run. (3) Roadmap: **25A2 — Wallet Shortcut
   Capture** after 25A; the order is 24T3 → 25A → 25A2 → 25C → 25C2 → 25D → 25E → 25F → 26.
+- **Codex review of f818ec5 (2026-10-02).** «Tu mayor gasto» (`spendingInsights`, `packages/domain/report-trend.ts`)
+  now nets a plan devolución: its line credits the plan (`targetPlanId`), so each principal line of the plan (an
+  instalment's or an adelanto's) counts at most the plan's recognised principal left after its credits dated up to the
+  period's end (B2: the credit reverses principal already recognised; a later instalment still recorded stays real
+  spending). A fully refunded $ 900 instalment is no longer named over an unrelated $ 400 purchase. B2 and the refund
+  amounts are unchanged. Test: `report-trend.test.ts` (Codex's case, before the devolución's date, partial, a credit
+  from an earlier month, an adelanto, another plan's credit), checked to fail without the fix.
 
 ### Later notes recorded in 24UX6A (future; document only, not scheduled)
 
